@@ -626,6 +626,21 @@ def window_overlaps(m, d0, d1):
     return a <= d1 and b >= d0
 
 
+def public_ids_by_month(months):
+    """23 Oct 2026 (the user: the abnormal loads on the public map's figures bar and in its animation): {month_index: [ids]}
+    of the PUBLIC movements (approved, notified, moved — D68) whose window touches each calendar month asked, each load ONCE
+    (a load counts 1, in and out alike; the user's answer 3). A load with no date typed is in no month. Ids only: the public
+    feature already carries them, so the map joins on the id; counted apart from the lorries' figures (D70)."""
+    import weeks as _weeks
+    rows = db.query("SELECT id, date_from, date_to FROM abnormal_loads WHERE tenant_id = ? AND status IN (?, ?, ?) "
+                    "ORDER BY date_from, id", (db.current_tenant(),) + tuple(PUBLIC_STATUSES))
+    out = {}
+    for m in months:
+        d0, d1 = _weeks.month_span(int(m))
+        out[int(m)] = [r["id"] for r in rows if window_overlaps(r, d0, d1)]
+    return out
+
+
 def brief(m):
     """One movement as the week block, the strip and the markers carry it (no advice lines, no geometry)."""
     adv = m.get("advice") or {}

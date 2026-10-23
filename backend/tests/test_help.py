@@ -922,11 +922,20 @@ ok("UI fix 8: the user guide's green box title (unused today) is #047857, 4.85:1
 
 # 23 Oct 2026 (the route line redesign, the user: idea 1 'Atlas'): the guide's words follow the map — the loads' lines are ink
 # with a white edge and the pinch points rings (not violet dashes and dots); the flow is a light along solid lanes (no dashes)
-ok("23 Oct: chapter 14 says the staff map draws each load's line in ink with a white edge and a ring at each pinch point, never violet dashes",
-   "draws each line in ink with a white edge, and a ring at each potential pinch point" in src and "violet dashes" not in src)
+ok("23 Oct: chapter 14 says the staff map draws each load's line in raspberry (NARROWED 23 Oct 2026 afternoon; ink that morning) with a white edge and a ring at each pinch point, never violet dashes",
+   "draws each line in raspberry with a white edge, and a ring at each potential pinch point" in src and "violet dashes" not in src and "in ink with a white edge" not in src)
 ok("23 Oct: the technical guide says a light runs along each lane only while Play runs and the lane's width is its band, never that dashes move",
    "A light runs along each lane only while Play runs, and the lanes stand still under reduced motion; the lane's width is its band." in _tg
    and "The dashes move only while Play runs" not in _tg)
+
+# ---- 23 Oct 2026: the abnormal loads on the public map's figures bar and in the animation ----
+_ug23 = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+_tg23 = open(TECH, encoding="utf-8").read()
+ok("23 Oct: the user guide names the bar's Abnormal loads figure (each once, apart from the lorries' figures) and the load travelling its route in raspberry; 14.3 says the public map draws it in its month",
+   "<strong>Abnormal loads this month</strong> (the approved abnormal loads moving in the month, each counted once, apart from the lorries' figures" in _ug23
+   and "draws each line in raspberry with a white edge" in _ug23 and "each as its route in the month it moves" in _ug23 and "in ink with a white edge" not in _ug23)
+ok("23 Oct: the technical guide says the month figures carry abnormal_loads",
+   "<code>abnormal_loads</code>, the ids of the public movements whose window touches the month" in _tg23)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
