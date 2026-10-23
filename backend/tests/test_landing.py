@@ -392,6 +392,20 @@ ok("D54: the privacy notice says what the demo login records (sign-ins, pages op
    "their own sign-in link, which stops working after 14 days" in _priv and "which pages you opened" in _priv
    and "the app sets one cookie that keeps you signed in" in _priv)
 
+# 23 Oct 2026 (claude/privacy-outreach): the notice also covers outreach emails and names no supplier
+_pt = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", _priv))
+_po = _pt[_pt.find("People we contact about their work"):_pt.find("Where it's kept")]
+ok("privacy notice: the outreach section sits after Why and before Where it's kept, with its key phrases",
+   _pt.find("Why") < _pt.find("People we contact about their work") < _pt.find("Where it's kept")
+   and all(k in _po for k in ("work email addresses that their organisation publishes", "legitimate interest", "24 months",
+                              '"no thanks"', "do-not-contact list", "or object")))
+ok("privacy notice: no supplier named (hosting or email provider), the kinds are said instead",
+   not any(n in _pt.lower() for n in ("render", "google", "workspace"))
+   and "our hosting provider" in _pt and "our email provider" in _pt and "We don't sell it" in _pt)
+ok("privacy notice: the right to object, and the lead and meta description cover both uses",
+   "object to us using your details" in _pt and "contact you about your work" in _pt
+   and 'content="What Wayscope collects from the demo request form and when we contact people about their work' in _priv)
+
 # --- the three support pages (8 Oct) ----------------------------------------------------
 for fn, must in (("privacy.html", ("ico.org.uk", "24 months", "JDavis@wayscope.co.uk", "no tracking cookies")),
                  ("thanks.html", ("Check your inbox", "junk", "JDavis@wayscope.co.uk")),
