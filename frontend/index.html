@@ -665,6 +665,13 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-scroll{margin-top:6px;border:1px solid var(--line);border-radius:8px;}
   .sim-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
   .kb-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}   /* 17 Oct 2026 (UI audit #15): a scrolling table a keyboard user can Tab to (tabindex 0, role region) */
+  /* 23 Oct 2026 (UI fix 9, decision 16): a Data table row opens from the keyboard through a real button on its name (Locations,
+     Zones) or code (Routes). It looks like the text it was; the row click stays for a mouse. The editor's heading takes the focus. */
+  .row-open{font:inherit;color:inherit;background:none;border:0;padding:0 2px;margin:0 6px 0 -2px;min-height:24px;display:inline-flex;align-items:center;text-align:left;cursor:pointer;border-radius:3px;}
+  .row-open:hover{text-decoration:underline;}
+  .row-open:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
+  .ed-head:focus{outline:none;}
+  .ed-head:focus-visible{outline:2px solid var(--navy);outline-offset:2px;border-radius:2px;}
   .sim-hours{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
   .sim-table td:nth-child(2){min-width:110px;}
   .sim-table td:nth-child(8){min-width:130px;}
@@ -11001,6 +11008,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [zoneList, setZoneList] = useState([]);
   const [haulUse, setHaulUse] = useState({});      // Phase 4: zone_id -> routes attached
   const [zoneForm, setZoneForm] = useState(null);   // null = not editing
+  // 23 Oct 2026 (UI fix 9): opened from a name button -> the focus moves to the editor's heading; when the editor closes
+  // (Cancel, Save, Delete) it goes back to that name, or to the table when the row is gone. A row or marker click sets neither.
+  const kbOpen = useRef(null);      // "loc" | "zone": focus this editor's heading once it shows
+  const kbReturn = useRef(null);    // { sel, fallback }: where the focus goes when the editor closes
+  const locHeadRef = useRef(null), zoneHeadRef = useRef(null);
   const [zoneMsg, setZoneMsg] = useState("");
   const [zoneBusy, setZoneBusy] = useState(false);
   const [zoneSel, setZoneSel] = useState(null);     // highlighted zone id
@@ -11432,6 +11444,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     openEditForNode(id);
     const m = mapObj.current;
     if(feat && m) m.easeTo({ center: feat.geometry.coordinates, zoom: Math.max(m.getZoom(), 11), duration: 700 });
+  };
+  const openLocFromKeys = (id) => {
+    locateNode(id);
+    kbOpen.current = "loc";
+    kbReturn.current = { sel: `[data-loc-open="${id}"]`, fallback: '[aria-label="Locations table"]' };
+    if(form && form.id === id && locHeadRef.current){ kbOpen.current = null; locHeadRef.current.focus(); }   // already open: no re-render to wait for
   };
   const cancelForm = () => { setForm(null); setMode("view"); setLocMsg(""); };
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -12070,6 +12088,28 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   };
 
   const cancelZone = () => { setZoneForm(null); setDrawPts([]); setZoneDraw(false); setZoneMsg(""); };
+  const openZoneFromKeys = (z) => {
+    editZone(z);
+    kbOpen.current = "zone";
+    kbReturn.current = { sel: `[data-zone-open="${z.id}"]`, fallback: "[data-zone-open]" };
+    if(zoneForm && zoneForm.id === z.id && zoneHeadRef.current){ kbOpen.current = null; zoneHeadRef.current.focus(); }
+  };
+  // the focus moves (UI fix 9): into the editor that a name button opened, and back when it closes
+  const formOpenId = form ? (form.id || "new") : null, zoneOpenId = zoneForm ? (zoneForm.id || "new") : null;
+  useEffect(() => {
+    const which = kbOpen.current;
+    if(which === "loc" && formOpenId && locHeadRef.current){ kbOpen.current = null; locHeadRef.current.focus(); }
+    if(which === "zone" && zoneOpenId && zoneHeadRef.current){ kbOpen.current = null; zoneHeadRef.current.focus(); }
+  }, [formOpenId, zoneOpenId]);
+  useEffect(() => {
+    const back = kbReturn.current;
+    if(!back || formOpenId || zoneOpenId) return;
+    kbReturn.current = null;
+    setTimeout(() => {   // after the table has re-rendered (a Save or Delete reloads it)
+      const el = document.querySelector(back.sel) || (back.fallback && document.querySelector(back.fallback));
+      if(el) el.focus();
+    }, 0);
+  }, [formOpenId, zoneOpenId]);
 
   const setZField = (k, v) => setZoneForm(f => ({ ...f, [k]: v }));
 
@@ -12365,7 +12405,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
             {form && (
               <div className="space-y-3">
-                <div className="text-sm font-medium text-slate-700">{form.id ? `Editing ${form.id}` : "New location"}</div>
+                <div ref={locHeadRef} tabIndex={-1} className="ed-head text-sm font-medium text-slate-700">{form.id ? `Editing ${form.id}` : "New location"}</div>
                 <label className="block">
                   <span className="block text-sm font-medium text-slate-700 mb-1">Name</span>
                   <input value={form.name} onChange={e => setField("name", e.target.value)} placeholder="e.g. Väo quarry"
@@ -12546,7 +12586,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <span className="block text-sm font-medium text-slate-700 mb-1">Gates</span>
                     {!gateForm && (
                       <button onClick={newGate}
-                        className="text-[13px] font-semibold text-[color:var(--blue)] hover:underline">
+                        className="text-[13px] font-semibold text-[color:var(--navy)] hover:underline">   {/* 23 Oct 2026 (UI fix 9, audit #38): was --blue, 3.67:1 */}
                         + Add gate
                       </button>
                     )}
@@ -12777,7 +12817,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           {onZones && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-semibold text-slate-700">{zoneForm ? (zoneForm.id ? `Editing ${zoneForm.id}` : "New zone") : "Zones"}</div>
+              <div ref={zoneHeadRef} tabIndex={zoneForm ? -1 : undefined} className="ed-head text-sm font-semibold text-slate-700">{zoneForm ? (zoneForm.id ? `Editing ${zoneForm.id}` : "New zone") : "Zones"}</div>
               {!zoneForm && (
                 <span className="flex items-center gap-2">
                   <button onClick={startNewZone} disabled={zoneBusy}
@@ -13148,7 +13188,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 <tr key={l.id} onClick={() => locateNode(l.id)}
                   className={"border-t border-slate-100 cursor-pointer " + ((form && form.id === l.id) ? "bg-blue-50" : "hover:bg-slate-50")}>
                   <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
-                    {l.name} <span className="text-slate-400 font-normal">{l.id}</span>
+                    <button type="button" className="row-open" data-loc-open={l.id} aria-label={`Edit ${l.name}`}
+                      aria-current={(form && form.id === l.id) ? "true" : undefined}
+                      onClick={(e) => { e.stopPropagation(); openLocFromKeys(l.id); }}>{l.name}</button>
+                    <span className="text-slate-400 font-normal">{l.id}</span>
                   </td>
                   <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{l.loc_type || "—"}</td>
                   <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{ROLE_LABEL[l.role] || l.role || "—"}</td>
@@ -13244,7 +13287,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       </button>
                     </td>
                     <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
-                      {r.id}
+                      <button type="button" className="row-open" data-route-open={r.id} aria-label={`Show ${r.id} on the map`}
+                        aria-current={selected === r.id ? "true" : undefined}
+                        onClick={(e) => { e.stopPropagation(); selectRoute(r.id); }}>{r.id}</button>
                       {!!(r.gate_blockers || []).length && (
                         <span title={(r.gate_blockers || []).join("; ")}
                           className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
@@ -13332,7 +13377,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <tr key={z.id} onClick={() => editZone(z)}
                       className={"cursor-pointer hover:bg-slate-50 " + (zoneSel === z.id ? "bg-slate-50" : "")}>
                     <td className="px-3 py-2 font-mono text-xs text-slate-500">{z.id}</td>
-                    <td className="px-3 py-2 font-medium">{z.name}</td>
+                    <td className="px-3 py-2 font-medium">
+                      <button type="button" className="row-open" data-zone-open={z.id} aria-label={`Edit ${z.name}`}
+                        aria-current={zoneSel === z.id ? "true" : undefined}
+                        onClick={(e) => { e.stopPropagation(); openZoneFromKeys(z); }}>{z.name}</button>
+                    </td>
                     <td className="px-3 py-2 text-slate-500">{(ZONE_KINDS.find(k => k[0] === z.kind) || [null, z.kind])[1]}</td>
                     <td className="px-3 py-2">
                       {/* 22 Oct 2026 (UI fix 6, card 6): "Routed through" on a solid var(--haul-soft) in var(--haul-text); the user's extra: "Avoided" is

@@ -2323,6 +2323,126 @@ async function routesDriversDom(){
 // is fired by hand. The counting rule itself, todayFit, is tested on its own first. Not covered here: real row heights,
 // fonts and the TV widths (the browser and the UI audit), and the count line's own height taking space from the list
 // (the observer re-measures when the box shrinks; with a stubbed box that size never changes).
+// 23 Oct 2026 (UI fix 9, decision 16): the Data tables' rows open from the keyboard. Each Locations / Zones row's name and
+// each Routes row's code is a real <button> (Tab stops on it, a screen reader reads "Edit <name>, button"); the row click
+// stays for a mouse. A name opens its editor and moves the focus to the editor's heading; Cancel puts it back on the name.
+// jsdom does not turn Enter on a button into a click (a browser does: HTML's activation behaviour), so the harness sends the
+// click that Enter makes; that the control IS a button is what makes the keyboard path real (asserted first).
+// NOT covered here: the ring's look (the UI audit's keyboard pass and its shots), the map (stubbed).
+async function rowsDom(){
+  // a map that says it has loaded, so the page asks for its locations (the shared stub never fires "load")
+  const MapWas = w.mapboxgl.Map;
+  w.mapboxgl.Map = function(){
+    const handlers = {};
+    const m = new Proxy({}, { get: (t, k) => {
+      if (k === "on") return (ev, a, b) => { const fn = typeof a === "function" ? a : b; (handlers[ev] = handlers[ev] || []).push(fn); if (ev === "load") setTimeout(() => fn(), 0); return m; };
+      if (k === "getCanvas" || k === "getCanvasContainer" || k === "getContainer") return () => ({ style: {}, addEventListener(){}, removeEventListener(){} });
+      if (k === "getZoom") return () => 10;
+      if (k === "getCenter") return () => ({ lng: 0, lat: 0 });
+      if (k === "getBounds") return () => ({ getWest: () => 0, getEast: () => 1, getSouth: () => 0, getNorth: () => 1 });
+      if (k === "getSource" || k === "getLayer" || k === "getStyle") return () => null;
+      if (k === "queryRenderedFeatures") return () => [];
+      if (k === "isStyleLoaded" || k === "loaded") return () => true;
+      if (k === "then") return undefined;
+      return () => m;
+    } });
+    return m;
+  };
+  const LOCS = { type: "FeatureCollection", features: [
+    ["L001", "Kilby Ridge Quarry", -1.238, 52.561], ["L002", "Northfield Quarry", -1.134, 52.727], ["L003", "Brook Pit", -0.752, 52.694]
+  ].map(([id, name, lon, lat]) => ({ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] },
+    properties: { id, name, role: "origin", loc_type: "Quarry", supplies: ["Small aggregate"], receives: [] } })) };
+  const STATUS = [{ id: "R001", origin: "Kilby Ridge Quarry", dest: "Brook Pit", origin_id: "L001", dest_id: "L003", ipt: "", profiles: {} },
+                  { id: "R002", origin: "Northfield Quarry", dest: "Brook Pit", origin_id: "L002", dest_id: "L003", ipt: "", profiles: {} }];
+  const ZONES = { zones: [{ id: "Z001", name: "Langton haul road", kind: "haul_road", affects_routing: 1, active: 1,
+                            geometry: { type: "LineString", coordinates: [[-1.0, 52.6], [-0.9, 52.65]] } },
+                          { id: "Z004", name: "Burrough village 7.5 t limit", kind: "weight_limit", affects_routing: 0, active: 1,
+                            geometry: { type: "Polygon", coordinates: [[[-1, 52], [-0.9, 52], [-0.9, 52.1], [-1, 52]]] } }], haul_links: {} };
+  const FC0 = { type: "FeatureCollection", features: [] };
+  const fetchWas = w.fetch;
+  w.fetch = (url) => { const u = String(url);
+    if (/\/locations\/geojson$/.test(u)) return respond(LOCS);
+    if (/\/routes\/status$/.test(u)) return respond(STATUS);
+    if (/\/routes\/summary$/.test(u)) return respond({ here_configured: true });
+    if (/\/zones$/.test(u)) return respond(ZONES);
+    if (/\/gates\?/.test(u)) return respond({ gates: [] });
+    if (/\/routes\/geojson\?|\/geometries$/.test(u)) return respond(FC0);
+    return new Promise(() => {}); };
+  const mount = async (sub) => {
+    const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+    await act(async () => { r.render(w.React.createElement(w.DataManagement, { meta: META, who: "t", subTab: sub, onSubTab(){} })); });
+    for (let i = 0; i < 6; i++) await tick();
+    return { el, done: async () => { await act(async () => { r.unmount(); }); el.remove(); } };
+  };
+  const press = async (el) => { await act(async () => { el.focus(); el.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); for (let i = 0; i < 4; i++) await tick(); };
+  const active = () => w.document.activeElement;
+  try {
+    // ---- Locations ----
+    const L = await mount("locations");
+    const names = [...L.el.querySelectorAll("button[data-loc-open]")];
+    ok("⭐ UI FIX 9 LOCATIONS: every location's name is a real <button type=button> in its row (3 of 3) — a keyboard stop; the rows had none",
+       names.length === 3 && names.every(b => b.tagName === "BUTTON" && b.type === "button" && b.closest("tr") && b.closest("td") === b.closest("tr").firstElementChild));
+    ok("UI FIX 9 LOCATIONS: each button is named 'Edit <the location>' and shows the name itself (the label holds the visible words, 2.5.3)",
+       names.map(b => b.getAttribute("aria-label") + "|" + b.textContent).join(";") === "Edit Kilby Ridge Quarry|Kilby Ridge Quarry;Edit Northfield Quarry|Northfield Quarry;Edit Brook Pit|Brook Pit");
+    ok("UI FIX 9 LOCATIONS: the grey code stays outside the button, and no <tr> is a tab stop (the button is the path, not the row)",
+       names.every(b => !/L00/.test(b.textContent) && /L00/.test(b.parentElement.textContent)) && !L.el.querySelector("tr[tabindex]"));
+    ok("UI FIX 9 LOCATIONS: nothing is open before a press (no editor heading, no aria-current)",
+       !L.el.querySelector(".ed-head") && !L.el.querySelector('[aria-current="true"]'));
+    await press(names[1]);
+    const head = L.el.querySelector(".ed-head");
+    ok("⭐ UI FIX 9 LOCATIONS: pressing Northfield Quarry's button opens ITS editor ('Editing L002', the Name box reads Northfield Quarry)",
+       !!head && head.textContent === "Editing L002" && [...L.el.querySelectorAll("input")].some(i => i.value === "Northfield Quarry"));
+    ok("⭐ UI FIX 9 LOCATIONS: …and the keyboard focus moves to that heading (tabindex -1), so a screen reader says 'Editing L002' and Tab goes on to Name",
+       active() === head && head.tabIndex === -1);
+    ok("UI FIX 9 LOCATIONS: the open location's button carries aria-current=true, the others none",
+       names[1].getAttribute("aria-current") === "true" && !names[0].hasAttribute("aria-current") && !names[2].hasAttribute("aria-current"));
+    const cancel = [...L.el.querySelectorAll("button")].find(b => b.textContent === "Cancel");
+    await press(cancel);
+    ok("⭐ UI FIX 9 LOCATIONS: Cancel closes the editor and puts the focus back on Northfield Quarry's button",
+       !L.el.querySelector(".ed-head") && active() === L.el.querySelector('button[data-loc-open="L002"]'));
+    // a mouse click on a row still opens it, and does NOT move the focus
+    const outside = w.document.createElement("button"); w.document.body.appendChild(outside); outside.focus();
+    await act(async () => { names[2].closest("tr").querySelector("td:nth-child(2)").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+    for (let i = 0; i < 4; i++) await tick();
+    const head3 = L.el.querySelector(".ed-head");
+    ok("UI FIX 9 LOCATIONS: a mouse click elsewhere in a row still opens it (Editing L003), as before",
+       !!head3 && head3.textContent === "Editing L003");
+    ok("UI FIX 9 LOCATIONS: …and leaves the focus where it was (only a name button moves it)", active() === outside);
+    outside.remove();
+    const gate = [...L.el.querySelectorAll("button")].find(b => b.textContent.trim() === "+ Add gate");
+    ok("UI FIX 9 card 4: + Add gate reads var(--navy) (was var(--blue), 3.67:1)",
+       !!gate && /text-\[color:var\(--navy\)\]/.test(gate.className) && !/--blue/.test(gate.className));
+    await L.done();
+
+    // ---- Zones ----
+    const Z = await mount("zones");
+    const zb = [...Z.el.querySelectorAll("button[data-zone-open]")];
+    ok("⭐ UI FIX 9 ZONES: every zone's name is a real <button> named 'Edit <the zone>' (the row offered only Delete to a keyboard)",
+       zb.length === 2 && zb.every(b => b.type === "button") && zb.map(b => b.getAttribute("aria-label") + "|" + b.textContent).join(";") === "Edit Langton haul road|Langton haul road;Edit Burrough village 7.5 t limit|Burrough village 7.5 t limit");
+    await press(zb[1]);
+    const zh = Z.el.querySelector(".ed-head");
+    ok("⭐ UI FIX 9 ZONES: pressing it opens that zone's editor and the focus lands on its heading ('Editing Z004')",
+       !!zh && zh.textContent === "Editing Z004" && active() === zh && zh.tabIndex === -1 && zb[1].getAttribute("aria-current") === "true");
+    const zc = [...Z.el.querySelectorAll("button")].find(b => b.textContent.trim() === "Cancel");
+    await press(zc);
+    ok("⭐ UI FIX 9 ZONES: Cancel puts the focus back on that zone's name", active() === Z.el.querySelector('button[data-zone-open="Z004"]'));
+    ok("UI FIX 9 ZONES: with no zone open the panel's heading is not a focus target (no tabindex)", !Z.el.querySelector(".ed-head[tabindex]"));
+    await Z.done();
+
+    // ---- Routes ----
+    const R = await mount("routes");
+    const rb = [...R.el.querySelectorAll("button[data-route-open]")];
+    const sheet = () => [...R.el.querySelectorAll("button")].find(b => b.textContent === "Route sheet (drivers)");
+    ok("⭐ UI FIX 9 ROUTES: every route's code is a real <button> named 'Show <code> on the map'",
+       rb.length === 2 && rb.every(b => b.type === "button") && rb.map(b => b.getAttribute("aria-label") + "|" + b.textContent).join(";") === "Show R001 on the map|R001;Show R002 on the map|R002");
+    ok("UI FIX 9 ROUTES: before a route is picked, the Route sheet button is disabled (as on main)", !!sheet() && sheet().disabled);
+    await press(rb[1]);
+    ok("⭐ UI FIX 9 ROUTES: pressing R002's button picks it (aria-current) and the Route sheet button comes on — reachable from the keyboard now",
+       rb[1].getAttribute("aria-current") === "true" && !rb[0].hasAttribute("aria-current") && sheet() && !sheet().disabled);
+    await R.done();
+  } finally { w.fetch = fetchWas; w.mapboxgl.Map = MapWas; }
+}
+
 async function todayFitDom(){
   const tf = w.todayFit;
   ok("UI FIX 6 card 5: todayFit is a global helper", typeof tf === "function");
@@ -2494,6 +2614,9 @@ async function todayFitDom(){
   // 22 Oct 2026 (UI fix 6, card 5): the big screen's Today list fitted to its box
   try { await todayFitDom(); ok("TODAY FIT: the section ran to the end", true); }
   catch (e) { ok("TODAY FIT: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  // 23 Oct 2026 (UI fix 9, decision 16): the Data tables' rows open from the keyboard
+  try { await rowsDom(); ok("UI FIX 9 ROWS: the section ran to the end", true); }
+  catch (e) { ok("UI FIX 9 ROWS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);
