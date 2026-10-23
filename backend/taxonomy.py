@@ -315,6 +315,9 @@ def list_ipts(active_only=True):
                     "WHERE tenant_id = ? ORDER BY id", (db.current_tenant(),))
     for r in rows:
         r["active"] = bool(r["active"])
+    # 23 Oct 2026: in slot NUMBER order, not the SQL's text order (which would put slot 10 before slot 2)
+    import teams
+    rows.sort(key=lambda r: teams.sort_key(r["id"]))
     return [r for r in rows if r["active"]] if active_only else rows
 
 
@@ -329,9 +332,12 @@ _TEAM_ID = re.compile(r"\bipt\s*[-_ ]?\s*([1-6])\b", re.I)
 
 
 def team_labels():
-    """{team id: the tenant's label} for every team row, active or not."""
+    """{team id: the tenant's label} for every NAMED team row, active or not.
+
+    23 Oct 2026: a row with no name is left out, so team_name() says "<team word> n" for it. It used to map to
+    its own id, and every screen, PDF and spreadsheet printed "IPT4" for an unnamed team."""
     try:
-        return {r["id"]: (r.get("label") or r["id"]) for r in list_ipts(active_only=False)}
+        return {r["id"]: r["label"].strip() for r in list_ipts(active_only=False) if (r.get("label") or "").strip()}
     except Exception:
         return {}
 
@@ -367,8 +373,9 @@ def team_text(value, labels=None, word=None):
     if value is None or value == "":
         return value
     labels = team_labels() if labels is None else labels
-    word = word or (None if labels and len(labels) >= 6 else _team_word())
-    return _TEAM_ID.sub(lambda m: team_name(f"IPT{m.group(1)}", labels, word or "Team"), str(value))
+    # 23 Oct 2026: the team word is looked up by team_name() only when an id has no name. It used to be skipped
+    # once six team rows existed, so an unnamed slot read "Team 6" even where the tenant's word was "Contractor".
+    return _TEAM_ID.sub(lambda m: team_name(f"IPT{m.group(1)}", labels, word), str(value))
 
 
 def team_ids():

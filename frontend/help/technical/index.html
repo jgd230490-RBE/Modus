@@ -352,6 +352,14 @@ is unchanged. Invite (72 h) and reset (60 min) links are single-use, sent as <co
 Limits: 5 failed sign-ins per email per 15 min, 30 per IP; 3 reset requests per email per hour, 10 per IP; kept in
 <code>auth_attempts</code>. The tables carry <code>tenant_id</code> but are not package data: a package import leaves
 them alone.</li>
+<li><strong>Teams (23 Oct 2026).</strong> A team is a row in <code>ipts</code> (slot id, name, active). At most six
+(<code>access.IPT_IDS</code>; John, 23 Oct 2026). Users &rarr; Teams (admins only) calls
+<code>GET/POST /api/admin/teams</code> and <code>PATCH /api/admin/teams/{id}</code> (<code>backend/teams.py</code>):
+a new team takes the lowest slot nothing has ever carried (no team row, no forecast line, no login), so a stopped
+team's slot never goes to a new contractor; a name is 1&ndash;60 characters, unique in any case, and not a slot id;
+stopping (<code>active</code> false) is refused while a login of the team can sign in, and keeps the team's name on
+its lines. Nothing deletes a team. A login can be put only in an active team. A team row with no name reads
+&ldquo;&lt;team word&gt; n&rdquo; (<code>taxonomy.team_name</code>), never its id.</li>
 <li><strong>The shared codes</strong> (<code>IPT1_CODE…IPT6_CODE</code>, <code>PLANNER_CODE</code>,
 <code>ADMIN_CODE</code>) work only while set; deleting them on Render ends them (decided for 31 Oct 2026). The sign-in
 screen offers the code form only while <code>/api/auth/me</code> says <code>codes: true</code>.</li>
