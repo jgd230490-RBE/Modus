@@ -1401,8 +1401,9 @@ try:
     _seen = {}
     export.urllib.request.urlopen = lambda req, timeout=0: (_seen.setdefault("url", req.full_url), _Resp(_png))[1]
     export.mapbox_static_png(export.route_geometries(pg))
-    ok("...the URL is a Static Images request over light-v11 with a path overlay per route",
+    ok("...the URL is a Static Images request over light-v11 with a path overlay per route, the paths under the road names (NARROWED 23 Oct 2026)",
        _seen.get("url", "").startswith("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/") and _seen.get("url", "").count("path-") == 2
+       and "before_layer=road-label-simple&" in _seen.get("url", "")
        and "access_token=" + config.MAPBOX_TOKEN_DEFAULT in _seen.get("url", ""), _seen.get("url", "no request made"))
     export.urllib.request.urlopen = lambda req, timeout=0: _Resp(b"<html>rate limited</html>")
     ok("🔴 a non-PNG answer is not drawn as a map — None, and the schematic takes over", export.mapbox_static_png(export.route_geometries(pg)) is None)

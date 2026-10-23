@@ -143,6 +143,8 @@ import zones  # noqa: E402
 import tenant_package  # noqa: E402
 import export  # noqa: E402
 import basemap  # noqa: E402
+import io
+from PIL import Image as PILImage
 import bulletin_doc  # noqa: E402
 import route_sheet as rs  # noqa: E402
 for _v in ("IPT1_CODE", "IPT2_CODE", "IPT3_CODE", "IPT4_CODE", "IPT5_CODE", "IPT6_CODE",
@@ -422,7 +424,7 @@ ok("⭐ the legend and the last mile, the arriving and leaving blocks with the g
    f"Loaded, A to B: {S['loaded_words']}" in T and "Empty, back to A" in T and "The last mile: about 1.5 km in and out of B" in T
    and "Arriving at B, Mill Compound" in T and "Gate in: North gate" in T and "Open 07:00–18:00, closed on Saturdays and Sundays" in T
    and "No deliveries 07:00–09:00 and 15:00–16:00 (the scheme's no-delivery windows)" in T
-   and "Leaving B" in T and "Gate out: South gate" in T and f"Then follow the dashed route back to A: {S['return_words']}." in T
+   and "Leaving B" in T and "Gate out: South gate" in T and f"Then follow the amber route back to A: {S['return_words']}." in T   # NARROWED 23 Oct 2026: amber, solid
    and "Gate in" in T and "Gate out" in T, T)
 # two columns: the text comes out a row at a time (both headings, then both bodies), so each row is checked in that order
 ok("⭐ the typed words under their headings, two to a row; 'Not typed' nowhere here (nothing is missing); the gate note in metres",
@@ -575,6 +577,68 @@ ok("🔴 the route words' CSS is at the TOP level of the map's stylesheet (not i
 
 # =========================================================================== #
 print()
+
+# =========================================================================== #
+#  23 Oct 2026 — the route line redesign on paper: the legs go into the        #
+#  picture under the road names, the haul-road stretches are dotted            #
+# =========================================================================== #
+# the split on its own: a five-point leg, the middle three on a two-point haul road 220 m long
+_road = [(-0.9, 52.5), (-0.9, 52.502)]
+_leg5 = [(-0.91, 52.499), (-0.9, 52.5), (-0.9, 52.501), (-0.9, 52.502), (-0.89, 52.503)]
+_pc = rs.haul_pieces(_leg5, [_road])
+ok("⭐ 23 Oct: haul_pieces — the three points on the haul road are one piece, in the leg's order; the public ends stay off it",
+   _pc == [[(-0.9, 52.5), (-0.9, 52.501), (-0.9, 52.502)]], str(_pc))
+ok("23 Oct: no road, nothing; a leg 50 m off the road, nothing; a lone point on the road is no piece",
+   rs.haul_pieces(_leg5, []) == [] and rs.haul_pieces([(-0.9008, 52.5), (-0.9008, 52.502)], [_road]) == []
+   and rs.haul_pieces([(-0.91, 52.499), (-0.9, 52.5), (-0.89, 52.503)], [_road]) == [])
+# on the fixture: a haul road drawn along three consecutive vertices of R1's road (STEP apart, 67.7 m)
+_zh = zones.create_zone("Mid-route haul road", {"type": "LineString", "coordinates": [list(LOADED[40]), list(LOADED[42])]},
+                        kind=zones.HAUL_KIND, speed_kph=10, haul_mode="splice")
+SH = rs.sheet("R1", acc=PLANNER)
+_r6 = lambda pieces: [[(round(a, 6), round(b, 6)) for a, b in p] for p in pieces]
+ok("⭐ 23 Oct: the sheet carries the haul-road stretches of both legs (three points each here) and none in the last mile",
+   _r6(SH["haul_loaded"]) == [[LOADED[40], LOADED[41], LOADED[42]]] and _r6(SH["haul_return"]) == [[LOADED[42], LOADED[41], LOADED[40]]]
+   and SH["haul_last_in"] == [] and SH["haul_last_out"] == [], str((SH["haul_loaded"], SH["haul_return"]))[:300])
+TH = flat(export.build_route_sheet_pdf(SH))
+ok("23 Oct: the legend names the loaded leg, the empty return and the haul road; the leaving words say the amber route, never a dashed one",
+   "Loaded, A to B" in TH and "Empty, back to A" in TH and "On a haul road" in TH and "Then follow the amber route back to A" in TH
+   and "dashed" not in TH, TH[:400])
+# the legs go into the basemap request as path overlays under the road names, when the URL fits
+_calls = []
+_bio = io.BytesIO(); PILImage.new("RGB", (4, 4), (250, 250, 250)).save(_bio, "PNG"); _PNG4 = _bio.getvalue()
+_real_fetch = basemap.fetch
+basemap.fetch = lambda v, token=None, timeout=12, retina=True, overlays=None, before_layer=None: (_calls.append((v, overlays, before_layer)), _PNG4)[1]
+try:
+    SP = rs.sheet("R1", acc=PLANNER)
+    PDFP = export.build_route_sheet_pdf(SP)
+finally:
+    basemap.fetch = _real_fetch
+_ov = [c_ for c_ in _calls if c_[1]]
+ok("⭐ 23 Oct: both maps ask Mapbox for the picture WITH the legs under the road names: four path overlays each — two white edges, "
+   "then green and amber — before road-label-simple; the sheet records that the legs are in the picture",
+   len(_calls) == 2 and len(_ov) == 2 and SP.get("map_legs_in_basemap") is True
+   and all(bl == "road-label-simple" and len(ov) == 4 and all(o.startswith("path-") for o in ov) and "+ffffff-" in ov[0] and "+ffffff-" in ov[1]
+           and "+059669-" in ov[2] and "+f59e0b-" in ov[3] for _, ov, bl in _ov),
+   str([(bl, [o[:24] for o in (ov or [])]) for _, ov, bl in _calls])[:400])
+ok("23 Oct: each request fits the API's URL limit, and the picture is drawn into the sheet",
+   all(len(basemap.url(v, "", overlays=ov, before_layer=bl)) <= basemap.URL_MAX for v, ov, bl in _ov) and b"/Subtype /Image" in PDFP
+   and basemap.URL_MAX == 7800 and basemap.LABELS_LAYER == "road-label-simple")
+# the overlay helpers on their own: a URL with overlays carries them before the centre and the layer before the token; the
+# polyline encoder round-trips Google's example; a simplified line keeps its ends; an offset line moves left of travel
+_v0 = basemap.view([(-1.0, 52.5), (-0.9, 52.5)], 640, 300)
+_u0 = basemap.url(_v0, "pk.x", overlays=["path-2+059669-1(abc)"], before_layer="road-label-simple")
+ok("23 Oct: basemap.url puts the overlays before the centre and before_layer before the token; without overlays it is the plain URL",
+   "/static/path-2+059669-1(abc)/" in _u0 and "?before_layer=road-label-simple&access_token=pk.x" in _u0
+   and basemap.url(_v0, "pk.x") == basemap.url(_v0, "pk.x", overlays=None, before_layer="road-label-simple")
+   and "before_layer" not in basemap.url(_v0, "pk.x"), _u0)
+ok("23 Oct: encode_polyline round-trips Google's own example; simplify_px keeps a straight line's two ends; offset_lonlat moves a west-east line north (left of travel)",
+   basemap.encode_polyline([(-120.2, 38.5), (-120.95, 40.7), (-126.453, 43.252)]) == "_p~iF~ps|U_ulLnnqC_mqNvxq`@"
+   and basemap.simplify_px(_v0, [(-1.0, 52.5), (-0.95, 52.5), (-0.9, 52.5)], 0.8) == [(-1.0, 52.5), (-0.9, 52.5)]
+   and all(lat > 52.5 for _, lat in basemap.offset_lonlat(_v0, [(-1.0, 52.5), (-0.9, 52.5)], 4.0)))
+ok("23 Oct: a refusal from Mapbox (an HTTP error) does not mark it down, so the plain picture can follow at once",
+   "except urllib.error.HTTPError:" in open(os.path.join(BACKEND, "basemap.py"), encoding="utf-8").read())
+zones.delete_zone(_zh["id"])
+
 for f_ in FAIL:
     print("  FAIL:", f_)
 print(f"\n{PASS} passed, {len(FAIL)} failed")

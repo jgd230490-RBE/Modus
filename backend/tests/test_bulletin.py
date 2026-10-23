@@ -1361,9 +1361,11 @@ _km, _px = basemap.scale(dict(_v0, lat=52.5, zoom=10.0), 110)
 _mpp = 40075016.686 * math.cos(math.radians(52.5)) / (512 * 2 ** 10)
 ok("basemap scale (hand): at 52.5° N, zoom 10, a bar near 110 px is a round km length, drawn at exactly km ÷ metres a pixel",
    _km in (0.5, 1, 2, 5, 10) and abs(_px - _km * 1000 / _mpp) < 1e-9 and 110 / 1.6 <= _px <= 110 * 1.6, str((_km, _px)))
-ok("🔴 the old route-in-URL map is gone (no bulletin_map_png, no static path or pin overlay built anywhere)",
-   not hasattr(export, "bulletin_map_png") and "path-" not in read("backend/basemap.py") and "path-{" not in _EXB
-   and "pin-s-" not in _EXB)
+# NARROWED 23 Oct 2026: basemap offers path overlays for the ROUTE SHEET (its two legs under the road names, URL-limited,
+# basemap.URL_MAX); the bulletin's own map builds none — its routes would overflow the URL, which is why it went
+ok("🔴 the old route-in-URL map is gone (no bulletin_map_png, no static path or pin overlay built by the bulletin)",
+   not hasattr(export, "bulletin_map_png") and "path_overlay(" not in _EXB and "path-{" not in _EXB
+   and "pin-s-" not in _EXB and "URL_MAX = 7800" in read("backend/basemap.py"))
 ok("🔴 basemap: the cache key is the URL WITHOUT the token; nothing is written to disk",
    'key = u.split("?", 1)[0]' in read("backend/basemap.py") and not re.search(r"(?<!url)open\(", read("backend/basemap.py")))
 
