@@ -87,8 +87,11 @@ ok("its toggle is enabled again", !/id="layer-temp"[^>]*disabled/.test(html));
 ok("and wired to a handler", /id="layer-temp"[^>]*onchange="toggleTempHaul/.test(html));
 ok("the '(Phase 4)' placeholder label is gone from the toggle",
   !/Temporary haul <span[^>]*>\(Phase 4\)/.test(html));
-ok("temporary haul is dashed — it is not the surveyed network",
-  /'line-dasharray': \[2, 1\.4\]/.test(code));
+// REVERSED 23 Oct 2026 (the user, the route line redesign): the haul overlay is a thin SOLID underlay; the legs themselves
+// are dotted where they run on a haul road (withHaulPieces), which is what now says "haul road" at a glance
+ok("temporary haul is a thin solid underlay — no [2, 1.4] dash (it was dashed to tell it from the surveyed network)",
+  !/'line-dasharray': \[2, 1\.4\]/.test(code)
+  && /'line-color': '#C2790B',\s*'line-width': \['interpolate', \['linear'\], \['zoom'\], 7, 1\.2, 12, 2\.6\],\s*'line-opacity': 0\.55,/.test(code));
 ok("haul roads are excluded from the zone overlay so they are not drawn twice",
   code.includes("['!=', ['get', 'kind'], 'haul_road']"));
 ok("clicking one opens its own popup", code.includes("map.on('click', 'temp-haul-lines'"));
@@ -419,10 +422,11 @@ ok("the direction offset collapses at high zoom instead of holding 4px",
     && /'id': 'inbound-lines',[\s\S]{0,400}'line-offset': OFFSET_IN/.test(code));
   ok("17 Oct: the reason is written where someone would 'restore' the mirror",
     /BOTH LEGS GO LEFT OF THEIR OWN TRAVEL/.test(src) && /Do not "restore" the mirror/.test(src));
-  ok("17 Oct: the k = 1.25 casing note is redone for same-sign offsets (zoom 14 binds, not 12)",
-    /that paragraph ASSUMED opposite signs/.test(src) && /zoom 14 is,\s*\/\/\s+where the halos already overlap/.test(src));
+  // REVERSED 23 Oct 2026: the k = 1.25 casing note went with the dots; the casing is a fixed 2.4 px around a solid core now
+  ok("17 Oct / 23 Oct: the k = 1.25 casing note is gone with the dotted legs; the solid-line note stands in its place",
+    !/that paragraph ASSUMED opposite signs/.test(src) && /idea 1 'Atlas'\): the legs are SOLID cased lines/.test(src));
 }
-ok("line width keeps scaling with zoom", /WIDTH_CORE\s*=[^;]*16,\s*6\.8\]/.test(code));
+ok("line width keeps scaling with zoom (NARROWED 23 Oct 2026: 6 px at zoom 16)", /WIDTH_CORE\s*=[^;]*16,\s*6\]/.test(code));
 ok("no hard-coded offset ramp survives inside a layer definition",
   !/'line-offset': \['interpolate'/.test(code));
 
@@ -501,8 +505,10 @@ ok("🔴 the click popup declares an interpolated stretch",
   /No survey on this stretch\./.test(code) && /p\.is_bridge/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter, no "alignment file"
 ok("...and says plainly that it is not measured geometry",
   /The line is filled in, not measured\./.test(code) && !/measured geometry/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no "geometry"
+// NARROWED 23 Oct 2026: the word "interpolated" only ever lived in a comment on the dotted legs (gone with them); the
+// legend note's own words are pinned instead
 ok("the sidebar legend no longer claims there are breaks in the line",
-  !/Breaks in the line/.test(html) && /interpolated/.test(html));
+  !/Breaks in the line/.test(html) && /Gaps in the survey are filled in/.test(html));
 ok("⭐ the reason it was made solid is written next to the layer",
   /drawn SOLID, at full opacity/.test(src) && /honest-presentation alternative is one number/.test(src)
   && !/open-questions\.md/.test(src));   // G2: the product does not cite one project's notes
@@ -541,7 +547,7 @@ ok("toggling the IPT view hides both legend blocks",
 // NARROWED 29 Sep 2026: the note used to quote the first tenant's figure ("~60 km has no
 // surveyed Main Track"); a tenant-neutral map explains the rule, not one alignment's number.
 ok("the legend explains what a fainter segment means",
-  /id="ipt-legend-note"/.test(html) && /no surveyed main track/i.test(html) && /interpolated/.test(html));
+  /id="ipt-legend-note"/.test(html) && /no surveyed main track/i.test(html) && /Gaps in the survey are filled in/.test(html));   // NARROWED 23 Oct 2026, as above
 ok("🔴 …and carries no first-tenant figure (no '~60 km', no '7 package edges')",
   !/~60/.test(html) && !/7 package edges/.test(html));
 
@@ -965,11 +971,12 @@ ok("the per-IPT filter agrees with the layer's own filter about bridges",
 // thinner line means a smaller gap, and at zoom 7 the design value would give
 // 0.57 px — where a dashed line starts aliasing to solid, at exactly the zoom the
 // change exists for. Wider gap below 10, design value above.
-ok("the route core is dashed", /const DASH_CORE\s*=\s*\[1, 0\.55\]/.test(code));
-// 🔴 Dashing only the core leaves the white casing showing through every gap and
-// the route reads as a pale continuous line with coloured beads on it.
-ok("🔴 the CASING is dashed too, or the dots sit on a solid white line",
-  /const DASH_CASING\s*=\s*\[0\.96, 0\.28\]/.test(code));
+// REVERSED 23 Oct 2026 (the user: "I dont want dotted lines anymore, on any routes"): the legs are SOLID cased lines;
+// DASH_CORE / DASH_CASING are gone, and the only dotted route line is the haul-road piece (HAUL_DOTS, round caps)
+ok("the route core is SOLID: no DASH_CORE", !/const DASH_CORE\b/.test(code)
+  && /const WIDTH_CORE\s*=\s*\['interpolate', \['linear'\], \['zoom'\], 7, 1\.4, 12, 3\.6, 16, 6\];/.test(code));
+ok("🔴 the CASING is solid and opaque too: no DASH_CASING, 'line-opacity': 1 on both legs' casing and core",
+  !/const DASH_CASING\b/.test(code) && (code.match(/'line-opacity': 1,\n\s+'line-offset': OFFSET_(IN|OUT)\n/g) || []).length === 4);
 
 // 🔴 2026-09-01. A step expression whose outputs were BARE ARRAYS made every route
 // vanish: an array literal used as an expression output must be wrapped in
@@ -994,25 +1001,30 @@ ok("line-dasharray is a plain constant, not an expression — cross-faded proper
   && !/DASH_(CORE|CASING)\s*=\s*\['/.test(code));
 ok("...and the reason is written where someone would 'improve' it back",
   /must be wrapped in \['literal'/.test(src) && /RETURNS WITHOUT ADDING THE LAYER/.test(src));
-ok("all four route layers carry a dasharray",
-  (code.match(/'line-dasharray': DASH_(CORE|CASING)/g) || []).length === 4);
+// REVERSED 23 Oct 2026
+ok("no route layer carries a dash array; the one dotted route line is the haul-road piece (HAUL_DOTS)",
+  (code.match(/'line-dasharray': DASH_(CORE|CASING)/g) || []).length === 0
+  && (code.match(/'line-dasharray': HAUL_DOTS/g) || []).length === 1 && /const HAUL_DOTS = \[0, 2\.2\];/.test(code));
 // 🔴 A round cap extends each dash by half the line width at EACH end, so a 1.0w
 // dot renders 2.0w long, the 0.333w gap is swallowed twice over, and the route
 // draws SOLID — indistinguishable from the change never having been applied.
 // 2026-09-02: a fifth butt-capped dashed layer, the EVR rail core, joined the four
-ok("🔴 line-cap is butt on all four route layers, or the dots render solid",
-  (code.match(/'line-cap': 'butt'/g) || []).length === 5
-  && /id: 'evr-rail-line'[\s\S]{0,300}'line-cap': 'butt'/.test(code));
-ok("the casing is a FIXED 1.25x the core at every zoom stop, or the two dash "
-   + "arrays cannot draw the same period on screen",
-  /WIDTH_CORE\s*=\s*\['interpolate', \['linear'\], \['zoom'\], 7, 1\.36, 12, 4,\s+16, 6\.8\]/.test(code)
-  && /WIDTH_CASING\s*=\s*\['interpolate', \['linear'\], \['zoom'\], 7, 1\.7,\s+12, 5,\s+16, 8\.5\]/.test(code));
+// NARROWED 23 Oct 2026: the legs are round-capped solid lines; the rail core is the one butt-capped (dashed) layer left
+ok("🔴 line-cap is round on all four route layers (solid lines); only the rail core keeps a butt cap",
+  (code.match(/'line-cap': 'butt'/g) || []).length === 1
+  && /id: 'evr-rail-line'[\s\S]{0,300}'line-cap': 'butt'/.test(code)
+  && (code.match(/'layout': \{ 'line-cap': 'round', 'line-join': 'round' \},/g) || []).length >= 6);
+// NARROWED 23 Oct 2026: a solid line's halo, not a dash period — the casing is the core plus 2.4 px at every stop
+ok("the casing is a FIXED 2.4 px around the core at every zoom stop",
+  /WIDTH_CORE\s*=\s*\['interpolate', \['linear'\], \['zoom'\], 7, 1\.4, 12, 3\.6, 16, 6\]/.test(code)
+  && /WIDTH_CASING\s*=\s*\['interpolate', \['linear'\], \['zoom'\], 7, 3\.8, 12, 6,\s+16, 8\.4\]/.test(code));
 ok("⭐ at corridor zoom the route is THINNER than the alignment's fixed 2.5 px",
-  /WIDTH_CORE\s*=\s*\['interpolate', \['linear'\], \['zoom'\], 7, 1\.36,/.test(code));
+  /WIDTH_CORE\s*=\s*\['interpolate', \['linear'\], \['zoom'\], 7, 1\.4,/.test(code));
 // ⚠️ the gap ratio is coupled to the width: a 20% thinner line is a 20% smaller gap,
 // and 0.45 at the new width gives 0.61 px at zoom 7 — back into aliasing
-ok("the gap ratio moved WITH the thinning, or the dots alias to solid at zoom 7",
-  /gap ratio moved 0\.45 -> 0\.55 WITH the thinning/.test(src));
+// REVERSED 23 Oct 2026: no gap ratio — the legs are solid; the haul dots' gap is in widths (HAUL_DOTS), so they space with the zoom
+ok("no gap ratio to move: the dotted-leg note is gone and the haul dots' note stands",
+  !/gap ratio moved 0\.45 -> 0\.55 WITH the thinning/.test(src) && /the gap is in widths, so the dots space with the zoom/.test(src));
 ok("the dasharray is NOT interpolated across zoom — it silently does nothing",
   !/'line-dasharray': \['interpolate'/.test(code));
 // 🔴 REMOVED 2026-09-01 at the user's request. Asserted GONE rather than deleted
@@ -1451,9 +1463,10 @@ ok("...pause / scrub / close hides it again",
   && /if\(!TL\.playing\)\{[\s\S]{0,160}applyRailFlow\(\); return; \}/.test(code));
 // NARROWED 16 Oct 2026 (D115): ONE count, FLOW_CYCLE long (a whole number of the rail's seven steps and of every
 // band's steps); the hauls read it as their march step, the rail modulo its seven
-ok("⭐ the rail steps on the SAME dash index as the hauls, not a second cycle",
-  /_dashIx=\(_dashIx\+1\)%FLOW_CYCLE;\s*if\(map\.getLayer\('forecast-flow'\)\) setFlowDash\(_dashIx\);[\s\S]{0,600}setRailFlowDash\(DASH_SEQ\[_dashIx%DASH_SEQ\.length\]\)/.test(code)
-  && /return FLOW_PERIODS\.map\(p => Math\.round\(p \/ FLOW_STEP\)\)\.concat\(\[DASH_SEQ\.length\]\)\.reduce\(\(a, b\) => a \* b \/ g\(a, b\), 1\);/.test(code));
+// NARROWED 23 Oct 2026: the hauls' light is a phase from the frame clock; the rail alone steps on _dashIx, in the same loop
+ok("⭐ the rail steps on _dashIx while the hauls' light runs on the same frames, one loop",
+  /_pulseT=\(\(ts\*FLOW_PULSE_SPEED\)\/1000\)%1; setFlowPulse\(_pulseT\);[\s\S]{0,300}_dashIx=\(_dashIx\+1\)%FLOW_CYCLE;[\s\S]{0,600}setRailFlowDash\(DASH_SEQ\[_dashIx%DASH_SEQ\.length\]\)/.test(code)
+  && /const FLOW_CYCLE = DASH_SEQ\.length \* 60;/.test(code));
 // the pinned trio is the CHECKBOX toggle. The flow layer must not join it, or the
 // checkbox alone would switch it to 'visible' and it would march on a paused map.
 ok("⭐ the flow layer is toggled separately from the corridor pair",
@@ -2126,8 +2139,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      /function reducedMotion\(\)\{\s*try \{ return !!\(window\.matchMedia && window\.matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches\); \} catch\(e\)\{ return false; \}/.test(code));
   // NARROWED 16 Oct 2026 (D115): the hauls' dashes STAND STILL under reduced motion (setFlowDash(null): round caps, the
   // bands' spacing) rather than going solid — still no march; the rail's overlay stays DASH_SOLID
-  ok("reduced motion: no dash march while playing when it matches — the hauls' dashes stand still, the rail stays DASH_SOLID",
-     /function startFlowAnimation\(\)\{\s*applyRailFlow\(\);\s*if\(reducedMotion\(\)\)\{ setFlowDash\(null\); setRailFlowDash\(DASH_SOLID\); return; \}\s*if\(_flowRAF==null\) _flowRAF=requestAnimationFrame\(animateFlow\);/.test(code));
+  ok("reduced motion: no motion while playing when it matches — the hauls' lanes stand still (NARROWED 23 Oct 2026), the rail stays DASH_SOLID",
+     /function startFlowAnimation\(\)\{\s*applyRailFlow\(\);\s*if\(reducedMotion\(\)\)\{ setFlowPulse\(null\); setRailFlowDash\(DASH_SOLID\); return; \}\s*if\(_flowRAF==null\) _flowRAF=requestAnimationFrame\(animateFlow\);/.test(code));
   ok("reduced motion: Show on map jumps instead of flying when it matches",
      /if \(reducedMotion\(\)\) map\.jumpTo\(cam\); else map\.flyTo\(\{ \.\.\.cam, duration: 700 \}\);/.test(code)
      && !/map\.flyTo\(\{ center: f\.geometry\.coordinates/.test(code));
@@ -3323,8 +3336,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("⭐ C1 (§2.2d's four count pins): the road-load layers use ROUND caps and joins and carry no dasharray at all",
      (blkCode.match(/layout: \{ 'line-cap': 'round', 'line-join': 'round' \}/g) || []).length === 2
      && !/'line-cap': 'butt'/.test(blkCode) && !/line-dasharray/.test(blkCode)
-     && (code.match(/'line-cap': 'butt'/g) || []).length === 5
-     && (code.match(/'line-dasharray': DASH_(CORE|CASING)/g) || []).length === 4);
+     && (code.match(/'line-cap': 'butt'/g) || []).length === 1   // NARROWED 23 Oct 2026: the legs went solid and round-capped
+     && (code.match(/'line-dasharray': DASH_(CORE|CASING)/g) || []).length === 0);
   ok("C1: both lazy adders re-raise the marks (raiseMarks count is additive)",
      // NARROWED 16 Oct 2026 (D115): the flow is put back over the sections between the two
      /map\.addLayer\(\{ id: 'road-load-labels'[\s\S]{0,400}wireRoadLoadPopup\(\);\s*if \(typeof placeFlowLayer === 'function'\) placeFlowLayer\(\);\s*raiseMarks\(\);/.test(blkCode)
@@ -3545,10 +3558,10 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
     let blkApi = null, blkErr = "";
     const fmap = mkMap();
     try {
-      blkApi = new Function("document", "map", "TL", "CONFIG", "a1_data", "routePassesFilters", "monthLabel", "teamText", "fmtDist", "DU", "raiseMarks",
+      blkApi = new Function("document", "map", "TL", "CONFIG", "a1_data", "routePassesFilters", "monthLabel", "teamText", "fmtDist", "DU", "raiseMarks", "labelAnchor",
         "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl", "forecastWindow",
         blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, runMidpoint, roadLoadLabelPoints, fmtTonnes, volumeColor, VOLUME_STOPS, heatMode, toggleHeatOff, carbonLabelPoints };")(
-        document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {},
+        document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {}, () => undefined,
         () => ["all"], "FLW", "FCW", url => fetchImpl(url), () => Promise.resolve(TL.matrix), () => { opened++; }, () => [9, 12],
         { r1: { origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, r2: { origin: "Northfield Quarry", dest: "Harborough Compound" } }, {},
         // merge with C3 (D14): the page's own forecastWindow — the matrix's span with volume; NARROWED 12 Oct 2026 (Track C
@@ -5655,12 +5668,14 @@ function qrRead(mod) {
   ok("⭐ D115: the lanes are offset LEFT of the direction of travel — one NEGATIVE constant (Mapbox: negative = left), on the flow only",
      /const FLOW_OFFSET = -1\.75;/.test(fcode) && /'line-offset': FLOW_OFFSET/.test(addFlow)
      && (code.match(/'line-offset': FLOW_OFFSET/g) || []).length === 1);
-  ok("⭐ D115: the dashes are ROUND-capped as added (standing still), 2.5 px wide, white, on round joins",
-     /layout: \{ 'line-cap': 'round', 'line-join': 'round',/.test(addFlow) && fcode.includes("const FLOW_WIDTH = 2.5;")
-     && /'line-color': '#ffffff', 'line-width': FLOW_WIDTH,/.test(addFlow) && /'line-dasharray': flowStillDash\(\)/.test(addFlow));
-  ok("🔴 D115: the march's butt cap is set at run time (setFlowDash), never in a layer definition — the five butt-capped route/rail layers are still five",
-     !/'line-cap': 'butt'/.test(fcode) && (code.match(/'line-cap': 'butt'/g) || []).length === 5
-     && /const cap = ix == null \? 'round' : 'butt';/.test(fcode));
+  // REVERSED 23 Oct 2026 (the user): the lanes are SOLID, white, round-capped, the width by band, a light along them while playing
+  ok("⭐ D115 / 23 Oct: the lanes as added — round caps and joins, white, the width a step by band, a plain gradient, the still opacity, no dash",
+     /layout: \{ 'line-cap': 'round', 'line-join': 'round',/.test(addFlow) && fcode.includes("const FLOW_WIDTHS = [1.6, 2.1, 2.6, 3.2, 3.8];")
+     && /'line-color': '#ffffff', 'line-width': flowWidthExpr\(\), 'line-opacity': FLOW_STILL_OPACITY,/.test(addFlow) && /'line-gradient': flowPulse\(null\)/.test(addFlow)
+     && !/line-dasharray/.test(addFlow) && /lineMetrics: true/.test(fcode));
+  ok("🔴 D115 / 23 Oct: no butt cap anywhere in the flow (no march to need one); the rail core is the one butt-capped layer left",
+     !/'line-cap': 'butt'/.test(fcode) && (code.match(/'line-cap': 'butt'/g) || []).length === 1
+     && !/const cap = ix == null/.test(fcode) && /function setFlowPulse\(t\)\{/.test(fcode));
   ok("⭐ D115: the blue under the lanes is the road, NOT offset, one width in every mode (6 / 8.5 px: forecast, Volume, Carbon, shared sections)",
      code.includes("const FORECAST_LINE_WIDTH = 6;") && code.includes("const FORECAST_CASING_WIDTH = 8.5;")
      && code.includes("const CARBON_LINE_WIDTH = 6, CARBON_CASING_WIDTH = 8.5;")
@@ -5677,22 +5692,24 @@ function qrRead(mod) {
      && !/setFlowDash\(DASH_SEQ/.test(code) && !/setFlowDash\(DASH_SOLID\)/.test(code));
   // ---- the bands ----
   ok("⭐ D115: the bands are FIXED — the Volume heat map's own stops (FLOW_STOPS = ROUTE_VOLUME_STOPS), never cut from the month's figures",
-     fcode.includes("const FLOW_STOPS = ROUTE_VOLUME_STOPS;") && !/Math\.max\(/.test(fcode) && !/\.sort\(\(a, b\) => b/.test(fcode));
-  ok("⭐ D115: the band expression wraps every array output in ['literal', …] (a bare one dropped every route on 1 Sep)",
-     /const e = \['step', \['to-number', \['get', 'fl_mv'\], 0\], \['literal', arrays\[0\]\]\];/.test(fcode)
-     && /e\.push\(s, \['literal', arrays\[i \+ 1\]\]\);/.test(fcode));
-  ok("⭐ D115: ONE march step for every band, and every period a whole number of steps (same speed, an exact repeat)",
-     /const FLOW_STEP = 0\.8;/.test(fcode) && (fcode.match(/FLOW_STEP\b/g) || []).length >= 3
-     && /flowR\(\(ix % Math\.round\(p \/ FLOW_STEP\)\) \* FLOW_STEP\)/.test(fcode));
+     fcode.includes("const FLOW_STOPS = ROUTE_VOLUME_STOPS;") && !/Math\.max\([^)]*fl_mv/.test(fcode) && !/\.sort\(\(a, b\) => b/.test(fcode));   // NARROWED 23 Oct 2026: flowPulse takes a max over the gradient's stops, never over a figure
+  // REVERSED 23 Oct 2026: the band expression's outputs are NUMBERS (the lane widths), which need no ['literal', …]
+  ok("⭐ D115 / 23 Oct: the width step's outputs are the five lane widths, plain numbers at the five stops",
+     /const e = \['step', \['to-number', \['get', 'fl_mv'\], 0\], FLOW_WIDTHS\[0\]\];/.test(fcode)
+     && /e\.push\(s, FLOW_WIDTHS\[i \+ 1\]\);/.test(fcode));
+  // REVERSED 23 Oct 2026: no march step; the light's phase runs from the frame clock at one speed on every lane
+  ok("⭐ D115 / 23 Oct: ONE speed for every lane (FLOW_PULSE_SPEED), FLOW_PULSES points a lane, no FLOW_STEP",
+     !/const FLOW_STEP\b/.test(fcode) && /const FLOW_PULSE_SPEED = 0\.22;/.test(fcode) && /const FLOW_PULSES = 3;/.test(fcode)
+     && /const FLOW_PULSE_LEN = 0\.07;/.test(fcode));
   ok("⭐ D115: both feeds stamp the unrounded daily rate (f_day) beside the label's rounded f_avg, through the ONE divisor helper",
      /f\.properties\.f_day=perWorkingDayExact\(vol\);/.test(code)
      && /f\.properties\.f_day = \(m\.per_day != null\) \? m\.per_day : perWorkingDayExact\(m\.avg\);/.test(code)
      && /function perWorkingDay\(monthTotal\)\{\s*return Math\.round\(perWorkingDayExact\(monthTotal\)\);/.test(code)
      && (code.match(/monthTotal \/ wd/g) || []).length === 1 && /Number\(p\.f_day != null \? p\.f_day : p\.f_avg\)/.test(fcode));
-  ok("D115: the march ticks on the old clock (65 ms) and the stop still drops to standing dashes, not a solid line",
+  ok("D115 / 23 Oct: the rail still ticks on the old clock (65 ms) and the stop drops the hauls to standing lanes, not a light",
      fcode.includes("const FLOW_TICK_MS = 65;") && /if\(map\.getLayer && \(ts-_dashT>FLOW_TICK_MS\)\)\{/.test(code)
-     && /function stopFlowAnimation\(\)\{\s*if\(_flowRAF!=null\)\{ cancelAnimationFrame\(_flowRAF\); _flowRAF=null; \}\s*setFlowDash\(null\);/.test(code)
-     && /if\(!TL\.playing\)\{ _flowRAF=null; setFlowDash\(null\);/.test(code));
+     && /function stopFlowAnimation\(\)\{\s*if\(_flowRAF!=null\)\{ cancelAnimationFrame\(_flowRAF\); _flowRAF=null; \}\s*setFlowPulse\(null\);/.test(code)
+     && /if\(!TL\.playing\)\{ _flowRAF=null; setFlowPulse\(null\);/.test(code));
   // ---- the legend's markup ----
   ok("D115: a flow legend under the heat map, hidden in the markup (shown while the lanes are on the map)",
      html.includes('<div class="mode-legend" id="flow-legend" hidden></div>')
@@ -5758,7 +5775,7 @@ function qrRead(mod) {
   try {
     api = new Function("map", "document", "a1_data", "modeRoutesPassing", "councilFocus", "mapModeMonth", "forecastWindow", "rlEsc", "monthLabel",
       "stepRanges", "VOLUME_STOPS", "ROUTE_VOLUME_STOPS", "CONFIG", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "raiseMarks",
-      fblk + "\nreturn { FLOW, FLOW_STOPS, FLOW_PERIODS, FLOW_DASH, FLOW_STEP, FLOW_WIDTH, FLOW_OFFSET, FLOW_CYCLE, DASH_SEQ, flowLanes, flowFeatures, drawFlow, ensureFlowLayer, placeFlowLayer, flowStillDash, flowMarchDash, flowMarchArray, setFlowDash, renderFlowLegend, flowSample };")(
+      fblk + "\nreturn { FLOW, FLOW_STOPS, FLOW_WIDTHS, FLOW_PULSES, FLOW_PULSE_LEN, FLOW_PULSE_SPEED, FLOW_STILL_OPACITY, FLOW_OFFSET, FLOW_CYCLE, DASH_SEQ, flowLanes, flowFeatures, drawFlow, ensureFlowLayer, placeFlowLayer, flowWidthExpr, flowPulse, setFlowPulse, renderFlowLegend, flowSample };")(
       fmap, document, a1_data, () => passing, () => focus, () => month, () => [9, 12], rlEsc, monthLabel, stepRanges, VS, VS, CONFIG, 6, 8.5, () => {});
   } catch (e) { err = e.message; }
   ok("⭐ D115 sandbox: the flow block runs against a fake map and DOM", !!api, err);
@@ -5817,62 +5834,56 @@ function qrRead(mod) {
     ["road-load-labels", "road-load-line", "road-load-casing"].forEach(id => fmap.removeLayer(id)); F.placeFlowLayer();
     ok("D115 sandbox: and back under the route labels when they go", fmap.order.indexOf("forecast-flow") === fmap.order.indexOf("forecast-layer") + 1);
     const fl = fmap.layers["forecast-flow"];
-    ok("⭐ D115 sandbox: the layer as added — offset left (negative), round caps, the still pattern", fl.paint["line-offset"] < 0 && fl.layout["line-cap"] === "round"
-       && JSON.stringify(fl.paint["line-dasharray"]) === JSON.stringify(F.flowStillDash()));
-    // the dash patterns
-    const still = F.flowStillDash();
+    // REVERSED 23 Oct 2026 (the user, the route line redesign): the lanes are solid; the volume is the lane's width and
+    // the march is a light running along the lane. Each pin below replaces the dash pin that stood here.
     const outs = e => e.filter((x, i) => i >= 2 && i % 2 === 0);
-    ok("⭐ D115 sandbox: the still pattern is a step on fl_mv at the five bands' stops [10, 25, 50, 100], every output ['literal', array]",
-       still[0] === "step" && JSON.stringify(still[1]) === JSON.stringify(["to-number", ["get", "fl_mv"], 0])
-       && JSON.stringify(still.filter((x, i) => i >= 3 && i % 2 === 1)) === "[10,25,50,100]"
-       && outs(still).length === 5 && outs(still).every(o => Array.isArray(o) && o[0] === "literal" && Array.isArray(o[1])), JSON.stringify(still));
-    ok("⭐ D115 sandbox: closer dashes = more movements — the periods shrink band by band, and every band has a clear gap",
-       F.FLOW_PERIODS.every((p, i) => i === 0 || p < F.FLOW_PERIODS[i - 1]) && F.FLOW_PERIODS.every(p => p - F.FLOW_DASH >= 1));
-    ok("🔴 D115 sandbox: standing still (round caps) no array holds a zero-length piece — under round caps one draws a dot (tested on 2.14.1)",
-       outs(still).every(o => o[1].length === 2 && o[1].every(v => v > 0)));
-    ok("D115 sandbox: standing still, each dash piece is one width short of the dash on screen (the round caps add a half width at each end)",
-       outs(still).every((o, i) => o[1][0] === F.FLOW_DASH - 1 && Math.abs(o[1][0] + o[1][1] - F.FLOW_PERIODS[i]) < 1e-9));
-    // where the march's dash lies along one period of a band, from its butt-capped array
-    const dashCover = arr => { let x = 0; const on = []; arr.forEach((v, i) => { if (i % 2 === 0 && v > 0) on.push([x, x + v]); x += v; }); return { on, len: x }; };
-    let marchOk = true, why = "";
-    for (let b = 0; b < 5 && marchOk; b++) {
-      const p = F.FLOW_PERIODS[b], steps = Math.round(p / F.FLOW_STEP);
-      if (Math.abs(steps * F.FLOW_STEP - p) > 1e-9) { marchOk = false; why = "band " + b + " is not a whole number of steps"; break; }
-      for (let k = 0; k < steps; k++) {
-        const arr = outs(F.flowMarchDash(k))[b][1], c = dashCover(arr);
-        const dash = c.on.reduce((a, r) => a + r[1] - r[0], 0);
-        const phi = Math.round(k * F.FLOW_STEP * 1000) / 1000;
-        const starts = c.on.map(r => r[0]);
-        const startOk = (phi + F.FLOW_DASH <= p) ? starts.some(s => Math.abs(s - phi) < 1e-6) : (starts[0] === 0 && starts.some(s => Math.abs(s - phi) < 1e-6));
-        if (Math.abs(c.len - p) > 1e-6 || Math.abs(dash - F.FLOW_DASH) > 1e-6 || !startOk || arr.length % 2) { marchOk = false; why = "band " + b + " tick " + k + " " + JSON.stringify(arr); break; }
-      }
+    ok("⭐ D115 sandbox / 23 Oct: the lane as added — offset left (negative), round caps, the width step, the plain gradient, the still opacity, no dash",
+       fl.paint["line-offset"] < 0 && fl.layout["line-cap"] === "round" && JSON.stringify(fl.paint["line-width"]) === JSON.stringify(F.flowWidthExpr())
+       && JSON.stringify(fl.paint["line-gradient"]) === JSON.stringify(F.flowPulse(null)) && fl.paint["line-opacity"] === F.FLOW_STILL_OPACITY
+       && !("line-dasharray" in fl.paint), JSON.stringify(fl.paint));
+    const wexp = F.flowWidthExpr();
+    ok("⭐ D115 sandbox / 23 Oct: the width is a step on fl_mv at the five bands' stops [10, 25, 50, 100], every output a number",
+       wexp[0] === "step" && JSON.stringify(wexp[1]) === JSON.stringify(["to-number", ["get", "fl_mv"], 0])
+       && JSON.stringify(wexp.filter((x, i) => i >= 3 && i % 2 === 1)) === "[10,25,50,100]"
+       && outs(wexp).length === 5 && outs(wexp).every(o => typeof o === "number"), JSON.stringify(wexp));
+    ok("⭐ D115 sandbox / 23 Oct: wider lane = more movements — the widths grow band by band, the thinnest at least 1.6 px",
+       F.FLOW_WIDTHS.every((w, i) => i === 0 || w > F.FLOW_WIDTHS[i - 1]) && F.FLOW_WIDTHS[0] >= 1.6);
+    const plain = F.flowPulse(null);
+    ok("🔴 D115 sandbox / 23 Oct: standing still the gradient is plain white end to end — no dash, no dot, nothing to march",
+       plain[0] === "interpolate" && JSON.stringify(plain[2]) === JSON.stringify(["line-progress"]) && plain.length === 7 && plain[4] === "#ffffff" && plain[6] === "#ffffff");
+    let lightOk = true, lightWhy = "";
+    for (const t of [0, 0.1, 0.33, 0.5, 0.66, 0.9, 0.999]) {
+      const g = F.flowPulse(t), st = g.slice(3).filter((x, i) => i % 2 === 0), bright = g.filter(x => x === "rgba(255,255,255,0.95)").length;
+      const inc = st.every((v, i) => i === 0 || v > st[i - 1]) && st[0] === 0 && st[st.length - 1] === 1;
+      if (!inc || bright !== F.FLOW_PULSES || g[0] !== "interpolate") { lightOk = false; lightWhy = "t=" + t + " " + JSON.stringify(g).slice(0, 160); break; }
     }
-    ok("⭐ D115 sandbox: SAME SPEED — at every tick every band's dash starts FLOW_STEP further on, is FLOW_DASH long and its pattern is one period",
-       marchOk, why);
-    ok("D115 sandbox: the march repeats exactly: FLOW_CYCLE is a whole number of every band's steps and of the rail's seven",
-       F.FLOW_CYCLE > 0 && F.FLOW_PERIODS.every(p => F.FLOW_CYCLE % Math.round(p / F.FLOW_STEP) === 0) && F.FLOW_CYCLE % F.DASH_SEQ.length === 0
-       && JSON.stringify(F.flowMarchDash(F.FLOW_CYCLE)) === JSON.stringify(F.flowMarchDash(0)), String(F.FLOW_CYCLE));
-    ok("D115 sandbox: on screen the bands are 30, 20, 16, 12 and 8 px apart and the dashes 5 px long, moving 2 px a tick (the rail's 2 px)",
-       JSON.stringify(F.FLOW_PERIODS.map(p => Math.round(p * F.FLOW_WIDTH * 100) / 100)) === "[30,20,16,12,8]"
-       && F.FLOW_DASH * F.FLOW_WIDTH === 5 && Math.abs(F.FLOW_STEP * F.FLOW_WIDTH - 2) < 1e-9);
-    F.setFlowDash(5);
-    ok("⭐ D115 sandbox: marching, the caps go butt (so no dot) and the pattern is the tick's", fl.layout["line-cap"] === "butt"
-       && JSON.stringify(fl.paint["line-dasharray"]) === JSON.stringify(F.flowMarchDash(5)));
-    F.setFlowDash(null);
-    ok("⭐ D115 sandbox: standing still again (pause, stop, reduced motion), round caps and the bands' own spacing", fl.layout["line-cap"] === "round"
-       && JSON.stringify(fl.paint["line-dasharray"]) === JSON.stringify(still));
+    ok("⭐ D115 sandbox / 23 Oct: the light at any phase — FLOW_PULSES bright points, every stop strictly increasing from 0 to 1, dark at both ends",
+       lightOk, lightWhy);
+    ok("⭐ D115 sandbox / 23 Oct: SAME SPEED — one phase from the frame clock moves the light on every lane at once, no per-band step",
+       /_pulseT=\(\(ts\*FLOW_PULSE_SPEED\)\/1000\)%1; setFlowPulse\(_pulseT\);/.test(code) && F.FLOW_PULSE_SPEED > 0 && F.FLOW_PULSE_SPEED < 1);
+    ok("D115 sandbox / 23 Oct: the rail's cycle is still a whole number of its seven steps",
+       F.FLOW_CYCLE > 0 && F.FLOW_CYCLE % F.DASH_SEQ.length === 0, String(F.FLOW_CYCLE));
+    ok("D115 sandbox / 23 Oct: on screen the lanes are 1.6, 2.1, 2.6, 3.2 and 3.8 px wide, fewest movements first",
+       JSON.stringify(F.FLOW_WIDTHS) === "[1.6,2.1,2.6,3.2,3.8]");
+    F.setFlowPulse(0.3);
+    ok("⭐ D115 sandbox / 23 Oct: playing, the light's gradient and full opacity go on the layer; the caps stay round", fl.layout["line-cap"] === "round"
+       && fl.paint["line-opacity"] === 1 && JSON.stringify(fl.paint["line-gradient"]) === JSON.stringify(F.flowPulse(0.3)));
+    F.setFlowPulse(null);
+    ok("⭐ D115 sandbox / 23 Oct: standing still again (pause, stop, reduced motion): the plain gradient and the still opacity",
+       fl.paint["line-opacity"] === F.FLOW_STILL_OPACITY && JSON.stringify(fl.paint["line-gradient"]) === JSON.stringify(plain));
     // the legend
     const lg = el("flow-legend");
-    ok("⭐ D115 sandbox: the legend says 'Closer dashes = more movements a day', each way, the month, and the five band figures",
-       lg.hidden === false && lg.innerHTML.includes("<b>Closer dashes = more movements a day</b>") && lg.innerHTML.includes("Each way, in Oct 2026")
+    ok("⭐ D115 sandbox / 23 Oct: the legend says 'Wider lane = more movements a day', each way, the month, and the five band figures",
+       lg.hidden === false && lg.innerHTML.includes("<b>Wider lane = more movements a day</b>") && lg.innerHTML.includes("Each way, in Oct 2026")
        && ["under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"].every(t => lg.innerHTML.includes(t)), lg.innerHTML.slice(0, 300));
-    ok("D115 sandbox: ...that each direction is its own lane on the left, the dashes move while the timeline plays, shared roads show the total, the bands are fixed",
-       lg.innerHTML.includes("Each direction has its own lane, on the left.") && !lg.innerHTML.includes("while the timeline plays")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the foot keeps two facts; the rest is in T10
-       && lg.innerHTML.includes("Where routes share a road, the dashes show their total") && !lg.innerHTML.includes("a spacing means the same number in every month"));
-    ok("D115 sandbox: each band's sample is drawn as the map draws it (a 2.5 px round-capped dash, one width short, on the 6 px blue)",
-       (lg.innerHTML.match(/<svg class="fl-sw"/g) || []).length === 5 && lg.innerHTML.includes('stroke-dasharray="2.5 27.5"')
-       && lg.innerHTML.includes('stroke-dasharray="2.5 5.5"') && lg.innerHTML.includes('stroke-width="6"') && lg.innerHTML.includes('aria-hidden="true"'));
-    ok("D115 sandbox: the legend names no team id and says lorries, never trucks", !/IPT\s*\d/i.test(lg.innerHTML) && !/truck/i.test(lg.innerHTML) && /movements a day/.test(lg.innerHTML));   // NARROWED 22 Oct 2026 (words sweep): the foot's "the way the lorries go" left with the motion sentence; the unit names movements
+    ok("D115 sandbox / 23 Oct: ...that each direction is its own lane on the left, the lane shows a shared road's total, the light moves while Play runs, the bands are fixed",
+       lg.innerHTML.includes("Each direction has its own lane, on the left.") && !lg.innerHTML.includes("while the timeline plays")
+       && lg.innerHTML.includes("Where routes share a road, the lane shows their total") && lg.innerHTML.includes("While Play runs, a light moves along each lane the way its lorries go")
+       && !lg.innerHTML.includes("a spacing means the same number in every month"));
+    ok("D115 sandbox / 23 Oct: each band's sample is drawn as the map draws it (a solid white lane of the band's width on the 6 px blue, no dash)",
+       (lg.innerHTML.match(/<svg class="fl-sw"/g) || []).length === 5 && lg.innerHTML.includes('stroke-width="1.6"') && lg.innerHTML.includes('stroke-width="3.8"')
+       && lg.innerHTML.includes('stroke-opacity="0.9"') && lg.innerHTML.includes('stroke-width="6"') && !lg.innerHTML.includes("stroke-dasharray") && lg.innerHTML.includes('aria-hidden="true"'));
+    ok("D115 sandbox: the legend names no team id and says lorries, never trucks", !/IPT\s*\d/i.test(lg.innerHTML) && !/truck/i.test(lg.innerHTML) && /movements a day/.test(lg.innerHTML));
     month = null; F.renderFlowLegend();
     ok("D115 sandbox: with no single month (Show forecast over the span) the legend says it is a daily average over the months",
        lg.innerHTML.includes("Each way, a daily average, Sep 2026 to Dec 2026"), lg.innerHTML.slice(0, 200));
@@ -6221,11 +6232,12 @@ function qrRead(mod) {
      && src.includes("const ABN = { staff: false, on: false, data: null, loading: false, dots: true, approved: false };")
      && src.includes("if (ABN.on && !ABN.data) loadAbnormal();") && src.includes("fetch('/api/abnormal/geojson', { credentials: 'same-origin' })")
      && (src.match(/fetch\('\/api\/abnormal\/geojson'/g) || []).length === 1);
-  ok("⭐ ABN: the line is violet dashes (its own style: not the blue routes, the green / amber legs or the red breach), the dots one colour a kind with a white edge, the kind told by the dot; " +
+  // REVERSED 23 Oct 2026 (the user: not purple): ink on a white edge, solid; the pinch points hollow rings in the kind's colour
+  ok("⭐ ABN / 23 Oct: the line is INK, solid, on a white edge (its own style: not the blue routes, the green / amber legs or the red breach), the pinch points hollow rings coloured by kind; " +
      "the layers come back after a basemap change like the collision layers",
-     src.includes("const ABN_LINE = '#7C3AED';") && src.includes("'line-dasharray': [2, 1.5]") && src.includes("'circle-stroke-color': '#ffffff'")
-     && src.includes("['match', ['get', 'kind'], 'turn', ABN_DOT.turn, 'roundabout', ABN_DOT.roundabout, 'slip_road', ABN_DOT.slip_road,")
-     && src.includes("const ABN_LAYERS = ['abnormal-lines', 'abnormal-points'];")
+     src.includes("const ABN_LINE = '#1F2024';") && src.includes("'line-width': ABN_WIDTH, 'line-opacity': 1 } }, labelAnchor());") && src.includes("'circle-color': '#ffffff', 'circle-stroke-width': 1.8,")
+     && src.includes("'circle-stroke-color': ['match', ['get', 'kind'], 'turn', ABN_DOT.turn, 'roundabout', ABN_DOT.roundabout, 'slip_road', ABN_DOT.slip_road,")
+     && src.includes("const ABN_LAYERS = ['abnormal-casing', 'abnormal-lines', 'abnormal-points'];") && src.includes("map.addLayer({ id: 'abnormal-casing', type: 'line', source: 'abnormal-source', filter: abnormalLineFilter(),")
      && (src.match(/if \(typeof ABN !== 'undefined' && ABN\.data\) ensureAbnormalLayers\(\);/g) || []).length === 2);
   {
     const fnSrc = src.slice(src.indexOf("function abnWhen(from, to, band) {"), src.indexOf("function abnormalLinePopup(e) {"));
@@ -6254,10 +6266,11 @@ function qrRead(mod) {
      grp.length > 200 && grp.includes('<input type="checkbox" id="layer-abnormal-public" onchange="toggleAbnormalPublic(this.checked)"> Abnormal loads (approved)')
      && !grp.includes(" checked") && grp.includes('id="abnormal-public-when"') && grp.includes("Indicative: the agreed route may differ.")
      && src.includes("const pg = document.getElementById('abnormal-public-group');") && src.includes("if (pg) pg.hidden = ABN.staff;"));
-  ok("🔴 ABP: read ONCE from /api/public/abnormal when ticked (behind the map password), drawn as the same violet dashes on its own layer, back after a basemap change like the staff layers; the popup prints the window, the movements, 'escorted', the roads and the indicative words — never the size, the team, the references or a dot",
+  ok("🔴 ABP: read ONCE from /api/public/abnormal when ticked (behind the map password), drawn as the same ink line on its own layers (a white edge under it; REVERSED 23 Oct 2026), back after a basemap change like the staff layers; the popup prints the window, the movements, 'escorted', the roads and the indicative words — never the size, the team, the references or a dot",
      (src.match(/fetch\('\/api\/public\/abnormal'/g) || []).length === 1 && src.includes("const ABP = { on: false, data: null, loading: false };")
      && src.includes("map.addLayer({ id: 'abnormal-public-lines', type: 'line', source: 'abnormal-public-source', filter: ['==', ['geometry-type'], 'LineString'],")
-     && src.includes("paint: { 'line-color': ABN_LINE, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.5, 13, 5], 'line-dasharray': [2, 1.5], 'line-opacity': 0.9 } });\n        map.on('click', 'abnormal-public-lines', e => abnormalPublicPopup(e));")
+     && src.includes("paint: { 'line-color': ABN_LINE, 'line-width': ABN_WIDTH, 'line-opacity': 1 } }, labelAnchor());\n        map.on('click', 'abnormal-public-lines', e => abnormalPublicPopup(e));")
+     && src.includes("map.addLayer({ id: 'abnormal-public-casing', type: 'line', source: 'abnormal-public-source', filter: ['==', ['geometry-type'], 'LineString'],")
      && (src.match(/if \(typeof ABP !== 'undefined' && ABP\.data\) ensureAbnormalPublicLayers\(\);/g) || []).length === 2
      && (() => { const pop = src.slice(src.indexOf("function abnormalPublicPopup(e) {"), src.indexOf("function renderAbnormalPublicPanel() {"));
                  return pop.includes("p.public_words || 'Indicative route; the agreed route may differ.'") && pop.includes("abnWhen(p.date_from, p.date_to, p.time_band)")
@@ -6266,10 +6279,82 @@ function qrRead(mod) {
      src.includes("when.textContent = n ? `${n} approved: ${lines.map(f => abnWhen(f.properties.date_from, f.properties.date_to, null)).join(', ')}. ${(ABP.data.words && ABP.data.words.indicative) || ''}`")
      && src.includes("'No approved abnormal load has a line drawn yet.'"));
   ok("ABN (phase 3): the structure kinds have their own dot colours in the community layer's palette (bridge, railway, level crossing, calming, overhead line), in the match and the legend; a dot found in OpenStreetMap says so in its popup",
-     src.includes("bridge: '#1F2024', railway: '#4338CA', level_crossing: '#DB2777', calming: '#A16207', overhead: '#0891B2' };")
+     src.includes("bridge: '#1F2024', railway: '#475569', level_crossing: '#DB2777', calming: '#A16207', overhead: '#0891B2' };")   // NARROWED 23 Oct 2026: the railway slate, the slip road sea-blue, no indigo or violet
+     && src.includes("slip_road: '#0369A1'") && !/#6D28D9|#4338CA|#7C3AED/.test(src.slice(src.indexOf("const ABN_LINE ="), src.indexOf("function abnormalStaff(")))
      && src.includes("'bridge', ABN_DOT.bridge, 'railway', ABN_DOT.railway, 'level_crossing', ABN_DOT.level_crossing,")
      && src.includes("['bridge', 'bridge'], ['railway', 'railway'], ['level_crossing', 'level crossing'], ['calming', 'traffic calming'], ['overhead', 'overhead line']]")
      && src.includes("p.source === 'osm' ? 'OpenStreetMap (the community layer’s extract)' : 'the route’s directions'") && src.includes("The structures are OpenStreetMap’s, as fetched."));
+}
+
+
+// ---- 23 Oct 2026: the route line redesign (the user: idea 1 'Atlas' of route-design-mockup-1023, the haul roads dotted and
+// thinner in the leg colours, road names over the lines, a quieter highlight than red, the loads not purple) ----------------
+{
+  const legs = code.slice(code.indexOf("const OFFSET_IN  ="), code.indexOf("id: 'temp-haul-lines'"));   // comments are stripped from code: end on the next layer, not a comment
+  ok("⭐ 23 Oct: the four leg layers are solid, round-capped, cased in opaque white, and every route line in the block is added BEFORE the basemap's labels",
+     legs.length > 1000 && (legs.match(/'line-dasharray'/g) || []).length === 1 && (legs.match(/\}, labelAnchor\(\)\);/g) || []).length >= 6
+     && !/'line-cap': 'butt'/.test(legs) && (legs.match(/'line-color': '#ffffff',\s*'line-width': WIDTH_CASING,\s*'line-opacity': 1,/g) || []).length === 2);
+  ok("⭐ 23 Oct: labelAnchor finds the basemap's first text layer and never one of the page's own, and the route layers use it",
+     /function labelAnchor\(\)\{/.test(code) && /x\.type === 'symbol' && x\.layout && x\.layout\['text-field'\]/.test(code)
+     && /\(forecast\|road-load\|temp-haul\|site\|restriction\|limit\|area\|community\|abnormal\|collision\|evr\)/.test(code)
+     && (code.match(/labelAnchor\(\)/g) || []).length >= 20);
+  ok("⭐ 23 Oct: the haul-road pieces — found within 9 m of a drawn haul road, added as 'Inbound Haul' / 'Outbound Haul' with the leg kept whole, on the network load",
+     /const HAUL_NEAR_M = 9;/.test(code) && /function withHaulPieces\(fc\)\{/.test(code) && /type: p\.type === 'Inbound Highway' \? 'Inbound Haul' : 'Outbound Haul', surface: 'haul'/.test(code)
+     && /return pieces\.length \? \{ type: 'FeatureCollection', features: feats\.concat\(pieces\) \} : fc;/.test(code) && /a1_data = withHaulPieces\(await loadNetwork\(\)\);/.test(code));
+  ok("⭐ 23 Oct: the pieces draw as a cut-out the casing's width under thinner dots in the leg's colour, left of travel, under the labels",
+     /'id': 'haul-eraser',[\s\S]{0,400}'line-color': haulEraserColour\(\), 'line-width': WIDTH_CASING, 'line-opacity': 1, 'line-offset': OFFSET_IN \}\n\s+\}, labelAnchor\(\)\);/.test(code)
+     && /'id': 'haul-dots',[\s\S]{0,500}'line-color': \['match', \['get', 'type'\], 'Inbound Haul', '#059669', '#f59e0b'\], 'line-width': HAUL_DOT_WIDTH,[\s\S]{0,120}'line-dasharray': HAUL_DOTS \}\n\s+\}, labelAnchor\(\)\);/.test(code)
+     && /const HAUL_DOT_WIDTH = \['interpolate', \['linear'\], \['zoom'\], 7, 1\.1, 12, 2\.4, 16, 3\.8\];/.test(code)
+     && /function haulEraserColour\(\)\{ return \/dark\/\.test\(/.test(code));
+  ok("23 Oct: the pieces follow the Laden / Empty ticks and the route filters (applyFilters), the ticks alone when no filter is set",
+     /function haulPieceFilter\(\)\{/.test(code)
+     && /\['haul-eraser', 'haul-dots'\]\.forEach\(l => \{ if \(map\.getLayer\(l\)\) map\.setFilter\(l, haulBase\[0\] === 'in' \? \['all', haulBase, \.\.\.filterArr\.slice\(1\)\] : haulBase\); \}\);/.test(code));
+  // the split, run: a leg of five points, the middle three on a 2-point haul road — one piece of three points a leg, the leg kept
+  {
+    const fn = src.slice(src.indexOf("    const HAUL_NEAR_M = 9;"), src.indexOf("    // the pieces' filter follows the Laden / Empty ticks"));
+    let W = null, e1 = "";
+    try { W = new Function(fn + "\nreturn withHaulPieces;")(); } catch (e) { e1 = String(e); }
+    ok("⭐ 23 Oct sandbox: withHaulPieces runs on its own", !!W && fn.length > 500, e1);
+    if (W) {
+      const road = [[-0.9, 52.5], [-0.9, 52.502]];                                                  // a haul road 220 m long, north-south
+      const legPts = [[-0.91, 52.499], [-0.9, 52.5], [-0.9, 52.501], [-0.9, 52.502], [-0.89, 52.503]];
+      const fc = { type: 'FeatureCollection', features: [
+        { type: 'Feature', properties: { type: 'Temp Haul Track', zone_id: 'Z1' }, geometry: { type: 'LineString', coordinates: road } },
+        { type: 'Feature', properties: { type: 'Inbound Highway', route_id: 'R1', leg: 'loaded' }, geometry: { type: 'LineString', coordinates: legPts } },
+        { type: 'Feature', properties: { type: 'Outbound Highway', route_id: 'R1', leg: 'return' }, geometry: { type: 'LineString', coordinates: legPts.slice().reverse() } },
+        { type: 'Feature', properties: { type: 'Node' }, geometry: { type: 'Point', coordinates: [0, 0] } } ] };
+      const out = W(fc);
+      const pieces = out.features.filter(f => /Haul$/.test(f.properties.type));
+      ok("⭐ 23 Oct sandbox: the three points on the haul road become one piece a leg, in the leg's own direction, the public ends left to the solid leg",
+         out.features.length === fc.features.length + 2 && pieces.length === 2
+         && pieces.every(f => f.geometry.coordinates.length === 3 && f.properties.route_id === 'R1' && f.properties.surface === 'haul')
+         && pieces[0].properties.type === 'Inbound Haul' && pieces[0].geometry.coordinates[0][1] === 52.5
+         && pieces[1].properties.type === 'Outbound Haul' && pieces[1].geometry.coordinates[0][1] === 52.502
+         && out.features.filter(f => f.properties.type === 'Inbound Highway').length === 1
+         && out.features[1].geometry.coordinates.length === 5, JSON.stringify(pieces.map(f => f.geometry.coordinates)));
+      ok("23 Oct sandbox: no haul road, nothing added; a leg 50 m off the road, nothing added",
+         W({ type: 'FeatureCollection', features: fc.features.slice(1) }).features.length === 3
+         && W({ type: 'FeatureCollection', features: [fc.features[0], { type: 'Feature', properties: { type: 'Inbound Highway', route_id: 'R2' },
+              geometry: { type: 'LineString', coordinates: [[-0.9008, 52.5], [-0.9008, 52.502]] } }] }).features.length === 2);
+    }
+  }
+  ok("⭐ 23 Oct: a clicked route — a blue halo (the accent, never the breach red), its own casing and colours re-drawn on top, under the labels; the rest dim to 0.42",
+     /id:'sel-glow'[^\n]*'line-color':CONFIG\.COLORS\.brand,'line-width':14,'line-opacity':0\.28,'line-blur':3,'line-offset':SEL_OFFSET\}\}, labelAnchor\(\)\);/.test(code)
+     && /id:'sel-casing'[^\n]*'line-color':'#ffffff','line-width':SEL_CASING_WIDTH/.test(code)
+     && /id:'sel-core'[^\n]*'line-color':\['match',\['get','type'\],'Inbound Highway','#059669','Outbound Highway','#f59e0b',CONFIG\.COLORS\.brand\]/.test(code)
+     && !/sel-(glow|core|casing)[^\n]*CONFIG\.COLORS\.selection/.test(code)
+     && /const DIM_OPACITY = 0\.42;/.test(code) && /function setRouteDim\(routeId\)\{/.test(code) && /\['case', \['==', \['get', 'route_id'\], routeId\], 1, DIM_OPACITY\] : 1/.test(code)
+     && /setRouteDim\(routeId\);/.test(code) && /setRouteDim\(null\);/.test(code));
+  ok("23 Oct: the planned routes, the heat map's sections and the alternatives go under the labels too",
+     /id:'forecast-casing'[^\n]*\}, labelAnchor\(\)\);/.test(code) && /id:'forecast-layer'[^\n]*\}, labelAnchor\(\)\);/.test(code)
+     && /id: 'road-load-casing'[\s\S]{0,300}\}, labelAnchor\(\)\);/.test(code) && /id: 'road-load-line'[\s\S]{0,300}\}, labelAnchor\(\)\);/.test(code)
+     && /'id': 'route-alt-lines'[\s\S]{0,700}\}, labelAnchor\(\)\);/.test(code));
+  ok("⭐ 23 Oct: the abnormal loads — ink on a white edge, solid, under the labels, for staff and for the public layer alike; rings, not dots",
+     (code.match(/'line-color': '#ffffff', 'line-width': ABN_CASING_WIDTH, 'line-opacity': 1 \} \}, labelAnchor\(\)\);/g) || []).length === 2
+     && (code.match(/'line-color': ABN_LINE, 'line-width': ABN_WIDTH, 'line-opacity': 1 \} \}, labelAnchor\(\)\);/g) || []).length === 2
+     && (src.match(/an ink line each/g) || []).length >= 2 && src.includes("'The ink line: the load’s own line. Rings: '") && src.includes("background:#fff;border:2px solid ${ABN_DOT[k]}"));
+  ok("23 Oct: the words follow — no 'violet dash', no 'Closer dashes' left in the page; the flow legend says wider lane",
+     !/violet dash/i.test(code) && !/Closer dashes/.test(code) && /Wider lane = more/.test(code) && !/Violet dashes:/.test(code));   // code, not src: a comment may say what was
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

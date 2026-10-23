@@ -920,5 +920,13 @@ for _nm, _pg in (("user guide", src), ("technical guide", _tg2)):
 ok("UI fix 8: the user guide's green box title (unused today) is #047857, 4.85:1 on its box",
    ".callout.ok{background:#E6F4F1;border-color:var(--green)}.callout.ok .ct{color:#047857}" in src)
 
+# 23 Oct 2026 (the route line redesign, the user: idea 1 'Atlas'): the guide's words follow the map — the loads' lines are ink
+# with a white edge and the pinch points rings (not violet dashes and dots); the flow is a light along solid lanes (no dashes)
+ok("23 Oct: chapter 14 says the staff map draws each load's line in ink with a white edge and a ring at each pinch point, never violet dashes",
+   "draws each line in ink with a white edge, and a ring at each potential pinch point" in src and "violet dashes" not in src)
+ok("23 Oct: the technical guide says a light runs along each lane only while Play runs and the lane's width is its band, never that dashes move",
+   "A light runs along each lane only while Play runs, and the lanes stand still under reduced motion; the lane's width is its band." in _tg
+   and "The dashes move only while Play runs" not in _tg)
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
