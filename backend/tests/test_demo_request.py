@@ -138,6 +138,16 @@ ok("an email seen 5 minutes ago is 'recent'; one seen 11 minutes ago is not",
 #  3. handle(): the outcomes                                                   #
 # =========================================================================== #
 reset_db()
+# 27 Oct 2026 (pilot readiness F3 a): the form makes a login, so it is OFF unless the deployment sets DEMO_LEADS=1
+os.environ.pop("DEMO_LEADS", None)
+r = dr.handle(GOOD, "203.0.113.7", T0)
+ok("🔴 F3 a: with DEMO_LEADS unset the form is off — 'error', nothing stored, no login made",
+   r["outcome"] == "error" and dr.leads_on() is False
+   and db.query("SELECT COUNT(*) AS n FROM demo_requests")[0]["n"] == 0 and not db.query("SELECT * FROM users"))
+os.environ["DEMO_LEADS"] = "0"
+ok("...'0' is off too", dr.leads_on() is False and dr.handle(GOOD, "203.0.113.7", T0)["outcome"] == "error")
+os.environ["DEMO_LEADS"] = "1"
+ok("...'1' turns it on (the demo)", dr.leads_on() is True)
 r = dr.handle(dict(GOOD, website="bot"), "203.0.113.7", T0)
 ok("🔴 honeypot → 'thanks' and NOTHING stored", r["outcome"] == "thanks" and r["reason"] == "honeypot"
    and db.query("SELECT COUNT(*) AS n FROM demo_requests")[0]["n"] == 0)

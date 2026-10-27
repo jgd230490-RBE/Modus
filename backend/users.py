@@ -857,8 +857,8 @@ def finish_setup(ticket, code, ip=None, now=None):
     t, user = use_token(ticket, ("mfa",), now)
     if not t:
         return None, None, "That took too long. Sign in again.", 410
-    db.execute("UPDATE users SET totp_secret = ?, totp_pending = NULL, totp_on_at = ?, totp_last_step = ? "
-               "WHERE tenant_id = ? AND id = ?", (key, _iso(now), step, _tenant(), user["id"]))
+    sql = "UPDATE users SET totp_secret = ?, totp_pending = NULL, totp_on_at = ?, totp_last_step = ? WHERE tenant_id = ? AND id = ?"
+    db.execute(sql, (key, _iso(now), step, _tenant(), user["id"]))
     codes = new_recovery_codes(user["id"])
     audit_event("two-step-on", user=user, ip=ip, now=now)
     audit_event("signin", user=user, ip=ip, now=now, detail={"second_step": "set up"})
@@ -885,8 +885,8 @@ def renew_recovery_codes(user, code, ip=None, now=None):
 def reset_two_step(user_id):
     """An admin's "Reset two-step", or the recovery command: the key and the codes go, every session
     ends, and the person sets it up again at their next sign-in."""
-    db.execute("UPDATE users SET totp_secret = NULL, totp_pending = NULL, totp_on_at = NULL, recovery_hashes = NULL, "
-               "totp_last_step = NULL WHERE tenant_id = ? AND id = ?", (_tenant(), user_id))
+    sql = ("UPDATE users SET totp_secret = NULL, totp_pending = NULL, totp_on_at = NULL, recovery_hashes = NULL, totp_last_step = NULL WHERE tenant_id = ? AND id = ?")
+    db.execute(sql, (_tenant(), user_id))
     end_all_sessions(user_id)
     return get_user(user_id)
 
@@ -1141,6 +1141,11 @@ def codes_enabled():
 
 # --------------------------------------------------------------------------- the first admin, and recovery (27 Oct 2026, F3 c)
 
+def _make_admin(user_id):
+    sql = "UPDATE users SET role = 'admin', team = NULL, kind = 'staff', expires_at = NULL, disabled = 0 WHERE tenant_id = ? AND id = ?"
+    db.execute(sql, (_tenant(), user_id))
+
+
 def ensure_first_admin(now=None):
     """
     A new deployment's first admin, without the admin token (F3 c). When FIRST_ADMIN_EMAIL is set and this
@@ -1159,8 +1164,7 @@ def ensure_first_admin(now=None):
         return "bad-email"
     user = find_by_email(email)
     if user:
-        db.execute("UPDATE users SET role = 'admin', team = NULL, kind = 'staff', expires_at = NULL, disabled = 0 "
-                   "WHERE tenant_id = ? AND id = ?", (_tenant(), user["id"]))
+        _make_admin(user["id"])
         user = get_user(user["id"])
     else:
         name = (os.getenv("FIRST_ADMIN_NAME") or "").strip() or email.split("@")[0]
@@ -1191,8 +1195,7 @@ def recover_admin(email, now=None):
         return None, "That email address doesn't look right."
     user = find_by_email(email)
     if user:
-        db.execute("UPDATE users SET role = 'admin', team = NULL, kind = 'staff', expires_at = NULL, disabled = 0 "
-                   "WHERE tenant_id = ? AND id = ?", (_tenant(), user["id"]))
+        _make_admin(user["id"])
         user = reset_two_step(user["id"])
     else:
         user, err = create_user(email, email.split("@")[0], "admin", created_by="recovery command")
