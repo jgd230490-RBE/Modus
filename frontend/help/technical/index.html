@@ -581,7 +581,7 @@ the repository owner). The first run, 27 Oct 2026, found 63 advisories in Pillow
 uses; every other library was clean.</p>
 <p><strong>Keys and when to change them.</strong> Every value below is set by hand on Render (Environment) or in the provider's
 own account, never in the repository. Give each new organisation's deployment fresh values; never copy the demo's.</p>
-<div class="tbl"><table><thead><tr><th>Key</th><th>Where it lives</th><th>What changing it does</th><th>When</th></tr></thead><tbody>
+<div class="tbl" tabindex="0" role="region" aria-label="Keys and when to change them"><table><thead><tr><th>Key</th><th>Where it lives</th><th>What changing it does</th><th>When</th></tr></thead><tbody>
 <tr><td class="k"><code>GATE_SECRET</code></td><td>Render</td><td>Signs every map visitor out once (their map cookie stops working); the salted IP hashes behind the rate limits start afresh.</td><td>At each deployment's start; after any suspicion. Must be set before <code>ADMIN_TOKEN</code> is deleted (without it the cookie key is made from the map password and the token).</td></tr>
 <tr><td class="k"><code>MAP_PASSWORD</code></td><td>Render</td><td>New visitors need the new password. Map cookies already given out keep working until they run out (30 days) unless <code>GATE_SECRET</code> changes too.</td><td>When someone who had it should no longer; change <code>GATE_SECRET</code> with it to end existing map access at once.</td></tr>
 <tr><td class="k"><code>ADMIN_TOKEN</code></td><td>Render (the demo only)</td><td>Scripts that used it stop; no screen uses it since 27 Oct 2026.</td><td>Delete it; a new deployment never sets it.</td></tr>
