@@ -3,12 +3,11 @@
 
 - The NOTICE CALENDAR across every movement the caller may see: an XLSX (one row a movement) and a PDF (A4 landscape,
   one table), sorted by the date the first notice must be received, then the apply-by date, then the window.
-- One movement's ESDAL DETAILS SHEET (A4 portrait): the fields ESDAL and the notices ask for — the vehicle, the
-  dimensions, the weights and axles, the load, from and to with the gates, the dates, the notices and permissions as
-  advised, the references — laid out so the haulier copies them across into their own ESDAL application. Nothing here
-  submits anything (D73): every line is advice from the typed figures, and the sheet says so.
+- 27 Oct 2026 (the final UI pass; the user: the haulier plans and applies in their own software, Wayscope forecasts the
+  load and tracks the notices): the ESDAL DETAILS SHEET of 22 Oct is GONE. The references the haulier gives back (ESDAL,
+  VR1, Special Order) stay on the load and in the calendar; nothing here submits anything (D73).
 
-Both carry the tenant's demo notice like every export. The words are the rules module's own, never new rules.
+The calendar carries the tenant's demo notice like every export. The words are the rules module's own, never new rules.
 """
 import datetime
 import io
@@ -28,9 +27,6 @@ CAL_SHORT = {"stgo": "STGO clear working days", "cu": "C&U working days", "calen
 CALENDAR_HEAD = ["Load", "Team", "From → to", "Window", "Band", "Movements", "Size (W × H × L m · t)", "Class", "Permission",
                  "Apply by", "Applied on", "Police notice by", "Authorities notice by", "Notify by", "Notified on", "Status",
                  "Flags", "ESDAL ref", "VR1 ref", "Special Order ref", "Escort planned", "Route drawn", "Potential pinch points"]
-SHEET_WORDS = ("This sheet lists what the haulier types into ESDAL and gives the notices as Wayscope advises them from the "
-               "typed figures. It is not an application and nothing has been sent: the haulier's ESDAL route and route "
-               "survey govern; ESDAL, the police and the road and bridge authorities decide.")
 FAR = "9999-12-31"
 PERMISSION_WORDS = {"special_order": "Special Order (BE16)", "vr1": "VR1 (National Highways)"}
 
@@ -382,156 +378,3 @@ def build_calendar_pdf(C):
 # --------------------------------------------------------------------------- #
 #  The ESDAL details sheet                                                     #
 # --------------------------------------------------------------------------- #
-def esdal_sheet(movement_id, acc, today=None, generated=None):
-    """Everything one sheet prints, as data; None when the caller may not see the movement."""
-    row = abnormal.get(movement_id)
-    if not row or not abnormal._visible(row, acc):
-        return None
-    pg = abnormal.page(acc, today=rules._date(today) or datetime.date.today())
-    m = next((x for x in pg["movements"] if x["id"] == movement_id), None)
-    if not m:
-        return None
-    adv = m.get("advice") or {}
-    nt = adv.get("notices") or {}
-    via = []
-    try:
-        import abnormal_route
-        via = abnormal_route.via_points(m)
-    except Exception:       # noqa: BLE001
-        via = []
-    S = {
-        "movement": m, "id": m["id"], "name": m.get("name"), "team": m.get("team_name"), "status": m.get("status_word") or m.get("status"),
-        "generated": _generated(generated), "tenant": export._tenant().get("name") or "", "demo_notice": export._demo_notice(),
-        "vehicle": m.get("vehicle_word") or rules.VEHICLE_WORDS.get(m.get("vehicle_type") or "", m.get("vehicle_type") or "—"),
-        "fill_in": [("Haulier", ""), ("Contact", ""), ("Vehicle registration", ""), ("ESDAL reference", m.get("esdal_ref") or "")],
-        "load": [("Load", m.get("name")), ("Indivisible", "declared" if m.get("indivisible") else "not declared — say so if it is"),
-                 ("Movements", f"{m.get('movements')}{' (the return abnormal too)' if m.get('return_abnormal') else ''}"),
-                 ("Window", _window(m)), ("Time band", (m.get("time_band") or "day") + " " + "–".join(rules.TIME_BANDS.get(m.get("time_band") or "day", ()))),
-                 ("Vehicle type", None)],
-        "dims": [("Overall length", f"{_nw(m.get('length_m'))} m"), ("Rigid length", f"{_nw(m.get('rigid_length_m'))} m"),
-                 ("Overall width", f"{_nw(m.get('width_m'))} m"), ("Travelling height", f"{_nw(m.get('height_m'))} m"),
-                 ("Projection, front", f"{_nw(m.get('proj_front_m'))} m"), ("Projection, rear", f"{_nw(m.get('proj_rear_m'))} m"),
-                 ("Projection, side", f"{_nw(m.get('proj_side_m'))} m")],
-        "weights": [("Gross weight", f"{_nw(m.get('gross_t'))} t"), ("Heaviest axle", f"{_nw(m.get('max_axle_t'))} t" + (" (a driving axle)" if m.get("axle_driving") else "")),
-                    ("Axles", _nw(m.get("axle_count"))), ("Axle spacings", m.get("axle_spacings_m") or "not typed"),
-                    ("C&U vehicle", "yes" if m.get("cu_vehicle") else "no")],
-        "route": [("From", (m.get("origin_name") or "—") + (f", {m['origin_gate_name']}" if m.get("origin_gate_name") else "")),
-                  ("To", (m.get("dest_name") or "—") + (f", {m['dest_gate_name']}" if m.get("dest_gate_name") else "")),
-                  ("Via points", "; ".join(f"{p[0]:.5f}, {p[1]:.5f}" for p in via) if via else "none"),
-                  ("Roads (indicative)", m.get("roads_words") or ("not drawn yet" if not m.get("routed") else "—")),
-                  ("Distance", f"{m['distance_km']:g} km" if m.get("routed") and m.get("distance_km") is not None else "—")],
-        "notices": [("Class", adv.get("category_words") or adv.get("summary") or "—"),
-                    ("Permission", _permission_words(adv)),
-                    ("Apply by", _apply_words({"apply_by": adv.get("apply_by"), "apply_by_be16": adv.get("apply_by_be16")}) if adv.get("apply_by") else "—"),
-                    ("Police notice", _police_words({"police_by": nt.get("police_by"), "police_days": nt.get("police_days")})
-                     + (f"; {', '.join(nt.get('police_triggers') or [])}" if nt.get("police_triggers") else "")),
-                    ("Authorities' notice", _rba_words({"rba_by": nt.get("rba_by"), "rba_days": nt.get("rba_days"), "rba_indemnity": nt.get("rba_indemnity")})),
-                    ("Notify by", (_day(adv["notify_by"]) + (f" — {adv['calendar_words']}" if adv.get("calendar_words") else "")) if adv.get("notify_by") else "—"),
-                    ("Attendant", "required" if adv.get("attendant") else "not required by the figures"),
-                    ("Escort", f"{ESCORT_EXPECTED_WORDS.get(adv.get('escort_expected') or 'none', adv.get('escort_expected'))}; planned: {ESCORT_WORDS.get(m.get('escort_planned') or 'none', m.get('escort_planned'))}"),
-                    ("Markers", ", ".join(adv.get("markers") or []) or "none required by the figures"),
-                    ("Speeds", f"{', '.join(str(x) for x in adv['speeds_mph'])} mph (motorway, dual carriageway, other roads)" if adv.get("speeds_mph") else "—"),
-                    ("Height", "; ".join(adv.get("height") or []) or "—")],
-        "refs": [("ESDAL", m.get("esdal_ref") or "—"), ("VR1", m.get("vr1_ref") or "—"), ("Special Order", m.get("so_ref") or "—"),
-                 ("Applied on", _day(m["applied_on"]) if m.get("applied_on") else "—"), ("Notified on", _day(m["notified_on"]) if m.get("notified_on") else "—")],
-        "lines": list(adv.get("lines") or []), "notes": list(adv.get("notes") or []),
-        "flags": [f"{FLAG_WORDS.get(f.get('code'), f.get('code'))}: {f.get('text')}" for f in (m.get("flags") or [])],
-        "pinch": [f"{c.get('id')} · {c.get('words')} — {abnormal_route_grade(c)}" for c in (m.get("candidates") or [])]
-                 + [f"{t.get('id')} · {t.get('place') or ''}{': ' if t.get('place') and t.get('words') else ''}{t.get('words') or ''} — {abnormal_route_grade(t)} (the planner's own)" for t in (m.get("typed_points") or [])],
-        "route_words": m.get("route_words"), "route_notes": list(m.get("route_notes") or []),
-        "words": {"sheet": SHEET_WORDS, "advice": rules.ADVICE_WORDS, "not_modelled": rules.NOT_MODELLED_WORDS,
-                  "counted_apart": (pg.get("words") or {}).get("counted_apart")},
-    }
-    S["load"][-1] = ("Vehicle type", S["vehicle"])
-    return S
-
-
-def abnormal_route_grade(c):
-    try:
-        import abnormal_route
-        return abnormal_route.GRADE_WORDS.get(c.get("grade") or "grey", c.get("grade") or "grey")
-    except Exception:       # noqa: BLE001
-        return c.get("grade") or "grey"
-
-
-def esdal_file_name(S):
-    safe = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in str(S["id"]))
-    return f"esdal-details-{safe}.pdf"
-
-
-def build_esdal_pdf(S):
-    """The ESDAL details sheet as an A4 portrait PDF, more pages when the pinch-point list needs them."""
-    if export.rl_canvas is None:
-        raise RuntimeError("reportlab is not installed: " + export.MISSING.get("pdf", ""))
-    W, H = export.A4
-    buf = io.BytesIO()
-    c = export.rl_canvas.Canvas(buf, pagesize=(W, H))
-    c.setTitle(f"ESDAL details sheet — {S['id']}")
-    m = 12 * export.mm
-    cw = W - 2 * m
-    R, B = export._BF("regular"), export._BF("bold")
-    sub = f"{S['id']} · {S['name']} · {S['team'] or ''} · {S['status']}. " + S["words"]["sheet"]
-    P = _Page(c, W, H, m, _header_block("ESDAL details sheet", sub, S),
-              _footer_block(S, S["words"]["advice"] + " " + (S["words"]["counted_apart"] or "")))
-
-    def section(title, pairs, cols=2):
-        P.need(22)
-        P.y -= 8
-        c.setFillColorRGB(*export.NAVY_RGB)
-        c.setFont(B, 9.6)
-        P.y -= 9.6
-        c.drawString(m, P.y, export._pdf_safe(title))
-        P.y -= 3
-        colw = cw / cols
-        i = 0
-        while i < len(pairs):
-            group = pairs[i:i + cols]
-            cells = [(k, export._wrap(str(v if v is not None else "") or "____________________", R, 8.2, colw - 104)) for k, v in group]
-            h = max(len(v) for _, v in cells) * 10.4 + 4
-            P.need(h)
-            x = m
-            for k, lines in cells:
-                c.setFillColorRGB(*export.GREY)
-                c.setFont(R, 7.6)
-                c.drawString(x, P.y - 9, export._pdf_safe(k))
-                c.setFillColorRGB(*export.NAVY_RGB)
-                c.setFont(R, 8.2)
-                for j, ln in enumerate(lines):
-                    c.drawString(x + 100, P.y - 9 - j * 10.4, ln)
-                x += colw
-            P.y -= h
-            i += cols
-
-    section("For the haulier to fill in", S["fill_in"])
-    section("The load", S["load"])
-    section("Dimensions (metres)", S["dims"])
-    section("Weights and axles", S["weights"])
-    section("The route", S["route"], cols=1)
-    if S.get("route_words"):
-        P.text(S["route_words"], R, 7.4, export.GREY, cw)
-    for n in S.get("route_notes") or []:
-        P.text("Note: " + n, R, 7.4, export.GREY, cw)
-    section("Notices and permissions, as Wayscope advises them", S["notices"], cols=1)
-    for ln in S["lines"]:
-        P.text("• " + ln, R, 7.8, export.NAVY_RGB, cw, indent=4)
-    for n in S["notes"]:
-        P.text("• " + n, R, 7.8, export.NAVY_RGB, cw, indent=4)
-    for f in S["flags"]:
-        P.text("! " + f, B, 7.8, export.DEMO_FG_RGB, cw, indent=4)
-    section("References", S["refs"])
-    P.y -= 8
-    P.need(20)
-    c.setFillColorRGB(*export.NAVY_RGB)
-    c.setFont(B, 9.6)
-    P.y -= 9.6
-    c.drawString(m, P.y, export._pdf_safe(f"Potential pinch points ({len(S['pinch'])})"))
-    P.y -= 3
-    if S["pinch"]:
-        for p_ in S["pinch"]:
-            P.text(p_, R, 7.6, export.NAVY_RGB, cw, indent=4)
-    else:
-        P.text("None found yet: draw the route on Plan → Abnormal loads.", R, 7.6, export.GREY, cw, indent=4)
-    P.y -= 6
-    P.text(S["words"]["not_modelled"], R, 7.2, export.GREY, cw)
-    P.finish()
-    return buf.getvalue()

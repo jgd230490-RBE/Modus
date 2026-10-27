@@ -350,6 +350,10 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .row-menu-list button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--popover-fg);font:inherit;font-size:14px;padding:7px 10px;border-radius:6px;cursor:pointer;}
   .row-menu-list button:hover{background:rgba(255,255,255,.06);} .row-menu-list button:disabled{opacity:.5;}
   .row-menu-note{font-size:12px;color:var(--popover-muted);padding:6px 10px 4px;border-top:1px solid var(--popover-line);margin-top:4px;white-space:normal;}
+  /* 27 Oct 2026 (the final UI pass, card 1): the one row-action pattern — a filled next step + the "⋯" menu (RowMenu) on every
+     table; a list row that only ever loses a line gets a named "×" instead of a red Remove link */
+  .row-x{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid var(--grey);border-radius:6px;background:var(--surface);color:var(--muted);font-size:15px;line-height:1;cursor:pointer;}
+  .row-x:hover{color:var(--ink);background:var(--surface-2);} .row-x:disabled{opacity:.5;}
   /* 10 Oct 2026 — Configuration as a form (mockup 6): the section list, the field, the one Save bar */
   .cfg-grid{display:grid;grid-template-columns:200px minmax(0,800px);gap:32px;align-items:start;}
   @media (max-width:900px){.cfg-grid{grid-template-columns:1fr;}}
@@ -934,7 +938,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .al-tri{background:none;border:0;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;min-width:24px;min-height:24px;transition:transform .12s;}
   .al-tri.is-open{transform:rotate(90deg);}
   .al-tbl td{white-space:normal;height:auto;padding-top:8px;padding-bottom:8px;vertical-align:top;}
-  .al-tbl td:nth-child(9){white-space:nowrap;}
+  .al-tbl td:nth-child(9){white-space:nowrap;} .al-tbl td[data-al-actions]{white-space:nowrap;}   /* 27 Oct: the next-step button and its ⋯ stay side by side (the Tailwind class on the cell is not defined in this file) */
   .al-det-row > td{padding:0 0 10px;background:var(--surface-2);}
   .al-dl{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;margin:0 0 10px;font-variant-numeric:tabular-nums;}
   .al-dl dt{color:var(--muted);} .al-dl dd{margin:0;}
@@ -2821,7 +2825,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
 // map's hover shows quantity and trips only, as on the Look-ahead).
 // 22 Oct 2026 (abnormal loads, phase 2): one strip under Gate arrivals — loads in the next four weeks, notices due or late
 // this week, permissions still to apply for — and the way to the page. One read (GET /abnormal/summary). Counted apart:
-// nothing here is in the six cards, the charts or the carbon target (D70, D71). Not on the big screen, not on a phone.
+// nothing here is in the six cards, the charts or the carbon target (decisions D70 and D71). Not on the big screen, not on a phone.
 function AbnormalStrip({ onOpen }){
   const [s, setS] = useState(null);
   const [err, setErr] = useState(false);
@@ -3852,7 +3856,7 @@ function CommunityPanel({ access }){
   return (
     <div className="mt-6 pt-5 border-t border-slate-200" data-cfg="community">
       <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Community considerations</h3>
-      <p className="text-[14px] text-slate-600 mb-3">Schools, hospitals, stations, bus stops, homes and more within {st ? st.strip.route_m : 250} m of a route and {st ? st.strip.site_m : 500} m of a site. Staff only. Fetch again after changing routes. The same fetch keeps the bridges, railways, level crossings, traffic calming, overhead lines and tagged limits along the roads for the abnormal loads' potential pinch points, and the strip takes in each abnormal load's own drawn line, so fetch again after drawing one.</p>
+      <p className="text-[14px] text-slate-600 mb-3">Schools, hospitals, stations, bus stops, homes and the roads' structures within {st ? st.strip.route_m : 250} m of a route and {st ? st.strip.site_m : 500} m of a site. Staff only. Fetch again after changing or drawing routes.</p>
       {!st ? <p className="text-[14px] text-slate-500">Reading…</p> : (
         <>
           <p className="text-[14px] text-slate-700 mb-2" data-community-state={st.state}>
@@ -3905,7 +3909,7 @@ function CollisionPanel({ access }){
   return (
     <div className="mt-6 pt-5 border-t border-slate-200" data-cfg="collisions">
       <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Collision history</h3>
-      <p className="text-[14px] text-slate-600 mb-3">Injury collisions from DfT road safety data (the latest five years) within {st ? st.strip.route_m : 250} m of a route, the abnormal loads' too, and {st ? st.strip.site_m : 500} m of a site. Evidence for the CLOCS route risk assessment; it is not the assessment. Staff only. Fetch again after changing routes, and each August.</p>
+      <p className="text-[14px] text-slate-600 mb-3">Injury collisions from DfT road safety data, five years, within {st ? st.strip.route_m : 250} m of a route, the abnormal loads' too, and {st ? st.strip.site_m : 500} m of a site. Evidence, not the assessment. Staff only. Fetch again after changing routes, and each August.</p>
       {!st ? <p className="text-[14px] text-slate-500">Reading…</p> : (
         <>
           <p className="text-[14px] text-slate-700 mb-2" data-collision-state={st.state}>
@@ -4224,7 +4228,7 @@ function fmtWhen(iso){
 // form's live panel reads the rules preview as the figures are typed (nothing saved until Save). Every line of
 // advice is the server's own words, labelled "check with the haulier" (D69); nothing here works a rule out. A team
 // login plans its own team's; a planner approves, reopens, deletes any, types the police time bans and fetches the
-// bank holidays. Desk only (D9): on a phone the Portal shows the desk-only card. Counted apart (D70, D71): nothing
+// bank holidays. Desk only (D9): on a phone the Portal shows the desk-only card. Counted apart (decisions D70 and D71): nothing
 // on this page is a lorry count.
 const AL_FLAG_WORD = { NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };
 const AL_FLAG_TONE = { NOTICE_DUE: "warn", NOTICE_LATE: "bad", SO_LEAD_TIME: "bad", AIL_ROAD_LIMIT: "bad" };
@@ -4277,6 +4281,45 @@ const AL_BLANK = { name: "", ipt: "", vehicle_type: "", origin_id: "", origin_ga
                    width_m: "", height_m: "", length_m: "", rigid_length_m: "", proj_front_m: "", proj_rear_m: "", proj_side_m: "",
                    gross_t: "", max_axle_t: "", axle_driving: false, axle_count: "", axle_spacings_m: "" };
 const AL_NEXT_WORD = { approved: "Approve", pending: "Reopen", notified: "Mark notified", moved: "Mark moved", withdrawn: "Withdraw" };
+// 27 Oct 2026 (the final UI pass, card 1): the ONE forward step a row shows as its filled button; everything else is in the "⋯"
+const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved", withdrawn: "pending" };
+// 27 Oct 2026 (the final UI pass, card 1): the one row-action pattern on every table — the Forecasts page's details.row-menu made
+// general. `name` names the row for a screen reader; the items are plain buttons (red for Delete / Withdraw, which confirm). The open
+// list is pinned to the screen beside its "⋯" (a table's card scrolls, and clipped the list), flips upward near the bottom edge, and
+// closes after a pick or on a scroll; a click elsewhere or Escape closes every details.row-menu (below).
+function RowMenu({ name, note, children }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const d = ref.current; if (!d) return;
+    const list = () => d.querySelector(".row-menu-list");
+    const place = () => {
+      const l = list(), s = d.querySelector("summary"); if (!l || !s) return;
+      const r = s.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+      l.style.position = "fixed"; l.style.left = "auto"; l.style.right = Math.max(8, vw - r.right) + "px";
+      const h = l.offsetHeight, w = l.offsetWidth;
+      l.style.top = (r.bottom + 4 + h <= vh - 8 || r.top - 4 - h < 8 ? r.bottom + 4 : r.top - 4 - h) + "px";
+      if (vw - parseFloat(l.style.right) - w < 8) l.style.right = Math.max(8, vw - 8 - w) + "px";
+    };
+    const onToggle = () => { if (d.open) place(); else { const l = list(); if (l) l.removeAttribute("style"); } };
+    const shut = () => { if (d.open) d.open = false; };
+    d.addEventListener("toggle", onToggle);
+    window.addEventListener("scroll", shut, true); window.addEventListener("resize", shut);
+    return () => { d.removeEventListener("toggle", onToggle); window.removeEventListener("scroll", shut, true); window.removeEventListener("resize", shut); };
+  }, []);
+  const pick = e => { const b = e.target.closest ? e.target.closest("button") : null; if (b && !b.disabled && ref.current) ref.current.open = false; };
+  return (
+    <details className="row-menu" ref={ref}>
+      <summary aria-label={`More actions for ${name}`} title="More actions">⋯</summary>
+      <div className="row-menu-list" onClick={pick}>{children}{note ? <div className="row-menu-note">{note}</div> : null}</div>
+    </details>
+  );
+}
+// 27 Oct 2026: every details.row-menu (the "⋯" menus, More filters, Monthly bulletin, Notice calendar, Config's more) closes on a
+// click outside it and on Escape (the render harness stubs `document` without listeners, hence the guard).
+if (typeof document.addEventListener === "function") {
+  document.addEventListener("click", e => { document.querySelectorAll("details.row-menu[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; }); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") document.querySelectorAll("details.row-menu[open]").forEach(d => { d.open = false; }); });
+}
 const AL_DAY_PRESETS = [["1111100", "Weekdays"], ["1111110", "Mon–Sat"], ["1111111", "Every day"], ["0000011", "Weekends"]];
 
 function AlChip({ tone, children, title }){
@@ -4440,6 +4483,9 @@ function AbnormalPage({ meta, access, who }){
   const transitions = choices.transitions || {};
   const plannerOnly = new Set(choices.planner_only || ["approved", "pending"]);
   const nextOf = (m) => (transitions[m.status] || []).filter(s => canApprove || !plannerOnly.has(s));
+  // 27 Oct 2026: the one forward step (the filled button); a team login has none (approving is a planner's)
+  const forwardOf = (m) => (canApprove && nextOf(m).includes(AL_FORWARD[m.status])) ? AL_FORWARD[m.status] : null;
+  const withdraw = (m) => { if (!window.confirm(`Withdraw "${m.name}"? It leaves the public map and the counts; a planner can reopen it.`)) return; setStatus(m, "withdrawn"); };
   const canDelete = (m) => canApprove || ["pending", "withdrawn"].includes(m.status);
   const banRows = bans || settings.time_bans || [];
   const field = (label, k, props) => (
@@ -4449,14 +4495,20 @@ function AbnormalPage({ meta, access, who }){
   return (
     <div className="max-w-7xl mx-auto p-6 pb-2" data-page="abnormal">
       <PageHeader title="Abnormal loads" kicker="Plan"
-        subtitle="Each abnormal load is planned on its own: its size and weight typed, its own route, its own dates. What the rules say is advice from the typed figures — check with the haulier; ESDAL, the police and the road and bridge authorities decide. Counted apart from the lorries, the CLP caps, the gate capacity and the carbon totals."
+        subtitle="Each load planned on its own and counted apart from the lorries."
         actions={<>
           <button type="button" className="btn-pri" onClick={startNew} disabled={!data || !!form} data-guide="al-plan">Plan an abnormal load</button>
-          <button type="button" className="btn-sec" onClick={() => setShowSettings(s => !s)} aria-expanded={showSettings}>Settings · bank holidays and time bans</button>
-          <button type="button" className="btn-sec" disabled={!data || busy} onClick={() => dl("/abnormal/calendar.xlsx", "abnormal-loads-notice-calendar.xlsx")} data-al-doc="calendar-xlsx"
-            title="Every load you may see with its apply-by, police, authorities and notify-by dates, as a spreadsheet (nothing is sent anywhere)">Notice calendar · XLSX</button>
-          <button type="button" className="btn-sec" disabled={!data || busy} onClick={() => dl("/abnormal/calendar.pdf", "abnormal-loads-notice-calendar.pdf")} data-al-doc="calendar-pdf"
-            title="The same calendar as an A4 landscape PDF">Notice calendar · PDF</button>
+          {/* 27 Oct 2026 (the final UI pass, card 3): the two calendar buttons under one "Notice calendar ▾"; Settings in one word;
+              the ESDAL details sheet is gone (the haulier applies in their own software; the references they give back stay on the load) */}
+          <details className="row-menu" data-al-docs="1">
+            <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }}
+              title="Every load you may see with its apply-by, police, authorities and notify-by dates (nothing is sent anywhere)">Notice calendar ▾</summary>
+            <div className="row-menu-list" style={{ minWidth: 220 }}>
+              <button type="button" disabled={!data || busy} onClick={() => dl("/abnormal/calendar.xlsx", "abnormal-loads-notice-calendar.xlsx")} data-al-doc="calendar-xlsx">Notice calendar · XLSX</button>
+              <button type="button" disabled={!data || busy} onClick={() => dl("/abnormal/calendar.pdf", "abnormal-loads-notice-calendar.pdf")} data-al-doc="calendar-pdf">Notice calendar · PDF</button>
+            </div>
+          </details>
+          <button type="button" className="btn-sec" onClick={() => setShowSettings(s => !s)} aria-expanded={showSettings}>Settings</button>
         </>} />
       {err && <EmptyState kind="error" title="Couldn't open the abnormal loads" body={err} action={<button type="button" className="btn-sec" onClick={load}>Try again</button>} />}
       {note && <div className="card p-3 mb-4 text-sm" role="status" style={{ borderColor: note.ok ? "var(--green)" : "var(--red)" }}>{note.text}</div>}
@@ -4466,7 +4518,6 @@ function AbnormalPage({ meta, access, who }){
           <div className="al-stat"><b>{(by.approved || 0) + (by.notified || 0) + (by.moved || 0)}</b><span>approved or later</span></div>
           <div className="al-stat"><b>{due}</b><span>notices due or late</span></div>
           <div className="al-stat"><b>{toApply}</b><span>Special Orders or VR1s to apply for</span></div>
-          <span className="al-holidays">{settings.holidays ? `Bank holidays: ${settings.holidays.words}` : ""}</span>
         </div>
       )}
       {showSettings && data && (
@@ -4493,7 +4544,7 @@ function AbnormalPage({ meta, access, who }){
                         <td><input className="ctl ctl-sm" type="time" value={b.from || ""} aria-label="From" onChange={e => setBans(rows => (rows || settings.time_bans).map((x, j) => j === i ? { ...x, from: e.target.value } : x))} /></td>
                         <td><input className="ctl ctl-sm" type="time" value={b.to || ""} aria-label="To" onChange={e => setBans(rows => (rows || settings.time_bans).map((x, j) => j === i ? { ...x, to: e.target.value } : x))} /></td>
                         <td><input className="ctl ctl-sm" value={b.note || ""} aria-label="Note" onChange={e => setBans(rows => (rows || settings.time_bans).map((x, j) => j === i ? { ...x, note: e.target.value } : x))} /></td>
-                        <td className="text-right"><button type="button" className="link-btn" style={{ color: "var(--red)" }} onClick={() => setBans(rows => (rows || settings.time_bans).filter((_, j) => j !== i))}>Remove</button></td>
+                        <td className="text-right"><button type="button" className="row-x" aria-label={`Remove time ban ${i + 1}`} title="Remove" onClick={() => setBans(rows => (rows || settings.time_bans).filter((_, j) => j !== i))}>×</button></td>
                       </> : <>
                         <td>{b.force}</td><td>{(AL_DAY_PRESETS.find(p => p[0] === b.days) || [null, b.days])[1]}</td><td>{b.from}</td><td>{b.to}</td><td>{b.note || ""}</td><td></td>
                       </>}
@@ -4601,14 +4652,18 @@ function AbnormalPage({ meta, access, who }){
                           <div className="text-[13px] text-slate-500">{(m.candidates || []).length} to survey{(m.route_notes || []).some(n => /at most/.test(n)) ? " · drawn at 30 m" : ""}{(m.limit_exceeds || []).length ? ` · ${m.limit_exceeds.length} limit${m.limit_exceeds.length === 1 ? "" : "s"} over` : ""}</div></>
                       : <span className="text-[13px] text-slate-500">{m.bake_error ? "not drawn (see the row)" : "not drawn"}</span>}</td>
                     <td><StatusWord status={{ pending: "Pending", approved: "Approved", notified: "Approved", moved: "confirmed", withdrawn: "Rejected" }[m.status]} label={m.status_word} /></td>
-                    <td className="text-right whitespace-nowrap">
-                      <button type="button" className="link-btn" disabled={busy} onClick={() => startEdit(m)}>Edit</button>
-                      {canApprove && <>{" "}<button type="button" className="link-btn" disabled={busy} onClick={() => draw(m)}
-                        title={m.routed ? "Draw the line again for the load's size" : "Draw the line for the load's size"}>{m.routed ? "Draw the route again" : "Draw the route"}</button></>}
-                      {" "}<button type="button" className="link-btn" disabled={busy} onClick={() => dl(`/abnormal/${encodeURIComponent(m.id)}/esdal.pdf`, `esdal-details-${m.id}.pdf`)}
-                        title="The fields ESDAL asks for, as typed and as advised, for the haulier to copy across — a PDF; nothing is sent">ESDAL sheet</button>
-                      {nextOf(m).map(s => <React.Fragment key={s}>{" "}<button type="button" className="link-btn" disabled={busy} onClick={() => setStatus(m, s)}>{AL_NEXT_WORD[s] || s}</button></React.Fragment>)}
-                      {canDelete(m) && <>{" "}<button type="button" className="link-btn" style={{ color: "var(--red)" }} disabled={busy} onClick={() => del(m)}>Delete</button></>}
+                    {/* 27 Oct 2026 (the final UI pass, card 1): one filled button for the next step, the rest in the "⋯" — Withdraw and
+                        Delete red at the bottom, each asking first; the ESDAL details sheet is gone (card 2) */}
+                    <td className="text-right whitespace-nowrap" data-al-actions={m.id}>
+                      {forwardOf(m) && <button type="button" className="btn-pri btn-sm mr-1" disabled={busy} onClick={() => setStatus(m, forwardOf(m))}>{AL_NEXT_WORD[forwardOf(m)]}</button>}
+                      <RowMenu name={m.name} note={m.created_by ? `Planned by ${m.created_by}${m.created_at ? ", " + alDay(m.created_at.slice(0, 10)) : ""}` : null}>
+                        <button type="button" disabled={busy} onClick={() => startEdit(m)}>Edit</button>
+                        {canApprove && <button type="button" disabled={busy} onClick={() => draw(m)}
+                          title={m.routed ? "Draw the line again for the load's size" : "Draw the line for the load's size"}>{m.routed ? "Draw the route again" : "Draw the route"}</button>}
+                        {nextOf(m).filter(s => s !== forwardOf(m) && s !== "withdrawn").map(s => <button key={s} type="button" disabled={busy} onClick={() => setStatus(m, s)}>{AL_NEXT_WORD[s] || s}</button>)}
+                        {nextOf(m).includes("withdrawn") && <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => withdraw(m)}>Withdraw…</button>}
+                        {canDelete(m) && <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => del(m)}>Delete…</button>}
+                      </RowMenu>
                     </td>
                   </tr>
                   {isOpen && (
@@ -4666,7 +4721,7 @@ function AbnormalPage({ meta, access, who }){
                                     {AL_GRADES.map(([k, w]) => <option key={k} value={k}>{w}</option>)}</select></td>
                                   <td className="al-typed-more">{[["owner", "Owner"], ["measure", "Measure"], ["permit", "Permit"], ["works", "Works"], ["link", "Link"], ["note", "Note"]].map(([k, l]) =>
                                     <input key={k} className="ctl ctl-sm" value={t[k] || ""} aria-label={l} placeholder={l} onChange={e => editTyped(m, i, k, e.target.value)} />)}</td>
-                                  <td className="text-right whitespace-nowrap"><button type="button" className="link-btn" style={{ color: "var(--red)" }} disabled={busy} onClick={() => removeTyped(m, i)}>Remove</button></td>
+                                  <td className="text-right whitespace-nowrap"><button type="button" className="row-x" aria-label={`Remove pinch point ${t.id || i + 1}`} title="Remove" disabled={busy} onClick={() => removeTyped(m, i)}>×</button></td>
                                 </tr>) : (
                                 <tr key={i} className="al-typed-row">
                                   <td className="font-semibold whitespace-nowrap">{t.id}</td><td>{AL_KIND_WORDS[t.kind] || t.kind}</td><td>{t.place}</td><td>{t.words}</td>
@@ -4719,7 +4774,8 @@ function AbnormalPage({ meta, access, who }){
           </table>
         </div>
       )}
-      {data && <p className="text-[12px] text-slate-500 mt-3" data-al-words="1">{words.advice} {words.not_modelled} {words.counted_apart}</p>}
+      {/* 27 Oct 2026 (the final UI pass, card 3): one line; what is not worked out and the counted-apart rule are in the guide's chapter 14 */}
+      {data && <p className="text-[12px] text-slate-500 mt-3" data-al-words="1">{words.advice}</p>}
     </div>
   );
 }
@@ -5057,12 +5113,11 @@ function UsersPage({ access }){
   return (
     <div className="max-w-7xl mx-auto p-6 pb-2">
       <PageHeader title="Users" kicker="Data"
-        subtitle={`Who can sign in, and as which ${TEAM().toLowerCase()} or role. A ${TEAM().toLowerCase()} login sees its own ${TEAM().toLowerCase()}'s lines; a planner sees every ${TEAM().toLowerCase()} and approves; an admin also manages logins and the configuration.`} />
+        subtitle={`Who can sign in, and as which ${TEAM().toLowerCase()} or role.`} />
       {!viaLogin && (
         <div className="card p-4 mb-4 text-sm">
           <label className="flex flex-wrap items-center gap-2"><span>Admin token</span>
             <input className="ctl ctl-sm" style={{ minWidth: 260 }} value={token} onChange={e => saveToken(e.target.value)} placeholder="Admin token" aria-label="Admin token" /></label>
-          <p className="text-slate-500 mt-2">To set up per-person sign-in: add yourself below as an Admin, open the link that arrives, choose a password, then sign out and sign in with your email.</p>
         </div>
       )}
       {data && data.codes && (
@@ -5116,11 +5171,14 @@ function UsersPage({ access }){
                         <td>{statusOf(u)}</td>
                         <td className="text-sm text-slate-600">{u.last_sign_in_at ? fmtWhen(u.last_sign_in_at) : "Never"}</td>
                         <td className="text-right whitespace-nowrap">
-                          {!u.disabled && <button type="button" className="btn-sec" disabled={busy} onClick={() => sendLink(u)}
-                            title={u.has_password ? "Email a link to choose a new password (60 minutes)" : "Email the set-your-password link again (72 hours)"}>{u.has_password ? "Send reset link" : "Send invite again"}</button>}{" "}
-                          {u.id !== data.me && <button type="button" className="btn-sec" disabled={busy} style={u.disabled ? undefined : { color: "var(--red)" }}
-                            onClick={() => change(u, { disabled: !u.disabled }, u.disabled ? `${u.name} can sign in again.` : `${u.name} is signed out everywhere and cannot sign in.`)}>
-                            {u.disabled ? "Enable" : "Disable"}</button>}
+                          {/* 27 Oct 2026 (the final UI pass, card 1) */}
+                          <RowMenu name={u.name}>
+                            {!u.disabled && <button type="button" disabled={busy} onClick={() => sendLink(u)}
+                              title={u.has_password ? "Email a link to choose a new password (60 minutes)" : "Email the set-your-password link again (72 hours)"}>{u.has_password ? "Send reset link" : "Send invite again"}</button>}
+                            {u.id !== data.me && <button type="button" disabled={busy} style={u.disabled ? undefined : { color: "var(--red)" }}
+                              onClick={() => change(u, { disabled: !u.disabled }, u.disabled ? `${u.name} can sign in again.` : `${u.name} is signed out everywhere and cannot sign in.`)}>
+                              {u.disabled ? "Enable" : "Disable"}</button>}
+                          </RowMenu>
                         </td>
                       </tr>
                     ))}
@@ -5141,10 +5199,12 @@ function UsersPage({ access }){
                           <td className="text-sm text-slate-600">{u.expires_at ? fmtWhen(u.expires_at) : "—"}</td>
                           <td className="text-sm text-slate-600">{u.last_sign_in_at ? fmtWhen(u.last_sign_in_at) : "Never"}</td>
                           <td className="text-right whitespace-nowrap">
-                            <button type="button" className="btn-sec" disabled={busy} onClick={() => change(u, { extend_days: 7 }, `${u.name}'s demo access now runs 7 days longer.`)}>7 more days</button>{" "}
-                            {u.status === "active" && <button type="button" className="btn-sec" disabled={busy} onClick={() => sendLink(u)}>Send their link again</button>}{" "}
-                            <button type="button" className="btn-sec" disabled={busy} style={u.disabled ? undefined : { color: "var(--red)" }}
-                              onClick={() => change(u, { disabled: !u.disabled }, u.disabled ? `${u.name} can use the demo again.` : `${u.name}'s demo access is off.`)}>{u.disabled ? "Enable" : "Disable"}</button>
+                            <RowMenu name={u.name}>
+                              <button type="button" disabled={busy} onClick={() => change(u, { extend_days: 7 }, `${u.name}'s demo access now runs 7 days longer.`)}>7 more days</button>
+                              {u.status === "active" && <button type="button" disabled={busy} onClick={() => sendLink(u)}>Send their link again</button>}
+                              <button type="button" disabled={busy} style={u.disabled ? undefined : { color: "var(--red)" }}
+                                onClick={() => change(u, { disabled: !u.disabled }, u.disabled ? `${u.name} can use the demo again.` : `${u.name}'s demo access is off.`)}>{u.disabled ? "Enable" : "Disable"}</button>
+                            </RowMenu>
                           </td>
                         </tr>
                       ))}
@@ -5188,13 +5248,16 @@ function UsersPage({ access }){
                             <button type="button" className="btn-pri" disabled={busy} onClick={saveTeamName}>Save</button>{" "}
                             <button type="button" className="btn-sec" disabled={busy} onClick={() => setEditTeam(null)}>Cancel</button>
                           </> : <>
-                            <button type="button" className="btn-sec" disabled={busy} onClick={() => setEditTeam({ id: t.id, label: t.named ? t.label : "" })}
-                              aria-label={`Rename ${t.label}`}>Rename</button>{" "}
-                            {t.active
-                              ? <button type="button" className="btn-sec" disabled={busy} style={{ color: "var(--red)" }} onClick={() => setTeamActive(t, false)}
-                                  aria-label={`Stop using ${t.label}`}>Stop using</button>
-                              : <button type="button" className="btn-sec" disabled={busy} onClick={() => setTeamActive(t, true)}
-                                  aria-label={`Use ${t.label} again`}>Use again</button>}
+                            {/* 27 Oct 2026 (the final UI pass, card 1) */}
+                            <RowMenu name={t.label}>
+                              <button type="button" disabled={busy} onClick={() => setEditTeam({ id: t.id, label: t.named ? t.label : "" })}
+                                aria-label={`Rename ${t.label}`}>Rename</button>
+                              {t.active
+                                ? <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => setTeamActive(t, false)}
+                                    aria-label={`Stop using ${t.label}`}>Stop using</button>
+                                : <button type="button" disabled={busy} onClick={() => setTeamActive(t, true)}
+                                    aria-label={`Use ${t.label} again`}>Use again</button>}
+                            </RowMenu>
                           </>}
                         </td>
                       </tr>
@@ -6080,7 +6143,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   return (
     <div className="max-w-7xl mx-auto p-5">
       <PageHeader title="Submit forecast"
-        subtitle="Choose where the material moves from and to — the route reference fills in automatically. One vehicle per line; a split across two vehicles is two lines." />
+        subtitle="One vehicle per line; a split across two vehicles is two lines." />
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -6214,9 +6277,6 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
           </Field>
         </div>
 
-        <p className="text-[13px] text-slate-400 -mt-1">
-          One vehicle per line: save a haul that uses two vehicle types as two lines.
-        </p>
 
         {/* From year / To year. One save covers the whole range — see the save()
             comment for why widening or narrowing it cannot touch another year's
@@ -6357,12 +6417,10 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
             {ct && <div className="w-full ct-line" data-carbon-target={ctOk(ct) ? "set" : "none"}>{ctCellsTarget(ct)}</div>}
             {ct && ctOk(ct) && ct.status.invalid && <div className="w-full ct-note">{ct.status.invalid}</div>}
           </div>
-          <div className="px-3 py-1.5 text-[13px] text-slate-400 bg-white">
-            Movements = loads per working day ({perDay.wd}/month). Vehicles needed = movements ÷{" "}
-            {tripsPerVehicleDay > 0
-              ? <>the <strong>{tripsPerVehicleDay}</strong> movements one {vehLabel(vehicle)} can make per day on this route (routed cycle), rounded up.</>
-              : <>what one vehicle can do per day on this route — <strong>not routed yet for {vehLabel(vehicle)}</strong>, so no fleet size can be given.</>}
-          </div>
+          {/* 27 Oct 2026 (the final UI pass, card 4): the formula is in the user guide §4.1; the screen keeps only the status that stops a figure */}
+          {tripsPerVehicleDay > 0 ? null : <div className="px-3 py-1.5 text-[13px] text-slate-500 bg-white" data-foot="1">
+            Not routed yet for <strong>{vehLabel(vehicle)}</strong>: no vehicles figure until a planner routes it.
+          </div>}
         </div>
 
         <div className="flex items-center gap-3">
@@ -6610,7 +6668,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
     <div className="max-w-7xl mx-auto p-6">
       <PageHeader title="Forecasts" kicker="Plan"
         subtitle={canApprove
-          ? "Every forecast line you can see, across every year it covers. Approve or reject each line here; approved lines feed the public map, the Look-ahead and the Dashboard."
+          ? "Approve or reject each line; approved lines feed the public map, the Look-ahead and the Dashboard."
           : `Your ${TEAM().toLowerCase()}'s forecast lines, across every year each one covers. Edit reopens a line in Submit forecast; a revised line goes back for approval.`}
         actions={<>
           <button onClick={() => setTick(t => t + 1)} className="btn-sec">Refresh</button>
@@ -6702,19 +6760,16 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                             {canApprove && g.status !== "Approved" && (
                               <button disabled={busy === g.key} onClick={() => setStatus(g, "Approved")} className="btn-pri btn-sm mr-1">Approve</button>
                             )}
-                            <details className="row-menu">
-                              <summary aria-label={`More actions for ${g.routeId}`} title="More actions">⋯</summary>
-                              <div className="row-menu-list">
-                                {canApprove && g.status !== "Rejected" && (
-                                  <button disabled={busy === g.key} onClick={() => setStatus(g, "Rejected")} style={{ color: "var(--red)" }}>Reject…</button>
-                                )}
-                                <button onClick={() => onEdit({ routeId: g.routeId, year: g.fromYear, toYear: g.toYear, discipline: g.discipline, sectionId: g.sectionId })}>Edit in Submit forecast</button>
-                                {(own || canApprove) && (
-                                  <button disabled={busy === g.key} onClick={() => withdraw(g)} style={{ color: "var(--red)" }}>Withdraw…</button>
-                                )}
-                                <div className="row-menu-note">Submitted by {teamText(g.submittedBy) || "—"}{own ? " (you)" : ""}, {g.yearLabel}</div>
-                              </div>
-                            </details>
+                            {/* 27 Oct 2026 (the final UI pass, card 1): the same RowMenu as every other table, the red items last */}
+                            <RowMenu name={g.routeId} note={`Submitted by ${teamText(g.submittedBy) || "—"}${own ? " (you)" : ""}, ${g.yearLabel}`}>
+                              <button onClick={() => onEdit({ routeId: g.routeId, year: g.fromYear, toYear: g.toYear, discipline: g.discipline, sectionId: g.sectionId })}>Edit in Submit forecast</button>
+                              {canApprove && g.status !== "Rejected" && (
+                                <button disabled={busy === g.key} onClick={() => setStatus(g, "Rejected")} style={{ color: "var(--red)" }}>Reject…</button>
+                              )}
+                              {(own || canApprove) && (
+                                <button disabled={busy === g.key} onClick={() => withdraw(g)} style={{ color: "var(--red)" }}>Withdraw…</button>
+                              )}
+                            </RowMenu>
                           </td>
                         </>}>
                         <RdItem t="Route">{g.routeId}</RdItem>
@@ -7002,7 +7057,7 @@ function ConfigPage({ meta, who, access }){
   return (
     <div className="max-w-7xl mx-auto p-6 pb-2">
       <PageHeader title="Configuration" kicker="Data"
-        subtitle="Vehicles, materials, planning constants and seasonal windows — the numbers every forecast, cycle time and map figure is computed from. Changes apply on save, everywhere, for everyone."
+        subtitle="The numbers every figure is computed from. Changes apply on save, for everyone."
         actions={
           <details className="row-menu" data-cfg-more="1">
             <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }} title={tokenNeeded(access) ? "Admin token and reset" : "Reset to defaults"}>More ▾</summary>
@@ -7171,8 +7226,8 @@ function ConfigPage({ meta, who, access }){
                     <span className="text-sm text-slate-500">to</span>
                     <input type="time" className="ctl w-32" value={b.to || ""} aria-label={`Peak band ${i + 1} to`}
                       onChange={e => upd(d => { d.planning.peak_bands[i].to = e.target.value; })} />
-                    <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "4px 10px" }}
-                      onClick={() => upd(d => { d.planning.peak_bands.splice(i, 1); if(!d.planning.peak_bands.length) delete d.planning.peak_bands; })}>Remove</button>
+                    <button type="button" className="row-x" aria-label={`Remove peak band ${i + 1}`} title="Remove"
+                      onClick={() => upd(d => { d.planning.peak_bands.splice(i, 1); if(!d.planning.peak_bands.length) delete d.planning.peak_bands; })}>×</button>
                   </div>
                 ))}
                 {((doc.planning || {}).peak_bands || []).length < PEAK_BANDS_MAX && (
@@ -9265,7 +9320,7 @@ function PhoneLookAhead({ meta, initialPage }){
               </div>
             </div>
           )}
-          <p className="ph-note" style={{ marginTop: 12 }}>Figures are planning figures, not plated weights. To type a day's plan, confirm the week or record what moved, open the Look-ahead on a desktop.</p>
+          <p className="ph-note" style={{ marginTop: 12 }}>To type a day's plan, confirm the week or record what moved, open the Look-ahead on a desktop.</p>
         </>
       )}
     </div>
@@ -12413,9 +12468,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       <PageHeader
         title={onLoc ? "Locations" : onRoutes ? "Routes" : "Zones"}
         subtitle={onLoc
-          ? "Every site the network hauls from and to. Click the map to place one, drag a marker to move it; deleting a site also deletes every route that uses it."
+          ? "Every site the network hauls from and to."
           : onRoutes
-          ? "Origin → destination pairs, routed for a lorry both ways. Moving an end clears the route until it is routed again."
+          ? "Origin → destination pairs, routed for a lorry both ways."
           : "Haul roads, closures and other areas routing knows about."}
         actions={<>
           <span className="text-xs text-slate-400">Basemap</span>
@@ -12709,10 +12764,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                             : <span className="text-amber-700" data-gate-access-missing={g.id}
                                 title="Draw a haul road on Zones from the public road to this gate, then pick it here">no access road drawn</span>}
                           <span className="ml-auto flex gap-2">
-                            <button onClick={() => editGate(g)}
-                              className="text-slate-500 hover:underline">Edit</button>
-                            <button onClick={() => deleteGate(g.id)}
-                              className="text-slate-400 hover:underline">Delete</button>
+                            {/* 27 Oct 2026 (the final UI pass, card 1) */}
+                            <RowMenu name={g.name || g.id}>
+                              <button type="button" onClick={() => editGate(g)}>Edit</button>
+                              <button type="button" style={{ color: "var(--red)" }} onClick={() => deleteGate(g.id)}>Delete…</button>
+                            </RowMenu>
                           </span>
                         </li>
                       ))}
@@ -12822,8 +12878,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                               <input type="time" value={w.to || ""} aria-label={`Shut time ${i + 1} to`}
                                 onChange={e => setGateForm(g => ({ ...g, shut_windows: g.shut_windows.map((x, j) => j === i ? { ...x, to: e.target.value } : x) }))}
                                 className="border border-slate-300 rounded-lg px-2 py-1 text-sm" />
-                              <button type="button" className="text-xs text-slate-500 underline px-2 py-1" aria-label={`Remove shut time ${i + 1}`}
-                                onClick={() => setGateForm(g => ({ ...g, shut_windows: g.shut_windows.filter((_, j) => j !== i) }))}>Remove</button>
+                              <button type="button" className="row-x" aria-label={`Remove shut time ${i + 1}`} title="Remove"
+                                onClick={() => setGateForm(g => ({ ...g, shut_windows: g.shut_windows.filter((_, j) => j !== i) }))}>×</button>
                             </div>
                           ))}
                           </div>
@@ -12912,16 +12968,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
             {!zoneForm && (
               <div className="space-y-2">
-                <p className="text-[13px] text-slate-400">
-                  A zone is an area with dates. Tick <strong>Affects routing</strong> and routes avoid it; unticked, it is only drawn on the maps.
-                </p>
-                <p className="text-[13px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                  Routes avoid the <strong>rectangle</strong> around what you draw: draw a long or L-shaped closure as several small zones.
-                </p>
-                <p className="text-[13px] text-slate-600 border border-slate-200 rounded p-2">
-                  {/* 22 Oct 2026 (UI fix 6, card 6): the words read var(--haul-text) */}
-                  <strong style={{ color: "var(--haul-text)" }}>Temporary haul roads</strong> work the other way: routes go <em>through</em>{" "}
-                  them. Attach one to a route on the <strong>Routes</strong> page (open the route's row).
+                {/* 27 Oct 2026 (the final UI pass, card 4): one line; the rectangle and the haul-road rule are in the user guide §9 */}
+                <p className="text-[13px] text-slate-500">
+                  An area with dates. Ticked <strong>Affects routing</strong>, routes avoid it; a haul road, routes go through it.
                 </p>
               </div>
             )}
@@ -13230,7 +13279,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   backgroundImage: `repeating-linear-gradient(to right, ${FAILED_COLOR} 0 4px, transparent 4px 7px)` }} />No route found
               </span>
             </div>
-            <p className="text-[13px] text-slate-400 mt-2">One colour here: this page shows the network's shape.</p>
             <p className="text-[13px] text-slate-400 mt-1">
               Each route has a laden leg out and an empty leg back. Green vehicle chip: both worked out;{" "}
               <span className="font-semibold">amber ↦</span>: outbound only, no cycle time yet. Open a row (▶) for the cycle figures.
@@ -13344,7 +13392,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 <th className={th}>{TEAM()}</th>
                 <th className="px-3 py-2 text-right font-semibold">{DU()} ({vehShort(showProfile)})</th>
                 <th className={th}>Vehicles</th>
-                <th className="px-3 py-2 text-right font-semibold">Actions</th>
+                <th className="px-3 py-2 text-right font-semibold"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -13396,13 +13444,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         title={Object.keys(r.profiles || {}).length
                           ? `Route again for ${Object.keys(r.profiles).map(vehShort).join(", ")}`
                           : `Not routed yet — will route for ${vehShort(showProfile)}`}
-                        className="inline-flex items-center min-h-6 text-[color:var(--navy)] hover:underline text-xs font-semibold disabled:opacity-40 mr-3">   {/* 18 Oct 2026 (UI audit #29): the one button that spends HERE calls was 16 px tall */}
+                        className="btn-sec btn-sm mr-1">   {/* 18 Oct 2026 (UI audit #29): the one button that spends HERE calls was 16 px tall */}
                         {bakeBusy === r.id ? "Routing…" : "Route"}
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); startEditRoute(r); }}
-                        className="text-[color:var(--navy)] hover:underline text-xs font-semibold mr-3">Edit</button>
-                      <button onClick={(e) => { e.stopPropagation(); deleteRoute(r.id); }}
-                        className="text-[color:var(--red)] hover:underline text-xs font-semibold">Delete</button>
+                      {/* 27 Oct 2026 (the final UI pass, card 1): Edit and Delete in the "⋯"; Route stays as the row's one visible button */}
+                      <span onClick={e => e.stopPropagation()}><RowMenu name={r.id}>
+                        <button type="button" onClick={() => startEditRoute(r)}>Edit</button>
+                        <button type="button" style={{ color: "var(--red)" }} onClick={() => deleteRoute(r.id)}>Delete…</button>
+                      </RowMenu></span>
                     </td>
                   </tr>
                   {open && <RouteAnalysis routeId={r.id} colSpan={7}
@@ -13495,9 +13544,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                             no routes
                           </span>}
                     </td>
-                    <td className="px-3 py-2 text-right">
-                      <button onClick={e => { e.stopPropagation(); removeZone(z); }} disabled={zoneBusy}
-                        className="text-xs text-[color:var(--red)] hover:underline disabled:opacity-40">Delete</button>
+                    <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
+                      {/* 27 Oct 2026 (the final UI pass, card 1) */}
+                      <RowMenu name={z.name || z.id}>
+                        <button type="button" onClick={() => editZone(z)}>Edit</button>
+                        <button type="button" disabled={zoneBusy} style={{ color: "var(--red)" }} onClick={() => removeZone(z)}>Delete…</button>
+                      </RowMenu>
                     </td>
                   </tr>
                 );
