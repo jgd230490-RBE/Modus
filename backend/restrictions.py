@@ -86,6 +86,7 @@ from datetime import datetime, timezone
 
 import db
 import projection
+import read_cache
 import zones
 
 BASE = "https://tarktee.ee/tarktee/rest/services"
@@ -354,18 +355,34 @@ def _get(url):
         return json.load(resp)
 
 
+#: Goes up on every fetch that fills the cache and on clear_cache(): the key of the stored route check
+#: (see check_all), so that answer is rebuilt whenever the feed it was built from has been replaced.
+_GEN = 0
+
+
 def _cached(key, ttl, build):
+    global _GEN
     hit = _cache.get(key)
     now = time.time()
     if hit and (now - hit[0]) < ttl:
         return hit[1]
     val = build()
     _cache[key] = (now, val)
+    _GEN += 1
     return val
 
 
-def clear_cache():
+def clear_cache(everything=False):
+    """The admin refresh: the next request fetches again. The last good copy of the National Highways feed
+    is KEPT (so a provider that is down at that moment still leaves the map its closures) unless
+    `everything` is set (tests)."""
+    global _GEN, _NH_GOOD
     _cache.clear()
+    _FILTERED.clear()
+    _FC_NH.clear()
+    _GEN += 1
+    if everything:
+        _NH_GOOD = None
     return {"cleared": True}
 
 
@@ -569,7 +586,7 @@ def _nh_page(offset, count=NH_PAGE, timeout=None):
     return _get(f"{NH_QUERY_URL}?{q}")
 
 
-def fetch_nh_closures(current_only=True):
+def fetch_nh_closures(current_only=True, _force=False):
     """
     Every planned closure on the strategic road network as one WGS84 FeatureCollection,
     paged through the FeatureServer (1000 per call, `resultOffset`). `current_only`
@@ -609,10 +626,13 @@ def fetch_nh_closures(current_only=True):
                 "colour": spec["colour"], "source": NATIONAL_HIGHWAYS["attribution"],
                 "fetched_layers": 1, "pages": pages, "errors": errors}
 
-    fc = _cached("lyr:nh_closures", CACHE_TTL_S, build)
+    fc = _nh_feed(build, force=_force)
     if fc.get("error") or not current_only:
         return fc
     today = datetime.now(timezone.utc).date()
+    hit = _FILTERED.get("nh")
+    if hit and hit[0] is fc and hit[1] == today:
+        return hit[2]                     # the same object, so serialised() and the stored check can hit
     live = []
     for f in fc["features"]:
         b = _epoch_ms((f["properties"] or {}).get("date_to"))
@@ -623,7 +643,96 @@ def fetch_nh_closures(current_only=True):
     out["features"] = live
     out["total_records"] = len(fc["features"])
     out["expired_or_future"] = len(fc["features"]) - len(live)   # here: ENDED only
+    _FILTERED["nh"] = (fc, today, out)
     return out
+
+
+#: 27 Oct 2026 (group 2a): the National Highways feed is national (~8 MB, thousands of closures) and the
+#: public map asked for the route check on every page load. The feed is kept CACHE_TTL_S; when a fresh fetch
+#: fails, comes back with an error on any page, or comes back EMPTY (National Highways' own service answered
+#: zero records on 27 Oct 2026, after a republish) while we hold a good copy no more than STALE_MAX_S old,
+#: the good copy is served instead, marked `stale`, and the fetch is tried again after STALE_RETRY_S.
+STALE_MAX_S = 86400
+STALE_RETRY_S = 300
+_NH_GOOD = None      # (fetched_at, fc) — the last fetch that had closures and no error
+_FILTERED = {}       # "nh" -> (feed fc, today, the current-only copy)
+_FC_NH = {}          # (current_only,) -> (the fetch_nh_closures() result, the fetch_all() dict)
+
+
+def _nh_feed(build, force=False):
+    """The cached feed (see the note above). `force` is the scheduled refresh: fetch now, whatever the age."""
+    global _NH_GOOD, _GEN
+    now = time.time()
+    hit = _cache.get("lyr:nh_closures")
+    if hit and not force and (now - hit[0]) < CACHE_TTL_S:
+        return hit[1]
+    fc = build()
+    bad = bool(fc.get("errors")) or not fc.get("features")
+    good = _NH_GOOD
+    if bad and good and (now - good[0]) <= STALE_MAX_S:
+        fc = dict(good[1])
+        fc["stale"] = True
+        fc["stale_since"] = good[0]
+        # kept for STALE_RETRY_S only, so the provider is asked again soon
+        _cache["lyr:nh_closures"] = (now - CACHE_TTL_S + STALE_RETRY_S, fc)
+    else:
+        fc["fetched_at"] = now
+        fc["stale"] = False
+        if not bad:
+            _NH_GOOD = (now, fc)
+        _cache["lyr:nh_closures"] = (now, fc)
+    _GEN += 1
+    return fc
+
+
+def refresh_feed():
+    """The scheduled refresh (start_refresher, and the admin's button): fetch the feed now, then rebuild the
+    stored route check the public map reads. Never raises."""
+    try:
+        if not enabled() or (current() or {}).get("key") != "nh_closures":
+            return {"refreshed": False, "reason": "not the National Highways provider"}
+        fetch_nh_closures(current_only=False, _force=True)
+        return {"refreshed": True, "feed": feed_state()}
+    except Exception as e:  # noqa: BLE001
+        return {"refreshed": False, "error": f"{e.__class__.__name__}: {str(e)[:160]}"}
+
+
+#: How often the scheduled refresh fetches the feed — before the CACHE_TTL_S copy runs out, so a viewer never
+#: waits for the fetch. The longest a closure the provider has changed can show the old way is CACHE_TTL_S.
+REFRESH_EVERY_S = 1200
+
+
+def start_refresher(tenant):
+    """One daemon thread: every REFRESH_EVERY_S fetch the National Highways feed and rebuild the stored route
+    check. Called from main.lifespan only (never by an import), beside read_cache.start_warmer."""
+    def run():
+        time.sleep(read_cache.WARM_FIRST_S + 30)       # the warmer's first pass fetches it at start-up
+        while True:
+            token = db.set_current_tenant(tenant)
+            try:
+                res = refresh_feed()
+                if res.get("refreshed"):
+                    check_all(current_only=False)
+                    print(f"🧮 closures: refreshed {res['feed'].get('features')} closure(s)"
+                          f"{' (stale copy)' if res['feed'].get('stale') else ''}")
+            except Exception as e:  # noqa: BLE001 — a refresh must never take the app down
+                print(f"⚠️  closures: refresh failed: {e.__class__.__name__}: {str(e)[:160]}")
+            finally:
+                db.reset_current_tenant(token)
+            time.sleep(REFRESH_EVERY_S)
+
+    threading.Thread(target=run, name="closures-refresher", daemon=True).start()
+
+
+def feed_state():
+    """How current the cached National Highways feed is, for the diagnostics and the technical guide."""
+    hit = _cache.get("lyr:nh_closures")
+    if not hit:
+        return {"cached": False, "last_good_age_s": (round(time.time() - _NH_GOOD[0]) if _NH_GOOD else None)}
+    fc = hit[1]
+    return {"cached": True, "stale": bool(fc.get("stale")),
+            "features": len(fc.get("features") or []),
+            "data_age_s": round(time.time() - (fc.get("stale_since") or fc.get("fetched_at") or hit[0]))}
 
 
 _SERIALISED = {}     # (keys, current_only) -> (fc, body)
@@ -655,15 +764,23 @@ def fetch_all(keys=None, current_only=True):
     p = current()
     if p["key"] == "nh_closures":
         fc = fetch_nh_closures(current_only=current_only)
-        return {"type": "FeatureCollection", "features": fc.get("features") or [],
-                "layers": ["nh_closures"],
-                "errors": ({"nh_closures": fc["errors"]} if fc.get("errors") else {}),
-                "counts": {"nh_closures": len(fc.get("features") or [])},
-                "current_only": current_only,
-                "total_records": fc.get("total_records", len(fc.get("features") or [])),
-                "expired_or_future": fc.get("expired_or_future", 0),
-                "pages": fc.get("pages"),
-                "attribution": p["attribution"], "provider": p["key"]}
+        memo = _FC_NH.get(bool(current_only))
+        if memo and memo[0] is fc:
+            return memo[1]                # the same object while the feed is, so serialised() can hit
+        out = {"type": "FeatureCollection", "features": fc.get("features") or [],
+               "layers": ["nh_closures"],
+               "errors": ({"nh_closures": fc["errors"]} if fc.get("errors") else {}),
+               "counts": {"nh_closures": len(fc.get("features") or [])},
+               "current_only": current_only,
+               "total_records": fc.get("total_records", len(fc.get("features") or [])),
+               "expired_or_future": fc.get("expired_or_future", 0),
+               "pages": fc.get("pages"),
+               "attribution": p["attribution"], "provider": p["key"]}
+        if fc.get("stale"):
+            out["stale"] = True
+            out["stale_since"] = fc.get("stale_since")
+        _FC_NH[bool(current_only)] = (fc, out)
+        return out
     keys = [k for k in (keys or list(LAYERS)) if k in LAYERS]
     out, errors, counts = [], {}, {}
     total, dropped = 0, 0
@@ -1038,6 +1155,17 @@ def check_all(profile=None, layers=None, current_only=True):
     fc = fetch_all(layers, current_only=current_only)
     if not fc.get("features") and fc.get("errors"):
         return {"error": "no restriction data could be fetched", "detail": fc["errors"]}
+    # 27 Oct 2026 (group 2a): the matching below is every route's stored geometry against every closure — seconds
+    # on live with an EMPTY feed (43 routes' lines read and parsed), far more with a full one — and the answer is
+    # the same for every viewer until the feed is replaced, a route is re-drawn (the data version) or the day
+    # turns. So it is kept in memory (read_cache) under that key, one entry per variant.
+    return read_cache.cached(
+        f"restrictions_check:{profile or ''}:{int(bool(current_only))}:{','.join(layers or [])}",
+        (_GEN, datetime.now(timezone.utc).date().isoformat()),
+        lambda: _check_all_build(fc, profile, current_only))
+
+
+def _check_all_build(fc, profile, current_only):
     out = {}
     for r in db.query("SELECT id FROM routes WHERE tenant_id = ? ORDER BY id",
                       (db.current_tenant(),)):
@@ -1049,6 +1177,7 @@ def check_all(profile=None, layers=None, current_only=True):
             "current_only": bool(fc.get("current_only", current_only)),
             "expired_or_future_excluded": fc.get("expired_or_future", 0),
             "layers": fc.get("layers"), "fetch_errors": fc.get("errors") or {},
+            "stale": bool(fc.get("stale")),
             "attribution": fc.get("attribution")}
 
 
@@ -1248,6 +1377,7 @@ def diagnostics(layer=None, probe=False):
         "match_m": match_m(),
         "cache_ttl_s": CACHE_TTL_S,
         "cache": cache_state(),
+        "feed": feed_state(),
         "probe": None,
         "unverified": [
             "tarktee.ee is never called from the build sandbox — every assertion is "
@@ -1305,6 +1435,7 @@ def _nh_diagnostics(probe=False):
         "match_m": match_m(),
         "cache_ttl_s": CACHE_TTL_S,
         "cache": cache_state(),
+        "feed": feed_state(),
         "probe": None,
         "unverified": [
             "the NH FeatureServer has never been called from the build sandbox — the field "
@@ -1357,4 +1488,5 @@ def _nh_diagnostics(probe=False):
 
 def summary():
     return {"provider": (current() or {}).get("key"), "layers": sorted(layers()),
-            "cache": cache_state(), "match_m": match_m()}
+            "cache": cache_state(),
+        "feed": feed_state(), "match_m": match_m()}

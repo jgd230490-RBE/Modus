@@ -151,6 +151,7 @@ async def lifespan(app: FastAPI):
     # (read_cache.start_warmer; again after writes go quiet). WAYSCOPE_WARM_CACHE=0 turns it off (http_smoke does).
     if os.environ.get("WAYSCOPE_WARM_CACHE", "1").strip() != "0":
         read_cache.start_warmer(db.current_tenant())
+        restrictions.start_refresher(db.current_tenant())   # 27 Oct 2026: the closures feed, before it runs out
     yield
 
 
@@ -3624,6 +3625,8 @@ def _areas_months_build():
 
 read_cache.WARMERS[AREAS_MONTHS_CACHE] = lambda: read_cache.cached(AREAS_MONTHS_CACHE, _areas_months_key(),
                                                                    _areas_months_build)
+# 27 Oct 2026 (group 2a): the public map's route check against the closures, built after start-up and after writes
+read_cache.WARMERS["restrictions_check"] = lambda: restrictions.check_all(current_only=False)
 
 
 @app.post("/api/admin/areas/import")
@@ -4899,7 +4902,8 @@ def diagnostics_restrictions(layer: Optional[str] = None, probe: bool = False,
 
 @app.post("/api/admin/restrictions/refresh")
 def refresh_restrictions(token: Optional[str] = None):
-    """Drop the cache so the next request re-fetches from the provider."""
+    """Drop the cache so the next request re-fetches from the provider. The last good copy of the National
+    Highways feed is kept, so a provider that is down at that moment does not leave the map without closures."""
     _check_admin(token)
     return restrictions.clear_cache()
 
