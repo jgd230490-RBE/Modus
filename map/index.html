@@ -4742,6 +4742,22 @@
         const first = layers.find(l => l.source && own.has(l.source));
         return first ? first.id : undefined;
     }
+    // 27 Oct 2026 (live, Jul 2028: Charnwood, Leicester and Melton had no card; "Loughborough", "Leicester" and
+    // "Melton Mowbray" printed instead): since the route lines went under the basemap's names (labelAnchor, 23 Oct) the
+    // first layer of ours is one of them, so areaBeforeId put the cards under the names too, and Mapbox places the higher
+    // layer's labels first. The CARDS go above the basemap's names again, still under every layer of ours that sits there
+    // (the first of ours after labelAnchor); the fills stay where areaBeforeId puts them, under the names and the routes.
+    function areaLabelBeforeId() {
+        const own = new Set(['evr-rail', 'routes-source', 'route-alts-source', 'alignment-source', 'alignment-survey-source',
+                             'chainage-source', 'ws-boundary-source', 'zones-source']);
+        const anchor = labelAnchor();
+        if (!anchor) return areaBeforeId();               // no basemap names (a bare style): as before
+        let layers = [];
+        try { layers = map.getStyle().layers || []; } catch (e) { return undefined; }
+        const i = layers.findIndex(l => l.id === anchor);
+        const first = layers.slice(i + 1).find(l => l.source && own.has(l.source));
+        return first ? first.id : undefined;              // none of ours above the names yet: on top
+    }
     function ensureAreaLayers() {
         if (!AREAS.data || !(AREAS.data.areas || []).length) return;
         if (!map.isStyleLoaded()) { map.once('idle', ensureAreaLayers); return; }
@@ -4754,7 +4770,7 @@
                                             attribution: (AREAS.data.attribution || []).join(' · ') });
             AREAS.drawn = [AREAS.month, AREAS.mode, [...AREAS.off].sort().join(',')].join('|');
         }
-        const before = areaBeforeId();
+        const before = areaBeforeId(), labelBefore = areaLabelBeforeId();
         const vis = areaVisibility(), dVis = vis['area-fill'], cVis = vis['area-county-outline'];
         const district = ['all', ['==', ['get', 'tier'], 'district'], ['!', ['get', 'off']]];
         const labelPt = ['==', ['geometry-type'], 'Point'];          // the labels read the label points only
@@ -4776,9 +4792,9 @@
         // its label only while the districts are off (with them on, their labels sit where it would)
         if (!map.getLayer('area-county-label')) map.addLayer({ id: 'area-county-label', type: 'symbol', source: 'areas-source',
             filter: ['all', ['==', ['get', 'tier'], 'county'], labelPt],
-            layout: areaLabelLayout(vis['area-county-label']), paint: AREA_LABEL_PAINT }, before);
+            layout: areaLabelLayout(vis['area-county-label']), paint: AREA_LABEL_PAINT }, labelBefore);
         if (!map.getLayer('area-label')) map.addLayer({ id: 'area-label', type: 'symbol', source: 'areas-source', filter: district.concat([labelPt]),
-            layout: areaLabelLayout(dVis), paint: AREA_LABEL_PAINT }, before);
+            layout: areaLabelLayout(dVis), paint: AREA_LABEL_PAINT }, labelBefore);
     }
     // 8 x 8 px: a diagonal stroke two pixels wide on a warm grey, mockup 4's hatch (#B8B2A8 on #F3F1EC)
     function areaHatchImage() {
