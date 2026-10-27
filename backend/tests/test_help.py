@@ -971,7 +971,9 @@ ok("27 Oct: the user guide carries the screens' longer sentences — §4.1 the m
    "Movements are loads per working day (22 a month unless Config says otherwise)." in _ug27 and "One vehicle per line: a haul that uses two vehicle types is two lines." in _ug27
    and "Locations: click the map to place a site and drag its marker to move it; deleting a site deletes every route that uses it. Routes: moving an end clears the route until it is routed again." in _ug27
    and "the rectangle around what you draw" in _ug27 and "A temporary haul road works the other way" in _ug27 and "so fetch again after drawing one" in _ug27
-   and "To set up per-person sign-in: on Users, add yourself as an Admin" in _ug27
+   # NARROWED 27 Oct 2026 (pilot readiness F3 c): the first admin is invited by FIRST_ADMIN_EMAIL now; §10 says who adds the rest
+   and "Admins add everyone else on Users; each person then sets a password and two-step sign-in." in _ug27
+   and "To set up per-person sign-in: on Users, add yourself as an Admin" not in _ug27
    and "rules as read on 16 Oct 2026" in _ug27 and "Counted apart: an abnormal load is never in the lorry counts" in _ug27 and "<strong>Settings</strong> shows the copy in use" in _ug27)
 ok("27 Oct: the technical guide — T1 names the advice line and the rules' reading date, T2 lists the pass; no guide mentions an ESDAL details sheet as a thing that exists",
    '<code>abnormal_rules.ADVICE_WORDS</code> ("Advice from the typed figures. The haulier, ESDAL, the police and the road and bridge authorities decide.")' in _tg27

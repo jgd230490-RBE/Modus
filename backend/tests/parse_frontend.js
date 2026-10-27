@@ -4185,7 +4185,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && src.includes("<p className=\"ph-note\" style={{ marginTop: 12 }}>To type a day's plan, confirm the week or record what moved, open the Look-ahead on a desktop.</p>"));
   ok("27 Oct: what left the screens is in the guides — §4.1 the formula, §9 the map hints, the rectangle, the haul road and the fetch rules, §10 the sign-in set-up, chapter 14 the caveats; T1 the advice words and the rules' date; T2 lists the pass",
      _ug27.includes("Movements are loads per working day (22 a month unless Config says otherwise).") && _ug27.includes("Locations: click the map to place a site and drag its marker to move it")
-     && _ug27.includes("To set up per-person sign-in: on Users, add yourself as an Admin") && _ug27.includes("rules as read on 16 Oct 2026")
+     // NARROWED 27 Oct 2026 (pilot readiness F3 c): the first admin comes from FIRST_ADMIN_EMAIL; §10 says who adds the rest
+     && _ug27.includes("Admins add everyone else on Users; each person then sets a password and two-step sign-in.") && _ug27.includes("rules as read on 16 Oct 2026")
      && _tg.includes('<code>abnormal_rules.ADVICE_WORDS</code> ("Advice from the typed figures. The haulier, ESDAL, the police and the road and bridge authorities decide.")')
      && _tg.includes("<li><strong>27 Oct 2026, the final UI pass.</strong>"));
 }

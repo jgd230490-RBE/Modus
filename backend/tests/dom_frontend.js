@@ -2621,7 +2621,9 @@ async function rowsDom(){
     ok("P5: an admin login sees Route all, Clear all routes, the Create route panel and each row's Route / Edit / Delete",
        [...R.el.querySelectorAll("button")].some(b => /^Route all/.test(b.textContent)) && /Create route/.test(R.el.textContent)
        && [...R.el.querySelectorAll("button")].some(b => b.textContent === "Clear all routes")
-       && [...R.el.querySelectorAll("button")].filter(b => b.textContent === "Delete").length === 2
+       // NARROWED 27 Oct 2026 (merged with UI fix 10): Edit and Delete… sit in each row's "⋯" menu now
+       && R.el.querySelectorAll("tbody details.row-menu").length >= 2
+       && [...R.el.querySelectorAll("tbody .row-menu-list button")].filter(b => b.textContent === "Delete…").length === 2
        && !R.el.querySelector("[data-readonly-note]"));
     await R.done();
 
@@ -2654,7 +2656,8 @@ async function rowsDom(){
     ok("⭐ P5 ROUTES (planner): 'Only an admin can change routes.'; no Create route panel, no Route all, no Clear all routes, no Route / Edit / Delete",
        (PR.el.querySelector("[data-readonly-note]") || {}).textContent === "Only an admin can change routes."
        && !/Create route/.test(PR.el.textContent)
-       && ![...PR.el.querySelectorAll("button")].some(b => /^Route all|^Clear all routes$|^Edit$|^Delete$|^Route$/.test(b.textContent.trim())));
+       && ![...PR.el.querySelectorAll("button")].some(b => /^Route all|^Clear all routes$|^Edit$|^Delete…?$|^Route$/.test(b.textContent.trim()))
+       && !PR.el.querySelector("tbody details.row-menu"));
     ok("P5 ROUTES (planner): the route sheet, collision evidence and the route map stay",
        [...PR.el.querySelectorAll("button")].some(b => b.textContent === "Route sheet (drivers)")
        && [...PR.el.querySelectorAll("button")].some(b => /Collision evidence/.test(b.textContent)));
