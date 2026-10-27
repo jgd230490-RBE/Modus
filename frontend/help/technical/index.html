@@ -491,6 +491,18 @@ realignment can follow a road that is no longer there.</li>
 the date it was checked. Mass, height and width give a real verdict; a weak bridge gives a load
 <em>class</em>, not a tonnage, so it is reported unjudged. The whole layer is advisory. The source carries
 expired records. The provider's data is read at most every 30 minutes. When a refresh cannot reach the provider the stored result stays in use and the Look-ahead says so (&ldquo;could not reach …; showing the last check&rdquo;).</li>
+<li><strong>National Highways closures on the public map (27 Oct 2026).</strong> The map asks for the route check
+(<code>GET /api/routes/restrictions</code>) on every page load; the answer is now kept in memory
+(<code>read_cache</code>) and rebuilt only when the feed is replaced, a route is written or the day turns. The feed
+itself is fetched at most every 30 minutes, and a background refresh fetches it every 20 minutes so a visitor never
+waits for it. <strong>How stale a closure can get:</strong> normally at most about 30 minutes after National Highways
+changes it. When a fetch fails, fails on any page, or comes back with no closures at all (National Highways&rsquo; own
+service answered zero records on 27 Oct 2026 after a republish) while a good copy no more than 24 hours old is held,
+that copy is served marked <code>stale</code> and the provider is asked again after 5 minutes; past 24 hours the empty
+or failed answer is accepted. The copy lives in one process and goes with a restart. <code>POST
+/api/admin/restrictions/refresh</code> drops the 30-minute copy and keeps the last good one;
+<code>GET /api/admin/diagnostics/restrictions</code> shows the feed&rsquo;s age and whether it is stale. The screens say
+nothing about any of this.</li>
 <li><strong>Diesel price</strong> — for EU countries and Great Britain, refreshed in the background, never on the
 page read. A failed fetch keeps the last good figure and says when it failed. Elsewhere there is nothing to fetch:
 the price is typed.</li>
