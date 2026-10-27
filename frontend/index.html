@@ -12334,15 +12334,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   };
 
   const editZone = (z) => {
-    if(!canEdit){   // a planner: show the zone on the map, no editor
-      setZoneSel(z.id);
-      const c0 = (z.geometry && z.geometry.coordinates) || [];
-      const pts0 = (z.geometry && z.geometry.type === "Polygon") ? (c0[0] || []) : c0;
-      const m0 = mapObj.current;
-      if(m0 && pts0.length) { try { m0.fitBounds(boundsOf(pts0), { padding: 80, maxZoom: 13, duration: 600 }); } catch(e){} }
-      return;
-    }
-    setZoneForm({ id: z.id, name: z.name || "", kind: z.kind || "other",
+    // 27 Oct 2026 (P5): a planner sees the zone framed on the map; only an admin gets the editor and its vertices
+    if(canEdit) setZoneForm({ id: z.id, name: z.name || "", kind: z.kind || "other",
                   affects_routing: !!z.affects_routing, starts_on: z.starts_on || "",
                   ends_on: z.ends_on || "", note: z.note || "", active: !!z.active,
                   speed_kph: (z.speed_kph == null ? "" : String(z.speed_kph)),
@@ -12356,9 +12349,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const pts = ring.slice();
     if(z.geometry && z.geometry.type === "Polygon"
        && pts.length > 1 && pts[0][0] === pts[pts.length-1][0] && pts[0][1] === pts[pts.length-1][1]) pts.pop();
-    setDrawPts(pts);
-    setZoneDraw(false);
-    setZoneMsg("");
+    if(canEdit){ setDrawPts(pts); setZoneDraw(false); setZoneMsg(""); }
     const m = mapObj.current;
     if(m && pts.length) { try { m.fitBounds(boundsOf(pts), { padding: 80, maxZoom: 13, duration: 600 }); } catch(e){} }
   };
