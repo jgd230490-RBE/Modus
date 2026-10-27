@@ -888,7 +888,7 @@ ok("⭐ 22 Oct 2026 (abnormal loads, phase 3): the guide's chapter 14 — planni
    '<h1 id="14-abnormal-loads">14. Abnormal loads</h1>' in src and src.count('<h2 id="14-') == 3
    and '<li class="l1"><a href="#14-abnormal-loads">14. Abnormal loads</a></li>' in src and src.count('<li class="l2"><a href="#14-') == 3
    and "Advice, never permission" in src and "ESDAL, the police and the road and bridge authorities decide" in src and "counted apart" in src
-   and "Check the roads again" in src and "Notice calendar" in src and "ESDAL details sheet" in src and "approved movements only" in src
+   and "Check the roads again" in src and "Notice calendar" in src and "ESDAL details sheet" not in src and "keeps the reference numbers they give back" in src and "approved movements only" in src   # NARROWED 27 Oct 2026: the sheet is gone
    and not re.search(r"\btrucks?\b", src[src.index('<h1 id="14-abnormal-loads">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')], re.I)
    and not re.search(r"\b(compliant|approved by|real-time|optimi[sz]e|predict)\b", src[src.index('<h1 id="14-abnormal-loads">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')], re.I)
    and '<h2 id="t1-abnormal">Abnormal loads (S16 / B5, 22 Oct 2026)</h2>' in _tg2 and '<li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li>' in _tg2
@@ -944,6 +944,19 @@ ok("23 Oct: the user guide names the bar's Abnormal loads figure (each once, apa
    and "draws each line in raspberry with a white edge" in _ug23 and "each as its route in the month it moves" in _ug23 and "in ink with a white edge" not in _ug23)
 ok("23 Oct: the technical guide says the month figures carry abnormal_loads",
    "<code>abnormal_loads</code>, the ids of the public movements whose window touches the month" in _tg23)
+
+# ---- 27 Oct 2026: the final UI pass — what left the screens is in the guides ----
+_ug27 = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+_tg27 = open(TECH, encoding="utf-8").read()
+ok("27 Oct: the user guide carries the screens' longer sentences — §4.1 the movements / vehicles formula and one vehicle per line, §9 the Locations map hints, the Routes 'moving an end', the Zones rectangle and haul-road rules, the community and collision fetch rules, §10 the sign-in set-up, chapter 14 the advice caveats and the counted-apart rule",
+   "Movements are loads per working day (22 a month unless Config says otherwise)." in _ug27 and "One vehicle per line: a haul that uses two vehicle types is two lines." in _ug27
+   and "Locations: click the map to place a site and drag its marker to move it; deleting a site deletes every route that uses it. Routes: moving an end clears the route until it is routed again." in _ug27
+   and "the rectangle around what you draw" in _ug27 and "A temporary haul road works the other way" in _ug27 and "so fetch again after drawing one" in _ug27
+   and "To set up per-person sign-in: on Users, add yourself as an Admin" in _ug27
+   and "rules as read on 16 Oct 2026" in _ug27 and "Counted apart: an abnormal load is never in the lorry counts" in _ug27 and "<strong>Settings</strong> shows the copy in use" in _ug27)
+ok("27 Oct: the technical guide — T1 names the advice line and the rules' reading date, T2 lists the pass; no guide mentions an ESDAL details sheet as a thing that exists",
+   '<code>abnormal_rules.ADVICE_WORDS</code> ("Advice from the typed figures. The haulier, ESDAL, the police and the road and bridge authorities decide.")' in _tg27
+   and "<li><strong>27 Oct 2026, the final UI pass.</strong>" in _tg27 and "went on 27 Oct 2026" in _tg27 and "ESDAL details sheet" not in _ug27)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

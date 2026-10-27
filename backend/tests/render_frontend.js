@@ -190,7 +190,7 @@ if (loaded) {
   const fSubmitter = render("Forecasts renders for a submitter",
     h(Forecasts, { meta, who: "t", access: submitter, onEdit(){}, onChanged(){} }));
   ok("⭐ the two roles get different copy, not one wording for both",
-    fPlanner !== fSubmitter && fPlanner.includes("Approve or reject each line here")
+    fPlanner !== fSubmitter && fPlanner.includes("Approve or reject each line;")   // NARROWED 27 Oct 2026 (the final UI pass): the planner's lead is one line
     && fSubmitter.includes("across every year each one covers")
     && !fPlanner.includes("across every year each one covers"));
 
@@ -862,7 +862,7 @@ if (loaded) {
       mSet.includes('data-carbon-cells="1"') && mSet.includes("Carbon of these cells: <b>28.3 tCO2e</b> (material 22.6 · transport 5.6)<")
       && mSet.includes('title="Making the material at the UK Government 2026 factor for aggregates; transport there and back on the routed distance."')
       && !mSet.includes("no route distance yet") && mSet.indexOf('data-cost-strip="1"') < mSet.indexOf('data-carbon-cells="1"')
-      && mSet.indexOf('data-carbon-cells="1"') < mSet.indexOf("Movements = loads per working day"));
+      && mSet.includes('data-carbon-cells="1"') && !mSet.includes("Movements = loads per working day"));   // NARROWED 27 Oct 2026: the formula left the screen (user guide §4.1)
     // NARROWED 11 Oct 2026 (the review: Submit forecast showed only "approved plan now", which always read far over a % target;
     // it now says the same three things as the Dashboard and Forecasts, with the server's verdicts)
     ok("...and the scheme target beside it, as forecast AND with the agreed decisions, in the Dashboard's words; nothing undefined or NaN",
@@ -885,7 +885,7 @@ if (loaded) {
       mTp.includes(">Target for your team&#x27;s lines: 43.4 tCO2e, 79.5% of the scheme&#x27;s target (73.1% below the approved plan) · As forecast on your team&#x27;s lines: 161.4 tCO2e, 118.0 tCO2e over the target · With the agreed decisions on your team&#x27;s lines: 43.4 tCO2e, on target<")
       && mTc.includes(">Target for your team&#x27;s lines: 43.4 tCO2e, 79.5% of the scheme&#x27;s fixed cap of 43.4 tCO2e · As forecast on your team&#x27;s lines: 161.4 tCO2e")
       && !mNo.includes("data-carbon-cells") && !mNo.includes("data-carbon-target")
-      && !/IPT\d/.test([mTp, mTc].map(o => seg(o, 'data-cost-strip="1"', "Movements = loads per working day")).join("")) && !/undefined|NaN/.test(mTp + mTc + mNo));
+      && !/IPT\d/.test([mTp, mTc].map(o => seg(o, 'data-cost-strip="1"', "Clear year")).join("")) && !/undefined|NaN/.test(mTp + mTc + mNo));   // NARROWED 27 Oct 2026: the strip ends before the form's buttons now
     const mBad = mx(PC, BAD), mCap2 = mx(PC, CAP2);
     ok("...decisions that no longer apply: 'With the agreed decisions: —' on the line and the server's sentence under it; a cap 2.0 over reads over",
       mBad.includes(" · With the agreed decisions: —<") && mBad.includes('<div class="w-full ct-note">The agreed decisions no longer fit the plan (route &#x27;R4&#x27; does not exist), so the plan with them cannot be worked out. A planner needs to set the target again on the Carbon planner.</div>')

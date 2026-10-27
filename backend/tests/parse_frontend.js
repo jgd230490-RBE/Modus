@@ -27,6 +27,8 @@ const FILE = path.join(ROOT, "frontend", "index.html");
 // 13 Oct 2026 (W4): the technical guide, where the passages the screens no longer carry now live
 const TECH = path.join(ROOT, "frontend", "help", "technical", "index.html");
 const _tg = fs.existsSync(TECH) ? fs.readFileSync(TECH, "utf8").replace(/\r\n?/g, "\n") : "";
+// 27 Oct 2026 (the final UI pass): the user guide, where the screens' longer sentences went
+const _ug27 = (() => { const p = path.join(ROOT, "frontend", "help", "index.html"); return fs.existsSync(p) ? fs.readFileSync(p, "utf8").replace(/\r\n?/g, "\n") : ""; })();
 const html = fs.readFileSync(FILE, "utf8").replace(/\r\n?/g, "\n");   // 9 Oct 2026: a Windows checkout (core.autocrlf) hands us CRLF; the regexes expect LF
 
 let pass = 0;
@@ -826,8 +828,9 @@ ok("approximate matches are declared, not hidden", !code.includes("matched appro
 ok("routing zones and advisory zones are drawn differently",
   code.includes("ZONE_ROUTING") && code.includes("ZONE_ADVISORY"));
 // NARROWED / REVERSED 22 Oct 2026 (UI fix 7, the user: "i dont want to much wording. and no info about api or backend stuff"): the screen says the rectangle in planner words; the HERE detail is in the technical guide
-ok("the panel states that HERE takes boxes, not polygons",
-  src.includes("Routes avoid the <strong>rectangle</strong> around what you draw") && !src.includes("bounding boxes, not polygons") && _tg.includes("bounding boxes, not polygons"));
+ok("the panel no longer states the rectangle rule (NARROWED 27 Oct 2026, the final UI pass: one line on the panel, the rectangle in the user guide §9 and the technical guide)",
+  !src.includes("Routes avoid the <strong>rectangle</strong> around what you draw") && src.includes("An area with dates. Ticked <strong>Affects routing</strong>, routes avoid it; a haul road, routes go through it.")
+  && _ug27.includes("the rectangle around what you draw") && !src.includes("bounding boxes, not polygons") && _tg.includes("bounding boxes, not polygons"));
 ok("the box sent to HERE is no longer printed under a zone; the technical guide gives its form",
   !src.includes("Sent to HERE as bbox:") && _tg.includes("bbox:west,south,east,north"));
 ok("deactivating is offered as the alternative to deleting",
@@ -1047,7 +1050,7 @@ ok("🔴 the save caution, withdraw prompt, row title, row menu and CSV show tea
   code.includes(', submitted by ${teamText(l.submitted_by)}') && !code.includes(', submitted by ${l.submitted_by}')
   && code.includes('(submitted by ${teamText(g.submittedBy)})') && !code.includes('(submitted by ${g.submittedBy})')
   // 13 Oct 2026 (W6, narrowed): the row title is the details' "Submitted by" line
-  && code.includes('<RdItem t="Submitted by">{`${teamText(g.submittedBy) || "—"}') && code.includes('Submitted by {teamText(g.submittedBy) || "—"}')
+  && code.includes('<RdItem t="Submitted by">{`${teamText(g.submittedBy) || "—"}') && code.includes('note={`Submitted by ${teamText(g.submittedBy) || "—"}')   // NARROWED 27 Oct 2026: the note is RowMenu's
   && !/Submitted by \$?\{g\.submittedBy/.test(code)
   && code.includes('g.months, g.status, teamText(g.submittedBy),'));
 ok("...the Forecasts search finds a line by its team NAME as well as the stored value",
@@ -1499,7 +1502,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("🔴 AL: none of the banned words in anything a person reads: compliant, approved by, secure, real-time, AI, predict, optimise, truck",
      alStrings.length > 80 && !alStrings.some(alBanned), alStrings.filter(alBanned).join(" | "));
   ok("AL: the page's words — check with the haulier, counted apart, the flags' words and tones (NOTICE DUE amber, NOTICE LATE and SO LEAD TIME red), the status words",
-     al.includes("check with the haulier; ESDAL, the police and the road and bridge authorities decide. Counted apart from the lorries, the CLP caps, the gate capacity and the carbon totals.")
+     al.includes('subtitle="Each load planned on its own and counted apart from the lorries."')   // NARROWED 27 Oct 2026 (the final UI pass): one line; the rest in the guide's chapter 14
+     && _ug27.includes("the haulier, ESDAL, the police and the road and bridge authorities decide") && _ug27.includes("Counted apart: an abnormal load is never in the lorry counts")
      && al.includes('const AL_FLAG_WORD = { NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
      && al.includes('const AL_FLAG_TONE = { NOTICE_DUE: "warn", NOTICE_LATE: "bad", SO_LEAD_TIME: "bad", AIL_ROAD_LIMIT: "bad" };')
      && al.includes('const AL_NEXT_WORD = { approved: "Approve", pending: "Reopen", notified: "Mark notified", moved: "Mark moved", withdrawn: "Withdraw" };'));
@@ -1520,11 +1524,13 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   const a0 = src.indexOf("// ================================================================= Abnormal loads (22 Oct 2026, S16 / B5)");
   const a1 = src.indexOf("// ================================================================= Public map\n");
   const al = src.slice(a0, a1).split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
-  ok("⭐ AL3: the documents come through the app's fetch — Notice calendar XLSX and PDF in the header, ESDAL sheet in every row — never a bare link (a code sign-in sends its header only through fetch)",
+  ok("⭐ AL3: the documents come through the app's fetch — the Notice calendar's XLSX and PDF under one 'Notice calendar ▾' in the header — never a bare link; "
+     + "REVERSED 27 Oct 2026 (the final UI pass, card 2): no ESDAL sheet anywhere (the haulier applies in their own software)",
      al.includes('onClick={() => dl("/abnormal/calendar.xlsx", "abnormal-loads-notice-calendar.xlsx")}') && al.includes('onClick={() => dl("/abnormal/calendar.pdf", "abnormal-loads-notice-calendar.pdf")}')
-     && al.includes('onClick={() => dl(`/abnormal/${encodeURIComponent(m.id)}/esdal.pdf`, `esdal-details-${m.id}.pdf`)}') && al.includes(">ESDAL sheet</button>")
+     && al.includes('<details className="row-menu" data-al-docs="1">') && al.includes(">Notice calendar ▾</summary>")
+     && !al.includes("esdal.pdf") && !al.includes("ESDAL sheet") && !src.includes("ESDAL sheet") && !src.includes("esdal.pdf")
      && al.includes("const dl = (path, fallback) => act(async () => {") && al.includes("const r = await fetch(`${API}${path}`);") && !/href=\{`\$\{API\}\/abnormal/.test(al)
-     && al.includes('title="The fields ESDAL asks for, as typed and as advised, for the haulier to copy across — a PDF; nothing is sent"'));
+     && al.includes(">Settings</button>") && !al.includes("Settings · bank holidays and time bans") && !al.includes("al-holidays"));
   ok("⭐ AL3: Check the roads again beside the pinch-point heading (a planner's; no HERE call), its note with the count and the fetch date; the structures' words under the table from the server; OpenStreetMap named as a source",
      al.includes('data-al-check={m.id}') && al.includes("const checkRoads = (m) => act(async () => {") && al.includes("/structures`, \"POST\")")
      && al.includes("from OpenStreetMap along the line${j.structures_fetched ? ` (fetched ${alDay(String(j.structures_fetched).slice(0, 10))})` : \"\"}") && al.includes("{words.structures && <p className=\"al-foot\">{words.structures}</p>}")
@@ -1538,7 +1544,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && al.includes("A found pinch point's grade saves as you change it.") && al.includes("{typedRows(m).map((t, i) => canApprove ? ("));
   const cfg = src.slice(src.indexOf('<div className="mt-6 pt-5 border-t border-slate-200" data-cfg="community">'), src.indexOf('<div className="mt-6 pt-5 border-t border-slate-200" data-cfg="collisions">'));
   ok("AL3: Config → Map and bulletin says the same fetch keeps the structures and tagged limits along the roads and takes in each abnormal load's line (the fourth source's row comes from the table the page already draws)",
-     cfg.includes("The same fetch keeps the bridges, railways, level crossings, traffic calming, overhead lines and tagged limits along the roads") && cfg.includes("so fetch again after drawing one")
+     cfg.includes("and the roads' structures within") && cfg.includes("Fetch again after changing or drawing routes.")   // NARROWED 27 Oct 2026 (the final UI pass): two sentences on the screen; the long one in the user guide §9
+     && _ug27.includes("the same fetch takes in each abnormal load's own drawn line, so fetch again after drawing one")
      && cfg.includes("st.sources.map("));
   const al3 = [al.slice(al.indexOf("const dl = (path, fallback)"), al.indexOf("const fetchHolidays")), al.slice(al.indexOf('data-al-typed={m.id}'), al.indexOf('data-al-typed={m.id}') + 4000)].join("\n");
   const strs = al3.match(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g) || [];
@@ -1559,7 +1566,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("⭐ AL2 page: a Route column after Notify by (length and time in the tenant's unit, 'N to survey', 'drawn at 30 m' when HERE capped the length, 'N limits over'); Draw the route is a planner's, after Edit, one HERE call",
      al.includes('["", "Load", TEAM(), "From → to", "Window", "What it needs", "Notify by", "Route", "Status", ""]') && al.includes('data-al-route-cell={m.routed ? "drawn" : "none"}')
      && al.includes('<div className="whitespace-nowrap">{fmtDist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min</div>') && !al.includes("{dist(m.distance_km)}") && !al.includes("${dist(j.distance_km)}") && al.includes('{(m.candidates || []).length} to survey')
-     && al.includes('/at most/.test(n)) ? " · drawn at 30 m" : ""') && al.includes("{canApprove && <>{\" \"}<button type=\"button\" className=\"link-btn\" disabled={busy} onClick={() => draw(m)}")
+     && al.includes('/at most/.test(n)) ? " · drawn at 30 m" : ""') && al.includes("{canApprove && <button type=\"button\" disabled={busy} onClick={() => draw(m)}")   // NARROWED 27 Oct 2026: in the row's "⋯" menu
      && al.includes("await call(`/abnormal/${encodeURIComponent(m.id)}/route`, \"POST\")") && al.includes('{m.routed ? "Draw the route again" : "Draw the route"}'));
   ok("⭐ AL2 row: the route block first in the opened row — the facts (length, roads, HERE's notes in the warning colour, motorway yes / no, when drawn, via points), the candidates table " +
      "(id, kind word, HERE's words and detail, the source, the grade), the signed limits at the load's size, the candidate words; a planner grades (one PUT), others read the grade",
@@ -2110,7 +2117,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && _fcBody.includes("const clearAll = () => setF({ status: \"ALL\", ipt: \"ALL\", discipline: \"ALL\", mine: false, q: \"\" });")
     && !_fcBody.includes("badge(s)"));
   ok("...Approve is the one visible action; Reject, Edit and Withdraw sit behind the row menu; status is a word with a dot",
-    _fcBody.includes('<details className="row-menu">') && _fcBody.includes(">Reject…</button>") && _fcBody.includes(">Edit in Submit forecast</button>") && _fcBody.includes(">Withdraw…</button>")
+    _fcBody.includes("<RowMenu name={g.routeId} note=") && _fcBody.includes(">Reject…</button>") && _fcBody.includes(">Edit in Submit forecast</button>") && _fcBody.includes(">Withdraw…</button>")
     // 13 Oct 2026 (W6, narrowed): the status is RowStatus, a word and an icon (Rejected, ROAD LIMIT, Pending, Mixed, Approved)
     && _fcBody.includes("<RowStatus word={st.word} tone={st.tone} more={st.more} />") && _fcBody.includes('className="btn-pri btn-sm mr-1">Approve</button>'));
   ok("🔴 no 9, 10 or 11 px product text on the Forecasts page (the 13 px allowance only)",
@@ -2244,7 +2251,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && ctc.includes("`The ${pendingN} pending line${pendingN === 1 ? \"\" : \"s\"} would add ${ctT(s.pending_t)} tCO2e.`"));
   ok("⭐ Submit forecast: the cells' carbon is the preview's own block (total and parts as sent, the unrouted words), inside the price strip, with the target beside it",
     mxCt.length > 300 && _mxc.indexOf('data-cost-strip="1"') < _mxc.indexOf("{cost && cost.carbon && (() => {")
-    && _mxc.indexOf("{ctCellsTarget(ct)}</div>}") < _mxc.indexOf("Movements = loads per working day")
+    && _mxc.indexOf("{ctCellsTarget(ct)}</div>}") < _mxc.indexOf('data-foot="1"')   // NARROWED 27 Oct 2026: the formula left the screen (user guide §4.1); the foot is the not-routed status
     && mxCt.includes("Carbon of these cells: <b>{ctT(c.total_t)} tCO2e</b>")
     && mxCt.includes('[["material", c.material_t], ["transport", c.transport_t], ["waste disposal", c.disposal_t]]')
     && mxCt.includes('{c.unrouted ? " · no route distance yet, so transport is not counted" : ""}') && mxCt.includes("title={c.basis || undefined}")
@@ -2627,14 +2634,15 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
 
 // ---- 11 Oct 2026 (late) — guide v2.1 review: the on-screen text that contradicted the guide -------------
 {
-  ok("🔴 the Locations subtitle says deleting a site deletes its routes (network.delete_location), as the confirm does",
-     src.includes("drag a marker to move it; deleting a site also deletes every route that uses it.")
+  ok("🔴 the Locations subtitle is one line; the deletion warning is the confirm's and the user guide §9's (NARROWED 27 Oct 2026, the final UI pass)",
+     !src.includes("drag a marker to move it; deleting a site also deletes every route that uses it.") && src.includes('? "Every site the network hauls from and to."')
+     && _ug27.includes("deleting a site deletes every route that uses it")
      && !src.includes("a site that a route uses cannot be deleted")
      && src.includes("This also removes any routes that use it."));
   ok("🔴 ...the planner's Forecasts subtitle and the Data legend call the map the public map, and the Dashboard by its name",
      src.includes("approved lines feed the public map, the Look-ahead and the Dashboard.")
      // NARROWED 22 Oct 2026 (UI fix 7, fewer words): the Data legend names no map now
-     && src.includes("One colour here: this page shows the network's shape.") && !src.includes("Material colouring lives on")
+     && !src.includes("One colour here: this page shows the network's shape.") && !src.includes("Material colouring lives on")   // NARROWED 27 Oct 2026: the legend's sentence is gone
      && !/approved lines feed the route map|the KPI cards\."|forecasting dashboard and the public route map/.test(src));
 }
 
@@ -3303,7 +3311,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && src.includes("data-sim-shut={g.gate_id}") && src.includes("No lorry arrives before its gate opens; one that arrives while it is shut waits.")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): the i box is four short sentences
      && !src.includes("a pour you type can bring mixers then, and the notes say how many"));
   ok("🔴 the review: each shut time's Remove is named for its row and has a 24 px hit area; the rows are one named group",
-     src.includes("aria-label={`Remove shut time ${i + 1}`}") && src.includes('className="text-xs text-slate-500 underline px-2 py-1"')
+     src.includes("aria-label={`Remove shut time ${i + 1}`}") && src.includes('<button type="button" className="row-x" aria-label={`Remove shut time ${i + 1}`} title="Remove"')   // NARROWED 27 Oct 2026: a named 26 px "×"
      && src.includes('<div role="group" aria-labelledby="gate-shut-h">') && src.includes('id="gate-shut-h">Shut during the day (optional)</div>'));
   ok("⭐ the review: a gate left no open time says so on the chart's tooltip and the week's card, never 'no check-in time typed'",
      src.includes('r.g.no_open_time ? "No open time: the bands and shut times cover its hours" : r.cap == null')
@@ -3702,9 +3710,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && (code.match(/<label key=\{cat\} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">/g) || []).length === 2
      && code.includes('<label key={v} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">')
      && !code.includes('className="flex items-center gap-2 text-xs text-slate-700">') && !code.includes('className="flex items-center gap-1 text-[13px] text-slate-600 whitespace-nowrap">'));
-  ok("#29: the Routes table's Route button (the one that spends HERE calls) is a 24 px inline-flex box; Edit and Delete beside it unchanged",
-     code.includes('className="inline-flex items-center min-h-6 text-[color:var(--navy)] hover:underline text-xs font-semibold disabled:opacity-40 mr-3">')
-     && code.includes('className="text-[color:var(--navy)] hover:underline text-xs font-semibold mr-3">Edit</button>'));
+  ok("#29: the Routes table's Route button (the one that spends HERE calls) is the row's one visible small button; Edit and Delete are in its \"⋯\" (NARROWED 27 Oct 2026, the final UI pass)",
+     code.includes('className="btn-sec btn-sm mr-1">') && code.includes("<span onClick={e => e.stopPropagation()}><RowMenu name={r.id}>")
+     && !code.includes('hover:underline text-xs font-semibold mr-3">Edit</button>'));
   ok("no visible word changed in the app for this branch: the pill still says Guide, the eye Show / Hide password, the links their two sentences",
      code.includes('<button type="button" className="demo-bar-guide" onClick={onGuide} title="Replay the guide for this page">Guide</button>')
      && (code.match(/aria-label=\{show \? "Hide password" : "Show password"\}/g) || []).length === 2
@@ -3844,7 +3852,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      (code.match(/ZONE_HAUL/g) || []).length === 2 && code.includes('const ZONE_HAUL = "#C2790B";')
      && code.includes('paint: { "line-color": ["case", ["get", "is_haul"], ZONE_HAUL,'));
   ok("⭐ UI FIX 6 card 6: the 12 haul-road words and fills read var(--haul-text) — four buttons, eight words — and the two chips sit on a solid var(--haul-soft); the see-through tint is gone",
-     (code.match(/var\(--haul-text\)/g) || []).length === 12 && (code.match(/background: "var\(--haul-text\)"/g) || []).length === 3
+     (code.match(/var\(--haul-text\)/g) || []).length === 11 && (code.match(/background: "var\(--haul-text\)"/g) || []).length === 3   // NARROWED 27 Oct 2026: the Zones panel's haul-road box is gone (11 reads, not 12)
      && code.includes('style={zoneDraw ? { background: isHaul(zoneForm) ? "var(--haul-text)" : ZONE_ROUTING } : undefined}>')
      && (code.match(/style=\{\{ background: "var\(--haul-soft\)", color: "var\(--haul-text\)" \}\}/g) || []).length === 2
      && !code.includes("rgba(194,121,11") && (code.match(/var\(--haul-soft\)/g) || []).length === 2);
@@ -3878,7 +3886,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && html.includes(".rail-group{font-size:12px;") && html.includes(".rail-count{font-size:12px;"));
   ok("UI FIX 7 card 1: the Locations gate list wraps (it crushed each gate into one-word columns, Delete off the card), its small words take the row's 12 px",
      src.includes('className={"flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs rounded px-1.5 py-1 " +')
-     && src.includes('{g.is_default && <span className="text-slate-500">default</span>}') && src.includes('className="text-slate-500 hover:underline">Edit</button>'));
+     && src.includes('{g.is_default && <span className="text-slate-500">default</span>}') && src.includes("<RowMenu name={g.name || g.id}>"));   // NARROWED 27 Oct 2026: Edit and Delete in the gate's "⋯"
   ok("UI FIX 7 card 5: the Account table's Line column keeps 220 px and the planned quantity never breaks before its unit",
      _laBody.includes('<td className="px-3 py-2 min-w-[220px]">')
      && _laBody.includes('<td className="px-2 py-2 text-right tabular-nums font-semibold whitespace-nowrap">{grp(r.planned_qty, 1)} {unitLbl(r.unit)}</td>')
@@ -3900,9 +3908,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
     "Click a marker to edit it, or drag it to move it. Deleting a location deletes its routes.",
     "Blank = not known. Opening stock = what was there at the start. Over capacity is flagged, never blocked.",
     "Where lorries join the public road. Blank = the marker.", "No gates yet: routes use the access gate above, or the marker.",
-    "A zone is an area with dates. Tick <strong>Affects routing</strong> and routes avoid it; unticked, it is only drawn on the maps.",
+    "An area with dates. Ticked <strong>Affects routing</strong>, routes avoid it; a haul road, routes go through it.",   // NARROWED 27 Oct 2026
     "Routes avoid this area; routes that cross it are worked out again.", "Saving works out again every route that crosses this zone.",
-    "Unticking a vehicle deletes its route and alternatives here.", "One colour here: this page shows the network's shape."];
+    "Unticking a vehicle deletes its route and alternatives here."];   // NARROWED 27 Oct 2026: the legend's "One colour here" sentence left the screen
   ok("⭐ UI FIX 7: the new lines are on the screens and carry no API / back-end word (HERE, bbox, factors, probe, stored, cached, token, parameter, endpoint, server)",
      _new.every(t => src.includes(t)) && _new.every(t => !/\b(HERE|bbox|factors|probe|stored|cached|token|parameters?|endpoint|server|API|JSON)\b/.test(t)),
      _new.filter(t => !src.includes(t)).join(" | "));
@@ -4088,6 +4096,53 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
 }
 
 // ---- report ------------------------------------------------------------------
+// ---- 27 Oct 2026: the final UI pass — one row-action pattern, the ESDAL sheet gone, fewer words (the user: minimal and clear;
+//      the haulier plans and applies in their own software; notes/ui-fix-actions-mockup-1027, yes to all) ----
+{
+  // the script with its comments stripped (block, JSX and whole-line or trailing // comments): what a screen can print
+  const _nc27 = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/[^\n]*/gm, "$1");
+  ok("⭐ 27 Oct: RowMenu — the Forecasts page's details.row-menu made general: a named '⋯' summary, the items plain buttons, a note under them",
+     src.includes("function RowMenu({ name, note, children }) {") && src.includes("<summary aria-label={`More actions for ${name}`} title=\"More actions\">⋯</summary>")
+     && src.includes('<div className="row-menu-list" onClick={pick}>{children}{note ? <div className="row-menu-note">{note}</div> : null}</div>')
+     && src.includes('l.style.position = "fixed"; l.style.left = "auto";') && src.includes('window.addEventListener("scroll", shut, true); window.addEventListener("resize", shut);')
+     && src.includes("if (b && !b.disabled && ref.current) ref.current.open = false;")
+     && src.includes('document.addEventListener("click", e => { document.querySelectorAll("details.row-menu[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; }); });')
+     && src.includes('if (e.key === "Escape") document.querySelectorAll("details.row-menu[open]").forEach(d => { d.open = false; });'));   // 27 Oct, after the Chrome check: pinned to the screen, closes after a pick / on scroll / a click elsewhere / Escape
+  ok("⭐ 27 Oct: the Abnormal loads actions cell keeps the next-step button and its '⋯' on one line (the table's other cells wrap)",
+     html.includes(".al-tbl td[data-al-actions]{white-space:nowrap;}"));
+  const menus = (src.match(/<RowMenu name=\{[^}]+\}/g) || []);
+  ok("⭐ 27 Oct: the '⋯' on six tables — Abnormal loads (with its note), Routes, Zones, the gates list, the logins, the demo leads, the teams",
+     menus.length === 8 && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
+     && src.includes("<RowMenu name={g.name || g.id}>") && (src.match(/<RowMenu name=\{u\.name\}>/g) || []).length === 2 && src.includes("<RowMenu name={t.label}>"), String(menus.length));
+  ok("⭐ 27 Oct: Abnormal loads — one filled button for the forward step (AL_FORWARD: pending → approved → notified → moved; withdrawn → pending), the rest in the menu, Withdraw and Delete red and asking first",
+     src.includes('const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved", withdrawn: "pending" };')
+     && src.includes("const forwardOf = (m) => (canApprove && nextOf(m).includes(AL_FORWARD[m.status])) ? AL_FORWARD[m.status] : null;")
+     && src.includes('{forwardOf(m) && <button type="button" className="btn-pri btn-sm mr-1" disabled={busy} onClick={() => setStatus(m, forwardOf(m))}>{AL_NEXT_WORD[forwardOf(m)]}</button>}')
+     && src.includes('{nextOf(m).includes("withdrawn") && <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => withdraw(m)}>Withdraw…</button>}')
+     && src.includes('{canDelete(m) && <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => del(m)}>Delete…</button>}')
+     && src.includes('const withdraw = (m) => { if (!window.confirm(`Withdraw "${m.name}"?') && !src.includes('className="link-btn" disabled={busy} onClick={() => startEdit(m)}>Edit</button>'));
+  ok("27 Oct: a list row that only loses a line has a named '×' (.row-x): the time bans, the typed pinch points, the peak bands, a gate's shut times; no red Remove link is left",
+     (src.match(/className="row-x" aria-label=\{`Remove /g) || []).length === 4 && html.includes(".row-x{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;")
+     && !src.includes('className="link-btn" style={{ color: "var(--red)" }}') && !src.includes(">Remove</button>"));
+  ok("27 Oct: the Routes column head is for a screen reader only; the Delete and Withdraw items end in an ellipsis because a confirm follows",
+     src.includes('<th className="px-3 py-2 text-right font-semibold"><span className="sr-only">Actions</span></th>')
+     && (src.match(/>Delete…<\/button>/g) || []).length === 4 && src.includes('onClick={() => deleteRoute(r.id)}>Delete…</button>'));
+  ok("⭐ 27 Oct: the words — every lead is one line; the foot of Abnormal loads prints the advice line only; no screen prints a decision code in brackets",
+     src.includes('? "Approve or reject each line; approved lines feed the public map, the Look-ahead and the Dashboard."')
+     && src.includes('subtitle="One vehicle per line; a split across two vehicles is two lines." />') && !src.includes("One vehicle per line: save a haul that uses two vehicle types as two lines.")
+     && src.includes('? "Origin → destination pairs, routed for a lorry both ways."') && src.includes('subtitle={`Who can sign in, and as which ${TEAM().toLowerCase()} or role.`}')
+     && !src.includes("To set up per-person sign-in: add yourself below as an Admin") && src.includes('subtitle="The numbers every figure is computed from. Changes apply on save, for everyone."')
+     && src.includes('data-al-words="1">{words.advice}</p>') && !src.includes("{words.not_modelled} {words.counted_apart}")
+     && !/\(D\d{2,3}[,)]/.test(_nc27) && !_nc27.includes("Movements = loads per working day")   // comments may cite a decision; no screen text does
+     && src.includes("Not routed yet for <strong>{vehLabel(vehicle)}</strong>: no vehicles figure until a planner routes it.")
+     && src.includes("<p className=\"ph-note\" style={{ marginTop: 12 }}>To type a day's plan, confirm the week or record what moved, open the Look-ahead on a desktop.</p>"));
+  ok("27 Oct: what left the screens is in the guides — §4.1 the formula, §9 the map hints, the rectangle, the haul road and the fetch rules, §10 the sign-in set-up, chapter 14 the caveats; T1 the advice words and the rules' date; T2 lists the pass",
+     _ug27.includes("Movements are loads per working day (22 a month unless Config says otherwise).") && _ug27.includes("Locations: click the map to place a site and drag its marker to move it")
+     && _ug27.includes("To set up per-person sign-in: on Users, add yourself as an Admin") && _ug27.includes("rules as read on 16 Oct 2026")
+     && _tg.includes('<code>abnormal_rules.ADVICE_WORDS</code> ("Advice from the typed figures. The haulier, ESDAL, the police and the road and bridge authorities decide.")')
+     && _tg.includes("<li><strong>27 Oct 2026, the final UI pass.</strong>"));
+}
+
 console.log();
 for (const f of fail) console.log("  FAIL:", f);
 console.log(`\n${pass} passed, ${fail.length} failed`);
