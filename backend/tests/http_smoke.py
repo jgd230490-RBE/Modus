@@ -1763,7 +1763,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and [m["status"] for m in _abj["movements"]] == ["approved", "pending", "pending"] and all(m.get("geometry") is None for m in _abj["movements"])
        and _abj.get("settings", {}).get("holidays", {}).get("source") == "seed"
        and _abj.get("settings", {}).get("time_bans") == [] and len(_abj.get("choices", {}).get("locations") or []) == 18
-       and "check with the haulier" in (_abj.get("words", {}).get("advice") or "").lower(), _ab.text[:200])
+       and "the haulier, esdal, the police" in (_abj.get("words", {}).get("advice") or "").lower(), _ab.text[:200])   # NARROWED 27 Oct 2026: the one advice line
     _pv = c.get("/api/abnormal/rules", params={"width_m": 4.6, "height_m": 3.9, "length_m": 16.5, "gross_t": 40, "max_axle_t": 9,
                                                 "axle_count": 6, "indivisible": "true", "date_from": "2027-03-08"}, headers=NORTH)
     _pvj = _pv.json() if _pv.status_code == 200 else {}
@@ -1832,12 +1832,12 @@ with TestClient(main.app, base_url="https://testserver") as c:
     _cal = c.get("/api/abnormal/calendar.xlsx", headers=PLAN)
     _calp = c.get("/api/abnormal/calendar.pdf", headers=PLAN)
     _es = c.get(f"/api/abnormal/{_cm}/esdal.pdf", headers=PLAN)
-    ok("abnormal loads, phase 3 (D73): the notice calendar as XLSX and PDF and a movement's ESDAL details sheet — any sign-in (401 signed out), the right media types and file names, a missing movement a 404",
-       c.get("/api/abnormal/calendar.xlsx").status_code == 401 and c.get(f"/api/abnormal/{_cm}/esdal.pdf").status_code == 401
+    # REVERSED 27 Oct 2026 (the final UI pass, card 2): the ESDAL details sheet is gone — its path answers nothing now
+    ok("abnormal loads, phase 3 (D73): the notice calendar as XLSX and PDF — any sign-in (401 signed out), the right media types and file names; the ESDAL sheet's old path is no route (404)",
+       c.get("/api/abnormal/calendar.xlsx").status_code == 401 and c.get(f"/api/abnormal/{_cm}/esdal.pdf").status_code in (401, 404)
        and _cal.status_code == 200 and "spreadsheetml" in _cal.headers.get("content-type", "") and "notice-calendar" in _cal.headers.get("content-disposition", "")
        and _calp.status_code == 200 and _calp.headers.get("content-type") == "application/pdf" and _calp.content[:4] == b"%PDF"
-       and _es.status_code == 200 and _es.content[:4] == b"%PDF" and f"esdal-details-{_cm}" in _es.headers.get("content-disposition", "")
-       and c.get("/api/abnormal/AL999/esdal.pdf", headers=PLAN).status_code == 404, f"{_cal.status_code} {_calp.status_code} {_es.status_code}")
+       and _es.status_code == 404 and c.get("/api/abnormal/AL999/esdal.pdf", headers=PLAN).status_code == 404, f"{_cal.status_code} {_calp.status_code} {_es.status_code}")
     _chk = c.post(f"/api/abnormal/{_cm}/structures", headers=dict(PLAN, **{"X-Wayscope": "1"}))
     ok("abnormal loads, phase 3: Check the roads again — a team code may not (403), a missing movement is a 404, an unrouted one a 400 in words (draw first), no HERE call needed",
        c.post(f"/api/abnormal/{_cm}/structures", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403

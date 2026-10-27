@@ -1825,10 +1825,10 @@ async function abnormalDom(){
   const rowOf = (el, id) => el.querySelector(`[data-al-row="${id}"]`);
 
   const p = await mount(plannerAcc);
-  ok("⭐ AL DOM: ONE read of /api/abnormal mounts the page: the header, the four tiles (2 planned, 1 approved or later, 1 notice due or late, 1 to apply for), the holidays' words",
+  ok("⭐ AL DOM: ONE read of /api/abnormal mounts the page: the header, the four tiles (2 planned, 1 approved or later, 1 notice due or late, 1 to apply for); the holidays' words no longer beside them",
      calls.filter(c => c.url === "/api/abnormal").length === 1 && p.el.querySelector("h2").textContent === "Abnormal loads"
      && [...p.el.querySelectorAll(".al-stat b")].map(b => b.textContent).join("|") === "2|1|1|1"
-     && p.el.querySelector(".al-holidays").textContent.includes("the copy shipped with Wayscope (fetched 22 Oct 2026)"), [...p.el.querySelectorAll(".al-stat b")].map(b => b.textContent).join("|"));
+     && !p.el.querySelector(".al-holidays"), [...p.el.querySelectorAll(".al-stat b")].map(b => b.textContent).join("|"));   // NARROWED 27 Oct 2026 (the final UI pass): the holidays' words live in the Settings card now (asserted there)
   ok("⭐ AL DOM: a row a movement with the team's NAME, the class chip from the server's advice, the notify-by date and the flag with its tone, the apply-by line",
      !!rowOf(p.el, "AL001") && rowOf(p.el, "AL001").textContent.includes("Central Team") && rowOf(p.el, "AL001").querySelector(".al-chip.al-stgo").textContent === "STGO Cat 1"
      && rowOf(p.el, "AL001").textContent.includes("3 Mar 2027") && rowOf(p.el, "AL001").querySelector(".al-chip.al-bad").textContent === "NOTICE LATE"
@@ -1837,9 +1837,13 @@ async function abnormalDom(){
   ok("AL DOM: the window reads as one span (8–12 Mar 2027, day, 3 movements) and the size line as the figures typed",
      rowOf(p.el, "AL001").textContent.includes("8–12 Mar 2027") && rowOf(p.el, "AL001").textContent.includes("day · 3 movements")
      && rowOf(p.el, "AL001").textContent.includes("Low-loader · 4.6 × 3.9 × 16.5 m · 40 t · 6 axles · 9 t axle"));
-  ok("⭐ AL DOM: a planner's actions follow the server's transitions: Approve and Withdraw on a pending movement, Mark notified / Mark moved / Withdraw / Reopen on an approved one, Delete on both",
-     [...rowOf(p.el, "AL002").querySelectorAll("button.link-btn")].map(b => b.textContent).join("|") === "Edit|Draw the route|ESDAL sheet|Approve|Withdraw|Delete"
-     && [...rowOf(p.el, "AL001").querySelectorAll("button.link-btn")].map(b => b.textContent).join("|") === "Edit|Draw the route again|ESDAL sheet|Mark notified|Mark moved|Withdraw|Reopen|Delete");   // NARROWED 22 Oct 2026 (phase 3): + ESDAL sheet; AL001 drawn in the fixture   // NARROWED 22 Oct 2026 (phase 2): + Draw the route, a planner's
+  // NARROWED 27 Oct 2026 (the final UI pass, card 1): one filled button for the forward step, the rest in the row's "⋯"; REVERSED: no ESDAL sheet
+  const menuOf = (row) => [...row.querySelectorAll(".row-menu-list button")].map(b => b.textContent).join("|");
+  ok("⭐ AL DOM: a planner's actions follow the server's transitions — the filled button is the forward step (Approve on a pending movement, Mark notified on an approved one), the menu holds Edit, Draw, the other steps, then Withdraw… and Delete…",
+     rowOf(p.el, "AL002").querySelector(".btn-pri").textContent === "Approve" && menuOf(rowOf(p.el, "AL002")) === "Edit|Draw the route|Withdraw…|Delete…"
+     && rowOf(p.el, "AL001").querySelector(".btn-pri").textContent === "Mark notified" && menuOf(rowOf(p.el, "AL001")) === "Edit|Draw the route again|Mark moved|Reopen|Withdraw…|Delete…"
+     && !rowOf(p.el, "AL001").querySelector("button.link-btn") && rowOf(p.el, "AL001").querySelector(".row-menu summary").getAttribute("aria-label") === "More actions for Modular office units (4.6 m wide)"
+     && !rowOf(p.el, "AL001").querySelector(".row-menu-note"), menuOf(rowOf(p.el, "AL001")));   // the fixture types no planner, so the menu has no note
   await act(async () => { rowOf(p.el, "AL002").querySelector("button.al-tri").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
   const det = p.el.querySelector('[data-al-details="AL002"]');
   ok("⭐ AL DOM: the chevron opens the row: the server's advice lines word for word, the category words, the typed figures, the references, the advice footer",
@@ -1855,12 +1859,10 @@ async function abnormalDom(){
   // ---- 22 Oct 2026 (phase 3): the documents' buttons, Check the roads again, the planner's own rows
   await act(async () => { byText(p.el, "button", "Notice calendar · XLSX").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
   await settle(20);
-  await act(async () => { [...rowOf(p.el, "AL002").querySelectorAll("button.link-btn")].find(b => b.textContent === "ESDAL sheet").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
-  await settle(20);
-  ok("⭐ AL3 DOM: the Notice calendar buttons (XLSX, PDF) in the header and the row's ESDAL sheet fetch the documents through the app's fetch (the sign-in's headers), never a bare link",
-     !!byText(p.el, "button", "Notice calendar · XLSX") && !!byText(p.el, "button", "Notice calendar · PDF")
-     && calls.some(c => c.url === "/api/abnormal/calendar.xlsx" && c.method === "GET") && calls.some(c => c.url === "/api/abnormal/AL002/esdal.pdf" && c.method === "GET")
-     && !p.el.querySelector('a[href*="calendar"]') && !p.el.querySelector('a[href*="esdal"]'));
+  ok("⭐ AL3 DOM: the Notice calendar's two buttons sit under one 'Notice calendar ▾' and fetch the documents through the app's fetch, never a bare link; REVERSED 27 Oct 2026: no ESDAL sheet on any row, nothing fetches one",
+     !!byText(p.el, "button", "Notice calendar · XLSX") && !!byText(p.el, "button", "Notice calendar · PDF") && !!p.el.querySelector('[data-al-docs="1"] summary')
+     && calls.some(c => c.url === "/api/abnormal/calendar.xlsx" && c.method === "GET") && !calls.some(c => /esdal/.test(c.url))
+     && !p.el.querySelector('a[href*="calendar"]') && !p.el.textContent.includes("ESDAL sheet") && !!byText(p.el, "button", "Settings"));
   await act(async () => { rowOf(p.el, "AL001").querySelector("button.al-tri").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
   const det1 = () => p.el.querySelector('[data-al-details="AL001"]');
   ok("⭐ AL3 DOM: the drawn row's pinch table names OpenStreetMap as a source beside HERE, carries the planner's amber grade and note, the structures words under it, and Check the roads again beside the heading",
@@ -1920,7 +1922,7 @@ async function abnormalDom(){
   ok("⭐ AL DOM: Save posts the typed fields as numbers and dates, blanks as null, the team the planner chose; the form closes and the page is read again",
      !!posted && posted.body.name === "Test load" && posted.body.width_m === "4.6" && posted.body.gross_t === "40" && posted.body.date_from === "2027-03-08"
      && posted.body.ipt === "IPT1" && posted.body.rigid_length_m === null && posted.body.indivisible === false && !form(), JSON.stringify(posted && posted.body).slice(0, 200));
-  await act(async () => { byText(p.el, "button", "Settings · bank holidays and time bans").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await act(async () => { byText(p.el, "button", "Settings").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });   // NARROWED 27 Oct 2026: one word
   const set = () => p.el.querySelector("[data-al-settings]");
   ok("AL DOM: a planner's settings card: the holidays' words and the Fetch button, an empty time-ban table with Add and Save, England and Wales named",
      !!set() && set().textContent.includes("England and Wales 83 days, Scotland 94, Northern Ireland 103") && !!byText(set(), "button", "Fetch now from gov.uk")
@@ -1930,7 +1932,7 @@ async function abnormalDom(){
   const t = await mount(TEAM_N);
   ok("⭐ AL DOM: a team login sees its own movement only, no Approve or Reopen (the planner's), Delete only while pending; its Settings card has no Fetch and no Add",
      !!rowOf(t.el, "AL002") && !rowOf(t.el, "AL001")
-     && [...rowOf(t.el, "AL002").querySelectorAll("button.link-btn")].map(b => b.textContent).join("|") === "Edit|ESDAL sheet|Withdraw|Delete"   // NARROWED 22 Oct 2026 (phase 3): + ESDAL sheet
+     && !rowOf(t.el, "AL002").querySelector(".btn-pri") && menuOf(rowOf(t.el, "AL002")) === "Edit|Withdraw…|Delete…"   // NARROWED 27 Oct 2026: no forward step for a team login; the menu holds Edit, Withdraw…, Delete…
      && !btns(t.el).includes("Fetch now from gov.uk"));
   await act(async () => { byText(t.el, "button", "Plan an abnormal load").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
   ok("AL DOM: a team login's form has the team locked to its own", t.el.querySelector('select[aria-label="Team"]').disabled && t.el.querySelector('select[aria-label="Team"]').value === "IPT1");

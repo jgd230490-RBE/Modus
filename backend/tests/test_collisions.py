@@ -1081,7 +1081,7 @@ ok("10: app — Config → Map and bulletin carries the panel; a planner or admi
    and 'access.role === "planner" || access.role === "admin"' in _cp and "setTimeout(read, 5000)" in _cp
    and APP.count("/collisions/status") == 1)
 ok("10: app — the panel says it is not the assessment, staff only, never the public map or bulletin, and when to fetch again",
-   "it is not the assessment." in _cp and "Staff only." in _cp and "Fetch again after changing routes, and each August." in _cp   # NARROWED 22 Oct 2026 (words sweep; the user: few words on screens): the panel is three short sentences; where it never shows is in the guide and T9
+   "Evidence, not the assessment." in _cp and "Staff only." in _cp and "Fetch again after changing routes, and each August." in _cp   # NARROWED 27 Oct 2026 (the final UI pass): fewer words   # NARROWED 22 Oct 2026 (words sweep; the user: few words on screens): the panel is three short sentences; where it never shows is in the guide and T9
    and "never on the public map or the bulletin" in read("frontend/help/index.html"))
 _cb = APP.split("function CollisionEvidenceButton(")[1].split("\nfunction ")[0]
 ok("10: app — the Routes page's buttons (PDF and XLSX) for the route picked in the list",

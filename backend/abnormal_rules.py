@@ -177,8 +177,8 @@ CALENDAR_WORDS = {
           "(C&U Sch 12 para 1)",
     "calendar": "calendar days: a Special Order counts every day unless the order says otherwise (aide memoire Note 1)",
 }
-ADVICE_WORDS = ("Advice worked out from the typed figures under the rules as read on 16 Oct 2026. Check with the "
-                "haulier: ESDAL, the police and the road and bridge authorities decide.")
+# 27 Oct 2026 (the final UI pass): the screen's one line; the rules' reading date (16 Oct 2026) is in the technical guide T1
+ADVICE_WORDS = "Advice from the typed figures. The haulier, ESDAL, the police and the road and bridge authorities decide."
 NOT_MODELLED_WORDS = ("Not worked out here: bridges and structures and their ratings (checked by their owners through "
                       "ESDAL), which police forces and authorities the route crosses, police time bans other than the "
                       "ones typed for this scheme, level crossings, overhead lines, swept paths and whether the load is "
