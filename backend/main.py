@@ -145,6 +145,12 @@ async def lifespan(app: FastAPI):
                   f"{back.get('left', 0)} left NULL (shared or unknown route IPT).")
     except Exception as e:
         print("Network seed skipped:", e)
+    # 27 Oct 2026 (pilot readiness F3 c): a new deployment's first admin comes from FIRST_ADMIN_EMAIL, not the
+    # admin token. Does nothing once any admin login exists.
+    try:
+        users.ensure_first_admin()
+    except Exception as e:  # noqa: BLE001
+        print("first admin: skipped:", e.__class__.__name__, str(e)[:200])
     # 22 Oct 2026: the start-up migrations above commit on their own connections; nothing is cached yet, but say so.
     db.bump_data_version()
     # ... and build the map's council figures in the background, so the first viewer after a deploy does not wait
@@ -609,6 +615,16 @@ class PasswordIn(BaseModel):
     new: str
 
 
+class CodeIn(BaseModel):
+    ticket: str
+    code: str
+    remember: bool = False
+
+
+class OwnCodeIn(BaseModel):
+    code: str
+
+
 class ActivityIn(BaseModel):
     page: str
 
@@ -641,7 +657,44 @@ def auth_signin(body: SignInIn, request: Request = None):
     user, err, status = users.sign_in(body.email, body.password, ip=_client_ip(request))
     if not user:
         raise HTTPException(status, err)
+    if users.needs_two_step(user):
+        # 27 Oct 2026 (F3 b): a staff login is not signed in yet. The answer is a 10-minute ticket for the
+        # code step (or the set-up step), never a session cookie.
+        return users.start_two_step(user)
     return _session_answer(user, request, remember=bool(body.remember))
+
+
+@app.post("/api/auth/code")
+def auth_code(body: CodeIn, request: Request = None):
+    """The second step: the ticket from /api/auth/signin (or /api/auth/reset) and a 6-digit code from the
+    authenticator app, or a recovery code → a session cookie. A wrong code counts towards the sign-in limit."""
+    user, err, status = users.finish_code(body.ticket, body.code, ip=_client_ip(request))
+    if not user:
+        raise HTTPException(status, err)
+    return _session_answer(user, request, remember=bool(body.remember))
+
+
+@app.post("/api/auth/setup")
+def auth_setup(body: CodeIn, request: Request = None):
+    """Turn two-step sign-in on: the ticket and the first code from the newly added key → a session cookie
+    and the ten recovery codes, shown once."""
+    user, codes, err, status = users.finish_setup(body.ticket, body.code, ip=_client_ip(request))
+    if not user:
+        raise HTTPException(status, err)
+    return _session_answer(user, request, remember=bool(body.remember), payload_extra={"recovery_codes": codes})
+
+
+@app.post("/api/auth/recovery-codes")
+def auth_recovery_codes(body: OwnCodeIn, request: Request = None):
+    """New recovery codes for the signed-in person (the old ones stop working); a code from the app first."""
+    acc = access.current()
+    if not acc or acc.get("via") != "login":
+        raise HTTPException(401, "Sign in with your email first.")
+    user = users.get_user(acc["user_id"])
+    codes, err, status = users.renew_recovery_codes(user, body.code, ip=_client_ip(request))
+    if not codes:
+        raise HTTPException(status, err)
+    return {"recovery_codes": codes}
 
 
 @app.get("/api/auth/me")
@@ -760,7 +813,11 @@ def auth_reset(body: ResetIn, request: Request = None):
     if not ok_:
         raise HTTPException(400, err)
     users.audit_event("password-set", user=user, ip=_client_ip(request), detail={"via": t["purpose"]})
-    return _session_answer(users.get_user(user["id"]), request, remember=bool(body.remember))
+    user = users.get_user(user["id"])
+    if users.needs_two_step(user):
+        # 27 Oct 2026 (F3 b): a reset link never skips the code; an invite goes on to the set-up step
+        return users.start_two_step(user)
+    return _session_answer(user, request, remember=bool(body.remember))
 
 
 @app.post("/api/auth/link")
@@ -988,6 +1045,24 @@ def admin_user_reset(user_id: str, token: Optional[str] = None):
     if not users.usable(user):
         raise HTTPException(400, "This login is disabled or has expired. Enable or extend it first.")
     return _send_demo_link(user) if user.get("kind") == "demo" else _invite_or_reset(user)
+
+
+@app.post("/api/admin/users/{user_id}/two-step-reset")
+def admin_user_two_step_reset(user_id: str, token: Optional[str] = None):
+    """27 Oct 2026 (F3 b): a lost phone. The login's authenticator key and recovery codes go, every session of it
+    ends, and the person sets two-step sign-in up again at their next sign-in. Not your own login (use a recovery
+    code, or the recovery command)."""
+    _check_admin(token)
+    user = users.get_user(user_id)
+    if not user:
+        raise HTTPException(404, "No such login.")
+    if _me_id() and _me_id() == user_id:
+        raise HTTPException(400, "Use one of your recovery codes to sign in instead.")
+    if not users.two_step_on(user):
+        raise HTTPException(400, "This login has not set up two-step sign-in yet.")
+    users.reset_two_step(user_id)
+    users.audit_event("two-step-reset", user=user, actor=_admin_actor())
+    return {"user": users.public(users.get_user(user_id))}
 
 
 @app.get("/api/admin/leads")
@@ -3730,7 +3805,7 @@ def tenant_export(token: Optional[str] = None):
     """
     _check_admin(token)
     pkg = tenant_package.export_tenant(app_version="modus-g2")
-    name = f"modus-tenant-{db.current_tenant()}-{pkg['exported_at'][:10]}.json"
+    name = f"wayscope-organisation-{db.current_tenant()}-{pkg['exported_at'][:10]}.json"
     return Response(content=json.dumps(pkg, ensure_ascii=False), media_type="application/json",
                     headers={"Content-Disposition": f'attachment; filename="{name}"'})
 

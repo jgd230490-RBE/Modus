@@ -31,9 +31,19 @@ access.resolve() still honours IPT1_CODE…IPT6_CODE, PLANNER_CODE and ADMIN_COD
 as any of them is set on the server. The user deletes them on Render on Sat 31 Oct 2026; from
 that redeploy on, a code resolves to nothing and only logins work. Nothing here reads a code.
 
+TWO-STEP SIGN-IN (27 Oct 2026, pilot readiness F3 b)
+----------------------------------------------------
+Every STAFF login signs in with its password AND a 6-digit code from an authenticator app (TOTP,
+RFC 6238: SHA-1, 30-second steps, one step either side accepted, a step works once). The password
+step answers a short-lived single-use ticket (`auth_tokens` purpose `mfa`), never a session; the
+code step turns the ticket into a session. A staff login without two-step set up gets the set-up
+step instead, and a session of such a login does not resolve (resolve_session), so every person
+signed in before this shipped sets it up at their next sign-in. Ten recovery codes, each usable
+once, stored as SHA-256. Demo logins (leads, a fictional scheme) are exempt.
+
 WHAT THIS IS NOT
 ----------------
-No two-factor, no single sign-on, no per-section permission (D7: a login belongs to a team).
+No single sign-on, no per-section permission (D7: a login belongs to a team).
 The public map keeps its shared password (D46).
 """
 import base64
@@ -77,7 +87,11 @@ RESET_PER_IP = 10
 ROLES = ("team", "planner", "admin")
 KINDS = ("staff", "demo")
 TEAM_SLOTS = ("IPT1", "IPT2", "IPT3", "IPT4", "IPT5", "IPT6")
-PURPOSES = ("invite", "reset", "demo")
+PURPOSES = ("invite", "reset", "demo", "mfa")
+#: purposes a link or ticket can be used for once only
+SINGLE_USE = ("invite", "reset", "mfa")
+#: the ticket between the password step and the code step
+MFA_TTL_S = 10 * 60
 
 PASSWORD_MIN = 10
 PASSWORD_MAX = 200
@@ -244,6 +258,7 @@ def public(user):
     out["team_label"] = team_label(user["team"]) if user.get("team") else None
     out["role_label"] = role_label(user)
     out["status"] = status_of(user)
+    out["two_step"] = two_step_on(user)
     return out
 
 
@@ -424,7 +439,8 @@ def access_for(user):
     label = team_label(user["team"]) if role == "team" else role_label(user)
     return {"role": acc_role, "ipt": user.get("team") if role == "team" else None, "label": label,
             "via": "login", "user_id": user["id"], "name": user["name"], "email": user["email"],
-            "kind": user.get("kind") or "staff", "expires_at": user.get("expires_at")}
+            "kind": user.get("kind") or "staff", "expires_at": user.get("expires_at"),
+            "two_step": two_step_on(user), "recovery_left": recovery_left(user)}
 
 
 # --------------------------------------------------------------------------- sessions
@@ -465,6 +481,9 @@ def resolve_session(raw, now=None):
         return None, None
     user = get_user(s["user_id"])
     if not usable(user, now):
+        return None, None
+    if needs_two_step(user) and not two_step_on(user):
+        # signed in before two-step shipped, or an admin reset it: sign in again and set it up
         return None, None
     seen = _parse(s.get("last_seen_at"))
     if not seen or (now - seen).total_seconds() >= TOUCH_EVERY_S:
@@ -514,7 +533,7 @@ def issue_token(user_id, purpose, ttl_s=None, expires_at=None, now=None):
         raise ValueError(purpose)
     now = now or _now()
     if expires_at is None:
-        expires_at = _later(ttl_s or (INVITE_TTL_S if purpose == "invite" else RESET_TTL_S), now)
+        expires_at = _later(ttl_s or {"invite": INVITE_TTL_S, "mfa": MFA_TTL_S}.get(purpose, RESET_TTL_S), now)
     db.execute("DELETE FROM auth_tokens WHERE tenant_id = ? AND user_id = ? AND purpose = ? AND used_at IS NULL",
                (_tenant(), user_id, purpose))
     raw = _new_token()
@@ -537,7 +556,7 @@ def peek_token(raw, purposes, now=None):
     exp = _parse(t["expires_at"])
     if not exp or exp <= now:
         return None, None
-    if t["purpose"] in ("invite", "reset") and t.get("used_at"):
+    if t["purpose"] in SINGLE_USE and t.get("used_at"):
         return None, None
     user = get_user(t["user_id"])
     if not usable(user, now):
@@ -552,7 +571,7 @@ def use_token(raw, purposes, now=None):
     t, user = peek_token(raw, purposes, now)
     if not t:
         return None, None
-    if t["purpose"] in ("invite", "reset"):
+    if t["purpose"] in SINGLE_USE:
         db.execute("UPDATE auth_tokens SET used_at = ?, uses = uses + 1 WHERE tenant_id = ? AND token_hash = ? "
                    "AND used_at IS NULL", (_iso(now), _tenant(), t["token_hash"]))
         # a race: another request used it between the read and the write
@@ -644,6 +663,232 @@ def sign_in(email, password, ip=None, now=None):
         return None, SIGNIN_REFUSED, 401
     audit_event("signin", user=user, ip=ip, now=now)
     return user, None, 200
+
+
+# --------------------------------------------------------------------------- two-step sign-in (27 Oct 2026, F3 b)
+
+TOTP_STEP_S = 30
+TOTP_DIGITS = 6
+#: one step either side of now is accepted (a phone's clock a little off)
+TOTP_WINDOW = 1
+RECOVERY_COUNT = 10
+#: no 0/O, 1/I/L: a person types these off paper
+RECOVERY_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+TOTP_ISSUER = "Wayscope"
+CODE_REFUSED = "That code didn't work. Codes change every 30 seconds."
+
+
+def needs_two_step(user):
+    """Every staff login. A lead's demo login (a fictional scheme, a 14-day look) does not."""
+    return bool(user) and (user.get("kind") or "staff") != "demo"
+
+
+def two_step_on(user):
+    return bool(user and user.get("totp_secret"))
+
+
+def recovery_left(user):
+    try:
+        return len(json.loads(user.get("recovery_hashes") or "[]"))
+    except (TypeError, ValueError):
+        return 0
+
+
+def new_totp_secret():
+    """20 random bytes as base32, no padding: what an authenticator app is given."""
+    return base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
+
+
+def _b32(secret):
+    s = (secret or "").replace(" ", "").upper()
+    return base64.b32decode(s + "=" * (-len(s) % 8))
+
+
+def totp_at(secret, step):
+    """The code for one 30-second step (RFC 6238 over RFC 4226, SHA-1, 6 digits)."""
+    mac = hmac.new(_b32(secret), int(step).to_bytes(8, "big"), hashlib.sha1).digest()
+    off = mac[-1] & 0x0F
+    n = int.from_bytes(mac[off:off + 4], "big") & 0x7FFFFFFF
+    return str(n % (10 ** TOTP_DIGITS)).zfill(TOTP_DIGITS)
+
+
+def totp_step(now=None):
+    return int((now or _now()).timestamp()) // TOTP_STEP_S
+
+
+def totp_match(secret, code, now=None, after_step=None):
+    """The step a code matches, else None. `after_step`: a step already used — that one and any
+    earlier are refused, so a code seen over someone's shoulder cannot be used again."""
+    code = re.sub(r"\s", "", str(code or ""))
+    if not secret or not re.fullmatch(r"\d{%d}" % TOTP_DIGITS, code):
+        return None
+    here = totp_step(now)
+    for step in range(here - TOTP_WINDOW, here + TOTP_WINDOW + 1):
+        if after_step is not None and step <= int(after_step):
+            continue
+        if hmac.compare_digest(totp_at(secret, step), code):
+            return step
+    return None
+
+
+def otpauth_uri(secret, email):
+    from urllib.parse import quote
+    label = quote(f"{TOTP_ISSUER}:{email}")
+    return f"otpauth://totp/{label}?secret={secret}&issuer={quote(TOTP_ISSUER)}&digits={TOTP_DIGITS}&period={TOTP_STEP_S}"
+
+
+def qr_svg(text):
+    """The set-up QR code as an SVG string (segno, drawn by the server: the key never goes to a third party)."""
+    import segno
+    buf = io.BytesIO()
+    segno.make(text, error="m").save(buf, kind="svg", scale=5, border=2, xmldecl=False, svgclass=None,
+                                     lineclass=None, title="QR code for your authenticator app")
+    return buf.getvalue().decode("utf-8")
+
+
+def _norm_recovery(code):
+    return re.sub(r"[^A-Z0-9]", "", str(code or "").upper())
+
+
+def _hash_recovery(code):
+    return hashlib.sha256(("recovery|" + _norm_recovery(code)).encode("utf-8")).hexdigest()
+
+
+def new_recovery_codes(user_id):
+    """Ten fresh codes ("7KQ2-M9XD"); the old ones stop working. Returns the codes (shown once)."""
+    codes = []
+    for _ in range(RECOVERY_COUNT):
+        raw = "".join(secrets.choice(RECOVERY_ALPHABET) for _ in range(8))
+        codes.append(raw[:4] + "-" + raw[4:])
+    db.execute("UPDATE users SET recovery_hashes = ? WHERE tenant_id = ? AND id = ?",
+               (json.dumps([_hash_recovery(c) for c in codes]), _tenant(), user_id))
+    return codes
+
+
+def use_recovery_code(user, code):
+    """True and the code is spent, or False."""
+    if len(_norm_recovery(code)) != 8:
+        return False
+    try:
+        hashes = json.loads(user.get("recovery_hashes") or "[]")
+    except (TypeError, ValueError):
+        return False
+    h = _hash_recovery(code)
+    hit = next((x for x in hashes if hmac.compare_digest(x, h)), None)
+    if not hit:
+        return False
+    hashes.remove(hit)
+    db.execute("UPDATE users SET recovery_hashes = ? WHERE tenant_id = ? AND id = ?",
+               (json.dumps(hashes), _tenant(), user["id"]))
+    return True
+
+
+def start_two_step(user, now=None):
+    """After a right password (or a used invite / reset link): the ticket for the code step and what
+    the screen needs. {"step": "code" | "setup", "ticket", "email"} (+ "key", "qr" for set-up)."""
+    raw = issue_token(user["id"], "mfa", now=now)
+    out = {"step": "code" if two_step_on(user) else "setup", "ticket": raw, "email": user["email"]}
+    if out["step"] == "setup":
+        # a fresh key each time the set-up screen is reached; it counts only once confirmed
+        key = new_totp_secret()
+        db.execute("UPDATE users SET totp_pending = ? WHERE tenant_id = ? AND id = ?", (key, _tenant(), user["id"]))
+        out["key"] = " ".join(key[i:i + 4] for i in range(0, len(key), 4))
+        out["qr"] = qr_svg(otpauth_uri(key, user["email"]))
+    return out
+
+
+def _code_blocked(user, ip, now):
+    return signin_blocked(user["email"], ip, now)
+
+
+def _code_failed(user, ip, now):
+    record_attempt("signin-email", _attempt_key("signin-email", user["email"]), False, now)
+    if ip:
+        record_attempt("signin-ip", _attempt_key("signin-ip", ip_hash(ip)), False, now)
+
+
+def finish_code(ticket, code, ip=None, now=None):
+    """(user, error, status). The code step: a 6-digit code, or a recovery code. A wrong one counts
+    towards the sign-in limit (five, then 15 minutes) and leaves the ticket live; a right one uses
+    the ticket."""
+    now = now or _now()
+    t, user = peek_token(ticket, ("mfa",), now)
+    if not t:
+        return None, "That took too long. Sign in again.", 410
+    if not two_step_on(user):
+        return None, "Set up two-step sign-in first.", 409
+    if _code_blocked(user, ip, now):
+        audit_event("signin-locked", user=user, ip=ip, now=now)
+        return None, SIGNIN_LOCKED, 429
+    step = totp_match(user["totp_secret"], code, now, after_step=user.get("totp_last_step"))
+    via = "app"
+    if step is None:
+        if use_recovery_code(user, code):
+            via = "recovery code"
+        else:
+            _code_failed(user, ip, now)
+            audit_event("signin-code-refused", user=user, ip=ip, now=now)
+            return None, CODE_REFUSED, 401
+    t, user = use_token(ticket, ("mfa",), now)
+    if not t:
+        return None, "That took too long. Sign in again.", 410
+    if step is not None:
+        db.execute("UPDATE users SET totp_last_step = ? WHERE tenant_id = ? AND id = ?", (step, _tenant(), user["id"]))
+    audit_event("signin", user=user, ip=ip, now=now, detail={"second_step": via})
+    return get_user(user["id"]), None, 200
+
+
+def finish_setup(ticket, code, ip=None, now=None):
+    """(user, recovery_codes, error, status). The set-up step: the code from the newly added key turns
+    two-step on, issues ten recovery codes and uses the ticket."""
+    now = now or _now()
+    t, user = peek_token(ticket, ("mfa",), now)
+    if not t:
+        return None, None, "That took too long. Sign in again.", 410
+    if two_step_on(user):
+        return None, None, "Two-step sign-in is already on. Sign in again.", 409
+    if _code_blocked(user, ip, now):
+        return None, None, SIGNIN_LOCKED, 429
+    key = user.get("totp_pending")
+    step = totp_match(key, code, now)
+    if step is None:
+        _code_failed(user, ip, now)
+        return None, None, CODE_REFUSED, 401
+    t, user = use_token(ticket, ("mfa",), now)
+    if not t:
+        return None, None, "That took too long. Sign in again.", 410
+    db.execute("UPDATE users SET totp_secret = ?, totp_pending = NULL, totp_on_at = ?, totp_last_step = ? "
+               "WHERE tenant_id = ? AND id = ?", (key, _iso(now), step, _tenant(), user["id"]))
+    codes = new_recovery_codes(user["id"])
+    audit_event("two-step-on", user=user, ip=ip, now=now)
+    audit_event("signin", user=user, ip=ip, now=now, detail={"second_step": "set up"})
+    return get_user(user["id"]), codes, None, 200
+
+
+def renew_recovery_codes(user, code, ip=None, now=None):
+    """(codes, error, status) — a signed-in person asks for new codes; a code from the app first."""
+    now = now or _now()
+    if not two_step_on(user):
+        return None, "Two-step sign-in is not on.", 409
+    if _code_blocked(user, ip, now):
+        return None, SIGNIN_LOCKED, 429
+    step = totp_match(user["totp_secret"], code, now, after_step=user.get("totp_last_step"))
+    if step is None:
+        _code_failed(user, ip, now)
+        return None, CODE_REFUSED, 400
+    db.execute("UPDATE users SET totp_last_step = ? WHERE tenant_id = ? AND id = ?", (step, _tenant(), user["id"]))
+    codes = new_recovery_codes(user["id"])
+    audit_event("recovery-codes-new", user=user, ip=ip, now=now)
+    return codes, None, 200
+
+
+def reset_two_step(user_id):
+    """An admin's "Reset two-step", or the recovery command: the key and the codes go, every session
+    ends, and the person sets it up again at their next sign-in."""
+    db.execute("UPDATE users SET totp_secret = NULL, totp_pending = NULL, totp_on_at = NULL, recovery_hashes = NULL, "
+               "totp_last_step = NULL WHERE tenant_id = ? AND id = ?", (_tenant(), user_id))
+    end_all_sessions(user_id)
+    return get_user(user_id)
 
 
 def note_reset_request(email, ip, now=None):
@@ -892,3 +1137,68 @@ def codes_enabled():
         return bool(access.configured_codes())
     except Exception:
         return False
+
+
+# --------------------------------------------------------------------------- the first admin, and recovery (27 Oct 2026, F3 c)
+
+def ensure_first_admin(now=None):
+    """
+    A new deployment's first admin, without the admin token (F3 c). When FIRST_ADMIN_EMAIL is set and this
+    organisation has NO admin login yet (enabled or not), make one for that address and send its invite (72 h).
+    When email is not set up, the link is printed to the service log, where only someone signed in to Render
+    can read it. Once any admin exists this does nothing, so a restart never sends a second invite.
+    Returns what happened, for the log and the tests: "off" | "exists" | "bad-email" | "sent" | "logged" | "error".
+    """
+    email = norm_email(os.getenv("FIRST_ADMIN_EMAIL") or "")
+    if not email:
+        return "off"
+    if count_admins(enabled_only=False) > 0:
+        return "exists"
+    if not email_ok(email):
+        print("first admin: FIRST_ADMIN_EMAIL does not look like an email address; nothing done")
+        return "bad-email"
+    user = find_by_email(email)
+    if user:
+        db.execute("UPDATE users SET role = 'admin', team = NULL, kind = 'staff', expires_at = NULL, disabled = 0 "
+                   "WHERE tenant_id = ? AND id = ?", (_tenant(), user["id"]))
+        user = get_user(user["id"])
+    else:
+        name = (os.getenv("FIRST_ADMIN_NAME") or "").strip() or email.split("@")[0]
+        user, err = create_user(email, name, "admin", created_by="FIRST_ADMIN_EMAIL")
+        if err:
+            print(f"first admin: not created: {err}")
+            return "error"
+    purpose = "reset" if user.get("password_hash") else "invite"
+    url = link(purpose, issue_token(user["id"], purpose, now=now))
+    sent = send_account_email(purpose, user, url)
+    audit_event("first-admin", user=user, actor=("system", None, "FIRST_ADMIN_EMAIL"), detail={"email": sent}, now=now)
+    if sent == "sent":
+        print(f"first admin: invite sent to {email}")
+        return "sent"
+    print(f"first admin: email is not set up; open this link to set the password (72 hours): {url}")
+    return "logged"
+
+
+def recover_admin(email, now=None):
+    """
+    Lock-out insurance without a standing secret (F3 c): run from the server's shell by someone signed in to
+    the hosting. The login for `email` (made if missing) becomes an enabled admin, its two-step sign-in is reset,
+    every session ends, and a single-use link comes back: a reset (60 min) when it has a password, else an
+    invite (72 h). (link, error).
+    """
+    email = norm_email(email)
+    if not email_ok(email):
+        return None, "That email address doesn't look right."
+    user = find_by_email(email)
+    if user:
+        db.execute("UPDATE users SET role = 'admin', team = NULL, kind = 'staff', expires_at = NULL, disabled = 0 "
+                   "WHERE tenant_id = ? AND id = ?", (_tenant(), user["id"]))
+        user = reset_two_step(user["id"])
+    else:
+        user, err = create_user(email, email.split("@")[0], "admin", created_by="recovery command")
+        if err:
+            return None, err
+    purpose = "reset" if user.get("password_hash") else "invite"
+    url = link(purpose, issue_token(user["id"], purpose, now=now))
+    audit_event("recovery-command", user=user, actor=("system", None, "recovery command"), now=now)
+    return url, None

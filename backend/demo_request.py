@@ -179,6 +179,13 @@ def get(rid):
 
 # --------------------------------------------------------------------------- the decision
 
+def leads_on():
+    """27 Oct 2026 (pilot readiness F3 a): the form makes a login, so it works ONLY where a deployment switches it
+    on with DEMO_LEADS=1 — the demo. On an organisation's own deployment it would hand a stranger a login to real
+    data, so there it is off unless someone sets the variable."""
+    return (os.getenv("DEMO_LEADS") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def handle(form, ip, now=None):
     """
     The whole policy for one POST. Returns a dict:
@@ -190,6 +197,8 @@ def handle(form, ip, now=None):
     `access` is personal_access(): the lead's own link and its expiry (HU14).
     """
     now = now or _now()
+    if not leads_on():
+        return {"outcome": "error", "reason": "demo requests are off on this site"}
     clean, err = validate(form)
     if err == "honeypot":
         return {"outcome": "thanks", "reason": "honeypot"}
