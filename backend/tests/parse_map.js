@@ -3059,7 +3059,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      /const AREA_STOPS = \{ movements: \[50, 100, 200\], carbon: \[50, 100, 200\] \};/.test(blk)
      && !/Math\.max\(|quantile|percentile/.test(blk.slice(blk.indexOf("function areaFillExpr"), blk.indexOf("function areaFigureText"))));
   ok("§2.2b: the fill is drawn UNDER every layer of ours (routes, sites, zones), so the routes stay on top",
-     /map\.addLayer\(\{ id: 'area-fill', type: 'fill'[\s\S]*?\}, before\);/.test(blk) && /const before = areaBeforeId\(\);/.test(blk)
+     /map\.addLayer\(\{ id: 'area-fill', type: 'fill'[\s\S]*?\}, before\);/.test(blk) && /const before = areaBeforeId\(\), labelBefore = areaLabelBeforeId\(\);/.test(blk)   /* NARROWED 27 Oct 2026: the same line now also finds the cards' place (areaLabelBeforeId) */
      && /'routes-source'/.test(blk.slice(blk.indexOf("function areaBeforeId"), blk.indexOf("function ensureAreaLayers"))));
   ok("§2.2b: a fill, an outline and a label per district; the county a dashed outline of its own",
      /id: 'area-fill', type: 'fill'/.test(blk) && /id: 'area-outline', type: 'line'/.test(blk)
@@ -5472,9 +5472,9 @@ function qrRead(mod) {
      && v3.includes("['coalesce', ['get', 'lb_name'], ['get', 'label']], {},"));
   ok("⭐ V3: the busiest district's label wins a collision (symbol-sort-key: a larger figure is placed first)",
      v3.includes("'symbol-sort-key': ['-', 0, ['get', 'v']],"));
-  ok("V3: BOTH label layers (district and county) take the one layout and paint",
-     src.includes("layout: areaLabelLayout(vis['area-county-label']), paint: AREA_LABEL_PAINT }, before);")
-     && src.includes("layout: areaLabelLayout(dVis), paint: AREA_LABEL_PAINT }, before);")
+  ok("V3: BOTH label layers (district and county) take the one layout and paint",   // NARROWED 27 Oct 2026: both now go before labelBefore (above the basemap's names)
+     src.includes("layout: areaLabelLayout(vis['area-county-label']), paint: AREA_LABEL_PAINT }, labelBefore);")
+     && src.includes("layout: areaLabelLayout(dVis), paint: AREA_LABEL_PAINT }, labelBefore);")
      && !/'text-field': \['get', 'label'\], 'text-size': 14/.test(src));
   ok("V3: the two cards are re-added after a basemap switch, behind hasImage, beside the hatch",
      v3.includes("if (!m.hasImage(id)) m.addImage(id, areaBadgeImage(AREA_BADGE_EDGE[k]),")
@@ -6400,6 +6400,44 @@ function qrRead(mod) {
   const f15 = idsFn({ START_YEAR: 2026 }, { data: fx })(15), f16 = idsFn({ START_YEAR: 2026 }, { data: fx })(16), f14 = idsFn({ START_YEAR: 2026 }, { data: fx })(14);
   ok("23 Oct: the month's ids from the features' windows: Mar 2027 (month 15) holds AL001 once (both legs) and the load that spans into April; April holds that one only; February none; no month gives null",
      JSON.stringify(f15) === '["AL001","AL009"]' && JSON.stringify(f16) === '["AL009"]' && JSON.stringify(f14) === '[]' && idsFn({ START_YEAR: 2026 }, { data: fx })(null) === null);
+}
+
+// ---- 27 Oct 2026 (live, Jul 2028, Councils: movements): Charnwood, Leicester and Melton had no card. Since 23 Oct the route
+// lines sit under the basemap's names (labelAnchor), so areaBeforeId (the first layer of ours) put the cards under the names
+// too, and Mapbox places the higher layer's labels first: "Loughborough", "Leicester", "Melton Mowbray" won. The cards go above
+// the basemap's names again (areaLabelBeforeId); the fills stay under them and under the routes. --------------------------
+{
+  const fnSrc = name => { const i = src.indexOf("function " + name + "("); if (i < 0) return ""; const j = src.indexOf("\n    }\n", i); return src.slice(i, j + 6); };
+  // a stand-in style laid out as live on 27 Oct: basemap lines, our route lines under the names, the names, then ours on top
+  const style = { layers: [
+    { id: 'land', type: 'background' }, { id: 'road-primary', type: 'line', source: 'composite' },
+    { id: 'route-alt-lines', type: 'line', source: 'route-alts-source' }, { id: 'outbound-lines', type: 'line', source: 'routes-source' },
+    { id: 'road-label-simple', type: 'symbol', source: 'composite', layout: { 'text-field': ['get', 'name'] } },
+    { id: 'settlement-minor-label', type: 'symbol', source: 'composite', layout: { 'text-field': ['get', 'name'] } },
+    { id: 'settlement-major-label', type: 'symbol', source: 'composite', layout: { 'text-field': ['get', 'name'] } },
+    { id: 'evr-rail-casing', type: 'line', source: 'evr-rail' },
+    { id: 'forecast-labels', type: 'symbol', source: 'routes-source', layout: { 'text-field': ['get', 'id'] } },
+    { id: 'site-gates', type: 'symbol', source: 'routes-source', layout: { 'icon-image': 'gate' } } ] };
+  const mkMap = st => ({ getStyle: () => st });
+  const api = st => new Function("map", fnSrc("labelAnchor") + "\n" + fnSrc("areaBeforeId") + "\n" + fnSrc("areaLabelBeforeId")
+    + "\nreturn { anchor: labelAnchor, fill: areaBeforeId, card: typeof areaLabelBeforeId === 'function' ? areaLabelBeforeId : () => 'missing' };")(mkMap(st));
+  const ids = style.layers.map(l => l.id), at = id => (id === undefined ? ids.length : ids.indexOf(id));
+  let a = null; try { a = api(style); } catch (e) { a = null; }
+  ok("⭐ 27 Oct: the council cards are placed ABOVE the basemap's place names (Charnwood / Leicester / Melton lost their cards to them on live), under our own layers that sit there",
+     !!a && fnSrc("areaLabelBeforeId").length > 0 && a.card() === 'evr-rail-casing'
+     && at(a.card()) > at('settlement-major-label') && at(a.card()) > at(a.anchor()));
+  ok("27 Oct: the fills stay where they were: under our route lines (and so under the names)",
+     !!a && a.fill() === 'route-alt-lines' && at(a.fill()) < at('road-label-simple'));
+  let top = null, bare = null;
+  try { top = api({ layers: style.layers.slice(0, 7) }).card(); } catch (e) { top = 'threw'; }
+  try { bare = api({ layers: style.layers.filter(l => l.type !== 'symbol') }); } catch (e) { bare = null; }
+  ok("27 Oct: with nothing of ours above the names the cards go on top; with no basemap names (a bare style) they go where the fills go, as before",
+     top === undefined && !!bare && bare.card() === bare.fill() && bare.fill() === 'route-alt-lines');
+  const ens = src.slice(src.indexOf("function ensureAreaLayers("), src.indexOf("function areaHatchImage("));
+  ok("⭐ 27 Oct: both card layers (district and county) are added before labelBefore; the fills, the hatch and the outlines before `before`",
+     /const before = areaBeforeId\(\), labelBefore = areaLabelBeforeId\(\);/.test(ens)
+     && (ens.match(/paint: AREA_LABEL_PAINT \}, labelBefore\);/g) || []).length === 2 && !/paint: AREA_LABEL_PAINT \}, before\);/.test(ens)
+     && /id: 'area-fill', type: 'fill'[\s\S]*?\}, before\);/.test(ens) && /id: 'area-outline', type: 'line'[\s\S]*?\}, before\);/.test(ens));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
