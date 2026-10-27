@@ -13629,8 +13629,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       ) : (
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
-          <span className="text-sm font-semibold text-slate-700">Zones <span className="text-slate-400 font-normal">· click a row to edit the zone and frame it on the map</span></span>
-          <span className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-slate-700">Zones <span className="text-slate-400 font-normal">· click a row to {canEdit ? "edit the zone and frame it" : "frame it"} on the map</span></span>
+          {canEdit && <span className="flex items-center gap-2">
             <button onClick={startNewZone} disabled={zoneBusy}
               className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--navy)" }}>
               + Draw zone
@@ -13640,7 +13640,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--haul-text)" }}>
               + Haul road
             </button>
-          </span>
+          </span>}
         </div>
         <div className="overflow-auto" style={{ maxHeight: "40vh" }}>
           <table className="w-full text-sm">
@@ -13659,7 +13659,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       className={"cursor-pointer hover:bg-slate-50 " + (zoneSel === z.id ? "bg-slate-50" : "")}>
                     <td className="px-3 py-2 font-mono text-xs text-slate-500">{z.id}</td>
                     <td className="px-3 py-2 font-medium">
-                      <button type="button" className="row-open" data-zone-open={z.id} aria-label={`Edit ${z.name}`}
+                      <button type="button" className="row-open" data-zone-open={z.id} aria-label={canEdit ? `Edit ${z.name}` : `Show ${z.name} on the map`}
                         aria-current={zoneSel === z.id ? "true" : undefined}
                         onClick={(e) => { e.stopPropagation(); openZoneFromKeys(z); }}>{z.name}</button>
                     </td>

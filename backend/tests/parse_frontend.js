@@ -759,8 +759,22 @@ ok("a line with no IPT is flagged on the Forecasts page as planner-only",
 // ---- 4g. NOTHING may upload ----------------------------------------------------
 // "Never build: file upload, OCR..." — asserted at source level so a later edit that
 // adds one trips here rather than shipping.
-for (const banned of ['type="file"', "FormData(", ".files[", "multipart/form-data"]) {
+for (const banned of ["FormData(", "multipart/form-data"]) {
   ok(`no upload path: ${banned} is absent`, !code.includes(banned));
+}
+// NARROWED 27 Oct 2026 (pilot readiness, the approved mockup card 6): ONE file chooser, Config -> Organisation file
+// (admins only), which reads the organisation's own JSON file in the browser and posts it as JSON. No other screen
+// takes a file: no spreadsheet or ticket upload, no OCR.
+{
+  const _of0 = code.indexOf("function OrgFile(");
+  const _of1 = code.indexOf("\nfunction ", _of0 + 10);
+  const _ofBody = _of0 < 0 ? "" : code.slice(_of0, _of1);
+  for (const banned of ['type="file"', ".files["]) {
+    ok(`no upload path: ${banned} appears only in the organisation file chooser`,
+       code.split(banned).length - 1 === 1 && _ofBody.includes(banned));
+  }
+  ok("...which reads the file as text and posts JSON (no FormData, no multipart)",
+     _ofBody.includes("f.text()") && _ofBody.includes('postJSON("/admin/tenant/import?replace=1", file.pkg)'));
 }
 
 // ---- 5. the double-counting caution --------------------------------------------
@@ -2860,12 +2874,15 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      pieces.length > 2000 && wsHits.length === 0,
      wsHits.slice(0, 8).map(p => `line ${p.line} ${p.comp} [${wsOf(p.t)}] ${JSON.stringify(p.t.trim().slice(0, 80))}`).join(" | "));
   // question 1: the admin token box shows only where it does something — the server lets an admin LOGIN through without it
-  ok("⭐ words sweep (question 1): the admin token box is hidden for an admin login, on Config, the diesel box and the Data pages; Users keeps its own rule",
-     src.includes('const tokenNeeded = (a) => !(a && a.via === "login" && a.role === "admin");')
-     && src.includes('{tokenNeeded(access) && <label className="row-menu-field"><span>Admin token</span>')
-     && src.includes('{tokenNeeded(access) && <input value={token} onChange={e => setToken(e.target.value)} placeholder="Admin token" aria-label="Admin token" className="border border-slate-200 rounded px-2 py-0.5 text-xs w-32" />}')
-     && src.includes('{tokenNeeded(ACCESS.info) && <input value={token} onChange={e => setToken(e.target.value)} placeholder="Admin token" aria-label="Admin token"')
-     && (src.match(/placeholder="Admin token"/g) || []).length === 4 && src.includes("{!viaLogin && (")
+  // REVERSED 27 Oct 2026 (pilot readiness F3 c, the approved mockup card 5): the admin token box is gone from EVERY screen —
+  // an admin login does every admin job, a planner reads the network and Config (decision P5). Was: hidden only for an
+  // admin login, four boxes, Users with its own rule.
+  ok("⭐ F3 c: no admin token box anywhere (was four), no tokenNeeded, and a token stored by an earlier version is removed",
+     !src.includes("tokenNeeded") && (src.match(/placeholder="Admin token"/g) || []).length === 0
+     && !/aria-label="Admin token"/.test(src) && !src.includes("{!viaLogin && (")
+     && !src.includes('localStorage.setItem("modus_admin_token"') && !src.includes('localStorage.getItem("modus_admin_token")')
+     && src.includes('try { localStorage.removeItem("modus_admin_token"); } catch(e){}')
+     && src.includes('const isAdminLogin = (a) => !!(a && a.via === "login" && a.role === "admin");')
      && !src.includes("needed to save unless you signed in as an admin") && !src.includes("needed here while you are signed in with a shared code"));
   ok("...and it would catch the old words (HERE calls, the stored route, the file in the repository, the feed)",
      wsOf("Each costs HERE calls.") && wsOf("Its stored route goes too.") && wsOf("with the file in the repository") && wsOf("feed: timeout")
@@ -2935,7 +2952,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      src.includes('<th scope="col" className="num">Planned ({CUR()})<InfoTip id="fc.cost" /></th>') && !src.includes("Hover a figure for")
      && !src.includes('data-carbon-target="set" title='));
   ok("W3 §1: the passages that left the screen read in plain words (each one's old text is in the technical guide)",
-     src.includes("Needed to change routes, locations and zones.") && !src.includes("Remembered in this browser.") && !src.includes("ADMIN_TOKEN")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): shorter
+     // NARROWED 27 Oct 2026 (F3 c): the Routes token box and its title went; a planner reads "Only an admin can change …"
+     !src.includes("Needed to change routes, locations and zones.") && src.includes('Only an admin can change {onLoc ? "locations" : onZones ? "zones" : "routes"}.')
+     && !src.includes("Remembered in this browser.") && !src.includes("ADMIN_TOKEN")   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): shorter
      && src.includes("Routing is not set up yet, so no route can be worked out.") && !src.includes("HERE_API_KEY")
      // NARROWED 22 Oct 2026 (UI fix 7, fewer words): the admin-token line under the Locations form is gone; the cycle note is one line
      && !src.includes("The admin token is taken from the field at the top of this page.") && !src.includes("taken from the bake panel")
@@ -3449,12 +3468,20 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("⭐ G3 USERS: never renders a team id — teams come from the server's NAMES; the slot is only an option value",
      up.length > 3000 && !/\{u\.team\}|\{l\.team\}|\{t\.id\}<|>\{.*\.team\}/.test(up) && up.includes('teams.map(t => ["team:" + t.id, t.label])')
      && up.includes("{choices.map(([v, l]) => <option key={v} value={v}>{l}</option>)}"));
-  ok("G3 USERS: the admin token is asked for only when NOT signed in as an admin login (D47 bootstrap), never sent by a login",
-     up.includes("{!viaLogin && (") && up.includes('if(!viaLogin && token) q.set("token", token);'));
+  // REVERSED 27 Oct 2026 (F3 c): Users never asks for the admin token now — admin logins only (FIRST_ADMIN_EMAIL makes the first)
+  ok("G3 USERS: the admin token is never asked for nor sent (admin logins only)",
+     !up.includes("{!viaLogin && (") && !up.includes('q.set("token"') && !up.includes("token") && up.includes("const qs = (extra) =>"));
+  ok("F3 b USERS: a Two-step column (On / Not set up) and 'Reset two-step' on another person's row, asked first",
+     up.includes('"Two-step", ""].map((h, i) =>') && up.includes('<StatusWord status="Approved" label="On" />')
+     && up.includes('<StatusWord status="Pending" label="Not set up" />')
+     && up.includes("{u.two_step && u.id !== data.me && !u.disabled && <button")
+     && up.includes("window.confirm(`Reset two-step sign-in for ${u.name}? They set it up again next time they sign in.`)")
+     && up.includes("`/admin/users/${u.id}/two-step-reset${qs()}`"));
   ok("G3 USERS: the person cannot disable themself; a link that could not be emailed is shown to pass on",
      up.includes("{u.id !== data.me && <button") && up.includes("Pass this link on yourself") && up.includes("navigator.clipboard.writeText(note.link)"));
-  ok("G3: Users is an admin-only item, shown to an admin and (for the first-admin step) a planner on a shared CODE, never a planner login",
-     code.includes('const isAdmin = !!(role && (role.role === "admin" || (role.can_approve && role.via !== "login")));'));
+  // NARROWED 27 Oct 2026 (F3 c): to an admin LOGIN only (no first-admin step on a code any more: FIRST_ADMIN_EMAIL)
+  ok("G3: Users is an admin-only item, shown to an admin LOGIN only — never a planner, never a shared code",
+     code.includes("const isAdmin = isAdminLogin(role);") && !code.includes('role.can_approve && role.via !== "login"'));
   // NARROWED 14 Oct 2026 (merged with the mobile shell, D9): and only at 768 px and up; on a phone it is the desk card
   ok("G3: Users is an admin-only item, rendered only for an admin",
      code.includes('{ id: "users", label: "Users", glyph: "☺", adminOnly: true }') && code.includes('{page === "users" && isAdmin && !narrow && <UsersPage access={role} />}')
@@ -3511,7 +3538,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
 // title. The visible word beside a select is in its name (WCAG 2.5.3): "Basemap" → Basemap, "Show" → Show vehicle.
 {
   const _h0 = src.indexOf('<span className="text-xs text-slate-400">Basemap</span>');
-  const _hd = _h0 < 0 ? "" : src.slice(_h0, src.indexOf('placeholder="Admin token"', _h0));
+  const _hd = _h0 < 0 ? "" : src.slice(_h0, src.indexOf("</>}>", _h0));   // NARROWED 27 Oct 2026: the token box that ended it is gone
   ok("names #14: the header of Locations / Routes / Zones is one block with four selects (Basemap, Show, direction, route option)",
      _h0 > 0 && _hd.length > 200 && _hd.length < 2500 && (_hd.match(/<select\b/g) || []).length === 4, String(_hd.length));
   ok("🔴 names #14: the Basemap select is named Basemap, the word shown beside it",
@@ -3994,7 +4021,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
       ["errMsg: a sentence this page threw → as a sentence", H.errMsg(new Error("3 leg(s) left and not falling")), "3 leg(s) left and not falling."],
       ["errMsg: an Error errOf made passes unchanged", H.errMsg(H.errOf(403, { detail: "bad or missing admin token" })), W.admin],
       ["errOf with a tail keeps one full stop at the end", H.errOf(400, { error: "gate is used by routes" }, " (R001, R004)").message, "Gate is used by routes (R001, R004)."],
-      ["errSay: what did not happen + why (card 1)", H.errSay("Not deleted.", H.errOf(403, { detail: "bad or missing admin token" })), "Not deleted. Not allowed: sign in as an admin, or type the admin token."],
+      ["errSay: what did not happen + why (card 1)", H.errSay("Not deleted.", H.errOf(403, { detail: "bad or missing admin token" })), "Not deleted. Not allowed: sign in as an admin."],
       ["errSay: card 3 (the export's 500)", H.errSay("Export failed.", H.errOf(500, "Internal Server Error")), "Export failed. Wayscope could not do this just now. Try again in a minute."],
     ];
     for (const [label, got, want] of rows) ok(`⭐ ERROR WORDS (helper): ${label}`, got === want, JSON.stringify(got));
@@ -4040,11 +4067,12 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && html.includes(".row-open:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}"));
   ok("UI FIX 9: the editor heading's ring shows for the keyboard only (.ed-head:focus none, :focus-visible the navy ring)",
      html.includes(".ed-head:focus{outline:none;}") && html.includes(".ed-head:focus-visible{outline:2px solid var(--navy);"));
+  // NARROWED 27 Oct 2026 (P5): an admin reads "Edit <name>"; anyone else "Show <name> on the map" (no editor opens)
   ok("⭐ UI FIX 9 LOCATIONS: the name is a <button type=button className=row-open data-loc-open> named `Edit ${l.name}`, opening through openLocFromKeys",
-     dm.includes('<button type="button" className="row-open" data-loc-open={l.id} aria-label={`Edit ${l.name}`}')
+     dm.includes('<button type="button" className="row-open" data-loc-open={l.id} aria-label={canEdit ? `Edit ${l.name}` : `Show ${l.name} on the map`}')
      && dm.includes("onClick={(e) => { e.stopPropagation(); openLocFromKeys(l.id); }}>{l.name}</button>"));
   ok("⭐ UI FIX 9 ZONES: the zone's name is a button named `Edit ${z.name}`, opening through openZoneFromKeys (the row offered only Delete)",
-     dm.includes('<button type="button" className="row-open" data-zone-open={z.id} aria-label={`Edit ${z.name}`}')
+     dm.includes('<button type="button" className="row-open" data-zone-open={z.id} aria-label={canEdit ? `Edit ${z.name}` : `Show ${z.name} on the map`}')
      && dm.includes("onClick={(e) => { e.stopPropagation(); openZoneFromKeys(z); }}>{z.name}</button>"));
   ok("⭐ UI FIX 9 ROUTES: the route's code is a button named `Show ${r.id} on the map` that picks it (selectRoute), so Route sheet / Collision evidence work from the keyboard",
      dm.includes('<button type="button" className="row-open" data-route-open={r.id} aria-label={`Show ${r.id} on the map`}')
