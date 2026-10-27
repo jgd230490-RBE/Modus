@@ -8,6 +8,13 @@ be reached — Tark Tee. Nothing here is stored, nothing here refuses a confirm.
     SHORTAGE        last week's actual < planned and calibrate has not carried it
     DAYS_NE_WEEK    sum(day planned) ≠ week planned      (slice 1's flag, surfaced)
     STOCKPILE_OVER       the destination stockpile's forecast balance at week end > capacity
+                    (27 Oct 2026: read from the forward balance, stockpiles.balances, so an Out
+                    nobody has typed yet is the planned use, not 0)
+    STOCKPILE_SOON  27 Oct 2026 (stockpile forecast, D7): the pile goes over, or runs out, in one of
+                    the next 8 weeks — amber, on the commit week's lines into it. Not raised for a
+                    pile with no planned use (it could only ever say "goes over")
+    STOCKPILE_EMPTY 27 Oct 2026: the planned use in the commit week is more than the pile holds —
+                    amber, "bring deliveries forward"
     ROUTE_CAP       max_vehicles_per_day typed on the route and the vehicles that day
                     on that route_id — across EVERY IPT — exceed it
     IPT_SHARE       two or more IPTs with quantity the same day on the same route_id,
@@ -57,7 +64,7 @@ import stockpiles
 import weeks
 
 CODES = ("SHORTAGE", "DAYS_NE_WEEK", "STOCKPILE_OVER", "ROUTE_CAP", "GATE_OVER", "IPT_SHARE", "RESTRICTION",
-         "LIMIT", "UNBAKED", "GATE_NEAR", "PARENT_CHANGED")
+         "LIMIT", "UNBAKED", "GATE_NEAR", "STOCKPILE_EMPTY", "STOCKPILE_SOON", "PARENT_CHANGED")
 
 #: The 98 % band (brief L5): a line "holds" when actual ≥ 98 % of planned.
 HOLD_BAND = 0.98
@@ -262,49 +269,65 @@ def ipt_share(lines):
 # --------------------------------------------------------------------------- #
 #  Stock and road restrictions                                                 #
 # --------------------------------------------------------------------------- #
+def _qty(q):
+    """26 200 — whole units, grouped with a space as the app prints them."""
+    return f"{round(float(q)):,}".replace(",", " ")
+
+
+def _week_of(m, w):
+    """'22 Mar' — the Monday of a week, as the flags name it."""
+    mon = weeks.week_span(m, w)[0]
+    return f"{mon.day} {mon.strftime('%b')}"
+
+
 def stock_forecast(lines, month_index, week_index):
     """
-    Per stockpile: opening (balance at the end of the previous week, from actuals), planned
-    inbound this week (the commit week's PLANNED quantities of every line into it, in the
-    stockpile's unit), typed consumption for the week, and the forecast balance. Over when
-    forecast > capacity. Stockpiles with no capacity are listed with `over` False.
+    Per stockpile: the commit week from the forward balance (stockpiles.balances, 27 Oct
+    2026): opening (the balance at the end of the week before), what comes in and goes out
+    in the week, the balance at its end, and whether it goes over or runs out this week or
+    in the next 8 weeks. Stockpiles with no capacity are listed with `over` False.
+
+    `lines` is kept for the call's shape; the week's lines are what the balance reads.
     """
-    import conversions
-    factors = conversions.load_factors()
-    bal = stockpiles.balances(1, int(month_index))
-    pm, pw = weeks.prev_week(month_index, week_index)
+    mi, wi = int(month_index), int(week_index)
+    bal = stockpiles.balances(1, min(mi + 3, max(mi, 60)))
+    pm, pw = weeks.prev_week(mi, wi)
     out = []
     for sp in bal["stockpiles"]:
-        wk = {(w["month_index"], w["week_index"]): w for w in sp["weeks"]}
+        rows = sp["weeks"]
+        wk = {(w["month_index"], w["week_index"]): w for w in rows}
         prev = wk.get((pm, pw))
-        this = wk.get((int(month_index), int(week_index)))
+        this = wk.get((mi, wi)) or {}
         opening = float(prev["balance_end"]) if prev else float(sp.get("opening_qty") or 0)
-        consume = float(this["consumed"]) if this else 0.0
-        inbound, dropped = 0.0, 0
-        for l in lines:
-            c = l.get("context") or {}
-            if c.get("dest_id") != sp["location_id"]:
-                continue
-            q = float((l.get("week") or {}).get("planned_qty") or 0)
-            v = stockpiles._to_pile_unit(q, l.get("unit"), sp["capacity_unit"],
-                                         l.get("material_type"), l.get("vehicle_type"), factors)
-            if v is None:
-                dropped += 1
-                continue
-            inbound += v
-        forecast = opening + inbound - consume
+        forecast = float(this.get("balance_end", opening))
         cap = sp.get("capacity_qty")
+        # the 8 weeks AFTER the commit week
+        after = [w for w in rows if (w["month_index"], w["week_index"]) > (mi, wi)][:stockpiles.AHEAD_WEEKS]
+        soon_over = next((w for w in after if w["over"]), None)
+        soon_empty = next((w for w in after if w.get("empty")), None)
         out.append({
             "location_id": sp["location_id"], "name": sp["name"],
             "unit": sp["capacity_unit"], "capacity_qty": cap,
-            "opening": round(opening, 3), "inbound_planned": round(inbound, 3),
-            "consume": round(consume, 3), "forecast": round(forecast, 3),
+            "forecast_pile": bool(sp.get("forecast")), "use_planned": bool(sp.get("use_planned")),
+            "opening": round(opening, 3), "inbound_planned": round(float(this.get("inbound", 0)), 3),
+            "consume": round(float(this.get("consumed", 0)), 3),
+            "forecast": round(forecast, 3),
             "remaining": (round(cap - forecast, 3) if cap is not None else None),
             "over": bool(cap is not None and forecast > cap),
             "over_by": (round(forecast - cap, 3) if cap is not None and forecast > cap else None),
-            "unconvertible_lines": dropped,
+            "short": round(float(this.get("short") or 0), 3),
+            "empty": bool(this.get("empty")),
+            "soon_over": ({"month_index": soon_over["month_index"], "week_index": soon_over["week_index"],
+                           "balance_end": soon_over["balance_end"]} if soon_over else None),
+            "soon_empty": ({"month_index": soon_empty["month_index"], "week_index": soon_empty["week_index"],
+                            "balance_end": soon_empty["balance_end"]} if soon_empty else None),
+            "unconvertible_lines": sp.get("unconvertible_movements", 0),
         })
     return out
+
+
+def _unit_word(u):
+    return "m³" if u == "m3" else (u or "t")
 
 
 def stockpile_over(lines, stock):
@@ -315,9 +338,49 @@ def stockpile_over(lines, stock):
         c = l.get("context") or {}
         s = over.get(c.get("dest_id"))
         if s:
+            u = _unit_word(s["unit"])
             out.append(_flag("STOCKPILE_OVER", l,
-                             f"{s['name']} forecasts {s['forecast']:g} / {s['capacity_qty']:g} {s['unit']} at week end — OVER by {s['over_by']:g}",
+                             f"{s['name']}: {_qty(s['forecast'])} {u} forecast at the week's end, "
+                             f"{_qty(s['over_by'])} {u} over its {_qty(s['capacity_qty'])} {u}.",
                              location_id=s["location_id"], over_by=s["over_by"]))
+    return out
+
+
+def stockpile_soon(lines, stock):
+    """
+    27 Oct 2026 (D7). STOCKPILE_EMPTY when the commit week's planned use is more than the pile
+    holds; STOCKPILE_SOON when it goes over, or runs out, in one of the next 8 weeks. Both amber,
+    on the week's lines into the pile; neither for a pile already over this week (STOCKPILE_OVER
+    says it) nor for a pile with no planned use.
+    """
+    by = {s["location_id"]: s for s in stock if s.get("use_planned") and not s.get("over")}
+    out = []
+    for l in lines:
+        c = l.get("context") or {}
+        s = by.get(c.get("dest_id"))
+        if not s:
+            continue
+        u = _unit_word(s["unit"])
+        if s.get("empty"):
+            want = s["consume"] + s["short"]
+            held = s["opening"] + s["inbound_planned"]
+            out.append(_flag("STOCKPILE_EMPTY", l,
+                             f"{s['name']} runs out this week: {_qty(want)} {u} planned use, "
+                             f"{_qty(held)} {u} in stock. Bring deliveries forward.",
+                             location_id=s["location_id"], short=s["short"]))
+            continue
+        so, se = s.get("soon_over"), s.get("soon_empty")
+        first = min([x for x in (so, se) if x], key=lambda x: (x["month_index"], x["week_index"]), default=None)
+        if first is None:
+            continue
+        if first is so:
+            text = (f"{s['name']} goes over {_qty(s['capacity_qty'])} {u} in the week of "
+                    f"{_week_of(so['month_index'], so['week_index'])} (forecast {_qty(so['balance_end'])} {u}).")
+        else:
+            text = f"{s['name']} runs out in the week of {_week_of(se['month_index'], se['week_index'])}."
+        out.append(_flag("STOCKPILE_SOON", l, text, location_id=s["location_id"],
+                         week={"month_index": first["month_index"], "week_index": first["week_index"]},
+                         kind=("over" if first is so else "empty")))
     return out
 
 
@@ -456,6 +519,7 @@ def compute(all_lines, visible_keys, account_rows, month_index, week_index,
     flags += gate_capacity(all_lines, gw)
     flags += ipt_share(all_lines)
     flags += stockpile_over(all_lines, stock)
+    flags += stockpile_soon(all_lines, stock)
     # the STORED check — a DB read, so it is always on. `with_restrictions=False` is for a
     # caller that wants the rail without it (none today).
     prov = restrictions.provider() or {}

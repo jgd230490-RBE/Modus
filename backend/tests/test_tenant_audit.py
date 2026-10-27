@@ -79,6 +79,8 @@ TENANTED = {
     # failures, naming both tables. That is four registrations per table, and the
     # fourth is this one.
     "forecast_weeks", "stockpile_weeks",
+    # 27 Oct 2026 (stockpile forecast): each pile's planned use by month. Registered here in the same edit.
+    "stockpile_plan",
     # 2.5b, 2026-09-03. The audit caught this one too, before it was registered here.
     "config",
     # Look-ahead v2 slice 1, 2026-09-09. And this one — the fourth registration, tripped
