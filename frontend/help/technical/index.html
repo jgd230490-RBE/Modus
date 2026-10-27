@@ -22,7 +22,7 @@ body{margin:0;font:15px/1.6 Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans
 main{margin-left:280px;padding:28px 44px 80px;max-width:1040px}
 h1{color:var(--deep);font-size:26px;margin:44px 0 12px;padding-top:12px;border-top:1px solid var(--line)}h1:first-child{border-top:0;margin-top:0}
 h2{color:var(--deep);font-size:19px;margin:30px 0 8px}h3{color:#1D4ED8;font-size:16px;margin:22px 0 6px}
-p{margin:0 0 10px}code{font:13px/1.4 Consolas,ui-monospace,monospace;background:#EEF1F5;padding:1px 4px;border-radius:4px}
+p{margin:0 0 10px}code{font:13px/1.4 Consolas,ui-monospace,monospace;background:#EEF1F5;padding:1px 4px;border-radius:4px;overflow-wrap:anywhere}
 pre{background:#F5F7FA;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.45 Consolas,ui-monospace,monospace}
 ul{margin:0 0 12px;padding-left:22px}li{margin:0 0 6px}
 .tbl{overflow-x:auto;margin:6px 0 18px}.tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}table{border-collapse:collapse;width:100%;font-size:13.5px}
@@ -307,7 +307,7 @@ and now describe the new haul; the stored route for each vehicle is cleared and 
 <p>Since 22 Oct 2026 the Data pages carry short planner words only (the user: no API or back-end detail on screens or in
 the user guide). What they used to say, where it is still worth knowing:</p>
 <ul>
-<li><strong>27 Oct 2026, the final UI pass.</strong> Every table's right-hand cell is one pattern: at most one filled button for the next step (Approve, Mark notified, Mark moved, Reopen on Abnormal loads; Route on Routes) and a "⋯" menu (<code>RowMenu</code>, the Forecasts page's <code>details.row-menu</code>) with the rest, Withdraw and Delete red at the bottom and asking first; a list row that only loses a line has a named "×" (<code>.row-x</code>). The screens lost these sentences, now in the user guide: Submit's formula (§4.1), the Locations map hints and the deletion warning (§9, and the Delete confirm), the Routes "moving an end clears the route" (§9), the Zones rectangle and haul-road boxes (§9 and this list), the Data legend's "one colour here", the Users set-up steps (§10), Config's long community and collision paragraphs (§9), the Abnormal loads explainer and footer (chapter 14).</li>
+<li><strong>27 Oct 2026, the final UI pass.</strong> Every table's right-hand cell is one pattern: at most one filled button for the next step (Approve, Mark notified, Mark moved, Reopen on Abnormal loads; Route on Routes) and a "⋯" menu (<code>RowMenu</code>, grown from the Forecasts page's menu) with the rest, Withdraw and Delete red at the bottom and asking first; a list row that only loses a line has a named "×" (<code>.row-x</code>). The screens lost these sentences, now in the user guide: Submit's formula (§4.1), the Locations map hints and the deletion warning (§9, and the Delete confirm), the Routes "moving an end clears the route" (§9), the Zones rectangle and haul-road boxes (§9 and this list), the Data legend's "one colour here", the Users set-up steps (§10), Config's long community and collision paragraphs (§9), the Abnormal loads explainer and footer (chapter 14).</li>
 <li><strong>Zones are rectangles.</strong> HERE's avoid-areas parameter takes bounding boxes, not polygons: a zone is sent
 as the rectangle around what was drawn (<code>bbox:west,south,east,north</code>), so a long diagonal or L-shaped closure
 blocks more ground than it looks. Draw several small zones where that matters.</li>

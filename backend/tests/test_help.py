@@ -836,6 +836,8 @@ _tg2 = open(TECH, encoding="utf-8").read()
 ok("\U0001f534 #15 the technical guide's <pre> blocks wrap (pre-wrap, overflow-wrap anywhere) at every width, so none scrolls sideways",
    "pre{background:#F5F7FA;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;white-space:pre-wrap;"
    "overflow-wrap:anywhere;font:12.5px/1.45 Consolas,ui-monospace,monospace}" in _tg2)
+ok("\U0001f534 27 Oct 2026 (audit #44): the technical guide's inline <code> may wrap anywhere, and T2 names no hyphenated code token that broke over two lines on a phone",
+   "border-radius:4px;overflow-wrap:anywhere}" in _tg2 and "details.row-menu" not in _tg2 and "grown from the Forecasts page's menu" in _tg2)
 _tgr = re.findall(r'<div class="tbl"( tabindex="0" role="region" aria-label="([^"]*)")?>', _tg2)
 ok3("\U0001f534 #15 the three tables that scroll on a phone (T3 sources, T6 words, T8 sources) are named regions with tabindex 0, the other two plain; a ring on focus",
    [l for _, l in _tgr] == ["Where each screen reads from", "Errors and what they mean", "Old words, new words", "Sourced and assumed figures", "The community considerations layer: sources", ""]   # NARROWED 22 Oct 2026 (words sweep): T5 (longer now) and T7's sourcing table (from Appendix D) scroll on a phone too, so they are named regions (the UI audit's axe found them)

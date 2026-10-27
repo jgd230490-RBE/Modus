@@ -341,7 +341,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   @keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
   .row-menu{display:inline-block;position:relative;}
   .row-menu summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:32px;height:28px;border-radius:6px;border:1px solid var(--grey);background:var(--surface);color:var(--muted);font-weight:700;}
-  .row-menu summary::-webkit-details-marker{display:none;}
+  .row-menu summary::-webkit-details-marker{display:none;} .row-menu summary.row-dots::before{content:"⋯";}   /* 27 Oct (audit #41 / #42): RowMenu's glyph is CSS content, not text (the other .row-menu summaries carry words) */
   .row-menu[open] summary{background:var(--surface-2);color:var(--ink);}
   .row-menu-list{position:absolute;right:0;top:32px;z-index:20;min-width:220px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:8px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.28);text-align:left;white-space:nowrap;}
   .row-menu-list button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--popover-fg);font:inherit;font-size:14px;padding:7px 10px;border-radius:6px;cursor:pointer;}
@@ -350,7 +350,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   /* 27 Oct 2026 (the final UI pass, card 1): the one row-action pattern — a filled next step + the "⋯" menu (RowMenu) on every
      table; a list row that only ever loses a line gets a named "×" instead of a red Remove link */
   .row-x{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid var(--grey);border-radius:6px;background:var(--surface);color:var(--muted);font-size:15px;line-height:1;cursor:pointer;}
-  .row-x:hover{color:var(--ink);background:var(--surface-2);} .row-x:disabled{opacity:.5;}
+  .row-x:hover{color:var(--ink);background:var(--surface-2);} .row-x:disabled{opacity:.5;} .row-x::before{content:"×";}   /* 27 Oct (audit #41): the glyph is CSS content, not text */
   /* 10 Oct 2026 — Configuration as a form (mockup 6): the section list, the field, the one Save bar */
   .cfg-grid{display:grid;grid-template-columns:200px minmax(0,800px);gap:32px;align-items:start;}
   @media (max-width:900px){.cfg-grid{grid-template-columns:1fr;}}
@@ -4304,7 +4304,8 @@ function RowMenu({ name, note, children }) {
   const pick = e => { const b = e.target.closest ? e.target.closest("button") : null; if (b && !b.disabled && ref.current) ref.current.open = false; };
   return (
     <details className="row-menu" ref={ref}>
-      <summary aria-label={`More actions for ${name}`} title="More actions">⋯</summary>
+      {/* 27 Oct 2026 (audit #41 / #42): the "⋯" is CSS content, so the summary has no visible text for axe to weigh against its name */}
+      <summary className="row-dots" aria-label={`More actions for ${name}`} title="More actions"></summary>
       <div className="row-menu-list" onClick={pick}>{children}{note ? <div className="row-menu-note">{note}</div> : null}</div>
     </details>
   );
@@ -4539,7 +4540,7 @@ function AbnormalPage({ meta, access, who }){
                         <td><input className="ctl ctl-sm" type="time" value={b.from || ""} aria-label="From" onChange={e => setBans(rows => (rows || settings.time_bans).map((x, j) => j === i ? { ...x, from: e.target.value } : x))} /></td>
                         <td><input className="ctl ctl-sm" type="time" value={b.to || ""} aria-label="To" onChange={e => setBans(rows => (rows || settings.time_bans).map((x, j) => j === i ? { ...x, to: e.target.value } : x))} /></td>
                         <td><input className="ctl ctl-sm" value={b.note || ""} aria-label="Note" onChange={e => setBans(rows => (rows || settings.time_bans).map((x, j) => j === i ? { ...x, note: e.target.value } : x))} /></td>
-                        <td className="text-right"><button type="button" className="row-x" aria-label={`Remove time ban ${i + 1}`} title="Remove" onClick={() => setBans(rows => (rows || settings.time_bans).filter((_, j) => j !== i))}>×</button></td>
+                        <td className="text-right"><button type="button" className="row-x" aria-label={`Remove time ban ${i + 1}`} title="Remove" onClick={() => setBans(rows => (rows || settings.time_bans).filter((_, j) => j !== i))}></button></td>
                       </> : <>
                         <td>{b.force}</td><td>{(AL_DAY_PRESETS.find(p => p[0] === b.days) || [null, b.days])[1]}</td><td>{b.from}</td><td>{b.to}</td><td>{b.note || ""}</td><td></td>
                       </>}
@@ -4716,7 +4717,7 @@ function AbnormalPage({ meta, access, who }){
                                     {AL_GRADES.map(([k, w]) => <option key={k} value={k}>{w}</option>)}</select></td>
                                   <td className="al-typed-more">{[["owner", "Owner"], ["measure", "Measure"], ["permit", "Permit"], ["works", "Works"], ["link", "Link"], ["note", "Note"]].map(([k, l]) =>
                                     <input key={k} className="ctl ctl-sm" value={t[k] || ""} aria-label={l} placeholder={l} onChange={e => editTyped(m, i, k, e.target.value)} />)}</td>
-                                  <td className="text-right whitespace-nowrap"><button type="button" className="row-x" aria-label={`Remove pinch point ${t.id || i + 1}`} title="Remove" disabled={busy} onClick={() => removeTyped(m, i)}>×</button></td>
+                                  <td className="text-right whitespace-nowrap"><button type="button" className="row-x" aria-label={`Remove pinch point ${t.id || i + 1}`} title="Remove" disabled={busy} onClick={() => removeTyped(m, i)}></button></td>
                                 </tr>) : (
                                 <tr key={i} className="al-typed-row">
                                   <td className="font-semibold whitespace-nowrap">{t.id}</td><td>{AL_KIND_WORDS[t.kind] || t.kind}</td><td>{t.place}</td><td>{t.words}</td>
@@ -7222,7 +7223,7 @@ function ConfigPage({ meta, who, access }){
                     <input type="time" className="ctl w-32" value={b.to || ""} aria-label={`Peak band ${i + 1} to`}
                       onChange={e => upd(d => { d.planning.peak_bands[i].to = e.target.value; })} />
                     <button type="button" className="row-x" aria-label={`Remove peak band ${i + 1}`} title="Remove"
-                      onClick={() => upd(d => { d.planning.peak_bands.splice(i, 1); if(!d.planning.peak_bands.length) delete d.planning.peak_bands; })}>×</button>
+                      onClick={() => upd(d => { d.planning.peak_bands.splice(i, 1); if(!d.planning.peak_bands.length) delete d.planning.peak_bands; })}></button>
                   </div>
                 ))}
                 {((doc.planning || {}).peak_bands || []).length < PEAK_BANDS_MAX && (
@@ -12872,7 +12873,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                                 onChange={e => setGateForm(g => ({ ...g, shut_windows: g.shut_windows.map((x, j) => j === i ? { ...x, to: e.target.value } : x) }))}
                                 className="border border-slate-300 rounded-lg px-2 py-1 text-sm" />
                               <button type="button" className="row-x" aria-label={`Remove shut time ${i + 1}`} title="Remove"
-                                onClick={() => setGateForm(g => ({ ...g, shut_windows: g.shut_windows.filter((_, j) => j !== i) }))}>×</button>
+                                onClick={() => setGateForm(g => ({ ...g, shut_windows: g.shut_windows.filter((_, j) => j !== i) }))}></button>
                             </div>
                           ))}
                           </div>

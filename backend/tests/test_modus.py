@@ -1126,6 +1126,9 @@ ok("ui_audit.js drives the installed Google Chrome (the user, 17 Oct 2026), the 
 # exempt from h1-many (decision 7), now recorded in the header.
 # RE-PINNED 18 Oct 2026 (claude/ui-fix-phone, decisions 8, 9, 10 built): the 44 px rule FAILS by default now; --no-strict-44
 # is the old grading. The header says since when, and why.
+ok("ui_audit.js (27 Oct 2026, finding #43) leaves screen-reader-only boxes (1 px, overflow hidden, absolute) out of text-clipped",
+   'if (cs.position === "absolute" && parseFloat(cs.width) <= 1 && parseFloat(cs.height) <= 1 && cs.overflow === "hidden") continue;' in _audit
+   and "screen-reader-only text (.sr-only: a 1 px box, overflow hidden, by design) is not a cut label" in _audit)
 ok("ui_audit.js runs the Dark + Blue pass at the desk width as part of the recorded shape (decision 15)",
    all(s in _audit for s in ('{ look: "dark", accent: "blue", widths: [DESK_W] }', "extraPasses: EXTRA_PASSES",
                              "await walkPortal(browser, server.base, p.look, p.accent, false, p.widths)", "o.extraPasses || []")))
