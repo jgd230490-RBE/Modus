@@ -1131,8 +1131,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    and 'style={{ color: "var(--warn-text)", background: "rgba(217,119,6,.10)" }} title="The last good published price is older than 8 days">stale</span>' in fe
    and 'style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>' in fe
    # NARROWED 22 Oct 2026 (finding #40): bad-text 6 -> 8, the Horizon commit column's short and month-changed words;
-   # and (abnormal loads, the same day) bad-text 8 -> 11, warn-text 2 -> 6: the .al-bad / .al-warn chips, the route-error line, the limits over, .al-notes, the route and candidate notes
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 11 and _fe_wo.count("var(--warn-text)") == 6
+   # NARROWED 27 Oct 2026 (UI fix 10): bad-text 11 -> 14, the two Look-ahead error boxes and the save message (--red was 4.39:1 on the rose)\n   # and (abnormal loads, the same day) bad-text 8 -> 11, warn-text 2 -> 6: the .al-bad / .al-warn chips, the route-error line, the limits over, .al-notes, the route and candidate notes
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 14 and _fe_wo.count("var(--warn-text)") == 6
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe
    and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--ok-text)\" }}>" in fe and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--navy-deep)\" }}>" in fe)

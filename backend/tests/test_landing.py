@@ -533,6 +533,13 @@ ok("the privacy notice's Back link is a 44 px tap on a touch screen, and still i
    and ".back{display:inline-block;margin-top:32px;font-weight:500;text-decoration:none}" in _priv_raw
    and '<a class="back" href="./">← Back to Wayscope</a>' in _priv_raw)
 
+_land_raw = open(os.path.join(ROOT, "landing", "index.html"), encoding="utf-8").read()
+ok("UI fix 10: the Walkthrough labels on the stone band read --orange-deep (6.34:1; --orange-text was 4.44:1); the other eyebrows keep theirs",
+   ".film .eyebrow{color:var(--orange-deep)}" in _land_raw and "--orange-deep:#8A4A05" in _land_raw
+   and ".eyebrow{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--orange-text)}" in _land_raw)
+ok("UI fix 10: the privacy footer's email link is an inline-block with 4 px above and below (17 px became 25 px, over the 24 px rule)",
+   "footer a{display:inline-block;padding:4px 0}" in _priv_raw)
+
 # --- the placeholders that still need the user's facts ---------------------------
 placeholders = sorted(set(re.findall(r"\[[A-Z][A-Z 0-9:,\-]+\]", body)))
 print("placeholders still on the page:", ", ".join(placeholders) or "none")
