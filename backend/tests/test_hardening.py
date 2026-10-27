@@ -152,6 +152,8 @@ for page in ("frontend/index.html", "map/index.html"):
        all(allowed("https://" + h, "connect-src") for h in js_hosts))
 ok("Google Fonts: the CSS in style-src, the font files in font-src",
    allowed("https://fonts.googleapis.com/css2", "style-src") and allowed("https://fonts.gstatic.com/x", "font-src"))
+ok("🔴 ...and the CSS in connect-src: an accessibility checker re-reads every stylesheet with fetch() (the UI audit's axe was refused on every page)",
+   allowed("https://fonts.googleapis.com/css2", "connect-src"))
 
 # =========================================================================== #
 #  3. the vendored file                                                         #

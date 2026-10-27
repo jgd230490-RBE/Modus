@@ -26,9 +26,11 @@ CSP_SOURCES = {
     "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
     # map tiles, sprites, Street View pictures and the bulletin's static maps are images from several services
     "img-src": ["'self'", "data:", "blob:", "https:"],
-    # Mapbox GL fetches styles, tiles, glyphs and its event pings; the Estonian ortho tiles for an EE tenant
+    # Mapbox GL fetches styles, tiles, glyphs and its event pings; the Estonian ortho tiles for an EE tenant. Google Fonts'
+    # CSS too: accessibility checkers (axe, which the UI audit runs) re-read every stylesheet with fetch(), and the policy
+    # refused it on every page (UI audit run 2026-10-27_230343); it serves font CSS only.
     "connect-src": ["'self'", "https://api.mapbox.com", "https://*.tiles.mapbox.com", "https://events.mapbox.com",
-                    "https://tiles.maaamet.ee"],
+                    "https://tiles.maaamet.ee", "https://fonts.googleapis.com"],
     # Mapbox GL runs its workers from blob: URLs
     "worker-src": ["'self'", "blob:"],
     "child-src": ["'self'", "blob:"],
