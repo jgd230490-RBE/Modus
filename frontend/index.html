@@ -14,13 +14,15 @@
 <script>(function(){var d=document.documentElement;try{var t=localStorage.getItem("modus_theme"),a=localStorage.getItem("modus_accent");
 d.setAttribute("data-theme",/^(ink|light|dark)$/.test(t||"")?t:"ink");d.setAttribute("data-accent",/^(orange|blue|blue-shades|orange-shades)$/.test(a||"")?a:"orange");}
 catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange");}})();</script>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet">
-<script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
+<!-- 27 Oct 2026 (pilot readiness phase 2): every outside script and stylesheet is an exact version with an integrity hash, so a changed
+     file on a CDN is refused by the browser, not run. Tailwind's CDN sends no CORS header, so it is served from this app (vendor/). -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js" integrity="sha384-KCD0A3BqTNZfWlXJcL7fKzDri97vicyNr4NUIr0vX6K9PZ0X5hOTeEbFh99jPEST" crossorigin="anonymous"></script>
+<script src="/vendor/tailwind-play-3.4.17.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt" crossorigin="anonymous"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" integrity="sha384-SDYx9Nwa5fE1fRuBplOPejrcbPOK/ql0Uym6hsGsTvnlC784P5LZhBJIbo8O/O+0" crossorigin="anonymous">
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js" integrity="sha384-Ou+jUFeikeoESn+KAPV/5+eLHVMHa7XkTmtsYfaMSfxt2SxXmz7h4UUkk+tpcSta" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>

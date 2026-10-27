@@ -862,10 +862,11 @@ ok("\U0001f534 27 Oct 2026 (audit #44): T2 names no hyphenated code token that b
    and "details.row-menu" not in _tg2 and "grown from the Forecasts page's menu" in _tg2)
 _tgr = re.findall(r'<div class="tbl"( tabindex="0" role="region" aria-label="([^"]*)")?>', _tg2)
 ok3("\U0001f534 #15 the three tables that scroll on a phone (T3 sources, T6 words, T8 sources) are named regions with tabindex 0, the other two plain; a ring on focus",
-   [l for _, l in _tgr] == ["Where each screen reads from", "Errors and what they mean", "Old words, new words", "Sourced and assumed figures", "The community considerations layer: sources", ""]   # NARROWED 22 Oct 2026 (words sweep): T5 (longer now) and T7's sourcing table (from Appendix D) scroll on a phone too, so they are named regions (the UI audit's axe found them)
+   # NARROWED 27 Oct 2026 (pilot readiness phase 2): + the key table in t7-hardening, a named region like the other wide tables
+   [l for _, l in _tgr] == ["Where each screen reads from", "Errors and what they mean", "Old words, new words", "Sourced and assumed figures", "Keys and when to change them", "The community considerations layer: sources", ""]   # NARROWED 22 Oct 2026 (words sweep): T5 (longer now) and T7's sourcing table (from Appendix D) scroll on a phone too, so they are named regions (the UI audit's axe found them)
    # NARROWED 18 Oct 2026 (decision 10): the fourth tabindex is main's -1, the "Skip to the text" link's target
-   and ".tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}" in _tg2 and _tg2.count('tabindex="0"') == 5
-   and _tg2.count("tabindex=") == 6, str(_tgr))
+   and ".tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}" in _tg2 and _tg2.count('tabindex="0"') == 6
+   and _tg2.count("tabindex=") == 7, str(_tgr))   # NARROWED 27 Oct 2026: six tables + main's -1
 # RE-PINNED 17 Oct 2026 (D114 fix): the opening sentence now also names the fallback (no approved line in the window ->
 # the months that have them), and the big-screen sentence says "the months the page opened on" instead of "this month ± 6"
 ok("⭐ D114 (17 Oct 2026): the guide says the Dashboard opens on this month ± 6, and how to see the whole programme and back",
@@ -906,7 +907,7 @@ for _nm, _pg, _roles in (("the user guide", src, True), ("the technical guide", 
         "#nav{position:fixed;top:0;left:0;bottom:0;width:280px;overflow:auto;" in _pg and "#nav li a{display:block;color:rgba(255,255,255,.72);text-decoration:none;padding:5px 8px;border-radius:6px}" in _pg)
 # NARROWED 22 Oct 2026 (UI fix 7): the technical guide gains one row, T2 "What the screens leave out"
 ok("decision 10: the only new visible words are the two skip links; the guides' chapter rows are as many as before (59 and 19, + 1 since UI fix 7; 58 + 4 and 28 + 1 since the abnormal loads' chapter 14 and its T1 entry, 22 Oct)",
-   len(re.findall(r'<li class="l[12]"', src)) == 62 and len(re.findall(r'<li class="l[12]"', _tg2)) == 29   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   len(re.findall(r'<li class="l[12]"', src)) == 62 and len(re.findall(r'<li class="l[12]"', _tg2)) == 30   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 ok("⭐ 22 Oct 2026 (abnormal loads, phase 3): the guide's chapter 14 — planning one, the route and the potential pinch points, where they show and the documents — says advice never permission, lorry never truck, counted apart; its three rows in the contents; the technical guide's T1 entry names the sources, the calendars, HERE's parameters, the structures pass and what is not modelled",
    '<h1 id="14-abnormal-loads">14. Abnormal loads</h1>' in src and src.count('<h2 id="14-') == 3
