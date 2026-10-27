@@ -1050,7 +1050,7 @@ ok("🔴 the save caution, withdraw prompt, row title, row menu and CSV show tea
   code.includes(', submitted by ${teamText(l.submitted_by)}') && !code.includes(', submitted by ${l.submitted_by}')
   && code.includes('(submitted by ${teamText(g.submittedBy)})') && !code.includes('(submitted by ${g.submittedBy})')
   // 13 Oct 2026 (W6, narrowed): the row title is the details' "Submitted by" line
-  && code.includes('<RdItem t="Submitted by">{`${teamText(g.submittedBy) || "—"}') && code.includes('Submitted by {teamText(g.submittedBy) || "—"}')
+  && code.includes('<RdItem t="Submitted by">{`${teamText(g.submittedBy) || "—"}') && code.includes('note={`Submitted by ${teamText(g.submittedBy) || "—"}')   // NARROWED 27 Oct 2026: the note is RowMenu's
   && !/Submitted by \$?\{g\.submittedBy/.test(code)
   && code.includes('g.months, g.status, teamText(g.submittedBy),'));
 ok("...the Forecasts search finds a line by its team NAME as well as the stored value",
@@ -2117,7 +2117,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && _fcBody.includes("const clearAll = () => setF({ status: \"ALL\", ipt: \"ALL\", discipline: \"ALL\", mine: false, q: \"\" });")
     && !_fcBody.includes("badge(s)"));
   ok("...Approve is the one visible action; Reject, Edit and Withdraw sit behind the row menu; status is a word with a dot",
-    _fcBody.includes('<details className="row-menu">') && _fcBody.includes(">Reject…</button>") && _fcBody.includes(">Edit in Submit forecast</button>") && _fcBody.includes(">Withdraw…</button>")
+    _fcBody.includes("<RowMenu name={g.routeId} note=") && _fcBody.includes(">Reject…</button>") && _fcBody.includes(">Edit in Submit forecast</button>") && _fcBody.includes(">Withdraw…</button>")
     // 13 Oct 2026 (W6, narrowed): the status is RowStatus, a word and an icon (Rejected, ROAD LIMIT, Pending, Mixed, Approved)
     && _fcBody.includes("<RowStatus word={st.word} tone={st.tone} more={st.more} />") && _fcBody.includes('className="btn-pri btn-sm mr-1">Approve</button>'));
   ok("🔴 no 9, 10 or 11 px product text on the Forecasts page (the 13 px allowance only)",
@@ -4103,10 +4103,16 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const _nc27 = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/[^\n]*/gm, "$1");
   ok("⭐ 27 Oct: RowMenu — the Forecasts page's details.row-menu made general: a named '⋯' summary, the items plain buttons, a note under them",
      src.includes("function RowMenu({ name, note, children }) {") && src.includes("<summary aria-label={`More actions for ${name}`} title=\"More actions\">⋯</summary>")
-     && src.includes('<div className="row-menu-list">{children}{note ? <div className="row-menu-note">{note}</div> : null}</div>'));
+     && src.includes('<div className="row-menu-list" onClick={pick}>{children}{note ? <div className="row-menu-note">{note}</div> : null}</div>')
+     && src.includes('l.style.position = "fixed"; l.style.left = "auto";') && src.includes('window.addEventListener("scroll", shut, true); window.addEventListener("resize", shut);')
+     && src.includes("if (b && !b.disabled && ref.current) ref.current.open = false;")
+     && src.includes('document.addEventListener("click", e => { document.querySelectorAll("details.row-menu[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; }); });')
+     && src.includes('if (e.key === "Escape") document.querySelectorAll("details.row-menu[open]").forEach(d => { d.open = false; });'));   // 27 Oct, after the Chrome check: pinned to the screen, closes after a pick / on scroll / a click elsewhere / Escape
+  ok("⭐ 27 Oct: the Abnormal loads actions cell keeps the next-step button and its '⋯' on one line (the table's other cells wrap)",
+     html.includes(".al-tbl td[data-al-actions]{white-space:nowrap;}"));
   const menus = (src.match(/<RowMenu name=\{[^}]+\}/g) || []);
   ok("⭐ 27 Oct: the '⋯' on six tables — Abnormal loads (with its note), Routes, Zones, the gates list, the logins, the demo leads, the teams",
-     menus.length === 7 && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
+     menus.length === 8 && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
      && src.includes("<RowMenu name={g.name || g.id}>") && (src.match(/<RowMenu name=\{u\.name\}>/g) || []).length === 2 && src.includes("<RowMenu name={t.label}>"), String(menus.length));
   ok("⭐ 27 Oct: Abnormal loads — one filled button for the forward step (AL_FORWARD: pending → approved → notified → moved; withdrawn → pending), the rest in the menu, Withdraw and Delete red and asking first",
      src.includes('const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved", withdrawn: "pending" };')

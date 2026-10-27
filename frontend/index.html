@@ -933,7 +933,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .al-tri{background:none;border:0;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;min-width:24px;min-height:24px;transition:transform .12s;}
   .al-tri.is-open{transform:rotate(90deg);}
   .al-tbl td{white-space:normal;height:auto;padding-top:8px;padding-bottom:8px;vertical-align:top;}
-  .al-tbl td:nth-child(9){white-space:nowrap;}
+  .al-tbl td:nth-child(9){white-space:nowrap;} .al-tbl td[data-al-actions]{white-space:nowrap;}   /* 27 Oct: the next-step button and its ⋯ stay side by side (the Tailwind class on the cell is not defined in this file) */
   .al-det-row > td{padding:0 0 10px;background:var(--surface-2);}
   .al-dl{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;margin:0 0 10px;font-variant-numeric:tabular-nums;}
   .al-dl dt{color:var(--muted);} .al-dl dd{margin:0;}
@@ -4279,14 +4279,41 @@ const AL_NEXT_WORD = { approved: "Approve", pending: "Reopen", notified: "Mark n
 // 27 Oct 2026 (the final UI pass, card 1): the ONE forward step a row shows as its filled button; everything else is in the "⋯"
 const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved", withdrawn: "pending" };
 // 27 Oct 2026 (the final UI pass, card 1): the one row-action pattern on every table — the Forecasts page's details.row-menu made
-// general. `name` names the row for a screen reader; the items are plain buttons (red for Delete / Withdraw, which confirm).
+// general. `name` names the row for a screen reader; the items are plain buttons (red for Delete / Withdraw, which confirm). The open
+// list is pinned to the screen beside its "⋯" (a table's card scrolls, and clipped the list), flips upward near the bottom edge, and
+// closes after a pick or on a scroll; a click elsewhere or Escape closes every details.row-menu (below).
 function RowMenu({ name, note, children }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const d = ref.current; if (!d) return;
+    const list = () => d.querySelector(".row-menu-list");
+    const place = () => {
+      const l = list(), s = d.querySelector("summary"); if (!l || !s) return;
+      const r = s.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+      l.style.position = "fixed"; l.style.left = "auto"; l.style.right = Math.max(8, vw - r.right) + "px";
+      const h = l.offsetHeight, w = l.offsetWidth;
+      l.style.top = (r.bottom + 4 + h <= vh - 8 || r.top - 4 - h < 8 ? r.bottom + 4 : r.top - 4 - h) + "px";
+      if (vw - parseFloat(l.style.right) - w < 8) l.style.right = Math.max(8, vw - 8 - w) + "px";
+    };
+    const onToggle = () => { if (d.open) place(); else { const l = list(); if (l) l.removeAttribute("style"); } };
+    const shut = () => { if (d.open) d.open = false; };
+    d.addEventListener("toggle", onToggle);
+    window.addEventListener("scroll", shut, true); window.addEventListener("resize", shut);
+    return () => { d.removeEventListener("toggle", onToggle); window.removeEventListener("scroll", shut, true); window.removeEventListener("resize", shut); };
+  }, []);
+  const pick = e => { const b = e.target.closest ? e.target.closest("button") : null; if (b && !b.disabled && ref.current) ref.current.open = false; };
   return (
-    <details className="row-menu">
+    <details className="row-menu" ref={ref}>
       <summary aria-label={`More actions for ${name}`} title="More actions">⋯</summary>
-      <div className="row-menu-list">{children}{note ? <div className="row-menu-note">{note}</div> : null}</div>
+      <div className="row-menu-list" onClick={pick}>{children}{note ? <div className="row-menu-note">{note}</div> : null}</div>
     </details>
   );
+}
+// 27 Oct 2026: every details.row-menu (the "⋯" menus, More filters, Monthly bulletin, Notice calendar, Config's more) closes on a
+// click outside it and on Escape (the render harness stubs `document` without listeners, hence the guard).
+if (typeof document.addEventListener === "function") {
+  document.addEventListener("click", e => { document.querySelectorAll("details.row-menu[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; }); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") document.querySelectorAll("details.row-menu[open]").forEach(d => { d.open = false; }); });
 }
 const AL_DAY_PRESETS = [["1111100", "Weekdays"], ["1111110", "Mon–Sat"], ["1111111", "Every day"], ["0000011", "Weekends"]];
 
@@ -6728,19 +6755,16 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                             {canApprove && g.status !== "Approved" && (
                               <button disabled={busy === g.key} onClick={() => setStatus(g, "Approved")} className="btn-pri btn-sm mr-1">Approve</button>
                             )}
-                            <details className="row-menu">
-                              <summary aria-label={`More actions for ${g.routeId}`} title="More actions">⋯</summary>
-                              <div className="row-menu-list">
-                                {canApprove && g.status !== "Rejected" && (
-                                  <button disabled={busy === g.key} onClick={() => setStatus(g, "Rejected")} style={{ color: "var(--red)" }}>Reject…</button>
-                                )}
-                                <button onClick={() => onEdit({ routeId: g.routeId, year: g.fromYear, toYear: g.toYear, discipline: g.discipline, sectionId: g.sectionId })}>Edit in Submit forecast</button>
-                                {(own || canApprove) && (
-                                  <button disabled={busy === g.key} onClick={() => withdraw(g)} style={{ color: "var(--red)" }}>Withdraw…</button>
-                                )}
-                                <div className="row-menu-note">Submitted by {teamText(g.submittedBy) || "—"}{own ? " (you)" : ""}, {g.yearLabel}</div>
-                              </div>
-                            </details>
+                            {/* 27 Oct 2026 (the final UI pass, card 1): the same RowMenu as every other table, the red items last */}
+                            <RowMenu name={g.routeId} note={`Submitted by ${teamText(g.submittedBy) || "—"}${own ? " (you)" : ""}, ${g.yearLabel}`}>
+                              <button onClick={() => onEdit({ routeId: g.routeId, year: g.fromYear, toYear: g.toYear, discipline: g.discipline, sectionId: g.sectionId })}>Edit in Submit forecast</button>
+                              {canApprove && g.status !== "Rejected" && (
+                                <button disabled={busy === g.key} onClick={() => setStatus(g, "Rejected")} style={{ color: "var(--red)" }}>Reject…</button>
+                              )}
+                              {(own || canApprove) && (
+                                <button disabled={busy === g.key} onClick={() => withdraw(g)} style={{ color: "var(--red)" }}>Withdraw…</button>
+                              )}
+                            </RowMenu>
                           </td>
                         </>}>
                         <RdItem t="Route">{g.routeId}</RdItem>
