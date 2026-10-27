@@ -538,7 +538,8 @@ ok("UI fix 10: the Walkthrough labels on the stone band read --orange-deep (6.34
    ".film .eyebrow{color:var(--orange-deep)}" in _land_raw and "--orange-deep:#8A4A05" in _land_raw
    and ".eyebrow{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--orange-text)}" in _land_raw)
 ok("UI fix 10: the privacy footer's email link is an inline-block with 4 px above and below (17 px became 25 px, over the 24 px rule)",
-   "footer a{display:inline-block;padding:4px 0}" in _priv_raw)
+   "footer a{display:inline-block;padding:4px 0}" in _priv_raw
+   and "@media (pointer:coarse){footer a{display:inline-flex;align-items:center;min-height:44px}}" in _priv_raw)
 
 # --- the placeholders that still need the user's facts ---------------------------
 placeholders = sorted(set(re.findall(r"\[[A-Z][A-Z 0-9:,\-]+\]", body)))

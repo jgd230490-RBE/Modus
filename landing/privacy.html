@@ -34,7 +34,8 @@
   .back{display:inline-block;margin-top:32px;font-weight:500;text-decoration:none}
   @media (pointer:coarse){.back{display:inline-flex;align-items:center;min-height:44px}}   /* 18 Oct 2026 (UI audit, the 44 px rule on a phone): a 44 px tap on a touch screen */
   footer{border-top:1px solid var(--line);padding:24px 0 48px;font-size:13px;color:var(--muted)}
-  footer a{display:inline-block;padding:4px 0}   /* 27 Oct 2026 (UI fix 10): 17 px tall became 25 px, over the 24 px target rule */
+  footer a{display:inline-block;padding:4px 0}
+  @media (pointer:coarse){footer a{display:inline-flex;align-items:center;min-height:44px}}   /* and a 44 px tap on a touch screen, like the Back link */   /* 27 Oct 2026 (UI fix 10): 17 px tall became 25 px, over the 24 px target rule */
 </style>
 </head>
 <body>

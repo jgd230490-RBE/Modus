@@ -156,7 +156,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-500{color:#475569}
   /* 27 Oct 2026 (UI fix 10): a chip (blue text on the 8 % blue tint) on a row that already has a wash (a selected row, the Account's
      short row) fell to 4.26-4.31:1, so there the chip's tint is plain surface (5.17:1 or better in every accent). !important: the tint is inline. */
-  html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) [style*="--navy-soft"]{background:var(--surface) !important}
+  html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) :where([style*="--navy-soft"],[style*="rgba(37, 99, 235, 0.08)"],[style*="rgba(37,99,235,.08)"]){background:var(--surface) !important}
   /* CAPTIONS-END */
   /* DARK-REMAP-START — generated 5 Oct 2026 from the colour utilities in this file; test_h1_uk asserts coverage both ways
      (17 Oct 2026: every utility has a remap, and every remap has a utility — four stale lines went that day) */
@@ -9209,7 +9209,7 @@ function PhoneLookAhead({ meta, initialPage }){
               <button key={iso} type="button" className={"ph-day" + (iso === today ? " is-today" : "")}
                 aria-pressed={iso === shown ? "true" : "false"} aria-label={phDayLabel(iso) + (iso === today ? ", today" : "")}
                 onClick={() => setDay(iso)}>
-                {dayName(iso)}<b>{dayNum(iso)}</b>
+                {dayName(iso)}{" "}<b>{dayNum(iso)}</b>
               </button>
             ))}
           </div>
