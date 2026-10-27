@@ -12659,7 +12659,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           <div ref={mapDiv} style={{ height: MAP_H, width: "100%" }} />
         </div>
 
-        <div className="space-y-4" style={panelStyle}>
+        {/* 27 Oct 2026 (P5): read-only, the panel may hold no control at all, so it is a tab stop itself to scroll by keyboard */}
+        <div className="space-y-4" style={panelStyle} {...(canEdit ? {} : { tabIndex: 0, role: "region", "aria-label": onLoc ? "Locations panel" : onZones ? "Zones panel" : "Routes panel" })}>
           {onLoc && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-2">

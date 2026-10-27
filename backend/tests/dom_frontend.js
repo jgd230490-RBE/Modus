@@ -2615,6 +2615,7 @@ async function rowsDom(){
     await press(rb[1]);
     ok("⭐ UI FIX 9 ROUTES: pressing R002's button picks it (aria-current) and the Route sheet button comes on — reachable from the keyboard now",
        rb[1].getAttribute("aria-current") === "true" && !rb[0].hasAttribute("aria-current") && sheet() && !sheet().disabled);
+    ok("P5: ...for an admin login the side panel is not an extra tab stop (its own controls are)", !R.el.querySelector('[aria-label="Routes panel"]'));
     ok("P5: an admin login sees Route all, Clear all routes, the Create route panel and each row's Route / Edit / Delete",
        [...R.el.querySelectorAll("button")].some(b => /^Route all/.test(b.textContent)) && /Create route/.test(R.el.textContent)
        && [...R.el.querySelectorAll("button")].some(b => b.textContent === "Clear all routes")
@@ -2641,6 +2642,9 @@ async function rowsDom(){
        (PZ.el.querySelector("[data-readonly-note]") || {}).textContent === "Only an admin can change zones."
        && ![...PZ.el.querySelectorAll("button")].some(b => /Draw zone|Haul road|^Delete$/.test(b.textContent.trim()))
        && [...PZ.el.querySelectorAll("button[data-zone-open]")].every(b => /^Show .* on the map$/.test(b.getAttribute("aria-label"))));
+    const pzPanel = PZ.el.querySelector('[role="region"][aria-label="Zones panel"]');
+    ok("P5 ZONES (planner): the side panel, which may hold no control now, is a named tab stop so the keyboard can scroll it (axe scrollable-region-focusable)",
+       !!pzPanel && pzPanel.tabIndex === 0);
     await press(PZ.el.querySelector("button[data-zone-open]"));
     ok("🔴 P5 ZONES (planner): pressing a zone shows it, opens no editor", !PZ.el.querySelector("input[aria-label], textarea") || !/Editing Z/.test(PZ.el.textContent));
     await PZ.done();

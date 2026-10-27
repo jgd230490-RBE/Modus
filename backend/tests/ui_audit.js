@@ -911,6 +911,8 @@ async function walkPortal(browser, base, look, accent, first, widths) {
     drain(store);
     // 3. every portal page
     for (const id of PORTAL_PAGES) {
+      // 27 Oct 2026 (F3 c): Users opens for an admin LOGIN only — a code run has no Users page (the login walk pictures it)
+      if (id === "users" && !OPT.email) continue;
       const ts = Date.now();
       await gotoPage(page, id);
       if (PAGE_TITLE[id]) await page.waitForFunction((t) => { const h = document.querySelector('[data-guide="page-header"] h2'); return h && h.textContent.trim() === t; }, PAGE_TITLE[id], { timeout: 20000 }).catch(() => {});
