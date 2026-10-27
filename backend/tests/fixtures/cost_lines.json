@@ -10,6 +10,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 4010.0,
@@ -28,6 +29,8 @@
    "origin_id": "L1",
    "cycle_min": 104.0,
    "cycles_per_vehicle_day": 5,
+   "drive_min": 84.0,
+   "other_work_min": 20.0,
    "km": 12060.0,
    "tonne_km": 240600.0,
    "co2_t": 12.033,
@@ -52,7 +55,8 @@
    "actual_tonnes": 1900.0,
    "actual_eur": 3300.0,
    "weeks_reported": 2,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R1",
@@ -64,6 +68,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 4010.0,
@@ -82,6 +87,8 @@
    "origin_id": "L1",
    "cycle_min": 104.0,
    "cycles_per_vehicle_day": 5,
+   "drive_min": 84.0,
+   "other_work_min": 20.0,
    "km": 12060.0,
    "tonne_km": 240600.0,
    "co2_t": 12.033,
@@ -106,7 +113,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R1",
@@ -118,6 +126,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 4010.0,
@@ -136,6 +145,8 @@
    "origin_id": "L1",
    "cycle_min": 104.0,
    "cycles_per_vehicle_day": 5,
+   "drive_min": 84.0,
+   "other_work_min": 20.0,
    "km": 12060.0,
    "tonne_km": 240600.0,
    "co2_t": 12.033,
@@ -162,7 +173,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R2",
@@ -174,6 +186,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Artic Tipper (44t)",
    "vehicle_short": "Tipper (44t)",
+   "vehicle_name": "Artic Tipper (44t)",
    "vehicle_class": "artic",
    "unit": "t",
    "quantity": 2600.0,
@@ -192,6 +205,8 @@
    "origin_id": "L1",
    "cycle_min": 108.0,
    "cycles_per_vehicle_day": 5,
+   "drive_min": 84.0,
+   "other_work_min": 24.0,
    "km": 5400.0,
    "tonne_km": 156000.0,
    "co2_t": 5.073,
@@ -216,7 +231,8 @@
    "actual_tonnes": 0.0,
    "actual_eur": null,
    "weeks_reported": 1,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R2",
@@ -228,6 +244,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Artic Tipper (44t)",
    "vehicle_short": "Tipper (44t)",
+   "vehicle_name": "Artic Tipper (44t)",
    "vehicle_class": "artic",
    "unit": "t",
    "quantity": 2600.0,
@@ -246,6 +263,8 @@
    "origin_id": "L1",
    "cycle_min": 108.0,
    "cycles_per_vehicle_day": 5,
+   "drive_min": 84.0,
+   "other_work_min": 24.0,
    "km": 5400.0,
    "tonne_km": 156000.0,
    "co2_t": 5.073,
@@ -270,7 +289,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R2",
@@ -282,6 +302,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Artic Tipper (44t)",
    "vehicle_short": "Tipper (44t)",
+   "vehicle_name": "Artic Tipper (44t)",
    "vehicle_class": "artic",
    "unit": "t",
    "quantity": 2600.0,
@@ -300,6 +321,8 @@
    "origin_id": "L1",
    "cycle_min": 108.0,
    "cycles_per_vehicle_day": 5,
+   "drive_min": 84.0,
+   "other_work_min": 24.0,
    "km": 5400.0,
    "tonne_km": 156000.0,
    "co2_t": 5.073,
@@ -326,7 +349,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R3",
@@ -338,6 +362,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 900.0,
@@ -356,6 +381,8 @@
    "origin_id": "L1",
    "cycle_min": null,
    "cycles_per_vehicle_day": null,
+   "drive_min": null,
+   "other_work_min": null,
    "km": null,
    "tonne_km": null,
    "co2_t": null,
@@ -382,7 +409,8 @@
    "weeks_reported": 0,
    "flags": [
     "UNBAKED"
-   ]
+   ],
+   "limit": null
   },
   {
    "route_id": "R3",
@@ -394,6 +422,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 900.0,
@@ -412,6 +441,8 @@
    "origin_id": "L1",
    "cycle_min": null,
    "cycles_per_vehicle_day": null,
+   "drive_min": null,
+   "other_work_min": null,
    "km": null,
    "tonne_km": null,
    "co2_t": null,
@@ -438,7 +469,8 @@
    "weeks_reported": 0,
    "flags": [
     "UNBAKED"
-   ]
+   ],
+   "limit": null
   },
   {
    "route_id": "R3",
@@ -450,6 +482,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 900.0,
@@ -468,6 +501,8 @@
    "origin_id": "L1",
    "cycle_min": null,
    "cycles_per_vehicle_day": null,
+   "drive_min": null,
+   "other_work_min": null,
    "km": null,
    "tonne_km": null,
    "co2_t": null,
@@ -494,7 +529,8 @@
    "weeks_reported": 0,
    "flags": [
     "UNBAKED"
-   ]
+   ],
+   "limit": null
   },
   {
    "route_id": "R4",
@@ -506,6 +542,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 1000.0,
@@ -524,6 +561,8 @@
    "origin_id": "L1",
    "cycle_min": 104.0,
    "cycles_per_vehicle_day": 5,
+   "drive_min": 84.0,
+   "other_work_min": 20.0,
    "km": 3000.0,
    "tonne_km": 60000.0,
    "co2_t": 2.993,
@@ -548,7 +587,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R4",
@@ -560,6 +600,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 1000.0,
@@ -578,6 +619,8 @@
    "origin_id": "L1",
    "cycle_min": 104.0,
    "cycles_per_vehicle_day": 5,
+   "drive_min": 84.0,
+   "other_work_min": 20.0,
    "km": 3000.0,
    "tonne_km": 60000.0,
    "co2_t": 2.993,
@@ -602,7 +645,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   },
   {
    "route_id": "R4",
@@ -614,6 +658,7 @@
    "material_type": "Small aggregate",
    "vehicle_type": "Rigid 8-wheeler (32t)",
    "vehicle_short": "8-wheeler (32t)",
+   "vehicle_name": "Rigid 8-wheeler (32t)",
    "vehicle_class": "rigid",
    "unit": "t",
    "quantity": 1000.0,
@@ -632,6 +677,8 @@
    "origin_id": "L1",
    "cycle_min": 104.0,
    "cycles_per_vehicle_day": 5,
+   "drive_min": 84.0,
+   "other_work_min": 20.0,
    "km": 3000.0,
    "tonne_km": 60000.0,
    "co2_t": 2.993,
@@ -658,7 +705,8 @@
    "actual_tonnes": null,
    "actual_eur": null,
    "weeks_reported": 0,
-   "flags": []
+   "flags": [],
+   "limit": null
   }
  ],
  "totals": {
@@ -713,18 +761,7 @@
   "baf_pct": null,
   "baf_reason": "no base",
   "fair_params": {
-   "driver_eur_per_h": 20.0,
-   "running_eur_per_km": 0.12,
-   "margin_pct": 8.0,
-   "consumption": {
-    "rigid": {
-     "l_per_100km_empty": 27.0
-    },
-    "artic": {
-     "l_per_100km_empty": 23.6
-    },
-    "l_per_100km_per_tonne": 0.4
-   },
+   "vehicle_standing_eur_per_h": 16.0,
    "season": {
     "thaw_months": [
      3,
@@ -739,7 +776,18 @@
     ],
     "winter_consumption_uplift_pct": 8.0
    },
-   "vehicle_standing_eur_per_h": 16.0,
+   "consumption": {
+    "rigid": {
+     "l_per_100km_empty": 27.0
+    },
+    "l_per_100km_per_tonne": 0.4,
+    "artic": {
+     "l_per_100km_empty": 23.6
+    }
+   },
+   "driver_eur_per_h": 20.0,
+   "margin_pct": 8.0,
+   "running_eur_per_km": 0.12,
    "vehicle_new_price_eur": 190000
   },
   "fair": {

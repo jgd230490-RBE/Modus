@@ -2179,9 +2179,10 @@ async function twoStepDom(){
     const orgName = w.__TENANT.name;
     ok("🔴 ORG FILE: Replace stays off until the organisation's name is typed exactly",
        btnT(O.box, "Replace").disabled === true && new RegExp("Type " + orgName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " to replace").test(O.box.textContent));
-    await setVal(conf, orgName.toLowerCase() === orgName ? orgName + "x" : orgName.toLowerCase());
+    await setVal(conf, orgName + "x");
     ok("...a near miss does not count", btnT(O.box, "Replace").disabled === true);
-    await setVal(conf, orgName);
+    await setVal(conf, "  " + orgName.toUpperCase().replace(/—/g, "-") + " ");
+    ok("...but case, a plain dash for a long one and extra spaces do (a long dash is hard to type)", btnT(O.box, "Replace").disabled === false);
     await act(async () => { btnT(O.box, "Replace").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); await tick(); await tick();
     const im = calls.filter(c => /\/api\/admin\/tenant\/import/.test(c.u)).pop();
     ok("⭐ ORG FILE: Replace posts the file's JSON to the import with replace=1, and says to draw the routes again (the file had none drawn)",

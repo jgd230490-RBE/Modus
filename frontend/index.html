@@ -382,9 +382,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .auth-links button:hover{color:var(--ink);}
   /* 27 Oct 2026 (F3 b): two-step sign-in */
   .auth-who{font-size:13px;color:var(--muted);background:var(--surface-2, #F8FAFC);border-radius:6px;padding:6px 10px;margin:0 0 6px;overflow-wrap:anywhere;}
-  .auth-steps{margin:0 0 6px;padding-left:20px;font-size:14px;color:var(--ink);}
+  .auth-steps{margin:0 0 6px;padding-left:20px;font-size:14px;color:var(--ink);list-style:decimal;}
   .auth-qr{display:inline-block;background:#fff;padding:4px;border:1px solid var(--line);border-radius:6px;margin:4px 0;line-height:0;}
-  .auth-qr svg{width:164px;height:164px;}
+  .auth-qr svg{width:164px;height:164px;display:block;}
   .auth-key{font-family:ui-monospace,Consolas,monospace;font-weight:600;letter-spacing:.06em;color:var(--ink);overflow-wrap:anywhere;}
   .auth-otp{font-family:ui-monospace,Consolas,monospace;font-size:22px;letter-spacing:.3em;text-align:center;}
   .recovery-codes{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin:10px 0 12px;padding:10px 14px;
@@ -5049,7 +5049,7 @@ function TwoStep({ ans, remember, onSignIn, onBack }){
             <p className="auth-sub">Each time you sign in, Wayscope also asks for a code from an app on your phone.</p>
             <ol className="auth-steps"><li>Open an authenticator app (Microsoft Authenticator, Google Authenticator or similar).</li><li>Scan this code.</li></ol>
             <div className="auth-qr" dangerouslySetInnerHTML={{ __html: ans.qr || "" }} />
-            <p className="auth-note" style={{ marginTop: 6 }}>Can't scan? Type this key: <span className="auth-key">{ans.key}</span></p>
+            <p className="auth-note" style={{ marginTop: 6, marginBottom: 12 }}>Can't scan? Type this key: <span className="auth-key">{ans.key}</span></p>
           </>
         ) : (
           <p className="auth-sub">{useRecovery ? "Type one of your recovery codes." : "Type the 6-digit code from your authenticator app."}</p>
@@ -7445,7 +7445,9 @@ function OrgFile(){
       .catch(e => setMsg({ ok: false, text: errSay("Not replaced.", e) }))
       .finally(() => setBusy(false));
   };
-  const nameOk = !!orgName && typed.trim() === orgName;
+  // the name as typed: case, the kind of dash and extra spaces do not matter (a long dash is hard to type)
+  const normName = (t) => String(t || "").toLowerCase().replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim();
+  const nameOk = !!orgName && normName(typed) === normName(orgName);
   return (
     <div className="px-6 pb-6" data-orgfile="1">
       <p className="text-sm text-slate-500 mb-3">Everything for this organisation in one file: sites, routes, forecasts, the look-ahead and the configuration. Logins are not in it.</p>

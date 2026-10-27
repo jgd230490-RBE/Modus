@@ -741,8 +741,9 @@ def qr_svg(text):
     """The set-up QR code as an SVG string (segno, drawn by the server: the key never goes to a third party)."""
     import segno
     buf = io.BytesIO()
+    # omitsize: a viewBox and no fixed width / height, so the page sizes it without clipping
     segno.make(text, error="m").save(buf, kind="svg", scale=5, border=2, xmldecl=False, svgclass=None,
-                                     lineclass=None, title="QR code for your authenticator app")
+                                     lineclass=None, omitsize=True, title="QR code for your authenticator app")
     return buf.getvalue().decode("utf-8")
 
 
