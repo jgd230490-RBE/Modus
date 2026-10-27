@@ -6110,10 +6110,16 @@ function qrRead(mod) {
      html.includes(".heat-seg .fc-toggle.fc-mode:has(input:checked){ background:var(--navy); color:#fff; font-weight:600; }")
      && !html.includes(".heat-seg label:has(input:checked)"));
   ok("19 Oct (seen in Chrome): the 2×2 filters and the share row are 13 px, so 'All destinations' is whole and the buttons sit two to a row",
-     html.includes(".filter-grid select{ min-width:0; font-size:13px; padding:8px 6px; }")
+     // NARROWED 27 Oct 2026 (group 2e): the select rule also carries grid-column:span 7 (see the 27 Oct check below)
+     html.includes(".filter-grid select{ min-width:0; font-size:13px; padding:8px 6px; grid-column:span 7; }")
      && html.includes(".share-group .share-row .btn{ font-size:13px; padding:8px 10px; }"));
   ok("19 Oct: the four filters sit two by two (the names on the selects kept)",
-     /<div class="filter-grid">\s*<select id="filter-origin"[^>]*aria-label="Origin">/.test(sb) && html.includes(".filter-grid{ display:grid; grid-template-columns:1fr 1fr; column-gap:6px; }"));
+     /<div class="filter-grid">\s*<select id="filter-origin"[^>]*aria-label="Origin">/.test(sb) && html.includes(".filter-grid{ display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); column-gap:6px; }"));   // NARROWED 27 Oct 2026: was 1fr 1fr, now twelfths (below)
+  ok("⭐ 27 Oct (group 2e, seen in Chrome): 'All destinations' and 'All disciplines' take seven twelfths of the panel (140 px), 'All origins' and 'All teams' five (98 px): every word whole, same text and 13 px",
+     /\.filter-grid select\{[^}]*font-size:13px[^}]*grid-column:span 7;/.test(html)
+     && /\.filter-grid #filter-origin, \.filter-grid #filter-ipt\{ grid-column:span 5; \}/.test(html)
+     && !/\.filter-grid\{[^}]*grid-template-columns:1fr 1fr/.test(html)
+     && html.includes('<option value="ALL">All destinations</option>') && html.includes('<option value="ALL">All disciplines</option>'));
   // ---- the month picker ----
   {
     const pSrc = (() => { const i = code.indexOf("    const MPICK = { year: null, forMonth: null };"); return i > 0 ? code.slice(i, code.indexOf("    function pickMonth(m)", i)) : ""; })();

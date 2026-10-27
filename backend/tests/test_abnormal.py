@@ -4,7 +4,7 @@ the endpoints at source level, the bare category.
 
 THE ASK (the user, 22 Oct 2026): each abnormal load planned on its own with its dimensions and weights typed by hand, the
 rules worked out as advice (D69: "check with the haulier"), the status pending → approved → notified → moved / withdrawn
-(D68), counted apart (D70), out of carbon (D71), no ESDAL link (D73), bank holidays from gov.uk on a button with a seed
+(D68), counted apart (D70), out of carbon (D71), no ESDAL link (D73; the sheet itself gone 27 Oct 2026), bank holidays from gov.uk on a button with a seed
 copy (D74), a per-tenant police time-ban table, empty by default (D72). Sources: notes/abnormal-loads-research-1016.md
 §1 (not in git) — STGO 2003 (SI 2003/1998), C&U 1986 (SI 1986/1078), the National Highways page and aide memoire
 (Jan 2022), the BE16 and VR1 forms, NPCC Abnormal Load Guidance 2025, the NH lighting and marking code (2021), the
@@ -413,8 +413,8 @@ ok("a VR1 raises SO_LEAD_TIME too (apply by 29 Mar 2027 for a 12 Apr move)",
 _all = " ".join(adv(fig(width_m=5.5, height_m=5.2, length_m=36, gross_t=160, max_axle_t=17, axle_count=12, proj_rear_m=6.5, proj_side_m=0.4, indivisible=False),
                      date_from="2027-04-12", today="2027-03-01", time_bans=_bans, escort_planned=None)["lines"])
 _src = read("backend/abnormal_rules.py") + read("backend/abnormal.py")
-ok("🔴 the words: 'check with the haulier' on the header, every line advice; never 'compliant', never 'approved by', never truck",
-   "Check with the haulier" in R.ADVICE_WORDS and not re.search(r"\bcompliant\b|\bapproved by\b|\btrucks?\b|real-time|\bAI\b", _all, re.I)
+ok("🔴 the words: the one advice line says who decides (NARROWED 27 Oct 2026: 'The haulier, ESDAL, the police and the road and bridge authorities decide.'), every line advice; never 'compliant', never 'approved by', never truck",
+   R.ADVICE_WORDS == "Advice from the typed figures. The haulier, ESDAL, the police and the road and bridge authorities decide." and not re.search(r"\bcompliant\b|\bapproved by\b|\btrucks?\b|real-time|\bAI\b", _all, re.I)
    and not re.search(r"\bcompliant\b|\btrucks?\b", re.sub(r"#.*", "", _src), re.I))
 ok("the not-modelled words name structures, forces, time bans, level crossings, swept paths and indivisibility",
    all(w in R.NOT_MODELLED_WORDS for w in ("structures", "forces", "time bans", "level crossings", "swept paths", "indivisible")))
@@ -558,7 +558,7 @@ ok("⭐ the page read: the movements with their advice and flags, the counts by 
    "(locations by name, gates with their location, the statuses with their words)",
    _pg["count"] == 2 and _pg["by_status"] == {"pending": 2} and _pg["flagged"] == 2
    and _pg["settings"]["holidays"]["source"] == "seed" and _pg["settings"]["time_bans"] == [] and _pg["settings"]["nation"] == "england-and-wales"
-   and "check with the haulier" in _pg["words"]["advice"].lower() and "D70" in _pg["words"]["counted_apart"]
+   and "the haulier, esdal, the police" in _pg["words"]["advice"].lower() and _pg["words"]["counted_apart"] == "Counted apart from the lorries' figures."   # NARROWED 27 Oct 2026: no decision code on a screen
    and [l["name"] for l in _pg["choices"]["locations"]] == ["Langton Compound", "Melton Compound", "Precast works"]
    and any(g["id"] == "G012" and g["location_id"] == "L008" for g in _pg["choices"]["gates"])
    and _pg["choices"]["statuses"][0] == {"key": "pending", "word": "Pending"} and _pg["today"] == "2027-03-01")
@@ -838,7 +838,7 @@ ok("⭐ WEEK: the movements whose window touches the week's dates (Mon 12 – Su
    [m["name"] for m in _wk["movements"]] == ["Units", "Beams", "Crane"] and _wk["count"] == 3 and _wk["from"] == "2027-04-12" and _wk["to"] == "2027-04-18"
    and set(_wk["movements"][0]) >= {"id", "name", "team_name", "origin_name", "dest_name", "date_from", "date_to", "time_band", "movements", "escort_planned",
                                    "status", "status_word", "summary", "permission", "notify_by", "apply_by", "flags", "routed", "distance_km", "candidates", "limit_exceeds"}
-   and "geometry" not in _wk["movements"][0] and "lines" not in _wk["movements"][0] and "never in the week's tonnes" in _wk["words"], str(_wk)[:300])
+   and "geometry" not in _wk["movements"][0] and "lines" not in _wk["movements"][0] and "Counted apart from the week's figures" in _wk["words"], str(_wk)[:300])
 ok("WEEK: a window that starts in the week's last day or ends on its first counts; one outside does not; no dates, nothing",
    A.week(["2027-04-14"], PLANNER)["count"] == 3 and A.week(["2027-04-15"], PLANNER)["count"] == 0 and A.week([], PLANNER)["count"] == 0
    and A.window_overlaps({"date_from": "2027-04-12", "date_to": "2027-04-14"}, datetime.date(2027, 4, 14), datetime.date(2027, 4, 20))
@@ -1017,30 +1017,24 @@ ok("CALENDAR as XLSX: the rows under one header on the first sheet (every column
    _wb.sheetnames == ["Notice calendar", "About"] and [_ws.cell(row=_hrow, column=j).value for j in range(1, len(AD.CALENDAR_HEAD) + 1)] == AD.CALENDAR_HEAD
    and str(_ws.cell(row=_hrow + 1, column=1).value).startswith(_ids[0] + " · ") and _ws.cell(row=_hrow + len(_ids), column=16).value in ("Pending", "Approved", "Notified", "Moved")
    and any(_wb["About"].cell(row=i, column=1).value == "Bank holidays" and "GOV.UK" in str(_wb["About"].cell(row=i, column=2).value) for i in range(1, 14))
-   and any("Advice worked out" in str(_wb["About"].cell(row=i, column=2).value) for i in range(1, 14)), str([_ws.cell(row=_hrow + 1, column=j).value for j in range(1, 6)]))
+   and any("Advice from the typed figures" in str(_wb["About"].cell(row=i, column=2).value) for i in range(1, 14)), str([_ws.cell(row=_hrow + 1, column=j).value for j in range(1, 6)]))
 _cpdf = AD.build_calendar_pdf(_C)
 _ct = " ".join(_pdf_text(_cpdf).split())
 ok("CALENDAR as PDF: A4 landscape, the title, the sub line with the count and the sorting, every load's id in the table, the column heads, the advice and the not-modelled words",
    _cpdf[:4] == b"%PDF" and "notice calendar" in _ct and f"{_C['count']} abnormal loads as at 15 Jan 2027" in _ct and "Sorted by the date the first notice" in _ct
-   and all(i in _ct for i in _ids) and "Police notice by" in _ct and "Notify by" in _ct and "Advice worked out from the typed figures" in _ct
+   and all(i in _ct for i in _ids) and "Police notice by" in _ct and "Notify by" in _ct and "Advice from the typed figures" in _ct
    and "Not worked out here" in _ct, _ct[:400])
-_S = AD.esdal_sheet(_b["id"], PLANNER, today="2027-01-15", generated="2027-01-15T09:00:00Z")
-ok("⭐ ESDAL SHEET: one movement's data — the haulier's blanks, the load, the dimensions and weights as typed, the route with its roads once drawn, the notices as advised, the references, every pinch point with its grade (the planner's own marked), the words that say it is not an application",
-   _S and _S["id"] == _b["id"] and _S["fill_in"][0] == ("Haulier", "") and ("Overall length", "36 m") in _S["dims"] and ("Overall width", f"{AD._nw(A.get(_b['id'])['width_m'])} m") in _S["dims"]
-   and _S["notices"][1] == ("Permission", "Special Order (BE16): apply 10 weeks ahead (the aide memoire; the BE16 form itself says 8: plan on 10)")
-   and next(r for r in _C["rows"] if r["id"] == _b["id"])["permission"].startswith("Special Order (BE16)") and _u_row["permission"] == "none beyond the notices"
-   and _S["weights"][0] == ("Gross weight", "78 t") and ("Axles", "8") in _S["weights"] and _S["load"][-1] == ("Vehicle type", "Modular trailer")
-   and _S["route"][0][0] == "From" and "Roman Way" in _S["route"][3][1] and "STGO" in _S["notices"][0][1] and _S["notices"][5][0] == "Notify by"
-   and any(x.startswith("T1 · Welland bridge: Arch bridge") and "(the planner's own)" in x and "Red" in x for x in _S["pinch"]) and len(_S["pinch"]) >= 8
-   and "not an application" in _S["words"]["sheet"] and AD.esdal_file_name(_S) == f"esdal-details-{_b['id']}.pdf"
-   and AD.esdal_sheet("AL999", PLANNER) is None and (AD.esdal_sheet(_u["id"], NORTH) is None) == (not A._visible(A.get(_u["id"]), NORTH)),
-   str(_S and (_S["dims"], _S["weights"], _S["notices"][:3], _S["pinch"][:3])))
-_epdf = AD.build_esdal_pdf(_S)
-_et = " ".join(_pdf_text(_epdf).split())
-ok("ESDAL SHEET as PDF: the title, the sections, the typed figures, the roads, the planner's pinch point, the not-an-application words, the advice words",
-   _epdf[:4] == b"%PDF" and "ESDAL details sheet" in _et and "For the haulier to fill in" in _et and "Overall length" in _et and "36 m" in _et
-   and "Roman Way" in _et and "Welland bridge" in _et and "not an application" in _et and "Advice worked out from the typed figures" in _et
-   and "Potential pinch points" in _et, _et[:400])
+# REVERSED 27 Oct 2026 (the final UI pass, card 2; the user: the haulier plans and applies in their own software, Wayscope
+# forecasts the load and tracks the notices): the ESDAL details sheet of 22 Oct is GONE — the builder, the file name, its
+# words, the endpoint and the row's button. The references the haulier gives back stay on the load and in the calendar.
+ok("⭐ ESDAL SHEET GONE: no esdal_sheet / build_esdal_pdf / esdal_file_name / SHEET_WORDS in abnormal_docs, no esdal route in main, no "
+   "'ESDAL sheet' in the app; the ESDAL / VR1 / Special Order references stay in the calendar's columns and on the load",
+   not hasattr(AD, "esdal_sheet") and not hasattr(AD, "build_esdal_pdf") and not hasattr(AD, "esdal_file_name") and not hasattr(AD, "SHEET_WORDS")
+   and "esdal.pdf" not in read("backend/main.py") and "esdal_sheet" not in read("backend/main.py") and "ESDAL sheet" not in read("frontend/index.html")
+   and "esdal.pdf" not in read("frontend/index.html") and "ESDAL ref" in AD.CALENDAR_HEAD and "VR1 ref" in AD.CALENDAR_HEAD and "Special Order ref" in AD.CALENDAR_HEAD
+   and "esdal_ref" in read("backend/abnormal.py") and "<dt>ESDAL</dt>" in read("frontend/index.html"))
+ok("CALENDAR: the permission words per row — the beams a Special Order (BE16), the units none beyond the notices",
+   next(r for r in _C["rows"] if r["id"] == _b["id"])["permission"].startswith("Special Order (BE16)") and _u_row["permission"] == "none beyond the notices")
 _main3 = read("backend/main.py")
 ok("ENDPOINTS: GET /api/abnormal/summary (any sign-in) and PUT /api/abnormal/{id}/pinch (an approver), the summary before the {movement_id} read",
    re.search(r'@app\.get\("/api/abnormal/summary"\)\ndef \w+\(\):\n(?:\s+""".*?"""\n)?\s+acc = _require_access\(\)', _main3, re.S)
@@ -1052,13 +1046,13 @@ ok("ENDPOINTS (phase 3): POST /api/abnormal/{id}/structures (an approver, no HER
    and 'return abnormal_route.feature_collection(ms, public=True)' in _main3 and A.PUBLIC_STATUSES == ("approved", "notified", "moved")
    and A.STAFF_VIEW == {"role": "planner", "ipt": None, "label": "Staff (map)"} and 'acc = abnormal.STAFF_VIEW' in _main3
    and '"/api/public/",' in read("backend/gate.py"))
-ok("ENDPOINTS (phase 3, D73): GET /api/abnormal/calendar.xlsx and .pdf (any sign-in, declared before the {movement_id} read) and GET /api/abnormal/{id}/esdal.pdf (any sign-in that may see it; 404 otherwise); each a file with a name and no-store",
+ok("ENDPOINTS (phase 3, D73; NARROWED 27 Oct 2026: the esdal.pdf route is gone): GET /api/abnormal/calendar.xlsx and .pdf (any sign-in, declared before the {movement_id} read); each a file with a name and no-store",
    re.search(r'@app\.get\("/api/abnormal/calendar\.xlsx"\)\ndef \w+\(\):\n(?:\s+""".*?"""\n)?\s+acc = _require_access\(\)', _main3, re.S)
    and re.search(r'@app\.get\("/api/abnormal/calendar\.pdf"\)\ndef \w+\(\):\n(?:\s+""".*?"""\n)?\s+acc = _require_access\(\)', _main3, re.S)
-   and re.search(r'@app\.get\("/api/abnormal/\{movement_id\}/esdal\.pdf"\)\ndef \w+\(movement_id: str\):\n(?:\s+""".*?"""\n)?\s+acc = _require_access\(\)', _main3, re.S)
+   and "esdal.pdf" not in _main3 and "esdal_sheet" not in _main3   # the typed reference field (esdal_ref) stays
    and _main3.index('"/api/abnormal/calendar.xlsx"') < _main3.index('@app.get("/api/abnormal/{movement_id}")')
-   and _main3.count('abnormal_docs.calendar_file_name(C, ') == 2 and 'raise HTTPException(404, "no such abnormal load")' in _main3[_main3.index('def abnormal_esdal_pdf'):][:900]
-   and _main3[_main3.index('def abnormal_calendar_xlsx'):].count('"Cache-Control": "no-store"') >= 3)
+   and _main3.count('abnormal_docs.calendar_file_name(C, ') == 2
+   and _main3[_main3.index('def abnormal_calendar_xlsx'):].count('"Cache-Control": "no-store"') >= 2)
 
 try:
     remove_scratch_db(db, TMP)

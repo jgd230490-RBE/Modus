@@ -832,16 +832,17 @@ async function signIn(page, base, how) {
 }
 
 // ---------------------------------------------------------------- the walks ------------------------------------------
-async function waitForMap(target) {
+async function waitForMap(target, playing = false) {
   // the map is a top-level `let` in a classic script: visible to evaluate by name, not as window.map. `target` is the
   // map page, or the public view's iframe (embeddedMap)
   const t0 = Date.now();
   while (Date.now() - t0 < 30000) {
-    const st = await target.evaluate(() => { try { return (typeof map !== "undefined" && map && map.loaded && map.loaded()) ? "loaded" : (document.querySelector("#p") ? "password" : "loading"); } catch (e) { return "error:" + e.message; } }).catch(() => "nav");
+    const st = await target.evaluate((playing) => { try { return (typeof map !== "undefined" && map && map.loaded && (map.loaded() || (playing && map.areTilesLoaded() && !map.isMoving()))) ? "loaded" : (document.querySelector("#p") ? "password" : "loading"); } catch (e) { return "error:" + e.message; } }, playing).catch(() => "nav");
     if (st === "loaded" || st === "password" || st.startsWith("error")) return st;
     await new Promise(r => setTimeout(r, 300));
   }
-  return "timeout";
+  const why = await target.evaluate(() => { try { return JSON.stringify({ style: map.isStyleLoaded(), tiles: map.areTilesLoaded(), moving: map.isMoving(), loaded: map.loaded() }); } catch (e) { return "?"; } }).catch(() => "?");
+  return "timeout " + why;
 }
 // the public view's map is an iframe (/map/?embed=1): its frame, once it has its address; null when none appears in time
 async function embeddedMap(page, cap = 10000) {
@@ -853,7 +854,8 @@ async function embeddedMap(page, cap = 10000) {
   }
   return null;
 }
-async function mapStop(page, store, meta) { meta.mapState = await waitForMap(page); return audit(page, store, meta); }
+// while the timeline plays the app keeps changing the map's sources, so style.loaded() / loaded() stay false (measured 27 Oct 2026: style false, tiles true, not moving): a playing map counts as ready once its tiles are in and it is still
+async function mapStop(page, store, meta) { meta.mapState = await waitForMap(page, /playing/.test(meta.name)); return audit(page, store, meta); }
 // a first visitor's context (the guide storage not switched off — the existing guide flag of newContext) that carries THIS
 // context's cookies: the map access and the staff session the signed-in context has (Playwright hands over the HttpOnly ones
 // too). The two guide stops open in one (17 Oct 2026, findings #32 / #33). Returns the page, its store and a close().

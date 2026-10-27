@@ -590,8 +590,8 @@ def page(acc=None, today=None):
         "flagged": sum(1 for m in movements if m["flags"]),
         "settings": {"holidays": holiday_status(), "time_bans": bans, "nation": nat},
         "words": {"advice": rules.ADVICE_WORDS, "not_modelled": rules.NOT_MODELLED_WORDS, "structures": _structures_words(),
-                  "counted_apart": ("Abnormal loads are counted on their own: never in the lorry counts, the CLP caps, "
-                                    "the gate capacity or the carbon totals (D70, D71).")},
+                  # 27 Oct 2026 (the final UI pass): a screen never prints a decision code; the rule (D70, D71) is in the technical guide
+                  "counted_apart": "Counted apart from the lorries' figures."},
         "choices": {"statuses": [{"key": k, "word": rules.STATUS_WORDS[k]} for k in rules.STATUSES],
                     "vehicle_types": [{"key": k, "word": rules.VEHICLE_WORDS[k]} for k in rules.VEHICLE_TYPES],
                     "escorts": list(rules.ESCORTS), "time_bands": list(rules.TIME_BANDS),
@@ -666,8 +666,7 @@ def week(dates, acc=None, today=None):
     rows = [brief(m) for m in pg["movements"] if m.get("status") != "withdrawn" and window_overlaps(m, d0, d1)]
     return {"movements": rows, "count": len(rows), "from": d0.isoformat(), "to": d1.isoformat(),
             "flagged": sum(1 for r in rows if r["flags"]),
-            "words": "Abnormal loads are never in the week's tonnes, loads, lorries, gate counts or carbon (D70). "
-                     "What each needs is advice from its typed figures: check with the haulier."}
+            "words": "Counted apart from the week's figures. What each needs is advice from its typed figures."}
 
 
 def summary(acc=None, today=None, weeks_ahead=4):
@@ -683,7 +682,7 @@ def summary(acc=None, today=None, weeks_ahead=4):
     return {"today": t.isoformat(), "weeks_ahead": weeks_ahead, "planned": len(pg["movements"]),
             "ahead": len(ahead), "ahead_names": [m["name"] for m in ahead][:4],
             "notices_due": len(due), "notices_late": len(late), "to_apply": len(to_apply), "road_limit": len(road),
-            "words": "Counted apart: none of these is in the cards, the charts or the carbon target (D70, D71)."}
+            "words": "Counted apart from the lorries' figures."}
 
 
 def gate_markers(month_index, acc=None, today=None):

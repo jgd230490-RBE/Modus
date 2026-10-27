@@ -390,8 +390,9 @@
         .heat-seg input{ position:absolute; opacity:0; width:1px; height:1px; margin:0; }
         .heat-seg .fc-toggle.fc-mode:has(input:checked){ background:var(--navy); color:#fff; font-weight:600; }   /* beats the white above (19 Oct, seen in Chrome: white on white) */
         .heat-seg label:focus-within{ outline:2px solid var(--navy); outline-offset:-3px; }
-        .filter-grid{ display:grid; grid-template-columns:1fr 1fr; column-gap:6px; }
-        .filter-grid select{ min-width:0; font-size:13px; padding:8px 6px; }      /* "All destinations" whole in a 129 px column (seen in Chrome, 19 Oct) */
+        .filter-grid{ display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); column-gap:6px; }
+        .filter-grid select{ min-width:0; font-size:13px; padding:8px 6px; grid-column:span 7; }      /* "All destinations" whole (seen in Chrome, 19 Oct; cut again in a 119 px column, 27 Oct): the wordier select of each row takes seven twelfths (140 px of 244), the other five (98 px) */
+        .filter-grid #filter-origin, .filter-grid #filter-ipt{ grid-column:span 5; }
         .share-group .share-row .btn{ font-size:13px; padding:8px 10px; }      /* two to a row at 300 px (were one each at 14 px) */
         .layers-box > summary small{ margin-left:6px; font-size:13px; font-weight:500; color:var(--muted); }
         /* the number badges' key (the badges on the map are drawn by pillBadgeImage) */
