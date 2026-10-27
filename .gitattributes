@@ -12,3 +12,6 @@
 *.woff2 binary
 *.ttf binary
 *.db binary
+
+# 27 Oct 2026: vendored files stay byte-identical to their source (their sha384 is checked)
+frontend/vendor/*.js -text
