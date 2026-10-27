@@ -224,9 +224,32 @@ is shut (before it opens, in a band or in one of its shut windows) waits for it 
 bottleneck is the first wait longer than the check-in. Nothing is saved. A window past midnight is refused.</p>
 
 <h2 id="t1-stock">Stockpiles</h2>
-<pre>balance at the week's end = opening + typed week actuals delivered there − typed consumption</pre>
-<p>A week nobody reported counts as nothing. Consumption is typed on Look-ahead → Account. The chart is red past
-capacity and amber from 90 %; a stockpile with no capacity recorded is listed, never drawn as zero.</p>
+<p>27 Oct 2026: the balance runs FORWARD from the plan (<code>backend/stockpiles.py</code>, <code>balances()</code>; decisions D1–D11
+in <code>notes\stockpile-forecast-plan-1027.md</code>). Nothing is stored that it works out. Weeks before the current week are
+past, the current week and later are the forecast.</p>
+<pre>balance_end(W) = count(W) if a stock count is typed, else balance_end(W−1) + In(W) − Out(W)
+In(W)   every APPROVED line whose route ends at the place, one line-week at a time:
+          past + actual typed      -> the actual
+          past + nothing typed     -> the plan (counted in not_recorded)
+          forecast                 -> the week row's planned_qty (edited, confirmed, calibrated) or the month ÷ its 4 / 5 weeks
+Out(W)  typed Out (stockpile_weeks.consumed_qty) -> that figure: everything that left, road hauls out included
+        else -> planned use (stockpile_plan, the month ÷ its weeks) + approved lines whose route STARTS at the place
+        a planned Out never takes more than the place holds; the rest is `short`, and the week is `empty` (≥ 1 unit)</pre>
+<p>Only a place with a capacity or a planned use runs forward (<code>forecast</code>); any other keeps the records-only rule
+(actuals in, typed Out out). Pending and Rejected lines never count; units go through <code>_to_pile_unit</code>. Per week the
+read returns <code>basis</code> (recorded · part · plan · forecast), <code>in_basis</code>, <code>out_basis</code>,
+<code>plan_in</code>, <code>plan_out</code>, <code>in_recorded</code>, <code>not_recorded</code>, <code>short</code>,
+<code>empty</code>, <code>count</code>, <code>count_adjust</code> and the week's Monday (<code>from</code>); per place
+<code>first_over</code>, <code>first_empty</code>, <code>peak</code> and the 8 weeks ahead (<code>soon_over</code>,
+<code>soon_empty</code>, <code>AHEAD_WEEKS</code>). One computation serves every reader of a page until the next write
+(<code>_MEMO</code>, keyed on <code>db.data_version()</code> and the current week).</p>
+<p>Writes: <code>PUT /api/stockpiles/plan</code> (one month or from–to) and <code>PUT /api/stockpiles/count</code>, planners
+and admins; <code>GET /api/stockpiles/plan</code>. The rail: STOCKPILE_OVER (the commit week over capacity, red),
+STOCKPILE_SOON (over or runs out within 8 weeks, amber, not for a place with no plan) and STOCKPILE_EMPTY (runs out in the
+commit week, amber), on the week's lines into the place. <code>/api/public/stockpile-timeline</code> sends a month's
+<code>over</code> and a figure above the capacity to staff only; the public read is capped at the capacity with
+<code>full</code> (D9 a + i), kept by <code>read_cache</code>. The Dashboard chart is red past capacity and amber from 90 %; a
+place with no capacity recorded is named, never drawn as zero.</p>
 
 <h2 id="t1-clp">CLP monitoring</h2>
 <p>Read from <code>GET /api/clp/monitoring?month=N</code> (<code>backend/clp.py</code>), the first time the Dashboard

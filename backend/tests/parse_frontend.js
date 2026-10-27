@@ -4219,6 +4219,56 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && _tg.includes("<li><strong>27 Oct 2026, the final UI pass.</strong>"));
 }
 
+// ---- 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast; John's D0–D12 and the mockup
+// notes\stockpile-forecast-mockup-1027\, "A,a,i"): the new Plan → Stockpiles page, the Dashboard's line chart, the
+// Account's plan figures and Next 8 weeks, the Horizon strip, the two amber rail words, and no location code on screen.
+{
+  const _sp = src.slice(src.indexOf("function StockpilesPage({ meta, access, who }){"), src.indexOf("function AbnormalPage({ meta, access, who }){"));
+  ok("STOCKPILES: a Plan-group page on a desk (a phone gets the desk-only card), its own line icon",
+     src.includes('{ id: "stockpiles", label: "Stockpiles", glyph: "▲" },') && /\n  stockpiles: "M/.test(src)
+     && src.includes('{page === "stockpiles" && !narrow && <StockpilesPage meta={meta} access={role} who={who} />}') && _sp.length > 6000);
+  ok("STOCKPILES: ONE read of the balance (the whole programme) and ONE of the plan; the writes are the plan, the count and (admins) the capacity",
+     (_sp.match(/fetch\(`\$\{API\}\/stockpiles/g) || []).length === 2 && _sp.includes("fetch(`${API}/stockpiles?from_month=1&to_month=${months.count}`)")
+     && _sp.includes("fetch(`${API}/stockpiles/plan`)") && _sp.includes('put("/stockpiles/plan", { location_id: sp.location_id, from_month: m, planned_qty: q')
+     && _sp.includes('put("/stockpiles/count", { location_id: sp.location_id, month_index: w.month_index, week_index: w.week_index, measured_qty: q')
+     && _sp.includes("put(`/locations/${encodeURIComponent(sp.location_id)}/capacity`, body"));
+  ok("STOCKPILES: D6 — planners and admins type the plan and the count; a team login reads the same page with no boxes; only an admin types the capacity",
+     _sp.includes("const canPlan = !!(access && access.can_approve);") && _sp.includes("const canCap = isAdminLogin(access);")
+     && _sp.includes("{canPlan ? <input") && _sp.includes("{canPlan && pastWeeks.length > 0 && (") && _sp.includes("{canCap ? <span"));
+  ok("STOCKPILES: the planned use is a year of months, plus 'Same each month from … to …' (one PUT for the range)",
+     _sp.includes('Planned use <span className="font-normal text-slate-500">{u} a month, laid on the works</span>')
+     && _sp.includes("Same each month from") && _sp.includes("from_month: Math.min(a, b), to_month: Math.max(a, b), planned_qty: q"));
+  ok("STOCKPILES: an emptied month clears it (null, not 0); a negative figure is refused in words",
+     _sp.includes('const q = v === "" ? null : numOr(v, NaN);') && _sp.includes('say(false, "Planned use must be a number, 0 or more.")'));
+  ok("STOCKPILES: the stock count names the week, and the last count says how far it was from the worked-out figure",
+     _sp.includes("At the end of the week of") && _sp.includes('than worked out` : "")') && _sp.includes('"No stock count yet."'));
+  ok("STOCKPILES: the status line — goes over (red) / runs out (amber) / nearly full (amber) / never over (green) — and its own forecast line",
+     _sp.includes("`Goes over in the week of ${stockWeekWord(sp.first_over.from)}") && _sp.includes("`Runs out in the week of ${stockWeekWord(sp.first_empty.from)}")
+     && _sp.includes("`Nearly full: ${Math.round(sp.peak_pct)} %") && _sp.includes("`Never over: ${Math.round(sp.peak_pct)} % at most`")
+     && _sp.includes("segment: { borderDash: (c) => (c.p0DataIndex >= cut ? [6, 4] : undefined) }"));
+  ok("STOCKPILES: failures in words (errSay), never a status number", _sp.includes('errSay("The stockpiles did not load.", e)')
+     && _sp.includes('"The planned use was not saved."') && _sp.includes('"The stock count was not saved."') && !/\$\{r\.status\}/.test(_sp));
+  const _la = src.slice(src.indexOf("account.week && (account.stock || []).length > 0 && (() => {"), src.indexOf("horizon.rows.length === 0 ? ("));
+  ok("ACCOUNT: 🔴 no location code on screen any more ({s.loc_type} · {s.location_id} is gone; the Dashboard names places, not codes)",
+     !src.includes("{s.loc_type} · {s.location_id}") && !src.includes("`${sp.loc_type} · ${sp.location_id}") && _la.length > 2000);
+  ok("ACCOUNT: In shows the record with the plan under it in grey; the Out box's hint is the planned figure; 'plan used' under Closing",
+     _la.includes('{s.inbound_recorded == null ? "—" : grp(s.inbound_recorded, 1)}<div className="text-[12px] text-slate-500" data-stock-plan-in="1">plan {grp(s.plan_in)}</div>')
+     && _la.includes('placeholder={s.forecast ? `plan ${grp(s.plan_out)}` : "out —"}') && _la.includes(">plan used</div>"));
+  ok("ACCOUNT: Next 8 weeks — over from <week> (red), runs out <week> (amber), fine + the fullest % (green), 'No use planned yet'",
+     _la.includes(">Next 8 weeks</th>") && _la.includes("over from {stockWeekWord(nx.week_from)}") && _la.includes("runs out {stockWeekWord(nx.week_from)}")
+     && _la.includes('<span style={{ color: "var(--ok-text)" }}>fine</span>') && _la.includes("No use planned yet"));
+  ok("ACCOUNT: the places with neither a capacity nor a plan fold under the table, records only",
+     _la.includes('data-stock-records="1"') && _la.includes('more {rec.length === 1 ? "place" : "places"} with no capacity: records only'));
+  ok("HORIZON: one stockpile strip under the week rows — % at the week's end, amber from 90 %, red over",
+     src.includes('<tbody data-horizon-stock="1">') && src.includes('const tone = c.over ? "over" : c.pct >= 90 ? "near" : "ok";')
+     && src.includes(`Stockpiles <span className="font-normal text-slate-500">% full at the week's end</span>`));
+  ok("RAIL: STOCKPILE SOON / STOCKPILE EMPTY are words in both tables, amber, ranked with the warnings",
+     src.includes('STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",') && src.includes('STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7 };')
+     && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";'));
+  ok("DASHBOARD: the 'No use planned yet' line names a stockpile with a capacity and no plan",
+     src.includes('{noPlan.length > 0 && <div className="text-[13px] text-slate-500 mt-1" data-stock-noplan="1">No use planned yet: {noPlan.map(sp => sp.name).join(", ")}.</div>}'));
+}
+
 console.log();
 for (const f of fail) console.log("  FAIL:", f);
 console.log(`\n${pass} passed, ${fail.length} failed`);
