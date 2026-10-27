@@ -375,13 +375,37 @@ Users → Activity or <code>GET /api/admin/audit.csv</code>.</li>
 <li><strong>Demo leads (HU14).</strong> A demo request makes (or renews) a <code>demo</code> login on the team slot
 <code>DEMO_TEAM_CODE_VAR</code> names, for 14 days, and emails its personal link (<code>#demo=…</code>), reusable until
 the login ends. The leads CSV gains login, expiry, sign-ins, first and last seen, pages.</li>
-<li><strong>The admin token.</strong> Admin actions (saving Configuration, changing routes, zones and gates, the fuel
-index, Users) pass on an admin LOGIN, or with the token typed in the admin token field (Config → More, the Data pages'
-header, the fuel widget, Users); it is remembered in this browser. Since 22 Oct 2026 the field is hidden for an admin login, which never needs it; it shows
-for a shared code and a planner login. It is checked against <code>ADMIN_TOKEN</code> on Render. The first admin is added
-with it: signed in with the shared admin code (or with no admin login yet), open Users, type the admin token, add yourself
-as an Admin, open the link in the email, choose a password, then sign out and sign in with your email.
-Since 12 Oct 2026 an unset <code>ADMIN_TOKEN</code> refuses those actions (it used to open them). The Data &rarr; Locations note about this field (it used to name a bake panel that no longer exists) left the screen on 22 Oct 2026: the field in the page header is the place.</li>
+<li><strong>Two-step sign-in (27 Oct 2026, pilot readiness F3 b).</strong> Every staff login (admin, planner, team)
+signs in with its password and a 6-digit TOTP code (RFC 6238: SHA-1, 30-second steps, one step either side accepted, a
+step accepted once, <code>users.totp_last_step</code>). <code>POST /api/auth/signin</code> answers a staff login with
+<code>{step, ticket}</code> and NO session: a single-use ticket (<code>auth_tokens</code> purpose <code>mfa</code>,
+10 minutes). <code>step: "setup"</code> also carries a fresh key and its QR code (an SVG drawn by the server with
+<code>segno</code>; the key never goes to a third party); <code>POST /api/auth/setup</code> confirms the first code, turns it
+on and answers ten recovery codes (shown once, stored as SHA-256 in <code>users.recovery_hashes</code>).
+<code>POST /api/auth/code</code> takes a code or a recovery code. Wrong codes count towards the sign-in limit (five, then
+15 minutes). An invite or reset link (<code>/api/auth/reset</code>) goes on to the same step. A staff session of a login
+without two-step does not resolve, so everyone signed in before it shipped sets it up at their next sign-in.
+<code>POST /api/auth/recovery-codes</code> (signed in, a code first) replaces the codes;
+<code>POST /api/admin/users/{id}/two-step-reset</code> (an admin, not their own login) clears a lost phone. Demo logins
+are exempt. The key is stored in <code>users.totp_secret</code> (plain base32, like any TOTP server must).</li>
+<li><strong>The admin token, retired from the screens (27 Oct 2026, F3 c).</strong> Admin actions (saving Configuration,
+changing locations, routes, zones and gates, the fuel index, Users, the organisation file) pass on an admin LOGIN. No
+screen asks for the token any more, and a token a browser kept from before (<code>localStorage.modus_admin_token</code>)
+is deleted on load. <code>_check_admin</code> still accepts <code>?token=</code> while <code>ADMIN_TOKEN</code> is set on
+Render (It is checked against <code>ADMIN_TOKEN</code> on Render, in constant time). The Data &rarr; Locations note about
+the old token field (it used to name a bake panel that no longer exists) left the screen on 22 Oct 2026, and the field itself
+on 27 Oct 2026; a new organisation's deployment never sets it, and the demo's is deleted once the steps below are checked.
+Since 12 Oct 2026 an unset <code>ADMIN_TOKEN</code> refuses token calls (it used to open them).
+<strong>The first admin</strong> of a new deployment: set <code>FIRST_ADMIN_EMAIL</code> (and optionally
+<code>FIRST_ADMIN_NAME</code>) on Render; at start-up, while the organisation has no admin login, one is made for that
+address and its invite emailed, or printed to the service log when email is not set up. <strong>Lock-out</strong>: in
+Render → the service → Shell, <code>python backend/recover_admin.py you@example.com</code> makes that login an enabled admin
+(creating it if needed), clears its two-step sign-in, signs it out everywhere and prints a single-use password link. It
+needs a Render sign-in, so no standing secret sits in the app. <strong>Backups and re-imports</strong>: Config →
+Organisation file (<code>GET /api/admin/tenant/export</code>, <code>POST /api/admin/tenant/import?replace=1</code>) on an
+admin login. A script that has to run them uses an admin login's session cookie with <code>X-Wayscope: 1</code>.
+<strong>The lead form</strong> (<code>/api/public/demo-request</code>) makes a login, so it works only where
+<code>DEMO_LEADS=1</code> is set (the demo); anywhere else it answers the error page and makes nothing.</li>
 <li><strong>Routing key.</strong> Routing needs <code>HERE_API_KEY</code> in Render → Environment for the
 <code>modus-web</code> service. Without it the Data → Routes banner says routing is not set up, and nothing bakes.</li>
 <li><strong>Configuration.</strong> The live source is the configuration table; <code>backend/factors.json</code> is the
@@ -523,10 +547,11 @@ not having routing — but it is a fair question and better answered before it i
 limit on wrong passwords, password links by email), and every change is recorded with who made it. Three things
 are still shared: the <strong>shared codes per role</strong>, which keep working until they are deleted on the
 hosting service (planned for Saturday 31 October 2026); the <strong>map password</strong>, by design, for councils
-and residents; and the <strong>admin token</strong>, for scripts. There is no two-factor sign-in. <strong>Do not describe the deployment as secure</strong>
+and residents; and the <strong>admin token</strong>, which no screen asks for since 27 October 2026 and which a new
+deployment never sets. Since 27 October 2026 every staff login also uses two-step sign-in (an authenticator app). <strong>Do not describe the deployment as secure</strong>
 on the strength of this: that is a decision for whoever runs it.</p>
-<p>Admin actions need an admin login or the admin token. Since 12 October 2026, with no admin token set they are
-refused, not open.</p>
+<p>Admin actions need an admin login (or the admin token, while one is set on the server). Since 12 October 2026, with no
+admin token set token calls are refused, not open.</p>
 <p>The carbon target's "Set by" is the name on the login (or, on a shared code, the name typed with it). Only the
 latest version of the target is kept; the activity log keeps every change.</p>
 

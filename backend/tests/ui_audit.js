@@ -16,7 +16,8 @@
  *     node backend/tests/ui_audit.js --compare latest    # ...and say what changed since the previous run of the same shape
  *     node backend/tests/ui_audit.js --no-strict-44      # the 44 px rule on a phone back to a warning (decision 14; a failure by default since 18 Oct 2026, see below)
  *     node backend/tests/ui_audit.js --base http://127.0.0.1:8834 --code <planner code> --map-password <pw>
- *     node backend/tests/ui_audit.js --base https://… --email you@… --password …     # a server whose codes are gone (D49)
+ *     node backend/tests/ui_audit.js --base https://… --email you@… --password … --totp KEY   # a server whose codes are gone (D49);
+ *       --totp is the base32 key of that login's authenticator (two-step sign-in, 27 Oct 2026)
  *
  * WHAT IT MEASURES (layer 1 of the UI review — the objective part, no judgement)
  *   at every stop (a screen at a width in a look):
@@ -127,6 +128,7 @@ function parseArgs(argv) {
     else if (a === "--team-code") o.teamCode = v();
     else if (a === "--email") o.email = v();
     else if (a === "--password") o.password = v();
+    else if (a === "--totp") o.totp = v();
     else if (a === "--map-password") o.mapPassword = v();
     else if (a === "--compare") o.compare = v();
     else if (a === "--widths") o.widths = v().split(",").map(Number);
@@ -776,6 +778,35 @@ async function openFolded(page) {
 async function alertText(page) { return page.locator('[role="alert"]').first().textContent({ timeout: 1000 }).catch(() => ""); }
 
 // the sign-in screens: the public view → Staff sign in → (the code form) → the portal. Returns how it signed in.
+// 27 Oct 2026 (two-step sign-in): the 6-digit code for a base32 key, as an authenticator app makes it (RFC 6238)
+function totpNow(key, offset) {
+  const crypto = require("crypto");
+  const b32 = String(key || "").replace(/\s+/g, "").toUpperCase();
+  const ALPH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const ch of b32) { const v = ALPH.indexOf(ch); if (v >= 0) bits += v.toString(2).padStart(5, "0"); }
+  const bytes = []; for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  const step = Math.floor(Date.now() / 30000) + (offset || 0);
+  const msg = Buffer.alloc(8); msg.writeUInt32BE(Math.floor(step / 0x100000000), 0); msg.writeUInt32BE(step >>> 0, 4);
+  const mac = crypto.createHmac("sha1", Buffer.from(bytes)).update(msg).digest();
+  const off = mac[mac.length - 1] & 0x0f;
+  return String((mac.readUInt32BE(off) & 0x7fffffff) % 1000000).padStart(6, "0");
+}
+// the recovery codes the login walk saved at set-up, for the phone's sign-in (a code from the app works once per 30 s)
+const RECOVERY = [];
+async function secondStep(page, how) {
+  // after a right password: the code step (or the set-up step, which only walkLogin expects). Nothing when the portal came.
+  const got = await page.waitForSelector('[data-guide="rail"], .phone-tabs, #auth-otp', { timeout: 30000 }).catch(() => null);
+  if (!got || !(await page.locator("#auth-otp").count())) return;
+  if (how.recovery) {
+    await page.getByRole("button", { name: "Use a recovery code instead" }).click();
+    await page.fill("#auth-otp", how.recovery);
+  } else if (how.totp) {
+    await page.fill("#auth-otp", totpNow(how.totp));
+  } else throw new Error("this login asks for a two-step code: pass --totp KEY");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+}
+
 async function signIn(page, base, how) {
   await page.goto(base + "/", { waitUntil: "domcontentloaded" });
   await page.waitForSelector('button:has-text("Staff sign in"), [data-guide="rail"], .phone-tabs', { timeout: 60000 });
@@ -785,6 +816,7 @@ async function signIn(page, base, how) {
   if (how.email) {
     await page.fill("#auth-email", how.email); await page.fill("#auth-pass", how.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await secondStep(page, how);
   } else {
     const codes = await page.evaluate(() => fetch("/api/auth/me").then(r => r.json()).then(j => !!j.codes).catch(() => false));
     if (!codes) throw new Error("the server offers no code sign-in (the shared codes are off): pass --email and --password");
@@ -874,7 +906,7 @@ async function walkPortal(browser, base, look, accent, first, widths) {
     }
     // 2. sign in (the planner sees every page; Users shows to a code with can_approve)
     const t1 = Date.now();
-    await signIn(page, base, OPT.email ? { email: OPT.email, password: OPT.password } : { code: OPT.code });
+    await signIn(page, base, OPT.email ? { email: OPT.email, password: OPT.password, totp: OPT.totp } : { code: OPT.code });
     if (first && w === DESK_W) { await page.waitForSelector(".dash-cards, [data-empty]", { timeout: 60000 }).catch(() => {}); REPORT.timings.portalFirstDataMs = Date.now() - t1; }
     drain(store);
     // 3. every portal page
@@ -899,7 +931,7 @@ async function walkPortal(browser, base, look, accent, first, widths) {
         if (OPT.deep) {
           const { gp, gs, close } = await guideContext(browser, ctx, base, look, accent, w);
           try {
-            await signIn(gp, base, OPT.email ? { email: OPT.email, password: OPT.password } : { code: OPT.code }); drain(gs);
+            await signIn(gp, base, OPT.email ? { email: OPT.email, password: OPT.password, totp: OPT.totp } : { code: OPT.code }); drain(gs);
             await gotoPage(gp, "dashboard");
             await gp.waitForFunction(() => { const h = document.querySelector('[data-guide="page-header"] h2'); return h && h.textContent.trim() === "Dashboard"; }, null, { timeout: 20000 }).catch(() => {});
             await waitGuide(gp);
@@ -979,21 +1011,12 @@ async function deepStops(page, store, meta, id, w) {
   if (id === "config") {
     for (const t of CONFIG_TABS.slice(1)) if (await clickText(page, ".cfg-nav-item", t)) await audit(page, store, meta("config-" + t.toLowerCase().replace(/[^a-z]+/g, "-").replace(/-$/, ""), w));
     await clickText(page, ".cfg-nav-item", CONFIG_TABS[0]);
-    // Save, on the copy: the page's saved state (its status line) is a screen too. Needs the admin token (a code is not an admin).
-    await page.locator('[data-guide="page-header"] details.row-menu > summary').first().click().catch(() => {});
-    await page.locator('[data-guide="page-header"] input[aria-label="Admin token"]').fill("ui-audit-admin-token").catch(() => {});
-    await page.keyboard.press("Escape");
+    // Save, on the copy: the page's saved state (its status line) is a screen too. 27 Oct 2026 (F3 c / P5): only an admin
+    // LOGIN has Save (no token box any more), so this stop is taken only when the run signs in as one.
     if (await clickText(page, '[data-guide="page-header"] button', "Save")) { await page.waitForTimeout(800); await audit(page, store, meta("config+saved", w)); }
   }
-  if (id === "users") {
-    // a code is not an admin: the list wants the token. The locked screen first (its own stop), then the table.
-    const tok = page.locator('input[aria-label="Admin token"]').first();
-    if (await tok.count()) {
-      await tok.fill("ui-audit-admin-token"); await tok.press("Enter");
-      await page.waitForSelector("table, [data-empty]", { timeout: 15000 }).catch(() => {});
-      await audit(page, store, meta("users+table", w));
-    }
-  }
+  // 27 Oct 2026 (F3 c): Users opens for an admin LOGIN only; the login walk pictures it (login-user-users). A code's run
+  // no longer reaches it, so the old "users+table" stop (the token typed) is gone.
 }
 
 // the public map's states: presets, the collision layer, a route's drawer, share, export, conditions, Play; on a phone the sheet, Layers, a route card
@@ -1028,7 +1051,7 @@ async function mapStates(page, store, meta, w, phone) {
 // "offline-lookahead" were pictures of /landing/error.html.
 async function errorStates(page, ctx, store, meta, w) {
   const base = meta("", w).base;
-  await signIn(page, base, OPT.email ? { email: OPT.email, password: OPT.password } : { code: OPT.code });
+  await signIn(page, base, OPT.email ? { email: OPT.email, password: OPT.password, totp: OPT.totp } : { code: OPT.code });
   const appTitle = await page.title();
   drain(store);
   // what the page shows for the failure: the app's EmptyState (data-empty="error", an alert) or its inline notice
@@ -1100,7 +1123,7 @@ async function walkLogin(browser, base) {
     if (w !== DESK_W) {
       // the phone, as the login user (the header's account menu, not Sign out): the password was set at the desk width first
       try {
-        await signIn(page, base, { email: "ui-audit@example.test", password: "ui-audit-password-1" });
+        await signIn(page, base, { email: "ui-audit@example.test", password: "ui-audit-password-1", recovery: RECOVERY.shift() });
         drain(store);
         for (const id of ["dashboard", "lookahead"]) { await gotoPage(page, id); await audit(page, store, meta("login-user-" + id, { portal: true, page: id })); }
       } catch (e) { note("login walk on the phone: " + String(e.message || e).split("\n")[0].slice(0, 160)); }
@@ -1112,6 +1135,19 @@ async function walkLogin(browser, base) {
     if (OPT.deep) await keyboardPass(page, meta("setpw"));
     await page.fill("#set-pw", "ui-audit-password-1"); await page.fill("#set-pw2", "ui-audit-password-1");
     await page.getByRole("button", { name: "Save and sign in" }).click();
+    // 27 Oct 2026 (F3 b): a staff login sets up two-step sign-in next — the QR card, then the recovery codes (two stops)
+    try {
+      await page.waitForSelector(".auth-qr svg", { timeout: 30000 });
+      await audit(page, store, meta("twostep-setup", w));
+      const key = (await page.locator(".auth-key").textContent()).trim();
+      await page.fill("#auth-otp", totpNow(key));
+      await page.getByRole("button", { name: "Turn on" }).click();
+      await page.waitForSelector(".recovery-codes li", { timeout: 30000 });
+      await audit(page, store, meta("twostep-codes", w));
+      RECOVERY.push(...(await page.locator(".recovery-codes li").allTextContents()).map(t => t.trim()));
+      await page.locator(".auth-check input").check();
+      await page.getByRole("button", { name: "Continue" }).click();
+    } catch (e) { note("login walk: the two-step set-up did not finish — " + String(e.message || e).split("\n")[0].slice(0, 160)); }
     try { await page.waitForSelector('[data-guide="rail"]', { timeout: 30000 }); } catch (e) { note("login walk: the invite did not sign in — " + (await alertText(page))); await ctx.close(); return; }
     drain(store);
     for (const id of ["dashboard", "users", "forecasts"]) {
