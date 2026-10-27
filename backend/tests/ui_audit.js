@@ -403,6 +403,8 @@ function domChecks(arg) {
     if (out.clipped.length >= 30) break;
     const cs = getComputedStyle(el);
     if (!vis(el) || el.childElementCount !== 0 || el.closest("svg, script, style")) continue;
+    // 27 Oct 2026 (finding #43): screen-reader-only text (.sr-only: a 1 px box, overflow hidden, by design) is not a cut label
+    if (cs.position === "absolute" && parseFloat(cs.width) <= 1 && parseFloat(cs.height) <= 1 && cs.overflow === "hidden") continue;
     if ((cs.overflowX !== "visible") && el.scrollWidth > el.clientWidth + 1 && (cs.textOverflow === "ellipsis" || cs.overflowX === "hidden" || cs.overflowX === "clip"))
       out.clipped.push({ sel: sel(el), text: name(el), over: el.scrollWidth - el.clientWidth, noEllipsis: cs.textOverflow !== "ellipsis" || undefined });
     else if (cs.display.startsWith("inline") && !/\s/.test((el.textContent || "").trim()) && (el.textContent || "").trim().length > 1 && el.getClientRects().length > 1)

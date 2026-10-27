@@ -4121,7 +4121,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // the script with its comments stripped (block, JSX and whole-line or trailing // comments): what a screen can print
   const _nc27 = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/[^\n]*/gm, "$1");
   ok("⭐ 27 Oct: RowMenu — the Forecasts page's details.row-menu made general: a named '⋯' summary, the items plain buttons, a note under them",
-     src.includes("function RowMenu({ name, note, children }) {") && src.includes("<summary aria-label={`More actions for ${name}`} title=\"More actions\">⋯</summary>")
+     src.includes("function RowMenu({ name, note, children }) {") && src.includes("<summary className=\"row-dots\" aria-label={`More actions for ${name}`} title=\"More actions\"></summary>")
+     && html.includes('.row-menu summary.row-dots::before{content:"⋯";}') && !html.includes('.row-menu summary::before') && html.includes('.row-x::before{content:"×";}')   // NARROWED 27 Oct 2026 (audit #41 / #42): the glyphs are CSS content
+     && (src.match(/className="row-x"[^\n]*?>×<\/button>/g) || []).length === 0   // the info / guide / chip × buttons keep their text (not row controls)
      && src.includes('<div className="row-menu-list" onClick={pick}>{children}{note ? <div className="row-menu-note">{note}</div> : null}</div>')
      && src.includes('l.style.position = "fixed"; l.style.left = "auto";') && src.includes('window.addEventListener("scroll", shut, true); window.addEventListener("resize", shut);')
      && src.includes("if (b && !b.disabled && ref.current) ref.current.open = false;")
