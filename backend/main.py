@@ -1060,8 +1060,7 @@ def admin_user_two_step_reset(user_id: str, token: Optional[str] = None):
         raise HTTPException(400, "Use one of your recovery codes to sign in instead.")
     if not users.two_step_on(user):
         raise HTTPException(400, "This login has not set up two-step sign-in yet.")
-    users.reset_two_step(user_id)
-    users.audit_event("two-step-reset", user=user, actor=_admin_actor())
+    users.reset_two_step(user_id)   # the middleware's audit row records who did it (as every admin write)
     return {"user": users.public(users.get_user(user_id))}
 
 

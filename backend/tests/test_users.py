@@ -893,10 +893,12 @@ tok = as_(access.resolve_request(None, s_a))
 ok("🔴 an admin cannot reset their own two-step (a recovery code, or the recovery command)",
    raises(lambda: main.admin_user_two_step_reset(ada["id"], None)) == 400)
 rr = main.admin_user_two_step_reset(bob["id"], None)
-ok("⭐ Reset two-step: key and codes gone, every session of the login ended, in the activity log",
+ok("⭐ Reset two-step: key and codes gone, every session of the login ended",
    rr["user"]["two_step"] is False and users.resolve_session(s_b) == (None, None)
-   and users.recovery_left(users.get_user(bob["id"])) == 0
-   and any(r["kind"] == "two-step-reset" and "Ada Lovelace" in r["actor_label"] for r in users.audit_rows()))
+   and users.recovery_left(users.get_user(bob["id"])) == 0)
+ok("...and only the middleware's write row records it (one Activity line, as every admin write; http_smoke checks it)",
+   not any(r["kind"] == "two-step-reset" for r in users.audit_rows())
+   and main._audited("/api/admin/users/x/two-step-reset"))
 ok("...a second reset is refused (nothing to reset)", raises(lambda: main.admin_user_two_step_reset(bob["id"], None)) == 400)
 ok("...and the next sign-in is the set-up step again",
    main.auth_signin(main.SignInIn(email="bob@example.org", password=GOOD_PW), REQ)["step"] == "setup")

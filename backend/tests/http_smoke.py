@@ -2043,7 +2043,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.post(f"/api/admin/users/{[u for u in _ul['users'] if u['email'] == 'bob@example.org'][0]['id']}/two-step-reset", headers=W)
     ok("⭐ F3 b: Ada resets Bob's two-step (a lost phone): it is off on the Users list",
        r.status_code == 200 and r.json()["user"]["two_step"] is False, r.text[:200])
-    _rr = [x for x in c.get("/api/admin/audit").json()["rows"] if x["kind"] == "two-step-reset"]
+    _rr = [x for x in c.get("/api/admin/audit").json()["rows"] if (x.get("path") or "").endswith("/two-step-reset")]
     ok("F3 b: ...recorded, naming Ada", _rr and "Ada Lovelace" in _rr[0]["actor_label"], json.dumps(_rr[:1])[:200])
     c.cookies.clear(); c.cookies.update(_bob_jar)
     ok("🔴 F3 b: ...and Bob's session ended at once", c.get("/api/auth/me").json()["signed_in"] is False)
