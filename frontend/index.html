@@ -154,6 +154,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
      attribute, but a colour is re-serialised by the browser (rgba(191, 46, 85, 0.05)), so the rose wash is matched both ways. */
   html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}
   html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-500{color:#475569}
+  /* 27 Oct 2026 (UI fix 10): a chip (blue text on the 8 % blue tint) on a row that already has a wash (a selected row, the Account's
+     short row) fell to 4.26-4.31:1, so there the chip's tint is plain surface (5.17:1 or better in every accent). !important: the tint is inline. */
+  html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) :where([style*="--navy-soft"],[style*="rgba(37, 99, 235, 0.08)"],[style*="rgba(37,99,235,.08)"]){background:var(--surface) !important}
   /* CAPTIONS-END */
   /* DARK-REMAP-START — generated 5 Oct 2026 from the colour utilities in this file; test_h1_uk asserts coverage both ways
      (17 Oct 2026: every utility has a remap, and every remap has a utility — four stale lines went that day) */
@@ -648,6 +651,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-pour{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-left:26px;}
   .sim-pour label{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
   .sim-off{opacity:.6;}
+  .sim-pour.sim-off{opacity:1;} .sim-pour.sim-off>label{opacity:.6;}   /* 27 Oct 2026 (UI fix 10): the pour note stays full strength, 4.76:1 */
+  @media (max-width:767px){.dash-sel{min-height:44px;}}   /* UI fix 10: the Dashboard's month boxes, a 44 px tap on a phone */
   .sim-ctl input:not([type=checkbox]),.sim-table input{font:inherit;font-size:14px;border:1px solid var(--grey);border-radius:6px;padding:2px 6px;color:var(--ink);background:var(--surface);min-height:28px;}
   .sim-ctl input[type=time],.sim-table input[type=time]{width:108px;}
   .sim-num{width:76px;}
@@ -2432,9 +2437,9 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       {!fill && <PageHeader title="Dashboard" kicker={`${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}`}
         actions={<div className="flex flex-wrap gap-2 items-center">
           {!wall && <>
-            <select className={sel} value={fromM} onChange={e => setFromM(+e.target.value)} aria-label="From month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
+            <select className={sel + " dash-sel"} value={fromM} onChange={e => setFromM(+e.target.value)} aria-label="From month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
             <span className="self-center text-slate-400 text-sm">→</span>
-            <select className={sel} value={toM} onChange={e => setToM(+e.target.value)} aria-label="To month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
+            <select className={sel + " dash-sel"} value={toM} onChange={e => setToM(+e.target.value)} aria-label="To month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
             {/* 17 Oct 2026 (D114): one click between this month ± 6 (the default) and the whole programme */}
             {(Math.min(fromM, toM) === 1 && Math.max(fromM, toM) === months.count)
               ? <button type="button" className="btn-sec dash-range-btn" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }}
@@ -7073,7 +7078,7 @@ function ConfigPage({ meta, who, access }){
         )}
       </PageHeader>
 
-      {msg && <div className="rounded-lg border p-3 text-sm mb-4 whitespace-pre-wrap" style={{ borderColor: msg.ok ? "var(--green)" : "var(--red)", color: msg.ok ? "var(--ok-text)" : "var(--red)", background: msg.ok ? "rgba(3,158,134,.06)" : "rgba(191,46,85,.06)" }}>{msg.text}</div>}
+      {msg && <div className="rounded-lg border p-3 text-sm mb-4 whitespace-pre-wrap" style={{ borderColor: msg.ok ? "var(--green)" : "var(--red)", color: msg.ok ? "var(--ok-text)" : "var(--bad-text)", background: msg.ok ? "rgba(3,158,134,.06)" : "rgba(191,46,85,.06)" }}>{msg.text}</div>}
 
       {!doc ? <SkeletonTable cols={["Vehicle", "Payload t", "GVW t", "kg CO₂e / km"]} rows={5} caption="Configuration · loading" /> : (
         <div className="cfg-grid">
@@ -8636,7 +8641,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
       </div>
 
       {err && <div className="rounded-lg border p-3 text-sm mb-3"
-        style={{ borderColor: "var(--red)", color: "var(--red)", background: "rgba(191,46,85,.06)" }}>{err}</div>}
+        style={{ borderColor: "var(--red)", color: "var(--bad-text)", background: "rgba(191,46,85,.06)" }}>{err}</div>}
 
       {!page ? <div className="p-8 text-center text-slate-400">Loading…</div>
       : view === "commit" ? (
@@ -9152,6 +9157,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
 const LONG_DAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const LONG_MONTH = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const phDayWords = (iso) => { const d = new Date(iso + "T00:00:00"); return `${LONG_DAY[d.getDay()]} ${d.getDate()} ${LONG_MONTH[d.getMonth()]}`; };
+// 27 Oct 2026 (UI fix 10): the button's spoken name starts with what it shows ("Mon 26"), WCAG 2.5.3
+const phDayLabel = (iso) => { const d = new Date(iso + "T00:00:00"); return `${dayName(iso)} ${d.getDate()} ${LONG_MONTH[d.getMonth()]}`; };
 // the five weekdays of the open week: from the lines' days, else from the week's Monday (a week with no line)
 const phWeekdays = (lines, cw) => {
   if(lines.length) return lines[0].days.map(d => d.day_date).filter(iso => !isWeekend(iso));
@@ -9249,15 +9256,15 @@ function PhoneLookAhead({ meta, initialPage }){
         ))}
       </div>
       {err && <div className="rounded-lg border p-3 text-sm mt-3" role="alert"
-        style={{ borderColor: "var(--red)", color: "var(--red)", background: "rgba(191,46,85,.06)" }}>{err}</div>}
+        style={{ borderColor: "var(--red)", color: "var(--bad-text)", background: "rgba(191,46,85,.06)" }}>{err}</div>}
       {!page ? (!err && <div className="p-8 text-center text-slate-500" role="status">Loading…</div>) : (
         <>
           <div className="ph-days" role="group" aria-label="Day" data-guide="ph-days">
             {dates.map(iso => (
               <button key={iso} type="button" className={"ph-day" + (iso === today ? " is-today" : "")}
-                aria-pressed={iso === shown ? "true" : "false"} aria-label={phDayWords(iso) + (iso === today ? ", today" : "")}
+                aria-pressed={iso === shown ? "true" : "false"} aria-label={phDayLabel(iso) + (iso === today ? ", today" : "")}
                 onClick={() => setDay(iso)}>
-                {dayName(iso)}<b>{dayNum(iso)}</b>
+                {dayName(iso)}{" "}<b>{dayNum(iso)}</b>
               </button>
             ))}
           </div>

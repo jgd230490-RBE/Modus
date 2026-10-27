@@ -1145,6 +1145,12 @@ ok("ui_audit.js grades the 44 px rule as a failure BY DEFAULT since the phone br
 ok("the map password page's show / hide eye keeps its 38 px drawing and taps at 44 px (a ::after halo, inset -3 px)",
    "width:38px; height:38px;" in main._MAP_PASSWORD_PAGE
    and '.pw-eye::after { content:""; position:absolute; inset:-3px; }' in main._MAP_PASSWORD_PAGE)
+ok("ui_audit.js: a PLAYING map counts as ready once its tiles are in and it is still (the timeline keeps style.loaded() false: measured "
+   "27 Oct 2026), a timeout records why, and every other stop still needs map.loaded()",
+   "async function waitForMap(target, playing = false)" in _audit
+   and "(map.loaded() || (playing && map.areTilesLoaded() && !map.isMoving()))" in _audit
+   and 'return "timeout " + why;' in _audit
+   and "waitForMap(page, /playing/.test(meta.name))" in _audit)
 ok("ui_audit.js records that the guides are exempt from h1-many (decision 7) and still exempts them",
    "exempt from h1-many" in _audit and "decision 7" in _audit
    and 'else if (dom.h1 > 1 && !/^help/.test(meta.name)) warnings.push({ id: "h1-many", detail: dom.h1 });' in _audit)

@@ -4095,6 +4095,25 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("TEAMS: the Activity tab words the two writes", code.includes('[/^admin\\/teams\\/[^/]+$/, "Changed a " + TEAM().toLowerCase()], [/^admin\\/teams$/, "Added a " + TEAM().toLowerCase()],'));
 }
 
+// ---- UI fix 10 (27 Oct 2026): the last UI-audit failures ----------------------------------------------------------
+{
+  ok("UI FIX 10 (1): the phone day button's spoken name starts with what it shows (Mon 26 October), not Monday 26 October (WCAG 2.5.3)",
+     src.includes('const phDayLabel = (iso) => { const d = new Date(iso + "T00:00:00"); return `${dayName(iso)} ${d.getDate()} ${LONG_MONTH[d.getMonth()]}`; };')
+     && src.includes('aria-label={phDayLabel(iso) + (iso === today ? ", today" : "")}')
+     && src.includes('{dayName(iso)}{" "}<b>{dayNum(iso)}</b>') && !src.includes('aria-label={phDayWords(iso)') && src.includes('<b>{phDayWords(shown)}</b>'));
+  ok("UI FIX 10 (2): a chip on a washed row (a selected row, the Account's rose short row) has a plain surface tint; the rule is light-look only and the dark remap is untouched",
+     html.includes('html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) :where([style*="--navy-soft"],[style*="rgba(37, 99, 235, 0.08)"],[style*="rgba(37,99,235,.08)"]){background:var(--surface) !important}')); // NARROWED 27 Oct (same day): the CatChips tint is a literal rgba, so the rule matches it too
+  const errBoxes = src.match(/borderColor: "var\(--red\)", color: "var\(--[a-z-]+\)", background: "rgba\(191,46,85,\.06\)"/g) || [];
+  ok("UI FIX 10 (3): the Look-ahead's two red error boxes read --bad-text (5.89:1 on the rose), not --red (4.39:1); the save message too",
+     errBoxes.length === 2 && errBoxes.every(s => s.includes('color: "var(--bad-text)"'))
+     && src.includes('color: msg.ok ? "var(--ok-text)" : "var(--bad-text)", background: msg.ok'));
+  ok("UI FIX 10 (4): the pour block's dimming reaches its labels only, so the note under it stays at full strength",
+     html.includes(".sim-pour.sim-off{opacity:1;} .sim-pour.sim-off>label{opacity:.6;}") && html.includes(".sim-off{opacity:.6;}"));
+  ok("UI FIX 10 (7): the Dashboard's two month boxes are 44 px tall on a phone and unchanged at a desk",
+     html.includes("@media (max-width:767px){.dash-sel{min-height:44px;}}")
+     && src.includes('<select className={sel + " dash-sel"} value={fromM}') && src.includes('<select className={sel + " dash-sel"} value={toM}'));
+}
+
 // ---- report ------------------------------------------------------------------
 // ---- 27 Oct 2026: the final UI pass — one row-action pattern, the ESDAL sheet gone, fewer words (the user: minimal and clear;
 //      the haulier plans and applies in their own software; notes/ui-fix-actions-mockup-1027, yes to all) ----
