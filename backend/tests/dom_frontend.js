@@ -1660,8 +1660,8 @@ async function phoneShellDom(){
   const shown = () => (dayBtns().find(b => b.getAttribute("aria-pressed") === "true") || {}).textContent;
   const weekdays = LA.commit.lines[0].days.map(d => d.day_date).filter(iso => !w.__F.isWeekend(iso));
   ok("PHONE: the date strip is the week's five weekdays, today pressed first (the fixture's today)",
-     dayBtns().length === 5 && dayBtns().map(b => b.textContent).join("|") === weekdays.map(iso => w.__F.dayName(iso) + w.__F.dayNum(iso)).join("|")
-     && shown() === w.__F.dayName(LA.today) + w.__F.dayNum(LA.today) && ph().querySelector("[data-ph-day]").getAttribute("data-ph-day") === LA.today);
+     dayBtns().length === 5 && dayBtns().map(b => b.textContent).join("|") === weekdays.map(iso => w.__F.dayName(iso) + " " + w.__F.dayNum(iso)).join("|")  /* NARROWED 27 Oct (UI fix 10): the button text has a real space, "Mon 26" */
+     && shown() === w.__F.dayName(LA.today) + " " + w.__F.dayNum(LA.today) && ph().querySelector("[data-ph-day]").getAttribute("data-ph-day") === LA.today);
   // the day's figures are the server's own, summed over the lines with something planned that day
   const dayRows = (iso) => LA.commit.lines.map(l => ({ l, d: l.days.find(x => x.day_date === iso) }))
     .filter(x => x.d && ((+x.d.planned_qty || 0) > 0 || ((x.d.derived || {}).trips || 0) > 0));
@@ -1684,9 +1684,9 @@ async function phoneShellDom(){
   ok("PHONE: ...and a tap shows them (route, vehicle, plan, lorries, the week's state)",
      fb.getAttribute("aria-expanded") === "true" && fdl.hidden === false && /Route/.test(fdl.textContent) && /Plan/.test(fdl.textContent) && /This week/.test(fdl.textContent));
   const other = weekdays.find(iso => iso !== LA.today);
-  click(dayBtns().find(b => b.textContent === w.__F.dayName(other) + w.__F.dayNum(other)));
+  click(dayBtns().find(b => b.textContent === w.__F.dayName(other) + " " + w.__F.dayNum(other)));
   ok("PHONE: another day in the strip shows that day's card (and shuts the open facts)",
-     ph().querySelector("[data-ph-day]").getAttribute("data-ph-day") === other && shown() === w.__F.dayName(other) + w.__F.dayNum(other)
+     ph().querySelector("[data-ph-day]").getAttribute("data-ph-day") === other && shown() === w.__F.dayName(other) + " " + w.__F.dayNum(other)
      && [...ph().querySelectorAll(".ph-line > button")].every(b => b.getAttribute("aria-expanded") === "false"));
   // nothing on a phone writes: no input, no select, no textarea, no write button, no request with a method
   const writeBtns = (el) => [...el.querySelectorAll("button")].filter(b => WRITE_WORDS.test(b.textContent.trim()));
@@ -2029,7 +2029,7 @@ async function phoneDayFlagsDom(){
   const more = (l) => (line(l).querySelector(".row-st .rs-more") || {}).textContent || "";
   const facts = (l) => line(l).querySelector("dl").textContent;
   const note = () => card().querySelector(".ph-note").textContent;
-  const pick = async (iso) => { await act(async () => { [...el.querySelectorAll(".ph-days > button")].find(b => b.textContent === w.__F.dayName(iso) + w.__F.dayNum(iso)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); };
+  const pick = async (iso) => { await act(async () => { [...el.querySelectorAll(".ph-days > button")].find(b => b.textContent === w.__F.dayName(iso) + " " + w.__F.dayNum(iso)).dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); };
 
   ok("PHONE DAY FLAGS: the card opens on today with all three lines", card().getAttribute("data-ph-day") === today && !!line(A) && !!line(B) && !!line(C));
   ok("⭐ PHONE DAY FLAGS (today): a gate over capacity dated another day is NOT on the card — not in the line's status, not in its details",
