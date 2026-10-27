@@ -548,7 +548,8 @@ ok("\U0001f534 the map: compound and railhead are the only squares; a tip draws 
    and "A site of any other type, such as a tip, is drawn as other." in text)
 ok("...the filters skip stockpiles; the quick buttons are named; the t / day figure is hidden in vehicles",
    "the route conditions (not to stockpiles over capacity)" in text
-   and "Light, Dark, Satellite and Streets (Streets is not in the Basemap list)" in text
+   # NARROWED 27 Oct 2026 (8a): Streets is in the Basemap list now (with Outdoors, Satellite without names and Navigation day / night)
+   and "Light, Dark, Satellite and Streets." in text and "Streets is not in the Basemap list" not in text
    and "Material a day appears too" not in text and "as shipped it counts in vehicles" not in text   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the count unit is in T10
    and "FORECAST_UNIT" in open(TECH, encoding="utf-8").read())
 ok("...an unbaked line is counted as unknown; a route with no geometry is left out of the bar",

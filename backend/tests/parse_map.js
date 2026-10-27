@@ -4047,15 +4047,15 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
     api = new Function("document", "window", "TL", "KPI", "WARN", "CONFIG", "monthLabel", "map", "teamText", "TENANT", "fmtN", "fmtDist", "DU", "ROUTEINFO",
       "routePropsById", "FORECAST_WORKING_DAYS", "forecastWindow", "ensureTimelineMatrix", "openTimeline", "setTimelineMonth", "stopTimeline", "tlStartMonth",
       "applyFilters", "selectRoute", "clearSelection", "kpiFetchMonth", "sidebarIsOpen", "toggleSidebar", "closeSidebar", "isPhoneShell", "PHONE_SHELL_MQ",
-      "location", "history", "navigator", "requestAnimationFrame", "MutationObserver", "setTimeout", "clearTimeout",
-      nb + "\nreturn { renderMonthChips, pickMonth, chipLabel, routeHoverView, runHoverView, encodeView, decodeView, monthParam, monthFromParam, layersFromChanges, shareUrl, writeView, currentView, VIEW, "
+      "location", "history", "navigator", "requestAnimationFrame", "MutationObserver", "setTimeout", "clearTimeout", "BASEMAP",
+      cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\n" + nb + "\nreturn { renderMonthChips, pickMonth, chipLabel, routeHoverView, runHoverView, encodeView, decodeView, monthParam, monthFromParam, layersFromChanges, shareUrl, writeView, currentView, VIEW, "
          + "qrGfMul, qrRsDivisor, qrRsRemainder, qrFormatBits, qrVersionBits, qrMatrix, qrSvg, qrDataCodewords, qrAlignPositions, concernAddress, concernMailto, renderConcernLinks, "
          + "monthTableRows, routeFigures, condSummary, sheetTo, toggleSheet, SHEET, CHIPS, openRunCard, runCardHTML, TAP_SLOP };")(
       document, window, TL, KPI, WARN, CONFIG, monthLabel, map, teamText, TENANT, fmtN, (km) => String(km), () => 'km', {},
       () => ({}), 21, () => [9, 12], () => Promise.resolve(TL.matrix), () => { calls.open++; TL.on = true; }, m => { calls.set.push(m); TL.month = m; },
       () => { calls.stop++; TL.playing = false; }, () => 9, () => {}, r => calls.sel.push(r), () => { calls.clear++; }, () => Promise.resolve(null),
       () => sidebarOpen, () => { sidebarOpen = !sidebarOpen; }, () => { sidebarOpen = false; }, () => false, '(max-width:767px)',
-      location, history, {}, () => 0, undefined, () => 0, () => {});
+      location, history, {}, () => 0, undefined, () => 0, () => {}, { shown: 'mapbox://styles/mapbox/light-v11', pending: null });
   } catch (e) { err = String(e && e.stack || e); }
   ok("C3: the new block runs against a fake DOM (every global it reads is one the page defines)", !!api, err.slice(0, 400));
   if (api) {
@@ -5083,16 +5083,17 @@ function qrRead(mod) {
   const window = { matchMedia: () => ({ matches: phone, addEventListener() {} }), innerWidth: 1280, innerHeight: 800 };
   const map = { touchPitch: { disable() {}, enable() {} }, dragRotate: { disable() {}, enable() {} }, setFeatureState() {}, getContainer: () => ({ getBoundingClientRect: () => ({ left: 0, top: 0 }) }), resize() {}, on() {} };
   let P = null, err = '';
+  const BASEMAP_FAKE = { shown: 'mapbox://styles/mapbox/light-v11', pending: null };   // 27 Oct 2026 (8a): the held basemap the link reads
   try {
     P = new Function("document", "window", "TL", "KPI", "WARN", "CONFIG", "monthLabel", "map", "teamText", "TENANT", "fmtN", "fmtDist", "DU", "ROUTEINFO",
       "routePropsById", "FORECAST_WORKING_DAYS", "forecastWindow", "ensureTimelineMatrix", "openTimeline", "setTimelineMonth", "stopTimeline", "tlStartMonth",
       "applyFilters", "selectRoute", "clearSelection", "kpiFetchMonth", "sidebarIsOpen", "toggleSidebar", "closeSidebar", "isPhoneShell", "PHONE_SHELL_MQ",
-      "location", "history", "navigator", "requestAnimationFrame", "MutationObserver", "setTimeout", "clearTimeout",
-      nb + "\nreturn { PRESETS, PRESET, applyPreset, renderPresets, presetMatches, presetLayers, VIEW, layersOn, currentView, encodeView, decodeView, writeView, applyViewFromUrl };")(
+      "location", "history", "navigator", "requestAnimationFrame", "MutationObserver", "setTimeout", "clearTimeout", "BASEMAP",
+      cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\n" + nb + "\nreturn { PRESETS, PRESET, applyPreset, renderPresets, presetMatches, presetLayers, VIEW, layersOn, currentView, encodeView, decodeView, writeView, applyViewFromUrl };")(
       document, window, TL, { cache: {} }, { counts: {}, live: [] }, { MONTH_COUNT: 60, START_YEAR: 2026, API_BASE: '' }, m => 'Oct 2026', map, v => v, { name: 'Wolds Link (fictional)' },
       n => String(n), km => String(km), () => 'km', {}, () => ({}), 21, () => [9, 12], () => Promise.resolve(null), () => {}, () => {}, () => {}, () => 9,
       () => {}, () => {}, () => {}, () => Promise.resolve(null), () => sheetOpen, () => { calls.sheet++; sheetOpen = !sheetOpen; }, () => {}, () => phone, '(max-width:767px)',
-      location, history, {}, () => 0, undefined, () => 0, () => {});
+      location, history, {}, () => 0, undefined, () => 0, () => {}, BASEMAP_FAKE);
   } catch (e) { err = String(e && e.stack || e); }
   ok("presets (sandbox): the last block runs against a fake DOM with the page's boxes", !!P, err.slice(0, 400));
   if (P) {
@@ -5185,6 +5186,32 @@ function qrRead(mod) {
     ok("presets link: decode keeps only council=carbon (anything else is the default colouring)",
        P.decodeView('?council=carbon').council === 'carbon' && P.decodeView('?council=x').council === null && P.decodeView('').council === null
        && P.encodeView({ month: null, layers: [], filters: {}, council: 'movements' }, []) === '');
+    // 27 Oct 2026 (8a): the ground travels in the link, by a short key; Light writes nothing, an unknown key is ignored
+    {
+      const base = { month: null, layers: [], filters: {} };
+      const keys = { dark: 'dark-v11', streets: 'streets-v12', outdoors: 'outdoors-v12', aerial: 'satellite-streets-v12',
+                     'aerial-plain': 'satellite-v9', 'nav-day': 'navigation-day-v1', 'nav-night': 'navigation-night-v1' };
+      ok("⭐ 27 Oct (8a) link (sandbox): every basemap key round-trips encodeView -> decodeView, e.g. basemap=outdoors",
+         P.encodeView(Object.assign({}, base, { basemap: 'outdoors' }), []) === 'basemap=outdoors'
+         && Object.keys(keys).every(k => P.decodeView('?' + P.encodeView(Object.assign({}, base, { basemap: k }), [])).basemap === k));
+      ok("⭐ 27 Oct (8a) link (sandbox): Light, the default, writes no basemap key; a link without one decodes to null",
+         P.encodeView(Object.assign({}, base, { basemap: null }), []) === '' && P.encodeView(base, []) === '' && P.decodeView('').basemap === null
+         && P.decodeView('?month=2026-10').basemap === null);
+      ok("🔴 27 Oct (8a) link (sandbox): an unknown key (or a style URL) is ignored on the way in and never written on the way out",
+         P.decodeView('?basemap=nonsense').basemap === null && P.decodeView('?basemap=mapbox://styles/mapbox/standard').basemap === null
+         && P.decodeView('?basemap=__proto__').basemap === null && P.decodeView('?basemap=constructor').basemap === null
+         && P.encodeView(Object.assign({}, base, { basemap: 'nonsense' }), []) === '');
+      ok("27 Oct (8a) link (sandbox): the basemap rides beside the other parts of a view",
+         P.decodeView('?' + P.encodeView({ month: 10, layers: [], filters: {}, council: 'carbon', marks: 'dots', basemap: 'nav-night' }, [])).basemap === 'nav-night'
+         && P.decodeView('?council=carbon&basemap=streets&marks=dots').council === 'carbon' && P.decodeView('?council=carbon&basemap=streets&marks=dots').marks === 'dots');
+      // the current view names the held ground (pending first, as the basemap is a pick the address already carries)
+      let cv = null, ecv = '';
+      try { cv = [P.currentView().basemap]; BASEMAP_FAKE.pending = 'mapbox://styles/mapbox/outdoors-v12'; cv.push(P.currentView().basemap);
+            BASEMAP_FAKE.pending = null; BASEMAP_FAKE.shown = 'mapbox://styles/mapbox/navigation-night-v1'; cv.push(P.currentView().basemap);
+            BASEMAP_FAKE.shown = 'mapbox://styles/mapbox/light-v11'; } catch (e) { ecv = String(e && e.stack || e); }
+      ok("⭐ 27 Oct (8a) link (sandbox): currentView reports the pending basemap first, else the shown one; Light reports none",
+         !!cv && cv.join() === ',outdoors,nav-night', ecv.slice(0, 300) + (cv ? cv.join() : ''));
+    }
     // a phone: the sheet goes down after a pick
     sheetOpen = true; P.applyPreset('everything');
     ok("presets (sandbox): on the desktop a pick leaves the panel open", sheetOpen === true && calls.sheet === 0);
@@ -5415,8 +5442,9 @@ function qrRead(mod) {
   }
   ok("⭐ V7: the link carries it as &marks=dots (icons are the default and write nothing); decode accepts only 'dots'",
      src.includes("if (v.marks === 'dots') q.set('marks', 'dots');")
-     && src.includes("marks: q.get('marks') === 'dots' ? 'dots' : null };")
-     && src.includes("marks: (typeof locDotsOn === 'function' && locDotsOn()) ? 'dots' : null };"));
+     // NARROWED 27 Oct 2026 (8a): both objects go on to carry the basemap after marks, so each marks line now ends in a comma
+     && src.includes("marks: q.get('marks') === 'dots' ? 'dots' : null,")
+     && src.includes("marks: (typeof locDotsOn === 'function' && locDotsOn()) ? 'dots' : null,"));
   ok("V7: a link with marks=dots ticks the box BEFORE the layer boxes, through its change event (toggleLocDots and the link listener run)",
      /const dots = document\.getElementById\('loc-dots'\);\s*if \(dots && dots\.checked !== \(v\.marks === 'dots'\)\) \{ dots\.checked = v\.marks === 'dots'; dots\.dispatchEvent\(new Event\('change', \{ bubbles: true \}\)\); \}\s*if \(v\.layers\) \{/.test(code));
   ok("V7: the legend's swatch draws a circle while dots are on, the type's shape otherwise",
@@ -5494,10 +5522,11 @@ function qrRead(mod) {
   const i0 = src.indexOf("const BASEMAP = {");
   const i1 = src.indexOf("function maaametOrthoStyle()");
   const bm = i0 >= 0 && i1 > i0 ? src.slice(i0, i1) : "";
-  ok("🔴 basemap: the held basemap starts on the map's own first style (light-v11) and becomes 'shown' only on a style.load",
-     bm.includes("const BASEMAP = { shown: 'mapbox://styles/mapbox/light-v11', pending: null,")
-     && src.includes("style: 'mapbox://styles/mapbox/light-v11', center:")
-     && bm.includes("map.on('style.load', () => { if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; } });"));
+  // NARROWED 27 Oct 2026 (8a): the map opens on INITIAL_BASEMAP (Light unless the share link names another), and the held basemap starts there
+  ok("🔴 basemap: the held basemap starts on the map's own first style (INITIAL_BASEMAP, light-v11 by default) and becomes 'shown' only on a style.load",
+     bm.includes("const BASEMAP = { shown: INITIAL_BASEMAP, pending: null,")
+     && src.includes("style: INITIAL_BASEMAP, center:") && src.includes("|| 'mapbox://styles/mapbox/light-v11';")
+     && bm.includes("map.on('style.load', () => { if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; } hideLiveTraffic(); });"));
   ok("🔴 basemap: a pick equal to the one showing (or on its way) returns before setStyle",
      /if \(styleUrl === \(BASEMAP\.pending \|\| BASEMAP\.shown\)\) return;[\s\S]*map\.setStyle\(/.test(bm));
   ok("basemap: the page's own styles are a full rebuild (diff: false: style.load always fires, the last pick wins); any other keeps GL's validate-first diff",
@@ -5532,8 +5561,9 @@ function qrRead(mod) {
   const fakeDoc = { getElementById: id => id === "basemap-select" ? sel : null, querySelectorAll: () => btns };
   let api = null;
   try {
-    api = new Function("map", "document", "maaametOrthoStyle",
-      bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, fakeDoc, () => ({ version: 8, sources: {}, layers: [] }));
+    // NARROWED 27 Oct 2026 (8a): the block reads INITIAL_BASEMAP (Light here, as with no ?basemap= in the address)
+    api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP",
+      bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, fakeDoc, () => ({ version: 8, sources: {}, layers: [] }), "mapbox://styles/mapbox/light-v11");
   } catch (e) { ok("basemap sandbox: the block runs", false, String(e)); }
   if (api) {
     const L = "mapbox://styles/mapbox/light-v11", D = "mapbox://styles/mapbox/dark-v11", S = "mapbox://styles/mapbox/streets-v12";
@@ -5588,8 +5618,10 @@ function qrRead(mod) {
      !/mapbox:\/\/styles\/mapbox\/standard/.test(src) && /mapbox:\/\/styles\/mapbox\/light-v11/.test(src));
   ok("basemap 16 Oct: every Basemap option is a classic Mapbox style (-vNN) or the Maa-amet raster style, which GL 2.14 validates",
      opts.length > 0 && opts.every(o => CLASSIC.test(o.value) || o.value === "maaamet-ortho"));
+  // NARROWED 27 Oct 2026 (8a): Streets, Outdoors, Satellite without names and the two Navigation styles joined the menu (pinned in full in the 27 Oct block)
   ok("basemap 16 Oct: the menu still offers Light (selected), Dark and Satellite, plus the hidden Maa-amet orthophoto",
-     opts.map(o => o.value).join("|") === "mapbox://styles/mapbox/light-v11|mapbox://styles/mapbox/dark-v11|mapbox://styles/mapbox/satellite-streets-v12|maaamet-ortho"
+     ["light-v11", "dark-v11", "satellite-streets-v12"].every(k => opts.some(o => o.value === "mapbox://styles/mapbox/" + k))
+     && opts[0].value === "mapbox://styles/mapbox/light-v11" && opts[opts.length - 1].value === "maaamet-ortho"
      && /<option value="mapbox:\/\/styles\/mapbox\/light-v11" selected>Light<\/option>/.test(sel)
      && /<option value="maaamet-ortho" id="basemap-maaamet" hidden>/.test(sel));
   ok("basemap 16 Oct: the four quick buttons at the bottom left are classic styles too (Light, Dark, Satellite, Streets)",
@@ -5598,7 +5630,10 @@ function qrRead(mod) {
      html.includes('<input type="checkbox" id="layer-buildings" onchange="toggleBuildings(this.checked)"> 3D buildings</label>')
      && code.includes("id: 'buildings-3d', type: 'fill-extrusion', source: 'composite',"));
   ok("basemap 16 Oct: the in-app guide lists the basemaps the menu offers, without Standard (3D)",
-     guide.includes("Light (default), Dark and Satellite (called Aerial for a British organisation)")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the basemap names no longer say Mapbox
+     // NARROWED 27 Oct 2026 (8a): the eight basemaps in the menu's order, Navigation shows no live traffic, a shared link keeps the ground
+     guide.includes("Light (default), Dark, Streets, Outdoors, Satellite, Satellite (no names), Navigation day and Navigation night (Satellite reads Aerial for a British organisation)")
+     && guide.includes("Navigation shows no live traffic.") && guide.includes("a shared link opens on the same one")
+     && !guide.includes("Light (default), Dark and Satellite")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the basemap names no longer say Mapbox
      && !/Standard \(3D\)/.test(guide));
 }
 
@@ -6311,7 +6346,7 @@ function qrRead(mod) {
      /'id': 'haul-eraser',[\s\S]{0,400}'line-color': haulEraserColour\(\), 'line-width': WIDTH_CASING, 'line-opacity': 1, 'line-offset': OFFSET_IN \}\n\s+\}, labelAnchor\(\)\);/.test(code)
      && /'id': 'haul-dots',[\s\S]{0,500}'line-color': \['match', \['get', 'type'\], 'Inbound Haul', '#059669', '#f59e0b'\], 'line-width': HAUL_DOT_WIDTH,[\s\S]{0,120}'line-dasharray': HAUL_DOTS \}\n\s+\}, labelAnchor\(\)\);/.test(code)
      && /const HAUL_DOT_WIDTH = \['interpolate', \['linear'\], \['zoom'\], 7, 1\.1, 12, 2\.4, 16, 3\.8\];/.test(code)
-     && /function haulEraserColour\(\)\{ return \/dark\/\.test\(/.test(code));
+     && /function haulEraserColour\(\)\{ return \/dark\|night\/\.test\(/.test(code));   // NARROWED 27 Oct 2026 (8a): the Navigation night style is dark ground too
   ok("23 Oct: the pieces follow the Laden / Empty ticks and the route filters (applyFilters), the ticks alone when no filter is set",
      /function haulPieceFilter\(\)\{/.test(code)
      && /\['haul-eraser', 'haul-dots'\]\.forEach\(l => \{ if \(map\.getLayer\(l\)\) map\.setFilter\(l, haulBase\[0\] === 'in' \? \['all', haulBase, \.\.\.filterArr\.slice\(1\)\] : haulBase\); \}\);/.test(code));
@@ -6400,6 +6435,106 @@ function qrRead(mod) {
   const f15 = idsFn({ START_YEAR: 2026 }, { data: fx })(15), f16 = idsFn({ START_YEAR: 2026 }, { data: fx })(16), f14 = idsFn({ START_YEAR: 2026 }, { data: fx })(14);
   ok("23 Oct: the month's ids from the features' windows: Mar 2027 (month 15) holds AL001 once (both legs) and the load that spans into April; April holds that one only; February none; no month gives null",
      JSON.stringify(f15) === '["AL001","AL009"]' && JSON.stringify(f16) === '["AL009"]' && JSON.stringify(f14) === '[]' && idsFn({ START_YEAR: 2026 }, { data: fx })(null) === null);
+}
+
+// ===== 27 Oct 2026 (task 8a): more classic basemaps on the public map =====
+// Streets, Outdoors, Satellite without names and Navigation day / night join Light, Dark and Satellite. All are classic
+// -vNN styles (GL JS 2.14.1 draws them with every overlay, 0 errors: notes\session-1027-more-basemaps.md). Navigation's live
+// traffic and incidents are switched off on every style load. The share link carries the ground as &basemap=<key>.
+{
+  const M = "mapbox://styles/mapbox/";
+  const sel = (html.match(/<select id="basemap-select"[^>]*>([\s\S]*?)<\/select>/) || [])[1] || "";
+  const opts = [...sel.matchAll(/<option value="([^"]*)"([^>]*)>([^<]*)<\/option>/g)].map(m => ({ value: m[1], attrs: m[2], label: m[3] }));
+  const want = [["light-v11", "Light"], ["dark-v11", "Dark"], ["streets-v12", "Streets"], ["outdoors-v12", "Outdoors"],
+                ["satellite-streets-v12", "Satellite"], ["satellite-v9", "Satellite (no names)"],
+                ["navigation-day-v1", "Navigation day"], ["navigation-night-v1", "Navigation night"]];
+  ok("⭐ 8a: the Basemap menu offers, in order, Light, Dark, Streets, Outdoors, Satellite, Satellite (no names), Navigation day and Navigation night, then the hidden Maa-amet",
+     opts.length === 9 && want.every(([k, label], i) => opts[i].value === M + k && opts[i].label === label)
+     && opts[8].value === "maaamet-ortho" && /hidden/.test(opts[8].attrs) && /selected/.test(opts[0].attrs) && opts.slice(1).every(o => !/selected/.test(o.attrs)));
+  ok("🔴 8a: every new option is a classic -vNN Mapbox style (GL JS 2.14 draws it) and none is the v3-only Standard style",
+     opts.slice(0, 8).every(o => /^mapbox:\/\/styles\/mapbox\/[a-z-]+-v\d+$/.test(o.value)) && !/mapbox\/standard/.test(src) && !/mapbox\/standard/.test(sel)
+     && /mapbox-gl-js\/v2\.\d+\.\d+\/mapbox-gl\.js/.test(html));
+  ok("8a: the two satellite options have their own ids, so a British tenant's wording can reach both",
+     /<option value="mapbox:\/\/styles\/mapbox\/satellite-streets-v12" id="basemap-satellite">/.test(sel)
+     && /<option value="mapbox:\/\/styles\/mapbox\/satellite-v9" id="basemap-satellite-plain">/.test(sel));
+  const i0 = src.indexOf("const BASEMAP = {"), i1 = src.indexOf("function maaametOrthoStyle()");
+  const bm = i0 >= 0 && i1 > i0 ? src.slice(i0, i1) : "";
+  ok("⭐ 8a: every menu style is in BASEMAP.rebuild (a full rebuild, so the page's layers come back on every one)",
+     want.every(([k]) => bm.slice(0, bm.indexOf("maaamet-ortho'")).includes(`'${M}${k}'`)) && bm.includes("'maaamet-ortho']) };"));
+  ok("8a: the widget's four quick buttons stay Light, Dark, Satellite and Streets",
+     [...src.matchAll(/changeTheme\(this, '([^']+)'\)/g)].map(m => m[1]).join("|") === [M + "light-v11", M + "dark-v11", M + "satellite-streets-v12", M + "streets-v12"].join("|"));
+  // the live traffic: only the two sources, on every style load
+  ok("⭐ 8a: hideLiveTraffic runs from style.load and hides only layers on the mapbox-traffic and mapbox-incidents sources",
+     /function hideLiveTraffic\(\) \{[\s\S]*?l\.source === 'mapbox-traffic' \|\| l\.source === 'mapbox-incidents'[\s\S]*?setLayoutProperty\(l\.id, 'visibility', 'none'\)/.test(bm)
+     && bm.includes("hideLiveTraffic(); });") && (src.match(/hideLiveTraffic\(\)/g) || []).length === 2);
+  {
+    const fnSrc = bm.slice(bm.indexOf("function hideLiveTraffic()"), bm.indexOf("map.on('style.load'"));
+    const layers = [{ id: 'road-primary', source: 'composite' }, { id: 'traffic-primary', source: 'mapbox-traffic' },
+                    { id: 'incident-label', source: 'mapbox-incidents' }, { id: 'forecast-lines', source: 'forecast' }, { id: 'bg', type: 'background' }];
+    const hidden = [];
+    const run = (m) => new Function("map", fnSrc + "\nhideLiveTraffic();")(m);
+    run({ getStyle: () => ({ layers }), setLayoutProperty: (id, p, v) => hidden.push([id, p, v]) });
+    ok("⭐ 8a (sandbox): the traffic and incident layers are set to visibility none; the roads, our own layers and the background are left alone",
+       JSON.stringify(hidden) === JSON.stringify([['traffic-primary', 'visibility', 'none'], ['incident-label', 'visibility', 'none']]), JSON.stringify(hidden));
+    let threw = false; try { run({ getStyle: () => { throw new Error("no style yet"); }, setLayoutProperty: () => {} }); } catch (e) { threw = true; }
+    ok("8a (sandbox): a map with no style to read hides nothing and does not throw", !threw);
+  }
+  // the same-pick rule and the rebuild, for the new styles, against a fake map
+  {
+    const calls = [], handlers = [];
+    const fakeMap = { on: (e, f) => { if (e === 'style.load') handlers.push(f); }, setStyle: (st, o) => calls.push([st, o]),
+                      getStyle: () => ({ layers: [] }), setLayoutProperty: () => {} };
+    const fakeSel = { value: M + "light-v11", selectedIndex: 0, options: [] };
+    const fakeDoc = { getElementById: () => fakeSel, querySelectorAll: () => [] };
+    let api = null, e0 = "";
+    try { api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, fakeDoc, () => ({}), M + "light-v11"); }
+    catch (e) { e0 = String(e); }
+    ok("8a (sandbox): the basemap block runs with the new styles", !!api, e0.slice(0, 300));
+    if (api) {
+      const load = () => handlers.forEach(f => f());
+      ["outdoors-v12", "satellite-v9", "navigation-day-v1", "navigation-night-v1"].forEach((k, i) => {
+        const n0 = calls.length;
+        api.changeBasemap(M + k);
+        const one = calls.length === n0 + 1 && calls[n0][0] === M + k && calls[n0][1] && calls[n0][1].diff === false;
+        load();
+        api.changeBasemap(M + k);
+        ok("⭐ 8a (sandbox): " + k + " is one setStyle, a full rebuild (diff: false), and a second pick of it while it shows calls setStyle NOT AT ALL",
+           one && calls.length === n0 + 1 && api.BASEMAP.shown === M + k && api.BASEMAP.pending === null);
+      });
+    }
+  }
+  // the map opens on the basemap a link names
+  ok("⭐ 8a: the share link's basemap is read BEFORE the map is made, so it opens on that ground (no second style load); Light unless the key is known",
+     src.indexOf("const INITIAL_BASEMAP = ") > 0 && src.indexOf("const INITIAL_BASEMAP = ") < src.indexOf("const map = new mapboxgl.Map(")
+     && src.indexOf("const BASEMAP_LINK = {") < src.indexOf("const INITIAL_BASEMAP = ")
+     && /new URLSearchParams\(location\.search\)\.get\('basemap'\)/.test(src) && src.includes("const map = new mapboxgl.Map({ container: 'map', style: INITIAL_BASEMAP,")
+     && src.includes("syncBasemapControls(INITIAL_BASEMAP);"));
+  {
+    const link = new Function(cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\nreturn { BASEMAP_LINK, basemapFromKey, basemapKey };")();
+    ok("8a: the link keys name exactly the seven non-default styles; an unknown key, a prototype name or a style URL is null",
+       Object.keys(link.BASEMAP_LINK).join() === "dark,streets,outdoors,aerial,aerial-plain,nav-day,nav-night"
+       && link.basemapFromKey('outdoors') === M + "outdoors-v12" && link.basemapFromKey('nav-night') === M + "navigation-night-v1"
+       && link.basemapFromKey('nope') === null && link.basemapFromKey('constructor') === null && link.basemapFromKey(null) === null
+       && link.basemapKey(M + "light-v11") === null && link.basemapKey(M + "streets-v12") === "streets"
+       && Object.values(link.BASEMAP_LINK).every(u => opts.some(o => o.value === u)));
+  }
+  ok("8a: changing the basemap rewrites the address (scheduleViewWrite), and the view carries the held ground",
+     /BASEMAP\.pending = styleUrl;\s*try \{ scheduleViewWrite\(\); \}/.test(bm) && src.includes("basemap: basemapKey(BASEMAP.pending || BASEMAP.shown) };")
+     && src.includes("if (v.basemap && BASEMAP_LINK[v.basemap]) q.set('basemap', v.basemap);"));
+  // a British tenant reads the satellite options as Aerial
+  {
+    const frag = src.slice(src.indexOf("        const sat = document.getElementById('basemap-satellite');"), src.indexOf("        // H2 (5 Oct 2026)"));
+    const mk = (country) => {
+      const els = { 'basemap-satellite': { textContent: 'Satellite' }, 'basemap-satellite-plain': { textContent: 'Satellite (no names)' } };
+      new Function("document", "TENANT", frag)({ getElementById: id => els[id] || null }, { country });
+      return [els['basemap-satellite'].textContent, els['basemap-satellite-plain'].textContent];
+    };
+    ok("⭐ 8a (sandbox): a British tenant reads Aerial and Aerial (no names); any other country reads Satellite and Satellite (no names)",
+       frag.length > 100 && mk('GB').join('|') === 'Aerial|Aerial (no names)' && mk('gb').join('|') === 'Aerial|Aerial (no names)'
+       && mk('EE').join('|') === 'Satellite|Satellite (no names)' && mk('').join('|') === 'Satellite|Satellite (no names)');
+  }
+  ok("🔴 8a: the Navigation night ground is dark for the haul-road cut-out, and no banned public word came in with the new options",
+     /function haulEraserColour\(\)\{ return \/dark\|night\/\.test\(/.test(code) && !/truck|real-time|live tracking|telematics/i.test(sel));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

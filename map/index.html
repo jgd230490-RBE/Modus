@@ -915,7 +915,12 @@
         <select id="basemap-select" onchange="changeBasemap(this.value)" aria-label="Basemap">
             <option value="mapbox://styles/mapbox/light-v11" selected>Light</option>
             <option value="mapbox://styles/mapbox/dark-v11">Dark</option>
+            <option value="mapbox://styles/mapbox/streets-v12">Streets</option>
+            <option value="mapbox://styles/mapbox/outdoors-v12">Outdoors</option>
             <option value="mapbox://styles/mapbox/satellite-streets-v12" id="basemap-satellite">Satellite</option>
+            <option value="mapbox://styles/mapbox/satellite-v9" id="basemap-satellite-plain">Satellite (no names)</option>
+            <option value="mapbox://styles/mapbox/navigation-day-v1">Navigation day</option>
+            <option value="mapbox://styles/mapbox/navigation-night-v1">Navigation night</option>
             <option value="maaamet-ortho" id="basemap-maaamet" hidden>Estonia orthophoto (Maa-amet)</option>
         </select>
     </div>
@@ -1398,7 +1403,10 @@
         if (bm) bm.hidden = (TENANT.country || '').toUpperCase() !== 'EE';
         // H1 (29 Sep 2026): a British tenant reads Mapbox Satellite as its "Aerial" basemap
         const sat = document.getElementById('basemap-satellite');
-        if (sat) sat.textContent = (TENANT.country || '').toUpperCase() === 'GB' ? 'Aerial' : 'Satellite';
+        const aerial = (TENANT.country || '').toUpperCase() === 'GB';
+        if (sat) sat.textContent = aerial ? 'Aerial' : 'Satellite';
+        const satPlain = document.getElementById('basemap-satellite-plain');
+        if (satPlain) satPlain.textContent = (aerial ? 'Aerial' : 'Satellite') + ' (no names)';
         // H2 (5 Oct 2026): a tenant whose overlay carries no existing railway has no use for
         // the rail layer — hide its control instead of showing an empty, ticked layer. The
         // demo scheme is a road; the first tenant's corridor had a railway under it.
@@ -1834,7 +1842,18 @@
     function isPhoneShell() {
         try { return !!(window.matchMedia && window.matchMedia(PHONE_SHELL_MQ).matches); } catch (e) { return false; }
     }
-    const map = new mapboxgl.Map({ container: 'map', style: 'mapbox://styles/mapbox/light-v11', center: [10, 54], zoom: 4,
+    // 27 Oct 2026: the basemap a share link asks for (&basemap=outdoors). The link names the style by a short key; Light, the
+    // default, adds nothing, and an unknown key is Light. Read here so the map opens on it (no second style load).
+    const BASEMAP_LINK = {
+        dark: 'mapbox://styles/mapbox/dark-v11', streets: 'mapbox://styles/mapbox/streets-v12',
+        outdoors: 'mapbox://styles/mapbox/outdoors-v12', aerial: 'mapbox://styles/mapbox/satellite-streets-v12',
+        'aerial-plain': 'mapbox://styles/mapbox/satellite-v9', 'nav-day': 'mapbox://styles/mapbox/navigation-day-v1',
+        'nav-night': 'mapbox://styles/mapbox/navigation-night-v1' };
+    function basemapFromKey(k) { return Object.prototype.hasOwnProperty.call(BASEMAP_LINK, k) ? BASEMAP_LINK[k] : null; }
+    function basemapKey(url) { return Object.keys(BASEMAP_LINK).find(k => BASEMAP_LINK[k] === url) || null; }
+    const INITIAL_BASEMAP = (() => { try { return basemapFromKey(new URLSearchParams(location.search).get('basemap')); } catch (e) { return null; } })()
+        || 'mapbox://styles/mapbox/light-v11';
+    const map = new mapboxgl.Map({ container: 'map', style: INITIAL_BASEMAP, center: [10, 54], zoom: 4,
                                    touchPitch: !isPhoneShell(), dragRotate: !isPhoneShell() });
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
     
@@ -2346,7 +2365,7 @@
         return types.length ? ['in', ['get', 'type'], ['literal', types]] : ['==', ['get', 'type'], 'NONE'];
     }
     // the cut-out under the dots is the basemap's own ground: white, or the Dark style's ink
-    function haulEraserColour(){ return /dark/.test(String((typeof BASEMAP !== 'undefined' && (BASEMAP.pending || BASEMAP.shown)) || '')) ? '#1F2024' : '#ffffff'; }
+    function haulEraserColour(){ return /dark|night/.test(String((typeof BASEMAP !== 'undefined' && (BASEMAP.pending || BASEMAP.shown)) || '')) ? '#1F2024' : '#ffffff'; }
     // 23 Oct 2026 (the user: a subtler highlight than the breach red): the clicked route keeps its own colours and every
     // other route dims; null puts them all back. Re-applied after a basemap change by the style.load handler.
     const DIM_LAYERS = ['inbound-lines', 'outbound-lines', 'inbound-lines-casing', 'outbound-lines-casing', 'haul-dots'];
@@ -4105,14 +4124,30 @@
     // A rebuild is what GL fell back to for these anyway (the diff fails on their sprites). Any other
     // style keeps the default: GL validates it first and keeps the working basemap if it rejects it,
     // where diff:false would drop the basemap and every overlay before finding out.
-    const BASEMAP = { shown: 'mapbox://styles/mapbox/light-v11', pending: null,
+    // 27 Oct 2026 (8a): Outdoors, Satellite without names and the two Navigation styles join the page's own set (classic -v9 /
+    // -v11 / -v12 styles, checked on 2.14.1 with every overlay: 0 errors), so they rebuild too. The map may open on one of
+    // them (the share link's &basemap=), so the held basemap starts on INITIAL_BASEMAP.
+    const BASEMAP = { shown: INITIAL_BASEMAP, pending: null,
         rebuild: new Set(['mapbox://styles/mapbox/light-v11', 'mapbox://styles/mapbox/dark-v11',
-            'mapbox://styles/mapbox/satellite-streets-v12', 'mapbox://styles/mapbox/streets-v12', 'maaamet-ortho']) };
-    map.on('style.load', () => { if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; } });
+            'mapbox://styles/mapbox/satellite-streets-v12', 'mapbox://styles/mapbox/streets-v12',
+            'mapbox://styles/mapbox/outdoors-v12', 'mapbox://styles/mapbox/satellite-v9',
+            'mapbox://styles/mapbox/navigation-day-v1', 'mapbox://styles/mapbox/navigation-night-v1', 'maaamet-ortho']) };
+    // The Navigation styles draw TODAY's traffic and road incidents (sources mapbox-traffic / mapbox-incidents). On a plan for a
+    // month ahead that misleads, and its orange and red sit beside the routes' amber and green, so those layers are switched
+    // off on every style load. The roads keep the Navigation look.
+    function hideLiveTraffic() {
+        try {
+            map.getStyle().layers.forEach(l => {
+                if (l.source === 'mapbox-traffic' || l.source === 'mapbox-incidents') map.setLayoutProperty(l.id, 'visibility', 'none');
+            });
+        } catch (e) { /* a style without them has nothing to hide */ }
+    }
+    map.on('style.load', () => { if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; } hideLiveTraffic(); });
     function changeBasemap(styleUrl) {
         syncBasemapControls(styleUrl);
         if (styleUrl === (BASEMAP.pending || BASEMAP.shown)) return;
         BASEMAP.pending = styleUrl;
+        try { scheduleViewWrite(); } catch (e) { /* the page's link is not wired yet */ }   // the address carries the ground
         const style = styleUrl === 'maaamet-ortho' ? maaametOrthoStyle() : styleUrl;
         if (BASEMAP.rebuild.has(styleUrl)) map.setStyle(style, { diff: false }); else map.setStyle(style);
     }
@@ -4127,6 +4162,7 @@
         document.querySelectorAll('.custom-map-widget .widget-btn').forEach(b =>
             b.classList.toggle('active', b.dataset.basemap === styleUrl));
     }
+    syncBasemapControls(INITIAL_BASEMAP);     // a link may open the map on another basemap than the select's first option
     function maaametOrthoStyle() {
         // Estonian Land Board (Maa-amet) orthophoto, all-zoom TMS tile pyramid (EPSG:3857).
         return {
@@ -8313,12 +8349,14 @@
         if (f.length) q.set('filters', f.join('|'));
         if (v.council === 'carbon') q.set('council', 'carbon');     // 13 Oct 2026: the districts' colouring (movements is the default)
         if (v.marks === 'dots') q.set('marks', 'dots');             // 16 Oct 2026 (V7): sites drawn as dots (icons are the default)
+        if (v.basemap && BASEMAP_LINK[v.basemap]) q.set('basemap', v.basemap);   // 27 Oct 2026: the ground (Light, the default, adds nothing)
         return q.toString();
     }
     function decodeView(search) {
         const q = new URLSearchParams(search || '');
         const out = { month: null, layers: null, filters: {}, council: q.get('council') === 'carbon' ? 'carbon' : null,
-                      marks: q.get('marks') === 'dots' ? 'dots' : null };
+                      marks: q.get('marks') === 'dots' ? 'dots' : null,
+                      basemap: basemapFromKey(q.get('basemap')) ? q.get('basemap') : null };
         if (q.has('month')) out.month = monthFromParam(q.get('month'));
         if (q.has('layers')) out.layers = (q.get('layers') || '').split('.').map(x => x.trim()).filter(x => /^-?[a-z0-9_-]+$/i.test(x));
         (q.get('filters') || '').split('|').forEach(part => {
@@ -8342,7 +8380,8 @@
                             team: selectedText('filter-ipt') },       // the team's NAME as the option shows it
                  // 13 Oct 2026: the districts' colouring, only while By council is on (a carbon colouring left behind is not a view)
                  council: (typeof councilFocus === 'function' && councilFocus() && typeof AREAS !== 'undefined' && AREAS.mode === 'carbon') ? 'carbon' : null,
-                 marks: (typeof locDotsOn === 'function' && locDotsOn()) ? 'dots' : null };
+                 marks: (typeof locDotsOn === 'function' && locDotsOn()) ? 'dots' : null,
+                 basemap: basemapKey(BASEMAP.pending || BASEMAP.shown) };
     }
     // the link a person shares: this page's address with the view, without the app's embed / cache-buster parameters;
     // monthOnly = the short form for a QR code that cannot hold the whole view
