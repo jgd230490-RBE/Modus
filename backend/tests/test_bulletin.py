@@ -663,9 +663,15 @@ _c9 = bulletin.conditions_of_month(9, payload=P10, factors=FACTORS)["stockpiles_
 ok("⭐ a stockpile over capacity at the end of September is listed, with the figures",
    len(_c9) == 1 and _c9[0]["location_id"] == "L2" and _c9[0]["name"] == "Mill Compound"
    and _c9[0]["capacity_qty"] == 1000 and near(_c9[0]["balance_end"], 1200) and near(_c9[0]["over_by"], 200), str(_c9))
-stockpiles.consume("L2", 10, 1, consumed_qty=300, unit="t")
+# NARROWED 27 Oct 2026 (stockpile forecast, D2): the stockpile has a capacity, so its balance runs forward from the plan (this
+# harness's October lines into it stand in for the weeks nobody recorded); the breaking case types an Out in October's LAST
+# week that brings it under by month END — the rule under test is unchanged: only the end of the month counts
+_oct = [w for s_ in stockpiles.balances(10, 10)["stockpiles"] if s_["location_id"] == "L2" for w in s_["weeks"]]
+_last = _oct[-1]
+_before = (_oct[-2]["balance_end"] if len(_oct) > 1 else 1200.0)
+stockpiles.consume("L2", 10, _last["week_index"], consumed_qty=_before + _last["inbound"] - 500, unit="t")
 _c10 = bulletin.conditions_of_month(10, payload=P10, factors=FACTORS)["stockpiles_over"]
-ok("…the breaking case: 300 t consumed in October's first week brings it under by month END, so October lists nothing",
+ok("…the breaking case: an Out typed in October's last week brings it under by month END, so October lists nothing",
    _c10 == [] and bulletin.conditions_of_month(9, payload=P10, factors=FACTORS)["stockpiles_over"], str(_c10))
 ok("…and a location with no capacity is never 'over'", all(x["location_id"] != "L4" for x in _c9))
 # 12 Oct 2026 (the tenancy / wording review; D23): the sentence a person reads says the balance is RECORDED —

@@ -300,6 +300,12 @@ def _flow():
     return {"rec": 0.0, "plan": 0.0, "plan_unrec": 0.0, "lines": 0, "unrec": 0}
 
 
+#: 27 Oct 2026: the last few whole computations, keyed on the data version and the current week, so one page that
+#: reads the balance three times (the Account rows, the rail, the Horizon strip) works it out once
+_MEMO = {}
+_MEMO_MAX = 6
+
+
 def balances(from_month, to_month, location_id=None, today=None):
     """
     Per-location, per-week stock for a month window.
@@ -309,16 +315,33 @@ def balances(from_month, to_month, location_id=None, today=None):
     FORWARD from the plan; any other place keeps the records-only figure.
     """
     lo, hi = min(int(from_month), int(to_month)), max(int(from_month), int(to_month))
+    cur = weeks_mod.editable_week(today=today)
+    key = (db.current_tenant(), db.data_version(), cur, location_id)
+    full = _MEMO.get(key)
+    if full is None or full["to"] < hi:
+        full = _balances_full(hi, location_id, cur)
+        if len(_MEMO) >= _MEMO_MAX:
+            _MEMO.pop(next(iter(_MEMO)))
+        _MEMO[key] = full
+    return {"from": lo, "to": hi, "current_week": full["current_week"],
+            "stockpiles": [dict(sp, weeks=[dict(w) for w in sp["weeks"] if lo <= w["month_index"] <= hi])
+                           for sp in full["stockpiles"]]}
+
+
+def _balances_full(hi, location_id, cur):
+    """Every week from month 1 to the end of the plan (never short of `hi`), for every place that holds stock."""
+    lo = 1
     factors = conversions.load_factors()
 
     locs = storage_locations()
     if location_id:
         locs = [l for l in locs if l["id"] == location_id]
     if not locs:
-        return {"from": lo, "to": hi, "stockpiles": []}
+        return {"from": lo, "to": hi, "current_week": {"month_index": cur[0], "week_index": cur[1]},
+                "stockpiles": []}
 
     tenant = db.current_tenant()
-    cm, cw = weeks_mod.editable_week(today=today)          # the current week: past is before it
+    cm, cw = cur                                            # the current week: past is before it
     plans = plan_rows(location_id)
     planned_locs = {k[0] for k in plans}
     fc_ids = {l["id"] for l in locs
@@ -350,6 +373,13 @@ def balances(from_month, to_month, location_id=None, today=None):
     for (_, m) in plans:
         last_m = max(last_m, m)
     n_weeks = {m: weeks_mod.weeks_in_month(m) for m in range(1, last_m + 1)}
+    # each week's Monday, so a screen can say "the week of 22 Mar" without its own calendar
+    _mon = {}
+
+    def week_from(m, w):
+        if (m, w) not in _mon:
+            _mon[(m, w)] = weeks_mod.week_span(m, w)[0].isoformat()
+        return _mon[(m, w)]
     is_past = lambda m, w: (m, w) < (cm, cw)
 
     # -- road lines into and out of the forecast piles, one line-week at a time (§2) ----------
@@ -396,7 +426,7 @@ def balances(from_month, to_month, location_id=None, today=None):
     # -- records-only places: today's rule, unchanged (actuals only, typed Out only) ---------
     rec_in = {}
     for w in week_rows:
-        if w.get("actual_qty") is None or int(w["month_index"]) > hi:
+        if w.get("actual_qty") is None or int(w["month_index"]) > last_m:
             continue
         lid = dest_of.get(w["route_id"])
         if lid is None or lid in fc_ids or lid not in pile_unit:
@@ -436,7 +466,7 @@ def balances(from_month, to_month, location_id=None, today=None):
         has_plan = lid in planned_locs
         running = opening
         rows, ahead = [], []
-        m_end = last_m if forecast else hi
+        m_end = last_m
         for m in range(1, m_end + 1):
             nw = n_weeks.get(m) or weeks_mod.weeks_in_month(m)
             for wi in range(1, nw + 1):
@@ -445,15 +475,14 @@ def balances(from_month, to_month, location_id=None, today=None):
                     inb = rec_in.get(k, 0.0)
                     con = typed_out.get(k, 0.0)
                     running = running + inb - con
-                    if lo <= m <= hi:
-                        rows.append({
-                            "month_index": m, "week_index": wi,
-                            "inbound": round(inb, 3), "consumed": round(con, 3),
-                            "balance_end": round(running, 3),
-                            # null, NOT zero, when no capacity is recorded
-                            "remaining": (round(cap - running, 3) if cap is not None else None),
-                            "over": bool(cap is not None and running > cap),
-                            "unit": unit, "basis": "recorded"})
+                    rows.append({
+                        "month_index": m, "week_index": wi,
+                        "inbound": round(inb, 3), "consumed": round(con, 3),
+                        "balance_end": round(running, 3),
+                        # null, NOT zero, when no capacity is recorded
+                        "remaining": (round(cap - running, 3) if cap is not None else None),
+                        "over": bool(cap is not None and running > cap),
+                        "unit": unit, "basis": "recorded", "from": week_from(m, wi)})
                     continue
                 past = is_past(m, wi)
                 fin = flows[lid]["in"].get((m, wi)) or _flow()
@@ -499,6 +528,7 @@ def balances(from_month, to_month, location_id=None, today=None):
                     "remaining": (round(cap - running, 3) if cap is not None else None),
                     "over": bool(cap is not None and running > cap),
                     "unit": unit, "basis": basis, "in_basis": in_basis, "out_basis": out_basis,
+                    "from": week_from(m, wi),
                     "plan_in": round(fin["plan"], 3), "plan_out": round(plan_out, 3),
                     # what was RECORDED coming in (None when no line into it has an actual yet)
                     "in_recorded": (round(fin["rec"], 3) if past and fin["lines"] > fin["unrec"] else None),
@@ -510,8 +540,7 @@ def balances(from_month, to_month, location_id=None, today=None):
                 }
                 if not past:
                     ahead.append(row)
-                if lo <= m <= hi:
-                    rows.append(row)
+                rows.append(row)
         sp = {
             "location_id": lid, "name": loc["name"],
             "loc_type": loc.get("loc_type"), "role": loc.get("role"),
@@ -522,7 +551,7 @@ def balances(from_month, to_month, location_id=None, today=None):
             "weeks": rows,
         }
         if forecast:
-            wk = lambda r: ({"month_index": r["month_index"], "week_index": r["week_index"],
+            wk = lambda r: ({"month_index": r["month_index"], "week_index": r["week_index"], "from": r["from"],
                              "balance_end": r["balance_end"], "short": r["short"]} if r else None)
             first_over = next((r for r in ahead if r["over"]), None)
             first_empty = next((r for r in ahead if r["empty"]), None)
@@ -538,7 +567,7 @@ def balances(from_month, to_month, location_id=None, today=None):
                                   if near and cap else None),
             })
         out.append(sp)
-    return {"from": lo, "to": hi, "current_week": {"month_index": cm, "week_index": cw},
+    return {"from": lo, "to": last_m, "current_week": {"month_index": cm, "week_index": cw},
             "stockpiles": out}
 
 

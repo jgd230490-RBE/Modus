@@ -60,6 +60,7 @@ import config  # noqa: E402
 import taxonomy  # noqa: E402
 import tenant_package  # noqa: E402
 import stockpiles  # noqa: E402
+import weeks  # noqa: E402
 import lookahead  # noqa: E402
 import carbon  # noqa: E402
 import areas  # noqa: E402
@@ -262,6 +263,39 @@ ok("⭐ every site lies inside the nine shipped council areas (the By council vi
 ok("every gate is open Monday to Friday at least, with its hours typed (§1.8), and one default per site",
    all(g["open_from"] and g["open_to"] and (g["open_days"] or "")[:5] == "11111" for g in T["location_gates"])
    and all(sum(1 for g in T["location_gates"] if g["location_id"] == l["id"] and g["is_default"]) == 1 for l in T["locations"]))
+
+# =========================================================================== #
+#  5b. 27 Oct 2026 — the stockpile story (stockpile forecast, plan §6, D11)    #
+# =========================================================================== #
+import stockpiles  # noqa: E402
+import weeks  # noqa: E402
+_bal = {s_["name"]: s_ for s_ in stockpiles.balances(1, 60)["stockpiles"]}
+_wo = lambda w: weeks.week_span(w["month_index"], w["week_index"])[0].isoformat() if w else None
+ok("⭐ the package carries a planned use for each of the three stockpiles (stockpile_plan)",
+   {r["location_id"] for r in T.get("stockpile_plan", [])} == {_bal[n]["location_id"] for n in
+                                                              ("Stockpile South", "Stockpile Tilton", "Stockpile North")},
+   str(len(T.get("stockpile_plan", []))))
+ok("⭐ Stockpile North fills over the winter (no capping laid Nov–Mar) and goes over its 25 000 t in the week of 22 Mar 2027",
+   _wo(_bal["Stockpile North"]["first_over"]) == "2027-03-22"
+   and 25000 < _bal["Stockpile North"]["first_over"]["balance_end"] < 27000, str(_bal["Stockpile North"]["first_over"]))
+ok("...Stockpile Tilton is over in Feb 2028 (from the week of 31 Jan), Stockpile South never",
+   _wo(_bal["Stockpile Tilton"]["first_over"]) == "2028-01-31" and _bal["Stockpile South"]["first_over"] is None
+   and _bal["Stockpile South"]["peak_pct"] < 50, str(_bal["Stockpile Tilton"]["first_over"]))
+# North's recorded deliveries to 26 Nov fall a little short of the plan, so the plan's summer laying meets a few tonnes
+# fewer than it expects: one honest "runs out" weeks after the over, small. South and Tilton never run out.
+_ne = _bal["Stockpile North"]["first_empty"]
+ok("...South and Tilton never run out; North only runs a few tonnes short in the summer, after it has gone over",
+   _bal["Stockpile South"]["first_empty"] is None and _bal["Stockpile Tilton"]["first_empty"] is None
+   and (_ne is None or (_wo(_ne) > "2027-03-22" and _ne["short"] < 50)),
+   str({n: _bal[n]["first_empty"] for n in _bal if _bal[n].get("forecast")}))
+_tc = [w for w in _bal["Stockpile Tilton"]["weeks"] if w.get("count") is not None]
+ok("...one stock count on Stockpile Tilton in the week of 14 Sep 2026, 180 t more than worked out",
+   len(_tc) == 1 and _tc[0]["count_adjust"] == 180.0 and (_tc[0]["month_index"], _tc[0]["week_index"]) == (9, 3), str(_tc))
+ok("...the four compounds and the railhead keep the records-only figure (no capacity, no plan)",
+   all(not s_["forecast"] for n, s_ in _bal.items() if not n.startswith("Stockpile ")))
+_gen0 = read("backend/tools/make_demo_tenant.py")
+ok("the generator: the winter nudge (no capping laid in Nov or Mar) and the plan from its own draw model",
+   "LAY_SHARE = {1: 0.0, 2: 0.0, 3: 0.0," in _gen0 and "11: 0.0, 12: 0.0}" in _gen0 and "def stock_plan_rows(loc):" in _gen0)
 
 # =========================================================================== #
 #  6. The generator agrees                                                     #

@@ -420,14 +420,25 @@ def _counting(*a, **k):
 
 
 db.query = _counting
+stockpiles._MEMO.clear()
 stockpiles.balances(1, NOV, today=TODAY)
 n_all = _calls[0]
 _calls[0] = 0
+stockpiles._MEMO.clear()
 stockpiles.balances(1, 24, today=TODAY)
 n_long = _calls[0]
+_calls[0] = 0
+stockpiles.balances(3, 9, today=TODAY)
+n_again = _calls[0]
 db.query = _real_query
-ok("🔴 one balance read is a FIXED number of queries, not one per pile or per week", n_all == n_long and n_all <= 10,
+ok("🔴 one balance read is a FIXED number of queries, not one per pile or per week", n_all == n_long and 0 < n_all <= 10,
    f"{n_all} vs {n_long}")
+ok("🔴 a second read with no write in between is worked out once (the page reads it three times: Account, rail, Horizon)",
+   n_again == 0, str(n_again))
+stockpiles.set_plan("P", DEC, planned_qty=1.0)
+ok("...and a write makes the next read fresh (the data version moves)", ("P", DEC) in stockpiles.plan_rows("P")
+   and wk(bal("P", to=DEC), DEC, 1)["plan_out"] > 0)
+stockpiles.set_plan("P", DEC, planned_qty=None)
 
 # =========================================================================== #
 #  4. the rail                                                                 #

@@ -249,6 +249,28 @@ def horizon_rows(commit_mi, commit_wi, route_id=None):
                       "make-ready": list(following), "early-warning": list(after)}}
 
 
+def horizon_stock(commit_mi):
+    """
+    27 Oct 2026 (stockpile forecast, card 4): one strip under the Horizon's week rows — each pile with a capacity and a
+    forecast, how full it is at the end of each week of the commit month and the next (`pct`, amber from 90, red over).
+    Not IPT-scoped: a stockpile has no IPT. The same forward balance as everywhere (stockpiles.balances).
+    """
+    import stockpiles
+    out = []
+    bal = stockpiles.balances(int(commit_mi), int(commit_mi) + 1)
+    for sp in bal["stockpiles"]:
+        cap = sp.get("capacity_qty")
+        if not sp.get("forecast") or not cap:
+            continue
+        out.append({"name": sp["name"], "capacity_qty": cap, "unit": sp.get("capacity_unit"),
+                    "use_planned": bool(sp.get("use_planned")),
+                    "weeks": {f"{w['month_index']}|{w['week_index']}": {
+                        "pct": round(w["balance_end"] * 100 / cap, 1), "balance_end": w["balance_end"],
+                        "over": w["over"], "empty": bool(w.get("empty")), "basis": w.get("basis")}
+                        for w in sp["weeks"]}})
+    return out
+
+
 def restriction_status(bucket="commit", route_id=None, acc=None, today=None):
     """
     The stored RESTRICTION flags for the caller's lines (in this bucket's week), plus how current they are and
@@ -359,6 +381,7 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     # horizon, filtered
     hz = horizon_rows(mi, wi, route_id=route_id)
     hz["rows"] = access.filter_lines(hz["rows"], acc)
+    hz["stock"] = horizon_stock(mi)
     out["horizon"] = hz
 
     # the rail, on the unfiltered lines, returned for the visible ones
