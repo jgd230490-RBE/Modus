@@ -1654,6 +1654,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
             os.environ.pop(v, None)
         form = {"name": "Ada Example", "email": "ada@example.org", "organisation": "Example Civils",
                 "role": "Principal contractor", "wants": "the look-ahead", "updates": "yes", "website": ""}
+        os.environ.pop("DEMO_LEADS", None)
+        r = c.post("/api/public/demo-request", follow_redirects=False, data=form)
+        ok("🔴 F3 a: with DEMO_LEADS unset the form is off: a 303 to error.html and no login made",
+           r.status_code == 303 and r.headers["location"].endswith("/error.html") and "#demo=" not in r.text)
+        os.environ["DEMO_LEADS"] = "1"
         r = c.post("/api/public/demo-request", follow_redirects=False, data=form)
         # REVERSED 14 Oct 2026 (G3 / HU14): the access page carried both shared codes; it now carries the lead's OWN link
         ok("⭐ no sender configured: the form POST (signed out) answers 200 with the access page — the lead's own link, no code",
@@ -1923,6 +1928,21 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.post("/api/auth/check", json={"token": _inv}, headers=W)
     ok("G3: the invite greets Ada", r.status_code == 200 and r.json()["name"] == "Ada Lovelace", r.text[:120])
     r = c.post("/api/auth/reset", json={"token": _inv, "password": "correct horse battery"}, headers=W)
+    # 27 Oct 2026 (F3 b): the password is set, but a staff login is signed in only after two-step sign-in is set up
+    ok("⭐ F3 b: the invite's password answers the SET-UP step: a ticket, the key, a QR code — and no session cookie",
+       r.status_code == 200 and r.json().get("step") == "setup" and r.json().get("ticket") and "<svg" in r.json().get("qr", "")
+       and "wayscope_session=" not in r.headers.get("set-cookie", ""), r.text[:200])
+    _ada_key = r.json()["key"].replace(" ", "")
+    _t = r.json()["ticket"]
+    r = c.post("/api/auth/setup", json={"ticket": _t, "code": "000000"}, headers=W)
+    ok("🔴 F3 b: a wrong set-up code is refused in words (401), no cookie",
+       r.status_code == 401 and "didn't work" in r.text and "wayscope_session=" not in r.headers.get("set-cookie", ""), r.text[:120])
+    r = c.post("/api/auth/setup", json={"ticket": _t, "code": "123456"})
+    ok("🔴 F3 b: the set-up step needs the app's header like every /api/auth/ call", r.status_code == 403)
+    r = c.post("/api/auth/setup", json={"ticket": _t, "code": _users.totp_at(_ada_key, _users.totp_step())}, headers=W)
+    _ada_codes = r.json().get("recovery_codes") or []
+    ok("⭐ F3 b: the right code turns two-step on and answers ten recovery codes",
+       r.status_code == 200 and len(_ada_codes) == 10 and r.json().get("two_step") is True, r.text[:200])
     _sc = r.headers.get("set-cookie", "")
     ok("⭐ G3: setting the password signs Ada in; the session cookie is HttpOnly, Secure, SameSite=Lax, path /, 12 hours",
        r.status_code == 200 and r.json()["via"] == "login" and r.json()["role"] == "admin"
@@ -1987,6 +2007,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
     _ada_jar = dict(c.cookies)
     c.cookies.clear()
     r = c.post("/api/auth/reset", json={"token": _bob_inv, "password": "bob's long password"}, headers=W)
+    _bob_key = r.json()["key"].replace(" ", "")
+    r = c.post("/api/auth/setup", json={"ticket": r.json()["ticket"], "code": _users.totp_at(_bob_key, _users.totp_step())}, headers=W)
+    _bob_codes = r.json().get("recovery_codes") or []
     ok("G3: Bob sets his password and is signed in as his team", r.status_code == 200 and r.json()["ipt"] == "IPT1"
        and r.json()["ipt_locked"] is True)
     _bob_lines = c.get("/api/forecasts").json()
@@ -2000,6 +2023,30 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("⭐ G3 sign out: the session row is gone, the cookie dropped, and the map still opens on this machine (map cookie)",
        r.status_code == 200 and c.get("/api/auth/me").json()["signed_in"] is False
        and c.get("/api/public/whoami").json()["level"] == "map" and c.get("/help/").status_code == 401)
+    # 27 Oct 2026 (F3 b): the code step through the real app — password, then a recovery code (the app's own code
+    # was used seconds ago at set-up; a code works once), and an admin's reset of a lost phone
+    c.cookies.clear()
+    r = c.post("/api/auth/signin", json={"email": "bob@example.org", "password": "bob's long password"}, headers=W)
+    ok("⭐ F3 b: with two-step on, the password answers the CODE step and no session cookie",
+       r.status_code == 200 and r.json().get("step") == "code" and "key" not in r.json()
+       and "wayscope_session=" not in r.headers.get("set-cookie", ""), r.text[:200])
+    _t = r.json()["ticket"]
+    ok("🔴 F3 b: the ticket alone opens nothing", c.get("/api/auth/me").json()["signed_in"] is False
+       and c.get("/api/forecasts", cookies={"wayscope_session": _t}).status_code in (401, 403))
+    r = c.post("/api/auth/code", json={"ticket": _t, "code": _users.totp_at(_bob_key, _users.totp_step())}, headers=W)
+    ok("🔴 F3 b: the code used seconds ago at set-up is refused (a code works once)", r.status_code == 401, r.text[:120])
+    r = c.post("/api/auth/code", json={"ticket": _t, "code": _bob_codes[0]}, headers=W)
+    ok("⭐ F3 b: a recovery code signs Bob in; nine left", r.status_code == 200 and r.json()["recovery_left"] == 9
+       and "wayscope_session=" in r.headers.get("set-cookie", ""), r.text[:200])
+    _bob_jar = dict(c.cookies)
+    c.cookies.clear(); c.cookies.update(_ada_jar)
+    r = c.post(f"/api/admin/users/{[u for u in _ul['users'] if u['email'] == 'bob@example.org'][0]['id']}/two-step-reset", headers=W)
+    ok("⭐ F3 b: Ada resets Bob's two-step (a lost phone): it is off on the Users list",
+       r.status_code == 200 and r.json()["user"]["two_step"] is False, r.text[:200])
+    _rr = [x for x in c.get("/api/admin/audit").json()["rows"] if (x.get("path") or "").endswith("/two-step-reset")]
+    ok("F3 b: ...recorded, naming Ada", _rr and "Ada Lovelace" in _rr[0]["actor_label"], json.dumps(_rr[:1])[:200])
+    c.cookies.clear(); c.cookies.update(_bob_jar)
+    ok("🔴 F3 b: ...and Bob's session ended at once", c.get("/api/auth/me").json()["signed_in"] is False)
     # rate limit: five failures lock the address
     c.cookies.clear()
     for _i in range(5):

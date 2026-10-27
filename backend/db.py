@@ -1114,6 +1114,19 @@ def init_users_db():
         """)
         cur.execute("CREATE INDEX IF NOT EXISTS ix_auth_attempts_key ON auth_attempts (kind, key_hash, at)")
         conn.commit()
+        # Pilot readiness (27 Oct 2026, F3 b): two-step sign-in. The authenticator key (base32), the key
+        # offered while it is being set up, the last 30-second step accepted (a code works once), when it
+        # was turned on, and the recovery codes as a JSON list of SHA-256 hashes. Plain ADD COLUMN.
+        for col in ("totp_secret", "totp_pending", "totp_on_at", "recovery_hashes", "totp_last_step"):
+            typ = "INTEGER" if col == "totp_last_step" else "TEXT"
+            try:
+                if IS_PG:
+                    cur.execute(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {typ}")
+                else:
+                    cur.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
+                conn.commit()
+            except Exception:
+                conn.rollback()  # column already present - fine
     finally:
         conn.close()
 

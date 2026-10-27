@@ -276,8 +276,22 @@ ok("⭐ G3: Users (9.6) is in the guide for admins only, in the nav too, and nam
    '<h2 id="9-6-users" data-role="admin">9.6 Users and activity (admins)</h2>' in src
    and '<li class="l2" data-navrole="admin"><a href="#9-6-users">' in src
    and all(f"<strong>{w}</strong>" in src for w in ("People.", "Demo leads", "Activity", "Send a personal login", "Add and send the link"))
-   and "The technical guide says how the first admin is added." in text and "open Users, type the admin token, add yourself" in open(TECH, encoding="utf-8").read())   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the steps are in T4
+   # NARROWED 27 Oct 2026 (F3 c): the first admin comes from FIRST_ADMIN_EMAIL now, no token typed on Users
+   and "The technical guide says how a new site's first admin is added." in text and "<code>FIRST_ADMIN_EMAIL</code>" in open(TECH, encoding="utf-8").read()
+   and "open Users, type the admin token, add yourself" not in open(TECH, encoding="utf-8").read())   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the steps are in T4
 _tech = open(TECH, encoding="utf-8").read()
+ok("⭐ F3 b: 2.1 explains two-step sign-in in a few words: the app, the QR code, ten recovery codes, the reset by an admin",
+   "<strong>Two-step sign-in.</strong>" in src and "Microsoft Authenticator, Google Authenticator or similar" in text
+   and "<strong>Use a recovery code instead</strong>" in src and "<strong>New recovery codes</strong>" in src
+   and "Ask an admin to reset your two-step sign-in." in text)
+ok("F3 b: 9.6 names the Two-step column and Reset two-step; Config names the organisation file (admins, the name typed)",
+   "<strong>Reset two-step</strong>" in src and "<strong>Organisation file</strong> (admins)" in src
+   and "you type your organisation's name first" in text and "Users opens for an admin login only." in text)
+ok("F3 b / c: the technical guide carries the detail: TOTP, the ticket, segno, the endpoints, FIRST_ADMIN_EMAIL, the recovery command, DEMO_LEADS",
+   all(x in _tech for x in ("<code>POST /api/auth/code</code>", "<code>POST /api/auth/setup</code>", "<code>segno</code>",
+                            "purpose <code>mfa</code>", "<code>python backend/recover_admin.py you@example.com</code>",
+                            "<code>DEMO_LEADS=1</code>", "<code>localStorage.modus_admin_token</code>"))
+   and "There is no two-factor sign-in." not in _tech)
 ok("TEAMS (23 Oct 2026): 9.6 names the Teams tab, up to six, and its three buttons; no slot id in the user guide",
    "<li><strong>Teams</strong> lists your organisation's teams (up to six)" in src
    and all(f"<strong>{w}</strong>" in src for w in ("Add the team", "Rename", "Stop using", "Use again"))
@@ -290,7 +304,8 @@ ok("🔴 G3: the guide no longer says per-person logins are planned, nor that an
    and "open to anyone who can reach them" not in text)
 ok("G3: section 10 signs each role in with a login, and says the admin code opens what the planner code opens until 31 Oct",
    "<td>a login for your team</td>" in src and "<td>a planner login</td>" in src and "<td>an admin login</td>" in src
-   and "only an admin <em>login</em> saves without the admin token" in src)
+   # NARROWED 27 Oct 2026 (F3 c / P5): only an admin login changes the network and Config; no token in the user guide
+   and "only an admin <em>login</em> changes Locations, Routes, Zones and Config" in src and "admin token" not in text.lower())
 _tg = open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()
 ok("⭐ G3: the technical guide explains the session, the links, the limits, the guard header, the audit trail and HU14",
    all(s in _tg for s in ("<code>wayscope_session</code>", "<code>user_sessions</code>", "<code>auth_tokens</code>",
@@ -396,8 +411,10 @@ ok("...the restriction popup gives no verdict against the vehicle: that is the r
    "is judged in the route check, not in this popup" in text and "EXCEEDS by" not in text)
 
 # Data pages and settings
-ok("Data pages: the token box at the top right, More ▾ on Configuration; Make primary; Create & route; Clear all routes",
-   "<strong>Admin token</strong> box" in src and "under <strong>More ▾</strong>" in src and "<strong>Make primary</strong>" in src
+# REVERSED 27 Oct 2026 (F3 c): no token box; a planner reads the Data pages, an admin changes them
+ok("Data pages: no token box, only an admin changes them; More ▾ on Configuration; Make primary; Create & route; Clear all routes",
+   "<strong>Admin token</strong> box" not in src and "Only an admin changes locations, routes and zones" in text
+   and "(under More ▾)" in src and "<strong>Make primary</strong>" in src
    and "<strong>Create &amp; route</strong>" in src and "<strong>Clear all routes</strong>" in src
    and "its forecast lines are not deleted with it" in text)
 ok("...a route with no rate is priced at the target rate and marked target; rate not set only when neither exists",
@@ -410,9 +427,10 @@ ok("⭐ money settings: the target rate, the fuel surcharge formula and its lock
    and "a floor for negotiation, never a quote" in text)
 
 # roles: the planner and admin codes open the same pages; the admin token is not a role
-ok("⭐ roles moved to section 10: the admin code opens what the planner code opens; the admin token is a separate key",
+# NARROWED 27 Oct 2026 (F3 c): the admin token is no longer a thing a user meets, so section 10 no longer explains it
+ok("⭐ roles moved to section 10: the admin code opens what the planner code opens; the admin token is not explained to users",
    '<h1 id="10-roles-who-can-do-what">10. Roles: who can do what</h1>' in src
-   and "exactly what the planner code opens" in text and "The admin token is not the admin code." in text
+   and "exactly what the planner code opens" in text and "The admin token is not the admin code." not in text
    and "plus the admin token for baking routes" not in text)
 
 # carbon factors and sources
@@ -543,9 +561,10 @@ ok("...an unbaked line is counted as unknown; a route with no geometry is left o
 ok("Data pages: a tip keeps its imported type; the Planning tick does not lead a country with its own vehicle set",
    "a tip or recycling site keeps the type it was imported with" in text
    and "the Planning tick does not change the lists" in text and "vehicle_sets" not in text and "vehicle_sets" in open(TECH, encoding="utf-8").read())   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the key is in T4
-ok("...the money settings split into three bullets; the token paragraph says a team code cannot open those pages",
+ok("...the money settings split into three bullets; a team login cannot open the Data pages",
    "<li><strong>Diesel index</strong> —" in src and "<li><strong>Fuel surcharge (BAF)</strong> —" in src
-   and "whichever of the planner or admin codes they signed in with (a team code cannot open those pages)" in text
+   # NARROWED 27 Oct 2026 (F3 c): the token paragraph went with the token; the roles table still says a team login cannot open the Data pages
+   and "open the Data pages</td>" in src and "whichever of the planner or admin codes they signed in with" not in text
    and "and withdraw the lines you saved" in text and "submit, edit and withdraw your team's forecast lines" not in text)
 
 # What the figures mean
@@ -956,7 +975,9 @@ ok("27 Oct: the user guide carries the screens' longer sentences — §4.1 the m
    "Movements are loads per working day (22 a month unless Config says otherwise)." in _ug27 and "One vehicle per line: a haul that uses two vehicle types is two lines." in _ug27
    and "Locations: click the map to place a site and drag its marker to move it; deleting a site deletes every route that uses it. Routes: moving an end clears the route until it is routed again." in _ug27
    and "the rectangle around what you draw" in _ug27 and "A temporary haul road works the other way" in _ug27 and "so fetch again after drawing one" in _ug27
-   and "To set up per-person sign-in: on Users, add yourself as an Admin" in _ug27
+   # NARROWED 27 Oct 2026 (pilot readiness F3 c): the first admin is invited by FIRST_ADMIN_EMAIL now; §10 says who adds the rest
+   and "Admins add everyone else on Users; each person then sets a password and two-step sign-in." in _ug27
+   and "To set up per-person sign-in: on Users, add yourself as an Admin" not in _ug27
    and "rules as read on 16 Oct 2026" in _ug27 and "Counted apart: an abnormal load is never in the lorry counts" in _ug27 and "<strong>Settings</strong> shows the copy in use" in _ug27)
 ok("27 Oct: the technical guide — T1 names the advice line and the rules' reading date, T2 lists the pass; no guide mentions an ESDAL details sheet as a thing that exists",
    '<code>abnormal_rules.ADVICE_WORDS</code> ("Advice from the typed figures. The haulier, ESDAL, the police and the road and bridge authorities decide.")' in _tg27

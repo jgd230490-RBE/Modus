@@ -311,5 +311,7 @@ def describe(acc=None):
     if acc.get("via") == "login":
         out.update({"name": acc.get("name"), "email": acc.get("email"), "kind": acc.get("kind"),
                     "expires_at": acc.get("expires_at"), "user_id": acc.get("user_id"),
-                    "session_expires_at": acc.get("session_expires_at")})
+                    "session_expires_at": acc.get("session_expires_at"),
+                    # 27 Oct 2026 (F3 b): the account menu's two-step block
+                    "two_step": bool(acc.get("two_step")), "recovery_left": acc.get("recovery_left") or 0})
     return out

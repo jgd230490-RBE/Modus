@@ -533,7 +533,7 @@ if node:
            not d["ok"] and d["calls"] == 4 and d["waits"] == [30, 60, 90] and d["err"] == "No answer after 4 tries.", str(d))   # NARROWED 22 Oct 2026 (error-words): was "503 — tried 4 times"
         ok("6. 🔴 a 403 is never retried: the admin sentence at once",   # NARROWED 22 Oct 2026 (error-words): was 'admin token rejected'
            not R["403"]["ok"] and R["403"]["calls"] == 1
-           and R["403"]["err"] == "Not allowed: sign in as an admin, or type the admin token." and R["403"]["waits"] == [])
+           and R["403"]["err"] == "Not allowed: sign in as an admin." and R["403"]["waits"] == [])   # NARROWED 27 Oct 2026 (F3 c): no admin token on screens
         ok("6. 🔴 a 500 (a real fault) is never retried", not R["500"]["ok"] and R["500"]["calls"] == 1   # NARROWED 22 Oct 2026 (error-words): was "500 body 500"
            and R["500"]["err"] == "Wayscope could not do this just now. Try again in a minute.")
 ok("6. the loop's stop message still says finished routes are kept and Route all can run again",

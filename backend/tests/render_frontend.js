@@ -157,7 +157,9 @@ if (loaded) {
     const out = render(`the ${page} page renders for a planner`,
       h(Portal, { role: planner, who: "tester", meta, metaErr: false, vehLang: "en" }));
     if (page === "map") ok("...the map page is an iframe", out.includes("<iframe"));
-    if (page === "config") ok("...the config page asks for the admin token", out.includes("Admin token"));
+    // REVERSED 27 Oct 2026 (F3 c / P5): no admin token box anywhere; a planner reads Config and cannot save it
+    if (page === "config") ok("...the config page asks for no admin token; a planner reads it, 'Only an admin can save the configuration.'",
+      !out.includes("Admin token") && out.includes("Only an admin can save the configuration.") && !out.includes(">Save</button>"));
     if (page === "carbon") ok("...the carbon page waits for its one read (no figures before the server answers)", out.includes("Loading the carbon planner"));
   }
 
@@ -1081,8 +1083,13 @@ if (loaded) {
         h(LookAhead, { meta: laMeta, who: "t", access: submitter, initialPage: fuelFix, initialView: "account" }));
       ok("...whose widget shows the yard and share as text, not inputs",
         fSub.includes('data-fuel-widget="strip"') && !fSub.includes("Yard €/L</span><input"));
+      // NARROWED 27 Oct 2026 (P5): the diesel admin row shows to an admin LOGIN; rendered as one here, and as a planner below
       const fCfg = render("the Costing tab renders (no data yet — useEffect never runs here)",
+        h(CostingTab, { who: "t", access: { ...planner, role: "admin", via: "login" }, token: "", setToken: () => {} }));
+      const fCfgP = render("the Costing tab renders for a planner",
         h(CostingTab, { who: "t", access: planner, token: "", setToken: () => {} }));
+      ok("P5: a planner sees the target-rate copy and the diesel widget, but not its admin row (Use this index, Reset the BAF base)",
+        fCfgP.includes("Target rate") && fCfgP.includes('data-fuel-widget="config"') && !fCfgP.includes("Reset the BAF base") && !fCfgP.includes("Use this index"));
       ok("...with the target-rate copy and the config widget's admin controls",
         fCfg.includes("Target rate") && fCfg.includes('data-fuel-widget="config"') && fCfg.includes("Reset the BAF base")
         // NARROWED (H1, 29 Sep): with no data and no tenant country there is no automatic

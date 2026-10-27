@@ -387,6 +387,15 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .auth-links{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 12px;margin-top:10px;font-size:13px;}
   .auth-links button{background:none;border:0;padding:0;font:inherit;color:var(--muted);text-decoration:underline;cursor:pointer;white-space:nowrap;}
   .auth-links button:hover{color:var(--ink);}
+  /* 27 Oct 2026 (F3 b): two-step sign-in */
+  .auth-who{font-size:13px;color:var(--muted);background:var(--surface-2, #F8FAFC);border-radius:6px;padding:6px 10px;margin:0 0 6px;overflow-wrap:anywhere;}
+  .auth-steps{margin:0 0 6px;padding-left:20px;font-size:14px;color:var(--ink);list-style:decimal;}
+  .auth-qr{display:inline-block;background:#fff;padding:4px;border:1px solid var(--line);border-radius:6px;margin:4px 0;line-height:0;}
+  .auth-qr svg{width:164px;height:164px;display:block;}
+  .auth-key{font-family:ui-monospace,Consolas,monospace;font-weight:600;letter-spacing:.06em;color:var(--ink);overflow-wrap:anywhere;}
+  .auth-otp{font-family:ui-monospace,Consolas,monospace;font-size:22px;letter-spacing:.3em;text-align:center;}
+  .recovery-codes{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin:10px 0 12px;padding:10px 14px;
+    background:var(--surface-2, #F8FAFC);border-radius:6px;font-family:ui-monospace,Consolas,monospace;font-weight:600;font-size:14px;color:var(--ink);}
   /* 18 Oct 2026 (UI audit #10, the 44 px rule): on a touch screen the two text links under Sign in are 44 px rows (they were
      20 px, with Sign in 10 px above); a mouse keeps the tight row */
   @media (pointer:coarse){.auth-links button{padding:12px 0;}}
@@ -1026,9 +1035,11 @@ const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 // cannot read; it travels with every same-origin call by itself. The code above keeps working only while the
 // server still has codes set (the shared codes end on 31 Oct 2026, D49).
 const ACCESS = { code: "", info: null };
-// 22 Oct 2026 (words sweep, question 1): an admin LOGIN saves master data without the admin token (main._check_admin, G3 D53),
-// so the token box shows only to everyone else (a shared code, a planner login). `a` is the access object (role / ACCESS.info).
-const tokenNeeded = (a) => !(a && a.via === "login" && a.role === "admin");
+// 27 Oct 2026 (pilot readiness F3 c): the admin token is gone from every screen. An admin LOGIN does every admin job
+// (main._check_admin, G3 D53); a planner reads the network and Config but does not change them (decision P5). A token
+// an earlier version kept in this browser is removed, so no request carries one any more.
+const isAdminLogin = (a) => !!(a && a.via === "login" && a.role === "admin");
+try { localStorage.removeItem("modus_admin_token"); } catch(e){}
 try { ACCESS.code = sessionStorage.getItem("modus_access_code") || ""; } catch(e){}
 // one place adds the headers, so no fetch() call site can forget them. X-Wayscope says the call comes from this app:
 // the server refuses a write signed in by the cookie without it (another site cannot add a header).
@@ -1080,7 +1091,7 @@ function postJSON(path, body){
 // sentence from errWords, never a status number, JSON or an HTML page. The raw reply goes to the browser console
 // (F12, a line starting "Wayscope:") for whoever has to debug it. Every failure path in this file goes through these.
 const ERR_WORDS = {
-  admin: "Not allowed: sign in as an admin, or type the admin token.",
+  admin: "Not allowed: sign in as an admin.",
   signedOut: "You are signed out. Sign in again.",
   invalid: "A value was not accepted. Check the form and try again.",
   notFound: "Not found. Reload the page and try again.",
@@ -4205,12 +4216,57 @@ function AccountMenu({ role, onSignOut }){
               <button type="button" className="btn-pri" style={{ marginTop: 8, width: "100%" }} disabled={busy || !cur || !nw} onClick={change}>
                 {busy ? "Saving…" : "Change password"}
               </button>
+              <TwoStepMenu role={role} />
             </>
           )}
           <button type="button" className="btn-sec acct-signout" style={{ marginTop: 10, width: "100%" }} onClick={() => { setOpen(false); onSignOut && onSignOut(); }}>Sign out</button>
         </div>
       )}
     </span>
+  );
+}
+// 27 Oct 2026 (F3 b): the account menu's two-step block. On for every staff login (no "turn off"); new recovery codes
+// need a code from the app, and the old ones stop working.
+function TwoStepMenu({ role }){
+  const [asking, setAsking] = useState(false);
+  const [code, setCode] = useState(""); const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const [codes, setCodes] = useState(null);
+  const total = 10;
+  const left = codes ? codes.length : (role.recovery_left || 0);
+  const renew = () => {
+    if(!code.trim()){ setErr("Type the 6-digit code from the app."); return; }
+    setBusy(true); setErr("");
+    postJSON("/auth/recovery-codes", { code: code.trim() })
+      .then(j => { setCodes(j.recovery_codes || []); setAsking(false); setCode(""); })
+      .catch(e => setErr((e.status === 400 || e.status === 429) && e.detail ? e.detail : errSay("No new codes.", e)))
+      .finally(() => setBusy(false));
+  };
+  const download = () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["Wayscope recovery codes for " + role.email + "\nEach works once.\n\n" + codes.join("\n") + "\n"], { type: "text/plain" }));
+    a.download = "wayscope-recovery-codes.txt"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  if(!role.two_step) return null;
+  return (
+    <div className="acct-two" style={{ borderTop: "1px solid var(--popover-line)", marginTop: 12, paddingTop: 10 }}>
+      <h6 style={{ padding: 0 }}>Two-step sign-in <span style={{ color: "#34D399" }}>· on</span></h6>
+      <div style={{ color: "var(--popover-muted)" }}>{total - left} of {total} recovery codes used.</div>
+      {codes && (
+        <>
+          <ul className="recovery-codes" style={{ background: "transparent", color: "var(--popover-fg)", padding: 0 }} aria-label="New recovery codes">{codes.map(c => <li key={c}>{c}</li>)}</ul>
+          <button type="button" className="btn-sec" style={{ width: "100%" }} onClick={download}>Download the new codes</button>
+        </>
+      )}
+      {asking && !codes && (
+        <>
+          <input inputMode="numeric" autoComplete="one-time-code" placeholder="Code from the app" aria-label="Code from the app" value={code}
+            onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === "Enter" && renew()} style={{ marginTop: 6 }} />
+          {err && <div style={{ marginTop: 6, color: "#FCA5A5" }} role="status">{err}</div>}
+        </>
+      )}
+      {!codes && <button type="button" className="btn-sec" style={{ marginTop: 8, width: "100%" }} disabled={busy}
+        onClick={() => asking ? renew() : setAsking(true)}>{busy ? "Checking…" : (asking ? "Show new codes" : "New recovery codes")}</button>}
+    </div>
   );
 }
 // "Wed 28 Oct 2026, 09:00" from the server's ISO time, in the browser's own time zone
@@ -4810,12 +4866,13 @@ function Login({ onSignIn, onBack, savedName, notice }){
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [show, setShow] = useState(false);   // 11 Oct 2026: the show / hide eye on the access code
+  const [step, setStep] = useState(null);    // 27 Oct 2026 (F3 b): the second step the password answered
   const go = (m) => { setMode(m); setErr(""); if(m !== "email") setMsg(""); };
   const signInEmail = () => {
     if(!email.trim() || !pass){ setErr("Enter your email and password."); return; }
     setBusy(true); setErr(""); setMsg("");
     postJSON("/auth/signin", { email: email.trim(), password: pass, remember })
-      .then(info => onSignIn(info))
+      .then(info => info && info.step ? setStep(info) : onSignIn(info))
       .catch(e => setErr((e.status === 401 || e.status === 429) && e.detail ? e.detail : errSay("Couldn't sign in.", e)))
       .finally(() => setBusy(false));
   };
@@ -4827,6 +4884,7 @@ function Login({ onSignIn, onBack, savedName, notice }){
       .catch(e => setErr(e.status === 429 && e.detail ? e.detail : "Couldn't send the link. Try again in a minute."))
       .finally(() => setBusy(false));
   };
+  if(step) return <TwoStep ans={step} remember={remember} onSignIn={onSignIn} onBack={() => { setStep(null); setPass(""); }} />;
   if(mode === "email" || mode === "forgot"){
     const forgot = mode === "forgot";
     return (
@@ -4947,6 +5005,7 @@ function SetPassword({ link, onSignIn, onBack }){
   const [pw, setPw] = useState(""); const [pw2, setPw2] = useState("");
   const [remember, setRemember] = useState(false);
   const [err, setErr] = useState(""); const [busy, setBusy] = useState(false); const [show, setShow] = useState(false);
+  const [step, setStep] = useState(null);
   useEffect(() => {
     postJSON("/auth/check", { token: link.token }).then(setInfo)
       .catch(e => setBad(e.detail || "This link has expired or has already been used. Ask for a new one."));
@@ -4956,10 +5015,11 @@ function SetPassword({ link, onSignIn, onBack }){
     if(pw !== pw2){ setErr("The two passwords are not the same."); return; }
     setBusy(true); setErr("");
     postJSON("/auth/reset", { token: link.token, password: pw, remember })
-      .then(info => onSignIn(info))
+      .then(info => info && info.step ? setStep(info) : onSignIn(info))
       .catch(e => { if(e.status === 410) setBad(e.detail); else setErr(errSay("Couldn't save the password.", e)); })
       .finally(() => setBusy(false));
   };
+  if(step) return <TwoStep ans={step} remember={remember} onSignIn={onSignIn} onBack={onBack} />;
   if(bad) return <AuthNote title="This link no longer works" body={bad + " On the sign-in screen, \u201cForgot your password?\u201d sends a new one."}
     action="Go to sign in" onAction={onBack} />;
   if(!info) return <div className="flex-1 flex items-center justify-center text-sm text-slate-500" role="status">Checking your link…</div>;
@@ -4992,6 +5052,86 @@ function SetPassword({ link, onSignIn, onBack }){
     </div>
   );
 }
+// ================================================================= Two-step sign-in (27 Oct 2026, pilot readiness F3 b)
+// After a right password (or a password set from a link) a staff login is not signed in yet: the server answered a
+// 10-minute ticket. "code": the 6 digits from the authenticator app, or a recovery code. "setup": scan the key, type
+// one code, then the ten recovery codes, shown once. Demo logins never come here.
+function TwoStep({ ans, remember, onSignIn, onBack }){
+  const setup = ans.step === "setup";
+  const [code, setCode] = useState("");
+  const [useRecovery, setUseRecovery] = useState(false);
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(null);      // the set-up answer, while its recovery codes are on screen
+  const [saved, setSaved] = useState(false); const [copied, setCopied] = useState(false);
+  const submit = () => {
+    const c = code.trim();
+    if(!c){ setErr(useRecovery ? "Type one of your recovery codes." : "Type the 6-digit code from the app."); return; }
+    setBusy(true); setErr("");
+    postJSON(setup ? "/auth/setup" : "/auth/code", { ticket: ans.ticket, code: c, remember })
+      .then(info => { if(setup) setDone(info); else onSignIn(info); })
+      .catch(e => {
+        if(e.status === 410){ setErr("That took too long. Sign in again."); return; }
+        setErr((e.status === 401 || e.status === 429 || e.status === 409) && e.detail ? e.detail : errSay("Couldn't sign in.", e));
+        setCode("");
+      })
+      .finally(() => setBusy(false));
+  };
+  if(done){
+    const codes = done.recovery_codes || [];
+    const text = "Wayscope recovery codes for " + ans.email + "\nEach works once.\n\n" + codes.join("\n") + "\n";
+    const download = () => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+      a.download = "wayscope-recovery-codes.txt"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+    const copy = () => { try { navigator.clipboard.writeText(text).then(() => setCopied(true)); } catch(e){} };
+    return (
+      <div className="flex-1 grid place-items-center px-5">
+        <div className="auth-card">
+          <h1>Save your recovery codes</h1>
+          <p className="auth-sub">If you lose your phone, each code signs you in once. They are shown only now.</p>
+          <ul className="recovery-codes" aria-label="Recovery codes">{codes.map(c => <li key={c}>{c}</li>)}</ul>
+          <div className="flex gap-2">
+            <button type="button" className="btn-sec" onClick={download}>Download</button>
+            <button type="button" className="btn-sec" onClick={copy}>{copied ? "Copied" : "Copy"}</button>
+          </div>
+          <label className="auth-check" style={{ marginTop: 14 }}><input type="checkbox" checked={saved} onChange={e => setSaved(e.target.checked)} />I have saved them somewhere safe</label>
+          <button onClick={() => onSignIn(done)} disabled={!saved} className="btn-pri auth-go">Continue</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex-1 grid place-items-center px-5">
+      <div className="auth-card">
+        <h1>{setup ? "Set up two-step sign-in" : "Staff sign in"}</h1>
+        {!setup && <div className="auth-who">{ans.email}</div>}
+        {setup ? (
+          <>
+            <p className="auth-sub">Each time you sign in, Wayscope also asks for a code from an app on your phone.</p>
+            <ol className="auth-steps"><li>Open an authenticator app (Microsoft Authenticator, Google Authenticator or similar).</li><li>Scan this code.</li></ol>
+            <div className="auth-qr" dangerouslySetInnerHTML={{ __html: ans.qr || "" }} />
+            <p className="auth-note" style={{ marginTop: 6, marginBottom: 12 }}>Can't scan? Type this key: <span className="auth-key">{ans.key}</span></p>
+          </>
+        ) : (
+          <p className="auth-sub">{useRecovery ? "Type one of your recovery codes." : "Type the 6-digit code from your authenticator app."}</p>
+        )}
+        <div className="field">
+          <label htmlFor="auth-otp">{setup ? "Code from the app" : (useRecovery ? "Recovery code" : "Code")}</label>
+          <input id="auth-otp" className={"auth-input" + (useRecovery ? "" : " auth-otp")} value={code} autoFocus
+            inputMode={useRecovery ? "text" : "numeric"} autoComplete="one-time-code" maxLength={useRecovery ? 12 : 7}
+            onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
+        </div>
+        {err && <p className="text-sm mb-2" style={{color:"var(--red)"}} role="alert">{err}</p>}
+        <button onClick={submit} disabled={busy} className="btn-pri auth-go">{busy ? "Checking…" : (setup ? "Turn on" : "Sign in")}</button>
+        <div className="auth-links">
+          {!setup && <button type="button" onClick={() => { setUseRecovery(r => !r); setCode(""); setErr(""); }}>{useRecovery ? "Use the app's code instead" : "Use a recovery code instead"}</button>}
+          <button type="button" onClick={onBack}>Back</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 // The show / hide eye of a password field: the same two drawings as the access code's eye (11 Oct 2026)
 function PwEye({ show }){
   return show
@@ -5015,15 +5155,18 @@ function AuthNote({ title, body, action, onAction }){
 // Admins only (D57). Three parts: People (every login: add, change team or role, disable, send a link, extend a demo
 // login), Leads (the demo requests with each lead's own login and what they opened, HU14; "Send a personal login"
 // for a lead who asked before 14 Oct, D56) and Activity (every change, sign-in and demo page open, D55). An admin
-// LOGIN needs nothing more (D53); signed in with the shared admin code, the admin token typed here opens it — that
-// is how the first admin is added (D47). A team is always shown by its NAME.
+// LOGIN needs nothing more (D53). Since 27 Oct 2026 (F3 c) only an admin login sees this page; a new deployment's first
+// admin comes from FIRST_ADMIN_EMAIL, a lock-out from the recovery command. A team is always shown by its NAME.
 const USER_STATUS = { active: ["Approved", "Active"], invited: ["Pending", "Invited"], disabled: ["Rejected", "Disabled"],
                       expired: ["none", "Ended"] };
 function roleChoice(u){ return u.role === "team" ? "team:" + u.team : u.role; }
 function describeActivity(r){
   const words = { signin: "Signed in", "signin-code": "Signed in with a shared code", "signin-refused": "Sign-in refused", "signin-locked": "Sign-in locked (too many tries)",
                   signout: "Signed out", "reset-asked": "Asked for a password link", "password-set": "Set a password",
-                  "password-changed": "Changed their password", "demo-link": "Opened their demo link" };
+                  "password-changed": "Changed their password", "demo-link": "Opened their demo link",
+                  "two-step-on": "Turned on two-step sign-in", "recovery-codes-new": "Made new recovery codes",
+                  "signin-code-refused": "Wrong sign-in code", "first-admin": "Made the first admin",
+                  "recovery-command": "Recovery command run" };
   if(words[r.kind]) return words[r.kind];
   if(r.kind === "page") return "Opened " + (r.target || "a page");
   const p = (r.path || "").replace(/^\/api\//, "");
@@ -5034,17 +5177,15 @@ function describeActivity(r){
     [/^forecast-days$/, "Edited a day"], [/^stockpiles\/consume$/, "Recorded stockpile use"], [/^carbon\/target$/, "Changed the carbon target"],
     [/^admin\/config\/factors\/reset$/, "Reset the configuration to the defaults"], [/^admin\/config\/factors$/, "Saved the configuration"],
     [/^admin\/teams\/[^/]+$/, "Changed a " + TEAM().toLowerCase()], [/^admin\/teams$/, "Added a " + TEAM().toLowerCase()],
-    [/^admin\/users\/[^/]+\/reset$/, "Sent a login its link"], [/^admin\/users\/[^/]+$/, "Changed a login"], [/^admin\/users$/, "Added a login"],
+    [/^admin\/users\/[^/]+\/reset$/, "Sent a login its link"], [/^admin\/users\/[^/]+\/two-step-reset$/, "Reset a login's two-step sign-in"], [/^admin\/users\/[^/]+$/, "Changed a login"], [/^admin\/users$/, "Added a login"],
     [/^admin\/leads\/[^/]+\/login$/, "Gave a lead a personal login"], [/^admin\/tenant\/import$/, "Imported the organisation's data"]];
   for(const [rx, w] of known){ if(rx.test(p)) return w; }
   const verb = { POST: "Added", PUT: "Changed", PATCH: "Changed", DELETE: "Removed" }[r.method] || "Changed";
   return verb + " · " + p.replace(/^admin\//, "");
 }
 function UsersPage({ access }){
-  const viaLogin = !!(access && access.via === "login");
-  const [token, setToken] = useState(() => { try { return localStorage.getItem("modus_admin_token") || ""; } catch(e){ return ""; } });
-  const saveToken = (v) => { setToken(v); try { localStorage.setItem("modus_admin_token", v); } catch(e){} };
-  const qs = (extra) => { const q = new URLSearchParams(extra || {}); if(!viaLogin && token) q.set("token", token); const t = q.toString(); return t ? "?" + t : ""; };
+  // 27 Oct 2026 (F3 c): admin logins only; no admin token box (an admin login already passes every Users call)
+  const qs = (extra) => { const t = new URLSearchParams(extra || {}).toString(); return t ? "?" + t : ""; };
   const [tab, setTab] = useState("people");
   const [data, setData] = useState(null);
   const [leads, setLeads] = useState(null);
@@ -5067,9 +5208,9 @@ function UsersPage({ access }){
   const load = () => call(`/admin/users${qs()}`).then(j => { setData(j); setErr(""); }).catch(e => { setData(null); setErr(e.message); });
   const loadLeads = () => call(`/admin/leads${qs()}`).then(j => setLeads(j.leads || [])).catch(e => setErr(e.message));
   const loadRows = () => call(`/admin/audit${qs(who ? { user: who } : {})}`).then(j => setRows(j.rows || [])).catch(e => setErr(e.message));
-  useEffect(() => { load(); }, [token]);
+  useEffect(() => { load(); }, []);
   const loadTeams = () => call(`/admin/teams${qs()}`).then(j => setTeamRows(j)).catch(e => setErr(e.message));
-  useEffect(() => { if(tab === "leads") loadLeads(); if(tab === "activity") loadRows(); if(tab === "teams") loadTeams(); }, [tab, who, token]);
+  useEffect(() => { if(tab === "leads") loadLeads(); if(tab === "activity") loadRows(); if(tab === "teams") loadTeams(); }, [tab, who]);
   const teams = (data && data.teams) || [];
   const teamLabel = (id) => (teams.find(t => t.id === id) || {}).label || teamName(id);
   const choices = [...teams.map(t => ["team:" + t.id, t.label]), ["planner", "Planner"], ["admin", "Admin"]];
@@ -5089,6 +5230,11 @@ function UsersPage({ access }){
   });
   const change = (u, body, done) => act(async () => { await call(`/admin/users/${u.id}${qs()}`, "PATCH", body); setNote({ ok: true, text: done }); await load(); });
   const sendLink = (u) => act(async () => { const j = await call(`/admin/users/${u.id}/reset${qs()}`, "POST"); setNote(sent(j, u.name)); });
+  // 27 Oct 2026 (F3 b): a lost phone. The person sets two-step sign-in up again at their next sign-in.
+  const resetTwoStep = (u) => {
+    if(!window.confirm(`Reset two-step sign-in for ${u.name}? They set it up again next time they sign in.`)) return;
+    act(async () => { await call(`/admin/users/${u.id}/two-step-reset${qs()}`, "POST"); setNote({ ok: true, text: `${u.name} sets up two-step sign-in again at their next sign-in.` }); await load(); });
+  };
   // a team write answers with the new list; the names go straight into the app's own team words, so every page
   // of this tab names the team as typed without a reload
   const teamDone = (j, text) => { setTeamRows(j); (j.teams || []).forEach(t => { TEAM_LABELS[iptKey(t.id)] = t.label; }); setNote({ ok: true, text }); };
@@ -5115,12 +5261,6 @@ function UsersPage({ access }){
     <div className="max-w-7xl mx-auto p-6 pb-2">
       <PageHeader title="Users" kicker="Data"
         subtitle={`Who can sign in, and as which ${TEAM().toLowerCase()} or role.`} />
-      {!viaLogin && (
-        <div className="card p-4 mb-4 text-sm">
-          <label className="flex flex-wrap items-center gap-2"><span>Admin token</span>
-            <input className="ctl ctl-sm" style={{ minWidth: 260 }} value={token} onChange={e => saveToken(e.target.value)} placeholder="Admin token" aria-label="Admin token" /></label>
-        </div>
-      )}
       {data && data.codes && (
         <div className="card p-4 mb-4 text-sm" role="note" style={{ borderColor: "var(--gold)" }}>
           <b>The shared codes still work on this site.</b> Anyone with a {TEAM().toLowerCase()}, planner or admin code can sign in without a login of their own.
@@ -5158,7 +5298,7 @@ function UsersPage({ access }){
               <div className="card overflow-auto">
                 <table className="tbl">
                   <caption><b>Logins</b> · {staff.length}</caption>
-                  <thead><tr>{["Name", `${TEAM()} or role`, "Status", "Last signed in", ""].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
+                  <thead><tr>{["Name", `${TEAM()} or role`, "Status", "Two-step", ""].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
                   <tbody>
                     {staff.map(u => (
                       <tr key={u.id}>
@@ -5169,13 +5309,15 @@ function UsersPage({ access }){
                             {choices.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                           </select>
                         </td>
-                        <td>{statusOf(u)}</td>
-                        <td className="text-sm text-slate-600">{u.last_sign_in_at ? fmtWhen(u.last_sign_in_at) : "Never"}</td>
+                        <td>{statusOf(u)}<div className="text-[13px] text-slate-500 whitespace-nowrap">{u.last_sign_in_at ? "Last in " + fmtWhen(u.last_sign_in_at) : "Never signed in"}</div></td>
+                        <td>{u.two_step ? <StatusWord status="Approved" label="On" /> : <StatusWord status="Pending" label="Not set up" />}</td>
                         <td className="text-right whitespace-nowrap">
                           {/* 27 Oct 2026 (the final UI pass, card 1) */}
                           <RowMenu name={u.name}>
                             {!u.disabled && <button type="button" disabled={busy} onClick={() => sendLink(u)}
                               title={u.has_password ? "Email a link to choose a new password (60 minutes)" : "Email the set-your-password link again (72 hours)"}>{u.has_password ? "Send reset link" : "Send invite again"}</button>}
+                            {u.two_step && u.id !== data.me && !u.disabled && <button type="button" disabled={busy} onClick={() => resetTwoStep(u)}
+                              aria-label={`Reset two-step sign-in for ${u.name}`}>Reset two-step</button>}
                             {u.id !== data.me && <button type="button" disabled={busy} style={u.disabled ? undefined : { color: "var(--red)" }}
                               onClick={() => change(u, { disabled: !u.disabled }, u.disabled ? `${u.name} can sign in again.` : `${u.name} is signed out everywhere and cannot sign in.`)}>
                               {u.disabled ? "Enable" : "Disable"}</button>}
@@ -5625,10 +5767,9 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
     const onKey = (e) => { if((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")){ e.preventDefault(); if(window.matchMedia && window.matchMedia(NARROW_Q).matches){ setMoreOpen(true); return; } setRailOpen(true); setTimeout(() => navRef.current && navRef.current.focus(), 0); } };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   }, []);
-  // G3: an item marked adminOnly (Users) shows to an admin — an admin login, or the shared admin code while codes last —
-  // and, so the first admin can be added on a site with no admin code set, to a planner signed in with a shared CODE.
-  // The page itself still needs an admin login or the admin token (the server checks), so this opens nothing new.
-  const isAdmin = !!(role && (role.role === "admin" || (role.can_approve && role.via !== "login")));
+  // G3: an item marked adminOnly (Users) shows to an admin. 27 Oct 2026 (F3 c): to an admin LOGIN only — the admin
+  // token is gone from the screens, and a shared code (even the admin code) never passed the server's admin check.
+  const isAdmin = isAdminLogin(role);
   const visible = NAV.filter(g => !g.admin || canApprove)
     .map(g => ({ ...g, items: g.items.filter(i => !i.adminOnly || isAdmin) })).filter(g => g.items.length);
   const navMatch = (it) => !navQ || it.label.toLowerCase().includes(navQ.toLowerCase());
@@ -6839,7 +6980,6 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
       const n = numOr(draft[k], null); if(n === null){ bad = k; } else body[k] = (k === "rate_eur_per_km" ? +(+distInRate(n)).toFixed(6) : n);
     });
     if(bad){ setMsg({ ok: false, text: "A target rate must be a number." }); return; }
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     setBusy(true); setMsg(null);
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     try {
@@ -6989,7 +7129,7 @@ function ConfigPage({ meta, who, access }){
   const [tab, setTab] = useState("vehicles");
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [token, setToken] = useState(() => { try { return localStorage.getItem("modus_admin_token") || ""; } catch(e){ return ""; } });
+  const [token, setToken] = useState("");
   const [raw, setRaw] = useState("");
   const [rawErr, setRawErr] = useState("");
   const [fileDoc, setFileDoc] = useState(null);
@@ -7010,7 +7150,6 @@ function ConfigPage({ meta, who, access }){
     if(tab === "raw"){
       try { body = JSON.parse(raw); } catch(e){ setRawErr("Not valid JSON: " + e.message); return; }
     }
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     setBusy(true); setMsg(null);
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     try {
@@ -7024,7 +7163,6 @@ function ConfigPage({ meta, who, access }){
   };
   const reset = async () => {
     if(!confirm("Put every setting back to the starting values? Every change made here is lost.")) return;
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     setBusy(true); setMsg(null);
     const qs = new URLSearchParams({ updated_by: who || "" }); if(token) qs.set("token", token);
     try {
@@ -7041,7 +7179,11 @@ function ConfigPage({ meta, who, access }){
   // admin token, "Reset to file") behind More with their confirm step. The Vehicles and
   // Materials sections keep a table because a grid is the right form for them.
   const inp = "ctl ctl-sm w-full tabular-nums";
-  const TABS = [["vehicles", "Vehicles"], ["materials", "Materials"], ["planning", "Planning"], ["costing", "Costing · fuel"], ["seasonal", "Seasonal restrictions"], ["mapbulletin", "Map and bulletin"], ["raw", "Everything (JSON)"]];
+  // 27 Oct 2026 (F3 c / P5): only an admin LOGIN saves; a planner reads every section. The organisation file (download
+  // everything, or replace it from a file) replaces the admin token's export / import scripts, admins only.
+  const canSave = isAdminLogin(access);
+  const TABS = [["vehicles", "Vehicles"], ["materials", "Materials"], ["planning", "Planning"], ["costing", "Costing · fuel"], ["seasonal", "Seasonal restrictions"], ["mapbulletin", "Map and bulletin"], ["raw", "Everything (JSON)"]]
+    .concat(canSave ? [["orgfile", "Organisation file"]] : []);
   // 13 Oct 2026 (W12): the scheme's council colour bands, three rising whole numbers per measure, in the tenant block.
   // A measure left blank reads COUNCIL_BREAKS_DEFAULT (backend config.COUNCIL_BREAKS_DEFAULT, held equal by parse_frontend).
   const setBreak = (d, m, i, v) => {
@@ -7059,12 +7201,10 @@ function ConfigPage({ meta, who, access }){
     <div className="max-w-7xl mx-auto p-6 pb-2">
       <PageHeader title="Configuration" kicker="Data"
         subtitle="The numbers every figure is computed from. Changes apply on save, for everyone."
-        actions={
+        actions={canSave &&
           <details className="row-menu" data-cfg-more="1">
-            <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }} title={tokenNeeded(access) ? "Admin token and reset" : "Reset to defaults"}>More ▾</summary>
+            <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }} title="Reset to defaults">More ▾</summary>
             <div className="row-menu-list" style={{ minWidth: 300 }}>
-              {tokenNeeded(access) && <label className="row-menu-field"><span>Admin token</span>
-                <input value={token} onChange={e => setToken(e.target.value)} placeholder="Admin token" aria-label="Admin token" /></label>}
               <button onClick={reset} disabled={busy} style={{ color: "var(--red)" }} title="Put back the starting values">Reset to defaults…</button>
               <div className="row-menu-note">Puts every value back to the starting values, your organisation's settings too. It asks first.</div>
             </div>
@@ -7315,10 +7455,12 @@ function ConfigPage({ meta, who, access }){
               {rawErr && <div className="text-sm mt-1" style={{ color: "var(--red)" }}>{rawErr}</div>}
             </div>
           )}
+          {tab === "orgfile" && canSave && <OrgFile />}
           </div>
         </div>
       )}
 
+      {tab !== "orgfile" && (canSave ? (
       <div className="savebar" data-cfg-savebar="1">
         <span className="text-slate-500">{!doc ? "" : dirty ? "Unsaved changes on this page" : tab === "raw" ? "Saving from the JSON section sends the text as typed" : "No unsaved changes"}</span>
         <span className="flex items-center gap-2">
@@ -7326,6 +7468,67 @@ function ConfigPage({ meta, who, access }){
           <button onClick={save} disabled={busy || !doc || (!dirty && tab !== "raw")} className="btn-pri">{busy ? "Saving…" : "Save"}</button>
         </span>
       </div>
+      ) : (
+      <div className="savebar" data-cfg-savebar="1">
+        <span className="text-slate-500" role="note">Only an admin can save the configuration.</span>
+      </div>
+      ))}
+    </div>
+  );
+}
+
+// ================================================================= Organisation file (27 Oct 2026, pilot readiness F3 c)
+// Everything for this organisation in one file, and replacing it from a file: what the admin token's export / import
+// scripts did, on an admin login. Logins, Activity and demo leads are never in the file and never replaced. Replacing
+// needs the organisation's name typed, because it cannot be undone.
+function OrgFile(){
+  const orgName = String((TENANT && TENANT.name) || "").trim();
+  const [file, setFile] = useState(null);     // {name, pkg, counts}
+  const [typed, setTyped] = useState("");
+  const [msg, setMsg] = useState(null); const [busy, setBusy] = useState(false);
+  const pick = (f) => {
+    setMsg(null); setTyped(""); setFile(null);
+    if(!f) return;
+    f.text().then(t => {
+      let pkg; try { pkg = JSON.parse(t); } catch(e){ setMsg({ ok: false, text: "That file is not an organisation file." }); return; }
+      const tb = (pkg && pkg.tables) || null;
+      if(!tb || typeof tb !== "object"){ setMsg({ ok: false, text: "That file is not an organisation file." }); return; }
+      const n = (k) => (tb[k] || []).length;
+      setFile({ name: f.name, pkg, counts: { locations: n("locations"), routes: n("routes"), lines: n("forecasts"), drawn: n("route_geometry") } });
+    }).catch(() => setMsg({ ok: false, text: "Couldn't read that file." }));
+  };
+  const replace = () => {
+    setBusy(true); setMsg(null);
+    postJSON("/admin/tenant/import?replace=1", file.pkg)
+      .then(() => {
+        setMsg({ ok: true, text: "Replaced." + (file.counts.routes && !file.counts.drawn ? " Draw the routes again on Routes." : "") });
+        setFile(null); setTyped("");
+      })
+      .catch(e => setMsg({ ok: false, text: errSay("Not replaced.", e) }))
+      .finally(() => setBusy(false));
+  };
+  // the name as typed: case, the kind of dash and extra spaces do not matter (a long dash is hard to type)
+  const normName = (t) => String(t || "").toLowerCase().replace(/[‐-―−]/g, "-").replace(/\s+/g, " ").trim();
+  const nameOk = !!orgName && normName(typed) === normName(orgName);
+  return (
+    <div className="px-6 pb-6" data-orgfile="1">
+      <p className="text-sm text-slate-500 mb-3">Everything for this organisation in one file: sites, routes, forecasts, the look-ahead and the configuration. Logins are not in it.</p>
+      <a className="btn-sec" href={`${API}/admin/tenant/export`} download>Download</a>
+      <h4 className="text-[15px] font-semibold text-slate-800 mt-6 mb-1">Replace from a file</h4>
+      <p className="text-sm text-slate-500 mb-2">Replaces everything above. Download a copy first.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="btn-sec" style={{ cursor: "pointer" }}>Choose file
+          <input type="file" accept=".json,application/json" className="sr-only" aria-label="Choose an organisation file" onChange={e => pick(e.target.files && e.target.files[0])} /></label>
+        {file && <span className="text-sm text-slate-600">{file.name} · {file.counts.locations} locations · {file.counts.routes} routes · {file.counts.lines} lines</span>}
+      </div>
+      {file && (
+        <div className="mt-3" style={{ maxWidth: 460 }}>
+          <label className="block text-sm text-slate-700 mb-1" htmlFor="orgfile-confirm">Type <b>{orgName}</b> to replace</label>
+          <input id="orgfile-confirm" className="ctl" style={{ width: "100%" }} value={typed} onChange={e => setTyped(e.target.value)} autoComplete="off" />
+          <button type="button" className="btn-pri mt-3" style={{ background: "var(--red)" }} disabled={busy || !nameOk} onClick={replace}>{busy ? "Replacing…" : "Replace"}</button>
+        </div>
+      )}
+      {msg && <div className="rounded-lg border p-3 text-sm mt-3" role="status" style={{ borderColor: msg.ok ? "var(--green)" : "var(--red)", color: msg.ok ? "var(--ok-text)" : "var(--red)" }}>{msg.text}</div>}
     </div>
   );
 }
@@ -8292,7 +8495,7 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
   const [draft, setDraft] = useState({});
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const [token, setToken] = useState(() => { try { return localStorage.getItem("modus_admin_token") || ""; } catch(e){ return ""; } });
+  const [token, setToken] = useState("");
   const canType = !!(access && access.can_approve);
   const load = (lazy) => fetch(`${API}/fuel-index?lazy=${lazy ? 1 : 0}`).then(okJSON)
     .then(j => { setFetched(j); return j; })
@@ -8316,7 +8519,6 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
   const put = async (path, body, method, admin) => {
     setBusy(true); setErr("");
     try {
-      if(admin){ try { localStorage.setItem("modus_admin_token", token); } catch(e){} }
       const qs = admin && token ? `?token=${encodeURIComponent(token)}` : "";
       const r = await fetch(`${API}${path}${qs}`, { method: method || "PUT", headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
       if(!r.ok) throw await errFrom(r);
@@ -8402,10 +8604,9 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
         <span className="text-xs text-slate-500">{baseTxt}</span>
         <span className="ml-auto">{attribution}</span>
       </div>
-      {mode === "config" && (
+      {mode === "config" && isAdminLogin(access) && (   /* 27 Oct 2026 (P5): the diesel admin row for an admin login only */
         <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
           <span className="text-xs uppercase tracking-wide text-slate-500">Admin</span>
-          {tokenNeeded(access) && <input value={token} onChange={e => setToken(e.target.value)} placeholder="Admin token" aria-label="Admin token" className="border border-slate-200 rounded px-2 py-0.5 text-xs w-32" />}
           {autoIdx && <button onClick={() => put("/admin/fuel-index/refresh?sync=1", null, "POST", true)} disabled={busy || rf.running}
             className="btn-sec btn-sm disabled:opacity-40">{prov && prov.key === "desnz" ? "Fetch this week's DESNZ price now" : "Get this week's price now"}</button>}
           <label className="inline-flex items-center gap-1">
@@ -10098,7 +10299,6 @@ function RoutePlanning({ route, token, onSaved }){
     setMsg("");
   }, [route.id]);
   const save = async () => {
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     setBusy(true);
     try {
@@ -10234,7 +10434,6 @@ function RouteSheetText({ route, token, onSaved }){
     setMsg("");
   }, [route.id]);
   const save = async () => {
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     setBusy(true);
     try {
@@ -10476,6 +10675,7 @@ function VehChips({ profiles }){
 // loop the zone writes use. It is more HERE calls than it looks: a spliced haul road costs
 // two calls per leg, not one, and the count is shown before it is spent.
 function HaulRoads({ routeId, haulRoads, token, onChanged }){
+  const canEdit = isAdminLogin(ACCESS.info);   // 27 Oct 2026 (P5): only an admin changes the network
   const [plan, setPlan] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -10583,12 +10783,14 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
               return (
                 <tr key={l.zone_id} className="border-t border-slate-100">
                   <td className="px-1 py-1 text-slate-400">
+                    {canEdit && <>
                     <button onClick={() => move(i, -1)} disabled={busy || i === 0}
                       title="Earlier on the outbound leg"
                       className="px-1 disabled:opacity-25 hover:text-slate-700">▲</button>
                     <button onClick={() => move(i, 1)} disabled={busy || i === attached.length - 1}
                       title="Later on the outbound leg"
                       className="px-1 disabled:opacity-25 hover:text-slate-700">▼</button>
+                    </>}
                   </td>
                   <td className="px-1 py-1">
                     <span className="font-medium text-slate-700">{z.name || l.zone_id}</span>
@@ -10614,8 +10816,8 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
                     {!z.haul_mode && <span className="text-slate-500"> (default)</span>}
                   </td>
                   <td className="px-1 py-1 text-right">
-                    <button onClick={() => detach(l.zone_id)} disabled={busy}
-                      className="text-[13px] font-semibold text-[color:var(--red)] hover:underline disabled:opacity-40">Detach</button>
+                    {canEdit && <button onClick={() => detach(l.zone_id)} disabled={busy}
+                      className="text-[13px] font-semibold text-[color:var(--red)] hover:underline disabled:opacity-40">Detach</button>}
                   </td>
                 </tr>
               );
@@ -10624,7 +10826,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
         </table>
       )}
 
-      <div className="flex items-center gap-2">
+      {canEdit && <div className="flex items-center gap-2">
         <select value={pick} onChange={e => setPick(e.target.value)} disabled={busy || !available.length}
           className="border border-slate-200 rounded-lg px-2 py-1 text-[13px] bg-white disabled:opacity-40">
           <option value="">{available.length ? "Add a haul road…" : "No other haul roads drawn"}</option>
@@ -10638,7 +10840,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
         <button onClick={attach} disabled={busy || !pick}
           className="text-[13px] font-semibold px-2 py-1 rounded-md text-white disabled:opacity-40"
           style={{ background: "var(--haul-text)" }}>Attach</button>
-      </div>
+      </div>}
 
       {!!attached.length && (
         <p className="text-[13px] text-slate-400 mt-1.5">
@@ -10854,7 +11056,7 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
   const pick = (label, lid, key) => (
     <label className="block">
       <span className="block text-sm font-medium text-slate-700 mb-1">{label}</span>
-      <select value={sel[key] || ""} onChange={e => write(key, e.target.value)}
+      <select value={sel[key] || ""} onChange={e => write(key, e.target.value)} disabled={!isAdminLogin(ACCESS.info)}
         className="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs bg-white">
         <option value="">Default for this site</option>
         {forLoc(lid).map(g => (
@@ -11051,6 +11253,9 @@ function CatChips({ list, dir }){
 }
 
 function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
+  // 27 Oct 2026 (decision P5): only an admin LOGIN changes locations, routes and zones. Everyone else reads them: no
+  // add / edit / delete, no dragging a marker, no Route all. The server refuses those writes anyway.
+  const canEdit = isAdminLogin(ACCESS.info);
   const { vehicles, materials = [], mapbox_token } = meta;
   const mapDiv = useRef(null);
   const mapObj = useRef(null);
@@ -11078,7 +11283,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [selGeoms, setSelGeoms] = useState(null);
   const [activeGeom, setActiveGeom] = useState(null);   // {profile, leg, alt_index}
   const [promoting, setPromoting] = useState("");
-  const [token, setToken] = useState(() => { try { return localStorage.getItem("modus_admin_token") || ""; } catch(e){ return ""; } });
+  const [token, setToken] = useState("");
   const [bakeBusy, setBakeBusy] = useState("");   // route id currently being (re-)baked
   const [selected, setSelected] = useState(null);
 
@@ -11186,7 +11391,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // rather than on whichever action happened to save it before
   useEffect(() => {
     tokenRef.current = token;
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
   }, [token]);
 
   const fetchStatus = () =>
@@ -11303,7 +11507,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       addNetworkLayers(m);
       // node drag (only in view/edit; add-mode clicks drop new points)
       m.on("mousedown", "node-dots", (e) => {
-        if(modeRef.current === "add") return;
+        if(modeRef.current === "add" || !canEdit) return;
         e.preventDefault();
         drag.id = e.features[0].properties.id; drag.moved = false;
         m.getCanvas().style.cursor = "grabbing";
@@ -11545,6 +11749,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
   // ---- location add / edit / move / delete ----
   const startAdd = () => {
+    if(!canEdit) return;
     setSubTab("locations");
     setSelected(null); setLocMsg("");
     setForm({ id: null, name: "", role: "origin", loc_type: "Quarry", supplies: [], receives: [],
@@ -11556,7 +11761,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   };
   const openEditForNode = (id) => {
     const feat = nodesFC.current.features.find(f => f.properties.id === id);
-    if(!feat) return;
+    if(!feat || !canEdit) return;
     const p = feat.properties;
     const supplies = asArray(p.supplies).length ? asArray(p.supplies) : asArray(p.materials);
     setSelected(null); setLocMsg("");
@@ -11626,7 +11831,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(!form.name.trim()){ setLocMsg("Name is required."); return; }
     const lat = parseFloat(form.lat), lon = parseFloat(form.lon);
     if(!isFinite(lat) || !isFinite(lon)){ setLocMsg("Enter valid coordinates — click the map or type them."); return; }
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     setSavingLoc(true); setLocMsg(form.id ? "Saving…" : "Creating…");
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     const body = bodyFromForm(form, lat, lon);
@@ -11720,7 +11924,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(!gateForm.name.trim()){ setGateMsg("Give the gate a name — it is what a refused route will say."); return; }
     const lat = parseFloat(gateForm.lat), lon = parseFloat(gateForm.lon);
     if(!isFinite(lat) || !isFinite(lon)){ setGateMsg("Place the gate on the map, or type its coordinates."); return; }
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     setGateMsg(gateForm.id ? "Saving gate…" : "Creating gate…");
     const payload = {
@@ -11780,7 +11983,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const deleteLoc = async () => {
     if(!form || !form.id) return;
     if(!confirm(`Delete ${form.name || form.id}? This also removes any routes that use it.`)) return;
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     setSavingLoc(true); setLocMsg("Deleting…");
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     try {
@@ -11897,7 +12099,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const createRoute = async () => {
     if(!rOrigin || !rDest){ setRouteMsg("Pick an origin and a destination."); return; }
     if(!destValid(rDest)){ setRouteMsg("That origin and destination share no material."); return; }
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     setRouteBusy(true); setRouteMsg("Creating route…");
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     try {
@@ -11970,7 +12171,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const had = Object.keys(cur.profiles || {}).sort();
     const add = eVehicles.filter(v => !had.includes(v));
     const drop = had.filter(v => !eVehicles.includes(v));
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     setRouteBusy(true);
     try {
@@ -12045,7 +12245,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
   const deleteRoute = async (id) => {
     if(!confirm(`Delete route ${id}?`)) return;
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     try {
       const res = await fetch(`${API}/admin/routes/${encodeURIComponent(id)}${qs}`, { method: "DELETE" });
@@ -12125,7 +12324,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const clearRoutes = async () => {
     if(!confirm("Clear ALL routes? Locations are kept. This cannot be undone.")) return;
     if(!confirm("Really clear every route? This removes all of them.")) return;
-    try { localStorage.setItem("modus_admin_token", token); } catch(e){}
     setRouteBusy(true); setRouteMsg("Clearing all routes…");
     const qs = token ? `?token=${encodeURIComponent(token)}` : "";
     try {
@@ -12202,7 +12400,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   };
 
   const editZone = (z) => {
-    setZoneForm({ id: z.id, name: z.name || "", kind: z.kind || "other",
+    // 27 Oct 2026 (P5): a planner sees the zone framed on the map; only an admin gets the editor and its vertices
+    if(canEdit) setZoneForm({ id: z.id, name: z.name || "", kind: z.kind || "other",
                   affects_routing: !!z.affects_routing, starts_on: z.starts_on || "",
                   ends_on: z.ends_on || "", note: z.note || "", active: !!z.active,
                   speed_kph: (z.speed_kph == null ? "" : String(z.speed_kph)),
@@ -12216,9 +12415,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const pts = ring.slice();
     if(z.geometry && z.geometry.type === "Polygon"
        && pts.length > 1 && pts[0][0] === pts[pts.length-1][0] && pts[0][1] === pts[pts.length-1][1]) pts.pop();
-    setDrawPts(pts);
-    setZoneDraw(false);
-    setZoneMsg("");
+    if(canEdit){ setDrawPts(pts); setZoneDraw(false); setZoneMsg(""); }
     const m = mapObj.current;
     if(m && pts.length) { try { m.fitBounds(boundsOf(pts), { padding: 80, maxZoom: 13, duration: 600 }); } catch(e){} }
   };
@@ -12492,11 +12689,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             <option value={1}>Alt 1</option>
             <option value={2}>Alt 2</option>
           </select>
-          {/* every admin action reads this one field — routes are baked per route now,
-              so there is no bulk-bake panel to hold it */}
-          {tokenNeeded(ACCESS.info) && <input value={token} onChange={e => setToken(e.target.value)} placeholder="Admin token" aria-label="Admin token"
-            title="Needed to change routes, locations and zones."
-            className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm w-36" />}
         </>}>
         <div className="text-xs text-slate-500 mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
           <span>{locs.length} locations</span><span className="text-slate-500">·</span>
@@ -12509,6 +12701,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       {summary && !summary.here_configured && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
           Routing is not set up yet, so no route can be worked out. Ask your admin.
+        </div>
+      )}
+
+      {!canEdit && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800" role="note" data-readonly-note="1">
+          Only an admin can change {onLoc ? "locations" : onZones ? "zones" : "routes"}.
         </div>
       )}
 
@@ -12525,17 +12723,18 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           <div ref={mapDiv} style={{ height: MAP_H, width: "100%" }} />
         </div>
 
-        <div className="space-y-4" style={panelStyle}>
+        {/* 27 Oct 2026 (P5): read-only, the panel may hold no control at all, so it is a tab stop itself to scroll by keyboard */}
+        <div className="space-y-4" style={panelStyle} {...(canEdit ? {} : { tabIndex: 0, role: "region", "aria-label": onLoc ? "Locations panel" : onZones ? "Zones panel" : "Routes panel" })}>
           {onLoc && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-semibold text-slate-700">Locations</div>
-              {mode === "view" && (
+              {mode === "view" && canEdit && (
                 <button onClick={startAdd} className="text-xs font-semibold px-2.5 py-1 rounded-md text-white" style={{ background: "var(--navy)" }}>+ Add location</button>
               )}
             </div>
 
-            {mode === "view" && (
+            {mode === "view" && canEdit && (
               <p className="text-[13px] text-slate-400">Click a marker to edit it, or drag it to move it. Deleting a location deletes its routes.</p>
             )}
 
@@ -12955,7 +13154,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
               <div ref={zoneHeadRef} tabIndex={zoneForm ? -1 : undefined} className="ed-head text-sm font-semibold text-slate-700">{zoneForm ? (zoneForm.id ? `Editing ${zoneForm.id}` : "New zone") : "Zones"}</div>
-              {!zoneForm && (
+              {!zoneForm && canEdit && (
                 <span className="flex items-center gap-2">
                   <button onClick={startNewZone} disabled={zoneBusy}
                     className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--navy)" }}>+ Draw zone</button>
@@ -13133,7 +13332,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           </div>
           )}
 
-          {onRoutes && (
+          {onRoutes && canEdit && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-semibold text-slate-700">{editingRoute ? `Edit route ${editingRoute}` : "Create route"}</div>
@@ -13292,11 +13491,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       {onLoc ? (
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
-          <span className="text-sm font-semibold text-slate-700">Locations <span className="text-slate-400 font-normal">· click a row to locate it on the map and open it for editing</span></span>
-          <button onClick={startAdd}
+          <span className="text-sm font-semibold text-slate-700">Locations <span className="text-slate-400 font-normal">· click a row to locate it on the map{canEdit ? " and open it for editing" : ""}</span></span>
+          {canEdit && <button onClick={startAdd}
             className="text-xs font-semibold px-2.5 py-1 rounded-md text-white" style={{ background: "var(--navy)" }}>
             + Add location
-          </button>
+          </button>}
         </div>
         <div className="overflow-auto kb-scroll" style={{ maxHeight: "40vh" }} tabIndex={0} role="region" aria-label="Locations table">
           <table className="w-full text-sm">
@@ -13317,7 +13516,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 <tr key={l.id} onClick={() => locateNode(l.id)}
                   className={"border-t border-slate-100 cursor-pointer " + ((form && form.id === l.id) ? "bg-blue-50" : "hover:bg-slate-50")}>
                   <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
-                    <button type="button" className="row-open" data-loc-open={l.id} aria-label={`Edit ${l.name}`}
+                    <button type="button" className="row-open" data-loc-open={l.id} aria-label={canEdit ? `Edit ${l.name}` : `Show ${l.name} on the map`}
                       aria-current={(form && form.id === l.id) ? "true" : undefined}
                       onClick={(e) => { e.stopPropagation(); openLocFromKeys(l.id); }}>{l.name}</button>
                     <span className="text-slate-400 font-normal">{l.id}</span>
@@ -13361,6 +13560,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             <CollisionEvidenceButton routeId={selected} />
             {/* Bulk bake. Vehicles come from the tick-boxes on the Create route panel so
                 there is one vehicle list on the tab rather than two that can disagree. */}
+            {canEdit && <>
             <select value={bakeLegs} onChange={e => setBakeLegs(e.target.value)} className={sel}
               title="Both legs gives a cycle time. Laden only is quicker but leaves the return not routed.">
               <option value="both">Both legs</option>
@@ -13378,6 +13578,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               className="text-xs font-semibold px-2.5 py-1 rounded-md border border-slate-200 text-[color:var(--red)] hover:bg-red-50 disabled:opacity-40">
               Clear all routes
             </button>
+            </>}
           </span>
         </div>
         {routeMsg && (
@@ -13440,6 +13641,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <td className="px-3 py-2 text-right tabular-nums">{pinfo && pinfo.distance_km != null ? fmtDist(pinfo.distance_km, 1) : "—"}</td>
                     <td className="px-3 py-2"><VehChips profiles={r.profiles} /></td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
+                      {canEdit && <>
                       <button onClick={(e) => { e.stopPropagation(); rebakeRoute(r.id, Object.keys(r.profiles || {})); }}
                         disabled={bakeBusy === r.id}
                         title={Object.keys(r.profiles || {}).length
@@ -13453,6 +13655,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         <button type="button" onClick={() => startEditRoute(r)}>Edit</button>
                         <button type="button" style={{ color: "var(--red)" }} onClick={() => deleteRoute(r.id)}>Delete…</button>
                       </RowMenu></span>
+                      </>}
                     </td>
                   </tr>
                   {open && <RouteAnalysis routeId={r.id} colSpan={7}
@@ -13461,7 +13664,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     active={selected === r.id ? activeGeom : null}
                     leg={showLeg}
                     onFocus={selected === r.id ? focusGeom : (p, a) => { selectRoute(r.id); focusGeom(p, a); }}
-                    onPromote={selected === r.id ? promoteAlt : null}
+                    onPromote={selected === r.id && canEdit ? promoteAlt : null}
                     promoting={promoting}
                     haulRoads={haulRoadList}
                     token={tokenRef.current}
@@ -13478,8 +13681,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       ) : (
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
-          <span className="text-sm font-semibold text-slate-700">Zones <span className="text-slate-400 font-normal">· click a row to edit the zone and frame it on the map</span></span>
-          <span className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-slate-700">Zones <span className="text-slate-400 font-normal">· click a row to {canEdit ? "edit the zone and frame it" : "frame it"} on the map</span></span>
+          {canEdit && <span className="flex items-center gap-2">
             <button onClick={startNewZone} disabled={zoneBusy}
               className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--navy)" }}>
               + Draw zone
@@ -13489,7 +13692,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--haul-text)" }}>
               + Haul road
             </button>
-          </span>
+          </span>}
         </div>
         <div className="overflow-auto" style={{ maxHeight: "40vh" }}>
           <table className="w-full text-sm">
@@ -13508,7 +13711,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       className={"cursor-pointer hover:bg-slate-50 " + (zoneSel === z.id ? "bg-slate-50" : "")}>
                     <td className="px-3 py-2 font-mono text-xs text-slate-500">{z.id}</td>
                     <td className="px-3 py-2 font-medium">
-                      <button type="button" className="row-open" data-zone-open={z.id} aria-label={`Edit ${z.name}`}
+                      <button type="button" className="row-open" data-zone-open={z.id} aria-label={canEdit ? `Edit ${z.name}` : `Show ${z.name} on the map`}
                         aria-current={zoneSel === z.id ? "true" : undefined}
                         onClick={(e) => { e.stopPropagation(); openZoneFromKeys(z); }}>{z.name}</button>
                     </td>
@@ -13547,10 +13750,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     </td>
                     <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
                       {/* 27 Oct 2026 (the final UI pass, card 1) */}
-                      <RowMenu name={z.name || z.id}>
+                      {canEdit && <RowMenu name={z.name || z.id}>
                         <button type="button" onClick={() => editZone(z)}>Edit</button>
                         <button type="button" disabled={zoneBusy} style={{ color: "var(--red)" }} onClick={() => removeZone(z)}>Delete…</button>
-                      </RowMenu>
+                      </RowMenu>}
                     </td>
                   </tr>
                 );

@@ -1731,13 +1731,12 @@ async function phoneShellDom(){
   const p = await mountPortal(plannerAcc, "dashboard");
   click(tabs(p.el)[3]);
   // NARROWED 14 Oct 2026 (merged with G3): a planner on a shared CODE also sees Users (G3's first-admin step), a desk page too
-  ok("PHONE: the planner's sheet adds the Data pages, Config and Users (each a desk page)",
+  // NARROWED 27 Oct 2026 (F3 c): no longer — Users is for an admin LOGIN only, so the planner's sheet ends at Config
+  ok("PHONE: the planner's sheet adds the Data pages and Config (each a desk page), not Users",
      // NARROWED 22 Oct 2026 (abnormal loads): + Abnormal loads after the Carbon planner
-     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Abnormal loads|Locations|Routes|Zones|Config|Users");
-  click([...p.el.querySelectorAll("#phone-more button.phone-more-item")].find(b => /Users/.test(b.textContent)));
-  ok("PHONE (with G3): Users on a phone is the card, the Users page never mounted",
-     !!p.el.querySelector("[data-desk-only]") && p.el.querySelector("[data-desk-only] h2").textContent === "Users" && !p.el.querySelector("main table, main input"));
-  click(tabs(p.el)[3]);
+     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Abnormal loads|Locations|Routes|Zones|Config");
+  ok("PHONE (with G3): ...and with no Users item, the Users page cannot be reached on a phone by a planner",
+     ![...p.el.querySelectorAll("#phone-more button.phone-more-item")].some(b => /Users/.test(b.textContent)));
   click([...p.el.querySelectorAll("#phone-more button.phone-more-item")].find(b => /Config/.test(b.textContent)));
   ok("PHONE: Config on a phone is the card (the Config page, its Save and its JSON never mount)",
      !!p.el.querySelector("[data-desk-only]") && !/Everything \(JSON\)/.test(p.el.textContent) && !p.el.querySelector("main textarea"));
@@ -2070,6 +2069,130 @@ async function phoneDayFlagsDom(){
 // NAME, never an id), the hint that resumes a session on reload, a session ending while the app is open, a demo login
 // sending its page opens, and the set-password screen (mounted on its own: the link is read once as the page loads).
 // NOT covered: the real cookie (http_smoke.py), how it looks (the browser check).
+// 27 Oct 2026 (pilot readiness F3 b): the two-step screens, mounted on their own (Login, then TwoStep after the
+// password), the account menu's block, and Config -> Organisation file. The server half is in test_users / http_smoke.
+async function twoStepDom(){
+  const answer = (status, data) => Promise.resolve({ ok: status < 300, status, json: () => Promise.resolve(data), text: () => Promise.resolve(JSON.stringify(data)) });
+  const setVal = (el, v) => act(() => { Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(el, v); el.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  const btnT = (box, t) => [...box.querySelectorAll("button")].find(b => b.textContent.trim() === t);
+  const ADMIN = { role: "admin", label: "Admin", ipt: null, can_approve: true, via: "login", name: "Ada Lovelace", email: "ada@example.org",
+                  kind: "staff", two_step: true, recovery_left: 7 };
+  const calls = [];
+  let signin = () => answer(200, { step: "code", ticket: "TICKET1", email: "ada@example.org" });
+  let code = () => answer(401, { detail: "That code didn't work. Codes change every 30 seconds." });
+  const fetchWas = w.fetch;
+  w.fetch = (url, o) => {
+    const u = String(url); calls.push({ u, o });
+    if (/\/api\/auth\/me$/.test(u)) return answer(200, { signed_in: false, access: null, codes: false });
+    if (/\/api\/auth\/signin$/.test(u)) return signin();
+    if (/\/api\/auth\/code$/.test(u)) return code();
+    if (/\/api\/auth\/setup$/.test(u)) return answer(200, { ...ADMIN, recovery_left: 10,
+      recovery_codes: ["AAAA-BBBB", "CCCC-DDDD", "EEEE-FFFF", "GGGG-HHHH", "JJJJ-KKKK", "MMMM-NNNN", "PPPP-QQQQ", "RRRR-SSSS", "TTTT-UUUU", "VVVV-WWWW"] });
+    if (/\/api\/auth\/recovery-codes$/.test(u)) return answer(200, { recovery_codes: ["ZZZZ-YYYY", "XXXX-WWWW"] });
+    if (/\/api\/admin\/tenant\/import/.test(u)) return answer(200, { ok: true, replaced: true });
+    return new Promise(() => {});
+  };
+  const mount = async (el) => {
+    const box = w.document.createElement("div"); w.document.body.appendChild(box);
+    const root = w.ReactDOM.createRoot(box);
+    await act(async () => { root.render(el); }); await tick(); await tick();
+    return { box, done: async () => { await act(async () => { root.unmount(); }); box.remove(); } };
+  };
+  try {
+    let signedIn = null;
+    const L = await mount(w.React.createElement(w.Login, { onSignIn: (i) => { signedIn = i; }, onBack(){} }));
+    await setVal(L.box.querySelector("input#auth-email"), "ada@example.org");
+    await setVal(L.box.querySelector("input#auth-pass"), "correct horse battery");
+    await act(async () => { btnT(L.box, "Sign in").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); await tick(); await tick();
+    ok("⭐ TWO-STEP: a right password answered with the code step shows the code screen, not the app (onSignIn not called)",
+       signedIn === null && /Type the 6-digit code from your authenticator app\./.test(L.box.textContent)
+       && /ada@example\.org/.test((L.box.querySelector(".auth-who") || {}).textContent || "") && !!L.box.querySelector("input#auth-otp"));
+    const otp = L.box.querySelector("input#auth-otp");
+    ok("TWO-STEP: the code box is a one-time-code box with a number keyboard", otp.getAttribute("autocomplete") === "one-time-code"
+       && otp.getAttribute("inputmode") === "numeric");
+    await setVal(otp, "000000");
+    await act(async () => { btnT(L.box, "Sign in").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); await tick(); await tick();
+    const cc = calls.filter(c => /\/api\/auth\/code$/.test(c.u)).pop();
+    ok("⭐ TWO-STEP: the code goes with the ticket to /api/auth/code; a wrong one says the server's sentence and clears the box",
+       cc && JSON.parse(cc.o.body).ticket === "TICKET1" && JSON.parse(cc.o.body).code === "000000"
+       && /That code didn't work\. Codes change every 30 seconds\./.test(L.box.textContent) && L.box.querySelector("input#auth-otp").value === "" && signedIn === null);
+    click(btnT(L.box, "Use a recovery code instead"));
+    ok("TWO-STEP: 'Use a recovery code instead' changes the box and the words", /Type one of your recovery codes\./.test(L.box.textContent)
+       && L.box.querySelector("input#auth-otp").getAttribute("inputmode") === "text" && !!btnT(L.box, "Use the app's code instead"));
+    code = () => answer(200, ADMIN);
+    await setVal(L.box.querySelector("input#auth-otp"), "AAAA-BBBB");
+    await act(async () => { btnT(L.box, "Sign in").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); await tick(); await tick();
+    ok("⭐ TWO-STEP: the right code signs in (onSignIn gets the server's answer)", signedIn && signedIn.email === "ada@example.org");
+    await L.done();
+    // the set-up step
+    signedIn = null;
+    signin = () => answer(200, { step: "setup", ticket: "TICKET2", email: "ada@example.org", key: "JBSW Y3DP EHPK 3PXP JBSW Y3DP EHPK 3PXP",
+                                 qr: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><title>QR code for your authenticator app</title><path d="M0 0h1v1H0z"/></svg>' });
+    const S = await mount(w.React.createElement(w.Login, { onSignIn: (i) => { signedIn = i; }, onBack(){} }));
+    await setVal(S.box.querySelector("input#auth-email"), "ada@example.org");
+    await setVal(S.box.querySelector("input#auth-pass"), "correct horse battery");
+    await act(async () => { btnT(S.box, "Sign in").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); await tick(); await tick();
+    ok("⭐ TWO-STEP SET-UP: the set-up card: its heading, the app hint, the QR picture from the server and the key as text",
+       /Set up two-step sign-in/.test(S.box.textContent) && !!S.box.querySelector(".auth-qr svg")
+       && (S.box.querySelector(".auth-key") || {}).textContent === "JBSW Y3DP EHPK 3PXP JBSW Y3DP EHPK 3PXP"
+       && /Microsoft Authenticator, Google Authenticator or similar/.test(S.box.textContent) && !!btnT(S.box, "Turn on")
+       && !btnT(S.box, "Use a recovery code instead"));
+    await setVal(S.box.querySelector("input#auth-otp"), "123456");
+    await act(async () => { btnT(S.box, "Turn on").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); await tick(); await tick();
+    const lis = [...S.box.querySelectorAll(".recovery-codes li")].map(x => x.textContent);
+    ok("⭐ TWO-STEP SET-UP: then the ten recovery codes, shown once, with Download and Copy; not signed in yet",
+       /Save your recovery codes/.test(S.box.textContent) && lis.length === 10 && lis[0] === "AAAA-BBBB"
+       && !!btnT(S.box, "Download") && !!btnT(S.box, "Copy") && signedIn === null);
+    ok("🔴 TWO-STEP SET-UP: Continue stays off until 'I have saved them somewhere safe' is ticked", btnT(S.box, "Continue").disabled === true);
+    click(S.box.querySelector(".auth-check input"));
+    click(btnT(S.box, "Continue"));
+    ok("...then it signs in", !btnT(S.box, "Continue") || (signedIn && signedIn.two_step === true));
+    await S.done();
+    // the account menu block
+    const M = await mount(w.React.createElement(w.AccountMenu, { role: ADMIN, onSignOut(){} }));
+    click(M.box.querySelector(".acct-btn"));
+    ok("⭐ ACCOUNT: the menu says two-step sign-in is on and how many recovery codes are used, with 'New recovery codes'; no way to turn it off",
+       /Two-step sign-in/.test(M.box.textContent) && /3 of 10 recovery codes used\./.test(M.box.textContent)
+       && !!btnT(M.box, "New recovery codes") && !/Turn off|turn off/.test(M.box.textContent));
+    click(btnT(M.box, "New recovery codes"));
+    await setVal(M.box.querySelector('input[aria-label="Code from the app"]'), "654321");
+    await act(async () => { btnT(M.box, "Show new codes").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); await tick(); await tick();
+    const rc = calls.filter(c => /\/api\/auth\/recovery-codes$/.test(c.u)).pop();
+    ok("ACCOUNT: new codes need a code from the app, and are listed with a Download",
+       rc && JSON.parse(rc.o.body).code === "654321" && /ZZZZ-YYYY/.test(M.box.textContent) && !!btnT(M.box, "Download the new codes"));
+    await M.done();
+    const DM = await mount(w.React.createElement(w.AccountMenu, { role: { ...ADMIN, kind: "demo", two_step: false, expires_at: "2026-11-10T09:00:00Z" }, onSignOut(){} }));
+    click(DM.box.querySelector(".acct-btn"));
+    ok("ACCOUNT: a demo login's menu has no two-step block", !/Two-step sign-in/.test(DM.box.textContent));
+    await DM.done();
+    // Config -> Organisation file
+    const O = await mount(w.React.createElement(w.OrgFile));
+    ok("⭐ ORG FILE: Download is a link to the organisation export; nothing to replace before a file is chosen",
+       (O.box.querySelector("a[download]") || {}).getAttribute && O.box.querySelector("a[download]").getAttribute("href") === "/api/admin/tenant/export"
+       && !btnT(O.box, "Replace") && /Logins are not in it\./.test(O.box.textContent));
+    const pkg = { modus_package: 1, tables: { locations: [{}, {}], routes: [{}], forecasts: [{}, {}, {}], route_geometry: [] } };
+    const fileIn = O.box.querySelector('input[type="file"]');
+    const fakeFile = { name: "acme.json", text: () => Promise.resolve(JSON.stringify(pkg)) };
+    Object.defineProperty(fileIn, "files", { value: [fakeFile], configurable: true });
+    await act(async () => { fileIn.dispatchEvent(new w.Event("change", { bubbles: true })); }); await tick(); await tick();
+    ok("ORG FILE: a chosen file is read in the page: its name and what it holds",
+       /acme\.json · 2 locations · 1 routes · 3 lines/.test(O.box.textContent));
+    const conf = O.box.querySelector("input#orgfile-confirm");
+    const orgName = w.__TENANT.name;
+    ok("🔴 ORG FILE: Replace stays off until the organisation's name is typed exactly",
+       btnT(O.box, "Replace").disabled === true && new RegExp("Type " + orgName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " to replace").test(O.box.textContent));
+    await setVal(conf, orgName + "x");
+    ok("...a near miss does not count", btnT(O.box, "Replace").disabled === true);
+    await setVal(conf, "  " + orgName.toUpperCase().replace(/—/g, "-") + " ");
+    ok("...but case, a plain dash for a long one and extra spaces do (a long dash is hard to type)", btnT(O.box, "Replace").disabled === false);
+    await act(async () => { btnT(O.box, "Replace").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); await tick(); await tick();
+    const im = calls.filter(c => /\/api\/admin\/tenant\/import/.test(c.u)).pop();
+    ok("⭐ ORG FILE: Replace posts the file's JSON to the import with replace=1, and says to draw the routes again (the file had none drawn)",
+       im && /replace=1/.test(im.u) && JSON.parse(im.o.body).tables.routes.length === 1 && /Replaced\. Draw the routes again on Routes\./.test(O.box.textContent));
+    await O.done();
+  } finally { w.fetch = fetchWas; }
+}
+
 async function g3LoginsDom(){
   const answer = (status, data) => Promise.resolve({ ok: status < 300, status, json: () => Promise.resolve(data), text: () => Promise.resolve(JSON.stringify(data)) });
   const ADMIN = { role: "admin", label: "Admin", ipt: null, can_approve: true, ipt_locked: false, ipt_required: true, demo: false,
@@ -2427,6 +2550,10 @@ async function rowsDom(){
   };
   const press = async (el) => { await act(async () => { el.focus(); el.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); for (let i = 0; i < 4; i++) await tick(); };
   const active = () => w.document.activeElement;
+  // 27 Oct 2026 (decision P5): only an admin LOGIN edits the network, so these checks run as one; the planner's
+  // read-only view is checked after them
+  const infoWas = w.__ACCESS.info;
+  w.__ACCESS.info = { role: "admin", label: "Admin", via: "login", can_approve: true, ipt: null, name: "Ada", email: "ada@example.org" };
   try {
     // ---- Locations ----
     const L = await mount("locations");
@@ -2490,8 +2617,52 @@ async function rowsDom(){
     await press(rb[1]);
     ok("⭐ UI FIX 9 ROUTES: pressing R002's button picks it (aria-current) and the Route sheet button comes on — reachable from the keyboard now",
        rb[1].getAttribute("aria-current") === "true" && !rb[0].hasAttribute("aria-current") && sheet() && !sheet().disabled);
+    ok("P5: ...for an admin login the side panel is not an extra tab stop (its own controls are)", !R.el.querySelector('[aria-label="Routes panel"]'));
+    ok("P5: an admin login sees Route all, Clear all routes, the Create route panel and each row's Route / Edit / Delete",
+       [...R.el.querySelectorAll("button")].some(b => /^Route all/.test(b.textContent)) && /Create route/.test(R.el.textContent)
+       && [...R.el.querySelectorAll("button")].some(b => b.textContent === "Clear all routes")
+       // NARROWED 27 Oct 2026 (merged with UI fix 10): Edit and Delete… sit in each row's "⋯" menu now
+       && R.el.querySelectorAll("tbody details.row-menu").length >= 2
+       && [...R.el.querySelectorAll("tbody .row-menu-list button")].filter(b => b.textContent === "Delete…").length === 2
+       && !R.el.querySelector("[data-readonly-note]"));
     await R.done();
-  } finally { w.fetch = fetchWas; w.mapboxgl.Map = MapWas; }
+
+    // ---- 27 Oct 2026 (decision P5): a PLANNER login reads the network and changes nothing ----
+    w.__ACCESS.info = { role: "planner", label: "Planner", via: "login", can_approve: true, ipt: null, name: "Pat", email: "pat@example.org" };
+    const PL = await mount("locations");
+    const pnames = [...PL.el.querySelectorAll("button[data-loc-open]")];
+    ok("⭐ P5 LOCATIONS (planner): one line says only an admin changes locations; no + Add location anywhere",
+       (PL.el.querySelector("[data-readonly-note]") || {}).textContent === "Only an admin can change locations."
+       && ![...PL.el.querySelectorAll("button")].some(b => /Add location/.test(b.textContent)));
+    ok("P5 LOCATIONS (planner): each name button reads 'Show <the location> on the map', not Edit",
+       pnames.length === 3 && pnames[1].getAttribute("aria-label") === "Show Northfield Quarry on the map");
+    await press(pnames[1]);
+    ok("🔴 P5 LOCATIONS (planner): pressing a name opens no editor (no 'Editing', no Name box, no Save)",
+       !PL.el.querySelector(".ed-head") && ![...PL.el.querySelectorAll("input")].some(i => i.value === "Northfield Quarry")
+       && ![...PL.el.querySelectorAll("button")].some(b => b.textContent === "Save" || b.textContent === "Create"));
+    await PL.done();
+    const PZ = await mount("zones");
+    ok("P5 ZONES (planner): 'Only an admin can change zones.', no + Draw zone / + Haul road, no Delete, names read 'Show …'",
+       (PZ.el.querySelector("[data-readonly-note]") || {}).textContent === "Only an admin can change zones."
+       && ![...PZ.el.querySelectorAll("button")].some(b => /Draw zone|Haul road|^Delete$/.test(b.textContent.trim()))
+       && [...PZ.el.querySelectorAll("button[data-zone-open]")].every(b => /^Show .* on the map$/.test(b.getAttribute("aria-label"))));
+    const pzPanel = PZ.el.querySelector('[role="region"][aria-label="Zones panel"]');
+    ok("P5 ZONES (planner): the side panel, which may hold no control now, is a named tab stop so the keyboard can scroll it (axe scrollable-region-focusable)",
+       !!pzPanel && pzPanel.tabIndex === 0);
+    await press(PZ.el.querySelector("button[data-zone-open]"));
+    ok("🔴 P5 ZONES (planner): pressing a zone shows it, opens no editor", !PZ.el.querySelector("input[aria-label], textarea") || !/Editing Z/.test(PZ.el.textContent));
+    await PZ.done();
+    const PR = await mount("routes");
+    ok("⭐ P5 ROUTES (planner): 'Only an admin can change routes.'; no Create route panel, no Route all, no Clear all routes, no Route / Edit / Delete",
+       (PR.el.querySelector("[data-readonly-note]") || {}).textContent === "Only an admin can change routes."
+       && !/Create route/.test(PR.el.textContent)
+       && ![...PR.el.querySelectorAll("button")].some(b => /^Route all|^Clear all routes$|^Edit$|^Delete…?$|^Route$/.test(b.textContent.trim()))
+       && !PR.el.querySelector("tbody details.row-menu"));
+    ok("P5 ROUTES (planner): the route sheet, collision evidence and the route map stay",
+       [...PR.el.querySelectorAll("button")].some(b => b.textContent === "Route sheet (drivers)")
+       && [...PR.el.querySelectorAll("button")].some(b => /Collision evidence/.test(b.textContent)));
+    await PR.done();
+  } finally { w.fetch = fetchWas; w.mapboxgl.Map = MapWas; w.__ACCESS.info = infoWas; }
 }
 
 async function todayFitDom(){
@@ -2633,6 +2804,8 @@ async function todayFitDom(){
   catch (e) { ok("MAP UNDER THE BAR: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
   try { await reloadResume(); ok("RELOAD: the section ran to the end", true); }
   catch (e) { ok("RELOAD: the section ran to the end", false, String(e && e.stack || e).slice(0, 400)); }
+  try { await twoStepDom(); ok("TWO-STEP: the section ran to the end", true); }
+  catch (e) { ok("TWO-STEP: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await g3LoginsDom(); ok("G3 LOGINS: the section ran to the end", true); }
   catch (e) { ok("G3 LOGINS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await configEstonianColumn(); ok("CONFIG (11 Oct 2026 review): the section ran to the end", true); }

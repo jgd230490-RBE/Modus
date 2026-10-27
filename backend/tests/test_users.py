@@ -219,11 +219,39 @@ def txt(msg):
     return (msg.get_body(preferencelist=("plain",)) or msg).get_content()
 
 
+REQ = _Request(headers={"user-agent": "UA", "x-forwarded-for": "198.51.100.77"})
+
+
 def cookie_of(resp):
     for kw in getattr(resp, "set", []):
         if kw.get("key") == users.SESSION_COOKIE:
             return kw
     return None
+
+
+# 27 Oct 2026 (F3 b): a staff login's session resolves only once two-step sign-in is on. These helpers turn it on
+# with a fixed key (as finish_setup would), and walk the second step of a sign-in.
+SECRET = "JBSWY3DPEHPK3PXP"
+
+
+def on2(uid, secret=SECRET):
+    db.execute("UPDATE users SET totp_secret = ?, totp_last_step = NULL WHERE id = ?", (secret, uid))
+
+
+def code_for(secret=SECRET):
+    return users.totp_at(secret, users.totp_step())
+
+
+def step2(ans, remember=False):
+    """The second step after main.auth_signin / main.auth_reset answered a ticket: the set-up step with the offered
+    key, or the code step. The fake clock stands still, so the last step used is cleared first (otherwise every
+    sign-in after the first in one test step would be a replayed code, refused — which section 12 asserts)."""
+    if ans["step"] == "setup":
+        return main.auth_setup(main.CodeIn(ticket=ans["ticket"], code=code_for(ans["key"].replace(" ", "")),
+                                           remember=remember), REQ)
+    u = users.find_by_email(ans["email"])
+    db.execute("UPDATE users SET totp_last_step = NULL WHERE id = ?", (u["id"],))
+    return main.auth_code(main.CodeIn(ticket=ans["ticket"], code=code_for(u["totp_secret"]), remember=remember), REQ)
 
 
 reset_db()
@@ -277,6 +305,7 @@ ok("...a slot the tenant has not named reads '<team word> <n>', never the id",
    users.team_label("IPT5") == "Team 5")
 ok("planner and admin read as words", users.public(pat)["role_label"] == "Planner" and users.public(ada)["role_label"] == "Admin")
 users.set_password(ada["id"], GOOD_PW); users.set_password(bob["id"], GOOD_PW); users.set_password(pat["id"], GOOD_PW)
+on2(ada["id"]); on2(bob["id"]); on2(pat["id"])
 ok("set_password stores a hash and the time", users.get_user(bob["id"])["password_set_at"] == "2026-10-14T09:00:00Z"
    and users.verify_password(GOOD_PW, users.get_user(bob["id"])["password_hash"]))
 ok("set_password applies the rule", users.set_password(bob["id"], "short")[1] is not None)
@@ -476,6 +505,7 @@ ok("an expiry must be the ISO form", users.update_user(eve["id"], {"expires_at":
 # =========================================================================== #
 reset_db()
 bob, _ = users.create_user("bob@example.org", "Bob North", "team", "IPT1")
+on2(bob["id"])
 s_b, _ = users.create_session(bob["id"])
 ok("a session alone resolves to the login", access.resolve_request(None, s_b)["via"] == "login")
 ok("a valid code wins over a session cookie left in the same browser",
@@ -580,16 +610,19 @@ finally:
 reset_db()
 SENT = []
 dr.send = lambda msg, settings: SENT.append(msg)
-REQ = _Request(headers={"user-agent": "UA", "x-forwarded-for": "198.51.100.77"})
 ok("with no session nobody is signed in", main.auth_me()["signed_in"] is False and main.auth_me()["codes"] is True)
 ada, _ = users.create_user("ada@example.org", "Ada Lovelace", "admin")
 users.set_password(ada["id"], GOOD_PW)
-r_ = main.auth_signin(main.SignInIn(email="ada@example.org", password=GOOD_PW), REQ)
+a0 = main.auth_signin(main.SignInIn(email="ada@example.org", password=GOOD_PW), REQ)
+ok("⭐ F3 b: a staff sign-in's password step answers the set-up step and NO session cookie",
+   isinstance(a0, dict) and a0["step"] == "setup" and a0["ticket"] and "<svg" in a0["qr"]
+   and len(a0["key"].replace(" ", "")) == 32 and not db.query("SELECT * FROM user_sessions"))
+r_ = step2(a0)
 ck = cookie_of(r_)
 ok("⭐ /api/auth/signin answers what the person can do and sets the session cookie (HttpOnly, Secure, Lax, 12 h)",
    r_.body["role"] == "admin" and r_.body["name"] == "Ada Lovelace" and r_.body["via"] == "login"
    and ck and ck["httponly"] and ck["secure"] and ck["samesite"] == "lax" and ck["max_age"] == 43200)
-r_ = main.auth_signin(main.SignInIn(email="ada@example.org", password=GOOD_PW, remember=True), REQ)
+r_ = step2(main.auth_signin(main.SignInIn(email="ada@example.org", password=GOOD_PW, remember=True), REQ), remember=True)
 ok("...30 days with remember", cookie_of(r_)["max_age"] == 30 * 86400)
 ok("a wrong password is a 401 with the one message",
    raises(lambda: main.auth_signin(main.SignInIn(email="ada@example.org", password="nope nope nope"), REQ)) == 401)
@@ -631,7 +664,10 @@ ok("/api/auth/check greets the invitee without using the link",
 ok("a too-short password is a 400 and does NOT burn the link",
    raises(lambda: main.auth_reset(main.ResetIn(token=itok, password="short"), REQ)) == 400
    and users.peek_token(itok, ("invite",))[0] is not None)
-r_ = main.auth_reset(main.ResetIn(token=itok, password=GOOD_PW), REQ)
+r0 = main.auth_reset(main.ResetIn(token=itok, password=GOOD_PW), REQ)
+ok("⭐ F3 b: the invite's password goes on to the set-up step, not straight to a session",
+   isinstance(r0, dict) and r0["step"] == "setup" and r0["email"] == "bob@example.org")
+r_ = step2(r0)
 ok("⭐ setting the password from the invite signs the person in", r_.body["email"] == "bob@example.org" and cookie_of(r_))
 ok("...and the link is used up (410 the second time)", raises(lambda: main.auth_reset(main.ResetIn(token=itok, password=GOOD_PW), REQ)) == 410
    and raises(lambda: main.auth_check(main.TokenIn(token=itok))) == 410)
@@ -654,7 +690,9 @@ ok("🔴 three reset requests for one address in an hour, then 429",
    raises(lambda: main.auth_forgot(main.EmailIn(email="bob@example.org"), REQ)) == 429)
 rtok = users.issue_token(bob_id, "reset")
 other_raw, _ = users.create_session(bob_id)
-r_ = main.auth_reset(main.ResetIn(token=rtok, password="a brand new password"), REQ)
+r0 = main.auth_reset(main.ResetIn(token=rtok, password="a brand new password"), REQ)
+ok("🔴 F3 b: a reset link never skips the code (the code step, no cookie)", isinstance(r0, dict) and r0["step"] == "code")
+r_ = step2(r0)
 ok("⭐ a reset signs every OTHER browser out and this one in",
    users.resolve_session(other_raw) == (None, None) and users.resolve_session(bob_raw) == (None, None)
    and users.resolve_session(cookie_of(r_)["value"])[0]["email"] == "bob@example.org")
@@ -749,6 +787,168 @@ ok("every login table query filters on the tenant",
 for fn in ("render.yaml", "env.example"):
     txt = open(os.path.join(ROOT, fn), encoding="utf-8").read()
     ok(f"{fn} documents APP_URL", "APP_URL" in txt)
+
+# =========================================================================== #
+# 12. two-step sign-in (27 Oct 2026, pilot readiness F3 b)                     #
+# =========================================================================== #
+import base64 as _b64  # noqa: E402
+_rfc = _b64.b32encode(b"12345678901234567890").decode()
+ok("⭐ TOTP matches RFC 6238's SHA-1 test vectors (6 digits)",
+   [users.totp_at(_rfc, t // 30) for t in (59, 1111111109, 1111111111, 1234567890, 2000000000)]
+   == ["287082", "081804", "050471", "005924", "279037"])
+reset_db()
+ada, _ = users.create_user("ada@example.org", "Ada Lovelace", "admin"); users.set_password(ada["id"], GOOD_PW)
+bob, _ = users.create_user("bob@example.org", "Bob North", "team", "IPT1"); users.set_password(bob["id"], GOOD_PW)
+s_old, _ = users.create_session(bob["id"])
+ok("🔴 a staff session from before two-step does not resolve (they sign in again and set it up)",
+   users.resolve_session(s_old) == (None, None))
+lead = users.demo_login("lead@example.org", "Lea Lead")["user"]
+s_lead, _ = users.create_session(lead["id"])
+ok("...a lead's demo login needs none (a fictional scheme)", users.needs_two_step(lead) is False
+   and users.resolve_session(s_lead)[0]["kind"] == "demo")
+ok("every staff role needs it: admin, planner, team",
+   all(users.needs_two_step(u) for u in (users.get_user(ada["id"]), users.get_user(bob["id"]))))
+a0 = main.auth_signin(main.SignInIn(email="bob@example.org", password=GOOD_PW), REQ)
+key = a0["key"].replace(" ", "")
+ok("the set-up answer: a fresh 32-character key, shown in groups of four, and a QR code drawn here",
+   a0["step"] == "setup" and re.fullmatch(r"[A-Z2-7]{32}", key) and a0["key"].count(" ") == 7
+   and a0["qr"].startswith("<svg") and "http" not in a0["qr"].replace("http://www.w3.org/2000/svg", ""))
+ok("...the key waits as 'pending', not on, until a code confirms it",
+   users.get_user(bob["id"])["totp_pending"] == key and not users.get_user(bob["id"])["totp_secret"])
+ok("the authenticator link names Wayscope and the address",
+   users.otpauth_uri(key, "bob@example.org") == f"otpauth://totp/Wayscope%3Abob%40example.org?secret={key}&issuer=Wayscope&digits=6&period=30")
+ok("🔴 a wrong set-up code: 401, two-step still off, the ticket still live",
+   raises(lambda: main.auth_setup(main.CodeIn(ticket=a0["ticket"], code="000000"), REQ)) == 401
+   and not users.two_step_on(users.get_user(bob["id"])) and users.peek_token(a0["ticket"], ("mfa",))[0] is not None)
+su = main.auth_setup(main.CodeIn(ticket=a0["ticket"], code=code_for(key)), REQ)
+codes = su.body["recovery_codes"]
+ok("⭐ the right code turns it on, signs in, and shows ten recovery codes once",
+   cookie_of(su) and users.two_step_on(users.get_user(bob["id"])) and len(codes) == 10 and len(set(codes)) == 10
+   and all(re.fullmatch(r"[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}", c) for c in codes)
+   and su.body["two_step"] is True and su.body["recovery_left"] == 10)
+bu = users.get_user(bob["id"])
+ok("🔴 the codes are stored hashed only; the pending key is cleared",
+   not any(c in (bu["recovery_hashes"] or "") or c.replace("-", "") in (bu["recovery_hashes"] or "") for c in codes)
+   and bu["totp_pending"] is None and bu["totp_secret"] == key)
+ok("...the ticket is used up", raises(lambda: main.auth_setup(main.CodeIn(ticket=a0["ticket"], code=code_for(key)), REQ)) == 410)
+ok("the set-up is in the activity log", any(r["kind"] == "two-step-on" for r in users.audit_rows()))
+ok("🔴 the Users list never carries the key, the pending key or the code hashes",
+   all(k not in json.dumps(users.public(bu)) for k in (key, "recovery_hashes", "totp_secret", "totp_pending"))
+   and users.public(bu)["two_step"] is True)
+# the code step
+t1 = main.auth_signin(main.SignInIn(email="bob@example.org", password=GOOD_PW), REQ)
+ok("⭐ with two-step on, the password step answers the code step (no key, no QR, no cookie)",
+   t1["step"] == "code" and "key" not in t1 and "qr" not in t1)
+ok("🔴 the code just used at set-up is refused (a code works once)",
+   raises(lambda: main.auth_code(main.CodeIn(ticket=t1["ticket"], code=code_for(key)), REQ)) == 401)
+at(seconds=30)
+ok("...the next step's code works", cookie_of(main.auth_code(main.CodeIn(ticket=t1["ticket"], code=code_for(key)), REQ)))
+ok("🔴 the code-step ticket is single use", raises(lambda: main.auth_code(main.CodeIn(ticket=t1["ticket"], code=code_for(key)), REQ)) == 410)
+at(seconds=120)
+t2 = users.start_two_step(users.get_user(bob["id"]))
+prev = users.totp_at(key, users.totp_step() - 1)
+nxt2 = users.totp_at(key, users.totp_step() + 2)
+ok("a phone clock one step behind still works; two steps out does not",
+   users.totp_match(key, prev) == users.totp_step() - 1 and users.totp_match(key, nxt2) is None)
+ok("codes with spaces are read; letters, 5 or 7 digits are not",
+   users.totp_match(key, " ".join(code_for(key))) is not None and users.totp_match(key, "abcdef") is None
+   and users.totp_match(key, "12345") is None and users.totp_match(key, "1234567") is None)
+ok("a wrong code says the one sentence", str(raises(lambda: main.auth_code(main.CodeIn(ticket=t2["ticket"], code="000000"), REQ))) == "401"
+   and users.CODE_REFUSED == "That code didn't work. Codes change every 30 seconds.")
+ok("...and the ticket stays live after a wrong code", users.peek_token(t2["ticket"], ("mfa",))[0] is not None)
+rc = main.auth_code(main.CodeIn(ticket=t2["ticket"], code=codes[0].lower().replace("-", "")), REQ)
+ok("⭐ a recovery code works instead (case and dash do not matter)", cookie_of(rc) and rc.body["recovery_left"] == 9)
+t3 = users.start_two_step(users.get_user(bob["id"]))
+ok("🔴 ...once only", raises(lambda: main.auth_code(main.CodeIn(ticket=t3["ticket"], code=codes[0]), REQ)) == 401)
+ok("the audit row says which second step was used",
+   any(r["kind"] == "signin" and "recovery code" in (r["detail"] or "") for r in users.audit_rows()))
+for _ in range(4):
+    raises(lambda: main.auth_code(main.CodeIn(ticket=t3["ticket"], code="111111"), REQ))
+ok("🔴 five wrong codes (with the one before) lock the address for 15 minutes, as passwords do",
+   raises(lambda: main.auth_code(main.CodeIn(ticket=t3["ticket"], code=code_for(key)), REQ)) == 429)
+at(minutes=30)
+ok("🔴 a ticket lasts 10 minutes", raises(lambda: main.auth_code(main.CodeIn(ticket=t3["ticket"], code=code_for(key)), REQ)) == 410)
+t4 = main.auth_signin(main.SignInIn(email="bob@example.org", password=GOOD_PW), REQ)
+ok("🔴 a ticket opens nothing by itself: it is not a session",
+   access.resolve_request(None, t4["ticket"]) is None and users.resolve_session(t4["ticket"]) == (None, None))
+ok("🔴 the code step on a key not yet set up is refused", raises(lambda: main.auth_code(
+    main.CodeIn(ticket=main.auth_signin(main.SignInIn(email="ada@example.org", password=GOOD_PW), REQ)["ticket"],
+                code="123456"), REQ)) == 409)
+# new recovery codes, signed in
+s_b = cookie_of(step2(t4))["value"]
+tok = as_(access.resolve_request(None, s_b))
+ok("describe() carries two-step and the codes left (the account menu)",
+   main.auth_me()["access"]["two_step"] is True and main.auth_me()["access"]["recovery_left"] == 9)
+at(minutes=31)
+ok("new recovery codes need a code from the app", raises(lambda: main.auth_recovery_codes(main.OwnCodeIn(code="000000"), REQ)) == 400)
+new = main.auth_recovery_codes(main.OwnCodeIn(code=code_for(key)), REQ)["recovery_codes"]
+ok("⭐ ...then ten new ones, and the old ones stop working",
+   len(new) == 10 and not set(new) & set(codes) and users.recovery_left(users.get_user(bob["id"])) == 10
+   and not users.use_recovery_code(users.get_user(bob["id"]), codes[1]))
+access._ACCESS.reset(tok)
+# an admin resets a lost phone
+on2(ada["id"])
+s_a, _ = users.create_session(ada["id"])
+tok = as_(access.resolve_request(None, s_a))
+ok("🔴 an admin cannot reset their own two-step (a recovery code, or the recovery command)",
+   raises(lambda: main.admin_user_two_step_reset(ada["id"], None)) == 400)
+rr = main.admin_user_two_step_reset(bob["id"], None)
+ok("⭐ Reset two-step: key and codes gone, every session of the login ended",
+   rr["user"]["two_step"] is False and users.resolve_session(s_b) == (None, None)
+   and users.recovery_left(users.get_user(bob["id"])) == 0)
+ok("...and only the middleware's write row records it (one Activity line, as every admin write; http_smoke checks it)",
+   not any(r["kind"] == "two-step-reset" for r in users.audit_rows())
+   and main._audited("/api/admin/users/x/two-step-reset"))
+ok("...a second reset is refused (nothing to reset)", raises(lambda: main.admin_user_two_step_reset(bob["id"], None)) == 400)
+ok("...and the next sign-in is the set-up step again",
+   main.auth_signin(main.SignInIn(email="bob@example.org", password=GOOD_PW), REQ)["step"] == "setup")
+access._ACCESS.reset(tok)
+tok = as_(users.access_for(users.get_user(bob["id"])))
+ok("🔴 a non-admin cannot reset anyone's two-step", raises(lambda: main.admin_user_two_step_reset(ada["id"], None)) == 403)
+access._ACCESS.reset(tok)
+ok("🔴 a demo link signs a lead in with no second step",
+   cookie_of(main.auth_link(main.TokenIn(token=users.demo_login("lead@example.org", "Lea Lead")["link"].split("#demo=")[1]), REQ)))
+
+# the first admin on a new deployment (FIRST_ADMIN_EMAIL) and the recovery command
+reset_db()
+os.environ.pop("FIRST_ADMIN_EMAIL", None)
+ok("FIRST_ADMIN_EMAIL unset: nothing happens", users.ensure_first_admin() == "off" and not users.list_users())
+os.environ["FIRST_ADMIN_EMAIL"] = "not an address"
+ok("...a bad address: nothing made", users.ensure_first_admin() == "bad-email" and not users.list_users())
+os.environ["FIRST_ADMIN_EMAIL"] = " Boss@Example.org "
+fa = users.ensure_first_admin()
+boss = users.find_by_email("boss@example.org")
+ok("⭐ F3 c: with no admin yet, an admin login is made and its invite issued (no sender: the link goes to the log)",
+   fa == "logged" and boss and boss["role"] == "admin" and boss["name"] == "boss"
+   and db.query("SELECT COUNT(*) AS n FROM auth_tokens WHERE purpose = 'invite'")[0]["n"] == 1)
+ok("...once an admin exists, a restart does nothing (no second invite)", users.ensure_first_admin() == "exists"
+   and db.query("SELECT COUNT(*) AS n FROM auth_tokens WHERE purpose = 'invite'")[0]["n"] == 1)
+ok("...the activity log names FIRST_ADMIN_EMAIL", any(r["kind"] == "first-admin" for r in users.audit_rows()))
+os.environ.pop("FIRST_ADMIN_EMAIL")
+ok("the lifespan calls ensure_first_admin after the tables exist",
+   MAIN.find("db.init_users_db()") < MAIN.find("users.ensure_first_admin()"))
+users.set_password(boss["id"], GOOD_PW); on2(boss["id"])
+s_boss, _ = users.create_session(boss["id"])
+url, err = users.recover_admin("boss@example.org")
+ok("⭐ the recovery command: a reset link, two-step cleared, every session ended",
+   err is None and "#reset=" in url and not users.two_step_on(users.get_user(boss["id"]))
+   and users.resolve_session(s_boss) == (None, None))
+url2, err2 = users.recover_admin("new@example.org")
+ok("...an unknown address becomes an admin with an invite link", err2 is None and "#invite=" in url2
+   and users.find_by_email("new@example.org")["role"] == "admin")
+ok("...a team login named in it becomes an enabled admin",
+   users.recover_admin(users.create_user("t@example.org", "T", "team", "IPT1")[0]["email"])[1] is None
+   and users.find_by_email("t@example.org")["role"] == "admin" and users.find_by_email("t@example.org")["team"] is None)
+ok("...a bad address is refused", users.recover_admin("nope")[1] is not None)
+ok("...and each run is in the activity log", sum(r["kind"] == "recovery-command" for r in users.audit_rows()) == 3)
+REC = open(os.path.join(BACKEND, "recover_admin.py"), encoding="utf-8").read()
+ok("recover_admin.py prints the link and sends nothing",
+   "users.recover_admin(argv[1])" in REC and "print(url)" in REC and "send" not in REC.replace("sent", ""))
+ok("render.yaml and env.example document FIRST_ADMIN_EMAIL and DEMO_LEADS",
+   all("FIRST_ADMIN_EMAIL" in open(os.path.join(ROOT, f), encoding="utf-8").read()
+       and "DEMO_LEADS" in open(os.path.join(ROOT, f), encoding="utf-8").read() for f in ("render.yaml", "env.example")))
+ok("segno is pinned in requirements.txt (the QR code)",
+   "segno==1.6.6" in open(os.path.join(BACKEND, "requirements.txt"), encoding="utf-8").read())
 
 print()
 for f in FAIL:

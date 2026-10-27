@@ -718,7 +718,9 @@ ok("APPEARANCE: charts rebuild on a change and read token colours — no literal
    and 'backgroundColor: "#2563EB"' not in fe and 'backgroundColor: "#3B82F6"' not in fe and 'borderColor: "#2563EB"' not in fe and 'tok("--chart-1"' in fe)
 ok("APPEARANCE: cards, the big-screen bar and the Look-ahead's white buttons read surface tokens — no literal white surface left in component CSS",
    ".card{background:var(--surface);" in fe and ".dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);" in fe
-   and 'background: "white"' not in fe and "background:#fff;" not in fe)
+   # NARROWED 27 Oct 2026 (pilot readiness F3 b): one exemption, the two-step QR code's frame — a QR code must be dark on
+   # WHITE in either look or a phone camera cannot read it
+   and 'background: "white"' not in fe and fe.count("background:#fff;") == 1 and ".auth-qr{display:inline-block;background:#fff;" in fe)
 ok("APPEARANCE: the map's dark basemap and the exports are untouched — the exports keep the print palette (export.py has no theme code)",
    "data-theme" not in read("backend/export.py") and '["Dark", "mapbox://styles/mapbox/dark-v11"]' in fe)
 ok("🔴 the Dashboard status line reads the tenant's unit word and dates the index 'published' / 'typed', never 'bulletin'",
@@ -1115,7 +1117,8 @@ def _text_uses(tok):
             out.append(_fe_wo[max(0, m.start() - 60):m.end() + 20].replace("\n", " "))
     return out
 ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the markup — the 10 uses left are the progress bar's fill, a card's border (×4: the abnormal loads' note card since 22 Oct), the status dots (×3), the carbon-tone dot and the row-status icon",
-   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 10 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
+   # NARROWED 27 Oct 2026: 11 — + the organisation file's message border (Config, F3 c), a border like the four above
+   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 11 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
    and "text-[color:var(--green)]" not in fe and "text-emerald-600" not in fe, str(_text_uses("var(--green)"))[:300])
 ok("...nor var(--gold): the 7 uses left are the gate-arrivals key, the warning triangle, a note's border, the status dots (×2), the carbon-tone dot and the flag chip's triangle; the Submit strip's text-[color:var(--gold)] is gone (decision 3)",
    not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 7 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
