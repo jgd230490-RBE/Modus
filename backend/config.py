@@ -233,6 +233,9 @@ def imagery_url_problem(v):
     return "Use an address with {z}/{x}/{y} or {bbox-epsg-3857}."
 
 
+EXPORT_MAP_STYLES = ("light", "streets", "outdoors", "aerial")      # = basemap.STYLES (asserted in test_route_map_export)
+
+
 def imagery_settings(conversions=None, doc=None):
     """The tenant's own imagery for the public map: {name, url, credit}, or None when it has none (or a bad address)."""
     if doc is None:
@@ -248,6 +251,16 @@ def imagery_settings(conversions=None, doc=None):
     name = name.strip() if isinstance(name, str) and name.strip() else IMAGERY_NAME_DEFAULT
     credit = credit.strip() if isinstance(credit, str) and credit.strip() else ""
     return {"name": name[:IMAGERY_NAME_MAX], "url": url.strip(), "credit": credit[:IMAGERY_CREDIT_MAX]}
+
+
+def export_map_style(conversions=None, doc=None):
+    """The tenant's "Maps on paper" style (basemap.STYLES key) for the route sheet, collision evidence and Look-ahead
+    sheets; 'light' without a usable setting."""
+    if doc is None:
+        doc = load(conversions) if conversions is not None else {}
+    block = doc.get("tenant") if isinstance(doc, dict) else None
+    k = block.get("export_map_style") if isinstance(block, dict) else None
+    return k.strip().lower() if isinstance(k, str) and k.strip().lower() in EXPORT_MAP_STYLES else "light"
 
 
 def imagery_connect_origin(conversions=None, doc=None):
@@ -614,6 +627,9 @@ def validate(doc, network=None):
                 fv = tb.get(fld)
                 if fv is not None and (not isinstance(fv, str) or len(fv) > mx):
                     p.append(f"tenant.{fld} must be text of at most {mx} characters, or null")
+            ems = tb.get("export_map_style")
+            if ems is not None and ems != "" and (not isinstance(ems, str) or ems.strip().lower() not in EXPORT_MAP_STYLES):
+                p.append("tenant.export_map_style must be light, streets, outdoors or aerial, or null")
             cb = tb.get("council_breaks")
             if cb is not None:
                 if not isinstance(cb, dict):

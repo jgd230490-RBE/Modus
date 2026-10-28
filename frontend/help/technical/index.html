@@ -782,6 +782,7 @@ injured only on the regional plan).</p>
 <h1 id="t10-public-map">T10 The public map</h1>
 <p>What the map's screens leave out since 22 Oct 2026 (the words sweep).</p>
 <ul>
+<li><strong>The style of the server-drawn maps</strong> (28 Oct 2026, task 8e): <code>basemap.STYLES</code> holds four (light, streets, outdoors, aerial) with each style's road-name layer, which the sheet's route lines are drawn under, and its credit. The style is the request's <code>style</code> (the CLP map export), else the tenant's <code>tenant.export_map_style</code>, else light; a refused style falls back to Light at once. The satellite style answers a JPEG, not a PNG. The bulletin always asks for Light.</li>
 <li><strong>Movements a day.</strong> One load = one two-way movement (out laden, back empty, counted once): the month's
 approved loads &divide; its working days. With Show forecast routes on, the figure is averaged over the months with
 volume. Vehicles are rounded up per line on the busiest month, using the drivers' hours rule (T1 Vehicles). A line not

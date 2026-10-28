@@ -607,7 +607,7 @@ ok("23 Oct: the legend names the loaded leg, the empty return and the haul road;
 _calls = []
 _bio = io.BytesIO(); PILImage.new("RGB", (4, 4), (250, 250, 250)).save(_bio, "PNG"); _PNG4 = _bio.getvalue()
 _real_fetch = basemap.fetch
-basemap.fetch = lambda v, token=None, timeout=12, retina=True, overlays=None, before_layer=None: (_calls.append((v, overlays, before_layer)), _PNG4)[1]
+basemap.fetch = lambda v, token=None, timeout=12, retina=True, overlays=None, before_layer=None, style=None: (_calls.append((v, overlays, before_layer)), _PNG4)[1]
 try:
     SP = rs.sheet("R1", acc=PLANNER)
     PDFP = export.build_route_sheet_pdf(SP)
