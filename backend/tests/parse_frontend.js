@@ -292,7 +292,7 @@ ok("H1: the pickers hide the tenant's hidden vehicles (its country's set) but ke
   && (code.match(/\.filter\(v => vehShown\(v/g) || []).length >= 5);
 ok("H1: the basemap list is by country — the Estonian orthophoto for EE only, 'Aerial' wording for GB",
   /function basemapsFor\(country\)/.test(code) && /val !== "maaamet-ortho" \|\| c === "EE"/.test(code)
-  && /"Aerial \(Mapbox Satellite\)"/.test(code) && /basemapsFor\(TENANT\.country\)\.map/.test(code)
+  && /"Satellite": "Aerial"/.test(code) && /basemapsFor\(TENANT\.country\)\.map/.test(code)   // NARROWED 28 Oct 2026 (the user: no supplier names on screens): was "Aerial (Mapbox Satellite)"
   && !/\{BASEMAPS\.map\(/.test(code));
 ok("G2/29 Sep: the page title is the tenant's name · Wayscope, and plain 'Wayscope' for the default tenant",
   /document\.title = \(TENANT\.name && TENANT\.name !== "Wayscope"\) \? TENANT\.name \+ " · Wayscope" : "Wayscope"/.test(code));
@@ -4340,6 +4340,31 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      /function stockMessage\(sps\)\{[\s\S]{0,400}if\(!sp\.use_planned\) return;/.test(src));
   ok("DASHBOARD: the 'No use planned yet' line names a stockpile with a capacity and no plan",
      src.includes('{noPlan.length > 0 && <div className="text-[13px] text-slate-500 mt-1" data-stock-noplan="1">No use planned yet: {noPlan.map(sp => sp.name).join(", ")}.</div>}'));
+}
+
+// ---- 28 Oct 2026 (the user: no supplier names on screens): the Data pages' basemap list ----------------------------
+// Locations, Routes and Zones read the public map's names and order; no label names Mapbox or Maa-amet (the suppliers
+// are in technical guide #t7-basemap-words).
+{
+  const tbl = (src.match(/const BASEMAPS_ALL = \[([\s\S]*?)\];/) || [])[1] || "";
+  const rows = [...tbl.matchAll(/\["([^"]+)", "([^"]+)"\]/g)].map(m => [m[1], m[2]]);
+  const gb = (src.match(/const GB_BASEMAP_LABELS = (\{[^}]*\})/) || [])[1] || "{}";
+  let gbMap = {}; try { gbMap = JSON.parse(gb); } catch (e) {}
+  const M = "mapbox://styles/mapbox/";
+  const want = [["Light", M + "light-v11"], ["Streets", M + "streets-v12"], ["Outdoors", M + "outdoors-v12"], ["Dark", M + "dark-v11"],
+                ["Satellite", M + "satellite-streets-v12"], ["Satellite (no names)", M + "satellite-v9"],
+                ["Navigation day", M + "navigation-day-v1"], ["Navigation night", M + "navigation-night-v1"],
+                ["Estonia aerial photo", "maaamet-ortho"]];
+  const labels = rows.map(r => r[0]).concat(Object.values(gbMap));
+  ok("⭐ BASEMAP WORDS: no Data-page basemap name says Mapbox or Maa-amet",
+     rows.length === 9 && labels.every(l => !/Mapbox|Maa-amet|ortho\b/i.test(l)), labels.join(" | "));
+  ok("BASEMAP WORDS: the public map's names and order (Satellite = with road names), a British organisation reads Aerial / Aerial (no names)",
+     want.every(([l, v], i) => rows[i] && rows[i][0] === l && rows[i][1] === v)
+     && gbMap["Satellite"] === "Aerial" && gbMap["Satellite (no names)"] === "Aerial (no names)" && Object.keys(gbMap).length === 2,
+     JSON.stringify(rows) + " " + gb);
+  ok("BASEMAP WORDS: the old labels are gone, and the legend tip names the Estonian option by its new name",
+     !src.includes("Aerial (Mapbox Satellite)") && !src.includes("Aerial with roads") && !src.includes("Estonia ortho")
+     && !src.includes('"Satellite Streets"') && src.includes('"Satellite or Estonia aerial photo"'));
 }
 
 console.log();
