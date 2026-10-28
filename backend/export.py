@@ -3318,19 +3318,19 @@ def _ce_time_of_day(c, S, m, y, cw, R, B, para, new_page, footer_h):
         bw = w1 / 24
         if gates:                                          # the hours the route's gates are open, shaded
             c.setFillColorRGB(0.91, 0.94, 0.995); c.rect(x0 + g0 * bw, base, (g1 - g0) * bw, ch, stroke=0, fill=1)
-        for a_, b_ in nod:                                 # the scheme's no-delivery bands, hatched
-            c.saveState()
-            p_ = c.beginPath(); p_.rect(x0 + a_ * bw, base, (b_ - a_) * bw, ch); c.clipPath(p_, stroke=0, fill=0)
-            c.setStrokeColorRGB(0.96, 0.7, 0.7); c.setLineWidth(0.6)
-            for t_ in range(-12, int((b_ - a_) * bw) + 12, 4):
-                c.line(x0 + a_ * bw + t_, base, x0 + a_ * bw + t_ + ch, base + ch)
-            c.restoreState()
         for h_, n_ in enumerate(col["weekday"]):
             if n_:
                 bh_ = n_ / top * (ch - 9)
                 c.setFillColorRGB(*(_hex_rgb(RS_LOADED) if not col["alt"] else _hex_rgb(CE_ALT)))
                 c.rect(x0 + h_ * bw + 0.6, base, bw - 1.2, bh_, stroke=0, fill=1)
                 c.setFillColorRGB(*GREY); c.setFont(R, 5.2); c.drawCentredString(x0 + (h_ + 0.5) * bw, base + bh_ + 1.4, str(n_))
+        for a_, b_ in nod:                                 # the scheme's no-delivery bands, hatched over the bars
+            c.saveState()
+            p_ = c.beginPath(); p_.rect(x0 + a_ * bw, base, (b_ - a_) * bw, ch - 9); c.clipPath(p_, stroke=0, fill=0)
+            c.setStrokeColorRGB(0.86, 0.15, 0.15); c.setStrokeAlpha(0.55); c.setLineWidth(0.5)
+            for t_ in range(-int(ch), int((b_ - a_) * bw) + 4, 3):
+                c.line(x0 + a_ * bw + t_, base, x0 + a_ * bw + t_ + ch, base + ch)
+            c.restoreState()
         c.setStrokeColorRGB(*GREY); c.setLineWidth(0.5); c.line(x0, base, x0 + w1, base)
         c.setFillColorRGB(*_hex_rgb(CE_BUSY))
         for a_, b_ in busy:                                # the busy bands, under the axis
