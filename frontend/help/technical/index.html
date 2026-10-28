@@ -779,6 +779,24 @@ appear while Alternative routes is ticked, and the route map plans leave them ou
 is a filter on the map group. The export card and the Routes page can add the collisions to the plans (killed or seriously
 injured only on the regional plan).</p>
 
+<p id="t9-time-of-day"><strong>By time of day (28 Oct 2026, task 0d).</strong> DfT's collision table carries <code>date</code>
+(dd/mm/yyyy), <code>day_of_week</code> (1 Sunday &hellip; 7 Saturday) and <code>time</code> (&ldquo;HH:MM&rdquo;) in every year 2021&ndash;2025
+(checked on the files). <code>read_collisions</code> keeps the hour (0&ndash;23) and whether the date fell Monday to Friday
+(<code>day_of_week</code> when the date does not read) in <code>detail_json</code> as <code>hour</code> and <code>weekday</code>; never the
+date or the minute, and no screen, popup or sheet prints one collision's hour (R6 for a single record). A fetch sets
+<code>hours</code> in the status; until every counted collision has its hour the sheet says the hours come with the next fetch.
+The evidence counts each road route's collisions on the route (25 m) on weekdays by hour, and in two fixed busy bands,
+<code>BUSY_BANDS</code> = 07:00&ndash;10:00 and 16:00&ndash;19:00 (the CLP form's example, chosen before any route was looked at), with
+10:00&ndash;16:00 beside them. An alternative is offered for a band only when the route had at least <code>OFFER_MIN</code> = 10 there
+in the five years and a one-sided exact test on the two counts (Binomial(route + alternative, &frac12;): the chance that the
+alternative's share is this small or smaller were each collision as likely on either) is below <code>OFFER_P</code> = 0.05. The test
+takes no account of length or traffic: a longer alternative makes it stricter, a shorter one looser; the sheet prints how much
+longer or shorter. The chart shades the route's gates' open hours (earliest open to latest shut at either end; the default gate
+hours where a gate has none) and hatches the scheme's no-delivery bands (<code>planning.peak_bands</code>). <code>GET
+/api/routes/{id}/collision-hours</code> (staff; a team code its own team's routes) gives the Routes page's line from the stored
+collisions and lines only. Offered, never applied: using the alternative in those hours waits for task 0c's per-period route
+choice. HERE gave the same road at every hour in the 16 Oct probe (R010, 32 calls), so any other road is a stored
+alternative.</p>
 <h1 id="t10-public-map">T10 The public map</h1>
 <p>What the map's screens leave out since 22 Oct 2026 (the words sweep).</p>
 <ul>

@@ -3521,6 +3521,21 @@ def _collision_evidence(route_id, request):
         raise HTTPException(404, str(e))
 
 
+@app.get("/api/routes/{route_id}/collision-hours")
+def collision_hours(route_id: str, request: Request = None):
+    """
+    28 Oct 2026 (task 0d): the Routes page's line under a route's options — an alternative that had clearly fewer
+    collisions on it in the weekday busy hours, with the counts side by side. Offered only: nothing is switched. Staff
+    only, like the evidence; a team code reads its own team's routes (404 for another's).
+    """
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the collision history is for staff")
+    try:
+        return collisions.busy_hours(route_id, acc=access.current())
+    except collisions.EvidenceError as e:
+        raise HTTPException(404, str(e))
+
+
 @app.get("/api/routes/{route_id}/collision-evidence.pdf")
 def collision_evidence_pdf(route_id: str, request: Request = None):
     """
