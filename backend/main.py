@@ -4635,6 +4635,7 @@ def diagnostics_route(route_id: str, profile: str = network.DEFAULT_PROFILE,
 @app.get("/api/admin/diagnostics/departure/{route_id}")
 def diagnostics_departure(route_id: str, profile: str = network.DEFAULT_PROFILE,
                           leg: str = "loaded", times: Optional[str] = None,
+                          alternatives: int = network.ALTERNATIVES, plan: bool = False,
                           token: Optional[str] = None):
     """
     Does HERE's answer for this leg depend on a departure time we never send?
@@ -4648,13 +4649,19 @@ def diagnostics_departure(route_id: str, profile: str = network.DEFAULT_PROFILE,
     `any`). Omit it and four default times on the next weekday are used; the response says
     which timezone source produced them.
 
-    ⚠️ Costs one HERE request per time plus two controls — six by default. Writes nothing,
+    ⚠️ Costs one HERE request per time plus `any` and two controls — seven by default. Writes nothing,
     and does NOT pin anything: no bake sends a departureTime. Read `experiment.reads_as`
     last, not first.
+
+    29 Oct 2026 (task 0f-1a): it replays the bake's own request (through the gate access roads) and asks for
+    `alternatives` options (the bake's 3 by default); every option is named by the stored option it matches.
+    `experiment.times_read_as` / `time_spread_pct` read the times, `option_sets_agree` / `quicker_than_first` the
+    options. `plan=true` makes no HERE call: the times, the stored options and `here_calls_estimate`.
     """
     _check_admin(token)
     want = [t.strip() for t in times.split(",") if t.strip()] if times else None
-    return network.departure_diagnostics(route_id, profile=profile, leg=leg, times=want)
+    return network.departure_diagnostics(route_id, profile=profile, leg=leg, times=want,
+                                         alternatives=alternatives, plan=plan)
 
 
 @app.get("/api/admin/diagnostics/road-class/{route_id}")
