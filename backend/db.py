@@ -54,6 +54,8 @@ TENANTED_TABLES = {
     # LINE and stockpile_weeks off a location; both are per-client data and both are
     # written by endpoints a second tenant would reach.
     "forecast_weeks", "stockpile_weeks",
+    # 27 Oct 2026 (stockpile forecast): the planned use per pile per month. Same rule, same edit.
+    "stockpile_plan",
     # 2.5b, 2026-09-03. The editable copy of factors.json. Per tenant: two clients
     # will not share a payload table.
     "config",
@@ -857,7 +859,17 @@ def init_weeks_db():
                 conn.rollback()  # column already present — fine
         _create_tenanted(cur, "forecast_weeks")
         _create_tenanted(cur, "stockpile_weeks")
+        # 27 Oct 2026 (stockpile forecast): the planned use, and the stock count column
+        _create_tenanted(cur, "stockpile_plan")
         conn.commit()
+        try:
+            if IS_PG:
+                cur.execute("ALTER TABLE stockpile_weeks ADD COLUMN IF NOT EXISTS measured_qty REAL")
+            else:
+                cur.execute("ALTER TABLE stockpile_weeks ADD COLUMN measured_qty REAL")
+            conn.commit()
+        except Exception:
+            conn.rollback()  # column already present — fine
         # 2026-09-09 (Look-ahead v2 slice 1): the day layer, and the one column the week
         # layer needs to tell a typed actual from a summed one. ALTER is idempotent the
         # same way the locations columns above are: a second boot rolls back harmlessly.
@@ -1773,7 +1785,30 @@ _TENANT_DDL = {
             note         TEXT,
             updated_by   TEXT,
             updated_at   TEXT,
+            -- 27 Oct 2026 (stockpile forecast, D5): a stock count (a survey) at the week's end, in
+            -- the pile's unit. It replaces the worked-out balance from that week on. Listed here AND
+            -- ALTERed in init_weeks_db(), or the SQLite tenant rebuild drops it.
+            measured_qty REAL,
             PRIMARY KEY (tenant_id, location_id, month_index, week_index)
+        )
+    """,
+    # ----------------------------------------------------------------------- #
+    #  27 Oct 2026 — the stockpile's planned use (stockpile forecast, D1 a)    #
+    # ----------------------------------------------------------------------- #
+    # What a planner expects to take out of a pile in a month (laid on the works by site
+    # plant, so no road line carries it), in the pile's own unit. The forward balance in
+    # stockpiles.py spreads it over the month's weeks. Typed by planners and admins (D6).
+    "stockpile_plan": """
+        CREATE TABLE stockpile_plan (
+            tenant_id    TEXT NOT NULL DEFAULT 'default',
+            location_id  TEXT NOT NULL,
+            month_index  INTEGER NOT NULL,
+            planned_qty  REAL,
+            unit         TEXT,
+            note         TEXT,
+            updated_by   TEXT,
+            updated_at   TEXT,
+            PRIMARY KEY (tenant_id, location_id, month_index)
         )
     """,
     # ----------------------------------------------------------------------- #
@@ -1814,6 +1849,7 @@ _TENANT_PK = {
     "forecast_weeks": "(tenant_id, route_id, month_index, discipline, section_id, "
                       "week_index)",
     "stockpile_weeks": "(tenant_id, location_id, month_index, week_index)",
+    "stockpile_plan": "(tenant_id, location_id, month_index)",
     "config": "(tenant_id, key)",
     "forecast_days": "(tenant_id, route_id, month_index, discipline, section_id, "
                      "day_date)",

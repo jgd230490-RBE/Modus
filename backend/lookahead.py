@@ -101,16 +101,23 @@ def account_rows(commit_mi, commit_wi, route_id=None):
 def account_stock(pm, pw):
     """
     10 Sep: the stockpiles for the ACCOUNT week — one row per stockpile: opening (the
-    balance at the end of the week before), in (typed week actuals on routes delivering
-    there), out (the typed consumption of this week, None until typed), closing, and
-    remaining against capacity. This is where "what came out" is typed now; the W1–W4
-    grid on Horizon is gone. Everything is stockpiles.balances()'s arithmetic — nothing
-    is recomputed here. Not IPT-scoped (C10): a stockpile has no IPT.
+    balance at the end of the week before), in, out (the typed consumption of this week,
+    None until typed), closing, and remaining against capacity. This is where "what came
+    out" is typed. Everything is stockpiles.balances()'s arithmetic — nothing is
+    recomputed here. Not IPT-scoped (C10): a stockpile has no IPT.
+
+    27 Oct 2026 (stockpile forecast): a pile with a capacity or a planned use runs forward
+    from the plan. `inbound` is what the balance used (the record, or the plan where a line
+    was not recorded: D2), `inbound_recorded` what was typed, `plan_in` / `plan_out` the plan
+    the page shows in grey and as the Out box's hint, and `next` what the next 8 weeks hold
+    ("over" / "empty" with the week, else the fullest it gets). A place with neither keeps
+    the records-only row (`forecast` False).
     """
     import stockpiles
     if pm is None or int(pm) < 1:
         return []
-    bal = stockpiles.balances(1, int(pm))
+    cur = weeks.editable_week()
+    bal = stockpiles.balances(1, max(int(pm), int(cur[0]) + 3))
     qm, qw = prev_week(pm, pw)
     typed = {(r["location_id"], int(r["month_index"]), int(r["week_index"])): r for r in db.query(
         "SELECT location_id, month_index, week_index, consumed_qty, unit, note "
@@ -125,18 +132,37 @@ def account_stock(pm, pw):
         t = typed.get((sp["location_id"], int(pm), int(pw)))
         cap = sp.get("capacity_qty")
         closing = float(this["balance_end"]) if this else opening
+        fc = bool(sp.get("forecast"))
+        nxt = None
+        if fc:
+            so, se = sp.get("soon_over"), sp.get("soon_empty")
+            first = min([x for x in (so, se) if x], key=lambda x: (x["month_index"], x["week_index"]), default=None)
+            if first is not None:
+                nxt = {"kind": "over" if first is so else "empty",
+                       "month_index": first["month_index"], "week_index": first["week_index"],
+                       "week_from": weeks.week_span(first["month_index"], first["week_index"])[0].isoformat()}
+            else:
+                nxt = {"kind": "fine", "peak_pct": sp.get("near_peak_pct")}
         out.append({
             "location_id": sp["location_id"], "name": sp["name"], "loc_type": sp.get("loc_type"),
             "unit": sp.get("capacity_unit"), "capacity_qty": cap,
+            "forecast": fc, "use_planned": bool(sp.get("use_planned")),
             "opening": round(opening, 3),
             "inbound": round(float(this["inbound"]), 3) if this else 0.0,
-            # None = not typed. 0 is a typed zero. The balance treats both as nothing out.
+            "inbound_recorded": (this.get("in_recorded") if this and fc else
+                                 (round(float(this["inbound"]), 3) if this else 0.0)),
+            "plan_in": (this.get("plan_in") if this and fc else None),
+            "plan_out": (this.get("plan_out") if this and fc else None),
+            "basis": (this.get("basis") if this else None),
+            "not_recorded": (this.get("not_recorded") if this and fc else 0),
+            # None = not typed. 0 is a typed zero. On a forecast pile an untyped Out is the plan.
             "consumed": (float(t["consumed_qty"]) if t and t.get("consumed_qty") is not None else None),
             "consumed_unit": (t.get("unit") if t else None),
             "note": (t.get("note") if t else None),
             "closing": round(closing, 3),
             "remaining": (round(float(cap) - closing, 3) if cap is not None else None),
             "over": bool(cap is not None and closing > float(cap)),
+            "next": nxt,
             "unconvertible_movements": sp.get("unconvertible_movements") or 0,
         })
     return out
@@ -221,6 +247,28 @@ def horizon_rows(commit_mi, commit_wi, route_id=None):
             "week_spans": spans,
             "roles": {"account": list(prev), "commit": list(commit),
                       "make-ready": list(following), "early-warning": list(after)}}
+
+
+def horizon_stock(commit_mi):
+    """
+    27 Oct 2026 (stockpile forecast, card 4): one strip under the Horizon's week rows — each pile with a capacity and a
+    forecast, how full it is at the end of each week of the commit month and the next (`pct`, amber from 90, red over).
+    Not IPT-scoped: a stockpile has no IPT. The same forward balance as everywhere (stockpiles.balances).
+    """
+    import stockpiles
+    out = []
+    bal = stockpiles.balances(int(commit_mi), int(commit_mi) + 1)
+    for sp in bal["stockpiles"]:
+        cap = sp.get("capacity_qty")
+        if not sp.get("forecast") or not cap:
+            continue
+        out.append({"name": sp["name"], "capacity_qty": cap, "unit": sp.get("capacity_unit"),
+                    "use_planned": bool(sp.get("use_planned")),
+                    "weeks": {f"{w['month_index']}|{w['week_index']}": {
+                        "pct": round(w["balance_end"] * 100 / cap, 1), "balance_end": w["balance_end"],
+                        "over": w["over"], "empty": bool(w.get("empty")), "basis": w.get("basis")}
+                        for w in sp["weeks"]}})
+    return out
 
 
 def restriction_status(bucket="commit", route_id=None, acc=None, today=None):
@@ -333,6 +381,7 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     # horizon, filtered
     hz = horizon_rows(mi, wi, route_id=route_id)
     hz["rows"] = access.filter_lines(hz["rows"], acc)
+    hz["stock"] = horizon_stock(mi)
     out["horizon"] = hz
 
     # the rail, on the unfiltered lines, returned for the visible ones

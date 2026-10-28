@@ -666,11 +666,12 @@ ok("🔴 computed, NOT stored — the read created exactly the day rows slice 1 
 # NARROWED 16 Oct 2026: and without collision_records / collision_meta (the collision history, CLOCS v5 C1)
 # NARROWED 22 Oct 2026: and without abnormal_loads (the abnormal loads, S16 / B5)
 # NARROWED 22 Oct 2026: and without traffic_counts (DfT's traffic counts, evidence v3)
+# NARROWED 27 Oct 2026: and without stockpile_plan (the stockpile forecast's planned use)
 ok("...no new table, no new column: sixteen tenanted tables, forecast_days' DDL unchanged",
    # NARROWED 12 Oct 2026: the sixteen are counted without route_sections (§2.2d), the one
    # table added since; slice 2 itself still added none
    # NARROWED again 12 Oct 2026: and without areas / route_area_km (§2.2b), the two added after it
-   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts"} <= db.TENANTED_TABLES
+   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan"} <= db.TENANTED_TABLES
    and "trips" not in db._TENANT_DDL["forecast_days"].lower())
 
 # ---- context chips
@@ -916,9 +917,10 @@ ok("forecast_weeks gained actual_cost_eur, calibrated_at, calibrated_qty",
 # NARROWED 16 Oct 2026: and without collision_records / collision_meta (the collision history, CLOCS v5 C1)
 # NARROWED 22 Oct 2026: and without traffic_counts (DfT's traffic counts, evidence v3)
 # NARROWED 22 Oct 2026: and without abnormal_loads (the abnormal loads, S16 / B5)
+# NARROWED 27 Oct 2026: and without stockpile_plan (the stockpile forecast's planned use)
 ok("...and still sixteen tenanted tables — no new table for slices 3-6 (NARROWED 12 Oct 2026: counted without "
    "route_sections, §2.2d, and NARROWED again the same day without areas and route_area_km, §2.2b)",
-   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts"} <= db.TENANTED_TABLES)
+   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan"} <= db.TENANTED_TABLES)
 db.init_lookahead_db()
 ok("init_lookahead_db() is idempotent on a table that already has the columns", True)
 
@@ -1040,9 +1042,16 @@ ok("the empty cap on R3 raises no ROUTE_CAP — no 40-trip constant anywhere",
    and "40" not in open(os.path.join(BACKEND, "clashes.py"), encoding="utf-8").read().replace("40-trip", ""))
 st = {s["location_id"]: s for s in pg["stock"]}
 exp_in = sum(float(L[w]["week"]["planned_qty"]) for w in ("WS1", "WS2", "WS3"))
+# NARROWED 27 Oct 2026 (stockpile forecast, D2): the opening is the FORWARD balance at the end of the week before (the
+# plan stands in for this seed's unrecorded weeks), not the records-only 100 t; the week's own arithmetic is unchanged
+import stockpiles as _spm
+_pw = weeks.prev_week(pg["commit_week"]["month_index"], pg["commit_week"]["week_index"])
+_l2w = {(w["month_index"], w["week_index"]): w for s_ in _spm.balances(1, _pw[0])["stockpiles"] if s_["location_id"] == "L2" for w in s_["weeks"]}
 ok("⭐ stock forecast: opening + planned inbound of every line into the stockpile − consume, over when > capacity",
    st["L2"]["over"] is True and abs(st["L2"]["inbound_planned"] - exp_in) < 1e-6
-   and abs(st["L2"]["forecast"] - (100.0 + exp_in)) < 1e-6 and abs(st["L2"]["over_by"] - (100.0 + exp_in - 1000.0)) < 1e-6)
+   and abs(st["L2"]["opening"] - _l2w[_pw]["balance_end"]) < 1e-6
+   and abs(st["L2"]["forecast"] - (st["L2"]["opening"] + exp_in - st["L2"]["consume"])) < 1e-6
+   and abs(st["L2"]["over_by"] - (st["L2"]["forecast"] - 1000.0)) < 1e-6, str(st["L2"]))
 ok("🔴 STOCKPILE_OVER on every line into the over-capacity stockpile", codes.get("STOCKPILE_OVER") == 3)
 # 🔴 09 Sep night: the live Tark Tee fetch + geometry loop was on the page's critical path
 # and froze the Look-ahead; off the path it still took 30 s+ per read. 10 Sep: the check is

@@ -603,9 +603,10 @@ ok("...colours lines by IPT from palette C, and is not rendered under the render
 // out-ranks a bg-blue-50 class — so the dark look paints today's column in its own tint (the figures were 1.14:1 on #eff6ff)
 ok("today's column carries the wash and the '· today' suffix",
   _laBody.includes('", today"') && _laBody.includes('style={t ? { background: "var(--navy-soft)" } : {}}'));
-ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ahead; seven inline var(--navy-soft) washes (today's th and td, the summary row, the Horizon's commit th and two td); the week pill reads var(--muted) when off",
+// NARROWED 27 Oct 2026 (stockpile forecast, card 4): + the Horizon's stockpile strip's heading row keeps the commit wash (eight)
+ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ahead; eight inline var(--navy-soft) washes (today's th and td, the summary row, the Horizon's commit th and two td, the stockpile strip's heading cell); the week pill reads var(--muted) when off",
   !/#eff6ff|#64748b|#B45309/i.test(_laBody)
-  && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 7
+  && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 8
   && _laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
 ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not checked) — classes the dark look remaps — with no inline colour (was 11 px #64748b / #B45309, 3.64:1 in Dark)",
   _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700")}>')
@@ -700,24 +701,39 @@ ok("🔴 the Dashboard's stock table is gone: no DashboardStock component, no 'S
   && !_dsBody.includes("Stock held") && _dsBody.includes('type: "bar"') && _dsBody.includes('indexAxis: "y"'));
 ok("...it is read-only: no consume call, no input, in that component",
   !_dsBody.includes("/stockpiles/consume") && !_dsBody.includes("<input"));
-ok("...a bar is the balance as a % of the RECORDED capacity, red past 100 %, a dashed line at capacity; no-capacity stockpiles are listed, never drawn as 0 %",
-  _dsBody.includes("pct: bal * 100 / sp.capacity_qty") && _dsBody.includes('b.over ? "#DC2626"')
-  && _dsBody.includes("sp.capacity_qty != null && sp.capacity_qty > 0") && _dsBody.includes("No capacity recorded")
-  && _dsBody.includes("getPixelForValue(100)"));
-ok("...the week is picked with chips, defaulting to the week that holds today", _dsBody.includes("setWk(x.k)") && _dsBody.includes("nowKey"));
+// REVERSED 27 Oct 2026 (stockpile forecast, John's D10 a): the one-week bars became a weekly LINE chart over the Dashboard's months
+ok("...a line is the balance as a % of the RECORDED capacity, red dots past 100 %, a dashed line at capacity; no-capacity stockpiles are listed by name, never drawn as 0 %",
+  _dsBody.includes("const pct = (sp, w) => w.balance_end * 100 / sp.capacity_qty") && _dsBody.includes('pointBackgroundColor: tok("--red", "#DC2626")')
+  && _dsBody.includes("sp.capacity_qty != null && sp.capacity_qty > 0") && _dsBody.includes("stock with no capacity: ")
+  && _dsBody.includes("getPixelForValue(100)") && _dsBody.includes('type: "line"'));
+// REVERSED 27 Oct 2026 (stockpile forecast, John's D10 a): the one-week bars became a weekly LINE chart over the Dashboard's months
+ok("...the weeks are the Dashboard's own months (From / To, or the whole programme), not one picked week",
+  _dsBody.includes("fetch(`${API}/stockpiles?from_month=${lo}&to_month=${hi}`)") && !_dsBody.includes("setWk(")
+  && code.includes("from={fromM} to={toM} />"));
+ok("...solid to the last recorded week, dashed after it (the plan); a 'now' mark; the message first",
+  _dsBody.includes("segment: { borderDash: (c) => (c.p0DataIndex >= cut ? [6, 4] : undefined) }") && _dsBody.includes('ctx.fillText("now", x + 4, a.top + fs + 2);')
+  && _dsBody.includes("const msg = stockMessage(withCap);") && /function stockMessage\(sps\)\{/.test(code)
+  && code.includes('return { text: "None over in the next 8 weeks", tone: null, hits };')
+  && code.includes("`${h.sp.name} goes over in the week of ${stockWeekWord(h.w.from)}`"));
 ok("consumption is typed on the ACCOUNT view through /stockpiles/consume, for the account week",
   _laBody.includes("/stockpiles/consume") && /month_index: account\.week\.month_index,\s*week_index: account\.week\.week_index/.test(_laBody));
+// NARROWED 27 Oct 2026 (stockpile forecast): the rows split into the forecast stockpiles and the records-only places (folded)
 ok("...one box per stockpile, and an emptied box is null (not typed), not zero",
-  /consumed_qty: \(v === "" \? null : numOr\(v, null\)\)/.test(_laBody) && _laBody.includes("account.stock.map("));
+  /consumed_qty: \(v === "" \? null : numOr\(v, null\)\)/.test(_laBody) && _laBody.includes("account.stock.filter(s => s.forecast)")
+  && _laBody.includes("{fcs.map(s => row(s, true))}") && _laBody.includes("{rec.map(s => row(s, false))}"));
 ok("...and the balance is read from /stockpiles", code.includes("/stockpiles?from_month="));
 // ⭐ no capacity recorded is NOT zero capacity
+// NARROWED 27 Oct 2026 (D10 a): the Dashboard names the places with no capacity in one line (no "max —" list)
 ok("⭐ an unset capacity renders '—' / 'not recorded', never 0",
-  _dsBody.includes("· max —") && !_dsBody.includes("capacity_qty || 0")
+  _dsBody.includes("stock with no capacity: ") && !_dsBody.includes("capacity_qty || 0")
   && /s\.capacity_qty == null \? <span className="text-slate-500">not recorded<\/span>/.test(_laBody));   // 17 Oct 2026 (UI fix 4): slate-500, readable
+// NARROWED 27 Oct 2026 (D10 a): the over-capacity weeks are red dots on the line
 ok("over capacity uses the existing red, not a reserved route colour",
-  _dsBody.includes('b.over ? "#DC2626"') && !_dsBody.includes('over ? "#059669"'));
-ok("the panel says inbound comes from typed actuals only",
-  code.includes("a week nobody") && code.includes("reported counts as nothing"));
+  _dsBody.includes('pointBackgroundColor: tok("--red", "#DC2626")') && !_dsBody.includes('over ? "#059669"'));
+// REVERSED 27 Oct 2026 (stockpile forecast, John's D2): a week nobody recorded uses the PLAN, labelled — not nothing
+ok("the panel says a week nobody recorded uses the plan (it no longer counts as nothing)",
+  code.includes("A week nobody recorded uses the plan.") && !code.includes("reported counts as nothing")
+  && code.includes('"la.stock": { title: "Stockpiles", text: "Type what came out of each stockpile this week. Left empty, the plan is used.",'));
 ok("🔴 the Commit view's stock card is gone — the week map stands in its place",
   !_laBody.includes("Stock held") && _laBody.includes("<CommitMap ") && /function CommitMap\(/.test(code));
 ok("🔴 the word 'pile' never appears on its own — always 'stockpile' (the human, 10 Sep)",
@@ -1491,8 +1507,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   const al = alSrc.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
   ok("⭐ AL: the page exists as one section before the Public map, with its component and its helpers", alSrc.length > 8000
      && /function AbnormalPage\(\{ meta, access, who \}\)/.test(al) && /function AlAdvice\(/.test(al) && /function alClass\(adv\)/.test(al));
+  // NARROWED 27 Oct 2026 (stockpile forecast, D4 a): the Stockpiles item follows it, the last in the Plan group
   ok("⭐ AL: a Plan-group rail item after the Carbon planner, its own line icon, and the page switch on a desk only (a phone gets the desk-only card)",
-     /\{ id: "abnormal", label: "Abnormal loads", glyph: "⬌" \},\n  \]\},/.test(code) && /\n  abnormal: "M/.test(code)
+     /\{ id: "abnormal", label: "Abnormal loads", glyph: "⬌" \},\s*(\/\/[^\n]*\s*)?\{ id: "stockpiles", label: "Stockpiles", glyph: "▲" \},\n  \]\},/.test(code) && /\n  abnormal: "M/.test(code)
      && code.includes('{page === "abnormal" && !narrow && <AbnormalPage meta={meta} access={role} who={who} />}')
      && !/PHONE_PAGES = \[[^\]]*abnormal/.test(code));
   ok("🔴 AL: ONE read of the page (/abnormal), the preview from /abnormal/rules, and the writes: plan (POST), change (PUT), status, delete, the holidays fetch, the time bans",
@@ -1603,9 +1620,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && wk.includes("data-abnormal-week-row={m.id}") && wk.includes("{esc(m.escort_planned)}") && wk.includes("<AlChip tone=\"grey\">{m.candidates} to survey</AlChip>")
      && wk.includes("{(m.flags || []).map(f => <AlFlag key={f.code} f={f} />)}") && wk.includes("notify by {alDay(m.notify_by)}") && wk.includes("{ab.words}")
      && code.includes("{page && page.abnormal && page.abnormal.count > 0 && <AbnormalWeek ab={page.abnormal} />}"));
+  // NARROWED 27 Oct 2026 (stockpile forecast, D7): the two amber stockpile warnings join the gold list after NOTICE_DUE
   ok("AL2 rail: the four words in the rail's tables (NOTICE DUE a gold warning, the other three red)",
      src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
-     && src.includes('code === "NOTICE_DUE") ? "warn" : "bad";'));
+     && src.includes('code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";'));
   const st0 = src.indexOf("function AbnormalStrip({ onOpen }){"), st1 = src.indexOf("function DashboardToday({ meta, week, err, wall, fill }){");
   const st = src.slice(st0, st1);
   ok("⭐ AL2 Dashboard: one strip under Gate arrivals (not on the big screen, not on a phone): ONE read of /abnormal/summary, the next-4-weeks count, notices due with the chip, " +
@@ -2981,10 +2999,12 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>'));
   // 14 Oct 2026 (narrowed): the gate chart joins the stockpile chart — its height follows its rows too (one a gate)
   // NARROWED 14 Oct 2026 (bundle G, W7): + the CLP section's three row charts (routes, sites, councils), one row each too
-  ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the stockpile, gate and CLP row charts, whose height follows their rows)",
-     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 5
+  // NARROWED 27 Oct 2026 (stockpile forecast, D10 a): the stockpile chart is a line chart now and takes the box's own height
+  // (as the Stockpiles page's does), so four row charts are left: the gate chart and the CLP section's three
+  ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the gate and CLP row charts, whose height follows their rows)",
+     (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 4
      && src.includes('height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />') && src.includes('height={Math.max(150, 46 * capped(C.site_caps.rows).length + 50)} />')
-     && src.includes('height={Math.max(170, 40 * (C.councils.rows || []).length + 80)} />') && src.includes("<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />") && /<ChartCanvas config=\{cfg\} height=\{Math\.max\(wall \? 220 : 160, 36 \* bars\.length \+ 40\)\} \/>/.test(src)
+     && src.includes('height={Math.max(170, 40 * (C.councils.rows || []).length + 80)} />') && src.includes("<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />") && !/<ChartCanvas config=\{cfg\} height=/.test(src)
      && !/height=\{wall \? \d+ : \d+\} \/>/.test(_db.replace(/<CommitMap[^>]*>/g, "")));
   ok("W5: a chart is built only once its box has a size; a ResizeObserver resizes it and moves the legend across 768 / 1024 px",
      _cc.includes("const ro = new ResizeObserver(") && _cc.includes("if(!sized || !ref.current || !window.Chart) return;")
@@ -3130,9 +3150,12 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      _td.includes('(fill ? " today-figs" : " xl:grid-cols-4")') && _td.includes("today-lines") && _td.includes('lg:col-span-3 today-map')
      && _td.includes("flush fill={fill} />") && /\.dash-wall\.dash-fill \.today-lines\{max-height:none !important;overflow:hidden;\}/.test(html)
      && src.includes('<div ref={mapDiv} style={fill ? { flex: "1 1 auto", minHeight: 0 } : { height: height || 380 }} />'));
-  ok("BIG SCREEN: the stockpile chart takes its card, and each bar names its fill in words (no hover on a TV)",
-     _sc.includes('(fill ? <ChartCanvas config={cfg} size="fill" /> : <ChartCanvas config={cfg} height={Math.max(wall ? 220 : 160, 36 * bars.length + 40)} />)')
-     && _sc.includes('(b.over ? " · over capacity" : b.pct >= 90 ? " · nearly full" : "")') && _sc.includes("plugins: [capLine, barLabels] };")
+  // REVERSED 27 Oct 2026 (stockpile forecast, D10 a): the big screen shows the same weekly LINE chart filled; the message in
+  // big type says which stockpile goes over and when (no hover on a TV), the text follows the screen's height
+  ok("BIG SCREEN: the stockpile chart takes its card, and its message says which stockpile goes over and when (no hover on a TV)",
+     _sc.includes('{withCap.length ? (fill ? <ChartCanvas config={cfg} size="fill" /> : <ChartCanvas config={cfg} />)')
+     && _sc.includes('<span className={fill ? "ch-val kpi-num" : "text-lg font-bold"} style={msgStyle}>{msg.text}</span>') && _sc.includes("plugins: [capLine] };")
+     && _sc.includes("const fs = wall ? sf : 11;")
      && /\.chart-box\.is-fill\{height:100%;min-height:0;\}/.test(html));
   ok("BIG SCREEN: eight charts no longer share one screen — Charts has the four a planner reads first, More charts (5th, added last) the other four, each 2 × 2",
      (_db.match(/<div className="wall-charts">/g) || []).length === 2 && /\{ key: "more",   title: "More charts" \}/.test(src)
@@ -3166,9 +3189,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("DESIGN: the headlines say what the number is measured against (delivered of plan, planned vs the model, share of tonnes, per tonne)",
      _wall.includes('label="of the plan delivered"') && _wall.includes('`${bigNum(K.actualT)} t reported of ${bigNum(K.totT)} t planned`')
      && _wall.includes('"the fair-price model"') && _wall.includes("% of the tonnes in view`") && _wall.includes("kg for each tonne moved`"));
-  ok("DESIGN: the stockpile screen opens with how many are over capacity (red), nearly full, with room, and with no capacity recorded",
-     _sc.includes('{nOver ? `${nOver} over capacity` : "None over capacity"}') && _sc.includes("`${noCap.length} with no capacity recorded`")
-     && _sc.includes("maxBarThickness: fill ? Math.round(sf * 4.5) : 40"));
+  // REVERSED 27 Oct 2026 (stockpile forecast, D10 a): the stockpile screen opens with the first one to go over in the next 8
+  // weeks (red) or run out (amber), else "None over in the next 8 weeks", and how many more; the places with no capacity by name
+  ok("DESIGN: the stockpile screen opens with the first stockpile to go over (red) or run out (amber) in the next 8 weeks, or none, and names the places with no capacity",
+     _sc.includes('const msgStyle = msg.tone === "bad" ? { color: "var(--bad-text)" } : msg.tone === "warn" ? { color: "var(--warn-text)" } : undefined;')
+     && _sc.includes("` · ${msg.hits.length - 1} more in the next 8 weeks`") && _sc.includes("stock with no capacity: {noCap.map(sp => sp.name).join(\", \")}."));
   ok("DESIGN: every chart's value axis starts at zero, with compact ticks, and a bar is capped at 4.5 × its text (fitChartConfig)",
      /if\(vax\.beginAtZero == null && vax\.min == null\) vax\.beginAtZero = true;/.test(src) && /if\(!vt\.callback\) vt\.callback = compactTick;/.test(src)
      && /o\.datasets = \{ \.\.\.\(o\.datasets \|\| \{\}\), bar: \{ maxBarThickness: Math\.round\(fsz \* 4\.5\)/.test(src)
@@ -3266,8 +3291,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("⭐ W17: the rail names GATE OVER CAPACITY / GATE NEAR CAPACITY (as the exports do); near is a gold warning, over red",
      // NARROWED 22 Oct 2026 (abnormal loads, phase 2): the rail's table goes on with the four abnormal-load words after GATE NEAR CAPACITY
      src.includes('GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",') && src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
-     && src.includes('GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR" };')
-     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE") ? "warn" : "bad";')
+     // NARROWED 27 Oct 2026 (stockpile forecast, D7): the grid's table and the tone go on with STOCKPILE SOON / EMPTY (amber)
+     && src.includes('GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY" };')
+     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";')
      && src.includes('<i style={{ background: laTone(f.code) === "warn" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i>')
      && /"GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"/.test(fs.readFileSync(path.join(ROOT, "backend", "export.py"), "utf8")));
   // W8: the data fields
@@ -4191,6 +4217,58 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && _ug27.includes("Admins add everyone else on Users; each person then sets a password and two-step sign-in.") && _ug27.includes("rules as read on 16 Oct 2026")
      && _tg.includes('<code>abnormal_rules.ADVICE_WORDS</code> ("Advice from the typed figures. The haulier, ESDAL, the police and the road and bridge authorities decide.")')
      && _tg.includes("<li><strong>27 Oct 2026, the final UI pass.</strong>"));
+}
+
+// ---- 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast; John's D0–D12 and the mockup
+// notes\stockpile-forecast-mockup-1027\, "A,a,i"): the new Plan → Stockpiles page, the Dashboard's line chart, the
+// Account's plan figures and Next 8 weeks, the Horizon strip, the two amber rail words, and no location code on screen.
+{
+  const _sp = src.slice(src.indexOf("function StockpilesPage({ meta, access, who }){"), src.indexOf("function AbnormalPage({ meta, access, who }){"));
+  ok("STOCKPILES: a Plan-group page on a desk (a phone gets the desk-only card), its own line icon",
+     src.includes('{ id: "stockpiles", label: "Stockpiles", glyph: "▲" },') && /\n  stockpiles: "M/.test(src)
+     && src.includes('{page === "stockpiles" && !narrow && <StockpilesPage meta={meta} access={role} who={who} />}') && _sp.length > 6000);
+  ok("STOCKPILES: ONE read of the balance (the whole programme) and ONE of the plan; the writes are the plan, the count and (admins) the capacity",
+     (_sp.match(/fetch\(`\$\{API\}\/stockpiles/g) || []).length === 2 && _sp.includes("fetch(`${API}/stockpiles?from_month=1&to_month=${months.count}`)")
+     && _sp.includes("fetch(`${API}/stockpiles/plan`)") && _sp.includes('put("/stockpiles/plan", { location_id: sp.location_id, from_month: m, planned_qty: q')
+     && _sp.includes('put("/stockpiles/count", { location_id: sp.location_id, month_index: w.month_index, week_index: w.week_index, measured_qty: q')
+     && _sp.includes("put(`/locations/${encodeURIComponent(sp.location_id)}/capacity`, body"));
+  ok("STOCKPILES: D6 — planners and admins type the plan and the count; a team login reads the same page with no boxes; only an admin types the capacity",
+     _sp.includes("const canPlan = !!(access && access.can_approve);") && _sp.includes("const canCap = isAdminLogin(access);")
+     && _sp.includes("{canPlan ? <input") && _sp.includes("{canPlan && pastWeeks.length > 0 && (") && _sp.includes("{canCap ? <span"));
+  ok("STOCKPILES: the planned use is a year of months, plus 'Same each month from … to …' (one PUT for the range)",
+     _sp.includes('Planned use <span className="font-normal text-slate-500">{u} a month, laid on the works</span>')
+     && _sp.includes("Same each month from") && _sp.includes("from_month: Math.min(a, b), to_month: Math.max(a, b), planned_qty: q"));
+  ok("STOCKPILES: an emptied month clears it (null, not 0); a negative figure is refused in words",
+     _sp.includes('const q = v === "" ? null : numOr(v, NaN);') && _sp.includes('say(false, "Planned use must be a number, 0 or more.")'));
+  ok("STOCKPILES: the stock count names the week, and the last count says how far it was from the worked-out figure",
+     _sp.includes("At the end of the week of") && _sp.includes('than worked out` : "")') && _sp.includes('"No stock count yet."'));
+  ok("STOCKPILES: the status line — goes over (red) / runs out (amber) / nearly full (amber) / never over (green) — and its own forecast line",
+     _sp.includes("`Goes over in the week of ${stockWeekWord(sp.first_over.from)}") && _sp.includes("`Runs out in the week of ${stockWeekWord(sp.first_empty.from)}")
+     && _sp.includes("`Nearly full: ${Math.round(sp.peak_pct)} %") && _sp.includes("`Never over: ${Math.round(sp.peak_pct)} % at most`")
+     && _sp.includes("segment: { borderDash: (c) => (c.p0DataIndex >= cut ? [6, 4] : undefined) }"));
+  ok("STOCKPILES: failures in words (errSay), never a status number", _sp.includes('errSay("The stockpiles did not load.", e)')
+     && _sp.includes('"The planned use was not saved."') && _sp.includes('"The stock count was not saved."') && !/\$\{r\.status\}/.test(_sp));
+  const _la = src.slice(src.indexOf("account.week && (account.stock || []).length > 0 && (() => {"), src.indexOf("horizon.rows.length === 0 ? ("));
+  ok("ACCOUNT: 🔴 no location code on screen any more ({s.loc_type} · {s.location_id} is gone; the Dashboard names places, not codes)",
+     !src.includes("{s.loc_type} · {s.location_id}") && !src.includes("`${sp.loc_type} · ${sp.location_id}") && _la.length > 2000);
+  ok("ACCOUNT: In shows the record with the plan under it in grey; the Out box's hint is the planned figure; 'plan used' under Closing",
+     _la.includes('{s.inbound_recorded == null ? "—" : grp(s.inbound_recorded, 1)}<div className="text-[12px] text-slate-500" data-stock-plan-in="1">plan {grp(s.plan_in)}</div>')
+     && _la.includes('placeholder={s.forecast ? `plan ${grp(s.plan_out)}` : "out —"}') && _la.includes(">plan used</div>"));
+  ok("ACCOUNT: Next 8 weeks — over from <week> (red), runs out <week> (amber), fine + the fullest % (green), 'No use planned yet'",
+     _la.includes(">Next 8 weeks</th>") && _la.includes("over from {stockWeekWord(nx.week_from)}") && _la.includes("runs out {stockWeekWord(nx.week_from)}")
+     && _la.includes('<span style={{ color: "var(--ok-text)" }}>fine</span>') && _la.includes("No use planned yet"));
+  ok("ACCOUNT: the places with neither a capacity nor a plan fold under the table, records only",
+     _la.includes('data-stock-records="1"') && _la.includes('more {rec.length === 1 ? "place" : "places"} with no capacity: records only'));
+  ok("HORIZON: one stockpile strip under the week rows — % at the week's end, amber from 90 %, red over",
+     src.includes('<tbody data-horizon-stock="1">') && src.includes('const tone = c.over ? "over" : c.pct >= 90 ? "near" : "ok";')
+     && src.includes(`Stockpiles <span className="font-normal text-slate-500">% full at the week's end</span>`));
+  ok("RAIL: STOCKPILE SOON / STOCKPILE EMPTY are words in both tables, amber, ranked with the warnings",
+     src.includes('STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",') && src.includes('STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7 };')
+     && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";'));
+  ok("DASHBOARD: a stockpile with no planned use never leads the message (as the rail's STOCKPILE SOON)",
+     /function stockMessage\(sps\)\{[\s\S]{0,400}if\(!sp\.use_planned\) return;/.test(src));
+  ok("DASHBOARD: the 'No use planned yet' line names a stockpile with a capacity and no plan",
+     src.includes('{noPlan.length > 0 && <div className="text-[13px] text-slate-500 mt-1" data-stock-noplan="1">No use planned yet: {noPlan.map(sp => sp.name).join(", ")}.</div>}'));
 }
 
 console.log();

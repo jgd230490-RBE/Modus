@@ -1046,7 +1046,9 @@ for _m in _TW.finditer(_fe_wo):
 # their own dark rule maps to --control-fg, so no text-white is left on a FIXED zone colour (finding 7 closed). The routing
 # zone's "Stop placing" shares its button with the haul one and keeps ZONE_ROUTING #DC2626 (white on it 4.83:1, every look).
 ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on an inline var(--navy) and 1 on var(--blue) (the dark rule maps them to --control-fg), 2 on bg-slate-800 (remapped), the team pill, the 4 haul-road buttons on var(--haul-text) (their own dark rule, 22 Oct) and none on a fixed zone colour — none on var(--green) or the Confirm pair, none unknown",
-   len(_sites.get("navy", [])) == 13 and len(_sites.get("blue", [])) == 1 and len(_sites.get("slate-800", [])) == 2
+   # NARROWED 27 Oct 2026 (stockpile forecast): 14 — the Dashboard stockpile chart's week chips are gone (−1); the
+   # Stockpiles page's picked stockpile and picked year are white on var(--navy) (+2)
+   len(_sites.get("navy", [])) == 14 and len(_sites.get("blue", [])) == 1 and len(_sites.get("slate-800", [])) == 2
    and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
 ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",
@@ -1118,7 +1120,8 @@ def _text_uses(tok):
     return out
 ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the markup — the 10 uses left are the progress bar's fill, a card's border (×4: the abnormal loads' note card since 22 Oct), the status dots (×3), the carbon-tone dot and the row-status icon",
    # NARROWED 27 Oct 2026: 11 — + the organisation file's message border (Config, F3 c), a border like the four above
-   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 11 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
+   # NARROWED 27 Oct 2026 (stockpile forecast): 12 — + the Stockpiles page's saved-message border, a border like the others
+   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 12 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
    and "text-[color:var(--green)]" not in fe and "text-emerald-600" not in fe, str(_text_uses("var(--green)"))[:300])
 ok("...nor var(--gold): the 7 uses left are the gate-arrivals key, the warning triangle, a note's border, the status dots (×2), the carbon-tone dot and the flag chip's triangle; the Submit strip's text-[color:var(--gold)] is gone (decision 3)",
    not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 7 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
@@ -1135,7 +1138,9 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    and 'style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>' in fe
    # NARROWED 22 Oct 2026 (finding #40): bad-text 6 -> 8, the Horizon commit column's short and month-changed words;
    # NARROWED 27 Oct 2026 (UI fix 10): bad-text 11 -> 14, the two Look-ahead error boxes and the save message (--red was 4.39:1 on the rose)\n   # and (abnormal loads, the same day) bad-text 8 -> 11, warn-text 2 -> 6: the .al-bad / .al-warn chips, the route-error line, the limits over, .al-notes, the route and candidate notes
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 14 and _fe_wo.count("var(--warn-text)") == 6
+   # NARROWED 27 Oct 2026 (stockpile forecast): bad-text 14 -> 18, warn-text 6 -> 10 — the stockpile words: the Dashboard's message,
+   # the Account's "Next 8 weeks", the Horizon strip's cells and the Stockpiles page's status, each red (over) or amber (runs out / near)
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 18 and _fe_wo.count("var(--warn-text)") == 10
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe
    and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--ok-text)\" }}>" in fe and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--navy-deep)\" }}>" in fe)

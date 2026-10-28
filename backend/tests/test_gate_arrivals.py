@@ -867,7 +867,11 @@ ok("⭐ DAY SHEET: the flags rank as the grid's LA_FLAG_RANK — GATE OVER after
    "MONTH CHANGED, before NOT ROUTED",
    list(_export.DAY_FLAG_RANK) == _lfr and set(_export.DAY_FLAG_RANK) == set(_clashes.CODES)
    and _export.DAY_FLAG_RANK.index("GATE_OVER") == _export.DAY_FLAG_RANK.index("ROUTE_CAP") + 1
-   and _export.DAY_FLAG_RANK.index("GATE_NEAR") == _export.DAY_FLAG_RANK.index("UNBAKED") - 1, str((_export.DAY_FLAG_RANK, _lfr)))
+   # NARROWED 27 Oct 2026 (stockpile forecast, D7): STOCKPILE EMPTY and STOCKPILE SOON, the two amber stockpile warnings,
+   # rank after GATE NEAR and before NOT ROUTED
+   and _export.DAY_FLAG_RANK.index("GATE_NEAR") == _export.DAY_FLAG_RANK.index("UNBAKED") - 3
+   and _export.DAY_FLAG_RANK[_export.DAY_FLAG_RANK.index("GATE_NEAR") + 1:_export.DAY_FLAG_RANK.index("UNBAKED")] == ("STOCKPILE_EMPTY", "STOCKPILE_SOON"),
+   str((_export.DAY_FLAG_RANK, _lfr)))
 # the week as the page reads it: every weekday's rows carry only that day's dated flags (and every undated one)
 _dsw = {}
 for _x in _gw["dates"]:

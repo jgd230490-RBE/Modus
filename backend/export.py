@@ -248,6 +248,8 @@ def _team_namer():
 
 # What a person reads for each clash code — the same names the user guide's §10.1 uses.
 FLAG_LABEL = {"SHORTAGE": "SHORTAGE", "DAYS_NE_WEEK": "DAYS ≠ WEEK", "STOCKPILE_OVER": "STOCKPILE OVER",
+              # 27 Oct 2026 (stockpile forecast, D7): the two amber stockpile warnings
+              "STOCKPILE_SOON": "STOCKPILE SOON", "STOCKPILE_EMPTY": "STOCKPILE EMPTY",
               "ROUTE_CAP": "ROUTE CAP", "IPT_SHARE": "SHARE",
               # H1: the restriction flag reads the provider's word (TARK TEE / ROADWORKS);
               # see _flag_label(), which reads it off the flag itself
@@ -881,14 +883,16 @@ def build_pdf(page):
 #: 17 Oct 2026: + the gate flags where the grid ranks them (GATE_OVER 3.5 beside the route cap, GATE_NEAR 7.5 with the
 #: warnings); they had no rank and sorted after NOT ROUTED, so a gate over capacity hid behind SHARE
 DAY_FLAG_RANK = ("LIMIT", "RESTRICTION", "SHORTAGE", "ROUTE_CAP", "GATE_OVER", "STOCKPILE_OVER", "IPT_SHARE",
-                 "DAYS_NE_WEEK", "PARENT_CHANGED", "GATE_NEAR", "UNBAKED")
+                 "DAYS_NE_WEEK", "PARENT_CHANGED", "GATE_NEAR", "STOCKPILE_EMPTY", "STOCKPILE_SOON", "UNBAKED")
 #: the words a person reads on the sheet (the grid's LINE_FLAG_LABEL, with the restriction's own word from the flag).
 #: 17 Oct 2026: + GATE OVER / GATE NEAR, the grid's and the phone day card's words (the sheet printed "GATE_OVER"); the
 #: rail's longer GATE OVER CAPACITY (FLAG_LABEL) would wrap the FLAG column, and the sentence under it names the capacity
 DAY_FLAG_WORD = {"LIMIT": "ROAD LIMIT", "RESTRICTION": "RESTRICTION", "SHORTAGE": "SHORT", "ROUTE_CAP": "CAP",
                  "STOCKPILE_OVER": "STOCKPILE OVER", "IPT_SHARE": "SHARE", "DAYS_NE_WEEK": "DAYS NOT = WEEK",
                  "PARENT_CHANGED": "MONTH CHANGED", "UNBAKED": "NOT ROUTED",
-                 "GATE_OVER": "GATE OVER", "GATE_NEAR": "GATE NEAR"}
+                 "GATE_OVER": "GATE OVER", "GATE_NEAR": "GATE NEAR",
+                 # 27 Oct 2026 (stockpile forecast): 15 characters at most, the FLAG column's width
+                 "STOCKPILE_SOON": "STOCKPILE SOON", "STOCKPILE_EMPTY": "STOCKPILE EMPTY"}
 
 
 #: flag sentences printed in full under the counts; the rest are counted (every one is in the Look-ahead)

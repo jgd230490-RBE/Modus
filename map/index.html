@@ -2458,15 +2458,21 @@
         else if (kind === 'Quarry') h += `<p style='margin:4px 0;'><b>Material:</b> ${props.material || '—'}</p>`;
         if (props.aux_info) h += props.aux_info;
         // Week 1, Task D2. 'Stock 1 240 t / 3 000 t', and ONLY when both numbers exist —
-        // half the sentence would read as a pile with no limit. No chart.
+        // half the sentence would read as a stockpile with no limit. No chart.
+        // 27 Oct 2026 (stockpile forecast, D9 a + i): the figure is the month on screen's (applyStockMonth), with
+        // "forecast" or "recorded" under it. Over capacity is a site matter: the server sends `over` and a figure above
+        // the capacity to signed-in staff only; the public reads "full".
         if (props.stock_balance != null && props.capacity_qty != null) {
             const u = props.capacity_unit === 'm3' ? 'm³' : (props.capacity_unit || 't');
-            const over = !(props.stock_over === false || props.stock_over === 'false');
-            h += `<p style='margin:4px 0;'><b>Stock:</b> ` +
-                 `<span style="color:${over ? '#DC2626' : 'inherit'};font-weight:${over ? '700' : '400'}">` +
-                 `${Number(props.stock_balance).toLocaleString()} ${u}</span>` +
-                 ` / ${Number(props.capacity_qty).toLocaleString()} ${u}` +
-                 `${over ? ' — over capacity' : ''}</p>`;
+            const over = props.stock_over === true || props.stock_over === 'true';
+            const full = !over && (props.stock_full === true || props.stock_full === 'true');
+            const bal = Number(props.stock_balance), cap = Number(props.capacity_qty);
+            h += `<p style='margin:4px 0;'><b>Stock:</b> ` + (full ? 'full' :
+                 `<span style="color:${over ? '#B91C1C' : 'inherit'};font-weight:${over ? '700' : '400'}">` +
+                 `${Math.round(bal).toLocaleString()} ${u}</span> / ${Math.round(cap).toLocaleString()} ${u}` +
+                 `${over ? ` — ${Math.round(bal - cap).toLocaleString()} ${u} over capacity` : ''}`) + `</p>`;
+            if (props.stock_month) h += `<p style='margin:2px 0 4px;font-size:12.5px;color:#475569;'>` +
+                 `${props.stock_basis === 'forecast' ? 'forecast' : 'recorded'}, end of ${monthLabel(Number(props.stock_month))}</p>`;
         }
         // Phase 2.5a — a slot the Street View thumbnail drops into once the free metadata
         // check has said there is imagery. Empty until then, and it stays empty for a
@@ -3116,12 +3122,39 @@
         const ids = new Set(); payloads.forEach(p => ((p && p.abnormal_loads) || []).forEach(id => ids.add(id)));
         el.textContent = String(ids.size); el.classList.add(ids.size ? 'abn-on' : 'abn-zero');
     }
+    // 27 Oct 2026 (stockpile forecast, D9 a + i): each stockpile's gauge and popup follow the month on screen (this
+    // month with no month picked), from the stockpile timeline: the forecast for this month and later, the record
+    // before. The public reads the figure capped at the capacity ("full"); only a staff read carries `over`, so the
+    // red ring is staff-only. The layer's data is set again only when a gauge changes step.
+    function applyStockMonth() {
+        if (!WARN.piles || !a1_data || !a1_data.features) return;
+        const m = (typeof mapModeMonth === 'function' ? mapModeMonth() : null) || WARN.pilesMonth;
+        if (!m) return;
+        let changed = false;
+        a1_data.features.forEach(f => {
+            const p = f.properties;
+            if (!p || p.type !== 'Node') return;
+            const sp = WARN.piles.find(x => x.location_id === p.id);
+            const e = sp && sp.months && sp.months[String(m)];
+            if (!e) return;
+            p.stock_balance = e.balance_end; p.stock_over = !!e.over; p.stock_full = !!e.full;
+            p.stock_basis = e.basis; p.stock_month = m;
+            const k = locIconKey(p);
+            if (k !== p.loc_icon) { p.loc_icon = k; changed = true; }
+        });
+        if (changed && map && map.getSource) {
+            addLocationImages(map || null);
+            const src = map.getSource('routes-source');
+            if (src) src.setData(a1_data);
+        }
+    }
     function applyFilters() {
         // 23 Oct 2026: the public abnormal loads follow the month on screen (every path that moves it ends here)
         try { if (typeof ABP !== 'undefined' && ABP.data) applyAbnormalPublicMonth(); } catch (e) {}
         const o = document.getElementById('filter-origin').value; const d = document.getElementById('filter-dest').value;
         const disc = document.getElementById('filter-discipline').value; const i = document.getElementById('filter-ipt').value;
         syncFilterReset();
+        try { applyStockMonth(); } catch (e) {}      // 27 Oct 2026: and so do the stockpile gauges
         const inVis = document.getElementById('layer-inbound').checked; const outVis = document.getElementById('layer-outbound').checked;
 
         calculateKPIs(o, d, disc, i);
@@ -7600,22 +7633,15 @@
         if (shown === null) shown = 'just over ' + cap;
         return `${rid}: ${shown} two-way movements a day against a planning flag of ${cap}`;
     }
-    // the last month whose end-of-month balance differs from the month before it: the last month anything was
-    // recorded against the pile (the stockpile timeline carries the balance forward to month 60 from actuals only)
-    function pileLastRecorded(sp) {
-        const ms = Object.keys((sp && sp.months) || {}).map(Number).filter(n => n > 0).sort((a, b) => a - b);
-        let last = null, prev = null;
-        ms.forEach(m => { const b = Number(sp.months[String(m)].balance_end) || 0; if (prev === null ? b !== 0 : b !== prev) last = m; prev = b; });
-        return last;
-    }
     function pileSentence(sp, month, u) {
         const mm = sp.months[String(month)];
         // 12 Oct 2026 (the base merge; Track B's bulletin wording): "has a capacity of", not "holds" — "holds" read as
-        // what is in the pile now, and the next figure is the recorded balance, a different number
+        // what is in the stockpile now, and the next figure is the balance, a different number.
+        // 27 Oct 2026 (stockpile forecast): the balance runs forward from the plan, so a month says whether its figure is
+        // the forecast (this month and later) or recorded (before). Only a staff read carries `over` (D9 a + i).
         const head = `${sp.name} has a capacity of ${Math.round(sp.capacity_qty).toLocaleString()} ${u}; ${Math.round(mm.balance_end).toLocaleString()} ${u}`;
-        const last = pileLastRecorded(sp);
-        if (last !== null && month > last) return `${head} recorded at the end of ${monthLabel(last)}; nothing recorded since.`;
-        return `${head} recorded in it at the end of ${monthLabel(month)}.`;
+        return mm.basis === 'forecast' ? `${head} forecast at the end of ${monthLabel(month)}.`
+                                       : `${head} recorded at the end of ${monthLabel(month)}.`;
     }
     // ---- end of the fix-pass helpers ----
     // 12 Oct 2026 (live A1): every hit carries from / to and is filtered to the month on screen
@@ -7633,7 +7659,7 @@
         if (WARN.piles) return WARN.piles;
         if (!WARN.pilesPending) WARN.pilesPending = fetch(CONFIG.API_BASE + '/public/stockpile-timeline?from=1&to=' + (CONFIG.MONTH_COUNT || 60))
             .then(r => r.ok ? r.json() : { stockpiles: [] })
-            .then(j => { WARN.piles = (j && j.stockpiles) || []; return WARN.piles; })
+            .then(j => { WARN.piles = (j && j.stockpiles) || []; WARN.pilesMonth = (j && j.current_month) || null; applyStockMonth(); return WARN.piles; })
             .catch(() => { WARN.piles = []; return WARN.piles; });
         return WARN.pilesPending;
     }
@@ -7856,8 +7882,9 @@
                 sort: worst.severity === 'breach' ? 1 : 2 });
         });
         // 2. stockpiles over at the end of this month -> CLASH
-        // D23 (12 Oct 2026): the balance is actuals-derived, so the sentence says "recorded",
-        // not "the plan puts" — it is what the stockpile timeline has on record, not a plan figure.
+        // D23 (12 Oct 2026): the sentence never says "the plan puts". 27 Oct 2026 (stockpile forecast, D9 a + i): the
+        // balance runs forward, so it says "forecast" or "recorded" for the month; `over` reaches a signed-in staff
+        // viewer only (the server strips it for the public), so this row and the timeline's mark are staff-only.
         (piles || []).forEach(sp => {
             const mm = sp.months && sp.months[String(month)];
             if (!mm || !mm.over) return;

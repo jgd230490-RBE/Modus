@@ -2238,7 +2238,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
       cut(html, '<div id="timeline-bar"', '<div id="tl-live"'), cut(html, '<div id="zone-kinds"', "Existing rail network"),
     ].join(" ");
     const must = ["nothing approved", "loading figures", "Paused at ", "playback paused: ", "Over a planning flag",
-                  "two-way movements a day against a planning flag of", "routes over planning flags", "nothing recorded since",
+                  // NARROWED 27 Oct 2026 (stockpile forecast): "nothing recorded since" is gone; a future month says "forecast at the end of"
+                  "two-way movements a day against a planning flag of", "routes over planning flags", "forecast at the end of",
                   "Full horizon", "Advisory", "Weight / height limit"];
     const missing = must.filter(w => !readable.includes(w));
     ok("wording: nothing a person reads in the new strings says truck, real-time, live tracking, AI, optimise, predict or secure",
@@ -2588,10 +2589,12 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("the map's stockpile sentence says 'has a capacity of N; M recorded', the bulletin's words, never 'holds'",
      code.includes("const head = `${sp.name} has a capacity of ${Math.round(sp.capacity_qty).toLocaleString()} ${u}; ${Math.round(mm.balance_end).toLocaleString()} ${u}`;")
      && !code.includes("${sp.name} holds "));
-  ok("row 3 / D23: the stockpile sentence says what is recorded at month end, not what 'the plan puts'",
-     code.includes("recorded in it at the end of ${monthLabel(month)}.") && !code.includes("The plan puts")
-     // 12 Oct fix pass: a month after the last recorded movement carries the balance forward and says so
-     && code.includes("recorded at the end of ${monthLabel(last)}; nothing recorded since.") && code.includes("what: pileSentence(sp, month, u), sort: 0"));
+  // REVERSED 27 Oct 2026 (stockpile forecast): the balance runs forward from the plan, so a month says "forecast" (this month
+  // and later) or "recorded" (before); the "last record carried forward" sentence and pileLastRecorded are gone
+  ok("row 3 / D23: the stockpile sentence says recorded or forecast at month end, never what 'the plan puts'",
+     code.includes("`${head} forecast at the end of ${monthLabel(month)}.`") && code.includes("`${head} recorded at the end of ${monthLabel(month)}.`")
+     && !code.includes("The plan puts") && !code.includes("nothing recorded since") && !code.includes("function pileLastRecorded(")
+     && code.includes("what: pileSentence(sp, month, u), sort: 0"));
 }
 
 // ---- 12 Oct 2026 — the mobile hotfix (review 2.8, live A6), names and the small bugs (claude/mr1-mobile) -------
@@ -2885,7 +2888,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         api = new Function("document", "window", "ResizeObserver", "setTimeout", "CONFIG", "fetch", "a1_data", "routePassesFilters", "TL", "map", "RESTR",
           "coordsBounds", "selectRoute", "reducedMotion", "monthSpan", "dnum", "stopTimeline", "announceTimeline", "monthLabel", "kpiFetchMonth",
           "FORECAST_WORKING_DAYS", "META", "setRestrictionHits", "setCapBadges", "KPI",
-          src.slice(a, b) + "\nreturn { WARN, renderTimelineWarnings, dismissWarning, showRestrictionHit, renderConditionsPill, capSentence, pileSentence, pileLastRecorded, splitHitRowId };")(
+          src.slice(a, b) + "\nreturn { WARN, renderTimelineWarnings, dismissWarning, showRestrictionHit, renderConditionsPill, capSentence, pileSentence, splitHitRowId };")(
           document, { innerWidth: 1280, innerHeight: 800, addEventListener() {} }, function () { this.observe = () => {}; }, () => {},
           { API_BASE: "", MONTH_COUNT: 60, START_YEAR: 2026 }, () => { throw new Error("fetch must not be called"); }, a1_data, () => true, TL, map, RESTR,
           () => [0, 0, 1, 1], rid => rec.select.push(rid), () => false, monthSpan, dnum,
@@ -2898,7 +2901,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
         const hit = { event_number: "E1", from: "2026-10-16T00:00:00", to: "2026-10-17T23:59:00", label: "Planned road closures", what: "A46 closure", severity: "hit" };
         W.restr = { R2: { hits: [hit] }, R5: { hits: [hit] } };
         W.piles = [{ location_id: "L1", name: "Langton stockpile", capacity_qty: 40000, unit: "t",
-                     months: { "9": { balance_end: 30000, over: false }, "10": { balance_end: 40510, over: true }, "11": { balance_end: 40510, over: true }, "12": { balance_end: 40510, over: true } } }];
+                     // 27 Oct 2026 (stockpile forecast): each month carries its basis (the timeline's); a staff read, so `over` is there
+                     months: { "9": { balance_end: 30000, over: false, basis: "recorded" }, "10": { balance_end: 40510, over: true, basis: "recorded" }, "11": { balance_end: 40510, over: true, basis: "forecast" }, "12": { balance_end: 40510, over: true, basis: "forecast" } } }];
         // the pure helpers
         ok("⭐ the cap sentence names its unit and the flag: 'R016: 32 two-way movements a day against a planning flag of 20'",
            api.capSentence("R016", 32.2, 20) === "R016: 32 two-way movements a day against a planning flag of 20");
@@ -2911,7 +2915,10 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
            api.capSentence("R1", 441 / 22, 20));
         ok("...and a figure too close to show reads 'just over 20', never '20.000'",
            api.capSentence("R1", 20.0001, 20) === "R1: just over 20 two-way movements a day against a planning flag of 20");
-        ok("the last month anything was recorded against a pile is the last month its balance moved (Oct here)", api.pileLastRecorded(W.piles[0]) === 10);
+        // REVERSED 27 Oct 2026 (stockpile forecast): no "last recorded month" any more — each month says what its figure is
+        ok("the stockpile sentence of a FUTURE month says 'forecast at the end of', of a past one 'recorded at the end of'",
+           api.pileSentence(W.piles[0], 12, "t").endsWith(" t forecast at the end of Dec 2026.")
+           && api.pileSentence(W.piles[0], 9, "t").endsWith(" t recorded at the end of Sep 2026."), api.pileSentence(W.piles[0], 12, "t"));
         ok("a row id splits into its event and its route; an old bare event id still works",
            JSON.stringify(api.splitHitRowId("00525419-001|R002")) === '{"ev":"00525419-001","rid":"R002"}' && api.splitHitRowId("E9").rid === null);
         api.renderConditionsPill([{ src: "cap", lvl: "warn" }, { src: "cap", lvl: "warn" }]);
@@ -2927,8 +2934,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
              && box().includes("R2: 32 two-way movements a day against a planning flag of 20") && !box().includes("planning cap"));
           ok("...and the pill counts it as '1 route over a planning flag'", pill().includes("1 route over a planning flag"), pill());
           // NARROWED 12 Oct 2026 (the base merge; Track B's bulletin wording): "has a capacity of N t;", not "holds N t."
-          ok("the stockpile sentence in a month with a record: '… has a capacity of 40,000 t; 40,510 t recorded in it at the end of Oct 2026.'",
-             box().includes(`Langton stockpile has a capacity of ${(40000).toLocaleString()} t; ${(40510).toLocaleString()} t recorded in it at the end of Oct 2026.`)   // the page formats with the reader's locale
+          // NARROWED 27 Oct 2026 (stockpile forecast): "recorded at the end of" (the "in it" went with the forecast wording)
+          ok("the stockpile sentence in a month with a record: '… has a capacity of 40,000 t; 40,510 t recorded at the end of Oct 2026.'",
+             box().includes(`Langton stockpile has a capacity of ${(40000).toLocaleString()} t; ${(40510).toLocaleString()} t recorded at the end of Oct 2026.`)   // the page formats with the reader's locale
              && !box().includes("stockpile holds"), box());
           api.showRestrictionHit("E1|R5"); api.showRestrictionHit("E1|R2"); api.showRestrictionHit("E1");
           ok("⭐ Show on map on each row selects THAT row's route (R5, then R2); a bare event id falls back to its first route",
@@ -2939,8 +2947,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
           api.dismissWarning("r|R2|10"); await flush(); await flush();
           ok("...and dismissing the last one clears it", JSON.stringify(rec.hits[rec.hits.length - 1]) === "[]");
           TL.month = 11; api.renderTimelineWarnings(11); await flush(); await flush();
-          ok("⭐ D23: a month after the last record carries the balance forward and says so",
-             box().includes(`Langton stockpile has a capacity of ${(40000).toLocaleString()} t; ${(40510).toLocaleString()} t recorded at the end of Oct 2026; nothing recorded since.`)   // NARROWED 12 Oct (base merge): "has a capacity of"
+          // REVERSED 27 Oct 2026 (stockpile forecast): a future month is the FORECAST, not the last record carried forward
+          ok("⭐ D23: a month after the current one says its figure is the forecast",
+             box().includes(`Langton stockpile has a capacity of ${(40000).toLocaleString()} t; ${(40510).toLocaleString()} t forecast at the end of Nov 2026.`)
              && !box().includes("stockpile holds"), box());
           ok("...and the October closure is not listed in November", !box().includes("E1|"));
           // F3: Play pressed on a red month counts as the loop's pause even when its conditions land after the first tick
@@ -6573,6 +6582,24 @@ function qrRead(mod) {
   }
   ok("🔴 8a: the Navigation night ground is dark for the haul-road cut-out, and no banned public word came in with the new options",
      /function haulEraserColour\(\)\{ return \/dark\|night\/\.test\(/.test(code) && !/truck|real-time|live tracking|telematics/i.test(sel));
+}
+
+// ---- 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast, D9 a + i): the gauges and the popup
+// follow the month on screen; "forecast" or "recorded" under the figure; over capacity reaches signed-in staff only.
+{
+  const _as = (code.match(/function applyStockMonth\(\) \{[\s\S]*?\n    \}\n/) || [""])[0];
+  ok("STOCK: the gauges follow the month on screen (or this month), from the stockpile timeline; the layer is set again only when a gauge changes step",
+     _as.includes("const m = (typeof mapModeMonth === 'function' ? mapModeMonth() : null) || WARN.pilesMonth;")
+     && _as.includes("p.stock_balance = e.balance_end; p.stock_over = !!e.over; p.stock_full = !!e.full;")
+     && _as.includes("if (k !== p.loc_icon) { p.loc_icon = k; changed = true; }") && _as.includes("if (changed && map && map.getSource) {")
+     && code.includes("try { applyStockMonth(); } catch (e) {}")
+     && code.includes("WARN.pilesMonth = (j && j.current_month) || null; applyStockMonth();"));
+  ok("STOCK: the popup says 'full' to the public (never a figure over the capacity) and the tonnes over to staff, with 'forecast' / 'recorded, end of <month>'",
+     code.includes("h += `<p style='margin:4px 0;'><b>Stock:</b> ` + (full ? 'full' :")
+     && code.includes("${over ? ` — ${Math.round(bal - cap).toLocaleString()} ${u} over capacity` : ''}")
+     && code.includes("${props.stock_basis === 'forecast' ? 'forecast' : 'recorded'}, end of ${monthLabel(Number(props.stock_month))}"));
+  ok("STOCK: 🔴 the map never decides staff on its own — `over` is read from the server, which sends it to staff only",
+     code.includes("const over = props.stock_over === true || props.stock_over === 'true';"));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

@@ -77,6 +77,7 @@ ORDER = [
     "route_area_km",        # 12 Oct 2026 (§2.2b): derived from route_geometry and areas, so after both
     "forecasts", "forecast_weeks", "forecast_days",
     "stockpile_weeks",
+    "stockpile_plan",       # 27 Oct 2026 (stockpile forecast): each pile's planned use by month
     # 14 Oct 2026: the community considerations layer (fetched along the routes; no foreign keys)
     "community_features", "community_meta",
     # 16 Oct 2026: the collision history (CLOCS v5 C1; fetched along the routes; no foreign keys)
@@ -88,7 +89,7 @@ ORDER = [
 # "Empty" for import purposes: the tables a person's work lands in. config is not in
 # the list because every booted tenant has the seeded factors row.
 EMPTY_CHECK = ("locations", "routes", "forecasts", "ipts", "work_sections", "zones",
-               "forecast_weeks", "stockpile_weeks")
+               "forecast_weeks", "stockpile_weeks", "stockpile_plan")
 
 
 def _now():

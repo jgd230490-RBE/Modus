@@ -528,7 +528,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .dash-wall.dash-fill .today-map{display:flex;flex-direction:column;}
   /* 4. Stockpiles: the chart takes the card */
   .dash-wall.dash-fill .stock-card{display:flex;flex-direction:column;min-height:0;}
-  .dash-wall.dash-fill .stock-body{flex:1 1 auto;min-height:0;grid-template-rows:minmax(0,1fr);}
+  .dash-wall.dash-fill .stock-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
+  .dash-wall.dash-fill .stock-body>.stock-plot{flex:1 1 auto;min-height:0;}
   .dash-wall.dash-fill .stock-nocap{font-size:clamp(13px,1.6vh,26px);}
   .chart-box.is-fill{height:100%;min-height:0;}
   /* the chart's headline on a filled big screen: the number, what it is, and what it is measured against */
@@ -1308,8 +1309,8 @@ const INFO = {
   "dash.today_reported": { title: "Reported today", text: "Lines with a day actual typed for today on the Look-ahead.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.week_to_date": { title: "This week to date", text: "The week's planned tonnes up to today. The bar fills as day actuals are typed.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.last_week": { title: "Last week", text: "Last week's account: tonnes reported against tonnes planned on the reported lines, and how many lines held their plan.", guide: "6-4-account-view-what-actually-happened-last-week" },
-  "dash.stock": { title: "Stockpile capacity", text: "Each stockpile's balance at the end of each week against its capacity. Red past capacity, amber from 90 %. A week nobody reported counts as nothing.",
-    how: "Balance = the opening balance + the week actuals delivered there − the consumption typed on Look-ahead → Account.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-stock" },
+  "dash.stock": { title: "Stockpile capacity", text: "Each stockpile's stock at the end of each week, as a share of its capacity. Solid = recorded; dashed = the plan. A week nobody recorded uses the plan. Red dots: over capacity.",
+    how: "Balance = the opening balance + what came in − what went out. In: the week actuals delivered there, or the approved plan where nothing was recorded. Out: the figure typed on Look-ahead → Account, or the planned use (Plan → Stockpiles).", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-stock" },
   "dash.chart.demand": { title: "Material demand over time", text: "The planned quantity in each month, stacked by material, for the lines in view." },
   "dash.chart.top": { title: "Top routes by tonnage", text: "The ten route lines with the most planned tonnes. Click a bar to narrow the page to that line; click it again to show every line." },
   "dash.chart.progress": { title: "Delivered against plan", text: "Planned and reported tonnes, month by month. A month nobody has reported has no delivered bar: it is not counted as zero.", tech: "t1-delivered" },
@@ -1331,8 +1332,8 @@ const INFO = {
     how: "The cost variance compares the actual against the quote, not the surcharged figure. BAF = (diesel index ÷ base − 1) × fuel share.", guide: "9-5-money-settings", tech: "t1-cost" },
   "la.cost_fair": { title: "Fair cost (model)", text: "What the job should cost from the vehicle, distance, tonnage, month and the diesel price, at the coefficients on Config. A floor for negotiation, never a quote.", guide: "9-5-money-settings", tech: "t1-fair" },
   "la.cost_actual": { title: "Actual cost", text: "The confirmed cost of this week, as invoiced or agreed. Typed, never worked out.", guide: "6-4-account-view-what-actually-happened-last-week" },
-  "la.stock": { title: "Stockpiles", text: "Type what came out of each stockpile this week. Empty means not typed, which is not zero.",
-    how: "Opening = the balance at the end of the week before. In = the week actuals delivered here (a week nobody reported counts as nothing). Closing = opening + in − out.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-stock" },
+  "la.stock": { title: "Stockpiles", text: "Type what came out of each stockpile this week. Left empty, the plan is used.",
+    how: "Opening = the balance at the end of the week before. In = the week actuals delivered here; a line nobody recorded counts its plan, shown in grey. Closing = opening + in − out. Next 8 weeks: whether it goes over or runs out.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-stock" },
   "la.horizon": { title: "The weeks ahead", text: "Week totals for the weeks after the commit week, so hauliers are not sent a four-week daily spreadsheet. Confirm lives on the Commit view.",
     how: "The blue column is the commit week: the week that holds today, or next week by the switch above. It is the only week with daily rows.", guide: "6-5-horizon-view" },
   "fc.cost": { title: "Planned and fair cost", text: "Planned: the route's typed rates, or the Config target rate. Fair: the cost model from the vehicle, distance, tonnage, month and diesel price. Each figure's per tonne, per trip and per mile or km is in the row's details.",
@@ -2637,7 +2638,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <ClpMonitoring months={months} initial={initialClp} />
           <details className="dash-more">
             <summary>Stockpile capacity</summary>
-            <div className="pt-3"><DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} tick={tick} /></div>
+            <div className="pt-3"><DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} tick={tick} from={fromM} to={toM} /></div>
           </details>
           <details className="dash-more" data-dash-table="1">
             <summary>Route planning detail</summary>
@@ -2788,7 +2789,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       </WallSection>
 
       <WallSection show={sectionShown(3)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[3].title}>
-        <DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} fill={fill} tick={tick} />
+        <DashboardStockChart meta={meta} weekNow={week && week.today_week} wall={wall} fill={fill} tick={tick} from={fromM} to={toM} />
       </WallSection>
 
       <WallSection show={sectionShown(4)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[4].title}>
@@ -3048,83 +3049,108 @@ function DashboardToday({ meta, week, err, wall, fill }){
 // (balance = opening + typed inbound − typed consumption; a week nobody reported counts as
 // nothing). A stockpile with NO capacity recorded cannot be a %, so it is listed beside
 // the chart with its balance — never drawn as 0 % or as full. Pick the week with the chips.
-function DashboardStockChart({ meta, weekNow, wall, fill, tick }){
+// 27 Oct 2026 (stockpile forecast, John's D10 a): each stockpile's stock as a share of its capacity, WEEK BY WEEK over the
+// Dashboard's months — solid to the last recorded week, dashed after it (the plan), the capacity line at 100 %, an amber
+// band from 90 %, a "now" mark — and the message first ("Stockpile North goes over in the week of 22 Mar"). Was one
+// bar a stockpile for one chosen week, every unrecorded week counted as nothing (the demo's stockpiles read 0–2 %).
+const STOCK_LINE_TOKENS = ["--chart-2", "--chart-3", "--chart-5", "--chart-4", "--chart-1"];
+const STOCK_LINE_FALLBACK = ["#1D4ED8", "#0D9488", "#A07D34", "#7C3AED", "#E8590C"];
+const stockWeekWord = (iso) => { if(!iso) return ""; const d = new Date(iso + "T00:00:00"); return `${d.getDate()} ${MONTHS[d.getMonth()]}`; };
+// the message every stockpile view leads with: the first one over (red), else the first to run out (amber), else none
+function stockMessage(sps){
+  const hits = [];
+  sps.forEach(sp => {
+    // as the rail's STOCKPILE SOON: a stockpile with no planned use says "No use planned yet" instead of a warning
+    if(!sp.use_planned) return;
+    if(sp.soon_over) hits.push({ sp, w: sp.soon_over, kind: "over" });
+    else if(sp.soon_empty) hits.push({ sp, w: sp.soon_empty, kind: "empty" });
+  });
+  hits.sort((a, b) => (a.w.from || "").localeCompare(b.w.from || ""));
+  if(!hits.length) return { text: "None over in the next 8 weeks", tone: null, hits };
+  const h = hits[0];
+  return { text: h.kind === "over" ? `${h.sp.name} goes over in the week of ${stockWeekWord(h.w.from)}`
+                                   : `${h.sp.name} runs out in the week of ${stockWeekWord(h.w.from)}`,
+           tone: h.kind === "over" ? "bad" : "warn", hits };
+}
+function DashboardStockChart({ meta, weekNow, wall, fill, tick, from, to }){
   const { months } = meta;
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
-  const [wk, setWk] = useState(null);
-  const now = new Date();
-  const thisM = Math.max(1, Math.min(months.count, (now.getFullYear() - months.start_year) * 12 + now.getMonth() + 1));
-  const toM = Math.min(months.count, thisM + 1);
+  const lo = Math.max(1, from || 1), hi = Math.min(months.count, to || months.count);
   useEffect(() => {
     let live = true;
-    fetch(`${API}/stockpiles?from_month=${thisM}&to_month=${toM}`)
+    fetch(`${API}/stockpiles?from_month=${lo}&to_month=${hi}`)
       .then(okJSON)
       .then(j => { if(live){ setData(j); setErr(""); } })
       .catch(e => { if(live) setErr(errSay("Couldn't load stock.", e)); });
     return () => { live = false; };
-  }, [thisM, toM, tick]);
+  }, [lo, hi, tick]);
   const sps = (data && data.stockpiles) || [];
-  const cols = [];
-  sps.forEach(sp => (sp.weeks || []).forEach(w => { const k = `${w.month_index}|${w.week_index}`; if(!cols.some(c => c.k === k)) cols.push({ k, m: w.month_index, w: w.week_index }); }));
-  cols.sort((a, b) => a.m - b.m || a.w - b.w);
-  const nowKey = weekNow ? `${weekNow.month_index}|${weekNow.week_index}` : null;
-  const selKey = wk && cols.some(c => c.k === wk) ? wk : (cols.some(c => c.k === nowKey) ? nowKey : (cols[0] || {}).k);
-  const cellOf = (sp) => { const c = cols.find(x => x.k === selKey); return c ? (sp.weeks || []).find(x => x.month_index === c.m && x.week_index === c.w) : null; };
   const withCap = sps.filter(sp => sp.capacity_qty != null && sp.capacity_qty > 0);
   const noCap = sps.filter(sp => !(sp.capacity_qty != null && sp.capacity_qty > 0));
-  const bars = withCap.map(sp => { const c = cellOf(sp) || {}; const bal = c.balance_end || 0; return { sp, c, bal, pct: bal * 100 / sp.capacity_qty, over: !!c.over }; });
-  const maxPct = Math.max(120, ...bars.map(b => b.pct));
-  const unitOf = (sp) => sp.capacity_unit === "m3" ? "m³" : (sp.capacity_unit || "");
+  const noPlan = withCap.filter(sp => sp.forecast && !sp.use_planned);
+  const cols = withCap.length ? withCap[0].weeks.map(w => ({ m: w.month_index, w: w.week_index, from: w.from })) : [];
+  const cw = data && data.current_week;
+  const nowIdx = cw ? cols.findIndex(c => c.m === cw.month_index && c.w === cw.week_index) : -1;
+  const pct = (sp, w) => w.balance_end * 100 / sp.capacity_qty;
+  const peak = Math.max(120, ...withCap.flatMap(sp => sp.weeks.map(w => pct(sp, w))));
+  const yMax = Math.ceil(peak / 20) * 20;
   // 14 Oct 2026: on the big screen the text follows the screen's height, as on the other charts
   const sf = Math.max(12, Math.min(30, Math.round(((typeof window !== "undefined" && window.innerHeight) || 900) / 76)));
+  const fs = wall ? sf : 11;
+  const msg = stockMessage(withCap);
+  const lastRec = (sp) => { let k = -1; sp.weeks.forEach((w, i) => { if(w.basis === "recorded" || w.basis === "part") k = i; }); return k; };
   const capLine = { id: "capLine", afterDatasetsDraw: (chart) => {
-    const x = chart.scales.x, ctx = chart.ctx; if(!x) return;
-    const px = x.getPixelForValue(100);
-    ctx.save(); ctx.strokeStyle = "#DC2626"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(px, chart.chartArea.top); ctx.lineTo(px, chart.chartArea.bottom); ctx.stroke();
-    ctx.fillStyle = "#DC2626"; ctx.font = `600 ${wall ? sf : 10}px Inter, system-ui, sans-serif`; ctx.textAlign = "center";
-    ctx.fillText("capacity", px, chart.chartArea.top - 4); ctx.restore();
-  } };
-  // 14 Oct 2026: on the big screen each bar says how full it is, in words for the two warnings (nobody hovers a TV)
-  const barLabels = { id: "barLabels", afterDatasetsDraw: (chart) => {
-    if(!wall) return;
-    const meta = chart.getDatasetMeta(0), ctx = chart.ctx;
-    ctx.save(); ctx.font = `600 ${sf + 1}px Inter, system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
-    ctx.fillStyle = tok("--ink", "#1E293B");
-    meta.data.forEach((el, i) => { const b = bars[i]; if(!b) return;
-      const t = `${b.pct.toFixed(0)} %` + (b.over ? " · over capacity" : b.pct >= 90 ? " · nearly full" : "");
-      ctx.fillText(t, el.x + 8, el.y); });
+    const y = chart.scales.y, a = chart.chartArea, ctx = chart.ctx; if(!y) return;
+    const p100 = y.getPixelForValue(100), p90 = y.getPixelForValue(90);
+    ctx.save();
+    ctx.fillStyle = "rgba(217,119,6,.10)"; ctx.fillRect(a.left, p100, a.right - a.left, p90 - p100);
+    ctx.strokeStyle = tok("--red", "#DC2626"); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(a.left, p100); ctx.lineTo(a.right, p100); ctx.stroke();
+    ctx.fillStyle = tok("--red", "#DC2626"); ctx.font = `600 ${fs}px Inter, system-ui, sans-serif`; ctx.textAlign = "right";
+    ctx.fillText("capacity", a.right, p100 - 4);
+    if(nowIdx >= 0){
+      const x = chart.scales.x.getPixelForValue(nowIdx);
+      ctx.setLineDash([]); ctx.strokeStyle = tok("--ink", "#1E293B"); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, a.top); ctx.lineTo(x, a.bottom); ctx.stroke();
+      ctx.fillStyle = tok("--ink", "#1E293B"); ctx.textAlign = "left"; ctx.fillText("now", x + 4, a.top + fs + 2);
+    }
     ctx.restore();
   } };
-  const cfg = { type: "bar",
-    data: { labels: bars.map(b => b.sp.name), datasets: [{ label: "% of capacity", data: bars.map(b => Math.round(b.pct * 10) / 10),
-              backgroundColor: bars.map(b => b.over ? "#DC2626" : b.pct >= 90 ? "#D97706" : "#059669"), borderWidth: 0, borderRadius: 4, barPercentage: 0.7,
-              maxBarThickness: fill ? Math.round(sf * 4.5) : 40 }] },
-    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 14, right: wall ? sf * 13 : 0 } },
-      plugins: { legend: { display: false }, tooltip: { callbacks: {
-        title: (items) => items.length ? bars[items[0].dataIndex].sp.name : "",
-        label: (item) => { const b = bars[item.dataIndex]; const u = unitOf(b.sp); return [
-          `${b.pct.toFixed(0)} % full · ${fmt(b.bal, b.sp.capacity_unit)} of ${fmt(b.sp.capacity_qty, b.sp.capacity_unit)} ${u}`,
-          `in ${fmt(b.c.inbound || 0, b.sp.capacity_unit)} · out ${fmt(b.c.consumed || 0, b.sp.capacity_unit)} this week`,
-          b.over ? `OVER capacity by ${fmt(-(b.c.remaining || 0), b.sp.capacity_unit)} ${u}` : `room for ${fmt(b.c.remaining == null ? 0 : b.c.remaining, b.sp.capacity_unit)} ${u} more` ]; } } } },
-      scales: { x: { min: 0, max: Math.ceil(maxPct / 10) * 10, grid: { display: false }, ticks: { font: { size: wall ? sf : 10 }, callback: (v) => v + " %" } },
-                y: { ticks: { font: { size: wall ? sf + 1 : 11 } } } } },
-    plugins: [capLine, barLabels] };
-  const c = cols.find(x => x.k === selKey);
-  // 14 Oct 2026 (the design check): on a filled big screen the chart opens with its message
-  const nOver = bars.filter(b => b.over).length, nNear = bars.filter(b => !b.over && b.pct >= 90).length, nRoom = bars.length - nOver - nNear;
+  const cfg = { type: "line",
+    data: { labels: cols.map(c => stockWeekWord(c.from)),
+      datasets: withCap.map((sp, i) => {
+        const col = tok(STOCK_LINE_TOKENS[i % STOCK_LINE_TOKENS.length], STOCK_LINE_FALLBACK[i % STOCK_LINE_FALLBACK.length]), cut = lastRec(sp);
+        return { label: sp.name, data: sp.weeks.map(w => Math.round(pct(sp, w) * 10) / 10),
+                 borderColor: col, backgroundColor: col, borderWidth: wall ? 3.5 : 2.2, tension: 0,
+                 pointRadius: sp.weeks.map(w => w.over ? (wall ? 4 : 2.5) : 0),
+                 pointBackgroundColor: tok("--red", "#DC2626"), pointBorderWidth: 0,
+                 // solid to the last recorded week, dashed after it: the plan
+                 segment: { borderDash: (c) => (c.p0DataIndex >= cut ? [6, 4] : undefined) } };
+      }) },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, layout: { padding: { top: 16 } },
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: true, position: "top", labels: { boxWidth: 18, boxHeight: 2, font: { size: fs } } },
+        tooltip: { callbacks: {
+          title: (items) => items.length ? `Week of ${stockWeekWord(cols[items[0].dataIndex].from)}` : "",
+          label: (item) => { const sp = withCap[item.datasetIndex], w = sp.weeks[item.dataIndex];
+            const u = sp.capacity_unit === "m3" ? "m³" : (sp.capacity_unit || "t");
+            const how = w.basis === "forecast" ? "forecast" : w.basis === "recorded" ? "recorded" : "plan used where not recorded";
+            return `${sp.name}: ${fmt(w.balance_end, sp.capacity_unit)} of ${fmt(sp.capacity_qty, sp.capacity_unit)} ${u} (${Math.round(pct(sp, w))} %), ${how}`; } } } },
+      scales: { y: { min: 0, max: yMax, ticks: { font: { size: fs }, callback: (v) => v + " %" }, grid: { color: tok("--chart-grid", "rgba(100,116,139,.18)") } },
+                x: { grid: { display: false }, ticks: { font: { size: fs }, autoSkip: true, maxTicksLimit: wall ? 14 : 10, maxRotation: 0 } } } },
+    plugins: [capLine] };
+  const msgStyle = msg.tone === "bad" ? { color: "var(--bad-text)" } : msg.tone === "warn" ? { color: "var(--warn-text)" } : undefined;
   return (
     <div className="card p-4 stock-card">
-      {fill && bars.length > 0 && <div className="chart-head" data-chart-head="1">
-        <span className="ch-val kpi-num" style={nOver ? { color: "var(--red)" } : undefined}>{nOver ? `${nOver} over capacity` : "None over capacity"}</span>
-        <div className="ch-note">{[nNear ? `${nNear} nearly full` : "", nRoom ? `${nRoom} with room` : "", noCap.length ? `${noCap.length} with no capacity recorded` : ""].filter(Boolean).join(" · ")}</div>
+      {withCap.length > 0 && <div className={fill ? "chart-head" : "mb-2"} data-chart-head="1" data-stock-msg={msg.tone || "none"}>
+        <span className={fill ? "ch-val kpi-num" : "text-lg font-bold"} style={msgStyle}>{msg.text}</span>
+        {msg.hits.length > 0 && <div className={fill ? "ch-note" : "text-[13px] text-slate-500"}>
+          {msg.hits[0].kind === "over" ? `forecast ${fmt(msg.hits[0].w.balance_end, msg.hits[0].sp.capacity_unit)} of ${fmt(msg.hits[0].sp.capacity_qty, msg.hits[0].sp.capacity_unit)}` : "planned use more than the stock"}
+          {msg.hits.length > 1 ? ` · ${msg.hits.length - 1} more in the next 8 weeks` : ""}</div>}
       </div>}
       <div className="flex items-baseline justify-between gap-2 flex-wrap mb-2">
-        <div className="text-sm font-semibold text-slate-700 chart-title">Stockpile capacity <span className="text-slate-400 font-normal">· how full each stockpile is at the end of {c ? `${MONTHS[(c.m - 1) % 12]} week ${c.w}` : "the week"}</span><InfoTip id="dash.stock" /></div>
-        <div className="flex flex-wrap gap-1">
-          {cols.map(x => <button key={x.k} type="button" onClick={() => setWk(x.k)} className={"rounded-full px-2 py-0.5 text-xs font-semibold " + (x.k === selKey ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")} style={x.k === selKey ? { background: "var(--navy)" } : undefined} title={x.k === nowKey ? "this week" : undefined}>{x.w === 1 ? MONTHS[(x.m - 1) % 12] + " " : ""}W{x.w}{x.k === nowKey ? " · now" : ""}</button>)}
-        </div>
+        <div className="text-sm font-semibold text-slate-700 chart-title">Stockpile capacity <span className="text-slate-400 font-normal">· % full, week by week</span><InfoTip id="dash.stock" /></div>
       </div>
       {err && <div className="text-xs mb-2" style={{ color: "var(--red)" }}>{err}</div>}
       {!data ? <div className="p-4 text-center text-slate-400 text-sm">Loading…</div>
@@ -3133,19 +3159,19 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick }){
           No locations that hold stock yet. Set a type of Stockpile, Site, Compound or Railhead on the Locations page, and give it a capacity there.
         </div>
       ) : (
-        <div className="grid lg:grid-cols-4 gap-4 stock-body">
-          <div className={(noCap.length ? "lg:col-span-3" : "lg:col-span-4") + (fill ? " min-h-0" : "")}>
-            {bars.length ? (fill ? <ChartCanvas config={cfg} size="fill" /> : <ChartCanvas config={cfg} height={Math.max(wall ? 220 : 160, 36 * bars.length + 40)} />)
-                         : <div className="text-sm text-slate-400 p-4">No stockpile has a capacity recorded — set one on the Locations page to see how full it is.</div>}
+        <div className="stock-body">
+          <div className="stock-plot">
+            {withCap.length ? (fill ? <ChartCanvas config={cfg} size="fill" /> : <ChartCanvas config={cfg} />)
+                            : <div className="text-sm text-slate-400 p-4">No stockpile has a capacity recorded — set one on the Locations page to see how full it is.</div>}
           </div>
-          {noCap.length > 0 && <div className="text-xs text-slate-600 stock-nocap">
-            {/* '—', never 0. No capacity recorded is not zero capacity. */}
-            <div className="font-semibold text-slate-700 mb-1">No capacity recorded</div>
-            {noCap.map(sp => { const cell = cellOf(sp) || {}; return (
-              <div key={sp.location_id} className="py-1 border-t border-slate-100" title={`${sp.loc_type} · ${sp.location_id} · in ${fmt(cell.inbound || 0, sp.capacity_unit)} · out ${fmt(cell.consumed || 0, sp.capacity_unit)}`}>
-                <span className="font-medium text-slate-800">{sp.name}</span> <span className="tabular-nums">{fmt(cell.balance_end || 0, sp.capacity_unit)} {unitOf(sp)}</span> <span className="text-slate-400">· max —</span>
-              </div>); })}
-            <div className="text-[13px] text-slate-400 mt-1">Give these a capacity on the Locations page and they join the chart.</div>
+          {!fill && withCap.length > 0 && <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[13px] text-slate-500" data-stock-key="1">
+            <span><svg width="22" height="8" aria-hidden="true"><line x1="0" x2="22" y1="4" y2="4" stroke="currentColor" strokeWidth="2" /></svg> recorded</span>
+            <span><svg width="22" height="8" aria-hidden="true"><line x1="0" x2="22" y1="4" y2="4" stroke="currentColor" strokeWidth="2" strokeDasharray="5 3" /></svg> planned</span>
+          </div>}
+          {noPlan.length > 0 && <div className="text-[13px] text-slate-500 mt-1" data-stock-noplan="1">No use planned yet: {noPlan.map(sp => sp.name).join(", ")}.</div>}
+          {noCap.length > 0 && <div className="text-[13px] text-slate-500 mt-1 stock-nocap">
+            {/* '—', never 0. No capacity recorded is not zero capacity. Names only: never a location code. */}
+            {noCap.length} more {noCap.length === 1 ? "place holds" : "places hold"} stock with no capacity: {noCap.map(sp => sp.name).join(", ")}.
           </div>}
         </div>
       )}
@@ -4403,6 +4429,194 @@ function AlAdvice({ adv, compact }){
   );
 }
 
+// ================================================================= Plan → Stockpiles
+// 27 Oct 2026 (stockpile forecast, John's D4 a; the approved mockup notes\stockpile-forecast-mockup-1027\, card 1): one
+// place per stockpile for its plan — capacity and opening, the PLANNED USE by month ("Same each month from … to …"), a
+// STOCK COUNT, and the stockpile's own forecast. Planners and admins type (D6); a team login reads the same page without the
+// boxes. Capacity and opening are master data: admins type them here or on Locations (the same call). Nothing is stored
+// that the balance works out: GET /stockpiles reads it, PUT /stockpiles/plan and /stockpiles/count write what people type.
+function stockUnit(u){ return u === "m3" ? "m³" : (u || "t"); }
+function StockpilesPage({ meta, access, who }){
+  const { months } = meta;
+  const canPlan = !!(access && access.can_approve);
+  const canCap = isAdminLogin(access);
+  const [data, setData] = useState(null);
+  const [plans, setPlans] = useState({});
+  const [err, setErr] = useState("");
+  const [note, setNote] = useState(null);
+  const [pick, setPick] = useState(null);
+  const [planYear, setPlanYear] = useState(null);
+  const [draft, setDraft] = useState({});
+  const [fill, setFill] = useState({ from: "", to: "", qty: "" });
+  const [count, setCount] = useState({ qty: "", week: "" });
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    let live = true;
+    Promise.all([fetch(`${API}/stockpiles?from_month=1&to_month=${months.count}`).then(okJSON),
+                 fetch(`${API}/stockpiles/plan`).then(okJSON)])
+      .then(([b, p]) => { if(live){ setData(b); setPlans((p && p.plans) || {}); setErr(""); } })
+      .catch(e => { if(live) setErr(errSay("The stockpiles did not load.", e)); });
+    return () => { live = false; };
+  }, [tick]);
+  // the stockpiles this page plans: a capacity, a plan, or the type Stockpile
+  const stockList = ((data && data.stockpiles) || []).filter(sp => sp.forecast || sp.loc_type === "Stockpile");
+  const sp = stockList.find(x => x.location_id === pick) || stockList[0];
+  const cw = data && data.current_week;
+  const sy = months.start_year;
+  const years = Array.from(new Set(Array.from({ length: months.count }, (_, i) => sy + Math.floor(i / 12))));
+  const yr = planYear || (cw ? sy + Math.floor((cw.month_index - 1) / 12) : sy);
+  const say = (ok, text) => { setNote({ ok, text }); if(ok) setTimeout(() => setNote(null), 2500); };
+  const put = (path, body, what) => fetch(`${API}${path}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    .then(okJSON).then(() => { say(true, "Saved."); setTick(t => t + 1); return true; })
+    .catch(e => { say(false, errSay(what, e)); return false; });
+  if(err) return <div className="max-w-7xl mx-auto p-6"><EmptyState kind="error" title="Couldn't open the stockpiles" body={err} action={<button type="button" className="btn-sec" onClick={() => setTick(t => t + 1)}>Try again</button>} /></div>;
+  if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;
+  const u = sp ? stockUnit(sp.capacity_unit) : "t";
+  const planOf = (m) => ((plans[sp.location_id] || {})[String(m)]);
+  const savePlan = (m) => {
+    const k = `${sp.location_id}|${m}`, v = draft[k];
+    if(v === undefined) return;
+    const q = v === "" ? null : numOr(v, NaN);
+    if(q !== null && !(q >= 0)){ say(false, "Planned use must be a number, 0 or more."); return; }
+    put("/stockpiles/plan", { location_id: sp.location_id, from_month: m, planned_qty: q, updated_by: who || null }, "The planned use was not saved.")
+      .then(ok => { if(ok) setDraft(d => { const n = { ...d }; delete n[k]; return n; }); });
+  };
+  const doFill = () => {
+    const a = +fill.from, b = +fill.to, q = numOr(fill.qty, NaN);
+    if(!a || !b || !(q >= 0)){ say(false, "Pick both months and type a figure, 0 or more."); return; }
+    put("/stockpiles/plan", { location_id: sp.location_id, from_month: Math.min(a, b), to_month: Math.max(a, b), planned_qty: q, updated_by: who || null },
+        "The planned use was not saved.").then(ok => { if(ok) setFill({ from: "", to: "", qty: "" }); });
+  };
+  const pastWeeks = sp ? sp.weeks.filter(w => cw && (w.month_index < cw.month_index || (w.month_index === cw.month_index && w.week_index < cw.week_index))).slice(-12).reverse() : [];
+  const saveCount = () => {
+    const w = pastWeeks.find(x => `${x.month_index}|${x.week_index}` === (count.week || (pastWeeks[0] && `${pastWeeks[0].month_index}|${pastWeeks[0].week_index}`)));
+    const q = numOr(count.qty, NaN);
+    if(!w || !(q >= 0)){ say(false, "Type the measured stock, 0 or more."); return; }
+    put("/stockpiles/count", { location_id: sp.location_id, month_index: w.month_index, week_index: w.week_index, measured_qty: q, updated_by: who || null },
+        "The stock count was not saved.").then(ok => { if(ok) setCount({ qty: "", week: "" }); });
+  };
+  const saveCap = (field, v) => {
+    const q = v === "" ? null : numOr(v, NaN);
+    if(q !== null && !(q >= 0)){ say(false, "Type a number, 0 or more."); return; }
+    const body = { capacity_qty: sp.capacity_qty, capacity_unit: sp.capacity_unit, opening_qty: sp.opening_qty, [field]: q };
+    put(`/locations/${encodeURIComponent(sp.location_id)}/capacity`, body, "The capacity was not saved.");
+  };
+  const lastCount = sp ? [...sp.weeks].reverse().find(w => w.count != null) : null;
+  // the status line: the forward balance's own summary of this stockpile
+  const status = !sp ? null : !sp.capacity_qty ? { tone: null, text: "No capacity recorded" }
+    : sp.first_over ? { tone: "bad", text: `Goes over in the week of ${stockWeekWord(sp.first_over.from)} ${sp.first_over.from.slice(0, 4)}` }
+    : sp.first_empty && sp.use_planned ? { tone: "warn", text: `Runs out in the week of ${stockWeekWord(sp.first_empty.from)} ${sp.first_empty.from.slice(0, 4)}` }
+    : sp.peak_pct != null && sp.peak_pct >= 90 ? { tone: "warn", text: `Nearly full: ${Math.round(sp.peak_pct)} % in the week of ${stockWeekWord(sp.peak.from)} ${sp.peak.from.slice(0, 4)}` }
+    : sp.peak_pct != null ? { tone: "ok", text: `Never over: ${Math.round(sp.peak_pct)} % at most` } : null;
+  const nowIdx = sp && cw ? sp.weeks.findIndex(w => w.month_index === cw.month_index && w.week_index === cw.week_index) : -1;
+  const cut = sp ? sp.weeks.reduce((k, w, i) => (w.basis === "recorded" || w.basis === "part") ? i : k, 0) : 0;
+  const C2 = tok("--chart-2", "#2563EB");
+  const chartCfg = sp && sp.capacity_qty ? { type: "line",
+    data: { labels: sp.weeks.map(w => stockWeekWord(w.from) + " " + (w.from || "").slice(2, 4)),
+      datasets: [{ label: sp.name, data: sp.weeks.map(w => Math.round(w.balance_end * 1000 / sp.capacity_qty) / 10),
+        borderColor: C2, backgroundColor: C2, borderWidth: 2.2, tension: 0,
+        pointRadius: sp.weeks.map(w => w.over ? 2.5 : 0), pointBackgroundColor: tok("--red", "#DC2626"), pointBorderWidth: 0,
+        segment: { borderDash: (c) => (c.p0DataIndex >= cut ? [6, 4] : undefined) } }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, layout: { padding: { top: 14 } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (it) => { const w = sp.weeks[it.dataIndex];
+        return `${fmt(w.balance_end, sp.capacity_unit)} of ${fmt(sp.capacity_qty, sp.capacity_unit)} ${u}, ${w.basis === "forecast" ? "forecast" : w.basis === "recorded" ? "recorded" : "plan used where not recorded"}`; } } } },
+      scales: { y: { min: 0, max: Math.ceil(Math.max(120, ...sp.weeks.map(w => w.balance_end * 100 / sp.capacity_qty)) / 20) * 20, ticks: { callback: (v) => v + " %" } },
+                x: { grid: { display: false }, ticks: { autoSkip: true, maxTicksLimit: 10, maxRotation: 0 } } } },
+    plugins: [{ id: "spCap", afterDatasetsDraw: (chart) => {
+      const y = chart.scales.y, a = chart.chartArea, ctx = chart.ctx; if(!y) return;
+      const p = y.getPixelForValue(100); ctx.save(); ctx.strokeStyle = tok("--red", "#DC2626"); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(a.left, p); ctx.lineTo(a.right, p); ctx.stroke();
+      if(nowIdx >= 0){ const x = chart.scales.x.getPixelForValue(nowIdx); ctx.setLineDash([]); ctx.strokeStyle = tok("--ink", "#1E293B"); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, a.top); ctx.lineTo(x, a.bottom); ctx.stroke(); ctx.fillStyle = tok("--ink", "#1E293B");
+        ctx.font = "600 11px Inter, system-ui, sans-serif"; ctx.textAlign = "center"; ctx.fillText("now", x, a.top - 3); }
+      ctx.restore(); } }] } : null;
+  return (
+    <div className="max-w-7xl mx-auto p-6 pb-2" data-page="stockpiles">
+      <PageHeader title="Stockpiles" kicker="Plan" subtitle="What comes in, what is used, how full each one gets." />
+      {note && <div className="card p-3 mb-4 text-sm" role="status" style={{ borderColor: note.ok ? "var(--green)" : "var(--red)" }}>{note.text}</div>}
+      {stockList.length === 0 ? (
+        <EmptyState title="No stockpiles yet" body="Give a place the type Stockpile, or a capacity, on Data → Locations." />
+      ) : (<>
+        <div className="flex flex-wrap gap-1.5 mb-3" role="tablist" aria-label="Stockpile">
+          {stockList.map(x => <button key={x.location_id} type="button" role="tab" aria-selected={x === sp}
+            className={"rounded-full px-3 py-1 text-[13px] font-semibold " + (x === sp ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}
+            style={x === sp ? { background: "var(--navy)" } : undefined} onClick={() => setPick(x.location_id)}>{x.name}</button>)}
+        </div>
+        <div className="card p-4" data-stockpile-card="1">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-[17px] font-bold text-[color:var(--navy-deep)]">{sp.name}</h2>
+              {status && <div className="text-sm font-semibold" data-stock-status={status.tone || "none"}
+                style={{ color: status.tone === "bad" ? "var(--bad-text)" : status.tone === "warn" ? "var(--warn-text)" : status.tone === "ok" ? "var(--ok-text)" : "var(--muted)" }}>{status.text}</div>}
+              {sp.forecast && !sp.use_planned && <div className="text-[13px] text-slate-500">No use planned yet.</div>}
+            </div>
+            <div className="flex flex-wrap gap-4">
+              {[["capacity_qty", "Capacity", sp.capacity_qty], ["opening_qty", "Opening, " + monthLabelAbs(1, sy), sp.opening_qty]].map(([f, lab, v]) => (
+                <label key={f} className="block text-[13px] text-slate-500">{lab}
+                  {canCap ? <span className="flex items-center gap-1 mt-0.5"><input className="ctl ctl-sm w-28 text-right" inputMode="decimal" aria-label={lab}
+                      defaultValue={v == null ? "" : v} key={`${sp.location_id}|${f}|${v}`} onBlur={e => { if(String(e.target.value) !== String(v == null ? "" : v)) saveCap(f, e.target.value); }} /> {u}</span>
+                    : <span className="block mt-0.5 text-sm text-slate-800 tabular-nums">{v == null ? "—" : `${grp(v)} ${u}`}</span>}
+                </label>))}
+            </div>
+          </div>
+
+          <h3 className="text-sm font-semibold text-slate-700 mt-4 mb-1">Planned use <span className="font-normal text-slate-500">{u} a month, laid on the works</span></h3>
+          <div className="flex flex-wrap gap-1 mb-2">
+            {years.map(y => <button key={y} type="button" onClick={() => setPlanYear(y)} aria-pressed={y === yr}
+              className={"rounded-full px-2.5 py-0.5 text-[13px] font-semibold " + (y === yr ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}
+              style={y === yr ? { background: "var(--navy)" } : undefined}>{y}</button>)}
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2" data-stock-plan-months="1">
+            {Array.from({ length: 12 }, (_, i) => {
+              const m = (yr - sy) * 12 + i + 1, inProg = m >= 1 && m <= months.count;
+              const k = `${sp.location_id}|${m}`, v = planOf(m);
+              return (
+                <label key={i} className="block text-[13px] text-slate-500">{MONTHS[i]}
+                  {canPlan ? <input className="ctl ctl-sm w-full text-right mt-0.5" inputMode="decimal" disabled={!inProg} aria-label={`Planned use ${MONTHS[i]} ${yr}`}
+                      placeholder={u} value={draft[k] ?? (v == null ? "" : String(Math.round(v * 10) / 10))}
+                      onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))} onBlur={() => savePlan(m)} />
+                    : <span className="block mt-0.5 text-sm text-slate-800 tabular-nums text-right">{v == null ? "—" : grp(v)}</span>}
+                </label>);
+            })}
+          </div>
+          {canPlan && (
+            <div className="flex flex-wrap items-end gap-2 mt-3 text-sm" data-stock-fill="1">
+              <span className="pb-1.5">Same each month from</span>
+              <select className="ctl ctl-sm" aria-label="From month" value={fill.from} onChange={e => setFill(f => ({ ...f, from: e.target.value }))}>
+                <option value="">month</option>{Array.from({ length: months.count }, (_, i) => <option key={i} value={i + 1}>{monthLabelAbs(i + 1, sy)}</option>)}</select>
+              <span className="pb-1.5">to</span>
+              <select className="ctl ctl-sm" aria-label="To month" value={fill.to} onChange={e => setFill(f => ({ ...f, to: e.target.value }))}>
+                <option value="">month</option>{Array.from({ length: months.count }, (_, i) => <option key={i} value={i + 1}>{monthLabelAbs(i + 1, sy)}</option>)}</select>
+              <input className="ctl ctl-sm w-24 text-right" inputMode="decimal" placeholder={u} aria-label="Planned use each month" value={fill.qty} onChange={e => setFill(f => ({ ...f, qty: e.target.value }))} />
+              <button type="button" className="btn-sec" onClick={doFill}>Fill</button>
+            </div>
+          )}
+
+          <h3 className="text-sm font-semibold text-slate-700 mt-4 mb-1">Stock count</h3>
+          {canPlan && pastWeeks.length > 0 && (
+            <div className="flex flex-wrap items-end gap-2 text-sm" data-stock-count="1">
+              <label className="block text-[13px] text-slate-500">Measured stock
+                <input className="ctl ctl-sm w-28 text-right mt-0.5 block" inputMode="decimal" placeholder={u} value={count.qty} onChange={e => setCount(c => ({ ...c, qty: e.target.value }))} /></label>
+              <label className="block text-[13px] text-slate-500">At the end of the week of
+                <select className="ctl ctl-sm mt-0.5 block" value={count.week} onChange={e => setCount(c => ({ ...c, week: e.target.value }))}>
+                  {pastWeeks.map(w => <option key={`${w.month_index}|${w.week_index}`} value={`${w.month_index}|${w.week_index}`}>{stockWeekWord(w.from)} {(w.from || "").slice(0, 4)}</option>)}</select></label>
+              <button type="button" className="btn-pri" onClick={saveCount}>Save count</button>
+            </div>
+          )}
+          <p className="text-[13px] text-slate-500 mt-1" data-stock-lastcount="1">
+            {lastCount ? `Last count: ${grp(lastCount.count)} ${u}, week of ${stockWeekWord(lastCount.from)} ${(lastCount.from || "").slice(0, 4)}` +
+              (lastCount.count_adjust ? ` · ${grp(Math.abs(lastCount.count_adjust))} ${u} ${lastCount.count_adjust > 0 ? "more" : "less"} than worked out` : "")
+              : "No stock count yet."}</p>
+
+          <h3 className="text-sm font-semibold text-slate-700 mt-4 mb-1">Forecast <span className="font-normal text-slate-500">% full, solid recorded, dashed planned</span></h3>
+          {chartCfg ? <ChartCanvas config={chartCfg} /> : <p className="text-sm text-slate-500">Give it a capacity to see how full it gets.</p>}
+          <p className="text-[13px] text-slate-500 mt-2">{canPlan ? "Saves as you type." : "Planners set the plan. Type what came out each week on Look-ahead → Account."}</p>
+        </div>
+      </>)}
+    </div>
+  );
+}
+
 function AbnormalPage({ meta, access, who }){
   const canApprove = !!(access && access.can_approve);
   const teamLocked = !!(access && access.ipt);
@@ -5499,6 +5713,8 @@ const NAV = [
     { id: "carbon", label: "Carbon planner", glyph: "◐" },
     // 22 Oct 2026 (S16 / B5): each abnormal load planned on its own; a team code plans its own, a planner approves
     { id: "abnormal", label: "Abnormal loads", glyph: "⬌" },
+    // 27 Oct 2026 (stockpile forecast, D4 a): each stockpile's planned use, stock count and forecast
+    { id: "stockpiles", label: "Stockpiles", glyph: "▲" },
   ]},
   { group: "Track", items: [
     { id: "lookahead", label: "Look-ahead", glyph: "◔" },
@@ -5529,6 +5745,7 @@ const NAV_ICON = {
   zones: "M12 3l8 4.5v9L12 21l-8-4.5v-9z",
   config: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12h2M3 12h2M12 3v2M12 19v2M17 7l1.4-1.4M5.6 18.4L7 17M17 17l1.4 1.4M5.6 5.6L7 7",
   map: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14",
+  stockpiles: "M3 19h18L14 6l-3 5-2-3z",
   abnormal: "M4 14h16M6 14v3M18 14v3M3 17h2M8 17h8M19 17h2M5 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 14V8h10v6M2 11h3M19 11h3",
 };
 function NavIcon({ id }){
@@ -5864,6 +6081,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
         {page === "forecasts" && !narrow && <Forecasts meta={meta} who={who} access={role} onEdit={editInMatrix} onChanged={refreshPending} />}
         {page === "carbon" && !narrow && <CarbonPage meta={meta} access={role} who={who} />}
         {page === "abnormal" && !narrow && <AbnormalPage meta={meta} access={role} who={who} />}
+        {page === "stockpiles" && !narrow && <StockpilesPage meta={meta} access={role} who={who} />}
         {page === "lookahead" && !narrow && <LookAhead meta={meta} who={who} access={role} />}
         {page === "lookahead" && narrow && <PhoneLookAhead meta={meta} />}
         {/* one mounted instance across the three data pages — see the note at the top */}
@@ -8426,6 +8644,8 @@ function GatesWeek({ gw }){
 // the status pill column between the line and the days — sparse by design
 // the clash rail's names for each code — the same words as the user guide's §10.1
 const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKPILE_OVER: "STOCKPILE OVER",
+                     // 27 Oct 2026 (stockpile forecast, D7): goes over or runs out within 8 weeks; runs out this week
+                     STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",
                      ROUTE_CAP: "ROUTE CAP", IPT_SHARE: "SHARE", RESTRICTION: "RESTRICTION",
                      LIMIT: "ROAD LIMIT", UNBAKED: "NOT ROUTED", PARENT_CHANGED: "PARENT CHANGED",
                      // 14 Oct 2026 (bundle G, W17)
@@ -8438,17 +8658,18 @@ const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.la
 // the grid's short words for each flag (the rail spells some out longer: RAIL_LABEL)
 const LINE_FLAG_LABEL = { UNBAKED: "NOT ROUTED", IPT_SHARE: "SHARE", ROUTE_CAP: "CAP", DAYS_NE_WEEK: "DAYS ≠ WEEK",
                   STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", LIMIT: "ROAD LIMIT", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED",
-                  GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR" };
+                  GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY" };
 // 13 Oct 2026 (W6): the Look-ahead row's ONE status. The flags, most serious first (a lorry over a road limit
 // before anything else: decision 1), win over the week's state; with no flag, the week's state. `more` counts the
 // other kinds of flag; every flag's sentence is in the details. (Replaces LineFlags' column of words and the
 // StatusChip column: one status a row.)
 const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1, SHORTAGE: 2, ROUTE_CAP: 3, STOCKPILE_OVER: 4, IPT_SHARE: 5, DAYS_NE_WEEK: 6, PARENT_CHANGED: 7, UNBAKED: 8,
-                       GATE_OVER: 3.5, GATE_NEAR: 7.5 };   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
+                       GATE_OVER: 3.5, GATE_NEAR: 7.5, STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7 };   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
 const laRank = (code) => (code in LA_FLAG_RANK ? LA_FLAG_RANK[code] : 99);
 const laSorted = (flags) => [...(flags || [])].sort((a, b) => laRank(a.code) - laRank(b.code));
 // the rail's colours: NOT ROUTED, a road restriction and a gate near capacity in amber, every other flag red
-const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE") ? "warn" : "bad";
+const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"
+                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";
 // the details' flag lines: one per kind of flag, most serious first, each distinct sentence once, team ids in
 // the team's words (teamText, as the rail does)
 function laFlagGroups(flags){
@@ -9172,56 +9393,87 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               </div>
             </div>
           )}
-          {/* 10 Sep: what came OUT of each stockpile in the account week — one box per
-              stockpile. In = the typed week actuals delivered there (a week nobody
-              reported counts as nothing). Over capacity is a flag, never a block. */}
-          {account.week && (account.stock || []).length > 0 && (
+          {/* 10 Sep: what came OUT of each stockpile in the account week — one box per stockpile. Over capacity is a
+              flag, never a block. 27 Oct 2026 (stockpile forecast): a stockpile with a capacity or a planned use shows what was
+              recorded with the plan under it in grey, the Out box's hint is the planned figure (left empty, the plan is
+              used), and the last column says what the next 8 weeks hold. Names only: never a location code. The places
+              with neither keep the records-only row, folded under the table. */}
+          {account.week && (account.stock || []).length > 0 && (() => {
+            const fcs = account.stock.filter(s => s.forecast), rec = account.stock.filter(s => !s.forecast);
+            const title = <div className="text-sm font-semibold text-slate-700 mb-2">Stockpiles · {spanLabel(account.week.from, account.week.to)}<InfoTip id="la.stock" /></div>;
+            const row = (s, withNext) => {
+              const k = `stock|${s.location_id}`;
+              const nx = s.next;
+              return (
+                <tr key={s.location_id} className="border-t border-slate-100" style={s.over ? { background: "rgba(191,46,85,.05)" } : {}} data-stock-row={s.forecast ? "forecast" : "records"}>
+                  <td className="px-3 py-2">
+                    <div className="font-semibold text-[color:var(--navy-deep)]">{s.name}</div>
+                    {s.unconvertible_movements ? <div className="text-[13px] text-amber-700">{s.unconvertible_movements} movement(s) not convertible to {s.unit}</div> : null}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums text-slate-600">{grp(s.opening, 1)} {s.unit}</td>
+                  <td className="px-2 py-2 text-right tabular-nums text-slate-600">
+                    {s.forecast ? <>{s.inbound_recorded == null ? "—" : grp(s.inbound_recorded, 1)}<div className="text-[12px] text-slate-500" data-stock-plan-in="1">plan {grp(s.plan_in)}</div></> : grp(s.inbound, 1)}
+                  </td>
+                  <td className="px-2 py-2 text-right">
+                    <input className={fld + " max-w-[110px] ml-auto"} inputMode="decimal"
+                      placeholder={s.forecast ? `plan ${grp(s.plan_out)}` : "out —"}
+                      aria-label={`Out of ${s.name} this week`}
+                      title={s.forecast ? `What came out of ${s.name} this week, in ${s.unit}. Left empty, the plan is used.` : `What came out of ${s.name} this week, in ${s.unit}. Empty = not typed, which is not zero.`}
+                      value={draft[k] ?? (s.consumed ?? "")}
+                      onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))}
+                      onBlur={() => saveConsumed(s)} />
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums font-semibold" style={{ color: s.over ? "var(--bad-text)" : "var(--navy-deep)" }}>
+                    {grp(s.closing, 1)}{s.forecast && s.basis && s.basis !== "recorded" ? <div className="text-[12px] font-normal text-slate-500">plan used</div> : null}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums text-slate-600">{s.capacity_qty == null ? <span className="text-slate-500">not recorded</span> : grp(s.capacity_qty)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums font-medium" style={{ color: s.over ? "var(--bad-text)" : "var(--ok-text)" }}>
+                    {s.remaining == null ? "—" : s.over ? `OVER by ${grp(-s.remaining, 1)}` : grp(s.remaining, 1)}
+                  </td>
+                  {withNext && <td className="px-2 py-2 text-left" data-stock-next={nx ? nx.kind : "none"}>
+                    {!s.use_planned ? <span className="text-[13px] text-slate-500">No use planned yet</span>
+                      : !nx ? "—"
+                      : nx.kind === "over" ? <span className="font-semibold" style={{ color: "var(--bad-text)" }}>over from {stockWeekWord(nx.week_from)}</span>
+                      : nx.kind === "empty" ? <span className="font-semibold" style={{ color: "var(--warn-text)" }}>runs out {stockWeekWord(nx.week_from)}</span>
+                      : <><span style={{ color: "var(--ok-text)" }}>fine</span>{nx.peak_pct != null && <div className="text-[12px] text-slate-500">{Math.round(nx.peak_pct)} % at most</div>}</>}
+                  </td>}
+                </tr>
+              );
+            };
+            const head = (withNext) => (
+              <thead className="la-acct-head">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold">Stockpile</th>
+                  <th className="px-2 py-2 text-right font-semibold">Opening</th>
+                  <th className="px-2 py-2 text-right font-semibold">In</th>
+                  <th className="px-2 py-2 text-right font-semibold">Out</th>
+                  <th className="px-2 py-2 text-right font-semibold">Closing</th>
+                  <th className="px-2 py-2 text-right font-semibold">Capacity</th>
+                  <th className="px-2 py-2 text-right font-semibold">Remaining</th>
+                  {withNext && <th className="px-2 py-2 text-left font-semibold">Next 8 weeks</th>}
+                </tr>
+              </thead>
+            );
+            return (
             <div className="mt-4">
-              <div className="text-sm font-semibold text-slate-700 mb-2">Stockpiles · {spanLabel(account.week.from, account.week.to)}<InfoTip id="la.stock" /></div>
+              {title}
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                <table className="text-sm w-full" style={{ minWidth: 760 }}>
-                  <thead className="la-acct-head">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-semibold">Stockpile</th>
-                      <th className="px-2 py-2 text-right font-semibold">Opening</th>
-                      <th className="px-2 py-2 text-right font-semibold">In</th>
-                      <th className="px-2 py-2 text-right font-semibold">Out</th>
-                      <th className="px-2 py-2 text-right font-semibold">Closing</th>
-                      <th className="px-2 py-2 text-right font-semibold">Capacity</th>
-                      <th className="px-2 py-2 text-right font-semibold">Remaining</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {account.stock.map(s => {
-                      const k = `stock|${s.location_id}`;
-                      return (
-                        <tr key={s.location_id} className="border-t border-slate-100" style={s.over ? { background: "rgba(191,46,85,.05)" } : {}}>
-                          <td className="px-3 py-2">
-                            <div className="font-semibold text-[color:var(--navy-deep)]">{s.name}</div>
-                            <div className="text-[13px] text-slate-500">{s.loc_type} · {s.location_id}{s.unconvertible_movements ? <span className="text-amber-700"> · {s.unconvertible_movements} movement(s) not convertible to {s.unit}</span> : null}</div>
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums text-slate-600">{grp(s.opening, 1)} {s.unit}</td>
-                          <td className="px-2 py-2 text-right tabular-nums text-slate-600">{grp(s.inbound, 1)}</td>
-                          <td className="px-2 py-2 text-right">
-                            <input className={fld + " max-w-[110px] ml-auto"} inputMode="decimal" placeholder="out —"
-                              title={`What came out of ${s.name} this week, in ${s.unit}. Empty = not typed, which is not zero.`}
-                              value={draft[k] ?? (s.consumed ?? "")}
-                              onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))}
-                              onBlur={() => saveConsumed(s)} />
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums font-semibold" style={{ color: s.over ? "var(--bad-text)" : "var(--navy-deep)" }}>{grp(s.closing, 1)}</td>
-                          <td className="px-2 py-2 text-right tabular-nums text-slate-600">{s.capacity_qty == null ? <span className="text-slate-500">not recorded</span> : grp(s.capacity_qty)}</td>
-                          <td className="px-2 py-2 text-right tabular-nums font-medium" style={{ color: s.over ? "var(--bad-text)" : "var(--ok-text)" }}>
-                            {s.remaining == null ? "—" : s.over ? `OVER by ${grp(-s.remaining, 1)}` : grp(s.remaining, 1)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                {fcs.length > 0 && <table className="text-sm w-full" style={{ minWidth: 860 }}>
+                  {head(true)}
+                  <tbody>{fcs.map(s => row(s, true))}</tbody>
+                </table>}
+                {rec.length > 0 && (fcs.length > 0 ? (
+                  <details className="la-stock-rec" data-stock-records="1">
+                    <summary className="px-3 py-2 text-[13px] text-slate-500 cursor-pointer">{rec.length} more {rec.length === 1 ? "place" : "places"} with no capacity: records only</summary>
+                    <table className="text-sm w-full" style={{ minWidth: 760 }}>{head(false)}<tbody>{rec.map(s => row(s, false))}</tbody></table>
+                  </details>
+                ) : (
+                  <table className="text-sm w-full" style={{ minWidth: 760 }}>{head(false)}<tbody>{rec.map(s => row(s, false))}</tbody></table>
+                ))}
               </div>
             </div>
-          )}
+            );
+          })()}
         </>
       ) : (
         <>
@@ -9307,6 +9559,41 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                         </tr>
                       ))}
                     </tbody>
+                    {/* 27 Oct 2026 (stockpile forecast, card 4): one strip under the week rows — each stockpile's forecast %
+                        at the week's end, amber from 90 %, red over, so the make-ready and early-warning weeks show it where
+                        the planner already looks */}
+                    {(horizon.stock || []).length > 0 && (
+                      <tbody data-horizon-stock="1">
+                        <tr className="border-t-2 border-slate-200 bg-slate-50">
+                          <th scope="row" className="px-3 py-1.5 text-left text-xs font-semibold text-slate-600 sticky left-0 bg-slate-50 z-10 border-r border-slate-200">
+                            Stockpiles <span className="font-normal text-slate-500">% full at the week's end</span>
+                          </th>
+                          {cols.map(({ m, w }) => <td key={`${m}|${w}`} className="border-r border-slate-100" style={roleOf(m, w) === "commit" ? { background: "var(--navy-soft)" } : {}}></td>)}
+                        </tr>
+                        {horizon.stock.map(sp => (
+                          <tr key={sp.name} className="border-t border-slate-100">
+                            <td className="px-3 py-1.5 border-r border-slate-100 sticky left-0 bg-white z-10">
+                              <div className="font-semibold text-[color:var(--navy-deep)] whitespace-nowrap">{sp.name}</div>
+                              <div className="text-xs text-slate-500">{grp(sp.capacity_qty)} {unitLbl(sp.unit)}</div>
+                            </td>
+                            {cols.map(({ m, w }) => {
+                              const c = (sp.weeks || {})[`${m}|${w}`];
+                              const role = roleOf(m, w);
+                              if(!c) return <td key={`${m}|${w}`} className="px-2 py-1.5 text-slate-500 border-r border-slate-100">—</td>;
+                              const tone = c.over ? "over" : c.pct >= 90 ? "near" : "ok";
+                              const bg = tone === "over" ? "rgba(220,38,38,.12)" : tone === "near" ? "rgba(217,119,6,.14)" : (role === "commit" ? "var(--navy-soft)" : undefined);
+                              return (
+                                <td key={`${m}|${w}`} data-hz-stock={tone} className="px-2 py-1.5 border-r border-slate-100 text-right tabular-nums"
+                                  style={{ background: bg, color: tone === "over" ? "var(--bad-text)" : tone === "near" ? "var(--warn-text)" : undefined, fontWeight: tone === "ok" ? 400 : 600 }}
+                                  title={`${sp.name}, week of ${stockWeekWord((((horizon && horizon.week_spans) || {})[`${m}|${w}`] || {}).from)}: ${grp(c.balance_end)} of ${grp(sp.capacity_qty)} ${unitLbl(sp.unit)}, ${c.basis === "forecast" ? "forecast" : c.basis === "recorded" ? "recorded" : "plan used where not recorded"}`}>
+                                  {Math.max(0, Math.round(c.pct))} %
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    )}
                   </table>
                 </div>
               </div>
@@ -12835,6 +13122,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <p className="text-[13px] text-slate-400 mt-1.5">
                     Blank = not known. Opening stock = what was there at the start. Over capacity is flagged, never blocked.
                   </p>
+                  <p className="text-[13px] text-slate-500 mt-1" data-stock-link="1">Planned use and stock counts: Plan → Stockpiles.</p>
                 </div>
                 )}
 
