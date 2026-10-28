@@ -590,7 +590,7 @@ def refresh(by=None, fetchers=None, index=None, today=None):
         _write_meta("failed", det)
         return status()
     if not index.lines:
-        det["notes"].append("No route has a stored road route yet, so only the sites were searched round.")
+        det["notes"].append("No route is routed yet, so only the sites were searched round.")
     last = latest_final_year(today)
     workdir = tempfile.mkdtemp(prefix="wayscope_collisions_")
     try:
@@ -619,7 +619,8 @@ def refresh(by=None, fetchers=None, index=None, today=None):
                     traffic_note = ("The traffic counts for " + ", ".join(tmissing) + " could not be read; the other "
                                     "authorities' were.")
             except Exception as e:          # noqa: BLE001 — said on the page, never fatal to the collisions
-                traffic_note = f"The traffic counts could not be read ({str(e)[:140]}); the ones already stored were kept."
+                print(f"🚧 collisions: the traffic counts could not be read: {str(e)[:300]}", flush=True)   # the reason: the log only
+                traffic_note = "The traffic counts could not be read just now; the ones already stored were kept."
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
     now = _now()

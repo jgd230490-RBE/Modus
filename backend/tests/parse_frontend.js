@@ -1206,7 +1206,9 @@ ok("⭐ ONE FuelWidget component, mounted THREE times: Commit (compact), Account
 ok("...the widget reads /fuel-index and never the feed host; it names the provider the API gives it",
   _fwBody.includes("fetch(`${API}/fuel-index?lazy=") && !/eurooilwatch\.com/i.test(code)
   && _fwBody.includes("const prov = idx.provider || (idx.auto_available ? TENANT.fuel_provider : null);")
-  && _fwBody.includes("(prov ? prov.label : \"automatic index\")") && !_fwBody.includes("EU Weekly Oil Bulletin via EuroOilWatch"));
+  // NARROWED 28 Oct 2026 (no supplier names on a screen): the provider in plain words (FUEL_PROVIDER_WORDS), was prov.label
+  && _fwBody.includes("(prov ? (FUEL_PROVIDER_WORDS[prov.key] || \"weekly price\") : \"automatic index\")") && !_fwBody.includes("EU Weekly Oil Bulletin via EuroOilWatch")
+  && code.includes('const FUEL_PROVIDER_WORDS = { desnz: "Weekly UK pump price", eu_bulletin: "Weekly EU price" };') && !_fwBody.includes("prov.label"));
 ok("H1: no fallback to Estonia in the widget — a tenant with no country reads 'no country'",
   !_fwBody.includes('fuelS.country || "EE"') && _fwBody.includes('const country = noCountry ? "no country" : rawCountry;')
   && _fwBody.includes("no country set"));
@@ -1610,6 +1612,29 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("ABNORMAL WORDS: Settings → Bank holidays: 'Update the bank holidays', its success note, no site named",
      al.includes('onClick={fetchHolidays}>Update the bank holidays</button>') && al.includes("text: `Bank holidays updated. ${(j.status && j.status.words) || \"\"}`.trim()")
      && !al.includes("Fetch now from gov.uk") && !al.includes("Bank holidays fetched:"));
+}
+// ---- 28 Oct 2026: Config (Map and bulletin's two cards, Costing · fuel) and the fuel strip name no supplier or data set
+// (the user; mockup notes\config-sources-mockup-1028). The names, licences and credit lines are in the technical guide
+// (T1 "What Config and the fuel strip leave out", T8, T9); the credits stay on the map layers and the PDFs.
+{
+  const strip = (t) => t.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+  const part = (a, b) => { const i = code.indexOf(a), j = code.indexOf(b, i + 1); return i > 0 && j > i ? strip(code.slice(i, j)) : ""; };
+  const cfg = [part("const COMM_SOURCE_WORDS =", "function RouteMapExportMenu("), part("function CostingTab(", "function ConfigPage("),
+               part("const FUEL_PROVIDER_WORDS =", "function LookAhead(")];
+  const CFG_BAN = /OpenStreetMap|\bOSM\b|NaPTAN|\bGIAS\b|STATS19|\bDfT\b|\bDfE\b|DESNZ|ICCT|US DOE|Geofabrik|Mapbox|\bHERE\b|GOV\.UK|gov\.uk|Oil Bulletin/;
+  const cfgStrs = cfg.join("\n").match(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`|>[^<>{}\n]*[A-Za-z][^<>{}\n]*</g) || [];
+  const cfgHits = cfgStrs.filter(x => CFG_BAN.test(x));
+  ok(`⭐ CONFIG WORDS: Config's community and collision cards, Costing · fuel and the fuel strip name no supplier or data set (${cfgStrs.length} pieces read)`,
+     cfg.every(x => x.length > 1500) && cfgStrs.length > 150 && cfgHits.length === 0, cfgHits.slice(0, 5).join(" | "));
+  ok("CONFIG WORDS: the sources in plain words, no credit line on Config, no raw error on hover; the four fuel hints and the strip's source in plain words",
+     code.includes('const COMM_SOURCE_WORDS = { osm: "Places and homes", osm_structures: "Bridges, crossings and limits", gias: "Schools", naptan: "Bus stops and stations" };')
+     && cfg[0].includes('<th scope="col">Data</th>') && !cfg[0].includes("st.credit") && !cfg[0].includes("title={st.error}") && !cfg[0].includes("title={s.error}")
+     && cfg[0].includes("Injury collisions reported to the police, five years,")
+     && cfg[1].includes("Typically 0.4–0.95; the low end is the default") && cfg[1].includes("From the government's 2026 factor")
+     && cfg[1].includes("34 laden − 0.4 × 26 t") && cfg[1].includes("Cars use about 15 % more at −7 °C; lorries less")
+     && cfg[2].includes('const provTitle = prov ? `${FUEL_PROVIDER_WORDS[prov.key] || "weekly price"} — '));
+  ok("...and the ban would catch the old words", ["DfT NaPTAN", "Injury collisions from DfT road safety data", "DESNZ weekly road fuel prices (gov.uk)",
+     "ICCT 34 laden", "US DOE: cars", "OpenStreetMap structures and limits along the roads"].every(x => CFG_BAN.test(x)) && !CFG_BAN.test("Here is the plan"));
 }
 
 // ---- 22 Oct 2026: the abnormal loads on the other screens (phase 2) ------------------------
