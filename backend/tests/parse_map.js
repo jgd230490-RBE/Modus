@@ -2046,14 +2046,18 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      code.includes("const undOn = !!uk && (!undBox || undBox.checked) &&"));
   ok("map bugs: nothing defers to map.once('style.load') (it has usually already fired)",
      !/\.once\(\s*['"]style\.load['"]/.test(code));
-  ok("...the zone layers wait for idle", code.includes("if (!map.isStyleLoaded()) { map.once('idle', ensureZoneLayers); return; }")
-     && !code.includes("map.once('style.load', ensureZoneLayers)"));
-  ok("...the restriction (closure) layers wait for idle",
-     code.includes("if(!map.isStyleLoaded()){ map.once('idle', ensureRestrictionLayers); return; }")
-     && !code.includes("map.once('style.load', ensureRestrictionLayers)"));
+  // 28 Oct 2026 (claude/overlays-after-switch): the three pins below were REVERSED. The idle wait made a chain one idle apart
+  // after a basemap switch (10–23 s on live) and a stall while Play runs; the gate is now styleReady() (the style document
+  // parsed) and no overlay waits for 'idle' or 'style.load' any more.
+  ok("...the zone layers gate on styleReady(), no idle wait (reversed 28 Oct 2026)",
+     /function ensureZoneLayers\(\) \{\s*if \(!styleReady\(\)\) return;/.test(code)
+     && !code.includes("map.once('idle', ensureZoneLayers)") && !code.includes("map.once('style.load', ensureZoneLayers)"));
+  ok("...the restriction (closure) layers gate on styleReady(), no idle wait (reversed 28 Oct 2026)",
+     /function ensureRestrictionLayers\(\)\{\s*if\(!styleReady\(\)\) return;/.test(code)
+     && !code.includes("map.once('idle', ensureRestrictionLayers)") && !code.includes("map.once('style.load', ensureRestrictionLayers)"));
   const defers = [...code.matchAll(/if\s*\(\s*!map\.isStyleLoaded\(\)\s*\)\s*\{\s*map\.once\(\s*'([^']+)'/g)].map(x => x[1]);
-  ok("...and every isStyleLoaded() deferral in the file waits for 'idle'",
-     defers.length >= 2 && defers.every(e => e === "idle"), JSON.stringify(defers));
+  ok("...and NO isStyleLoaded() deferral is left in the file (reversed 28 Oct 2026: was 'every one waits for idle')",
+     defers.length === 0 && !code.includes("map.once('idle'"), JSON.stringify(defers));
   ok("...the style.load handler still re-adds both on a basemap switch",
      code.includes("if (ZONES.loaded) ensureZoneLayers(); else loadZones();")
      && code.includes("if (RESTR.data) ensureRestrictionLayers(); else loadRestrictions();"));
@@ -4825,11 +4829,11 @@ function qrRead(mod) {
   const quiet = { warn() {}, log() {}, info() {} };
   let L = null, lerr = '';
   try {
-    L = new Function("escHtml", "DU", "fmtDist", "document", "window", "map", "mapboxgl", "CONFIG", "MARK_LAYERS", "raiseMarks", "fetch", "console",
+    L = new Function("escHtml", "DU", "fmtDist", "document", "window", "map", "mapboxgl", "CONFIG", "MARK_LAYERS", "raiseMarks", "fetch", "console", "styleReady",
       sec + "\nreturn { drawLimitSign, limitSignSVG, limitCardHTML, limitConditionRows, limitChipText, limitAppliesText, limitValueText, limitLengthText, limitDate,"
           + " limitPointFeatures, limitLineFeatures, limitAttribution, limitImageName, loadLimits, renderLimitGroup, ensureLimitLayers, toggleLimits, raiseLimits, LIM };")(
       escHtml, DU, fmtDist, document, window, map, { Popup: function () { return { setLngLat() { return this; }, setHTML() { return this; }, addTo() { return this; } }; } },
-      { API_BASE: '/api' }, ['site-gates', 'locations', 'site-gates-label'], () => {}, fetch, quiet);
+      { API_BASE: '/api' }, ['site-gates', 'locations', 'site-gates-label'], () => {}, fetch, quiet, () => true);
   } catch (e) { lerr = String(e && e.stack || e); }
   ok("limits (sandbox): the section runs against plain data, a recording context and a fake map", !!L, lerr.slice(0, 400));
   if (L) {
@@ -4987,14 +4991,15 @@ function qrRead(mod) {
       ok("⭐ limits (sandbox): the style 'not loaded' and no idle coming — the five layers and two sources are still added at once",
          ['limit-lines', 'limit-clusters', 'limit-cluster-count', 'limit-dots', 'limit-signs'].every(id => M.layers[id])
          && M.sources['limits-points'] && M.sources['limits-lines']);
-      ok("...and ONE idle wait is armed, not one per call", idleArmed === 1, String(idleArmed));
+      ok("...and NO idle wait is armed at all (narrowed 28 Oct 2026: was one per call; the gate is styleReady())", idleArmed === 0, String(idleArmed));
       map.isStyleLoaded = savedIsLoaded; map.once = savedOnce;
       ok("limits (source): a route's hover card gives way over a lorry limit (seen in Chrome 13 Oct)",
          code.includes("|| (typeof limitHitAt === 'function' && limitHitAt(e.point))) { card.hidden = true; HOVER.key = ''; return; }"));
       ok("limits (source): the card scrolls inside the popup instead of running off the map",
          html.includes(".lim-card{ font-size:14px; line-height:1.4; color:var(--ink); min-width:230px; max-height:min(52vh, 380px); overflow-y:auto; }"));
-      ok("limits (source): the deferral tries the add at once and retries on a refusal",
-         code.includes("try { addLimitLayers(); } catch (e) { setTimeout(ensureLimitLayers, 500); }"));
+      ok("limits (source): the add gates on styleReady() and nothing else (reversed 28 Oct 2026: was the try-now-retry-on-idle net)",
+         /function ensureLimitLayers\(\) \{\s*if \(!LIM\.data\) return;[\s\S]{0,500}if \(!styleReady\(\)\) return;\s*addLimitLayers\(\);\s*\}/.test(code)
+         && !code.includes("setTimeout(ensureLimitLayers, 500)") && !code.includes("LIM.idleArmed"));
       // an empty collection: the note, no boxes; a failed read: no group
       L.LIM.data = { type: 'FeatureCollection', features: [] }; L.renderLimitGroup();
       ok("⭐ limits (sandbox): nothing loaded yet: the group shows 'No lorry limits loaded for this area yet' instead of the boxes",
@@ -6913,7 +6918,8 @@ function qrRead(mod) {
 
   // ---- the addLayer rule, against a fake map with and without slots
   const helpers = cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP");
-  const wrap = cut0(src, "    const _addLayerRaw = map.addLayer.bind(map);", "    // Standard's light preset");
+  // 28 Oct 2026 (overlays-after-switch): the slice ends at the STYLE_READY gate that now sits under the wrapper (was the light preset's comment)
+  const wrap = cut0(src, "    const _addLayerRaw = map.addLayer.bind(map);", "    // 28 Oct 2026 (seen on live after 8d");
   ok("8d: every addLayer of the page goes through one rule beside the map's construction", wrap.length > 200 && src.indexOf("const _addLayerRaw") > src.indexOf("const map = new mapboxgl.Map(")
      && src.indexOf("const _addLayerRaw") - src.indexOf("const map = new mapboxgl.Map(") < 600);
   const run = (slots, layers) => {
@@ -6982,6 +6988,56 @@ function qrRead(mod) {
   ok("8d: the user guide names Standard, Standard satellite and the Light row in a few words; the technical guide says the engine is 3.33.0",
      guide.includes("Standard (3D buildings and landmarks when zoomed in), Standard satellite,") && guide.includes("On Standard a Light row sets the time of day (Day, Dawn, Dusk, Night).")
      && fs.readFileSync(path.join(ROOT, "frontend", "help", "technical", "index.html"), "utf8").includes("Mapbox GL JS 3.33.0"));
+}
+
+// ---- 28 Oct 2026 — the overlays after a basemap switch (claude/overlays-after-switch) ----------------------------------------
+// Seen on live after 8d and measured the same on a 2.14.1 copy: the eight overlays that waited for 'idle' came back one idle
+// apart (zones 7 s, councils 9, abnormal 13, closures 15 on live; up to 23 s locally), and a switch while Play ran left them
+// all off until Pause (the map never idles while a frame is set each tick). One gate replaces the waits.
+{
+  const src = html;
+  const gate = cut0(src, "const STYLE_READY = { now: false };", "function styleReady() { return STYLE_READY.now; }") + "function styleReady() { return STYLE_READY.now; }";
+  ok("overlays: the gate is declared by the map's construction — set on every style.load (registered first), cleared by a setStyle wrapper",
+     gate.includes("map.on('style.load', () => { STYLE_READY.now = true; });")
+     && gate.includes("map.setStyle = function (...a) { STYLE_READY.now = false; return _setStyleRaw(...a); };")
+     && src.indexOf("const STYLE_READY = { now: false };") > src.indexOf("const map = new mapboxgl.Map({")
+     && src.indexOf("const STYLE_READY = { now: false };") > src.indexOf("const _addLayerRaw = map.addLayer.bind(map);")
+     && src.indexOf("const STYLE_READY = { now: false };") - src.indexOf("const map = new mapboxgl.Map(") < 3000
+     && src.indexOf("map.on('style.load', () => { STYLE_READY.now = true; });") < src.indexOf("map.on('style.load', async () => {"));
+  const gated = ['ensureZoneLayers', 'ensureAreaLayers', 'ensureRestrictionLayers', 'ensureLimitLayers', 'ensureCommunityLayers',
+                 'ensureCollisionLayers', 'ensureAbnormalLayers', 'ensureAbnormalPublicLayers'];
+  const missing = gated.filter(fn => {
+    const body = cut0(src, "function " + fn + "(", "\n    }\n");
+    return !/if\s*\(\s*!styleReady\(\)\s*\)\s*return;/.test(body);
+  });
+  ok("overlays: all eight re-adds gate on styleReady() — zones, councils, closures, limits, community, collisions, abnormal, public abnormal",
+     missing.length === 0, JSON.stringify(missing));
+  ok("overlays: no overlay waits for 'idle' anywhere in the page, and nothing defers to 'style.load'",
+     !src.includes("once('idle'") && !/\.once\(\s*['"]style\.load['"]/.test(src));
+  ok("overlays: the style.load handler still re-adds every gated overlay whose data is in (so a call that found the gate shut is not lost)",
+     ["if (ZONES.loaded) ensureZoneLayers(); else loadZones();",
+      "if (AREAS.data) { AREAS.drawn = ''; ensureAreaLayers(); renderAreas(); } else refreshAreas();",
+      "if (typeof COMM !== 'undefined' && COMM.data) ensureCommunityLayers();",
+      "if (typeof COLL !== 'undefined' && COLL.data) ensureCollisionLayers();",
+      "if (typeof ABN !== 'undefined' && ABN.data) ensureAbnormalLayers();",
+      "if (typeof ABP !== 'undefined' && ABP.data) ensureAbnormalPublicLayers();",
+      "if (RESTR.data) ensureRestrictionLayers(); else loadRestrictions();",
+      "if (LIM.data) ensureLimitLayers(); else loadLimits();"].every(t => src.includes(t)));
+  // the gate's semantics, run against a fake map
+  let G = null, gerr = '';
+  try {
+    const H = {};
+    const map = { on: (ev, fn) => { (H[ev] = H[ev] || []).push(fn); }, setStyle: () => 'raw' };
+    G = new Function("map", gate.replace(/^\s*\/\/.*$/mg, "") + "\nreturn { styleReady, fire: () => (H => {})(), map };")(map);
+    const fire = ev => (H[ev] || []).forEach(fn => fn());
+    const before = G.styleReady();
+    fire('style.load'); const afterLoad = G.styleReady();
+    const r = map.setStyle('x'); const afterSet = G.styleReady();
+    fire('style.load'); const afterSecond = G.styleReady();
+    ok("overlays (sandbox): the gate is shut before the first style.load, open after it, shut again by setStyle (which still runs) and open on the next style.load",
+       before === false && afterLoad === true && r === 'raw' && afterSet === false && afterSecond === true,
+       JSON.stringify({ before, afterLoad, r, afterSet, afterSecond }));
+  } catch (e) { gerr = String(e && e.stack || e); ok("overlays (sandbox): the gate runs against a fake map", false, gerr.slice(0, 300)); }
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

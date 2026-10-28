@@ -1947,6 +1947,18 @@
         if (before && !map.getLayer(before)) before = undefined;
         return _addLayerRaw(layer, before);
     };
+    // 28 Oct 2026 (seen on live after 8d, the same on 2.14.1): the eight overlays that waited for 'idle' before re-adding their
+    // layers (zones, councils, closures, limits, community, collisions, abnormal loads, the public abnormal loads) came back
+    // ONE IDLE APART after a basemap switch — each add made isStyleLoaded() false again for the next, 10–23 s in all — and
+    // while Play runs the map never goes idle, so a switch made then left them all off until Pause. Mapbox accepts a source
+    // and a layer as soon as the style DOCUMENT is parsed (what the 31 other overlays rely on from inside style.load; tiles
+    // do not matter), so the gate is that and nothing else: true from each style.load until the next setStyle. A function
+    // that finds it false does nothing — the style.load handler on its way re-adds every overlay whose data is in.
+    const STYLE_READY = { now: false };
+    map.on('style.load', () => { STYLE_READY.now = true; });     // registered first, so it runs before every other handler
+    const _setStyleRaw = map.setStyle.bind(map);
+    map.setStyle = function (...a) { STYLE_READY.now = false; return _setStyleRaw(...a); };
+    function styleReady() { return STYLE_READY.now; }
     // Standard's light preset (day / dawn / dusk / night): set on every style load while a Standard style shows; the row of
     // buttons under the Basemap list shows only then; the share link carries &light= (day, the default, writes nothing)
     function applyLightPreset() {
@@ -4442,10 +4454,9 @@
         ensureZoneLayers();
     }
 
-    // 🔴 11 Oct 2026: wait for 'idle', NEVER 'style.load'. isStyleLoaded() stays false until every
-    // source's tiles are in, so it is false when this runs from inside the style.load handler (or just
-    // after the zones fetch) — and waiting for a style.load that has already fired waited forever: the
-    // zones were never drawn, on load or after a basemap switch. 'idle' fires once everything is loaded.
+    // 🔴 11 Oct 2026: never defer to 'style.load' (it has usually already fired, and the zones were never drawn). It then
+    // waited for 'idle' — 28 Oct 2026: that made a chain one idle apart after a basemap switch and a stall while Play
+    // runs; now the gate is styleReady() (the style document parsed), see STYLE_READY by the map's construction.
     // ===== D24 (12 Oct 2026): one symbol and one toggle per zone KIND ================
     // Colours per colour-system-1010.md line 24: amber #D97706 is "edited / closure /
     // warning"; red is kept for a cap breach or a clash and is NOT used here. Whether the
@@ -4484,7 +4495,7 @@
     }
 
     function ensureZoneLayers() {
-        if (!map.isStyleLoaded()) { map.once('idle', ensureZoneLayers); return; }
+        if (!styleReady()) return;
         if (!map.getSource('zones-source')) map.addSource('zones-source', { type: 'geojson', data: ZONES.data });
         else map.getSource('zones-source').setData(ZONES.data);
         const cb = document.getElementById('layer-zones');
@@ -4970,7 +4981,7 @@
     }
     function ensureAreaLayers() {
         if (!AREAS.data || !(AREAS.data.areas || []).length) return;
-        if (!map.isStyleLoaded()) { map.once('idle', ensureAreaLayers); return; }
+        if (!styleReady()) return;
         const when = (typeof monthLabel === 'function' && AREAS.month) ? monthLabel(AREAS.month) : '';
         // the hatch for "no figure" (an image of our own: re-added after a basemap switch, which drops images)
         try { if (map.hasImage && !map.hasImage('area-hatch')) map.addImage('area-hatch', areaHatchImage()); } catch (e) {}
@@ -5280,11 +5291,11 @@
         return !!(cb && cb.checked);
     }
 
-    // 🔴 11 Oct 2026: 'idle', not 'style.load' — the same trap as ensureZoneLayers(). The closures
-    // arrived while tiles were still loading, waited for a style.load that had already fired, and
-    // ticking "Planned road closures" then drew nothing, even after a basemap switch.
+    // 🔴 11 Oct 2026: never 'style.load' — the same trap as ensureZoneLayers(). The closures arrived while tiles were
+    // still loading, waited for a style.load that had already fired, and ticking "Planned road closures" then drew
+    // nothing. 28 Oct 2026: styleReady() (the style document parsed), no idle wait — see STYLE_READY.
     function ensureRestrictionLayers(){
-        if(!map.isStyleLoaded()){ map.once('idle', ensureRestrictionLayers); return; }
+        if(!styleReady()) return;
         if(!RESTR.data) return;
         if(!map.getSource('restrictions-source')) map.addSource('restrictions-source', { type:'geojson', data: RESTR.data });
         else map.getSource('restrictions-source').setData(RESTR.data);
@@ -5861,15 +5872,10 @@
     // the sources and layers, from the cached collection; called on load, on every tick of a box and on style.load
     function ensureLimitLayers() {
         if (!LIM.data) return;
-        if (!map.isStyleLoaded()) {
-            // 13 Oct 2026, seen in Chrome on the local copy: the limits arrived after the map had gone busy and 'idle'
-            // never came again (map.loaded() stayed false with the style parsed and no source loading), so the layers
-            // were never drawn. Mapbox accepts a source and a layer once the style document is parsed, tiles or not:
-            // try now; keep one idle wait armed and retry shortly if Mapbox refuses.
-            if (!LIM.idleArmed) { LIM.idleArmed = true; map.once('idle', () => { LIM.idleArmed = false; ensureLimitLayers(); }); }
-            try { addLimitLayers(); } catch (e) { setTimeout(ensureLimitLayers, 500); }
-            return;
-        }
+        // 13 Oct 2026, seen in Chrome on the local copy: the limits arrived after the map had gone busy and 'idle' never came
+        // again, so they were never drawn; the add was tried at once with an idle wait as the net. 28 Oct 2026: the one
+        // style-ready gate (STYLE_READY, by the map's construction) replaces that net for every overlay.
+        if (!styleReady()) return;
         addLimitLayers();
     }
     function addLimitLayers() {
@@ -9097,7 +9103,7 @@
     }
     function ensureCommunityLayers() {
         if (!COMM.data || !COMM.staff) return;
-        if (!map.isStyleLoaded()) { map.once('idle', ensureCommunityLayers); return; }
+        if (!styleReady()) return;
         ((COMM.data.kinds) || []).forEach(k => {
             const id = 'comm-' + k.key;
             try { if (map.hasImage && !map.hasImage(id)) map.addImage(id, commSymbolImage(k.symbol, k.colour), { pixelRatio: 2 }); } catch (e) {}
@@ -9226,7 +9232,7 @@
             try { map.setFilter('collision-points', collisionFilter()); map.setLayoutProperty('collision-points', 'visibility', COLL.on ? 'visible' : 'none'); } catch (e) {}
             return;
         }
-        if (!map.isStyleLoaded()) { map.once('idle', ensureCollisionLayers); return; }
+        if (!styleReady()) return;
         const data = { type: 'FeatureCollection', features: COLL.data.features || [] };
         if (!map.getSource('collision-source')) map.addSource('collision-source', { type: 'geojson', data, attribution: COLL.data.credit || '' });
         else map.getSource('collision-source').setData(data);
@@ -9344,7 +9350,7 @@
                   map.setLayoutProperty('abnormal-points', 'visibility', (ABN.on && ABN.dots) ? 'visible' : 'none'); } catch (e) {}
             return;
         }
-        if (!map.isStyleLoaded()) { map.once('idle', ensureAbnormalLayers); return; }
+        if (!styleReady()) return;
         const data = ABN.data;
         if (!map.getSource('abnormal-source')) map.addSource('abnormal-source', { type: 'geojson', data });
         else map.getSource('abnormal-source').setData(data);
@@ -9441,7 +9447,7 @@
         if (!ABP.data) return;
         const vis = ABP.on ? 'visible' : 'none';
         if (map.getLayer('abnormal-public-lines')) { try { ['abnormal-public-casing', 'abnormal-public-lines', 'abnormal-public-ends', 'abnormal-public-dot'].forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', vis); }); } catch (e) {} applyAbnormalPublicMonth(); return; }
-        if (!map.isStyleLoaded()) { map.once('idle', ensureAbnormalPublicLayers); return; }
+        if (!styleReady()) return;
         if (!map.getSource('abnormal-public-source')) map.addSource('abnormal-public-source', { type: 'geojson', data: ABP.data });
         else map.getSource('abnormal-public-source').setData(ABP.data);
         map.addLayer({ id: 'abnormal-public-casing', type: 'line', source: 'abnormal-public-source', filter: ['==', ['geometry-type'], 'LineString'],
