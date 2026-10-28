@@ -3342,6 +3342,9 @@ def _ce_time_of_day(c, S, m, y, cw, R, B, para, new_page, footer_h):
     if not T.get("shown"):
         return para("The hour of each collision comes with the next fetch of the collision history (Config, Map and bulletin, "
                     "Fetch now).", y, 7.4, NAVY_RGB) - 8
+    if not any(sum(col["weekday"]) + col["weekend"] + (col.get("unknown") or 0) for col in T["columns"]):
+        return para(f"No collisions on this route{' or its alternatives' if len(T['columns']) > 1 else ''} "
+                    f"(within {S['on_route_m']} m), {S['period']}.", y, 7.4, NAVY_RGB) - 8
     cols = T["columns"][:3]
     ch = 72                                     # the bars' height
     need = ch + 60
