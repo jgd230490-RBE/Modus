@@ -1263,7 +1263,7 @@ ok("⭐ every lazy layer adder re-raises the marks afterwards",
 // putting the flow back under the labels (placeFlowLayer)
 ok("⭐ ...including the three forecast layers, which are the ones that actually covered them",
   /'text-halo-width':2\}\}\);\s*\n\s*raiseMarks\(\);/.test(code)
-  && /function ensureFlowLayer\(\)\{[\s\S]{0,1200}drawFlow\(\);\s*placeFlowLayer\(\);\s*raiseMarks\(\);\s*\}/.test(code));
+  && /function ensureFlowLayer\(\)\{[\s\S]{0,2600}drawFlow\(\);\s*placeFlowLayer\(\);\s*raiseMarks\(\);\s*\}/.test(code));   // NARROWED 28 Oct 2026 (8d, GL JS v3): the dots layer is added in the same function
 ok("⭐ ...and applyFilters, which runs after every user action",
   /markRouteEnds\(\);\s*\n\s*raiseMarks\(\);/.test(code));
 
@@ -2563,7 +2563,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      /id:'forecast-cap-badge',type:'symbol',source:'routes-source'/.test(code)
      && code.includes("['concat', 'over planning flag ', ['to-string', ['get', 'max_vehicles_per_day']]]")
      && code.includes("return ['all', ['==', ['get', 'type'], 'Inbound Highway'], ['in', ['get', 'route_id'], ['literal', ids]]];")
-     && (code.match(/'forecast-flow','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2
+     && (code.match(/'forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2   // NARROWED 28 Oct 2026 (8d): + the light's dots layer
      && code.includes("setCapBadges(overCap.filter(rid => live.some(i => i.src === 'cap' && i.id === rid)));"));
 
   // 6. review §3 row 3 — the overlay honours the filters; per-route roll-up; WS names; the stockpile sentence
@@ -3354,7 +3354,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && /map\.addLayer\(\{ id: CARBON_LABEL_LAYER[\s\S]{0,700}raiseMarks\(\);/.test(blkCode)
      && (code.match(/raiseMarks\(\);/g) || []).length >= 11);   // 9 on the base, + the two new adders
   ok("⭐ C1: the road-load and carbon-label ids are in BOTH removal lists (Show forecast off, and closeTimeline)",
-     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
   ok("⭐ C1: re-added on style.load (setStyle drops every source and layer): the handler calls refreshMapModes() after the month re-render",
      (() => { const a = code.indexOf("map.on('style.load', async () => {"); const b = code.indexOf("let ALIGNMENT_POPUP_WIRED");
               const sl = a > 0 && b > a ? code.slice(a, b) : "";
@@ -3371,7 +3371,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   // 12 Oct 2026 (night, the user: By council "would be good to see by itself")
   ok("⭐ council view: while a By council box is ticked the routes are thin pale grey with no casing, flow dashes or cap badges, and the route labels hide",
      blkCode.includes("const COUNCIL_ROUTE_COLOR = '#A8A29E', COUNCIL_ROUTE_WIDTH = 2;")
-     && blkCode.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-cap-badge'];")
+     && blkCode.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge'];")   // NARROWED 28 Oct 2026 (8d): + the light's dots layer
      && blkCode.includes("COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });")
      && blkCode.includes("function councilFocus(){ return typeof areaTierOn === 'function' && (areaTierOn('district') || areaTierOn('county')); }"));
   ok("⭐ council view: ticking a council box turns the heat map Off; picking Volume or Carbon unticks the council boxes (one picture at a time); both write the link",
@@ -4326,7 +4326,7 @@ function qrRead(mod) {
      (code.match(/map\.on\('mousemove'/g) || []).length === 1 && (code.match(/generateId: true/g) || []).length === 1
      && !/promoteId/.test(code));
   ok("Track C: the two removal lists are the one list, unchanged by the merge (Road load, Carbon and the forecast layers; the council areas are their own group and stay)",
-     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'\]\.forEach/g) || []).length === 2
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach/g) || []).length === 2   // NARROWED 28 Oct 2026 (8d): + the light's dots layer
      && !/'area-fill','forecast/.test(code));
   // the deep link carries Road load and Carbon
   ok("⭐ Track C link: the Road load and Carbon boxes travel in &layers= (the box list names them; a change to either writes the link)",
@@ -5541,7 +5541,7 @@ function qrRead(mod) {
   ok("basemap: the page's own styles are a full rebuild (diff: false: style.load always fires, the last pick wins); any other keeps GL's validate-first diff",
      bm.includes("if (BASEMAP.rebuild.has(styleUrl)) map.setStyle(style, { diff: false }); else map.setStyle(style);")
      && ["light-v11", "dark-v11", "satellite-streets-v12", "streets-v12"].every(k => bm.includes(`'mapbox://styles/mapbox/${k}'`))
-     && bm.includes("'maaamet-ortho']) };") && !bm.includes("mapbox://styles/mapbox/standard"));
+     && bm.includes("'mapbox://styles/mapbox/standard', 'mapbox://styles/mapbox/standard-satellite']) };") && bm.includes("'maaamet-ortho',"));   // REVERSED 28 Oct 2026 (8d): the page loads GL JS v3, which draws Standard
   ok("basemap: Maa-amet is still a style object, chosen by its key",
      bm.includes("const style = styleUrl === 'maaamet-ortho' ? maaametOrthoStyle() : styleUrl;"));
   const ct = (src.match(/window\.changeTheme = function\(btn, styleUrl\) \{([^}]*)\};/) || [])[1] || "";
@@ -5574,9 +5574,9 @@ function qrRead(mod) {
     // NARROWED 27 Oct 2026 (8a): the block reads INITIAL_BASEMAP (Light here, as with no ?basemap= in the address)
     // NARROWED 28 Oct 2026 (8b): the block also holds loadLateBasemap (the OS map / the tenant's imagery), which reads the
     // late-basemap helpers beside BASEMAP_LINK, TENANT, fetch and toast: all given here, none used by the 16 Oct checks
-    api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast",
+    api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast", "applyLightPreset", "syncLightRow", "restyleHaulEraser",
       cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(
-      fakeMap, fakeDoc, () => ({ version: 8, sources: {}, layers: [] }), "mapbox://styles/mapbox/light-v11", {}, () => Promise.reject(new Error("no network")), () => {});
+      fakeMap, fakeDoc, () => ({ version: 8, sources: {}, layers: [] }), "mapbox://styles/mapbox/light-v11", {}, () => Promise.reject(new Error("no network")), () => {}, () => {}, () => {}, () => {});   // NARROWED 28 Oct 2026 (8d, GL JS v3)
   } catch (e) { ok("basemap sandbox: the block runs", false, String(e)); }
   if (api) {
     const L = "mapbox://styles/mapbox/light-v11", D = "mapbox://styles/mapbox/dark-v11", S = "mapbox://styles/mapbox/streets-v12";
@@ -5600,7 +5600,7 @@ function qrRead(mod) {
     ok("⭐ sandbox: back to the shown Dark before Streets loaded: a full rebuild (diff: false), so style.load re-adds the layers",
        calls.length === 3 && calls[2][0] === D && calls[2][1] && calls[2][1].diff === false && api.BASEMAP.pending === D);
     load();
-    api.changeBasemap("mapbox://styles/mapbox/standard");    // a style GL 2.14 rejects: no style.load ever comes
+    api.changeBasemap("mapbox://styles/mapbox/no-such-style-v1");    // a style the page does not list: no style.load ever comes (NARROWED 28 Oct 2026, 8d: Standard is a page style now)
     ok("sandbox: a style the page does not list keeps GL's default diff (validated first; a rejection keeps the basemap)",
        calls.length === 4 && calls[3][1] === undefined);
     api.changeBasemap(D);
@@ -5623,14 +5623,15 @@ function qrRead(mod) {
   const widget = [...src.matchAll(/changeTheme\(this, '([^']+)'\)/g)].map(m => m[1]);   // src, not code: code's comment strip cuts 'mapbox://...' at the //
   const CLASSIC = /^mapbox:\/\/styles\/mapbox\/[a-z-]+-v\d+$/;   // light-v11, dark-v11, satellite-streets-v12, streets-v12 ...
   const guide = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8");
-  ok("basemap 16 Oct: the page still loads GL JS 2.x (v3 would draw the Standard style; this block assumes it does not)",
-     glv.length === 3 && glv[0] === 2);
-  ok("🔴 basemap 16 Oct: 'Standard (3D)' is gone from the Basemap menu (mapbox/standard needs GL JS v3; on 2.14 it drew nothing new)",
-     opts.length >= 3 && !opts.some(o => /mapbox\/standard/.test(o.value) || /standard/i.test(o.label)));
-  ok("🔴 basemap 16 Oct: nothing in the page's code sets the Standard style (no setStyle / changeTheme with mapbox/standard)",
-     !/mapbox:\/\/styles\/mapbox\/standard/.test(src) && /mapbox:\/\/styles\/mapbox\/light-v11/.test(src));
+  ok("basemap 16 Oct: the page loads GL JS 3.x (REVERSED 28 Oct 2026, 8d: it was 2.x; v3 draws the Standard style)",
+     glv.length === 3 && glv[0] === 3 && glv[1] >= 33);
+  ok("🔴 basemap 16 Oct: Standard is BACK in the Basemap menu as 'Standard' (REVERSED 28 Oct 2026, 8d: GL JS v3 draws it; it was removed on 2.14)",
+     opts.length >= 3 && opts.some(o => o.value === "mapbox://styles/mapbox/standard" && o.label === "Standard")
+     && opts.some(o => o.value === "mapbox://styles/mapbox/standard-satellite" && o.label === "Standard satellite") && !opts.some(o => /Standard \(3D\)/.test(o.label)));
+  ok("🔴 basemap 16 Oct: the page sets the Standard style only through changeBasemap / the menu (REVERSED 28 Oct 2026, 8d: it names mapbox/standard in the menu, the link keys, the rebuild set and STANDARD_STYLES, nowhere else)",
+     (src.match(/mapbox:\/\/styles\/mapbox\/standard(?!-)/g) || []).length === 3 && (html.match(/<option value="mapbox:\/\/styles\/mapbox\/standard">/g) || []).length === 1 && /mapbox:\/\/styles\/mapbox\/light-v11/.test(src) && !/changeTheme\(this, 'mapbox:\/\/styles\/mapbox\/standard/.test(src));
   ok("basemap 16 Oct: every Basemap option is a classic Mapbox style (-vNN) or the Maa-amet raster style, which GL 2.14 validates",
-     opts.length > 0 && opts.every(o => CLASSIC.test(o.value) || o.value === "maaamet-ortho" || o.value === "os-zoomstack" || o.value === "client-imagery"));   // NARROWED 28 Oct 2026 (8b): + the OS map and the tenant's imagery (styles built in the page, GL 2.14 draws them)
+     opts.length > 0 && opts.every(o => CLASSIC.test(o.value) || o.value === "maaamet-ortho" || o.value === "os-zoomstack" || o.value === "client-imagery" || /^mapbox:\/\/styles\/mapbox\/standard(-satellite)?$/.test(o.value)));   // NARROWED 28 Oct 2026 (8b): + the OS map and the tenant's imagery; (8d): + the two Standard styles v3 draws
   // NARROWED 27 Oct 2026 (8a): Streets, Outdoors, Satellite without names and the two Navigation styles joined the menu (pinned in full in the 27 Oct block)
   ok("basemap 16 Oct: the menu still offers Light (selected), Dark and Satellite, plus the hidden Maa-amet orthophoto",
      ["light-v11", "dark-v11", "satellite-streets-v12"].every(k => opts.some(o => o.value === "mapbox://styles/mapbox/" + k))
@@ -5642,9 +5643,10 @@ function qrRead(mod) {
   ok("basemap 16 Oct: the 3D look GL 2.14 can draw stays — the 3D buildings overlay (fill-extrusion on the composite source)",
      html.includes('<input type="checkbox" id="layer-buildings" onchange="toggleBuildings(this.checked)"> 3D buildings</label>')
      && code.includes("id: 'buildings-3d', type: 'fill-extrusion', source: 'composite',"));
-  ok("basemap 16 Oct: the in-app guide lists the basemaps the menu offers, without Standard (3D)",
-     // NARROWED 27 Oct 2026 (8a): the eight basemaps in the menu's order, Navigation shows no live traffic, a shared link keeps the ground
-     guide.includes("Light (default), Dark, Streets, Outdoors, Satellite, Satellite (no names), Navigation day and Navigation night (Satellite reads Aerial for a British organisation)")
+  ok("basemap 16 Oct: the in-app guide lists the basemaps the menu offers, Standard among them (REVERSED 28 Oct 2026, 8d: it was 'without Standard (3D)')",
+     // NARROWED 27 Oct 2026 (8a): the eight basemaps in the menu's order, Navigation shows no live traffic, a shared link keeps the ground; 28 Oct (8d): + Standard, Standard satellite, the Light row
+     guide.includes("Light (default), Dark, Standard (3D buildings and landmarks when zoomed in), Standard satellite, Streets, Outdoors, Satellite, Satellite (no names), Navigation day and Navigation night (Satellite reads Aerial for a British organisation)")
+     && guide.includes("On Standard a Light row sets the time of day (Day, Dawn, Dusk, Night).")
      && guide.includes("Navigation shows no live traffic.") && guide.includes("a shared link opens on the same one")
      && !guide.includes("Light (default), Dark and Satellite")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the basemap names no longer say Mapbox
      && !/Standard \(3D\)/.test(guide));
@@ -5717,9 +5719,9 @@ function qrRead(mod) {
      /const FLOW_OFFSET = -1\.75;/.test(fcode) && /'line-offset': FLOW_OFFSET/.test(addFlow)
      && (code.match(/'line-offset': FLOW_OFFSET/g) || []).length === 1);
   // REVERSED 23 Oct 2026 (the user): the lanes are SOLID, white, round-capped, the width by band, a light along them while playing
-  ok("⭐ D115 / 23 Oct: the lanes as added — round caps and joins, white, the width a step by band, a plain gradient, the still opacity, no dash",
+  ok("⭐ D115 / 23 Oct: the lanes as added — round caps and joins, white, the width a step by band, the still opacity, no dash, and NO gradient (NARROWED 28 Oct 2026, 8d: the light is dots on their own source)",
      /layout: \{ 'line-cap': 'round', 'line-join': 'round',/.test(addFlow) && fcode.includes("const FLOW_WIDTHS = [1.6, 2.1, 2.6, 3.2, 3.8];")
-     && /'line-color': '#ffffff', 'line-width': flowWidthExpr\(\), 'line-opacity': FLOW_STILL_OPACITY,/.test(addFlow) && /'line-gradient': flowPulse\(null\)/.test(addFlow)
+     && /'line-color': '#ffffff', 'line-width': flowWidthExpr\(\), 'line-opacity': FLOW_STILL_OPACITY,/.test(addFlow) && !/line-gradient/.test(fcode)
      && !/line-dasharray/.test(addFlow) && /lineMetrics: true/.test(fcode));
   ok("🔴 D115 / 23 Oct: no butt cap anywhere in the flow (no march to need one); the rail core is the one butt-capped layer left",
      !/'line-cap': 'butt'/.test(fcode) && (code.match(/'line-cap': 'butt'/g) || []).length === 1
@@ -5769,8 +5771,9 @@ function qrRead(mod) {
     const strings = (fcode.match(/'[^'\n]*'/g) || []).join(" ");
     ok("D115: nothing a person reads in the flow block says truck, real-time, live tracking, telematics, AI, optimise, predict or secure",
        !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(strings) && !/\bAI\b/.test(strings));
-    ok("D115: no lorry, dot or time on the public map's flow (D36): the block draws lines only, no symbol or circle layer, no clock",
-       !/type: '(symbol|circle)'/.test(fcode) && !/Date\(|toLocaleTimeString|getHours/.test(fcode));
+    ok("D115: no lorry or time on the public map's flow (D36): the block draws the lanes and the light's dots only — one circle layer, no symbol, no clock (NARROWED 28 Oct 2026, 8d)",
+       (fcode.match(/type: 'circle'/g) || []).length === 1 && /id: 'forecast-flow-light', type: 'circle', source: FLOW_LIGHT_SOURCE/.test(fcode)
+       && !/type: 'symbol'/.test(fcode) && !/Date\(|toLocaleTimeString|getHours/.test(fcode));
   }
 
   {
@@ -5823,7 +5826,7 @@ function qrRead(mod) {
   try {
     api = new Function("map", "document", "a1_data", "modeRoutesPassing", "councilFocus", "mapModeMonth", "forecastWindow", "rlEsc", "monthLabel",
       "stepRanges", "VOLUME_STOPS", "ROUTE_VOLUME_STOPS", "CONFIG", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "raiseMarks",
-      fblk + "\nreturn { FLOW, FLOW_STOPS, FLOW_WIDTHS, FLOW_PULSES, FLOW_PULSE_LEN, FLOW_PULSE_SPEED, FLOW_STILL_OPACITY, FLOW_OFFSET, FLOW_CYCLE, DASH_SEQ, flowLanes, flowFeatures, drawFlow, ensureFlowLayer, placeFlowLayer, flowWidthExpr, flowPulse, setFlowPulse, renderFlowLegend, flowSample };")(
+      fblk + "\nreturn { FLOW, FLOW_STOPS, FLOW_WIDTHS, FLOW_PULSES, FLOW_PULSE_LEN, FLOW_PULSE_SPEED, FLOW_STILL_OPACITY, FLOW_OFFSET, FLOW_CYCLE, DASH_SEQ, flowLanes, flowFeatures, drawFlow, ensureFlowLayer, placeFlowLayer, flowWidthExpr, flowLightPoints, laneMetric, FLOW_LIGHT_SOURCE, setFlowPulse, renderFlowLegend, flowSample };")(
       fmap, document, a1_data, () => passing, () => focus, () => month, () => [9, 12], rlEsc, monthLabel, stepRanges, VS, VS, CONFIG, 6, 8.5, () => {});
   } catch (e) { err = e.message; }
   ok("⭐ D115 sandbox: the flow block runs against a fake map and DOM", !!api, err);
@@ -5874,7 +5877,7 @@ function qrRead(mod) {
     [0, 2, 3].forEach(i => { delete a1_data.features[i].properties.f_day; }); F.drawFlow();
     // the layer and its order
     ok("⭐ D115 sandbox: the flow is added right over forecast-layer and under the labels and badges",
-       fmap.order.join(",") === "forecast-casing,forecast-layer,forecast-flow,forecast-labels,forecast-cap-badge", fmap.order.join(","));
+       fmap.order.join(",") === "forecast-casing,forecast-layer,forecast-flow,forecast-labels,forecast-cap-badge,forecast-flow-light", fmap.order.join(","));   // NARROWED 28 Oct 2026 (8d): the dots on top, like the abnormal load's dot
     fmap.addLayer({ id: "road-load-casing", paint: {}, layout: {} }); fmap.addLayer({ id: "road-load-line", paint: {}, layout: {} }); fmap.addLayer({ id: "road-load-labels", paint: {}, layout: {} });
     F.placeFlowLayer();
     ok("D115 sandbox: with the Volume heat map's shared sections on, the flow moves over them (and under their labels)",
@@ -5885,9 +5888,9 @@ function qrRead(mod) {
     // REVERSED 23 Oct 2026 (the user, the route line redesign): the lanes are solid; the volume is the lane's width and
     // the march is a light running along the lane. Each pin below replaces the dash pin that stood here.
     const outs = e => e.filter((x, i) => i >= 2 && i % 2 === 0);
-    ok("⭐ D115 sandbox / 23 Oct: the lane as added — offset left (negative), round caps, the width step, the plain gradient, the still opacity, no dash",
+    ok("⭐ D115 sandbox / 23 Oct: the lane as added — offset left (negative), round caps, the width step, the still opacity, no dash, no gradient (NARROWED 28 Oct 2026, 8d)",
        fl.paint["line-offset"] < 0 && fl.layout["line-cap"] === "round" && JSON.stringify(fl.paint["line-width"]) === JSON.stringify(F.flowWidthExpr())
-       && JSON.stringify(fl.paint["line-gradient"]) === JSON.stringify(F.flowPulse(null)) && fl.paint["line-opacity"] === F.FLOW_STILL_OPACITY
+       && !("line-gradient" in fl.paint) && fl.paint["line-opacity"] === F.FLOW_STILL_OPACITY
        && !("line-dasharray" in fl.paint), JSON.stringify(fl.paint));
     const wexp = F.flowWidthExpr();
     ok("⭐ D115 sandbox / 23 Oct: the width is a step on fl_mv at the five bands' stops [10, 25, 50, 100], every output a number",
@@ -5896,17 +5899,27 @@ function qrRead(mod) {
        && outs(wexp).length === 5 && outs(wexp).every(o => typeof o === "number"), JSON.stringify(wexp));
     ok("⭐ D115 sandbox / 23 Oct: wider lane = more movements — the widths grow band by band, the thinnest at least 1.6 px",
        F.FLOW_WIDTHS.every((w, i) => i === 0 || w > F.FLOW_WIDTHS[i - 1]) && F.FLOW_WIDTHS[0] >= 1.6);
-    const plain = F.flowPulse(null);
-    ok("🔴 D115 sandbox / 23 Oct: standing still the gradient is plain white end to end — no dash, no dot, nothing to march",
-       plain[0] === "interpolate" && JSON.stringify(plain[2]) === JSON.stringify(["line-progress"]) && plain.length === 7 && plain[4] === "#ffffff" && plain[6] === "#ffffff");
+    const plain = F.flowLightPoints(null);
+    ok("🔴 D115 sandbox / 23 Oct: standing still there is no light — no dots, no dash, nothing to march (NARROWED 28 Oct 2026, 8d: dots, not a gradient)",
+       plain.type === "FeatureCollection" && plain.features.length === 0);
     let lightOk = true, lightWhy = "";
+    const litN = (F.FLOW.lit || []).length;
     for (const t of [0, 0.1, 0.33, 0.5, 0.66, 0.9, 0.999]) {
-      const g = F.flowPulse(t), st = g.slice(3).filter((x, i) => i % 2 === 0), bright = g.filter(x => x === "rgba(255,255,255,0.95)").length;
-      const inc = st.every((v, i) => i === 0 || v > st[i - 1]) && st[0] === 0 && st[st.length - 1] === 1;
-      if (!inc || bright !== F.FLOW_PULSES || g[0] !== "interpolate") { lightOk = false; lightWhy = "t=" + t + " " + JSON.stringify(g).slice(0, 160); break; }
+      const g = F.flowLightPoints(t), pts = g.features.map(f => f.geometry.coordinates);
+      const fin = pts.every(c => Number.isFinite(c[0]) && Number.isFinite(c[1]));
+      if (!fin || g.features.length !== litN * F.FLOW_PULSES || litN === 0 || !g.features.every(f => f.geometry.type === "Point")) { lightOk = false; lightWhy = "t=" + t + " " + g.features.length + "/" + litN + " " + JSON.stringify(pts).slice(0, 120); break; }
     }
-    ok("⭐ D115 sandbox / 23 Oct: the light at any phase — FLOW_PULSES bright points, every stop strictly increasing from 0 to 1, dark at both ends",
+    ok("⭐ D115 sandbox / 23 Oct: the light at any phase — FLOW_PULSES dots on every lane with movements, each a point with finite coordinates (NARROWED 28 Oct 2026, 8d)",
        lightOk, lightWhy);
+    {
+      // a two-point lane: the dot at phase 0 is its start, at 0.5 its middle; a phase step moves the dot along it
+      const lane = F.laneMetric({ coords: [[0, 0], [1, 0]] });
+      const one = (t) => { const keep = F.FLOW.lit; F.FLOW.lit = [lane]; const g = F.flowLightPoints(t); F.FLOW.lit = keep; return g.features.map(f => f.geometry.coordinates[0]); };
+      const p0 = one(0), p5 = one(0.5);
+      ok("⭐ 8d (sandbox): the dots sit ON the lane — at phase 0 on its start, a third and two thirds along; at 0.5 in its middle; the x of a dot grows with the phase",
+         lane.len > 0 && p0.length === F.FLOW_PULSES && Math.abs(p0[0]) < 1e-9 && Math.abs(p0[1] - 1 / 3) < 1e-9 && Math.abs(p0[2] - 2 / 3) < 1e-9
+         && Math.abs(p5[0] - 0.5) < 1e-9 && Math.abs(p5[1] - (0.5 + 1 / 3) % 1) < 1e-9, JSON.stringify([p0, p5]));
+    }
     ok("⭐ D115 sandbox / 23 Oct: SAME SPEED — one phase from the frame clock moves the light on every lane at once, no per-band step",
        /_pulseT=\(\(ts\*FLOW_PULSE_SPEED\)\/1000\)%1; setFlowPulse\(_pulseT\);/.test(code) && F.FLOW_PULSE_SPEED > 0 && F.FLOW_PULSE_SPEED < 1);
     ok("D115 sandbox / 23 Oct: the rail's cycle is still a whole number of its seven steps",
@@ -5914,11 +5927,12 @@ function qrRead(mod) {
     ok("D115 sandbox / 23 Oct: on screen the lanes are 1.6, 2.1, 2.6, 3.2 and 3.8 px wide, fewest movements first",
        JSON.stringify(F.FLOW_WIDTHS) === "[1.6,2.1,2.6,3.2,3.8]");
     F.setFlowPulse(0.3);
-    ok("⭐ D115 sandbox / 23 Oct: playing, the light's gradient and full opacity go on the layer; the caps stay round", fl.layout["line-cap"] === "round"
-       && fl.paint["line-opacity"] === 1 && JSON.stringify(fl.paint["line-gradient"]) === JSON.stringify(F.flowPulse(0.3)));
+    const dots = () => (fmap.sources[F.FLOW_LIGHT_SOURCE] && fmap.sources[F.FLOW_LIGHT_SOURCE]._data || { features: [] }).features.length;
+    ok("⭐ D115 sandbox / 23 Oct: playing, full opacity goes on the lane and the dots go on their source; the caps stay round (NARROWED 28 Oct 2026, 8d)", fl.layout["line-cap"] === "round"
+       && fl.paint["line-opacity"] === 1 && !("line-gradient" in fl.paint) && dots() === (F.FLOW.lit || []).length * F.FLOW_PULSES && dots() > 0, String(dots()));
     F.setFlowPulse(null);
-    ok("⭐ D115 sandbox / 23 Oct: standing still again (pause, stop, reduced motion): the plain gradient and the still opacity",
-       fl.paint["line-opacity"] === F.FLOW_STILL_OPACITY && JSON.stringify(fl.paint["line-gradient"]) === JSON.stringify(plain));
+    ok("⭐ D115 sandbox / 23 Oct: standing still again (pause, stop, reduced motion): the still opacity and no dots",
+       fl.paint["line-opacity"] === F.FLOW_STILL_OPACITY && dots() === 0);
     // the legend
     const lg = el("flow-legend");
     ok("⭐ D115 sandbox / 23 Oct: the legend says 'Wider lane = more movements a day', each way, the month, and the five band figures",
@@ -6359,7 +6373,7 @@ function qrRead(mod) {
      /'id': 'haul-eraser',[\s\S]{0,400}'line-color': haulEraserColour\(\), 'line-width': WIDTH_CASING, 'line-opacity': 1, 'line-offset': OFFSET_IN \}\n\s+\}, labelAnchor\(\)\);/.test(code)
      && /'id': 'haul-dots',[\s\S]{0,500}'line-color': \['match', \['get', 'type'\], 'Inbound Haul', '#059669', '#f59e0b'\], 'line-width': HAUL_DOT_WIDTH,[\s\S]{0,120}'line-dasharray': HAUL_DOTS \}\n\s+\}, labelAnchor\(\)\);/.test(code)
      && /const HAUL_DOT_WIDTH = \['interpolate', \['linear'\], \['zoom'\], 7, 1\.1, 12, 2\.4, 16, 3\.8\];/.test(code)
-     && /function haulEraserColour\(\)\{ return \/dark\|night\/\.test\(/.test(code));   // NARROWED 27 Oct 2026 (8a): the Navigation night style is dark ground too
+     && /function haulEraserColour\(\)\{\s*const bm = String[\s\S]{0,500}return \(\/dark\|night\/\.test\(bm\) \|\| standardDark\) \? '#1F2024' : '#ffffff';/.test(code)   /* NARROWED 28 Oct 2026 (8d): + Standard at dusk / night */);   // NARROWED 27 Oct 2026 (8a): the Navigation night style is dark ground too
   ok("23 Oct: the pieces follow the Laden / Empty ticks and the route filters (applyFilters), the ticks alone when no filter is set",
      /function haulPieceFilter\(\)\{/.test(code)
      && /\['haul-eraser', 'haul-dots'\]\.forEach\(l => \{ if \(map\.getLayer\(l\)\) map\.setFilter\(l, haulBase\[0\] === 'in' \? \['all', haulBase, \.\.\.filterArr\.slice\(1\)\] : haulBase\); \}\);/.test(code));
@@ -6560,30 +6574,30 @@ function qrRead(mod) {
   const M = "mapbox://styles/mapbox/";
   const sel = (html.match(/<select id="basemap-select"[^>]*>([\s\S]*?)<\/select>/) || [])[1] || "";
   const opts = [...sel.matchAll(/<option value="([^"]*)"([^>]*)>([^<]*)<\/option>/g)].map(m => ({ value: m[1], attrs: m[2], label: m[3] }));
-  const want = [["light-v11", "Light"], ["dark-v11", "Dark"], ["streets-v12", "Streets"], ["outdoors-v12", "Outdoors"],
+  const want = [["light-v11", "Light"], ["dark-v11", "Dark"], ["standard", "Standard"], ["standard-satellite", "Standard satellite"], ["streets-v12", "Streets"], ["outdoors-v12", "Outdoors"],   // NARROWED 28 Oct 2026 (8d): + the two Standard styles
                 ["satellite-streets-v12", "Satellite"], ["satellite-v9", "Satellite (no names)"],
                 ["navigation-day-v1", "Navigation day"], ["navigation-night-v1", "Navigation night"]];
   ok("⭐ 8a: the Basemap menu offers, in order, Light, Dark, Streets, Outdoors, Satellite, Satellite (no names), Navigation day and Navigation night, then the hidden Maa-amet",
-     opts.length === 11 && want.every(([k, label], i) => opts[i].value === M + k && opts[i].label === label)
-     && opts[8].value === "os-zoomstack" && opts[8].label === "OS map" && /hidden/.test(opts[8].attrs)
-     && opts[9].value === "client-imagery" && opts[9].label === "Client imagery" && /hidden/.test(opts[9].attrs)
-     && opts[10].value === "maaamet-ortho" && /hidden/.test(opts[10].attrs) && /selected/.test(opts[0].attrs) && opts.slice(1).every(o => !/selected/.test(o.attrs)));   // NARROWED 28 Oct 2026 (8b): nine -> eleven, the OS map and the imagery before the Maa-amet, both hidden until set
-  ok("🔴 8a: every new option is a classic -vNN Mapbox style (GL JS 2.14 draws it) and none is the v3-only Standard style",
-     opts.slice(0, 8).every(o => /^mapbox:\/\/styles\/mapbox\/[a-z-]+-v\d+$/.test(o.value)) && !/mapbox\/standard/.test(src) && !/mapbox\/standard/.test(sel)
-     && /mapbox-gl-js\/v2\.\d+\.\d+\/mapbox-gl\.js/.test(html));
+     opts.length === 13 && want.every(([k, label], i) => opts[i].value === M + k && opts[i].label === label)
+     && opts[10].value === "os-zoomstack" && opts[10].label === "OS map" && /hidden/.test(opts[10].attrs)
+     && opts[11].value === "client-imagery" && opts[11].label === "Client imagery" && /hidden/.test(opts[11].attrs)
+     && opts[12].value === "maaamet-ortho" && /hidden/.test(opts[12].attrs) && /selected/.test(opts[0].attrs) && opts.slice(1).every(o => !/selected/.test(o.attrs)));   // NARROWED 28 Oct 2026 (8d): 11 -> 13   // NARROWED 28 Oct 2026 (8b): nine -> eleven, the OS map and the imagery before the Maa-amet, both hidden until set
+  ok("🔴 8a: every Mapbox option is a classic -vNN style or one of the two Standard styles, which GL JS v3 draws (REVERSED 28 Oct 2026, 8d: Standard is back, the engine is 3.x)",
+     opts.slice(0, 10).every(o => /^mapbox:\/\/styles\/mapbox\/([a-z-]+-v\d+|standard|standard-satellite)$/.test(o.value)) && /mapbox\/standard/.test(sel)
+     && /mapbox-gl-js\/v3\.\d+\.\d+\/mapbox-gl\.js/.test(html));
   ok("8a: the two satellite options have their own ids, so a British tenant's wording can reach both",
      /<option value="mapbox:\/\/styles\/mapbox\/satellite-streets-v12" id="basemap-satellite">/.test(sel)
      && /<option value="mapbox:\/\/styles\/mapbox\/satellite-v9" id="basemap-satellite-plain">/.test(sel));
   const i0 = src.indexOf("const BASEMAP = {"), i1 = src.indexOf("function maaametOrthoStyle()");
   const bm = i0 >= 0 && i1 > i0 ? src.slice(i0, i1) : "";
   ok("⭐ 8a: every menu style is in BASEMAP.rebuild (a full rebuild, so the page's layers come back on every one)",
-     want.every(([k]) => bm.slice(0, bm.indexOf("maaamet-ortho'")).includes(`'${M}${k}'`)) && bm.includes("'maaamet-ortho']) };"));
+     want.every(([k]) => bm.slice(bm.indexOf("const BASEMAP = {"), bm.indexOf("]) };") + 5).includes(`'${M}${k}'`)) && bm.includes("'maaamet-ortho',") && bm.includes("'mapbox://styles/mapbox/standard-satellite']) };"));   // NARROWED 28 Oct 2026 (8d, GL JS v3)
   ok("8a: the widget's four quick buttons stay Light, Dark, Satellite and Streets",
      [...src.matchAll(/changeTheme\(this, '([^']+)'\)/g)].map(m => m[1]).join("|") === [M + "light-v11", M + "dark-v11", M + "satellite-streets-v12", M + "streets-v12"].join("|"));
   // the live traffic: only the two sources, on every style load
   ok("⭐ 8a: hideLiveTraffic runs from style.load and hides only layers on the mapbox-traffic and mapbox-incidents sources",
      /function hideLiveTraffic\(\) \{[\s\S]*?l\.source === 'mapbox-traffic' \|\| l\.source === 'mapbox-incidents'[\s\S]*?setLayoutProperty\(l\.id, 'visibility', 'none'\)/.test(bm)
-     && /BASEMAP\.pending = null; \}\n\s*hideLiveTraffic\(\);\s*\}\);/.test(bm) && (src.match(/hideLiveTraffic\(\)/g) || []).length === 2);   // NARROWED 28 Oct 2026 (8b): the handler is multi-line
+     && /BASEMAP\.pending = null; \}\n\s*hideLiveTraffic\(\);\n\s*applyLightPreset\(\); syncLightRow\(\);[^\n]*\n\s*\}\);/.test(bm) && (src.match(/hideLiveTraffic\(\)/g) || []).length === 2);   // NARROWED 28 Oct 2026 (8b): the handler is multi-line; (8d): + Standard's light
   {
     const fnSrc = bm.slice(bm.indexOf("function hideLiveTraffic()"), bm.indexOf("map.on('style.load'"));
     const layers = [{ id: 'road-primary', source: 'composite' }, { id: 'traffic-primary', source: 'mapbox-traffic' },
@@ -6604,8 +6618,8 @@ function qrRead(mod) {
     const fakeSel = { value: M + "light-v11", selectedIndex: 0, options: [] };
     const fakeDoc = { getElementById: () => fakeSel, querySelectorAll: () => [] };
     let api = null, e0 = "";
-    try { api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast",
-      cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, fakeDoc, () => ({}), M + "light-v11", {}, () => Promise.reject(new Error("no network")), () => {}); }   // NARROWED 28 Oct 2026 (8b)
+    try { api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast", "applyLightPreset", "syncLightRow", "restyleHaulEraser",
+      cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, fakeDoc, () => ({}), M + "light-v11", {}, () => Promise.reject(new Error("no network")), () => {}, () => {}, () => {}, () => {}); }   // NARROWED 28 Oct 2026 (8b, 8d)
     catch (e) { e0 = String(e); }
     ok("8a (sandbox): the basemap block runs with the new styles", !!api, e0.slice(0, 300));
     if (api) {
@@ -6630,14 +6644,14 @@ function qrRead(mod) {
   {
     const link = new Function(cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\nreturn { BASEMAP_LINK, basemapFromKey, basemapKey };")();
     ok("8a: the link keys name exactly the seven non-default styles (NARROWED 28 Oct 2026, 8b: and the OS map and the tenant's imagery, os / imagery); an unknown key, a prototype name or a style URL is null",
-       Object.keys(link.BASEMAP_LINK).join() === "dark,streets,outdoors,aerial,aerial-plain,nav-day,nav-night,os,imagery"
+       Object.keys(link.BASEMAP_LINK).join() === "dark,streets,outdoors,aerial,aerial-plain,nav-day,nav-night,standard,standard-satellite,os,imagery"   // NARROWED 28 Oct 2026 (8d, GL JS v3)
        && link.basemapFromKey('outdoors') === M + "outdoors-v12" && link.basemapFromKey('nav-night') === M + "navigation-night-v1"
        && link.basemapFromKey('nope') === null && link.basemapFromKey('constructor') === null && link.basemapFromKey(null) === null
        && link.basemapKey(M + "light-v11") === null && link.basemapKey(M + "streets-v12") === "streets"
        && Object.values(link.BASEMAP_LINK).every(u => opts.some(o => o.value === u)));
   }
   ok("8a: changing the basemap rewrites the address (scheduleViewWrite), and the view carries the held ground",
-     /BASEMAP\.pending = styleUrl;\s*try \{ scheduleViewWrite\(\); \}/.test(bm) && src.includes("basemap: basemapKey(BASEMAP.pending || BASEMAP.shown) };")
+     /BASEMAP\.pending = styleUrl;\s*try \{ scheduleViewWrite\(\); \}/.test(bm) && src.includes("basemap: basemapKey(BASEMAP.pending || BASEMAP.shown),")   // NARROWED 28 Oct 2026 (8d, GL JS v3): + the light
      && src.includes("if (v.basemap && BASEMAP_LINK[v.basemap]) q.set('basemap', v.basemap);"));
   // a British tenant reads the satellite options as Aerial
   {
@@ -6652,7 +6666,7 @@ function qrRead(mod) {
        && mk('EE').join('|') === 'Satellite|Satellite (no names)' && mk('').join('|') === 'Satellite|Satellite (no names)');
   }
   ok("🔴 8a: the Navigation night ground is dark for the haul-road cut-out, and no banned public word came in with the new options",
-     /function haulEraserColour\(\)\{ return \/dark\|night\/\.test\(/.test(code) && !/truck|real-time|live tracking|telematics/i.test(sel));
+     /function haulEraserColour\(\)\{\s*const bm = String[\s\S]{0,500}return \(\/dark\|night\/\.test\(bm\) \|\| standardDark\) \? '#1F2024' : '#ffffff';/.test(code)   /* NARROWED 28 Oct 2026 (8d): + Standard at dusk / night */ && !/truck|real-time|live tracking|telematics/i.test(sel));
 }
 
 // ===== 28 Oct 2026 (task 8b): the OS map and the tenant's own imagery as basemaps =====
@@ -6684,13 +6698,18 @@ function qrRead(mod) {
   // ---- OS's style, made ready
   const st = { version: 8, sources: { os: { type: "vector", url: OSURL, maxzoom: 19 }, ras: { type: "raster", tiles: ["https://x.example/{z}/{x}/{y}.png"] },
                                        low: { type: "vector", url: OSURL + "/low", maxzoom: 12 }, none: { type: "vector", url: OSURL + "/none" } },
-               layers: [{ id: "bg", type: "background" }] };
+               layers: [{ id: "bg", type: "background" }, { id: "open-road", type: "line", source: "os", minzoom: 9, maxzoom: 16 }, { id: "open-wood", type: "fill", source: "os", maxzoom: 15 },
+                        { id: "detail-building", type: "fill", source: "os", minzoom: 16, maxzoom: 17 }, { id: "detail-kerb", type: "line", source: "os", minzoom: 17 }, { id: "far", type: "line", source: "os", maxzoom: 9 }] };
   const snap = JSON.stringify(st);
   const out = pure.osStyleReady(st, 2026);
   ok("⭐ 8b: OS's own style is made ready: every vector source stops at zoom 15 (OS OpenData tiles stop there; GL enlarges the last tile), carries OS's credit, and the input is untouched",
      out && out.sources.os.maxzoom === 15 && out.sources.low.maxzoom === 12 && out.sources.none.maxzoom === 15
      && ["os", "low", "none"].every(k => out.sources[k].attribution === "Contains OS data © Crown copyright and database right 2026")
      && out.sources.ras.attribution === undefined && JSON.stringify(st) === snap && pure.osCredit(2031).endsWith("database right 2031"));
+  ok("⭐ 8b (28 Oct, seen on live): a layer capped at 16 or under that is on below 16 loses its cap, so the zoom-15 tiles keep drawing enlarged past 16; the detailed layers from 16 and 17 (Premium tiles, never fetched) and a far-out cap keep theirs",
+     out.layers.find(l => l.id === "open-road").maxzoom === undefined && out.layers.find(l => l.id === "open-wood").maxzoom === undefined
+     && out.layers.find(l => l.id === "detail-building").maxzoom === 17 && out.layers.find(l => l.id === "detail-kerb").maxzoom === undefined && out.layers.find(l => l.id === "detail-kerb").minzoom === 17
+     && out.layers.find(l => l.id === "far").maxzoom === 9, JSON.stringify(out.layers.map(l => [l.id, l.minzoom, l.maxzoom])));
   ok("8b: a style OS answers with nothing usable (no vector source, no layers, not an object) is null, never drawn",
      pure.osStyleReady({ version: 8, sources: { r: { type: "raster" } }, layers: [] }, 2026) === null && pure.osStyleReady(null, 2026) === null
      && pure.osStyleReady({ sources: {} }, 2026) === null && pure.osStyleReady("x", 2026) === null && pure.osStyleReady({ sources: { v: { type: "vector" } } }, 2026) === null);
@@ -6746,8 +6765,8 @@ function qrRead(mod) {
     const doc = { getElementById: () => sel, querySelectorAll: () => [] };
     let api = null, e0 = "";
     try {
-      api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast",
-        helpers + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, doc, () => ({}), M + "light-v11", tenant, fetchImpl, t => toasts.push(t));
+      api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast", "applyLightPreset", "syncLightRow", "restyleHaulEraser",
+        helpers + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, doc, () => ({}), M + "light-v11", tenant, fetchImpl, t => toasts.push(t), () => {}, () => {}, () => {});   // NARROWED 28 Oct 2026 (8d, GL JS v3)
     } catch (e) { e0 = String(e); }
     return { api, e0, calls, load: () => loads.forEach(f => f()), err: e => errs.forEach(f => f(e)), toasts, sel };
   };
@@ -6840,8 +6859,8 @@ function qrRead(mod) {
   ok("8b: the OS map and the imagery are in the menu as hidden lines with their own ids, before the Estonia one; no new quick button",
      /<option value="os-zoomstack" id="basemap-os" hidden>OS map<\/option>\s*<option value="client-imagery" id="basemap-imagery" hidden>Client imagery<\/option>\s*<option value="maaamet-ortho"/.test(html)
      && (src.match(/changeTheme\(this, '/g) || []).length === 4);
-  ok("8b: GL JS is still 2.x (the OS style and the raster style are plain v8 styles it draws), and neither late basemap uses a v3-only feature",
-     /mapbox-gl-js\/v2\.\d+\.\d+\/mapbox-gl\.js/.test(html) && !/mapbox\/standard/.test(src));
+  ok("8b: GL JS is 3.x now (REVERSED 28 Oct 2026, 8d); the OS style and the raster style are plain v8 styles it still draws, and neither late basemap is a Standard style",
+     /mapbox-gl-js\/v3\.\d+\.\d+\/mapbox-gl\.js/.test(html) && pure.BASEMAP_LINK.os === "os-zoomstack" && pure.BASEMAP_LINK.imagery === "client-imagery");
 }
 
 // ---- 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast, D9 a + i): the gauges and the popup
@@ -6860,6 +6879,98 @@ function qrRead(mod) {
      && code.includes("${props.stock_basis === 'forecast' ? 'forecast' : 'recorded'}, end of ${monthLabel(Number(props.stock_month))}"));
   ok("STOCK: 🔴 the map never decides staff on its own — `over` is read from the server, which sends it to staff only",
      code.includes("const over = props.stock_over === true || props.stock_over === 'true';"));
+}
+
+
+// ===== 28 Oct 2026 (task 8d): Mapbox GL JS v3 =====
+// The engine goes from 2.14.1 to 3.33.0 on both pages (an exact version with its integrity hash, as pilot readiness phase 2 asks).
+// Standard and Standard satellite are back in the menu with a Light row (day / dawn / dusk / night) shown only on them. A style
+// with slots takes the page's lines in the 'middle' slot and every layer of ours keeps its colour under Standard's lighting
+// (an emissive strength of 1); a classic style keeps today's beforeId. The light while Play runs is dots (the gradient re-set
+// cost 60 -> 10-22 fps on v3; the dots run at 60, measured: notes\gl-v3-plan-1027.md). The staff app gets the version only.
+{
+  const M = "mapbox://styles/mapbox/";
+  const fe = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8");
+  const tagJs = (h) => (h.match(/<script src="https:\/\/api\.mapbox\.com\/mapbox-gl-js\/v([0-9.]+)\/mapbox-gl\.js"[^>]*>/) || [])[0] || "";
+  const tagCss = (h) => (h.match(/<link href="https:\/\/api\.mapbox\.com\/mapbox-gl-js\/v([0-9.]+)\/mapbox-gl\.css"[^>]*>/) || [])[0] || "";
+  ok("⭐ 8d: both pages load Mapbox GL JS 3.33.0 and its CSS, the same exact tags, each with a sha384 integrity hash and crossorigin=anonymous",
+     tagJs(html).includes("/v3.33.0/") && tagJs(html) === tagJs(fe) && tagCss(html).includes("/v3.33.0/") && tagCss(html) === tagCss(fe)
+     && /integrity="sha384-[A-Za-z0-9+\/=]{64}" crossorigin="anonymous"/.test(tagJs(html)) && /integrity="sha384-[A-Za-z0-9+\/=]{64}" crossorigin="anonymous"/.test(tagCss(html))
+     && !/mapbox-gl-js\/v2\./.test(html) && !/mapbox-gl-js\/v2\./.test(fe));
+  ok("8d: the staff app is the version bump only: no slot, no setConfigProperty, no emissive strength, no Standard style in it",
+     !/slot:|setConfigProperty|emissive-strength|mapbox\/standard/.test(fe));
+
+  // ---- the addLayer rule, against a fake map with and without slots
+  const helpers = cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP");
+  const wrap = cut0(src, "    const _addLayerRaw = map.addLayer.bind(map);", "    // Standard's light preset");
+  ok("8d: every addLayer of the page goes through one rule beside the map's construction", wrap.length > 200 && src.indexOf("const _addLayerRaw") > src.indexOf("const map = new mapboxgl.Map(")
+     && src.indexOf("const _addLayerRaw") - src.indexOf("const map = new mapboxgl.Map(") < 600);
+  const run = (slots, layers) => {
+    const added = [];
+    const fake = { getSlots: () => slots, getLayer: id => layers.includes(id) ? { id } : undefined, addLayer: (l, b) => { added.push([l, b]); return fake; } };
+    const api = new Function("map", "TENANT", helpers + "\n" + wrap + "\nreturn map;")(fake, {});
+    return { api, added };
+  };
+  {
+    const S = run(["bottom", "middle", "top"], ["inbound-lines"]);
+    S.api.addLayer({ id: "a", type: "line", source: "x", paint: { "line-color": "#000" } }, "road-label-simple");
+    S.api.addLayer({ id: "b", type: "symbol", source: "x", layout: {} });
+    S.api.addLayer({ id: "c", type: "circle", source: "x" }, "inbound-lines");
+    S.api.addLayer({ id: "d", type: "fill", source: "x", paint: { "fill-emissive-strength": 0.4 } });
+    S.api.addLayer({ id: "e", type: "line", source: "x", slot: "top" });
+    const [a, b, c, d, e] = S.added;
+    ok("⭐ 8d (sandbox, a style with slots): a line goes in the middle slot, its before (a basemap label the style does not list) dropped; a symbol and a circle keep no slot (on top); an own before is kept; a slot the page chose stays",
+       a[0].slot === "middle" && a[1] === undefined && b[0].slot === undefined && c[0].slot === undefined && c[1] === "inbound-lines" && d[0].slot === "middle" && e[0].slot === "top",
+       JSON.stringify(S.added.map(x => [x[0].id, x[0].slot, x[1]])));
+    ok("⭐ 8d (sandbox): every layer of ours keeps its colour under Standard's lighting — an emissive strength of 1 on lines, fills and circles, icon and text for a symbol; one the page set itself is kept",
+       a[0].paint["line-emissive-strength"] === 1 && a[0].paint["line-color"] === "#000" && c[0].paint["circle-emissive-strength"] === 1 && d[0].paint["fill-emissive-strength"] === 0.4
+       && b[0].paint["icon-emissive-strength"] === 1 && b[0].paint["text-emissive-strength"] === 1);
+  }
+  {
+    const C = run([], ["road-label-simple", "inbound-lines"]);
+    C.api.addLayer({ id: "a", type: "line", source: "x" }, "road-label-simple");
+    C.api.addLayer({ id: "b", type: "symbol", source: "x" });
+    const [a, b] = C.added;
+    ok("⭐ 8d (sandbox, a classic style): no slot is set and today's before (the first label layer) is kept, so the names still print over the lines",
+       a[0].slot === undefined && a[1] === "road-label-simple" && b[0].slot === undefined && b[1] === undefined && a[0].paint["line-emissive-strength"] === 1);
+  }
+
+  // ---- the menu and the Light row
+  const sel2 = (html.match(/<select id="basemap-select"[^>]*>([\s\S]*?)<\/select>/) || [])[1] || "";
+  ok("8d: Standard and Standard satellite sit right after Dark in the menu, by their Mapbox URLs, and the Light row with its four buttons follows the list, hidden until Standard shows",
+     /<option value="mapbox:\/\/styles\/mapbox\/dark-v11">Dark<\/option>\s*<option value="mapbox:\/\/styles\/mapbox\/standard">Standard<\/option>\s*<option value="mapbox:\/\/styles\/mapbox\/standard-satellite">Standard satellite<\/option>/.test(sel2)
+     && /<div id="light-row" class="light-row" hidden>/.test(html) && ["day", "dawn", "dusk", "night"].every(k => html.includes(`data-light="${k}" onclick="setLightPreset('${k}')"`))
+     && /role="group" aria-label="Light"/.test(html) && /\.light-btn\{ min-height:44px; \}/.test(html));
+  const L = new Function("location", helpers + "\nreturn { LIGHT, LIGHT_PRESETS, STANDARD_STYLES, isStandard, BASEMAP_LINK };")({ search: "?light=night" });
+  ok("8d: the link's &light= is read before the map is made (night here); an unknown value is day; the two Standard styles are the only ones with a light",
+     L.LIGHT.preset === "night" && new Function("location", helpers + "\nreturn LIGHT.preset;")({ search: "?light=noon" }) === "day" && new Function("location", helpers + "\nreturn LIGHT.preset;")({ search: "" }) === "day"
+     && L.isStandard(M + "standard") && L.isStandard(M + "standard-satellite") && !L.isStandard(M + "light-v11") && L.BASEMAP_LINK.standard === M + "standard" && L.BASEMAP_LINK["standard-satellite"] === M + "standard-satellite");
+  const lightFns = cut0(src, "    function applyLightPreset() {", "    // 🔴 16 Oct 2026: pressing the basemap");
+  ok("8d: the preset is set on the style (setConfigProperty basemap lightPreset) only while a Standard style shows, from style.load and from the buttons; the row hides otherwise; a change rewrites the address and the haul cut-out",
+     /function applyLightPreset\(\) \{\s*if \(!isStandard\(BASEMAP\.pending \|\| BASEMAP\.shown\)\) return;\s*try \{ map\.setConfigProperty\('basemap', 'lightPreset', LIGHT\.preset\); \}/.test(lightFns)
+     && /row\.hidden = !isStandard\(BASEMAP\.pending \|\| BASEMAP\.shown\)/.test(lightFns) && /function setLightPreset\(v\) \{[\s\S]*?applyLightPreset\(\); syncLightRow\(\);[\s\S]*?restyleHaulEraser[\s\S]*?scheduleViewWrite\(\);/.test(lightFns)
+     && /applyLightPreset\(\); syncLightRow\(\);\s*\/\/ 28 Oct 2026 \(8d\)/.test(src));
+  ok("8d: the share link carries &light= only on a Standard style and only when it is not day; the view reads it back",
+     src.includes("if (v.light && v.light !== 'day' && LIGHT_PRESETS.includes(v.light)) q.set('light', v.light);")
+     && src.includes("light: LIGHT_PRESETS.includes(q.get('light')) ? q.get('light') : null };")
+     && src.includes("light: isStandard(BASEMAP.pending || BASEMAP.shown) ? LIGHT.preset : null };"));
+  ok("8d: the two Standard styles are in BASEMAP.rebuild (a full rebuild, the last pick wins) and the haul cut-out is dark on Standard at dusk or night",
+     /'mapbox:\/\/styles\/mapbox\/standard', 'mapbox:\/\/styles\/mapbox\/standard-satellite'\]\) \};/.test(src)
+     && /const standardDark = typeof isStandard === 'function' && isStandard\(bm\) && typeof LIGHT !== 'undefined' && \(LIGHT\.preset === 'dusk' \|\| LIGHT\.preset === 'night'\);/.test(code));
+  ok("8d: on a style with slots the 3D buildings box switches Standard's own objects (show3dObjects) and says 'from zoom 15'; a classic style keeps the composite extrusion",
+     /function ensureBuildingLayer\(\) \{[\s\S]{0,400}if \(styleHasSlots\(\)\) \{[\s\S]{0,200}'from zoom 15'[\s\S]{0,200}setConfigProperty\('basemap', 'show3dObjects', buildingsVisible\(\)\)[\s\S]{0,100}return true;/.test(code)
+     && /function toggleBuildings\(visible\) \{[\s\S]{0,300}if \(styleHasSlots\(\)\) \{ try \{ map\.setConfigProperty\('basemap', 'show3dObjects', !!visible\); \}/.test(code)
+     && code.includes("id: 'buildings-3d', type: 'fill-extrusion', source: 'composite',"));
+
+  // ---- the light's dots
+  ok("8d: the dots layer: white with a thin ink edge, radius by zoom, on its own source, quietened with the lanes in the council view and removed with them",
+     /id: 'forecast-flow-light', type: 'circle', source: FLOW_LIGHT_SOURCE,[\s\S]{0,400}'circle-stroke-color': '#1F2024'/.test(code)
+     && code.includes("const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge'];")
+     && (code.match(/'forecast-flow','forecast-flow-light','forecast-cap-badge'\]/g) || []).length === 2 && !/flowPulse\(|line-progress/.test(code));
+  const guide = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8");
+  ok("8d: the user guide names Standard, Standard satellite and the Light row in a few words; the technical guide says the engine is 3.33.0",
+     guide.includes("Standard (3D buildings and landmarks when zoomed in), Standard satellite,") && guide.includes("On Standard a Light row sets the time of day (Day, Dawn, Dusk, Night).")
+     && fs.readFileSync(path.join(ROOT, "frontend", "help", "technical", "index.html"), "utf8").includes("Mapbox GL JS 3.33.0"));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

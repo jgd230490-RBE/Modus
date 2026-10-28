@@ -595,7 +595,7 @@ policy does not stop injected inline script. A page that starts using a new outs
 (<code>test_hardening.py</code> fails until it does). The landing site (<code>wayscope.co.uk</code>) is a separate Render static
 site and does not get these headers from the app.</p>
 <p><strong>Outside scripts.</strong> Every outside script and stylesheet is an exact version with an <code>integrity</code> hash
-(React 18.3.1, ReactDOM 18.3.1, Babel 7.23.10, Chart.js 4.4.4, Mapbox GL JS 2.14.1 and its CSS): if the CDN ever served a
+(React 18.3.1, ReactDOM 18.3.1, Babel 7.23.10, Chart.js 4.4.4, Mapbox GL JS 3.33.0 and its CSS): if the CDN ever served a
 different file, the browser refuses it. Tailwind's play script is served from the app (<code>/vendor/tailwind-play-3.4.17.js</code>)
 because its CDN sends no CORS header, which an integrity hash needs. Google Fonts' CSS cannot carry a hash (it differs per
 browser); it is styles only.</p>
@@ -756,7 +756,7 @@ bulletin; the district bands differ from the route carbon bands.</li>
 (&ldquo;For information only&rdquo;). A zone marked Affects routing is avoided (T2).</li>
 <li><strong>Alternatives.</strong> The other options HERE returned and the plan does not use. A route along a haul road
 has none (T2).</li>
-<li><strong>Basemaps.</strong> Eight Mapbox styles (classic <code>-vNN</code>, GL JS 2.14.1); Navigation's live traffic and incident
+<li><strong>Basemaps.</strong> Ten Mapbox styles (eight classic <code>-vNN</code> styles and, since 28 Oct 2026 on GL JS 3.33.0, Standard and Standard satellite); Navigation's live traffic and incident
 layers (<code>mapbox-<wbr>traffic</code>, <code>mapbox-<wbr>incidents</code>) are switched off on every style load. The share link carries
 <code>&amp;basemap=</code> (dark, streets, outdoors, aerial, aerial-plain, nav-day, nav-night, os, imagery; Light writes nothing). Two
 more exist only where set: <strong>the OS map</strong> (deployment setting <code>OS_MAPS_KEY</code>, an OS Data Hub key with the OS Vector

@@ -12,8 +12,8 @@
          Mapbox's canvas keeps its own touch-action:none, so the map gestures are unchanged -->
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- 27 Oct 2026 (pilot readiness phase 2): exact version + integrity hash; a changed file on the CDN is refused -->
-    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" integrity="sha384-SDYx9Nwa5fE1fRuBplOPejrcbPOK/ql0Uym6hsGsTvnlC784P5LZhBJIbo8O/O+0" crossorigin="anonymous">
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js" integrity="sha384-Ou+jUFeikeoESn+KAPV/5+eLHVMHa7XkTmtsYfaMSfxt2SxXmz7h4UUkk+tpcSta" crossorigin="anonymous"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.css" rel="stylesheet" integrity="sha384-S0a+eT2dLtsB1suB6ZJ/8IX+0d0Fvix9weJQ67L3E+jHOvn6SUKwYXVDyGdMuJtL" crossorigin="anonymous">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.js" integrity="sha384-jdGuG3GDIph+ONsjITkxWmlUE2RR0At6jtOVirn6L/6dYy3WcAVDaBNI3X96rUT0" crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="config.js"></script>
@@ -697,6 +697,7 @@
             #kpi-hud, #menu-toggle, #timeline-bar, #tl-warnings, #route-drawer, #btn-detail{ display:none !important; }
             #tl-toast, #wall-hud, #wall-hint{ display:none !important; }   /* M3 (12 Oct evening): the sheet carries the month and Play */
             .custom-map-widget{ display:none !important; }   /* the basemap widget is off on phones; the Layers sheet has the basemap */
+            .light-btn{ min-height:44px; }                   /* 28 Oct 2026 (8d): the Light buttons are finger-sized on a phone */
             .mapboxgl-ctrl-top-right{ top:calc(var(--notice-h, 0px) + 64px) !important; }
             .mapboxgl-ctrl-group button{ width:44px; height:44px; }
             /* wording review (12 Oct): the bottom sheet sits over the map's foot, where Mapbox draws its logo and the
@@ -907,14 +908,14 @@
     <summary>More layers <small>basemap, closures, limits…</small></summary>
     <div class="control-group">
         <h3>Basemap</h3>
-        <!-- 16 Oct 2026: "Standard (3D)" (mapbox://styles/mapbox/standard) is gone. That style needs
-             Mapbox GL JS v3; on the 2.14.1 loaded above, setStyle rejects it (695 validation errors:
-             "measure-light", "config", "batched-model" ...) and the map stays on the basemap it had while
-             the menu says Standard. The 3D look GL 2.14 can draw is the "3D buildings" overlay below.
-             Offer here only styles GL 2.14 validates: the classic -v11 / -v12 styles and raster styles. -->
+        <!-- 16 Oct 2026: Standard (3D) was removed: GL JS 2.14.1 rejected it (695 validation errors) and the map stayed on
+             the basemap it had. 28 Oct 2026 (8d): the page loads GL JS 3.33.0, which draws it, so Standard and Standard
+             satellite are back after Dark; their light presets are the row of buttons under this list. -->
         <select id="basemap-select" onchange="changeBasemap(this.value)" aria-label="Basemap">
             <option value="mapbox://styles/mapbox/light-v11" selected>Light</option>
             <option value="mapbox://styles/mapbox/dark-v11">Dark</option>
+            <option value="mapbox://styles/mapbox/standard">Standard</option>
+            <option value="mapbox://styles/mapbox/standard-satellite">Standard satellite</option>
             <option value="mapbox://styles/mapbox/streets-v12">Streets</option>
             <option value="mapbox://styles/mapbox/outdoors-v12">Outdoors</option>
             <option value="mapbox://styles/mapbox/satellite-streets-v12" id="basemap-satellite">Satellite</option>
@@ -925,6 +926,16 @@
             <option value="client-imagery" id="basemap-imagery" hidden>Client imagery</option>
             <option value="maaamet-ortho" id="basemap-maaamet" hidden>Estonia orthophoto (Maa-amet)</option>
         </select>
+        <!-- 28 Oct 2026 (8d, GL JS v3): Standard's light presets, shown only while Standard or Standard satellite is on -->
+        <div id="light-row" class="light-row" hidden>
+            <span class="light-label">Light</span>
+            <div class="light-seg" role="group" aria-label="Light">
+                <button type="button" class="light-btn active" data-light="day" onclick="setLightPreset('day')" aria-pressed="true">Day</button>
+                <button type="button" class="light-btn" data-light="dawn" onclick="setLightPreset('dawn')" aria-pressed="false">Dawn</button>
+                <button type="button" class="light-btn" data-light="dusk" onclick="setLightPreset('dusk')" aria-pressed="false">Dusk</button>
+                <button type="button" class="light-btn" data-light="night" onclick="setLightPreset('night')" aria-pressed="false">Night</button>
+            </div>
+        </div>
     </div>
 
     <div class="control-group">
@@ -1856,7 +1867,20 @@
         outdoors: 'mapbox://styles/mapbox/outdoors-v12', aerial: 'mapbox://styles/mapbox/satellite-streets-v12',
         'aerial-plain': 'mapbox://styles/mapbox/satellite-v9', 'nav-day': 'mapbox://styles/mapbox/navigation-day-v1',
         'nav-night': 'mapbox://styles/mapbox/navigation-night-v1',
+        standard: 'mapbox://styles/mapbox/standard', 'standard-satellite': 'mapbox://styles/mapbox/standard-satellite',
         os: 'os-zoomstack', imagery: 'client-imagery' };
+    // 28 Oct 2026 (8d, GL JS v3): the two Standard styles keep their layers in an import, so map.getStyle().layers lists only
+    // the page's own layers and labelAnchor() finds no text layer. A style with slots takes the page's lines in the 'middle'
+    // slot (over the roads, under the names); a classic style keeps today's beforeId. Standard also lights the map
+    // (LIGHT_PRESETS): every layer of ours is given an emissive strength of 1 so it keeps its own colour at dusk and night.
+    const STANDARD_STYLES = new Set(['mapbox://styles/mapbox/standard', 'mapbox://styles/mapbox/standard-satellite']);
+    const LIGHT_PRESETS = ['day', 'dawn', 'dusk', 'night'];
+    const LIGHT = { preset: (() => { try { const v = new URLSearchParams(location.search).get('light'); return LIGHT_PRESETS.includes(v) ? v : 'day'; } catch (e) { return 'day'; } })() };
+    function isStandard(url) { return STANDARD_STYLES.has(url); }
+    function styleHasSlots() { try { return typeof map.getSlots === 'function' && map.getSlots().length > 0; } catch (e) { return false; } }
+    const EMISSIVE = { line: 'line-emissive-strength', fill: 'fill-emissive-strength', circle: 'circle-emissive-strength',
+                       'fill-extrusion': 'fill-extrusion-emissive-strength', raster: 'raster-emissive-strength' };
+    const SLOT_TYPES = new Set(['line', 'fill', 'fill-extrusion', 'raster', 'heatmap']);
     // 28 Oct 2026 (8b): two basemaps that exist only where the deployment has them: the OS map (the deployment holds an OS key) and the
     // tenant's own imagery (an address typed on Config). They arrive with the tenant's words, after the map is made, so a
     // link that names one opens on Light and switches once they are here (applyViewFromUrl); the menu lines stay hidden
@@ -1904,6 +1928,39 @@
         || 'mapbox://styles/mapbox/light-v11';
     const map = new mapboxgl.Map({ container: 'map', style: INITIAL_BASEMAP, center: [10, 54], zoom: 4,
                                    touchPitch: !isPhoneShell(), dragRotate: !isPhoneShell(), transformRequest: osTransformRequest });
+    // every addLayer of the page goes through here (8d): the slot and the emissive strength, and a `before` that names a layer
+    // the style does not list (a classic style's label layer, on Standard) is dropped rather than refused
+    const _addLayerRaw = map.addLayer.bind(map);
+    map.addLayer = function (layer, before) {
+        if (layer && typeof layer === 'object') {
+            if (styleHasSlots() && !layer.slot && SLOT_TYPES.has(layer.type)) layer.slot = 'middle';
+            const em = EMISSIVE[layer.type];
+            if (em) { layer.paint = Object.assign({}, layer.paint || {}); if (!(em in layer.paint)) layer.paint[em] = 1; }
+            if (layer.type === 'symbol') { layer.paint = Object.assign({}, layer.paint || {});
+                if (!('icon-emissive-strength' in layer.paint)) layer.paint['icon-emissive-strength'] = 1;
+                if (!('text-emissive-strength' in layer.paint)) layer.paint['text-emissive-strength'] = 1; }
+        }
+        if (before && !map.getLayer(before)) before = undefined;
+        return _addLayerRaw(layer, before);
+    };
+    // Standard's light preset (day / dawn / dusk / night): set on every style load while a Standard style shows; the row of
+    // buttons under the Basemap list shows only then; the share link carries &light= (day, the default, writes nothing)
+    function applyLightPreset() {
+        if (!isStandard(BASEMAP.pending || BASEMAP.shown)) return;
+        try { map.setConfigProperty('basemap', 'lightPreset', LIGHT.preset); } catch (e) {}
+    }
+    function syncLightRow() {
+        const row = document.getElementById('light-row');
+        if (row) row.hidden = !isStandard(BASEMAP.pending || BASEMAP.shown);
+        document.querySelectorAll('.light-btn').forEach(b => { const on = b.dataset.light === LIGHT.preset; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
+    }
+    function setLightPreset(v) {
+        if (!LIGHT_PRESETS.includes(v) || v === LIGHT.preset) return;
+        LIGHT.preset = v;
+        applyLightPreset(); syncLightRow();
+        try { if (typeof restyleHaulEraser === 'function') restyleHaulEraser(); } catch (e) {}
+        try { scheduleViewWrite(); } catch (e) {}
+    }
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
     
     let hoveredRouteId = null;
@@ -2417,7 +2474,13 @@
         return types.length ? ['in', ['get', 'type'], ['literal', types]] : ['==', ['get', 'type'], 'NONE'];
     }
     // the cut-out under the dots is the basemap's own ground: white, or the Dark style's ink
-    function haulEraserColour(){ return /dark|night/.test(String((typeof BASEMAP !== 'undefined' && (BASEMAP.pending || BASEMAP.shown)) || '')) ? '#1F2024' : '#ffffff'; }
+    function haulEraserColour(){
+        const bm = String((typeof BASEMAP !== 'undefined' && (BASEMAP.pending || BASEMAP.shown)) || '');
+        // 28 Oct 2026 (8d): Standard at dusk or night is a dark ground too
+        const standardDark = typeof isStandard === 'function' && isStandard(bm) && typeof LIGHT !== 'undefined' && (LIGHT.preset === 'dusk' || LIGHT.preset === 'night');
+        return (/dark|night/.test(bm) || standardDark) ? '#1F2024' : '#ffffff';
+    }
+    function restyleHaulEraser(){ try { if (map.getLayer('haul-eraser')) map.setPaintProperty('haul-eraser', 'line-color', haulEraserColour()); } catch (e) {} }
     // 23 Oct 2026 (the user: a subtler highlight than the breach red): the clicked route keeps its own colours and every
     // other route dims; null puts them all back. Re-applied after a basemap change by the style.load handler.
     const DIM_LAYERS = ['inbound-lines', 'outbound-lines', 'inbound-lines-casing', 'outbound-lines-casing', 'haul-dots'];
@@ -2755,6 +2818,12 @@
     }
     function ensureBuildingLayer() {
         const note = document.getElementById('buildings-note');
+        // 28 Oct 2026 (8d): Standard draws its own buildings and landmarks (no composite source); the box switches those
+        if (styleHasSlots()) {
+            if (note) note.firstChild.textContent = 'from zoom 15';
+            try { map.setConfigProperty('basemap', 'show3dObjects', buildingsVisible()); } catch (e) {}
+            return true;
+        }
         if (!map.getSource('composite')) {
             if (note) note.firstChild.textContent = 'not available on this basemap';
             return false;
@@ -2780,6 +2849,7 @@
     }
     function toggleBuildings(visible) {
         if (visible && !ensureBuildingLayer()) return;
+        if (styleHasSlots()) { try { map.setConfigProperty('basemap', 'show3dObjects', !!visible); } catch (e) {} return; }
         toggleLayer('buildings-3d', visible);
     }
 
@@ -4216,7 +4286,8 @@
         rebuild: new Set(['mapbox://styles/mapbox/light-v11', 'mapbox://styles/mapbox/dark-v11',
             'mapbox://styles/mapbox/satellite-streets-v12', 'mapbox://styles/mapbox/streets-v12',
             'mapbox://styles/mapbox/outdoors-v12', 'mapbox://styles/mapbox/satellite-v9',
-            'mapbox://styles/mapbox/navigation-day-v1', 'mapbox://styles/mapbox/navigation-night-v1', 'maaamet-ortho']) };
+            'mapbox://styles/mapbox/navigation-day-v1', 'mapbox://styles/mapbox/navigation-night-v1', 'maaamet-ortho',
+            'mapbox://styles/mapbox/standard', 'mapbox://styles/mapbox/standard-satellite']) };   // 28 Oct 2026 (8d): the two Standard styles
     // The Navigation styles draw TODAY's traffic and road incidents (sources mapbox-traffic / mapbox-incidents). On a plan for a
     // month ahead that misleads, and its orange and red sit beside the routes' amber and green, so those layers are switched
     // off on every style load. The roads keep the Navigation look.
@@ -4230,6 +4301,7 @@
     map.on('style.load', () => {
         if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; }
         hideLiveTraffic();
+        applyLightPreset(); syncLightRow();      // 28 Oct 2026 (8d): Standard's light, and the row of buttons only on Standard
     });
     // 28 Oct 2026 (8b): the OS map and the tenant's imagery are fetched / built BEFORE the basemap is touched: a full rebuild
     // drops the old basemap and every overlay before it knows the new style works, so a bad key or an offline OS would blank
@@ -4295,6 +4367,7 @@
             b.classList.toggle('active', b.dataset.basemap === styleUrl));
     }
     syncBasemapControls(INITIAL_BASEMAP);     // a link may open the map on another basemap than the select's first option
+    syncLightRow();
     function maaametOrthoStyle() {
         // Estonian Land Board (Maa-amet) orthophoto, all-zoom TMS tile pyramid (EPSG:3857).
         return {
@@ -6099,7 +6172,7 @@
             let status = document.getElementById('forecast-status');
 
             if (!isChecked) {
-                ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
+                ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
                 const sd = map.getSource('routes-source');
                 if (sd) { const d = sd._data; d.features.forEach(f => { if (f.properties) f.properties.is_forecast = false; }); sd.setData(d); }
                 applyRailHighlight();      // §6b: forecast off -> dim, unless a railhead origin is selected
@@ -6889,7 +6962,7 @@
     // grey (where the lorries run), with no casing, no flow dashes, no labels and no cap badges; the heat map is off
     // (the two never share the blues). Unticking both boxes puts everything back.
     const COUNCIL_ROUTE_COLOR = '#A8A29E', COUNCIL_ROUTE_WIDTH = 2;
-    const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-cap-badge'];
+    const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge'];
     function councilFocus(){ return typeof areaTierOn === 'function' && (areaTierOn('district') || areaTierOn('county')); }
     function setForecastLabelsVisible(on){
         if (map.getLayer('forecast-labels')) map.setLayoutProperty('forecast-labels', 'visibility', on ? 'visible' : 'none');
@@ -7143,6 +7216,7 @@
     // DASH_CORE). And line-dasharray is cross-faded: each re-set re-lays out the layer's source, which is why the flow
     // has its OWN small source rather than routes-source (until 16 Oct every tick re-laid out all nine route layers).
     const FLOW_SOURCE = 'flow-source';
+    const FLOW_LIGHT_SOURCE = 'flow-light-source';
     const FLOW_OFFSET = -1.75;         // px, NEGATIVE = left of the direction of travel: each lane 0.5 to 3 px off the middle
     //: the bands, movements a day each way: the Volume heat map's own fixed stops (under 10 · 10-25 · 25-50 · 50-100 ·
     //: 100 and over; twenty times these when the map counts t or m³ a day), so one spacing means the same number in
@@ -7150,9 +7224,12 @@
     //: roads up to about 110, so the five bands are all in use.
     const FLOW_STOPS = ROUTE_VOLUME_STOPS;
     //: 23 Oct 2026 (the user, the route line redesign): the lanes are SOLID — no dashes on a route. The volume is the
-    //: lane's WIDTH, one per band (px), and while Play runs a light runs along each lane the way its lorries go: a
-    //: line-gradient on the lane, FLOW_PULSES bright points a lane, FLOW_PULSE_SPEED lane-lengths a second. Standing
-    //: still the lane is a faint solid stripe (FLOW_STILL_OPACITY), so the two directions still show without motion.
+    //: lane's WIDTH, one per band (px), and while Play runs a light runs along each lane the way its lorries go:
+    //: FLOW_PULSES bright dots a lane, FLOW_PULSE_SPEED lane-lengths a second. Standing still the lane is a faint solid
+    //: stripe (FLOW_STILL_OPACITY), so the two directions still show without motion.
+    //: 28 Oct 2026 (8d, GL JS v3): the light was a line-gradient re-set every frame; on v3 that re-lays the lanes out each
+    //: time (60 -> 10-22 fps playing, measured). It is now FLOW_PULSES dots a lane on a small point source of their own
+    //: (setData a frame: 60 fps on v3 and on 2.14, measured), the lanes untouched. Same spacing, same speed, same meaning.
     const FLOW_WIDTHS = [1.6, 2.1, 2.6, 3.2, 3.8];
     const FLOW_STILL_OPACITY = 0.35;
     const FLOW_PULSES = 3;
@@ -7283,7 +7360,7 @@
         if (!src) return;
         const feats = flowFeatures();
         const key = feats.map(f => f.properties.lane + ':' + f.properties.fl_mv).join(',');
-        if (key !== FLOW.drawn) { src.setData({ type: 'FeatureCollection', features: feats }); FLOW.drawn = key; }
+        if (key !== FLOW.drawn) { src.setData({ type: 'FeatureCollection', features: feats }); FLOW.drawn = key; FLOW.lit = feats.map(f => FLOW.lanes[f.properties.lane]); }
         FLOW.count = feats.length;
         renderFlowLegend();
     }
@@ -7293,8 +7370,15 @@
         if (!map.getLayer('forecast-flow')) {
             map.addLayer({ id: 'forecast-flow', type: 'line', source: FLOW_SOURCE,
                 layout: { 'line-cap': 'round', 'line-join': 'round', visibility: councilFocus() ? 'none' : 'visible' },
-                paint: { 'line-color': '#ffffff', 'line-width': flowWidthExpr(), 'line-opacity': FLOW_STILL_OPACITY, 'line-offset': FLOW_OFFSET,
-                         'line-gradient': flowPulse(null) } });
+                paint: { 'line-color': '#ffffff', 'line-width': flowWidthExpr(), 'line-opacity': FLOW_STILL_OPACITY, 'line-offset': FLOW_OFFSET } });
+        }
+        // the light's dots: their own small source, above the names like the abnormal load's dot
+        if (!map.getSource(FLOW_LIGHT_SOURCE)) map.addSource(FLOW_LIGHT_SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        if (!map.getLayer('forecast-flow-light')) {
+            map.addLayer({ id: 'forecast-flow-light', type: 'circle', source: FLOW_LIGHT_SOURCE,
+                layout: { visibility: councilFocus() ? 'none' : 'visible' },
+                paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 7, 2.2, 12, 3, 16, 3.8], 'circle-color': '#ffffff',
+                         'circle-stroke-color': '#1F2024', 'circle-stroke-width': 1, 'circle-opacity': 0.95, 'circle-stroke-opacity': 0.85 } });
             if (_flowRAF != null) setFlowPulse(_pulseT);   // re-added while playing (a basemap switch): the light runs on
         }
         drawFlow();
@@ -7319,29 +7403,35 @@
         FLOW_STOPS.forEach((s, i) => { e.push(s, FLOW_WIDTHS[i + 1]); });
         return e;
     }
-    // the light: FLOW_PULSES bright points along each lane (line-progress 0 to 1 is the lane's direction of travel) at
-    // phase t in [0, 1); t null = standing still, a plain lane. Every stop is strictly increasing, as line-gradient needs,
-    // and no stop is rounded: two stops rounded onto each other would make GL JS drop the whole expression, silently.
-    function flowPulse(t){
-        if (t == null) return ['interpolate', ['linear'], ['line-progress'], 0, '#ffffff', 1, '#ffffff'];
-        const pts = []; for (let i = 0; i < FLOW_PULSES; i++) pts.push((t + i / FLOW_PULSES) % 1);
-        pts.sort((a, b) => a - b);
-        const stops = [0, 'rgba(255,255,255,0)']; let last = 0;
-        pts.forEach(p => {
-            const a = Math.max(last + 0.0001, p - FLOW_PULSE_LEN), b = Math.min(0.9999, p + 0.012);
-            if (a <= last || b <= a) return;
-            stops.push(a, 'rgba(255,255,255,0)', Math.max(a + 0.0001, Math.min(p, b - 0.0001)), 'rgba(255,255,255,0.95)', b, 'rgba(255,255,255,0)');
-            last = b;
-        });
-        if (last < 1) stops.push(1, 'rgba(255,255,255,0)');
-        return ['interpolate', ['linear'], ['line-progress'], ...stops];
+    // the light: FLOW_PULSES dots along each lane with movements (0 to 1 is the lane's direction of travel) at phase t in
+    // [0, 1); t null = standing still, no dots. Each lane's length along its points is worked out once (laneMetric).
+    function laneMetric(l){
+        if (l.cum) return l;
+        const kx = Math.cos(52.5 * Math.PI / 180) * 111320, ky = 110540, c = l.coords, cum = [0];
+        for (let i = 1; i < c.length; i++) cum.push(cum[i - 1] + Math.hypot((c[i][0] - c[i - 1][0]) * kx, (c[i][1] - c[i - 1][1]) * ky));
+        l.cum = cum; l.len = cum[cum.length - 1];
+        return l;
     }
-    // t null: standing still (pause, stop, reduced motion); else the light at phase t
+    function lanePoint(l, f){
+        const d = f * l.len, c = l.coords; let i = 1;
+        while (i < l.cum.length - 1 && l.cum[i] < d) i++;
+        const a = l.cum[i - 1], b = l.cum[i], t = b > a ? (d - a) / (b - a) : 0;
+        return [c[i - 1][0] + (c[i][0] - c[i - 1][0]) * t, c[i - 1][1] + (c[i][1] - c[i - 1][1]) * t];
+    }
+    function flowLightPoints(t){
+        const out = [];
+        if (t == null) return { type: 'FeatureCollection', features: out };
+        (FLOW.lit || []).forEach(l => { if (!l || !l.coords || l.coords.length < 2) return; laneMetric(l); if (!(l.len > 0)) return;
+            for (let i = 0; i < FLOW_PULSES; i++) out.push({ type: 'Feature', geometry: { type: 'Point', coordinates: lanePoint(l, (t + i / FLOW_PULSES) % 1) }, properties: {} }); });
+        return { type: 'FeatureCollection', features: out };
+    }
+    // t null: standing still (pause, stop, reduced motion): a faint lane and no dots; else the dots at phase t on a bright lane
     function setFlowPulse(t){
         if (!map.getLayer('forecast-flow')) return;
         try {
-            map.setPaintProperty('forecast-flow', 'line-gradient', flowPulse(t));
             map.setPaintProperty('forecast-flow', 'line-opacity', t == null ? FLOW_STILL_OPACITY : 1);
+            const src = map.getSource(FLOW_LIGHT_SOURCE);
+            if (src) src.setData(flowLightPoints(t));
         } catch (e) {}
     }
     // the legend, under the heat map: the five spacings as the map draws them (one lane on the blue), and what they mean
@@ -7649,7 +7739,7 @@
         if(src){ const d=src._data; d.features.forEach(f=>{ if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString') f.properties.is_forecast=false; }); src.setData(d); }
         // 12 Oct 2026 (review §2.2d): the road-load and carbon-label layers go with the overlay, or closing the bar
         // left the month's shared sections on the map
-        ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
+        ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
         applyZoneMonth(null);   // no month on screen: show every active zone again
         applyFilters();         // KPI cards and the rail rule follow the timeline closing
         if(typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon say they need a month
@@ -8517,13 +8607,15 @@
         if (v.council === 'carbon') q.set('council', 'carbon');     // 13 Oct 2026: the districts' colouring (movements is the default)
         if (v.marks === 'dots') q.set('marks', 'dots');             // 16 Oct 2026 (V7): sites drawn as dots (icons are the default)
         if (v.basemap && BASEMAP_LINK[v.basemap]) q.set('basemap', v.basemap);   // 27 Oct 2026: the ground (Light, the default, adds nothing)
+        if (v.light && v.light !== 'day' && LIGHT_PRESETS.includes(v.light)) q.set('light', v.light);   // 28 Oct 2026 (8d): Standard's light
         return q.toString();
     }
     function decodeView(search) {
         const q = new URLSearchParams(search || '');
         const out = { month: null, layers: null, filters: {}, council: q.get('council') === 'carbon' ? 'carbon' : null,
                       marks: q.get('marks') === 'dots' ? 'dots' : null,
-                      basemap: basemapFromKey(q.get('basemap')) ? q.get('basemap') : null };
+                      basemap: basemapFromKey(q.get('basemap')) ? q.get('basemap') : null,
+                      light: LIGHT_PRESETS.includes(q.get('light')) ? q.get('light') : null };
         if (q.has('month')) out.month = monthFromParam(q.get('month'));
         if (q.has('layers')) out.layers = (q.get('layers') || '').split('.').map(x => x.trim()).filter(x => /^-?[a-z0-9_-]+$/i.test(x));
         (q.get('filters') || '').split('|').forEach(part => {
@@ -8548,7 +8640,8 @@
                  // 13 Oct 2026: the districts' colouring, only while By council is on (a carbon colouring left behind is not a view)
                  council: (typeof councilFocus === 'function' && councilFocus() && typeof AREAS !== 'undefined' && AREAS.mode === 'carbon') ? 'carbon' : null,
                  marks: (typeof locDotsOn === 'function' && locDotsOn()) ? 'dots' : null,
-                 basemap: basemapKey(BASEMAP.pending || BASEMAP.shown) };
+                 basemap: basemapKey(BASEMAP.pending || BASEMAP.shown),
+                 light: isStandard(BASEMAP.pending || BASEMAP.shown) ? LIGHT.preset : null };
     }
     // the link a person shares: this page's address with the view, without the app's embed / cache-buster parameters;
     // monthOnly = the short form for a QR code that cannot hold the whole view
