@@ -2310,7 +2310,10 @@
     // Streets), so it is found, never named. With no text layer (a bare style) the line simply goes on top, as it used to.
     function labelAnchor(){
         try {
-            const l = map.getStyle().layers.find(x => x.type === 'symbol' && x.layout && x.layout['text-field']
+            // 28 Oct 2026: while a council view is on, the town names sit UNDER the council fill (placeTownNames); the
+            // anchor is the first basemap name ABOVE the fill, so a layer added then still goes over the colours
+            const layers = map.getStyle().layers, fill = layers.findIndex(x => x.id === 'area-fill');
+            const l = layers.find((x, i) => i > fill && x.type === 'symbol' && x.layout && x.layout['text-field']
                 && !/^(forecast|road-load|temp-haul|site|restriction|limit|area|community|abnormal|collision|evr)/.test(x.id));
             return l ? l.id : undefined;
         } catch (e) { return undefined; }
@@ -4829,6 +4832,30 @@
             layout: areaLabelLayout(vis['area-county-label']), paint: AREA_LABEL_PAINT }, labelBefore);
         if (!map.getLayer('area-label')) map.addLayer({ id: 'area-label', type: 'symbol', source: 'areas-source', filter: district.concat([labelPt]),
             layout: areaLabelLayout(dVis), paint: AREA_LABEL_PAINT }, labelBefore);
+        placeTownNames();
+    }
+    // 28 Oct 2026 (John, from notes\council-fills-mockup-1028): while the council colours are on, the basemap's TOWN
+    // names go UNDER them, as on 21 Oct, so Sileby or Market Harborough no longer print over a district's colour; the
+    // route lines, the road names and the cards stay on top (moving the fills up instead buried the routes a person
+    // ticks back on in a council view). Colours off: the names go back over the routes (the 23 Oct "Atlas" look).
+    const TOWN_NAMES = /^settlement-/, TOWNS = { home: null };
+    function placeTownNames() {
+        let layers = [];
+        try { layers = map.getStyle().layers || []; } catch (e) { return; }
+        const fill = layers.findIndex(l => l.id === 'area-fill');
+        const towns = layers.filter(l => l.type === 'symbol' && TOWN_NAMES.test(l.id));
+        if (fill < 0 || !towns.length) return;
+        const at = layers.findIndex(l => l.id === towns[0].id), under = at < fill;
+        const want = areaVisibility()['area-fill'] === 'visible';
+        if (want && !under) {
+            const last = layers.findIndex(l => l.id === towns[towns.length - 1].id);
+            const next = layers.slice(last + 1).find(l => !TOWN_NAMES.test(l.id));
+            TOWNS.home = next ? next.id : null;           // where they go back to (null: the top)
+            towns.forEach(l => map.moveLayer(l.id, 'area-fill'));
+        } else if (!want && under) {
+            const home = TOWNS.home && map.getLayer(TOWNS.home) ? TOWNS.home : undefined;
+            towns.forEach(l => map.moveLayer(l.id, home));
+        }
     }
     // 8 x 8 px: a diagonal stroke two pixels wide on a warm grey, mockup 4's hatch (#B8B2A8 on #F3F1EC)
     function areaHatchImage() {
@@ -4876,6 +4903,7 @@
         if (on && !areasMonth() && typeof TL !== 'undefined' && !TL.on && typeof openTimeline === 'function') openTimeline();
         const vis = areaVisibility();
         AREA_LAYERS.concat(AREA_COUNTY_LAYERS).forEach(l => toggleLayer(l, vis[l] === 'visible'));
+        if (map.getLayer('area-fill')) placeTownNames();
         if (on) refreshAreas(); else renderAreas();
         councilSolo(areaTierOn('district') || areaTierOn('county'));
         // 12 Oct 2026 (night): By council is seen by itself: the heat map goes Off, the routes go thin and grey

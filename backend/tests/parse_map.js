@@ -6484,6 +6484,70 @@ function qrRead(mod) {
      && /id: 'area-fill', type: 'fill'[\s\S]*?\}, before\);/.test(ens) && /id: 'area-outline', type: 'line'[\s\S]*?\}, before\);/.test(ens));
 }
 
+// ---- 28 Oct 2026 (John, notes\council-fills-mockup-1028): while the council colours are on, the basemap's TOWN names go
+// UNDER them (as on 21 Oct); the route lines, the road names and the cards stay on top. Moving the fills up instead buried
+// the routes a person ticks back on in a council view (seen on live). Colours off: the names go back over the routes. ----
+{
+  const fnSrc = name => { const i = src.indexOf("function " + name + "("); if (i < 0) return ""; const j = src.indexOf("\n    }\n", i); return src.slice(i, j + 6); };
+  const constLine = (src.match(/\n    const TOWN_NAMES = [^\n]*\n/) || [""])[0];
+  const L = (id, type, source, text) => Object.assign({ id, type, source }, text ? { layout: { 'text-field': ['get', 'name'] } } : {});
+  // a stand-in style laid out as live on 28 Oct: basemap lines, the council fill, our route lines under the names, the
+  // names (a road name, then the town names, then a POI name), then the cards and ours on top
+  const fresh = () => [L('land', 'background'), L('road-primary', 'line', 'composite'),
+    L('area-fill', 'fill', 'areas-source'), L('area-outline', 'line', 'areas-source'),
+    L('route-alt-lines', 'line', 'route-alts-source'), L('outbound-lines', 'line', 'routes-source'), L('forecast-layer', 'line', 'routes-source'),
+    L('road-label-simple', 'symbol', 'composite', true),
+    L('settlement-subdivision-label', 'symbol', 'composite', true), L('settlement-minor-label', 'symbol', 'composite', true),
+    L('settlement-major-label', 'symbol', 'composite', true), L('poi-label', 'symbol', 'composite', true),
+    L('area-label', 'symbol', 'areas-source', true), L('evr-rail-casing', 'line', 'evr-rail')];
+  const mkMap = layers => ({
+    getStyle: () => ({ layers }), getLayer: id => layers.find(l => l.id === id),
+    moveLayer: (id, before) => { const i = layers.findIndex(l => l.id === id); const [l] = layers.splice(i, 1);
+      const j = before === undefined ? -1 : layers.findIndex(x => x.id === before); if (j < 0) layers.push(l); else layers.splice(j, 0, l); } });
+  const api = (layers, fillOn) => new Function("map", "areaVisibility", constLine + fnSrc("labelAnchor") + "\n" + fnSrc("placeTownNames")
+    + "\nreturn { anchor: labelAnchor, place: typeof placeTownNames === 'function' ? placeTownNames : () => { throw new Error('missing'); } };")(
+      mkMap(layers), () => ({ 'area-fill': fillOn() ? 'visible' : 'none' }));
+  const order = layers => layers.map(l => l.id), at = (layers, id) => layers.findIndex(l => l.id === id);
+  const towns = ['settlement-subdivision-label', 'settlement-minor-label', 'settlement-major-label'];
+  const style = fresh(), before = order(style).join(',');
+  let on = true, a = null, err = null;
+  try { a = api(style, () => on); a.place(); } catch (e) { err = String(e); }
+  ok("⭐ 28 Oct: with the council colours on, the three town-name layers go UNDER the council fill, in their own order",
+     !err && towns.every(t => at(style, t) < at(style, 'area-fill'))
+     && at(style, towns[0]) < at(style, towns[1]) && at(style, towns[1]) < at(style, towns[2]));
+  ok("⭐ 28 Oct: the route lines stay above the colours, the road name and the POI name stay above the routes, the cards stay above the names",
+     !err && at(style, 'outbound-lines') > at(style, 'area-fill') && at(style, 'forecast-layer') > at(style, 'area-fill')
+     && at(style, 'road-label-simple') > at(style, 'forecast-layer') && at(style, 'poi-label') > at(style, 'forecast-layer')
+     && at(style, 'area-label') > at(style, 'poi-label'));
+  ok("⭐ 28 Oct: with the names under the fill, a layer added then still goes over the colours (labelAnchor is the first name ABOVE the fill)",
+     !err && a.anchor() === 'road-label-simple' && at(style, a.anchor()) > at(style, 'area-fill'));
+  let again = null;
+  try { a.place(); again = order(style).join(','); a.place(); } catch (e) { again = null; }
+  ok("28 Oct: placing them again while the colours stay on moves nothing",
+     again !== null && again === order(style).join(','));
+  on = false;
+  try { a.place(); } catch (e) { err = String(e); }
+  ok("⭐ 28 Oct: colours off: the town names go back to exactly where the basemap had them (over the routes, the 23 Oct look)",
+     !err && order(style).join(',') === before);
+  const off = fresh(); let offErr = null;
+  try { api(off, () => false).place(); } catch (e) { offErr = String(e); }
+  const nofill = fresh().filter(l => !l.id.startsWith('area-')), nfBefore = order(nofill).join(','); let nfErr = null;
+  try { api(nofill, () => true).place(); } catch (e) { nfErr = String(e); }
+  ok("28 Oct: colours off from the start, or no council layers on the style: nothing moves",
+     !offErr && order(off).join(',') === before && !nfErr && order(nofill).join(',') === nfBefore);
+  let plain = null;
+  try { plain = api(nofill, () => false).anchor(); } catch (e) { plain = 'threw'; }
+  ok("28 Oct: with no council fill the anchor is the first basemap name, as before (the 23 Oct rule)",
+     plain === 'road-label-simple');
+  const ens = src.slice(src.indexOf("function ensureAreaLayers("), src.indexOf("function areaHatchImage("));
+  const tog = fnSrc("toggleAreaTier");
+  ok("⭐ 28 Oct: the names are placed after the council layers are added (every basemap switch re-adds them) and on every tick of the boxes",
+     /paint: AREA_LABEL_PAINT \}, labelBefore\);\n        placeTownNames\(\);\n    \}/.test(ens)
+     && /forEach\(l => toggleLayer\(l, vis\[l\] === 'visible'\)\);\n        if \(map\.getLayer\('area-fill'\)\) placeTownNames\(\);/.test(tog));
+  ok("28 Oct: the fills themselves stay under the routes (moving them over the names buried the routes)",
+     /id: 'area-fill', type: 'fill'[^;]*\}, before\);/.test(ens) && !/id: 'area-fill', type: 'fill'[^;]*\}, labelBefore\);/.test(ens));
+}
+
 // ===== 27 Oct 2026 (task 8a): more classic basemaps on the public map =====
 // Streets, Outdoors, Satellite without names and Navigation day / night join Light, Dark and Satellite. All are classic
 // -vNN styles (GL JS 2.14.1 draws them with every overlay, 0 errors: notes\session-1027-more-basemaps.md). Navigation's live
