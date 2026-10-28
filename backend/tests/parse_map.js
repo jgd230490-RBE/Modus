@@ -7040,6 +7040,16 @@ function qrRead(mod) {
   } catch (e) { gerr = String(e && e.stack || e); ok("overlays (sandbox): the gate runs against a fake map", false, gerr.slice(0, 300)); }
 }
 
+// ---- 28 Oct 2026 (the user: no supplier names on screens): the hidden Estonian option reads "Estonia aerial photo" ----
+{
+  const sel = (html.match(/<select id="basemap-select"[^>]*>([\s\S]*?)<\/select>/) || [])[1] || "";
+  const labels = [...sel.matchAll(/<option [^>]*>([^<]*)<\/option>/g)].map(m => m[1]);
+  ok("⭐ BASEMAP WORDS: no Basemap menu name says Mapbox or Maa-amet; the Estonian option reads 'Estonia aerial photo'",
+     labels.length === 13 && labels.every(l => !/Mapbox|Maa-amet|orthophoto/i.test(l))
+     && /<option value="maaamet-ortho" id="basemap-maaamet" hidden>Estonia aerial photo<\/option>/.test(html), labels.join(" | "));
+  ok("...the Land Board's credit stays on the map layer", /attribution: 'Orthophoto: Estonian Land Board \(Maa-amet\)'/.test(html));
+}
+
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();
   for (const f of fail) console.log("  FAIL:", f);

@@ -10875,19 +10875,21 @@ function nodeExpr(){
 // to an Estonian tenant only (until H1 every tenant saw it); for a British tenant Mapbox
 // Satellite is the named "Aerial" option (the research: APGB cannot be licensed for a
 // SaaS, OS OpenData has no aerial). Nothing Estonian reaches a GB page.
+// 28 Oct 2026 (the user: no supplier names on screens): the public map's names and order — Satellite is the photo
+// with road names, Satellite (no names) the plain one; the suppliers are named in the technical guide only (#t7-basemap-words).
 const BASEMAPS_ALL = [
   ["Light", "mapbox://styles/mapbox/light-v11"],
   ["Streets", "mapbox://styles/mapbox/streets-v12"],
   ["Outdoors", "mapbox://styles/mapbox/outdoors-v12"],
   ["Dark", "mapbox://styles/mapbox/dark-v11"],
-  ["Satellite", "mapbox://styles/mapbox/satellite-v9"],
-  ["Satellite Streets", "mapbox://styles/mapbox/satellite-streets-v12"],
-  ["Navigation Day", "mapbox://styles/mapbox/navigation-day-v1"],
-  ["Navigation Night", "mapbox://styles/mapbox/navigation-night-v1"],
-  ["Estonia ortho (Maa-amet)", "maaamet-ortho"],
+  ["Satellite", "mapbox://styles/mapbox/satellite-streets-v12"],
+  ["Satellite (no names)", "mapbox://styles/mapbox/satellite-v9"],
+  ["Navigation day", "mapbox://styles/mapbox/navigation-day-v1"],
+  ["Navigation night", "mapbox://styles/mapbox/navigation-night-v1"],
+  ["Estonia aerial photo", "maaamet-ortho"],
 ];
 const BASEMAPS = BASEMAPS_ALL;   // the full table; pickers call basemapsFor()
-const GB_BASEMAP_LABELS = { "Satellite": "Aerial (Mapbox Satellite)", "Satellite Streets": "Aerial with roads" };
+const GB_BASEMAP_LABELS = { "Satellite": "Aerial", "Satellite (no names)": "Aerial (no names)" };
 function basemapsFor(country){
   const c = String(country || "").toUpperCase();
   return BASEMAPS_ALL
@@ -13808,7 +13810,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               Each route has a laden leg out and an empty leg back. Green vehicle chip: both worked out;{" "}
               <span className="font-semibold">amber ↦</span>: outbound only, no cycle time yet. Open a row (▶) for the cycle figures.
             </p>
-            <p className="text-[13px] text-slate-400 mt-1">Tip: switch the basemap to {String(TENANT.country || "").toUpperCase() === "GB" ? "Aerial" : String(TENANT.country || "").toUpperCase() === "EE" ? "Satellite or Estonia ortho" : "Satellite"} to see routes sit exactly on the roads.</p>
+            <p className="text-[13px] text-slate-400 mt-1">Tip: switch the basemap to {String(TENANT.country || "").toUpperCase() === "GB" ? "Aerial" : String(TENANT.country || "").toUpperCase() === "EE" ? "Satellite or Estonia aerial photo" : "Satellite"} to see routes sit exactly on the roads.</p>
           </div>
         </div>
       </div>
