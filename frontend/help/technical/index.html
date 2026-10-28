@@ -768,7 +768,9 @@ https only, Web Mercator only). Both reach the map only through <code>/api/publi
 key and an address that carries a licence key must not go through <code>/api/meta</code>), and both are fetched or built <em>before</em> the basemap
 is replaced: a full style rebuild drops every overlay first, so a bad key or an offline service keeps the basemap you had and says
 so. OS plans: the OpenData plan is worded for internal business use; a service for third parties (this one) is the Premium plan, used
-on OpenData map views only (free). Server-drawn maps (bulletin, route sheet, CLP plans) keep Mapbox and never draw OS data.</li>
+on OpenData map views only (free). The map page's content security policy lists <code>api.os.uk</code> and adds the one host of the tenant's
+imagery address to its own answers only (<code>security_headers.csp</code>; the host is letters, digits, dots, hyphens and a port, so a typed address
+cannot add anything else). Server-drawn maps (bulletin, route sheet, CLP plans) keep Mapbox and never draw OS data.</li>
 <li><strong>3D buildings</strong> come from Mapbox's vector tiles, from zoom 14; a raster basemap (the Estonia
 orthophoto) has none. The basemap names no longer say &ldquo;Mapbox&rdquo;; Mapbox's own credit stays on the map.</li>
 <li><strong>Alignment overlay.</strong> Gaps in the survey file are interpolated so the corridor reads continuously; the

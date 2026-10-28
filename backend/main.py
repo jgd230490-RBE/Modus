@@ -442,7 +442,16 @@ if _Request is not None and hasattr(app, "middleware"):
     @app.middleware("http")
     async def _security_headers_middleware(request, call_next):
         response = await call_next(request)
-        security_headers.apply(request.url.path, response.headers)
+        path = request.url.path
+        extra = ()
+        if path == "/map" or path.startswith("/map/"):
+            # 28 Oct 2026 (8b): the map page may load a tenant's OWN imagery from the host typed on Config
+            try:
+                origin = config.imagery_connect_origin(conversions)
+                extra = (origin,) if origin else ()
+            except Exception:
+                extra = ()
+        security_headers.apply(path, response.headers, extra)
         return response
 
 

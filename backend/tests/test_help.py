@@ -1015,7 +1015,8 @@ ok("28 Oct: the user guide's Basemap line says the OS map and an organisation's 
 ok("28 Oct: the technical guide T10 holds the detail: the deployment setting, OS's style and request address, the key added to every OS request, the zoom 15 limit and why, the tenant fields, the address forms, the one read that carries them, fetch before replace, the plan wording and that server-drawn maps keep Mapbox",
    all(t in _tg28 for t in ("<strong>Basemaps.</strong>", "<code>OS_MAPS_KEY</code>", "api.os.uk/maps/<wbr>vector/v1/vts/<wbr>resources/styles<wbr>?srs=3857", "<code>transformRequest</code>",
                             "16&ndash;19 is Premium", "<code>tenant.imagery_url</code>", "<code>{bbox-epsg-3857}</code>", "<code>/api/public/alignment</code>",
-                            "<code>/api/meta</code>", "<em>before</em> the basemap", "the Premium plan", "keep Mapbox and never draw OS data")))
+                            "<code>/api/meta</code>", "<em>before</em> the basemap", "the Premium plan", "keep Mapbox and never draw OS data",
+                            "<code>security_headers.csp</code>", "adds the one host of the tenant's")))
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

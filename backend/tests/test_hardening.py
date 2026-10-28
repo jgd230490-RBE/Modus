@@ -81,7 +81,7 @@ ok("⭐ the sign-in calls and the Users list are never cached (a set-up answer h
 
 MAIN = read("backend/main.py")
 ok("⭐ main.py adds the headers in a middleware declared AFTER the access middleware (so it wraps the gate's refusals)",
-   "security_headers.apply(request.url.path, response.headers)" in MAIN
+   "security_headers.apply(path, response.headers, extra)" in MAIN   # NARROWED 28 Oct 2026 (8b): the map page also gets the tenant's imagery host
    and MAIN.find("async def _access_middleware") < MAIN.find("async def _security_headers_middleware"))
 ok("...and imports the module", "\nimport security_headers" in MAIN)
 

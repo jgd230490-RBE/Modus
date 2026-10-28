@@ -224,7 +224,7 @@ def imagery_url_problem(v):
     u = v.strip()
     if len(u) > IMAGERY_URL_MAX:
         return f"The address is longer than {IMAGERY_URL_MAX} characters."
-    if not re.match(r"^https://[^\s/{}]+/", u):
+    if not re.match(r"^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?/", u) or "." not in u.split("/")[2]:
         return "The address must start with https:// and name a site."
     if re.search(r"\s", u):
         return "The address has a space in it."
@@ -248,6 +248,15 @@ def imagery_settings(conversions=None, doc=None):
     name = name.strip() if isinstance(name, str) and name.strip() else IMAGERY_NAME_DEFAULT
     credit = credit.strip() if isinstance(credit, str) and credit.strip() else ""
     return {"name": name[:IMAGERY_NAME_MAX], "url": url.strip(), "credit": credit[:IMAGERY_CREDIT_MAX]}
+
+
+def imagery_connect_origin(conversions=None, doc=None):
+    """The origin (https://host[:port]) the tenant's imagery is loaded from, for the map page's content security policy; None
+    when the tenant has no usable imagery."""
+    im = imagery_settings(conversions, doc)
+    if not im:
+        return None
+    return "https://" + im["url"].split("/")[2]
 
 
 def os_maps_key():

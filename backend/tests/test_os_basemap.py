@@ -15,6 +15,8 @@ What this proves, on a scratch SQLite database (FastAPI stubbed, so the endpoint
   5. /api/public/alignment carries tenant.imagery and tenant.os_maps_key; /api/meta carries NEITHER (and so neither does any
      other reader of tenant_settings); the ETag changes when the key or the address changes, so a browser never keeps an old one;
   6. the key is never a screen word: no template of the staff app or the map prints OS_MAPS_KEY.
+  7. the content security policy (pilot readiness phase 2) lets the OS service load on the map, adds a tenant's OWN imagery host
+     to the MAP page's policy only, and a typed address cannot add a directive, a second host or a plain-http source.
 
 What it does not prove: OS's own service (it needs a key; checked by hand), the map page itself (parse_map.js runs its block against a
 fake map), the Config card (parse_frontend.js), Postgres.
@@ -289,6 +291,42 @@ ok("6: the map reads the key only to add it to a request to OS (osKeyedUrl), nev
    "TENANT.os_maps_key" in mp and "textContent = TENANT.os_maps_key" not in mp and "innerHTML" not in mp.split("function osKeyedUrl", 1)[1].split("function osTransformRequest", 1)[0])
 ok("6: the Config card has the three fields and no key field", all(k in fe for k in ("cfg-imagery-name", "cfg-imagery-url", "cfg-imagery-credit"))
    and "cfg-os" not in fe)
+
+# =========================================================================== #
+#  7. the content security policy                                             #
+# =========================================================================== #
+import security_headers as sh  # noqa: E402
+
+base_csp = sh.csp()
+ok("7: the policy lets the map load OS's service (style, tiles, fonts, sprites are fetched)", "connect-src" in base_csp
+   and "https://api.os.uk" in dict(p.strip().split(" ", 1) for p in base_csp.split(";"))["connect-src"].split())
+ok("7: the default policy names no tenant imagery host", sh.csp() == sh.csp(()) == sh.csp(None))
+with_host = sh.csp(("https://tiles.example.org",))
+conn = dict(p.strip().split(" ", 1) for p in with_host.split(";"))["connect-src"].split()
+ok("7: a tenant's imagery origin is added to connect-src, once, after the fixed hosts; no other directive changes",
+   "https://tiles.example.org" in conn and conn[: len(sh.CSP_SOURCES["connect-src"])] == sh.CSP_SOURCES["connect-src"]
+   and with_host.replace(" https://tiles.example.org", "") == base_csp and sh.csp(("https://tiles.example.org", "https://tiles.example.org")).count("tiles.example.org") == 1)
+for junk in ("https://a.example.org;script-src *", "http://a.example.org", "https://a.example.org/path", "https://a.example.org, https://b.example.org",
+             "https://", "*", "https://a b.example.org", "https://a.example.org'", 5, None):
+    ok(f"7: {str(junk)[:36]!r} is dropped, never put in the policy", sh.csp((junk,)) == base_csp)
+ok("7: a port is allowed", "https://tiles.example.org:8443" in sh.csp(("https://tiles.example.org:8443",)))
+h = {}
+sh.apply("/map/", h, ("https://tiles.example.org",))
+h2 = {}
+sh.apply("/api/public/alignment", h2)
+ok("7: apply() with an extra origin writes it into the Content-Security-Policy, without one the fixed policy",
+   "https://tiles.example.org" in h["Content-Security-Policy"] and h2["Content-Security-Policy"] == base_csp)
+mw = main_src = read("backend/main.py")
+ok("7: only the MAP page's answers carry the tenant's imagery host (the API, the app and the guides do not)",
+   'if path == "/map" or path.startswith("/map/"):' in mw and "security_headers.apply(path, response.headers, extra)" in mw
+   and mw.count("imagery_connect_origin(") == 1)
+ok("7: the origin comes from the typed address: https plus its host only", config.imagery_connect_origin(doc={"tenant": {"imagery_url": GOOD_XYZ}}) == "https://tiles.tenant.invalid".replace("tiles.tenant.invalid", "tiles.example.org")
+   and config.imagery_connect_origin(doc={"tenant": {"imagery_url": "https://t.example.org:8443/a/{z}/{x}/{y}.png"}}) == "https://t.example.org:8443"
+   and config.imagery_connect_origin(doc={"tenant": {}}) is None and config.imagery_connect_origin(doc={"tenant": {"imagery_url": "http://x.example.org/{z}/{x}/{y}"}}) is None)
+for bad_host in ("https://a.example.org;script-src%20*/{z}/{x}/{y}", "https://a.example.org'/{z}/{x}/{y}", "https://user@a.example.org/{z}/{x}/{y}",
+                 "https://localhost/{z}/{x}/{y}", "https://a..example.org-/{z}/{x}/{y}.png", "https://-a.example.org/{z}/{x}/{y}", "https://a.example.org:99999999/{z}/{x}/{y}"):
+    ok(f"7: the address {bad_host[:44]!r} is refused (the host is letters, digits, dots, hyphens and a port, with a dot)",
+       config.imagery_url_problem(bad_host) is not None)
 
 print(f"\ntest_os_basemap: {PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

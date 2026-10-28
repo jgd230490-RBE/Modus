@@ -7638,7 +7638,7 @@ function ConfigPage({ meta, who, access }){
                 </div>
                 <div className="field" style={{ marginBottom: 8 }}>
                   <label htmlFor="cfg-imagery-url">Address</label>
-                  <input id="cfg-imagery-url" className="ctl w-full" maxLength={600} placeholder="https://example.org/{z}/{x}/{y}.jpg"
+                  <input id="cfg-imagery-url" className="ctl w-full" maxLength={600} placeholder="https://…/{z}/{x}/{y}.jpg"
                     value={(doc.tenant || {}).imagery_url || ""} onChange={e => upd(d => { setTenantText(d, "imagery_url", e.target.value); })} />
                   <div className="hint">An address with {"{z}/{x}/{y}"}, or a WMS address. Web Mercator only.</div>
                 </div>
