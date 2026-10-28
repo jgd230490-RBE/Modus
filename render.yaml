@@ -56,6 +56,8 @@ services:
         sync: false
       - key: MAPBOX_TOKEN           # the Mapbox PUBLIC token (pk.…) for the app and PDF map
         sync: false
+      - key: OS_MAPS_KEY            # 28 Oct 2026 (8b): optional — an OS Data Hub key (OS Vector Tile API) for the public map's OS map; unset = no OS line
+        sync: false
       - key: GOOGLE_MAPS_API_KEY    # optional — Street View
         sync: false
       - key: GOOGLE_MAPS_URL_SIGNING_SECRET   # optional, recommended with the key above

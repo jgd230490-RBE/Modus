@@ -3728,7 +3728,11 @@ def public_alignment(request: Request):
     path reads updated_at only, never the overlay value.
     """
     stamp = tenant_package.get_overlay_stamp()
-    tenant = config.tenant_settings(conversions)
+    tenant = dict(config.tenant_settings(conversions))
+    # 28 Oct 2026 (8b): the map's own extras, here and nowhere else (/api/meta is read before sign-in): the tenant's own
+    # imagery (name, address, credit) and the OS map key. In the ETag's hash below, so a new key or address is seen at once.
+    tenant["imagery"] = config.imagery_settings(conversions)
+    tenant["os_maps_key"] = config.os_maps_key()
     # the tenant's names for its team slots, so the map shows "North Team", not an id
     # 23 Oct 2026: an unnamed team is "<team word> n" (taxonomy.team_name), never its id
     team_rows = [{"id": r["id"], "label": taxonomy.team_name(r["id"])}

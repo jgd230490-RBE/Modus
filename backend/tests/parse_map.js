@@ -3116,7 +3116,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && /if \(at\) at\.textContent = \(j\.attribution \|\| \[\]\)\.join\(' (?:·|\\u00b7) '\);/.test(blk)
      && /<div class="area-note" id="area-attribution"><\/div>/.test(html));
   ok("🔴 §2.2b: ...and never a hard-coded dataset's lines (another tenant's boundaries must not be credited to ONS)",
-     !/Office for National Statistics|Crown copyright/.test(code));
+     !/Office for National Statistics|Crown copyright/.test(code.replace(/function osCredit\(year\) \{[^\n]*\}/, "")));   // NARROWED 28 Oct 2026 (8b): OS's own credit for OS's own map, osCredit(), is the one place the words appear
   // the card, as the page builds it
   const card = new Function((blk.match(/function areaCardHTML\(a, payload, when\) \{[\s\S]*?\n    \}/) || [""])[0] + "; return areaCardHTML;")();
   const A = { area_id: "E07000131", name: "Harborough", tier: "district", tier_words: "local authority district",
@@ -3903,7 +3903,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && sheetHtml.includes('<button type="button" class="m-play" id="m-play" onclick="toggleTimeline()" aria-label="Play" aria-pressed="false">&#9654;</button>')
      && sheetHtml.includes('<div class="month-chips" id="m-chips" role="group" aria-label="Month"></div>'));
   ok("C3 phone: touchPitch and dragRotate are off on a phone only — at construction, and switched with the breakpoint",
-     code.includes("touchPitch: !isPhoneShell(), dragRotate: !isPhoneShell() });")
+     code.includes("touchPitch: !isPhoneShell(), dragRotate: !isPhoneShell(), transformRequest: osTransformRequest });")   // NARROWED 28 Oct 2026 (8b)
      && code.includes("try { if (on) { map.touchPitch.disable(); map.dragRotate.disable(); } else { map.touchPitch.enable(); map.dragRotate.enable(); } } catch (e) {}"));
   ok("C3 phone (D14): a tap on a route opens the route card in the sheet INSTEAD of the popup and the drawer",
      /selectRoute\(rid\);\s*if\(typeof isPhoneShell==='function' && isPhoneShell\(\) && typeof openRouteCard==='function'\)\{ openRouteCard\(rid\); return; \}\s*const info=ROUTEINFO/.test(code));
@@ -5524,9 +5524,9 @@ function qrRead(mod) {
   const bm = i0 >= 0 && i1 > i0 ? src.slice(i0, i1) : "";
   // NARROWED 27 Oct 2026 (8a): the map opens on INITIAL_BASEMAP (Light unless the share link names another), and the held basemap starts there
   ok("🔴 basemap: the held basemap starts on the map's own first style (INITIAL_BASEMAP, light-v11 by default) and becomes 'shown' only on a style.load",
-     bm.includes("const BASEMAP = { shown: INITIAL_BASEMAP, pending: null,")
+     bm.includes("const BASEMAP = { shown: INITIAL_BASEMAP, pending: null, prev: INITIAL_BASEMAP,")   // NARROWED 28 Oct 2026 (8b): + prev
      && src.includes("style: INITIAL_BASEMAP, center:") && src.includes("|| 'mapbox://styles/mapbox/light-v11';")
-     && bm.includes("map.on('style.load', () => { if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; } hideLiveTraffic(); });"));
+     && bm.includes("map.on('style.load', () => {\n        if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; }"));   // NARROWED 28 Oct 2026 (8b): the handler is multi-line
   ok("🔴 basemap: a pick equal to the one showing (or on its way) returns before setStyle",
      /if \(styleUrl === \(BASEMAP\.pending \|\| BASEMAP\.shown\)\) return;[\s\S]*map\.setStyle\(/.test(bm));
   ok("basemap: the page's own styles are a full rebuild (diff: false: style.load always fires, the last pick wins); any other keeps GL's validate-first diff",
@@ -5538,8 +5538,9 @@ function qrRead(mod) {
   const ct = (src.match(/window\.changeTheme = function\(btn, styleUrl\) \{([^}]*)\};/) || [])[1] || "";
   ok("🔴 basemap: the widget's changeTheme calls changeBasemap and nothing else (no second setStyle path)",
      ct.trim() === "changeBasemap(styleUrl);");
-  ok("🔴 basemap: exactly two setStyle calls in the page, both inside changeBasemap",
-     (src.match(/\.setStyle\(/g) || []).length === 2 && (bm.match(/map\.setStyle\(/g) || []).length === 2);
+  ok("🔴 basemap: exactly three setStyle calls in the page, all in the basemap block (NARROWED 28 Oct 2026, 8b: two in changeBasemap, and loadLateBasemap's, which runs only after the OS / imagery style is good and still the pick)",
+     (src.match(/\.setStyle\(/g) || []).length === 3 && (bm.match(/map\.setStyle\(/g) || []).length === 3
+     && /if \(BASEMAP\.pending !== id\) return;\s*if \(!style\) \{ basemapFallback\(false\); return; \}\s*map\.setStyle\(style, \{ diff: false \}\);/.test(bm));
   ok("basemap: each widget button names its style (data-basemap), the select and widget are synced, also when the widget arrives",
      ["light-v11", "dark-v11", "satellite-streets-v12", "streets-v12"].every(k =>
        src.includes(`data-basemap="mapbox://styles/mapbox/${k}" onclick="changeTheme(this, 'mapbox://styles/mapbox/${k}')"`))
@@ -5562,8 +5563,11 @@ function qrRead(mod) {
   let api = null;
   try {
     // NARROWED 27 Oct 2026 (8a): the block reads INITIAL_BASEMAP (Light here, as with no ?basemap= in the address)
-    api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP",
-      bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, fakeDoc, () => ({ version: 8, sources: {}, layers: [] }), "mapbox://styles/mapbox/light-v11");
+    // NARROWED 28 Oct 2026 (8b): the block also holds loadLateBasemap (the OS map / the tenant's imagery), which reads the
+    // late-basemap helpers beside BASEMAP_LINK, TENANT, fetch and toast: all given here, none used by the 16 Oct checks
+    api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast",
+      cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(
+      fakeMap, fakeDoc, () => ({ version: 8, sources: {}, layers: [] }), "mapbox://styles/mapbox/light-v11", {}, () => Promise.reject(new Error("no network")), () => {});
   } catch (e) { ok("basemap sandbox: the block runs", false, String(e)); }
   if (api) {
     const L = "mapbox://styles/mapbox/light-v11", D = "mapbox://styles/mapbox/dark-v11", S = "mapbox://styles/mapbox/streets-v12";
@@ -5617,7 +5621,7 @@ function qrRead(mod) {
   ok("🔴 basemap 16 Oct: nothing in the page's code sets the Standard style (no setStyle / changeTheme with mapbox/standard)",
      !/mapbox:\/\/styles\/mapbox\/standard/.test(src) && /mapbox:\/\/styles\/mapbox\/light-v11/.test(src));
   ok("basemap 16 Oct: every Basemap option is a classic Mapbox style (-vNN) or the Maa-amet raster style, which GL 2.14 validates",
-     opts.length > 0 && opts.every(o => CLASSIC.test(o.value) || o.value === "maaamet-ortho"));
+     opts.length > 0 && opts.every(o => CLASSIC.test(o.value) || o.value === "maaamet-ortho" || o.value === "os-zoomstack" || o.value === "client-imagery"));   // NARROWED 28 Oct 2026 (8b): + the OS map and the tenant's imagery (styles built in the page, GL 2.14 draws them)
   // NARROWED 27 Oct 2026 (8a): Streets, Outdoors, Satellite without names and the two Navigation styles joined the menu (pinned in full in the 27 Oct block)
   ok("basemap 16 Oct: the menu still offers Light (selected), Dark and Satellite, plus the hidden Maa-amet orthophoto",
      ["light-v11", "dark-v11", "satellite-streets-v12"].every(k => opts.some(o => o.value === "mapbox://styles/mapbox/" + k))
@@ -6449,8 +6453,10 @@ function qrRead(mod) {
                 ["satellite-streets-v12", "Satellite"], ["satellite-v9", "Satellite (no names)"],
                 ["navigation-day-v1", "Navigation day"], ["navigation-night-v1", "Navigation night"]];
   ok("⭐ 8a: the Basemap menu offers, in order, Light, Dark, Streets, Outdoors, Satellite, Satellite (no names), Navigation day and Navigation night, then the hidden Maa-amet",
-     opts.length === 9 && want.every(([k, label], i) => opts[i].value === M + k && opts[i].label === label)
-     && opts[8].value === "maaamet-ortho" && /hidden/.test(opts[8].attrs) && /selected/.test(opts[0].attrs) && opts.slice(1).every(o => !/selected/.test(o.attrs)));
+     opts.length === 11 && want.every(([k, label], i) => opts[i].value === M + k && opts[i].label === label)
+     && opts[8].value === "os-zoomstack" && opts[8].label === "OS map" && /hidden/.test(opts[8].attrs)
+     && opts[9].value === "client-imagery" && opts[9].label === "Client imagery" && /hidden/.test(opts[9].attrs)
+     && opts[10].value === "maaamet-ortho" && /hidden/.test(opts[10].attrs) && /selected/.test(opts[0].attrs) && opts.slice(1).every(o => !/selected/.test(o.attrs)));   // NARROWED 28 Oct 2026 (8b): nine -> eleven, the OS map and the imagery before the Maa-amet, both hidden until set
   ok("🔴 8a: every new option is a classic -vNN Mapbox style (GL JS 2.14 draws it) and none is the v3-only Standard style",
      opts.slice(0, 8).every(o => /^mapbox:\/\/styles\/mapbox\/[a-z-]+-v\d+$/.test(o.value)) && !/mapbox\/standard/.test(src) && !/mapbox\/standard/.test(sel)
      && /mapbox-gl-js\/v2\.\d+\.\d+\/mapbox-gl\.js/.test(html));
@@ -6466,7 +6472,7 @@ function qrRead(mod) {
   // the live traffic: only the two sources, on every style load
   ok("⭐ 8a: hideLiveTraffic runs from style.load and hides only layers on the mapbox-traffic and mapbox-incidents sources",
      /function hideLiveTraffic\(\) \{[\s\S]*?l\.source === 'mapbox-traffic' \|\| l\.source === 'mapbox-incidents'[\s\S]*?setLayoutProperty\(l\.id, 'visibility', 'none'\)/.test(bm)
-     && bm.includes("hideLiveTraffic(); });") && (src.match(/hideLiveTraffic\(\)/g) || []).length === 2);
+     && /BASEMAP\.pending = null; \}\n\s*hideLiveTraffic\(\);\s*\}\);/.test(bm) && (src.match(/hideLiveTraffic\(\)/g) || []).length === 2);   // NARROWED 28 Oct 2026 (8b): the handler is multi-line
   {
     const fnSrc = bm.slice(bm.indexOf("function hideLiveTraffic()"), bm.indexOf("map.on('style.load'"));
     const layers = [{ id: 'road-primary', source: 'composite' }, { id: 'traffic-primary', source: 'mapbox-traffic' },
@@ -6487,7 +6493,8 @@ function qrRead(mod) {
     const fakeSel = { value: M + "light-v11", selectedIndex: 0, options: [] };
     const fakeDoc = { getElementById: () => fakeSel, querySelectorAll: () => [] };
     let api = null, e0 = "";
-    try { api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, fakeDoc, () => ({}), M + "light-v11"); }
+    try { api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast",
+      cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, fakeDoc, () => ({}), M + "light-v11", {}, () => Promise.reject(new Error("no network")), () => {}); }   // NARROWED 28 Oct 2026 (8b)
     catch (e) { e0 = String(e); }
     ok("8a (sandbox): the basemap block runs with the new styles", !!api, e0.slice(0, 300));
     if (api) {
@@ -6511,8 +6518,8 @@ function qrRead(mod) {
      && src.includes("syncBasemapControls(INITIAL_BASEMAP);"));
   {
     const link = new Function(cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\nreturn { BASEMAP_LINK, basemapFromKey, basemapKey };")();
-    ok("8a: the link keys name exactly the seven non-default styles; an unknown key, a prototype name or a style URL is null",
-       Object.keys(link.BASEMAP_LINK).join() === "dark,streets,outdoors,aerial,aerial-plain,nav-day,nav-night"
+    ok("8a: the link keys name exactly the seven non-default styles (NARROWED 28 Oct 2026, 8b: and the OS map and the tenant's imagery, os / imagery); an unknown key, a prototype name or a style URL is null",
+       Object.keys(link.BASEMAP_LINK).join() === "dark,streets,outdoors,aerial,aerial-plain,nav-day,nav-night,os,imagery"
        && link.basemapFromKey('outdoors') === M + "outdoors-v12" && link.basemapFromKey('nav-night') === M + "navigation-night-v1"
        && link.basemapFromKey('nope') === null && link.basemapFromKey('constructor') === null && link.basemapFromKey(null) === null
        && link.basemapKey(M + "light-v11") === null && link.basemapKey(M + "streets-v12") === "streets"
@@ -6535,6 +6542,195 @@ function qrRead(mod) {
   }
   ok("🔴 8a: the Navigation night ground is dark for the haul-road cut-out, and no banned public word came in with the new options",
      /function haulEraserColour\(\)\{ return \/dark\|night\/\.test\(/.test(code) && !/truck|real-time|live tracking|telematics/i.test(sel));
+}
+
+// ===== 28 Oct 2026 (task 8b): the OS map and the tenant's own imagery as basemaps =====
+// Two lines in the Basemap menu that exist only where the deployment has them: the OS map (an OS key on the deployment) and the
+// tenant's own aerial imagery (an address typed on Config). Hidden until the tenant's words arrive; fetched / built BEFORE the
+// basemap is replaced, so a bad key or an offline OS keeps the basemap the person had.
+{
+  const M = "mapbox://styles/mapbox/";
+  const K = "abcdEFGH12345678abcdEFGH";
+  const helpers = cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP");
+  const i0 = src.indexOf("const BASEMAP = {"), i1 = src.indexOf("function maaametOrthoStyle()");
+  const bm = i0 >= 0 && i1 > i0 ? src.slice(i0, i1) : "";
+  const pure = new Function("TENANT", helpers + "\nreturn { BASEMAP_LINK, BASEMAP_LATE, osCredit, osKeyedUrl, osTransformRequest, osStyleReady, clientImageryStyle, basemapFromKey, basemapKey };")({ os_maps_key: K });
+  const OSURL = "https://api.os.uk/maps/vector/v1/vts";
+
+  // ---- the request address
+  ok("⭐ 8b: every request to api.os.uk gets the key and the web-map projection once; another address, a request with no key, or an OS address inside another address is left alone",
+     pure.osKeyedUrl(OSURL, K) === OSURL + "?srs=3857&key=" + K
+     && pure.osKeyedUrl(OSURL + "?srs=3857", K) === OSURL + "?srs=3857&key=" + K
+     && pure.osKeyedUrl(OSURL + "/tile/5/9/12.pbf?srs=3857&key=other", K) === OSURL + "/tile/5/9/12.pbf?srs=3857&key=other"
+     && pure.osKeyedUrl(OSURL, "") === OSURL && pure.osKeyedUrl("https://api.mapbox.com/v4/x", K) === "https://api.mapbox.com/v4/x"
+     && pure.osKeyedUrl("https://evil.example/?u=https://api.os.uk/x", K) === "https://evil.example/?u=https://api.os.uk/x"
+     && pure.osKeyedUrl("https://api.os.uk/x", "a&b=c") === "https://api.os.uk/x?srs=3857&key=a%26b%3Dc");
+  const tr = (T) => new Function("TENANT", helpers + "\nreturn osTransformRequest;")(T);
+  ok("8b: the map's request hook adds the key from the tenant's words (the deployment's key), and only to OS: nothing else is rewritten",
+     tr({ os_maps_key: K })(OSURL + "/resources/fonts/a/0-255.pbf").url === OSURL + "/resources/fonts/a/0-255.pbf?srs=3857&key=" + K
+     && tr({ os_maps_key: K })("https://api.mapbox.com/fonts/x") === undefined && tr({})(OSURL) === undefined && tr({ os_maps_key: null })(OSURL) === undefined);
+
+  // ---- OS's style, made ready
+  const st = { version: 8, sources: { os: { type: "vector", url: OSURL, maxzoom: 19 }, ras: { type: "raster", tiles: ["https://x.example/{z}/{x}/{y}.png"] },
+                                       low: { type: "vector", url: OSURL + "/low", maxzoom: 12 }, none: { type: "vector", url: OSURL + "/none" } },
+               layers: [{ id: "bg", type: "background" }] };
+  const snap = JSON.stringify(st);
+  const out = pure.osStyleReady(st, 2026);
+  ok("⭐ 8b: OS's own style is made ready: every vector source stops at zoom 15 (OS OpenData tiles stop there; GL enlarges the last tile), carries OS's credit, and the input is untouched",
+     out && out.sources.os.maxzoom === 15 && out.sources.low.maxzoom === 12 && out.sources.none.maxzoom === 15
+     && ["os", "low", "none"].every(k => out.sources[k].attribution === "Contains OS data © Crown copyright and database right 2026")
+     && out.sources.ras.attribution === undefined && JSON.stringify(st) === snap && pure.osCredit(2031).endsWith("database right 2031"));
+  ok("8b: a style OS answers with nothing usable (no vector source, no layers, not an object) is null, never drawn",
+     pure.osStyleReady({ version: 8, sources: { r: { type: "raster" } }, layers: [] }, 2026) === null && pure.osStyleReady(null, 2026) === null
+     && pure.osStyleReady({ sources: {} }, 2026) === null && pure.osStyleReady("x", 2026) === null && pure.osStyleReady({ sources: { v: { type: "vector" } } }, 2026) === null);
+
+  // ---- the tenant's imagery
+  const imx = pure.clientImageryStyle({ url: "https://t.example/{z}/{x}/{y}.jpg", credit: "© Example Council 2025" });
+  const imw = pure.clientImageryStyle({ url: "https://w.example/wms?BBOX={bbox-epsg-3857}&W=256", credit: "" });
+  ok("⭐ 8b: the tenant's imagery is one raster layer on one raster source: the address as the tile address, 256 px, the credit as the source's credit; a WMS address allows one zoom more",
+     imx && imx.version === 8 && imx.layers.length === 1 && imx.layers[0].type === "raster" && imx.layers[0].source === "client-imagery"
+     && imx.sources["client-imagery"].type === "raster" && imx.sources["client-imagery"].tiles.join() === "https://t.example/{z}/{x}/{y}.jpg"
+     && imx.sources["client-imagery"].tileSize === 256 && imx.sources["client-imagery"].maxzoom === 19 && imx.sources["client-imagery"].attribution === "© Example Council 2025"
+     && imw.sources["client-imagery"].maxzoom === 20 && imw.sources["client-imagery"].attribution === ""
+     && pure.clientImageryStyle(null) === null && pure.clientImageryStyle({}) === null && pure.clientImageryStyle({ url: "" }) === null);
+
+  // ---- the menu lines appear with the tenant's words
+  const frag = src.slice(src.indexOf("        const osOpt = document.getElementById('basemap-os');"), src.indexOf("        const satPlain = document.getElementById('basemap-satellite-plain');"));
+  const lines = (T) => {
+    const els = { "basemap-os": { hidden: true, textContent: "OS map" }, "basemap-imagery": { hidden: true, textContent: "Client imagery" } };
+    new Function("document", "TENANT", frag)({ getElementById: id => els[id] || null }, T);
+    return els;
+  };
+  const l0 = lines({}), l1 = lines({ os_maps_key: K }), l2 = lines({ imagery: { url: "https://t.example/{z}/{x}/{y}.png", name: "Council aerial 2025" } });
+  const l3 = lines({ imagery: { url: "https://t.example/{z}/{x}/{y}.png" } }), l4 = lines({ imagery: null, os_maps_key: null });
+  ok("⭐ 8b: the OS map line shows only where the deployment holds a key; the imagery line only where an address is typed, under the tenant's own name (default 'Client imagery'); the demo, with neither, shows neither",
+     frag.length > 100 && l0["basemap-os"].hidden && l0["basemap-imagery"].hidden
+     && !l1["basemap-os"].hidden && l1["basemap-imagery"].hidden
+     && l2["basemap-os"].hidden && !l2["basemap-imagery"].hidden && l2["basemap-imagery"].textContent === "Council aerial 2025"
+     && !l3["basemap-imagery"].hidden && l3["basemap-imagery"].textContent === "Client imagery"
+     && l4["basemap-os"].hidden && l4["basemap-imagery"].hidden);
+
+  // ---- the link
+  const initial = (search) => new Function("location", helpers + "\n" + src.slice(src.indexOf("const INITIAL_BASEMAP = "), src.indexOf("const map = new mapboxgl.Map(")) + "\nreturn INITIAL_BASEMAP;")({ search });
+  ok("⭐ 8b: the map opens on the basemap a link names, except the OS map and the tenant's imagery (they need the tenant's words): a link naming one opens on Light and switches once the words are in",
+     initial("?basemap=nav-night") === M + "navigation-night-v1" && initial("?basemap=os") === M + "light-v11" && initial("?basemap=imagery") === M + "light-v11"
+     && initial("") === M + "light-v11" && initial("?basemap=nope") === M + "light-v11");
+  const nr = src.slice(src.indexOf("function onNetworkReady() {"), src.indexOf("renderMonthChips(); renderSheet(); sheetAria();"));
+  ok("8b: once the network is in, a link naming a late basemap switches to it when the tenant's words are here and the line is shown (never to a hidden line)",
+     nr.length > 100 && /const want = basemapFromKey\(new URLSearchParams\(location\.search\)\.get\('basemap'\)\);\s*if \(BASEMAP_LATE\.has\(want\) && typeof OVERLAY_READY !== 'undefined'\) OVERLAY_READY\.then\(\(\) => \{[\s\S]*?o\.value === want && !o\.hidden\);\s*if \(opt\) changeBasemap\(want\);/.test(nr));
+  ok("8b: the link names the OS map os and the imagery imagery, and both are late basemaps (os-zoomstack, client-imagery)",
+     pure.BASEMAP_LINK.os === "os-zoomstack" && pure.BASEMAP_LINK.imagery === "client-imagery" && pure.BASEMAP_LATE.has("os-zoomstack") && pure.BASEMAP_LATE.has("client-imagery")
+     && pure.BASEMAP_LATE.size === 2 && pure.basemapKey("os-zoomstack") === "os" && pure.basemapFromKey("imagery") === "client-imagery");
+
+  // ---- the basemap block against a fake map: fetch first, replace only on success, the last pick wins
+  const tick = () => new Promise(r => setTimeout(r, 0));
+  const make = (tenant, fetchImpl) => {
+    const calls = [], loads = [], errs = [], toasts = [];
+    const fakeMap = { on: (e, f) => { if (e === "style.load") loads.push(f); if (e === "error") errs.push(f); }, setStyle: (s, o) => calls.push([s, o]),
+                      getStyle: () => ({ layers: [] }), setLayoutProperty: () => {} };
+    const sel = { value: M + "light-v11", selectedIndex: 0,
+                  options: [M + "light-v11", M + "dark-v11", "os-zoomstack", "client-imagery"].map(v => ({ value: v, hidden: false })) };
+    Object.defineProperty(sel, "value", { get() { return this.selectedIndex >= 0 ? this.options[this.selectedIndex].value : ""; },
+                                          set(v) { this.selectedIndex = this.options.findIndex(o => o.value === v); } });
+    const doc = { getElementById: () => sel, querySelectorAll: () => [] };
+    let api = null, e0 = "";
+    try {
+      api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast",
+        helpers + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, doc, () => ({}), M + "light-v11", tenant, fetchImpl, t => toasts.push(t));
+    } catch (e) { e0 = String(e); }
+    return { api, e0, calls, load: () => loads.forEach(f => f()), err: e => errs.forEach(f => f(e)), toasts, sel };
+  };
+  const good = { version: 8, sources: { os: { type: "vector", url: OSURL, maxzoom: 19 } }, layers: [{ id: "bg", type: "background" }] };
+  const resp = (ok_, body, status) => Promise.resolve({ ok: ok_, status: status || (ok_ ? 200 : 401), json: () => Promise.resolve(body) });
+  ASYNC_PINS.push((async () => {
+    const fetched = [];
+    const a = make({ os_maps_key: K }, (u) => { fetched.push(u); return resp(true, good); });
+    ok("8b (sandbox): the basemap block runs with the late basemaps", !!a.api, a.e0.slice(0, 300));
+    if (!a.api) return;
+    a.api.changeBasemap("os-zoomstack");
+    ok("⭐ 8b (sandbox): picking the OS map fetches OS's style FIRST (no setStyle yet, the basemap still the old one, the pick pending)",
+       fetched.length === 1 && a.calls.length === 0 && a.api.BASEMAP.shown === M + "light-v11" && a.api.BASEMAP.pending === "os-zoomstack", JSON.stringify(fetched));
+    await tick(); await tick();
+    ok("⭐ 8b (sandbox): the style request carries the key and the web-map projection; a good answer is ONE setStyle, a full rebuild (diff: false), the vector tiles stopping at zoom 15 under OS's credit",
+       fetched[0] === OSURL + "/resources/styles?srs=3857&key=" + K && a.calls.length === 1 && a.calls[0][1] && a.calls[0][1].diff === false
+       && a.calls[0][0].sources.os.maxzoom === 15 && /^Contains OS data © Crown copyright and database right \d{4}$/.test(a.calls[0][0].sources.os.attribution), JSON.stringify(a.calls[0] || []).slice(0, 200));
+    a.load();
+    ok("8b (sandbox): after the style loads the OS map is the shown basemap, the old one remembered as where to go back to; picking it again calls nothing",
+       a.api.BASEMAP.shown === "os-zoomstack" && a.api.BASEMAP.pending === null && a.api.BASEMAP.prev === M + "light-v11");
+    a.api.changeBasemap("os-zoomstack"); await tick();
+    ok("8b (sandbox): ...a second pick of the OS map while it shows fetches and calls nothing more", fetched.length === 1 && a.calls.length === 1);
+
+    // a failure leaves the basemap alone, and says so
+    const fails = [["a network failure", () => Promise.reject(new Error("offline"))],
+                   ["a refusal (a bad key)", () => resp(false, {}, 401)],
+                   ["an answer with no vector source", () => resp(true, { version: 8, sources: { r: { type: "raster" } }, layers: [] })],
+                   ["an answer that is not a style", () => resp(true, "nope")]];
+    for (const [label, impl] of fails) {
+      const t = make({ os_maps_key: K }, impl);
+      t.api.changeBasemap("os-zoomstack"); await tick(); await tick();
+      ok("⭐ 8b (sandbox): " + label + " keeps the basemap the person had: no setStyle, nothing pending, the menu back on it, one sentence in words",
+         t.calls.length === 0 && t.api.BASEMAP.shown === M + "light-v11" && t.api.BASEMAP.pending === null && t.sel.value === M + "light-v11"
+         && t.toasts.length === 1 && t.toasts[0] === "That map did not load. Your basemap is unchanged.", JSON.stringify([t.calls.length, t.toasts]));
+    }
+    const nk = make({}, () => { throw new Error("must not fetch"); });
+    nk.api.changeBasemap("os-zoomstack"); await tick(); await tick();
+    ok("8b (sandbox): no key: nothing is fetched, the basemap stays, the person is told", nk.calls.length === 0 && nk.toasts.length === 1 && nk.api.BASEMAP.pending === null);
+
+    // the last pick wins
+    let release = null;
+    const slow = make({ os_maps_key: K }, () => new Promise(r => { release = () => r({ ok: true, status: 200, json: () => Promise.resolve(good) }); }));
+    slow.api.changeBasemap("os-zoomstack");
+    slow.api.changeBasemap(M + "dark-v11");
+    release(); await tick(); await tick();
+    ok("⭐ 8b (sandbox): a later pick wins: Dark was picked while OS's style was on its way, so the late answer is dropped (one setStyle, Dark's) and no sentence is shown",
+       slow.calls.length === 1 && slow.calls[0][0] === M + "dark-v11" && slow.api.BASEMAP.pending === M + "dark-v11" && slow.toasts.length === 0);
+
+    // the tenant's imagery: built in the page, replaces the basemap, a missing one falls back in words
+    const im = make({ imagery: { url: "https://t.example/{z}/{x}/{y}.png", credit: "© X" } }, () => { throw new Error("imagery is not fetched"); });
+    im.api.changeBasemap("client-imagery"); await tick();
+    ok("⭐ 8b (sandbox): the tenant's imagery is one setStyle (diff: false) of a raster style built from the typed address, with nothing fetched",
+       im.calls.length === 1 && im.calls[0][1].diff === false && im.calls[0][0].sources["client-imagery"].tiles[0] === "https://t.example/{z}/{x}/{y}.png"
+       && im.calls[0][0].sources["client-imagery"].attribution === "© X");
+    const noim = make({}, () => Promise.resolve());
+    noim.api.changeBasemap("client-imagery"); await tick();
+    ok("8b (sandbox): a tenant with no imagery that is asked for it (an old link) keeps its basemap and is told", noim.calls.length === 0 && noim.toasts.length === 1 && noim.api.BASEMAP.pending === null);
+
+    // OS refusing the tiles after the style was drawn: back to the basemap before it, once
+    const t2 = make({ os_maps_key: K }, () => resp(true, good));
+    t2.api.changeBasemap("os-zoomstack"); await tick(); await tick(); t2.load();
+    t2.err({ error: { status: 401, url: "https://api.mapbox.com/styles/v1/x" } });
+    ok("8b (sandbox): a refusal from another address is not OS's: nothing happens", t2.calls.length === 1 && t2.toasts.length === 0);
+    t2.err({ error: { status: 401, url: OSURL + "/tile/6/20/31.pbf?srs=3857&key=" + K } });
+    t2.err({ error: { status: 403, url: OSURL + "/tile/6/20/32.pbf?srs=3857&key=" + K } });
+    ok("⭐ 8b (sandbox): OS refusing its tiles (a key without the service) puts the earlier basemap back ONCE (a rebuild, diff: false), with the sentence, however many tiles are refused",
+       t2.calls.length === 2 && t2.calls[1][0] === M + "light-v11" && t2.calls[1][1].diff === false && t2.toasts.length === 1 && t2.api.BASEMAP.pending === M + "light-v11");
+    // the basemap the person HAD is what a failure keeps: here the tenant's imagery, picked before the OS map
+    const both = { os_maps_key: K, imagery: { url: "https://t.example/{z}/{x}/{y}.png", credit: "" } };
+    const t4 = make(both, () => Promise.reject(new Error("offline")));
+    t4.api.changeBasemap("client-imagery"); await tick(); t4.load();
+    t4.api.changeBasemap("os-zoomstack"); await tick(); await tick();
+    ok("⭐ 8b (sandbox): OS's style not coming while the imagery shows keeps the IMAGERY (not Light): no new setStyle, the menu back on the imagery, one sentence",
+       t4.calls.length === 1 && t4.api.BASEMAP.shown === "client-imagery" && t4.api.BASEMAP.pending === null && t4.sel.value === "client-imagery" && t4.toasts.length === 1);
+    const t5 = make(both, () => resp(true, good));
+    t5.api.changeBasemap("client-imagery"); await tick(); t5.load();
+    t5.api.changeBasemap("os-zoomstack"); await tick(); await tick(); t5.load();
+    t5.err({ error: { status: 401, url: OSURL + "/tile/6/20/31.pbf" } });
+    ok("8b (sandbox): OS refusing its tiles while it replaced the imagery puts the IMAGERY back (the basemap before it), a rebuild",
+       t5.calls.length === 3 && t5.calls[2][0].sources && t5.calls[2][0].sources["client-imagery"] && t5.calls[2][1].diff === false && t5.toasts.length === 1);
+    const t3 = make({ os_maps_key: K }, () => resp(true, good));
+    t3.err({ error: { status: 401, url: OSURL + "/tile/6/20/31.pbf" } });
+    ok("8b (sandbox): an OS refusal while the OS map is not the basemap is ignored", t3.calls.length === 0 && t3.toasts.length === 0);
+  })());
+
+  // ---- source pins
+  ok("8b: the late basemaps never put the key on a screen: it is read only by osKeyedUrl / osTransformRequest and the style request, no literal key is in the page",
+     !/[?&]key=[A-Za-z0-9]{20,}/.test(src) && !/(textContent|innerHTML|title|alt)\s*=\s*[^;\n]*os_maps_key/.test(src)
+     && (src.match(/os_maps_key/g) || []).length === 3);   // the menu line's visibility, the request hook, the style request: nothing else reads it
+  ok("8b: the OS map and the imagery are in the menu as hidden lines with their own ids, before the Estonia one; no new quick button",
+     /<option value="os-zoomstack" id="basemap-os" hidden>OS map<\/option>\s*<option value="client-imagery" id="basemap-imagery" hidden>Client imagery<\/option>\s*<option value="maaamet-ortho"/.test(html)
+     && (src.match(/changeTheme\(this, '/g) || []).length === 4);
+  ok("8b: GL JS is still 2.x (the OS style and the raster style are plain v8 styles it draws), and neither late basemap uses a v3-only feature",
+     /mapbox-gl-js\/v2\.\d+\.\d+\/mapbox-gl\.js/.test(html) && !/mapbox\/standard/.test(src));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

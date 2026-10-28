@@ -205,6 +205,57 @@ _CONCERN_EMAIL_RE = re.compile(r"^[^\s@<>\"',;:?&]+@[^\s@<>\"',;:?&]+\.[^\s@<>\"
 
 def is_concern_email(v):
     return isinstance(v, str) and 0 < len(v.strip()) <= 254 and bool(_CONCERN_EMAIL_RE.match(v.strip()))
+# 28 Oct 2026 (task 8b): a tenant's OWN aerial imagery as a public-map basemap, and the OS map. Neither goes through
+# tenant_settings / /api/meta (that one is read before anybody signs in and an imagery address may carry its licence key):
+# they reach the map only through /api/public/alignment, behind the map password. The address is a tile address with
+# {z}/{x}/{y}, or a WMS GetMap address with {bbox-epsg-3857}; the OS key is the deployment setting OS_MAPS_KEY.
+IMAGERY_URL_MAX = 600
+IMAGERY_NAME_MAX = 40
+IMAGERY_CREDIT_MAX = 160
+IMAGERY_NAME_DEFAULT = "Client imagery"
+_IMAGERY_TILE_TOKENS = ("{z}", "{x}", "{y}")
+_OS_KEY_RE = re.compile(r"^[A-Za-z0-9_-]{16,80}$")
+
+
+def imagery_url_problem(v):
+    """One plain sentence when a typed imagery address cannot be drawn, else None."""
+    if not isinstance(v, str) or not v.strip():
+        return "Type an address."
+    u = v.strip()
+    if len(u) > IMAGERY_URL_MAX:
+        return f"The address is longer than {IMAGERY_URL_MAX} characters."
+    if not re.match(r"^https://[^\s/{}]+/", u):
+        return "The address must start with https:// and name a site."
+    if re.search(r"\s", u):
+        return "The address has a space in it."
+    if all(t in u for t in _IMAGERY_TILE_TOKENS) or "{bbox-epsg-3857}" in u:
+        return None
+    return "Use an address with {z}/{x}/{y} or {bbox-epsg-3857}."
+
+
+def imagery_settings(conversions=None, doc=None):
+    """The tenant's own imagery for the public map: {name, url, credit}, or None when it has none (or a bad address)."""
+    if doc is None:
+        doc = load(conversions) if conversions is not None else {}
+    block = doc.get("tenant") if isinstance(doc, dict) else None
+    if not isinstance(block, dict):
+        return None
+    url = block.get("imagery_url")
+    if not isinstance(url, str) or imagery_url_problem(url) is not None:
+        return None
+    name = block.get("imagery_name")
+    credit = block.get("imagery_credit")
+    name = name.strip() if isinstance(name, str) and name.strip() else IMAGERY_NAME_DEFAULT
+    credit = credit.strip() if isinstance(credit, str) and credit.strip() else ""
+    return {"name": name[:IMAGERY_NAME_MAX], "url": url.strip(), "credit": credit[:IMAGERY_CREDIT_MAX]}
+
+
+def os_maps_key():
+    """The OS Data Hub key for the OS map (OS Vector Tile API), from OS_MAPS_KEY; None when unset or not key-shaped."""
+    k = (os.getenv("OS_MAPS_KEY") or "").strip()
+    return k if _OS_KEY_RE.match(k) else None
+
+
 # a small in-process cache so the many load_factors() calls inside one request do not
 # each hit the database. Invalidated on every write through this module; a write made
 # by another process (another Render instance) shows up within TTL seconds.
@@ -545,6 +596,15 @@ def validate(doc, network=None):
             ce = tb.get("concern_email")
             if ce is not None and ce != "" and not is_concern_email(ce):
                 p.append("tenant.concern_email must be one email address, or null")
+            iu = tb.get("imagery_url")
+            if iu is not None and iu != "":
+                pr = imagery_url_problem(iu)
+                if pr:
+                    p.append("tenant.imagery_url: " + pr)
+            for fld, mx in (("imagery_name", IMAGERY_NAME_MAX), ("imagery_credit", IMAGERY_CREDIT_MAX)):
+                fv = tb.get(fld)
+                if fv is not None and (not isinstance(fv, str) or len(fv) > mx):
+                    p.append(f"tenant.{fld} must be text of at most {mx} characters, or null")
             cb = tb.get("council_breaks")
             if cb is not None:
                 if not isinstance(cb, dict):

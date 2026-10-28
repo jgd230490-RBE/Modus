@@ -4193,6 +4193,21 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && _tg.includes("<li><strong>27 Oct 2026, the final UI pass.</strong>"));
 }
 
+// ===== 28 Oct 2026 (task 8b): Config -> Map and bulletin: the tenant's own aerial imagery =====
+{
+  const cfgSrc = src.slice(src.indexOf('data-cfg="imagery"'), src.indexOf("<CommunityPanel access={access} />"));
+  ok("⭐ 8b: Config → Map and bulletin has the imagery card: a name, an address and a credit, each a labelled box of its own, under the council colours and above the community panel",
+     cfgSrc.length > 300 && ['cfg-imagery-name', 'cfg-imagery-url', 'cfg-imagery-credit'].every(id => cfgSrc.includes('id="' + id + '"') && cfgSrc.includes('htmlFor="' + id + '"'))
+     && src.indexOf('data-cfg="council-breaks"') < src.indexOf('data-cfg="imagery"') && src.indexOf('data-cfg="imagery"') < src.indexOf("<CommunityPanel access={access} />"));
+  ok("8b: the three boxes write the tenant block's imagery_name, imagery_url and imagery_credit, and a blank box removes its key (the line is simply hidden)",
+     ['imagery_name', 'imagery_url', 'imagery_credit'].every(k => cfgSrc.includes('setTenantText(d, "' + k + '"'))
+     && /const setTenantText = \(d, k, v\) => \{\s*d\.tenant = d\.tenant \|\| \{\};\s*if\(String\(v \|\| ""\)\.trim\(\) === ""\) delete d\.tenant\[k\]; else d\.tenant\[k\] = v;/.test(src)
+     && cfgSrc.includes('maxLength={40}') && cfgSrc.includes('maxLength={600}') && cfgSrc.includes('maxLength={160}'));
+  ok("8b: the card is few words, with no back-end term and no key box: the address hint names {z}/{x}/{y} and a WMS address; the OS key is not on any screen",
+     cfgSrc.includes('An address with {"{z}/{x}/{y}"}, or a WMS address. Web Mercator only.') && !/bbox|OS_MAPS|api key|token/i.test(cfgSrc.replace(/placeholder="[^"]*"/g, ""))
+     && !/OS_MAPS_KEY|os_maps_key/.test(src));
+}
+
 console.log();
 for (const f of fail) console.log("  FAIL:", f);
 console.log(`\n${pass} passed, ${fail.length} failed`);

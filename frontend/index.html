@@ -7194,6 +7194,11 @@ function ConfigPage({ meta, who, access }){
     if(arr.every(x => x == null)) delete cb[m]; else cb[m] = arr;
     if(!Object.keys(cb).length) delete d.tenant.council_breaks;
   };
+  // 28 Oct 2026 (8b): the tenant's own aerial imagery, three plain text fields in the tenant block; a blank one is removed
+  const setTenantText = (d, k, v) => {
+    d.tenant = d.tenant || {};
+    if(String(v || "").trim() === "") delete d.tenant[k]; else d.tenant[k] = v;
+  };
   const discard = () => { if(!orig) return; const d = JSON.parse(orig); setDoc(d); setRaw(JSON.stringify(d, null, 2)); setRawErr(""); setMsg(null); };
   const tabLabel = (TABS.find(([k]) => k === tab) || [])[1] || "";
 
@@ -7401,6 +7406,29 @@ function ConfigPage({ meta, who, access }){
                   </div>
                 );
               })}
+              {/* 28 Oct 2026 (8b): the tenant's own aerial imagery as a public-map basemap. Blank address = no line in the Basemap
+                  list. The checking of the address is the server's, on Save (config.imagery_url_problem). */}
+              <div className="field" data-cfg="imagery">
+                <label id="cfg-imagery">Your own aerial imagery</label>
+                <div className="hint">Shown in the Basemap list on the public map. Leave the address empty to hide it.</div>
+                <div className="field" style={{ marginBottom: 8 }}>
+                  <label htmlFor="cfg-imagery-name">Name in the list</label>
+                  <input id="cfg-imagery-name" className="ctl w-full" maxLength={40} placeholder="Client imagery"
+                    value={(doc.tenant || {}).imagery_name || ""} onChange={e => upd(d => { setTenantText(d, "imagery_name", e.target.value); })} />
+                </div>
+                <div className="field" style={{ marginBottom: 8 }}>
+                  <label htmlFor="cfg-imagery-url">Address</label>
+                  <input id="cfg-imagery-url" className="ctl w-full" maxLength={600} placeholder="https://example.org/{z}/{x}/{y}.jpg"
+                    value={(doc.tenant || {}).imagery_url || ""} onChange={e => upd(d => { setTenantText(d, "imagery_url", e.target.value); })} />
+                  <div className="hint">An address with {"{z}/{x}/{y}"}, or a WMS address. Web Mercator only.</div>
+                </div>
+                <div className="field" style={{ marginBottom: 8 }}>
+                  <label htmlFor="cfg-imagery-credit">Credit shown on the map</label>
+                  <input id="cfg-imagery-credit" className="ctl w-full" maxLength={160} placeholder="© Example Council 2025"
+                    value={(doc.tenant || {}).imagery_credit || ""} onChange={e => upd(d => { setTenantText(d, "imagery_credit", e.target.value); })} />
+                  <div className="hint">Most aerial licences ask for it.</div>
+                </div>
+              </div>
               <CommunityPanel access={access} />
               <CollisionPanel access={access} />
             </div>

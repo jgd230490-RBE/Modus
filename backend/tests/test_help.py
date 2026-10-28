@@ -984,5 +984,16 @@ ok("27 Oct: the technical guide — T1 names the advice line and the rules' read
    '<code>abnormal_rules.ADVICE_WORDS</code> ("Advice from the typed figures. The haulier, ESDAL, the police and the road and bridge authorities decide.")' in _tg27
    and "<li><strong>27 Oct 2026, the final UI pass.</strong>" in _tg27 and "went on 27 Oct 2026" in _tg27 and "ESDAL details sheet" not in _ug27)
 
+# 28 Oct 2026 (task 8b): the OS map and the tenant's own imagery are in the guides, in few words on the user's side, in detail on the technical side
+_ug28 = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+_tg28 = open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()
+ok("28 Oct: the user guide's Basemap line says the OS map and an organisation's own imagery appear where they are set up, and that the OS map shows OS's credit; no key, address or back-end term",
+   "The OS map and an organisation's own aerial imagery appear in the list where they are set up (the imagery under Configuration, Map and bulletin); the OS map shows OS's credit." in _ug28
+   and "OS_MAPS_KEY" not in _ug28 and "api.os.uk" not in _ug28 and "bbox" not in _ug28)
+ok("28 Oct: the technical guide T10 holds the detail: the deployment setting, OS's style and request address, the key added to every OS request, the zoom 15 limit and why, the tenant fields, the address forms, the one read that carries them, fetch before replace, the plan wording and that server-drawn maps keep Mapbox",
+   all(t in _tg28 for t in ("<strong>Basemaps.</strong>", "<code>OS_MAPS_KEY</code>", "api.os.uk/maps/<wbr>vector/v1/vts/<wbr>resources/styles<wbr>?srs=3857", "<code>transformRequest</code>",
+                            "16&ndash;19 is Premium", "<code>tenant.imagery_url</code>", "<code>{bbox-epsg-3857}</code>", "<code>/api/public/alignment</code>",
+                            "<code>/api/meta</code>", "<em>before</em> the basemap", "the Premium plan", "keep Mapbox and never draw OS data")))
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

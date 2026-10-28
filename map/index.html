@@ -920,6 +920,8 @@
             <option value="mapbox://styles/mapbox/satellite-v9" id="basemap-satellite-plain">Satellite (no names)</option>
             <option value="mapbox://styles/mapbox/navigation-day-v1">Navigation day</option>
             <option value="mapbox://styles/mapbox/navigation-night-v1">Navigation night</option>
+            <option value="os-zoomstack" id="basemap-os" hidden>OS map</option>
+            <option value="client-imagery" id="basemap-imagery" hidden>Client imagery</option>
             <option value="maaamet-ortho" id="basemap-maaamet" hidden>Estonia orthophoto (Maa-amet)</option>
         </select>
     </div>
@@ -1404,6 +1406,11 @@
         const sat = document.getElementById('basemap-satellite');
         const aerial = (TENANT.country || '').toUpperCase() === 'GB';
         if (sat) sat.textContent = aerial ? 'Aerial' : 'Satellite';
+        // 28 Oct 2026 (8b): the OS map where the deployment has a key, the tenant's own imagery where an address is typed
+        const osOpt = document.getElementById('basemap-os');
+        if (osOpt) osOpt.hidden = !TENANT.os_maps_key;
+        const imOpt = document.getElementById('basemap-imagery');
+        if (imOpt) { const im = TENANT.imagery; imOpt.hidden = !(im && im.url); imOpt.textContent = (im && im.name) || 'Client imagery'; }
         const satPlain = document.getElementById('basemap-satellite-plain');
         if (satPlain) satPlain.textContent = (aerial ? 'Aerial' : 'Satellite') + ' (no names)';
         // H2 (5 Oct 2026): a tenant whose overlay carries no existing railway has no use for
@@ -1847,13 +1854,55 @@
         dark: 'mapbox://styles/mapbox/dark-v11', streets: 'mapbox://styles/mapbox/streets-v12',
         outdoors: 'mapbox://styles/mapbox/outdoors-v12', aerial: 'mapbox://styles/mapbox/satellite-streets-v12',
         'aerial-plain': 'mapbox://styles/mapbox/satellite-v9', 'nav-day': 'mapbox://styles/mapbox/navigation-day-v1',
-        'nav-night': 'mapbox://styles/mapbox/navigation-night-v1' };
+        'nav-night': 'mapbox://styles/mapbox/navigation-night-v1',
+        os: 'os-zoomstack', imagery: 'client-imagery' };
+    // 28 Oct 2026 (8b): two basemaps that exist only where the deployment has them: the OS map (the deployment holds an OS key) and the
+    // tenant's own imagery (an address typed on Config). They arrive with the tenant's words, after the map is made, so a
+    // link that names one opens on Light and switches once they are here (applyViewFromUrl); the menu lines stay hidden
+    // until then. Their styles are built / fetched FIRST and replace the basemap only when they are good (loadLateBasemap).
+    const BASEMAP_OS = 'os-zoomstack', BASEMAP_IMG = 'client-imagery';
+    const BASEMAP_LATE = new Set([BASEMAP_OS, BASEMAP_IMG]);
+    const OS_ORIGIN = 'https://api.os.uk/';
+    const OS_MAX_ZOOM = 15;     // OS OpenData tiles stop at zoom 15 in the web-map projection (16-19 is Premium): GL enlarges the last tile
+    function osCredit(year) { return 'Contains OS data \u00a9 Crown copyright and database right ' + year; }
+    // every request to OS carries the deployment's key and the web-map projection; a request that already has them is left alone
+    function osKeyedUrl(url, key) {
+        if (typeof url !== 'string' || url.indexOf(OS_ORIGIN) !== 0 || !key) return url;
+        let u = url;
+        if (!/[?&]srs=/.test(u)) u += (u.indexOf('?') >= 0 ? '&' : '?') + 'srs=3857';
+        if (!/[?&]key=/.test(u)) u += (u.indexOf('?') >= 0 ? '&' : '?') + 'key=' + encodeURIComponent(key);
+        return u;
+    }
+    function osTransformRequest(url) {
+        const k = (typeof TENANT !== 'undefined' && TENANT && TENANT.os_maps_key) || '';
+        const u = osKeyedUrl(url, k);
+        return u !== url ? { url: u } : undefined;
+    }
+    // OS's own style, made ready: its vector tiles stop at zoom 15 and carry OS's credit. null when it has no vector source.
+    function osStyleReady(st, year) {
+        if (!st || typeof st !== 'object' || !st.sources || !Array.isArray(st.layers)) return null;
+        const out = JSON.parse(JSON.stringify(st));
+        let n = 0;
+        Object.keys(out.sources).forEach(k => {
+            const src = out.sources[k];
+            if (src && src.type === 'vector') { src.maxzoom = Math.min(Number(src.maxzoom) || OS_MAX_ZOOM, OS_MAX_ZOOM); src.attribution = osCredit(year); n++; }
+        });
+        return n ? out : null;
+    }
+    // the tenant's own imagery as a raster basemap: a tile address ({z}/{x}/{y}) or a WMS address ({bbox-epsg-3857})
+    function clientImageryStyle(im) {
+        if (!im || typeof im.url !== 'string' || !im.url) return null;
+        const wms = im.url.indexOf('{bbox-epsg-3857}') >= 0;
+        return { version: 8, glyphs: 'mapbox://fonts/mapbox/{fontstack}/{range}.pbf',
+            sources: { 'client-imagery': { type: 'raster', tiles: [im.url], tileSize: 256, maxzoom: wms ? 20 : 19, attribution: im.credit || '' } },
+            layers: [{ id: 'client-imagery', type: 'raster', source: 'client-imagery' }] };
+    }
     function basemapFromKey(k) { return Object.prototype.hasOwnProperty.call(BASEMAP_LINK, k) ? BASEMAP_LINK[k] : null; }
     function basemapKey(url) { return Object.keys(BASEMAP_LINK).find(k => BASEMAP_LINK[k] === url) || null; }
-    const INITIAL_BASEMAP = (() => { try { return basemapFromKey(new URLSearchParams(location.search).get('basemap')); } catch (e) { return null; } })()
+    const INITIAL_BASEMAP = (() => { try { const u = basemapFromKey(new URLSearchParams(location.search).get('basemap')); return BASEMAP_LATE.has(u) ? null : u; } catch (e) { return null; } })()
         || 'mapbox://styles/mapbox/light-v11';
     const map = new mapboxgl.Map({ container: 'map', style: INITIAL_BASEMAP, center: [10, 54], zoom: 4,
-                                   touchPitch: !isPhoneShell(), dragRotate: !isPhoneShell() });
+                                   touchPitch: !isPhoneShell(), dragRotate: !isPhoneShell(), transformRequest: osTransformRequest });
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
     
     let hoveredRouteId = null;
@@ -4126,7 +4175,7 @@
     // 27 Oct 2026 (8a): Outdoors, Satellite without names and the two Navigation styles join the page's own set (classic -v9 /
     // -v11 / -v12 styles, checked on 2.14.1 with every overlay: 0 errors), so they rebuild too. The map may open on one of
     // them (the share link's &basemap=), so the held basemap starts on INITIAL_BASEMAP.
-    const BASEMAP = { shown: INITIAL_BASEMAP, pending: null,
+    const BASEMAP = { shown: INITIAL_BASEMAP, pending: null, prev: INITIAL_BASEMAP,
         rebuild: new Set(['mapbox://styles/mapbox/light-v11', 'mapbox://styles/mapbox/dark-v11',
             'mapbox://styles/mapbox/satellite-streets-v12', 'mapbox://styles/mapbox/streets-v12',
             'mapbox://styles/mapbox/outdoors-v12', 'mapbox://styles/mapbox/satellite-v9',
@@ -4141,12 +4190,59 @@
             });
         } catch (e) { /* a style without them has nothing to hide */ }
     }
-    map.on('style.load', () => { if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; } hideLiveTraffic(); });
+    map.on('style.load', () => {
+        if (BASEMAP.pending) { BASEMAP.shown = BASEMAP.pending; BASEMAP.pending = null; }
+        hideLiveTraffic();
+    });
+    // 28 Oct 2026 (8b): the OS map and the tenant's imagery are fetched / built BEFORE the basemap is touched: a full rebuild
+    // drops the old basemap and every overlay before it knows the new style works, so a bad key or an offline OS would blank
+    // the map. Only a good style goes to setStyle; otherwise the basemap stays and the person is told in words. A later pick
+    // (BASEMAP.pending changed while this one loaded) wins.
+    async function loadLateBasemap(id) {
+        let style = null;
+        try {
+            if (id === BASEMAP_OS) {
+                const key = TENANT.os_maps_key;
+                if (!key) throw new Error('no key');
+                const r = await fetch(osKeyedUrl(OS_ORIGIN + 'maps/vector/v1/vts/resources/styles', key));
+                if (!r.ok) throw new Error('OS answered ' + r.status);
+                style = osStyleReady(await r.json(), new Date().getFullYear());
+            } else {
+                style = clientImageryStyle(TENANT.imagery);
+            }
+        } catch (e) { console.warn('Wayscope: that basemap did not load', e && e.message); }
+        if (BASEMAP.pending !== id) return;
+        if (!style) { basemapFallback(false); return; }
+        map.setStyle(style, { diff: false });
+    }
+    // drawn = the late style was already drawn (OS then refused its tiles): put the basemap from before it back. Not drawn (the
+    // style never came): nothing was touched, the basemap the person has stays and only the menu and the address are put right.
+    function basemapFallback(drawn) {
+        BASEMAP.pending = null;
+        const back = BASEMAP.prev || 'mapbox://styles/mapbox/light-v11';
+        if (drawn && BASEMAP.shown !== back) {
+            BASEMAP.shown = '';
+            changeBasemap(back);
+        } else { syncBasemapControls(BASEMAP.shown); try { scheduleViewWrite(); } catch (e) {} }
+        try { toast('That map did not load. Your basemap is unchanged.'); } catch (e) {}
+    }
+    // OS refusing the tiles (a key without the vector tile service, a stopped project): back to the basemap before it, once
+    map.on('error', e => {
+        const er = e && e.error;
+        if (er && (er.status === 401 || er.status === 403) && typeof er.url === 'string' && er.url.indexOf(OS_ORIGIN) === 0
+            && (BASEMAP.shown === BASEMAP_OS || BASEMAP.pending === BASEMAP_OS) && !BASEMAP.osRefused) {
+            BASEMAP.osRefused = true;
+            setTimeout(() => { BASEMAP.osRefused = false; }, 5000);
+            basemapFallback(true);
+        }
+    });
     function changeBasemap(styleUrl) {
         syncBasemapControls(styleUrl);
         if (styleUrl === (BASEMAP.pending || BASEMAP.shown)) return;
+        BASEMAP.prev = BASEMAP.shown;           // the basemap this pick replaces: where an OS refusal puts the person back
         BASEMAP.pending = styleUrl;
         try { scheduleViewWrite(); } catch (e) { /* the page's link is not wired yet */ }   // the address carries the ground
+        if (BASEMAP_LATE.has(styleUrl)) { loadLateBasemap(styleUrl); return; }
         const style = styleUrl === 'maaamet-ortho' ? maaametOrthoStyle() : styleUrl;
         if (BASEMAP.rebuild.has(styleUrl)) map.setStyle(style, { diff: false }); else map.setStyle(style);
     }
@@ -9872,6 +9968,14 @@
         renderMonthChips();
         ensureTimelineMatrix().then(() => { CHIPS.failed = false; renderMonthChips(); }, () => { CHIPS.failed = true; renderMonthChips(); });
         applyViewFromUrl();
+        // 28 Oct 2026 (8b): a link naming the OS map or the tenant's imagery switches once the tenant's words are in
+        try {
+            const want = basemapFromKey(new URLSearchParams(location.search).get('basemap'));
+            if (BASEMAP_LATE.has(want) && typeof OVERLAY_READY !== 'undefined') OVERLAY_READY.then(() => {
+                const opt = Array.from(document.querySelectorAll('#basemap-select option')).find(o => o.value === want && !o.hidden);
+                if (opt) changeBasemap(want);
+            });
+        } catch (e) { /* no link, or no basemap in it */ }
         renderConcernLinks();
         renderSheet();
         try { if (new URLSearchParams(location.search).get('wall') === '1' && typeof enterWallMode === 'function') enterWallMode(); } catch (e) {}
