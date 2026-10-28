@@ -526,7 +526,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .dash-wall.dash-fill .today-map{display:flex;flex-direction:column;}
   /* 4. Stockpiles: the chart takes the card */
   .dash-wall.dash-fill .stock-card{display:flex;flex-direction:column;min-height:0;}
-  .dash-wall.dash-fill .stock-body{flex:1 1 auto;min-height:0;grid-template-rows:minmax(0,1fr);}
+  .dash-wall.dash-fill .stock-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
+  .dash-wall.dash-fill .stock-body>.stock-plot{flex:1 1 auto;min-height:0;}
   .dash-wall.dash-fill .stock-nocap{font-size:clamp(13px,1.6vh,26px);}
   .chart-box.is-fill{height:100%;min-height:0;}
   /* the chart's headline on a filled big screen: the number, what it is, and what it is measured against */
@@ -3057,8 +3058,10 @@ const stockWeekWord = (iso) => { if(!iso) return ""; const d = new Date(iso + "T
 function stockMessage(sps){
   const hits = [];
   sps.forEach(sp => {
+    // as the rail's STOCKPILE SOON: a stockpile with no planned use says "No use planned yet" instead of a warning
+    if(!sp.use_planned) return;
     if(sp.soon_over) hits.push({ sp, w: sp.soon_over, kind: "over" });
-    else if(sp.soon_empty && sp.use_planned) hits.push({ sp, w: sp.soon_empty, kind: "empty" });
+    else if(sp.soon_empty) hits.push({ sp, w: sp.soon_empty, kind: "empty" });
   });
   hits.sort((a, b) => (a.w.from || "").localeCompare(b.w.from || ""));
   if(!hits.length) return { text: "None over in the next 8 weeks", tone: null, hits };
@@ -3108,7 +3111,7 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick, from, to }){
       const x = chart.scales.x.getPixelForValue(nowIdx);
       ctx.setLineDash([]); ctx.strokeStyle = tok("--ink", "#1E293B"); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x, a.top); ctx.lineTo(x, a.bottom); ctx.stroke();
-      ctx.fillStyle = tok("--ink", "#1E293B"); ctx.textAlign = "center"; ctx.fillText("now", x, a.top - 4);
+      ctx.fillStyle = tok("--ink", "#1E293B"); ctx.textAlign = "left"; ctx.fillText("now", x + 4, a.top + fs + 2);
     }
     ctx.restore();
   } };
@@ -3155,7 +3158,7 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick, from, to }){
         </div>
       ) : (
         <div className="stock-body">
-          <div className={fill ? "min-h-0" : ""}>
+          <div className="stock-plot">
             {withCap.length ? (fill ? <ChartCanvas config={cfg} size="fill" /> : <ChartCanvas config={cfg} />)
                             : <div className="text-sm text-slate-400 p-4">No stockpile has a capacity recorded — set one on the Locations page to see how full it is.</div>}
           </div>

@@ -711,7 +711,7 @@ ok("...the weeks are the Dashboard's own months (From / To, or the whole program
   _dsBody.includes("fetch(`${API}/stockpiles?from_month=${lo}&to_month=${hi}`)") && !_dsBody.includes("setWk(")
   && code.includes("from={fromM} to={toM} />"));
 ok("...solid to the last recorded week, dashed after it (the plan); a 'now' mark; the message first",
-  _dsBody.includes("segment: { borderDash: (c) => (c.p0DataIndex >= cut ? [6, 4] : undefined) }") && _dsBody.includes('ctx.fillText("now", x, a.top - 4);')
+  _dsBody.includes("segment: { borderDash: (c) => (c.p0DataIndex >= cut ? [6, 4] : undefined) }") && _dsBody.includes('ctx.fillText("now", x + 4, a.top + fs + 2);')
   && _dsBody.includes("const msg = stockMessage(withCap);") && /function stockMessage\(sps\)\{/.test(code)
   && code.includes('return { text: "None over in the next 8 weeks", tone: null, hits };')
   && code.includes("`${h.sp.name} goes over in the week of ${stockWeekWord(h.w.from)}`"));
@@ -4265,6 +4265,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("RAIL: STOCKPILE SOON / STOCKPILE EMPTY are words in both tables, amber, ranked with the warnings",
      src.includes('STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",') && src.includes('STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7 };')
      && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";'));
+  ok("DASHBOARD: a stockpile with no planned use never leads the message (as the rail's STOCKPILE SOON)",
+     /function stockMessage\(sps\)\{[\s\S]{0,400}if\(!sp\.use_planned\) return;/.test(src));
   ok("DASHBOARD: the 'No use planned yet' line names a stockpile with a capacity and no plan",
      src.includes('{noPlan.length > 0 && <div className="text-[13px] text-slate-500 mt-1" data-stock-noplan="1">No use planned yet: {noPlan.map(sp => sp.name).join(", ")}.</div>}'));
 }
