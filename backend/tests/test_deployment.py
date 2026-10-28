@@ -277,7 +277,17 @@ ok("the steps name both services, the region, the release branch, the address",
                           "acme.wayscope.co.uk", "Name acme", "DNS only (grey)")))
 ok("🔴 the steps list what must never be set", "NEVER add: ADMIN_TOKEN" in _st and "DEMO_LEADS" in _st.split("NEVER add:")[1])
 ok("the steps say the database takes no outside connection, and what to do with no custom-domain place free",
-   "Access Control: no source listed" in _st and "skip C: set APP_URL to the address from step 10" in _st)
+   "close the database to the internet" in _st and "skip C: set APP_URL to the address from step 10" in _st)
+_a = _st.split("A. THE DATABASE")[1].split("B. THE WEB SERVICE")[0]
+ok("🔴 step 3 removes every database source (0.0.0.0/0 included), confirms Render's block and names the result",
+   all(s in _a for s in ("delete every source", "0.0.0.0/0", 'type "block all internet traffic to PostgreSQL"',
+                         "Block All Inbound IPs", "All internet traffic is blocked by PostgreSQL inbound IP rules")))
+ok("🔴 ...and leaves the workspace's own rule alone (changing it could reach the web services)",
+   'Leave the rule marked\n    "Affected by: Workspace" alone' in _a)
+_f = _st.split("F. CHECKS BEFORE HANDING OVER")[1].split("G. THE END OF THE PILOT")[0]
+ok("🔴 the hand-over checks look again that the database is still closed",
+   "wayscope-acme-db -> Info -> Networking" in _f and "All internet traffic is blocked" in _f)
+ok("the old vague wording is gone", "no source listed" not in _st)
 ok("the steps end with both checks and the end of the pilot",
    "check_pilot.py https://acme.wayscope.co.uk" in _st and "check_deployment.py" in _st and "THE END OF THE PILOT" in _st)
 _ry = read("render.yaml")
