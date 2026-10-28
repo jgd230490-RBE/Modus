@@ -256,15 +256,9 @@ function ok(label, cond, extra) { if (cond) pass++; else fail.push(label + (extr
   ok("⭐ ...each carrying vehicles, trips AND tonnes, all three non-zero",
     chips.every(c => /[1-9][\d.,]* veh\/d/.test(c) && /[1-9][\d.,]* trips\/d/.test(c)
                   && /[1-9][\d.,]* t\/d/.test(c)), JSON.stringify(chips));
-  // ⭐ the brief's own test: the EVR paint is grey, and the reserved rail/green colours
-  // never reach it. Read off the LIVE layer, not the source.
-  const railPaint = await page.evaluate(() => ({
-    line: map.getPaintProperty("evr-rail-line", "line-color"),
-    casing: map.getPaintProperty("evr-rail-casing", "line-color"),
-    dash: map.getPaintProperty("evr-rail-line", "line-dasharray"),
-  }));
-  ok("⭐ §B: the EVR corridor is painted grey, never #0F766E or #039E86",
-    railPaint.line === "#64748B" && railPaint.casing === "#334155", JSON.stringify(railPaint));
+  // REVERSED 28 Oct 2026 (task 0a: the rail option off the panel, the railway no longer drawn)
+  const railLayers = await page.evaluate(() => ["evr-rail-line", "evr-rail-casing", "evr-rail-flow"].filter(id => !!map.getLayer(id)));
+  ok("🔴 no rail layer on the map", railLayers.length === 0, JSON.stringify(railLayers));
   // ⭐ §D's real question: does the switcher actually regroup, or just relabel?
   const swBtns = await page.evaluate(() =>
     Array.from(document.querySelectorAll("#kpi-switch button")).map(b => b.textContent));
@@ -482,42 +476,15 @@ function ok(label, cond, extra) { if (cond) pass++; else fail.push(label + (extr
   await page.evaluate(() => setTimelineMonth(7));
   await page.waitForTimeout(1000);
 
-  // ---- the EVR overlay ----------------------------------------------------------
-  const flowState = () => page.evaluate(() => ({
-    exists: !!map.getLayer("evr-rail-flow"),
-    vis: map.getLayer("evr-rail-flow") ? map.getLayoutProperty("evr-rail-flow", "visibility") : null,
-    dash: map.getLayer("evr-rail-flow") ? map.getPaintProperty("evr-rail-flow", "line-dasharray") : null,
-  }));
-  let f = await flowState();
-  ok("the EVR flow layer exists", f.exists, JSON.stringify(f));
-  ok("⭐ and is hidden while the timeline is merely open, not playing", f.vis === "none", JSON.stringify(f));
-
+  // ---- the EVR overlay: REVERSED 28 Oct 2026 (task 0a: the rail option off the panel, the railway no longer drawn) ----
+  const railBits = await page.evaluate(() => ({ flow: !!map.getLayer("evr-rail-flow"), box: !!document.getElementById("layer-rail"),
+                                                note: !!document.getElementById("rail-note") }));
+  ok("🔴 no marching rail overlay, no rail box, no rail note", !railBits.flow && !railBits.box && !railBits.note, JSON.stringify(railBits));
   await page.evaluate(() => startTimeline());
   await page.waitForTimeout(900);
-  f = await flowState();
-  ok("⭐ Play makes it march", f.vis === "visible", JSON.stringify(f));
-  const d1 = JSON.stringify(f.dash);
-  await page.waitForTimeout(500);
-  const d2 = JSON.stringify((await flowState()).dash);
-  ok("...and the dash is actually stepping", d1 !== d2, d1 + " -> " + d2);
   await shot("04-playing");
-
   await page.evaluate(() => stopTimeline());
   await page.waitForTimeout(500);
-  f = await flowState();
-  ok("⭐ pause hides it again", f.vis === "none", JSON.stringify(f));
-
-  // the checkbox half of the rule
-  await page.evaluate(() => { const c = document.getElementById("layer-rail"); c.checked = false; toggleRail(false); startTimeline(); });
-  await page.waitForTimeout(700);
-  f = await flowState();
-  ok("⭐ Play with the EVR checkbox OFF does not march", f.vis === "none", JSON.stringify(f));
-  await page.evaluate(() => { stopTimeline(); const c = document.getElementById("layer-rail"); c.checked = true; toggleRail(true); });
-  await page.waitForTimeout(400);
-
-  const railNote = await page.evaluate(() => document.getElementById("rail-note").textContent);
-  ok("⭐ the EVR note says provisional and points at the click popup",
-    /Provisional corridor/.test(railNote) && /Click the line/.test(railNote), railNote);
 
   // ---- §F4: the buildings layer, and its guard -----------------------------------
   // ⚠️ the offline stub style has NO composite source — the same shape as the Maa-amet
@@ -527,7 +494,7 @@ function ok(label, cond, extra) { if (cond) pass++; else fail.push(label + (extr
     document.getElementById("layer-buildings").checked = true;
     toggleBuildings(true);
     return { layer: !!map.getLayer("buildings-3d"),
-             note: document.querySelector("#buildings-note span").textContent };
+             note: document.getElementById("buildings-note").hidden ? "" : document.querySelector("#buildings-note span").textContent };   // NARROWED 28 Oct 2026: shown only then
   });
   ok("⭐ §F4: with no composite source, nothing is added and the sidebar says why",
     bStub.layer === false && /not available on this basemap/.test(bStub.note), JSON.stringify(bStub));
@@ -538,7 +505,7 @@ function ok(label, cond, extra) { if (cond) pass++; else fail.push(label + (extr
   await page.evaluate(() => closeTimeline());
   await page.waitForTimeout(800);
   ok("⭐ closing the timeline removes every end emphasis", (await endState()).length === 0);
-  ok("...and the marching overlay is gone", (await flowState()).vis === "none");
+  ok("...and still no rail overlay (REVERSED 28 Oct 2026 (task 0a: the rail option off the panel, the railway no longer drawn))", await page.evaluate(() => !map.getLayer("evr-rail-flow")));
   ok("⭐ ...and the vehicles caveat from the last month goes with it",
     await page.evaluate(() => document.getElementById("kpi-vehicles-label").textContent) === "Vehicles needed",
     await page.evaluate(() => document.getElementById("kpi-vehicles-label").textContent));

@@ -1072,5 +1072,22 @@ ok3("GUIDE SOURCES: technical guide #t1-guide-sources names what the user guide 
     'id="t1-guide-sources"' in _tg_gs and all(x in _tg_gs for x in ["Get Information about Schools, the\nDepartment for Transport's NaPTAN",
         "safety data (STATS19), released each late July", "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"]))
 
+# ---- 28 Oct 2026 (John, task 0a; notes/map-panel-mockup-1028): the panel's long sentences live here now; the rail option is gone
+_ug0a = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+ok3("⭐ 0a: the user guide lists Labels (Off, Few or All) in the panel and explains Few / All / Off in §8.2",
+    "<li><strong>Labels</strong> — Off, Few or All;</li>" in _ug0a and "<strong>Few</strong> (the default) shows the site names from zoom 11" in _ug0a
+    and "<strong>Off</strong> shows none of them" in _ug0a and "A shared link keeps the choice." in _ug0a)
+ok3("0a: the moved panel notes are in §8.2 (survey bridge, boundary ticks, chainage, buildings, gates, dimmed zones, alternatives, credits)",
+    all(t in _ug0a for t in ["click the line to see which stretches are measured", "ticks from zoom 11, labelled from zoom 13",
+        "10 km apart at corridor zoom", "3D buildings show from zoom 14 (15 on Standard)", "a hollow gate is not in use",
+        "A dimmed disruption-zone row has none in force", "how many other ways the routing found", "<strong>Credits</strong>"]))
+ok3("🔴 0a: no 'Existing rail network' left in the user guide (the panel option and its Sources row are gone)",
+    "Existing rail network" not in _ug0a)
+ok3("0a: the flow in §8.3 is lanes whose WIDTH is the movements (no 'Closer dashes'), keyed 'Movements a day, each way'",
+    "<strong>A wider lane means more movements a day</strong>" in _ug0a and "Closer dashes" not in _ug0a
+    and "<em>Movements a day, each way</em>" in _ug0a)
+ok3("0a: the technical guide says the map no longer draws the existing rail corridor",
+    "since 28 Oct 2026 the public map does not draw it" in open(TECH, encoding="utf-8").read())
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

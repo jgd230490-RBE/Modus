@@ -327,7 +327,7 @@ ok("§9: ⭐ a line with no stored road route is counted as unknown, never as ze
   && !code.includes("'not baked'") && !code.includes("'s'} unbaked)"));
 ok("the bar's method note and the alternatives note say 'stored road route', not 'baked'",
   code.includes("Active routes = the routes on the map that match the filters.")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the method note is short; its detail is in T10
-  && code.includes("Vehicles = lorries needed in a driver's day (a planning figure)") && code.includes("'none: a route along a haul road has none'")
+  && code.includes("Vehicles = lorries needed in a driver's day (a planning figure)") && code.includes("if (note) note.textContent = n ? n.toLocaleString('en-GB') : 'none';")   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): a count beside the label
   && !code.includes("every baked route matching") && !code.includes("(baked cycle)") && !code.includes("'none baked"));
 ok("§9: the fleet figure is the busiest month's, not the average", /const fleet = Math\.max\(\.\.\.mFleet\)/.test(code));
 ok("§9: no card says trips equal vehicles", !code.includes("Trips = vehicle loads on every line"));
@@ -369,9 +369,8 @@ ok("§D: IPT comes from the route, discipline and section from the line (named v
 ok("§9: a stale fetch cannot overwrite a newer month (guarded by the months and filters on screen, not a call counter)",
   /if \(KPI\.onScreen !== onScreen\) return;/.test(code) && /KPI\.onScreen = onScreen;/.test(code)
   && !/if \(seq !== KPI\.seq\) return;/.test(code));
-ok("§9: the forecast toggle recomputes the cards",
-  /src\.setData\(currentData\);\s*applyRailHighlight\(\);\s*applyFilters\(\);/.test(code)
-  || /applyRailHighlight\(\);[\s\S]{0,120}applyFilters\(\);[\s\S]{0,60}\/\/ §9/.test(src));
+ok("§9: the forecast toggle recomputes the cards (NARROWED 28 Oct 2026 (task 0a): no rail highlight between)",
+  /src\.setData\(currentData\);\s*applyFilters\(\);/.test(code) && !/applyRailHighlight/.test(code));
 ok("§9: never actuals", !/actual/.test(code.slice(code.indexOf("function calculateKPIs"), code.indexOf("function calculateKPIs") + 5000)));
 ok("scrubbing the timeline recalculates them",
   /applyZoneMonth\(m\);[\s\S]{0,500}applyFilters\(\);/.test(code));
@@ -379,7 +378,7 @@ ok("the card label says which question it is answering", code.includes("'Routes 
 
 ok("the ant-march animation runs only while the timeline is playing",
   code.includes("if(!TL.playing)"));
-ok("and the line goes solid when it stops", code.includes("DASH_SOLID"));
+ok("and the lanes stand still when it stops (NARROWED 28 Oct 2026 (task 0a): DASH_SOLID went with the rail's march)", /if\(!TL\.playing\)\{ _flowRAF=null; setFlowPulse\(null\); return; \}/.test(code) && !code.includes("DASH_SOLID"));
 ok("stopping playback cancels the rAF loop rather than letting it spin for ever",
   code.includes("cancelAnimationFrame(_flowRAF)"));
 ok("starting playback starts it", code.includes("startFlowAnimation();"));
@@ -507,8 +506,8 @@ ok("...and says plainly that it is not measured geometry",
   /The line is filled in, not measured\./.test(code) && !/measured geometry/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no "geometry"
 // NARROWED 23 Oct 2026: the word "interpolated" only ever lived in a comment on the dotted legs (gone with them); the
 // legend note's own words are pinned instead
-ok("the sidebar legend no longer claims there are breaks in the line",
-  !/Breaks in the line/.test(html) && /Gaps in the survey are filled in/.test(html));
+ok("the sidebar legend no longer claims there are breaks in the line (NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): nor carries the survey note)",
+  !/Breaks in the line/.test(html) && !/Gaps in the survey are filled in/.test(html));
 ok("⭐ the reason it was made solid is written next to the layer",
   /drawn SOLID, at full opacity/.test(src) && /honest-presentation alternative is one number/.test(src)
   && !/open-questions\.md/.test(src));   // G2: the product does not cite one project's notes
@@ -543,11 +542,11 @@ ok("the reason for that order is written down next to it",
 
 // the three parts of the IPT view move together
 ok("toggling the IPT view hides both legend blocks",
-  /function toggleAlignment[\s\S]{0,500}'ipt-legend-note'/.test(code));
+  /function toggleAlignment[\s\S]{0,500}\['ipt-legend'\]\.forEach/.test(code) && !/ipt-legend-note/.test(src));   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): one block now
 // NARROWED 29 Sep 2026: the note used to quote the first tenant's figure ("~60 km has no
 // surveyed Main Track"); a tenant-neutral map explains the rule, not one alignment's number.
 ok("the legend explains what a fainter segment means",
-  /id="ipt-legend-note"/.test(html) && /no surveyed main track/i.test(html) && /Gaps in the survey are filled in/.test(html));   // NARROWED 23 Oct 2026, as above
+  /no surveyed main track/i.test(html) && !/id="ipt-legend-note"/.test(html));   // NARROWED 23 Oct 2026, as above; NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): the line's popup says it, the panel note is gone
 ok("🔴 …and carries no first-tenant figure (no '~60 km', no '7 package edges')",
   !/~60/.test(html) && !/7 package edges/.test(html));
 
@@ -838,8 +837,8 @@ ok("and keep their halo so they stay readable over the basemap",
 ok("the reason ['zoom'] is not used in a filter is recorded, since it is the "
    + "obvious thing to reach for",
   /cannot use \['zoom'\] inside a layer `filter`/.test(src));
-ok("the sidebar says what the marker behaviour is",
-  /10 km ticks at corridor zoom/.test(html));
+ok("the chainage behaviour is in the user guide, not the panel (NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8))",
+  !/10 km ticks at corridor zoom/.test(html));
 
 // what must NOT have changed
 // G2 narrowing: the rationale stays; the one project's feature counts left with its data
@@ -1010,9 +1009,8 @@ ok("no route layer carries a dash array; the one dotted route line is the haul-r
 // draws SOLID — indistinguishable from the change never having been applied.
 // 2026-09-02: a fifth butt-capped dashed layer, the EVR rail core, joined the four
 // NARROWED 23 Oct 2026: the legs are round-capped solid lines; the rail core is the one butt-capped (dashed) layer left
-ok("🔴 line-cap is round on all four route layers (solid lines); only the rail core keeps a butt cap",
-  (code.match(/'line-cap': 'butt'/g) || []).length === 1
-  && /id: 'evr-rail-line'[\s\S]{0,300}'line-cap': 'butt'/.test(code)
+ok("🔴 line-cap is round on all four route layers (solid lines); no butt cap is left (REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn))",
+  (code.match(/'line-cap': 'butt'/g) || []).length === 0 && !/evr-rail-line/.test(code)
   && (code.match(/'layout': \{ 'line-cap': 'round', 'line-join': 'round' \},/g) || []).length >= 6);
 // NARROWED 23 Oct 2026: a solid line's halo, not a dash period — the casing is the core plus 2.4 px at every stop
 ok("the casing is a FIXED 2.4 px around the core at every zoom stop",
@@ -1101,7 +1099,7 @@ ok("there is a control for it, OFF by default",
 ok("the fetch is off the critical path — a failure must not cost the map",
   /async function loadAlternatives/.test(code) && /catch\(e\)\{[\s\S]{0,200}alternatives unavailable/.test(code));
 ok("...and it says how many there are, or why there are none",
-  /none: a route along a haul road has none/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): plain words
+  /n \? n\.toLocaleString\('en-GB'\) : 'none'/.test(code) && /id="alts-note"/.test(html));   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8); NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): plain words
 
 
 // =============================================================================
@@ -1110,22 +1108,18 @@ ok("...and it says how many there are, or why there are none",
 // G2 (16 Sep): the existing-railway geometry is the package's `rail`, not a file
 ok("G2: no static rail file is loaded", !/src=["']data\/evr_rail\.js/.test(html));
 ok("G2: the overlay module fills window.evr_rail_data from the package", /window\.evr_rail_data = \(o\.rail/.test(iptSrc));
-ok("it is NOT the alignment layer — separate sources", /addSource\('evr-rail'/.test(code) && /addSource\('alignment-source'/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no rail source; the alignment keeps its own", !/addSource\('evr-rail'/.test(code) && /addSource\('alignment-source'/.test(code));
 
-ok("there is an evr-rail source", /addSource\('evr-rail'/.test(code));
-ok("...that tolerates the file being absent",
-  /window\.evr_rail_data \|\| \{ type: 'FeatureCollection', features: \[\] \}/.test(code));
-ok("and an evr-rail-line layer on it",
-  /id: 'evr-rail-line', type: 'line', source: 'evr-rail'/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): there is no evr-rail source", !/evr-rail/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): the map reads nothing from the package's rail (it stays in the file)", !/evr_rail_data/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no evr-rail-line / -casing / -flow layer", !/evr-rail-(line|casing|flow)/.test(code));
 
 // the build list's numbers, exactly
-ok("the rail colour is the reserved #0F766E", /const RAIL_COLOR = '#0F766E'/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): RAIL_COLOR / RAIL_DIM went with the layers; a railhead keeps its teal mark", !/RAIL_COLOR|RAIL_DIM/.test(code) && /Railhead:\s*'#0F766E'/.test(code));
 // 2026-09-02 §6a restyle: a quiet grey casing + short-tick dash by default; the
 // reserved rail colour only when highlighted. The old 2px/25% single line is gone.
-ok("§6a: default = casing 5 px #334155 at 35%",
-  /RAIL_DIM\s*=\s*\{ casingW: 5, casingC: '#334155', casingO: 0\.35/.test(code));
-ok("§6a: ...under a 2 px #64748B dash with [2, 18]",
-  /dashW: 2,\s*dashC: '#64748B',\s*dashO: 1\.0, dash: \[2, 18\]/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no rail casing style left", !/casingC: '#334155'/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no rail dash style left", !/dash: \[2, 18\]/.test(code));
 // 🔴 REVERSED 2026-09-08 (§B). These asserted a BOLD state painted in RAIL_COLOR.
 // That made provisional Natural Earth geometry — ~6.4 km out at Lelle — the loudest
 // thing on the map whenever a railhead was in play. The brief: never green, never bold,
@@ -1134,7 +1128,7 @@ ok("⭐ §B: there is no bold rail state at all", !/RAIL_BOLD/.test(code));
 ok("⭐ §B: the rail colour never reaches the corridor's paint",
   !/(line-color'?,\s*RAIL_COLOR)/.test(code)
   && !/casingC: RAIL_COLOR/.test(code) && !/dashC: RAIL_COLOR/.test(code));
-ok("§6a: two rail layers, casing under core", /id: 'evr-rail-casing'[\s\S]{0,900}id: 'evr-rail-line'/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no rail layers at all", !/id: 'evr-rail/.test(code));
 ok("§6a: no IPT or reserved route colour in either rail style",
   !/(RAIL_DIM|RAIL_BOLD)\s*=[^}]*(#039E86|#f59e0b|#C2790B|#3398DB|#BF2E55|#003787|#0A1446|#4338CA|#6D28D9|#57534E|#9A3412|#9F1239|#5B21B6)/i.test(code));
 ok("the old single 2px/25% style is gone", !/RAIL_DIM_WIDTH/.test(code));
@@ -1142,17 +1136,12 @@ ok("the old single 2px/25% style is gone", !/RAIL_DIM_WIDTH/.test(code));
 // BOLD, and now decides whether it TICKS. One home — railInUseOnScreen(), beside
 // railFlowOn(). Two copies of "is a railhead in use this month" would have drifted the
 // first time one of them learned about a filter.
-ok("§B: 'a railhead is in use' has exactly one implementation",
-  /function railInUseOnScreen\(\)/.test(code) && !/function railheadMovementOnScreen\(\)/.test(code));
-ok("§B: it needs forecast on or the timeline open",
-  /const forecastOn = \(typeof TL !== 'undefined' && TL\.on\)[\s\S]{0,180}toggle-forecast/.test(code));
-ok("§B: ...and a route carrying volume NOW, inside the current filter, touching a railhead",
-  /f\.properties\.is_forecast && routePassesFilters\(f\.properties\)/.test(code)
-  && /locTypeById\(f\.properties\.origin_id\) === 'Railhead'[\s\S]{0,80}locTypeById\(f\.properties\.dest_id\) === 'Railhead'/.test(code));
-ok("§6b: the forecast toggle recomputes it, both on and off",
-  (src.match(/applyRailHighlight\(\);\s*\/\/ §6b/g) || []).length === 2);
-ok("§6b: turning forecast off clears is_forecast so the rule sees no movement",
-  /if \(f\.properties\) f\.properties\.is_forecast = false; \}\); sd\.setData\(d\); \}\s*applyRailHighlight/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): 'a railhead is in use' (the march's rule) is gone with the march", !/function railInUseOnScreen\(\)/.test(code) && !/function railheadMovementOnScreen\(\)/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): railFlowOn is gone", !/function railFlowOn\(\)/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): locTypeById (only the march used it) is gone; routePassesFilters stays for the bar and the ends", !/function locTypeById\(/.test(code) && /function routePassesFilters\(p\)/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): the forecast toggle no longer calls a rail highlight", !/applyRailHighlight/.test(src));
+ok("§6b: turning forecast off clears is_forecast, then the filters run (NARROWED 28 Oct 2026 (task 0a))",
+  /if \(f\.properties\) f\.properties\.is_forecast = false; \}\); sd\.setData\(d\); \}\s*applyFilters\(\);/.test(code));
 ok("§6b: closing the timeline re-runs the filters", /applyZoneMonth\(null\);[^\n]*\n\s*applyFilters\(\);/.test(code));
 // ⭐ #0F766E must not collide with anything already meaning something on this map.
 for (const reserved of ["#039E86", "#f59e0b", "#C2790B", "#3398DB", "#BF2E55",
@@ -1163,39 +1152,24 @@ for (const reserved of ["#039E86", "#f59e0b", "#C2790B", "#3398DB", "#BF2E55",
 
 // visibility from the checkbox, never a module variable — style.load re-adds every
 // layer on a basemap switch and a drifted variable restores one the user turned off
-ok("rail visibility is read from the checkbox",
-  /function railVisible\(\)/.test(code)
-  && /document\.getElementById\('layer-rail'\)/.test(code)
-  && /visibility: railVisible\(\)/.test(code));
-ok("there is a Rail network control, ON by default",
-  /id="layer-rail" checked/.test(html));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no railVisible, no layer-rail box", !/function railVisible\(\)/.test(code) && !/layer-rail/.test(src));
+ok("⭐ 🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): the panel has no 'Existing rail network' row and no rail note", !/Existing rail network/.test(html) && !/id="rail-note"/.test(html) && !/Provisional corridor/.test(src));
 // 🔴 REVERSED 2026-09-08. This used to assert the OPPOSITE — that toggleRail() moved
 // the railhead marks with the corridor. That was the bug: a railhead is a LOCATION, and
 // unchecking "Rail network" was hiding sites. The assertion now refuses the old wiring.
-ok("⭐ the rail toggle moves the corridor and NOTHING else",
-  /function toggleRail\(visible\) \{[\s\S]{0,700}\['evr-rail-casing', 'evr-rail-line'\]\.forEach/.test(code)
-  && !/'evr-rail-line', 'railheads'/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): toggleRail is gone (and no railheads layer ever comes back)", !/function toggleRail\(/.test(code) && !/id: 'railheads'/.test(code));
 
 // the highlight
-ok("the highlight follows the origin filter", /function applyRailHighlight\(\)/.test(code)
-  && /applyRailHighlight\(\);/.test(code));
-ok("...and applyFilters is what calls it",
-  /function applyFilters\(\)[\s\S]{0,2600}applyRailHighlight\(\);/.test(code));
-ok("it bolds only when the selected origin is a Railhead",
-  /locTypeByName\(sel\) === 'Railhead'/.test(code));
-ok("the loc_type comes from the Node features, not a hard-coded list",
-  /function locTypeByName\(name\)/.test(code)
-  && /x\.properties\.type === 'Node'/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): applyRailHighlight is gone", !/function applyRailHighlight\(\)/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): applyFilters no longer calls it", !/function applyFilters\(\)[\s\S]{0,2600}applyRailHighlight/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no railhead-origin branch on the rail", !/locTypeByName\(sel\) === 'Railhead'/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): locTypeByName is gone; the location layer still filters Node features", !/function locTypeByName\(/.test(code) && /x\.properties\.type === 'Node'/.test(code));
 // ⭐ an array literal used as an expression OUTPUT must be wrapped in ['literal', ...]
 // or setFilter validates, errors and silently applies nothing
 ok("⭐ the id filter wraps its array in ['literal', ...]",
   /\['in', \['get', 'id'\], \['literal', ids\]\]/.test(code));
-ok("heads are matched case-insensitively and by substring, both ways",
-  /function railFeaturesFor\(name\)/.test(code)
-  && /toLowerCase\(\)\.trim\(\)/.test(code)
-  && /n\.indexOf\(hh\) >= 0 \|\| hh\.indexOf\(n\) >= 0/.test(code));
-ok("⭐ §B: one style, applied unconditionally — there is nothing to return FROM",
-  /const st = RAIL_DIM;/.test(code) && !/bold \? RAIL_BOLD/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): railFeaturesFor is gone", !/function railFeaturesFor\(/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no RAIL_DIM / RAIL_BOLD anywhere", !/RAIL_DIM|RAIL_BOLD/.test(code));
 // ⭐ the road filter must be untouched: a railhead origin still isolates its hauls
 ok("⭐ the existing road-route filter is not disturbed",
   /setFilter\('inbound-lines',/.test(code) && /setFilter\('outbound-lines',/.test(code)
@@ -1245,7 +1219,7 @@ ok("§A: the layer is filtered to Node features, by canonical kind",
 // the whole rail-alignment stack, the chainage labels and the selection glow. A railhead
 // with two routes converging on it was about 70% covered by the 6 px forecast casing.
 ok("⭐ the location and gate layers are re-raised to the top of the stack",
-  /const MARK_LAYERS = \['site-gates', 'locations', 'site-gates-label'\];/.test(code)
+  /const MARK_LAYERS = \['site-gates', 'locations', 'location-names', 'site-gates-label'\];/.test(code)   // NARROWED 28 Oct 2026 (task 0a): + the site names
   && /function raiseMarks\(\)/.test(code)
   && /present\.forEach\(id => \{ try \{ map\.moveLayer\(id\); \} catch \(e\) \{\} \}\);/.test(code));
 // moveLayer forces a style recalculation and applyFilters() runs on every keystroke in
@@ -1321,8 +1295,8 @@ ok("⭐ the compound is a solid site cabin, not an outline",
 
 // ⭐ the honesty channel. The picture reads as authoritative; the popup is where the
 // caveat lives, exactly as the alignment's gap bridges do.
-ok("⭐ clicking the rail line opens a popup", /map\.on\('click', 'evr-rail-line'/.test(code));
-ok("⭐ ...built by railPopupHTML", /function railPopupHTML\(p\)/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no rail click handler", !/map\.on\('click', 'evr-rail-line'/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): railPopupHTML is gone", !/function railPopupHTML\(/.test(code));
 // ⚠️ RUN IT, do not grep it. A source-level check for "Provisional geometry" passed
 // on a deliberately broken tree where the caveat had been branched out with
 // `if (false)` — the string was still in the file and unreachable. Executing the
@@ -1340,31 +1314,27 @@ const _railFn = (() => {
       "#0F766E", (km, dp) => (km == null ? "—" : Number(km).toFixed(dp == null ? 1 : dp)), () => "km");
   } catch (e) { return null; }
 })();
-ok("railPopupHTML can be isolated and run", typeof _railFn === "function");
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): (so there is no rail popup to run)", _railFn === null);
 const _railHtml = _railFn ? _railFn({
   name: "Rapla - Lelle", operator: "Eesti Raudtee (EVR)",
   heads: '["Rapla","Lelle"]', length_km: 16.6, provisional: "true",
   accuracy_note: "wrong at the Lelle end by ~6.4 km",
   source: "Natural Earth 10m railroads",
 }) : "";
-ok("⭐ the rendered popup SAYS the geometry is provisional",
-  _railHtml.includes("Approximate line."));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no "geometry"
-ok("⭐ ...and renders the feature's own accuracy note",
-  _railHtml.includes("6.4 km"));
-ok("H1 (HU5): the rail popup prints the length in the tenant's unit (16.60 km here)",
-  _railHtml.includes("16.60 km") && /const DU = \(\) => \(TENANT\.distance_unit === 'mi' \? 'mi' : 'km'\);/.test(code)
-  && (code.match(/fmtDist\(/g) || []).length >= 5 && /distance_unit: 'km'/.test(code));
-ok("⭐ ...and names the source", _railHtml.includes("Natural Earth"));
-ok("⭐ ...and parses the stringified heads array rather than printing JSON",
-  _railHtml.includes("Rapla · Lelle") && !_railHtml.includes('["Rapla"'));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): ⭐ the rendered popup SAYS the geometry is provisional — no popup, no words", _railHtml === "");
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): ⭐ ...and renders the feature's own accuracy note — no popup, no words", _railHtml === "");
+ok("H1 (HU5): the map prints lengths in the tenant's unit (NARROWED 28 Oct 2026 (task 0a): the rail popup that was its example is gone)",
+  /const DU = \(\) => \(TENANT\.distance_unit === 'mi' \? 'mi' : 'km'\);/.test(code)
+  && (code.match(/fmtDist\(/g) || []).length >= 4 && /distance_unit: 'km'/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): ⭐ ...and names the source — no popup, no words", _railHtml === "");
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): ⭐ ...and parses the stringified heads array rather than printing JSON — no popup, no words", _railHtml === "");
 // a real (non-provisional) file must NOT carry the caveat, or it becomes wallpaper
 const _railOk = _railFn ? _railFn({ name: "x", provisional: false, source: "OSM" }) : "x";
 ok("⭐ a file marked provisional:false shows NO caveat",
   !_railOk.includes("Provisional geometry"));
 // properties cross Mapbox's boundary as strings — 'false' is truthy
-ok("stringified properties are parsed, not trusted",
-  /typeof heads === 'string'/.test(code)
-  && /p\.provisional === false \|\| p\.provisional === 'false'/.test(code));
+ok("stringified properties are parsed, not trusted (NARROWED 28 Oct 2026 (task 0a): the gates keep the rule; the rail's heads are gone)",
+  !/typeof heads === 'string'/.test(code) && /p\.active === false \|\| p\.active === 'false'/.test(code));
 
 // Task D2's popup line
 ok("the node popup shows stock only when BOTH numbers exist",
@@ -1445,45 +1415,33 @@ ok("the empty-network hint names a page that still exists",
 // =============================================================================
 
 // ---- 1. the EVR corridor marches while the timeline plays --------------------
-ok("there is a marching overlay on the EVR source, not an animation of the corridor",
-  /id: 'evr-rail-flow', type: 'line', source: 'evr-rail'/.test(code)
-  && /id: 'evr-rail-flow'[\s\S]{0,300}'line-color': '#ffffff'/.test(code));
-ok("...starting hidden, so a paused map is not marching before Play is pressed",
-  /id: 'evr-rail-flow'[\s\S]{0,200}visibility: 'none'/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no marching rail overlay", !/evr-rail-flow/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): setRailFlowDash is gone", !/setRailFlowDash/.test(code));
 // ⭐ THE RULE. Play AND the checkbox — not one or the other. A corridor that marched
 // with its own layer switched off would be drawing something the user turned off.
 // ⭐ NARROWED 2026-09-08 (§B). Play AND the checkbox was not enough: the corridor
 // ticked in every month, which said "rail" about months with no rail movement in them.
 // A third condition, and the brief's own test — "animation only when the playhead month
 // has a Railhead movement".
-ok("⭐ the overlay ticks only on Play, with the checkbox on, in a month that USES the rail",
-  /function railFlowOn\(\) \{\s*return !!\(typeof TL !== 'undefined' && TL\.playing\) && railVisible\(\) && railInUseOnScreen\(\);/.test(code));
-ok("...pause / scrub / close hides it again",
-  /function stopFlowAnimation\(\)\{[\s\S]{0,320}applyRailFlow\(\);/.test(code)
-  && /if\(!TL\.playing\)\{[\s\S]{0,160}applyRailFlow\(\); return; \}/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): applyRailFlow is gone", !/applyRailFlow/.test(code));
+ok("...pause / scrub / close stops the loop and drops the light (NARROWED 28 Oct 2026 (task 0a))",
+  /function stopFlowAnimation\(\)\{\s*if\(_flowRAF!=null\)\{ cancelAnimationFrame\(_flowRAF\); _flowRAF=null; \}\s*setFlowPulse\(null\);/.test(code));
 // NARROWED 16 Oct 2026 (D115): ONE count, FLOW_CYCLE long (a whole number of the rail's seven steps and of every
 // band's steps); the hauls read it as their march step, the rail modulo its seven
 // NARROWED 23 Oct 2026: the hauls' light is a phase from the frame clock; the rail alone steps on _dashIx, in the same loop
-ok("⭐ the rail steps on _dashIx while the hauls' light runs on the same frames, one loop",
-  /_pulseT=\(\(ts\*FLOW_PULSE_SPEED\)\/1000\)%1; setFlowPulse\(_pulseT\);[\s\S]{0,300}_dashIx=\(_dashIx\+1\)%FLOW_CYCLE;[\s\S]{0,600}setRailFlowDash\(DASH_SEQ\[_dashIx%DASH_SEQ\.length\]\)/.test(code)
-  && /const FLOW_CYCLE = DASH_SEQ\.length \* 60;/.test(code));
+ok("⭐ the count steps on _dashIx while the hauls' light runs on the frames, one loop (NARROWED 28 Oct 2026 (task 0a): no rail reads it now)",
+  /_pulseT=\(\(ts\*FLOW_PULSE_SPEED\)\/1000\)%1; setFlowPulse\(_pulseT\);[\s\S]{0,300}_dashIx=\(_dashIx\+1\)%FLOW_CYCLE;/.test(code)
+  && /const FLOW_CYCLE = 7 \* 60;/.test(code) && !/DASH_SEQ/.test(code));
 // the pinned trio is the CHECKBOX toggle. The flow layer must not join it, or the
 // checkbox alone would switch it to 'visible' and it would march on a paused map.
-ok("⭐ the flow layer is toggled separately from the corridor pair",
-  /\['evr-rail-casing', 'evr-rail-line'\]/.test(code)
-  && !/'evr-rail-line', 'evr-rail-flow'\]/.test(code)
-  && /forEach\(l => toggleLayer\(l, visible\)\);\s*applyRailFlow\(\);/.test(code));
-ok("the overlay carries the same railhead narrowing as the corridor under it",
-  /if \(map\.getLayer\('evr-rail-flow'\)\) map\.setFilter\('evr-rail-flow', idFilter\);/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no corridor pair to toggle", !/\['evr-rail-casing', 'evr-rail-line'\]/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no rail narrowing (setFilter on a rail layer)", !/setFilter\('evr-rail/.test(code));
 // ⚠️ EVR is reference geometry. It is not a haul and must never be counted as one.
 ok("⭐ EVR is still not in routes-source and still not a counted route",
   !/source: 'routes-source'[\s\S]{0,120}evr-rail/.test(code)
   && !/evr[\s\S]{0,60}mRoutes\.add/.test(code));
-ok("the EVR note carries the provisional caveat permanently, not only when dimmed",
-  src.includes("Provisional corridor — reference only, not survey. Click the line for detail.")
-  && /note\.innerHTML =[\s\S]{0,40}'Provisional corridor/.test(src));
-ok("...and the click popup is still railPopupHTML",
-  /function railPopupHTML\(p\)/.test(code) && /map\.on\('click', 'evr-rail-line'/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no rail note words left in the page", !src.includes("Provisional corridor") && !/getElementById\('rail-note'\)/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): and no rail popup", !/railPopupHTML/.test(code));
 
 // ---- 2. the KPI panel ---------------------------------------------------------
 ok("the panel has a month title", /id="kpi-title"/.test(html) && code.includes("set('kpi-title'"));
@@ -1587,8 +1545,8 @@ ok("only the lines carrying volume this month, inside the filter",
 ok("...one carriageway only", /if \(p\.type !== 'Inbound Highway'\) return;/.test(code));
 ok("⭐ nothing is emphasised with the timeline shut and forecast off",
   /const live = \(typeof TL !== 'undefined' && TL\.on\)/.test(code));
-ok("it follows the playhead and every filter change",
-  /applyRailHighlight\(\);\s*markRouteEnds\(\);/.test(code));
+ok("it follows the playhead and every filter change (NARROWED 28 Oct 2026 (task 0a): applyFilters ends on markRouteEnds, no rail between)",
+  /function applyFilters\(\)[\s\S]*?markRouteEnds\(\);/.test(code) && !/applyRailHighlight\(\);\s*markRouteEnds/.test(code));
 // ⚠️ setData on this source runs on every timeline tick; only when something flipped.
 ok("⭐ the source is only re-set when a mark actually changed",
   /if \(changed\) src\.setData\(a1_data\);/.test(code));
@@ -1602,15 +1560,10 @@ ok("⭐ applyFilters() is still followed immediately by renderTimelineWarnings(m
   /applyFilters\(\);\s*renderTimelineWarnings\(m\);/.test(code));
 
 // ---- §B, 2026-09-08: the corridor is grey and ticks only when the rail is used -----
-ok("⭐ §B: the sidebar note says what the ticking means, in both states",
-  src.includes("ticking: a movement this month starts or ends at a railhead")
-  && src.includes("static grey unless a movement this month uses a railhead"));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): the ticking words are gone", !src.includes("ticking: a movement this month") && !src.includes("static grey unless a movement"));
 // G2 narrowing: the geometry is no longer a file — it is the package's `rail`
-ok("§B: the geometry is the package's, and the popup is untouched",
-  !src.includes("data/evr_rail.js") && /window\.evr_rail_data \|\| \{ type: 'FeatureCollection', features: \[\] \}/.test(code)
-  && /function railPopupHTML\(p\)/.test(code));
-ok("§B: applyRailHighlight re-applies the flow rule, so a filter change lands on it too",
-  /if \(note\) note\.innerHTML =[\s\S]{0,260}applyRailFlow\(\);/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no static rail file and no rail popup", !src.includes("data/evr_rail.js") && !/function railPopupHTML/.test(code));
+ok("🔴 REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn): no rail note writer", !/note\.innerHTML =[\s\S]{0,60}Provisional/.test(code));
 
 // ---- §E, 2026-09-08: the warning stack has three NAMED levels ---------------------
 // ⚠️ 2026-10-06 — REVERSED: the level WORD is gone. The dot's colour plus a plain noun
@@ -1705,8 +1658,8 @@ ok("§F4: it is fill-extrusion off Mapbox's own building layer, not an ortho mes
 // ⚠️ the Maa-amet orthophoto basemap is RASTER and has no composite source. addLayer
 // would fire an error and return having added nothing — the 2026-09-01 silent failure.
 ok("⭐ §F4: guarded on the composite source, with the sidebar told when it is absent",
-  /if \(!map\.getSource\('composite'\)\) \{/.test(code)
-  && src.includes("not available on this basemap"));
+  /if \(!map\.getSource\('composite'\)\) \{\s*if \(note\) note\.hidden = false;/.test(code)
+  && html.includes('id="buildings-note" hidden') && html.includes("not available on this basemap"));   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): only that case shows
 ok("§F4: only re-added on style.load when the checkbox is on",
   /if \(buildingsVisible\(\)\) ensureBuildingLayer\(\);/.test(code));
 
@@ -2003,7 +1956,7 @@ ok("11 Oct: the map takes the app's shell — warm neutrals, sentence-case 13 px
   /--line:#E7E5E4; --bg:#FFFFFF;/.test(html) && /--action:#C2410C; --action-fg:#FFFFFF;/.test(html) && /--navy:#2563EB;/.test(html)
   && /\.sidebar h3 \{ margin:0 0 8px; font-size:13px; font-weight:600; letter-spacing:0; color:var\(--navy-deep\); text-transform:none; \}/.test(html)
   && /select \{ width:100%;[^}]*font-size:14px;/.test(html) && /\.btn \{[^}]*background:var\(--action\); color:var\(--action-fg\); \}/.test(html)
-  && !/font-size:1(0|0\.5|1)px;\s*color:#8a9099/.test(html) && html.includes('<div style="height:44px;flex:none"></div>')
+  && !/font-size:1(0|0\.5|1)px;\s*color:#8a9099/.test(html) && html.includes('<div class="panel-top" aria-hidden="true"></div>') && /\.sidebar \.panel-top\{ flex:none; position:sticky; top:-20px;/.test(html)   /* NARROWED 28 Oct 2026 (task 0a, card 6): the spacer is the sticky strip */
   && /\.fc-row label\{ font-size:12\.5px;/.test(html) && /\.an-lbl\{ font-size:12px; font-weight:500; letter-spacing:0; text-transform:none;/.test(html));
 ok("11 Oct: the Loads / day card is hidden in a vehicles unit (it repeated two-way movements); kept for tonnes / m3",
   /<div class="kpi-card" id="kpi-material-card">/.test(html) && code.includes("if (mc) mc.hidden = (unitLbl === 'vehicles');"));
@@ -2143,8 +2096,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      /function reducedMotion\(\)\{\s*try \{ return !!\(window\.matchMedia && window\.matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches\); \} catch\(e\)\{ return false; \}/.test(code));
   // NARROWED 16 Oct 2026 (D115): the hauls' dashes STAND STILL under reduced motion (setFlowDash(null): round caps, the
   // bands' spacing) rather than going solid — still no march; the rail's overlay stays DASH_SOLID
-  ok("reduced motion: no motion while playing when it matches — the hauls' lanes stand still (NARROWED 23 Oct 2026), the rail stays DASH_SOLID",
-     /function startFlowAnimation\(\)\{\s*applyRailFlow\(\);\s*if\(reducedMotion\(\)\)\{ setFlowPulse\(null\); setRailFlowDash\(DASH_SOLID\); return; \}\s*if\(_flowRAF==null\) _flowRAF=requestAnimationFrame\(animateFlow\);/.test(code));
+ok("reduced motion: no motion while playing when it matches — the hauls' lanes stand still (NARROWED 28 Oct 2026 (task 0a): no rail step)",
+     /function startFlowAnimation\(\)\{\s*if\(reducedMotion\(\)\)\{ setFlowPulse\(null\); return; \}\s*if\(_flowRAF==null\) _flowRAF=requestAnimationFrame\(animateFlow\);/.test(code));
   ok("reduced motion: Show on map jumps instead of flying when it matches",
      /if \(reducedMotion\(\)\) map\.jumpTo\(cam\); else map\.flyTo\(\{ \.\.\.cam, duration: 700 \}\);/.test(code)
      && !/map\.flyTo\(\{ center: f\.geometry\.coordinates/.test(code));
@@ -2239,7 +2192,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
     const readable = [
       lits(cut(code, "function tlLoopBounds", "const WARN")), lits(cut(code, "const WARN", "(function initAnalysis")),
       lits(cut(code, "function calculateKPIs", "function applyFilters")), lits(cut(code, "const kindLabels", "</script>")),
-      cut(html, '<div id="timeline-bar"', '<div id="tl-live"'), cut(html, '<div id="zone-kinds"', "Existing rail network"),
+      cut(html, '<div id="timeline-bar"', '<div id="tl-live"'), cut(html, '<div id="zone-kinds"', "<h3>Haul routes</h3>"),   /* NARROWED 28 Oct 2026 (task 0a): the rail row that ended it is gone */
     ].join(" ");
     const must = ["nothing approved", "loading figures", "Paused at ", "playback paused: ", "Over a planning flag",
                   // NARROWED 27 Oct 2026 (stockpile forecast): "nothing recorded since" is gone; a future month says "forecast at the end of"
@@ -2727,7 +2680,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("14 px: the zone-kind rows, the zone legend note and the Full horizon switch are 14 px (were 12.5, 12 and 11)",
      /#zone-kinds \.control-item \{ padding:4px 2px; font-size:14px; \}/.test(html)
      && /\.tl-seg button\{[^}]*font:500 14px/.test(html) && !/#timeline-bar \.tl-full\{/.test(html)
-     && /<span style="font-size:14px;color:var\(--note\);">A dimmed row has none in force this month\./.test(html)   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the swatches carry the colours
+     && html.includes('<div class="info-pop" id="info-zones" hidden><p>A dimmed row has none in force this month.</p></div>')   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the swatches carry the colours
      && !/#zone-kinds \.control-item \{[^}]*font-size:12\.5px/.test(html));
   ok("14 px: the map's new badges (over planning flag, the boxed weight/height limit) are 14 px (were 10.5 and 11.5)",
      /id:'forecast-cap-badge'[\s\S]{0,400}'text-size':14,/.test(code)
@@ -3272,7 +3225,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()"> Volume</label>')
      && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-carbon" onchange="toggleCarbon()"> Carbon</label>')
      && /<div class="heat-seg">\s*<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off"/.test(code)
-     && code.includes('<p><b>Volume</b>: two-way movements a day. Each route by its own figure; a stretch of road two or more routes share by the routes using it, summed.</p><p><b>Carbon</b>: t CO₂e in the month, per route.</p>')
+     && code.includes('<p><b>Volume</b>: two-way movements a day.</p><p><b>Carbon</b>: t CO₂e in the month.</p>')   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)
      && !code.includes('<span class="mode-sub">')
      && !/type="checkbox" id="toggle-(road-load|carbon)"/.test(code) && !code.includes("> Road load</label>")
      && !/id="toggle-road-load"[^>]*checked/.test(code) && !/id="toggle-carbon"[^>]*checked/.test(code)
@@ -3349,7 +3302,7 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
   ok("⭐ C1 (§2.2d's four count pins): the road-load layers use ROUND caps and joins and carry no dasharray at all",
      (blkCode.match(/layout: \{ 'line-cap': 'round', 'line-join': 'round' \}/g) || []).length === 2
      && !/'line-cap': 'butt'/.test(blkCode) && !/line-dasharray/.test(blkCode)
-     && (code.match(/'line-cap': 'butt'/g) || []).length === 1   // NARROWED 23 Oct 2026: the legs went solid and round-capped
+     && (code.match(/'line-cap': 'butt'/g) || []).length === 0   // NARROWED 28 Oct 2026 (task 0a): the rail core, the last butt cap, is gone
      && (code.match(/'line-dasharray': DASH_(CORE|CASING)/g) || []).length === 0);
   ok("C1: both lazy adders re-raise the marks (raiseMarks count is additive)",
      // NARROWED 16 Oct 2026 (D115): the flow is put back over the sections between the two
@@ -4729,7 +4682,7 @@ function qrRead(mod) {
      && /> Weight </.test(grpHtml) && /> Height </.test(grpHtml) && /> Width </.test(grpHtml)
      && !grpHtml.includes('layer-limit-axle'));
   ok("limits panel: the source note and the 'none loaded' line are in the group",
-     grpHtml.includes("OpenStreetMap contributors and HERE · coverage is incomplete")
+     grpHtml.includes('<div class="info-pop" id="info-limits" hidden><p id="limit-source">Not every limit is mapped: check the sign on site.</p></div>') && !grpHtml.includes("OpenStreetMap contributors")   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): the credit is on the map
      && grpHtml.includes('<div class="control-item" id="limit-empty" hidden>') && grpHtml.includes("No lorry limits loaded for this area yet"));
   ok("⭐ limits: /api/public/limits is fetched (through CONFIG.API_BASE, like the other gated reads)",
      secCode.includes("fetch(CONFIG.API_BASE + '/public/limits')"));
@@ -4958,7 +4911,7 @@ function qrRead(mod) {
          !byId['limits-group'].hidden && byId['limit-count-weight'].textContent === '2' && byId['limit-count-height'].textContent === '2'
          && byId['limit-count-width'].textContent === '0' && byId['limit-row-width'].classes.has('dim') && !byId['limit-row-weight'].classes.has('dim')
          && !byId['limit-boxes'].hidden && byId['limit-empty'].hidden
-         && byId['limit-source'].textContent === 'OpenStreetMap contributors and HERE · coverage is incomplete. Advisory: check the signed limit on site.');
+         && byId['limit-source'].textContent === 'Not every limit is mapped: check the sign on site.');   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)
       const ps = M.sources['limits-points'], ls = M.sources['limits-lines'];
       ok("⭐ limits load (sandbox): a clustered point source (max zoom 10, radius 40) and a line source, both carrying the attribution",
          ps && ps.cluster === true && ps.clusterMaxZoom === 10 && ps.clusterRadius === 40 && ls
@@ -5460,7 +5413,7 @@ function qrRead(mod) {
      && src.includes("marks: q.get('marks') === 'dots' ? 'dots' : null,")
      && src.includes("marks: (typeof locDotsOn === 'function' && locDotsOn()) ? 'dots' : null,"));
   ok("V7: a link with marks=dots ticks the box BEFORE the layer boxes, through its change event (toggleLocDots and the link listener run)",
-     /const dots = document\.getElementById\('loc-dots'\);\s*if \(dots && dots\.checked !== \(v\.marks === 'dots'\)\) \{ dots\.checked = v\.marks === 'dots'; dots\.dispatchEvent\(new Event\('change', \{ bubbles: true \}\)\); \}\s*if \(v\.layers\) \{/.test(code));
+     /const dots = document\.getElementById\('loc-dots'\);\s*if \(dots && dots\.checked !== \(v\.marks === 'dots'\)\) \{ dots\.checked = v\.marks === 'dots'; dots\.dispatchEvent\(new Event\('change', \{ bubbles: true \}\)\); \}\s*if \(v\.labels[^\n]*\n\s*if \(v\.layers\) \{/.test(code));
   ok("V7: the legend's swatch draws a circle while dots are on, the type's shape otherwise",
      /if \(locDotsOn\(\)\) \{ g\.beginPath\(\); g\.arc\(S \/ 2, S \/ 2, kind === 'Other' \? 5 : 9, 0, Math\.PI \* 2\); \}\s*else locShapePath\(g, kind, S \/ 2, S \/ 2, kind === 'Other' \? 6 : 13\);/.test(code));
   ok("🔴 V7: no banned public word and no 'truck' in the new box", !/truck|real-time|live tracking|telematics/i.test('Show sites as dots'));
@@ -5728,8 +5681,8 @@ function qrRead(mod) {
      /layout: \{ 'line-cap': 'round', 'line-join': 'round',/.test(addFlow) && fcode.includes("const FLOW_WIDTHS = [1.6, 2.1, 2.6, 3.2, 3.8];")
      && /'line-color': '#ffffff', 'line-width': flowWidthExpr\(\), 'line-opacity': FLOW_STILL_OPACITY,/.test(addFlow) && !/line-gradient/.test(fcode)
      && !/line-dasharray/.test(addFlow) && /lineMetrics: true/.test(fcode));
-  ok("🔴 D115 / 23 Oct: no butt cap anywhere in the flow (no march to need one); the rail core is the one butt-capped layer left",
-     !/'line-cap': 'butt'/.test(fcode) && (code.match(/'line-cap': 'butt'/g) || []).length === 1
+ok("🔴 D115 / 23 Oct: no butt cap anywhere in the flow (no march to need one); none left on the page (REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn))",
+     !/'line-cap': 'butt'/.test(fcode) && (code.match(/'line-cap': 'butt'/g) || []).length === 0
      && !/const cap = ix == null/.test(fcode) && /function setFlowPulse\(t\)\{/.test(fcode));
   ok("⭐ D115: the blue under the lanes is the road, NOT offset, one width in every mode (6 / 8.5 px: forecast, Volume, Carbon, shared sections)",
      code.includes("const FORECAST_LINE_WIDTH = 6;") && code.includes("const FORECAST_CASING_WIDTH = 8.5;")
@@ -5742,9 +5695,8 @@ function qrRead(mod) {
      /function placeFlowLayer\(\)\{[\s\S]{0,400}const anchor = \['road-load-line', 'forecast-layer'\]\.find/.test(fcode)
      && /drawFlow\(\);\s*placeFlowLayer\(\);\s*raiseMarks\(\);/.test(fcode)
      && /if \(had && typeof placeFlowLayer === 'function'\) placeFlowLayer\(\);/.test(code));
-  ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both legs) is gone; DASH_SEQ stays for the rail only",
-     !/'line-dasharray':\[0,4,3\]\}\}\)/.test(code) && /if\(map\.getLayer\('evr-rail-flow'\)\) setRailFlowDash\(DASH_SEQ\[_dashIx%DASH_SEQ\.length\]\);/.test(code)
-     && !/setFlowDash\(DASH_SEQ/.test(code) && !/setFlowDash\(DASH_SOLID\)/.test(code));
+ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both legs) is gone; DASH_SEQ went with the rail (REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel, the railway no longer drawn))",
+     !/'line-dasharray':\[0,4,3\]\}\}\)/.test(code) && !/DASH_SEQ/.test(code) && !/setFlowDash\(/.test(code));
   // ---- the bands ----
   ok("⭐ D115: the bands are FIXED — the Volume heat map's own stops (FLOW_STOPS = ROUTE_VOLUME_STOPS), never cut from the month's figures",
      fcode.includes("const FLOW_STOPS = ROUTE_VOLUME_STOPS;") && !/Math\.max\([^)]*fl_mv/.test(fcode) && !/\.sort\(\(a, b\) => b/.test(fcode));   // NARROWED 23 Oct 2026: flowPulse takes a max over the gradient's stops, never over a figure
@@ -5784,8 +5736,8 @@ function qrRead(mod) {
   {
     const guide = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8");
     ok("D115: the in-app guide (§8.3) describes the lanes, the fixed bands, the shared-road total and the dashes standing still when paused",
-       guide.includes("each direction has its own lane, on the left as driven") && guide.includes("<strong>Closer dashes mean more movements a day</strong> each way, on five fixed bands (under 10, 10 to 25, 25 to 50, 50 to 100, 100 and over)")
-       && guide.includes("Where routes share a road, its dashes show their total") && guide.includes("paused, or with reduced motion set on your device, they stand still")
+       guide.includes("each direction has its own lane, on the left as driven") && guide.includes("<strong>A wider lane means more movements a day</strong> each way, on five fixed bands (under 10, 10 to 25, 25 to 50, 50 to 100, 100 and over)")   /* NARROWED 28 Oct 2026 (task 0a): the lanes are widths now, as drawn since 23 Oct */
+       && guide.includes("Where routes share a road, its lane shows their total") && guide.includes("paused, or with reduced motion set on your device, the lanes stand still")
        && !guide.includes("white dashes run along the blue routes from origin to destination"));
   }
 
@@ -5831,7 +5783,7 @@ function qrRead(mod) {
   try {
     api = new Function("map", "document", "a1_data", "modeRoutesPassing", "councilFocus", "mapModeMonth", "forecastWindow", "rlEsc", "monthLabel",
       "stepRanges", "VOLUME_STOPS", "ROUTE_VOLUME_STOPS", "CONFIG", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "raiseMarks",
-      fblk + "\nreturn { FLOW, FLOW_STOPS, FLOW_WIDTHS, FLOW_PULSES, FLOW_PULSE_LEN, FLOW_PULSE_SPEED, FLOW_STILL_OPACITY, FLOW_OFFSET, FLOW_CYCLE, DASH_SEQ, flowLanes, flowFeatures, drawFlow, ensureFlowLayer, placeFlowLayer, flowWidthExpr, flowLightPoints, laneMetric, FLOW_LIGHT_SOURCE, setFlowPulse, renderFlowLegend, flowSample };")(
+      fblk + "\nreturn { FLOW, FLOW_STOPS, FLOW_WIDTHS, FLOW_PULSES, FLOW_PULSE_LEN, FLOW_PULSE_SPEED, FLOW_STILL_OPACITY, FLOW_OFFSET, FLOW_CYCLE, flowLanes, flowFeatures, drawFlow, ensureFlowLayer, placeFlowLayer, flowWidthExpr, flowLightPoints, laneMetric, FLOW_LIGHT_SOURCE, setFlowPulse, renderFlowLegend, flowSample };")(
       fmap, document, a1_data, () => passing, () => focus, () => month, () => [9, 12], rlEsc, monthLabel, stepRanges, VS, VS, CONFIG, 6, 8.5, () => {});
   } catch (e) { err = e.message; }
   ok("⭐ D115 sandbox: the flow block runs against a fake map and DOM", !!api, err);
@@ -5928,7 +5880,7 @@ function qrRead(mod) {
     ok("⭐ D115 sandbox / 23 Oct: SAME SPEED — one phase from the frame clock moves the light on every lane at once, no per-band step",
        /_pulseT=\(\(ts\*FLOW_PULSE_SPEED\)\/1000\)%1; setFlowPulse\(_pulseT\);/.test(code) && F.FLOW_PULSE_SPEED > 0 && F.FLOW_PULSE_SPEED < 1);
     ok("D115 sandbox / 23 Oct: the rail's cycle is still a whole number of its seven steps",
-       F.FLOW_CYCLE > 0 && F.FLOW_CYCLE % F.DASH_SEQ.length === 0, String(F.FLOW_CYCLE));
+       F.FLOW_CYCLE > 0 && F.FLOW_CYCLE % 7 === 0, String(F.FLOW_CYCLE));
     ok("D115 sandbox / 23 Oct: on screen the lanes are 1.6, 2.1, 2.6, 3.2 and 3.8 px wide, fewest movements first",
        JSON.stringify(F.FLOW_WIDTHS) === "[1.6,2.1,2.6,3.2,3.8]");
     F.setFlowPulse(0.3);
@@ -5941,7 +5893,7 @@ function qrRead(mod) {
     // the legend
     const lg = el("flow-legend");
     ok("⭐ D115 sandbox / 23 Oct: the legend says 'Wider lane = more movements a day', each way, the month, and the five band figures",
-       lg.hidden === false && lg.innerHTML.includes("<b>Wider lane = more movements a day</b>") && lg.innerHTML.includes("Each way, in Oct 2026")
+       lg.hidden === false && lg.innerHTML.includes("<b style=\"margin:0\">Movements a day, each way</b>") && lg.innerHTML.includes("In Oct 2026") && lg.innerHTML.includes('aria-controls="info-flow"')   /* NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): the title says it, the paragraph behind an i */
        && ["under 10", "10 to 25", "25 to 50", "50 to 100", "100 and over"].every(t => lg.innerHTML.includes(t)), lg.innerHTML.slice(0, 300));
     ok("D115 sandbox / 23 Oct: ...that each direction is its own lane on the left, the lane shows a shared road's total, the light moves while Play runs, the bands are fixed",
        lg.innerHTML.includes("Each direction has its own lane, on the left.") && !lg.innerHTML.includes("while the timeline plays")
@@ -5950,10 +5902,10 @@ function qrRead(mod) {
     ok("D115 sandbox / 23 Oct: each band's sample is drawn as the map draws it (a solid white lane of the band's width on the 6 px blue, no dash)",
        (lg.innerHTML.match(/<svg class="fl-sw"/g) || []).length === 5 && lg.innerHTML.includes('stroke-width="1.6"') && lg.innerHTML.includes('stroke-width="3.8"')
        && lg.innerHTML.includes('stroke-opacity="0.9"') && lg.innerHTML.includes('stroke-width="6"') && !lg.innerHTML.includes("stroke-dasharray") && lg.innerHTML.includes('aria-hidden="true"'));
-    ok("D115 sandbox: the legend names no team id and says lorries, never trucks", !/IPT\s*\d/i.test(lg.innerHTML) && !/truck/i.test(lg.innerHTML) && /movements a day/.test(lg.innerHTML));
+    ok("D115 sandbox: the legend names no team id and says lorries, never trucks", !/IPT\s*\d/i.test(lg.innerHTML) && !/truck/i.test(lg.innerHTML) && /Movements a day/.test(lg.innerHTML));   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)
     month = null; F.renderFlowLegend();
     ok("D115 sandbox: with no single month (Show forecast over the span) the legend says it is a daily average over the months",
-       lg.innerHTML.includes("Each way, a daily average, Sep 2026 to Dec 2026"), lg.innerHTML.slice(0, 200));
+       lg.innerHTML.includes("A daily average, Sep 2026 to Dec 2026")   /* NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8) */, lg.innerHTML.slice(0, 200));
     month = 10;
     focus = true; F.renderFlowLegend();
     ok("D115 sandbox: the council view (no flow drawn there) hides the legend", lg.hidden === true);
@@ -6119,8 +6071,8 @@ function qrRead(mod) {
   const pops = (sb + html.slice(html.indexOf('<div class="control-group fc-box" id="fc-box">'), html.indexOf("</div>`;", html.indexOf('id="fc-box"'))));
   ok("⭐ 19 Oct wording: each explanation sits behind an 'i' — Month, Heat map, Views, the council figures — word for word",
      pops.includes('<div class="info-pop" id="info-views" hidden>Each sets the layers, the heat map and the council colouring together. Link and QR code shares the view.</div>')
-     && pops.includes('<div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: two-way movements a day. Each route by its own figure;')
-     && pops.includes('<div class="info-pop" id="info-month" hidden><p>Approved forecasts only.</p>')   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
+     && pops.includes('<div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: two-way movements a day.</p>')   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)
+     && pops.includes('<div class="info-pop" id="info-month" hidden><p>Approved forecasts only. A grey month has none.</p></div>')   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
      && /<div class="info-pop" id="info-council" hidden>\s*<div class="area-note" id="area-unitary-note"><\/div>\s*<div class="area-note" id="area-focus-note" hidden>/.test(sb)
      && ['info-month', 'info-heat', 'info-views', 'info-council'].every(id => (html.match(new RegExp('aria-controls="' + id + '"', "g")) || []).length === 1));
   ok("19 Oct wording: the old visible notes are gone from the panel (preset note, the Volume note, the mode sub-lines, 'Approved forecasts only.' as a status)",
@@ -6132,7 +6084,7 @@ function qrRead(mod) {
      /\.info-i\{ position:relative; flex:none; display:inline-grid; place-items:center; width:18px; height:18px;/.test(html)
      && html.includes(".info-i::after{ content:\"\"; position:absolute; inset:-13px; }")
      // named by aria-label (the UI audit, 19 Oct: a hidden .sr-only span counted as 1 px clipped text on every map stop)
-     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 4
+     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z-]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 12   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): + Labels, zones, community, collisions, abnormal (staff and public), closures, limits
      && !/class="info-i"[^>]*>[^]*?<span class="sr-only">About/.test(html.slice(0, html.indexOf('id="month-text"'))));
   ok("19 Oct (UI audit): on a phone the folds' summary rows are 44 px tall (By council, What's moving, More layers)",
      /@media \(max-width:767px\)[\s\S]*?\.layers-box > summary\{ min-height:44px; display:flex; align-items:center; flex-wrap:wrap; padding:2px 0; \}/.test(html));
@@ -6349,8 +6301,8 @@ function qrRead(mod) {
                  return pop.includes("p.public_words || 'Indicative route; the agreed route may differ.'") && pop.includes("abnWhen(p.date_from, p.date_to, p.time_band)")
                      && !pop.includes("p.size") && !pop.includes("p.team_name") && !pop.includes("p.name") && !pop.includes("p.candidates") && !pop.includes("esdal"); })());
   ok("ABP: the panel line counts the approved loads drawn and lists their windows; nothing drawn says so; the words never promise the route",
-     src.includes("when.textContent = n ? `${n} ${ids ? 'this month' : 'approved'}: ${shown.map(f => abnWhen(f.properties.date_from, f.properties.date_to, null)).join(', ')}. ${(ABP.data.words && ABP.data.words.indicative) || ''}`")   /* NARROWED 23 Oct 2026: by the month on screen */
-     && src.includes("'No approved abnormal load has a line drawn yet.'"));
+     src.includes("when.textContent = n ? `${n} ${ids ? 'this month' : 'approved'} · ${shown.map(f => abnWhen(f.properties.date_from, f.properties.date_to, null)).join(', ')}`")   /* NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): one short line; the words behind the i */   /* NARROWED 23 Oct 2026: by the month on screen */
+     && src.includes("'None drawn yet'") && src.includes("(ABP.data && ABP.data.words && ABP.data.words.indicative) || 'Indicative: the agreed route may differ.'"));
   ok("ABN (phase 3): the structure kinds have their own dot colours in the community layer's palette (bridge, railway, level crossing, calming, overhead line), in the match and the legend; a dot found in OpenStreetMap says so in its popup",
      src.includes("bridge: '#1F2024', railway: '#475569', level_crossing: '#DB2777', calming: '#A16207', overhead: '#0891B2' };")   // NARROWED 23 Oct 2026: the railway slate, the slip road sea-blue, no indigo or violet
      && src.includes("slip_road: '#0369A1'") && !/#6D28D9|#4338CA|#7C3AED/.test(src.slice(src.indexOf("const ABN_LINE ="), src.indexOf("function abnormalStaff(")))
@@ -6436,9 +6388,9 @@ function qrRead(mod) {
   ok("⭐ 23 Oct: the abnormal loads — ink on a white edge, solid, under the labels, for staff and for the public layer alike; rings, not dots",
      (code.match(/'line-color': '#ffffff', 'line-width': ABN_CASING_WIDTH, 'line-opacity': 1 \} \}, labelAnchor\(\)\);/g) || []).length === 2
      && (code.match(/'line-color': ABN_LINE, 'line-width': ABN_WIDTH, 'line-opacity': 1 \} \}, labelAnchor\(\)\);/g) || []).length === 2
-     && (src.match(/an ink line each/g) || []).length === 0 && !html.includes("an ink line each") && (src.match(/each as its route in the month it moves/g) || []).length >= 1 && html.includes("each as its route in the month it moves") && src.includes("'The raspberry line: the load’s own line. Rings: '")   /* NARROWED 23 Oct 2026 afternoon: raspberry */ && src.includes("background:#fff;border:2px solid ${ABN_DOT[k]}"));
+     && (src.match(/an ink line each/g) || []).length === 0 && !html.includes("an ink line each") && /* NARROWED 28 Oct 2026 (task 0a): the sentence is the i box's, in the markup */ html.includes("each as its route in the month it moves") && src.includes("'The raspberry line: the load’s own line. Rings: '")   /* NARROWED 23 Oct 2026 afternoon: raspberry */ && src.includes("background:#fff;border:2px solid ${ABN_DOT[k]}"));
   ok("23 Oct: the words follow — no 'violet dash', no 'Closer dashes' left in the page; the flow legend says wider lane",
-     !/violet dash/i.test(code) && !/Closer dashes/.test(code) && /Wider lane = more/.test(code) && !/Violet dashes:/.test(code));   // code, not src: a comment may say what was
+     !/violet dash/i.test(code) && !/Closer dashes/.test(code) && !/Violet dashes:/.test(code) && /' a day' : 'Movements a day'/.test(code));   // NARROWED 28 Oct 2026 (task 0a): "Movements a day, each way" (was "Wider lane = more"); code, not src: a comment may say what was
 }
 
 // ---- 23 Oct 2026 (afternoon): the abnormal loads on the public map's figures bar and in the animation — the user's five answers
@@ -6466,7 +6418,7 @@ function qrRead(mod) {
      && (src.match(/setAbnormalDots\(null\)/g) || []).length >= 2);
   ok("23 Oct: the public loads are read at page load for every visitor (the box ticked) and nothing switches the layer off for staff (they keep their own group as well); the legend row says what the colour and the dot are",
      src.includes("    checkRouteExportStaff();\n    loadAbnormalPublic();") && !src.includes("ABP.on = false;") && src.includes("staff keep the public layer too")
-     && html.includes('<div class="mode-legend" id="abnormal-legend-public" hidden></div>') && src.includes("'<b>Abnormal load this month</b>'") && src.includes("On its way while Play runs"));
+     && html.includes('<div class="mode-legend" id="abnormal-legend-public" hidden></div>') && src.includes("'<b>Abnormal load</b>'") && src.includes("Moving (Play)"));   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)
   const dotFn = new Function(src.slice(src.indexOf("function abnormalPointAlong(ix, frac){"), src.indexOf("function setAbnormalDots(t){")) + "; return abnormalPointAlong;")();
   const ix = { coords: [[0, 0], [1, 0], [1, 1]], cum: [0, 100, 200], total: 200 };
   ok("23 Oct: the point along a line: the start at 0, the corner at half, the end at 1, a straight share between",
@@ -6493,7 +6445,7 @@ function qrRead(mod) {
     { id: 'road-label-simple', type: 'symbol', source: 'composite', layout: { 'text-field': ['get', 'name'] } },
     { id: 'settlement-minor-label', type: 'symbol', source: 'composite', layout: { 'text-field': ['get', 'name'] } },
     { id: 'settlement-major-label', type: 'symbol', source: 'composite', layout: { 'text-field': ['get', 'name'] } },
-    { id: 'evr-rail-casing', type: 'line', source: 'evr-rail' },
+    { id: 'chainage-global', type: 'line', source: 'chainage-source' },   // NARROWED 28 Oct 2026 (task 0a): was the rail casing
     { id: 'forecast-labels', type: 'symbol', source: 'routes-source', layout: { 'text-field': ['get', 'id'] } },
     { id: 'site-gates', type: 'symbol', source: 'routes-source', layout: { 'icon-image': 'gate' } } ] };
   const mkMap = st => ({ getStyle: () => st });
@@ -6502,7 +6454,7 @@ function qrRead(mod) {
   const ids = style.layers.map(l => l.id), at = id => (id === undefined ? ids.length : ids.indexOf(id));
   let a = null; try { a = api(style); } catch (e) { a = null; }
   ok("⭐ 27 Oct: the council cards are placed ABOVE the basemap's place names (Charnwood / Leicester / Melton lost their cards to them on live), under our own layers that sit there",
-     !!a && fnSrc("areaLabelBeforeId").length > 0 && a.card() === 'evr-rail-casing'
+     !!a && fnSrc("areaLabelBeforeId").length > 0 && a.card() === 'chainage-global'
      && at(a.card()) > at('settlement-major-label') && at(a.card()) > at(a.anchor()));
   ok("27 Oct: the fills stay where they were: under our route lines (and so under the names)",
      !!a && a.fill() === 'route-alt-lines' && at(a.fill()) < at('road-label-simple'));
@@ -6533,7 +6485,7 @@ function qrRead(mod) {
     L('road-label-simple', 'symbol', 'composite', true),
     L('settlement-subdivision-label', 'symbol', 'composite', true), L('settlement-minor-label', 'symbol', 'composite', true),
     L('settlement-major-label', 'symbol', 'composite', true), L('poi-label', 'symbol', 'composite', true),
-    L('area-label', 'symbol', 'areas-source', true), L('evr-rail-casing', 'line', 'evr-rail')];
+    L('area-label', 'symbol', 'areas-source', true), L('chainage-global', 'line', 'chainage-source')];   // NARROWED 28 Oct 2026: was the rail
   const mkMap = layers => ({
     getStyle: () => ({ layers }), getLayer: id => layers.find(l => l.id === id),
     moveLayer: (id, before) => { const i = layers.findIndex(l => l.id === id); const [l] = layers.splice(i, 1);
@@ -6576,7 +6528,7 @@ function qrRead(mod) {
   const ens = src.slice(src.indexOf("function ensureAreaLayers("), src.indexOf("function areaHatchImage("));
   const tog = fnSrc("toggleAreaTier");
   ok("⭐ 28 Oct: the names are placed after the council layers are added (every basemap switch re-adds them) and on every tick of the boxes",
-     /paint: AREA_LABEL_PAINT \}, labelBefore\);\n        placeTownNames\(\);\n    \}/.test(ens)
+     /paint: AREA_LABEL_PAINT \}, labelBefore\);\n        placeTownNames\(\);\n        applyLabels\(\);[^\n]*\n    \}/.test(ens)   // NARROWED 28 Oct 2026 (task 0a): then the Labels switch
      && /forEach\(l => toggleLayer\(l, vis\[l\] === 'visible'\)\);\n        if \(map\.getLayer\('area-fill'\)\) placeTownNames\(\);/.test(tog));
   ok("28 Oct: the fills themselves stay under the routes (moving them over the names buried the routes)",
      /id: 'area-fill', type: 'fill'[^;]*\}, before\);/.test(ens) && !/id: 'area-fill', type: 'fill'[^;]*\}, labelBefore\);/.test(ens));
@@ -6671,7 +6623,7 @@ function qrRead(mod) {
      && src.includes("if (v.basemap && BASEMAP_LINK[v.basemap]) q.set('basemap', v.basemap);"));
   // a British tenant reads the satellite options as Aerial
   {
-    const frag = src.slice(src.indexOf("        const sat = document.getElementById('basemap-satellite');"), src.indexOf("        // H2 (5 Oct 2026)"));
+    const frag = src.slice(src.indexOf("        const sat = document.getElementById('basemap-satellite');"), src.indexOf("        // H2: the tenant's demo notice"));   // NARROWED 28 Oct 2026 (task 0a): the rail block that ended it is gone
     const mk = (country) => {
       const els = { 'basemap-satellite': { textContent: 'Satellite' }, 'basemap-satellite-plain': { textContent: 'Satellite (no names)' } };
       new Function("document", "TENANT", frag)({ getElementById: id => els[id] || null }, { country });
@@ -6969,13 +6921,13 @@ function qrRead(mod) {
      && /applyLightPreset\(\); syncLightRow\(\);\s*\/\/ 28 Oct 2026 \(8d\)/.test(src));
   ok("8d: the share link carries &light= only on a Standard style and only when it is not day; the view reads it back",
      src.includes("if (v.light && v.light !== 'day' && LIGHT_PRESETS.includes(v.light)) q.set('light', v.light);")
-     && src.includes("light: LIGHT_PRESETS.includes(q.get('light')) ? q.get('light') : null };")
-     && src.includes("light: isStandard(BASEMAP.pending || BASEMAP.shown) ? LIGHT.preset : null };"));
+     && src.includes("light: LIGHT_PRESETS.includes(q.get('light')) ? q.get('light') : null,")   // NARROWED 28 Oct 2026 (task 0a): + labels after it
+     && src.includes("light: isStandard(BASEMAP.pending || BASEMAP.shown) ? LIGHT.preset : null,"));
   ok("8d: the two Standard styles are in BASEMAP.rebuild (a full rebuild, the last pick wins) and the haul cut-out is dark on Standard at dusk or night",
      /'mapbox:\/\/styles\/mapbox\/standard', 'mapbox:\/\/styles\/mapbox\/standard-satellite'\]\) \};/.test(src)
      && /const standardDark = typeof isStandard === 'function' && isStandard\(bm\) && typeof LIGHT !== 'undefined' && \(LIGHT\.preset === 'dusk' \|\| LIGHT\.preset === 'night'\);/.test(code));
   ok("8d: on a style with slots the 3D buildings box switches Standard's own objects (show3dObjects) and says 'from zoom 15'; a classic style keeps the composite extrusion",
-     /function ensureBuildingLayer\(\) \{[\s\S]{0,400}if \(styleHasSlots\(\)\) \{[\s\S]{0,200}'from zoom 15'[\s\S]{0,200}setConfigProperty\('basemap', 'show3dObjects', buildingsVisible\(\)\)[\s\S]{0,100}return true;/.test(code)
+     /function ensureBuildingLayer\(\) \{[\s\S]{0,400}if \(styleHasSlots\(\)\) \{\s*if \(note\) note\.hidden = true;[\s\S]{0,200}setConfigProperty\('basemap', 'show3dObjects', buildingsVisible\(\)\)[\s\S]{0,100}return true;/.test(code)
      && /function toggleBuildings\(visible\) \{[\s\S]{0,300}if \(styleHasSlots\(\)\) \{ try \{ map\.setConfigProperty\('basemap', 'show3dObjects', !!visible\); \}/.test(code)
      && code.includes("id: 'buildings-3d', type: 'fill-extrusion', source: 'composite',"));
 
@@ -7048,6 +7000,112 @@ function qrRead(mod) {
      labels.length === 13 && labels.every(l => !/Mapbox|Maa-amet|orthophoto/i.test(l))
      && /<option value="maaamet-ortho" id="basemap-maaamet" hidden>Estonia aerial photo<\/option>/.test(html), labels.join(" | "));
   ok("...the Land Board's credit stays on the map layer", /attribution: 'Orthophoto: Estonian Land Board \(Maa-amet\)'/.test(html));
+}
+
+// ---- 28 Oct 2026 (John, task 0a; notes/map-panel-mockup-1028, "yes, as recommended"): the control panel — the rail option off,
+//      fewer words (the detail in the user guide §8), the credits on the map, one Labels switch (Off · Few · All) and one label style
+{
+  ok("⭐ 0a: a row the page hides stays hidden (.control-item's display:flex beat the hidden attribute: the rail row showed on every tenant)",
+     html.includes(".sidebar .control-item[hidden]{ display:none; }"));
+  ok("0a card 2: the Overlays notes are gone from the panel (survey note, package edges, chainage ticks, gate zooms, the zones' dimmed-row line as a row)",
+     !html.includes("Package edges · ticks from zoom 11") && !html.includes("10 km ticks at corridor zoom") && !html.includes("from zoom 10 · hollow = deactivated")
+     && !html.includes('<span style="font-size:14px;color:var(--note);">A dimmed row has none in force this month.</span>')
+     && html.includes('aria-controls="info-zones"'));
+  ok("0a card 2: Alternative routes carries its count beside the label, no sentence",
+     html.includes('Alternative routes <span class="lim-n" id="alts-note"></span>') && !code.includes("other ways the routes could go"));
+  ok("0a card 2: the staff groups — one 'Staff layers' heading, a count and an 'i' on each row, no credit line in the panel",
+     html.includes("<h3>Staff layers</h3>") && /id="community-count"/.test(html) && /id="collision-count"/.test(html) && /id="abnormal-count"/.test(html)
+     && !/id="community-attribution"|id="collision-attribution"/.test(html) && !/Show community considerations|Show collision history|Show abnormal loads/.test(html)
+     && /<div class="info-pop" id="info-collisions" hidden><p id="collision-when">/.test(html));
+  ok("0a card 2: the visitors' abnormal loads — one short line ('1 this month · 8–12 Mar 2027'), the explanation behind the 'i'",
+     /<div class="info-pop" id="info-abnormal-public" hidden>/.test(html) && code.includes("'None this month'"));
+  ok("0a card 2: the flow key's title says it ('Movements a day, each way'); its paragraph is behind an 'i' that stays open across a rebuild",
+     code.includes("', each way</b>'") && code.includes("const was = document.getElementById('info-flow'), open = !!(was && !was.hidden);"));
+  ok("⭐ 0a card 3: the road closures' provider is on the map's credit line (the source's attribution), not printed in the panel",
+     /addSource\('restrictions-source', \{ type:'geojson', data: RESTR\.data,\s*attribution: \(RESTR\.provider && RESTR\.provider\.name\) \|\| '' \}\)/.test(code)
+     && !code.includes("'Source: ' + cat.provider.name"));
+  ok("0a card 3: the lorry limits' panel note is one caveat, no supplier names (their credit is the sources' attribution)",
+     code.includes("if (note) note.textContent = 'Not every limit is mapped: check the sign on site.';") && /withAttr\(\{ type: 'geojson', data: pts/.test(code));
+  ok("0a card 6: a white strip at the top of the panel stays put, so a scrolled row passes under it, not under the floating button",
+     /\.sidebar \.panel-top\{ flex:none; position:sticky; top:-20px; z-index:2; height:64px; margin:-20px -18px 0; background:#fff; \}/.test(html)
+     && html.includes('<div class="panel-top" aria-hidden="true"></div>'));
+
+  // ---- the Labels switch
+  ok("⭐ 0a card 4: a Labels group under Heat map — Off · Few · All radios, Few the default (from the link), an 'i' that says what each does",
+     code.includes('<div class="heat-group labels-group" role="radiogroup" aria-labelledby="labels-label">')
+     && ["off", "few", "all"].every(m => code.includes(`id="labels-${m}" onchange="setLabels('${m}')"`))
+     && code.includes("Off hides the names on the map. Few shows the sites and the figures. All shows every name.")
+     && /return LABEL_MODES\.includes\(v\) \? v : 'few';/.test(code));
+  ok("0a card 4: the share link carries &labels=off|all only (Few writes nothing); the view reads it back and applies it",
+     code.includes("if (v.labels === 'off' || v.labels === 'all') q.set('labels', v.labels);")
+     && /labels: \/\^\(off\|few\|all\)\$\/\.test\(q\.get\('labels'\) \|\| ''\) \? q\.get\('labels'\) : null/.test(code)
+     && code.includes("labels: (typeof LABELS !== 'undefined') ? LABELS.mode : null"));
+  ok("⭐ 0a card 5: the site NAMES are a layer (they were never drawn), filtered and shown with their marks; the marks make room for names",
+     /id: 'location-names', type: 'symbol', source: 'routes-source'/.test(code)
+     && /map\.setFilter\('location-names', \['all', \['==', \['get', 'type'\], 'Node'\], \['in', \['get', 'loc_kind'\], \['literal', visibleLocKinds\(\)\]\]\]\);/.test(code)
+     && /'icon-allow-overlap': true, 'icon-ignore-placement': false,/.test(code) && !/'icon-ignore-placement': true/.test(code));
+  ok("0a: a layer already done carries a marker that draws nothing (text-translate-anchor 'map', its default) beside its signature; a re-added layer has none, so it is done again",
+     code.includes("if (!force && LABELS.done.get(id) === sig && map.getPaintProperty(id, 'text-translate-anchor') === 'map') return;")
+     && code.includes("map.setPaintProperty(id, 'text-translate-anchor', 'map');") && !/new WeakMap/.test(code.slice(code.indexOf("const LABEL_MODES"), code.indexOf("function syncLabelsSwitch"))));
+  ok("0a: raiseMarks applies the labels to any label layer just (re)made; a dark ground (the light preset too) re-applies them",
+     /function raiseMarks\(\) \{\s*if \(!map \|\| !map\.getStyle\) return;\s*if \(typeof applyLabels === 'function'\) applyLabels\(\);/.test(code)
+     && /function setLightPreset\(v\) \{[\s\S]{0,400}applyLabels\(\)/.test(code));
+
+  // sandbox: the engine against a fake map
+  const a = src.indexOf("    const LABEL_MODES = ['off', 'few', 'all'];"), b = src.indexOf("    function syncLabelsSwitch() {");
+  let L = null, err = "";
+  const layers = {};
+  const mkLayer = (id, tf) => (layers[id] = { id, min: 0, layout: { 'text-field': tf }, paint: {} });
+  ["location-names", "zone-label", "temp-haul-label", "site-gates-label", "ws-boundary-labels", "zone-limit", "limit-signs", "road-load-labels", "area-label"]
+    .forEach(id => mkLayer(id, ['get', 'name']));
+  layers['limit-signs'].layout['text-field'] = ['step', ['zoom'], '', 14, ['get', '_label']];
+  const fmap = { getLayer: id => layers[id], setLayerZoomRange: (id, mn) => { layers[id].min = mn; },
+                 setLayoutProperty: (id, k, v) => { layers[id].layout[k] = v; }, getLayoutProperty: (id, k) => layers[id].layout[k],
+                 setPaintProperty: (id, k, v) => { layers[id].paint[k] = v; }, getPaintProperty: (id, k) => layers[id].paint[k] };
+  const BASEMAP = { shown: 'mapbox://styles/mapbox/light-v11', pending: null }, LIGHT = { preset: 'day' };
+  try {
+    L = new Function("map", "location", "BASEMAP", "LIGHT", "isStandard", "BASEMAP_IMG", "BASEMAP_OS", "console",
+      src.slice(a, b) + "\nreturn { LABELS, LABEL_RULES, applyLabels, labelsDark };")(
+      fmap, { search: "" }, BASEMAP, LIGHT, u => /standard/.test(u), 'client-imagery', 'os-zoomstack', { warn() {} });
+  } catch (e) { err = e.message; }
+  ok("⭐ 0a (sandbox): the labels engine runs against a fake map", !!L, err);
+  if (L) {
+    L.applyLabels();
+    ok("⭐ 0a (sandbox): Few — sites from 11, short zone names from 12, haul names from 13 without the gates' access roads, gates from 14, no work-section marks; the figures and the limit box stay",
+       layers['location-names'].min === 11 && layers['zone-label'].min === 12 && layers['temp-haul-label'].min === 13 && layers['site-gates-label'].min === 14
+       && layers['ws-boundary-labels'].min === 24 && layers['road-load-labels'].min === 0 && layers['zone-limit'].min === 9 && layers['area-label'].min === 0
+       && JSON.stringify(layers['zone-label'].layout['text-field']).includes('index-of')
+       && JSON.stringify(layers['temp-haul-label'].layout['text-field']) === JSON.stringify(['case', ['coalesce', ['get', 'access_road'], false], '', ['get', 'name']]));
+    ok("⭐ 0a (sandbox): the one name style — 13 px semibold, ink on a soft white halo, sorted site > zone > haul > gate",
+       layers['location-names'].layout['text-size'] === 13 && JSON.stringify(layers['location-names'].layout['text-font']).includes('Open Sans Semibold')
+       && layers['location-names'].paint['text-color'] === '#1F2024' && layers['location-names'].paint['text-halo-color'] === '#FFFFFF'
+       && layers['location-names'].paint['text-halo-width'] === 1.75 && layers['location-names'].paint['text-halo-blur'] === 0.5
+       && layers['location-names'].layout['symbol-sort-key'] === 1 && layers['site-gates-label'].layout['symbol-sort-key'] === 4
+       && layers['location-names'].layout['text-max-width'] === 10);
+    L.LABELS.mode = 'off'; L.applyLabels(true);
+    ok("⭐ 0a (sandbox): Off — every label of ours at a zoom no map reaches; the lorry-limit signs stay but lose their words",
+       ['location-names', 'zone-label', 'temp-haul-label', 'site-gates-label', 'zone-limit', 'road-load-labels', 'area-label'].every(id => layers[id].min === 24)
+       && layers['limit-signs'].min === 13 && layers['limit-signs'].layout['text-field'] === '');
+    L.LABELS.mode = 'all'; L.applyLabels(true);
+    ok("0a (sandbox): All — the old zooms, the full zone name, the access roads named from 15, the work-section marks back, the signs' words back",
+       layers['zone-label'].min === 10 && JSON.stringify(layers['zone-label'].layout['text-field']) === JSON.stringify(['get', 'name'])
+       && JSON.stringify(layers['temp-haul-label'].layout['text-field']).includes('"step"') && layers['ws-boundary-labels'].min === 11
+       && JSON.stringify(layers['limit-signs'].layout['text-field']).includes('_label'));
+    BASEMAP.shown = 'mapbox://styles/mapbox/dark-v11'; L.applyLabels();
+    ok("⭐ 0a (sandbox): a dark ground turns the names near-white on a near-black halo (Dark, the aerial styles, Standard at night); light is ink on white",
+       layers['location-names'].paint['text-color'] === '#F5F5F4' && layers['location-names'].paint['text-halo-color'] === 'rgba(18,19,22,0.92)'
+       && (BASEMAP.shown = 'mapbox://styles/mapbox/satellite-streets-v12', L.labelsDark()) && (BASEMAP.shown = 'mapbox://styles/mapbox/standard', !L.labelsDark())
+       && (LIGHT.preset = 'night', L.labelsDark()) && (BASEMAP.shown = 'mapbox://styles/mapbox/streets-v12', !L.labelsDark()));
+    L.applyLabels(); const before = JSON.stringify(layers['zone-label']); layers['zone-label'].layout['text-size'] = 11; L.applyLabels();
+    ok("0a (sandbox): a second pass with nothing changed skips a done layer (the marker and the signature match)", layers['zone-label'].layout['text-size'] === 11 && before.includes('text-translate-anchor'));
+    layers['zone-label'].paint = {}; L.applyLabels();
+    ok("0a (sandbox): ...and a layer re-added by a basemap switch (no marker) is styled again", layers['zone-label'].layout['text-size'] === 13);
+    BASEMAP.shown = 'os-zoomstack'; LIGHT.preset = 'day'; delete layers['location-names'].layout['text-font']; L.applyLabels(true);
+    ok("0a (sandbox): on the OS map the names keep OS's own font", !('text-font' in layers['location-names'].layout));
+  }
+  const net = fs.readFileSync(path.join(ROOT, "backend", "network.py"), "utf8");
+  ok("0a: the map data marks a gate's own access road (access_road), so Few can leave its name off",
+     net.includes('"access_road": z["id"] in access,') && /SELECT access_zone_id FROM location_gates WHERE tenant_id = \? AND access_zone_id IS NOT NULL/.test(net));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

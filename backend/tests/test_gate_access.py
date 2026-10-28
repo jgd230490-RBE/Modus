@@ -243,6 +243,14 @@ ok("🔴 no road for a gate without one, a None gate, an inactive road, a road o
 
 ZMID = haul_zone("Langton haul road", [[-0.96, LAT], [-0.94, LAT]], speed=20)
 haul.attach("R1", ZMID)
+# 28 Oct 2026 (task 0a): the public map's haul features say which roads are a gate's own access road (Labels "Few" leaves
+# their names off); a haul road no gate owns says false
+_HF = {f["properties"]["zone_id"]: f["properties"] for f in network.public_map_data()["features"]
+       if f["properties"].get("type") == "Temp Haul Track"}
+ok("0a: the map data flags each gate's access road (access_road true) and not a route's own haul road",
+   _HF.get(ZQ, {}).get("access_road") is True and _HF.get(ZIN, {}).get("access_road") is True
+   and _HF.get(ZOUT, {}).get("access_road") is True and _HF.get(ZMID, {}).get("access_road") is False,
+   str({k: v.get("access_road") for k, v in _HF.items()}))
 ST = haul.leg_steps("R1", [GQ[0], GQ[1]], [GIN[0], GIN[1]], "loaded", gq, gin)
 ok("⭐ THE ORDER on a leg: the leaving gate's road, the route's own haul road, the arriving gate's road",
    [s["zone_id"] for s in ST] == [ZQ, ZMID, ZIN], str([s["zone_id"] for s in ST]))

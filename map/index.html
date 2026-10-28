@@ -45,6 +45,8 @@
 
         .sidebar { position:absolute; top:0; bottom:0; left:0; width:300px; background:#fff; border-right:1px solid var(--line); padding:20px 18px 24px; z-index:10; display:flex; flex-direction:column; gap:22px; overflow-y:auto; transition:transform .25s ease; }
         .sidebar.closed { transform:translateX(-100%); }
+        .sidebar .panel-top{ flex:none; position:sticky; top:-20px; z-index:2; height:64px; margin:-20px -18px 0; background:#fff; }   /* top:-20px: sticky counts from the panel's padding edge */
+        .sidebar-close{ z-index:3; }
         .sidebar h2 { margin:0; font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--navy-deep); padding-top:42px; display:flex; align-items:center; gap:9px; }
         .sidebar h2::before{ content:""; width:8px; height:22px; background:var(--navy); border-radius:2px; }
         .sidebar h2 small{ display:block; font-size:9.5px; font-weight:500; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin-top:3px; }
@@ -67,6 +69,10 @@
         #restrictions-group h3{ font-size:14px; }   /* 22 Oct 2026 (UI fix 6, card 9): the road-closures heading at 14 px like its sibling groups in More layers (was the shared 13 px) */
         .control-item { display:flex; align-items:center; justify-content:space-between; font-size:13.5px; padding:7px 2px; }
         .control-item + .control-item{ border-top:1px solid var(--line); }
+        /* 28 Oct 2026 (task 0a): .control-item's display:flex beat the hidden attribute, so a row the page hid still showed
+           (the existing-railway row on every tenant) */
+        .sidebar .control-item[hidden]{ display:none; }
+        .row-end{ display:inline-flex; align-items:center; gap:10px; flex:none; }
         .control-item label { display:flex; align-items:center; gap:9px; cursor:pointer; width:100%; font-weight:500; color:var(--ink); }
         .control-item input[type=checkbox]{ accent-color:var(--navy); width:14px; height:14px; }
         #ipt-legend label{ min-height:24px; }   /* 18 Oct 2026 (UI audit #26): a team row is its box's label, 24 px (the phone block makes it 48) */
@@ -109,7 +115,7 @@
         #limits-group h3, #limits-group .control-item{ font-size:14px; }
         #limits-group [hidden]{ display:none; }
         #limit-boxes .control-item.dim label{ opacity:.45; }
-        .lim-n{ margin-left:auto; padding-left:8px; color:var(--muted); font-weight:400; font-variant-numeric:tabular-nums; }
+        .lim-n{ margin-left:auto; padding-left:8px; padding-right:8px; color:var(--muted); font-weight:400; font-variant-numeric:tabular-nums; }   /* 28 Oct 2026: 8 px clear of the swatch */
         .lim-sw{ flex:none; width:13px; height:13px; margin-left:8px; border-radius:50%; background:#fff; border:2.5px solid #C8102E; box-sizing:border-box; }
         .lim-card{ font-size:14px; line-height:1.4; color:var(--ink); min-width:230px; max-height:min(52vh, 380px); overflow-y:auto; }   /* 13 Oct, seen in Chrome: a card with three routes ran off the map */
         .lim-head{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
@@ -828,7 +834,7 @@
 <button type="button" id="m-layers-btn" onclick="openLayersSheet()" aria-controls="main-sidebar" aria-expanded="false">&#8779; Layers</button>
 <div class="sidebar" id="main-sidebar">
     <button type="button" class="sidebar-close" id="sidebar-close" onclick="toggleSidebar()" aria-label="Close the control panel" title="Close the control panel">&times;</button>
-    <div style="height:44px;flex:none"></div>   <!-- 11 Oct: flex:none — the panel is a flex column and squeezed this to 0, putting the first heading under the menu button -->
+    <div class="panel-top" aria-hidden="true"></div>   <!-- 11 Oct: flex:none — the panel is a flex column and squeezed this to 0, putting the first heading under the menu button; 28 Oct (task 0a, card 6): a white strip that stays at the top, so a scrolled row passes under it, not under the floating button -->
 
     <!-- 13 Oct 2026 (the user): preset views at the top of the panel, one click each. The buttons are built by
          renderPresets() in the last script block; on a phone this panel IS the Layers sheet, so they reach it too. -->
@@ -946,9 +952,7 @@
              colours are defined. -->
         <div class="control-item"><label><input type="checkbox" id="layer-alignment" checked onchange="toggleAlignment(this.checked)"> Alignment (by package)</label><span class="color-dot" id="ipt-alignment-swatch" style="background:#94a3b8; border-radius:0; width:13px; height:3px;"></span></div>
         <div id="ipt-legend" style="padding-left:23px;margin:-2px 0 4px;"></div>
-        <div id="ipt-legend-note" style="padding-left:23px;margin:-2px 0 6px;font-size:12px;color:var(--note);line-height:1.45;">Gaps in the survey are filled in. Click the line to see which stretches are measured.</div>
         <div class="control-item"><label><input type="checkbox" id="layer-ws-bounds" checked onchange="toggleWsBounds(this.checked)"> Work section boundaries</label><span class="color-dot" style="background:#334155; border-radius:0; width:3px; height:13px;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">Package edges · ticks from zoom 11, labels from 13</span></div>
         <!-- The alignment as it was drawn before the IPT overlay: every track type, one
              dark line, nothing cut. Kept as its own layer because the IPT view answers
              "which package" and this one answers "where is the railway" — and the gap
@@ -956,7 +960,6 @@
              view is the one that carries information. -->
         <div class="control-item"><label><input type="checkbox" id="layer-alignment-survey" onchange="toggleLayer('rail-alignment-survey', this.checked)"> Alignment (survey, continuous)</label><span class="color-dot" style="background:#000000; border-radius:0; width:13px; height:2px;"></span></div>
         <div class="control-item"><label><input type="checkbox" id="layer-chainage" onchange="toggleLayer('chainage-global', this.checked); toggleLayer('chainage-labels', this.checked);"> Chainage markers</label><span class="color-dot" style="background:#94a3b8;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">10 km ticks at corridor zoom · denser and labelled as you zoom in</span></div>
         <!-- 2026-09-08 (§A). ONE type, ONE symbol, and the legend IS the filter — seven
              boxes that each hide their own type and nothing else. Previously the only
              location control was this master switch, and a railhead was hidden by the
@@ -975,9 +978,9 @@
              it should stay that way: this is a 200 km corridor and the buildings only
              mean anything at site zoom. Not an ortho mesh — the brief is explicit. -->
         <div class="control-item"><label><input type="checkbox" id="layer-buildings" onchange="toggleBuildings(this.checked)"> 3D buildings</label><span class="color-dot" style="background:#cbd5e1;"></span></div>
-        <div class="control-item" id="buildings-note" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">from zoom 14</span></div>
+        <!-- 28 Oct 2026 (task 0a): shown only where the basemap has no buildings; the zooms are in the user guide §8.2 -->
+        <div class="control-item" id="buildings-note" hidden style="padding-left:23px;margin-top:-4px;"><span style="font-size:14px;color:var(--note);">not available on this basemap</span></div>
         <div class="control-item"><label><input type="checkbox" id="layer-gates" checked onchange="toggleGates(this.checked)"> Site gates</label><span class="color-dot" style="background:#64748B;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);">from zoom 10 · hollow = deactivated</span></div>
         <!-- Phase 3 / D24 (12 Oct 2026). One symbol per KIND, and one toggle per kind under
              the group master (the master keeps its old id). Colours per colour-system-1010.md
              line 24: a closure is AMBER (#D97706) - red stays for a cap breach or a clash;
@@ -986,7 +989,8 @@
              is still said in the popup, not by the colour. With the forecast timeline open
              these follow the month on screen, so a closure that ends in March is gone by
              April, and a kind's row dims when none of it is in force that month. -->
-        <div class="control-item"><label><input type="checkbox" id="layer-zones" checked onchange="toggleZones(this.checked)"> Disruption zones</label><span class="color-dot" style="background:#D97706;"></span></div>
+        <div class="control-item"><label><input type="checkbox" id="layer-zones" checked onchange="toggleZones(this.checked)"> Disruption zones</label><span class="row-end"><span class="color-dot" style="background:#D97706;"></span><button type="button" class="info-i" aria-expanded="false" aria-controls="info-zones" onclick="toggleInfo(this)" title="About the disruption zones" aria-label="About the disruption zones"><span aria-hidden="true">i</span></button></span></div>
+        <div class="info-pop" id="info-zones" hidden><p>A dimmed row has none in force this month.</p></div>
         <div id="zone-kinds" style="padding-left:23px;margin:-2px 0 4px;">
             <div class="control-item zone-kind" data-kind="closure"><label><input type="checkbox" id="layer-zone-closure" checked onchange="toggleZoneKind('closure', this.checked)"> Road closure</label><span class="color-dot" style="background:rgba(217,119,6,.35); border:2px solid #D97706;"></span></div>
             <div class="control-item zone-kind" data-kind="works"><label><input type="checkbox" id="layer-zone-works" checked onchange="toggleZoneKind('works', this.checked)"> Works area</label><span class="color-dot" style="background:rgba(245,158,11,.3); border:2px dashed #D97706;"></span></div>
@@ -994,11 +998,9 @@
             <div class="control-item zone-kind" data-kind="haul_road"><label><input type="checkbox" id="layer-zone-haul_road" checked onchange="toggleZoneKind('haul_road', this.checked)"> Haul road</label><span class="color-dot" style="background:#C2790B;"></span></div>
             <div class="control-item zone-kind" data-kind="other"><label><input type="checkbox" id="layer-zone-other" checked onchange="toggleZoneKind('other', this.checked)"> Advisory</label><span class="color-dot" style="background:rgba(100,116,139,.3); border:2px solid #64748B;"></span></div>
         </div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:14px;color:var(--note);">A dimmed row has none in force this month.</span></div>
-        <!-- The EXISTING railway (the package's `rail`), not the alignment being built.
-             Dim until an origin filter picks a Railhead, then bold. Default ON. -->
-        <div class="control-item"><label><input type="checkbox" id="layer-rail" checked onchange="toggleRail(this.checked)"> Existing rail network</label><span class="color-dot" style="background:repeating-linear-gradient(90deg,#64748B 0 2px,transparent 2px 6px); border-radius:0; width:13px; height:3px;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span style="font-size:12px;color:var(--note);" id="rail-note">approximate line · bold when a railhead is the origin</span></div>
+        <!-- 28 Oct 2026 (John, task 0a): the existing-railway option is OFF the panel and the public map no longer draws the
+             package's `rail` (it stays in the organisation file). Its row had shown on every tenant: `.control-item
+             { display:flex }` beat the hidden attribute (now `.sidebar .control-item[hidden]`). -->
     </div>
 
     <div class="control-group">
@@ -1015,19 +1017,17 @@
              OFF by default — 107 routes with up to two alternatives each on both
              legs is a lot of line, and this answers a question nobody asks
              continuously. -->
-        <div class="control-item"><label><input type="checkbox" id="layer-alts" onchange="toggleAlts(this.checked)"> Alternative routes</label><span class="color-dot" style="background:#94a3b8; opacity:.6;"></span></div>
-        <div class="control-item" style="padding-left:23px;margin-top:-4px;"><span id="alts-note" style="font-size:12px;color:var(--note);">loading…</span></div>
+        <div class="control-item"><label><input type="checkbox" id="layer-alts" onchange="toggleAlts(this.checked)"> Alternative routes <span class="lim-n" id="alts-note"></span></label><span class="color-dot" style="background:#94a3b8; opacity:.6;"></span></div>
     </div>
     <!-- 14 Oct 2026: the community considerations layer (the CLOCS CLP template's "community considerations").
          STAFF ONLY: hidden in the markup and shown only when /api/public/whoami answers level "staff" (as the
          route map export is); the map password's view never sees it and /api/community refuses its cookie. Off by
          default; a tick per kind, built from the kinds the server sends (their colour, symbol and words). -->
     <div class="control-group" id="community-group" hidden>
-        <h3>Community considerations</h3>
-        <div class="control-item"><label><input type="checkbox" id="layer-community" onchange="toggleCommunity(this.checked)"> Show community considerations</label></div>
+        <h3>Staff layers</h3>
+        <div class="control-item"><label><input type="checkbox" id="layer-community" onchange="toggleCommunity(this.checked)"> Community considerations <span class="lim-n" id="community-count"></span></label><button type="button" class="info-i" aria-expanded="false" aria-controls="info-community" onclick="toggleInfo(this)" title="About the community considerations" aria-label="About the community considerations"><span aria-hidden="true">i</span></button></div>
+        <div class="info-pop" id="info-community" hidden><p id="community-when">Schools, hospitals, stops and other places near the routes and sites.</p></div>
         <div id="community-kinds" hidden></div>
-        <div class="area-note" id="community-when"></div>
-        <div class="area-note" id="community-attribution"></div>
     </div>
 
     <!-- 16 Oct 2026 (CLOCS v5 C1): the collision history — the police-reported injury collisions (DfT STATS19) along the
@@ -1035,15 +1035,13 @@
          markup, shown only when whoami says staff; /api/collisions refuses the map password's cookie. Off by default;
          read only when ticked; the slight ones off until their own box is ticked. Size by severity, one ink. -->
     <div class="control-group" id="collision-group" hidden>
-        <h3>Collision history</h3>
-        <div class="control-item"><label><input type="checkbox" id="layer-collisions" onchange="toggleCollisions(this.checked)"> Show collision history</label></div>
+        <div class="control-item"><label><input type="checkbox" id="layer-collisions" onchange="toggleCollisions(this.checked)"> Collision history <span class="lim-n" id="collision-count"></span></label><button type="button" class="info-i" aria-expanded="false" aria-controls="info-collisions" onclick="toggleInfo(this)" title="About the collision history" aria-label="About the collision history"><span aria-hidden="true">i</span></button></div>
+        <div class="info-pop" id="info-collisions" hidden><p id="collision-when">Injury collisions reported to the police near the routes and sites.</p></div>
         <div id="collision-filters" hidden>
             <div class="control-item" style="padding-left:23px"><label><input type="checkbox" id="coll-slight" onchange="collisionFilterChanged()"> Include slight injuries</label></div>
             <div class="control-item" style="padding-left:23px"><label><input type="checkbox" id="coll-vru" onchange="collisionFilterChanged()"> Only where a vulnerable road user was hurt</label></div>
             <div class="area-note" id="collision-legend"></div>
         </div>
-        <div class="area-note" id="collision-when"></div>
-        <div class="area-note" id="collision-attribution"></div>
     </div>
 
     <!-- 22 Oct 2026 (abnormal loads, phase 2, D67): each abnormal load's OWN line, drawn by HERE for its size, and the potential
@@ -1052,14 +1050,13 @@
          staff; /api/abnormal/geojson refuses the map password's cookie. Off by default; read only when ticked. The public
          map's own layer (approved loads only, no dots, D68) is phase 3. -->
     <div class="control-group" id="abnormal-group" hidden>
-        <h3>Abnormal loads</h3>
-        <div class="control-item"><label><input type="checkbox" id="layer-abnormal" onchange="toggleAbnormal(this.checked)"> Show abnormal loads</label></div>
+        <div class="control-item"><label><input type="checkbox" id="layer-abnormal" onchange="toggleAbnormal(this.checked)"> Abnormal loads <span class="lim-n" id="abnormal-count"></span></label><button type="button" class="info-i" aria-expanded="false" aria-controls="info-abnormal" onclick="toggleInfo(this)" title="About the abnormal loads" aria-label="About the abnormal loads"><span aria-hidden="true">i</span></button></div>
+        <div class="info-pop" id="info-abnormal" hidden><p id="abnormal-when"></p></div>
         <div id="abnormal-filters" hidden>
             <div class="control-item" style="padding-left:23px"><label><input type="checkbox" id="abn-dots" checked onchange="abnormalFilterChanged()"> Potential pinch points (dots)</label></div>
             <div class="control-item" style="padding-left:23px"><label><input type="checkbox" id="abn-approved" onchange="abnormalFilterChanged()"> Approved loads only</label></div>
             <div class="area-note" id="abnormal-legend"></div>
         </div>
-        <div class="area-note" id="abnormal-when"></div>
     </div>
 
     <!-- 22 Oct 2026 (abnormal loads, phase 3, D68): the APPROVED abnormal loads for every visitor — each as its drawn line and
@@ -1068,17 +1065,16 @@
          travels in a shared link (&layers=abnormal-public). Hidden for staff, whose own group above shows everything. -->
     <div class="control-group" id="abnormal-public-group">
         <h3>Abnormal loads</h3>
-        <div class="control-item"><label><input type="checkbox" id="layer-abnormal-public" onchange="toggleAbnormalPublic(this.checked)" checked> Abnormal loads (approved)</label></div>
-        <div class="area-note" id="abnormal-public-when">Approved abnormal loads, each as its route in the month it moves, counted on the figures bar. Indicative: the agreed route may differ.</div>
+        <div class="control-item"><label><input type="checkbox" id="layer-abnormal-public" onchange="toggleAbnormalPublic(this.checked)" checked> Abnormal loads (approved)</label><button type="button" class="info-i" aria-expanded="false" aria-controls="info-abnormal-public" onclick="toggleInfo(this)" title="About the abnormal loads" aria-label="About the abnormal loads"><span aria-hidden="true">i</span></button></div>
+        <div class="info-pop" id="info-abnormal-public" hidden><p>Approved abnormal loads, each as its route in the month it moves, counted on the figures bar.</p><p id="abnormal-public-words">Indicative: the agreed route may differ.</p></div>
+        <div class="area-note" id="abnormal-public-when"></div>
     </div>
 
     <div class="control-group" id="restrictions-group" hidden>
         <!-- 22 Oct 2026 (UI fix 6, card 9): the source's name at 13 px in the muted grey (4.76:1), as the fold's other captions (was #8a9099 at the small's ~10.8 px, 3.22:1) -->
-        <h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;font-size:13px;text-transform:none;letter-spacing:0;color:var(--muted);"></small></h3>
+        <div class="ctl-head"><h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;font-size:13px;text-transform:none;letter-spacing:0;color:var(--muted);"></small></h3><button type="button" class="info-i" aria-expanded="false" aria-controls="info-restrictions" onclick="toggleInfo(this)" title="About the road closures" aria-label="About the road closures"><span aria-hidden="true">i</span></button></div>
+        <div class="info-pop" id="info-restrictions" hidden><p id="restriction-source">For information only: routes do not avoid these.</p></div>
         <div id="restriction-toggles"><div class="control-item"><span style="font-size:12px;color:var(--note);">Loading…</span></div></div>
-        <div class="control-item" style="padding-left:2px;margin-top:-2px;">
-            <span id="restriction-source" style="font-size:12px;color:var(--note);">For information only: routes do not avoid these.</span>
-        </div>
     </div>
 
     <!-- 13 Oct 2026: LORRY LIMITS (weight, height, width; axle weight rides with Weight) from OpenStreetMap and HERE,
@@ -1087,16 +1083,14 @@
          view's remember / restore exactly as the other layer boxes do. Hidden when the endpoint fails; the boxes give way
          to a one-line note when nothing is loaded. Drawn by ensureLimitLayers() in the first script block. -->
     <div class="control-group" id="limits-group" hidden>
-        <h3>Lorry limits</h3>
+        <div class="ctl-head"><h3>Lorry limits</h3><button type="button" class="info-i" aria-expanded="false" aria-controls="info-limits" onclick="toggleInfo(this)" title="About the lorry limits" aria-label="About the lorry limits"><span aria-hidden="true">i</span></button></div>
+        <div class="info-pop" id="info-limits" hidden><p id="limit-source">Not every limit is mapped: check the sign on site.</p></div>
         <div id="limit-boxes">
             <div class="control-item" id="limit-row-weight"><label title="Weight limits, and axle weight limits with them"><input type="checkbox" id="layer-limit-weight" onchange="toggleLimits()"> Weight <span class="lim-n" id="limit-count-weight"></span></label><span class="lim-sw" aria-hidden="true"></span></div>
             <div class="control-item" id="limit-row-height"><label title="Height limits (low headroom)"><input type="checkbox" id="layer-limit-height" onchange="toggleLimits()"> Height <span class="lim-n" id="limit-count-height"></span></label><span class="lim-sw" aria-hidden="true"></span></div>
             <div class="control-item" id="limit-row-width"><label title="Width limits"><input type="checkbox" id="layer-limit-width" onchange="toggleLimits()"> Width <span class="lim-n" id="limit-count-width"></span></label><span class="lim-sw" aria-hidden="true"></span></div>
         </div>
         <div class="control-item" id="limit-empty" hidden><span style="font-size:14px;color:var(--note);">No lorry limits loaded for this area yet</span></div>
-        <div class="control-item" style="padding-left:2px;margin-top:-2px;">
-            <span id="limit-source" style="font-size:14px;color:var(--note);">OpenStreetMap contributors and HERE · coverage is incomplete. Advisory: check the signed limit on site.</span>
-        </div>
     </div>
 
     </details>
@@ -1425,13 +1419,6 @@
         if (imOpt) { const im = TENANT.imagery; imOpt.hidden = !(im && im.url); imOpt.textContent = (im && im.name) || 'Client imagery'; }
         const satPlain = document.getElementById('basemap-satellite-plain');
         if (satPlain) satPlain.textContent = (aerial ? 'Aerial' : 'Satellite') + ' (no names)';
-        // H2 (5 Oct 2026): a tenant whose overlay carries no existing railway has no use for
-        // the rail layer — hide its control instead of showing an empty, ticked layer. The
-        // demo scheme is a road; the first tenant's corridor had a railway under it.
-        const railCb = document.getElementById('layer-rail');
-        const railItem = railCb && railCb.closest('.control-item');
-        const hasRail = !!(window.evr_rail_data && window.evr_rail_data.features && window.evr_rail_data.features.length);
-        if (railItem) railItem.hidden = !hasRail;
         // H2: the tenant's demo notice, on the map like every other screen
         // 11 Oct 2026: not when the app's demo bar is drawn above this iframe (barAbove) — the bar carries it.
         // (review, 11 Oct: it said !EMBED, which hid the notice even when the app had drawn no bar)
@@ -1816,7 +1803,7 @@
             const el = uk ? document.getElementById(iptCheckboxId(uk)) : null;
             return !el || el.checked;
         })());
-        ['ipt-legend', 'ipt-legend-note'].forEach(id => {
+        ['ipt-legend'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = visible ? 'block' : 'none';
         });
@@ -1835,14 +1822,12 @@
             if (src) src.setData(alts_data);
             const n = (alts_data.features || []).length;
             const note = document.getElementById('alts-note');
-            if (note) note.textContent = n
-                ? n + ' other ways the routes could go (not used)'
-                : 'none: a route along a haul road has none';
+            if (note) note.textContent = n ? n.toLocaleString('en-GB') : 'none';     // 28 Oct 2026 (task 0a): a count; what they are is in the user guide §8.2
             console.log('[alts] ' + n + ' alternative geometries');
         } catch(e){
             console.warn('route alternatives unavailable', e);
             const note = document.getElementById('alts-note');
-            if (note) note.textContent = 'could not be loaded';
+            if (note) note.textContent = 'not read';
         }
     }
 
@@ -1975,6 +1960,7 @@
         LIGHT.preset = v;
         applyLightPreset(); syncLightRow();
         try { if (typeof restyleHaulEraser === 'function') restyleHaulEraser(); } catch (e) {}
+        try { if (typeof applyLabels === 'function') applyLabels(); } catch (e) {}     // 28 Oct 2026: a dark ground turns the names light
         try { scheduleViewWrite(); } catch (e) {}
     }
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -2020,34 +2006,6 @@
     }
     function perWorkingDay(monthTotal){
         return Math.round(perWorkingDayExact(monthTotal));
-    }
-    const RAIL_COLOR = '#0F766E';
-    // 2026-09-02 (§6a): a QUIET default so the corridor cannot be mistaken for a second
-    // alignment - grey casing under short grey ticks with big gaps - and the reserved
-    // rail colour only when highlighted. Two layers: a casing and a dashed core.
-    // ⭐ line-dasharray is in multiples of THAT LAYER'S width, so [2, 18] on a 2 px line
-    // is a 4 px tick and a 36 px gap. Plain constants, set by setPaintProperty -
-    // dasharray is cross-faded and expression support for it has been patchy.
-    // 🔴 2026-09-08 (§B): THERE IS NO BOLD STATE ANY MORE. RAIL_BOLD painted the corridor
-    // in RAIL_COLOR (#0F766E) whenever a railhead was the origin or a railhead movement
-    // was on screen, which made the reference geometry the loudest thing on the map —
-    // possibly provisional line (coarse public geometry), drawn in a colour that reads
-    // as "this matters". The brief is explicit: never green, never bold, never teal.
-    //
-    // ONE style. Thin mid-grey, short tick and a large gap, dark slate casing at low
-    // opacity — the same visual weight as the original alignment profile. What changes
-    // with rail USE is the marching overlay, not the line.
-    const RAIL_DIM   = { casingW: 5, casingC: '#334155', casingO: 0.35,
-                         dashW: 2,   dashC: '#64748B',   dashO: 1.0, dash: [2, 18] };
-    // ⚠️ No IPT band colour, no reserved route colour, and NO RAIL_COLOR appears in the
-    // line style. parse_map.js asserts that against the reserved list.
-
-    // Read from the CHECKBOX, never a module variable - style.load re-adds every
-    // layer on a basemap switch and a drifted variable would restore a layer the user
-    // had turned off. Same rule as the gates and alternatives layers.
-    function railVisible() {
-        const cb = document.getElementById('layer-rail');
-        return !cb || cb.checked;
     }
     // ===== 2026-09-08 (§A) — ONE LOCATION TYPE, ONE MAP-LAYER SYMBOL ==================
     //
@@ -2404,6 +2362,10 @@
         map.setFilter('locations', ['all', ['==', ['get', 'type'], 'Node'],
             ['in', ['get', 'loc_kind'], ['literal', visibleLocKinds()]]]);
         map.setLayoutProperty('locations', 'visibility', nodesVisible() ? 'visible' : 'none');
+        if (map.getLayer('location-names')) {     // 28 Oct 2026 (task 0a): the names follow their marks
+            map.setFilter('location-names', ['all', ['==', ['get', 'type'], 'Node'], ['in', ['get', 'loc_kind'], ['literal', visibleLocKinds()]]]);
+            map.setLayoutProperty('location-names', 'visibility', nodesVisible() ? 'visible' : 'none');
+        }
     }
 
     // ===== 2026-09-08 (pm) — THE MARKS SIT ON TOP OF EVERYTHING =====================
@@ -2425,7 +2387,7 @@
     //
     // The index guard is not decoration: setLayerZoomRange/moveLayer forces a style
     // recalculation, and applyFilters() runs on every filter keystroke.
-    const MARK_LAYERS = ['site-gates', 'locations', 'site-gates-label'];
+    const MARK_LAYERS = ['site-gates', 'locations', 'location-names', 'site-gates-label'];
     // 23 Oct 2026 (the user): road names and labels print OVER the routes. Every route line is inserted before the
     // basemap's first text layer; the page's own symbols (route labels, badges, the marks) are added without a before and
     // stay on top as before. Each basemap names that layer differently (road-label-simple on Light and Dark, road-label on
@@ -2507,6 +2469,7 @@
     }
     function raiseMarks() {
         if (!map || !map.getStyle) return;
+        if (typeof applyLabels === 'function') applyLabels();     // 28 Oct 2026 (task 0a): a label layer just (re)made
         let ids;
         try { ids = map.getStyle().layers.map(l => l.id); } catch (e) { return; }
         // 13 Oct 2026: the lorry limits go over the routes first, so the marks then land on top of them
@@ -2517,6 +2480,102 @@
         const tail = ids.slice(ids.length - present.length);
         if (tail.join('|') === present.join('|')) return;
         present.forEach(id => { try { map.moveLayer(id); } catch (e) {} });
+    }
+
+
+    // ===== 28 Oct 2026 (John, task 0a; notes\map-panel-mockup-1028 cards 4 and 5) — LABELS: Off · Few · All, one style =====
+    // "Labels need to be optional on the public map and better style." One switch under Heat map decides which of the page's
+    // own words the map draws; the basemap's town and road names are the basemap's and stay. Each label layer keeps its own
+    // box (zones, gates, limits, the heat map…): the switch works on the layer's ZOOM RANGE, never its visibility, so the two
+    // never fight. Off = none of our words (a zoom range no map reaches); Few (the default, writes nothing in the link) = the
+    // site names, the figures and the short zone names, the long names only close in; All = every label at the old zooms.
+    // The NAMES share one style: 13 px semibold, ink on a soft white halo, or near-white on a near-black halo on a dark ground
+    // (Dark, Navigation night, the aerial styles, Standard at dusk or night). Re-applied whenever a label layer is (re)made
+    // (raiseMarks), the basemap or its light changes, or the switch moves. A layer already done carries a marker that changes
+    // nothing on screen (text-translate-anchor set to its default, 'map'): GL JS v3 hands back a new object from every getLayer,
+    // and a basemap switch re-adds the layer without the marker, so the pair (marker, signature) says whether to skip it.
+    const LABEL_MODES = ['off', 'few', 'all'];
+    const LABELS = { mode: (() => { try { const v = new URLSearchParams(location.search).get('labels'); return LABEL_MODES.includes(v) ? v : 'few'; } catch (e) { return 'few'; } })(),
+                     done: new Map(), base: {} };
+    const LABEL_NEVER = 24;            // a minzoom no map reaches: the layer draws nothing (Off)
+    const LABEL_FONT = ['Open Sans Semibold', 'Arial Unicode MS Regular'];
+    const ACCESS_ROAD = ['coalesce', ['get', 'access_road'], false];
+    const ZONE_SHORT = ['case', ['>', ['index-of', ':', ['get', 'name']], 0], ['slice', ['get', 'name'], 0, ['index-of', ':', ['get', 'name']]], ['get', 'name']];
+    //: per layer: the zoom it starts at in Few and in All (null = not drawn in that mode) and, for a NAME, its role in the style
+    const LABEL_RULES = {
+        'location-names':     { few: 11, all: 10, name: 'site' },
+        'zone-label':         { few: 12, all: 10, name: 'zone' },
+        'temp-haul-label':    { few: 13, all: 12, name: 'haul' },
+        'site-gates-label':   { few: 14, all: 13, name: 'gate' },
+        'ws-boundary-labels': { few: null, all: 11 },
+        'chainage-labels':    { few: null, all: 0 },
+        'zone-limit':         { few: 9, all: 9 },
+        'restriction-labels': { few: 11, all: 11 },
+        'limit-signs':        { few: 13, all: 13, words: true },     // Off keeps the signs and drops their words
+        'forecast-labels':    { few: 0, all: 0 },
+        'forecast-cap-badge': { few: 0, all: 0 },
+        'road-load-labels':   { few: 0, all: 0 },
+        'carbon-route-labels':{ few: 0, all: 0 },
+        'area-label':         { few: 0, all: 0 },
+        'area-county-label':  { few: 0, all: 0 },
+    };
+    const LABEL_SORT = { site: 1, zone: 2, haul: 3, gate: 4 };
+    // a dark ground: the names turn near-white on a near-black halo
+    function labelsDark() {
+        const bm = String((typeof BASEMAP !== 'undefined' && (BASEMAP.pending || BASEMAP.shown)) || '');
+        if (/dark|night|satellite|maaamet/.test(bm) || bm === BASEMAP_IMG) return true;
+        return isStandard(bm) && (LIGHT.preset === 'dusk' || LIGHT.preset === 'night');
+    }
+    // the OS map brings its own fonts: there the names keep the style's default font
+    function labelsOwnFont() { return String((typeof BASEMAP !== 'undefined' && (BASEMAP.pending || BASEMAP.shown)) || '') !== BASEMAP_OS; }
+    function labelPaint(role, dark) {
+        const ink = role === 'haul' ? (dark ? '#FCD9A6' : '#7A4C05') : role === 'gate' ? (dark ? '#E7E5E4' : '#44403C') : (dark ? '#F5F5F4' : '#1F2024');
+        return { 'text-color': ink, 'text-halo-color': dark ? 'rgba(18,19,22,0.92)' : '#FFFFFF', 'text-halo-width': 1.75, 'text-halo-blur': 0.5 };
+    }
+    function labelTextField(id, mode) {
+        if (id === 'zone-label') return mode === 'all' ? ['get', 'name'] : ZONE_SHORT;
+        // the gates' own access roads ("…: Weighbridge (in) access road") are never named in Few; All names them from 15
+        if (id === 'temp-haul-label') return mode === 'all' ? ['step', ['zoom'], ['case', ACCESS_ROAD, '', ['get', 'name']], 15, ['get', 'name']]
+                                                           : ['case', ACCESS_ROAD, '', ['get', 'name']];
+        return null;
+    }
+    function applyLabels(force) {
+        if (!map || !map.getLayer) return;
+        const mode = LABELS.mode, dark = labelsDark(), font = labelsOwnFont();
+        const sig = mode + '|' + dark + '|' + font;
+        Object.keys(LABEL_RULES).forEach(id => {
+            try { if (!map.getLayer(id)) return; } catch (e) { return; }
+            if (!force && LABELS.done.get(id) === sig && map.getPaintProperty(id, 'text-translate-anchor') === 'map') return;
+            const r = LABEL_RULES[id];
+            try {
+                if (!(id in LABELS.base)) LABELS.base[id] = { tf: map.getLayoutProperty(id, 'text-field') };
+                const z = mode === 'off' ? (r.words ? r.few : LABEL_NEVER) : r[mode];
+                map.setLayerZoomRange(id, z == null ? LABEL_NEVER : z, 24);
+                if (r.words) map.setLayoutProperty(id, 'text-field', mode === 'off' ? '' : LABELS.base[id].tf);
+                if (r.name) {
+                    const tf = labelTextField(id, mode);
+                    if (tf) map.setLayoutProperty(id, 'text-field', tf);
+                    map.setLayoutProperty(id, 'text-size', r.name === 'site' || r.name === 'zone' ? 13 : 12.5);
+                    if (font) map.setLayoutProperty(id, 'text-font', ['literal', LABEL_FONT]);
+                    map.setLayoutProperty(id, 'text-max-width', 10);
+                    map.setLayoutProperty(id, 'text-padding', 4);
+                    map.setLayoutProperty(id, 'symbol-sort-key', LABEL_SORT[r.name]);
+                    const p = labelPaint(r.name, dark);
+                    Object.keys(p).forEach(k => map.setPaintProperty(id, k, p[k]));
+                }
+                map.setPaintProperty(id, 'text-translate-anchor', 'map');
+                LABELS.done.set(id, sig);
+            } catch (e) { console.warn('labels: ' + id, e); }
+        });
+    }
+    function syncLabelsSwitch() {
+        LABEL_MODES.forEach(m => { const el = document.getElementById('labels-' + m); if (el) el.checked = LABELS.mode === m; });
+    }
+    function setLabels(mode) {
+        if (!LABEL_MODES.includes(mode)) return;
+        LABELS.mode = mode;
+        applyLabels(true); syncLabelsSwitch();
+        try { scheduleViewWrite(); } catch (e) {}
     }
 
     // The other half of the in-use treatment: what is NOT in use goes translucent while
@@ -2620,108 +2679,16 @@
     // location marks: the same rounded square, but filled #0F766E per the signed table,
     // with the rail and sleepers reversed to white. locGlyph('Railhead', …) draws it.
 
-    function toggleRail(visible) {
-        // 🔴 'railheads' USED TO BE IN THIS LIST. A railhead is a LOCATION, not part of
-        // the rail corridor, and unchecking "Rail network" hid the site along with the
-        // geography. The list is the corridor and nothing else now; §A owns every
-        // location mark, including a railhead's.
-        ['evr-rail-casing', 'evr-rail-line'].forEach(l => toggleLayer(l, visible));
-        // the marching overlay is toggled SEPARATELY and never joins that list: it is only
-        // ever on while Play is, so following the checkbox straight into 'visible' would
-        // leave it marching on a paused map.
-        applyRailFlow();
-    }
-
-    // ===== 2026-09-07 — the EVR corridor marches while the timeline PLAYS ============
-    //
-    // The rule is deliberately narrow: visible only when Play is on AND the EVR checkbox
-    // is on. Pausing, scrubbing or closing hides it again, and the corridor goes back to
-    // whatever applyRailHighlight() had it at — the overlay never touches the dim/bold
-    // state, it sits on top of it.
-    //
-    // ⚠️ EVR is NOT in routes-source, carries no forecast volume and is counted nowhere.
-    // Nothing here puts it into the KPI route count; that walks routes-source and matches
-    // 'Inbound Highway', which no rail feature is.
-    // ⭐ 2026-09-08 (§B), THE RULE CHANGED. It was (Play is running) AND (the checkbox is
-    // on). It is now (Play is running) AND (the checkbox is on) AND (a movement in the
-    // month on the playhead starts or ends at a Railhead). A corridor that ticked in
-    // every month said "rail" about months with no rail in them.
-    //
-    // ⚠️ Play is still required, and that is deliberate rather than an oversight of the
-    // brief's wording. An animation on a map nobody is scrubbing is a rAF wakeup every
-    // frame for as long as the tab is open — the reason the march was tied to playback in
-    // the first place (see the 2.5a note on animateFlow). "Months where a railhead is
-    // used" narrows WHICH months tick; it does not turn a static map into a moving one.
-    function railInUseOnScreen() {
-        if (!a1_data || !a1_data.features) return false;
-        const forecastOn = (typeof TL !== 'undefined' && TL.on)
-            || (function () { const cb = document.getElementById('toggle-forecast'); return !!(cb && cb.checked); })();
-        if (!forecastOn) return false;
-        return a1_data.features.some(f => f.geometry && f.geometry.type === 'LineString'
-            && f.properties.route_id && f.properties.is_forecast && routePassesFilters(f.properties)
-            && (locTypeById(f.properties.origin_id) === 'Railhead'
-                || locTypeById(f.properties.dest_id) === 'Railhead'));
-    }
-    function railFlowOn() {
-        return !!(typeof TL !== 'undefined' && TL.playing) && railVisible() && railInUseOnScreen();
-    }
-    function setRailFlowDash(seq) {
-        try { if (map.getLayer('evr-rail-flow')) map.setPaintProperty('evr-rail-flow', 'line-dasharray', seq); } catch (e) {}
-    }
-    function applyRailFlow() {
-        if (!map.getLayer('evr-rail-flow')) return;
-        map.setLayoutProperty('evr-rail-flow', 'visibility', railFlowOn() ? 'visible' : 'none');
-    }
-
-    // name -> loc_type, built from the Node features the API sends. The origin
-    // dropdown holds NAMES (they come off the route features), so this is how
-    // "is the selected origin a railhead" gets answered.
-    function locTypeByName(name) {
-        if (!name || name === 'ALL' || !a1_data || !a1_data.features) return null;
-        const f = a1_data.features.find(x => x.properties
-            && x.properties.type === 'Node' && x.properties.name === name);
-        // 'Rail head' -> 'Railhead' on 2026-09-02; the backend canonicalises, this is
-        // belt and braces for a cached map-data payload
-        const t = f ? (f.properties.node_type || null) : null;
-        return t === 'Rail head' ? 'Railhead' : t;
-    }
-
-    // Which rail features serve a given head. Matched CASE-INSENSITIVELY and by
-    // SUBSTRING both ways, so a location called "Ashby railhead" matches the head
-    // "Ashby" and vice versa - the human names the locations, and requiring an exact
-    // string match would mean the highlight silently does nothing.
-    function railFeaturesFor(name) {
-        const n = String(name || '').toLowerCase().trim();
-        if (!n || !window.evr_rail_data) return [];
-        return evr_rail_data.features.filter(f => (f.properties.heads || []).some(h => {
-            const hh = String(h).toLowerCase().trim();
-            return hh && (n.indexOf(hh) >= 0 || hh.indexOf(n) >= 0);
-        })).map(f => f.properties.id);
-    }
-
-    // Bold when the origin filter is a Railhead, dim otherwise. Called from
-    // applyFilters(), so it follows the origin dropdown AND filterByNode().
-    // node id -> loc_type, for "does this route touch a railhead"
-    function locTypeById(id) {
-        if (!id || !a1_data || !a1_data.features) return null;
-        const f = a1_data.features.find(x => x.properties && x.properties.type === 'Node'
-                                              && x.properties.id === id);
-        const t = f ? (f.properties.node_type || null) : null;
-        return t === 'Rail head' ? 'Railhead' : t;
-    }
-    // does a route line pass the four sidebar filters? Shared by the KPI count and the
-    // rail rule so "in the current filter" means one thing.
+    // 28 Oct 2026 (task 0a): toggleRail, the rail's march (railInUseOnScreen, railFlowOn, setRailFlowDash, applyRailFlow),
+    // locTypeByName and railFeaturesFor went with the existing-railway layers.
+    // does a route line pass the four sidebar filters? Shared by the KPI count, the route ends and the overlays,
+    // so "in the current filter" means one thing.
     function routePassesFilters(p) {
         const o = document.getElementById('filter-origin').value, d = document.getElementById('filter-dest').value;
         const disc = document.getElementById('filter-discipline').value, i = document.getElementById('filter-ipt').value;
         return (o === 'ALL' || p.origin === o) && (d === 'ALL' || p.dest === d)
             && (disc === 'ALL' || (p.disciplines || []).includes(disc)) && (i === 'ALL' || p.ipt === i);
     }
-    // 2026-09-08: railheadMovementOnScreen() was here and is now railInUseOnScreen(),
-    // beside railFlowOn() — the same test, one home. It was written for §6b's bold
-    // state; §B deleted the bold state and gave the same question a new job, deciding
-    // whether the corridor TICKS. Two copies of "is a railhead in use this month" would
-    // have drifted the first time one of them learned about a filter.
     // ===== 2026-09-08 (§C) — the ends of the live routes, as ICONS ==================
     //
     // 🔴 THE 07 SEP CALLOUT PLATES ARE GONE. They named each end in a white box with the
@@ -2771,56 +2738,6 @@
         applyLocationDim(live);
     }
 
-    // 2026-09-08 (§B): this used to choose between RAIL_DIM and RAIL_BOLD. It no longer
-    // chooses anything about the paint — the corridor is grey, always. What survives is
-    // the NARROWING (an explicit railhead origin draws only that head's branch) and the
-    // sidebar note, both of which say something the colour was trying to say badly.
-    function applyRailHighlight() {
-        if (!map.getLayer('evr-rail-line')) return;
-        const el = document.getElementById('filter-origin');
-        const sel = el ? el.value : 'ALL';
-        const originIsHead = sel !== 'ALL' && locTypeByName(sel) === 'Railhead';
-        const st = RAIL_DIM;
-        if (map.getLayer('evr-rail-casing')) {
-            map.setPaintProperty('evr-rail-casing', 'line-color', st.casingC);
-            map.setPaintProperty('evr-rail-casing', 'line-width', st.casingW);
-            map.setPaintProperty('evr-rail-casing', 'line-opacity', st.casingO);
-        }
-        map.setPaintProperty('evr-rail-line', 'line-color', st.dashC);
-        map.setPaintProperty('evr-rail-line', 'line-width', st.dashW);
-        map.setPaintProperty('evr-rail-line', 'line-opacity', st.dashO);
-        map.setPaintProperty('evr-rail-line', 'line-dasharray', st.dash);
-        const ids = originIsHead ? railFeaturesFor(sel) : [];
-        // ⭐ An array literal used as an expression OUTPUT must be wrapped in
-        // ['literal', ...]. Style.addLayer/setFilter validates BEFORE applying and on
-        // failure fires an error and returns having done nothing - which is how four
-        // route layers vanished silently on 2026-09-01.
-        //
-        // ⚠️ DELIBERATE DEVIATION: with no matching feature the layer is left UNFILTERED
-        // rather than filtered to nothing. A railhead this provisional file does not name
-        // would otherwise make the whole corridor disappear at the moment somebody asked
-        // to see it. Showing it unfiltered says "here is the network, we cannot tell you
-        // which branch"; an empty map says nothing at all.
-        const idFilter = (originIsHead && ids.length) ? ['in', ['get', 'id'], ['literal', ids]] : null;
-        map.setFilter('evr-rail-line', idFilter);
-        if (map.getLayer('evr-rail-casing')) map.setFilter('evr-rail-casing', idFilter);
-        // the marching overlay follows the same narrowing, or it would march along a
-        // branch the corridor beneath it has stopped drawing
-        if (map.getLayer('evr-rail-flow')) map.setFilter('evr-rail-flow', idFilter);
-        const note = document.getElementById('rail-note');
-        // ⚠️ The caveat is PERMANENT and comes first. This corridor is Natural Earth 10m
-        // — possibly kilometres out where the geometry is coarse — and it says WHICH corridor a haul
-        // relates to, never where the track is.
-        const railState = originIsHead
-            ? (ids.length ? `showing the ${sel} branch` : `${sel} is not named in the rail data - showing the whole corridor`)
-            : (railInUseOnScreen() ? 'ticking: a movement this month starts or ends at a railhead'
-                                   : 'static grey unless a movement this month uses a railhead');
-        if (note) note.innerHTML =
-            'Provisional corridor — reference only, not survey. Click the line for detail.'
-            + '<br><span style="opacity:.85">' + railState + '</span>';
-        applyRailFlow();
-    }
-
     // ===== 2026-09-08 (§F4) — extruded buildings, off by default =====================
     //
     // ⚠️ The `building` source-layer belongs to Mapbox's own vector tiles, which reach the
@@ -2836,15 +2753,15 @@
         const note = document.getElementById('buildings-note');
         // 28 Oct 2026 (8d): Standard draws its own buildings and landmarks (no composite source); the box switches those
         if (styleHasSlots()) {
-            if (note) note.firstChild.textContent = 'from zoom 15';
+            if (note) note.hidden = true;
             try { map.setConfigProperty('basemap', 'show3dObjects', buildingsVisible()); } catch (e) {}
             return true;
         }
         if (!map.getSource('composite')) {
-            if (note) note.firstChild.textContent = 'not available on this basemap';
+            if (note) note.hidden = false;
             return false;
         }
-        if (note) note.firstChild.textContent = 'from zoom 14';
+        if (note) note.hidden = true;
         if (!map.getLayer('buildings-3d')) {
             map.addLayer({
                 id: 'buildings-3d', type: 'fill-extrusion', source: 'composite',
@@ -3331,10 +3248,6 @@
         // so that the address-bar write stays the last line of applyFilters
         if (typeof refreshAreas === 'function') refreshAreas();
 
-        // Week 1, Task E. The road filter above is untouched: selecting a railhead as
-        // the origin still isolates the road hauls that start there. This only changes
-        // how the rail corridor is DRAWN.
-        applyRailHighlight();
         // 2026-09-08 (§C): and the end emphasis. Here rather than only in
         // setTimelineMonth so that changing a filter drops the emphasis from a route the
         // filter just removed — every filter change comes through this function.
@@ -3385,55 +3298,6 @@
         if (!map.getSource('alignment-survey-source')) map.addSource('alignment-survey-source', { type: 'geojson', data: alignment_data });
         if (!map.getSource('chainage-source')) map.addSource('chainage-source', { type: 'geojson', data: chainageStepData() });
         if (!map.getSource('ws-boundary-source')) map.addSource('ws-boundary-source', { type: 'geojson', data: wsBoundaryData() });
-
-        // ===== The existing railway (the package's `rail`) ======================
-        // ⚠️ NOT the alignment being built. That is alignment-source above. This is
-        // an operating line a railhead sits on, so "filter to this railhead" has
-        // something to show. Tenant data from the overlay package; empty when the
-        // package has none, and then these layers simply draw nothing.
-        //
-        // 🔴 A package's rail geometry may be PROVISIONAL (coarse public data rather
-        // than survey). Each feature should carry provisional:true, its source and an
-        // accuracy_note, and the click popup repeats them. It shows WHICH corridor a
-        // haul relates to, never where the track is.
-        //
-        // Added HERE, before the route layers, because add order is z-order and this
-        // is reference geometry that must sit UNDER the hauls.
-        if (!map.getSource('evr-rail')) map.addSource('evr-rail',
-            { type: 'geojson', data: (window.evr_rail_data || { type: 'FeatureCollection', features: [] }) });
-        if (!map.getLayer('evr-rail-casing')) map.addLayer({
-            id: 'evr-rail-casing', type: 'line', source: 'evr-rail',
-            layout: { visibility: railVisible() ? 'visible' : 'none',
-                      'line-cap': 'round', 'line-join': 'round' },
-            paint: { 'line-color': RAIL_DIM.casingC, 'line-width': RAIL_DIM.casingW,
-                     'line-opacity': RAIL_DIM.casingO },
-        });
-        if (!map.getLayer('evr-rail-line')) map.addLayer({
-            id: 'evr-rail-line', type: 'line', source: 'evr-rail',
-            // ⭐ line-cap butt, or the dashes draw solid
-            layout: { visibility: railVisible() ? 'visible' : 'none',
-                      'line-cap': 'butt', 'line-join': 'round' },
-            paint: { 'line-color': RAIL_DIM.dashC, 'line-width': RAIL_DIM.dashW,
-                     'line-opacity': RAIL_DIM.dashO, 'line-dasharray': RAIL_DIM.dash },
-        });
-        // 2026-09-07 — the marching overlay. White ticks on the SAME dash cycle as the
-        // hauls' forecast-flow, on the same source as the corridor, so while the timeline
-        // plays the rail reads as part of one movement rather than a static backdrop.
-        //
-        // Its OWN layer, not an animation of evr-rail-line, because that line carries the
-        // dim/bold state applyRailHighlight() owns — colour, width and dash. Marching the
-        // same layer would put two things on one line-dasharray and the last write wins.
-        //
-        // ⚠️ Deliberately NO explicit 'line-cap'. Mapbox's default is already butt,
-        // forecast-flow relies on that same default, and parse_map.js counts the explicit
-        // butt strings — five, the four haul layers plus the EVR core. A sixth here would
-        // move that count without anything having changed about the dotted routes.
-        if (!map.getLayer('evr-rail-flow')) map.addLayer({
-            id: 'evr-rail-flow', type: 'line', source: 'evr-rail',
-            layout: { visibility: 'none', 'line-join': 'round' },
-            paint: { 'line-color': '#ffffff', 'line-width': 2, 'line-opacity': 0.9,
-                     'line-dasharray': [0, 4, 3] },
-        });
 
         // --- PROFESSIONAL MAPBOX STYLING (Corporate Palette + Highway Offsets) ---
 
@@ -3690,10 +3554,22 @@
                       // 16 Oct 2026 (V7): built by locIconImage(), which adds '-dot' while "Show sites as dots" is ticked
                       'icon-image': locIconImage(),
                       'icon-size': ['interpolate', ['linear'], ['zoom'], 6, 0.55, 12, 0.9, 16, 1.1],
-                      'icon-allow-overlap': true, 'icon-ignore-placement': true,
+                      // 28 Oct 2026 (task 0a): still drawn whatever else is there, but no longer "in nobody's way": a name
+                      // now makes room for the mark instead of printing under it ("Langton cutting works area" on live)
+                      'icon-allow-overlap': true, 'icon-ignore-placement': false,
                       'icon-anchor': 'center' },
             // set from applyLocationDim(); 1 for every mark until the timeline is open
             paint: { 'icon-opacity': 1 },
+        });
+        // 28 Oct 2026 (task 0a): the site NAMES under their marks, the same filter and visibility as the marks; the zooms and the
+        // style are the Labels switch's (applyLabels)
+        if (!map.getLayer('location-names')) map.addLayer({
+            id: 'location-names', type: 'symbol', source: 'routes-source', minzoom: 11,
+            filter: ['all', ['==', ['get', 'type'], 'Node'], ['in', ['get', 'loc_kind'], ['literal', visibleLocKinds()]]],
+            layout: { visibility: nodesVisible() ? 'visible' : 'none',
+                      'text-field': ['get', 'name'], 'text-size': 13, 'text-anchor': 'top', 'text-offset': [0, 1.1],
+                      'text-max-width': 10, 'text-optional': true },
+            paint: { 'text-color': '#1F2024', 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.75 },
         });
         // §F4: only when the checkbox is on. Adding it unconditionally would put a
         // fill-extrusion layer on every basemap switch for a feature that is off.
@@ -4183,17 +4059,6 @@
                 .setHTML(gatePopupHTML(e.features[0].properties)).addTo(map);
         });
 
-        // Week 1, Task E. The rail popup exists to carry the caveat the LINE cannot:
-        // this geometry is provisional and wrong by kilometres in places. Same pattern
-        // as the alignment's gap-bridge popup, and for the same reason - the picture
-        // reads as authoritative and the text is where the honesty lives.
-        map.on('mouseenter', 'evr-rail-line', () => { map.getCanvas().style.cursor = 'pointer'; });
-        map.on('mouseleave', 'evr-rail-line', () => { map.getCanvas().style.cursor = ''; });
-        map.on('click', 'evr-rail-line', (e) => {
-            if (!e.features || !e.features.length) return;
-            new mapboxgl.Popup({ offset: 8 }).setLngLat(e.lngLat)
-                .setHTML(railPopupHTML(e.features[0].properties)).addTo(map);
-        });
         // §A: the location popup is a LAYER click now, not a marker's attached popup.
         // Same content, same Street View slot, same "Filter Routes to this Location".
         map.on('mouseenter', 'locations', () => { map.getCanvas().style.cursor = 'pointer'; });
@@ -4956,7 +4821,7 @@
     }
     // drawn UNDER every layer of ours, so the routes, sites and zones stay on top of the fill
     function areaBeforeId() {
-        const own = new Set(['evr-rail', 'routes-source', 'route-alts-source', 'alignment-source', 'alignment-survey-source',
+        const own = new Set(['routes-source', 'route-alts-source', 'alignment-source', 'alignment-survey-source',
                              'chainage-source', 'ws-boundary-source', 'zones-source']);
         let layers = [];
         try { layers = map.getStyle().layers || []; } catch (e) { return undefined; }
@@ -4969,7 +4834,7 @@
     // layer's labels first. The CARDS go above the basemap's names again, still under every layer of ours that sits there
     // (the first of ours after labelAnchor); the fills stay where areaBeforeId puts them, under the names and the routes.
     function areaLabelBeforeId() {
-        const own = new Set(['evr-rail', 'routes-source', 'route-alts-source', 'alignment-source', 'alignment-survey-source',
+        const own = new Set(['routes-source', 'route-alts-source', 'alignment-source', 'alignment-survey-source',
                              'chainage-source', 'ws-boundary-source', 'zones-source']);
         const anchor = labelAnchor();
         if (!anchor) return areaBeforeId();               // no basemap names (a bare style): as before
@@ -5017,6 +4882,7 @@
         if (!map.getLayer('area-label')) map.addLayer({ id: 'area-label', type: 'symbol', source: 'areas-source', filter: district.concat([labelPt]),
             layout: areaLabelLayout(dVis), paint: AREA_LABEL_PAINT }, labelBefore);
         placeTownNames();
+        applyLabels();      // 28 Oct 2026 (task 0a): Off hides the council cards too
     }
     // 28 Oct 2026 (John, from notes\council-fills-mockup-1028): while the council colours are on, the basemap's TOWN
     // names go UNDER them, as on 21 Oct, so Sileby or Market Harborough no longer print over a district's colour; the
@@ -5223,7 +5089,7 @@
             const ui = cat.provider.ui_label || '';
             if (hd) hd.textContent = ui.includes('(') ? ui.slice(0, ui.indexOf('(')).trim() : (ui || 'Road restrictions');
             const sv = document.getElementById('restriction-source');
-            if (sv && cat.provider.name) sv.textContent = 'Source: ' + cat.provider.name + (cat.provider.site ? ' (' + cat.provider.site + ')' : '') + '. For information only: routes do not avoid these.';
+            if (sv) sv.textContent = 'For information only: routes do not avoid these.';   // 28 Oct 2026 (task 0a): the source is on the map's credit line
             RESTR.layers = cat.layers || [];
             RESTR.colour = {};
             RESTR.layers.forEach(l => { RESTR.colour[l.key] = l.colour; });
@@ -5297,7 +5163,9 @@
     function ensureRestrictionLayers(){
         if(!styleReady()) return;
         if(!RESTR.data) return;
-        if(!map.getSource('restrictions-source')) map.addSource('restrictions-source', { type:'geojson', data: RESTR.data });
+        // 28 Oct 2026 (task 0a): the provider's credit on the map's credit line while the layer shows (was a panel line)
+        if(!map.getSource('restrictions-source')) map.addSource('restrictions-source', { type:'geojson', data: RESTR.data,
+            attribution: (RESTR.provider && RESTR.provider.name) || '' });
         else map.getSource('restrictions-source').setData(RESTR.data);
 
         // one pair of layers for everything, filtered by _kind, so adding a layer to
@@ -5461,30 +5329,6 @@
 
     function toggleGates(visible) {
         ['site-gates', 'site-gates-label'].forEach(l => toggleLayer(l, visible));
-    }
-
-    // ⚠️ Properties cross Mapbox's feature boundary as STRINGS - `heads` arrives as
-    // '["Ashby","Melton"]' and `provisional` as 'true', not true. Both are parsed
-    // rather than trusted; comparing a stringified 'false' as a boolean is the same
-    // trap gatePopupHTML() documents for `active`.
-    function railPopupHTML(p) {
-        let heads = p.heads;
-        if (typeof heads === 'string') { try { heads = JSON.parse(heads); } catch (e) { heads = [heads]; } }
-        const provisional = !(p.provisional === false || p.provisional === 'false');
-        let h = `<div style='min-width:230px;max-width:300px;'>` +
-                `<h3 style='margin:0 0 5px 0;color:${RAIL_COLOR};border-bottom:1px solid #eee;padding-bottom:4px;'>` +
-                `${p.name || 'Rail line'}</h3>` +
-                `<p style='margin:4px 0;'><b>Operator:</b> ${p.operator || '—'}</p>`;
-        if (heads && heads.length) h += `<p style='margin:4px 0;'><b>Serves:</b> ${heads.join(' · ')}</p>`;
-        if (p.length_km) h += `<p style='margin:4px 0;'><b>Length:</b> ${fmtDist(p.length_km, 2)} ${DU()}</p>`;
-        if (provisional) {
-            h += `<p style='margin:6px 0 4px 0;padding:5px 6px;background:rgba(191,46,85,.08);` +
-                 `border-left:3px solid #DC2626;font-size:11.5px;line-height:1.45;'>` +
-                 `<b>Approximate line.</b> ${p.accuracy_note || ''}</p>`;
-        }
-        h += `<p style='margin:4px 0;font-size:12px;color:var(--note);line-height:1.4;'>` +
-             `Source: ${p.source || 'unknown'}</p></div>`;
-        return h;
     }
 
     function gatePopupHTML(p) {
@@ -5850,10 +5694,9 @@
         const boxes = document.getElementById('limit-boxes'), empty = document.getElementById('limit-empty');
         if (boxes) boxes.hidden = !fs.length;
         if (empty) empty.hidden = !!fs.length;
-        const src = new Set(fs.map(f => (f.properties || {}).source));
-        const names = [(!fs.length || src.has('osm')) ? 'OpenStreetMap contributors' : '', (!fs.length || src.has('here')) ? 'HERE' : ''].filter(Boolean);
+        // 28 Oct 2026 (task 0a): the credit is on the map (the sources' attribution); the panel keeps one caveat, behind its "i"
         const note = document.getElementById('limit-source');
-        if (note) note.textContent = names.join(' and ') + ' · coverage is incomplete. Advisory: check the signed limit on site.';
+        if (note) note.textContent = 'Not every limit is mapped: check the sign on site.';
     }
     function ensureLimitImage(p) {
         const name = limitImageName(p.kind, p.icon_text, p.imperial, Number(p.breach_count) > 0);
@@ -6023,7 +5866,7 @@
                     <!-- 19 Oct 2026 (the user: "too many month tabs"): a year row and its twelve months (renderMonthPicker)
                          replace the 12 Oct (D14) chip per month — 60 chips on the four-year demo. The phone sheet keeps its chips. -->
                     <div class="ctl-head"><h3 id="fc-month-label">Month</h3><button type="button" class="info-i" aria-expanded="false" aria-controls="info-month" onclick="toggleInfo(this)" title="About the month" aria-label="About the month"><span aria-hidden="true">i</span></button></div>
-                    <div class="info-pop" id="info-month" hidden><p>Approved forecasts only.</p><p>A grey month has nothing approved. Play steps month by month. Show forecast routes averages every month with volume.</p></div>
+                    <div class="info-pop" id="info-month" hidden><p>Approved forecasts only. A grey month has none.</p></div>
                     <div class="month-picker" id="fc-months" role="group" aria-labelledby="fc-month-label"></div>
                     <button type="button" class="btn" id="tl-open" onclick="startTimeline()">▶ Play forecast timeline</button>
                     <label class="fc-toggle"><input type="checkbox" id="toggle-forecast" onchange="toggleForecastPlugin()"> Show forecast routes</label>
@@ -6032,7 +5875,7 @@
                          19 Oct 2026: drawn as one segmented control, the explanations behind its "i" -->
                     <div class="heat-group" role="radiogroup" aria-labelledby="heat-label">
                     <div class="ctl-head"><div class="heat-label" id="heat-label">Heat map</div><button type="button" class="info-i" aria-expanded="false" aria-controls="info-heat" onclick="toggleInfo(this)" title="About the heat map" aria-label="About the heat map"><span aria-hidden="true">i</span></button></div>
-                    <div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: two-way movements a day. Each route by its own figure; a stretch of road two or more routes share by the routes using it, summed.</p><p><b>Carbon</b>: t CO₂e in the month, per route.</p><p id="heat-info-more"></p></div>
+                    <div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: two-way movements a day.</p><p><b>Carbon</b>: t CO₂e in the month.</p><p id="heat-info-more"></p></div>
                     <div class="heat-seg">
                     <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off" onchange="toggleHeatOff()" checked> Off</label>
                     <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()"> Volume</label>
@@ -6040,6 +5883,16 @@
                     </div>
                     <div class="mode-legend" id="road-load-legend" hidden></div>
                     <div class="mode-legend" id="carbon-legend" hidden></div>
+                    </div>
+                    <!-- 28 Oct 2026 (John, task 0a): the labels on the map, Off / Few / All (applyLabels); Few is the default -->
+                    <div class="heat-group labels-group" role="radiogroup" aria-labelledby="labels-label">
+                    <div class="ctl-head"><div class="heat-label" id="labels-label">Labels</div><button type="button" class="info-i" aria-expanded="false" aria-controls="info-labels" onclick="toggleInfo(this)" title="About the labels" aria-label="About the labels"><span aria-hidden="true">i</span></button></div>
+                    <div class="info-pop" id="info-labels" hidden><p>Off hides the names on the map. Few shows the sites and the figures. All shows every name.</p></div>
+                    <div class="heat-seg">
+                    <label class="fc-toggle fc-mode"><input type="radio" name="labels-mode" id="labels-off" onchange="setLabels('off')"> Off</label>
+                    <label class="fc-toggle fc-mode"><input type="radio" name="labels-mode" id="labels-few" onchange="setLabels('few')"> Few</label>
+                    <label class="fc-toggle fc-mode"><input type="radio" name="labels-mode" id="labels-all" onchange="setLabels('all')"> All</label>
+                    </div>
                     </div>
                     <!-- 16 Oct 2026 (D115): the flow's legend, shown while the lanes are on the map (renderFlowLegend) -->
                     <!-- 23 Oct 2026: the abnormal load this month (renderAbnormalLegend) -->
@@ -6051,6 +5904,7 @@
                 if (top) top.insertAdjacentHTML('beforebegin', pluginUI); else sidebar.insertAdjacentHTML('beforeend', pluginUI);
                 if (typeof renderMonthChips === 'function') renderMonthChips();
                 if (typeof renderConcernLinks === 'function') renderConcernLinks();
+                if (typeof syncLabelsSwitch === 'function') syncLabelsSwitch();
             }
         });
 
@@ -6185,7 +6039,6 @@
                 ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
                 const sd = map.getSource('routes-source');
                 if (sd) { const d = sd._data; d.features.forEach(f => { if (f.properties) f.properties.is_forecast = false; }); sd.setData(d); }
-                applyRailHighlight();      // §6b: forecast off -> dim, unless a railhead origin is selected
                 applyFilters();            // §9: and the cards drop back to the network count
                 status.innerHTML = "";
                 status.style.color = "#6b7280";
@@ -6251,7 +6104,6 @@
                     }
                 });
                 src.setData(currentData);
-                applyRailHighlight();      // §6b: a railhead movement in the window bolds the corridor
                 applyFilters();            // §9: the KPI cards follow the window
 
                 if (!map.getLayer('forecast-layer')) {
@@ -7158,7 +7010,7 @@
     }
     // the layers with a click of their own that the route query does not cover: the cursor shows a hand over them
     const CLICKABLE_LAYERS = ['rail-alignment', 'ws-boundary-ticks', 'ws-boundary-labels', 'zone-fill', 'zone-outline', 'site-gates',
-                              'evr-rail-line', 'locations', 'restriction-points', 'restriction-lines',
+                              'locations', 'restriction-points', 'restriction-lines',
                               'limit-signs', 'limit-dots', 'limit-lines', 'limit-clusters', 'area-fill', 'area-county-fill'];
     function clickableAt(point){
         const ls = CLICKABLE_LAYERS.filter(l => map.getLayer(l));
@@ -7260,11 +7112,8 @@
     // dead when playback stops.
     // 16 Oct 2026 (D115), 23 Oct 2026: the light runs only while the timeline plays; when it stops the hauls' lanes stand
     // still as faint solid stripes, so the width (movements a day) and the lanes (which way) still read on a paused map.
-    // The rail's overlay still goes (DASH_SOLID, hidden: applyRailFlow).
-    const DASH_SEQ=[[0,4,3],[1,4,2],[2,4,1],[3,4,0],[0,1,3,3],[0,2,3,2],[0,3,3,1]];   // the EVR rail's march (butt caps)
-    const DASH_SOLID=[1,0];
-    //: the tick count's cycle: a whole number of the rail's seven steps (23 Oct 2026: the hauls' light is a phase, not a tick)
-    const FLOW_CYCLE = DASH_SEQ.length * 60;
+    //: the tick count's cycle (28 Oct 2026: the rail's seven-step march that set it is gone; the count is kept)
+    const FLOW_CYCLE = 7 * 60;
     let _dashIx=0,_dashT=0,_flowRAF=null,_pulseT=0;
 
     // the legs the map draws, in page order (their positions are the lanes' leg indexes)
@@ -7458,55 +7307,48 @@
         box.hidden = !on;
         if (!on) return;
         const m = mapModeMonth(), win = m ? null : (forecastWindow() || []);
-        const when = m ? 'in ' + rlEsc(monthLabel(m))
-                       : (win[0] ? 'a daily average, ' + rlEsc(monthLabel(win[0])) + (win[1] && win[1] !== win[0] ? ' to ' + rlEsc(monthLabel(win[1])) : '') : 'a daily average');
-        const unit = FLOW_STOPS !== VOLUME_STOPS ? rlEsc(CONFIG.FORECAST_UNIT) + ' a day' : 'movements a day';
-        box.innerHTML = '<b>Wider lane = more ' + unit + '</b>' +
-            '<div class="ml-sub">Each way, ' + when + '</div>' +
-            stepRanges(FLOW_STOPS, '').map((t, i) => '<div class="ml-row">' + flowSample(FLOW_WIDTHS[i]) + t + '</div>').join('') +
-            '<div class="ml-foot">Each direction has its own lane, on the left. Where routes share a road, the lane shows their total. While Play runs, a light moves along each lane the way its lorries go.</div>';
+        const when = m ? 'In ' + rlEsc(monthLabel(m))
+                       : (win[0] ? 'A daily average, ' + rlEsc(monthLabel(win[0])) + (win[1] && win[1] !== win[0] ? ' to ' + rlEsc(monthLabel(win[1])) : '') : 'A daily average');
+        const unit = FLOW_STOPS !== VOLUME_STOPS ? rlEsc(CONFIG.FORECAST_UNIT) + ' a day' : 'Movements a day';
+        // 28 Oct 2026 (task 0a): the title says it; the paragraph is behind the "i" (kept open across a rebuild)
+        const was = document.getElementById('info-flow'), open = !!(was && !was.hidden);
+        box.innerHTML = '<div class="ctl-head" style="margin:0 0 4px"><b style="margin:0">' + unit + ', each way</b>' +
+            '<button type="button" class="info-i" aria-expanded="' + open + '" aria-controls="info-flow" onclick="toggleInfo(this)" title="About the lanes" aria-label="About the lanes"><span aria-hidden="true">i</span></button></div>' +
+            '<div class="info-pop" id="info-flow"' + (open ? '' : ' hidden') + '><p>Each direction has its own lane, on the left. Where routes share a road, the lane shows their total. While Play runs, a light moves along each lane the way its lorries go.</p></div>' +
+            '<div class="ml-sub">' + when + '</div>' +
+            stepRanges(FLOW_STOPS, '').map((t, i) => '<div class="ml-row">' + flowSample(FLOW_WIDTHS[i]) + t + '</div>').join('');
     }
     // ===== end of the flow =====
 
     function animateFlow(ts){
-        if(!TL.playing){ _flowRAF=null; setFlowPulse(null); setRailFlowDash(DASH_SOLID); applyRailFlow(); return; }
+        if(!TL.playing){ _flowRAF=null; setFlowPulse(null); return; }
         // 23 Oct 2026: the hauls' light runs every frame (a phase, not a tick); the rail keeps its 65 ms dash steps
         if(map.getLayer && map.getLayer('forecast-flow')){ _pulseT=((ts*FLOW_PULSE_SPEED)/1000)%1; setFlowPulse(_pulseT); }
         // 23 Oct 2026 (the user): the abnormal load on its way, at the same frame
         if(typeof setAbnormalDots === 'function') try { setAbnormalDots(((ts*ABN_DOT_SPEED)/1000)%1); } catch(e){}
         if(map.getLayer && (ts-_dashT>FLOW_TICK_MS)){
             _dashIx=(_dashIx+1)%FLOW_CYCLE;
-            // ⭐ the rail steps on the SAME index as the hauls. Two cycles at the same
-            // period but a different phase read as two unrelated animations, which is the
-            // opposite of what putting them on one cycle is for.
-            // 16 Oct 2026 (D115): one count, FLOW_CYCLE long (a whole number of the rail's seven steps), the rail
-            // reading it modulo its own seven; both move 2 px a tick
-            if(map.getLayer('evr-rail-flow')) setRailFlowDash(DASH_SEQ[_dashIx%DASH_SEQ.length]);
+            // 28 Oct 2026 (task 0a): the rail's march, which stepped on this count, is gone with the rail layers
             _dashT=ts;
         }
         _flowRAF=requestAnimationFrame(animateFlow);
     }
     // 12 Oct 2026 (review §2.4, WCAG 2.3.3): reduced motion is a PAINT property here, not CSS. When the
-    // visitor's system asks for less motion the dashes stay DASH_SOLID while playing (the month still
+    // visitor's system asks for less motion the lanes stand still while playing (the month still
     // steps) and "Show on map" jumps instead of flying. GL JS 2.14.1 has no respectPrefersReducedMotion.
     // 16 Oct 2026 (D115), 23 Oct 2026: the hauls' lanes stand still (setFlowPulse(null): a faint solid stripe, the width
-    // by band) rather than moving; the rail's overlay stays DASH_SOLID and hidden.
+    // by band) rather than moving.
     function reducedMotion(){
         try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch(e){ return false; }
     }
     function startFlowAnimation(){
-        applyRailFlow();
-        if(reducedMotion()){ setFlowPulse(null); setRailFlowDash(DASH_SOLID); return; }   // no motion: the lanes stand still
+        if(reducedMotion()){ setFlowPulse(null); return; }   // no motion: the lanes stand still
         if(_flowRAF==null) _flowRAF=requestAnimationFrame(animateFlow);
     }
     function stopFlowAnimation(){
         if(_flowRAF!=null){ cancelAnimationFrame(_flowRAF); _flowRAF=null; }
         setFlowPulse(null);
         try { setAbnormalDots(null); } catch(e){}      // 23 Oct 2026: the load's dot goes with the light
-        // pause, scrub or close: the ticks stop AND the overlay goes away, so the corridor
-        // is left exactly as applyRailHighlight() drew it
-        setRailFlowDash(DASH_SOLID);
-        applyRailFlow();
     }
 
     // 11 Sep pm: play speed. TL_STEP_MS is one month at 1×; the select multiplies it. Kept in
@@ -8618,6 +8460,7 @@
         if (v.marks === 'dots') q.set('marks', 'dots');             // 16 Oct 2026 (V7): sites drawn as dots (icons are the default)
         if (v.basemap && BASEMAP_LINK[v.basemap]) q.set('basemap', v.basemap);   // 27 Oct 2026: the ground (Light, the default, adds nothing)
         if (v.light && v.light !== 'day' && LIGHT_PRESETS.includes(v.light)) q.set('light', v.light);   // 28 Oct 2026 (8d): Standard's light
+        if (v.labels === 'off' || v.labels === 'all') q.set('labels', v.labels);   // 28 Oct 2026 (task 0a): Few, the default, adds nothing   // 28 Oct 2026 (task 0a): Few adds nothing
         return q.toString();
     }
     function decodeView(search) {
@@ -8625,7 +8468,8 @@
         const out = { month: null, layers: null, filters: {}, council: q.get('council') === 'carbon' ? 'carbon' : null,
                       marks: q.get('marks') === 'dots' ? 'dots' : null,
                       basemap: basemapFromKey(q.get('basemap')) ? q.get('basemap') : null,
-                      light: LIGHT_PRESETS.includes(q.get('light')) ? q.get('light') : null };
+                      light: LIGHT_PRESETS.includes(q.get('light')) ? q.get('light') : null,
+                      labels: /^(off|few|all)$/.test(q.get('labels') || '') ? q.get('labels') : null };   // 28 Oct 2026 (task 0a): LABEL_MODES
         if (q.has('month')) out.month = monthFromParam(q.get('month'));
         if (q.has('layers')) out.layers = (q.get('layers') || '').split('.').map(x => x.trim()).filter(x => /^-?[a-z0-9_-]+$/i.test(x));
         (q.get('filters') || '').split('|').forEach(part => {
@@ -8651,7 +8495,8 @@
                  council: (typeof councilFocus === 'function' && councilFocus() && typeof AREAS !== 'undefined' && AREAS.mode === 'carbon') ? 'carbon' : null,
                  marks: (typeof locDotsOn === 'function' && locDotsOn()) ? 'dots' : null,
                  basemap: basemapKey(BASEMAP.pending || BASEMAP.shown),
-                 light: isStandard(BASEMAP.pending || BASEMAP.shown) ? LIGHT.preset : null };
+                 light: isStandard(BASEMAP.pending || BASEMAP.shown) ? LIGHT.preset : null,
+                 labels: (typeof LABELS !== 'undefined') ? LABELS.mode : null };
     }
     // the link a person shares: this page's address with the view, without the app's embed / cache-buster parameters;
     // monthOnly = the short form for a QR code that cannot hold the whole view
@@ -8703,6 +8548,7 @@
         // 16 Oct 2026 (V7): dots before the boxes; the change event runs toggleLocDots and the link listener
         const dots = document.getElementById('loc-dots');
         if (dots && dots.checked !== (v.marks === 'dots')) { dots.checked = v.marks === 'dots'; dots.dispatchEvent(new Event('change', { bubbles: true })); }
+        if (v.labels && typeof setLabels === 'function' && v.labels !== LABELS.mode) setLabels(v.labels);     // 28 Oct 2026 (task 0a)
         if (v.layers) {
             const want = new Set(layersFromChanges(VIEW.defaults, v.layers));
             layerBoxes().forEach(cb => {
@@ -9161,11 +9007,12 @@
     }
     function renderCommunityPanel() {
         const box = document.getElementById('community-kinds'), when = document.getElementById('community-when'),
-              att = document.getElementById('community-attribution');
+              cnt = document.getElementById('community-count');
         const D = COMM.data;
         if (!box || !when) return;
-        if (!D) { box.hidden = true; when.textContent = COMM.loading ? 'Loading…' : ''; return; }
+        if (!D) { box.hidden = true; if (cnt) cnt.textContent = COMM.loading ? 'loading…' : ''; return; }
         const total = (D.features || []).length;
+        if (cnt) cnt.textContent = !total && !D.fetched_at ? 'not fetched yet' : total.toLocaleString('en-GB');
         box.hidden = !COMM.on || !total;
         box.innerHTML = (D.kinds || []).map(k => `<div class="control-item" style="padding-left:23px"><label style="display:flex;gap:6px;align-items:center">` +
             `<input type="checkbox" data-comm-kind="${escHtml(k.key)}" ${COMM.off.has(k.key) ? '' : 'checked'} ${k.count ? '' : 'disabled'} ` +
@@ -9176,7 +9023,6 @@
             ? 'Not fetched yet. A planner fetches it on Config → Map and bulletin.'
             : `Within ${D.strip.route_m} m of the routes and ${D.strip.site_m} m of the sites. From ${src.join(', ')}.` +
               (D.error ? ' The last fetch did not finish; the earlier data is kept.' : '');
-        if (att) att.textContent = D.credit || '';
     }
     function loadCommunity() {
         if (!COMM.staff || COMM.loading) return;
@@ -9184,7 +9030,7 @@
         fetch('/api/community', { credentials: 'same-origin' })
             .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 401 ? 'only staff can see this layer' : 'not read (' + r.status + ')')))
             .then(j => { COMM.data = j; COMM.loading = false; renderCommunityPanel(); ensureCommunityLayers(); })
-            .catch(e => { COMM.loading = false; const w = document.getElementById('community-when'); if (w) w.textContent = 'Could not load this layer.'; });
+            .catch(e => { COMM.loading = false; const w = document.getElementById('community-count'); if (w) w.textContent = 'not read'; });
     }
     function toggleCommunity(on) {
         COMM.on = !!on && COMM.staff;
@@ -9275,11 +9121,12 @@
     }
     function renderCollisionPanel() {
         const box = document.getElementById('collision-filters'), when = document.getElementById('collision-when'),
-              att = document.getElementById('collision-attribution'), leg = document.getElementById('collision-legend');
+              cnt = document.getElementById('collision-count'), leg = document.getElementById('collision-legend');
         const D = COLL.data;
         if (!box || !when) return;
-        if (!D) { box.hidden = true; when.textContent = COLL.loading ? 'Loading…' : ''; return; }
+        if (!D) { box.hidden = true; if (cnt) cnt.textContent = COLL.loading ? 'loading…' : ''; return; }
         const n = D.counts || { all: 0, ksi: 0 };
+        if (cnt) cnt.textContent = !D.fetched_at ? 'not fetched yet' : Number(n.all || 0).toLocaleString('en-GB');
         const alt = D.alternatives_only || { all: 0, ksi: 0 };
         box.hidden = !COLL.on || !(n.all || alt.all);
         const dot = (r, fill, stroke) => `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" style="flex:none"><circle cx="7" cy="7" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="1.3"/></svg>`;
@@ -9294,7 +9141,6 @@
                          (altsShown() ? 'drawn while Alternative routes is ticked.' : 'tick Alternative routes to see them.') : '') +
               ' Evidence, not a risk assessment.' +
               (D.error ? ' The last fetch did not finish; the earlier data is kept.' : '');
-        if (att) att.textContent = D.credit || '';
     }
     function loadCollisions() {
         if (!COLL.staff || COLL.loading) return;
@@ -9302,7 +9148,7 @@
         fetch('/api/collisions', { credentials: 'same-origin' })
             .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 401 ? 'only staff can see this layer' : 'not read (' + r.status + ')')))
             .then(j => { COLL.data = j; COLL.loading = false; renderCollisionPanel(); ensureCollisionLayers(); })
-            .catch(e => { COLL.loading = false; const w = document.getElementById('collision-when'); if (w) w.textContent = 'Could not load this layer.'; });
+            .catch(e => { COLL.loading = false; const w = document.getElementById('collision-count'); if (w) w.textContent = 'not read'; });
     }
     function toggleCollisions(on) {
         COLL.on = !!on && COLL.staff;
@@ -9412,16 +9258,19 @@
         const box = document.getElementById('abnormal-filters'), when = document.getElementById('abnormal-when'), leg = document.getElementById('abnormal-legend');
         if (!box || !when) return;
         box.hidden = !ABN.on;
-        if (ABN.loading) { when.textContent = 'Reading the abnormal loads…'; return; }
-        if (!ABN.data) { when.textContent = ABN.on ? '' : 'Each abnormal load’s own line, drawn for its size, with the potential pinch points found on it. Staff only.'; return; }
+        const cnt = document.getElementById('abnormal-count');
+        const about = 'Each abnormal load’s own line, drawn for its size, with the potential pinch points found on it. Staff only.';
+        if (ABN.loading) { if (cnt) cnt.textContent = 'loading…'; when.textContent = about; return; }
+        if (!ABN.data) { if (cnt) cnt.textContent = ''; when.textContent = about; return; }
         const D = ABN.data, n = D.count || 0, dots = (D.features || []).filter(f => f.geometry && f.geometry.type === 'Point').length;
+        if (cnt) cnt.textContent = String(n);
         when.textContent = n ? `${n} abnormal load${n === 1 ? '' : 's'} drawn, ${dots} potential pinch point${dots === 1 ? '' : 's'}. ${(D.words && D.words.indicative) || ''} ${(D.words && D.words.counted_apart) || ''}`
                              : 'No abnormal load has a line drawn yet (a planner draws it on Plan → Abnormal loads).';
+        when.textContent += ' Each ring is grey until surveyed; the route survey decides.';
         if (leg) leg.innerHTML = 'The raspberry line: the load’s own line. Rings: ' +
             [['turn', 'turn'], ['roundabout', 'roundabout'], ['slip_road', 'slip road'], ['bend', 'sharp bend'], ['limit', 'signed limit'],
              ['bridge', 'bridge'], ['railway', 'railway'], ['level_crossing', 'level crossing'], ['calming', 'traffic calming'], ['overhead', 'overhead line']]
-            .map(([k, w]) => `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#fff;border:2px solid ${ABN_DOT[k]};vertical-align:middle"></span> ${w}`).join(' · ') +
-            '. Each Grey — to survey; the route survey decides.';
+            .map(([k, w]) => `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#fff;border:2px solid ${ABN_DOT[k]};vertical-align:middle"></span> ${w}`).join(' · ');
     }
     function loadAbnormal() {
         if (ABN.loading) return;
@@ -9429,7 +9278,8 @@
         fetch('/api/abnormal/geojson', { credentials: 'same-origin' })
             .then(r => { if (!r.ok) throw new Error(r.status === 401 ? 'sign in as staff to see the abnormal loads' : 'HTTP ' + r.status); return r.json(); })
             .then(j => { ABN.data = j; ABN.loading = false; renderAbnormalPanel(); ensureAbnormalLayers(); })
-            .catch(e => { ABN.loading = false; const w = document.getElementById('abnormal-when'); if (w) w.textContent = /sign in/.test(String(e && e.message)) ? 'Sign in as staff to see the abnormal loads.' : 'The abnormal loads could not be read: try again.'; });
+            .catch(e => { ABN.loading = false; const w = document.getElementById('abnormal-when'); if (w) w.textContent = /sign in/.test(String(e && e.message)) ? 'Sign in as staff to see the abnormal loads.' : 'The abnormal loads could not be read: try again.';
+                            const c = document.getElementById('abnormal-count'); if (c) c.textContent = 'not read'; });
     }
     function toggleAbnormal(on) {
         ABN.on = !!on;
@@ -9524,9 +9374,9 @@
         const box = document.getElementById('abnormal-legend-public'); if (!box) return;
         const on = ABP.on && !!ABP.month && ABP.active.length > 0;
         box.hidden = !on; if (!on) return;
-        box.innerHTML = '<b>Abnormal load this month</b>' +
-            '<div class="ml-row"><span class="ml-sw" style="background:' + ABN_LINE + ';height:5px;border-radius:3px"></span>Its route, drawn for its month only</div>' +
-            '<div class="ml-row"><span class="ml-sw" style="background:' + ABN_LINE + ';width:11px;height:11px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)"></span>On its way while Play runs</div>';
+        box.innerHTML = '<b>Abnormal load</b>' +
+            '<div class="ml-row"><span class="ml-sw" style="background:' + ABN_LINE + ';height:5px;border-radius:3px"></span>Its route</div>' +
+            '<div class="ml-row"><span class="ml-sw" style="background:' + ABN_LINE + ';width:11px;height:11px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)"></span>Moving (Play)</div>';
     }
     function abnormalPublicPopup(e) {
         const f = e.features && e.features[0]; if (!f) return;
@@ -9540,15 +9390,17 @@
     function renderAbnormalPublicPanel() {
         const when = document.getElementById('abnormal-public-when');
         if (!when) return;
-        if (ABP.loading) { when.textContent = 'Reading the approved abnormal loads…'; return; }
-        const base = 'Approved abnormal loads, each as its route in the month it moves, counted on the figures bar. Indicative: the agreed route may differ.';
-        if (!ABP.data || !ABP.on) { when.textContent = base; return; }
+        if (ABP.loading) { when.textContent = 'Reading…'; return; }
+        // 28 Oct 2026 (task 0a): one short line ("1 this month · 8–12 Mar 2027"); the explanation is behind the "i"
+        const words = document.getElementById('abnormal-public-words');
+        if (words) words.textContent = (ABP.data && ABP.data.words && ABP.data.words.indicative) || 'Indicative: the agreed route may differ.';
+        if (!ABP.data || !ABP.on) { when.textContent = ''; return; }
         const lines = (ABP.data.features || []).filter(f => f.geometry && f.geometry.type === 'LineString' && f.properties && f.properties.leg !== 'return');
         const ids = abnormalPublicMonthIds(ABP.month);
         const shown = ids ? lines.filter(f => ids.includes(String(f.properties.id))) : lines;
         const n = ids ? shown.length : (ABP.data.count || lines.length);
-        when.textContent = n ? `${n} ${ids ? 'this month' : 'approved'}: ${shown.map(f => abnWhen(f.properties.date_from, f.properties.date_to, null)).join(', ')}. ${(ABP.data.words && ABP.data.words.indicative) || ''}`
-                             : (ids ? 'No approved abnormal load moves this month.' : 'No approved abnormal load has a line drawn yet.');
+        when.textContent = n ? `${n} ${ids ? 'this month' : 'approved'} · ${shown.map(f => abnWhen(f.properties.date_from, f.properties.date_to, null)).join(', ')}`
+                             : (ids ? 'None this month' : 'None drawn yet');
     }
     function loadAbnormalPublic() {
         if (ABP.loading) return;

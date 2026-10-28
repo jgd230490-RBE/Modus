@@ -952,10 +952,12 @@ ok("E: the overlay module fills window.evr_rail_data from the package's `rail`",
    "window.evr_rail_data = (o.rail" in _ov)
 _mp = open(os.path.join(ROOT, "map", "index.html"), encoding="utf-8").read()
 ok("E: the map no longer loads a static rail file", "data/evr_rail.js" not in _mp)
-ok("E: the map still draws the corridor from window.evr_rail_data",
-   "window.evr_rail_data" in _mp)
-ok("E: ⭐ it is not the alignment layer — the two stay separate sources",
-   "alignment-source" in _mp and "'evr-rail'" in _mp)
+# REVERSED 28 Oct 2026 (task 0a, John: the rail option off the panel; the public map no longer draws the railway).
+# The organisation file keeps its `rail` (the overlay module still fills the global, above); the map reads none of it.
+ok("E: 🔴 the map no longer draws the corridor (reads nothing from window.evr_rail_data)",
+   "window.evr_rail_data" not in _mp)
+ok("E: 🔴 no evr-rail source or layer; the alignment keeps its own source",
+   "alignment-source" in _mp and "'evr-rail" not in _mp and "Existing rail network" not in _mp)
 
 
 # =========================================================================== #

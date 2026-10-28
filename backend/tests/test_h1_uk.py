@@ -438,7 +438,9 @@ ok("H2: the notice is on both exports (XLSX About row, PDF footer) and the app's
    and """ft.insert(0, P(f'<font color=\"#{DEMO_FG_HEX}\"><b>' + E(_demo_notice()) + \"</b></font>\", st_grey))""" in read("backend/export.py")
    and '<span className="demo-bar-text" title={TENANT.demo_notice}>{TENANT.demo_notice}</span>' in read("frontend/index.html")
    and 'className="demo-badge' not in read("frontend/index.html") and "demo_notice: (tn.demo_notice || null)" in read("frontend/index.html")
-   and "railItem.hidden = !hasRail" in read("map/index.html") and "dn.textContent = TENANT.demo_notice" in read("map/index.html"))
+   # REVERSED 28 Oct 2026 (task 0a, John): the map no longer has a rail layer to hide; no rail row at all
+   and "railItem.hidden = !hasRail" not in read("map/index.html") and "Existing rail network" not in read("map/index.html")
+   and "dn.textContent = TENANT.demo_notice" in read("map/index.html"))
 # --- 30 Sep 2026: the national feed against baked routes must be pre-filtered by box -----
 # The first GB run with baked routes put the live service at 100 % CPU for hours: 2,920
 # closures × 170,000 vertices against 18 routes × 4 legs, vertex by segment. These pin the
@@ -659,8 +661,8 @@ except ImportError:
 _mp_src = read("map/index.html")
 ok("🔴 the map's legend carries no first-tenant figure ('~60 km' unsurveyed, '7 package edges') — the words are generic",
    "~60" not in _mp_src and "7 package edges" not in _mp_src
-   and "Gaps in the survey are filled in. Click the line to see which stretches are measured." in _mp_src   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): no "alignment file"
-   and "Package edges · ticks from zoom 11" in _mp_src)
+   # NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel): both notes moved to the user guide §8.2
+   and "Gaps in the survey are filled in." not in _mp_src and "Package edges · ticks from zoom 11" not in _mp_src)
 
 # =========================================================================== #
 #  3. Source level: Estonian things are gated                                   #

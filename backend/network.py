@@ -882,6 +882,10 @@ def public_map_data(profile=None):
     # road is open when it is not.
     try:
         counts = haul.link_counts()
+        # 28 Oct 2026 (task 0a): a gate's own access road is flagged, so the public map's Labels "Few" leaves its name off
+        access = {g["access_zone_id"] for g in db.query(
+            "SELECT access_zone_id FROM location_gates WHERE tenant_id = ? AND access_zone_id IS NOT NULL",
+            (db.current_tenant(),)) if g.get("access_zone_id")}
         for z in zones.haul_roads():
             line = zones.as_line(z["geometry"])
             if not line:
@@ -894,6 +898,7 @@ def public_map_data(profile=None):
                     "speed_kph": z["speed_kph"],
                     "length_km": z["length_km"],
                     "routes_attached": counts.get(z["id"], 0),
+                    "access_road": z["id"] in access,
                     "starts_on": z["starts_on"], "ends_on": z["ends_on"],
                     "note": z["note"] or "",
                 },
