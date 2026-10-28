@@ -920,11 +920,16 @@ def public_map_data(profile=None):
                 if sp["capacity_qty"] is None or not sp["weeks"]:
                     continue
                 last = sp["weeks"][-1]
+                # 27 Oct 2026 (stockpile forecast, D9 a + i): this layer is PUBLIC, so the gauge
+                # reads the forecast capped at the capacity ("full"), never a pile over it — a pile
+                # over capacity is a site matter. Staff read the real figure from the timeline.
                 stock[sp["location_id"]] = {
                     "capacity_qty": sp["capacity_qty"],
                     "capacity_unit": sp["capacity_unit"],
-                    "stock_balance": last["balance_end"],
-                    "stock_over": last["over"],
+                    "stock_balance": min(last["balance_end"], sp["capacity_qty"]),
+                    "stock_over": False,
+                    "stock_full": bool(last["balance_end"] >= sp["capacity_qty"]),
+                    "stock_basis": "forecast" if sp.get("forecast") else "recorded",
                 }
     except Exception:
         pass   # forecast_weeks / stockpile_weeks may not exist yet on a cold database

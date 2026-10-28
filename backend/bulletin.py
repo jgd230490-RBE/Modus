@@ -88,18 +88,26 @@ _MONTHS_LONG = ("January", "February", "March", "April", "May", "June", "July", 
                 "September", "October", "November", "December")
 
 
-def stockpile_wording(name, capacity_qty, balance_end, unit, month_index):
+def stockpile_wording(name, capacity_qty, balance_end, unit, month_index, basis="recorded"):
     """
-    The sentence a person reads about a stockpile over capacity (D23, 12 Oct 2026). The
-    balance is a running total of the week ACTUALS typed on the Look-ahead, carried
-    forward — not a plan figure — so it is "recorded in it", never "the plan puts".
+    The sentence a person reads about a stockpile over capacity (D23, 12 Oct 2026). A month
+    whose weeks were all recorded says "recorded in it", never "the plan puts".
+
+    27 Oct 2026 (stockpile forecast): the balance runs forward from the plan. A month from the
+    current week on is the FORECAST ("forecast at the end of"); a past month where the plan
+    stood in for weeks nobody recorded says so. The basis comes from stockpiles.balances.
     """
     u = unit or "t"
     # 12 Oct 2026 (the review and fix pass): "has a capacity of", not "holds" — "holds" read as
-    # what is in the pile now, and the next figure is a different "contents" figure
-    return (f"{name} has a capacity of {float(capacity_qty):,.0f} {u}; {float(balance_end):,.0f} {u} "
-            f"recorded in it at the end of {month_label(month_index)}, from the week actuals typed so far, "
-            "carried forward.")
+    # what is in the stockpile now, and the next figure is a different "contents" figure
+    head = f"{name} has a capacity of {float(capacity_qty):,.0f} {u}; {float(balance_end):,.0f} {u} "
+    if basis == "forecast":
+        return head + f"forecast at the end of {month_label(month_index)}, from the approved plan."
+    if basis in ("plan", "part"):
+        return head + (f"at the end of {month_label(month_index)}, from the week actuals typed so far and the plan "
+                       "where nothing was recorded.")
+    return head + (f"recorded in it at the end of {month_label(month_index)}, from the week actuals typed so far, "
+                   "carried forward.")
 
 
 # --------------------------------------------------------------------------- #
@@ -598,8 +606,9 @@ def conditions_of_month(month_index, payload=None, factors=None):
                           "capacity_qty": sp["capacity_qty"], "unit": sp["capacity_unit"],
                           "balance_end": last["balance_end"],
                           "over_by": _r(float(last["balance_end"]) - float(sp["capacity_qty"])),
+                          "basis": last.get("basis", "recorded"),
                           "wording": stockpile_wording(sp["name"], sp["capacity_qty"], last["balance_end"],
-                                                       sp["capacity_unit"], mi)})
+                                                       sp["capacity_unit"], mi, basis=last.get("basis", "recorded"))})
 
     # 3. seasonal windows for this calendar month
     seasonal = []

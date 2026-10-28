@@ -1704,7 +1704,8 @@ async function phoneShellDom(){
   ok("PHONE: More opens a sheet (a dialog) with the pages made for a desk this role can see, and the user guide",
      !!sheet() && sheet().getAttribute("role") === "dialog" && tabs(t.el)[3].getAttribute("aria-expanded") === "true"
      // NARROWED 22 Oct 2026 (abnormal loads, S16 / B5): + Abnormal loads, a Plan-group desk page a team sees
-     && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Abnormal loads"
+     // NARROWED 27 Oct 2026 (stockpile forecast, D4 a): + Stockpiles, a Plan-group desk page a team reads
+     && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles"
      && !!sheet().querySelector('a[href^="/help/?role="][target="_blank"]'));
   ok("PHONE: ...a team code's sheet holds no Data or Config page (the role's own pages only)", !/Locations|Routes|Zones|Config/.test(sheet().textContent));
   await act(async () => { w.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
@@ -1734,7 +1735,8 @@ async function phoneShellDom(){
   // NARROWED 27 Oct 2026 (F3 c): no longer — Users is for an admin LOGIN only, so the planner's sheet ends at Config
   ok("PHONE: the planner's sheet adds the Data pages and Config (each a desk page), not Users",
      // NARROWED 22 Oct 2026 (abnormal loads): + Abnormal loads after the Carbon planner
-     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Abnormal loads|Locations|Routes|Zones|Config");
+     // NARROWED 27 Oct 2026 (stockpile forecast): + Stockpiles after Abnormal loads
+     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Locations|Routes|Zones|Config");
   ok("PHONE (with G3): ...and with no Users item, the Users page cannot be reached on a phone by a planner",
      ![...p.el.querySelectorAll("#phone-more button.phone-more-item")].some(b => /Users/.test(b.textContent)));
   click([...p.el.querySelectorAll("#phone-more button.phone-more-item")].find(b => /Config/.test(b.textContent)));

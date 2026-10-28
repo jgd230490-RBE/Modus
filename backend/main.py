@@ -48,6 +48,7 @@ import tenant_package  # G2, 16 Sep — a tenant as one JSON document; the map o
 import costing       # 10 Sep evening — target rates + fuel settings (config key 'costing'), BAF
 import fuel          # 10 Sep evening — the EU Weekly Oil Bulletin diesel index, fetched server-side
 import costlines     # 11 Sep — one read of every forecast line's volume, haul and cost figures (Dashboard, Forecasts)
+import security_headers  # 27 Oct 2026 (pilot readiness phase 2): the headers on every answer
 import demo_request  # H9, 8 Oct — the landing page's demo-request form: store, email or show the access details
 import users         # G3, 14 Oct 2026 — per-person logins, sessions, reset links, the audit trail
 import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternatives, drivers ranked by tCO2e moved
@@ -434,6 +435,15 @@ if _Request is not None and hasattr(app, "middleware"):
             return response
         finally:
             access.reset_current(token)
+
+    # 27 Oct 2026 (pilot readiness phase 2, F3 e): the security headers on EVERY answer — pages, the map, the guides,
+    # the bulletin, the API and the gate's refusals. Declared after the access middleware, so it wraps it and sees
+    # those refusals too. The policy and its limit: backend/security_headers.py.
+    @app.middleware("http")
+    async def _security_headers_middleware(request, call_next):
+        response = await call_next(request)
+        security_headers.apply(request.url.path, response.headers)
+        return response
 
 
 #: G3 (plan §4.6): the header the app's fetch wrapper adds to every API call. A session-cookie
@@ -2006,6 +2016,7 @@ def list_stockpiles(from_month: int = Query(1, ge=1, le=MONTH_COUNT),
     # one from the routes that feed it would be a guess. An IPT code sees every stockpile.
     _require_access()
     out = stockpiles.balances(from_month, to_month, location_id=location_id)
+    out["ahead_weeks"] = stockpiles.AHEAD_WEEKS
     out["storage_types"] = list(stockpiles.STORAGE_TYPES)
     out["capacity_units"] = list(stockpiles.CAPACITY_UNITS)
     return out
@@ -2020,6 +2031,64 @@ def consume_stockpile(body: ConsumeIn):
                              note=body.note, by=_by(body.updated_by))
     if res.get("error"):
         raise HTTPException(404, res["error"])
+    return res
+
+
+# 27 Oct 2026 (stockpile forecast, D1 a / D5 / D6): each pile's planned use by month and the stock
+# count. Planners and admins type them (a team login reads the page without the boxes); every write
+# lands in audit_log through the middleware.
+class StockPlanIn(BaseModel):
+    location_id: str
+    from_month: int
+    to_month: Optional[int] = None
+    planned_qty: Optional[float] = None
+    note: Optional[str] = None
+    updated_by: Optional[str] = None
+
+
+class StockCountIn(BaseModel):
+    location_id: str
+    month_index: int
+    week_index: int
+    measured_qty: Optional[float] = None
+    note: Optional[str] = None
+    updated_by: Optional[str] = None
+
+
+@app.get("/api/stockpiles/plan")
+def stockpile_plan(location_id: Optional[str] = None):
+    """The planned use per pile per month, in each pile's unit."""
+    _require_access()
+    rows = stockpiles.plan_rows(location_id)
+    out = {}
+    for (lid, m), q in sorted(rows.items()):
+        out.setdefault(lid, {})[str(m)] = q
+    return {"plans": out}
+
+
+@app.put("/api/stockpiles/plan")
+def put_stockpile_plan(body: StockPlanIn):
+    """One month, or the same figure for every month from–to. Planners and admins only."""
+    _require_approver()
+    if not (1 <= body.from_month <= MONTH_COUNT) or (body.to_month is not None and not 1 <= body.to_month <= MONTH_COUNT):
+        raise HTTPException(400, "That month is outside the programme.")
+    res = stockpiles.set_plan(body.location_id, body.from_month, body.to_month,
+                              planned_qty=body.planned_qty, note=body.note, by=_by(body.updated_by))
+    if res.get("error"):
+        raise HTTPException(400, res["error"])
+    return res
+
+
+@app.put("/api/stockpiles/count")
+def put_stockpile_count(body: StockCountIn):
+    """A stock count at the end of one week. Planners and admins only."""
+    _require_approver()
+    if not 1 <= body.month_index <= MONTH_COUNT:
+        raise HTTPException(400, "That month is outside the programme.")
+    res = stockpiles.set_count(body.location_id, body.month_index, body.week_index,
+                               measured_qty=body.measured_qty, note=body.note, by=_by(body.updated_by))
+    if res.get("error"):
+        raise HTTPException(400, res["error"])
     return res
 
 
@@ -2765,18 +2834,15 @@ def _approved_co2(factors, from_month, to_month):
 CO2_ERROR_SENTENCE = "The carbon figures could not be read ({cls})."
 
 
-@app.get("/api/public/stockpile-timeline")
-def public_stockpile_timeline(from_: int = Query(1, alias="from", ge=1, le=MONTH_COUNT),
-                              to: int = Query(MONTH_COUNT, ge=1, le=MONTH_COUNT)):
-    """
-    2026-09-02 (§8). Per location, per month: is the stockpile over capacity at the END of
-    that month, and by how much. Read from the same balance read model the Look-ahead
-    uses; nothing stored, nothing new computed. Only stockpiles with a recorded capacity can
-    be over, so only those appear. No week detail — the public map stays monthly.
-    """
-    lo, hi = min(from_, to), max(from_, to)
+STOCK_TIMELINE_CACHE = "stockpile-timeline"
+
+
+def _stock_timeline_build():
+    """Every pile with a capacity, its END-of-month balance for every month, worked out once."""
     out = []
-    for sp in stockpiles.balances(lo, hi)["stockpiles"]:
+    bal = stockpiles.balances(1, MONTH_COUNT)
+    cm = bal["current_week"]["month_index"]
+    for sp in bal["stockpiles"]:
         if sp["capacity_qty"] is None:
             continue
         months = {}
@@ -2785,11 +2851,54 @@ def public_stockpile_timeline(from_: int = Query(1, alias="from", ge=1, le=MONTH
         out.append({
             "location_id": sp["location_id"], "name": sp["name"],
             "capacity_qty": sp["capacity_qty"], "unit": sp["capacity_unit"],
+            "forecast": sp.get("forecast", False),
             "months": {str(m): {"balance_end": w["balance_end"], "over": w["over"],
-                                "remaining": w["remaining"]}
+                                "remaining": w["remaining"],
+                                # 27 Oct 2026: a month before this one is recorded (or the plan where
+                                # nothing was), this month and later are the forecast
+                                "basis": ("forecast" if m >= cm and sp.get("forecast") else
+                                          ("recorded" if w.get("basis", "recorded") == "recorded" else "part"))}
                        for m, w in months.items()},
         })
-    return {"from": lo, "to": hi, "stockpiles": out}
+    return {"current_month": cm, "stockpiles": out}
+
+
+@app.get("/api/public/stockpile-timeline")
+def public_stockpile_timeline(from_: int = Query(1, alias="from", ge=1, le=MONTH_COUNT),
+                              to: int = Query(MONTH_COUNT, ge=1, le=MONTH_COUNT),
+                              request: Request = None):
+    """
+    2026-09-02 (§8). Per location, per month: the stockpile's balance at the END of that month,
+    from the same balance read model the Look-ahead uses. Only stockpiles with a recorded capacity
+    appear. No week detail — the public map stays monthly.
+
+    27 Oct 2026 (stockpile forecast, D9 a + i): future months are the FORECAST (`basis`). A pile
+    over capacity is a site matter (the 14 Oct bulletin call), so only a STAFF caller reads `over`
+    and a balance above the capacity; anyone else reads the balance capped at the capacity and
+    `full` instead. Worked out once per data version (read_cache).
+    """
+    import datetime as _dt
+    lo, hi = min(from_, to), max(from_, to)
+    built = read_cache.cached(STOCK_TIMELINE_CACHE, (MONTH_COUNT, _dt.date.today().isoformat()),
+                              _stock_timeline_build)
+    staff = _staff_request(request)
+    out = []
+    for sp in built["stockpiles"]:
+        cap = sp["capacity_qty"]
+        months = {}
+        for m, w in sp["months"].items():
+            if not lo <= int(m) <= hi:
+                continue
+            if staff:
+                months[m] = dict(w)
+            else:
+                months[m] = {"balance_end": min(w["balance_end"], cap), "over": False,
+                             "full": bool(w["balance_end"] >= cap),
+                             "remaining": max(0.0, w["remaining"]) if w["remaining"] is not None else None,
+                             "basis": w["basis"]}
+        out.append(dict(sp, months=months))
+    return {"from": lo, "to": hi, "current_month": built["current_month"], "staff": staff,
+            "stockpiles": out}
 
 
 @app.get("/api/public/forecast-matrix")
@@ -5058,6 +5167,9 @@ class NoCacheStatic(StaticFiles):
         await super().check_config()
 
 
+# 27 Oct 2026 (pilot readiness phase 2): third-party files served from this app because their CDN cannot be pinned with an
+# integrity hash (Tailwind's play script sends no CORS header). Exact versions in the file names; frontend/vendor/README.md.
+app.mount("/vendor", NoCacheStatic(directory=str(ROOT / "frontend" / "vendor"), check_dir=False), name="vendor")
 # Map (Mapbox app) at /map/ ; must be mounted before the catch-all "/".
 app.mount("/map", NoCacheStatic(directory=str(ROOT / "map"), html=True), name="map")
 # The user guide at /help/ (frontend/help/, landed on the repo on 10 Sep afternoon by

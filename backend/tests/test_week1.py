@@ -817,13 +817,21 @@ seed_line(months=(9,), qty=400.0)
 main.set_route_status("R1", main.StatusUpdate(status="Approved"),
                       discipline="earthworks", section_id="WS1")
 
+# NARROWED 27 Oct 2026 (stockpile forecast, John's D2 and D8): "no week actual = inbound 0" now holds for a place with
+# neither a capacity nor a planned use (records only). A pile WITH a capacity runs forward from the plan: an unrecorded
+# past week counts the plan, labelled (test_stockpile_forecast.py has every case). Both are pinned here.
+stockpiles.set_capacity("L2", capacity_qty=None, capacity_unit=None, opening_qty=200.0)
 bal = stockpiles.balances(9, 9)["stockpiles"]
 L2 = [s for s in bal if s["location_id"] == "L2"][0]
 w = {r["week_index"]: r for r in L2["weeks"]}
-ok("D2: ⭐ inbound is 0 until a week ACTUAL is typed — never the month forecast",
-   all(r["inbound"] == 0 for r in w.values()))
+ok("D2: ⭐ inbound is 0 until a week ACTUAL is typed — never the month forecast (records only: no capacity, no plan)",
+   all(r["inbound"] == 0 for r in w.values()) and L2["forecast"] is False)
 ok("D2: balance therefore starts at the opening figure", w[1]["balance_end"] == 200.0)
-ok("D2: remaining = capacity - balance", w[1]["remaining"] == 2800.0)
+stockpiles.set_capacity("L2", capacity_qty=3000.0, capacity_unit="t", opening_qty=200.0)
+w = {r["week_index"]: r for r in
+     [s for s in stockpiles.balances(9, 9)["stockpiles"] if s["location_id"] == "L2"][0]["weeks"]}
+ok("D2: remaining = capacity - balance (with a capacity the plan stands in for the unrecorded week: 200 + 100)",
+   w[1]["remaining"] == 2700.0 and w[1]["inbound"] == 100.0 and w[1]["basis"] == "plan", str(w[1]))
 ok("D2: not over capacity", w[1]["over"] is False)
 
 weeks.set_actual("R1", 9, "earthworks", "WS1", 1, actual_qty=500.0, by="foreman")
@@ -837,8 +845,9 @@ ok("D2: ⭐ balance = opening + inbound - consumed", w[1]["balance_end"] == 600.
    str(w[1]["balance_end"]))
 ok("D2: ⭐ remaining = capacity - (opening + inbound - consumed)",
    w[1]["remaining"] == 2400.0, str(w[1]["remaining"]))
-ok("D2: the balance carries forward into week 2 with no new movement",
-   w[2]["balance_end"] == 600.0)
+# NARROWED 27 Oct 2026 (D2): week 2 has no record, so the plan's 100 t stands in (records only, it carried 600)
+ok("D2: the balance carries forward into week 2, plus the plan where nothing was recorded",
+   w[2]["balance_end"] == 700.0 and w[2]["in_basis"] == "plan", str(w[2]))
 
 # over capacity is a FLAG, never a block
 weeks.set_actual("R1", 9, "earthworks", "WS1", 2, actual_qty=5000.0, by="foreman")
@@ -869,8 +878,10 @@ main.set_route_status("R9", main.StatusUpdate(status="Approved"),
 weeks.set_actual("R9", 9, "earthworks", "WS3", 1, actual_qty=999.0, by="foreman")
 tot = sum(r["inbound"] for s in stockpiles.balances(9, 9)["stockpiles"]
           for r in s["weeks"])
+# NARROWED 27 Oct 2026 (D2): 5 500 t recorded + the plan's 100 t for each of the two unrecorded weeks; R9's 999 t, with
+# no destination, is still nowhere
 ok("D2: ⭐ a route with no dest_id contributes nothing — no guessing",
-   tot == 5500.0, str(tot))
+   tot == 5700.0, str(tot))
 
 
 # =========================================================================== #
@@ -1379,12 +1390,20 @@ stockpiles.set_capacity("L2", capacity_qty=100.0, capacity_unit="t", opening_qty
 # the lines above were written Approved directly, so nothing materialised their weeks
 weeks.materialise_line("R1", "earthworks", "WS1")
 weeks.set_actual("R1", 9, "earthworks", "WS1", 1, actual_qty=150.0, by="f")
+# NARROWED 27 Oct 2026 (stockpile forecast, D9 a + i): a pile over capacity is shown to STAFF only; the public reads the
+# balance capped at the capacity and `full`. The balance runs forward (the plan stands in for weeks 2-4, D2).
+_st_staff = main.public_stockpile_timeline(9, 10)
+_ps = [s for s in _st_staff["stockpiles"] if s["location_id"] == "L2"][0]
 _as(None)
 _st = main.public_stockpile_timeline(9, 10)
 ok("§8: /api/public/stockpile-timeline is open without a code", isinstance(_st, dict))
 _p = [s for s in _st["stockpiles"] if s["location_id"] == "L2"][0]
-ok("§8: ⭐ the stockpile is over at the end of month 9", _p["months"]["9"]["over"] is True and _p["months"]["9"]["balance_end"] == 150.0)
-ok("§8: ...and still over in month 10 with no movement (the balance carries)", _p["months"]["10"]["over"] is True)
+ok("§8: ⭐ the stockpile is over at the end of month 9 (read by staff; 150 t recorded + the plan after it)",
+   _ps["months"]["9"]["over"] is True and _ps["months"]["9"]["balance_end"] >= 150.0, str(_ps["months"]["9"]))
+ok("§8: ...and still over in month 10 (staff)", _ps["months"]["10"]["over"] is True)
+ok("§8: ...the PUBLIC reads it 'full', capped at the capacity, never over",
+   _p["months"]["9"]["over"] is False and _p["months"]["9"]["full"] is True and _p["months"]["9"]["balance_end"] == 100.0,
+   str(_p["months"]["9"]))
 ok("§8: only stockpiles WITH a capacity appear — nothing can be 'over' an unknown limit",
    (stockpiles.set_capacity("L2", capacity_qty=None, opening_qty=0.0),
     main.public_stockpile_timeline(9, 10)["stockpiles"] == [])[1])

@@ -378,7 +378,9 @@ EARTHWORKS_SEASON = range(4, 11)  # April–October (§1.3)
 # The stockpiles' draw (§1.9, ASSUMPTION): a pile gives out what its sections lay. Out of season the formation is not
 # left exposed and frozen material is unacceptable (SHW Series 600), so little is laid: the share of the week's
 # deliveries laid straight away by calendar month, and in season a quarter of the stock held is laid each week too.
-LAY_SHARE = {1: 0.0, 2: 0.0, 3: 0.2, 4: 1.0, 5: 1.0, 6: 1.0, 7: 1.0, 8: 1.0, 9: 1.0, 10: 1.0, 11: 0.1, 12: 0.0}
+# 27 Oct 2026 (stockpile forecast, D11, "the winter nudge"): no capping is laid in November or March either (was 0.1
+# and 0.2), so Stockpile North, filling all winter, goes over in March 2027 — the demo's stockpile story.
+LAY_SHARE = {1: 0.0, 2: 0.0, 3: 0.0, 4: 1.0, 5: 1.0, 6: 1.0, 7: 1.0, 8: 1.0, 9: 1.0, 10: 1.0, 11: 0.0, 12: 0.0}
 LAY_BACKLOG = {m: (0.25 if 4 <= m <= 10 else 0.0) for m in range(1, 13)}
 RAIN_NOTE = "Rain: formation covered, capping stood down Tue–Wed"
 
@@ -434,6 +436,44 @@ def _outside_checkout(path):
         return os.path.commonpath([p, r]) != r
     except ValueError:          # another drive on Windows
         return True
+
+
+#: the one stock count the demo types: (pile, month_index, week_index, tonnes above the worked-out stock) — Stockpile
+#: Tilton, the week of 14 Sep 2026
+COUNT_AT = ("S2", 9, 3, 180.0)
+
+
+def AS_OF_WEEK_AFTER(at, as_of_week):
+    """True when the count's week is before the as-of week (only a past week can be counted)."""
+    return (at[1], at[2]) < as_of_week
+
+
+def stock_plan_rows(loc):
+    """Write stockpile_plan for the three stockpiles from the draw model over the planned deliveries (plan §6)."""
+    tenant = db.current_tenant()
+    planned = {}
+    for r in db.query("SELECT f.month_index, f.quantity, f.unit, r.dest_id FROM forecasts f JOIN routes r "
+                      "ON r.tenant_id = f.tenant_id AND r.id = f.route_id "
+                      "WHERE f.tenant_id = ? AND f.status = 'Approved'", (tenant,)):
+        if r["dest_id"] in [loc[k] for k in ("S1", "S2", "S3")]:
+            assert (r["unit"] or "t") == "t", r
+            k = (r["dest_id"], int(r["month_index"]))
+            planned[k] = planned.get(k, 0.0) + float(r["quantity"] or 0)
+    last = max(m for (_, m) in planned)
+    for key in ("S1", "S2", "S3"):
+        lid, held = loc[key], 0.0
+        for m in range(1, min(last + 6, 60) + 1):      # six months past the last delivery: the stock still held is laid
+            nw = weeks.weeks_in_month(m)
+            week_in = planned.get((lid, m), 0.0) / nw
+            cal_m = (m - 1) % 12 + 1
+            used = 0.0
+            for _ in range(nw):
+                draw = min(held + week_in, week_in * LAY_SHARE[cal_m] + held * LAY_BACKLOG[cal_m])
+                held = held + week_in - draw
+                used += draw
+            if used >= 0.5 or any(mm >= m for (l, mm) in planned if l == lid):
+                res = stockpiles.set_plan(lid, m, m, planned_qty=round(used), by="tools/make_demo_tenant.py")
+                assert "error" not in res, res
 
 
 def build(with_areas=False, out=None):
@@ -937,6 +977,7 @@ def build(with_areas=False, out=None):
     # out what their sections lay (LAY_SHARE, LAY_BACKLOG). Nothing is typed for the as-of week itself, so a pile near
     # capacity forecasts over in the commit week (STOCKPILE_OVER).
     held = {loc[k]: 0.0 for k in ("S1", "S2", "S3")}
+    counted = None
     for m in range(1, aw_m + 1):
         for wk in range(1, weeks.weeks_in_month(m) + 1):
             if (m, wk) >= (aw_m, aw_w):
@@ -958,7 +999,18 @@ def build(with_areas=False, out=None):
                 res = stockpiles.consume(lid, m, wk, consumed_qty=round(draw, 1), unit="t",
                                          note=("Laid on the section" if draw > 0 else "Stock held: formation not laid in winter"),
                                          by="site clerk")
+                if (key, m, wk) == COUNT_AT[:3]:
+                    counted = held[lid]
                 assert "error" not in res, res
+    # 27 Oct 2026 (stockpile forecast, plan §6): each stockpile's PLANNED use, month by month — the same draw model
+    # (LAY_SHARE, LAY_BACKLOG) run over the PLANNED deliveries (every approved line into the pile, its month spread
+    # evenly over the month's weeks), so the plan agrees with the history typed above. And one stock count on Stockpile
+    # Tilton (COUNT_AT), a little more than worked out, so the page shows a count adjustment.
+    stock_plan_rows(loc)
+    if counted is not None and AS_OF_WEEK_AFTER(COUNT_AT, (aw_m, aw_w)):
+        res = stockpiles.set_count(loc[COUNT_AT[0]], COUNT_AT[1], COUNT_AT[2],
+                                   measured_qty=round(counted + COUNT_AT[3]), note="Survey", by="site engineer")
+        assert "error" not in res, res
     # the as-of week: days for every line, day actuals for the days before the as-of date (Monday to Wednesday for a
     # Thursday), one South Team line's day split typed 10 t short of its week (DAYS_NE_WEEK), and the North Team's
     # week confirmed — so the Confirm button is still live for the Central and South Teams.

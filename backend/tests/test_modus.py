@@ -1183,6 +1183,14 @@ ok("ui_audit.js credits a control's hit area to the control itself or its label,
    "const lands = (h) => !!h && (h === el || el.contains(h) || (!!labEl && (h === labEl || labEl.contains(h))))" in _audit
    and "const reach = (d) => lands(hit(cx - d, cy)) && lands(hit(cx + d, cy)) && lands(hit(cx, cy - d)) && lands(hit(cx, cy + d))" in _audit
    and "owns(el, hit(cx" not in _audit)
+# 28 Oct 2026: Plan > Stockpiles (PR #144) is a page of the audit: the planner's walk, the team's (read-only) and a deep
+# stop on the stockpile that goes over; an older run whose pages are a subset still pairs in --compare
+ok("ui_audit.js audits Plan > Stockpiles: in the portal and team pages, its header named, a deep stop on Stockpile North, "
+   "and --compare pairs a run that only adds pages",
+   re.search(r'const PORTAL_PAGES = [^\n]*"abnormal", "stockpiles"', _audit) is not None
+   and re.search(r'const TEAM_PAGES = \[[^\n]*"stockpiles"', _audit) is not None
+   and 'stockpiles: "Stockpiles"' in _audit and 'meta("stockpiles+north", w)' in _audit
+   and 'pa.every(p => pb.includes(p))' in _audit and 'o.pages, o.browser' not in _audit)
 ok("ui_audit.js strips the harness's server origin from the compare keys (finding #34: the port is picked per run)",
    'const noOrigin = (s) => String(s).replace(/^https?:\\/\\/(127\\.0\\.0\\.1|localhost|\\[::1\\])(:\\d+)?/, "")' in _audit
    and "(x.url ? noOrigin(x.url) : null)" in _audit and "noOrigin(x).slice(0, 80)" in _audit)
