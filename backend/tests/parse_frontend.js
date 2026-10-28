@@ -2561,7 +2561,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const _dbSW = _dbS.slice(_dbS.indexOf("{!wall ? ("), _dbS.indexOf("      ) : (\n        <>\n")), _dbSWl = _dbS.slice(_dbS.indexOf("      ) : (\n        <>\n"));
   ok("⭐ S7: one block before CommitMap holding the panel, its player, map, timeline, scenario, table and phone list",
     simSrc.length > 20000 && ["function SimulationPanel({ meta, months, phone, initial })", "function SimPlayer({ meta, D, store, scenario, open })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
-      "function SimMap({ meta, D, store, frame })", "function SimTimeline({ D, t, onSeek })", "const SimScenario = React.memo(function SimScenario(",
+      // RE-PINNED 28 Oct 2026 (simulation v2): the map and the timeline take the chosen site
+      "function SimMap({ meta, D, store, frame, site })", "function SimTimeline({ D, t, onSeek, site })", "const SimScenario = React.memo(function SimScenario(",
       "const SimTable = React.memo(function SimTable(", "function SimPhoneList({ D })", "function simFrame(D, legs, t)", "function simQS(month, sc, legs)"].every(f => simSrc.includes(f)));
   ok("⭐ S7: under Gate arrivals on the desk Dashboard, before the folded sections; never on the big screen",
     _dbSW.includes("<SimulationPanel meta={meta} months={months} phone={phone} initial={initialSim} />")
@@ -2586,7 +2587,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && (simc.match(/Math\.ceil/g) || []).length === 1 && simc.includes("for(let h = Math.ceil(s0 / 60); h <= Math.floor(s1 / 60); h++)"));
   ok("⭐ S7 (D85): the timeline's red mark is the server's bottleneck (the first wait longer than the check-in), said in words",
     simSrc.includes("{g.bottleneck_at != null") && simSrc.includes("bottleneck from {simHM(g.bottleneck_at)} · up to {g.most_waiting} waiting")
-    && simSrc.includes("none longer than the {+g.check_in} min check-in"));
+    // RE-PINNED 28 Oct 2026 (v2): a station row says "minutes a lorry", a gate row "check-in" (simTlRows)
+    && simSrc.includes("none longer than the {+g.limit} min {g.word}") && simSrc.includes('word: "check-in"') && simSrc.includes('word: "minutes a lorry"'));
   ok("⭐ S7 (D81): lorries are dots (one circle layer, laden filled, empty hollow, mixers orange, waiting red); no icons",
     mapSrc.includes('m.addLayer({ id: "sim-lorries", type: "circle", source: "sim-lorries"') && !/icon-image|loadImage|addImage/.test(mapSrc)
     && mapSrc.includes('"laden", tok("--sim-lorry", "#2563EB"), "pour", tok("--sim-mixer", "#E8590C"), "#FFFFFF"')
@@ -2665,8 +2667,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && /\.sim-wall-fill \.sim-map\{height:100%;\}/.test(html) && /\.sim-wall-clock\{font-size:clamp\(/.test(html)
     && wallSrc.includes('<div className={"sim-wall" + (fill ? " sim-wall-fill" : "")} data-sim-wall="1">'));
   ok("⭐ SIM ONE SCREEN: from 1024 px the map and its timeline sit left, the clock / Gates now / scenario beside them; the table and the haul roads fold away (closed)",
-    fn("SimPlayer", "const SimScenario").includes('<div className="sim-main">\n          <SimMap meta={meta} D={D} store={store} frame={f} />')
-    && /<div className="sim-main">[\s\S]{0,700}<SimTimeline D=\{D\} t=\{t\}/.test(fn("SimPlayer", "const SimScenario"))
+    // RE-PINNED 28 Oct 2026 (v2): the site select sits above the map; the map and the timeline take the chosen site
+    fn("SimPlayer", "const SimScenario").includes('<SimMap meta={meta} D={D} store={store} frame={f} site={site} />')
+    && /<div className="sim-main">[\s\S]{0,1400}<SimTimeline D=\{D\} t=\{t\}/.test(fn("SimPlayer", "const SimScenario"))
     && /@media \(min-width:1024px\)\{\.sim-grid\{grid-template-columns:minmax\(0,1fr\) 300px;align-items:start;\}\n\s*\.sim-main \.sim-map\{height:clamp\(260px,calc\(100vh - 420px\),680px\);\}\}/.test(html)
     // found in Chrome: in the flex column the map's box shrank to nothing (align-self:start); it stretches across its column
     && /\.sim-main>\.sim-map-wrap\{align-self:stretch;\}/.test(html)
@@ -2675,6 +2678,65 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("S7: the info box entry (≤ 40 words) and the controls are named for a screen reader",
     /"dash\.sim": \{ title: "Simulation", text: "[^"]+", *\n? *how: "[^"]+", tech: "t1-gates" \}/.test(src)
     && ["Simulation month", "Playback speed", "Every gate opens at", "Every gate closes at", "Pour gate", "Pour starts at", "Busiest hour at each gate"].every(a => simSrc.includes(`aria-label="${a}"`)));
+}
+
+
+// ---- 28 Oct 2026 (simulation v2, task 0e): the scales, the site view, the stations, the sites' what-ifs; the forms ----
+// Source-level. What they prove: the scale and the sites' what-ifs reach the server only as the query sim.scenario_from_query
+// reads; the browser draws the server's chain on site and works out no figure; the forms carry the new fields. Not covered:
+// how a site looks on the map (the Chrome check on a local copy, notes/session-1028-sim-v2.md).
+{
+  const s0 = src.indexOf("// ---- 16 Oct 2026 (S7): the Simulation on the staff Dashboard"), s1 = src.indexOf("function CommitMap(");
+  const simSrc = src.slice(s0, s1);
+  const fn = (name, next) => simSrc.slice(simSrc.indexOf(`function ${name}(`), next ? simSrc.indexOf(next) : undefined);
+  const panelSrc = fn("SimulationPanel", "// ---- 17 Oct 2026: the Simulation on the BIG SCREEN"), playerSrc = fn("SimPlayer", "const SimScenario");
+  const scnSrc = fn("SimScenario", "const gateBandWords"), phoneSrc = fn("SimPhoneList", "function SimulationPanel(");
+  ok("⭐ SIM V2: the scale is part of the scenario (month · week · day) and reaches the server as scale= / week= / date=; the sites' what-ifs as site_speed / service / bays / wash",
+    simSrc.includes('scale: "month", bucket: "commit", date: "", site_speed: {}, service: {}, bays: {}, wash: null });')
+    && simSrc.includes('if(sc.scale === "week") q.push("scale=week", `week=${sc.bucket === "next" ? "next" : "commit"}`);')
+    && simSrc.includes('else if(sc.scale === "day" && sc.date) q.push("scale=day", `date=${encodeURIComponent(sc.date)}`);')
+    && ["`site_speed=${encodeURIComponent(l + \"=\" + sc.site_speed[l])}`", "`service=${encodeURIComponent(a + \"=\" + sc.service[a])}`",
+        "`bays=${encodeURIComponent(a + \"=\" + sc.bays[a])}`", '`wash=${sc.wash ? "on" : "off"}`'].every(t => simSrc.includes(t)));
+  ok("⭐ SIM V2: the scale switch is a named group of three pressed buttons; the Month select shows for the month, a Week select (this / next) for the week, a Day select of the server's day choices for the day",
+    panelSrc.includes('<div className="sim-seg" role="group" aria-label="Simulation scale" data-sim-scale={sc.scale}>')
+    && panelSrc.includes('aria-pressed={sc.scale === v}') && panelSrc.includes('{sc.scale === "month" && <label className="ct-line">Month <select className="ga-sel" value={month}')
+    && panelSrc.includes('aria-label="Simulation week">') && panelSrc.includes('<option value="commit">This week</option><option value="next">Next week</option>')
+    && panelSrc.includes('aria-label="Simulation day">') && panelSrc.includes('{((D && D.day_choices) || []).map(c => <option key={c.date} value={c.date}>{c.words}'));
+  ok("🔴 SIM V2: a week or a day is the server's month — the panel takes j.month and reads the lines once for it; still ONE fetch call",
+    panelSrc.includes('if(sc.scale !== "month" && j.month !== month){ shown.current = (store && store.month === j.month) ? `${j.month}|${scKey}` : null; setMonth(j.month); }')
+    && (panelSrc.match(/fetch\(/g) || []).length === 1);
+  ok("⭐ SIM V2: the site view — a named Site select (Whole scheme first), the map and the timeline take the site, Stations now replaces Gates now for it, 'on site' in the now line",
+    playerSrc.includes('aria-label="Simulation site" data-sim-site="1">') && playerSrc.includes('<option value="">Whole scheme</option>')
+    && playerSrc.includes('<SimMap meta={meta} D={D} store={store} frame={f} site={site} />') && playerSrc.includes('<SimTimeline D={D} t={t} onSeek={(m) => { setPlaying(false); seek(m); }} site={site} />')
+    && playerSrc.includes('data-sim-stations-now="1"') && playerSrc.includes('<div className="sim-card-h">Stations now · {site.d.name}</div>')
+    && playerSrc.includes('` · ${f.onSite} on site`'));
+  ok("🔴 SIM V2: the browser draws the server's chain on site and works out no figure: hops along the server's paths at the parts' speeds, waiting lorries back along the path 25 m apart, a served lorry at its station; the stations' figures are printed, never computed",
+    simSrc.includes("function simSites(D){") && simSrc.includes('pos = simPointAt(path, simDistAt(path.parts, t - h.t0));')
+    && simSrc.includes('pos = path ? simPointAt(path, path.len_m - Math.max(0, q) * SIM_QUEUE_M) : site.points[sp.st]; k = "wait"; waiting++;')
+    && simSrc.includes('else if(sp.start <= t && t < sp.done){ pos = site.points[sp.st]; k = "serve"; }')
+    && ["st.bottleneck_at", "st.most_waiting", "st.minutes_lost", "st.longest_wait", "st.status_word", "x.avg_on_site", "x.lorries_out"].every(t => panelSrc.includes(t)));
+  ok("⭐ SIM V2: the On site fold (closed), one table a site, a fourth check only when a site exists; the key names the served lorry, the area and the wash only with a site",
+    panelSrc.includes('<details className="sim-fold" data-sim-fold="site"><summary>On site</summary>') && !/data-sim-fold="site" open/.test(panelSrc)
+    && panelSrc.includes('{(D.sites || []).length > 0 && <div>{ok(D.checks.sites_add_up)} On site, every lorry checked in left by a gate or is named as having no area.</div>}')
+    && simSrc.includes('{(D.sites || []).length > 0 && <div><i className="sim-dot sim-dot-serve" aria-hidden="true"></i>Being unloaded, loaded or washed</div>}')
+    && simSrc.includes('{(D.sites || []).some(x => x.wash) && <div><i className="sim-dot sim-dot-wash" aria-hidden="true"></i>Wheel wash</div>}'));
+  ok("⭐ SIM V2: the scenario card offers each site's speed (in the tenant's unit, sent in km/h), each area's minutes and bays, the wash switch; the pour's gate list is still the server's",
+    scnSrc.includes('data-sim-onsite={onsite.location_id}') && scnSrc.includes('const kphIn = (v) => DU() === "mi" ? +v * KM_PER_MI : +v;')
+    && scnSrc.includes('aria-label={`${onsite.name}: site speed`}') && scnSrc.includes('aria-label={`${a.name}: minutes a lorry`}') && scnSrc.includes('aria-label={`${a.name}: bays`}')
+    && scnSrc.includes('<span>Wheel wash on the way out</span>') && scnSrc.includes("const sites = D.pour_gates || [];"));
+  ok("SIM V2: on the phone a card a station, read-only", phoneSrc.includes('data-sim-station={st.key}') && !phoneSrc.includes("<input"));
+  ok("⭐ SIM V2 FORMS: the Locations form has Site speed (the tenant's unit, stored km/h), Site areas (name, activity, the materials it takes, minutes, bays, level, a point placed on the map) and the gate's Closed for a period; the zone form Inside a site",
+    code.includes('data-site-speed-field="1"') && code.includes('site_speed_kph: (f.site_speed === "" || f.site_speed == null) ? null : (DU() === "mi" ? +f.site_speed * KM_PER_MI : +f.site_speed),')
+    && code.includes('data-site-areas="1"') && code.includes('data-site-area-form="1"') && code.includes('<option value="unload">Unloading</option><option value="load">Loading</option><option value="wash">Wheel wash (on the way out)</option>')
+    && code.includes('cbRef.current.placeAreaAt = (lng, lat) => {') && code.includes('data-gate-closed-form="1"') && code.includes('aria-label="Closed from"') && code.includes('aria-label="Closed to"')
+    && code.includes('closed_from: gateForm.closed_from || "", closed_to: gateForm.closed_to || "",') && code.includes('data-zone-inside-site="1"') && code.includes('<option value="">No: a public haul road</option>')
+    && code.includes('location_id: (haulNow && zoneForm.location_id) ? zoneForm.location_id : null,'));
+  ok("SIM V2 FORMS: the gates list prints the closed words; Gate arrivals prints a closed gate's own line only when no note names it; Gates this week says it on the gate",
+    code.includes('{g.closed_words ? <span style={{ color: "var(--red)" }} data-gate-closed={g.id}>{g.closed_words}</span> : null}')
+    && code.includes('(ga.closed_gates || []).filter(c => !(ga.notes || []).some(n => n.includes(c.gate_name)))') && code.includes('data-gw-closed={g.gate_id}'));
+  ok("🔴 SIM V2: no back-end word in the new screen text (the scenario card, the phone cards, the areas form)",
+    !/\b(endpoint|JSON|predict\w*|real-time|trucks?)\b/i.test([scnSrc, phoneSrc, code.slice(code.indexOf('data-site-areas="1"'), code.indexOf('data-site-areas="1"') + 9000)]
+      .join("\n").split("\n").map(l => l.replace(/^\s*\/\/.*$/, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "")).join("\n")));
 }
 
 // ---- 11 Oct 2026 — the guide update: the tour text that was wrong or stale ------------------------
@@ -2810,7 +2872,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("W1: every map the app creates opens on UK_VIEW (the Look-ahead map, the Routes / Zones map, the Simulation map)",
      (html.match(/center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/g) || []).length === 3
      && (html.match(/new window\.mapboxgl\.Map\(/g) || []).length === 3
-     && /function SimMap\(\{ meta, D, store, frame \}\)\{[\s\S]{0,700}new window\.mapboxgl\.Map\(\{ container: div\.current, style: "mapbox:\/\/styles\/mapbox\/light-v11", center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/.test(html));
+     && /function SimMap\(\{ meta, D, store, frame, site \}\)\{[\s\S]{0,700}new window\.mapboxgl\.Map\(\{ container: div\.current, style: "mapbox:\/\/styles\/mapbox\/light-v11", center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/.test(html));
   const locFetch = (html.match(/fetch\(`\$\{API\}\/locations\/geojson`\)\.then\(r => r\.json\(\)\)\.then\(gj => \{([\s\S]*?)\n    \}\)\.catch/) || ["", ""])[1];
   ok("⭐ W1: the Routes / Zones map frames the scheme's locations the FIRST time they load, once (a ref), finite points only, inside a try",
      /const framedRef = useRef\(false\);/.test(html) && /if\(!framedRef\.current\)\{/.test(locFetch)
@@ -3816,7 +3878,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && mat.includes('<td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}</td>'));
   ok("🔴 #13: the Seasonal restrictions' vehicle rows, the Locations form's two material lists and the Routes form's vehicle list are 24 px rows (min-h-6) — four lists, no 16 px tick row left among them",
      code.includes('<label key={v} className="flex items-center gap-1 min-h-6 text-[13px] text-slate-600 whitespace-nowrap">')
-     && (code.match(/<label key=\{cat\} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">/g) || []).length === 2
+     // NARROWED 28 Oct 2026 (simulation v2): a third list — the materials a site area takes (the same 24 px rows)
+     && (code.match(/<label key=\{cat\} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">/g) || []).length === 3
      && code.includes('<label key={v} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">')
      && !code.includes('className="flex items-center gap-2 text-xs text-slate-700">') && !code.includes('className="flex items-center gap-1 text-[13px] text-slate-600 whitespace-nowrap">'));
   ok("#29: the Routes table's Route button (the one that spends HERE calls) is the row's one visible small button; Edit and Delete are in its \"⋯\" (NARROWED 27 Oct 2026, the final UI pass)",
@@ -3961,10 +4024,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      (code.match(/ZONE_HAUL/g) || []).length === 2 && code.includes('const ZONE_HAUL = "#C2790B";')
      && code.includes('paint: { "line-color": ["case", ["get", "is_haul"], ZONE_HAUL,'));
   ok("⭐ UI FIX 6 card 6: the 12 haul-road words and fills read var(--haul-text) — four buttons, eight words — and the two chips sit on a solid var(--haul-soft); the see-through tint is gone",
-     (code.match(/var\(--haul-text\)/g) || []).length === 11 && (code.match(/background: "var\(--haul-text\)"/g) || []).length === 3   // NARROWED 27 Oct 2026: the Zones panel's haul-road box is gone (11 reads, not 12)
+     // NARROWED 28 Oct 2026 (simulation v2): the Zones table's "Inside a site" chip is a third haul-soft / haul-text pair (12 reads, 3 chips)
+     (code.match(/var\(--haul-text\)/g) || []).length === 12 && (code.match(/background: "var\(--haul-text\)"/g) || []).length === 3   // NARROWED 27 Oct 2026: the Zones panel's haul-road box is gone (11 reads, not 12)
      && code.includes('style={zoneDraw ? { background: isHaul(zoneForm) ? "var(--haul-text)" : ZONE_ROUTING } : undefined}>')
-     && (code.match(/style=\{\{ background: "var\(--haul-soft\)", color: "var\(--haul-text\)" \}\}/g) || []).length === 2
-     && !code.includes("rgba(194,121,11") && (code.match(/var\(--haul-soft\)/g) || []).length === 2);
+     && (code.match(/style=\{\{ background: "var\(--haul-soft\)", color: "var\(--haul-text\)" \}\}/g) || []).length === 3
+     && !code.includes("rgba(194,121,11") && (code.match(/var\(--haul-soft\)/g) || []).length === 3);
   ok("UI FIX 6 card 6: the tokens — haul-text #9A5F08 and haul-soft #FBF0DF in :root, #F0A838 and #3A2E1C in the dark block — and the dark rule that gives the four fills the control's own text colour (the navy / blue rule kept as it was)",
      /--ok-text:#047857; --warn-text:#B45309; --bad-text:#B91C1C;\n[\s\S]{0,900}?--haul-text:#9A5F08; --haul-soft:#FBF0DF;/.test(html)
      && html.includes("--ok-text:#34D399; --warn-text:#FBBF24; --bad-text:#F87171;\n    --haul-text:#F0A838; --haul-soft:#3A2E1C;")

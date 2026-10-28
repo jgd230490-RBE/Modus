@@ -243,7 +243,7 @@ def site_model(loc, loc_gates, areas, roads, factors, scen, on=None):
     graph, at = build_graph(road_lines, points, kph, lat0)
     return {"location_id": loc["id"], "name": loc.get("name") or loc["id"], "speed_kph": kph, "speed_basis": basis,
             "areas": active_areas, "wash": wash, "roads": roads, "stations": stations, "graph": graph, "at": at,
-            "paths": {}, "on": on, "loc": loc, "loc_gates": loc_gates}
+            "paths": {}, "on": on, "loc": loc, "loc_gates": loc_gates, "factors": factors}
 
 
 def path_between(site, a_key, b_key):
@@ -416,20 +416,27 @@ def station_figures(st, S):
 
 
 def site_reply(site, fig, send_lines):
-    """The reply's block for one site (the roads' and paths' lines only with `send_lines`)."""
+    """
+    The reply's block for one site. Its lines (the roads, the areas, the paths between stations) are small and
+    change with the scenario (a site speed moves every path's minutes), so they travel in EVERY reply; only the
+    routes' long lines wait for legs=1.
+    """
+    gl = {g["id"]: g for g in site["loc_gates"]}
     out = {"location_id": site["location_id"], "name": site["name"],
            "speed_kph": site["speed_kph"], "speed_basis": site["speed_basis"],
            "gates": [{"gate_id": st["gate_id"], "name": st["name"], "entry": st["serves_entry"], "exit": st["serves_exit"],
-                      "closed": st["closed"], "closed_words": st["closed_words"]}
+                      "closed": st["closed"], "closed_words": st["closed_words"],
+                      "lat": (gl.get(st["gate_id"]) or {}).get("lat"), "lon": (gl.get(st["gate_id"]) or {}).get("lon")}
                      for st in site["stations"].values() if st["kind"] == "gate"],
            "areas": [{"id": a["id"], "name": a["name"], "activity": a["activity"], "bays": site["stations"][f"area:{a['id']}"]["bays"],
-                      "service": site["stations"][f"area:{a['id']}"]["service"], "service_typed": a.get("service_minutes"),
+                      # the minutes the station runs at (typed, the scenario's, or the default) — the drawing's label
+                      "service": service_minutes(site, f"area:{a['id']}", None, site.get("factors")), "service_typed": a.get("service_minutes"),
                       "level": a.get("level"), "materials": a["materials"], "vehicles": a["vehicles"],
-                      "point": a.get("point"), "geometry": (a.get("geometry") if send_lines else None)}
+                      "point": a.get("point"), "geometry": a.get("geometry")}
                      for a in site["areas"] if f"area:{a['id']}" in site["stations"]],
            "wash": (site["wash"]["id"] if site["wash"] else None),
            "roads": [{"zone_id": z["id"], "name": z.get("name"), "speed_kph": z.get("speed_kph"), "length_km": z.get("length_km"),
-                      "coords": (z.get("line") if send_lines else None)} for z in site["roads"]],
-           "paths": ({k: v for k, v in site["paths"].items() if v} if send_lines else {})}
+                      "coords": z.get("line")} for z in site["roads"]],
+           "paths": {k: v for k, v in site["paths"].items() if v}}
     out.update(fig)
     return out

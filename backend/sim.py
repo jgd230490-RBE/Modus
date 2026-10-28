@@ -935,7 +935,16 @@ def lookahead_lines(bucket, date, factors, today=None):
     week = {"bucket": bucket, "month_index": cw.get("month_index"), "week_index": cw.get("week_index"),
             "from": cw["from"], "to": cw["to"], "weekdays": len(wdays), "lines": len(full.get("lines") or []),
             "confirmed_lines": confirmed, "label": f"Week of {_day_words(wdays[0])}"}
-    # the days a person can pick: the weekdays of both buckets
+    choices = day_choices_for(today)
+    if chosen is not None:
+        on, wd = chosen, 1
+    else:
+        on, wd = wdays[min(2, len(wdays) - 1)], max(1, len(wdays))
+    return rows, week, wd, on, choices, chosen
+
+
+def day_choices_for(today=None):
+    """The days a person can pick for the day scale: the weekdays of the Look-ahead's two buckets."""
     choices = []
     for b in ("commit", "next"):
         try:
@@ -947,11 +956,7 @@ def lookahead_lines(bucket, date, factors, today=None):
                     choices.append({"date": d.isoformat(), "words": _day_words(d), "bucket": b})
         except Exception:
             continue
-    if chosen is not None:
-        on, wd = chosen, 1
-    else:
-        on, wd = wdays[min(2, len(wdays) - 1)], max(1, len(wdays))
-    return rows, week, wd, on, choices, chosen
+    return choices
 
 
 def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=None, with_lines=True,
@@ -972,6 +977,8 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
     my_team = (acc or {}).get("ipt")
     team_scope = bool(my_team)
     scale = scale if scale in ("month", "week", "day") else "month"
+    if scale == "day" and date in (None, ""):
+        raise ValueError("The day scale needs a date: pick a weekday of the Look-ahead's two weeks.")
 
     week_block, day_choices, chosen = None, [], None
     if scale == "month":
@@ -981,6 +988,7 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
                         "ORDER BY route_id, discipline, section_id", (db.current_tenant(), int(month_index)))
         on_gate = int(month_index)
         label = gate_arrivals.month_label(int(month_index))
+        day_choices = day_choices_for(today)
     else:
         rows, week_block, wd, on_gate, day_choices, chosen = lookahead_lines(bucket, date if scale == "day" else None,
                                                                             factors, today=today)

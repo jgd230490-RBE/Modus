@@ -1109,6 +1109,8 @@ def locations_geojson():
                            "opening_qty": l.get("opening_qty"),
                            # 14 Oct 2026 (bundle G, W8): lorry visits a day agreed in the CLP; null = none
                            "clp_cap_per_day": l.get("clp_cap_per_day"),
+                           # 28 Oct 2026 (simulation v2): the speed on the site's roads, km/h
+                           "site_speed_kph": l.get("site_speed_kph"),
                            # 16 Oct 2026 (CLOCS v5 C3): printed on the route sheet; null = none typed
                            "site_rules": l.get("site_rules")},
             "geometry": {"type": "Point", "coordinates": [l["lon"], l["lat"]]},

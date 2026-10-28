@@ -688,7 +688,8 @@ _fits = [m.start() for m in _re2.finditer(r"\.fitBounds\(", fe)]
 ok("🔴 every fitBounds in the app is inside a try (30 Sep: a NaN bounds on the Look-ahead map white-screened the whole app)",
    # NARROWED 13 Oct 2026 (W1): four, the Routes / Zones map now frames the scheme's locations on first load
    # NARROWED 16 Oct 2026 (S7): five, the Dashboard's Simulation map frames the day's routes once a month
-   len(_fits) == 5 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
+   # NARROWED 28 Oct 2026 (simulation v2): seven, the site view frames the chosen site and the whole scheme again
+   len(_fits) == 7 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
    and "try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); store.framed = true; } catch(e){}" in fe, str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
 # --- 5 Oct 2026: Appearance (Ink / Light / Dark) ------------------------------------------
 _PAL = re.compile(r'(?:(?:hover|focus|disabled|group-hover|sm|md|lg):)?(?:bg|text|border|divide|ring|placeholder)-(?:white|black|transparent|current|\[color:[^\]]+\]|\[#[0-9a-fA-F]{3,8}\]|\[rgba?\([^\]]+\)\]|(?:slate|gray|red|amber|blue|emerald|green)-\d{2,3})(?:/\d{1,3})?')
@@ -1050,7 +1051,8 @@ for _m in _TW.finditer(_fe_wo):
 ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on an inline var(--navy) and 1 on var(--blue) (the dark rule maps them to --control-fg), 2 on bg-slate-800 (remapped), the team pill, the 4 haul-road buttons on var(--haul-text) (their own dark rule, 22 Oct) and none on a fixed zone colour — none on var(--green) or the Confirm pair, none unknown",
    # NARROWED 27 Oct 2026 (stockpile forecast): 14 — the Dashboard stockpile chart's week chips are gone (−1); the
    # Stockpiles page's picked stockpile and picked year are white on var(--navy) (+2)
-   len(_sites.get("navy", [])) == 14 and len(_sites.get("blue", [])) == 1 and len(_sites.get("slate-800", [])) == 2
+   # NARROWED 28 Oct 2026 (simulation v2): 15 and 2 — the site areas form's Save / Create button (navy) and its Place on map (blue)
+   len(_sites.get("navy", [])) == 15 and len(_sites.get("blue", [])) == 2 and len(_sites.get("slate-800", [])) == 2
    and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
 ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",

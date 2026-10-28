@@ -374,6 +374,8 @@ ok("⭐ the reply carries one site with four stations (gate A has no exits, so n
    len(D["sites"]) == 1 and S["name"] == "Viaduct site" and set(st) == {"gate:GB", "area:A001", "area:A002", "area:A003"}
    and S["lorries_in"] == ga["arrivals"] > 0 and S["lorries_out"] == S["lorries_in"] and S["no_area"] == []
    and D["checks"]["sites_add_up"] is True, str({k: v["arrivals"] for k, v in st.items()}))
+ok("the areas in the reply carry the minutes they run at (the wash 2, not blank) for the drawing's label",
+   {a["id"]: a["service"] for a in S["areas"]} == {"A001": 5.0, "A002": 10.0, "A003": 2.0}, str([(a["id"], a["service"]) for a in S["areas"]]))
 ok("⭐ the stations' minutes: pier bases 5 (typed), spoil loading 10 (typed), the wash 2 (the default), the gates none",
    st["area:A001"]["service"] == 5 and st["area:A002"]["service"] == 10 and st["area:A003"]["service"] == 2
    and st["gate:GB"]["service"] is None and st["area:A001"]["service_basis"] == "typed" and st["area:A003"]["service_basis"] == "vehicle")
@@ -405,7 +407,10 @@ ok("the paths for the drawing are in the reply with legs=1 (coords, cum, parts, 
    "gate:GA>area:A001" in S["paths"] and S["paths"]["gate:GA>area:A001"]["coords"] and S["paths"]["gate:GA>area:A001"]["parts"]
    and all(r["coords"] for r in S["roads"]) and all(a["geometry"] or a["point"] for a in S["areas"]))
 D0 = sim.day(9, acc_planner, factors=factors, working_days=WD)
-ok("without legs=1 the reply carries no path or road lines, the same figures", D0["sites"][0]["paths"] == {} and all(r["coords"] is None for r in D0["sites"][0]["roads"])
+# NARROWED the same day: the site's small lines travel in every reply (a scenario's site speed moves every path), the routes' long lines wait for legs=1
+ok("without legs=1 the reply still carries the site's paths, roads, areas and the gates' positions, the same figures; the routes' lines do not",
+   D0["sites"][0]["paths"] and all(r["coords"] for r in D0["sites"][0]["roads"]) and all(g.get("lat") is not None for g in D0["sites"][0]["gates"])
+   and all("coords" not in v for v in D0["legs"].values())
    and D0["sites"][0]["lorries_out"] == S["lorries_out"] and [s["minutes_lost"] for s in D0["sites"][0]["stations"]] == [s["minutes_lost"] for s in S["stations"]])
 ok("the old figures do not move: the gate's own queue, capacity and busiest hour are what sim.gate_figures gave before v2",
    ga["check_in"] == 3 and ga["capacity"] is not None and ga["busiest"] > 0 and D["checks"]["table_equals_arrivals"] is True and D["checks"]["hours_add_up"] is True)
@@ -476,9 +481,9 @@ ok("🔴 the closed period is refused in words: one date only, the end before th
    and "YYYY-MM-DD" in (gates.update_gate("GB", closed_from="soon", closed_to="later").get("error") or "")
    and "only gate" in (gates.update_gate("GQ", closed_from="2026-09-01", closed_to="2026-09-30").get("error") or ""))
 r = gates.update_gate("GB", closed_from="2026-09-01", closed_to="2026-11-30")
-ok("⭐ Brook Lane gate closed 1 Sep – 30 Nov 2026: stored, read back, worded",
+ok("⭐ Brook Lane gate closed 1 Sep – 30 Nov 2026: stored, read back, worded on the gate row too",
    not r.get("error") and r["closed_from"] == "2026-09-01" and r["closed_to"] == "2026-11-30"
-   and gates.closed_words(r) == "closed 1 Sep – 30 Nov 2026", str(r.get("error") or gates.closed_words(r)))
+   and gates.closed_words(r) == "closed 1 Sep – 30 Nov 2026" and r["closed_words"] == "closed 1 Sep – 30 Nov 2026", str(r.get("error") or gates.closed_words(r)))
 ok("🔴 closing the other gate over an overlapping period is refused: one gate must stay open",
    "one gate must stay open" in (gates.update_gate("GA", closed_from="2026-10-01", closed_to="2026-10-31").get("error") or "")
    and not gates.update_gate("GA", closed_from="2027-01-04", closed_to="2027-01-08").get("error")
@@ -536,6 +541,9 @@ ok("⭐ the day scale: one planned weekday, each line's trips whole as planned (
    Ddy["scale"] == "day" and Ddy["date"] == "2026-09-16" and Ddy["label"] == "Wed 16 Sep 2026" and Ddy["working_days"] == 1
    and Ddy["rounding"]["exact"] is True and Ddy["rounding"]["worst"] == 0 and Ddy["loads"] == sum(l["loads"] for l in Ddy["lines"])
    and all(l["loads"] == l["trips_month"] for l in Ddy["lines"]) and Ddy["checks"]["table_equals_arrivals"] is True, str(Ddy.get("label")))
+ok("🔴 the day scale without a date is refused in words", "needs a date" in str(raises(lambda: sim.day(9, acc_planner, factors=factors, working_days=WD, scale="day", today=TODAY))))
+ok("the month scale carries the day choices too (the screen offers them before the day scale is picked)",
+   len(sim.day(9, acc_planner, factors=factors, working_days=WD, today=TODAY)["day_choices"]) == 10)
 ok("the day choices: the ten weekdays of the two weeks, commit then next",
    len(Ddy["day_choices"]) == 10 and Ddy["day_choices"][0]["date"] == "2026-09-14" and Ddy["day_choices"][-1]["date"] == "2026-09-25"
    and Ddy["day_choices"][5]["bucket"] == "next" and Ddy["day_choices"][2]["words"] == "Wed 16 Sep 2026")

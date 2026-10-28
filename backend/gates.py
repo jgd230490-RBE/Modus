@@ -142,6 +142,7 @@ def _row(g):
         # 28 Oct 2026 (simulation v2): closed for a period, ISO dates inclusive; None = never
         "closed_from": g.get("closed_from") or None,
         "closed_to": g.get("closed_to") or None,
+        "closed_words": closed_words(g),
         "created_at": g.get("created_at"),
         "updated_at": g.get("updated_at"),
     }

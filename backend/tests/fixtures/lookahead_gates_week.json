@@ -29,6 +29,7 @@
    "shut_words": null,
    "no_open_time": false,
    "closed_days": null,
+   "closed_words": null,
    "capacity_per_day": 200.0,
    "near_per_day": 170.0,
    "peak_pct": 128,
@@ -42,6 +43,7 @@
      "capacity": 200.0,
      "pct": 128,
      "open": true,
+     "closed": false,
      "flag": "red",
      "status_word": "Over gate capacity"
     },
@@ -52,6 +54,7 @@
      "capacity": 200.0,
      "pct": 128,
      "open": true,
+     "closed": false,
      "flag": "red",
      "status_word": "Over gate capacity"
     },
@@ -62,6 +65,7 @@
      "capacity": 200.0,
      "pct": 128,
      "open": true,
+     "closed": false,
      "flag": "red",
      "status_word": "Over gate capacity"
     },
@@ -72,6 +76,7 @@
      "capacity": 200.0,
      "pct": 128,
      "open": true,
+     "closed": false,
      "flag": "red",
      "status_word": "Over gate capacity"
     },
@@ -82,6 +87,7 @@
      "capacity": 200.0,
      "pct": 128,
      "open": true,
+     "closed": false,
      "flag": "red",
      "status_word": "Over gate capacity"
     }
@@ -102,6 +108,7 @@
    "shut_words": null,
    "no_open_time": false,
    "closed_days": null,
+   "closed_words": null,
    "capacity_per_day": 300.0,
    "near_per_day": 255.0,
    "peak_pct": 104,
@@ -115,6 +122,7 @@
      "capacity": 300.0,
      "pct": 104,
      "open": true,
+     "closed": false,
      "flag": "red",
      "status_word": "Over gate capacity"
     },
@@ -125,6 +133,7 @@
      "capacity": 300.0,
      "pct": 104,
      "open": true,
+     "closed": false,
      "flag": "red",
      "status_word": "Over gate capacity"
     },
@@ -135,6 +144,7 @@
      "capacity": 300.0,
      "pct": 104,
      "open": true,
+     "closed": false,
      "flag": "red",
      "status_word": "Over gate capacity"
     },
@@ -145,6 +155,7 @@
      "capacity": 300.0,
      "pct": 104,
      "open": true,
+     "closed": false,
      "flag": "red",
      "status_word": "Over gate capacity"
     },
@@ -155,6 +166,7 @@
      "capacity": 300.0,
      "pct": 104,
      "open": true,
+     "closed": false,
      "flag": "red",
      "status_word": "Over gate capacity"
     }
@@ -175,6 +187,7 @@
    "shut_words": null,
    "no_open_time": false,
    "closed_days": null,
+   "closed_words": null,
    "capacity_per_day": 150.0,
    "near_per_day": 127.5,
    "peak_pct": 11,
@@ -188,6 +201,7 @@
      "capacity": 150.0,
      "pct": 11,
      "open": true,
+     "closed": false,
      "flag": null,
      "status_word": null
     },
@@ -198,6 +212,7 @@
      "capacity": 150.0,
      "pct": 11,
      "open": true,
+     "closed": false,
      "flag": null,
      "status_word": null
     },
@@ -208,6 +223,7 @@
      "capacity": 150.0,
      "pct": 11,
      "open": true,
+     "closed": false,
      "flag": null,
      "status_word": null
     },
@@ -218,6 +234,7 @@
      "capacity": 150.0,
      "pct": 11,
      "open": true,
+     "closed": false,
      "flag": null,
      "status_word": null
     },
@@ -228,6 +245,7 @@
      "capacity": 150.0,
      "pct": 11,
      "open": true,
+     "closed": false,
      "flag": null,
      "status_word": null
     }
@@ -248,6 +266,7 @@
    "shut_words": null,
    "no_open_time": false,
    "closed_days": null,
+   "closed_words": null,
    "capacity_per_day": null,
    "near_per_day": null,
    "peak_pct": null,
@@ -261,6 +280,7 @@
      "capacity": null,
      "pct": null,
      "open": true,
+     "closed": false,
      "flag": null,
      "status_word": null
     },
@@ -271,6 +291,7 @@
      "capacity": null,
      "pct": null,
      "open": true,
+     "closed": false,
      "flag": null,
      "status_word": null
     },
@@ -281,6 +302,7 @@
      "capacity": null,
      "pct": null,
      "open": true,
+     "closed": false,
      "flag": null,
      "status_word": null
     },
@@ -291,6 +313,7 @@
      "capacity": null,
      "pct": null,
      "open": true,
+     "closed": false,
      "flag": null,
      "status_word": null
     },
@@ -301,6 +324,7 @@
      "capacity": null,
      "pct": null,
      "open": true,
+     "closed": false,
      "flag": null,
      "status_word": null
     }
