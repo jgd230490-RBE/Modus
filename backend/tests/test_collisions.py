@@ -1323,6 +1323,33 @@ ok("12: the technical guide T9 holds the method: the fields read, the bands, 10 
    'id="t9-time-of-day"' in _tg and "<code>OFFER_MIN</code> = 10" in _tg and "<code>OFFER_P</code> = 0.05" in _tg
    and "Binomial(route + alternative, &frac12;)" in _tg and "/api/routes/{id}/collision-hours" in _tg
    and "Offered, never applied" in _tg and _tg.index('id="t9-time-of-day"') < _tg.index('id="t10-public-map"'))
+# 28 Oct 2026 (found on live after PR #160: the evidence answered 500) — location_gates.active is BOOLEAN on Postgres and an
+# integer in SQLite, so "active = 1" in SQL broke the sheet on live only. No backend query compares `active` in SQL now.
+_active_sql = []
+for _f in sorted(os.listdir(BACKEND)):
+    if _f.endswith(".py"):
+        for _n in ast.walk(ast.parse(read("backend/" + _f))):
+            if isinstance(_n, ast.Constant) and isinstance(_n.value, str) and re.search(r"\bactive\s*(=|!=|<>)\s*(1|0|TRUE|FALSE)\b", _n.value, re.I) \
+                    and re.search(r"\b(SELECT|UPDATE|DELETE|WHERE)\b", _n.value):
+                _active_sql.append(f"{_f}: {_n.value[:80]}")
+ok("12: no backend SQL compares `active` with a number or TRUE / FALSE (BOOLEAN on Postgres, an integer in SQLite)",
+   not _active_sql, str(_active_sql))
+db.execute("INSERT INTO location_gates (tenant_id, id, location_id, name, direction, lat, lon, active, open_from, open_to) "
+           "VALUES (?, 'GA1', 'LA', 'In', 'access', ?, ?, ?, '06:00', '18:00')", (T, LAT0, -0.95, True))
+db.execute("INSERT INTO location_gates (tenant_id, id, location_id, name, direction, lat, lon, active, open_from, open_to) "
+           "VALUES (?, 'GA2', 'LA', 'Old', 'access', ?, ?, ?, '00:00', '23:00')", (T, LAT0, -0.95, False))
+ok("12: gate_span: the route's gates' hours, a stopped gate left out (Python decides, not SQL)",
+   cl.gate_span({"origin_id": "LA", "dest_id": "LB"}) == (360, 1080), str(cl.gate_span({"origin_id": "LA", "dest_id": "LB"})))
+db.execute("DELETE FROM location_gates WHERE tenant_id = ? AND id IN ('GA1', 'GA2')", (T,))
+# a route with no collision near it, after a fetch that stored the hours: "none", never "the hours come with the next fetch"
+E12d = cl.evidence("R2", now=date(2026, 10, 16))
+_t12d = " ".join(pdf_text(export.build_collision_evidence_pdf(E12d), "").split()) if shutil.which("pdftotext") else ""
+ok("12: a route with no collisions near it: the hours are shown as none (0 in the busy rows), the sheet says so, the Routes "
+   "line has nothing to offer",
+   E12d["time_of_day"]["shown"] is True and E12d["headline"][0]["busy"] == [0, 0]
+   and cl.busy_hours("R2") == {"shown": True, "offers": [], "period": "2021–2025"}
+   and (not _t12d or ("No collisions on this route (within 25 m), 2021–2025." in _t12d
+                      and "comes with the next fetch" not in _t12d)), _t12d[-600:])
 ok("12: the offer is never applied: collisions.py writes nothing to routes, route_geometry or route_choice",
    not re.search(r"(UPDATE|INSERT INTO|DELETE FROM)\s+(routes|route_geometry|route_choice)\b", read("backend/collisions.py")))
 
