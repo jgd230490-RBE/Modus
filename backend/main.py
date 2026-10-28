@@ -538,6 +538,40 @@ def _require_access():
     return acc
 
 
+# 28 Oct 2026 (the demo narrative's F1): the staff screens' heavy reads kept in memory until the next write
+# (read_cache: never stale, one build at a time). Live took 4-21 s for the Dashboard's reads, 25 s for the Carbon
+# planner's, 47 s for the CLP pack and 95 s for the bulletin when the server was busy; the same reads take 0.1-2.5 s on
+# a laptop copy, so it is the server's time, not the queries. The key is the read, its parameters, the caller's ROLE and
+# TEAM (what access.line_visible and can_approve read: a team login never gets another team's answer) and today's date
+# (a week or a "this month" turns over at midnight). STAFF_WARM: the admin's Dashboard set is built after start-up and
+# after writes go quiet, so the first visit after a deploy does not wait either.
+STAFF_CACHE = "staff:"
+
+
+def _staff_scope(acc):
+    acc = acc or {}
+    return f"{acc.get('role') or '-'}|{access.canonical_ipt(acc.get('ipt')) or '-'}"
+
+
+def _staff_name(name, params, acc):
+    return f"{STAFF_CACHE}{name}|{_staff_scope(acc)}|{json.dumps(params, sort_keys=True, default=str)}"
+
+
+def _staff_json(name, params, build, acc=None):
+    """build()'s reply for this caller, kept until the next write (see above). The value itself is kept and returned
+    (FastAPI encodes it as before; nothing downstream changes it), so every caller of these endpoints is unchanged."""
+    import datetime as _dt
+    acc = acc if acc is not None else access.current()
+    return read_cache.cached(_staff_name(name, params, acc), _dt.date.today().isoformat(), build)
+
+
+def _staff_bytes(name, params, build, acc=None, keep=None):
+    """build()'s bytes (a PDF) for this caller, kept until the next write unless keep() says no."""
+    import datetime as _dt
+    acc = acc if acc is not None else access.current()
+    return read_cache.cached(_staff_name(name, params, acc), _dt.date.today().isoformat(), build, keep=keep)
+
+
 def _require_approver():
     acc = _require_access()
     if not access.can_approve(acc):
@@ -1374,9 +1408,14 @@ def withdraw_route(route_id: str, submitted_by: Optional[str] = None,
 @app.get("/api/forecasts/summary")
 def forecasts_summary():
     """One row per route: status, span, and window total in vehicles — for the ledger/approvals view."""
+    acc = _require_access()
+    return _staff_json("forecasts/summary", {}, lambda: _forecasts_summary_build(acc), acc)
+
+
+def _forecasts_summary_build(acc):
     rows = access.filter_lines(
         db.query("SELECT * FROM forecasts WHERE tenant_id = ?", (db.current_tenant(),)),
-        _require_access())
+        acc)
     factors = conversions.load_factors()
     by_line = {}
     for r in rows:
@@ -1839,8 +1878,9 @@ def lookahead_page(bucket: str = "commit", route_id: Optional[str] = None,
     """
     acc = _require_access()
     on = bool(restrictions_on) if tark_tee is None else bool(tark_tee)
-    return lookahead.page(bucket=("next" if bucket == "next" else "commit"),
-                          route_id=route_id, acc=acc, with_restrictions=on)
+    b = "next" if bucket == "next" else "commit"
+    return _staff_json("lookahead", {"bucket": b, "route_id": route_id, "on": on},
+                       lambda: lookahead.page(bucket=b, route_id=route_id, acc=acc, with_restrictions=on), acc)
 
 
 @app.get("/api/lookahead/geometry")
@@ -1862,7 +1902,8 @@ def lookahead_geometry(ids: str = "", vehicles: str = "", bucket: str = "commit"
         wk = days.bucket_dates(mi, wi) if mi is not None else None
     except Exception:
         wk = None
-    return {"routes": lookahead.week_geometry(id_list, veh, days=wk)}
+    return _staff_json("lookahead/geometry", {"ids": id_list, "veh": veh, "bucket": bucket},
+                       lambda: {"routes": lookahead.week_geometry(id_list, veh, days=wk)})
 
 
 @app.get("/api/forecast-weeks/restrictions")
@@ -2302,7 +2343,8 @@ def costing_lines(from_: Optional[int] = Query(None, alias="from"), to: Optional
     the access filter is the same as /api/forecasts.
     """
     acc = _require_access()
-    return costlines.lines(acc, from_month=from_, to_month=to, status=status)
+    return _staff_json("costing/lines", {"from": from_, "to": to, "status": status},
+                       lambda: costlines.lines(acc, from_month=from_, to_month=to, status=status), acc)
 
 
 # ------------------------------------------------------------------ carbon planner (10 Oct 2026)
@@ -2342,10 +2384,13 @@ def carbon_scenario(body: CarbonScenarioIn):
     if len(body.alternatives) > CARBON_MAX_ALTERNATIVES:
         raise HTTPException(400, f"at most {CARBON_MAX_ALTERNATIVES} alternatives at a time")
     alts = [a.model_dump() if hasattr(a, "model_dump") else a.dict() for a in body.alternatives]
+    sent = body.model_dump() if hasattr(body, "model_dump") else body.dict()
     try:
-        return carbon.scenario(acc, alternatives=alts, baseline_levers=body.baseline,
-                               from_month=body.from_month, to_month=body.to_month, status=body.status,
-                               spend_m=body.spend_gbp_m, allocation=body.allocation)
+        return _staff_json("carbon/scenario", sent,
+                           lambda: carbon.scenario(acc, alternatives=alts, baseline_levers=body.baseline,
+                                                   from_month=body.from_month, to_month=body.to_month,
+                                                   status=body.status, spend_m=body.spend_gbp_m,
+                                                   allocation=body.allocation), acc)
     except carbon.CarbonError as e:
         raise HTTPException(400, str(e))
 
@@ -2478,9 +2523,15 @@ def bulletin_month_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), request: R
     from fastapi.responses import Response       # not in every test stub; imported here
     if not _staff_request(request):
         raise HTTPException(401, "sign in — a valid access code is required")
-    sheet = bulletin_doc.sheet(month, access.current())
+    acc = access.current()
+    misses = basemap.MISSES[0]
+
+    def build():
+        return export.build_bulletin_pdf(bulletin_doc.sheet(month, acc))
     try:
-        data = export.build_bulletin_pdf(sheet)
+        # kept only when every map in it is Mapbox's picture: one drawn as the schematic stand-in is served, not kept
+        data = _staff_bytes("bulletin/month.pdf", {"month": int(month), "staff": bool(acc)}, build, acc,
+                            keep=lambda: basemap.MISSES[0] == misses)
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     y, m = weeks._month_of(month)
@@ -3026,12 +3077,12 @@ def _forecast_matrix(from_, to, unit, sections):
 # ------------------------------------------------------------------ routing network (Phase 0)
 @app.get("/api/routes/status")
 def routes_status():
-    return network.routes_status()
+    return _staff_json("routes/status", {}, network.routes_status)
 
 
 @app.get("/api/routes/summary")
 def routes_summary():
-    return network.summary()
+    return _staff_json("routes/summary", {}, network.summary)
 
 
 @app.get("/api/routes/diversions")
@@ -3041,7 +3092,9 @@ def routes_diversions(route_id: Optional[str] = None):
     zone's name and each leg's option and change in length — the Routes page's Diversions list and its chip — and
     what "Find a way round" would cost now.
     """
-    return {"periods": route_choice.periods(route_id), "way_round": network.way_round_calls(route_id)}
+    return _staff_json("routes/diversions", {"route_id": route_id},
+                       lambda: {"periods": route_choice.periods(route_id),
+                                "way_round": network.way_round_calls(route_id)})
 
 
 @app.post("/api/admin/route-diversions/keep-main")
@@ -3890,6 +3943,29 @@ def _areas_months_build():
         return read_cache.json_bytes(areas.area_load_all(wd, months))
 
 
+#: 28 Oct 2026 (F1): the staff reads an admin's Dashboard, Look-ahead and Routes pages open with, warmed as an admin
+#: (the scope a demo is given in); a planner or a team login builds its own on its first visit
+STAFF_WARM_ACC = {"role": "admin", "label": "Admin", "ipt": None, "via": "warmer", "kind": "staff"}
+
+
+def _warm_staff():
+    """Build the admin's first-visit reads (each endpoint's own call, as the page sends it). Never raises past warm()."""
+    tok = access._ACCESS.set(STAFF_WARM_ACC)
+    try:
+        forecasts_summary()
+        costing_lines(from_=None, to=None, status="All")                       # the Dashboard, the Forecasts page
+        lookahead_page(bucket="commit", route_id=None, restrictions_on=0, tark_tee=None)   # the Dashboard
+        lookahead_page(bucket="commit", route_id=None, restrictions_on=1, tark_tee=None)   # the Look-ahead page
+        gate_arrivals_month(month=None)
+        clp_monitoring(month=None)
+        routes_status()
+        routes_summary()
+        routes_diversions(route_id=None)
+    finally:
+        access._ACCESS.reset(tok)
+
+
+read_cache.WARMERS["staff"] = _warm_staff
 read_cache.WARMERS[AREAS_MONTHS_CACHE] = lambda: read_cache.cached(AREAS_MONTHS_CACHE, _areas_months_key(),
                                                                    _areas_months_build)
 # 27 Oct 2026 (group 2a): the public map's route check against the closures, built after start-up and after writes
@@ -4391,6 +4467,10 @@ def gate_arrivals_month(month: Optional[int] = None):
         month = max(1, min(MONTH_COUNT, weeks.month_index_of(_dt.date.today())))
     if not (1 <= int(month) <= MONTH_COUNT):
         raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
+    return _staff_json("gates/arrivals", {"month": int(month)}, lambda: _gate_arrivals_build(int(month), acc), acc)
+
+
+def _gate_arrivals_build(month, acc):
     factors = conversions.load_factors()
     wd = _working_days(factors)
     out = gate_arrivals.arrivals(int(month), acc, factors=factors, working_days=wd)
@@ -4462,6 +4542,10 @@ def clp_monitoring(month: Optional[int] = None):
         month = max(1, min(MONTH_COUNT, weeks.month_index_of(_dt.date.today())))
     if not (1 <= int(month) <= MONTH_COUNT):
         raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
+    return _staff_json("clp/monitoring", {"month": int(month)}, lambda: _clp_monitoring_build(int(month), acc), acc)
+
+
+def _clp_monitoring_build(month, acc):
     factors = conversions.load_factors()
     return clp.monitoring(int(month), acc, factors=factors, working_days=_working_days(factors))
 
@@ -4480,7 +4564,7 @@ def clp_pack_pdf(month: Optional[int] = None):
     data (the same reply as /api/clp/monitoring), the rest named with what they need; the demo notice on every page."""
     m = _clp_pack_reply(month)
     try:
-        data = clp_pack.build_pdf(m)
+        data = _staff_bytes("clp/pack.pdf", {"month": int(month)}, lambda: clp_pack.build_pdf(m))
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     return Response(content=data, media_type="application/pdf",

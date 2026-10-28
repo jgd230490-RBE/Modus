@@ -23,7 +23,12 @@ wait either. It only ever calls the same builder a viewer would.
 
 WHAT THIS DOES NOT DO: share entries between processes (Render runs one; see db.py), hold more than
 one entry per name and tenant, or keep anything across a restart.
+
+28 Oct 2026 (the demo narrative's F1, the staff screens' reads): many entries now (one per screen, role, team and
+month), so the store is capped (MAX_ENTRIES, MAX_BYTES; the least recently used goes first), and a build can be kept
+only on a condition (`keep`: a bulletin whose map fell back to the schematic is served, never kept).
 """
+import itertools
 import json
 import threading
 import time
@@ -32,6 +37,15 @@ import db
 
 #: (name, tenant) -> (key, version, value)
 _STORE = {}
+#: (name, tenant) -> a running number of the last build or hit, for the cap below (a counter, not the clock: Windows'
+#: clock ticks every ~16 ms, so two uses inside one tick would look equally old)
+_USED = {}
+_TICK = itertools.count()
+#: the store's cap: at most this many entries and this many bytes of bytes values (the least recently used go first).
+#: Measured 28 Oct 2026 on a laptop copy of the four-year demo: one role-and-team's whole staff set (cost lines, both
+#: Look-aheads, gates, CLP, forecasts, routes, Carbon planner) keeps ~7 MB of Python objects; a bulletin PDF 3.7 MB.
+MAX_ENTRIES = 60
+MAX_BYTES = 24 * 1024 * 1024
 _LOCK = threading.Lock()
 #: (name, tenant) -> threading.Lock, so one build at a time per entry
 _BUILDING = {}
@@ -52,15 +66,33 @@ def peek(name, key):
     slot = (name, db.current_tenant())
     hit = _STORE.get(slot)
     if hit and hit[0] == key and hit[1] == db.data_version():
+        _USED[slot] = next(_TICK)
         return hit[2]
     return None
 
 
-def cached(name, key, build):
+def _size(value):
+    return len(value) if isinstance(value, (bytes, bytearray)) else 0
+
+
+def _trim():
+    """Drop the least recently used entries until the store is within MAX_ENTRIES and MAX_BYTES. Holds _LOCK."""
+    total = sum(_size(v[2]) for v in _STORE.values())
+    for slot in sorted(_STORE, key=lambda sl: _USED.get(sl, -1)):
+        if len(_STORE) <= MAX_ENTRIES and total <= MAX_BYTES:
+            break
+        total -= _size(_STORE[slot][2])
+        _STORE.pop(slot, None)
+        _USED.pop(slot, None)
+        STATS["evicted"] = STATS.get("evicted", 0) + 1
+
+
+def cached(name, key, build, keep=None):
     """
     The value of build() for this tenant and `key`, built at most once per data version. `key` is
     whatever else the answer depends on (working days, the horizon, the day). build() takes no
     arguments and returns the value to keep (read_cache keeps it as it is; callers keep bytes).
+    `keep` (optional, no arguments, called after build): False = serve this value but do not keep it.
     """
     slot = (name, db.current_tenant())
     hit = peek(name, key)
@@ -76,8 +108,13 @@ def cached(name, key, build):
         value = build()
         STATS["builds"] += 1
         with _LOCK:
-            if db.data_version() == version:
+            if keep is not None and not keep():
+                STATS["not_kept"] = STATS.get("not_kept", 0) + 1
+                _STORE.pop(slot, None)
+            elif db.data_version() == version:
                 _STORE[slot] = (key, version, value)
+                _USED[slot] = next(_TICK)
+                _trim()
             else:
                 STATS["discarded"] += 1        # a write landed mid-build: serve it to this viewer, keep nothing
                 _STORE.pop(slot, None)
@@ -88,6 +125,7 @@ def clear():
     """Forget every entry (tests; nothing in the app needs it — the version does the work)."""
     with _LOCK:
         _STORE.clear()
+        _USED.clear()
 
 
 def json_bytes(value):
