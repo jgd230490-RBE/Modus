@@ -471,7 +471,8 @@ try:
     # bake_batch end to end, HERE stubbed: four legs upserted, one rebuild
     _real_conf, _real_leg = network.here_routing.configured, network._bake_leg
 
-    def _fake_leg(r, o, d, profile, leg, factors, alternatives=None, avoid=None, zone_tag=None, gates_by_loc=None):
+    def _fake_leg(r, o, d, profile, leg, factors, alternatives=None, avoid=None, zone_tag=None, gates_by_loc=None,
+                  depart_at=None):   # 29 Oct (D94): the batch passes its pinned time
         pts = {"R001": A, "R002": B, "R003": C}.get(r["id"], C)
         pts = pts if leg == "loaded" else list(reversed(pts))
         network._upsert_geom(r["id"], profile, json.dumps(pts), round(plen(pts), 3), 1.0, None, leg=leg, alt_index=0)

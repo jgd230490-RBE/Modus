@@ -373,8 +373,10 @@ limits.store_checks()
 # =========================================================================== #
 #  5. The clash rail: LIMIT                                                    #
 # =========================================================================== #
+# NARROWED 28 Oct 2026 (task 0c): NO_WAY_ROUND sits between LIMIT and UNBAKED
 ok("5. LIMIT is a clash code, after RESTRICTION and before UNBAKED",
-   clashes.CODES.index("LIMIT") == clashes.CODES.index("RESTRICTION") + 1 and clashes.CODES.index("UNBAKED") == clashes.CODES.index("LIMIT") + 1)
+   clashes.CODES.index("LIMIT") == clashes.CODES.index("RESTRICTION") + 1 and clashes.CODES.index("UNBAKED") == clashes.CODES.index("LIMIT") + 2
+   and clashes.CODES[clashes.CODES.index("LIMIT") + 1] == "NO_WAY_ROUND")
 
 
 def line(rid, veh, baked=True):

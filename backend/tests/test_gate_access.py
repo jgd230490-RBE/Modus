@@ -269,7 +269,7 @@ CALLS = []
 
 
 def _fake_routes(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_areas=None, alternatives=1, laden=True,
-                 via=None, pass_through=False):
+                 via=None, pass_through=False, departure_time=None):   # 29 Oct (D94): the bake now pins a time
     CALLS.append(((o_lat, o_lon), (d_lat, d_lon)))
     return [{"geometry": [[o_lon, o_lat], [d_lon, d_lat]], "distance_km": 10.0, "duration_hr": 0.25, "sections": []}]
 
@@ -312,7 +312,7 @@ try:
 
     # ---- 17 Oct 2026 (D109): a leg whose only drawn roads are its two gate access roads keeps HERE's alternatives ----
     def _fake_alts(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_areas=None, alternatives=1, laden=True,
-                   via=None, pass_through=False):
+                   via=None, pass_through=False, departure_time=None):
         CALLS.append(((o_lat, o_lon), (d_lat, d_lon), alternatives))
         return [{"geometry": [[o_lon, o_lat], [(o_lon + d_lon) / 2, (o_lat + d_lat) / 2 + 0.01 * i], [d_lon, d_lat]],
                  "distance_km": 10.0 + i, "duration_hr": 0.25 + 0.05 * i, "sections": []}

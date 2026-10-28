@@ -76,6 +76,7 @@ ORDER = [
     "routes", "route_haul_roads", "route_geometry",
     "route_sections",       # 12 Oct 2026 (§2.2d): derived from route_geometry, so after it
     "route_area_km",        # 12 Oct 2026 (§2.2b): derived from route_geometry and areas, so after both
+    "route_choice",         # 28 Oct 2026 (task 0c): names routes, zones and stored options, so after route_geometry
     "forecasts", "forecast_weeks", "forecast_days",
     "stockpile_weeks",
     "stockpile_plan",       # 27 Oct 2026 (stockpile forecast): each pile's planned use by month

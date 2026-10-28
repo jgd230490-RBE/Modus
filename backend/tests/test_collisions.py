@@ -296,10 +296,12 @@ def collision_rows(y):
         "C7": (*P(450, 0, -0.90), 3, "11/11/%d" % y, "5", "0", "6", "30", "0", "-1", "0", "1"),  # near site B only
         "C8": (*P(1000, -5), 2, "30/12/%d" % y, "3", "6", "3", "70", "0", "-1", "0", "6"),    # on R1, dual, dark
     }
+    # 28 Oct 2026 (0d): the hour each happened (C1 falls on a Saturday in 2025: the date wins over day_of_week's "3")
+    times = {"C1": "08:15", "C2": "17:40", "C8": "23:05", "C3": "16:00"}
     out = [C_HEAD]
     for cid, (lon, lat, sev, d, rc, rn, rt, sl, jd, rc2, rn2, light) in pts.items():
-        out.append(f"{y}{cid},{y},{cid},0,0,{lon},{lat},33,{sev},2,1,{d},3,08:15,E10000018,{rc},{rn},{rt},{sl},{jd},"
-                   f"{rc2},{rn2},{light}")
+        out.append(f"{y}{cid},{y},{cid},0,0,{lon},{lat},33,{sev},2,1,{d},3,{times.get(cid, '08:15')},E10000018,{rc},{rn},{rt},"
+                   f"{sl},{jd},{rc2},{rn2},{light}")
     return "\n".join(out) + "\n"
 
 
@@ -332,8 +334,18 @@ keep = cl.read_collisions(write("c.csv", collision_rows(Y)), DIX, year=Y)
 ok("3: in the strip: C1, C2, C3 (route), C4 (alternative), C7 (site), C8; out: far away, no position",
    sorted(k[4:] for k in keep) == ["C1", "C2", "C3", "C4", "C7", "C8"], str(sorted(keep)))
 c1 = keep.get(f"{Y}C1", {})
-ok("3: the month is kept (2025-03), never the day or the time", c1.get("month") == "2025-03" and "date" not in c1
-   and "time" not in c1 and "day" not in json.dumps(c1).lower().replace("daylight", ""), str(c1.get("month")))
+# NARROWED 28 Oct 2026 (0d, John's yes to notes\collision-time-mockup-1028): the hour and a weekday flag are kept in the
+# details too; still never the date, the day or the minute
+ok("3: the month is kept (2025-03), never the date, the day or the minute", c1.get("month") == "2025-03" and "date" not in c1
+   and "time" not in c1 and "day" not in json.dumps(c1).lower().replace("daylight", "").replace("weekday", "")
+   and ":15" not in json.dumps(c1), str(c1.get("month")))
+ok("3: ...the hour (08:15 -> 8) and whether it fell Monday to Friday, read from the date (Sat 15 Mar 2025 -> False although "
+   "day_of_week says 3)", c1["detail"].get("hour") == 8 and c1["detail"].get("weekday") is False
+   and keep[f"{Y}C2"]["detail"]["hour"] == 17 and keep[f"{Y}C2"]["detail"]["weekday"] is True, str(c1.get("detail")))
+ok("3: hour and weekday readers: blank or odd time -> None; DfT's day_of_week when the date does not read (1 Sunday, 7 Saturday)",
+   cl._hour_of("") is None and cl._hour_of("-1") is None and cl._hour_of("24:00") is None and cl._hour_of("00:59") == 0
+   and cl._weekday_of("", "1") is False and cl._weekday_of("", "7") is False and cl._weekday_of("x", "2") is True
+   and cl._weekday_of("", "") is None and cl._weekday_of("03/11/2026") is True)
 ok("3: road, junction, road type, speed limit, light and highway authority in words",
    c1.get("road") == "A6" and c1.get("junction") == "T or staggered junction" and c1.get("road_type") == "Single carriageway"
    and c1.get("speed_limit") == 30 and c1.get("light") == "Daylight" and c1.get("authority") == "E10000018"
@@ -557,7 +569,9 @@ wb = openpyxl.load_workbook(io.BytesIO(_x))
 # NARROWED 22 Oct 2026 (evidence v3): the routes compared, the lorries, the cycle routes and left turns
 ok("7: the XLSX: Summary, Stretches, Routes compared, Lorries, Cycle and left turns, Places, Collisions, About",
    # NARROWED 22 Oct 2026 (v3 part 2): and the comparison with roads like these
-   wb.sheetnames == ["Summary", "Stretches", "Routes compared", "Lorries", "Compared with roads like these", "Cycle and left turns",
+   # NARROWED 28 Oct 2026 (0d): and By time of day after the routes compared
+   wb.sheetnames == ["Summary", "Stretches", "Routes compared", "By time of day", "Lorries", "Compared with roads like these",
+                     "Cycle and left turns",
                      "Places", "Collisions", "About"],
    str(wb.sheetnames))
 wc = wb["Collisions"]
@@ -1189,6 +1203,180 @@ ok("11: the words: the Config card says the abnormal loads' routes are in the st
 ok("11: collisions.index_from_db reads the abnormal loads' lines the way community.strip_from_db does (both legs, not withdrawn)",
    "FROM abnormal_loads WHERE tenant_id = ? \"\n                      \"AND status != 'withdrawn'" in read("backend/collisions.py")
    and read("backend/collisions.py").count('"return_geometry_json"') >= 1)
+
+# --------------------------------------------------------------------------- #
+#  12. By time of day (28 Oct 2026, task 0d; John's yes to                     #
+#      notes\collision-time-mockup-1028, every question as recommended)       #
+# --------------------------------------------------------------------------- #
+ok("12: a fetch records that the hours are in (status 'hours')", cl.status()["hours"] is True)
+ok("12: the busy bands are fixed before any route is looked at: weekdays 07:00–10:00 and 16:00–19:00; 10 and 1 in 20",
+   cl.BUSY_BANDS == [("07:00", "10:00"), ("16:00", "19:00")] and cl.MIDDAY == ("10:00", "16:00")
+   and cl.OFFER_MIN == 10 and cl.OFFER_P == 0.05)
+ok("12: the exact test on two counts (R001 on live, 28 Oct: 17 vs 5 -> 0.008; 27 vs 15 -> 0.044; 33 vs 26 -> 0.22)",
+   abs(cl.chance_of_fewer(17, 5) - 0.0085) < 0.001 and abs(cl.chance_of_fewer(27, 15) - 0.0442) < 0.001
+   and abs(cl.chance_of_fewer(33, 26) - 0.217) < 0.002 and cl.chance_of_fewer(0, 0) == 1.0
+   and cl.chance_of_fewer(10, 10) > 0.5)
+_r001 = [2, 0, 0, 0, 0, 4, 7, 9, 5, 3, 6, 3, 3, 9, 5, 7, 11, 7, 9, 12, 4, 7, 2, 3]
+_a001 = [0, 0, 0, 0, 0, 1, 1, 1, 3, 1, 4, 3, 4, 2, 9, 4, 4, 10, 1, 3, 2, 3, 3, 3]
+
+
+def _hc(wk):
+    return {"weekday": wk, "weekend": 0, "unknown": 0}
+
+
+_off = cl.busy_offers([("This route", 0, _hc(_r001)), ("Alternative 1", 1, _hc(_a001))])
+ok("12: R001's live hours: Alternative 1 offered in both busy bands (17 vs 5, 27 vs 15), the middle of the day beside them",
+   len(_off) == 1 and _off[0]["alt"] == 1 and [(b["from"], b["route"], b["alt"]) for b in _off[0]["bands"]]
+   == [("07:00", 17, 5), ("16:00", 27, 15)] and (_off[0]["midday"]["route"], _off[0]["midday"]["alt"]) == (33, 26), str(_off))
+_r014 = [0] * 24
+_r014[7], _r014[16], _r014[17] = 3, 6, 5
+_a014 = [0] * 24
+_a014[7], _a014[16], _a014[17] = 4, 6, 5
+ok("12: no offer when the counts are about the same (R014: 11 vs 11) or the route had fewer than 10 in the band; 10 vs 0 is",
+   cl.busy_offers([("This route", 0, _hc(_r014)), ("Alternative 1", 1, _hc(_a014))]) == []
+   and cl.busy_offers([("This route", 0, _hc([0] * 7 + [9] + [0] * 16)), ("Alternative 1", 1, _hc([0] * 24))]) == []
+   and cl.busy_offers([("This route", 0, _hc([0] * 7 + [10] + [0] * 16)),
+                       ("Alternative 1", 1, _hc([0] * 24))])[0]["bands"][0]["route"] == 10)
+ok("12: an alternative is never offered against itself, nor a route without alternatives",
+   cl.busy_offers([("This route", 0, _hc(_r001))]) == [] and cl.busy_offers([]) == [])
+_w = cl.offer_words(_off[0], "2021–2025")
+ok("12: the words: counts against counts with the years; no rate, no verdict",
+   _w == "Alternative 1 had fewer in the busy hours: 5 against 17 (07:00–10:00) and 15 against 27 (16:00–19:00), weekdays "
+   "2021–2025. Between 10:00 and 16:00: 26 against 33."
+   and cl.offer_words(_off[0], "2021–2025", short=True).startswith(
+       "Alternative 1 had fewer collisions on it in the busy hours: 5 against 17")
+   and not VERDICT.search(_w) and "%" not in _w and "per " not in _w, _w)
+_hcs = cl.hour_counts([{"detail": {"hour": 8, "weekday": True}}, {"detail": {"hour": 8, "weekday": True}},
+                       {"detail": {"hour": 22, "weekday": False}}, {"detail": {"hour": None, "weekday": True}}, {"detail": {}}])
+ok("12: hour_counts: weekdays by hour, the weekend as one total, no hour or no day counted apart",
+   _hcs["weekday"][8] == 2 and sum(_hcs["weekday"]) == 2 and _hcs["weekend"] == 1 and _hcs["unknown"] == 2)
+ok("12: has_hours is False while any record was fetched before the hours (no 'hour' key)",
+   cl.has_hours([{"detail": {"hour": 3}}, {"detail": {"hour": None}}]) and not cl.has_hours([{"detail": {"hour": 3}}, {"detail": {}}]))
+E12 = cl.evidence("R1", now=date(2026, 10, 16))
+T12 = E12["time_of_day"]
+ok("12: the evidence: on R1 C2 (Wed 17:40) and C8 (Tue 23:05) on weekdays, C1 (Sat) at the weekend; the alternative none",
+   T12["shown"] and T12["columns"][0]["weekday"][17] == 1 and T12["columns"][0]["weekday"][23] == 1
+   and sum(T12["columns"][0]["weekday"]) == 2 and T12["columns"][0]["weekend"] == 1
+   and [c_["label"] for c_ in T12["columns"]] == ["This route", "Alternative 1"] and sum(T12["columns"][1]["weekday"]) == 0,
+   str(T12["columns"])[:300])
+ok("12: ...the busy bands on page 1's table (0 in the morning, 1 in the evening), no offer on counts this small",
+   E12["headline"][0]["busy"] == [0, 1] and E12["headline"][1]["busy"] == [0, 0] and T12["offers"] == [],
+   str((E12["headline"][0].get("busy"), T12["offers"])))
+ok("12: ...the route's gates' hours (none typed here: the default gate hours) and the scheme's no-delivery bands (none)",
+   T12["gates"] == {"from": "08:00", "to": "17:00"} and T12["no_delivery"] == [], str((T12["gates"], T12["no_delivery"])))
+_hr = export.collision_headline_rows(E12)
+ok("12: page 1's table gains '…on weekdays 07:00–10:00' and '…on weekdays 16:00–19:00' after the KSI row",
+   [r_[0] for r_ in _hr][2:5] == ["…killed or seriously injured (KSI)", "…on weekdays 07:00–10:00", "…on weekdays 16:00–19:00"]
+   and _hr[4][1:] == ["1", "0"], str([r_[0] for r_ in _hr]))
+_pdf12 = export.build_collision_evidence_pdf(E12)
+_t12 = " ".join(pdf_text(_pdf12, "").split()) if shutil.which("pdftotext") else ""
+ok("12: the PDF: the 'By time of day' block, the weekends, the rule, 'Nothing is switched', no alternative clearly fewer",
+   not _t12 or ("By time of day" in _t12 and "Weekday collisions on the route by the hour they happened" in _t12
+                and "Weekends: 1 on this route; 0 on Alternative 1." in _t12 and "Nothing is switched" in _t12
+                and "No alternative had clearly fewer in the busy hours." in _t12 and "on weekdays 16:00–19:00" in _t12
+                and "shaded: the route's gates open (08:00–17:00)" in _t12), _t12[:300])
+ok("12: no verdict word on the sheet with the block in", not _t12 or not VERDICT.search(_t12), str(VERDICT.findall(_t12)))
+_wb12 = openpyxl.load_workbook(io.BytesIO(export.build_collision_evidence_xlsx(E12)))
+_wh = _wb12["By time of day"]
+ok("12: the XLSX sheet: 24 hour rows, the bands in order, the weekends; one column per road route",
+   [_wh.cell(row=3, column=j).value for j in (1, 2, 3)] == ["Hour", "This route, weekdays", "Alternative 1, weekdays"]
+   and _wh.cell(row=21, column=1).value == "17:00–18:00" and _wh.cell(row=21, column=2).value == 1
+   and _wh.cell(row=27, column=1).value == "23:00–24:00" and _wh.cell(row=27, column=2).value == 1
+   and [_wh.cell(row=r_, column=1).value for r_ in (28, 29, 30, 31)]
+   == ["Weekdays 07:00–10:00", "Weekdays 10:00–16:00", "Weekdays 16:00–19:00", "Weekends, all hours"]
+   and [_wh.cell(row=r_, column=2).value for r_ in (28, 29, 30, 31)] == [0, 0, 1, 1],
+   str([[_wh.cell(row=r_, column=j).value for j in (1, 2, 3)] for r_ in range(1, 34)]))
+_hdr12 = [c_.value for c_ in _wb12["Collisions"][1]]
+ok("12: R6 at the record level: no sheet lists one collision's hour (the Collisions sheet has no hour, day or time column)",
+   not any(h and re.search(r"\b(date|day|time|hour)\b", h, re.I) for h in _hdr12) and "Month" in _hdr12, str(_hdr12))
+ok("12: ...nor the map's payload (a feature carries the month only)",
+   all("hour" not in f["properties"] and "weekday" not in f["properties"] and "detail" not in f["properties"]
+       for f in cl.payload()["features"]))
+# a record fetched before 28 Oct (no 'hour' in its details): the evidence says the hours come with the next fetch
+_old_rows = db.query("SELECT collision_id, detail_json FROM collision_records WHERE tenant_id = ?", (T,))
+db.execute("UPDATE collision_records SET detail_json = ? WHERE tenant_id = ? AND collision_id = ?",
+           (json.dumps({"urban": 1}), T, _old_rows[0]["collision_id"]))
+E12b = cl.evidence("R1", now=date(2026, 10, 16))
+_t12b = " ".join(pdf_text(export.build_collision_evidence_pdf(E12b), "").split()) if shutil.which("pdftotext") else ""
+ok("12: fetched before the hours: no busy rows, no chart, the sheet says the hours come with the next fetch",
+   E12b["time_of_day"]["shown"] is False and E12b["headline"][0]["busy"] is None
+   and not any(r_[0].startswith("…on weekdays") for r_ in export.collision_headline_rows(E12b))
+   and (not _t12b or "The hour of each collision comes with the next fetch" in _t12b)
+   and openpyxl.load_workbook(io.BytesIO(export.build_collision_evidence_xlsx(E12b)))["By time of day"].cell(row=1, column=1).value
+   .startswith("The hour of each collision comes with the next fetch"))
+for r_ in _old_rows:
+    db.execute("UPDATE collision_records SET detail_json = ? WHERE tenant_id = ? AND collision_id = ?",
+               (r_["detail_json"], T, r_["collision_id"]))
+_off2 = [dict(_off[0], words=_w, extra="6.2 mi longer each way")]
+E12c = dict(E12, time_of_day=dict(T12, offers=_off2))
+_t12c = " ".join(pdf_text(export.build_collision_evidence_pdf(E12c), "").split()) if shutil.which("pdftotext") else ""
+ok("12: with an offer, the PDF prints its sentence and the extra length, and no 'clearly fewer' denial",
+   not _t12c or ("Alternative 1 had fewer in the busy hours: 5 against 17 (07:00–10:00)" in _t12c
+                 and "Alternative 1 is 6.2 mi longer each way." in _t12c and "No alternative had clearly fewer" not in _t12c),
+   _t12c[-900:])
+_ug, _tg = read("frontend/help/index.html"), read("frontend/help/technical/index.html")
+_ug_ct = _ug[_ug.index("<em>By time of day</em>"):_ug.index("<em>By time of day</em>") + 400] if "<em>By time of day</em>" in _ug else ""
+ok("12: the user guide: By time of day in a few words (the busy hours, the Routes line, nothing is switched), no method or API",
+   "07:00&ndash;10:00 and 16:00&ndash;19:00" in _ug_ct and "nothing is switched" in _ug_ct and "under the route&rsquo;s options" in _ug_ct
+   and not re.search(r"Binomial|exact test|/api/|detail_json|OFFER_", _ug_ct), _ug_ct[:200])
+ok("12: the technical guide T9 holds the method: the fields read, the bands, 10 and 0.05, the test, the endpoint, offered only",
+   'id="t9-time-of-day"' in _tg and "<code>OFFER_MIN</code> = 10" in _tg and "<code>OFFER_P</code> = 0.05" in _tg
+   and "Binomial(route + alternative, &frac12;)" in _tg and "/api/routes/{id}/collision-hours" in _tg
+   and "Offered, never applied" in _tg and _tg.index('id="t9-time-of-day"') < _tg.index('id="t10-public-map"'))
+# 28 Oct 2026 (found on live after PR #160: the evidence answered 500) — location_gates.active is BOOLEAN on Postgres and an
+# integer in SQLite, so "active = 1" in SQL broke the sheet on live only. No backend query compares `active` in SQL now.
+_active_sql = []
+for _f in sorted(os.listdir(BACKEND)):
+    if _f.endswith(".py"):
+        for _n in ast.walk(ast.parse(read("backend/" + _f))):
+            if isinstance(_n, ast.Constant) and isinstance(_n.value, str) and re.search(r"\bactive\s*(=|!=|<>)\s*(1|0|TRUE|FALSE)\b", _n.value, re.I) \
+                    and re.search(r"\b(SELECT|UPDATE|DELETE|WHERE)\b", _n.value):
+                _active_sql.append(f"{_f}: {_n.value[:80]}")
+ok("12: no backend SQL compares `active` with a number or TRUE / FALSE (BOOLEAN on Postgres, an integer in SQLite)",
+   not _active_sql, str(_active_sql))
+db.execute("INSERT INTO location_gates (tenant_id, id, location_id, name, direction, lat, lon, active, open_from, open_to) "
+           "VALUES (?, 'GA1', 'LA', 'In', 'access', ?, ?, ?, '06:00', '18:00')", (T, LAT0, -0.95, True))
+db.execute("INSERT INTO location_gates (tenant_id, id, location_id, name, direction, lat, lon, active, open_from, open_to) "
+           "VALUES (?, 'GA2', 'LA', 'Old', 'access', ?, ?, ?, '00:00', '23:00')", (T, LAT0, -0.95, False))
+ok("12: gate_span: the route's gates' hours, a stopped gate left out (Python decides, not SQL)",
+   cl.gate_span({"origin_id": "LA", "dest_id": "LB"}) == (360, 1080), str(cl.gate_span({"origin_id": "LA", "dest_id": "LB"})))
+db.execute("DELETE FROM location_gates WHERE tenant_id = ? AND id IN ('GA1', 'GA2')", (T,))
+# a route with no collision near it, after a fetch that stored the hours: "none", never "the hours come with the next fetch"
+E12d = cl.evidence("R2", now=date(2026, 10, 16))
+_t12d = " ".join(pdf_text(export.build_collision_evidence_pdf(E12d), "").split()) if shutil.which("pdftotext") else ""
+ok("12: a route with no collisions near it: the hours are shown as none (0 in the busy rows), the sheet says so, the Routes "
+   "line has nothing to offer",
+   E12d["time_of_day"]["shown"] is True and E12d["headline"][0]["busy"] == [0, 0]
+   and cl.busy_hours("R2") == {"shown": True, "offers": [], "period": "2021–2025"}
+   and (not _t12d or ("No collisions on this route (within 25 m), 2021–2025." in _t12d
+                      and "comes with the next fetch" not in _t12d)), _t12d[-600:])
+# 28 Oct 2026 (found on live after #160: a route re-routed after the fetch gained an "Alt 2" with 0 collisions on it — its road
+# had never been searched — and was offered as "0 against 48"). The fetch records the roads it searched; only those are offered.
+ok("12: the fetch records the road routes it searched along (the route and its alternative here)",
+   cl.searched_keys() == {"R1", "R1@1"}, str(cl.searched_keys()))
+_cols3 = [("This route", 0, _hc(_r001)), ("Alternative 1", 1, _hc(_a001)), ("Alternative 2", 2, _hc([0] * 24))]
+ok("12: an alternative drawn after the fetch (R1@2, never searched) is left out of the comparison; the route is always kept",
+   [c[1] for c in cl._searched_only("R1", _cols3)] == [0, 1]
+   and [o["alt"] for o in cl.busy_offers(cl._searched_only("R1", _cols3))] == [1]
+   and [o["alt"] for o in cl.busy_offers(_cols3)] == [1, 2])
+_det12 = cl._detail(cl._meta_row())
+cl._write_meta("done", {k: v for k, v in _det12.items() if k != "searched"})
+ok("12: ...a fetch made before this rule (no list stored) leaves every column in, as before",
+   cl.searched_keys() is None and [c[1] for c in cl._searched_only("R1", _cols3)] == [0, 1, 2])
+cl._write_meta("done", _det12)
+_mid = []
+
+
+def _peek_dl(url, dest):
+    _mid.append(cl.status()["hours"])
+    return stub_download(only_2025)(url, dest)
+
+
+cl.refresh(fetchers={"download": _peek_dl}, today=date(2026, 10, 16))
+ok("12: while a fetch runs the status still says the stored rows carry their hours (it read False mid-fetch on live)",
+   _mid and all(h is True for h in _mid) and cl.status()["hours"] is True, str(_mid[:3]))
+ok("12: the offer is never applied: collisions.py writes nothing to routes, route_geometry or route_choice",
+   not re.search(r"(UPDATE|INSERT INTO|DELETE FROM)\s+(routes|route_geometry|route_choice)\b", read("backend/collisions.py")))
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

@@ -585,6 +585,20 @@ def _avoid_str(bbox):
     return f"bbox:{w:.6f},{s:.6f},{e:.6f},{n:.6f}"
 
 
+#: 28 Oct 2026 (task 0c): the shape a WAY ROUND sends HERE for a dated zone. "bbox" is what the main line has always
+#: sent (avoid_areas). Which other shapes HERE honours is decided by the probe zone-avoid-probe.ps1, never assumed.
+AVOID_SHAPE = "bbox"
+
+
+def avoid_strings(zone, shape=None):
+    """
+    HERE avoid[areas] entries for ONE zone, for a way round (network.bake_way_rounds). "bbox": the drawn shape's
+    rectangle, one entry — the same string avoid_areas() sends.
+    """
+    bb = bbox_of(zone.get("geometry")) if zone.get("geometry") else None
+    return [_avoid_str(bb)] if bb else []
+
+
 def routing_zones(on=None):
     """
     Active, routing-affecting zones in force on a date (default today) — the ones whose

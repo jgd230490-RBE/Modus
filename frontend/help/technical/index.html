@@ -332,12 +332,33 @@ call per leg; two for a spliced haul road). Moving a node re-bakes the routes it
 is used only for the direction it serves. Changing a gate moves where HERE routes to, so the stored route has to be
 re-baked before the distances mean anything. A deactivated gate that a route selected makes that route refuse to
 bake, by name.</li>
+<li id="t2-bake-hour"><strong>The hour a route is worked out for (29 Oct 2026, D94).</strong> Every bake (Route all, Route on a row, a way round) sends HERE <code>departureTime</code> = the next Tuesday at least two days ahead, 10:00 in the tenant's time zone (<code>here_routing.bake_departure_time</code>), resolved once per run; the run's answer carries it as <code>departure_time</code>. Until then no time was sent and every line was HERE&rsquo;s &ldquo;now&rdquo; at the minute of the bake: on 28 Oct a Route all at 21:30 UTC stored roads 23&ndash;48&nbsp;% longer on R001 and R010 than HERE gives at every weekday hour 06:00&ndash;18:00. The admin departure check (<code>GET /api/admin/diagnostics/departure/{route}</code>) replays the bake at chosen hours (the bake&rsquo;s own hour added), names each option by the stored one it matches, and with <code>plan=true</code> makes no HERE call.</li>
 <li><strong>Alternatives.</strong> HERE may return more than one option per vehicle. &ldquo;Make primary&rdquo; swaps
 an alternative into first place (<code>alt_index</code> 0); re-baking restores HERE's ranking.</li>
-<li><strong>Zones.</strong> A zone ticked to avoid is sent to HERE as an avoid-area (the rectangle around what was
-drawn) and every baked leg crossing it is cleared and re-routed. Legs baked before zones existed are matched
-approximately: there is no record of what they avoided. Unticking Active retires a zone and keeps the record of why
-past bakes went the way they did.</li>
+<li><strong>Zones.</strong> A zone ticked to avoid and with NO dates is sent to HERE as an avoid-area (the rectangle
+around what was drawn) with every bake, and every baked leg crossing it is cleared and re-routed.
+Legs baked before zones existed are matched approximately: there is no record of what they avoided. Unticking Active
+retires a zone and keeps the record of why past bakes went the way they did.</li>
+<li id="t2-diversions"><strong>Zones with dates: diversions (28 Oct 2026).</strong> A dated routing zone is never sent with
+the main line's bake (<code>network.active_avoid</code> takes undated zones only; until 28 Oct the zones in force on the
+day of the bake shaped the line for every month). Instead <code>route_choice.refresh_zones()</code> — run after every zone
+save, Route all, route bake, Make primary and way round, geometry only, no HERE call — cuts the programme at every dated
+zone's start and end and, for each (route, vehicle profile, leg) whose alt-0 line crosses a zone in force (exact test on
+the drawn shape, <code>zones.line_hits_geometry</code>), stores a <code>route_choice</code> row: the SHORTEST stored option
+that misses every routing zone in force then (<code>in_use</code>), or <code>needs_route</code>. &ldquo;Find a way round&rdquo;
+(<code>POST /api/admin/route-diversions/way-round</code>, admin) bakes ONE option per such leg with the zones' areas added to
+<code>avoid[areas]</code>, stored at <code>alt_index</code> 10 (<code>route_choice.WAY_ROUND_BASE</code>) with the zone ids in
+<code>route_geometry.avoids</code>; a plain re-bake keeps it; a failure writes nothing; a returned line that still crosses
+the zone is <code>no_way_round</code>. &ldquo;Keep the main route&rdquo; is a <code>keep_main</code> row the refresh honours
+(<code>declined</code>). Readers: <code>derived.cycle_for(month_index, week_index)</code> blends each option by its share of the
+period's working days (Mon&ndash;Fri, bank holidays not removed), trips a lorry a day the fewest of the options used;
+<code>route_analysis(pairs=)</code> pairs a laden and an empty option; the month figures, costlines, carbon and Look-ahead go
+through it; the NO_WAY_ROUND flag; lorry limits are checked on options in use and count in the weeks their dates touch;
+<code>/api/public/map-data</code> carries <code>Diversion</code> features (months, periods, zone names) that the map swaps
+into the leg in those months; the route sheet adds a page per diversion. NOT yet following the month: shared road
+sections (busiest roads, heat map), council km, the bulletin's and CLP plans' maps, the Simulation, the collision and
+community strips (they read the main line). The table <code>route_choice</code> carries <code>hours_from</code> /
+<code>hours_to</code> and <code>reason_kind</code> for task 0d's peak-hour choice (<code>offered</code> until accepted).</li>
 <li><strong>Haul roads.</strong> <em>Splice</em> assumes HERE has never heard of the road: route to one end, use the
 drawn line, route on from the other end (two HERE calls per leg). <em>Via</em> lets HERE find its own way through (one
 call). Which end is the entry is worked out per leg from the geometry, so the order the road was drawn in does not
@@ -794,6 +815,24 @@ appear while Alternative routes is ticked, and the route map plans leave them ou
 is a filter on the map group. The export card and the Routes page can add the collisions to the plans (killed or seriously
 injured only on the regional plan).</p>
 
+<p id="t9-time-of-day"><strong>By time of day (28 Oct 2026, task 0d).</strong> DfT's collision table carries <code>date</code>
+(dd/mm/yyyy), <code>day_of_week</code> (1 Sunday &hellip; 7 Saturday) and <code>time</code> (&ldquo;HH:MM&rdquo;) in every year 2021&ndash;2025
+(checked on the files). <code>read_collisions</code> keeps the hour (0&ndash;23) and whether the date fell Monday to Friday
+(<code>day_of_week</code> when the date does not read) in <code>detail_json</code> as <code>hour</code> and <code>weekday</code>; never the
+date or the minute, and no screen, popup or sheet prints one collision's hour (R6 for a single record). A fetch sets
+<code>hours</code> in the status; until every counted collision has its hour the sheet says the hours come with the next fetch.
+The evidence counts each road route's collisions on the route (25 m) on weekdays by hour, and in two fixed busy bands,
+<code>BUSY_BANDS</code> = 07:00&ndash;10:00 and 16:00&ndash;19:00 (the CLP form's example, chosen before any route was looked at), with
+10:00&ndash;16:00 beside them. An alternative is offered for a band only when the route had at least <code>OFFER_MIN</code> = 10 there
+in the five years and a one-sided exact test on the two counts (Binomial(route + alternative, &frac12;): the chance that the
+alternative's share is this small or smaller were each collision as likely on either) is below <code>OFFER_P</code> = 0.05. The test
+takes no account of length or traffic: a longer alternative makes it stricter, a shorter one looser; the sheet prints how much
+longer or shorter. The chart shades the route's gates' open hours (earliest open to latest shut at either end; the default gate
+hours where a gate has none) and hatches the scheme's no-delivery bands (<code>planning.peak_bands</code>). <code>GET
+/api/routes/{id}/collision-hours</code> (staff; a team code its own team's routes) gives the Routes page's line from the stored
+collisions and lines only. Offered, never applied: using the alternative in those hours waits for task 0c's per-period route
+choice. HERE gave the same road at every hour in the 16 Oct probe (R010, 32 calls), so any other road is a stored
+alternative.</p>
 <h1 id="t10-public-map">T10 The public map</h1>
 <p>What the map's screens leave out since 22 Oct 2026 (the words sweep).</p>
 <ul>
@@ -818,7 +857,8 @@ count km and carbon there, not movements. Carbon is split by the km inside each 
 in a council&rdquo; until the clip runs, on the next bake or council-areas import. Council bands are on Config &rarr; Map and
 bulletin; the district bands differ from the route carbon bands.</li>
 <li><strong>Closures and zones.</strong> National Highways closures are never passed to HERE, so routes do not avoid them
-(&ldquo;For information only&rdquo;). A zone marked Affects routing is avoided (T2).</li>
+(&ldquo;For information only&rdquo;). A zone marked Affects routing is avoided (T2); one with dates only in its
+dates, where the month on screen draws the route's diversion (<a href="#t2-diversions">T2, diversions</a>).</li>
 <li><strong>Alternatives.</strong> The other options HERE returned and the plan does not use. A route along a haul road
 has none (T2).</li>
 <li><strong>Basemaps.</strong> Ten Mapbox styles (eight classic versioned styles and, since 28 Oct 2026 on GL JS 3.33.0, Standard and Standard satellite); Navigation's live traffic and incident

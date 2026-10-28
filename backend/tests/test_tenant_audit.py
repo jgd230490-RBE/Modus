@@ -107,6 +107,9 @@ TENANTED = {
     # 22 Oct 2026 (evidence v3, traffic.py): DfT's traffic counts at the count points along one tenant's routes.
     # Registered in the same edit as the table — twelve.
     "traffic_counts",
+    # 28 Oct 2026 (task 0c, route_choice.py): which stored option a route uses between two dates. Registered in the same
+    # edit as the table.
+    "route_choice",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is

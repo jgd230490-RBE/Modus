@@ -64,7 +64,7 @@ import stockpiles
 import weeks
 
 CODES = ("SHORTAGE", "DAYS_NE_WEEK", "STOCKPILE_OVER", "ROUTE_CAP", "GATE_OVER", "IPT_SHARE", "RESTRICTION",
-         "LIMIT", "UNBAKED", "GATE_NEAR", "STOCKPILE_EMPTY", "STOCKPILE_SOON", "PARENT_CHANGED")
+         "LIMIT", "NO_WAY_ROUND", "UNBAKED", "GATE_NEAR", "STOCKPILE_EMPTY", "STOCKPILE_SOON", "PARENT_CHANGED")
 
 #: The 98 % band (brief L5): a line "holds" when actual ≥ 98 % of planned.
 HOLD_BAND = 0.98
@@ -471,6 +471,20 @@ def restriction(lines, month_index=None, week_index=None):
                  "week": ([wf.isoformat(), wt.isoformat()] if wf and wt else None)}
 
 
+def _diversion_touches(periods, line):
+    """True when one of a diversion's date runs [{"from", "to"}] touches the line's week (or month)."""
+    try:
+        import route_choice
+        days = (route_choice.week_days(int(line["month_index"]), int(line["week_index"]))
+                if line.get("week_index") is not None else route_choice.month_days(int(line["month_index"])))
+    except Exception:
+        return True
+    if not days:
+        return False
+    lo, hi = days[0].isoformat(), days[-1].isoformat()
+    return any((not p.get("from") or p["from"] <= hi) and (not p.get("to") or p["to"] >= lo) for p in periods)
+
+
 def limit(lines):
     """
     LIMIT (13 Oct 2026) from the STORED per-route limits check (limits.store_checks): the
@@ -487,6 +501,8 @@ def limit(lines):
         veh = (l.get("context") or {}).get("vehicle_type") or l.get("vehicle_type")
         # 13 Oct 2026 (W6): the rule and the words live in limits.py, shared with costlines
         hits = limits.exceeding(stored.get(l["route_id"]), veh)
+        # 28 Oct 2026 (task 0c): a limit on a diversion counts only in a week its dates touch
+        hits = [h for h in hits if not h.get("diversion") or _diversion_touches(h["diversion"], l)]
         if not hits:
             continue
         h = hits[0]
@@ -495,6 +511,36 @@ def limit(lines):
                          kind=h.get("kind"), limit=h.get("limit"), unit=h.get("unit"),
                          source=h.get("source"), checked_at=(stored.get(l["route_id"]) or {}).get("checked_at")))
     return out, {"status": "ok" if checked else "unchecked", "checked_at": (min(checked) if checked else None)}
+
+
+#: 28 Oct 2026 (task 0c): why a line still runs through a dated zone in force this week, in the rail's words
+NO_WAY_WORDS = {"needs_route": "no way round found yet",
+                "no_way_round": "there is no road round it",
+                "declined": "kept on the main route"}
+
+
+def no_way_round(lines):
+    """
+    NO_WAY_ROUND (28 Oct 2026, task 0c): a dated zone with Affects routing is in force on some of this week's days
+    and the line's route still goes through it — no stored option misses it yet, HERE found no road round it, or the
+    planner kept the main route (route_choice). One flag per line, from its context (derived.cycle_for's mix).
+    """
+    try:
+        import zones as _zones
+        names = {z["id"]: z.get("name") for z in _zones.list_zones()}
+    except Exception:
+        names = {}
+    out = []
+    for l in lines:
+        probs = (l.get("context") or {}).get("diversion_problems") or []
+        if not probs:
+            continue
+        p = probs[0]
+        zn = ", ".join(names.get(z) or z for z in (p.get("zone") or "").split(",") if z)
+        text = f"{_label(l)}: {zn} is in force; {NO_WAY_WORDS.get(p.get('status'), 'no way round')}."
+        out.append(_flag("NO_WAY_ROUND", l, text, label="NO WAY ROUND", zone=p.get("zone"),
+                         status=p.get("status"), date_from=p.get("from"), date_to=p.get("to")))
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -520,6 +566,7 @@ def compute(all_lines, visible_keys, account_rows, month_index, week_index,
     flags += ipt_share(all_lines)
     flags += stockpile_over(all_lines, stock)
     flags += stockpile_soon(all_lines, stock)
+    flags += no_way_round(all_lines)              # 28 Oct 2026 (task 0c)
     # the STORED check — a DB read, so it is always on. `with_restrictions=False` is for a
     # caller that wants the rail without it (none today).
     prov = restrictions.provider() or {}

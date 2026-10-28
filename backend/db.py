@@ -86,6 +86,9 @@ TENANTED_TABLES = {
     # 22 Oct 2026 (evidence v3, traffic.py): DfT's traffic counts (AADF) at the count points along ITS routes, for the
     # evidence sheet's "expected for roads like these". One tenant's data, carried in its package.
     "traffic_counts",
+    # 28 Oct 2026 (task 0c, route_choice.py): which stored option a route uses between two dates (a dated zone's diversion,
+    # and from 0d a peak-hour choice). One tenant's routes, carried in its package. Registered in the same edit.
+    "route_choice",
 }
 
 # A contextvar rather than a module global, so Phase 6 can make the tenant
@@ -547,6 +550,8 @@ def init_network_db():
             print("⚠️  abnormal_loads: a missing column could not be added:", e)
         _create_tenanted(cur, "traffic_counts")     # 22 Oct 2026 (evidence v3). Born with tenant_id in the key.
         conn.commit()
+        _create_tenanted(cur, "route_choice")       # 28 Oct 2026 (task 0c). Born with tenant_id in the key.
+        conn.commit()
         # 22 Oct 2026 (evidence v3): the vehicle details, NULL until the next fetch
         try:
             if IS_PG:
@@ -575,8 +580,10 @@ def init_network_db():
         #                    route_analysis() reads and the point of assigning a speed is
         #                    that cycle time moves. Keeping the raw figure is what makes
         #                    the adjustment auditable rather than a number that appeared.
+        # 28 Oct 2026 (task 0c): avoids = the dated zone ids a WAY ROUND (alt_index >= 10, route_choice.WAY_ROUND_BASE)
+        # was baked to miss; NULL on every row HERE ranked (0-2)
         for col, typ in (("zones_applied", "TEXT"), ("haul_zones", "TEXT"),
-                         ("haul_km", "REAL"), ("duration_hr_here", "REAL")):
+                         ("haul_km", "REAL"), ("duration_hr_here", "REAL"), ("avoids", "TEXT")):
             try:
                 if IS_PG:
                     cur.execute(f"ALTER TABLE route_geometry ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -1304,6 +1311,7 @@ _TENANT_DDL = {
             haul_zones       TEXT,
             haul_km          REAL,
             duration_hr_here REAL,
+            avoids           TEXT,
             PRIMARY KEY (tenant_id, route_id, vehicle_profile, leg, alt_index)
         )
     """,
@@ -1416,6 +1424,38 @@ _TENANT_DDL = {
     # 22 Oct 2026 (evidence v3, traffic.py): DfT road traffic statistics, the annual average daily flow at each count
     # point within the strip of a route, one row per point and year: the road, where, its link length, all motor
     # vehicles, pedal cycles and HGVs a day, and whether that year was counted or estimated. Fetched with the collisions.
+    # ----------------------------------------------------------------------- #
+    #  28 Oct 2026 — route_choice: a route's option by date (task 0c / 0d)     #
+    # ----------------------------------------------------------------------- #
+    # "Route R uses stored option N between these dates (and, from 0d, these hours) because of …". Zone rows
+    # (reason_kind 'zone', source 'auto') are worked out from the dated zones and the stored lines by
+    # route_choice.refresh_zones() and rewritten whole; a planner's "Keep the main route" is a 'keep_main' row
+    # (source 'planner') that the refresh reads and never deletes. Readers ask route_choice.alt_on / month_mix only.
+    "route_choice": """
+        CREATE TABLE route_choice (
+            tenant_id       TEXT NOT NULL DEFAULT 'default',
+            id              TEXT NOT NULL,
+            route_id        TEXT NOT NULL,
+            vehicle_profile TEXT,
+            leg             TEXT,
+            alt_index       INTEGER NOT NULL DEFAULT 0,
+            starts_on       TEXT,
+            ends_on         TEXT,
+            hours_from      TEXT,
+            hours_to        TEXT,
+            days            TEXT,
+            reason_kind     TEXT NOT NULL,
+            reason_ref      TEXT,
+            status          TEXT NOT NULL,
+            source          TEXT NOT NULL,
+            km_delta        REAL,
+            decided_by      TEXT,
+            decided_at      TEXT,
+            created_at      TEXT,
+            updated_at      TEXT,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
     "traffic_counts": """
         CREATE TABLE traffic_counts (
             tenant_id       TEXT NOT NULL DEFAULT 'default',
@@ -1919,6 +1959,7 @@ _TENANT_PK = {
     "collision_meta": "(tenant_id, meta_id)",
     "abnormal_loads": "(tenant_id, id)",
     "traffic_counts": "(tenant_id, count_point_id, year)",
+    "route_choice": "(tenant_id, id)",
 }
 
 # Extra UNIQUE constraints that must also take tenant_id. Only forecasts has one.
