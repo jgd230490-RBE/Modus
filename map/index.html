@@ -702,6 +702,8 @@
         /* 28 Oct 2026 (John: "on a phone we need an option to select full screen for the map"; notes\map-phone-fullscreen-mockup-1028):
            the ⤢ button, its floating strip and the Layers sheet's Guide exist on a phone only */
         #m-full-btn, #m-full-strip, #btn-guide-sheet{ display:none; }
+        /* the two symbols are drawn by CSS, the buttons named by aria-label (a bare symbol as text reads as a name mismatch) */
+        #m-full-btn::before{ content:"\2922"; content:"\2922" / ""; } #m-full-exit::before{ content:"\2921"; content:"\2921" / ""; }
         @media (max-width:767px){
             #kpi-hud, #menu-toggle, #timeline-bar, #tl-warnings, #route-drawer, #btn-detail{ display:none !important; }
             #tl-toast, #wall-hud, #wall-hint{ display:none !important; }   /* M3 (12 Oct evening): the sheet carries the month and Play */
@@ -871,11 +873,11 @@
 <!-- 12 Oct 2026 (review 2.8 row 2, mockup 7): on a phone the ONE Layers button opens the panel as a full-screen sheet -->
 <button type="button" id="m-layers-btn" onclick="openLayersSheet()" aria-controls="main-sidebar" aria-expanded="false">&#8779; Layers</button>
 <!-- 28 Oct 2026 (John): a full-screen map on a phone — ⤢ enters, the floating strip keeps Play and the month, ⤡ / Back / Esc leave -->
-<button type="button" id="m-full-btn" onclick="enterMapFull()" aria-label="Full screen map" title="Full screen map">&#10530;</button>
+<button type="button" id="m-full-btn" onclick="enterMapFull()" aria-label="Full screen map" title="Full screen map"></button>
 <div id="m-full-strip" role="group" aria-label="Full screen map" hidden>
   <button type="button" class="m-play" id="m-full-play" onclick="toggleTimeline()" aria-label="Play" aria-pressed="false">&#9654;</button>
   <div class="mf-month"><b id="m-full-month">No month on screen</b><span id="m-full-fig"></span></div>
-  <button type="button" id="m-full-exit" onclick="exitMapFull()" aria-label="Leave full screen" title="Leave full screen">&#10529;</button>
+  <button type="button" id="m-full-exit" onclick="exitMapFull()" aria-label="Leave full screen" title="Leave full screen"></button>
 </div>
 <div class="sidebar" id="main-sidebar">
     <button type="button" class="sidebar-close" id="sidebar-close" onclick="toggleSidebar()" aria-label="Close the control panel" title="Close the control panel">&times;</button>

@@ -7114,10 +7114,11 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
 //      forecast section take up too much space"; notes/map-phone-fullscreen-mockup-1028, "yes, as recommended") ----
 {
   ok("⭐ FULL: a ⤢ button and a floating strip (Play, the month and its figure, ⤡) exist, hidden above the phone width",
-     html.includes('<button type="button" id="m-full-btn" onclick="enterMapFull()" aria-label="Full screen map" title="Full screen map">&#10530;</button>')
+     html.includes('<button type="button" id="m-full-btn" onclick="enterMapFull()" aria-label="Full screen map" title="Full screen map"></button>')
      && html.includes('<div id="m-full-strip" role="group" aria-label="Full screen map" hidden>')
      && html.includes('<button type="button" class="m-play" id="m-full-play" onclick="toggleTimeline()" aria-label="Play" aria-pressed="false">&#9654;</button>')
-     && html.includes('<button type="button" id="m-full-exit" onclick="exitMapFull()" aria-label="Leave full screen" title="Leave full screen">&#10529;</button>')
+     && html.includes('<button type="button" id="m-full-exit" onclick="exitMapFull()" aria-label="Leave full screen" title="Leave full screen"></button>')
+     && html.includes('#m-full-btn::before{ content:"\\2922"; content:"\\2922" / ""; } #m-full-exit::before{ content:"\\2921"; content:"\\2921" / ""; }')
      && html.includes("#m-full-btn, #m-full-strip, #btn-guide-sheet{ display:none; }"));
   ok("⭐ FULL: full screen hides the sheet, Layers, ⤢ and the tips; the demo notice stays (as a pill at the top centre); a route's card still opens",
      /body\.map-full #m-sheet, body\.map-full #m-layers-btn, body\.map-full #m-full-btn, body\.map-full \.guide-strip,\s*body\.map-full \.guide-tip\{ display:none !important; \}/.test(html)
