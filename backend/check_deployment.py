@@ -27,9 +27,8 @@ def database_facts():
     """{database, admins, admins_two_step, staff_logins, locations, routes}."""
     import db
     import users
-    t = db.current_tenant()
     try:
-        rows = db.query("SELECT role, kind, disabled, totp_secret FROM users WHERE tenant_id = ?", (t,))
+        rows = db.query("SELECT role, kind, disabled, totp_secret FROM users WHERE tenant_id = ?", (db.current_tenant(),))
     except Exception:  # noqa: BLE001 — a deployment that has never started has no users table: no logins
         rows = []
     live = [r for r in rows if not r.get("disabled")]
@@ -39,8 +38,8 @@ def database_facts():
         "admins": len(admins),
         "admins_two_step": sum(1 for r in admins if users.two_step_on(r)),
         "staff_logins": sum(1 for r in live if (r.get("kind") or "staff") != "demo"),
-        "locations": _count(db, "SELECT COUNT(*) AS n FROM locations WHERE tenant_id = ?", (t,)),
-        "routes": _count(db, "SELECT COUNT(*) AS n FROM routes WHERE tenant_id = ?", (t,)),
+        "locations": _count(db, "SELECT COUNT(*) AS n FROM locations WHERE tenant_id = ?", (db.current_tenant(),)),
+        "routes": _count(db, "SELECT COUNT(*) AS n FROM routes WHERE tenant_id = ?", (db.current_tenant(),)),
     }
 
 

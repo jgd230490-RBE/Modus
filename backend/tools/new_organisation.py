@@ -109,7 +109,7 @@ A. THE DATABASE (Render)
     It works only from a service in the same region, which is why both are in Frankfurt.
 
 B. THE WEB SERVICE (Render)
- 4. New -> Web Service -> Git Provider -> jgd230490-RBE/Modus.
+ 4. New -> Web Service -> Git Provider -> the same repository modus-web deploys from.
  5. Name: {n['web']}. Language: Python 3. Branch: {branch}{branch_note}.
     Region: {REGION} (the same as the database). Root Directory: leave empty.
  6. Build Command:  {BUILD}
@@ -150,7 +150,7 @@ E. THE ORGANISATION'S DATA
 18. Users -> invite the organisation's people (each sets up their own two-step sign-in).
 
 F. CHECKS BEFORE HANDING OVER (Claude can run both)
-19. On the laptop, in Modus:   python backend/tools/check_pilot.py {n['url']}
+19. On the laptop, in the code folder:   python backend/tools/check_pilot.py {n['url']}
     Every line pass (a "note" is information).
 20. Render -> {n['web']} -> Shell:   python backend/check_deployment.py
     Its last line says "nothing that must be fixed".
