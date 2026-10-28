@@ -1350,6 +1350,31 @@ ok("12: a route with no collisions near it: the hours are shown as none (0 in th
    and cl.busy_hours("R2") == {"shown": True, "offers": [], "period": "2021–2025"}
    and (not _t12d or ("No collisions on this route (within 25 m), 2021–2025." in _t12d
                       and "comes with the next fetch" not in _t12d)), _t12d[-600:])
+# 28 Oct 2026 (found on live after #160: a route re-routed after the fetch gained an "Alt 2" with 0 collisions on it — its road
+# had never been searched — and was offered as "0 against 48"). The fetch records the roads it searched; only those are offered.
+ok("12: the fetch records the road routes it searched along (the route and its alternative here)",
+   cl.searched_keys() == {"R1", "R1@1"}, str(cl.searched_keys()))
+_cols3 = [("This route", 0, _hc(_r001)), ("Alternative 1", 1, _hc(_a001)), ("Alternative 2", 2, _hc([0] * 24))]
+ok("12: an alternative drawn after the fetch (R1@2, never searched) is left out of the comparison; the route is always kept",
+   [c[1] for c in cl._searched_only("R1", _cols3)] == [0, 1]
+   and [o["alt"] for o in cl.busy_offers(cl._searched_only("R1", _cols3))] == [1]
+   and [o["alt"] for o in cl.busy_offers(_cols3)] == [1, 2])
+_det12 = cl._detail(cl._meta_row())
+cl._write_meta("done", {k: v for k, v in _det12.items() if k != "searched"})
+ok("12: ...a fetch made before this rule (no list stored) leaves every column in, as before",
+   cl.searched_keys() is None and [c[1] for c in cl._searched_only("R1", _cols3)] == [0, 1, 2])
+cl._write_meta("done", _det12)
+_mid = []
+
+
+def _peek_dl(url, dest):
+    _mid.append(cl.status()["hours"])
+    return stub_download(only_2025)(url, dest)
+
+
+cl.refresh(fetchers={"download": _peek_dl}, today=date(2026, 10, 16))
+ok("12: while a fetch runs the status still says the stored rows carry their hours (it read False mid-fetch on live)",
+   _mid and all(h is True for h in _mid) and cl.status()["hours"] is True, str(_mid[:3]))
 ok("12: the offer is never applied: collisions.py writes nothing to routes, route_geometry or route_choice",
    not re.search(r"(UPDATE|INSERT INTO|DELETE FROM)\s+(routes|route_geometry|route_choice)\b", read("backend/collisions.py")))
 

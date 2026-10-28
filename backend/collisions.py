@@ -613,7 +613,9 @@ def refresh(by=None, fetchers=None, index=None, today=None):
     start_refresh() runs it on a thread. All or nothing: a failure keeps what was stored. Returns status()."""
     fetch = dict(default_fetchers(), **(fetchers or {}))
     old = _detail(_meta_row())
-    det = {"years": old.get("years") or [], "files": old.get("files") or [], "notes": [], "error": None}
+    det = {"years": old.get("years") or [], "files": old.get("files") or [], "notes": [], "error": None,
+           # 28 Oct 2026 (0d, found on live): what the stored rows carry stays true while a fetch runs
+           "hours": old.get("hours"), "vehicle_details": old.get("vehicle_details"), "searched": old.get("searched")}
     _write_meta("running", det, by=by, started_at=_now())
     index = index or index_from_db()
     if not index.bbox:
@@ -667,6 +669,9 @@ def refresh(by=None, fetchers=None, index=None, today=None):
         det["notes"].append(f"The {last} data is not published yet; the latest five final years are {period_words(years)}.")
     det["vehicle_details"] = True     # 22 Oct 2026 (v3): rows fetched from here on carry detail_json
     det["hours"] = True               # 28 Oct 2026 (0d): ...and the hour and weekday
+    # 28 Oct 2026 (0d, found on live: a route's alternative drawn AFTER the fetch had 0 collisions on it, so it looked
+    # quieter): the road routes this fetch searched along; an alternative not among them is never offered
+    det["searched"] = sorted({k for k, _ in index.lines})
     _write_meta("done", det, fetched_at=now)
     return status()
 
@@ -784,6 +789,20 @@ BUSY_BANDS = [("07:00", "10:00"), ("16:00", "19:00")]
 MIDDAY = ("10:00", "16:00")
 OFFER_MIN = 10        # the route had at least this many on it in the band over the five years...
 OFFER_P = 0.05        # ...and a gap this big comes by chance less than 1 time in 20 (an exact test on the two counts)
+
+
+def searched_keys():
+    """The route keys (route_key) the last fetch searched along, or None for a fetch made before 28 Oct 2026 (night)."""
+    v = _detail(_meta_row()).get("searched")
+    return set(v) if isinstance(v, list) else None
+
+
+def _searched_only(route_id, cols):
+    """The columns [(label, alt, hours)] whose road the last fetch searched along (the route itself always kept)."""
+    keys = searched_keys()
+    if keys is None:
+        return cols
+    return [c for c in cols if not c[1] or route_key(route_id, c[1]) in keys]
 
 
 def has_hours(recs):
@@ -1444,6 +1463,7 @@ def busy_hours(route_id, acc=None):
     def km_of(alt):
         v = (geo.get(alt) or {}).get(used)
         return float(v) if v is not None else None
+    cols = _searched_only(route_id, cols)
     offers = _word_offers(busy_offers(cols) if cols and not cols[0][1] else [], period, km_of)
     return {"shown": True, "offers": offers, "period": period}
 
@@ -1622,7 +1642,7 @@ def evidence(route_id, acc=None, now=None):
     # where the gap is clear (busy_offers). Offered, never switched.
     import gate_hours
     span = gate_span(r, factors)
-    offers = busy_offers(hours_cols) if hours_known_ else []
+    offers = busy_offers(_searched_only(route_id, hours_cols)) if hours_known_ else []
     def km_of(alt):
         g = ((geo.get(alt) or {}).get(used) or {}).get("loaded")
         return float(g["distance_km"]) if g and g.get("distance_km") is not None else None
