@@ -107,8 +107,11 @@ A. THE DATABASE (Render)
  2. Name: {n['db']}. Region: {REGION}. Plan: {DB_PLAN}. Leave the rest. Create Database.
  3. When it says Available: Info -> Connections -> copy the INTERNAL Database URL (it starts postgresql://).
     It works only from a service in the same region, which is why both are in Frankfurt.
-    Settings -> Networking / Access Control: no source listed (the app connects inside Render; nothing
-    outside needs the database). A rule marked "Affected by: Workspace" is the workspace's, set once for all.
+    Then close the database to the internet (the app connects inside Render; nothing outside needs it):
+    Info -> Networking -> "PostgreSQL Inbound IP Rules" -> delete every source listed there (Render may list
+    0.0.0.0/0 "everywhere") -> Save -> type "block all internet traffic to PostgreSQL" -> Block All Inbound IPs.
+    It then reads "All internet traffic is blocked by PostgreSQL inbound IP rules". Leave the rule marked
+    "Affected by: Workspace" alone: it is the workspace's, set once for all.
 
 B. THE WEB SERVICE (Render)
  4. New -> Web Service -> Git Provider -> the same repository modus-web deploys from.
@@ -158,6 +161,7 @@ F. CHECKS BEFORE HANDING OVER (Claude can run both)
     Every line pass (a "note" is information).
 20. Render -> {n['web']} -> Shell:   python backend/check_deployment.py
     Its last line says "nothing that must be fixed".
+    And Render -> {n['db']} -> Info -> Networking still reads "All internet traffic is blocked" (step 3).
 21. Config -> Everything -> Organisation file -> Download. Keep it with the pilot's papers (it is the client's data).
 22. Delete {org}-render-environment.txt. Keep the map password in your password manager; give it to the people
     the organisation chooses (council officers, residents' groups), never in the same email as the address.
