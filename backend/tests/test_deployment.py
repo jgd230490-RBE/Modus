@@ -159,6 +159,8 @@ _cl = check_deployment.lines(GOOD, _f)
 ok("the database line sits second", _cl[1].startswith("database: sqlite (a file) · admin logins 1 (0 with two-step on)"), _cl[1])
 ok("an admin without two-step is a warning on an organisation's deployment",
    any("has not set up two-step" in l for l in _cl), str(_cl))
+ok("...printed above the all-clear line, which stays last (the rehearsal printed it after, 28 Oct)",
+   _cl[-1] == "deployment ✓ nothing that must be fixed" and "has not set up two-step" in _cl[-2], str(_cl))
 db.execute("UPDATE users SET totp_secret = ? WHERE id = ?", ("JBSWY3DPEHPK3PXP", _u["id"]))
 _cl = check_deployment.lines(GOOD, check_deployment.database_facts())
 ok("...gone once two-step is on", not any("two-step" in l and "⚠" in l for l in _cl) and "(1 with two-step on)" in _cl[1], str(_cl))
@@ -245,6 +247,8 @@ _src = read("backend/tools/check_pilot.py")
 ok("🔴 the form is tried with its trap field only (the app stores nothing for it)",
    'data=b"website=check-pilot"' in _src and "website" == __import__("demo_request").HONEYPOT)
 ok("it sends no password, code or cookie", not re.search(r"(?i)password=|X-Access-Code|Cookie", _src.split("def checks")[1]))
+ok("the address row says it is Render's edge, not the region (28 Oct: a Frankfurt service resolved to us-west1)",
+   "it does not show the region" in _src)
 ok("it never follows a redirect", "_NoRedirect" in _src and "return None" in _src)
 ok("standard library only", not re.search(r"^import (requests|httpx)|^from (requests|httpx)", _src, re.M))
 
@@ -272,6 +276,8 @@ ok("the steps name both services, the region, the release branch, the address",
    all(s in _st for s in ("wayscope-acme-db", "wayscope-acme", "Frankfurt (EU Central)", "Branch: pilot-release",
                           "acme.wayscope.co.uk", "Name acme", "DNS only (grey)")))
 ok("🔴 the steps list what must never be set", "NEVER add: ADMIN_TOKEN" in _st and "DEMO_LEADS" in _st.split("NEVER add:")[1])
+ok("the steps say the database takes no outside connection, and what to do with no custom-domain place free",
+   "Access Control: no source listed" in _st and "skip C: set APP_URL to the address from step 10" in _st)
 ok("the steps end with both checks and the end of the pilot",
    "check_pilot.py https://acme.wayscope.co.uk" in _st and "check_deployment.py" in _st and "THE END OF THE PILOT" in _st)
 _ry = read("render.yaml")

@@ -108,7 +108,8 @@ def checks(base, fetch=http_fetch, demo=False):
     try:
         name, aliases, _ = socket.gethostbyname_ex(host)
         chain = [a for a in aliases + [name] if a != host]
-        add(True, "Address points at: " + (" -> ".join(chain) if chain else name), note=True)
+        add(True, "Address points at: " + (" -> ".join(chain) if chain else name)
+            + " (Render's edge; it does not show the region)", note=True)
     except Exception as e:  # noqa: BLE001
         add(True, f"Address lookup: {e.__class__.__name__}", note=True)
     return out

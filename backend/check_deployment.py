@@ -52,7 +52,10 @@ def lines(env=None, facts=None):
                   f"({facts['admins_two_step']} with two-step on) · staff logins {facts['staff_logins']} · "
                   f"locations {facts['locations']} · routes {facts['routes']}")
     if deployment.kind(env) == "organisation" and facts["admins"] > facts["admins_two_step"]:
-        out.append("deployment ⚠ An admin has not set up two-step sign-in yet (it is asked at their next sign-in).")
+        warn = "deployment ⚠ An admin has not set up two-step sign-in yet (it is asked at their next sign-in)."
+        # above the all-clear line, so the ✓ stays the last word (the rehearsal printed it after, 28 Oct)
+        at = len(out) - 1 if out[-1].startswith("deployment ✓") else len(out)
+        out.insert(at, warn)
     return out
 
 

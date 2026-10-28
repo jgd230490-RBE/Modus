@@ -107,6 +107,8 @@ A. THE DATABASE (Render)
  2. Name: {n['db']}. Region: {REGION}. Plan: {DB_PLAN}. Leave the rest. Create Database.
  3. When it says Available: Info -> Connections -> copy the INTERNAL Database URL (it starts postgresql://).
     It works only from a service in the same region, which is why both are in Frankfurt.
+    Settings -> Networking / Access Control: no source listed (the app connects inside Render; nothing
+    outside needs the database). A rule marked "Affected by: Workspace" is the workspace's, set once for all.
 
 B. THE WEB SERVICE (Render)
  4. New -> Web Service -> Git Provider -> the same repository modus-web deploys from.
@@ -125,6 +127,8 @@ B. THE WEB SERVICE (Render)
     letters if the name is taken). Note it: step 13 needs the part after https://.
 
 C. THE ADDRESS ({n['host']})
+    Needs a free custom-domain place on the Render plan (28 Oct 2026: 2 of 2 used, by the landing page and the
+    demo). With none free, skip C: set APP_URL to the address from step 10 and use that address everywhere below.
 11. Render -> {n['web']} -> Settings -> Custom Domains -> Add Custom Domain -> {n['host']} -> Save.
 12. dash.cloudflare.com -> {DOMAIN} -> DNS -> Records -> Add record:
       Type CNAME · Name {org} · Target <the address from step 10, without https://> · Proxy status: DNS only (grey)
