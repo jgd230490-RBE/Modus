@@ -343,20 +343,23 @@ ok("6: the demo has TWO batching plants (Melton and Welland Ready-Mix), each fic
    and [l["loc_type"] for l in T["locations"] if "Asphalt Plant" in l["name"]] == ["Asphalt plant"])
 _bp_id = {l["name"]: l["id"] for l in _bp}
 _pr = {n: sorted(r["id"] for r in T["routes"] if r["origin_id"] == i) for n, i in _bp_id.items()}
-ok("6: the mixer routes leave each plant by id (Melton R021, R022, R033, R034; Welland R035, R036), each with both gates named",
-   _pr == {"Wolds Link Batching Plant (fictional)": ["R021", "R022", "R033", "R034"], "Welland Ready-Mix (fictional)": ["R035", "R036"]}
+# RE-PINNED 28 Oct 2026 (simulation v2): + R049, the Melton plant to the Tilton Viaduct site
+ok("6: the mixer routes leave each plant by id (Melton R021, R022, R033, R034, R049; Welland R035, R036), each with both gates named",
+   _pr == {"Wolds Link Batching Plant (fictional)": ["R021", "R022", "R033", "R034", "R049"], "Welland Ready-Mix (fictional)": ["R035", "R036"]}
    and all(r["material_category"] == "Ready-mixed concrete" and r["origin_gate_id"] and r["dest_gate_id"]
            for r in T["routes"] if r["origin_id"] in _bp_id.values()))
 _pl = [f for f in T["forecasts"] if f["material_type"] == "Ready-mixed concrete"]
 _lines = {(f["route_id"], f["discipline"], f["section_id"], f["vehicle_type"]) for f in _pl}
 # RE-PINNED 17 Oct 2026 (R2, §3a): the mixer line keys read once from the regenerated package — 16 lines (structures on the
 # 8 m³ mixer, kerbs and surrounds on the 6 m³), 210 line-months
-ok("6: sixteen mixer lines (11 structures, 5 substructure), 210 line-months in m³, approved, both mixers used",
-   len(_lines) == 16 and len(_pl) == 210 and all(f["unit"] == "m3" and f["status"] == "Approved" for f in _pl)
-   and {l[3] for l in _lines} == {M8, M6} and sorted(l[1] for l in _lines).count("structures") == 11
+# RE-PINNED 28 Oct 2026 (simulation v2): the viaduct's piles and deck concrete are the site's own line now (R049), no longer
+# summed with the A47 junction's months at the compound: 17 lines, 223 line-months
+ok("6: seventeen mixer lines (12 structures, 5 substructure), 223 line-months in m³, approved, both mixers used",
+   len(_lines) == 17 and len(_pl) == 223 and all(f["unit"] == "m3" and f["status"] == "Approved" for f in _pl)
+   and {l[3] for l in _lines} == {M8, M6} and sorted(l[1] for l in _lines).count("structures") == 12
    and all((l[1] == "structures") == (l[3] == M8) for l in _lines))
-ok("6: every other line is on a lorry, never a mixer: 697 others (the programme's 905 approved less 210, + Pending and Rejected)",
-   len([f for f in T["forecasts"] if f["material_type"] != "Ready-mixed concrete"]) == 697
+ok("6: every other line is on a lorry, never a mixer: 721 others (the programme's 942 approved less 223, + Pending and Rejected; RE-PINNED 28 Oct)",
+   len([f for f in T["forecasts"] if f["material_type"] != "Ready-mixed concrete"]) == 721
    and not any("mixer" in (f["vehicle_type"] or "").lower() for f in T["forecasts"] if f["material_type"] != "Ready-mixed concrete"))
 ok("6: the package's own factors carry the new categories and the mixer names",
    all(k in json.loads(next(r["value"] for r in T["config"] if r["key"] == "factors"))["material_categories"] for k in NEW)
