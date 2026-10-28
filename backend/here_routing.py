@@ -537,9 +537,10 @@ BAKE_HOUR = 10
 BAKE_LEAD_DAYS = 2
 
 
-def bake_departure_time(now=None, country=None):
+def bake_departure_time(now=None, country=None, hour=None):
     """The ISO departure time every bake sends (D94): the next Tuesday at least two days ahead, 10:00 local time.
-    UTC when the tenant's country has no known zone (as default_departure_times)."""
+    UTC when the tenant's country has no known zone (as default_departure_times). 29 Oct 2026 (task 0f-2): `hour`
+    ("HH:MM") the same Tuesday at another hour, for the busy-hour times (hour_times)."""
     now = now or datetime.now(timezone.utc)
     country = (country if country is not None else _tenant_country()) or ""
     zone = COUNTRY_TZ.get(str(country).upper())
@@ -553,7 +554,8 @@ def bake_departure_time(now=None, country=None):
     day = now.astimezone(tz).date() + timedelta(days=BAKE_LEAD_DAYS)
     while day.weekday() != BAKE_WEEKDAY:
         day += timedelta(days=1)
-    return datetime(day.year, day.month, day.day, BAKE_HOUR, 0, tzinfo=tz).isoformat()
+    hh, mm = (int(hour[:2]), int(hour[3:5])) if hour else (BAKE_HOUR, 0)
+    return datetime(day.year, day.month, day.day, hh, mm, tzinfo=tz).isoformat()
 
 
 # 29 Oct 2026 (task 0f-1a): under this spread of the first option's time across the pinned hours a leg reads as flat

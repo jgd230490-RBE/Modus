@@ -1468,6 +1468,16 @@ def busy_hours(route_id, acc=None):
     return {"shown": True, "offers": offers, "period": period}
 
 
+def _cycle_by_hour(route_id):
+    """hour_times.evidence_block, or None (nothing worked out, or a read that failed: the sheet goes without it)."""
+    try:
+        import hour_times
+        return hour_times.evidence_block(route_id)
+    except Exception as e:
+        print("⚠️  cycle by hour:", e)
+        return None
+
+
 def evidence(route_id, acc=None, now=None):
     """
     Everything one Route collision evidence sheet prints, as data: the route, the period, the counts on the route and
@@ -1669,6 +1679,8 @@ def evidence(route_id, acc=None, now=None):
         "turns": turns0, "cycle": {"beside": headline[0]["beside"] if headline else None,
                                    "meets": [{"m": m, "words": f"{du_words(m)} {du}", "name": n} for m, n in cyc0["meets"]]},
         "time_of_day": time_of_day,
+        # 29 Oct 2026 (task 0f-2, card 4): the Artic Tipper's cycle at each busy-hour time, this route and its alternatives
+        "cycle_by_hour": _cycle_by_hour(route_id),
         "lorry_list": lorry_list, "traffic_shown": bool(with_exp), "traffic_credit": traffic.SOURCE["attribution"] + "." if with_exp else None,
         "records": [c for c in prim_recs],
         "on": [c for _, c in on], "stretches": stretch_rows, "plan": plan, "plan_error": plan_error,

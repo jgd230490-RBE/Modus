@@ -669,11 +669,12 @@ ok("🔴 computed, NOT stored — the read created exactly the day rows slice 1 
 # NARROWED 27 Oct 2026: and without stockpile_plan (the stockpile forecast's planned use)
 # NARROWED 28 Oct 2026: and without site_areas (simulation v2, the areas inside a site)
 # NARROWED 28 Oct 2026: and without route_choice (task 0c: a route's option by date)
+# NARROWED 29 Oct 2026: and without route_hour_times (task 0f-2: drive times by departure hour)
 ok("...no new table, no new column: sixteen tenanted tables, forecast_days' DDL unchanged",
    # NARROWED 12 Oct 2026: the sixteen are counted without route_sections (§2.2d), the one
    # table added since; slice 2 itself still added none
    # NARROWED again 12 Oct 2026: and without areas / route_area_km (§2.2b), the two added after it
-   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice"} <= db.TENANTED_TABLES
+   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times"} <= db.TENANTED_TABLES
    and "trips" not in db._TENANT_DDL["forecast_days"].lower())
 
 # ---- context chips
@@ -922,9 +923,10 @@ ok("forecast_weeks gained actual_cost_eur, calibrated_at, calibrated_qty",
 # NARROWED 27 Oct 2026: and without stockpile_plan (the stockpile forecast's planned use)
 # NARROWED 28 Oct 2026: and without site_areas (simulation v2, the areas inside a site)
 # NARROWED 28 Oct 2026: and without route_choice (task 0c: a route's option by date)
+# NARROWED 29 Oct 2026: and without route_hour_times (task 0f-2: drive times by departure hour)
 ok("...and still sixteen tenanted tables — no new table for slices 3-6 (NARROWED 12 Oct 2026: counted without "
    "route_sections, §2.2d, and NARROWED again the same day without areas and route_area_km, §2.2b)",
-   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice"} <= db.TENANTED_TABLES)
+   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times"} <= db.TENANTED_TABLES)
 db.init_lookahead_db()
 ok("init_lookahead_db() is idempotent on a table that already has the columns", True)
 

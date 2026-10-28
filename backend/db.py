@@ -89,6 +89,9 @@ TENANTED_TABLES = {
     # 28 Oct 2026 (task 0c, route_choice.py): which stored option a route uses between two dates (a dated zone's diversion,
     # and from 0d a peak-hour choice). One tenant's routes, carried in its package. Registered in the same edit.
     "route_choice",
+    # 29 Oct 2026 (task 0f-2, hour_times.py): each route's drive times for a lorry setting off at set weekday hours, one
+    # row a HERE option, named by the stored option it matched. One tenant's routes, carried in its package.
+    "route_hour_times",
 }
 
 # A contextvar rather than a module global, so Phase 6 can make the tenant
@@ -551,6 +554,8 @@ def init_network_db():
         _create_tenanted(cur, "traffic_counts")     # 22 Oct 2026 (evidence v3). Born with tenant_id in the key.
         conn.commit()
         _create_tenanted(cur, "route_choice")       # 28 Oct 2026 (task 0c). Born with tenant_id in the key.
+        conn.commit()
+        _create_tenanted(cur, "route_hour_times")   # 29 Oct 2026 (task 0f-2). Born with tenant_id in the key.
         conn.commit()
         # 22 Oct 2026 (evidence v3): the vehicle details, NULL until the next fetch
         try:
@@ -1456,6 +1461,33 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, id)
         )
     """,
+    # ----------------------------------------------------------------------- #
+    #  29 Oct 2026 — route_hour_times: drive times by departure hour (0f-2)   #
+    # ----------------------------------------------------------------------- #
+    # One row per (route, vehicle, leg, hour, HERE's rank at that hour). `alt_index` = the STORED option with the same
+    # line when the row was worked out (NULL = a road not stored) and `geom_computed_at` that option's computed_at: a
+    # reader trusts a row only while the stored line is still the one it matched (hour_times.times_for). rank -1 = the
+    # call failed (kept so a run moves on), with the reason in `error`.
+    "route_hour_times": """
+        CREATE TABLE route_hour_times (
+            tenant_id        TEXT NOT NULL DEFAULT 'default',
+            route_id         TEXT NOT NULL,
+            vehicle_profile  TEXT NOT NULL,
+            leg              TEXT NOT NULL,
+            hour             TEXT NOT NULL,
+            rank             INTEGER NOT NULL,
+            depart_at        TEXT,
+            fingerprint      TEXT,
+            alt_index        INTEGER,
+            geom_computed_at TEXT,
+            distance_km      REAL,
+            duration_hr      REAL,
+            duration_hr_here REAL,
+            error            TEXT,
+            computed_at      TEXT,
+            PRIMARY KEY (tenant_id, route_id, vehicle_profile, leg, hour, rank)
+        )
+    """,
     "traffic_counts": """
         CREATE TABLE traffic_counts (
             tenant_id       TEXT NOT NULL DEFAULT 'default',
@@ -1960,6 +1992,7 @@ _TENANT_PK = {
     "abnormal_loads": "(tenant_id, id)",
     "traffic_counts": "(tenant_id, count_point_id, year)",
     "route_choice": "(tenant_id, id)",
+    "route_hour_times": "(tenant_id, route_id, vehicle_profile, leg, hour, rank)",
 }
 
 # Extra UNIQUE constraints that must also take tenant_id. Only forecasts has one.

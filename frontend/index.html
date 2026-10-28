@@ -11785,6 +11785,31 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
 
   const cell = "px-2 py-1 text-right tabular-nums whitespace-nowrap";
   const head = "px-2 py-1 text-right font-semibold whitespace-nowrap";
+  // 29 Oct 2026 (task 0f-2, card 1): the cycle at the busy-hour times, beside the plan's (never in it); at each hour the
+  // quicker option of each vehicle is green and bold (John: "highlighting which route is quicker")
+  const ht = data && data.hour_times;
+  const hourCols = ht ? ht.screen_hours : [];
+  const quickAlt = {};
+  if(ht) for(const r of data.rows) for(const h of hourCols){
+    const v = r.hours && r.hours[h];
+    if(v == null) continue;
+    const k = `${r.profile}|${h}`;
+    if(!(k in quickAlt) || v < quickAlt[k].v) quickAlt[k] = { v, alt: r.alt_index };
+  }
+  const isQuick = (r, h) => !!(r.hours && r.hours[h] != null && quickAlt[`${r.profile}|${h}`]
+    && quickAlt[`${r.profile}|${h}`].alt === r.alt_index && data.rows.filter(x => x.profile === r.profile && x.hours && x.hours[h] != null).length > 1);
+  // 0d's busy-hours line gains the time difference: the Artic Tipper (the lorry the times are worked out for)
+  const busyGap = (alt) => {
+    if(!ht) return "";
+    const p = data.rows.find(x => x.profile === ht.profile && x.alt_index === 0);
+    const a = data.rows.find(x => x.profile === ht.profile && x.alt_index === alt);
+    if(!p || !a || !p.hours || !a.hours) return "";
+    const g = ["08:00", "17:00"].map(h => (p.hours[h] != null && a.hours[h] != null) ? Math.round((a.hours[h] - p.hours[h]) * 60) : null);
+    if(g.some(x => x == null)) return "";
+    const say = (d) => d === 0 ? "the same time" : `${Math.abs(d)} min ${d > 0 ? "longer" : "less"}`;
+    return g[0] === g[1] ? ` It takes ${say(g[0])} a round trip at 08:00 and at 17:00.`
+                         : ` It takes ${say(g[0])} a round trip at 08:00 and ${say(g[1])} at 17:00.`;
+  };
 
   return (
     <tr className="bg-slate-50/70">
@@ -11812,6 +11837,7 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                   <th className={head}>Back {DU()}</th>
                   <th className={head}>Turn</th>
                   <th className={head}>Cycle</th>
+                  {hourCols.map(h => <th key={h} className={head} data-hour-col={h}>{h}</th>)}
                   <th className={head}>Trips/day</th>
                   <th className={head}>t/day</th>
                   <th className={head}>t/month</th>
@@ -11870,6 +11896,16 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                         : undefined}>
                       {r.cycle_hr} h{r.haul_speed_applied ? <span style={{ color: "var(--haul-text)" }}>†</span> : null}
                     </td>
+                    {hourCols.map(h => {
+                      const v = r.hours ? r.hours[h] : null;
+                      const q = isQuick(r, h);
+                      return (
+                        <td key={h} className={cell} data-hour={h} data-quick={q ? "1" : undefined}
+                          style={q ? { background: "rgba(4,120,87,.12)", color: "var(--ok-text)", fontWeight: 700 } : undefined}>
+                          {v == null ? <span className="text-slate-500">—</span> : `${v.toFixed(2)} h`}
+                        </td>
+                      );
+                    })}
                     <td className={cell} title={(r.lorry_day && r.lorry_day.words) || undefined} data-trips-limit={(r.lorry_day && r.lorry_day.limited_by) || undefined}>{r.trips_per_day || <span className="text-slate-500">0</span>}{r.lorry_day && r.trips_per_day < r.lorry_day.trips_without_rules ? <span className="text-slate-500">§</span> : null}</td>
                     <td className={cell}>{r.tonnes_per_day}</td>
                     <td className={cell}>{r.tonnes_per_month}</td>
@@ -11903,6 +11939,12 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                 † includes a haul road timed at its set speed. Hover the cycle for the time without it.
               </p>
             )}
+            {ht && (
+              <p className="text-[13px] text-slate-400 mt-1" data-hour-note>
+                {hourCols.join(" · ")} = the cycle for a lorry setting off then on a weekday. Green, bold: the quicker option at
+                that hour.{data.rows.some(r => r.hours_scaled) ? " Other lorries scaled from the Artic Tipper." : ""}
+              </p>
+            )}
             <p className="text-[13px] text-slate-400 mt-1">
               Click a row to show that option on the map. “Make primary” makes an alternative the route the plan uses.
             </p>
@@ -11910,7 +11952,7 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
               <p key={o.alt} className="text-[13px] mt-2" data-busy-hours={o.alt}>
                 Busy hours, weekdays: <span className="font-semibold" style={{ color: "var(--navy)" }}>{o.label}</span> had
                 fewer collisions on it. {o.bands.map(b => `${b.from}–${b.to}: ${b.alt} against ${b.route}.`).join(" ")}{" "}
-                <span className="text-slate-400">{busy.period}.</span>
+                <span className="text-slate-400">{busy.period}.</span>{busyGap(o.alt)}
               </p>
             ))}
           </div>
@@ -12027,6 +12069,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [rMaterial, setRMaterial] = useState("");
   const [routeBusy, setRouteBusy] = useState(false);
   const [routeMsg, setRouteMsg] = useState("");
+  // 29 Oct 2026 (task 0f-2, card 2): what a busy-hour times run costs, read for an admin only (the button is theirs)
+  const [hourPlan, setHourPlan] = useState(null);
+  useEffect(() => {
+    if(!canEdit) return;
+    fetch(`${API}/admin/hour-times/plan`).then(okJSON).then(setHourPlan).catch(e => console.warn("Wayscope:", e));
+  }, [canEdit]);
   const [bakeLegs, setBakeLegs] = useState("both");   // bulk bake: both legs or laden only
 
   // ---- zones (Phase 3): geofencing and disruptions in one table ----
@@ -13025,10 +13073,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // all (a restart during a deploy) is tried again after 30, 60 and 90 s before the loop stops.
   // Finished legs are kept server-side, so a try again only resumes.
   const ROUTE_RETRY_S = [30, 60, 90];
-  const postRouteBatch = async (q, say) => {
+  // 29 Oct 2026 (task 0f-2): `path` (optional) posts the same way to another batch endpoint (the busy-hour times)
+  const postRouteBatch = async (q, say, path) => {
     for(let attempt = 0; ; attempt++){
       let res = null;
-      try { res = await fetch(`${API}/admin/bake-routes?${q}`, { method: "POST" }); }
+      try { res = await (path ? fetch(`${API}/admin/${path}?${q}`, { method: "POST" })
+                              : fetch(`${API}/admin/bake-routes?${q}`, { method: "POST" })); }
       catch(e){ errLog("bake-routes", 0, String(e && e.message)); }
       if(res && res.ok) return res.json();
       if(res && ![502, 503, 504].includes(res.status)) throw await errFrom(res);
@@ -13048,6 +13098,34 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   //
   // The endpoint works in batches of legs and reports what is left, so this loops until
   // 'remaining' hits 0 rather than trying to do it in one request that would time out.
+  // 29 Oct 2026 (task 0f-2, card 2): "Busy-hour times" — the cycle at set weekday hours, its own run (never Route all);
+  // the count of routing calls is on the button and in the question first, the batches looped as Route all's
+  const hourBake = async () => {
+    const calls = hourPlan ? hourPlan.here_calls : 0;
+    if(!confirm(`Work out the busy-hour times for ${hourPlan ? hourPlan.routes : 0} routes?\n\n${calls} routing calls. ` +
+                `The plan's figures do not change.`)) return;
+    setRouteBusy(true);
+    try {
+      let res = await fetch(`${API}/admin/hour-times/clear`, { method: "POST" });
+      if(!res.ok) throw await errFrom(res);
+      let last = Infinity;
+      while(true){
+        const j = await postRouteBatch(new URLSearchParams({ limit: "30" }), setRouteMsg, "hour-times/bake");
+        const left = j.remaining ?? 0;
+        setRouteMsg(`Busy-hour times — ${left} left…`);
+        if(left <= 0) break;
+        if(left >= last) throw new Error(`${left} left and not falling`);
+        last = left;
+      }
+      const p = await fetch(`${API}/admin/hour-times/plan`).then(okJSON);
+      setHourPlan(p);
+      setRouteMsg(`Busy-hour times worked out for ${p.routes} routes.`);
+    } catch(e){
+      setRouteMsg(`Busy-hour times stopped. ${errMsg(e)} Those already worked out are kept.`);
+    }
+    setRouteBusy(false);
+  };
+
   const bulkBake = async () => {
     const profs = rVehicles.length ? rVehicles : [showProfile];
     const legLabel = bakeLegs === "loaded" ? "laden leg only" : "both legs";
@@ -14467,7 +14545,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
           <span className="text-sm font-semibold text-slate-700">Routes <span className="text-slate-400 font-normal">· click a row to locate it on the map</span></span>
-          <span className="flex items-center gap-2">
+          {/* 29 Oct 2026 (task 0f-2, card 2): the buttons wrap as whole buttons when the row is full (the busy-hour button made it so) */}
+          <span className="flex items-center gap-2" style={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
             {/* 14 Oct 2026 (backlog item 2): the route map export (replaces the per-route sheet) */}
             <RouteMapExportMenu months={meta.months} ipts={meta.ipts} picked={selected} />
             {/* 16 Oct 2026 (CLOCS v5 C3): the route sheet for drivers, for the route picked in the list */}
@@ -14482,6 +14561,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               <option value="both">Both legs</option>
               <option value="loaded">Laden leg only</option>
             </select>
+            {hourPlan && hourPlan.legs > 0 && (
+              <button onClick={hourBake} disabled={routeBusy} data-hour-bake style={{ whiteSpace: "nowrap" }}
+                className="text-xs font-semibold px-2.5 py-1 rounded-md border border-slate-300 disabled:opacity-40">
+                {`Busy-hour times · ${hourPlan.here_calls} calls`}
+              </button>
+            )}
             <button onClick={bulkBake} disabled={routeBusy || !(status && status.length)}
               title={rVehicles.length
                 ? `Route the whole network for ${rVehicles.map(vehShort).join(", ")} — ticked on the Create route panel`
