@@ -545,7 +545,7 @@ def leg_request(r, o, d, leg, gates_by_loc=None):
 
 
 def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
-              avoid=None, zone_tag=None, gates_by_loc=None, way_round=None):
+              avoid=None, zone_tag=None, gates_by_loc=None, way_round=None, depart_at=None):
     """
     Route one direction of one route and cache every alternative HERE offers.
 
@@ -566,6 +566,10 @@ def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
     """
     if avoid is None and zone_tag is None:
         avoid, zone_tag = active_avoid()
+    # 29 Oct 2026 (D94): every bake asks HERE for the same typical weekday hour, never "now" (a batch resolves it once
+    # and passes it in, like the zones, so every leg of one run is asked for the same time)
+    if depart_at is None:
+        depart_at = here_routing.bake_departure_time()
     req = leg_request(r, o, d, leg, gates_by_loc)
     a_lat, a_lon = req["a"]["lat"], req["a"]["lon"]
     b_lat, b_lon = req["b"]["lat"], req["b"]["lon"]
@@ -578,7 +582,7 @@ def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
         try:
             opts = haul.route_with_haul(a_lat, a_lon, b_lat, b_lon, profile, steps,
                                         factors=factors, avoid_areas=((avoid or []) + way_round["areas"]) or None,
-                                        laden=(leg == "loaded"), alternatives=1)
+                                        laden=(leg == "loaded"), alternatives=1, departure_time=depart_at)
         except Exception as e:
             return 0, str(e)
         db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ? "
@@ -593,7 +597,8 @@ def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
     try:
         opts = haul.route_with_haul(a_lat, a_lon, b_lat, b_lon, profile, steps,
                                     factors=factors, avoid_areas=(avoid or None),
-                                    laden=(leg == "loaded"), alternatives=alternatives)
+                                    laden=(leg == "loaded"), alternatives=alternatives,
+                                    departure_time=depart_at)
     except Exception as e:
         _upsert_geom(r["id"], profile, None, None, None, str(e)[:300], leg=leg, alt_index=0,
                      zones_applied=zone_tag, haul_zones=haul_tag)
@@ -659,6 +664,7 @@ def bake_batch(profile=DEFAULT_PROFILE, limit=25, legs=LEGS, alternatives=ALTERN
                                         (db.current_tenant(),))}
     factors = conversions.load_factors()
     avoid, zone_tag = active_avoid()
+    depart = here_routing.bake_departure_time()   # D94: one pinned time for the whole run
     # Phase 5a: one query for every gate in the tenant, resolved per leg below. Asking
     # per route would be 214 queries a run for data that fits in one.
     try:
@@ -701,7 +707,7 @@ def bake_batch(profile=DEFAULT_PROFILE, limit=25, legs=LEGS, alternatives=ALTERN
             continue
         here_calls += haul._here_calls_for([(r["id"], profile, leg)])
         n, err = _bake_leg(r, o, d, profile, leg, factors, alternatives,
-                           avoid=avoid, zone_tag=zone_tag, gates_by_loc=gates_by_loc)
+                           avoid=avoid, zone_tag=zone_tag, gates_by_loc=gates_by_loc, depart_at=depart)
         if err:
             errors += 1
             if len(samples) < 5:
@@ -723,6 +729,7 @@ def bake_batch(profile=DEFAULT_PROFILE, limit=25, legs=LEGS, alternatives=ALTERN
             "attempted": done, "stopped_for_time": stopped_for_time,
             "seconds": round(time.monotonic() - t0, 1),
             "zones_applied": [z for z in zone_tag.split(",") if z],
+            "departure_time": depart,
             "avoid_areas": avoid,
             # Phase 5a (B2): legs not attempted because a selected gate is deactivated
             # or gone. Counted apart from `errors` — a refusal is a state someone can
@@ -1620,6 +1627,7 @@ def bake_route(route_id, profile=DEFAULT_PROFILE, legs=None, alternatives=ALTERN
                                         (db.current_tenant(),))}
     o = locs.get(r["origin_id"]); d = locs.get(r["dest_id"])
     avoid, zone_tag = active_avoid()
+    depart = here_routing.bake_departure_time()   # D94: one pinned time for the whole run
     if not o or not d:
         for leg in legs:
             _upsert_geom(route_id, profile, None, None, None,
@@ -1646,11 +1654,11 @@ def bake_route(route_id, profile=DEFAULT_PROFILE, legs=None, alternatives=ALTERN
 
     factors = conversions.load_factors()
     out = {"route_id": route_id, "profile": profile, "legs": {},
-           "zones_applied": [z for z in zone_tag.split(",") if z]}
+           "zones_applied": [z for z in zone_tag.split(",") if z], "departure_time": depart}
     errs = []
     for leg in legs:
         n, err = _bake_leg(r, o, d, profile, leg, factors, alternatives,
-                           avoid=avoid, zone_tag=zone_tag, gates_by_loc=gates_by_loc)
+                           avoid=avoid, zone_tag=zone_tag, gates_by_loc=gates_by_loc, depart_at=depart)
         if err:
             errs.append(f"{leg}: {err[:120]}")
             out["legs"][leg] = {"baked": False, "error": err[:200]}
@@ -1694,6 +1702,7 @@ def bake_way_rounds(route_id=None, limit=30, budget_s=None):
     zs = {z["id"]: z for z in zones.list_zones()}
     factors = conversions.load_factors()
     avoid, zone_tag = active_avoid()
+    depart = here_routing.bake_departure_time()   # D94: one pinned time for the whole run
     t0 = time.monotonic()
     done = baked = errors = here_calls = 0
     samples = []
@@ -1709,7 +1718,7 @@ def bake_way_rounds(route_id=None, limit=30, budget_s=None):
         areas = [a for zid in ids if zid in zs for a in zones.avoid_strings(zs[zid])]
         here_calls += haul._here_calls_for([(rid, prof, leg)])
         n, err = _bake_leg(r, o, d, prof, leg, factors, avoid=avoid, zone_tag=zone_tag,
-                           gates_by_loc=gates_by_loc, way_round={"areas": areas, "ids": ids})
+                           gates_by_loc=gates_by_loc, way_round={"areas": areas, "ids": ids}, depart_at=depart)
         if err:
             errors += 1
             if len(samples) < 5:
@@ -1719,7 +1728,7 @@ def bake_way_rounds(route_id=None, limit=30, budget_s=None):
     route_choice.refresh_quietly("way round")
     remaining = len(route_choice.needs_route(route_id))
     # a leg HERE failed on stays needs_route; stop the page's loop rather than asking again for the same legs
-    return {"baked": baked, "errors": errors, "attempted": done, "remaining": remaining if baked else 0,
+    return {"baked": baked, "errors": errors, "attempted": done, "remaining": remaining if baked else 0, "departure_time": depart,
             "still_needed": remaining, "here_calls": here_calls, "error_samples": samples,
             "seconds": round(time.monotonic() - t0, 1)}
 
@@ -2396,6 +2405,11 @@ def departure_diagnostics(route_id, profile=DEFAULT_PROFILE, leg="loaded", times
     else:
         tz_note = None
     times = list(times)
+    # 29 Oct 2026 (D94): the bake now asks for a pinned weekday hour, so the stored line is compared with THAT hour's
+    # answer (added to the hours tried when it is not one of them), not with HERE's "now"
+    bake_at = here_routing.bake_departure_time()
+    if bake_at not in times:
+        times = [bake_at] + times
     access_only = haul.access_roads_only(steps)
     try:
         per_request = haul._here_calls_for([(route_id, profile, leg)])   # the bake's own count of one leg's calls
@@ -2411,6 +2425,7 @@ def departure_diagnostics(route_id, profile=DEFAULT_PROFILE, leg="loaded", times
         "cached": ({k: primary[k] for k in ("distance_km", "duration_hr", "computed_at")} if primary else None),
         "stored": stored_rows,
         "times": times,
+        "bake_time": bake_at,
         # before the run: the requests (each time, `any`, two controls) x the calls one leg costs (haul._here_calls_for,
         # the count the zone screens quote: one between two gate access roads, one more per haul road part way along)
         "here_calls_estimate": ((len(times) + 3) * per_request if per_request else None),
@@ -2440,14 +2455,15 @@ def departure_diagnostics(route_id, profile=DEFAULT_PROFILE, leg="loaded", times
         for opt in row.get("option_list") or []:
             opt["stored_alt"] = by_print.get(opt.get("fingerprint"))
     out["here_calls"] = sum(row.get("here_calls") or 0 for row in out["experiment"]["rows"])
-    # the comparison the report began with: does the live answer still match the row?
-    ctl = next((x for x in out["experiment"]["rows"] if x["label"] == "control_before"), {})
+    # does the answer at the bake's own pinned hour still match the stored row? (before D94 the bake sent no time, and
+    # this compared the no-time control)
+    ctl = next((x for x in out["experiment"]["rows"] if x["label"] == bake_at), {})
     if primary and ctl.get("distance_km") is not None:
         gap = round(ctl["distance_km"] - (primary["distance_km"] or 0), 2)
         out["cached_vs_live_km"] = gap
         out["cached_reproduces"] = (abs(gap) < 0.01)
-        out["control_is_stored_primary"] = (ctl.get("fingerprint") is not None
-                                            and ctl.get("fingerprint") == primary.get("fingerprint"))
+        out["bake_time_is_stored_primary"] = (ctl.get("fingerprint") is not None
+                                              and ctl.get("fingerprint") == primary.get("fingerprint"))
     return out
 
 

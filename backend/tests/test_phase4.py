@@ -443,7 +443,7 @@ _calls = []
 
 
 def _fake_routes(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_areas=None,
-                 alternatives=1, laden=True, via=None, pass_through=False):
+                 alternatives=1, laden=True, via=None, pass_through=False, departure_time=None):   # 29 Oct (D94)
     _calls.append({"o": (o_lat, o_lon), "d": (d_lat, d_lon), "avoid": avoid_areas,
                    "alternatives": alternatives, "via": via, "laden": laden,
                    "pass_through": pass_through})
@@ -1047,12 +1047,19 @@ ok("09-09: the diagnostic is admin-gated like every other one",
    "_check_admin(token)" in main_code.split("def diagnostics_departure")[1]
                                      .split("\ndef ")[0])
 
-# 🔴 The whole point of this slice is that it does NOT pin anything yet. If a later
-# session quietly threads a departure time into the bake, this fails and says why.
+# 🔴 The whole point of this slice was that it did NOT pin anything until the probe decided.
+# 29 Oct 2026 (D94): the probes decided (16 Oct R010; 28 Oct on live, an evening Route all stored roads 23-48 % longer
+# than every weekday hour), so this is NARROWED, not deleted: the bake sends ONE time, the pinned weekday hour, and
+# nothing else — never "now", never a time of its own.
 _bake_leg_body = net_code.split("def _bake_leg")[1].split("\ndef ")[0]
-ok("09-09: 🔴 NOTHING in the bake path sends a departureTime — the probe decides first",
-   "departure_time" not in _bake_leg_body
-   and "departure_time" not in net_code.split("def bake_batch")[1].split("\ndef ")[0])
+_bake_batch_body = net_code.split("def bake_batch")[1].split("\ndef ")[0]
+ok("29-10 (D94): 🔴 the bake sends ONLY the pinned weekday time — every departure_time in _bake_leg is depart_at, "
+   "and a missing one is the pinned time, never None",
+   _bake_leg_body.count("departure_time=") == _bake_leg_body.count("departure_time=depart_at") == 2
+   and "depart_at = here_routing.bake_departure_time()" in _bake_leg_body)
+ok("29-10 (D94): ...and a batch resolves that time once, for every leg it bakes",
+   "depart = here_routing.bake_departure_time()" in _bake_batch_body and "depart_at=depart" in _bake_batch_body
+   and "departure_time=" not in _bake_batch_body.replace('"departure_time": depart', ""))
 
 
 # =========================================================================== #

@@ -244,6 +244,7 @@ _real_routes, _real_conf = here_routing.routes, here_routing.configured
 here_routing.routes = _fake_routes
 here_routing.configured = lambda: True
 FACT = conversions.load_factors()
+BAKE_AT = here_routing.bake_departure_time()      # D94: what every bake and every check below asks for
 try:
     R = db.query("SELECT * FROM routes WHERE id = 'R1'")[0]
     L = {l["id"]: l for l in db.query("SELECT * FROM locations")}
@@ -255,8 +256,10 @@ try:
         n, e = network._bake_leg(R, L["L1"], L["L2"], ART, leg, FACT, avoid=AVOID, zone_tag=ZTAG)
         BAKE[leg] = list(CALLS)
         ok(f"the bake stores HERE's three options on the {leg} leg", (n, e) == (3, None), f"{n} {e}")
-    ok("⭐ the bake sends no departure time at all: the keyword is not even passed (byte-identical to before)",
-       all(not c["has_dep_kw"] for leg in BAKE for c in BAKE[leg]) and all(len(BAKE[l]) == 1 for l in BAKE))
+    # 29 Oct 2026 (D94): REVERSED from "the bake sends no departure time at all" (0f-1a): it now sends the pinned hour
+    ok("⭐ D94: the bake sends the pinned weekday hour on its HERE call, never 'now' (no call without a time)",
+       all(c["has_dep_kw"] and c["dep"] == BAKE_AT for leg in BAKE for c in BAKE[leg]) and all(len(BAKE[l]) == 1 for l in BAKE),
+       str([c["dep"] for l in BAKE for c in BAKE[l]]))
 
     def snapshot():
         return json.dumps(db.query("SELECT * FROM route_geometry ORDER BY route_id, vehicle_profile, leg, alt_index"),
@@ -274,11 +277,11 @@ try:
         b = BAKE[leg][0]
         calls = D[leg]["_calls"]
         ok(f"⭐ 1. {leg}: every HERE call of the check has the bake's ends, 3 options, laden flag and avoid areas",
-           len(calls) == 7 and all((c["o"], c["d"], c["alternatives"], c["laden"], c["avoid"], c["via"])
+           len(calls) == 8 and all((c["o"], c["d"], c["alternatives"], c["laden"], c["avoid"], c["via"])
                                    == (b["o"], b["d"], b["alternatives"], b["laden"], b["avoid"], b["via"]) for c in calls),
            f"{calls[:1]} vs {b}")
-        ok(f"1. {leg}: the controls send no time (no keyword), `any` sends 'any', each hour its own time, in order",
-           [c["dep"] for c in calls] == [None, "any", T06, T08, T12, T17, None]
+        ok(f"1. {leg}: the controls send no time (no keyword), `any` sends 'any', then the bake's own pinned hour, then "
+           "each hour asked for, in order", [c["dep"] for c in calls] == [None, "any", BAKE_AT, T06, T08, T12, T17, None]
            and not calls[0]["has_dep_kw"] and not calls[-1]["has_dep_kw"])
     ok("⭐ 1. the one-way site: the check's return leg leaves by the SOUTH gate's road and arrives on the quarry's",
        D["return"]["_calls"][0]["o"] == (ROUT[1], ROUT[0]) and D["return"]["_calls"][0]["d"] == (RQ[1], RQ[0])
@@ -292,13 +295,14 @@ try:
 
     # ---- 2. options named by the stored line -----------------------------------------------------------------------
     rows = D["loaded"]["experiment"]["rows"]
+    _r08 = next(r for r in rows if r["label"] == T08)
     ok("⭐ 2. every row lists three options, each named by the stored option with the same line (0, 1, 2)",
-       len(rows) == 7 and all([o["stored_alt"] for o in r["option_list"]] == [0, 1, 2] for r in rows),
+       len(rows) == 8 and all([o["stored_alt"] for o in r["option_list"]] == [0, 1, 2] for r in rows),
        str([[o["stored_alt"] for o in r["option_list"]] for r in rows]))
     ok("2. ...with each option's km and time, the two 35 m access roads included (HERE's own time beside it)",
        all(r["option_list"][2]["distance_km"] == 12.07 for r in rows)
-       and rows[3]["label"] == T08 and rows[3]["option_list"][0]["duration_hr_here"] == round(0.25 * 1.10, 4)
-       and abs(rows[3]["option_list"][0]["duration_hr"] - (0.275 + 0.007)) < 0.0006, str(rows[3]["option_list"][0]))
+       and _r08["option_list"][0]["duration_hr_here"] == round(0.25 * 1.10, 4)
+       and abs(_r08["option_list"][0]["duration_hr"] - (0.275 + 0.007)) < 0.0006, str(_r08["option_list"][0]))
     ex = D["loaded"]["experiment"]
     ok("⭐ 2. the options agree at every hour; none overtakes the first", ex["option_sets_agree"] is True
        and ex["quicker_than_first"] == [])
@@ -308,21 +312,21 @@ try:
        and ex["time_spread_pct"] > 10 and ex["times_read_as"].startswith("moving"), f"{ex.get('time_spread_pct')} {ex.get('times_read_as')}")
     ok("2. the old road verdict is still there (the same road at every pinned hour)",
        ex["control_stable"] is True and ex["pinned_all_agree"] is True and "does NOT clear" in ex["reads_as"])
-    ok("2. the no-time control is the stored primary, to the metre and to the line",
-       D["loaded"]["cached_reproduces"] is True and D["loaded"]["control_is_stored_primary"] is True
-       and D["loaded"]["cached_vs_live_km"] == 0.0)
+    ok("⭐ 2. D94: the stored primary is compared with the answer at the bake's OWN pinned hour (not 'now'): same line, "
+       "same km", D["loaded"]["bake_time"] == BAKE_AT and D["loaded"]["cached_reproduces"] is True
+       and D["loaded"]["bake_time_is_stored_primary"] is True and D["loaded"]["cached_vs_live_km"] == 0.0)
     ok("2. the stored options are listed with their fingerprints",
        [s["alt_index"] for s in D["loaded"]["stored"]] == [0, 1, 2] and all(s["fingerprint"] for s in D["loaded"]["stored"]))
 
     # ---- 3. the counts and nothing written ------------------------------------------------------------------------
-    ok("⭐ 3. calls made = the estimate before the run: 7 requests x 1 call (between two access roads)",
-       D["loaded"]["here_calls"] == 7 and D["loaded"]["here_calls_estimate"] == 7 and len(D["loaded"]["_calls"]) == 7)
+    ok("⭐ 3. calls made = the estimate before the run: 8 requests (4 hours + the bake's hour + any + 2 controls) x 1 call",
+       D["loaded"]["here_calls"] == 8 and D["loaded"]["here_calls_estimate"] == 8 and len(D["loaded"]["_calls"]) == 8)
     ok("⭐ 3. the check writes nothing (route_geometry identical, every row)", snapshot() == BEFORE)
     CALLS.clear()
     P = network.departure_diagnostics("R1", profile=ART, leg="loaded", times=[T08, T17], plan=True)
-    ok("⭐ 3. plan=true makes NO HERE call and says what a run would cost (2 hours + any + 2 controls = 5)",
-       len(CALLS) == 0 and P.get("plan_only") is True and "experiment" not in P and P["here_calls_estimate"] == 5
-       and P["times"] == [T08, T17] and len(P["stored"]) == 3, str({k: P.get(k) for k in ("plan_only", "here_calls_estimate")}))
+    ok("⭐ 3. plan=true makes NO HERE call and says what a run would cost (the bake's hour + 2 hours + any + 2 controls = 6)",
+       len(CALLS) == 0 and P.get("plan_only") is True and "experiment" not in P and P["here_calls_estimate"] == 6
+       and P["times"] == [BAKE_AT, T08, T17] and len(P["stored"]) == 3, str({k: P.get(k) for k in ("plan_only", "here_calls_estimate")}))
     ok("3. options are capped at the bake's three; one asked for gives one",
        network.departure_diagnostics("R1", profile=ART, leg="loaded", times=[T08], alternatives=9, plan=True)["alternatives"] == 3
        and len(network.departure_diagnostics("R1", profile=ART, leg="loaded", times=[T08], alternatives=1)
@@ -375,12 +379,45 @@ try:
     M = network.departure_diagnostics("R1", profile=ART, leg="loaded", times=[T08, T17])
     ok("⭐ 5. with a haul road part way along, one option comes back (as the bake), two calls a request, and the "
        "estimate equals what was spent", all(len(r["option_list"]) == 1 for r in M["experiment"]["rows"])
-       and all(r["here_calls"] == 2 for r in M["experiment"]["rows"]) and M["here_calls"] == 10
-       and M["here_calls_estimate"] == 10 and len(CALLS) == 10 and M["access_roads_only"] is False,
+       and all(r["here_calls"] == 2 for r in M["experiment"]["rows"]) and M["here_calls"] == 12
+       and M["here_calls_estimate"] == 12 and len(CALLS) == 12 and M["access_roads_only"] is False,
        f"{M.get('here_calls')} {M.get('here_calls_estimate')} {len(CALLS)}")
     haul.detach("R1", ZMID)
+
+    # ---- 7. D94: the bake's answers say which hour they asked for ---------------------------------------------------
+    CALLS.clear()
+    BR = network.bake_route("R1", profile=ART)
+    ok("⭐ 7. bake_route says the pinned hour it asked for, and every HERE call of it carried that hour",
+       BR.get("departure_time") == BAKE_AT and CALLS and all(c["dep"] == BAKE_AT for c in CALLS), str(BR.get("departure_time")))
+    network.clear_geometry(profile=ART, route_id="R1")
+    CALLS.clear()
+    BB = network.bake_batch(profile=ART, limit=10)
+    ok("⭐ 7. bake_batch (Route all) the same: one pinned hour for the whole batch, on every call",
+       BB.get("departure_time") == BAKE_AT and BB.get("baked") == 2 and all(c["dep"] == BAKE_AT for c in CALLS),
+       str({k: BB.get(k) for k in ("baked", "departure_time", "errors")}))
 finally:
     here_routing.routes, here_routing.configured = _real_routes, _real_conf
+
+# ---- 7. the pinned time, worked out --------------------------------------------------------------------------------
+import datetime as _dt  # noqa: E402
+_UTC = _dt.timezone.utc
+ok("⭐ 7. D94: the pinned time is the next Tuesday at least two days ahead, 10:00 local (GB, winter: +00:00)",
+   here_routing.bake_departure_time(now=_dt.datetime(2026, 10, 28, 21, 30, tzinfo=_UTC), country="GB") == "2026-11-03T10:00:00+00:00"
+   and here_routing.bake_departure_time(now=_dt.datetime(2026, 11, 2, 9, 0, tzinfo=_UTC), country="GB") == "2026-11-10T10:00:00+00:00"
+   and here_routing.bake_departure_time(now=_dt.datetime(2026, 11, 1, 12, 0, tzinfo=_UTC), country="GB") == "2026-11-03T10:00:00+00:00")
+ok("7. ...in summer the same clock time (10:00 BST is +01:00), and UTC where the country has no known zone",
+   here_routing.bake_departure_time(now=_dt.datetime(2026, 7, 1, 12, 0, tzinfo=_UTC), country="GB") == "2026-07-07T10:00:00+01:00"
+   and here_routing.bake_departure_time(now=_dt.datetime(2026, 10, 28, 12, 0, tzinfo=_UTC), country="") == "2026-11-03T10:00:00+00:00")
+ok("7. the pin is stated in code: Tuesday, 10:00, two days ahead",
+   (here_routing.BAKE_WEEKDAY, here_routing.BAKE_HOUR, here_routing.BAKE_LEAD_DAYS) == (1, 10, 2))
+_net = read("backend/network.py")
+ok("7. all three bakes (Route all, one route, the ways round) resolve one pinned time and pass it to every leg",
+   _net.count("depart = here_routing.bake_departure_time()") == 3 and _net.count("depart_at=depart)") == 3)
+
+_ug, _tg = read("frontend/help/index.html"), read("frontend/help/technical/index.html")
+ok("7. the user guide says it in plain words (no supplier); the technical guide has the detail",
+   "Every route is worked out for a weekday at 10:00, so the result does not depend on when you press it." in _ug
+   and 'id="t2-bake-hour"' in _tg and "bake_departure_time" in _tg and "plan=true" in _tg)
 
 ok("an unknown leg and route are refused in words",
    network.departure_diagnostics("R1", leg="sideways")["error"].startswith("leg must be one of")
@@ -398,9 +435,9 @@ ok("⭐ 6. the bake and the check resolve a leg through the one leg_request()",
    and "_waypoint_full" not in _bake and "_waypoint_full" not in _diag)
 ok("6. leg_request keeps the return leg as exit-from-dest, entry-to-origin",
    'a, a_role, a_gate = d, "exit", d_gate' in _req and 'b, b_role, b_gate = o, "entry", o_gate' in _req)
-ok("⭐ 6. the check replays route_with_haul with the time; the bake path still sends none",
-   "haul.route_with_haul(" in _diag and "departure_time=dep" in _diag and "departure_time" not in _bake
-   and "departure_time" not in net.split("def bake_batch(")[1].split("\ndef ")[0])
+ok("⭐ 6. the check replays route_with_haul with the time; the bake sends only the pinned one (D94)",
+   "haul.route_with_haul(" in _diag and "departure_time=dep" in _diag
+   and _bake.count("departure_time=") == _bake.count("departure_time=depart_at") == 2)
 _m = read("backend/main.py").split("def diagnostics_departure(")[1].split("\n@app")[0]
 ok("6. the endpoint passes the options and plan, and is admin-gated",
    "alternatives: int = network.ALTERNATIVES" in _m and "plan: bool = False" in _m
