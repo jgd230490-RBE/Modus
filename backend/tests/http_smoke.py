@@ -1813,7 +1813,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
                                          "height_m": 4.2, "length_m": 36, "gross_t": 78, "max_axle_t": 11, "axle_count": 8}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
        and c.post("/api/abnormal/AL001/route", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403
        and c.post("/api/abnormal/AL001/route", headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 400
-       and "no routing key" in c.post("/api/abnormal/AL001/route", headers=dict(PLAN, **{"X-Wayscope": "1"})).json().get("detail", "")
+       # NARROWED 28 Oct 2026 (no back-end words on a screen): was "no routing key"
+       and c.post("/api/abnormal/AL001/route", headers=dict(PLAN, **{"X-Wayscope": "1"})).json().get("detail", "") == "The line could not be drawn: route drawing is not set up here."
        and c.put("/api/abnormal/AL001/via", json={"via": [[52.6, -0.9]]}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 200
        and c.put("/api/abnormal/AL001/via", json={"via": [[95, 0]]}, headers=dict(PLAN, **{"X-Wayscope": "1"})).status_code == 400
        and c.get("/api/abnormal/geojson", headers=PLAN).json().get("count") == 0

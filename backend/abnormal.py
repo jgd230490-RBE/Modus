@@ -172,9 +172,19 @@ def holiday_status():
             "seed_fetched_on": "2026-10-22",
             "from": dates[0].isoformat() if dates else None, "to": dates[-1].isoformat() if dates else None,
             "count": {d: len((feed.get(d) or {}).get("events") or []) for d in HOLIDAY_DIVISIONS if feed.get(d)},
-            "words": ("GOV.UK bank holidays (Open Government Licence)" + (f", fetched {fetched_at[:10]}" if fetched_at else
-                      ", the copy shipped with Wayscope (fetched 22 Oct 2026)")
-                      + (f"; dates to {dates[-1].isoformat()}" if dates else ""))}
+            # 28 Oct 2026 (the user: no supplier names on a screen): the source (GOV.UK, Open Government Licence) is in
+            # the technical guide, T1, and on the Notice calendar's own source line
+            "words": ((f"Up to {_day(dates[-1])}, updated " if dates else "Updated ")
+                      + (_day(datetime.date.fromisoformat(fetched_at[:10])) if fetched_at else "22 Oct 2026") + ".")}
+
+
+def _day(d):
+    """1 Jan 2027"""
+    return f"{d.day} {d:%b} {d.year}"
+
+
+#: 28 Oct 2026: the one sentence a failed update shows (the reason goes to the log)
+HOLIDAYS_FAILED = "The bank holidays could not be updated just now. Try again later."
 
 
 def refresh_holidays(by=None, fetch=None):
@@ -187,12 +197,15 @@ def refresh_holidays(by=None, fetch=None):
             with urllib.request.urlopen(req, timeout=20) as resp:
                 doc = json.load(resp)
     except urllib.error.URLError as e:
-        return {"ok": False, "error": f"gov.uk could not be read: {getattr(e, 'reason', e)}"}
+        print(f"🚧 bank holidays: gov.uk could not be read: {getattr(e, 'reason', e)}", flush=True)   # the log only
+        return {"ok": False, "error": HOLIDAYS_FAILED}
     except Exception as e:  # noqa: BLE001 — the answer is the error, never a crash
-        return {"ok": False, "error": f"gov.uk could not be read: {str(e)[:200]}"}
+        print(f"🚧 bank holidays: gov.uk could not be read: {str(e)[:200]}", flush=True)
+        return {"ok": False, "error": HOLIDAYS_FAILED}
     probs = feed_problems(doc)
     if probs:
-        return {"ok": False, "error": "the feed did not look like gov.uk's: " + "; ".join(probs)}
+        print("🚧 bank holidays: the feed did not look like gov.uk's: " + "; ".join(probs), flush=True)
+        return {"ok": False, "error": HOLIDAYS_FAILED}
     _config_set(HOLIDAYS_KEY, {"fetched_at": _now(), "source": HOLIDAYS_URL, "feed": doc}, by=by)
     return {"ok": True, "status": holiday_status()}
 
@@ -547,15 +560,19 @@ def decorate(row, today=None, feed=None, bans=None, locs=None, gates=None, label
         except Exception:
             d[k[:-5]] = None
     d["routed"] = bool(d.get("geometry"))
+    if d.get("bake_error"):
+        # 28 Oct 2026: an older version saved the router's raw answer here; the page prints one sentence
+        import abnormal_route as _ar0
+        d["bake_error"] = _ar0.plain_bake_error(d["bake_error"])
     # 22 Oct 2026 (phase 2): the line's facts for the page and the map — the roads in words, HERE's notes (a size HERE
     # capped, a return leg not drawn), the candidates and the typed rows apart, the limit hits over the line
     if d["routed"]:
         import abnormal_route as _ar
         hn = d.get("here_notices") or {}
         d["roads_words"] = _ar.roads_sentence(d.get("roads") or [])
-        d["route_notes"] = list(hn.get("notes") or [])
+        d["route_notes"] = [_ar.plain_note(n) for n in (hn.get("notes") or [])]
         d["has_motorway"] = bool(hn.get("has_motorway"))
-        d["candidates"] = [c for c in (d.get("pinch") or []) if c.get("source") != "typed"]
+        d["candidates"] = [_ar.plain_candidate(c) for c in (d.get("pinch") or []) if c.get("source") != "typed"]
         d["typed_points"] = [c for c in (d.get("pinch") or []) if c.get("source") == "typed"]
         d["limit_exceeds"] = [h for h in (d.get("limits_hits") or []) if h.get("verdict") == "exceeds"]
         if d["limit_exceeds"]:

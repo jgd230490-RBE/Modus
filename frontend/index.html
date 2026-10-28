@@ -4325,7 +4325,11 @@ const AL_GRADES = [["grey", "Grey — to survey"], ["green", "Green — passable
 // phase 3: the planner's own rows (the survey's list) — the kinds a person types, and a blank row
 const AL_TYPED_KINDS = ["bridge", "junction", "furniture", "level_crossing", "overhead", "railway", "calming", "width", "other"];
 const AL_TYPED_BLANK = { kind: "other", place: "", words: "", grade: "grey", note: "", owner: "", measure: "", permit: "", works: "", link: "" };
-const AL_CANDIDATE_WORDS = "Potential pinch points found by Wayscope from the route's turn-by-turn directions, the line itself and the stored signed limits, each graded Grey (to survey). The route survey decides: no structure rating, no swept path, no overhead clearance is worked out here.";
+// 28 Oct 2026 (the user: no supplier or back-end words on a screen): one line under the table (abnormal_route.CANDIDATE_WORDS);
+// it replaces this line and the server's structures paragraph (OpenStreetMap, the community layer, Fetch now)
+const AL_CANDIDATE_WORDS = "Found from the route's turns and bends, the signed limits and the bridges, railways, overhead lines, crossings and traffic calming on the map. Each starts Grey; the route survey decides.";
+// where a found pinch point came from, in words (the suppliers are named in the technical guide, T1)
+const AL_SOURCE_WORDS = { here: "the route's directions", line: "the line", limits: "signed limit", osm: "the map" };
 // the one-word class chip: the permission first, then the STGO weight category, then the regime
 function alClass(adv){
   if(!adv) return ["—", "cu"];
@@ -4713,11 +4717,11 @@ function AbnormalPage({ meta, access, who }){
     document.body.appendChild(a); a.click(); a.remove();
     if(a.href !== "#") setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   });
-  // phase 3: look again along the drawn line for OpenStreetMap's structures and limits — no HERE call
+  // phase 3: look again along the drawn line for the map's bridges, crossings and limits (the line is not drawn again)
   const checkRoads = (m) => act(async () => {
     const j = await call(`/abnormal/${encodeURIComponent(m.id)}/structures`, "POST");
     const n = j.structures || 0;
-    setNote({ ok: true, text: `${m.name}: ${n} structure${n === 1 ? "" : "s"} or tagged limit${n === 1 ? "" : "s"} from OpenStreetMap along the line${j.structures_fetched ? ` (fetched ${alDay(String(j.structures_fetched).slice(0, 10))})` : ""}.${j.note ? " " + j.note : ""}` });
+    setNote({ ok: true, text: j.note ? `${m.name}: ${j.note}` : `${m.name}: ${n} bridge${n === 1 ? "" : "s"}, crossing${n === 1 ? "" : "s"} or limit${n === 1 ? "" : "s"} on the line.` });
     await load();
   });
   // phase 3: the planner's own pinch-point rows — edited in a draft, saved in one press with the found candidates' grades
@@ -4735,7 +4739,7 @@ function AbnormalPage({ meta, access, who }){
   });
   const fetchHolidays = () => act(async () => {
     const j = await call("/abnormal/bank-holidays/refresh", "POST");
-    setNote({ ok: true, text: `Bank holidays fetched: ${(j.status && j.status.words) || "done"}.` });
+    setNote({ ok: true, text: `Bank holidays updated. ${(j.status && j.status.words) || ""}`.trim() });
     await load();
   });
   const saveBans = () => act(async () => {
@@ -4800,7 +4804,7 @@ function AbnormalPage({ meta, access, who }){
             <div>
               <h4 className="al-h4">Bank holidays</h4>
               <p className="text-sm">{settings.holidays && settings.holidays.words}{settings.holidays && settings.holidays.count ? ` England and Wales ${settings.holidays.count["england-and-wales"] || 0} days, Scotland ${settings.holidays.count.scotland || 0}, Northern Ireland ${settings.holidays.count["northern-ireland"] || 0}.` : ""}</p>
-              {canApprove && <button type="button" className="btn-sec" disabled={busy} onClick={fetchHolidays}>Fetch now from gov.uk</button>}
+              {canApprove && <button type="button" className="btn-sec" disabled={busy} onClick={fetchHolidays}>Update the bank holidays</button>}
               <p className="text-[13px] text-slate-500 mt-2">The STGO calendar leaves out every public holiday in Great Britain. The C&amp;U calendar leaves out the bank holidays of <b>{settings.nation === "scotland" ? "Scotland" : "England and Wales"}</b> (Config → Planning, admins).</p>
             </div>
             <div>
@@ -4943,7 +4947,7 @@ function AbnormalPage({ meta, access, who }){
                     <tr className="al-det-row" data-al-details={m.id}><td colSpan={10}>
                       <div className="al-det">
                         <div className="al-route" style={{ gridColumn: "1 / -1" }} data-al-route={m.routed ? "drawn" : "none"}>
-                          {!m.routed && <p className="text-sm text-slate-600">{m.bake_error ? <span style={{ color: "var(--bad-text)" }}>The line could not be drawn: {m.bake_error}</span>
+                          {!m.routed && <p className="text-sm text-slate-600">{m.bake_error ? <span style={{ color: "var(--bad-text)" }}>{m.bake_error}</span>
                             : <>No line drawn yet.{canApprove ? " Press Draw the route: the line is drawn for the load's size, and the potential pinch points are listed here." : " A planner draws it."}</>}</p>}
                           {m.routed && <>
                             <h4 className="al-h4">The route · indicative, drawn for the load's size</h4>
@@ -4956,7 +4960,7 @@ function AbnormalPage({ meta, access, who }){
                             </dl>
                             <div className="al-h4row"><h4 className="al-h4">Potential pinch points · {(m.candidates || []).length} found, graded Grey (to survey) · the route survey decides</h4>
                               {canApprove && <button type="button" className="btn-sec btn-sm" disabled={busy} onClick={() => checkRoads(m)} data-al-check={m.id}
-                                title="Look again along the drawn line for OpenStreetMap's structures and limits (after Fetch now on Config → Map and bulletin); the line is not drawn again">Check the roads again</button>}</div>
+                                title="Look along the line again for bridges, crossings and limits. The line stays as drawn.">Check the roads again</button>}</div>
                             {(m.candidates || []).length === 0 && <p className="text-sm text-slate-500">None found on this line: no turn, roundabout, sharp bend, structure, crossing or signed limit the load is over.</p>}
                             {(m.candidates || []).length > 0 && <table className="al-ptbl" data-al-pinch={m.id}>
                               <thead><tr><th></th><th>Kind</th><th>Where / what</th><th>From</th><th>Grade</th></tr></thead>
@@ -4965,7 +4969,7 @@ function AbnormalPage({ meta, access, who }){
                                   <td className="font-semibold whitespace-nowrap">{c.id}</td>
                                   <td>{AL_KIND_WORDS[c.kind] || c.kind}</td>
                                   <td>{c.words}{c.detail ? <span className="text-slate-500"> · {c.detail}</span> : null}{c.note ? <div className="text-[13px]" style={{ color: "var(--warn-text)" }}>{c.note}</div> : null}</td>
-                                  <td className="text-slate-500 whitespace-nowrap">{{ here: "the route's directions", line: "the line", limits: "signed limit", osm: "OpenStreetMap" }[c.source] || c.source}</td>
+                                  <td className="text-slate-500 whitespace-nowrap">{AL_SOURCE_WORDS[c.source] || ""}</td>
                                   <td>{canApprove
                                     ? <select className="ctl ctl-sm" value={c.grade || "grey"} aria-label={`Grade of ${c.id}`} disabled={busy} onChange={e => grade(m, c.id, e.target.value)}>
                                         {AL_GRADES.map(([k, w]) => <option key={k} value={k}>{w}</option>)}</select>
@@ -4978,7 +4982,6 @@ function AbnormalPage({ meta, access, who }){
                                 {h.headline}: the load's {h.vehicle_value != null ? `${h.vehicle_value} ${h.unit}` : "figure"} {h.verdict === "exceeds" ? "is over it" : h.verdict === "at_limit" ? "is exactly at it" : h.verdict === "within" ? "is within it" : "could not be compared"}{h.note ? ` — ${h.note}` : ""}</li>)}</ul>
                             </>}
                             <p className="al-foot">{AL_CANDIDATE_WORDS}</p>
-                            {words.structures && <p className="al-foot">{words.structures}</p>}
                           </>}
                           {(typedRows(m).length > 0 || canApprove) && <div className="al-typed" data-al-typed={m.id}>
                             <h4 className="al-h4">Your own pinch points · {typedRows(m).length} · the survey's list</h4>

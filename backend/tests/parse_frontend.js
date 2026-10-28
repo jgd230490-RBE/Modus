@@ -1562,10 +1562,17 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && !al.includes("esdal.pdf") && !al.includes("ESDAL sheet") && !src.includes("ESDAL sheet") && !src.includes("esdal.pdf")
      && al.includes("const dl = (path, fallback) => act(async () => {") && al.includes("const r = await fetch(`${API}${path}`);") && !/href=\{`\$\{API\}\/abnormal/.test(al)
      && al.includes(">Settings</button>") && !al.includes("Settings · bank holidays and time bans") && !al.includes("al-holidays"));
-  ok("⭐ AL3: Check the roads again beside the pinch-point heading (a planner's; no HERE call), its note with the count and the fetch date; the structures' words under the table from the server; OpenStreetMap named as a source",
+  // REVERSED 28 Oct 2026 (the user: no supplier or back-end words on a screen; mockup notes\abnormal-words-mockup-1028): the note
+  // counts bridges, crossings or limits "on the line" (no source, no fetch date), the server's structures paragraph is no longer
+  // printed (AL_CANDIDATE_WORDS is the one line), and the map rows' source reads "the map". Was: "from OpenStreetMap along the
+  // line (fetched …)", {words.structures} under the table, osm: "OpenStreetMap".
+  ok("⭐ AL3: Check the roads again beside the pinch-point heading (a planner's; no HERE call), its note with the count in plain words or the server's note; one line under the table; the map rows' source is 'the map'",
      al.includes('data-al-check={m.id}') && al.includes("const checkRoads = (m) => act(async () => {") && al.includes("/structures`, \"POST\")")
-     && al.includes("from OpenStreetMap along the line${j.structures_fetched ? ` (fetched ${alDay(String(j.structures_fetched).slice(0, 10))})` : \"\"}") && al.includes("{words.structures && <p className=\"al-foot\">{words.structures}</p>}")
-     && al.includes(`here: "the route's directions", line: "the line", limits: "signed limit", osm: "OpenStreetMap"`) && al.includes("no turn, roundabout, sharp bend, structure, crossing or signed limit the load is over"));
+     && al.includes("text: j.note ? `${m.name}: ${j.note}` : `${m.name}: ${n} bridge${n === 1 ? \"\" : \"s\"}, crossing${n === 1 ? \"\" : \"s\"} or limit${n === 1 ? \"\" : \"s\"} on the line.`")
+     && !al.includes("words.structures") && !al.includes("from OpenStreetMap along the line")
+     && al.includes(`const AL_SOURCE_WORDS = { here: "the route's directions", line: "the line", limits: "signed limit", osm: "the map" };`)
+     && al.includes("{AL_SOURCE_WORDS[c.source] || \"\"}") && al.includes("no turn, roundabout, sharp bend, structure, crossing or signed limit the load is over")
+     && al.includes('title="Look along the line again for bridges, crossings and limits. The line stays as drawn."'));
   ok("⭐ AL3: the planner's own rows — a draft per movement, Add / Remove, Where and What inputs, the kind from AL_TYPED_KINDS, the survey fields (owner, measure, permit, works, link, note), saved in ONE PUT with the found candidates' grades; read-only rows for a team",
      al.includes('const [typedDraft, setTypedDraft] = useState({});') && al.includes('const AL_TYPED_KINDS = ["bridge", "junction", "furniture", "level_crossing", "overhead", "railway", "calming", "width", "other"];')
      && al.includes('data-al-typed={m.id}') && al.includes(">+ Add your own pinch point</button>") && al.includes(">Save your own rows</button>") && al.includes('aria-label="Where"') && al.includes('aria-label="What"')
@@ -1582,6 +1589,27 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   const strs = al3.match(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g) || [];
   ok("AL3 wording: lorry never truck; none of the banned words; no 'compliant', no 'approved by'",
      strs.length > 30 && !strs.some(x => /\b(truck|real-time|live tracking|telematics|optimi[sz]e|predict|compliant|approved by)\b/i.test(x) || /\bsecure\b|\bAI\b/.test(x)));
+}
+// ---- 28 Oct 2026: the Abnormal loads page names no supplier and no back end (the user, 22 Oct: "no info about api or backend
+// stuff"; supplier names only in the technical guide; mockup notes\abnormal-words-mockup-1028). The server's own words are
+// guarded in test_abnormal.py (abnormal_route.SCREEN_BAN, over everything abnormal.page() sends, old saved rows included).
+{
+  const a0 = src.indexOf("// ================================================================= Abnormal loads (22 Oct 2026, S16 / B5)");
+  const a1 = src.indexOf("// ================================================================= Public map\n");
+  const al = src.slice(a0, a1).split("\n").map(l => l.replace(/^\s*\/\/.*$/, "").replace(/\s\/\/ .*$/, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "")).join("\n")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+  const AL_BAN = /\bHERE\b|OpenStreetMap|\bOSM\b|Mapbox|GOV\.UK|gov\.uk|NaPTAN|\bGIAS\b|STATS19|\bDfT\b|Geofabrik|Fetch now|routing key|community layer|severity|router's|\bAPI\b|\bendpoints?\b|\bserver\b|\bcached?\b|\btoken\b/;
+  const alStrs = (al.match(/"[^"\n]*"|'[^'\n]*'|`[^`\n]*`|>[^<>{}\n]*[A-Za-z][^<>{}\n]*</g) || []);
+  const alHits = alStrs.filter(x => AL_BAN.test(x.replace(/\$\{API\}/g, "")));   // ${API} is the address prefix in code, never a word
+  ok(`⭐ ABNORMAL WORDS: no string or text on the Abnormal loads page (and its constants) names HERE, OpenStreetMap, Mapbox, GOV.UK, NaPTAN, GIAS, STATS19, DfT, Geofabrik, Fetch now, a routing key, the community layer, a severity, an API, a server, a cache or a token (${alStrs.length} pieces read)`,
+     alStrs.length > 300 && alHits.length === 0, alHits.slice(0, 6).join(" | "));
+  ok("...and it would catch the old words (the turn severity, the source column, the footers, the button, the Check note)",
+     ["HERE's turn severity: quite", '"OpenStreetMap"', "Structures and limits from OpenStreetMap along the drawn line", ">Fetch now from gov.uk<",
+      "after Fetch now on Config → Map and bulletin", "the community layer"].every(x => AL_BAN.test(x))
+     && !AL_BAN.test("Here is the load") && !AL_BAN.test("the route's directions"));
+  ok("ABNORMAL WORDS: Settings → Bank holidays: 'Update the bank holidays', its success note, no site named",
+     al.includes('onClick={fetchHolidays}>Update the bank holidays</button>') && al.includes("text: `Bank holidays updated. ${(j.status && j.status.words) || \"\"}`.trim()")
+     && !al.includes("Fetch now from gov.uk") && !al.includes("Bank holidays fetched:"));
 }
 
 // ---- 22 Oct 2026: the abnormal loads on the other screens (phase 2) ------------------------
@@ -1610,8 +1638,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("AL2 row: the via points are typed one a line as latitude, longitude, saved with one PUT, and the line is said to need drawing again; a bad line is refused in words",
      al.includes("await call(`/abnormal/${encodeURIComponent(m.id)}/via`, \"PUT\", { via: pts })") && al.includes('throw new Error("Each via point is one line: latitude, longitude.");')
      && al.includes("Press Draw the route again to draw the line through them."));
+  // NARROWED 28 Oct 2026: the server's reason is the whole sentence ("The line could not be drawn just now. Try again in a minute."),
+  // so the page prints it as it comes; was "The line could not be drawn: {m.bake_error}"
   ok("AL2 row: no line yet is said in words, with the reason stored when HERE refused; a not-planner is told a planner draws it",
-     al.includes("The line could not be drawn: {m.bake_error}") && al.includes("No line drawn yet.") && al.includes("A planner draws it."));
+     al.includes('<span style={{ color: "var(--bad-text)" }}>{m.bake_error}</span>') && !al.includes("The line could not be drawn: {m.bake_error}")
+     && al.includes("No line drawn yet.") && al.includes("A planner draws it."));
   const wk0 = src.indexOf("function AbnormalWeek({ ab }){"), wk1 = src.indexOf("function GatesWeek({ gw }){");
   const wk = src.slice(wk0, wk1);
   ok("⭐ AL2 Look-ahead: an 'Abnormal loads this week' block under the gates' week (only when the server's block has movements), one row a brief — the load and its ends, " +

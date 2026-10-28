@@ -1785,8 +1785,8 @@ async function abnormalDom(){
   const pageFor = (acc) => {
     const all = [mv("AL001", "Modular office units (4.6 m wide)", "IPT2", "Central Team", "approved", unitsAdv,
                     { routed: true, distance_km: 12.08, duration_hr: 0.253, baked_at: "2026-10-22T16:00:00Z", roads_words: "Roman Way, Doddridge Road, Bowden Lane", has_motorway: false,
-                      candidates: [{ id: "P1", source: "here", kind: "turn", words: "Turn right onto Doddridge Road", detail: "HERE's turn severity: quite", grade: "amber", note: "checked on site" },
-                                   { id: "P2", source: "osm", kind: "bridge", words: "Bridge carrying the road: Welland Viaduct (arch)", detail: "the structure's owner assesses it for the load's weight through ESDAL (OpenStreetMap as fetched 2026-10-22)", grade: "grey" }],
+                      candidates: [{ id: "P1", source: "here", kind: "turn", words: "Turn right onto Doddridge Road", detail: null, grade: "amber", note: "checked on site" },
+                                   { id: "P2", source: "osm", kind: "bridge", words: "Bridge carrying the road: Welland Viaduct (arch)", detail: "the structure's owner assesses it for the load's weight through ESDAL", grade: "grey" }],
                       typed_points: [{ id: "T1", source: "typed", kind: "bridge", place: "Welland bridge", words: "Arch bridge, headroom 3.9 m at the kerb", grade: "red", owner: "Leicestershire CC", measure: "run on the crown", permit: null, works: null, link: null, note: null }],
                       limits_hits: [], route_notes: [], via: [] }),
                  mv("AL002", "32 m precast bridge beams, Melton junction", "IPT1", "North Team", "pending", beamAdv,
@@ -1794,9 +1794,9 @@ async function abnormalDom(){
     const mine = acc.ipt ? all.filter(m => m.ipt === acc.ipt) : all;
     const by = {}; mine.forEach(m => { by[m.status] = (by[m.status] || 0) + 1; });
     return { movements: mine, count: mine.length, by_status: by, flagged: mine.filter(m => m.flags.length).length,
-      settings: { holidays: { source: "seed", words: "GOV.UK bank holidays (Open Government Licence), the copy shipped with Wayscope (fetched 22 Oct 2026); dates to 2028-12-26", count: { "england-and-wales": 83, scotland: 94, "northern-ireland": 103 } }, time_bans: [], nation: "england-and-wales" },
+      settings: { holidays: { source: "seed", words: "Up to 26 Dec 2028, updated 22 Oct 2026.", count: { "england-and-wales": 83, scotland: 94, "northern-ireland": 103 } }, time_bans: [], nation: "england-and-wales" },
       words: { advice: beamAdv.advice_words, not_modelled: "Not worked out here: bridges and structures and their ratings.",
-               structures: "Structures and limits from OpenStreetMap along the drawn line — the community layer's extract (Config → Map and bulletin → Fetch now). A road may be mapped without its tags: the survey decides.", counted_apart: "Abnormal loads are counted on their own: never in the lorry counts, the CLP caps, the gate capacity or the carbon totals (D70, D71)." },
+               structures: "Bridges, railways, overhead lines, crossings, traffic calming and limits marked on the map along the line. Not every road is fully mapped: the survey decides.", counted_apart: "Abnormal loads are counted on their own: never in the lorry counts, the CLP caps, the gate capacity or the carbon totals (D70, D71)." },
       choices: { statuses: [], vehicle_types: [{ key: "low_loader", word: "Low-loader" }, { key: "modular_trailer", word: "Modular trailer" }], escorts: ["none", "attendant", "private", "police"], time_bands: ["day", "night"],
         locations: [{ id: "L004", name: "Harborough Rail Freight Terminal" }, { id: "L006", name: "Langton Compound" }],
         gates: [{ id: "G009", location_id: "L006", name: "Main gate", active: true }],
@@ -1866,17 +1866,22 @@ async function abnormalDom(){
      && !p.el.querySelector('a[href*="calendar"]') && !p.el.textContent.includes("ESDAL sheet") && !!byText(p.el, "button", "Settings"));
   await act(async () => { rowOf(p.el, "AL001").querySelector("button.al-tri").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
   const det1 = () => p.el.querySelector('[data-al-details="AL001"]');
-  ok("⭐ AL3 DOM: the drawn row's pinch table names OpenStreetMap as a source beside HERE, carries the planner's amber grade and note, the structures words under it, and Check the roads again beside the heading",
+  // REVERSED 28 Oct 2026 (the user: no supplier names on a screen): the map rows' source reads "the map", ONE line under the table
+  // (AL_CANDIDATE_WORDS; the server's structures sentence is no longer printed). Was: "OpenStreetMap", the structures paragraph.
+  ok("⭐ AL3 DOM: the drawn row's pinch table names the map as a source beside the route's directions, carries the planner's amber grade and note, one line under it, and Check the roads again beside the heading",
      !!det1() && det1().querySelector('[data-al-pinch="AL001"]') && det1().textContent.includes("Bridge carrying the road: Welland Viaduct (arch)")
-     && [...det1().querySelectorAll('[data-al-pinch="AL001"] tbody tr')].map(r => r.children[3].textContent).join("|") === "the route's directions|OpenStreetMap"
+     && [...det1().querySelectorAll('[data-al-pinch="AL001"] tbody tr')].map(r => r.children[3].textContent).join("|") === "the route's directions|the map"
      && det1().querySelector('select[aria-label="Grade of P1"]').value === "amber" && det1().textContent.includes("checked on site")
-     && det1().textContent.includes("Structures and limits from OpenStreetMap along the drawn line") && !!det1().querySelector('[data-al-check="AL001"]'),
+     && det1().textContent.includes("Each starts Grey; the route survey decides.") && !det1().textContent.includes("marked on the map along the line")
+     && !/OpenStreetMap|\bHERE\b|Fetch now|severity/.test(det1().textContent) && !!det1().querySelector('[data-al-check="AL001"]'),
      det1() ? det1().textContent.slice(0, 300) : "no details");
   await act(async () => { det1().querySelector('[data-al-check="AL001"]').dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
   await settle(20);
-  ok("AL3 DOM: Check the roads again posts to /structures (no HERE call), reads the page again and says what it found and when it was fetched",
+  // NARROWED 28 Oct 2026: the count in plain words, no source and no fetch date (the fetch date is on Config → Map and bulletin)
+  ok("AL3 DOM: Check the roads again posts to /structures (no HERE call), reads the page again and says what it found",
      calls.some(c => c.url === "/api/abnormal/AL001/structures" && c.method === "POST")
-     && p.el.querySelector('[role="status"]').textContent.includes("1 structure or tagged limit from OpenStreetMap along the line (fetched 22 Oct 2026)"));
+     && p.el.querySelector('[role="status"]').textContent === "Modular office units (4.6 m wide): 1 bridge, crossing or limit on the line.",
+     p.el.querySelector('[role="status"]') ? p.el.querySelector('[role="status"]').textContent : "no status");
   const typed = () => det1().querySelector('[data-al-typed="AL001"]');
   ok("⭐ AL3 DOM: the planner's own rows: T1 from the server in its own table — the kind, where, what, the grade and the survey fields as inputs — with Add and no Save until something changes",
      !!typed() && typed().textContent.includes("Your own pinch points · 1") && typed().querySelector('input[aria-label="Where"]').value === "Welland bridge"
@@ -1925,8 +1930,10 @@ async function abnormalDom(){
      && posted.body.ipt === "IPT1" && posted.body.rigid_length_m === null && posted.body.indivisible === false && !form(), JSON.stringify(posted && posted.body).slice(0, 200));
   await act(async () => { byText(p.el, "button", "Settings").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });   // NARROWED 27 Oct 2026: one word
   const set = () => p.el.querySelector("[data-al-settings]");
-  ok("AL DOM: a planner's settings card: the holidays' words and the Fetch button, an empty time-ban table with Add and Save, England and Wales named",
-     !!set() && set().textContent.includes("England and Wales 83 days, Scotland 94, Northern Ireland 103") && !!byText(set(), "button", "Fetch now from gov.uk")
+  // NARROWED 28 Oct 2026: the button is "Update the bank holidays" and the card names no site (was "Fetch now from gov.uk")
+  ok("AL DOM: a planner's settings card: the holidays' words and the Update button, an empty time-ban table with Add and Save, England and Wales named",
+     !!set() && set().textContent.includes("Up to 26 Dec 2028, updated 22 Oct 2026. England and Wales 83 days, Scotland 94, Northern Ireland 103") && !!byText(set(), "button", "Update the bank holidays")
+     && !/GOV\.UK|gov\.uk|Licence/.test(set().textContent)
      && set().textContent.includes("None typed.") && !!byText(set(), "button", "+ Add a force") && set().textContent.includes("England and Wales (Config"));
   await p.done();
 
@@ -1934,7 +1941,7 @@ async function abnormalDom(){
   ok("⭐ AL DOM: a team login sees its own movement only, no Approve or Reopen (the planner's), Delete only while pending; its Settings card has no Fetch and no Add",
      !!rowOf(t.el, "AL002") && !rowOf(t.el, "AL001")
      && !rowOf(t.el, "AL002").querySelector(".btn-pri") && menuOf(rowOf(t.el, "AL002")) === "Edit|Withdraw…|Delete…"   // NARROWED 27 Oct 2026: no forward step for a team login; the menu holds Edit, Withdraw…, Delete…
-     && !btns(t.el).includes("Fetch now from gov.uk"));
+     && !btns(t.el).includes("Update the bank holidays") && !btns(t.el).includes("Fetch now from gov.uk"));
   await act(async () => { byText(t.el, "button", "Plan an abnormal load").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
   ok("AL DOM: a team login's form has the team locked to its own", t.el.querySelector('select[aria-label="Team"]').disabled && t.el.querySelector('select[aria-label="Team"]').value === "IPT1");
   ok("AL3 DOM: a team login has no Check the roads again and no Add your own pinch point (a planner's), and the documents' buttons still",
