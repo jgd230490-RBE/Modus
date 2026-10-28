@@ -9300,7 +9300,9 @@
         const p = f.properties || {};
         const html = `<div style="font:14px system-ui;max-width:300px"><b>${escHtml(p.pinch_id || '')} · ${escHtml(p.words || '')}</b><br>` +
             `${escHtml(p.movement || '')}${p.detail ? ' · ' + escHtml(p.detail) : ''}<br>` +
-            `<span style="color:#475569">${escHtml(p.grade_word || 'Grey — to survey')} · found by Wayscope from ${p.source === 'line' ? 'the line' : p.source === 'limits' ? 'the stored signed limits' : p.source === 'typed' ? 'the planner' : p.source === 'osm' ? 'OpenStreetMap (the community layer’s extract)' : 'the route’s directions'}; the route survey decides.</span></div>`;
+            // 28 Oct 2026 (the user: no supplier names on a screen; mockup notes\map-abnormal-words-mockup-1028): the source in the
+            // page's own words (its From column); the suppliers are named in the technical guide, T1
+            `<span style="color:#475569">${escHtml(p.grade_word || 'Grey — to survey')} · from ${p.source === 'line' ? 'the line' : p.source === 'limits' ? 'a signed limit' : p.source === 'typed' ? 'the planner' : p.source === 'osm' ? 'the map' : 'the route’s directions'}; the route survey decides.</span></div>`;
         new mapboxgl.Popup({ maxWidth: '320px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
     }
     function renderAbnormalPanel() {
@@ -9316,7 +9318,7 @@
             [['turn', 'turn'], ['roundabout', 'roundabout'], ['slip_road', 'slip road'], ['bend', 'sharp bend'], ['limit', 'signed limit'],
              ['bridge', 'bridge'], ['railway', 'railway'], ['level_crossing', 'level crossing'], ['calming', 'traffic calming'], ['overhead', 'overhead line']]
             .map(([k, w]) => `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#fff;border:2px solid ${ABN_DOT[k]};vertical-align:middle"></span> ${w}`).join(' · ') +
-            '. Each Grey — to survey; the route survey decides. The structures are OpenStreetMap’s, as fetched.';
+            '. Each Grey — to survey; the route survey decides.';
     }
     function loadAbnormal() {
         if (ABN.loading) return;
