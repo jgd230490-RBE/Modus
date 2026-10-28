@@ -69,6 +69,7 @@ import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry 
 import heavy_reads  # 21 Oct 2026 — the public map's heavy reads a few at a time, one memory line each (live OOM kills)
 import abnormal  # 22 Oct 2026 (S16 / B5) — the abnormal loads: each one its own planned movement, with the rules' advice
 import read_cache  # 22 Oct 2026 — whole reads kept until the next write (the first council view on live)
+import deployment  # 28 Oct 2026 — which settings this deployment has (names only) and what an organisation's must fix
 
 ROOT = Path(__file__).resolve().parent.parent          # repo root
 HERE = Path(__file__).resolve().parent                 # backend/
@@ -152,6 +153,13 @@ async def lifespan(app: FastAPI):
         users.ensure_first_admin()
     except Exception as e:  # noqa: BLE001
         print("first admin: skipped:", e.__class__.__name__, str(e)[:200])
+    # 28 Oct 2026 (pilot readiness phase 3): one "deployment:" line in the service log — which settings are set (names
+    # only) and what an organisation's deployment must still fix. backend/check_deployment.py prints the same in the Shell.
+    try:
+        for line in deployment.report_lines(admins=users.count_admins()):
+            print(line)
+    except Exception as e:  # noqa: BLE001
+        print("deployment: check skipped:", e.__class__.__name__, str(e)[:200])
     # 22 Oct 2026: the start-up migrations above commit on their own connections; nothing is cached yet, but say so.
     db.bump_data_version()
     # ... and build the map's council figures in the background, so the first viewer after a deploy does not wait

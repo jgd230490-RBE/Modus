@@ -27,8 +27,11 @@ services:
       # Secrets: set in the Render dashboard, NOT here — this file is in the repository.
       # Listed with sync: false so a blueprint sync never wipes them. env.example
       # explains each one.
-      - key: ADMIN_TOKEN            # required — admin calls are OPEN while it is unset
-        sync: false
+      # The DEMO's blueprint. An organisation's own deployment (a pilot) is NOT made from this file: it is made by
+      # hand in Frankfurt from the steps backend/tools/new_organisation.py writes, so no client's name is ever in
+      # this public repository, and it follows the pilot-release branch, not main.
+      - key: ADMIN_TOKEN            # being retired: admin LOGINS do everything (27 Oct 2026); with it unset every
+        sync: false                 # admin call is refused without an admin login (12 Oct 2026, C11)
       # G3 (14 Oct 2026): people sign in with their own email and password (Config → Users).
       # The eight shared codes below keep working only while they are set; delete them on
       # Render to end them (decided: Sat 31 Oct 2026). Nothing else changes when they go.
@@ -50,7 +53,7 @@ services:
         sync: false
       - key: MAP_PASSWORD           # the shared password for outside map viewers
         sync: false
-      - key: GATE_SECRET            # optional
+      - key: GATE_SECRET            # set it (the map cookie's key; without it the key leans on ADMIN_TOKEN)
         sync: false
       - key: HERE_API_KEY           # needed to bake routes
         sync: false

@@ -2118,6 +2118,49 @@ with TestClient(main.app, base_url="https://testserver") as c:
        r.text.split("\n")[0].endswith(",login,login_expires_at,sign_ins,first_seen,last_seen,pages")
        and ",active," in _bea_line and _bea_line.endswith(",lookahead 1"), _bea_line)
 
+    # ---- 28 Oct 2026 (pilot readiness phase 3): the outside hand-over check against the REAL app ----
+    # backend/tools/check_pilot.py asks a deployment what anyone can ask. Here its requests go to this app (Render's
+    # http -> https redirect and the address lookup cannot be had locally, so those two rows are not asserted).
+    sys.path.insert(0, os.path.join(BACKEND, "tools"))
+    import check_pilot  # noqa: E402
+
+    def _cp_fetch(method, url, data=None, headers=None, timeout=30):
+        if url.startswith("http://"):
+            return 301, {"location": "https://" + url[len("http://"):]}, ""
+        path = url[len("https://pilot.example.test"):] or "/"
+        rr = c.request(method, path, content=data, headers=dict(headers or {}), follow_redirects=False)
+        return rr.status_code, {k.lower(): v for k, v in rr.headers.items()}, rr.text
+
+    c.cookies.clear()
+    _cp_saved = {k: os.environ.pop(k, None) for k in ("ADMIN_TOKEN", "DEMO_LEADS")}
+    try:
+        _cp = dict((w.split(":")[0].split(" (")[0], r) for r, w in check_pilot.checks("https://pilot.example.test", fetch=_cp_fetch))
+        _n_req = len(db.query("SELECT * FROM demo_requests"))
+        os.environ["ADMIN_TOKEN"] = "adm-token-xyz"
+        _cp_tok = dict((w.split(":")[0].split(" (")[0], r) for r, w in check_pilot.checks("https://pilot.example.test", fetch=_cp_fetch))
+        os.environ["DEMO_LEADS"] = "1"
+        _cp_demo = dict((w.split(":")[0].split(" (")[0], r) for r, w in
+                        check_pilot.checks("https://pilot.example.test", fetch=_cp_fetch, demo=True))
+        _n_req2 = len(db.query("SELECT * FROM demo_requests"))
+    finally:
+        for k, v in _cp_saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    _want = ("Health", "Sign-in page", "Security headers on the app page", "The page refuses to be framed by another site",
+             "Sign-in answers are never cached", "Admin calls refused without an admin login", "The landing form is off here",
+             "The public map asks for its password", "The guides ask for a staff sign-in")
+    ok("⭐ phase 3: check_pilot passes every outside check on an organisation's settings (no token, form off)",
+       all(_cp.get(w) == "pass" for w in _want), json.dumps(_cp))
+    ok("🔴 phase 3: ...and FAILS the admin row when ADMIN_TOKEN is set (the 403 words tell a set token from none)",
+       _cp_tok.get("Admin calls refused without an admin login") == "FAIL", json.dumps(_cp_tok))
+    ok("phase 3: ...on the demo (--demo) a set token is a note and the form must be ON",
+       _cp_demo.get("Admin calls refused without an admin login") == "note"
+       and _cp_demo.get("The landing form is ON here") == "pass", json.dumps(_cp_demo))
+    ok("🔴 phase 3: the form check (its trap field only) stores no request, form on or off", _n_req2 == _n_req,
+       f"{_n_req} -> {_n_req2}")
+
 print()
 for f in FAIL:
     print("  FAIL:", f)

@@ -59,6 +59,7 @@ main:focus{outline:0}
 <li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>
 <li class="l1"><a href="#t3-sources">T3 Where each screen reads from</a></li>
 <li class="l1"><a href="#t4-settings">T4 Settings and deployment</a></li>
+<li class="l2"><a href="#t4-organisation">A deployment per organisation</a></li>
 <li class="l1"><a href="#t5-errors">T5 Errors and what they mean</a></li>
 <li class="l1"><a href="#t6-words">T6 Old words, new words</a></li>
 <li class="l1"><a href="#t7-reference">T7 Sourced and assumed figures</a></li>
@@ -447,6 +448,26 @@ kept. It was built to retire the first seed (the V2 seed).</li>
 <li><strong>Users &rarr; Activity.</strong> A write with no words of its own shows as &ldquo;Changed a record&rdquo;; the
 CSV keeps the path. The carbon target's write carries the decisions, never a figure: Wayscope works every figure out.</li>
 <li><strong>Diagnostics</strong> left Data → Routes on 22 Oct 2026 (the user: no back-end detail on screens). The same two checks, with the admin token, are in <a href="#t2-left-out">What the screens leave out</a>: ● a profile appears in stored geometry; ⚠ its name is not a key in <code>factors.json</code> and falls back to <code>_default</code> (identical payload and CO₂ for every such profile, which looks like the vehicle being ignored).</li>
+</ul>
+
+<h2 id="t4-organisation">A deployment per organisation (28 Oct 2026, pilot readiness phase 3)</h2>
+<p>Each organisation with real data gets its own web service and database on Render, in Frankfurt, made by hand (not from
+<code>render.yaml</code>, which is the demo's), at its own address <code>&lt;name&gt;.wayscope.co.uk</code>. It follows the
+<code>pilot-release</code> branch, which is moved to a tested <code>main</code> when a release is wanted, so a merge reaches the
+demo at once and a client only on purpose. Three tools:</p>
+<ul>
+<li><code>python backend/tools/new_organisation.py acme "Acme Rail" you@example.com</code> writes, outside the checkout, the
+settings to paste into Render (<code>TENANT_ID</code>, <code>APP_URL</code>, <code>FIRST_ADMIN_EMAIL</code> and a fresh
+<code>GATE_SECRET</code> and <code>MAP_PASSWORD</code>) and the numbered steps with the names filled in. Never set on such a
+deployment: <code>ADMIN_TOKEN</code>, the shared codes, <code>DEMO_LEADS</code>, <code>ALLOW_DEMO_CODES</code>,
+<code>MAP_GATE</code>.</li>
+<li>At start-up the service log has one <code>deployment:</code> line (which settings are set, by name, never a value) and one
+line per problem (<code>backend/deployment.py</code>): ✗ must be fixed, ⚠ should be. <code>python backend/check_deployment.py</code>
+in Render's Shell prints the same, plus the admin logins and their two-step sign-in and the data loaded; it changes nothing.</li>
+<li><code>python backend/tools/check_pilot.py https://acme.wayscope.co.uk</code> from a laptop asks what anyone can ask: health,
+https, the headers, no-store on sign-in, admin calls refused (the refusal's words tell a set admin token from none), the
+landing form off (tried with its trap field only, which stores nothing), the map's password, the guides' sign-in. Add
+<code>--demo</code> for the demo, where the form must be on.</li>
 </ul>
 
 <h1 id="t5-errors">T5 Errors and what they mean</h1>
