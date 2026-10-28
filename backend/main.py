@@ -68,6 +68,7 @@ import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts
 import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
 import heavy_reads  # 21 Oct 2026 — the public map's heavy reads a few at a time, one memory line each (live OOM kills)
 import abnormal  # 22 Oct 2026 (S16 / B5) — the abnormal loads: each one its own planned movement, with the rules' advice
+import route_choice  # 28 Oct 2026 (task 0c) — which stored option a route uses on a day: a dated zone's diversion
 import read_cache  # 22 Oct 2026 — whole reads kept until the next write (the first council view on live)
 import deployment  # 28 Oct 2026 — which settings this deployment has (names only) and what an organisation's must fix
 
@@ -2697,7 +2698,15 @@ def _month_kpis_payloads(months, unit):
     _tpv_cache = {}
     _pre = {}
 
-    def trips_per_vehicle_day(route_id, vehicle):
+    _rc_rows = route_choice._rows_by_route()     # 28 Oct 2026 (task 0c): read once for every month
+    _cyc_cache = {"__route_analysis_pre__": _pre}
+
+    def trips_per_vehicle_day(route_id, vehicle, month=None):
+        # 28 Oct 2026 (task 0c): a route a dated zone diverts in this month takes its figure from derived.cycle_for (the
+        # fewest trips of the options used that month); every other route keeps the one alt-0 figure as before
+        if month is not None and route_id in _rc_rows:
+            row = derived.cycle_for(route_id, vehicle, _cyc_cache, month_index=month)
+            return max(1, int(row.get("trips_per_day") or 0)) if row else None
         key = (route_id, vehicle)
         if key not in _tpv_cache:
             tpv = None
@@ -2736,7 +2745,7 @@ def _month_kpis_payloads(months, unit):
         for r in rows_by_month.get(month, []):
             line = _month_kpi_line(r, unit, factors, vs, fb_payload, fb_name)
             # movements one vehicle can make per day on THIS route, or None if unbaked
-            line["trips_per_vehicle_day"] = trips_per_vehicle_day(r["route_id"], r.get("vehicle_type"))
+            line["trips_per_vehicle_day"] = trips_per_vehicle_day(r["route_id"], r.get("vehicle_type"), month)
             lines.append(line)
         co2_by_key, to_date, unbaked_to_date = {}, {}, 0
         for (rid, disc, sec, mi), co2 in items:
@@ -3015,6 +3024,45 @@ def routes_status():
 @app.get("/api/routes/summary")
 def routes_summary():
     return network.summary()
+
+
+@app.get("/api/routes/diversions")
+def routes_diversions(route_id: Optional[str] = None):
+    """
+    28 Oct 2026 (task 0c): the dated zones' diversions (route_choice), grouped per route, zone and dates, with the
+    zone's name and each leg's option and change in length — the Routes page's Diversions list and its chip — and
+    what "Find a way round" would cost now.
+    """
+    return {"periods": route_choice.periods(route_id), "way_round": network.way_round_calls(route_id)}
+
+
+@app.post("/api/admin/route-diversions/keep-main")
+def route_keep_main(body: dict, token: Optional[str] = None):
+    """28 Oct 2026 (task 0c): "Keep the main route" for one route through one dated zone ({route_id, zone_id,
+    keep: true}), or its undo (keep: false). The route then goes through the zone in its dates and the Look-ahead
+    flags those weeks (NO_WAY_ROUND)."""
+    _check_admin(token)
+    rid, zid = str(body.get("route_id") or "").strip(), str(body.get("zone_id") or "").strip()
+    if not rid or not zid:
+        raise HTTPException(400, "Name the route and the zone.")
+    if not zones.get_zone(zid):
+        raise HTTPException(404, "That zone is not here.")
+    keep = bool(body.get("keep", True))
+    summ = route_choice.keep_main(rid, zid, keep=keep, who=_by())
+    return {"route_id": rid, "zone_id": zid, "keep": keep,
+            "periods": route_choice.periods(rid), "by_zone": (summ or {}).get("by_zone", {})}
+
+
+@app.post("/api/admin/route-diversions/way-round")
+def route_way_round(route_id: Optional[str] = None, limit: int = Query(30, ge=1, le=60),
+                    token: Optional[str] = None):
+    """
+    28 Oct 2026 (task 0c, "Find a way round"): one HERE call a leg (+1 per haul road on it) for the legs whose main
+    line crosses a dated zone in force with no stored option that misses it. Call until `remaining` is 0, like
+    Route all; stops starting legs after network.BAKE_BUDGET_S. Spends HERE calls, so admin only.
+    """
+    _check_admin(token)
+    return network.bake_way_rounds(route_id=route_id, limit=limit, budget_s=network.BAKE_BUDGET_S)
 
 
 @app.get("/api/routes/{route_id}/route-sheet.pdf")
@@ -4653,11 +4701,26 @@ class ZoneIn(BaseModel):
     haul_mode: Optional[str] = None
 
 
-def _zone_write_result(zone, inval):
-    """Shape shared by create/update/delete: the zone, plus what it just invalidated."""
-    return {"zone": zone, "invalidated": inval,
-            "rebake_required": inval.get("leg_count", 0) > 0,
-            "here_calls": inval.get("here_calls", 0)}
+def _zone_write_result(zone, inval, zone_id=None):
+    """Shape shared by create/update/delete: the zone, plus what it just invalidated.
+    28 Oct 2026 (task 0c): plus the diversions it makes (route_choice, worked out again here — geometry only) and
+    what "Find a way round" would cost; the page refreshes these again after its re-route loop."""
+    out = {"zone": zone, "invalidated": inval,
+           "rebake_required": inval.get("leg_count", 0) > 0,
+           "here_calls": inval.get("here_calls", 0)}
+    if zone_id:
+        summ = route_choice.refresh_quietly("zone save") or {}
+        out["diversions"] = (summ.get("by_zone") or {}).get(zone_id) or {"routes": [], "needs_route": [],
+                                                                          "no_way_round": [], "declined": []}
+        out["way_round"] = network.way_round_calls()
+    return out
+
+
+def _permanent_routing(z):
+    """28 Oct 2026 (task 0c): a routing zone with NO dates shapes the main line (network.active_avoid); a dated one
+    diverts its routes in its own dates only (route_choice) and leaves the main line alone."""
+    return bool(z and z["affects_routing"] and z["active"] and z["kind"] != zones.HAUL_KIND
+                and not (z.get("starts_on") or z.get("ends_on")))
 
 
 @app.get("/api/zones")
@@ -4678,7 +4741,9 @@ def list_zones(on: Optional[str] = None, include_inactive: bool = True):
             "haul_modes": list(haul.MODES),
             "haul_default_mode": haul.DEFAULT_MODE,
             "haul_kind": zones.HAUL_KIND,
-            "haul_links": haul.link_counts()}
+            "haul_links": haul.link_counts(),
+            # 28 Oct 2026 (task 0c): per dated routing zone, the routes it diverts and those with no way round
+            "diversions": route_choice.summary()["by_zone"]}
 
 
 @app.get("/api/zones/{zone_id}")
@@ -4713,11 +4778,13 @@ def create_zone(body: ZoneIn, token: Optional[str] = None):
         # attachment is explicit: drawing a road near a route does not silently re-bake
         # it. Routing zones invalidate on creation; haul roads invalidate on attach.
         return _zone_write_result(z, haul.invalidate_for_zone(z["id"]))
-    # a zone that does not affect routing invalidates nothing — it is drawn, not routed
+    # a zone that does not affect routing invalidates nothing — it is drawn, not routed.
+    # 28 Oct 2026 (task 0c): nor does a DATED one: the main line keeps going through it and route_choice diverts the
+    # routes in its dates only (_zone_write_result works that out). Only a permanent (undated) one re-routes the main line.
     inval = (zones.invalidate(new_geometry=z["geometry"])
-             if (z["affects_routing"] and z["active"] and zones.applies_on(z))
+             if _permanent_routing(z)
              else zones.invalidate(dry_run=True))
-    return _zone_write_result(z, inval)
+    return _zone_write_result(z, inval, z["id"])
 
 
 @app.put("/api/admin/zones/{zone_id}")
@@ -4753,16 +4820,19 @@ def update_zone(zone_id: str, body: ZoneIn, token: Optional[str] = None):
         haul.refresh_origin_temp_km()
         return _zone_write_result(z, inval)
 
-    now_routes = z["affects_routing"] and z["active"] and zones.applies_on(z)
-    was_routes = (before["affects_routing"] and before["active"]
-                  and zones.applies_on(before))
+    # 28 Oct 2026 (task 0c): only a PERMANENT routing zone steers the main line, so only one re-routes lines that
+    # cross it (new) or passed near it (old). The legs whose record names this zone (baked round it — on live, every
+    # leg routed while Z003 was in force) are cleared whatever it is now: that is how a zone that gained dates gives
+    # its main lines back, and the page re-routes them.
+    now_routes = _permanent_routing(z)
+    was_routes = _permanent_routing(before)
     inval = zones.invalidate(
         zone_id=zone_id,
         new_geometry=(z["geometry"] if now_routes else None),
         # the old shape only matters if it was actually steering the router before
         old_geometry=(before["geometry"] if was_routes else None),
     )
-    return _zone_write_result(z, inval)
+    return _zone_write_result(z, inval, zone_id)
 
 
 @app.delete("/api/admin/zones/{zone_id}")
@@ -4795,8 +4865,7 @@ def delete_zone(zone_id: str, token: Optional[str] = None):
         out["access_road_of_gates"] = gates_cleared
         return out
 
-    was_routes = (before["affects_routing"] and before["active"]
-                  and zones.applies_on(before))
+    was_routes = _permanent_routing(before)          # 28 Oct 2026 (task 0c): a dated zone never steered the main line
     res = zones.delete_zone(zone_id)
     if res.get("error"):
         raise HTTPException(404, res["error"])
@@ -4804,7 +4873,7 @@ def delete_zone(zone_id: str, token: Optional[str] = None):
         zone_id=zone_id,
         old_geometry=(before["geometry"] if was_routes else None),
     )
-    return _zone_write_result({"deleted": zone_id, "was": before}, inval)
+    return _zone_write_result({"deleted": zone_id, "was": before}, inval, zone_id)
 
 
 @app.get("/api/admin/zones/{zone_id}/impact")

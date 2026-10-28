@@ -346,6 +346,7 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
                                     "material_type": r.get("material_type"),
                                     "vehicle_type": r.get("vehicle_type"), "ipt": r.get("ipt"),
                                     "discipline": r.get("discipline"), "section_id": r.get("section_id"),
+                                    "week_index": r.get("week_index"),   # 28 Oct 2026 (task 0c)
                                     "week": r}, factors, routes=routes, cache=cache, cost=cost)
         pf = derived.day_figures(r.get("planned_qty"), ctx, factors)
         r["rate_set"] = bool(ctx.get("rate_set"))
