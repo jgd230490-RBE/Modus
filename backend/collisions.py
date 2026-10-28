@@ -791,6 +791,12 @@ def has_hours(recs):
     return all("hour" in (c.get("detail") or {}) for c in recs)
 
 
+def hours_known(recs):
+    """The hours can be shown: every record has its hour — or, with no record near the route at all, the last fetch stored
+    the hours (so the sheet says there were none, never that the hours are still to come)."""
+    return has_hours(recs) if recs else bool(_detail(_meta_row()).get("hours"))
+
+
 def _h(t):
     return int(t[:2])
 
@@ -865,7 +871,9 @@ def gate_span(route_row, factors=None):
     spans = []
     for end in ("origin", "dest"):
         gid, lid = route_row.get(f"{end}_gate_id"), route_row.get(f"{end}_id")
-        gates = db.query("SELECT * FROM location_gates WHERE tenant_id = ? AND location_id = ? AND active = 1", (tenant, lid))
+        # 28 Oct 2026 (found on live, a 500): never compare `active` in SQL — BOOLEAN on Postgres, an integer in SQLite
+        gates = [g for g in db.query("SELECT * FROM location_gates WHERE tenant_id = ? AND location_id = ?", (tenant, lid))
+                 if g.get("active") not in (False, 0, "0", "false", "f")]
         if gid:
             gates = [g for g in gates if g["id"] == gid] or gates
         for g in gates:
@@ -1424,7 +1432,7 @@ def busy_hours(route_id, acc=None):
     keys = [(a, route_key(route_id, a)) for a in sorted(geo)] or [(0, route_key(route_id))]
     recs = records([k for _, k in keys])
     period = status()["period"]
-    if not recs or not has_hours(recs):
+    if not hours_known(recs):
         return {"shown": False, "offers": [], "period": period}
     cols = []
     for alt, key in keys:
@@ -1531,7 +1539,7 @@ def evidence(route_id, acc=None, now=None):
             g = next((v.get("loaded") for v in (geo.get(alt) or {}).values() if v.get("loaded")), None)
         return _coords(g["geometry"]) if g else []
     headline, alt_lines, hours_cols = [], [], []
-    hours_known = bool(recs) and has_hours(recs)     # 28 Oct 2026 (0d): counts by hour only once every record has its hour
+    hours_known_ = hours_known(recs)     # 28 Oct 2026 (0d): counts by hour once every record has its hour (or none is near)
     cyc0, turns0 = {"beside_m": [], "meets": []}, []
     for col in columns:
         line = loaded if not col["alt"] else leg_of(col["alt"])
@@ -1554,7 +1562,7 @@ def evidence(route_id, acc=None, now=None):
             "turns_cycle": sum(1 for x in turns if x["cycle"]) if grid is not None else None,
             "lorries": (plan["per_day"] if plan else None) if not col["alt"] else None,
             # 28 Oct 2026 (0d): the weekday busy bands, on the route
-            "busy": [band_sum(hc["weekday"], b) for b in BUSY_BANDS] if hours_known else None,
+            "busy": [band_sum(hc["weekday"], b) for b in BUSY_BANDS] if hours_known_ else None,
         })
     for x in turns0:
         x["words"] = f"{du_words(x['m'])} {du}"
@@ -1614,15 +1622,15 @@ def evidence(route_id, acc=None, now=None):
     # where the gap is clear (busy_offers). Offered, never switched.
     import gate_hours
     span = gate_span(r, factors)
-    offers = busy_offers(hours_cols) if hours_known else []
+    offers = busy_offers(hours_cols) if hours_known_ else []
     def km_of(alt):
         g = ((geo.get(alt) or {}).get(used) or {}).get("loaded")
         return float(g["distance_km"]) if g and g.get("distance_km") is not None else None
     _word_offers(offers, st["period"], km_of)
     time_of_day = {
-        "shown": hours_known, "bands": [{"from": a, "to": b} for a, b in BUSY_BANDS],
+        "shown": hours_known_, "bands": [{"from": a, "to": b} for a, b in BUSY_BANDS],
         "midday": {"from": MIDDAY[0], "to": MIDDAY[1]},
-        "columns": [{"label": lab, "alt": alt, **hc} for lab, alt, hc in hours_cols] if hours_known else [],
+        "columns": [{"label": lab, "alt": alt, **hc} for lab, alt, hc in hours_cols] if hours_known_ else [],
         "gates": {"from": gate_hours._hhmm(span[0]), "to": gate_hours._hhmm(span[1] % (24 * 60)) if span[1] < 24 * 60 else "24:00"} if span else None,
         "no_delivery": gate_hours.peak_bands(factors),
         "offers": offers, "offer_min": OFFER_MIN,
