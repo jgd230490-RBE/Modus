@@ -1357,6 +1357,10 @@
   <label class="rme-check"><input type="checkbox" id="rme-no-community"> Leave out the community considerations</label>
   <!-- 16 Oct 2026 (CLOCS v5 C1): the collision history is left off the plan unless this is ticked -->
   <label class="rme-check"><input type="checkbox" id="rme-collisions"> Add the collision history (killed or seriously injured only on the regional plan)</label>
+  <!-- 28 Oct 2026 (8e): the map's style; "As on screen" follows the basemap showing when it is one of the four -->
+  <label class="rme-field" for="rme-style">Map style</label>
+  <select id="rme-style"><option value="">As on screen</option><option value="light">Light</option><option value="streets">Streets</option>
+    <option value="outdoors">Outdoors</option><option value="aerial">Aerial (with names)</option></select>
   <div class="share-row"><button type="button" class="btn" id="rme-go" onclick="downloadRouteExport('pdf')">Download PDF</button>
     <button type="button" class="btn btn-ghost" id="rme-go-png" onclick="downloadRouteExport('png')">Download PNG</button></div>
   <p class="rme-note">PDF: to scale on A4 at 100 %. PNG: for Word; after resizing, use the scale bar.</p>
@@ -8910,6 +8914,15 @@
         if (p) p.hidden = true;
         if (RME.opener && RME.opener.focus) { try { RME.opener.focus(); } catch (e) {} }
     }
+    // 28 Oct 2026 (8e): the style the plan is drawn in — the box's pick, or (As on screen) the basemap showing when it is one of the
+    // four the server draws (Light, Streets, Outdoors, Aerial with names), else Light
+    const EXPORT_STYLE_OF = { 'mapbox://styles/mapbox/light-v11': 'light', 'mapbox://styles/mapbox/streets-v12': 'streets',
+        'mapbox://styles/mapbox/outdoors-v12': 'outdoors', 'mapbox://styles/mapbox/satellite-streets-v12': 'aerial' };
+    function exportMapStyle() {
+        const sel = document.getElementById('rme-style');
+        if (sel && sel.value) return sel.value;
+        return EXPORT_STYLE_OF[BASEMAP.pending || BASEMAP.shown] || 'light';
+    }
     function routeExportUrl(kind) {
         const q = routeExportQuery();
         const plan = document.getElementById('rme-plan').value;
@@ -8922,6 +8935,7 @@
         if (noc && noc.checked) q.set('community', '0');     // 14 Oct 2026: on unless the box leaves it out
         const col = document.getElementById('rme-collisions');
         if (col && col.checked) q.set('collisions', '1');     // 16 Oct 2026: off unless the box adds it
+        q.set('style', exportMapStyle());                      // 28 Oct 2026 (8e)
         return '/api/routes/map-export.' + (kind === 'png' ? 'png' : 'pdf') + '?' + q.toString();
     }
     async function downloadRouteExport(kind) {
