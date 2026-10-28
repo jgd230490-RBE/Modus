@@ -4479,6 +4479,14 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   })());
 }
 
+// 28 Oct 2026 (simulation v2 polish, seen on a local copy with an admin login)
+{
+  ok("SIM V2 polish: a road inside a site does not read 'Does nothing until it is attached to a route' (it is never routed through)",
+    src.includes("{!zoneForm.location_id && <p className=\"text-[13px] text-amber-800\">\n                      Does nothing until it is <strong>attached to a route</strong>"));
+  ok("SIM V2 polish: an area's coordinates open in the form rounded to 6 decimals (no float noise such as -0.8874029999999999)",
+    src.includes('lat: a.point ? String(Math.round(a.point[1] * 1e6) / 1e6) : ""') && src.includes('lon: a.point ? String(Math.round(a.point[0] * 1e6) / 1e6) : ""'));
+}
+
 console.log();
 for (const f of fail) console.log("  FAIL:", f);
 console.log(`\n${pass} passed, ${fail.length} failed`);
