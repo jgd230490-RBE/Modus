@@ -1844,7 +1844,7 @@ def lookahead_page(bucket: str = "commit", route_id: Optional[str] = None,
 
 
 @app.get("/api/lookahead/geometry")
-def lookahead_geometry(ids: str = "", vehicles: str = ""):
+def lookahead_geometry(ids: str = "", vehicles: str = "", bucket: str = "commit"):
     """
     10 Sep — the Commit view's week map. `ids` = comma-separated route ids (the lines the
     caller already sees), `vehicles` = the matching vehicle types, aligned by position and
@@ -1856,7 +1856,13 @@ def lookahead_geometry(ids: str = "", vehicles: str = ""):
     id_list = [x.strip() for x in ids.split(",") if x.strip()]
     veh_list = [x.strip() for x in vehicles.split(",")] if vehicles else []
     veh = {rid: v for rid, v in zip(id_list, veh_list) if v}
-    return {"routes": lookahead.week_geometry(id_list, veh)}
+    # 29 Oct 2026 (task 0c, PR B): the week on screen, so a route diverted that week is drawn on its diversion
+    try:
+        mi, wi = days.bucket_of("next" if bucket == "next" else "commit")
+        wk = days.bucket_dates(mi, wi) if mi is not None else None
+    except Exception:
+        wk = None
+    return {"routes": lookahead.week_geometry(id_list, veh, days=wk)}
 
 
 @app.get("/api/forecast-weeks/restrictions")

@@ -214,11 +214,22 @@ def _thin(coords, step_m=60.0):
 
 def strip_from_db():
     """The tenant's strip: every PRIMARY stored road route (both legs, every vehicle, duplicates thinned out)
-    and every site with a position."""
+    and every site with a position.
+    29 Oct 2026 (task 0c, PR B): + every stored option a dated zone's diversion uses (lorries drive it in those
+    months), so a fetch covers the schools and homes along a diversion too."""
     tenant = db.current_tenant()
     lines, seen = [], set()
-    for r in db.query("SELECT route_id, vehicle_profile, leg, geometry FROM route_geometry WHERE tenant_id = ? "
-                      "AND alt_index = 0 AND geometry IS NOT NULL", (tenant,)):
+    try:
+        import route_choice
+        use = route_choice.in_use()
+    except Exception:
+        use = {}
+    used_alt = {(rid, lg, a) for (rid, _p, lg), alts in use.items() for a in alts}
+    for r in db.query("SELECT route_id, vehicle_profile, leg, alt_index, geometry FROM route_geometry WHERE tenant_id = ? "
+                      "AND geometry IS NOT NULL", (tenant,)):
+        a = int(r.get("alt_index") or 0)
+        if a and (r["route_id"], r["leg"], a) not in used_alt:
+            continue
         try:
             coords = json.loads(r["geometry"]) if isinstance(r["geometry"], str) else r["geometry"]
         except Exception:

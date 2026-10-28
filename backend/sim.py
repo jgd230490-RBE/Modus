@@ -850,20 +850,36 @@ def mixer_m3(factors):
 
 
 # --------------------------------------------------------------------------------------------------- reading the day
-def _legs_for(route_ids, want_lines):
+def _legs_for(route_ids, want_lines, days=None):
     """
     Each (route, vehicle profile, leg) the day needs: its stored time and, when `want_lines`, the line, the haul
     roads it was routed along and their speeds. Primary option only (alt_index 0).
+
+    29 Oct 2026 (task 0c, PR B): with `days` (the period the day stands for: the month's or the week's working days,
+    or the one date), a leg a dated zone diverts on most of those days runs on that diversion
+    (route_choice.majority_alt) — its time, its line.
     """
     if not route_ids:
         return {}, {}
     marks = ",".join("?" * len(route_ids))
-    cols = "route_id, vehicle_profile, leg, duration_hr, distance_km, haul_zones" + (", geometry" if want_lines else "")
-    rows = db.query(f"SELECT {cols} FROM route_geometry WHERE tenant_id = ? AND alt_index = 0 "
+    cols = "route_id, vehicle_profile, leg, alt_index, duration_hr, distance_km, haul_zones" + (", geometry" if want_lines else "")
+    rows = db.query(f"SELECT {cols} FROM route_geometry WHERE tenant_id = ? "
                     f"AND route_id IN ({marks})", (db.current_tenant(), *route_ids))
-    per = {}
+    per, alts = {}, {}
     for r in rows:
-        per.setdefault(r["route_id"], {}).setdefault(r["vehicle_profile"], {})[r["leg"]] = r
+        a = int(r.get("alt_index") or 0)
+        if a:
+            alts[(r["route_id"], r["vehicle_profile"], r["leg"], a)] = r
+        else:
+            per.setdefault(r["route_id"], {}).setdefault(r["vehicle_profile"], {})[r["leg"]] = r
+    if days and alts:
+        import route_choice
+        for rid, profs in per.items():
+            for prof, legs in profs.items():
+                for leg in list(legs):
+                    a = route_choice.majority_alt(rid, prof, leg, days)
+                    if a and (rid, prof, leg, a) in alts:
+                        legs[leg] = alts[(rid, prof, leg, a)]
     zone_rows = {}
     if want_lines:
         for z in zones.list_zones(include_inactive=True):
@@ -1038,7 +1054,18 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
                             "laden_per_day": round(v["laden"], 3)} for g, v in per.items()]}
 
     # the routes' times (and lines): each line's OWN vehicle where it was worked out, else the first that was (said)
-    per, zone_rows = _legs_for(sorted({l["route_id"] for l in lines}), with_lines)
+    # 29 Oct 2026 (task 0c, PR B): the days this day stands for, so a leg diverted on most of them runs its diversion
+    try:
+        import route_choice
+        if scale == "month":
+            span_days = route_choice.month_days(int(month_index))
+        elif scale == "day":
+            span_days = [chosen]
+        else:
+            span_days = route_choice.week_days(int(week_block["month_index"]), int(week_block["week_index"]))
+    except Exception:
+        span_days = None
+    per, zone_rows = _legs_for(sorted({l["route_id"] for l in lines}), with_lines, days=span_days)
     speed = {z: (zone_rows[z].get("speed_kph") or 0) for z in zone_rows}
     legs, leg_minutes, leg_meta, used_zones = {}, {}, {}, set()
     for l in lines:

@@ -10767,7 +10767,8 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){
     let live = true;
     if(!ids.length){ setGeo({ routes: [] }); return; }
     const vehicles = ids.map(id => ((byRoute[id] || [])[0] || {}).vehicle_type || "");
-    fetch(`${API}/lookahead/geometry?ids=${encodeURIComponent(ids.join(","))}&vehicles=${encodeURIComponent(vehicles.join(","))}`)
+    // 29 Oct 2026 (task 0c, PR B): the week on screen, so a route diverted that week is drawn on its diversion
+    fetch(`${API}/lookahead/geometry?ids=${encodeURIComponent(ids.join(","))}&vehicles=${encodeURIComponent(vehicles.join(","))}&bucket=${bucket === "next" ? "next" : "commit"}`)
       .then(okJSON)
       .then(j => { if(live){ setGeo(j); setErr(""); } })
       .catch(e => { if(live) setErr(errSay("Couldn't load the week's routes for the map.", e)); });

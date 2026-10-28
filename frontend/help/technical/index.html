@@ -355,9 +355,16 @@ period's working days (Mon&ndash;Fri, bank holidays not removed), trips a lorry 
 <code>route_analysis(pairs=)</code> pairs a laden and an empty option; the month figures, costlines, carbon and Look-ahead go
 through it; the NO_WAY_ROUND flag; lorry limits are checked on options in use and count in the weeks their dates touch;
 <code>/api/public/map-data</code> carries <code>Diversion</code> features (months, periods, zone names) that the map swaps
-into the leg in those months; the route sheet adds a page per diversion. NOT yet following the month: shared road
-sections (busiest roads, heat map), council km, the bulletin's and CLP plans' maps, the Simulation, the collision and
-community strips (they read the main line). The table <code>route_choice</code> carries <code>hours_from</code> /
+into the leg in those months; the route sheet adds a page per diversion. Since 29 Oct 2026 (PR B) the rest follows too:
+the shared-road index (<code>road_sections.polylines_for</code>) and the council clip (<code>areas.compute</code>) also
+hold every option in use, keyed <code>R012@1</code> (<code>route_choice.leg_key</code>); a stretch only a route's main line
+and its own diversion share is not a shared road (owners counted by route); <code>road_load(month)</code> and the council
+month give each key its share of the month's working days (<code>route_choice.month_weights</code>) and list routes, not
+keys; the bulletin, export and CLP plan maps take the month's diversion (<code>bulletin_doc._geometries(month_index)</code>);
+the Look-ahead week map and its PDF the week's (<code>lookahead.week_geometry(days)</code>, the option used on most of the
+week's days); the Simulation's legs the period's (<code>sim._legs_for(days)</code>); a collision near an option in use
+is along a route (<code>collisions.along(in_use)</code>); the community strip covers the options in use (a Fetch again
+picks them up). The indexes are rebuilt when the set of options in use changes. The table <code>route_choice</code> carries <code>hours_from</code> /
 <code>hours_to</code> and <code>reason_kind</code> for task 0d's peak-hour choice (<code>offered</code> until accepted).</li>
 <li><strong>Haul roads.</strong> <em>Splice</em> assumes HERE has never heard of the road: route to one end, use the
 drawn line, route on from the other end (two HERE calls per leg). <em>Via</em> lets HERE find its own way through (one

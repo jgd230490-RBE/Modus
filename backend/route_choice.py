@@ -205,9 +205,11 @@ def refresh_zones():
     """
     rows = work_out()
     try:
-        before = {r["route_id"] for r in db.query(
-            "SELECT DISTINCT route_id FROM route_choice WHERE tenant_id = ? AND status = 'in_use' AND alt_index <> 0",
-            (db.current_tenant(),))}
+        _prev = db.query("SELECT route_id, vehicle_profile, leg, alt_index FROM route_choice WHERE tenant_id = ? "
+                         "AND status = 'in_use' AND alt_index <> 0 AND reason_kind = 'zone' AND source = 'auto'",
+                         (db.current_tenant(),))
+        before = {r["route_id"] for r in _prev}
+        before_use = {(r["route_id"], r["vehicle_profile"], r["leg"], int(r["alt_index"])) for r in _prev}
         db.execute("DELETE FROM route_choice WHERE tenant_id = ? AND reason_kind = 'zone' AND source = 'auto'",
                    (db.current_tenant(),))
     except Exception as e:
@@ -222,6 +224,16 @@ def refresh_zones():
             (db.current_tenant(), r["id"], r["route_id"], r["vehicle_profile"], r["leg"], r["alt_index"],
              r["starts_on"], r["ends_on"], None, None, "zone", r["reason_ref"], r["status"], "auto",
              r["km_delta"], now, now))
+    # 29 Oct 2026 (task 0c, PR B): the shared-road index and the council clip know the options in use — rebuilt when
+    # that set changed (a zone save, a way round, Keep the main route); a bake rebuilds them itself at its end
+    after = {(r["route_id"], r["vehicle_profile"], r["leg"], r["alt_index"]) for r in rows
+             if r["status"] == "in_use" and r["alt_index"]}
+    if after != before_use:
+        try:
+            import road_sections
+            road_sections._rebuild_quietly("diversions changed")
+        except Exception as e:
+            print("route_choice: shared roads not rebuilt:", str(e)[:120])
     # the lorry limits are checked on the options in use as well as the main line (limits.check_route)
     try:
         import limits
@@ -478,3 +490,69 @@ def needs_route(route_id=None):
         ids = seen.setdefault(k, set())
         ids.update(x for x in (r.get("reason_ref") or "").split(",") if x)
     return [(k[0], k[1], k[2], sorted(v)) for k, v in sorted(seen.items())]
+
+
+# --------------------------------------------------------------------------- #
+#  29 Oct 2026 (task 0c, PR B): the readers that follow the month — shared     #
+#  roads, councils, the bulletin / CLP / export maps, the Simulation and the  #
+#  collision / community strips                                               #
+# --------------------------------------------------------------------------- #
+def leg_key(route_id, alt):
+    """The key a stored option goes by in the indexes: the route's own id for its main line, "R012@1" for an option
+    (collisions.route_key's form, so one key names one stored line everywhere)."""
+    return str(route_id) if not int(alt or 0) else f"{route_id}@{int(alt)}"
+
+
+def base_of(key):
+    """The route id of an index key ("R012@1" → "R012")."""
+    return str(key).split("@", 1)[0]
+
+
+def in_use(profile=None, rows=None):
+    """{(route_id, profile, leg): {alt, …}} — the stored options a zone row has IN USE (alt ≠ 0) on some day; with
+    `profile`, only the rows that apply to it (a row for every lorry type, or that one)."""
+    rows = _rows_by_route() if rows is None else rows
+    out = {}
+    for rid, rs in rows.items():
+        for r in rs:
+            if r.get("status") != "in_use" or not int(r.get("alt_index") or 0):
+                continue
+            prof = r.get("vehicle_profile")
+            if profile is not None and prof not in (None, "", profile):
+                continue
+            legs = [r["leg"]] if r.get("leg") else ["loaded", "return"]
+            for leg in legs:
+                out.setdefault((rid, prof or profile, leg), set()).add(int(r["alt_index"]))
+    return out
+
+
+def in_use_keys(rows=None):
+    """{"R012@1", …}: every stored option a diversion uses on some day, whatever the lorry type and leg."""
+    return {leg_key(rid, a) for (rid, _p, _l), alts in in_use(rows=rows).items() for a in alts}
+
+
+def month_weights(route_id, profile, month_index, rows=None):
+    """
+    The month's working days split by option: {"loaded": {alt: share}, "return": {alt: share},
+    "pairs": [((loaded_alt, return_alt), share)]} — mix() over the month's days. A route no row touches is
+    {"loaded": {0: 1.0}, "return": {0: 1.0}, "pairs": [((0, 0), 1.0)]}.
+    """
+    m = mix(route_id, profile, month_days(int(month_index)), rows=rows)
+    out = {"loaded": {}, "return": {}, "pairs": m["pairs"]}
+    for (la, ra), w in m["pairs"]:
+        out["loaded"][la] = out["loaded"].get(la, 0.0) + w
+        out["return"][ra] = out["return"].get(ra, 0.0) + w
+    return out
+
+
+def majority_alt(route_id, profile, leg, days, rows=None):
+    """The option a route uses on MOST of these days (ties: the main line) — for a reader that draws one line for a
+    period (a week's map, the Simulation's average day)."""
+    rows = _rows_by_route() if rows is None else rows
+    if not days or not has_rows(route_id, rows):
+        return 0
+    n = {}
+    for d in days:
+        a = alt_on(route_id, profile, leg, d, rows=rows)
+        n[a] = n.get(a, 0) + 1
+    return max(sorted(n), key=lambda a: (n[a], a == 0))
