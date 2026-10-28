@@ -2993,6 +2993,7 @@ CE_INK = "#27272A"               # the collision symbol: one ink, size by severi
 # is drawn as a square in its own ink — an identifying colour, not a status colour (no red / amber / green)
 CE_LORRY = "#6D28D9"
 CE_ALT = "#71717A"               # an alternative route: grey under the route (solid since 23 Oct 2026, as on the map)
+CE_BUSY = CE_INK                  # 28 Oct 2026 (0d): the busy hours' mark under the hour axis (no hue claims a meaning)
 CE_RADIUS = {1: 4.4, 2: 3.2, 3: 2.2}
 CE_MAP_H_MM = 92.0
 
@@ -3212,6 +3213,10 @@ def collision_headline_rows(S):
         ["Length"] + cells(lambda h: h.get("length") or "—"),
         [f"Collisions on the route ({S['on_route_m']} m), {S['period']}"] + cells(lambda h: str(h["on"])),
         ["…killed or seriously injured (KSI)"] + cells(lambda h: f"{h['ksi']}" + (f" ({h['fatal']} fatal)" if h["fatal"] else "")),
+        # 28 Oct 2026 (0d): the weekday busy bands, once every collision carries its hour
+        *([[f"…on weekdays {b['from']}–{b['to']}"] + cells(lambda h, i=i: str(h["busy"][i]))
+           for i, b in enumerate((S.get("time_of_day") or {}).get("bands") or [])]
+          if (S.get("time_of_day") or {}).get("shown") and all(h.get("busy") is not None for h in H) else []),
         ["…a vulnerable road user KSI"] + cells(lambda h: str(h["vru_ksi"])),
         ["…a cyclist hurt (KSI)"] + cells(lambda h: f"{h['cyclist']} ({h['cyclist_ksi']})"),
         ["…a goods vehicle over 3.5 t involved"] + cells(lambda h: str(h["goods"])),
@@ -3280,6 +3285,77 @@ def collision_count_fold(S):
     if other:
         out.append("Every column is 0 for: " + "; ".join(o[0].lower() + o[1:] for o in other) + ".")
     return keep, out
+
+
+def _ce_time_of_day(c, S, m, y, cw, R, B, para, new_page, footer_h):
+    """The evidence sheet's "By time of day" block (0d, 28 Oct 2026); returns the new y."""
+    T = S.get("time_of_day") or {}
+    if y - 40 < m + footer_h:
+        y = new_page()
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 10.5); c.drawString(m, y - 10.5, "By time of day")
+    y -= 14
+    if not T.get("shown"):
+        return para("The hour of each collision comes with the next fetch of the collision history (Config, Map and bulletin, "
+                    "Fetch now).", y, 7.4, NAVY_RGB) - 8
+    cols = T["columns"][:3]
+    ch = 72                                     # the bars' height
+    need = ch + 60
+    if y - need < m + footer_h:
+        y = new_page()
+    gap = 14
+    w1 = (cw - gap * (len(cols) - 1)) / len(cols)
+    top = max([1] + [max(col["weekday"]) for col in cols])
+    gates = T.get("gates")
+    g0 = int(gates["from"][:2]) + int(gates["from"][3:]) / 60 if gates else None
+    g1 = int(gates["to"][:2]) + int(gates["to"][3:]) / 60 if gates else None
+    nod = [(int(b["from"][:2]) + int(b["from"][3:]) / 60, int(b["to"][:2]) + int(b["to"][3:]) / 60) for b in T.get("no_delivery") or []]
+    busy = [(int(b["from"][:2]), int(b["to"][:2])) for b in T["bands"]]
+    for k_, col in enumerate(cols):
+        x0 = m + k_ * (w1 + gap)
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 7.4)
+        c.drawString(x0, y - 7.4, _pdf_safe(col["label"] + (f" ({S['route_id']})" if not col["alt"] else "")))
+        base = y - 12 - ch
+        bw = w1 / 24
+        if gates:                                          # the hours the route's gates are open, shaded
+            c.setFillColorRGB(0.91, 0.94, 0.995); c.rect(x0 + g0 * bw, base, (g1 - g0) * bw, ch, stroke=0, fill=1)
+        for a_, b_ in nod:                                 # the scheme's no-delivery bands, hatched
+            c.saveState()
+            p_ = c.beginPath(); p_.rect(x0 + a_ * bw, base, (b_ - a_) * bw, ch); c.clipPath(p_, stroke=0, fill=0)
+            c.setStrokeColorRGB(0.96, 0.7, 0.7); c.setLineWidth(0.6)
+            for t_ in range(-12, int((b_ - a_) * bw) + 12, 4):
+                c.line(x0 + a_ * bw + t_, base, x0 + a_ * bw + t_ + ch, base + ch)
+            c.restoreState()
+        for h_, n_ in enumerate(col["weekday"]):
+            if n_:
+                bh_ = n_ / top * (ch - 9)
+                c.setFillColorRGB(*(_hex_rgb(RS_LOADED) if not col["alt"] else _hex_rgb(CE_ALT)))
+                c.rect(x0 + h_ * bw + 0.6, base, bw - 1.2, bh_, stroke=0, fill=1)
+                c.setFillColorRGB(*GREY); c.setFont(R, 5.2); c.drawCentredString(x0 + (h_ + 0.5) * bw, base + bh_ + 1.4, str(n_))
+        c.setStrokeColorRGB(*GREY); c.setLineWidth(0.5); c.line(x0, base, x0 + w1, base)
+        c.setFillColorRGB(*_hex_rgb(CE_BUSY))
+        for a_, b_ in busy:                                # the busy bands, under the axis
+            c.rect(x0 + a_ * bw, base - 3.4, (b_ - a_) * bw, 2.2, stroke=0, fill=1)
+        c.setFillColorRGB(*GREY); c.setFont(R, 6)
+        for h_ in (0, 6, 12, 18, 24):
+            c.drawCentredString(min(max(x0 + h_ * bw, x0 + 4), x0 + w1 - 4), base - 10.5, f"{h_:02d}")
+    y -= 12 + ch + 16
+    key = []
+    if gates:
+        key.append(f"shaded: the route's gates open ({gates['from']}–{gates['to']})")
+    if nod:
+        key.append("hatched: no deliveries (the scheme's bands, " + ", ".join(f"{b['from']}–{b['to']}" for b in T["no_delivery"]) + ")")
+    key.append("under the axis: the busy hours " + " and ".join(f"{b['from']}–{b['to']}" for b in T["bands"]))
+    y = para("Weekday collisions on the route by the hour they happened, " + S["period"] + ". " + "; ".join(key) + ".", y, 6.8)
+    for o in T.get("offers") or []:
+        y = para(o["words"] + (f" {o['label']} is {o['extra']}." if o.get("extra") else ""), y - 2, 7.6, NAVY_RGB)
+    if not T.get("offers") and len(T["columns"]) > 1:
+        y = para("No alternative had clearly fewer in the busy hours.", y - 2, 7.6, NAVY_RGB)
+    we = "; ".join(f"{col['weekend']} on {('this route' if not col['alt'] else col['label'])}" for col in T["columns"])
+    unk = sum(col.get("unknown") or 0 for col in T["columns"])
+    y = para(f"Weekends: {we}." + (f" {unk} had no hour or day recorded." if unk else "") + " Counts only, never divided by "
+             f"traffic or length. A sentence appears only where this route had at least {T['offer_min']} in those hours and the "
+             "gap is too big to be chance (technical guide T9). Nothing is switched.", y - 1, 6.6) - 8
+    return y
 
 
 def build_collision_evidence_pdf(S):
@@ -3380,7 +3456,7 @@ def build_collision_evidence_pdf(S):
             c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 6.9); c.drawString(m + 2, y - 7.2, _pdf_safe(row[0]))
             for j, val in enumerate(row[1:]):
                 c.setFont(B if j == 0 else R, 6.9)
-                if i == 5:
+                if row[0].startswith("…a goods vehicle"):      # by its words: the busy-hour rows (0d) move it down
                     c.setFillColorRGB(*_hex_rgb(CE_LORRY))
                 else:
                     c.setFillColorRGB(*NAVY_RGB)
@@ -3694,6 +3770,11 @@ def build_collision_evidence_pdf(S):
              "of every route on that stretch in the month named, one movement being one load there and back; two figures "
              "are the lowest and the highest along the stretch. A cycle route is beside the route within "
              f"{cl.CYCLE_BESIDE_M} m and meets it within {cl.CYCLE_MEETS_M} m.", y - 2, 6.8) - 8
+
+    # by time of day — 28 Oct 2026 (0d, John's yes to notes\collision-time-mockup-1028): weekday collisions on each road
+    # route by the hour they happened, the same scale side by side; the hours its gates are open shaded, the scheme's
+    # no-delivery bands hatched, the busy bands marked under the axis; one sentence only where the gap is clear
+    y = _ce_time_of_day(c, S, m, y, cw, R, B, para, new_page, footer_h)
 
     # compared with roads like these — 22 Oct 2026 (v3 part 2; the user: "nothing to compare it to"; R5 reversed for this
     # one comparison, at the user's word): a count and the range a typical road would show, never a ratio or a verdict
@@ -4034,6 +4115,50 @@ def build_collision_evidence_xlsx(S):
     for i, row in enumerate(hrows, 2):
         for j, v in enumerate(row, 1):
             wr_.cell(row=i, column=j, value=v)
+    # 28 Oct 2026 (0d): by time of day — weekday collisions on each road route by hour, the bands, the weekends; counts
+    # only (no collision's own hour anywhere in the workbook)
+    T = S.get("time_of_day") or {}
+    wh = wb.create_sheet("By time of day")
+    if not T.get("shown"):
+        wh.cell(row=1, column=1, value="The hour of each collision comes with the next fetch of the collision history "
+                                       "(Config, Map and bulletin, Fetch now).")
+    else:
+        wh.cell(row=1, column=1, value=(f"Weekday collisions on the route ({S['on_route_m']} m) by the hour they happened, "
+                                        f"{S['period']}. Counts only."))
+        header(wh, ["Hour"] + [f"{col['label']}, weekdays" for col in T["columns"]], row=3)
+        wh.column_dimensions["A"].width = 26
+        for h_ in range(24):
+            wh.cell(row=4 + h_, column=1, value=f"{h_:02d}:00–{(h_ + 1) % 24:02d}:00" if h_ < 23 else "23:00–24:00")
+            for j, col in enumerate(T["columns"], 2):
+                wh.cell(row=4 + h_, column=j, value=col["weekday"][h_])
+        r_ = 28
+        for lab, band in ([(f"Weekdays {b['from']}–{b['to']}", b) for b in T["bands"][:1]]
+                          + [(f"Weekdays {T['midday']['from']}–{T['midday']['to']}", T["midday"])]
+                          + [(f"Weekdays {b['from']}–{b['to']}", b) for b in T["bands"][1:]]):
+            wh.cell(row=r_, column=1, value=lab).font = Font(bold=True)
+            for j, col in enumerate(T["columns"], 2):
+                wh.cell(row=r_, column=j, value=cl.band_sum(col["weekday"], (band["from"], band["to"])))
+            r_ += 1
+        wh.cell(row=r_, column=1, value="Weekends, all hours").font = Font(bold=True)
+        for j, col in enumerate(T["columns"], 2):
+            wh.cell(row=r_, column=j, value=col["weekend"])
+        r_ += 1
+        if any(col.get("unknown") for col in T["columns"]):
+            wh.cell(row=r_, column=1, value="No hour or day recorded")
+            for j, col in enumerate(T["columns"], 2):
+                wh.cell(row=r_, column=j, value=col.get("unknown") or 0)
+            r_ += 1
+        r_ += 1
+        for o in T.get("offers") or []:
+            wh.cell(row=r_, column=1, value=o["words"] + (f" {o['label']} is {o['extra']}." if o.get("extra") else ""))
+            r_ += 1
+        if T.get("gates"):
+            wh.cell(row=r_, column=1, value=f"The route's gates are open {T['gates']['from']}–{T['gates']['to']}.")
+            r_ += 1
+        if T.get("no_delivery"):
+            wh.cell(row=r_, column=1, value="No deliveries (the scheme's bands): "
+                                            + ", ".join(f"{b['from']}–{b['to']}" for b in T["no_delivery"]) + ".")
+        wh.freeze_panes = "A4"
     wl = wb.create_sheet("Lorries")
     header(wl, [f"Distance from A ({du})", "Road", "Junction", "Severity", "Goods vehicle", "Articulated", "Turning or waiting to turn left",
                 "On a journey for work", "Vulnerable road users hurt", "Year", "DfT collision reference"])

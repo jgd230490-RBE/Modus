@@ -11421,6 +11421,19 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                         haulRoads, token, onHaulChanged, originId, destId, gateBlockers }){
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(null);
+
+  // 28 Oct 2026 (task 0d): an alternative with clearly fewer collisions on it in the weekday busy hours, offered under the
+  // options; nothing is switched. A failed read shows nothing (the line is an extra).
+  useEffect(() => {
+    let live = true;
+    setBusy(null);
+    fetch(`${API}/routes/${encodeURIComponent(routeId)}/collision-hours`)
+      .then(okJSON)
+      .then(j => { if(live) setBusy(j); })
+      .catch(e => { console.warn("Wayscope:", e); });
+    return () => { live = false; };
+  }, [routeId]);
 
   useEffect(() => {
     let live = true;
@@ -11555,6 +11568,13 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
             <p className="text-[13px] text-slate-400 mt-1">
               Click a row to show that option on the map. “Make primary” makes an alternative the route the plan uses.
             </p>
+            {busy && busy.shown && (busy.offers || []).map(o => (
+              <p key={o.alt} className="text-[13px] mt-2" data-busy-hours={o.alt}>
+                Busy hours, weekdays: <span className="font-semibold" style={{ color: "var(--navy)" }}>{o.label}</span> had
+                fewer collisions on it. {o.bands.map(b => `${b.from}–${b.to}: ${b.alt} against ${b.route}.`).join(" ")}{" "}
+                <span className="text-slate-400">{busy.period}.</span>
+              </p>
+            ))}
           </div>
         )}
       </td>

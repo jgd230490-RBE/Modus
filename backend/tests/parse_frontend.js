@@ -4058,6 +4058,22 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
     ok(`⭐ ERROR WORDS: no failure message carries ${what}`, !hit, hit ? hit[0] : "");
   }
   ok("ERROR WORDS: the Config JSON editor keeps its own parse error (the person's text, not a reply)", src.includes('setRawErr("Not valid JSON: " + e.message)'));
+
+// 28 Oct 2026 (task 0d, John's yes to notes\collision-time-mockup-1028, card 5): the busy-hours line under a route's options
+{
+  const ra = src.slice(src.indexOf("function RouteAnalysis("), src.indexOf("// Material categories a location supplies"));
+  ok("BUSY HOURS: the route's options read /collision-hours once per route", ra.includes("/collision-hours`)") && ra.includes("}, [routeId]);"));
+  ok("BUSY HOURS: the line shows only when every collision has its hour and an alternative is offered",
+     ra.includes("busy && busy.shown && (busy.offers || []).map(") && ra.includes("data-busy-hours={o.alt}"));
+  ok("BUSY HOURS: counts against counts with the years, in a few words",
+     ra.includes("Busy hours, weekdays: ") && ra.includes("had\n                fewer collisions on it.")
+     && ra.includes("`${b.from}–${b.to}: ${b.alt} against ${b.route}.`") && ra.includes("{busy.period}."));
+  ok("BUSY HOURS: offered, never applied: no button and no write in the line (task 0c's choice comes later)",
+     !/Use (Alt|it) in these hours/.test(src) && !/collision-hours[^\n]*method/.test(ra));
+  ok("BUSY HOURS: no rate, score or verdict word in the line",
+     !/(risk|safer|safest|dangerous|rate\b|per (km|mile)|predict)/i.test(ra.slice(ra.indexOf("Busy hours, weekdays"), ra.indexOf("Busy hours, weekdays") + 400)));
+  ok("BUSY HOURS: a failed read shows nothing and goes to the console only", ra.includes('.catch(e => { console.warn("Wayscope:", e); });'));
+}
   for (const f of ["const ERR_WORDS = {", "function errSentence(", "function errWords(", "function errLog(", "function errOf(",
                    "async function errFrom(", "async function okJSON(", "function errMsg(", "function errSay("])
     ok(`ERROR WORDS: the helper ${f.replace(/[({ =]+$/, "")} is defined once`, src.split(f).length === 2);

@@ -32,7 +32,16 @@ flattens after 20 m, and 25 m allows for a dual carriageway).
 WHO SEES IT (R6)
 ----------------
 Staff only. The public map and the bulletin never show it. A collision is stored with its year and month, never its day
-or time.
+or time. 28 Oct 2026 (task 0d, John's yes to notes/collision-time-mockup-1028): its HOUR (0-23) and whether it fell Monday
+to Friday are kept too, in detail_json, for counts by time of day only — no screen, popup or sheet prints one collision's
+hour, and the date and the minute are still never stored.
+
+BUSY HOURS (0d)
+---------------
+The evidence counts each route's and alternative's collisions ON the route on weekdays by hour, and in the two busy bands
+(BUSY_BANDS, chosen before looking at any route). An alternative is OFFERED for a band only when the route had at least
+OFFER_MIN there in the five years and an exact test on the two counts says a gap this big comes by chance less than
+OFFER_P of the time (busy_offers). Offered only: nothing is switched; applying it waits for task 0c's route_choice.
 """
 import csv
 import json
@@ -281,6 +290,7 @@ def read_collisions(path, index, year=None):
             sev = 3
         d = (r.get("date") or "").strip()          # dd/mm/yyyy: only the month is kept (R6)
         month = f"{d[6:10]}-{d[3:5]}" if len(d) == 10 and d[2] == "/" else None
+        hour, weekday = _hour_of(r.get("time")), _weekday_of(d, r.get("day_of_week"))
         yr = r.get("collision_year") or (month[:4] if month else year)
         out[r["collision_index"]] = {
             "collision_id": r["collision_index"],
@@ -302,11 +312,31 @@ def read_collisions(path, index, year=None):
             "detail": {"urban": int(r["urban_or_rural_area"]) if str(r.get("urban_or_rural_area") or "").strip() in ("1", "2") else None,
                        # DfT's probability that a collision is serious once severity recording is adjusted (fatal = 1):
                        # the observed figure beside DfT's adjusted fatal-or-serious rates
-                       "adj_serious": _adj(r.get("collision_adjusted_severity_serious"))},
+                       "adj_serious": _adj(r.get("collision_adjusted_severity_serious")),
+                       # 28 Oct 2026 (0d, John's yes to notes\collision-time-mockup-1028): the hour (0-23) and whether it was
+                       # Monday to Friday — never the date or the minute; only counts by hour are ever shown (R6)
+                       "hour": hour, "weekday": weekday},
             "dist_m": min(list(routes.values()) + list(sites.values())),
             "routes": routes, "sites": sites,
         }
     return out
+
+
+def _hour_of(t):
+    """DfT's time "HH:MM" -> its hour, 0-23 (None when blank or not a time)."""
+    t = str(t or "").strip()
+    h = t.split(":")[0] if ":" in t else ""
+    return int(h) if h.isdigit() and 0 <= int(h) <= 23 else None
+
+
+def _weekday_of(d, dow=None):
+    """True Monday to Friday, False at the weekend, from the date (dd/mm/yyyy); DfT's day_of_week (1 = Sunday … 7 =
+    Saturday) when the date does not read. None when neither does."""
+    try:
+        return date(int(d[6:10]), int(d[3:5]), int(d[0:2])).weekday() < 5
+    except (TypeError, ValueError, IndexError):
+        v = str(dow or "").strip()
+        return (v not in ("1", "7")) if v in ("1", "2", "3", "4", "5", "6", "7") else None
 
 
 def _code(r, field):
@@ -491,6 +521,7 @@ def status():
             "strip": {"route_m": NEAR_ROUTE_M, "site_m": NEAR_SITE_M, "on_route_m": ON_ROUTE_M},
             "counts": n, "alternatives_only": alt, "source": SOURCE,
             "vehicle_details": bool(det.get("vehicle_details")),
+            "hours": bool(det.get("hours")),
             "credit": credit_line() if n["all"] or alt["all"] or years else "",
             "name": LAYER_NAME, "what": WHAT}
 
@@ -635,6 +666,7 @@ def refresh(by=None, fetchers=None, index=None, today=None):
     if back:
         det["notes"].append(f"The {last} data is not published yet; the latest five final years are {period_words(years)}.")
     det["vehicle_details"] = True     # 22 Oct 2026 (v3): rows fetched from here on carry detail_json
+    det["hours"] = True               # 28 Oct 2026 (0d): ...and the hour and weekday
     _write_meta("done", det, fetched_at=now)
     return status()
 
@@ -744,6 +776,106 @@ def counts_for(recs, key, rows=None):
 def has_details(recs):
     """True when every record carries the v3 vehicle details (fetched after 22 Oct 2026)."""
     return all("goods_types" in (c.get("detail") or {}) for c in recs)
+
+
+# 28 Oct 2026 (0d): the busy hours, weekdays — the CLP form's example bands, fixed before any route is looked at (John's
+# yes, Q1); the middle of the day is shown beside them, never offered on
+BUSY_BANDS = [("07:00", "10:00"), ("16:00", "19:00")]
+MIDDAY = ("10:00", "16:00")
+OFFER_MIN = 10        # the route had at least this many on it in the band over the five years...
+OFFER_P = 0.05        # ...and a gap this big comes by chance less than 1 time in 20 (an exact test on the two counts)
+
+
+def has_hours(recs):
+    """True when every record carries the hour and weekday (fetched after 28 Oct 2026)."""
+    return all("hour" in (c.get("detail") or {}) for c in recs)
+
+
+def _h(t):
+    return int(t[:2])
+
+
+def hour_counts(recs):
+    """{'weekday': [24 counts by hour, Monday to Friday], 'weekend': n, 'unknown': n (no hour or no day recorded)}."""
+    wk, we, unk = [0] * 24, 0, 0
+    for c in recs:
+        d = c.get("detail") or {}
+        h, w = d.get("hour"), d.get("weekday")
+        if h is None or w is None:
+            unk += 1
+        elif w:
+            wk[h] += 1
+        else:
+            we += 1
+    return {"weekday": wk, "weekend": we, "unknown": unk}
+
+
+def band_sum(hours, band):
+    a, b = _h(band[0]), _h(band[1])
+    return sum(hours[a:b])
+
+
+def chance_of_fewer(route_n, alt_n):
+    """One-sided exact test on two counts on an equal footing: the chance that the alternative's share of the pair is
+    as small as this or smaller, were each collision as likely on either (Binomial(route_n + alt_n, 1/2))."""
+    n = route_n + alt_n
+    if n == 0:
+        return 1.0
+    return sum(math.comb(n, k) for k in range(alt_n + 1)) / 2 ** n
+
+
+def busy_offers(columns_hours):
+    """[(label, alt, [{band, route, alt}], midday)] — for each alternative, the busy bands where it had clearly fewer on it
+    than this route (OFFER_MIN, OFFER_P). columns_hours: [(label, alt_index, hour_counts)], this route first."""
+    if not columns_hours or columns_hours[0][1]:
+        return []
+    r_hours = columns_hours[0][2]["weekday"]
+    out = []
+    for label, alt, hc in columns_hours[1:]:
+        bands = []
+        for band in BUSY_BANDS:
+            rn, an = band_sum(r_hours, band), band_sum(hc["weekday"], band)
+            if rn >= OFFER_MIN and chance_of_fewer(rn, an) < OFFER_P:
+                bands.append({"from": band[0], "to": band[1], "route": rn, "alt": an})
+        if bands:
+            out.append({"label": label, "alt": alt, "bands": bands,
+                        "midday": {"from": MIDDAY[0], "to": MIDDAY[1], "route": band_sum(r_hours, MIDDAY),
+                                   "alt": band_sum(hc["weekday"], MIDDAY)}})
+    return out
+
+
+def offer_words(o, period, short=False):
+    """'Alternative 1 had fewer in the busy hours: 5 against 17 (07:00–10:00) and …, weekdays 2021–2025.' (short: the
+    Routes page's line)."""
+    bands = [f"{b['alt']} against {b['route']} ({b['from']}–{b['to']})" for b in o["bands"]]
+    joined = bands[0] if len(bands) == 1 else ", ".join(bands[:-1]) + " and " + bands[-1]
+    if short:
+        return f"{o['label']} had fewer collisions on it in the busy hours: {joined}, weekdays {period}."
+    mid = o["midday"]
+    rest = (f" Between {mid['from']} and {mid['to']}: {mid['alt']} against {mid['route']}." if mid else "")
+    return f"{o['label']} had fewer in the busy hours: {joined}, weekdays {period}.{rest}"
+
+
+def gate_span(route_row, factors=None):
+    """(from, to) in minutes: the earliest a gate at either end of the route opens to the latest one shuts (each gate's
+    own hours, else the default gate hours) — the hours the route's lorries can be on the road. No gate at either end:
+    the default gate hours."""
+    import gate_hours
+    tenant = db.current_tenant()
+    spans = []
+    for end in ("origin", "dest"):
+        gid, lid = route_row.get(f"{end}_gate_id"), route_row.get(f"{end}_id")
+        gates = db.query("SELECT * FROM location_gates WHERE tenant_id = ? AND location_id = ? AND active = 1", (tenant, lid))
+        if gid:
+            gates = [g for g in gates if g["id"] == gid] or gates
+        for g in gates:
+            (a, b), _basis = gate_hours.effective_window(g, factors)
+            if a is not None and b is not None:
+                spans.append((a, b) if b > a else (0, 24 * 60))     # a gate open past midnight: the whole day
+    if not spans:
+        d = gate_hours.default_hours(factors)
+        return gate_hours.minutes_of(d["from"]), gate_hours.minutes_of(d["to"])
+    return min(a for a, _ in spans), max(b for _, b in spans)
 
 
 def _chainage(index, line, p):
@@ -1249,6 +1381,65 @@ class EvidenceError(LookupError):
     """No such route (for this tenant, or for this team code)."""
 
 
+def _route_row(route_id, acc=None):
+    """The route's row; EvidenceError when there is none, or when a team code asks for another team's route."""
+    rows = db.query("SELECT * FROM routes WHERE tenant_id = ? AND id = ?", (db.current_tenant(), route_id))
+    if not rows:
+        raise EvidenceError(f"no route {route_id}")
+    r = rows[0]
+    own = (acc or {}).get("ipt") if isinstance(acc, dict) else None
+    if own:
+        import access
+        if (access.canonical_ipt(r.get("ipt")) or r.get("ipt")) != (access.canonical_ipt(own) or own):
+            raise EvidenceError(f"no route {route_id}")
+    return r
+
+
+def _word_offers(offers, period, km_of):
+    """Each offer's words, and how much longer or shorter the alternative is (the loaded leg, the tenant's unit)."""
+    import export
+    du = export._du()
+    r_km = km_of(0)
+    for o in offers:
+        a_km = km_of(o["alt"])
+        if a_km is not None and r_km is not None:
+            o["extra"] = f"{export._dist(abs(a_km - r_km)):.1f} {du} {'longer' if a_km >= r_km else 'shorter'} each way"
+        o["words"] = offer_words(o, period)
+        o["short"] = offer_words(o, period, short=True)
+    return offers
+
+
+def busy_hours(route_id, acc=None):
+    """
+    28 Oct 2026 (0d): the Routes page's line under a route's options — the alternatives that had clearly fewer collisions on
+    them in the weekday busy hours (busy_offers), read from the stored collisions and the stored road routes only (no
+    map, plan or traffic: quick). {"shown": every record has its hour, "offers": [...], "period"}. Offered, never applied.
+    """
+    import network
+    _route_row(route_id, acc)
+    geo = {}
+    for g in db.query("SELECT alt_index, vehicle_profile, distance_km FROM route_geometry WHERE tenant_id = ? AND route_id = ? "
+                      "AND leg = 'loaded' AND geometry IS NOT NULL", (db.current_tenant(), route_id)):
+        geo.setdefault(int(g.get("alt_index") or 0), {})[g["vehicle_profile"]] = g.get("distance_km")
+    keys = [(a, route_key(route_id, a)) for a in sorted(geo)] or [(0, route_key(route_id))]
+    recs = records([k for _, k in keys])
+    period = status()["period"]
+    if not recs or not has_hours(recs):
+        return {"shown": False, "offers": [], "period": period}
+    cols = []
+    for alt, key in keys:
+        on_c = [c for c in recs if c["routes"].get(key, 1e9) <= ON_ROUTE_M]
+        cols.append(("This route" if not alt else f"Alt {alt}", alt, hour_counts(on_c)))
+    prim = geo.get(0) or {}
+    used = network.DEFAULT_PROFILE if network.DEFAULT_PROFILE in prim else (sorted(prim)[0] if prim else None)
+
+    def km_of(alt):
+        v = (geo.get(alt) or {}).get(used)
+        return float(v) if v is not None else None
+    offers = _word_offers(busy_offers(cols) if cols and not cols[0][1] else [], period, km_of)
+    return {"shown": True, "offers": offers, "period": period}
+
+
 def evidence(route_id, acc=None, now=None):
     """
     Everything one Route collision evidence sheet prints, as data: the route, the period, the counts on the route and
@@ -1261,15 +1452,7 @@ def evidence(route_id, acc=None, now=None):
     import export
     import bulletin_doc
     tenant = db.current_tenant()
-    rows = db.query("SELECT * FROM routes WHERE tenant_id = ? AND id = ?", (tenant, route_id))
-    if not rows:
-        raise EvidenceError(f"no route {route_id}")
-    r = rows[0]
-    own = (acc or {}).get("ipt") if isinstance(acc, dict) else None
-    if own:
-        import access
-        if (access.canonical_ipt(r.get("ipt")) or r.get("ipt")) != (access.canonical_ipt(own) or own):
-            raise EvidenceError(f"no route {route_id}")
+    r = _route_row(route_id, acc)
     locs = {l["id"]: l for l in db.query("SELECT id, name FROM locations WHERE tenant_id = ? AND id IN (?, ?)",
                                          (tenant, r["origin_id"], r["dest_id"]))}
     geo = {}
@@ -1347,7 +1530,8 @@ def evidence(route_id, acc=None, now=None):
         if not g:
             g = next((v.get("loaded") for v in (geo.get(alt) or {}).values() if v.get("loaded")), None)
         return _coords(g["geometry"]) if g else []
-    headline, alt_lines = [], []
+    headline, alt_lines, hours_cols = [], [], []
+    hours_known = bool(recs) and has_hours(recs)     # 28 Oct 2026 (0d): counts by hour only once every record has its hour
     cyc0, turns0 = {"beside_m": [], "meets": []}, []
     for col in columns:
         line = loaded if not col["alt"] else leg_of(col["alt"])
@@ -1358,6 +1542,8 @@ def evidence(route_id, acc=None, now=None):
         if not col["alt"]:
             cyc0, turns0 = cyc, turns
         on_c = [c for c in recs if c["routes"].get(col["key"], 1e9) <= ON_ROUTE_M]
+        hc = hour_counts(on_c)
+        hours_cols.append((col["label"], col["alt"], hc))
         headline.append({
             "label": col["label"], "length": col.get("length"), "on": len(on_c),
             "ksi": sum(1 for c in on_c if c["ksi"]), "fatal": sum(1 for c in on_c if c["severity"] == 1),
@@ -1367,6 +1553,8 @@ def evidence(route_id, acc=None, now=None):
             "meets": len(cyc["meets"]) if grid is not None else None, "turns": len(turns),
             "turns_cycle": sum(1 for x in turns if x["cycle"]) if grid is not None else None,
             "lorries": (plan["per_day"] if plan else None) if not col["alt"] else None,
+            # 28 Oct 2026 (0d): the weekday busy bands, on the route
+            "busy": [band_sum(hc["weekday"], b) for b in BUSY_BANDS] if hours_known else None,
         })
     for x in turns0:
         x["words"] = f"{du_words(x['m'])} {du}"
@@ -1421,6 +1609,24 @@ def evidence(route_id, acc=None, now=None):
     st = status()
     factors = conversions.load_factors()
     notice = export._demo_notice() or None
+    # 28 Oct 2026 (0d): by time of day — each road route's weekday hours on the route, the busy bands, the hours the
+    # route's lorries can be on the road (its gates) and the scheme's no-delivery bands; an alternative offered only
+    # where the gap is clear (busy_offers). Offered, never switched.
+    import gate_hours
+    span = gate_span(r, factors)
+    offers = busy_offers(hours_cols) if hours_known else []
+    def km_of(alt):
+        g = ((geo.get(alt) or {}).get(used) or {}).get("loaded")
+        return float(g["distance_km"]) if g and g.get("distance_km") is not None else None
+    _word_offers(offers, st["period"], km_of)
+    time_of_day = {
+        "shown": hours_known, "bands": [{"from": a, "to": b} for a, b in BUSY_BANDS],
+        "midday": {"from": MIDDAY[0], "to": MIDDAY[1]},
+        "columns": [{"label": lab, "alt": alt, **hc} for lab, alt, hc in hours_cols] if hours_known else [],
+        "gates": {"from": gate_hours._hhmm(span[0]), "to": gate_hours._hhmm(span[1] % (24 * 60)) if span[1] < 24 * 60 else "24:00"} if span else None,
+        "no_delivery": gate_hours.peak_bands(factors),
+        "offers": offers, "offer_min": OFFER_MIN,
+    }
     as_at = now or date.today()
     return {
         "route_id": route_id, "title": SHEET_NAME, "tenant": export._tenant_name() or "Wayscope",
@@ -1434,6 +1640,7 @@ def evidence(route_id, acc=None, now=None):
         "headline": headline, "alt_lines": alt_lines, "cycle_lines": cl_lines, "cycle_shown": grid is not None,
         "turns": turns0, "cycle": {"beside": headline[0]["beside"] if headline else None,
                                    "meets": [{"m": m, "words": f"{du_words(m)} {du}", "name": n} for m, n in cyc0["meets"]]},
+        "time_of_day": time_of_day,
         "lorry_list": lorry_list, "traffic_shown": bool(with_exp), "traffic_credit": traffic.SOURCE["attribution"] + "." if with_exp else None,
         "records": [c for c in prim_recs],
         "on": [c for _, c in on], "stretches": stretch_rows, "plan": plan, "plan_error": plan_error,
