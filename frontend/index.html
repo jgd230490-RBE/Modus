@@ -3978,6 +3978,7 @@ function RouteMapExportMenu({ months, ipts, picked }){
   const [plan, setPlan] = useState("regional");
   const [scale, setScale] = useState("");
   const [at, setAt] = useState("");
+  const [mstyle, setMstyle] = useState("");          // 28 Oct 2026 (8e): the map's style; blank = the tenant's Maps on paper setting
   const [noComm, setNoComm] = useState(false);     // 14 Oct 2026: the community considerations, on unless left out
   const [addColl, setAddColl] = useState(false);   // 16 Oct 2026 (CLOCS v5 C1): the collision history, off unless added
   const [opts, setOpts] = useState({ plans: [], places: [], regional_fitted: null });
@@ -4009,6 +4010,7 @@ function RouteMapExportMenu({ months, ipts, picked }){
       if(spec && spec.centred && at) q.set("at", at);
       if(noComm) q.set("community", "0");
       if(addColl) q.set("collisions", "1");
+      if(mstyle) q.set("style", mstyle);
       const r = await fetch(`${API}/routes/map-export.${kind}?${q.toString()}`);
       if(!r.ok){
         throw await errFrom(r);
@@ -4047,6 +4049,9 @@ function RouteMapExportMenu({ months, ipts, picked }){
           {(spec ? spec.scales : []).map(n => <option key={n} value={String(n)}>1:{Number(n).toLocaleString("en-GB")}</option>)}</select></label>
         {spec && spec.centred && <label><span>Centred on</span><select value={at} onChange={e => setAt(e.target.value)} aria-label="Centred on">
           {(opts.places || []).map(n => <option key={n} value={n}>{n}</option>)}</select></label>}
+        <label><span>Map style</span><select value={mstyle} onChange={e => setMstyle(e.target.value)} aria-label="Map style">
+          <option value="">As set on Config</option><option value="light">Light</option><option value="streets">Streets</option>
+          <option value="outdoors">Outdoors</option><option value="aerial">Aerial (with names)</option></select></label>
         <label className="flex items-center gap-2" style={{ flexDirection: "row" }}><input type="checkbox" checked={noComm} onChange={e => setNoComm(e.target.checked)} data-rme-no-community="1" /> Leave out the community considerations</label>
         <label className="flex items-center gap-2" style={{ flexDirection: "row" }}><input type="checkbox" checked={addColl} onChange={e => setAddColl(e.target.checked)} data-rme-collisions="1" /> Add the collision history (killed or seriously injured only on the regional plan)</label>
         <button type="button" onClick={() => download("pdf")} disabled={busy || noPlace}>{busy ? "Drawing the map…" : "Download PDF"}</button>
@@ -7652,6 +7657,15 @@ function ConfigPage({ meta, who, access }){
                     value={(doc.tenant || {}).imagery_credit || ""} onChange={e => upd(d => { setTenantText(d, "imagery_credit", e.target.value); })} />
                   <div className="hint">Most aerial licences ask for it.</div>
                 </div>
+              </div>
+              {/* 28 Oct 2026 (8e): the style of the maps in the PDFs. One setting; the route map export can pick its own. */}
+              <div className="field" data-cfg="export-map-style">
+                <label htmlFor="cfg-export-map-style">Maps on paper</label>
+                <select id="cfg-export-map-style" className="ctl" value={(doc.tenant || {}).export_map_style || "light"}
+                  onChange={e => upd(d => { setTenantText(d, "export_map_style", e.target.value === "light" ? "" : e.target.value); })}>
+                  <option value="light">Light</option><option value="streets">Streets</option>
+                  <option value="outdoors">Outdoors</option><option value="aerial">Aerial (with names)</option></select>
+                <div className="hint">The map in the route sheet, collision evidence and Look-ahead PDFs. The bulletin stays Light.</div>
               </div>
               <CommunityPanel access={access} />
               <CollisionPanel access={access} />

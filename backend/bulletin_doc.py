@@ -1093,7 +1093,7 @@ def _map_view(points, w, h, pad):
     try:
         import basemap
         v = basemap.view(points, w, h, pad)
-        png = basemap.fetch(v, retina=False) if v else None
+        png = basemap.fetch(v, retina=False, style="light") if v else None
     except Exception:
         png = None
     if png:

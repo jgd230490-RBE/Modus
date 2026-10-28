@@ -1303,7 +1303,8 @@ ok("council: the shared projection — one projector for the page and the PDF (b
    "or the basemap's view of the same points",
    "bulletin_doc.projector(bulletin_doc.council_points(C), w, h, 3 * mm)" in read("backend/export.py")
    and "P, img, v = _map_view(council_points(C), w, h, 16)" in read("backend/bulletin_doc.py")
-   and "_basemap_box(bulletin_doc.council_points(self.C), self.width, self.height, 20)" in read("backend/export.py"))
+   # NARROWED 28 Oct 2026 (8e): the call now ends in style="light" (the bulletin stays Light whatever Maps on paper says)
+   and "_basemap_box(bulletin_doc.council_points(self.C), self.width, self.height, 20, style=\"light\")" in read("backend/export.py"))
 
 # the static map's URL (a capturing stub, never the network)
 _seen = []
@@ -2262,7 +2263,7 @@ import zlib  # noqa: E402
 _real_fetch = basemap.fetch
 _fetched = []
 # a different PNG per request (reportlab draws identical image bytes once and reuses them)
-basemap.fetch = lambda v, token=None, timeout=12, retina=True: (_fetched.append((v["w"], v["h"], retina)), _tiny_png(4 + len(_fetched)))[1]
+basemap.fetch = lambda v, token=None, timeout=12, retina=True, style=None: (_fetched.append((v["w"], v["h"], retina)), _tiny_png(4 + len(_fetched)))[1]
 try:
     _PDFM = export.build_bulletin_pdf(S10B)
     _LFM = export.build_bulletin_leaflet_pdf(S10B)
