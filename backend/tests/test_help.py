@@ -179,7 +179,8 @@ _cp_groups = ("Month", "Heat map", "Views", "Filter routes", "By council", "What
 ok("\U0001f534 ...and correcting that sentence did NOT take the Control Panel description "
    "with it", "Control Panel" in src and all(g in _cp for g in _cp_groups)
    and [_cp.index(g) for g in _cp_groups] == sorted(_cp.index(g) for g in _cp_groups)
-   and "the \u2630 button opens it" in src)
+   # NARROWED 28 Oct 2026 (the phone's full screen): the phone opens the panel with Layers (a sheet), not the \u2630 button
+   and "<strong>Layers</strong> opens the panel as a sheet" in src and "the \u2630 button opens it" not in src)
 
 # deep links
 ok("every figure with a screen behind it links into the live app (21 of 27)",

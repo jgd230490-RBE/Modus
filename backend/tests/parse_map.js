@@ -1947,7 +1947,9 @@ ok("11 Oct: the tour bubble is Google-style — dark, slightly transparent (88 %
   && code.includes("card.dataset.place = place;"));
 ok("11 Oct: the strip sits just under the bar, offers the tour and hides everything with ×; shown until the tour is done",
   code.includes("if (on && guideRead() !== 'done' && kpi) {") && code.includes("onclick=\"guideStart()\">Take the tour</button>")
-  && code.includes("onclick=\"guideOff()\">\\u00d7</button>") && code.includes("strip.style.top = (Math.round(k.bottom) + 10) + 'px';"));
+  && code.includes("onclick=\"guideOff()\">\\u00d7</button>")
+  // NARROWED 28 Oct 2026 (phone full screen, card 2): under the bar, or on a phone under Layers AND the demo pill beside it
+  && code.includes("const below = Math.max(k.bottom, dn ? dn.getBoundingClientRect().bottom : 0);") && code.includes("strip.style.top = (Math.round(below) + 10) + 'px';"));
 ok("11 Oct: one pulsing dot per visible feature, hover / focus / tap shows its line, none during the tour or once switched off",
   code.includes("function guideHintsOn(){ return !!TENANT.demo_notice && guideRead() !== 'off'; }") && code.includes("const on = guideHintsOn() && guideIndex < 0;")
   && code.includes("dot.onmouseenter = show; dot.onfocus = show; dot.onmouseleave = hide; dot.onblur = hide;")
@@ -3861,7 +3863,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      sheetHtml.indexOf('id="m-month"') > 0 && sheetHtml.indexOf('id="m-trips"') > sheetHtml.indexOf('id="m-month"')
      && sheetHtml.indexOf('id="m-vehicles"') > sheetHtml.indexOf('id="m-trips"') && sheetHtml.indexOf('id="m-cond"') > sheetHtml.indexOf('id="m-vehicles"')
      && sheetHtml.indexOf('id="m-busiest"') > sheetHtml.indexOf('id="m-body"') && sheetHtml.indexOf('id="m-conditions"') > sheetHtml.indexOf('id="m-busiest"')
-     && sheetHtml.includes(">two-way movements a day<") && sheetHtml.includes(">vehicles needed<"));
+     && sheetHtml.includes('<b id="m-trips">&mdash;</b><span>a day</span>') && sheetHtml.includes('<b id="m-vehicles">&mdash;</b><span>vehicles</span>'));   // NARROWED 28 Oct 2026 (phone full screen, card 2): one line folded, short words
   ok("C3 phone: the full detent is the filters and layers (sheetTo('full') opens the panel as the layers sheet)",
      sheetHtml.includes(`onclick="sheetTo('full')">Filters and layers</button>`) && /if \(state === 'full'\) \{ openLayersSheet\(\); return; \}/.test(code));
   ok("C3 phone: the month chips and Play sit at the BOTTOM of the sheet (the last row), Play named and pressed-state",
@@ -3887,7 +3889,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   ok("C3 (D14): the forecast box carries the month picker (desktop) and the sheet the month chips (phone)",
      html.includes('<div class="month-picker" id="fc-months" role="group" aria-labelledby="fc-month-label"></div>')
      && !html.includes('id="fc-chips"') && /document\.querySelectorAll\('\.month-chips'\)\.forEach\(box =>/.test(code)
-     && /box\.querySelectorAll\('\.month-chip'\)\.forEach\(b => b\.setAttribute\('aria-pressed', String\(Number\(b\.dataset\.month\) === cur\)\)\);\s*\}\);\s*renderMonthPicker\(\);/.test(code));
+     && /box\.querySelectorAll\('\.month-chip'\)\.forEach\(b => b\.setAttribute\('aria-pressed', String\(Number\(b\.dataset\.month\) === cur\)\)\);[\s\S]{0,900}?\}\);\s*renderMonthPicker\(\);/.test(code));   // NARROWED 28 Oct 2026: the phone row scrolls to the month in between
   ok("C3 (D14): Show forecast routes, the route analysis and the detail table read the span with volume (forecastWindow), after the matrix",
      // NARROWED 12 Oct 2026 (Track C review): `|| []` (the window may be null); REVERSED: no matrix is NO window, never
      // the whole horizon (which made the bar ask for up to 60 months)
@@ -7106,6 +7108,51 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   const net = fs.readFileSync(path.join(ROOT, "backend", "network.py"), "utf8");
   ok("0a: the map data marks a gate's own access road (access_road), so Few can leave its name off",
      net.includes('"access_road": z["id"] in access,') && /SELECT access_zone_id FROM location_gates WHERE tenant_id = \? AND access_zone_id IS NOT NULL/.test(net));
+}
+
+// ---- 28 Oct 2026 (John: "on a phone we need an option to select full screen for the map, as the top banner and the bottom
+//      forecast section take up too much space"; notes/map-phone-fullscreen-mockup-1028, "yes, as recommended") ----
+{
+  ok("⭐ FULL: a ⤢ button and a floating strip (Play, the month and its figure, ⤡) exist, hidden above the phone width",
+     html.includes('<button type="button" id="m-full-btn" onclick="enterMapFull()" aria-label="Full screen map" title="Full screen map"></button>')
+     && html.includes('<div id="m-full-strip" role="group" aria-label="Full screen map" hidden>')
+     && html.includes('<button type="button" class="m-play" id="m-full-play" onclick="toggleTimeline()" aria-label="Play" aria-pressed="false">&#9654;</button>')
+     && html.includes('<button type="button" id="m-full-exit" onclick="exitMapFull()" aria-label="Leave full screen" title="Leave full screen"></button>')
+     && html.includes('#m-full-btn::before{ content:"\\2922"; content:"\\2922" / ""; } #m-full-exit::before{ content:"\\2921"; content:"\\2921" / ""; }')
+     && html.includes("#m-full-btn, #m-full-strip, #btn-guide-sheet{ display:none; }"));
+  ok("⭐ FULL: full screen hides the sheet, Layers, ⤢ and the tips; the demo notice stays (as a pill at the top centre); a route's card still opens",
+     /body\.map-full #m-sheet, body\.map-full #m-layers-btn, body\.map-full #m-full-btn, body\.map-full \.guide-strip,\s*body\.map-full \.guide-tip\{ display:none !important; \}/.test(html)
+     && !/body\.map-full[^{]*#demo-notice\{[^}]*display:none/.test(html)
+     && html.includes("body.map-full.map-full-card #m-sheet{ display:flex !important; z-index:31; }")
+     && code.includes("if (typeof MAPFULL !== 'undefined' && MAPFULL.on) document.body.classList.toggle('map-full-card', state !== 'peek');"));
+  ok("FULL: entering pushes a history entry and asks the browser for its own full screen (caught where refused); leaving undoes both",
+     /function enterMapFull\(\) \{[\s\S]{0,900}history\.pushState\(\{ wayscopeMapFull: 1 \}, ''\)[\s\S]{0,300}el\.requestFullscreen \? el\.requestFullscreen\(\) : \(el\.webkitRequestFullscreen/.test(code)
+     && /function exitMapFull\(fromHistory\) \{[\s\S]{0,700}document\.exitFullscreen\(\)[\s\S]{0,400}if \(MAPFULL\.pushed && !fromHistory\) \{ MAPFULL\.pushed = false; try \{ history\.back\(\); \}/.test(code));
+  ok("⭐ FULL: the ways out — Back (popstate), the browser leaving its full screen, Esc, and the window growing past a phone",
+     code.includes("window.addEventListener('popstate', () => { if (MAPFULL.on) { MAPFULL.pushed = false; exitMapFull(true); } });")
+     && code.includes("if (MAPFULL.on && MAPFULL.fs) exitMapFull();")
+     && code.includes("if (typeof MAPFULL !== 'undefined' && MAPFULL.on && !document.body.classList.contains('map-full-card')) { exitMapFull(); return; }")
+     && code.includes("window.addEventListener('resize', () => { if (MAPFULL.on && !isPhoneShell()) exitMapFull(); });"));
+  ok("FULL: the strip follows the month (renderSheet → renderFullStrip) and Play's state (syncPlayButtons does both buttons); Mapbox's credits ride above it",
+     code.includes("if (typeof MAPFULL !== 'undefined' && MAPFULL.on) renderFullStrip();") && code.includes("['m-play', 'm-full-play'].forEach(id => {")
+     && code.includes("const h = (sh && isPhoneShell()) ? (full ? 72 : Math.round(sh.offsetHeight || 0)) : 0;")
+     && !/wayscopeMapFull|map-full/.test(code.slice(code.indexOf("function encodeView("), code.indexOf("function decodeView("))));
+  ok("FULL card 2: on a phone the demo notice is a pill between Layers and ⤢ (nothing moves down for it: --notice-h 0) and the Guide is in the Layers sheet",
+     html.includes("body.has-demo-notice #demo-notice{ left:122px; right:60px; top:14px; transform:none;")
+     && code.includes("if (typeof isPhoneShell === 'function' && isPhoneShell()) { document.body.style.setProperty('--notice-h', '0px'); return; }")
+     && html.includes('<button type="button" class="btn btn-ghost" id="btn-guide-sheet" hidden onclick="closeLayersSheet(); guideStart();">Guide</button>')
+     && code.includes("const gs = document.getElementById('btn-guide-sheet'); if (gs) gs.hidden = false;"));
+  ok("⭐ FULL card 2: folded, the sheet is one line (the month alone, then 'a day', 'vehicles'); the conditions pill waits in the opened sheet, a red dot on the handle",
+     html.includes('#m-sheet[data-state="peek"] .m-peek{ flex-wrap:nowrap; align-items:baseline; gap:4px 12px; }')
+     && html.includes('#m-sheet[data-state="peek"] .m-cond{ display:none; }') && html.includes(".m-handle.has-cond::after{")
+     && code.includes("set('m-month', TL.on ? (SHEET.state === 'peek' ? monthLabel(TL.month) : (barHead() || monthLabel(TL.month))) :")
+     && code.includes("if (hd && hd.classList) hd.classList.toggle('has-cond', !!s);"));
+  ok("FULL card 2: the phone's month row scrolls to the month on screen, Play pinned at its left end",
+     code.includes("row.scrollLeft += (c.left - r.left) - (row.clientWidth - c.width) / 2;") && html.includes(".m-chips-row .m-play{ position:sticky; left:0; z-index:1;"));
+  const g = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8");
+  ok("FULL: the user guide says how the phone map works — Layers (with the Guide), the one-line sheet and its red dot, ⤢ full screen and the ways out",
+     g.includes("<strong>⤢ Full screen</strong> shows the map alone") && g.includes("<strong>⤡</strong>, the phone's Back or Esc leaves.")
+     && g.includes("on an iPhone Safari keeps its bar") && !g.includes("On a phone the panel is closed by default; the ☰ button opens it."));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
