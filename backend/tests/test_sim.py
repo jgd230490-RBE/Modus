@@ -332,7 +332,8 @@ ok("the engine reuses the Dashboard's rules: trips_for, entry_gate, judge, gate_
    and "gate_arrivals.judge(" in code_only and "gate_hours.STATUS_WORDS" in code_only and "gate_hours.NEAR_PCT" in code_only)
 ga_src = open(os.path.join(BACKEND, "gate_arrivals.py"), encoding="utf-8").read()
 ok("gate_arrivals resolves every end with entry_gate() (arrivals, week_by_day) and judges with judge()",
-   ga_src.count("entry_gate(loc") == 3 and "jd = judge(arr_raw, open_g, gm)" in ga_src
+   # RE-PINNED 28 Oct 2026 (simulation v2): a fourth call resolves where a gate closed for a period sends its lorries
+   ga_src.count("entry_gate(loc") == 4 and "jd = judge(arr_raw, open_g, gm)" in ga_src
    and ga_src.count('gates.resolve(loc, "entry"') == 2)
 main_src = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
 _sd = main_src[main_src.index('@app.get("/api/sim/day")'):]

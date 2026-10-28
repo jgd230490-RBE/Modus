@@ -66,6 +66,7 @@ import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one 
 import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
 import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
+import site_areas  # 28 Oct 2026 (simulation v2): the areas inside a site
 import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
 import heavy_reads  # 21 Oct 2026 — the public map's heavy reads a few at a time, one memory line each (live OOM kills)
 import abnormal  # 22 Oct 2026 (S16 / B5) — the abnormal loads: each one its own planned movement, with the rules' advice
@@ -4064,6 +4065,8 @@ class LocationIn(BaseModel):
     clp_cap_per_day: Optional[float] = None
     # 16 Oct 2026 (CLOCS v5 C3): the site's rules for drivers, printed on the route sheet; written only when sent
     site_rules: Optional[str] = None
+    # 28 Oct 2026 (simulation v2): the speed on the site's internal roads, km/h; written only when sent
+    site_speed_kph: Optional[float] = None
 
 
 def _fields_set(model):
@@ -4100,7 +4103,8 @@ def _check_admin(token):
 @app.post("/api/admin/locations")
 def create_location(body: LocationIn, token: Optional[str] = None):
     _check_admin(token)
-    cp = network.clp_cap_problem(body.clp_cap_per_day) or network.sheet_text_problem(body.site_rules, "the site rules")
+    cp = (network.clp_cap_problem(body.clp_cap_per_day) or network.sheet_text_problem(body.site_rules, "the site rules")
+          or network.site_speed_problem(body.site_speed_kph))
     if cp:
         raise HTTPException(400, cp)
     out = network.create_location(body.name, body.role, body.materials, body.lat, body.lon,
@@ -4111,6 +4115,8 @@ def create_location(body: LocationIn, token: Optional[str] = None):
         network.set_clp_cap(out["id"], body.clp_cap_per_day)
     if body.site_rules is not None and out.get("id"):
         network.set_site_rules(out["id"], body.site_rules)
+    if body.site_speed_kph is not None and out.get("id"):
+        network.set_site_speed(out["id"], body.site_speed_kph)
     return out
 
 
@@ -4133,6 +4139,12 @@ def update_location(location_id: str, body: LocationIn, token: Optional[str] = N
         rp = network.sheet_text_problem(body.site_rules, "the site rules")
         if rp:
             raise HTTPException(400, rp)
+    # 28 Oct 2026 (simulation v2): the site speed only when sent, the same rule
+    speed_given = "site_speed_kph" in set(_fields_set(body))
+    if speed_given:
+        sp = network.site_speed_problem(body.site_speed_kph)
+        if sp:
+            raise HTTPException(400, sp)
     out = network.update_location(location_id, body.name, body.role, body.materials,
                                   body.lat, body.lon, body.loc_type,
                                   supplies=body.supplies, receives=body.receives,
@@ -4144,6 +4156,8 @@ def update_location(location_id: str, body: LocationIn, token: Optional[str] = N
         network.set_clp_cap(location_id, body.clp_cap_per_day)
     if rules_given and not (isinstance(out, dict) and out.get("error")):
         network.set_site_rules(location_id, body.site_rules)
+    if speed_given and not (isinstance(out, dict) and out.get("error")):
+        network.set_site_speed(location_id, body.site_speed_kph)
     return out
 
 
@@ -4186,6 +4200,9 @@ class GateIn(BaseModel):
     # 17 Oct 2026: the gate's shut windows during the day, [{from, to}] (gate_hours.shut_problem); None or [] = none.
     # Also the stored text ('08:30-09:15,12:00-12:30') or a list of 'HH:MM-HH:MM': any other shape is refused in words
     shut_windows: Optional[Union[List[dict], List[str], str]] = None
+    # 28 Oct 2026 (simulation v2): closed for a period, ISO dates inclusive (both or neither)
+    closed_from: Optional[str] = None
+    closed_to: Optional[str] = None
 
 
 class GatePatch(BaseModel):
@@ -4203,11 +4220,82 @@ class GatePatch(BaseModel):
     open_days: Optional[str] = None
     access_zone_id: Optional[str] = None
     shut_windows: Optional[Union[List[dict], List[str], str]] = None
+    closed_from: Optional[str] = None
+    closed_to: Optional[str] = None
 
 
 class RouteGatesIn(BaseModel):
     origin_gate_id: Optional[str] = None
     dest_gate_id: Optional[str] = None
+
+
+class SiteAreaIn(BaseModel):
+    """28 Oct 2026 (simulation v2): an area inside a site (site_areas.py). geometry = a GeoJSON Point or Polygon."""
+    location_id: str
+    name: str
+    activity: str = "unload"                 # 'unload' | 'load' | 'wash'
+    materials: List[str] = []                # material categories the area takes ([] = any)
+    vehicles: List[str] = []                 # vehicle keys ([] = any)
+    service_minutes: Optional[float] = None  # blank = the vehicle's own loading / unloading minutes
+    bays: int = 1
+    level: Optional[str] = None
+    geometry: Optional[dict] = None
+    seq: int = 0
+    active: bool = True
+    note: Optional[str] = None
+    area_id: Optional[str] = None
+
+
+class SiteAreaPatch(BaseModel):
+    name: Optional[str] = None
+    activity: Optional[str] = None
+    materials: Optional[List[str]] = None
+    vehicles: Optional[List[str]] = None
+    service_minutes: Optional[float] = None
+    bays: Optional[int] = None
+    level: Optional[str] = None
+    geometry: Optional[dict] = None
+    seq: Optional[int] = None
+    active: Optional[bool] = None
+    note: Optional[str] = None
+
+
+@app.get("/api/site-areas")
+def list_site_areas(location_id: Optional[str] = None, include_inactive: bool = True):
+    """28 Oct 2026 (simulation v2): the areas inside the sites. Any signed-in code (the Locations page and the simulation)."""
+    _require_access()
+    return {"areas": site_areas.list_areas(location_id, include_inactive=include_inactive)}
+
+
+@app.post("/api/admin/site-areas")
+def create_site_area(body: SiteAreaIn, token: Optional[str] = None):
+    _check_admin(token)
+    out = site_areas.create_area(body.location_id, body.name, activity=body.activity, materials=body.materials,
+                                 vehicles=body.vehicles, service_minutes=body.service_minutes, bays=body.bays,
+                                 level=body.level, geometry=body.geometry, seq=body.seq, active=body.active,
+                                 note=body.note, area_id=body.area_id)
+    if out.get("error"):
+        raise HTTPException(400, out["error"])
+    return out
+
+
+@app.patch("/api/admin/site-areas/{area_id}")
+def update_site_area(area_id: str, body: SiteAreaPatch, token: Optional[str] = None):
+    _check_admin(token)
+    sent = set(_fields_set(body))
+    out = site_areas.update_area(area_id, **{k: getattr(body, k) for k in sent})
+    if out.get("error"):
+        raise HTTPException(404 if out["error"] == "area not found" else 400, out["error"])
+    return out
+
+
+@app.delete("/api/admin/site-areas/{area_id}")
+def delete_site_area(area_id: str, token: Optional[str] = None):
+    _check_admin(token)
+    out = site_areas.delete_area(area_id)
+    if out.get("error"):
+        raise HTTPException(404, out["error"])
+    return out
 
 
 @app.get("/api/gates")
@@ -4250,7 +4338,10 @@ def gate_arrivals_month(month: Optional[int] = None):
 def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None),
             check_in: Optional[List[str]] = Query(None), bands: Optional[str] = None,
             pour_gate: Optional[str] = None, pour_start: Optional[str] = None, pour_m3: Optional[str] = None,
-            pour_m3_per_load: Optional[str] = None, pour_rate: Optional[str] = None, legs: Optional[str] = None):
+            pour_m3_per_load: Optional[str] = None, pour_rate: Optional[str] = None, legs: Optional[str] = None,
+            scale: Optional[str] = None, week: Optional[str] = None, date: Optional[str] = None,
+            site_speed: Optional[List[str]] = Query(None), service: Optional[List[str]] = Query(None),
+            bays: Optional[List[str]] = Query(None), wash: Optional[str] = None):
     """
     16 Oct 2026 (S3) — the haulage simulation: an average working day of one month at every gate, lorry by lorry
     (sim.py; the example the user approved on 16 Oct is its spec). Whole loads per line, each gate's arrivals spread
@@ -4260,8 +4351,14 @@ def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None
     parameters and nothing else: no write, nothing saved, no link (D86). Any signed-in code, like the Gate arrivals
     panel; a team code sees other teams' lines by route only. `legs=1` adds each route's line for the drawing.
     400 in words for a scenario that cannot be simulated (a window past midnight, D93; a pour past midnight).
+    28 Oct 2026 (v2): `scale` month (default) | week (`week` commit | next) | day (`date` YYYY-MM-DD, a weekday of
+    the Look-ahead's two weeks); the sites' station chains in every reply; `site_speed`, `service`, `bays`, `wash`
+    as the sites' what-ifs (on screen only, like the rest).
     """
     acc = _require_access()
+    scale = (scale or "month").strip().lower()
+    if scale not in ("month", "week", "day"):
+        raise HTTPException(400, "scale must be month, week or day")
     if month is None:
         import datetime as _dt
         month = max(1, min(MONTH_COUNT, weeks.month_index_of(_dt.date.today())))
@@ -4269,11 +4366,13 @@ def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None
         raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
     factors = conversions.load_factors()
     try:
-        sc = sim.scenario_from_query(hours=hours, check_in=check_in, bands=bands, pour_gate=pour_gate,
+        sc = sim.scenario_from_query(site_speed=site_speed, service=service, bays=bays, wash=wash,
+                                     hours=hours, check_in=check_in, bands=bands, pour_gate=pour_gate,
                                      pour_start=pour_start, pour_m3=pour_m3, pour_m3_per_load=pour_m3_per_load,
                                      pour_rate=pour_rate)
         return sim.day(int(month), acc, factors=factors, working_days=_working_days(factors), scenario=sc,
-                       send_lines=str(legs or "").lower() in ("1", "true", "yes"))
+                       send_lines=str(legs or "").lower() in ("1", "true", "yes"),
+                       scale=scale, bucket=(week or "commit"), date=date)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -4341,7 +4440,8 @@ def create_gate(body: GateIn, token: Optional[str] = None):
                              is_default=body.is_default, active=body.active,
                              note=body.note, gate_id=body.gate_id,
                              open_from=body.open_from, open_to=body.open_to, open_days=body.open_days,
-                             access_zone_id=body.access_zone_id, shut_windows=body.shut_windows)
+                             access_zone_id=body.access_zone_id, shut_windows=body.shut_windows,
+                             closed_from=body.closed_from, closed_to=body.closed_to)
 
 
 @app.patch("/api/admin/gates/{gate_id}")
@@ -4667,6 +4767,8 @@ class ZoneIn(BaseModel):
     # module default, which is 'splice'; see haul.py for why that is the safe one.
     speed_kph: Optional[float] = None
     haul_mode: Optional[str] = None
+    # 28 Oct 2026 (simulation v2): a haul road INSIDE this site (mode internal; never spliced into a public route)
+    location_id: Optional[str] = None
 
 
 def _zone_write_result(zone, inval):
@@ -4720,7 +4822,7 @@ def create_zone(body: ZoneIn, token: Optional[str] = None):
     z = zones.create_zone(
         body.name, body.geometry, kind=body.kind, affects_routing=body.affects_routing,
         starts_on=body.starts_on, ends_on=body.ends_on, note=body.note, active=body.active,
-        speed_kph=body.speed_kph, haul_mode=body.haul_mode)
+        speed_kph=body.speed_kph, haul_mode=body.haul_mode, location_id=getattr(body, "location_id", None))
     if z.get("error"):
         raise HTTPException(400, z["error"])
     if z["kind"] == zones.HAUL_KIND:
@@ -4755,7 +4857,7 @@ def update_zone(zone_id: str, body: ZoneIn, token: Optional[str] = None):
     sent = set(_fields_set(body))
     fields = {k: getattr(body, k) for k in
               ("name", "geometry", "kind", "affects_routing", "starts_on", "ends_on",
-               "note", "active", "speed_kph", "haul_mode") if k in sent}
+               "note", "active", "speed_kph", "haul_mode", "location_id") if k in sent}
     z = zones.update_zone(zone_id, **fields)
     if z.get("error"):
         raise HTTPException(400, z["error"])

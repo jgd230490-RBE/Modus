@@ -48,6 +48,12 @@ band; an overlap with a band counts once.
 PEAK BANDS: `planning.peak_bands` as typed, on by default when typed; switched on with none typed, Config's example
 bands (gate_hours.PEAK_PLACEHOLDER) stand in and the reply says so.
 
+8. ON SITE (28 Oct 2026, v2; sim_site.py). At a site with areas or internal roads a checked-in lorry drives the drawn
+   roads at the site speed to the area that takes its material (bays, service minutes), then the wheel wash, then
+   out by the site's exit gate — a gate closed for a period hands both directions to the other gate. Every station
+   queues first come first served and is counted like the gate. SCALES: the month's average working day (as
+   above), the Look-ahead week's average weekday, or one planned day (lookahead_lines).
+
 D84: an origin's gate (a quarry, the railhead) serves other customers too — only this scheme's lorries are counted.
 D86: nothing is saved; a scenario exists only in the request that asks for it. D92: one drive time a route, all day.
 
@@ -59,12 +65,18 @@ import functools
 import json
 import math
 
+import datetime
+
 import access
 import conversions
+import days
 import db
+import derived
 import gate_arrivals
 import gate_hours
 import gates
+import site_areas
+import sim_site
 import taxonomy
 import zones
 
@@ -95,7 +107,7 @@ POUR_SITE_TYPES = ("compound", "site")
 NOTE_ORIGIN = "Serves other customers too: only this scheme's lorries are counted, so a queue here is the least it could be."
 LIMITS = ("Planning view, not a record of what happened.",
           "Congestion on the public road is not modelled: each route has one drive time all day, so the only "
-          "bottlenecks shown are the gates.",
+          "bottlenecks shown are at the gates and on site.",
           "A lorry held up at a gate is not late for anything afterwards: each arrival is placed by its gate's open "
           "hours, not by the lorry's last trip.")
 
@@ -583,7 +595,10 @@ def simulate(inp, scen):
     roads and the window the clock plays. See the module docstring for each step.
     """
     lines, G = inp["lines"], inp["gates"]
-    rnd = whole_loads([l["share"] for l in lines], [l["touch"] for l in lines], inp["panel"])
+    if inp.get("fixed") is not None:          # 28 Oct 2026 (v2): the day scale — each line's trips are whole already
+        rnd = {"per_line": [int(x) for x in inp["fixed"]], "exact": True, "worst": 0.0}
+    else:
+        rnd = whole_loads([l["share"] for l in lines], [l["touch"] for l in lines], inp["panel"])
     per_line = list(rnd["per_line"])
     bands = band_intervals(scen.get("bands") or [])
 
@@ -637,6 +652,17 @@ def simulate(inp, scen):
         f["unplaced"] = sum(1 for a in A if a.get("t") is None)
         out_g[g] = f
 
+    # 8. on site (28 Oct 2026, v2): each site's chain of stations for the lorries checked in at its gates
+    sites_out, departures = {}, {}
+    gate_loc = inp.get("gate_loc") or {}
+    for lid, site in (inp.get("sites") or {}).items():
+        lor = [a for g, f in out_g.items() if gate_loc.get(g) == lid for a in f["queued"]]
+        sites_out[lid] = sim_site.run_site(site, lor, lines, inp.get("factors"))
+        for a in lor:
+            if a.get("chain"):
+                og = a["chain"][-1].split(":", 1)[1]
+                departures[og] = departures.get(og, 0) + 1
+
     # 7. journeys: each arrival set off its route's drive time earlier; the pour's mixers only for their last stretch
     legs = inp["legs"]
     journeys = []
@@ -673,13 +699,16 @@ def simulate(inp, scen):
 
     # the day the clock plays: the first lorry setting off to the last check-in done, in whole half hours
     deps = [a["depart"] for a, _ in journeys if a.get("depart") is not None]
+    deps += [a["t"] for a, _ in journeys if a.get("depart") is None]       # no line to drive: the clock starts at its arrival
     dones = [f["last_done"] for f in out_g.values() if f["arrivals"]]
+    dones += [a["out_at"] for f in out_g.values() for a in f["queued"] if a.get("out_at") is not None]
     if deps and dones:
         win = (max(0, math.floor((min(deps) - 10) / 30) * 30), min(24 * 60, math.ceil((max(dones) + 10) / 30) * 30))
     else:
         win = tuple(inp.get("empty_window") or EMPTY_DAY_WINDOW)
     return {"per_line": per_line, "rounding_exact": rnd["exact"], "rounding_worst": rnd["worst"],
-            "gates": out_g, "pour": pour, "haul": haul, "window": win, "total": sum(per_line)}
+            "gates": out_g, "pour": pour, "haul": haul, "window": win, "total": sum(per_line),
+            "sites": sites_out, "departures": departures}
 
 
 # --------------------------------------------------------------------------------------------------- the scenario
@@ -698,15 +727,53 @@ def _hours_pair(v, who):
 
 
 def scenario_from_query(hours=None, check_in=None, bands=None, pour_gate=None, pour_start=None, pour_m3=None,
-                        pour_m3_per_load=None, pour_rate=None):
+                        pour_m3_per_load=None, pour_rate=None, site_speed=None, service=None, bays=None, wash=None):
     """
     The query parameters of GET /api/sim/day as one scenario, or ValueError in words. Nothing here is saved (D86).
       hours     repeated 'GATE=HH:MM-HH:MM', or 'all=HH:MM-HH:MM' for every gate (a gate's own wins over 'all')
       check_in  repeated 'GATE=minutes' ('GATE=' or 0 = no check-in: that gate never queues)
       bands     'on' or 'off' (unset: on when the scheme has bands typed)
       pour_*    gate, start HH:MM, m³, m³ a load (default: the app's mixer), pour rate in m³ an hour
+      28 Oct 2026 (v2): site_speed repeated 'LOC=kph'; service repeated 'AREA=minutes'; bays 'AREA=n';
+      wash 'on' or 'off' (unset: as typed)
     """
-    sc = {"hours": {}, "all": None, "check_in": {}, "bands": None, "pour": None}
+    sc = {"hours": {}, "all": None, "check_in": {}, "bands": None, "pour": None,
+          "site_speed": {}, "service": {}, "bays": {}, "wash": None}
+    for item in site_speed or []:
+        if not item:
+            continue
+        if "=" not in item:
+            raise ValueError("site_speed must be given as LOCATION=km/h")
+        g, v = [x.strip() for x in item.split("=", 1)]
+        k = _num(v, f"{g}: the site speed")
+        if not (0 < k <= 60):
+            raise ValueError(f"{g}: the site speed must be above 0 and at most 60 km/h")
+        sc["site_speed"][g] = k
+    for item in service or []:
+        if not item:
+            continue
+        if "=" not in item:
+            raise ValueError("service must be given as AREA=minutes")
+        g, v = [x.strip() for x in item.split("=", 1)]
+        m = _num(v, f"{g}: the minutes a lorry")
+        if m < 0 or m > MAX_CHECK_IN:
+            raise ValueError(f"{g}: the minutes a lorry must be between 0 and {MAX_CHECK_IN:g}")
+        sc["service"][g] = m
+    for item in bays or []:
+        if not item:
+            continue
+        if "=" not in item:
+            raise ValueError("bays must be given as AREA=n")
+        g, v = [x.strip() for x in item.split("=", 1)]
+        n = _num(v, f"{g}: the bays")
+        if n < 1 or n > site_areas.MAX_BAYS or n != int(n):
+            raise ValueError(f"{g}: bays must be a whole number between 1 and {site_areas.MAX_BAYS}")
+        sc["bays"][g] = int(n)
+    if wash not in (None, ""):
+        w = str(wash).strip().lower()
+        if w not in ("on", "off"):
+            raise ValueError("wash must be on or off")
+        sc["wash"] = (w == "on")
     for item in hours or []:
         if not item:
             continue
@@ -800,59 +867,167 @@ def _legs_for(route_ids, want_lines):
     zone_rows = {}
     if want_lines:
         for z in zones.list_zones(include_inactive=True):
-            if z.get("kind") == zones.HAUL_KIND and z.get("geometry"):
+            if z.get("kind") == zones.HAUL_KIND and z.get("geometry") and not z.get("location_id"):
                 zone_rows[z["id"]] = z
     return per, zone_rows
 
 
-def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=None, with_lines=True,
-        send_lines=False):
+def _weekday_dates(iso_from, iso_to):
+    a, b = datetime.date.fromisoformat(iso_from), datetime.date.fromisoformat(iso_to)
+    out = []
+    while a <= b:
+        if a.weekday() < 5:
+            out.append(a)
+        a += datetime.timedelta(days=1)
+    return out
+
+
+def _day_words(d):
+    return d.strftime("%a %d %b %Y").replace(" 0", " ")
+
+
+def _line_trips(qty, row, factors):
+    """One day's trips for a Look-ahead line (the grid's own rule: derived.day_figures on an unbaked context)."""
+    payload_t, _fb = derived.payload_for(row.get("vehicle_type"), factors)
+    ctx = {"unit": row.get("unit"), "payload_t": payload_t, "material_type": row.get("material_type"),
+           "vehicle_type": row.get("vehicle_type"), "baked": False}
+    return int(derived.day_figures(qty, ctx, factors)["trips"])
+
+
+def lookahead_lines(bucket, date, factors, today=None):
     """
-    The contract behind GET /api/sim/day?month=N. Reads only. `scenario` from scenario_from_query (or None for the
-    month as typed, no pour); `panel` = gate_arrivals.arrivals' reply when the caller already has it.
+    28 Oct 2026 (v2): the WEEK and DAY scales read the Look-ahead's day-by-day plan (forecast_days, the two buckets
+    the Look-ahead holds: 'commit' = the week with today in it, 'next'). Each line's trips a weekday
+    (days.list_days + derived.day_figures, the grid's own), summed over the week's weekdays; or one dated day's.
+    Returns (rows like the month's forecast rows with `trips` and `share`, the week block, working days, on, choices).
+    """
+    bucket = "next" if bucket == "next" else "commit"
+    full = days.list_days(bucket=bucket, today=today)
+    cw = full.get("commit_week") or {}
+    if not cw:
+        raise ValueError("The Look-ahead has no week to simulate.")
+    wdays = _weekday_dates(cw["from"], cw["to"])
+    chosen = None
+    if date is not None:
+        try:
+            chosen = datetime.date.fromisoformat(str(date)[:10])
+        except ValueError:
+            raise ValueError("The day must be a date such as 2027-04-14.")
+        if chosen not in wdays:
+            raise ValueError(f"{_day_words(chosen)} is not a weekday of the week of {_day_words(wdays[0])}: pick a day of "
+                             f"the Look-ahead's two weeks.")
+    rows, confirmed = [], 0
+    for l in full.get("lines") or []:
+        w = l.get("week") or {}
+        if str(w.get("status") or "") == "confirmed":
+            confirmed += 1
+        by_date = {d["day_date"]: float(d.get("planned_qty") or 0) for d in (l.get("days") or [])}
+        if chosen is not None:
+            q = by_date.get(chosen.isoformat(), 0.0)
+            trips = _line_trips(q, l, factors)
+        else:
+            trips = sum(_line_trips(by_date.get(d.isoformat(), 0.0), l, factors) for d in wdays)
+        if trips <= 0:
+            continue
+        rows.append({"route_id": l["route_id"], "discipline": l.get("discipline") or "", "section_id": l.get("section_id") or "",
+                     "ipt": l.get("ipt"), "vehicle_type": l.get("vehicle_type"), "material_type": l.get("material_type"),
+                     "unit": l.get("unit"), "quantity": None, "trips": trips, "status": w.get("status")})
+    week = {"bucket": bucket, "month_index": cw.get("month_index"), "week_index": cw.get("week_index"),
+            "from": cw["from"], "to": cw["to"], "weekdays": len(wdays), "lines": len(full.get("lines") or []),
+            "confirmed_lines": confirmed, "label": f"Week of {_day_words(wdays[0])}"}
+    # the days a person can pick: the weekdays of both buckets
+    choices = []
+    for b in ("commit", "next"):
+        try:
+            mi, wi = days.bucket_of(b, today=today)
+            if mi is None:
+                continue
+            for d in days.bucket_dates(mi, wi):
+                if d.weekday() < 5:
+                    choices.append({"date": d.isoformat(), "words": _day_words(d), "bucket": b})
+        except Exception:
+            continue
+    if chosen is not None:
+        on, wd = chosen, 1
+    else:
+        on, wd = wdays[min(2, len(wdays) - 1)], max(1, len(wdays))
+    return rows, week, wd, on, choices, chosen
+
+
+def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=None, with_lines=True,
+        send_lines=False, scale="month", bucket="commit", date=None, today=None):
+    """
+    The contract behind GET /api/sim/day. Reads only. `scenario` from scenario_from_query (or None for the
+    month as typed, no pour); `panel` = gate_arrivals.arrivals' reply when the caller already has it (month scale).
     `with_lines` False skips the routes' lines (the Gate arrivals panel needs the gates only: departures then come
     from the stored times, the pour's mixers have none, and the haul roads are not counted). `send_lines` puts each
     route's line, simplified, into the reply for the drawing.
+    28 Oct 2026 (v2): `scale` 'month' (the forecast month's average working day, as before), 'week' (the Look-ahead
+    week's average weekday, `bucket` commit | next) or 'day' (one dated weekday of those two weeks, `date`); the
+    sites' station chains (sim_site) run at every scale.
     Raises ValueError (in words) for a scenario that cannot be simulated.
     """
     factors = factors or conversions.load_factors()
-    wd = gate_arrivals._positive(working_days, gate_arrivals._working_days(factors))
     sc = scenario or scenario_from_query()
-    panel = panel or gate_arrivals.arrivals(int(month_index), acc, factors=factors, working_days=wd)
     my_team = (acc or {}).get("ipt")
     team_scope = bool(my_team)
+    scale = scale if scale in ("month", "week", "day") else "month"
 
-    rows = db.query("SELECT * FROM forecasts WHERE tenant_id = ? AND month_index = ? AND status = 'Approved' "
-                    "ORDER BY route_id, discipline, section_id", (db.current_tenant(), int(month_index)))
+    week_block, day_choices, chosen = None, [], None
+    if scale == "month":
+        wd = gate_arrivals._positive(working_days, gate_arrivals._working_days(factors))
+        panel = panel or gate_arrivals.arrivals(int(month_index), acc, factors=factors, working_days=wd)
+        rows = db.query("SELECT * FROM forecasts WHERE tenant_id = ? AND month_index = ? AND status = 'Approved' "
+                        "ORDER BY route_id, discipline, section_id", (db.current_tenant(), int(month_index)))
+        on_gate = int(month_index)
+        label = gate_arrivals.month_label(int(month_index))
+    else:
+        rows, week_block, wd, on_gate, day_choices, chosen = lookahead_lines(bucket, date if scale == "day" else None,
+                                                                            factors, today=today)
+        month_index = week_block["month_index"]
+        label = (_day_words(chosen) if scale == "day" else week_block["label"])
+        panel = None
     routes = {r["id"]: r for r in db.query("SELECT * FROM routes WHERE tenant_id = ?", (db.current_tenant(),))}
     locations = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
     gbl = gates.gates_by_location()
     gate_rows = {g["id"]: g for gs in gbl.values() for g in gs}
     labels = taxonomy.team_labels()
 
-    lines = []
+    lines, closed_seen = [], {}
     for row in rows:
         route = routes.get(row.get("route_id"))
         if not route:
             continue
-        trips = gate_arrivals.trips_for(row, factors)
+        trips = row["trips"] if scale != "month" else gate_arrivals.trips_for(row, factors)
         ends = {}
         for end, loc_key, gate_key in (("laden", "dest_id", "dest_gate_id"), ("empty", "origin_id", "origin_gate_id")):
             loc = locations.get(route.get(loc_key))
             if not loc:
                 ends[end] = None
                 continue
-            r, _blocked = gate_arrivals.entry_gate(loc, route.get(gate_key), gbl.get(loc["id"]) or [])
+            r, blocked = gate_arrivals.entry_gate(loc, route.get(gate_key), gbl.get(loc["id"]) or [], on=on_gate)
+            if blocked and blocked.get("reason") == "closed":
+                closed_seen[blocked["gate_id"]] = (blocked, r.get("gate_name"), loc)
             ends[end] = r.get("gate_id")
         team_key = access.canonical_ipt(row.get("ipt")) or row.get("ipt")
         lines.append({"route_id": route["id"], "discipline": row.get("discipline") or "",
                       "section_id": row.get("section_id") or "", "team_key": team_key,
                       "team": taxonomy.team_name(team_key, labels) if team_key else None,
                       "vehicle": row.get("vehicle_type"), "material": row.get("material_type"),
+                      "vehicle_label": conversions.vehicle_label(factors, row.get("vehicle_type")),
                       "quantity": row.get("quantity"), "unit": row.get("unit"),
                       "trips": trips, "share": trips / wd,
                       "laden_gate": ends["laden"], "empty_gate": ends["empty"],
                       "touch": [g for g in (ends["laden"], ends["empty"]) if g]})
+    if panel is None:
+        # the week's / the day's own reference figures: each gate's arrivals a day from the same lines
+        per = {}
+        for l in lines:
+            for g, k in ((l["laden_gate"], "laden"), (l["empty_gate"], "empty")):
+                if g:
+                    per.setdefault(g, {"laden": 0.0, "empty": 0.0})[k] += l["share"]
+        panel = {"gates": [{"gate_id": g, "arrivals_per_day": round(v["laden"] + v["empty"], 3),
+                            "laden_per_day": round(v["laden"], 3)} for g, v in per.items()]}
 
     # the routes' times (and lines): each line's OWN vehicle where it was worked out, else the first that was (said)
     per, zone_rows = _legs_for(sorted({l["route_id"] for l in lines}), with_lines)
@@ -907,6 +1082,8 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
             ploc = locations.get(pg.get("location_id")) or {}
             raise ValueError(f"A pour goes to a working site (a compound or a site): {ploc.get('name') or p['gate']} "
                              f"is {('a ' + str(ploc.get('loc_type')).strip().lower()) if ploc.get('loc_type') else 'not one'}.")
+        if gates.closed_on(pg, on_gate):
+            raise ValueError(f"{pg.get('name')} is {gates.closed_words(pg)}: pour by the site's other gate.")
         if p.get("m3_per_load") is None:
             p = dict(p, m3_per_load=mixer_m3(factors)[0])
         prob = pour_problem(p["start"], p["m3"], p["m3_per_load"], p["rate"])
@@ -951,14 +1128,35 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         G[gid] = {"window": win, "basis": basis, "check_in": ci, "typed": typed,
                   "shut": band_intervals(shut), "shut_typed": shut}
 
+    # 28 Oct 2026 (v2): the sites with areas or internal roads — their station chains (sim_site)
+    areas_by = site_areas.by_location(include_inactive=True)
+    roads_by = zones.internal_roads()
+    for aid in list(sc.get("service") or {}) + list(sc.get("bays") or {}):
+        if not any(a["id"] == aid for al in areas_by.values() for a in al):
+            raise ValueError(f"{aid} is not one of this scheme's site areas.")
+    for lid in list(sc.get("site_speed") or {}):
+        if lid not in locations:
+            raise ValueError(f"{lid} is not one of this scheme's sites.")
+    sites = {}
+    for lid, loc in locations.items():
+        areas = areas_by.get(lid) or []
+        roads = [dict(z, line=zones.as_line(z["geometry"])) for z in (roads_by.get(lid) or [])]
+        if not any(a["active"] for a in areas) and not roads:
+            continue
+        sites[lid] = sim_site.site_model(loc, gbl.get(lid) or [], areas, roads, factors, sc, on=on_gate)
+    gate_loc = {gid: g.get("location_id") for gid, g in gate_rows.items()}
+
     # 17 Oct 2026: a gate's ACCESS ROAD (location_gates.access_zone_id) is a haul-road zone too, and lorries still cross
     # it at its speed (the legs above are untouched), but it is the last few metres to a gate, not a haul road a planner
     # watches: it is not listed or counted with the haul roads. The reply says how many were left out.
     access_ids = {g.get("access_zone_id") for g in gate_rows.values() if g.get("access_zone_id")}
     inp = {"lines": lines, "gates": G, "legs": legs, "leg_minutes": leg_minutes, "empty_window": dwin,
            "panel": {g["gate_id"]: g["arrivals_per_day"] for g in panel.get("gates") or []},
+           # the day scale: each line's trips are already whole (no rounding)
+           "fixed": ([l["trips"] for l in lines] if scale == "day" else None),
            # the haul roads some leg of the day was routed along (an unused or switched-off road is not listed)
-           "haul_roads": {z: zone_rows[z] for z in sorted(used_zones - access_ids)} if with_lines else {}}
+           "haul_roads": {z: zone_rows[z] for z in sorted(used_zones - access_ids)} if with_lines else {},
+           "sites": sites, "gate_loc": gate_loc, "factors": factors}
     if p:
         sc = dict(sc, pour=p)
     res = simulate(inp, {"bands": bands, "pour": sc.get("pour")})
@@ -990,6 +1188,10 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
             "open_basis": G[gid]["basis"], "open_words": words,
             # 17 Oct 2026: the gate's shut windows as typed (always applied) and their words
             "shut_windows": G[gid]["shut_typed"], "shut_words": gate_hours.peak_words(G[gid]["shut_typed"]),
+            # 28 Oct 2026 (v2): in and out by this gate while the site's other gate is closed
+            "closed_words": gates.closed_words(grow),
+            "serves_exit_too": any(k == gid for k, _v in closed_seen_to(closed_seen)),
+            "departures": res["departures"].get(gid, 0),
             "arrivals": f["arrivals"], "laden": f["laden"], "empty": f["empty"], "pour": f["pour"],
             "unplaced": f["unplaced"],
             "open_minutes": f["open_minutes"], "intervals": f["intervals"], "last_open": f["last_open"],
@@ -1016,7 +1218,14 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
                              "route": a["route"], "leg": a.get("leg"),
                              "at": _r2(a["t"]), "start": _r2(a["start"]), "wait": _r2(a["wait"]),
                              "done": _r2(a["done"]), "depart": _r2(a.get("depart")),
-                             "from_m": _r2(a.get("from_m")), "t_from": _r2(a.get("t_from"))})
+                             "from_m": _r2(a.get("from_m")), "t_from": _r2(a.get("t_from")),
+                             # 28 Oct 2026 (v2): on site — the stations after the gate and the drives between them
+                             "site": gate_loc.get(gid) if a.get("chain") else None,
+                             "stops": [{"st": s["st"], "at": _r2(s["t"]), "start": _r2(s["start"]), "done": _r2(s["done"]),
+                                        "bay": s["bay"]} for s in (a.get("stops") or [])],
+                             "hops": [{"path": h["path"], "t0": _r2(h["t0"]), "t1": _r2(h["t1"])} for h in (a.get("hops") or [])],
+                             "out_at": _r2(a.get("out_at")), "on_site": _r2(a.get("on_site")),
+                             "no_area": bool(a.get("no_area"))})
     arrivals.sort(key=lambda a: (a["at"], a["gate"]))
 
     out_lines = []
@@ -1028,7 +1237,7 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
                 "laden_leg": l["laden_leg"], "empty_leg": l["empty_leg"]}
         if mine(li):
             base.update({"discipline": l["discipline"], "section_id": l["section_id"], "vehicle": l["vehicle"],
-                         "vehicle_label": conversions.vehicle_label(factors, l["vehicle"]),
+                         "vehicle_label": l["vehicle_label"],
                          "vehicle_as_planned": l["vehicle_as_planned"], "material": l["material"],
                          "trips_month": l["trips"], "per_day": round(l["share"], 3), "loads": res["per_line"][li]})
         out_lines.append(base)
@@ -1063,6 +1272,20 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
                 "m3_per_load": pour["m3_per_load"], "rate": pour["rate"], "loads": pour["loads"],
                 "gap_minutes": _r2(pour["gap"]), "end": hhmm(pour["end"]), "approach_leg": pour["approach_leg"],
                 "while_shut": pour.get("while_shut", 0)}
+
+    # 28 Oct 2026 (v2): the sites' blocks and their words
+    out_sites = [sim_site.site_reply(sites[lid], res["sites"][lid], send_lines) for lid in sorted(sites, key=lambda k: sites[k]["name"])]
+    for s in out_sites:
+        if s["speed_basis"] == "default":
+            notes.append(f"{s['name']}: no site speed typed, so the simulation's default site speed stands in "
+                         f"(Data → Locations).")
+        for na in s["no_area"]:
+            who = f"route {na['route']}" if na["route"] else "the pour"
+            notes.append(f"{s['name']}: no area takes {na['material'] or 'this material'} from {who}, so those "
+                         f"{na['lorries']} lorries leave from the gate.")
+    for gid, (blocked, to_name, loc) in sorted(closed_seen.items()):
+        notes.append(f"{loc.get('name') or loc.get('id')}: {blocked.get('name')} {gates.closed_words(blocked)}: "
+                     f"in and out by {to_name}.")
 
     n_pour = pour["loads"] if pour else 0
     total_arr = sum(g["arrivals"] for g in out_gates)
@@ -1100,11 +1323,15 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         notes.append(f"Lines of another {word} are shown by route only: their own figures are theirs.")
     mx, mx_name = mixer_m3(factors)
     return {
-        "month": int(month_index), "label": gate_arrivals.month_label(int(month_index)),
+        "month": int(month_index), "label": label,
+        # 28 Oct 2026 (v2): the scale and what it reads
+        "scale": scale, "week": week_block, "date": (chosen.isoformat() if chosen else None),
+        "day_choices": day_choices,
         "working_days": wd, "scope": "team" if team_scope else "scheme",
         "loads": res["total"], "loads_month": sum(l["trips"] for l in lines),
         "gate_arrivals": total_arr,
         "lines": out_lines, "gates": out_gates, "arrivals": arrivals, "pour": pour, "haul_roads": haul,
+        "sites": out_sites,
         "access_roads_hidden": (len(used_zones & access_ids) if with_lines else 0),
         # 17 Oct 2026: where a pour can go (working sites only), busiest first; the first is the screen's default
         "pour_gates": pgates, "pour_default": (pgates[0]["gate_id"] if pgates else None),
@@ -1124,13 +1351,27 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         # D.stand_in.from when its Simulation section mounts, and the page would go blank without it. Remove after.
         "stand_in": {"from": hhmm(dwin[0]), "to": hhmm(dwin[1]), "shift_hours": (dwin[1] - dwin[0]) / 60.0},
         "near_pct": gate_hours.NEAR_PCT,
+        "site_speed_default_kph": sim_site.DEFAULT_SITE_KPH,
         "checks": {"arrivals_listed": len(arrivals), "arrivals_expected": expect,
                    "table_equals_arrivals": total_arr == len(arrivals) == expect - sum(g["unplaced"] for g in out_gates),
                    "hours_add_up": all(sum(g["hours"]) == g["arrivals"] for g in out_gates),
-                   "largest_panel_difference": (round(max(diffs), 2) if diffs else None)},
+                   "largest_panel_difference": (round(max(diffs), 2) if diffs else None),
+                   # 28 Oct 2026 (v2): every chained lorry left by a gate, and the stations' arrivals add up
+                   "sites_add_up": all(s["lorries_out"] + sum(n["lorries"] for n in s["no_area"]) == s["lorries_in"]
+                                       for s in out_sites)},
         "rounding": {"exact": res["rounding_exact"], "worst": round(res["rounding_worst"], 3)},
         "notes": notes, "limits": list(LIMITS),
     }
+
+
+def closed_seen_to(closed_seen):
+    """[(the gate id lorries went to instead, the closed gate id)] — for the gate rows' 'serves the exit too' flag."""
+    out = []
+    for cg, (blocked, to_name, loc) in closed_seen.items():
+        for g in gates.list_gates(loc.get("id")):
+            if g.get("name") == to_name:
+                out.append((g["id"], cg))
+    return out
 
 
 def busiest(month_index, acc, factors, working_days, panel):

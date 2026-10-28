@@ -405,6 +405,8 @@ def _row(z):
         # distinguishable from one deliberately set to HERE's own timing.
         "speed_kph": (float(z["speed_kph"]) if z.get("speed_kph") not in (None, "") else None),
         "haul_mode": (z.get("haul_mode") or None),
+        # 28 Oct 2026 (simulation v2): a haul road INSIDE this site (never spliced into a public route)
+        "location_id": (z.get("location_id") or None),
         "length_km": (round(line_length_km(as_line(geom)), 3)
                       if geom and as_line(geom) else None),
         # what the router would actually receive, exposed so the difference between the
@@ -448,14 +450,30 @@ def _clean_speed(v):
 
 def _clean_mode(v):
     v = (v or "").strip().lower()
-    return v if v in ("splice", "via") else None
+    return v if v in ("splice", "via", "internal") else None
+
+
+def _internal_problem(location_id, kind):
+    """28 Oct 2026: a road inside a site is a haul road of a location that exists; blank = a public haul road."""
+    if location_id in (None, ""):
+        return None
+    if kind != HAUL_KIND:
+        return "only a haul road can be drawn inside a site"
+    if not db.query("SELECT id FROM locations WHERE tenant_id = ? AND id = ?", (db.current_tenant(), str(location_id))):
+        return f"location {location_id} not found"
+    return None
 
 
 def create_zone(name, geometry, kind=None, affects_routing=True,
                 starts_on=None, ends_on=None, note=None, active=True, zone_id=None,
-                speed_kph=None, haul_mode=None):
+                speed_kph=None, haul_mode=None, location_id=None):
     if not (name or "").strip():
         return {"error": "name is required"}
+    ip = _internal_problem(location_id, kind or "other")
+    if ip:
+        return {"error": ip}
+    if location_id not in (None, ""):
+        haul_mode = "internal"
     if not _valid_geometry(geometry):
         return {"error": "geometry must be a GeoJSON Polygon or LineString with coordinates"}
     kind = kind or "other"
@@ -471,12 +489,12 @@ def create_zone(name, geometry, kind=None, affects_routing=True,
     now = _now()
     db.execute(
         "INSERT INTO zones (tenant_id, id, name, kind, geometry, affects_routing, "
-        "starts_on, ends_on, note, active, created_at, updated_at, speed_kph, haul_mode) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "starts_on, ends_on, note, active, created_at, updated_at, speed_kph, haul_mode, location_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (db.current_tenant(), zid, name.strip(), kind, json.dumps(geometry),
          bool(affects_routing), _clean_date(starts_on), _clean_date(ends_on),
          (note or None), bool(active), now, now,
-         _clean_speed(speed_kph), _clean_mode(haul_mode)),
+         _clean_speed(speed_kph), _clean_mode(haul_mode), (str(location_id).strip() if location_id not in (None, "") else None)),
     )
     return get_zone(zid)
 
@@ -513,8 +531,18 @@ def update_zone(zone_id, **fields):
                          "along, and a closed shape has no entry or exit"}
     if "speed_kph" in fields:
         sets.append("speed_kph = ?"); params.append(_clean_speed(fields["speed_kph"]))
-    if "haul_mode" in fields:
-        sets.append("haul_mode = ?"); params.append(_clean_mode(fields["haul_mode"]))
+    # 28 Oct 2026 (simulation v2): inside a site = mode internal; blank = a public haul road again
+    new_loc = fields["location_id"] if "location_id" in fields else cur[0].get("location_id")
+    ip = _internal_problem(new_loc, new_kind)
+    if ip:
+        return {"error": ip}
+    if "location_id" in fields:
+        sets.append("location_id = ?"); params.append(str(new_loc).strip() if new_loc not in (None, "") else None)
+    if new_loc not in (None, ""):
+        sets.append("haul_mode = ?"); params.append("internal")
+    elif "haul_mode" in fields or "location_id" in fields:
+        m = _clean_mode(fields.get("haul_mode", cur[0].get("haul_mode")))
+        sets.append("haul_mode = ?"); params.append(None if m == "internal" else m)
     if "affects_routing" in fields:
         sets.append("affects_routing = ?"); params.append(bool(fields["affects_routing"]))
     if "starts_on" in fields:
@@ -573,15 +601,30 @@ def routing_zones(on=None):
             and applies_on(z, on)]
 
 
-def haul_roads(on=None, include_inactive=False, require_geometry=True):
+def haul_roads(on=None, include_inactive=False, require_geometry=True, internal=False):
     """
     Haul-road zones in force on a date. `affects_routing` gates them here exactly as it
     gates the avoid list: off means drawn on the map but never threaded into a route.
+    28 Oct 2026 (simulation v2): a road INSIDE a site (`location_id` set) is left out unless `internal` is
+    asked for — the router, the access roads, the maps and the PDFs never see one; the simulation reads them
+    through internal_roads().
     """
     out = [z for z in list_zones(include_inactive=include_inactive)
-           if z["kind"] == HAUL_KIND and applies_on(z, on)]
+           if z["kind"] == HAUL_KIND and applies_on(z, on) and (internal or not z.get("location_id"))]
     if require_geometry:
         out = [z for z in out if z["geometry"]]
+    return out
+
+
+def internal_roads(location_id=None, include_inactive=False):
+    """28 Oct 2026 (simulation v2): the haul roads drawn inside a site ({location id: [zones]}, or one site's list)."""
+    rows = [z for z in list_zones(include_inactive=include_inactive)
+            if z["kind"] == HAUL_KIND and z.get("location_id") and z["geometry"]]
+    if location_id:
+        return [z for z in rows if z["location_id"] == location_id]
+    out = {}
+    for z in rows:
+        out.setdefault(z["location_id"], []).append(z)
     return out
 
 

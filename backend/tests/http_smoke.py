@@ -1102,6 +1102,28 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("🔴 S3: a window past midnight is refused in words — 400 (D93)", r.status_code == 400 and "past midnight" in r.text, r.text[:200])
     r = c.get("/api/sim/day?month=16&pour_gate=G007&pour_start=23:00&pour_m3=160&pour_rate=60", headers=PLAN)
     ok("🔴 S3: a pour past midnight is refused in words — 400", r.status_code == 400 and "past midnight" in r.text, r.text[:200])
+    # ---- 28 Oct 2026 (simulation v2, task 0e): the scales, the sites, the site areas -----------------------------------
+    r = c.get("/api/sim/day?month=16&scale=fortnight", headers=PLAN)
+    ok("🔴 v2: scale=fortnight is refused in words — 400", r.status_code == 400 and "scale must be month, week or day" in r.text, r.text[:200])
+    r = c.get("/api/sim/day?scale=week", headers=PLAN)
+    sw = r.json() if r.status_code == 200 else {}
+    ok("⭐ v2: scale=week answers the Look-ahead week with today in it (its dates, ten day choices, the sites list, the checks)",
+       r.status_code == 200 and sw.get("scale") == "week" and (sw.get("week") or {}).get("from") and len(sw.get("day_choices") or []) == 10
+       and isinstance(sw.get("sites"), list) and sw.get("checks", {}).get("table_equals_arrivals") is True, r.text[:300])
+    _d = (sw.get("day_choices") or [{}])[2].get("date")
+    r = c.get(f"/api/sim/day?scale=day&date={_d}", headers=PLAN)
+    sdy = r.json() if r.status_code == 200 else {}
+    ok("⭐ v2: scale=day on a weekday of that week answers that day's planned lorries, whole as planned",
+       r.status_code == 200 and sdy.get("scale") == "day" and sdy.get("date") == _d and sdy.get("working_days") == 1
+       and (sdy.get("rounding") or {}).get("exact") is True and sdy.get("checks", {}).get("table_equals_arrivals") is True, r.text[:300])
+    r = c.get("/api/sim/day?scale=day&date=2030-12-31", headers=PLAN)
+    ok("🔴 v2: a day outside the Look-ahead's two weeks is refused in words — 400", r.status_code == 400 and "pick a day" in r.text, r.text[:200])
+    r = c.get("/api/site-areas")
+    ok("🔴 v2: the site areas without a code — 401", r.status_code == 401, str(r.status_code))
+    r = c.get("/api/site-areas", headers=PLAN)
+    ok("v2: the site areas list answers a planner (the shipped demo has none until the viaduct site lands)",
+       r.status_code == 200 and isinstance(r.json().get("areas"), list), r.text[:200])
+    ok("v2: the month's day carries the sites list and the default site speed", isinstance(sd.get("sites"), list) and sd.get("site_speed_default_kph") == 8.0)
     r = c.get("/api/sim/day?month=16&legs=1", headers=PLAN)
     sl = r.json() if r.status_code == 200 else {}
     # the demo package carries no route lines (they are worked out after an import), so here every route is "not drawn"

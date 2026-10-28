@@ -126,17 +126,18 @@ def trips_for(row, factors):
     return int(derived.day_figures(row.get("quantity"), ctx, factors)["trips"])
 
 
-def entry_gate(loc, named, loc_gates):
+def entry_gate(loc, named, loc_gates, on=None):
     """
     (resolved, blocked) — the gate a lorry ARRIVES by at `loc`: gates.resolve(loc, 'entry', the route's named gate).
     A named gate that is inactive or no longer recorded (`blocked`) still has lorries arriving, so they are counted at
     the location's default entry gate. 16 Oct 2026 (S3): pulled out of arrivals() so the simulation (sim.py) and
-    week_by_day() resolve every end by this one rule.
+    week_by_day() resolve every end by this one rule. 28 Oct 2026 (simulation v2): `on` (a date or a month index)
+    makes a gate closed for a period fall to the site's other gate — for both directions (gates.resolve).
     """
-    r = gates.resolve(loc, "entry", named, gates=loc_gates)
+    r = gates.resolve(loc, "entry", named, gates=loc_gates, on=on)
     blocked = r.get("blocked")
     if blocked:
-        r = gates.resolve(loc, "entry", None, gates=loc_gates)
+        r = gates.resolve(loc, "entry", None, gates=loc_gates, on=on)
     return r, blocked
 
 
@@ -237,7 +238,7 @@ def arrivals(month_index, acc, factors=None, working_days=None):
             # the route names a gate that is inactive or no longer recorded: resolve refuses to pick another (the bake
             # must not quietly move to a different road), but the lorries on an approved line still arrive, so
             # entry_gate counts them at the location's default entry gate, and a note here says so.
-            r, blocked = entry_gate(loc, named, loc_gates)
+            r, blocked = entry_gate(loc, named, loc_gates, on=int(month_index))
             if blocked:
                 b = blocked_at.setdefault((loc["id"], named), {
                     "loc": loc, "blocked": dict(blocked), "to": r.get("gate_name"), "routes": set()})
@@ -359,9 +360,13 @@ def arrivals(month_index, acc, factors=None, working_days=None):
         name = b["loc"].get("name") or lid
         n = len(b["routes"])
         routes_word = "1 route names" if n == 1 else f"{n} routes name"
+        reason = b["blocked"].get("reason")
         gate_word = (f"gate {b['blocked'].get('name')}, which is inactive"
-                     if b["blocked"].get("reason") == "inactive" else "a gate that is no longer recorded")
-        if b["to"]:
+                     if reason == "inactive" else "a gate that is no longer recorded")
+        # 28 Oct 2026 (simulation v2): a gate closed for a period — in and out by the site's other gate
+        if reason == "closed" and b["to"]:
+            notes.append(f"{name}: {b['blocked'].get('name')} {gates.closed_words(b['blocked'])}: in and out by {b['to']}.")
+        elif b["to"]:
             notes.append(f"{name}: {routes_word} {gate_word}, so arrivals there are counted at {b['to']}.")
         else:
             no_gate_locs.pop(lid, None)
@@ -370,6 +375,18 @@ def arrivals(month_index, acc, factors=None, working_days=None):
     for lid in sorted(no_gate_locs):
         name = no_gate_locs[lid].get("name") or lid
         notes.append(f"{name} has no entry gate recorded, so arrivals there are not shown.")
+    # 28 Oct 2026 (simulation v2): the gates closed for this month at the sites with arrivals, for their own row
+    closed_gates = []
+    _locs_with = {gate_rows[g]["location_id"] for g in per_gate if g in gate_rows}
+    for gid, grow in sorted(gate_rows.items()):
+        if grow.get("active") and grow["location_id"] in _locs_with and gid not in per_gate \
+                and gates.closed_on(grow, int(month_index)):
+            loc = locations.get(grow["location_id"]) or {}
+            to = entry_gate(loc, None, gbl.get(loc.get("id")) or [], on=int(month_index))[0]
+            closed_gates.append({"gate_id": gid, "gate_name": grow.get("name"), "location_id": grow["location_id"],
+                                 "location_name": loc.get("name") or grow["location_id"],
+                                 "closed_words": gates.closed_words(grow), "closed_from": grow.get("closed_from"),
+                                 "closed_to": grow.get("closed_to"), "to_gate_name": to.get("gate_name")})
     # 17 Oct 2026: every gate has clock hours now (typed, or the default), so the bands come off every gate and the note
     # that they could not (the shift had no clock times) is gone; one note says what the averages rest on
     bands = gate_hours.peak_bands(factors)
@@ -407,6 +424,7 @@ def arrivals(month_index, acc, factors=None, working_days=None):
         "scope": scope,
         "gates": out_gates,
         "notes": notes,
+        "closed_gates": closed_gates,
         # 14 Oct 2026 (W17): the 85 % step, the scheme's no-delivery windows and the printed limit
         "near_pct": gate_hours.NEAR_PCT,
         "peak_bands": bands,
@@ -477,7 +495,7 @@ def week_by_day(lines, factors=None, dates=None):
         "SELECT * FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
     gbl = gates.gates_by_location()
     gate_rows = {g["id"]: g for gs in gbl.values() for g in gs}
-    per, keys, all_dates = {}, {}, set(dates or [])
+    per, keys, all_dates, rcache = {}, {}, set(dates or []), {}
     for l in lines or []:
         route = routes.get(l.get("route_id"))
         if not route:
@@ -489,13 +507,18 @@ def week_by_day(lines, factors=None, dates=None):
             loc = locations.get(route.get(loc_key))
             if not loc:
                 continue
-            r, _blocked = entry_gate(loc, route.get(gate_key), gbl.get(loc["id"]) or [])
-            gid = r.get("gate_id")
-            if gid is None:
-                continue
+            named, lgs = route.get(gate_key), gbl.get(loc["id"]) or []
             for d in l.get("days") or []:
                 t = int(((d.get("derived") or {}).get("trips")) or 0)
                 if t <= 0:
+                    continue
+                # 28 Oct 2026 (simulation v2): resolved on the day, so a gate closed for a period hands its
+                # lorries to the site's other gate on the days it is closed
+                ck = (loc["id"], named, d["day_date"])
+                if ck not in rcache:
+                    rcache[ck] = entry_gate(loc, named, lgs, on=datetime.date.fromisoformat(d["day_date"]))[0].get("gate_id")
+                gid = rcache[ck]
+                if gid is None:
                     continue
                 g = per.setdefault(gid, {})
                 g[d["day_date"]] = g.get(d["day_date"], 0) + t
@@ -517,7 +540,8 @@ def week_by_day(lines, factors=None, dates=None):
         for iso in shown:
             arr = int(byday.get(iso, 0))
             # 17 Oct 2026: a gate whose bands and shut windows leave it no open minute is shut all day, like a closed day
-            open_today = gate_hours.is_open_on(grow, datetime.date.fromisoformat(iso)) and om["minutes"] > 0
+            closed_period = gates.closed_on(grow, datetime.date.fromisoformat(iso))
+            open_today = gate_hours.is_open_on(grow, datetime.date.fromisoformat(iso)) and om["minutes"] > 0 and not closed_period
             flag = gate_hours.status(arr, cap_raw, open_today)
             cap_day = (r1(cap_raw) if cap_raw is not None else None) if open_today else 0.0
             pct = round(arr * 100.0 / cap_raw) if (cap_raw and arr and open_today) else None
@@ -526,7 +550,8 @@ def week_by_day(lines, factors=None, dates=None):
             if flag == "red" or (flag == "amber" and worst is None):
                 worst = flag
             days_out.append({"date": iso, "day": day_words(iso), "arrivals": arr, "capacity": cap_day, "pct": pct,
-                             "open": open_today, "flag": flag, "status_word": gate_hours.STATUS_WORDS.get(flag),
+                             "open": open_today, "closed": closed_period,
+                             "flag": flag, "status_word": gate_hours.STATUS_WORDS.get(flag),
                              "_lines": keys.get((gid, iso), [])})
         no_open = om["minutes"] <= 0
         out.append({"gate_id": gid, "gate_name": grow.get("name"), "location_id": grow.get("location_id"),
@@ -537,6 +562,8 @@ def week_by_day(lines, factors=None, dates=None):
                     # 17 Oct 2026 (review): the bands and shut times leave no open minute — every day is shut
                     "no_open_time": no_open,
                     "closed_days": gate_hours.closed_days_words(grow),
+                    # 28 Oct 2026 (simulation v2): closed for a period (its own row says so; its lorries are at the other gate)
+                    "closed_words": gates.closed_words(grow),
                     "capacity_per_day": (0.0 if no_open else (r1(cap_raw) if cap_raw is not None else None)),
                     "near_per_day": (0.0 if no_open else (r1(cap_raw * gate_hours.NEAR_PCT / 100.0) if cap_raw is not None else None)),
                     "peak_pct": peak_pct, "flag": worst, "status_word": gate_hours.STATUS_WORDS.get(worst),
