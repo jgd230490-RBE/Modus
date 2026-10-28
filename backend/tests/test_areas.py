@@ -1148,13 +1148,18 @@ ok("8. nothing external: no urllib, requests, HERE, shapely", not re.search(r"\b
 ok("8. no geometry library added to the requirements", "shapely" not in read("backend/requirements.txt").lower())
 ok("8. the month read takes the bar's payload through road_sections.month_lines (one read of the month)",
    "payload = road_sections.month_lines(month)" in src and "import costlines" not in src)
+# NARROWED 29 Oct 2026 (task 0c, PR B): the same divisor for each (laden option, empty option) pair a month uses, the
+# share of the month's working days on that pair (w) in front: a route no dated zone diverts is one pair, w = 1.0
 ok("8. ⭐ the carbon divisor is the two-way length, the laden km plus the stored return",
-   '(prof.get("loaded") or {}).get(WHOLE_LEG, 0.0) + (prof.get("return") or {}).get(WHOLE_LEG, 0.0)' in src
-   and "co2 += c * (lin + rin) / two_way" in src)
+   "two_way = L.get(WHOLE_LEG, 0.0) + Rt.get(WHOLE_LEG, 0.0)" in src
+   and "co2 += c * w * (lin + rin) / two_way" in src)
 # NARROWED 12 Oct 2026 (Track C review): "enters" is at least ENTER_KM (200 m, the BSC generalisation) of the laden leg,
 # not any length over half a metre; the return still adds none
+# NARROWED 29 Oct 2026 (task 0c, PR B): the loads of the share of the month whose LADEN line enters (w_in: 1.0 for a
+# route no dated zone diverts), still only one place that adds loads
 ok("8. ⭐ movements: the loads of routes whose LADEN leg enters (200 m or more inside), the return adds none",
-   "if lin >= ENTER_KM:\n                routes.append(rid)\n                loads += ld" in src and "ENTER_KM = 0.2" in src
+   "w_in = sum(w for w, L, Rt in opts if L.get(aid, 0.0) >= ENTER_KM)" in src
+   and "if w_in > 0:\n                routes.append(rid)\n                loads += ld * w_in" in src and "ENTER_KM = 0.2" in src
    and src.count("loads += ld") == 1)
 ok("8. no US spelling in the module's sentences", not re.search(r"\b(color|center|meter|kilometer|neighbor|analyze|optimize)\b", src, re.I))
 ok("8. the module says what it does not do", "WHAT THIS DOES NOT DO" in src)

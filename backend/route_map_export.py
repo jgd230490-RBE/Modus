@@ -123,7 +123,7 @@ def sheet(month_index, route_ids=None, team=None, acc=None, now=None, origin=Non
     R = bulletin.rollup_payloads([payload], routes, wd, acc=acc)
     rows = list(R.get("by_route") or [])
     ids = [r["route_id"] for r in rows]
-    geo = bulletin_doc._geometries(ids)
+    geo = bulletin_doc._geometries(ids, month_index=mi)     # 29 Oct 2026 (task 0c, PR B): the month's lines
 
     # letter pins, the busiest route's ends first (the bulletin's rule); `end` says which end of a route it is
     places, letter_of = [], {}

@@ -10767,7 +10767,8 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){
     let live = true;
     if(!ids.length){ setGeo({ routes: [] }); return; }
     const vehicles = ids.map(id => ((byRoute[id] || [])[0] || {}).vehicle_type || "");
-    fetch(`${API}/lookahead/geometry?ids=${encodeURIComponent(ids.join(","))}&vehicles=${encodeURIComponent(vehicles.join(","))}`)
+    // 29 Oct 2026 (task 0c, PR B): the week on screen, so a route diverted that week is drawn on its diversion
+    fetch(`${API}/lookahead/geometry?ids=${encodeURIComponent(ids.join(","))}&vehicles=${encodeURIComponent(vehicles.join(","))}&bucket=${bucket === "next" ? "next" : "commit"}`)
       .then(okJSON)
       .then(j => { if(live){ setGeo(j); setErr(""); } })
       .catch(e => { if(live) setErr(errSay("Couldn't load the week's routes for the map.", e)); });
@@ -12676,7 +12677,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const newArea = () => setAreaForm({ id: null, name: "", activity: "unload", materials: [], service_minutes: "", bays: "1", level: "", lat: "", lon: "", active: true, geometry: null });
   const editArea = (a) => setAreaForm({ id: a.id, name: a.name || "", activity: a.activity || "unload", materials: a.materials || [],
     service_minutes: a.service_minutes == null ? "" : a.service_minutes, bays: String(a.bays || 1), level: a.level || "",
-    lat: a.point ? a.point[1] : "", lon: a.point ? a.point[0] : "", active: !!a.active, geometry: a.geometry || null });
+    lat: a.point ? String(Math.round(a.point[1] * 1e6) / 1e6) : "", lon: a.point ? String(Math.round(a.point[0] * 1e6) / 1e6) : "",
+    active: !!a.active, geometry: a.geometry || null });
   const saveArea = async () => {
     if(!areaForm || !form || !form.id) return;
     if(!areaForm.name.trim()){ setAreaMsg("Give the area a name."); return; }
@@ -14213,9 +14215,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         Splice if the road is not on the map yet; Via if it is. Not sure: Splice.
                       </span>
                     </label>}
-                    <p className="text-[13px] text-amber-800">
+                    {!zoneForm.location_id && <p className="text-[13px] text-amber-800">
                       Does nothing until it is <strong>attached to a route</strong> (Routes page, open the route's row).
-                    </p>
+                    </p>}
                   </div>
                 )}
 

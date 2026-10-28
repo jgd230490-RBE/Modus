@@ -185,6 +185,17 @@ class _Vertices:
         return vid
 
 
+def _base(key):
+    """29 Oct 2026 (task 0c, PR B): an owner key's route — "R012@1" (a diversion's line) is R012."""
+    return str(key).split("@", 1)[0]
+
+
+def _n_routes(owners):
+    """How many ROUTES own a segment: a route's main line and its own diversion are one route, not two, so a stretch
+    only they share is not a shared road."""
+    return len({_base(k) for k in owners})
+
+
 def _run_id(leg, owners, geom):
     """
     A short id that is stable across rebuilds of the same geometry. 12 Oct 2026 (the
@@ -252,7 +263,7 @@ def build_runs(polylines, leg="loaded"):
         while k < n:
             sk = _sk(ids[k - 1], ids[k])
             own = seg_owners[sk]
-            if len(own) < MIN_OWNERS or sk in used:
+            if _n_routes(own) < MIN_OWNERS or sk in used:
                 k += 1
                 continue
             used.add(sk)
@@ -325,7 +336,7 @@ def build_runs(polylines, leg="loaded"):
     stats = {
         "routes_indexed": len(walked),
         "vertices_total": sum(1 for o in V.owners if o),
-        "vertices_shared": sum(1 for o in V.owners if len(o) >= MIN_OWNERS),
+        "vertices_shared": sum(1 for o in V.owners if _n_routes(o) >= MIN_OWNERS),
         "runs": len(runs),
     }
     return runs, stats
@@ -352,16 +363,30 @@ def index_profile():
     return sorted(have, key=lambda p: (-have[p], p))[0]
 
 
-def polylines_for(leg, profile):
-    """{route_id: coords} of the primary geometry of one leg for one profile."""
+def polylines_for(leg, profile, diversions=True):
+    """{route_id: coords} of the primary geometry of one leg for one profile.
+
+    29 Oct 2026 (task 0c, PR B): with `diversions`, plus every stored option a dated zone's diversion uses on this leg
+    for this profile, keyed "R012@1" (route_choice.leg_key): the index then knows the roads a route takes in its
+    diverted months, and road_load gives each key its share of the month (route_choice.month_weights)."""
     out = {}
+    use = {}
+    if diversions:
+        try:
+            import route_choice
+            use = {(rid, lg): alts for (rid, _p, lg), alts in route_choice.in_use(profile).items()}
+        except Exception:
+            use = {}
     for g in db.query(
-            "SELECT route_id, geometry FROM route_geometry WHERE tenant_id = ? "
-            "AND vehicle_profile = ? AND leg = ? AND alt_index = 0 AND geometry IS NOT NULL",
+            "SELECT route_id, alt_index, geometry FROM route_geometry WHERE tenant_id = ? "
+            "AND vehicle_profile = ? AND leg = ? AND geometry IS NOT NULL",
             (db.current_tenant(), profile, leg)):
+        alt = int(g.get("alt_index") or 0)
+        if alt and alt not in use.get((g["route_id"], leg), ()):
+            continue
         pts = coords_of(g["geometry"])
         if len(pts) >= 2:
-            out[g["route_id"]] = pts
+            out[g["route_id"] if not alt else f"{g['route_id']}@{alt}"] = pts
     return out
 
 
@@ -553,9 +578,37 @@ def route_lengths(profile):
     loaded = {rid: length_km(pts) for rid, pts in polylines_for("loaded", profile).items()}
     ret = {rid: length_km(pts) for rid, pts in polylines_for("return", profile).items()}
     out = {}
-    for rid in set(loaded) | set(ret):
+    for rid in {k for k in set(loaded) | set(ret) if "@" not in k}:
         lk, rk = loaded.get(rid, 0.0), ret.get(rid, 0.0)
         out[rid] = {"loaded": lk, "return": rk, "two_way": lk + rk}
+    # 29 Oct 2026 (task 0c, PR B): a diversion's key ("R012@1"): that option's own leg where it is stored, the route's
+    # main leg where it is not — the two-way length a month's carbon on that key is divided over
+    for key in {k for k in set(loaded) | set(ret) if "@" in k}:
+        lk = loaded.get(key, loaded.get(_base(key), 0.0))
+        rk = ret.get(key, ret.get(_base(key), 0.0))
+        out[key] = {"loaded": lk, "return": rk, "two_way": lk + rk}
+    return out
+
+
+def key_weights(owners, month, leg, profile, cache=None):
+    """
+    29 Oct 2026 (task 0c, PR B): {owner key: share of `month`'s working days the route uses that line on `leg`}. A main
+    line ("R012") gets the days on no diversion, "R012@1" the days on option 1; a route no diversion touches gets 1.0.
+    `cache` ({(route, month): weights}) lives for one read.
+    """
+    import route_choice
+    out = {}
+    for k in owners:
+        rid = _base(k)
+        ck = (rid, int(month))
+        if cache is None or ck not in cache:
+            w = route_choice.month_weights(rid, profile, int(month))
+            if cache is not None:
+                cache[ck] = w
+        else:
+            w = cache[ck]
+        alt = int(k.split("@", 1)[1]) if "@" in k else 0
+        out[k] = float((w.get(leg) or {}).get(alt, 0.0))
     return out
 
 
@@ -590,20 +643,26 @@ def section_co2_max(route_month_co2, leg="loaded", profile=None, drawn=None):
     each route). None when no run carries a figure.
     """
     drawn = drawn_route_ids() if drawn is None else set(drawn)
-    lens = route_lengths(profile or index_profile())
+    profile = profile or index_profile()
+    lens = route_lengths(profile)
+    wcache = {}
     best = None
     for run in stored_runs(leg):
         per_month = {}
         for r in run["routes"]:
-            if r not in drawn:
+            if _base(r) not in drawn:
                 continue
             tw = (lens.get(r) or {}).get("two_way") or 0.0
             if tw <= 0:
                 continue
-            for m, c in (route_month_co2.get(r) or {}).items():
+            for m, c in (route_month_co2.get(_base(r)) or {}).items():
                 if c is None:
                     continue
-                per_month[m] = per_month.get(m, 0.0) + float(c) * run["length_km"] / tw
+                # 29 Oct 2026 (task 0c, PR B): a line's share of the month (1.0 for a route no diversion touches)
+                w = key_weights([r], int(m), leg, profile, wcache)[r]
+                if w <= 0:
+                    continue
+                per_month[m] = per_month.get(m, 0.0) + float(c) * w * run["length_km"] / tw
         for v in per_month.values():
             if v > 0 and (best is None or v > best):
                 best = v
@@ -711,24 +770,40 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
             return 0.0
         return pr["co2_t"] if pr["co2_lines"] else None
 
-    def co2_share(rid, run_km):
-        c = route_co2(rid)
+    def co2_share(key, run_km, w=1.0):
+        c = route_co2(_base(key))
         if c is None:
             return None
-        tw = (lens.get(rid) or {}).get("two_way") or 0.0
-        return (c * run_km / tw) if tw > 0 else 0.0
+        tw = (lens.get(key) or {}).get("two_way") or 0.0
+        return (c * w * run_km / tw) if tw > 0 else 0.0
 
+    # 29 Oct 2026 (task 0c, PR B): a run's owners are index keys ("R012" the main line, "R012@1" a diversion's line).
+    # Each key carries its route's month volume × its share of the month's working days (key_weights), and the run
+    # lists ROUTES — one entry a route, its keys' shares summed (a route on both its main line and its diversion in
+    # one run has the whole month). A key with no share in this month is not on the run this month.
+    wcache = {}
     runs_out = []
     for run in stored_runs(leg):
-        owners = run["routes"]
-        loads = sum(per_route.get(r, _NO_VOLUME)["loads"] for r in owners)
+        kw = key_weights(run["routes"], month, leg, profile, wcache)
+        rw = {}
+        for k, w in kw.items():
+            if w > 0:
+                rw[_base(k)] = rw.get(_base(k), 0.0) + w
+        owners = sorted(rw)
+        loads = sum(per_route.get(r, _NO_VOLUME)["loads"] * min(1.0, rw[r]) for r in owners)
         if loads <= 0:
             continue
         co2, co2_known = 0.0, False
         routes_out = []
         for r in owners:
             pr = per_route.get(r, _NO_VOLUME)
-            share = co2_share(r, run["length_km"])
+            share = None
+            for k, w in kw.items():
+                if _base(k) != r or w <= 0:
+                    continue
+                s_k = co2_share(k, run["length_km"], w)
+                if s_k is not None:
+                    share = (share or 0.0) + s_k
             if share is not None:
                 co2 += share
                 if pr["loads"] > 0:
@@ -737,9 +812,9 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
             routes_out.append({
                 "route_id": r,
                 "teams": team_names(r),
-                "loads": round(pr["loads"], 3),
+                "loads": round(pr["loads"] * min(1.0, rw[r]), 3),
                 "trips": pr["trips"],
-                "movements_per_day": round(pr["loads"] / wd, 2),
+                "movements_per_day": round(pr["loads"] * min(1.0, rw[r]) / wd, 2),
                 "vehicles": pr["vehicles"],
                 "co2_t": (None if share is None else round(share, 3)),
                 "co2_lines_unbaked": pr["co2_lines_unbaked"],
@@ -750,6 +825,7 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
             "id": run["id"],
             "leg": leg,
             "routes": owners,
+            "diverted": sorted({_base(k) for k, w in kw.items() if "@" in k and w > 0}),   # 29 Oct 2026 (0c PR B)
             "teams": sorted({t for r in owners for t in team_names(r)}),
             "loads": round(loads, 3),
             "trips": sum(per_route.get(r, _NO_VOLUME)["trips"] for r in owners),

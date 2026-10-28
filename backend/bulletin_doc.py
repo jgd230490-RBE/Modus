@@ -160,14 +160,26 @@ def _letters(i):
 # --------------------------------------------------------------------------- #
 #  The view model                                                              #
 # --------------------------------------------------------------------------- #
-def _geometries(route_ids):
-    """{route_id: [(lon, lat), …]} — the LADEN leg the public map draws, from the same read."""
+def _geometries(route_ids, month_index=None):
+    """{route_id: [(lon, lat), …]} — the LADEN leg the public map draws, from the same read.
+
+    29 Oct 2026 (task 0c, PR B): with `month_index`, a route a dated zone diverts in that month is drawn on its
+    diversion, as the public map draws it in that month (the map data's 'Diversion' features)."""
     import network
     want, out = set(route_ids), {}
-    for f in (network.public_map_data() or {}).get("features", []) or []:
+    feats = (network.public_map_data() or {}).get("features", []) or []
+    div = {}
+    if month_index is not None:
+        for f in feats:
+            p, g = f.get("properties") or {}, f.get("geometry") or {}
+            if (p.get("type") == "Diversion" and p.get("leg") == "loaded" and p.get("route_id") in want
+                    and int(month_index) in (p.get("months") or []) and g.get("type") == "LineString"):
+                div[p["route_id"]] = g.get("coordinates") or []
+    for f in feats:
         p, g = f.get("properties") or {}, f.get("geometry") or {}
         if p.get("route_id") in want and p.get("type") == "Inbound Highway" and g.get("type") == "LineString":
-            cs = [(float(c[0]), float(c[1])) for c in (g.get("coordinates") or []) if len(c) >= 2]
+            src = div.get(p["route_id"]) or g.get("coordinates") or []
+            cs = [(float(c[0]), float(c[1])) for c in src if len(c) >= 2]
             if len(cs) >= 2:
                 out[p["route_id"]] = (cs, p.get("origin_id"), p.get("dest_id"))
     return out
@@ -734,7 +746,7 @@ def sheet(month_index, acc=None, now=None):
 
     rows = list(R.get("by_route") or [])
     prev_rows = {r["route_id"]: r for r in ((prev or {}).get("by_route") or [])}
-    geo = _geometries([r["route_id"] for r in rows])
+    geo = _geometries([r["route_id"] for r in rows], month_index=mi)     # 29 Oct 2026 (task 0c, PR B): the month's lines
 
     # letter pins: the busiest route's sites first, so the top route reads "A → B"
     places, letter_of = [], {}
