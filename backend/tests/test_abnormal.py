@@ -580,14 +580,17 @@ ok("⭐ the shipped copy of gov.uk's feed: three divisions, dates to Dec 2028, E
    set(FEED) >= {"england-and-wales", "scotland", "northern-ireland"} and A.holiday_status()["to"] == "2028-12-26"
    and [e["date"] for e in FEED["england-and-wales"]["events"] if e["date"].startswith("2026")]
    == ["2026-01-01", "2026-04-03", "2026-04-06", "2026-05-04", "2026-05-25", "2026-08-31", "2026-12-25", "2026-12-28"])
-ok("the status words name GOV.UK, the licence and the shipped copy's date; the url is the feed",
-   "GOV.UK" in A.holiday_status()["words"] and "Open Government Licence" in A.holiday_status()["words"]
-   and "22 Oct 2026" in A.holiday_status()["words"] and A.HOLIDAYS_URL == "https://www.gov.uk/bank-holidays.json")
+# REVERSED 28 Oct 2026 (the user: no supplier names on a screen): the words no longer name GOV.UK or the licence (both in
+# the technical guide, T1); they say how far the copy runs and when it was updated. Was: GOV.UK, the licence, the date.
+ok("the status words say how far the copy runs and when it was updated, naming no source; the url is still the feed",
+   A.holiday_status()["words"] == "Up to 26 Dec 2028, updated 22 Oct 2026." and "GOV.UK" not in A.holiday_status()["words"]
+   and "Licence" not in A.holiday_status()["words"] and A.HOLIDAYS_URL == "https://www.gov.uk/bank-holidays.json")
 _bf = A.refresh_holidays(by="Planner", fetch=lambda: {"england-and-wales": {"events": [{"date": "x"}]}})
 ok("🔴 a feed that does not look like gov.uk's is refused in words and nothing is stored",
-   not _bf["ok"] and "did not look like gov.uk" in _bf["error"] and A.holiday_status()["source"] == "seed")
+   not _bf["ok"] and _bf["error"] == A.HOLIDAYS_FAILED and A.holiday_status()["source"] == "seed")   # NARROWED 28 Oct: one sentence, the reason in the log
 _bf2 = A.refresh_holidays(by="Planner", fetch=lambda: (_ for _ in ()).throw(OSError("no route")))
-ok("a failed read is the answer, never a crash", not _bf2["ok"] and "could not be read" in _bf2["error"])
+ok("a failed read is the answer, never a crash (28 Oct: in one sentence that names no site; the reason goes to the log)",
+   not _bf2["ok"] and _bf2["error"] == "The bank holidays could not be updated just now. Try again later." and "no route" not in _bf2["error"])
 _feed2 = json.loads(json.dumps(FEED))
 _feed2["england-and-wales"]["events"].append({"title": "Test day", "date": "2027-06-07", "notes": "", "bunting": False})
 _rf = A.refresh_holidays(by="Planner", fetch=lambda: _feed2)
@@ -699,12 +702,12 @@ _vp, _vn = AR.vehicle_params(A.get(_b["id"]))
 ok("⭐ ROUTE: HERE's truck parameters come from the typed figures (kg and cm), and a length over HERE's 30 m maximum is drawn at 30 m and SAID",
    _vp == {"transportMode": "truck", "vehicle[grossWeight]": 78000, "vehicle[weightPerAxle]": 11000, "vehicle[height]": 420, "vehicle[width]": 280,
            "vehicle[length]": 3000, "vehicle[axleCount]": 8}
-   and _vn == ["HERE takes a length of at most 30 m: the line is drawn for 30 m, the load is 36 m"] and AR.HERE_MAX_CM == {"height": 5000, "width": 5000, "length": 3000})
+   and _vn == ["Drawn for a length of 30 m, the most a line can be drawn for; the load is 36 m."] and AR.HERE_MAX_CM == {"height": 5000, "width": 5000, "length": 3000})
 ok("ROUTE: a movement with no heaviest axle or axle count sends neither",
    "vehicle[weightPerAxle]" not in AR.vehicle_params(dict(BEAM, max_axle_t=None, axle_count=None))[0] and "vehicle[axleCount]" not in AR.vehicle_params(dict(BEAM, max_axle_t=None, axle_count=None))[0])
 _nk = AR.bake(_u["id"])
 ok("🔴 ROUTE: with no HERE key nothing is drawn, the reason is stored on the movement and returned, nothing raised",
-   not _nk["ok"] and "no routing key" in _nk["error"] and A.get(_u["id"])["bake_error"] == _nk["error"] and A.get(_u["id"])["geometry_json"] is None)
+   not _nk["ok"] and _nk["error"] == "The line could not be drawn: route drawing is not set up here." and A.get(_u["id"])["bake_error"] == _nk["error"] and A.get(_u["id"])["geometry_json"] is None)
 _r = AR.bake(_u["id"], by="Planner", _routes=_here_stub(PTS, ACTS, SPANS), _limits=[])
 _m = A.decorate(A.get(_u["id"]))
 ok("⭐ ROUTE: the bake sends the typed vehicle and the probe's extras (actions, instructions; spans names, routeNumbers, functionalClass, length, notices), "
@@ -716,10 +719,10 @@ ok("⭐ ROUTE: the line, its length and time, HERE's turn-by-turn and the roads 
    and [a["action"] for a in _m["actions"]] == ["depart", "turn", "roundaboutExit", "roundaboutPass", "ramp", "arrive"]
    and _m["roads_words"] == "Roman Way, Doddridge Road, B6047 Leicester Road, M1" and _m["has_motorway"] is True)
 _c = {c["kind"]: c for c in _m["candidates"]}
-ok("⭐ CANDIDATES: a turn (with HERE's severity word), a roundabout exit (with its number), a 'pass N roundabouts' stretch (N read from HERE's words); "
+ok("⭐ CANDIDATES: a turn (28 Oct: no severity word shown), a roundabout exit (with its number), a 'pass N roundabouts' stretch (N read from HERE's words); "
    "no slip road for a load that is not long; each placed on the line at HERE's offset; every one Grey, 'here'",
    [c["kind"] for c in _m["candidates"]] == ["turn", "roundabout", "roundabout"]
-   and _c["turn"]["words"] == "Turn right onto Doddridge Road" and _c["turn"]["detail"] == "turn severity: quite (the router's word)"
+   and _c["turn"]["words"] == "Turn right onto Doddridge Road" and _c["turn"]["detail"] is None and _m["actions"][1]["severity"] == "quite"
    and any(c["words"] == "Roundabout: 2nd exit onto Leicester Road (B6047)" for c in _m["candidates"])
    and any(c["words"] == "Passes 3 roundabouts on Leicester Road (A607)" for c in _m["candidates"])
    and _c["turn"]["lon"] == PTS[2][0] and _c["turn"]["lat"] == PTS[2][1] and all(c["grade"] == "grey" and c["source"] == "here" for c in _m["candidates"])
@@ -736,7 +739,8 @@ ok("CANDIDATES: the bend rule is 60° within 40 m, a bend within 30 m of a HERE 
    AR.BEND_DEG == 60.0 and AR.BEND_WINDOW_M == 40.0 and AR.BEND_NEAR_M == 30.0 and AR.is_long({"length_m": 25.9}) is False and AR.is_long({"length_m": 25.91}) is True
    and AR.bends(PTS, {"length_m": 36}, SPANS, taken_points=[PTS[8]]) == []
    and AR.is_long({"length_m": 16, "rigid_length_m": 18.76}) is True)
-ok("ROUTE: the capped length is a note on the movement, read by the page", _mb["route_notes"] == ["HERE takes a length of at most 30 m: the line is drawn for 30 m, the load is 36 m"])
+ok("ROUTE: the capped length is a note on the movement, read by the page (28 Oct: in words that name no supplier)",
+   _mb["route_notes"] == ["Drawn for a length of 30 m, the most a line can be drawn for; the load is 36 m."])
 # the signed limits at the LOAD's size: a 4.0 m height limit along the line, a 4.2 m load
 _lim = [{"source": "osm", "ext_id": "w1", "kind": "height", "value": 4.0, "unit": "m", "signed": "4.0 m", "name": "Melton Road", "ref": None, "exceptions": None,
          "geom_type": "LineString", "geometry": [PTS[3], PTS[4], PTS[5]], "length_m": 200.0, "anchor_lon": PTS[4][0], "anchor_lat": PTS[4][1]},
@@ -792,8 +796,10 @@ ok("…and a re-bake keeps the typed rows beside the new candidates, numbered ap
    [c["id"] for c in A.decorate(A.get(_b["id"]))["typed_points"]] == ["T1"] and A.decorate(A.get(_b["id"]))["candidates"][0]["id"] == "P1")
 # HERE failing
 _r7 = AR.bake(_cr["id"], _routes=lambda *a, **k: (_ for _ in ()).throw(RuntimeError("HTTP 400: E605024")))
+# NARROWED 28 Oct 2026: the stored words are one sentence; HERE's raw answer (E605024) goes to the log, never to the movement
 ok("ROUTE: a HERE error is stored on the movement in words and returned, never raised; the old line is kept until a bake succeeds",
-   not _r7["ok"] and "the line could not be drawn" in _r7["error"] and "E605024" in A.get(_cr["id"])["bake_error"] and A.get(_cr["id"])["geometry_json"])
+   not _r7["ok"] and _r7["error"] == "The line could not be drawn just now. Try again in a minute." and "E605024" not in A.get(_cr["id"])["bake_error"]
+   and A.get(_cr["id"])["bake_error"] == _r7["error"] and A.get(_cr["id"])["geometry_json"])
 # the collections
 A.set_status(_u["id"], "approved", PLANNER)
 _all = A.page(PLANNER)["movements"]
@@ -937,7 +943,7 @@ _sc = AR.structure_candidates(PTS, dict(BEAM), FEATS, fetched="2026-10-22T16:00:
 _by_kind = {}
 for _c in _sc:
     _by_kind.setdefault(_c["kind"], []).append(_c)
-ok("⭐ STRUCTURES: along the beam's line — a railway crossed (on a bridge: a height question), a bridge carrying the road (its maxweight 44 t against 78 t), a level crossing and a hump within 20 m, a 132 kV line crossed, a maxheight 4.0 m road the 4.2 m beam is over (its maxweight 100 t not worth a word), a 3.0 m height restrictor — the far railway and the far cushion not; every one Grey, source osm, dated by the fetch",
+ok("⭐ STRUCTURES: along the beam's line — a railway crossed (on a bridge: a height question), a bridge carrying the road (its maxweight 44 t against 78 t), a level crossing and a hump within 20 m, a 132 kV line crossed, a maxheight 4.0 m road the 4.2 m beam is over (its maxweight 100 t not worth a word), a 3.0 m height restrictor — the far railway and the far cushion not; every one Grey, source osm (28 Oct: the detail no longer names OpenStreetMap or the fetch date)",
    [c["kind"] for c in _sc] == ["railway", "bridge", "level_crossing", "calming", "overhead", "limit", "limit"]
    and _by_kind["railway"][0]["words"] == "Railway crossed: Midland Main Line (test)" and "carried over the road on a bridge" in _by_kind["railway"][0]["detail"]
    and _by_kind["bridge"][0]["words"] == "Bridge carrying the road: Welland Viaduct (arch)" and "maxweight 44 t: the load's gross weight 78 t is over it" in _by_kind["bridge"][0]["detail"]
@@ -945,7 +951,7 @@ ok("⭐ STRUCTURES: along the beam's line — a railway crossed (on a bridge: a 
    and _by_kind["overhead"][0]["words"] == "Overhead line crossed (132 kV)"
    and _by_kind["limit"][0]["words"] == "Signed limit on Station Road: maxheight 4 m: the load's height 4.2 m is over it"
    and _by_kind["limit"][1]["words"] == "Height restrictor: maxheight 3 m: the load's height 4.2 m is over it"
-   and all(c["grade"] == "grey" and c["source"] == "osm" and "(OpenStreetMap as fetched 2026-10-22)" in c["detail"] and c["lon"] is not None and c["ref"] for c in _sc)
+   and all(c["grade"] == "grey" and c["source"] == "osm" and "OpenStreetMap" not in c["detail"] and "2026-10-22" not in c["detail"] and c["lon"] is not None and c["ref"] for c in _sc)
    and abs(_by_kind["railway"][0]["lon"] - _x3) < 1e-6 and _by_kind["bridge"][0]["lon"] == PTS[1][0]
    and AR.structure_candidates(PTS, dict(BEAM), []) == [] and AR.structure_candidates([], dict(BEAM), FEATS) == [],
    str([(c["kind"], c["words"]) for c in _sc]))
@@ -969,14 +975,15 @@ AR.set_pinch(_b["id"], [{"id": _osm_id, "grade": "red", "note": "44 t posted"},
                          "owner": "Leicestershire CC", "measure": "run on the crown", "permit": "asked 20 Oct", "link": "https://example.test/drawing"}], by="Planner")   # the page sends every row
 _c0 = AR.check_structures(_b["id"], by="Planner", _structures=[], _fetched=None)
 _d35 = A.decorate(A.get(_b["id"]))
-ok("STRUCTURES: Check the roads again before any fetch: nothing to check against, so what was found (and the red grade on the bridge) stays, and the note says where Fetch now is",
-   _c0["ok"] and _c0["structures"] == 7 and "Fetch now" in _c0["note"] and [c["source"] for c in _d35["candidates"]] == _srcs
+ok("STRUCTURES: Check the roads again before any fetch: nothing to check against, so what was found (and the red grade on the bridge) stays, and the note says where to fetch the map data (28 Oct: in plain words)",
+   _c0["ok"] and _c0["structures"] == 7 and _c0["note"] == "no map data yet. Fetch it on Config → Map and bulletin, then check again." and [c["source"] for c in _d35["candidates"]] == _srcs
    and next(c for c in _d35["candidates"] if c["source"] == "osm" and c["kind"] == "bridge")["grade"] == "red", str(_c0))
 _c2 = AR.check_structures(_b["id"], by="Planner", _structures=FEATS, _fetched="2026-10-23T09:00:00Z")
 _d5 = A.decorate(A.get(_b["id"]))
 _brg = next(c for c in _d5["candidates"] if c["source"] == "osm" and c["kind"] == "bridge")
-ok("STRUCTURES: ...after a fetch they are found afresh and come back in their place with the grade and note the planner set (matched on the OpenStreetMap object), dated by the new fetch",
-   _c2["ok"] and _c2["structures"] == 7 and _brg["grade"] == "red" and _brg["note"] == "44 t posted" and "2026-10-23" in _brg["detail"]
+ok("STRUCTURES: ...after a fetch they are found afresh and come back in their place with the grade and note the planner set (matched on the OpenStreetMap object); the answer carries the new fetch's date (28 Oct: no longer each row's detail)",
+   _c2["ok"] and _c2["structures"] == 7 and _brg["grade"] == "red" and _brg["note"] == "44 t posted" and _c2["structures_fetched"] == "2026-10-23T09:00:00Z"
+   and "2026-10-23" not in _brg["detail"]
    and [c["source"] for c in _d5["candidates"]] == _srcs and _c2["note"] is None, str(_brg))
 _c1 = AR.check_structures(_b["id"], by="Planner", _structures=[], _fetched="2026-10-23T09:00:00Z")
 _d4 = A.decorate(A.get(_b["id"]))
@@ -984,14 +991,14 @@ ok("STRUCTURES: a fetch that finds nothing along the line takes the structure ca
    _c1["ok"] and _c1["structures"] == 0 and "osm" not in [c["source"] for c in _d4["candidates"]] and len(_d4["candidates"]) == len(_d3["candidates"]) - 7
    and _d4["candidates"][0]["grade"] == "amber" and _d4["typed_points"][0]["place"] == "Welland bridge" and _c1["note"] is None, str(_c1))
 _nr = A.create(dict(BEAM, name="Not routed yet"), PLANNER)["movement"]
-ok("STRUCTURES: an unrouted movement cannot be checked (draw first); with no fetch yet the note says where Fetch now is; the collection's words carry the structures' sentence for staff and not for the public",
+ok("STRUCTURES: an unrouted movement cannot be checked (draw first); with no fetch yet the note says where to fetch the map data; the collection's words carry the structures' sentence for staff and not for the public",
    "draw the route first" in AR.check_structures(_nr["id"], _structures=[])["error"]
-   and "Fetch now" in (AR.check_structures(_b["id"], _structures=[], _fetched=None)["note"] or "")
+   and "Config → Map and bulletin" in (AR.check_structures(_b["id"], _structures=[], _fetched=None)["note"] or "")
    and AR.feature_collection([_d5])["words"]["structures"] == AR.STRUCTURES_WORDS and AR.feature_collection([_d5], public=True)["words"]["structures"] is None
-   and "OpenStreetMap" in AR.STRUCTURES_WORDS and "the survey decides" in AR.STRUCTURES_WORDS
+   and "OpenStreetMap" not in AR.STRUCTURES_WORDS and "Fetch now" not in AR.STRUCTURES_WORDS and "the survey decides" in AR.STRUCTURES_WORDS   # REVERSED 28 Oct
    and A.delete(_nr["id"], PLANNER)["ok"] and AR.check_structures("AL999", _structures=[])["error"] == "no such abnormal load")
 AR.check_structures(_b["id"], by="Planner", _structures=FEATS, _fetched="2026-10-23T09:00:00Z")
-ok("STRUCTURES: the page read carries the structures' sentence for the row's foot (phase 3), beside the advice and the counted-apart words",
+ok("STRUCTURES: the page read carries the structures' sentence (phase 3; since 28 Oct the page prints CANDIDATE_WORDS only), beside the advice and the counted-apart words",
    A.page(PLANNER)["words"]["structures"] == AR.STRUCTURES_WORDS and A.page(PLANNER)["words"]["advice"] == R.ADVICE_WORDS)
 # ---- 22 Oct 2026 (phase 3, D73): the documents — the notice calendar (XLSX / PDF) and the ESDAL details sheet ---------
 import abnormal_docs as AD  # noqa: E402
@@ -1053,6 +1060,76 @@ ok("ENDPOINTS (phase 3, D73; NARROWED 27 Oct 2026: the esdal.pdf route is gone):
    and _main3.index('"/api/abnormal/calendar.xlsx"') < _main3.index('@app.get("/api/abnormal/{movement_id}")')
    and _main3.count('abnormal_docs.calendar_file_name(C, ') == 2
    and _main3[_main3.index('def abnormal_calendar_xlsx'):].count('"Cache-Control": "no-store"') >= 2)
+
+
+# ---- 28 Oct 2026: the page's words name no supplier and no back end (the user, 22 Oct; mockup notes\abnormal-words-mockup-1028) ----
+# Older versions saved the words on each movement, so the guard is on what the page READS: abnormal.page(), with rows that
+# carry every old form (the live demo's three loads were drawn with them).
+ok("⭐ WORDS: the ban list catches the old words and passes the new",
+   all(AR.SCREEN_BAN.search(t) for t in ["HERE's turn severity: quite", "turn severity: quite (the router's word)", "straight over each; HERE counts them in its words",
+                                          "(OpenStreetMap as fetched 2026-10-22)", "Config → Map and bulletin → Fetch now", "no routing key is set on this deployment",
+                                          "GOV.UK bank holidays (Open Government Licence)", "Fetch now from gov.uk", "HTTP 400: E605024", "code 1234, severity critical"])
+   and not any(AR.SCREEN_BAN.search(t) for t in [AR.CANDIDATE_WORDS, AR.STRUCTURES_WORDS, AR.NOT_SET_UP, AR.JUST_NOW, AR.RETURN_JUST_NOW, AR.NO_MAP_DATA,
+                                                  A.HOLIDAYS_FAILED, AR.cap_note("width", 50, 52), "Network Rail: notice where a load goes over"]))
+_OLD_PINCH = [
+    {"source": "here", "kind": "turn", "words": "Turn right onto Norman Way (A607)", "detail": "HERE's turn severity: quite", "grade": "grey", "id": "P1"},
+    {"source": "here", "kind": "turn", "words": "Turn left onto Thorpe Road (A607)", "detail": "turn severity: quite (the router's word)", "grade": "amber", "note": "check", "id": "P2"},
+    {"source": "here", "kind": "roundabout", "words": "Passes 3 roundabouts on Leicester Road (A607)", "detail": "straight over each; HERE counts them in its words", "grade": "grey", "id": "P3"},
+    {"source": "here", "kind": "notice", "words": "Routing notice: E605024", "detail": "code E605024, severity critical", "grade": "grey", "id": "P4"},
+    {"source": "osm", "kind": "bridge", "words": "Bridge carrying the road: Welland Viaduct",
+     "detail": "the structure's owner assesses it for the load's weight through ESDAL (the road and bridge authority's notice) (OpenStreetMap as fetched 2026-10-22)", "grade": "red", "id": "P5"},
+    {"source": "osm", "kind": "limit", "words": "Height restrictor: maxheight 3 m",
+     "detail": "tagged in OpenStreetMap on a barrier; the sign on the road is what counts (OpenStreetMap as fetched 2026-10-22)", "grade": "grey", "id": "P6"},
+    {"source": "osm", "kind": "limit", "words": "Signed limit on Station Road: maxheight 4 m",
+     "detail": "tagged in OpenStreetMap on the road; the sign on the road is what counts, and the stored signed limits are checked apart (OpenStreetMap)", "grade": "grey", "id": "P7"},
+    {"source": "typed", "kind": "bridge", "place": "Welland bridge", "words": "Arch bridge", "grade": "red", "id": "T1"}]
+db.execute("UPDATE abnormal_loads SET pinch_json = ?, here_notices_json = ? WHERE tenant_id = ? AND id = ?",
+           (json.dumps(_OLD_PINCH), json.dumps({"notices": [], "notes": ["HERE takes a length of at most 30 m: the line is drawn for 30 m, the load is 36 m",
+                                                                          "the return leg could not be drawn: HTTP 400: E605024"], "via": [], "has_motorway": False}),
+            db.current_tenant(), _b["id"]))
+db.execute("UPDATE abnormal_loads SET bake_error = ? WHERE tenant_id = ? AND id = ?",
+           ("the line could not be drawn: HTTP 400: E605024 vehicle[length] out of range", db.current_tenant(), _cr["id"]))
+_wb = A.decorate(A.get(_b["id"]))
+_wc = A.decorate(A.get(_cr["id"]))
+_wd = {c["id"]: c for c in _wb["candidates"]}
+ok("⭐ WORDS: words an older version SAVED are reworded as the page reads them — the severity and the notice code gone, the roundabout note short, "
+   "the map rows without OpenStreetMap or the fetch date, the capped size and the return leg in plain words, a raw error one sentence; the saved row untouched",
+   _wd["P1"]["detail"] is None and _wd["P2"]["detail"] is None and _wd["P2"]["grade"] == "amber" and _wd["P2"]["note"] == "check"
+   and _wd["P3"]["detail"] == "straight over each" and _wd["P4"]["detail"] is None and _wd["P4"]["words"] == "Routing notice: a restriction the route could not keep to"
+   and _wd["P5"]["detail"] == "the structure's owner assesses it for the load's weight through ESDAL (the road and bridge authority's notice)"
+   and _wd["P6"]["detail"] == "marked on the map; the sign on the road is what counts"
+   and _wd["P7"]["detail"] == "marked on the map; the sign on the road is what counts"
+   and _wb["route_notes"] == ["Drawn for a length of 30 m, the most a line can be drawn for; the load is 36 m.", "The return leg could not be drawn just now."]
+   and _wc["bake_error"] == "The line could not be drawn just now. Try again in a minute."
+   and "HERE's turn severity" in A.get(_b["id"])["pinch_json"] and _wb["typed_points"][0]["id"] == "T1",
+   str([(c["id"], c["detail"]) for c in _wb["candidates"]]) + str(_wb["route_notes"]) + str(_wc["bake_error"]))
+ok("WORDS: a reason the line was not drawn that is already words becomes one sentence; the new sentences pass through unchanged",
+   AR.plain_bake_error("Langton has no coordinates") == "The line could not be drawn: Langton has no coordinates."
+   and AR.plain_bake_error("no routing key is set on this deployment, so no line can be drawn") == AR.NOT_SET_UP
+   and AR.plain_bake_error(AR.JUST_NOW) == AR.JUST_NOW and AR.plain_bake_error(None) is None
+   and AR.plain_note("the return leg could not be drawn: boom") == AR.RETURN_JUST_NOW and AR.plain_note("a via point note") == "a via point note")
+
+
+def _page_strings(x):
+    if isinstance(x, str):
+        yield x
+    elif isinstance(x, dict):
+        for k, v in x.items():
+            if k in ("actions", "here_notices", "geometry", "return_geometry", "roads", "url", "source", "ref", "id", "pinch",
+                     "limits_hits", "esdal_ref", "vr1_ref", "so_ref", "created_by", "updated_by", "ipt", "origin_id", "dest_id",
+                     "origin_gate_id", "dest_gate_id", "vehicle_type"):
+                continue                                           # data the page does not print as words (pinch: printed as candidates)
+            yield from _page_strings(v)
+    elif isinstance(x, list):
+        for v in x:
+            yield from _page_strings(v)
+
+
+_pg = A.page(PLANNER)
+_bad = sorted({t for t in _page_strings(_pg) if AR.SCREEN_BAN.search(t)})
+ok("⭐ WORDS: nothing the page reads — every movement's candidates, route notes, reason not drawn, advice and flags, the settings and the words — "
+   "names HERE, OpenStreetMap, Mapbox, GOV.UK, NaPTAN, GIAS, STATS19, DfT, Geofabrik, Fetch now, a routing key, the community layer, a severity or a router error code",
+   len(list(_page_strings(_pg))) > 200 and _bad == [] and any(m["id"] == _b["id"] for m in _pg["movements"]), str(_bad[:6]))
 
 try:
     remove_scratch_db(db, TMP)
