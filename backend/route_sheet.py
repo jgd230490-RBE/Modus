@@ -98,10 +98,13 @@ def _gate_words(loc, role, gate_id, gate_list, factors=None):
     }
 
 
-def _limits_words(route_id, profile, vehicle_text):
-    """The stored lorry-limits check for this route and vehicle, in words: (status, [lines])."""
+def _limits_words(route_id, profile, vehicle_text, alts=(0,)):
+    """The stored lorry-limits check for this route and vehicle, in words: (status, [lines]).
+    28 Oct 2026 (task 0c): `alts` = the stored options this page draws — page 1 the main line (0), a diversion page its
+    own options; a limit on a diversion is not the main route's (limits.check_route tags it with alt_index)."""
     import limits
-    st = (limits.stored_checks([route_id]) or {}).get(route_id) or {}
+    st = dict((limits.stored_checks([route_id]) or {}).get(route_id) or {})
+    st["hits"] = [h for h in st.get("hits") or [] if isinstance(h, dict) and int(h.get("alt_index") or 0) in set(alts)]
     if not st.get("checked_at"):
         return "not_checked", ["Not checked yet on this route. Follow the road signs."]
     when = str(st["checked_at"])[:10]
@@ -249,7 +252,71 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
         "limits_status": lim_status, "limits_lines": lim_lines,
         "issued": f"{as_at:%d %b %Y}".lstrip("0"),
         "drawn": bool(loaded),
+        # 28 Oct 2026 (task 0c, the user's Q6): one more page per diversion, in date order
+        "diversions": _diversions(route_id, used, legs, leg_words, vehicle_text) if used else [],
     }
+
+
+def _diversions(route_id, used, legs, leg_words, vehicle_text):
+    """The dated zones' diversions of this route for the lorry drawn, one entry per run of dates: the line of each leg
+    (the diversion's, or the main one where that leg is not diverted), the words, why, and the day it goes back."""
+    import db
+    import route_choice
+    import zones
+    tenant = db.current_tenant()
+    rows = [r for r in route_choice._all_rows() if r["route_id"] == route_id and r.get("reason_kind") == "zone"
+            and r.get("status") == "in_use" and int(r.get("alt_index") or 0) and r.get("vehicle_profile") in (None, "", used)]
+    if not rows:
+        return []
+    names = {z["id"]: z.get("name") for z in zones.list_zones()}
+    runs = {}
+    for r in rows:
+        runs.setdefault((r.get("starts_on") or "", r.get("ends_on") or ""), {})[r["leg"]] = r
+    out = []
+    for (s, e), by_leg in sorted(runs.items()):
+        drawn = {}
+        for leg in ("loaded", "return"):
+            r = by_leg.get(leg)
+            if r:
+                g = db.query("SELECT * FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ? "
+                             "AND leg = ? AND alt_index = ?", (tenant, route_id, used, leg, int(r["alt_index"])))
+                drawn[leg] = g[0] if g else legs.get(leg)
+            else:
+                drawn[leg] = legs.get(leg)
+        zids = sorted({z for r in by_leg.values() for z in (r.get("reason_ref") or "").split(",") if z})
+        back = None
+        if e:
+            d = datetime.date.fromisoformat(e) + datetime.timedelta(days=1)
+            back = f"{d.day} {d:%b %Y}"
+        alts = sorted({0} | {int(r["alt_index"]) for r in by_leg.values()})
+        lim_status, lim_lines = _limits_words(route_id, used, vehicle_text, alts=alts)
+        out.append({
+            "from": s or None, "to": e or None,
+            "when": _when(s or None, e or None),
+            "because": [names.get(z) or z for z in zids],
+            "loaded": _coords(drawn["loaded"]["geometry"]) if drawn.get("loaded") else [],
+            "return": _coords(drawn["return"]["geometry"]) if drawn.get("return") else [],
+            "loaded_words": leg_words(drawn.get("loaded")), "return_words": leg_words(drawn.get("return")),
+            "back_on": back, "limits_status": lim_status, "limits_lines": lim_lines,
+        })
+    return out
+
+
+def _when(s, e):
+    """"1–31 Dec 2027" / "1 Jun – 31 Oct 2029" / "5 Oct 2026 – 17 Dec 2027" / "from 5 Oct 2026" (the app's divWhen)."""
+    a = datetime.date.fromisoformat(s) if s else None
+    b = datetime.date.fromisoformat(e) if e else None
+    if a and not b:
+        return f"from {a.day} {a:%b %Y}"
+    if b and not a:
+        return f"until {b.day} {b:%b %Y}"
+    if not a:
+        return ""
+    if (a.year, a.month) == (b.year, b.month):
+        return f"{a.day}–{b.day} {b:%b %Y}"
+    if a.year == b.year:
+        return f"{a.day} {a:%b} – {b.day} {b:%b %Y}"
+    return f"{a.day} {a:%b %Y} – {b.day} {b:%b %Y}"
 
 
 # 23 Oct 2026 (the route line redesign): a leg's stretch on a drawn haul road is drawn dotted and thinner, as on the public

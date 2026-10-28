@@ -83,6 +83,7 @@ import db
 import fairprice
 import fuel
 import network
+import route_choice       # 28 Oct 2026 (task 0c): a dated zone diverts a route for some days
 
 #: The one flag this slice raises. The full set is slice 3's.
 FLAG_UNBAKED = "UNBAKED"
@@ -212,11 +213,47 @@ def costing_context():
     return out
 
 
-def cycle_for(route_id, vehicle, cache=None):
+#: 28 Oct 2026 (task 0c): the figures of a diverted period are each option's weighted by its share of the working days
+_BLEND = ("loaded_km", "return_km", "total_km", "loaded_hr", "return_hr", "cycle_hr", "co2_kg_per_trip", "haul_km",
+          "drive_min", "other_work_min", "turnaround_hr")
+
+
+def _period_days(month_index=None, week_index=None):
+    """The working days a line's figures cover: its week when it has one (the Look-ahead), else its month."""
+    try:
+        if month_index is not None and week_index is not None:
+            return route_choice.week_days(int(month_index), int(week_index))
+        if month_index is not None:
+            return route_choice.month_days(int(month_index))
+    except Exception:
+        return None
+    return None
+
+
+def cycle_for(route_id, vehicle, cache=None, month_index=None, week_index=None):
     """
     The alt-0 route_analysis() row for (route, vehicle), or None when the route is not
     baked for that vehicle. One call per pair per request, exactly as month-kpis.
+
+    28 Oct 2026 (task 0c): with `month_index` (and `week_index`, a Look-ahead week) the row is the one for THOSE
+    working days: where a dated zone diverts the route on some of them (route_choice), the distances, times and
+    carbon are each option's weighted by its share of the days, and the trips a lorry a day are the FEWEST of the
+    options used (a fleet is sized for its longest week; the user's Q2 answer). The row then carries `diversion`
+    ({"share", "zones"}) and, where a zone in force crosses the line used, `diversion_problems`. A route no dated
+    zone touches gets the alt-0 row, as before.
     """
+    days = _period_days(month_index, week_index)
+    m = route_choice.mix(route_id, vehicle, days) if days else None
+    if m is not None and m["pairs"] == [((0, 0), 1.0)] and not m["problems"]:
+        m = None
+    if m is not None:
+        key = (route_id, vehicle, "mix", tuple(m["pairs"]), tuple(sorted((p["zone"], p["status"]) for p in m["problems"])))
+        if cache is not None and key in cache:
+            return cache[key]
+        row = _blended_row(route_id, vehicle, m, cache)
+        if cache is not None:
+            cache[key] = row
+        return row
     key = (route_id, vehicle)
     if cache is not None and key in cache:
         return cache[key]
@@ -237,6 +274,40 @@ def cycle_for(route_id, vehicle, cache=None):
     return row
 
 
+def _blended_row(route_id, vehicle, m, cache):
+    """One cycle row for a mix of options (route_choice.mix): see cycle_for."""
+    pre = cache.setdefault("__route_analysis_pre__", {}) if cache is not None else None
+    try:
+        res = network.route_analysis(route_id, profiles=[vehicle] if vehicle else None, pre=pre,
+                                     pairs=[p for p, _w in m["pairs"]])
+    except Exception:
+        return None
+    rows = {(r.get("alt_index"), r.get("return_alt_index")): r for r in res.get("rows", []) or []
+            if not vehicle or r.get("profile") == vehicle}
+    got = [(rows[p], w) for p, w in m["pairs"] if p in rows]
+    if not got:
+        # an option the mix names is gone (a re-route since the refresh): the main line, as a reader always fell back
+        base = rows.get((0, 0))
+        return dict(base) if base else None
+    tot = sum(w for _r, w in got) or 1.0
+    out = dict(got[0][0])
+    for k in _BLEND:
+        vals = [(r.get(k), w) for r, w in got if r.get(k) is not None]
+        if vals:
+            out[k] = round(sum(float(v) * w for v, w in vals) / tot, 3)
+    worst = min(got, key=lambda rw: (int(rw[0].get("trips_per_day") or 0), -float(rw[0].get("cycle_hr") or 0)))[0]
+    for k in ("trips_per_day", "tonnes_per_day", "tonnes_per_month", "lorry_day"):
+        out[k] = worst.get(k)
+    out["co2_kg_per_day"] = round(float(out.get("co2_kg_per_trip") or 0) * int(out.get("trips_per_day") or 0), 1)
+    out["return_estimated"] = any(r.get("return_estimated") for r, _w in got)
+    out["alt_index"] = 0                     # the row stands for the period, not for one option
+    out["diversion"] = {"share": m["diverted"], "zones": m["zones"],
+                        "options": [{"loaded": p[0], "return": p[1], "share": round(w, 4)} for p, w in m["pairs"]]}
+    if m["problems"]:
+        out["diversion_problems"] = m["problems"]
+    return out
+
+
 def line_context(line, factors, routes=None, cache=None, cost=None):
     """
     Everything a line's chips and expanded strip need, none of it per-day.
@@ -252,7 +323,8 @@ def line_context(line, factors, routes=None, cache=None, cost=None):
     rid, veh = line.get("route_id"), line.get("vehicle_type")
     payload, fb = payload_for(veh, factors)
     rt = routes.get(rid) or {}
-    row = cycle_for(rid, veh, cache)
+    # 28 Oct 2026 (task 0c): the line's own month (and week, on the Look-ahead) — a dated zone may divert it
+    row = cycle_for(rid, veh, cache, month_index=line.get("month_index"), week_index=line.get("week_index"))
     baked = row is not None
     return_baked = bool(baked and not row.get("return_estimated"))
     dist = float(row.get("loaded_km") or 0) if baked else None
@@ -324,6 +396,10 @@ def line_context(line, factors, routes=None, cache=None, cost=None):
         "km_basis": basis,
         "basis_km": (round(basis_km, 2) if basis_km is not None else None),
         "flags": flags,
+        # 28 Oct 2026 (task 0c): the share of the line's days on a diversion and the zones that cause it, and the days a
+        # zone in force crosses the line used (no way round / kept) — None / [] on a route no dated zone touches
+        "diversion": (row.get("diversion") if baked else None),
+        "diversion_problems": ((row.get("diversion_problems") or []) if baked else []),
     }
 
 

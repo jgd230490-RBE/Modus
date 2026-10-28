@@ -164,6 +164,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and c.post("/api/collisions/refresh", headers={"X-Wayscope": "1"}).status_code == 401
        and c.get("/api/routes/R016/collision-evidence.pdf").status_code == 401
        and c.get("/api/routes/R016/collision-evidence.xlsx").status_code == 401)
+    # 28 Oct 2026 (task 0d): the Routes page's busy-hours line is staff only too
+    ok("🔴 COLLISION HISTORY: a route's busy-hours line without a credential — 401",
+       c.get("/api/routes/R016/collision-hours").status_code == 401)
     # 13 Oct 2026 (D43): the one-page leaflet, page and PDF, the bulletin's staff rule
     r = c.get("/bulletin/leaflet/?month=10")
     ok("🔴 the leaflet page is closed without a staff sign-in — 401, the bulletin's sign-in page",
@@ -1775,6 +1778,14 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("⭐ …and a route's evidence PDF before any fetch: 200, a PDF that says it has not been fetched",
        _ce.status_code == 200 and _ce.content[:5] == b"%PDF-" and "no-store" in _ce.headers.get("cache-control", ""),
        str(_ce.status_code))
+    # 28 Oct 2026 (task 0d): the busy-hours line — the map cookie 401; a planner 200 with nothing to offer before a fetch;
+    # a route that does not exist 404
+    _bh = c.get("/api/routes/R016/collision-hours", headers=PLAN)
+    _bhj = _bh.json() if _bh.status_code == 200 else {}
+    ok("⭐ …a route's busy-hours line: 401 on the map cookie; a planner 200, nothing shown or offered before any fetch; 404 for no route",
+       c.get("/api/routes/R016/collision-hours").status_code == 401 and _bh.status_code == 200
+       and _bhj.get("shown") is False and _bhj.get("offers") == []
+       and c.get("/api/routes/NOPE/collision-hours", headers=PLAN).status_code == 404, _bh.text[:200])
     ok("🔴 …a team code may read it but not fetch it: 403 (no fetch is started from this harness: it would go online)",
        c.get("/api/collisions", headers=NORTH).status_code == 200
        and c.post("/api/collisions/refresh", headers=dict(NORTH, **{"X-Wayscope": "1"})).status_code == 403)

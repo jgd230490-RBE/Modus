@@ -927,9 +927,13 @@ def headline(limit):
 def check_route(route_id, _limits=None):
     """Which stored limits each baked leg of a route runs along. Reports, never blocks."""
     tenant = db.current_tenant()
-    geoms = db.query("SELECT vehicle_profile, leg, geometry FROM route_geometry WHERE tenant_id = ? "
-                     "AND route_id = ? AND alt_index = 0 AND geometry IS NOT NULL", (tenant, route_id))
-    if not geoms:
+    # 28 Oct 2026 (task 0c): the options a dated zone's diversion USES are checked too, each hit carrying the
+    # diversion's dates (clashes.limit counts it only in a week those dates touch)
+    div = _diversions_in_use(route_id)
+    geoms = [g for g in db.query("SELECT vehicle_profile, leg, alt_index, geometry FROM route_geometry WHERE tenant_id = ? "
+                                 "AND route_id = ? AND geometry IS NOT NULL", (tenant, route_id))
+             if int(g.get("alt_index") or 0) == 0 or (g["vehicle_profile"], g["leg"], int(g["alt_index"])) in div]
+    if not any(int(g.get("alt_index") or 0) == 0 for g in geoms):
         return {"route_id": route_id, "baked": False, "hits": []}
     lims = _limits if _limits is not None else stored()
     hits, seen = [], set()
@@ -962,7 +966,8 @@ def check_route(route_id, _limits=None):
                 if along <= 0 or along < need:
                     continue
                 point = False
-            key = (g["vehicle_profile"], g["leg"], L["source"], L["ext_id"], L["kind"])
+            alt = int(g.get("alt_index") or 0)
+            key = (g["vehicle_profile"], g["leg"], alt, L["source"], L["ext_id"], L["kind"])
             if key in seen:
                 continue
             seen.add(key)
@@ -984,11 +989,28 @@ def check_route(route_id, _limits=None):
                 "verdict": a["verdict"], "vehicle_value": a["vehicle"], "margin": a["margin"], "note": note,
                 "anchor": [L["anchor_lon"], L["anchor_lat"]],
             })
+            if alt:
+                hits[-1]["alt_index"] = alt
+                hits[-1]["diversion"] = div[(g["vehicle_profile"], g["leg"], alt)]
     order = {"exceeds": 0, "at_limit": 1, "unknown": 2, "within": 3}
     # a limit the route runs ALONG outranks a point limit (which may be a crossing)
     hits.sort(key=lambda h: (order.get(h["verdict"], 3), bool(h["point"]), h["kind"], h["vehicle_profile"], h["leg"]))
     return {"route_id": route_id, "baked": True, "hits": hits,
             "exceeds": len([h for h in hits if h["verdict"] == "exceeds"])}
+
+
+def _diversions_in_use(route_id):
+    """{(profile, leg, alt): [{"from", "to"}, …]} — the stored options route_choice has in use on this route."""
+    try:
+        rows = db.query("SELECT vehicle_profile, leg, alt_index, starts_on, ends_on FROM route_choice WHERE tenant_id = ? "
+                        "AND route_id = ? AND status = 'in_use' AND alt_index <> 0", (db.current_tenant(), route_id))
+    except Exception:
+        return {}
+    out = {}
+    for r in rows:
+        out.setdefault((r["vehicle_profile"], r["leg"], int(r["alt_index"])), []).append(
+            {"from": r.get("starts_on"), "to": r.get("ends_on")})
+    return out
 
 
 def _matches(line, lims):
