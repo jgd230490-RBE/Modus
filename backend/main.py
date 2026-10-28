@@ -39,6 +39,7 @@ import weeks         # Week 1 — the 4-week look-ahead and typed actuals (Tasks
 import days         # Look-ahead v2 slice 1 (2026-09-09) — the commit week by day
 import derived      # Look-ahead v2 slice 2 (2026-09-09) — trips / vehicles / km / t·km on read
 import lookahead    # Look-ahead v2 slices 3-6 — the page's read model, clashes, account, horizon
+import basemap      # 28 Oct 2026 (8e): the style of the server-drawn maps
 import export       # Look-ahead v2 slice 4 — XLSX + PDF of the commit week
 import stockpiles    # Week 1 — stockpile capacity and typed consumption (Task D2)
 import access        # 2026-09-02 — IPT access codes (Task F)
@@ -3091,6 +3092,16 @@ def route_sheet_pdf(route_id: str, vehicle: Optional[str] = None, request: Reque
                              "Cache-Control": "no-store"})
 
 
+def _export_style(style):
+    """8e: the `style` a map export asks for — a key of basemap.STYLES, blank = the tenant's setting; anything else is a 422."""
+    if style is None or str(style).strip() == "":
+        return None
+    k = basemap.clean_style(style)
+    if not k:
+        raise HTTPException(422, "style must be light, streets, outdoors or aerial")
+    return k
+
+
 def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community=1, collisions=0):
     """
     14 Oct 2026 (backlog item 2; the evening rework, the user: "just the map … add certain scales as in the CLP
@@ -3129,12 +3140,15 @@ def route_map_export_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: 
                          dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
                          routes: Optional[str] = None, plan: str = "regional", scale: Optional[str] = None,
                          at: Optional[str] = None, community: int = 1, collisions: int = 0,
-                         request: Request = None):
-    """The plan as one A4 landscape page, exactly at its stated scale when printed at 100 % (_route_map_plan)."""
+                         style: Optional[str] = None, request: Request = None):
+    """The plan as one A4 landscape page, exactly at its stated scale when printed at 100 % (_route_map_plan).
+    `style` = the map's style (light | streets | outdoors | aerial; none = the tenant's Maps on paper setting), 8e."""
     from fastapi.responses import Response       # not in every test stub; imported here
+    sk = _export_style(style)
     S = _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community, collisions)
     try:
-        data = export.build_route_map_pdf(S)
+        with basemap.use(sk):
+            data = export.build_route_map_pdf(S)
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     return Response(content=data, media_type="application/pdf",
@@ -3147,12 +3161,14 @@ def route_map_export_png(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: 
                          dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
                          routes: Optional[str] = None, plan: str = "regional", scale: Optional[str] = None,
                          at: Optional[str] = None, community: int = 1, collisions: int = 0,
-                         request: Request = None):
+                         style: Optional[str] = None, request: Request = None):
     """The same plan as a PNG for a Word document: the PDF page rasterised, so the two never differ."""
     from fastapi.responses import Response
+    sk = _export_style(style)
     S = _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community, collisions)
     try:
-        data = export.route_map_png(export.build_route_map_pdf(S))
+        with basemap.use(sk):
+            data = export.route_map_png(export.build_route_map_pdf(S))
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     return Response(content=data, media_type="image/png",

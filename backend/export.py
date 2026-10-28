@@ -61,6 +61,7 @@ except Exception as e:                                   # pragma: no cover
     rl_canvas = None
     MISSING["pdf"] = str(e)
 
+import basemap
 import config
 import gate_hours
 
@@ -455,7 +456,7 @@ def mapbox_static_png(routes, size="1200x600", timeout=12, token=None):
         overlays.append(f"pin-s-{chr(97 + (i % 26))}+DC2626({thin[-1][0]:.5f},{thin[-1][1]:.5f})")
     # 23 Oct 2026 (the route line redesign): the lines go UNDER the road names (basemap.LABELS_LAYER), as on the map
     import basemap
-    q = f"padding=40&before_layer={basemap.LABELS_LAYER}&access_token=" + urllib.parse.quote(token)
+    q = f"padding=40&before_layer={basemap.LABELS_LAYER}&access_token=" + urllib.parse.quote(token)   # the bulletin's map: always Light
     url = ("https://api.mapbox.com/styles/v1/mapbox/light-v11/static/" + ",".join(overlays) + f"/auto/{size}@2x?" + q)
     if len(url) > 8000:                       # the API's URL limit; drop pins, thin harder
         overlays = ["path-3+1F2024-0.9(" + urllib.parse.quote(_encode_polyline(_thin(c, 60)), safe="") + ")"
@@ -1343,7 +1344,7 @@ class _Caption(Flowable):
         elif kind == "schematic":
             tail = " · schematic from the baked geometry (no map tiles — Mapbox could not be reached)"
         else:
-            tail = " · map © Mapbox © OpenStreetMap"
+            tail = " · map " + basemap.credit()
         txt = f"Routes this week: {n_routes}" + tail
         self.canv.setFont("Helvetica", 7.5)
         self.canv.setFillColorRGB(*GREY)
@@ -1392,7 +1393,7 @@ class _sizing:
         _SIZING.on = False
 
 
-def _basemap_box(points, w_pt, h_pt, pad_px=40, reserve_right_pt=0):
+def _basemap_box(points, w_pt, h_pt, pad_px=40, reserve_right_pt=0, style=None):
     """14 Oct 2026: the view and basemap PNG for a box of w_pt × h_pt (basemap.py), and the box projection (y up, points).
     (None, None, None) when there is no basemap — the caller draws its schematic — and on a sizing pass."""
     if getattr(_SIZING, "on", False):
@@ -1401,7 +1402,7 @@ def _basemap_box(points, w_pt, h_pt, pad_px=40, reserve_right_pt=0):
     w_px = basemap.MAX_PX
     h_px = max(200, int(round(w_px * h_pt / w_pt)))
     v = basemap.view(points, w_px, h_px, pad_px, reserve_right_px=int(reserve_right_pt * w_px / w_pt))
-    png = basemap.fetch(v)
+    png = basemap.fetch(v, style=style)
     if not png:
         return None, None, None
     k = w_pt / v["w"]
@@ -1525,7 +1526,7 @@ class _BulletinMap(Flowable):
         # 14 Oct 2026: the basemap alone from Mapbox (a short URL that always fits), the routes drawn on it in vector
         import bulletin_doc
         v, png, P = _basemap_box(bulletin_doc.map_points(self.S), self.width, self.height,
-                                 reserve_right_pt=getattr(self, "reserve_right", 0))
+                                 reserve_right_pt=getattr(self, "reserve_right", 0), style="light")   # the bulletin stays Light (8e)
         if png:
             try:
                 self.canv.drawImage(ImageReader(io.BytesIO(png)), 0, 0, width=self.width, height=self.height)
@@ -1555,7 +1556,7 @@ class _BulletinMapCaption(Flowable):
 
     def draw(self):
         # NARROWED 14 Oct 2026 (the publishing check: legends too wordy): one line, the credit or "not to scale"
-        tail = ("© Mapbox © OpenStreetMap" if self.mp.kind == "mapbox"
+        tail = (basemap.credit("light") if self.mp.kind == "mapbox"
                 else "Schematic from the stored road routes, not to scale.")
         self.canv.setFont(_BF("regular"), 7.5); self.canv.setFillColorRGB(*GREY)
         self.canv.drawRightString(self.width, 1.4 * mm, tail)
@@ -1714,7 +1715,7 @@ class _CouncilMap(Flowable):
         # 14 Oct 2026 (the user: no map behind): the districts at the public map's 0.8 over the basemap, so the towns
         # and roads read through; the schematic districts when no basemap can be had
         import bulletin_doc
-        v, png, P = _basemap_box(bulletin_doc.council_points(self.C), self.width, self.height, 20)
+        v, png, P = _basemap_box(bulletin_doc.council_points(self.C), self.width, self.height, 20, style="light")
         self.kind = "schematic"
         if png:
             try:
@@ -2387,7 +2388,7 @@ def _plan_panel(c, S, fw, fh, basemap_ok):
         text("No basemap could be had: the routes alone, still to scale.", B, 7, 8.8, DEMO_FG_RGB)
     text(f"{S['as_at']}. Approved lines only. A planning document, not an approved CLP.", R, 6.8, 8.4, GREY)
     if basemap_ok:
-        text("Map © Mapbox © OpenStreetMap.", R, 6.8, 8.4, GREY)
+        text("Map " + basemap.credit() + ".", R, 6.8, 8.4, GREY)
     if CM.get("credit"):
         text(CM["credit"], R, 6.6, 8.2, GREY)
     if (CO or {}).get("credit") and (CO or {}).get("records"):
@@ -2679,7 +2680,7 @@ def _rs_overlays(v, w, legs):
             return None
         out = ([basemap.path_overlay(line, (RS_W + RS_CASING_EXTRA) * ppt, RS_CASING) for line, _ in lines] if with_edge else []) \
             + [basemap.path_overlay(line, RS_W * ppt, colour) for line, colour in lines]
-        if len(basemap.url(v, "", overlays=out, before_layer=basemap.LABELS_LAYER)) <= basemap.URL_MAX:
+        if len(basemap.url(v, "", overlays=out, before_layer=basemap.labels_layer())) <= basemap.URL_MAX:
             return out
     return None
 
@@ -2699,7 +2700,7 @@ def _rs_gate(c, x, y, colour):
 def _rs_map(c, S, v, x, y, w, h, legs, *, pins=(), gates=(), community=None, empty_words="", haul=()):
     """One map box at (x, y), w x h points: the basemap, the legs, the haul-road stretches, the pins, the scale bar, the
     north arrow. 23 Oct 2026 (the route line redesign): the legs go INTO the basemap request as path overlays under the
-    road names (basemap.LABELS_LAYER) whenever the URL fits — the names print over the lines as on the public map; else
+    road names (basemap.labels_layer(), the chosen style's) whenever the URL fits — the names print over the lines as on the public map; else
     they are drawn here over the picture, as before. The haul-road stretches (`haul`: dots over a cut-out), the community
     layer, the gates and the pins are always drawn here. Returns True when a basemap was drawn."""
     import basemap
@@ -2710,7 +2711,7 @@ def _rs_map(c, S, v, x, y, w, h, legs, *, pins=(), gates=(), community=None, emp
     overlays = _rs_overlays(v, w, legs) if (v and legs and not sizing) else None
     png = None
     if v and not sizing:
-        png = basemap.fetch(v, overlays=overlays, before_layer=basemap.LABELS_LAYER if overlays else None)
+        png = basemap.fetch(v, overlays=overlays, before_layer=basemap.labels_layer() if overlays else None)
         if png is None and overlays:          # the request with the legs was refused: the plain picture, the legs drawn over it
             overlays = None
             png = basemap.fetch(v)
@@ -2971,7 +2972,7 @@ def build_route_sheet_pdf(S):
     foot = [f"From the scheme's routes as stored in Wayscope on {S['issued']}. A planning document: the site team's "
             "instructions and the road signs come first."]
     if S.get("basemap"):
-        foot.append("Map © Mapbox © OpenStreetMap.")
+        foot.append("Map " + basemap.credit() + ".")
     if (S.get("community") or {}).get("credit"):
         foot.append(S["community"]["credit"])
     fy = m + footer_h - 8
@@ -3358,7 +3359,7 @@ def build_collision_evidence_pdf(S):
         if S.get("traffic_credit"):          # ...and the traffic counts and the national rates
             foot.append(S["traffic_credit"])
         if S.get("basemap"):
-            foot.append("Map © Mapbox © OpenStreetMap.")
+            foot.append("Map " + basemap.credit() + ".")
         fy = m + footer_h - 8
         c.setStrokeColorRGB(*BAND_GREY_RGB); c.setLineWidth(0.5); c.line(m, m + footer_h - 2, W - m, m + footer_h - 2)
         for ln in _wrap(" ".join(foot), R, 6.6, cw - 40)[:7]:

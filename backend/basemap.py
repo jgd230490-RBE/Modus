@@ -23,14 +23,72 @@ so a document never waits on Mapbox twice. The harnesses never reach Mapbox: por
 refuses urllib.request.urlopen for the whole process, so fetch() returns None and every caller draws its schematic.
 The image carries Mapbox's own logo and attribution; the captions say "Map © Mapbox © OpenStreetMap" as well.
 """
+import contextlib
 import math
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
 TILE = 512                       # Mapbox style tiles are 512 px at zoom 0
-STYLE = "mapbox/light-v11"       # the public map's light basemap
+STYLE = "mapbox/light-v11"       # the public map's light basemap (the default style)
+# 28 Oct 2026 (task 8e): the style of the server-drawn maps is a choice — key -> (Mapbox style, the style's road-name layer
+# the routes are drawn UNDER, the credit words). Probed 28 Oct: the three -v12 styles name their road-name layer `road-label`,
+# light-v11 `road-label-simple`. Standard and the OS map are NOT offered here (not confirmed for the Static Images service;
+# OS data into PDFs is outside the plan's terms).
+STYLES = {
+    "light": ("mapbox/light-v11", "road-label-simple", "© Mapbox © OpenStreetMap"),
+    "streets": ("mapbox/streets-v12", "road-label", "© Mapbox © OpenStreetMap"),
+    "outdoors": ("mapbox/outdoors-v12", "road-label", "© Mapbox © OpenStreetMap"),
+    "aerial": ("mapbox/satellite-streets-v12", "road-label", "© Maxar © Mapbox © OpenStreetMap"),
+}
+STYLE_NAMES = {"light": "Light", "streets": "Streets", "outdoors": "Outdoors", "aerial": "Aerial (with names)"}
+DEFAULT_STYLE = "light"
+_USE = threading.local()          # a request's own choice (the CLP map export's "Map style"), else the tenant's setting
+
+
+def clean_style(key):
+    """`key` when it is one of STYLES, else None."""
+    k = (key or "").strip().lower() if isinstance(key, str) else ""
+    return k if k in STYLES else None
+
+
+@contextlib.contextmanager
+def use(key):
+    """Every map drawn in this thread inside the block uses style `key` (an unknown key changes nothing)."""
+    k = clean_style(key)
+    prev = getattr(_USE, "key", None)
+    if k:
+        _USE.key = k
+    try:
+        yield
+    finally:
+        _USE.key = prev
+
+
+def resolve_style(style=None):
+    """The style key a map is drawn in: the one asked for, else this thread's `use` block, else the tenant's "Maps on paper"
+    setting (Config), else light. Never raises: a harness with no database gets light."""
+    k = clean_style(style) or clean_style(getattr(_USE, "key", None))
+    if k:
+        return k
+    try:
+        import config
+        import conversions
+        return clean_style(config.export_map_style(conversions)) or DEFAULT_STYLE
+    except Exception:
+        return DEFAULT_STYLE
+
+
+def labels_layer(style=None):
+    """The road-name layer of the style a map is drawn in (routes go under it)."""
+    return STYLES[resolve_style(style)][1]
+
+
+def credit(style=None):
+    """The credit words printed with a map in this style."""
+    return STYLES[resolve_style(style)][2]
 MAX_PX = 1280                    # the Static Images API's largest side (before @2x)
 CACHE_S = 24 * 3600
 _CACHE = {}                      # url without the token -> (fetched_at, png bytes)
@@ -95,10 +153,10 @@ LABELS_LAYER = "road-label-simple"
 URL_MAX = 7800
 
 
-def url(v, token, retina=True, overlays=None, before_layer=None):
+def url(v, token, retina=True, overlays=None, before_layer=None, style=None):
     ov = (",".join(overlays) + "/") if overlays else ""
     q = f"before_layer={before_layer}&" if (overlays and before_layer) else ""
-    return (f"https://api.mapbox.com/styles/v1/{STYLE}/static/{ov}{v['lon']:.5f},{v['lat']:.5f},{v['zoom']:.2f},0/"
+    return (f"https://api.mapbox.com/styles/v1/{STYLES[resolve_style(style)][0]}/static/{ov}{v['lon']:.5f},{v['lat']:.5f},{v['zoom']:.2f},0/"
             f"{v['w']}x{v['h']}{'@2x' if retina else ''}?{q}access_token=" + urllib.parse.quote(token))
 
 
@@ -269,8 +327,8 @@ def length_words(metres):
     return f"{metres / 1000:g} km" if metres >= 1000 else f"{metres:g} m"
 
 
-def fetch(v, token=None, timeout=12, retina=True, overlays=None, before_layer=None):
-    """The basemap PNG for view v, or None (no view, no token, Mapbox refused or unreachable). Cached for a day.
+def fetch(v, token=None, timeout=12, retina=True, overlays=None, before_layer=None, style=None):
+    """The basemap picture (a PNG; a JPEG for the satellite style) for view v, or None (no view, no token, Mapbox refused or unreachable). Cached for a day.
     23 Oct 2026: with `overlays` (path strings) and `before_layer`, the picture carries them under that layer. A refusal
     (an HTTP error: a bad overlay, a wrong layer id) answers None without marking Mapbox down, so a plain request can
     follow at once; a network failure still does."""
@@ -281,7 +339,7 @@ def fetch(v, token=None, timeout=12, retina=True, overlays=None, before_layer=No
         token = config.mapbox_token()
     if not token:
         return None
-    u = url(v, token, retina, overlays, before_layer)
+    u = url(v, token, retina, overlays, before_layer, style)
     key = u.split("?", 1)[0]
     hit = _CACHE.get(key)
     if hit and time.time() - hit[0] < CACHE_S:
@@ -293,11 +351,18 @@ def fetch(v, token=None, timeout=12, retina=True, overlays=None, before_layer=No
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = resp.read()
     except urllib.error.HTTPError:
-        return None                  # Mapbox answered: this request is wrong, the next one need not wait
+        # Mapbox answered: this request is wrong, the next one need not wait. 28 Oct 2026 (8e): a chosen style it refused
+        # falls back to Light at once (its own road-name layer under the overlays), then to the caller's schematic.
+        sk = resolve_style(style)
+        if sk != DEFAULT_STYLE:
+            lb = STYLES[DEFAULT_STYLE][1] if before_layer == STYLES[sk][1] else before_layer
+            return fetch(v, token, timeout, retina, overlays, lb, DEFAULT_STYLE)
+        return None
     except Exception:
         _DOWN_UNTIL[0] = time.time() + DOWN_S
         return None
-    if data[:8] != b"\x89PNG\r\n\x1a\n":
+    # 28 Oct 2026 (8e): the satellite style answers a JPEG (photographs), the others a PNG; reportlab draws either.
+    if data[:8] != b"\x89PNG\r\n\x1a\n" and data[:3] != b"\xff\xd8\xff":
         _DOWN_UNTIL[0] = time.time() + DOWN_S
         return None
     if len(_CACHE) > 64:

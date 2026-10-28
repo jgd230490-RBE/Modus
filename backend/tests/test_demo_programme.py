@@ -275,27 +275,49 @@ ok("⭐ the package carries a planned use for each of the three stockpiles (stoc
    {r["location_id"] for r in T.get("stockpile_plan", [])} == {_bal[n]["location_id"] for n in
                                                               ("Stockpile South", "Stockpile Tilton", "Stockpile North")},
    str(len(T.get("stockpile_plan", []))))
-ok("⭐ Stockpile North fills over the winter (no capping laid Nov–Mar) and goes over its 25 000 t in the week of 22 Mar 2027",
-   _wo(_bal["Stockpile North"]["first_over"]) == "2027-03-22"
-   and 25000 < _bal["Stockpile North"]["first_over"]["balance_end"] < 27000, str(_bal["Stockpile North"]["first_over"]))
-ok("...Stockpile Tilton is over in Feb 2028 (from the week of 31 Jan), Stockpile South never",
-   _wo(_bal["Stockpile Tilton"]["first_over"]) == "2028-01-31" and _bal["Stockpile South"]["first_over"] is None
-   and _bal["Stockpile South"]["peak_pct"] < 50, str(_bal["Stockpile Tilton"]["first_over"]))
-# North's recorded deliveries to 26 Nov fall a little short of the plan, so the plan's summer laying meets a few tonnes
-# fewer than it expects: one honest "runs out" weeks after the over, small. South and Tilton never run out.
-_ne = _bal["Stockpile North"]["first_empty"]
-ok("...South and Tilton never run out; North only runs a few tonnes short in the summer, after it has gone over",
-   _bal["Stockpile South"]["first_empty"] is None and _bal["Stockpile Tilton"]["first_empty"] is None
-   and (_ne is None or (_wo(_ne) > "2027-03-22" and _ne["short"] < 50)),
-   str({n: _bal[n]["first_empty"] for n in _bal if _bal[n].get("forecast")}))
-_tc = [w for w in _bal["Stockpile Tilton"]["weeks"] if w.get("count") is not None]
-ok("...one stock count on Stockpile Tilton in the week of 14 Sep 2026, 180 t more than worked out",
-   len(_tc) == 1 and _tc[0]["count_adjust"] == 180.0 and (_tc[0]["month_index"], _tc[0]["week_index"]) == (9, 3), str(_tc))
+# 28 Oct 2026 (task 0b): the plan is a LAYING PROGRAMME (a rate a week, winter pace, a residue) and the history drifts
+# from it, so the three stockpiles tell three different stories. The 27 Oct assertions on Tilton and North are narrowed
+# to these (Tilton no longer goes over: it is the pile that runs short and is topped up; North stays the pile that goes
+# over, now for months, not weeks).
+_N, _T, _S = _bal["Stockpile North"], _bal["Stockpile Tilton"], _bal["Stockpile South"]
+ok("⭐ Stockpile North fills over the winter (no capping laid Nov-Mar) and goes over its 25 000 t in the week of 22 Mar 2027",
+   _wo(_N["first_over"]) == "2027-03-22" and 25000 < _N["first_over"]["balance_end"] < 27000, str(_N["first_over"]))
+_nover = [w for w in _N["weeks"] if w["over"]]
+ok("...and stays over for months (about 17 weeks), not a week (the laying rate is below the arrivals), peaking 105-110 % of its capacity",
+   14 <= len(_nover) <= 30 and 105 <= _N["peak_pct"] <= 110 and _wo(_nover[-1]) < "2027-09-01",
+   f"{len(_nover)} weeks, peak {_N['peak_pct']} %, last {_wo(_nover[-1])}")
+ok("⭐ Stockpile Tilton runs short once and is topped up: Jul 2027's laying is planned for more than the pile can supply "
+   "(a shortfall of 1 000-2 000 t from the week of 12 Jul 2027), and August's deliveries refill it",
+   _T["first_empty"] is not None and _wo(_T["first_empty"]) == "2027-07-12"
+   and 1000 <= sum(w["short"] for w in _T["weeks"]) <= 2000
+   and not any(w["empty"] for w in _T["weeks"] if w["month_index"] > 19)
+   and next(w for w in _T["weeks"] if (w["month_index"], w["week_index"]) == (20, 4))["balance_end"] > 0,
+   str(_T["first_empty"]))
+ok("...Stockpile Tilton is never over (its winter peak is about 60 %), Stockpile South never over or empty (peak under 50 %): "
+   "the healthy pile",
+   _T["first_over"] is None and _T["peak_pct"] < 70 and _S["first_over"] is None and _S["first_empty"] is None
+   and _S["peak_pct"] < 50 and _N["first_empty"] is None, f"{_T['peak_pct']} {_S['peak_pct']}")
+_cnt = [(n_, w["month_index"], w["week_index"], w["count_adjust"]) for n_, s_ in _bal.items() for w in s_["weeks"]
+        if w.get("count") is not None]
+ok("...two stock counts: Tilton the week of 14 Sep 2026, about 180 t MORE than the book; North the week of 9 Nov 2026, "
+   "about 240 t LESS",
+   sorted(_cnt) == sorted([("Stockpile Tilton", 9, 3, _cnt[[c[0] for c in _cnt].index("Stockpile Tilton")][3]),
+                           ("Stockpile North", 11, 2, _cnt[[c[0] for c in _cnt].index("Stockpile North")][3])])
+   and len(_cnt) == 2 and all(c[0] != "Stockpile Tilton" or abs(c[3] - 180) < 2 for c in _cnt)
+   and all(c[0] != "Stockpile North" or abs(c[3] + 240) < 2 for c in _cnt), str(_cnt))
+_past = [w for s_ in (_T, _N) for w in s_["weeks"] if w["basis"] == "recorded" and w["consumed"] > 0]
+ok("...the history carries ACTUAL laying that differs from the plan: of the weeks typed, most differ from the planned use "
+   "by 5 % or more, with both over and under (rain weeks and catch-up weeks)",
+   len(_past) >= 25 and sum(1 for w in _past if abs(w["consumed"] - w["plan_out"]) > 0.05 * max(1, w["plan_out"])) > len(_past) / 2
+   and any(w["consumed"] > w["plan_out"] * 1.1 for w in _past) and any(w["consumed"] < w["plan_out"] * 0.8 for w in _past),
+   f"{len(_past)} weeks")
 ok("...the four compounds and the railhead keep the records-only figure (no capacity, no plan)",
    all(not s_["forecast"] for n, s_ in _bal.items() if not n.startswith("Stockpile ")))
 _gen0 = read("backend/tools/make_demo_tenant.py")
-ok("the generator: the winter nudge (no capping laid in Nov or Mar) and the plan from its own draw model",
-   "LAY_SHARE = {1: 0.0, 2: 0.0, 3: 0.0," in _gen0 and "11: 0.0, 12: 0.0}" in _gen0 and "def stock_plan_rows(loc):" in _gen0)
+ok("the generator: the laying programme (LAY_RATE, WINTER_PACE, PLAN_SURGE, COUNTS, ACTUAL_PACE) and the plan from it",
+   all(x in _gen0 for x in ("LAY_RATE = {", "WINTER_PACE = {", "PLAN_SURGE = {", "COUNTS = [", "ACTUAL_PACE = {",
+                            "def lay_draw(", "def actual_draw(", "def stock_plan_rows(loc):"))
+   and "LAY_SHARE" not in _gen0)
 
 # =========================================================================== #
 #  6. The generator agrees                                                     #
