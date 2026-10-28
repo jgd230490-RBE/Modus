@@ -605,13 +605,18 @@ ok("⭐ 5b: the structures and limits are the FOURTH source (phase 3), read from
    and st["credit"].count("OpenStreetMap") == 1 and [x["key"] for x in st["sources"]] == ["osm", "osm_structures", "gias", "naptan"],
    json.dumps(src["osm_structures"])[:300] + f" downloads {_downloads}")
 _s = community.structures()
+# NARROWED 28 Oct 2026 (a flake: CI failed on it once, 1 local run in 2 too): each source is stamped when IT finishes and the
+# refresh when the whole run does, so across a second boundary the two differ by a second (11:08:27 vs 11:08:28, seen).
+# Was: structures_fetched_at() == the refresh's fetched_at. Now: it is the structures source's own time, inside the refresh.
+_s5b = src["osm_structures"]["fetched_at"]
 ok("5b: community.structures() reads them back with kind, name, detail and geometry; a bbox away from them reads none; "
-   "structures_fetched_at() is the refresh's time",
+   "structures_fetched_at() is the structures source's own time, within the refresh (started_at … fetched_at)",
    ({(x["kind"], x["name"]) for x in _s} == EXPECT_STRUCT if HAVE_OSMIUM else len(_s) == 1)
    and all(x["geometry"]["type"] in ("Point", "LineString") and x["source_ref"] for x in _s)
    and community.structures(bbox=[-0.80, 52.29, -0.79, 52.31]) == []
    and len(community.structures(bbox=[mid - 0.01, LAT0 - 0.01, mid + 0.01, LAT0 + 0.01])) == len(_s)
-   and community.structures_fetched_at() == st["fetched_at"], str([(x["kind"], x["name"]) for x in _s]))
+   and community.structures_fetched_at() == _s5b and bool(_s5b) and st["started_at"] <= _s5b <= st["fetched_at"],
+   str([(x["kind"], x["name"]) for x in _s]) + f" structures {community.structures_fetched_at()} refresh {st.get('started_at')}…{st['fetched_at']}")
 _before = {x["properties"]["name"] for x in community.features(["bus_stops", "stations"])}
 FAILS.add("naptan")
 st2 = community.refresh(by="Planner", fetchers=FX_FETCH, strip=strip, today=TODAY)
