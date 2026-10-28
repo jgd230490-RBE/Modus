@@ -339,10 +339,106 @@ ok("⭐ R3b: the package's council bands are the ones chosen from the live four-
    and '"council_breaks": {"movements": [25, 50, 100], "carbon": [10, 25, 50]}' in _gen
    and "18 Oct 2026 (R3b)" in _gen, str(FAC.get("tenant", {}).get("council_breaks")))
 
+# =========================================================================== #
+#  7. A live refresh keeps what only live has (28 Oct 2026, the demo F6)       #
+# =========================================================================== #
+# The generator is loaded last: it points db at its own scratch file, after this harness is done with its own.
+import copy as _copy  # noqa: E402
+import importlib.util as _ilu  # noqa: E402
+_spec = _ilu.spec_from_file_location("make_demo_tenant_f6", os.path.join(BACKEND, "tools", "make_demo_tenant.py"))
+GEN = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(GEN)
+
+_xmas = {z["name"]: z for z in PKG["tables"]["zones"] if "Christmas trading" in z["name"]}
+ok("⭐ F4: Christmas trading 2027 in Market Harborough DIVERTS routes in its dates (as ticked on live, 28 Oct); 2028 stays "
+   "advisory",
+   _xmas.get("Market Harborough town centre: Christmas trading 2027", {}).get("affects_routing") in (1, True)
+   and _xmas.get("Market Harborough town centre: Christmas trading 2028", {}).get("affects_routing") in (0, False)
+   and (_xmas.get("Market Harborough town centre: Christmas trading 2027") or {}).get("starts_on") == "2027-12-01",
+   str({k: v.get("affects_routing") for k, v in _xmas.items()}))
+_empty = sorted(t for t, rows in PKG["tables"].items() if not rows)
+ok("⭐ F6: every table the shipped package leaves empty (made on live: baked, fetched, chosen) is one a refresh copies "
+   "from live — so a new live-only table cannot be dropped by a refresh unnoticed",
+   set(_empty) <= set(GEN.LIVE_TABLES), f"empty {_empty}; LIVE_TABLES {GEN.LIVE_TABLES}")
+ok("...route_choice (the diversions, task 0c) and traffic_counts are among them",
+   "route_choice" in GEN.LIVE_TABLES and "traffic_counts" in GEN.LIVE_TABLES)
+
+
+def _live_export(mutate=None):
+    """A stand-in for a live export: the shipped package as Postgres hands it out (BOOLEAN columns true / false), with
+    what only live has: a diversion, a traffic count, two drawn abnormal loads."""
+    live = _copy.deepcopy(PKG)
+    for t, rows in live["tables"].items():
+        for r in rows:
+            for c in ("affects_routing", "active", "return_abnormal", "indivisible", "axle_driving", "cu_vehicle"):
+                if c in r and r[c] in (0, 1):
+                    r[c] = bool(r[c])
+    lt = live["tables"]
+    lt["route_choice"] = [{"tenant_id": "default", "route_id": "R012", "zone_id": "Z038", "status": "applied"}]
+    lt["traffic_counts"] = [{"tenant_id": "default", "id": "CP1", "aadf_hgv": 812}]
+    ab = lt["abnormal_loads"]
+    for r in ab:
+        r["geometry_json"] = '[[-0.9, 52.5], [-0.8, 52.6]]'
+        r["distance_km"] = 12.3
+        r["pinch_json"] = '[{"what": "bridge"}]'
+        r["baked_at"] = "2026-10-22T22:30:00Z"
+    if len(ab) > 1:
+        ab[1]["width_m"] = (ab[1].get("width_m") or 3.0) + 1.0      # this load's size changed since it was drawn
+    if mutate:
+        mutate(lt)
+    return live
+
+
+def _refresh(live):
+    path = os.path.join(TMP, "live-export-f6.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(live, f)
+    pkg = _copy.deepcopy(PKG)
+    GEN.copy_live_tables(pkg, path)
+    return pkg
+
+
+try:
+    _r = _refresh(_live_export())
+    _err = None
+except SystemExit as e:
+    _r, _err = None, str(e)
+ok("F6: a live export from Postgres (BOOLEAN columns true / false) is not refused when its zones, routes and gates are "
+   "the package's", _r is not None, _err or "")
+_rt = (_r or {}).get("tables", {})
+ok("...its diversions (route_choice) and traffic counts come across",
+   _rt.get("route_choice") == [{"tenant_id": "default", "route_id": "R012", "zone_id": "Z038", "status": "applied"}]
+   and _rt.get("traffic_counts", [{}])[0].get("aadf_hgv") == 812)
+_ab = _rt.get("abnormal_loads") or []
+ok("...an abnormal load drawn on live keeps its drawing (line, distance, pinch points, when drawn)",
+   len(_ab) >= 2 and _ab[0].get("geometry_json") == '[[-0.9, 52.5], [-0.8, 52.6]]' and _ab[0].get("distance_km") == 12.3
+   and _ab[0].get("pinch_json") == '[{"what": "bridge"}]' and _ab[0].get("baked_at") == "2026-10-22T22:30:00Z",
+   str([(a.get("id"), a.get("distance_km")) for a in _ab]))
+ok("...but one whose size changed since it was drawn is left undrawn (the drawing would be for another lorry)",
+   len(_ab) >= 2 and not _ab[1].get("geometry_json") and _ab[1].get("distance_km") is None)
+
+
+def _flip_xmas(lt):
+    for z in lt["zones"]:
+        if z["name"] == "Market Harborough town centre: Christmas trading 2027":
+            z["affects_routing"] = False
+
+
+try:
+    _refresh(_live_export(_flip_xmas))
+    _refused = False
+except SystemExit as e:
+    _refused = "zones differ" in str(e)
+ok("...and a live export whose zones DO differ (a routing tick not in the package) is still refused", _refused)
+shutil_tmp = getattr(GEN, "TMP", None)
+
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)
 print(f"\n{PASS} passed, {len(FAIL)} failed")
+if shutil_tmp:
+    import shutil as _sh  # noqa: E402
+    _sh.rmtree(shutil_tmp, ignore_errors=True)
 import shutil  # noqa: E402
 shutil.rmtree(TMP, ignore_errors=True)
 sys.exit(1 if FAIL else 0)

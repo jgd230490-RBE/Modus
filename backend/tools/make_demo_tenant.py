@@ -1280,8 +1280,13 @@ def build(with_areas=False, out=None):
          "2028-12-01", "2028-12-31",
          "No scheme lorries through the town centre during Christmas trading, by agreement with the council (fictional)."),
     ]
+    # 28 Oct 2026 (task 0c, the demo narrative's F4): Christmas trading 2027 DIVERTS the routes through the town centre in
+    # its dates, as ticked on live that evening (R003, R012, R038, R040 in Dec 2027); a live refresh compares the zones'
+    # affects_routing, so the package says what live says. 2028 stays advisory, as on live.
+    ROUTING_IN_DATES = {"Market Harborough town centre: Christmas trading 2027"}
     for name, geom, kind, s_on, e_on, note in ADVISORY:
-        z = zones.create_zone(name, geom, kind=kind, affects_routing=False, starts_on=s_on, ends_on=e_on, note=note)
+        z = zones.create_zone(name, geom, kind=kind, affects_routing=name in ROUTING_IN_DATES,
+                              starts_on=s_on, ends_on=e_on, note=note)
         assert "error" not in z, z
 
     # --- D75 (22 Oct 2026, abnormal loads phase 3): three fictional abnormal loads ------------------------------------
@@ -1372,8 +1377,44 @@ def build(with_areas=False, out=None):
 
 
 # The tables a live refresh carries over from the live demo unchanged (§1.9): baked and fetched, never generated here.
-LIVE_TABLES = ("route_geometry", "route_sections", "route_area_km", "areas",
-               "community_features", "community_meta", "collision_records", "collision_meta")
+# 28 Oct 2026 (the demo narrative's F6): + route_choice (task 0c's diversions, made on live by a zone save or Find a way
+# round; without it a refresh dropped every diversion) and traffic_counts (fetched with the collisions since 22 Oct).
+LIVE_TABLES = ("route_geometry", "route_sections", "route_area_km", "areas", "route_choice",
+               "community_features", "community_meta", "collision_records", "collision_meta", "traffic_counts")
+
+# 28 Oct 2026 (F6): an abnormal load is generated here but DRAWN on live (Draw the route, Check the roads again), in the
+# same row. A refresh keeps live's drawing for a load whose ends and size are unchanged; any other load stays undrawn.
+ABNORMAL_DRAWN_COLS = ("geometry_json", "return_geometry_json", "distance_km", "duration_hr", "baked_at", "bake_error",
+                       "here_notices_json", "actions_json", "roads_json", "limits_hits_json", "limits_checked_at",
+                       "pinch_json")
+ABNORMAL_SAME_COLS = ("origin_id", "origin_gate_id", "dest_id", "dest_gate_id", "via_json", "return_abnormal",
+                      "width_m", "height_m", "length_m", "rigid_length_m", "gross_t", "max_axle_t", "axle_count",
+                      "axle_spacings_m", "vehicle_type")
+
+
+def _same(v):
+    """A value as the comparisons see it: a Postgres export carries BOOLEAN columns as true / false, a package built on
+    SQLite as 1 / 0 (Python already treats True == 1; this says so on purpose); floats to 6 places."""
+    if isinstance(v, bool):
+        return int(v)
+    if isinstance(v, float):
+        return round(v, 6)
+    return v
+
+
+def copy_abnormal_drawings(live_rows, new_rows):
+    """Copy ABNORMAL_DRAWN_COLS from live's row to the new row of the same id when every ABNORMAL_SAME_COLS value
+    matches; returns the ids copied."""
+    live_by_id = {r.get("id"): r for r in live_rows or []}
+    copied = []
+    for r in new_rows or []:
+        lr = live_by_id.get(r.get("id"))
+        if lr is None or any(_same(lr.get(c)) != _same(r.get(c)) for c in ABNORMAL_SAME_COLS):
+            continue
+        for c in ABNORMAL_DRAWN_COLS:
+            r[c] = lr.get(c)
+        copied.append(r.get("id"))
+    return copied
 
 
 def copy_live_tables(pkg, path):
@@ -1384,8 +1425,7 @@ def copy_live_tables(pkg, path):
     lt, nt = live.get("tables") or {}, pkg["tables"]
 
     def sig(rows, cols):
-        return sorted(tuple((round(r.get(c), 6) if isinstance(r.get(c), float) else r.get(c)) for c in cols)
-                      for r in rows or [])
+        return sorted(tuple(_same(r.get(c)) for c in cols) for r in rows or [])
     problems = []
     for t, cols in (("routes", ("id", "origin_id", "dest_id", "material_category")),
                     ("location_gates", ("id", "location_id", "lat", "lon", "access_zone_id")),
@@ -1397,6 +1437,7 @@ def copy_live_tables(pkg, path):
         raise SystemExit("--live-export refused: " + "; ".join(problems) + ". Re-bake on live instead (§4.2).")
     for t in LIVE_TABLES:
         nt[t] = list(lt.get(t) or [])
+    copy_abnormal_drawings(lt.get("abnormal_loads"), nt.get("abnormal_loads"))
     row = [r for r in lt.get("config") or [] if r.get("key") == "carbon_target"]
     nt["config"] = [r for r in nt["config"] if r.get("key") != "carbon_target"] + row
 
