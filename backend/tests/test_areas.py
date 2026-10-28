@@ -386,18 +386,19 @@ sp = {a["name"]: a for a in areas.area_load(10)["areas"]}
 # NARROWED 14 Oct 2026 (civils materials): the batching plant sits in Melton (14 sites)
 # RE-PINNED 17 Oct 2026 (demo redesign R2, §3a): the asphalt plant and Welland Ready-Mix both sit in Harborough (16 sites)
 # NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): the precast works in Hinckley and Bosworth and the crane depot in Charnwood (18 sites)
-ok("3. ⭐ the demo's 18 sites by point-in-polygon: Harborough 10, Melton 3, Charnwood 2, Blaby 1, Rutland 1, Hinckley and Bosworth 1 (the mockup's recount, not the chain's 9)",
+# RE-PINNED 28 Oct 2026 (simulation v2, the Tilton Viaduct site L019: two gates G020 / G021 with access roads Z027 / Z028, four internal roads Z029–Z032, seven routes R044–R050, 942 approved line-months)
+ok("3. ⭐ the demo's 19 sites by point-in-polygon: Harborough 11, Melton 3, Charnwood 2, Blaby 1, Rutland 1, Hinckley and Bosworth 1 (the mockup's recount, not the chain's 9)",
    {n: sp[n]["sites_count"] for n in ("Harborough", "Melton", "Blaby", "Charnwood", "Rutland", "Leicester",
                                        "Oadby and Wigston", "Hinckley and Bosworth")}
-   == {"Harborough": 10, "Melton": 3, "Blaby": 1, "Charnwood": 2, "Rutland": 1, "Leicester": 0,
+   == {"Harborough": 11, "Melton": 3, "Blaby": 1, "Charnwood": 2, "Rutland": 1, "Leicester": 0,
        "Oadby and Wigston": 0, "Hinckley and Bosworth": 1}
-   and sp["Leicestershire"]["sites_count"] == 17 and len(_pkg["tables"]["locations"]) == 18,
+   and sp["Leicestershire"]["sites_count"] == 18 and len(_pkg["tables"]["locations"]) == 19,
    str({n: a["sites_count"] for n, a in sp.items()}))
 ok("3. ...Kilby Ridge in Blaby, Northfield and the crane depot in Charnwood, Brook Pit in Rutland, the precast works in Hinckley and Bosworth",
    sp["Blaby"]["sites"] == ["Kilby Ridge Quarry"] and sorted(sp["Charnwood"]["sites"]) == ["Northfield Quarry", "Soar Valley Crane Hire (fictional)"]
    and sp["Rutland"]["sites"] == ["Brook Pit"] and sp["Hinckley and Bosworth"]["sites"] == ["Earl Shilton Precast Works (fictional)"])
-ok("3. ...and the totals say 18 sites, so the card reads Harborough '10 of 18' (NARROWED 14 Oct: the batching plant; RE-PINNED 17 Oct: the two plants; 22 Oct: the two abnormal-load sites)",
-   areas.area_load(10)["totals"]["sites"] == 18)
+ok("3. ...and the totals say 19 sites, so the card reads Harborough '11 of 19' (NARROWED 14 Oct: the batching plant; RE-PINNED 17 Oct: the two plants; 22 Oct: the two abnormal-load sites; 28 Oct: the viaduct site)",
+   areas.area_load(10)["totals"]["sites"] == 19)
 _seed_areas = {a["name"]: a for a in areas.area_load(10)["areas"]}
 ok("3. ⭐ every seed area carries ONE label point, inside its own polygon (the map's one label per area)",
    len(_seed_areas) == 9 and all(a["label_point"] and areas.Area(a["area_id"], a["geometry"]).contains(*a["label_point"])
