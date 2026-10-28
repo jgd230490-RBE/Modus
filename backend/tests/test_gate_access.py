@@ -491,12 +491,15 @@ for g in T["location_gates"]:
 ok("⭐ THE DEMO: every one of the 23 gates has an access road — a spliced haul road from the road point to the gate, 35 m",
    len(T["location_gates"]) == 23 and not bad, str(bad))
 ok("...the old zones keep their ids (Z001-Z005: the two haul roads and three geofences); the access roads are Z006-Z028, "
-   "the viaduct site's four internal roads Z029-Z032, the advisory zones after them",
+   "the viaduct site's four internal roads Z029-Z032, the dated zones after them (all advisory but Christmas trading 2027, "
+   "which re-routes in its dates since 28 Oct)",
    [z["id"] for z in T["zones"]][:5] == ["Z001", "Z002", "Z003", "Z004", "Z005"]
    and [ZB[i]["name"] for i in ("Z001", "Z002")] == ["Langton haul road", "Stockpile North haul road"]
    and sorted(g["access_zone_id"] for g in T["location_gates"]) == [f"Z{n:03d}" for n in range(6, 29)]
    and all(z["kind"] == "haul_road" and z["haul_mode"] == "internal" and z["location_id"] == "L019" for z in T["zones"] if 29 <= int(z["id"][1:]) <= 32)
-   and all(z["kind"] != "haul_road" and not z["affects_routing"] for z in T["zones"] if int(z["id"][1:]) > 32))
+   # NARROWED 28 Oct 2026 (the demo narrative's F4): the one exception is Christmas trading 2027, a dated diversion
+   and all(z["kind"] != "haul_road" and (not z["affects_routing"]) == (z["name"] != "Market Harborough town centre: Christmas trading 2027")
+           for z in T["zones"] if int(z["id"][1:]) > 32))
 ok("...named for the site and gate, the road named in the note, 10 km/h, no end date",
    all(re.match(r"^.+: .+ access road$", ZB[g["access_zone_id"]]["name"]) for g in T["location_gates"])
    and all(ZB[g["access_zone_id"]]["note"].startswith("Bellmouth off ") for g in T["location_gates"])

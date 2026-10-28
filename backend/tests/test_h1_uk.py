@@ -361,14 +361,16 @@ ok("16 Oct 2026: and one access road per gate (23 since 28 Oct), all spliced hau
 # start date, ends with the junction build 17 Dec 2027; the Burrough limit runs the whole programme; the Melton works area
 # Mar 2026 – Sep 2027), then the seven ADVISORY zones created after the access roads (Z025–Z031; Z027–Z033 since 22 Oct 2026,
 # the two abnormal-load sites' access roads before them): nothing new steers routing
-ok("H2: three geofences — a closure that re-routes (Tilton), an advisory 7.5 t village limit, an advisory works area — then seven advisory zones",
+ok("H2: three geofences — a closure that re-routes (Tilton), an advisory 7.5 t village limit, an advisory works area — then seven dated zones, six advisory and Christmas trading 2027 re-routing (28 Oct)",
    [(z["id"], z["kind"], z["affects_routing"], z["starts_on"], z["ends_on"]) for z in _T["zones"] if z["kind"] != "haul_road"]
    == [("Z003", "closure", 1, "2026-10-05", "2027-12-17"), ("Z004", "weight_limit", 0, "2026-01-01", "2030-12-31"),
        ("Z005", "works", 0, "2026-03-01", "2027-09-30"),
        # RE-PINNED 28 Oct 2026 (simulation v2): Z033–Z039, after the viaduct site's two access roads and four internal roads
        ("Z033", "works", 0, "2026-05-01", "2028-05-31"), ("Z034", "works", 0, "2027-04-01", "2028-09-30"),
        ("Z035", "closure", 0, "2027-04-01", "2027-04-30"), ("Z036", "closure", 0, "2028-03-01", "2028-06-30"),
-       ("Z037", "works", 0, "2029-06-01", "2029-10-31"), ("Z038", "closure", 0, "2027-12-01", "2027-12-31"),
+       ("Z037", "works", 0, "2029-06-01", "2029-10-31"),
+       # NARROWED 28 Oct 2026 (the demo narrative's F4): Christmas trading 2027 now DIVERTS in its dates, as ticked on live
+       ("Z038", "closure", 1, "2027-12-01", "2027-12-31"),
        ("Z039", "closure", 0, "2028-12-01", "2028-12-31")]
    and all("(fictional)" in (z["note"] or "") for z in _T["zones"] if z["kind"] != "haul_road")
    and "8 vehicles a day" in [z for z in _T["zones"] if z["id"] == "Z004"][0]["note"]
