@@ -236,8 +236,8 @@ ok("the tenant's settings live in the tenanted config table under one key, no ne
    # NARROWED 12 Oct 2026: route_sections (public map review §2.2d) is the one table added
    # since; costing itself still added none, which is what this pins.
    # NARROWED again 12 Oct 2026: areas and route_area_km (§2.2b, D27) are the two added after it
-   costing.KEY == "costing" and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "route_choice"}) == 16
-   and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "route_choice"} <= db.TENANTED_TABLES)
+   costing.KEY == "costing" and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice"}) == 16
+   and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice"} <= db.TENANTED_TABLES)
 ok("nothing is seeded: no target rate, no share, no base, no yard, no index row",
    costing.settings()["target"] == {k: None for k in costing.TARGET_FIELDS}
    and costing.settings()["fuel"]["share_pct"] is None and costing.settings()["fuel"]["baf_base_eur_per_l"] is None

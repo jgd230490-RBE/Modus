@@ -636,6 +636,16 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-dot-empty{background:#FFFFFF;border:2px solid var(--sim-lorry);}
   .sim-dot-pour{background:var(--sim-mixer);}
   .sim-dot-wait{background:#FFFFFF;border:2px solid #DC2626;}
+  /* 28 Oct 2026 (v2): on site — a lorry being served, an area, the wheel wash; the scale switch; a site's what-ifs */
+  .sim-dot-serve{background:var(--ok-text);}
+  .sim-dot-area{background:rgba(29,78,216,.14);border:1.5px dashed #1D4ED8;border-radius:2px;}
+  .sim-dot-wash{background:#FFFFFF;border:2.5px solid #0E7490;}
+  .sim-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .sim-seg button{border:0;background:var(--surface);padding:4px 12px;font-size:13.5px;cursor:pointer;color:var(--ink);min-height:28px;}
+  .sim-seg button+button{border-left:1px solid var(--line);}
+  .sim-seg button.on{background:var(--navy);color:#fff;}
+  .sim-site-row{margin-bottom:4px;}
+  .sim-onsite{border-top:1px solid var(--line);padding-top:6px;margin-top:4px;}
   .sim-dot-gate{background:radial-gradient(circle,#1E293B 0 2.5px,#FFFFFF 3px);border:2.5px solid #1E293B;width:15px;height:15px;}
   .sim-line{display:inline-block;width:18px;height:0;flex:0 0 auto;}
   .sim-line-end{border-top:1.5px dashed #94A3B8;}
@@ -1307,8 +1317,8 @@ const INFO = {
     how: "Loaded lorries count at the delivery site's gate, empty ones at the loading site's. Capacity = open minutes (less shut times and peak bands) ÷ check-in minutes a lorry. Averages, no peak hour.", guide: "3-1-filters-and-the-six-cards", tech: "t1-gates" },
   // 14 Oct 2026 (bundle G, W7): the CLP monitoring section
   // 16 Oct 2026 (S7): the Simulation section
-  "dash.sim": { title: "Simulation", text: "An average working day of the month, lorry by lorry: each gate's arrivals spread evenly over its open hours, one lane at each gate. Try other hours, check-in times, bands or a pour; nothing is saved.",
-    how: "Loads are rounded to whole loads. No lorry arrives before its gate opens; one that arrives while it is shut waits. The bottleneck is the first lorry that waits longer than the gate's check-in.", tech: "t1-gates" },
+  "dash.sim": { title: "Simulation", text: "A working day lorry by lorry: the month's average day, a Look-ahead week's average weekday, or one planned day. On a site with areas a lorry drives on to its area, the wash and out. Nothing is saved.",
+    how: "Loads are rounded to whole loads. No lorry arrives before its gate opens; one that arrives while it is shut waits. The bottleneck is the first lorry that waits longer than the station's own minutes. A gate closed for a period hands both directions to the site's other gate.", tech: "t1-gates" },
   "dash.clp": { title: "CLP monitoring", text: "The Construction Logistics Plan's figures from the approved plan: caps, vehicles, councils, carbon and trips avoided. Planned, not observed: Wayscope holds no gate log or arrival times.",
     how: "Each chart says what is missing when it cannot be drawn. The CLP pack prints the same charts for a month.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   "clp.route_caps": { title: "Routes against their planning cap", text: "Two-way movements a day on each route in the month against the cap typed on the route. Red past the cap. A flag, never a block.",
@@ -1950,6 +1960,8 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
         </details>
       )}
       {(ga.notes || []).map((n, i) => <div key={i} className="ct-note">{n}</div>)}
+      {/* 28 Oct 2026 (simulation v2): a gate closed for a period that no route names has its own line */}
+      {(ga.closed_gates || []).filter(c => !(ga.notes || []).some(n => n.includes(c.gate_name))).map(c => <div key={c.gate_id} className="ct-note" data-ga-closed={c.gate_id}>{c.location_name}, {c.gate_name} {c.closed_words}{c.to_gate_name ? `: in and out by ${c.to_gate_name}` : ""}.</div>)}
       {ga.busiest_note && <div className="ct-note" data-ga-busy-note="1">{ga.busiest_note}</div>}
     </section>
   );
@@ -8696,6 +8708,7 @@ function GatesWeek({ gw }){
         {shown.map(g => (
           <div key={g.gate_id} className="gw-gate" data-gw-gate={g.gate_id} data-gw-flag={g.flag || "none"}>
             <div className="text-sm font-semibold text-slate-700">{g.location_name}<span className="text-slate-400 font-normal"> · {g.gate_name}</span></div>
+            {g.closed_words && <div className="clp-note" data-gw-closed={g.gate_id}>{g.closed_words[0].toUpperCase() + g.closed_words.slice(1)}: its lorries use the site's other gate meanwhile.</div>}
             <div className="clp-note">{g.no_open_time ? "No open time: the no-delivery bands and this gate's shut times cover all its hours."
               : g.capacity_per_day == null ? "No check-in time typed: nothing is compared."
               : `Can check in ${grp(g.capacity_per_day)} a day (open ${g.open_hours}${g.open_basis === "default" ? " by default" : ""}${g.peak_minutes ? `, less ${g.peak_minutes} min of peak bands` : ""}${g.shut_minutes ? `, less ${g.shut_minutes} min shut` : ""} ÷ ${+g.check_in_minutes} min a lorry)${g.closed_days ? `, ${g.closed_days}` : ""}.`}</div>
@@ -9914,12 +9927,17 @@ function PhoneLookAhead({ meta, initialPage }){
 const SIM_PLAY_SECONDS = 60;
 const SIM_QUEUE_M = 25;                 // drawing only: a waiting lorry every 25 m back along its own road
 const SIM_SPEEDS = [["0.5", "½×"], ["1", "1×"], ["2", "2×"], ["4", "4×"]];
-const SIM_SC0 = () => ({ all: null, hours: {}, check_in: {}, bands: null, pour: { on: false, gate: "", start: "10:00", m3: "160", mpl: "", rate: "60" } });
+const SIM_SC0 = () => ({ all: null, hours: {}, check_in: {}, bands: null, pour: { on: false, gate: "", start: "10:00", m3: "160", mpl: "", rate: "60" },
+  // 28 Oct 2026 (v2): the scale (month · week · day) and the sites' what-ifs are part of the scenario (on screen only, D86)
+  scale: "month", bucket: "commit", date: "", site_speed: {}, service: {}, bays: {}, wash: null });
+const SIM_SCALES = [["month", "Month"], ["week", "Week"], ["day", "Day"]];
 const simHM = (m) => { if(m == null || !isFinite(m)) return "—"; const r = Math.round(m); return String(Math.floor(r / 60)).padStart(2, "0") + ":" + String(((r % 60) + 60) % 60).padStart(2, "0"); };
 const simN1 = (n) => n == null ? "—" : (+n).toFixed(1);
 // the scenario as the query the server reads (scenario_from_query); nothing else carries it
 function simQS(month, sc, legs){
   const q = [`month=${month}`];
+  if(sc.scale === "week") q.push("scale=week", `week=${sc.bucket === "next" ? "next" : "commit"}`);
+  else if(sc.scale === "day" && sc.date) q.push("scale=day", `date=${encodeURIComponent(sc.date)}`);
   if(sc.all) q.push(`hours=${encodeURIComponent("all=" + sc.all[0] + "-" + sc.all[1])}`);
   Object.keys(sc.hours).forEach(g => q.push(`hours=${encodeURIComponent(g + "=" + sc.hours[g][0] + "-" + sc.hours[g][1])}`));
   Object.keys(sc.check_in).forEach(g => q.push(`check_in=${encodeURIComponent(g + "=" + sc.check_in[g])}`));
@@ -9929,6 +9947,10 @@ function simQS(month, sc, legs){
     q.push(`pour_gate=${encodeURIComponent(p.gate)}`, `pour_start=${encodeURIComponent(p.start)}`, `pour_m3=${encodeURIComponent(p.m3)}`, `pour_rate=${encodeURIComponent(p.rate)}`);
     if(p.mpl !== "") q.push(`pour_m3_per_load=${encodeURIComponent(p.mpl)}`);
   }
+  Object.keys(sc.site_speed || {}).forEach(l => q.push(`site_speed=${encodeURIComponent(l + "=" + sc.site_speed[l])}`));
+  Object.keys(sc.service || {}).forEach(a => q.push(`service=${encodeURIComponent(a + "=" + sc.service[a])}`));
+  Object.keys(sc.bays || {}).forEach(a => q.push(`bays=${encodeURIComponent(a + "=" + sc.bays[a])}`));
+  if(sc.wash != null) q.push(`wash=${sc.wash ? "on" : "off"}`);
   if(legs) q.push("legs=1");
   return q.join("&");
 }
@@ -9946,7 +9968,22 @@ function simPointAt(leg, d){
   const seg = (c[hi] - c[lo]) || 1, u = (d - c[lo]) / seg, A = leg.coords[lo], B = leg.coords[hi];
   return [A[0] + (B[0] - A[0]) * u, A[1] + (B[1] - A[1]) * u];
 }
-// drawing: every lorry on the road or in a gate's lane at minute t, and each gate's waiting and minutes lost so far
+// 28 Oct 2026 (v2): the sites the server sent, once per reply — where each station is and the paths between them
+function simSites(D){
+  if(D.__sites) return D.__sites;
+  const out = {};
+  (D.sites || []).forEach(sd => {
+    const points = {};
+    (sd.gates || []).forEach(g => { if(g.lon != null && g.lat != null) points["gate:" + g.gate_id] = [+g.lon, +g.lat]; });
+    (sd.areas || []).forEach(a => { if(a.point) points["area:" + a.id] = a.point; });
+    out[sd.location_id] = { d: sd, points, paths: sd.paths || {} };
+  });
+  D.__sites = out;
+  return out;
+}
+// drawing: every lorry on the road, in a gate's lane or on site at minute t; each gate's and each station's waiting
+// and minutes lost so far. On site a lorry runs the hops and stops the server sent (sim_site): along a path at the
+// parts' speeds, waiting back along the path into its station 25 m apart, or at the station being served.
 function simFrame(D, legs, t){
   const lanes = {}, gates = {};
   (D.gates || []).forEach(g => { gates[g.gate_id] = { w: 0, lost: 0 }; });
@@ -9956,29 +9993,73 @@ function simFrame(D, legs, t){
     if(a.at < t) G.lost += Math.max(0, Math.min(t, a.start) - a.at);
   }
   Object.keys(lanes).forEach(g => lanes[g].sort((x, y) => x.start - y.start));      // the gate's one lane, in check-in order
-  const feats = []; let laden = 0, empty = 0, mixers = 0, waiting = 0;
+  const sites = simSites(D), stQ = {}, stations = {};
   for(const a of D.arrivals){
-    if(a.depart == null || t < a.depart || t >= a.start) continue;
-    const leg = legs && legs[a.leg];
-    if(!leg || !leg.coords) continue;
-    let pos, k = a.kind;
-    if(t < a.at){
-      pos = simPointAt(leg, simDistAt(leg.parts, (t - a.depart) + (a.t_from || 0)));
-      if(k === "laden") laden++; else if(k === "empty") empty++; else mixers++;
-    } else {
-      const q = lanes[a.gate].indexOf(a);
-      pos = simPointAt(leg, leg.len_m - Math.max(0, q) * SIM_QUEUE_M); k = "wait"; waiting++;
+    for(const sp of (a.stops || [])){
+      const S = stations[sp.st] || (stations[sp.st] = { w: 0, busy: 0, lost: 0 });
+      if(sp.at <= t && t < sp.start){ (stQ[sp.st] || (stQ[sp.st] = [])).push({ a, sp }); S.w++; }
+      if(sp.start <= t && t < sp.done) S.busy++;
+      if(sp.at < t) S.lost += Math.max(0, Math.min(t, sp.start) - sp.at);
     }
+  }
+  Object.keys(stQ).forEach(k => stQ[k].sort((x, y) => x.sp.start - y.sp.start));   // each station's queue, in service order
+  const feats = []; let laden = 0, empty = 0, mixers = 0, waiting = 0, onSite = 0;
+  for(const a of D.arrivals){
+    const chained = (a.stops || []).length > 0, site = chained ? sites[a.site] : null;
+    let pos = null, k = a.kind;
+    if(t < a.start){
+      if(a.depart == null || t < a.depart) continue;
+      const leg = legs && legs[a.leg];
+      if(!leg || !leg.coords) continue;
+      if(t < a.at){
+        pos = simPointAt(leg, simDistAt(leg.parts, (t - a.depart) + (a.t_from || 0)));
+        if(k === "laden") laden++; else if(k === "empty") empty++; else mixers++;
+      } else {
+        const q = lanes[a.gate].indexOf(a);
+        pos = simPointAt(leg, leg.len_m - Math.max(0, q) * SIM_QUEUE_M); k = "wait"; waiting++;
+      }
+    } else if(site){
+      if(t < a.done){ pos = site.points["gate:" + a.gate]; k = "serve"; }
+      else {
+        for(let i = 0; i < a.stops.length && !pos; i++){
+          const h = a.hops[i], sp = a.stops[i], path = h && site.paths[h.path];
+          if(h && path && h.t0 <= t && t < h.t1) pos = simPointAt(path, simDistAt(path.parts, t - h.t0));
+          else if(sp.at <= t && t < sp.start){
+            const q = (stQ[sp.st] || []).findIndex(x => x.a === a);
+            pos = path ? simPointAt(path, path.len_m - Math.max(0, q) * SIM_QUEUE_M) : site.points[sp.st]; k = "wait"; waiting++;
+          }
+          else if(sp.start <= t && t < sp.done){ pos = site.points[sp.st]; k = "serve"; }
+        }
+      }
+      if(!pos) continue;
+      onSite++;
+    } else continue;
     feats.push({ type: "Feature", properties: { k }, geometry: { type: "Point", coordinates: pos } });
   }
-  return { feats, laden, empty, mixers, waiting, gates };
+  return { feats, laden, empty, mixers, waiting, onSite, gates, stations };
 }
+// 28 Oct 2026 (v2): the timeline's rows — the gates where a lorry waits, or (a site chosen) that site's stations
+function simTlRows(D, site){
+  if(site){
+    const sd = site.d, ing = (D.gates || []).filter(g => g.location_id === sd.location_id && g.queue_start != null);
+    const rows = ing.map(g => ({ id: g.gate_id, gate_id: g.gate_id, name: simGateName(g) + " · " + g.gate_name, items: D.arrivals.filter(a => a.gate === g.gate_id && a.wait > 0.01).map(a => [a.at, a.start]),
+      queue_start: g.queue_start, bottleneck_at: g.bottleneck_at, most_waiting: g.most_waiting, limit: g.check_in, word: "check-in", intervals: g.intervals }));
+    (sd.stations || []).filter(st => st.queue_start != null).forEach(st => rows.push({ id: st.key, name: st.name,
+      items: D.arrivals.flatMap(a => (a.stops || []).filter(sp => sp.st === st.key && sp.start - sp.at > 0.01).map(sp => [sp.at, sp.start])),
+      queue_start: st.queue_start, bottleneck_at: st.bottleneck_at, most_waiting: st.most_waiting, limit: st.service, word: "minutes a lorry", intervals: null }));
+    return rows;
+  }
+  return (D.gates || []).filter(g => g.queue_start != null).map(g => ({ id: g.gate_id, gate_id: g.gate_id, name: simGateName(g), items: D.arrivals.filter(a => a.gate === g.gate_id && a.wait > 0.01).map(a => [a.at, a.start]),
+    queue_start: g.queue_start, bottleneck_at: g.bottleneck_at, most_waiting: g.most_waiting, limit: g.check_in, word: "check-in", intervals: g.intervals }));
+}
+// 28 Oct 2026 (v2): what kind of day this is, by scale
+const simDayWords = (D) => D.scale === "day" ? "as planned" : D.scale === "week" ? "an average weekday" : "an average working day";
 const simGateName = (g) => (g.location_name || "").replace(" Rail Freight Terminal", " Terminal");
 const simWord = (g) => g.arrivals === 0 ? "No arrivals" : g.check_in == null ? "No check-in time typed" : g.flag === "red" ? "Over gate capacity" : g.flag === "amber" ? "Queue likely" : "Spacing holds";
 const simTone = (g) => g.flag === "red" ? "bad" : g.flag === "amber" ? "warn" : "none";
 
 // the map: its own Mapbox instance (CommitMap's pattern), drawn from the reply and redrawn at each clock minute
-function SimMap({ meta, D, store, frame }){
+function SimMap({ meta, D, store, frame, site }){
   const div = useRef(null), mapObj = useRef(null), badges = useRef({});
   const [ready, setReady] = useState(false);
   const [mapErr, setMapErr] = useState("");
@@ -9992,12 +10073,23 @@ function SimMap({ meta, D, store, frame }){
     m.addControl(new window.mapboxgl.NavigationControl({ showCompass: false }), "top-right");
     m.on("load", () => {
       const empty = { type: "FeatureCollection", features: [] };
-      ["sim-routes", "sim-ends", "sim-haul", "sim-gates", "sim-lorries"].forEach(s => m.addSource(s, { type: "geojson", data: empty }));
+      ["sim-routes", "sim-ends", "sim-haul", "sim-gates", "sim-lorries", "sim-areas", "sim-area-pts", "sim-wash"].forEach(s => m.addSource(s, { type: "geojson", data: empty }));
       m.addLayer({ id: "sim-routes", type: "line", source: "sim-routes", paint: { "line-color": "#94A3B8", "line-width": 1.6, "line-opacity": 0.75 } });
       m.addLayer({ id: "sim-ends", type: "line", source: "sim-ends", paint: { "line-color": "#94A3B8", "line-width": 1, "line-dasharray": [2, 2] } });
       m.addLayer({ id: "sim-haul", type: "line", source: "sim-haul", paint: { "line-color": tok("--chart-4", "#7C3AED"), "line-width": 4, "line-dasharray": [1.5, 1] } });
       m.addLayer({ id: "sim-haul-label", type: "symbol", source: "sim-haul", layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-size": 12, "text-offset": [0, -1] },
                    paint: { "text-color": "#5B21B6", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
+      // 28 Oct 2026 (v2): a site's areas (a shape or a point, named with its level) and its wheel wash
+      m.addLayer({ id: "sim-areas", type: "fill", source: "sim-areas", paint: { "fill-color": ["match", ["get", "act"], "load", "#A16207", "#1D4ED8"], "fill-opacity": 0.12 } });
+      m.addLayer({ id: "sim-areas-line", type: "line", source: "sim-areas", paint: { "line-color": ["match", ["get", "act"], "load", "#A16207", "#1D4ED8"], "line-width": 1.5, "line-dasharray": [3, 2] } });
+      m.addLayer({ id: "sim-areas-pt", type: "circle", source: "sim-area-pts", paint: { "circle-radius": 9, "circle-color": ["match", ["get", "act"], "load", "#A16207", "#1D4ED8"], "circle-opacity": 0.18, "circle-stroke-color": ["match", ["get", "act"], "load", "#A16207", "#1D4ED8"], "circle-stroke-width": 1.5 } });
+      m.addLayer({ id: "sim-areas-label", type: "symbol", source: "sim-areas", layout: { "text-field": ["get", "label"], "text-size": 12, "text-offset": [0, 1.4], "text-anchor": "top" },
+                   paint: { "text-color": "#1E293B", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
+      m.addLayer({ id: "sim-areas-pt-label", type: "symbol", source: "sim-area-pts", layout: { "text-field": ["get", "label"], "text-size": 12, "text-offset": [0, 1.4], "text-anchor": "top" },
+                   paint: { "text-color": "#1E293B", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
+      m.addLayer({ id: "sim-wash", type: "circle", source: "sim-wash", paint: { "circle-radius": 5.5, "circle-color": "#FFFFFF", "circle-stroke-color": "#0E7490", "circle-stroke-width": 2.5 } });
+      m.addLayer({ id: "sim-wash-label", type: "symbol", source: "sim-wash", layout: { "text-field": ["get", "label"], "text-size": 12, "text-offset": [0, 1.1], "text-anchor": "top" },
+                   paint: { "text-color": "#0E7490", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
       // 17 Oct 2026 (the user: the gate and an empty lorry looked too alike, both a small white dot with a rim): the gate is a
       // BULLSEYE — a bigger white ring with a thick dark rim and a dark centre — so it never reads as a lorry
       m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 2.5 } });
@@ -10009,6 +10101,9 @@ function SimMap({ meta, D, store, frame }){
         "circle-color": ["match", ["get", "k"], "laden", tok("--sim-lorry", "#2563EB"), "pour", tok("--sim-mixer", "#E8590C"), "#FFFFFF"],
         "circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF", tok("--sim-lorry", "#2563EB")],
         "circle-stroke-width": ["match", ["get", "k"], "laden", 1, "pour", 1, 2] } });
+      // 28 Oct 2026 (v2): a lorry being unloaded, loaded or washed — green, over the lorry layer
+      m.addLayer({ id: "sim-serving", type: "circle", source: "sim-lorries", filter: ["==", ["get", "k"], "serve"],
+        paint: { "circle-radius": 5.5, "circle-color": tok("--ok-text", "#047857"), "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 1 } });
       setReady(true);
     });
     mapObj.current = m;
@@ -10040,6 +10135,25 @@ function SimMap({ meta, D, store, frame }){
       properties: { label: `${h.name} · ${h.speed_kph == null ? "no speed typed" : Math.round(speed(h.speed_kph)) + " " + SPD()}` }, geometry: { type: "LineString", coordinates: h.coords } }));
     const gpts = (D.gates || []).filter(g => g.lon != null && g.lat != null).map(g => ({ type: "Feature", properties: { name: simGateName(g) }, geometry: { type: "Point", coordinates: [+g.lon, +g.lat] } }));
     gpts.forEach(f => b.extend(f.geometry.coordinates));
+    // 28 Oct 2026 (v2): each site's roads (at the site speed unless the road has its own), areas, wash and exit gates
+    const areas = [], areaPts = [], wash = [], stationPts = {};
+    (D.sites || []).forEach(sd => {
+      const kph = (z) => z.speed_kph == null ? sd.speed_kph : z.speed_kph;
+      (sd.roads || []).filter(z => z.coords && z.coords.length > 1).forEach(z => haul.push({ type: "Feature",
+        properties: { label: `${z.name} · ${Math.round(speed(kph(z)))} ${SPD()}` }, geometry: { type: "LineString", coordinates: z.coords } }));
+      (sd.gates || []).forEach(g => { if(g.lon == null || g.lat == null) return; stationPts["gate:" + g.gate_id] = [+g.lon, +g.lat];
+        if(!gateBy[g.gate_id]) gpts.push({ type: "Feature", properties: { name: `${g.name}${g.closed ? " · closed" : ""}` }, geometry: { type: "Point", coordinates: [+g.lon, +g.lat] } }); });
+      (sd.areas || []).forEach(a => {
+        if(a.point) stationPts["area:" + a.id] = a.point;
+        if(a.activity === "wash"){ if(a.point) wash.push({ type: "Feature", properties: { label: `${a.name} · ${a.service} min` }, geometry: { type: "Point", coordinates: a.point } }); return; }
+        const props = { act: a.activity, label: a.level ? `${a.name}\n${a.level}` : a.name };
+        if(a.geometry && a.geometry.type === "Polygon") areas.push({ type: "Feature", properties: props, geometry: { ...a.geometry } });
+        else if(a.point) areaPts.push({ type: "Feature", properties: props, geometry: { type: "Point", coordinates: a.point } });
+      });
+    });
+    m.getSource("sim-areas").setData({ type: "FeatureCollection", features: areas });
+    m.getSource("sim-area-pts").setData({ type: "FeatureCollection", features: areaPts });
+    m.getSource("sim-wash").setData({ type: "FeatureCollection", features: wash });
     m.getSource("sim-routes").setData({ type: "FeatureCollection", features: lines });
     m.getSource("sim-ends").setData({ type: "FeatureCollection", features: ends });
     m.getSource("sim-haul").setData({ type: "FeatureCollection", features: haul });
@@ -10053,8 +10167,31 @@ function SimMap({ meta, D, store, frame }){
       el.className = "sim-badge"; el.style.display = "none";
       badges.current[g.gate_id] = { el, m: new window.mapboxgl.Marker({ element: el, anchor: "left", offset: [7, -10] }).setLngLat([+g.lon, +g.lat]).addTo(m) };
     });
+    // 28 Oct 2026 (v2): a badge on each station of a site too (areas, the wash; the exit gate crosses with no wait)
+    Object.keys(stationPts).forEach(key => {
+      if(key.startsWith("gate:") && badges.current[key.slice(5)]) return;
+      const el = document.createElement("div");
+      el.className = "sim-badge"; el.style.display = "none";
+      badges.current["st:" + key] = { el, m: new window.mapboxgl.Marker({ element: el, anchor: "left", offset: [7, -10] }).setLngLat(stationPts[key]).addTo(m) };
+    });
     if(!b.isEmpty() && !store.framed){ try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); store.framed = true; } catch(e){} }
   }, [ready, store, D]);
+  // 28 Oct 2026 (v2): the site view frames the chosen site (its roads, areas and gates); Whole scheme frames every route again
+  useEffect(() => {
+    const m = mapObj.current;
+    if(!m || !ready || !D) return;
+    const b = new window.mapboxgl.LngLatBounds();
+    if(site){
+      (site.d.roads || []).forEach(z => (z.coords || []).forEach(c => b.extend(c)));
+      (site.d.areas || []).forEach(a => { if(a.geometry && a.geometry.type === "Polygon") a.geometry.coordinates[0].forEach(c => b.extend(c)); else if(a.point) b.extend(a.point); });
+      (site.d.gates || []).forEach(g => { if(g.lon != null && g.lat != null) b.extend([+g.lon, +g.lat]); });
+      if(!b.isEmpty()){ try { m.fitBounds(b, { padding: 50, maxZoom: 17, duration: 300 }); } catch(e){} }
+    } else if(store && store.framed){
+      Object.values(store.legs || {}).forEach(lg => (lg && lg.coords || []).forEach(c => b.extend(c)));
+      (D.gates || []).forEach(g => { if(g.lon != null && g.lat != null) b.extend([+g.lon, +g.lat]); });
+      if(!b.isEmpty()){ try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 300 }); } catch(e){} }
+    }
+  }, [site, ready]);
   // the moving part
   useEffect(() => {
     const m = mapObj.current;
@@ -10062,7 +10199,7 @@ function SimMap({ meta, D, store, frame }){
     const f = frame;
     try { m.getSource("sim-lorries").setData({ type: "FeatureCollection", features: f.feats }); } catch(e){}
     Object.keys(badges.current).forEach(gid => {
-      const x = badges.current[gid], w = (f.gates[gid] || {}).w || 0;
+      const x = badges.current[gid], w = gid.startsWith("st:") ? ((f.stations || {})[gid.slice(3)] || {}).w || 0 : (f.gates[gid] || {}).w || 0;
       x.el.style.display = w > 0 ? "" : "none";
       if(w > 0) x.el.textContent = `${w} waiting`;
     });
@@ -10075,7 +10212,10 @@ function SimMap({ meta, D, store, frame }){
         <div><i className="sim-dot sim-dot-empty" aria-hidden="true"></i>Lorry, empty</div>
         {D.pour && <div><i className="sim-dot sim-dot-pour" aria-hidden="true"></i>{(D.mixer && D.mixer.vehicle_label) || "Concrete mixer"} (pour)</div>}
         <div><i className="sim-dot sim-dot-wait" aria-hidden="true"></i>Waiting at a gate (one lane, 25 m apart)</div>
+        {(D.sites || []).length > 0 && <div><i className="sim-dot sim-dot-serve" aria-hidden="true"></i>Being unloaded, loaded or washed</div>}
         <div><i className="sim-dot sim-dot-gate" aria-hidden="true"></i>Entry gate</div>
+        {(D.sites || []).length > 0 && <div><i className="sim-dot sim-dot-area" aria-hidden="true"></i>Area on site</div>}
+        {(D.sites || []).some(x => x.wash) && <div><i className="sim-dot sim-dot-wash" aria-hidden="true"></i>Wheel wash</div>}
         <div><i className="sim-line sim-line-end" aria-hidden="true"></i>Route end to its gate</div>
         <div><i className="sim-line sim-line-haul" aria-hidden="true"></i>Haul road (assigned speed)</div>
       </div>
@@ -10087,7 +10227,7 @@ function SimMap({ meta, D, store, frame }){
 // the timeline: one row a gate where a lorry waits; the shaded band is lorries waiting; the red mark is the bottleneck
 // (D85: the first wait longer than the gate's check-in). Click to move the clock there.
 const SIM_TL_LEFT = 150;
-function SimTimeline({ D, t, onSeek }){
+function SimTimeline({ D, t, onSeek, site }){
   const box = useRef(null);
   const [W, setW] = useState(900);
   useEffect(() => {
@@ -10098,45 +10238,45 @@ function SimTimeline({ D, t, onSeek }){
   }, []);
   const s0 = D.window.start, s1 = D.window.end;
   const tx = (m) => SIM_TL_LEFT + (m - s0) / Math.max(1, s1 - s0) * (W - SIM_TL_LEFT - 10);
-  const qg = (D.gates || []).filter(g => g.queue_start != null);
+  const qg = simTlRows(D, site);
   const rowH = 32, H = 34 + Math.max(1, qg.length) * rowH + 8;
   const still = useMemo(() => {
     const parts = [];
     const iv = (D.gates[0] || {}).intervals || [];
-    const same = D.gates.every(g => JSON.stringify(g.intervals) === JSON.stringify(iv));
+    const same = !site && D.gates.every(g => JSON.stringify(g.intervals) === JSON.stringify(iv));
     if(same) iv.forEach(([a, b], i) => parts.push(<rect key={"o" + i} x={tx(a)} y={18} width={Math.max(0, tx(b) - tx(a))} height={H - 26} className="sim-tl-open" />));
     // 17 Oct 2026: gates open at different times (their own hours or shut times): each waiting gate's row is shaded by its own
-    else qg.forEach((g, i) => (g.intervals || []).forEach(([a, b], j) => parts.push(<rect key={"o" + i + "-" + j} x={tx(a)} y={34 + i * rowH} width={Math.max(0, tx(b) - tx(a))} height={rowH - 4} className="sim-tl-open" />)));
+    else qg.forEach((g, i) => (g.intervals || iv || []).forEach(([a, b], j) => parts.push(<rect key={"o" + i + "-" + j} x={tx(a)} y={34 + i * rowH} width={Math.max(0, tx(b) - tx(a))} height={rowH - 4} className="sim-tl-open" />)));
     const pourAt = D.arrivals.filter(a => a.kind === "pour").map(a => a.at);
     if(pourAt.length) parts.push(<rect key="pour" x={tx(pourAt[0])} y={13} height={4} width={Math.max(2, tx(pourAt[pourAt.length - 1]) - tx(pourAt[0]))} className="sim-tl-pour" />);
     for(let h = Math.ceil(s0 / 60); h <= Math.floor(s1 / 60); h++){
       const x = tx(h * 60);
       parts.push(<g key={"h" + h}><line x1={x} x2={x} y1={18} y2={H - 8} className="sim-tl-grid" /><text x={x} y={12} className="sim-tl-hour" textAnchor="middle">{String(h).padStart(2, "0")}:00</text></g>);
     }
-    if(!qg.length) parts.push(<text key="none" x={SIM_TL_LEFT} y={34 + rowH / 2} className="sim-tl-ok">No lorry waits at any gate on this day.</text>);
+    if(!qg.length) parts.push(<text key="none" x={SIM_TL_LEFT} y={34 + rowH / 2} className="sim-tl-ok">{site ? "No lorry waits anywhere on this site on this day." : "No lorry waits at any gate on this day."}</text>);
     qg.forEach((g, i) => {
       const y0 = 34 + i * rowH, base = y0 + rowH - 6, mx = Math.max(1, g.most_waiting);
-      const arr = D.arrivals.filter(a => a.gate === g.gate_id && a.wait > 0.01);
+      const arr = g.items;
       const pts = [];
-      for(let m = s0; m <= s1; m += 2){ const w = arr.filter(a => a.at <= m && m < a.start).length; pts.push(`${tx(m).toFixed(1)},${(base - w / mx * (rowH - 12)).toFixed(1)}`); }
-      parts.push(<g key={g.gate_id} data-sim-tl-gate={g.gate_id}>
-        <text x={4} y={base - 6} className="sim-tl-name">{simGateName(g)}</text>
+      for(let m = s0; m <= s1; m += 2){ const w = arr.filter(a => a[0] <= m && m < a[1]).length; pts.push(`${tx(m).toFixed(1)},${(base - w / mx * (rowH - 12)).toFixed(1)}`); }
+      parts.push(<g key={g.id} data-sim-tl-gate={g.gate_id || undefined} data-sim-tl-row={g.id}>
+        <text x={4} y={base - 6} className="sim-tl-name">{g.name}</text>
         <polyline points={`${tx(s0)},${base} ${pts.join(" ")} ${tx(s1)},${base}`} className="sim-tl-wait" />
         {g.bottleneck_at != null
           ? <><line x1={tx(g.bottleneck_at)} x2={tx(g.bottleneck_at)} y1={y0 + 2} y2={base} className="sim-tl-mark" />
               <text x={tx(g.bottleneck_at) + 4} y={y0 + 11} className="sim-tl-marktext">bottleneck from {simHM(g.bottleneck_at)} · up to {g.most_waiting} waiting</text></>
-          : <text x={tx(g.queue_start) + 4} y={y0 + 11} className="sim-tl-note">waits from {simHM(g.queue_start)}, none longer than the {+g.check_in} min check-in</text>}
+          : <text x={tx(g.queue_start) + 4} y={y0 + 11} className="sim-tl-note">waits from {simHM(g.queue_start)}, none longer than the {+g.limit} min {g.word}</text>}
       </g>);
     });
     return parts;
-  }, [D, W]);
+  }, [D, W, site]);
   const click = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     onSeek(s0 + (e.clientX - r.left - SIM_TL_LEFT) / Math.max(1, r.width - SIM_TL_LEFT - 10) * (s1 - s0));
   };
   return (
     <div ref={box} className="sim-tl" data-sim-timeline="1">
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} onClick={click} role="img" aria-label={qg.length ? `Waiting lorries over the day at ${qg.length} gate${qg.length === 1 ? "" : "s"}` : "No lorry waits on this day"}>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} onClick={click} role="img" aria-label={qg.length ? `Waiting lorries over the day at ${qg.length} ${site ? "station" : "gate"}${qg.length === 1 ? "" : "s"}` : "No lorry waits on this day"}>
         {still}
         <line x1={tx(t)} x2={tx(t)} y1={16} y2={H - 6} className="sim-tl-cursor" />
       </svg>
@@ -10174,20 +10314,29 @@ function SimPlayer({ meta, D, store, scenario, open }){
   const f = useMemo(() => simFrame(D, store ? store.legs : {}, t), [D, store, t]);
   const order = (D.gates || []).slice().sort((a, b) => (b.arrivals - a.arrivals) || (a.gate_id < b.gate_id ? -1 : 1));
   const playWord = playing ? "Pause" : (t >= s1 ? "Play again" : "Play");
+  // 28 Oct 2026 (v2): the site view — the map framed on one site, its stations now and its queues
+  const [siteId, setSiteId] = useState("");
+  const site = siteId ? (simSites(D)[siteId] || null) : null;
+  useEffect(() => { if(siteId && !simSites(D)[siteId]) setSiteId(""); }, [D]);
+  const stOrder = site ? [...(D.gates || []).filter(g => g.location_id === site.d.location_id).map(g => ({ key: "gate:" + g.gate_id, name: g.gate_name, sub: g.check_in != null ? `check-in ${+g.check_in} min` : "", gate: g })),
+    ...(site.d.stations || []).filter(st => st.kind !== "gate" || !(D.gates || []).some(g => g.gate_id === st.gate_id)).map(st => ({ key: st.key, name: st.name, sub: st.kind === "gate" ? "out" : `${st.bays} bay${st.bays === 1 ? "" : "s"} · ${+st.service} min`, st }))] : [];
   return (
     <div className="sim-play" data-sim-player="1">
       {/* 17 Oct 2026 (one screen): the map with the queue timeline under it on the left, the clock, Gates now and the
           scenario beside it; the busiest-hour table and the haul roads fold away below (SimulationPanel) */}
       <div className="sim-grid">
         <div className="sim-main">
-          <SimMap meta={meta} D={D} store={store} frame={f} />
-          <div className="sim-tl-head" title="Shaded = lorries waiting at each gate. Red mark = the bottleneck. Click to move the clock."><b>When queues start</b> · the red mark is the bottleneck</div>
-          <SimTimeline D={D} t={t} onSeek={(m) => { setPlaying(false); seek(m); }} />
+          {(D.sites || []).length > 0 && <div className="sim-row sim-site-row"><label className="sim-lbl">Site <select className="ga-sel" value={siteId} onChange={e => setSiteId(e.target.value)} aria-label="Simulation site" data-sim-site="1">
+            <option value="">Whole scheme</option>{(D.sites || []).map(x => <option key={x.location_id} value={x.location_id}>{x.name}</option>)}</select></label>
+            {site && <span className="ct-note">{site.d.speed_basis === "default" ? "no site speed typed: " : ""}{Math.round(speed(site.d.speed_kph))} {SPD()} on site{site.d.gates.some(g => g.closed) ? ` · ${site.d.gates.filter(g => g.closed).map(g => `${g.name} ${g.closed_words}`).join("; ")}` : ""}</span>}</div>}
+          <SimMap meta={meta} D={D} store={store} frame={f} site={site} />
+          <div className="sim-tl-head" title="Shaded = lorries waiting. Red mark = the bottleneck. Click to move the clock."><b>When queues start</b> · the red mark is the bottleneck</div>
+          <SimTimeline D={D} t={t} onSeek={(m) => { setPlaying(false); seek(m); }} site={site} />
         </div>
         <div className="sim-side">
           <div className="sim-card">
             <div className="sim-clock" aria-live="off" data-sim-clock="1">{simHM(t)}</div>
-            <div className="ct-note">{D.label}, an average working day · {D.window.from}–{D.window.to} plays in about {SIM_PLAY_SECONDS} s at 1×</div>
+            <div className="ct-note">{D.label}, {simDayWords(D)} · {D.window.from}–{D.window.to} plays in about {SIM_PLAY_SECONDS} s at 1×</div>
             <div className="sim-btns">
               <button type="button" className="btn-pri" onClick={() => { if(t >= s1) setT(s0); setPlaying(p => !p); }} data-sim-play="1">{playWord}</button>
               <button type="button" className="btn-sec" onClick={() => { setPlaying(false); setT(s0); }}>Restart</button>
@@ -10195,14 +10344,22 @@ function SimPlayer({ meta, D, store, scenario, open }){
                 {SIM_SPEEDS.map(([v, w]) => <option key={v} value={v}>{w}</option>)}</select></label>
             </div>
             <label className="sim-lbl sim-jump">Jump to <input type="range" min={s0} max={s1} step={5} value={Math.round(t)} onChange={e => { setPlaying(false); seek(+e.target.value); }} aria-label="Jump to a time of day" /></label>
-            <div className="ct-note" data-sim-now="1">On the road now: {f.laden} laden · {f.empty} empty{f.mixers ? ` · ${f.mixers} mixer${f.mixers === 1 ? "" : "s"}` : ""} · {f.waiting} waiting at gates</div>
+            <div className="ct-note" data-sim-now="1">On the road now: {f.laden} laden · {f.empty} empty{f.mixers ? ` · ${f.mixers} mixer${f.mixers === 1 ? "" : "s"}` : ""} · {f.waiting} waiting{(D.sites || []).length ? ` · ${f.onSite} on site` : " at gates"}</div>
           </div>
-          <div className="sim-card">
+          {site
+            ? <div className="sim-card" data-sim-stations-now="1">
+              <div className="sim-card-h">Stations now · {site.d.name}</div>
+              <table className="sim-now"><thead><tr><th scope="col">Station</th><th scope="col" className="num">Waiting</th><th scope="col" className="num">Busy</th><th scope="col" className="num">Minutes lost</th></tr></thead>
+                <tbody>{stOrder.map(r => { const n = r.gate ? { w: (f.gates[r.gate.gate_id] || {}).w || 0, lost: (f.gates[r.gate.gate_id] || {}).lost || 0, busy: null } : (f.stations[r.key] || { w: 0, busy: 0, lost: 0 });
+                  return <tr key={r.key} className={n.w > 0 ? "sim-q" : ""} data-sim-now-station={r.key}><td>{r.name}{r.sub ? <div className="sim-sub">{r.sub}</div> : null}</td><td className="num">{n.w || ""}</td><td className="num">{r.st && r.st.kind !== "gate" ? `${n.busy} of ${r.st.bays}` : "—"}</td><td className="num">{Math.round(n.lost)}</td></tr>; })}</tbody></table>
+              <div className="ct-note">On site now: {f.onSite}. Gate in → gate out this day: {site.d.avg_on_site == null ? "—" : `${Math.round(site.d.avg_on_site)} min on average, ${Math.round(site.d.longest_on_site)} min the longest`}.</div>
+            </div>
+            : <div className="sim-card">
             <div className="sim-card-h">Gates now</div>
             <table className="sim-now"><thead><tr><th scope="col">Gate</th><th scope="col" className="num">Waiting now</th><th scope="col" className="num">Minutes lost so far</th></tr></thead>
               <tbody>{order.map(g => { const n = f.gates[g.gate_id] || { w: 0, lost: 0 };
                 return <tr key={g.gate_id} className={n.w > 0 ? "sim-q" : ""} data-sim-now-gate={g.gate_id}><td>{simGateName(g)}</td><td className="num">{n.w}{n.w > 0 ? " waiting" : ""}</td><td className="num">{Math.round(n.lost)}</td></tr>; })}</tbody></table>
-          </div>
+          </div>}
           {scenario}
         </div>
       </div>
@@ -10249,6 +10406,21 @@ const SimScenario = React.memo(function SimScenario({ D, sc, onChange, onReset, 
           <label>Pour rate <input type="number" min={5} step={5} value={p.rate} onChange={e => setPour("rate", e.target.value)} disabled={!p.on} aria-label="Pour rate in cubic metres an hour" className="sim-num" /> m³ an hour</label>
           <div className="ct-note">{D.mixer.m3_per_load} m³: the {D.mixer.vehicle_label || "concrete mixer"} legal fill.{D.pour ? ` ${D.pour.loads} mixers, one every ${simN1(D.pour.gap_minutes)} min, ${D.pour.start}–${D.pour.end}.` : ""}</div>
         </div>
+        {/* 28 Oct 2026 (v2): each site's speed, its areas' minutes and bays, the wheel wash — on screen only */}
+        {(D.sites || []).map(x => { const onsite = x; const kphIn = (v) => DU() === "mi" ? +v * KM_PER_MI : +v;
+          return <div key={onsite.location_id} className="sim-onsite" data-sim-onsite={onsite.location_id}>
+            <div className="sim-lbl"><b>{onsite.name}</b></div>
+            <label className="sim-lbl">Site speed <input type="number" min={1} step={1} className="sim-num" aria-label={`${onsite.name}: site speed`}
+              value={sc.site_speed[onsite.location_id] != null ? Math.round(speed(sc.site_speed[onsite.location_id])) : Math.round(speed(onsite.speed_kph))}
+              onChange={e => { const v = +e.target.value; if(v > 0) onChange({ ...sc, site_speed: { ...sc.site_speed, [onsite.location_id]: Math.round(kphIn(v) * 10) / 10 } }); }} /> {SPD()}</label>
+            {onsite.areas.filter(a => a.activity !== "wash").map(a => <div key={a.id} className="sim-lbl">{a.name}:
+              <input type="number" min={0} step={1} className="sim-num" aria-label={`${a.name}: minutes a lorry`} value={sc.service[a.id] != null ? sc.service[a.id] : (a.service == null ? "" : +a.service)}
+                onChange={e => { const v = e.target.value; if(v !== "" && +v >= 0) onChange({ ...sc, service: { ...sc.service, [a.id]: +v } }); }} /> min ·
+              <input type="number" min={1} max={20} step={1} className="sim-num" aria-label={`${a.name}: bays`} value={sc.bays[a.id] != null ? sc.bays[a.id] : a.bays}
+                onChange={e => { const v = +e.target.value; if(v >= 1) onChange({ ...sc, bays: { ...sc.bays, [a.id]: v } }); }} /> {(sc.bays[a.id] != null ? sc.bays[a.id] : a.bays) === 1 ? "bay" : "bays"}</div>)}
+            {onsite.areas.some(a => a.activity === "wash") && <label className="sim-check"><input type="checkbox" checked={sc.wash != null ? sc.wash : !!onsite.wash} onChange={e => onChange({ ...sc, wash: e.target.checked })} />
+              <span>Wheel wash on the way out</span></label>}
+          </div>; })}
         <label className="sim-check sim-off" title="Comes with holding areas (V1)"><input type="checkbox" disabled /><span>Holding area: lorries wait off the highway</span></label>
         <div className="ct-note">Comes with holding areas (V1).</div>
         {msg && <div className="sim-msg" role="alert">{msg}</div>}
@@ -10327,6 +10499,17 @@ function SimPhoneList({ D }){
           {g.late > 0 && <div className="sim-sub sim-warn">{g.late} checked in after the last open minute</div>}
           {g.origin_share_note && <div className="sim-sub sim-warn">{g.origin_share_note}</div>}
         </li>))}
+      {(D.sites || []).flatMap(x => (x.stations || []).filter(st => st.kind !== "gate").map(st => (
+        <li key={st.key} className="sim-pcard" data-sim-station={st.key} data-sim-flag={st.flag || "none"}>
+          <div className="sim-pc-h"><b>{x.name} · {st.name}</b><RowStatus word={st.status_word} tone={st.flag === "red" ? "bad" : st.flag === "amber" ? "warn" : "none"} /></div>
+          <div className="sim-sub">{st.bays} bay{st.bays === 1 ? "" : "s"} · {+st.service} min a lorry</div>
+          <dl className="sim-pc-dl">
+            <div><dt>Lorries this day</dt><dd>{st.arrivals}</dd></div>
+            <div><dt>Queue</dt><dd>{st.queue_start == null ? "No queue" : (st.bottleneck_at != null ? `bottleneck ${simHM(st.bottleneck_at)}` : `short waits from ${simHM(st.queue_start)}`)}</dd></div>
+            <div><dt>Most waiting</dt><dd>{st.most_waiting || 0}</dd></div>
+            <div><dt>Minutes lost</dt><dd>{Math.round(st.minutes_lost || 0)}</dd></div>
+          </dl>
+        </li>)))}
     </ul>
   );
 }
@@ -10361,6 +10544,8 @@ function SimulationPanel({ meta, months, phone, initial }){
         if(!live) return;
         good.current = sc; shown.current = key;
         if(wantLines) setStore({ month, legs: j.legs, haul: j.haul_roads });
+        // 28 Oct 2026 (v2): a week or a day is the server's month; the lines are read once for it like any month
+        if(sc.scale !== "month" && j.month !== month){ shown.current = (store && store.month === j.month) ? `${j.month}|${scKey}` : null; setMonth(j.month); }
         setData(j); setLoadErr(false); setMsg(""); setBusy(false);
       }).catch(e => {
         if(!live) return;
@@ -10402,14 +10587,24 @@ function SimulationPanel({ meta, months, phone, initial }){
         <div className="ct-row">
           <div className="sim-chips"><span className="sim-chip sim-chip-staff">Staff only · never on the public map</span><span className="sim-chip">Planning view, not a record of what happened</span>
             <span className="sim-chip">Congestion on the public road is not modelled</span><InfoTip id="dash.sim" /></div>
-          <label className="ct-line">Month <select className="ga-sel" value={month} onChange={e => { setMonth(+e.target.value); }} aria-label="Simulation month">
-            {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}</select></label>
+          {/* 28 Oct 2026 (v2): the scale — the forecast month's average day, the Look-ahead week's average weekday, or one planned day */}
+          <div className="sim-seg" role="group" aria-label="Simulation scale" data-sim-scale={sc.scale}>
+            {SIM_SCALES.map(([v, w]) => <button key={v} type="button" className={sc.scale === v ? "on" : ""} aria-pressed={sc.scale === v}
+              onClick={() => { if(sc.scale === v) return; const d = D && D.day_choices && D.day_choices.length ? D.day_choices : [];
+                setMsg(""); setSc(x => ({ ...x, scale: v, date: v === "day" ? (x.date || (d[0] || {}).date || "") : x.date })); }}>{w}</button>)}
+          </div>
+          {sc.scale === "month" && <label className="ct-line">Month <select className="ga-sel" value={month} onChange={e => { setMonth(+e.target.value); }} aria-label="Simulation month">
+            {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}</select></label>}
+          {sc.scale === "week" && <label className="ct-line">Week <select className="ga-sel" value={sc.bucket} onChange={e => setSc(x => ({ ...x, bucket: e.target.value }))} aria-label="Simulation week">
+            <option value="commit">This week</option><option value="next">Next week</option></select></label>}
+          {sc.scale === "day" && <label className="ct-line">Day <select className="ga-sel" value={sc.date} onChange={e => setSc(x => ({ ...x, date: e.target.value }))} aria-label="Simulation day">
+            {((D && D.day_choices) || []).map(c => <option key={c.date} value={c.date}>{c.words}{c.bucket === "next" ? " (next week)" : ""}</option>)}</select></label>}
         </div>
         {loadErr && <div className="ct-line" style={{ color: "var(--red)" }}>The simulation did not load.</div>}
         {!D && !loadErr && <div className="ct-note">Working out the day…</div>}
         {D && D.loads === 0 && <EmptyState kind="none" title={`No approved lines in ${D.label}`} body="Pick another month. The simulation plays the approved lines of a month's average working day." />}
         {D && D.loads > 0 && <>
-          <div className="ct-line" data-sim-lead="1">{D.label}: an average working day, {grp(D.loads)} loads ({grp(D.gate_arrivals)} lorry arrivals at the gates{pourN ? `, ${pourN} of them mixers` : ""}). Each gate's arrivals are spread evenly over its open hours{(D.gates || []).some(g => g.shut_words) ? ", its shut times" + (D.bands.on ? "" : " taken off") : ""}{D.bands.on ? `${(D.gates || []).some(g => g.shut_words) ? " and" : ","} the no-delivery bands ${D.bands.words} taken off` : ""}; one lane at each gate.{busy ? " Working it out…" : ""}</div>
+          <div className="ct-line" data-sim-lead="1">{D.label}: {simDayWords(D)}, {grp(D.loads)} loads ({grp(D.gate_arrivals)} lorry arrivals at the gates{pourN ? `, ${pourN} of them mixers` : ""}). Each gate's arrivals are spread evenly over its open hours{(D.gates || []).some(g => g.shut_words) ? ", its shut times" + (D.bands.on ? "" : " taken off") : ""}{D.bands.on ? `${(D.gates || []).some(g => g.shut_words) ? " and" : ","} the no-delivery bands ${D.bands.words} taken off` : ""}; one lane at each gate.{busy ? " Working it out…" : ""}</div>
           {(D.notes || []).map((n, i) => <div key={i} className="ct-note">{n}</div>)}
           {phone
             ? <><div className="ct-note" data-sim-phone="1">The map, the playback and the what-if controls open on a desktop.</div><SimPhoneList D={D} /></>
@@ -10428,10 +10623,27 @@ function SimulationPanel({ meta, months, phone, initial }){
                     <td className="num">{h.busiest || 0}<div className="sim-sub">{h.busiest_hour || ""}</div></td><td className="num">{(h.routes || []).length}</td></tr>)}</tbody></table></div>
               </details>}
               {D.access_roads_hidden > 0 && <p className="ct-note" data-sim-access-hidden="1">Gate access roads are not listed ({D.access_roads_hidden}): lorries still cross them at their typed speed.</p>}
+              {/* 28 Oct 2026 (v2): on site — each site's stations, counted like the gates */}
+              {(D.sites || []).length > 0 && <details className="sim-fold" data-sim-fold="site"><summary>On site</summary>
+                <p className="ct-note">After its check-in each lorry drives the site's roads to the area that takes its material, then the wheel wash, then out. Every station queues first come first served.</p>
+                {D.sites.map(x => <div key={x.location_id} data-sim-onsite-table={x.location_id}>
+                  <div className="sim-card-h">{x.name} · {Math.round(speed(x.speed_kph))} {SPD()}{x.speed_basis === "default" ? " (no site speed typed)" : ""}</div>
+                  <div className="overflow-auto sim-scroll" tabIndex={0} role="region" aria-label={`On site: ${x.name}`}><table className="sim-table"><thead><tr><th scope="col">Station</th><th scope="col" className="num">Minutes a lorry</th><th scope="col" className="num">Bays</th>
+                    <th scope="col" className="num">Lorries</th><th scope="col">Queue</th><th scope="col" className="num">Most waiting</th><th scope="col" className="num">Minutes lost</th><th scope="col">Status</th></tr></thead>
+                    <tbody>{(x.stations || []).map(st => <tr key={st.key} data-sim-station={st.key} data-sim-flag={st.flag || "none"}><td><b>{st.name}</b>{st.closed_words ? <div className="sim-sub">{st.closed_words}</div> : null}</td>
+                      <td className="num">{st.service == null ? "—" : +st.service}</td><td className="num">{st.bays == null ? "—" : st.bays}</td><td className="num"><b>{st.arrivals}</b></td>
+                      <td>{st.queue_start == null ? (st.kind === "gate" ? "—" : "No queue") : <><b className="sim-red">{st.bottleneck_at != null ? `bottleneck ${simHM(st.bottleneck_at)}` : `short waits from ${simHM(st.queue_start)}`}</b><div className="sim-sub">first wait {simHM(st.queue_start)}</div></>}</td>
+                      <td className="num">{st.most_waiting || 0}{st.most_at != null && <div className="sim-sub">at {simHM(st.most_at)}</div>}</td>
+                      <td className="num">{Math.round(st.minutes_lost || 0)}{st.longest_wait > 0.01 && <div className="sim-sub">longest wait {Math.round(st.longest_wait)} min</div>}</td>
+                      <td className="rd-status"><RowStatus word={st.status_word} tone={st.flag === "red" ? "bad" : st.flag === "amber" ? "warn" : "none"} /></td></tr>)}</tbody></table></div>
+                  <div className="ct-note">{x.lorries_in} in, {x.lorries_out} out through the stations{x.avg_on_site != null ? `; gate in → gate out ${Math.round(x.avg_on_site)} min on average, ${Math.round(x.longest_on_site)} min the longest` : ""}; {Math.round(x.minutes_lost || 0)} minutes lost on site.</div>
+                </div>)}
+              </details>}
               <div className="sim-checks" data-sim-checks="1">
                 <div>{ok(D.checks.table_equals_arrivals && played === D.gate_arrivals)} {grp(D.loads)} loads in the day, each arriving at its gate at both ends, plus {pourN} mixer{pourN === 1 ? "" : "s"}: the table counts {grp(D.gate_arrivals)} lorry arrivals and the map plays {grp(played)} between {D.window.from} and {D.window.to}.</div>
                 <div>{ok(D.checks.hours_add_up)} Each gate's hours add up to its day.</div>
-                {D.checks.largest_panel_difference != null && <div>{ok(D.checks.largest_panel_difference < 1)} Leaving out the pour, every gate is within {simN1(D.checks.largest_panel_difference)} of a lorry of the Dashboard's {D.label} average: a day has whole lorries, the Dashboard a decimal average.</div>}
+                {D.checks.largest_panel_difference != null && <div>{ok(D.checks.largest_panel_difference < 1)} Leaving out the pour, every gate is within {simN1(D.checks.largest_panel_difference)} of a lorry of the {D.scale === "month" ? "Dashboard's" : "Look-ahead's"} {D.label} average: a day has whole lorries, the average a decimal.</div>}
+                {(D.sites || []).length > 0 && <div>{ok(D.checks.sites_add_up)} On site, every lorry checked in left by a gate or is named as having no area.</div>}
               </div>
               {(D.not_drawn || []).length > 0 && <div className="ct-note">Not drawn (no route worked out): {D.not_drawn.join(", ")}. Their lorries still count at the gates.</div>}
               {other.length > 0 && <div className="ct-note">Drawn on another vehicle's route (none worked out for their own): {other.map(l => `${l.route_id} (${vehLabel(l.vehicle)}, drawn as ${vehLabel(l.vehicle_drawn)})`).join("; ")}.</div>}
@@ -11264,7 +11476,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
                       : <span className="text-slate-500">—</span>}
                   </td>
                   <td className="px-1 py-1 text-slate-500">
-                    {(z.haul_mode || "splice")}
+                    {z.location_id ? "inside a site" : (z.haul_mode || "splice")}
                     {!z.haul_mode && <span className="text-slate-500"> (default)</span>}
                   </td>
                   <td className="px-1 py-1 text-right">
@@ -11846,6 +12058,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // same reason the other two are — the map's click handler is registered once, at
   // init, and closes over whatever it can see then.
   const gatePlaceRef = useRef(false);
+  const areaPlaceRef = useRef(false);     // 28 Oct 2026 (simulation v2): the next map click places an area
 
   // ---- location management (Phase 1) ----
   const [mode, setMode] = useState("view");        // 'view' | 'add' | 'edit'
@@ -11857,6 +12070,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // added or edited; `gatePlace` is on while the next map click sets its coordinate.
   const [gateList, setGateList] = useState([]);
   const [gateForm, setGateForm] = useState(null);
+  // 28 Oct 2026 (simulation v2): the site's areas, edited like its gates
+  const [areaList, setAreaList] = useState([]);
+  const [areaForm, setAreaForm] = useState(null);
+  const [areaPlace, setAreaPlace] = useState(false);
+  const [areaMsg, setAreaMsg] = useState("");
   const [gatePlace, setGatePlace] = useState(false);
   const [gateMsg, setGateMsg] = useState("");
   // refs so once-bound map handlers always read current values
@@ -12009,6 +12227,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         // Phase 5a: placing a gate takes the click before node/route selection, so a
         // gate can be dropped on top of the site it belongs to without selecting it
         if(gatePlaceRef.current){ (cbRef.current.placeGateAt || (()=>{}))(e.lngLat.lng, e.lngLat.lat); return; }
+        if(areaPlaceRef.current){ (cbRef.current.placeAreaAt || (()=>{}))(e.lngLat.lng, e.lngLat.lat); return; }
         if(modeRef.current === "add"){ (cbRef.current.placeAt || (()=>{}))(e.lngLat.lng, e.lngLat.lat); return; }
         if(justDragged.current) return;
         const box = [[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]];
@@ -12244,7 +12463,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       vendor: "", detail: "", lat: "", lon: "", gate_lat: "", gate_lon: "",
       // Week 1, Task D2. Blank means NOT RECORDED, which is not zero — the balance
       // still computes and `remaining` comes back unknown.
-      capacity_qty: "", capacity_unit: "t", opening_qty: "", clp_cap_per_day: "", site_rules: "" });
+      capacity_qty: "", capacity_unit: "t", opening_qty: "", clp_cap_per_day: "", site_rules: "", site_speed: "" });
     setMode("add");
   };
   const openEditForNode = (id) => {
@@ -12264,6 +12483,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       capacity_unit: p.capacity_unit || "t",
       opening_qty: p.opening_qty == null ? "" : p.opening_qty,
       clp_cap_per_day: p.clp_cap_per_day == null ? "" : p.clp_cap_per_day,
+      // 28 Oct 2026 (simulation v2): the site speed is stored in km/h and typed in the tenant's unit
+      site_speed: p.site_speed_kph == null ? "" : String(Math.round(speed(p.site_speed_kph) * 10) / 10),
       site_rules: p.site_rules || "" });
     setMode("edit");
   };
@@ -12306,6 +12527,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     clp_cap_per_day: (f.clp_cap_per_day === "" || f.clp_cap_per_day == null) ? null : +f.clp_cap_per_day,
     // 16 Oct 2026 (CLOCS v5 C3): the site's rules for drivers, on every route sheet that loads or delivers here
     site_rules: (f.site_rules || "").trim() || null,
+    site_speed_kph: (f.site_speed === "" || f.site_speed == null) ? null : (DU() === "mi" ? +f.site_speed * KM_PER_MI : +f.site_speed),
   });
 
   // The build list's rule: the three storage fields show for Stockpile / Site /
@@ -12373,6 +12595,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // it — the same contract zone and haul-road writes already have, and the same
   // rebakeAffected() helper.
   useEffect(() => { gatePlaceRef.current = gatePlace; }, [gatePlace]);
+  useEffect(() => { areaPlaceRef.current = areaPlace; }, [areaPlace]);
 
   const loadGates = async (locId) => {
     if(!locId){ setGateList([]); return; }
@@ -12386,15 +12609,61 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   useEffect(() => {
     setGateForm(null); setGatePlace(false); setGateMsg("");
     loadGates(form && form.id);
+    setAreaForm(null); setAreaPlace(false); setAreaMsg("");
+    loadAreas(form && form.id);
   }, [form && form.id]);
 
   // leaving Locations abandons a half-placed gate, so map clicks stop dropping one
   useEffect(() => { if(subTab !== "locations") setGatePlace(false); }, [subTab]);
+  useEffect(() => { if(subTab !== "locations") setAreaPlace(false); }, [subTab]);
+  // 28 Oct 2026 (simulation v2): the site's areas (site_areas.py); a point is placed like a gate
+  const loadAreas = async (locId) => {
+    if(!locId){ setAreaList([]); return; }
+    try {
+      const res = await fetch(`${API}/site-areas?location_id=${encodeURIComponent(locId)}`);
+      const j = await okJSON(res);
+      setAreaList(j.areas || []);
+    } catch(e){ setAreaList([]); }
+  };
+  const newArea = () => setAreaForm({ id: null, name: "", activity: "unload", materials: [], service_minutes: "", bays: "1", level: "", lat: "", lon: "", active: true, geometry: null });
+  const editArea = (a) => setAreaForm({ id: a.id, name: a.name || "", activity: a.activity || "unload", materials: a.materials || [],
+    service_minutes: a.service_minutes == null ? "" : a.service_minutes, bays: String(a.bays || 1), level: a.level || "",
+    lat: a.point ? a.point[1] : "", lon: a.point ? a.point[0] : "", active: !!a.active, geometry: a.geometry || null });
+  const saveArea = async () => {
+    if(!areaForm || !form || !form.id) return;
+    if(!areaForm.name.trim()){ setAreaMsg("Give the area a name."); return; }
+    const lat = parseFloat(areaForm.lat), lon = parseFloat(areaForm.lon);
+    const moved = isFinite(lat) && isFinite(lon) && !(areaForm.geometry && areaForm.geometry.type === "Point" && areaForm.geometry.coordinates && +areaForm.geometry.coordinates[0] === lon && +areaForm.geometry.coordinates[1] === lat);
+    const geom = moved ? { type: "Point", coordinates: [+(+lon).toFixed(6), +(+lat).toFixed(6)] } : (areaForm.geometry || null);
+    const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+    const payload = { name: areaForm.name.trim(), activity: areaForm.activity, materials: areaForm.activity === "wash" ? [] : (areaForm.materials || []),
+      service_minutes: areaForm.service_minutes === "" ? null : Number(areaForm.service_minutes), bays: Math.max(1, parseInt(areaForm.bays, 10) || 1),
+      level: areaForm.level || null, geometry: geom, active: !!areaForm.active };
+    setAreaMsg(areaForm.id ? "Saving area…" : "Creating area…");
+    try {
+      const res = await fetch(areaForm.id ? `${API}/admin/site-areas/${encodeURIComponent(areaForm.id)}${qs}` : `${API}/admin/site-areas${qs}`,
+        { method: areaForm.id ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(areaForm.id ? payload : { ...payload, location_id: form.id }) });
+      const j = await okJSON(res);
+      if(j.error) throw new Error(j.error);
+      setAreaForm(null); setAreaPlace(false); setAreaMsg("Saved.");
+      await loadAreas(form.id);
+    } catch(e){ setAreaMsg(errSay("Couldn't save the area.", e)); }
+  };
+  const deleteArea = async (aid) => {
+    if(!confirm(`Delete area ${aid}? Unticking Active keeps it.`)) return;
+    const qs = token ? `?token=${encodeURIComponent(token)}` : "";
+    try {
+      const res = await fetch(`${API}/admin/site-areas/${encodeURIComponent(aid)}${qs}`, { method: "DELETE" });
+      await okJSON(res);
+      setAreaForm(null); await loadAreas(form.id); setAreaMsg(`Deleted ${aid}.`);
+    } catch(e){ setAreaMsg(errSay("Not deleted.", e)); }
+  };
 
   const newGate = () => setGateForm({
     id: null, name: "", direction: "both", lat: "", lon: "",
     safety_minutes: "", internal_travel_minutes: "", is_default: !gateList.length,
-    active: true, note: "", open_from: "", open_to: "", open_days: "", access_zone_id: "", shut_windows: [] });
+    active: true, note: "", closed_from: "", closed_to: "",
+    open_from: "", open_to: "", open_days: "", access_zone_id: "", shut_windows: [] });
 
   const editGate = (g) => setGateForm({
     id: g.id, name: g.name || "", direction: g.direction || "both",
@@ -12403,6 +12672,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     internal_travel_minutes: g.internal_travel_minutes == null ? "" : g.internal_travel_minutes,
     is_default: !!g.is_default, active: !!g.active, note: g.note || "",
     open_from: g.open_from || "", open_to: g.open_to || "", open_days: g.open_days || "",
+    closed_from: g.closed_from || "", closed_to: g.closed_to || "",
     access_zone_id: g.access_zone_id || "", shut_windows: (g.shut_windows || []).map(w => ({ from: w.from, to: w.to })) });
 
   const numOrNull = (v) => (v === "" || v == null) ? null : Number(v);
@@ -12426,6 +12696,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       shut_windows: (gateForm.shut_windows || []).filter(w => w.from || w.to),
       // 16 Oct 2026: the haul road drawn from the public road to this gate; blank = none
       access_zone_id: gateForm.access_zone_id || null,
+      // 28 Oct 2026 (simulation v2): closed for a period; "" clears (the refusals come back in words)
+      closed_from: gateForm.closed_from || "", closed_to: gateForm.closed_to || "",
     };
     try {
       const url = gateForm.id
@@ -12535,6 +12807,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   cbRef.current.placeGateAt = (lng, lat) => {
     setGateForm(g => g ? { ...g, lat: +(+lat).toFixed(6), lon: +(+lng).toFixed(6) } : g);
     setGatePlace(false);
+  };
+  cbRef.current.placeAreaAt = (lng, lat) => {
+    setAreaForm(a => a ? { ...a, lat: +(+lat).toFixed(6), lon: +(+lng).toFixed(6) } : a);
+    setAreaPlace(false);
   };
 
   // ---- route authoring: derived option validity (invalid shown but disabled) ----
@@ -12874,7 +13150,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const blankZone = () => ({
     id: null, name: "", kind: "closure", affects_routing: true,
     starts_on: "", ends_on: "", note: "", active: true,
-    speed_kph: "", haul_mode: "",
+    speed_kph: "", haul_mode: "", location_id: "",
   });
 
   const startNewZone = () => {
@@ -12894,7 +13170,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   affects_routing: !!z.affects_routing, starts_on: z.starts_on || "",
                   ends_on: z.ends_on || "", note: z.note || "", active: !!z.active,
                   speed_kph: (z.speed_kph == null ? "" : String(z.speed_kph)),
-                  haul_mode: z.haul_mode || "" });
+                  haul_mode: z.haul_mode || "", location_id: z.location_id || "" });
     setZoneSel(z.id);
     // load the existing shape as editable vertices. A polygon's repeated closing point is
     // dropped; a haul road has none to drop, and popping its last point would shorten the
@@ -13019,6 +13295,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       speed_kph: (haulNow && String(zoneForm.speed_kph).trim() !== ""
                   ? Number(zoneForm.speed_kph) : null),
       haul_mode: (haulNow && zoneForm.haul_mode ? zoneForm.haul_mode : null),
+      // 28 Oct 2026 (simulation v2): a haul road inside a site (never spliced into a public route); blank = a public haul road
+      location_id: (haulNow && zoneForm.location_id) ? zoneForm.location_id : null,
     };
     setZoneBusy(true); setZoneMsg("Saving…");
     try {
@@ -13128,8 +13406,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // cursor reflects add mode
   useEffect(() => {
     const m = mapObj.current; if(!m || !mapReady) return;
-    try { m.getCanvas().style.cursor = (mode === "add" || zoneDraw || gatePlace) ? "crosshair" : ""; } catch(e){}
-  }, [mode, zoneDraw, gatePlace, mapReady]);
+    try { m.getCanvas().style.cursor = (mode === "add" || zoneDraw || gatePlace || areaPlace) ? "crosshair" : ""; } catch(e){}
+  }, [mode, zoneDraw, gatePlace, areaPlace, mapReady]);
 
   // sub-tab switch: re-lean the shared map
   useEffect(() => {
@@ -13394,6 +13672,19 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </p>
                 </div>
 
+                {/* 28 Oct 2026 (simulation v2): the speed on the site's own roads, for the Simulation's drive between the gate,
+                    the areas and the wheel wash */}
+                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5" data-site-speed-field="1">
+                  <label className="block">
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Site speed (optional)</span>
+                    <input value={form.site_speed} onChange={e => setField("site_speed", e.target.value)}
+                      inputMode="decimal" placeholder="none" aria-label={`Site speed in ${SPD()}`}
+                      className="mt-0.5 w-40 border border-slate-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
+                    <span className="ml-2 text-xs text-slate-500">{SPD()} on the site's roads</span>
+                  </label>
+                  <p className="text-[13px] text-slate-400 mt-1.5">The Simulation drives the site's roads at this speed (a road with its own speed keeps it). Blank = 5 mph stands in.</p>
+                </div>
+
                 {/* Operator and free-text detail. Salvaged out of a1_data.js before that
                     file was retired — the quarry operator existed nowhere else in the
                     system — and editable here so it stays current. */}
@@ -13484,6 +13775,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                             open {g.open_from}–{g.open_to}{gateDaysWords(g.open_days) ? ` · ${gateDaysWords(g.open_days)}` : ""}</span> : null}
                           {(g.shut_windows || []).length ? <span className="text-slate-500" data-gate-shut={g.id}>
                             shut {gateBandWords(g.shut_windows)}</span> : null}
+                          {g.closed_words ? <span style={{ color: "var(--red)" }} data-gate-closed={g.id}>{g.closed_words}</span> : null}
                           {/* 16 Oct 2026: every gate should have its access road drawn from the public road */}
                           {g.access_zone_id
                             ? <span className="text-slate-500" data-gate-access={g.id}>
@@ -13622,6 +13914,16 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           takes no lorries, every open day (e.g. a school run); at most {GATE_SHUT_MAX}. Arrivals outside them are flagged, never blocked.
                         </p>
                       </div>
+                      {/* 28 Oct 2026 (simulation v2): closed for a period — the site's other gate serves both directions meanwhile */}
+                      <div className="rounded-lg border border-slate-200 p-2" data-gate-closed-form="1">
+                        <div className="text-sm font-medium text-slate-700">Closed for a period (optional)</div>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <input type="date" value={gateForm.closed_from} aria-label="Closed from" onChange={e => setGateForm(g => ({ ...g, closed_from: e.target.value }))} className="border border-slate-300 rounded-lg px-2 py-1 text-sm" />
+                          <span className="text-xs text-slate-500">to</span>
+                          <input type="date" value={gateForm.closed_to} aria-label="Closed to" onChange={e => setGateForm(g => ({ ...g, closed_to: e.target.value }))} className="border border-slate-300 rounded-lg px-2 py-1 text-sm" />
+                        </div>
+                        <p className="text-[13px] text-slate-400 mt-1">While closed, lorries go in and out by the site's other gate.</p>
+                      </div>
                       <div className="flex items-center gap-4 text-xs text-slate-600">
                         <label className="flex items-center gap-1.5">
                           <input type="checkbox" checked={!!gateForm.is_default}
@@ -13652,6 +13954,77 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     </div>
                   )}
                   {gateMsg && <p className="text-[13px] text-slate-500 mt-1.5">{gateMsg}</p>}
+                </div>
+                )}
+                {/* 28 Oct 2026 (simulation v2): the areas inside the site — where a lorry is unloaded or loaded, and the
+                    wheel wash. The Simulation drives each lorry from its gate to the area that takes its material. */}
+                {form.id && (
+                <div className="rounded-lg border border-slate-200 p-2.5" data-site-areas="1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Site areas</span>
+                    {!areaForm && canEdit && <button onClick={newArea} className="text-[13px] font-semibold text-[color:var(--navy)] hover:underline">+ Add an area</button>}
+                  </div>
+                  {!areaList.length && !areaForm && <p className="text-[13px] text-slate-400 mt-1.5">No areas yet: a lorry leaves from the gate once checked in.</p>}
+                  {areaList.length > 0 && (
+                    <ul className="mt-1.5 space-y-1">
+                      {areaList.map(a => (
+                        <li key={a.id} className={"flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs rounded px-1.5 py-1 " + (a.active ? "hover:bg-slate-50" : "opacity-60 bg-slate-50")} data-site-area={a.id}>
+                          <span className="font-medium text-slate-700">{a.name}</span>
+                          <span className="rd-chip">{a.activity === "wash" ? "wheel wash" : a.activity === "load" ? "loading" : "unloading"}</span>
+                          {a.activity !== "wash" && <span className="text-slate-500">{(a.materials || []).length ? a.materials.join(", ") : "any material"}</span>}
+                          <span className="text-slate-500">{a.service_minutes == null ? (a.activity === "wash" ? "2 min" : "the vehicle's minutes") : `${+a.service_minutes} min`} · {a.bays} bay{a.bays === 1 ? "" : "s"}</span>
+                          {a.level && <span className="text-slate-500">{a.level}</span>}
+                          {!a.point && <span style={{ color: "var(--red)" }}>not placed</span>}
+                          {!a.active && <span style={{ color: "var(--red)" }}>inactive</span>}
+                          {canEdit && !areaForm && <button onClick={() => editArea(a)} className="ml-auto text-[13px] font-semibold text-[color:var(--navy)] hover:underline">Edit</button>}
+                        </li>))}
+                    </ul>
+                  )}
+                  {areaForm && (
+                    <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2" data-site-area-form="1">
+                      <input value={areaForm.name} onChange={e => setAreaForm(a => ({ ...a, name: e.target.value }))} placeholder="Area name (e.g. Pier bases)" aria-label="Area name"
+                        className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block"><span className="text-sm font-medium text-slate-700">Activity</span>
+                          <select value={areaForm.activity} onChange={e => setAreaForm(a => ({ ...a, activity: e.target.value }))} aria-label="Area activity"
+                            className="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+                            <option value="unload">Unloading</option><option value="load">Loading</option><option value="wash">Wheel wash (on the way out)</option></select></label>
+                        <label className="block"><span className="text-sm font-medium text-slate-700">Level (words)</span>
+                          <input value={areaForm.level} onChange={e => setAreaForm(a => ({ ...a, level: e.target.value }))} placeholder="e.g. river terrace, −8 m" aria-label="Area level"
+                            className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm" /></label>
+                      </div>
+                      {areaForm.activity !== "wash" && <div>
+                        <span className="block text-sm font-medium text-slate-700 mb-1">Takes (none ticked = any material)</span>
+                        <div className="mt-1 grid grid-cols-2 gap-x-3">
+                          {materials.map(cat => <label key={cat} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">
+                            <input type="checkbox" checked={(areaForm.materials || []).includes(cat)} onChange={() => setAreaForm(a => ({ ...a, materials: (a.materials || []).includes(cat) ? a.materials.filter(c => c !== cat) : [...(a.materials || []), cat] }))} />{cat}</label>)}
+                        </div></div>}
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block"><span className="text-sm font-medium text-slate-700" title="Blank: the vehicle's own loading or unloading minutes; a wash takes 2">Minutes a lorry</span>
+                          <input value={areaForm.service_minutes} onChange={e => setAreaForm(a => ({ ...a, service_minutes: e.target.value }))} inputMode="decimal" placeholder="the vehicle's" aria-label="Minutes a lorry"
+                            className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm" /></label>
+                        <label className="block"><span className="text-sm font-medium text-slate-700" title="How many lorries are served at once">Bays</span>
+                          <input value={areaForm.bays} onChange={e => setAreaForm(a => ({ ...a, bays: e.target.value }))} inputMode="numeric" aria-label="Bays"
+                            className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm" /></label>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <input value={areaForm.lat} onChange={e => setAreaForm(a => ({ ...a, lat: e.target.value }))} inputMode="decimal" placeholder="Lat" aria-label="Area latitude"
+                          className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm" />
+                        <input value={areaForm.lon} onChange={e => setAreaForm(a => ({ ...a, lon: e.target.value }))} inputMode="decimal" placeholder="Lon" aria-label="Area longitude"
+                          className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm" />
+                        <button onClick={() => setAreaPlace(v => !v)} className={"rounded-lg px-2 py-1.5 text-xs font-semibold border " + (areaPlace ? "text-white border-transparent" : "border-slate-300 text-slate-600 hover:bg-slate-50")}
+                          style={areaPlace ? { background: "var(--blue)" } : undefined}>{areaPlace ? "Click the map…" : "Place on map"}</button>
+                      </div>
+                      <p className="text-[13px] text-slate-400">Where lorries stop. An area drawn as a shape keeps its shape; placing it here moves its point.</p>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" checked={!!areaForm.active} onChange={e => setAreaForm(a => ({ ...a, active: e.target.checked }))} />Active</label>
+                      <div className="flex items-center gap-2">
+                        <button onClick={saveArea} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs" style={{ background: "var(--navy)" }}>{areaForm.id ? "Save area" : "Create area"}</button>
+                        <button onClick={() => { setAreaForm(null); setAreaPlace(false); }} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
+                        {areaForm.id && <button onClick={() => deleteArea(areaForm.id)} className="ml-auto px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ color: "var(--red)" }}>Delete</button>}
+                      </div>
+                    </div>
+                  )}
+                  {areaMsg && <p className="text-[13px] text-slate-500 mt-1.5">{areaMsg}</p>}
                 </div>
                 )}
                 {!form.id && (
@@ -13742,7 +14115,17 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         Time on this road = its length ÷ this speed. Blank = not set.
                       </span>
                     </label>
-                    <label className="block">
+                    <label className="block" data-zone-inside-site="1">
+                      <span className="block text-sm font-medium text-slate-700 mb-1">Inside a site</span>
+                      <select value={zoneForm.location_id} onChange={e => setZField("location_id", e.target.value)} className={"mt-1 w-full " + sel} aria-label="Inside a site">
+                        <option value="">No: a public haul road</option>
+                        {locs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                      </select>
+                      <span className="block text-[13px] text-slate-500 mt-1">
+                        A road inside a site is never routed through. The Simulation drives it between the gates, the areas and the wheel wash.
+                      </span>
+                    </label>
+                    {!zoneForm.location_id && <label className="block">
                       <span className="block text-sm font-medium text-slate-700 mb-1">Mode</span>
                       <select value={zoneForm.haul_mode} onChange={e => setZField("haul_mode", e.target.value)} className={"mt-1 w-full " + sel}>
                         <option value="">Default (splice)</option>
@@ -13751,7 +14134,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       <span className="block text-[13px] text-slate-500 mt-1">
                         Splice if the road is not on the map yet; Via if it is. Not sure: Splice.
                       </span>
-                    </label>
+                    </label>}
                     <p className="text-[13px] text-amber-800">
                       Does nothing until it is <strong>attached to a route</strong> (Routes page, open the route's row).
                     </p>
@@ -14274,7 +14657,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       {/* 22 Oct 2026 (UI fix 6, card 6): "Routed through" on a solid var(--haul-soft) in var(--haul-text); the user's extra: "Avoided" is
                           #B91C1C on its pink (5.53:1, was #DC2626 at 4.13:1), a fixed pair in every look */}
                       {z.kind === HAUL_KIND
-                        ? (z.affects_routing
+                        ? (z.location_id
+                           /* 28 Oct 2026 (simulation v2): a road inside a site is never routed through */
+                           ? <span className="text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap" data-zone-inside={z.id}
+                               style={{ background: "var(--haul-soft)", color: "var(--haul-text)" }}
+                               title="A road inside a site: never routed through; the Simulation drives it between the gates, the areas and the wheel wash.">
+                               Inside a site{z.speed_kph ? ` @ ${z.speed_kph}` : ""}
+                             </span>
+                           : z.affects_routing
                            ? <span className="text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap"
                                style={{ background: "var(--haul-soft)", color: "var(--haul-text)" }}
                                title="Routes attached to this road are sent through it.">

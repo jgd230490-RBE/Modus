@@ -441,7 +441,9 @@ ok("the response carries every key of the contract on every gate",
                   "no_open_time"} for g in gl)
    # NARROWED 22 Oct 2026 (abnormal loads, phase 2): + abnormal_total, how many abnormal loads the month's markers name
    and set(res) == {"month", "label", "working_days", "shift_hours", "open_minutes", "scope", "gates", "notes",
-                    "near_pct", "peak_bands", "limit", "default_hours", "abnormal_total"})
+                    "near_pct", "peak_bands", "limit", "default_hours", "abnormal_total",
+                    # NARROWED 28 Oct 2026 (simulation v2): + closed_gates, the gates closed for a period at the sites with arrivals
+                    "closed_gates"})
 
 # =========================================================================== #
 #  5. A team code: totals and names, never the other team's figure              #

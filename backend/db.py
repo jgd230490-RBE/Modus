@@ -56,6 +56,9 @@ TENANTED_TABLES = {
     "forecast_weeks", "stockpile_weeks",
     # 27 Oct 2026 (stockpile forecast): the planned use per pile per month. Same rule, same edit.
     "stockpile_plan",
+    # 28 Oct 2026 (simulation v2, task 0e): a site's areas (unloading, loading, the wheel wash) — per tenant, in the
+    # package, same rule, same edit.
+    "site_areas",
     # 2.5b, 2026-09-03. The editable copy of factors.json. Per tenant: two clients
     # will not share a payload table.
     "config",
@@ -759,7 +762,8 @@ def init_zones_db():
         #               this road applies. See haul.MODES — the choice depends on
         #               whether HERE's map knows the road exists, which is a fact about
         #               the world, not a preference.
-        for col, typ in (("speed_kph", "REAL"), ("haul_mode", "TEXT")):
+        # 28 Oct 2026 (simulation v2): location_id = a road inside a site (also in init_lookahead_db)
+        for col, typ in (("speed_kph", "REAL"), ("haul_mode", "TEXT"), ("location_id", "TEXT")):
             try:
                 if IS_PG:
                     cur.execute(f"ALTER TABLE zones ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -868,6 +872,8 @@ def init_weeks_db():
         _create_tenanted(cur, "stockpile_weeks")
         # 27 Oct 2026 (stockpile forecast): the planned use, and the stock count column
         _create_tenanted(cur, "stockpile_plan")
+        # 28 Oct 2026 (simulation v2): the site areas
+        _create_tenanted(cur, "site_areas")
         conn.commit()
         try:
             if IS_PG:
@@ -943,7 +949,13 @@ def init_lookahead_db():
                                 # 16 Oct 2026: the gate's access road (a haul-road zone id)
                                 ("location_gates", "access_zone_id", "TEXT"),
                                 # 17 Oct 2026: the gate's shut windows ('08:30-09:15,12:00-12:30')
-                                ("location_gates", "shut_windows", "TEXT")):
+                                ("location_gates", "shut_windows", "TEXT"),
+                                # 28 Oct 2026 (simulation v2, task 0e): a gate closed for a period (ISO dates), a
+                                # site's speed on its internal roads (km/h), a haul road inside a site
+                                ("location_gates", "closed_from", "TEXT"),
+                                ("location_gates", "closed_to", "TEXT"),
+                                ("locations", "site_speed_kph", "REAL"),
+                                ("zones", "location_id", "TEXT")):
             try:
                 if IS_PG:
                     cur.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -1229,6 +1241,10 @@ _TENANT_DDL = {
             -- printed on every route sheet that loads or delivers here. NULL = none typed.
             -- ALTERed in init_lookahead_db() as well, or the rebuild drops it.
             site_rules         TEXT,
+            -- 28 Oct 2026 (simulation v2): the speed on the site's internal roads, km/h (a GB
+            -- screen reads mph). NULL = the simulation's stand-in (sim_site.DEFAULT_SITE_KPH), said.
+            -- ALTERed in init_lookahead_db() as well, or the rebuild drops it.
+            site_speed_kph     REAL,
             PRIMARY KEY (tenant_id, id)
         )
     """,
@@ -1627,6 +1643,10 @@ _TENANT_DDL = {
             updated_at      TEXT,
             speed_kph       REAL,
             haul_mode       TEXT,
+            -- 28 Oct 2026 (simulation v2): a haul road INSIDE a site (haul_mode 'internal'): never
+            -- spliced into a public route; the simulation drives it between the gates, the areas and
+            -- the wheel wash. NULL = a public haul road. ALTERed in init_lookahead_db() as well.
+            location_id     TEXT,
             PRIMARY KEY (tenant_id, id)
         )
     """,
@@ -1699,6 +1719,11 @@ _TENANT_DDL = {
             -- starts along it, a leg arriving ends along it (haul.leg_steps). NULL = none drawn.
             -- ALTERed in init_lookahead_db() as well, or the SQLite rebuild drops it.
             access_zone_id          TEXT,
+            -- 28 Oct 2026 (simulation v2): the gate CLOSED FOR A PERIOD, ISO dates inclusive, both
+            -- or neither. While closed it is treated as inactive and the site's other gate serves
+            -- both directions (gates.resolve with `on`). ALTERed in init_lookahead_db() as well.
+            closed_from             TEXT,
+            closed_to               TEXT,
             PRIMARY KEY (tenant_id, id)
         )
     """,
@@ -1852,6 +1877,37 @@ _TENANT_DDL = {
         )
     """,
     # ----------------------------------------------------------------------- #
+    #  28 Oct 2026 — site areas (simulation v2, task 0e)                       #
+    # ----------------------------------------------------------------------- #
+    # The places inside a site a lorry goes after the gate: an UNLOADING area (laden lorries
+    # whose material it takes), a LOADING area (empty lorries coming to load) or the WHEEL
+    # WASH (every lorry on its way out; at most one a site). `bays` lorries are served at
+    # once, each for `service_minutes` (NULL = the vehicle's own loading / unloading time).
+    # `materials` / `vehicles` are JSON lists of categories / vehicle keys ([] = any).
+    # `level` is words for the drawing ("river terrace, -8 m"); nothing is computed from it.
+    # `geometry` is a GeoJSON Point or Polygon. Read by sim_site.py; typed on Data -> Locations.
+    "site_areas": """
+        CREATE TABLE site_areas (
+            tenant_id       TEXT NOT NULL DEFAULT 'default',
+            id              TEXT NOT NULL,
+            location_id     TEXT NOT NULL,
+            name            TEXT NOT NULL,
+            activity        TEXT NOT NULL DEFAULT 'unload',
+            materials       TEXT,
+            vehicles        TEXT,
+            service_minutes REAL,
+            bays            INTEGER NOT NULL DEFAULT 1,
+            level           TEXT,
+            geometry        TEXT,
+            seq             INTEGER NOT NULL DEFAULT 0,
+            active          BOOLEAN NOT NULL DEFAULT TRUE,
+            note            TEXT,
+            created_at      TEXT,
+            updated_at      TEXT,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
+    # ----------------------------------------------------------------------- #
     #  2.5b — config: the editable copy of factors.json                        #
     # ----------------------------------------------------------------------- #
     # One row per (tenant, key); today the only key is 'factors' and its value is the
@@ -1890,6 +1946,7 @@ _TENANT_PK = {
                       "week_index)",
     "stockpile_weeks": "(tenant_id, location_id, month_index, week_index)",
     "stockpile_plan": "(tenant_id, location_id, month_index)",
+    "site_areas": "(tenant_id, id)",
     "config": "(tenant_id, key)",
     "forecast_days": "(tenant_id, route_id, month_index, discipline, section_id, "
                      "day_date)",

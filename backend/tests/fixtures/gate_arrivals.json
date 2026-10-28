@@ -153,6 +153,7 @@
   "1 pending line in Sep 2026 would add 5.0 lorries a day (10.0 gate arrivals across the gates below); they are not in the figures.",
   "Averages only, if arrivals are spread evenly across each gate's open hours (07:00–17:00 where none are typed). No hourly peak is typed."
  ],
+ "closed_gates": [],
  "near_pct": 85,
  "peak_bands": [],
  "limit": "Planned arrivals spread evenly over the gate's open hours, less its shut times and the no-delivery bands; no hourly peak is known."

@@ -243,6 +243,21 @@ check-in minutes an hour. The same day, with a scenario (open hours, check-in, p
 <code>GET /api/sim/day?month=N</code>: one lane at each gate, first come first served; a lorry that comes while the gate
 is shut (before it opens, in a band or in one of its shut windows) waits for it to open, and one still waiting after the last open minute is checked in late and counted; the
 bottleneck is the first wait longer than the check-in. Nothing is saved. A window past midnight is refused.</p>
+<p id="t1-sim-v2">28 Oct 2026 (simulation v2, task 0e): <code>backend/sim_site.py</code> runs the chain ON SITE for every site with
+areas (<code>site_areas</code>: activity unload / load / wash, materials and vehicles as JSON lists, <code>service_minutes</code>,
+<code>bays</code>, a Point or Polygon) or internal roads (<code>zones.location_id</code>, <code>haul_mode = 'internal'</code>, never
+spliced into a public route): gate in (sim.queue) → drive → area → drive → wash → drive → gate out, each station a first-come-
+first-served queue with <code>bays</code> servers; the drive is the shortest path by time over the drawn roads (ends joined within
+5 m, a station snapping within 60 m, else straight lines) at each road's speed or <code>locations.site_speed_kph</code> (8 km/h
+stood in and said). A gate <code>closed_from</code>–<code>closed_to</code> is inactive for <code>gates.resolve(on=)</code>; the site's
+other gate serves both directions (<code>closed_fallback</code>); a month counts as closed when the closure covers more than half its
+weekdays. <code>GET /api/sim/day</code> takes <code>scale=month|week|day</code> (<code>week=commit|next</code>,
+<code>date=YYYY-MM-DD</code>; the week and day read <code>forecast_days</code> through <code>days.list_days</code> and
+<code>derived.day_figures</code>, each line's day rounded up to whole trips as the grid does), and the sites' what-ifs
+<code>site_speed=LOC=kph</code>, <code>service=AREA=min</code>, <code>bays=AREA=n</code>, <code>wash=on|off</code>. The reply adds
+<code>sites[]</code> (stations with the gate's figures, the paths for the drawing in every reply, <code>no_area</code> lines),
+each arrival's <code>stops</code> and <code>hops</code>, <code>day_choices</code> and <code>checks.sites_add_up</code>.
+<code>/api/site-areas</code> lists (any sign-in); the admin writes are <code>/api/admin/site-areas</code>.</p>
 
 <h2 id="t1-stock">Stockpiles</h2>
 <p>27 Oct 2026: the balance runs FORWARD from the plan (<code>backend/stockpiles.py</code>, <code>balances()</code>; John's decisions D1–D11 of

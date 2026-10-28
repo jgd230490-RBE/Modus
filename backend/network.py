@@ -99,7 +99,9 @@ def _ensure_location_columns():
                      # 14 Oct 2026 (bundle G, W8): the site's CLP cap — set_clp_cap()
                      ("clp_cap_per_day", "REAL"),
                      # 16 Oct 2026 (CLOCS v5 C3): the site's rules for drivers — set_site_rules()
-                     ("site_rules", "TEXT")):
+                     ("site_rules", "TEXT"),
+                     # 28 Oct 2026 (simulation v2): the speed on the site's internal roads — set_site_speed()
+                     ("site_speed_kph", "REAL")):
         try:
             if db.IS_PG:
                 db.execute(f"ALTER TABLE locations ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -1208,6 +1210,8 @@ def locations_geojson():
                            "opening_qty": l.get("opening_qty"),
                            # 14 Oct 2026 (bundle G, W8): lorry visits a day agreed in the CLP; null = none
                            "clp_cap_per_day": l.get("clp_cap_per_day"),
+                           # 28 Oct 2026 (simulation v2): the speed on the site's roads, km/h
+                           "site_speed_kph": l.get("site_speed_kph"),
                            # 16 Oct 2026 (CLOCS v5 C3): printed on the route sheet; null = none typed
                            "site_rules": l.get("site_rules")},
             "geometry": {"type": "Point", "coordinates": [l["lon"], l["lat"]]},
@@ -1229,6 +1233,40 @@ def clp_cap_problem(v):
     if f != f or f <= 0:
         return "the CLP cap must be above 0 (clear it to mean no cap)"
     return None
+
+
+SITE_SPEED_MAX_KPH = 60.0
+
+
+def site_speed_problem(value):
+    """None for blank or a speed above 0 and at most SITE_SPEED_MAX_KPH km/h; else the problem in words."""
+    if value in (None, ""):
+        return None
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return "the site speed must be a number"
+    if not (0 < v <= SITE_SPEED_MAX_KPH):
+        return f"the site speed must be above 0 and at most {SITE_SPEED_MAX_KPH:g} km/h"
+    return None
+
+
+def set_site_speed(location_id, value):
+    """
+    28 Oct 2026 (simulation v2). The speed on the site's internal roads, km/h, for the simulation's drive between
+    the gate, the areas and the wheel wash. Blank clears it (the simulation then stands in a speed and says so).
+    Routes are untouched: no re-bake.
+    """
+    _ensure_location_columns()
+    p = site_speed_problem(value)
+    if p:
+        return {"error": p}
+    if not db.query("SELECT id FROM locations WHERE tenant_id = ? AND id = ?", (db.current_tenant(), location_id)):
+        return {"error": "not found"}
+    v = None if value in (None, "") else float(value)
+    db.execute("UPDATE locations SET site_speed_kph = ? WHERE tenant_id = ? AND id = ?",
+               (v, db.current_tenant(), location_id))
+    return {"ok": True, "id": location_id, "site_speed_kph": v}
 
 
 def set_clp_cap(location_id, value):

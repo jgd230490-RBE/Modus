@@ -49,6 +49,7 @@ the same total, and there is exactly one place that computes it now.
 """
 import re
 from datetime import datetime, timezone
+import datetime as _dt
 
 import db
 import gate_hours
@@ -138,6 +139,10 @@ def _row(g):
         "shut_windows": gate_hours.shut_windows(g),
         # 16 Oct 2026: the haul road drawn from the public road to this gate; None = none drawn
         "access_zone_id": g.get("access_zone_id") or None,
+        # 28 Oct 2026 (simulation v2): closed for a period, ISO dates inclusive; None = never
+        "closed_from": g.get("closed_from") or None,
+        "closed_to": g.get("closed_to") or None,
+        "closed_words": closed_words(g),
         "created_at": g.get("created_at"),
         "updated_at": g.get("updated_at"),
     }
@@ -187,7 +192,88 @@ def serves(gate, role):
     return _clean_direction(gate.get("direction")) in _ROLE_OK[role]
 
 
-def resolve(location, role, gate_id=None, gates=None):
+def _date(v):
+    try:
+        return _dt.date.fromisoformat(str(v).strip()[:10])
+    except (TypeError, ValueError):
+        return None
+
+
+def closure_of(gate):
+    """(from, to) as dates when the gate has a closure typed, else None."""
+    a, b = _date((gate or {}).get("closed_from")), _date((gate or {}).get("closed_to"))
+    return (a, b) if (a and b and a <= b) else None
+
+
+def month_weekdays(month_index, start_year=None):
+    """The Monday-to-Friday dates of a calendar month of the horizon (month 1 = January of the start year)."""
+    import weeks
+    sy = int(start_year if start_year is not None else weeks.START_YEAR)
+    mi = int(month_index)
+    y, m = sy + (mi - 1) // 12, (mi - 1) % 12 + 1
+    d = _dt.date(y, m, 1)
+    out = []
+    while d.month == m:
+        if d.weekday() < 5:
+            out.append(d)
+        d += _dt.timedelta(days=1)
+    return out
+
+
+def closed_on(gate, on):
+    """
+    28 Oct 2026 (simulation v2): True when the gate is closed for a period covering `on` — a date, or a month
+    index (closed for the month when the closure covers MORE THAN HALF of its weekdays). None = not asked: never.
+    """
+    if on is None:
+        return False
+    c = closure_of(gate)
+    if not c:
+        return False
+    a, b = c
+    if isinstance(on, _dt.date):
+        return a <= on <= b
+    days = month_weekdays(on)
+    return bool(days) and sum(1 for d in days if a <= d <= b) * 2 > len(days)
+
+
+def closed_words(gate):
+    """'closed 1 Mar – 31 May 2027', or None."""
+    c = closure_of(gate)
+    if not c:
+        return None
+    a, b = c
+    fa = a.strftime("%d %b").lstrip("0") + (f" {a.year}" if a.year != b.year else "")
+    return f"closed {fa} – {b.strftime('%d %b %Y').lstrip('0')}"
+
+
+def _period_problem(closed_from, closed_to, location_id, gate_id=None):
+    """Both dates or neither, in order; and the site keeps another active gate open over the period."""
+    f = None if closed_from in (None, "") else str(closed_from).strip()
+    t = None if closed_to in (None, "") else str(closed_to).strip()
+    if (f is None) != (t is None):
+        return "type both dates of the closed period (from and to), or clear both"
+    if f is None:
+        return None
+    a, b = _date(f), _date(t)
+    if a is None or b is None:
+        return "the closed period's dates must be YYYY-MM-DD"
+    if b < a:
+        return "the closed period must end on or after the day it starts"
+    others = [g for g in list_gates(location_id) if g["active"] and g["id"] != gate_id]
+    if not others:
+        return "this is the site's only gate: it cannot be closed for a period (deactivate it instead)"
+    open_other = False
+    for g in others:
+        c = closure_of(g)
+        if not c or c[1] < a or c[0] > b:
+            open_other = True
+    if not open_other:
+        return "every other gate of this site is closed over the same period: one gate must stay open"
+    return None
+
+
+def resolve(location, role, gate_id=None, gates=None, on=None):
     """
     Which point HERE should be given for `location` when a truck is arriving
     (role='entry') or leaving (role='exit'), and where that point came from.
@@ -197,6 +283,9 @@ def resolve(location, role, gate_id=None, gates=None):
     here; the caller decides. network.bake_route() refuses the bake and names it (B2),
     while the diagnostics report it and carry on, because a diagnostic that refuses to
     run is no use for working out why a bake refused.
+    28 Oct 2026 (simulation v2): with `on` (a date or a month index) a gate closed for a period is treated as
+    inactive (`blocked` reason 'closed'), and when no open gate serves the role the site's other open gate
+    serves it (source 'closed_fallback'): in and out by the one gate. Without `on` nothing changes.
     """
     if role not in ROLES:
         raise ValueError(f"role must be one of {ROLES}, got {role!r}")
@@ -222,13 +311,20 @@ def resolve(location, role, gate_id=None, gates=None):
             blocked = {"gate_id": gate_id, "reason": "missing"}
         elif not named["active"]:
             blocked = {"gate_id": gate_id, "name": named["name"], "reason": "inactive"}
+        elif closed_on(named, on):
+            blocked = {"gate_id": gate_id, "name": named["name"], "reason": "closed",
+                       "closed_from": named.get("closed_from"), "closed_to": named.get("closed_to")}
         elif serves(named, role):
             chosen = named
         # a named gate that is active but does not serve this role falls through to the
         # default below, and `source` records that it did
 
+    fallback = False
     if chosen is None and blocked is None:
-        usable = [g for g in gates if g["active"] and serves(g, role)]
+        open_g = [g for g in gates if g["active"] and not closed_on(g, on)]
+        usable = [g for g in open_g if serves(g, role)]
+        if not usable and on is not None and len(open_g) < len([g for g in gates if g["active"]]):
+            usable, fallback = open_g, True          # the other gate is closed: in and out by this one
         chosen = next((g for g in usable if g["is_default"]), None) \
             or (sorted(usable, key=lambda g: g["id"])[0] if usable else None)
 
@@ -238,7 +334,8 @@ def resolve(location, role, gate_id=None, gates=None):
             "gate_id": chosen["id"], "gate_name": chosen["name"],
             "safety_minutes": chosen.get("safety_minutes") or 0.0,
             "internal_travel_minutes": chosen.get("internal_travel_minutes") or 0.0,
-            "source": "selected" if (gate_id and chosen["id"] == gate_id) else "default",
+            "source": ("closed_fallback" if fallback else
+                       ("selected" if (gate_id and chosen["id"] == gate_id) else "default")),
             "blocked": blocked,
         }
 
@@ -332,8 +429,9 @@ def access_problem(zone_id):
 def create_gate(location_id, name, lat, lon, direction="both", safety_minutes=None,
                 internal_travel_minutes=None, is_default=False, active=True,
                 note=None, gate_id=None, open_from=None, open_to=None, open_days=None,
-                access_zone_id=None, shut_windows=None):
-    hp = _hours_problem(open_from, open_to, open_days, shut_windows) or access_problem(access_zone_id)
+                access_zone_id=None, shut_windows=None, closed_from=None, closed_to=None):
+    hp = (_hours_problem(open_from, open_to, open_days, shut_windows) or access_problem(access_zone_id)
+          or _period_problem(closed_from, closed_to, location_id))
     if hp:
         return {"error": hp}
     if not (location_id or "").strip():
@@ -354,13 +452,16 @@ def create_gate(location_id, name, lat, lon, direction="both", safety_minutes=No
     db.execute(
         "INSERT INTO location_gates (tenant_id, id, location_id, name, direction, "
         "lat, lon, safety_minutes, internal_travel_minutes, is_default, active, note, "
-        "created_at, updated_at, open_from, open_to, open_days, access_zone_id, shut_windows) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "created_at, updated_at, open_from, open_to, open_days, access_zone_id, shut_windows, "
+        "closed_from, closed_to) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (db.current_tenant(), gid, location_id, name.strip(),
          _clean_direction(direction), la, lo, _clean_minutes(safety_minutes),
          _clean_minutes(internal_travel_minutes), bool(is_default), bool(active),
          (note or None), now, now, _clean_hhmm(open_from), _clean_hhmm(open_to),
-         gate_hours.clean_days(open_days), (access_zone_id or None), gate_hours.clean_shut(shut_windows)),
+         gate_hours.clean_days(open_days), (access_zone_id or None), gate_hours.clean_shut(shut_windows),
+         (None if closed_from in (None, "") else str(closed_from).strip()[:10]),
+         (None if closed_to in (None, "") else str(closed_to).strip()[:10])),
     )
     if is_default:
         _clear_other_defaults(location_id, gid)
@@ -426,6 +527,15 @@ def update_gate(gate_id, **fields):
         if ap:
             return {"error": ap}
         sets.append("access_zone_id = ?"); params.append(fields["access_zone_id"] or None)
+    # 28 Oct 2026 (simulation v2): the closed period, checked as a pair against what is stored
+    if {"closed_from", "closed_to"} & set(fields):
+        cf = fields.get("closed_from", cur.get("closed_from"))
+        ct = fields.get("closed_to", cur.get("closed_to"))
+        pp = _period_problem(cf, ct, cur["location_id"], gate_id)
+        if pp:
+            return {"error": pp}
+        sets.append("closed_from = ?"); params.append(None if cf in (None, "") else str(cf).strip()[:10])
+        sets.append("closed_to = ?"); params.append(None if ct in (None, "") else str(ct).strip()[:10])
     if "active" in fields:
         sets.append("active = ?"); params.append(bool(fields["active"]))
     if "is_default" in fields:

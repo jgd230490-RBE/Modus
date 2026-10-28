@@ -687,6 +687,18 @@ async function simDom(){
   const c4 = simCalls()[simCalls().length - 1];
   ok("⭐ SIM DOM: Back to the scheme's figures reads the plain month again (no scenario, no lines); every call was a GET",
      c4.url === `/api/sim/day?month=${thisMonth}` && calls.every(c => c.method === "GET"), JSON.stringify(c4));
+  // 28 Oct 2026 (simulation v2): the scale switch — Week reads the week once (scale=week&week=commit), without the lines
+  {
+    const n0 = simCalls().length;
+    const wk = [...m.el.querySelectorAll('[data-sim-scale] button')].find(b => b.textContent === "Week");
+    ok("SIM DOM V2: the scale switch renders Month · Week · Day with Month pressed; no Site select on a day with no site",
+       !!wk && !!m.el.querySelector('[data-sim-scale="month"]') && (m.el.querySelector('[data-sim-scale] button[aria-pressed="true"]') || {}).textContent === "Month" && !m.el.querySelector('[data-sim-site]'));
+    await act(async () => { wk.click(); });
+    await settle(450);
+    const c5 = simCalls()[simCalls().length - 1];
+    ok("⭐ SIM DOM V2: pressing Week reads the week once (scale=week&week=commit, the month's lines kept, no legs) and a Week select appears",
+       simCalls().length === n0 + 1 && c5.url === `/api/sim/day?month=${thisMonth}&scale=week&week=commit` && !!m.el.querySelector('select[aria-label="Simulation week"]'), JSON.stringify(c5));
+  }
   m.done();
 
   // the phone: the table only, no lines asked for, no player, nothing to type

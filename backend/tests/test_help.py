@@ -1091,4 +1091,20 @@ ok3("0a: the technical guide says the map no longer draws the existing rail corr
     "since 28 Oct 2026 the public map does not draw it" in open(TECH, encoding="utf-8").read())
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
+# ---- 28 Oct 2026 (simulation v2, task 0e): the user guide says what the Simulation's scales and the site view are, in
+# plain words; the Locations and Zones chapters name the new fields; the technical guide holds the detail
+_ug = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+_simp = (re.search(r"<p><strong>Simulation</strong>.*?</p>", _ug, re.S) or [""])
+_simp = _simp.group(0) if hasattr(_simp, "group") else ""
+ok3("⭐ SIM V2: the user guide's Simulation paragraph names the three scales, the areas, the wash, the site view, the closed period, and says nothing is saved",
+    all(w in _simp for w in ("<strong>Month</strong>", "<strong>Week</strong>", "<strong>Day</strong>", "<strong>areas</strong>", "wheel wash", "<strong>Site</strong>", "closed for a period", "nothing is saved", "not a record of what happened"))
+    and not re.search(r"\b(API|endpoint|server|JSON|predict\w*|real-time)\b", _simp), _simp[:200])
+ok3("SIM V2: 9.1 names the closed period and the site areas (minutes a lorry, bays, level), 9.3 the road inside a site",
+    "<strong>Closed for a period (optional)</strong>" in _ug and "<strong>Site areas</strong>" in _ug and "<strong>Minutes a lorry</strong>" in _ug
+    and "<strong>Bays</strong>" in _ug and "<strong>Inside a site</strong>" in _ug)
+_tgv2 = open(TECH, encoding="utf-8").read()
+ok3("SIM V2: the technical guide #t1-sim-v2 holds the detail (the table, the chain, the resolver, the scales, the query parameters)",
+    'id="t1-sim-v2"' in _tgv2 and "<code>backend/sim_site.py</code>" in _tgv2 and "<code>site_areas</code>" in _tgv2
+    and "<code>closed_fallback</code>" in _tgv2 and "<code>scale=month|week|day</code>" in _tgv2 and "<code>/api/site-areas</code>" in _tgv2)
+
 sys.exit(1 if failed else 0)
