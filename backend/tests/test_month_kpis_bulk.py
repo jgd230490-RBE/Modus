@@ -205,8 +205,9 @@ MC = main.MONTH_COUNT
 APPROVED = db.query("SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved'", (db.current_tenant(),))
 ROUTES = db.query("SELECT * FROM routes WHERE tenant_id = ? ORDER BY id", (db.current_tenant(),))
 LOCS = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
-ok("0. the four-year demo: 905 approved line-months on 43 routes",
-   len(APPROVED) == 905 and len(ROUTES) == 43, f"{len(APPROVED)} {len(ROUTES)}")
+# RE-PINNED 28 Oct 2026 (simulation v2, the Tilton Viaduct site L019: two gates G020 / G021 with access roads Z027 / Z028, four internal roads Z029–Z032, seven routes R044–R050, 942 approved line-months)
+ok("0. the four-year demo: 942 approved line-months on 50 routes",
+   len(APPROVED) == 942 and len(ROUTES) == 50, f"{len(APPROVED)} {len(ROUTES)}")
 VEH_BY_ROUTE = {}
 for f in APPROVED:
     VEH_BY_ROUTE.setdefault(f["route_id"], set()).add(f["vehicle_type"])
@@ -389,9 +390,9 @@ ok("1. ⭐ ...and the month read is byte for byte what it answered on main 10a30
 _lines = sum(len(ONE[m]["lines"]) for m in ONE)
 _trips = [l["trips_per_vehicle_day"] for m in REF for l in REF[m]["lines"]]
 _co2 = [l["co2_t"] for m in REF for l in REF[m]["lines"]]
-ok("1. the comparison means something: all 905 approved line-months; in the spread, figures and Nones both and the "
+ok("1. the comparison means something: all 942 approved line-months; in the spread, figures and Nones both and the "
    "carbon to date summed",
-   _lines == 905 and any(x is None for x in _trips) and any(x for x in _trips)
+   _lines == 942 and any(x is None for x in _trips) and any(x for x in _trips)
    and any(x is None for x in _co2) and any(x for x in _co2)
    and any(REF[m]["co2_to_date"] for m in REF) and any(REF[m]["co2_to_date_unbaked_lines"] for m in REF),
    f"{_lines} lines")
@@ -506,7 +507,7 @@ ok("4. ⭐ a failed carbon read: every month says co2_error, every co2_t is None
        and _bf["months"][str(m)]["co2_to_date"] == [] for m in range(1, MC + 1))
    and all(dumps(_bf["months"][str(m)]) == dumps(_of[m]) for m in _of))
 ok("4. ...and the volumes are not carbon's hostage (the lines are all there)",
-   sum(len(_bf["months"][str(m)]["lines"]) for m in range(1, MC + 1)) == 905)
+   sum(len(_bf["months"][str(m)]["lines"]) for m in range(1, MC + 1)) == 942)
 
 # =========================================================================== #
 #  5. heavy_reads: a few at a time, one line each                              #

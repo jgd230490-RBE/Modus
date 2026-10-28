@@ -273,8 +273,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
        # NARROWED 16 Oct 2026 (an access road to every gate, the user): + 17 zones (Z006-Z022)
        # RE-PINNED 17 Oct 2026 (demo redesign R2, §3a): every table's count read from the package file itself (exact), for
        # every table the package carries rows in, so a regeneration never needs this line touched again
+       # RE-PINNED 28 Oct 2026 (simulation v2, the viaduct site): 50 routes, 944 forecasts
        all(res.get("inserted", {}).get(t) == len(rows) for t, rows in DEMO["tables"].items() if rows)
-       and res["inserted"].get("routes") == 43 and res["inserted"].get("forecasts") == 907, str(res.get("inserted")))
+       and res["inserted"].get("routes") == 50 and res["inserted"].get("forecasts") == 944, str(res.get("inserted")))
     ok("...and the GB diesel price applied", res.get("fuel_index_applied") == ["GB"], str(res.get("fuel_index_applied")))
     r = c.post("/api/admin/tenant/import", params=TOKEN, json=DEMO)
     ok("🔴 a second import into a non-empty tenant is refused — 400",
@@ -304,8 +305,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and _mo["routes"] == [] and _mo["ipts"] == [] and _mo["work_sections"] == [] and len(_mo["vehicles"]) > 0
        and isinstance(_mo["factors"].get("vehicle_payload_t"), dict) and isinstance(_mo["seasonal_restrictions"], list),
        str({k: _mo.get(k) for k in ("scope", "routes", "ipts", "work_sections")})[:200])
-    ok("⭐ D31: ...and the SAME visitor with the planner code in the header (the staff app's fetch) gets the staff shape: forty-three routes (RE-PINNED 17 Oct: the four-year programme), three teams, eight sections",
-       r_meta_hdr.status_code == 200 and r_meta_hdr.json()["scope"] == "staff" and len(r_meta_hdr.json()["routes"]) == 43
+    # RE-PINNED 28 Oct 2026 (simulation v2, the Tilton Viaduct site): fifty routes (R044–R050 the site's)
+    ok("⭐ D31: ...and the SAME visitor with the planner code in the header (the staff app's fetch) gets the staff shape: fifty routes (RE-PINNED 28 Oct: the viaduct site), three teams, eight sections",
+       r_meta_hdr.status_code == 200 and r_meta_hdr.json()["scope"] == "staff" and len(r_meta_hdr.json()["routes"]) == 50
        and [i["label"] for i in r_meta_hdr.json()["ipts"]] == ["North Team", "Central Team", "South Team"]
        and len(r_meta_hdr.json()["work_sections"]) == 8, str(r_meta_hdr.json().get("scope")))
     ok("🔴 D18: /api/gates to a visitor with no credential is the map's 401 JSON, not the gate list",
@@ -328,9 +330,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and m["tenant"]["country"] == "GB", str(m["tenant"]))
     # NARROWED 12 Oct 2026 (D31): this client holds the STAFF cookie (from /api/auth above) and sends no header — the
     # app's iframe — and that alone earns the staff shape
-    ok("⭐ ...three named teams, eight sections, forty-three routes (RE-PINNED 17 Oct) — the staff shape, on the staff COOKIE alone (no header)",
+    ok("⭐ ...three named teams, eight sections, fifty routes (RE-PINNED 28 Oct) — the staff shape, on the staff COOKIE alone (no header)",
        [i["label"] for i in m["ipts"]] == ["North Team", "Central Team", "South Team"]
-       and len(m["work_sections"]) == 8 and len(m["routes"]) == 43 and m["scope"] == "staff",
+       and len(m["work_sections"]) == 8 and len(m["routes"]) == 50 and m["scope"] == "staff",
        str([i["label"] for i in m["ipts"]]) + " " + str(m.get("scope")))
     # RE-PINNED 17 Oct 2026 (R2, §3a, §1.8): the Burrough lane community agreement, 8 a day on each route (was 20 and 30)
     ok("§2.5: every meta route carries max_vehicles_per_day — 8 on R016 and R018 (the demo's village caps), None elsewhere",
@@ -445,8 +447,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
     rows = r.json() if r.status_code == 200 else []
     # NARROWED 14 Oct 2026: + the ten concrete-pour line-months. RE-PINNED 17 Oct 2026 (demo redesign R2, §3a): the four-year
     # programme, read from the package file itself
-    ok("a planner sees all 907 forecast rows (905 approved, 1 pending, 1 rejected — the four-year programme)",
-       r.status_code == 200 and len(rows) == len(DEMO["tables"]["forecasts"]) == 907, f"{r.status_code} {len(rows)}")
+    # RE-PINNED 28 Oct 2026 (simulation v2, the Tilton Viaduct site): 944 rows (942 approved)
+    ok("a planner sees all 944 forecast rows (942 approved, 1 pending, 1 rejected — the four-year programme with the viaduct site)",
+       r.status_code == 200 and len(rows) == len(DEMO["tables"]["forecasts"]) == 944, f"{r.status_code} {len(rows)}")
     r = c.get("/api/forecasts", headers=NORTH)
     nrows = r.json() if r.status_code == 200 else []
     ok("⭐ the North Team code sees ONLY North Team's rows",
@@ -465,8 +468,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.post("/api/carbon/scenario", headers=PLAN, json={})
     cs = r.json() if r.status_code == 200 else {}
     bt = (cs.get("baseline") or {}).get("totals") or {}
-    ok("⭐ the carbon scenario answers a planner: 905 approved line-months (RE-PINNED 17 Oct: the four-year programme), unbaked network EXCLUDED from transport",
-       r.status_code == 200 and len(cs.get("lines") or []) == 905 and bt.get("baked_lines") == 0
+    ok("⭐ the carbon scenario answers a planner: 942 approved line-months (RE-PINNED 28 Oct: the viaduct site), unbaked network EXCLUDED from transport",
+       r.status_code == 200 and len(cs.get("lines") or []) == 942 and bt.get("baked_lines") == 0
        and bt.get("excludes_unbaked") is True and bt.get("transport_t") == 0 and bt.get("material_t", 0) > 0,
        f"{r.status_code} {r.text[:200]}")
     ok("...with the known limits, the Planned items and every factor's source, year and status",
@@ -509,13 +512,14 @@ with TestClient(main.app, base_url="https://testserver") as c:
     _pe = r.json() if r.status_code == 200 else {}
     # NARROWED 14 Oct 2026 (civils materials): 22 October lines on 21 routes (the pour's two Melton lines share a route)
     # RE-PINNED 17 Oct 2026 (demo redesign R2, §3a): October 2026 of the four-year programme is 18 lines on 13 routes
-    ok("⭐ the bulletin on the unbaked demo: empty (four headline figures null), all 18 October lines named as on routes the map does not draw",
+    # RE-PINNED 28 Oct 2026 (simulation v2, the Tilton Viaduct site): 20 October lines on 15 routes
+    ok("⭐ the bulletin on the unbaked demo: empty (four headline figures null), all 20 October lines named as on routes the map does not draw",
        r.status_code == 200 and _pe["rollup"]["empty"] is True and _pe["rollup"]["headline"]["two_way_a_day"] is None
-       and _pe["rollup"]["headline"]["routes_in_use"] == 0 and _pe["rollup"]["routes_not_drawn"]["lines"] == 18
-       and len(_pe["rollup"]["routes_not_drawn"]["routes"]) == 13
+       and _pe["rollup"]["headline"]["routes_in_use"] == 0 and _pe["rollup"]["routes_not_drawn"]["lines"] == 20
+       and len(_pe["rollup"]["routes_not_drawn"]["routes"]) == 15
        # NARROWED 12 Oct 2026 (the review and fix pass): plain words, "with no stored road route yet", not "not yet baked"
        # NARROWED 22 Oct 2026 (words sweep): "not routed yet", as the map says it
-       and _pe["rollup"]["note"] == ("No approved forecast on a route the map draws in this month: 18 lines on 13 routes "
+       and _pe["rollup"]["note"] == ("No approved forecast on a route the map draws in this month: 20 lines on 15 routes "
                                      "not routed yet, listed below and not counted.")
        and _pe["conditions"]["route_caps"]["wording"] == "planning flag", f"{r.status_code} {str(_pe)[:300]}")
     # NARROWED 12 Oct 2026 (the tests-and-regressions review): the carbon figures on that empty roll-up are
@@ -645,13 +649,13 @@ with TestClient(main.app, base_url="https://testserver") as c:
         _oct = [f for f in DEMO["tables"]["forecasts"] if f["month_index"] == 10 and f["status"] == "Approved"]
         _t001 = sum(f["quantity"] for f in _oct if f["route_id"] == "R001")
         ok("⭐ …the figures are the map bar's rules over the map's own payload: R001 is the ONE drawn route — its October tonnes ÷ 29 t "
-           "= loads ÷ working days; vehicles = ceil per line from the same trips_per_vehicle_day; the 12 undrawn routes named",
-           _t001 == 2800 and len(_oct) == 18 and len({f["route_id"] for f in _oct}) == 13
+           "= loads ÷ working days; vehicles = ceil per line from the same trips_per_vehicle_day; the 14 undrawn routes named (RE-PINNED 28 Oct)",
+           _t001 == 2800 and len(_oct) == 20 and len({f["route_id"] for f in _oct}) == 15
            and hl["routes_in_use"] == 1 and abs(hl["tonnes"] - _t001) < 1e-6 and abs(hl["movements_in_month"] - _t001 / 29) < 1e-3
            and abs(hl["two_way_a_day"] - _t001 / 29 / _wd) < 1e-3 and len(_r001) == 1 and _r001[0]["trips_per_vehicle_day"]
            and pg["rollup"]["vehicles"]["fleet"] == -(-(_t001 / 29 / _wd) // _r001[0]["trips_per_vehicle_day"])
            # NARROWED 14 Oct 2026: 21 lines on 20 undrawn routes (the concrete pour). RE-PINNED 17 Oct 2026: 17 on 12
-           and pg["rollup"]["routes_not_drawn"]["lines"] == 17 and len(pg["rollup"]["routes_not_drawn"]["routes"]) == 12
+           and pg["rollup"]["routes_not_drawn"]["lines"] == 19 and len(pg["rollup"]["routes_not_drawn"]["routes"]) == 14    # RE-PINNED 28 Oct: 19 on 14
            and "R001" not in pg["rollup"]["routes_not_drawn"]["routes"], f"{hl} {pg['rollup'].get('vehicles')} {_r001}")
         _cl10 = sum(x["co2_t"] for x in cl["lines"] if x["route_id"] == "R001" and x["month_index"] == 10 and x["co2_t"] is not None)
         ok("⭐ …carbon is the costlines figure the Dashboard reads (R001, October), stamped as the Carbon page stamps it",
@@ -666,8 +670,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
            and [t["key"] for t in pg["rollup"]["breakdown"]["team"]] == ["South Team"] and "IPT" not in r.text, str(_b)[:200])
         _cn = pg["conditions"]
         # NARROWED 14 Oct 2026: 21 routes carry October volume (the concrete pour's two). RE-PINNED 17 Oct 2026 (R2): 13
-        ok("⭐ …conditions of the month from what is STORED: no stored check, so \"never checked\" on all 13 routes (National Highways provider)",
-           _cn["restrictions"]["status"] == "never checked" and len(_cn["restrictions"]["never_checked_routes"]) == 13
+        ok("⭐ …conditions of the month from what is STORED: no stored check, so \"never checked\" on all 15 routes (National Highways provider; RE-PINNED 28 Oct)",
+           _cn["restrictions"]["status"] == "never checked" and len(_cn["restrictions"]["never_checked_routes"]) == 15
            and _cn["restrictions"]["hits"] == [] and _cn["restrictions"]["provider"] == "nh_closures", str(_cn["restrictions"])[:200])
         # REVERSED 14 Oct 2026 (the user took the recommendation): the public bulletin no longer carries the stockpile over
         # capacity (a site matter). The sentence and the figures stay pinned on bulletin.conditions_of_month in
@@ -1094,7 +1098,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
                 key=lambda g: g.get("laden_per_day") or 0, default={}).get("location_name")
     ok("⭐ S7 fix: on the demo package the pour is offered at the compounds only (no landfill, soil recycling, batching plant, "
        "stockpile, quarry or terminal), and defaults to the compound with the most laden lorries (Melton Compound in Apr 2027)",
-       bool(_pgn) and all(n.endswith("Compound") for n in _pgn) and _most == "Melton Compound"
+       # NARROWED 28 Oct 2026 (simulation v2): the Tilton Viaduct site (type Site) is a working site too
+       bool(_pgn) and all(n.endswith("Compound") or n.startswith("Tilton Viaduct site") for n in _pgn) and _most == "Melton Compound"
        and next((x["location_name"] for x in sd["pour_gates"] if x["gate_id"] == sd.get("pour_default")), None) == _most,
        str(_pgn) + " " + str(_most))
     _lf = [g for g in c.get("/api/gates").json().get("gates", []) if g.get("location_id") == "L012"]
@@ -1254,10 +1259,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # whose 20 lines (mixer lines among them, so the PLAN column) fit ONE page by the same rule — read from the page itself
     _nl = sum(1 for l in ((la.get("commit") or {}).get("lines") or [])
               if any(d["day_date"] == _day and (d.get("planned_qty") or 0) > 0 for d in l.get("days", [])))
-    ok("⭐ DAY SHEET: the planner downloads A4 portrait (real reportlab), named after the day — one page for the pinned Monday's 20 lines",
-       _day == "2026-11-23" and _nl == 20 and f"{_nl} lines" in _dst
+    # RE-PINNED 28 Oct 2026 (simulation v2, the Tilton Viaduct site): the Monday has 22 lines (the site's concrete and reinforcement lines are their own now), two pages by the sheet's rule
+    ok("⭐ DAY SHEET: the planner downloads A4 portrait (real reportlab), named after the day — two pages for the pinned Monday's 22 lines",
+       _day == "2026-11-23" and _nl == 22 and f"{_nl} lines" in _dst
        and r.status_code == 200 and r.headers.get("content-type") == "application/pdf" and r.content[:5] == b"%PDF-"
-       and r.content.count(b"/Type /Page\n") == 1 and f'filename="day-sheet-{_day}.pdf"' in r.headers.get("content-disposition", "")
+       and r.content.count(b"/Type /Page\n") == 2 and f'filename="day-sheet-{_day}.pdf"' in r.headers.get("content-disposition", "")
        and b"/MediaBox [ 0 0 595." in r.content and "day sheet" in _dst and "not a delivery note" in _dst,
        f"{r.status_code} pages={r.content.count(b'/Type /Page\n')} mb={r.content[r.content.find(b'/MediaBox'):r.content.find(b'/MediaBox')+40]!r} {_dst[-400:]}")
     ok("...with the demo notice, team NAMES and no team id; NOT ROUTED counted, never the server's 'baked' working note",
@@ -1358,12 +1364,12 @@ with TestClient(main.app, base_url="https://testserver") as c:
        rl.get("runs") == [] and rl.get("month") == 10 and rl.get("leg") == "loaded" and (rl.get("working_days") or 0) > 0
        and rl.get("totals", {}).get("runs") == 0 and rl.get("totals", {}).get("lines") == 0
        # NARROWED 22 Oct 2026 (words sweep): the note reads on the map, so it names no field ("routes_not_drawn" left it)
-       and any("18 lines not routed yet, not counted" in n for n in rl.get("notes", []))
+       and any("20 lines not routed yet, not counted" in n for n in rl.get("notes", []))
        and not any("routes_not_drawn" in n for n in rl.get("notes", [])), str(rl.get("notes")))
     # NARROWED 14 Oct 2026: 22 October lines on 21 routes (the concrete pour). RE-PINNED 17 Oct 2026 (R2, §3a): 18 on 13
-    ok("...and the October demo volume is NOT in the totals (the map draws none of it): all 18 lines named in routes_not_drawn",
+    ok("...and the October demo volume is NOT in the totals (the map draws none of it): all 20 lines named in routes_not_drawn (RE-PINNED 28 Oct)",
        rl.get("totals", {}).get("routes_with_volume") == 0 and rl.get("totals", {}).get("trips") == 0
-       and rl.get("routes_not_drawn", {}).get("lines") == 18 and len(rl.get("routes_not_drawn", {}).get("routes", [])) == 13
+       and rl.get("routes_not_drawn", {}).get("lines") == 20 and len(rl.get("routes_not_drawn", {}).get("routes", [])) == 15
        and rl.get("totals", {}).get("co2_t") == 0.0, str(rl.get("totals")))
     _ret = c.get("/api/public/road-load", params={"month": 10, "leg": "return"})
     # NARROWED 12 Oct 2026: the status is checked too — called as a function, month-kpis' `unit` default was
@@ -1433,13 +1439,14 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # NARROWED 14 Oct 2026 (civils materials): the batching plant is a fourteenth site, in Melton
     # RE-PINNED 17 Oct 2026 (R2, §3a): the asphalt plant and Welland Ready-Mix are both in Harborough (10 of 16)
     # NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): the crane depot in Charnwood, the precast works in Hinckley and Bosworth (18)
-    ok("...the demo's sites where the package coordinates put them (Harborough 10, Melton 3, Blaby 1, Charnwood 2, Rutland 1, Hinckley and Bosworth 1)",
-       [_by.get(n, {}).get("sites_count") for n in ("Harborough", "Melton", "Blaby", "Charnwood", "Rutland", "Hinckley and Bosworth")] == [10, 3, 1, 2, 1, 1])
-    ok("...of the 18 the totals carry (the card's '10 of 18'), and one label point per area for the map's one label",
-       ar.get("totals", {}).get("sites") == 18
+    # RE-PINNED 28 Oct 2026 (simulation v2): the Tilton Viaduct site is in Harborough district (11)
+    ok("...the demo's sites where the package coordinates put them (Harborough 11, Melton 3, Blaby 1, Charnwood 2, Rutland 1, Hinckley and Bosworth 1)",
+       [_by.get(n, {}).get("sites_count") for n in ("Harborough", "Melton", "Blaby", "Charnwood", "Rutland", "Hinckley and Bosworth")] == [11, 3, 1, 2, 1, 1])
+    ok("...of the 19 the totals carry (the card's '11 of 19'; RE-PINNED 28 Oct), and one label point per area for the map's one label",
+       ar.get("totals", {}).get("sites") == 19
        and all(isinstance(a.get("label_point"), list) and len(a["label_point"]) == 2 for a in ar.get("areas", [])), r.text[:200])
     ok("...and the October lines are named as undrawn, never counted in an area",
-       len(ar.get("routes_not_drawn", [])) == 13 and ar.get("totals", {}).get("loads") == 0)   # NARROWED 14 Oct: 21 routes; RE-PINNED 17 Oct: 13
+       len(ar.get("routes_not_drawn", [])) == 15 and ar.get("totals", {}).get("loads") == 0)   # NARROWED 14 Oct: 21 routes; RE-PINNED 17 Oct: 13; RE-PINNED 28 Oct: 15
     # 12 Oct 2026 (Track C review): the polygons once (no month roll-up), the month's figures without them
     r = c.get("/api/public/areas/shapes")
     sh = r.json() if r.status_code == 200 else {}
@@ -1636,10 +1643,12 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # RE-PINNED 17 Oct 2026 (R2, §3a): read from the package file (exact). Weeks may only GROW on the round trip: reads above
     # materialise the weeks of later months on demand (§1.9: future weeks materialise on read), never drop one
     ok("...a valid package of the same size", pkg.get("modus_package") == 1
-       and len(pkg["tables"]["routes"]) == len(DEMO["tables"]["routes"]) == 43
-       and len(pkg["tables"]["forecasts"]) == len(DEMO["tables"]["forecasts"]) == 907
+       # RE-PINNED 28 Oct 2026 (simulation v2): 50 routes, 944 forecasts, 23 gates (the viaduct site's)
+       and len(pkg["tables"]["routes"]) == len(DEMO["tables"]["routes"]) == 50
+       and len(pkg["tables"]["forecasts"]) == len(DEMO["tables"]["forecasts"]) == 944
        and len(pkg["tables"]["forecast_weeks"]) >= len(DEMO["tables"]["forecast_weeks"])
-       and len(pkg["tables"]["location_gates"]) == len(DEMO["tables"]["location_gates"]) == 21      # NARROWED 22 Oct 2026: the two abnormal-load sites
+       and len(pkg["tables"]["location_gates"]) == len(DEMO["tables"]["location_gates"]) == 23      # NARROWED 22 Oct 2026: the two abnormal-load sites; 28 Oct: the viaduct site's two
+       and len(pkg["tables"]["site_areas"]) == len(DEMO["tables"]["site_areas"]) == 4
        and len(pkg["tables"]["abnormal_loads"]) == len(DEMO["tables"]["abnormal_loads"]) == 3)
     ok("...and it carries the route_sections table (empty: nothing is baked here)",
        "route_sections" in pkg.get("tables", {}) and pkg["tables"]["route_sections"] == [])
@@ -1649,8 +1658,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("⭐ replace=1 re-imports the exported tenant over itself", r.status_code == 200 and r.json().get("replaced") is True,
        r.text[:160])
     m2 = c.get("/api/meta").json()
-    ok("...and nothing is lost or doubled", len(m2["routes"]) == 43 and len(m2["ipts"]) == 3   # NARROWED 14 Oct: 22 / 88; RE-PINNED 17 Oct: 43 / 907
-       and len(c.get("/api/forecasts", headers=PLAN).json()) == 907)
+    ok("...and nothing is lost or doubled", len(m2["routes"]) == 50 and len(m2["ipts"]) == 3   # NARROWED 14 Oct: 22 / 88; RE-PINNED 17 Oct: 43 / 907; 28 Oct: 50 / 944
+       and len(c.get("/api/forecasts", headers=PLAN).json()) == 944)
     ok("...and the council areas came back with the package (9)",
        len(c.get("/api/admin/areas", params=TOKEN).json().get("areas", [])) == 9)
 
@@ -1800,7 +1809,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
        _ab.status_code == 200 and [m["id"] for m in _abj.get("movements") or []] == ["AL001", "AL002", "AL003"]
        and [m["status"] for m in _abj["movements"]] == ["approved", "pending", "pending"] and all(m.get("geometry") is None for m in _abj["movements"])
        and _abj.get("settings", {}).get("holidays", {}).get("source") == "seed"
-       and _abj.get("settings", {}).get("time_bans") == [] and len(_abj.get("choices", {}).get("locations") or []) == 18
+       and _abj.get("settings", {}).get("time_bans") == [] and len(_abj.get("choices", {}).get("locations") or []) == 19   # RE-PINNED 28 Oct: + the viaduct site
        and "the haulier, esdal, the police" in (_abj.get("words", {}).get("advice") or "").lower(), _ab.text[:200])   # NARROWED 27 Oct 2026: the one advice line
     _pv = c.get("/api/abnormal/rules", params={"width_m": 4.6, "height_m": 3.9, "length_m": 16.5, "gross_t": 40, "max_axle_t": 9,
                                                 "axle_count": 6, "indivisible": "true", "date_from": "2027-03-08"}, headers=NORTH)

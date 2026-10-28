@@ -150,17 +150,19 @@ ok("the north opens in December 2028: no WS4–WS6 pavement line after November 
 # =========================================================================== #
 #  2. The totals the note quotes (§1.5)                                        #
 # =========================================================================== #
-ok("⭐ 905 approved line-months on 42 routes (R020, the Carbon planner's alternative, carries none)",
-   len(APPROVED) == 905 and len({f["route_id"] for f in APPROVED}) == 42
-   and "R020" not in {f["route_id"] for f in APPROVED} and len(T["routes"]) == 43)
-ok("⭐ 2,722,900 t over the programme (concrete at 2.4 t/m³) and 114,000 m³ of ready-mixed concrete",
-   round(sum(tonnes(f) for f in APPROVED)) == 2722900
+# RE-PINNED 28 Oct 2026 (simulation v2, the Tilton Viaduct site L019): + 7 routes (R044–R050) and 24 line-months of its own,
+# + 13 where the viaduct's concrete and reinforcement left the compound's summed lines: 942 on 49 routes
+ok("⭐ 942 approved line-months on 49 routes (R020, the Carbon planner's alternative, carries none)",
+   len(APPROVED) == 942 and len({f["route_id"] for f in APPROVED}) == 49
+   and "R020" not in {f["route_id"] for f in APPROVED} and len(T["routes"]) == 50)
+ok("⭐ 2,745,500 t over the programme (concrete at 2.4 t/m³; RE-PINNED 28 Oct: + 22,600 t for the viaduct site) and 114,000 m³ of ready-mixed concrete",
+   round(sum(tonnes(f) for f in APPROVED)) == 2745500
    and round(sum(float(f["quantity"]) for f in APPROVED if f["unit"] == "m3")) == 114000)
 _lt = {}
 for f in APPROVED:
     _lt[TEAM[f["ipt"]]] = _lt.get(TEAM[f["ipt"]], 0) + loads(f)
-ok("⭐ 100,839 loads by the app's rule: North 49,130, Central 32,893, South 18,816",
-   sum(_lt.values()) == 100839 and _lt == {"North Team": 49130, "Central Team": 32893, "South Team": 18816}, str(_lt))
+ok("⭐ 101,641 loads by the app's rule: North 49,932 (RE-PINNED 28 Oct: + 802 for the viaduct site), Central 32,893, South 18,816",
+   sum(_lt.values()) == 101641 and _lt == {"North Team": 49932, "Central Team": 32893, "South Team": 18816}, str(_lt))
 _byk = {}
 for f in APPROVED:
     _byk.setdefault((f["route_id"], f["discipline"], f["section_id"]), set()).add(f["vehicle_type"])
@@ -242,8 +244,8 @@ ok("⭐ the carbon read gives the feed NO material carbon (counted once, in the 
 _kept = {"Kilby Ridge Quarry", "Northfield Quarry", "Brook Pit", "Harborough Rail Freight Terminal", "Harborough Compound",
          "Langton Compound", "Tilton Compound", "Melton Compound", "Stockpile South", "Stockpile Tilton", "Stockpile North"}
 # NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): eighteen — the precast works and the crane depot the three abnormal loads start from
-ok("⭐ eighteen sites: the eleven named after places, and every other one says \"(fictional)\" in its name",
-   len(T["locations"]) == 18 and {l["name"] for l in T["locations"]} >= _kept
+ok("⭐ nineteen sites (RE-PINNED 28 Oct: + the Tilton Viaduct site): the eleven named after places, and every other one says \"(fictional)\" in its name",
+   len(T["locations"]) == 19 and {l["name"] for l in T["locations"]} >= _kept
    and all("(fictional)" in l["name"] for l in T["locations"] if l["name"] not in _kept))
 ok("⭐ D75 (phase 3): the three fictional abnormal loads ship in the package — the 4.6 m units (approved) from the rail terminal to Langton Compound, the 72 t crane (pending, in and out) from the crane depot and the 32 m beams (pending, a Special Order) from the precast works to Melton Compound; the two new sites with a gate each; nothing routed in the file (a planner draws on live)",
    [(m["id"], m["status"], m["origin_id"], m["dest_id"], bool(m.get("return_abnormal")), m.get("geometry_json")) for m in T["abnormal_loads"]]

@@ -428,10 +428,12 @@ dc = tenant_package.counts(demo)
 # zones after the access roads, the Langton haul road on all nine routes into Langton Compound. Teams 3 and sections 8 stay.
 # NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): + the precast works and the crane depot (2 locations, 2 gates, 2 access
 # roads) and the three abnormal loads, which are rows of their own, never forecasts
-ok("demo: 18 locations, 43 routes, 3 teams, 8 sections, 907 forecasts (905 approved + 1 pending + 1 rejected), 21 gates, 33 zones "
-   "(5 + 21 gate access roads + 7 advisory), 11 haul links, 3 abnormal loads",
-   dc["locations"] == 18 and dc["routes"] == 43 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 907
-   and dc["location_gates"] == 21 and dc["zones"] == 33 and dc["route_haul_roads"] == 11 and dc["abnormal_loads"] == 3, str(dc))
+# RE-PINNED 28 Oct 2026 (simulation v2, the Tilton Viaduct site L019: two gates G020 / G021 with access roads Z027 / Z028, four internal roads Z029–Z032, seven routes R044–R050, 942 approved line-months)
+ok("demo: 19 locations, 50 routes, 3 teams, 8 sections, 944 forecasts (942 approved + 1 pending + 1 rejected), 23 gates, 39 zones "
+   "(5 + 23 gate access roads + 4 roads inside the viaduct site + 7 advisory), 11 haul links, 3 abnormal loads, 4 site areas",
+   dc["locations"] == 19 and dc["routes"] == 50 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 944
+   and dc["location_gates"] == 23 and dc["zones"] == 39 and dc["route_haul_roads"] == 11 and dc["abnormal_loads"] == 3
+   and dc["site_areas"] == 4, str(dc))
 _locs = {l["id"]: l for l in demo["tables"]["locations"]}
 _rts = {r["id"]: r for r in demo["tables"]["routes"]}
 # RE-PINNED 17 Oct 2026 (R2, §3a): R019 carries the Langton cutting's surplus Apr 2027 – Sep 2028 (months 16–33) and the
@@ -461,8 +463,8 @@ _st = {s_: sum(1 for r in demo["tables"]["forecasts"] if r["status"] == s_) for 
 # NARROWED 14 Oct 2026 (civils materials, D13): the demo gained a batching plant (1 location, 1 gate), 2 mixer routes and
 # 10 m³ lines (3 of them in October, two on one route)
 # RE-PINNED 17 Oct 2026 (R2, §3a): the programme's 905 approved line-months; Pending 1 and Rejected 1 kept
-ok("demo: 905 Approved (the four-year programme, 17 Oct), exactly one Pending and one Rejected (with a reason)",
-   _st == {"Approved": 905, "Pending": 1, "Rejected": 1}
+ok("demo: 942 Approved (the four-year programme, 17 Oct; the viaduct site, 28 Oct), exactly one Pending and one Rejected (with a reason)",
+   _st == {"Approved": 942, "Pending": 1, "Rejected": 1}
    and all(r["reject_reason"] for r in demo["tables"]["forecasts"] if r["status"] == "Rejected"), str(_st))
 ok("demo: weeks are materialised and some actuals typed",
    dc["forecast_weeks"] > 0 and any(r.get("actual_qty") for r in demo["tables"]["forecast_weeks"]))
@@ -582,8 +584,8 @@ ok("demo: /api/meta reads the tenant back — £, Team, GB",
 ok("demo: the pickers see three teams and eight sections",
    len(m3["ipts"]) == 3 and len(m3["work_sections"]) == 8)
 ok("demo: the routes reach /api/meta with no distance (unbaked)",
-   # NARROWED 14 Oct 2026: 22 routes (the two concrete-pour routes). RE-PINNED 17 Oct 2026 (R2): 43 (R001–R043)
-   len(m3["routes"]) == 43 and all(not r.get("distance_km") for r in m3["routes"]))
+   # NARROWED 14 Oct 2026: 22 routes (the two concrete-pour routes). RE-PINNED 17 Oct 2026 (R2): 43 (R001–R043); 28 Oct: 50
+   len(m3["routes"]) == 50 and all(not r.get("distance_km") for r in m3["routes"]))
 
 # --- 5a-bis. Postgres booleans (29 Sep 2026: the first demo import on Render) ---------
 # `psycopg2.errors.DatatypeMismatch: column "in_scope" is of type boolean but expression

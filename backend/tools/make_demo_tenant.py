@@ -122,6 +122,7 @@ import haul                  # noqa: E402
 import carbon_target         # noqa: E402
 import clashes               # noqa: E402
 import tenant_package        # noqa: E402
+import site_areas            # noqa: E402
 
 OUT = os.path.join(ROOT, "demo", "uk-corridor.package.json")
 AREAS_SEED = os.path.join(BACKEND, "data", "areas_demo.geojson")   # --with-areas (§2.2b)
@@ -256,8 +257,12 @@ ROUTES = [
     ("RH", "C3", GENERAL), ("RH", "C1", GENERAL), ("RH", "C2", PRECAST), ("RH", "C4", PRECAST),   # R037–R040
     ("Q2", "S1", SMALL), ("Q2", "S2", SMALL),                                     # R041–R042 capping stockpiled
     ("Q2", "C2", ASPHALT),                                                        # R043 a quarry coating plant (2030)
+    # 28 Oct 2026 (simulation v2, task 0e): the Tilton Viaduct site — stone and concrete to the pier bases, reinforcement,
+    # steel and precast to the laydown, piling arisings out to the tip (muck away: the empty lorry comes to LOAD)
+    ("Q1", "VS", BALLAST), ("Q2", "VS", SMALL), ("RH", "VS", GENERAL), ("RH", "VS", PRECAST), ("RH", "VS", STEEL),   # R044–R048
+    ("BP", "VS", READY), ("VS", "TIP", EARTH),                                    # R049–R050
 ]
-assert len(ROUTES) == 43 and len(set(ROUTES)) == 43
+assert len(ROUTES) == 50 and len(set(ROUTES)) == 50
 ROUTE_ID = {r: f"R{i + 1:03d}" for i, r in enumerate(ROUTES)}
 
 # Every activity: (section, discipline, material, origin, destination, vehicle, unit, first month, the quantity in
@@ -295,11 +300,17 @@ PROGRAMME = [
     ("WS5", "structures", GENERAL, "RH", "C4", FLAT, "t", 8, [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100], "Reinforcement — WS5 structures"),
     ("WS5", "structures", PRECAST, "RH", "C4", FLAT, "t", 10, [100, 200, 200, 200, 300, 300, 200, 200, 200, 200, 100], "Precast culvert units and parapets"),
     ("WS4", "earthworks", EARTH, "Q3", "S2", TIP, "t", 7, [1400, 1700, 2100, 1700, 700, 200, 400, 400, 1300, 2600, 2600, 2600, 2500, 2100, 1700, 1000], "Imported granular fill to the viaduct approaches"),
-    ("WS4", "earthworks", EARTH, "C3", "TIP", TIP, "t", 5, [800, 1000, 1200, 1400, 1600, 1600, 1600, 900, 1100, 1300, 1600, 1500, 1400, 1200, 1000, 800], "Piling arisings and unsuitable material to tip"),
-    ("WS4", "structures", READY, "BP", "C3", MIX8, "m3", 5, [840, 1070, 1290, 1510, 1630, 1630, 1620, 910, 1170, 1380, 1620, 1620, 1510, 1290, 1070, 840], "C32/40 concrete — Tilton viaduct piles, pile caps, piers and abutments"),
-    ("WS4", "structures", READY, "BP", "C3", MIX8, "m3", 23, [580, 500, 690, 810, 960, 880, 580], "C32/40 concrete — Tilton viaduct deck slab, edge beams and approach slabs"),
+    ("WS4", "earthworks", EARTH, "VS", "TIP", TIP, "t", 5, [800, 1000, 1200, 1400, 1600, 1600, 1600, 900, 1100, 1300, 1600, 1500, 1400, 1200, 1000, 800], "Piling arisings and unsuitable material to tip"),
+    ("WS4", "structures", READY, "BP", "VS", MIX8, "m3", 5, [840, 1070, 1290, 1510, 1630, 1630, 1620, 910, 1170, 1380, 1620, 1620, 1510, 1290, 1070, 840], "C32/40 concrete — Tilton viaduct piles, pile caps, piers and abutments"),
+    ("WS4", "structures", READY, "BP", "VS", MIX8, "m3", 23, [580, 500, 690, 810, 960, 880, 580], "C32/40 concrete — Tilton viaduct deck slab, edge beams and approach slabs"),
     ("WS4", "structures", READY, "BP", "C3", MIX8, "m3", 10, [260, 340, 230, 350, 430, 500, 500, 500, 500, 500, 500, 490, 410, 340, 150], "C32/40 concrete — A47 junction overbridge"),
-    ("WS4", "structures", GENERAL, "RH", "C3", FLAT, "t", 5, [100, 100, 100, 100, 100, 200, 200, 100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100, 100, 100, 100, 100, 100, 100], "Reinforcement — Tilton viaduct and A47 junction"),
+    ("WS4", "structures", GENERAL, "RH", "VS", FLAT, "t", 5, [100, 100, 100, 100, 100, 200, 200, 100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100, 100, 100, 100, 100, 100, 100], "Reinforcement — Tilton viaduct and A47 junction"),
+    # 28 Oct 2026 (simulation v2): the viaduct site's own lines — the piling mat and pier drainage stone in, the deck's
+    # structural steel (the longest girders go as abnormal loads, not here) and the precast parapets
+    ("WS4", "substructure", BALLAST, "Q1", "VS", TIP, "t", 5, [2600, 3100, 3100, 2200, 1400], "Piling mat and working platform stone at the viaduct site (Type 1)"),
+    ("WS4", "substructure", SMALL, "Q2", "VS", TIP, "t", 9, [900, 1200, 1200, 900], "Pier drainage and bedding stone"),
+    ("WS4", "structures", STEEL, "RH", "VS", FLAT, "t", 14, [300, 500, 600, 600, 600, 600, 500, 400, 300], "Structural steel girders for the composite deck (the longest go as abnormal loads)"),
+    ("WS4", "structures", PRECAST, "RH", "VS", FLAT, "t", 24, [200, 300, 300, 300, 300, 200], "Precast parapet and deck edge units"),
     ("WS4", "substructure", SMALL, "Q2", "C3", TIP, "t", 12, [400, 800, 1100, 1900, 2200, 2200, 2100, 2100, 2100, 2100, 2100, 1700, 600, 800, 700], "Pipe bedding and filter drain stone"),
     ("WS4", "substructure", PRECAST, "RH", "C3", FLAT, "t", 12, [100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100], "Drainage pipes, chambers and culvert units"),
     ("WS4", "substructure", SMALL, "Q2", "S2", TIP, "t", 18, [4000, 5600, 7200, 7200, 7200, 7200, 3500, 5900, 5100, 4000], "6F2 capping (stockpiled at Stockpile Tilton)"),
@@ -632,7 +643,7 @@ def build(with_areas=False, out=None):
         vendor="Northfield Stone Co. (fictional)", detail="Granodiorite, with a coating plant (asphalt for the 2030 side roads). Weighbridge queue peaks 07:00–09:00.")
     add("Q3", "Brook Pit", "origin", "Quarry", -0.7520, 52.6940, supplies=[EARTH, SMALL],
         vendor="Brook Pit Sand & Gravel (fictional)", detail="Sand and gravel; imported granular fill.")
-    add("RH", "Harborough Rail Freight Terminal", "origin", "Railhead", -0.9180, 52.4785, supplies=[PRECAST, GENERAL, SMALL],
+    add("RH", "Harborough Rail Freight Terminal", "origin", "Railhead", -0.9180, 52.4785, supplies=[PRECAST, GENERAL, SMALL, STEEL],
         detail="Rail-delivered precast units, structural steel and aggregate transhipped to road. Fictional.")
 
     # Compounds and stockpiles along the corridor, ~400 m off the alignment.
@@ -696,10 +707,18 @@ def build(with_areas=False, out=None):
         detail="Mobile cranes for the beam lifts; the 250 t-class crane travels in and out as an abnormal load in its own right. "
                "Fictional: no such depot.")
     assert [loc[k] for k in ("Q1", "BP", "AP", "WR", "EP", "CD")] == ["L001", "L014", "L015", "L016", "L017", "L018"], loc
+    # 28 Oct 2026 (simulation v2, task 0e): the viaduct works site, on the line where it crosses the brook valley south-west
+    # of Tilton Compound: the laydown at the top of the bank, the pier bases on the terrace 8 m below, a gate in and a
+    # gate out on the lane south of it (the gate-out closed March–May 2027 for the deck steel's lift season).
+    add("VS", "Tilton Viaduct site (fictional)", "destination", "Site", -0.8822, 52.6447,
+        receives=[READY, GENERAL, PRECAST, STEEL, BALLAST, SMALL], vendor="Wolds Link joint venture (fictional)",
+        detail="The viaduct works: piling and pier bases on the river terrace, the laydown and crane pads at the top of "
+               "the bank, a wheel wash on the way out. Check in 3 min; 5 mph on site. Fictional: no such site.")
+    assert loc["VS"] == "L019", loc
 
     # --- routes (R001–R043, in ROUTES order) -------------------------------------------
     team_of = {"C1": "IPT3", "C2": "IPT2", "C3": "IPT1", "C4": "IPT1", "S1": "IPT3", "S2": "IPT1", "S3": "IPT1",
-               "AP": "IPT1"}
+               "AP": "IPT1", "VS": "IPT1"}
     routes = {}
     for o, d, mat in ROUTES:
         # routes.ipt is free text; the demo writes the slot id, which every display turns into the team's name
@@ -879,12 +898,20 @@ def build(with_areas=False, out=None):
     G["WR"]     = gate("WR", "Plant gate", 0, 130, "both", default=True, safety=3, internal=3,
                        note="One-way loop under the batching plant; wash-out bay before the exit (fictional).")
     assert G["WR"] == "G019", G
+    # 28 Oct 2026 (simulation v2): the viaduct site's gate in (check-in 3 min) and gate out, both on the lane south of it;
+    # the gate out is CLOSED 1 Mar – 31 May 2027 (the lane under the crane outriggers): in and out by the gate in meanwhile
+    G["VS_in"]  = gate("VS", "South lane gate (in)", 150, -200, "access", default=True, safety=3,
+                       note="Check in here; 5 mph on site; leave by the gate out past the wheel wash (fictional).")
+    G["VS_out"] = gate("VS", "South lane gate (out)", -120, -230, "egress")
+    assert G["VS_out"] == "G021", G
+    res = gates.update_gate(G["VS_out"], closed_from="2027-03-01", closed_to="2027-05-31")
+    assert "error" not in res, res
     # the routes name their gates explicitly (the resolver would pick the defaults anyway;
     # an explicit choice is what a planner does on the route form)
     origin_gate = {"Q1": G["Q1_out"], "Q2": G["Q2_out"], "Q3": G["Q3"], "RH": G["RH"], "C1": G["C1_out"], "C2": G["C2"],
-                   "C3": G["C3"], "BP": G["BP"], "AP": G["AP"], "WR": G["WR"]}
+                   "C3": G["C3"], "BP": G["BP"], "AP": G["AP"], "WR": G["WR"], "VS": G["VS_out"]}
     dest_gate = {"C1": G["C1_in"], "C2": G["C2"], "C3": G["C3"], "C4": G["C4"], "S1": G["S1"], "S2": G["S2"], "S3": G["S3"],
-                 "TIP": G["TIP"], "HUB": G["HUB"], "AP": G["AP"]}
+                 "TIP": G["TIP"], "HUB": G["HUB"], "AP": G["AP"], "VS": G["VS_in"]}
     for rid, (o, d, mat) in routes.items():
         res = gates.set_route_gates(rid, origin_gate_id=origin_gate[o], dest_gate_id=dest_gate[d],
                                     origin_given=True, dest_given=True)
@@ -1141,8 +1168,9 @@ def build(with_areas=False, out=None):
     # BELLMOUTH_M in from the nearest lorry road, and that stretch is drawn as the gate's access road (a haul road,
     # spliced, at 10 km/h): every route arriving by the gate ends along it and every route leaving starts along it
     # (haul.leg_steps). Done after every gate exists and after the five zones above, so those keep Z001–Z005 and the
-    # access roads take Z006–Z026 in gate order (Z025, Z026 the two abnormal-load sites', 22 Oct 2026); the advisory
-    # zones below come after them (Z027 on).
+    # access roads take Z006–Z028 in gate order (Z025, Z026 the two abnormal-load sites', 22 Oct 2026; Z027, Z028 the
+    # viaduct site's, 28 Oct 2026), then the viaduct site's four internal roads (Z029–Z032); the advisory zones below
+    # come after them (Z033 on).
     # The road points: the nearest OpenStreetMap way of class trunk / primary / secondary / tertiary / unclassified
     # (residential streets left out on purpose: no quarry gate on a housing close) to each gate's v2 position, one
     # Overpass query, 16 Oct 2026 (the two new plants' gates: one more query, 16 Oct 2026 night; the precast works and
@@ -1171,6 +1199,10 @@ def build(with_areas=False, out=None):
         ("Welland Ready-Mix (fictional)", "Plant gate"): ([-0.892004, 52.525043], "Welham Road"),
         ("Earl Shilton Precast Works (fictional)", "Works gate"): ([-1.322679, 52.566067], "Clickers Way (A47)"),
         ("Soar Valley Crane Hire (fictional)", "Depot gate"): ([-1.08357, 52.703875], "Fosse Way"),
+        # 28 Oct 2026 (simulation v2): two points on the lane south of Tilton Compound, read from the demo's own routed
+        # line into the compound on a local copy (R007's last kilometre; Overpass was at capacity that evening)
+        ("Tilton Viaduct site (fictional)", "South lane gate (in)"): ([-0.879952, 52.64273], "the lane south of Tilton Compound"),
+        ("Tilton Viaduct site (fictional)", "South lane gate (out)"): ([-0.883957, 52.642399], "the lane south of Tilton Compound"),
     }
     names = {r["id"]: r["name"] for r in db.query("SELECT id, name FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
     for g in gates.list_gates():
@@ -1187,9 +1219,45 @@ def build(with_areas=False, out=None):
         assert "error" not in z, z
         res = gates.update_gate(g["id"], lat=at[1], lon=at[0], access_zone_id=z["id"])
         assert "error" not in res, res
-    assert z["id"] == "Z026", z
+    assert z["id"] == "Z028", z        # 28 Oct 2026 (simulation v2): + the viaduct site's two gates (Z027, Z028)
 
-    # --- §1.8: the ADVISORY zones of the programme (Z027 on), created after the access roads ----------------------
+    # --- 28 Oct 2026 (simulation v2, task 0e): the viaduct site's INSIDE — its roads, its areas, its speed ---------------
+    # Drawn from the gates' final positions (35 m in from the lane): the top road up to the laydown and down the ramp to
+    # the terrace, a spur to the spoil loading, the exit loop past the wheel wash to the gate out. Roads inside a site
+    # are never spliced into a public route (zones.location_id); the simulation drives them at the site speed.
+    vs = loc["VS"]
+    g_in, g_out = gates.get_gate(G["VS_in"]), gates.get_gate(G["VS_out"])
+    pin, pout = [g_in["lon"], g_in["lat"]], [g_out["lon"], g_out["lat"]]
+    J0, J1, RT, RB = offset(pin, -60, 90), offset(pin, -180, 180), offset(pin, -300, 240), offset(pin, -420, 340)
+    PB, SP, LD = offset(pin, -500, 410), offset(pin, -370, 440), offset(pin, -140, 310)
+    E1, W = offset(pout, 110, 200), offset(pout, 40, 110)
+    for name, pts in (("Tilton Viaduct site: top road and terrace ramp", [pin, J0, J1, RT, RB, PB]),
+                      ("Tilton Viaduct site: spoil spur", [RB, SP]),
+                      ("Tilton Viaduct site: laydown spur", [J1, LD]),
+                      ("Tilton Viaduct site: exit loop", [J0, E1, W, pout])):
+        z = zones.create_zone(name, {"type": "LineString", "coordinates": pts}, kind=zones.HAUL_KIND, location_id=vs,
+                              note="Internal haul road at the site speed (fictional).")
+        assert "error" not in z, z
+    assert z["id"] == "Z032", z
+    def rect(c, w, h):
+        return {"type": "Polygon", "coordinates": [[offset(c, -w / 2, h / 2), offset(c, w / 2, h / 2), offset(c, w / 2, -h / 2),
+                                                    offset(c, -w / 2, -h / 2), offset(c, -w / 2, h / 2)]]}
+    for name, act, mats, mins, bays, level, geom, note in (
+            ("Pier bases", "unload", [READY, BALLAST, SMALL], 5, 1, "river terrace, −8 m", rect(PB, 140, 110),
+             "Concrete to the pump, stone to the piling mat; one pump bay (fictional)."),
+            ("Deck and laydown", "unload", [STEEL, PRECAST, GENERAL], 5, 2, "top of the bank", rect(LD, 120, 90),
+             "Steel, precast and reinforcement off-loaded by the crawler crane; two bays (fictional)."),
+            ("Spoil loading", "load", [EARTH], 10, 1, "river terrace, −8 m", {"type": "Point", "coordinates": SP},
+             "Piling arisings loaded by the 360 (fictional)."),
+            ("Wheel wash", "wash", [], 2, 1, None, {"type": "Point", "coordinates": W}, "Every lorry out (fictional).")):
+        a = site_areas.create_area(vs, name, activity=act, materials=mats, service_minutes=mins, bays=bays, level=level,
+                                   geometry=geom, note=note)
+        assert "error" not in a, a
+    assert a["id"] == "A004", a
+    res = network.set_site_speed(vs, 8.0)         # 5 mph
+    assert "error" not in res, res
+
+    # --- §1.8: the ADVISORY zones of the programme (Z033 on), created after the access roads and the site's inside ---------
     # Advisory: drawn on the map by month and listed in the bulletin's local controls; the router is not told.
     def at_chain(m, east=0.0, north=0.0):
         return offset(point_at(ALIGN_PTS, ALIGN_CHAIN, m), east, north)
