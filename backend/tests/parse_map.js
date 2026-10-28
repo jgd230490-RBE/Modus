@@ -6333,7 +6333,18 @@ function qrRead(mod) {
      && src.includes("slip_road: '#0369A1'") && !/#6D28D9|#4338CA|#7C3AED/.test(src.slice(src.indexOf("const ABN_LINE ="), src.indexOf("function abnormalStaff(")))
      && src.includes("'bridge', ABN_DOT.bridge, 'railway', ABN_DOT.railway, 'level_crossing', ABN_DOT.level_crossing,")
      && src.includes("['bridge', 'bridge'], ['railway', 'railway'], ['level_crossing', 'level crossing'], ['calming', 'traffic calming'], ['overhead', 'overhead line']]")
-     && src.includes("p.source === 'osm' ? 'OpenStreetMap (the community layer’s extract)' : 'the route’s directions'") && src.includes("The structures are OpenStreetMap’s, as fetched."));
+     // REVERSED 28 Oct 2026 (the user: no supplier names on a screen): a map dot says "from the map", and the legend's
+     // "The structures are OpenStreetMap's, as fetched." is gone. Was: "OpenStreetMap (the community layer's extract)".
+     && src.includes("p.source === 'osm' ? 'the map' : 'the route’s directions'") && !src.includes("The structures are OpenStreetMap’s, as fetched."));
+  // 28 Oct 2026: the staff map's abnormal-loads popups and panel name no supplier or back end (the page's rule, PR #146)
+  const abnPop = src.slice(src.indexOf("function abnormalStaff("), src.indexOf("function loadAbnormal() {"));
+  const ABN_BAN = /OpenStreetMap|\bOSM\b|\bHERE\b|community layer|Geofabrik|Fetch now|severity|stored signed|found by Wayscope/;
+  const abnStrs = (abnPop.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n").match(/'[^'\n]*'|`[^`\n]*`|"[^"\n]*"/g) || []);
+  ok("⭐ ABN words: the staff map's abnormal-load popups and panel name no supplier or back end (OpenStreetMap, HERE, the community layer, Fetch now, a severity, 'stored signed limits') — each source in the page's own words",
+     abnPop.length > 2000 && abnStrs.length > 40 && !abnStrs.some(x => ABN_BAN.test(x))
+     && abnPop.includes("· from ${p.source === 'line' ? 'the line' : p.source === 'limits' ? 'a signed limit' : p.source === 'typed' ? 'the planner' : p.source === 'osm' ? 'the map' : 'the route’s directions'}; the route survey decides.")
+     && ABN_BAN.test("OpenStreetMap (the community layer’s extract)") && ABN_BAN.test("the stored signed limits"),
+     abnStrs.filter(x => ABN_BAN.test(x)).slice(0, 4).join(" | "));
 }
 
 
