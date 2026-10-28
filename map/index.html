@@ -1912,6 +1912,10 @@
             const src = out.sources[k];
             if (src && src.type === 'vector') { src.maxzoom = Math.min(Number(src.maxzoom) || OS_MAX_ZOOM, OS_MAX_ZOOM); src.attribution = osCredit(year); n++; }
         });
+        // 28 Oct 2026 (seen on live with a key): OS's style stops its open layers at zoom 16 and starts its detailed ones there,
+        // from tiles the free plan never serves, so past 16 the map was blank but for the land. A cap at or under 16 on a layer
+        // that is on below 16 is lifted: the zoom-15 tiles keep drawing, enlarged, as a classic style does past its last zoom.
+        out.layers.forEach(l => { if (l && l.maxzoom != null && l.maxzoom >= OS_MAX_ZOOM && l.maxzoom <= OS_MAX_ZOOM + 1 && (l.minzoom == null || l.minzoom < OS_MAX_ZOOM + 1)) delete l.maxzoom; });
         return n ? out : null;
     }
     // the tenant's own imagery as a raster basemap: a tile address ({z}/{x}/{y}) or a WMS address ({bbox-epsg-3857})
