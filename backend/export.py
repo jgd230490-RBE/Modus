@@ -421,6 +421,19 @@ def _thin(coords, n=120):
     return [coords[int(round(i * step))] for i in range(n)]
 
 
+def _page_week_days(page):
+    """29 Oct 2026 (task 0c, PR B): the dates of the page's commit week, for week_geometry's diversions; None when the
+    page names no week."""
+    try:
+        import days as _days
+        cw = page.get("commit_week") or (page.get("commit") or {}).get("commit_week") or {}
+        if cw.get("month_index") is None:
+            return None
+        return _days.bucket_dates(int(cw["month_index"]), int(cw["week_index"]))
+    except Exception:
+        return None
+
+
 def route_geometries(page):
     """[(route_id, origin_name, dest_name, [(lon, lat), …])] for the lines on the page —
     the loaded alt-0 geometry for the line's own vehicle, else any baked profile. Since
@@ -430,7 +443,8 @@ def route_geometries(page):
     lines = page.get("commit", {}).get("lines", [])
     out = []
     for g in lookahead.week_geometry([l.get("route_id") for l in lines],
-                                     {l.get("route_id"): (l.get("context") or {}).get("vehicle_type") for l in lines}):
+                                     {l.get("route_id"): (l.get("context") or {}).get("vehicle_type") for l in lines},
+                                     days=_page_week_days(page)):    # 29 Oct 2026 (task 0c, PR B)
         if g.get("geometry") and len(g["geometry"]) >= 2:
             out.append((g["route_id"], g["origin"]["name"], g["dest"]["name"],
                         [(float(p[0]), float(p[1])) for p in g["geometry"]]))
@@ -688,7 +702,8 @@ def _pdf_rows(page):
     lines = page.get("commit", {}).get("lines", [])
     ends = {g["route_id"]: g for g in lookahead.week_geometry(
         [l.get("route_id") for l in lines],
-        {l.get("route_id"): (l.get("context") or {}).get("vehicle_type") for l in lines})}
+        {l.get("route_id"): (l.get("context") or {}).get("vehicle_type") for l in lines},
+        days=_page_week_days(page))}
     out = []
     for l in lines:
         c = l.get("context") or {}

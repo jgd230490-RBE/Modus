@@ -485,13 +485,24 @@ def compute():
     if not prepared:
         return []
     rows = []
+    # 29 Oct 2026 (task 0c, PR B): + every stored option a dated zone's diversion uses, under "R012@1"
+    # (route_choice.leg_key), so a diverted month's km and carbon fall in the councils the diversion crosses
+    try:
+        import route_choice
+        use = route_choice.in_use()
+    except Exception:
+        use = {}
     for g in db.query(
-            "SELECT route_id, vehicle_profile, leg, geometry FROM route_geometry WHERE tenant_id = ? "
-            "AND alt_index = 0 AND geometry IS NOT NULL", (db.current_tenant(),)):
+            "SELECT route_id, vehicle_profile, leg, alt_index, geometry FROM route_geometry WHERE tenant_id = ? "
+            "AND geometry IS NOT NULL", (db.current_tenant(),)):
+        alt = int(g.get("alt_index") or 0)
+        if alt and not any(alt in alts for (rid, prof, lg), alts in use.items()
+                           if rid == g["route_id"] and lg == g["leg"] and prof in (None, "", g["vehicle_profile"])):
+            continue
         pts = road_sections.coords_of(g["geometry"])
         if len(pts) < 2:
             continue
-        key = (g["route_id"], g["vehicle_profile"], g["leg"])
+        key = (g["route_id"] if not alt else f"{g['route_id']}@{alt}", g["vehicle_profile"], g["leg"])
         rows.append(key + (WHOLE_LEG, road_sections.length_km(pts)))
         for a in prepared:
             km = clip_km(pts, a)
@@ -665,8 +676,13 @@ def _month_context(drawn=None):
     areas = stored_areas()
     prepared = [Area(a["area_id"], a["geometry"]) for a in areas]
     sites, sites_placed = _sites_in(prepared)
+    try:
+        import route_choice
+        diverted = {rid for (rid, _p, _l) in route_choice.in_use()}     # 29 Oct 2026 (task 0c, PR B)
+    except Exception:
+        diverted = set()
     return {"drawn": drawn, "clips": clip_table(), "areas": areas, "sites": sites, "sites_placed": sites_placed,
-            "stops": _stops()}
+            "stops": _stops(), "diverted": diverted}
 
 
 def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
@@ -701,14 +717,30 @@ def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
     with_volume = sorted(r for r, pr in per_route.items() if pr["loads"] > 0)
 
     # each route on the profile the map draws it with
+    # 29 Oct 2026 (task 0c, PR B): and in a month a dated zone diverts it, each (laden option, empty option) pair the
+    # month uses with its share of the working days (route_choice.month_weights); a route no zone touches is one pair,
+    # its main lines, the whole month
     legs_of = {}
     not_clipped = []
     for rid in with_volume:
-        prof = (clips.get(rid) or {}).get(drawn.get(rid)) or {}
+        prof_name = drawn.get(rid)
+        prof = (clips.get(rid) or {}).get(prof_name) or {}
         if WHOLE_LEG not in (prof.get("loaded") or {}):
             not_clipped.append(rid)
             continue
-        legs_of[rid] = prof
+        pairs = [((0, 0), 1.0)]
+        if ctx.get("diverted") and rid in ctx["diverted"]:
+            try:
+                import route_choice
+                pairs = route_choice.month_weights(rid, prof_name, int(month))["pairs"]
+            except Exception:
+                pairs = [((0, 0), 1.0)]
+        opts = []
+        for (la, ra), w in pairs:
+            lp = prof if not la else ((clips.get(f"{rid}@{la}") or {}).get(prof_name) or prof)
+            rp = prof if not ra else ((clips.get(f"{rid}@{ra}") or {}).get(prof_name) or prof)
+            opts.append((w, (lp.get("loaded") or {}), (rp.get("return") or {})))
+        legs_of[rid] = opts
 
     out_areas = []
     for a in areas:
@@ -716,29 +748,32 @@ def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
         loads = laden_km = lorry_km = co2 = 0.0
         co2_known, co2_unbaked = False, []
         routes, return_only, edge = [], [], []
-        for rid, prof in legs_of.items():
-            lin = (prof.get("loaded") or {}).get(aid, 0.0)
-            rin = (prof.get("return") or {}).get(aid, 0.0)
-            if lin <= 0 and rin <= 0:
+        for rid, opts in legs_of.items():
+            # one (share, laden clip, empty clip) a pair of options the month uses; a route no zone touches has one
+            w_in = sum(w for w, L, Rt in opts if L.get(aid, 0.0) >= ENTER_KM)
+            touched = [(w, L.get(aid, 0.0), Rt.get(aid, 0.0), L, Rt) for w, L, Rt in opts
+                       if L.get(aid, 0.0) > 0 or Rt.get(aid, 0.0) > 0]
+            if not touched:
                 continue
             ld = per_route[rid]["loads"]
-            if lin >= ENTER_KM:
+            if w_in > 0:
                 routes.append(rid)
-                loads += ld                         # one load = one two-way movement, laden leg only
-            elif lin <= 0 and rin >= ENTER_KM:
+                loads += ld * w_in                  # one load = one two-way movement, laden leg only
+            elif all(lin <= 0 and rin >= ENTER_KM for _w, lin, rin, _L, _R in touched):
                 return_only.append(rid)             # empties only: no movement added
             else:
                 edge.append(rid)                    # under 200 m inside: km and carbon, no movement
-            laden_km += ld * lin
-            lorry_km += ld * (lin + rin)
+            laden_km += ld * sum(w * lin for w, lin, _rin, _L, _R in touched)
+            lorry_km += ld * sum(w * (lin + rin) for w, lin, rin, _L, _R in touched)
             c = route_co2(rid)
             if c is None:
                 co2_unbaked.append(rid)
                 continue
-            two_way = (prof.get("loaded") or {}).get(WHOLE_LEG, 0.0) + (prof.get("return") or {}).get(WHOLE_LEG, 0.0)
-            if two_way > 0:
-                co2 += c * (lin + rin) / two_way
-                co2_known = True
+            for w, lin, rin, L, Rt in touched:
+                two_way = L.get(WHOLE_LEG, 0.0) + Rt.get(WHOLE_LEG, 0.0)
+                if two_way > 0:
+                    co2 += c * w * (lin + rin) / two_way
+                    co2_known = True
         has_volume = bool(routes or return_only or edge)
         co2_val = None if co2_failed else (round(co2, 3) if (co2_known or not has_volume) else None)
         out_areas.append({

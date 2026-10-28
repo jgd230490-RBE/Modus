@@ -452,15 +452,29 @@ def replace_all(records, fetched_at):
     return len(rows)
 
 
-def along(c):
+def _in_use_keys():
+    """29 Oct 2026 (task 0c, PR B): the stored options a dated zone's diversion USES ("R012@1"): lorries drive them in
+    those months, so a collision near one is along a route, not near an unused alternative."""
+    try:
+        import route_choice
+        return route_choice.in_use_keys()
+    except Exception:
+        return set()
+
+
+def along(c, in_use=None):
     """'route' when a collision is near a PRIMARY road route (the ones the map draws) or a site; 'alternative' when it is
     near a stored alternative only (16 Oct 2026, found on live: 1,013 of 1,887 were, and the map drew them on roads it
     shows no route on). The map, the counts and the CLP plans use 'route'; the alternatives' show with the map's
-    Alternative routes layer, and each route's evidence sheet sets the alternatives in their own columns."""
-    return "route" if (c.get("sites") or any("@" not in k for k in c.get("routes") or {})) else "alternative"
+    Alternative routes layer, and each route's evidence sheet sets the alternatives in their own columns.
+    29 Oct 2026 (task 0c, PR B): a stored option a diversion uses (`in_use`, route_choice.in_use_keys) counts as a
+    route — its key keeps its "@", so each route's evidence still sets it in its own column."""
+    in_use = _in_use_keys() if in_use is None else in_use
+    return "route" if (c.get("sites") or any(("@" not in k) or (k in in_use) for k in c.get("routes") or {})) \
+        else "alternative"
 
 
-def _load(r):
+def _load(r, in_use=None):
     c = dict(r)
     for k, dflt in (("vru_json", []), ("vru_ksi_json", []), ("routes_json", {}), ("sites_json", {}), ("detail_json", {})):
         try:
@@ -469,16 +483,17 @@ def _load(r):
             c[k[:-5]] = dflt
     c["goods"] = bool(c.get("goods"))
     c["ksi"] = c.get("severity") in (1, 2)
-    c["along"] = along(c)
+    c["along"] = along(c, in_use)
     return c
 
 
 def records(route_keys=None):
     """The stored collisions (dicts, newest first). With route_keys, only those near at least one of them."""
     out = []
+    in_use = _in_use_keys()          # 29 Oct 2026 (task 0c, PR B): read once, not once a record
     for r in db.query("SELECT * FROM collision_records WHERE tenant_id = ? ORDER BY year DESC, month DESC, collision_id",
                       (db.current_tenant(),)):
-        c = _load(r)
+        c = _load(r, in_use)
         if route_keys is not None and not any(k in c["routes"] for k in route_keys):
             continue
         out.append(c)
@@ -492,6 +507,7 @@ def status():
     # stored alternative only are counted apart (alternatives_only)
     n = {"all": 0, "ksi": 0, "vru": 0}
     alt = {"all": 0, "ksi": 0}
+    in_use = _in_use_keys()          # 29 Oct 2026 (task 0c, PR B)
     for r in db.query("SELECT severity, vru_json, routes_json, sites_json FROM collision_records WHERE tenant_id = ?",
                       (db.current_tenant(),)):
         try:
@@ -499,7 +515,7 @@ def status():
         except (TypeError, ValueError):
             c = {"routes": {}, "sites": {}}
         ksi = r["severity"] in (1, 2)
-        if along(c) == "alternative":
+        if along(c, in_use) == "alternative":
             alt["all"] += 1
             alt["ksi"] += 1 if ksi else 0
             continue

@@ -168,7 +168,7 @@ def account_stock(pm, pw):
     return out
 
 
-def week_geometry(route_ids, vehicles=None):
+def week_geometry(route_ids, vehicles=None, days=None):
     """
     10 Sep — the Commit view's map and the PDF's map read this. For each route id (in the
     order given): the LOADED alt-0 geometry baked for that line's vehicle, else any baked
@@ -176,6 +176,9 @@ def week_geometry(route_ids, vehicles=None):
     geometry is returned with `geometry: null` — drawn as nothing, never as a straight
     line pretending to be a road. Not a page read: three small queries, whatever the
     number of lines.
+
+    29 Oct 2026 (task 0c, PR B): with `days` (the week's dates), a route a dated zone diverts on most of them is drawn
+    on that diversion (route_choice.majority_alt) and its distance is the diversion's.
     """
     ids = [r for r in dict.fromkeys(route_ids or []) if r]
     if not ids:
@@ -191,12 +194,23 @@ def week_geometry(route_ids, vehicles=None):
         locs = {l["id"]: l for l in db.query(
             f"SELECT id, name, loc_type, lat, lon FROM locations WHERE tenant_id = ? AND id IN ({lm})",
             (db.current_tenant(), *loc_ids))}
-    geo = {}
+    geo, alts = {}, {}
     for g in db.query(
-            f"SELECT route_id, vehicle_profile, geometry, distance_km FROM route_geometry "
-            f"WHERE tenant_id = ? AND leg = 'loaded' AND alt_index = 0 AND geometry IS NOT NULL "
+            f"SELECT route_id, vehicle_profile, alt_index, geometry, distance_km FROM route_geometry "
+            f"WHERE tenant_id = ? AND leg = 'loaded' AND geometry IS NOT NULL "
             f"AND route_id IN ({marks})", (db.current_tenant(), *ids)):
-        geo.setdefault(g["route_id"], {})[g["vehicle_profile"]] = g
+        if int(g.get("alt_index") or 0):
+            alts[(g["route_id"], g["vehicle_profile"], int(g["alt_index"]))] = g
+        else:
+            geo.setdefault(g["route_id"], {})[g["vehicle_profile"]] = g
+    if days and alts:
+        import route_choice
+        wd = route_choice.working_days(days)
+        for rid, per in geo.items():
+            for prof in list(per):
+                a = route_choice.majority_alt(rid, prof, "loaded", wd)
+                if a and (rid, prof, a) in alts:
+                    per[prof] = alts[(rid, prof, a)]
 
     def end(loc_id):
         l = locs.get(loc_id) or {}
