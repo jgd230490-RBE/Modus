@@ -527,6 +527,35 @@ def default_departure_times(now=None, country=None):
              for (h, m) in _DEFAULT_HOURS], note)
 
 
+# 29 Oct 2026 (D94, task 0f): the bake's PINNED departure time. Until now no bake sent one, so every stored line was
+# HERE's "now" at the minute Route all ran. Measured on live 28 Oct (notes/busy-hours-0f-mockup-1028/probe-20261028.txt):
+# a Route all at 21:30 UTC stored evening roads on R001 / R010, 23-48 % longer than HERE's road at every weekday hour
+# 06:00-18:00. The bake now asks for a typical weekday mid-morning: the next Tuesday at least BAKE_LEAD_DAYS ahead, 10:00
+# in the tenant's time zone (Tuesday and Thursday agreed within 2.3 % in the same probe).
+BAKE_WEEKDAY = 1          # Monday = 0
+BAKE_HOUR = 10
+BAKE_LEAD_DAYS = 2
+
+
+def bake_departure_time(now=None, country=None):
+    """The ISO departure time every bake sends (D94): the next Tuesday at least two days ahead, 10:00 local time.
+    UTC when the tenant's country has no known zone (as default_departure_times)."""
+    now = now or datetime.now(timezone.utc)
+    country = (country if country is not None else _tenant_country()) or ""
+    zone = COUNTRY_TZ.get(str(country).upper())
+    try:
+        if not zone:
+            raise LookupError("no zone for this country")
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(zone)
+    except Exception:
+        tz = timezone.utc
+    day = now.astimezone(tz).date() + timedelta(days=BAKE_LEAD_DAYS)
+    while day.weekday() != BAKE_WEEKDAY:
+        day += timedelta(days=1)
+    return datetime(day.year, day.month, day.day, BAKE_HOUR, 0, tzinfo=tz).isoformat()
+
+
 # 29 Oct 2026 (task 0f-1a): under this spread of the first option's time across the pinned hours a leg reads as flat
 # (the reading rule fixed before the run, notes/busy-hours-0f-mockup-1028/README.md)
 FLAT_SPREAD_PCT = 2.0

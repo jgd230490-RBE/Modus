@@ -374,7 +374,7 @@ WAY = [[-1.0, LAT], [-0.95, LAT - 0.01], [-0.9, LAT]]
 
 
 def _fake_routes(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_areas=None, alternatives=1, laden=True,
-                 via=None, pass_through=False):
+                 via=None, pass_through=False, departure_time=None):   # 29 Oct (D94): the bake now pins a time
     CALLS.append({"avoid": list(avoid_areas or []), "alternatives": alternatives})
     line = WAY if o_lon < d_lon else list(reversed(WAY))
     return [{"geometry": line, "distance_km": 8.5, "duration_hr": 0.23, "sections": []}]

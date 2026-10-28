@@ -606,7 +606,7 @@ here_routing.configured = lambda: True
 
 
 def _fake_routes(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_areas=None,
-                 alternatives=1, laden=True):
+                 alternatives=1, laden=True, departure_time=None):   # 29 Oct (D94): the bake now pins a time
     _calls.append({"avoid": avoid_areas, "laden": laden, "profile": profile})
     return [{"geometry": [[24.30, 58.30], [24.70, 58.70]],
              "distance_km": 55.0, "duration_hr": 1.1}]
