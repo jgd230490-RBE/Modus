@@ -527,8 +527,13 @@ def default_departure_times(now=None, country=None):
              for (h, m) in _DEFAULT_HOURS], note)
 
 
+# 29 Oct 2026 (task 0f-1a): under this spread of the first option's time across the pinned hours a leg reads as flat
+# (the reading rule fixed before the run, notes/busy-hours-0f-mockup-1028/README.md)
+FLAT_SPREAD_PCT = 2.0
+
+
 def departure_probe(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_areas=None,
-                    laden=True, times=None, alternatives=1, now=None):
+                    laden=True, times=None, alternatives=1, now=None, route_fn=None):
     """
     Does HERE's answer for one leg depend on the departure time we do not send?
 
@@ -544,6 +549,13 @@ def departure_probe(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_are
 
     The verdict block states only what was measured, plus one conditional reading. It
     cannot prove WHY an answer moved -- only that it did, or did not, under these inputs.
+
+    29 Oct 2026 (task 0f-1a): `route_fn(departure_time)`, when given, is the call each row makes instead of routes() --
+    network.departure_diagnostics passes the BAKE's own call (haul.route_with_haul through the gate access roads), so
+    a row answers the request the bake sends, at that hour. Every row now lists every option HERE gave
+    (`option_list`), and the summary reads the TIMES as well as the roads: `time_spread_pct` (the first option's
+    spread across the pinned hours), `times_read_as`, `option_sets_agree` (the same roads came back at every pinned
+    hour, in any order) and `quicker_than_first` (the hours at which an option HERE did not rank first was quicker).
     """
     times = list(times) if times else None
     tz_note = None
@@ -553,19 +565,29 @@ def departure_probe(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_are
     def one(label, dep):
         row = {"label": label, "departure_time": dep}
         try:
-            opts = routes(o_lat, o_lon, d_lat, d_lon, profile, factors,
-                          avoid_areas=avoid_areas, alternatives=alternatives,
-                          laden=laden, departure_time=dep)
+            if route_fn is not None:
+                opts = route_fn(dep)
+            else:
+                opts = routes(o_lat, o_lon, d_lat, d_lon, profile, factors,
+                              avoid_areas=avoid_areas, alternatives=alternatives,
+                              laden=laden, departure_time=dep)
             best = opts[0]
             row.update({"distance_km": best["distance_km"],
                         "duration_hr": best["duration_hr"],
                         "sections": len(best.get("sections") or []),
                         "options": len(opts),
                         "fingerprint": _fingerprint(best.get("geometry")),
+                        "option_list": [{"rank": i, "distance_km": o.get("distance_km"),
+                                         "duration_hr": o.get("duration_hr"),
+                                         "duration_hr_here": o.get("duration_hr_here"),
+                                         "fingerprint": _fingerprint(o.get("geometry"))}
+                                        for i, o in enumerate(opts)],
+                        "here_calls": best.get("haul_calls", 1),
                         "error": None})
         except Exception as e:
             row.update({"distance_km": None, "duration_hr": None, "sections": None,
-                        "options": 0, "fingerprint": None, "error": str(e)[:300]})
+                        "options": 0, "fingerprint": None, "option_list": [], "here_calls": None,
+                        "error": str(e)[:300]})
         return row
 
     rows = [one("control_before", None), one(TIME_ANY, TIME_ANY)]
@@ -588,6 +610,28 @@ def departure_probe(o_lat, o_lon, d_lat, d_lon, profile, factors=None, avoid_are
         "pinned_all_agree": len(prints) <= 1,
         "distinct_geometries": len({r["fingerprint"] for r in rows if r["fingerprint"]}),
     }
+    # 29 Oct 2026 (task 0f-1a): the times, which the verdict below never looked at (16 Oct, R010: "conditions are flat"
+    # while the hours moved 14-16 %). `hours` = the pinned clock times only, not `any`.
+    hours = [r for r in pinned if r["label"] != TIME_ANY and r.get("duration_hr")]
+    if hours:
+        lo, hi = min(r["duration_hr"] for r in hours), max(r["duration_hr"] for r in hours)
+        spread = round((hi - lo) / lo * 100.0, 1) if lo else None
+        out["time_spread_pct"] = spread
+        out["times_read_as"] = (
+            "flat: the first option's time moves under %.0f %% across the hours tried" % FLAT_SPREAD_PCT
+            if spread is not None and spread < FLAT_SPREAD_PCT else
+            f"moving: the first option's time moves {spread} % across the hours tried")
+        sets = [frozenset(o["fingerprint"] for o in r.get("option_list") or [] if o.get("fingerprint")) for r in hours]
+        out["option_sets_agree"] = len(set(sets)) <= 1
+        out["quicker_than_first"] = [
+            r["label"] for r in hours
+            if any(o["rank"] > 0 and o.get("duration_hr") is not None and o["duration_hr"] < r["duration_hr"]
+                   for o in r.get("option_list") or [])]
+    else:
+        out["time_spread_pct"] = None
+        out["times_read_as"] = "not measured: no pinned hour produced a time"
+        out["option_sets_agree"] = None
+        out["quicker_than_first"] = []
     if not control_stable:
         out["reads_as"] = ("🔴 the UNPINNED answer changed during the experiment itself, so "
                            "nothing below is attributable to departureTime. Re-run.")

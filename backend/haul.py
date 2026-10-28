@@ -392,8 +392,14 @@ def _speed_hr(length_km, speed_kph):
     return (length_km / speed_kph) if (speed_kph and speed_kph > 0) else None
 
 
+def _dep(departure_time):
+    """29 Oct 2026 (task 0f-1a): the departure time as a keyword for here_routing.routes(), or nothing at all, so a
+    call without a time (every bake) is exactly the call it was before."""
+    return {"departure_time": departure_time} if departure_time else {}
+
+
 def route_with_haul(o_lat, o_lon, d_lat, d_lon, profile, steps, factors=None,
-                    avoid_areas=None, laden=True, alternatives=1):
+                    avoid_areas=None, laden=True, alternatives=1, departure_time=None):
     """
     One leg, routed through its haul roads. Returns a list shaped exactly like
     here_routing.routes() so _bake_leg does not need to know which path it took, plus
@@ -421,31 +427,35 @@ def route_with_haul(o_lat, o_lon, d_lat, d_lon, profile, steps, factors=None,
     between them, so there is no cross product: HERE's own alternatives on that middle call are spliced between the
     same two access roads (_route_access_alternatives), ranked as HERE ranks them. Without this, every route lost its
     alternatives the day every gate got an access road (16 Oct), and the collision evidence its side-by-side columns.
+
+    29 Oct 2026 (task 0f-1a): `departure_time` reaches every HERE call of the leg, so the departure check replays the
+    bake's own request at a chosen hour. None (what the bake sends) keeps every call exactly as before: no departureTime.
     """
     if not steps:
         return here_routing.routes(o_lat, o_lon, d_lat, d_lon, profile, factors,
                                    avoid_areas=avoid_areas, alternatives=alternatives,
-                                   laden=laden)
+                                   laden=laden, **_dep(departure_time))
     if alternatives and alternatives > 1 and access_roads_only(steps):
         return _route_access_alternatives(o_lat, o_lon, d_lat, d_lon, profile, steps,
-                                          factors, avoid_areas, laden, alternatives)
+                                          factors, avoid_areas, laden, alternatives,
+                                          departure_time=departure_time)
 
     via_steps = [s for s in steps if s["mode"] == "via"]
     splice_steps = [s for s in steps if s["mode"] != "via"]
 
     if via_steps and not splice_steps:
         return _route_all_via(o_lat, o_lon, d_lat, d_lon, profile, steps,
-                              factors, avoid_areas, laden)
+                              factors, avoid_areas, laden, departure_time=departure_time)
     if splice_steps and not via_steps:
         return _route_all_splice(o_lat, o_lon, d_lat, d_lon, profile, steps,
-                                 factors, avoid_areas, laden)
+                                 factors, avoid_areas, laden, departure_time=departure_time)
     # Mixed modes on one leg. Splicing wins: every road is spliced, including the ones
     # marked 'via'. Interleaving the two would need the via road to be reached by a
     # sub-call that itself carries vias, and the section indices that the via speed
     # substitution reads would no longer line up with the roads they belong to. Reported
     # rather than silently downgraded.
     res = _route_all_splice(o_lat, o_lon, d_lat, d_lon, profile, steps,
-                            factors, avoid_areas, laden)
+                            factors, avoid_areas, laden, departure_time=departure_time)
     res[0]["haul_note"] = (
         f"{len(via_steps)} haul road(s) on this leg are set to 'via' mode but were "
         f"spliced instead: modes cannot be mixed on one leg.")
@@ -453,7 +463,7 @@ def route_with_haul(o_lat, o_lon, d_lat, d_lon, profile, steps, factors=None,
 
 
 def _route_all_splice(o_lat, o_lon, d_lat, d_lon, profile, steps,
-                      factors, avoid_areas, laden):
+                      factors, avoid_areas, laden, departure_time=None):
     """
     Origin -> entry1, [drawn road 1], exit1 -> entry2, [drawn road 2], ... -> destination.
 
@@ -470,7 +480,8 @@ def _route_all_splice(o_lat, o_lon, d_lat, d_lon, profile, steps,
         # 16 Oct 2026: a gate's access road starts at the gate the leg leaves from — no HERE call from a point to itself
         if _metres(cur_lat, cur_lon, e_lat, e_lon) > SAME_POINT_M:
             r = here_routing.routes(cur_lat, cur_lon, e_lat, e_lon, profile, factors,
-                                    avoid_areas=avoid_areas, alternatives=1, laden=laden)[0]
+                                    avoid_areas=avoid_areas, alternatives=1, laden=laden,
+                                    **_dep(departure_time))[0]
             calls += 1
             coords = _join(coords, r["geometry"])
             dist += r["distance_km"]
@@ -499,7 +510,8 @@ def _route_all_splice(o_lat, o_lon, d_lat, d_lon, profile, steps,
     # ...and ends at the gate the leg arrives at: no HERE call from the end of its access road to the gate
     if _metres(cur_lat, cur_lon, d_lat, d_lon) > SAME_POINT_M:
         r = here_routing.routes(cur_lat, cur_lon, d_lat, d_lon, profile, factors,
-                                avoid_areas=avoid_areas, alternatives=1, laden=laden)[0]
+                                avoid_areas=avoid_areas, alternatives=1, laden=laden,
+                                    **_dep(departure_time))[0]
         calls += 1
         coords = _join(coords, r["geometry"])
         dist += r["distance_km"]
@@ -534,7 +546,7 @@ def access_roads_only(steps):
 
 
 def _route_access_alternatives(o_lat, o_lon, d_lat, d_lon, profile, steps,
-                               factors, avoid_areas, laden, alternatives):
+                               factors, avoid_areas, laden, alternatives, departure_time=None):
     """
     17 Oct 2026 (D109). [access road out] + HERE's options from its road end to the next access road's road end +
     [access road in]: one option per HERE alternative on that one middle call, each spliced between the same two drawn
@@ -550,7 +562,8 @@ def _route_access_alternatives(o_lat, o_lon, d_lat, d_lon, profile, steps,
         nonlocal calls
         calls += 1
         return here_routing.routes(a_lat, a_lon, b_lat, b_lon, profile, factors,
-                                   avoid_areas=avoid_areas, alternatives=1, laden=laden)[0]
+                                   avoid_areas=avoid_areas, alternatives=1, laden=laden,
+                                    **_dep(departure_time))[0]
 
     def _road(s, acc):
         hr = _speed_hr(s["length_km"], s["speed_kph"])
@@ -584,7 +597,8 @@ def _route_access_alternatives(o_lat, o_lon, d_lat, d_lon, profile, steps,
     end_lat, end_lon = arr["entry"] if arr else (d_lat, d_lon)
     if _metres(cur_lat, cur_lon, end_lat, end_lon) > SAME_POINT_M:
         middles = here_routing.routes(cur_lat, cur_lon, end_lat, end_lon, profile, factors,
-                                      avoid_areas=avoid_areas, alternatives=alternatives, laden=laden)
+                                      avoid_areas=avoid_areas, alternatives=alternatives, laden=laden,
+                                      **_dep(departure_time))
         calls += 1
     else:
         middles = [None]
@@ -618,7 +632,7 @@ def _route_access_alternatives(o_lat, o_lon, d_lat, d_lon, profile, steps,
 
 
 def _route_all_via(o_lat, o_lon, d_lat, d_lon, profile, steps,
-                   factors, avoid_areas, laden):
+                   factors, avoid_areas, laden, departure_time=None):
     """
     One HERE call, each road's entry and exit sent as STOPOVER via-waypoints.
 
@@ -639,7 +653,7 @@ def _route_all_via(o_lat, o_lon, d_lat, d_lon, profile, steps,
         via.append(s["exit"])
     opts = here_routing.routes(o_lat, o_lon, d_lat, d_lon, profile, factors,
                                avoid_areas=avoid_areas, alternatives=1, laden=laden,
-                               via=via, pass_through=False)
+                               via=via, pass_through=False, **_dep(departure_time))
     best = opts[0]
     secs = best.get("sections") or []
     expected = len(via) + 1
