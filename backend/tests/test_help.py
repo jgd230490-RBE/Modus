@@ -752,8 +752,16 @@ _ws_hits = sorted(set(m.group(0) for m in _WS_BAN.finditer(_ws_text)))
 ok("⭐ words sweep: no back-end word anywhere in the user guide, the troubleshooter's answers included (%d characters read)"
    % len(_ws_text), len(_ws_text) > 100000 and len(_ws_ts) > 2000 and not _ws_hits)
 _ws_here = re.findall(r".{0,40}\bHERE\b.{0,40}", _ws_text)
-ok("...HERE is named only as A.1's source (the source table row and its limits cell): %d mentions" % len(_ws_here),
-   0 < len(_ws_here) <= 4 and all(("HERE Routing (lorry profile)" in h or "HERE's road map" in h or "HERE's line" in h) for h in _ws_here))
+# REVERSED 28 Oct 2026 (the user: no supplier names in the user guide; mockup notes\config-sources-mockup-1028): A.1 no longer
+# names HERE (nor Google or Mapbox): "Lorry routing", "Street-level photos", "The base maps". Was: HERE named in A.1 only.
+_ug_src = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+_ug_src_a1 = _ug_src[_ug_src.index('<h2 id="a-1-data-sources">'):_ug_src.index('<h2 id="a-2-planning-assumptions">')]
+ok("...HERE is named nowhere in the user guide, A.1 included (%d mentions); A.1 says lorry routing, street-level photos and the base maps" % len(_ws_here),
+   len(_ws_here) == 0 and "Lorry routing (lorry profile)" in _ug_src_a1 and "Street-level photos" in _ug_src_a1
+   and "The base maps, and a national aerial photo where one is published" in _ug_src_a1
+   and not re.search(r"Google Street View|Mapbox|HERE Routing", _ug_src_a1)
+   # the government and National Highways sources stay (Q1): the appendix is where a figure's source is quoted
+   and "UK Government greenhouse gas conversion factors 2026 (DESNZ)" in _ug_src_a1 and "National Highways Carbon Tool v2.7" in _ug_src_a1)
 ok("...and the rule would catch the old words (the troubleshooter's 'baked', the routing service, the database reads)",
    all(_WS_BAN.search(x) for x in ("That route has not been baked", "the routing service offered", "small database reads",
                                    "Probe HERE runs a live routing call", "POST /api/admin/tenant/import")))

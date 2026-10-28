@@ -176,6 +176,15 @@ the country's set in one click when the figures differ. Each coefficient's sourc
 
 <h2 id="t1-baf">Fuel index and fuel surcharge (BAF)</h2>
 <ul>
+<li id="t1-config-words"><strong>What Config and the fuel strip leave out (28 Oct 2026; the user: no supplier or data-set
+names on a screen).</strong> The fuel strip (Config, Look-ahead Commit and Account) says &ldquo;Weekly UK pump price&rdquo; for
+DESNZ's weekly road fuel prices (gov.uk) and &ldquo;Weekly EU price&rdquo; for the EU Weekly Oil Bulletin
+(<code>FUEL_PROVIDER_WORDS</code>; the provider's own label stays in <code>/fuel-index</code> and on the documents). Config &rarr;
+Costing &middot; fuel's hints name no study: L/100 km per tonne carried &ldquo;typically 0.4&ndash;0.95&rdquo; is DfT's payload
+study; the rigid empty figure is the DESNZ 2026 factor (checked 9 Oct 2026); the artic empty figure is ICCT's 34 L/100 km
+laden less 0.4 &times; 26 t; the winter uplift's &ldquo;cars use about 15 % more at &minus;7 &deg;C&rdquo; is the US DOE
+(fueleconomy.gov, cold weather). The user guide's A.1 names lorry routing, the street-level photos and the base maps
+without the company: they are HERE Routing v8 (T2), Google Street View and Mapbox.</li>
 <li><strong>The index.</strong> Great Britain: DESNZ's weekly road fuel prices (ULSD pump price, incl. duty and VAT; the
 widget also shows it ex-VAT). EU countries: the EU Weekly Oil Bulletin. Refreshed in the background, never on a page read;
 an admin can press &ldquo;Fetch this week's DESNZ price now&rdquo; / &ldquo;Get this week's price now&rdquo;. A failed
@@ -618,6 +627,11 @@ own account, never in the repository. Give each new organisation's deployment fr
 </tbody></table></div>
 
 <h1 id="t8-community">T8 The community considerations layer</h1>
+<p id="t8-config-words">Config &rarr; Map and bulletin names each source in plain words (28 Oct 2026, <code>COMM_SOURCE_WORDS</code>):
+&ldquo;Places and homes&rdquo; = OpenStreetMap, &ldquo;Bridges, crossings and limits&rdquo; = OpenStreetMap's second pass
+(<code>osm_structures</code>), &ldquo;Schools&rdquo; = DfE Get Information about Schools, &ldquo;Bus stops and stations&rdquo; =
+DfT NaPTAN. Config no longer prints the credit line; the licence credits are on the Route map layer (its attribution) and
+on every PDF that draws the layer (<code>community.credit_line</code>). A source's error is not shown on the page.</p>
 <p>Staff only (14 Oct 2026). <code>GET /api/community</code> serves what is stored as one GeoJSON FeatureCollection with the
 kinds, each source's date and the credit line; <code>GET /api/community/status</code> the same without the features. Both
 answer 401 to the map password's cookie and to no credential. <code>POST /api/community/refresh</code> (a planner or an
@@ -642,6 +656,10 @@ in its package. A download that arrives short is resumed with a Range request wh
 handed to curl (on 14 Oct 2026 Python's own reads were cut short on the build laptop, not curl's).</p>
 
 <h1 id="t9-collisions">T9 The collision history (CLOCS v5 C1)</h1>
+<p id="t9-config-words">Config &rarr; Map and bulletin says &ldquo;injury collisions reported to the police&rdquo; (28 Oct 2026):
+the data is DfT's road safety data (STATS19). Config no longer prints the credit line; it is on the Route map layer and on
+the Route collision evidence. A traffic-count failure reads &ldquo;could not be read just now&rdquo;; the reason goes to the
+server log (<code>🚧 collisions</code>).</p>
 <p>Staff only (16 Oct 2026). <code>GET /api/collisions</code> serves what is stored as one GeoJSON FeatureCollection (year and month,
 never the day or time) with the years held and the credit line; <code>GET /api/collisions/status</code> the same without the
 features. Both answer 401 to the map password's cookie and to no credential. <code>POST /api/collisions/refresh</code> (a

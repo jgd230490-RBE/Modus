@@ -487,7 +487,7 @@ def refresh(by=None, fetchers=None, strip=None, today=None, sources=SOURCE_ORDER
         _write_meta("failed", det)
         return status()
     if not strip.lines:
-        det["notes"].append("No route has a stored road route yet, so only the sites were searched round.")
+        det["notes"].append("No route is routed yet, so only the sites were searched round.")
     workdir = tempfile.mkdtemp(prefix="wayscope_community_")
     ok_any = False
     try:

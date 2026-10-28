@@ -3873,6 +3873,9 @@ function App(){
 // and from what, the count of each kind, the credit line, and "Fetch again" for a planner or an admin. The fetch reads
 // three public sources along the routes as they are stored now and takes a few minutes; the page asks every 5 s while it
 // runs. The layer itself is on the Route map (staff only) and on the three route map plans.
+// 28 Oct 2026 (the user: no supplier or data-set names on a screen; mockup notes\config-sources-mockup-1028): each source in
+// plain words; the names, licences and credit lines are in the technical guide, T8, and on the map layer and the PDFs
+const COMM_SOURCE_WORDS = { osm: "Places and homes", osm_structures: "Bridges, crossings and limits", gias: "Schools", naptan: "Bus stops and stations" };
 function CommunityPanel({ access }){
   const [st, setSt] = useState(null);
   const [msg, setMsg] = useState("");
@@ -3900,17 +3903,16 @@ function CommunityPanel({ access }){
         <>
           <p className="text-[14px] text-slate-700 mb-2" data-community-state={st.state}>
             {st.state === "running" ? "Fetching now…" : st.fetched_at ? `Fetched ${day(st.fetched_at)}${st.by ? ` by ${st.by}` : ""}.` : "Not fetched yet."}
-            {st.error ? <span className="text-amber-700" title={st.error}> The last fetch did not finish; the earlier data is kept.</span> : null}
+            {st.error ? <span className="text-amber-700"> The last fetch did not finish; the earlier data is kept.</span> : null}
           </p>
           <table className="tbl text-[14px] mb-2">
-            <thead><tr><th scope="col">Source</th><th scope="col">Data as at</th><th scope="col" className="num">Items</th></tr></thead>
+            <thead><tr><th scope="col">Data</th><th scope="col">Data as at</th><th scope="col" className="num">Items</th></tr></thead>
             <tbody>{st.sources.map(s => (
-              <tr key={s.key}><td>{s.name}{s.error ? <div className="text-amber-700 text-[13px]" title={s.error}>Could not fetch {s.name}.</div> : null}</td>
+              <tr key={s.key}><td>{COMM_SOURCE_WORDS[s.key] || s.name}{s.error ? <div className="text-amber-700 text-[13px]">Could not fetch {COMM_SOURCE_WORDS[s.key] || s.name}.</div> : null}</td>
                 <td>{day(s.data_date || s.fetched_at)}</td><td className="num tabular-nums">{s.count == null ? "—" : grp(s.count, 0)}</td></tr>
             ))}</tbody>
           </table>
           <p className="text-[13px] text-slate-500 mb-3">{st.kinds.map(k => `${k.label} ${grp(k.count, 0)}`).join(" · ")}</p>
-          {st.credit ? <p className="text-[13px] text-slate-500 mb-3">{st.credit}</p> : null}
           {canFetch
             ? <button type="button" className="btn-sec" disabled={st.state === "running"} onClick={start}>{st.fetched_at ? "Fetch again" : "Fetch now"}</button>
             : <p className="text-[13px] text-slate-500">A planner or an admin fetches it.</p>}
@@ -3948,16 +3950,15 @@ function CollisionPanel({ access }){
   return (
     <div className="mt-6 pt-5 border-t border-slate-200" data-cfg="collisions">
       <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Collision history</h3>
-      <p className="text-[14px] text-slate-600 mb-3">Injury collisions from DfT road safety data, five years, within {st ? st.strip.route_m : 250} m of a route, the abnormal loads' too, and {st ? st.strip.site_m : 500} m of a site. Evidence, not the assessment. Staff only. Fetch again after changing routes, and each August.</p>
+      <p className="text-[14px] text-slate-600 mb-3">Injury collisions reported to the police, five years, within {st ? st.strip.route_m : 250} m of a route, the abnormal loads' too, and {st ? st.strip.site_m : 500} m of a site. Evidence, not the assessment. Staff only. Fetch again after changing routes, and each August.</p>
       {!st ? <p className="text-[14px] text-slate-500">Reading…</p> : (
         <>
           <p className="text-[14px] text-slate-700 mb-2" data-collision-state={st.state}>
             {st.state === "running" ? "Fetching now…" : st.fetched_at ? `Fetched ${day(st.fetched_at)}${st.by ? ` by ${st.by}` : ""}: ${st.period}.` : "Not fetched yet."}
-            {st.error ? <span className="text-amber-700" title={st.error}> The last fetch did not finish; the earlier data is kept.</span> : null}
+            {st.error ? <span className="text-amber-700"> The last fetch did not finish; the earlier data is kept.</span> : null}
           </p>
           {st.fetched_at ? <p className="text-[13px] text-slate-500 mb-2">{grp(st.counts.all, 0)} collisions along the routes and round the sites, {grp(st.counts.ksi, 0)} of them killed or seriously injured, {grp(st.counts.vru, 0)} with a vulnerable road user hurt.{st.alternatives_only && st.alternatives_only.all ? ` Another ${grp(st.alternatives_only.all, 0)} (${grp(st.alternatives_only.ksi, 0)} killed or seriously injured) are near alternative routes only.` : ""}</p> : null}
           {(st.notes || []).map((n, i) => <p key={i} className="text-[13px] text-slate-500 mb-2">{n}</p>)}
-          {st.credit ? <p className="text-[13px] text-slate-500 mb-3">{st.credit}</p> : null}
           {canFetch
             ? <button type="button" className="btn-sec" disabled={st.state === "running"} onClick={start}>{st.fetched_at ? "Fetch again" : "Fetch now"}</button>
             : <p className="text-[13px] text-slate-500">A planner or an admin fetches it.</p>}
@@ -7313,22 +7314,22 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
         <label className="block">
           <span className="block text-sm font-medium text-slate-700 mb-1">L/100 km per tonne carried</span>
           <input className={inp + " mt-1"} inputMode="decimal" value={cons.l_per_100km_per_tonne ?? ""} onChange={e => set(f => { f.consumption = f.consumption || {}; f.consumption.l_per_100km_per_tonne = num(e.target.value); })} />
-          <span className="block text-[13px] text-slate-500 mt-1">DfT payload study: 0.4–0.95; the low end is the default</span>
+          <span className="block text-[13px] text-slate-500 mt-1">Typically 0.4–0.95; the low end is the default</span>
         </label>
         <label className="block">
           <span className="block text-sm font-medium text-slate-700 mb-1">Rigid, empty L/100 km</span>
           <input className={inp + " mt-1"} inputMode="decimal" value={(cons.rigid || {}).l_per_100km_empty ?? ""} onChange={e => set(f => { f.consumption = f.consumption || {}; f.consumption.rigid = f.consumption.rigid || {}; f.consumption.rigid.l_per_100km_empty = num(e.target.value); })} />
-          <span className="block text-[13px] text-slate-500 mt-1">From the DESNZ 2026 factor (checked 9 Oct 2026)</span>
+          <span className="block text-[13px] text-slate-500 mt-1">From the government's 2026 factor</span>
         </label>
         <label className="block">
           <span className="block text-sm font-medium text-slate-700 mb-1">Artic, empty L/100 km</span>
           <input className={inp + " mt-1"} inputMode="decimal" value={(cons.artic || {}).l_per_100km_empty ?? ""} onChange={e => set(f => { f.consumption = f.consumption || {}; f.consumption.artic = f.consumption.artic || {}; f.consumption.artic.l_per_100km_empty = num(e.target.value); })} />
-          <span className="block text-[13px] text-slate-500 mt-1">ICCT 34 laden − 0.4 × 26 t</span>
+          <span className="block text-[13px] text-slate-500 mt-1">34 laden − 0.4 × 26 t</span>
         </label>
         <label className="block">
           <span className="block text-sm font-medium text-slate-700 mb-1">Winter consumption uplift %</span>
           <input className={inp + " mt-1"} inputMode="decimal" value={season.winter_consumption_uplift_pct ?? ""} onChange={e => set(f => { f.season = f.season || {}; f.season.winter_consumption_uplift_pct = num(e.target.value); })} />
-          <span className="block text-[13px] text-slate-500 mt-1">US DOE: cars ~15 % at −7 °C; HGVs less</span>
+          <span className="block text-[13px] text-slate-500 mt-1">Cars use about 15 % more at −7 °C; lorries less</span>
         </label>
         {monthsBox("winter_months", "Winter months (uplift applies)")}
         {monthsBox("thaw_months", "Thaw months (flag: 8 t road limits may apply)")}
@@ -8743,6 +8744,9 @@ const costingToData = (c) => !c ? null : ({
   fuel: c.fuel || {}, summary: c,
   index: { eur_per_l: c.index_eur_per_l, bulletin_date: c.index_bulletin_date, source: c.index_source,
            stale: c.index_eur_per_l == null, refresh: null, attribution: "EU Weekly Oil Bulletin via EuroOilWatch" } });
+// 28 Oct 2026 (the user: no supplier or data-set names on a screen): the index's source in plain words; the provider
+// (DESNZ, the EU Weekly Oil Bulletin) is named in the technical guide, T1 "Fuel index", and on the documents
+const FUEL_PROVIDER_WORDS = { desnz: "Weekly UK pump price", eu_bulletin: "Weekly EU price" };
 function FuelWidget({ who, access, mode, initial, onChanged }){
   // mode: "compact" (Commit KPI card) · "strip" (Account, one row) · "config" (everything)
   const [fetched, setFetched] = useState(null);
@@ -8819,12 +8823,12 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
   // is none (Norway…) and for a tenant with no country. Nothing here names a country.
   const prov = idx.provider || (idx.auto_available ? TENANT.fuel_provider : null);
   const autoIdx = idx.auto_available != null ? !!idx.auto_available : !!TENANT.fuel_index_auto;
-  const provTitle = prov ? `${prov.label} — ${prov.series || ""}${prov.unit ? ` (${prov.unit})` : ""}` : "";
+  const provTitle = prov ? `${FUEL_PROVIDER_WORDS[prov.key] || "weekly price"} — ${prov.series || ""}${prov.unit ? ` (${prov.unit})` : ""}` : "";
   const attribution = <span className="text-xs text-slate-500"
     title={!autoIdx ? (noCountry ? "No country set, so an admin types the price" : "No published price for this country: an admin types it")
                     : (idx.source === "manual" ? `typed by an admin on Config (the automatic series is ${provTitle})` : provTitle)}>
     {!autoIdx ? "typed index · " + (noCountry ? "no country set" : "no automatic series for " + country)
-              : (idx.source === "manual" ? "typed index" : (prov ? prov.label : "automatic index"))}
+              : (idx.source === "manual" ? "typed index" : (prov ? (FUEL_PROVIDER_WORDS[prov.key] || "weekly price") : "automatic index"))}
     {exVat ? <span className="ml-1" title="the published pump price includes VAT; this is the same figure with VAT removed">· {exVat}</span> : null}</span>;
 
   if(mode === "compact"){
@@ -8862,7 +8866,7 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
         <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
           <span className="text-xs uppercase tracking-wide text-slate-500">Admin</span>
           {autoIdx && <button onClick={() => put("/admin/fuel-index/refresh?sync=1", null, "POST", true)} disabled={busy || rf.running}
-            className="btn-sec btn-sm disabled:opacity-40">{prov && prov.key === "desnz" ? "Fetch this week's DESNZ price now" : "Get this week's price now"}</button>}
+            className="btn-sec btn-sm disabled:opacity-40">Get this week's price now</button>}
           <label className="inline-flex items-center gap-1">
             <span>Manual index {CUR()}/L</span>
             <input className={inputCls} inputMode="decimal" placeholder="—" value={draft.manual_eur ?? ""} onChange={e => setDraft(d => ({ ...d, manual_eur: e.target.value }))} />
