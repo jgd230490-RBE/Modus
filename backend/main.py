@@ -48,6 +48,7 @@ import tenant_package  # G2, 16 Sep — a tenant as one JSON document; the map o
 import costing       # 10 Sep evening — target rates + fuel settings (config key 'costing'), BAF
 import fuel          # 10 Sep evening — the EU Weekly Oil Bulletin diesel index, fetched server-side
 import costlines     # 11 Sep — one read of every forecast line's volume, haul and cost figures (Dashboard, Forecasts)
+import security_headers  # 27 Oct 2026 (pilot readiness phase 2): the headers on every answer
 import demo_request  # H9, 8 Oct — the landing page's demo-request form: store, email or show the access details
 import users         # G3, 14 Oct 2026 — per-person logins, sessions, reset links, the audit trail
 import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternatives, drivers ranked by tCO2e moved
@@ -434,6 +435,15 @@ if _Request is not None and hasattr(app, "middleware"):
             return response
         finally:
             access.reset_current(token)
+
+    # 27 Oct 2026 (pilot readiness phase 2, F3 e): the security headers on EVERY answer — pages, the map, the guides,
+    # the bulletin, the API and the gate's refusals. Declared after the access middleware, so it wraps it and sees
+    # those refusals too. The policy and its limit: backend/security_headers.py.
+    @app.middleware("http")
+    async def _security_headers_middleware(request, call_next):
+        response = await call_next(request)
+        security_headers.apply(request.url.path, response.headers)
+        return response
 
 
 #: G3 (plan §4.6): the header the app's fetch wrapper adds to every API call. A session-cookie
@@ -5153,6 +5163,9 @@ class NoCacheStatic(StaticFiles):
         await super().check_config()
 
 
+# 27 Oct 2026 (pilot readiness phase 2): third-party files served from this app because their CDN cannot be pinned with an
+# integrity hash (Tailwind's play script sends no CORS header). Exact versions in the file names; frontend/vendor/README.md.
+app.mount("/vendor", NoCacheStatic(directory=str(ROOT / "frontend" / "vendor"), check_dir=False), name="vendor")
 # Map (Mapbox app) at /map/ ; must be mounted before the catch-all "/".
 app.mount("/map", NoCacheStatic(directory=str(ROOT / "map"), html=True), name="map")
 # The user guide at /help/ (frontend/help/, landed on the repo on 10 Sep afternoon by

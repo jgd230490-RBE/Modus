@@ -1899,6 +1899,27 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("🔴 a non-ASCII admin token is a 403, not a 500 (hmac.compare_digest on str raised TypeError)", r.status_code == 403,
        f"{r.status_code} {r.text[:80]}")
 
+    # ------------------------------------------------------------ 5b. pilot readiness phase 2 (27 Oct 2026): the headers
+    # on the real app's answers — a page, the API, the gate's refusal page, the guide, the sign-in calls, the vendored file.
+    import security_headers as _sh
+    _anon2 = TestClient(main.app, base_url="https://testserver")
+    for _p in ("/", "/api/health", "/map/", "/help/", "/api/auth/me", "/api/meta"):
+        _r = _anon2.get(_p)
+        ok(f"⭐ HEADERS: {_p} ({_r.status_code}) carries every security header, the CSP whole",
+           all(_r.headers.get(k) == v for k, v in _sh.HEADERS.items()), str({k: _r.headers.get(k) for k in _sh.HEADERS})[:300])
+    ok("🔴 HEADERS: the gate's refusal page (a 401 HTML page) carries them too",
+       _anon2.get("/map/").status_code == 401 and _anon2.get("/map/").headers.get("x-frame-options") == "SAMEORIGIN")
+    ok("HEADERS: /api/auth/me is never cached; the app shell keeps its own no-cache (revalidated, not refetched)",
+       _anon2.get("/api/auth/me").headers.get("cache-control") == "no-store"
+       and _anon2.get("/").headers.get("cache-control") == "no-cache")
+    _r = _anon2.post("/api/auth/signin", json={"email": "x@example.org", "password": "y"}, headers={"X-Wayscope": "1"})
+    ok("HEADERS: a refused sign-in is no-store as well", _r.status_code == 401 and _r.headers.get("cache-control") == "no-store")
+    _r = _anon2.get("/vendor/tailwind-play-3.4.17.js")
+    ok("⭐ VENDOR: the app serves Tailwind 3.4.17 itself, as JavaScript, unchanged",
+       _r.status_code == 200 and "javascript" in (_r.headers.get("content-type") or "")
+       and len(_r.content) == os.path.getsize(os.path.join(ROOT, "frontend", "vendor", "tailwind-play-3.4.17.js")), str(_r.status_code))
+    ok("🔴 VENDOR: nothing else under /vendor/ (a missing file is a 404)", _anon2.get("/vendor/nope.js").status_code == 404)
+
     # ------------------------------------------------------------ 6. G3: per-person logins (14 Oct 2026)
     # The real app: the cookie the browser gets, the middleware's guard header and audit row, CORS, the package
     # re-import leaving the logins alone, HU14's link. users.py's every branch is in test_users.py.
