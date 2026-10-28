@@ -1001,10 +1001,23 @@ ok("27 Oct: the user guide carries the screens' longer sentences — §4.1 the m
    # NARROWED 27 Oct 2026 (pilot readiness F3 c): the first admin is invited by FIRST_ADMIN_EMAIL now; §10 says who adds the rest
    and "Admins add everyone else on Users; each person then sets a password and two-step sign-in." in _ug27
    and "To set up per-person sign-in: on Users, add yourself as an Admin" not in _ug27
-   and "rules as read on 16 Oct 2026" in _ug27 and "Counted apart: an abnormal load is never in the lorry counts" in _ug27 and "<strong>Settings</strong> shows the copy in use" in _ug27)
+   and "rules as read on 16 Oct 2026" in _ug27 and "Counted apart: an abnormal load is never in the lorry counts" in _ug27 and "<strong>Settings</strong> shows how far it runs and updates it" in _ug27)   # NARROWED 28 Oct 2026: was "shows the copy in use" (GOV.UK named)
 ok("27 Oct: the technical guide — T1 names the advice line and the rules' reading date, T2 lists the pass; no guide mentions an ESDAL details sheet as a thing that exists",
    '<code>abnormal_rules.ADVICE_WORDS</code> ("Advice from the typed figures. The haulier, ESDAL, the police and the road and bridge authorities decide.")' in _tg27
    and "<li><strong>27 Oct 2026, the final UI pass.</strong>" in _tg27 and "went on 27 Oct 2026" in _tg27 and "ESDAL details sheet" not in _ug27)
+
+# 28 Oct 2026 (the user: no supplier names in the user guide; mockup notes\abnormal-words-mockup-1028): chapter 14 names no
+# supplier or data set; the technical guide's T1 holds what the page and the guide leave out
+_ch14 = _ug27[_ug27.index('<h1 id="14-abnormal-loads">'):_ug27.index('<h1 id="15-stockpiles">')]
+ok3("⭐ 28 Oct: the user guide's chapter 14 names no supplier or data set (HERE, OpenStreetMap, GOV.UK, the community layer); the click path to the fetch stays",
+   not re.search(r"\bHERE\b|OpenStreetMap|\bOSM\b|GOV\.UK|gov\.uk|Geofabrik|community layer|severity", _ch14)
+   and "once the map data has been fetched (<strong>Config → Map and bulletin → Fetch now</strong>)" in _ch14
+   and "the map data is only as complete as the people who map it" in _ch14 and "The bank holidays are the government's published list" in _ch14,
+   re.findall(r"\bHERE\b|OpenStreetMap|GOV\.UK|community layer", _ch14)[:5])
+ok("28 Oct: the technical guide's T1 says what the Abnormal loads page leaves out — the severity word, 'the map' = OpenStreetMap, the raw error to the log, the GOV.UK feed and its licence, the old saved words reworded on read",
+   'id="t1-abnormal-words"' in _tg27 and "<code>severity</code> word is kept in <code>actions_json</code> but not shown" in _tg27
+   and "means OpenStreetMap" in _tg27 and "Open Government Licence v3.0" in _tg27 and "plain_candidate / plain_note / plain_bake_error" in _tg27
+   and "<code>abnormal_route.SCREEN_BAN</code>" in _tg27)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

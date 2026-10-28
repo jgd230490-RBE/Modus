@@ -67,10 +67,85 @@ KIND_WORDS = {"turn": "Turn", "roundabout": "Roundabout", "slip_road": "Slip roa
               "width": "Narrow road", "junction": "Junction", "furniture": "Street furniture", "other": "Other"}
 INDICATIVE_WORDS = ("Indicative line, drawn for the load's size. The haulier's ESDAL route and route survey govern; "
                     "structures are checked by their owners through ESDAL.")
-CANDIDATE_WORDS = ("Potential pinch points found by Wayscope from the route's turn-by-turn directions, the line itself and the stored signed "
-                   "limits, each graded Grey (to survey). The route survey decides: no structure rating, no swept path, "
-                   "no overhead clearance is worked out here.")
+#: 28 Oct 2026 (the user: no supplier or back-end words on a screen): the one line under the pinch-point table — the old
+#: two (this and STRUCTURES_WORDS, 75 words naming OpenStreetMap, the community layer and Fetch now) made one. What is not
+#: worked out (structure ratings, swept paths, clearances) is in the user guide, chapter 14.
+CANDIDATE_WORDS = ("Found from the route's turns and bends, the signed limits and the bridges, railways, overhead lines, crossings and "
+                   "traffic calming on the map. Each starts Grey; the route survey decides.")
 _ORD = {1: "1st", 2: "2nd", 3: "3rd"}
+
+# --------------------------------------------------------------------------- #
+#  28 Oct 2026 (the user, 22 Oct: "no info about api or backend stuff" on a     #
+#  screen; supplier names only in the technical guide): the sentences the page  #
+#  prints when a line is capped or not drawn, and plain_*() — the same words for #
+#  what an older version SAVED on a movement (pinch_json, here_notices_json,     #
+#  bake_error), applied as the page reads it, so nothing needs drawing again.   #
+# --------------------------------------------------------------------------- #
+NOT_SET_UP = "The line could not be drawn: route drawing is not set up here."
+JUST_NOW = "The line could not be drawn just now. Try again in a minute."
+RETURN_JUST_NOW = "The return leg could not be drawn just now."
+NO_MAP_DATA = "no map data yet. Fetch it on Config → Map and bulletin, then check again."
+#: what no screen of this page may say (the guard in tests/test_abnormal.py and parse_frontend.js uses the same list)
+SCREEN_BAN = re.compile(r"\bHERE\b|OpenStreetMap|\bOSM\b|Mapbox|GOV\.UK|gov\.uk|NaPTAN|\bGIAS\b|STATS19|\bDfT\b|Geofabrik|"
+                        r"Fetch now|routing key|community layer|severity|router|\bE\d{6}\b")
+
+
+def cap_note(key, most, typed):
+    """A load bigger than the router can take: the line is drawn at the most it takes, and the row says so."""
+    return f"Drawn for a {key} of {most:g} m, the most a line can be drawn for; the load is {typed:g} m."
+
+
+_OLD_CAP = re.compile(r"^HERE takes a (\w+) of at most ([\d.]+) m: the line is drawn for [\d.]+ m, the load is ([\d.]+) m$")
+_OLD_SOURCE = re.compile(r"\s*\(OpenStreetMap(?: as fetched [0-9-]+)?\)")
+
+
+def plain_note(n):
+    """A route note as the page prints it (an older version's words reworded)."""
+    t = str(n or "")
+    m = _OLD_CAP.match(t)
+    if m:
+        return cap_note(m.group(1), float(m.group(2)), float(m.group(3)))
+    if t.startswith("the return leg could not be drawn"):
+        return RETURN_JUST_NOW
+    return t
+
+
+def plain_bake_error(e):
+    """Why the line is not drawn, as one sentence (never the supplier's raw answer)."""
+    if not e:
+        return e
+    t = str(e)
+    if t in (NOT_SET_UP, JUST_NOW) or t.startswith("The line could not be drawn"):
+        return t
+    if "routing key" in t:
+        return NOT_SET_UP
+    if t.startswith("the line could not be drawn"):
+        return JUST_NOW
+    return f"The line could not be drawn: {t.rstrip('.')}."
+
+
+def plain_candidate(c):
+    """A found pinch point as the page prints it: an older version's detail reworded (a copy; the saved row is untouched)."""
+    if not isinstance(c, dict):
+        return c
+    c = dict(c)
+    d = c.get("detail")
+    if d:
+        d = str(d)
+        if "turn severity" in d or re.match(r"^code .*, severity ", d):
+            d = None
+        elif d.startswith("straight over each"):
+            d = "straight over each"
+        else:
+            d = _OLD_SOURCE.sub("", d)
+            d = d.replace("tagged in OpenStreetMap on the road; the sign on the road is what counts, and the stored signed limits are checked apart",
+                          "marked on the map; the sign on the road is what counts")
+            d = d.replace("tagged in OpenStreetMap on a barrier", "marked on the map")
+        c["detail"] = d
+    w = c.get("words")
+    if w and c.get("kind") == "notice":
+        c["words"] = re.sub(r"^Routing notice: [A-Z0-9_]+$", "Routing notice: a restriction the route could not keep to", str(w))
+    return c
 
 
 def _now():
@@ -110,8 +185,7 @@ def vehicle_params(m):
             continue
         cm = int(round(v * 100))
         if cm > HERE_MAX_CM[key]:
-            notes.append(f"HERE takes a {key} of at most {HERE_MAX_CM[key] / 100:g} m: the line is drawn for {HERE_MAX_CM[key] / 100:g} m, "
-                         f"the load is {v:g} m")
+            notes.append(cap_note(key, HERE_MAX_CM[key] / 100, v))
             cm = HERE_MAX_CM[key]
         p[f"vehicle[{key}]"] = cm
     n = rules._int(m.get("axle_count"))
@@ -256,10 +330,10 @@ def candidates_from_actions(actions, geometry, m, spans=None):
         off = int(a.get("offset") or 0)
         pt = geometry[off] if geometry and 0 <= off < len(geometry) else None
         road = _road_of(a.get("instruction")) or _road_at(spans, off)
-        sev = a.get("severity")
         if kind == "turn":
+            # 28 Oct 2026: the router's severity word stays in actions_json, never on a screen (technical guide T1)
             k, words = "turn", f"Turn {a.get('direction') or ''} onto {road}".replace("  ", " ") if road else f"Turn {a.get('direction') or ''}".strip()
-            detail = f"turn severity: {sev} (the router's word)" if sev else None
+            detail = None
         elif kind == "uTurn":
             k, words, detail = "turn", f"U-turn{(' at ' + road) if road else ''}", None
         elif kind == "roundaboutExit":
@@ -268,7 +342,7 @@ def candidates_from_actions(actions, geometry, m, spans=None):
         elif kind == "roundaboutPass":
             mm = re.search(r"Pass (\d+) roundabouts?", a.get("instruction") or "")
             n = mm.group(1) if mm else "several"
-            k, words, detail = "roundabout", f"Passes {n} roundabouts" + (f" on {road}" if road else ""), "straight over each; the directions count them"
+            k, words, detail = "roundabout", f"Passes {n} roundabouts" + (f" on {road}" if road else ""), "straight over each"
         elif kind in ("ramp", "keep") and long_load:
             k, words = "slip_road", (a.get("instruction") or "Slip road").split(". Go for")[0]
             detail = "a long load on a slip road or a lane change: the swept path is the survey's question"
@@ -332,8 +406,8 @@ def notice_candidates(notices, geometry):
     out = []
     for n in notices or []:
         out.append({"source": "here", "kind": "notice", "place": None,
-                    "words": f"Routing notice: {n.get('title') or n.get('code') or 'a restriction the route could not keep to'}",
-                    "detail": f"code {n.get('code')}, severity {n.get('severity')}", "grade": "grey",
+                    "words": f"Routing notice: {n.get('title') or 'a restriction the route could not keep to'}",
+                    "detail": None, "grade": "grey",
                     "lon": geometry[0][0] if geometry else None, "lat": geometry[0][1] if geometry else None, "offset": 0})
     return out
 
@@ -350,10 +424,10 @@ STRUCT_PAD_M = 60.0       # the stored features are read for the line's bbox plu
 LIMIT_WORDS = {"maxheight": ("height", "m"), "maxwidth": ("width", "m"), "maxweight": ("gross weight", "t"),
                "maxaxleload": ("heaviest axle", "t"), "maxlength": ("length", "m")}
 LIMIT_NEAR = {"maxheight": 0.3, "maxwidth": 0.3, "maxweight": 0.10, "maxaxleload": 0.10, "maxlength": 1.0}   # m, m, share, share, m
-STRUCTURES_WORDS = ("Structures and limits from OpenStreetMap along the drawn line — the community layer's extract "
-                    "(Config → Map and bulletin → Fetch now): a bridge the road is carried on, a railway or an overhead line "
-                    "crossed, a level crossing, traffic calming, a limit tagged on the road. A road may be mapped without its "
-                    "tags: the survey decides.")
+#: 28 Oct 2026: the staff map's and the feature collection's line about the map rows (was: OpenStreetMap, the community
+#: layer's extract, Config → Map and bulletin → Fetch now). The page itself prints CANDIDATE_WORDS only.
+STRUCTURES_WORDS = ("Bridges, railways, overhead lines, crossings, traffic calming and limits marked on the map along the line. "
+                    "Not every road is fully mapped: the survey decides.")
 _FT_IN = re.compile(r"""^\s*(\d+)\s*'\s*(\d+(?:\.\d+)?)?\s*"?\s*$""")
 
 
@@ -530,7 +604,9 @@ def structure_candidates(geometry, m, feats, fetched=None):
     dims = {"maxheight": rules._num(m.get("height_m")), "maxwidth": rules._num(m.get("width_m")),
             "maxweight": rules._num(m.get("gross_t")), "maxaxleload": rules._num(m.get("max_axle_t")),
             "maxlength": rules._num(m.get("length_m"))}
-    when = f" (OpenStreetMap as fetched {str(fetched)[:10]})" if fetched else " (OpenStreetMap)"
+    # 28 Oct 2026 (the user: no supplier names on a screen): the details no longer end "(OpenStreetMap as fetched …)";
+    # `fetched` stays in the signature (the callers pass it) and the source is named in the technical guide, T1
+    when = ""
     out = []
     for f in feats:
         g = f.get("geometry") or {}
@@ -558,7 +634,7 @@ def structure_candidates(geometry, m, feats, fetched=None):
                     continue
                 k = "limit"
                 words = ("Height restrictor" if tags.get("barrier") == "height_restrictor" else "Signed limit") + (f" at {name}" if name else "") + ": " + over
-                detail = "tagged in OpenStreetMap on a barrier; the sign on the road is what counts" + when
+                detail = "marked on the map; the sign on the road is what counts" + when
             else:
                 continue
         elif g.get("type") == "LineString":
@@ -596,8 +672,7 @@ def structure_candidates(geometry, m, feats, fetched=None):
                     if not over:
                         continue
                     k, words = "limit", "Signed limit" + (f" on {road}" if road else "") + ": " + over
-                    detail = ("tagged in OpenStreetMap on the road; the sign on the road is what counts, and the stored signed "
-                              "limits are checked apart" + when)
+                    detail = "marked on the map; the sign on the road is what counts" + when
             else:
                 continue
         else:
@@ -689,7 +764,7 @@ def bake(movement_id, by=None, _routes=None, _limits=None, _structures=None, _fe
         return {"ok": False, "error": "no such abnormal load"}
     call = _routes or here_routing.routes
     if _routes is None and not here_routing.configured():
-        err = "no routing key is set on this deployment, so no line can be drawn"
+        err = NOT_SET_UP
         _store(movement_id, {"bake_error": err, "baked_at": _now()})
         return {"ok": False, "error": err}
     locs = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
@@ -699,6 +774,7 @@ def bake(movement_id, by=None, _routes=None, _limits=None, _structures=None, _fe
         gbl = {}
     a, b, problem = ends(m, locs, gbl)
     if problem:
+        problem = plain_bake_error(problem)
         _store(movement_id, {"bake_error": problem, "baked_at": _now()})
         return {"ok": False, "error": problem}
     params, notes = vehicle_params(m)
@@ -706,7 +782,8 @@ def bake(movement_id, by=None, _routes=None, _limits=None, _structures=None, _fe
     try:
         opts = call(a["lat"], a["lon"], b["lat"], b["lon"], None, vehicle=params, extras=dict(EXTRAS), via=via or None, alternatives=1)
     except Exception as e:  # noqa: BLE001 — the answer is the error, stored on the movement
-        err = f"the line could not be drawn: {str(e)[:240]}"
+        print(f"🚧 abnormal route {movement_id}: the router refused: {str(e)[:400]}", flush=True)   # the raw answer: the log only
+        err = JUST_NOW
         _store(movement_id, {"bake_error": err, "baked_at": _now()})
         return {"ok": False, "error": err}
     best = opts[0]
@@ -734,7 +811,8 @@ def bake(movement_id, by=None, _routes=None, _limits=None, _structures=None, _fe
             rg, _, _ = _join_sections(back[0].get("sections") or [{"geometry": back[0].get("geometry")}])
             ret_geom = rg or back[0].get("geometry")
         except Exception as e:  # noqa: BLE001
-            ret_notes.append(f"the return leg could not be drawn: {str(e)[:160]}")
+            print(f"🚧 abnormal route {movement_id}: the return leg was refused: {str(e)[:400]}", flush=True)
+            ret_notes.append(RETURN_JUST_NOW)
     compact_actions = [{k: a2.get(k) for k in ("action", "direction", "severity", "exit", "offset", "length", "duration", "instruction") if k in a2}
                        for a2 in actions]
     _store(movement_id, {
@@ -777,8 +855,7 @@ def check_structures(movement_id, by=None, _structures=None, _fetched=None):
         # any grade on it) stays; the note says where Fetch now is
         return {"ok": True, "movement_id": movement_id, "structures": sum(1 for c in found if c.get("source") == "osm"),
                 "candidates": len(found), "structures_fetched": None,
-                "note": ("no structures have been fetched for this scheme yet: Config → Map and bulletin → Fetch now (the "
-                         "community layer) brings them, then Check the roads again")}
+                "note": NO_MAP_DATA}
     keep = [c for c in found if c.get("source") != "osm"]
     before = [c for c in keep if c.get("source") != "limits"]
     after = [c for c in keep if c.get("source") == "limits"]
@@ -786,8 +863,7 @@ def check_structures(movement_id, by=None, _structures=None, _fetched=None):
     cands = _carry_grades(found, _numbered(before + struct_c + after))
     _store(movement_id, {"pinch_json": json.dumps(cands + typed_rows(m)), "updated_by": by, "updated_at": _now()})
     return {"ok": True, "movement_id": movement_id, "structures": len(struct_c), "candidates": len(cands), "structures_fetched": fetched,
-            "note": None if fetched else ("no structures have been fetched for this scheme yet: Config → Map and bulletin → "
-                                          "Fetch now (the community layer) brings them, then Check the roads again")}
+            "note": None if fetched else NO_MAP_DATA}
 
 
 def set_via(movement_id, points, by=None):
