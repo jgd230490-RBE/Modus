@@ -149,7 +149,7 @@ const HEIGHT = { 320: 568, 360: 780, 390: 844, 768: 1024, 1024: 768, 1366: 768, 
 const WIDTHS = OPT.widths || (OPT.full ? [320, 360, 390, 768, 1024, 1366, 1920] : [390, 1366]);
 const LOOKS = OPT.looks || (OPT.full ? ["ink", "light", "dark"] : ["ink", "dark"]);
 const EXTRA_ACCENTS = OPT.accents || (OPT.full ? ["blue", "blue-shades", "orange-shades"] : []);
-const PORTAL_PAGES = OPT.pages || ["dashboard", "submit", "forecasts", "carbon", "abnormal", "lookahead", "locations", "routes", "zones", "config", "users", "map"];   // 22 Oct 2026: + abnormal (S16 / B5)
+const PORTAL_PAGES = OPT.pages || ["dashboard", "submit", "forecasts", "carbon", "abnormal", "stockpiles", "lookahead", "locations", "routes", "zones", "config", "users", "map"];   // 22 Oct 2026: + abnormal (S16 / B5); 28 Oct 2026: + stockpiles (Plan > Stockpiles, PR #144)
 const DESK_W = Math.max(...WIDTHS);           // where the deep stops and the keyboard pass run
 // decision 15 (17 Oct 2026): one more pass, the Dark look with the Blue accent at the desk width (1366 in the quick shape, 1920
 // in --full): the Blue accent's --navy is #5B8FF0 in Dark, where white figures on it fail (3.17:1) — a pair no other pass
@@ -160,9 +160,9 @@ const EXTRA_PASSES = (OPT.looks || OPT.accents) ? [] : [{ look: "dark", accent: 
 const PHONE_W = Math.min(...WIDTHS);
 const CONFIG_TABS = ["Vehicles", "Materials", "Planning", "Costing · fuel", "Seasonal restrictions", "Map and bulletin", "Everything (JSON)"];
 // what the page header says on each portal page (the NAV labels, except Config); the map page has no header
-const PAGE_TITLE = { dashboard: "Dashboard", submit: "Submit forecast", forecasts: "Forecasts", carbon: "Carbon planner", abnormal: "Abnormal loads", lookahead: "Look-ahead",
+const PAGE_TITLE = { dashboard: "Dashboard", submit: "Submit forecast", forecasts: "Forecasts", carbon: "Carbon planner", abnormal: "Abnormal loads", stockpiles: "Stockpiles", lookahead: "Look-ahead",
                      locations: "Locations", routes: "Routes", zones: "Zones", config: "Configuration", users: "Users" };
-const TEAM_PAGES = ["dashboard", "submit", "forecasts", "carbon", "abnormal", "lookahead", "map"];   // 22 Oct 2026: + abnormal (a team plans its own)
+const TEAM_PAGES = ["dashboard", "submit", "forecasts", "carbon", "abnormal", "stockpiles", "lookahead", "map"];   // 22 Oct 2026: + abnormal (a team plans its own); 28 Oct 2026: + stockpiles (read-only for a team)
 const PHONE_PAGES = ["dashboard", "lookahead", "map"];   // what a phone shows as itself (frontend PHONE_PAGES); the rest is the desk-only card
 // the screens a visitor meets signed out: a 401 / 403 there is the gate working, anywhere else it is a defect
 const SIGNED_OUT = /^(public|login|login-wrong|login-forgot|login-code|setpw|linkerr|map-password|map-password-wrong|map-public|landing|privacy|thanks|landing-error)$/;
@@ -1009,6 +1009,13 @@ async function deepStops(page, store, meta, id, w) {
     if (await clickText(page, ".unit-sw-seg button", "Lorries")) { await audit(page, store, meta("forecasts+lorries", w)); await clickText(page, ".unit-sw-seg button", "Loads"); }
   }
   if (id === "carbon" && await openFolded(page)) await audit(page, store, meta("carbon+open", w));
+  // 28 Oct 2026: Plan > Stockpiles opens on the first stockpile; the deep stop is the demo's one that goes over (North,
+  // March 2027), its year picked, so the line, the capacity line and the status line "Goes over in the week of ..." are measured
+  if (id === "stockpiles" && await clickText(page, '[role="tablist"][aria-label="Stockpile"] button', "Stockpile North")) {
+    await page.waitForTimeout(600);
+    if (await clickText(page, '[data-page="stockpiles"] button', "2027")) await page.waitForTimeout(600);
+    await audit(page, store, meta("stockpiles+north", w));
+  }
   if (id === "locations" && await tryClick(page, "main table tbody tr:visible")) { await page.waitForTimeout(500); await audit(page, store, meta("locations+edit", w)); }
   if (id === "lookahead") {
     for (const [k, t] of [["account", "Account"], ["horizon", "Horizon"]]) if (await clickText(page, '[data-guide="lookahead-tabs"] button', t)) await audit(page, store, meta("lookahead-" + k, w));
@@ -1256,7 +1263,11 @@ function findingKeys(stop) {
 }
 // a run before 17 Oct was the bundled Chromium; one from before the Dark / Blue pass (decision 15) has no extraPasses and does
 // not pair with one that has it. --strict-44 is a grading, not a shape, of the same stops: a strict run pairs with a plain one.
-function sameShape(a, b) { const k = (o) => [o.widths, o.looks, o.extraAccents, o.extraPasses || [], o.pages, o.browser || "chromium"]; return JSON.stringify(k(a)) === JSON.stringify(k(b)); }
+// 28 Oct 2026: a run whose pages are the earlier run's plus new ones (Plan > Stockpiles) still pairs: the added page's stops
+// read as new rows; a page dropped, or any other change of shape, does not pair
+function sameShape(a, b) { const k = (o) => [o.widths, o.looks, o.extraAccents, o.extraPasses || [], o.browser || "chromium"];
+  const pa = a.pages || [], pb = b.pages || [];
+  return JSON.stringify(k(a)) === JSON.stringify(k(b)) && pa.every(p => pb.includes(p)); }
 async function compareRuns(browser, prevPath) {
   if (prevPath === "latest") {
     const runs = fs.readdirSync(OPT.out).filter(d => d !== STAMP && fs.existsSync(path.join(OPT.out, d, "report.json"))).sort().reverse();

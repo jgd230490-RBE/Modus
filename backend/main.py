@@ -3289,7 +3289,7 @@ def abnormal_holidays_refresh():
     acc = _require_approver()
     res = abnormal.refresh_holidays(by=acc.get("name") or acc.get("label") or acc.get("role"))
     if not res.get("ok"):
-        raise HTTPException(502, res.get("error") or "gov.uk could not be read")
+        raise HTTPException(502, res.get("error") or abnormal.HOLIDAYS_FAILED)
     return res
 
 
