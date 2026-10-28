@@ -699,6 +699,9 @@
            full-screen sheet) with a 48 px handle, the month chips and Play at the bottom, a route card instead of the
            drawer, 44-48 px targets. */
         #m-layers-btn, #m-sheet, .m-done{ display:none; }
+        /* 28 Oct 2026 (John: "on a phone we need an option to select full screen for the map"; notes\map-phone-fullscreen-mockup-1028):
+           the ⤢ button, its floating strip and the Layers sheet's Guide exist on a phone only */
+        #m-full-btn, #m-full-strip, #btn-guide-sheet{ display:none; }
         @media (max-width:767px){
             #kpi-hud, #menu-toggle, #timeline-bar, #tl-warnings, #route-drawer, #btn-detail{ display:none !important; }
             #tl-toast, #wall-hud, #wall-hint{ display:none !important; }   /* M3 (12 Oct evening): the sheet carries the month and Play */
@@ -710,6 +713,31 @@
                attribution (Mapbox, OpenStreetMap and, with a council layer on, the ONS / OS licence lines): both ride
                above the sheet, at its measured height (syncSheetHeight) */
             .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right{ bottom:var(--m-sheet-h, 0px); }
+            /* 28 Oct 2026 (card 2): the demo strip is a pill on the Layers row (the map starts at the top of the screen); the
+               Guide is in the Layers sheet; ⤢ top right, the zoom under it. measureNotice() sets --notice-h to 0 here. */
+            body.has-demo-notice #demo-notice{ left:122px; right:60px; top:14px; transform:none; max-width:none; border-radius:20px; display:flex; flex-wrap:wrap;
+                      justify-content:center; align-items:center; gap:2px 0; border-width:1px; padding:3px 8px; font-size:14px; line-height:1.2; letter-spacing:.03em;
+                      text-align:center; white-space:normal; }
+            #guide-btn{ display:none !important; }
+            #btn-guide-sheet:not([hidden]){ display:block; }
+            #m-full-btn{ display:grid; place-items:center; position:absolute; right:8px; top:10px; z-index:27; width:44px; height:44px; padding:0;
+                      border:1px solid var(--line); border-radius:22px; background:#fff; color:var(--navy-deep); font-size:20px; line-height:1;
+                      box-shadow:0 2px 10px rgba(16,24,40,.12); cursor:pointer; }
+            #m-full-strip:not([hidden]){ display:flex; align-items:center; gap:10px; position:absolute; left:8px; right:8px; z-index:27;
+                      bottom:calc(8px + env(safe-area-inset-bottom, 0px)); height:56px; padding:0 6px; border-radius:28px;
+                      background:rgba(255,255,255,.96); box-shadow:0 4px 18px rgba(16,24,40,.22); font-family:Inter,system-ui,sans-serif; }
+            #m-full-strip .mf-month{ flex:1 1 auto; min-width:0; color:var(--navy-deep); }
+            #m-full-strip .mf-month b{ display:block; font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            #m-full-strip .mf-month span{ display:block; font-size:14px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            #m-full-exit{ flex:0 0 44px; width:44px; height:44px; border-radius:22px; border:1px solid var(--line); background:#fff;
+                      color:var(--navy-deep); font-size:20px; line-height:1; padding:0; cursor:pointer; }
+            /* full screen: the map alone — the sheet, Layers, ⤢ and the guide's strip go; the demo pill moves to the top
+               centre; a route's card still opens in the sheet (map-full-card) until the sheet folds again */
+            body.map-full #m-sheet, body.map-full #m-layers-btn, body.map-full #m-full-btn, body.map-full .guide-strip,
+            body.map-full .guide-tip{ display:none !important; }
+            body.map-full.map-full-card #m-sheet{ display:flex !important; z-index:31; }
+            body.map-full.has-demo-notice #demo-notice{ left:50%; right:auto; top:8px; transform:translateX(-50%); max-width:calc(100vw - 80px); white-space:nowrap; }
+            body.map-full .mapboxgl-ctrl-top-right{ top:44px !important; }
             #m-layers-btn{ display:flex; align-items:center; gap:8px; position:absolute; left:12px; top:12px; z-index:27; height:48px; padding:0 18px;
                            border:1px solid var(--line); border-radius:24px; background:#fff; color:var(--navy-deep); font:600 15px Inter,system-ui,sans-serif;
                            box-shadow:0 2px 10px rgba(16,24,40,.12); cursor:pointer; }
@@ -742,6 +770,14 @@
             .m-body{ overflow:auto; padding:0 16px 8px; flex:1 1 auto; min-height:0; }
             #m-sheet[data-state="half"]{ height:min(62vh, calc(100% - var(--notice-h, 0px) - 72px)); }   /* half: about half the screen; the body scrolls */
             #m-sheet[data-state="peek"] .m-body{ display:none; }
+            /* 28 Oct 2026 (card 2): folded, the month and its two figures are ONE line ("Mar 2027 · 69 a day · 28 vehicles") and the
+               conditions pill waits in the opened sheet, its presence a red dot on the handle: 274 → about 150 px */
+            #m-sheet[data-state="peek"] .m-peek{ flex-wrap:nowrap; align-items:baseline; gap:4px 12px; }
+            #m-sheet[data-state="peek"] .m-month{ flex:1 1 auto; min-width:0; }
+            #m-sheet[data-state="peek"] .m-fig{ flex:0 0 auto; white-space:nowrap; }
+            #m-sheet[data-state="peek"] .m-fig b{ display:inline; font-size:20px; margin-right:4px; }
+            #m-sheet[data-state="peek"] .m-cond{ display:none; }
+            .m-handle.has-cond::after{ content:""; width:8px; height:8px; border-radius:50%; background:#DC2626; margin-left:8px; }
             .m-body h3{ margin:10px 0 6px; font-size:14px; font-weight:600; color:var(--navy-deep); }
             .m-body .btn{ min-height:48px; margin-top:8px; }
             .m-body .tl-warn .show, .m-body .tl-warn .x{ min-height:44px; min-width:44px; font-size:14px; }
@@ -749,6 +785,8 @@
             .m-chips-row .month-chips{ flex-wrap:nowrap; }
             .m-chips-row .month-chip{ min-width:48px; padding:0 10px; flex:0 0 auto; }   /* 48 px targets; a long tenant scrolls the row */
             .m-play{ flex:0 0 48px; width:48px; height:48px; border-radius:24px; border:0; background:var(--navy); color:#fff; font-size:18px; cursor:pointer; }
+            /* 28 Oct 2026: the row now scrolls to the month on screen, so Play stays pinned at its left end, the chips passing under it */
+            .m-chips-row .m-play{ position:sticky; left:0; z-index:1; box-shadow:0 0 0 8px #fff; }
             .route-card h3{ margin:4px 0 2px; font-size:16px; }
             .route-card .rc-sub{ color:var(--muted); margin-bottom:8px; }
             .route-card dl{ display:grid; grid-template-columns:1fr auto; gap:6px 12px; margin:0 0 10px; }
@@ -832,6 +870,13 @@
 <button type="button" id="menu-toggle" onclick="toggleSidebar()" aria-controls="main-sidebar" aria-expanded="true">☰ Control Panel</button>
 <!-- 12 Oct 2026 (review 2.8 row 2, mockup 7): on a phone the ONE Layers button opens the panel as a full-screen sheet -->
 <button type="button" id="m-layers-btn" onclick="openLayersSheet()" aria-controls="main-sidebar" aria-expanded="false">&#8779; Layers</button>
+<!-- 28 Oct 2026 (John): a full-screen map on a phone — ⤢ enters, the floating strip keeps Play and the month, ⤡ / Back / Esc leave -->
+<button type="button" id="m-full-btn" onclick="enterMapFull()" aria-label="Full screen map" title="Full screen map">&#10530;</button>
+<div id="m-full-strip" role="group" aria-label="Full screen map" hidden>
+  <button type="button" class="m-play" id="m-full-play" onclick="toggleTimeline()" aria-label="Play" aria-pressed="false">&#9654;</button>
+  <div class="mf-month"><b id="m-full-month">No month on screen</b><span id="m-full-fig"></span></div>
+  <button type="button" id="m-full-exit" onclick="exitMapFull()" aria-label="Leave full screen" title="Leave full screen">&#10529;</button>
+</div>
 <div class="sidebar" id="main-sidebar">
     <button type="button" class="sidebar-close" id="sidebar-close" onclick="toggleSidebar()" aria-label="Close the control panel" title="Close the control panel">&times;</button>
     <div class="panel-top" aria-hidden="true"></div>   <!-- 11 Oct: flex:none — the panel is a flex column and squeezed this to 0, putting the first heading under the menu button; 28 Oct (task 0a, card 6): a white strip that stays at the top, so a scrolled row passes under it, not under the floating button -->
@@ -1104,6 +1149,8 @@
             <!-- 14 Oct 2026 (backlog item 2): the route map export, STAFF ONLY (the user, 14 Oct). Hidden until
                  /api/public/whoami says staff; the endpoint refuses anyone else (401) whatever the page shows. -->
             <button type="button" class="btn btn-ghost" id="rme-open" hidden onclick="openRouteExport()">Export route map (plan)</button>
+            <!-- 28 Oct 2026 (card 2): on a phone the Guide is here, not on the map -->
+            <button type="button" class="btn btn-ghost" id="btn-guide-sheet" hidden onclick="closeLayersSheet(); guideStart();">Guide</button>
         </div>
     </div>
 
@@ -1242,8 +1289,8 @@
   <button type="button" class="m-handle" id="m-handle" onclick="toggleSheet()" aria-controls="m-body" aria-expanded="false" aria-label="Show the busiest routes and conditions"><span class="m-grip"></span></button>
   <div class="m-peek" id="m-peek">
     <div class="m-month" id="m-month">No month on screen</div>
-    <div class="m-fig"><b id="m-trips">&mdash;</b><span>two-way movements a day</span></div>
-    <div class="m-fig"><b id="m-vehicles">&mdash;</b><span>vehicles needed</span></div>
+    <div class="m-fig"><b id="m-trips">&mdash;</b><span>a day</span></div>
+    <div class="m-fig"><b id="m-vehicles">&mdash;</b><span>vehicles</span></div>
     <button type="button" class="m-cond" id="m-cond" onclick="sheetTo('half')" hidden></button>
   </div>
   <div class="m-body" id="m-body">
@@ -1534,7 +1581,10 @@
                     + '<button type="button" class="guide-x" aria-label="Hide the tips" title="Hide the tips and the dots" onclick="guideOff()">\u00d7</button>';
             }
             const k = kpi.getBoundingClientRect();
-            strip.style.top = (Math.round(k.bottom) + 10) + 'px'; strip.style.left = (Math.round(k.left) + 12) + 'px';
+            // 28 Oct 2026: on a phone the demo notice is a pill beside Layers and may wrap (3 lines at 320 px): the strip goes under both
+            const dn = guideOnPhone() ? document.getElementById('demo-notice') : null;
+            const below = Math.max(k.bottom, dn ? dn.getBoundingClientRect().bottom : 0);
+            strip.style.top = (Math.round(below) + 10) + 'px'; strip.style.left = (Math.round(k.left) + 12) + 'px';
         } else if (strip) strip.remove();
         MAP_GUIDE_STEPS.forEach((st, n) => {
             // 18 Oct 2026 (UI audit decision 8): no dots on a phone (767 px and below) — the strip's "Take the tour" carries
@@ -1582,6 +1632,7 @@
         } else {
             const btn = guideEl('guide-btn', 'button');
             btn.type = 'button'; btn.textContent = 'Guide'; btn.title = 'Replay the guide'; btn.onclick = guideStart;
+            const gs = document.getElementById('btn-guide-sheet'); if (gs) gs.hidden = false;   // 28 Oct 2026: the phone's Guide, in the Layers sheet
             // Beside the demo notice, measured — the notice is centred and its width depends on
             // the tenant's words, so a fixed offset overlapped it (seen live, 8 Oct).
             // 11 Oct 2026: placed by CSS at every width now — at the right end of the notice strip, off the bar.
@@ -7806,6 +7857,8 @@
         const dn = document.getElementById('demo-notice');
         const on = dn && document.body.classList.contains('has-demo-notice') && window.innerWidth <= 1023;
         if (!on) { document.body.style.removeProperty('--notice-h'); return; }
+        // 28 Oct 2026 (card 2): on a phone the notice is a pill over the map, so nothing moves down for it
+        if (typeof isPhoneShell === 'function' && isPhoneShell()) { document.body.style.setProperty('--notice-h', '0px'); return; }
         if (!dn._ro) { try { dn._ro = new ResizeObserver(() => positionWarnStack()); dn._ro.observe(dn); } catch (e) {} }
         const nh = Math.round(dn.getBoundingClientRect().height);
         if (nh) document.body.style.setProperty('--notice-h', nh + 'px');
@@ -8287,6 +8340,13 @@
             }
             // the month on screen is the pressed chip; updated in place, so a focused chip keeps its focus during Play
             box.querySelectorAll('.month-chip').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.month) === cur)));
+            // 28 Oct 2026 (seen on live: the row opened on Jan 2026 with Mar 2027 shown): the phone's row scrolls to the month on screen
+            const row = box.closest ? box.closest('.m-chips-row') : null, on = box.querySelector('.month-chip[aria-pressed="true"]');
+            if (row && on && row.clientWidth && box._shown !== cur) {
+                box._shown = cur;
+                const r = row.getBoundingClientRect(), c = on.getBoundingClientRect();
+                row.scrollLeft += (c.left - r.left) - (row.clientWidth - c.width) / 2;
+            }
         });
         renderMonthPicker();       // 19 Oct 2026: the panel's year-and-month picker follows the same month
     }
@@ -9701,6 +9761,64 @@
         renderConcernLinks();
     }
 
+
+    // ---------------------------------------------------------------- 28 Oct 2026 (John: "on a phone we need an option to select
+    // full screen for the map, as the top banner and the bottom forecast section take up too much space"; the approved mockup
+    // notes\map-phone-fullscreen-mockup-1028, card 1). ⤢ shows the map alone: the sheet, Layers and the guide's strip go, the
+    // demo notice stays as a pill, a floating strip keeps Play, the month and its lead figure, and ⤡ to leave. It also asks the
+    // browser for its own full screen (Android Chrome hides its bar; iPhone Safari does not allow it for a page). Leaving: ⤡,
+    // the phone's Back (a history entry is pushed), Esc, the browser leaving full screen, or the window growing past a phone.
+    // Not saved and not in the share link. A tapped route's card still opens in the sheet (map-full-card) until it folds.
+    const MAPFULL = { on: false, pushed: false, fs: false };
+    function renderFullStrip() {
+        const m = document.getElementById('m-full-month'), f = document.getElementById('m-full-fig');
+        const trips = (document.getElementById('kpi-trips') || {}).textContent || '';
+        const mt = TL.on ? monthLabel(TL.month) : 'No month on screen';
+        const ft = TL.on ? ((trips.trim() && trips.trim() !== '—') ? trips.trim() + ' two-way movements a day' : 'Nothing approved') : 'Press ▶ to play the months';
+        if (m && m.textContent !== mt) m.textContent = mt;
+        if (f && f.textContent !== ft) f.textContent = ft;
+    }
+    function enterMapFull() {
+        if (MAPFULL.on || !isPhoneShell()) return;
+        MAPFULL.on = true;
+        if (sidebarIsOpen()) closeLayersSheet();
+        if (SHEET.state !== 'peek') sheetTo('peek');
+        document.body.classList.add('map-full');
+        document.body.classList.remove('map-full-card');
+        const st = document.getElementById('m-full-strip'); if (st) st.hidden = false;
+        renderFullStrip(); syncPlayButtons(); syncSheetHeight();
+        try { history.pushState({ wayscopeMapFull: 1 }, ''); MAPFULL.pushed = true; } catch (e) {}
+        const el = document.documentElement;
+        try {
+            const p = el.requestFullscreen ? el.requestFullscreen() : (el.webkitRequestFullscreen ? el.webkitRequestFullscreen() : null);
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch (e) {}
+        setTimeout(() => { try { map.resize(); } catch (e) {} }, 80);
+        const x = document.getElementById('m-full-exit'); if (x) { try { x.focus(); } catch (e) {} }
+    }
+    function exitMapFull(fromHistory) {
+        if (!MAPFULL.on) return;
+        MAPFULL.on = false; MAPFULL.fs = false;
+        document.body.classList.remove('map-full', 'map-full-card');
+        const st = document.getElementById('m-full-strip'); if (st) st.hidden = true;
+        try {
+            if (document.fullscreenElement && document.exitFullscreen) { const p = document.exitFullscreen(); if (p && typeof p.catch === 'function') p.catch(() => {}); }
+            else if (document.webkitFullscreenElement && document.webkitExitFullscreen) document.webkitExitFullscreen();
+        } catch (e) {}
+        if (MAPFULL.pushed && !fromHistory) { MAPFULL.pushed = false; try { history.back(); } catch (e) {} }
+        MAPFULL.pushed = false;
+        syncSheetHeight();
+        setTimeout(() => { try { map.resize(); } catch (e) {} try { scheduleViewWrite(); } catch (e) {} }, 80);
+        const b = document.getElementById('m-full-btn'); if (b && isPhoneShell()) { try { b.focus(); } catch (e) {} }
+    }
+    if (typeof window.addEventListener === 'function') window.addEventListener('popstate', () => { if (MAPFULL.on) { MAPFULL.pushed = false; exitMapFull(true); } });
+    if (typeof document.addEventListener === 'function') ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, () => {
+        const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        if (inFs) { MAPFULL.fs = true; return; }
+        if (MAPFULL.on && MAPFULL.fs) exitMapFull();       // the browser left its full screen (its own Back or swipe)
+    }));
+    if (typeof window.addEventListener === 'function') window.addEventListener('resize', () => { if (MAPFULL.on && !isPhoneShell()) exitMapFull(); });
+
     // ---------------------------------------------------------------- the phone shell's sheet (review 2.8 row 2)
     const SHEET = { state: 'peek', before: 'peek', card: null, busySrc: null };
     function sheetAria() {
@@ -9717,12 +9835,15 @@
     // sheet on a phone (the CSS reads --m-sheet-h); 0 above 767 px, where there is no sheet
     function syncSheetHeight() {
         const sh = document.getElementById('m-sheet');
-        const h = (sh && isPhoneShell()) ? Math.round(sh.offsetHeight || 0) : 0;
+        // 28 Oct 2026: in full screen the sheet is hidden and Mapbox's logo and credits sit above the floating strip
+        const full = typeof MAPFULL !== 'undefined' && MAPFULL.on && !document.body.classList.contains('map-full-card');
+        const h = (sh && isPhoneShell()) ? (full ? 72 : Math.round(sh.offsetHeight || 0)) : 0;
         try { document.documentElement.style.setProperty('--m-sheet-h', h + 'px'); } catch (e) {}
     }
     // peek | half | full. Full is the filters and layers: the panel opened as a full-screen sheet.
     function sheetTo(state) {
         if (state === 'full') { openLayersSheet(); return; }
+        if (typeof MAPFULL !== 'undefined' && MAPFULL.on) document.body.classList.toggle('map-full-card', state !== 'peek');   // 28 Oct 2026
         if (SHEET.state === 'full' && sidebarIsOpen()) { SHEET.before = state; closeSidebar(); }   // syncSheetWithPanel sets the state
         SHEET.state = state;
         if (state === 'peek' && SHEET.card) { SHEET.card = null; renderRouteCard(); }
@@ -9780,10 +9901,12 @@
         if (!sheet) return;
         const set = (id, v) => { const el = document.getElementById(id); if (el && el.textContent !== v) el.textContent = v; };
         const txt = id => { const el = document.getElementById(id); return el ? el.textContent.trim() : ''; };
-        set('m-month', TL.on ? (barHead() || monthLabel(TL.month)) : 'No month on screen: pick a month or press Play');
+        set('m-month', TL.on ? (SHEET.state === 'peek' ? monthLabel(TL.month) : (barHead() || monthLabel(TL.month))) : 'No month on screen: pick a month or press Play');
         set('m-trips', TL.on ? (txt('kpi-trips') || '—') : '—');
         set('m-vehicles', TL.on ? (txt('kpi-vehicles') || '—') : '—');
         const cond = document.getElementById('m-cond'), s = TL.on ? condSummary(WARN.counts) : '';
+        const hd = document.getElementById('m-handle'); if (hd && hd.classList) hd.classList.toggle('has-cond', !!s);   // 28 Oct 2026: folded, a red dot
+        if (typeof MAPFULL !== 'undefined' && MAPFULL.on) renderFullStrip();
         if (cond) {
             cond.hidden = !s;
             set('m-cond', s ? s + ' ›' : '');
@@ -9805,11 +9928,13 @@
         }
     }
     function syncPlayButtons() {
-        const b = document.getElementById('m-play');
-        if (!b) return;
-        b.setAttribute('aria-pressed', String(!!TL.playing));
         const t = TL.playing ? '⏸' : '▶';
-        if (b.textContent !== t) b.textContent = t;
+        ['m-play', 'm-full-play'].forEach(id => {     // 28 Oct 2026: the full-screen strip's Play too
+            const b = document.getElementById(id);
+            if (!b) return;
+            b.setAttribute('aria-pressed', String(!!TL.playing));
+            if (b.textContent !== t) b.textContent = t;
+        });
     }
     function onConditionsChanged() {
         renderSheet();
@@ -9990,6 +10115,7 @@
         const mt = document.getElementById('month-text');
         if (mt && !mt.hidden) { closeMonthText(); return; }
         if (isPhoneShell() && sidebarIsOpen()) { closeLayersSheet(); return; }
+        if (typeof MAPFULL !== 'undefined' && MAPFULL.on && !document.body.classList.contains('map-full-card')) { exitMapFull(); return; }   // 28 Oct 2026
         if (isPhoneShell() && SHEET.state !== 'peek') sheetTo('peek');
     });
     // once the network is in (initNetwork): the chips need the months with volume, then the deep link is applied
