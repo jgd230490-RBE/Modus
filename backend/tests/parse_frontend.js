@@ -4376,11 +4376,15 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      /function ZoneDiversions\(/.test(src) && src.includes(">Keep the main route</button>;")
      && src.includes("Find a way round (") && src.includes("routing call"));
   ok("0c: the Used by column says what a dated zone diverts, and when a route has no way round",
-     src.includes("Diverts {zoneDiv[z.id].routes.length} route") && src.includes(" route(s): no way round"));
+     src.includes("Diverts {zoneDiv[z.id].routes.length} route") && src.includes(" route(s): no way round")
+     // the link is named by its visible words: an aria-label that said something else failed axe (label-content-name-mismatch)
+     && src.includes("data-zone-div={z.id}>") && !src.includes("Show the routes ${z.name} diverts"));
   ok("⭐ 0c: a diverted route carries a chip with its months; a route a zone crosses with no way round reads Not diverted",
      src.includes("data-route-diverted={r.id}") && src.includes('{used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}'));
   ok("0c: the opened route lists its Diversions (DivRows)", src.includes("data-route-diversions={r.id}") && /function DivRows\(/.test(src));
-  ok("0c: the network reload reads the diversions with the routes", src.includes("fetch(`${API}/routes/diversions`)"));
+  ok("0c: the first load and every network reload read the diversions, on their own (never inside the routes' Promise.all)",
+     src.includes("fetch(`${API}/routes/diversions`)") && (src.match(/loadDiversions\(\)/g) || []).length >= 2
+     && !/Promise\.all\(\[[^\]]*routes\/diversions/.test(src));
   ok("⭐ 0c: the Look-ahead line says Diverted (chip + details) and the rail knows NO WAY ROUND, ranked after a road limit",
      src.includes('(c.diversion && c.diversion.share > 0) ? "Diverted" : null') && src.includes('NO_WAY_ROUND: "NO WAY ROUND"')
      && /NO_WAY_ROUND: 0\.5/.test(src));

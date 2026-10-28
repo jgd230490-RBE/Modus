@@ -1427,6 +1427,7 @@ _TENANT_DDL = {
             ends_on         TEXT,
             hours_from      TEXT,
             hours_to        TEXT,
+            days            TEXT,
             reason_kind     TEXT NOT NULL,
             reason_ref      TEXT,
             status          TEXT NOT NULL,

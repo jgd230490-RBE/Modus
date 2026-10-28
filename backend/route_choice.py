@@ -287,6 +287,10 @@ def _applies(row, profile, leg, day, hour=None):
         return False
     if e and day > e:
         return False
+    # `days`: a seven-character Mon..Sun mask like the gates' open days ('1111100' = weekdays), NULL = every day (0d's peaks)
+    mask = (row.get("days") or "").strip()
+    if len(mask) == 7 and mask[day.weekday()] != "1":
+        return False
     hf, ht = row.get("hours_from"), row.get("hours_to")
     if hf or ht:
         if hour is None:

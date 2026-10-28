@@ -199,7 +199,7 @@ for leg in ("loaded", "return"):
 cols = {r["name"] if isinstance(r, dict) and "name" in r else r[1] for r in db.query("PRAGMA table_info(route_choice)")}
 ok("⭐ route_choice exists with the shape 0d shares (dates, hours, reason, status, source)",
    {"tenant_id", "id", "route_id", "vehicle_profile", "leg", "alt_index", "starts_on", "ends_on", "hours_from",
-    "hours_to", "reason_kind", "reason_ref", "status", "source", "km_delta", "decided_by", "decided_at"} <= cols, str(cols))
+    "hours_to", "days", "reason_kind", "reason_ref", "status", "source", "km_delta", "decided_by", "decided_at"} <= cols, str(cols))
 ok("🔴 route_choice is tenanted and keyed (tenant_id, id), registered in the same edit",
    "route_choice" in db.TENANTED_TABLES and db._TENANT_PK["route_choice"] == "(tenant_id, id)")
 ok("the tenant package carries it, after route_geometry (it names stored options)",
@@ -256,6 +256,16 @@ ok("⭐ in the zone's dates: option 2", route_choice.alt_on("R1", ART, "loaded",
 ok("⭐ the day after: back to the main line", route_choice.alt_on("R1", ART, "loaded", "2027-12-18") == 0)
 ok("...another lorry type is not diverted by this lorry type's rows", route_choice.alt_on("R1", "Flatbed", "loaded", "2027-12-06") == 0)
 ok("needs_route gives the main line (0), never a missing option", route_choice.alt_on("R2", ART, "loaded", "2027-12-06") == 0)
+_peak = {"R9": [{"route_id": "R9", "vehicle_profile": None, "leg": None, "alt_index": 1, "starts_on": None, "ends_on": None,
+                 "hours_from": "07:00", "hours_to": "10:00", "days": "1111100", "reason_kind": "peak", "status": "in_use"}]}
+ok("⭐ 0d's shape: an accepted peak row with hours and a weekday mask decides only those hours on those days",
+   route_choice.alt_on("R9", ART, "loaded", "2027-12-06", hour=8, rows=_peak) == 1          # a Monday, 08:00
+   and route_choice.alt_on("R9", ART, "loaded", "2027-12-06", hour=11, rows=_peak) == 0
+   and route_choice.alt_on("R9", ART, "loaded", "2027-12-11", hour=8, rows=_peak) == 0      # a Saturday
+   and route_choice.alt_on("R9", ART, "loaded", "2027-12-06", rows=_peak) == 0)            # never a whole day
+_peak["R9"][0]["status"] = "offered"
+ok("...and an OFFERED peak row changes nothing until the planner accepts it",
+   route_choice.alt_on("R9", ART, "loaded", "2027-12-06", hour=8, rows=_peak) == 0)
 DEC27 = (2027 - 2026) * 12 + 12          # month_index 24
 NOV27 = DEC27 - 1
 m = route_choice.mix("R1", ART, route_choice.month_days(DEC27))

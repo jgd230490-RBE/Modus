@@ -11852,13 +11852,19 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     tokenRef.current = token;
   }, [token]);
 
-  const fetchStatus = () =>
-    Promise.all([
+  // 28 Oct 2026 (task 0c): the dated zones' diversions, read on their own so a slow answer never holds the routes table up
+  const loadDiversions = () =>
+    fetch(`${API}/routes/diversions`).then(r => r.ok ? r.json() : null).then(dv => {
+      if(dv){ setDivPeriods(dv.periods || []); setWayRound(dv.way_round || { legs: 0, here_calls: 0, routes: [] }); }
+    }).catch(() => {});
+
+  const fetchStatus = () => {
+    loadDiversions();
+    return Promise.all([
       fetch(`${API}/routes/status`).then(r => r.json()),
       fetch(`${API}/routes/summary`).then(r => r.json()),
-      fetch(`${API}/routes/diversions`).then(r => r.ok ? r.json() : null).catch(() => null),   // 28 Oct 2026 (task 0c)
-    ]).then(([st, sm, dv]) => { setStatus(st); setSummary(sm);
-      if(dv){ setDivPeriods(dv.periods || []); setWayRound(dv.way_round || { legs: 0, here_calls: 0, routes: [] }); } });
+    ]).then(([st, sm]) => { setStatus(st); setSummary(sm); });
+  };
 
   useEffect(() => { fetchStatus().catch(() => setStatus([])); }, []);
 
@@ -12147,13 +12153,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const reloadNetwork = async () => {
     const m = mapObj.current;
     try {
-      const [loc, st, sm, dv] = await Promise.all([
+      loadDiversions();       // 28 Oct 2026 (task 0c): beside the network, never holding it up
+      const [loc, st, sm] = await Promise.all([
         fetch(`${API}/locations/geojson`).then(r => r.json()),
         fetch(`${API}/routes/status`).then(r => r.json()),
         fetch(`${API}/routes/summary`).then(r => r.json()),
-        fetch(`${API}/routes/diversions`).then(r => r.ok ? r.json() : null).catch(() => null),   // 28 Oct 2026 (task 0c)
       ]);
-      if(dv){ setDivPeriods(dv.periods || []); setWayRound(dv.way_round || { legs: 0, here_calls: 0, routes: [] }); }
       nodesFC.current = loc;
       setLocs(featProps(loc));
       if(m && m.getSource("nodes")) m.getSource("nodes").setData(loc);
@@ -14273,7 +14278,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       {z.kind !== HAUL_KIND && zoneDiv[z.id] && ((zoneDiv[z.id].routes || []).length
                         || (zoneDiv[z.id].needs_route || []).length || (zoneDiv[z.id].no_way_round || []).length)
                         ? <button type="button" className="row-open text-left" onClick={(e) => { e.stopPropagation(); setDivZone(z.id); }}
-                            aria-label={`Show the routes ${z.name} diverts`}>
+                            data-zone-div={z.id}>   {/* named by its own words (axe label-content-name-mismatch, 28 Oct audit) */}
                             {(zoneDiv[z.id].routes || []).length > 0 && <span className="text-slate-600 block">
                               Diverts {zoneDiv[z.id].routes.length} route{zoneDiv[z.id].routes.length === 1 ? "" : "s"}</span>}
                             {((zoneDiv[z.id].needs_route || []).length + (zoneDiv[z.id].no_way_round || []).length) > 0 &&
