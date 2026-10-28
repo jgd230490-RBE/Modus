@@ -803,8 +803,10 @@ ok("8: nothing is fetched on a page view: only refresh() reaches the downloaders
    _sql.count("fetch[\"download\"](") == 4 and "default_fetchers()" in _sql.split("def refresh(")[1][:400])
 GUIDE, TECH = read("frontend/help/index.html"), read("frontend/help/technical/index.html")
 ok("8: the user guide says what the layer is, who sees it, where it comes from and how old it is",
-   "Community considerations" in GUIDE and "250 m" in GUIDE and "OpenStreetMap" in GUIDE and "NaPTAN" in GUIDE
-   and "Get Information about Schools" in GUIDE and "staff" in GUIDE.split("Community considerations")[1][:3000].lower()
+   "Community considerations" in GUIDE and "250 m" in GUIDE   # NARROWED 28 Oct 2026 (the user: no data-set names in the user guide): the sources in plain words; named in technical #t1-guide-sources
+   and "the government's lists of schools and of bus stops and stations, and a map that volunteers keep" in GUIDE
+   and "NaPTAN" not in GUIDE and "Get Information about Schools" not in GUIDE
+   and "Get Information about Schools, the\nDepartment for Transport's NaPTAN and OpenStreetMap" in TECH and "staff" in GUIDE.split("Community considerations")[1][:3000].lower()
    and "the regional plan leaves the bus stops out" in GUIDE)
 ok("8: the technical guide says how it is fetched (Geofabrik, not the public Overpass) and the licences",
    "Geofabrik" in TECH and "Overpass" in TECH and "ODbL" in TECH and "Open Government Licence" in TECH)

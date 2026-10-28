@@ -1100,7 +1100,8 @@ ok("10: the tables are tenanted, in the package (last) and in the audit's regist
 GUIDE, TECH = read("frontend/help/index.html"), read("frontend/help/technical/index.html")
 _g = GUIDE.split("<li><strong>Collision history</strong>")[1].split("</li>")[0] if "<li><strong>Collision history</strong>" in GUIDE else ""
 ok("10: the user guide says what it is, who sees it, where it comes from, what it cannot tell you, and that it is not the assessment",
-   _g and "staff only" in _g and "STATS19" in _g and "250 m" in _g and "not the assessment" in _g
+   _g and "staff only" in _g and "the government&rsquo;s road safety figures" in _g and "STATS19" not in _g and "250 m" in _g and "not the assessment" in _g   # NARROWED 28 Oct 2026 (the user: no data-set names in the user guide): STATS19 is named in technical #t1-guide-sources
+   and "safety data (STATS19), released each late July" in TECH
    and "police" in _g and "2016" in _g and "never the day or time" in _g and "Collision evidence (PDF)" in _g)
 ok("10: v2 (22 Oct 2026): the user guide describes the stretches, the strip, the lorries beside (never a rate), the fold "
    "and the appendix's Nearby rule; the technical guide the rules behind them",

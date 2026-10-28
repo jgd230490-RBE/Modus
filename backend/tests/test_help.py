@@ -1049,5 +1049,28 @@ ok3("BASEMAP WORDS: technical guide #t7-basemap-words names the suppliers and th
     'id="t7-basemap-words"' in _tg28 and "Estonian Land Board's (Maa-amet) orthophoto" in _tg28
     and "Aerial (Mapbox\nSatellite)" in _tg28 and "are Mapbox styles" in _tg28)
 
+# ---- 28 Oct 2026 (the user: no supplier or data-set names in the user guide): DESNZ, DfT and their data sets are named
+# only in the source tables A.1 / A.2 (kept: the OGL asks for the source) and in technical guide #t1-guide-sources.
+_gs = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+_gs_a, _gs_b = _gs.find('id="a-1-data-sources"'), _gs.find('id="a-3-what-the-platform-does-not-do"')
+_gs_rest = _gs[:_gs_a] + _gs[_gs_b:] if 0 < _gs_a < _gs_b else ""
+_GS_BAN = re.compile(r"DESNZ|\bDfT\b|\bDfE\b|Department for (?:Transport|Education|Energy)|NaPTAN|STATS19|Get Information about Schools|\bGIAS\b")
+ok3("⭐ GUIDE SOURCES: outside A.1 / A.2 the user guide names no DESNZ, DfT, DfE, NaPTAN, STATS19 or GIAS",
+    len(_gs_rest) > 50000 and not _GS_BAN.search(_gs_rest), ", ".join(sorted(set(_GS_BAN.findall(_gs_rest)))))
+ok3("GUIDE SOURCES: A.1 / A.2 still name them (the source tables), and the ban would catch the old sentences",
+    "UK Government greenhouse gas conversion factors 2026 (DESNZ)" in _gs[_gs_a:_gs_b] and "(DfT and Innovate UK)" in _gs[_gs_a:_gs_b]
+    and all(_GS_BAN.search(x) for x in ["each lorry's DESNZ 2026 factor", "from DfT&rsquo;s road safety data (STATS19)",
+                                         "the Department for Transport's NaPTAN", "the Government's weekly road fuel prices (DESNZ)"]))
+ok3("GUIDE SOURCES: the plain words are in the guide",
+    "each lorry's 2026 UK Government factor" in _gs and "against the UK national average (2026)" in _gs
+    and "stamped as a Wayscope planning estimate on the UK Government's 2026 factors, not Carbon Tool figures" in _gs
+    and "the government's lists of schools and of bus stops and stations, and a map that volunteers keep" in _gs
+    and "from the government&rsquo;s road safety figures" in _gs and "UK Government conversion factors, 2026" in _gs
+    and "UK Government material use and waste disposal factors, 2026." in _gs)
+_tg_gs = open(TECH, encoding="utf-8").read()
+ok3("GUIDE SOURCES: technical guide #t1-guide-sources names what the user guide leaves out",
+    'id="t1-guide-sources"' in _tg_gs and all(x in _tg_gs for x in ["Get Information about Schools, the\nDepartment for Transport's NaPTAN",
+        "safety data (STATS19), released each late July", "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"]))
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
