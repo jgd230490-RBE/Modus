@@ -1038,5 +1038,16 @@ ok("28 Oct: the technical guide's T1 says what the Abnormal loads page leaves ou
    and "means OpenStreetMap" in _tg27 and "Open Government Licence v3.0" in _tg27 and "plain_candidate / plain_note / plain_bake_error" in _tg27
    and "<code>abnormal_route.SCREEN_BAN</code>" in _tg27)
 
+# ---- 28 Oct 2026 (the user: no supplier names in the user guide): the Basemap line names no supplier ----
+_bm = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+_bmli = (re.search(r"<li><strong>Basemap</strong>.*?</li>", _bm, re.S) or [""])
+_bmli = _bmli.group(0) if hasattr(_bmli, "group") else ""
+ok3("⭐ BASEMAP WORDS: the user guide's Basemap line names no supplier (no Maa-amet, no Mapbox)",
+    bool(_bmli) and "Maa-amet" not in _bmli and "Mapbox" not in _bmli and "(today: Estonia's)" in _bmli, _bmli[:160])
+_tg28 = open(TECH, encoding="utf-8").read()
+ok3("BASEMAP WORDS: technical guide #t7-basemap-words names the suppliers and the old labels",
+    'id="t7-basemap-words"' in _tg28 and "Estonian Land Board's (Maa-amet) orthophoto" in _tg28
+    and "Aerial (Mapbox\nSatellite)" in _tg28 and "are Mapbox styles" in _tg28)
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
