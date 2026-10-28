@@ -1061,9 +1061,12 @@ ok("10: map — a collision near an alternative only is drawn only while Alterna
    and "if (typeof COLL !== 'undefined' && COLL.data) { ensureCollisionLayers(); renderCollisionPanel(); }"
        in MAP.split("function toggleAlts(")[1].split("\n    }")[0])
 _ecl = MAP.split("function ensureCollisionLayers(")[1].split("function collisionPopup(")[0]
-ok("10: map — a tick on an existing layer goes straight on (the filter is not left waiting for the map to go idle)",
-   _ecl.index("if (map.getLayer('collision-points')) {") < _ecl.index("if (!map.isStyleLoaded()) { map.once('idle', ensureCollisionLayers); return; }")
-   and "map.setFilter('collision-points', collisionFilter());" in _ecl.split("if (!map.isStyleLoaded())")[0])
+# 28 Oct 2026 (claude/overlays-after-switch): the idle wait is gone — the gate is styleReady() (the style document parsed);
+# the pin is NARROWED to that gate, same order (the tick on an existing layer comes before the gate, and never waits).
+ok("10: map — a tick on an existing layer goes straight on, before the style-ready gate (no idle wait anywhere since 28 Oct 2026)",
+   _ecl.index("if (map.getLayer('collision-points')) {") < _ecl.index("if (!styleReady()) return;")
+   and "map.setFilter('collision-points', collisionFilter());" in _ecl.split("if (!styleReady())")[0]
+   and "once('idle'" not in _ecl and "isStyleLoaded" not in _ecl.split("if (!styleReady())")[1])
 ok("10: map — the group's words count the alternatives' apart and say how to see them",
    "are along the alternative routes only: " in MAP and "tick Alternative routes to see them." in MAP)
 ok("10: app — the Config panel counts them apart too",
@@ -1100,7 +1103,8 @@ ok("10: the tables are tenanted, in the package (last) and in the audit's regist
 GUIDE, TECH = read("frontend/help/index.html"), read("frontend/help/technical/index.html")
 _g = GUIDE.split("<li><strong>Collision history</strong>")[1].split("</li>")[0] if "<li><strong>Collision history</strong>" in GUIDE else ""
 ok("10: the user guide says what it is, who sees it, where it comes from, what it cannot tell you, and that it is not the assessment",
-   _g and "staff only" in _g and "STATS19" in _g and "250 m" in _g and "not the assessment" in _g
+   _g and "staff only" in _g and "the government&rsquo;s road safety figures" in _g and "STATS19" not in _g and "250 m" in _g and "not the assessment" in _g   # NARROWED 28 Oct 2026 (the user: no data-set names in the user guide): STATS19 is named in technical #t1-guide-sources
+   and "safety data (STATS19), released each late July" in TECH
    and "police" in _g and "2016" in _g and "never the day or time" in _g and "Collision evidence (PDF)" in _g)
 ok("10: v2 (22 Oct 2026): the user guide describes the stretches, the strip, the lorries beside (never a rate), the fold "
    "and the appendix's Nearby rule; the technical guide the rules behind them",
