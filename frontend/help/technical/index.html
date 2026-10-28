@@ -756,6 +756,22 @@ bulletin; the district bands differ from the route carbon bands.</li>
 (&ldquo;For information only&rdquo;). A zone marked Affects routing is avoided (T2).</li>
 <li><strong>Alternatives.</strong> The other options HERE returned and the plan does not use. A route along a haul road
 has none (T2).</li>
+<li><strong>Basemaps.</strong> Eight Mapbox styles (classic <code>-vNN</code>, GL JS 2.14.1); Navigation's live traffic and incident
+layers (<code>mapbox-<wbr>traffic</code>, <code>mapbox-<wbr>incidents</code>) are switched off on every style load. The share link carries
+<code>&amp;basemap=</code> (dark, streets, outdoors, aerial, aerial-plain, nav-day, nav-night, os, imagery; Light writes nothing). Two
+more exist only where set: <strong>the OS map</strong> (deployment setting <code>OS_MAPS_KEY</code>, an OS Data Hub key with the OS Vector
+Tile API; OS's own style is fetched from <code>api.os.uk/maps/<wbr>vector/v1/vts/<wbr>resources/styles<wbr>?srs=3857</code>, every request to
+<code>api.os.uk</code> gets the key and <code>srs=3857</code> from the map's <code>transformRequest</code>, the vector source is limited to zoom 15
+because OS OpenData tiles stop there in the web-map projection (16&ndash;19 is Premium), and OS's credit is set on the source) and
+<strong>the tenant's own imagery</strong> (<code>tenant.imagery_url</code>, <code>imagery_name</code>, <code>imagery_credit</code>, typed on
+Config &rarr; Map and bulletin: a tile address with <code>{z}/{x}/{y}</code>, or a WMS GetMap address with <code>{bbox-epsg-3857}</code>;
+https only, Web Mercator only). Both reach the map only through <code>/api/public/alignment</code> (behind the map password; the
+key and an address that carries a licence key must not go through <code>/api/meta</code>), and both are fetched or built <em>before</em> the basemap
+is replaced: a full style rebuild drops every overlay first, so a bad key or an offline service keeps the basemap you had and says
+so. OS plans: the OpenData plan is worded for internal business use; a service for third parties (this one) is the Premium plan, used
+on OpenData map views only (free). The map page's content security policy lists <code>api.os.uk</code> and adds the one host of the tenant's
+imagery address to its own answers only (<code>security_headers.csp</code>; the host is letters, digits, dots, hyphens and a port, so a typed address
+cannot add anything else). Server-drawn maps (bulletin, route sheet, CLP plans) keep Mapbox and never draw OS data.</li>
 <li><strong>3D buildings</strong> come from Mapbox's vector tiles, from zoom 14; a raster basemap (the Estonia
 orthophoto) has none. The basemap names no longer say &ldquo;Mapbox&rdquo;; Mapbox's own credit stays on the map.</li>
 <li><strong>Alignment overlay.</strong> Gaps in the survey file are interpolated so the corridor reads continuously; the

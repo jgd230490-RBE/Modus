@@ -17,6 +17,8 @@ Adding a new outside host to a page (a basemap's tiles, a script) means adding i
 backend/tests/test_hardening.py fails on any https host a page names that the policy does not allow.
 """
 
+import re
+
 #: where each kind of thing may be loaded from
 CSP_SOURCES = {
     "default-src": ["'self'"],
@@ -26,11 +28,13 @@ CSP_SOURCES = {
     "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
     # map tiles, sprites, Street View pictures and the bulletin's static maps are images from several services
     "img-src": ["'self'", "data:", "blob:", "https:"],
-    # Mapbox GL fetches styles, tiles, glyphs and its event pings; the Estonian ortho tiles for an EE tenant. Google Fonts'
+    # Mapbox GL fetches styles, tiles, glyphs and its event pings; the Estonian ortho tiles for an EE tenant; OS's own web
+    # service for the OS map (28 Oct 2026, 8b: its style, tiles, fonts and sprites). A tenant's OWN imagery host is not
+    # listed here: it is typed on Config, so csp(extra_connect) adds that one host to the MAP page's policy only. Google Fonts'
     # CSS too: accessibility checkers (axe, which the UI audit runs) re-read every stylesheet with fetch(), and the policy
     # refused it on every page (UI audit run 2026-10-27_230343); it serves font CSS only.
     "connect-src": ["'self'", "https://api.mapbox.com", "https://*.tiles.mapbox.com", "https://events.mapbox.com",
-                    "https://tiles.maaamet.ee", "https://fonts.googleapis.com"],
+                    "https://tiles.maaamet.ee", "https://api.os.uk", "https://fonts.googleapis.com"],
     # Mapbox GL runs its workers from blob: URLs
     "worker-src": ["'self'", "blob:"],
     "child-src": ["'self'", "blob:"],
@@ -42,9 +46,17 @@ CSP_SOURCES = {
 }
 
 
-def csp():
-    return "; ".join(f"{k} {' '.join(v)}" for k, v in CSP_SOURCES.items())
+def csp(extra_connect=()):
+    """The policy as one header value. `extra_connect` = origins added to connect-src for this answer (a tenant's imagery host
+    on the map page); each must be a plain https origin, anything else is dropped, so a typed address cannot add a directive."""
+    src = dict(CSP_SOURCES)
+    extra = [o for o in (extra_connect or ()) if isinstance(o, str) and _ORIGIN_RE.match(o)]
+    if extra:
+        src["connect-src"] = src["connect-src"] + [o for i, o in enumerate(extra) if o not in src["connect-src"] and o not in extra[:i]]
+    return "; ".join(f"{k} {' '.join(v)}" for k, v in src.items())
 
+
+_ORIGIN_RE = re.compile(r"^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?$")
 
 HEADERS = {
     # HTTPS only for a year. No includeSubDomains: the rule would bind every *.wayscope.co.uk, decided per subdomain.
@@ -60,12 +72,12 @@ HEADERS = {
 NO_STORE_PREFIXES = ("/api/auth/", "/api/admin/users")
 
 
-def apply(path, headers):
+def apply(path, headers, extra_connect=()):
     """Set the headers on a response's header mapping (Starlette's MutableHeaders or a plain dict). A header the
-    endpoint already set is kept, except Cache-Control on a NO_STORE path, which becomes no-store."""
+    endpoint already set is kept, except Cache-Control on a NO_STORE path, which becomes no-store. `extra_connect`: see csp()."""
     for k, v in HEADERS.items():
         if k not in headers:
-            headers[k] = v
+            headers[k] = csp(extra_connect) if k == "Content-Security-Policy" and extra_connect else v
     if any((path or "").startswith(p) for p in NO_STORE_PREFIXES):
         headers["Cache-Control"] = "no-store"
     return headers

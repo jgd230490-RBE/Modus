@@ -442,7 +442,16 @@ if _Request is not None and hasattr(app, "middleware"):
     @app.middleware("http")
     async def _security_headers_middleware(request, call_next):
         response = await call_next(request)
-        security_headers.apply(request.url.path, response.headers)
+        path = request.url.path
+        extra = ()
+        if path == "/map" or path.startswith("/map/"):
+            # 28 Oct 2026 (8b): the map page may load a tenant's OWN imagery from the host typed on Config
+            try:
+                origin = config.imagery_connect_origin(conversions)
+                extra = (origin,) if origin else ()
+            except Exception:
+                extra = ()
+        security_headers.apply(path, response.headers, extra)
         return response
 
 
@@ -3837,7 +3846,11 @@ def public_alignment(request: Request):
     path reads updated_at only, never the overlay value.
     """
     stamp = tenant_package.get_overlay_stamp()
-    tenant = config.tenant_settings(conversions)
+    tenant = dict(config.tenant_settings(conversions))
+    # 28 Oct 2026 (8b): the map's own extras, here and nowhere else (/api/meta is read before sign-in): the tenant's own
+    # imagery (name, address, credit) and the OS map key. In the ETag's hash below, so a new key or address is seen at once.
+    tenant["imagery"] = config.imagery_settings(conversions)
+    tenant["os_maps_key"] = config.os_maps_key()
     # the tenant's names for its team slots, so the map shows "North Team", not an id
     # 23 Oct 2026: an unnamed team is "<team word> n" (taxonomy.team_name), never its id
     team_rows = [{"id": r["id"], "label": taxonomy.team_name(r["id"])}
