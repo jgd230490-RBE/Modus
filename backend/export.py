@@ -257,7 +257,9 @@ FLAG_LABEL = {"SHORTAGE": "SHORTAGE", "DAYS_NE_WEEK": "DAYS ≠ WEEK", "STOCKPIL
               "RESTRICTION": "RESTRICTION",
               "UNBAKED": "UNBAKED", "PARENT_CHANGED": "PARENT CHANGED",
               # 14 Oct 2026 (bundle G, W17): a gate's planned arrivals on a day against what it can check in
-              "GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"}
+              "GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY",
+              # 28 Oct 2026 (task 0c): a dated zone in force crosses the route this week and it is not diverted
+              "NO_WAY_ROUND": "NO WAY ROUND"}
 
 #: 14 Oct 2026 (W17): printed wherever a gate flag is — the figures are planned, not observed
 #: 17 Oct 2026: built from gate_hours.LIMIT_WORDS (it now names the shut times and bands), so the two cannot drift
@@ -883,7 +885,7 @@ def build_pdf(page):
 #: the Look-ahead's order of seriousness (frontend LA_FLAG_RANK): a lorry over a road limit first.
 #: 17 Oct 2026: + the gate flags where the grid ranks them (GATE_OVER 3.5 beside the route cap, GATE_NEAR 7.5 with the
 #: warnings); they had no rank and sorted after NOT ROUTED, so a gate over capacity hid behind SHARE
-DAY_FLAG_RANK = ("LIMIT", "RESTRICTION", "SHORTAGE", "ROUTE_CAP", "GATE_OVER", "STOCKPILE_OVER", "IPT_SHARE",
+DAY_FLAG_RANK = ("LIMIT", "NO_WAY_ROUND", "RESTRICTION", "SHORTAGE", "ROUTE_CAP", "GATE_OVER", "STOCKPILE_OVER", "IPT_SHARE",
                  "DAYS_NE_WEEK", "PARENT_CHANGED", "GATE_NEAR", "STOCKPILE_EMPTY", "STOCKPILE_SOON", "UNBAKED")
 #: the words a person reads on the sheet (the grid's LINE_FLAG_LABEL, with the restriction's own word from the flag).
 #: 17 Oct 2026: + GATE OVER / GATE NEAR, the grid's and the phone day card's words (the sheet printed "GATE_OVER"); the
@@ -893,7 +895,8 @@ DAY_FLAG_WORD = {"LIMIT": "ROAD LIMIT", "RESTRICTION": "RESTRICTION", "SHORTAGE"
                  "PARENT_CHANGED": "MONTH CHANGED", "UNBAKED": "NOT ROUTED",
                  "GATE_OVER": "GATE OVER", "GATE_NEAR": "GATE NEAR",
                  # 27 Oct 2026 (stockpile forecast): 15 characters at most, the FLAG column's width
-                 "STOCKPILE_SOON": "STOCKPILE SOON", "STOCKPILE_EMPTY": "STOCKPILE EMPTY"}
+                 "STOCKPILE_SOON": "STOCKPILE SOON", "STOCKPILE_EMPTY": "STOCKPILE EMPTY",
+                 "NO_WAY_ROUND": "NO WAY ROUND"}    # 28 Oct 2026 (task 0c)
 
 
 #: flag sentences printed in full under the counts; the rest are counted (every one is in the Look-ahead)
@@ -2977,8 +2980,49 @@ def build_route_sheet_pdf(S):
         c.setFillColorRGB(*GREY); c.setFont(R, 6.8); c.drawString(m, fy, ln)
         fy -= 8.4
     c.showPage()
+    # 28 Oct 2026 (task 0c, the user's Q6): one more page per diversion of this route, in date order
+    for dv in S.get("diversions") or []:
+        _route_sheet_diversion_page(c, S, dv, m, cw, W, H, R, B, size)
+        c.showPage()
     c.save()
     return buf.getvalue()
+
+
+def _route_sheet_diversion_page(c, S, dv, m, cw, W, H, R, B, size):
+    """One diversion of the route sheet: the heading with its dates, the way it takes (green out, amber back, under the
+    road names as on page 1), why, the distances, the lorry limits on it, and the day it goes back to page 1's route."""
+    import basemap
+    import route_sheet as rs
+    y = H - m
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 18); c.drawString(m, y - 18, _pdf_safe(f"Diversion: {dv['when']}"))
+    if S.get("demo_notice"):
+        c.setFillColorRGB(*DEMO_FG_RGB); c.setFont(B, 8)
+        c.drawRightString(W - m, y - 9, _pdf_safe("DEMO · " + S["demo_notice"]))
+    y -= 26
+    for ln in _wrap(f"{S['origin']}  →  {S['dest']} · {S['route_id']}", B, 13, cw):
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 13); c.drawString(m, y - 13, ln)
+        y -= 16
+    y -= 4
+    h1 = rs.MAP1_H_MM * mm
+    w1, hpx = int(round(rs.MAP1_W_MM * rs.PX_PER_MM)), int(round(rs.MAP1_H_MM * rs.PX_PER_MM))
+    v = basemap.view(list(dv["loaded"]) + list(dv["return"]), w1, hpx, pad_px=80, max_zoom=15.0)
+    _rs_map(c, S, v, m, y - h1, cw, h1, [(dv["loaded"], RS_LOADED, RS_OFFSET), (dv["return"], RS_RETURN, RS_OFFSET)],
+            pins=((dv["loaded"][0] if dv["loaded"] else None, "A"), (dv["loaded"][-1] if dv["loaded"] else None, "B")),
+            empty_words="No road route to draw.")
+    y -= h1 + 6
+    blocks = [("Why", [", ".join(dv["because"]) + ". In these dates this route goes the way above."]),
+              ("Loaded, A to B", [dv.get("loaded_words") or "—"]),
+              ("Empty, back to A", [dv.get("return_words") or "—"])]
+    lim_head = {"over": "Lorry limits: this lorry is over", "look": "Lorry limits to look at"}.get(dv["limits_status"], "Lorry limits")
+    blocks.append((lim_head, dv["limits_lines"]))
+    colw = (cw - 6 * mm) / 2
+    for i in range(0, len(blocks), 2):
+        hs = [_rs_block(c, m + j * (colw + 6 * mm), y, colw, head, body, size, True)
+              for j, (head, body) in enumerate(blocks[i:i + 2])]
+        y -= max(hs)
+    if dv.get("back_on"):
+        c.setFillColorRGB(*GREY); c.setFont(R, 8.4)
+        c.drawString(m, y - 10, _pdf_safe(f"Back to page 1's route from {dv['back_on']}."))
 
 
 # --------------------------------------------------------------------------- #

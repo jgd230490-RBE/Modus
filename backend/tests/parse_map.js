@@ -7105,6 +7105,43 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     BASEMAP.shown = 'os-zoomstack'; LIGHT.preset = 'day'; delete layers['location-names'].layout['text-font']; L.applyLabels(true);
     ok("0a (sandbox): on the OS map the names keep OS's own font", !('text-font' in layers['location-names'].layout));
   }
+  // ---- 28 Oct 2026 (task 0c): a dated zone's diversion, drawn in its months only (mockup card 4) ----------------------
+  {
+    const a = src.indexOf("const DIV = { orig: new Map()"), b = src.indexOf("function renderMonthFrame(m){");
+    ok("⭐ 0c: the map holds a diversion swap before renderMonthFrame", a > 0 && b > a);
+    const D = new Function(src.slice(a, b) + "\nreturn { DIV, applyDiversions, divWhen };")();
+    const main = [[0, 0], [1, 0], [2, 0]], way = [[0, 0], [1, 1], [2, 0]];
+    const fc = { type: "FeatureCollection", features: [
+      { type: "Feature", properties: { type: "Inbound Highway", route_id: "R1", leg: "loaded", distance_km: 7 }, geometry: { type: "LineString", coordinates: main } },
+      { type: "Feature", properties: { type: "Outbound Highway", route_id: "R1", leg: "return", distance_km: 7 }, geometry: { type: "LineString", coordinates: main.slice().reverse() } },
+      { type: "Feature", properties: { type: "Inbound Haul", route_id: "R1" }, geometry: { type: "LineString", coordinates: [[0, 0], [0.1, 0]] } },
+      { type: "Feature", properties: { type: "Diversion", route_id: "R1", leg: "loaded", months: [24], periods: [{ from: "2027-12-01", to: "2027-12-31" }],
+        because: ["Christmas trading"], distance_km: 8 }, geometry: { type: "LineString", coordinates: way } },
+    ] };
+    ok("0c: a month the diversion does not cover changes nothing", D.applyDiversions(23, fc) === false
+       && fc.features[0].geometry.coordinates === main);
+    const ch = D.applyDiversions(24, fc);
+    ok("⭐ 0c: in its month the laden leg takes the diversion's line and length, with its dates and why for the card",
+       ch === true && fc.features[0].geometry.coordinates === way && fc.features[0].properties.distance_km === 8
+       && fc.features[0].properties.div_when === "1–31 Dec 2027" && fc.features[0].properties.div_because === "Christmas trading"
+       && fc.features[0].properties.div_main_km === 7);
+    ok("0c: ...the empty leg, not diverted, keeps the main line", fc.features[1].geometry.coordinates.length === 3
+       && fc.features[1].geometry.coordinates[0][0] === 2);
+    ok("0c: ...and the diverted leg's haul-road dots are hidden (they sit on the main line)", fc.features[2].geometry.coordinates.length === 0);
+    ok("0c: the flow lanes are rebuilt when a leg changed (DIV.rev moved)", D.DIV.rev === 1);
+    const back = D.applyDiversions(25, fc);
+    ok("⭐ 0c: the month after, back to the main line, its length and its dots", back === true && fc.features[0].geometry.coordinates === main
+       && fc.features[0].properties.distance_km === 7 && !("div_when" in fc.features[0].properties) && fc.features[2].geometry.coordinates.length === 2);
+    D.applyDiversions(24, fc);
+    ok("0c: no month on screen (the bar shut) is the main line too", D.applyDiversions(null, fc) === true && fc.features[0].geometry.coordinates === main);
+    ok("0c: divWhen words: a month, a span, open ends", D.divWhen("2029-06-01", "2029-10-31") === "1 Jun – 31 Oct 2029"
+       && D.divWhen("2026-10-05", "2027-12-17") === "5 Oct 2026 – 17 Dec 2027" && D.divWhen("2026-10-05", null) === "from 5 Oct 2026");
+    ok("🔴 0c: no layer draws a 'Diversion' feature of its own (the layers filter by type)",
+       !/\['get', 'type'\], 'Diversion'/.test(src) && src.includes("if(applyDiversions(m, data)) changed=true;"));
+    ok("0c: closing the bar puts the main lines back, and the route card says the diversion first",
+       src.includes("applyDiversions(null, d);") && src.includes("if (rp.div_when) rows.unshift(['Diverted ' + rp.div_when"));
+    ok("0c: the flow lanes key on DIV.rev", src.includes("FLOW.divRev !== divRev"));
+  }
   const net = fs.readFileSync(path.join(ROOT, "backend", "network.py"), "utf8");
   ok("0a: the map data marks a gate's own access road (access_road), so Few can leave its name off",
      net.includes('"access_road": z["id"] in access,') && /SELECT access_zone_id FROM location_gates WHERE tenant_id = \? AND access_zone_id IS NOT NULL/.test(net));
