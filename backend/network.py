@@ -2664,7 +2664,7 @@ def _turnaround_parts(profile, factors, origin=None, dest=None, route=None,
 ANALYSIS_GEOMETRY_SQL = (
     "SELECT tenant_id, route_id, vehicle_profile, leg, alt_index, "
     "CASE WHEN geometry IS NULL OR geometry = '' THEN NULL ELSE 1 END AS geometry, "
-    "distance_km, duration_hr, computed_at, error, zones_applied, haul_zones, haul_km, duration_hr_here "
+    "distance_km, duration_hr, computed_at, error, zones_applied, haul_zones, haul_km, duration_hr_here, avoids "
     "FROM route_geometry WHERE tenant_id = ? AND route_id = ?")
 
 

@@ -3346,9 +3346,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && src.includes('<RowStatus word={`${d.day}: ${d.status_word}${d.pct != null ? ` (${d.pct} %)` : d.open ? "" : " (closed)"}`} tone={d.flag === "red" ? "bad" : "warn"} />'));
   ok("⭐ W17: the rail names GATE OVER CAPACITY / GATE NEAR CAPACITY (as the exports do); near is a gold warning, over red",
      // NARROWED 22 Oct 2026 (abnormal loads, phase 2): the rail's table goes on with the four abnormal-load words after GATE NEAR CAPACITY
-     src.includes('GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",') && src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
+     // NARROWED 28 Oct 2026 (task 0c): both tables go on with NO_WAY_ROUND after the last entry
+     src.includes('GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",') && src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT",')
      // NARROWED 27 Oct 2026 (stockpile forecast, D7): the grid's table and the tone go on with STOCKPILE SOON / EMPTY (amber)
-     && src.includes('GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY" };')
+     && src.includes('GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",')
      && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";')
      && src.includes('<i style={{ background: laTone(f.code) === "warn" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i>')
      && /"GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"/.test(fs.readFileSync(path.join(ROOT, "backend", "export.py"), "utf8")));
@@ -3751,7 +3752,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n            style={{ background: bg, color: fg }}>')
      && code.includes('<span className="rd-chip">\n                            {g.direction === "access" ? "in only"') && !code.includes("rgba(31,86,168,.1)")
      && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
-     && (code.match(/className="ml-1\.5 text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 2
+     // NARROWED 28 Oct 2026 (task 0c): + the Routes row's "Diverted" chip, the same house chip (three)
+     && (code.match(/className="ml-1\.5 text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 3
      && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
      && (code.match(/text-\[9px\]/g) || []).length === 0
      && code.includes('<div className={"text-xs uppercase tracking-wide " + (role === "commit" ? "text-slate-600" : "text-slate-400")}>{roleLbl[role] || "\u00a0"}</div>'));
@@ -4334,7 +4336,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      src.includes('<tbody data-horizon-stock="1">') && src.includes('const tone = c.over ? "over" : c.pct >= 90 ? "near" : "ok";')
      && src.includes(`Stockpiles <span className="font-normal text-slate-500">% full at the week's end</span>`));
   ok("RAIL: STOCKPILE SOON / STOCKPILE EMPTY are words in both tables, amber, ranked with the warnings",
-     src.includes('STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",') && src.includes('STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7 };')
+     // NARROWED 28 Oct 2026 (task 0c): the rank table goes on with NO_WAY_ROUND
+     src.includes('STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",') && src.includes('STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7,')
      && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";'));
   ok("DASHBOARD: a stockpile with no planned use never leads the message (as the rail's STOCKPILE SOON)",
      /function stockMessage\(sps\)\{[\s\S]{0,400}if\(!sp\.use_planned\) return;/.test(src));
@@ -4365,6 +4368,31 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("BASEMAP WORDS: the old labels are gone, and the legend tip names the Estonian option by its new name",
      !src.includes("Aerial (Mapbox Satellite)") && !src.includes("Aerial with roads") && !src.includes("Estonia ortho")
      && !src.includes('"Satellite Streets"') && src.includes('"Satellite or Estonia aerial photo"'));
+}
+
+// ---- 28 Oct 2026 (task 0c): zone diversions on Zones, Routes and the Look-ahead (mockup cards 1-3, 5) ---------------
+{
+  ok("⭐ 0c: the Zones page lists a saved zone's diversions (ZoneDiversions) with Keep the main route and Find a way round",
+     /function ZoneDiversions\(/.test(src) && src.includes(">Keep the main route</button>;")
+     && src.includes("Find a way round (") && src.includes("routing call"));
+  ok("0c: the Used by column says what a dated zone diverts, and when a route has no way round",
+     src.includes("Diverts {zoneDiv[z.id].routes.length} route") && src.includes(" route(s): no way round"));
+  ok("⭐ 0c: a diverted route carries a chip with its months; a route a zone crosses with no way round reads Not diverted",
+     src.includes("data-route-diverted={r.id}") && src.includes('{used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}'));
+  ok("0c: the opened route lists its Diversions (DivRows)", src.includes("data-route-diversions={r.id}") && /function DivRows\(/.test(src));
+  ok("0c: the network reload reads the diversions with the routes", src.includes("fetch(`${API}/routes/diversions`)"));
+  ok("⭐ 0c: the Look-ahead line says Diverted (chip + details) and the rail knows NO WAY ROUND, ranked after a road limit",
+     src.includes('(c.diversion && c.diversion.share > 0) ? "Diverted" : null') && src.includes('NO_WAY_ROUND: "NO WAY ROUND"')
+     && /NO_WAY_ROUND: 0\.5/.test(src));
+  ok("0c: the zone form's note says a dated zone diverts in its dates", src.includes('"In its dates, the routes that cross it take a way round."'));
+  ok("0c: divWhen / divMonths words", (() => {
+    const a = src.indexOf("const _dvD = "), b = src.indexOf("const DIV_PROBLEM");
+    if (a < 0 || b < a) return false;
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const f = new Function("MONTHS", src.slice(a, b) + "\nreturn { divWhen, divMonths };")(MONTHS);
+    return f.divWhen("2027-12-01", "2027-12-31") === "1–31 Dec 2027" && f.divMonths("2029-06-01", "2029-10-31") === "Jun–Oct 2029"
+      && f.divMonths("2026-10-05", "2027-12-17") === "Oct 2026 – Dec 2027" && f.divMonths("2027-12-01", "2027-12-17") === "Dec 2027";
+  })());
 }
 
 console.log();

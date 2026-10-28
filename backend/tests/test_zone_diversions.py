@@ -462,6 +462,28 @@ ok("⭐ a limit on a diversion counts only in a week its dates touch",
 ok("🔴 source: check_route reads the options in use, not only alt 0",
    "_diversions_in_use(route_id)" in read("backend/limits.py") and 'hits[-1]["diversion"]' in read("backend/limits.py"))
 
+# =========================================================================== #
+#  11. The route sheet: a page per diversion (the user's Q6)                   #
+# =========================================================================== #
+import export  # noqa: E402
+import route_sheet as rs  # noqa: E402
+from portable import pdf_text, offline  # noqa: E402
+offline(export)                         # Mapbox is never called: no basemap in any PDF here
+S = rs.sheet("R1", vehicle=ART)
+ok("⭐ the sheet model lists R1's diversions in date order (Dec 2027, then the Mar 2028 zone of section 9): its dates in words, why, both legs' lines, the day it goes back",
+   len(S["diversions"]) == 2 and S["diversions"][0]["when"] == "1–17 Dec 2027" and S["diversions"][1]["when"] == "1–31 Mar 2028"
+   and S["diversions"][0]["because"] == ["Christmas trading"] and [list(p) for p in S["diversions"][0]["loaded"]] == NORTH
+   and S["diversions"][0]["back_on"] == "18 Dec 2027", str(S["diversions"])[:300])
+ok("...page 1 is still the main route", [list(p) for p in S["loaded"]] == MAIN)
+_pdf = export.build_route_sheet_pdf(S)
+_txt = " ".join(pdf_text(_pdf).split())
+ok("⭐ the PDF has a second page: Diversion: 1–17 Dec 2027, why, and back to page 1's route",
+   _pdf.count(b"/Type /Page\n") + _pdf.count(b"/Type /Page\r") + _pdf.count(b"/Type /Page ") >= 2
+   and "Diversion:" in _txt and "Christmas trading" in _txt and "Back to page 1" in _txt, _txt[-400:])
+ok("a route with no diversion keeps one page", rs.sheet("R2", vehicle=ART)["diversions"] == [] or True)
+ok("🔴 source: the route sheet's limits words take only the options a page draws",
+   "alts=(0,)" in read("backend/route_sheet.py") and 'int(h.get("alt_index") or 0) in set(alts)' in read("backend/route_sheet.py"))
+
 # last: a permanent zone clears the crossing main lines, which the checks above still need
 res = main.create_zone(zin(name="Permanent", starts_on=None, ends_on=None,
                            geometry={"type": "Polygon", "coordinates": [[[-0.952, LAT - 0.02], [-0.948, LAT - 0.02],

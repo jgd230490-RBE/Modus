@@ -257,8 +257,9 @@ reset_db()
 # (twenty-three with the two collision tables)
 # NARROWED 22 Oct 2026: and without abnormal_loads (the abnormal loads, S16 / B5) — twenty-four; twenty-five with traffic_counts (evidence v3, the same day)
 # NARROWED 27 Oct 2026: and without stockpile_plan (the stockpile forecast's planned use)
-ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 26
-   and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan"}) == 16,
+# NARROWED 28 Oct 2026: and without route_choice (task 0c: a route's option by date) — twenty-seven
+ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 27
+   and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "route_choice"}) == 16,
    f"got {len(db.TENANTED_TABLES)}")
 
 for t in sorted(db.TENANTED_TABLES):

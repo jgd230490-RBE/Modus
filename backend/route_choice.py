@@ -253,13 +253,19 @@ def _all_rows():
         return []
 
 
+_MEMO = {}
+
+
 def _rows_by_route():
-    """{route_id: [row, …]} — one read per data version (read_cache), so a month read over 60 months asks once."""
-    try:
-        import read_cache
-        return read_cache.cached("route_choice", "rows", _build_by_route)
-    except Exception:
-        return _build_by_route()
+    """{route_id: [row, …]} — one read per tenant and data version, so a month read over 60 months asks once. Its own
+    memo, not read_cache: read_cache counts its builds for the council read, and this is read inside that build."""
+    key = (db.current_tenant(), db.data_version())
+    hit = _MEMO.get(key[0])
+    if hit and hit[0] == key[1]:
+        return hit[1]
+    rows = _build_by_route()
+    _MEMO[key[0]] = (key[1], rows)
+    return rows
 
 
 def _build_by_route():

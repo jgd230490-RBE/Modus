@@ -1024,6 +1024,32 @@ const API = "/api";
 // button of its own (the app's bar carries both). /map/ opened directly keeps its own.
 const MAP_URL = "/map/?embed=1&v=" + Date.now();  // per-load cache-buster so the iframe never serves a stale map
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+// 28 Oct 2026 (task 0c): a diversion's dates in words. divWhen "1–31 Dec 2027" / "1 Jun – 31 Oct 2029" /
+// "5 Oct 2026 – 17 Dec 2027" / "from 5 Oct 2026"; divMonths the chip's "Dec 2027" / "Jun–Oct 2029".
+const _dvD = (iso) => { if(!iso) return null; const [y, m, d] = iso.split("-").map(Number); return { y, m, d }; };
+const divWhen = (from, to) => {
+  const a = _dvD(from), b = _dvD(to);
+  if(!a && !b) return "all the time";
+  if(!b) return `from ${a.d} ${MONTHS[a.m - 1]} ${a.y}`;
+  if(!a) return `until ${b.d} ${MONTHS[b.m - 1]} ${b.y}`;
+  if(a.y === b.y && a.m === b.m) return `${a.d}–${b.d} ${MONTHS[b.m - 1]} ${b.y}`;
+  if(a.y === b.y) return `${a.d} ${MONTHS[a.m - 1]} – ${b.d} ${MONTHS[b.m - 1]} ${b.y}`;
+  return `${a.d} ${MONTHS[a.m - 1]} ${a.y} – ${b.d} ${MONTHS[b.m - 1]} ${b.y}`;
+};
+const divMonths = (from, to) => {
+  const a = _dvD(from), b = _dvD(to);
+  if(!a || !b) return a ? `from ${MONTHS[a.m - 1]} ${a.y}` : (b ? `until ${MONTHS[b.m - 1]} ${b.y}` : "");
+  if(a.y === b.y && a.m === b.m) return `${MONTHS[b.m - 1]} ${b.y}`;
+  if(a.y === b.y) return `${MONTHS[a.m - 1]}–${MONTHS[b.m - 1]} ${b.y}`;
+  return `${MONTHS[a.m - 1]} ${a.y} – ${MONTHS[b.m - 1]} ${b.y}`;
+};
+// the change in length each way: the laden leg of the lorry type on screen where it is listed, else any laden leg
+const divDelta = (p, prof) => {
+  const legs = (p && p.legs) || [];
+  const l = legs.find(x => x.leg === "loaded" && x.vehicle_profile === prof) || legs.find(x => x.leg === "loaded") || legs[0];
+  return l && l.km_delta != null ? l.km_delta : null;
+};
+const DIV_PROBLEM = { needs_route: "No way round yet", no_way_round: "No road round it", declined: "Kept on the main route" };
 
 // ---- 2026-09-02, Task F: access codes are resolved by the SERVER --------------
 // The client-side LOGINS dict with plaintext codes in view-source is gone. The code is
@@ -8683,20 +8709,24 @@ const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKP
                      // 14 Oct 2026 (bundle G, W17)
                      GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",
                      // 22 Oct 2026 (abnormal loads, phase 2): the words of the Abnormal loads block's flags (a load, not a line)
-                     NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };
+                     NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT",
+                     // 28 Oct 2026 (task 0c): a dated zone in force crosses the route this week and it is not diverted
+                     NO_WAY_ROUND: "NO WAY ROUND" };
 // H1 (29 Sep 2026): a RESTRICTION flag carries the provider's own word — "TARK TEE" for an
 // Estonian tenant, "ROADWORKS" (National Highways planned closures) for a British one.
 const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);
 // the grid's short words for each flag (the rail spells some out longer: RAIL_LABEL)
 const LINE_FLAG_LABEL = { UNBAKED: "NOT ROUTED", IPT_SHARE: "SHARE", ROUTE_CAP: "CAP", DAYS_NE_WEEK: "DAYS ≠ WEEK",
                   STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", LIMIT: "ROAD LIMIT", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED",
-                  GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY" };
+                  GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",
+                  NO_WAY_ROUND: "NO WAY ROUND" };
 // 13 Oct 2026 (W6): the Look-ahead row's ONE status. The flags, most serious first (a lorry over a road limit
 // before anything else: decision 1), win over the week's state; with no flag, the week's state. `more` counts the
 // other kinds of flag; every flag's sentence is in the details. (Replaces LineFlags' column of words and the
 // StatusChip column: one status a row.)
 const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1, SHORTAGE: 2, ROUTE_CAP: 3, STOCKPILE_OVER: 4, IPT_SHARE: 5, DAYS_NE_WEEK: 6, PARENT_CHANGED: 7, UNBAKED: 8,
-                       GATE_OVER: 3.5, GATE_NEAR: 7.5, STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7 };   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
+                       GATE_OVER: 3.5, GATE_NEAR: 7.5, STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7,
+                       NO_WAY_ROUND: 0.5 };   // 28 Oct 2026 (task 0c): through a closed road, after a road limit   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
 const laRank = (code) => (code in LA_FLAG_RANK ? LA_FLAG_RANK[code] : 99);
 const laSorted = (flags) => [...(flags || [])].sort((a, b) => laRank(a.code) - laRank(b.code));
 // the rail's colours: NOT ROUTED, a road restriction and a gate near capacity in amber, every other flag red
@@ -9207,7 +9237,9 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                           firstClass="la-stick" firstStyle={{ minWidth: 280 }}
                           rowProps={{ "data-la-line": lk }}
                           summary={<>{c.origin_name || line.route_id} <span className="text-slate-400 font-normal">→</span> {c.dest_name || "—"}</>}
-                          chips={[teamWord, c.material_type || null]}
+                          chips={[teamWord, c.material_type || null,
+                                  /* 28 Oct 2026 (task 0c): a dated zone diverts the route on some of this week's days */
+                                  (c.diversion && c.diversion.share > 0) ? "Diverted" : null]}
                           cells={<>
                             <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>
                             {weekdaysOf(line).map(d => {
@@ -9255,6 +9287,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                           <RdItem t="Vehicle">{veh}</RdItem>
                           <RdItem t="Vehicle, full name">{c.vehicle_type && vehLabel(c.vehicle_type) !== veh ? vehLabel(c.vehicle_type) : null}</RdItem>
                           <RdItem t="This week">{laWeekWords(w.status)}</RdItem>
+                          <RdItem t="Diversion">{c.diversion && c.diversion.share > 0
+                            ? (c.diversion.share >= 0.999 ? "A way round a closed road, all week." : "A way round a closed road, some days.") : null}</RdItem>
                           <RdItem t="Parent month changed" wide bad>{w.parent_changed ? "The parent month's quantity changed after this week was set. This week was deliberately not refreshed." : null}</RdItem>
                           <RdItem t="Days and week disagree" wide bad>{line.days_ne_week ? `The days add up to ${grp(line.days_sum, 1)} ${unitLbl(line.unit)}, not the week's ${grp(w.planned_qty, 1)}.` : null}</RdItem>
                           {laFlagGroups(lf).map(g => <RdItem key={g.code} t={g.word} wide bad={g.tone === "bad"}>{g.texts.map((x, i) => <div key={i}>{x}</div>)}</RdItem>)}
@@ -10961,6 +10995,84 @@ const vehShort = (v) => vehLabel(v).replace(/^(Artic|Rigid)\s+/, "");
 // A route is baked in two directions now, so a chip is only "fully baked" (solid) when
 // both the laden run out and the empty run back are cached. Outbound-only shows hollow —
 // enough to draw the map, not enough for a cycle time.
+// 28 Oct 2026 (task 0c, mockup notes\zone-alternatives-mockup-1028 cards 1-3): a dated zone's diversions.
+// divSigned: "−0.7 mi" / "+1.2 mi" each way. DivRows: one row a (route, dates), the button that keeps the main route or
+// gives the diversion back (admins). ZoneDiversions: the panel under the Zones form after a save (or the Used by link).
+const divSigned = (km) => (km == null ? "—" : `${km < 0 ? "−" : "+"}${fmtDist(Math.abs(km), 1)} ${DU()}`);
+function DivButton({ p, canEdit, busy, onKeep }){
+  if(!canEdit) return null;
+  const zid = (p.zones || [])[0];
+  if(p.status === "in_use") return <button type="button" className="btn-sec btn-sm" disabled={busy} onClick={() => onKeep(p.route_id, zid, true)}>Keep the main route</button>;
+  if(p.status === "declined") return <button type="button" className="btn-sec btn-sm" disabled={busy} onClick={() => onKeep(p.route_id, zid, false)}>Use the diversion</button>;
+  return null;
+}
+function DivRows({ rows, prof, canEdit, busy, onKeep, showRoute, routes }){
+  const names = Object.fromEntries((routes || []).map(r => [r.id, r]));
+  // the Zones side card is narrow: one stacked block a route there (the route, then its dates, change and button)
+  if(showRoute) return (
+    <ul className="mt-2 divide-y divide-slate-100 text-xs">{rows.map((p, i) => {
+      const r = names[p.route_id] || {};
+      return (
+        <li key={i} className="py-2" data-div-row={p.route_id}>
+          <div><b>{p.route_id}</b> <span className="text-slate-500">{r.origin ? `${r.origin} → ${r.dest}` : ""}</span></div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+            <span>{divWhen(p.starts_on, p.ends_on)}</span>
+            {p.status === "in_use" ? <span className="tabular-nums">{divSigned(divDelta(p, prof))} each way</span>
+              : <span style={{ color: "var(--bad-text)" }}>{DIV_PROBLEM[p.status] || "—"}</span>}
+            <DivButton p={p} canEdit={canEdit} busy={busy} onKeep={onKeep} />
+          </div>
+        </li>);
+    })}</ul>);
+  return (
+    <table className="tbl w-full text-xs mt-1">
+      <thead><tr>
+        <th className="text-left px-2 py-1">Dates</th>
+        <th className="text-left px-2 py-1">Because</th>
+        <th className="text-right px-2 py-1">Each way</th>
+        {canEdit && <th className="px-2 py-1"><span className="sr-only">Action</span></th>}
+      </tr></thead>
+      <tbody>{rows.map((p, i) => {
+        return (
+          <tr key={i} className="border-t border-slate-100">
+            <td className="px-2 py-1 whitespace-nowrap">{divWhen(p.starts_on, p.ends_on)}</td>
+            <td className="px-2 py-1">{(p.zone_names || []).join(", ")}</td>
+            <td className="px-2 py-1 text-right tabular-nums">
+              {p.status === "in_use" ? divSigned(divDelta(p, prof))
+                : <span style={{ color: "var(--bad-text)" }}>{DIV_PROBLEM[p.status] || "—"}</span>}
+            </td>
+            {canEdit && <td className="px-2 py-1 text-right"><DivButton p={p} canEdit={canEdit} busy={busy} onKeep={onKeep} /></td>}
+          </tr>);
+      })}</tbody>
+    </table>);
+}
+function ZoneDiversions({ zoneId, periods, routes, prof, wayRound, canEdit, busy, onKeep, onFind, onClose }){
+  const ps = (periods || []).filter(p => (p.zones || []).includes(zoneId));
+  const used = ps.filter(p => p.status === "in_use");
+  const nRoutes = new Set(used.map(p => p.route_id)).size;
+  const stuck = [...new Set(ps.filter(p => p.status === "needs_route").map(p => p.route_id))];
+  const none = [...new Set(ps.filter(p => p.status === "no_way_round").map(p => p.route_id))];
+  return (
+    <div className="mt-3 border border-slate-200 rounded-md p-3" data-zone-diversions={zoneId}>
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-slate-700">
+          {nRoutes ? `${nRoutes} route${nRoutes === 1 ? " takes" : "s take"} a diversion` : (new Set(ps.map(p => p.route_id)).size ? `${new Set(ps.map(p => p.route_id)).size} route(s) cross it` : "No route crosses it")}
+          {used.length ? ` (${divMonths(used[0].starts_on, used[used.length - 1].ends_on)})` : ""}
+        </p>
+        <button type="button" className="text-xs text-slate-500 hover:underline" onClick={onClose}>Hide</button>
+      </div>
+      {stuck.length > 0 && (
+        <div className="mt-2 text-[13px] rounded-md px-3 py-2" style={{ background: "rgba(180,83,9,.10)", color: "var(--warn-text)" }}>
+          {stuck.join(", ")}: no way round yet. Until you find one they keep their route, flagged on the Look-ahead.
+          {canEdit && wayRound && wayRound.legs > 0 && <div className="mt-1.5">
+            <button type="button" className="btn-pri btn-sm" disabled={busy} onClick={onFind}>
+              {busy ? "Working…" : `Find a way round (${wayRound.here_calls} routing call${wayRound.here_calls === 1 ? "" : "s"})`}
+            </button></div>}
+        </div>)}
+      {none.length > 0 && <p className="mt-2 text-[13px]" style={{ color: "var(--bad-text)" }}>
+        {none.join(", ")}: no road round it. They keep their route, flagged.</p>}
+      {ps.length > 0 && <DivRows rows={ps} prof={prof} canEdit={canEdit} busy={busy} onKeep={onKeep} showRoute routes={routes} />}
+    </div>);
+}
 function VehChips({ profiles }){
   const keys = Object.keys(profiles || {}).sort();
   if(!keys.length) return <span className="text-xs text-slate-500">not routed</span>;
@@ -11674,6 +11786,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // ---- zones (Phase 3): geofencing and disruptions in one table ----
   const [zoneList, setZoneList] = useState([]);
   const [haulUse, setHaulUse] = useState({});      // Phase 4: zone_id -> routes attached
+  // 28 Oct 2026 (task 0c): the dated zones' diversions — per zone (the Used by column), per route and dates (the
+  // Routes page and the panel after a zone save), and what "Find a way round" would cost now
+  const [zoneDiv, setZoneDiv] = useState({});
+  const [divPeriods, setDivPeriods] = useState([]);
+  const [wayRound, setWayRound] = useState({ legs: 0, here_calls: 0, routes: [] });
+  const [divZone, setDivZone] = useState(null);     // the zone whose diversions show under the form after a save
+  const [divBusy, setDivBusy] = useState(false);
   const [zoneForm, setZoneForm] = useState(null);   // null = not editing
   // 23 Oct 2026 (UI fix 9): opened from a name button -> the focus moves to the editor's heading; when the editor closes
   // (Cancel, Save, Delete) it goes back to that name, or to the table when the row is gone. A row or marker click sets neither.
@@ -11723,7 +11842,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     Promise.all([
       fetch(`${API}/routes/status`).then(r => r.json()),
       fetch(`${API}/routes/summary`).then(r => r.json()),
-    ]).then(([st, sm]) => { setStatus(st); setSummary(sm); });
+      fetch(`${API}/routes/diversions`).then(r => r.ok ? r.json() : null).catch(() => null),   // 28 Oct 2026 (task 0c)
+    ]).then(([st, sm, dv]) => { setStatus(st); setSummary(sm);
+      if(dv){ setDivPeriods(dv.periods || []); setWayRound(dv.way_round || { legs: 0, here_calls: 0, routes: [] }); } });
 
   useEffect(() => { fetchStatus().catch(() => setStatus([])); }, []);
 
@@ -12012,11 +12133,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const reloadNetwork = async () => {
     const m = mapObj.current;
     try {
-      const [loc, st, sm] = await Promise.all([
+      const [loc, st, sm, dv] = await Promise.all([
         fetch(`${API}/locations/geojson`).then(r => r.json()),
         fetch(`${API}/routes/status`).then(r => r.json()),
         fetch(`${API}/routes/summary`).then(r => r.json()),
+        fetch(`${API}/routes/diversions`).then(r => r.ok ? r.json() : null).catch(() => null),   // 28 Oct 2026 (task 0c)
       ]);
+      if(dv){ setDivPeriods(dv.periods || []); setWayRound(dv.way_round || { legs: 0, here_calls: 0, routes: [] }); }
       nodesFC.current = loc;
       setLocs(featProps(loc));
       if(m && m.getSource("nodes")) m.getSource("nodes").setData(loc);
@@ -12672,6 +12795,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const reloadZones = () =>
     fetch(`${API}/zones`).then(r => r.json()).then(j => {
       setZoneList(j.zones || []);
+      setZoneDiv(j.diversions || {});     // 28 Oct 2026 (task 0c): per dated zone, the routes it diverts
       // Phase 4: zone_id -> number of routes attached. A haul road on no route is the
       // commonest reason one "does nothing", and the table has to say so rather than
       // leaving it to be discovered after a bake that changed nothing.
@@ -12805,6 +12929,36 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     return ` Re-routed ${done} leg(s) across ${profs.length} vehicle profile(s).`;
   };
 
+  // 28 Oct 2026 (task 0c): "Keep the main route" (and its undo) for one route through one dated zone
+  const keepMain = async (routeId, zoneId, keep) => {
+    setDivBusy(true);
+    try {
+      const qs = tokenRef.current ? `?token=${encodeURIComponent(tokenRef.current)}` : "";
+      await postJSON(`/admin/route-diversions/keep-main${qs}`, { route_id: routeId, zone_id: zoneId, keep });
+      await reloadNetwork(); await reloadZones().catch(() => {});
+    } catch(e){ setZoneMsg(errSay("Not changed.", e)); }
+    setDivBusy(false);
+  };
+  // "Find a way round": one routing call a leg, looped like Route all; the count is shown on the button first
+  const findWayRound = async () => {
+    setDivBusy(true);
+    try {
+      let last = Infinity;
+      while(true){
+        const q = new URLSearchParams({ limit: "30" });
+        if(tokenRef.current) q.set("token", tokenRef.current);
+        const res = await fetch(`${API}/admin/route-diversions/way-round?${q}`, { method: "POST" });
+        const j = await okJSON(res);
+        const left = j.remaining ?? 0;
+        setZoneMsg(left ? `Finding ways round — ${left} left…` : "Done.");
+        if(left <= 0 || left >= last) break;
+        last = left;
+      }
+      await reloadNetwork(); await reloadZones().catch(() => {});
+    } catch(e){ setZoneMsg(errSay("No way round found.", e)); }
+    setDivBusy(false);
+  };
+
   const saveZone = async () => {
     if(!zoneForm) return;
     const haulNow = isHaul(zoneForm);
@@ -12845,6 +12999,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       if(inv.leg_count) msg += ` ${inv.leg_count} route leg(s) cleared; routing again now.`;
       setZoneMsg(msg);
       if(inv.leg_count) msg += await rebakeAfterZone(inv);
+      // 28 Oct 2026 (task 0c): a dated zone's diversions, worked out on the server, listed under the form
+      if(j.diversions){
+        await reloadNetwork(); await reloadZones().catch(() => {});
+        setDivZone(j.zone && j.zone.id);
+        const d = j.diversions, n = (d.routes || []).length;
+        if(n) msg += ` ${n} route${n === 1 ? " takes" : "s take"} a diversion in its dates.`;
+      }
       setZoneMsg(msg);
       setZoneForm(null); setDrawPts([]); setZoneDraw(false);
     } catch(e){ setZoneMsg(errSay("Not saved.", e)); }
@@ -13643,7 +13804,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 </div>
                 {zoneForm.affects_routing && !isHaul(zoneForm) && (
                   <p className="text-[13px] text-amber-700">
-                    Saving works out again every route that crosses this zone.
+                    {/* 28 Oct 2026 (task 0c): a dated zone diverts in its dates; only an undated one moves the routes for good */}
+                    {(zoneForm.starts_on || zoneForm.ends_on)
+                      ? "In its dates, the routes that cross it take a way round."
+                      : "Saving works out again every route that crosses this zone."}
                   </p>
                 )}
                 {isHaul(zoneForm) && (
@@ -13656,6 +13820,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               </div>
             )}
             {zoneMsg && <p className="text-xs text-slate-600 mt-2">{zoneMsg}</p>}
+            {divZone && !zoneForm && <ZoneDiversions zoneId={divZone} periods={divPeriods} routes={status} prof={showProfile}
+              wayRound={wayRound} canEdit={canEdit} busy={divBusy} onKeep={keepMain} onFind={findWayRound}
+              onClose={() => setDivZone(null)} />}
           </div>
           )}
 
@@ -13954,6 +14121,21 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           gate blocked
                         </span>
                       )}
+                      {(() => {
+                        // 28 Oct 2026 (task 0c): "Diverted Dec 2027" when a dated zone diverts it; red when one crosses it with no way round
+                        const ps = (divPeriods || []).filter(p => p.route_id === r.id);
+                        if(!ps.length) return null;
+                        const used = ps.filter(p => p.status === "in_use"), bad = ps.filter(p => p.status !== "in_use");
+                        const p = (used[0] || bad[0]);
+                        const more = (used.length ? used : bad).length - 1;
+                        return (
+                          <span data-route-diverted={r.id}
+                            className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                            style={used.length ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }
+                                               : { background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>
+                            {used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}{more > 0 ? ` +${more}` : ""}
+                          </span>);
+                      })()}
                       {!!(r.haul_roads || []).length && (
                         // 22 Oct 2026 (UI fix 6, card 6): the chip sits on a SOLID var(--haul-soft) (4.64:1 on any row; the tint fell to 4.24:1 on a selected row)
                         <span title={`Routed through ${(r.haul_roads || []).length} temporary haul road(s): ${(r.haul_roads || []).join(", ")}. Expand the row to edit.`}
@@ -13996,6 +14178,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     haulRoads={haulRoadList}
                     token={tokenRef.current}
                     onHaulChanged={rebakeAfterZone} />}
+                  {open && (divPeriods || []).some(p => p.route_id === r.id) && (
+                    <tr data-route-diversions={r.id}><td colSpan={7} className="px-3 pb-3">
+                      <p className="text-xs font-semibold text-slate-700 mt-1">Diversions</p>
+                      <DivRows rows={(divPeriods || []).filter(p => p.route_id === r.id)} prof={showProfile} canEdit={canEdit}
+                        busy={divBusy} onKeep={keepMain} routes={status} />
+                    </td></tr>)}
                   </React.Fragment>
                 );
               })}
@@ -14067,7 +14255,18 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     </td>
                     <td className="px-3 py-2 text-xs">
                       {/* 22 Oct 2026 (UI fix 6, card 6): "no routes" reads var(--haul-text) */}
-                      {z.kind !== HAUL_KIND ? <span className="text-slate-500">—</span>
+                      {/* 28 Oct 2026 (task 0c): a dated routing zone says what it diverts, and what it cannot */}
+                      {z.kind !== HAUL_KIND && zoneDiv[z.id] && ((zoneDiv[z.id].routes || []).length
+                        || (zoneDiv[z.id].needs_route || []).length || (zoneDiv[z.id].no_way_round || []).length)
+                        ? <button type="button" className="row-open text-left" onClick={(e) => { e.stopPropagation(); setDivZone(z.id); }}
+                            aria-label={`Show the routes ${z.name} diverts`}>
+                            {(zoneDiv[z.id].routes || []).length > 0 && <span className="text-slate-600 block">
+                              Diverts {zoneDiv[z.id].routes.length} route{zoneDiv[z.id].routes.length === 1 ? "" : "s"}</span>}
+                            {((zoneDiv[z.id].needs_route || []).length + (zoneDiv[z.id].no_way_round || []).length) > 0 &&
+                              <span className="block" style={{ color: "var(--bad-text)" }}>
+                                {(zoneDiv[z.id].needs_route || []).length + (zoneDiv[z.id].no_way_round || []).length} route(s): no way round</span>}
+                          </button>
+                        : z.kind !== HAUL_KIND ? <span className="text-slate-500">—</span>
                         : haulUse[z.id]
                         ? <span className="text-slate-600">{haulUse[z.id]} route(s)</span>
                         : <span style={{ color: "var(--haul-text)" }}

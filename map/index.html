@@ -7185,9 +7185,11 @@
     // built once per network (the geometry never changes with the month; only the figures do)
     function flowLanes(){
         const feats = (typeof a1_data !== 'undefined' && a1_data && a1_data.features) || [];
-        if (FLOW.feats !== feats || FLOW.n !== feats.length) {
+        // 28 Oct 2026 (task 0c): and again when a month's diversion swapped a leg's line (DIV.rev)
+        const divRev = (typeof DIV !== 'undefined') ? DIV.rev : 0;
+        if (FLOW.feats !== feats || FLOW.n !== feats.length || FLOW.divRev !== divRev) {
             FLOW.legs = flowLegs(feats); FLOW.lanes = buildFlowLanes(FLOW.legs);
-            FLOW.feats = feats; FLOW.n = feats.length; FLOW.drawn = null;
+            FLOW.feats = feats; FLOW.n = feats.length; FLOW.drawn = null; FLOW.divRev = divRev;
         }
         return FLOW.lanes;
     }
@@ -7514,9 +7516,73 @@
             kpiFetchAll().catch(()=>{});      // one read; on failure each month is read when it is shown
         }, 0);
     }
+    // 28 Oct 2026 (task 0c, mockup card 4): a dated zone's DIVERSIONS. The map data carries 'Diversion' features (a route's
+    // leg on the stored option it takes in a zone's dates, with the months it is used in); no layer draws that type. In a
+    // month on screen that one covers, the route's own leg takes the diversion's line (and its length), so every layer
+    // keyed on the leg — the route lines, the flow, the labels, the card — follows; other months, and with no month on
+    // screen, the main line. Nothing is drawn for the stretch the diversion leaves out (the user's Q7).
+    const DIV = { orig: new Map(), rev: 0, month: undefined };
+    const _divMonths = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function divWhen(from, to){
+        const p = (iso) => { if (!iso) return null; const a = iso.split('-').map(Number); return { y: a[0], m: a[1], d: a[2] }; };
+        const a = p(from), b = p(to);
+        if (!a && !b) return '';
+        if (!b) return 'from ' + a.d + ' ' + _divMonths[a.m - 1] + ' ' + a.y;
+        if (!a) return 'until ' + b.d + ' ' + _divMonths[b.m - 1] + ' ' + b.y;
+        if (a.y === b.y && a.m === b.m) return a.d + '–' + b.d + ' ' + _divMonths[b.m - 1] + ' ' + b.y;
+        if (a.y === b.y) return a.d + ' ' + _divMonths[a.m - 1] + ' – ' + b.d + ' ' + _divMonths[b.m - 1] + ' ' + b.y;
+        return a.d + ' ' + _divMonths[a.m - 1] + ' ' + a.y + ' – ' + b.d + ' ' + _divMonths[b.m - 1] + ' ' + b.y;
+    }
+    function applyDiversions(month, data){
+        const feats = (data && data.features) || [];
+        const legType = { loaded: 'Inbound Highway', 'return': 'Outbound Highway' };
+        const want = new Map();
+        if (month) feats.forEach(f => {
+            const p = f.properties || {};
+            if (p.type === 'Diversion' && (p.months || []).indexOf(month) >= 0) want.set(p.route_id + '|' + legType[p.leg], f);
+        });
+        let changed = false;
+        feats.forEach(f => {
+            const p = f.properties || {};
+            if (!(p.type === 'Inbound Highway' || p.type === 'Outbound Highway') || !p.route_id || !f.geometry) return;
+            const key = p.route_id + '|' + p.type, dv = want.get(key);
+            if (dv) {
+                if (!DIV.orig.has(key)) DIV.orig.set(key, { coords: f.geometry.coordinates, km: p.distance_km, hr: p.duration_hr });
+                if (f.geometry.coordinates !== dv.geometry.coordinates) {
+                    const dp = dv.properties || {};
+                    f.geometry = { type: 'LineString', coordinates: dv.geometry.coordinates };
+                    p.distance_km = dp.distance_km; p.duration_hr = dp.duration_hr;
+                    p.div_when = (dp.periods || []).map(x => divWhen(x.from, x.to)).join(', ');
+                    p.div_because = (dp.because || []).join(', ');
+                    p.div_main_km = DIV.orig.get(key).km;
+                    changed = true;
+                }
+            } else if (DIV.orig.has(key)) {
+                const o = DIV.orig.get(key);
+                f.geometry = { type: 'LineString', coordinates: o.coords };
+                p.distance_km = o.km; p.duration_hr = o.hr;
+                delete p.div_when; delete p.div_because; delete p.div_main_km;
+                DIV.orig.delete(key);
+                changed = true;
+            }
+        });
+        // the dotted haul-road pieces of a diverted leg (withHaulPieces) sit on the main line: hidden while it is diverted
+        const pieceOf = { 'Inbound Haul': 'Inbound Highway', 'Outbound Haul': 'Outbound Highway' };
+        feats.forEach(f => {
+            const p = f.properties || {};
+            if (!pieceOf[p.type] || !p.route_id || !f.geometry) return;
+            const key = p.route_id + '|' + pieceOf[p.type];
+            if (want.has(key) && !f._divHidden) { f._divHidden = f.geometry; f.geometry = { type: 'LineString', coordinates: [] }; changed = true; }
+            else if (!want.has(key) && f._divHidden) { f.geometry = f._divHidden; delete f._divHidden; changed = true; }
+        });
+        if (changed) DIV.rev++;
+        DIV.month = month;
+        return changed;
+    }
     function renderMonthFrame(m){
         const src=map.getSource('routes-source'); if(!src||!TL.matrix) return;
         const data=src._data, byR=TL.matrix.byRoute, unit=TL.matrix.unit; let count=0, sum=0, changed=false;
+        if(applyDiversions(m, data)) changed=true;      // 28 Oct 2026 (task 0c): the month's diversions, before anything reads a line
         data.features.forEach(f=>{
             if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString'){
                 const rid=(f.properties.route_id||'').toString().trim().toLowerCase();
@@ -7588,7 +7654,8 @@
         const bar=document.getElementById('timeline-bar'); if(bar) bar.style.display='none';
         syncTimelineFoot();
         const src=map.getSource('routes-source');
-        if(src){ const d=src._data; d.features.forEach(f=>{ if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString') f.properties.is_forecast=false; }); src.setData(d); }
+        if(src){ const d=src._data; applyDiversions(null, d);   /* 28 Oct 2026 (task 0c): no month on screen, the main lines */
+                 d.features.forEach(f=>{ if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString') f.properties.is_forecast=false; }); src.setData(d); }
         // 12 Oct 2026 (review §2.2d): the road-load and carbon-label layers go with the overlay, or closing the bar
         // left the month's shared sections on the map
         ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
@@ -9837,6 +9904,9 @@
         const rp = routePropsById()[rid] || {};
         const rows = [['Why this route', rp.route_reason], ['Permitted diversions', rp.permitted_deviations]]
             .filter(r => r[1] && String(r[1]).trim());
+        // 28 Oct 2026 (task 0c): in a month a dated zone diverts it, the card says so first
+        if (rp.div_when) rows.unshift(['Diverted ' + rp.div_when, (rp.div_because ? rp.div_because + '. ' : '')
+            + fmtDist(rp.distance_km, 1) + ' ' + DU() + (rp.div_main_km != null ? ', was ' + fmtDist(rp.div_main_km, 1) + ' ' + DU() : '') + '.']);
         return rows.length ? '<div class="route-words">' + rows.map(r => '<h4>' + r[0] + '</h4><p>' + escHtml(String(r[1]).trim()) + '</p>').join('') + '</div>' : '';
     }
     function routeCardHTML(rid) {
