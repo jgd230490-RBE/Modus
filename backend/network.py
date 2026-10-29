@@ -1760,9 +1760,10 @@ def bake_route(route_id, profile=DEFAULT_PROFILE, legs=None, alternatives=ALTERN
            "zones_applied": [z for z in zone_tag.split(",") if z], "departure_time": depart}
     errs = []
     for leg in legs:
+        # 29 Oct 2026 (task 3c): a plain bake calls _bake_leg exactly as before (harnesses stand in for it)
+        _via = {"via_holding": True} if via_holding else {}
         n, err = _bake_leg(r, o, d, profile, leg, factors, alternatives,
-                           avoid=avoid, zone_tag=zone_tag, gates_by_loc=gates_by_loc,
-                           via_holding=via_holding, depart_at=depart)
+                           avoid=avoid, zone_tag=zone_tag, gates_by_loc=gates_by_loc, **_via, depart_at=depart)
         if err:
             errs.append(f"{leg}: {err[:120]}")
             out["legs"][leg] = {"baked": False, "error": err[:200]}
@@ -2868,7 +2869,9 @@ def _turnaround_parts(profile, factors, origin=None, dest=None, route=None,
 ANALYSIS_GEOMETRY_SQL = (
     "SELECT tenant_id, route_id, vehicle_profile, leg, alt_index, "
     "CASE WHEN geometry IS NULL OR geometry = '' THEN NULL ELSE 1 END AS geometry, "
-    "distance_km, duration_hr, computed_at, error, zones_applied, haul_zones, haul_km, duration_hr_here, avoids "
+    "distance_km, duration_hr, computed_at, error, zones_applied, haul_zones, haul_km, duration_hr_here, avoids, "
+    # 29 Oct 2026 (task 3c): the holding-area mark (the Routes page reads it with the row)
+    "holding_id, holding_at_km, holding_tail_hr "
     "FROM route_geometry WHERE tenant_id = ? AND route_id = ?")
 
 

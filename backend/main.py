@@ -4724,7 +4724,8 @@ def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None
             site_speed: Optional[List[str]] = Query(None), service: Optional[List[str]] = Query(None),
             bays: Optional[List[str]] = Query(None), wash: Optional[str] = None,
             arrivals: Optional[str] = None, rush_share: Optional[str] = None, rush_minutes: Optional[str] = None,
-            planned: Optional[str] = None):
+            planned: Optional[str] = None, holding: Optional[str] = None,
+            holding_call: Optional[List[str]] = Query(None), holding_spaces: Optional[List[str]] = Query(None)):
     """
     16 Oct 2026 (S3) — the haulage simulation: an average working day of one month at every gate, lorry by lorry
     (sim.py; the example the user approved on 16 Oct is its spec). Whole loads per line, each gate's arrivals spread
@@ -4756,7 +4757,7 @@ def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None
                                      hours=hours, check_in=check_in, bands=bands, pour_gate=pour_gate,
                                      pour_start=pour_start, pour_m3=pour_m3, pour_m3_per_load=pour_m3_per_load,
                                      pour_rate=pour_rate, arrivals=arrivals, rush_share=rush_share, rush_minutes=rush_minutes,
-                                     planned=planned)
+                                     planned=planned, holding=holding, holding_call=holding_call, holding_spaces=holding_spaces)
         return sim.day(int(month), acc, factors=factors, working_days=_working_days(factors), scenario=sc,
                        send_lines=str(legs or "").lower() in ("1", "true", "yes"),
                        scale=scale, bucket=(week or "commit"), date=date)

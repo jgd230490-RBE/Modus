@@ -251,7 +251,7 @@ ok("1. the words are the UK's: lorry, never truck (the vehicle KEY 'Truck mixer'
    "truck" not in src.replace("Truck mixer", "").lower())
 _net = open(os.path.join(BACKEND, "network.py"), encoding="utf-8").read()
 ok("1. a plain bake's leg_request call is exactly what it was; the holding stop joins only on via_holding",
-   "leg_request(r, o, d, leg, gates_by_loc) if hold is None else" in _net and _net.count("via_holding=via_holding") == 1)
+   "leg_request(r, o, d, leg, gates_by_loc) if hold is None else" in _net and '{"via_holding": True} if via_holding else {}' in _net)
 for col in ("holding_spaces", "holding_call", "holding_exempt", "holding_id"):
     ok(f"1. locations.{col} exists", db.query(f"SELECT {col} FROM locations WHERE tenant_id = ? LIMIT 1", (db.current_tenant(),)) is not None)
 ok("1. routes.skip_holding exists", db.query("SELECT skip_holding FROM routes WHERE tenant_id = ? LIMIT 1", (db.current_tenant(),)) is not None)
