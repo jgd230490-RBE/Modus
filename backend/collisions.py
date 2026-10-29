@@ -693,11 +693,16 @@ def refresh(by=None, fetchers=None, index=None, today=None):
 
 
 def start_refresh(by=None, sync=False, **kw):
+    import fetch_guard
     tenant = db.current_tenant()
-    with _LOCK:
+    # 29 Oct 2026: one big fetch at a time — the community layer's and this one together took live over its memory
+    with fetch_guard.LOCK, _LOCK:
         st = status()
         if st["state"] == "running":
             return dict(st, started=False, message="a fetch is already running")
+        busy = fetch_guard.other_running("collisions")
+        if busy:
+            return dict(st, started=False, message=busy)
         _write_meta("running", dict(_detail(_meta_row()), error=None), by=by, started_at=_now())
 
     def run():
