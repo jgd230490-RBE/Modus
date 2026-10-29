@@ -4525,7 +4525,7 @@ function PourBar({ parts }){
 }
 function PourFigures({ p }){
   if(!p) return null;
-  if(p.problem) return <p className="text-sm text-amber-800" data-pour-problem="1">{p.problem}</p>;
+  if(p.problem) return <p className="text-sm" style={{ color: "var(--warn-text)" }} data-pour-problem="1">{p.problem}</p>;
   const f = p.figures;
   if(!f) return null;
   const st = pourStatus(p);
@@ -4541,7 +4541,7 @@ function PourFigures({ p }){
       <p className="text-sm mt-2"><RowStatus word={st.word} tone={st.tone} more={0} />
         <span className="text-slate-600"> · {f.loads} loads · loading to the end of discharge {pourHm(f.transit)}
           {p.basis === "hours" ? " · drive times for the hours the mixers set off" : " · drive times of the planned route"}</span></p>
-      {(p.flags || []).map((x, i) => <p key={i} className={"text-sm " + (POUR_RED.includes(x.code) ? "text-red-700" : "text-amber-800")}>{x.text}</p>)}
+      {(p.flags || []).map((x, i) => <p key={i} className="text-sm" style={{ color: POUR_RED.includes(x.code) ? "var(--bad-text)" : "var(--warn-text)" }}>{x.text}</p>)}
     </div>
   );
 }
@@ -4621,7 +4621,7 @@ function PoursPage({ meta, access, who }){
     <div className="max-w-7xl mx-auto p-6 pb-2" data-page="pours">
       <PageHeader title="Pours" kicker="Plan" subtitle="Each pour's mixers, their gap and whether it keeps flowing."
         actions={lines.length ? <button type="button" className="btn-pri" onClick={() => open(null)} data-pour-add="1">+ Add pour</button> : null} />
-      {note && <p className={"text-sm mb-3 " + (note.ok ? "text-emerald-700" : "text-red-700")} role="status">{note.text}</p>}
+      {note && <p className="text-sm mb-3" style={{ color: note.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{note.text}</p>}
       {edit && (
         <div className="card p-4 mb-4" data-pour-editor="1">
           <h2 className="text-lg font-semibold text-slate-800 mb-1" tabIndex={-1} ref={headRef}>{edit === "new" ? "New pour" : (form.place || "Pour")}</h2>
