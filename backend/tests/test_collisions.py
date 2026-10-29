@@ -1375,6 +1375,32 @@ def _peek_dl(url, dest):
 cl.refresh(fetchers={"download": _peek_dl}, today=date(2026, 10, 16))
 ok("12: while a fetch runs the status still says the stored rows carry their hours (it read False mid-fetch on live)",
    _mid and all(h is True for h in _mid) and cl.status()["hours"] is True, str(_mid[:3]))
+# 29 Oct 2026 (found on live after U8c: R017's busy-hour offer was "Alt 10" — task 0c's way round a closed zone, not one of
+# HERE's alternatives). A way round is never offered for the busy hours and is named "Way round" wherever a column is labelled.
+import route_choice  # noqa: E402
+_W = route_choice.WAY_ROUND_BASE
+ok("12: column labels: this route, Alternative n (short Alt n), Way round (a second: Way round 2)",
+   [cl.column_label(a) for a in (0, 1, 2, _W, _W + 1)] == ["This route", "Alternative 1", "Alternative 2", "Way round", "Way round 2"]
+   and cl.column_label(2, short=True) == "Alt 2" and cl.column_label(_W, short=True) == "Way round")
+_cols4 = [("This route", 0, _hc(_r001)), ("Alternative 1", 1, _hc(_a001)), ("Way round", _W, _hc([0] * 24))]
+_det_w = cl._detail(cl._meta_row())
+cl._write_meta("done", dict(_det_w, searched=sorted(set(_det_w.get("searched") or []) | {f"R1@{_W}"})))
+ok("12: a way round is left out of the busy-hour comparison even when the fetch searched along it",
+   [c[1] for c in cl._searched_only("R1", _cols4)] == [0, 1] and [o["alt"] for o in cl.busy_offers(cl._searched_only("R1", _cols4))] == [1])
+cl._write_meta("done", {k: v for k, v in _det_w.items() if k != "searched"})
+ok("12: ...and with no searched list (an older fetch) too", [c[1] for c in cl._searched_only("R1", _cols4)] == [0, 1])
+cl._write_meta("done", _det_w)
+network._upsert_geom("R1", PROF, json.dumps(ALT), 3.7, 0.1, None, leg="loaded", alt_index=_W)
+E12w = cl.evidence("R1", now=date(2026, 10, 16))
+ok("12: the evidence names the way round 'Way round', never 'Alternative 10' (the table, the hours, the routes compared)",
+   [c["label"] for c in E12w["columns"]] == ["This route", "Alternative 1", "Way round"]
+   and [c["label"] for c in E12w["time_of_day"]["columns"]] == ["This route", "Alternative 1", "Way round"]
+   and [h["label"] for h in E12w["headline"]] == ["This route", "Alternative 1", "Way round"]
+   and all(o["alt"] < _W for o in E12w["time_of_day"]["offers"]), str([c["label"] for c in E12w["columns"]]))
+_x12w = openpyxl.load_workbook(io.BytesIO(export.build_collision_evidence_xlsx(E12w)))["By time of day"]
+ok("12: ...the XLSX's By time of day header too", _x12w.cell(row=3, column=4).value == "Way round, weekdays",
+   str([_x12w.cell(row=3, column=j).value for j in (1, 2, 3, 4)]))
+db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = 'R1' AND alt_index = ?", (T, _W))
 ok("12: the offer is never applied: collisions.py writes nothing to routes, route_geometry or route_choice",
    not re.search(r"(UPDATE|INSERT INTO|DELETE FROM)\s+(routes|route_geometry|route_choice)\b", read("backend/collisions.py")))
 

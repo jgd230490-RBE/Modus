@@ -814,11 +814,25 @@ def searched_keys():
 
 
 def _searched_only(route_id, cols):
-    """The columns [(label, alt, hours)] whose road the last fetch searched along (the route itself always kept)."""
+    """The columns [(label, alt, hours)] an offer may compare: the route itself, and each of HERE's alternatives whose road
+    the last fetch searched along. A WAY ROUND (alt_index >= route_choice.WAY_ROUND_BASE, baked for a closed zone and baked
+    again when the zone changes) is never offered for the busy hours (29 Oct 2026, found on live: R017's "Alt 10")."""
+    import route_choice
     keys = searched_keys()
-    if keys is None:
-        return cols
-    return [c for c in cols if not c[1] or route_key(route_id, c[1]) in keys]
+    return [c for c in cols if not c[1] or (c[1] < route_choice.WAY_ROUND_BASE
+                                            and (keys is None or route_key(route_id, c[1]) in keys))]
+
+
+def column_label(alt, short=False):
+    """'This route', 'Alternative 2' (short 'Alt 2'), or 'Way round' for a road baked round a closed zone (0c); a second
+    way round on one route reads 'Way round 2'."""
+    import route_choice
+    if not alt:
+        return "This route"
+    if alt >= route_choice.WAY_ROUND_BASE:
+        n = alt - route_choice.WAY_ROUND_BASE + 1
+        return "Way round" + (f" {n}" if n > 1 else "")
+    return f"Alt {alt}" if short else f"Alternative {alt}"
 
 
 def has_hours(recs):
@@ -1472,7 +1486,7 @@ def busy_hours(route_id, acc=None):
     cols = []
     for alt, key in keys:
         on_c = [c for c in recs if c["routes"].get(key, 1e9) <= ON_ROUTE_M]
-        cols.append(("This route" if not alt else f"Alt {alt}", alt, hour_counts(on_c)))
+        cols.append((column_label(alt, short=True), alt, hour_counts(on_c)))
     prim = geo.get(0) or {}
     used = network.DEFAULT_PROFILE if network.DEFAULT_PROFILE in prim else (sorted(prim)[0] if prim else None)
 
@@ -1536,7 +1550,7 @@ def evidence(route_id, acc=None, now=None):
     rows = ROWS + (DETAIL_ROWS if details else [])
     columns = []
     for alt, key in keys:
-        columns.append({"key": key, "alt": alt, "label": "This route" if not alt else f"Alternative {alt}",
+        columns.append({"key": key, "alt": alt, "label": column_label(alt),
                         "length": length_words(alt), **counts_for(recs, key, rows)})
     key0 = route_key(route_id)
     prim_recs = [c for c in recs if key0 in c["routes"]]
