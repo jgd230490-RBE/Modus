@@ -1103,6 +1103,9 @@ ok3("⭐ T2 ranking: HERE's wording with its source links, why the Primary is HE
     and "is HERE's first route and is the Primary every figure uses" in _t2r
     and "nowhere does HERE say its first route is the safer or the lower-carbon one" in _t2r
     and "never describes HERE's choice as safer or greener" in _t2r, _t2r[:160])
+ok3("T2 ranking: the 29 Oct measurement says what the counts support and what they do not",
+    "do not support &ldquo;safer&rdquo; on their own" in _t2r and "the shorter in 49, the quicker in 55" in _t2r
+    and "Schools and homes are not compared yet" in _t2r, _t2r[-300:])
 ok3("T2 ranking: none of it in the user guide (no HERE source links, no routingMode, no section id)",
     "t2-ranking" not in _ug_rank and "routingMode" not in _ug_rank and "docs.here.com" not in _ug_rank)
 
