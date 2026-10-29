@@ -408,6 +408,20 @@ ok("6. the user guide says it in plain words; the technical guide has the detail
    "<strong>Busy-hour times</strong> (admins, beside Route all)" in _ug and "The plan's own figures do not change." in _ug
    and 'id="t2-hour-times"' in _tg and "route_hour_times" in _tg)
 
+# 29 Oct 2026 (John: "please ensure full outline of this is in user and tech guide. try and include how here exactly ranks")
+_why = _ug.split('<li id="ug-why-primary">')[1].split("</li>")[0] if 'id="ug-why-primary"' in _ug else ""
+ok("⭐ 7. the user guide says why the Primary is not always the quickest, in plain words, naming no supplier",
+   "it prefers main roads" in _why and "That is a preference, not a restriction" in _why and "Make primary" in _why
+   and "nothing re-ranks the options by time or distance" in _why and not re.search(r"\bHERE\b", _why))
+ok("7. ...and what a — in a busy-hour column means", "means that road was not one of its options at that hour" in _ug)
+_rk = _tg.split('<li id="t2-ranking">')[1].split("</li>")[0] if 'id="t2-ranking"' in _tg else ""
+ok("⭐ 7. the technical guide explains how HERE ranks a lorry route, sourced, and says what HERE does not publish",
+   "routing-v8-truck-routing.md" in _rk and "routing-api-v8-calculateroutes.md" in _rk and "uses its default, <code>fast</code>" in _rk
+   and "high-priority roads to low-priority ones" in _rk and "What HERE does not publish" in _rk and "A preference produces no notice" in _rk
+   and "R049 Alt 2" in _rk and "That is not verified" in _rk)
+ok("7. the request really sends no routingMode (so HERE's default applies, as the guide says)",
+   "routingMode" not in read("backend/here_routing.py").split("def routes(")[1].split(chr(10) + "def ")[0])
+
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)
