@@ -234,6 +234,8 @@ BALLAST, SMALL, EARTH = "Large aggregate / ballast", "Small aggregate", "Earthwo
 PRECAST, GENERAL = "Precast / concrete", "General / imported"
 # 29 Oct 2026 (3b, the steel split): the girders are Structural steel and the bar Reinforcement; the old Steel / rail is retired
 STRUCT, REINF = "Structural steel", "Reinforcement"
+# 29 Oct 2026 (3b-2): the reinforcement line is typed as m³ of concrete at the demo's own figure (see the forecasts step)
+REBAR_KG_PER_M3, REBAR_STRUCTURE = 125, "Viaduct and overbridge (demo figure)"
 READY, ASPHALT = "Ready-mixed concrete", "Asphalt"
 FEED = "Aggregate for the asphalt plant"   # D112: the plant's feed, on its own category with NO material carbon
 TIP, FLAT = "Artic Tipper (44t)", "Artic Flatbed (44t)"
@@ -982,6 +984,21 @@ def build(with_areas=False, out=None):
     if aw_m < N_MONTHS:
         insert(n + 2, REJECTED[0], aw_m + 1, REJECTED[1], REJECTED[2], REJECTED[3], "t", SMALL, REJECTED[4], TIP,
                "Rejected", REJECTED[5])
+
+    # --- 29 Oct 2026 (3b-2): the viaduct's reinforcement line is TYPED AS M³ OF CONCRETE, as an engineer does before the bar
+    # bending schedules exist: REBAR_KG_PER_M3 kg of bar a m³ (the demo's own figure, said so in the structure's name —
+    # not a published one). Its tonnes are unchanged (100 t = 800 m³), so no load, lorry or carbon figure moves; the
+    # Forecasts row then reads "800 m³ of concrete × 125 kg/m³ (Viaduct and overbridge, demo figure)".
+    rebar_rid = ROUTE_ID[("RH", "VS", REINF)]
+    rebar_rows = db.query("SELECT id, quantity FROM forecasts WHERE tenant_id = ? AND route_id = ? AND material_type = ?",
+                          (db.current_tenant(), rebar_rid, REINF))
+    assert rebar_rows, rebar_rid
+    for r in rebar_rows:
+        m3 = float(r["quantity"]) * 1000.0 / REBAR_KG_PER_M3
+        assert m3 == round(m3), (r["id"], r["quantity"])          # every month a whole number of m³
+        db.execute("UPDATE forecasts SET concrete_m3 = ?, rebar_kg_per_m3 = ?, structure_type = ? "
+                   "WHERE tenant_id = ? AND id = ?",
+                   (m3, float(REBAR_KG_PER_M3), REBAR_STRUCTURE, db.current_tenant(), r["id"]))
 
     # --- the concrete pours (29 Oct 2026, task 3a): before the weeks materialise, so the as-of week's split carries them
     pfactors = conversions.load_factors()

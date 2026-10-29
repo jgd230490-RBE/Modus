@@ -839,6 +839,14 @@ ok("11: the guide says how to type m³ of concrete, that a Config change leaves 
    and "Florida DOT's Structures Design Guidelines (January 2022, section 9.2.3)" in G11
    and "A bar bending schedule always replaces them" in G11)
 
+GEN11 = read("backend/tools/make_demo_tenant.py")
+ok("11: the demo's viaduct reinforcement line is typed as m³ of concrete at the demo's own, labelled figure (125 kg/m³), "
+   "its tonnes unchanged (a whole number of m³ every month, asserted in the generator)",
+   'REBAR_KG_PER_M3, REBAR_STRUCTURE = 125, "Viaduct and overbridge (demo figure)"' in GEN11
+   and 'rebar_rid = ROUTE_ID[("RH", "VS", REINF)]' in GEN11
+   and 'assert m3 == round(m3), (r["id"], r["quantity"])' in GEN11
+   and '"UPDATE forecasts SET concrete_m3 = ?, rebar_kg_per_m3 = ?, structure_type = ? "' in GEN11)
+
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
     print("  FAIL:", f)
