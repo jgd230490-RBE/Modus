@@ -3421,6 +3421,145 @@ def _ce_time_of_day(c, S, m, y, cw, R, B, para, new_page, footer_h):
     return y
 
 
+CE_QUICK_FILL = (0xDC / 255, 0xFC / 255, 0xE7 / 255)   # 29 Oct 2026 (0f-2, card 4): the quicker option's cell, with bold text
+CE_QUICK_TEXT = (0x06 / 255, 0x5F / 255, 0x46 / 255)
+CE_HOUR_ALT2 = "#7C3AED"                                  # a second alternative's line: violet, dotted (named on the chart)
+
+
+def _ce_cycle_by_hour(c, S, m, y, cw, R, B, para, new_page, footer_h):
+    """
+    29 Oct 2026 (task 0f-2, card 4 of notes/busy-hours-0f-mockup-1028, John: "a line chart comparing each route's cycle
+    times hour by hour … highlighting which route is quicker"): the Artic Tipper's cycle at each hour tried, this route and
+    each alternative, the busy hours shaded; at each hour the quicker option has a filled dot and a green, bold cell.
+    Nothing when the times are not worked out. Returns the new y.
+    """
+    Q = S.get("cycle_by_hour")
+    if not Q:
+        return y
+    hrs, series, quick = Q["hours"], Q["series"], Q["quicker"]
+    ch, rows_h = 92, 11 * (len(series) + 1)
+    if y - (ch + rows_h + 70) < m + footer_h:
+        y = new_page()
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 10.5); c.drawString(m, y - 10.5, "Cycle by hour, minutes")
+    y -= 20
+    vals = [v for s_ in series for v in s_["minutes"] if v is not None]
+    lo, hi = (min(vals) // 10) * 10, (max(vals) // 10 + 1) * 10
+    w = cw * 0.72
+    x0, base = m + 26, y - ch
+    X = lambda hh: x0 + (int(hh[:2]) + int(hh[3:]) / 60 - 5.5) / 13.0 * (w - 26)
+    Y = lambda v: base + (v - lo) / ((hi - lo) or 1) * (ch - 8)
+    c.setFillColorRGB(0.937, 0.965, 1.0)                    # the busy hours, shaded (07:00-10:00, 16:00-19:00)
+    for a_, b_ in ((7, 10), (16, 18.5)):
+        xa, xb = x0 + (a_ - 5.5) / 13.0 * (w - 26), x0 + (b_ - 5.5) / 13.0 * (w - 26)
+        c.rect(xa, base, xb - xa, ch, stroke=0, fill=1)
+    c.setStrokeColorRGB(*BAND_GREY_RGB); c.setLineWidth(0.4); c.setFont(R, 6); c.setFillColorRGB(*GREY)
+    step = 10 if hi - lo <= 60 else 20
+    v = lo
+    while v <= hi:
+        c.line(x0, Y(v), x0 + w - 26, Y(v)); c.drawRightString(x0 - 3, Y(v) - 2, str(int(v)))
+        v += step
+    for hh in hrs:
+        c.drawCentredString(X(hh), base - 9, hh)
+    cols = [_hex_rgb(RS_LOADED), _hex_rgb(CE_ALT), _hex_rgb(CE_HOUR_ALT2)]
+    dashes = [[], [3, 2], [1, 1.6]]
+    ends = []
+    for i, s_ in enumerate(series):
+        col = cols[min(i, 2)]
+        c.setStrokeColorRGB(*col); c.setLineWidth(1.6)
+        if dashes[min(i, 2)]:
+            c.setDash(dashes[min(i, 2)], 0)
+        else:
+            c.setDash()
+        pts = [(X(hh), Y(v_)) for hh, v_ in zip(hrs, s_["minutes"]) if v_ is not None]
+        for (xa, ya), (xb, yb) in zip(pts, pts[1:]):
+            c.line(xa, ya, xb, yb)
+        c.setDash()
+        for k, (hh, v_) in enumerate(zip(hrs, s_["minutes"])):
+            if v_ is None:
+                continue
+            c.setStrokeColorRGB(*col); c.setLineWidth(1.2)
+            if quick[k] == i:
+                c.setFillColorRGB(*col); c.circle(X(hh), Y(v_), 2.6, stroke=1, fill=1)
+            else:
+                c.setFillColorRGB(1, 1, 1); c.circle(X(hh), Y(v_), 1.9, stroke=1, fill=1)
+        if pts:
+            ends.append([pts[-1][1], s_["label"] + (f" ({S['route_id']})" if not s_["alt"] else "")])
+    ends.sort()
+    for j in range(1, len(ends)):                            # the line names, never on top of each other
+        if ends[j][0] - ends[j - 1][0] < 8:
+            ends[j][0] = ends[j - 1][0] + 8
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 6.6)
+    for ey, name in ends:
+        c.drawString(x0 + w - 20, ey - 2, _pdf_safe(name))
+    y = base - 20
+    # the table: the same minutes, the quicker option's cell green and bold
+    cw0, cwh = 120, (cw - 120) / len(hrs)
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 6.6)
+    c.drawString(m, y - 7, "Cycle, minutes")
+    for k, hh in enumerate(hrs):
+        c.drawCentredString(m + cw0 + (k + 0.5) * cwh, y - 7, hh)
+    y -= 11
+    for i, s_ in enumerate(series):
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 6.8)
+        c.drawString(m, y - 7, _pdf_safe(s_["label"] + (f" ({S['route_id']})" if not s_["alt"] else "")))
+        for k, v_ in enumerate(s_["minutes"]):
+            cx = m + cw0 + k * cwh
+            if quick[k] == i and v_ is not None:
+                c.setFillColorRGB(*CE_QUICK_FILL); c.rect(cx + 1, y - 9.5, cwh - 2, 10, stroke=0, fill=1)
+                c.setFillColorRGB(*CE_QUICK_TEXT); c.setFont(B, 6.8)
+            else:
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 6.8)
+            c.drawCentredString(cx + cwh / 2, y - 7, "—" if v_ is None else str(v_))
+        y -= 11
+    y = para(ce_cycle_words(Q), y - 3, 7.6, NAVY_RGB)
+    wo = (Q.get("worked_out") or {}).get("computed_at") or ""
+    y = para("A lorry setting off at that hour on a weekday, Artic Tipper; the turnaround as in the plan. Filled dot and green, "
+             "bold cell: the quicker option at that hour. Shaded: the busy hours."
+             + (f" Worked out on {_ce_date(wo)}." if wo else "") + " Beside the plan's figures, never in them.", y - 1, 6.6) - 8
+    return y
+
+
+def _ce_date(iso):
+    try:
+        d = datetime.date.fromisoformat(str(iso)[:10])
+        return f"{d.day} {d.strftime('%b %Y')}"
+    except Exception:
+        return str(iso)[:10]
+
+
+def ce_cycle_words(Q):
+    """One sentence: which option is quicker at which hours, and the gap at 08:00 (card 4)."""
+    hrs, series, quick = Q["hours"], Q["series"], Q["quicker"]
+    named = [k for k in quick if k is not None]
+    if not named:
+        return "No option has a time at these hours."
+    if len(series) == 1:
+        return "Only this route has times at these hours."
+    if all(k == named[0] for k in named):
+        who = "This route" if series[named[0]]["alt"] == 0 else series[named[0]]["label"]
+        at = [hh for hh, k in zip(hrs, quick) if k is not None]
+        lead = (f"{who} is quicker at every hour tried." if len(at) == len(hrs) else
+                f"{who} is quicker at {', '.join(at[:-1]) + ' and ' + at[-1] if len(at) > 1 else at[0]}, "
+                "the hours another option has a time.")
+    else:
+        parts = []
+        for i, s_ in enumerate(series):
+            at = [hh for hh, k in zip(hrs, quick) if k == i]
+            if at:
+                parts.append(f"{s_['label'] if s_['alt'] else 'this route'} at {', '.join(at)}")
+        lead = "The quicker option changes with the hour: " + "; ".join(parts) + "."
+    k8 = hrs.index("08:00") if "08:00" in hrs else None
+    gaps = []
+    if k8 is not None and series[0]["alt"] == 0 and series[0]["minutes"][k8] is not None:
+        for s_ in series[1:]:
+            v_ = s_["minutes"][k8]
+            if v_ is not None:
+                d_ = v_ - series[0]["minutes"][k8]
+                if d_:
+                    gaps.append(f"{s_['label']} takes {abs(d_)} min {'longer' if d_ > 0 else 'less'} at 08:00")
+    return lead + (" " + "; ".join(gaps) + "." if gaps else "")
+
+
 def build_collision_evidence_pdf(S):
     """
     The Route collision evidence (collisions.evidence) as A4 portrait pages. 22 Oct 2026, v2 (the user's yes to
@@ -3838,6 +3977,8 @@ def build_collision_evidence_pdf(S):
     # route by the hour they happened, the same scale side by side; the hours its gates are open shaded, the scheme's
     # no-delivery bands hatched, the busy bands marked under the axis; one sentence only where the gap is clear
     y = _ce_time_of_day(c, S, m, y, cw, R, B, para, new_page, footer_h)
+    # 29 Oct 2026 (task 0f-2, card 4): the cycle hour by hour, the quicker option marked; only when the times are worked out
+    y = _ce_cycle_by_hour(c, S, m, y, cw, R, B, para, new_page, footer_h)
 
     # compared with roads like these — 22 Oct 2026 (v3 part 2; the user: "nothing to compare it to"; R5 reversed for this
     # one comparison, at the user's word): a count and the range a typical road would show, never a ratio or a verdict
@@ -4222,6 +4363,22 @@ def build_collision_evidence_xlsx(S):
             wh.cell(row=r_, column=1, value="No deliveries (the scheme's bands): "
                                             + ", ".join(f"{b['from']}–{b['to']}" for b in T["no_delivery"]) + ".")
         wh.freeze_panes = "A4"
+    # 29 Oct 2026 (task 0f-2, card 4): the cycle by hour, the quicker option's cell green and bold, as on the PDF
+    Q = S.get("cycle_by_hour")
+    if Q:
+        r0 = wh.max_row + 2
+        wh.cell(row=r0, column=1, value="Cycle by hour, minutes (a lorry setting off at that hour on a weekday, Artic Tipper)"
+                ).font = Font(bold=True)
+        for k, hh in enumerate(Q["hours"], 2):
+            wh.cell(row=r0 + 1, column=k, value=hh).font = Font(bold=True)
+        for i, s_ in enumerate(Q["series"]):
+            wh.cell(row=r0 + 2 + i, column=1, value=s_["label"] + (f" ({S['route_id']})" if not s_["alt"] else ""))
+            for k, v_ in enumerate(s_["minutes"]):
+                cell = wh.cell(row=r0 + 2 + i, column=k + 2, value=v_)
+                if Q["quicker"][k] == i and v_ is not None:
+                    cell.font = Font(bold=True, color="065F46")
+                    cell.fill = PatternFill("solid", fgColor="DCFCE7")
+        wh.cell(row=r0 + 3 + len(Q["series"]), column=1, value=ce_cycle_words(Q))
     wl = wb.create_sheet("Lorries")
     header(wl, [f"Distance from A ({du})", "Road", "Junction", "Severity", "Goods vehicle", "Articulated", "Turning or waiting to turn left",
                 "On a journey for work", "Vulnerable road users hurt", "Year", "DfT collision reference"])

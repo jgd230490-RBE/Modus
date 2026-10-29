@@ -2961,6 +2961,9 @@ def route_analysis(route_id, profiles=None, pre=None, pairs=None):
             }
             if pairs is not None:
                 row["return_alt_index"] = ralt
+            # 29 Oct 2026 (task 0f-2): the return option this row was costed on (the pairing above), so the busy-hour
+            # times (hour_times.attach) pair the same two legs
+            row["return_alt_used"] = (rg["alt_index"] if rg is not None else None)
             out.append(row)
     return {
         "route_id": route_id,

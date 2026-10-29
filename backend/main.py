@@ -26,6 +26,7 @@ from pydantic import BaseModel
 
 import conversions
 import db
+import hour_times   # 29 Oct 2026 (task 0f-2): drive times by departure hour
 import network
 import here_routing
 import taxonomy
@@ -3732,8 +3733,37 @@ def route_analysis(route_id: str, profile: Optional[str] = None):
     Haul-cycle analysis for one route: cycle time, trips/day, tonnes and CO2 per vehicle
     profile x alternative. Derived from cached geometry plus factors.json planning
     constants — no HERE calls, so it is cheap to open per row.
+
+    29 Oct 2026 (task 0f-2): each row also carries `hours` (the cycle for a lorry setting off at each busy-hour time,
+    hour_times.attach) when the times are worked out; the plan's own figures are unchanged.
     """
-    return network.route_analysis(route_id, profiles=[profile] if profile else None)
+    return hour_times.attach(network.route_analysis(route_id, profiles=[profile] if profile else None))
+
+
+@app.get("/api/admin/hour-times/plan")
+def hour_times_plan(token: Optional[str] = None):
+    """29 Oct 2026 (task 0f-2): what a busy-hour times run would cost (routes, legs, hours, HERE calls) and when the
+    times were last worked out. No HERE call. Admin, like the run."""
+    _check_admin(token)
+    return hour_times.plan()
+
+
+@app.post("/api/admin/hour-times/clear")
+def hour_times_clear(token: Optional[str] = None):
+    """29 Oct 2026 (task 0f-2): drop the worked-out busy-hour times, so the next run works every one out again."""
+    _check_admin(token)
+    return hour_times.clear()
+
+
+@app.post("/api/admin/hour-times/bake")
+def hour_times_bake(limit: int = Query(30, ge=1, le=60), token: Optional[str] = None):
+    """
+    29 Oct 2026 (task 0f-2, the "Busy-hour times" button): work out the next batch of (route, leg, hour) drive times —
+    one HERE call each, asked as the bake asks, at hour_times.HOURS on the bake's weekday. Call until `remaining` is 0;
+    stops starting calls after network.BAKE_BUDGET_S. Spends HERE calls, so admin only.
+    """
+    _check_admin(token)
+    return hour_times.bake_batch(limit=limit, budget_s=network.BAKE_BUDGET_S)
 
 
 @app.get("/api/public/whoami")
