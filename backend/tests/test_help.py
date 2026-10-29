@@ -314,7 +314,8 @@ ok("⭐ G3: the technical guide explains the session, the links, the limits, the
                           "5 failed sign-ins per email per 15 min", "Demo leads (HU14).", "<code>APP_URL/#invite=…</code>"))
    and "those actions are open to anyone who can reach them" not in _tg)
 ok("the menu as it is: four groups with the Carbon planner under PLAN, Find a page, Ctrl K, User guide, Collapse",
-   "<strong>PLAN</strong> (Dashboard, Submit forecast, Forecasts, Carbon planner)" in src
+   # NARROWED 29 Oct 2026 (the Simulation's own page): the PLAN list names every planning view
+   "<strong>PLAN</strong> (Dashboard, Submit forecast, Forecasts, Carbon planner, Abnormal loads, Stockpiles, Pours, Simulation)" in src
    and "Find a page…" in src and "Ctrl K" in src and "<strong>User guide</strong>" in src and "‹ Collapse" in src)
 # NARROWED 11 Oct 2026 (EU vehicles removed): the header no longer offers vehicle names "by country" (English
 # always, European everywhere except Great Britain, Estonian in Estonia). The vehicles are named in English and
@@ -918,7 +919,8 @@ for _nm, _pg, _roles in (("the user guide", src, True), ("the technical guide", 
 ok("decision 10: the only new visible words are the two skip links; the guides' chapter rows are as many as before (59 and 19, + 1 since UI fix 7; 58 + 4 and 28 + 1 since the abnormal loads' chapter 14 and its T1 entry, 22 Oct)",
    # NARROWED 27 Oct 2026 (stockpile forecast): + chapter 15 Stockpiles and its three sections (66); merged with main's technical-guide row (30)
    # NARROWED 29 Oct 2026 (task 3a): + chapter 16 Concrete pours and its three sections (70); + T1 "Concrete pours" (32)
-   len(re.findall(r'<li class="l[12]"', src)) == 70 and len(re.findall(r'<li class="l[12]"', _tg2)) == 32   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   # NARROWED 29 Oct 2026 (the Simulation's own page): + chapter 17 The Simulation and its three sections (74)
+   len(re.findall(r'<li class="l[12]"', src)) == 74 and len(re.findall(r'<li class="l[12]"', _tg2)) == 32   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,
@@ -1136,5 +1138,19 @@ ok3("⭐ SIM RUSH: the user guide's Simulation paragraph names the Arrivals bloc
 ok3("SIM RUSH: the technical guide #t1-sim-rush holds the rule (sim.place, the first k arrivals in the first W open minutes) and the three query parameters",
     'id="t1-sim-rush"' in _tgv2 and "<code>sim.place</code>" in _tgv2 and "<code>arrivals=even|rush</code>" in _tgv2
     and "<code>rush_share</code>" in _tgv2 and "<code>rush_minutes</code>" in _tgv2 and "<code>first_trip_share</code>" in _tgv2)
+# ---- 29 Oct 2026: the Simulation's own page — chapter 17 of the user guide (the chapter-3 paragraph moved there), the nav, 2.2 / 2.4; T1 the detail
+_ch17 = _ug[_ug.index('<h1 id="17-the-simulation">'):_ug.index('<h1 id="appendix-a-methods-and-assumptions">')]
+ok3("⭐ SIM PAGE: the user guide has chapter 17 'The Simulation' with 17.1–17.3 in the nav and the text, holding the Month / Week / Day paragraph (chapter 3 keeps one pointer line)",
+    all(t in _ug for t in ('<a href="#17-the-simulation">17. The Simulation</a>', '<a href="#17-1-the-day-and-the-controls">17.1', '<a href="#17-2-the-scenario">17.2', '<a href="#17-3-the-tables-the-checks-and-the-phone">17.3'))
+    and all(t in _ch17 for t in ('<h2 id="17-1-the-day-and-the-controls">', '<h2 id="17-2-the-scenario">', '<h2 id="17-3-the-tables-the-checks-and-the-phone">', "<strong>Month</strong>", "<strong>Hours and check-in</strong>", "<strong>Every gate</strong>",
+        "<strong>Arrivals</strong>", "<strong>morning rush</strong>", "<strong>Busiest hour at each gate</strong>", "<strong>Checks</strong>", "<strong>more gates</strong>", "Read here, plan on a desktop"))
+    and _ug.count("<p><strong>Simulation</strong> plays a working day lorry by lorry on its own map") == 1 and _ug.index('<h1 id="17-the-simulation">') < _ug.index("<p><strong>Simulation</strong> plays a working day")
+    and "has its own page under Plan (chapter 17)" in _ug and "<strong>Open the Simulation</strong>" in _ug, _ch17[:200])
+ok3("SIM PAGE: chapter 17 names no supplier, rule code, parameter or back-end word; the phone section (2.4) lists the Simulation first under 'Read here, plan on a desktop'",
+    not re.search(r"\b(API|endpoint|server|JSON|D59|D85|D86|HERE|Mapbox|predict\w*|real-time|trucks?)\b", _ch17)
+    and "lists the <strong>Simulation</strong> first, under <em>Read here, plan on a desktop</em>" in _ug)
+ok3("SIM PAGE: the technical guide #t1-sim-page holds the detail (the NAV id, PHONE_READ_PAGES, SimDashLine, the look's style, the audit stops)",
+    'id="t1-sim-page"' in _tgv2 and "<code>PHONE_READ_PAGES</code>" in _tgv2 and "<code>SimDashLine</code>" in _tgv2 and "<code>simMapStyle()</code>" in _tgv2
+    and "<code>simulation+site</code>" in _tgv2 and "<code>#simulation</code>" in _tgv2)
 
 sys.exit(1 if failed else 0)

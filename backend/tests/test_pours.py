@@ -540,7 +540,8 @@ ok("...the technical guide's T1 entry holds the sources and the arithmetic",
 
 _aud = read("backend/tests/ui_audit.js")
 ok("the UI audit walks Plan > Pours (portal and team pages, its header named, a deep stop on the first pour opened)",
-   '"stockpiles", "pours", "lookahead"' in _aud and 'pours: "Pours"' in _aud and 'meta("pours+open", w)' in _aud
+   # NARROWED 29 Oct 2026 (the Simulation's own page): the Simulation follows Pours in the portal pages
+   '"stockpiles", "pours", "simulation", "lookahead"' in _aud and 'pours: "Pours"' in _aud and 'meta("pours+open", w)' in _aud
    and re.search(r'const TEAM_PAGES = \[[^\n]*"pours"', _aud) is not None)
 
 print()
