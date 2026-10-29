@@ -228,10 +228,17 @@ ok("2. a route without an alternative makes no pair", route_compare.summary([{"r
 # =========================================================================== #
 #  3. The community strip covers every option HERE gave                        #
 # =========================================================================== #
+# 29 Oct 2026 (NARROWED, not deleted): the wide strip is too heavy for the deployment's OpenStreetMap pass, so a
+# Fetch now covers the main routes and diversions only; the wide strip is an option for a study on a bigger machine
 lines = community.strip_from_db().lines
-ok("⭐ 3. the community fetch's strip now covers the alternative (so its schools and homes are fetched too)",
-   any(abs(c[1] - 52.51) < 1e-6 for ln in lines for c in ln))
-ok("3. ...but not a way round a closed zone that no diversion uses", not any(abs(c[1] - 52.49) < 1e-6 for ln in lines for c in ln))
+wide = community.strip_from_db(all_options=True).lines
+ok("⭐ 3. a Fetch now's strip is the main routes and diversions only (the wide one is too heavy for the deployment)",
+   not any(abs(c[1] - 52.51) < 1e-6 for ln in lines for c in ln))
+ok("⭐ 3. ...the wide strip (all_options=True) covers the alternative, for a study run with more memory",
+   any(abs(c[1] - 52.51) < 1e-6 for ln in wide for c in ln))
+ok("3. ...and neither covers a way round a closed zone that no diversion uses",
+   not any(abs(c[1] - 52.49) < 1e-6 for ln in lines + wide for c in ln))
+ok("3. refresh() uses the default (narrow) strip", "strip = strip or strip_from_db()" in read("backend/community.py"))
 
 # =========================================================================== #
 #  4. Source                                                                   #

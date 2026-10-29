@@ -13,8 +13,10 @@ left out: it is not HERE's choice between options), on that lorry type:
   * collisions within collisions.ON_ROUTE_M of the option (both legs, every lorry type: its route key), all, killed or
     seriously injured, people walking, cycling or riding hurt badly, cyclists;
   * the community considerations near the option (NEAR_M by kind; an area counts when one of its outline points is that
-    close; a point when it is), from the stored community layer, which covers every option since this change
-    (community.strip_from_db);
+    close; a point when it is), from the stored community layer. ⚠️ On live that layer is fetched along the main routes
+    and diversions only (a wider fetch is too heavy for the deployment), so an alternative's counts there are UNDER-counted
+    where it leaves the main route by more than 250 m; a fair count needs community.strip_from_db(all_options=True) run
+    on a machine with more memory;
   * the laden leg's cycle-route stretches and meeting points and its left turns (the collision evidence's own rules).
 summary(rows) — for each route with an alternative, HERE's first option against each alternative, kind by kind:
 fewer / same / more. Counts only, never rates or a verdict; the words come from whoever reads the table.
