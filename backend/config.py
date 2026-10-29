@@ -381,12 +381,42 @@ def validate(doc, network=None):
                     p.append(f"material '{k}': units must be a list of m3, t or vehicles (or left out for all three)")
                 elif c.get("default_unit") not in (None,) and c.get("default_unit") not in un:
                     p.append(f"material '{k}': its default unit is not one of its units")
+            # 29 Oct 2026 (3b-2): `from_concrete` — lines may be typed as m³ of concrete × a kg/m³ ratio
+            if "from_concrete" in c and not isinstance(c.get("from_concrete"), bool):
+                p.append(f"material '{k}': from_concrete must be true or false")
             # 29 Oct 2026 (3b): `retired` — kept for the lines that carry it, not offered for new ones
             if "retired" in c and not isinstance(c.get("retired"), bool):
                 p.append(f"material '{k}': retired must be true or false")
             for v in c.get("vehicles") or []:
                 if isinstance(vs, dict) and v not in vs:
                     p.append(f"material '{k}' lists vehicle '{v}', which does not exist")
+    # 29 Oct 2026 (3b-2): planning.rebar_ratios — kg of reinforcement per m³ of concrete by structure type
+    rr = plan.get("rebar_ratios") if isinstance(plan, dict) else None
+    if rr is not None:
+        if not isinstance(rr, list):
+            p.append("planning.rebar_ratios must be a list of structure types")
+        else:
+            seen_n, seen_i = set(), set()
+            for i, r in enumerate(rr):
+                if not isinstance(r, dict):
+                    p.append(f"reinforcement ratio row {i + 1} must be an object")
+                    continue
+                nm = (r.get("name") or "").strip() if isinstance(r.get("name"), str) else ""
+                label = nm or f"row {i + 1}"
+                if not nm:
+                    p.append(f"reinforcement ratio row {i + 1}: type the structure's name")
+                elif nm.lower() in seen_n:
+                    p.append(f"reinforcement ratio '{nm}' is listed twice")
+                seen_n.add(nm.lower())
+                rid = r.get("id")
+                if not isinstance(rid, str) or not rid.strip():
+                    p.append(f"reinforcement ratio '{label}' has no id")
+                elif rid in seen_i:
+                    p.append(f"reinforcement ratio id '{rid}' is used twice")
+                seen_i.add(rid)
+                kg = r.get("kg_per_m3")
+                if kg is not None and (not num(kg) or kg <= 0 or kg > 1000):
+                    p.append(f"reinforcement ratio '{label}': kg per m³ must be a number above 0 and at most 1000, or blank")
     if isinstance(vs, dict):
         for k, v in vs.items():
             if k.startswith("_") or not isinstance(v, dict):

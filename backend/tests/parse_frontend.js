@@ -426,8 +426,9 @@ ok("⭐ vehicles needed = movements ÷ trips-per-vehicle, rounded UP",
 ok("⭐ an unbaked route reads 'not routed', never a fleet size",
   code.includes('"not routed" : String(fleetOf(') && code.includes("not routed yet for") && !code.includes('"not baked" : String(fleetOf('));
 ok("the dashboard's fleet column is the server's model (costlines.vehicles), read not recomputed", _dbBody.includes("r.vehicles") && !code.includes("Math.ceil(peakPerDay / a.capacityPerDay)"));
+// NARROWED 29 Oct 2026 (3b-2): m³ of concrete (Reinforcement) also reads "m³"
 ok("...and avg / peak material in the CHOSEN unit",
-  code.includes('`Avg ${unit === "m3" ? "m³"') && code.includes('`Peak ${unit === "m3" ? "m³"'));
+  code.includes('`Avg ${unit === "m3" || conc ? "m³"') && code.includes('`Peak ${unit === "m3" || conc ? "m³"'));
 ok("working days come from factors.planning, defaulting to 22",
   /working_days_per_month\) \|\| 22/.test(code));
 ok("averages are over months WITH a figure, not the whole range",
@@ -2201,7 +2202,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // in its own unit, is in the details
     _fcBody.includes('<table className="tbl rd-table" data-rd-table="forecasts">') && _fcBody.includes("<caption><b>Forecast lines</b> · {sortCaption}")
     && _fcBody.includes('{th(qtyHead, "quantity", true)}') && _fcBody.includes('<td className="num" data-label={qtyHead}>')
-    && _fcBody.includes('<RdItem t="Typed">{`${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>') && _fcBody.includes('const [sort, setSort] = useState({ key: "quantity", dir: "desc" });'));
+    // NARROWED 29 Oct 2026 (3b-2): a line typed as m³ of concrete shows that basis in Typed; every other line as before
+    && _fcBody.includes('<RdItem t="Typed">{g.kg != null && g.concrete > 0') && _fcBody.includes(': `${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>') && _fcBody.includes('const [sort, setSort] = useState({ key: "quantity", dir: "desc" });'));
   ok("...a filter row with applied-filter chips and Clear all above the table; the status chips left the page header",
     _fcBody.includes('<div className="filter-row" data-guide="forecast-status">') && _fcBody.includes("<AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll}")
     && _fcBody.includes("const clearAll = () => setF({ status: \"ALL\", ipt: \"ALL\", discipline: \"ALL\", mine: false, q: \"\" });")
@@ -4339,8 +4341,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && src.includes('{nextOf(m).includes("withdrawn") && <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => withdraw(m)}>Withdraw…</button>}')
      && src.includes('{canDelete(m) && <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => del(m)}>Delete…</button>}')
      && src.includes('const withdraw = (m) => { if (!window.confirm(`Withdraw "${m.name}"?') && !src.includes('className="link-btn" disabled={busy} onClick={() => startEdit(m)}>Edit</button>'));
-  ok("27 Oct: a list row that only loses a line has a named '×' (.row-x): the time bans, the typed pinch points, the peak bands, a gate's shut times; no red Remove link is left",
-     (src.match(/className="row-x" aria-label=\{`Remove /g) || []).length === 4 && html.includes(".row-x{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;")
+  // NARROWED 29 Oct 2026 (3b-2): 5 — + a Reinforcement ratios row on Config → Materials
+  ok("27 Oct: a list row that only loses a line has a named '×' (.row-x): the time bans, the typed pinch points, the peak bands, a gate's shut times, a reinforcement ratio; no red Remove link is left",
+     (src.match(/className="row-x" aria-label=\{`Remove /g) || []).length === 5 && html.includes(".row-x{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;")
      && !src.includes('className="link-btn" style={{ color: "var(--red)" }}') && !src.includes(">Remove</button>"));
   ok("27 Oct: the Routes column head is for a screen reader only; the Delete and Withdraw items end in an ellipsis because a confirm follows",
      src.includes('<th className="px-3 py-2 text-right font-semibold"><span className="sr-only">Actions</span></th>')
