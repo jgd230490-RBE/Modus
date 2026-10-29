@@ -842,6 +842,12 @@ hours where a gate has none) and hatches the scheme's no-delivery bands (<code>p
 collisions and lines only. Offered, never applied: using the alternative in those hours waits for task 0c's per-period route
 choice. HERE gave the same road at every hour in the 16 Oct probe (R010, 32 calls), so any other road is a stored
 alternative.</p>
+<p id="t9-one-fetch"><strong>One big fetch at a time (29 Oct 2026).</strong> The community considerations&rsquo; fetch and the
+collision history&rsquo;s fetch each read large files on a thread; run together on live they took the service over its memory and
+it restarted, killing both. Each start now takes one shared lock (<code>fetch_guard.LOCK</code>) and refuses while the other is
+running, with the sentence Config shows (&ldquo;The community considerations are being fetched. Fetch the collision history when that
+has finished.&rdquo; and the other way round). A run left &lsquo;running&rsquo; by a restart stops blocking once its own stale limit
+passes (community 30 min, collisions 45 min).</p>
 <h1 id="t10-public-map">T10 The public map</h1>
 <p>What the map's screens leave out since 22 Oct 2026 (the words sweep).</p>
 <ul>

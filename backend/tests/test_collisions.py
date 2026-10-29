@@ -1401,6 +1401,41 @@ _x12w = openpyxl.load_workbook(io.BytesIO(export.build_collision_evidence_xlsx(E
 ok("12: ...the XLSX's By time of day header too", _x12w.cell(row=3, column=4).value == "Way round, weekdays",
    str([_x12w.cell(row=3, column=j).value for j in (1, 2, 3, 4)]))
 db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = 'R1' AND alt_index = ?", (T, _W))
+# --------------------------------------------------------------------------- #
+#  13. One big fetch at a time (29 Oct 2026: the community and collision        #
+#      fetches together took live over its 512 MB; Render restarted it)         #
+# --------------------------------------------------------------------------- #
+import fetch_guard  # noqa: E402
+_cm_det = community._detail(community._meta_row()) if community._meta_row() else {}
+_cl_state = cl.status()["state"]
+community._write_meta("running", {}, started_at=community._now())
+_r13 = cl.start_refresh(by="x", sync=True, fetchers={"download": stub_download(only_2025)}, today=date(2026, 10, 16))
+ok("13: the collision fetch refuses while the community fetch runs, in words a person can act on, and marks nothing",
+   _r13["started"] is False and _r13["message"] == fetch_guard.BUSY_WORDS["community"]
+   and "Fetch the collision history when that has finished." in _r13["message"] and cl.status()["state"] == _cl_state,
+   str(_r13.get("message")))
+community._write_meta("running", {}, started_at="2026-10-14T00:00:00Z")
+_r13b = cl.start_refresh(by="x", sync=True, fetchers={"download": stub_download(only_2025)}, today=date(2026, 10, 16))
+ok("13: ...a community run older than its stale limit (a dead thread after a restart) does not block it",
+   _r13b["started"] is True and cl.status()["state"] == "done", str(_r13b.get("message")))
+community._write_meta("done", _cm_det)
+cl._write_meta("running", cl._detail(cl._meta_row()), started_at=cl._now())
+_r13c = community.start_refresh(by="x", sync=True)
+ok("13: the community fetch refuses while the collision fetch runs, and marks nothing",
+   _r13c["started"] is False and _r13c["message"] == fetch_guard.BUSY_WORDS["collisions"]
+   and community.status()["state"] != "running", str(_r13c.get("message")))
+cl._write_meta("done", cl._detail(cl._meta_row()))
+ok("13: the words name no supplier or back end", not re.search(r"Geofabrik|GIAS|NaPTAN|DfT|STATS19|server|thread|memory|API",
+                                                              " ".join(fetch_guard.BUSY_WORDS.values())))
+_src_cm, _src_cl = read("backend/community.py"), read("backend/collisions.py")
+ok("13: both starters check and mark their run under the ONE shared lock (two presses at once cannot both start)",
+   "with fetch_guard.LOCK, _LOCK:" in _src_cm.split("def start_refresh(")[1][:900]
+   and "with fetch_guard.LOCK, _LOCK:" in _src_cl.split("def start_refresh(")[1][:900]
+   and 'fetch_guard.other_running("community")' in _src_cm and 'fetch_guard.other_running("collisions")' in _src_cl)
+ok("13: the technical guide says so (T9, before T10); the user guide carries no back-end word for it",
+   'id="t9-one-fetch"' in read("frontend/help/technical/index.html")
+   and read("frontend/help/technical/index.html").index('id="t9-one-fetch"') < read("frontend/help/technical/index.html").index('id="t10-public-map"')
+   and "fetch_guard" not in read("frontend/help/index.html"))
 ok("12: the offer is never applied: collisions.py writes nothing to routes, route_geometry or route_choice",
    not re.search(r"(UPDATE|INSERT INTO|DELETE FROM)\s+(routes|route_geometry|route_choice)\b", read("backend/collisions.py")))
 
