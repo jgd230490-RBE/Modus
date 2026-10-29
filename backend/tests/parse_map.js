@@ -2533,7 +2533,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && code.includes("['in', ['get', 'route_id'], ['literal', rids]]];")
      // NARROWED 16 Oct 2026 (D115): three layers now — forecast-flow is drawn from its own lanes (flow-source), whose
      // features carry no type / route_id, so drawFlow() applies the same leg toggles and routePassesFilters instead
-     && code.includes("const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels'];")
+     // NARROWED 29 Oct 2026 (the diversion edge): + 'diversion-edge', so the amber edge follows the same filter
+     && code.includes("const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels','diversion-edge'];")
      && code.includes("if (map.getLayer('forecast-flow')) drawFlow();")
      && /function flowLegFigures\(\)\{[\s\S]{0,500}const legOn = \{ 'Inbound Highway': !inCb \|\| inCb\.checked, 'Outbound Highway': !outCb \|\| outCb\.checked \};[\s\S]{0,200}const passing = modeRoutesPassing\(\);[\s\S]{0,200}\(p\.is_forecast && legOn\[p\.type\] && passing\[p\.route_id\]\)/.test(code)
      && !/filter:\['==','is_forecast',true\]/.test(code));
@@ -2696,7 +2697,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      code.includes("const FORECAST_LINE_WIDTH = 6;") && code.includes("const FORECAST_CASING_WIDTH = 8.5;")
      && !code.includes("FORECAST_VOL_STOPS") && !code.includes("forecastWidth(")
      && !/\['interpolate', \['linear'\], \['to-number', \['get', '(f_avg|rl_mv)'\]/.test(code)
-     && (code.match(/'line-width':\s?FORECAST_LINE_WIDTH/g) || []).length === 2 && (code.match(/'line-width':\s?FORECAST_CASING_WIDTH/g) || []).length === 2
+     // NARROWED 29 Oct 2026: the casing width three times — the amber diversion edge takes the casing's place, at its width
+     && (code.match(/'line-width':\s?FORECAST_LINE_WIDTH/g) || []).length === 2 && (code.match(/'line-width':\s?FORECAST_CASING_WIDTH/g) || []).length === 3
      && !/'line-color':\s?CONFIG\.COLORS\.forecast,\s?'line-width':\s?3\.5/.test(code));
   ok("...and the routes stay blue: the forecast colour is untouched", (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
   // the drawer's half of review bug (d)
@@ -3312,8 +3314,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      // NARROWED 12 Oct 2026 (night): the carbon label layer's definition is longer (point placement), so a wider window
      && /map\.addLayer\(\{ id: CARBON_LABEL_LAYER[\s\S]{0,700}raiseMarks\(\);/.test(blkCode)
      && (code.match(/raiseMarks\(\);/g) || []).length >= 11);   // 9 on the base, + the two new adders
+  // NARROWED 29 Oct 2026 (the diversion edge): both lists also remove 'diversion-edge', after the labels
   ok("⭐ C1: the road-load and carbon-label ids are in BOTH removal lists (Show forecast off, and closeTimeline)",
-     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
   ok("⭐ C1: re-added on style.load (setStyle drops every source and layer): the handler calls refreshMapModes() after the month re-render",
      (() => { const a = code.indexOf("map.on('style.load', async () => {"); const b = code.indexOf("let ALIGNMENT_POPUP_WIRED");
               const sl = a > 0 && b > a ? code.slice(a, b) : "";
@@ -4285,7 +4288,7 @@ function qrRead(mod) {
      (code.match(/map\.on\('mousemove'/g) || []).length === 1 && (code.match(/generateId: true/g) || []).length === 1
      && !/promoteId/.test(code));
   ok("Track C: the two removal lists are the one list, unchanged by the merge (Road load, Carbon and the forecast layers; the council areas are their own group and stay)",
-     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach/g) || []).length === 2   // NARROWED 28 Oct 2026 (8d): + the light's dots layer
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach/g) || []).length === 2   // NARROWED 28 Oct 2026 (8d): + the light's dots layer; NARROWED 29 Oct 2026: + the diversion edge
      && !/'area-fill','forecast/.test(code));
   // the deep link carries Road load and Carbon
   ok("⭐ Track C link: the Road load and Carbon boxes travel in &layers= (the box list names them; a change to either writes the link)",
@@ -7141,6 +7144,50 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     ok("0c: closing the bar puts the main lines back, and the route card says the diversion first",
        src.includes("applyDiversions(null, d);") && src.includes("if (rp.div_when) rows.unshift(['Diverted ' + rp.div_when"));
     ok("0c: the flow lanes key on DIV.rev", src.includes("FLOW.divRev !== divRev"));
+  }
+  // ---- 29 Oct 2026: the soft amber edge where a route goes round a closure (mockup diversion-highlight-1029, B) ----
+  {
+    const a = src.indexOf("const DIV_EDGE = {"), b = src.indexOf("function renderMonthFrame(m){");
+    ok("⭐ edge: the amber edge code sits beside the diversion swap, before renderMonthFrame", a > 0 && b > a);
+    let sent = 0; const added = [];
+    const map = { getSource: () => ({ setData: () => { sent++; } }), getLayer: (id) => id === 'forecast-layer', addSource: () => {},
+                  addLayer: (l, before) => added.push([l.id, before, l.paint['line-width'], l.paint['line-color']]) };
+    let legend = 0;
+    const E = new Function("map", "DIV", "forecastLayerFilter", "FORECAST_CASING_WIDTH", "FORECAST_LINE_WIDTH", "CONFIG", "renderFlowLegend",
+      src.slice(a, b) + "\nreturn { DIV_EDGE, divOffPieces, updateDiversionEdge, ensureDiversionEdge };")(
+      map, { orig: new Map() }, () => ['all'], 8.5, 6, { COLORS: { forecast: '#3B6FE0' } }, () => { legend++; });
+    // a main line along lat 52.5 and a diversion that leaves it between lon -0.96 and -0.94 (a 0.01 deg hump, ~1.1 km)
+    const mainL = []; for (let i = 0; i <= 20; i++) mainL.push([-1.0 + i * 0.005, 52.5]);
+    const divL = mainL.map(c => [c[0], (c[0] > -0.961 && c[0] < -0.939) ? 52.51 : 52.5]);
+    const pcs = E.divOffPieces(divL, mainL);
+    ok("⭐ edge: only the stretch off the usual road is edged — one piece, from where it leaves to where it rejoins",
+       pcs.length === 1 && pcs[0][0][1] === 52.5 && pcs[0][pcs[0].length - 1][1] === 52.5
+       && pcs[0].slice(1, -1).every(c => c[1] === 52.51), JSON.stringify(pcs));
+    ok("edge: a diversion that never leaves its road has no piece", E.divOffPieces(mainL, mainL).length === 0);
+    const DIVm = new Map([["R1|Inbound Highway", { coords: mainL }]]);
+    const E2 = new Function("map", "DIV", "forecastLayerFilter", "FORECAST_CASING_WIDTH", "FORECAST_LINE_WIDTH", "CONFIG", "renderFlowLegend",
+      src.slice(a, b) + "\nreturn { DIV_EDGE, updateDiversionEdge, ensureDiversionEdge };")(
+      map, { orig: DIVm }, () => ['all'], 8.5, 6, { COLORS: { forecast: '#3B6FE0' } }, () => { legend++; });
+    const fc = { features: [{ type: 'Feature', properties: { type: 'Inbound Highway', route_id: 'R1', div_when: '1–31 Dec 2027', is_forecast: true },
+                              geometry: { type: 'LineString', coordinates: divL } }] };
+    sent = 0; legend = 0;
+    E2.updateDiversionEdge(fc);
+    ok("⭐ edge: a diverted leg gives its pieces the leg's type, route and is_forecast (so the overlay filter applies)",
+       E2.DIV_EDGE.fc.features.length === 1 && E2.DIV_EDGE.fc.features[0].properties.type === 'Inbound Highway'
+       && E2.DIV_EDGE.fc.features[0].properties.route_id === 'R1' && E2.DIV_EDGE.fc.features[0].properties.is_forecast === true
+       && sent === 1 && legend === 1);
+    E2.updateDiversionEdge(fc);
+    ok("edge: the same month again sends nothing (no source push on every tick)", sent === 1);
+    E2.updateDiversionEdge({ features: [] });
+    ok("edge: a month with no diversion clears the edge once", sent === 2 && E2.DIV_EDGE.fc.features.length === 0);
+    E2.ensureDiversionEdge();
+    ok("⭐ edge: the layer goes UNDER the route line (before 'forecast-layer'), at the casing's width, amber",
+       added.length === 1 && added[0][0] === 'diversion-edge' && added[0][1] === 'forecast-layer' && added[0][2] === 8.5 && added[0][3] === '#F59E0B');
+    ok("edge: the legend line, only in a month with a diversion, and the edge rides with the overlay (added, filtered, removed)",
+       src.includes("? '<div class=\"ml-row\" id=\"div-legend\">' + divEdgeSample() + 'Where a route goes round a closure</div>' : ''")
+       && src.includes("if (typeof ensureDiversionEdge === 'function') ensureDiversionEdge();")
+       && src.includes("updateDiversionEdge(data);      // 29 Oct 2026"));
+    ok("🔴 edge: no dotted line anywhere in it (the user's rule)", !/line-dasharray/.test(src.slice(a, b)));
   }
   const net = fs.readFileSync(path.join(ROOT, "backend", "network.py"), "utf8");
   ok("0a: the map data marks a gate's own access road (access_road), so Few can leave its name off",
