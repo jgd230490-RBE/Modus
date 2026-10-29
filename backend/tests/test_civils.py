@@ -250,9 +250,14 @@ _OLD_DM = {
     "stations": ["Precast / concrete", "Steel / rail", "General / imported"],
     "temporary_works": ["Small aggregate", "Large aggregate / ballast", "General / imported"],
 }
-ok("3: every discipline ↔ material pair of before 14 Oct is kept, in order, at the front",
-   all(DM.get(d, [])[:len(c)] == c for d, c in _OLD_DM.items()))
-ok("3: every new category is linked to at least one discipline", all(any(k in c for c in DM.values()) for k in NEW))
+# NARROWED 29 Oct 2026 (3b, the steel split; the user said yes): the two RETIRED steel categories are no longer seeded
+# (Rail / Reinforcement / Structural steel take their place); every other pair of before 14 Oct is kept, in order, at the front
+_RET = ("Steel / rail", "Structural steel / rebar", "Rail", "Reinforcement", "Structural steel")   # every steel name, old and new
+ok("3: every discipline ↔ material pair of before 14 Oct is kept, in order, at the front (bar the two retired steel ones)",
+   all([x for x in DM.get(d, []) if x not in _RET][:len([x for x in c if x not in _RET])] == [x for x in c if x not in _RET]
+       for d, c in _OLD_DM.items()))
+ok("3: every new category is linked to at least one discipline (bar the retired Structural steel / rebar)",
+   all(any(k in c for c in DM.values()) for k in NEW if k not in _RET))
 ok("3: ready-mixed concrete reaches structures, substructure, utilities, stations; asphalt the pavement",
    all("Ready-mixed concrete" in DM[d] for d in ("structures", "substructure", "utilities", "stations"))
    and "Asphalt" in DM["superstructure"])
@@ -565,9 +570,10 @@ ok("7: the guide names the four categories and the Concrete mixers with their so
 # --------------------------------------------------------------------------- #
 #  9. Steel in tonnes only (the user, 15 Oct 2026)                             #
 # --------------------------------------------------------------------------- #
-STEEL = ("Steel / rail", "Structural steel / rebar")
+# WIDENED 29 Oct 2026 (3b): the three steel categories of the split are tonnes only too
+STEEL = ("Steel / rail", "Structural steel / rebar", "Rail", "Reinforcement", "Structural steel")
 F9 = conversions.load_factors_file()
-ok("9: both steel categories are tonnes only in the seed, with the reason",
+ok("9: every steel category (the two older ones and the three of the split) is tonnes only in the seed, with the reason",
    all(F9["material_categories"][k].get("units") == ["t"] and F9["material_categories"][k].get("default_unit") == "t"
        and "tonnes only" in F9["material_categories"][k].get("_units_note", "") for k in STEEL))
 # NARROWED 22 Oct 2026 (abnormal loads, B2's bare category): "Abnormal loads" is movements only (units ["vehicles"])
@@ -608,6 +614,101 @@ ok("9: Config → Materials has a 'Tonnes only' tick that sets units ['t'] and t
    '"Tonnes only"' in APP9 and 'if(e.target.checked){ m.units = ["t"]; m.default_unit = "t"; } else delete m.units;' in APP9
    and "disabled={isTonnesOnly(c)}" in APP9)
 ok("9: the guide says steel can only be typed in tonnes", "can only be typed in tonnes" in read("frontend/help/index.html"))
+
+# --------------------------------------------------------------------------- #
+#  10. The steel split (3b, 29 Oct 2026; the user: yes to Q1-Q6 as recommended) #
+# --------------------------------------------------------------------------- #
+F10 = conversions.load_factors_file()
+C10 = F10["material_categories"]
+SPLIT = ("Rail", "Reinforcement", "Structural steel")
+RET10 = ("Steel / rail", "Structural steel / rebar")
+ok("10: the three new categories are in the seed, in that order, just before Asphalt",
+   [k for k in C10 if not k.startswith("_")].index("Asphalt") - 3 == [k for k in C10 if not k.startswith("_")].index("Rail")
+   and [k for k in C10 if k in SPLIT] == list(SPLIT))
+ok("10: each new one carries the old steel numbers exactly: 7.85, tonnes only, no m³ conversion, flatbed, metals",
+   all(C10[k]["density_t_per_m3"] == 7.85 and C10[k]["default_unit"] == "t" and C10[k]["units"] == ["t"]
+       and C10[k]["volume_convertible"] is False and C10[k]["vehicles"] == ["Artic Flatbed (44t)"]
+       and C10[k]["carbon_material"] == "metals" for k in SPLIT))
+ok("10: same numbers as the two older steel categories (so no figure moves when a line changes category)",
+   all(C10[k][f] == C10["Steel / rail"][f] == C10["Structural steel / rebar"][f]
+       for k in SPLIT for f in ("density_t_per_m3", "default_unit", "units", "volume_convertible", "vehicles", "carbon_material")))
+ok("10: each new density names its source; Rail's note names Network Rail's 45 ft road limit and its source",
+   all("BS EN 1993-1-1" in C10[k]["_density_basis"] for k in SPLIT)
+   and "45 ft" in C10["Rail"]["_note"] and "NRA22-01" in C10["Rail"]["_note"])
+ok("10: no new category is retired; the two older ones are, with the reason, and keep every number they had",
+   all(C10[k].get("retired") is not True for k in SPLIT)
+   and all(C10[k].get("retired") is True and "RETIRED" in C10[k].get("_retired_note", "") for k in RET10)
+   and C10["Steel / rail"]["vehicles"] == ["Artic Flatbed (44t)"] and C10["Structural steel / rebar"]["density_t_per_m3"] == 7.85)
+ok("10: retired_materials names exactly the two older ones; material_names still lists them (old lines stay valid)",
+   conversions.retired_materials(F10) == list(RET10)
+   and all(k in conversions.material_names(F10) for k in RET10 + SPLIT)
+   and conversions.retired_materials({}) == [] and conversions.retired_materials({"material_categories": {"X": {"retired": "yes"}}}) == [])
+ok("10: an older category still converts and still counts in tonnes (density 7.85, tonnes only)",
+   conversions.allowed_units(F10, "Steel / rail") == ["t"] and conversions.to_tonnes(12, "t", "Steel / rail", "Artic Flatbed (44t)", F10) == 12)
+_c10 = (F10.get("carbon") or {}).get("materials") or {}
+ok("10: carbon: all five steel categories read the one government metals figure", "metals" in _c10
+   and len({C10[k]["carbon_material"] for k in SPLIT + RET10}) == 1)
+ok("10: the seed validates with the retired flag", config.validate(F10) == [], str(config.validate(F10))[:300])
+_b10 = json.loads(json.dumps(F10))
+_b10["material_categories"]["Rail"]["retired"] = "yes"
+ok("10: Config refuses a retired flag that is not true or false", any("Rail" in x and "retired must be true or false" in x
+                                                                      for x in config.validate(_b10)))
+_c10b = json.loads(json.dumps(F10))
+for _k, _c in _c10b["material_categories"].items():
+    if not _k.startswith("_") and isinstance(_c, dict):
+        _c["retired"] = True
+ok("10: Config refuses a document whose every category is retired (nothing left to pick)",
+   any("at least one category that is not retired" in x for x in config.validate(_c10b)))
+ok("10: the disciplines link the new categories and no retired one",
+   not any(k in c for c in taxonomy.DISCIPLINE_MATERIALS.values() for k in RET10)
+   and all(k in taxonomy.DISCIPLINE_MATERIALS["structures"] for k in ("Reinforcement", "Structural steel"))
+   and "Rail" in taxonomy.DISCIPLINE_MATERIALS["superstructure"]
+   and all(k in taxonomy.DISCIPLINE_MATERIALS["substructure"] for k in ("Reinforcement", "Structural steel")))
+boot()
+access.set_current("planner123")
+_m10 = main.meta(None)
+ok("10: /api/meta lists every category (the older ones too) and names the retired ones",
+   all(k in _m10["materials"] for k in SPLIT + RET10) and _m10["retired_materials"] == list(RET10))
+for _k in SPLIT:
+    _row = main.MatrixRow(route_id="R-none", discipline="structures", section_id="", material_type=_k,
+                          vehicle_type="Artic Flatbed (44t)", unit="vehicles", cells=[], ipt="IPT1")
+    try:
+        main.save_matrix_row(_row)
+        _e10 = None
+    except Exception as e:      # noqa: BLE001
+        _e10 = e
+    ok(f"10: a {_k} line in vehicles is refused in words (tonnes only)",
+       getattr(_e10, "status_code", None) == 400 and "is planned in tonnes only" in str(getattr(_e10, "detail", "")), f"{_e10!r}"[:200])
+APP10 = read("frontend/index.html")
+ok("10: the app has one picker rule: every category that is not retired, plus the record's own value",
+   "function pickMaterials(all, meta, keep) {" in APP10
+   and "const ret = new Set((meta && meta.retired_materials) || []);" in APP10
+   and "return (all || []).filter(m => !ret.has(m) || k.has(m));" in APP10)
+ok("10: the Submit picker, a location's supplies and receives, and a site area's materials all go through it",
+   "{pickMaterials(materials, meta, material).map(m => <option key={m}>{m}</option>)}" in APP10
+   and "{pickMaterials(materials, meta, form.supplies).map(cat => (" in APP10
+   and "{pickMaterials(materials, meta, form.receives).map(cat => (" in APP10
+   and "{pickMaterials(materials, meta, areaForm.materials).map(cat =>" in APP10)
+ok("10: Config → Materials marks a retired category 'Older: pick one of the three' and lists it last",
+   "{c.retired === true && <span" in APP10 and "Older: pick one of the three" in APP10
+   and ".sort((x, y) => ((doc.material_categories[x] || {}).retired === true) - ((doc.material_categories[y] || {}).retired === true))" in APP10)
+ok("10: no screen source names a steel category (they come from Config)",
+   not any(x in APP10 for x in ('"Steel / rail"', '"Structural steel / rebar"', '"Structural steel"', '"Reinforcement"')))
+GEN10 = read("backend/tools/make_demo_tenant.py")
+ok("10: the demo generator no longer uses a retired steel category; the girders are Structural steel, the bar Reinforcement",
+   '"Steel / rail"' not in GEN10 and '"Structural steel / rebar"' not in GEN10
+   and 'STRUCT, REINF = "Structural steel", "Reinforcement"' in GEN10
+   and '("RH", "VS", REINF), ("RH", "VS", PRECAST), ("RH", "VS", STRUCT),   # R044–R048' in GEN10
+   and '("WS4", "structures", STRUCT, "RH", "VS", FLAT, "t", 14,' in GEN10
+   and '("WS4", "structures", REINF, "RH", "VS", FLAT, "t", 5,' in GEN10
+   and '("Deck and laydown", "unload", [STRUCT, REINF, PRECAST, GENERAL],' in GEN10)
+G10 = read("frontend/help/index.html")
+ok("10: the guide names the three, says the older two are marked Older and how a line moves, and the carbon and density rows",
+   "Rail, Reinforcement and Structural steel) can only be typed in tonnes" in G10
+   and "The older Steel / rail and Structural steel / rebar are marked Older on Config" in G10
+   and "to move a line, edit its category (no figure changes)" in G10
+   and "Rail, Reinforcement and Structural steel 7.85" in G10
+   and "Rail, Reinforcement and Structural steel (and the older Steel / rail, Structural steel / rebar) 3821.94858" in G10)
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

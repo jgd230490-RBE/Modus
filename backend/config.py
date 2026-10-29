@@ -355,6 +355,8 @@ def validate(doc, network=None):
     plan = doc.get("planning")
     if not isinstance(cats, dict) or not any(not k.startswith("_") for k in cats):
         p.append("material_categories must be an object with at least one category")
+    elif not any(not k.startswith("_") and isinstance(c, dict) and c.get("retired") is not True for k, c in cats.items()):
+        p.append("material_categories must keep at least one category that is not retired")
     if not isinstance(vs, dict) or not any(not k.startswith("_") for k in vs):
         p.append("vehicles must be an object with at least one vehicle")
     if not isinstance(plan, dict):
@@ -379,6 +381,9 @@ def validate(doc, network=None):
                     p.append(f"material '{k}': units must be a list of m3, t or vehicles (or left out for all three)")
                 elif c.get("default_unit") not in (None,) and c.get("default_unit") not in un:
                     p.append(f"material '{k}': its default unit is not one of its units")
+            # 29 Oct 2026 (3b): `retired` — kept for the lines that carry it, not offered for new ones
+            if "retired" in c and not isinstance(c.get("retired"), bool):
+                p.append(f"material '{k}': retired must be true or false")
             for v in c.get("vehicles") or []:
                 if isinstance(vs, dict) and v not in vs:
                     p.append(f"material '{k}' lists vehicle '{v}', which does not exist")

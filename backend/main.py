@@ -1283,6 +1283,8 @@ def meta(request: Request = None):
         "scope": "staff" if staff else "public",
         "units": conversions.UNITS,
         "materials": conversions.material_names(factors),
+        # 29 Oct 2026 (3b): kept for old lines, left out of the pickers for new ones
+        "retired_materials": conversions.retired_materials(factors),
         # every vehicle in the live document, unchanged and in its own order: baked
         # geometry is keyed on vehicle_profile and every saved line names a vehicle, so a
         # list that dropped one would strand those routes and lines.

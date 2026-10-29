@@ -66,19 +66,21 @@ DISCIPLINES = [
 # 14 Oct 2026 (civils materials): the four categories added to factors.json are APPENDED to each
 # discipline's list (nothing removed or renamed): ready-mixed concrete wherever concrete is placed,
 # precast units and steel / rebar where structures and drainage are built, asphalt on the pavement.
+# 29 Oct 2026 (3b, the steel split): the lists name Rail / Reinforcement / Structural steel in place of the two retired
+# steel categories. The seed only ever INSERTS a missing link, so a tenant's old links stay as they are.
 DISCIPLINE_MATERIALS = {
     "earthworks": ["Earthworks / soil", "Small aggregate"],
     "substructure": ["Small aggregate", "Large aggregate / ballast",
                      "Precast / concrete", "General / imported",
-                     "Ready-mixed concrete", "Precast units", "Structural steel / rebar"],
+                     "Ready-mixed concrete", "Precast units", "Reinforcement", "Structural steel"],
     "utilities": ["General / imported", "Precast / concrete",
                   "Ready-mixed concrete", "Precast units"],
-    "structures": ["Precast / concrete", "Steel / rail", "General / imported",
-                   "Ready-mixed concrete", "Precast units", "Structural steel / rebar"],
-    "superstructure": ["Large aggregate / ballast", "Steel / rail", "Precast / concrete",
+    "structures": ["Precast / concrete", "General / imported",
+                   "Ready-mixed concrete", "Precast units", "Reinforcement", "Structural steel"],
+    "superstructure": ["Large aggregate / ballast", "Rail", "Precast / concrete",
                        "Asphalt", "Ready-mixed concrete"],
-    "stations": ["Precast / concrete", "Steel / rail", "General / imported",
-                 "Ready-mixed concrete", "Precast units", "Structural steel / rebar"],
+    "stations": ["Precast / concrete", "General / imported",
+                 "Ready-mixed concrete", "Precast units", "Reinforcement", "Structural steel"],
     "temporary_works": ["Small aggregate", "Large aggregate / ballast", "General / imported",
                         "Ready-mixed concrete"],
     # mep / ene / ccs carry no material rows until they come into scope.

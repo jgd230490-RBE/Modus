@@ -6649,7 +6649,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Field label="Material category">
             <select value={material} onChange={e => setMaterial(e.target.value)} className={selCls}>
-              {materials.map(m => <option key={m}>{m}</option>)}
+              {pickMaterials(materials, meta, material).map(m => <option key={m}>{m}</option>)}
             </select>
           </Field>
           <Field label="Material description (optional)">
@@ -7384,6 +7384,14 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
 
 // 13 Oct 2026 (W12): the council colour bands a scheme reads until it types its own (backend config.COUNCIL_BREAKS_DEFAULT)
 const COUNCIL_BREAKS_DEFAULT = { movements: [50, 100, 200], carbon: [50, 100, 200] };
+// 29 Oct 2026 (3b, the steel split): a RETIRED category stays valid on what already carries it but is not offered for new
+// use. pickMaterials(all, meta, keep) = the list a picker shows: every category that is not retired, plus any retired one
+// in `keep` (the line's / record's own value), so editing an old line never blanks its material.
+function pickMaterials(all, meta, keep) {
+  const ret = new Set((meta && meta.retired_materials) || []);
+  const k = new Set([].concat(keep || []));
+  return (all || []).filter(m => !ret.has(m) || k.has(m));
+}
 // 15 Oct 2026: a material whose only unit is tonnes (steel, the user)
 // 22 Oct 2026 (words sweep): "17 Oct 2026, 12:03 UTC" for the Configuration header (was the raw ISO stamp)
 const cfgWhen = (s) => { const d = new Date(String(s).replace(" ", "T").replace(/Z?$/, "Z")); return isNaN(d) ? String(s) : d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC"; };
@@ -7410,7 +7418,9 @@ function ConfigPage({ meta, who, access }){
   const upd = (fn) => setDoc(d => { const n = JSON.parse(JSON.stringify(d)); fn(n); return n; });
   const num = (v) => (v === "" || v == null ? null : (isNaN(+v) ? v : +v));
   const vehicles = doc ? Object.keys(doc.vehicles || {}).filter(k => !k.startsWith("_")) : [];
-  const materials = doc ? Object.keys(doc.material_categories || {}).filter(k => !k.startsWith("_")) : [];
+  // 29 Oct 2026 (3b): the retired (Older) categories listed last, as the approved mockup draws them
+  const materials = doc ? Object.keys(doc.material_categories || {}).filter(k => !k.startsWith("_"))
+    .sort((x, y) => ((doc.material_categories[x] || {}).retired === true) - ((doc.material_categories[y] || {}).retired === true)) : [];
 
   const save = async () => {
     let body = doc;
@@ -7557,7 +7567,7 @@ function ConfigPage({ meta, who, access }){
                 <tbody>
                   {materials.map(k => { const c = doc.material_categories[k]; return (
                     <tr key={k} className="align-top">
-                      <td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}</td>   {/* 18 Oct 2026 (decision 12): a long name wraps */}
+                      <td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}{c.retired === true && <span className="block mt-1"><span className="chip-st"><i style={{ background: "var(--gold)" }} aria-hidden="true"></i>Older: pick one of the three</span></span>}</td>   {/* 18 Oct 2026 (decision 12): a long name wraps; 29 Oct 2026 (3b): a retired category says so */}
                       <td className="num w-28"><input className={inp + " text-right"} value={c.density_t_per_m3 ?? ""} aria-label={`${k} density`} onChange={e => upd(d => { d.material_categories[k].density_t_per_m3 = num(e.target.value); })} /></td>
                       <td className="w-32">
                         <select className={inp} value={c.default_unit || "t"} aria-label={`${k} default unit`} disabled={isTonnesOnly(c)} onChange={e => upd(d => { d.material_categories[k].default_unit = e.target.value; })}>
@@ -13649,7 +13659,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <div>
                     <span className="block text-sm font-medium text-slate-700 mb-1">Supplies · materials it provides</span>
                     <div className="mt-1 space-y-1">
-                      {materials.map(cat => (
+                      {pickMaterials(materials, meta, form.supplies).map(cat => (
                         <label key={cat} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">   {/* 18 Oct 2026 (UI audit #13): 24 px rows */}
                           <input type="checkbox" checked={(form.supplies || []).includes(cat)} onChange={() => toggleCat("supplies", cat)} style={{ accentColor: "#2563EB" }} />
                           {cat}
@@ -13662,7 +13672,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <div>
                     <span className="block text-sm font-medium text-slate-700 mb-1">Receives · materials it accepts</span>
                     <div className="mt-1 space-y-1">
-                      {materials.map(cat => (
+                      {pickMaterials(materials, meta, form.receives).map(cat => (
                         <label key={cat} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">
                           <input type="checkbox" checked={(form.receives || []).includes(cat)} onChange={() => toggleCat("receives", cat)} style={{ accentColor: "#059669" }} />
                           {cat}
@@ -14076,7 +14086,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       {areaForm.activity !== "wash" && <div>
                         <span className="block text-sm font-medium text-slate-700 mb-1">Takes (none ticked = any material)</span>
                         <div className="mt-1 grid grid-cols-2 gap-x-3">
-                          {materials.map(cat => <label key={cat} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">
+                          {pickMaterials(materials, meta, areaForm.materials).map(cat => <label key={cat} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">
                             <input type="checkbox" checked={(areaForm.materials || []).includes(cat)} onChange={() => setAreaForm(a => ({ ...a, materials: (a.materials || []).includes(cat) ? a.materials.filter(c => c !== cat) : [...(a.materials || []), cat] }))} />{cat}</label>)}
                         </div></div>}
                       <div className="grid grid-cols-2 gap-2">
