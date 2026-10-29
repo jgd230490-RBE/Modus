@@ -951,10 +951,16 @@ with TestClient(main.app, base_url="https://testserver") as c:
     mb = byname.get(("Melton Compound", "Compound gate")) or {}
     hb = byname.get(("Harborough Compound", "A6 entrance (in)")) or {}
     lg = byname.get(("Langton Compound", "Compound gate")) or {}
-    ok("⭐ Melton Compound's gate, the month's busiest: 25–40 laden arrivals a day, one every 12–21 min, check-in 3, NOT red (honest: averages alone do not queue)",
-       max((g["arrivals_per_day"] for g in ga.get("gates", [])), default=0) == mb.get("arrivals_per_day")
-       and 25 <= mb.get("arrivals_per_day", 0) <= 40 and 12 <= mb.get("gap_minutes", 0) <= 21 and mb.get("gate_minutes") == 3.0
+    # NARROWED 29 Oct 2026 (the muck-away peak, session-1028-sim-v2.md §8): Melton keeps its figures but is no longer the
+    # month's busiest — the viaduct site's gate in is (about 77 a day: 11 laden + 66 empty tippers coming to load the cutting)
+    ok("⭐ Melton Compound's gate: 25–40 laden arrivals a day, one every 12–21 min, check-in 3, NOT red (honest: averages alone do not queue)",
+       25 <= mb.get("arrivals_per_day", 0) <= 40 and 12 <= mb.get("gap_minutes", 0) <= 21 and mb.get("gate_minutes") == 3.0
        and mb.get("flag") is None and "if arrivals are spread evenly" in mb.get("reason", ""), str(mb)[:300])
+    vg = byname.get(("Tilton Viaduct site (fictional)", "South lane gate (in)")) or {}
+    ok("⭐ 29 Oct 2026: the month's busiest gate is the viaduct site's gate in — 70–85 a day (about 11 laden, the rest empty tippers for the cutting), one every 6–8 min against a 3 min check-in, still not red",
+       max((g["arrivals_per_day"] for g in ga.get("gates", [])), default=0) == vg.get("arrivals_per_day")
+       and 70 <= vg.get("arrivals_per_day", 0) <= 85 and 60 <= vg.get("empty_per_day", 0) <= 72 and 6 <= vg.get("gap_minutes", 0) <= 8
+       and vg.get("gate_minutes") == 3.0 and vg.get("flag") is None, str(vg)[:300])
     ok("⭐ Langton Compound's gate: 10–17 a day (laden plus the muck-away lorries coming to load, role both), check-in 3, not red",
        10 <= lg.get("arrivals_per_day", 0) <= 17 and lg.get("role") == "both" and lg.get("empty_per_day", 0) > 0
        and lg.get("gate_minutes") == 3.0 and lg.get("flag") is None, str(lg)[:300])

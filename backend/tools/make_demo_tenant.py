@@ -300,7 +300,11 @@ PROGRAMME = [
     ("WS5", "structures", GENERAL, "RH", "C4", FLAT, "t", 8, [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100], "Reinforcement — WS5 structures"),
     ("WS5", "structures", PRECAST, "RH", "C4", FLAT, "t", 10, [100, 200, 200, 200, 300, 300, 200, 200, 200, 200, 100], "Precast culvert units and parapets"),
     ("WS4", "earthworks", EARTH, "Q3", "S2", TIP, "t", 7, [1400, 1700, 2100, 1700, 700, 200, 400, 400, 1300, 2600, 2600, 2600, 2500, 2100, 1700, 1000], "Imported granular fill to the viaduct approaches"),
-    ("WS4", "earthworks", EARTH, "VS", "TIP", TIP, "t", 5, [800, 1000, 1200, 1400, 1600, 1600, 1600, 900, 1100, 1300, 1600, 1500, 1400, 1200, 1000, 800], "Piling arisings and unsuitable material to tip"),
+    # 29 Oct 2026 (John: the Simulation must show at least six lorries queuing, the prep for the vehicle holding areas):
+    # the south approach cutting is dug to tip in Mar–May 2027, the three months the viaduct's gate out is closed —
+    # 38,000 / 42,000 / 38,000 t, about 60–66 tipper loads a day against the Spoil loading bay's six an hour, so
+    # 7–11 lorries wait there by mid-afternoon (sized on a copy of the demo; session-1028-sim-v2.md §8)
+    ("WS4", "earthworks", EARTH, "VS", "TIP", TIP, "t", 5, [800, 1000, 1200, 1400, 1600, 1600, 1600, 900, 1100, 1300, 38000, 42000, 38000, 1200, 1000, 800], "Piling arisings, unsuitable material and the south approach cutting to tip"),
     ("WS4", "structures", READY, "BP", "VS", MIX8, "m3", 5, [840, 1070, 1290, 1510, 1630, 1630, 1620, 910, 1170, 1380, 1620, 1620, 1510, 1290, 1070, 840], "C32/40 concrete — Tilton viaduct piles, pile caps, piers and abutments"),
     ("WS4", "structures", READY, "BP", "VS", MIX8, "m3", 23, [580, 500, 690, 810, 960, 880, 580], "C32/40 concrete — Tilton viaduct deck slab, edge beams and approach slabs"),
     ("WS4", "structures", READY, "BP", "C3", MIX8, "m3", 10, [260, 340, 230, 350, 430, 500, 500, 500, 500, 500, 500, 490, 410, 340, 150], "C32/40 concrete — A47 junction overbridge"),
