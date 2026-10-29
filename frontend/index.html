@@ -673,7 +673,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-pour{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-left:26px;}
   .sim-arrivals{display:flex;flex-direction:column;gap:6px;}   /* 29 Oct 2026: the arrival pattern (even / a morning rush) */
   .sim-rush{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-left:26px;}
-  .sim-rush.sim-off input{opacity:.6;}
+  .sim-rush.sim-off{opacity:1;} .sim-rush.sim-off input{opacity:.6;}   /* the words keep full strength (4.56:1); only the two numbers dim */
   .sim-pour label{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
   .sim-off{opacity:.6;}
   .sim-pour.sim-off{opacity:1;} .sim-pour.sim-off>label{opacity:.6;}   /* 27 Oct 2026 (UI fix 10): the pour note stays full strength, 4.76:1 */
