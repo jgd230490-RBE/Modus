@@ -657,7 +657,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-pstations{list-style:none;margin:8px 0 0;padding:0 0 0 12px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:8px;}
   .sim-pmore>summary{cursor:pointer;font-size:14px;color:var(--navy);padding:8px 0;min-height:44px;display:flex;align-items:center;}
   .sim-dash-line{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;margin-top:12px;}
-  @media (max-width:767px){.sim-seg button,.sim-ctl-row .ga-sel,.sim-ctl-row .btn-pri,.sim-ctl-row .btn-sec{min-height:44px;}}
+  @media (max-width:767px){.sim-ctl-row .sim-seg button,.sim-ctl-row .ga-sel,.sim-ctl-row .btn-pri,.sim-ctl-row .btn-sec,.sim-dash-line .btn-sec{min-height:44px;min-width:44px;}}
   .sim-dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:0 0 auto;box-sizing:border-box;}
   .sim-dot-laden{background:var(--sim-lorry);}
   .sim-dot-empty{background:#FFFFFF;border:2px solid var(--sim-lorry);}
@@ -670,7 +670,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
   .sim-seg button{border:0;background:var(--surface);padding:4px 12px;font-size:13.5px;cursor:pointer;color:var(--ink);min-height:28px;}
   .sim-seg button+button{border-left:1px solid var(--line);}
-  .sim-seg button.on{background:var(--navy);color:#fff;}
+  .sim-seg button.on{background:var(--navy);color:var(--control-fg);}   /* 29 Oct 2026: ink on the Dark look's light navy (the audit: white failed) */
   .sim-site-row{margin-bottom:4px;}
   .sim-onsite{border-top:1px solid var(--line);padding-top:6px;margin-top:4px;}
   .sim-dot-gate{background:radial-gradient(circle,#1E293B 0 2.5px,#FFFFFF 3px);border:2.5px solid #1E293B;width:15px;height:15px;}
