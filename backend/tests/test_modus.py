@@ -1193,6 +1193,11 @@ ok("ui_audit.js audits Plan > Stockpiles: in the portal and team pages, its head
    and re.search(r'const TEAM_PAGES = \[[^\n]*"stockpiles"', _audit) is not None
    and 'stockpiles: "Stockpiles"' in _audit and 'meta("stockpiles+north", w)' in _audit
    and 'pa.every(p => pb.includes(p))' in _audit and 'o.pages, o.browser' not in _audit)
+# 29 Oct 2026: Plan > Simulation (its own page) is a page of the audit too, with a deep stop on the site view
+ok("ui_audit.js audits Plan > Simulation: in the portal and team pages, its header named, a deep stop on the site view that waits for the day",
+   re.search(r'const PORTAL_PAGES = [^\n]*"pours", "simulation"', _audit) is not None
+   and re.search(r'const TEAM_PAGES = \[[^\n]*"simulation"', _audit) is not None
+   and 'simulation: "Simulation"' in _audit and 'meta("simulation+site", w)' in _audit and "[data-sim-state=\"set\"]" in _audit)
 ok("ui_audit.js strips the harness's server origin from the compare keys (finding #34: the port is picked per run)",
    'const noOrigin = (s) => String(s).replace(/^https?:\\/\\/(127\\.0\\.0\\.1|localhost|\\[::1\\])(:\\d+)?/, "")' in _audit
    and "(x.url ? noOrigin(x.url) : null)" in _audit and "noOrigin(x).slice(0, 80)" in _audit)

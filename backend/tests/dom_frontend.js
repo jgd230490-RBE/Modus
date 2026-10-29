@@ -581,29 +581,33 @@ async function simDom(){
   const simCalls = () => calls.filter(c => c.url.startsWith("/api/sim/day"));
   const _d = new Date(), thisMonth = Math.max(1, Math.min(metaMin.months.count, (_d.getFullYear() - metaMin.months.start_year) * 12 + _d.getMonth() + 1));
   const mount = (props) => { const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
-    act(() => { r.render(w.React.createElement(w.SimulationPanel, props)); }); return { el, done: () => { act(() => { r.unmount(); }); el.remove(); } }; };
-  const toggle = (det, on) => act(async () => { det.open = on; det.dispatchEvent(new w.Event("toggle")); await sleep(40); });
+    // RE-PINNED 29 Oct 2026 (the Simulation's own page): SimulationPage, read on mount; no fold any more
+    act(() => { r.render(w.React.createElement(w.SimulationPage, props)); }); return { el, done: () => { act(() => { r.unmount(); }); el.remove(); } }; };
+  const hm = (x) => { const r = Math.round(x); return String(Math.floor(r / 60)).padStart(2, "0") + ":" + String(r % 60).padStart(2, "0"); };
+  const g7 = SIM.gates.find(g => g.gate_id === "G007"), g1 = SIM.gates.find(g => g.gate_id === "G001");
 
   const m = mount({ meta: metaMin, months: metaMin.months });
-  await settle(30);
-  const det = m.el.querySelector("details[data-sim]");
-  ok("⭐ SIM DOM: a folded Simulation reads NOTHING", simCalls().length === 0 && !!det && !det.open);
-  await toggle(det, true);
-  await settle(40);
-  ok("⭐ SIM DOM: opening it reads this month's day once, as a GET, with the routes' lines (legs=1)",
-     simCalls().length === 1 && simCalls()[0].url === `/api/sim/day?month=${thisMonth}&legs=1` && simCalls()[0].method === "GET", JSON.stringify(calls));
+  await settle(60);
+  ok("⭐ SIM DOM: the page reads this month's day ONCE on mount, as a GET, with the routes' lines (legs=1); it is a page, not a fold",
+     simCalls().length === 1 && simCalls()[0].url === `/api/sim/day?month=${thisMonth}&legs=1` && simCalls()[0].method === "GET"
+     && !m.el.querySelector("details[data-sim]") && !!m.el.querySelector('[data-page="simulation"][data-sim="1"]'), JSON.stringify(calls));
+  ok("SIM DOM: the page's header, the one tag and the i box (no chips)",
+     (m.el.querySelector('[data-guide="page-header"] h2') || {}).textContent === "Simulation" && (m.el.querySelector('[data-sim-tag]') || {}).textContent === "Planning view, not a record"
+     && !!m.el.querySelector('button[aria-label="About: Simulation"]') && !m.el.querySelector(".sim-chip"));
   const lead = (m.el.querySelector("[data-sim-lead]") || {}).textContent || "";
-  ok("⭐ SIM DOM: the day is drawn from the reply: the lead line, eleven gate rows, the three checks all ticked",
-     m.el.querySelector('[data-sim-state="set"]') && lead.startsWith("Sep 2026: an average working day, 312 loads (646 lorry arrivals at the gates, 22 of them mixers)")
+  ok("⭐ SIM DOM: the day is drawn from the reply: the figures line, eleven gate rows, the three checks all ticked on one line",
+     m.el.querySelector('[data-sim-state="set"]') && lead.startsWith("Sep 2026 · an average working day · 312 loads · 646 arrivals, 22 of them mixers · spread evenly")
      && m.el.querySelectorAll("[data-sim-table] tr[data-sim-gate]").length === 11
-     && [...m.el.querySelectorAll("[data-sim-checks] .sim-ok")].length === 3 && !m.el.querySelector("[data-sim-checks] .sim-bad"), lead);
+     && [...m.el.querySelectorAll("[data-sim-checks] .sim-ok")].length === 3 && !m.el.querySelector("[data-sim-checks] .sim-bad")
+     && m.el.querySelector("[data-sim-checks]").getAttribute("data-sim-checks-ok") === "3/3" && m.el.querySelector("[data-sim-checks]").textContent.includes("Checks: the day adds up (3 of 3)"), lead);
   const hb = m.el.querySelector('[data-sim-table] tr[data-sim-gate="G007"]');
-  ok("SIM DOM: Harborough's row carries the server's figures: 101 arrivals, 84 % used, 12 waiting at 12:38, 1776 minutes lost, longest wait 56",
-     !!hb && hb.textContent.includes("101") && hb.textContent.includes("84 % used") && hb.textContent.includes("at 12:38")
-     && hb.textContent.includes("1776") && hb.textContent.includes("longest wait 56 min") && hb.textContent.includes("first wait 10:00"), hb && hb.textContent);
+  // RE-PINNED 29 Oct 2026 (card 9): ten short columns, one figure a cell — "84 %", "longest 56", the bottleneck time; no inputs in the row
+  ok("SIM DOM: Harborough's row carries the server's figures: 101 arrivals, 84 %, the bottleneck, 12 waiting at 12:38, 1776 minutes lost, longest 56; read-only",
+     !!hb && hb.textContent.includes("101") && hb.textContent.includes("84 %") && hb.textContent.includes(`bottleneck ${hm(g7.bottleneck_at)}`) && hb.textContent.includes("at 12:38")
+     && hb.textContent.includes("1776") && hb.textContent.includes("longest 56") && !hb.querySelector("input") && hb.querySelectorAll("td").length === 10, hb && hb.textContent);
   ok("SIM DOM: the timeline marks Harborough's bottleneck in words", (m.el.querySelector('[data-sim-tl-gate="G007"]') || {}).textContent && m.el.querySelector('[data-sim-tl-gate="G007"]').textContent.includes("bottleneck from"));
-  await toggle(det, false); await toggle(det, true);
-  ok("SIM DOM: folding and opening again reads nothing more", simCalls().length === 1, JSON.stringify(simCalls()));
+  await settle(350);
+  ok("SIM DOM: with the day on screen nothing is read again (one read)", simCalls().length === 1, JSON.stringify(simCalls()));
 
   // the clock. The test drives the animation frames itself (jsdom's own frames race React's act and made this flaky):
   // a frame every 100 ms of page time; 05:30–17:30 plays in 60 s at 1×, so one second of frames is 12 minutes of the day
@@ -629,10 +633,11 @@ async function simDom(){
   await act(async () => { play().click(); });
   frames(11);
   ok("SIM DOM: at 2× one second of frames is 24 minutes (05:42 → 06:06)", clock() === "06:06", clock());
-  await toggle(det, false);
+  // RE-PINNED 29 Oct 2026 (the page): there is no fold to close; while it plays one frame is always queued, and Pause empties the queue
+  ok("SIM DOM: while it plays a frame is always queued (the loop is alive)", play().textContent === "Pause" && queued.size === 1, String(queued.size));
+  await act(async () => { play().click(); });
   frames(10);
-  ok("SIM DOM: folding the section while it plays pauses it (nothing plays unseen)", play().textContent === "Play" && clock() === "06:06" && queued.size === 0, clock());
-  await toggle(det, true);
+  ok("SIM DOM: Pause holds the clock at 06:06 and asks for no frame", play().textContent === "Play" && clock() === "06:06" && queued.size === 0, clock());
   w.requestAnimationFrame = realRaf; w.cancelAnimationFrame = realCaf;
   const restart = byText(m.el, "button", "Restart");
   await act(async () => { restart.click(); await sleep(20); });
@@ -668,19 +673,26 @@ async function simDom(){
   const nBefore = simCalls().length;
   await settle(400);
   ok("SIM DOM: the scenario put back is the one on screen: nothing read again", simCalls().length === nBefore, JSON.stringify(simCalls().slice(nBefore)));
-  // a window past midnight typed in the table: refused on the screen, nothing read
-  const closes = m.el.querySelector('[data-sim-table] tr[data-sim-gate="G001"] input[aria-label$="closes at"]');
+  // RE-PINNED 29 Oct 2026 (card 9): the hours and check-in are typed on the Hours and check-in card — a gate drop-down, open from / to,
+  // check-in, Apply; the table is read-only. A window past midnight: refused on the screen, nothing read
+  const gateSel = m.el.querySelector('select[aria-label="Gate to change"]');
+  const setSel = (sel, v) => act(async () => { Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(sel, v); sel.dispatchEvent(new w.Event("change", { bubbles: true })); await sleep(20); });
+  await setSel(gateSel, "G001");
+  const closes = m.el.querySelector('[data-sim-hours-card] input[aria-label="Closes at"]');
   await setVal(closes, "06:00");
+  await act(async () => { byText(m.el, "button", "Apply").click(); });
   await settle(400);
   ok("⭐ SIM DOM: a gate closing before it opens is refused on the screen in words (D93), and nothing is read",
-     simCalls().length === nBefore && (m.el.querySelector(".sim-msg") || {}).textContent === "Kilby Ridge Quarry: the gate must close after it opens; a window past midnight is not simulated.",
+     simCalls().length === nBefore && (m.el.querySelector(".sim-msg") || {}).textContent === `${g1.location_name}, ${g1.gate_name}: the gate must close after it opens; a window past midnight is not simulated.`,
      (m.el.querySelector(".sim-msg") || {}).textContent);
-  const ci = m.el.querySelector('[data-sim-table] tr[data-sim-gate="G012"] input[type=number]');
+  await setSel(gateSel, "G012");
+  const ci = m.el.querySelector('[data-sim-hours-card] input[aria-label="Check-in minutes a lorry"]');
   await setVal(ci, "20");
+  await act(async () => { byText(m.el, "button", "Apply").click(); });
   await settle(450);
   const c3 = simCalls()[simCalls().length - 1];
-  ok("SIM DOM: a check-in typed in the table reads the day again with it (check_in=G012=20), the pour still on",
-     simCalls().length === nBefore + 1 && c3.url.includes("check_in=G012%3D20") && c3.url.includes("pour_gate=G007"), JSON.stringify(c3));
+  ok("SIM DOM: a check-in applied for one gate reads the day again with it (check_in=G012=20) and that gate's hours, the pour still on",
+     simCalls().length === nBefore + 1 && c3.url.includes("check_in=G012%3D20") && c3.url.includes("hours=G012%3D") && c3.url.includes("pour_gate=G007"), JSON.stringify(c3));
   const back = byText(m.el, "button", "Back to the scheme's figures");
   await act(async () => { back.click(); });
   await settle(450);
@@ -701,17 +713,19 @@ async function simDom(){
   }
   m.done();
 
-  // the phone: the table only, no lines asked for, no player, nothing to type
+  // the phone: the cards only, no lines asked for, no player, nothing to type (RE-PINNED 29 Oct 2026: read on mount, one card a gate,
+  // the small gates folded under "more gates", the scale and month controls on the page)
   calls.length = 0;
   const p = mount({ meta: metaMin, months: metaMin.months, phone: true });
-  await settle(20);
-  await toggle(p.el.querySelector("details[data-sim]"), true);
-  await settle(40);
-  ok("⭐ SIM DOM: on a phone the day is read without the lines; one card a gate, read-only, with the desktop note",
+  await settle(60);
+  ok("⭐ SIM DOM: on a phone the day is read without the lines; one card a gate, read-only, with the one-line note",
      simCalls().length === 1 && simCalls()[0].url === `/api/sim/day?month=${thisMonth}` && !!p.el.querySelector('[data-sim-phone="1"]')
      && !p.el.querySelector("[data-sim-player]") && p.el.querySelectorAll("[data-sim-table] li[data-sim-gate]").length === 11
      && (p.el.querySelector('li[data-sim-gate="G007"] [data-sim-busy]') || {}).textContent === "16 at 10:00"
-     && !p.el.querySelector("[data-sim-table] input") && !p.el.querySelector("[data-sim-scenario]"));
+     && !p.el.querySelector("[data-sim-table] input") && !p.el.querySelector("[data-sim-scenario]")
+     && !!p.el.querySelector("[data-sim-scale]") && !!p.el.querySelector('select[aria-label="Simulation month"]')
+     // the fold shows only when a gate has fewer than 5 lorries a day (none in the fixture)
+     && !!p.el.querySelector("details.sim-pmore") === SIM.gates.some(g => g.arrivals < 5));
   p.done();
 }
 
@@ -1718,7 +1732,9 @@ async function phoneShellDom(){
      // NARROWED 22 Oct 2026 (abnormal loads, S16 / B5): + Abnormal loads, a Plan-group desk page a team sees
      // NARROWED 27 Oct 2026 (stockpile forecast, D4 a): + Stockpiles, a Plan-group desk page a team reads
      // NARROWED 29 Oct 2026 (task 3a): + Pours, a Plan-group desk page a team plans on its own lines
-     && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours"
+     // NARROWED 29 Oct 2026 (the Simulation's own page): Simulation first, under "Read here, plan on a desktop"; the desk pages under "Made for a desktop"
+     && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Simulation|Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours"
+     && [...sheet().querySelectorAll("h3")].map(h => h.textContent).join("|") === "Read here, plan on a desktop|Made for a desktop"
      && !!sheet().querySelector('a[href^="/help/?role="][target="_blank"]'));
   ok("PHONE: ...a team code's sheet holds no Data or Config page (the role's own pages only)", !/Locations|Routes|Zones|Config/.test(sheet().textContent));
   await act(async () => { w.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
@@ -1750,7 +1766,8 @@ async function phoneShellDom(){
      // NARROWED 22 Oct 2026 (abnormal loads): + Abnormal loads after the Carbon planner
      // NARROWED 27 Oct 2026 (stockpile forecast): + Stockpiles after Abnormal loads
      // NARROWED 29 Oct 2026 (task 3a): + Pours after Stockpiles
-     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours|Locations|Routes|Zones|Config");
+     // NARROWED 29 Oct 2026 (the Simulation's own page): + Simulation first (it reads on a phone)
+     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Simulation|Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours|Locations|Routes|Zones|Config");
   ok("PHONE (with G3): ...and with no Users item, the Users page cannot be reached on a phone by a planner",
      ![...p.el.querySelectorAll("#phone-more button.phone-more-item")].some(b => /Users/.test(b.textContent)));
   click([...p.el.querySelectorAll("#phone-more button.phone-more-item")].find(b => /Config/.test(b.textContent)));

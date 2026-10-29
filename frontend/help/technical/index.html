@@ -271,6 +271,21 @@ its arrivals, <code>null</code> where a line at the gate has no cycle; the card 
 pour on top; the site chain (<code>sim_site</code>) follows the gate's check-in times. On screen only (D86): nothing is saved,
 and the Dashboard's Gate arrivals, the Look-ahead's GATE OVER / NEAR flags, the public map and the big screen keep the even
 spread. The figures are a what-if on a planning day, never a prediction.</p>
+<p id="t1-sim-page">29 Oct 2026 (the user: "the simulation needs its own page now and full comprehensive UI/UX review"): Plan → Simulation,
+<code>#simulation</code> (NAV id <code>simulation</code>, after Pours; <code>NAV_ICON.simulation</code>). <code>SimulationPage</code> is the
+old Dashboard section unfolded: it reads <code>GET /api/sim/day</code> on mount, keyed on the month and the scenario, the lines once a
+month; <code>PhoneSimulation</code> is the same page with <code>phone</code> (no lines, one card a gate), listed in
+<code>PHONE_READ_PAGES</code> so the phone shell draws it instead of the desk-only card (the More sheet's "Read here, plan on a
+desktop"). The Dashboard's one line, <code>SimDashLine</code>, is the Gate arrivals reply's busiest gate (<code>arrivals_per_day</code>);
+no second simulation runs there. <code>SimPlayer</code> takes the page's controls (scale → period → site) and the chosen site; the key
+is a list under the map (<code>.sim-key</code>) on the page and the box (<code>.sim-legend</code>) on the big screen only
+(<code>SimMap</code>'s <code>wall</code>). The map's style follows the look (<code>simMapStyle()</code>: <code>dark-v11</code> in the Dark
+look) and is re-applied through <code>THEME.subs</code>; the sources and layers are added again on every <code>style.load</code> and the
+still parts set again (<code>styleN</code>). The Hours and check-in card sends the same <code>hours=</code> / <code>check_in=</code>
+parameters the table's inputs did (<code>all=</code> for every gate; a check-in of 0 = none); the tables are read-only. The timeline
+keeps 24 px at the right, labels every second hour under 900 px and every fourth under 500, and flips a mark's words left of the mark
+at the edge. The big screen's section 6 (<code>SimWall</code>) is unchanged. The UI audit walks the page (<code>simulation</code>,
+deep stop <code>simulation+site</code>).</p>
 
 <h2 id="t1-stock">Stockpiles</h2>
 <p>27 Oct 2026: the balance runs FORWARD from the plan (<code>backend/stockpiles.py</code>, <code>balances()</code>; John's decisions D1–D11 of

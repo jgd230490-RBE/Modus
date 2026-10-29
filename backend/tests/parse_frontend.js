@@ -1513,7 +1513,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   // NARROWED 27 Oct 2026 (stockpile forecast, D4 a): the Stockpiles item follows it, the last in the Plan group
   // NARROWED 29 Oct 2026 (task 3a): the Plan group goes on with Pours after Stockpiles
   ok("⭐ AL: a Plan-group rail item after the Carbon planner, its own line icon, and the page switch on a desk only (a phone gets the desk-only card)",
-     /\{ id: "abnormal", label: "Abnormal loads", glyph: "⬌" \},\s*(\/\/[^\n]*\s*)?\{ id: "stockpiles", label: "Stockpiles", glyph: "▲" \},\s*(\/\/[^\n]*\s*)?\{ id: "pours", label: "Pours", glyph: "◒" \},\n  \]\},/.test(code) && /\n  abnormal: "M/.test(code)
+     // NARROWED 29 Oct 2026 (the Simulation's own page): + Simulation after Pours, the last of the Plan group
+     /\{ id: "abnormal", label: "Abnormal loads", glyph: "⬌" \},\s*(\/\/[^\n]*\s*)?\{ id: "stockpiles", label: "Stockpiles", glyph: "▲" \},\s*(\/\/[^\n]*\s*)?\{ id: "pours", label: "Pours", glyph: "◒" \},\s*(\/\/[^\n]*\s*)?\{ id: "simulation", label: "Simulation", glyph: "▶" \},\n  \]\},/.test(code) && /\n  abnormal: "M/.test(code)
      && code.includes('{page === "abnormal" && !narrow && <AbnormalPage meta={meta} access={role} who={who} />}')
      && !/PHONE_PAGES = \[[^\]]*abnormal/.test(code));
   ok("🔴 AL: ONE read of the page (/abnormal), the preview from /abnormal/rules, and the writes: plan (POST), change (PUT), status, delete, the holidays fetch, the time bans",
@@ -2330,7 +2331,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // NARROWED 11 Oct 2026 (gate arrivals: the render harness's prop initialGates joins the signature); 14 Oct 2026: + phone
     // NARROWED 14 Oct 2026 (bundle G, W7: the render harness's prop initialClp joins the signature too; merged with D9's phone)
     // NARROWED 16 Oct 2026 (S7: the render harness's prop initialSim joins the signature)
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialSim, onWall, onOpen, phone })")
+    // RE-PINNED 29 Oct 2026 (the Simulation's own page): initialSim leaves the Dashboard; SimulationPage takes `initial`
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, onWall, onOpen, phone })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
@@ -2560,21 +2562,32 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const simc = simSrc.split("\n").map(l => l.replace(/^\s*\/\/.*$/, "")).join("\n");
   const fn = (name, next) => simSrc.slice(simSrc.indexOf(`function ${name}(`), next ? simSrc.indexOf(next) : undefined);
   // 17 Oct 2026: the panel ends where the big screen's SimWall begins (same block)
-  const mapSrc = fn("SimMap", "const SIM_TL_LEFT"), panelSrc = fn("SimulationPanel", "// ---- 17 Oct 2026: the Simulation on the BIG SCREEN");
+  // RE-PINNED 29 Oct 2026 (the Simulation's own page): the panel is SimulationPage, ending where the phone wrapper begins
+  const mapSrc = fn("SimMap", "const SIM_TL_LEFT"), panelSrc = fn("SimulationPage", "// the phone's Simulation: the same page");
   const _dbS = code.slice(code.indexOf("function Dashboard("), code.indexOf("function DashboardToday("));
   const _dbSW = _dbS.slice(_dbS.indexOf("{!wall ? ("), _dbS.indexOf("      ) : (\n        <>\n")), _dbSWl = _dbS.slice(_dbS.indexOf("      ) : (\n        <>\n"));
   ok("⭐ S7: one block before CommitMap holding the panel, its player, map, timeline, scenario, table and phone list",
-    simSrc.length > 20000 && ["function SimulationPanel({ meta, months, phone, initial })", "function SimPlayer({ meta, D, store, scenario, open })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
+    // RE-PINNED 29 Oct 2026 (its own page): SimulationPage (+ PhoneSimulation, SimDashLine); the player takes the page's controls and site; the map `wall`
+    simSrc.length > 20000 && ["function SimulationPage({ meta, months, phone, initial })", "function PhoneSimulation({ meta, months })", "function SimDashLine({ ga, month, months, onOpen })",
+      "function SimPlayer({ meta, D, store, scenario, controls, site, open })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
       // RE-PINNED 28 Oct 2026 (simulation v2): the map and the timeline take the chosen site
-      "function SimMap({ meta, D, store, frame, site })", "function SimTimeline({ D, t, onSeek, site })", "const SimScenario = React.memo(function SimScenario(",
-      "const SimTable = React.memo(function SimTable(", "function SimPhoneList({ D })", "function simFrame(D, legs, t)", "function simQS(month, sc, legs)"].every(f => simSrc.includes(f)));
-  ok("⭐ S7: under Gate arrivals on the desk Dashboard, before the folded sections; never on the big screen",
-    _dbSW.includes("<SimulationPanel meta={meta} months={months} phone={phone} initial={initialSim} />")
-    && _dbSW.indexOf("<SimulationPanel") > _dbSW.indexOf("<GateArrivalsPanel") && _dbSW.indexOf("<SimulationPanel") < _dbSW.indexOf('<details className="dash-more"')
-    && !_dbSWl.includes("<SimulationPanel") && (code.match(/<SimulationPanel /g) || []).length === 1);
-  ok("⭐ S7: folded, read on FIRST OPEN with one GET of /api/sim/day (the lines once a month), keyed on open, the month and the scenario",
-    panelSrc.includes('<details className="dash-more" data-sim="1" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>')
-    && panelSrc.includes("if(!open) return;") && panelSrc.includes("fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`)") && panelSrc.includes("}, [open, month, scKey]);")
+      "function SimMap({ meta, D, store, frame, site, wall })", "function SimTimeline({ D, t, onSeek, site })", "const SimScenario = React.memo(function SimScenario(",
+      "const SimTable = React.memo(function SimTable(", "function SimPhoneList({ D })", "function simFrame(D, legs, t)", "function simQS(month, sc, legs)"].every(f => simSrc.includes(f))
+    && !code.includes("function SimulationPanel("));
+  // RE-PINNED 29 Oct 2026 (the Simulation's own page, card 1): the Dashboard keeps ONE line under Gate arrivals (the busiest gate from the
+  // Gate arrivals reply, no second simulation run) with a button to the page; the page itself mounts on a desk and, as PhoneSimulation, on a phone
+  ok("⭐ S7: one line under Gate arrivals on the desk Dashboard, before the folded sections; never on the big screen; the page mounted from the Portal",
+    _dbSW.includes("<SimDashLine ga={ga} month={gaMonth} months={months} onOpen={onOpen} />")
+    && _dbSW.indexOf("<SimDashLine") > _dbSW.indexOf("<GateArrivalsPanel") && _dbSW.indexOf("<SimDashLine") < _dbSW.indexOf('<details className="dash-more"')
+    && !_dbSWl.includes("<SimDashLine") && !code.includes("<SimulationPanel") && (code.match(/<SimDashLine /g) || []).length === 1
+    && code.includes('{page === "simulation" && !narrow && <SimulationPage meta={meta} months={meta.months} />}')
+    && code.includes('{page === "simulation" && narrow && <PhoneSimulation meta={meta} months={meta.months} />}')
+    && (code.match(/<SimulationPage /g) || []).length === 2 && !/fetch\(/.test(fn("SimDashLine", "// ---- 17 Oct 2026: the Simulation on the BIG SCREEN"))
+    && fn("SimDashLine", "// ---- 17 Oct 2026: the Simulation on the BIG SCREEN").includes('onOpen("simulation")'));
+  // RE-PINNED 29 Oct 2026 (its own page): read on MOUNT (the page is the fold), keyed on the month and the scenario
+  ok("⭐ S7: its own page, read on mount with one GET of /api/sim/day (the lines once a month), keyed on the month and the scenario",
+    panelSrc.includes('<div className="max-w-7xl mx-auto p-6 pb-2" data-page="simulation" data-sim="1">') && !panelSrc.includes("<details className=\"dash-more\"")
+    && panelSrc.includes("fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`)") && panelSrc.includes("}, [month, scKey]);")
     && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (panelSrc.match(/fetch\(/g) || []).length === 1
     // NARROWED 17 Oct 2026: the block holds the big screen's SimWall too, with its own one read (the plain month, with the lines)
     && (simc.match(/fetch\(/g) || []).length === 2 && fn("SimWall", "function CommitMap(").includes("fetch(`${API}/sim/day?month=${month}&legs=1`)"));
@@ -2590,9 +2603,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // the one ceil is the timeline's first hour tick (drawing)
     && (simc.match(/Math\.ceil/g) || []).length === 1 && simc.includes("for(let h = Math.ceil(s0 / 60); h <= Math.floor(s1 / 60); h++)"));
   ok("⭐ S7 (D85): the timeline's red mark is the server's bottleneck (the first wait longer than the check-in), said in words",
-    simSrc.includes("{g.bottleneck_at != null") && simSrc.includes("bottleneck from {simHM(g.bottleneck_at)} · up to {g.most_waiting} waiting")
+    simSrc.includes("{g.bottleneck_at != null") && simSrc.includes("`bottleneck from ${simHM(g.bottleneck_at)} · up to ${g.most_waiting} waiting`")
     // RE-PINNED 28 Oct 2026 (v2): a station row says "minutes a lorry", a gate row "check-in" (simTlRows)
-    && simSrc.includes("none longer than the {+g.limit} min {g.word}") && simSrc.includes('word: "check-in"') && simSrc.includes('word: "minutes a lorry"'));
+    // RE-PINNED 29 Oct 2026 (the page, card 6): the note reads "none over 2 min" for a gate and a station alike (it read "the 2 min minutes a lorry")
+    && simSrc.includes("`waits from ${simHM(g.queue_start)}, none over ${+g.limit} min`") && !simSrc.includes("min {g.word}")
+    && simSrc.includes('word: "check-in"') && simSrc.includes('word: "minutes a lorry"'));
   ok("⭐ S7 (D81): lorries are dots (one circle layer, laden filled, empty hollow, mixers orange, waiting red); no icons",
     mapSrc.includes('m.addLayer({ id: "sim-lorries", type: "circle", source: "sim-lorries"') && !/icon-image|loadImage|addImage/.test(mapSrc)
     && mapSrc.includes('"laden", tok("--sim-lorry", "#2563EB"), "pour", tok("--sim-mixer", "#E8590C"), "#FFFFFF"')
@@ -2608,18 +2623,22 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     simSrc.includes("const SIM_PLAY_SECONDS = 60;") && simSrc.includes('const SIM_SPEEDS = [["0.5", "½×"], ["1", "1×"], ["2", "2×"], ["4", "4×"]];')
     && simSrc.includes('playing ? "Pause" : (t >= s1 ? "Play again" : "Play")') && simSrc.includes(">Restart</button>")
     && simSrc.includes('aria-label="Jump to a time of day"') && simSrc.includes("onClick={click}"));
-  ok("⭐ S7: the words — staff only, a planning view, congestion not modelled; the holding area greyed for V1; no hourly HERE switch (D92)",
-    simSrc.includes(">Staff only · never on the public map<") && simSrc.includes(">Planning view, not a record of what happened<")
-    && simSrc.includes(">Congestion on the public road is not modelled<") && simSrc.includes('<input type="checkbox" disabled /><span>Holding area: lorries wait off the highway</span>')
-    && simSrc.includes("Comes with holding areas (V1).") && !/\bHERE\b/.test(simc) && !/hour of day|hourly drive/i.test(simc));
+  // RE-PINNED 29 Oct 2026 (the page, cards 3 and 15): one tag + the i box instead of three chips; "Staff only." in the subtitle;
+  // the holding area reads "coming" (no version code on screen)
+  ok("⭐ S7: the words — staff only, a planning view (one tag + the i box), congestion not modelled in the i box; the holding area greyed, 'coming'; no hourly HERE switch (D92)",
+    simSrc.includes('subtitle="An average working day, lorry by lorry, at every gate and on site. Staff only."') && simSrc.includes('<span className="sim-tag" data-sim-tag="1">Planning view, not a record</span><InfoTip id="dash.sim" />')
+    && !panelSrc.includes("sim-chip") && /"dash\.sim": \{[^\n]*Staff only\. Nothing is saved\./.test(src) && /"dash\.sim": \{[\s\S]{0,1400}Congestion on the public road is not modelled/.test(src)
+    && simSrc.includes('<input type="checkbox" disabled /><span>Holding area: lorries wait off the highway <span className="sim-tag">coming</span></span>')
+    && !/\(V1\)|\bV1\b/.test(simc) && !/\bHERE\b/.test(simc) && !/hour of day|hourly drive/i.test(simc));
   ok("🔴 S7: no banned word and no word-rule word on screen; lorries never trucks; teams through teamText; the tenant's distance unit and speed",
     // GeoJSON's own key (geometry) and Mapbox's token setting are code, not words on a screen
     !/\b(bake[ds]?|cached|geometry|server|endpoint|token|real-time|live tracking|telematics|optimi[sz]\w*|predict\w*|trucks?|secure|booking)\b/i.test(simc.replace(/accessToken|mapbox_token|geometry: \{|\.geometry\b/g, ""))
     && simSrc.includes("teamText(x)") && simSrc.includes("${Math.round(speed(h.speed_kph))} ${SPD()}") && simSrc.includes("${fmtDist(h.length_km, 1)} ${DU()}")
     && simSrc.includes("D.mixer.vehicle_label") && !/IPT ?[1-6]/.test(simSrc));
-  ok("S7: below 768 px one card a gate, read-only, and the desktop note; the scenario controls are not there",
-    panelSrc.includes("? <><div className=\"ct-note\" data-sim-phone=\"1\">The map, the playback and the what-if controls open on a desktop.</div><SimPhoneList D={D} /></>")
-    && !fn("SimPhoneList", "function SimulationPanel(").includes("<input"));
+  // RE-PINNED 29 Oct 2026 (the page, card 12): one card a site with its stations nested, one short line; the scenario controls are not there
+  ok("S7: below 768 px one card a gate, read-only, and the one-line note; the scenario controls are not there",
+    panelSrc.includes("? <><div className=\"ct-note\" data-sim-phone=\"1\">The plan's day, read-only here.</div><SimPhoneList D={D} /></>")
+    && !fn("SimPhoneList", "// ---- 29 Oct 2026: the Simulation's own PAGE").includes("<input") && fn("SimPhoneList", "// ---- 29 Oct 2026: the Simulation's own PAGE").includes('<ul className="sim-pstations"'));
   // 17 Oct 2026 (found on live): the pour's gates and default are the server's (working sites only); the gate access roads
   // are not listed with the haul roads, and the screen says so in one line
   const scnSrc = fn("SimScenario", "const gateBandWords");
@@ -2659,10 +2678,12 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && mapSrc.includes('"circle-radius": ["match", ["get", "k"], "wait", 4.5, 4]') && mapSrc.includes('"circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF", tok("--sim-lorry", "#2563EB")]')
     && /\.sim-dot-gate\{background:radial-gradient\(circle,#1E293B 0 2\.5px,#FFFFFF 3px\);border:2\.5px solid #1E293B;width:15px;height:15px;\}/.test(html)
     && /\.sim-dot-empty\{background:#FFFFFF;border:2px solid var\(--sim-lorry\);\}/.test(html));
-  ok("SIM: the map's key is a named group (an aria-label on a plain div is not allowed: the UI audit's aria-prohibited-attr)",
-    mapSrc.includes('<div className="sim-legend" role="group" aria-label="Map key">') && !mapSrc.includes('<div className="sim-legend" aria-label='));
+  // RE-PINNED 29 Oct 2026 (the page, card 5): the key is a row UNDER the map (a named list) on the page; the box over the map stays on the big screen only
+  ok("SIM: the map's key is a named group on the big screen, a named list under the map on the page (an aria-label on a plain div is not allowed: the UI audit's aria-prohibited-attr)",
+    mapSrc.includes('? <div className="sim-legend" role="group" aria-label="Map key">') && mapSrc.includes(': <ul className="sim-key" aria-label="Key" data-sim-key="1">')
+    && mapSrc.includes("{wall\n") && !mapSrc.includes('<div className="sim-legend" aria-label='));
   ok("SIM: the map's key names the concrete mixer only on a day with a pour",
-    mapSrc.includes('{D.pour && <div><i className="sim-dot sim-dot-pour" aria-hidden="true"></i>'));
+    mapSrc.includes('D.pour && ["sim-dot sim-dot-pour", `${(D.mixer && D.mixer.vehicle_label) || "Concrete mixer"} (pour)`],'));
   ok("🔴 SIM BIG SCREEN: no scenario controls and no table on the TV; it reads the plain month (no pour) only while shown",
     !/<input|<select|<button|SimScenario|SimTable|pour_gate|onHours|onCheckIn/.test(wallSrc)
     && wallSrc.includes("if(!show) return;") && wallSrc.includes("fetch(`${API}/sim/day?month=${month}&legs=1`)") && wallSrc.includes("no pour"));
@@ -2672,16 +2693,20 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && wallSrc.includes('<div className={"sim-wall" + (fill ? " sim-wall-fill" : "")} data-sim-wall="1">'));
   ok("⭐ SIM ONE SCREEN: from 1024 px the map and its timeline sit left, the clock / Gates now / scenario beside them; the table and the haul roads fold away (closed)",
     // RE-PINNED 28 Oct 2026 (v2): the site select sits above the map; the map and the timeline take the chosen site
+    // RE-PINNED 29 Oct 2026 (the page, card 2): the timeline is FULL WIDTH under the grid, the scenario a band under it; the map the app's height
     fn("SimPlayer", "const SimScenario").includes('<SimMap meta={meta} D={D} store={store} frame={f} site={site} />')
-    && /<div className="sim-main">[\s\S]{0,1400}<SimTimeline D=\{D\} t=\{t\}/.test(fn("SimPlayer", "const SimScenario"))
-    && /@media \(min-width:1024px\)\{\.sim-grid\{grid-template-columns:minmax\(0,1fr\) 300px;align-items:start;\}\n\s*\.sim-main \.sim-map\{height:clamp\(260px,calc\(100vh - 420px\),680px\);\}\}/.test(html)
+    && /<div className="sim-main">\s*<SimMap [^\n]*\n\s*<\/div>\s*<div className="sim-side">/.test(fn("SimPlayer", "const SimScenario"))
+    && /<\/div>\s*<\/div>\s*<div className="sim-tl-head"[^\n]*\n\s*<SimTimeline D=\{D\} t=\{t\}[^\n]*\n\s*\{scenario && <div className="sim-band">\{scenario\}<\/div>\}/.test(fn("SimPlayer", "const SimScenario"))
+    && /@media \(min-width:1024px\)\{\.sim-grid\{grid-template-columns:minmax\(0,1fr\) 300px;align-items:start;\}\n\s*\.sim-main \.sim-map\{height:62vh;min-height:360px;max-height:720px;\}\}/.test(html)
+    && /\n  \.sim-map\{height:62vh;min-height:360px;max-height:720px;/.test(html)
     // found in Chrome: in the flex column the map's box shrank to nothing (align-self:start); it stretches across its column
     && /\.sim-main>\.sim-map-wrap\{align-self:stretch;\}/.test(html)
     && panelSrc.includes('<details className="sim-fold" data-sim-fold="table"><summary>Busiest hour at each gate</summary>')
     && panelSrc.includes('<details className="sim-fold" data-sim-fold="haul"><summary>Haul roads</summary>') && !/data-sim-fold="[a-z]+" open/.test(panelSrc));
   ok("S7: the info box entry (≤ 40 words) and the controls are named for a screen reader",
     /"dash\.sim": \{ title: "Simulation", text: "[^"]+", *\n? *how: "[^"]+", tech: "t1-gates" \}/.test(src)
-    && ["Simulation month", "Playback speed", "Every gate opens at", "Every gate closes at", "Pour gate", "Pour starts at", "Busiest hour at each gate"].every(a => simSrc.includes(`aria-label="${a}"`)));
+    // RE-PINNED 29 Oct 2026 (card 9): the hours and check-in are typed on one card with a gate drop-down (Every gate, then each gate)
+    && ["Simulation month", "Playback speed", "Gate to change", "Opens at", "Closes at", "Check-in minutes a lorry", "Pour gate", "Pour starts at", "Busiest hour at each gate"].every(a => simSrc.includes(`aria-label="${a}"`)));
 }
 
 
@@ -2693,8 +2718,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const s0 = src.indexOf("// ---- 16 Oct 2026 (S7): the Simulation on the staff Dashboard"), s1 = src.indexOf("function CommitMap(");
   const simSrc = src.slice(s0, s1);
   const fn = (name, next) => simSrc.slice(simSrc.indexOf(`function ${name}(`), next ? simSrc.indexOf(next) : undefined);
-  const panelSrc = fn("SimulationPanel", "// ---- 17 Oct 2026: the Simulation on the BIG SCREEN"), playerSrc = fn("SimPlayer", "const SimScenario");
-  const scnSrc = fn("SimScenario", "const gateBandWords"), phoneSrc = fn("SimPhoneList", "function SimulationPanel(");
+  // RE-PINNED 29 Oct 2026 (the Simulation's own page): SimulationPage; the phone list ends where the page begins
+  const panelSrc = fn("SimulationPage", "// the phone's Simulation: the same page"), playerSrc = fn("SimPlayer", "const SimScenario");
+  const scnSrc = fn("SimScenario", "const gateBandWords"), phoneSrc = fn("SimPhoneList", "// ---- 29 Oct 2026: the Simulation's own PAGE");
   ok("⭐ SIM V2: the scale is part of the scenario (month · week · day) and reaches the server as scale= / week= / date=; the sites' what-ifs as site_speed / service / bays / wash",
     simSrc.includes('scale: "month", bucket: "commit", date: "", site_speed: {}, service: {}, bays: {}, wash: null });')
     && simSrc.includes('if(sc.scale === "week") q.push("scale=week", `week=${sc.bucket === "next" ? "next" : "commit"}`);')
@@ -2710,7 +2736,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     panelSrc.includes('if(sc.scale !== "month" && j.month !== month){ shown.current = (store && store.month === j.month) ? `${j.month}|${scKey}` : null; setMonth(j.month); }')
     && (panelSrc.match(/fetch\(/g) || []).length === 1);
   ok("⭐ SIM V2: the site view — a named Site select (Whole scheme first), the map and the timeline take the site, Stations now replaces Gates now for it, 'on site' in the now line",
-    playerSrc.includes('aria-label="Simulation site" data-sim-site="1">') && playerSrc.includes('<option value="">Whole scheme</option>')
+    // RE-PINNED 29 Oct 2026 (the page, card 4): the Site select is in the page's controls row (scale → period → site), the player takes the site
+    panelSrc.includes('aria-label="Simulation site" data-sim-site="1">') && panelSrc.includes('<option value="">Whole scheme</option>') && panelSrc.includes("site={site} controls={controls}")
     && playerSrc.includes('<SimMap meta={meta} D={D} store={store} frame={f} site={site} />') && playerSrc.includes('<SimTimeline D={D} t={t} onSeek={(m) => { setPlaying(false); seek(m); }} site={site} />')
     && playerSrc.includes('data-sim-stations-now="1"') && playerSrc.includes('<div className="sim-card-h">Stations now · {site.d.name}</div>')
     && playerSrc.includes('` · ${f.onSite} on site`'));
@@ -2721,9 +2748,12 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && ["st.bottleneck_at", "st.most_waiting", "st.minutes_lost", "st.longest_wait", "st.status_word", "x.avg_on_site", "x.lorries_out"].every(t => panelSrc.includes(t)));
   ok("⭐ SIM V2: the On site fold (closed), one table a site, a fourth check only when a site exists; the key names the served lorry, the area and the wash only with a site",
     panelSrc.includes('<details className="sim-fold" data-sim-fold="site"><summary>On site</summary>') && !/data-sim-fold="site" open/.test(panelSrc)
-    && panelSrc.includes('{(D.sites || []).length > 0 && <div>{ok(D.checks.sites_add_up)} On site, every lorry checked in left by a gate or is named as having no area.</div>}')
-    && simSrc.includes('{(D.sites || []).length > 0 && <div><i className="sim-dot sim-dot-serve" aria-hidden="true"></i>Being unloaded, loaded or washed</div>}')
-    && simSrc.includes('{(D.sites || []).some(x => x.wash) && <div><i className="sim-dot sim-dot-wash" aria-hidden="true"></i>Wheel wash</div>}'));
+    // RE-PINNED 29 Oct 2026 (the page, card 10): the checks are one line with the details folded; the fourth only with a site
+    && panelSrc.includes('(D.sites || []).length > 0 && [D.checks.sites_add_up, "On site, every lorry checked in left by a gate or is named as having no area."]].filter(Boolean) : [];')
+    && panelSrc.includes('<div className="sim-checks-line" data-sim-checks="1" data-sim-checks-ok={`${nOk}/${checks.length}`}>')
+    // RE-PINNED 29 Oct 2026 (card 5): the key's rows are one list, drawn as a row on the page and a box on the big screen
+    && simSrc.includes('(D.sites || []).length > 0 && ["sim-dot sim-dot-serve", "Being unloaded, loaded or washed"],')
+    && simSrc.includes('(D.sites || []).some(x => x.wash) && ["sim-dot sim-dot-wash", "Wheel wash"],'));
   ok("⭐ SIM V2: the scenario card offers each site's speed (in the tenant's unit, sent in km/h), each area's minutes and bays, the wash switch; the pour's gate list is still the server's",
     scnSrc.includes('data-sim-onsite={onsite.location_id}') && scnSrc.includes('const kphIn = (v) => DU() === "mi" ? +v * KM_PER_MI : +v;')
     && scnSrc.includes('aria-label={`${onsite.name}: site speed`}') && scnSrc.includes('aria-label={`${a.name}: minutes a lorry`}') && scnSrc.includes('aria-label={`${a.name}: bays`}')
@@ -2753,8 +2783,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && (scnSrc.match(/disabled=\{sc\.arrivals !== "rush"\}/g) || []).length === 2
     && scnSrc.includes("x.first_trip_pct != null && x.arrivals > 0).sort((a, b) => b.arrivals - a.arrivals)[0]")
     && scnSrc.includes("The plan's first trips: about {g.first_trip_pct} % at {simGateName(g)}, {g.gate_name}."));
-  ok("SIM RUSH: the day's lead sentence prints the server's pattern words under a rush and the even-spread words otherwise; no 'predict' word",
-    panelSrc.includes('{(D.arrival_pattern && D.arrival_pattern.kind === "rush") ? D.arrival_pattern.words : "Each gate\'s arrivals are spread evenly over its open hours"}')
+  // RE-PINNED 29 Oct 2026 (the page, card 3): the lead is a short figures line; "spread evenly" for the even day, the server's words under a rush
+  ok("SIM RUSH: the day's figures line prints the server's pattern words under a rush and 'spread evenly' otherwise; no 'predict' word",
+    panelSrc.includes('{(D.arrival_pattern && D.arrival_pattern.kind === "rush") ? D.arrival_pattern.words : "spread evenly"}')
     && !/\b(predict\w*|expected|likely)\b/i.test(scnSrc.slice(scnSrc.indexOf('className="sim-arrivals"'), scnSrc.indexOf('className="sim-arrivals"') + 2500)));
 }
 
@@ -2891,7 +2922,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("W1: every map the app creates opens on UK_VIEW (the Look-ahead map, the Routes / Zones map, the Simulation map)",
      (html.match(/center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/g) || []).length === 3
      && (html.match(/new window\.mapboxgl\.Map\(/g) || []).length === 3
-     && /function SimMap\(\{ meta, D, store, frame, site \}\)\{[\s\S]{0,700}new window\.mapboxgl\.Map\(\{ container: div\.current, style: "mapbox:\/\/styles\/mapbox\/light-v11", center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/.test(html));
+     // RE-PINNED 29 Oct 2026 (the page, card 5): the Simulation map's style follows the look (dark-v11 in the Dark look, light-v11 otherwise)
+     && /function SimMap\(\{ meta, D, store, frame, site, wall \}\)\{[\s\S]{0,900}new window\.mapboxgl\.Map\(\{ container: div\.current, style: styleNow, center: UK_VIEW\.center, zoom: UK_VIEW\.zoom/.test(html)
+     && html.includes('const simMapStyle = () => (typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "dark") ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/light-v11";')
+     && html.includes("let m, styleNow = simMapStyle();") && html.includes("THEME.subs.add(onLook);") && html.includes("THEME.subs.delete(onLook);")
+     && html.includes('m.on("style.load", () => {\n      if(m.getSource("sim-routes")) return;'));
   const locFetch = (html.match(/fetch\(`\$\{API\}\/locations\/geojson`\)\.then\(r => r\.json\(\)\)\.then\(gj => \{([\s\S]*?)\n    \}\)\.catch/) || ["", ""])[1];
   ok("⭐ W1: the Routes / Zones map frames the scheme's locations the FIRST time they load, once (a ref), finite points only, inside a try",
      /const framedRef = useRef\(false\);/.test(html) && /if\(!framedRef\.current\)\{/.test(locFetch)
@@ -3533,7 +3568,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      _po.includes('{page === "submit" && !narrow && <Matrix ') && _po.includes('{page === "forecasts" && !narrow && <Forecasts ')
      && _po.includes('{page === "carbon" && !narrow && <CarbonPage ') && _po.includes('{page === "lookahead" && !narrow && <LookAhead ')
      && _po.includes("{DATA_PAGES.includes(page) && canApprove && !narrow && (") && _po.includes('{page === "config" && canApprove && !narrow && <ConfigPage ')
-     && _po.includes("const phoneDesk = narrow && !PHONE_PAGES.includes(page);") && _po.includes("{phoneDesk && <DeskOnly label={current.label} onHome={() => pickPage(\"dashboard\")} />}")
+     // NARROWED 29 Oct 2026 (the Simulation's own page): a page in PHONE_READ_PAGES reads on a phone (its own phone layout), never the desk-only card
+     && _po.includes("const phoneDesk = narrow && !PHONE_PAGES.includes(page) && !PHONE_READ_PAGES.includes(page);") && src.includes('const PHONE_READ_PAGES = ["simulation"];')
+     && _po.includes("{phoneDesk && <DeskOnly label={current.label} onHome={() => pickPage(\"dashboard\")} />}")
      && !/disabled=\{[^}]*\b(narrow|phone)\b/.test(src));
   // the same rule for ANY page added later (G3's Users page, say): every page the Portal mounts, other than the Dashboard
   // and the Route map, carries `!narrow`, or is a Phone… page mounted only when narrow
@@ -3548,7 +3585,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      _do.includes("<h2>{label}</h2>") && _do.includes('<p className="do-lead">Open on a desktop to edit this.</p>')
      && _do.includes("On a phone, Wayscope shows the Dashboard, the Look-ahead and the Route map, to read.") && _do.includes("Go to the Dashboard"));
   ok("PHONE: More lists the role's desk pages (from the visible groups, so a team code never sees Data or Config) and the user guide in a new tab",
-     _pm.includes("const desk = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));")
+     // NARROWED 29 Oct 2026 (card 12): the pages that read on a phone are listed first under "Read here, plan on a desktop"
+     _pm.includes("const all = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));")
+     && _pm.includes("const reads = all.filter(it => PHONE_READ_PAGES.includes(it.id)), desk = all.filter(it => !PHONE_READ_PAGES.includes(it.id));")
+     && _pm.includes("{reads.length > 0 && <><h3>Read here, plan on a desktop</h3>") && _pm.includes("<h3>Made for a desktop</h3>")
      && _pm.includes('role="dialog" aria-modal="true" aria-label="More pages"') && _pm.includes('target="_blank" rel="noopener noreferrer"')
      && _pm.includes("{teamText(who) || \"—\"} · {role.ipt ? teamName(role.ipt) : role.label}"));
   ok("PHONE: Escape and the shade shut More; Ctrl K opens it on a phone (the rail's search is not drawn there)",
