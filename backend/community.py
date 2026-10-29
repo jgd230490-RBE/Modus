@@ -216,7 +216,10 @@ def strip_from_db():
     """The tenant's strip: every PRIMARY stored road route (both legs, every vehicle, duplicates thinned out)
     and every site with a position.
     29 Oct 2026 (task 0c, PR B): + every stored option a dated zone's diversion uses (lorries drive it in those
-    months), so a fetch covers the schools and homes along a diversion too."""
+    months), so a fetch covers the schools and homes along a diversion too.
+    29 Oct 2026 (the route options compared, route_compare.py): + every option HERE gave (alt_index 1-9), so the schools,
+    homes and cycle routes along an alternative are fetched too and the options can be compared fairly. A way round a
+    closed zone (alt_index 10+) stays in only while a diversion uses it."""
     tenant = db.current_tenant()
     lines, seen = [], set()
     try:
@@ -228,7 +231,7 @@ def strip_from_db():
     for r in db.query("SELECT route_id, vehicle_profile, leg, alt_index, geometry FROM route_geometry WHERE tenant_id = ? "
                       "AND geometry IS NOT NULL", (tenant,)):
         a = int(r.get("alt_index") or 0)
-        if a and (r["route_id"], r["leg"], a) not in used_alt:
+        if a > 9 and (r["route_id"], r["leg"], a) not in used_alt:
             continue
         try:
             coords = json.loads(r["geometry"]) if isinstance(r["geometry"], str) else r["geometry"]
