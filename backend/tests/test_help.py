@@ -1105,7 +1105,10 @@ ok3("⭐ T2 ranking: HERE's wording with its source links, why the Primary is HE
     and "never describes HERE's choice as safer or greener" in _t2r, _t2r[:160])
 ok3("T2 ranking: the 29 Oct measurement says what the counts support and what they do not",
     "do not support &ldquo;safer&rdquo; on their own" in _t2r and "the shorter in 49, the quicker in 55" in _t2r
-    and "Schools and homes are not compared yet" in _t2r, _t2r[-300:])
+    and "Schools and homes are not compared yet" not in _t2r, _t2r[-300:])
+ok3("T2 ranking: the schools and homes measured along every option (laptop run, 29 Oct), as counts, never 'homes' as a number",
+    "fewer residential areas within 100 m in 45 of the 68" in _t2r and "fewer schools within 250 m in 34" in _t2r
+    and "strip_from_db(all_options=True)" in _t2r and "counts areas, not homes or people" in _t2r, _t2r[-300:])
 ok3("T2 ranking: none of it in the user guide (no HERE source links, no routingMode, no section id)",
     "t2-ranking" not in _ug_rank and "routingMode" not in _ug_rank and "docs.here.com" not in _ug_rank)
 
