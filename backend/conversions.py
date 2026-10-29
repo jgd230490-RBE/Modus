@@ -174,6 +174,14 @@ def material_names(factors):
     return [k for k in factors.get("material_categories", {}) if not k.startswith("_")]
 
 
+def retired_materials(factors):
+    """29 Oct 2026 (3b, the steel split): the categories marked `retired` — still valid on every line that carries one
+    and counted exactly as before, but not offered for NEW lines, locations or site areas ("Steel / rail" and
+    "Structural steel / rebar" since Rail / Reinforcement / Structural steel)."""
+    cats = (factors or {}).get("material_categories") or {}
+    return [k for k, c in cats.items() if not k.startswith("_") and isinstance(c, dict) and c.get("retired") is True]
+
+
 def vehicle_names(factors):
     return [k for k in factors.get("vehicles", {}) if not k.startswith("_")]
 

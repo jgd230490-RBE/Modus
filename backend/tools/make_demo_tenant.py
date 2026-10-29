@@ -231,7 +231,9 @@ BAND_COLOURS = {"IPT1": "#4C1D95", "IPT2": "#155E75", "IPT3": "#57534E"}
 #  The programme — DATA, ported from notes/demo-redesign-1016/ (16 Oct 2026; D95–D114)
 # ------------------------------------------------------------------------------------
 BALLAST, SMALL, EARTH = "Large aggregate / ballast", "Small aggregate", "Earthworks / soil"
-PRECAST, STEEL, GENERAL = "Precast / concrete", "Steel / rail", "General / imported"
+PRECAST, GENERAL = "Precast / concrete", "General / imported"
+# 29 Oct 2026 (3b, the steel split): the girders are Structural steel and the bar Reinforcement; the old Steel / rail is retired
+STRUCT, REINF = "Structural steel", "Reinforcement"
 READY, ASPHALT = "Ready-mixed concrete", "Asphalt"
 FEED = "Aggregate for the asphalt plant"   # D112: the plant's feed, on its own category with NO material carbon
 TIP, FLAT = "Artic Tipper (44t)", "Artic Flatbed (44t)"
@@ -260,7 +262,7 @@ ROUTES = [
     ("Q2", "C2", ASPHALT),                                                        # R043 a quarry coating plant (2030)
     # 28 Oct 2026 (simulation v2, task 0e): the Tilton Viaduct site — stone and concrete to the pier bases, reinforcement,
     # steel and precast to the laydown, piling arisings out to the tip (muck away: the empty lorry comes to LOAD)
-    ("Q1", "VS", BALLAST), ("Q2", "VS", SMALL), ("RH", "VS", GENERAL), ("RH", "VS", PRECAST), ("RH", "VS", STEEL),   # R044–R048
+    ("Q1", "VS", BALLAST), ("Q2", "VS", SMALL), ("RH", "VS", REINF), ("RH", "VS", PRECAST), ("RH", "VS", STRUCT),   # R044–R048 (R046 / R048 renamed 29 Oct, 3b)
     ("BP", "VS", READY), ("VS", "TIP", EARTH),                                    # R049–R050
 ]
 assert len(ROUTES) == 50 and len(set(ROUTES)) == 50
@@ -309,12 +311,12 @@ PROGRAMME = [
     ("WS4", "structures", READY, "BP", "VS", MIX8, "m3", 5, [840, 1070, 1290, 1510, 1630, 1630, 1620, 910, 1170, 1380, 1620, 1620, 1510, 1290, 1070, 840], "C32/40 concrete — Tilton viaduct piles, pile caps, piers and abutments"),
     ("WS4", "structures", READY, "BP", "VS", MIX8, "m3", 23, [580, 500, 690, 810, 960, 880, 580], "C32/40 concrete — Tilton viaduct deck slab, edge beams and approach slabs"),
     ("WS4", "structures", READY, "BP", "C3", MIX8, "m3", 10, [260, 340, 230, 350, 430, 500, 500, 500, 500, 500, 500, 490, 410, 340, 150], "C32/40 concrete — A47 junction overbridge"),
-    ("WS4", "structures", GENERAL, "RH", "VS", FLAT, "t", 5, [100, 100, 100, 100, 100, 200, 200, 100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100, 100, 100, 100, 100, 100, 100], "Reinforcement — Tilton viaduct and A47 junction"),
+    ("WS4", "structures", REINF, "RH", "VS", FLAT, "t", 5, [100, 100, 100, 100, 100, 200, 200, 100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100, 100, 100, 100, 100, 100, 100], "Reinforcement — Tilton viaduct and A47 junction"),
     # 28 Oct 2026 (simulation v2): the viaduct site's own lines — the piling mat and pier drainage stone in, the deck's
     # structural steel (the longest girders go as abnormal loads, not here) and the precast parapets
     ("WS4", "substructure", BALLAST, "Q1", "VS", TIP, "t", 5, [2600, 3100, 3100, 2200, 1400], "Piling mat and working platform stone at the viaduct site (Type 1)"),
     ("WS4", "substructure", SMALL, "Q2", "VS", TIP, "t", 9, [900, 1200, 1200, 900], "Pier drainage and bedding stone"),
-    ("WS4", "structures", STEEL, "RH", "VS", FLAT, "t", 14, [300, 500, 600, 600, 600, 600, 500, 400, 300], "Structural steel girders for the composite deck (the longest go as abnormal loads)"),
+    ("WS4", "structures", STRUCT, "RH", "VS", FLAT, "t", 14, [300, 500, 600, 600, 600, 600, 500, 400, 300], "Structural steel girders for the composite deck (the longest go as abnormal loads)"),
     ("WS4", "structures", PRECAST, "RH", "VS", FLAT, "t", 24, [200, 300, 300, 300, 300, 200], "Precast parapet and deck edge units"),
     ("WS4", "substructure", SMALL, "Q2", "C3", TIP, "t", 12, [400, 800, 1100, 1900, 2200, 2200, 2100, 2100, 2100, 2100, 2100, 1700, 600, 800, 700], "Pipe bedding and filter drain stone"),
     ("WS4", "substructure", PRECAST, "RH", "C3", FLAT, "t", 12, [100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100], "Drainage pipes, chambers and culvert units"),
@@ -674,7 +676,7 @@ def build(with_areas=False, out=None):
         vendor="Northfield Stone Co. (fictional)", detail="Granodiorite, with a coating plant (asphalt for the 2030 side roads). Weighbridge queue peaks 07:00–09:00.")
     add("Q3", "Brook Pit", "origin", "Quarry", -0.7520, 52.6940, supplies=[EARTH, SMALL],
         vendor="Brook Pit Sand & Gravel (fictional)", detail="Sand and gravel; imported granular fill.")
-    add("RH", "Harborough Rail Freight Terminal", "origin", "Railhead", -0.9180, 52.4785, supplies=[PRECAST, GENERAL, SMALL, STEEL],
+    add("RH", "Harborough Rail Freight Terminal", "origin", "Railhead", -0.9180, 52.4785, supplies=[PRECAST, GENERAL, SMALL, STRUCT, REINF],
         detail="Rail-delivered precast units, structural steel and aggregate transhipped to road. Fictional.")
 
     # Compounds and stockpiles along the corridor, ~400 m off the alignment.
@@ -683,7 +685,7 @@ def build(with_areas=False, out=None):
     for key, m in comp_chain.items():
         p = offset(point_at(ALIGN_PTS, ALIGN_CHAIN, m), east_m=420, north_m=-120)
         add(key, comp_names[key], "destination", "Compound", p[0], p[1],
-            receives=[BALLAST, SMALL, EARTH, PRECAST, STEEL, GENERAL, READY, ASPHALT],
+            receives=[BALLAST, SMALL, EARTH, PRECAST, STRUCT, REINF, GENERAL, READY, ASPHALT],
             detail=f"Site compound at chainage {chain_text(m)}. It stands for all of its section's site accesses: "
                    "the plan delivers to sites, not to work faces.")
     stock_chain = {"S1": 4500, "S2": 17500, "S3": 25000}
@@ -742,7 +744,7 @@ def build(with_areas=False, out=None):
     # of Tilton Compound: the laydown at the top of the bank, the pier bases on the terrace 8 m below, a gate in and a
     # gate out on the lane south of it (the gate-out closed March–May 2027 for the deck steel's lift season).
     add("VS", "Tilton Viaduct site (fictional)", "destination", "Site", -0.8822, 52.6447,
-        receives=[READY, GENERAL, PRECAST, STEEL, BALLAST, SMALL], vendor="Wolds Link joint venture (fictional)",
+        receives=[READY, GENERAL, PRECAST, STRUCT, REINF, BALLAST, SMALL], vendor="Wolds Link joint venture (fictional)",
         detail="The viaduct works: piling and pier bases on the river terrace, the laydown and crane pads at the top of "
                "the bank, a wheel wash on the way out. Check in 3 min; 5 mph on site. Fictional: no such site.")
     assert loc["VS"] == "L019", loc
@@ -1288,7 +1290,7 @@ def build(with_areas=False, out=None):
     for name, act, mats, mins, bays, level, geom, note in (
             ("Pier bases", "unload", [READY, BALLAST, SMALL], 5, 1, "river terrace, −8 m", rect(PB, 140, 110),
              "Concrete to the pump, stone to the piling mat; one pump bay (fictional)."),
-            ("Deck and laydown", "unload", [STEEL, PRECAST, GENERAL], 5, 2, "top of the bank", rect(LD, 120, 90),
+            ("Deck and laydown", "unload", [STRUCT, REINF, PRECAST, GENERAL], 5, 2, "top of the bank", rect(LD, 120, 90),
              "Steel, precast and reinforcement off-loaded by the crawler crane; two bays (fictional)."),
             ("Spoil loading", "load", [EARTH], 10, 1, "river terrace, −8 m", {"type": "Point", "coordinates": SP},
              "Piling arisings loaded by the 360 (fictional)."),

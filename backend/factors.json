@@ -62,7 +62,9 @@
       "units": [
         "t"
       ],
-      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three."
+      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three.",
+      "retired": true,
+      "_retired_note": "29 Oct 2026 (3b, the steel split; the user said yes): RETIRED. Kept so every line, location, route and area that names it still counts exactly as before; not offered for new lines (the Submit form, Locations and site areas leave it out unless the record already carries it). Its lines move by editing their category to Rail, Reinforcement or Structural steel (same density, lorry and carbon figure, so no figure changes)."
     },
     "General / imported": {
       "density_t_per_m3": 1.5,
@@ -108,7 +110,54 @@
       "units": [
         "t"
       ],
-      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three."
+      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three.",
+      "retired": true,
+      "_retired_note": "29 Oct 2026 (3b, the steel split; the user said yes): RETIRED. Kept so every line, location, route and area that names it still counts exactly as before; not offered for new lines (the Submit form, Locations and site areas leave it out unless the record already carries it). Its lines move by editing their category to Rail, Reinforcement or Structural steel (same density, lorry and carbon figure, so no figure changes)."
+    },
+    "Rail": {
+      "density_t_per_m3": 7.85,
+      "default_unit": "t",
+      "volume_convertible": false,
+      "vehicles": [
+        "Artic Flatbed (44t)"
+      ],
+      "carbon_material": "metals",
+      "units": [
+        "t"
+      ],
+      "_density_basis": "Steel 77.0-78.5 kN/m3, BS EN 1991-1-1 Annex A (quoted in 'Steel Buildings in Europe', Part 3 Actions, p.4, read 14 Oct 2026); 7,850 kg/m3 is the unit mass BS EN 1993-1-1 (Eurocode 3) 3.2.6 gives for steel. Stored, not used: steel is planned in tonnes. Added 29 Oct 2026.",
+      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three.",
+      "_note": "29 Oct 2026 (3b, the steel split): rail, fastenings and track steel moved by ROAD. Long rail does not go by road: Network Rail's own road fleet may carry rail up to 45 ft (13.7 m), longer rail by road only through its contracted haulier, and long welded rail goes by rail train (Network Rail safety advice NRA22-01, read 29 Oct 2026). Flatbed only: no source found for another default."
+    },
+    "Reinforcement": {
+      "density_t_per_m3": 7.85,
+      "default_unit": "t",
+      "volume_convertible": false,
+      "vehicles": [
+        "Artic Flatbed (44t)"
+      ],
+      "carbon_material": "metals",
+      "units": [
+        "t"
+      ],
+      "_density_basis": "Steel 77.0-78.5 kN/m3, BS EN 1991-1-1 Annex A (quoted in 'Steel Buildings in Europe', Part 3 Actions, p.4, read 14 Oct 2026); 7,850 kg/m3 is the unit mass BS EN 1993-1-1 (Eurocode 3) 3.2.6 gives for steel. Stored, not used: steel is planned in tonnes. Added 29 Oct 2026.",
+      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three.",
+      "_note": "29 Oct 2026 (3b): reinforcing bar, mesh, cut-and-bent bar and cages. Flatbed only: no published source was found that fixes another default lorry; tick more on Config."
+    },
+    "Structural steel": {
+      "density_t_per_m3": 7.85,
+      "default_unit": "t",
+      "volume_convertible": false,
+      "vehicles": [
+        "Artic Flatbed (44t)"
+      ],
+      "carbon_material": "metals",
+      "units": [
+        "t"
+      ],
+      "_density_basis": "Steel 77.0-78.5 kN/m3, BS EN 1991-1-1 Annex A (quoted in 'Steel Buildings in Europe', Part 3 Actions, p.4, read 14 Oct 2026); 7,850 kg/m3 is the unit mass BS EN 1993-1-1 (Eurocode 3) 3.2.6 gives for steel. Stored, not used: steel is planned in tonnes. Added 29 Oct 2026.",
+      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three.",
+      "_note": "29 Oct 2026 (3b): girders, beams, columns, plate. A piece too long or heavy for a flatbed is an abnormal load, planned on Plan -> Abnormal loads."
     },
     "Asphalt": {
       "density_t_per_m3": 2.3,
@@ -124,7 +173,9 @@
     "Abnormal loads": {
       "density_t_per_m3": 1.0,
       "default_unit": "vehicles",
-      "units": ["vehicles"],
+      "units": [
+        "vehicles"
+      ],
       "volume_convertible": false,
       "vehicles": [],
       "carbon_material": null,

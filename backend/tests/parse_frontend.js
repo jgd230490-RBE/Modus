@@ -3880,7 +3880,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("decision 12: ...and the table FITS the 800 px card at 1366 (measured 799 px in Chrome): three short headings wrap to two lines at their least width (Density, Tonnes only at width 1; Volume ↔ weight at 92 px), a long material name wraps at 136 px; the six headings read as before",
      mat.includes('style={h === "Volume ↔ weight" ? { whiteSpace: "normal", minWidth: 92 } : ["Density t/m³", "Tonnes only"].includes(h) ? { whiteSpace: "normal", width: 1 } : undefined}>{h}</th>')
      && mat.includes('["Material", "Density t/m³", "Default unit", "Tonnes only", "Volume ↔ weight", "Vehicles used"].map(h =>')
-     && mat.includes('<td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}</td>'));
+     // NARROWED 29 Oct 2026 (3b, the steel split): the name cell also carries the retired category's "Older" chip
+     && mat.includes('<td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}{c.retired === true && <span className="block mt-1"><span className="chip-st">'));
   ok("🔴 #13: the Seasonal restrictions' vehicle rows, the Locations form's two material lists and the Routes form's vehicle list are 24 px rows (min-h-6) — four lists, no 16 px tick row left among them",
      code.includes('<label key={v} className="flex items-center gap-1 min-h-6 text-[13px] text-slate-600 whitespace-nowrap">')
      // NARROWED 28 Oct 2026 (simulation v2): a third list — the materials a site area takes (the same 24 px rows)
