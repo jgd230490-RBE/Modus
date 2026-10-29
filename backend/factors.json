@@ -62,7 +62,9 @@
       "units": [
         "t"
       ],
-      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three."
+      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three.",
+      "retired": true,
+      "_retired_note": "29 Oct 2026 (3b, the steel split; the user said yes): RETIRED. Kept so every line, location, route and area that names it still counts exactly as before; not offered for new lines (the Submit form, Locations and site areas leave it out unless the record already carries it). Its lines move by editing their category to Rail, Reinforcement or Structural steel (same density, lorry and carbon figure, so no figure changes)."
     },
     "General / imported": {
       "density_t_per_m3": 1.5,
@@ -108,7 +110,56 @@
       "units": [
         "t"
       ],
-      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three."
+      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three.",
+      "retired": true,
+      "_retired_note": "29 Oct 2026 (3b, the steel split; the user said yes): RETIRED. Kept so every line, location, route and area that names it still counts exactly as before; not offered for new lines (the Submit form, Locations and site areas leave it out unless the record already carries it). Its lines move by editing their category to Rail, Reinforcement or Structural steel (same density, lorry and carbon figure, so no figure changes)."
+    },
+    "Rail": {
+      "density_t_per_m3": 7.85,
+      "default_unit": "t",
+      "volume_convertible": false,
+      "vehicles": [
+        "Artic Flatbed (44t)"
+      ],
+      "carbon_material": "metals",
+      "units": [
+        "t"
+      ],
+      "_density_basis": "Steel 77.0-78.5 kN/m3, BS EN 1991-1-1 Annex A (quoted in 'Steel Buildings in Europe', Part 3 Actions, p.4, read 14 Oct 2026); 7,850 kg/m3 is the unit mass BS EN 1993-1-1 (Eurocode 3) 3.2.6 gives for steel. Stored, not used: steel is planned in tonnes. Added 29 Oct 2026.",
+      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three.",
+      "_note": "29 Oct 2026 (3b, the steel split): rail, fastenings and track steel moved by ROAD. Long rail does not go by road: Network Rail's own road fleet may carry rail up to 45 ft (13.7 m), longer rail by road only through its contracted haulier, and long welded rail goes by rail train (Network Rail safety advice NRA22-01, read 29 Oct 2026). Flatbed only: no source found for another default."
+    },
+    "Reinforcement": {
+      "density_t_per_m3": 7.85,
+      "default_unit": "t",
+      "volume_convertible": false,
+      "vehicles": [
+        "Artic Flatbed (44t)"
+      ],
+      "carbon_material": "metals",
+      "units": [
+        "t"
+      ],
+      "_density_basis": "Steel 77.0-78.5 kN/m3, BS EN 1991-1-1 Annex A (quoted in 'Steel Buildings in Europe', Part 3 Actions, p.4, read 14 Oct 2026); 7,850 kg/m3 is the unit mass BS EN 1993-1-1 (Eurocode 3) 3.2.6 gives for steel. Stored, not used: steel is planned in tonnes. Added 29 Oct 2026.",
+      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three.",
+      "_note": "29 Oct 2026 (3b): reinforcing bar, mesh, cut-and-bent bar and cages. Flatbed only: no published source was found that fixes another default lorry; tick more on Config.",
+      "from_concrete": true,
+      "_from_concrete_note": "29 Oct 2026 (3b-2, John): a Reinforcement line may be typed as m³ of CONCRETE with a kg-per-m³ ratio (planning.rebar_ratios, or one typed for the line); it is stored in tonnes = m³ × kg/m³ ÷ 1000 and keeps its basis (forecasts.concrete_m3 / rebar_kg_per_m3 / structure_type)."
+    },
+    "Structural steel": {
+      "density_t_per_m3": 7.85,
+      "default_unit": "t",
+      "volume_convertible": false,
+      "vehicles": [
+        "Artic Flatbed (44t)"
+      ],
+      "carbon_material": "metals",
+      "units": [
+        "t"
+      ],
+      "_density_basis": "Steel 77.0-78.5 kN/m3, BS EN 1991-1-1 Annex A (quoted in 'Steel Buildings in Europe', Part 3 Actions, p.4, read 14 Oct 2026); 7,850 kg/m3 is the unit mass BS EN 1993-1-1 (Eurocode 3) 3.2.6 gives for steel. Stored, not used: steel is planned in tonnes. Added 29 Oct 2026.",
+      "_units_note": "15 Oct 2026 (the user): steel is planned in tonnes only — not m³ (a volume of steel means nothing on a delivery note) and not vehicles (a load's tonnage varies too much by section). The Submit form offers tonnes alone and the server refuses another unit. Remove `units` to allow all three.",
+      "_note": "29 Oct 2026 (3b): girders, beams, columns, plate. A piece too long or heavy for a flatbed is an abnormal load, planned on Plan -> Abnormal loads."
     },
     "Asphalt": {
       "density_t_per_m3": 2.3,
@@ -124,7 +175,9 @@
     "Abnormal loads": {
       "density_t_per_m3": 1.0,
       "default_unit": "vehicles",
-      "units": ["vehicles"],
+      "units": [
+        "vehicles"
+      ],
       "volume_convertible": false,
       "vehicles": [],
       "carbon_material": null,
@@ -457,7 +510,64 @@
     "load_minutes": 12,
     "unload_minutes": 8,
     "working_days_per_month": 22,
-    "shift_hours_per_day": 10
+    "shift_hours_per_day": 10,
+    "rebar_ratios": [
+      {
+        "id": "pile_caps",
+        "name": "Pile caps",
+        "kg_per_m3": 130,
+        "basis": "UK estimate 110–150"
+      },
+      {
+        "id": "abutments",
+        "name": "Abutments (on piles)",
+        "kg_per_m3": 80,
+        "basis": "Florida DOT 2022"
+      },
+      {
+        "id": "piers_short",
+        "name": "Piers, short (under 7.6 m)",
+        "kg_per_m3": 116,
+        "basis": "Florida DOT 2022"
+      },
+      {
+        "id": "piers_tall",
+        "name": "Piers, tall (over 7.6 m)",
+        "kg_per_m3": 128,
+        "basis": "Florida DOT 2022"
+      },
+      {
+        "id": "deck_slab",
+        "name": "Deck slab",
+        "kg_per_m3": 122,
+        "basis": "Florida DOT 2022"
+      },
+      {
+        "id": "approach_slabs",
+        "name": "Approach slabs",
+        "kg_per_m3": 119,
+        "basis": "Florida DOT 2022"
+      },
+      {
+        "id": "capping_beams",
+        "name": "Capping beams",
+        "kg_per_m3": 135,
+        "basis": "UK estimate"
+      },
+      {
+        "id": "retaining_walls",
+        "name": "Retaining walls",
+        "kg_per_m3": 130,
+        "basis": "UK estimate 110–150"
+      },
+      {
+        "id": "piles",
+        "name": "Piles",
+        "kg_per_m3": null,
+        "basis": "Type your own"
+      }
+    ],
+    "_rebar_ratios_note": "29 Oct 2026 (3b-2; John: yes as recommended): kg of reinforcement per m³ of concrete by structure type, for a Reinforcement line typed as m³ of concrete. Early-stage estimating figures only: a bar bending schedule always replaces them, and an engineer adds or edits a row per structure. 'Florida DOT 2022' = Florida Department of Transportation, Structures Design Guidelines, Topic No. 625-020-018, January 2022, §9.2.3 'Design Aid for Determination of Reinforcing Steel (Rev. 01/22)': 'In the absence of better information, use the following quantities of reinforcing steel pounds per cubic yard of concrete' — pile abutments 135, multiple column piers short (<25 ft) 195 / tall (>25 ft) 215, decks standard 205, approach slabs 200 lb/yd³, × 0.5933 (1 lb/yd³ = 0.45359237 kg ÷ 0.764554858 m³), rounded. US practice (Florida), not UK. 'UK estimate' = Prova Surveying Ltd, 'Reinforcement Estimates' (building elements, ranges: pile caps 110-150, capping beams 135, retaining walls 110-150; midpoints used), as quoted by One Click LCA help (read 29 Oct 2026). Piles: no published figure found, blank. No UK bridge figure was found (notes: session-1029-steel-split.md §10)."
   },
   "_seasonal_note": "Calendar months (1=Jan..12=Dec) with statutory HGV weight or access restrictions in the tenant's country, shown as a warning at submission when a forecast month falls in a window (and, if listed, the chosen vehicle is the restricted kind). EMPTY in the seed: a spring-thaw window is a Nordic/Baltic fact, not a product default. Add one on the Config page.",
   "seasonal_restrictions": [],

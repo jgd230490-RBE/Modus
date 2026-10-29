@@ -406,6 +406,17 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     # 14 Oct 2026 (bundle G, W17): the committed week at each gate (the rail's GATE_OVER / GATE_NEAR come from it)
     out["gates_week"] = cl.pop("gates_week", None)
     out["clashes"] = cl
+    # 29 Oct 2026 (task 3a): the week's concrete pours on the lines the caller can see (the grid's POUR mark)
+    try:
+        import pours as _pours
+        ds = days.bucket_dates(mi, wi)
+        out["pours"] = [{k: p[k] for k in ("id", "route_id", "month_index", "discipline", "section_id", "pour_date",
+                                            "start", "m3", "rate_m3h", "place", "status")}
+                        for p in _pours.list_pours(ds[0].isoformat(), ds[-1].isoformat(), include_cancelled=False)
+                        if (p["route_id"], p["month_index"], p["discipline"] or "", p["section_id"] or "") in vis_keys]
+    except Exception as e:                       # noqa: BLE001
+        out["pours"] = []
+        print("⚠️  look-ahead pours:", str(e)[:120])
     # 22 Oct 2026 (abnormal loads, phase 2): the movements whose window touches the committed week — a block of their
     # own under the gates' week, never a line and never in the week's figures (D70). A database without the table
     # (an old scratch file) must not take the page down.

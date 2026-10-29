@@ -34,6 +34,8 @@ be reached — Tark Tee. Nothing here is stored, nothing here refuses a confirm.
                     access" is said in the text. Standing limits: no week test.
     UNBAKED         quantity on a route not baked for the line's vehicle (slice 2)
     PARENT_CHANGED  the month moved under a set week (Task C's flag, surfaced)
+    POUR_*          29 Oct 2026 (task 3a, pours.py): a concrete pour in the week — COLD JOINT and TRANSIT red,
+                    MIXERS SHORT, IN A BAND and OVER PLAN amber — on the pour's day only (`day_date`)
 
 Rules that are the module, not details:
 
@@ -64,7 +66,9 @@ import stockpiles
 import weeks
 
 CODES = ("SHORTAGE", "DAYS_NE_WEEK", "STOCKPILE_OVER", "ROUTE_CAP", "GATE_OVER", "IPT_SHARE", "RESTRICTION",
-         "LIMIT", "NO_WAY_ROUND", "UNBAKED", "GATE_NEAR", "STOCKPILE_EMPTY", "STOCKPILE_SOON", "PARENT_CHANGED")
+         "LIMIT", "NO_WAY_ROUND", "UNBAKED", "GATE_NEAR", "STOCKPILE_EMPTY", "STOCKPILE_SOON", "PARENT_CHANGED",
+         # 29 Oct 2026 (task 3a): the concrete pours' flags (pours.CODES), after the rest
+         "POUR_COLD_JOINT", "POUR_TRANSIT", "POUR_SHORT", "POUR_BAND", "POUR_OVER_PLAN")
 
 #: The 98 % band (brief L5): a line "holds" when actual ≥ 98 % of planned.
 HOLD_BAND = 0.98
@@ -567,6 +571,14 @@ def compute(all_lines, visible_keys, account_rows, month_index, week_index,
     flags += stockpile_over(all_lines, stock)
     flags += stockpile_soon(all_lines, stock)
     flags += no_way_round(all_lines)              # 28 Oct 2026 (task 0c)
+    # 29 Oct 2026 (task 3a): the week's concrete pours. An old database without the table must not take the rail down.
+    try:
+        import days as _days
+        import pours as _pours
+        ds = _days.bucket_dates(month_index, week_index)
+        flags += _pours.flags_for_lines(all_lines, ds[0].isoformat(), ds[-1].isoformat())
+    except Exception as e:                       # noqa: BLE001
+        print("⚠️  pour flags:", str(e)[:120])
     # the STORED check — a DB read, so it is always on. `with_restrictions=False` is for a
     # caller that wants the rail without it (none today).
     prov = restrictions.provider() or {}

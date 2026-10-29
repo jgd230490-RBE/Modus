@@ -289,6 +289,8 @@ ok("every material category names its Government class",
        # NARROWED 14 Oct 2026 (civils materials): the four categories added, each on its Government class
        "Ready-mixed concrete": "concrete", "Precast units": "concrete", "Structural steel / rebar": "metals",
        "Asphalt": "asphalt",
+       # NARROWED 29 Oct 2026 (3b, the steel split): the three steel categories, on the same metals class
+       "Rail": "metals", "Reinforcement": "metals", "Structural steel": "metals",
        # NARROWED 22 Oct 2026 (abnormal loads, B2's bare category): null ON PURPOSE — an abnormal load is left out of the
        # carbon totals (D71); the category exists for the holding-area exemption list (D63) and the picker
        "Abnormal loads": None})

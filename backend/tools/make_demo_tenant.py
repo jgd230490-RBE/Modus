@@ -123,6 +123,7 @@ import carbon_target         # noqa: E402
 import clashes               # noqa: E402
 import tenant_package        # noqa: E402
 import site_areas            # noqa: E402
+import pours                 # noqa: E402
 
 OUT = os.path.join(ROOT, "demo", "uk-corridor.package.json")
 AREAS_SEED = os.path.join(BACKEND, "data", "areas_demo.geojson")   # --with-areas (§2.2b)
@@ -230,7 +231,9 @@ BAND_COLOURS = {"IPT1": "#4C1D95", "IPT2": "#155E75", "IPT3": "#57534E"}
 #  The programme — DATA, ported from notes/demo-redesign-1016/ (16 Oct 2026; D95–D114)
 # ------------------------------------------------------------------------------------
 BALLAST, SMALL, EARTH = "Large aggregate / ballast", "Small aggregate", "Earthworks / soil"
-PRECAST, STEEL, GENERAL = "Precast / concrete", "Steel / rail", "General / imported"
+PRECAST, GENERAL = "Precast / concrete", "General / imported"
+# 29 Oct 2026 (3b, the steel split): the girders are Structural steel and the bar Reinforcement; the old Steel / rail is retired
+STRUCT, REINF = "Structural steel", "Reinforcement"
 READY, ASPHALT = "Ready-mixed concrete", "Asphalt"
 FEED = "Aggregate for the asphalt plant"   # D112: the plant's feed, on its own category with NO material carbon
 TIP, FLAT = "Artic Tipper (44t)", "Artic Flatbed (44t)"
@@ -259,7 +262,7 @@ ROUTES = [
     ("Q2", "C2", ASPHALT),                                                        # R043 a quarry coating plant (2030)
     # 28 Oct 2026 (simulation v2, task 0e): the Tilton Viaduct site — stone and concrete to the pier bases, reinforcement,
     # steel and precast to the laydown, piling arisings out to the tip (muck away: the empty lorry comes to LOAD)
-    ("Q1", "VS", BALLAST), ("Q2", "VS", SMALL), ("RH", "VS", GENERAL), ("RH", "VS", PRECAST), ("RH", "VS", STEEL),   # R044–R048
+    ("Q1", "VS", BALLAST), ("Q2", "VS", SMALL), ("RH", "VS", REINF), ("RH", "VS", PRECAST), ("RH", "VS", STRUCT),   # R044–R048 (R046 / R048 renamed 29 Oct, 3b)
     ("BP", "VS", READY), ("VS", "TIP", EARTH),                                    # R049–R050
 ]
 assert len(ROUTES) == 50 and len(set(ROUTES)) == 50
@@ -308,12 +311,12 @@ PROGRAMME = [
     ("WS4", "structures", READY, "BP", "VS", MIX8, "m3", 5, [840, 1070, 1290, 1510, 1630, 1630, 1620, 910, 1170, 1380, 1620, 1620, 1510, 1290, 1070, 840], "C32/40 concrete — Tilton viaduct piles, pile caps, piers and abutments"),
     ("WS4", "structures", READY, "BP", "VS", MIX8, "m3", 23, [580, 500, 690, 810, 960, 880, 580], "C32/40 concrete — Tilton viaduct deck slab, edge beams and approach slabs"),
     ("WS4", "structures", READY, "BP", "C3", MIX8, "m3", 10, [260, 340, 230, 350, 430, 500, 500, 500, 500, 500, 500, 490, 410, 340, 150], "C32/40 concrete — A47 junction overbridge"),
-    ("WS4", "structures", GENERAL, "RH", "VS", FLAT, "t", 5, [100, 100, 100, 100, 100, 200, 200, 100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100, 100, 100, 100, 100, 100, 100], "Reinforcement — Tilton viaduct and A47 junction"),
+    ("WS4", "structures", REINF, "RH", "VS", FLAT, "t", 5, [100, 100, 100, 100, 100, 200, 200, 100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100, 100, 100, 100, 100, 100, 100], "Reinforcement — Tilton viaduct and A47 junction"),
     # 28 Oct 2026 (simulation v2): the viaduct site's own lines — the piling mat and pier drainage stone in, the deck's
     # structural steel (the longest girders go as abnormal loads, not here) and the precast parapets
     ("WS4", "substructure", BALLAST, "Q1", "VS", TIP, "t", 5, [2600, 3100, 3100, 2200, 1400], "Piling mat and working platform stone at the viaduct site (Type 1)"),
     ("WS4", "substructure", SMALL, "Q2", "VS", TIP, "t", 9, [900, 1200, 1200, 900], "Pier drainage and bedding stone"),
-    ("WS4", "structures", STEEL, "RH", "VS", FLAT, "t", 14, [300, 500, 600, 600, 600, 600, 500, 400, 300], "Structural steel girders for the composite deck (the longest go as abnormal loads)"),
+    ("WS4", "structures", STRUCT, "RH", "VS", FLAT, "t", 14, [300, 500, 600, 600, 600, 600, 500, 400, 300], "Structural steel girders for the composite deck (the longest go as abnormal loads)"),
     ("WS4", "structures", PRECAST, "RH", "VS", FLAT, "t", 24, [200, 300, 300, 300, 300, 200], "Precast parapet and deck edge units"),
     ("WS4", "substructure", SMALL, "Q2", "C3", TIP, "t", 12, [400, 800, 1100, 1900, 2200, 2200, 2100, 2100, 2100, 2100, 2100, 1700, 600, 800, 700], "Pipe bedding and filter drain stone"),
     ("WS4", "substructure", PRECAST, "RH", "C3", FLAT, "t", 12, [100, 100, 200, 200, 200, 200, 200, 200, 200, 200, 200, 100], "Drainage pipes, chambers and culvert units"),
@@ -385,6 +388,32 @@ FEED_DESC = "Crushed rock for the asphalt plant (coarse and fine aggregate)"
 
 # The approval step (§1.9): one Pending and one Rejected line, each on its own line key (approval acts on every month
 # of a line). (route, discipline, section, t, material description, reason)
+#: 29 Oct 2026 (task 3a, John's Q10 "as recommended"): the planned concrete pours, on the batching plant's lines. When:
+#: "as-of thursday" / "next tuesday" follow the as-of date (so the Look-ahead's this week / next week each show one), or a
+#: fixed date. A pour whose line does not run in that month is left out (an as-of outside the line's months). The mixers
+#: booked and the wash-out minutes are FICTIONAL, like the plant; the drive times are whatever the routes give.
+#: (origin, destination, material, section, discipline, when, start, m³, m³ an hour, mixers booked, wash-out min, where,
+#:  how)
+DEMO_POURS = [
+    ("BP", "VS", None, "WS4", "structures", "as-of thursday", "09:15", 60.0, 20.0, None, 10.0,
+     "Pier 2 pile cap (fictional)", "Pump"),
+    ("BP", "C4", None, "WS8", "structures", "next tuesday", "09:15", 180.0, 40.0, 6, 10.0,
+     "Melton junction bridge deck (fictional)", "Pump"),
+    ("BP", "VS", None, "WS4", "structures", "2028-04-19", "07:00", 400.0, 60.0, None, 10.0,
+     "Viaduct deck slab, span 3 (fictional)", "Two pumps"),
+]
+
+
+def demo_pour_date(when, as_of):
+    """The date a DEMO_POURS row names: the as-of week's Thursday, next week's Tuesday, or the date itself."""
+    mon = as_of - datetime.timedelta(days=as_of.weekday())
+    if when == "as-of thursday":
+        return mon + datetime.timedelta(days=3)
+    if when == "next tuesday":
+        return mon + datetime.timedelta(days=8)
+    return datetime.date.fromisoformat(when)
+
+
 PENDING = ("R013", "earthworks", "WS1", 6400.0, "Imported Class 1A for the Harborough South roundabout embankment")
 REJECTED = ("R005", "earthworks", "WS2", 24000.0, "Granular fill (6F2) for the Langton cutting embankments",
             "24,000 t in one month is more than Langton can place before the capping starts: resubmit spread over "
@@ -647,7 +676,7 @@ def build(with_areas=False, out=None):
         vendor="Northfield Stone Co. (fictional)", detail="Granodiorite, with a coating plant (asphalt for the 2030 side roads). Weighbridge queue peaks 07:00–09:00.")
     add("Q3", "Brook Pit", "origin", "Quarry", -0.7520, 52.6940, supplies=[EARTH, SMALL],
         vendor="Brook Pit Sand & Gravel (fictional)", detail="Sand and gravel; imported granular fill.")
-    add("RH", "Harborough Rail Freight Terminal", "origin", "Railhead", -0.9180, 52.4785, supplies=[PRECAST, GENERAL, SMALL, STEEL],
+    add("RH", "Harborough Rail Freight Terminal", "origin", "Railhead", -0.9180, 52.4785, supplies=[PRECAST, GENERAL, SMALL, STRUCT, REINF],
         detail="Rail-delivered precast units, structural steel and aggregate transhipped to road. Fictional.")
 
     # Compounds and stockpiles along the corridor, ~400 m off the alignment.
@@ -656,7 +685,7 @@ def build(with_areas=False, out=None):
     for key, m in comp_chain.items():
         p = offset(point_at(ALIGN_PTS, ALIGN_CHAIN, m), east_m=420, north_m=-120)
         add(key, comp_names[key], "destination", "Compound", p[0], p[1],
-            receives=[BALLAST, SMALL, EARTH, PRECAST, STEEL, GENERAL, READY, ASPHALT],
+            receives=[BALLAST, SMALL, EARTH, PRECAST, STRUCT, REINF, GENERAL, READY, ASPHALT],
             detail=f"Site compound at chainage {chain_text(m)}. It stands for all of its section's site accesses: "
                    "the plan delivers to sites, not to work faces.")
     stock_chain = {"S1": 4500, "S2": 17500, "S3": 25000}
@@ -715,7 +744,7 @@ def build(with_areas=False, out=None):
     # of Tilton Compound: the laydown at the top of the bank, the pier bases on the terrace 8 m below, a gate in and a
     # gate out on the lane south of it (the gate-out closed March–May 2027 for the deck steel's lift season).
     add("VS", "Tilton Viaduct site (fictional)", "destination", "Site", -0.8822, 52.6447,
-        receives=[READY, GENERAL, PRECAST, STEEL, BALLAST, SMALL], vendor="Wolds Link joint venture (fictional)",
+        receives=[READY, GENERAL, PRECAST, STRUCT, REINF, BALLAST, SMALL], vendor="Wolds Link joint venture (fictional)",
         detail="The viaduct works: piling and pier bases on the river terrace, the laydown and crane pads at the top of "
                "the bank, a wheel wash on the way out. Check in 3 min; 5 mph on site. Fictional: no such site.")
     assert loc["VS"] == "L019", loc
@@ -953,6 +982,18 @@ def build(with_areas=False, out=None):
     if aw_m < N_MONTHS:
         insert(n + 2, REJECTED[0], aw_m + 1, REJECTED[1], REJECTED[2], REJECTED[3], "t", SMALL, REJECTED[4], TIP,
                "Rejected", REJECTED[5])
+
+    # --- the concrete pours (29 Oct 2026, task 3a): before the weeks materialise, so the as-of week's split carries them
+    pfactors = conversions.load_factors()
+    for o, d, _mat, sec, disc, when, start, m3, rate, booked, wash, place, how in DEMO_POURS:
+        pd = demo_pour_date(when, as_of)
+        res = pours.create_pour({"route_id": ROUTE_ID[(o, d, READY)], "discipline": disc, "section_id": sec,
+                                 "pour_date": pd.isoformat(), "start": start, "m3": m3, "rate_m3h": rate,
+                                 "mixers_booked": booked, "washout_min": wash, "place": place, "method": how,
+                                 "status": "planned"}, pfactors, by=f"{team_name[team_of_section[sec]]} planner")
+        if res.get("error"):
+            # the line does not run that month (an as-of outside its months): no pour, said on the console
+            print(f"  pour left out ({place}, {pd}): {res['error']}")
 
     # --- the history up to the as-of date (§1.9) -------------------------------------------------------------
     # Only weeks that carry history ship: every approved month up to the as-of month is materialised; later weeks
@@ -1249,7 +1290,7 @@ def build(with_areas=False, out=None):
     for name, act, mats, mins, bays, level, geom, note in (
             ("Pier bases", "unload", [READY, BALLAST, SMALL], 5, 1, "river terrace, −8 m", rect(PB, 140, 110),
              "Concrete to the pump, stone to the piling mat; one pump bay (fictional)."),
-            ("Deck and laydown", "unload", [STEEL, PRECAST, GENERAL], 5, 2, "top of the bank", rect(LD, 120, 90),
+            ("Deck and laydown", "unload", [STRUCT, REINF, PRECAST, GENERAL], 5, 2, "top of the bank", rect(LD, 120, 90),
              "Steel, precast and reinforcement off-loaded by the crawler crane; two bays (fictional)."),
             ("Spoil loading", "load", [EARTH], 10, 1, "river terrace, −8 m", {"type": "Point", "coordinates": SP},
              "Piling arisings loaded by the 360 (fictional)."),

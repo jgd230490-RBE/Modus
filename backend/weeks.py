@@ -304,6 +304,7 @@ def materialise_line(route_id, discipline, section_id, month_index=None):
         (db.current_tenant(), route_id, discipline or "", section_id or ""))
     if month_index is not None:
         rows = [r for r in rows if r["month_index"] == int(month_index)]
+    pw = _pours_by_week([r["month_index"] for r in rows])
 
     for p in rows:
         have = {r["week_index"]: r for r in db.query(
@@ -312,18 +313,48 @@ def materialise_line(route_id, discipline, section_id, month_index=None):
             "AND section_id = ?",
             (db.current_tenant(), p["route_id"], p["month_index"],
              p["discipline"] or "", p["section_id"] or ""))}
-        c, r, k = _materialise_parent(p, have)
+        c, r, k = _materialise_parent(p, have, pw.get((p["route_id"], p["discipline"] or "", p["section_id"] or "",
+                                                       int(p["month_index"]))))
         created += c; refreshed += r; kept += k
     return {"created": created, "refreshed": refreshed, "kept": kept}
 
 
-def _materialise_parent(p, have):
+def _pours_by_week(month_indexes):
+    """29 Oct 2026 (task 3a, Q5): {(route_id, discipline, section_id, month_index): {week_index: m³}} of the live pours
+    in those months — pours.split_month's input. {} when there are none (or no table on an old scratch database)."""
+    ms = [int(m) for m in month_indexes or []]
+    if not ms:
+        return {}
+    try:
+        import pours
+        got = pours.by_line(min(ms), max(ms))
+    except Exception:
+        return {}
+    out = {}
+    for k, by_date in got.items():
+        for d, m3 in by_date.items():
+            mi, wi = week_of_date(d)
+            if mi != k[3]:
+                continue
+            e = out.setdefault(k, {})
+            e[wi] = e.get(wi, 0.0) + m3
+    return out
+
+
+def _materialise_parent(p, have, pours_by_week=None):
     """One approved month's weeks against the rows it already has (`have`: week_index -> row).
-    Writes only what is missing or moved. Returns (created, refreshed, kept)."""
+    Writes only what is missing or moved. Returns (created, refreshed, kept).
+    29 Oct 2026 (task 3a, Q5): with pours (`pours_by_week` {week_index: m³}) each derived week is its pours plus an even
+    share of what the month has left (pours.split_month); without, quantity ÷ the month's weeks, as before."""
     created = refreshed = kept = 0
     n_weeks = weeks_in_month(p["month_index"])
-    share = float(p["quantity"] or 0) / n_weeks
+    if pours_by_week:
+        import pours
+        shares = pours.split_month(p["quantity"], n_weeks, pours_by_week)
+    else:
+        shares = {w: float(p["quantity"] or 0) / n_weeks for w in range(1, n_weeks + 1)}
     for w in range(1, n_weeks + 1):
+        share = shares[w]
         cur = have.get(w)
         if cur is None:
             _insert_week(p["route_id"], p["month_index"], p["discipline"],
@@ -373,12 +404,13 @@ def materialise_window(from_month, to_month):
         k = (r["route_id"], r["discipline"] or "", r["section_id"] or "", int(r["month_index"]))
         have_by.setdefault(k, {})[r["week_index"]] = r
     seen = set()
+    pw = _pours_by_week(range(int(from_month), int(to_month) + 1))
     for p in _parent_lines(from_month, to_month):
         key = (p["route_id"], p["discipline"] or "", p["section_id"] or "", int(p["month_index"]))
         if key in seen:
             continue
         seen.add(key)
-        c, r, k = _materialise_parent(p, have_by.get(key, {}))
+        c, r, k = _materialise_parent(p, have_by.get(key, {}), pw.get(key))
         out["created"] += c; out["refreshed"] += r; out["kept"] += k
     return out
 

@@ -69,6 +69,7 @@ import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" pa
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
 import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
 import site_areas  # 28 Oct 2026 (simulation v2): the areas inside a site
+import pours  # 29 Oct 2026 (task 3a): concrete pours
 import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
 import heavy_reads  # 21 Oct 2026 — the public map's heavy reads a few at a time, one memory line each (live OOM kills)
 import abnormal  # 22 Oct 2026 (S16 / B5) — the abnormal loads: each one its own planned movement, with the rules' advice
@@ -1176,6 +1177,13 @@ class Cell(BaseModel):
     quantity: float
 
 
+class RebarBasis(BaseModel):
+    """29 Oct 2026 (3b-2): a Reinforcement line typed as m³ of concrete. The cells then carry m³ of CONCRETE; the
+    server stores tonnes of steel = m³ × kg_per_m3 ÷ 1000 and keeps the basis on each line-month."""
+    structure_type: Optional[str] = None
+    kg_per_m3: float
+
+
 class MatrixRow(BaseModel):
     """
     One forecast LINE: a route, a discipline, a section, one material, ONE vehicle.
@@ -1205,6 +1213,7 @@ class MatrixRow(BaseModel):
     unit: str                                  # 'm3' | 't' | 'vehicles'
     cells: List[Cell]
     status: str = "Pending"
+    rebar: Optional[RebarBasis] = None         # 29 Oct 2026 (3b-2): cells are m³ of concrete; stored as tonnes
     # Task F: which IPT this line belongs to. Forced to the caller's IPT for an IPT
     # code; required from a planner; see access.ipt_for_save().
     ipt: Optional[str] = None
@@ -1283,6 +1292,8 @@ def meta(request: Request = None):
         "scope": "staff" if staff else "public",
         "units": conversions.UNITS,
         "materials": conversions.material_names(factors),
+        # 29 Oct 2026 (3b): kept for old lines, left out of the pickers for new ones
+        "retired_materials": conversions.retired_materials(factors),
         # every vehicle in the live document, unchanged and in its own order: baked
         # geometry is keyed on vehicle_profile and every saved line names a vehicle, so a
         # list that dropped one would strand those routes and lines.
@@ -1486,6 +1497,19 @@ def save_matrix_row(row: MatrixRow):
     if row.unit not in _ok_units:
         raise HTTPException(400, f"{row.material_type} is planned in {conversions.units_words(_ok_units)} only")
 
+    # 29 Oct 2026 (3b-2): reinforcement worked out from m³ of concrete × kg per m³ (stored in tonnes)
+    rb_kg, rb_type = None, None
+    if row.rebar is not None:
+        _cat = (conversions.load_factors().get("material_categories") or {}).get(row.material_type) or {}
+        if not (isinstance(_cat, dict) and _cat.get("from_concrete") is True):
+            raise HTTPException(400, f"{row.material_type} cannot be typed as m³ of concrete")
+        if row.unit != "t":
+            raise HTTPException(400, "a line typed as m³ of concrete is kept in tonnes")
+        rb_kg = row.rebar.kg_per_m3
+        if not (isinstance(rb_kg, (int, float)) and 0 < rb_kg <= 1000):
+            raise HTTPException(400, "type the kg of reinforcement per m³ of concrete (above 0, at most 1000)")
+        rb_type = (row.rebar.structure_type or "").strip()[:80] or None
+
     disc = row.discipline or ""
     sect = row.section_id or ""
     # Task F. The IPT written on the line is decided HERE, not trusted from the body:
@@ -1517,8 +1541,8 @@ def save_matrix_row(row: MatrixRow):
                     (tenant_id, id, route_id, month_index, discipline, section_id,
                      quantity, unit,
                      material_type, material_description, vehicle_type, submitted_by,
-                     status, reject_reason, ipt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     status, reject_reason, ipt, concrete_m3, rebar_kg_per_m3, structure_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 -- must match the widened UNIQUE key exactly; see MatrixRow's docstring
                 ON CONFLICT (tenant_id, route_id, month_index, discipline, section_id)
                 DO UPDATE SET
@@ -1530,12 +1554,18 @@ def save_matrix_row(row: MatrixRow):
                     submitted_by         = EXCLUDED.submitted_by,
                     status               = EXCLUDED.status,
                     reject_reason        = NULL,
-                    ipt                  = COALESCE(EXCLUDED.ipt, forecasts.ipt)
+                    ipt                  = COALESCE(EXCLUDED.ipt, forecasts.ipt),
+                    concrete_m3          = EXCLUDED.concrete_m3,
+                    rebar_kg_per_m3      = EXCLUDED.rebar_kg_per_m3,
+                    structure_type       = EXCLUDED.structure_type
                 """,
                 (db.current_tenant(),
-                 rid, row.route_id, c.month_index, disc, sect, float(c.quantity), row.unit,
+                 rid, row.route_id, c.month_index, disc, sect,
+                 # 3b-2: a concrete-typed cell is m³ of concrete; the line keeps tonnes of steel
+                 (round(float(c.quantity) * rb_kg / 1000.0, 6) if rb_kg else float(c.quantity)), row.unit,
                  row.material_type, row.material_description, row.vehicle_type,
-                 _by(row.submitted_by), row.status, None, ipt),
+                 _by(row.submitted_by), row.status, None, ipt,
+                 (float(c.quantity) if rb_kg else None), rb_kg, (rb_type if rb_kg else None)),
             )
             touched += 1
         else:
@@ -4443,6 +4473,114 @@ class SiteAreaPatch(BaseModel):
     seq: Optional[int] = None
     active: Optional[bool] = None
     note: Optional[str] = None
+
+
+class PourIn(BaseModel):
+    """29 Oct 2026 (task 3a): one concrete pour on a ready-mixed concrete line (pours.py)."""
+    route_id: str
+    discipline: str = ""
+    section_id: str = ""
+    pour_date: str                           # YYYY-MM-DD
+    start: str                               # HH:MM, the first mixer discharging
+    m3: float
+    rate_m3h: float
+    mixers_booked: Optional[int] = None      # blank = enough
+    washout_min: Optional[float] = None      # blank = not counted
+    place: Optional[str] = None
+    method: Optional[str] = None
+    status: str = "planned"
+    note: Optional[str] = None
+
+
+class PourPatch(BaseModel):
+    pour_date: Optional[str] = None
+    start: Optional[str] = None
+    m3: Optional[float] = None
+    rate_m3h: Optional[float] = None
+    mixers_booked: Optional[int] = None
+    washout_min: Optional[float] = None
+    place: Optional[str] = None
+    method: Optional[str] = None
+    status: Optional[str] = None
+    note: Optional[str] = None
+
+
+def _pour_line_access(route_id, pour_date, discipline, section_id):
+    """A pour's line must be visible to the caller (a team its own lines; planners and admins every line). 404 as
+    _require_line: a team must not learn that another team's line exists."""
+    import datetime as _dt
+    try:
+        d = _dt.date.fromisoformat(str(pour_date))
+    except ValueError:
+        raise HTTPException(400, "The pour needs a date.")
+    return _require_line(route_id, pours.month_of(d), discipline, section_id)
+
+
+@app.get("/api/pours")
+def list_pours_ep(from_date: Optional[str] = None, to_date: Optional[str] = None):
+    """29 Oct 2026 (task 3a): every pour this caller may see, with its figures and flags (Plan -> Pours)."""
+    acc = _require_access()
+    return _staff_json("pours", {"from": from_date, "to": to_date},
+                       lambda: pours.page(acc, from_date, to_date), acc)
+
+
+@app.get("/api/pours/lines")
+def pour_lines():
+    """The lines a pour can go on (m³ lines whose vehicle carries an m³ load), for the Add pour form."""
+    acc = _require_access()
+    return {"lines": pours.line_choices(acc)}
+
+
+@app.get("/api/pours/preview")
+def preview_pour_ep(route_id: str, pour_date: str, start: str, m3: float, rate_m3h: float, discipline: str = "",
+                    section_id: str = "", mixers_booked: Optional[int] = None, washout_min: Optional[float] = None,
+                    exclude_id: Optional[str] = None):
+    """The figures of a pour as the Pours form is typed: nothing saved. The line must be visible to the caller."""
+    _pour_line_access(route_id, pour_date, discipline, section_id)
+    out = pours.preview({"route_id": route_id, "discipline": discipline, "section_id": section_id,
+                         "pour_date": pour_date, "start": start, "m3": m3, "rate_m3h": rate_m3h,
+                         "mixers_booked": mixers_booked, "washout_min": washout_min}, conversions.load_factors(),
+                        exclude_id=exclude_id)
+    if out.get("error"):
+        raise HTTPException(400, out["error"])
+    return out
+
+
+@app.post("/api/pours")
+def create_pour_ep(body: PourIn):
+    _pour_line_access(body.route_id, body.pour_date, body.discipline, body.section_id)
+    out = pours.create_pour(body.dict() if hasattr(body, "dict") else body.model_dump(), conversions.load_factors(),
+                            by=_by(None))
+    if out.get("error"):
+        raise HTTPException(400, out["error"])
+    return pours.decorate([out])[0]
+
+
+@app.patch("/api/pours/{pour_id}")
+def update_pour_ep(pour_id: str, body: PourPatch):
+    cur = pours.get_pour(pour_id)
+    if not cur:
+        _require_access()
+        raise HTTPException(404, "No such pour.")
+    _pour_line_access(cur["route_id"], cur["pour_date"], cur["discipline"], cur["section_id"])
+    sent = set(_fields_set(body))
+    if "pour_date" in sent:
+        # moving a pour to another month keeps it on its line: that month must hold the line, and it must be visible
+        _pour_line_access(cur["route_id"], body.pour_date, cur["discipline"], cur["section_id"])
+    out = pours.update_pour(pour_id, {k: getattr(body, k) for k in sent}, conversions.load_factors(), by=_by(None))
+    if out.get("error"):
+        raise HTTPException(400, out["error"])
+    return pours.decorate([out])[0]
+
+
+@app.delete("/api/pours/{pour_id}")
+def delete_pour_ep(pour_id: str):
+    cur = pours.get_pour(pour_id)
+    if not cur:
+        _require_access()
+        raise HTTPException(404, "No such pour.")
+    _pour_line_access(cur["route_id"], cur["pour_date"], cur["discipline"], cur["section_id"])
+    return pours.delete_pour(pour_id)
 
 
 @app.get("/api/site-areas")

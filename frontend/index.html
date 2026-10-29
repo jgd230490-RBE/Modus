@@ -704,6 +704,22 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .row-open{font:inherit;color:inherit;background:none;border:0;padding:0 2px;margin:0 6px 0 -2px;min-height:24px;display:inline-flex;align-items:center;text-align:left;cursor:pointer;border-radius:3px;}
   .row-open:hover{text-decoration:underline;}
   .row-open:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
+  /* 29 Oct 2026 (task 3a): Plan → Pours — the form, the four figures, the round trip as one bar, the grid's POUR mark */
+  .pour-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 14px;margin-top:8px;}
+  .pour-fld label{display:block;font-size:13px;color:var(--muted);margin-bottom:2px;}
+  .pour-wide{grid-column:span 4;}
+  .pour-figs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:4px 0 10px;}
+  .pour-figs div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;}
+  .pour-figs b{display:block;font-size:20px;line-height:1.2;font-variant-numeric:tabular-nums;color:var(--ink);}
+  .pour-figs span{font-size:13px;color:var(--muted);}
+  .pour-bar{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--line);font-size:12px;}
+  .pour-bar div{display:flex;align-items:center;justify-content:center;color:#fff;white-space:nowrap;overflow:hidden;min-width:0;}
+  .pour-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);margin-top:6px;}
+  .pour-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
+  .pb-load{background:#475569;} .pb-there{background:#2563EB;} .pb-chk{background:#64748B;} .pb-dis{background:#C2410C;}
+  .pb-wash{background:#0F766E;} .pb-back{background:#1E40AF;}
+  .pour-mark{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.03em;border-radius:4px;padding:0 5px;margin-left:4px;background:#334155;color:#fff;vertical-align:1px;}
+  @media (max-width:900px){.pour-form,.pour-figs{grid-template-columns:repeat(2,minmax(0,1fr));}.pour-wide{grid-column:span 2;}}
   .ed-head:focus{outline:none;}
   .ed-head:focus-visible{outline:2px solid var(--navy);outline-offset:2px;border-radius:2px;}
   .sim-hours{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
@@ -4480,6 +4496,201 @@ function AlAdvice({ adv, compact }){
   );
 }
 
+// ================================================================= Plan → Pours (29 Oct 2026, task 3a)
+// The approved mockup notes\concrete-pours-mockup-1029\ cards 1–2 (John: "as recommended", no plant output). One row a
+// pour (the 27 Oct row pattern: the name opens it, one status, the "⋯" menu); the form asks the server for the figures as
+// it is typed (GET /pours/preview: nothing saved), so the arithmetic lives in one place (backend pours.py).
+const POUR_WORD = { POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT",
+                    POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN" };
+const POUR_RED = ["POUR_COLD_JOINT", "POUR_TRANSIT"];
+const pourHm = (m) => { m = Math.round(+m || 0); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`; };
+const pourDay = (iso) => { const d = new Date(iso + "T00:00:00"); return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]} ${longDate(iso)}`; };
+function pourStatus(p){
+  if(p.status === "cancelled") return { word: "Cancelled", tone: "none", more: 0 };
+  if(p.problem || !p.figures) return { word: "No figures", tone: "warn", more: 0 };
+  if(p.worst) return { word: POUR_WORD[p.worst] || p.worst, tone: POUR_RED.includes(p.worst) ? "bad" : "warn",
+                       more: new Set((p.flags || []).map(f => f.code)).size - 1 };
+  return { word: "Enough mixers", tone: "ok", more: 0 };
+}
+const POUR_PARTS = [["loading", "Loading", "pb-load"], ["there", "Drive there", "pb-there"], ["check_in", "Check-in", "pb-chk"],
+                    ["discharge", "Discharge", "pb-dis"], ["washout", "Wash-out", "pb-wash"], ["back", "Drive back", "pb-back"]];
+function PourBar({ parts }){
+  return (
+    <div>
+      <div className="pour-bar" role="img" aria-label={"A mixer's round trip: " + POUR_PARTS.map(([k, l]) => `${l.toLowerCase()} ${Math.round(parts[k] || 0)} min`).join(", ")}>
+        {POUR_PARTS.filter(([k]) => (parts[k] || 0) > 0).map(([k, l, c]) => (
+          <div key={k} className={c} style={{ flex: parts[k] }} title={`${l}: ${Math.round(parts[k])} min`}>{parts[k] >= 8 ? Math.round(parts[k]) : ""}</div>
+        ))}
+      </div>
+      <div className="pour-legend" aria-hidden="true">{POUR_PARTS.map(([k, l, c]) => <span key={k}><i className={c}></i>{l}</span>)}</div>
+    </div>
+  );
+}
+function PourFigures({ p }){
+  if(!p) return null;
+  if(p.problem) return <p className="text-sm" style={{ color: "var(--warn-text)" }} data-pour-problem="1">{p.problem}</p>;
+  const f = p.figures;
+  if(!f) return null;
+  const st = pourStatus(p);
+  return (
+    <div data-pour-figures="1">
+      <div className="pour-figs">
+        <div><b>{f.booked && f.booked < f.needed ? `${f.booked} of ${f.needed}` : f.needed}</b><span>mixers needed</span></div>
+        <div><b>{pourHm(f.real_gap)}</b><span>between mixers</span></div>
+        <div><b>{pourHm(f.cycle)}</b><span>a mixer's round trip</span></div>
+        <div><b>{f.first_loads} – {f.ends}</b><span>first loads · pour ends</span></div>
+      </div>
+      <PourBar parts={f.parts} />
+      <p className="text-sm mt-2"><RowStatus word={st.word} tone={st.tone} more={0} />
+        <span className="text-slate-600"> · {f.loads} loads · loading to the end of discharge {pourHm(f.transit)}
+          {p.basis === "hours" ? " · drive times for the hours the mixers set off" : " · drive times of the planned route"}</span></p>
+      {(p.flags || []).map((x, i) => <p key={i} className="text-sm" style={{ color: POUR_RED.includes(x.code) ? "var(--bad-text)" : "var(--warn-text)" }}>{x.text}</p>)}
+    </div>
+  );
+}
+const POUR_BLANK = { line: "", pour_date: "", start: "07:30", m3: "", rate_m3h: "", mixers_booked: "", washout_min: "", place: "", status: "planned" };
+const pourLineKey = (x) => `${x.route_id}|${x.discipline || ""}|${x.section_id || ""}`;
+
+function PoursPage({ meta, access, who }){
+  const [data, setData] = useState(null);
+  const [lines, setLines] = useState([]);
+  const [err, setErr] = useState("");
+  const [tick, setTick] = useState(0);
+  const [edit, setEdit] = useState(null);          // null | "new" | a pour id
+  const [form, setForm] = useState(POUR_BLANK);
+  const [preview, setPreview] = useState(null);
+  const [note, setNote] = useState(null);
+  const headRef = useRef(null);
+  useEffect(() => {
+    let live = true;
+    Promise.all([fetch(`${API}/pours`).then(okJSON), fetch(`${API}/pours/lines`).then(okJSON)])
+      .then(([p, l]) => { if(live){ setData(p); setLines((l && l.lines) || []); setErr(""); } })
+      .catch(e => { if(live) setErr(errSay("The pours did not load.", e)); });
+    return () => { live = false; };
+  }, [tick]);
+  // the figures as the form is typed: the server works them out, nothing is saved
+  useEffect(() => {
+    if(!edit){ setPreview(null); return; }
+    const f = form;
+    if(!f.line || !f.pour_date || !f.start || !(+f.m3 > 0) || !(+f.rate_m3h > 0)){ setPreview(null); return; }
+    const [route_id, discipline, section_id] = f.line.split("|");
+    const q = new URLSearchParams({ route_id, discipline, section_id, pour_date: f.pour_date, start: f.start, m3: f.m3, rate_m3h: f.rate_m3h });
+    if(f.mixers_booked !== "") q.set("mixers_booked", f.mixers_booked);
+    if(f.washout_min !== "") q.set("washout_min", f.washout_min);
+    if(edit !== "new") q.set("exclude_id", edit);
+    let live = true;
+    const t = setTimeout(() => {
+      fetch(`${API}/pours/preview?${q}`).then(okJSON).then(p => { if(live) setPreview(p); })
+        .catch(e => { if(live) setPreview({ problem: errMsg(e) }); });
+    }, 350);
+    return () => { live = false; clearTimeout(t); };
+  }, [edit, form]);
+  useEffect(() => { if(edit && headRef.current) headRef.current.focus(); }, [edit]);
+  const say = (ok, text) => { setNote({ ok, text }); if(ok) setTimeout(() => setNote(null), 2500); };
+  if(err) return <div className="max-w-7xl mx-auto p-6"><EmptyState kind="error" title="Couldn't open the pours" body={err} action={<button type="button" className="btn-sec" onClick={() => setTick(t => t + 1)}>Try again</button>} /></div>;
+  if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;
+  const list = data.pours || [];
+  const lineOf = (k) => lines.find(x => pourLineKey(x) === k);
+  const lineWords = (x) => `${x.origin_name || x.route_id} → ${x.dest_name || "—"}${x.description ? " · " + x.description : ""}`;
+  const open = (p) => {
+    setEdit(p ? p.id : "new");
+    setForm(p ? { line: pourLineKey(p), pour_date: p.pour_date, start: p.start, m3: String(p.m3), rate_m3h: String(p.rate_m3h),
+                  mixers_booked: p.mixers_booked == null ? "" : String(p.mixers_booked),
+                  washout_min: p.washout_min == null ? "" : String(p.washout_min), place: p.place || "", status: p.status }
+              : { ...POUR_BLANK, line: lines.length === 1 ? pourLineKey(lines[0]) : "" });
+  };
+  const close = () => { setEdit(null); setPreview(null); };
+  const send = (method, path, body, what) => fetch(`${API}${path}`, { method, headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined }).then(okJSON)
+    .then(() => { say(true, "Saved."); setTick(t => t + 1); return true; })
+    .catch(e => { say(false, errSay(what, e)); return false; });
+  const save = () => {
+    const f = form, [route_id, discipline, section_id] = (f.line || "||").split("|");
+    const body = { pour_date: f.pour_date, start: f.start, m3: numOr(f.m3, null), rate_m3h: numOr(f.rate_m3h, null),
+                   mixers_booked: f.mixers_booked === "" ? null : numOr(f.mixers_booked, null),
+                   washout_min: f.washout_min === "" ? null : numOr(f.washout_min, null), place: f.place || null, status: f.status };
+    const go = edit === "new" ? send("POST", "/pours", { route_id, discipline, section_id, ...body }, "The pour was not saved.")
+                              : send("PATCH", `/pours/${edit}`, body, "The pour was not saved.");
+    go.then(ok => { if(ok) close(); });
+  };
+  const setStatus = (p, status) => send("PATCH", `/pours/${p.id}`, { status }, "The pour was not changed.");
+  const remove = (p) => { if(window.confirm(`Delete the pour "${p.place || p.id}"? This cannot be undone.`))
+    send("DELETE", `/pours/${p.id}`, null, "The pour was not deleted."); };
+  const fld = (k, label, attrs) => (
+    <div className="pour-fld"><label htmlFor={"pour-" + k}>{label}</label>
+      <input id={"pour-" + k} className="ctl w-full" value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} {...(attrs || {})} /></div>
+  );
+  return (
+    <div className="max-w-7xl mx-auto p-6 pb-2" data-page="pours">
+      <PageHeader title="Pours" kicker="Plan" subtitle="Each pour's mixers, their gap and whether it keeps flowing."
+        actions={lines.length ? <button type="button" className="btn-pri" onClick={() => open(null)} data-pour-add="1">+ Add pour</button> : null} />
+      {note && <p className="text-sm mb-3" style={{ color: note.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{note.text}</p>}
+      {edit && (
+        <div className="card p-4 mb-4" data-pour-editor="1">
+          <h2 className="text-lg font-semibold text-slate-800 mb-1" tabIndex={-1} ref={headRef}>{edit === "new" ? "New pour" : (form.place || "Pour")}</h2>
+          <div className="pour-form">
+            <div className="pour-fld pour-wide"><label htmlFor="pour-line">Line</label>
+              <select id="pour-line" className="ctl w-full" value={form.line} disabled={edit !== "new"} onChange={e => setForm(f => ({ ...f, line: e.target.value }))}>
+                <option value="">Choose a concrete line…</option>
+                {lines.map(x => <option key={pourLineKey(x)} value={pourLineKey(x)}>{lineWords(x)}</option>)}
+              </select>
+              {form.line && lineOf(form.line) && <div className="hint">{lineOf(form.line).vehicle_name}</div>}
+            </div>
+            {fld("pour_date", "Date", { type: "date" })}
+            {fld("start", "First mixer at site", { type: "time" })}
+            {fld("m3", "Volume, m³", { inputMode: "decimal" })}
+            {fld("rate_m3h", "Pour rate, m³ an hour", { inputMode: "decimal" })}
+            {fld("mixers_booked", "Mixers booked", { inputMode: "numeric", placeholder: "enough" })}
+            {fld("washout_min", "Wash-out, minutes", { inputMode: "decimal", placeholder: "not counted" })}
+            {fld("place", "Where", { placeholder: "Pier 3 base" })}
+            <div className="pour-fld"><label htmlFor="pour-status">Status</label>
+              <select id="pour-status" className="ctl w-full" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                {[["planned", "Planned"], ["confirmed", "Confirmed"], ["done", "Done"], ["cancelled", "Cancelled"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select></div>
+          </div>
+          <div className="mt-3"><PourFigures p={preview} /></div>
+          <div className="flex gap-2 mt-3">
+            <button type="button" className="btn-pri" onClick={save} data-pour-save="1">Save</button>
+            <button type="button" className="btn-sec" onClick={close}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {!list.length ? (
+        <EmptyState title="No pours yet" body={lines.length ? "Add one with + Add pour." : "A pour goes on a ready-mixed concrete line planned in m³ with a concrete mixer."} />
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="tbl" data-pours-table="1">
+            <thead><tr><th>Pour</th><th className="num">m³</th><th className="num">Mixers</th><th className="num">Gap</th><th>Status</th><th className="w-10"><span className="sr-only">Actions</span></th></tr></thead>
+            <tbody>
+              {list.map(p => {
+                const st = pourStatus(p), f = p.figures;
+                return (
+                  <tr key={p.id} data-pour-row={p.id}>
+                    <td style={{ whiteSpace: "normal" }}>
+                      <button type="button" className="row-open" aria-label={`Edit ${p.place || p.id}`} onClick={() => open(p)}>{p.place || p.id}</button>
+                      <span className="block text-[12px] text-slate-500">{pourDay(p.pour_date)} · {p.start} · {p.dest_name || "—"}</span>
+                    </td>
+                    <td className="num tabular-nums">{grp(p.m3)}</td>
+                    <td className="num tabular-nums">{f ? (f.booked && f.booked < f.needed ? `${f.booked} of ${f.needed}` : grp(f.needed)) : "—"}</td>
+                    <td className="num tabular-nums">{f ? pourHm(f.real_gap) : "—"}</td>
+                    <td className="rd-status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>
+                    <td><RowMenu name={p.place || p.id}>
+                      <button type="button" onClick={() => open(p)}>Edit</button>
+                      {p.status === "cancelled" ? <button type="button" onClick={() => setStatus(p, "planned")}>Plan again</button>
+                                                : <button type="button" onClick={() => setStatus(p, "cancelled")}>Cancel the pour</button>}
+                      <button type="button" style={{ color: "var(--red)" }} onClick={() => remove(p)}>Delete…</button>
+                    </RowMenu></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ================================================================= Plan → Stockpiles
 // 27 Oct 2026 (stockpile forecast, John's D4 a; the approved mockup notes\stockpile-forecast-mockup-1027\, card 1): one
 // place per stockpile for its plan — capacity and opening, the PLANNED USE by month ("Same each month from … to …"), a
@@ -5765,6 +5976,8 @@ const NAV = [
     { id: "abnormal", label: "Abnormal loads", glyph: "⬌" },
     // 27 Oct 2026 (stockpile forecast, D4 a): each stockpile's planned use, stock count and forecast
     { id: "stockpiles", label: "Stockpiles", glyph: "▲" },
+    // 29 Oct 2026 (task 3a): each concrete pour's mixers, their gap and the flags
+    { id: "pours", label: "Pours", glyph: "◒" },
   ]},
   { group: "Track", items: [
     { id: "lookahead", label: "Look-ahead", glyph: "◔" },
@@ -5796,6 +6009,7 @@ const NAV_ICON = {
   config: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12h2M3 12h2M12 3v2M12 19v2M17 7l1.4-1.4M5.6 18.4L7 17M17 17l1.4 1.4M5.6 5.6L7 7",
   map: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14",
   stockpiles: "M3 19h18L14 6l-3 5-2-3z",
+  pours: "M4 15h11l3-5h2v5h-1M4 15V9l6-3 5 3v6M7 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
   abnormal: "M4 14h16M6 14v3M18 14v3M3 17h2M8 17h8M19 17h2M5 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 14V8h10v6M2 11h3M19 11h3",
 };
 function NavIcon({ id }){
@@ -6132,6 +6346,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
         {page === "carbon" && !narrow && <CarbonPage meta={meta} access={role} who={who} />}
         {page === "abnormal" && !narrow && <AbnormalPage meta={meta} access={role} who={who} />}
         {page === "stockpiles" && !narrow && <StockpilesPage meta={meta} access={role} who={who} />}
+        {page === "pours" && !narrow && <PoursPage meta={meta} access={role} who={who} />}
         {page === "lookahead" && !narrow && <LookAhead meta={meta} who={who} access={role} />}
         {page === "lookahead" && narrow && <PhoneLookAhead meta={meta} />}
         {/* one mounted instance across the three data pages — see the note at the top */}
@@ -6239,6 +6454,13 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   const volumeOk = cat.volume_convertible !== false;
   // 15 Oct 2026: a category may name the only units its lines are typed in (steel: tonnes only); none = all three
   const catUnits = (Array.isArray(cat.units) && cat.units.length) ? cat.units : null;
+  // 29 Oct 2026 (3b-2, John): Reinforcement may be typed as m³ of CONCRETE ("m3c", this form only) × kg per m³ — a
+  // structure type's ratio from Config (planning.rebar_ratios) or one typed for the line. The line is SAVED in tonnes of
+  // steel (the server works them out, quantity = m³ × kg/m³ ÷ 1000) and keeps its basis, so every other read is unchanged.
+  const fromConc = cat.from_concrete === true;
+  const RATIOS = ((factors && factors.planning) || {}).rebar_ratios || [];
+  const [structName, setStructName] = useState("");
+  const [ratio, setRatio] = useState("");
 
   // ---- discipline + work section ----
   // Both belong on the LINE, not on the route or the location. A lorry of track ballast
@@ -6265,6 +6487,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   const firstShown = (list) => (list || []).find(v => !HIDDEN_VEHICLES.includes(v)) || (list || [])[0] || "";
   const [vehicle, setVehicle] = useState(firstShown(vehicles));
   const [unit, setUnit] = useState(units[0] || "m3");
+  const conc = unit === "m3c" && fromConc;           // 3b-2: the months are m³ of concrete
+  const kgm = conc ? (+ratio || 0) : 0;
 
   // ---- year RANGE, not a single year ----------------------------------------
   // One save now covers From year..To year. Nothing about the stored shape changed:
@@ -6334,7 +6558,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
 
   // category change -> sensible default unit + primary vehicle
   useEffect(() => {
-    setUnit(u => ((u === "m3" && !volumeOk) || (catUnits && !catUnits.includes(u))) ? (cat.default_unit || (catUnits || ["t"])[0]) : u);
+    setUnit(u => (u === "m3c" && fromConc) ? u : ((u === "m3" && !volumeOk) || u === "m3c" || (catUnits && !catUnits.includes(u))) ? (cat.default_unit || (catUnits || ["t"])[0]) : u);
     setVehicle(v => suggestedVehicles.includes(v) ? v : (firstShown(suggestedVehicles) || v));
   }, [material]);
 
@@ -6373,12 +6597,15 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
         && (x.section_id || "") === sectionId
         && x.month_index >= mLo && x.month_index <= mHi);
       const next = {};
-      mine.forEach(x => { next[x.month_index] = String(x.quantity); });
+      // 3b-2: a line typed as m³ of concrete reopens in m³ of concrete, with its ratio and structure type
+      const cm = mine.length > 0 && mine[0].concrete_m3 != null;
+      mine.forEach(x => { next[x.month_index] = String(cm && x.concrete_m3 != null ? x.concrete_m3 : x.quantity); });
       setVals(next);
       const first = mine[0];
       if(first){
         if(first.ipt && !iptLocked) setIpt(first.ipt);
-        if(first.unit) setUnit(first.unit);
+        if(cm){ setUnit("m3c"); setRatio(String(first.rebar_kg_per_m3 ?? "")); setStructName(first.structure_type || ""); }
+        else if(first.unit) setUnit(first.unit);
         if(first.material_type && materials.includes(first.material_type)) setMaterial(first.material_type);
         if(first.vehicle_type) setVehicle(first.vehicle_type);
         setDescription(first.material_description || "");
@@ -6400,6 +6627,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   }, [routeId, fromYear, toYear, discipline, sectionId]);
 
   const setMonth = (mi, v) => setVals(s => ({ ...s, [mi]: v }));
+  // 3b-2: tonnes of one typed cell — m³ of concrete × kg/m³ ÷ 1000, or the usual conversion
+  const tq = (q) => conc ? (+q || 0) * kgm / 1000 : toTonnes(q, unit, material, vehicle, factors);
 
   // Only the cells inside the current window count. vals is replaced wholesale by the
   // load effect whenever the range moves, so a stale key should never survive — but
@@ -6418,14 +6647,14 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
     let live = true;
     const t = setTimeout(() => {
       fetch(`${API}/costing/preview`, { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ route_id: routeId, vehicle_type: vehicle, material_type: material, unit,
-                               cells: inRange.filter(([, q]) => +q > 0).map(([mi, q]) => ({ month_index: mi, quantity: +q })) }) })
+        body: JSON.stringify({ route_id: routeId, vehicle_type: vehicle, material_type: material, unit: conc ? "t" : unit,
+                               cells: inRange.filter(([, q]) => +q > 0).map(([mi, q]) => ({ month_index: mi, quantity: conc ? tq(q) : +q })) }) })
         .then(okJSON)
         .then(j => { if(live){ setCost(j); setCostErr(""); } })
         .catch(e => { if(live){ setCost(null); setCostErr(errSay("Couldn't price these cells.", e)); } });
     }, 400);
     return () => { live = false; clearTimeout(t); };
-  }, [routeId, vehicle, material, unit, cellsKey]);
+  }, [routeId, vehicle, material, unit, cellsKey, kgm]);
   const costCell = useMemo(() => { const m = {}; ((cost && cost.cells) || []).forEach(c => m[c.month_index] = c); return m; }, [cost]);
 
   // One vehicle per line since Phase 2. A load split across two vehicle types is two
@@ -6433,12 +6662,12 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   // averaged two haul cycles that are not close -- an Artic Flatbed turns round in 45
   // minutes against a Tipper's 24 -- and hid that inside a single number.
   const effPayload = payload(factors, vehicle);
-  const allowedUnits = units.filter(u => (u !== "m3" || volumeOk) && (!catUnits || catUnits.includes(u)));
+  const allowedUnits = units.filter(u => (u !== "m3" || volumeOk) && (!catUnits || catUnits.includes(u))).concat(fromConc ? ["m3c"] : []);
 
   // Totals run across the WHOLE range, not one year — the brief's requirement and the
   // only reading that makes sense once a save can cover 2026-2027.
   const totalUnit = inRange.reduce((a, [, q]) => a + (+q || 0), 0);
-  const totalT = inRange.reduce((a, [, q]) => a + toTonnes(q, unit, material, vehicle, factors), 0);
+  const totalT = inRange.reduce((a, [, q]) => a + tq(q), 0);
   const totalVeh = totalT / (effPayload || 1);
 
   // Daily rates. A year total tells you nothing about whether a site gate can cope;
@@ -6460,7 +6689,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
     const months = inRange.filter(([, q]) => +q > 0);
     if(!months.length || wd <= 0) return { avgT:0, peakT:0, avgVeh:0, peakVeh:0,
       avgTrips:0, peakTrips:0, avgQty:0, peakQty:0, months:0, wd };
-    const monthlyT = months.map(([, q]) => toTonnes(q, unit, material, vehicle, factors));
+    const monthlyT = months.map(([, q]) => tq(q));
     const monthlyQ = months.map(([, q]) => +q);
     const sum = (a) => a.reduce((x, y) => x + y, 0);
     const avgT = (sum(monthlyT) / months.length) / wd;
@@ -6471,7 +6700,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
       avgTrips: avgVeh, peakTrips: peakVeh,
       avgQty: (sum(monthlyQ) / months.length) / wd, peakQty: Math.max(...monthlyQ) / wd,
       months: months.length, wd };
-  }, [inRange, unit, material, vehicle, factors, effPayload]);
+  }, [inRange, unit, material, vehicle, factors, effPayload, kgm]);
 
   const warnings = useMemo(() => {
     // seasonal_restrictions.months are CALENDAR months 1-12. month_index is absolute,
@@ -6514,6 +6743,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   const save = () => {
     if(!routeId){ setMsg({ ok: false, text: "Pick an origin and destination that map to a route first." }); return; }
     if(iptRequired && !ipt){ setMsg({ ok: false, text: `Pick which ${TEAM().toLowerCase()} this line belongs to before saving.` }); return; }
+    if(conc && !(kgm > 0 && kgm <= 1000)){ setMsg({ ok: false, text: "Not saved. Type the kg of reinforcement per m³ of concrete." }); return; }
     setBusy(true); setMsg(null); setCaution(null);
     // ONE POST for the whole range. The backend upserts a cell with a quantity and
     // DELETES one at zero, both on the full widened key, so an emptied month inside
@@ -6527,7 +6757,9 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
         route_id: routeId, discipline, section_id: sectionId,
         material_type: material, material_description: description || null,
         vehicle_type: vehicle, submitted_by: who || null,
-        unit, cells, status: "Pending",
+        unit: conc ? "t" : unit, cells, status: "Pending",
+        // 3b-2: the cells are m³ of concrete; the server keeps the line in tonnes of steel and stores this basis
+        rebar: conc ? { structure_type: structName || null, kg_per_m3: kgm } : null,
         // the server forces this to the caller's IPT for an IPT code regardless
         ipt: (iptLocked ? access.ipt : ipt) || null,
       }),
@@ -6652,7 +6884,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Field label="Material category">
             <select value={material} onChange={e => setMaterial(e.target.value)} className={selCls}>
-              {materials.map(m => <option key={m}>{m}</option>)}
+              {pickMaterials(materials, meta, material).map(m => <option key={m}>{m}</option>)}
             </select>
           </Field>
           <Field label="Material description (optional)">
@@ -6684,10 +6916,30 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
           </Field>
           <Field label="Input unit">
             <select value={unit} onChange={e => setUnit(e.target.value)} className={selCls}>
-              {allowedUnits.map(u => <option key={u} value={u}>{u === "m3" ? "m³" : u === "t" ? "tonnes" : "vehicles"}</option>)}
+              {allowedUnits.map(u => <option key={u} value={u}>{u === "m3c" ? "m³ of concrete" : u === "m3" ? "m³" : u === "t" ? "tonnes" : "vehicles"}</option>)}
             </select>
           </Field>
         </div>
+
+        {/* 29 Oct 2026 (3b-2, John): Reinforcement typed as m³ of concrete — the structure type's ratio, or one typed here */}
+        {conc && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3" data-rebar-basis>
+            <Field label="Structure type">
+              <select value={structName} className={selCls} onChange={e => {
+                const nm = e.target.value; setStructName(nm);
+                const rw = RATIOS.find(x => x.name === nm);
+                if(rw && rw.kg_per_m3 != null) setRatio(String(rw.kg_per_m3));
+              }}>
+                <option value="">Other (type the ratio)</option>
+                {RATIOS.filter(x => (x.name || "").trim()).map(x => <option key={x.id || x.name} value={x.name}>{x.name}{x.kg_per_m3 != null ? ` · ${x.kg_per_m3} kg/m³` : ""}</option>)}
+                {structName && !RATIOS.some(x => x.name === structName) && <option value={structName}>{structName}</option>}
+              </select>
+            </Field>
+            <Field label="kg of reinforcement per m³">
+              <input value={ratio} onChange={e => setRatio(e.target.value)} inputMode="decimal" className={selCls} placeholder="e.g. 130" />
+            </Field>
+          </div>
+        )}
 
 
         {/* From year / To year. One save covers the whole range — see the save()
@@ -6762,12 +7014,12 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
             and a site gate, and a range total hides it. */}
         <div className="rounded-lg border border-slate-200 overflow-hidden text-sm">
           <div className="bg-slate-50 p-4 flex flex-wrap gap-x-8 gap-y-2 border-b border-slate-200">
-            <Stat label={`${fromYear === toYear ? "Year" : "Range"} total · ${rangeLabel} (${unit === "m3" ? "m³" : unit})`}
-              value={fmt(totalUnit, unit)} />
-            <Stat label="≈ tonnes" value={fmt(totalT, "t")} />
+            <Stat label={`${fromYear === toYear ? "Year" : "Range"} total · ${rangeLabel} (${conc ? "m³ of concrete" : unit === "m3" ? "m³" : unit})`}
+              value={fmt(totalUnit, conc ? "m3" : unit)} />
+            <Stat label={conc ? "≈ tonnes of steel" : "≈ tonnes"} value={fmt(totalT, "t")} />
             <Stat label="≈ vehicle loads" value={fmt(totalVeh, "vehicles")} tone="var(--navy)" />
             <span className="text-xs text-slate-400 self-center">
-              {volumeOk ? `${density(factors, material)} t/m³ · ` : ""}
+              {conc ? `${kgm || "?"} kg/m³${structName ? ` (${structName})` : ""} · ` : volumeOk ? `${density(factors, material)} t/m³ · ` : ""}
               {`${payload(factors, vehicle)} t/load · ${vehLabel(vehicle)}`}
               {` · ${perDay.wd} working days/month · ${perDay.months} month${perDay.months === 1 ? "" : "s"} with a figure`}
             </span>
@@ -6782,8 +7034,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
               ["Peak movements / day", fmt(perDay.peakTrips, "vehicles")],
               ["Vehicles needed (avg)",  fleetOf(perDay.avgTrips) == null ? "not routed" : String(fleetOf(perDay.avgTrips))],
               ["Vehicles needed (peak)", fleetOf(perDay.peakTrips) == null ? "not routed" : String(fleetOf(perDay.peakTrips))],
-              [`Avg ${unit === "m3" ? "m³" : unit === "t" ? "t" : "loads"} / day`,  fmt(perDay.avgQty, unit)],
-              [`Peak ${unit === "m3" ? "m³" : unit === "t" ? "t" : "loads"} / day`, fmt(perDay.peakQty, unit)],
+              [`Avg ${unit === "m3" || conc ? "m³" : unit === "t" ? "t" : "loads"} / day`,  fmt(perDay.avgQty, conc ? "m3" : unit)],
+              [`Peak ${unit === "m3" || conc ? "m³" : unit === "t" ? "t" : "loads"} / day`, fmt(perDay.peakQty, conc ? "m3" : unit)],
             ].map(([label, value]) => (
               <div key={label} className="px-3 py-2.5 flex flex-col justify-between">
                 <div className="text-xs uppercase tracking-wide">{label}</div>
@@ -6947,8 +7199,10 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
         statuses: new Set(), material: r.material_type, material_description: r.material_description,
         vehicle: r.vehicle_type, unit: r.unit, submittedBy: r.submitted_by || "",
         months: 0, quantity: 0, rejectReason: null, minMonth: r.month_index, maxMonth: r.month_index,
+        concrete: 0, kg: r.rebar_kg_per_m3 ?? null, structure: r.structure_type || "",   // 3b-2
       });
       e.statuses.add(r.status); e.months += 1; e.quantity += (+r.quantity || 0);
+      if(r.concrete_m3 != null) e.concrete += (+r.concrete_m3 || 0);
       e.minMonth = Math.min(e.minMonth, r.month_index); e.maxMonth = Math.max(e.maxMonth, r.month_index);
       if(r.reject_reason && !e.rejectReason) e.rejectReason = r.reject_reason;
     });
@@ -7193,7 +7447,9 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                         <RdItem t="Vehicle">{vehLabel(g.vehicle)}</RdItem>
                         <RdItem t="Vehicle, full name">{g.vehicle && vehShort(g.vehicle) !== vehLabel(g.vehicle) ? vehLabel(g.vehicle) : null}</RdItem>
                         <RdItem t="Months">{`${g.months}, ${g.yearLabel}`}</RdItem>
-                        <RdItem t="Typed">{`${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>
+                        <RdItem t="Typed">{g.kg != null && g.concrete > 0
+                          ? `${fmt(g.concrete, "m3")} m³ of concrete × ${g.kg} kg/m³${g.structure ? ` (${g.structure})` : ""}`
+                          : `${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>
                         <RdItem t="Tonnes">{c ? grp(c.t) : null}</RdItem>
                         <RdItem t="Loads (loaded trips)">{c ? grp(c.trips) : null}</RdItem>
                         <RdItem t="Lorries, busiest month">{c ? (c.peakVeh == null ? "Needs the route worked out" : String(c.peakVeh)) : null}</RdItem>
@@ -7387,6 +7643,14 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
 
 // 13 Oct 2026 (W12): the council colour bands a scheme reads until it types its own (backend config.COUNCIL_BREAKS_DEFAULT)
 const COUNCIL_BREAKS_DEFAULT = { movements: [50, 100, 200], carbon: [50, 100, 200] };
+// 29 Oct 2026 (3b, the steel split): a RETIRED category stays valid on what already carries it but is not offered for new
+// use. pickMaterials(all, meta, keep) = the list a picker shows: every category that is not retired, plus any retired one
+// in `keep` (the line's / record's own value), so editing an old line never blanks its material.
+function pickMaterials(all, meta, keep) {
+  const ret = new Set((meta && meta.retired_materials) || []);
+  const k = new Set([].concat(keep || []));
+  return (all || []).filter(m => !ret.has(m) || k.has(m));
+}
 // 15 Oct 2026: a material whose only unit is tonnes (steel, the user)
 // 22 Oct 2026 (words sweep): "17 Oct 2026, 12:03 UTC" for the Configuration header (was the raw ISO stamp)
 const cfgWhen = (s) => { const d = new Date(String(s).replace(" ", "T").replace(/Z?$/, "Z")); return isNaN(d) ? String(s) : d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC"; };
@@ -7413,7 +7677,9 @@ function ConfigPage({ meta, who, access }){
   const upd = (fn) => setDoc(d => { const n = JSON.parse(JSON.stringify(d)); fn(n); return n; });
   const num = (v) => (v === "" || v == null ? null : (isNaN(+v) ? v : +v));
   const vehicles = doc ? Object.keys(doc.vehicles || {}).filter(k => !k.startsWith("_")) : [];
-  const materials = doc ? Object.keys(doc.material_categories || {}).filter(k => !k.startsWith("_")) : [];
+  // 29 Oct 2026 (3b): the retired (Older) categories listed last, as the approved mockup draws them
+  const materials = doc ? Object.keys(doc.material_categories || {}).filter(k => !k.startsWith("_"))
+    .sort((x, y) => ((doc.material_categories[x] || {}).retired === true) - ((doc.material_categories[y] || {}).retired === true)) : [];
 
   const save = async () => {
     let body = doc;
@@ -7560,7 +7826,7 @@ function ConfigPage({ meta, who, access }){
                 <tbody>
                   {materials.map(k => { const c = doc.material_categories[k]; return (
                     <tr key={k} className="align-top">
-                      <td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}</td>   {/* 18 Oct 2026 (decision 12): a long name wraps */}
+                      <td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}{c.retired === true && <span className="block mt-1"><span className="chip-st"><i style={{ background: "var(--gold)" }} aria-hidden="true"></i>Older: pick one of the three</span></span>}</td>   {/* 18 Oct 2026 (decision 12): a long name wraps; 29 Oct 2026 (3b): a retired category says so */}
                       <td className="num w-28"><input className={inp + " text-right"} value={c.density_t_per_m3 ?? ""} aria-label={`${k} density`} onChange={e => upd(d => { d.material_categories[k].density_t_per_m3 = num(e.target.value); })} /></td>
                       <td className="w-32">
                         <select className={inp} value={c.default_unit || "t"} aria-label={`${k} default unit`} disabled={isTonnesOnly(c)} onChange={e => upd(d => { d.material_categories[k].default_unit = e.target.value; })}>
@@ -7594,6 +7860,34 @@ function ConfigPage({ meta, who, access }){
                 </tbody>
               </table>
               <p className="px-6 py-3 text-[13px] text-slate-500 border-t border-slate-100">In Submit forecast an unlisted vehicle is shown but greyed out.</p>
+              {/* 29 Oct 2026 (3b-2, John): kg of reinforcement per m³ of concrete by structure type, for Reinforcement typed
+                  as m³ of concrete. Seeded with the published early-estimate figures (factors.json planning._rebar_ratios_note);
+                  an engineer edits a row or adds their own structure. A change here never moves a line already typed. */}
+              <div className="border-t border-slate-200 pt-4" data-cfg="rebar-ratios">
+                <h3 className="px-6 text-base font-semibold text-slate-800">Reinforcement ratios</h3>
+                <p className="px-6 mt-1 text-[13px] text-slate-500">kg of reinforcement per m³ of concrete, for Reinforcement typed as m³ of concrete.</p>
+                {((doc.planning || {}).rebar_ratios || []).length > 0 && (   /* no empty table: headings with no rows (axe th-has-data-cells) */
+                <table className="tbl mt-2">
+                  <thead><tr>{["Structure type", "kg per m³ of concrete", "Basis"].map(h => <th key={h} scope="col" className={h.startsWith("kg") ? "num" : ""}>{h}</th>)}<th scope="col"><span className="sr-only">Remove</span></th></tr></thead>
+                  <tbody>
+                    {((doc.planning || {}).rebar_ratios || []).map((rw, i) => (
+                      <tr key={rw.id || i} data-rebar-row={i}>
+                        <td><input className={inp} value={rw.name || ""} aria-label={`Structure type ${i + 1}`} onChange={e => upd(d => { d.planning.rebar_ratios[i].name = e.target.value; })} /></td>
+                        <td className="num w-32"><input className={inp + " text-right"} value={rw.kg_per_m3 ?? ""} placeholder="—" aria-label={`${rw.name || "Structure " + (i + 1)} kg per m³`} onChange={e => upd(d => { d.planning.rebar_ratios[i].kg_per_m3 = num(e.target.value); })} /></td>
+                        <td><input className={inp} value={rw.basis || ""} aria-label={`${rw.name || "Structure " + (i + 1)} basis`} onChange={e => upd(d => { d.planning.rebar_ratios[i].basis = e.target.value; })} /></td>
+                        <td className="text-right"><button type="button" className="row-x" aria-label={`Remove ${rw.name || "structure " + (i + 1)}`} title="Remove"
+                          onClick={() => upd(d => { d.planning.rebar_ratios.splice(i, 1); })}></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                )}
+                <div className="px-6 py-3">
+                  <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 12px" }}
+                    onClick={() => upd(d => { d.planning = d.planning || {}; const L = d.planning.rebar_ratios = d.planning.rebar_ratios || [];
+                      L.push({ id: "st_" + Date.now().toString(36), name: "", kg_per_m3: null, basis: "" }); })}>+ Add structure type</button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -7653,6 +7947,19 @@ function ConfigPage({ meta, who, access }){
                 )}
                 <div className="hint">Hours the CLP allows no deliveries, e.g. 07:00–10:00. Each gate's daily capacity loses them. At most {PEAK_BANDS_MAX}.</div>
               </div>
+              {/* 29 Oct 2026 (task 3a): the concrete pours' two limits (backend pours.limits; blank = 120 and 30 minutes).
+                  Settings, never a standard: the sources are in the technical guide only */}
+              {[["transit_limit_min", "Concrete: loading to the end of discharge, at most (minutes)", "120", "A rule of thumb. Your specification or the supplier's ticket wins."],
+                ["cold_joint_min", "Concrete: cold joint when the face waits more than (minutes)", "30", "Between one mixer's last concrete and the next one's first."]].map(([k, l, ph, help]) => (
+                <div key={k} className="field" data-cfg={"pours-" + k}>
+                  <label htmlFor={"cfg-pours-" + k}>{l}</label>
+                  <input id={"cfg-pours-" + k} className="ctl w-40 tabular-nums" inputMode="decimal" placeholder={ph}
+                    value={((doc.planning || {}).pours || {})[k] ?? ""}
+                    onChange={e => upd(d => { d.planning = d.planning || {}; const p = d.planning.pours = d.planning.pours || {};
+                      const v = num(e.target.value); if(v == null) delete p[k]; else p[k] = v; if(!Object.keys(p).length) delete d.planning.pours; })} />
+                  <div className="hint">{help}</div>
+                </div>
+              ))}
             </div>
           )}
 
@@ -8738,6 +9045,8 @@ const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKP
                      LIMIT: "ROAD LIMIT", UNBAKED: "NOT ROUTED", PARENT_CHANGED: "PARENT CHANGED",
                      // 14 Oct 2026 (bundle G, W17)
                      GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",
+                     // 29 Oct 2026 (task 3a): the concrete pours
+                     POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT", POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN",
                      // 22 Oct 2026 (abnormal loads, phase 2): the words of the Abnormal loads block's flags (a load, not a line)
                      NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT",
                      // 28 Oct 2026 (task 0c): a dated zone in force crosses the route this week and it is not diverted
@@ -8749,19 +9058,23 @@ const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.la
 const LINE_FLAG_LABEL = { UNBAKED: "NOT ROUTED", IPT_SHARE: "SHARE", ROUTE_CAP: "CAP", DAYS_NE_WEEK: "DAYS ≠ WEEK",
                   STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", LIMIT: "ROAD LIMIT", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED",
                   GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",
-                  NO_WAY_ROUND: "NO WAY ROUND" };
+                  NO_WAY_ROUND: "NO WAY ROUND",
+                  // 29 Oct 2026 (task 3a): the concrete pours, on the pour's day (backend pours.WORDS)
+                  POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT", POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN" };
 // 13 Oct 2026 (W6): the Look-ahead row's ONE status. The flags, most serious first (a lorry over a road limit
 // before anything else: decision 1), win over the week's state; with no flag, the week's state. `more` counts the
 // other kinds of flag; every flag's sentence is in the details. (Replaces LineFlags' column of words and the
 // StatusChip column: one status a row.)
 const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1, SHORTAGE: 2, ROUTE_CAP: 3, STOCKPILE_OVER: 4, IPT_SHARE: 5, DAYS_NE_WEEK: 6, PARENT_CHANGED: 7, UNBAKED: 8,
                        GATE_OVER: 3.5, GATE_NEAR: 7.5, STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7,
-                       NO_WAY_ROUND: 0.5 };   // 28 Oct 2026 (task 0c): through a closed road, after a road limit   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
+                       NO_WAY_ROUND: 0.5, POUR_COLD_JOINT: 0.6, POUR_TRANSIT: 0.7, POUR_SHORT: 8.1, POUR_BAND: 8.2, POUR_OVER_PLAN: 8.3 };   // 28 Oct 2026 (task 0c): through a closed road, after a road limit   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
 const laRank = (code) => (code in LA_FLAG_RANK ? LA_FLAG_RANK[code] : 99);
 const laSorted = (flags) => [...(flags || [])].sort((a, b) => laRank(a.code) - laRank(b.code));
 // the rail's colours: NOT ROUTED, a road restriction and a gate near capacity in amber, every other flag red
 const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"
-                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";
+                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"
+                          // 29 Oct 2026 (task 3a): a pour's warnings; COLD JOINT and TRANSIT stay red
+                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";
 // the details' flag lines: one per kind of flag, most serious first, each distinct sentence once, team ids in
 // the team's words (teamText, as the rail does)
 function laFlagGroups(flags){
@@ -9039,6 +9352,12 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
     (rail.flags || []).forEach(f => { const k = lineKeyOf(f); (g[k] || (g[k] = [])).push(f); });
     return g;
   }, [rail]);
+  // 29 Oct 2026 (task 3a): the week's concrete pours, by line and day — the cell's POUR mark
+  const poursAt = useMemo(() => {
+    const g = {};
+    ((page && page.pours) || []).forEach(p => { const k = `${lineKeyOf(p)}|${p.pour_date}`; (g[k] || (g[k] = [])).push(p); });
+    return g;
+  }, [page]);
   const allConfirmed = lines.length > 0 && lines.every(l => l.week && l.week.status === "confirmed");
   const anyConfirmed = lines.some(l => l.week && l.week.status === "confirmed");
 
@@ -9300,6 +9619,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                                     <span className="tabular-nums font-semibold text-slate-700">{grp(d.planned_qty, 1)}{own}</span>
                                   )}
                                   {typed}
+                                  {poursAt[`${lk}|${d.day_date}`] && <span className="pour-mark" data-pour-mark={d.day_date}
+                                    title={poursAt[`${lk}|${d.day_date}`].map(p => `${p.place || "Pour"}: ${grp(p.m3)} m³ from ${p.start}`).join("; ")}>POUR</span>}
                                 </td>
                               );
                             })}
@@ -9802,6 +10123,8 @@ function PhoneLookAhead({ meta, initialPage }){
   const shown = (day && dates.includes(day)) ? day : (dates.includes(today) ? today : dates[0]);
   const rail = (page && page.clashes) || { flags: [] };
   const flagsByLine = useMemo(() => phFlagsByLine(rail.flags, shown), [rail, shown]);
+  // 29 Oct 2026 (task 3a): the lines with a concrete pour on the day shown
+  const pourLines = new Set(((page && page.pours) || []).filter(p => p.pour_date === shown).map(p => lineKeyOf(p)));
   const rows = lines.map(line => {
     const d = (line.days || []).find(x => x.day_date === shown);
     if(!d) return null;
@@ -9882,7 +10205,7 @@ function PhoneLookAhead({ meta, initialPage }){
                     <button type="button" aria-expanded={isOpen ? "true" : "false"} aria-controls={did}
                       onClick={() => setOpened(o => ({ ...o, [r.lk]: !o[r.lk] }))}>
                       <span className="ph-l">
-                        <span>{r.c.origin_name || r.line.route_id} → {r.c.dest_name || "—"}</span>
+                        <span>{r.c.origin_name || r.line.route_id} → {r.c.dest_name || "—"}{pourLines.has(r.lk) && <span className="pour-mark">POUR</span>}</span>
                         <span className="rd-chips"><span className="rd-chip">{teamWord}</span>{r.c.material_type && <span className="rd-chip">{r.c.material_type}</span>}</span>
                         <RowStatus word={r.st.word} tone={r.st.tone} more={r.st.more} />
                       </span>
@@ -13671,7 +13994,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <div>
                     <span className="block text-sm font-medium text-slate-700 mb-1">Supplies · materials it provides</span>
                     <div className="mt-1 space-y-1">
-                      {materials.map(cat => (
+                      {pickMaterials(materials, meta, form.supplies).map(cat => (
                         <label key={cat} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">   {/* 18 Oct 2026 (UI audit #13): 24 px rows */}
                           <input type="checkbox" checked={(form.supplies || []).includes(cat)} onChange={() => toggleCat("supplies", cat)} style={{ accentColor: "#2563EB" }} />
                           {cat}
@@ -13684,7 +14007,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <div>
                     <span className="block text-sm font-medium text-slate-700 mb-1">Receives · materials it accepts</span>
                     <div className="mt-1 space-y-1">
-                      {materials.map(cat => (
+                      {pickMaterials(materials, meta, form.receives).map(cat => (
                         <label key={cat} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">
                           <input type="checkbox" checked={(form.receives || []).includes(cat)} onChange={() => toggleCat("receives", cat)} style={{ accentColor: "#059669" }} />
                           {cat}
@@ -14098,7 +14421,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       {areaForm.activity !== "wash" && <div>
                         <span className="block text-sm font-medium text-slate-700 mb-1">Takes (none ticked = any material)</span>
                         <div className="mt-1 grid grid-cols-2 gap-x-3">
-                          {materials.map(cat => <label key={cat} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">
+                          {pickMaterials(materials, meta, areaForm.materials).map(cat => <label key={cat} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">
                             <input type="checkbox" checked={(areaForm.materials || []).includes(cat)} onChange={() => setAreaForm(a => ({ ...a, materials: (a.materials || []).includes(cat) ? a.materials.filter(c => c !== cat) : [...(a.materials || []), cat] }))} />{cat}</label>)}
                         </div></div>}
                       <div className="grid grid-cols-2 gap-2">

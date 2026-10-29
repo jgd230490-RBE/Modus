@@ -59,6 +59,9 @@ TENANTED_TABLES = {
     # 28 Oct 2026 (simulation v2, task 0e): a site's areas (unloading, loading, the wheel wash) — per tenant, in the
     # package, same rule, same edit.
     "site_areas",
+    # 29 Oct 2026 (task 3a, concrete pours): each planned pour on a ready-mixed concrete line — per tenant, in the
+    # package, same rule, same edit.
+    "pours",
     # 2.5b, 2026-09-03. The editable copy of factors.json. Per tenant: two clients
     # will not share a payload table.
     "config",
@@ -412,14 +415,17 @@ def init_db():
         conn.commit()
         _migrate_forecasts_to_phase2(conn, cur)
         # Task F: the line's IPT. Plain ADD COLUMN on both backends; in _TENANT_DDL too.
-        try:
-            if IS_PG:
-                cur.execute("ALTER TABLE forecasts ADD COLUMN IF NOT EXISTS ipt TEXT")
-            else:
-                cur.execute("ALTER TABLE forecasts ADD COLUMN ipt TEXT")
-            conn.commit()
-        except Exception:
-            conn.rollback()  # column already present - fine
+        # 29 Oct 2026 (3b-2): the three reinforcement-from-concrete columns, the same way.
+        for col, typ in (("ipt", "TEXT"), ("concrete_m3", "REAL"), ("rebar_kg_per_m3", "REAL"),
+                         ("structure_type", "TEXT")):
+            try:
+                if IS_PG:
+                    cur.execute(f"ALTER TABLE forecasts ADD COLUMN IF NOT EXISTS {col} {typ}")
+                else:
+                    cur.execute(f"ALTER TABLE forecasts ADD COLUMN {col} {typ}")
+                conn.commit()
+            except Exception:
+                conn.rollback()  # column already present - fine
     finally:
         conn.close()
 
@@ -879,6 +885,8 @@ def init_weeks_db():
         _create_tenanted(cur, "stockpile_plan")
         # 28 Oct 2026 (simulation v2): the site areas
         _create_tenanted(cur, "site_areas")
+        # 29 Oct 2026 (task 3a): the concrete pours
+        _create_tenanted(cur, "pours")
         conn.commit()
         try:
             if IS_PG:
@@ -1204,6 +1212,12 @@ _TENANT_DDL = {
             -- and admins only until somebody sets it. Listed here AND ALTERed in
             -- init_db(), or the SQLite tenant rebuild drops it.
             ipt                  TEXT,
+            -- 29 Oct 2026 (3b-2, reinforcement from concrete): a Reinforcement line typed as m³ of concrete keeps
+            -- its basis here; quantity / unit stay the TONNES every read uses (quantity = concrete_m3 ×
+            -- rebar_kg_per_m3 ÷ 1000). NULL on every other line. Listed here AND ALTERed in init_db().
+            concrete_m3          REAL,
+            rebar_kg_per_m3      REAL,
+            structure_type       TEXT,
             PRIMARY KEY (tenant_id, id),
             UNIQUE (tenant_id, route_id, month_index, discipline, section_id)
         )
@@ -1939,6 +1953,36 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, id)
         )
     """,
+    # 29 Oct 2026 (task 3a, concrete pours; pours.py). One planned pour on a ready-mixed concrete LINE: the line's
+    # key (route_id, discipline, section_id) and the month of the pour's week (`month_index`, the Look-ahead's
+    # calendar), the date, `start` (HH:MM, the first mixer discharging), the volume and the pour rate, the mixers
+    # booked and the wash-out minutes (both optional), words for where and how, a status planned | confirmed | done |
+    # cancelled. The mixer, the route and the gate come from the line on read; nothing derived is stored.
+    "pours": """
+        CREATE TABLE pours (
+            tenant_id     TEXT NOT NULL DEFAULT 'default',
+            id            TEXT NOT NULL,
+            route_id      TEXT NOT NULL,
+            discipline    TEXT NOT NULL DEFAULT '',
+            section_id    TEXT NOT NULL DEFAULT '',
+            month_index   INTEGER NOT NULL,
+            pour_date     TEXT NOT NULL,
+            start         TEXT NOT NULL,
+            m3            REAL NOT NULL,
+            rate_m3h      REAL NOT NULL,
+            mixers_booked INTEGER,
+            washout_min   REAL,
+            place         TEXT,
+            method        TEXT,
+            status        TEXT NOT NULL DEFAULT 'planned',
+            note          TEXT,
+            created_by    TEXT,
+            created_at    TEXT,
+            updated_by    TEXT,
+            updated_at    TEXT,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
     # ----------------------------------------------------------------------- #
     #  2.5b — config: the editable copy of factors.json                        #
     # ----------------------------------------------------------------------- #
@@ -1979,6 +2023,7 @@ _TENANT_PK = {
     "stockpile_weeks": "(tenant_id, location_id, month_index, week_index)",
     "stockpile_plan": "(tenant_id, location_id, month_index)",
     "site_areas": "(tenant_id, id)",
+    "pours": "(tenant_id, id)",
     "config": "(tenant_id, key)",
     "forecast_days": "(tenant_id, route_id, month_index, discipline, section_id, "
                      "day_date)",

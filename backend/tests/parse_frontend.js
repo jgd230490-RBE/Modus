@@ -426,8 +426,9 @@ ok("⭐ vehicles needed = movements ÷ trips-per-vehicle, rounded UP",
 ok("⭐ an unbaked route reads 'not routed', never a fleet size",
   code.includes('"not routed" : String(fleetOf(') && code.includes("not routed yet for") && !code.includes('"not baked" : String(fleetOf('));
 ok("the dashboard's fleet column is the server's model (costlines.vehicles), read not recomputed", _dbBody.includes("r.vehicles") && !code.includes("Math.ceil(peakPerDay / a.capacityPerDay)"));
+// NARROWED 29 Oct 2026 (3b-2): m³ of concrete (Reinforcement) also reads "m³"
 ok("...and avg / peak material in the CHOSEN unit",
-  code.includes('`Avg ${unit === "m3" ? "m³"') && code.includes('`Peak ${unit === "m3" ? "m³"'));
+  code.includes('`Avg ${unit === "m3" || conc ? "m³"') && code.includes('`Peak ${unit === "m3" || conc ? "m³"'));
 ok("working days come from factors.planning, defaulting to 22",
   /working_days_per_month\) \|\| 22/.test(code));
 ok("averages are over months WITH a figure, not the whole range",
@@ -1510,8 +1511,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("⭐ AL: the page exists as one section before the Public map, with its component and its helpers", alSrc.length > 8000
      && /function AbnormalPage\(\{ meta, access, who \}\)/.test(al) && /function AlAdvice\(/.test(al) && /function alClass\(adv\)/.test(al));
   // NARROWED 27 Oct 2026 (stockpile forecast, D4 a): the Stockpiles item follows it, the last in the Plan group
+  // NARROWED 29 Oct 2026 (task 3a): the Plan group goes on with Pours after Stockpiles
   ok("⭐ AL: a Plan-group rail item after the Carbon planner, its own line icon, and the page switch on a desk only (a phone gets the desk-only card)",
-     /\{ id: "abnormal", label: "Abnormal loads", glyph: "⬌" \},\s*(\/\/[^\n]*\s*)?\{ id: "stockpiles", label: "Stockpiles", glyph: "▲" \},\n  \]\},/.test(code) && /\n  abnormal: "M/.test(code)
+     /\{ id: "abnormal", label: "Abnormal loads", glyph: "⬌" \},\s*(\/\/[^\n]*\s*)?\{ id: "stockpiles", label: "Stockpiles", glyph: "▲" \},\s*(\/\/[^\n]*\s*)?\{ id: "pours", label: "Pours", glyph: "◒" \},\n  \]\},/.test(code) && /\n  abnormal: "M/.test(code)
      && code.includes('{page === "abnormal" && !narrow && <AbnormalPage meta={meta} access={role} who={who} />}')
      && !/PHONE_PAGES = \[[^\]]*abnormal/.test(code));
   ok("🔴 AL: ONE read of the page (/abnormal), the preview from /abnormal/rules, and the writes: plan (POST), change (PUT), status, delete, the holidays fetch, the time bans",
@@ -1677,9 +1679,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && wk.includes("{(m.flags || []).map(f => <AlFlag key={f.code} f={f} />)}") && wk.includes("notify by {alDay(m.notify_by)}") && wk.includes("{ab.words}")
      && code.includes("{page && page.abnormal && page.abnormal.count > 0 && <AbnormalWeek ab={page.abnormal} />}"));
   // NARROWED 27 Oct 2026 (stockpile forecast, D7): the two amber stockpile warnings join the gold list after NOTICE_DUE
+  // NARROWED 29 Oct 2026 (task 3a): the tone's last line is the pour's three warnings
   ok("AL2 rail: the four words in the rail's tables (NOTICE DUE a gold warning, the other three red)",
      src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
-     && src.includes('code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";'));
+     && src.includes('code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";'));
   const st0 = src.indexOf("function AbnormalStrip({ onOpen }){"), st1 = src.indexOf("function DashboardToday({ meta, week, err, wall, fill }){");
   const st = src.slice(st0, st1);
   ok("⭐ AL2 Dashboard: one strip under Gate arrivals (not on the big screen, not on a phone): ONE read of /abnormal/summary, the next-4-weeks count, notices due with the chip, " +
@@ -2199,7 +2202,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // in its own unit, is in the details
     _fcBody.includes('<table className="tbl rd-table" data-rd-table="forecasts">') && _fcBody.includes("<caption><b>Forecast lines</b> · {sortCaption}")
     && _fcBody.includes('{th(qtyHead, "quantity", true)}') && _fcBody.includes('<td className="num" data-label={qtyHead}>')
-    && _fcBody.includes('<RdItem t="Typed">{`${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>') && _fcBody.includes('const [sort, setSort] = useState({ key: "quantity", dir: "desc" });'));
+    // NARROWED 29 Oct 2026 (3b-2): a line typed as m³ of concrete shows that basis in Typed; every other line as before
+    && _fcBody.includes('<RdItem t="Typed">{g.kg != null && g.concrete > 0') && _fcBody.includes(': `${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>') && _fcBody.includes('const [sort, setSort] = useState({ key: "quantity", dir: "desc" });'));
   ok("...a filter row with applied-filter chips and Clear all above the table; the status chips left the page header",
     _fcBody.includes('<div className="filter-row" data-guide="forecast-status">') && _fcBody.includes("<AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll}")
     && _fcBody.includes("const clearAll = () => setF({ status: \"ALL\", ipt: \"ALL\", discipline: \"ALL\", mine: false, q: \"\" });")
@@ -3424,10 +3428,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("⭐ W17: the rail names GATE OVER CAPACITY / GATE NEAR CAPACITY (as the exports do); near is a gold warning, over red",
      // NARROWED 22 Oct 2026 (abnormal loads, phase 2): the rail's table goes on with the four abnormal-load words after GATE NEAR CAPACITY
      // NARROWED 28 Oct 2026 (task 0c): both tables go on with NO_WAY_ROUND after the last entry
+     // NARROWED 29 Oct 2026 (task 3a): the tone goes on with the pour's three warnings
      src.includes('GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",') && src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT",')
      // NARROWED 27 Oct 2026 (stockpile forecast, D7): the grid's table and the tone go on with STOCKPILE SOON / EMPTY (amber)
      && src.includes('GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",')
-     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";')
+     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";')
      && src.includes('<i style={{ background: laTone(f.code) === "warn" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i>')
      && /"GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"/.test(fs.readFileSync(path.join(ROOT, "backend", "export.py"), "utf8")));
   // W8: the data fields
@@ -3892,7 +3897,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("decision 12: ...and the table FITS the 800 px card at 1366 (measured 799 px in Chrome): three short headings wrap to two lines at their least width (Density, Tonnes only at width 1; Volume ↔ weight at 92 px), a long material name wraps at 136 px; the six headings read as before",
      mat.includes('style={h === "Volume ↔ weight" ? { whiteSpace: "normal", minWidth: 92 } : ["Density t/m³", "Tonnes only"].includes(h) ? { whiteSpace: "normal", width: 1 } : undefined}>{h}</th>')
      && mat.includes('["Material", "Density t/m³", "Default unit", "Tonnes only", "Volume ↔ weight", "Vehicles used"].map(h =>')
-     && mat.includes('<td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}</td>'));
+     // NARROWED 29 Oct 2026 (3b, the steel split): the name cell also carries the retired category's "Older" chip
+     && mat.includes('<td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}{c.retired === true && <span className="block mt-1"><span className="chip-st">'));
   ok("🔴 #13: the Seasonal restrictions' vehicle rows, the Locations form's two material lists and the Routes form's vehicle list are 24 px rows (min-h-6) — four lists, no 16 px tick row left among them",
      code.includes('<label key={v} className="flex items-center gap-1 min-h-6 text-[13px] text-slate-600 whitespace-nowrap">')
      // NARROWED 28 Oct 2026 (simulation v2): a third list — the materials a site area takes (the same 24 px rows)
@@ -4339,8 +4345,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ 27 Oct: the Abnormal loads actions cell keeps the next-step button and its '⋯' on one line (the table's other cells wrap)",
      html.includes(".al-tbl td[data-al-actions]{white-space:nowrap;}"));
   const menus = (src.match(/<RowMenu name=\{[^}]+\}/g) || []);
+  // NARROWED 29 Oct 2026 (task 3a): + Plan → Pours (Edit, Cancel the pour / Plan again, Delete…) — nine
   ok("⭐ 27 Oct: the '⋯' on six tables — Abnormal loads (with its note), Routes, Zones, the gates list, the logins, the demo leads, the teams",
-     menus.length === 8 && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
+     menus.length === 9 && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
      && src.includes("<RowMenu name={g.name || g.id}>") && (src.match(/<RowMenu name=\{u\.name\}>/g) || []).length === 2 && src.includes("<RowMenu name={t.label}>"), String(menus.length));
   ok("⭐ 27 Oct: Abnormal loads — one filled button for the forward step (AL_FORWARD: pending → approved → notified → moved; withdrawn → pending), the rest in the menu, Withdraw and Delete red and asking first",
      src.includes('const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved", withdrawn: "pending" };')
@@ -4349,12 +4356,15 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && src.includes('{nextOf(m).includes("withdrawn") && <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => withdraw(m)}>Withdraw…</button>}')
      && src.includes('{canDelete(m) && <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => del(m)}>Delete…</button>}')
      && src.includes('const withdraw = (m) => { if (!window.confirm(`Withdraw "${m.name}"?') && !src.includes('className="link-btn" disabled={busy} onClick={() => startEdit(m)}>Edit</button>'));
-  ok("27 Oct: a list row that only loses a line has a named '×' (.row-x): the time bans, the typed pinch points, the peak bands, a gate's shut times; no red Remove link is left",
-     (src.match(/className="row-x" aria-label=\{`Remove /g) || []).length === 4 && html.includes(".row-x{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;")
+  // NARROWED 29 Oct 2026 (3b-2): 5 — + a Reinforcement ratios row on Config → Materials
+  ok("27 Oct: a list row that only loses a line has a named '×' (.row-x): the time bans, the typed pinch points, the peak bands, a gate's shut times, a reinforcement ratio; no red Remove link is left",
+     (src.match(/className="row-x" aria-label=\{`Remove /g) || []).length === 5 && html.includes(".row-x{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;")
      && !src.includes('className="link-btn" style={{ color: "var(--red)" }}') && !src.includes(">Remove</button>"));
   ok("27 Oct: the Routes column head is for a screen reader only; the Delete and Withdraw items end in an ellipsis because a confirm follows",
      src.includes('<th className="px-3 py-2 text-right font-semibold"><span className="sr-only">Actions</span></th>')
-     && (src.match(/>Delete…<\/button>/g) || []).length === 4 && src.includes('onClick={() => deleteRoute(r.id)}>Delete…</button>'));
+     // NARROWED 29 Oct 2026 (task 3a): + the Pours page's Delete… — five
+     && (src.match(/>Delete…<\/button>/g) || []).length === 5 && src.includes('onClick={() => deleteRoute(r.id)}>Delete…</button>')
+     && src.includes('onClick={() => remove(p)}>Delete…</button>'));
   ok("⭐ 27 Oct: the words — every lead is one line; the foot of Abnormal loads prints the advice line only; no screen prints a decision code in brackets",
      src.includes('? "Approve or reject each line; approved lines feed the public map, the Look-ahead and the Dashboard."')
      && src.includes('subtitle="One vehicle per line; a split across two vehicles is two lines." />') && !src.includes("One vehicle per line: save a haul that uses two vehicle types as two lines.")
@@ -4430,10 +4440,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("HORIZON: one stockpile strip under the week rows — % at the week's end, amber from 90 %, red over",
      src.includes('<tbody data-horizon-stock="1">') && src.includes('const tone = c.over ? "over" : c.pct >= 90 ? "near" : "ok";')
      && src.includes(`Stockpiles <span className="font-normal text-slate-500">% full at the week's end</span>`));
+  // NARROWED 29 Oct 2026 (task 3a): the tone goes on with the pour's three warnings
   ok("RAIL: STOCKPILE SOON / STOCKPILE EMPTY are words in both tables, amber, ranked with the warnings",
      // NARROWED 28 Oct 2026 (task 0c): the rank table goes on with NO_WAY_ROUND
      src.includes('STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",') && src.includes('STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7,')
-     && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";'));
+     && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";'));
   ok("DASHBOARD: a stockpile with no planned use never leads the message (as the rail's STOCKPILE SOON)",
      /function stockMessage\(sps\)\{[\s\S]{0,400}if\(!sp\.use_planned\) return;/.test(src));
   ok("DASHBOARD: the 'No use planned yet' line names a stockpile with a capacity and no plan",

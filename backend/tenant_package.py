@@ -79,6 +79,7 @@ ORDER = [
     "route_choice",         # 28 Oct 2026 (task 0c): names routes, zones and stored options, so after route_geometry
     "route_hour_times",     # 29 Oct 2026 (task 0f-2): drive times by hour, named by the stored option, so after route_geometry
     "forecasts", "forecast_weeks", "forecast_days",
+    "pours",                # 29 Oct 2026 (task 3a): names a forecast line's key, so after forecasts
     "stockpile_weeks",
     "stockpile_plan",       # 27 Oct 2026 (stockpile forecast): each pile's planned use by month
     # 14 Oct 2026: the community considerations layer (fetched along the routes; no foreign keys)
@@ -92,7 +93,7 @@ ORDER = [
 # "Empty" for import purposes: the tables a person's work lands in. config is not in
 # the list because every booted tenant has the seeded factors row.
 EMPTY_CHECK = ("locations", "routes", "forecasts", "ipts", "work_sections", "zones",
-               "forecast_weeks", "stockpile_weeks", "stockpile_plan", "site_areas")
+               "forecast_weeks", "stockpile_weeks", "stockpile_plan", "site_areas", "pours")
 
 
 def _now():

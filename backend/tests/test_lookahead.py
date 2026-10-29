@@ -670,11 +670,12 @@ ok("🔴 computed, NOT stored — the read created exactly the day rows slice 1 
 # NARROWED 28 Oct 2026: and without site_areas (simulation v2, the areas inside a site)
 # NARROWED 28 Oct 2026: and without route_choice (task 0c: a route's option by date)
 # NARROWED 29 Oct 2026: and without route_hour_times (task 0f-2: drive times by departure hour)
+# NARROWED 29 Oct 2026: and without pours (task 3a: concrete pours)
 ok("...no new table, no new column: sixteen tenanted tables, forecast_days' DDL unchanged",
    # NARROWED 12 Oct 2026: the sixteen are counted without route_sections (§2.2d), the one
    # table added since; slice 2 itself still added none
    # NARROWED again 12 Oct 2026: and without areas / route_area_km (§2.2b), the two added after it
-   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times"} <= db.TENANTED_TABLES
+   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours"} <= db.TENANTED_TABLES
    and "trips" not in db._TENANT_DDL["forecast_days"].lower())
 
 # ---- context chips
@@ -924,9 +925,10 @@ ok("forecast_weeks gained actual_cost_eur, calibrated_at, calibrated_qty",
 # NARROWED 28 Oct 2026: and without site_areas (simulation v2, the areas inside a site)
 # NARROWED 28 Oct 2026: and without route_choice (task 0c: a route's option by date)
 # NARROWED 29 Oct 2026: and without route_hour_times (task 0f-2: drive times by departure hour)
+# NARROWED 29 Oct 2026: and without pours (task 3a: concrete pours)
 ok("...and still sixteen tenanted tables — no new table for slices 3-6 (NARROWED 12 Oct 2026: counted without "
    "route_sections, §2.2d, and NARROWED again the same day without areas and route_area_km, §2.2b)",
-   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times"} <= db.TENANTED_TABLES)
+   len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours"}) == 16 and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours"} <= db.TENANTED_TABLES)
 db.init_lookahead_db()
 ok("init_lookahead_db() is idempotent on a table that already has the columns", True)
 
@@ -1793,9 +1795,13 @@ ok("SPEED: the page decorates twice and prices the Account week with ONE cache, 
    and "routes, cost, cache = derived._routes_and_names(), derived.costing_context(), {}" in _lka
    and "def decorate(res, factors=None, cache=None, routes=None, cost=None):" in _drv)
 ok("SPEED: the weeks of a window and the days of a bucket are read once, not once a line; the per-line rule is one function",
-   "def _materialise_parent(p, have):" in _wks and "c, r, k = _materialise_parent(p, have_by.get(key, {}))" in _wks
+   # NARROWED 29 Oct 2026 (task 3a): the per-line rule takes the month's pours, read once a window / a bucket too
+   "def _materialise_parent(p, have, pours_by_week=None):" in _wks
+   and "c, r, k = _materialise_parent(p, have_by.get(key, {}), pw.get(key))" in _wks
+   and _wks.count("pw = _pours_by_week(") == 2
    and "materialise_line(p[" not in _wks and "def _days_in_bucket(month_index, week_index):" in _dys
-   and _dys.count("days_by = _days_in_bucket(mi, wi)") == 2 and "week=w," in _dys)
+   and _dys.count("days_by = _days_in_bucket(mi, wi)") == 2 and "week=w," in _dys
+   and "pd_by = _pour_days_by_line(mi)" in _dys)
 
 
 # =========================================================================== #

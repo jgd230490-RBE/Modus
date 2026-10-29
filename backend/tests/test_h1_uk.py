@@ -1132,8 +1132,9 @@ ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the marku
    # NARROWED 27 Oct 2026 (stockpile forecast): 12 — + the Stockpiles page's saved-message border, a border like the others
    not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 12 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
    and "text-[color:var(--green)]" not in fe and "text-emerald-600" not in fe, str(_text_uses("var(--green)"))[:300])
-ok("...nor var(--gold): the 7 uses left are the gate-arrivals key, the warning triangle, a note's border, the status dots (×2), the carbon-tone dot and the flag chip's triangle; the Submit strip's text-[color:var(--gold)] is gone (decision 3)",
-   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 7 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
+# NARROWED 29 Oct 2026 (3b, the steel split): 8 — + the dot of Config's "Older: pick one of the three" chip (a status dot, not text)
+ok("...nor var(--gold): the 8 uses left are the gate-arrivals key, the warning triangle, a note's border, the status dots (×2), the carbon-tone dot, the flag chip's triangle and the Older chip's dot; the Submit strip's text-[color:var(--gold)] is gone (decision 3)",
+   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 8 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
 ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's variance figures and the stockpile table's over-capacity figures on a rose-washed row (bad-text: --red is 4.83:1 on white but 4.4–4.5:1 on the wash); since 22 Oct the abnormal loads' .al-bad chip, route-error line and the limits a load is over (bad-text ×3), its .al-notes list, .al-warn chip, route notes and candidate notes (warn-text ×4)",
    '<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>' in fe
    and '<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>' in fe
@@ -1151,7 +1152,9 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # the Account's "Next 8 weeks", the Horizon strip's cells and the Stockpiles page's status, each red (over) or amber (runs out / near)
    # NARROWED 28 Oct 2026 (task 0c): bad-text 18 -> 23, warn-text 10 -> 12 — the diversions: the Routes chip (amber Diverted /
    # red Not diverted), the Zones Used by "no way round", the panel's no-road line and its no-way-round-yet box, the problem words (table and stacked rows)
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 23 and _fe_wo.count("var(--warn-text)") == 12
+   # NARROWED 29 Oct 2026 (task 3a): bad-text 23 -> 25, warn-text 12 -> 14 — the Pours page: its saved / not-saved line, each
+   # flag's sentence (red COLD JOINT / TRANSIT, amber the rest) and a pour with no figures (amber)
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 25 and _fe_wo.count("var(--warn-text)") == 14
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe
    and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--ok-text)\" }}>" in fe and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--navy-deep)\" }}>" in fe)
