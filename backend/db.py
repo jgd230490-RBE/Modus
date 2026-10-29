@@ -415,14 +415,17 @@ def init_db():
         conn.commit()
         _migrate_forecasts_to_phase2(conn, cur)
         # Task F: the line's IPT. Plain ADD COLUMN on both backends; in _TENANT_DDL too.
-        try:
-            if IS_PG:
-                cur.execute("ALTER TABLE forecasts ADD COLUMN IF NOT EXISTS ipt TEXT")
-            else:
-                cur.execute("ALTER TABLE forecasts ADD COLUMN ipt TEXT")
-            conn.commit()
-        except Exception:
-            conn.rollback()  # column already present - fine
+        # 29 Oct 2026 (3b-2): the three reinforcement-from-concrete columns, the same way.
+        for col, typ in (("ipt", "TEXT"), ("concrete_m3", "REAL"), ("rebar_kg_per_m3", "REAL"),
+                         ("structure_type", "TEXT")):
+            try:
+                if IS_PG:
+                    cur.execute(f"ALTER TABLE forecasts ADD COLUMN IF NOT EXISTS {col} {typ}")
+                else:
+                    cur.execute(f"ALTER TABLE forecasts ADD COLUMN {col} {typ}")
+                conn.commit()
+            except Exception:
+                conn.rollback()  # column already present - fine
     finally:
         conn.close()
 
@@ -1209,6 +1212,12 @@ _TENANT_DDL = {
             -- and admins only until somebody sets it. Listed here AND ALTERed in
             -- init_db(), or the SQLite tenant rebuild drops it.
             ipt                  TEXT,
+            -- 29 Oct 2026 (3b-2, reinforcement from concrete): a Reinforcement line typed as m³ of concrete keeps
+            -- its basis here; quantity / unit stay the TONNES every read uses (quantity = concrete_m3 ×
+            -- rebar_kg_per_m3 ÷ 1000). NULL on every other line. Listed here AND ALTERed in init_db().
+            concrete_m3          REAL,
+            rebar_kg_per_m3      REAL,
+            structure_type       TEXT,
             PRIMARY KEY (tenant_id, id),
             UNIQUE (tenant_id, route_id, month_index, discipline, section_id)
         )

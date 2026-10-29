@@ -6451,6 +6451,13 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   const volumeOk = cat.volume_convertible !== false;
   // 15 Oct 2026: a category may name the only units its lines are typed in (steel: tonnes only); none = all three
   const catUnits = (Array.isArray(cat.units) && cat.units.length) ? cat.units : null;
+  // 29 Oct 2026 (3b-2, John): Reinforcement may be typed as m³ of CONCRETE ("m3c", this form only) × kg per m³ — a
+  // structure type's ratio from Config (planning.rebar_ratios) or one typed for the line. The line is SAVED in tonnes of
+  // steel (the server works them out, quantity = m³ × kg/m³ ÷ 1000) and keeps its basis, so every other read is unchanged.
+  const fromConc = cat.from_concrete === true;
+  const RATIOS = ((factors && factors.planning) || {}).rebar_ratios || [];
+  const [structName, setStructName] = useState("");
+  const [ratio, setRatio] = useState("");
 
   // ---- discipline + work section ----
   // Both belong on the LINE, not on the route or the location. A lorry of track ballast
@@ -6477,6 +6484,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   const firstShown = (list) => (list || []).find(v => !HIDDEN_VEHICLES.includes(v)) || (list || [])[0] || "";
   const [vehicle, setVehicle] = useState(firstShown(vehicles));
   const [unit, setUnit] = useState(units[0] || "m3");
+  const conc = unit === "m3c" && fromConc;           // 3b-2: the months are m³ of concrete
+  const kgm = conc ? (+ratio || 0) : 0;
 
   // ---- year RANGE, not a single year ----------------------------------------
   // One save now covers From year..To year. Nothing about the stored shape changed:
@@ -6546,7 +6555,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
 
   // category change -> sensible default unit + primary vehicle
   useEffect(() => {
-    setUnit(u => ((u === "m3" && !volumeOk) || (catUnits && !catUnits.includes(u))) ? (cat.default_unit || (catUnits || ["t"])[0]) : u);
+    setUnit(u => (u === "m3c" && fromConc) ? u : ((u === "m3" && !volumeOk) || u === "m3c" || (catUnits && !catUnits.includes(u))) ? (cat.default_unit || (catUnits || ["t"])[0]) : u);
     setVehicle(v => suggestedVehicles.includes(v) ? v : (firstShown(suggestedVehicles) || v));
   }, [material]);
 
@@ -6585,12 +6594,15 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
         && (x.section_id || "") === sectionId
         && x.month_index >= mLo && x.month_index <= mHi);
       const next = {};
-      mine.forEach(x => { next[x.month_index] = String(x.quantity); });
+      // 3b-2: a line typed as m³ of concrete reopens in m³ of concrete, with its ratio and structure type
+      const cm = mine.length > 0 && mine[0].concrete_m3 != null;
+      mine.forEach(x => { next[x.month_index] = String(cm && x.concrete_m3 != null ? x.concrete_m3 : x.quantity); });
       setVals(next);
       const first = mine[0];
       if(first){
         if(first.ipt && !iptLocked) setIpt(first.ipt);
-        if(first.unit) setUnit(first.unit);
+        if(cm){ setUnit("m3c"); setRatio(String(first.rebar_kg_per_m3 ?? "")); setStructName(first.structure_type || ""); }
+        else if(first.unit) setUnit(first.unit);
         if(first.material_type && materials.includes(first.material_type)) setMaterial(first.material_type);
         if(first.vehicle_type) setVehicle(first.vehicle_type);
         setDescription(first.material_description || "");
@@ -6612,6 +6624,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   }, [routeId, fromYear, toYear, discipline, sectionId]);
 
   const setMonth = (mi, v) => setVals(s => ({ ...s, [mi]: v }));
+  // 3b-2: tonnes of one typed cell — m³ of concrete × kg/m³ ÷ 1000, or the usual conversion
+  const tq = (q) => conc ? (+q || 0) * kgm / 1000 : toTonnes(q, unit, material, vehicle, factors);
 
   // Only the cells inside the current window count. vals is replaced wholesale by the
   // load effect whenever the range moves, so a stale key should never survive — but
@@ -6630,14 +6644,14 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
     let live = true;
     const t = setTimeout(() => {
       fetch(`${API}/costing/preview`, { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ route_id: routeId, vehicle_type: vehicle, material_type: material, unit,
-                               cells: inRange.filter(([, q]) => +q > 0).map(([mi, q]) => ({ month_index: mi, quantity: +q })) }) })
+        body: JSON.stringify({ route_id: routeId, vehicle_type: vehicle, material_type: material, unit: conc ? "t" : unit,
+                               cells: inRange.filter(([, q]) => +q > 0).map(([mi, q]) => ({ month_index: mi, quantity: conc ? tq(q) : +q })) }) })
         .then(okJSON)
         .then(j => { if(live){ setCost(j); setCostErr(""); } })
         .catch(e => { if(live){ setCost(null); setCostErr(errSay("Couldn't price these cells.", e)); } });
     }, 400);
     return () => { live = false; clearTimeout(t); };
-  }, [routeId, vehicle, material, unit, cellsKey]);
+  }, [routeId, vehicle, material, unit, cellsKey, kgm]);
   const costCell = useMemo(() => { const m = {}; ((cost && cost.cells) || []).forEach(c => m[c.month_index] = c); return m; }, [cost]);
 
   // One vehicle per line since Phase 2. A load split across two vehicle types is two
@@ -6645,12 +6659,12 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   // averaged two haul cycles that are not close -- an Artic Flatbed turns round in 45
   // minutes against a Tipper's 24 -- and hid that inside a single number.
   const effPayload = payload(factors, vehicle);
-  const allowedUnits = units.filter(u => (u !== "m3" || volumeOk) && (!catUnits || catUnits.includes(u)));
+  const allowedUnits = units.filter(u => (u !== "m3" || volumeOk) && (!catUnits || catUnits.includes(u))).concat(fromConc ? ["m3c"] : []);
 
   // Totals run across the WHOLE range, not one year — the brief's requirement and the
   // only reading that makes sense once a save can cover 2026-2027.
   const totalUnit = inRange.reduce((a, [, q]) => a + (+q || 0), 0);
-  const totalT = inRange.reduce((a, [, q]) => a + toTonnes(q, unit, material, vehicle, factors), 0);
+  const totalT = inRange.reduce((a, [, q]) => a + tq(q), 0);
   const totalVeh = totalT / (effPayload || 1);
 
   // Daily rates. A year total tells you nothing about whether a site gate can cope;
@@ -6672,7 +6686,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
     const months = inRange.filter(([, q]) => +q > 0);
     if(!months.length || wd <= 0) return { avgT:0, peakT:0, avgVeh:0, peakVeh:0,
       avgTrips:0, peakTrips:0, avgQty:0, peakQty:0, months:0, wd };
-    const monthlyT = months.map(([, q]) => toTonnes(q, unit, material, vehicle, factors));
+    const monthlyT = months.map(([, q]) => tq(q));
     const monthlyQ = months.map(([, q]) => +q);
     const sum = (a) => a.reduce((x, y) => x + y, 0);
     const avgT = (sum(monthlyT) / months.length) / wd;
@@ -6683,7 +6697,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
       avgTrips: avgVeh, peakTrips: peakVeh,
       avgQty: (sum(monthlyQ) / months.length) / wd, peakQty: Math.max(...monthlyQ) / wd,
       months: months.length, wd };
-  }, [inRange, unit, material, vehicle, factors, effPayload]);
+  }, [inRange, unit, material, vehicle, factors, effPayload, kgm]);
 
   const warnings = useMemo(() => {
     // seasonal_restrictions.months are CALENDAR months 1-12. month_index is absolute,
@@ -6726,6 +6740,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   const save = () => {
     if(!routeId){ setMsg({ ok: false, text: "Pick an origin and destination that map to a route first." }); return; }
     if(iptRequired && !ipt){ setMsg({ ok: false, text: `Pick which ${TEAM().toLowerCase()} this line belongs to before saving.` }); return; }
+    if(conc && !(kgm > 0 && kgm <= 1000)){ setMsg({ ok: false, text: "Not saved. Type the kg of reinforcement per m³ of concrete." }); return; }
     setBusy(true); setMsg(null); setCaution(null);
     // ONE POST for the whole range. The backend upserts a cell with a quantity and
     // DELETES one at zero, both on the full widened key, so an emptied month inside
@@ -6739,7 +6754,9 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
         route_id: routeId, discipline, section_id: sectionId,
         material_type: material, material_description: description || null,
         vehicle_type: vehicle, submitted_by: who || null,
-        unit, cells, status: "Pending",
+        unit: conc ? "t" : unit, cells, status: "Pending",
+        // 3b-2: the cells are m³ of concrete; the server keeps the line in tonnes of steel and stores this basis
+        rebar: conc ? { structure_type: structName || null, kg_per_m3: kgm } : null,
         // the server forces this to the caller's IPT for an IPT code regardless
         ipt: (iptLocked ? access.ipt : ipt) || null,
       }),
@@ -6896,10 +6913,30 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
           </Field>
           <Field label="Input unit">
             <select value={unit} onChange={e => setUnit(e.target.value)} className={selCls}>
-              {allowedUnits.map(u => <option key={u} value={u}>{u === "m3" ? "m³" : u === "t" ? "tonnes" : "vehicles"}</option>)}
+              {allowedUnits.map(u => <option key={u} value={u}>{u === "m3c" ? "m³ of concrete" : u === "m3" ? "m³" : u === "t" ? "tonnes" : "vehicles"}</option>)}
             </select>
           </Field>
         </div>
+
+        {/* 29 Oct 2026 (3b-2, John): Reinforcement typed as m³ of concrete — the structure type's ratio, or one typed here */}
+        {conc && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3" data-rebar-basis>
+            <Field label="Structure type">
+              <select value={structName} className={selCls} onChange={e => {
+                const nm = e.target.value; setStructName(nm);
+                const rw = RATIOS.find(x => x.name === nm);
+                if(rw && rw.kg_per_m3 != null) setRatio(String(rw.kg_per_m3));
+              }}>
+                <option value="">Other (type the ratio)</option>
+                {RATIOS.filter(x => (x.name || "").trim()).map(x => <option key={x.id || x.name} value={x.name}>{x.name}{x.kg_per_m3 != null ? ` · ${x.kg_per_m3} kg/m³` : ""}</option>)}
+                {structName && !RATIOS.some(x => x.name === structName) && <option value={structName}>{structName}</option>}
+              </select>
+            </Field>
+            <Field label="kg of reinforcement per m³">
+              <input value={ratio} onChange={e => setRatio(e.target.value)} inputMode="decimal" className={selCls} placeholder="e.g. 130" />
+            </Field>
+          </div>
+        )}
 
 
         {/* From year / To year. One save covers the whole range — see the save()
@@ -6974,12 +7011,12 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
             and a site gate, and a range total hides it. */}
         <div className="rounded-lg border border-slate-200 overflow-hidden text-sm">
           <div className="bg-slate-50 p-4 flex flex-wrap gap-x-8 gap-y-2 border-b border-slate-200">
-            <Stat label={`${fromYear === toYear ? "Year" : "Range"} total · ${rangeLabel} (${unit === "m3" ? "m³" : unit})`}
-              value={fmt(totalUnit, unit)} />
-            <Stat label="≈ tonnes" value={fmt(totalT, "t")} />
+            <Stat label={`${fromYear === toYear ? "Year" : "Range"} total · ${rangeLabel} (${conc ? "m³ of concrete" : unit === "m3" ? "m³" : unit})`}
+              value={fmt(totalUnit, conc ? "m3" : unit)} />
+            <Stat label={conc ? "≈ tonnes of steel" : "≈ tonnes"} value={fmt(totalT, "t")} />
             <Stat label="≈ vehicle loads" value={fmt(totalVeh, "vehicles")} tone="var(--navy)" />
             <span className="text-xs text-slate-400 self-center">
-              {volumeOk ? `${density(factors, material)} t/m³ · ` : ""}
+              {conc ? `${kgm || "?"} kg/m³${structName ? ` (${structName})` : ""} · ` : volumeOk ? `${density(factors, material)} t/m³ · ` : ""}
               {`${payload(factors, vehicle)} t/load · ${vehLabel(vehicle)}`}
               {` · ${perDay.wd} working days/month · ${perDay.months} month${perDay.months === 1 ? "" : "s"} with a figure`}
             </span>
@@ -6994,8 +7031,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
               ["Peak movements / day", fmt(perDay.peakTrips, "vehicles")],
               ["Vehicles needed (avg)",  fleetOf(perDay.avgTrips) == null ? "not routed" : String(fleetOf(perDay.avgTrips))],
               ["Vehicles needed (peak)", fleetOf(perDay.peakTrips) == null ? "not routed" : String(fleetOf(perDay.peakTrips))],
-              [`Avg ${unit === "m3" ? "m³" : unit === "t" ? "t" : "loads"} / day`,  fmt(perDay.avgQty, unit)],
-              [`Peak ${unit === "m3" ? "m³" : unit === "t" ? "t" : "loads"} / day`, fmt(perDay.peakQty, unit)],
+              [`Avg ${unit === "m3" || conc ? "m³" : unit === "t" ? "t" : "loads"} / day`,  fmt(perDay.avgQty, conc ? "m3" : unit)],
+              [`Peak ${unit === "m3" || conc ? "m³" : unit === "t" ? "t" : "loads"} / day`, fmt(perDay.peakQty, conc ? "m3" : unit)],
             ].map(([label, value]) => (
               <div key={label} className="px-3 py-2.5 flex flex-col justify-between">
                 <div className="text-xs uppercase tracking-wide">{label}</div>
@@ -7159,8 +7196,10 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
         statuses: new Set(), material: r.material_type, material_description: r.material_description,
         vehicle: r.vehicle_type, unit: r.unit, submittedBy: r.submitted_by || "",
         months: 0, quantity: 0, rejectReason: null, minMonth: r.month_index, maxMonth: r.month_index,
+        concrete: 0, kg: r.rebar_kg_per_m3 ?? null, structure: r.structure_type || "",   // 3b-2
       });
       e.statuses.add(r.status); e.months += 1; e.quantity += (+r.quantity || 0);
+      if(r.concrete_m3 != null) e.concrete += (+r.concrete_m3 || 0);
       e.minMonth = Math.min(e.minMonth, r.month_index); e.maxMonth = Math.max(e.maxMonth, r.month_index);
       if(r.reject_reason && !e.rejectReason) e.rejectReason = r.reject_reason;
     });
@@ -7405,7 +7444,9 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                         <RdItem t="Vehicle">{vehLabel(g.vehicle)}</RdItem>
                         <RdItem t="Vehicle, full name">{g.vehicle && vehShort(g.vehicle) !== vehLabel(g.vehicle) ? vehLabel(g.vehicle) : null}</RdItem>
                         <RdItem t="Months">{`${g.months}, ${g.yearLabel}`}</RdItem>
-                        <RdItem t="Typed">{`${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>
+                        <RdItem t="Typed">{g.kg != null && g.concrete > 0
+                          ? `${fmt(g.concrete, "m3")} m³ of concrete × ${g.kg} kg/m³${g.structure ? ` (${g.structure})` : ""}`
+                          : `${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>
                         <RdItem t="Tonnes">{c ? grp(c.t) : null}</RdItem>
                         <RdItem t="Loads (loaded trips)">{c ? grp(c.trips) : null}</RdItem>
                         <RdItem t="Lorries, busiest month">{c ? (c.peakVeh == null ? "Needs the route worked out" : String(c.peakVeh)) : null}</RdItem>
@@ -7816,6 +7857,34 @@ function ConfigPage({ meta, who, access }){
                 </tbody>
               </table>
               <p className="px-6 py-3 text-[13px] text-slate-500 border-t border-slate-100">In Submit forecast an unlisted vehicle is shown but greyed out.</p>
+              {/* 29 Oct 2026 (3b-2, John): kg of reinforcement per m³ of concrete by structure type, for Reinforcement typed
+                  as m³ of concrete. Seeded with the published early-estimate figures (factors.json planning._rebar_ratios_note);
+                  an engineer edits a row or adds their own structure. A change here never moves a line already typed. */}
+              <div className="border-t border-slate-200 pt-4" data-cfg="rebar-ratios">
+                <h3 className="px-6 text-base font-semibold text-slate-800">Reinforcement ratios</h3>
+                <p className="px-6 mt-1 text-[13px] text-slate-500">kg of reinforcement per m³ of concrete, for Reinforcement typed as m³ of concrete.</p>
+                {((doc.planning || {}).rebar_ratios || []).length > 0 && (   /* no empty table: headings with no rows (axe th-has-data-cells) */
+                <table className="tbl mt-2">
+                  <thead><tr>{["Structure type", "kg per m³ of concrete", "Basis"].map(h => <th key={h} scope="col" className={h.startsWith("kg") ? "num" : ""}>{h}</th>)}<th scope="col"><span className="sr-only">Remove</span></th></tr></thead>
+                  <tbody>
+                    {((doc.planning || {}).rebar_ratios || []).map((rw, i) => (
+                      <tr key={rw.id || i} data-rebar-row={i}>
+                        <td><input className={inp} value={rw.name || ""} aria-label={`Structure type ${i + 1}`} onChange={e => upd(d => { d.planning.rebar_ratios[i].name = e.target.value; })} /></td>
+                        <td className="num w-32"><input className={inp + " text-right"} value={rw.kg_per_m3 ?? ""} placeholder="—" aria-label={`${rw.name || "Structure " + (i + 1)} kg per m³`} onChange={e => upd(d => { d.planning.rebar_ratios[i].kg_per_m3 = num(e.target.value); })} /></td>
+                        <td><input className={inp} value={rw.basis || ""} aria-label={`${rw.name || "Structure " + (i + 1)} basis`} onChange={e => upd(d => { d.planning.rebar_ratios[i].basis = e.target.value; })} /></td>
+                        <td className="text-right"><button type="button" className="row-x" aria-label={`Remove ${rw.name || "structure " + (i + 1)}`} title="Remove"
+                          onClick={() => upd(d => { d.planning.rebar_ratios.splice(i, 1); })}></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                )}
+                <div className="px-6 py-3">
+                  <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 12px" }}
+                    onClick={() => upd(d => { d.planning = d.planning || {}; const L = d.planning.rebar_ratios = d.planning.rebar_ratios || [];
+                      L.push({ id: "st_" + Date.now().toString(36), name: "", kg_per_m3: null, basis: "" }); })}>+ Add structure type</button>
+                </div>
+              </div>
             </div>
           )}
 

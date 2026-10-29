@@ -608,7 +608,8 @@ for _u, _want in (("vehicles", True), ("m3", True), ("t", False)):
        _refused == _want, f"{_e9!r}"[:200])
 APP9 = read("frontend/index.html")
 ok("9: the Submit form offers only the category's units, and moves off a unit the category does not allow",
-   'const allowedUnits = units.filter(u => (u !== "m3" || volumeOk) && (!catUnits || catUnits.includes(u)));' in APP9
+   # NARROWED 29 Oct 2026 (3b-2): Reinforcement may also add "m³ of concrete" (m3c), and the effect keeps it on such a material
+   'const allowedUnits = units.filter(u => (u !== "m3" || volumeOk) && (!catUnits || catUnits.includes(u))).concat(fromConc ? ["m3c"] : []);' in APP9
    and '(catUnits && !catUnits.includes(u))) ? (cat.default_unit || (catUnits || ["t"])[0]) : u);' in APP9)
 ok("9: Config → Materials has a 'Tonnes only' tick that sets units ['t'] and the default unit, or removes the rule",
    '"Tonnes only"' in APP9 and 'if(e.target.checked){ m.units = ["t"]; m.default_unit = "t"; } else delete m.units;' in APP9
@@ -709,6 +710,134 @@ ok("10: the guide names the three, says the older two are marked Older and how a
    and "to move a line, edit its category (no figure changes)" in G10
    and "Rail, Reinforcement and Structural steel 7.85" in G10
    and "Rail, Reinforcement and Structural steel (and the older Steel / rail, Structural steel / rebar) 3821.94858" in G10)
+
+# --------------------------------------------------------------------------- #
+#  11. Reinforcement from m³ of concrete (3b-2, 29 Oct 2026; John: yes as     #
+#      recommended — Q7 lines keep their ratio, Q8 seeded, Q10 Reinforcement   #
+#      only, Q11 the basis on the screen)                                      #
+# --------------------------------------------------------------------------- #
+F11 = conversions.load_factors_file()
+C11 = F11["material_categories"]
+RR = F11["planning"]["rebar_ratios"]
+ok("11: only Reinforcement may be typed as m³ of concrete (Q10)",
+   C11["Reinforcement"].get("from_concrete") is True
+   and [k for k, c in C11.items() if isinstance(c, dict) and c.get("from_concrete")] == ["Reinforcement"])
+_RR = {r["name"]: r["kg_per_m3"] for r in RR}
+ok("11: the seed ratios (Q8): the sourced figures, piles blank",
+   _RR == {"Pile caps": 130, "Abutments (on piles)": 80, "Piers, short (under 7.6 m)": 116, "Piers, tall (over 7.6 m)": 128,
+           "Deck slab": 122, "Approach slabs": 119, "Capping beams": 135, "Retaining walls": 130, "Piles": None}, str(_RR))
+_LB = 0.45359237 / 0.764554858
+ok("11: the Florida DOT rows are its lb per cubic yard × 0.5933, rounded (135, 195, 215, 205, 200)",
+   all(round(lb * _LB) == _RR[n] for n, lb in (("Abutments (on piles)", 135), ("Piers, short (under 7.6 m)", 195),
+                                               ("Piers, tall (over 7.6 m)", 215), ("Deck slab", 205), ("Approach slabs", 200))))
+_n11 = F11["planning"].get("_rebar_ratios_note", "")
+ok("11: the note names both sources exactly and says a bar bending schedule replaces them",
+   "Topic No. 625-020-018, January 2022, §9.2.3" in _n11 and "Prova Surveying" in _n11
+   and "bar bending schedule always" in _n11 and "No UK bridge figure was found" in _n11)
+ok("11: every row carries a short basis for the screen (Q11), ids unique",
+   all((r.get("basis") or "").strip() for r in RR) and len({r["id"] for r in RR}) == len(RR)
+   and {r["basis"] for r in RR if r["name"] in ("Deck slab", "Approach slabs")} == {"Florida DOT 2022"})
+ok("11: the seed validates", config.validate(F11) == [], str(config.validate(F11))[:300])
+def _v11(mut):
+    d = json.loads(json.dumps(F11)); mut(d); return config.validate(d)
+ok("11: Config refuses a table that is not a list", any("rebar_ratios must be a list" in x
+                                                         for x in _v11(lambda d: d["planning"].__setitem__("rebar_ratios", {}))))
+ok("11: Config refuses a blank name, a name twice, an id twice",
+   any("type the structure's name" in x for x in _v11(lambda d: d["planning"]["rebar_ratios"][0].__setitem__("name", " ")))
+   and any("'Deck slab' is listed twice" in x for x in _v11(lambda d: d["planning"]["rebar_ratios"][0].__setitem__("name", "deck slab")))
+   and any("is used twice" in x for x in _v11(lambda d: d["planning"]["rebar_ratios"][1].__setitem__("id", "pile_caps"))))
+ok("11: Config refuses a ratio of 0, over 1000, or words — and allows a blank",
+   all(any("kg per m³ must be a number above 0 and at most 1000" in x for x in _v11(lambda d, v=v: d["planning"]["rebar_ratios"][0].__setitem__("kg_per_m3", v)))
+       for v in (0, 1001, "lots"))
+   and _v11(lambda d: d["planning"]["rebar_ratios"][0].__setitem__("kg_per_m3", None)) == [])
+ok("11: Config refuses a from_concrete flag that is not true or false",
+   any("from_concrete must be true or false" in x for x in _v11(lambda d: d["material_categories"]["Rail"].__setitem__("from_concrete", "yes"))))
+
+reset_db()
+boot()
+access.set_current("planner123")
+def _row11(**k):
+    base = dict(route_id="R-rebar", discipline="structures", section_id="", material_type="Reinforcement",
+                vehicle_type="Artic Flatbed (44t)", unit="t", ipt="IPT1",
+                cells=[main.Cell(month_index=3, quantity=840), main.Cell(month_index=4, quantity=420)])
+    base.update(k)
+    return main.MatrixRow(**base)
+def _err11(row):
+    try:
+        main.save_matrix_row(row)
+        return None
+    except Exception as e:      # noqa: BLE001
+        return e
+_e = _err11(_row11(rebar=main.RebarBasis(structure_type="Pile caps", kg_per_m3=130)))
+_rows = {r["month_index"]: r for r in db.query("SELECT * FROM forecasts WHERE tenant_id = ? AND route_id = 'R-rebar'", (db.current_tenant(),))}
+ok("11: a line typed as m³ of concrete saves as TONNES of steel: 840 m³ × 130 kg/m³ = 109.2 t, 420 m³ = 54.6 t",
+   _e is None and abs(_rows[3]["quantity"] - 109.2) < 1e-9 and abs(_rows[4]["quantity"] - 54.6) < 1e-9
+   and _rows[3]["unit"] == "t", f"{_e!r} {_rows}"[:300])
+ok("11: ...and keeps its basis on every month: the m³, the ratio, the structure type",
+   _rows[3]["concrete_m3"] == 840 and _rows[4]["concrete_m3"] == 420 and _rows[3]["rebar_kg_per_m3"] == 130
+   and _rows[3]["structure_type"] == "Pile caps" and _rows[4]["structure_type"] == "Pile caps")
+ok("11: the line reads back through the forecasts list with the three fields (what Submit reopens from)",
+   all(k in (main.list_forecasts(route_id="R-rebar")[0]) for k in ("concrete_m3", "rebar_kg_per_m3", "structure_type"))
+   if hasattr(main, "list_forecasts") else "concrete_m3" in _rows[3])
+_cfg = conversions.load_factors()
+ok("11: a line's tonnes do not move when Config's ratio changes (Q7): the stored figure is the line's own",
+   abs(_rows[3]["quantity"] - 109.2) < 1e-9)
+_e2 = _err11(_row11(cells=[main.Cell(month_index=3, quantity=100)]))
+_r2 = db.query("SELECT * FROM forecasts WHERE tenant_id = ? AND route_id = 'R-rebar' AND month_index = 3", (db.current_tenant(),))[0]
+ok("11: saved again in plain tonnes, the basis is cleared (no stale m³ left on the line)",
+   _e2 is None and _r2["quantity"] == 100 and _r2["concrete_m3"] is None and _r2["rebar_kg_per_m3"] is None
+   and _r2["structure_type"] is None, str(_r2)[:300])
+_e3 = _err11(_row11(rebar=main.RebarBasis(structure_type=None, kg_per_m3=142)))
+_r3 = db.query("SELECT * FROM forecasts WHERE tenant_id = ? AND route_id = 'R-rebar' AND month_index = 3", (db.current_tenant(),))[0]
+ok("11: a ratio typed for the line with no structure type works (an engineer's own figure)",
+   _e3 is None and abs(_r3["quantity"] - 840 * 142 / 1000) < 1e-9 and _r3["structure_type"] is None)
+for _lab, _row, _want in (
+        ("another material", _row11(material_type="Structural steel", rebar=main.RebarBasis(kg_per_m3=130)), "cannot be typed as m³ of concrete"),
+        ("a unit other than tonnes", _row11(unit="vehicles", rebar=main.RebarBasis(kg_per_m3=130)), ""),
+        ("a ratio of 0", _row11(rebar=main.RebarBasis(kg_per_m3=0)), "kg of reinforcement per m³"),
+        ("a ratio over 1000", _row11(rebar=main.RebarBasis(kg_per_m3=1500)), "kg of reinforcement per m³")):
+    _ex = _err11(_row)
+    ok(f"11: refused in words: {_lab}", getattr(_ex, "status_code", None) == 400 and _want in str(getattr(_ex, "detail", "")),
+       f"{_ex!r}"[:200])
+_cols11 = [r["name"] for r in db.query("PRAGMA table_info(forecasts)")] if not getattr(db, "IS_PG", False) else []
+ok("11: the forecasts table carries the three columns (and so the organisation file does)",
+   all(c in _cols11 for c in ("concrete_m3", "rebar_kg_per_m3", "structure_type")), str(_cols11))
+DB11 = read("backend/db.py")
+ok("11: the columns are in the table's DDL AND added by init_db on an existing database",
+   "concrete_m3          REAL," in DB11 and '("concrete_m3", "REAL"), ("rebar_kg_per_m3", "REAL")' in DB11)
+APP11 = read("frontend/index.html")
+ok("11: Submit offers 'm³ of concrete' only where the material allows it, and keeps it across a material change",
+   '.concat(fromConc ? ["m3c"] : [])' in APP11 and 'u === "m3c" ? "m³ of concrete"' in APP11
+   and 'setUnit(u => (u === "m3c" && fromConc) ? u :' in APP11)
+ok("11: Submit's structure type fills the ratio from Config; the ratio can be typed; a stored name not on Config stays",
+   "const RATIOS = ((factors && factors.planning) || {}).rebar_ratios || [];" in APP11
+   and 'if(rw && rw.kg_per_m3 != null) setRatio(String(rw.kg_per_m3));' in APP11
+   and '<option value="">Other (type the ratio)</option>' in APP11
+   and '{structName && !RATIOS.some(x => x.name === structName) && <option value={structName}>{structName}</option>}' in APP11)
+ok("11: Submit's tonnes, loads and price use m³ × kg/m³ ÷ 1000; the save sends tonnes as the unit and the basis",
+   "const tq = (q) => conc ? (+q || 0) * kgm / 1000 : toTonnes(q, unit, material, vehicle, factors);" in APP11
+   and "const totalT = inRange.reduce((a, [, q]) => a + tq(q), 0);" in APP11
+   and 'unit: conc ? "t" : unit, cells, status: "Pending",' in APP11
+   and "rebar: conc ? { structure_type: structName || null, kg_per_m3: kgm } : null," in APP11
+   and 'quantity: conc ? tq(q) : +q' in APP11)
+ok("11: Submit refuses to save m³ of concrete without a ratio, in words",
+   'if(conc && !(kgm > 0 && kgm <= 1000)){ setMsg({ ok: false, text: "Not saved. Type the kg of reinforcement per m³ of concrete." }); return; }' in APP11)
+ok("11: Submit reopens a concrete-typed line in m³ of concrete with its ratio and structure type",
+   'if(cm){ setUnit("m3c"); setRatio(String(first.rebar_kg_per_m3 ?? "")); setStructName(first.structure_type || ""); }' in APP11)
+ok("11: the Forecasts row's Typed says the m³, the ratio and the structure type",
+   '`${fmt(g.concrete, "m3")} m³ of concrete × ${g.kg} kg/m³${g.structure ? ` (${g.structure})` : ""}`' in APP11)
+ok("11: Config → Materials has the Reinforcement ratios table: name, kg per m³, basis, remove, + Add structure type",
+   'data-cfg="rebar-ratios"' in APP11 and '>Reinforcement ratios</h3>' in APP11
+   and '["Structure type", "kg per m³ of concrete", "Basis"]' in APP11 and ">+ Add structure type</button>" in APP11
+   and "d.planning.rebar_ratios.splice(i, 1);" in APP11
+   # no empty table when a Config has no rows (the UI audit's axe th-has-data-cells, 29 Oct)
+   and "{((doc.planning || {}).rebar_ratios || []).length > 0 && (" in APP11)
+G11 = read("frontend/help/index.html")
+ok("11: the guide says how to type m³ of concrete, that a Config change leaves a typed line alone, and names the sources",
+   "Reinforcement can be typed as <strong>m³ of concrete</strong>" in G11
+   and "Changing a ratio on Config later does not change a line already typed" in G11
+   and "Florida DOT's Structures Design Guidelines (January 2022, section 9.2.3)" in G11
+   and "A bar bending schedule always replaces them" in G11)
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
