@@ -2682,8 +2682,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("SIM: the map's key is a named group on the big screen, a named list under the map on the page (an aria-label on a plain div is not allowed: the UI audit's aria-prohibited-attr)",
     mapSrc.includes('? <div className="sim-legend" role="group" aria-label="Map key">') && mapSrc.includes(': <ul className="sim-key" aria-label="Key" data-sim-key="1">')
     && mapSrc.includes("{wall\n") && !mapSrc.includes('<div className="sim-legend" aria-label='));
-  ok("SIM: the map's key names the concrete mixer only on a day with a pour",
-    mapSrc.includes('D.pour && ["sim-dot sim-dot-pour", `${(D.mixer && D.mixer.vehicle_label) || "Concrete mixer"} (pour)`],'));
+  // NARROWED 29 Oct 2026 (task 3a PR C): a planned pour on the Day puts the mixer in the key too
+  ok("SIM: the map's key names the concrete mixer only on a day with a pour (the what-if or a planned pour)",
+    mapSrc.includes('(D.pour || (D.planned_pours || []).length > 0) && ["sim-dot sim-dot-pour", `${(D.mixer && D.mixer.vehicle_label) || "Concrete mixer"} (pour)`],')
+    && !mapSrc.includes('    D.pour && ["sim-dot sim-dot-pour"'));
   ok("🔴 SIM BIG SCREEN: no scenario controls and no table on the TV; it reads the plain month (no pour) only while shown",
     !/<input|<select|<button|SimScenario|SimTable|pour_gate|onHours|onCheckIn/.test(wallSrc)
     && wallSrc.includes("if(!show) return;") && wallSrc.includes("fetch(`${API}/sim/day?month=${month}&legs=1`)") && wallSrc.includes("no pour"));

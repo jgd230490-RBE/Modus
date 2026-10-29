@@ -336,6 +336,14 @@ busy-hour times (<code>hour_times.times_for</code>, task 0f) at the HOURS neares
 (there + back) of those hours (Q11). The mixer's own rows where it was worked out, else the Artic Tipper's scaled by the
 ratio of the two rows' times where both run the same road (<code>hour_times.attach</code>'s rule); else the planned
 10:00 bake. <code>basis</code> = hours | planned.</p>
+<p><strong>The Simulation (PR C).</strong> On the Day scale (<code>sim.day</code>, <code>planned=off</code> leaves them
+out) each live pour of the date on a line of the day: its loads leave the line's even spread at both ends and come back as
+its mixers, kind <code>pour</code> with <code>pour_id</code> — at the site's gate at first discharge − the planned
+check-in + j × real gap, at the plant's gate loading + drive + the plant's check-in earlier — driving the whole laden leg.
+After the gate (and the site's area, where one takes concrete) the mixers discharge at the pour rate on one pump, in turn:
+loading → end of discharge = end − gate arrival + planned drive + loading, against <code>transit_limit_min</code>; the
+pump's stand between mixers against <code>cold_joint_min</code> (<code>sim.pump</code>). Month and Week keep the typed
+what-if only.</p>
 <p><strong>The split (Q5).</strong> <code>split_month</code>: each derived week = its pours + (month − all pours) ÷ the
 month's weeks. <code>split_days</code>: a pour day = its pours; the other weekdays share (week − the week's pours); a
 weekend pour carries its m³. Edited and confirmed weeks and days hold what was typed (<code>weeks._materialise_parent</code>,

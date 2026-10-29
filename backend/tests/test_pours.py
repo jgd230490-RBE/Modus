@@ -544,6 +544,135 @@ ok("the UI audit walks Plan > Pours (portal and team pages, its header named, a 
    '"stockpiles", "pours", "simulation", "lookahead"' in _aud and 'pours: "Pours"' in _aud and 'meta("pours+open", w)' in _aud
    and re.search(r'const TEAM_PAGES = \[[^\n]*"pours"', _aud) is not None)
 
+# =========================================================================== #
+#  10. PR C: the Simulation's planned pours (the Day scale)                    #
+# =========================================================================== #
+import sim  # noqa: E402
+
+
+def raises(fn):
+    try:
+        fn()
+    except Exception as e:      # noqa: BLE001
+        return e
+    return None
+
+
+GP = gates.create_gate("P", "Plant gate", 52.5, -1.0, direction="both", safety_minutes=2, is_default=True)
+ok("fixture: a gate at the plant with a 2 min check-in", (GP or {}).get("safety_minutes") == 2, str(GP))
+TODAY_S = datetime.date(2027, 3, 9)
+_rs = pours.update_pour("P001", {"mixers_booked": None, "rate_m3h": 30, "m3": 120}, FAC)
+ok("fixture: P001 back to 120 m³ at 30 m³ an hour, no mixers booked (one every 15 min)", "error" not in _rs and _rs.get("mixers_booked") in (None, ""), str(_rs))
+DAY_S = "2027-03-11"
+pd_ = pours.decorate([pours.get_pour("P001")], FAC)[0]
+pf = pd_["figures"]
+
+
+def simday(acc=None, **q):
+    return sim.day(MAR27, acc or PLANNER, factors=FAC, scale="day", date=DAY_S, today=TODAY_S,
+                   scenario=sim.scenario_from_query(**q))
+
+
+S0 = simday()
+p0 = S0["planned_pours"][0]
+ok("🔴 a pour planned before its gate opens: the first mixers wait for the opening (default 08:00), the note says how many",
+   p0["worst_wait"] > 30 and any("reach Gate A while it is shut" in n and "they wait for it to open" in n for n in S0["notes"]),
+   str((p0["worst_wait"], [n for n in S0["notes"] if "P001" in n])))
+ok("...and the pour carries more loads than its line's day as typed (90 m³): the extra mixers are named, the check leaves them out",
+   any(f"{p0['extra'] if 'extra' in p0 else ''}" or "more mixers than its line's day as typed" in n for n in S0["notes"])
+   and any("more mixers than its line's day as typed" in n for n in S0["notes"])
+   and S0["checks"]["largest_panel_difference"] < 1, str(S0["checks"]))
+OPEN = [f"{G['id']}=06:00-18:00"]
+S1 = simday(hours=OPEN)
+pp = (S1.get("planned_pours") or [{}])[0]
+mix = sorted((a for a in S1["arrivals"] if a.get("pour_id") == "P001" and a["kind"] == "pour"), key=lambda a: a["at"])
+at_plant = [a for a in S1["arrivals"] if a.get("pour_id") == "P001" and a["kind"] == "empty"]
+ok("⭐ the Day scale simulates the day's planned pour: one entry, its loads as mixers at the site's gate",
+   len(S1["planned_pours"]) == 1 and pp.get("id") == "P001" and pp.get("mixers") == pf["loads"] == len(mix)
+   and all(a["gate"] == G["id"] for a in mix) and S1["planned_on"] is True, str(pp))
+ok("...each mixer reaches the gate as the pour plans it: first discharge − the gate's 3 min, one every real gap",
+   all(abs(a["at"] - (pf["start_min"] + j * pf["real_gap"] - 3)) < 0.02 for j, a in enumerate(mix)),
+   str([a["at"] for a in mix][:4]))
+ok("⭐ ...and loaded at the plant: each mixer's arrival at the plant's gate is loading + drive + its 2 min check-in earlier",
+   len(at_plant) == pf["loads"] and all(a["gate"] == GP["id"] for a in at_plant)
+   and sorted(round(a["at"], 1) for a in at_plant)
+   == sorted(round(a["at"] - pf["parts"]["there"] - pf["parts"]["loading"] - 2, 1) for a in mix))
+ok("⭐ a mixer drives the route's whole laden leg from the plant (not the what-if's last 2.5 miles)",
+   all(a["from_m"] == 0.0 and abs(a["depart"] - (a["at"] - 47)) < 0.02 for a in mix), str(mix[0]))
+ln = next(l for l in S1["lines"] if l["route_id"] == "R1" and l.get("section_id") == "WS4")
+ok("🔴 the pour's loads come out of its line's day: the line counts the pour's loads (more than the 90 m³ typed on the day)",
+   ln["loads"] == pf["loads"] and ln["trips_month"] < pf["loads"], str(ln))
+ok("⭐ the self-checks still add up with the planned mixers (table = arrivals = expected; every gate within 1 of its average)",
+   S1["checks"]["table_equals_arrivals"] and S1["checks"]["hours_add_up"] and S1["checks"]["largest_panel_difference"] < 1,
+   str(S1["checks"]))
+ok("...the gate row counts them as mixers of the plan (pour = pour_planned)",
+   next(g for g in S1["gates"] if g["gate_id"] == G["id"])["pour_planned"] == pf["loads"]
+   == next(g for g in S1["gates"] if g["gate_id"] == G["id"])["pour"])
+ok("⭐ with no queue the simulated loading → end of discharge is the pour's own transit, and nothing is flagged",
+   abs(pp["transit_max"] - pf["transit"]) < 0.06 and pp["over_limit"] == 0 and pp["flags"] == [] and not pp["cold"],
+   str((pp["transit_max"], pf["transit"])))
+ok("...its sentence and figures come from the server (place, start, m³, gap, the end)",
+   pp["place"] == "Pier 3 base" and pp["start"] == pd_["start"] and pp["m3"] == pd_["m3"]
+   and pp["gap_minutes"] == pf["real_gap"] and pp["words"].startswith("Longest loading → end of discharge:"), str(pp))
+S2 = simday(hours=OPEN, check_in=[f"{G['id']}=20"])
+p2 = S2["planned_pours"][0]
+ok("⭐ a queue at the gate (a 20 min check-in): the mixers wait, loading → discharge rises past the limit, flagged in words",
+   p2["worst_wait"] > 30 and p2["transit_max"] > 120 and p2["over_limit"] > 0
+   and [f["code"] for f in p2["flags"]][:1] == ["POUR_TRANSIT"] and "over the 2 h 00 limit" in p2["flags"][0]["text"]
+   and "wait at Gate A" in p2["words"], str(p2))
+ok("...the pump stands between mixers (at least 20 min a mixer at the gate against 15 to discharge; the gate's other lorries too), under 30: not a cold joint",
+   5 - 0.06 <= p2["stand_max"] < 30 and not p2["cold"] and "POUR_COLD_JOINT" not in [f["code"] for f in p2["flags"]], str(p2["stand_max"]))
+S3 = simday(hours=OPEN, check_in=[f"{G['id']}=50"])
+p3 = S3["planned_pours"][0]
+ok("🔴 a 50 min check-in: the pump stands at least 35 min between mixers, over the 30 min cold-joint gap, flagged in words",
+   p3["cold"] and p3["stand_max"] >= 35 - 0.06 and "POUR_COLD_JOINT" in [f["code"] for f in p3["flags"]]
+   and f"The pump stands {pours.hm(p3['stand_max'])} between mixers, over 30 min." in [f["text"] for f in p3["flags"]], str(p3["flags"]))
+Soff = simday(planned="off")
+ln_off = next(l for l in Soff["lines"] if l["route_id"] == "R1" and l.get("section_id") == "WS4")
+ok("⭐ planned=off: no planned pour, no pour mixer, the line back to its typed day's loads",
+   Soff["planned_pours"] == [] and Soff["planned_on"] is False and not any(a.get("pour_id") for a in Soff["arrivals"])
+   and ln_off["loads"] == ln_off["trips_month"] < pf["loads"], str(ln_off))
+ok("🔴 planned must be on or off (in words)", "planned must be on or off" in str(raises(lambda: sim.scenario_from_query(planned="maybe"))))
+ok("the month and week scales keep the what-if only: no planned pour",
+   sim.day(MAR27, PLANNER, factors=FAC, today=TODAY_S)["planned_pours"] == []
+   and sim.day(MAR27, PLANNER, factors=FAC, scale="week", today=TODAY_S)["planned_pours"] == [])
+WHATIF = {"pour_gate": G["id"], "pour_start": "13:00", "pour_m3": "30", "pour_rate": "30"}
+Sw = simday(hours=OPEN, **WHATIF)
+ok("⭐ the what-if still works on the Day, on top of the planned pour (its 4 mixers have no pour id)",
+   Sw["pour"]["loads"] == 4 and len(Sw["planned_pours"]) == 1
+   and sum(1 for a in Sw["arrivals"] if a["kind"] == "pour" and not a.get("pour_id")) == 4
+   and Sw["checks"]["table_equals_arrivals"], str(Sw["checks"]))
+Sc = sim.day(MAR27, PLANNER, factors=FAC, scale="day", date="2027-03-16", today=TODAY_S)
+ok("🔴 a day of NEXT week with no week sent (the screen sends the date only): simulated, not refused",
+   Sc["date"] == "2027-03-16" and Sc["week"]["bucket"] == "next", str(Sc.get("week")))
+ok("a cancelled pour (P002 on 16 Mar) is not simulated", Sc["planned_pours"] == [])
+St = simday(TEAM2)
+pt = St["planned_pours"][0]
+ok("🔴 another team sees the pour by route only: no place, no m³ (its mixers still count at the gate)",
+   pt["route_id"] == "R1" and pt["place"] is None and pt["m3"] is None and pt["mixers"] == pf["loads"], str(pt))
+St1 = simday(TEAM1)
+ok("...the pour's own team sees its place", St1["planned_pours"][0]["place"] == "Pier 3 base")
+_tbl = {t: db.query(f"SELECT COUNT(*) AS n FROM {t} WHERE tenant_id = ?", (db.current_tenant(),))[0]["n"] for t in ("pours", "forecast_days")}
+simday(check_in=[f"{G['id']}=20"])
+ok("a simulation with planned pours writes nothing (D86)",
+   _tbl == {t: db.query(f"SELECT COUNT(*) AS n FROM {t} WHERE tenant_id = ?", (db.current_tenant(),))[0]["n"] for t in _tbl})
+fe_ = read("frontend/index.html")
+_scn = fe_[fe_.index("const SimScenario = React.memo"):fe_.index("const SimScenario = React.memo") + 12000]
+ok("⭐ the scenario card: 'Planned pours this day' ticked on the Day, one line each, the flags, the what-if 'Another pour'",
+   "Planned pours this day" in _scn and 'D.scale === "day" && <div className="sim-planned"' in _scn
+   and "checked={sc.planned !== false}" in _scn and "{x.words}" in _scn and "data-sim-pp-flag" in _scn
+   and '"Another pour"' in _scn and "None planned (Plan → Pours)." in _scn)
+ok("...the switch reaches the server only when unticked (planned=off), and the key shows the mixer for a planned pour",
+   'if(sc.planned === false) q.push("planned=off");' in fe_ and "planned: true," in fe_
+   and "(D.pour || (D.planned_pours || []).length > 0)" in fe_)
+ok("...the screen works out no pour figure: the card prints the server's words and figures only",
+   not re.search(r"x\.(?:transit_max|worst_wait|stand_max)\s*[-+*/]", _scn))
+_main = read("backend/main.py")
+ok("the endpoint passes planned through", "planned: Optional[str] = None" in _main and "planned=planned)" in _main)
+ok("⭐ the guides: the user guide's pours chapter and Simulation chapter say it; technical T1 the arithmetic",
+   "planned pours this day" in ug.lower() and "Another pour" in read("frontend/help/index.html")
+   and "one pump" in read("frontend/help/technical/index.html"))
+
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)
