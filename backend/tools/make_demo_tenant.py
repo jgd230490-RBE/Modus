@@ -123,6 +123,7 @@ import carbon_target         # noqa: E402
 import clashes               # noqa: E402
 import tenant_package        # noqa: E402
 import site_areas            # noqa: E402
+import pours                 # noqa: E402
 
 OUT = os.path.join(ROOT, "demo", "uk-corridor.package.json")
 AREAS_SEED = os.path.join(BACKEND, "data", "areas_demo.geojson")   # --with-areas (§2.2b)
@@ -387,6 +388,32 @@ FEED_DESC = "Crushed rock for the asphalt plant (coarse and fine aggregate)"
 
 # The approval step (§1.9): one Pending and one Rejected line, each on its own line key (approval acts on every month
 # of a line). (route, discipline, section, t, material description, reason)
+#: 29 Oct 2026 (task 3a, John's Q10 "as recommended"): the planned concrete pours, on the batching plant's lines. When:
+#: "as-of thursday" / "next tuesday" follow the as-of date (so the Look-ahead's this week / next week each show one), or a
+#: fixed date. A pour whose line does not run in that month is left out (an as-of outside the line's months). The mixers
+#: booked and the wash-out minutes are FICTIONAL, like the plant; the drive times are whatever the routes give.
+#: (origin, destination, material, section, discipline, when, start, m³, m³ an hour, mixers booked, wash-out min, where,
+#:  how)
+DEMO_POURS = [
+    ("BP", "VS", None, "WS4", "structures", "as-of thursday", "09:15", 60.0, 20.0, None, 10.0,
+     "Pier 2 pile cap (fictional)", "Pump"),
+    ("BP", "C4", None, "WS8", "structures", "next tuesday", "09:15", 180.0, 40.0, 6, 10.0,
+     "Melton junction bridge deck (fictional)", "Pump"),
+    ("BP", "VS", None, "WS4", "structures", "2028-04-19", "07:00", 400.0, 60.0, None, 10.0,
+     "Viaduct deck slab, span 3 (fictional)", "Two pumps"),
+]
+
+
+def demo_pour_date(when, as_of):
+    """The date a DEMO_POURS row names: the as-of week's Thursday, next week's Tuesday, or the date itself."""
+    mon = as_of - datetime.timedelta(days=as_of.weekday())
+    if when == "as-of thursday":
+        return mon + datetime.timedelta(days=3)
+    if when == "next tuesday":
+        return mon + datetime.timedelta(days=8)
+    return datetime.date.fromisoformat(when)
+
+
 PENDING = ("R013", "earthworks", "WS1", 6400.0, "Imported Class 1A for the Harborough South roundabout embankment")
 REJECTED = ("R005", "earthworks", "WS2", 24000.0, "Granular fill (6F2) for the Langton cutting embankments",
             "24,000 t in one month is more than Langton can place before the capping starts: resubmit spread over "
@@ -955,6 +982,18 @@ def build(with_areas=False, out=None):
     if aw_m < N_MONTHS:
         insert(n + 2, REJECTED[0], aw_m + 1, REJECTED[1], REJECTED[2], REJECTED[3], "t", SMALL, REJECTED[4], TIP,
                "Rejected", REJECTED[5])
+
+    # --- the concrete pours (29 Oct 2026, task 3a): before the weeks materialise, so the as-of week's split carries them
+    pfactors = conversions.load_factors()
+    for o, d, _mat, sec, disc, when, start, m3, rate, booked, wash, place, how in DEMO_POURS:
+        pd = demo_pour_date(when, as_of)
+        res = pours.create_pour({"route_id": ROUTE_ID[(o, d, READY)], "discipline": disc, "section_id": sec,
+                                 "pour_date": pd.isoformat(), "start": start, "m3": m3, "rate_m3h": rate,
+                                 "mixers_booked": booked, "washout_min": wash, "place": place, "method": how,
+                                 "status": "planned"}, pfactors, by=f"{team_name[team_of_section[sec]]} planner")
+        if res.get("error"):
+            # the line does not run that month (an as-of outside its months): no pour, said on the console
+            print(f"  pour left out ({place}, {pd}): {res['error']}")
 
     # --- the history up to the as-of date (§1.9) -------------------------------------------------------------
     # Only weeks that carry history ship: every approved month up to the as-of month is materialised; later weeks

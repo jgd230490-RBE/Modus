@@ -8745,6 +8745,8 @@ const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKP
                      LIMIT: "ROAD LIMIT", UNBAKED: "NOT ROUTED", PARENT_CHANGED: "PARENT CHANGED",
                      // 14 Oct 2026 (bundle G, W17)
                      GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",
+                     // 29 Oct 2026 (task 3a): the concrete pours
+                     POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT", POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN",
                      // 22 Oct 2026 (abnormal loads, phase 2): the words of the Abnormal loads block's flags (a load, not a line)
                      NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT",
                      // 28 Oct 2026 (task 0c): a dated zone in force crosses the route this week and it is not diverted
@@ -8756,19 +8758,23 @@ const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.la
 const LINE_FLAG_LABEL = { UNBAKED: "NOT ROUTED", IPT_SHARE: "SHARE", ROUTE_CAP: "CAP", DAYS_NE_WEEK: "DAYS ≠ WEEK",
                   STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", LIMIT: "ROAD LIMIT", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED",
                   GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",
-                  NO_WAY_ROUND: "NO WAY ROUND" };
+                  NO_WAY_ROUND: "NO WAY ROUND",
+                  // 29 Oct 2026 (task 3a): the concrete pours, on the pour's day (backend pours.WORDS)
+                  POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT", POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN" };
 // 13 Oct 2026 (W6): the Look-ahead row's ONE status. The flags, most serious first (a lorry over a road limit
 // before anything else: decision 1), win over the week's state; with no flag, the week's state. `more` counts the
 // other kinds of flag; every flag's sentence is in the details. (Replaces LineFlags' column of words and the
 // StatusChip column: one status a row.)
 const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1, SHORTAGE: 2, ROUTE_CAP: 3, STOCKPILE_OVER: 4, IPT_SHARE: 5, DAYS_NE_WEEK: 6, PARENT_CHANGED: 7, UNBAKED: 8,
                        GATE_OVER: 3.5, GATE_NEAR: 7.5, STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7,
-                       NO_WAY_ROUND: 0.5 };   // 28 Oct 2026 (task 0c): through a closed road, after a road limit   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
+                       NO_WAY_ROUND: 0.5, POUR_COLD_JOINT: 0.6, POUR_TRANSIT: 0.7, POUR_SHORT: 8.1, POUR_BAND: 8.2, POUR_OVER_PLAN: 8.3 };   // 28 Oct 2026 (task 0c): through a closed road, after a road limit   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
 const laRank = (code) => (code in LA_FLAG_RANK ? LA_FLAG_RANK[code] : 99);
 const laSorted = (flags) => [...(flags || [])].sort((a, b) => laRank(a.code) - laRank(b.code));
 // the rail's colours: NOT ROUTED, a road restriction and a gate near capacity in amber, every other flag red
 const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"
-                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY") ? "warn" : "bad";
+                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"
+                          // 29 Oct 2026 (task 3a): a pour's warnings; COLD JOINT and TRANSIT stay red
+                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";
 // the details' flag lines: one per kind of flag, most serious first, each distinct sentence once, team ids in
 // the team's words (teamText, as the rail does)
 function laFlagGroups(flags){
