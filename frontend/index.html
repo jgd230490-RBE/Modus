@@ -702,6 +702,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-rush{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-left:26px;}
   .sim-rush.sim-off{opacity:1;} .sim-rush.sim-off input{opacity:.6;}   /* the words keep full strength (4.56:1); only the two numbers dim */
   .sim-pour label{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .sim-planned{margin-bottom:10px;} .sim-pp{margin:4px 0 6px 26px;font-size:14px;} .sim-pp .ct-note{margin-top:2px;} .sim-pp-flag{color:var(--bad-text);font-size:13px;margin-top:2px;}
   .sim-off{opacity:.6;}
   .sim-pour.sim-off{opacity:1;} .sim-pour.sim-off>label{opacity:.6;}   /* 27 Oct 2026 (UI fix 10): the pour note stays full strength, 4.76:1 */
   @media (max-width:767px){.dash-sel{min-height:44px;}}   /* UI fix 10: the Dashboard's month boxes, a 44 px tap on a phone */
@@ -10300,6 +10301,8 @@ const SIM_SC0 = () => ({ all: null, hours: {}, check_in: {}, bands: null, pour: 
   // 29 Oct 2026: the arrival pattern — "even" (D59, the default) or "rush" (a morning rush: a share of each gate's lorries
   // in its first open minutes); the two numbers are what the card shows and sends (the engine's defaults are the same)
   arrivals: "even", rush_share: 30, rush_minutes: 30,
+  // 29 Oct 2026 (task 3a): the Day scale's planned pours (Plan → Pours), on unless unticked
+  planned: true,
   // 28 Oct 2026 (v2): the scale (month · week · day) and the sites' what-ifs are part of the scenario (on screen only, D86)
   scale: "month", bucket: "commit", date: "", site_speed: {}, service: {}, bays: {}, wash: null });
 const SIM_SCALES = [["month", "Month"], ["week", "Week"], ["day", "Day"]];
@@ -10315,6 +10318,7 @@ function simQS(month, sc, legs){
   Object.keys(sc.check_in).forEach(g => q.push(`check_in=${encodeURIComponent(g + "=" + sc.check_in[g])}`));
   if(sc.bands != null) q.push(`bands=${sc.bands ? "on" : "off"}`);
   if(sc.arrivals === "rush") q.push("arrivals=rush", `rush_share=${encodeURIComponent(sc.rush_share)}`, `rush_minutes=${encodeURIComponent(sc.rush_minutes)}`);
+  if(sc.planned === false) q.push("planned=off");
   const p = sc.pour;
   if(p.on && p.gate){
     q.push(`pour_gate=${encodeURIComponent(p.gate)}`, `pour_start=${encodeURIComponent(p.start)}`, `pour_m3=${encodeURIComponent(p.m3)}`, `pour_rate=${encodeURIComponent(p.rate)}`);
@@ -10590,7 +10594,7 @@ function SimMap({ meta, D, store, frame, site, wall }){
   // the key, in words: a box over the map on the big screen, a row under it on the page (card 5)
   const key = [
     ["sim-dot sim-dot-laden", "Lorry, laden"], ["sim-dot sim-dot-empty", "Lorry, empty"],
-    D.pour && ["sim-dot sim-dot-pour", `${(D.mixer && D.mixer.vehicle_label) || "Concrete mixer"} (pour)`],
+    (D.pour || (D.planned_pours || []).length > 0) && ["sim-dot sim-dot-pour", `${(D.mixer && D.mixer.vehicle_label) || "Concrete mixer"} (pour)`],
     ["sim-dot sim-dot-wait", "Waiting (one lane, 25 m apart)"],
     (D.sites || []).length > 0 && ["sim-dot sim-dot-serve", "Being unloaded, loaded or washed"],
     ["sim-dot sim-dot-gate", "Gate"],
@@ -10815,9 +10819,20 @@ const SimScenario = React.memo(function SimScenario({ D, sc, onChange, onReset, 
             {(() => { const g = (D.gates || []).filter(x => x.first_trip_pct != null && x.arrivals > 0).sort((a, b) => b.arrivals - a.arrivals)[0];
               return g ? <div className="ct-note" data-sim-first-trips={g.gate_id}>The plan's first trips: about {g.first_trip_pct} % at {simGateName(g)}, {g.gate_name}.</div> : null; })()}
           </div>
+          {/* 29 Oct 2026 (task 3a, card 5): on a Day, the day's planned pours (Plan → Pours), ticked; the what-if below */}
+          {D.scale === "day" && <div className="sim-planned" data-sim-planned={(D.planned_pours || []).length}>
+            <label className="sim-check"><input type="checkbox" checked={sc.planned !== false} onChange={e => onChange({ ...sc, planned: e.target.checked })} />
+              <span>Planned pours this day</span></label>
+            {sc.planned !== false && !(D.planned_pours || []).length && <div className="ct-note">None planned (Plan → Pours).</div>}
+            {sc.planned !== false && (D.planned_pours || []).map(x => <div key={x.id} className="sim-pp" data-sim-pp={x.id}>
+              <div>{x.place || x.route_id} · {x.start}{x.m3 != null ? ` · ${x.m3} m³` : ""} · {x.mixers} mixer{x.mixers === 1 ? "" : "s"}, one every {simN1(x.gap_minutes)} min</div>
+              <div className="ct-note">{x.words}</div>
+              {(x.flags || []).map(f => <div key={f.code} className="sim-pp-flag" data-sim-pp-flag={f.code}>{f.text}</div>)}
+            </div>)}
+          </div>}
           <label className={"sim-check" + (sites.length ? "" : " sim-off")}><input type="checkbox" checked={p.on} disabled={!sites.length}
               onChange={e => onChange({ ...sc, pour: { ...p, on: e.target.checked, gate: p.gate || D.pour_default || "" } })} />
-            <span>Concrete pour <span className="sim-tag">a what-if</span></span></label>
+            <span>{D.scale === "day" ? "Another pour" : "Concrete pour"} <span className="sim-tag">a what-if</span></span></label>
           {!sites.length && <div className="ct-note" data-sim-no-pour-site="1">No site to pour at: a pour goes to a location of type Compound or Site (Data → Locations).</div>}
           <div className={"sim-pour" + (p.on ? "" : " sim-off")}>
             <label>Gate <select className="ga-sel" value={p.gate} onChange={e => setPour("gate", e.target.value)} disabled={!p.on} aria-label="Pour gate">

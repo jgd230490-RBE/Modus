@@ -28,9 +28,19 @@ WHAT A DAY IS (each step is one function below)
    times skipped as above), the rest evenly over the remaining open minutes. A window at or past the gate's open
    minutes, or a share of nothing, is the even spread. On screen only (D86); every gate; every scale. The Dashboard's
    capacity words, the Look-ahead's gate flags and the public map keep the even spread.
-4. THE POUR (a typed what-if until V5 holds pours): ceil(m³ ÷ m³ a load) mixers, one every (m³ a load ÷ pour rate)
+4. THE POUR (a typed what-if): ceil(m³ ÷ m³ a load) mixers, one every (m³ a load ÷ pour rate)
    hours from the start, on top of the gate's day. The default mixer is the app's "Truck mixer 8 m³ (32t)"
    (payload_m3 7.5 in factors.json). A pour whose last mixer would come after 23:59 is refused.
+   4a. THE PLANNED POURS (29 Oct 2026, task 3a PR C): on the DAY scale the date's live pours (Plan → Pours, pours.py)
+   are simulated as planned, on by default (`planned` off leaves them out). A pour is part of its line's day (the day
+   split, pours.split_days), so its loads come OUT of the line's even spread (at both ends) and go back in as the
+   pour's mixers: each reaches the site's gate when pours.figures plans it (first discharge − the gate's planned
+   check-in, one every `real_gap`), having loaded at the plant `loading` + `there` minutes before (its arrival at the
+   plant's gate is placed that early again, less the plant's check-in). A mixer is kind "pour" with its `pour_id`; it
+   drives the route's whole laden leg from the plant. After the gate (and the site's stations where an area takes
+   concrete) each mixer discharges at the pour's rate, one at a time (one pump): loading → end of discharge, with
+   every wait, against the scheme's transit limit, and the pump's longest stand between mixers against the cold-joint
+   gap (pours.limits). Month and week keep the typed what-if only.
 5. THE QUEUE. One lane at each gate, first come first served, each lorry taking the gate's check-in minutes
    (`safety_minutes`). A lorry that comes while the gate is shut (before it opens, in a no-delivery band or in one of
    the gate's shut windows) waits for it to open. One still waiting after the last open minute is checked in late and COUNTED (D89), queue or not.
@@ -441,6 +451,8 @@ def gate_figures(A, iv, check_in):
         "laden": sum(1 for a in A if a["kind"] == "laden"),
         "empty": sum(1 for a in A if a["kind"] == "empty"),
         "pour": sum(1 for a in A if a["kind"] == "pour"),
+        # 29 Oct 2026 (task 3a): of those, the planned pours' mixers (part of the plan's day, unlike the what-if's)
+        "pour_planned": sum(1 for a in A if a["kind"] == "pour" and a.get("pour_id")),
         "open_minutes": O, "intervals": [[a, b] for a, b in iv], "last_open": last_open,
         "check_in": c,
         "capacity": (gate_arrivals.r1(cap) if cap else None), "capacity_raw": cap,
@@ -631,11 +643,21 @@ def simulate(inp, scen):
         rnd = whole_loads([l["share"] for l in lines], [l["touch"] for l in lines], inp["panel"])
     per_line = list(rnd["per_line"])
     bands = band_intervals(scen.get("bands") or [])
+    # 4a. 29 Oct 2026 (task 3a, PR C): a planned pour's loads leave its line's even spread and come back as its mixers;
+    # a pour with more loads than the line's day carries them all (per_line counts them)
+    planned = inp.get("planned_pours") or []
+    spread = list(per_line)
+    for pp in planned:
+        li = pp["line"]
+        take = min(spread[li], pp["loads"])
+        spread[li] -= take
+        per_line[li] += pp["loads"] - take
+        pp["extra"] = pp["loads"] - take        # mixers beyond the line's day as typed (said; left out of the panel check)
 
     # 2–3. every arrival at every gate, then D59 at each gate
     by_gate = {g: [] for g in G}
     for li, l in enumerate(lines):
-        n = per_line[li]
+        n = spread[li]
         for k in range(n):
             ph = (k + 0.5) / n
             if l.get("laden_gate") in by_gate:
@@ -673,6 +695,22 @@ def simulate(inp, scen):
             by_gate[p["gate"]].append({"gate": p["gate"], "kind": "pour", "line": None, "route": None, "phase": None,
                                        "leg": approach, "t": t})
 
+    # 4a. the planned pours' mixers at the site's gate as planned, and at the plant's gate to load (placed, not spread)
+    for pp in planned:
+        li = pp["line"]
+        l = lines[li]
+        iv = ivs.get(l.get("laden_gate")) or []
+        pp["while_shut"] = sum(1 for t in pp["times"] if not any(a <= t < z for a, z in iv))
+        for j, t in enumerate(pp["times"]):
+            if l.get("laden_gate") in by_gate:
+                by_gate[l["laden_gate"]].append({"gate": l["laden_gate"], "kind": "pour", "line": li, "route": l["route_id"],
+                                                 "phase": None, "leg": l.get("laden_leg"), "t": t,
+                                                 "pour_id": pp["id"], "pour_j": j})
+            if l.get("empty_gate") in by_gate:
+                by_gate[l["empty_gate"]].append({"gate": l["empty_gate"], "kind": "empty", "line": li, "route": l["route_id"],
+                                                 "phase": None, "leg": l.get("empty_leg"), "t": pp["plant_times"][j],
+                                                 "pour_id": pp["id"], "pour_j": j})
+
     # 5–6. the queue and each gate's figures
     out_g = {}
     for g, A in by_gate.items():
@@ -701,7 +739,7 @@ def simulate(inp, scen):
             leg = legs.get(a.get("leg")) if a.get("leg") else None
             a["from_m"], a["t_from"] = 0.0, 0.0
             if leg:
-                if a["kind"] == "pour":
+                if a["kind"] == "pour" and not a.get("pour_id"):       # the what-if's mixers: their last stretch only
                     a["from_m"] = max(0.0, leg["len_m"] - MIXER_APPROACH_M)
                     a["t_from"] = time_at_dist(leg["plan"], a["from_m"])
                     a["depart"] = a["t"] - (leg["plan"]["minutes"] - a["t_from"])
@@ -709,7 +747,7 @@ def simulate(inp, scen):
                     a["depart"] = a["t"] - leg["plan"]["minutes"]
             else:
                 mins = inp["leg_minutes"].get(a.get("leg")) if a.get("leg") else None
-                a["depart"] = (a["t"] - mins) if (mins and a["kind"] != "pour") else None
+                a["depart"] = (a["t"] - mins) if (mins and (a["kind"] != "pour" or a.get("pour_id"))) else None
             journeys.append((a, leg))
 
     # haul roads: lorries onto each one, both ways, by the hour they reach it (mixers too, where their stretch crosses)
@@ -738,7 +776,36 @@ def simulate(inp, scen):
         win = tuple(inp.get("empty_window") or EMPTY_DAY_WINDOW)
     return {"per_line": per_line, "rounding_exact": rnd["exact"], "rounding_worst": rnd["worst"],
             "gates": out_g, "pour": pour, "haul": haul, "window": win, "total": sum(per_line),
-            "sites": sites_out, "departures": departures}
+            "sites": sites_out, "departures": departures,
+            "planned": [pump(pp, [a for f in out_g.values() for a in f["queued"]
+                                  if a.get("pour_id") == pp["id"] and a["kind"] == "pour"]) for pp in planned]}
+
+
+def pump(pp, mixers):
+    """
+    4a. One planned pour after the queue: its mixers discharge at the pour's rate one at a time, each when it is ready
+    (checked in, or started at its area on site) and the one before has finished. Per mixer: the wait at the gate,
+    loading → end of discharge (planned loading and drive, then every wait), and the pump's stand before it.
+    """
+    rows, prev = [], None
+    for a in sorted(mixers, key=lambda x: x["pour_j"]):
+        ready = a["stops"][0]["start"] if a.get("stops") else a["done"]
+        dur = pp["m3s"][a["pour_j"]] / pp["rate"] * 60.0
+        ds = ready if prev is None else max(ready, prev)
+        stand = 0.0 if prev is None else max(0.0, ds - prev)
+        de = ds + dur
+        rows.append({"j": a["pour_j"], "at": a["t"], "wait": a["wait"], "start": ds, "end": de, "stand": stand,
+                     "transit": de - a["t"] + pp["there"] + pp["loading"]})
+        prev = de
+    lim, cj = pp["transit_limit"], pp["cold_joint"]
+    return {"id": pp["id"], "line": pp["line"], "loads": pp["loads"], "mixers": rows,
+            "extra": pp.get("extra", 0), "while_shut": pp.get("while_shut", 0),
+            "first": (rows[0]["start"] if rows else None), "end": (rows[-1]["end"] if rows else None),
+            "worst_wait": max([0.0] + [r["wait"] for r in rows]),
+            "transit_max": max([0.0] + [r["transit"] for r in rows]),
+            "over_limit": sum(1 for r in rows if r["transit"] > lim + 1e-6),
+            "stand_max": max([0.0] + [r["stand"] for r in rows]),
+            "cold": any(r["stand"] > cj + 1e-6 for r in rows)}
 
 
 # --------------------------------------------------------------------------------------------------- the scenario
@@ -758,7 +825,7 @@ def _hours_pair(v, who):
 
 def scenario_from_query(hours=None, check_in=None, bands=None, pour_gate=None, pour_start=None, pour_m3=None,
                         pour_m3_per_load=None, pour_rate=None, site_speed=None, service=None, bays=None, wash=None,
-                        arrivals=None, rush_share=None, rush_minutes=None):
+                        arrivals=None, rush_share=None, rush_minutes=None, planned=None):
     """
     The query parameters of GET /api/sim/day as one scenario, or ValueError in words. Nothing here is saved (D86).
       hours     repeated 'GATE=HH:MM-HH:MM', or 'all=HH:MM-HH:MM' for every gate (a gate's own wins over 'all')
@@ -768,9 +835,15 @@ def scenario_from_query(hours=None, check_in=None, bands=None, pour_gate=None, p
       28 Oct 2026 (v2): site_speed repeated 'LOC=kph'; service repeated 'AREA=minutes'; bays 'AREA=n';
       wash 'on' or 'off' (unset: as typed)
       29 Oct 2026: arrivals 'even' (default) or 'rush'; rush_share 1–100 (%), rush_minutes 5–240 — the morning rush
+      29 Oct 2026 (task 3a): planned 'on' (default) or 'off' — the day scale's planned pours (Plan → Pours)
     """
     sc = {"hours": {}, "all": None, "check_in": {}, "bands": None, "pour": None,
-          "site_speed": {}, "service": {}, "bays": {}, "wash": None, "arrivals": {"kind": "even"}}
+          "site_speed": {}, "service": {}, "bays": {}, "wash": None, "arrivals": {"kind": "even"}, "planned": True}
+    if planned not in (None, ""):
+        pl = str(planned).strip().lower()
+        if pl not in ("on", "off"):
+            raise ValueError("planned must be on or off")
+        sc["planned"] = (pl == "on")
     kind = str(arrivals or "even").strip().lower()
     if kind not in ("even", "rush"):
         raise ValueError("arrivals must be even or rush")
@@ -1040,6 +1113,13 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
     scale = scale if scale in ("month", "week", "day") else "month"
     if scale == "day" and date in (None, ""):
         raise ValueError("The day scale needs a date: pick a weekday of the Look-ahead's two weeks.")
+    if scale == "day":
+        # 29 Oct 2026 (task 3a, PR C): the day's own week — the screen sends the date only, so a day of NEXT week was
+        # refused as "not a weekday of the week of" this one (the planned pours live mostly in next week)
+        for c in day_choices_for(today):
+            if c["date"] == str(date)[:10]:
+                bucket = c["bucket"]
+                break
 
     week_block, day_choices, chosen = None, [], None
     if scale == "month":
@@ -1175,6 +1255,32 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         if g not in gate_rows:
             raise ValueError(f"{g} is not one of this scheme's gates.")
 
+    # 4a. 29 Oct 2026 (task 3a, PR C): the day scale's planned pours (Plan → Pours), as planned (pours.figures)
+    planned, planned_rows, planned_skip = [], [], []
+    if scale == "day" and sc.get("planned", True) and chosen is not None:
+        import pours as _pours
+        lim = _pours.limits(factors)
+        drows = _pours.decorate(_pours.list_pours(chosen.isoformat(), chosen.isoformat(), include_cancelled=False), factors)
+        by_key = {(l["route_id"], l["discipline"] or "", l["section_id"] or ""): li for li, l in enumerate(lines)}
+        for pr in drows:
+            li = by_key.get((pr["route_id"], pr.get("discipline") or "", pr.get("section_id") or ""))
+            fig = pr.get("figures")
+            if li is None or not fig:
+                planned_skip.append((pr, "its line has no lorries this day" if li is None else (pr.get("problem") or "it cannot be worked out")))
+                continue
+            l = lines[li]
+            parts = fig["parts"]
+            start, gap, chk = float(fig["start_min"]), float(fig["real_gap"]), float(parts["check_in"])
+            loads, mpl = int(fig["loads"]), float(fig["m3_per_load"])
+            times = [start + j * gap - chk for j in range(loads)]
+            pchk = float((gate_rows.get(l.get("empty_gate")) or {}).get("safety_minutes") or 0)
+            plant = [t - float(parts["there"]) - float(parts["loading"]) - pchk for t in times]
+            planned.append({"id": pr["id"], "line": li, "loads": loads, "times": times, "plant_times": plant,
+                            "m3s": [mpl] * (loads - 1) + [float(fig["last_load_m3"])], "rate": float(pr["rate_m3h"]),
+                            "there": float(parts["there"]), "loading": float(parts["loading"]),
+                            "transit_limit": float(lim["transit_min"]), "cold_joint": float(lim["cold_joint_min"])})
+            planned_rows.append(pr)
+
     typed_bands = gate_hours.peak_bands(factors)
     bands_on = sc["bands"] if sc["bands"] is not None else bool(typed_bands)
     bands_src = ("typed" if typed_bands else "example") if bands_on else None
@@ -1236,7 +1342,7 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
            "fixed": ([l["trips"] for l in lines] if scale == "day" else None),
            # the haul roads some leg of the day was routed along (an unused or switched-off road is not listed)
            "haul_roads": {z: zone_rows[z] for z in sorted(used_zones - access_ids)} if with_lines else {},
-           "sites": sites, "gate_loc": gate_loc, "factors": factors}
+           "sites": sites, "gate_loc": gate_loc, "factors": factors, "planned_pours": planned}
     if p:
         sc = dict(sc, pour=p)
     pattern = sc.get("arrivals") or {"kind": "even"}
@@ -1298,6 +1404,7 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
             "serves_exit_too": any(k == gid for k, _v in closed_seen_to(closed_seen)),
             "departures": res["departures"].get(gid, 0),
             "arrivals": f["arrivals"], "laden": f["laden"], "empty": f["empty"], "pour": f["pour"],
+            "pour_planned": f["pour_planned"],
             "unplaced": f["unplaced"],
             "open_minutes": f["open_minutes"], "intervals": f["intervals"], "last_open": f["last_open"],
             "check_in": f["check_in"], "capacity": f["capacity"], "pct": f["pct"], "gap": f["gap"],
@@ -1326,7 +1433,7 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
     arrivals = []
     for gid in gate_ids:
         for a in res["gates"][gid]["queued"]:
-            arrivals.append({"gate": gid, "kind": a["kind"],
+            arrivals.append({"gate": gid, "kind": a["kind"], "pour_id": a.get("pour_id"),
                              "line": a["line"] if (a["line"] is None or mine(a["line"])) else None,
                              "route": a["route"], "leg": a.get("leg"),
                              "at": _r2(a["t"]), "start": _r2(a["start"]), "wait": _r2(a["wait"]),
@@ -1386,6 +1493,49 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
                 "gap_minutes": _r2(pour["gap"]), "end": hhmm(pour["end"]), "approach_leg": pour["approach_leg"],
                 "while_shut": pour.get("while_shut", 0)}
 
+    # 4a. 29 Oct 2026 (task 3a, PR C): each planned pour as simulated, one sentence each (the screen works out nothing)
+    out_planned = []
+    for pr, r in zip(planned_rows, res["planned"]):
+        import pours as _pours
+        fig = pr["figures"]
+        lim = fig["limits"]
+        own = mine(r["line"])
+        late = (r["end"] - float(fig["ends_min"])) if r["end"] is not None else 0.0
+        ww = js_round(r["worst_wait"])
+        words = (f"Longest loading → end of discharge: {_pours.hm(r['transit_max'])}"
+                 + (f" (a {ww} min wait at {pr.get('gate_name') or 'the gate'})" if ww >= 1 else "")
+                 + (f" · ends {hhmm(r['end'])}, {_pours.hm(late)} later than planned" if late >= 1 else ""))
+        flags = []
+        if r["over_limit"]:
+            flags.append({"code": "POUR_TRANSIT",
+                          "text": f"{r['over_limit']} of {r['loads']} mixers over the {_pours.hm(lim['transit_min'])} limit."})
+        if r["cold"]:
+            flags.append({"code": "POUR_COLD_JOINT",
+                          "text": f"The pump stands {_pours.hm(r['stand_max'])} between mixers, over "
+                                  f"{_pours.hm(lim['cold_joint_min'])}."})
+        out_planned.append({
+            "id": pr["id"], "route_id": pr["route_id"], "line": r["line"],
+            "place": (pr.get("place") if own else None), "m3": (pr.get("m3") if own else None),
+            "rate_m3h": (pr.get("rate_m3h") if own else None), "status": pr.get("status"),
+            "gate": lines[r["line"]]["laden_gate"], "gate_name": pr.get("gate_name"), "site_name": pr.get("dest_name"),
+            "mixers": r["loads"], "gap_minutes": _r2(fig["real_gap"]),
+            "start": pr.get("start"), "first": hhmm(r["first"]), "end": hhmm(r["end"]),
+            "end_planned": fig["ends"], "late_by": _r2(max(0.0, late)),
+            "worst_wait": _r2(r["worst_wait"]), "transit_max": _r2(r["transit_max"]),
+            "transit_limit": lim["transit_min"], "over_limit": r["over_limit"],
+            "stand_max": _r2(r["stand_max"]), "cold_joint": lim["cold_joint_min"], "cold": r["cold"],
+            "words": words, "flags": flags})
+        who = f"The pour {pr['id']}" + (f" ({pr['place']})" if own and pr.get("place") else "")
+        if r["while_shut"]:
+            notes.append(f"{who}: {r['while_shut']} of its {r['loads']} mixers reach {pr.get('gate_name') or 'the gate'} "
+                         f"while it is shut (before it opens, in a no-delivery band or a shut time); they wait for it to open.")
+        if r["extra"]:
+            notes.append(f"{who}: {r['extra']} more mixer{'s' if r['extra'] != 1 else ''} than its line's day as typed; "
+                         f"the simulation runs the pour as planned.")
+    for pr, why in planned_skip:
+        notes.append(f"The pour {pr['id']}{(' (' + pr['place'] + ')') if (pr.get('place') and access_ok(acc, pr)) else ''} "
+                     f"is not simulated: {why}.")
+
     # 28 Oct 2026 (v2): the sites' blocks and their words
     out_sites = [sim_site.site_reply(sites[lid], res["sites"][lid], send_lines) for lid in sorted(sites, key=lambda k: sites[k]["name"])]
     for s in out_sites:
@@ -1403,7 +1553,14 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
     n_pour = pour["loads"] if pour else 0
     total_arr = sum(g["arrivals"] for g in out_gates)
     expect = sum(res["per_line"][i] * len(l["touch"]) for i, l in enumerate(lines)) + n_pour
-    diffs = [abs((g["laden"] + g["empty"]) - g["panel_per_day"]) for g in out_gates if g["panel_per_day"] is not None]
+    # a planned pour's mixers are part of the plan's day; any beyond its line's day as typed are left out, like the what-if
+    extra_at = {}
+    for r in res["planned"]:
+        for g in (lines[r["line"]]["laden_gate"], lines[r["line"]]["empty_gate"]):
+            if g:
+                extra_at[g] = extra_at.get(g, 0) + r["extra"]
+    diffs = [abs((g["laden"] + g["empty"] + g["pour_planned"] - extra_at.get(g["gate_id"], 0)) - g["panel_per_day"])
+             for g in out_gates if g["panel_per_day"] is not None]
     if refused:
         notes.append("Open hours past midnight are not simulated (one day, midnight to midnight): "
                      + ", ".join(f"{(locations.get((gate_rows.get(g) or {}).get('location_id')) or {}).get('name') or g}" for g in refused)
@@ -1444,6 +1601,8 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         "loads": res["total"], "loads_month": sum(l["trips"] for l in lines),
         "gate_arrivals": total_arr,
         "lines": out_lines, "gates": out_gates, "arrivals": arrivals, "pour": pour, "haul_roads": haul,
+        # 29 Oct 2026 (task 3a, PR C): the day scale's planned pours as simulated ([] on month / week, or switched off)
+        "planned_pours": out_planned, "planned_on": bool(sc.get("planned", True)),
         "sites": out_sites,
         "access_roads_hidden": (len(used_zones & access_ids) if with_lines else 0),
         # 17 Oct 2026: where a pour can go (working sites only), busiest first; the first is the screen's default
@@ -1477,6 +1636,12 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         "rounding": {"exact": res["rounding_exact"], "worst": round(res["rounding_worst"], 3)},
         "notes": notes, "limits": list(LIMITS),
     }
+
+
+def access_ok(acc, pour_row):
+    """A team code reads its own pours' words only (a pour's place names the work)."""
+    my = (acc or {}).get("ipt")
+    return (not my) or access.canonical_ipt(pour_row.get("ipt")) == my
 
 
 def pattern_words(pattern):
