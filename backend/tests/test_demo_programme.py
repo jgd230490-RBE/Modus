@@ -155,14 +155,15 @@ ok("the north opens in December 2028: no WS4–WS6 pavement line after November 
 ok("⭐ 942 approved line-months on 49 routes (R020, the Carbon planner's alternative, carries none)",
    len(APPROVED) == 942 and len({f["route_id"] for f in APPROVED}) == 49
    and "R020" not in {f["route_id"] for f in APPROVED} and len(T["routes"]) == 50)
-ok("⭐ 2,745,500 t over the programme (concrete at 2.4 t/m³; RE-PINNED 28 Oct: + 22,600 t for the viaduct site) and 114,000 m³ of ready-mixed concrete",
-   round(sum(tonnes(f) for f in APPROVED)) == 2745500
+# RE-PINNED 29 Oct 2026 (the muck-away peak, John: at least six lorries queuing — the viaduct's south approach cutting to tip, Mar–May 2027 38,000 / 42,000 / 38,000 t on R050; session-1028-sim-v2.md §8)
+ok("⭐ 2,859,000 t over the programme (concrete at 2.4 t/m³; RE-PINNED 28 Oct: + 22,600 t for the viaduct site; 29 Oct: + 113,500 t, the south approach cutting) and 114,000 m³ of ready-mixed concrete",
+   round(sum(tonnes(f) for f in APPROVED)) == 2859000
    and round(sum(float(f["quantity"]) for f in APPROVED if f["unit"] == "m3")) == 114000)
 _lt = {}
 for f in APPROVED:
     _lt[TEAM[f["ipt"]]] = _lt.get(TEAM[f["ipt"]], 0) + loads(f)
-ok("⭐ 101,641 loads by the app's rule: North 49,932 (RE-PINNED 28 Oct: + 802 for the viaduct site), Central 32,893, South 18,816",
-   sum(_lt.values()) == 101641 and _lt == {"North Team": 49932, "Central Team": 32893, "South Team": 18816}, str(_lt))
+ok("⭐ 105,555 loads by the app's rule: North 53,846 (RE-PINNED 28 Oct: + 802 for the viaduct site; 29 Oct: + 3,914 tipper loads for the cutting), Central 32,893, South 18,816",
+   sum(_lt.values()) == 105555 and _lt == {"North Team": 53846, "Central Team": 32893, "South Team": 18816}, str(_lt))
 _byk = {}
 for f in APPROVED:
     _byk.setdefault((f["route_id"], f["discipline"], f["section_id"]), set()).add(f["vehicle_type"])
