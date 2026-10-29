@@ -1046,7 +1046,10 @@ _wb, _ = months_body()
 ok("6b. ⭐ warm(): builds the council read for the tenant, and the next viewer's read is a hit with the same bytes",
    # NARROWED 27 Oct 2026 (group 2a): main also registers the closures check as a warmer ("restrictions_check"), so the
    # result holds both names, each "ok"; the council read is still built and served the same way
-   _w == {"areas/months": "ok", "restrictions_check": "ok"} and read_cache.STATS["builds"] == _bw and _wb == fresh())
+   # NARROWED 28 Oct 2026 (the demo narrative's F1): + "staff", the admin's Dashboard / Look-ahead / Routes reads
+   {k: _w.get(k) for k in ("areas/months", "restrictions_check")} == {"areas/months": "ok", "restrictions_check": "ok"}
+   and set(_w) == {"areas/months", "restrictions_check", "staff"}
+   and read_cache.STATS["builds"] == _bw and _wb == fresh())
 ok("6b. a warmer that fails says so and never raises",
    (lambda: (read_cache.WARMERS.__setitem__("t/boom", lambda: 1 / 0), read_cache.warm(db.current_tenant()),
              read_cache.WARMERS.pop("t/boom"))[1])().get("t/boom", "").startswith("ZeroDivisionError"))
