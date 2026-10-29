@@ -1132,6 +1132,23 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and (sdy.get("rounding") or {}).get("exact") is True and sdy.get("checks", {}).get("table_equals_arrivals") is True, r.text[:300])
     r = c.get("/api/sim/day?scale=day&date=2030-12-31", headers=PLAN)
     ok("🔴 v2: a day outside the Look-ahead's two weeks is refused in words — 400", r.status_code == 400 and "pick a day" in r.text, r.text[:200])
+    # ---- 29 Oct 2026: the morning rush (a scenario where lorries bottleneck AT THE GATE; on screen only, D86)
+    r = c.get("/api/sim/day?month=16&arrivals=rush&rush_share=30&rush_minutes=30", headers=PLAN)
+    sr = r.json() if r.status_code == 200 else {}
+    _busy = max(sr.get("gates", []), key=lambda g: g.get("arrivals", 0), default={})
+    ok("⭐ RUSH: arrivals=rush&rush_share=30&rush_minutes=30 answers the same loads as the even day, says so in the reply, "
+       "puts about 30 % of the busiest gate's lorries in its first 30 minutes, and that gate queues (the even day never does)",
+       r.status_code == 200 and sr.get("loads") == sd.get("loads") and (sr.get("arrival_pattern") or {}).get("kind") == "rush"
+       and (sr.get("arrival_pattern") or {}).get("share") == 30 and "morning rush" in (sr.get("arrival_pattern") or {}).get("words", "")
+       and _busy and abs(_busy.get("rush_n", 0) - 0.3 * _busy.get("arrivals", 0)) <= 1 and (_busy.get("most_waiting") or 0) >= 2
+       and all(g.get("queue_start") is None for g in sd.get("gates", []) if g.get("check_in")), r.text[:300])
+    ok("RUSH: the even day says so too and places no lorry in a rush (rush_n 0); every gate carries a first-trip share or None",
+       (sd.get("arrival_pattern") or {}).get("kind") == "even" and all(g.get("rush_n") == 0 for g in sd.get("gates", []))
+       and all(("first_trip_share" in g) and (g["first_trip_share"] is None or 0 < g["first_trip_share"] <= 1) for g in sd.get("gates", [])))
+    r = c.get("/api/sim/day?month=16&arrivals=rush&rush_share=0", headers=PLAN)
+    ok("🔴 RUSH: a share of 0 % is refused in words — 400", r.status_code == 400 and "between 1 and 100" in r.text, r.text[:200])
+    r = c.get("/api/sim/day?month=16&arrivals=lunch", headers=PLAN)
+    ok("🔴 RUSH: an unknown pattern is refused in words — 400", r.status_code == 400 and "even or rush" in r.text, r.text[:200])
     r = c.get("/api/site-areas")
     ok("🔴 v2: the site areas without a code — 401", r.status_code == 401, str(r.status_code))
     r = c.get("/api/site-areas", headers=PLAN)

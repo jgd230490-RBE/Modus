@@ -22,6 +22,12 @@ WHAT A DAY IS (each step is one function below)
    minutes. A boundary minute belongs to the NEXT interval (a band 07:00–10:00 on 05:00–17:00: open minute 120 is
    10:00, never 07:00). So no lorry is placed before its gate opens: it sets off its drive time earlier (step 7) —
    before 08:00 for a gate opening at 08:00 — and arrives from the opening (the user, 17 Oct 2026).
+   29 Oct 2026 (the user: a scenario where lorries bottleneck AT THE GATE): the scenario's ARRIVAL PATTERN — `even`
+   (the above, the default) or a MORNING RUSH: the first round(share × n) of the gate's arrivals, in the same order
+   (so every line's first trips come first, interleaved), evenly over the first `minutes` OPEN minutes (bands and shut
+   times skipped as above), the rest evenly over the remaining open minutes. A window at or past the gate's open
+   minutes, or a share of nothing, is the even spread. On screen only (D86); every gate; every scale. The Dashboard's
+   capacity words, the Look-ahead's gate flags and the public map keep the even spread.
 4. THE POUR (a typed what-if until V5 holds pours): ceil(m³ ÷ m³ a load) mixers, one every (m³ a load ÷ pour rate)
    hours from the start, on top of the gate's day. The default mixer is the app's "Truck mixer 8 m³ (32t)"
    (payload_m3 7.5 in factors.json). A pour whose last mixer would come after 23:59 is refused.
@@ -89,6 +95,10 @@ MIXER_NAME = "Truck mixer 8 m³ (32t)"
 MIXER_M3_FALLBACK = 7.5
 MAX_POUR_MIXERS = 400
 MAX_CHECK_IN = 240.0
+#: 29 Oct 2026: the morning rush's defaults (the plan's own first trips at the demo's busiest gate: 30 % in 30 min)
+RUSH_DEFAULT_SHARE = 30.0
+RUSH_DEFAULT_MINUTES = 30.0
+RUSH_MIN_MINUTES, RUSH_MAX_MINUTES = 5.0, 240.0
 #: a lorry waiting less than this has not waited (float dust between equal minutes)
 WAIT_EPS = 0.01
 #: drawing: the pour's mixers appear this far out on the shortest road into the gate (2.5 miles)
@@ -320,16 +330,34 @@ def next_service(iv, s):
     return s
 
 
-def place(arrivals, iv):
+def place(arrivals, iv, pattern=None):
     """
     D59: the gate's arrivals evenly over its open minutes, the lines interleaved — sorted by each lorry's place in its
     own line's day (phase), then line, then kind; arrival i of n at (i + ½) / n of the open minutes. Sets `t`.
+    29 Oct 2026: `pattern` {"kind": "rush", "share": 0–1, "minutes": W} puts the first k = round(share × n) arrivals
+    (the same order: every line's first trips first) evenly over the first W open minutes and the rest evenly over
+    the remaining O − W; W is capped at O, and W ≥ O or k = 0 is the even spread. Marks the rush's lorries `rush`.
     """
     O = sum(b - a for a, b in iv)
     arrivals.sort(key=lambda a: (a["phase"], a["line"], a["kind"]))
     n = len(arrivals)
+    for a in arrivals:
+        a["rush"] = False
+    rush = pattern if (pattern and pattern.get("kind") == "rush") else None
+    W = min(float(rush["minutes"]), O) if rush else 0.0
+    k = int(round(float(rush["share"]) * n)) if rush else 0
+    if not rush or O <= 0 or n == 0 or W >= O or k <= 0:
+        for i, a in enumerate(arrivals):
+            a["t"] = clock_at_open(iv, (i + 0.5) / n * O) if O > 0 else None
+        return arrivals
+    k = min(n, k)
     for i, a in enumerate(arrivals):
-        a["t"] = clock_at_open(iv, (i + 0.5) / n * O) if O > 0 else None
+        if i < k:
+            u = (i + 0.5) / k * W
+            a["rush"] = True
+        else:
+            u = W + (i - k + 0.5) / (n - k) * (O - W)
+        a["t"] = clock_at_open(iv, u)
     return arrivals
 
 
@@ -430,6 +458,8 @@ def gate_figures(A, iv, check_in):
         "longest_wait": max([0.0] + [a["wait"] for a in A]),
         "late": len(late),
         "last_done": (max(a["done"] for a in A) if A else None),
+        # 29 Oct 2026: how many of the gate's lorries the morning rush placed in its first minutes (0 under the even spread)
+        "rush_n": sum(1 for a in A if a.get("rush")),
     }
 
 
@@ -618,7 +648,7 @@ def simulate(inp, scen):
     for g, A in by_gate.items():
         # 17 Oct 2026: the gate's own shut windows come off with the bands (open_intervals: an overlap counts once)
         ivs[g] = open_intervals(G[g]["window"], bands + list(G[g].get("shut") or [])) if G[g]["window"] is not None else []
-        place(A, ivs[g])
+        place(A, ivs[g], scen.get("arrivals"))
 
     # 4. the pour, a burst on top
     pour = None
@@ -727,7 +757,8 @@ def _hours_pair(v, who):
 
 
 def scenario_from_query(hours=None, check_in=None, bands=None, pour_gate=None, pour_start=None, pour_m3=None,
-                        pour_m3_per_load=None, pour_rate=None, site_speed=None, service=None, bays=None, wash=None):
+                        pour_m3_per_load=None, pour_rate=None, site_speed=None, service=None, bays=None, wash=None,
+                        arrivals=None, rush_share=None, rush_minutes=None):
     """
     The query parameters of GET /api/sim/day as one scenario, or ValueError in words. Nothing here is saved (D86).
       hours     repeated 'GATE=HH:MM-HH:MM', or 'all=HH:MM-HH:MM' for every gate (a gate's own wins over 'all')
@@ -736,9 +767,23 @@ def scenario_from_query(hours=None, check_in=None, bands=None, pour_gate=None, p
       pour_*    gate, start HH:MM, m³, m³ a load (default: the app's mixer), pour rate in m³ an hour
       28 Oct 2026 (v2): site_speed repeated 'LOC=kph'; service repeated 'AREA=minutes'; bays 'AREA=n';
       wash 'on' or 'off' (unset: as typed)
+      29 Oct 2026: arrivals 'even' (default) or 'rush'; rush_share 1–100 (%), rush_minutes 5–240 — the morning rush
     """
     sc = {"hours": {}, "all": None, "check_in": {}, "bands": None, "pour": None,
-          "site_speed": {}, "service": {}, "bays": {}, "wash": None}
+          "site_speed": {}, "service": {}, "bays": {}, "wash": None, "arrivals": {"kind": "even"}}
+    kind = str(arrivals or "even").strip().lower()
+    if kind not in ("even", "rush"):
+        raise ValueError("arrivals must be even or rush")
+    if kind == "rush":
+        share = RUSH_DEFAULT_SHARE if rush_share in (None, "") else _num(rush_share, "The morning rush share")
+        if not (1 <= share <= 100):
+            raise ValueError("The morning rush share must be between 1 and 100 %.")
+        mins = RUSH_DEFAULT_MINUTES if rush_minutes in (None, "") else _num(rush_minutes, "The morning rush minutes")
+        if not (RUSH_MIN_MINUTES <= mins <= RUSH_MAX_MINUTES):
+            raise ValueError(f"The morning rush must last between {RUSH_MIN_MINUTES:g} and {RUSH_MAX_MINUTES:g} minutes.")
+        sc["arrivals"] = {"kind": "rush", "share": share / 100.0, "minutes": float(mins)}
+    elif rush_share not in (None, "") or rush_minutes not in (None, ""):
+        raise ValueError("rush_share and rush_minutes go with arrivals=rush.")
     for item in site_speed or []:
         if not item:
             continue
@@ -1194,7 +1239,32 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
            "sites": sites, "gate_loc": gate_loc, "factors": factors}
     if p:
         sc = dict(sc, pour=p)
-    res = simulate(inp, {"bands": bands, "pour": sc.get("pour")})
+    pattern = sc.get("arrivals") or {"kind": "even"}
+    res = simulate(inp, {"bands": bands, "pour": sc.get("pour"), "arrivals": pattern})
+
+    # 29 Oct 2026: the plan's own first trips at each gate — its lorries (each line's loads a day ÷ the trips one lorry
+    # makes a day, rounded up: the Dashboard's vehicles rule through derived.cycle_for) over its arrivals; None where a
+    # line at the gate has no cycle worked out. A planning aid for the morning-rush share, never a figure of the day.
+    first_trips = {}
+    try:
+        _cc = {}
+        _wk = (int(week_block["week_index"]) if (scale != "month" and week_block) else None)
+        _mi = (int(week_block["month_index"]) if (scale != "month" and week_block) else int(month_index))
+        for li, l in enumerate(lines):
+            row = derived.cycle_for(l["route_id"], l.get("vehicle_drawn") or l.get("vehicle"), _cc, month_index=_mi, week_index=_wk)
+            tpd = int((row or {}).get("trips_per_day") or 0)
+            loads = res["per_line"][li]
+            lorries = (math.ceil(loads / tpd) if (tpd > 0 and loads > 0) else (0 if loads == 0 else None))
+            for g in (l["laden_gate"], l["empty_gate"]):
+                if not g:
+                    continue
+                ft = first_trips.setdefault(g, {"lorries": 0, "known": True})
+                if lorries is None:
+                    ft["known"] = False
+                else:
+                    ft["lorries"] += lorries
+    except Exception:
+        first_trips = {}
 
     # ---- the reply
     panel_by = {g["gate_id"]: g for g in panel.get("gates") or []}
@@ -1239,6 +1309,14 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
             "most_waiting": f["most_waiting"], "most_at": _r2(f["most_at"]),
             "minutes_lost": _r2(f["minutes_lost"]), "longest_wait": _r2(f["longest_wait"]),
             "late": f["late"], "last_done": _r2(f["last_done"]),
+            # 29 Oct 2026: the morning rush's lorries at this gate, and the plan's first-trip share (None when unknown)
+            "rush_n": f.get("rush_n", 0),
+            "first_trip_share": (round(min(1.0, first_trips[gid]["lorries"] / (f["laden"] + f["empty"])), 2)
+                                 if (gid in first_trips and first_trips[gid]["known"] and (f["laden"] + f["empty"]) > 0) else None),
+            "first_trip_lorries": (first_trips[gid]["lorries"] if (gid in first_trips and first_trips[gid]["known"]) else None),
+            # the same share as a whole per cent for the screen (the browser works out no figure)
+            "first_trip_pct": (int(round(min(1.0, first_trips[gid]["lorries"] / (f["laden"] + f["empty"])) * 100))
+                               if (gid in first_trips and first_trips[gid]["known"] and (f["laden"] + f["empty"]) > 0) else None),
         })
     out_gates.sort(key=lambda g: (-g["arrivals"], g["gate_id"]))
 
@@ -1378,6 +1456,8 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
                    "from": hhmm(res["window"][0]), "to": hhmm(res["window"][1])},
         "bands": {"on": bands_on, "source": bands_src, "bands": bands, "typed": typed_bands,
                   "words": gate_hours.peak_words(bands)},
+        # 29 Oct 2026: the arrival pattern the day was placed by (on screen only, like the rest of the scenario)
+        "arrival_pattern": pattern_words(pattern),
         "mixer": {"m3_per_load": mx, "vehicle": mx_name,
                   "vehicle_label": conversions.vehicle_label(factors, mx_name) if mx_name else None},
         # 17 Oct 2026: the default gate hours (was "stand_in", the lorry shift placed at 07:00)
@@ -1397,6 +1477,18 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         "rounding": {"exact": res["rounding_exact"], "worst": round(res["rounding_worst"], 3)},
         "notes": notes, "limits": list(LIMITS),
     }
+
+
+def pattern_words(pattern):
+    """The reply's `arrival_pattern`: kind, the share in %, the minutes, and one sentence for the screen."""
+    if pattern and pattern.get("kind") == "rush":
+        share = int(round(float(pattern["share"]) * 100))
+        mins = float(pattern["minutes"])
+        return {"kind": "rush", "share": share, "minutes": (int(mins) if mins == int(mins) else mins),
+                "words": f"A morning rush: {share} % of each gate's lorries in the first {mins:g} min, the rest spread "
+                         f"evenly over its open hours"}
+    return {"kind": "even", "share": None, "minutes": None,
+            "words": "Each gate's arrivals are spread evenly over its open hours"}
 
 
 def closed_seen_to(closed_seen):

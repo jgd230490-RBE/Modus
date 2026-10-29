@@ -258,6 +258,19 @@ weekdays. <code>GET /api/sim/day</code> takes <code>scale=month|week|day</code> 
 <code>sites[]</code> (stations with the gate's figures, the paths for the drawing in every reply, <code>no_area</code> lines),
 each arrival's <code>stops</code> and <code>hops</code>, <code>day_choices</code> and <code>checks.sites_add_up</code>.
 <code>/api/site-areas</code> lists (any sign-in); the admin writes are <code>/api/admin/site-areas</code>.</p>
+<p id="t1-sim-rush">29 Oct 2026 (the user: a scenario where lorries bottleneck at the gate): the scenario's arrival pattern.
+<code>sim.place</code> takes a pattern: <code>even</code> (D59, the default, as above) or <code>rush</code> — the first
+k = round(share × n) of a gate's arrivals, in the same phase order (every line's first trips first, the lines interleaved),
+evenly over the first W OPEN minutes (bands and shut times skipped), the other n − k evenly over the remaining O − W; W is
+capped at O, and W ≥ O or k = 0 is the even spread. Query: <code>arrivals=even|rush</code>, <code>rush_share</code> (1–100,
+%), <code>rush_minutes</code> (5–240; defaults 30 / 30, <code>RUSH_DEFAULT_SHARE</code> / <code>RUSH_DEFAULT_MINUTES</code>);
+a value outside its range is a 400 in words. The reply carries <code>arrival_pattern</code> {kind, share, minutes, words}
+and, per gate, <code>rush_n</code> (its lorries placed in the window) and <code>first_trip_share</code> — the plan's lorries at
+the gate (each line's loads a day ÷ the trips one lorry makes a day, rounded up, through <code>derived.cycle_for</code>) over
+its arrivals, <code>null</code> where a line at the gate has no cycle; the card prints it as a note. Every gate, every scale; the
+pour on top; the site chain (<code>sim_site</code>) follows the gate's check-in times. On screen only (D86): nothing is saved,
+and the Dashboard's Gate arrivals, the Look-ahead's GATE OVER / NEAR flags, the public map and the big screen keep the even
+spread. The figures are a what-if on a planning day, never a prediction.</p>
 
 <h2 id="t1-stock">Stockpiles</h2>
 <p>27 Oct 2026: the balance runs FORWARD from the plan (<code>backend/stockpiles.py</code>, <code>balances()</code>; John's decisions D1–D11 of
