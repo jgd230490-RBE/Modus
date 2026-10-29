@@ -13,7 +13,8 @@ WHAT THIS PROVES
   * the parameters split entries (the Look-ahead with and without the restriction check; two Carbon planner bodies;
     two months of gate arrivals); a refused Carbon planner body is a 400 and keeps nothing;
   * the store's cap (entries and bytes, least recently used first) and `keep` (served, not kept);
-  * the bulletin PDF is kept only when no map fell back to the schematic while it was drawn;
+  * the bulletin PDF is kept only when no map fell back to the schematic while it was drawn; the CLP pack reads the
+    CLP monitoring reply from memory (29 Oct), so a second pack builds nothing;
   * the warmer builds the admin's Dashboard / Look-ahead / Routes set, after which those reads build nothing;
   * at source: every one of the cached endpoints goes through the helpers.
 
@@ -343,6 +344,16 @@ try:
        and "bulletin-2026-10.pdf" in r4.headers.get("Content-Disposition", ""))
 finally:
     main.export.build_bulletin_pdf = _real_build
+
+# 29 Oct 2026 (F1 follow-up): the CLP pack reads the CLP monitoring reply from memory, so a second pack builds nothing
+read_cache.clear()
+_p1 = as_(ADMIN, lambda: main.clp_pack_pdf(month=10))
+s_p = stats()
+_p2 = as_(ADMIN, lambda: main.clp_pack_pdf(month=10))
+ok("⭐ the CLP pack: a second download builds nothing (neither the CLP figures nor the PDF), same bytes",
+   stats()["builds"] == s_p["builds"] and _p1.body == _p2.body and _p1.body[:5] == b"%PDF-", f"{s_p} {stats()}")
+ok("...and the figures it was drawn from are the Dashboard's CLP monitoring answer for that month (one entry)",
+   as_(ADMIN, lambda: main.clp_monitoring(month=10)) is as_(ADMIN, lambda: main._clp_pack_reply(10)))
 
 # =========================================================================== #
 #  6. The warmer                                                               #

@@ -4551,11 +4551,12 @@ def _clp_monitoring_build(month, acc):
 
 
 def _clp_pack_reply(month):
-    acc = _require_access()
+    _require_access()
     if month is None or not (1 <= int(month) <= MONTH_COUNT):
         raise HTTPException(400, f"month must be 1..{MONTH_COUNT}")
-    factors = conversions.load_factors()
-    return clp.monitoring(int(month), acc, factors=factors, working_days=_working_days(factors))
+    # 29 Oct 2026 (F1 follow-up): the CLP monitoring reply kept in memory (the Dashboard's own read), not worked out
+    # again; on live it took 6.5-7.9 s before the pack's own cached PDF was even reached. The builders only read it.
+    return clp_monitoring(month=int(month))
 
 
 @app.get("/api/clp/pack.pdf")
