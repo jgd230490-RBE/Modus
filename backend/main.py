@@ -4502,6 +4502,21 @@ def pour_lines():
     return {"lines": pours.line_choices(acc)}
 
 
+@app.get("/api/pours/preview")
+def preview_pour_ep(route_id: str, pour_date: str, start: str, m3: float, rate_m3h: float, discipline: str = "",
+                    section_id: str = "", mixers_booked: Optional[int] = None, washout_min: Optional[float] = None,
+                    exclude_id: Optional[str] = None):
+    """The figures of a pour as the Pours form is typed: nothing saved. The line must be visible to the caller."""
+    _pour_line_access(route_id, pour_date, discipline, section_id)
+    out = pours.preview({"route_id": route_id, "discipline": discipline, "section_id": section_id,
+                         "pour_date": pour_date, "start": start, "m3": m3, "rate_m3h": rate_m3h,
+                         "mixers_booked": mixers_booked, "washout_min": washout_min}, conversions.load_factors(),
+                        exclude_id=exclude_id)
+    if out.get("error"):
+        raise HTTPException(400, out["error"])
+    return out
+
+
 @app.post("/api/pours")
 def create_pour_ep(body: PourIn):
     _pour_line_access(body.route_id, body.pour_date, body.discipline, body.section_id)

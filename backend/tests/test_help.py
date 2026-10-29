@@ -917,7 +917,8 @@ for _nm, _pg, _roles in (("the user guide", src, True), ("the technical guide", 
 # NARROWED 22 Oct 2026 (UI fix 7): the technical guide gains one row, T2 "What the screens leave out"
 ok("decision 10: the only new visible words are the two skip links; the guides' chapter rows are as many as before (59 and 19, + 1 since UI fix 7; 58 + 4 and 28 + 1 since the abnormal loads' chapter 14 and its T1 entry, 22 Oct)",
    # NARROWED 27 Oct 2026 (stockpile forecast): + chapter 15 Stockpiles and its three sections (66); merged with main's technical-guide row (30)
-   len(re.findall(r'<li class="l[12]"', src)) == 66 and len(re.findall(r'<li class="l[12]"', _tg2)) == 31   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   # NARROWED 29 Oct 2026 (task 3a): + chapter 16 Concrete pours and its three sections (70); + T1 "Concrete pours" (32)
+   len(re.findall(r'<li class="l[12]"', src)) == 70 and len(re.findall(r'<li class="l[12]"', _tg2)) == 32   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,

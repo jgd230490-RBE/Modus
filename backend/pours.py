@@ -489,8 +489,10 @@ def _bands(gate, factors):
     return [(a, z) for a, z in out if a is not None and z is not None and z > a]
 
 
-def decorate(rows, factors=None, cache=None):
-    """Each pour + its line's words, its gate, the drive times and figures(); OVER PLAN across a line's month."""
+def decorate(rows, factors=None, cache=None, exclude_ids=()):
+    """Each pour + its line's words, its gate, the drive times and figures(); OVER PLAN across a line's month.
+    A row marked `_preview` (preview()) counts its own m³ in its line's month; `exclude_ids` (the stored pour it stands
+    for) are left out of the sums."""
     import conversions
     import gates as _gates
     factors = factors or conversions.load_factors()
@@ -508,8 +510,14 @@ def decorate(rows, factors=None, cache=None):
                                (db.current_tenant(),))}
     month_sum = {}
     for p in list_pours(include_cancelled=False):
+        if p["id"] in (exclude_ids or ()):
+            continue
         k = (p["route_id"], p["month_index"], p["discipline"] or "", p["section_id"] or "")
         month_sum[k] = month_sum.get(k, 0.0) + float(p["m3"])
+    for p in rows:
+        if p.get("_preview") and p.get("status") in LIVE:
+            k = (p["route_id"], p["month_index"], p["discipline"] or "", p["section_id"] or "")
+            month_sum[k] = month_sum.get(k, 0.0) + float(p["m3"])
     out = []
     for p in rows:
         p = dict(p)
@@ -563,6 +571,28 @@ def decorate(rows, factors=None, cache=None):
         p["worst"] = worst_flag(flags)
         out.append(p)
     return out
+
+
+def preview(fields, factors, exclude_id=None):
+    """
+    The figures of a pour as typed, nothing saved (the Pours form asks as it is typed): {error} or the decorated pour.
+    `exclude_id` = the stored pour being edited, left out of OVER PLAN's sum (the typed one counts instead).
+    """
+    f = {k: fields.get(k) for k in ("route_id", "discipline", "section_id", "pour_date", "start", "m3", "rate_m3h",
+                                    "mixers_booked", "washout_min", "place", "status")}
+    f["discipline"], f["section_id"] = f.get("discipline") or "", f.get("section_id") or ""
+    f["status"] = (f.get("status") or "planned").strip().lower()
+    p = problem(f, factors)
+    if p:
+        return {"error": p}
+    d = datetime.date.fromisoformat(str(f["pour_date"]))
+    row = {"id": None, "route_id": f["route_id"], "discipline": f["discipline"], "section_id": f["section_id"],
+           "month_index": month_of(d), "pour_date": d.isoformat(), "start": clock(minutes_of(f["start"])),
+           "m3": float(f["m3"]), "rate_m3h": float(f["rate_m3h"]),
+           "mixers_booked": None if f.get("mixers_booked") in (None, "") else int(float(f["mixers_booked"])),
+           "washout_min": None if f.get("washout_min") in (None, "") else float(f["washout_min"]),
+           "place": f.get("place"), "status": f["status"], "_preview": True}
+    return decorate([row], factors, exclude_ids=(exclude_id,) if exclude_id else ())[0]
 
 
 def page(acc=None, from_date=None, to_date=None, factors=None):

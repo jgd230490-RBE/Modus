@@ -452,12 +452,96 @@ ok("the generator plans three pours (fictional), one this week, one next week, t
    gen.count("(fictional)\", \"Pump") + gen.count("(fictional)\", \"Two pumps") == 3 and "as-of thursday" in gen
    and "next tuesday" in gen and "2028-04-19" in gen)
 import make_demo_tenant as _mdt  # noqa: E402
+db._SQLITE_PATH = os.path.join(TMP, "scratch.db")      # the generator points the database at its own file on import
 ok("demo_pour_date: the as-of week's Thursday, next week's Tuesday, a fixed date",
    _mdt.demo_pour_date("as-of thursday", datetime.date(2026, 10, 29)) == datetime.date(2026, 10, 29)
    and _mdt.demo_pour_date("next tuesday", datetime.date(2026, 10, 29)) == datetime.date(2026, 11, 3)
    and _mdt.demo_pour_date("2028-04-19", datetime.date(2026, 10, 29)) == datetime.date(2028, 4, 19))
 ok("the module says the limits are not a standard and names the sources",
    all(s in read("backend/pours.py") for s in ("NOT A STANDARD", "BS 8500:2023", "Concrete Society", "1710.3")))
+
+# =========================================================================== #
+#  9. PR B: the preview, the Day sheet, the screens (source level)              #
+# =========================================================================== #
+pv = as_(PLANNER, main.preview_pour_ep, "R1", "2027-03-11", "07:30", 120, 30, discipline="structures", section_id="WS4",
+         washout_min=10)
+ok("⭐ the preview (nothing saved): the worked example's figures for a pour as typed",
+   pv["id"] is None and pv["figures"]["needed"] == 9 and pv["figures"]["ends"] == "11:30"
+   and len(pours.list_pours()) == 2, str(pv.get("figures")))
+pv2 = as_(PLANNER, main.preview_pour_ep, "R1", "2027-03-16", "07:30", 900, 30, discipline="structures", section_id="WS4")
+ok("the preview counts its own m³ in OVER PLAN: 120 + 900 over the line's 1000",
+   "POUR_OVER_PLAN" in [x["code"] for x in pv2["flags"]], str(pv2["flags"]))
+pv3 = as_(PLANNER, main.preview_pour_ep, "R1", "2027-03-11", "07:30", 900, 30, discipline="structures", section_id="WS4",
+          exclude_id="P001")
+ok("...and leaves out the stored pour it stands for (P001's 120 replaced by 900: no OVER PLAN)",
+   "POUR_OVER_PLAN" not in [x["code"] for x in pv3["flags"]], str(pv3["flags"]))
+try:
+    as_(PLANNER, main.preview_pour_ep, "R1", "2027-03-11", "07:30", 120, 0, discipline="structures", section_id="WS4")
+    ok("a preview with no rate is a 400 in words", False)
+except _HTTPException as e:
+    ok("a preview with no rate is a 400 in words", e.status_code == 400 and "pour rate" in e.detail.lower(), e.detail)
+try:
+    as_(TEAM2, main.preview_pour_ep, "R1", "2027-03-11", "07:30", 120, 30, discipline="structures", section_id="WS4")
+    ok("🔴 a team cannot preview on another team's line", False)
+except _HTTPException as e:
+    ok("🔴 a team cannot preview on another team's line (404)", e.status_code == 404)
+
+import export  # noqa: E402
+from portable import pdf_text, offline  # noqa: E402
+offline(export)
+pg = lookahead.page(today=today)
+ok("the Day sheet's pours: Thursday's is P001, Monday has none",
+   [p["id"] for p in export.day_sheet_pours(pg, "2027-03-11")] == ["P001"] and export.day_sheet_pours(pg, "2027-03-08") == [])
+try:
+    ds = " ".join(pdf_text(export.build_day_sheet_pdf(pg, "2027-03-11"), "", raw=True).split())
+except Exception as e:      # noqa: BLE001
+    ds = "ERROR " + str(e)
+ok("⭐ the Day sheet PDF: 'Pours today' with the place, the start, the mixers and the flag, above the lines",
+   "Pours today" in ds and "Pier 3 base" in ds and "07:30" in ds and "COLD JOINT" in ds
+   and ds.index("Pours today") < ds.index("FROM / TO"), ds[:400])
+ds_mon = " ".join(pdf_text(export.build_day_sheet_pdf(pg, "2027-03-08"), "", raw=True).split())
+ok("...Monday's sheet has no pour block", "Pours today" not in ds_mon and "FROM / TO" in ds_mon)
+
+fe = read("frontend/index.html")
+pp = fe[fe.index("const POUR_WORD = {"):fe.index("// ================================================================= Plan → Stockpiles")]
+# what a person can read: the slice without its comments (// lines and {/* */} blocks)
+pp_words = re.sub(r"\{/\*.*?\*/\}", "", re.sub(r"(?m)^\s*//.*$", "", pp), flags=re.S).replace("${API}", "")
+ok("⭐ Plan → Pours: in the Plan group after Stockpiles, its icon, a desk page",
+   '{ id: "pours", label: "Pours", glyph: "◒" }' in fe and "\n  pours: \"M" in fe
+   and '{page === "pours" && !narrow && <PoursPage meta={meta} access={role} who={who} />}' in fe)
+ok("the page reads /pours and /pours/lines once each; the form asks /pours/preview; writes POST / PATCH / DELETE",
+   pp.count("fetch(`${API}/pours`)") == 1 and pp.count("fetch(`${API}/pours/lines`)") == 1
+   and "fetch(`${API}/pours/preview?${q}`)" in pp and 'send("POST", "/pours"' in pp and 'send("PATCH", `/pours/${edit}`' in pp
+   and 'send("DELETE", `/pours/${p.id}`' in pp)
+ok("the row: the name opens it (row-open), one status, the ⋯ with Edit, Cancel the pour / Plan again, a red Delete… that asks",
+   'className="row-open" aria-label={`Edit ${p.place || p.id}`}' in pp and "<RowStatus word={st.word}" in pp
+   and ">Cancel the pour</button>" in pp and ">Plan again</button>" in pp and "window.confirm(`Delete the pour" in pp)
+ok("the four figures and the round trip as one bar, named for a screen reader",
+   all(w in pp for w in ("mixers needed", "between mixers", "a mixer's round trip", "first loads · pour ends"))
+   and 'role="img" aria-label={"A mixer\'s round trip: "' in pp)
+ok("🔴 the Pours page names no standard, no supplier and no back end (sources are in the technical guide only)",
+   not re.search(r"BS 8500|EN 206|Concrete Society|Holcim|Series 1700|\bAPI\b|endpoint|server|\bHERE\b", pp_words),
+   str(re.findall(r"BS 8500|EN 206|Concrete Society|Holcim|Series 1700|\bAPI\b|endpoint|server|\bHERE\b", pp_words)))
+ok("⭐ the Look-ahead grid's POUR mark on the pour's day; the phone card's on the day shown",
+   "const poursAt = useMemo(" in fe and 'className="pour-mark" data-pour-mark={d.day_date}' in fe
+   and "const pourLines = new Set(((page && page.pours) || []).filter(p => p.pour_date === shown)" in fe)
+ok("Config → Planning: the two limits, blank = 120 and 30, the hint says the specification wins",
+   'data-cfg={"pours-" + k}' in fe and '"transit_limit_min", "Concrete: loading to the end of discharge, at most (minutes)", "120"' in fe
+   and '"cold_joint_min", "Concrete: cold joint when the face waits more than (minutes)", "30"' in fe
+   and "Your specification or the supplier's ticket wins." in fe)
+ug = read("frontend/help/index.html")
+tg = read("frontend/help/technical/index.html")
+ok("⭐ the user guide's chapter 16 (three sections, in the contents): the figures, the flags, where pours show",
+   '<h1 id="16-concrete-pours">16. Concrete pours</h1>' in ug and ug.count('<h2 id="16-') == 3
+   and '<a href="#16-concrete-pours">16. Concrete pours</a>' in ug and "settings, not a standard" in ug)
+ok("...the technical guide's T1 entry holds the sources and the arithmetic",
+   '<h2 id="t1-pours">Concrete pours</h2>' in tg
+   and all(w in tg for w in ("BS 8500:2023", "Concrete Society", "1710.3", "split_month", "was not read")))
+
+_aud = read("backend/tests/ui_audit.js")
+ok("the UI audit walks Plan > Pours (portal and team pages, its header named, a deep stop on the first pour opened)",
+   '"stockpiles", "pours", "lookahead"' in _aud and 'pours: "Pours"' in _aud and 'meta("pours+open", w)' in _aud
+   and re.search(r'const TEAM_PAGES = \[[^\n]*"pours"', _aud) is not None)
 
 print()
 for f_ in FAIL:
