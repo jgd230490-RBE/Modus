@@ -7863,6 +7863,7 @@ function ConfigPage({ meta, who, access }){
               <div className="border-t border-slate-200 pt-4" data-cfg="rebar-ratios">
                 <h3 className="px-6 text-base font-semibold text-slate-800">Reinforcement ratios</h3>
                 <p className="px-6 mt-1 text-[13px] text-slate-500">kg of reinforcement per m³ of concrete, for Reinforcement typed as m³ of concrete.</p>
+                {((doc.planning || {}).rebar_ratios || []).length > 0 && (   /* no empty table: headings with no rows (axe th-has-data-cells) */
                 <table className="tbl mt-2">
                   <thead><tr>{["Structure type", "kg per m³ of concrete", "Basis"].map(h => <th key={h} scope="col" className={h.startsWith("kg") ? "num" : ""}>{h}</th>)}<th scope="col"><span className="sr-only">Remove</span></th></tr></thead>
                   <tbody>
@@ -7877,6 +7878,7 @@ function ConfigPage({ meta, who, access }){
                     ))}
                   </tbody>
                 </table>
+                )}
                 <div className="px-6 py-3">
                   <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 12px" }}
                     onClick={() => upd(d => { d.planning = d.planning || {}; const L = d.planning.rebar_ratios = d.planning.rebar_ratios || [];

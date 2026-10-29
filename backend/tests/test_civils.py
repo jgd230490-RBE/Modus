@@ -829,7 +829,9 @@ ok("11: the Forecasts row's Typed says the m³, the ratio and the structure type
 ok("11: Config → Materials has the Reinforcement ratios table: name, kg per m³, basis, remove, + Add structure type",
    'data-cfg="rebar-ratios"' in APP11 and '>Reinforcement ratios</h3>' in APP11
    and '["Structure type", "kg per m³ of concrete", "Basis"]' in APP11 and ">+ Add structure type</button>" in APP11
-   and "d.planning.rebar_ratios.splice(i, 1);" in APP11)
+   and "d.planning.rebar_ratios.splice(i, 1);" in APP11
+   # no empty table when a Config has no rows (the UI audit's axe th-has-data-cells, 29 Oct)
+   and "{((doc.planning || {}).rebar_ratios || []).length > 0 && (" in APP11)
 G11 = read("frontend/help/index.html")
 ok("11: the guide says how to type m³ of concrete, that a Config change leaves a typed line alone, and names the sources",
    "Reinforcement can be typed as <strong>m³ of concrete</strong>" in G11
