@@ -987,6 +987,19 @@ def day_sheet_rows(page, day):
     return out
 
 
+def day_sheet_pours(page, day):
+    """
+    29 Oct 2026 (task 3a): the day's pours for the Day sheet's "Pours today" block — the page's own pours (the lines the
+    caller can see) on `day`, decorated (pours.decorate: the figures and the flags), earliest first.
+    """
+    ids = [p["id"] for p in (page.get("pours") or []) if p.get("pour_date") == day]
+    if not ids:
+        return []
+    import pours as _pours
+    rows = [r for r in (_pours.get_pour(i) for i in ids) if r]
+    return sorted(_pours.decorate(rows), key=lambda p: (p["start"], p["id"]))
+
+
 def day_sheet_totals(rows):
     routed = [r for r in rows if r["routed"]]
     return {"lines": len(rows), "tonnes": sum(r["tonnes"] or 0 for r in rows), "loads": sum(r["loads"] for r in rows),
@@ -1049,6 +1062,42 @@ def build_day_sheet_pdf(page, day):
                    f"<b>{_n(tot['loads'])}</b> loads, each a two-way movement · <b>{lor}</b> lorries{lor_note}"
                    + (f" · {tot['flagged']} flagged" if tot["flagged"] else ""), st_figs))
     story.append(Spacer(1, 3 * mm))
+
+    # 29 Oct 2026 (task 3a): the day's concrete pours, above the lines — the gate and the pour supervisor read one block
+    pl = day_sheet_pours(page, day)
+    if pl:
+        import pours as _pours
+        ph = [P(x, st_h) for x in ("POUR", "SITE / GATE", "START TO END", "M3 / RATE", "MIXERS", "GAP", "FIRST LOADS",
+                                   "FLAG")]
+        pdata = [ph]
+        for p in pl:
+            f = p.get("figures") or {}
+            word = DAY_FLAG_WORD.get(_pours.worst_flag(p.get("flags"))) if p.get("flags") else None
+            mix = "—" if not f else (f"{f['booked']} of {f['needed']}" if f.get("booked") and f["booked"] < f["needed"]
+                                     else f"{f['needed']} needed")
+            pdata.append([P(E(p.get("place") or p["id"])),
+                          P(E(p.get("dest_name") or "—") + (f"<br/><font size=6.5 color='#64748B'>{E(p['gate_name'])}</font>"
+                                                            if p.get("gate_name") else "")),
+                          P(f"{E(p['start'])} to {E(f.get('ends') or '—')}"),
+                          P(f"{_n(p['m3'])} m3<br/><font size=6.5 color='#64748B'>{_n(p['rate_m3h'])} an hour</font>"),
+                          P(E(mix)), P("—" if not f else f"{int(round(f['real_gap']))} min"),
+                          P("—" if not f else f"{E(f['first_loads'])} at the plant"),
+                          P(("<font color='#DC2626'><b>" + E(word) + "</b></font>") if word else "—")])
+        pw = [30 * mm, 30 * mm, 24 * mm, 20 * mm, 17 * mm, 13 * mm, 26 * mm]
+        pw.append(usable - sum(pw))
+        pt = LongTable(pdata, colWidths=pw, repeatRows=1)
+        pt.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.8, colors.Color(*NAVY_RGB)),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LINEBELOW", (0, 1), (-1, -1), 0.4, colors.Color(0.85, 0.87, 0.9)),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        story.append(KeepTogether([P("Pours today", st_navy), Spacer(1, 1 * mm), pt]))
+        texts = [f"{p.get('place') or p['id']}: {x['text']}" for p in pl for x in (p.get("flags") or [])]
+        story += [P(E(t), st_red) for t in texts[:DAY_FLAGS_SHOWN]]
+        story.append(Spacer(1, 3 * mm))
 
     team_word = E((_tenant().get("team_label") or "Team"))
     # the PLAN column only when a line is planned in another unit than tonnes (in tonnes it repeats TONNES)

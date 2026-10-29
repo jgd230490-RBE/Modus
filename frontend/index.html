@@ -701,6 +701,22 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .row-open{font:inherit;color:inherit;background:none;border:0;padding:0 2px;margin:0 6px 0 -2px;min-height:24px;display:inline-flex;align-items:center;text-align:left;cursor:pointer;border-radius:3px;}
   .row-open:hover{text-decoration:underline;}
   .row-open:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
+  /* 29 Oct 2026 (task 3a): Plan → Pours — the form, the four figures, the round trip as one bar, the grid's POUR mark */
+  .pour-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 14px;margin-top:8px;}
+  .pour-fld label{display:block;font-size:13px;color:var(--muted);margin-bottom:2px;}
+  .pour-wide{grid-column:span 4;}
+  .pour-figs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:4px 0 10px;}
+  .pour-figs div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;}
+  .pour-figs b{display:block;font-size:20px;line-height:1.2;font-variant-numeric:tabular-nums;color:var(--ink);}
+  .pour-figs span{font-size:13px;color:var(--muted);}
+  .pour-bar{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--line);font-size:12px;}
+  .pour-bar div{display:flex;align-items:center;justify-content:center;color:#fff;white-space:nowrap;overflow:hidden;min-width:0;}
+  .pour-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);margin-top:6px;}
+  .pour-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
+  .pb-load{background:#475569;} .pb-there{background:#2563EB;} .pb-chk{background:#64748B;} .pb-dis{background:#C2410C;}
+  .pb-wash{background:#0F766E;} .pb-back{background:#1E40AF;}
+  .pour-mark{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.03em;border-radius:4px;padding:0 5px;margin-left:4px;background:#334155;color:#fff;vertical-align:1px;}
+  @media (max-width:900px){.pour-form,.pour-figs{grid-template-columns:repeat(2,minmax(0,1fr));}.pour-wide{grid-column:span 2;}}
   .ed-head:focus{outline:none;}
   .ed-head:focus-visible{outline:2px solid var(--navy);outline-offset:2px;border-radius:2px;}
   .sim-hours{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
@@ -4477,6 +4493,201 @@ function AlAdvice({ adv, compact }){
   );
 }
 
+// ================================================================= Plan → Pours (29 Oct 2026, task 3a)
+// The approved mockup notes\concrete-pours-mockup-1029\ cards 1–2 (John: "as recommended", no plant output). One row a
+// pour (the 27 Oct row pattern: the name opens it, one status, the "⋯" menu); the form asks the server for the figures as
+// it is typed (GET /pours/preview: nothing saved), so the arithmetic lives in one place (backend pours.py).
+const POUR_WORD = { POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT",
+                    POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN" };
+const POUR_RED = ["POUR_COLD_JOINT", "POUR_TRANSIT"];
+const pourHm = (m) => { m = Math.round(+m || 0); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`; };
+const pourDay = (iso) => { const d = new Date(iso + "T00:00:00"); return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]} ${longDate(iso)}`; };
+function pourStatus(p){
+  if(p.status === "cancelled") return { word: "Cancelled", tone: "none", more: 0 };
+  if(p.problem || !p.figures) return { word: "No figures", tone: "warn", more: 0 };
+  if(p.worst) return { word: POUR_WORD[p.worst] || p.worst, tone: POUR_RED.includes(p.worst) ? "bad" : "warn",
+                       more: new Set((p.flags || []).map(f => f.code)).size - 1 };
+  return { word: "Enough mixers", tone: "ok", more: 0 };
+}
+const POUR_PARTS = [["loading", "Loading", "pb-load"], ["there", "Drive there", "pb-there"], ["check_in", "Check-in", "pb-chk"],
+                    ["discharge", "Discharge", "pb-dis"], ["washout", "Wash-out", "pb-wash"], ["back", "Drive back", "pb-back"]];
+function PourBar({ parts }){
+  return (
+    <div>
+      <div className="pour-bar" role="img" aria-label={"A mixer's round trip: " + POUR_PARTS.map(([k, l]) => `${l.toLowerCase()} ${Math.round(parts[k] || 0)} min`).join(", ")}>
+        {POUR_PARTS.filter(([k]) => (parts[k] || 0) > 0).map(([k, l, c]) => (
+          <div key={k} className={c} style={{ flex: parts[k] }} title={`${l}: ${Math.round(parts[k])} min`}>{parts[k] >= 8 ? Math.round(parts[k]) : ""}</div>
+        ))}
+      </div>
+      <div className="pour-legend" aria-hidden="true">{POUR_PARTS.map(([k, l, c]) => <span key={k}><i className={c}></i>{l}</span>)}</div>
+    </div>
+  );
+}
+function PourFigures({ p }){
+  if(!p) return null;
+  if(p.problem) return <p className="text-sm" style={{ color: "var(--warn-text)" }} data-pour-problem="1">{p.problem}</p>;
+  const f = p.figures;
+  if(!f) return null;
+  const st = pourStatus(p);
+  return (
+    <div data-pour-figures="1">
+      <div className="pour-figs">
+        <div><b>{f.booked && f.booked < f.needed ? `${f.booked} of ${f.needed}` : f.needed}</b><span>mixers needed</span></div>
+        <div><b>{pourHm(f.real_gap)}</b><span>between mixers</span></div>
+        <div><b>{pourHm(f.cycle)}</b><span>a mixer's round trip</span></div>
+        <div><b>{f.first_loads} – {f.ends}</b><span>first loads · pour ends</span></div>
+      </div>
+      <PourBar parts={f.parts} />
+      <p className="text-sm mt-2"><RowStatus word={st.word} tone={st.tone} more={0} />
+        <span className="text-slate-600"> · {f.loads} loads · loading to the end of discharge {pourHm(f.transit)}
+          {p.basis === "hours" ? " · drive times for the hours the mixers set off" : " · drive times of the planned route"}</span></p>
+      {(p.flags || []).map((x, i) => <p key={i} className="text-sm" style={{ color: POUR_RED.includes(x.code) ? "var(--bad-text)" : "var(--warn-text)" }}>{x.text}</p>)}
+    </div>
+  );
+}
+const POUR_BLANK = { line: "", pour_date: "", start: "07:30", m3: "", rate_m3h: "", mixers_booked: "", washout_min: "", place: "", status: "planned" };
+const pourLineKey = (x) => `${x.route_id}|${x.discipline || ""}|${x.section_id || ""}`;
+
+function PoursPage({ meta, access, who }){
+  const [data, setData] = useState(null);
+  const [lines, setLines] = useState([]);
+  const [err, setErr] = useState("");
+  const [tick, setTick] = useState(0);
+  const [edit, setEdit] = useState(null);          // null | "new" | a pour id
+  const [form, setForm] = useState(POUR_BLANK);
+  const [preview, setPreview] = useState(null);
+  const [note, setNote] = useState(null);
+  const headRef = useRef(null);
+  useEffect(() => {
+    let live = true;
+    Promise.all([fetch(`${API}/pours`).then(okJSON), fetch(`${API}/pours/lines`).then(okJSON)])
+      .then(([p, l]) => { if(live){ setData(p); setLines((l && l.lines) || []); setErr(""); } })
+      .catch(e => { if(live) setErr(errSay("The pours did not load.", e)); });
+    return () => { live = false; };
+  }, [tick]);
+  // the figures as the form is typed: the server works them out, nothing is saved
+  useEffect(() => {
+    if(!edit){ setPreview(null); return; }
+    const f = form;
+    if(!f.line || !f.pour_date || !f.start || !(+f.m3 > 0) || !(+f.rate_m3h > 0)){ setPreview(null); return; }
+    const [route_id, discipline, section_id] = f.line.split("|");
+    const q = new URLSearchParams({ route_id, discipline, section_id, pour_date: f.pour_date, start: f.start, m3: f.m3, rate_m3h: f.rate_m3h });
+    if(f.mixers_booked !== "") q.set("mixers_booked", f.mixers_booked);
+    if(f.washout_min !== "") q.set("washout_min", f.washout_min);
+    if(edit !== "new") q.set("exclude_id", edit);
+    let live = true;
+    const t = setTimeout(() => {
+      fetch(`${API}/pours/preview?${q}`).then(okJSON).then(p => { if(live) setPreview(p); })
+        .catch(e => { if(live) setPreview({ problem: errMsg(e) }); });
+    }, 350);
+    return () => { live = false; clearTimeout(t); };
+  }, [edit, form]);
+  useEffect(() => { if(edit && headRef.current) headRef.current.focus(); }, [edit]);
+  const say = (ok, text) => { setNote({ ok, text }); if(ok) setTimeout(() => setNote(null), 2500); };
+  if(err) return <div className="max-w-7xl mx-auto p-6"><EmptyState kind="error" title="Couldn't open the pours" body={err} action={<button type="button" className="btn-sec" onClick={() => setTick(t => t + 1)}>Try again</button>} /></div>;
+  if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;
+  const list = data.pours || [];
+  const lineOf = (k) => lines.find(x => pourLineKey(x) === k);
+  const lineWords = (x) => `${x.origin_name || x.route_id} → ${x.dest_name || "—"}${x.description ? " · " + x.description : ""}`;
+  const open = (p) => {
+    setEdit(p ? p.id : "new");
+    setForm(p ? { line: pourLineKey(p), pour_date: p.pour_date, start: p.start, m3: String(p.m3), rate_m3h: String(p.rate_m3h),
+                  mixers_booked: p.mixers_booked == null ? "" : String(p.mixers_booked),
+                  washout_min: p.washout_min == null ? "" : String(p.washout_min), place: p.place || "", status: p.status }
+              : { ...POUR_BLANK, line: lines.length === 1 ? pourLineKey(lines[0]) : "" });
+  };
+  const close = () => { setEdit(null); setPreview(null); };
+  const send = (method, path, body, what) => fetch(`${API}${path}`, { method, headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined }).then(okJSON)
+    .then(() => { say(true, "Saved."); setTick(t => t + 1); return true; })
+    .catch(e => { say(false, errSay(what, e)); return false; });
+  const save = () => {
+    const f = form, [route_id, discipline, section_id] = (f.line || "||").split("|");
+    const body = { pour_date: f.pour_date, start: f.start, m3: numOr(f.m3, null), rate_m3h: numOr(f.rate_m3h, null),
+                   mixers_booked: f.mixers_booked === "" ? null : numOr(f.mixers_booked, null),
+                   washout_min: f.washout_min === "" ? null : numOr(f.washout_min, null), place: f.place || null, status: f.status };
+    const go = edit === "new" ? send("POST", "/pours", { route_id, discipline, section_id, ...body }, "The pour was not saved.")
+                              : send("PATCH", `/pours/${edit}`, body, "The pour was not saved.");
+    go.then(ok => { if(ok) close(); });
+  };
+  const setStatus = (p, status) => send("PATCH", `/pours/${p.id}`, { status }, "The pour was not changed.");
+  const remove = (p) => { if(window.confirm(`Delete the pour "${p.place || p.id}"? This cannot be undone.`))
+    send("DELETE", `/pours/${p.id}`, null, "The pour was not deleted."); };
+  const fld = (k, label, attrs) => (
+    <div className="pour-fld"><label htmlFor={"pour-" + k}>{label}</label>
+      <input id={"pour-" + k} className="ctl w-full" value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} {...(attrs || {})} /></div>
+  );
+  return (
+    <div className="max-w-7xl mx-auto p-6 pb-2" data-page="pours">
+      <PageHeader title="Pours" kicker="Plan" subtitle="Each pour's mixers, their gap and whether it keeps flowing."
+        actions={lines.length ? <button type="button" className="btn-pri" onClick={() => open(null)} data-pour-add="1">+ Add pour</button> : null} />
+      {note && <p className="text-sm mb-3" style={{ color: note.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{note.text}</p>}
+      {edit && (
+        <div className="card p-4 mb-4" data-pour-editor="1">
+          <h2 className="text-lg font-semibold text-slate-800 mb-1" tabIndex={-1} ref={headRef}>{edit === "new" ? "New pour" : (form.place || "Pour")}</h2>
+          <div className="pour-form">
+            <div className="pour-fld pour-wide"><label htmlFor="pour-line">Line</label>
+              <select id="pour-line" className="ctl w-full" value={form.line} disabled={edit !== "new"} onChange={e => setForm(f => ({ ...f, line: e.target.value }))}>
+                <option value="">Choose a concrete line…</option>
+                {lines.map(x => <option key={pourLineKey(x)} value={pourLineKey(x)}>{lineWords(x)}</option>)}
+              </select>
+              {form.line && lineOf(form.line) && <div className="hint">{lineOf(form.line).vehicle_name}</div>}
+            </div>
+            {fld("pour_date", "Date", { type: "date" })}
+            {fld("start", "First mixer at site", { type: "time" })}
+            {fld("m3", "Volume, m³", { inputMode: "decimal" })}
+            {fld("rate_m3h", "Pour rate, m³ an hour", { inputMode: "decimal" })}
+            {fld("mixers_booked", "Mixers booked", { inputMode: "numeric", placeholder: "enough" })}
+            {fld("washout_min", "Wash-out, minutes", { inputMode: "decimal", placeholder: "not counted" })}
+            {fld("place", "Where", { placeholder: "Pier 3 base" })}
+            <div className="pour-fld"><label htmlFor="pour-status">Status</label>
+              <select id="pour-status" className="ctl w-full" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                {[["planned", "Planned"], ["confirmed", "Confirmed"], ["done", "Done"], ["cancelled", "Cancelled"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select></div>
+          </div>
+          <div className="mt-3"><PourFigures p={preview} /></div>
+          <div className="flex gap-2 mt-3">
+            <button type="button" className="btn-pri" onClick={save} data-pour-save="1">Save</button>
+            <button type="button" className="btn-sec" onClick={close}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {!list.length ? (
+        <EmptyState title="No pours yet" body={lines.length ? "Add one with + Add pour." : "A pour goes on a ready-mixed concrete line planned in m³ with a concrete mixer."} />
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="tbl" data-pours-table="1">
+            <thead><tr><th>Pour</th><th className="num">m³</th><th className="num">Mixers</th><th className="num">Gap</th><th>Status</th><th className="w-10"><span className="sr-only">Actions</span></th></tr></thead>
+            <tbody>
+              {list.map(p => {
+                const st = pourStatus(p), f = p.figures;
+                return (
+                  <tr key={p.id} data-pour-row={p.id}>
+                    <td style={{ whiteSpace: "normal" }}>
+                      <button type="button" className="row-open" aria-label={`Edit ${p.place || p.id}`} onClick={() => open(p)}>{p.place || p.id}</button>
+                      <span className="block text-[12px] text-slate-500">{pourDay(p.pour_date)} · {p.start} · {p.dest_name || "—"}</span>
+                    </td>
+                    <td className="num tabular-nums">{grp(p.m3)}</td>
+                    <td className="num tabular-nums">{f ? (f.booked && f.booked < f.needed ? `${f.booked} of ${f.needed}` : grp(f.needed)) : "—"}</td>
+                    <td className="num tabular-nums">{f ? pourHm(f.real_gap) : "—"}</td>
+                    <td className="rd-status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>
+                    <td><RowMenu name={p.place || p.id}>
+                      <button type="button" onClick={() => open(p)}>Edit</button>
+                      {p.status === "cancelled" ? <button type="button" onClick={() => setStatus(p, "planned")}>Plan again</button>
+                                                : <button type="button" onClick={() => setStatus(p, "cancelled")}>Cancel the pour</button>}
+                      <button type="button" style={{ color: "var(--red)" }} onClick={() => remove(p)}>Delete…</button>
+                    </RowMenu></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ================================================================= Plan → Stockpiles
 // 27 Oct 2026 (stockpile forecast, John's D4 a; the approved mockup notes\stockpile-forecast-mockup-1027\, card 1): one
 // place per stockpile for its plan — capacity and opening, the PLANNED USE by month ("Same each month from … to …"), a
@@ -5762,6 +5973,8 @@ const NAV = [
     { id: "abnormal", label: "Abnormal loads", glyph: "⬌" },
     // 27 Oct 2026 (stockpile forecast, D4 a): each stockpile's planned use, stock count and forecast
     { id: "stockpiles", label: "Stockpiles", glyph: "▲" },
+    // 29 Oct 2026 (task 3a): each concrete pour's mixers, their gap and the flags
+    { id: "pours", label: "Pours", glyph: "◒" },
   ]},
   { group: "Track", items: [
     { id: "lookahead", label: "Look-ahead", glyph: "◔" },
@@ -5793,6 +6006,7 @@ const NAV_ICON = {
   config: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12h2M3 12h2M12 3v2M12 19v2M17 7l1.4-1.4M5.6 18.4L7 17M17 17l1.4 1.4M5.6 5.6L7 7",
   map: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14",
   stockpiles: "M3 19h18L14 6l-3 5-2-3z",
+  pours: "M4 15h11l3-5h2v5h-1M4 15V9l6-3 5 3v6M7 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
   abnormal: "M4 14h16M6 14v3M18 14v3M3 17h2M8 17h8M19 17h2M5 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 14V8h10v6M2 11h3M19 11h3",
 };
 function NavIcon({ id }){
@@ -6129,6 +6343,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
         {page === "carbon" && !narrow && <CarbonPage meta={meta} access={role} who={who} />}
         {page === "abnormal" && !narrow && <AbnormalPage meta={meta} access={role} who={who} />}
         {page === "stockpiles" && !narrow && <StockpilesPage meta={meta} access={role} who={who} />}
+        {page === "pours" && !narrow && <PoursPage meta={meta} access={role} who={who} />}
         {page === "lookahead" && !narrow && <LookAhead meta={meta} who={who} access={role} />}
         {page === "lookahead" && narrow && <PhoneLookAhead meta={meta} />}
         {/* one mounted instance across the three data pages — see the note at the top */}
@@ -7650,6 +7865,19 @@ function ConfigPage({ meta, who, access }){
                 )}
                 <div className="hint">Hours the CLP allows no deliveries, e.g. 07:00–10:00. Each gate's daily capacity loses them. At most {PEAK_BANDS_MAX}.</div>
               </div>
+              {/* 29 Oct 2026 (task 3a): the concrete pours' two limits (backend pours.limits; blank = 120 and 30 minutes).
+                  Settings, never a standard: the sources are in the technical guide only */}
+              {[["transit_limit_min", "Concrete: loading to the end of discharge, at most (minutes)", "120", "A rule of thumb. Your specification or the supplier's ticket wins."],
+                ["cold_joint_min", "Concrete: cold joint when the face waits more than (minutes)", "30", "Between one mixer's last concrete and the next one's first."]].map(([k, l, ph, help]) => (
+                <div key={k} className="field" data-cfg={"pours-" + k}>
+                  <label htmlFor={"cfg-pours-" + k}>{l}</label>
+                  <input id={"cfg-pours-" + k} className="ctl w-40 tabular-nums" inputMode="decimal" placeholder={ph}
+                    value={((doc.planning || {}).pours || {})[k] ?? ""}
+                    onChange={e => upd(d => { d.planning = d.planning || {}; const p = d.planning.pours = d.planning.pours || {};
+                      const v = num(e.target.value); if(v == null) delete p[k]; else p[k] = v; if(!Object.keys(p).length) delete d.planning.pours; })} />
+                  <div className="hint">{help}</div>
+                </div>
+              ))}
             </div>
           )}
 
@@ -9042,6 +9270,12 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
     (rail.flags || []).forEach(f => { const k = lineKeyOf(f); (g[k] || (g[k] = [])).push(f); });
     return g;
   }, [rail]);
+  // 29 Oct 2026 (task 3a): the week's concrete pours, by line and day — the cell's POUR mark
+  const poursAt = useMemo(() => {
+    const g = {};
+    ((page && page.pours) || []).forEach(p => { const k = `${lineKeyOf(p)}|${p.pour_date}`; (g[k] || (g[k] = [])).push(p); });
+    return g;
+  }, [page]);
   const allConfirmed = lines.length > 0 && lines.every(l => l.week && l.week.status === "confirmed");
   const anyConfirmed = lines.some(l => l.week && l.week.status === "confirmed");
 
@@ -9303,6 +9537,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                                     <span className="tabular-nums font-semibold text-slate-700">{grp(d.planned_qty, 1)}{own}</span>
                                   )}
                                   {typed}
+                                  {poursAt[`${lk}|${d.day_date}`] && <span className="pour-mark" data-pour-mark={d.day_date}
+                                    title={poursAt[`${lk}|${d.day_date}`].map(p => `${p.place || "Pour"}: ${grp(p.m3)} m³ from ${p.start}`).join("; ")}>POUR</span>}
                                 </td>
                               );
                             })}
@@ -9805,6 +10041,8 @@ function PhoneLookAhead({ meta, initialPage }){
   const shown = (day && dates.includes(day)) ? day : (dates.includes(today) ? today : dates[0]);
   const rail = (page && page.clashes) || { flags: [] };
   const flagsByLine = useMemo(() => phFlagsByLine(rail.flags, shown), [rail, shown]);
+  // 29 Oct 2026 (task 3a): the lines with a concrete pour on the day shown
+  const pourLines = new Set(((page && page.pours) || []).filter(p => p.pour_date === shown).map(p => lineKeyOf(p)));
   const rows = lines.map(line => {
     const d = (line.days || []).find(x => x.day_date === shown);
     if(!d) return null;
@@ -9885,7 +10123,7 @@ function PhoneLookAhead({ meta, initialPage }){
                     <button type="button" aria-expanded={isOpen ? "true" : "false"} aria-controls={did}
                       onClick={() => setOpened(o => ({ ...o, [r.lk]: !o[r.lk] }))}>
                       <span className="ph-l">
-                        <span>{r.c.origin_name || r.line.route_id} → {r.c.dest_name || "—"}</span>
+                        <span>{r.c.origin_name || r.line.route_id} → {r.c.dest_name || "—"}{pourLines.has(r.lk) && <span className="pour-mark">POUR</span>}</span>
                         <span className="rd-chips"><span className="rd-chip">{teamWord}</span>{r.c.material_type && <span className="rd-chip">{r.c.material_type}</span>}</span>
                         <RowStatus word={r.st.word} tone={r.st.tone} more={r.st.more} />
                       </span>

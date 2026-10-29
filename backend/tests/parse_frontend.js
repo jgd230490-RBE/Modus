@@ -1510,8 +1510,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("⭐ AL: the page exists as one section before the Public map, with its component and its helpers", alSrc.length > 8000
      && /function AbnormalPage\(\{ meta, access, who \}\)/.test(al) && /function AlAdvice\(/.test(al) && /function alClass\(adv\)/.test(al));
   // NARROWED 27 Oct 2026 (stockpile forecast, D4 a): the Stockpiles item follows it, the last in the Plan group
+  // NARROWED 29 Oct 2026 (task 3a): the Plan group goes on with Pours after Stockpiles
   ok("⭐ AL: a Plan-group rail item after the Carbon planner, its own line icon, and the page switch on a desk only (a phone gets the desk-only card)",
-     /\{ id: "abnormal", label: "Abnormal loads", glyph: "⬌" \},\s*(\/\/[^\n]*\s*)?\{ id: "stockpiles", label: "Stockpiles", glyph: "▲" \},\n  \]\},/.test(code) && /\n  abnormal: "M/.test(code)
+     /\{ id: "abnormal", label: "Abnormal loads", glyph: "⬌" \},\s*(\/\/[^\n]*\s*)?\{ id: "stockpiles", label: "Stockpiles", glyph: "▲" \},\s*(\/\/[^\n]*\s*)?\{ id: "pours", label: "Pours", glyph: "◒" \},\n  \]\},/.test(code) && /\n  abnormal: "M/.test(code)
      && code.includes('{page === "abnormal" && !narrow && <AbnormalPage meta={meta} access={role} who={who} />}')
      && !/PHONE_PAGES = \[[^\]]*abnormal/.test(code));
   ok("🔴 AL: ONE read of the page (/abnormal), the preview from /abnormal/rules, and the writes: plan (POST), change (PUT), status, delete, the holidays fetch, the time bans",
@@ -4326,8 +4327,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ 27 Oct: the Abnormal loads actions cell keeps the next-step button and its '⋯' on one line (the table's other cells wrap)",
      html.includes(".al-tbl td[data-al-actions]{white-space:nowrap;}"));
   const menus = (src.match(/<RowMenu name=\{[^}]+\}/g) || []);
+  // NARROWED 29 Oct 2026 (task 3a): + Plan → Pours (Edit, Cancel the pour / Plan again, Delete…) — nine
   ok("⭐ 27 Oct: the '⋯' on six tables — Abnormal loads (with its note), Routes, Zones, the gates list, the logins, the demo leads, the teams",
-     menus.length === 8 && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
+     menus.length === 9 && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
      && src.includes("<RowMenu name={g.name || g.id}>") && (src.match(/<RowMenu name=\{u\.name\}>/g) || []).length === 2 && src.includes("<RowMenu name={t.label}>"), String(menus.length));
   ok("⭐ 27 Oct: Abnormal loads — one filled button for the forward step (AL_FORWARD: pending → approved → notified → moved; withdrawn → pending), the rest in the menu, Withdraw and Delete red and asking first",
      src.includes('const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved", withdrawn: "pending" };')
@@ -4341,7 +4343,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && !src.includes('className="link-btn" style={{ color: "var(--red)" }}') && !src.includes(">Remove</button>"));
   ok("27 Oct: the Routes column head is for a screen reader only; the Delete and Withdraw items end in an ellipsis because a confirm follows",
      src.includes('<th className="px-3 py-2 text-right font-semibold"><span className="sr-only">Actions</span></th>')
-     && (src.match(/>Delete…<\/button>/g) || []).length === 4 && src.includes('onClick={() => deleteRoute(r.id)}>Delete…</button>'));
+     // NARROWED 29 Oct 2026 (task 3a): + the Pours page's Delete… — five
+     && (src.match(/>Delete…<\/button>/g) || []).length === 5 && src.includes('onClick={() => deleteRoute(r.id)}>Delete…</button>')
+     && src.includes('onClick={() => remove(p)}>Delete…</button>'));
   ok("⭐ 27 Oct: the words — every lead is one line; the foot of Abnormal loads prints the advice line only; no screen prints a decision code in brackets",
      src.includes('? "Approve or reject each line; approved lines feed the public map, the Look-ahead and the Dashboard."')
      && src.includes('subtitle="One vehicle per line; a split across two vehicles is two lines." />') && !src.includes("One vehicle per line: save a haul that uses two vehicle types as two lines.")

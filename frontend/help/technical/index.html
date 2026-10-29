@@ -53,7 +53,7 @@ main:focus{outline:0}
 <li class="l2"><a href="#t1-fair">Fair cost (the model)</a></li>
 <li class="l2"><a href="#t1-baf">Fuel index and BAF</a></li>
 <li class="l2"><a href="#t1-gates">Gate arrivals</a></li>
-<li class="l2"><a href="#t1-stock">Stockpiles</a></li>
+<li class="l2"><a href="#t1-stock">Stockpiles</a></li><li class="l2"><a href="#t1-pours">Concrete pours</a></li>
 <li class="l2"><a href="#t1-clp">CLP monitoring</a></li><li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li>
 <li class="l1"><a href="#t2-routing">T2 Routing with HERE</a></li>
 <li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>
@@ -287,6 +287,43 @@ commit week, amber), on the week's lines into the place. <code>/api/public/stock
 <code>full</code> (D9 a + i), kept by <code>read_cache</code>. The Dashboard chart is red past capacity and amber from 90 %; a
 place with no capacity recorded is named, never drawn as zero.</p>
 
+<h2 id="t1-pours">Concrete pours</h2>
+<p>29 Oct 2026 (task 3a, <code>backend/pours.py</code>; John's answers Q1–Q12 "as recommended", no plant output). A pour is a row of
+the tenanted table <code>pours</code> on a ready-mixed concrete LINE (route, discipline, section) in the month of its week
+(the Thursday rule, <code>weeks.week_of_date</code>). Nothing derived is stored.</p>
+<pre>m³ a load   the line's vehicle payload_m3 (8 m³ mixer 7.5; 6 m³ mixer 6.0 — stated assumptions in the factors)
+loads       ceil(m³ ÷ m³ a load); the last may be a part load
+gap         m³ a load ÷ pour rate × 60 — also each mixer's discharge on a pour (Q3)
+cycle       loading (vehicle load_minutes) + drive there + gate check-in (safety_minutes) + discharge + wash-out (typed, blank 0) + drive back
+needed      ceil(cycle ÷ gap)
+transit     loading + drive there + check-in + discharge (no wait)
+booked < needed:  real gap = cycle ÷ booked; face waits = real gap − discharge
+COLD JOINT  face waits > planning.pours.cold_joint_min (30)        red
+TRANSIT     transit > planning.pours.transit_limit_min (120)       red
+MIXERS SHORT booked < needed, no cold joint                         amber
+IN A BAND   a mixer at the gate (check-in before its discharge) inside planning.peak_bands or the gate's shut windows   amber
+OVER PLAN   the line's live pours in the month &gt; the line's quantity   amber</pre>
+<p><strong>Drive times.</strong> <code>derived.cycle_for(route, mixer, month)</code> (a dated diversion counts), then the
+busy-hour times (<code>hour_times.times_for</code>, task 0f) at the HOURS nearest each laden departure — the worst
+(there + back) of those hours (Q11). The mixer's own rows where it was worked out, else the Artic Tipper's scaled by the
+ratio of the two rows' times where both run the same road (<code>hour_times.attach</code>'s rule); else the planned
+10:00 bake. <code>basis</code> = hours | planned.</p>
+<p><strong>The split (Q5).</strong> <code>split_month</code>: each derived week = its pours + (month − all pours) ÷ the
+month's weeks. <code>split_days</code>: a pour day = its pours; the other weekdays share (week − the week's pours); a
+weekend pour carries its m³. Edited and confirmed weeks and days hold what was typed (<code>weeks._materialise_parent</code>,
+<code>days.materialise_week_days</code>).</p>
+<p><strong>The limits are not a standard.</strong> BS 8500-2:2015+A2:2019 cl. 14.2 "Time of transport" required delivery
+within 2 h after the time of loading in a truck mixer or agitator (1 h non-agitating) unless the specifier said otherwise;
+BS 8500:2023 dropped the clause (The Concrete Society, Fingertips "Limits to time in transit", 2 Jun 2025, which still
+calls 2 h "a reasonable rule of thumb for a conventional concrete"). The Specification for Highway Works Series 1700 had
+"within 2 hours of the introduction of cement to the aggregate" (cl. 1706.5, May 2001) and from the 2014 amendment
+defers to BS 8500-2 cl. 14 instead. The 30 minutes is Series 1700 cl. 1710.3 (March 2020 revision): fresh concrete "shall
+not be placed against in situ concrete that has been in position for more than 30 minutes unless a construction joint is
+formed". The current Series 1700 (Oct 2022 amendment / CC 482) was not read. Supplier terms (e.g. a waiting-time charge
+after 30 minutes on site) are contracts, not standards. BS EN 206 cl. 7.3 puts the time of loading on the delivery ticket
+(read second-hand).</p>
+<p><strong>Not modelled:</strong> the plant's output (John: not needed); concrete temperature, retarders or admixtures;
+a second pump (type the higher rate); a mixer that waits on site (the Simulation shows queues at the gate).</p>
 <h2 id="t1-clp">CLP monitoring</h2>
 <p>Read from <code>GET /api/clp/monitoring?month=N</code> (<code>backend/clp.py</code>), the first time the Dashboard
 section is opened; the CLP pack prints the same reply. Each chart comes back with <code>state</code> "set", or "empty"
