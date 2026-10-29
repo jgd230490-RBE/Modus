@@ -2741,6 +2741,21 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("🔴 SIM V2: no back-end word in the new screen text (the scenario card, the phone cards, the areas form)",
     !/\b(endpoint|JSON|predict\w*|real-time|trucks?)\b/i.test([scnSrc, phoneSrc, code.slice(code.indexOf('data-site-areas="1"'), code.indexOf('data-site-areas="1"') + 9000)]
       .join("\n").split("\n").map(l => l.replace(/^\s*\/\/.*$/, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "")).join("\n")));
+  // ---- 29 Oct 2026 (the user: a scenario where lorries bottleneck AT THE GATE): the arrival pattern on the scenario card
+  ok("⭐ SIM RUSH: the arrival pattern is part of the scenario (even by default, 30 % / 30 min the card's numbers) and reaches the server only as arrivals=rush&rush_share=&rush_minutes=",
+    simSrc.includes('arrivals: "even", rush_share: 30, rush_minutes: 30,')
+    && simSrc.includes('if(sc.arrivals === "rush") q.push("arrivals=rush", `rush_share=${encodeURIComponent(sc.rush_share)}`, `rush_minutes=${encodeURIComponent(sc.rush_minutes)}`);')
+    && !/arrivals=even/.test(simSrc));
+  ok("⭐ SIM RUSH: the card's Arrivals block is a named radio group (Spread evenly / Morning rush, a what-if) with two named numbers that are off until the rush is picked, and the plan's first-trip note is the server's figure at the busiest gate that has one",
+    scnSrc.includes('<div className="sim-arrivals" role="radiogroup" aria-label="Arrivals" data-sim-arrivals={sc.arrivals}>')
+    && scnSrc.includes('<span>Spread evenly through the day</span>') && scnSrc.includes('<span>Morning rush <span className="sim-tag">a what-if</span></span>')
+    && scnSrc.includes('aria-label="Share of each gate\'s lorries in the morning rush, per cent"') && scnSrc.includes('aria-label="Minutes the morning rush lasts"')
+    && (scnSrc.match(/disabled=\{sc\.arrivals !== "rush"\}/g) || []).length === 2
+    && scnSrc.includes("x.first_trip_pct != null && x.arrivals > 0).sort((a, b) => b.arrivals - a.arrivals)[0]")
+    && scnSrc.includes("The plan's first trips: about {g.first_trip_pct} % at {simGateName(g)}, {g.gate_name}."));
+  ok("SIM RUSH: the day's lead sentence prints the server's pattern words under a rush and the even-spread words otherwise; no 'predict' word",
+    panelSrc.includes('{(D.arrival_pattern && D.arrival_pattern.kind === "rush") ? D.arrival_pattern.words : "Each gate\'s arrivals are spread evenly over its open hours"}')
+    && !/\b(predict\w*|expected|likely)\b/i.test(scnSrc.slice(scnSrc.indexOf('className="sim-arrivals"'), scnSrc.indexOf('className="sim-arrivals"') + 2500)));
 }
 
 // ---- 11 Oct 2026 — the guide update: the tour text that was wrong or stale ------------------------

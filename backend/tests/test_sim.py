@@ -855,6 +855,62 @@ ok("clearing the shut times puts Harborough back to the whole day", gates.get_ga
    and {g["gate_id"]: g for g in sim.day(9, acc_planner, factors=factors, working_days=WD)["gates"]}["G007"]["open_minutes"] == 600)
 
 # =========================================================================== #
+#  8b. The morning rush (29 Oct 2026: a scenario where lorries bottleneck AT THE GATE)                              #
+# =========================================================================== #
+# place() alone: 10 arrivals over one 100-minute interval
+def _arr(n):
+    return [{"phase": (i + 0.5) / n, "line": 0, "kind": "laden"} for i in range(n)]
+_ev = sim.place(_arr(10), [(0, 100)])
+ok("place() with no pattern is D59 to the minute: arrival i of 10 at (i + ½) / 10 of 100 open minutes, none marked rush",
+   [round(a["t"], 6) for a in _ev] == [5.0 + 10 * i for i in range(10)] and not any(a["rush"] for a in _ev))
+_ru = sim.place(_arr(10), [(0, 100)], {"kind": "rush", "share": 0.3, "minutes": 30})
+ok("⭐ rush 30 % in 30 min: the first 3 arrivals evenly over the first 30 open minutes (5, 15, 25), the other 7 evenly over the remaining 70, all marked",
+   [round(a["t"], 2) for a in _ru] == [5.0, 15.0, 25.0] + [round(30 + (i + 0.5) / 7 * 70, 2) for i in range(7)]
+   and [a["rush"] for a in _ru] == [True] * 3 + [False] * 7, str([round(a["t"], 1) for a in _ru]))
+ok("the rush keeps the phase order: every line's first trips come first (the lowest phases are the rush)",
+   [a["phase"] for a in _ru] == sorted(a["phase"] for a in _ru) and all(a["phase"] < 0.3 for a in _ru if a["rush"]))
+ok("a window at or past the open minutes, or a share that rounds to nothing, is the even spread",
+   [a["t"] for a in sim.place(_arr(10), [(0, 100)], {"kind": "rush", "share": 0.3, "minutes": 100})] == [a["t"] for a in _ev]
+   and [a["t"] for a in sim.place(_arr(10), [(0, 100)], {"kind": "rush", "share": 0.04, "minutes": 30})] == [a["t"] for a in _ev])
+_rb = sim.place(_arr(10), [(0, 20), (40, 120)], {"kind": "rush", "share": 0.5, "minutes": 30})
+ok("the first W minutes are OPEN minutes: with a band 20–40, a 30-minute rush spans 0–20 and 40–50 and no lorry is placed in the band",
+   all(a["t"] < 50 for a in _rb[:5]) and not any(20 <= a["t"] < 40 for a in _rb) and all(a["t"] >= 50 for a in _rb[5:]), str([round(a["t"], 1) for a in _rb]))
+# the scenario
+for bad, why in ((dict(arrivals="lunch"), "even or rush"), (dict(arrivals="rush", rush_share="0"), "between 1 and 100"),
+                 (dict(arrivals="rush", rush_share="101"), "between 1 and 100"), (dict(arrivals="rush", rush_minutes="4"), "between 5 and 240"),
+                 (dict(arrivals="rush", rush_minutes="241"), "between 5 and 240"), (dict(rush_share="30"), "go with arrivals=rush")):
+    _e = raises(lambda: sim.scenario_from_query(**bad))
+    ok(f"scenario_from_query refuses {bad} in words", _e is not None and why in str(_e), str(_e))
+ok("scenario_from_query: even by default; rush with the defaults 30 % / 30 min when no number is given; the numbers as given",
+   sim.scenario_from_query()["arrivals"] == {"kind": "even"}
+   and sim.scenario_from_query(arrivals="rush")["arrivals"] == {"kind": "rush", "share": 0.3, "minutes": 30.0}
+   and sim.scenario_from_query(arrivals="RUSH", rush_share="45", rush_minutes="15")["arrivals"] == {"kind": "rush", "share": 0.45, "minutes": 15.0})
+# the day: the example's Sep 2026, no pour, no bands — the even day never queues (above); the rush queues at the busy gates
+Drush = sim.day(9, acc_planner, factors=factors, working_days=WD, scenario=sim.scenario_from_query(arrivals="rush"))
+rg = {g["gate_id"]: g for g in Drush["gates"]}
+ok("⭐ the rush day has the same loads and arrivals as the even day, says what it did, and every gate's rush_n is about 30 % of its lorries",
+   Drush["loads"] == Doff["loads"] and Drush["gate_arrivals"] == Doff["gate_arrivals"]
+   and Drush["arrival_pattern"] == {"kind": "rush", "share": 30, "minutes": 30,
+                                    "words": "A morning rush: 30 % of each gate's lorries in the first 30 min, the rest spread evenly over its open hours"}
+   and all(abs(g["rush_n"] - round(0.3 * g["arrivals"])) <= 0 for g in Drush["gates"]), str([(g["gate_id"], g["arrivals"], g["rush_n"]) for g in Drush["gates"]]))
+ok("the even day says so and marks no lorry (rush_n 0 everywhere)",
+   Doff["arrival_pattern"]["kind"] == "even" and all(g["rush_n"] == 0 for g in Doff["gates"]))
+_queued = [(g, rg[g]["most_waiting"], hm(rg[g]["bottleneck_at"]) if rg[g]["bottleneck_at"] is not None else None, round(rg[g]["minutes_lost"])) for g in sorted(rg) if rg[g]["queue_start"] is not None]
+ok("⭐ under the rush the three busiest gates queue at opening (Kilby Ridge, Brook Pit, Harborough) and nothing queues under the even spread",
+   {q[0] for q in _queued} >= {"G001", "G005", "G007"} and all(rg[g]["most_waiting"] >= 3 for g in ("G001", "G005", "G007"))
+   and all(g["queue_start"] is None for g in Doff["gates"]), str(_queued))
+ok("every gate carries first_trip_share (the plan's lorries ÷ its arrivals, at most 1) and first_trip_lorries, None only where a line has no cycle",
+   all("first_trip_share" in g and "first_trip_lorries" in g for g in Drush["gates"])
+   and all((g["first_trip_share"] is None) == (g["first_trip_lorries"] is None) for g in Drush["gates"])
+   and all(g["first_trip_share"] is None or 0 < g["first_trip_share"] <= 1 for g in Drush["gates"])
+   and all((g["first_trip_pct"] is None) == (g["first_trip_share"] is None) and (g["first_trip_pct"] is None or g["first_trip_pct"] == round(g["first_trip_share"] * 100)) for g in Drush["gates"])
+   and any(g["first_trip_share"] is not None for g in Drush["gates"]), str([(g["gate_id"], g["first_trip_share"]) for g in Drush["gates"]]))
+Drush_p = sim.day(9, acc_planner, factors=factors, working_days=WD, scenario=sim.scenario_from_query(arrivals="rush", **POUR))
+ok("the pour sits on top of the rush: 22 mixers at Harborough, the same mixer times as the even day's pour",
+   (Drush_p["pour"] or {}).get("loads") == 22
+   and sorted(a["at"] for a in Drush_p["arrivals"] if a["kind"] == "pour") == sorted(a["at"] for a in D["arrivals"] if a["kind"] == "pour"))
+
+# =========================================================================== #
 #  9. Nothing written                                                          #
 # =========================================================================== #
 _tables = ["forecasts", "routes", "locations", "location_gates", "zones", "route_geometry", "config"]

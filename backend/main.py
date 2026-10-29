@@ -4668,7 +4668,8 @@ def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None
             pour_m3_per_load: Optional[str] = None, pour_rate: Optional[str] = None, legs: Optional[str] = None,
             scale: Optional[str] = None, week: Optional[str] = None, date: Optional[str] = None,
             site_speed: Optional[List[str]] = Query(None), service: Optional[List[str]] = Query(None),
-            bays: Optional[List[str]] = Query(None), wash: Optional[str] = None):
+            bays: Optional[List[str]] = Query(None), wash: Optional[str] = None,
+            arrivals: Optional[str] = None, rush_share: Optional[str] = None, rush_minutes: Optional[str] = None):
     """
     16 Oct 2026 (S3) — the haulage simulation: an average working day of one month at every gate, lorry by lorry
     (sim.py; the example the user approved on 16 Oct is its spec). Whole loads per line, each gate's arrivals spread
@@ -4681,6 +4682,8 @@ def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None
     28 Oct 2026 (v2): `scale` month (default) | week (`week` commit | next) | day (`date` YYYY-MM-DD, a weekday of
     the Look-ahead's two weeks); the sites' station chains in every reply; `site_speed`, `service`, `bays`, `wash`
     as the sites' what-ifs (on screen only, like the rest).
+    29 Oct 2026: `arrivals=even|rush` with `rush_share` (1–100 %) and `rush_minutes` (5–240) — the morning rush, a
+    what-if where part of each gate's lorries come in its first open minutes (sim.place); on screen only.
     """
     acc = _require_access()
     scale = (scale or "month").strip().lower()
@@ -4696,7 +4699,7 @@ def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None
         sc = sim.scenario_from_query(site_speed=site_speed, service=service, bays=bays, wash=wash,
                                      hours=hours, check_in=check_in, bands=bands, pour_gate=pour_gate,
                                      pour_start=pour_start, pour_m3=pour_m3, pour_m3_per_load=pour_m3_per_load,
-                                     pour_rate=pour_rate)
+                                     pour_rate=pour_rate, arrivals=arrivals, rush_share=rush_share, rush_minutes=rush_minutes)
         return sim.day(int(month), acc, factors=factors, working_days=_working_days(factors), scenario=sc,
                        send_lines=str(legs or "").lower() in ("1", "true", "yes"),
                        scale=scale, bucket=(week or "commit"), date=date)

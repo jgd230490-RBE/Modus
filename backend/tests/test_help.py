@@ -1129,5 +1129,12 @@ _tgv2 = open(TECH, encoding="utf-8").read()
 ok3("SIM V2: the technical guide #t1-sim-v2 holds the detail (the table, the chain, the resolver, the scales, the query parameters)",
     'id="t1-sim-v2"' in _tgv2 and "<code>backend/sim_site.py</code>" in _tgv2 and "<code>site_areas</code>" in _tgv2
     and "<code>closed_fallback</code>" in _tgv2 and "<code>scale=month|week|day</code>" in _tgv2 and "<code>/api/site-areas</code>" in _tgv2)
+# ---- 29 Oct 2026: the morning rush (a scenario where lorries bottleneck at the gate) — the user guide in plain words, T1 the rule
+ok3("⭐ SIM RUSH: the user guide's Simulation paragraph names the Arrivals block and the morning rush, keeps the even spread as the default, and says nothing is saved; no rule code or back-end word",
+    "<strong>Arrivals</strong>" in _simp and "<strong>morning rush</strong>" in _simp and "even spread stays the default" in _simp
+    and "nothing is saved" in _simp and not re.search(r"\b(D59|D86|rush_share|arrivals=|API|endpoint|JSON|predict\w*)\b", _simp), _simp[-300:])
+ok3("SIM RUSH: the technical guide #t1-sim-rush holds the rule (sim.place, the first k arrivals in the first W open minutes) and the three query parameters",
+    'id="t1-sim-rush"' in _tgv2 and "<code>sim.place</code>" in _tgv2 and "<code>arrivals=even|rush</code>" in _tgv2
+    and "<code>rush_share</code>" in _tgv2 and "<code>rush_minutes</code>" in _tgv2 and "<code>first_trip_share</code>" in _tgv2)
 
 sys.exit(1 if failed else 0)
