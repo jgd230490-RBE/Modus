@@ -1154,7 +1154,9 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # red Not diverted), the Zones Used by "no way round", the panel's no-road line and its no-way-round-yet box, the problem words (table and stacked rows)
    # NARROWED 29 Oct 2026 (task 3a): bad-text 23 -> 25, warn-text 12 -> 14 — the Pours page: its saved / not-saved line, each
    # flag's sentence (red COLD JOINT / TRANSIT, amber the rest) and a pour with no figures (amber)
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 25 and _fe_wo.count("var(--warn-text)") == 14
+   # NARROWED 29 Oct 2026 (task 3a PR C): bad-text 25 -> 26 — the Simulation's planned-pour flag line (.sim-pp-flag)
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 26 and _fe_wo.count("var(--warn-text)") == 14
+   and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe
    and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--ok-text)\" }}>" in fe and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--navy-deep)\" }}>" in fe)
