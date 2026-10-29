@@ -1090,6 +1090,22 @@ ok3("0a: the flow in §8.3 is lanes whose WIDTH is the movements (no 'Closer das
 ok3("0a: the technical guide says the map no longer draws the existing rail corridor",
     "since 28 Oct 2026 the public map does not draw it" in open(TECH, encoding="utf-8").read())
 
+# 29 Oct 2026 (John, via the 0d session: "this is useful info that should be in the tech guide"): how HERE ranks a lorry
+# route, its own wording and source, and what it does NOT claim, in the technical guide only, never in the user guide
+_tg_rank = open(TECH, encoding="utf-8").read()
+_ug_rank = open(HELP, encoding="utf-8").read()
+_t2r = _tg_rank.split('<li id="t2-ranking">')[1].split("</li>")[0] if 'id="t2-ranking"' in _tg_rank else ""
+ok3("⭐ T2 ranking: HERE's wording with its source links, why the Primary is HERE's first option, and that HERE claims "
+    "neither safer nor lower-carbon",
+    "may not be the route with the fastest possible travel time" in _t2r
+    and "https://docs.here.com/routing/reference/routing-api-v8-calculateroutes.md" in _t2r
+    and "https://docs.here.com/routing/docs/routing-v8-truck-routing.md" in _t2r
+    and "is HERE's first route and is the Primary every figure uses" in _t2r
+    and "nowhere does HERE say its first route is the safer or the lower-carbon one" in _t2r
+    and "never describes HERE's choice as safer or greener" in _t2r, _t2r[:160])
+ok3("T2 ranking: none of it in the user guide (no HERE source links, no routingMode, no section id)",
+    "t2-ranking" not in _ug_rank and "routingMode" not in _ug_rank and "docs.here.com" not in _ug_rank)
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 # ---- 28 Oct 2026 (simulation v2, task 0e): the user guide says what the Simulation's scales and the site view are, in
 # plain words; the Locations and Zones chapters name the new fields; the technical guide holds the detail

@@ -26,6 +26,7 @@ from pydantic import BaseModel
 
 import conversions
 import db
+import route_compare  # 29 Oct 2026: the route options compared (a study read, admin)
 import hour_times   # 29 Oct 2026 (task 0f-2): drive times by departure hour
 import network
 import here_routing
@@ -3738,6 +3739,15 @@ def route_analysis(route_id: str, profile: Optional[str] = None):
     hour_times.attach) when the times are worked out; the plan's own figures are unchanged.
     """
     return hour_times.attach(network.route_analysis(route_id, profiles=[profile] if profile else None))
+
+
+@app.get("/api/admin/route-options/compare")
+def route_options_compare(profile: str = route_compare.PROFILE, token: Optional[str] = None):
+    """29 Oct 2026: every route's options HERE gave side by side (distance, minutes, carbon, collisions, community
+    considerations, cycle routes, left turns) and how HERE's first option compares with each alternative. Read only, no
+    HERE call. Admin: it feeds a study, not a screen."""
+    _check_admin(token)
+    return route_compare.compare(profile)
 
 
 @app.get("/api/admin/hour-times/plan")
