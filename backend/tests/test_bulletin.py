@@ -2175,7 +2175,9 @@ _fh = _MS[_MS.index("def bulletin_page("):_MS.index("def bulletin_page(") + 2200
 ok("🔴 source: both endpoints check staff (_staff_request) before reading anything; the PDF and page come from bulletin_doc.sheet",
    '@app.get("/api/bulletin/month.pdf")' in _MS and '@app.get("/bulletin/")' in _MS
    and _fp.index("_staff_request(request)") < _fp.index("bulletin_doc.sheet(") and _fh.index("_staff_request(request)") < _fh.index("bulletin_doc.sheet(")
-   and "export.build_bulletin_pdf(sheet)" in _fp and "bulletin_doc.html(bulletin_doc.sheet(" in _fh)
+   # NARROWED 28 Oct 2026 (F1): the PDF is built inside the read cache's build, from the same sheet
+   and ("export.build_bulletin_pdf(sheet)" in _fp or "export.build_bulletin_pdf(bulletin_doc.sheet(month, acc))" in _fp)
+   and "bulletin_doc.html(bulletin_doc.sheet(" in _fh)
 ok("…the middleware refuses /bulletin with the bulletin's page, not the guide's", 'if gate.scope_for(path) == "bulletin":' in _MS
    and "_BULLETIN_SIGNIN_PAGE" in _MS)
 

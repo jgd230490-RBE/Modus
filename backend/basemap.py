@@ -94,6 +94,9 @@ CACHE_S = 24 * 3600
 _CACHE = {}                      # url without the token -> (fetched_at, png bytes)
 DOWN_S = 120                     # after a failed fetch, no further attempt for this long: a PDF never waits twice
 _DOWN_UNTIL = [0.0]
+#: 28 Oct 2026 (F1): how many times fetch() had a token and still answered None (refused, unreachable, down): a
+#: cached PDF is kept only if this did not move while it was drawn, so a schematic stand-in is never kept
+MISSES = [0]
 
 
 def _merc(lon, lat):
@@ -345,6 +348,7 @@ def fetch(v, token=None, timeout=12, retina=True, overlays=None, before_layer=No
     if hit and time.time() - hit[0] < CACHE_S:
         return hit[1]
     if time.time() < _DOWN_UNTIL[0]:
+        MISSES[0] += 1
         return None                  # Mapbox failed a moment ago: the schematic, at once, not another 12 s wait
     try:
         req = urllib.request.Request(u, headers={"User-Agent": "Wayscope/1.0"})
@@ -357,13 +361,16 @@ def fetch(v, token=None, timeout=12, retina=True, overlays=None, before_layer=No
         if sk != DEFAULT_STYLE:
             lb = STYLES[DEFAULT_STYLE][1] if before_layer == STYLES[sk][1] else before_layer
             return fetch(v, token, timeout, retina, overlays, lb, DEFAULT_STYLE)
+        MISSES[0] += 1
         return None
     except Exception:
         _DOWN_UNTIL[0] = time.time() + DOWN_S
+        MISSES[0] += 1
         return None
     # 28 Oct 2026 (8e): the satellite style answers a JPEG (photographs), the others a PNG; reportlab draws either.
     if data[:8] != b"\x89PNG\r\n\x1a\n" and data[:3] != b"\xff\xd8\xff":
         _DOWN_UNTIL[0] = time.time() + DOWN_S
+        MISSES[0] += 1
         return None
     if len(_CACHE) > 64:
         _CACHE.clear()
