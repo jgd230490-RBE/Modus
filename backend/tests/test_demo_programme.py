@@ -361,7 +361,9 @@ ok("⭐ F6: every table the shipped package leaves empty (made on live: baked, f
    "from live — so a new live-only table cannot be dropped by a refresh unnoticed",
    set(_empty) <= set(GEN.LIVE_TABLES), f"empty {_empty}; LIVE_TABLES {GEN.LIVE_TABLES}")
 ok("...route_choice (the diversions, task 0c) and traffic_counts are among them",
-   "route_choice" in GEN.LIVE_TABLES and "traffic_counts" in GEN.LIVE_TABLES)
+   "route_choice" in GEN.LIVE_TABLES and "traffic_counts" in GEN.LIVE_TABLES
+   # 29 Oct 2026 (task 0f-2): and the busy-hour times, which only live works out
+   and "route_hour_times" in GEN.LIVE_TABLES)
 
 
 def _live_export(mutate=None):

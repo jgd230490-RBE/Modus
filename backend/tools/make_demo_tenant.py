@@ -1379,8 +1379,11 @@ def build(with_areas=False, out=None):
 # The tables a live refresh carries over from the live demo unchanged (§1.9): baked and fetched, never generated here.
 # 28 Oct 2026 (the demo narrative's F6): + route_choice (task 0c's diversions, made on live by a zone save or Find a way
 # round; without it a refresh dropped every diversion) and traffic_counts (fetched with the collisions since 22 Oct).
+# 29 Oct 2026 (task 0f-2): + route_hour_times, the busy-hour drive times worked out on live (HERE calls), named by the
+# stored lines they matched — copied with route_geometry, so a refresh keeps both or neither
 LIVE_TABLES = ("route_geometry", "route_sections", "route_area_km", "areas", "route_choice",
-               "community_features", "community_meta", "collision_records", "collision_meta", "traffic_counts")
+               "community_features", "community_meta", "collision_records", "collision_meta", "traffic_counts",
+               "route_hour_times")
 
 # 28 Oct 2026 (F6): an abnormal load is generated here but DRAWN on live (Draw the route, Check the roads again), in the
 # same row. A refresh keeps live's drawing for a load whose ends and size are unchanged; any other load stays undrawn.
