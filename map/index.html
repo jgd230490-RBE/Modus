@@ -6093,7 +6093,7 @@
             let status = document.getElementById('forecast-status');
 
             if (!isChecked) {
-                ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
+                ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
                 const sd = map.getSource('routes-source');
                 if (sd) { const d = sd._data; d.features.forEach(f => { if (f.properties) f.properties.is_forecast = false; }); sd.setData(d); }
                 applyFilters();            // §9: and the cards drop back to the network count
@@ -6484,7 +6484,7 @@
     // 16 Oct 2026 (D115): forecast-flow left this list. It is drawn from its own source (the lanes, flow-source), whose
     // features carry no is_forecast / type / route_id, so this filter would hide every lane; drawFlow() cuts the lanes
     // by the same three tests instead.
-    const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels'];
+    const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels','diversion-edge'];   // 29 Oct 2026: + the amber edge
     function forecastLayerFilter(){
         const legs = [];
         const inCb = document.getElementById('layer-inbound'), outCb = document.getElementById('layer-outbound');
@@ -6511,6 +6511,7 @@
         map.addLayer({id:'forecast-casing',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecastCasing,'line-width':FORECAST_CASING_WIDTH,'line-opacity':0.9}}, labelAnchor());
         map.addLayer({id:'forecast-layer',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecast,'line-width':FORECAST_LINE_WIDTH,'line-opacity':0.95}}, labelAnchor());
         map.addLayer({id:'forecast-labels',type:'symbol',source:'routes-source',filter:f,layout:{'symbol-placement':'line-center','text-field':['concat', ['get', 'f_avg'], ' ', FORECAST_LABEL_UNIT],'text-size':12,'text-offset':[0,-1]},paint:{'text-color':'#ffffff','text-halo-color':CONFIG.COLORS.forecastLabelHalo,'text-halo-width':2}});
+        if (typeof ensureDiversionEdge === 'function') ensureDiversionEdge();   // 29 Oct 2026: with the overlay it edges
         raiseMarks();
         ensureCapBadgeLayer();
     }
@@ -7375,7 +7376,15 @@
             '<button type="button" class="info-i" aria-expanded="' + open + '" aria-controls="info-flow" onclick="toggleInfo(this)" title="About the lanes" aria-label="About the lanes"><span aria-hidden="true">i</span></button></div>' +
             '<div class="info-pop" id="info-flow"' + (open ? '' : ' hidden') + '><p>Each direction has its own lane, on the left. Where routes share a road, the lane shows their total. While Play runs, a light moves along each lane the way its lorries go.</p></div>' +
             '<div class="ml-sub">' + when + '</div>' +
-            stepRanges(FLOW_STOPS, '').map((t, i) => '<div class="ml-row">' + flowSample(FLOW_WIDTHS[i]) + t + '</div>').join('');
+            stepRanges(FLOW_STOPS, '').map((t, i) => '<div class="ml-row">' + flowSample(FLOW_WIDTHS[i]) + t + '</div>').join('') +
+            // 29 Oct 2026: one line, only in a month with a diversion on the map (variant B of the mockup)
+            ((typeof DIV_EDGE !== 'undefined' && DIV_EDGE.fc.features.length)
+                ? '<div class="ml-row" id="div-legend">' + divEdgeSample() + 'Where a route goes round a closure</div>' : '');
+    }
+    function divEdgeSample(){
+        return '<svg class="fl-sw" width="64" height="12" viewBox="0 0 64 12" aria-hidden="true">' +
+            '<line x1="5" y1="6" x2="59" y2="6" stroke="' + DIV_EDGE.colour + '" stroke-width="' + FORECAST_CASING_WIDTH + '" stroke-linecap="round"/>' +
+            '<line x1="5" y1="6" x2="59" y2="6" stroke="' + CONFIG.COLORS.forecast + '" stroke-width="' + FORECAST_LINE_WIDTH + '" stroke-linecap="round"/></svg>';
     }
     // ===== end of the flow =====
 
@@ -7636,6 +7645,76 @@
         DIV.month = month;
         return changed;
     }
+    // 29 Oct 2026 (the user said yes to the mockup notes\diversion-highlight-mockup-1029, variant B): a SOFT AMBER EDGE
+    // where a route is diverted round a closure — only on the stretch of its diversion that leaves its own usual road
+    // (more than DIV_EDGE.near_m from that route's main line). The edge takes the place of the dark forecast casing on
+    // those stretches (layer 'diversion-edge', between forecast-casing and forecast-layer, the casing's width), so the
+    // route keeps its volume colour and lanes. Pieces carry the leg's type, route and is_forecast, so the forecast
+    // overlay's own filter (leg ticks, sidebar filters) applies to them. A route's usual line is DIV.orig's.
+    const DIV_EDGE = { colour: '#F59E0B', near_m: 25, cache: new Map(), fc: { type: 'FeatureCollection', features: [] }, sig: '' };
+    function divOffPieces(divCoords, mainCoords){
+        const kx = Math.cos(52.5 * Math.PI / 180) * 111320, ky = 110540, NEAR = DIV_EDGE.near_m, CELL = 200;
+        const segs = [], grid = new Map();
+        for (let i = 1; i < mainCoords.length; i++) {
+            const a = mainCoords[i - 1], b = mainCoords[i];
+            const g = [a[0] * kx, a[1] * ky, b[0] * kx, b[1] * ky];
+            const ix = segs.push(g) - 1;
+            for (let x = Math.floor((Math.min(g[0], g[2]) - NEAR) / CELL); x <= Math.floor((Math.max(g[0], g[2]) + NEAR) / CELL); x++)
+                for (let y = Math.floor((Math.min(g[1], g[3]) - NEAR) / CELL); y <= Math.floor((Math.max(g[1], g[3]) + NEAR) / CELL); y++) {
+                    const k = x + ':' + y; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(ix);
+                }
+        }
+        const near = (c) => {
+            const x = c[0] * kx, y = c[1] * ky, ids = grid.get(Math.floor(x / CELL) + ':' + Math.floor(y / CELL));
+            if (!ids) return false;
+            for (const i of ids) {
+                const g = segs[i], dx = g[2] - g[0], dy = g[3] - g[1], l2 = dx * dx + dy * dy;
+                const t = l2 ? Math.max(0, Math.min(1, ((x - g[0]) * dx + (y - g[1]) * dy) / l2)) : 0;
+                const px = g[0] + t * dx - x, py = g[1] + t * dy - y;
+                if (px * px + py * py <= NEAR * NEAR) return true;
+            }
+            return false;
+        };
+        const out = []; let run = null, last = null;
+        const flush = () => { if (run && run.length >= 2) out.push(run); run = null; };
+        divCoords.forEach(c => {
+            if (near(c)) { if (run) { run.push(c); flush(); } last = c; return; }
+            if (!run) run = last ? [last] : [];   // start where it leaves the usual road, so the edge meets the junction
+            run.push(c); last = c;
+        });
+        flush();
+        return out;
+    }
+    function updateDiversionEdge(data){
+        const feats = ((data || (typeof a1_data !== 'undefined' && a1_data)) || {}).features || [];
+        const out = [];
+        feats.forEach(f => {
+            const p = f.properties || {};
+            if (!p.div_when || !(p.type === 'Inbound Highway' || p.type === 'Outbound Highway') || !f.geometry) return;
+            const key = p.route_id + '|' + p.type, o = DIV.orig.get(key);
+            if (!o) return;
+            const div = f.geometry.coordinates, ck = key + '|' + div.length + '|' + o.coords.length;
+            if (!DIV_EDGE.cache.has(ck)) DIV_EDGE.cache.set(ck, divOffPieces(div, o.coords));
+            DIV_EDGE.cache.get(ck).forEach(run => out.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: run },
+                properties: { type: p.type, route_id: p.route_id, is_forecast: !!p.is_forecast, diverted: true } }));
+        });
+        // sent only when the pieces changed: renderMonthFrame runs on every timeline tick, and an empty month after an
+        // empty month must not push a source to GL (its own setData guard's rule)
+        const sig = out.map(x => x.properties.route_id + x.properties.type[0] + (x.properties.is_forecast ? 1 : 0) + ':' + x.geometry.coordinates.length).join(',');
+        if (sig === DIV_EDGE.sig) return;
+        DIV_EDGE.sig = sig;
+        DIV_EDGE.fc = { type: 'FeatureCollection', features: out };
+        const src = map.getSource && map.getSource('diversion-edge-source');
+        if (src) src.setData(DIV_EDGE.fc);
+        if (typeof renderFlowLegend === 'function') renderFlowLegend();
+    }
+    function ensureDiversionEdge(){
+        if (!map.getSource('diversion-edge-source')) map.addSource('diversion-edge-source', { type: 'geojson', data: DIV_EDGE.fc });
+        if (!map.getLayer('diversion-edge') && map.getLayer('forecast-layer'))
+            map.addLayer({ id: 'diversion-edge', type: 'line', source: 'diversion-edge-source', filter: forecastLayerFilter(),
+                layout: { 'line-cap': 'round', 'line-join': 'round' },
+                paint: { 'line-color': DIV_EDGE.colour, 'line-width': FORECAST_CASING_WIDTH, 'line-opacity': 0.95 } }, 'forecast-layer');
+    }
     function renderMonthFrame(m){
         const src=map.getSource('routes-source'); if(!src||!TL.matrix) return;
         const data=src._data, byR=TL.matrix.byRoute, unit=TL.matrix.unit; let count=0, sum=0, changed=false;
@@ -7658,6 +7737,7 @@
         // changed — two empty months in a row must not push the whole network to GL again
         if(changed) src.setData(data);
         ensureForecastLayers(); ensureFlowLayer();
+        updateDiversionEdge(data);      // 29 Oct 2026: the amber edge where a route goes round a closure this month
         // 15 Sep (the human): "the text vehicles needs to be replaced with deliveries or
         // trips". 🔴 Not a blind string swap — `unit` comes from the API and can be t or
         // m³, and "4 444 trips" over a tonnage would be a lie. Only the vehicle-loads
@@ -7715,7 +7795,8 @@
                  d.features.forEach(f=>{ if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString') f.properties.is_forecast=false; }); src.setData(d); }
         // 12 Oct 2026 (review §2.2d): the road-load and carbon-label layers go with the overlay, or closing the bar
         // left the month's shared sections on the map
-        ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
+        ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
+        if (typeof updateDiversionEdge === 'function') updateDiversionEdge(src && src._data);   // 29 Oct 2026: no month, no edge
         applyZoneMonth(null);   // no month on screen: show every active zone again
         applyFilters();         // KPI cards and the rail rule follow the timeline closing
         if(typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon say they need a month
