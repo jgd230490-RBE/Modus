@@ -275,7 +275,7 @@ def _insert_day(route_id, month_index, discipline, section_id, day, planned, wee
 
 
 def materialise_week_days(route_id, month_index, discipline, section_id, week_index,
-                          week=None, day_rows=None):
+                          week=None, day_rows=None, pour_days=None):
     """
     Create or refresh the days of ONE (line, week). Only called for the commit bucket.
 
@@ -285,12 +285,20 @@ def materialise_week_days(route_id, month_index, discipline, section_id, week_in
 
     13 Oct 2026 (speed): materialise_commit_week passes the week row and the line's day rows it
     already read for the whole bucket; any other caller reads them here, as before.
+    29 Oct 2026 (task 3a, Q5): `pour_days` {date: m³} — a pour day carries its pours and the other weekdays share the
+    rest (pours.split_days); None = read the line's pours here.
     """
     w = week if week is not None else _week_row(route_id, month_index, discipline, section_id, week_index)
     if not w:
         return {"created": 0, "refreshed": 0, "kept": 0}
     dates = bucket_dates(month_index, week_index)
-    shares = split_week(w.get("planned_qty"), dates)
+    if pour_days is None:
+        pour_days = _pour_days_by_line(month_index).get((route_id, discipline or "", section_id or ""), {})
+    if pour_days:
+        import pours
+        shares = pours.split_days(w.get("planned_qty"), dates, pour_days, WEEKDAY_MAX)
+    else:
+        shares = split_week(w.get("planned_qty"), dates)
     if day_rows is None:
         day_rows = _days_of(route_id, month_index, discipline, section_id, week_index)
     have = {r["day_date"]: r for r in day_rows}
@@ -351,15 +359,28 @@ def materialise_commit_week(start_year=None, today=None, bucket="commit"):
     if mi is None:
         return out
     days_by = _days_in_bucket(mi, wi)      # one read for every line (13 Oct 2026, speed)
+    pd_by = _pour_days_by_line(mi)          # 29 Oct 2026 (task 3a): one read of the month's pours
     for w in weeks.list_weeks(mi, mi):
         if int(w["week_index"]) != int(wi) or w.get("parent_status") != "Approved":
             continue
+        lk = (w["route_id"], w["discipline"] or "", w["section_id"] or "")
         r = materialise_week_days(w["route_id"], w["month_index"], w["discipline"],
                                   w["section_id"], wi, week=w,
-                                  day_rows=days_by.get((w["route_id"], w["discipline"] or "", w["section_id"] or ""), []))
+                                  day_rows=days_by.get(lk, []), pour_days=pd_by.get(lk, {}))
         for k in ("created", "refreshed", "kept"):
             out[k] += r[k]
     return out
+
+
+def _pour_days_by_line(month_index):
+    """29 Oct 2026 (task 3a): {(route_id, discipline, section_id): {date: m³}} of the live pours of one month's lines.
+    {} when there are none (or no table on an old scratch database)."""
+    try:
+        import pours
+        got = pours.by_line(int(month_index), int(month_index))
+    except Exception:
+        return {}
+    return {(k[0], k[1], k[2]): v for k, v in got.items()}
 
 
 # --------------------------------------------------------------------------- #
