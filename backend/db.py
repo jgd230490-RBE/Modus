@@ -594,7 +594,9 @@ def init_network_db():
         # 28 Oct 2026 (task 0c): avoids = the dated zone ids a WAY ROUND (alt_index >= 10, route_choice.WAY_ROUND_BASE)
         # was baked to miss; NULL on every row HERE ranked (0-2)
         for col, typ in (("zones_applied", "TEXT"), ("haul_zones", "TEXT"),
-                         ("haul_km", "REAL"), ("duration_hr_here", "REAL"), ("avoids", "TEXT")):
+                         ("haul_km", "REAL"), ("duration_hr_here", "REAL"), ("avoids", "TEXT"),
+                         # 29 Oct 2026 (task 3c): the holding-area mark (holding.py)
+                         ("holding_id", "TEXT"), ("holding_at_km", "REAL"), ("holding_tail_hr", "REAL")):
             try:
                 if IS_PG:
                     cur.execute(f"ALTER TABLE route_geometry ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -968,7 +970,17 @@ def init_lookahead_db():
                                 ("location_gates", "closed_from", "TEXT"),
                                 ("location_gates", "closed_to", "TEXT"),
                                 ("locations", "site_speed_kph", "REAL"),
-                                ("zones", "location_id", "TEXT")):
+                                ("zones", "location_id", "TEXT"),
+                                # 29 Oct 2026 (task 3c, holding areas): the holding area's fields, a site's choice,
+                                # a route's tick, and the mark on every stored line
+                                ("locations", "holding_spaces", "INTEGER"),
+                                ("locations", "holding_call", "INTEGER"),
+                                ("locations", "holding_exempt", "TEXT"),
+                                ("locations", "holding_id", "TEXT"),
+                                ("routes", "skip_holding", "INTEGER"),
+                                ("route_geometry", "holding_id", "TEXT"),
+                                ("route_geometry", "holding_at_km", "REAL"),
+                                ("route_geometry", "holding_tail_hr", "REAL")):
             try:
                 if IS_PG:
                     cur.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -1264,6 +1276,13 @@ _TENANT_DDL = {
             -- screen reads mph). NULL = the simulation's stand-in (sim_site.DEFAULT_SITE_KPH), said.
             -- ALTERed in init_lookahead_db() as well, or the rebuild drops it.
             site_speed_kph     REAL,
+            -- 29 Oct 2026 (task 3c, holding.py): on a location of type "Holding area" — its spaces (lorries), how
+            -- many are called forward at a time, the vehicle keys that go straight to the gate (JSON; NULL = the
+            -- mixers); on a SITE, the holding area its lorries call off through. ALTERed in init_lookahead_db() too.
+            holding_spaces     INTEGER,
+            holding_call       INTEGER,
+            holding_exempt     TEXT,
+            holding_id         TEXT,
             PRIMARY KEY (tenant_id, id)
         )
     """,
@@ -1284,6 +1303,9 @@ _TENANT_DDL = {
             -- SQLite tenant rebuild copies only the intersection and drops them.
             origin_gate_id    TEXT,
             dest_gate_id      TEXT,
+            -- 29 Oct 2026 (task 3c): 1 = this route's lorries never call off at a holding area (the user's Q4).
+            -- ALTERed in init_lookahead_db() too.
+            skip_holding      INTEGER,
             -- 2026-09-09 (Look-ahead v2 slices 3-5). All nullable and never seeded.
             -- A typed planning cap (a flag never a block) and three contract rates
             -- which are SUMMED where filled. km_basis says which distance the
@@ -1331,6 +1353,11 @@ _TENANT_DDL = {
             haul_km          REAL,
             duration_hr_here REAL,
             avoids           TEXT,
+            -- 29 Oct 2026 (task 3c, holding.mark_leg): the holding area this stored row stops at (NULL = none), where
+            -- along the line (km; NULL = the line does not pass it), the stored time from the stop to the gate
+            holding_id       TEXT,
+            holding_at_km    REAL,
+            holding_tail_hr  REAL,
             PRIMARY KEY (tenant_id, route_id, vehicle_profile, leg, alt_index)
         )
     """,

@@ -319,6 +319,13 @@ def import_tenant(pkg, replace=False):
         _road_sections._rebuild_quietly("tenant import")
     except Exception as e:
         print("tenant_package: road sections not rebuilt:", e)
+    # 29 Oct 2026 (task 3c): where each stored line stops at a holding area (nothing with no geometry, as a demo
+    # package ships; a live export carries its marks and gets the same ones again)
+    try:
+        import holding as _holding
+        _holding.mark_quietly("tenant import")
+    except Exception as e:
+        print("tenant_package: holding areas not marked:", e)
     # An optional national fuel-index price the package suggests (a typed placeholder
     # for a country the bulletin does not cover). fuel_index is GLOBAL, one row per
     # country, so it is applied only where that country has no row yet — never over a

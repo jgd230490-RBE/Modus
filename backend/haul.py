@@ -488,6 +488,15 @@ def _route_all_splice(o_lat, o_lon, d_lat, d_lon, profile, steps,
             here_hr += r["duration_hr"]
             adjusted_hr += r["duration_hr"]
 
+        # 29 Oct 2026 (task 3c): a holding area's entrance is a STOP of no length (holding.step_for): nothing drawn,
+        # nothing added, the leg simply goes to it and on from it
+        if s.get("holding_id"):
+            detail.append({"zone_id": s["zone_id"], "name": s["name"], "mode": "stop", "length_km": 0.0,
+                           "speed_kph": None, "here_duration_hr": None, "applied_duration_hr": 0.0,
+                           "reversed": False, "holding_id": s["holding_id"], "note": None})
+            cur_lat, cur_lon = s["exit"]
+            continue
+
         # the haul stretch itself: drawn geometry, drawn length, assigned duration.
         # HERE is not asked about it and contributes nothing to duration_hr_here, which
         # is why a spliced leg's raw and adjusted durations differ by the whole haul

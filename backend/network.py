@@ -101,7 +101,10 @@ def _ensure_location_columns():
                      # 16 Oct 2026 (CLOCS v5 C3): the site's rules for drivers — set_site_rules()
                      ("site_rules", "TEXT"),
                      # 28 Oct 2026 (simulation v2): the speed on the site's internal roads — set_site_speed()
-                     ("site_speed_kph", "REAL")):
+                     ("site_speed_kph", "REAL"),
+                     # 29 Oct 2026 (task 3c): the holding area's fields and a site's choice — holding.py
+                     ("holding_spaces", "INTEGER"), ("holding_call", "INTEGER"),
+                     ("holding_exempt", "TEXT"), ("holding_id", "TEXT")):
         try:
             if db.IS_PG:
                 db.execute(f"ALTER TABLE locations ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -154,6 +157,8 @@ def _role_for(loc_type):
         return "origin"
     if t in ("compound", "site", "stockpile"):
         return "destination"
+    if t == "holding area":              # 29 Oct 2026 (task 3c): never a route's start or end
+        return "holding"
     return "both"
 
 
@@ -505,7 +510,7 @@ def active_avoid():
     return areas, ",".join(sorted(ids))
 
 
-def leg_request(r, o, d, leg, gates_by_loc=None):
+def leg_request(r, o, d, leg, gates_by_loc=None, holding_for=None):
     """
     The two ends and the drawn roads of one leg, exactly as the bake asks HERE for them: {"a", "b"} (the resolved
     waypoints, _waypoint_full), "steps" (haul.leg_steps) and "haul_tag". Shared by _bake_leg and
@@ -543,11 +548,16 @@ def leg_request(r, o, d, leg, gates_by_loc=None):
         steps = haul.leg_steps(r["id"], [a_res["lon"], a_res["lat"]], [b_res["lon"], b_res["lat"]], leg, a_row, b_row)
     except Exception:
         steps = []          # route_haul_roads may not exist yet on a cold database
+    # 29 Oct 2026 (task 3c): a leg routed THROUGH its holding area — its entrance as a stop before the arrival gate's
+    # access road (holding.with_step); only when the caller asks (via_holding), never on a plain bake
+    if holding_for:
+        import holding as _holding
+        steps = _holding.with_step(steps, holding_for)
     return {"a": a_res, "b": b_res, "steps": steps, "haul_tag": ",".join([s["zone_id"] for s in steps])}
 
 
 def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
-              avoid=None, zone_tag=None, gates_by_loc=None, way_round=None, depart_at=None):
+              avoid=None, zone_tag=None, gates_by_loc=None, way_round=None, depart_at=None, via_holding=False):
     """
     Route one direction of one route and cache every alternative HERE offers.
 
@@ -572,7 +582,15 @@ def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
     # and passes it in, like the zones, so every leg of one run is asked for the same time)
     if depart_at is None:
         depart_at = here_routing.bake_departure_time()
-    req = leg_request(r, o, d, leg, gates_by_loc)
+    # 29 Oct 2026 (task 3c): asked to route this leg through its holding area (the Routes page's "Route again")
+    import holding as _holding
+    hold = None
+    if via_holding:
+        try:
+            hold = _holding.stops(r, leg, _holding.context(factors), profile)
+        except Exception:
+            hold = None
+    req = leg_request(r, o, d, leg, gates_by_loc) if hold is None else leg_request(r, o, d, leg, gates_by_loc, holding_for=hold)
     a_lat, a_lon = req["a"]["lat"], req["a"]["lon"]
     b_lat, b_lon = req["b"]["lat"], req["b"]["lon"]
     steps, haul_tag = req["steps"], req["haul_tag"]
@@ -595,6 +613,7 @@ def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
                      leg=leg, alt_index=route_choice.WAY_ROUND_BASE, zones_applied=zone_tag, haul_zones=haul_tag,
                      haul_km=res.get("haul_km"), duration_hr_here=res.get("duration_hr_here"),
                      avoids=",".join(way_round["ids"]))
+        _mark_leg_quietly(r["id"], profile, leg)
         return 1, None
     try:
         opts = haul.route_with_haul(a_lat, a_lon, b_lat, b_lon, profile, steps,
@@ -620,7 +639,18 @@ def _bake_leg(r, o, d, profile, leg, factors, alternatives=ALTERNATIVES,
                      # None on a leg with no haul road: there was no substitution, so
                      # there is no separate 'before' figure and duration_hr is HERE's own
                      duration_hr_here=res.get("duration_hr_here"))
+    _mark_leg_quietly(r["id"], profile, leg)
     return len(opts), None
+
+
+def _mark_leg_quietly(route_id, profile, leg):
+    """29 Oct 2026 (task 3c): after a leg is stored, mark where it stops at a holding area (holding.mark_leg). Pure
+    geometry over the stored rows; never fails a bake."""
+    try:
+        import holding as _holding
+        _holding.mark_leg(route_id, profile, leg)
+    except Exception as e:
+        print(f"holding: {route_id} {profile} {leg} not marked: {e}")
 
 
 # 12 Oct 2026 (the review and fix pass): every leg the batch upserts marks the shared-section
@@ -1212,11 +1242,25 @@ def locations_geojson():
                            "clp_cap_per_day": l.get("clp_cap_per_day"),
                            # 28 Oct 2026 (simulation v2): the speed on the site's roads, km/h
                            "site_speed_kph": l.get("site_speed_kph"),
+                           # 29 Oct 2026 (task 3c): a holding area's fields; a site's holding area
+                           "holding_spaces": l.get("holding_spaces"), "holding_call": l.get("holding_call"),
+                           "holding_exempt": _holding_exempt_list(l.get("holding_exempt")),
+                           "holding_id": l.get("holding_id"),
                            # 16 Oct 2026 (CLOCS v5 C3): printed on the route sheet; null = none typed
                            "site_rules": l.get("site_rules")},
             "geometry": {"type": "Point", "coordinates": [l["lon"], l["lat"]]},
         })
     return {"type": "FeatureCollection", "features": feats}
+
+
+def _holding_exempt_list(raw):
+    """The stored JSON list, or None (= the default: the mixers, holding.default_exempt)."""
+    if raw in (None, ""):
+        return None
+    try:
+        return [str(x) for x in json.loads(raw)]
+    except Exception:
+        return None
 
 
 CLP_CAP_WORDS = "lorry visits a day agreed in the CLP (one visit = one lorry in and out)"
@@ -1357,6 +1401,9 @@ def create_location(name, role, materials=None, lat=None, lon=None, loc_type=Non
     lid = _next_location_id()
     supplies = supplies if supplies is not None else (materials or [])
     receives = receives or []
+    # 29 Oct 2026 (task 3c): a holding area is role 'holding' and supplies / receives nothing
+    if canonical_loc_type(loc_type) == "Holding area":
+        role, supplies, receives = "holding", [], []
     g_lat, g_lon = _coord_or_none(gate_lat), _coord_or_none(gate_lon)
     if g_lat is None or g_lon is None:      # a gate needs both halves to mean anything
         g_lat = g_lon = None
@@ -1395,6 +1442,16 @@ def update_location(location_id, name=None, role=None, materials=None, lat=None,
         return {"error": "not found"}
     cur = cur[0]
     moved = (lat is not None and float(lat) != cur["lat"]) or (lon is not None and float(lon) != cur["lon"])
+    # 29 Oct 2026 (task 3c): a holding area keeps role 'holding' and supplies / receives nothing; a location that
+    # stops being one loses the sites that called off through it and its marks (holding.on_location_deleted)
+    new_type = canonical_loc_type(loc_type) if loc_type is not None else canonical_loc_type(cur.get("loc_type"))
+    if new_type == "Holding area":
+        role, supplies, receives, materials = "holding", [], [], []
+    elif canonical_loc_type(cur.get("loc_type")) == "Holding area":
+        import holding as _holding
+        _holding.on_location_deleted(location_id)
+        if role == "holding":
+            role = _role_for(new_type)
 
     if gate_given:
         g_lat, g_lon = _coord_or_none(gate_lat), _coord_or_none(gate_lon)
@@ -1445,6 +1502,8 @@ def update_location(location_id, name=None, role=None, materials=None, lat=None,
 
 def delete_location(location_id):
     routes = routes_touching(location_id)
+    import holding as _holding              # 29 Oct 2026 (task 3c): the sites that called off through it
+    _holding.on_location_deleted(location_id)
     for rid in routes:
         db.execute("DELETE FROM route_geometry WHERE tenant_id = ? AND route_id = ?",
                    (db.current_tenant(), rid))
@@ -1491,6 +1550,9 @@ def create_route(origin_id, dest_id, material_category=None, route_id=None, ipt=
     if not o or not d:
         return {"error": "origin or destination not found"}
     o, d = o[0], d[0]
+    # 29 Oct 2026 (task 3c): lorries call off AT a holding area on the way to a site; no route starts or ends there
+    if canonical_loc_type(o.get("loc_type")) == "Holding area" or canonical_loc_type(d.get("loc_type")) == "Holding area":
+        return {"error": "a holding area is never where a route starts or ends"}
 
     supplies = _loc_list(o, "supplies") or _loc_list(o, "materials")
     receives = _loc_list(d, "receives")
@@ -1591,8 +1653,11 @@ def update_route(route_id, origin_id=None, dest_id=None, material_category=None,
     if new_o == new_d:
         return {"error": "origin and destination must be different"}
     for lid in (new_o, new_d):
-        if not db.query("SELECT id FROM locations WHERE tenant_id = ? AND id = ?", (tenant, lid)):
+        _l = db.query("SELECT id, loc_type FROM locations WHERE tenant_id = ? AND id = ?", (tenant, lid))
+        if not _l:
             return {"error": f"location {lid} not found"}
+        if canonical_loc_type(_l[0].get("loc_type")) == "Holding area":     # 29 Oct 2026 (task 3c)
+            return {"error": "a holding area is never where a route starts or ends"}
     # the same supply/receive guard create_route applies — the API must not be laxer
     if "material_category" in given and material_category:
         o = db.query("SELECT * FROM locations WHERE tenant_id = ? AND id = ?", (tenant, new_o))[0]
@@ -1646,7 +1711,7 @@ def clear_routes():
 
 @_limits_once                                  # 17 Oct 2026: one lorry-limits check
 @road_sections.rebuild_once("route bake")      # 12 Oct 2026: both legs, one index rebuild
-def bake_route(route_id, profile=DEFAULT_PROFILE, legs=None, alternatives=ALTERNATIVES):
+def bake_route(route_id, profile=DEFAULT_PROFILE, legs=None, alternatives=ALTERNATIVES, via_holding=False):
     """
     Route + cache geometry for a single route (used to bake a freshly authored route).
 
@@ -1696,7 +1761,8 @@ def bake_route(route_id, profile=DEFAULT_PROFILE, legs=None, alternatives=ALTERN
     errs = []
     for leg in legs:
         n, err = _bake_leg(r, o, d, profile, leg, factors, alternatives,
-                           avoid=avoid, zone_tag=zone_tag, gates_by_loc=gates_by_loc, depart_at=depart)
+                           avoid=avoid, zone_tag=zone_tag, gates_by_loc=gates_by_loc,
+                           via_holding=via_holding, depart_at=depart)
         if err:
             errs.append(f"{leg}: {err[:120]}")
             out["legs"][leg] = {"baked": False, "error": err[:200]}
@@ -1873,7 +1939,7 @@ def routes_status():
 
 
 PLANNING_FIELDS = ("max_vehicles_per_day", "rate_eur_per_load", "rate_eur_per_t",
-                   "rate_eur_per_km", "km_basis")
+                   "rate_eur_per_km", "km_basis", "skip_holding")
 
 
 def set_route_planning(route_id, given, **vals):
@@ -1909,6 +1975,8 @@ def set_route_planning(route_id, given, **vals):
             if iv < 0:
                 return {"error": "max_vehicles_per_day cannot be negative"}
             new[f] = iv
+        elif f == "skip_holding":            # 29 Oct 2026 (task 3c): the route's "does not call off" tick
+            new[f] = 1 if gates._truthy(v) else 0
         else:
             try:
                 fv = float(v)
@@ -1919,9 +1987,15 @@ def set_route_planning(route_id, given, **vals):
             new[f] = fv
     db.execute(
         "UPDATE routes SET max_vehicles_per_day = ?, rate_eur_per_load = ?, rate_eur_per_t = ?, "
-        "rate_eur_per_km = ?, km_basis = ? WHERE tenant_id = ? AND id = ?",
+        "rate_eur_per_km = ?, km_basis = ?, skip_holding = ? WHERE tenant_id = ? AND id = ?",
         (new["max_vehicles_per_day"], new["rate_eur_per_load"], new["rate_eur_per_t"],
-         new["rate_eur_per_km"], new["km_basis"], tenant, route_id))
+         new["rate_eur_per_km"], new["km_basis"], (new["skip_holding"] or 0), tenant, route_id))
+    if "skip_holding" in given:
+        try:
+            import holding as _holding
+            _holding.mark_route(route_id)
+        except Exception as e:
+            print(f"holding: {route_id} not marked after the tick: {e}")
     out = {"id": route_id}
     out.update(new)
     out["km_basis"] = new["km_basis"] or "round_trip"
@@ -2163,6 +2237,11 @@ def promote_alternative(route_id, profile, alt_index, leg="loaded"):
         (alt_index, db.current_tenant(), route_id, profile, leg, TMP))
     road_sections._rebuild_quietly("alternative promoted")   # 12 Oct 2026: a new primary
     route_choice.refresh_quietly("alternative promoted")     # 28 Oct 2026 (task 0c): the main line changed
+    try:                                                     # 29 Oct 2026 (task 3c): the marks follow the rows
+        import holding as _holding
+        _holding.mark_route(route_id)
+    except Exception as e:
+        print(f"holding: {route_id} not marked after promote: {e}")
     return {"route_id": route_id, "profile": profile, "leg": leg,
             "promoted": alt_index, "swapped_with": 0,
             "note": "Re-baking this route will restore HERE's own ranking."}
@@ -2753,8 +2832,16 @@ def _turnaround_parts(profile, factors, origin=None, dest=None, route=None,
     else:
         internal_m, source = 0.0, "none"
 
-    total = load_m + unload_m + safety_m + internal_m
+    # 29 Oct 2026 (task 3c): the holding area's own check minutes, where this lorry calls off (0.0 with none)
+    try:
+        import holding as _holding
+        holding_m = _holding.cycle_minutes(route, origin, dest, profile, gates_by_loc=gbl, factors=factors)
+    except Exception:
+        holding_m = 0.0
+
+    total = load_m + unload_m + safety_m + internal_m + holding_m
     return {
+        "holding_minutes": holding_m,
         "load_minutes": load_m,
         "unload_minutes": unload_m,
         "unloading_minutes": load_m + unload_m,
@@ -2931,6 +3018,8 @@ def route_analysis(route_id, profiles=None, pre=None, pairs=None):
                     "internal_travel_flat_available":
                         round(parts["internal_travel_flat_available"], 3),
                     "total_minutes": round(parts["total_minutes"], 3),
+                    # 29 Oct 2026 (task 3c): the holding area's check minutes, where this lorry calls off
+                    "holding_minutes": round(parts.get("holding_minutes", 0.0), 3),
                 },
                 "return_estimated": rg is None,
                 # 17 Oct 2026: the lorry's day under the UK drivers' hours — what the trips a day rest on, in parts and
