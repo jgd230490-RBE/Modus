@@ -69,6 +69,7 @@ import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" pa
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
 import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
 import site_areas  # 28 Oct 2026 (simulation v2): the areas inside a site
+import pours  # 29 Oct 2026 (task 3a): concrete pours
 import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
 import heavy_reads  # 21 Oct 2026 — the public map's heavy reads a few at a time, one memory line each (live OOM kills)
 import abnormal  # 22 Oct 2026 (S16 / B5) — the abnormal loads: each one its own planned movement, with the rules' advice
@@ -4443,6 +4444,99 @@ class SiteAreaPatch(BaseModel):
     seq: Optional[int] = None
     active: Optional[bool] = None
     note: Optional[str] = None
+
+
+class PourIn(BaseModel):
+    """29 Oct 2026 (task 3a): one concrete pour on a ready-mixed concrete line (pours.py)."""
+    route_id: str
+    discipline: str = ""
+    section_id: str = ""
+    pour_date: str                           # YYYY-MM-DD
+    start: str                               # HH:MM, the first mixer discharging
+    m3: float
+    rate_m3h: float
+    mixers_booked: Optional[int] = None      # blank = enough
+    washout_min: Optional[float] = None      # blank = not counted
+    place: Optional[str] = None
+    method: Optional[str] = None
+    status: str = "planned"
+    note: Optional[str] = None
+
+
+class PourPatch(BaseModel):
+    pour_date: Optional[str] = None
+    start: Optional[str] = None
+    m3: Optional[float] = None
+    rate_m3h: Optional[float] = None
+    mixers_booked: Optional[int] = None
+    washout_min: Optional[float] = None
+    place: Optional[str] = None
+    method: Optional[str] = None
+    status: Optional[str] = None
+    note: Optional[str] = None
+
+
+def _pour_line_access(route_id, pour_date, discipline, section_id):
+    """A pour's line must be visible to the caller (a team its own lines; planners and admins every line). 404 as
+    _require_line: a team must not learn that another team's line exists."""
+    import datetime as _dt
+    try:
+        d = _dt.date.fromisoformat(str(pour_date))
+    except ValueError:
+        raise HTTPException(400, "The pour needs a date.")
+    return _require_line(route_id, pours.month_of(d), discipline, section_id)
+
+
+@app.get("/api/pours")
+def list_pours_ep(from_date: Optional[str] = None, to_date: Optional[str] = None):
+    """29 Oct 2026 (task 3a): every pour this caller may see, with its figures and flags (Plan -> Pours)."""
+    acc = _require_access()
+    return _staff_json("pours", {"from": from_date, "to": to_date},
+                       lambda: pours.page(acc, from_date, to_date), acc)
+
+
+@app.get("/api/pours/lines")
+def pour_lines():
+    """The lines a pour can go on (m³ lines whose vehicle carries an m³ load), for the Add pour form."""
+    acc = _require_access()
+    return {"lines": pours.line_choices(acc)}
+
+
+@app.post("/api/pours")
+def create_pour_ep(body: PourIn):
+    _pour_line_access(body.route_id, body.pour_date, body.discipline, body.section_id)
+    out = pours.create_pour(body.dict() if hasattr(body, "dict") else body.model_dump(), conversions.load_factors(),
+                            by=_by(None))
+    if out.get("error"):
+        raise HTTPException(400, out["error"])
+    return pours.decorate([out])[0]
+
+
+@app.patch("/api/pours/{pour_id}")
+def update_pour_ep(pour_id: str, body: PourPatch):
+    cur = pours.get_pour(pour_id)
+    if not cur:
+        _require_access()
+        raise HTTPException(404, "No such pour.")
+    _pour_line_access(cur["route_id"], cur["pour_date"], cur["discipline"], cur["section_id"])
+    sent = set(_fields_set(body))
+    if "pour_date" in sent:
+        # moving a pour to another month keeps it on its line: that month must hold the line, and it must be visible
+        _pour_line_access(cur["route_id"], body.pour_date, cur["discipline"], cur["section_id"])
+    out = pours.update_pour(pour_id, {k: getattr(body, k) for k in sent}, conversions.load_factors(), by=_by(None))
+    if out.get("error"):
+        raise HTTPException(400, out["error"])
+    return pours.decorate([out])[0]
+
+
+@app.delete("/api/pours/{pour_id}")
+def delete_pour_ep(pour_id: str):
+    cur = pours.get_pour(pour_id)
+    if not cur:
+        _require_access()
+        raise HTTPException(404, "No such pour.")
+    _pour_line_access(cur["route_id"], cur["pour_date"], cur["discipline"], cur["section_id"])
+    return pours.delete_pour(pour_id)
 
 
 @app.get("/api/site-areas")

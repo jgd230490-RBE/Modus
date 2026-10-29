@@ -260,8 +260,9 @@ reset_db()
 # NARROWED 28 Oct 2026: and without site_areas (simulation v2, the areas inside a site), and without route_choice
 # (task 0c: a route's option by date) — twenty-eight
 # NARROWED 29 Oct 2026: and without route_hour_times (task 0f-2: drive times by departure hour) — twenty-nine
-ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 29
-   and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times"}) == 16,
+# NARROWED 29 Oct 2026: and without pours (task 3a: concrete pours) — thirty
+ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 30
+   and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours"}) == 16,
    f"got {len(db.TENANTED_TABLES)}")
 
 for t in sorted(db.TENANTED_TABLES):

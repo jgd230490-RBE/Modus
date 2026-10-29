@@ -259,7 +259,10 @@ FLAG_LABEL = {"SHORTAGE": "SHORTAGE", "DAYS_NE_WEEK": "DAYS ≠ WEEK", "STOCKPIL
               # 14 Oct 2026 (bundle G, W17): a gate's planned arrivals on a day against what it can check in
               "GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY",
               # 28 Oct 2026 (task 0c): a dated zone in force crosses the route this week and it is not diverted
-              "NO_WAY_ROUND": "NO WAY ROUND"}
+              "NO_WAY_ROUND": "NO WAY ROUND",
+              # 29 Oct 2026 (task 3a): the concrete pours (pours.WORDS)
+              "POUR_COLD_JOINT": "COLD JOINT", "POUR_TRANSIT": "TRANSIT", "POUR_SHORT": "MIXERS SHORT",
+              "POUR_BAND": "IN A BAND", "POUR_OVER_PLAN": "OVER PLAN"}
 
 #: 14 Oct 2026 (W17): printed wherever a gate flag is — the figures are planned, not observed
 #: 17 Oct 2026: built from gate_hours.LIMIT_WORDS (it now names the shut times and bands), so the two cannot drift
@@ -900,8 +903,11 @@ def build_pdf(page):
 #: the Look-ahead's order of seriousness (frontend LA_FLAG_RANK): a lorry over a road limit first.
 #: 17 Oct 2026: + the gate flags where the grid ranks them (GATE_OVER 3.5 beside the route cap, GATE_NEAR 7.5 with the
 #: warnings); they had no rank and sorted after NOT ROUTED, so a gate over capacity hid behind SHARE
-DAY_FLAG_RANK = ("LIMIT", "NO_WAY_ROUND", "RESTRICTION", "SHORTAGE", "ROUTE_CAP", "GATE_OVER", "STOCKPILE_OVER", "IPT_SHARE",
-                 "DAYS_NE_WEEK", "PARENT_CHANGED", "GATE_NEAR", "STOCKPILE_EMPTY", "STOCKPILE_SOON", "UNBAKED")
+#: 29 Oct 2026 (task 3a): a pour's COLD JOINT and TRANSIT after NO WAY ROUND (the red group); MIXERS SHORT, IN A BAND and
+#: OVER PLAN, the pour's warnings, last
+DAY_FLAG_RANK = ("LIMIT", "NO_WAY_ROUND", "POUR_COLD_JOINT", "POUR_TRANSIT", "RESTRICTION", "SHORTAGE", "ROUTE_CAP",
+                 "GATE_OVER", "STOCKPILE_OVER", "IPT_SHARE", "DAYS_NE_WEEK", "PARENT_CHANGED", "GATE_NEAR", "STOCKPILE_EMPTY",
+                 "STOCKPILE_SOON", "UNBAKED", "POUR_SHORT", "POUR_BAND", "POUR_OVER_PLAN")
 #: the words a person reads on the sheet (the grid's LINE_FLAG_LABEL, with the restriction's own word from the flag).
 #: 17 Oct 2026: + GATE OVER / GATE NEAR, the grid's and the phone day card's words (the sheet printed "GATE_OVER"); the
 #: rail's longer GATE OVER CAPACITY (FLAG_LABEL) would wrap the FLAG column, and the sentence under it names the capacity
@@ -911,7 +917,10 @@ DAY_FLAG_WORD = {"LIMIT": "ROAD LIMIT", "RESTRICTION": "RESTRICTION", "SHORTAGE"
                  "GATE_OVER": "GATE OVER", "GATE_NEAR": "GATE NEAR",
                  # 27 Oct 2026 (stockpile forecast): 15 characters at most, the FLAG column's width
                  "STOCKPILE_SOON": "STOCKPILE SOON", "STOCKPILE_EMPTY": "STOCKPILE EMPTY",
-                 "NO_WAY_ROUND": "NO WAY ROUND"}    # 28 Oct 2026 (task 0c)
+                 "NO_WAY_ROUND": "NO WAY ROUND",    # 28 Oct 2026 (task 0c)
+                 # 29 Oct 2026 (task 3a): the concrete pours (pours.WORDS), 15 characters at most
+                 "POUR_COLD_JOINT": "COLD JOINT", "POUR_TRANSIT": "TRANSIT", "POUR_SHORT": "MIXERS SHORT",
+                 "POUR_BAND": "IN A BAND", "POUR_OVER_PLAN": "OVER PLAN"}
 
 
 #: flag sentences printed in full under the counts; the rest are counted (every one is in the Look-ahead)
