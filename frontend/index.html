@@ -12741,11 +12741,15 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   }, [token]);
 
   // 28 Oct 2026 (task 0c): the dated zones' diversions, read on their own so a slow answer never holds the routes table up
-  const loadDiversions = () =>
+  // 30 Oct 2026 (task 3c, the UI audit): BOTH reads inside the braces. Without them the holding read alone was the function's
+  // body and the diversions read ran as a statement of every render — each answer set state, which rendered again, which
+  // read again: a request every few hundred ms for as long as a Data page was open (the audit saw the page never settle).
+  const loadDiversions = () => {
     fetch(`${API}/holding`).then(r => r.ok ? r.json() : null).then(hs => { if(hs) setHoldSum(hs); }).catch(() => {});
     fetch(`${API}/routes/diversions`).then(r => r.ok ? r.json() : null).then(dv => {
       if(dv){ setDivPeriods(dv.periods || []); setWayRound(dv.way_round || { legs: 0, here_calls: 0, routes: [] }); }
     }).catch(() => {});
+  };
 
   const fetchStatus = () => {
     loadDiversions();

@@ -4545,6 +4545,13 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("0c: the first load and every network reload read the diversions, on their own (never inside the routes' Promise.all)",
      src.includes("fetch(`${API}/routes/diversions`)") && (src.match(/loadDiversions\(\)/g) || []).length >= 2
      && !/Promise\.all\(\[[^\]]*routes\/diversions/.test(src));
+  // 30 Oct 2026 (task 3c, the UI audit): BOTH reads sit inside loadDiversions's braces. Without them the holding read alone was
+  // the arrow's body and the diversions read was a statement of every render — each answer set state, which rendered again,
+  // which read again: a request every few hundred ms while a Data page was open (the audit: Locations / Routes / Zones never settled).
+  ok("⭐ 3c: loadDiversions is a braced function holding the holding read AND the diversions read — never a per-render statement",
+     src.includes("const loadDiversions = () => {\n    fetch(`${API}/holding`)")
+     && /const loadDiversions = \(\) => \{\n    fetch\(`\$\{API\}\/holding`\)[^\n]*\n    fetch\(`\$\{API\}\/routes\/diversions`\)[\s\S]{0,400}?\n  \};/.test(src)
+     && !src.includes("const loadDiversions = () =>\n    fetch("));
   ok("⭐ 0c: the Look-ahead line says Diverted (chip + details) and the rail knows NO WAY ROUND, ranked after a road limit",
      src.includes('(c.diversion && c.diversion.share > 0) ? "Diverted" : null') && src.includes('NO_WAY_ROUND: "NO WAY ROUND"')
      && /NO_WAY_ROUND: 0\.5/.test(src));

@@ -2575,7 +2575,15 @@ async function rowsDom(){
                             geometry: { type: "Polygon", coordinates: [[[-1, 52], [-0.9, 52], [-0.9, 52.1], [-1, 52]]] } }], haul_links: {} };
   const FC0 = { type: "FeatureCollection", features: [] };
   const fetchWas = w.fetch;
+  // 30 Oct 2026 (task 3c, the UI audit): the diversions and holding reads are ANSWERED and counted. Their answers set state,
+  // so a read made as a statement of the render (the bug the audit caught: the Data pages never settled) shows as a count
+  // that climbs with every render; loadDiversions as a braced function reads each once per load.
+  const CALLS = { div: 0, hold: 0 };
   w.fetch = (url) => { const u = String(url);
+    // answered at most five times each: under the per-render bug the sixth read stays open and the count stops at 6 (a clean failure,
+    // not a harness that never settles — answered without end, the bug made act() wait for ever)
+    if (/\/routes\/diversions$/.test(u)) { CALLS.div++; return CALLS.div <= 5 ? respond({ periods: [], way_round: { legs: 0, here_calls: 0, routes: [] } }) : new Promise(() => {}); }
+    if (/\/holding$/.test(u)) { CALLS.hold++; return CALLS.hold <= 5 ? respond({ holding_areas: [], routes: [] }) : new Promise(() => {}); }
     if (/\/locations\/geojson$/.test(u)) return respond(LOCS);
     if (/\/routes\/status$/.test(u)) return respond(STATUS);
     if (/\/routes\/summary$/.test(u)) return respond({ here_configured: true });
@@ -2649,7 +2657,13 @@ async function rowsDom(){
     await Z.done();
 
     // ---- Routes ----
+    CALLS.div = 0; CALLS.hold = 0;
     const R = await mount("routes");
+    await settle(300);
+    const n0 = { ...CALLS };
+    ok("⭐ 3c ROUTES DOM: mounting the Routes page reads the diversions and the holding areas ONCE each per load, never once per render "
+       + "(their answers set state; a per-render read climbs past 2 in 300 ms)",
+       CALLS.hold >= 1 && CALLS.div === CALLS.hold && CALLS.div <= 2, JSON.stringify(CALLS));
     const rb = [...R.el.querySelectorAll("button[data-route-open]")];
     const sheet = () => [...R.el.querySelectorAll("button")].find(b => b.textContent === "Route sheet (drivers)");
     ok("⭐ UI FIX 9 ROUTES: every route's code is a real <button> named 'Show <code> on the map'",
@@ -2658,6 +2672,8 @@ async function rowsDom(){
     await press(rb[1]);
     ok("⭐ UI FIX 9 ROUTES: pressing R002's button picks it (aria-current) and the Route sheet button comes on — reachable from the keyboard now",
        rb[1].getAttribute("aria-current") === "true" && !rb[0].hasAttribute("aria-current") && sheet() && !sheet().disabled);
+    ok("3c ROUTES DOM: picking a route re-renders the page and reads the diversions / holding areas NO further time",
+       CALLS.div === n0.div && CALLS.hold === n0.hold, JSON.stringify([n0, CALLS]));
     ok("P5: ...for an admin login the side panel is not an extra tab stop (its own controls are)", !R.el.querySelector('[aria-label="Routes panel"]'));
     ok("P5: an admin login sees Route all, Clear all routes, the Create route panel and each row's Route / Edit / Delete",
        [...R.el.querySelectorAll("button")].some(b => /^Route all/.test(b.textContent)) && /Create route/.test(R.el.textContent)
