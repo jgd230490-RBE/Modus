@@ -4757,7 +4757,8 @@ def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None
                                      hours=hours, check_in=check_in, bands=bands, pour_gate=pour_gate,
                                      pour_start=pour_start, pour_m3=pour_m3, pour_m3_per_load=pour_m3_per_load,
                                      pour_rate=pour_rate, arrivals=arrivals, rush_share=rush_share, rush_minutes=rush_minutes,
-                                     planned=planned, holding=holding, holding_call=holding_call, holding_spaces=holding_spaces)
+                                     holding=holding, holding_call=holding_call, holding_spaces=holding_spaces,
+                                     planned=planned)
         return sim.day(int(month), acc, factors=factors, working_days=_working_days(factors), scenario=sc,
                        send_lines=str(legs or "").lower() in ("1", "true", "yes"),
                        scale=scale, bucket=(week or "commit"), date=date)
