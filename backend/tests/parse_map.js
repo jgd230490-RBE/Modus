@@ -1205,8 +1205,9 @@ ok("§A: the images are re-added on style.load, guarded by hasImage",
   // a scope, and this file has been bitten by that before.
   && code.indexOf("addLocationImages(map);") > code.indexOf("map.on('style.load'")
   && code.indexOf("addLocationImages(map);") < code.indexOf("id: 'locations', type: 'symbol'"));
-ok("§A: the legend lists all seven types", /id="loc-legend"/.test(html)
-  && /const LOC_KINDS = \['Quarry', 'Port', 'Compound', 'Site', 'Railhead', 'Stockpile', 'Other'\]/.test(code));
+// NARROWED 29 Oct 2026 (task 3c): + 'Holding' (the holding area, labelled "Holding area" in the panel)
+ok("§A: the legend lists all eight types", /id="loc-legend"/.test(html)
+  && /const LOC_KINDS = \['Quarry', 'Port', 'Compound', 'Site', 'Railhead', 'Stockpile', 'Holding', 'Other'\]/.test(code));
 ok("§A: the layer is filtered to Node features, by canonical kind",
   /\['in', \['get', 'loc_kind'\], \['literal', visibleLocKinds\(\)\]\]/.test(code));
 
@@ -7237,6 +7238,38 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   ok("FULL: the user guide says how the phone map works — Layers (with the Guide), the one-line sheet and its red dot, ⤢ full screen and the ways out",
      g.includes("<strong>⤢ Full screen</strong> shows the map alone") && g.includes("<strong>⤡</strong>, the phone's Back or Esc leaves.")
      && g.includes("on an iPhone Safari keeps its bar") && !g.includes("On a phone the panel is closed by default; the ☰ button opens it."));
+}
+
+{ // ---- 29 Oct 2026 (task 3c): the holding areas on the public map — the place, the chevrons, the card, the legend ------
+  const hc = code.slice(code.indexOf("const HOLD_CHEV = {"), code.indexOf("function renderMonthFrame(m){"));
+  ok("⭐ HOLD: 'Holding' is a location kind with its own fill, mapped from the type 'Holding area', labelled 'Holding area' in the panel",
+     hc.length > 500 && /const LOC_KINDS = \['Quarry', 'Port', 'Compound', 'Site', 'Railhead', 'Stockpile', 'Holding', 'Other'\]/.test(code)
+     && code.includes("Holding:   '#1D4ED8',") && code.includes("if (/^holding( area)?$/i.test(s)) return 'Holding';")
+     && code.includes("const LOC_LABEL = { Holding: 'Holding area' };") && code.includes("`${LOC_LABEL[k] || k}${note[k] ?"));
+  ok("HOLD: the mark is a square with a white H (three white bars), drawn like the other marks (locGlyph), never a DOM marker",
+     code.includes("kind === 'Compound' || kind === 'Railhead' || kind === 'Holding'")
+     && (code.slice(code.indexOf("} else if (kind === 'Holding') {"), code.indexOf("} else if (kind === 'Site') {")).match(/g\.fillRect\(/g) || []).length === 3);
+  ok("⭐ HOLD: the popup says one sentence and offers no count and no route filter",
+     code.includes("else if (kind === 'Holding') h += `<p style='margin:4px 0;'>Construction lorries wait here before going to ${rlEsc(props.holding_served || 'the site')}.</p>`;")
+     && code.includes("h += kind === 'Holding' ? '</div>' : `<button onclick=\"filterByNode(") && !/waiting now|held now|lorries waiting/i.test(hc));
+  ok("⭐ HOLD: the chevrons — a symbol layer of '›' along the run from the stop to the end of the leg, under the labels (labelAnchor), gated on styleReady, never an idle wait",
+     hc.includes("id: 'holding-chevrons', type: 'symbol', source: 'holding-chevrons-source'") && hc.includes("'symbol-placement': 'line'") && hc.includes("'text-field': '›'")
+     && hc.includes("'text-keep-upright': false") && hc.includes("}, labelAnchor());") && hc.includes("if (!styleReady()) return;") && !hc.includes("once('idle'")
+     && hc.includes("if (p.holding_at_km == null || p.holding_straight === true || p.holding_straight === 'true') return;"));
+  ok("HOLD: the chevrons follow the leg toggles, the four filters and the month (is_forecast while the timeline is on), and the clicked route's dim",
+     hc.includes("if (typeof TL !== 'undefined' && TL.on) f.push(['==', ['get', 'is_forecast'], true]);")
+     && code.includes("if (map.getLayer('holding-chevrons')) applyHoldingChevronFilter();")
+     && code.includes("map.setPaintProperty('holding-chevrons', 'text-opacity', routeId ? ['case', ['==', ['get', 'route_id'], routeId], 1, DIM_OPACITY] : 1)"));
+  ok("HOLD: rebuilt where the lines are — on data load, every month frame, the timeline closing — and re-added with the base layers on style.load",
+     (code.match(/updateHoldingChevrons\(/g) || []).length >= 4 && (code.match(/ensureHoldingChevrons\(\);/g) || []).length >= 2
+     && code.indexOf("ensureHoldingChevrons();") > code.indexOf("'id': 'inbound-lines',"));
+  ok("⭐ HOLD: the route card reads origin → H holding area → destination, with the one sentence; a straight one says 'first'",
+     code.includes("' → <span class=\"hbadge\" aria-hidden=\"true\">H</span>' + escHtml(rp.holding_name)")
+     && code.includes("'Lorries wait at the holding area and are called forward to the gate'")
+     && code.includes("'Lorries call off at ' + escHtml(rp.holding_name || 'the holding area') + ' first.'"));
+  ok("HOLD: the legend line, hidden until the scheme has a holding area; no purple and no dash came with it; lorries, never trucks",
+     html.includes('<div class="control-item" id="holding-legend" hidden>') && html.includes("Holding area · <b>›››</b> called forward to the gate")
+     && !/7c3aed|9572ee|violet|line-dasharray/i.test(hc) && !/\btruck/i.test(hc));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

@@ -429,10 +429,11 @@ dc = tenant_package.counts(demo)
 # NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): + the precast works and the crane depot (2 locations, 2 gates, 2 access
 # roads) and the three abnormal loads, which are rows of their own, never forecasts
 # RE-PINNED 28 Oct 2026 (simulation v2, the Tilton Viaduct site L019: two gates G020 / G021 with access roads Z027 / Z028, four internal roads Z029–Z032, seven routes R044–R050, 942 approved line-months)
-ok("demo: 19 locations, 50 routes, 3 teams, 8 sections, 944 forecasts (942 approved + 1 pending + 1 rejected), 23 gates, 39 zones "
-   "(5 + 23 gate access roads + 4 roads inside the viaduct site + 7 advisory), 11 haul links, 3 abnormal loads, 4 site areas",
-   dc["locations"] == 19 and dc["routes"] == 50 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 944
-   and dc["location_gates"] == 23 and dc["zones"] == 39 and dc["route_haul_roads"] == 11 and dc["abnormal_loads"] == 3
+# RE-PINNED 29 Oct 2026 (task 3c): + the Billesdon Lane holding area, its entrance gate and the gate's access road (Z040)
+ok("demo: 20 locations, 50 routes, 3 teams, 8 sections, 944 forecasts (942 approved + 1 pending + 1 rejected), 24 gates, 40 zones "
+   "(5 + 24 gate access roads + 4 roads inside the viaduct site + 7 advisory), 11 haul links, 3 abnormal loads, 4 site areas",
+   dc["locations"] == 20 and dc["routes"] == 50 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 944
+   and dc["location_gates"] == 24 and dc["zones"] == 40 and dc["route_haul_roads"] == 11 and dc["abnormal_loads"] == 3
    and dc["site_areas"] == 4, str(dc))
 _locs = {l["id"]: l for l in demo["tables"]["locations"]}
 _rts = {r["id"]: r for r in demo["tables"]["routes"]}

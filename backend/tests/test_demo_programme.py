@@ -245,8 +245,8 @@ ok("⭐ the carbon read gives the feed NO material carbon (counted once, in the 
 _kept = {"Kilby Ridge Quarry", "Northfield Quarry", "Brook Pit", "Harborough Rail Freight Terminal", "Harborough Compound",
          "Langton Compound", "Tilton Compound", "Melton Compound", "Stockpile South", "Stockpile Tilton", "Stockpile North"}
 # NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): eighteen — the precast works and the crane depot the three abnormal loads start from
-ok("⭐ nineteen sites (RE-PINNED 28 Oct: + the Tilton Viaduct site): the eleven named after places, and every other one says \"(fictional)\" in its name",
-   len(T["locations"]) == 19 and {l["name"] for l in T["locations"]} >= _kept
+ok("⭐ twenty sites (RE-PINNED 28 Oct: + the Tilton Viaduct site; 29 Oct, task 3c: + the Billesdon Lane holding area): the eleven named after places, and every other one says \"(fictional)\" in its name",
+   len(T["locations"]) == 20 and {l["name"] for l in T["locations"]} >= _kept
    and all("(fictional)" in l["name"] for l in T["locations"] if l["name"] not in _kept))
 ok("⭐ D75 (phase 3): the three fictional abnormal loads ship in the package — the 4.6 m units (approved) from the rail terminal to Langton Compound, the 72 t crane (pending, in and out) from the crane depot and the 32 m beams (pending, a Special Order) from the precast works to Melton Compound; the two new sites with a gate each; nothing routed in the file (a planner draws on live)",
    [(m["id"], m["status"], m["origin_id"], m["dest_id"], bool(m.get("return_abnormal")), m.get("geometry_json")) for m in T["abnormal_loads"]]

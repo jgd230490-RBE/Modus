@@ -71,6 +71,7 @@ import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts
 import clp_doc  # 30 Oct 2026 (task 4a) — the outline Construction Logistics Plan as a Word file, for a site or a set
 import site_areas  # 28 Oct 2026 (simulation v2): the areas inside a site
 import pours  # 29 Oct 2026 (task 3a): concrete pours
+import holding  # 29 Oct 2026 (task 3c): vehicle holding areas
 import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
 import heavy_reads  # 21 Oct 2026 — the public map's heavy reads a few at a time, one memory line each (live OOM kills)
 import abnormal  # 22 Oct 2026 (S16 / B5) — the abnormal loads: each one its own planned movement, with the rules' advice
@@ -4283,6 +4284,12 @@ class LocationIn(BaseModel):
     site_rules: Optional[str] = None
     # 28 Oct 2026 (simulation v2): the speed on the site's internal roads, km/h; written only when sent
     site_speed_kph: Optional[float] = None
+    # 29 Oct 2026 (task 3c): a holding area's own fields (type "Holding area" only) and a site's holding area;
+    # each written only when sent
+    holding_spaces: Optional[int] = None
+    holding_call: Optional[int] = None
+    holding_exempt: Optional[List[str]] = None
+    holding_id: Optional[str] = None
 
 
 def _fields_set(model):
@@ -4319,10 +4326,18 @@ def _check_admin(token):
 @app.post("/api/admin/locations")
 def create_location(body: LocationIn, token: Optional[str] = None):
     _check_admin(token)
+    sent = set(_fields_set(body))
     cp = (network.clp_cap_problem(body.clp_cap_per_day) or network.sheet_text_problem(body.site_rules, "the site rules")
-          or network.site_speed_problem(body.site_speed_kph))
+          or network.site_speed_problem(body.site_speed_kph)
+          or holding.problem_fields(body.holding_spaces, body.holding_call, body.holding_exempt, given=sent)
+          or holding.problem_calls_through(None, body.holding_id))
     if cp:
         raise HTTPException(400, cp)
+    hold_given = {"holding_spaces", "holding_call", "holding_exempt"} & sent
+    if hold_given and network.canonical_loc_type(body.loc_type) != holding.TYPE:
+        raise HTTPException(400, "the spaces, called forward and the vehicles belong to a holding area")
+    if body.holding_id is not None and network.canonical_loc_type(body.loc_type) == holding.TYPE:
+        raise HTTPException(400, "a holding area does not call off through another")
     out = network.create_location(body.name, body.role, body.materials, body.lat, body.lon,
                                   body.loc_type, supplies=body.supplies, receives=body.receives,
                                   gate_lat=body.gate_lat, gate_lon=body.gate_lon,
@@ -4333,6 +4348,16 @@ def create_location(body: LocationIn, token: Optional[str] = None):
         network.set_site_rules(out["id"], body.site_rules)
     if body.site_speed_kph is not None and out.get("id"):
         network.set_site_speed(out["id"], body.site_speed_kph)
+    # 29 Oct 2026 (task 3c)
+    if hold_given and out.get("id"):
+        r = holding.set_holding(out["id"], hold_given, spaces=body.holding_spaces, call=body.holding_call,
+                                exempt=body.holding_exempt)
+        if r.get("error"):
+            raise HTTPException(400, r["error"])
+    if body.holding_id is not None and out.get("id"):
+        r = holding.set_calls_through(out["id"], body.holding_id)
+        if r.get("error"):
+            raise HTTPException(400, r["error"])
     return out
 
 
@@ -4361,6 +4386,18 @@ def update_location(location_id: str, body: LocationIn, token: Optional[str] = N
         sp = network.site_speed_problem(body.site_speed_kph)
         if sp:
             raise HTTPException(400, sp)
+    # 29 Oct 2026 (task 3c): the holding area's fields and a site's holding area, only when sent
+    sent = set(_fields_set(body))
+    hold_given = {"holding_spaces", "holding_call", "holding_exempt"} & sent
+    calls_given = "holding_id" in sent
+    if hold_given:
+        hp = holding.problem_fields(body.holding_spaces, body.holding_call, body.holding_exempt, given=sent)
+        if hp:
+            raise HTTPException(400, hp)
+    if calls_given:
+        hp = holding.problem_calls_through(location_id, body.holding_id)
+        if hp:
+            raise HTTPException(400, hp)
     out = network.update_location(location_id, body.name, body.role, body.materials,
                                   body.lat, body.lon, body.loc_type,
                                   supplies=body.supplies, receives=body.receives,
@@ -4374,6 +4411,15 @@ def update_location(location_id: str, body: LocationIn, token: Optional[str] = N
         network.set_site_rules(location_id, body.site_rules)
     if speed_given and not (isinstance(out, dict) and out.get("error")):
         network.set_site_speed(location_id, body.site_speed_kph)
+    if hold_given and not (isinstance(out, dict) and out.get("error")):
+        r = holding.set_holding(location_id, hold_given, spaces=body.holding_spaces, call=body.holding_call,
+                                exempt=body.holding_exempt)
+        if r.get("error"):
+            raise HTTPException(400, r["error"])
+    if calls_given and not (isinstance(out, dict) and out.get("error")):
+        r = holding.set_calls_through(location_id, body.holding_id)
+        if r.get("error"):
+            raise HTTPException(400, r["error"])
     return out
 
 
@@ -4584,6 +4630,14 @@ def delete_pour_ep(pour_id: str):
     return pours.delete_pour(pour_id)
 
 
+@app.get("/api/holding")
+def holding_summary():
+    """29 Oct 2026 (task 3c): every holding area with its sites, and which routes call off (holding.summary). Any
+    signed-in code: the Locations and Routes pages, the Simulation."""
+    _require_access()
+    return holding.summary()
+
+
 @app.get("/api/site-areas")
 def list_site_areas(location_id: Optional[str] = None, include_inactive: bool = True):
     """28 Oct 2026 (simulation v2): the areas inside the sites. Any signed-in code (the Locations page and the simulation)."""
@@ -4659,6 +4713,7 @@ def _gate_arrivals_build(month, acc):
     for g in out.get("gates") or []:
         g["busiest_hour"] = (b.get("gates") or {}).get(g["gate_id"])
     out["busiest_note"] = b.get("note")
+    out["holding"] = b.get("holding") or []        # 29 Oct 2026 (task 3c): a row a holding area under the gates
     return out
 
 
@@ -4671,7 +4726,8 @@ def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None
             site_speed: Optional[List[str]] = Query(None), service: Optional[List[str]] = Query(None),
             bays: Optional[List[str]] = Query(None), wash: Optional[str] = None,
             arrivals: Optional[str] = None, rush_share: Optional[str] = None, rush_minutes: Optional[str] = None,
-            planned: Optional[str] = None):
+            planned: Optional[str] = None, holding: Optional[str] = None,
+            holding_call: Optional[List[str]] = Query(None), holding_spaces: Optional[List[str]] = Query(None)):
     """
     16 Oct 2026 (S3) — the haulage simulation: an average working day of one month at every gate, lorry by lorry
     (sim.py; the example the user approved on 16 Oct is its spec). Whole loads per line, each gate's arrivals spread
@@ -4703,6 +4759,7 @@ def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None
                                      hours=hours, check_in=check_in, bands=bands, pour_gate=pour_gate,
                                      pour_start=pour_start, pour_m3=pour_m3, pour_m3_per_load=pour_m3_per_load,
                                      pour_rate=pour_rate, arrivals=arrivals, rush_share=rush_share, rush_minutes=rush_minutes,
+                                     holding=holding, holding_call=holding_call, holding_spaces=holding_spaces,
                                      planned=planned)
         return sim.day(int(month), acc, factors=factors, working_days=_working_days(factors), scenario=sc,
                        send_lines=str(legs or "").lower() in ("1", "true", "yes"),
@@ -4913,6 +4970,7 @@ def update_route(route_id: str, body: RoutePatch, token: Optional[str] = None):
 
 class RoutePlanning(BaseModel):
     max_vehicles_per_day: Optional[int] = None
+    skip_holding: Optional[int] = None          # 29 Oct 2026 (task 3c): 1 = never calls off at a holding area
     rate_eur_per_load: Optional[float] = None
     rate_eur_per_t: Optional[float] = None
     rate_eur_per_km: Optional[float] = None
@@ -5089,11 +5147,13 @@ def diagnostics_compare(route_id: str, probe: bool = False, token: Optional[str]
 
 @app.post("/api/admin/bake-route")
 def bake_route(route_id: str, profile: str = network.DEFAULT_PROFILE,
-               legs: Optional[str] = None, token: Optional[str] = None):
-    """Bake one route. Both legs by default; pass legs='loaded' for the outbound only."""
+               legs: Optional[str] = None, via_holding: bool = False, token: Optional[str] = None):
+    """Bake one route. Both legs by default; pass legs='loaded' for the outbound only.
+    29 Oct 2026 (task 3c): via_holding=true routes each leg that calls off THROUGH its holding area (one more HERE call
+    a leg, one option) — the Routes page's "Route again" for a line that does not pass it."""
     _check_admin(token)
     want = tuple(l.strip() for l in legs.split(",") if l.strip() in network.LEGS) if legs else None
-    return network.bake_route(route_id, profile, legs=want)
+    return network.bake_route(route_id, profile, legs=want, via_holding=via_holding)
 
 
 @app.get("/api/admin/diagnostics/zones")
