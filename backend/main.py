@@ -68,6 +68,7 @@ import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one 
 import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
 import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
+import clp_doc  # 30 Oct 2026 (task 4a) — the outline Construction Logistics Plan as a Word file, for a site or a set
 import site_areas  # 28 Oct 2026 (simulation v2): the areas inside a site
 import pours  # 29 Oct 2026 (task 3a): concrete pours
 import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
@@ -4766,6 +4767,28 @@ def clp_pack_xlsx(month: Optional[int] = None):
         raise HTTPException(503, str(e))
     return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="{clp_pack.file_name(m, "xlsx")}"'})
+
+
+@app.get("/api/clp/document.docx")
+def clp_document_docx(locations: Optional[str] = None, impact: Optional[str] = None):
+    """30 Oct 2026 (task 4a, PR 1) — the outline Construction Logistics Plan as a Word file for one location or a set
+    (`locations` = ids, comma-separated): every figure Wayscope holds filled in, a yellow "To complete" wherever only a
+    person can write, a dated snapshot. Planner or admin. `impact` = higher (default) or medium picks §5's checklist.
+    422 for no location, an unknown one or an unknown impact. Kept until the next write, like the CLP pack."""
+    _require_approver()
+    ids = [x.strip() for x in str(locations or "").split(",") if x.strip()]
+    imp = (impact or "higher").strip().lower()
+    if imp not in clp_doc.IMPACT:
+        raise HTTPException(422, "impact must be higher or medium")
+    factors = conversions.load_factors()
+    try:
+        data = clp_doc.gather(ids, factors=factors, working_days=_working_days(factors))
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    body = _staff_bytes("clp/document.docx", {"locations": ids, "impact": imp}, lambda: clp_doc.build(data, impact=imp))
+    return Response(content=body,
+                    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    headers={"Content-Disposition": f'attachment; filename="{clp_doc.file_name(data)}"'})
 
 
 @app.post("/api/admin/gates")
