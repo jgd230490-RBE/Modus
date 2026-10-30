@@ -22,6 +22,7 @@ NOT covered: PostgreSQL (SQLite only), HERE (no key — routes stay UNBAKED), Ma
 (the PDF falls back to its schematic map when the static-map service is unreachable),
 and any browser rendering.
 """
+import io
 import json
 import math
 import os
@@ -1219,6 +1220,24 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and 'filename="wayscope-clp-pack-2026-10.xlsx"' in r.headers.get("content-disposition", ""), str(r.status_code))
     r = c.get("/api/clp/pack.pdf?month=10")
     ok("🔴 the CLP pack without a code — 401", r.status_code == 401, str(r.status_code))
+    # 30 Oct 2026 (task 4a): the CLP document, a Word file for one site or a set of sites
+    r = c.get("/api/clp/document.docx?locations=L019", headers=PLAN)
+    _cd = r.headers.get("content-disposition", "")
+    ok("⭐ the CLP document for the viaduct site: 200, a Word file, 'CLP <site> <date>.docx'",
+       r.status_code == 200 and r.content[:2] == b"PK"
+       and r.headers.get("content-type", "").startswith("application/vnd.openxmlformats-officedocument.wordprocessingml")
+       and re.search(r'filename="CLP [^"]+ \d{4}-\d{2}-\d{2}\.docx"', _cd) is not None, f"{r.status_code} {_cd}")
+    if r.status_code == 200:
+        import zipfile as _zf
+        _z = _zf.ZipFile(io.BytesIO(r.content))
+        _hx = b"".join(_z.read(n) for n in _z.namelist() if n.startswith("word/header"))
+        ok("...the demo's notice heads its pages", b"DEMO" in _hx)
+    r = c.get("/api/clp/document.docx?locations=L019")
+    ok("🔴 the CLP document without a code — 401", r.status_code == 401, str(r.status_code))
+    r = c.get("/api/clp/document.docx?locations=L019", headers=NORTH)
+    ok("🔴 the CLP document on a team code — 403", r.status_code == 403, str(r.status_code))
+    r = c.get("/api/clp/document.docx?locations=L999", headers=PLAN)
+    ok("🔴 an unknown location — 422 in words", r.status_code == 422 and "No such location: L999." in r.text, str(r.status_code))
     print("  CLP monitoring, Oct 2026 (demo package):")
     for k in cm.get("order") or []:
         c_ = ch.get(k) or {}

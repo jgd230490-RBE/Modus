@@ -518,6 +518,11 @@ def validate(doc, network=None):
         pp = _pours.limits_problem(plan.get("pours"))
         if pp:
             p.append(pp)
+        # 30 Oct 2026 (task 4a): the CLP document's programme and stages (absent = clp_doc.DEFAULT_STAGES)
+        import clp_doc as _clp_doc
+        cp = _clp_doc.settings_problem(plan.get("clp"))
+        if cp:
+            p.append(cp)
         # 22 Oct 2026 (abnormal loads, D74): which nation's bank holidays the C&U notice calendar leaves out (the STGO
         # calendar leaves out every GB public holiday whatever this says). Absent = England and Wales.
         an = plan.get("abnormal_nation")
