@@ -3117,6 +3117,23 @@ def routes_summary():
     return _staff_json("routes/summary", {}, network.summary)
 
 
+@app.get("/api/routes/community-counts")
+def routes_community_counts():
+    """
+    30 Oct 2026 (task 4b): the community considerations near each route's drawn line, by kind — the Routes page's "Near the
+    route" column. Counts only, from the stored layer (nothing is fetched); `fetched_at` is null until it has been, and a
+    route with no drawn line is absent. A team code reads its own team's routes. Kept until the next write.
+    """
+    acc = access.current() or {}
+    return _staff_json("routes/community-counts", {}, lambda: _community_counts_build(acc.get("ipt")))
+
+
+def _community_counts_build(team):
+    import route_community
+    with _heavy("routes/community-counts"):
+        return route_community.counts(team=team)
+
+
 @app.get("/api/routes/diversions")
 def routes_diversions(route_id: Optional[str] = None):
     """

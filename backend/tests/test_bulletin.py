@@ -783,6 +783,10 @@ ok("…and that is what it gets: the team code's busiest routes and discipline r
 ok("month_rollup over a window reaches the same figures as the pure function",
    bulletin.month_rollup(10, PLANNER, months=[10, 11])["vehicles"]["fleet"] == R2M["vehicles"]["fleet"]
    and bulletin.month_rollup(10, PLANNER)["headline"] == H)
+# 30 Oct 2026 (task 4b): the typed contact lines (Config -> Map and bulletin) a stubbed tenant may carry
+CONTACTS = dict(concern_email="haulage.concerns@example.org", contact_phone="0116 000 0000",
+                working_hours="Monday to Friday 07:30-18:00", other_formats="email haulage.concerns@example.org",
+                newsletter_url="https://www.example.org/lorries")
 _real_ts = bulletin.config.tenant_settings
 bulletin.config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)",
                                                         demo_notice="Fictional demo scheme · nothing here is real")
@@ -983,9 +987,13 @@ finally:
 ok("…and with Inter it prints the subscript", export._co2_pdf("t CO2e a day") == "t CO₂e a day" and export._co2_pdf(None) == "")
 # NARROWED 14 Oct 2026 (the publishing check): the placeholder reads "[contact not set yet]" ("[... a typed field this scheme has not set yet]"
 # read as an error)
-ok("⭐ the report-a-lorry block with the typed fields as placeholders (no invented contact)",
+# NARROWED 30 Oct 2026 (task 4b): only the report line keeps a visible gap; the hours and other formats lines are LEFT OUT
+# while empty (they used to print "[not set yet]")
+ok("⭐ the report-a-lorry block with nothing typed: the report line keeps its gap (no invented contact), the other lines are left out",
    "Report a lorry off route: the date, time, place, direction and registration, to [contact not set yet]." in T10J
-   and "Working hours: [not set yet]." in T10J and "@" not in S10["report"]["lorry"])
+   and "Working hours" not in T10J and "Large print and other formats" not in T10J and "not set yet" in T10J
+   and T10J.count("not set yet") == T10J.count("[contact not set yet]") and "@" not in S10["report"]["lorry"]
+   and S10["report"]["hours"] is None and S10["report"]["formats"] is None and S10["newsletter_url"] is None)
 # 12 Oct 2026 (Track C review): the typed tenant.concern_email (the map's "Report a concern" address) is the
 # bulletin's report-a-lorry address too; the placeholder prints only while it is not typed
 _real_ts3 = config.tenant_settings
@@ -1155,7 +1163,7 @@ _CO2_ROUTE = {rid: sum(l["co2_t"] for l in P10["lines"] if l["route_id"] == rid 
 _CT = _CO2_ROUTE["R1"] + _CO2_ROUTE["R2"]
 _tt = lambda v: f"{v:,.0f} t" if v >= 10 else f"{v:,.1f} t"
 _real_ts4 = config.tenant_settings
-config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE, **CONTACTS)
 _calls = []
 _real_open = export.urllib.request.urlopen
 
@@ -1534,7 +1542,7 @@ ok("⭐ W12: typed bands are saved and read back by ONE reader; a measure not ty
    and config.tenant_settings(conversions)["council_breaks"] == config.council_breaks(), str(_sv))
 ok("⭐ W12 held equal, map side: both payloads the map reads carry the scheme's bands (shapes and the month's figures)",
    _A10["stops"] == config.council_breaks() and areas.shapes()["stops"] == config.council_breaks())
-config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE)
+config.tenant_settings = lambda *a, **k: dict(config.TENANT_DEFAULTS, name="Wolds Link (fictional)", demo_notice=NOTICE, **CONTACTS)
 try:
     S10B = bulletin_doc.sheet(10, PLANNER, now=datetime.datetime(2026, 10, 12, 9, 0, tzinfo=datetime.timezone.utc))
     PDF10B = export.build_bulletin_pdf(S10B)
@@ -2029,9 +2037,68 @@ ok("⭐ the leaflet: the band (leaflet), the demo bar, the heading, the four fig
    all(t in _LPB[0] for t in ("Lorry movements bulletin · October 2026", "· leaflet ·", "Fictional demo scheme · nothing here is real",
                               "Lorries on your roads in October 2026", bulletin_doc.DEFINITION, "Two-way movements a day:",
                               "Key points", "Report a lorry off route", "Working hours:", "Large print and other formats:",
-                              "Every route, the councils and the carbon are in the monthly newsletter: [link not set yet]"))
+                              "Working hours: Monday to Friday 07:30-18:00.",
+                              "Every route, the councils and the carbon are in the monthly newsletter: https://www.example.org/lorries"))
    and "(page 2)" not in _LPB[0] and "page 1" in _LPB[0]
    and all(f["value"] in _LPB[0] for f in S10B["headline"]) and b"Inter-Bold" in LF10B and all(b"+" in f for f in _shown_fonts(LF10B)))
+# --------------------------------------------------------------------------- #
+#  30 Oct 2026 (task 4b): the typed contact lines — Config -> Map and bulletin -> Contact lines
+# --------------------------------------------------------------------------- #
+_RL = bulletin_doc.report_lines
+_LEAD = "Report a lorry off route: the date, time, place, direction and registration, "
+ok("⭐ 4b the four states of the report box: nothing / address / address + phone / all typed",
+   _RL({}) == {"lorry": _LEAD + "to [contact not set yet].", "hours": None, "formats": None}
+   and _RL({"concern_email": "a@b.org"})["lorry"] == _LEAD + "to a@b.org."
+   and _RL({"concern_email": "a@b.org", "contact_phone": "0116 000 0000"})["lorry"] == _LEAD + "to a@b.org or on 0116 000 0000."
+   and _RL({"contact_phone": "0116 000 0000"})["lorry"] == _LEAD + "on 0116 000 0000."
+   and _RL({"working_hours": "Mon-Fri 07:30-18:00.", "other_formats": "ask a@b.org"})["hours"] == "Working hours: Mon-Fri 07:30-18:00."
+   and _RL({"other_formats": "ask a@b.org"})["formats"] == "Large print and other formats: ask a@b.org."
+   and _RL({"working_hours": ""})["hours"] is None)
+LH10 = bulletin_doc.leaflet_html(S10)
+ok("⭐ 4b the leaflet page with nothing typed: the report gap only, no hours / formats / newsletter line, no 'not set yet' elsewhere",
+   "[contact not set yet]" in LH10 and "Working hours" not in LH10 and "Large print" not in LH10
+   and "monthly newsletter" not in LH10 and LH10.count("not set yet") == 1)
+ok("🔴 4b the staff-only 'open it here' link is gone from the leaflet page, typed or not",
+   "open it here" not in LH10 and "open it here" not in LH10B and "(staff)" not in LH10 + LH10B
+   and "/bulletin/?month=" not in LH10B)
+ok("⭐ 4b the leaflet page with every line typed: report, hours, formats, and the newsletter line with its link",
+   "haulage.concerns@example.org or on 0116 000 0000." in LH10B and "Working hours: Monday to Friday 07:30-18:00." in LH10B
+   and "Large print and other formats: email haulage.concerns@example.org." in LH10B
+   and '<a href="https://www.example.org/lorries">https://www.example.org/lorries</a>' in LH10B
+   and "not set yet" not in LH10B)
+_LPJ = " ".join(_LP[0].split())
+ok("⭐ 4b the leaflet PDF with nothing typed prints the gap only; with all typed (S10B) the hours, formats and link as text",
+   "Working hours" not in _LPJ and "monthly newsletter" not in _LPJ and _LPJ.count("not set yet") == 1
+   and "https://www.example.org/lorries" in " ".join(_LPB[0].split()) and "0116 000 0000" in " ".join(_LPB[0].split()))
+ok("🔴 4b the newsletter's report box (page and PDF) follows the same lines; nothing typed leaves the other two out",
+   HTML10B.count("Working hours: Monday to Friday 07:30-18:00.") == 2 and "Working hours" not in bulletin_doc.html(S10)
+   and "Large print" not in bulletin_doc.html(S10))
+# escaping: the typed text is plain text in the page (validation refuses < and >; the page escapes anyway)
+_SE = dict(S10, report=_RL({"working_hours": "A & B", "concern_email": "a@b.org"}), newsletter_url="https://x.org/?a=1&b=2")
+_LHE = bulletin_doc.leaflet_html(_SE)
+ok("🔴 4b typed text is escaped in the leaflet page", "Working hours: A &amp; B." in _LHE and "A & B" not in _LHE
+   and 'href="https://x.org/?a=1&amp;b=2"' in _LHE)
+# the config side: validated on Save, cleaned when read
+ok("⭐ 4b config: tenant_settings serves each typed line trimmed, None when empty or unusable; the defaults are None",
+   all(config.TENANT_DEFAULTS[k] is None for k in ("contact_phone", "working_hours", "other_formats", "newsletter_url"))
+   and config.tenant_settings(doc={"tenant": {"working_hours": "  Mon-Fri 08:00-18:00 ", "contact_phone": "0116 000 0000",
+                                              "other_formats": "ask us", "newsletter_url": " https://www.x.org/l "}})["working_hours"] == "Mon-Fri 08:00-18:00"
+   and config.tenant_settings(doc={"tenant": {"newsletter_url": "http://x.org"}})["newsletter_url"] is None
+   and config.tenant_settings(doc={"tenant": {"working_hours": "a<b"}})["working_hours"] is None
+   and config.tenant_settings(doc={"tenant": {"working_hours": "x" * 161}})["working_hours"] is None
+   and config.tenant_settings(doc={})["other_formats"] is None)
+_good = {"name": "x", "contact_phone": "0116 000 0000", "working_hours": "Mon-Fri", "other_formats": "ask",
+         "newsletter_url": "https://www.example.org/lorries", "concern_email": "a@b.org"}
+_bad4 = [("working_hours", "a<b"), ("working_hours", "x" * 161), ("other_formats", "line" + chr(10) + "break"), ("contact_phone", "1" * 41),
+        ("newsletter_url", "http://x.org"), ("newsletter_url", "javascript:alert(1)"), ("newsletter_url", "https://x.org/a b"),
+        ("newsletter_url", "https://"), ("newsletter_url", "https://nodot"), ("newsletter_url", "https://x.org/" + "a" * 300),
+        ("working_hours", 5)]
+_msgs = lambda t: config.validate(dict(json.loads(json.dumps(_doc0)), tenant=t))
+ok("⭐ 4b config.validate: typed contact lines pass; HTML, line breaks, over-length, a non-https link and a bare host are refused",
+   not [m for m in _msgs(_good) if any(k in m for k in ("phone number", "working hours", "large print", "newsletter link"))]
+   and all(any((config.CONTACT_LABELS.get(f) or "newsletter link") in m for m in _msgs(dict(_good, **{f: v}))) for f, v in _bad4)
+   and not [m for m in _msgs(dict(_good, contact_phone="", working_hours=None)) if "phone number" in m or "working hours" in m]
+   and not any("tenant." in m or "null" in m for f, v in _bad4 for m in _msgs(dict(_good, **{f: v}))))   # plain words, no field names
 ok("🔴 the leaflet: word ban, UK words, no team id or name", not _BANNED.search(_LPB[0]) and not _trucks(_LPB[0])
    and not ID_FORM.search(_LPB[0]) and "North Team" not in _LPB[0])
 # NARROWED 14 Oct 2026 (the publishing check): bigger maps; the fit is found on sizing passes with no basemap, and

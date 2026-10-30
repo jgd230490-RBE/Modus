@@ -79,7 +79,10 @@ TENANT_DEFAULTS = {"name": "Wayscope", "team_label": "Team", "currency": "EUR", 
                    # 12 Oct 2026 (map review 2.1 / 2.3): the address the public map's "Report a concern" link
                    # writes to. TYPED by the tenant, never invented: null (the demo) and the map says that no
                    # contact address has been typed. Validated as one plain email address or null.
-                   "concern_email": None}
+                   "concern_email": None,
+                   # 30 Oct 2026 (task 4b): the bulletin's and the resident leaflet's other typed lines. Plain text or null;
+                   # an empty one is left out of the page and the PDFs (contact_text / newsletter_link check them).
+                   "contact_phone": None, "working_hours": None, "other_formats": None, "newsletter_url": None}
 
 CURRENCIES = {
     "EUR": {"symbol": "€", "name": "euro"},
@@ -149,6 +152,9 @@ def tenant_settings(conversions=None, doc=None):
     t["demo_notice"] = dn.strip() if isinstance(dn, str) and dn.strip() else None
     ce = (block or {}).get("concern_email") if isinstance(block, dict) else None
     t["concern_email"] = ce.strip() if is_concern_email(ce) else None
+    for k in CONTACT_TEXT_MAX:
+        t[k] = contact_text((block or {}).get(k) if isinstance(block, dict) else None, k)
+    t["newsletter_url"] = newsletter_link((block or {}).get("newsletter_url") if isinstance(block, dict) else None)
     t["council_breaks"] = council_breaks(doc=doc)
     return t
 
@@ -205,6 +211,33 @@ _CONCERN_EMAIL_RE = re.compile(r"^[^\s@<>\"',;:?&]+@[^\s@<>\"',;:?&]+\.[^\s@<>\"
 
 def is_concern_email(v):
     return isinstance(v, str) and 0 < len(v.strip()) <= 254 and bool(_CONCERN_EMAIL_RE.match(v.strip()))
+
+
+# 30 Oct 2026 (task 4b): the contact lines the bulletin and the leaflet print. Plain text only: no < or >, no line breaks.
+CONTACT_TEXT_MAX = {"contact_phone": 40, "working_hours": 160, "other_formats": 160}
+CONTACT_LABELS = {"contact_phone": "phone number", "working_hours": "working hours", "other_formats": "large print and other formats line"}
+NEWSLETTER_URL_MAX = 300
+_URL_BAD = re.compile(r"[\s<>\"'`\\]")
+
+
+def contact_text(v, key):
+    """A contact line's text, trimmed, or None when it is empty or not usable (too long, a < or >, a line break)."""
+    if not isinstance(v, str):
+        return None
+    t = v.strip()
+    if not t or len(t) > CONTACT_TEXT_MAX[key] or any(c in t for c in "<>\r\n"):
+        return None
+    return t
+
+
+def newsletter_link(v):
+    """The public newsletter link: one https:// address with a host, no spaces or quote marks, or None."""
+    if not isinstance(v, str):
+        return None
+    t = v.strip()
+    if not t or len(t) > NEWSLETTER_URL_MAX or _URL_BAD.search(t) or not t.lower().startswith("https://"):
+        return None
+    return t if len(t) > len("https://") and "." in t[len("https://"):].split("/")[0] else None
 # 28 Oct 2026 (task 8b): a tenant's OWN aerial imagery as a public-map basemap, and the OS map. Neither goes through
 # tenant_settings / /api/meta (that one is read before anybody signs in and an imagery address may carry its licence key):
 # they reach the map only through /api/public/alignment, behind the map password. The address is a tile address with
@@ -658,6 +691,13 @@ def validate(doc, network=None):
             ce = tb.get("concern_email")
             if ce is not None and ce != "" and not is_concern_email(ce):
                 p.append("tenant.concern_email must be one email address, or null")
+            for fld, mx in CONTACT_TEXT_MAX.items():
+                cv = tb.get(fld)
+                if cv is not None and cv != "" and (not isinstance(cv, str) or contact_text(cv, fld) is None):
+                    p.append(f"The {CONTACT_LABELS[fld]} must be plain text of at most {mx} characters, on one line, with no < or >")
+            nu = tb.get("newsletter_url")
+            if nu is not None and nu != "" and newsletter_link(nu) is None:
+                p.append(f"The newsletter link must be one https:// address of at most {NEWSLETTER_URL_MAX} characters")
             iu = tb.get("imagery_url")
             if iu is not None and iu != "":
                 pr = imagery_url_problem(iu)

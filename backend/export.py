@@ -1999,7 +1999,8 @@ class _Kit:
 
     def report_box(self, S, lines=("lorry", "hours", "formats")):
         E, P = self.E, self.P
-        rep = LongTable([[P(("<b>" + E(S["report"][k]) + "</b>") if k == "lorry" else E(S["report"][k]))] for k in lines],
+        rep = LongTable([[P(("<b>" + E(S["report"][k]) + "</b>") if k == "lorry" else E(S["report"][k]))]
+                         for k in lines if S["report"].get(k)],
                         colWidths=[self.usable])
         # 14 Oct 2026 (the publishing check): a warm strip with an orange edge, so "report a lorry" is found at a glance
         rep.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("BACKGROUND", (0, 0), (-1, -1), REPORT_TINT),
@@ -2332,7 +2333,8 @@ def _leaflet(S, map_h):
     story.append(Spacer(1, 2.5 * mm))
     story.append(K.report_box(S))
     story.append(Spacer(1, 1.5 * mm))
-    story.append(P(E(f"Every route, the councils and the carbon are in the monthly newsletter: {S['newsletter_where']}"), K.st))
+    if S.get("newsletter_url"):          # 30 Oct 2026 (task 4b): no typed link, no line
+        story.append(P(E(f"Every route, the councils and the carbon are in the monthly newsletter: {S['newsletter_url']}"), K.st))
     story.append(P(E(S.get("carbon_stamp") or ""), K.st_grey))
     doc.build(story)
     return buf.getvalue(), doc.page

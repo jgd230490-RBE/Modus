@@ -811,6 +811,64 @@ ok("8: the user guide says what the layer is, who sees it, where it comes from a
 ok("8: the technical guide says how it is fetched (Geofabrik, not the public Overpass) and the licences",
    "Geofabrik" in TECH and "Overpass" in TECH and "ODbL" in TECH and "Open Government Licence" in TECH)
 
+# --------------------------------------------------------------------------- #
+#  9. 30 Oct 2026 (task 4b): the counts per route, the Routes page's "Near the route" column                  #
+# --------------------------------------------------------------------------- #
+import route_community  # noqa: E402
+import route_compare  # noqa: E402
+import collisions  # noqa: E402
+boot()
+db.execute("INSERT INTO locations (tenant_id, id, name, role, lat, lon) VALUES (?, ?, ?, ?, ?, ?)",
+           (db.current_tenant(), "L1", "Site", "destination", SITE[1], SITE[0]))
+db.execute("INSERT INTO routes (tenant_id, id, origin_id, dest_id) VALUES (?, ?, ?, ?)", (db.current_tenant(), "R1", "L1", "L1"))
+db.execute("INSERT INTO routes (tenant_id, id, origin_id, dest_id) VALUES (?, ?, ?, ?)", (db.current_tenant(), "R2", "L1", "L1"))   # never drawn
+network._upsert_geom("R1", "Artic Tipper (44t)", json.dumps(ROUTE), 3.4, 0.1, None, leg="loaded", alt_index=0)
+network._upsert_geom("R1", "Artic Tipper (44t)", json.dumps(list(reversed(ROUTE))), 3.4, 0.1, None, leg="return", alt_index=0)
+network._upsert_geom("R1", "Artic Tipper (44t)", json.dumps([[-0.95, LAT0 + 3000 * DLAT], [-0.90, LAT0 + 3000 * DLAT]]), 3.4, 0.1, None, leg="loaded", alt_index=1)
+_c0 = route_community.counts()
+ok("9: nothing fetched yet: fetched_at is null and no route is counted (the page says Not fetched, never a 0)",
+   _c0["fetched_at"] is None and _c0["routes"] == {} and [k["key"] for k in _c0["kinds"]] == route_compare.KINDS)
+_pt = lambda kind, ref, lon, lat: {"kind": kind, "source_ref": ref, "name": ref, "detail": "", "geometry": P(lon, lat), "dist_m": 1.0}
+community.replace_source("gias", [_pt("schools", "S200", mid, LAT0 + 200 * DLAT), _pt("schools", "S240", mid, LAT0 + 240 * DLAT),
+                                  _pt("schools", "S400", mid, LAT0 + 400 * DLAT), _pt("hospitals", "H1", mid, LAT0 + 100 * DLAT),
+                                  _pt("schools", "FAR", mid, LAT0 + 3000 * DLAT)], "2026-10-30T09:00:00Z")
+community.replace_source("naptan", [_pt("bus_stops", "B80", mid, LAT0 + 80 * DLAT), _pt("bus_stops", "B150", mid, LAT0 + 150 * DLAT)],
+                         "2026-10-30T09:00:00Z")
+community._write_meta("done", {}, by="test", started_at="2026-10-30T09:00:00Z", fetched_at="2026-10-30T09:00:00Z")
+_c1 = route_community.counts()
+_r1 = _c1["routes"].get("R1") or {}
+ok("9: a drawn route counts each kind within its distance: schools 200 and 240 m in, 400 m out; a hospital in; bus stops 100 m (80 in, 150 out)",
+   _r1.get("schools") == 2 and _r1.get("hospitals") == 1 and _r1.get("bus_stops") == 1 and _r1.get("health") == 0
+   and set(_r1) == set(route_compare.KINDS), str(_r1))
+ok("9: a route never drawn is absent (the page shows a dash); an alternative option's line is not counted under the route",
+   "R2" not in _c1["routes"] and set(_c1["routes"]) == {"R1"} and _c1["fetched_at"] == "2026-10-30T09:00:00Z"
+   and _c1["near_m"]["schools"] == 250 and _c1["near_m"]["bus_stops"] == 100)
+_ix = collisions.index_from_db()
+ok("9: the numbers are route_compare.near_counts' own (the collision evidence's rule), not a second counting",
+   route_compare.near_counts(_ix, ["R1"])["R1"] == _r1 and "route_compare.near_counts(" in read("backend/route_community.py"))
+ok("9: a team code reads its own team's routes only (a route of no team is not another team's view)",
+   route_community.counts(team="IPT1")["routes"] == {} and set(route_community.counts(team=None)["routes"]) == {"R1"})
+_acc_cur = access.current
+access.current = lambda: {"role": "planner", "label": "Planner"}
+_ep = main.routes_community_counts()
+_ep2 = main.routes_community_counts()
+ok("9: GET /api/routes/community-counts answers the same counts, kept until the next write (the second read is the first)",
+   _ep["routes"] == _c1["routes"] and _ep2 is _ep, str(_ep)[:200])
+access.current = _acc_cur
+_SRC9 = read("backend/main.py")
+ok("9: the endpoint sits before the {route_id} paths, takes a heavy-read slot and reads through the staff cache",
+   _SRC9.index('@app.get("/api/routes/community-counts")') < _SRC9.index('@app.get("/api/routes/{route_id}/route-sheet.pdf")')
+   and 'with _heavy("routes/community-counts")' in _SRC9 and '_staff_json("routes/community-counts"' in _SRC9)
+_FE9 = read("frontend/index.html")
+ok("9: the Routes page: a Near the route column after the team, the cell and the opened-row list, the table's colSpan 8 throughout",
+   '<th className={th}>Near the route</th>' in _FE9 and "<NearCell data={nearData} id={r.id} />" in _FE9
+   and "<NearDetails data={nearData} id={r.id} colSpan={8} />" in _FE9 and "<RouteAnalysis routeId={r.id} colSpan={8}" in _FE9
+   and 'data-route-diversions={r.id}><td colSpan={8}' in _FE9 and "Not fetched" in _FE9 and "None of these" in _FE9
+   and "fetch(`${API}/routes/community-counts`)" in _FE9)
+ok("9: ...three chips (schools, health, bus stops), counts only: no score, no ranking; the guides say so",
+   'const NEAR_CHIPS = [["schools"' in _FE9 and "nothing is scored or ranked" in _FE9 and "Near the route" in GUIDE
+   and "nothing is scored or ranked" in GUIDE and "t8-route-counts" in TECH and "route_compare.near_counts" in TECH)
+
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
     print("  FAIL:", f)

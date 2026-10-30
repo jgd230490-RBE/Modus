@@ -688,6 +688,11 @@ def month_page(month_index, acc):
         # 12 Oct 2026 (Track C review): the typed, validated address the map's "Report a concern"
         # link uses, so the bulletin's report-a-lorry block prints the same one (None until typed)
         "concern_email": tenant.get("concern_email") or None,
+        # 30 Oct 2026 (task 4b): the other typed contact lines (Config -> Map and bulletin); None while empty
+        "contact_phone": tenant.get("contact_phone") or None,
+        "working_hours": tenant.get("working_hours") or None,
+        "other_formats": tenant.get("other_formats") or None,
+        "newsletter_url": tenant.get("newsletter_url") or None,
         "plan_only": True,
         "terms": {
             "two_way_movements": rollup["headline"].get("rule") if not rollup.get("empty") else
