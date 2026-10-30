@@ -488,25 +488,27 @@ for g in T["location_gates"]:
 # RE-PINNED 22 Oct 2026 (abnormal loads, phase 3, D75): 21 gates (the precast works' Works gate and the crane depot's Depot
 # gate); their access roads Z025 and Z026; the advisory zones now Z027–Z033
 # RE-PINNED 28 Oct 2026 (simulation v2, the Tilton Viaduct site L019: two gates G020 / G021 with access roads Z027 / Z028, four internal roads Z029–Z032, seven routes R044–R050, 942 approved line-months)
-ok("⭐ THE DEMO: every one of the 23 gates has an access road — a spliced haul road from the road point to the gate, 35 m",
-   len(T["location_gates"]) == 23 and not bad, str(bad))
+# RE-PINNED 29 Oct 2026 (task 3c): 24 — the holding area's entrance (its road is the last zone, Z040, so no id moved)
+ok("⭐ THE DEMO: every one of the 24 gates has an access road — a spliced haul road from the road point to the gate, 35 m",
+   len(T["location_gates"]) == 24 and not bad, str(bad))
 ok("...the old zones keep their ids (Z001-Z005: the two haul roads and three geofences); the access roads are Z006-Z028, "
    "the viaduct site's four internal roads Z029-Z032, the dated zones after them (all advisory but Christmas trading 2027, "
    "which re-routes in its dates since 28 Oct)",
    [z["id"] for z in T["zones"]][:5] == ["Z001", "Z002", "Z003", "Z004", "Z005"]
    and [ZB[i]["name"] for i in ("Z001", "Z002")] == ["Langton haul road", "Stockpile North haul road"]
-   and sorted(g["access_zone_id"] for g in T["location_gates"]) == [f"Z{n:03d}" for n in range(6, 29)]
+   and sorted(g["access_zone_id"] for g in T["location_gates"]) == [f"Z{n:03d}" for n in range(6, 29)] + ["Z040"]
    and all(z["kind"] == "haul_road" and z["haul_mode"] == "internal" and z["location_id"] == "L019" for z in T["zones"] if 29 <= int(z["id"][1:]) <= 32)
    # NARROWED 28 Oct 2026 (the demo narrative's F4): the one exception is Christmas trading 2027, a dated diversion
    and all(z["kind"] != "haul_road" and (not z["affects_routing"]) == (z["name"] != "Market Harborough town centre: Christmas trading 2027")
-           for z in T["zones"] if int(z["id"][1:]) > 32))
+           for z in T["zones"] if 32 < int(z["id"][1:]) < 40)
+   and ZB["Z040"]["name"] == "Billesdon Lane holding area (fictional): Lane entrance access road" and ZB["Z040"]["kind"] == "haul_road")
 ok("...named for the site and gate, the road named in the note, 10 km/h, no end date",
    all(re.match(r"^.+: .+ access road$", ZB[g["access_zone_id"]]["name"]) for g in T["location_gates"])
    and all(ZB[g["access_zone_id"]]["note"].startswith("Bellmouth off ") for g in T["location_gates"])
    and all(ZB[g["access_zone_id"]]["speed_kph"] == 10 and ZB[g["access_zone_id"]]["ends_on"] is None for g in T["location_gates"]))
 _gen = read("backend/tools/make_demo_tenant.py")
 ok("the generator's road points cover every gate by (site, gate) and leave residential streets out on purpose",
-   _gen.count('): ([-') == 23 and "BELLMOUTH_M = 35.0" in _gen and "residential streets left out on purpose" in _gen)
+   _gen.count('): ([-') == 24 and "BELLMOUTH_M = 35.0" in _gen and "residential streets left out on purpose" in _gen)
 
 print()
 for f_ in FAIL:

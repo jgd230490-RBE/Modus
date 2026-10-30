@@ -941,6 +941,27 @@ def build(with_areas=False, out=None):
     assert G["VS_out"] == "G021", G
     res = gates.update_gate(G["VS_out"], closed_from="2027-03-01", closed_to="2027-05-31")
     assert "error" not in res, res
+    # 29 Oct 2026 (task 3c, the user's Q10): the VEHICLE HOLDING AREA — a field beside the lane north from the A47 at
+    # Billesdon, 300 m up it, where every tipper and flatbed route into the viaduct site and Tilton Compound already runs
+    # (its entrance is a vertex of the stored lane line, read on live 29 Oct 2026, so nothing is drawn again); 15 spaces,
+    # 2 called forward at a time, the concrete mixers straight to the gate (the default); the viaduct site and Tilton
+    # Compound call off through it; the asphalt plant's route into the compound (600 m east of it) is ticked "does not
+    # call off" (Q4). Fictional, like every site here.
+    ha_gate = (-0.92094, 52.6226)
+    ha_pt = offset(list(ha_gate), east_m=115, north_m=122)
+    add("HA", "Billesdon Lane holding area (fictional)", "holding", "Holding area", ha_pt[0], ha_pt[1],
+        detail="Vehicle holding area: lorries for Tilton Viaduct site and Tilton Compound wait here to be called forward. Fictional: no such site.")
+    assert loc["HA"] == "L020", loc
+    hours["HA"] = ("07:00", "20:30", "1111100")
+    G["HA"] = gate("HA", "Lane entrance", -80, -100, "both", default=True)      # set back to 35 m from the lane below
+    import holding as _holding
+    res = _holding.set_holding(loc["HA"], {"holding_spaces", "holding_call"}, spaces=15, call=2)
+    assert not res.get("error"), res
+    for key in ("VS", "C3"):
+        res = _holding.set_calls_through(loc[key], loc["HA"])
+        assert not res.get("error"), res
+    res = network.set_route_planning(by_od[("AP", "C3")], ("skip_holding",), skip_holding=1)
+    assert not res.get("error"), res
     # the routes name their gates explicitly (the resolver would pick the defaults anyway;
     # an explicit choice is what a planner does on the route form)
     origin_gate = {"Q1": G["Q1_out"], "Q2": G["Q2_out"], "Q3": G["Q3"], "RH": G["RH"], "C1": G["C1_out"], "C2": G["C2"],
@@ -1265,9 +1286,13 @@ def build(with_areas=False, out=None):
         # line into the compound on a local copy (R007's last kilometre; Overpass was at capacity that evening)
         ("Tilton Viaduct site (fictional)", "South lane gate (in)"): ([-0.879952, 52.64273], "the lane south of Tilton Compound"),
         ("Tilton Viaduct site (fictional)", "South lane gate (out)"): ([-0.883957, 52.642399], "the lane south of Tilton Compound"),
+        # 29 Oct 2026 (task 3c): the holding area's entrance — a vertex of the stored lane line north from the A47 at
+        # Billesdon (read on live 29 Oct 2026), so every route along the lane passes it within the 50 m the mark allows
+        ("Billesdon Lane holding area (fictional)", "Lane entrance"): ([-0.92094, 52.6226], "the lane north from the A47 at Billesdon"),
     }
     names = {r["id"]: r["name"] for r in db.query("SELECT id, name FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
-    for g in gates.list_gates():
+
+    def access_road(g):
         road, road_name = ROAD_AT[(names[g["location_id"]], g["name"])]     # a KeyError here = a gate with no road point
         # set back along the line from the road point towards where the gate was (into the site)
         kx = 111320.0 * math.cos(math.radians(road[1]))
@@ -1281,6 +1306,14 @@ def build(with_areas=False, out=None):
         assert "error" not in z, z
         res = gates.update_gate(g["id"], lat=at[1], lon=at[0], access_zone_id=z["id"])
         assert "error" not in res, res
+        return z
+
+    # 29 Oct 2026 (task 3c): the holding area's entrance gets its road LAST (after the advisory zones), so every zone id
+    # the demo already carries — the access roads, the viaduct site's inside, the advisory zones — keeps its number
+    for g in gates.list_gates():
+        if g["location_id"] == loc["HA"]:
+            continue
+        z = access_road(g)
     assert z["id"] == "Z028", z        # 28 Oct 2026 (simulation v2): + the viaduct site's two gates (Z027, Z028)
 
     # --- 28 Oct 2026 (simulation v2, task 0e): the viaduct site's INSIDE — its roads, its areas, its speed ---------------
@@ -1350,6 +1383,9 @@ def build(with_areas=False, out=None):
         z = zones.create_zone(name, geom, kind=kind, affects_routing=name in ROUTING_IN_DATES,
                               starts_on=s_on, ends_on=e_on, note=note)
         assert "error" not in z, z
+    # 29 Oct 2026 (task 3c): the holding area's access road, the last zone (see access_road above)
+    z = access_road(next(g for g in gates.list_gates() if g["location_id"] == loc["HA"]))
+    assert z["id"] == "Z040", z
 
     # --- D75 (22 Oct 2026, abnormal loads phase 3): three fictional abnormal loads ------------------------------------
     # Each is its own planned movement (D66a), counted apart from the lorries (D70, D71), unrouted in the package: a
