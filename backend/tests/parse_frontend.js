@@ -3887,6 +3887,12 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // 0 included, as the pack prints it (clp_pack: str(most)) — and "—" only when it has none
   ok("⭐ CLP holding areas: the most-held cell prints 0 as a figure, like the PDF / XLSX, and — only when the Simulation gave none",
      code.includes('<td>{r.most != null ? `${r.most}${r.most_at ? ` at ${r.most_at}` : ""}` : "—"}</td>') && !code.includes('<td>{r.most ? `${r.most}'));
+  // 30 Oct 2026 (task 3c, the UI audit): the scenario card's holding row WRAPS and its "go straight to the gate" note is a line UNDER
+  // the inline-flex row, not a flex item beside it — as a flex item it ran off the card at 1366 px and the page scrolled sideways
+  ok("⭐ Simulation scenario: each holding area's row is a wrapping flex row and its note sits under it, not beside it",
+     code.includes('<div key={h.id} data-sim-holding={h.id}><div className="sim-lbl sim-hold-row">{h.name}:{" "}')
+     && code.includes('/> spaces</div>\n              <div className="ct-note">{(h.exempt_labels || []).length ? ')
+     && html.includes('.sim-hold-row{flex-wrap:wrap;') && !code.includes('className="sim-lbl" data-sim-holding='));   // the CSS is in html, not in the script's code
   ok("after the first compare: the two slate-100 chips on Zones (Advisory, Not open) read slate-600 (slate-500 on slate-100 is 4.34:1), and the compact fuel card's two captions no longer truncate at 12 px (the BAF line carries its own hover title) — finding 11's clipped captions, brought forward because the 12 px made the clipping worse",
      !/bg-slate-100 text-slate-500|text-slate-500 bg-slate-100/.test(code)
      && code.includes('<span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>')

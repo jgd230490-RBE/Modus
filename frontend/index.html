@@ -715,6 +715,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-ctl input:not([type=checkbox]),.sim-table input{font:inherit;font-size:14px;border:1px solid var(--grey);border-radius:6px;padding:2px 6px;color:var(--ink);background:var(--surface);min-height:28px;}
   .sim-ctl input[type=time],.sim-table input[type=time]{width:108px;}
   .sim-num{width:76px;}
+  .sim-hold-row{flex-wrap:wrap;row-gap:2px;}   /* 30 Oct 2026 (task 3c): the holding row wraps; its note is a line under it, never a flex item beside it */
   .sim-msg{color:var(--red);font-size:14px;font-weight:600;}
   .sim-h4{font-size:15px;font-weight:600;color:var(--ink);margin:16px 0 2px;}
   .sim-tl{border:1px solid var(--line);border-radius:8px;background:var(--surface);overflow:hidden;cursor:pointer;margin-top:6px;}
@@ -10984,11 +10985,11 @@ const SimScenario = React.memo(function SimScenario({ D, sc, onChange, onReset, 
             <div className="sim-scn-h">Holding areas</div>
             <label className="sim-check" data-sim-holding-switch="1"><input type="checkbox" checked={sc.holding !== false} onChange={e => onChange({ ...sc, holding: e.target.checked ? null : false })} />
               <span>Holding area: lorries wait off the highway</span></label>
-            {(D.holding || []).map(h => <div key={h.id} className="sim-lbl" data-sim-holding={h.id}>{h.name}:{" "}
+            {(D.holding || []).map(h => <div key={h.id} data-sim-holding={h.id}><div className="sim-lbl sim-hold-row">{h.name}:{" "}
               <input type="number" min={1} max={50} step={1} className="sim-num" aria-label={`${h.name}: called forward at a time`} disabled={sc.holding === false}
                 value={sc.holding_call[h.id] != null ? sc.holding_call[h.id] : h.call} onChange={e => { const v = +e.target.value; if(v >= 1) onChange({ ...sc, holding_call: { ...sc.holding_call, [h.id]: v } }); }} /> called forward at a time ·{" "}
               <input type="number" min={1} max={500} step={1} className="sim-num" aria-label={`${h.name}: spaces`} disabled={sc.holding === false}
-                value={sc.holding_spaces[h.id] != null ? sc.holding_spaces[h.id] : (h.spaces == null ? "" : h.spaces)} onChange={e => { const v = +e.target.value; if(v >= 1) onChange({ ...sc, holding_spaces: { ...sc.holding_spaces, [h.id]: v } }); }} /> spaces
+                value={sc.holding_spaces[h.id] != null ? sc.holding_spaces[h.id] : (h.spaces == null ? "" : h.spaces)} onChange={e => { const v = +e.target.value; if(v >= 1) onChange({ ...sc, holding_spaces: { ...sc.holding_spaces, [h.id]: v } }); }} /> spaces</div>
               <div className="ct-note">{(h.exempt_labels || []).length ? `${h.exempt_labels.join(", ")} go straight to the gate.` : "Every lorry calls off here."}</div></div>)}
           </div> : <div className="ct-note" data-sim-no-holding="1">No holding area (Data → Locations).</div>}
           {msg && <div className="sim-msg" role="alert">{msg}</div>}
