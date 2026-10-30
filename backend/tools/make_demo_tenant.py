@@ -592,6 +592,9 @@ def build(with_areas=False, out=None):
     # The user saved them on live the same day.
     doc["tenant"] = {"name": TENANT_NAME, "team_label": "Team", "currency": "GBP", "country": "GB",
                      "distance_unit": "mi", "demo_notice": DEMO_NOTICE,
+                     # 30 Oct 2026 (3d, John): where the public map's "Report a concern" link goes. The company's
+                     # own address, not a person's; before this it was never saved on live.
+                     "concern_email": "hello@wayscope.co.uk",
                      "council_breaks": {"movements": [25, 50, 100], "carbon": [10, 25, 50]}}
     # D106: NO seasonal windows — the product's are scheme-wide by calendar month and meant for statutory
     # restrictions; Market Harborough's Christmas trading goes in as an advisory zone each December instead.

@@ -199,6 +199,12 @@ config.seed_from_file(conversions)
 _res = tenant_package.import_tenant(PKG, replace=True)
 ok("the package imports into an empty tenant", _res.get("ok") is True, str(_res)[:200])
 config.invalidate()
+# 30 Oct 2026 (3d): the public map's "Report a concern" address is saved in the package (it had been typed on live only)
+_ten = json.loads(next(r["value"] for r in T["config"] if r["key"] == "factors"))["tenant"]
+ok("3d: the package carries the Report a concern address (the company's, a valid single address)",
+   _ten.get("concern_email") == "hello@wayscope.co.uk" and config.is_concern_email(_ten["concern_email"]), str(_ten.get("concern_email")))
+ok("3d: and the imported tenant serves it", config.tenant_settings(conversions).get("concern_email") == "hello@wayscope.co.uk",
+   str(config.tenant_settings(conversions).get("concern_email")))
 _PIN = pin_today(DEMO_AS_OF)
 _ACC = {"role": "planner", "ipt": None}
 _pg = lookahead.page(acc=_ACC, with_restrictions=False)
