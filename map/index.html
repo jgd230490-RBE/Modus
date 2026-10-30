@@ -360,6 +360,8 @@
         #flow-legend{ margin-top:12px; }
         .mode-legend .ml-sub{ color:var(--muted); margin:-2px 0 4px; }
         .mode-legend .fl-sw{ flex:0 0 64px; display:block; }
+        /* 29 Oct 2026 (task 3c): the holding area's mark in words — a blue square H (the lorry-park sign's look) */
+        .hbadge{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:3px; background:#1D4ED8; color:#fff; font-weight:700; font-size:12px; border:1.5px solid #fff; box-shadow:0 0 0 1px #1D4ED8; vertical-align:-3px; margin-right:4px; }
         /* 19 Oct 2026 (the user: "check the control panel is in a logical order, remove too much wording and put it into
            an info box; too many month tabs"): the panel reads Month, Heat map, Views, Filter routes, then three folds and
            the share row. An "i" button opens its section's explanation in place (one at a time; Esc or a click elsewhere
@@ -1054,6 +1056,8 @@
         <h3>Haul routes</h3>
         <div class="control-item"><label><input type="checkbox" id="layer-inbound" checked onchange="applyFilters()"> Laden (out)</label><span class="color-dot" style="background:#059669;"></span></div>
         <div class="control-item"><label><input type="checkbox" id="layer-outbound" checked onchange="applyFilters()"> Empty (return)</label><span class="color-dot" style="background:#f59e0b;"></span></div>
+        <!-- 29 Oct 2026 (task 3c): shown once the scheme has a holding area (updateHoldingChevrons) -->
+        <div class="control-item" id="holding-legend" hidden><span class="hbadge" aria-hidden="true">H</span><span style="font-size:12.5px;color:#57534E;font-weight:500;">Holding area · <b>›››</b> called forward to the gate</span></div>
         <!-- Temporary haul removed: the network stores only a scalar origin_temp_km per
              route, no geometry, so there is nothing real to draw. Returns in Phase 4 as
              drawn polylines edited on the route itself. -->
@@ -2092,7 +2096,8 @@
     // rule above and it is the human's call: the pre-08 Sep map was circles-with-symbols
     // and they preferred it. Railhead and Compound stay squares so the two types that
     // sit ON the corridor are separable from the rest by silhouette alone.
-    const LOC_KINDS = ['Quarry', 'Port', 'Compound', 'Site', 'Railhead', 'Stockpile', 'Other'];
+    const LOC_KINDS = ['Quarry', 'Port', 'Compound', 'Site', 'Railhead', 'Stockpile', 'Holding', 'Other'];   // 29 Oct 2026 (task 3c): + Holding
+    const LOC_LABEL = { Holding: 'Holding area' };            // the panel's word for a kind whose key is shorter
     const LOC_FILL = {
         Port:      '#0369A1',
         // ⚠️ CHOSEN, NOT INHERITED. The brief says "existing compound sand"; there is no
@@ -2107,6 +2112,7 @@
         // is the CONTAINER cream; STOCK_FILL below is the pile itself and STOCK_OVER is the
         // pile once it is past its capacity. It was #78350F (dark brown) until 08 Sep pm.
         Stockpile: '#EFEBE0',
+        Holding:   '#1D4ED8',
         Other:     '#94a3b8',
     };
     const STOCK_FILL = '#BDB49C';        // the creamy-grey pile
@@ -2133,6 +2139,7 @@
         const s = String(t || '').trim();
         if (/^rail\s*head$/i.test(s)) return 'Railhead';
         if (s === 'Hub') return 'Port';
+        if (/^holding( area)?$/i.test(s)) return 'Holding';     // 29 Oct 2026 (task 3c): the type "Holding area"
         return LOC_KINDS.indexOf(s) >= 0 ? s : 'Other';
     }
     // key -> {kind, fill}. Filled as the network loads, so a quarry material nobody
@@ -2194,8 +2201,8 @@
     const LOC_IMG_S = 72;
     function locShapePath(g, kind, cx, cy, r) {
         g.beginPath();
-        if (kind === 'Compound' || kind === 'Railhead') {          // rounded square
-            const s = r * 1.72, x = cx - s / 2, y = cy - s / 2, rr = s * 0.24;
+        if (kind === 'Compound' || kind === 'Railhead' || kind === 'Holding') {          // rounded square (the holding area's squarer)
+            const s = r * 1.72, x = cx - s / 2, y = cy - s / 2, rr = kind === 'Holding' ? s * 0.12 : s * 0.24;
             g.moveTo(x + rr, y);
             g.arcTo(x + s, y, x + s, y + s, rr); g.arcTo(x + s, y + s, x, y + s, rr);
             g.arcTo(x, y + s, x, y, rr);         g.arcTo(x, y, x + s, y, rr);
@@ -2314,6 +2321,13 @@
             // top — and the map would be claiming a reading it does not have.
             if (stock === 'na') g.setLineDash([5, 4]);
             g.stroke(); g.setLineDash([]);
+        } else if (kind === 'Holding') {
+            // 29 Oct 2026 (task 3c): a white H on the blue square — the lorry-park sign's look; three bars
+            g.fillStyle = '#ffffff';
+            const w = r * 0.6;
+            g.fillRect(cx - w, cy - w * 1.1, w * 0.42, w * 2.2);
+            g.fillRect(cx + w * 0.58, cy - w * 1.1, w * 0.42, w * 2.2);
+            g.fillRect(cx - w, cy - w * 0.2, w * 2, w * 0.4);
         } else if (kind === 'Site') {
             g.fillStyle = '#ffffff'; g.beginPath(); g.arc(cx, cy, r * 0.34, 0, Math.PI * 2); g.fill();
         } else if (kind === 'Quarry') {
@@ -2523,6 +2537,7 @@
     function setRouteDim(routeId){
         DIM_LAYERS.forEach(l => { if (!map.getLayer(l)) return;
             try { map.setPaintProperty(l, 'line-opacity', routeId ? ['case', ['==', ['get', 'route_id'], routeId], 1, DIM_OPACITY] : 1); } catch (e) {} });
+        if (map.getLayer('holding-chevrons')) { try { map.setPaintProperty('holding-chevrons', 'text-opacity', routeId ? ['case', ['==', ['get', 'route_id'], routeId], 1, DIM_OPACITY] : 1); } catch (e) {} }
     }
     function raiseMarks() {
         if (!map || !map.getStyle) return;
@@ -2692,7 +2707,7 @@
             `<div class="control-item" style="padding:3px 2px;border:0;">` +
             `<label style="font-size:12.5px;color:#57534E;font-weight:500;">` +
             `<input type="checkbox" id="loc-kind-${k.toLowerCase()}" checked onchange="toggleLocKind()"> ` +
-            `${k}${note[k] ? ` <span style="color:#a2a8b0">· ${note[k]}</span>` : ''}</label>` +
+            `${LOC_LABEL[k] || k}${note[k] ? ` <span style="color:#a2a8b0">· ${note[k]}</span>` : ''}</label>` +
             `<img alt="" data-loc-kind="${k}" src="${swatch(k)}" style="width:15px;height:15px;margin-left:auto;">` +
             `</div>`).join('');
     }
@@ -2703,6 +2718,8 @@
                 `<p style='margin:4px 0;'><b>Type:</b> ${props.node_type}</p>`;
         if (kind === 'Compound' && props.ipt) h += `<p style='margin:4px 0;'><b>${TEAM}:</b> ${teamText(props.ipt)}</p>`;
         else if (kind === 'Quarry') h += `<p style='margin:4px 0;'><b>Material:</b> ${props.material || '—'}</p>`;
+        // 29 Oct 2026 (task 3c): a holding area says what it is for, in one sentence — never how many wait there
+        else if (kind === 'Holding') h += `<p style='margin:4px 0;'>Construction lorries wait here before going to ${rlEsc(props.holding_served || 'the site')}.</p>`;
         if (props.aux_info) h += props.aux_info;
         // Week 1, Task D2. 'Stock 1 240 t / 3 000 t', and ONLY when both numbers exist —
         // half the sentence would read as a stockpile with no limit. No chart.
@@ -2726,7 +2743,8 @@
         // location Google has never driven past, which is most quarry gates.
         h += `<div id="${svId}" style="margin-top:8px;"></div>`;
         const safe = String(props.name || '').replace(/'/g, "\\'");
-        h += `<button onclick="filterByNode('${safe}', '${kind}')" style="margin-top:10px; width:100%; background:#2563EB; color:#fff; border:none; padding:8px; border-radius:4px; font-weight:bold; cursor:pointer;">Filter Routes to this Location</button></div>`;
+        // 29 Oct 2026 (task 3c): no route starts or ends at a holding area, so nothing to filter to
+        h += kind === 'Holding' ? '</div>' : `<button onclick="filterByNode('${safe}', '${kind}')" style="margin-top:10px; width:100%; background:#2563EB; color:#fff; border:none; padding:8px; border-radius:4px; font-weight:bold; cursor:pointer;">Filter Routes to this Location</button></div>`;
         return h;
     }
 
@@ -3294,6 +3312,7 @@
             inVis ? ['all', ['==', ['get', 'type'], 'Inbound Highway'], ...filterArr.slice(1)] : none);
         if (map.getLayer('outbound-lines-casing')) map.setFilter('outbound-lines-casing',
             outVis ? ['all', ['==', ['get', 'type'], 'Outbound Highway'], ...filterArr.slice(1)] : none);
+        if (map.getLayer('holding-chevrons')) applyHoldingChevronFilter();     // 29 Oct 2026 (task 3c): the same four filters and leg toggles
         // 23 Oct 2026: the haul-road pieces follow the leg toggles and the same filters as the legs they belong to
         const haulBase = haulPieceFilter();
         ['haul-eraser', 'haul-dots'].forEach(l => { if (map.getLayer(l)) map.setFilter(l, haulBase[0] === 'in' ? ['all', haulBase, ...filterArr.slice(1)] : haulBase); });
@@ -3508,6 +3527,8 @@
         // 23 Oct 2026: the haul-road stretches of every leg, over the solid legs — a cut-out the casing's width in the
         // basemap's own ground, then the dots in the leg's colour, thinner (the user: "same colours but dotted and
         // thinner on the haul road"). Both pieces sit left of travel like the leg they belong to (OFFSET_IN).
+        ensureHoldingChevrons();      // 29 Oct 2026 (task 3c): the "called forward" run of each leg that stops at a holding area
+
         map.addLayer({
             'id': 'haul-eraser',
             'type': 'line',
@@ -4150,6 +4171,7 @@
     // layer now; this only stamps the icon key the layer reads.
     function buildNodeMarkers() {
         stampLocationIcons(a1_data);
+        if (typeof updateHoldingChevrons === 'function') { updateHoldingChevrons(a1_data); ensureHoldingChevrons(); }   // 29 Oct 2026 (task 3c)
         buildLocLegend();
         const src = map.getSource('routes-source');
         if (src) src.setData(a1_data);
@@ -7652,6 +7674,80 @@
     // route keeps its volume colour and lanes. Pieces carry the leg's type, route and is_forecast, so the forecast
     // overlay's own filter (leg ticks, sidebar filters) applies to them. A route's usual line is DIV.orig's.
     const DIV_EDGE = { colour: '#F59E0B', near_m: 25, cache: new Map(), fc: { type: 'FeatureCollection', features: [] }, sig: '' };
+
+    // ===== 29 Oct 2026 (task 3c): the holding areas — the route goes to H first, then chevrons to the gate ==============
+    // A leg that calls off at a holding area carries holding_at_km (the public feed; null where the line does not pass
+    // it). The stretch from there to the END of the leg is the run a lorry makes once CALLED FORWARD, drawn as '›'
+    // glyphs over the leg's own line — the route sheet and the Simulation draw the same mark. A leg whose line misses
+    // the holding area (holding_straight) gets none. No colour of its own, no dash. The holding area itself is a
+    // location of kind 'Holding' (the blue square H, locGlyph) with one sentence in its popup and no count.
+    const HOLD_CHEV = { fc: { type: 'FeatureCollection', features: [] }, sig: '', any: false };
+    function holdChevronPiece(coords, atKm){
+        const kx = Math.cos(52.5 * Math.PI / 180) * 111320, ky = 110540, want = Number(atKm) * 1000;
+        let cum = 0;
+        for (let i = 1; i < coords.length; i++) {
+            const a = coords[i - 1], b = coords[i], dx = (b[0] - a[0]) * kx, dy = (b[1] - a[1]) * ky, L = Math.sqrt(dx * dx + dy * dy);
+            if (cum + L >= want) {
+                const u = L ? (want - cum) / L : 0;
+                return [[a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]].concat(coords.slice(i));
+            }
+            cum += L;
+        }
+        return null;
+    }
+    function updateHoldingChevrons(data){
+        const feats = ((data || (typeof a1_data !== 'undefined' && a1_data)) || {}).features || [];
+        const out = [];
+        feats.forEach(f => {
+            const p = f.properties || {};
+            if (!f.geometry || f.geometry.type !== 'LineString') return;
+            if (p.holding_at_km == null || p.holding_straight === true || p.holding_straight === 'true') return;
+            if (!(p.type === 'Inbound Highway' || p.type === 'Outbound Highway')) return;
+            const run = holdChevronPiece(f.geometry.coordinates, p.holding_at_km);
+            if (!run || run.length < 2) return;
+            out.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: run },
+                properties: { type: p.type, route_id: p.route_id, origin: p.origin, dest: p.dest, ipt: p.ipt, disciplines: p.disciplines || [],
+                              is_forecast: !!(p.is_forecast === true || p.is_forecast === 'true'), holding_id: p.holding_id, holding_name: p.holding_name } });
+        });
+        // (a harness runs this block alone: nothing here reaches outside it without a check)
+        HOLD_CHEV.any = feats.some(f => f.properties && f.properties.type === 'Node' && /^holding/i.test(String(f.properties.node_type || '')));
+        const lg = holdEl('holding-legend'); if (lg) lg.hidden = !(HOLD_CHEV.any || out.length);
+        const sig = out.map(x => x.properties.route_id + x.properties.type[0] + (x.properties.is_forecast ? 1 : 0) + ':' + x.geometry.coordinates.length).join(',');
+        if (sig === HOLD_CHEV.sig) { applyHoldingChevronFilter(); return; }
+        HOLD_CHEV.sig = sig;
+        HOLD_CHEV.fc = { type: 'FeatureCollection', features: out };
+        const src = (typeof map !== 'undefined' && map.getSource) ? map.getSource('holding-chevrons-source') : null;
+        if (src) src.setData(HOLD_CHEV.fc);
+        applyHoldingChevronFilter();
+    }
+    const holdEl = (id) => (typeof document !== 'undefined' && document.getElementById) ? document.getElementById(id) : null;
+    function holdingChevronFilter(){
+        const legs = [];
+        const inCb = holdEl('layer-inbound'), outCb = holdEl('layer-outbound');
+        if (!inCb || inCb.checked) legs.push('Inbound Highway');
+        if (!outCb || outCb.checked) legs.push('Outbound Highway');
+        const f = ['all', ['in', ['get', 'type'], ['literal', legs]]];
+        const o = holdEl('filter-origin'), d = holdEl('filter-dest'), disc = holdEl('filter-discipline'), i = holdEl('filter-ipt');
+        if (o && o.value !== 'ALL') f.push(['==', ['get', 'origin'], o.value]);
+        if (d && d.value !== 'ALL') f.push(['==', ['get', 'dest'], d.value]);
+        if (i && i.value !== 'ALL') f.push(['==', ['get', 'ipt'], i.value]);
+        if (disc && disc.value !== 'ALL') f.push(['in', disc.value, ['get', 'disciplines']]);
+        if (typeof TL !== 'undefined' && TL.on) f.push(['==', ['get', 'is_forecast'], true]);   // in a month: the routes carrying movements
+        return f;
+    }
+    function applyHoldingChevronFilter(){
+        if (typeof map === 'undefined' || !map.getLayer || !map.getLayer('holding-chevrons')) return;
+        try { map.setFilter('holding-chevrons', holdingChevronFilter()); } catch (e) {}
+    }
+    function ensureHoldingChevrons(){
+        if (!styleReady()) return;
+        if (!map.getSource('holding-chevrons-source')) map.addSource('holding-chevrons-source', { type: 'geojson', data: HOLD_CHEV.fc });
+        if (!map.getLayer('holding-chevrons')) map.addLayer({ id: 'holding-chevrons', type: 'symbol', source: 'holding-chevrons-source', filter: holdingChevronFilter(),
+            // the style's own font: a named font that one basemap lacks would drop every glyph on that basemap
+            layout: { 'symbol-placement': 'line', 'symbol-spacing': 34, 'text-field': '›', 'text-size': 18, 'text-keep-upright': false,
+                      'text-allow-overlap': true, 'text-ignore-placement': true },
+            paint: { 'text-color': '#1F2024', 'text-halo-color': '#FFFFFF', 'text-halo-width': 1.2 } }, labelAnchor());
+    }
     function divOffPieces(divCoords, mainCoords){
         const kx = Math.cos(52.5 * Math.PI / 180) * 111320, ky = 110540, NEAR = DIV_EDGE.near_m, CELL = 200;
         const segs = [], grid = new Map();
@@ -7738,6 +7834,7 @@
         if(changed) src.setData(data);
         ensureForecastLayers(); ensureFlowLayer();
         updateDiversionEdge(data);      // 29 Oct 2026: the amber edge where a route goes round a closure this month
+        updateHoldingChevrons(data);    // 29 Oct 2026 (task 3c): the chevrons follow the month's lines
         // 15 Sep (the human): "the text vehicles needs to be replaced with deliveries or
         // trips". 🔴 Not a blind string swap — `unit` comes from the API and can be t or
         // m³, and "4 444 trips" over a tonnage would be a lie. Only the vehicle-loads
@@ -7797,6 +7894,7 @@
         // left the month's shared sections on the map
         ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
         if (typeof updateDiversionEdge === 'function') updateDiversionEdge(src && src._data);   // 29 Oct 2026: no month, no edge
+        if (typeof updateHoldingChevrons === 'function') updateHoldingChevrons(src && src._data);   // 29 Oct 2026 (task 3c): every route again
         applyZoneMonth(null);   // no month on screen: show every active zone again
         applyFilters();         // KPI cards and the rail rule follow the timeline closing
         if(typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon say they need a month
@@ -10136,8 +10234,18 @@
         const info = ROUTEINFO[String(rid).trim().toLowerCase()] || {};
         const team = rp.ipt && rp.ipt !== 'Unknown_IPT' ? teamText(rp.ipt) : '';
         const month = TL.on ? TL.month : null, kp = month ? KPI.cache[month] : null;
-        let html = '<h3>' + escHtml((rp.origin || info.origin || '—') + ' → ' + (rp.dest || info.dest || '—')) + '</h3>'
+        // 29 Oct 2026 (task 3c): a route that calls off reads origin → H holding area → destination (the user: "the route
+        // need to clearly show going to the vha first"), with one sentence under it
+        const hb = (rp.holding_id && rp.holding_name) ? ' → <span class="hbadge" aria-hidden="true">H</span>' + escHtml(rp.holding_name) : '';
+        let html = '<h3>' + escHtml(rp.origin || info.origin || '—') + hb + ' → ' + escHtml(rp.dest || info.dest || '—') + '</h3>'
             + '<div class="rc-sub">' + escHtml([rid, team, (rp.disciplines || []).join(', ')].filter(Boolean).join(' · ')) + '</div>';
+        if (rp.holding_id) {
+            const straight = rp.holding_straight === true || rp.holding_straight === 'true';
+            const left = (rp.distance_km != null && rp.holding_at_km != null) ? Math.max(0, Number(rp.distance_km) - Number(rp.holding_at_km)) : null;
+            const mins = rp.holding_tail_hr != null ? Math.round(Number(rp.holding_tail_hr) * 60) : null;
+            html += '<p class="mt-note" data-holding-words="1">' + (straight ? 'Lorries call off at ' + escHtml(rp.holding_name || 'the holding area') + ' first.'
+                : 'Lorries wait at the holding area and are called forward to the gate' + (left != null ? ' (' + escHtml(fmtDist(left, 1) + ' ' + DU()) + (mins != null ? ', about ' + mins + ' min' : '') + ')' : '') + '.') + '</p>';
+        }
         if (!month) html += '<p class="mt-note">Pick a month to see this route’s movements a day.</p>';
         else if (!kp) html += '<p class="mt-note">Loading the figures for ' + escHtml(monthLabel(month)) + '…</p>';
         else {

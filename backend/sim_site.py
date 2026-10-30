@@ -412,6 +412,8 @@ def station_figures(st, S):
             "most_waiting": most, "most_at": (round(most_at, 2) if most_at is not None else None),
             "minutes_lost": round(sum(s["wait"] for s in S), 2),
             "longest_wait": round(max([0.0] + [s["wait"] for s in S]), 2),
+            # 29 Oct 2026 (task 3c, the user's Q13): the station's work on this day, against its gate's open minutes
+            "work_minutes": round(sum(s["service"] for s in S), 1),
             "flag": flag, "status_word": word, "closed_words": st.get("closed_words")}
 
 

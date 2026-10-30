@@ -334,7 +334,8 @@ ok("H2: every site has a gate at its own coordinates; the quarries and the town 
    # RE-PINNED 17 Oct 2026 (demo redesign R2, §3a): 19 — the asphalt plant's and Welland Ready-Mix's; == one per site at least
    # RE-PINNED 22 Oct 2026 (abnormal loads, phase 3, D75): 21 — the precast works' and the crane depot's
    # RE-PINNED 28 Oct 2026 (simulation v2): 23 — the viaduct site's gate in and gate out
-   len(_T["location_gates"]) == 23 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
+   # RE-PINNED 29 Oct 2026 (task 3c): 24 — the holding area's entrance
+   len(_T["location_gates"]) == 24 and {g["location_id"] for g in _T["location_gates"]} == {l["id"] for l in _T["locations"]}
    and all(g["lat"] and g["lon"] for g in _T["location_gates"])
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L001") == ["access", "egress"]
    and sorted(g["direction"] for g in _T["location_gates"] if g["location_id"] == "L005") == ["access", "egress"])
@@ -354,8 +355,8 @@ ok("H2: two haul roads, spliced (HERE does not know them), attached to the route
              + [("R016", "Z002"), ("R018", "Z002")])
    and {r["id"] for r in _T["routes"] if r["dest_id"] == "L006"} == {l["route_id"] for l in _T["route_haul_roads"] if l["zone_id"] == "Z001"})
 # NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): 21 gates, the precast works' and the crane depot's among them
-ok("16 Oct 2026: and one access road per gate (23 since 28 Oct), all spliced haul roads, none attached to a route",
-   len(_access) == 23 and all(z["kind"] == "haul_road" and z["haul_mode"] == "splice" for z in _T["zones"] if z["id"] in _access)
+ok("16 Oct 2026: and one access road per gate (24 since 29 Oct, task 3c), all spliced haul roads, none attached to a route",
+   len(_access) == 24 and all(z["kind"] == "haul_road" and z["haul_mode"] == "splice" for z in _T["zones"] if z["id"] in _access)
    and not ({l["zone_id"] for l in _T["route_haul_roads"]} & _access))
 # RE-PINNED 17 Oct 2026 (R2, §3a, §1.8): the three geofences re-dated to the four-year programme (Z003 keeps its box and
 # start date, ends with the junction build 17 Dec 2027; the Burrough limit runs the whole programme; the Melton works area
@@ -1155,7 +1156,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 29 Oct 2026 (task 3a): bad-text 23 -> 25, warn-text 12 -> 14 — the Pours page: its saved / not-saved line, each
    # flag's sentence (red COLD JOINT / TRANSIT, amber the rest) and a pour with no figures (amber)
    # NARROWED 29 Oct 2026 (task 3a PR C): bad-text 25 -> 26 — the Simulation's planned-pour flag line (.sim-pp-flag)
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 26 and _fe_wo.count("var(--warn-text)") == 14
+   # NARROWED 29 Oct 2026 (task 3c): warn-text 14 -> 15 — the Routes row's amber "Route again: does not pass the holding area" chip
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 26 and _fe_wo.count("var(--warn-text)") == 15
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe

@@ -612,8 +612,10 @@ def page(acc=None, today=None):
         "choices": {"statuses": [{"key": k, "word": rules.STATUS_WORDS[k]} for k in rules.STATUSES],
                     "vehicle_types": [{"key": k, "word": rules.VEHICLE_WORDS[k]} for k in rules.VEHICLE_TYPES],
                     "escorts": list(rules.ESCORTS), "time_bands": list(rules.TIME_BANDS),
+                    # 29 Oct 2026 (task 3c): a holding area is never where a load starts or ends
                     "locations": [{"id": l["id"], "name": l["name"], "loc_type": l.get("loc_type")} for l in
-                                  sorted(locs.values(), key=lambda x: x["name"] or "")],
+                                  sorted(locs.values(), key=lambda x: x["name"] or "")
+                                  if str(l.get("loc_type") or "").strip().lower() != "holding area"],
                     "gates": [{"id": g["id"], "location_id": g["location_id"], "name": g["name"], "direction": g.get("direction"),
                                "active": bool(g.get("active", True))} for g in gates.values()],
                     "transitions": TRANSITIONS, "planner_only": sorted(PLANNER_ONLY)},

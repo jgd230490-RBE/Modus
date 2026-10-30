@@ -2772,7 +2772,51 @@ def _rs_gate(c, x, y, colour):
     c.setFillColorRGB(*_hex_rgb(colour)); c.rect(x - 3.6, y - 3.6, 7.2, 7.2, stroke=1, fill=1)
 
 
-def _rs_map(c, S, v, x, y, w, h, legs, *, pins=(), gates=(), community=None, empty_words="", haul=()):
+# 29 Oct 2026 (task 3c): the holding area's mark — a blue square with a white H (the lorry-park sign's look), and the
+# chevrons along the run from it to the gate ("called forward"); one ink, a white halo, no dots, no violet
+RS_HOLD = "#1D4ED8"
+RS_CHEVRON_EVERY_PT = 11.0
+
+
+def _rs_hmark(c, x, y, s=5.2):
+    c.saveState()
+    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(0.9)
+    c.setFillColorRGB(*_hex_rgb(RS_HOLD)); c.rect(x - s, y - s, 2 * s, 2 * s, stroke=1, fill=1)
+    c.setFillColorRGB(1, 1, 1); c.setFont(_BF("bold"), 7.4)
+    c.drawCentredString(x, y - 2.6, "H")
+    c.restoreState()
+
+
+def _rs_chevrons(c, P, coords, every=RS_CHEVRON_EVERY_PT):
+    """Small chevrons along a polyline (page points), each pointing the way of travel, a white halo under each."""
+    pts = [P(*q) for q in coords]
+    if len(pts) < 2:
+        return
+    import math as _m
+    c.saveState()
+    c.setLineCap(1); c.setLineJoin(1)
+    run, nxt = 0.0, every / 2
+    for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+        seg = _m.hypot(bx - ax, by - ay)
+        if seg <= 0:
+            continue
+        ux, uy = (bx - ax) / seg, (by - ay) / seg
+        while nxt <= run + seg:
+            t = nxt - run
+            px, py = ax + ux * t, ay + uy * t
+            for colour, wd in ((RS_CASING, 2.6), (RS_BOTH, 1.1)):
+                c.setStrokeColorRGB(*_hex_rgb(colour)); c.setLineWidth(wd)
+                p = c.beginPath()
+                p.moveTo(px - ux * 2.4 - uy * 2.2, py - uy * 2.4 + ux * 2.2)
+                p.lineTo(px, py)
+                p.lineTo(px - ux * 2.4 + uy * 2.2, py - uy * 2.4 - ux * 2.2)
+                c.drawPath(p, stroke=1, fill=0)
+            nxt += every
+        run += seg
+    c.restoreState()
+
+
+def _rs_map(c, S, v, x, y, w, h, legs, *, pins=(), gates=(), community=None, empty_words="", haul=(), marks=(), chevrons=()):
     """One map box at (x, y), w x h points: the basemap, the legs, the haul-road stretches, the pins, the scale bar, the
     north arrow. 23 Oct 2026 (the route line redesign): the legs go INTO the basemap request as path overlays under the
     road names (basemap.labels_layer(), the chosen style's) whenever the URL fits — the names print over the lines as on the public map; else
@@ -2809,6 +2853,8 @@ def _rs_map(c, S, v, x, y, w, h, legs, *, pins=(), gates=(), community=None, emp
                 _rs_line(c, P, coords, colour, RS_W, offset=offset)
         for coords, colour, offset in haul:
             _rs_line(c, P, coords, colour, RS_HAUL_W, dots=True, offset=offset, edge=RS_W + RS_CASING_EXTRA - RS_HAUL_W)
+        for coords in chevrons:                   # 29 Oct 2026 (task 3c): the run from the holding area to the gate
+            _rs_chevrons(c, P, coords)
         if community:
             _draw_community(c, {"community": community}, P, "over")
     else:
@@ -2829,6 +2875,9 @@ def _rs_map(c, S, v, x, y, w, h, legs, *, pins=(), gates=(), community=None, emp
         for at, letter in pins:
             if at:
                 _rs_pin(c, *P(*at), letter)
+        for at in marks:                          # 29 Oct 2026 (task 3c): the H badge, last like the pins
+            if at:
+                _rs_hmark(c, *P(*at))
     c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.6)
     c.rect(0, 0, w, h, stroke=1, fill=0)
     c.restoreState()
@@ -2870,6 +2919,12 @@ def route_sheet_lines(S):
                 + (f", {e['closed']}" if e.get("closed") else "")]
     if e.get("shut"):
         arriving.append(f"Gate shut {e['shut']}")
+    # 29 Oct 2026 (task 3c): the holding area first — three steps before the gate, then its rules as typed
+    H = S.get("holding")
+    if H and H.get("leg") == "loaded":
+        arriving = _holding_steps(H, "the gate") + ["3. Then drive to the gate:"] + arriving
+    elif H and H.get("leg") == "return":
+        arriving.append(f"On the way back to A, this lorry calls off at {H['name']} (see Leaving B).")
     arriving += [
                 ("No deliveries " + S["peak_words"] + " (the scheme's no-delivery windows)") if S.get("peak_words")
                 else "No-delivery windows: none typed for the scheme"]
@@ -2885,7 +2940,27 @@ def route_sheet_lines(S):
                        + (f", shut {li['shut']}" if li.get("shut") else "") + ".")
     if lo.get("name"):
         leaving.append(f"At A, leave loaded by {lo['name']}.")
+    if H and H.get("leg") == "return":
+        leaving = leaving[:1] + _holding_steps(H, "A's gate") + ["3. Then drive to A's gate:"] + leaving[1:]
     return arriving, leaving
+
+
+def _holding_steps(H, gate_word):
+    """29 Oct 2026 (task 3c): the first two of the three numbered steps for a lorry that calls off at a holding area."""
+    g = H.get("gate") or {}
+    where = []
+    if H.get("before_words"):
+        where.append(("on this route, " if not H.get("straight") else "") + H["before_words"])
+    hours = ("open " + g["hours"]) if g.get("hours") else (
+        f"open hours none typed (planned on {g['default_hours']}, the default)" if g.get("default_hours") else None)
+    if hours:
+        where.append(hours + (f", {g['closed']}" if g.get("closed") else ""))
+    if H.get("spaces"):
+        where.append(f"{H['spaces']} spaces")
+    line1 = f"1. Go to {H['name']} first" + (": " + "; ".join(where) if where else "") + "."
+    if H.get("straight"):
+        line1 += " (This route's line does not pass it: the run from it to the gate is drawn straight.)"
+    return [line1, "2. Wait there to be called forward."]
 
 
 def route_sheet_blocks(S):
@@ -2893,10 +2968,14 @@ def route_sheet_blocks(S):
     empty field reads "Not typed" rather than vanishing."""
     import route_sheet as rs
     out = []
-    for head, v in (("Why this route", S.get("route_reason")),
-                    ("Permitted diversions", S.get("permitted_deviations")),
-                    (f"Site rules at B, {S['dest']}", S.get("site_rules_dest")),
-                    (f"Site rules at A, {S['origin']}", S.get("site_rules_origin"))):
+    heads = [("Why this route", S.get("route_reason")),
+             ("Permitted diversions", S.get("permitted_deviations")),
+             (f"Site rules at B, {S['dest']}", S.get("site_rules_dest")),
+             (f"Site rules at A, {S['origin']}", S.get("site_rules_origin"))]
+    H = S.get("holding")
+    if H:          # 29 Oct 2026 (task 3c): the holding area's own rules, as typed on it
+        heads.insert(2, (f"Site rules at H, {H['name']}", H.get("site_rules")))
+    for head, v in heads:
         out.append((head, v if v else rs.NOT_TYPED, not v))
     return out
 
@@ -2932,7 +3011,8 @@ def build_route_sheet_pdf(S):
                 c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 13); c.drawString(m, y - 13, ln)
             y -= 16
         sub = " · ".join(w for w in (S["route_id"], S.get("team"), S.get("material"),
-                                     (f"drawn for the {S['vehicle_text']}" if S.get("vehicle_text") else None)) if w)
+                                     (f"drawn for the {S['vehicle_text']}" if S.get("vehicle_text") else None),
+                                     (f"calls at {S['holding']['name']}" if S.get("holding") else None)) if w)
         for ln in _wrap(sub, R, 8.4, cw):
             if draw:
                 c.setFillColorRGB(*GREY); c.setFont(R, 8.4); c.drawString(m, y - 8.4, ln)
@@ -2947,12 +3027,24 @@ def build_route_sheet_pdf(S):
                                         + [(p, RS_RETURN, RS_OFFSET) for p in S.get("haul_return") or []],
                                    pins=((S["loaded"][0] if S["loaded"] else None, "A"),
                                          (S["loaded"][-1] if S["loaded"] else None, "B")),
+                                   marks=((S["holding"]["point"],) if S.get("holding") else ()),
+                                   chevrons=((S["holding"]["run"],) if (S.get("holding") and S["holding"].get("run")) else ()),
                                    empty_words="No road route has been worked out for this route yet.")
         y -= h1 + 4
         if draw:                                   # the legend under it
             lx = m
-            swatches = [(RS_LOADED, False, "Loaded, A to B" + (f": {S['loaded_words']}" if S.get("loaded_words") else "")),
-                        (RS_RETURN, False, "Empty, back to A")]
+            HOLD = S.get("holding")                  # not H: the page height is H in this function
+            if HOLD and HOLD.get("leg") == "loaded":    # 29 Oct 2026 (task 3c): A to H, H to B when called, back with no stop
+                swatches = [(RS_LOADED, False, "Loaded, A to H" + (f": {HOLD['to_h_words']}" if HOLD.get("to_h_words") else "")),
+                            (RS_LOADED, False, "H to B when called" + (f": {HOLD['h_to_gate_words']}" if HOLD.get("h_to_gate_words") else "")),
+                            (RS_RETURN, False, "Empty, back to A (no stop at H)")]
+            elif HOLD and HOLD.get("leg") == "return":
+                swatches = [(RS_LOADED, False, "Loaded, A to B" + (f": {S['loaded_words']}" if S.get("loaded_words") else "")),
+                            (RS_RETURN, False, "Empty, back to H" + (f": {HOLD['to_h_words']}" if HOLD.get("to_h_words") else "")),
+                            (RS_RETURN, False, "H to A when called" + (f": {HOLD['h_to_gate_words']}" if HOLD.get("h_to_gate_words") else ""))]
+            else:
+                swatches = [(RS_LOADED, False, "Loaded, A to B" + (f": {S['loaded_words']}" if S.get("loaded_words") else "")),
+                            (RS_RETURN, False, "Empty, back to A")]
             if S.get("haul_loaded") or S.get("haul_return"):
                 swatches.append((RS_LOADED, True, "On a haul road"))
             for colour, dots, words in swatches:
@@ -2967,19 +3059,28 @@ def build_route_sheet_pdf(S):
                 _rs_pin(c, lx + 5, y - 4, letter, r=4.6)
                 c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.8); c.drawString(lx + 13, y - 6.6, words)
                 lx += 13 + c.stringWidth(words, R, 7.8) + 12
+            if S.get("holding"):
+                _rs_hmark(c, lx + 5, y - 4, s=4.6)
+                words = "holding area"
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(R, 7.8); c.drawString(lx + 13, y - 6.6, words)
+                lx += 13 + c.stringWidth(words, R, 7.8) + 12
         y -= 16
         # the last mile, and beside it arriving / leaving / limits
         w2, h2 = rs.MAP2_W_MM * mm, rs.MAP2_H_MM * mm
+        hrun = bool(S.get("holding_run_view") and S.get("holding"))
         if draw:
             c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 9.2)
-            c.drawString(m, y - 9.2, f"The last mile: about {rs.LAST_MILE_M / 1000:g} km in and out of B")
+            c.drawString(m, y - 9.2, "From the holding area to the gate" if hrun
+                         else f"The last mile: about {rs.LAST_MILE_M / 1000:g} km in and out of B")
         top2 = y - 14
         if draw:
             _rs_map(c, S, S.get("view2"), m, top2 - h2, w2, h2,
-                    [(S["last_mile_in"], RS_LOADED, RS_OFFSET), (S["last_mile_out"], RS_RETURN, RS_OFFSET)],
+                    [((S["holding"]["run"] if hrun else S["last_mile_in"]), RS_LOADED, RS_OFFSET), (S["last_mile_out"], RS_RETURN, RS_OFFSET)],
                     haul=[(p, RS_LOADED, RS_OFFSET) for p in S.get("haul_last_in") or []]
                          + [(p, RS_RETURN, RS_OFFSET) for p in S.get("haul_last_out") or []],
                     pins=((S["loaded"][-1] if S["loaded"] else None, "B"),),
+                    marks=((S["holding"]["point"],) if S.get("holding") else ()),
+                    chevrons=((S["holding"]["run"],) if (S.get("holding") and S["holding"].get("run")) else ()),
                     gates=(((e.get("at"), RS_BOTH),) if S.get("same_gate") else ((e.get("at"), RS_IN), (x_.get("at"), RS_OUT)))
                           if S.get("drawn") else (),
                     community=S.get("community"), empty_words="No road route to draw.")

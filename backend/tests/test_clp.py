@@ -271,16 +271,18 @@ ok("⭐ clp.py is read-only: no db.execute, no INSERT / UPDATE / DELETE",
 ok("⭐ clp.py imports neither main nor network and names no team slot id",
    not re.search(r"^\s*(import|from)\s+(network|main)\b", src, re.M) and re.search(r"\bIPT ?[1-6]\b", src) is None)
 _stmts = re.findall(r'db\.query\(\s*((?:"[^"]*"\s*)+)', code_only)
-ok("🔴 tenant isolation: both SQL literals in clp.py constrain tenant_id",
-   len(_stmts) == 2 and all("tenant_id = ?" in s for s in _stmts), str(_stmts))
+ok("🔴 tenant isolation: all three SQL literals in clp.py constrain tenant_id (29 Oct 2026: the holding areas' lines)",
+   len(_stmts) == 3 and all("tenant_id = ?" in s for s in _stmts), str(_stmts))
 ok("the reply's keys and the chart order are the contract's",
    set(M) == {"month", "label", "working_days", "distance_unit", "months", "order", "charts", "with_data", "peak_bands",
               "peak_words", "scope", "scope_line", "limit", "demo_notice"}
-   and M["order"] == ["route_caps", "site_caps", "vehicle_types", "euro_class", "councils", "carbon_rate", "trips_avoided"]
+   and M["order"] == ["route_caps", "site_caps", "holding_areas", "vehicle_types", "euro_class", "councils", "carbon_rate", "trips_avoided"]
    and list(C) == M["order"] and M["label"] == "Oct 2026" and M["working_days"] == 22.0)
 ok("every chart carries key, number, title, the CLP item it serves, state and missing",
    all({"key", "number", "title", "serves", "state", "missing"} <= set(c) and c["key"] == k for k, c in C.items())
-   and [C[k]["number"] for k in M["order"]] == ["1", "1", "4", "5", "6", "10", "16"])
+   and [C[k]["number"] for k in M["order"]] == ["1", "1", "1", "4", "5", "6", "10", "16"])
+ok("29 Oct 2026 (task 3c): with no holding area the Holding areas table is empty and says what to type",
+   C["holding_areas"]["state"] == "empty" and "Holding area" in (C["holding_areas"]["missing"] or ""), str(C["holding_areas"]))
 
 # =========================================================================== #
 #  2. Empty states before anything is typed: each names its field, never a 0     #
@@ -420,8 +422,34 @@ ok("the four council areas import and the routed legs are clipped", _imp.get("im
 DECISIONS = [{"driver": "vehicle", "scope": {"route_id": R2}, "vehicle": ART}]
 _t = main.put_carbon_target(main.CarbonTargetIn(mode="pct", levers=DECISIONS, ui_state={}, updated_by="Sam (planner)"))
 ok("the carbon target is set from one decision (a lorry swap on R002)", (_t.get("target") or {}).get("levers") == DECISIONS, str(_t)[:300])
+# 29 Oct 2026 (task 3c): a holding area on R001's line, serving Yard East (Data -> Locations), its entrance gate typed
+import holding  # noqa: E402
+import gates as _gates  # noqa: E402
+_had_tok = os.environ.get("ADMIN_TOKEN")
+os.environ["ADMIN_TOKEN"] = "adm"
+_h = main.create_location(main.LocationIn(name="Lane holding area", role="both", lat=52.55, lon=-0.88, loc_type="Holding area",
+                                          holding_spaces=10, holding_call=2), token="adm")
+H1 = _h["id"]
+_gates.create_gate(H1, "Lane entrance", 52.55, -0.88, direction="both", open_from="07:00", open_to="20:30", open_days="1111100")
+_hl = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}[d1]
+main.update_location(d1, main.LocationIn(name=_hl["name"], role="destination", receives=[BAL], lat=_hl["lat"], lon=_hl["lon"],
+                                         loc_type=_hl.get("loc_type") or "Compound", holding_id=H1), token="adm")
+if _had_tok is None:
+    os.environ.pop("ADMIN_TOKEN", None)
+else:
+    os.environ["ADMIN_TOKEN"] = _had_tok
 M2 = clp.monitoring(10, acc_planner, factors=factors, working_days=WD)
 C2 = M2["charts"]
+_HA = C2["holding_areas"]
+ok("⭐ 29 Oct 2026 (task 3c): the Holding areas table is set: one row, 10 spaces, its hours, the site it serves, the mixers straight to the gate",
+   _HA["state"] == "set" and len(_HA["rows"]) == 1 and _HA["rows"][0]["holding_area"] == "Lane holding area" and _HA["rows"][0]["spaces"] == 10
+   and _HA["rows"][0]["open"].startswith("07:00–20:30") and _HA["rows"][0]["serves"] == "Yard East"
+   and "mixer" in _HA["rows"][0]["straight"].lower() and _HA["rows"][0]["straight"].endswith("abnormal loads"), str(_HA)[:400])
+ok("⭐ ...and the lorries a day: R001's 100 loads into Yard East ÷ 22 (R002 and R003 serve no holding area; no return calls off)",
+   _HA["rows"][0]["per_day"] == round(100 / 22.0, 1) and _HA["headline"].startswith("1 holding area, 4.5 lorries a day"), str(_HA["rows"][0]["per_day"]) + " " + _HA["headline"])
+ok("...the most held at once comes from the Simulation's day (a figure, with its time, or a dash), never a crash",
+   ("most" in _HA["rows"][0]) and (_HA["rows"][0]["most"] is None or isinstance(_HA["rows"][0]["most"], int)), str(_HA["rows"][0]))
+ok("...basis and source are in words a reader can check", "÷ 22 working days" in _HA["basis"] and _HA["source"].startswith("Wayscope"))
 
 # chart 1
 RC = C2["route_caps"]

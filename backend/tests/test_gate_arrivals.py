@@ -508,7 +508,8 @@ ok("a pending-only gate would list with no approved arrivals: gap None and the n
 ep = main.gate_arrivals_month(9)
 # NARROWED 16 Oct 2026 (S3): the endpoint adds the simulation's busiest hour to each gate (busiest_hour) and one note
 # (busiest_note); everything arrivals() sends is unchanged
-_ep_core = {k: v for k, v in ep.items() if k != "busiest_note"}
+# NARROWED 29 Oct 2026 (task 3c): the endpoint also adds the holding areas' rows (holding), from the same simulation day
+_ep_core = {k: v for k, v in ep.items() if k not in ("busiest_note", "holding")}
 _ep_core["gates"] = [{k: v for k, v in g.items() if k != "busiest_hour"} for g in ep["gates"]]
 ok("the endpoint: main.gate_arrivals_month(9) returns gate_arrivals.arrivals(9, acc, …) plus each gate's busiest hour and its note",
    _ep_core == res and all("busiest_hour" in g for g in ep["gates"]) and "busiest_note" in ep

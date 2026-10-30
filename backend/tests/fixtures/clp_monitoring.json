@@ -16,6 +16,7 @@
  "order": [
   "route_caps",
   "site_caps",
+  "holding_areas",
   "vehicle_types",
   "euro_class",
   "councils",
@@ -126,6 +127,31 @@
    "subtitle": "lorry visits a day, Oct 2026",
    "basis": "A visit is one lorry in and out: a delivery where the site is the destination, or a lorry coming to load where it is the origin; the month's approved trips ÷ 22 working days, every team together, against the CLP cap typed on the location. A flag, never a block.",
    "source": "Wayscope: the approved plan and each site's typed CLP cap"
+  },
+  "holding_areas": {
+   "number": "1",
+   "title": "Holding areas",
+   "serves": "TfL CLP guidance: the size of any vehicle holding areas",
+   "key": "holding_areas",
+   "state": "set",
+   "missing": null,
+   "rows": [
+    {
+     "holding_id": "L005",
+     "holding_area": "Lane holding area",
+     "spaces": 10,
+     "open": "07:00–20:30, closed on Saturdays and Sundays",
+     "serves": "Yard East",
+     "straight": "Concrete mixer 6 m³ (26t), Concrete mixer 8 m³ (32t), abnormal loads",
+     "per_day": 4.5,
+     "most": 0,
+     "most_at": null
+    }
+   ],
+   "headline": "1 holding area, 4.5 lorries a day call off there",
+   "subtitle": "lorries a day, Oct 2026",
+   "basis": "The month's approved lines whose lorries call off at the holding area — a delivery to a site it serves, or a lorry coming back to such a site to load — for the lorry types that do not go straight to the gate, ÷ 22 working days; the most held at once is the Simulation's average day, called forward as typed on the holding area.",
+   "source": "Wayscope: the approved plan, each holding area as typed, and the Simulation's day"
   },
   "vehicle_types": {
    "number": "4",
@@ -370,6 +396,7 @@
  "with_data": [
   "route_caps",
   "site_caps",
+  "holding_areas",
   "vehicle_types",
   "euro_class",
   "councils",

@@ -678,6 +678,12 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-line-end{border-top:1.5px dashed #94A3B8;}
   .sim-line-haul{border-top:3px dashed #7C3AED;}
   .sim-badge{background:#FFFFFF;border:1px solid #DC2626;color:#B91C1C;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.12);}
+  /* 29 Oct 2026 (task 3c): the holding area's mark — a blue square H (the lorry-park sign's look), on the map and in the tables */
+  .sim-hbadge,.hbadge{display:inline-flex;align-items:center;justify-content:center;background:#1D4ED8;color:#FFFFFF;font-weight:700;border:1.5px solid #FFFFFF;box-shadow:0 0 0 1px #1D4ED8;border-radius:3px;}
+  .sim-hbadge{width:22px;height:22px;font-size:14px;}
+  .hbadge{width:18px;height:18px;font-size:12px;vertical-align:-3px;margin-right:4px;}
+  .sim-dot-held{background:#475569;}
+  .sim-cmp td:first-child{max-width:190px;}
   .sim-side{display:flex;flex-direction:column;gap:12px;min-width:0;}
   .sim-card{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--surface);color:var(--ink);}
   .sim-card-h{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:6px;}
@@ -709,6 +715,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-ctl input:not([type=checkbox]),.sim-table input{font:inherit;font-size:14px;border:1px solid var(--grey);border-radius:6px;padding:2px 6px;color:var(--ink);background:var(--surface);min-height:28px;}
   .sim-ctl input[type=time],.sim-table input[type=time]{width:108px;}
   .sim-num{width:76px;}
+  .sim-hold-row{flex-wrap:wrap;row-gap:2px;}   /* 30 Oct 2026 (task 3c): the holding row wraps; its note is a line under it, never a flex item beside it */
   .sim-msg{color:var(--red);font-size:14px;font-weight:600;}
   .sim-h4{font-size:15px;font-weight:600;color:var(--ink);margin:16px 0 2px;}
   .sim-tl{border:1px solid var(--line);border-radius:8px;background:var(--surface);overflow:hidden;cursor:pointer;margin-top:6px;}
@@ -1379,6 +1386,8 @@ const INFO = {
     how: "The bulletin's figures: a route counts in every area its laden leg enters, so the areas add up to more than the scheme.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   "clp.carbon_rate": { title: "Carbon per delivery and per tonne", text: "All-in carbon (making the material, transport and waste) a tonne and a load each month, as planned and with the agreed decisions, against the carbon target shared out over the tonnes.",
     how: "Per load has no target line: moving material to a bigger lorry makes fewer, heavier loads, so the carbon a load can rise while the total falls.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  "clp.holding_areas": { title: "Holding areas", text: "Each holding area's spaces, hours, the sites it serves, the lorries that go straight to the gate, the lorries a day that call off there this month, and the most held at once on the Simulation's average day.",
+    how: "A lorry calls off where it arrives at a site that names the holding area, unless its type is exempt or its route is ticked. The most held comes from the Simulation's day, not from a count.", guide: "17-2-the-scenario", tech: "t1-holding" },
   "clp.trips_avoided": { title: "Lorry trips avoided", text: "Loads each month as planned and with the decisions agreed with the carbon target, and the difference.",
     how: "Only a decision that changes the lorry, the supplier or the route changes trips; one that changes only the material does not.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   // 14 Oct 2026 (bundle G, W17)
@@ -2001,6 +2010,16 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
                 </RowDetails>
               );
             })}
+            {/* 29 Oct 2026 (task 3c): the holding areas under the gates they serve — lorries a day through each, the most held at once */}
+            {(ga.holding || []).map(h => (
+              <tr key={"h" + h.id} className="rd-row" data-ga-holding={h.id}>
+                <td><span className="hbadge" aria-hidden="true">H</span>{h.name}<div className="ga-gate">calls off to {h.served_names}</div></td>
+                <td className="num" data-label="Arrivals a day">{gaN1(h.per_day)}</td>
+                <td className="num" data-label="Average gap">—</td>
+                <td className="num" data-label="Check-in a lorry">{h.check_minutes == null ? "—" : `${+h.check_minutes} min`}</td>
+                <td className="num" data-label="Busiest hour">{h.most ? `${h.most} held at ${h.most_at}` : "—"}</td>
+                <td className="rd-status" data-label="Status"><RowStatus word={h.spaces ? (h.most > h.spaces ? "Over its spaces" : `${h.spaces} spaces`) : "No spaces typed"} tone={h.spaces && h.most > h.spaces ? "bad" : "none"} /></td>
+              </tr>))}
           </tbody>
         </table></div>
         </details>
@@ -3459,6 +3478,13 @@ function ClpMonitoring({ months, initial }){
               {capped(C.site_caps.rows).length > 0 && <ChartCanvas config={clpBulletCfg(capped(C.site_caps.rows), "visits_per_day", "site", "visits a day")} height={Math.max(150, 46 * capped(C.site_caps.rows).length + 50)} />}
               <ClpUncapped rows={C.site_caps.rows} nameKey="site" valKey="visits_per_day" word="a day" what="site" />
             </ClpCard>
+            {/* 29 Oct 2026 (task 3c): the holding areas, as the CLP pack prints them */}
+            {C.holding_areas && <ClpCard c={C.holding_areas} info={<InfoTip id="clp.holding_areas" />} wide>
+              {(C.holding_areas.rows || []).length > 0 && <div className="overflow-auto"><table className="ga-table rd-table" data-clp-holding="1">
+                <thead><tr><th scope="col">Holding area</th><th scope="col" className="num">Spaces</th><th scope="col">Open</th><th scope="col">Serves</th><th scope="col">Straight to the gate</th><th scope="col" className="num">Lorries a day</th><th scope="col">Most held at once</th></tr></thead>
+                <tbody>{(C.holding_areas.rows || []).map(r => <tr key={r.holding_id}><td><span className="hbadge" aria-hidden="true">H</span>{r.holding_area}</td><td className="num">{r.spaces == null ? "—" : r.spaces}</td><td>{r.open || "—"}</td><td>{r.serves}</td><td>{r.straight}</td><td className="num">{clpN1(r.per_day)}</td><td>{r.most != null ? `${r.most}${r.most_at ? ` at ${r.most_at}` : ""}` : "—"}</td></tr>)}</tbody>
+              </table></div>}
+            </ClpCard>}
             <ClpCard c={C.vehicle_types} info={<InfoTip id="clp.vehicle_types" />}>
               <ChartCanvas config={clpShareCfg(C.vehicle_types)} />
             </ClpCard>
@@ -9095,6 +9121,13 @@ function GatesWeek({ gw }){
             </div>
           </div>
         ))}
+        {/* 29 Oct 2026 (task 3c): the holding areas — lorries a day through each this week (spaces are not a rate: no capacity line) */}
+        {(gw.holding || []).map(h => (
+          <div key={"h" + h.id} className="gw-gate" data-gw-holding={h.id}>
+            <div className="text-sm font-semibold text-slate-700"><span className="hbadge" aria-hidden="true">H</span>{h.name}<span className="text-slate-400 font-normal"> · holding area{h.spaces ? ` · ${h.spaces} spaces` : ""}</span></div>
+            <div className="clp-note">Calls off to {h.served_names}.</div>
+            <div className="gw-days">{(h.days || []).map(d => <span key={d.date} className="gw-day" data-gw-hday={d.date}><RowStatus word={`${d.day}: ${d.arrivals}`} tone="none" /></span>)}</div>
+          </div>))}
       </div>
       {rest.length > 0 && <div className="clp-note" data-gw-rest="1">{rest.length} more gate{rest.length === 1 ? "" : "s"}: {rest.map(g => `${g.location_name}, ${g.gate_name}${g.status_word ? ` (${g.status_word})` : ""}`).join("; ")}.</div>}
       <div className="ct-note">{gw.limit} The days are this page's own: the month spread over its calendar weeks, rounded up a day, so a day can be busier than the Dashboard's month average.</div>
@@ -10325,7 +10358,9 @@ const SIM_SC0 = () => ({ all: null, hours: {}, check_in: {}, bands: null, pour: 
   // 29 Oct 2026 (task 3a): the Day scale's planned pours (Plan → Pours), on unless unticked
   planned: true,
   // 28 Oct 2026 (v2): the scale (month · week · day) and the sites' what-ifs are part of the scenario (on screen only, D86)
-  scale: "month", bucket: "commit", date: "", site_speed: {}, service: {}, bays: {}, wash: null });
+  scale: "month", bucket: "commit", date: "", site_speed: {}, service: {}, bays: {}, wash: null,
+  // 29 Oct 2026 (task 3c): the holding areas on (null = as typed) or off; called forward at a time and spaces as what-ifs
+  holding: null, holding_call: {}, holding_spaces: {} });
 const SIM_SCALES = [["month", "Month"], ["week", "Week"], ["day", "Day"]];
 const simHM = (m) => { if(m == null || !isFinite(m)) return "—"; const r = Math.round(m); return String(Math.floor(r / 60)).padStart(2, "0") + ":" + String(((r % 60) + 60) % 60).padStart(2, "0"); };
 const simN1 = (n) => n == null ? "—" : (+n).toFixed(1);
@@ -10340,6 +10375,9 @@ function simQS(month, sc, legs){
   if(sc.bands != null) q.push(`bands=${sc.bands ? "on" : "off"}`);
   if(sc.arrivals === "rush") q.push("arrivals=rush", `rush_share=${encodeURIComponent(sc.rush_share)}`, `rush_minutes=${encodeURIComponent(sc.rush_minutes)}`);
   if(sc.planned === false) q.push("planned=off");
+  if(sc.holding === false) q.push("holding=off");
+  Object.keys(sc.holding_call || {}).forEach(h => q.push(`holding_call=${encodeURIComponent(h + "=" + sc.holding_call[h])}`));
+  Object.keys(sc.holding_spaces || {}).forEach(h => q.push(`holding_spaces=${encodeURIComponent(h + "=" + sc.holding_spaces[h])}`));
   const p = sc.pour;
   if(p.on && p.gate){
     q.push(`pour_gate=${encodeURIComponent(p.gate)}`, `pour_start=${encodeURIComponent(p.start)}`, `pour_m3=${encodeURIComponent(p.m3)}`, `pour_rate=${encodeURIComponent(p.rate)}`);
@@ -10401,11 +10439,35 @@ function simFrame(D, legs, t){
     }
   }
   Object.keys(stQ).forEach(k => stQ[k].sort((x, y) => x.sp.start - y.sp.start));   // each station's queue, in service order
-  const feats = []; let laden = 0, empty = 0, mixers = 0, waiting = 0, onSite = 0;
+  // 29 Oct 2026 (task 3c): the lorries held at each holding area at minute t (in order of arrival: their slots in the field)
+  const heldNow = {}, heldLost = {}, holdPt = {};
+  (D.holding || []).forEach(h => { holdPt[h.id] = h.point; heldNow[h.id] = []; heldLost[h.id] = 0; });
+  const firstHold = ((D.holding || [])[0] || {}).id;
+  const holdOf = (a) => (legs && legs[a.leg] && legs[a.leg].hold_id) || firstHold;
+  for(const a of D.arrivals){
+    if(!a.held) continue;
+    const hid = holdOf(a);
+    if(a.held.at <= t && t < a.held.called) (heldNow[hid] || (heldNow[hid] = [])).push(a);
+    if(a.held.at < t) heldLost[hid] = (heldLost[hid] || 0) + Math.max(0, Math.min(t, a.held.called) - a.held.at);
+  }
+  Object.values(heldNow).forEach(l => l.sort((x, y) => x.held.at - y.held.at));
+  const feats = []; let laden = 0, empty = 0, mixers = 0, waiting = 0, onSite = 0, held = 0;
   for(const a of D.arrivals){
     const chained = (a.stops || []).length > 0, site = chained ? sites[a.site] : null;
     let pos = null, k = a.kind;
-    if(t < a.start){
+    if(a.held && t < a.at){
+      // before the gate: on the road to the holding area, parked there, or on the run from it to the gate once called
+      const hid = holdOf(a);
+      if(t >= a.held.at && t < a.held.called){ pos = simHoldSlot(holdPt[hid], (heldNow[hid] || []).indexOf(a)); k = "held"; held++; if(!pos) continue; }
+      else {
+        if(a.depart == null || t < a.depart) continue;
+        const leg = legs && legs[a.leg];
+        if(!leg || !leg.coords) continue;
+        const el = t < a.held.at ? (t - a.depart) : ((a.held.at - a.depart) + (t - a.held.called));
+        pos = simPointAt(leg, simDistAt(leg.parts, el));
+        if(k === "laden") laden++; else if(k === "empty") empty++; else mixers++;
+      }
+    } else if(t < a.start){
       if(a.depart == null || t < a.depart) continue;
       const leg = legs && legs[a.leg];
       if(!leg || !leg.coords) continue;
@@ -10434,8 +10496,12 @@ function simFrame(D, legs, t){
     } else continue;
     feats.push({ type: "Feature", properties: { k }, geometry: { type: "Point", coordinates: pos } });
   }
-  return { feats, laden, empty, mixers, waiting, onSite, gates, stations };
+  const heldBy = {};
+  Object.keys(heldNow).forEach(h => { heldBy[h] = heldNow[h].length; });
+  return { feats, laden, empty, mixers, waiting, onSite, gates, stations, held, heldBy, heldLost };
 }
+// 29 Oct 2026 (task 3c): a held lorry's place in the holding area's field — five abreast, about 20 m apart, south of its mark
+const simHoldSlot = (pt, q) => pt ? [pt[0] + ((Math.max(0, q) % 5) - 2) * 0.00028, pt[1] - 0.00014 - Math.floor(Math.max(0, q) / 5) * 0.00018] : null;
 // 28 Oct 2026 (v2): the timeline's rows — the gates where a lorry waits, or (a site chosen) that site's stations
 function simTlRows(D, site){
   if(site){
@@ -10479,7 +10545,7 @@ function SimMap({ meta, D, store, frame, site, wall }){
     m.on("style.load", () => {
       if(m.getSource("sim-routes")) return;
       const empty = { type: "FeatureCollection", features: [] };
-      ["sim-routes", "sim-ends", "sim-haul", "sim-gates", "sim-lorries", "sim-areas", "sim-area-pts", "sim-wash"].forEach(s => m.addSource(s, { type: "geojson", data: empty }));
+      ["sim-routes", "sim-ends", "sim-haul", "sim-gates", "sim-lorries", "sim-areas", "sim-area-pts", "sim-wash", "sim-called"].forEach(s => m.addSource(s, { type: "geojson", data: empty }));
       m.addLayer({ id: "sim-routes", type: "line", source: "sim-routes", paint: { "line-color": "#94A3B8", "line-width": 1.6, "line-opacity": 0.75 } });
       m.addLayer({ id: "sim-ends", type: "line", source: "sim-ends", paint: { "line-color": "#94A3B8", "line-width": 1, "line-dasharray": [2, 2] } });
       m.addLayer({ id: "sim-haul", type: "line", source: "sim-haul", paint: { "line-color": tok("--chart-4", "#7C3AED"), "line-width": 4, "line-dasharray": [1.5, 1] } });
@@ -10504,12 +10570,16 @@ function SimMap({ meta, D, store, frame, site, wall }){
                    paint: { "text-color": "#1E293B", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
       m.addLayer({ id: "sim-lorries", type: "circle", source: "sim-lorries", paint: {
         "circle-radius": ["match", ["get", "k"], "wait", 4.5, 4],
-        "circle-color": ["match", ["get", "k"], "laden", tok("--sim-lorry", "#2563EB"), "pour", tok("--sim-mixer", "#E8590C"), "#FFFFFF"],
-        "circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF", tok("--sim-lorry", "#2563EB")],
+        "circle-color": ["match", ["get", "k"], "laden", tok("--sim-lorry", "#2563EB"), "pour", tok("--sim-mixer", "#E8590C"), "held", "#475569", "#FFFFFF"],
+        "circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF", "held", "#FFFFFF", tok("--sim-lorry", "#2563EB")],
         "circle-stroke-width": ["match", ["get", "k"], "laden", 1, "pour", 1, 2] } });
       // 28 Oct 2026 (v2): a lorry being unloaded, loaded or washed — green, over the lorry layer
       m.addLayer({ id: "sim-serving", type: "circle", source: "sim-lorries", filter: ["==", ["get", "k"], "serve"],
         paint: { "circle-radius": 5.5, "circle-color": tok("--ok-text", "#047857"), "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 1 } });
+      // 29 Oct 2026 (task 3c): chevrons along the run from a holding area to the gate — "called forward" (the route map's mark)
+      m.addLayer({ id: "sim-called", type: "symbol", source: "sim-called", layout: { "symbol-placement": "line", "symbol-spacing": 34, "text-field": "›", "text-size": 18,
+        "text-keep-upright": false, "text-allow-overlap": true, "text-ignore-placement": true, "text-font": ["DIN Pro Bold", "Arial Unicode MS Bold"] },
+        paint: { "text-color": tok("--ink", "#1F2024"), "text-halo-color": "#FFFFFF", "text-halo-width": 1.2 } }, "sim-lorries");
       setReady(true);
       setStyleN(n => n + 1);     // a new style: the still parts and the frame are set again
     });
@@ -10566,9 +10636,27 @@ function SimMap({ meta, D, store, frame, site, wall }){
     m.getSource("sim-ends").setData({ type: "FeatureCollection", features: ends });
     m.getSource("sim-haul").setData({ type: "FeatureCollection", features: haul });
     m.getSource("sim-gates").setData({ type: "FeatureCollection", features: gpts });
+    // 29 Oct 2026 (task 3c): the run from each holding area to the gate, from the leg's mark to its end
+    const called = [];
+    Object.values(store.legs || {}).forEach(lg => {
+      if(!lg || !lg.coords || lg.hold_m == null) return;
+      const i0 = (lg.cum || []).findIndex(c => c >= lg.hold_m);
+      if(i0 < 0) return;
+      called.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [simPointAt(lg, lg.hold_m)].concat(lg.coords.slice(i0)) } });
+    });
+    m.getSource("sim-called").setData({ type: "FeatureCollection", features: called });
     // the "N waiting" badges, one a gate (words, never a colour alone)
     Object.values(badges.current).forEach(x => { try { x.m.remove(); } catch(e){} });
     badges.current = {};
+    // 29 Oct 2026 (task 3c): the H badge at each holding area, and its "n held" badge beside it
+    (D.holding || []).forEach(h => {
+      if(!h.point) return;
+      b.extend(h.point);
+      const el = document.createElement("div"); el.className = "sim-hbadge"; el.textContent = "H"; el.title = h.name;
+      badges.current["hb:" + h.id] = { el, m: new window.mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat(h.point).addTo(m), fixed: true };
+      const el2 = document.createElement("div"); el2.className = "sim-badge"; el2.style.display = "none";
+      badges.current["hold:" + h.id] = { el: el2, m: new window.mapboxgl.Marker({ element: el2, anchor: "left", offset: [14, -10] }).setLngLat(h.point).addTo(m) };
+    });
     (D.gates || []).forEach(g => {
       if(g.lon == null || g.lat == null) return;
       const el = document.createElement("div");
@@ -10607,9 +10695,12 @@ function SimMap({ meta, D, store, frame, site, wall }){
     const f = frame;
     try { m.getSource("sim-lorries").setData({ type: "FeatureCollection", features: f.feats }); } catch(e){}
     Object.keys(badges.current).forEach(gid => {
-      const x = badges.current[gid], w = gid.startsWith("st:") ? ((f.stations || {})[gid.slice(3)] || {}).w || 0 : (f.gates[gid] || {}).w || 0;
+      const x = badges.current[gid];
+      if(x.fixed) return;                                       // 29 Oct 2026 (task 3c): the H badge stays
+      const isHold = gid.startsWith("hold:");
+      const w = isHold ? ((f.heldBy || {})[gid.slice(5)] || 0) : gid.startsWith("st:") ? ((f.stations || {})[gid.slice(3)] || {}).w || 0 : (f.gates[gid] || {}).w || 0;
       x.el.style.display = w > 0 ? "" : "none";
-      if(w > 0) x.el.textContent = `${w} waiting`;
+      if(w > 0) x.el.textContent = isHold ? `${w} held` : `${w} waiting`;
     });
   }, [frame, ready, styleN]);
   // the key, in words: a box over the map on the big screen, a row under it on the page (card 5)
@@ -10618,6 +10709,7 @@ function SimMap({ meta, D, store, frame, site, wall }){
     (D.pour || (D.planned_pours || []).length > 0) && ["sim-dot sim-dot-pour", `${(D.mixer && D.mixer.vehicle_label) || "Concrete mixer"} (pour)`],
     ["sim-dot sim-dot-wait", "Waiting (one lane, 25 m apart)"],
     (D.sites || []).length > 0 && ["sim-dot sim-dot-serve", "Being unloaded, loaded or washed"],
+    (D.holding || []).length > 0 && ["sim-dot sim-dot-held", "Held at the holding area"],
     ["sim-dot sim-dot-gate", "Gate"],
     (D.sites || []).length > 0 && ["sim-dot sim-dot-area", "Area on site"],
     (D.sites || []).some(x => x.wash) && ["sim-dot sim-dot-wash", "Wheel wash"],
@@ -10754,20 +10846,42 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open }){
             <div className="sim-clock" aria-live="off" data-sim-clock="1">{simHM(t)}</div>
             <div className="ct-note">{D.window.from}–{D.window.to} plays in about {SIM_PLAY_SECONDS} s at 1×</div>
             <label className="sim-lbl sim-jump">Jump to <input type="range" min={s0} max={s1} step={5} value={Math.round(t)} onChange={e => { setPlaying(false); seek(+e.target.value); }} aria-label="Jump to a time of day" /></label>
-            <div className="ct-note" data-sim-now="1">On the road now: {f.laden} laden · {f.empty} empty{f.mixers ? ` · ${f.mixers} mixer${f.mixers === 1 ? "" : "s"}` : ""} · {f.waiting} waiting{(D.sites || []).length ? ` · ${f.onSite} on site` : " at gates"}</div>
+            <div className="ct-note" data-sim-now="1">On the road now: {f.laden} laden · {f.empty} empty{f.mixers ? ` · ${f.mixers} mixer${f.mixers === 1 ? "" : "s"}` : ""} · {f.waiting} waiting{(D.sites || []).length ? ` · ${f.onSite} on site` : " at gates"}{(D.holding || []).length ? ` · ${f.held} held` : ""}</div>
           </div>
+          {/* 29 Oct 2026 (task 3c): each holding area's day, with and without it; two labelled lines, never in a total (Q12) */}
+          {(D.holding || []).filter(h => h.on).map(h => { const w = h.with || {}, wo = h.without || {}, M = D.holding_measures || {};
+            const mins = (s) => (s.site_minutes_lost || 0) + (s.gate_minutes_lost || 0) + (s.minutes_held || 0);
+            const gbp = (s) => M.lorry_hour_gbp ? Math.round(mins(s) / 60 * M.lorry_hour_gbp) : null;
+            const kg = (s) => M.idle_g_per_min ? (mins(s) * M.idle_g_per_min / 1000) : null;
+            return <div key={h.id} className="sim-card" data-sim-holding-card={h.id}>
+              <div className="sim-card-h"><span className="hbadge" aria-hidden="true">H</span>{h.name}</div>
+              <div className="ct-note">{h.held} held this day · most {h.most}{h.most_at != null ? ` at ${simHM(h.most_at)}` : ""}{h.spaces ? ` of ${h.spaces} spaces` : ""}{h.over_spaces ? <b className="sim-red"> · {h.over_spaces} over</b> : null}{h.first != null ? ` · call-off from ${simHM(h.first)}` : ""}</div>
+              <table className="sim-now sim-cmp"><thead><tr><th scope="col">This day</th><th scope="col" className="num">Without</th><th scope="col" className="num">With</th></tr></thead><tbody>
+                <tr><td>Most waiting on site</td><td className="num">{wo.site_most == null ? "—" : wo.site_most}</td><td className="num"><b>{w.site_most == null ? "—" : w.site_most}</b></td></tr>
+                <tr><td>Most waiting at the gate</td><td className="num">{wo.gate_most == null ? "—" : wo.gate_most}</td><td className="num"><b>{w.gate_most == null ? "—" : w.gate_most}</b></td></tr>
+                <tr><td>Time on site, average</td><td className="num">{wo.avg_on_site == null ? "—" : `${Math.round(wo.avg_on_site)} min`}</td><td className="num"><b>{w.avg_on_site == null ? "—" : `${Math.round(w.avg_on_site)} min`}</b></td></tr>
+                <tr><td>Minutes waiting, on site and at the gate</td><td className="num">{Math.round((wo.site_minutes_lost || 0) + (wo.gate_minutes_lost || 0))}</td><td className="num"><b>{Math.round((w.site_minutes_lost || 0) + (w.gate_minutes_lost || 0))}</b></td></tr>
+                <tr><td>Minutes held</td><td className="num">—</td><td className="num"><b>{Math.round(w.minutes_held || 0)}</b></td></tr>
+                <tr><td>Last lorry out</td><td className="num">{simHM(wo.last_out)}</td><td className="num"><b>{simHM(w.last_out)}</b></td></tr>
+                {gbp(wo) != null && <tr><td>All waiting as lorry time<div className="sim-sub">{M.lorry_hour_words}</div></td><td className="num">£{gbp(wo).toLocaleString("en-GB")}</td><td className="num"><b>£{gbp(w).toLocaleString("en-GB")}</b></td></tr>}
+                {kg(wo) != null && <tr><td>Idling, if every waiting engine runs<div className="sim-sub">{M.idle_words}</div></td><td className="num">{kg(wo).toFixed(1)} kg CO₂</td><td className="num"><b>{kg(w).toFixed(1)} kg CO₂</b></td></tr>}
+              </tbody></table>
+              <div className="ct-note">A holding area moves the waiting off the site and the lane; it does not remove it.</div>
+            </div>; })}
           {site
             ? <div className="sim-card" data-sim-stations-now="1">
               <div className="sim-card-h">Stations now · {site.d.name}</div>
               <table className="sim-now"><thead><tr><th scope="col">Station</th><th scope="col" className="num">Waiting</th><th scope="col" className="num">Busy</th><th scope="col" className="num">Min lost</th></tr></thead>
-                <tbody>{stOrder.map(r => { const n = r.gate ? { w: (f.gates[r.gate.gate_id] || {}).w || 0, lost: (f.gates[r.gate.gate_id] || {}).lost || 0, busy: null } : (f.stations[r.key] || { w: 0, busy: 0, lost: 0 });
+                <tbody>{(D.holding || []).filter(h => h.on && (h.served || []).some(s => s.id === site.d.location_id)).map(h => <tr key={"h" + h.id} className={((f.heldBy || {})[h.id] || 0) > 0 ? "sim-q" : ""} data-sim-now-holding={h.id}><td><span className="hbadge" aria-hidden="true">H</span>{h.name}<div className="sim-sub">{h.spaces ? `${h.spaces} spaces · ` : ""}{h.call} called forward at a time</div></td><td className="num">{((f.heldBy || {})[h.id] || 0) || ""}{((f.heldBy || {})[h.id] || 0) > 0 ? " held" : ""}</td><td className="num nw">—</td><td className="num">{Math.round((f.heldLost || {})[h.id] || 0)}</td></tr>)}
+                {stOrder.map(r => { const n = r.gate ? { w: (f.gates[r.gate.gate_id] || {}).w || 0, lost: (f.gates[r.gate.gate_id] || {}).lost || 0, busy: null } : (f.stations[r.key] || { w: 0, busy: 0, lost: 0 });
                   return <tr key={r.key} className={n.w > 0 ? "sim-q" : ""} data-sim-now-station={r.key}><td>{r.name}{r.sub ? <div className="sim-sub">{r.sub}</div> : null}</td><td className="num">{n.w || ""}</td><td className="num nw">{r.st && r.st.kind !== "gate" ? `${n.busy} / ${r.st.bays}` : (r.gate ? "one lane" : "—")}</td><td className="num">{Math.round(n.lost)}</td></tr>; })}</tbody></table>
               <div className="ct-note">On site now {f.onSite}{site.d.avg_on_site == null ? "" : ` · gate in → gate out ${Math.round(site.d.avg_on_site)} min on average, ${Math.round(site.d.longest_on_site)} the longest`}</div>
             </div>
             : <div className="sim-card">
             <div className="sim-card-h">Gates now</div>
             <table className="sim-now"><thead><tr><th scope="col">Gate</th><th scope="col" className="num">Waiting</th><th scope="col" className="num">Min lost</th></tr></thead>
-              <tbody>{order.map(g => { const n = f.gates[g.gate_id] || { w: 0, lost: 0 };
+              <tbody>{(D.holding || []).filter(h => h.on).map(h => <tr key={"h" + h.id} className={((f.heldBy || {})[h.id] || 0) > 0 ? "sim-q" : ""} data-sim-now-holding={h.id}><td><span className="hbadge" aria-hidden="true">H</span>{h.name}</td><td className="num">{(f.heldBy || {})[h.id] || 0}{((f.heldBy || {})[h.id] || 0) > 0 ? " held" : ""}</td><td className="num">{Math.round((f.heldLost || {})[h.id] || 0)}</td></tr>)}
+                {order.map(g => { const n = f.gates[g.gate_id] || { w: 0, lost: 0 };
                 return <tr key={g.gate_id} className={n.w > 0 ? "sim-q" : ""} data-sim-now-gate={g.gate_id}><td>{simGateName(g)}</td><td className="num">{n.w}{n.w > 0 ? " waiting" : ""}</td><td className="num">{Math.round(n.lost)}</td></tr>; })}</tbody></table>
           </div>}
         </div>
@@ -10887,7 +11001,18 @@ const SimScenario = React.memo(function SimScenario({ D, sc, onChange, onReset, 
               {onsite.areas.some(a => a.activity === "wash") && <label className="sim-check"><input type="checkbox" checked={sc.wash != null ? sc.wash : !!onsite.wash} onChange={e => onChange({ ...sc, wash: e.target.checked })} />
                 <span>Wheel wash on the way out</span></label>}
             </div>; })}
-          <label className="sim-check sim-off" title="Holding areas are coming"><input type="checkbox" disabled /><span>Holding area: lorries wait off the highway <span className="sim-tag">coming</span></span></label>
+          {/* 29 Oct 2026 (task 3c): the holding areas — on (as typed) or off for the day; called forward at a time and the spaces as what-ifs */}
+          {(D.holding || []).length > 0 ? <div className="sim-onsite" data-sim-holding-card="1">
+            <div className="sim-scn-h">Holding areas</div>
+            <label className="sim-check" data-sim-holding-switch="1"><input type="checkbox" checked={sc.holding !== false} onChange={e => onChange({ ...sc, holding: e.target.checked ? null : false })} />
+              <span>Holding area: lorries wait off the highway</span></label>
+            {(D.holding || []).map(h => <div key={h.id} data-sim-holding={h.id}><div className="sim-lbl sim-hold-row">{h.name}:{" "}
+              <input type="number" min={1} max={50} step={1} className="sim-num" aria-label={`${h.name}: called forward at a time`} disabled={sc.holding === false}
+                value={sc.holding_call[h.id] != null ? sc.holding_call[h.id] : h.call} onChange={e => { const v = +e.target.value; if(v >= 1) onChange({ ...sc, holding_call: { ...sc.holding_call, [h.id]: v } }); }} /> called forward at a time ·{" "}
+              <input type="number" min={1} max={500} step={1} className="sim-num" aria-label={`${h.name}: spaces`} disabled={sc.holding === false}
+                value={sc.holding_spaces[h.id] != null ? sc.holding_spaces[h.id] : (h.spaces == null ? "" : h.spaces)} onChange={e => { const v = +e.target.value; if(v >= 1) onChange({ ...sc, holding_spaces: { ...sc.holding_spaces, [h.id]: v } }); }} /> spaces</div>
+              <div className="ct-note">{(h.exempt_labels || []).length ? `${h.exempt_labels.join(", ")} go straight to the gate.` : "Every lorry calls off here."}</div></div>)}
+          </div> : <div className="ct-note" data-sim-no-holding="1">No holding area (Data → Locations).</div>}
           {msg && <div className="sim-msg" role="alert">{msg}</div>}
           <div><button type="button" className="btn-sec" onClick={onReset}>Back to the scheme's figures</button></div>
         </div>
@@ -10959,6 +11084,10 @@ function SimPhoneList({ D }){
   const main = order.filter(g => g.arrivals >= 5), small = order.filter(g => g.arrivals < 5);
   return (
     <ul className="sim-plist" data-sim-table="1" aria-label="Gates and stations">
+      {(D.holding || []).filter(h => h.on).map(h => <li key={"h" + h.id} className="sim-pcard" data-sim-phone-holding={h.id}>
+        <div className="sim-pc-h"><b>{h.name}</b><RowStatus word={h.over_spaces ? "Over its spaces" : "Holding area"} tone={h.over_spaces ? "bad" : "none"} /></div>
+        <div className="sim-pline">{h.held} held · most {h.most}{h.most_at != null ? ` at ${simHM(h.most_at)}` : ""}{h.spaces ? ` of ${h.spaces} spaces` : ""} · {Math.round(h.minutes_held)} min held</div>
+      </li>)}
       {main.map(card)}
       {small.length > 0 && <li><details className="sim-pmore"><summary>{small.length} more gate{small.length === 1 ? "" : "s"}, fewer than 5 lorries a day</summary>
         <ul className="sim-plist">{small.map(card)}</ul></details></li>}
@@ -11361,13 +11490,13 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){
 // Look-ahead prints "rate not set" rather than €0. The cap is a FLAG on the Look-ahead,
 // never a block (brief L2). km basis decides what the per-km rate and t·km multiply.
 function RoutePlanning({ route, token, onSaved }){
-  const [v, setV] = useState({ max_vehicles_per_day: "", rate_eur_per_load: "", rate_eur_per_t: "", rate_eur_per_km: "", km_basis: "round_trip" });
+  const [v, setV] = useState({ max_vehicles_per_day: "", rate_eur_per_load: "", rate_eur_per_t: "", rate_eur_per_km: "", km_basis: "round_trip", skip_holding: false });
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     setV({ max_vehicles_per_day: route.max_vehicles_per_day ?? "", rate_eur_per_load: route.rate_eur_per_load ?? "",
            rate_eur_per_t: route.rate_eur_per_t ?? "", rate_eur_per_km: route.rate_eur_per_km == null ? "" : +(+distRate(route.rate_eur_per_km)).toFixed(4),
-           km_basis: route.km_basis || "round_trip" });
+           km_basis: route.km_basis || "round_trip", skip_holding: !!route.skip_holding });
     setMsg("");
   }, [route.id]);
   const save = async () => {
@@ -11379,6 +11508,7 @@ function RoutePlanning({ route, token, onSaved }){
         body[k] = (v[k] === "" || v[k] == null) ? null : (k === "rate_eur_per_km" ? +(+distInRate(+v[k])).toFixed(6) : +v[k]);
       });
       body.km_basis = v.km_basis;
+      body.skip_holding = v.skip_holding ? 1 : 0;              // 29 Oct 2026 (task 3c)
       const res = await fetch(`${API}/admin/routes/${encodeURIComponent(route.id)}/planning${qs}`, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if(!res.ok) throw await errFrom(res);
@@ -11414,6 +11544,10 @@ function RoutePlanning({ route, token, onSaved }){
         <F k="rate_eur_per_load" label={`${CUR()} per load`} />
         <F k="rate_eur_per_t" label={`${CUR()} per tonne`} />
         <F k="rate_eur_per_km" label={`${CUR()} per ${DU()}`} rate />
+        <label className="flex items-center gap-2 min-h-6 text-sm text-slate-700 col-span-2" data-route-skip-holding="1">
+          <input type="checkbox" checked={!!v.skip_holding} onChange={e => setV(x => ({ ...x, skip_holding: e.target.checked }))} style={{ accentColor: "#1D4ED8" }} />
+          Does not call off at a holding area
+        </label>
       </div>
       <button onClick={save} disabled={busy}
         className="w-full py-2 rounded-lg text-sm font-semibold border disabled:opacity-50"
@@ -11570,7 +11704,7 @@ const MAP_H = "62vh";     // map height — the right-hand column matches it and
 // is MY choice, not a reserved value: it is clear of every reserved route, brand and
 // IPT colour. Change it here and the legend follows, because both are generated from
 // this object.
-const NODE_COLORS = { "Quarry": "#C6841D", "Port": "#2563EB", "Compound": "#059669",
+const NODE_COLORS = { "Holding area": "#1D4ED8", "Quarry": "#C6841D", "Port": "#2563EB", "Compound": "#059669",
                       "Site": "#6D28D9", "Railhead": "#0F766E", "Stockpile": "#78350F" };
 
 // Phase 3 zones. The colour carries the only distinction that matters at a glance:
@@ -11658,7 +11792,7 @@ function maaametStyle(){
 //              quarry or a port — map/index.html's filterByNode() and
 //              network._role_for() carry the matching rule and all three must agree.
 //   Stockpile  somewhere material is held. A DESTINATION by default.
-const LOC_TYPES = ["Quarry", "Port", "Compound", "Site", "Railhead", "Stockpile", "Other"];
+const LOC_TYPES = ["Quarry", "Port", "Compound", "Site", "Railhead", "Stockpile", "Holding area", "Other"];   // 29 Oct 2026 (task 3c): Holding area
 // 2026-09-02: 'Rail head' -> 'Railhead'. The backend rewrites old rows on boot and
 // canonicalises on read, but this client can meet a row the backend has not touched yet
 // (a stale /api/locations/geojson in the tab). Read either spelling; write only the new.
@@ -11667,7 +11801,7 @@ const locTypeOf = (t) => (t === "Rail head" ? "Railhead" : t);
 // stockpiles.STORAGE_TYPES on the backend.
 const STORAGE_TYPES = ["Stockpile", "Site", "Compound", "Railhead"];
 const ROLE_OPTIONS = [["origin", "Origin (supplier)"], ["destination", "Destination (site)"], ["both", "Both"]];
-const ROLE_LABEL = { origin: "Origin", destination: "Destination", both: "Both" };
+const ROLE_LABEL = { origin: "Origin", destination: "Destination", both: "Both", holding: "Holding area" };
 const asArray = (v) => Array.isArray(v) ? v : (() => { try { return JSON.parse(v || "[]"); } catch(e){ return []; } })();
 
 // "Artic Tipper (44t)" -> "Tipper (44t)". Full name stays in the chip's tooltip.
@@ -12615,6 +12749,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [divPeriods, setDivPeriods] = useState([]);
   // 30 Oct 2026 (task 4b): the community considerations near each route's drawn line — the "Near the route" column
   const [nearData, setNearData] = useState(null);
+  const [holdSum, setHoldSum] = useState(null);       // 29 Oct 2026 (task 3c): the holding areas and each route's state
   const [wayRound, setWayRound] = useState({ legs: 0, here_calls: 0, routes: [] });
   const [divZone, setDivZone] = useState(null);     // the zone whose diversions show under the form after a save
   const [divBusy, setDivBusy] = useState(false);
@@ -12670,10 +12805,15 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   }, [token]);
 
   // 28 Oct 2026 (task 0c): the dated zones' diversions, read on their own so a slow answer never holds the routes table up
-  const loadDiversions = () =>
+  // 30 Oct 2026 (task 3c, the UI audit): BOTH reads inside the braces. Without them the holding read alone was the function's
+  // body and the diversions read ran as a statement of every render — each answer set state, which rendered again, which
+  // read again: a request every few hundred ms for as long as a Data page was open (the audit saw the page never settle).
+  const loadDiversions = () => {
+    fetch(`${API}/holding`).then(r => r.ok ? r.json() : null).then(hs => { if(hs) setHoldSum(hs); }).catch(() => {});
     fetch(`${API}/routes/diversions`).then(r => r.ok ? r.json() : null).then(dv => {
       if(dv){ setDivPeriods(dv.periods || []); setWayRound(dv.way_round || { legs: 0, here_calls: 0, routes: [] }); }
     }).catch(() => {});
+  };
 
   const loadNear = () =>
     fetch(`${API}/routes/community-counts`).then(okJSON).then(j => setNearData(j)).catch(e => { console.warn("Wayscope:", e); setNearData(false); });
@@ -12991,10 +13131,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // Bake one route for a set of vehicle profiles. Routes are baked individually now —
   // there is no global profile selection, so every caller states which vehicles it means.
   // Returns the profiles that failed.
-  const bakeOneRoute = async (routeId, profiles) => {
+  const bakeOneRoute = async (routeId, profiles, viaHolding) => {
     const failed = [];
     for(const prof of (profiles || [])){
       const q = new URLSearchParams({ route_id: routeId, profile: prof });
+      if(viaHolding) q.set("via_holding", "true");               // 29 Oct 2026 (task 3c): through the holding area, one option
       if(tokenRef.current) q.set("token", tokenRef.current);
       try {
         const r = await fetch(`${API}/admin/bake-route?${q.toString()}`, { method: "POST" });
@@ -13021,11 +13162,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   };
 
   // Routes-table action: re-bake this route for the vehicles it already has.
-  const rebakeRoute = async (routeId, profiles) => {
+  const rebakeRoute = async (routeId, profiles, viaHolding) => {
     const profs = (profiles && profiles.length) ? profiles : [showProfile];
     setBakeBusy(routeId);
-    setRouteMsg(`Re-routing ${routeId} for ${profs.map(vehShort).join(", ")}…`);
-    const failed = await bakeOneRoute(routeId, profs);
+    setRouteMsg(`Re-routing ${routeId} for ${profs.map(vehShort).join(", ")}${viaHolding ? " through the holding area" : ""}…`);
+    const failed = await bakeOneRoute(routeId, profs, viaHolding);
     await reloadNetwork();
     if(selected === routeId){
       try {
@@ -13046,7 +13187,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       vendor: "", detail: "", lat: "", lon: "", gate_lat: "", gate_lon: "",
       // Week 1, Task D2. Blank means NOT RECORDED, which is not zero — the balance
       // still computes and `remaining` comes back unknown.
-      capacity_qty: "", capacity_unit: "t", opening_qty: "", clp_cap_per_day: "", site_rules: "", site_speed: "" });
+      capacity_qty: "", capacity_unit: "t", opening_qty: "", clp_cap_per_day: "", site_rules: "", site_speed: "",
+      holding_spaces: "", holding_call: "", holding_exempt: null, holding_id: "" });
     setMode("add");
   };
   const openEditForNode = (id) => {
@@ -13068,7 +13210,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       clp_cap_per_day: p.clp_cap_per_day == null ? "" : p.clp_cap_per_day,
       // 28 Oct 2026 (simulation v2): the site speed is stored in km/h and typed in the tenant's unit
       site_speed: p.site_speed_kph == null ? "" : String(Math.round(speed(p.site_speed_kph) * 10) / 10),
-      site_rules: p.site_rules || "" });
+      site_rules: p.site_rules || "",
+      // 29 Oct 2026 (task 3c): a holding area's fields (null exemption = the mixers), a site's holding area
+      holding_spaces: p.holding_spaces == null ? "" : p.holding_spaces, holding_call: p.holding_call == null ? "" : p.holding_call,
+      holding_exempt: p.holding_exempt || null, holding_id: p.holding_id || "" });
     setMode("edit");
   };
   // Locations-table row click: centre the map on the node and open it for editing.
@@ -13111,6 +13256,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     // 16 Oct 2026 (CLOCS v5 C3): the site's rules for drivers, on every route sheet that loads or delivers here
     site_rules: (f.site_rules || "").trim() || null,
     site_speed_kph: (f.site_speed === "" || f.site_speed == null) ? null : (DU() === "mi" ? +f.site_speed * KM_PER_MI : +f.site_speed),
+    // 29 Oct 2026 (task 3c): a holding area's own fields; any other type names the holding area its lorries call off through
+    ...(f.loc_type === "Holding area"
+      ? { holding_spaces: (f.holding_spaces === "" || f.holding_spaces == null) ? null : +f.holding_spaces,
+          holding_call: (f.holding_call === "" || f.holding_call == null) ? null : +f.holding_call,
+          holding_exempt: f.holding_exempt == null ? null : f.holding_exempt }
+      : { holding_id: f.holding_id || null }),
   });
 
   // The build list's rule: the three storage fields show for Stockpile / Site /
@@ -14165,12 +14316,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="block">
+                  {form.loc_type !== "Holding area" && <label className="block">
                     <span className="block text-sm font-medium text-slate-700 mb-1">Role</span>
                     <select value={form.role} onChange={e => setField("role", e.target.value)} className={"mt-1 w-full " + sel}>
                       {ROLE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                     </select>
-                  </label>
+                  </label>}
                   <label className="block">
                     <span className="block text-sm font-medium text-slate-700 mb-1">Type</span>
                     <select value={form.loc_type} onChange={e => setField("loc_type", e.target.value)} className={"mt-1 w-full " + sel}>
@@ -14178,8 +14329,43 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     </select>
                   </label>
                 </div>
+                {/* 29 Oct 2026 (task 3c): a holding area's own fields — spaces, called forward at a time, the vehicles that go
+                    straight to the gate (the concrete mixers unless changed); any other location names the holding area its
+                    lorries call off through */}
+                {form.loc_type === "Holding area" ? (() => {
+                  const keys = Object.keys(VEH.labels || {}).filter(k => k !== "_default");
+                  const isMixer = (k) => /mixer/i.test(k) || /mixer/i.test(vehLabel(k));
+                  const cur = form.holding_exempt || keys.filter(isMixer);
+                  const toggle = (k) => setField("holding_exempt", cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k]);
+                  return <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5" data-holding-fields="1">
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block">
+                        <span className="block text-sm font-medium text-slate-700 mb-1">Spaces (lorries)</span>
+                        <input value={form.holding_spaces} onChange={e => setField("holding_spaces", e.target.value)} inputMode="numeric" placeholder="—"
+                          className="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
+                      </label>
+                      <label className="block">
+                        <span className="block text-sm font-medium text-slate-700 mb-1">Called forward at a time</span>
+                        <input value={form.holding_call} onChange={e => setField("holding_call", e.target.value)} inputMode="numeric" placeholder="2"
+                          className="mt-0.5 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
+                      </label>
+                    </div>
+                    <span className="block text-sm font-medium text-slate-700 mt-2 mb-1">Go straight to the gate</span>
+                    <div className="mt-1 space-y-1" data-holding-exempt="1">
+                      {keys.map(k => <label key={k} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">
+                        <input type="checkbox" checked={cur.includes(k)} onChange={() => toggle(k)} style={{ accentColor: "#1D4ED8" }} />{vehLabel(k)}</label>)}
+                    </div>
+                    <p className="text-[13px] text-slate-400 mt-1.5">Abnormal loads never call off here.</p>
+                  </div>; })()
+                : (locs.some(l => l.loc_type === "Holding area") && <label className="block" data-holding-through="1">
+                    <span className="block text-sm font-medium text-slate-700 mb-1">Lorries call off through</span>
+                    <select value={form.holding_id || ""} onChange={e => setField("holding_id", e.target.value)} className={"mt-1 w-full " + sel}>
+                      <option value="">None</option>
+                      {locs.filter(l => l.loc_type === "Holding area").map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  </label>)}
 
-                {form.role !== "destination" && (
+                {form.role !== "destination" && form.loc_type !== "Holding area" && (
                   <div>
                     <span className="block text-sm font-medium text-slate-700 mb-1">Supplies · materials it provides</span>
                     <div className="mt-1 space-y-1">
@@ -14192,7 +14378,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     </div>
                   </div>
                 )}
-                {form.role !== "origin" && (
+                {form.role !== "origin" && form.loc_type !== "Holding area" && (
                   <div>
                     <span className="block text-sm font-medium text-slate-700 mb-1">Receives · materials it accepts</span>
                     <div className="mt-1 space-y-1">
@@ -14288,7 +14474,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
                 {/* 28 Oct 2026 (simulation v2): the speed on the site's own roads, for the Simulation's drive between the gate,
                     the areas and the wheel wash */}
-                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5" data-site-speed-field="1">
+                {form.loc_type !== "Holding area" && <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5" data-site-speed-field="1">
                   <label className="block">
                     <span className="block text-sm font-medium text-slate-700 mb-1">Site speed (optional)</span>
                     <input value={form.site_speed} onChange={e => setField("site_speed", e.target.value)}
@@ -14297,7 +14483,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <span className="ml-2 text-xs text-slate-500">{SPD()} on the site's roads</span>
                   </label>
                   <p className="text-[13px] text-slate-400 mt-1.5">The Simulation drives the site's roads at this speed (a road with its own speed keeps it). Blank = 5 mph stands in.</p>
-                </div>
+                </div>}
 
                 {/* Operator and free-text detail. Salvaged out of a1_data.js before that
                     file was retired — the quarry operator existed nowhere else in the
@@ -15166,6 +15352,18 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         </span>
                       )}
                       {(() => {
+                        // 29 Oct 2026 (task 3c): what this route's lorries do at the holding area
+                        const hr = ((holdSum || {}).routes || []).find(x => x.route_id === r.id);
+                        if(!hr) return null;
+                        const hid = Object.values(hr.stops || {})[0];
+                        const H = ((holdSum || {}).holding_areas || []).find(x => x.id === hid) || {};
+                        const words = hr.state === "calls" ? `Calls at ${H.name || "the holding area"}` : hr.state === "route_again" ? "Route again: does not pass the holding area"
+                          : hr.state === "skip" ? "Does not call off" : hr.state === "exempt" ? "Straight to the gate" : "Not routed yet";
+                        return <span data-route-holding={hr.state} title={hr.state === "route_again" ? "Its line does not pass the holding area: Route again through the holding area in the row's menu (one option)" : undefined}
+                          className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          style={hr.state === "route_again" ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" } : { background: "rgba(29,78,216,.10)", color: "var(--navy)" }}>{words}</span>;
+                      })()}
+                      {(() => {
                         // 28 Oct 2026 (task 0c): "Diverted Dec 2027" when a dated zone diverts it; red when one crosses it with no way round
                         const ps = (divPeriods || []).filter(p => p.route_id === r.id);
                         if(!ps.length) return null;
@@ -15206,6 +15404,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       </button>
                       {/* 27 Oct 2026 (the final UI pass, card 1): Edit and Delete in the "⋯"; Route stays as the row's one visible button */}
                       <span onClick={e => e.stopPropagation()}><RowMenu name={r.id}>
+                        {(((holdSum || {}).routes || []).find(x => x.route_id === r.id) || {}).state === "route_again" && <button type="button" data-route-via-holding={r.id} onClick={() => rebakeRoute(r.id, Object.keys(r.profiles || {}), true)}>Route again through the holding area</button>}
                         <button type="button" onClick={() => startEditRoute(r)}>Edit</button>
                         <button type="button" style={{ color: "var(--red)" }} onClick={() => deleteRoute(r.id)}>Delete…</button>
                       </RowMenu></span>

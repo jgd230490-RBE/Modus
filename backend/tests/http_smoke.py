@@ -22,6 +22,7 @@ NOT covered: PostgreSQL (SQLite only), HERE (no key — routes stay UNBAKED), Ma
 (the PDF falls back to its schematic map when the static-map service is unreachable),
 and any browser rendering.
 """
+import io
 import json
 import math
 import os
@@ -1191,8 +1192,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
     r = c.get("/api/clp/monitoring?month=10", headers=PLAN)
     cm = r.json() if r.status_code == 200 else {}
     ch = cm.get("charts") or {}
-    ok("⭐ the planner reads CLP monitoring for Oct 2026 of the demo: seven charts in order, each set or empty with a sentence",
-       r.status_code == 200 and cm.get("label") == "Oct 2026" and cm.get("order") == ["route_caps", "site_caps", "vehicle_types", "euro_class",
+    # RE-PINNED 29 Oct 2026 (task 3c): eight charts — the holding areas' table after the site caps
+    ok("⭐ the planner reads CLP monitoring for Oct 2026 of the demo: eight charts in order, each set or empty with a sentence",
+       r.status_code == 200 and cm.get("label") == "Oct 2026" and cm.get("order") == ["route_caps", "site_caps", "holding_areas", "vehicle_types", "euro_class",
                                                                                    "councils", "carbon_rate", "trips_avoided"]
        and all((c_.get("state") == "set") or (c_.get("state") == "empty" and c_.get("missing")) for c_ in ch.values()), r.text[:300])
     ok("the demo's vehicle chart is drawn (approved loads exist), its shares from the server",
@@ -1218,6 +1220,24 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and 'filename="wayscope-clp-pack-2026-10.xlsx"' in r.headers.get("content-disposition", ""), str(r.status_code))
     r = c.get("/api/clp/pack.pdf?month=10")
     ok("🔴 the CLP pack without a code — 401", r.status_code == 401, str(r.status_code))
+    # 30 Oct 2026 (task 4a): the CLP document, a Word file for one site or a set of sites
+    r = c.get("/api/clp/document.docx?locations=L019", headers=PLAN)
+    _cd = r.headers.get("content-disposition", "")
+    ok("⭐ the CLP document for the viaduct site: 200, a Word file, 'CLP <site> <date>.docx'",
+       r.status_code == 200 and r.content[:2] == b"PK"
+       and r.headers.get("content-type", "").startswith("application/vnd.openxmlformats-officedocument.wordprocessingml")
+       and re.search(r'filename="CLP [^"]+ \d{4}-\d{2}-\d{2}\.docx"', _cd) is not None, f"{r.status_code} {_cd}")
+    if r.status_code == 200:
+        import zipfile as _zf
+        _z = _zf.ZipFile(io.BytesIO(r.content))
+        _hx = b"".join(_z.read(n) for n in _z.namelist() if n.startswith("word/header"))
+        ok("...the demo's notice heads its pages", b"DEMO" in _hx)
+    r = c.get("/api/clp/document.docx?locations=L019")
+    ok("🔴 the CLP document without a code — 401", r.status_code == 401, str(r.status_code))
+    r = c.get("/api/clp/document.docx?locations=L019", headers=NORTH)
+    ok("🔴 the CLP document on a team code — 403", r.status_code == 403, str(r.status_code))
+    r = c.get("/api/clp/document.docx?locations=L999", headers=PLAN)
+    ok("🔴 an unknown location — 422 in words", r.status_code == 422 and "No such location: L999." in r.text, str(r.status_code))
     print("  CLP monitoring, Oct 2026 (demo package):")
     for k in cm.get("order") or []:
         c_ = ch.get(k) or {}
@@ -1463,10 +1483,11 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # RE-PINNED 17 Oct 2026 (R2, §3a): the asphalt plant and Welland Ready-Mix are both in Harborough (10 of 16)
     # NARROWED 22 Oct 2026 (abnormal loads, phase 3, D75): the crane depot in Charnwood, the precast works in Hinckley and Bosworth (18)
     # RE-PINNED 28 Oct 2026 (simulation v2): the Tilton Viaduct site is in Harborough district (11)
-    ok("...the demo's sites where the package coordinates put them (Harborough 11, Melton 3, Blaby 1, Charnwood 2, Rutland 1, Hinckley and Bosworth 1)",
-       [_by.get(n, {}).get("sites_count") for n in ("Harborough", "Melton", "Blaby", "Charnwood", "Rutland", "Hinckley and Bosworth")] == [11, 3, 1, 2, 1, 1])
-    ok("...of the 19 the totals carry (the card's '11 of 19'; RE-PINNED 28 Oct), and one label point per area for the map's one label",
-       ar.get("totals", {}).get("sites") == 19
+    # RE-PINNED 29 Oct 2026 (task 3c): + the Billesdon Lane holding area, in Harborough (12 of 20)
+    ok("...the demo's sites where the package coordinates put them (Harborough 12, Melton 3, Blaby 1, Charnwood 2, Rutland 1, Hinckley and Bosworth 1)",
+       [_by.get(n, {}).get("sites_count") for n in ("Harborough", "Melton", "Blaby", "Charnwood", "Rutland", "Hinckley and Bosworth")] == [12, 3, 1, 2, 1, 1])
+    ok("...of the 20 the totals carry (the card's '12 of 20'; RE-PINNED 28 Oct, 29 Oct), and one label point per area for the map's one label",
+       ar.get("totals", {}).get("sites") == 20
        and all(isinstance(a.get("label_point"), list) and len(a["label_point"]) == 2 for a in ar.get("areas", [])), r.text[:200])
     ok("...and the October lines are named as undrawn, never counted in an area",
        len(ar.get("routes_not_drawn", [])) == 15 and ar.get("totals", {}).get("loads") == 0)   # NARROWED 14 Oct: 21 routes; RE-PINNED 17 Oct: 13; RE-PINNED 28 Oct: 15
@@ -1670,7 +1691,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and len(pkg["tables"]["routes"]) == len(DEMO["tables"]["routes"]) == 50
        and len(pkg["tables"]["forecasts"]) == len(DEMO["tables"]["forecasts"]) == 944
        and len(pkg["tables"]["forecast_weeks"]) >= len(DEMO["tables"]["forecast_weeks"])
-       and len(pkg["tables"]["location_gates"]) == len(DEMO["tables"]["location_gates"]) == 23      # NARROWED 22 Oct 2026: the two abnormal-load sites; 28 Oct: the viaduct site's two
+       and len(pkg["tables"]["location_gates"]) == len(DEMO["tables"]["location_gates"]) == 24      # NARROWED 22 Oct 2026: the two abnormal-load sites; 28 Oct: the viaduct site's two; 29 Oct (task 3c): the holding area's entrance
        and len(pkg["tables"]["site_areas"]) == len(DEMO["tables"]["site_areas"]) == 4
        and len(pkg["tables"]["abnormal_loads"]) == len(DEMO["tables"]["abnormal_loads"]) == 3)
     ok("...and it carries the route_sections table (empty: nothing is baked here)",

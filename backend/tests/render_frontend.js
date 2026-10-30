@@ -695,9 +695,10 @@ if (loaded) {
         && CLPF.order.every(k => cP.includes(`data-clp-head="${k}">${escH(CLPF.charts[k].headline)}<`)),
         CLPF.order.filter(k => !cP.includes(`data-clp-chart="${k}" data-clp-state="set"`)).join(", "));
       ok("CLP: each card names its title, its source, an info box and how it is worked out; the scope, the limit and the peak bands are said once",
-        ["Routes against their planning cap", "Sites against their CLP cap", "Movements by vehicle type", "Movements by Euro class",
+        // RE-PINNED 29 Oct 2026 (task 3c): eight cards — the holding areas' table after the site caps
+        ["Routes against their planning cap", "Sites against their CLP cap", "Holding areas", "Movements by vehicle type", "Movements by Euro class",
          "Movements and lorry distance by council", "Carbon per delivery and per tonne", "Lorry trips avoided"].every(t => cP.includes(`aria-label="About: ${t}"`))
-        && (cP.match(/<summary>How it is worked out<\/summary>/g) || []).length === 7 && (cP.match(/class="clp-src">Source: Wayscope/g) || []).length === 7
+        && (cP.match(/<summary>How it is worked out<\/summary>/g) || []).length === 8 && (cP.match(/class="clp-src">Source: Wayscope/g) || []).length === 8
         && cP.includes(escH(CLPF.scope_line)) && cP.includes(escH(CLPF.limit)) && cP.includes('data-clp-peak="1">' + escH(CLPF.peak_words) + "<")
         && cP.includes('aria-label="About: CLP monitoring"'));
       ok("CLP: the routes and sites with no cap are one line each, never a bar; the councils' double-count sentence and licence lines print",
