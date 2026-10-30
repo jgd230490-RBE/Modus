@@ -331,6 +331,7 @@
    ]
   }
  ],
+ "holding": [],
  "near_pct": 85,
  "limit": "Planned arrivals spread evenly over the gate's open hours, less its shut times and the no-delivery bands; no hourly peak is known.",
  "default_hours": "07:00–17:00",

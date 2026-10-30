@@ -953,6 +953,14 @@ def public_map_data(profile=None):
                     # typed, for the route card; None when nobody typed them. On both legs, like the cap.
                     "route_reason": r.get("route_reason"),
                     "permitted_deviations": r.get("permitted_deviations"),
+                    # 29 Oct 2026 (task 3c): where this leg stops at a holding area (holding.mark_leg): the holding
+                    # area, its name, the km along the line (None = the line does not pass it: drawn straight), the
+                    # stored time from the stop to the gate. None on a leg that does not stop.
+                    "holding_id": g.get("holding_id"),
+                    "holding_name": ((locs.get(g.get("holding_id")) or {}).get("name") if g.get("holding_id") else None),
+                    "holding_at_km": g.get("holding_at_km"),
+                    "holding_tail_hr": g.get("holding_tail_hr"),
+                    "holding_straight": bool(g.get("holding_id") and g.get("holding_at_km") is None),
                 },
                 "geometry": {"type": "LineString",
                              "coordinates": json.loads(g["geometry"])},
@@ -1064,6 +1072,10 @@ def public_map_data(profile=None):
                 "ipt": "",
                 "vendor": l.get("vendor") or "",
                 "aux_info": aux,
+                # 29 Oct 2026 (task 3c): a holding area names the sites whose lorries call off through it; its spaces
+                "holding_served": (" and ".join(sorted(x["name"] for x in locs.values() if x.get("holding_id") == l["id"]))
+                                   if canonical_loc_type(l.get("loc_type")) == "Holding area" else None),
+                "holding_spaces": (l.get("holding_spaces") if canonical_loc_type(l.get("loc_type")) == "Holding area" else None),
                 # absent unless a capacity is recorded — see the note above
                 **stock.get(l["id"], {}),
             },

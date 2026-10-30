@@ -561,7 +561,7 @@ ok("⭐ the download button beside the route map export, for the route picked in
    and "`${API}/routes/${encodeURIComponent(routeId)}/route-sheet.pdf`" in _fe and "Route sheet (drivers)" in _fe)
 ok("⭐ the location form's 'Site rules for drivers' box, sent as null when blank",
    "Site rules for drivers (optional)" in _fe and 'site_rules: (f.site_rules || "").trim() || null,' in _fe
-   and 'site_rules: p.site_rules || "" });' in _fe)
+   and 'site_rules: p.site_rules || ""' in _fe)       # 29 Oct 2026 (task 3c): the form's state gained fields after it
 _mp = read("map/index.html")
 ok("⭐ the public map: the route card and the route analysis both show the typed words, escaped, and only when typed",
    "function routeWordsHTML(rid)" in _mp and "html += routeWordsHTML(rid);" in _mp and "routeWordsHTML(routeId)+" in _mp
@@ -638,6 +638,76 @@ ok("23 Oct: encode_polyline round-trips Google's own example; simplify_px keeps 
 ok("23 Oct: a refusal from Mapbox (an HTTP error) does not mark it down, so the plain picture can follow at once",
    "except urllib.error.HTTPError:" in open(os.path.join(BACKEND, "basemap.py"), encoding="utf-8").read())
 zones.delete_zone(_zh["id"])
+
+# =========================================================================== #
+#  29 Oct 2026 (task 3c) — the holding area on the sheet: go to H first        #
+# =========================================================================== #
+import holding  # noqa: E402
+MIX = "Truck mixer 8 m³ (32t)"
+T_R1_BEFORE = flat(export.build_route_sheet_pdf(rs.sheet("R1", acc=PLANNER)))
+# a second site east, a route to it from A whose line passes the holding area 1.35 km before the gate, a second
+# quarry whose line to it does not, and a route FROM the site (its empty lorries come back there to load)
+db.execute("INSERT INTO locations (id, name, lat, lon, loc_type, role) VALUES (?, ?, ?, ?, ?, ?)", ("L4", "Hill Compound", LAT, -0.7, "Compound", "destination"))
+db.execute("INSERT INTO locations (id, name, lat, lon, loc_type, role) VALUES (?, ?, ?, ?, ?, ?)", ("L5", "Far Tip", 52.4, -0.7, "Landfill", "destination"))
+G_HILL = gates.create_gate("L4", "Hill gate", LAT, -0.7, direction="both", open_from="07:30", open_to="18:00", open_days="1111100")
+for _rid, _o, _d in (("R5", "L1", "L4"), ("R6", "L3", "L4"), ("R7", "L4", "L5")):
+    db.execute("INSERT INTO routes (id, origin_id, dest_id, material_category, ipt) VALUES (?, ?, ?, ?, ?)", (_rid, _o, _d, "Small aggregate", "IPT 1"))
+HPT = (-0.72, LAT)
+L5 = [(round(-1.0 + i * 0.003, 6), LAT) for i in range(101)]                       # A (-1.0) -> Hill gate (-0.7), through HPT
+_geom("R5", ART, "loaded", L5, 20.3, 0.5)
+_geom("R5", ART, "return", list(reversed(L5)), 20.3, 0.5)
+_geom("R5", MIX, "loaded", L5, 20.3, 0.55)
+_geom("R6", ART, "loaded", [(-1.2, LAT), (-0.72, LAT + 0.02), (-0.7, LAT)], 36.0, 0.8)   # 2.2 km north of H at its nearest
+_geom("R7", ART, "loaded", [(-0.7, LAT), (-0.7, 52.4)], 11.1, 0.3)
+_geom("R7", ART, "return", [(-0.7, 52.4), (-0.75, 52.45), HPT, (-0.7, LAT)], 14.0, 0.35)   # back to Hill via H
+H_ID = network.create_location("Lane holding area", "both", lat=HPT[1], lon=HPT[0], loc_type="Holding area")["id"]
+ok("3c. a holding area is made with the role 'holding' whatever was sent",
+   (db.query("SELECT role FROM locations WHERE tenant_id = ? AND id = ?", ("default", H_ID)) or [{}])[0].get("role") == "holding")
+holding.set_holding(H_ID, {"holding_spaces", "holding_call"}, spaces=15, call=2)
+gates.create_gate(H_ID, "Lane entrance", HPT[1], HPT[0], direction="both", open_from="07:00", open_to="20:30", open_days="1111100")
+network.set_site_rules(H_ID, "Engines off while you wait.")
+holding.set_calls_through("L4", H_ID)
+_m5 = db.query("SELECT holding_id, holding_at_km FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ? AND leg = ?",
+               ("default", "R5", ART, "loaded"))[0]
+ok("3c. the marks: R5's loaded leg stops at H about 19 km along; R6's line does not pass it; R7's RETURN stops; the mixer's row does not",
+   _m5["holding_id"] == H_ID and _m5["holding_at_km"] is not None and abs(float(_m5["holding_at_km"]) - 18.95) < 0.4
+   and db.query("SELECT holding_at_km FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND leg = ?", ("default", "R6", "loaded"))[0]["holding_at_km"] is None
+   and db.query("SELECT holding_id FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND leg = ?", ("default", "R7", "return"))[0]["holding_id"] == H_ID
+   and db.query("SELECT holding_id FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ?", ("default", "R5", MIX))[0]["holding_id"] is None,
+   str(_m5))
+S5 = rs.sheet("R5", vehicle=ART, acc=PLANNER)
+H5 = S5["holding"]
+ok("⭐ 3c. the sheet knows the stop: the holding area, on the loaded leg, 1.35 km before the gate, its hours, 15 spaces, its rules, the run to the gate",
+   bool(H5) and H5["id"] == H_ID and H5["leg"] == "loaded" and not H5["straight"] and abs(H5["h_to_gate_km"] - 1.355) < 0.05
+   and H5["gate"]["hours"] == "07:00–20:30" and H5["spaces"] == 15 and H5["site_rules"] == "Engines off while you wait."
+   and H5["before_words"].endswith("before the site") and H5["run"] and abs(H5["run"][0][0] - HPT[0]) < 0.0005 and tuple(H5["run"][-1]) == L5[-1]
+   and "about" in H5["h_to_gate_words"], str(H5)[:400])
+ok("3c. the second map frames the run from the holding area to the gate (1.35 km, under 3 km)", rs.views(dict(S5))["holding_run_view"] is True)
+T5 = flat(export.build_route_sheet_pdf(S5))
+ok("⭐ 3c. the sheet says it: calls at H in the subtitle; the legend A to H, H to B when called, back with no stop; the H badge in the key",
+   "calls at Lane holding area" in T5 and "Loaded, A to H" in T5 and "H to B when called" in T5 and "Empty, back to A (no stop at H)" in T5
+   and "holding area" in T5 and "Loaded, A to B" not in T5, T5[:600])
+ok("⭐ 3c. Arriving opens with the three steps, in order, then the gate: go to H first (where, hours, spaces); wait to be called forward; then the gate",
+   T5.index("1. Go to Lane holding area first") < T5.index("2. Wait there to be called forward.") < T5.index("3. Then drive to the gate:") < T5.index("Gate in: Hill gate")
+   and "before the" in T5 and "open 07:00–20:30, closed on Saturdays and Sundays" in T5 and "spaces" in T5, T5[T5.find("Arriving"):][:500])
+ok("3c. the holding area's rules as typed, under their own heading; the second map's heading",
+   "Site rules at H, Lane holding area" in T5 and "Engines off while you wait." in T5
+   and "From the holding area to the gate" in T5 and "The last mile" not in T5)
+S6 = rs.sheet("R6", vehicle=ART, acc=PLANNER)
+T6 = flat(export.build_route_sheet_pdf(S6))
+ok("⭐ 3c. a line that does not pass the holding area: the stop is drawn straight and the sheet says so (the second map frames the straight run)",
+   bool(S6["holding"]) and S6["holding"]["straight"] is True and "drawn straight" in T6 and "1. Go to Lane holding area first" in T6, T6[:400])
+S7 = rs.sheet("R7", vehicle=ART, acc=PLANNER)
+T7 = flat(export.build_route_sheet_pdf(S7))
+ok("⭐ 3c. a lorry coming back to the served site to load: the RETURN stops — Empty, back to H / H to A when called, the steps under Leaving B",
+   bool(S7["holding"]) and S7["holding"]["leg"] == "return" and "Empty, back to H" in T7 and "H to A when called" in T7 and "3. Then drive to A" in T7
+   and T7.index("Leaving B") < T7.index("1. Go to Lane holding area first") and "calls off at Lane holding area" in T7, T7[:500])
+SM = rs.sheet("R5", vehicle=MIX, acc=PLANNER)
+TM = flat(export.build_route_sheet_pdf(SM))
+ok("⭐ 3c. the concrete mixer is exempt: its sheet has no holding area at all", SM["holding"] is None and "holding area" not in TM and "Loaded, A to B" in TM)
+ok("⭐ 3c. a route whose site has no holding area prints exactly as before", flat(export.build_route_sheet_pdf(rs.sheet("R1", acc=PLANNER))) == T_R1_BEFORE)
+holding.set_calls_through("L4", None)
+ok("3c. the site unticked: R5's sheet is plain again", rs.sheet("R5", vehicle=ART, acc=PLANNER)["holding"] is None)
 
 for f_ in FAIL:
     print("  FAIL:", f_)

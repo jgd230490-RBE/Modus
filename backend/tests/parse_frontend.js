@@ -698,7 +698,8 @@ ok("🔴 the old Stockpiles grid component no longer exists",
 ok("🔴 the Dashboard's stock table is gone: no DashboardStock component, no 'Stock held' heading, no per-week <table> in the stock component",
   !/function DashboardStock\(/.test(code) && !/<DashboardStock /.test(code)
   && /function DashboardStockChart\(/.test(code) && /<DashboardStockChart meta=\{meta\}/.test(code)
-  && !(_dsBody = code.slice(code.indexOf("function DashboardStockChart("), code.indexOf("function App("))).includes("<table")
+  // NARROWED 29 Oct 2026 (task 3c): up to the CLP section (ClpMonitoring has a holding-areas table now), not to App
+  && !(_dsBody = code.slice(code.indexOf("function DashboardStockChart("), code.indexOf("function ClpMonitoring("))).includes("<table")
   && !_dsBody.includes("Stock held") && _dsBody.includes('type: "bar"') && _dsBody.includes('indexAxis: "y"'));
 ok("...it is read-only: no consume call, no input, in that component",
   !_dsBody.includes("/stockpiles/consume") && !_dsBody.includes("<input"));
@@ -749,7 +750,7 @@ ok("capacity has ONE write path, its own endpoint",
 
 // ---- 4f. Task E — the two new location types -----------------------------------
 ok("Railhead and Stockpile are offered as location types",
-  /const LOC_TYPES = \["Quarry", "Port", "Compound", "Site", "Railhead", "Stockpile", "Other"\]/.test(code));
+  /const LOC_TYPES = \["Quarry", "Port", "Compound", "Site", "Railhead", "Stockpile", (?:"Holding area", )?"Other"\]/.test(code));   // 29 Oct 2026 (task 3c): + Holding area
 ok("Railhead is drawn in the reserved rail colour",
   /"Railhead": "#0F766E"/.test(code));
 
@@ -2610,7 +2611,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && simSrc.includes('word: "check-in"') && simSrc.includes('word: "minutes a lorry"'));
   ok("⭐ S7 (D81): lorries are dots (one circle layer, laden filled, empty hollow, mixers orange, waiting red); no icons",
     mapSrc.includes('m.addLayer({ id: "sim-lorries", type: "circle", source: "sim-lorries"') && !/icon-image|loadImage|addImage/.test(mapSrc)
-    && mapSrc.includes('"laden", tok("--sim-lorry", "#2563EB"), "pour", tok("--sim-mixer", "#E8590C"), "#FFFFFF"')
+    && mapSrc.includes('"laden", tok("--sim-lorry", "#2563EB"), "pour", tok("--sim-mixer", "#E8590C")')   // NARROWED 29 Oct 2026 (task 3c): + a held lorry, grey
     && /:root\{--sim-lorry:#2563EB;--sim-mixer:#E8590C;\}/.test(html) && /html\[data-theme="dark"\]\{--sim-lorry:#5B8FF0;--sim-mixer:#E8681E;\}/.test(html));
   ok("🔴 S7: its own Mapbox instance (CommitMap's pattern), never removed; the only .remove() is a waiting badge's marker; no new script",
     (mapSrc.match(/new window\.mapboxgl\.Map\(/g) || []).length === 1 && (mapSrc.match(/\.remove\(\)/g) || []).length === 1 && mapSrc.includes("try { x.m.remove(); } catch(e){}")
@@ -2624,11 +2625,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && simSrc.includes('playing ? "Pause" : (t >= s1 ? "Play again" : "Play")') && simSrc.includes(">Restart</button>")
     && simSrc.includes('aria-label="Jump to a time of day"') && simSrc.includes("onClick={click}"));
   // RE-PINNED 29 Oct 2026 (the page, cards 3 and 15): one tag + the i box instead of three chips; "Staff only." in the subtitle;
-  // the holding area reads "coming" (no version code on screen)
-  ok("⭐ S7: the words — staff only, a planning view (one tag + the i box), congestion not modelled in the i box; the holding area greyed, 'coming'; no hourly HERE switch (D92)",
+  // 29 Oct 2026 (task 3c): the holding area switch is LIVE (no "coming", no version code on screen)
+  ok("⭐ S7: the words — staff only, a planning view (one tag + the i box), congestion not modelled in the i box; the holding area switch live; no hourly HERE switch (D92)",
     simSrc.includes('subtitle="An average working day, lorry by lorry, at every gate and on site. Staff only."') && simSrc.includes('<span className="sim-tag" data-sim-tag="1">Planning view, not a record</span><InfoTip id="dash.sim" />')
     && !panelSrc.includes("sim-chip") && /"dash\.sim": \{[^\n]*Staff only\. Nothing is saved\./.test(src) && /"dash\.sim": \{[\s\S]{0,1400}Congestion on the public road is not modelled/.test(src)
-    && simSrc.includes('<input type="checkbox" disabled /><span>Holding area: lorries wait off the highway <span className="sim-tag">coming</span></span>')
+    && simSrc.includes('<span>Holding area: lorries wait off the highway</span>') && !simSrc.includes('className="sim-tag">coming')
     && !/\(V1\)|\bV1\b/.test(simc) && !/\bHERE\b/.test(simc) && !/hour of day|hourly drive/i.test(simc));
   ok("🔴 S7: no banned word and no word-rule word on screen; lorries never trucks; teams through teamText; the tenant's distance unit and speed",
     // GeoJSON's own key (geometry) and Mapbox's token setting are code, not words on a screen
@@ -2675,7 +2676,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("⭐ SIM: an entry gate never reads as a lorry — a bullseye (radius 7, thick ink rim, ink centre) against the empty lorry's small blue ring (radius 4); the key draws the same",
     mapSrc.includes('m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 2.5 } });')
     && mapSrc.includes('m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1E293B" } });')
-    && mapSrc.includes('"circle-radius": ["match", ["get", "k"], "wait", 4.5, 4]') && mapSrc.includes('"circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF", tok("--sim-lorry", "#2563EB")]')
+    && mapSrc.includes('"circle-radius": ["match", ["get", "k"], "wait", 4.5, 4]') && mapSrc.includes('"circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF"')   // NARROWED 29 Oct 2026 (task 3c)
     && /\.sim-dot-gate\{background:radial-gradient\(circle,#1E293B 0 2\.5px,#FFFFFF 3px\);border:2\.5px solid #1E293B;width:15px;height:15px;\}/.test(html)
     && /\.sim-dot-empty\{background:#FFFFFF;border:2px solid var\(--sim-lorry\);\}/.test(html));
   // RE-PINNED 29 Oct 2026 (the page, card 5): the key is a row UNDER the map (a named list) on the page; the box over the map stays on the big screen only
@@ -2724,7 +2725,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const panelSrc = fn("SimulationPage", "// the phone's Simulation: the same page"), playerSrc = fn("SimPlayer", "const SimScenario");
   const scnSrc = fn("SimScenario", "const gateBandWords"), phoneSrc = fn("SimPhoneList", "// ---- 29 Oct 2026: the Simulation's own PAGE");
   ok("⭐ SIM V2: the scale is part of the scenario (month · week · day) and reaches the server as scale= / week= / date=; the sites' what-ifs as site_speed / service / bays / wash",
-    simSrc.includes('scale: "month", bucket: "commit", date: "", site_speed: {}, service: {}, bays: {}, wash: null });')
+    simSrc.includes('scale: "month", bucket: "commit", date: "", site_speed: {}, service: {}, bays: {}, wash: null,')   // NARROWED 29 Oct 2026 (task 3c): + the holding areas
     && simSrc.includes('if(sc.scale === "week") q.push("scale=week", `week=${sc.bucket === "next" ? "next" : "commit"}`);')
     && simSrc.includes('else if(sc.scale === "day" && sc.date) q.push("scale=day", `date=${encodeURIComponent(sc.date)}`);')
     && ["`site_speed=${encodeURIComponent(l + \"=\" + sc.site_speed[l])}`", "`service=${encodeURIComponent(a + \"=\" + sc.service[a])}`",
@@ -3877,10 +3878,15 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && code.includes('<span className="rd-chip">\n                            {g.direction === "access" ? "in only"') && !code.includes("rgba(31,86,168,.1)")
      && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
      // NARROWED 28 Oct 2026 (task 0c): + the Routes row's "Diverted" chip, the same house chip (three)
-     && (code.match(/className="ml-1\.5 text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 3
+     // RE-PINNED 29 Oct 2026 (task 3c): + the Routes row's holding-area chip, the same house chip (four)
+     && (code.match(/className="ml-1\.5 text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 4
      && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
      && (code.match(/text-\[9px\]/g) || []).length === 0
      && code.includes('<div className={"text-xs uppercase tracking-wide " + (role === "commit" ? "text-slate-600" : "text-slate-400")}>{roleLbl[role] || "\u00a0"}</div>'));
+  // 30 Oct 2026 (task 3c): the CLP holding-areas table prints the most held at once as a figure whenever the Simulation gave one —
+  // 0 included, as the pack prints it (clp_pack: str(most)) — and "—" only when it has none
+  ok("⭐ CLP holding areas: the most-held cell prints 0 as a figure, like the PDF / XLSX, and — only when the Simulation gave none",
+     code.includes('<td>{r.most != null ? `${r.most}${r.most_at ? ` at ${r.most_at}` : ""}` : "—"}</td>') && !code.includes('<td>{r.most ? `${r.most}'));
   ok("after the first compare: the two slate-100 chips on Zones (Advisory, Not open) read slate-600 (slate-500 on slate-100 is 4.34:1), and the compact fuel card's two captions no longer truncate at 12 px (the BAF line carries its own hover title) — finding 11's clipped captions, brought forward because the 12 px made the clipping worse",
      !/bg-slate-100 text-slate-500|text-slate-500 bg-slate-100/.test(code)
      && code.includes('<span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>')

@@ -126,6 +126,14 @@ HAUL_NEAR_M = 4.0
 SIMPLIFY_M = 15.0
 #: whole_loads() stops searching after this many steps and keeps the best day found (`exact` False)
 NODE_BUDGET = 300_000
+#: 29 Oct 2026 (task 3c, the user's Q12): two labelled lines beside the counts, never in any total. The figures and their
+#: sources are in the user guide (A.2) and the technical guide; the screen names no study.
+LORRY_HOUR_GBP = 86.48          # DfT TAG Data Book v2.03 (May 2026), table A1.3.1: an OGV hour, 2023 prices and values
+IDLE_G_CO2_PER_MIN = 68.64      # TRL PPR987 v3, figure 1: a diesel HGV idling, grams of CO2 a minute
+HOLDING_MEASURES = {"lorry_hour_gbp": LORRY_HOUR_GBP,
+                    "lorry_hour_words": "the government's appraisal value of a lorry hour, 2023 prices",
+                    "idle_g_per_min": IDLE_G_CO2_PER_MIN,
+                    "idle_words": "the published idling figure for a diesel lorry"}
 #: 17 Oct 2026: a concrete pour goes to a WORKING site — the location types the app treats as one (network._role_for's
 #: compound and site; the Locations form offers Quarry, Port, Compound, Site, Railhead, Stockpile, Other). Never a quarry,
 #: a railhead, a stockpile, a landfill, a soil recycling hub or a batching plant. Matched without regard to case.
@@ -767,11 +775,20 @@ def simulate(inp, scen):
                     a["from_m"] = max(0.0, leg["len_m"] - MIXER_APPROACH_M)
                     a["t_from"] = time_at_dist(leg["plan"], a["from_m"])
                     a["depart"] = a["t"] - (leg["plan"]["minutes"] - a["t_from"])
+                elif a.get("held"):
+                    # 29 Oct 2026 (task 3c): a held lorry set off so as to reach the HOLDING AREA when it did — the drawn
+                    # run to it (hold_m on the line), or the leg less the run from it to the gate (a line that misses it)
+                    hm = leg.get("hold_m")
+                    th = time_at_dist(leg["plan"], hm) if hm is not None else max(0.0, leg["plan"]["minutes"] - a["held"]["tail"])
+                    a["depart"] = a["held"]["at"] - th
                 else:
                     a["depart"] = a["t"] - leg["plan"]["minutes"]
             else:
                 mins = inp["leg_minutes"].get(a.get("leg")) if a.get("leg") else None
-                a["depart"] = (a["t"] - mins) if (mins and (a["kind"] != "pour" or a.get("pour_id"))) else None
+                if a.get("held") and mins:
+                    a["depart"] = a["held"]["at"] - max(0.0, mins - a["held"]["tail"])
+                else:
+                    a["depart"] = (a["t"] - mins) if (mins and (a["kind"] != "pour" or a.get("pour_id"))) else None
             journeys.append((a, leg))
 
     # haul roads: lorries onto each one, both ways, by the hour they reach it (mixers too, where their stretch crosses)
@@ -1674,7 +1691,7 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         srv = [{"id": s, "name": (locations.get(s) or {}).get("name") or s} for s in H["served"]]
         out_holding.append({
             "id": hid, "name": H["name"], "spaces": H["spaces"], "call": H["call"], "on": bool(hold_on),
-            "exempt": H["exempt"], "exempt_labels": sorted({conversions.vehicle_label(factors, k) for k in H["exempt"]}),
+            "exempt_labels": sorted({conversions.vehicle_label(factors, k) for k in H["exempt"]}),
             "served": srv, "point": H["point"], "gate_name": (H["gate"] or {}).get("gate_name"),
             "check_minutes": (H["gate"] or {}).get("safety_minutes"), "gate_lane": sim_holding.GATE_LANE,
             "held": fig["held"] if fig else 0, "hours": fig["hours"] if fig else [0] * 24,
@@ -1765,7 +1782,7 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         "planned_pours": out_planned, "planned_on": bool(sc.get("planned", True)),
         "sites": out_sites,
         # 29 Oct 2026 (task 3c): the holding areas of the day, each with the day with and without it
-        "holding": out_holding, "holding_on": bool(hold_on),
+        "holding": out_holding, "holding_on": bool(hold_on), "holding_measures": dict(HOLDING_MEASURES),
         "access_roads_hidden": (len(used_zones & access_ids) if with_lines else 0),
         # 17 Oct 2026: where a pour can go (working sites only), busiest first; the first is the screen's default
         "pour_gates": pgates, "pour_default": (pgates[0]["gate_id"] if pgates else None),
@@ -1854,4 +1871,13 @@ def busiest(month_index, acc, factors, working_days, panel):
             + (", its shut times" if shut and d["bands"]["on"] else (", its shut times taken off" if shut else ""))
             + (f"{' and' if shut else ','} the no-delivery bands {d['bands']['words']} taken off" if d["bands"]["on"] else "")
             + ". No pour.")
-    return {"gates": out, "note": note, "loads": d["loads"]}
+    # 29 Oct 2026 (task 3c): the holding areas for the panel's rows — lorries a day through each (the day's held loads),
+    # the most held at once and when, against its spaces
+    hold = []
+    for h in d.get("holding") or []:
+        hold.append({"id": h["id"], "name": h["name"], "spaces": h["spaces"], "call": h["call"],
+                     "served_names": " and ".join(s["name"] for s in h["served"]), "served": [s["id"] for s in h["served"]],
+                     "per_day": h["held"], "most": h["most"], "most_at": hhmm(h["most_at"]) if h.get("most_at") is not None else None,
+                     "over_spaces": h["over_spaces"], "check_minutes": h.get("check_minutes"),
+                     "exempt_labels": h.get("exempt_labels") or [], "on": h.get("on", True)})
+    return {"gates": out, "note": note, "loads": d["loads"], "holding": hold}

@@ -1115,6 +1115,26 @@ ok3("T2 ranking: the schools and homes measured along every option (laptop run, 
 ok3("T2 ranking: none of it in the user guide (no HERE source links, no routingMode, no section id)",
     "t2-ranking" not in _ug_rank and "routingMode" not in _ug_rank and "docs.here.com" not in _ug_rank)
 
+# ---- 29 Oct 2026 (task 3c, holding areas): the user guide says it in plain words (the Simulation's scenario, Locations,
+# Routes; the two figures with their sources in A.2 only); the technical guide holds the detail
+_ug3c = _ug if "_ug" in dir() else open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+_tg3c = open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()
+ok3("⭐ HOLDING: 17.2 says how a holding area works (called forward so many at a time, at most two at the gate, never into a shut gate; moves the waiting, does not remove it)",
+    "they reach it first and wait to be called forward" in _ug3c and "at most two waiting at the gate, never into a shut gate" in _ug3c
+    and "moves the waiting off the site and the lane; it does not remove it" in _ug3c and "never added to any total" in _ug3c)
+ok3("HOLDING: 9.1 names the type and its fields, the site's 'Lorries call off through', and that no route starts or ends at one",
+    "<strong>Holding area</strong> is a type of its own" in _ug3c and "<strong>Lorries call off through</strong>" in _ug3c
+    and "never where a route starts or ends" in _ug3c and "abnormal loads never call off" in _ug3c)
+ok3("HOLDING: 9.2 names the chip words, Route again through the holding area, and the tick",
+    "<strong>Calls at …</strong>" in _ug3c and "<strong>Route again through the holding area</strong>" in _ug3c
+    and "<strong>Does not call off at a holding area</strong>" in _ug3c)
+ok3("HOLDING: A.2 holds the two figures with their sources (TAG A1.3.1 £86.48; TRL PPR987 68.64 g) and nowhere else in the guide names them",
+    "£86.48 an hour" in _ug3c and "table A1.3.1" in _ug3c and "68.64 g CO₂ a minute" in _ug3c and "TRL PPR987" in _ug3c
+    and _ug3c.count("86.48") == 1 and _ug3c.count("68.64") == 1)
+ok3("HOLDING: the technical guide #t1-holding holds the detail (the rule, the mark, the loop, the measures)",
+    'id="t1-holding"' in _tg3c and "<code>stops(route, leg, ctx, profile)</code>" in _tg3c and "<code>backend/sim_holding.py</code>" in _tg3c
+    and "<code>LORRY_HOUR_GBP</code>" in _tg3c and "<code>ON_LINE_M</code>" in _tg3c)
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 # ---- 28 Oct 2026 (simulation v2, task 0e): the user guide says what the Simulation's scales and the site view are, in
 # plain words; the Locations and Zones chapters name the new fields; the technical guide holds the detail

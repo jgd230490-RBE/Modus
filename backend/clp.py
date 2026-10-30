@@ -52,7 +52,7 @@ import gate_hours
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 MAX_MONTHS = 24          # the over-time charts show at most two years around the chosen month
 NOT_TYPED = "Not typed"
-ORDER = ("route_caps", "site_caps", "vehicle_types", "euro_class", "councils", "carbon_rate", "trips_avoided")
+ORDER = ("route_caps", "site_caps", "holding_areas", "vehicle_types", "euro_class", "councils", "carbon_rate", "trips_avoided")
 
 #: Each chart's number in the outside brief's table, its title and the CLP item it serves.
 CHARTS = {
@@ -60,6 +60,9 @@ CHARTS = {
                    "serves": "TfL CLP guidance: estimated vehicle movements, kept within what was agreed"},
     "site_caps": {"number": "1", "title": "Sites against their CLP cap",
                   "serves": "TfL CLP guidance: the peak number of vehicles a site can take"},
+    # 29 Oct 2026 (task 3c): the CLP reports the size of any vehicle holding area
+    "holding_areas": {"number": "1", "title": "Holding areas",
+                      "serves": "TfL CLP guidance: the size of any vehicle holding areas"},
     "vehicle_types": {"number": "4", "title": "Movements by vehicle type",
                       "serves": "TfL CLP guidance: vehicle movements by type and size"},
     "euro_class": {"number": "5", "title": "Movements by Euro class",
@@ -206,6 +209,79 @@ def site_caps(mi, wd, factors, locs):
                          f"coming to load where it is the origin; the month's approved trips ÷ {wd:g} working days, "
                          "every team together, against the CLP cap typed on the location. A flag, never a block."),
                   source="Wayscope: the approved plan and each site's typed CLP cap")
+
+
+# --------------------------------------------------------------------------- #
+#  Holding areas (29 Oct 2026, task 3c) — one row a holding area               #
+# --------------------------------------------------------------------------- #
+def holding_areas(mi, wd, factors, acc, locs):
+    """Each holding area: its spaces, hours, the sites it serves, the lorry types that go straight to the gate, the
+    month's lorries a day that call off there (the approved lines whose leg arrives at a served site, for a lorry type
+    that is not exempt, on a route not ticked — holding.stops), and the most held at once on the Simulation's average
+    day (sim.day, or "—" when it cannot run)."""
+    import holding
+    import gates
+    import gate_hours
+    label = month_label(mi)
+    try:
+        ctx = holding.context(factors)
+    except Exception:
+        ctx = {"holding": {}, "routes": {}, "gates_by_loc": {}}
+    if not ctx["holding"]:
+        return _chart("holding_areas", "empty", "No holding area typed (Data → Locations: a location of type Holding area).")
+    per_day = {hid: 0.0 for hid in ctx["holding"]}
+    rows_f = db.query("SELECT route_id, vehicle_type, quantity, unit, material_type FROM forecasts WHERE tenant_id = ? "
+                      "AND month_index = ? AND status = 'Approved'", (db.current_tenant(), mi))
+    for f in rows_f:
+        route = ctx["routes"].get(f.get("route_id"))
+        if not route:
+            continue
+        t = gate_arrivals.trips_for(f, factors)
+        for leg in ("loaded", "return"):
+            h = holding.stops(route, leg, ctx, f.get("vehicle_type"))
+            if h is not None:
+                per_day[h["id"]] += t / float(wd)
+    most = {}
+    try:
+        import sim
+        d = sim.day(mi, acc, factors=factors, working_days=wd, with_lines=False)
+        for h in d.get("holding") or []:
+            most[h["id"]] = (h.get("most"), h.get("most_at"))
+    except Exception:
+        most = {}
+    rows = []
+    for hid in sorted(ctx["holding"]):
+        h = ctx["holding"][hid]
+        g = next((x for x in (ctx["gates_by_loc"].get(hid) or []) if x["id"] == (h["gate"] or {}).get("gate_id")), None)
+        w = gate_hours.window_of(g) if g else None
+        hours = (f"{g['open_from'].strip()}–{g['open_to'].strip()}" + (f", {gate_hours.closed_days_words(g)}" if gate_hours.closed_days_words(g) else "")
+                 if w else "not typed")
+        m = most.get(hid)
+        rows.append({"holding_id": hid, "holding_area": h.get("name") or hid,
+                     "spaces": h.get("spaces"), "open": hours,
+                     "serves": ", ".join((locs.get(s) or {}).get("name") or s for s in h["served"]) or "no site yet",
+                     "straight": ", ".join(sorted({conversions.vehicle_label(factors, k) for k in h["exempt"]}) + ["abnormal loads"]),
+                     "per_day": _r1(per_day.get(hid, 0.0)),
+                     "most": (m[0] if m else None), "most_at": (sim_hhmm(m[1]) if (m and m[1] is not None) else None)})
+    n_served = sum(1 for r in rows if r["serves"] != "no site yet")
+    return _chart("holding_areas", "set", rows=rows,
+                  headline=(f"{len(rows)} holding area{'' if len(rows) == 1 else 's'}, "
+                            f"{sum(r['per_day'] or 0 for r in rows):g} lorries a day call off there" if n_served
+                            else f"{len(rows)} holding area{'' if len(rows) == 1 else 's'}, no site calls off through one yet"),
+                  subtitle=f"lorries a day, {label}",
+                  basis=("The month's approved lines whose lorries call off at the holding area — a delivery to a site it "
+                         "serves, or a lorry coming back to such a site to load — for the lorry types that do not go "
+                         f"straight to the gate, ÷ {wd:g} working days; the most held at once is the Simulation's average "
+                         "day, called forward as typed on the holding area."),
+                  source="Wayscope: the approved plan, each holding area as typed, and the Simulation's day")
+
+
+def sim_hhmm(m):
+    try:
+        m = int(round(float(m)))
+    except (TypeError, ValueError):
+        return None
+    return f"{m // 60:02d}:{m % 60:02d}"
 
 
 # --------------------------------------------------------------------------- #
@@ -466,6 +542,7 @@ def monitoring(month_index, acc=None, factors=None, working_days=None):
     charts = {
         "route_caps": route_caps(mi, wd, payload, locs, routes),
         "site_caps": site_caps(mi, wd, factors, locs),
+        "holding_areas": holding_areas(mi, wd, factors, acc, locs),
         "vehicle_types": vehicle_types(lines, months, factors, label),
         "euro_class": euro_class(lines, months, factors, label),
         "councils": councils(mi, wd, unit),

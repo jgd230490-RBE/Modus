@@ -98,6 +98,12 @@ def table_of(c, M):
                   (_n(r["cap"]) if r["cap"] is not None else "no cap typed"), (f"{r['pct']} %" if r["pct"] is not None else "—"),
                   ("Over the CLP cap" if r["over"] else ("Within the cap" if r["cap"] is not None else "Not compared"))]
                  for r in c.get("rows") or []])
+    if k == "holding_areas":     # 29 Oct 2026 (task 3c)
+        return (["Holding area", "Spaces", "Open", "Serves", "Straight to the gate", "Lorries a day", "Most held at once"],
+                [[r["holding_area"], (_n(r["spaces"], 0) if r.get("spaces") else "not typed"), r["open"], r["serves"], r["straight"],
+                  _n(r["per_day"]), (f"{r['most']} at {r['most_at']}" if (r.get("most") is not None and r.get("most_at")) else
+                                     (str(r["most"]) if r.get("most") is not None else "—"))]
+                 for r in c.get("rows") or []])
     if k in ("vehicle_types", "euro_class"):
         months = [m["label"] for m in c.get("months") or []]
         head = ["Vehicle type" if k == "vehicle_types" else "Euro class"] + [f"{m} loads" for m in months] + [f"{m} share" for m in months]
@@ -548,7 +554,7 @@ def build_pdf(M, generated=None):
 # --------------------------------------------------------------------------- #
 #  XLSX                                                                        #
 # --------------------------------------------------------------------------- #
-SHEET = {"route_caps": "Routes vs cap", "site_caps": "Sites vs CLP cap", "vehicle_types": "By vehicle type",
+SHEET = {"route_caps": "Routes vs cap", "site_caps": "Sites vs CLP cap", "holding_areas": "Holding areas", "vehicle_types": "By vehicle type",
          "euro_class": "By Euro class", "councils": "By council", "carbon_rate": "Carbon a tonne", "trips_avoided": "Trips avoided"}
 
 

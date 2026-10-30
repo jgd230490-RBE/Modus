@@ -496,6 +496,13 @@ def week_by_day(lines, factors=None, dates=None):
     gbl = gates.gates_by_location()
     gate_rows = {g["id"]: g for gs in gbl.values() for g in gs}
     per, keys, all_dates, rcache = {}, {}, set(dates or []), {}
+    # 29 Oct 2026 (task 3c): the holding areas — the day's lorries that call off through each (holding.stops is the rule)
+    try:
+        import holding as _holding
+        hctx = _holding.context(factors)
+    except Exception:
+        hctx, _holding = {"holding": {}, "routes": {}}, None
+    hold_per = {}
     for l in lines or []:
         route = routes.get(l.get("route_id"))
         if not route:
@@ -522,6 +529,12 @@ def week_by_day(lines, factors=None, dates=None):
                     continue
                 g = per.setdefault(gid, {})
                 g[d["day_date"]] = g.get(d["day_date"], 0) + t
+                if hctx["holding"] and _holding is not None:
+                    hh = _holding.stops(hctx["routes"].get(route["id"]), "loaded" if loc_key == "dest_id" else "return",
+                                        hctx, l.get("vehicle_type"))
+                    if hh is not None:
+                        hp = hold_per.setdefault(hh["id"], {})
+                        hp[d["day_date"]] = hp.get(d["day_date"], 0) + t
                 kl = keys.setdefault((gid, d["day_date"]), [])
                 if lk not in kl:
                     kl.append(lk)
@@ -571,7 +584,13 @@ def week_by_day(lines, factors=None, dates=None):
     order = {"red": 0, "amber": 1, None: 2}
     out.sort(key=lambda x: (order.get(x["flag"], 2), -(x["peak_pct"] or -1), -max([d["arrivals"] for d in x["days"]] or [0]),
                             x["gate_id"]))
-    return {"dates": shown, "days": [day_words(i) for i in shown], "gates": out, "near_pct": gate_hours.NEAR_PCT,
+    hold_out = []
+    for hid in sorted(hold_per):
+        h = hctx["holding"].get(hid) or {}
+        hold_out.append({"id": hid, "name": h.get("name") or hid, "spaces": h.get("spaces"),
+                         "served_names": " and ".join((locations.get(s) or {}).get("name") or s for s in (h.get("served") or [])),
+                         "days": [{"date": iso, "day": day_words(iso), "arrivals": int(hold_per[hid].get(iso, 0))} for iso in shown]})
+    return {"dates": shown, "days": [day_words(i) for i in shown], "gates": out, "holding": hold_out, "near_pct": gate_hours.NEAR_PCT,
             "limit": gate_hours.LIMIT_WORDS, "default_hours": gate_hours.default_words(factors),
             "peak_bands": gate_hours.peak_bands(factors)}
 

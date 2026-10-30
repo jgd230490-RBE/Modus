@@ -14,6 +14,9 @@ route (§5.6f) and "route information upon egress from site" (§5.6g), and to de
     arriving / leaving     the gate in, its open hours and closed days, the scheme's no-delivery windows; the gate out
     the typed words        why this route, the permitted diversions (routes), the site rules (locations) — C2 / C3
     lorry limits           the stored lorry-limits check for this vehicle (limits.py): the limits it is over, or none
+    the holding area       29 Oct 2026 (task 3c): where this lorry calls off on the way in (holding.stops, the stored
+                           row's mark): "go to H first", its hours and spaces, "wait there to be called forward", then the
+                           gate; an H badge and chevrons from H to the gate on the map. Nothing for an exempt lorry.
 
 It prints what the scheme typed and what Wayscope stored, and says so where a field is empty ("Not typed"). It never
 writes an instruction of its own: no invented speed, phone number or rule. Reads only; stores nothing.
@@ -36,6 +39,8 @@ LAST_MILE_M = 1500.0                                            # how far along 
 GATE_FAR_M = 50.0
 
 NOT_TYPED = "Not typed"
+#: 29 Oct 2026 (task 3c): the second map frames the holding area -> gate run when it is at most this long
+HOLD_RUN_M = 3000.0
 
 
 class SheetError(LookupError):
@@ -219,6 +224,7 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
     bands = gate_hours.peak_bands(factors)
     lim_status, lim_lines = _limits_words(route_id, used, vehicle_text) if used else ("not_checked", [
         "No road route has been worked out for this route yet."])
+    hold = _holding_stop(r, used, legs, loaded, ret, gbl, factors, du) if used else None
 
     try:
         import taxonomy
@@ -241,6 +247,8 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
         "loaded_words": leg_words(legs.get("loaded")), "return_words": leg_words(legs.get("return")),
         "last_mile_in": last_in,
         "last_mile_out": last_out,
+        # 29 Oct 2026 (task 3c): the holding area this lorry calls off at on the way in, or None
+        "holding": hold,
         "haul_loaded": haul_pieces(loaded, roads), "haul_return": haul_pieces(ret, roads),
         "haul_last_in": haul_pieces(last_in, roads), "haul_last_out": haul_pieces(last_out, roads),
         "last_mile_m": LAST_MILE_M,
@@ -255,6 +263,83 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
         # 28 Oct 2026 (task 0c, the user's Q6): one more page per diversion, in date order
         "diversions": _diversions(route_id, used, legs, leg_words, vehicle_text) if used else [],
     }
+
+
+def _holding_stop(r, used, legs, loaded, ret, gbl, factors, du):
+    """
+    29 Oct 2026 (task 3c). Where this lorry calls off: the holding area the arrival leg stops at (holding.stops — the
+    rule; the exempt lorry types never), on the LOADED leg into B or, when the lorry comes back to a served site to load,
+    on the return into A. From the stored row's mark: `at_km` along the line (None = the line does not pass it: the run
+    from the holding area to the gate is drawn straight and said so) and the time from the stop to the gate.
+    """
+    import holding
+    import export
+    try:
+        ctx = holding.context(factors)
+    except Exception:
+        return None
+    if not ctx["holding"]:
+        return None
+    for leg_name, coords in (("loaded", loaded), ("return", ret)):
+        h = holding.stops(r, leg_name, ctx, used)
+        if h is None:
+            continue
+        row = legs.get(leg_name) or {}
+        pt = (float(h["gate"]["lon"]), float(h["gate"]["lat"]))
+        at_km = row.get("holding_at_km") if row.get("holding_id") == h["id"] else None
+        tail_hr = row.get("holding_tail_hr") if at_km is not None else None
+        dist = float(row["distance_km"]) if row.get("distance_km") is not None else None
+        dur = float(row["duration_hr"]) if row.get("duration_hr") else None
+        if at_km is not None and dist:
+            to_h_km, h_to_gate_km = float(at_km), max(0.0, dist - float(at_km))
+            h_to_gate_hr = float(tail_hr) if tail_hr is not None else None
+            to_h_hr = (dur - h_to_gate_hr) if (dur is not None and h_to_gate_hr is not None) else None
+            straight = False
+        else:
+            end = coords[-1] if coords else None
+            h_to_gate_km = (_haversine_m(pt, end) / 1000.0) if end else None
+            to_h_km = (max(0.0, dist - h_to_gate_km) if (dist is not None and h_to_gate_km is not None) else None)
+            h_to_gate_hr = (dur * h_to_gate_km / dist) if (dur and dist and h_to_gate_km is not None) else None
+            to_h_hr = (dur - h_to_gate_hr) if (dur is not None and h_to_gate_hr is not None) else None
+            straight = True
+
+        def words(km, hr):
+            if km is None:
+                return None
+            out = f"{export._dist(km):.1f} {du}"
+            if hr is not None:
+                m = int(round(hr * 60))
+                out += f", about {m // 60} h {m % 60:02d} min" if m >= 60 else f", about {m} min"
+            return out
+        gate = _gate_words(h, "entry", None, gbl.get(h["id"]), factors)
+        spaces = h.get("spaces")
+        return {"id": h["id"], "name": h.get("name") or h["id"], "point": pt, "leg": leg_name,
+                "at_km": (float(at_km) if at_km is not None else None), "straight": straight,
+                "to_h_words": words(to_h_km, to_h_hr), "h_to_gate_words": words(h_to_gate_km, h_to_gate_hr),
+                "before_words": (f"{export._dist(h_to_gate_km):.1f} {du} before the site" if h_to_gate_km is not None else None),
+                "h_to_gate_km": h_to_gate_km,
+                "gate": gate, "spaces": (int(spaces) if spaces else None),
+                "site_rules": h.get("site_rules") or None,
+                # the run from the holding area to the gate, for the chevrons: the line from the mark to its end
+                "run": (_run_from(coords, float(at_km)) if (at_km is not None and coords) else
+                        ([pt, coords[-1]] if coords else []))}
+    return None
+
+
+def _run_from(coords, at_km):
+    """The part of a polyline from `at_km` along it to its end (the first point interpolated onto the line)."""
+    target = at_km * 1000.0
+    run, out = 0.0, []
+    for a, b in zip(coords, coords[1:]):
+        seg = _haversine_m(a, b)
+        if out:
+            out.append(b)
+            continue
+        if run + seg >= target:
+            u = (target - run) / seg if seg else 0.0
+            out = [(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u), b]
+        run += seg
+    return out or list(coords[-1:])
 
 
 def _diversions(route_id, used, legs, leg_words, vehicle_text):
@@ -380,10 +465,21 @@ def views(S):
     import route_map_export as rme
     w1, h1 = int(round(MAP1_W_MM * PX_PER_MM)), int(round(MAP1_H_MM * PX_PER_MM))
     w2, h2 = int(round(MAP2_W_MM * PX_PER_MM)), int(round(MAP2_H_MM * PX_PER_MM))
-    S["view1"] = basemap.view(list(S["loaded"]) + list(S["return"]), w1, h1, pad_px=80, max_zoom=15.0)
+    pts1 = list(S["loaded"]) + list(S["return"])
+    H = S.get("holding")
+    if H and H.get("point"):
+        pts1.append(H["point"])
+    S["view1"] = basemap.view(pts1, w1, h1, pad_px=80, max_zoom=15.0)
     near = list(S["last_mile_in"]) + list(S["last_mile_out"])
+    # 29 Oct 2026 (task 3c): the second map becomes the run from the holding area to the gate when it is short enough
+    # to read at that scale (under HOLD_RUN_M); else it stays the last mile, with the H badge when in frame
+    S["holding_run_view"] = bool(H and H.get("run") and H.get("h_to_gate_km") is not None and H["h_to_gate_km"] * 1000.0 <= HOLD_RUN_M)
+    if S["holding_run_view"]:
+        near = list(H["run"]) + list(S["last_mile_out"])
     if near:      # the gates in frame too, so a gate just off the end of the road route is on the map
         near += [g["at"] for g in (S["entry"], S["exit"]) if g.get("at")]
+        if H and H.get("point") and S["holding_run_view"]:
+            near.append(H["point"])
     S["view2"] = basemap.view(near, w2, h2, pad_px=70, max_zoom=17.0) if near else None
     S["community"] = rme.community_in_frame(S["view2"]) if S["view2"] else None
     return S
