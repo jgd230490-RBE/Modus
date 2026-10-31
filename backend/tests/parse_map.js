@@ -1741,7 +1741,7 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
      (code.match(/new mapboxgl\.Map\(/g) || []).length === 1 && !/map\.remove\(\)/.test(code));
   // NARROWED 31 Oct 2026 (task 4c PR 1): a fourth tag, site-layouts.js, the site layouts' drawing shared with the Locations page; the guide is still in-page
   // NARROWED 31 Oct 2026 (task 4c PR 2): site-layouts.js?v=3 (the words from zoom 15; data sent again when shown; PR 4's v=2 the minzoom option)
-  ok("🔴 no new script tag: the guide is in-page (four script src tags: + site-layouts.js, 31 Oct)", (html.match(/<script src=/g) || []).length === 4 && html.includes('<script src="site-layouts.js?v=3"></script>'));
+  ok("🔴 no new script tag: the guide is in-page (four script src tags: + site-layouts.js, 31 Oct)", (html.match(/<script src=/g) || []).length === 4 && html.includes('<script src="site-layouts.js?v=4"></script>'));   // NARROWED 31 Oct 2026 (task 4c PR 3): v=4, + WSLayouts.pictures
   ok("the card and ring are fixed overlays over the map, not inside it",
      /#guide-ring\{position:fixed;z-index:9000;pointer-events:none;/.test(html) && /#guide-card\{position:fixed;z-index:9001;/.test(html));
   ok("the anchor is scrolled into view before measuring, and the card is clamped into the window (seen live: an off-screen card)",
@@ -6093,7 +6093,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      /\.info-i\{ position:relative; flex:none; display:inline-grid; place-items:center; width:18px; height:18px;/.test(html)
      && html.includes(".info-i::after{ content:\"\"; position:absolute; inset:-13px; }")
      // named by aria-label (the UI audit, 19 Oct: a hidden .sr-only span counted as 1 px clipped text on every map stop)
-     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z-]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 14   // NARROWED 31 Oct 2026 (task 4c PR 4): + the public site layouts. NARROWED 31 Oct 2026 (task 4c PR 1): + site layouts. NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): + Labels, zones, community, collisions, abnormal (staff and public), closures, limits
+     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z-]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 15   // NARROWED 31 Oct 2026 (task 4c PR 3): + the pinned pictures. NARROWED 31 Oct 2026 (task 4c PR 4): + the public site layouts. NARROWED 31 Oct 2026 (task 4c PR 1): + site layouts. NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): + Labels, zones, community, collisions, abnormal (staff and public), closures, limits
      && !/class="info-i"[^>]*>[^]*?<span class="sr-only">About/.test(html.slice(0, html.indexOf('id="month-text"'))));
   ok("19 Oct (UI audit): on a phone the folds' summary rows are 44 px tall (By council, What's moving, More layers)",
      /@media \(max-width:767px\)[\s\S]*?\.layers-box > summary\{ min-height:44px; display:flex; align-items:center; flex-wrap:wrap; padding:2px 0; \}/.test(html));
@@ -7286,9 +7286,10 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && grp.includes("Every layout, shown on the public map or not. Draw and change them on Data → Locations."));
   ok("🔴 SITE LAYOUTS: staff only (siteLayoutsStaff from checkRouteExportStaff); off by default; read only when ticked, for the month on screen",
      src.includes("siteLayoutsStaff(RME.staff); })") && src.includes("if (g) g.hidden = !SLY.staff;")
-     && src.includes("const SLY = { on: false, staff: false, styles: null, data: null, h: null, month: undefined, loading: false };")
+     // NARROWED 31 Oct 2026 (task 4c PR 3): + picsOn / pics (the Pinned pictures tick reads the same answer)
+     && src.includes("const SLY = { on: false, staff: false, styles: null, data: null, h: null, month: undefined, loading: false,\n                  picsOn: false, pics: null };")
      && src.includes("fetch('/api/site-layouts/map' + q, { credentials: 'same-origin' })") && src.includes("if (SLY.on) refreshSiteLayouts();")
-     && /function applyFilters\(\) \{[\s\S]{0,1200}if \(typeof SLY !== 'undefined' && SLY\.on\) refreshSiteLayouts\(\);/.test(src));
+     && /function applyFilters\(\) \{[\s\S]{0,1200}if \(typeof SLY !== 'undefined' && \(SLY\.on \|\| SLY\.picsOn\)\) refreshSiteLayouts\(\);/.test(src));
   const ens = cut0(src, "function ensureSiteLayoutLayers(", "\n    }\n");
   ok("SITE LAYOUTS: re-added on style.load through styleReady(), under the basemap's names (labelAnchor)",
      /if\s*\(\s*!styleReady\(\)\s*\)\s*return;/.test(ens) && ens.includes("before: () => labelAnchor()") && ens.includes("SLY.h.reinstall();")
@@ -7296,7 +7297,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   const js = fs.readFileSync(path.join(__dirname, "..", "..", "map", "site-layouts.js"), "utf8").replace(/\r\n?/g, "\n");
   ok("SITE LAYOUTS: site-layouts.js draws from the style table it is given; sizes in metres with zoom top-level (GL drops a nested zoom)",
      // NARROWED 31 Oct 2026 (task 4c PR 2): + geo (the drawing tools' geometry) and WORDS_Z
-     js.includes("window.WSLayouts = { install, metres, centroid, areaM2, bearing, geo, WORDS_Z };") && !/once\(['"]idle/.test(js)
+     // NARROWED 31 Oct 2026 (task 4c PR 3): + pictures (the pinned pictures, both maps)
+     js.includes("window.WSLayouts = { install, pictures, metres, centroid, areaM2, bearing, geo, WORDS_Z };") && !/once\(['"]idle/.test(js)
      && /\["coalesce", \["get", "_m"\], 1\.6\]/.test(js) && !/\["\*",[^\]]*\["zoom"\]/.test(js));
   ok("SITE LAYOUTS: a basemap switch puts back the features as sent (not the prepared copy)",
      js.includes("raw = list;") && js.includes("setData(raw);"));
@@ -7306,6 +7308,41 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
         slyFn.includes("SLY.failed === month") && slyFn.includes("SLY.failed = month;")
         && slyFn.includes("SLY.tried !== siteLayoutMonth()") && !slyFn.includes("SLY.month !== siteLayoutMonth()")
         && /function toggleSiteLayouts\(on\) \{\s*SLY\.on = !!on;\s*SLY\.failed = undefined;/.test(html));
+}
+
+// 31 Oct 2026 (task 4c PR 3, the mockup John approved, Q9): the staff map's Pinned pictures — a tick under "Every site
+// layout", OFF when the map opens, staff only (in the hidden staff group); one image source a picture UNDER the layouts
+// (WSLayouts.pictures, site-layouts.js), set again on every read and after a basemap switch (set() re-adds what the style
+// dropped), never on an idle wait. The pictures' images are never read by the public map's code.
+{
+  const grp = html.slice(html.indexOf('<div class="control-group" id="site-layouts-group" hidden>'), html.indexOf('<!-- 16 Oct 2026 (CLOCS v5 C1): the collision history'));
+  ok("⭐ PICTURES: a 'Pinned pictures' tick in the HIDDEN staff site-layouts group, off by default, with a count and an 'i'",
+     grp.includes('<input type="checkbox" id="layer-site-pictures" onchange="toggleSitePictures(this.checked)"> Pinned pictures <span class="lim-n" id="site-pictures-count"></span>')
+     && !/id="layer-site-pictures"[^>]*\schecked[\s>]/.test(grp) && grp.includes('aria-controls="info-site-pictures"')
+     && grp.includes("Drawings and PDF pages pinned on the layouts, under them. Staff only. Pin them in Draw on Data → Locations."));
+  const ens = src.slice(src.indexOf("function ensureSitePictures()"), src.indexOf("async function refreshSiteLayouts"));
+  ok("PICTURES: drawn by WSLayouts.pictures under the layouts' first layer (else the names' anchor), only once the style is ready",
+     /if \(!window\.WSLayouts \|\| !WSLayouts\.pictures \|\| !styleReady\(\)\) return;/.test(ens)
+     && ens.includes("WSLayouts.pictures(map, { prefix: 'site-picture', visible: SLY.picsOn,")
+     && ens.includes("before: () => (SLY.h && SLY.h.layerIds()[0]) || labelAnchor() })")
+     && ens.includes("SLY.pics.set((SLY.data && SLY.data.pictures) || []);") && !/once\(['"]idle/.test(ens));
+  ok("PICTURES: re-added with the layouts after a basemap switch and a month change (ensureSiteLayoutLayers calls it)",
+     cut0(src, "function ensureSiteLayoutLayers(", "\n    }\n").length > 0 && /SLY\.h\.setVisible\(SLY\.on\);\s*\}\s*ensureSitePictures\(\);/.test(src));
+  ok("PICTURES: the tick reads the staff layouts' answer (no read of its own) and a staff logout switches it off",
+     /function toggleSitePictures\(on\) \{\s*SLY\.picsOn = !!on;\s*SLY\.failed = undefined;\s*if \(SLY\.pics\) SLY\.pics\.setVisible\(SLY\.picsOn\);\s*if \(SLY\.picsOn\) refreshSiteLayouts\(\);/.test(src)
+     && src.includes("if (!SLY.staff) { SLY.on = false; SLY.picsOn = false;")
+     && !/\/api\/site-layouts\/pictures/.test(src));
+  const js = fs.readFileSync(path.join(__dirname, "..", "..", "map", "site-layouts.js"), "utf8").replace(/\r\n?/g, "\n");
+  const pj = js.slice(js.indexOf("function pictures(map, opts)"), js.indexOf("window.WSLayouts ="));
+  ok("PICTURES: site-layouts.js — an image source + a raster layer a picture, corners in Mapbox's order, no fade, under opts.before",
+     pj.includes('map.addSource(P + p.id, { type: "image", url, coordinates: now.corners });')
+     && pj.includes('type: "raster", source: P + p.id') && pj.includes('"raster-fade-duration": 0') && pj.includes("}, before());")
+     && pj.includes("src(p.id).setCoordinates(p.corners)") && !/once\(['"]idle/.test(pj));
+  ok("PICTURES: set() re-adds a picture the style dropped and reloads one only when its address changed (moving corners keeps the image)",
+     pj.includes("if (!o || o.url !== p.url) drop(p.id);") && pj.includes("if (!src(p.id)) { add(p); continue; }")
+     && pj.includes("function reinstall() { const now = list; remove(); list = []; set(now); }"));
+  ok("PICTURES: the public map's own code never draws pictures (its site layouts come from /api/public/site-layouts only)",
+     !/PSL[\s\S]{0,40}pictures/.test(src) && !src.includes("WSLayouts.pictures(map, { prefix: 'site-layout-public'"));
 }
 
 // 31 Oct 2026 (task 4c PR 2, the approved mockup notes\site-layout-draw-mockup-1031, Q5): the layout's WORDS show from zoom 15 on

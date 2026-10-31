@@ -79,6 +79,7 @@ import holding  # 29 Oct 2026 (task 3c): vehicle holding areas
 import site_layouts  # 31 Oct 2026 (task 4c PR 1): a site's logistics layout, its phases and the drawings brought in
 import site_layout_import  # 31 Oct 2026 (task 4c PR 1): DXF / KML / KMZ / GeoJSON / shapefile zip read into map things
 import site_layout_styles  # 31 Oct 2026 (task 4c PR 1): the one style table (11 lines, 10 areas, 31 symbols, 8 layers)
+import site_layout_pictures  # 31 Oct 2026 (task 4c PR 3): pictures / PDF pages pinned on a layout by four corners (staff)
 import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
 import heavy_reads  # 21 Oct 2026 — the public map's heavy reads a few at a time, one memory line each (live OOM kills)
 import abnormal  # 22 Oct 2026 (S16 / B5) — the abnormal loads: each one its own planned movement, with the rules' advice
@@ -440,7 +441,8 @@ if _Request is not None and hasattr(app, "middleware"):
                 # 22 Oct 2026 (read_cache): every write that reached an endpoint, worked or not, ends every cached
                 # read. db.note_write already bumps on each committed statement; this is the second net for a path
                 # that writes some other way. The skipped paths (sign-in, page opens, previews) change no figure.
-                if write and _audited(path) and not _CLP_NOTES_PATH.match(path) and not _REVIEW_PATH.match(path):
+                if (write and _audited(path) and not _CLP_NOTES_PATH.match(path) and not _REVIEW_PATH.match(path)
+                        and not _PICTURE_PATH.match(path)):
                     db.bump_data_version()
 
             # G3 (D55): every write that worked, with who did it and what was sent (secrets removed).
@@ -494,10 +496,15 @@ AUDIT_SKIP = ("/api/costing/preview", "/api/carbon/scenario", "/api/carbon/summa
               # skipped so the middleware does not keep a 10 MB upload in memory a second time
               "/api/site-layouts/read")
 AUDIT_SKIP_PREFIXES = ("/api/auth/",)
+#: 31 Oct 2026 (task 4c PR 3): adding a pinned picture (a file of up to 10 MB as the body) writes its OWN audit row, so
+#: the middleware does not keep the upload in memory a second time (as /api/site-layouts/read)
+_PICTURE_UPLOAD_PATH = re.compile(r"^/api/locations/[^/]+/site-layout/pictures$")
+#: ... and a picture's writes (add, move, delete) end no kept read: nothing is built from a picture (NO_DATA_TABLES)
+_PICTURE_PATH = re.compile(r"^/api/(site-layouts/pictures/[^/]+|locations/[^/]+/site-layout/pictures)$")
 
 
 def _audited(path):
-    return path not in AUDIT_SKIP and not path.startswith(AUDIT_SKIP_PREFIXES)
+    return path not in AUDIT_SKIP and not path.startswith(AUDIT_SKIP_PREFIXES) and not _PICTURE_UPLOAD_PATH.match(path)
 
 
 def _client_ip(request):
@@ -5012,9 +5019,91 @@ def copy_site_layout_phase(phase_id: str):
 
 @app.delete("/api/site-layouts/phases/{phase_id}")
 def delete_site_layout_phase(phase_id: str, version: int):
-    """Delete a phase. Carries its version: 409 when someone else saved first."""
+    """Delete a phase (and the pictures pinned on it alone). Carries its version: 409 when someone else saved first."""
     _require_approver()
     return _layout_call(site_layouts.delete_phase, phase_id, version)
+
+
+# ---- 31 Oct 2026 (task 4c PR 3): pictures and PDF pages pinned by their four corners. STAFF ONLY: no public read ever
+# carries a picture, its id or its address (test_site_layout_pictures reads every /api/public/ answer).
+@app.post("/api/locations/{location_id}/site-layout/pictures")
+async def add_site_layout_picture(request: Request, location_id: str, name: str, page: int = 1,
+                                  scale: Optional[str] = None, clear: Optional[str] = None,
+                                  phase_id: Optional[str] = None, every: bool = False,
+                                  lon: Optional[float] = None, lat: Optional[float] = None):
+    """Pin a PNG, JPG or one page of a PDF (the raw file as the body, at most 10 MB) on a site's layout, north up on
+    (lon, lat) or the site: at its true size when a PDF's scale (1:`scale`) is given, else 150 m wide. Planner or admin.
+    The picture is made ONCE here (a PDF page drawn, cut to 4,096 dots a side, white made see-through when asked) and
+    only that is kept. Made ALONE under the drawing reads' name (heavy_reads.solo): live has 512 MB."""
+    _require_approver()
+    too_big = "This file is over 10 MB."
+    try:
+        if int(request.headers.get("content-length") or 0) > site_layout_pictures.MAX_BYTES:
+            raise HTTPException(413, too_big)
+    except ValueError:
+        pass
+    buf = bytearray()
+    async for chunk in request.stream():
+        buf.extend(chunk)
+        if len(buf) > site_layout_pictures.MAX_BYTES:
+            raise HTTPException(413, too_big)
+    data = bytes(buf)
+    del buf
+    opts = {"page": page, "scale": scale, "phase_id": phase_id, "every": every,
+            "clear": None if clear in (None, "") else str(clear).lower() in ("1", "true", "yes", "on"),
+            "centre": [lon, lat] if lon is not None and lat is not None else None}
+    with heavy_reads.solo("site-layout-read", busy=lambda: HTTPException(
+            503, "Another drawing or picture is being read. Try again in a minute.", headers={"Retry-After": "30"})):
+        out = _layout_call(site_layout_pictures.add, location_id, data, name, opts, _by(None))
+    del data
+    _audit_write(request, request.url.path, "POST", 200, None)
+    return out
+
+
+class SiteLayoutPictureIn(BaseModel):
+    version: int
+    corners: Optional[list] = None
+    opacity: Optional[float] = None
+    name: Optional[str] = None
+    phase_id: Optional[str] = None
+    every: Optional[bool] = None
+
+
+@app.patch("/api/site-layouts/pictures/{picture_id}")
+def edit_site_layout_picture(picture_id: str, body: SiteLayoutPictureIn):
+    """Move a picture's corners, set its opacity, rename it or give it a phase / every phase. Carries its version: 409
+    when someone else saved first. Planner or admin."""
+    _require_approver()
+    sent = set(_fields_set(body))
+    d = {k: getattr(body, k) for k in sent}
+    d["version"] = body.version
+    return {"picture": _layout_call(site_layout_pictures.edit, picture_id, d, _by(None))}
+
+
+@app.delete("/api/site-layouts/pictures/{picture_id}")
+def delete_site_layout_picture(picture_id: str, version: int):
+    """Delete a pinned picture. Carries its version: 409 when someone else saved first. Planner or admin."""
+    _require_approver()
+    return _layout_call(site_layout_pictures.delete, picture_id, version)
+
+
+@app.get("/api/site-layouts/pictures/{picture_id}/image")
+def site_layout_picture_image(picture_id: str, request: Request = None):
+    """A pinned picture's image (PNG or JPEG). STAFF ONLY: a code or login, or the staff gate cookie (the map's image
+    source sends cookies, not the code header); the map password's cookie and no credential get 401. Kept by the browser
+    for this person only (`private`); the address carries when it was added (the image never changes after that, so a
+    moved picture keeps its copy, and a new picture under a re-used id is a new address)."""
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the site layouts are for staff")
+    try:
+        mime, data, stamp = site_layout_pictures.image(picture_id)
+    except site_layout_pictures.Problem as e:
+        raise HTTPException(404, str(e))
+    etag = f'"{picture_id}-{stamp}"'
+    head = {"Cache-Control": "private, max-age=86400", "ETag": etag}
+    if request is not None and (request.headers.get("if-none-match") or "") == etag:
+        return Response(status_code=304, headers=head)
+    return Response(content=data, media_type=mime, headers=head)
 
 
 @app.get("/api/gates")
