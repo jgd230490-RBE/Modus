@@ -474,8 +474,10 @@ ok("3. the staff Route map in Apr 2027: the Piers picture and the every-phase on
 fm2 = main.site_layouts_map("2027-08", _Request(cookies=STAFF))
 ok("3. ...in Aug 2027 the Deck's and the every-phase one", sorted(p["id"] for p in fm2["pictures"]) == ["PI002", "PI003"])
 fm3 = main.site_layouts_map("2026-01", _Request(cookies=STAFF))
-ok("3. ...in a month with no phase of the site in force, none (an every-phase picture shows with its layout)",
-   fm3["pictures"] == [])
+# 31 Oct 2026 (PR 6): the demo package now carries an every-month phase on L019, so a phase IS in force in Jan 2026:
+# only the every-phase picture shows (the Piers and the Deck's, each pinned to a phase of its own months, do not)
+ok("3. ...in a month when only the demo's every-month phase is in force, just the every-phase picture (not the Piers' or the Deck's)",
+   [p["id"] for p in fm3["pictures"]] == ["PI002"], str([p["id"] for p in fm3["pictures"]]))
 
 # --- the image --------------------------------------------------------------------------------------------------------
 st, r = http(main.site_layout_picture_image, "PI001", _Request(cookies=STAFF))
