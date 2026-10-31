@@ -54,7 +54,7 @@ main:focus{outline:0}
 <li class="l2"><a href="#t1-baf">Fuel index and BAF</a></li>
 <li class="l2"><a href="#t1-gates">Gate arrivals</a></li>
 <li class="l2"><a href="#t1-stock">Stockpiles</a></li><li class="l2"><a href="#t1-pours">Concrete pours</a></li>
-<li class="l2"><a href="#t1-clp">CLP monitoring</a></li><li class="l2"><a href="#t1-clp-records">CLP documents</a></li><li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li><li class="l2"><a href="#t1-layouts">Site layouts</a></li>
+<li class="l2"><a href="#t1-clp">CLP monitoring</a></li><li class="l2"><a href="#t1-clp-records">CLP documents</a></li><li class="l2"><a href="#t1-clp-notes">CLP notes and tasks</a></li><li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li><li class="l2"><a href="#t1-layouts">Site layouts</a></li>
 <li class="l1"><a href="#t2-routing">T2 Routing with HERE</a></li>
 <li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>
 <li class="l1"><a href="#t3-sources">T3 Where each screen reads from</a></li>
@@ -436,7 +436,46 @@ template's stages for the programme, <code>clp_doc.DEFAULT_STAGES</code>, sent t
 (<code>clp_doc.settings_problem</code>, checked on Config save). A discipline in no stage gets a stage of its own after the
 last. 2.4.2 lists named schools, hospitals and health centres first (<code>clp_doc_layers.SENSITIVE_KINDS</code>), then the
 other named places, nearest first; places with no name are counted per kind (<code>places_unnamed</code>).</p>
-<p><strong>Not yet built.</strong> Notes and tasks on a plan (PR 3b); the client's reviewers (PR 3c); the appendices (PR 4).</p>
+<p><strong>Not yet built.</strong> The client's reviewers (PR 3c); the appendices (PR 4). Notes and tasks (PR 3b): the next section.</p>
+<h2 id="t1-clp-notes">CLP notes and tasks</h2>
+<p>31 Oct 2026 (task 4a, PR 3b; mockup <code>notes/clp-notes-mockup-1031</code>, Q1–Q12 as recommended). <code>backend/clp_notes.py</code>
+over one tenanted table, in the organisation file (after <code>clp_issues</code>) and kept by a demo refresh:</p>
+<pre>clp_notes  (tenant_id, id) — clp_id, kind note | task | step | lines, words, for_kind team | approvers | person, for_team,
+           for_user (a login id), due (YYYY-MM-DD), from_line, done_by / done_at, step sent | changes | approved, issue_no,
+           written_by (the name shown), written_key (u:&lt;login&gt; or c:&lt;role&gt;:&lt;team&gt;: who may delete or change it),
+           written_at, updated_at</pre>
+<p><strong>Who.</strong> Every read and write goes through <code>clp_records._record(id, acc)</code>, so a team reaches only its
+own team's plans (another's is a 404, as for the plan). Anyone who sees the plan writes a note, adds a task and ticks one
+(<code>done</code>, recorded with who and when); the writer (<code>written_key</code>) or <code>access.can_approve</code> deletes a
+note or changes / deletes a task. A task can be For a person only if that login is enabled, unexpired, of kind staff and can see
+the plan (the team's logins, planners, admins); a demo lead is offered no names and cannot pick one.</p>
+<p><strong>Steps.</strong> <code>clp_records.send</code>, <code>ask_changes</code> and <code>approve</code> call
+<code>clp_notes.add_step</code> with the record's own time; <code>thread()</code> also reads the steps from before 3b out of
+<code>clp_issues</code> and the record's <code>sent_*</code> / <code>changes_*</code>, leaving out any that match a written step.
+<code>POST …/changes</code> with <code>{"task": {"due": …}}</code> adds its note as a task for the plan's team (the planners and
+admins on an every-team plan); a bad date is refused before anything moves.</p>
+<p><strong>Kept lines.</strong> <code>clp_doc.build</code> leaves its Still to complete list in <code>data["todos"]</code>; the
+draft download and approve keep it as one <code>lines</code> row a plan (<code>keep_lines</code>, written only when it moved).
+A task whose <code>from_line</code> is missing from the kept list has <code>line_gone_at</code>; it is never ticked by itself.
+A listed row (<code>auto-…</code>) keeps its notes by its id without becoming a saved record (the mockup's card 7 said it
+would; nothing a person sees differs).</p>
+<p><strong>Kept reads.</strong> <code>clp_notes</code> is in <code>db.NO_DATA_TABLES</code> and the middleware skips its version
+bump for <code>_CLP_NOTES_PATH</code> (…/notes, …/tasks): no kept read is built from the table, and a note must not throw away
+a kept draft (a heavy build). Those writes are still in the audit trail. The kept lines are written inside the draft build
+without moving the version, so the draft stays kept.</p>
+<p><strong>Email.</strong> <code>email_task</code>, only for a task given (or moved) to one named person other than the writer:
+<code>users.mail_settings()</code> and <code>demo_request.send</code>, the task, the plan's name and team, the due date, the app
+link, and the demo notice on a demo. The reply's <code>email</code> is <code>sent</code> / <code>unsent</code> /
+<code>failed</code>; the task is kept either way. A shared code has no address and is never sent one.</p>
+<pre>GET    /api/clp/documents/{id}/notes            tasks, notes with the steps, lines, for_options, can_moderate
+POST   /api/clp/documents/{id}/notes            {note}
+DELETE /api/clp/documents/{id}/notes/{nid}      a note (writer / planner / admin)
+POST   /api/clp/documents/{id}/tasks            {words, for: team | approvers | user:&lt;id&gt;, due, from_line}
+PATCH  /api/clp/documents/{id}/tasks/{tid}      {done} anyone · {words, for, due} writer / planner / admin
+DELETE /api/clp/documents/{id}/tasks/{tid}      a task (writer / planner / admin)</pre>
+<p>The list's rows carry <code>tasks = {open, overdue, next_due, notes, done, mine_open}</code> (one read for every plan);
+<code>approve-preview</code> carries <code>tasks = {open, overdue, first_overdue}</code>. Deleting a plan made with + New CLP
+deletes its rows (<code>drop_all</code>); clearing a listed row keeps them. Nothing of this table reaches the Word file.</p>
 <h2 id="t1-abnormal">Abnormal loads (S16 / B5, 22 Oct 2026)</h2>
 <p>Each abnormal load is its own row in <code>abnormal_loads</code> (one tenant's, carried in its package), never a forecast line: nothing of it reaches the tonnes, trips, vehicles, CLP caps, gate capacity or carbon figures (D70, D71). The rules engine is <code>backend/abnormal_rules.py</code>, every threshold a named constant with its source, and <code>test_abnormal.py</code> asserts each on both sides.</p>
 <ul><li><strong>When a load is abnormal.</strong> Over 44 t gross, over 2.9 m wide, over 18.65 m rigid, over 10 t on an axle (11.5 t driving): the Road Vehicles (Authorised Weight) Regulations 1998 and the Construction and Use Regulations 1986 as the National Highways aide memoire reads them. Construction and Use covers up to 4.3 m wide and 27.4 m long; STGO 2003 Schedule 1 gives Category 1 (up to 50 t on 5 or 6 axles), 2 (80 t, 6 or more) and 3 (150 t), with 12.5 / 12 / 16.5 t axle limits, 1.35 m minimum spacing and the tonnes-a-metre rule; over 150 t, 6.1 m wide or 30 m long is a Special Order (BE16). Width over 5.0 m (to 6.1 m) is a VR1.</li>
