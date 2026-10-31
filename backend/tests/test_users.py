@@ -770,7 +770,10 @@ ok("⭐ the middleware writes one audit row per write that worked",
    re.search(r"if write and _audited\(path\) and 200 <= getattr\(response, \"status_code\", 0\) < 300:\n\s+_audit_write\(", MAIN))
 ok("...skipping only the POSTs that change nothing and the paths that log themselves",
    set(main.AUDIT_SKIP) == {"/api/costing/preview", "/api/carbon/scenario", "/api/carbon/summary.pdf",
-                            "/api/public/demo-request", "/api/map-auth", "/api/gate-signout", "/api/auth", "/api/activity"}
+                            "/api/public/demo-request", "/api/map-auth", "/api/gate-signout", "/api/auth", "/api/activity",
+                            # NARROWED 31 Oct 2026 (task 4c PR 1): reading a drawing saves nothing (it is held; the place is audited)
+                            "/api/site-layouts/read"}
+   and main._audited("/api/locations/L1/site-layout/place")
    and main._audited("/api/forecasts/bulk") and main._audited("/api/admin/config/factors")
    and main._audited("/api/routes/R1/status") and not main._audited("/api/auth/signin"))
 ok("🔴 CORS no longer allows every origin with credentials",

@@ -1,0 +1,675 @@
+"""
+Site layouts, PR 1 (31 Oct 2026, task 4c; plan notes site-layouts-plan-1030.md §8): the style table, the drawings
+brought in (DXF on National Grid and on a site grid, KML, KMZ, GeoJSON, shapefile zip), the survey-point fit, the
+"in the file -> becomes" table saved per organisation, placing on a phase, the phases (months, rename, delete, the
+version check), the staff Route map's read, the organisation file, the refusals in plain words.
+
+The six sample drawings in fixtures/site_layouts/ are ONE fictional contractor's logistics plan for the demo's Tilton
+Viaduct site (L019), written by backend/tools/make_site_layout_samples.py around the demo's own gates. The mockup
+measured them (40 of 40 from the National Grid DXF with Gate 1 0.00 m from G020; 32 of 32 from the others; the
+site-grid fit turn 27.61°, scale 1.0003, worst miss 0.01 m) and this harness holds the build to the same figures.
+
+WHAT THIS DOES NOT PROVE: the screens (parse_frontend / dom_frontend / the UI audit), the Route map layer (parse_map),
+Postgres, the HTTP layer (stubbed), the memory on Render (measured by hand before the merge).
+Run (PowerShell):  $env:PYTHONUTF8 = "1"; .venv-tests\\Scripts\\python backend/tests/test_site_layouts.py
+"""
+import asyncio
+import hashlib
+import io
+import json
+import math
+import os
+import re
+import sys
+import tempfile
+import types
+import zipfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+BACKEND = os.path.dirname(HERE)
+ROOT = os.path.dirname(BACKEND)
+FIX = os.path.join(HERE, "fixtures", "site_layouts")
+sys.path.insert(0, BACKEND)
+
+# --- the same stubs every backend harness uses (no FastAPI in .venv-tests) -------------------------------------------
+_fp = types.ModuleType("flexpolyline")
+_fp.decode = lambda s: []
+_fp.encode = lambda pts: ""
+sys.modules.setdefault("flexpolyline", _fp)
+
+
+def _passthrough_decorator(*a, **k):
+    def wrap(fn):
+        return fn
+    return wrap
+
+
+class _App:
+    def __init__(self, *a, **k):
+        pass
+
+    def get(self, *a, **k):
+        return _passthrough_decorator()
+    post = put = delete = patch = get
+
+    def add_middleware(self, *a, **k):
+        pass
+
+    def mount(self, *a, **k):
+        pass
+
+
+class _HTTPException(Exception):
+    def __init__(self, status_code, detail="", headers=None):
+        super().__init__(f"{status_code}: {detail}")
+        self.status_code = status_code
+        self.detail = detail
+
+
+def _Query(default=None, **k):
+    return default
+
+
+_fa = types.ModuleType("fastapi")
+_fa.FastAPI = _App
+_fa.HTTPException = _HTTPException
+_fa.Query = _Query
+
+
+class _Request:
+    def __init__(self, headers=None, body=b"", cookies=None):
+        self.headers = {k.lower(): v for k, v in (headers or {}).items()}
+        self._body = body
+        self.cookies = cookies or {}
+
+    async def stream(self):
+        for i in range(0, len(self._body), 65536):
+            yield self._body[i:i + 65536]
+
+
+_fa.Request = _Request
+sys.modules.setdefault("fastapi", _fa)
+_mw = types.ModuleType("fastapi.middleware")
+_cors = types.ModuleType("fastapi.middleware.cors")
+_cors.CORSMiddleware = object
+_mw.cors = _cors
+sys.modules.setdefault("fastapi.middleware", _mw)
+sys.modules.setdefault("fastapi.middleware.cors", _cors)
+_resp = types.ModuleType("fastapi.responses")
+_resp.FileResponse = lambda *a, **k: None
+
+
+class _Response:
+    def __init__(self, content=None, status_code=200, headers=None, media_type=None):
+        self.body = content
+        self.status_code = status_code
+        self.headers = dict(headers or {})
+        self.media_type = media_type
+
+
+_resp.Response = _Response
+sys.modules.setdefault("fastapi.responses", _resp)
+_static = types.ModuleType("fastapi.staticfiles")
+
+
+class _StaticFiles:
+    def __init__(self, *a, **k):
+        pass
+
+    async def get_response(self, path, scope):
+        return None
+
+
+_static.StaticFiles = _StaticFiles
+sys.modules.setdefault("fastapi.staticfiles", _static)
+
+TMP = tempfile.mkdtemp(prefix="rbe_layouts_")
+from portable import remove_scratch_db   # noqa: E402  tests/portable.py
+os.environ.pop("DATABASE_URL", None)
+os.environ.pop("ADMIN_TOKEN", None)
+
+import db  # noqa: E402
+db._SQLITE_PATH = os.path.join(TMP, "scratch.db")
+import conversions  # noqa: E402
+import main  # noqa: E402
+import access  # noqa: E402
+import config  # noqa: E402
+import limits  # noqa: E402
+import tenant_package  # noqa: E402
+import site_layouts as SL  # noqa: E402
+import site_layout_import as SI  # noqa: E402
+import site_layout_styles as ST  # noqa: E402
+for _v in ("IPT1_CODE", "IPT2_CODE", "IPT3_CODE", "IPT4_CODE", "IPT5_CODE", "IPT6_CODE",
+           "PLANNER_CODE", "ADMIN_CODE"):
+    os.environ.pop(_v, None)
+os.environ["ALLOW_DEMO_CODES"] = "1"
+
+
+def reset_db():
+    remove_scratch_db(db, TMP)
+    db.init_db()
+    db.init_network_db()
+    db.init_taxonomy_db()
+    db.init_zones_db()
+    db.init_gates_db()
+    db.init_weeks_db()
+    db.init_lookahead_db()
+    db.init_config_db()
+    db.init_costing_db()
+    db.init_tenant()
+    limits.init_db()
+    config.invalidate()
+    config.seed_from_file(conversions)
+
+
+PASS = 0
+FAIL = []
+
+
+def ok(label, cond, extra=""):
+    global PASS
+    if cond:
+        PASS += 1
+    else:
+        FAIL.append(f"{label} {extra}".strip())
+
+
+def raises(fn):
+    try:
+        fn()
+    except Exception as e:
+        return e
+    return None
+
+
+def fx(name):
+    return open(os.path.join(FIX, name), "rb").read()
+
+
+def metres(a, b):
+    return SI.metres(a, b)
+
+
+# the demo's own records for L019 (read only), the site the samples were drawn round
+PKG = json.load(open(os.path.join(ROOT, "demo", "uk-corridor.package.json"), encoding="utf-8"))
+L019 = next(r for r in PKG["tables"]["locations"] if r["id"] == "L019")
+GATES = [g for g in PKG["tables"]["location_gates"] if g["location_id"] == "L019"]
+G020 = next(g for g in GATES if g["id"] == "G020")
+G021 = next(g for g in GATES if g["id"] == "G021")
+NEAR = [[L019["lon"], L019["lat"]]]
+
+# =========================================================================== #
+#  0. The style table                                                          #
+# =========================================================================== #
+ok("0. 11 line styles, 10 area styles, 31 symbols, 8 layers",
+   (len(ST.LINE_STYLES), len(ST.AREA_STYLES), len(ST.SYMBOLS), len(ST.LAYERS)) == (11, 10, 31, 8),
+   str((len(ST.LINE_STYLES), len(ST.AREA_STYLES), len(ST.SYMBOLS), len(ST.LAYERS))))
+ok("0. every symbol key once, each an SVG in a 64 box with a size in metres and a group the layers know",
+   len(ST.SYMBOL_KEYS) == 31 and all(s["svg"].strip().startswith("<") and s["size"] > 0 and s["group"] in ST.SYMBOL_LAYER
+                                     for s in ST.SYMBOLS))
+ok("0. every line style sits on one of the eight layers; every colour is #RRGGBB",
+   all(v["layer"] in ST.LAYERS and re.fullmatch(r"#[0-9A-F]{6}", v["color"]) for v in ST.LINE_STYLES.values())
+   and all(re.fullmatch(r"#[0-9A-F]{6}", v["color"]) and v["fill"] in ST.FILLS and v["outline"] in ST.OUTLINES
+           for v in ST.AREA_STYLES.values()))
+ok("0. the import table offers 11 + 10 + 31 + text + leave out = 54 choices", len(ST.choices()) == 54
+   and "skip" in ST.choices() and "text" in ST.choices() and not ST.choice_ok("line:flying") and not ST.choice_ok(None))
+ok("0. security and CCTV are the two symbols never on the public map (Q7)",
+   set(ST.PRIVATE_SYMBOLS) == {"security", "cctv"} and all(k in ST.SYMBOL_KEYS for k in ST.PRIVATE_SYMBOLS))
+P = ST.payload()
+ok("0. the payload the page reads carries the layers, lines, areas, symbols, glyphs and the choices with their words",
+   {"layers", "lines", "areas", "symbols", "glyphs", "choices", "fills", "private_symbols"} <= set(P)
+   and len(P["choices"]) == 54 and all(c.get("label") for c in P["choices"]), str(sorted(P)))
+ok("0. guesses: a hoarding layer, a GATE block, a crane radius, a drainage layer (imported line), a text layer",
+   ST.guess("C-HOARDING", {"LineString"}) == "line:hoarding" and ST.guess("block GATE", {"Point"}) == "sym:gate"
+   and ST.guess("C-CRANE-RADIUS", {"Polygon"}) == "area:crane_radius" and ST.guess("C-DRAINAGE", {"LineString"}) == "line:imported"
+   and ST.guess("C-TEXT", {"Text"}) == "text")
+
+# =========================================================================== #
+#  1. The grid and the six samples                                             #
+# =========================================================================== #
+GRID = os.path.join(BACKEND, "data", "proj", SI.GRID_FILE)
+ok("1. the OSTN15 grid ships in backend/data/proj, the file PROJ-data published (sha256)",
+   os.path.isfile(GRID) and hashlib.sha256(open(GRID, "rb").read()).hexdigest()
+   == "5d6ed64d2119952c4c559fa1fccbc594b6520fc3ec3ef2fc10be13202c4384fa")
+ok("1. its licence is written beside it (OS, 2-Clause BSD)",
+   "2-Clause BSD" in open(os.path.join(BACKEND, "data", "proj", "README.md"), encoding="utf-8").read())
+ok("1. the import is ready only with the grid in place", SI.grid_ready())
+
+R = {}
+for f in ("tilton-logistics-bng.dxf", "tilton-logistics.kml", "tilton-logistics.kmz", "tilton-logistics.geojson",
+          "tilton-logistics-shp.zip"):
+    R[f] = SI.read(fx(f), f, near=NEAR)
+bng = R["tilton-logistics-bng.dxf"]
+ok("1. DXF on National Grid: 40 things on 14 layers, as the mockup measured", bng["report"]["things"] == 40
+   and bng["report"]["layers"] == 14 and bng["report"]["grid"] == "bng", str(bng["report"]))
+ok("1. ...by OS's OSTN15 grid, named in the report (not PROJ's 2 m Helmert fallback)",
+   bng["report"].get("transform") == "Inverse of British National Grid + OSGB36 to WGS 84 (9)", bng["report"].get("transform"))
+first = bng["things"][0]
+ok("1. ...the first haul road starts where the mockup put it (7 decimals)",
+   first["geometry"]["coordinates"][0] == [-0.880001, 52.643043] and first["properties"]["width_m"] == 7.0
+   and first["properties"]["color"] == "#FF7F00", str(first)[:200])
+ok("1. ...the dimension and the title block are left out and said so",
+   bng["report"]["left_out"].get("Dimensions") == 1
+   and bng["report"]["left_out"].get("The title block and anything else in paper space") == 1, str(bng["report"]["left_out"]))
+ok("1. ...units metres, the DXF version and what DXF keeps", bng["report"]["units"] == "metres" and bng["report"]["version"]
+   and "Leaves out dimensions" in bng["report"]["keeps"])
+for f in ("tilton-logistics.kml", "tilton-logistics.kmz", "tilton-logistics.geojson", "tilton-logistics-shp.zip"):
+    ok(f"1. {f}: 32 things on 12 layers, the haul road on the same spot",
+       R[f]["report"]["things"] == 32 and R[f]["report"]["layers"] == 12
+       and R[f]["things"][0]["geometry"]["coordinates"][0] == [-0.880001, 52.643043], str(R[f]["report"])[:200])
+ok("1. the shapefile's .prj (British National Grid) went through the same OSTN15 transform",
+   "OSGB36 to WGS 84 (9)" in R["tilton-logistics-shp.zip"]["report"]["transform"]
+   and "British National Grid" in R["tilton-logistics-shp.zip"]["report"]["crs"])
+ok("1. KMZ reads exactly as its KML", json.dumps(R["tilton-logistics.kmz"]["things"]) == json.dumps(R["tilton-logistics.kml"]["things"]))
+
+rows = {r["key"]: r for r in SI.rows(bng["things"])}
+ok("1. the table: one row per layer / block, each with its count and a first guess",
+   rows["C-HAUL-ROAD"]["n"] == 3 and rows["C-HAUL-ROAD"]["becomes"] == "line:twoway"
+   and rows["block GATE"]["n"] == 2 and rows["block GATE"]["becomes"] == "sym:gate"
+   and rows["C-TEXT"]["becomes"] == "text" and rows["C-CRANE-RADIUS"]["becomes"] == "area:crane_radius"
+   and rows["C-HERAS"]["kinds"] == ["LineString", "Polygon"] and len(rows) == 23, str(sorted(rows)))
+krows = {r["key"]: r for r in SI.rows(R["tilton-logistics.kml"]["things"])}
+ok("1. KML: folders as rows, icons as symbol rows, labels as text",
+   krows["Haul roads"]["becomes"] == "line:twoway" and krows["symbol gate"]["becomes"] == "sym:gate"
+   and krows["Labels"]["becomes"] == "text" and len(krows) == 20, str(sorted(krows)))
+ok("1. a saved choice wins over the guess and says so",
+   {r["key"]: r for r in SI.rows(bng["things"], {"C-DRAINAGE": "skip"})}["C-DRAINAGE"]["becomes"] == "skip"
+   and {r["key"]: r for r in SI.rows(bng["things"], {"C-DRAINAGE": "skip"})}["C-DRAINAGE"]["saved"] is True)
+
+gc = SI.gate_checks(bng["things"], [{"name": G020["name"], "lon": G020["lon"], "lat": G020["lat"]},
+                                    {"name": G021["name"], "lon": G021["lon"], "lat": G021["lat"]}])
+ok("1. the gate check: the drawing's two gates land on G020 / G021, 0.00 m", len(gc) == 2 and gc[0]["m"] <= 0.01
+   and gc[1]["m"] <= 0.01 and {g["gate"] for g in gc} == {G020["name"], G021["name"]}, str(gc))
+
+# =========================================================================== #
+#  2. The site grid and the fit                                                #
+# =========================================================================== #
+site = SI.read(fx("tilton-logistics-site-grid.dxf"), "tilton-logistics-site-grid.dxf", near=NEAR)
+ok("2. a DXF on its own grid with survey points: taken as a site grid, 40 things, three points CP1-CP3",
+   site["report"]["grid"] == "site" and site["report"]["things"] == 40
+   and [c["name"] for c in site["report"]["control"]] == ["CP1", "CP2", "CP3"], str(site["report"].get("control")))
+TRUTH = json.load(open(os.path.join(FIX, "site-grid-control.json"), encoding="utf-8"))
+tr = SI.transformer(27700)
+pairs = []
+for t in TRUTH:
+    c = next(c for c in site["report"]["control"] if c["name"] == t["name"])
+    ok(f"2. {t['name']} is read where it was drawn", [c["x"], c["y"]] == t["site_grid"], str(c))
+    lon, lat = tr.transform(*t["bng"])
+    pairs.append({"name": t["name"], "x": c["x"], "y": c["y"], "lon": lon, "lat": lat})
+ft = SI.fit(pairs)
+ok("2. the fit from three points: turn 27.61°, scale 1.0003, worst miss 0.01 m or less (the mockup's figures)",
+   abs(ft["turn"] - 27.61) < 0.006 and abs(ft["scale"] - 1.0003) < 0.00006 and ft["worst"] <= 0.015
+   and not ft["over"] and not ft["scale_flag"], str({k: ft[k] for k in ("turn", "scale", "worst")}))
+ok("2. ...in one sentence", SI.fit_words(ft).startswith("Fitted from 3 points: the drawing turned 27.61°, scale 1.000"))
+moved = SI.fitted(site["things"], ft)
+gs = SI.gate_checks(moved, [{"name": G020["name"], "lon": G020["lon"], "lat": G020["lat"]},
+                            {"name": G021["name"], "lon": G021["lon"], "lat": G021["lat"]}])
+ok("2. ...both gates land on G020 / G021 within 0.01 m", len(gs) == 2 and max(g["m"] for g in gs) <= 0.015, str(gs))
+ok("2. ...and the haul road starts where the National Grid drawing's does (within 2 cm)",
+   metres(moved[0]["geometry"]["coordinates"][0], bng["things"][0]["geometry"]["coordinates"][0]) < 0.02)
+ok("2. a symbol's angle loses the fit's turn", all(abs((m["properties"].get("rot") or 0) - ((s["properties"].get("rot") or 0) - ft["turn"])) < 1e-6
+                                                  for m, s in zip(moved, site["things"]) if "rot" in s["properties"]))
+ft2 = SI.fit(pairs[:2])
+ok("2. two points are enough (no stretch: turn and scale from the pair)", abs(ft2["turn"] - 27.61) < 0.01 and ft2["points"] == 2)
+bad = [dict(p) for p in pairs]
+bad[2]["lat"] += 10 / 111000
+ftb = SI.fit(bad)
+ok("2. a point 10 m out: worst miss over 1 m, and the sentence says check the points",
+   ftb["over"] and ftb["worst"] > 1 and "check the points" in SI.fit_words(ftb))
+scaled = [dict(p, x=p["x"] * 1.01, y=p["y"] * 1.01) for p in pairs]
+ok("2. a drawing scaled 1 % (wrong units, wrong points) is flagged", SI.fit(scaled)["scale_flag"]
+   and "scale is not 1" in SI.fit_words(SI.fit(scaled)) or SI.fit(scaled)["over"])
+e = raises(lambda: SI.fit(pairs[:1]))
+ok("2. one point is refused in words", isinstance(e, SI.Refused) and "at least two" in str(e))
+e = raises(lambda: SI.fit([pairs[0], dict(pairs[1], x=pairs[0]["x"], y=pairs[0]["y"])]))
+ok("2. two points on top of each other are refused", isinstance(e, SI.Refused) and "on top of each other" in str(e))
+
+# =========================================================================== #
+#  3. Refusals, in plain words                                                 #
+# =========================================================================== #
+import ezdxf  # noqa: E402
+
+
+def dxf_bytes(units=6, x=475879.5, y=305620.0, control=False):
+    d = ezdxf.new("R2010")
+    d.header["$INSUNITS"] = units
+    m = d.modelspace()
+    m.add_line((x, y), (x + 50, y + 20), dxfattribs={"layer": "C-HAUL-ROAD"})
+    if control:
+        m.add_point((x, y), dxfattribs={"layer": "SURVEY-CONTROL"})
+        m.add_point((x + 100, y), dxfattribs={"layer": "SURVEY-CONTROL"})
+    s = io.StringIO()
+    d.write(s)
+    return s.getvalue().encode("utf-8")
+
+
+def refused(data, name, *words, **k):
+    e = raises(lambda: SI.read(data, name, **k))
+    return isinstance(e, SI.Refused) and all(w in str(e) for w in words), str(e)
+
+
+for label, args in [
+    ("DWG", (b"AC1032xxxx", "plan.dwg", "Save it as DXF in your CAD program")),
+    ("a drawing in inches", (dxf_bytes(units=1), "plan.dxf", "This drawing is in inches, not metres")),
+    ("a drawing in millimetres", (dxf_bytes(units=4), "plan.dxf", "millimetres")),
+    ("a drawing that does not say its units", (dxf_bytes(units=0), "plan.dxf", "does not say it is in metres")),
+    ("a file that is not a DXF", (b"hello world", "plan.dxf", "not a DXF")),
+    ("an empty file", (b"", "plan.kml", "empty")),
+    ("a file over 10 MB", (b" " * (SI.MAX_BYTES + 1), "plan.geojson", "over 10 MB")),
+    ("a PDF (a picture comes in PR 3)", (b"%PDF-1.7", "plan.pdf", "Wayscope reads DXF, KML, KMZ, GeoJSON and shapefile zips")),
+    ("a GeoJSON on another grid",
+     (json.dumps({"type": "FeatureCollection", "crs": {"type": "name", "properties": {"name": "EPSG:27700"}},
+                  "features": []}).encode(), "plan.geojson", "not in longitude / latitude", "EPSG:4326")),
+    ("a KML that is not one", (b"<<<", "plan.kml", "not a Google Earth file")),
+]:
+    good, why = refused(*args)
+    ok(f"3. refused in words: {label}", good, why)
+
+zb = io.BytesIO()
+with zipfile.ZipFile(zb, "w") as z:
+    src = zipfile.ZipFile(io.BytesIO(fx("tilton-logistics-shp.zip")))
+    for n in src.namelist():
+        if not n.lower().endswith(".prj"):
+            z.writestr(n, src.read(n))
+good, why = refused(zb.getvalue(), "noprj.zip", "has no .prj file, so its position is unknown.")
+ok("3. a shapefile with no .prj is refused, naming the file", good, why)
+zb = io.BytesIO()
+with zipfile.ZipFile(zb, "w") as z:
+    z.writestr("readme.txt", "nothing here")
+good, why = refused(zb.getvalue(), "empty.kmz", "holds no KML")
+ok("3. a KMZ with no KML in it", good, why)
+good, why = refused(zb.getvalue(), "empty.zip", "holds no shapefile")
+ok("3. a zip with no shapefile in it", good, why)
+zb = io.BytesIO()
+with zipfile.ZipFile(zb, "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("doc.kml", b" " * (SI.MAX_UNPACKED + 10))
+good, why = refused(zb.getvalue(), "bomb.kmz", "unpacks to more than 50 MB")
+ok("3. a zip that unpacks past 50 MB is refused before it is read whole", good, why)
+many = {"type": "FeatureCollection", "features": [
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [-0.88, 52.64]}, "properties": {"marker-symbol": "cone"}}
+    for _ in range(SI.MAX_THINGS + 2)]}
+good, why = refused(json.dumps(many).encode(), "many.geojson", "more than 5,000 things")
+ok("3. more than 5,000 things is refused", good, why)
+e = raises(lambda: SI.read(dxf_bytes(x=200000.0, y=900000.0), "far.dxf", near=NEAR))
+ok("3. a DXF far from every location with no survey points: the page is asked which grid",
+   isinstance(e, SI.AskGrid) and "National Grid" in str(e), repr(e))
+r = SI.read(dxf_bytes(x=200000.0, y=900000.0), "far.dxf", grid="bng", near=NEAR)
+ok("3. ...answered National Grid, it is read on National Grid", r["report"]["grid"] == "bng")
+good, why = refused(dxf_bytes(x=200000.0, y=900000.0), "far.dxf", "fewer than two survey points", grid="site")
+ok("3. ...answered site grid with no survey points, refused in words", good, why)
+r = SI.read(dxf_bytes(x=1000.0, y=2000.0, control=True), "site.dxf", near=NEAR)
+ok("3. a small drawing near (0, 0) with survey points is taken as a site grid", r["report"]["grid"] == "site"
+   and len(r["report"]["control"]) == 2)
+_g = SI.GRID_DIR
+SI.GRID_DIR = os.path.join(TMP, "no-grid")
+good, why = refused(fx("tilton-logistics.kml"), "plan.kml", "cannot be brought in on this server yet")
+SI.GRID_DIR = _g
+ok("3. without the OSTN15 grid every import is refused (no 2 m Helmert fallback)", good, why)
+
+# =========================================================================== #
+#  4. Through the endpoints: read, fit, place, the table kept                   #
+# =========================================================================== #
+reset_db()
+T = db.current_tenant()
+db.execute("INSERT INTO locations (tenant_id, id, name, loc_type, role, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?)",
+           (T, "L019", L019["name"], "Site", "destination", L019["lat"], L019["lon"]))
+db.execute("INSERT INTO locations (tenant_id, id, name, loc_type, role, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?)",
+           (T, "L001", "Quarry (fictional)", "Quarry", "origin", 52.7, -0.95))
+for g in GATES:
+    db.execute("INSERT INTO location_gates (tenant_id, id, location_id, name, direction, lat, lon, active) "
+               "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (T, g["id"], "L019", g["name"], g["direction"], g["lat"], g["lon"], True))
+
+
+def as_code(code):
+    return access.set_current(code)
+
+
+def http(fn, *a, **k):
+    """(status, answer) for a main.* endpoint: 200 and the value, or the HTTPException's code and detail."""
+    try:
+        return 200, fn(*a, **k)
+    except _HTTPException as e:
+        return e.status_code, e.detail
+
+
+def read_ep(data, name, loc="L019", grid="auto"):
+    return http(lambda: asyncio.run(main.read_site_layout_file(_Request({"content-length": str(len(data))}, data),
+                                                                location_id=loc, name=name, grid=grid)))
+
+
+as_code(None)
+ok("4. signed out: every site layout read and write is refused (401)",
+   http(main.site_layout_styles_ep)[0] == 401 and http(main.get_site_layout, "L019")[0] == 401
+   and read_ep(fx("tilton-logistics.kml"), "x.kml")[0] == 401
+   and http(main.site_layouts_map, None, _Request())[0] == 401)
+ok("4. the map password's cookie alone does not open the staff layer (401)",
+   http(main.site_layouts_map, None, _Request(cookies={"wayscope_map": "x"}))[0] == 401)
+import gate  # noqa: E402
+os.environ.setdefault("GATE_SECRET", "site-layouts-harness-secret")   # sign() needs a key
+ok("4. the styles: signed out 401, the map password's cookie 401 (31 Oct: the read takes the request)",
+   http(main.site_layout_styles_ep, _Request())[0] == 401
+   and http(main.site_layout_styles_ep, _Request(cookies={gate.COOKIE: gate.sign(gate.LEVEL_MAP)}))[0] == 401
+   and http(main.site_layouts_map, None, _Request(cookies={gate.COOKIE: gate.sign(gate.LEVEL_MAP)}))[0] == 401)
+ok("4. the staff gate cookie alone (the public map sends no code) reads the styles and the map layer (200)",
+   http(main.site_layout_styles_ep, _Request(cookies={gate.COOKIE: gate.sign(gate.LEVEL_STAFF)}))[0] == 200
+   and http(main.site_layouts_map, None, _Request(cookies={gate.COOKIE: gate.sign(gate.LEVEL_STAFF)}))[0] == 200)
+as_code("submitter123")
+ok("4. a submitter reads the styles and a site's layout, but cannot bring in a drawing or save (403)",
+   http(main.site_layout_styles_ep)[0] == 200 and http(main.get_site_layout, "L019")[0] == 200
+   and read_ep(fx("tilton-logistics.kml"), "x.kml")[0] == 403
+   and http(main.add_site_layout_phase, "L019", main.SiteLayoutPhaseIn(name="x"))[0] == 403)
+as_code("planner123")
+st, g0 = http(main.get_site_layout, "L019")
+ok("4. a site with no layout yet: none, and the import is ready", st == 200 and g0["layout"] is None and g0["ready"] is True)
+st, rd = read_ep(fx("tilton-logistics-bng.dxf"), "tilton-logistics-bng.dxf")
+ok("4. a planner brings in the National Grid DXF: held, 23 rows, the gate check, the site's gates for the map",
+   st == 200 and rd.get("import_id") and len(rd["rows"]) == 23 and len(rd["gate_check"]) == 2
+   and rd["gate_check"][0]["m"] <= 0.01 and len(rd["site_gates"]) == 2 and rd["bounds"], str(rd)[:300])
+ok("4. ...nothing is saved by reading", db.query("SELECT COUNT(*) AS n FROM site_layouts WHERE tenant_id = ?", (T,))[0]["n"] == 0)
+ok("4. ...reading is not an audited write (the place step is)", "/api/site-layouts/read" in main.AUDIT_SKIP
+   and main._audited("/api/locations/L019/site-layout/place"))
+st, big = read_ep(b" " * (SI.MAX_BYTES + 1), "big.geojson")
+ok("4. an upload over 10 MB is refused before it is read (413, in words)", st == 413 and "over 10 MB" in big)
+st, ask = read_ep(dxf_bytes(x=200000.0, y=900000.0), "far.dxf")
+ok("4. a drawing whose grid cannot be told: the answer asks", st == 200 and "ask_grid" in ask)
+st, bad = read_ep(b"AC1032", "plan.dwg")
+ok("4. a DWG: 400 with the sentence", st == 400 and "Save it as DXF" in bad)
+
+ch = {r["key"]: r["becomes"] for r in rd["rows"]}
+ch["C-DRAINAGE"] = "skip"
+st, pl = http(main.place_site_layout, "L019", main.SiteLayoutPlaceIn(
+    import_id=rd["import_id"], choices=ch, where="new", phase={"name": "Pier bases", "month_from": "2027-03",
+                                                                "month_to": "2027-06"}))
+ok("4. placed on a new phase: 39 things (the drainage left out by the table), the phase named and dated",
+   st == 200 and pl["placed"] == 39 and pl["left_out"] == 1 and pl["phase"]["name"] == "Pier bases"
+   and pl["phase"]["month_from"] == "2027-03" and pl["phase"]["things"] == 39, str(pl)[:300])
+lay = main.get_site_layout("L019")["layout"]
+ph = lay["phases"][0]
+feats = ph["features"]["features"]
+ok("4. the layout is made with its first phase; the import is logged with the transform",
+   lay["location_id"] == "L019" and len(lay["phases"]) == 1 and len(lay["imports"]) == 1
+   and lay["imports"][0]["things"] == 39 and lay["imports"][0]["format"] == "DXF"
+   and "OSGB36 to WGS 84 (9)" in (lay["imports"][0]["transform"] or ""), str(lay["imports"]))
+kinds = {}
+for f in feats:
+    kinds[f["properties"]["style"]] = kinds.get(f["properties"]["style"], 0) + 1
+ok("4. each thing is an ordinary layout thing: styles from the table, the source kept",
+   kinds.get("twoway") == 3 and kinds.get("sym") == 12 and kinds.get("text") == 8 and kinds.get("welfare") == 4
+   and all(f["properties"].get("source") == "tilton-logistics-bng.dxf (DXF)" for f in feats), str(kinds))
+haul = next(f for f in feats if f["properties"]["style"] == "twoway")
+ok("4. a line keeps its drawn width; with 'ours' the style's colour, not the file's",
+   haul["properties"]["w"] == 7.0 and haul["properties"]["color"] == ST.LINE_STYLES["twoway"]["color"])
+gate = next(f for f in feats if f["properties"].get("sym") == "gate")
+ok("4. a symbol is a point with the style table's size and layer", gate["geometry"]["type"] == "Point"
+   and gate["properties"]["layer"] == "Access" and gate["properties"]["size"] == ST.SYMBOL_KEYS["gate"]["size"])
+txt = [f for f in feats if f["properties"]["style"] == "text"]
+ok("4. words keep their text and a size from the drawn height", all(t["properties"]["text"] for t in txt)
+   and all(t["properties"]["size"] > 0 for t in txt) and any("GATE" in t["properties"]["text"] for t in txt))
+ok("4. every saved coordinate has at most 7 decimals",
+   all(len(str(c).split(".")[-1]) <= 7 for f in feats for c in json.dumps(f["geometry"]["coordinates"]).replace("[", ",").replace("]", ",").split(",") if c.strip() and "." in c))
+ok("4. the organisation's table is kept in Config (site_layouts.import_map), the drainage as leave out",
+   SL.import_map().get("C-DRAINAGE") == "skip" and SL.import_map().get("block GATE") == "sym:gate")
+st, rd2 = read_ep(fx("tilton-logistics-bng.dxf"), "again.dxf")
+r2 = {r["key"]: r for r in rd2["rows"]}
+ok("4. the second drawing from the same contractor needs no choosing: the rows come back as saved",
+   r2["C-DRAINAGE"]["becomes"] == "skip" and r2["C-DRAINAGE"]["saved"] is True and r2["C-HAUL-ROAD"]["saved"] is True)
+st, pl2 = http(main.place_site_layout, "L019", main.SiteLayoutPlaceIn(import_id=rd2["import_id"], keep_colours=True,
+                                                                      where=ph["id"], version=ph["version"]))
+ok("4. placed on the phase shown (keeping the file's colours): 39 more on the same phase",
+   st == 200 and pl2["placed"] == 39 and pl2["phase"]["things"] == 78 and pl2["phase"]["version"] == ph["version"] + 1, str(pl2)[:200])
+ph = main.get_site_layout("L019")["layout"]["phases"][0]
+ok("4. ...the file's colour kept where asked", any(f["properties"].get("color") == "#FF7F00" for f in ph["features"]["features"]))
+st, again = http(main.place_site_layout, "L019", main.SiteLayoutPlaceIn(import_id=rd2["import_id"]))
+ok("4. a held drawing is placed once: a second place asks for the file again", st == 400 and "Bring the file in again" in again)
+st, rk = read_ep(fx("tilton-logistics.kml"), "tilton-logistics.kml")
+st, other = http(main.place_site_layout, "L001", main.SiteLayoutPlaceIn(import_id=rk["import_id"]))
+ok("4. a drawing held for one site cannot be placed on another", st == 400 and "no longer held" in other)
+
+# the site grid through the endpoints
+st, rs = read_ep(fx("tilton-logistics-site-grid.dxf"), "tilton-logistics-site-grid.dxf")
+ok("4. the site-grid DXF: held, three survey points, no gate check until it is placed",
+   st == 200 and [c["name"] for c in rs["control"]] == ["CP1", "CP2", "CP3"] and rs["gate_check"] == [] and rs["bounds"] is None)
+pts = ";".join(f"{p['name']}:{p['lon']},{p['lat']}" for p in pairs)
+st, fp = http(main.site_layout_fit, "L019", rs["import_id"], pts)
+ok("4. the fit through the endpoint: turn 27.61°, each point's miss, the gates within 0.01 m",
+   st == 200 and abs(fp["turn"] - 27.61) < 0.006 and len(fp["misses"]) == 3 and max(m["m"] for m in fp["misses"]) <= 0.015
+   and max(g["m"] for g in fp["gate_check"]) <= 0.015 and fp["words"].startswith("Fitted from 3 points"), str(fp)[:300])
+st, one = http(main.site_layout_fit, "L019", rs["import_id"], pts.split(";")[0])
+ok("4. ...one point: 400, place at least two", st == 400 and "at least two" in one)
+badpts = [dict(p) for p in pairs]
+badpts[2]["lat"] += 10 / 111000
+st, refuse = http(main.place_site_layout, "L019", main.SiteLayoutPlaceIn(import_id=rs["import_id"], points=badpts,
+                                                                         phase={"name": "Site grid"}))
+ok("4. a fit missing a point by more than 1 m is refused unless Place anyway", st == 400 and "Place anyway" in refuse)
+# 31 Oct 2026 (seen in Chrome): two points always fit with no miss, so a stretched fit is refused on its scale alone
+twopts = [dict(p) for p in pairs[:2]]
+twopts[1]["lat"] += 60 / 111000
+st, fsc = http(main.site_layout_fit, "L019", rs["import_id"], ";".join(f"{p['name']}:{p['lon']},{p['lat']}" for p in twopts))
+st2, refuse2 = http(main.place_site_layout, "L019", main.SiteLayoutPlaceIn(import_id=rs["import_id"], points=twopts,
+                                                                           phase={"name": "Site grid"}))
+ok("4. two points picked wrong: no miss, but the scale is flagged and the place refused unless Place anyway",
+   st == 200 and fsc["worst"] == 0 and not fsc["over"] and fsc["scale_flag"] and st2 == 400
+   and "stretched" in refuse2 and "Place anyway" in refuse2, str(fsc)[:200] + " " + str(refuse2))
+st, ps = http(main.place_site_layout, "L019", main.SiteLayoutPlaceIn(import_id=rs["import_id"], points=pairs,
+                                                                     phase={"name": "Site grid"}))
+ok("4. placed with good points: a second phase, the fit in the log", st == 200 and ps["placed"] == 39
+   and ps["report"]["fit"]["worst"] <= 0.015 and "Fitted from 3 points" in ps["report"]["fit_words"], str(ps)[:200])
+lay = main.get_site_layout("L019")["layout"]
+ok("4. the log keeps the fit's sentence", lay["imports"][0]["fit"] and lay["imports"][0]["fit"].startswith("Fitted"))
+
+# =========================================================================== #
+#  5. Phases: months, rename, delete, the version check, the things checked    #
+# =========================================================================== #
+st, np_ = http(main.add_site_layout_phase, "L019", main.SiteLayoutPhaseIn(name="Deck lift", month_from="2027-07"))
+ok("5. a new empty phase", st == 200 and np_["phase_id"] and len(np_["layout"]["phases"]) == 3)
+pid = np_["phase_id"]
+cur = next(p for p in np_["layout"]["phases"] if p["id"] == pid)
+st, e1 = http(main.add_site_layout_phase, "L019", main.SiteLayoutPhaseIn(name=" "))
+ok("5. a phase needs a name", st == 400 and "name" in e1)
+st, e2 = http(main.add_site_layout_phase, "L019", main.SiteLayoutPhaseIn(name="x", month_from="2027-13"))
+ok("5. a month must be a month", st == 400 and "like 2027-04" in e2)
+st, e3 = http(main.add_site_layout_phase, "L019", main.SiteLayoutPhaseIn(name="x", month_from="2027-06", month_to="2027-05"))
+ok("5. To before From is refused", st == 400 and "before the From" in e3)
+st, ed = http(main.edit_site_layout_phase, pid, main.SiteLayoutPhaseIn(name="Deck lift and launch", month_to="2027-09",
+                                                                         version=cur["version"]))
+ok("5. renamed and given its last month; the version moves on", st == 200 and ed["name"] == "Deck lift and launch"
+   and ed["month_from"] == "2027-07" and ed["month_to"] == "2027-09" and ed["version"] == cur["version"] + 1, str(ed))
+st, stale = http(main.edit_site_layout_phase, pid, main.SiteLayoutPhaseIn(name="Mine", version=cur["version"]))
+ok("5. a save behind someone else's is refused (409) with the sentence", st == 409 and stale == SL.STALE)
+st, stale2 = http(main.save_site_layout_things, pid, main.SiteLayoutThingsIn(version=cur["version"], features={"features": []}))
+ok("5. ...the same for the things", st == 409 and stale2 == SL.STALE)
+st, stale3 = http(main.delete_site_layout_phase, pid, cur["version"])
+ok("5. ...and for a delete", st == 409 and stale3 == SL.STALE)
+things = {"type": "FeatureCollection", "features": [
+    {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-0.881, 52.644], [-0.8815, 52.6445]]},
+     "properties": {"style": "heras", "evil": "<script>", "w": 0.12}},
+    {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-0.881, 52.644], [-0.8811, 52.644], [-0.8811, 52.6441]]]},
+     "properties": {"style": "laydown", "fill": "polka"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [-0.881, 52.644]}, "properties": {"style": "sym", "sym": "towercrane"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [-0.881, 52.644]}, "properties": {"style": "flying"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [-0.881, 52.644]}, "properties": {"style": "sym", "sym": "dragon"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [-0.881, 52.644]}, "properties": {"style": "text"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [-0.881, 52.644]}, "properties": {"style": "heras"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [-0.88123456789, 252.0]}, "properties": {"style": "sym", "sym": "towercrane"}},
+]}
+st, sv = http(main.save_site_layout_things, pid, main.SiteLayoutThingsIn(version=ed["version"], features=things))
+ok("5. things saved after checking: three kept, five left out with a reason each", st == 200 and sv["things"] == 3
+   and len(sv["left_out"]) == 5 and any("not one Wayscope draws" in w for w in sv["left_out"])
+   and any("needs words" in w for w in sv["left_out"]) and any("must be a line" in w for w in sv["left_out"]), str(sv.get("left_out")))
+kept = sv["features"]["features"]
+ok("5. an unknown property is dropped, an unknown fill too; the ring is closed; the layer filled in",
+   "evil" not in kept[0]["properties"] and kept[0]["properties"]["layer"] == "Traffic management"
+   and "fill" not in kept[1]["properties"] and kept[1]["geometry"]["coordinates"][0][0] == kept[1]["geometry"]["coordinates"][0][-1]
+   and kept[2]["properties"]["layer"] == "Plant", str(kept)[:300])
+too_many = {"features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-0.881, 52.644]},
+                          "properties": {"style": "sym", "sym": "cone"}}] * (SL.MAX_PHASE + 1)}
+st, tm = http(main.save_site_layout_things, pid, main.SiteLayoutThingsIn(version=sv["version"], features=too_many))
+ok("5. a phase holds at most 2,000 things", st == 400 and "2,000" in tm)
+st, dl = http(main.delete_site_layout_phase, pid, sv["version"])
+ok("5. deleted with its version", st == 200 and len(main.get_site_layout("L019")["layout"]["phases"]) == 2)
+ok("5. in_month: open ends apply, closed ends bound", SL.in_month({"month_from": None, "month_to": None}, "2030-01")
+   and SL.in_month({"month_from": "2027-03", "month_to": "2027-06"}, "2027-06")
+   and not SL.in_month({"month_from": "2027-03", "month_to": "2027-06"}, "2027-07")
+   and not SL.in_month({"month_from": "2027-03", "month_to": None}, "2027-02"))
+
+# =========================================================================== #
+#  6. The staff Route map's read                                               #
+# =========================================================================== #
+st, m4 = http(main.site_layouts_map, "2027-04", _Request())
+ok("6. April 2027: both phases apply (Pier bases Mar-Jun, Site grid undated), each thing tagged with site and phase",
+   st == 200 and len(m4["sites"]) == 1 and len(m4["sites"][0]["phases"]) == 2
+   and len(m4["features"]["features"]) == 78 + 39
+   and all(f["properties"]["site"] == "L019" and f["properties"]["phase"] for f in m4["features"]["features"]), str(m4["sites"]))
+st, m8 = http(main.site_layouts_map, "2027-08", _Request())
+ok("6. August 2027: only the undated phase", st == 200 and len(m8["features"]["features"]) == 39)
+st, mbad = http(main.site_layouts_map, "Aug", _Request())
+ok("6. a month must be YYYY-MM", st == 400)
+st, mnow = http(main.site_layouts_map, None, _Request())
+ok("6. no month: this month", st == 200 and re.fullmatch(r"\d{4}-\d{2}", mnow["month"]))
+ok("6. the summary for the Locations list", main.site_layout_summary()["sites"] == {"L019": {"phases": 2, "things": 117}})
+
+# =========================================================================== #
+#  7. The organisation file, Config's check, the dependencies                  #
+# =========================================================================== #
+ok("7. the three tables are tenanted, in the package's order after the locations, and a layout makes it not empty",
+   {"site_layouts", "site_layout_phases", "site_layout_imports"} <= db.TENANTED_TABLES
+   and tenant_package.ORDER.index("site_layouts") > tenant_package.ORDER.index("location_gates")
+   and tenant_package.ORDER.index("site_layout_phases") > tenant_package.ORDER.index("site_layouts")
+   and "site_layouts" in tenant_package.EMPTY_CHECK and not tenant_package.is_empty())
+pkg = tenant_package.export_tenant()
+ok("7. exported: the layout, its two phases and its three imports",
+   len(pkg["tables"]["site_layouts"]) == 1 and len(pkg["tables"]["site_layout_phases"]) == 2
+   and len(pkg["tables"]["site_layout_imports"]) == 3)
+before = main.get_site_layout("L019")["layout"]
+res = tenant_package.import_tenant(pkg, replace=True)
+after = main.get_site_layout("L019")["layout"]
+ok("7. ...and back: the same layout, phases and things", res["ok"] and json.dumps(before, sort_keys=True) == json.dumps(after, sort_keys=True))
+doc = json.loads(json.dumps(config.load(conversions, use_cache=False)))
+doc["site_layouts"] = {"import_map": {"C-HAUL": "line:flying"}}
+ok("7. Config refuses an import table row that becomes no style", any("must become a style" in p for p in config.validate(doc)))
+doc["site_layouts"] = {"import_map": {"C-HAUL": "line:twoway", "block X": "skip"}}
+ok("7. ...and takes a good one", not any("site_layouts" in p for p in config.validate(doc)))
+doc["site_layouts"] = []
+ok("7. ...site_layouts must be an object", "site_layouts must be an object" in config.validate(doc))
+req = open(os.path.join(BACKEND, "requirements.txt"), encoding="utf-8").read().split()
+ok("7. ezdxf, pyproj and pyshp are pinned exact", {"ezdxf==1.4.5", "pyproj==3.8.0", "pyshp==3.1.6"} <= set(req))
+src = open(os.path.join(BACKEND, "site_layout_import.py"), encoding="utf-8").read()
+ok("7. PROJ never fetches a grid by itself; pyproj and ezdxf load only when a drawing is read",
+   "set_network_enabled(False)" in src and not re.search(r"^import (ezdxf|pyproj|shapefile)", src, re.M))
+ok("7. no fastkml (LGPL)", "fastkml" not in "".join(req))
+mainsrc = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
+ok("7. the read runs alone under the heavy-read guard", 'heavy_reads.solo("site-layout-read"' in mainsrc)
+ok("7. every write needs a planner or an admin (_require_approver), reads any signed-in code",
+   all(re.search(r'def ' + fn + r'\([^)]*\):\n(?:    """[\s\S]*?"""\n)?    _require_approver\(\)', mainsrc)
+       for fn in ("site_layout_fit", "place_site_layout", "add_site_layout_phase", "edit_site_layout_phase",
+                  "save_site_layout_things", "delete_site_layout_phase")))
+
+as_code(None)
+print()
+for f_ in FAIL:
+    print("  FAIL:", f_)
+print(f"\n{PASS} passed, {len(FAIL)} failed")
+import shutil  # noqa: E402
+remove_scratch_db(db, TMP)
+shutil.rmtree(TMP, ignore_errors=True)
+sys.exit(1 if FAIL else 0)

@@ -73,6 +73,9 @@ import clp_records  # 31 Oct 2026 (task 4a, PR 3a) — the CLPs as records: each
 import site_areas  # 28 Oct 2026 (simulation v2): the areas inside a site
 import pours  # 29 Oct 2026 (task 3a): concrete pours
 import holding  # 29 Oct 2026 (task 3c): vehicle holding areas
+import site_layouts  # 31 Oct 2026 (task 4c PR 1): a site's logistics layout, its phases and the drawings brought in
+import site_layout_import  # 31 Oct 2026 (task 4c PR 1): DXF / KML / KMZ / GeoJSON / shapefile zip read into map things
+import site_layout_styles  # 31 Oct 2026 (task 4c PR 1): the one style table (11 lines, 10 areas, 31 symbols, 8 layers)
 import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
 import heavy_reads  # 21 Oct 2026 — the public map's heavy reads a few at a time, one memory line each (live OOM kills)
 import abnormal  # 22 Oct 2026 (S16 / B5) — the abnormal loads: each one its own planned movement, with the rules' advice
@@ -481,7 +484,10 @@ GUARD_HEADER = "X-Wayscope"
 #: logged by the middleware.
 AUDIT_SKIP = ("/api/costing/preview", "/api/carbon/scenario", "/api/carbon/summary.pdf",
               "/api/public/demo-request", "/api/map-auth", "/api/gate-signout", "/api/auth",
-              "/api/activity")
+              "/api/activity",
+              # 31 Oct 2026 (task 4c): reading a drawing saves nothing (it is held for the place step, which is audited);
+              # skipped so the middleware does not keep a 10 MB upload in memory a second time
+              "/api/site-layouts/read")
 AUDIT_SKIP_PREFIXES = ("/api/auth/",)
 
 
@@ -4694,6 +4700,158 @@ def delete_site_area(area_id: str, token: Optional[str] = None):
     if out.get("error"):
         raise HTTPException(404, out["error"])
     return out
+
+
+# ---- 31 Oct 2026 (task 4c PR 1): site layouts ------------------------------------------------------------------------ #
+class SiteLayoutPhaseIn(BaseModel):
+    name: Optional[str] = None
+    month_from: Optional[str] = None
+    month_to: Optional[str] = None
+    version: Optional[int] = None
+
+
+class SiteLayoutThingsIn(BaseModel):
+    version: int
+    features: Optional[dict] = None
+
+
+class SiteLayoutPlaceIn(BaseModel):
+    import_id: str
+    choices: Optional[dict] = None
+    points: Optional[List[dict]] = None
+    place_anyway: bool = False
+    keep_colours: bool = False
+    where: str = "new"
+    phase: Optional[dict] = None
+    version: Optional[int] = None
+
+
+def _layout_call(fn, *a):
+    try:
+        return fn(*a)
+    except site_layouts.Problem as e:
+        raise HTTPException(409 if str(e) == site_layouts.STALE else 400, str(e))
+    except site_layout_import.Refused as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/site-layouts/styles")
+def site_layout_styles_ep(request: Request = None):
+    """The one style table: the lines, areas, symbols (SVG), layers and the import table's choices. Staff: a code or
+    login, or the staff gate cookie (the public map sends no header); the map password's cookie is 401."""
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the site layouts are for staff")
+    return site_layout_styles.payload()
+
+
+@app.get("/api/site-layouts/summary")
+def site_layout_summary():
+    """{location id: {phases, things}} for every site with a layout (the Locations list)."""
+    _require_access()
+    return {"sites": site_layouts.summary()}
+
+
+@app.get("/api/locations/{location_id}/site-layout")
+def get_site_layout(location_id: str):
+    """A site's layout: its phases with their things and the drawings brought in. Signed in."""
+    _require_access()
+    return {"layout": site_layouts.get(location_id), "ready": site_layout_import.grid_ready()}
+
+
+@app.get("/api/site-layouts/map")
+def site_layouts_map(month: Optional[str] = None, request: Request = None):
+    """The staff Route map's "Site layouts" layer: every site's phases that apply in `month` ('YYYY-MM', default this
+    month) as one FeatureCollection. STAFF ONLY: the map password's cookie and no credential get 401."""
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the site layouts are for staff")
+    if month and not site_layouts.MONTH_RE.match(month):
+        raise HTTPException(400, "month must be YYYY-MM")
+    return site_layouts.for_map(month or None)
+
+
+@app.post("/api/site-layouts/read")
+async def read_site_layout_file(request: Request, location_id: str, name: str, grid: str = "auto"):
+    """Read an uploaded drawing (the raw file as the body, at most 10 MB) and hold it for the place step: the report,
+    the "in the file -> becomes" rows, the survey points, the gate check. Saves nothing. Planner or admin. Read ALONE
+    (heavy_reads.solo): ezdxf / pyproj on a big drawing take memory, and live has 512 MB."""
+    _require_approver()
+    try:
+        if int(request.headers.get("content-length") or 0) > site_layout_import.MAX_BYTES:
+            raise HTTPException(413, "This file is over 10 MB. Send the logistics layers only.")
+    except ValueError:
+        pass
+    buf = bytearray()
+    async for chunk in request.stream():
+        buf.extend(chunk)
+        if len(buf) > site_layout_import.MAX_BYTES:
+            raise HTTPException(413, "This file is over 10 MB. Send the logistics layers only.")
+    data = bytes(buf)
+    del buf
+    with heavy_reads.solo("site-layout-read", busy=lambda: HTTPException(
+            503, "Another drawing is being read. Try again in a minute.", headers={"Retry-After": "30"})):
+        try:
+            return _layout_call(site_layouts.read_file, location_id, data, name, grid, _by(None))
+        except site_layout_import.AskGrid as e:
+            return {"ask_grid": str(e)}
+
+
+@app.get("/api/site-layouts/fit")
+def site_layout_fit(location_id: str, import_id: str, pts: str = ""):
+    """The survey-point fit from the points placed so far (`pts` = NAME:lon,lat;NAME:lon,lat): turn, scale, each
+    point's miss and the gate check. Nothing saved. Planner or admin."""
+    _require_approver()
+    points = []
+    for part in (pts or "").split(";"):
+        nm, _, ll = part.partition(":")
+        xy = ll.split(",")
+        if nm and len(xy) == 2:
+            try:
+                points.append({"name": nm.strip(), "lon": float(xy[0]), "lat": float(xy[1])})
+            except ValueError:
+                pass
+    return _layout_call(site_layouts.fit_preview, location_id, import_id, points)
+
+
+@app.post("/api/locations/{location_id}/site-layout/place")
+def place_site_layout(location_id: str, body: SiteLayoutPlaceIn):
+    """Place a held drawing on a new phase (or the one named in `where`), each row of the table as chosen; the choices
+    are kept for the organisation's next drawing; the import is logged. Planner or admin; one audited write."""
+    _require_approver()
+    d = body.dict() if hasattr(body, "dict") else body.model_dump()
+    return _layout_call(site_layouts.place, location_id, d, _by(None))
+
+
+@app.post("/api/locations/{location_id}/site-layout/phases")
+def add_site_layout_phase(location_id: str, body: SiteLayoutPhaseIn):
+    """A new empty phase (the layout is made with it). Planner or admin."""
+    _require_approver()
+    d = body.dict() if hasattr(body, "dict") else body.model_dump()
+    pid = _layout_call(site_layouts.add_phase, location_id, d, _by(None))
+    return {"phase_id": pid, "layout": site_layouts.get(location_id)}
+
+
+@app.patch("/api/site-layouts/phases/{phase_id}")
+def edit_site_layout_phase(phase_id: str, body: SiteLayoutPhaseIn):
+    """Rename a phase or set its months. Carries the phase's version: 409 when someone else saved first."""
+    _require_approver()
+    sent = set(_fields_set(body))
+    d = {k: getattr(body, k) for k in sent}
+    return _layout_call(site_layouts.edit_phase, phase_id, d, _by(None))
+
+
+@app.put("/api/site-layouts/phases/{phase_id}/features")
+def save_site_layout_things(phase_id: str, body: SiteLayoutThingsIn):
+    """Replace a phase's things (each checked against the style table). 409 when someone else saved first."""
+    _require_approver()
+    return _layout_call(site_layouts.save_things, phase_id, {"version": body.version, "features": body.features or {}},
+                        _by(None))
+
+
+@app.delete("/api/site-layouts/phases/{phase_id}")
+def delete_site_layout_phase(phase_id: str, version: int):
+    """Delete a phase. Carries its version: 409 when someone else saved first."""
+    _require_approver()
+    return _layout_call(site_layouts.delete_phase, phase_id, version)
 
 
 @app.get("/api/gates")

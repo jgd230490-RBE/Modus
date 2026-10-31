@@ -15,3 +15,6 @@
 
 # 27 Oct 2026: vendored files stay byte-identical to their source (their sha384 is checked)
 frontend/vendor/*.js -text
+# 31 Oct 2026 (task 4c): the OSTN15 grid (its sha256 is checked) and the site layout samples as a contractor sends them
+*.tif binary
+backend/tests/fixtures/site_layouts/* -text

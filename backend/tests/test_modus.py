@@ -1147,6 +1147,11 @@ ok("ui_audit.js grades the 44 px rule as a failure BY DEFAULT since the phone br
                              "FAIL without --no-strict-44"))
    and "strict44: false" not in _audit and "OFF by default; it turns on by default" not in _audit
    and "o.strict44" not in _audit.split("function sameShape")[1].split("\n")[0])
+# 31 Oct 2026 (task 4c PR 1): the Locations stop opens the demo's Tilton Viaduct site, brings in the KML sample by the
+# drawing chooser (on the run's DB copy) and places it, so the import table and the placed phase are measured
+ok("ui_audit.js measures the Site layout card: locations+layout-import (the table) and locations+site-layout (the phase)",
+   all(s in _audit for s in ('meta("locations+layout-import", w)', 'meta("locations+site-layout", w)',
+                             '"fixtures", "site_layouts", "tilton-logistics.kml"', 'input[aria-label="Drawing to bring in"]')))
 # 18 Oct 2026 (the 44 px rule, claude/ui-fix-phone): the map's password page's 38 px eye taps at 44 through a halo, like the app's
 ok("the map password page's show / hide eye keeps its 38 px drawing and taps at 44 px (a ::after halo, inset -3 px)",
    "width:38px; height:38px;" in main._MAP_PASSWORD_PAGE

@@ -921,7 +921,8 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 29 Oct 2026 (task 3a): + chapter 16 Concrete pours and its three sections (70); + T1 "Concrete pours" (32)
    # NARROWED 29 Oct 2026 (the Simulation's own page): + chapter 17 The Simulation and its three sections (74)
    # NARROWED 31 Oct 2026 (task 4a, PR 3a): + chapter 18 CLP documents and its four sections (79); + T1 "CLP documents" (33)
-   len(re.findall(r'<li class="l[12]"', src)) == 79 and len(re.findall(r'<li class="l[12]"', _tg2)) == 33   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   # NARROWED 31 Oct 2026 (task 4c PR 1): + chapter 19 Site layouts and its three sections (83); + T1 "Site layouts" (34)
+   len(re.findall(r'<li class="l[12]"', src)) == 83 and len(re.findall(r'<li class="l[12]"', _tg2)) == 34   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,
@@ -1136,7 +1137,7 @@ ok3("HOLDING: the technical guide #t1-holding holds the detail (the rule, the ma
     'id="t1-holding"' in _tg3c and "<code>stops(route, leg, ctx, profile)</code>" in _tg3c and "<code>backend/sim_holding.py</code>" in _tg3c
     and "<code>LORRY_HOUR_GBP</code>" in _tg3c and "<code>ON_LINE_M</code>" in _tg3c)
 
-print("test_help.py: %d passed, %d failed" % (passed, failed))
+# 31 Oct 2026: the count is printed at the end (it was printed here, before the checks below, which ran uncounted)
 # ---- 28 Oct 2026 (simulation v2, task 0e): the user guide says what the Simulation's scales and the site view are, in
 # plain words; the Locations and Zones chapters name the new fields; the technical guide holds the detail
 _ug = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
@@ -1176,7 +1177,8 @@ ok3("SIM PAGE: the technical guide #t1-sim-page holds the detail (the NAV id, PH
     and "<code>simulation+site</code>" in _tgv2 and "<code>#simulation</code>" in _tgv2)
 
 # ---- 31 Oct 2026 (task 4a, PR 3a): CLP documents — chapter 18 of the user guide in plain words; T1 #t1-clp-records the detail
-_ch18 = _ug[_ug.index('<h1 id="18-clp-documents">'):_ug.index('<h1 id="appendix-a-methods-and-assumptions">')]
+# NARROWED 31 Oct 2026: chapter 18 now ends where chapter 19 (Site layouts, task 4c PR 1) starts
+_ch18 = _ug[_ug.index('<h1 id="18-clp-documents">'):_ug.index('<h1 id="19-site-layouts">')]
 ok3("⭐ CLP DOCS: the user guide has chapter 18 'CLP documents' with 18.1–18.4 in the nav and the text: a team sees its own, planners and admins all; listed rows; + New CLP; the cover details; DRAFT; send, approve as Issue N, ask for changes, history, delete; the stages on Configuration",
     all(t in _ug for t in ('<a href="#18-clp-documents">18. CLP documents</a>', '<a href="#18-1-the-list">18.1', '<a href="#18-2-the-cover-details-and-the-places">18.2',
                            '<a href="#18-3-sending-approving-and-the-issues">18.3', '<a href="#18-4-the-stages">18.4'))
@@ -1193,4 +1195,19 @@ ok3("CLP DOCS: the technical guide #t1-clp-records holds the detail (the two tab
     and "clp_documents" in _tgv2 and "clp_issues" in _tgv2 and "<code>auto-&lt;loc&gt;-all</code>" in _tgv2 and "<code>heavy_reads.solo</code>" in _tgv2
     and "/api/clp/documents/{id}/approve" in _tgv2 and "<code>clp_stage_defaults</code>" in _tgv2 and "<code>clp_doc_layers.SENSITIVE_KINDS</code>" in _tgv2)
 
+# ---- 31 Oct 2026 (task 4c PR 1): chapter 19 Site layouts (few words, no back end); T1 #t1-layouts the detail
+_ch19 = _ug[_ug.index('<h1 id="19-site-layouts">'):_ug.index('<h1 id="appendix-a-methods-and-assumptions">')]
+ok3("⭐ SITE LAYOUTS: the user guide has chapter 19 with 19.1-19.3 in the nav and the text (phases, bringing in a drawing, the public map for staff); 9.1 points to it",
+    all(t in _ug for t in ('<a href="#19-site-layouts">19. Site layouts</a>', '<a href="#19-1-phases">19.1', '<a href="#19-2-bringing-in-a-drawing">19.2', '<a href="#19-3-on-the-public-map">19.3'))
+    and all(t in _ch19 for t in ("<strong>Bring in a drawing</strong>", "<strong>+ Add a phase</strong>", "<strong>Place anyway</strong>", "<strong>Keep the file&#39;s colours</strong>",
+                                 "Save a DWG as DXF first.", "Planners and admins change it", "Visitors with the map password do not see it."))
+    and "is under its areas: chapter 19." in _ug, _ch19[:200])
+ok3("SITE LAYOUTS: chapter 19 names no library, grid file, rule code or back-end word",
+    not re.search(r"\b(API|endpoint|server|JSON|OSTN15|pyproj|ezdxf|EPSG|PROJ|Mapbox|HERE|held|trucks?)\b", _ch19))
+ok3("SITE LAYOUTS: the technical guide #t1-layouts holds the detail (the three tables, the read / fit / place calls, the limits, the grid, the 409 sentence)",
+    'id="t1-layouts"' in _tgv2 and '<a href="#t1-layouts">Site layouts</a>' in _tgv2 and "<code>site_layout_phases</code>" in _tgv2
+    and "/api/site-layouts/read?" in _tgv2 and "/api/site-layouts/fit?" in _tgv2 and "OSTN15" in _tgv2 and "10 MB" in _tgv2
+    and "Someone else saved this layout. Reload to see their changes." in _tgv2 and "<code>site_layouts.import_map</code>" in _tgv2)
+
+print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

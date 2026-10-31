@@ -22,6 +22,8 @@
          and arrive from GET /api/public/alignment at load (see OVERLAY_READY below).
          ?v= because this file and index.html are a matched pair. -->
     <script src="overlay.js?v=1"></script>
+    <!-- 31 Oct 2026 (task 4c PR 1): the site layouts' drawing, shared with the Locations page (one look in one place) -->
+    <script src="site-layouts.js?v=1"></script>
     <style>
         :root{
             --navy:#2563EB; --navy-deep:#1F2024; --ink:#1E293B; --muted:#64748B;
@@ -64,6 +66,7 @@
            Community considerations on the password view, and By council on an organisation with no council areas */
         .control-group[hidden] { display:none; }
         #community-group h3, #community-group .control-item{ font-size:14px; }
+        #site-layouts-group .control-item{ font-size:14px; }
         #collision-group h3, #collision-group .control-item{ font-size:14px; }
         #abnormal-group h3, #abnormal-group .control-item{ font-size:14px; }
         #restrictions-group h3{ font-size:14px; }   /* 22 Oct 2026 (UI fix 6, card 9): the road-closures heading at 14 px like its sibling groups in More layers (was the shared 13 px) */
@@ -1079,6 +1082,14 @@
         <div class="control-item"><label><input type="checkbox" id="layer-community" onchange="toggleCommunity(this.checked)"> Community considerations <span class="lim-n" id="community-count"></span></label><button type="button" class="info-i" aria-expanded="false" aria-controls="info-community" onclick="toggleInfo(this)" title="About the community considerations" aria-label="About the community considerations"><span aria-hidden="true">i</span></button></div>
         <div class="info-pop" id="info-community" hidden><p id="community-when">Schools, hospitals, stops and other places near the routes and sites.</p></div>
         <div id="community-kinds" hidden></div>
+    </div>
+
+    <!-- 31 Oct 2026 (task 4c PR 1): each site's logistics layout in the month on screen, as drawn on the Locations page.
+         STAFF ONLY like the groups round it: hidden in the markup, shown only when whoami says staff; /api/site-layouts/map
+         refuses the map password's cookie. Off by default; read only when ticked; read only (drawn on the Locations page). -->
+    <div class="control-group" id="site-layouts-group" hidden>
+        <div class="control-item"><label><input type="checkbox" id="layer-site-layouts" onchange="toggleSiteLayouts(this.checked)"> Site layouts <span class="lim-n" id="site-layouts-count"></span></label><button type="button" class="info-i" aria-expanded="false" aria-controls="info-site-layouts" onclick="toggleInfo(this)" title="About the site layouts" aria-label="About the site layouts"><span aria-hidden="true">i</span></button></div>
+        <div class="info-pop" id="info-site-layouts" hidden><p>Each site's layout in the month on screen. Draw and change them on Data → Locations.</p></div>
     </div>
 
     <!-- 16 Oct 2026 (CLOCS v5 C1): the collision history — the police-reported injury collisions (DfT STATS19) along the
@@ -3285,6 +3296,7 @@
         const disc = document.getElementById('filter-discipline').value; const i = document.getElementById('filter-ipt').value;
         syncFilterReset();
         try { applyStockMonth(); } catch (e) {}      // 27 Oct 2026: and so do the stockpile gauges
+        try { if (typeof SLY !== 'undefined' && SLY.on) refreshSiteLayouts(); } catch (e) {}   // 31 Oct 2026 (task 4c): and the site layouts' phases
         const inVis = document.getElementById('layer-inbound').checked; const outVis = document.getElementById('layer-outbound').checked;
 
         calculateKPIs(o, d, disc, i);
@@ -3961,6 +3973,8 @@
         // 22 Oct 2026: and the abnormal loads (staff only)
         if (typeof ABN !== 'undefined' && ABN.data) ensureAbnormalLayers();
         if (typeof ABP !== 'undefined' && ABP.data) ensureAbnormalPublicLayers();
+        // 31 Oct 2026 (task 4c): and the site layouts (staff only; their pictures go with the style too)
+        if (typeof SLY !== 'undefined' && SLY.h) ensureSiteLayoutLayers();
         // and so do the Tark Tee restriction layers. Already-fetched data is re-added
         // from the cached FeatureCollection rather than re-requested — a basemap switch
         // must not cost another round trip to a government service.
@@ -9082,7 +9096,7 @@
             fetch('/api/public/whoami', { credentials: 'same-origin' })
                 .then(r => r.ok ? r.json() : null)
                 .then(j => { RME.staff = !!(j && j.level === 'staff'); const b = document.getElementById('rme-open'); if (b) b.hidden = !RME.staff;
-                             communityStaff(RME.staff); collisionStaff(RME.staff); abnormalStaff(RME.staff); })
+                             communityStaff(RME.staff); collisionStaff(RME.staff); abnormalStaff(RME.staff); siteLayoutsStaff(RME.staff); })
                 .catch(() => {});
         } catch (e) {}
     }
@@ -9602,6 +9616,68 @@
             .then(j => { ABN.data = j; ABN.loading = false; renderAbnormalPanel(); ensureAbnormalLayers(); })
             .catch(e => { ABN.loading = false; const w = document.getElementById('abnormal-when'); if (w) w.textContent = /sign in/.test(String(e && e.message)) ? 'Sign in as staff to see the abnormal loads.' : 'The abnormal loads could not be read: try again.';
                             const c = document.getElementById('abnormal-count'); if (c) c.textContent = 'not read'; });
+    }
+    // ---------------------------------------------------------------- site layouts (31 Oct 2026, task 4c PR 1)
+    // Each site's logistics layout, read from /api/site-layouts/map for the month on screen (no month: this month), drawn
+    // by site-layouts.js (WSLayouts) from the server's one style table. Read only here; drawn on Data -> Locations.
+    // Re-added on style.load through styleReady(), like every overlay (never on an idle wait).
+    const SLY = { on: false, staff: false, styles: null, data: null, h: null, month: undefined, loading: false };
+    function siteLayoutsStaff(staff) {
+        SLY.staff = !!staff;
+        const g = document.getElementById('site-layouts-group');
+        if (g) g.hidden = !SLY.staff;
+        if (!SLY.staff) { SLY.on = false; if (SLY.h) { try { SLY.h.setVisible(false); } catch (e) {} } }
+    }
+    function siteLayoutMonth() {
+        const m = (typeof mapModeMonth === 'function') ? mapModeMonth() : null;
+        if (!m) return null;
+        return (CONFIG.START_YEAR + Math.floor((m - 1) / 12)) + '-' + String((m - 1) % 12 + 1).padStart(2, '0');
+    }
+    function ensureSiteLayoutLayers() {
+        if (!SLY.styles || !window.WSLayouts) return;
+        if (!styleReady()) return;
+        if (!SLY.h) {
+            SLY.h = WSLayouts.install(map, SLY.styles, { prefix: 'site-layout', before: () => labelAnchor(), visible: SLY.on });
+            SLY.h.ready.then(() => { if (SLY.data) SLY.h.setData(SLY.data.features); });
+        } else {
+            SLY.h.reinstall();
+            SLY.h.setVisible(SLY.on);
+        }
+    }
+    async function refreshSiteLayouts() {
+        const month = siteLayoutMonth();
+        if (SLY.loading || (SLY.data && SLY.month === month) || SLY.failed === month) return;
+        SLY.loading = true;
+        SLY.tried = month;
+        const cnt = document.getElementById('site-layouts-count');
+        try {
+            if (!SLY.styles) {
+                const r = await fetch('/api/site-layouts/styles', { credentials: 'same-origin' });
+                if (!r.ok) throw new Error('styles ' + r.status);
+                SLY.styles = await r.json();
+            }
+            const q = month ? '?month=' + encodeURIComponent(month) : '';
+            const r2 = await fetch('/api/site-layouts/map' + q, { credentials: 'same-origin' });
+            if (!r2.ok) throw new Error('map ' + r2.status);
+            SLY.data = await r2.json();
+            SLY.month = month;
+            if (cnt) cnt.textContent = SLY.data.sites.length ? String(SLY.data.sites.length) : '0';
+            ensureSiteLayoutLayers();
+            if (SLY.h) SLY.h.ready.then(() => SLY.h.setData(SLY.data.features));
+        } catch (e) {
+            console.warn('Wayscope: site layouts', e);
+            SLY.failed = month;   // once a month: no retry storm on every filter pass (ticking the box again retries)
+            if (cnt) cnt.textContent = '';
+        } finally {
+            SLY.loading = false;
+            if (SLY.on && SLY.tried !== siteLayoutMonth()) refreshSiteLayouts();
+        }
+    }
+    function toggleSiteLayouts(on) {
+        SLY.on = !!on;
+        SLY.failed = undefined;
+        if (SLY.h) SLY.h.setVisible(SLY.on);
+        if (SLY.on) refreshSiteLayouts();
     }
     function toggleAbnormal(on) {
         ABN.on = !!on;

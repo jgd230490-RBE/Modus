@@ -62,6 +62,9 @@ TENANTED_TABLES = {
     # 29 Oct 2026 (task 3a, concrete pours): each planned pour on a ready-mixed concrete line — per tenant, in the
     # package, same rule, same edit.
     "pours",
+    # 31 Oct 2026 (task 4c PR 1, site layout designs): a site's layout, its phases (each a set of map things) and the
+    # log of drawings brought in — per tenant, in the package, same rule, same edit.
+    "site_layouts", "site_layout_phases", "site_layout_imports",
     # 31 Oct 2026 (task 4a, PR 3a): each Construction Logistics Plan (its places, one team or all, the cover details, the
     # approval step) and each approved issue (its number, who sent and approved it, what changed, the Word file itself).
     # Per tenant, in the package, same rule, same edit.
@@ -893,6 +896,10 @@ def init_weeks_db():
         _create_tenanted(cur, "site_areas")
         # 29 Oct 2026 (task 3a): the concrete pours
         _create_tenanted(cur, "pours")
+        # 31 Oct 2026 (task 4c PR 1): the site layouts
+        _create_tenanted(cur, "site_layouts")
+        _create_tenanted(cur, "site_layout_phases")
+        _create_tenanted(cur, "site_layout_imports")
         # 31 Oct 2026 (task 4a, PR 3a): the CLP records and their issues
         _create_tenanted(cur, "clp_documents")
         _create_tenanted(cur, "clp_issues")
@@ -2017,6 +2024,59 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, id)
         )
     """,
+    # 31 Oct 2026 (task 4c PR 1, site layout designs; site_layouts.py). ONE layout a site (a location), `public` the
+    # "Show on the public map" switch (PR 4; off until then). `version` goes up on every save of the layout's own row.
+    "site_layouts": """
+        CREATE TABLE site_layouts (
+            tenant_id   TEXT NOT NULL DEFAULT 'default',
+            id          TEXT NOT NULL,
+            location_id TEXT NOT NULL,
+            name        TEXT,
+            public      BOOLEAN NOT NULL DEFAULT FALSE,
+            created_by  TEXT,
+            created_at  TEXT,
+            updated_at  TEXT,
+            version     INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
+    # A phase of a layout: the months it applies to (`month_from` / `month_to` 'YYYY-MM', either blank = open) and its
+    # map things as a GeoJSON FeatureCollection in WGS 84 (7 decimals), each thing's properties checked against the
+    # style table on save. `version` is the save check: a save carrying an older version is refused.
+    "site_layout_phases": """
+        CREATE TABLE site_layout_phases (
+            tenant_id     TEXT NOT NULL DEFAULT 'default',
+            id            TEXT NOT NULL,
+            layout_id     TEXT NOT NULL,
+            name          TEXT NOT NULL,
+            month_from    TEXT,
+            month_to      TEXT,
+            clp_stage     TEXT,
+            sort          INTEGER NOT NULL DEFAULT 0,
+            features_json TEXT NOT NULL DEFAULT '{"type":"FeatureCollection","features":[]}',
+            updated_by    TEXT,
+            updated_at    TEXT,
+            version       INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
+    # The log of drawings brought into a layout: the file's name and format, what was kept and left out, the transform
+    # and any survey-point fit (`report_json`), how many things were placed. The file itself is not kept.
+    "site_layout_imports": """
+        CREATE TABLE site_layout_imports (
+            tenant_id   TEXT NOT NULL DEFAULT 'default',
+            id          TEXT NOT NULL,
+            layout_id   TEXT NOT NULL,
+            phase_id    TEXT,
+            file_name   TEXT,
+            format      TEXT,
+            report_json TEXT,
+            things      INTEGER NOT NULL DEFAULT 0,
+            created_by  TEXT,
+            created_at  TEXT,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
     # 31 Oct 2026 (task 4a, PR 3a; clp_records.py). One CLP: `location_ids` a JSON list of location ids, `team` a team
     # slot (NULL = every team), `impact` higher | medium, `cover` a JSON block of the typed cover details, `status`
     # draft | sent | changes | approved, with who sent it / asked for changes and their notes. A row whose id starts
@@ -2108,6 +2168,9 @@ _TENANT_PK = {
     "stockpile_plan": "(tenant_id, location_id, month_index)",
     "site_areas": "(tenant_id, id)",
     "pours": "(tenant_id, id)",
+    "site_layouts": "(tenant_id, id)",
+    "site_layout_phases": "(tenant_id, id)",
+    "site_layout_imports": "(tenant_id, id)",
     "clp_documents": "(tenant_id, id)",
     "clp_issues": "(tenant_id, clp_id, issue_no)",
     "config": "(tenant_id, key)",

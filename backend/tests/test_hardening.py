@@ -176,6 +176,17 @@ REQ = read("backend/requirements.txt")
 ok("⭐ Pillow is 13.0.0: the 63 advisories pip-audit found in 12.2.0 on 27 Oct 2026 are all fixed there",
    "pillow==13.0.0" in REQ and "pillow==12.2.0" not in REQ)
 ok("every requirement is pinned to an exact version", all("==" in l for l in REQ.splitlines() if l.strip() and not l.startswith("#")))
+# 31 Oct 2026 (task 4c PR 1): the three libraries the site layouts' import reads drawings with, and the grid it ships
+ok("⭐ site layouts: ezdxf 1.4.5, pyproj 3.8.0, pyshp 3.1.6, exact versions (all MIT)",
+   all(x in REQ.splitlines() for x in ("ezdxf==1.4.5", "pyproj==3.8.0", "pyshp==3.1.6")))
+GRID = os.path.join(ROOT, "backend", "data", "proj", "uk_os_OSTN15_NTv2_OSGBtoETRS.tif")
+ok("🔴 ...the OSTN15 grid ships byte-identical (sha256), kept binary by git; its README records source, hash, licence",
+   os.path.isfile(GRID) and hashlib.sha256(open(GRID, "rb").read()).hexdigest()
+   == "5d6ed64d2119952c4c559fa1fccbc594b6520fc3ec3ef2fc10be13202c4384fa"
+   and "*.tif binary" in read(".gitattributes")
+   and all(x in read("backend/data/proj/README.md") for x in ("cdn.proj.org", "5d6ed64d2119952c", "2-Clause BSD")))
+ok("...and PROJ never fetches a grid by itself (the network off in the one place pyproj is set up)",
+   "set_network_enabled(False)" in read("backend/site_layout_import.py"))
 WF = read(".github/workflows/dependency-audit.yml")
 ok("⭐ the weekly audit: Mondays, on demand, and on a PR that changes requirements.txt; pip-audit pinned; read-only",
    'cron: "17 6 * * 1"' in WF and "workflow_dispatch:" in WF and '- "backend/requirements.txt"' in WF
