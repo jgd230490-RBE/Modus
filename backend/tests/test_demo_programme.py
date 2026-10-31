@@ -390,7 +390,7 @@ ok("...it was placed from the repo's own National Grid sample, and its two gate 
    and len(_gc) == 2 and {g["gate"] for g in _gc} == _vs_gates and all(g["m"] <= 0.05 for g in _gc),
    str(_gc))
 ok("...and a refresh keeps live's layout tables (they are LIVE_TABLES)",
-   {"site_layouts", "site_layout_phases", "site_layout_imports"} <= set(GEN.LIVE_TABLES))
+   {"site_layouts", "site_layout_phases", "site_layout_imports", "site_layout_pictures"} <= set(GEN.LIVE_TABLES))
 
 
 def _live_export(mutate=None):
