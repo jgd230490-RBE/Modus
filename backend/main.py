@@ -69,6 +69,7 @@ import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" pa
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
 import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
 import clp_doc  # 30 Oct 2026 (task 4a) — the outline Construction Logistics Plan as a Word file, for a site or a set
+import clp_records  # 31 Oct 2026 (task 4a, PR 3a) — the CLPs as records: each team's own, the approval step, the issues
 import site_areas  # 28 Oct 2026 (simulation v2): the areas inside a site
 import pours  # 29 Oct 2026 (task 3a): concrete pours
 import holding  # 29 Oct 2026 (task 3c): vehicle holding areas
@@ -1296,6 +1297,8 @@ def meta(request: Request = None):
         "materials": conversions.material_names(factors),
         # 29 Oct 2026 (3b): kept for old lines, left out of the pickers for new ones
         "retired_materials": conversions.retired_materials(factors),
+        # 31 Oct 2026 (task 4a, PR 3a): the CLP template's stages for each programme type, shown on Config until changed
+        "clp_stage_defaults": clp_doc.DEFAULT_STAGES,
         # every vehicle in the live document, unchanged and in its own order: baked
         # geometry is keyed on vehicle_profile and every saved line names a vehicle, so a
         # list that dropped one would strand those routes and lines.
@@ -4873,20 +4876,140 @@ def clp_document_docx(locations: Optional[str] = None, impact: Optional[str] = N
     except ValueError as e:
         raise HTTPException(422, str(e))
     misses = basemap.MISSES[0]
+    body = _staff_bytes("clp/document.docx", {"locations": ids, "impact": imp}, lambda: _clp_build(data, imp, acc),
+                        acc=acc, keep=lambda: basemap.MISSES[0] == misses)
+    return _docx_reply(body, clp_doc.file_name(data))
 
-    def build():
-        import clp_doc_layers
-        # 31 Oct 2026: alone, outside the public map's slots (one build held a slot for minutes, and two at once
-        # doubled the memory); a second press while one is being made is answered busy at once
-        with heavy_reads.solo("clp-document", busy=lambda: HTTPException(
-                503, "Another CLP document is being made. Try again in a minute.", headers={"Retry-After": "60"})):
-            data["layers"] = clp_doc_layers.gather(data, area_month=_clp_area_month)
-            return clp_doc.build(data, impact=imp, acc=acc)
-    body = _staff_bytes("clp/document.docx", {"locations": ids, "impact": imp}, build, acc=acc,
+
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def _docx_reply(body, name):
+    return Response(content=body, media_type=DOCX_TYPE, headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+def _clp_build(data, impact, acc):
+    """The Word file for gather()'s data, built ALONE (31 Oct 2026: one at a time, outside the public map's slots; one
+    build held a slot for minutes, and two at once doubled the memory); a second press is answered busy at once."""
+    import clp_doc_layers
+    with heavy_reads.solo("clp-document", busy=lambda: HTTPException(
+            503, "Another CLP document is being made. Try again in a minute.", headers={"Retry-After": "60"})):
+        data["layers"] = clp_doc_layers.gather(data, area_month=_clp_area_month)
+        return clp_doc.build(data, impact=impact, acc=acc)
+
+
+# ---- 31 Oct 2026 (task 4a, PR 3a): the CLPs as records (clp_records.py; mockup notes/clp-screens-mockup-1031/) ------- #
+# A team login reads and edits ITS OWN team's CLPs only (another team's, or an every-team CLP, is a 404 like one that
+# does not exist) and sends one for approval; a planner or an admin sees every CLP, makes one, approves it as Issue N
+# (the Word file is kept) or asks for changes. Every write is in the audit trail (the middleware).
+class ClpIn(BaseModel):
+    name: Optional[str] = None
+    location_ids: Optional[List[str]] = None
+    team: Optional[str] = None
+    impact: Optional[str] = None
+    cover: Optional[dict] = None
+
+
+class ClpNoteIn(BaseModel):
+    note: Optional[str] = None
+
+
+def _fields_set_dict(model):
+    """Only the fields the client sent, as a dict (a PATCH must not blank what it did not name)."""
+    return {k: getattr(model, k) for k in _fields_set(model)}
+
+
+def _clp_out(out):
+    if out is None:
+        raise HTTPException(404, "No such CLP.")
+    if isinstance(out, dict) and out.get("error"):
+        raise HTTPException(int(out.get("status") or 422), out["error"])
+    return out
+
+
+@app.get("/api/clp/documents")
+def clp_documents_list():
+    """Every CLP the caller may see (a team its own; a planner or an admin all, the ones sent for approval first)."""
+    return clp_records.list_for(_require_access())
+
+
+@app.post("/api/clp/documents")
+def clp_documents_create(body: ClpIn):
+    acc = _require_access()
+    return _clp_out(clp_records.create(_fields_set_dict(body), acc))
+
+
+@app.get("/api/clp/documents/{clp_id}")
+def clp_documents_get(clp_id: str):
+    return _clp_out(clp_records.get(clp_id, _require_access()))
+
+
+@app.patch("/api/clp/documents/{clp_id}")
+def clp_documents_update(clp_id: str, body: ClpIn):
+    acc = _require_access()
+    return _clp_out(clp_records.update(clp_id, _fields_set_dict(body), acc))
+
+
+@app.delete("/api/clp/documents/{clp_id}")
+def clp_documents_delete(clp_id: str):
+    return _clp_out(clp_records.delete(clp_id, _require_access()))
+
+
+@app.post("/api/clp/documents/{clp_id}/send")
+def clp_documents_send(clp_id: str, body: ClpNoteIn):
+    return _clp_out(clp_records.send(clp_id, body.note, _require_access()))
+
+
+@app.post("/api/clp/documents/{clp_id}/changes")
+def clp_documents_changes(clp_id: str, body: ClpNoteIn):
+    return _clp_out(clp_records.ask_changes(clp_id, body.note, _require_access()))
+
+
+@app.get("/api/clp/documents/{clp_id}/approve-preview")
+def clp_documents_preview(clp_id: str):
+    acc = _require_access()
+    factors = conversions.load_factors()
+    return _clp_out(clp_records.preview(clp_id, acc, factors, _working_days(factors)))
+
+
+@app.post("/api/clp/documents/{clp_id}/approve")
+def clp_documents_approve(clp_id: str, body: ClpNoteIn):
+    """Build the file as Issue N (alone, like every CLP build), keep it and record who and when."""
+    acc = _require_access()
+    factors = conversions.load_factors()
+    return _clp_out(clp_records.approve(clp_id, body.note, acc, factors, _working_days(factors),
+                                        lambda data, rec: _clp_build(data, rec["impact"], acc)))
+
+
+@app.get("/api/clp/documents/{clp_id}/history")
+def clp_documents_history(clp_id: str):
+    return _clp_out(clp_records.history(clp_id, _require_access()))
+
+
+@app.get("/api/clp/documents/{clp_id}/draft.docx")
+def clp_documents_draft(clp_id: str):
+    """The CLP as it stands, marked DRAFT on every page; kept until the next write, like the other CLP downloads."""
+    acc = _require_access()
+    factors = conversions.load_factors()
+    try:
+        rec, data = clp_records.draft_data(clp_id, acc, factors, _working_days(factors))
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    if rec is None:
+        raise HTTPException(404, "No such CLP.")
+    misses = basemap.MISSES[0]
+    body = _staff_bytes("clp/draft.docx", {"id": rec["id"]}, lambda: _clp_build(data, rec["impact"], acc), acc=acc,
                         keep=lambda: basemap.MISSES[0] == misses)
-    return Response(content=body,
-                    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    headers={"Content-Disposition": f'attachment; filename="{clp_doc.file_name(data)}"'})
+    return _docx_reply(body, clp_doc.file_name(data).replace(".docx", " DRAFT.docx"))
+
+
+@app.get("/api/clp/documents/{clp_id}/issues/{issue_no}.docx")
+def clp_documents_issue(clp_id: str, issue_no: int):
+    """An approved issue's Word file exactly as approved."""
+    got = clp_records.issue_file(clp_id, issue_no, _require_access())
+    if not got:
+        raise HTTPException(404, "No such issue.")
+    return _docx_reply(got[1], got[0])
 
 
 @app.post("/api/admin/gates")

@@ -1488,9 +1488,11 @@ def build(with_areas=False, out=None):
 # round; without it a refresh dropped every diversion) and traffic_counts (fetched with the collisions since 22 Oct).
 # 29 Oct 2026 (task 0f-2): + route_hour_times, the busy-hour drive times worked out on live (HERE calls), named by the
 # stored lines they matched — copied with route_geometry, so a refresh keeps both or neither
+# 31 Oct 2026 (task 4a, PR 3a): + clp_documents and clp_issues, the CLPs people type, send and approve on live (an issue
+# keeps its Word file): a refresh must not drop an approved issue
 LIVE_TABLES = ("route_geometry", "route_sections", "route_area_km", "areas", "route_choice",
                "community_features", "community_meta", "collision_records", "collision_meta", "traffic_counts",
-               "route_hour_times")
+               "route_hour_times", "clp_documents", "clp_issues")
 
 # 28 Oct 2026 (F6): an abnormal load is generated here but DRAWN on live (Draw the route, Check the roads again), in the
 # same row. A refresh keeps live's drawing for a load whose ends and size are unchanged; any other load stays undrawn.
