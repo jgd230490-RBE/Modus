@@ -348,6 +348,14 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .row-menu summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:32px;height:28px;border-radius:6px;border:1px solid var(--grey);background:var(--surface);color:var(--muted);font-weight:700;}
   .row-menu summary::-webkit-details-marker{display:none;} .row-menu summary.row-dots::before{content:"⋯";}   /* 27 Oct (audit #41 / #42): RowMenu's glyph is CSS content, not text (the other .row-menu summaries carry words) */
   .row-menu[open] summary{background:var(--surface-2);color:var(--ink);}
+  /* 31 Oct 2026 (task 4c PR 3): a pinned picture's Move corners handles (on the map, over the photo: fixed colours) and the
+     Pictures list's eye (CSS glyph, named by aria-label) */
+  .slp-corner{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid #1E3A8A;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:grab;}
+  .slp-corner::after{content:attr(data-n);position:absolute;left:20px;top:-4px;font:700 12px Inter,sans-serif;color:#fff;background:#1E3A8A;border-radius:4px;padding:0 4px;}
+  .slp-mover{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);border:2px solid #1E3A8A;cursor:move;display:grid;place-items:center;font-size:18px;color:#1E3A8A;box-shadow:0 1px 4px rgba(0,0,0,.35);}
+  .slp-turner{width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #1E3A8A;cursor:grab;display:grid;place-items:center;font-size:15px;color:#1E3A8A;}
+  .slp-eye{width:28px;height:28px;border-radius:6px;display:inline-grid;place-items:center;color:var(--muted);flex:none;}
+  .slp-eye:hover{background:var(--surface-2);} .slp-eye::before{content:"◉";} .slp-eye[aria-pressed="false"]::before{content:"○";}
   .row-menu-list{position:absolute;right:0;top:32px;z-index:20;min-width:220px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:8px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.28);text-align:left;white-space:nowrap;}
   .row-menu-list button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--popover-fg);font:inherit;font-size:14px;padding:7px 10px;border-radius:6px;cursor:pointer;}
   .row-menu-list button:hover{background:rgba(255,255,255,.06);} .row-menu-list button:disabled{opacity:.5;}
@@ -16484,7 +16492,7 @@ function loadSiteLayoutsJs(){
   if(window.WSLayouts) return Promise.resolve(true);
   if(!SL_JS) SL_JS = new Promise((res) => {
     const s = document.createElement("script");
-    s.src = "/map/site-layouts.js?v=3"; s.onload = () => res(true); s.onerror = () => { SL_JS = null; res(false); };
+    s.src = "/map/site-layouts.js?v=4"; s.onload = () => res(true); s.onerror = () => { SL_JS = null; res(false); };
     document.head.appendChild(s);
   });
   return SL_JS;
@@ -16496,6 +16504,8 @@ function slMonths(p){
   if(p.month_from && p.month_to) return `${slMonth(p.month_from)} – ${slMonth(p.month_to)}`;
   return p.month_from ? `from ${slMonth(p.month_from)}` : `to ${slMonth(p.month_to)}`;
 }
+// 31 Oct 2026 (task 4c PR 3): " · 1 picture" in a phase's row (its own pictures and those shown in every phase)
+const slPicWords = (n) => n ? ` · ${n} picture${n === 1 ? "" : "s"}` : "";
 function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstallRef, drawing, onDraw }){
   const canLayout = !!(ACCESS.info && ACCESS.info.can_approve);
   const [styles, setStyles] = useState(SL_STYLES);
@@ -16684,7 +16694,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
             <li key={p.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs rounded px-1.5 py-1 hover:bg-slate-50" data-site-layout-phase={p.id}>
               <button onClick={() => setShown(p.id)} aria-pressed={shown === p.id} className={"font-medium text-left " + (shown === p.id ? "text-[color:var(--navy)] underline" : "text-slate-700 hover:underline")}
                 title="Show on the map">{p.name}</button>
-              <span className="text-slate-500">{slMonths(p)} · {p.things} things</span>
+              <span className="text-slate-500">{slMonths(p)} · {p.things} things{slPicWords((p.pictures || 0) + ((lay && lay.pictures) || []).filter(x => x.every).length)}</span>
               {canLayout && !edit && !imp && (
                 <span className="ml-auto flex items-center gap-1.5">
                   {onDraw && <button onClick={() => onDraw(p.id)} className="px-2.5 py-1 rounded-lg text-white font-semibold text-[13px]" style={{ background: "var(--navy)" }} aria-label={`Draw ${p.name}`}>Draw</button>}
@@ -16842,7 +16852,8 @@ const PalBtn = ({ on, ...r }) => <button {...r} aria-pressed={on} className={"w-
 function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstallRef, onDone }){
   const E = useRef(null);
   if(!E.current) E.current = { draw: null, h: null, holes: new Map(), last: new Map(), kept: [], hist: [], fut: [], saved: "[]",
-    hidden: new Set(), locked: new Set(), snap: true, angle: false, tool: { kind: "select" }, sel: null, ver: null, ctx: [], pend: 0, pushT: 0, dirty: false };
+    hidden: new Set(), locked: new Set(), snap: true, angle: false, tool: { kind: "select" }, sel: null, ver: null, ctx: [], pend: 0, pushT: 0, dirty: false,
+    pics: null, picList: [], picBase: {}, pdirty: false, cm: null, blobs: [] };
   const e = E.current;
   const [phase, setPhase] = useState(null);
   const [phases, setPhases] = useState([]);
@@ -16860,6 +16871,16 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
   const [locked, setLocked] = useState([]);
   const [snap, setSnap] = useState(true);
   const [angle, setAngle] = useState(false);
+  // 31 Oct 2026 (task 4c PR 3): the pinned pictures in this phase (its own and every phase's), as changed here
+  const [pics, setPicsS] = useState([]);
+  const [picSel, setPicSel] = useState(null);
+  const [picOff, setPicOff] = useState([]);
+  const [pdirty, setPdirtyS] = useState(false);
+  const [corner, setCorner] = useState(null);
+  const [cWords, setCWords] = useState("");
+  const [padd, setPadd] = useState(null);
+  const [naming, setNaming] = useState(false);
+  const [picAsk, setPicAsk] = useState(null);   // the picture whose Delete… is being asked (in the panel: the editor has no pop-ups)
   const say = (t, bad) => setMsgS({ t, bad: !!bad });
   const LINES = useMemo(() => (styles.lines || []).filter(s => s.key !== "imported"), [styles]);
   const AREAS = useMemo(() => (styles.areas || []).filter(s => s.key !== "imported_area"), [styles]);
@@ -17004,12 +17025,129 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
     e.draw.setMode(t.kind === "select" ? "select" : t.kind === "line" ? "linestring" : t.kind === "area" ? (t.style === "crane_radius" ? "circle" : (t.shape || "polygon")) : "point");
   };
 
+  // ---- the pinned pictures (31 Oct 2026, task 4c PR 3, the mockup John approved): corners, opacity, name and "every
+  // phase" are kept by the one Save with the phase (Q8); adding and deleting are written at once (a file). Move corners
+  // pauses drawing (Terra Draw's static mode): four numbered corners, ✥ moves it whole, ⟳ turns it; Done / Cancel.
+  const picKey = (p) => JSON.stringify([p.corners, p.opacity, p.name, !!p.every]);
+  const picCopy = (p) => ({ ...p, corners: p.corners.map(c => c.slice()) });
+  const setPics = (list) => {
+    e.picList = list; setPicsS(list);
+    if(e.pics) e.pics.set(list);
+    const d = list.some(p => !e.picBase[p.id] || picKey(e.picBase[p.id]) !== picKey(p));
+    e.pdirty = d; setPdirtyS(d);
+  };
+  const updPic = (id, patch) => setPics(e.picList.map(p => p.id === id ? { ...p, ...patch } : p));
+  // a code sign-in sends its code in a header, which the map's own image read cannot: read it here and hand the map a copy
+  const picUrl = (p) => !ACCESS.code ? p.url : fetch(p.url).then(r => r.ok ? r.blob() : null)
+    .then(b => { if(!b) return null; const u = URL.createObjectURL(b); e.blobs.push(u); return u; }).catch(() => null);
+  const r7 = (v) => Math.round(v * 1e7) / 1e7;
+  const mid4 = (cs) => [cs.reduce((a, c) => a + c[0], 0) / 4, cs.reduce((a, c) => a + c[1], 0) / 4];
+  const turnAt = (cs) => { const r = [(cs[1][0] + cs[2][0]) / 2, (cs[1][1] + cs[2][1]) / 2], c = mid4(cs); return [r[0] + (r[0] - c[0]) * 0.15, r[1] + (r[1] - c[1]) * 0.15]; };
+  const startCorners = (id) => {
+    if(e.cm) stopCorners(true);
+    const p = e.picList.find(x => x.id === id), m = mapRef.current;
+    if(!p || !m || !e.draw) return;
+    if(e.sel){ try { e.draw.deselectFeature(e.sel); } catch(x){} }
+    try { e.draw.setMode("static"); } catch(x){}
+    if(picOff.includes(id)){ setPicOff(o => o.filter(x => x !== id)); if(e.pics) e.pics.hide(id, false); }
+    const G = slGeo(), keep = p.corners.map(c => c.slice());
+    let cs = p.corners.map(c => c.slice());
+    const mk = (cls, txt, n) => { const d = document.createElement("div"); d.className = cls; if(n) d.dataset.n = n; if(txt) d.textContent = txt; d.setAttribute("aria-hidden", "true"); return d; };
+    const show = () => { if(e.pics) e.pics.setCorners(id, cs); };
+    const corners = cs.map((c, i) => {
+      const k = new mapboxgl.Marker({ element: mk("slp-corner", "", String(i + 1)), draggable: true }).setLngLat(c).addTo(m);
+      k.on("drag", () => { cs[i] = k.getLngLat().toArray(); show(); put(false, false, i); });
+      k.on("dragend", () => { cs[i] = k.getLngLat().toArray(); show(); put(); });
+      return k;
+    });
+    const mover = new mapboxgl.Marker({ element: mk("slp-mover", "✥"), draggable: true }).setLngLat(mid4(cs)).addTo(m);
+    // Measured from where the handle sat BEFORE the drag: Mapbox fires dragstart after the marker's first step, so a
+    // position read there loses that step (a quick drag lost 40 % of the move — found in Chrome, 31 Oct)
+    let from = null, start = null;
+    const moveTo = () => { const now = mover.getLngLat().toArray(), dx = now[0] - start[0], dy = now[1] - start[1];
+      cs = from.map(c => [c[0] + dx, c[1] + dy]); show(); };
+    mover.on("dragstart", () => { from = cs.map(c => c.slice()); start = mid4(from); });
+    mover.on("drag", () => { moveTo(); put(true); });
+    mover.on("dragend", () => { moveTo(); put(); });
+    const turner = new mapboxgl.Marker({ element: mk("slp-turner", "⟳"), draggable: true }).setLngLat(turnAt(cs)).addTo(m);
+    let a0 = 0, base = null, o = null;
+    turner.on("dragstart", () => { base = cs.map(c => c.slice()); o = mid4(base); const t = G.toM(turnAt(base), o); a0 = Math.atan2(t[1], t[0]); });
+    turner.on("drag", () => {
+      const t = G.toM(turner.getLngLat().toArray(), o), da = Math.atan2(t[1], t[0]) - a0, c = Math.cos(da), s = Math.sin(da);
+      cs = base.map(q => { const [x, y] = G.toM(q, o); return G.fromM([x * c - y * s, x * s + y * c], o); });
+      show(); put(false, true); setCWords(`Turned ${Math.round(-da * 180 / Math.PI)}°.`);
+    });
+    turner.on("dragend", () => put());
+    function put(skipMover, skipTurner, skipCorner){
+      corners.forEach((k, i) => { if(i !== skipCorner) k.setLngLat(cs[i]); });
+      if(!skipMover) mover.setLngLat(mid4(cs));
+      if(!skipTurner) turner.setLngLat(turnAt(cs));
+    }
+    e.cm = { id, keep, get: () => cs, markers: [...corners, mover, turner] };
+    setCorner(id); setPicSel(id);
+    setCWords("Drag the numbered corners onto points you know; ✥ moves it whole, ⟳ turns it. Drawing is paused.");
+  };
+  const stopCorners = (kept) => {
+    const c = e.cm; if(!c) return;
+    e.cm = null;
+    c.markers.forEach(k => { try { k.remove(); } catch(x){} });
+    const cs = kept ? c.get().map(q => [r7(q[0]), r7(q[1])]) : c.keep;
+    setPics(e.picList.map(p => p.id === c.id ? { ...p, corners: cs } : p));
+    setCorner(null); setCWords("");
+    setTool(e.tool);
+    return c.id;
+  };
+  const cornersDone = () => { const id = stopCorners(true), p = e.picList.find(x => x.id === id), b = e.picBase[id];
+    if(p) say(b && JSON.stringify(b.corners) === JSON.stringify(p.corners) ? `${p.name}: not moved.` : `${p.name}: corners set. Save to keep them.`); };
+  const cornersCancel = () => { stopCorners(false); say("Corners put back."); };
+  const fitPic = (p) => { const m = mapRef.current, b = new mapboxgl.LngLatBounds(); p.corners.forEach(c => b.extend(c)); try { m.fitBounds(b, { padding: 60, duration: 500, maxZoom: 20 }); } catch(x){} };
+  const eyePic = (id) => { const on = !picOff.includes(id); setPicOff(o => on ? [...o, id] : o.filter(x => x !== id)); if(e.pics) e.pics.hide(id, on); };
+  const addPic = async () => {
+    const f = padd && padd.file, m = mapRef.current;
+    if(!f || !phase || busy) return;
+    setBusy("pic"); say("");
+    try {
+      const c = m.getCenter(), pdf = /\.pdf$/i.test(f.name);
+      const q = new URLSearchParams({ name: f.name, page: String(pdf ? (+padd.page || 1) : 1), clear: padd.clear ? "true" : "false",
+        lon: String(c.lng), lat: String(c.lat), ...(padd.every ? { every: "true" } : { phase_id: phase.id }), ...(pdf && +padd.scale ? { scale: String(+padd.scale) } : {}) });
+      const j = await okJSON(await fetch(`${API}/locations/${encodeURIComponent(locId)}/site-layout/pictures?${q}`,
+        { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: f }));
+      const np = j.picture;
+      e.picBase[np.id] = picCopy(np);
+      setPics([...e.picList, picCopy(np)]);
+      setPadd(null); setPhase(x => ({ ...x, pictures: (x.pictures || 0) + (np.every ? 0 : 1) }));
+      say(j.words);
+      startCorners(np.id);
+    } catch(x){ say(errSay("Not added.", x), true); }
+    finally { setBusy(""); }
+  };
+  const deletePic = async (p) => {
+    setPicAsk(null);
+    if(e.cm && e.cm.id === p.id) stopCorners(false);
+    try {
+      const v = (e.picBase[p.id] || p).version;
+      await okJSON(await fetch(`${API}/site-layouts/pictures/${encodeURIComponent(p.id)}?version=${v}`, { method: "DELETE" }));
+      delete e.picBase[p.id];
+      setPics(e.picList.filter(x => x.id !== p.id));
+      if(picSel === p.id) setPicSel(null);
+      say(`Deleted “${p.name}”.`);
+    } catch(x){ say(errSay("Not deleted.", x), true); }
+  };
+  const loadPics = (lay, id) => {
+    const list = ((lay && lay.pictures) || []).filter(p => p.every || p.phase_id === id).map(picCopy);
+    e.picBase = Object.fromEntries(list.map(p => [p.id, picCopy(p)]));
+    setPicSel(null); setPicOff([]); setNaming(false); setPadd(null);
+    setPics(list);
+  };
+
   // ---- open: the scripts, the phase, the site's gates; close: everything put back
   const loadPhase = async (id) => {
     const j = await okJSON(await fetch(`${API}/locations/${encodeURIComponent(locId)}/site-layout`));
     const ps = (j.layout && j.layout.phases) || [];
     const p = ps.find(x => x.id === id);
     if(!p) throw new Error("That phase is gone.");
+    if(e.cm) stopCorners(false);
+    loadPics(j.layout, id);
     setPhases(ps); setPhase(p); e.ver = p.version;
     const refused = loadThings(p.features.features || []);
     e.saved = JSON.stringify(things()); e.hist = [e.saved]; e.fut = [];
@@ -17027,6 +17165,7 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
         e.h = WSLayouts.install(m, styles, { prefix: "dm-draw" });
         await e.h.ready;
         if(gone) return;
+        e.pics = WSLayouts.pictures(m, { prefix: "dm-pic", before: () => e.h && e.h.layerIds()[0], url: picUrl });
         makeDraw(); setTool({ kind: "select" });
         try {
           const gs = await okJSON(await fetch(`${API}/gates?location_id=${encodeURIComponent(locId)}`));
@@ -17043,22 +17182,27 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
         try { if(!b.isEmpty() && m.getZoom() < 15) m.fitBounds(b, { padding: 40, maxZoom: 18, duration: 0 }); } catch(x){}
       } catch(x){ if(!gone){ setBusy("fail"); say(errSay("Couldn't open the drawing.", x), true); } }
     })();
-    const unload = (ev) => { if(e.dirty){ ev.preventDefault(); ev.returnValue = ""; } };
+    const unload = (ev) => { if(e.dirty || e.pdirty){ ev.preventDefault(); ev.returnValue = ""; } };
     window.addEventListener("beforeunload", unload);
-    LAYOUT_LEAVE = () => { if(!e.dirty) return false; setAsk(true); say("Save or discard your changes first.", true); return true; };
+    LAYOUT_LEAVE = () => { if(!e.dirty && !e.pdirty) return false; setAsk(true); say("Save or discard your changes first.", true); return true; };
     reinstallRef.current = () => {   // a basemap switch drops every layer, Terra Draw's too: put both back with the things as they are
       if(!e.draw || !e.h) return;
       const now = things();
       try { e.draw.stop(); } catch(x){}
       e.h.reinstall(); makeDraw(); loadThings(now); setTool(e.tool);
+      if(e.pics) e.pics.set(e.picList);   // the new style dropped them: set() adds them back under the layout
+      if(e.cm) try { e.draw.setMode("static"); } catch(x){}
     };
     return () => {
       gone = true; LAYOUT_LEAVE = null; reinstallRef.current = null;
       window.removeEventListener("beforeunload", unload);
       clearTimeout(e.pushT); if(e.pend) cancelAnimationFrame(e.pend);
+      if(e.cm){ e.cm.markers.forEach(k => { try { k.remove(); } catch(x){} }); e.cm = null; }
       try { if(e.draw) e.draw.stop(); } catch(x){}
+      try { if(e.pics) e.pics.remove(); } catch(x){}
       try { if(e.h) e.h.remove(); } catch(x){}
-      e.draw = null; e.h = null;
+      e.blobs.forEach(u => URL.revokeObjectURL(u)); e.blobs = [];
+      e.draw = null; e.h = null; e.pics = null;
     };
   }, []);
 
@@ -17069,6 +17213,7 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
       const k = ev.key.toLowerCase();
       if(k === "s"){ ev.preventDefault(); save(); return; }
       if(/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "")) return;
+      if(e.cm) return;   // moving a picture's corners: Done or Cancel first
       if(k === "z"){ ev.preventDefault(); ev.shiftKey ? redo() : undo(); }
       else if(k === "y"){ ev.preventDefault(); redo(); }
       else if(k === "d"){ ev.preventDefault(); duplicate(); }
@@ -17081,17 +17226,33 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
   const save = async () => {
     if(busy || !phase || !e.draw) return;
     if(e.pushT) push();
+    if(e.cm) stopCorners(true);
     setBusy("save"); setAsk(false);
     try {
-      const list = things().map(f => ({ type: "Feature", geometry: f.geometry, properties: f.properties }));
-      const res = await fetch(`${API}/site-layouts/phases/${encodeURIComponent(phase.id)}/features`,
-        { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: e.ver, features: { type: "FeatureCollection", features: list } }) });
-      if(res.status === 409){ setStale(true); say("Someone else saved this layout. Reload to see their changes.", true); return; }
-      const j = await okJSON(res);
-      e.ver = j.version; setPhase(p => ({ ...p, version: j.version, things: j.things }));
-      e.saved = e.hist[e.hist.length - 1] = JSON.stringify(things()); setDirty(false);
-      const lost = (j.left_out || []).length;
-      say(`Saved: ${j.things.toLocaleString("en-GB")} things.` + (lost ? ` ${lost} not kept: ${j.left_out[0]}.` : ""), lost > 0);
+      let words = "Saved.", lost = 0;
+      if(e.dirty){
+        const list = things().map(f => ({ type: "Feature", geometry: f.geometry, properties: f.properties }));
+        const res = await fetch(`${API}/site-layouts/phases/${encodeURIComponent(phase.id)}/features`,
+          { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: e.ver, features: { type: "FeatureCollection", features: list } }) });
+        if(res.status === 409){ setStale(true); say("Someone else saved this layout. Reload to see their changes.", true); return; }
+        const j = await okJSON(res);
+        e.ver = j.version; setPhase(p => ({ ...p, version: j.version, things: j.things }));
+        e.saved = e.hist[e.hist.length - 1] = JSON.stringify(things()); setDirty(false);
+        lost = (j.left_out || []).length;
+        words = `Saved: ${j.things.toLocaleString("en-GB")} things.` + (lost ? ` ${lost} not kept: ${j.left_out[0]}.` : "");
+      }
+      // the pictures changed here (31 Oct 2026, task 4c PR 3): one write each, its own version checked
+      for(const p of e.picList){
+        const b = e.picBase[p.id];
+        if(b && picKey(b) === picKey(p)) continue;
+        const res = await fetch(`${API}/site-layouts/pictures/${encodeURIComponent(p.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ version: (b || p).version, corners: p.corners, opacity: p.opacity, name: p.name, every: !!p.every, phase_id: p.every ? null : phase.id }) });
+        if(res.status === 409){ setStale(true); say("Someone else changed a picture. Reload to see their changes.", true); return; }
+        const j = await okJSON(res);
+        e.picBase[p.id] = picCopy(j.picture);
+        setPics(e.picList.map(x => x.id === p.id ? { ...x, version: j.picture.version } : x));
+      }
+      say(words, lost > 0);
     } catch(x){ say(errSay("Not saved.", x), true); }
     finally { setBusy(""); }
   };
@@ -17102,12 +17263,15 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
     finally { setBusy(""); }
   };
   const discard = () => {
+    if(e.cm) stopCorners(false);
+    setPics(e.picList.filter(p => e.picBase[p.id]).map(p => picCopy(e.picBase[p.id])));
     loadThings(JSON.parse(e.saved)); e.hist = [e.saved]; e.fut = []; setHist({ undo: false, redo: false });
     setDirty(false); setAsk(false); say("Changes thrown away.");
   };
-  const done = () => { if(e.dirty){ setAsk(true); say("Save or discard your changes first.", true); return; } onDone(phase && phase.id); };
+  const done = () => { if(e.cm) stopCorners(true); if(e.dirty || e.pdirty){ setAsk(true); say("Save or discard your changes first.", true); return; } onDone(phase && phase.id); };
   const switchPhase = async (id) => {
-    if(e.dirty){ setAsk(true); say("Save or discard your changes first.", true); return; }
+    if(e.cm) stopCorners(true);
+    if(e.dirty || e.pdirty){ setAsk(true); say("Save or discard your changes first.", true); return; }
     setBusy("load");
     try { await loadPhase(id); } catch(x){ say(errSay("Couldn't open that phase.", x), true); }
     finally { setBusy(""); }
@@ -17156,11 +17320,11 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
         className="border border-slate-300 rounded-lg px-2 py-1 text-[13px] bg-white">
         {phases.map(x => <option key={x.id} value={x.id}>{x.name} ({slMonths(x)})</option>)}
       </select>
-      <span className="text-[13px]" style={{ color: dirty ? "var(--warn-text)" : "var(--muted)" }} data-save-state={dirty ? "dirty" : "clean"}>{dirty ? "Unsaved changes" : "All changes saved"}</span>
+      <span className="text-[13px]" style={{ color: dirty || pdirty ? "var(--warn-text)" : "var(--muted)" }} data-save-state={dirty || pdirty ? "dirty" : "clean"}>{dirty || pdirty ? "Unsaved changes" : "All changes saved"}</span>
       <span className="ml-auto flex flex-wrap items-center gap-2">
         <button onClick={undo} disabled={!hist.undo || busy !== ""} className={tb} title="Undo (Ctrl+Z)">Undo</button>
         <button onClick={redo} disabled={!hist.redo || busy !== ""} className={tb} title="Redo (Ctrl+Y)">Redo</button>
-        <button onClick={save} disabled={!dirty || busy !== ""} className="px-3 py-1 rounded-lg text-white font-semibold text-[13px] disabled:opacity-50" style={{ background: "var(--navy)" }} title="Save (Ctrl+S)">{busy === "save" ? "Saving…" : "Save"}</button>
+        <button onClick={save} disabled={!(dirty || pdirty) || busy !== ""} className="px-3 py-1 rounded-lg text-white font-semibold text-[13px] disabled:opacity-50" style={{ background: "var(--navy)" }} title="Save (Ctrl+S)">{busy === "save" ? "Saving…" : "Save"}</button>
         <button onClick={done} className={tb}>Done</button>
       </span>
       {(msg.t || stale || ask) && (
@@ -17170,8 +17334,15 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
           {ask && <><button onClick={save} className={tb}>Save</button><button onClick={discard} className={tb} style={{ color: "var(--red)" }}>Discard</button></>}
         </p>
       )}
+      {corner && (
+        <p className="basis-full text-[13px] flex flex-wrap items-center gap-2 text-slate-700" role="status" data-picture-corners={corner}>
+          <span>{cWords}</span>
+          <button onClick={cornersDone} className="px-3 py-1 rounded-lg text-white font-semibold text-[13px]" style={{ background: "var(--navy)" }}>Done</button>
+          <button onClick={cornersCancel} className={tb}>Cancel</button>
+        </p>
+      )}
     </div>
-    <div className="card p-2 space-y-2" style={{ ...place(1, 2), maxHeight: wide ? SL_DRAW_H : undefined, overflowY: "auto" }} data-site-layout-palette="1" aria-label="What to draw" role="region" tabIndex={0}>
+    <div className="card p-2 space-y-2" style={{ ...place(1, 2), maxHeight: wide ? SL_DRAW_H : undefined, overflowY: "auto", ...(corner ? { opacity: 0.45, pointerEvents: "none" } : {}) }} data-site-layout-palette="1" aria-label="What to draw" role="region" tabIndex={0} aria-disabled={corner ? "true" : undefined}>
       <PalBtn onClick={() => setTool({ kind: "select" })} on={tk === "select"}>↖ Select</PalBtn>
       <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 pt-1">Lines</div>
       {LINES.map(s => <PalBtn key={s.key} onClick={() => setTool({ kind: "line", style: s.key })} on={tk === "line:" + s.key}>
@@ -17238,6 +17409,63 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
             <button onClick={remove} className={tb} style={{ color: "var(--red)" }} title="Delete">Delete</button>
           </div>
         </>}
+      </div>
+      <div className="card p-3 space-y-2" data-site-layout-pictures="1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-slate-700">Pictures</span>
+          {!padd && <button onClick={() => setPadd({ file: null, page: 1, scale: "", clear: true, every: false })} disabled={busy !== "" || !!corner || !phase}
+            className="text-[13px] font-semibold text-[color:var(--navy)] hover:underline disabled:opacity-50">+ Add a picture</button>}
+        </div>
+        {!pics.length && !padd && <p className="text-[13px] text-slate-500">A PNG, JPG or PDF page, pinned under the layout.</p>}
+        {pics.map(p => {
+          const on = picSel === p.id, hid = picOff.includes(p.id);
+          return (
+            <div key={p.id} className="space-y-1.5" data-site-picture={p.id}>
+              <div className="flex items-center gap-1 text-[13px]">
+                <button type="button" onClick={() => eyePic(p.id)} className="slp-eye" aria-pressed={!hid} aria-label={`${hid ? "Show" : "Hide"} ${p.name}`} title={hid ? "Show" : "Hide while drawing"}></button>
+                <button type="button" onClick={() => { setPicSel(on ? null : p.id); setNaming(false); }} aria-pressed={on}
+                  className={"flex-1 min-w-0 text-left truncate font-medium " + (on ? "text-[color:var(--navy)] underline" : "text-slate-700 hover:underline")}>{p.name}</button>
+                {p.every && <span className="text-slate-500" style={{ whiteSpace: "nowrap" }}>every phase</span>}
+                <RowMenu name={p.name}>
+                  <button type="button" onClick={() => startCorners(p.id)}>Move corners</button>
+                  <button type="button" onClick={() => fitPic(p)}>Fit to screen</button>
+                  <button type="button" onClick={() => { setPicSel(p.id); setNaming(true); }}>Rename</button>
+                  <button type="button" onClick={() => updPic(p.id, { every: !p.every, phase_id: p.every ? phase.id : null })}>{p.every ? "Show in this phase only" : "Show in every phase"}</button>
+                  <button type="button" style={{ color: "var(--red)" }} onClick={() => setPicAsk(p.id)}>Delete…</button>
+                </RowMenu>
+              </div>
+              {picAsk === p.id && <div className="pl-8 flex flex-wrap items-center gap-2 text-[13px] text-slate-700" role="alert" data-site-picture-ask={p.id}>
+                <span>Delete “{p.name}”?</span>
+                <button onClick={() => deletePic(p)} className={tb} style={{ color: "var(--red)" }}>Delete</button>
+                <button onClick={() => setPicAsk(null)} className={tb}>Keep</button>
+              </div>}
+              {on && <div className="pl-8 space-y-1.5" data-site-picture-detail={p.id}>
+                {naming && <label className={lab}>Name<input value={p.name} maxLength={80} autoFocus onChange={ev => updPic(p.id, { name: ev.target.value })} onBlur={() => setNaming(false)} className={inp} /></label>}
+                <label className={lab}>Opacity {Math.round(p.opacity * 100)} %<input type="range" min="0.05" max="1" step="0.05" value={p.opacity} onChange={ev => updPic(p.id, { opacity: +ev.target.value })} className="w-full" /></label>
+                {corner !== p.id && <button onClick={() => startCorners(p.id)} disabled={busy !== ""} className={tb}>Move corners</button>}
+              </div>}
+            </div>);
+        })}
+        {padd && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2" data-site-picture-add="1">
+            <label className={lab}>File<input type="file" accept=".png,.jpg,.jpeg,.pdf" className="mt-0.5 block w-full text-[13px]"
+              onChange={ev => { const f = ev.target.files && ev.target.files[0]; setPadd(x => ({ ...x, file: f || null, clear: f ? /\.pdf$/i.test(f.name) : x.clear })); }} /></label>
+            <p className="text-[13px] text-slate-500">PNG, JPG or PDF, up to 10 MB.</p>
+            {padd.file && /\.pdf$/i.test(padd.file.name) && <div className="grid grid-cols-2 gap-2">
+              <label className={lab}>Page<input type="number" min="1" step="1" value={padd.page} onChange={ev => setPadd(x => ({ ...x, page: ev.target.value }))} className={inp} /></label>
+              <label className={lab}>Scale 1:<input type="number" min="10" step="1" value={padd.scale} placeholder="500" onChange={ev => setPadd(x => ({ ...x, scale: ev.target.value }))} className={inp} /></label>
+            </div>}
+            <label className="flex items-center gap-1.5 text-[13px] text-slate-700"><input type="checkbox" checked={padd.clear} onChange={ev => setPadd(x => ({ ...x, clear: ev.target.checked }))} />Make white see-through</label>
+            <fieldset className="text-[13px] text-slate-700 space-y-0.5"><legend className="sr-only">Show it in</legend>
+              <label className="flex items-center gap-1.5"><input type="radio" name="slp-every" checked={!padd.every} onChange={() => setPadd(x => ({ ...x, every: false }))} />This phase</label>
+              <label className="flex items-center gap-1.5"><input type="radio" name="slp-every" checked={padd.every} onChange={() => setPadd(x => ({ ...x, every: true }))} />Every phase</label>
+            </fieldset>
+            <div className="flex items-center gap-2">
+              <button onClick={addPic} disabled={!padd.file || busy !== ""} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs disabled:opacity-50" style={{ background: "var(--navy)" }}>{busy === "pic" ? "Adding…" : "Add"}</button>
+              <button onClick={() => setPadd(null)} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
+            </div>
+          </div>
+        )}
       </div>
       <div className="card p-3" data-site-layout-layers="1">
         <div className="text-sm font-semibold text-slate-700 mb-1">Layers</div>

@@ -270,10 +270,15 @@ def get(location_id, with_things=True):
         imports.append({"id": r["id"], "phase_id": r.get("phase_id"), "file_name": r.get("file_name"),
                         "format": r.get("format"), "things": int(r.get("things") or 0), "by": r.get("created_by"),
                         "at": r.get("created_at"), "fit": rep.get("fit_words"), "transform": rep.get("transform")})
+    import site_layout_pictures as pictures      # task 4c PR 3: staff only (never in a public read)
+    pics = pictures.for_layout(lay["id"])
+    out_phases = [_phase_out(p, with_things) for p in phases]
+    for ph in out_phases:
+        ph["pictures"] = sum(1 for x in pics if x["phase_id"] == ph["id"])
     return {"id": lay["id"], "location_id": lay["location_id"], "name": lay.get("name"),
             "public": _truthy(lay.get("public")), "version": int(lay.get("version") or 1),
             "updated_at": lay.get("updated_at"),
-            "phases": [_phase_out(p, with_things) for p in phases], "imports": imports}
+            "phases": out_phases, "imports": imports, "pictures": pics}
 
 
 def summary():
@@ -292,7 +297,10 @@ def summary():
         b = by.setdefault(p["layout_id"], [0, 0])
         b[0] += 1
         b[1] += n
-    return {l["location_id"]: {"phases": by.get(l["id"], [0, 0])[0], "things": by.get(l["id"], [0, 0])[1]} for l in lays}
+    import site_layout_pictures as pictures
+    pics = pictures.counts()
+    return {l["location_id"]: {"phases": by.get(l["id"], [0, 0])[0], "things": by.get(l["id"], [0, 0])[1],
+                               "pictures": sum(pics.get(l["id"], {}).values())} for l in lays}
 
 
 def in_month(ph, month):
@@ -310,14 +318,15 @@ def for_map(month=None):
     tenant = db.current_tenant()
     lays = {l["id"]: l for l in db.query("SELECT id, location_id FROM site_layouts WHERE tenant_id = ?", (tenant,))}
     if not lays:
-        return {"month": month, "sites": [], "features": _fc([])}
+        return {"month": month, "sites": [], "features": _fc([]), "pictures": []}
     names = {r["id"]: r.get("name") for r in db.query("SELECT id, name FROM locations WHERE tenant_id = ?", (tenant,))}
-    feats, sites = [], {}
+    feats, sites, in_force = [], {}, {}
     for p in db.query("SELECT * FROM site_layout_phases WHERE tenant_id = ? ORDER BY sort, id", (tenant,)):
         lay = lays.get(p["layout_id"])
         if not lay or not in_month(p, month):
             continue
         ph = _phase_out(p)
+        in_force[ph["id"]] = lay["location_id"]
         for f in ph["features"]["features"]:
             q = dict(f["properties"])
             q.update(site=lay["location_id"], phase=ph["id"])
@@ -325,7 +334,9 @@ def for_map(month=None):
         s = sites.setdefault(lay["location_id"], {"location_id": lay["location_id"],
                                                   "name": names.get(lay["location_id"]) or lay["location_id"], "phases": []})
         s["phases"].append({"id": ph["id"], "name": ph["name"], "things": ph["things"]})
-    return {"month": month, "sites": sorted(sites.values(), key=lambda s: s["name"] or ""), "features": _fc(feats)}
+    import site_layout_pictures as pictures      # task 4c PR 3: the staff map's pinned pictures (metadata only)
+    return {"month": month, "sites": sorted(sites.values(), key=lambda s: s["name"] or ""), "features": _fc(feats),
+            "pictures": pictures.for_map(month, in_force)}
 
 
 # ---- 31 Oct 2026 (task 4c PR 4): the PUBLIC map's layer -------------------------------------------------------------
@@ -550,6 +561,10 @@ def delete_phase(phase_id, version):
         raise Problem(STALE)
     db.execute("DELETE FROM site_layout_phases WHERE tenant_id = ? AND id = ? AND version = ?",
                (db.current_tenant(), phase_id, int(cur.get("version") or 1)))
+    if db.query("SELECT id FROM site_layout_phases WHERE tenant_id = ? AND id = ?", (db.current_tenant(), phase_id)):
+        raise Problem(STALE)                     # someone saved it between the read and the delete
+    import site_layout_pictures as pictures      # task 4c PR 3: the phase's own pictures go with it
+    pictures.delete_for_phase(phase_id)
     return {"ok": True, "deleted": phase_id}
 
 

@@ -1034,10 +1034,18 @@ for _banned in ("UploadFile", "File(", "multipart", "python-multipart"):
     ok(f"⭐ no upload path in the backend: {_banned!r} is absent",
        _hits == 0, "found in backend/*.py")
 _main_src = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
-ok("⭐ ...the one file the server takes is the site layout's drawing, as the raw body of /api/site-layouts/read, capped at 10 MB",
-   _main_src.count("request.stream()") == 1 and '@app.post("/api/site-layouts/read")' in _main_src
-   and _main_src.index("request.stream()") > _main_src.index('@app.post("/api/site-layouts/read")')
-   and "if len(buf) > site_layout_import.MAX_BYTES:" in _main_src)
+# NARROWED 31 Oct 2026 (task 4c PR 3, the approved pictures mockup): the two files the server takes are the site layout's
+# drawing (/api/site-layouts/read) and a pinned picture (/api/locations/{id}/site-layout/pictures), each the raw body,
+# each read in a stream capped at 10 MB — still no form and no multipart.
+_s1 = _main_src.find("request.stream()")
+_s2 = _main_src.find("request.stream()", _s1 + 1)
+ok("⭐ ...the only files the server takes are a site layout's drawing and a pinned picture, each the raw body, capped at 10 MB",
+   _main_src.count("request.stream()") == 2 and '@app.post("/api/site-layouts/read")' in _main_src
+   and '@app.post("/api/locations/{location_id}/site-layout/pictures")' in _main_src
+   and _s1 > _main_src.index('@app.post("/api/site-layouts/read")')
+   and _s2 > _main_src.index('@app.post("/api/locations/{location_id}/site-layout/pictures")')
+   and "if len(buf) > site_layout_import.MAX_BYTES:" in _main_src
+   and "if len(buf) > site_layout_pictures.MAX_BYTES:" in _main_src)
 _reqs = open(os.path.join(BACKEND, "requirements.txt"), encoding="utf-8").read()
 ok("⭐ ...and python-multipart is not a dependency", "multipart" not in _reqs)
 

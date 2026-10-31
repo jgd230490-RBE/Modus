@@ -71,6 +71,7 @@ ORDER = [
     "locations", "location_gates",
     "site_areas",           # 28 Oct 2026 (simulation v2): names a location, nothing later
     "site_layouts", "site_layout_phases", "site_layout_imports",   # 31 Oct 2026 (task 4c): a location, then its layout
+    "site_layout_pictures",  # 31 Oct 2026 (task 4c PR 3): names a layout and a phase, so after them
     "abnormal_loads",       # 22 Oct 2026 (S16 / B5): names locations and gates, nothing later (the fetched layers stay last)
     "zones",
     "areas",                # 12 Oct 2026 (§2.2b): the council boundaries the tenant imported

@@ -289,5 +289,81 @@
     return { ready, setData, setVisible, remove, reinstall, layerIds: () => ids.slice(), prefix: P, count: () => data.features.length };
   }
 
-  window.WSLayouts = { install, metres, centroid, areaM2, bearing, geo, WORDS_Z };
+  // ---------------------------------------------------------------- pinned pictures (31 Oct 2026, task 4c PR 3)
+  // A contractor's picture or one PDF page, pinned by its four corners (top-left, top-right, bottom-right, bottom-left:
+  // Mapbox's order). STAFF ONLY: the image is read from /api/site-layouts/pictures/{id}/image, never from a public
+  // address. One image source + one raster layer a picture, drawn UNDER the layout (opts.before: the layout's first layer),
+  // in the list's order (the first lowest).
+  //
+  //   const pics = WSLayouts.pictures(map, { prefix: "slp", before: () => h.layerIds()[0], url: (p) => p.url });
+  //   pics.set(list);  pics.setCorners(id, corners);  pics.setOpacity(id, 0.6);  pics.hide(id, true);
+  //   pics.setVisible(false);  pics.reinstall();   // after map.setStyle
+  function pictures(map, opts) {
+    opts = opts || {};
+    const P = (opts.prefix || "slp") + "-";
+    let list = [], visible = opts.visible !== false;
+    const off = new Set();
+    const src = (id) => { try { return map.getSource(P + id); } catch (e) { return null; } };
+    const lyr = (id) => { try { return map.getLayer(P + id); } catch (e) { return null; } };
+    function before() {
+      const b = typeof opts.before === "function" ? opts.before() : opts.before;
+      try { return b && map.getLayer(b) ? b : undefined; } catch (e) { return undefined; }
+    }
+    const shows = (p) => visible && !off.has(p.id);
+    function add(p) {
+      if (src(p.id)) return;
+      Promise.resolve(opts.url ? opts.url(p) : p.url).then((url) => {
+        const now = list.find((q) => q.id === p.id);
+        if (!url || !now || src(p.id)) return;
+        try {
+          map.addSource(P + p.id, { type: "image", url, coordinates: now.corners });
+          map.addLayer({ id: P + p.id, type: "raster", source: P + p.id, layout: { visibility: shows(now) ? "visible" : "none" },
+            paint: { "raster-opacity": now.opacity, "raster-fade-duration": 0 } }, before());
+          order();
+        } catch (e) { /* the style is changing: reinstall() puts it back */ }
+      });
+    }
+    function drop(id) { try { if (lyr(id)) map.removeLayer(P + id); if (src(id)) map.removeSource(P + id); } catch (e) { /* the map is gone */ } }
+    function order() { const b = before(); for (const p of list) if (lyr(p.id)) { try { map.moveLayer(P + p.id, b); } catch (e) { /* ok */ } } }
+    function set(next) {
+      const old = Object.fromEntries(list.map((p) => [p.id, p]));
+      const keep = new Set((next || []).map((p) => p.id));
+      for (const id of Object.keys(old)) if (!keep.has(id)) { drop(id); off.delete(id); }
+      list = (next || []).filter((p) => p && Array.isArray(p.corners) && p.corners.length === 4).map((p) => Object.assign({}, p, { corners: p.corners.map((c) => c.slice()) }));
+      for (const p of list) {
+        const o = old[p.id];
+        if (!o || o.url !== p.url) drop(p.id);
+        if (!src(p.id)) { add(p); continue; }
+        try {
+          if (JSON.stringify(o.corners) !== JSON.stringify(p.corners)) src(p.id).setCoordinates(p.corners);
+          if (lyr(p.id)) { map.setPaintProperty(P + p.id, "raster-opacity", p.opacity); map.setLayoutProperty(P + p.id, "visibility", shows(p) ? "visible" : "none"); }
+        } catch (e) { /* ok */ }
+      }
+      order();
+    }
+    function setCorners(id, corners) {
+      const p = list.find((q) => q.id === id); if (!p) return;
+      p.corners = corners.map((c) => c.slice());
+      const s = src(id); if (s) { try { s.setCoordinates(p.corners); } catch (e) { /* ok */ } }
+    }
+    function setOpacity(id, v) {
+      const p = list.find((q) => q.id === id); if (!p) return;
+      p.opacity = v; if (lyr(id)) { try { map.setPaintProperty(P + id, "raster-opacity", v); } catch (e) { /* ok */ } }
+    }
+    function hide(id, on) {
+      if (on) off.add(id); else off.delete(id);
+      const p = list.find((q) => q.id === id);
+      if (p && lyr(id)) { try { map.setLayoutProperty(P + id, "visibility", shows(p) ? "visible" : "none"); } catch (e) { /* ok */ } }
+    }
+    function setVisible(on) {
+      visible = !!on;
+      for (const p of list) if (lyr(p.id)) { try { map.setLayoutProperty(P + p.id, "visibility", shows(p) ? "visible" : "none"); } catch (e) { /* ok */ } }
+    }
+    function remove() { for (const p of list) drop(p.id); }
+    // after map.setStyle every source is gone: add them again from the list as it is
+    function reinstall() { const now = list; remove(); list = []; set(now); }
+    return { set, setCorners, setOpacity, hide, setVisible, remove, reinstall, order, list: () => list.map((p) => Object.assign({}, p)), prefix: P };
+  }
+
+  window.WSLayouts = { install, pictures, metres, centroid, areaM2, bearing, geo, WORDS_Z };
 })();
