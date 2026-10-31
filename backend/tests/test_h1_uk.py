@@ -697,7 +697,8 @@ ok("🔴 every fitBounds in the app is inside a try (30 Sep: a NaN bounds on the
    # NARROWED 16 Oct 2026 (S7): five, the Dashboard's Simulation map frames the day's routes once a month
    # NARROWED 28 Oct 2026 (simulation v2): seven, the site view frames the chosen site and the whole scheme again
    # NARROWED 31 Oct 2026 (task 4c PR 1): eight, the Site layout card frames a drawing brought in and its fitted place
-   len(_fits) == 8 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
+   # NARROWED 31 Oct 2026 (task 4c PR 2): 8 -> 9 — the drawing tools go to the phase's drawing once, on open
+   len(_fits) == 9 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
    and "try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); store.framed = true; } catch(e){}" in fe, str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
 # --- 5 Oct 2026: Appearance (Ink / Light / Dark) ------------------------------------------
 _PAL = re.compile(r'(?:(?:hover|focus|disabled|group-hover|sm|md|lg):)?(?:bg|text|border|divide|ring|placeholder)-(?:white|black|transparent|current|\[color:[^\]]+\]|\[#[0-9a-fA-F]{3,8}\]|\[rgba?\([^\]]+\)\]|(?:slate|gray|red|amber|blue|emerald|green)-\d{2,3})(?:/\d{1,3})?')
@@ -1062,7 +1063,8 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    # NARROWED 28 Oct 2026 (simulation v2): 15 and 2 — the site areas form's Save / Create button (navy) and its Place on map (blue)
    # NARROWED 31 Oct 2026 (task 4c PR 1): 18 and 3 — the Site layout card's Save / Add phase, On National Grid and Place it
    # (navy) and its survey point's Place while picking (blue)
-   len(_sites.get("navy", [])) == 18 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
+   # NARROWED 31 Oct 2026 (task 4c PR 2): 21 — the drawing tools' picked tool in the palette (PalBtn), their Save and the card's Draw (navy)
+   len(_sites.get("navy", [])) == 21 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
    and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
 ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",
@@ -1163,8 +1165,10 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 29 Oct 2026 (task 3c): warn-text 14 -> 15 — the Routes row's amber "Route again: does not pass the holding area" chip
    # NARROWED 31 Oct 2026 (task 4a, PR 3b): bad-text 29 -> 34 — Notes and tasks: the panel's load error and failed-action line,
    # a task's "overdue", the approve card's "N overdue" and the list's Tasks cell "N overdue"
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 34 and   # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
-   _fe_wo.count("var(--warn-text)") == 15
+   # NARROWED 31 Oct 2026 (task 4c PR 2): bad-text 34 -> 35, warn-text 15 -> 16 — the drawing tools' save line (red when a
+   # save fails) and "Unsaved changes" (amber)
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 35 and   # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
+   _fe_wo.count("var(--warn-text)") == 16
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe

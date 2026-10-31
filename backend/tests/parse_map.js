@@ -1740,7 +1740,8 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   ok("🔴 ONE Mapbox instance, never removed: the guide adds no map and no map.remove()",
      (code.match(/new mapboxgl\.Map\(/g) || []).length === 1 && !/map\.remove\(\)/.test(code));
   // NARROWED 31 Oct 2026 (task 4c PR 1): a fourth tag, site-layouts.js, the site layouts' drawing shared with the Locations page; the guide is still in-page
-  ok("🔴 no new script tag: the guide is in-page (four script src tags: + site-layouts.js, 31 Oct)", (html.match(/<script src=/g) || []).length === 4 && html.includes('<script src="site-layouts.js?v=1"></script>'));
+  // NARROWED 31 Oct 2026 (task 4c PR 2): site-layouts.js?v=3 (the words from zoom 15; data sent again when shown)
+  ok("🔴 no new script tag: the guide is in-page (four script src tags: + site-layouts.js, 31 Oct)", (html.match(/<script src=/g) || []).length === 4 && html.includes('<script src="site-layouts.js?v=3"></script>'));
   ok("the card and ring are fixed overlays over the map, not inside it",
      /#guide-ring\{position:fixed;z-index:9000;pointer-events:none;/.test(html) && /#guide-card\{position:fixed;z-index:9001;/.test(html));
   ok("the anchor is scrolled into view before measuring, and the card is clamped into the window (seen live: an off-screen card)",
@@ -7292,7 +7293,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && src.includes("if (typeof SLY !== 'undefined' && SLY.h) ensureSiteLayoutLayers();"));
   const js = fs.readFileSync(path.join(__dirname, "..", "..", "map", "site-layouts.js"), "utf8").replace(/\r\n?/g, "\n");
   ok("SITE LAYOUTS: site-layouts.js draws from the style table it is given; sizes in metres with zoom top-level (GL drops a nested zoom)",
-     js.includes("window.WSLayouts = { install, metres, centroid, areaM2, bearing };") && !/once\(['"]idle/.test(js)
+     // NARROWED 31 Oct 2026 (task 4c PR 2): + geo (the drawing tools' geometry) and WORDS_Z
+     js.includes("window.WSLayouts = { install, metres, centroid, areaM2, bearing, geo, WORDS_Z };") && !/once\(['"]idle/.test(js)
      && /\["coalesce", \["get", "_m"\], 1\.6\]/.test(js) && !/\["\*",[^\]]*\["zoom"\]/.test(js));
   ok("SITE LAYOUTS: a basemap switch puts back the features as sent (not the prepared copy)",
      js.includes("raw = list;") && js.includes("setData(raw);"));
@@ -7302,6 +7304,72 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
         slyFn.includes("SLY.failed === month") && slyFn.includes("SLY.failed = month;")
         && slyFn.includes("SLY.tried !== siteLayoutMonth()") && !slyFn.includes("SLY.month !== siteLayoutMonth()")
         && /function toggleSiteLayouts\(on\) \{\s*SLY\.on = !!on;\s*SLY\.failed = undefined;/.test(html));
+}
+
+// 31 Oct 2026 (task 4c PR 2, the approved mockup notes\site-layout-draw-mockup-1031, Q5): the layout's WORDS show from zoom 15 on
+// both maps (the live test L1: at the whole-scheme zoom they printed as a smudge), and geo: the drawing tools' geometry, run here
+{
+  const js = fs.readFileSync(path.join(__dirname, "..", "..", "map", "site-layouts.js"), "utf8").replace(/\r\n?/g, "\n");
+  ok("⭐ SITE LAYOUTS (PR 2): the words — text things, area names, symbol labels — show from zoom 15 only (WORDS_Z), the pictures always",
+     js.includes("const WORDS_Z = 15;")
+     && /id: "d-alabel", type: "symbol", source: DRV, minzoom: WORDS_Z,/.test(js)
+     && /id: bold \? "t-bold" : "t-reg", type: "symbol", source: SRC, minzoom: WORDS_Z,/.test(js)
+     && js.includes('"text-field": ["step", ["zoom"], "", WORDS_Z, ["coalesce", ["get", "label"], ""]]')
+     && !/id: "s-icons"[^\n]*minzoom/.test(js) && !/id: "d-icons"[^\n]*minzoom/.test(js));
+  // the Chrome check, 31 Oct: after Done, the things drawn while the card was hidden showed their words but not their lines
+  ok("🔴 SITE LAYOUTS (PR 2): setVisible(true) sends the data again (GL JS v3 keeps stale tiles of a source set while hidden)",
+     /function setVisible\(on\) \{[\s\S]{0,400}if \(visible\) \{ const s = src\(SRC\), d = src\(DRV\); if \(s\) s\.setData\(data\); if \(d\) d\.setData\(derived\); \}/.test(js));
+  // the Chrome check, 31 Oct (also on main since PR 1): Sign out with a site's layout card open blanked the app — the card's
+  // clean-up called setData after DataManagement had removed the map, and Mapbox's getSource threw
+  ok("🔴 SITE LAYOUTS: setData / setVisible / remove never throw once the map is gone (getSource / getLayer guarded)",
+     js.includes("const src = (id) => { try { return map.getSource(id); } catch (e) { return null; } };")
+     && js.includes("const lyr = (id) => { try { return map.getLayer(id); } catch (e) { return null; } };")
+     && !/function (setData|setVisible|remove)\([^)]*\) \{[^}]*map\.get(Source|Layer)\(/.test(js));
+  {
+    const vm2 = require("vm"), box2 = { window: {}, Image: function () {}, document: {} };
+    vm2.createContext(box2); vm2.runInContext(js, box2);
+    const deadMap = { getSource() { throw new TypeError("Cannot read properties of undefined (reading 'getOwnSource')"); }, getLayer() { throw new TypeError("gone"); },
+                      hasImage() { return false; }, addImage() {}, on() {}, off() {} };
+    let threw = null;
+    try { const h = box2.window.WSLayouts.install(deadMap, { lines: [], areas: [], symbols: [] }, { prefix: "x" }); h.setData([]); h.setVisible(true); h.setVisible(false); h.remove(); }
+    catch (e) { threw = e; }
+    ok("🔴 SITE LAYOUTS: on a removed map (getSource throws) setData([]), setVisible and remove do not throw", threw === null, threw && threw.message);
+  }
+  // the file in a sandbox, with a window and no map: geo is pure
+  const vm = require("vm"), box = { window: {}, Image: function () {}, document: {} };
+  vm.createContext(box); vm.runInContext(js, box);
+  const G = box.window.WSLayouts && box.window.WSLayouts.geo;
+  const sq = (c, h) => [[c[0] - h, c[1] - h], [c[0] + h, c[1] - h], [c[0] + h, c[1] + h], [c[0] - h, c[1] + h], [c[0] - h, c[1] - h]];
+  const O = [-0.8836, 52.6452], outer = sq(O, 0.0004), hole = sq(O, 0.0001);
+  const near = (a, b, m) => a.every((p, i) => { const d = G.toM(p, b[i]); return Math.hypot(d[0], d[1]) <= m; });
+  ok("SITE LAYOUTS (PR 2): geo is there for the drawing tools (turn, resize, shift, fit, holes, 7 dp)",
+     !!G && ["round7", "mapGeom", "rotate", "scale", "shift", "fit", "inRing", "holesFollow", "toM", "fromM", "lengthM"].every(k => typeof G[k] === "function"));
+  if (G) {
+    const turned = G.rotate({ type: "Polygon", coordinates: [outer] }, 30, O).coordinates[0];
+    const r1 = G.holesFollow([hole], outer, turned);
+    ok("⭐ SITE LAYOUTS (PR 2): a hole TURNS with its area (the outside edge turned 30° about the middle -> the hole turned the same, within 1 cm)",
+       r1.dropped === 0 && r1.holes.length === 1 && near(r1.holes[0], G.rotate({ type: "Polygon", coordinates: [hole] }, 30, O).coordinates[0], 0.01));
+    const moved = G.shift({ type: "Polygon", coordinates: [outer] }, 25, -10).coordinates[0];
+    const big = G.scale({ type: "Polygon", coordinates: [outer] }, 1.1, O).coordinates[0];
+    ok("SITE LAYOUTS (PR 2): ...MOVES and RESIZES with it too",
+       near(G.holesFollow([hole], outer, moved).holes[0], G.shift({ type: "Polygon", coordinates: [hole] }, 25, -10).coordinates[0], 0.01)
+       && near(G.holesFollow([hole], outer, big).holes[0], G.scale({ type: "Polygon", coordinates: [hole] }, 1.1, O).coordinates[0], 0.01));
+    const corner = outer.map((p, i) => i === 2 ? [p[0] + 0.0002, p[1] + 0.0002] : p);
+    ok("SITE LAYOUTS (PR 2): one corner dragged leaves the hole where it was (not a move, a turn or a resize)",
+       JSON.stringify(G.holesFollow([hole], outer, corner).holes[0]) === JSON.stringify(hole));
+    // the two left corners dragged right past the hole: not a move / turn / resize, and the hole is no longer inside
+    const narrow = outer.map(p => p[0] < O[0] ? [O[0] + 0.0002, p[1]] : p);
+    const r2 = G.holesFollow([hole], outer, narrow);
+    ok("SITE LAYOUTS (PR 2): a hole left outside the edge is dropped and counted (the editor says so; Undo puts it back)",
+       r2.holes.length === 0 && r2.dropped === 1);
+    const added = outer.slice(0, 2).concat([[O[0] + 0.0004, O[1]]], outer.slice(2));
+    ok("SITE LAYOUTS (PR 2): a corner added keeps the hole (still inside)", G.holesFollow([hole], outer, added).holes.length === 1
+       && JSON.stringify(G.holesFollow([hole], outer, added).holes[0]) === JSON.stringify(hole));
+    const g7 = G.round7({ type: "LineString", coordinates: [[-0.123456789, 52.987654321]] }).coordinates[0];
+    ok("SITE LAYOUTS (PR 2): coordinates rounded to 7 dp", g7[0] === -0.1234568 && g7[1] === 52.9876543);
+    ok("SITE LAYOUTS (PR 2): lengthM measures in metres (100 m north is 100 m, within 1 m)",
+       Math.abs(G.lengthM([O, [O[0], O[1] + 100 / 110574]]) - 100) < 1);
+  }
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
