@@ -502,6 +502,25 @@ def save_things(phase_id, body, by):
     return out
 
 
+def copy_phase(phase_id, by):
+    """A copy of a phase as a NEW phase of the same layout: every thing, the name with " (copy)" after it, no months
+    (so it applies in every month until set). PR 2 (31 Oct 2026, the mockup's Q8). One write; the 24-phase limit holds."""
+    cur = _phase_row(phase_id)
+    tenant = db.current_tenant()
+    n = db.query("SELECT COUNT(*) AS n, MAX(sort) AS s FROM site_layout_phases WHERE tenant_id = ? AND layout_id = ?",
+                 (tenant, cur["layout_id"]))[0]
+    if int(n["n"] or 0) >= MAX_PHASES:
+        raise Problem(f"A layout holds at most {MAX_PHASES} phases.")
+    base = re.sub(r"\s+", " ", str(cur.get("name") or "")).strip()
+    name = (base[:MAX_NAME - 7] + " (copy)") if base else "Copy"
+    pid = _next_id("site_layout_phases", "PH")
+    db.execute("INSERT INTO site_layout_phases (tenant_id, id, layout_id, name, month_from, month_to, sort, "
+               "features_json, updated_by, updated_at, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+               (tenant, pid, cur["layout_id"], name, None, None, int(n["s"] or 0) + 1,
+                cur.get("features_json") or json.dumps(_fc([])), by, _now()))
+    return _phase_out(_phase_row(pid), with_things=False)
+
+
 def set_public(location_id, body, by):
     """31 Oct 2026 (task 4c PR 4): "Show on the public map" on or off. Carries the LAYOUT's version (STALE when someone
     else changed it first) and moves it on."""

@@ -783,6 +783,44 @@ too_many = {"features": [{"type": "Feature", "geometry": {"type": "Point", "coor
                           "properties": {"style": "sym", "sym": "cone"}}] * (SL.MAX_PHASE + 1)}
 st, tm = http(main.save_site_layout_things, pid, main.SiteLayoutThingsIn(version=sv["version"], features=too_many))
 ok("5. a phase holds at most 2,000 things", st == 400 and "2,000" in tm)
+# 31 Oct 2026 (task 4c PR 2): what the drawing tools send — an area WITH a hole (the tools keep holes beside Terra Draw and put
+# them back on save) keeps both rings; 7 dp coordinates come back as sent
+holed = {"type": "FeatureCollection", "features": kept + [
+    {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [
+        [[-0.8810000, 52.6440000], [-0.8800000, 52.6440000], [-0.8800000, 52.6450000], [-0.8810000, 52.6450000], [-0.8810000, 52.6440000]],
+        [[-0.8806000, 52.6444000], [-0.8806000, 52.6446000], [-0.8804000, 52.6446000], [-0.8804000, 52.6444000], [-0.8806000, 52.6444000]]]},
+     "properties": {"style": "exclusion", "text": "LIFT ZONE", "mode": "polygon", "selected": True}}]}
+st, sh = http(main.save_site_layout_things, pid, main.SiteLayoutThingsIn(version=sv["version"], features=holed))
+hz = sh["features"]["features"][-1] if st == 200 else {}
+ok("5. (PR 2) an area with a hole saved by the drawing tools keeps both rings, its 7 dp corners and its words; their own flags dropped",
+   st == 200 and sh["things"] == 4 and len(hz["geometry"]["coordinates"]) == 2 and hz["geometry"]["coordinates"][1][1] == [-0.8806, 52.6446]
+   and hz["properties"]["text"] == "LIFT ZONE" and "selected" not in hz["properties"], str(sh)[:300])
+# Copy to a new phase (Q8): every thing, "<name> (copy)", no months, opened in the editor by the page
+as_code("submitter123")
+ok("5. (PR 2) a submitter cannot copy a phase (403)", http(main.copy_site_layout_phase, pid)[0] == 403)
+as_code("planner123")
+before_n = len(main.get_site_layout("L019")["layout"]["phases"])
+st, cp = http(main.copy_site_layout_phase, pid)
+cph = cp["phase"] if st == 200 else {}
+lay_c = main.get_site_layout("L019")["layout"]
+full = next((p for p in lay_c["phases"] if p["id"] == cph.get("id")), {})
+src_ph = next(p for p in lay_c["phases"] if p["id"] == pid)
+ok("⭐ 5. (PR 2) Copy to a new phase: a new phase with every thing (holes too), the name + ' (copy)', no months, version 1, last in order",
+   st == 200 and cph["id"] != pid and cph["name"] == "Deck lift and launch (copy)" and cph["month_from"] is None and cph["month_to"] is None
+   and cph["version"] == 1 and cph["things"] == 4 and len(lay_c["phases"]) == before_n + 1 and lay_c["phases"][-1]["id"] == cph["id"]
+   and full["features"] == src_ph["features"] and "features" not in cph, str(cp)[:300])
+ok("5. (PR 2) ...the copy leaves the phase it came from as it was (same version, same things)",
+   src_ph["version"] == sh["version"] and src_ph["things"] == 4)
+_max = SL.MAX_PHASES
+SL.MAX_PHASES = len(lay_c["phases"])
+st, cfull = http(main.copy_site_layout_phase, pid)
+SL.MAX_PHASES = _max
+ok("5. (PR 2) ...refused at the phase limit, in words", st == 400 and "at most" in cfull and "phases" in cfull, str(cfull))
+st, cgone = http(main.copy_site_layout_phase, "PH999")
+ok("5. (PR 2) ...a phase that is not there: refused in words, like every phase call", st == 400 and "not there" in cgone, str((st, cgone)))
+st, dcp = http(main.delete_site_layout_phase, cph["id"], cph["version"])
+ok("5. (PR 2) ...and the copy deletes like any phase", st == 200)
+sv = sh
 st, dl = http(main.delete_site_layout_phase, pid, sv["version"])
 ok("5. deleted with its version", st == 200 and len(main.get_site_layout("L019")["layout"]["phases"]) == 2)
 ok("5. in_month: open ends apply, closed ends bound", SL.in_month({"month_from": None, "month_to": None}, "2030-01")
