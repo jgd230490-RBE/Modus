@@ -4831,18 +4831,29 @@ def clp_document_docx(locations: Optional[str] = None, impact: Optional[str] = N
     """30 Oct 2026 (task 4a, PR 1) — the outline Construction Logistics Plan as a Word file for one location or a set
     (`locations` = ids, comma-separated): every figure Wayscope holds filled in, a yellow "To complete" wherever only a
     person can write, a dated snapshot. Planner or admin. `impact` = higher (default) or medium picks §5's checklist.
-    422 for no location, an unknown one or an unknown impact. Kept until the next write, like the CLP pack."""
-    _require_approver()
+    422 for no location, an unknown one or an unknown impact. Kept until the next write, like the CLP pack.
+    PR 2: the charts, the three plans per site (the basemap) and §2.3 / §2.4 from the stored layers; built in a heavy
+    slot (one memory line, a 503 when busy), and not kept when a plan was drawn without its basemap."""
+    acc = _require_approver()
     ids = [x.strip() for x in str(locations or "").split(",") if x.strip()]
     imp = (impact or "higher").strip().lower()
     if imp not in clp_doc.IMPACT:
         raise HTTPException(422, "impact must be higher or medium")
     factors = conversions.load_factors()
     try:
-        data = clp_doc.gather(ids, factors=factors, working_days=_working_days(factors))
+        data = clp_doc.gather(ids, factors=factors, working_days=_working_days(factors), layers=False)
     except ValueError as e:
         raise HTTPException(422, str(e))
-    body = _staff_bytes("clp/document.docx", {"locations": ids, "impact": imp}, lambda: clp_doc.build(data, impact=imp))
+    misses = basemap.MISSES[0]
+
+    def build():
+        import clp_doc_layers
+        with heavy_reads.slot("clp-document", busy=lambda: HTTPException(
+                503, "Wayscope is busy; try again in a minute.", headers={"Retry-After": "30"})):
+            data["layers"] = clp_doc_layers.gather(data)
+            return clp_doc.build(data, impact=imp, acc=acc)
+    body = _staff_bytes("clp/document.docx", {"locations": ids, "impact": imp}, build, acc=acc,
+                        keep=lambda: basemap.MISSES[0] == misses)
     return Response(content=body,
                     media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     headers={"Content-Disposition": f'attachment; filename="{clp_doc.file_name(data)}"'})

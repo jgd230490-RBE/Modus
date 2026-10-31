@@ -142,6 +142,8 @@ import site_areas  # noqa: E402
 import taxonomy  # noqa: E402
 import carbon_target  # noqa: E402
 import clp_doc  # noqa: E402
+import export  # noqa: E402
+offline(export)            # PR 2 draws plans: Mapbox is never called from a test (the schematic branch)
 from docx import Document  # noqa: E402
 for _v in ("IPT1_CODE", "IPT2_CODE", "IPT3_CODE", "IPT4_CODE", "IPT5_CODE", "IPT6_CODE",
            "PLANNER_CODE", "ADMIN_CODE"):
