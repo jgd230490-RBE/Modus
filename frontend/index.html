@@ -753,6 +753,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .clp-thread{list-style:none;padding:0;margin:0 0 8px;}
   .clp-thread > li{border-top:1px solid var(--line);padding:7px 0;}
   .clp-step{font-size:13px;color:var(--muted);}
+  /* 31 Oct 2026 (task 4a, PR 3c): a client reviewer's comment carries its group's name */
+  .clp-org{display:inline-block;font-size:12px;font-weight:600;line-height:18px;padding:0 8px;margin-right:6px;border-radius:999px;background:var(--navy-soft);color:var(--navy);}
   .clp-words{font-size:14px;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere;}
   .clp-line{display:flex;gap:6px;align-items:baseline;font-size:13px;padding:3px 0;color:var(--ink);}
   .clp-line b{white-space:nowrap;}
@@ -1157,7 +1159,7 @@ window.fetch = (url, opts) => {
     o.headers = { ...(o.headers || {}), "X-Wayscope": "1", ...(ACCESS.code ? { "X-Access-Code": ACCESS.code } : {}) };
     // a login whose session has ended (signed out elsewhere, disabled, expired): back to the sign-in screen once
     return _rawFetch(url, o).then(r => {
-      if(r.status === 401 && ACCESS.info && ACCESS.info.via === "login" && !u.startsWith(API + "/auth/")){
+      if(r.status === 401 && ACCESS.info && (ACCESS.info.via === "login" || ACCESS.info.via === "reviewer") && !u.startsWith(API + "/auth/")){
         try { window.dispatchEvent(new Event(SESSION_ENDED)); } catch(e){}
       }
       return r;
@@ -3828,8 +3830,10 @@ function App(){
   // grants (the same call the sign-in form makes), and returns to the staff app. A refused code is forgotten.
   // G3 (14 Oct 2026): "setpw" (an invite or reset link), "linkerr" (a demo link that no longer works). A session is
   // resumed the same way a code is — only when this browser signed in before (the hint) or a lead's link is opening.
+  // 31 Oct 2026 (task 4a, PR 3c): "review" is a client reviewer's one page; the reviewers' email links to #review, which
+  // opens the sign-in for someone not signed in on this browser
   const [view, setView] = useState(() => (START_LINK && START_LINK.purpose !== "demo") ? "setpw"
-    : (START_LINK || ACCESS.code || hasAuthHint()) ? "resume" : "public");   // public | login | portal | resume | setpw | linkerr
+    : (START_LINK || ACCESS.code || hasAuthHint()) ? "resume" : ((typeof location !== "undefined" && location.hash === "#review") ? "login" : "public"));   // public | login | portal | review | resume | setpw | linkerr
   const [authNotice, setAuthNotice] = useState("");
   const [linkErr, setLinkErr] = useState("");
   const [role, setRole] = useState(null);
@@ -3909,7 +3913,7 @@ function App(){
     else { try { sessionStorage.removeItem("modus_access_code"); } catch(e){} authHint(true); }
     setRole(info); setWho(n); setAuthNotice("");
     try { localStorage.setItem("modus_who", n); } catch(e){}
-    setView("portal");
+    setView(info && info.via === "reviewer" ? "review" : "portal");
   };
   // G3: a lead's link (HU14) signs them straight in; a browser that signed in before asks who it is
   useEffect(() => {
@@ -3923,7 +3927,8 @@ function App(){
     if(START_LINK || !hasAuthHint()) return;
     fetch(`${API}/auth/me`).then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(j => {
-        if(j && j.signed_in && j.access && j.access.via === "login"){ ACCESS.info = j.access; setRole(j.access); setWho(j.access.name || ""); setView("portal"); }
+        if(j && j.signed_in && j.reviewer){ ACCESS.info = j.reviewer; setRole(j.reviewer); setWho(j.reviewer.name || ""); setView("review"); }
+        else if(j && j.signed_in && j.access && j.access.via === "login"){ ACCESS.info = j.access; setRole(j.access); setWho(j.access.name || ""); setView("portal"); }
         else { authHint(false); setView("public"); }
       })
       .catch(() => setView("public"));
@@ -3965,7 +3970,7 @@ function App(){
   // the bar's Guide: none on the sign-in view (it has no tour); the embedded map's tour on a map view, once the map
   // has said it is ready (never over the map password page); this app's guide on every other Portal page
   const onMap = view === "public" || (view === "portal" && page === "map");
-  const barGuide = (view === "login" || view === "resume" || view === "setpw" || view === "linkerr") ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;
+  const barGuide = (view === "login" || view === "resume" || view === "setpw" || view === "linkerr" || view === "review") ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;
 
   return (
     <div className="h-full flex flex-col">
@@ -3980,9 +3985,10 @@ function App(){
           <AuthNote title="This link no longer works" body={linkErr} action="Back to the map" onAction={() => setView("public")} />
         )}
         {view === "resume" && <div className="flex-1 flex items-center justify-center text-sm text-slate-500" role="status">Signing you back in…</div>}
-        {view === "portal" && (
+        {view === "portal" && !(role && role.via === "reviewer") && (
           <Portal role={role} who={who} meta={meta} metaErr={metaErr} vehLang={vehLang} onPage={setPage} />
         )}
+        {view === "review" && role && role.via === "reviewer" && <ReviewPage role={role} />}
       </main>
     </div>
   );
@@ -4197,7 +4203,7 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
             white/70 (hidden below the sm breakpoint, 640 px). The default tenant is
             named "Wayscope" too, so the name is shown only when it is the tenant's own.
             Click-to-home kept. */}
-        <button onClick={() => setView(role ? "portal" : "public")} className="flex items-center gap-3 text-left min-w-0"
+        <button onClick={() => setView(role ? (role.via === "reviewer" ? "review" : "portal") : "public")} className="flex items-center gap-3 text-left min-w-0"
           title={TENANT.name && TENANT.name !== "Wayscope" ? TENANT.name + " · Wayscope" : "Wayscope"}>
           <img src="/brand/logo-header-on-dark.svg" alt="Wayscope" className="brand-lockup" draggable="false" />
           {TENANT.name && TENANT.name !== "Wayscope" && (
@@ -4221,7 +4227,7 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
               {/* Vehicle names, one button per language offered. Label only — see vehLabel(). 11 Oct 2026: shown
                   only when there is a CHOICE — the seed's vehicles carry English alone, so a new organisation and
                   the GB demo get no buttons (until then the GB demo showed a lone "English" button). */}
-              {VEH_LANGS.filter(([k]) => vehLangShown(k)).length > 1 && (
+              {role.via !== "reviewer" && VEH_LANGS.filter(([k]) => vehLangShown(k)).length > 1 && (
               <span className="hidden md:inline-flex rounded-md overflow-hidden hdr-seg text-xs mr-2"
                 title="How vehicle names are shown.">
                 {VEH_LANGS.filter(([k]) => vehLangShown(k)).map(([k, l]) => (
@@ -4231,7 +4237,7 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
                   </button>
                 ))}
               </span>)}
-              {role.via === "login" ? <AccountMenu role={role} onSignOut={signOut} />
+              {(role.via === "login" || role.via === "reviewer") ? <AccountMenu role={role} onSignOut={signOut} />
                 : <span className="hidden sm:inline hdr-muted mr-1">{role.ipt ? teamName(role.ipt) : role.label}</span>}
               {/* 11 Oct 2026: the Guide button moved to the right end of the demo bar (DemoBar). It was shown
                   only to a demo tenant, and the bar shows exactly then, so a real tenant loses nothing. */}
@@ -4239,7 +4245,7 @@ function Header({ view, role, setView, signOut, vehLang, setVehLang }){
               {/* G3: below 640 px a LOGIN's Sign out lives in the account menu (the header has no room for the name, the
                   appearance button and Sign out on a 360 px phone); a code sign-in keeps this button at every width */}
               <button onClick={signOut}
-                className={"px-4 py-2 rounded-md hdr-btn font-medium transition" + (role.via === "login" ? " hdr-signout-login" : "")}>
+                className={"px-4 py-2 rounded-md hdr-btn font-medium transition" + ((role.via === "login" || role.via === "reviewer") ? " hdr-signout-login" : "")}>
                 Sign out
               </button>
             </>
@@ -4784,6 +4790,7 @@ function ClpNotes({ clp, teamWord, headRef, onClose, onChanged }){
   const [words, setWords] = useState("");
   const [tf, setTf] = useState(null);             // the task form: null | { id?, words, for, due, from_line }
   const [allLines, setAllLines] = useState(false);
+  const [showTo, setShowTo] = useState("");       // PR 3c: a contractor note shown to one reviewer group ("" = only us)
   const base = `${API}/clp/documents/${encodeURIComponent(clp.id)}`;
   useEffect(() => {
     let live = true;
@@ -4815,12 +4822,16 @@ function ClpNotes({ clp, teamWord, headRef, onClose, onChanged }){
   const tick = (x) => call("PATCH", `tasks/${encodeURIComponent(x.id)}`, { done: !x.done }, x.done ? "The task was not ticked back." : "The task was not ticked done.");
   const delTask = (x) => { if(window.confirm(`Delete the task "${x.words.slice(0, 80)}"?`)) call("DELETE", `tasks/${encodeURIComponent(x.id)}`, null, "The task was not deleted.", () => "Deleted."); };
   const delNote = (n) => { if(window.confirm("Delete this note?")) call("DELETE", `notes/${encodeURIComponent(n.id)}`, null, "The note was not deleted.", () => "Deleted."); };
-  const addNote = () => call("POST", "notes", { note: words }, "The note was not saved.", () => "Note added.").then(d => { if(d) setWords(""); });
+  const addNote = () => call("POST", "notes", { note: words, show_to: showTo || null }, "The note was not saved.", () => "Note added.").then(d => { if(d){ setWords(""); setShowTo(""); } });
+  // PR 3c: a reviewer's comment made into a task (planners and admins); the task names the group it came from
+  const taskFrom = (n) => call("POST", "tasks", { words: n.words, for: forOpts[0] ? forOpts[0].key : "approvers", from_note: n.id },
+    "The task was not added.", mailed("Task added."));
+  const showOpts = t.show_to || [];
   return (
     <div className="card p-4 mb-4" data-clp-notes="1">
       {head}
       {msg && <p className="text-sm mb-1" style={{ color: msg.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{msg.text}</p>}
-      <h3 className="clp-h3">Tasks <span className="font-normal text-slate-500">{open.length} open{done.length ? ` · ${done.length} done` : ""}</span></h3>
+      <h3 className="clp-h3">Tasks <span className="font-normal text-slate-500">{open.length} open{done.length ? ` · ${done.length} done` : ""}{showOpts.length ? " · never shown to the client's reviewers" : ""}</span></h3>
       {open.length > 0 && (
         <div className="overflow-x-auto"><table className="tbl clp-tasks" data-clp-tasks="1">
           <thead><tr><th scope="col"><span className="sr-only">Done</span></th><th scope="col">Task</th><th scope="col">For</th><th scope="col">Due</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
@@ -4829,6 +4840,7 @@ function ClpNotes({ clp, teamWord, headRef, onClose, onChanged }){
               <td style={{ width: 36 }}><input type="checkbox" checked={false} aria-label={`Done: ${x.words}`} onChange={() => tick(x)} /></td>
               <td style={{ whiteSpace: "normal", minWidth: 240 }}><span className="clp-words">{x.words}</span>
                 {x.from_section && <span className="rd-chip ml-1.5">To complete · {x.from_section}</span>}
+                {x.from_group && <span className="block text-[12px] text-slate-500">From {x.from_group}'s comment</span>}
                 {x.line_gone_at && <span className="block text-[12px]" style={{ color: "var(--ok-text)" }}>✓ no longer in the draft of {clpShort(x.line_gone_at)}</span>}</td>
               <td>{x.for_word}</td>
               <td className="tabular-nums">{x.due ? clpShort(x.due) : "—"}{x.overdue && <span className="block text-[12px] font-semibold" style={{ color: "var(--bad-text)" }}>overdue</span>}</td>
@@ -4878,16 +4890,24 @@ function ClpNotes({ clp, teamWord, headRef, onClose, onChanged }){
       <ol className="clp-thread" data-clp-thread="1">
         {!t.notes.length && <li className="text-[13px] text-slate-500">No notes yet.</li>}
         {t.notes.map(n => n.kind === "step" ? (
-          <li key={n.id || n.step + n.at} className="clp-step" data-clp-step={n.step}>↗ {n.step_word} by {n.by || "—"} · {clpWhen(n.at)}{n.words ? <> · “{n.words}”</> : null}</li>
+          <li key={n.id || n.step + n.at} className="clp-step" data-clp-step={n.step}>{n.step === "review-returned" ? "↩" : n.step === "review-accepted" ? "✓" : "↗"} {n.step_word} by {n.by || "—"} · {clpWhen(n.at)}{n.words ? <> · “{n.words}”</> : null}</li>
         ) : (
           <li key={n.id} data-clp-note-row={n.id}>
-            <div className="text-[12px] text-slate-500">{n.by} · {clpWhen(n.at)}
+            <div className="text-[12px] text-slate-500">{n.reviewer && n.group_name ? <span className="clp-org" data-clp-org="1">{n.group_name}</span> : null}{n.by} · {clpWhen(n.at)}
+              {n.shown_to && <span className="ml-1">· shown to {n.shown_to}</span>}
+              {n.can_task && <button type="button" className="link-btn text-[12px] ml-2" aria-label={`Make a task from the comment by ${n.by}`} onClick={() => taskFrom(n)} data-clp-make-task="1">Make a task</button>}
               {n.can_delete && <button type="button" className="link-btn text-[12px] ml-2" aria-label={`Delete the note by ${n.by}, ${clpWhen(n.at)}`} onClick={() => delNote(n)}>Delete</button>}</div>
             <div className="clp-words">{n.words}</div>
           </li>))}
       </ol>
       <label htmlFor="clp-nn" className="block text-[13px] text-slate-500 mb-1">Add a note</label>
       <textarea id="clp-nn" className="ctl w-full" rows={2} maxLength={1000} placeholder="Write a note for everyone who can see this CLP" value={words} onChange={e => setWords(e.target.value)} />
+      {showOpts.length > 0 && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm" data-clp-show-to="1">{showOpts.map(o => (
+          <label key={o.id} className="inline-flex items-center gap-1.5"><input type="checkbox" checked={showTo === o.id} onChange={e => setShowTo(e.target.checked ? o.id : "")} />
+            Show to {o.name}</label>))}
+          <span className="text-[13px] text-slate-500">Off: only {TENANT.name && TENANT.name !== "Wayscope" ? TENANT.name + "'s" : "the contractor's"} people see it.</span></div>
+      )}
       <div className="flex flex-wrap items-center gap-2 mt-2">
         <button type="button" className="btn-pri" onClick={addNote} disabled={!words.trim()} data-clp-note-add="1">Add note</button>
         <button type="button" className="btn-sec" onClick={onClose}>Close</button>
@@ -4903,6 +4923,7 @@ function ClpPage({ access }){
   const [fTeam, setFTeam] = useState("");
   const [fStatus, setFStatus] = useState("");
   const [fTasks, setFTasks] = useState("");       // PR 3b: "" | open | mine | overdue
+  const [fRev, setFRev] = useState("");           // PR 3c: "" | waiting | accepted | returned
   const [panel, setPanel] = useState(null);       // null | { kind: "edit" | "new" | "send" | "approve" | "changes" | "history" | "notes", clp }
   const [form, setForm] = useState({});
   const [pv, setPv] = useState(null);             // the approve card's preview, or the history
@@ -4923,7 +4944,8 @@ function ClpPage({ access }){
   const teamWord = (c) => c.team_name || "All teams";
   const tk = (c) => c.tasks || {};
   const list = (data.clps || []).filter(c => (!fTeam || (fTeam === "all" ? !c.team : c.team === fTeam)) && (!fStatus || c.status === fStatus)
-    && (!fTasks || (fTasks === "open" ? tk(c).open > 0 : fTasks === "mine" ? tk(c).mine_open > 0 : tk(c).overdue > 0)));
+    && (!fTasks || (fTasks === "open" ? tk(c).open > 0 : fTasks === "mine" ? tk(c).mine_open > 0 : tk(c).overdue > 0))
+    && (!fRev || (c.reviews || []).some(r => r.state === fRev)));
   const close = () => { setPanel(null); setPv(null); };
   const send = (method, path, body, what, done) => fetch(`${API}${path}`, { method, headers: { "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : undefined }).then(okJSON)
@@ -4954,9 +4976,29 @@ function ClpPage({ access }){
   const openChanges = (c) => { setPv(null); setPanel({ kind: "changes", clp: c }); setForm({ note: "", asTask: false, due: "" }); };
   const openNotes = (c) => { setPv(null); setPanel({ kind: "notes", clp: c }); };
   const openApprove = (c) => {
-    setPanel({ kind: "approve", clp: c }); setForm({ note: "" }); setPv(null);
-    fetch(`${API}/clp/documents/${encodeURIComponent(c.id)}/approve-preview`).then(okJSON).then(setPv)
-      .catch(e => setPv({ problem: errSay("What changed could not be worked out.", e) }));
+    setPanel({ kind: "approve", clp: c }); setForm({ note: "", sendTo: [] }); setPv(null);
+    fetch(`${API}/clp/documents/${encodeURIComponent(c.id)}/approve-preview`).then(okJSON).then(p => {
+      setPv(p);
+      // PR 3c: a group that had the last issue is ticked for the next one
+      const last = c.last_issue ? c.last_issue.no : null;
+      setForm(f => ({ ...f, sendTo: (p.review_groups || []).filter(g => last && g.had_issue === last).map(g => g.id) }));
+    }).catch(e => setPv({ problem: errSay("What changed could not be worked out.", e) }));
+  };
+  const openReview = (c) => {
+    setPanel({ kind: "review", clp: c }); setForm({ sendTo: [] }); setPv(null);
+    fetch(`${API}/clp/documents/${encodeURIComponent(c.id)}/review-send`).then(okJSON).then(p => {
+      setPv(p); setForm({ sendTo: (p.groups || []).filter(g => !g.has_this && g.had_issue).map(g => g.id) });
+    }).catch(e => setPv({ problem: errSay("The groups did not load.", e) }));
+  };
+  const tickGroup = (id, on) => setForm(f => ({ ...f, sendTo: on ? [...(f.sendTo || []), id] : (f.sendTo || []).filter(x => x !== id) }));
+  // the words after a send: who got it, and whether their email went
+  const sentWords = (rs) => {
+    if(!rs) return "";
+    if(rs.error) return " " + errSay("It was not sent to the reviewers.", { message: rs.error });
+    const got = (rs.sent || []).map(x => x.group_name);
+    const unsent = (rs.sent || []).some(x => x.email && (x.email.unsent || x.email.failed));
+    return (got.length ? ` Sent to ${got.join(" and ")}.` : "") + (unsent ? " Not every reviewer could be emailed: tell them yourself." : "")
+      + ((rs.skipped || []).length ? ` ${(rs.skipped || []).map(x => x.group_name).join(" and ")} already had it.` : "");
   };
   const openHistory = (c) => {
     setPanel({ kind: "history", clp: c }); setPv(null);
@@ -4982,8 +5024,18 @@ function ClpPage({ access }){
   const doApprove = () => {
     const c = panel.clp;
     setBuilding(c.id);
-    send("POST", `/clp/documents/${encodeURIComponent(c.id)}/approve`, { note: form.note || null }, "The CLP was not approved.",
-         `Approved as Issue ${c.next_issue}.`).then(ok => { setBuilding(""); if(ok) close(); });
+    fetch(`${API}/clp/documents/${encodeURIComponent(c.id)}/approve`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: form.note || null, send_to: (form.sendTo || []).length ? form.sendTo : null }) }).then(okJSON)
+      .then(d => { say(true, `Approved as Issue ${c.next_issue}.` + sentWords(d.review_send)); setTick(t => t + 1); close(); })
+      .catch(e => say(false, errSay("The CLP was not approved.", e)))
+      .finally(() => setBuilding(""));
+  };
+  const doReview = () => {
+    const c = panel.clp;
+    fetch(`${API}/clp/documents/${encodeURIComponent(c.id)}/review-send`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groups: form.sendTo || [], issue_no: pv.issue_no }) }).then(okJSON)
+      .then(d => { say(true, `Issue ${pv.issue_no}:` + sentWords(d)); setTick(t => t + 1); close(); })
+      .catch(e => say(false, errSay("It was not sent.", e)));
   };
   const remove = (c) => {
     const n = tk(c).notes || 0, t = (tk(c).open || 0) + (tk(c).done || 0);
@@ -5078,6 +5130,13 @@ function ClpPage({ access }){
           {pv.last_issue && <ul className="list-disc pl-5 mt-1 text-slate-700" data-clp-changes="1">{(pv.changes || []).map((x, i) => <li key={i}>{x}</li>)}</ul>}
         </div>
       )}
+      {pv && !pv.problem && (pv.review_groups || []).length > 0 && (
+        <fieldset className="mt-3" data-clp-send-to="1"><legend className="text-[13px] text-slate-500 mb-1">Send to the client's reviewers</legend>
+          {pv.review_groups.map(g => (
+            <label key={g.id} className="flex items-center gap-1.5 text-sm py-0.5"><input type="checkbox" checked={(form.sendTo || []).includes(g.id)} onChange={e => tickGroup(g.id, e.target.checked)} />
+              {g.name} <span className="text-slate-500">· {g.reviewers} reviewer{g.reviewers === 1 ? "" : "s"}{g.had_issue ? ` · had Issue ${g.had_issue}` : ""}</span></label>))}
+        </fieldset>
+      )}
       <label htmlFor="clp-anote" className="block text-[13px] text-slate-500 mt-3 mb-1">Your note (optional, printed in the history)</label>
       <textarea id="clp-anote" className="ctl w-full" rows={2} maxLength={1000} value={form.note || ""} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} />
       <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -5085,8 +5144,26 @@ function ClpPage({ access }){
           {building === panel.clp.id ? busyWords : "Approve and issue"}</button>
         {panel.clp.status === "sent" && <button type="button" className="btn-sec" onClick={() => openChanges(panel.clp)} disabled={building === panel.clp.id}>Ask for changes</button>}
         <button type="button" className="btn-sec" onClick={close} disabled={building === panel.clp.id}>Cancel</button>
-        <span className="text-[13px] text-slate-500">Approving builds the file, keeps it as Issue {panel.clp.next_issue} and records who and when.</span>
+        <span className="text-[13px] text-slate-500">Approving builds the file, keeps it as Issue {panel.clp.next_issue} and records who and when.{(form.sendTo || []).length ? ` The ticked groups get Issue ${panel.clp.next_issue} to review.` : ""}</span>
       </div>
+    </div>
+  );
+  const reviewCard = panel && panel.kind === "review" && (
+    <div className="card p-4 mb-4" data-clp-review-send="1">
+      <h2 className="text-lg font-semibold text-slate-800 mb-2" tabIndex={-1} ref={headRef}>Send {pv && pv.issue_no ? `Issue ${pv.issue_no}` : "the last issue"} to reviewers · {panel.clp.name} · {teamWord(panel.clp)}</h2>
+      {!pv ? <p className="text-sm text-slate-500">Loading…</p> : pv.problem ? <p className="text-sm" style={{ color: "var(--bad-text)" }}>{pv.problem}</p> : (
+        <>
+          {(pv.groups || []).map(g => (
+            <label key={g.id} className="flex items-center gap-1.5 text-sm py-0.5"><input type="checkbox" disabled={g.has_this} checked={g.has_this || (form.sendTo || []).includes(g.id)} onChange={e => tickGroup(g.id, e.target.checked)} />
+              {g.name} <span className="text-slate-500">· {g.reviewers} reviewer{g.reviewers === 1 ? "" : "s"}{g.has_this ? ` · has Issue ${pv.issue_no}` : g.had_issue ? ` · had Issue ${g.had_issue}` : ""}</span></label>))}
+          {!(pv.groups || []).length && <p className="text-sm text-slate-500">No client group yet. An admin adds one on Users → Client reviewers.</p>}
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            <button type="button" className="btn-pri" onClick={doReview} disabled={!(form.sendTo || []).length} data-clp-review-go="1">Send Issue {pv.issue_no}</button>
+            <button type="button" className="btn-sec" onClick={close}>Cancel</button>
+            <span className="text-[13px] text-slate-500">They get the file kept as Issue {pv.issue_no}, and an email.</span>
+          </div>
+        </>
+      )}
     </div>
   );
   const historyCard = panel && panel.kind === "history" && (
@@ -5111,6 +5188,10 @@ function ClpPage({ access }){
                       c.busiest_label ? `busiest ${c.busiest_label}` : "no approved lorries"].filter(Boolean).join(" · ");
   const statusLine = (c) => c.status === "sent" ? `by ${c.sent_by || "the team"} · ${clpDay(c.sent_at)}`
     : c.status === "changes" ? (c.changes_note ? `“${c.changes_note}”` : "") : "";
+  // PR 3c: where the last issue sent to each client group stands (Returned in red)
+  const reviewLine = (r) => r.state === "accepted" ? [`✓ Accepted by ${r.group_name} · ${clpShort(r.at)}`, "var(--ok-text)"]
+    : r.state === "returned" ? [`Returned by ${r.group_name} · ${clpShort(r.at)}`, "var(--bad-text)"]
+    : [`With ${r.group_name} · since ${clpShort(r.sent_at)}`, "var(--muted)"];
   const primary = (c) => {
     if(building === c.id) return <button type="button" className="btn-sec" disabled>{busyWords}</button>;
     if(appr && c.status === "sent") return <button type="button" className="btn-pri" onClick={() => openApprove(c)} data-clp-primary="approve">Approve as Issue {c.next_issue}…</button>;
@@ -5123,7 +5204,7 @@ function ClpPage({ access }){
         actions={appr ? <button type="button" className="btn-pri" onClick={() => openEdit(null)} data-clp-add="1">+ New CLP</button>
                       : (data.team_name ? <span className="row-st rs-none">{data.team_name}</span> : null)} />
       {note && <p className="text-sm mb-3" style={{ color: note.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{note.text}</p>}
-      {editor}{noteCard}{approveCard}{historyCard}
+      {editor}{noteCard}{approveCard}{reviewCard}{historyCard}
       {panel && panel.kind === "notes" && <ClpNotes key={panel.clp.id} clp={panel.clp} teamWord={teamWord} headRef={headRef} onClose={close} onChanged={() => setTick(t => t + 1)} />}
       {appr && <div className="flex flex-wrap items-center gap-3 mb-3 text-sm" data-clp-filters="1">
         <label className="inline-flex items-center gap-1.5">Team
@@ -5139,10 +5220,14 @@ function ClpPage({ access }){
           <select className="ctl" value={fTasks} onChange={e => setFTasks(e.target.value)} data-clp-tasks-filter="1">
             <option value="">Any</option><option value="open">Open</option><option value="mine">Given to me</option><option value="overdue">Overdue</option>
           </select></label>
+        {data.review_groups && <label className="inline-flex items-center gap-1.5">Reviewers
+          <select className="ctl" value={fRev} onChange={e => setFRev(e.target.value)} data-clp-reviewers-filter="1">
+            <option value="">Any</option><option value="waiting">Waiting</option><option value="accepted">Accepted</option><option value="returned">Returned</option>
+          </select></label>}
       </div>}
       {!list.length ? (
         <EmptyState kind={(data.clps || []).length ? "nomatch" : "none"} title={(data.clps || []).length ? "No CLP matches" : "No CLPs yet"}
-          body={(data.clps || []).length ? "Change the team, the status or the tasks." : (appr ? "Add a compound, site or stockpile on Data → Locations, or make one with + New CLP." : "Your team has no lorries at a compound, site or stockpile yet.")} />
+          body={(data.clps || []).length ? "Change the filters." : (appr ? "Add a compound, site or stockpile on Data → Locations, or make one with + New CLP." : "Your team has no lorries at a compound, site or stockpile yet.")} />
       ) : (
         <div className="card overflow-x-auto">
           <table className="tbl" data-clp-table="1">
@@ -5157,7 +5242,9 @@ function ClpPage({ access }){
                   </td>
                   {appr && <td>{teamWord(c)}</td>}
                   <td className="rd-status" style={{ whiteSpace: "normal" }}><RowStatus word={c.status_word} tone={CLP_TONE[c.status]} more={0} />
-                    {statusLine(c) && <span className="block text-[12px] text-slate-500">{statusLine(c)}</span>}</td>
+                    {statusLine(c) && <span className="block text-[12px] text-slate-500">{statusLine(c)}</span>}
+                    {(c.reviews || []).map(r => { const [w, col] = reviewLine(r);
+                      return <span key={r.group_id} className="block text-[12px]" style={{ color: col }} data-clp-review-line={r.state}>{w}</span>; })}</td>
                   <td>{c.last_issue ? <>Issue {c.last_issue.no} · {clpDay(c.last_issue.date)}{appr && c.last_issue.by ? <span className="block text-[12px] text-slate-500">{c.last_issue.by}</span> : null}</> : "—"}</td>
                   <td data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open
                       {tk(c).overdue > 0 ? <span className="block text-[12px] font-semibold" style={{ color: "var(--bad-text)" }}>{tk(c).overdue} overdue</span>
@@ -5172,6 +5259,7 @@ function ClpPage({ access }){
                       {canEdit && <button type="button" onClick={() => openEdit(c)}>{appr ? "Edit" : "Edit cover details"}</button>}
                       {!appr && data.team && <button type="button" onClick={() => openSend(c)}>{c.status === "sent" ? "Send for approval (sent)" : "Send for approval…"}</button>}
                       <button type="button" onClick={() => openNotes(c)}>Notes and tasks{tk(c).open > 0 ? ` (${tk(c).open} open)` : ""}</button>
+                      {appr && data.review_groups && c.issues > 0 && <button type="button" onClick={() => openReview(c)}>Send Issue {c.last_issue ? c.last_issue.no : c.issues} to reviewers…</button>}
                       {c.issues > 0 && <button type="button" onClick={() => openHistory(c)}>Document history</button>}
                       {appr && c.issues === 0 && (!c.auto || c.saved) && <button type="button" style={{ color: "var(--red)" }} onClick={() => remove(c)}>{c.auto ? "Clear typed details…" : "Delete…"}</button>}
                     </RowMenu></div></td>
@@ -5861,7 +5949,7 @@ function Login({ onSignIn, onBack, savedName, notice }){
     return (
       <div className="flex-1 grid place-items-center px-5">
         <div className="auth-card">
-          <h1>{forgot ? "Forgotten your password?" : "Staff sign in"}</h1>
+          <h1>{forgot ? "Forgotten your password?" : "Sign in"}</h1>
           <p className="auth-sub">{forgot ? "Enter your email. We'll send you a link to choose a new password." : "Sign in with your email and password."}</p>
           {msg && <div className="auth-msg" role="status">{msg}</div>}
           <div className="field">
@@ -5899,7 +5987,7 @@ function Login({ onSignIn, onBack, savedName, notice }){
           </button>
           <p className="auth-note">
             Your login belongs to your {TEAM().toLowerCase()}: you see your {TEAM().toLowerCase()}'s forecast lines. A planner sees every {TEAM().toLowerCase()} and
-            approves. Ask your administrator if you do not have a login.
+            approves. Ask your administrator if you do not have a login. Reviewers from a client sign in here too.
           </p>
         </div>
       </div>
@@ -6075,7 +6163,7 @@ function TwoStep({ ans, remember, onSignIn, onBack }){
   return (
     <div className="flex-1 grid place-items-center px-5">
       <div className="auth-card">
-        <h1>{setup ? "Set up two-step sign-in" : "Staff sign in"}</h1>
+        <h1>{setup ? "Set up two-step sign-in" : "Sign in"}</h1>
         {!setup && <div className="auth-who">{ans.email}</div>}
         {setup ? (
           <>
@@ -6122,6 +6210,173 @@ function AuthNote({ title, body, action, onAction }){
   );
 }
 
+// ================================================================= CLPs for review (31 Oct 2026, task 4a, PR 3c)
+// A client reviewer's whole Wayscope (the approved mockup notes\clp-reviewers-mockup-1031\, cards 4 and 5): the CLPs the contractor
+// sent to the reviewer's group, waiting ones first; one CLP opens to its issue as approved (Download), the history of what was sent
+// and decided, and the comments. Accept asks once; Return with comments needs a comment. One decision per group per issue: another
+// reviewer in the group can change it while the issue is the latest. No rail, no Dashboard, no map: the server lets a reviewer
+// read nothing else, and this page asks for nothing else. A desk table becomes cards on a phone.
+const RV_STATE = { waiting: ["Waiting", "warn"], accepted: ["Accepted", "ok"], returned: ["Returned", "bad"] };
+function rvDecision(st, by, at){
+  if(st === "accepted") return `Accepted by ${by || "your group"}${at ? " · " + clpShort(at) : ""}`;
+  if(st === "returned") return `Returned by ${by || "your group"}${at ? " · " + clpShort(at) : ""}`;
+  return "Waiting for your group";
+}
+function ReviewPage({ role }){
+  const [list, setList] = useState(null);
+  const [err, setErr] = useState("");
+  const [tick, setTick] = useState(0);
+  const [open, setOpen] = useState(null);
+  const [openErr, setOpenErr] = useState("");
+  const [words, setWords] = useState("");
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [narrow, setNarrow] = useState(() => { try { return !!(window.matchMedia && window.matchMedia("(max-width: 767px)").matches); } catch(e){ return false; } });
+  const headRef = useRef(null);
+  useEffect(() => {
+    let mq = null; try { mq = window.matchMedia("(max-width: 767px)"); } catch(e){}
+    if(!mq) return;
+    const on = () => setNarrow(mq.matches);
+    try { mq.addEventListener("change", on); } catch(e){ mq.addListener(on); }
+    return () => { try { mq.removeEventListener("change", on); } catch(e){ mq.removeListener(on); } };
+  }, []);
+  useEffect(() => {
+    let live = true;
+    fetch(`${API}/review/clps`).then(okJSON).then(d => { if(live){ setList(d); setErr(""); } })
+      .catch(e => { if(live) setErr(errSay("The CLPs did not load.", e)); });
+    return () => { live = false; };
+  }, [tick]);
+  useEffect(() => { if((open || openErr) && headRef.current) headRef.current.focus(); }, [open && open.id, openErr]);
+  const show = (id) => {
+    setOpenErr(""); setMsg(null); setWords("");
+    fetch(`${API}/review/clps/${encodeURIComponent(id)}`).then(okJSON).then(setOpen)
+      .catch(e => setOpenErr(errSay("The CLP did not open.", e)));
+  };
+  const back = () => { setOpen(null); setOpenErr(""); setMsg(null); setWords(""); };
+  const post = (path, body, what, done) => {
+    setBusy(true); setMsg(null);
+    return fetch(`${API}/review/clps/${encodeURIComponent(open.id)}/${path}`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body) }).then(okJSON)
+      .then(d => { setOpen(d); setMsg({ ok: true, text: done }); setWords(""); setTick(t => t + 1); return true; })
+      .catch(e => { setMsg({ ok: false, text: errSay(what, e) }); return false; })
+      .finally(() => setBusy(false));
+  };
+  const download = async (no) => {
+    setMsg(null);
+    try {
+      const r = await fetch(`${API}/review/clps/${encodeURIComponent(open.id)}/issues/${no}.docx`);
+      if(!r.ok) throw await errFrom(r);
+      const blob = await r.blob();
+      const fm = (r.headers.get("content-disposition") || "").match(/filename="([^"]+)"/);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = fm ? fm[1] : `CLP Issue ${no}.docx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ setMsg({ ok: false, text: errSay("The issue did not download.", e) }); }
+  };
+  const group = (list && list.group_name) || role.group_name || role.label || "";
+  const scheme = (list && list.scheme) || TENANT.name || "the contractor";
+  const header = <PageHeader title="CLPs for review" kicker="For review" subtitle={`Construction Logistics Plans ${scheme} has sent to ${group}.`} />;
+  if(open || openErr){
+    if(openErr) return (
+      <div className="max-w-5xl mx-auto p-6" data-page="review" data-review-clp="error">
+        <h2 className="text-lg font-semibold text-slate-800 mb-2" tabIndex={-1} ref={headRef}>This CLP did not open</h2>
+        <p className="text-sm mb-3" style={{ color: "var(--bad-text)" }} role="alert">{openErr}</p>
+        <button type="button" className="btn-sec" onClick={back}>Back to the list</button>
+      </div>);
+    const L = open.latest, n = L.no;
+    return (
+      <div className="max-w-5xl mx-auto p-6 pb-2" data-page="review" data-review-clp={open.id}>
+        <button type="button" className="link-btn text-sm mb-2" onClick={back}>← CLPs for review</button>
+        <h2 className="text-[22px] font-bold text-[color:var(--navy-deep)] mb-1" tabIndex={-1} ref={headRef}>{open.name} · {open.team_name} · Issue {n}</h2>
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <button type="button" className="btn-pri" onClick={() => download(n)} data-review-download={n}>Download Issue {n} (Word)</button>
+          <span className="text-[13px] text-slate-500">Sent {clpDay(L.sent_at)}{L.sent_by ? ` by ${L.sent_by}` : ""}{L.note ? <> · “{L.note}”</> : null}</span>
+        </div>
+        <p className="mb-3"><RowStatus word={rvDecision(L.state, L.by, L.at)} tone={RV_STATE[L.state] ? RV_STATE[L.state][1] : "none"} more={0} /></p>
+        {msg && <p className="text-sm mb-2" style={{ color: msg.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{msg.text}</p>}
+        <div className="card p-4 mb-4">
+          <h3 className="clp-h3" style={{ marginTop: 0 }}>History</h3>
+          <div className="overflow-x-auto"><table className="tbl" data-review-history="1">
+            <thead><tr><th scope="col">Issue</th><th scope="col">What happened</th><th scope="col">When</th><th scope="col"><span className="sr-only">Download</span></th></tr></thead>
+            <tbody>{open.issues.map(i => (
+              <tr key={i.no}><td className="tabular-nums">Issue {i.no}</td>
+                <td style={{ whiteSpace: "normal", minWidth: 240 }}>Sent to {open.group_name}{i.sent_by ? ` by ${i.sent_by}` : ""}
+                  {(i.decisions || []).map((d, k) => <span key={k} className="block text-[13px]" style={{ color: d.decision === "returned" ? "var(--bad-text)" : "var(--ok-text)" }}>
+                    {d.word} by {d.by}{d.words ? <>: “{d.words}”</> : null}</span>)}
+                  {!(i.decisions || []).length && <span className="block text-[13px] text-slate-500">Waiting</span>}</td>
+                <td className="tabular-nums">{clpDay(i.sent_at)}{i.at ? ` – ${clpDay(i.at)}` : ""}</td>
+                <td>{i.no !== n && <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "4px 10px" }}
+                  aria-label={`Download Issue ${i.no}`} onClick={() => download(i.no)}>Download</button>}</td></tr>))}</tbody>
+          </table></div>
+        </div>
+        <div className="card p-4 mb-4">
+          <h3 className="clp-h3" style={{ marginTop: 0 }}>Comments</h3>
+          <ol className="clp-thread" data-review-thread="1">
+            {!open.thread.length && <li className="text-[13px] text-slate-500">No comments yet.</li>}
+            {open.thread.map(x => x.kind === "step" ? (
+              <li key={x.id} className="clp-step" data-review-step={x.step}>{x.step === "review-returned" ? "↩" : x.step === "review-accepted" ? "✓" : "↗"} {x.step_word} by {x.by || "—"} · {clpWhen(x.at)}</li>
+            ) : (
+              <li key={x.id}>
+                <div className="text-[12px] text-slate-500">{x.by} · {x.org} · {clpWhen(x.at)}</div>
+                <div className="clp-words">{x.words}</div>
+              </li>))}
+          </ol>
+          <label htmlFor="rv-words" className="block text-[13px] text-slate-500 mb-1">Add a comment</label>
+          <textarea id="rv-words" className="ctl w-full" rows={3} maxLength={2000} value={words} onChange={e => setWords(e.target.value)}
+            placeholder="Your comment goes to the contractor and to the other reviewers in your group" />
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <button type="button" className="btn-sec" disabled={busy || !words.trim()} data-review-comment="1"
+              onClick={() => post("comments", { words }, "The comment was not saved.", "Comment added.")}>Add comment</button>
+            {open.can_decide ? <>
+              <button type="button" className="btn-pri" disabled={busy} data-review-accept={n}
+                onClick={() => { if(window.confirm(`Accept Issue ${n} of the ${open.name} CLP for ${open.group_name}?`))
+                  post("decision", { issue_no: n, decision: "accepted", words: words.trim() || null }, "Not accepted.", `Issue ${n} accepted.`); }}>Accept Issue {n}…</button>
+              <button type="button" className="btn-sec" disabled={busy} data-review-return={n} style={{ color: "var(--bad-text)" }}
+                onClick={() => { if(!words.trim()){ setMsg({ ok: false, text: "Write what needs changing in the comment box first." }); return; }
+                  post("decision", { issue_no: n, decision: "returned", words }, "Not returned.", `Issue ${n} returned with your comment.`); }}>Return with comments…</button>
+            </> : <span className="text-[13px] text-slate-500">The contractor has a newer issue that is not sent to {open.group_name} yet.</span>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  const rows = (list && list.clps) || [];
+  return (
+    <div className="max-w-5xl mx-auto p-6 pb-2" data-page="review">
+      {header}
+      {err ? <EmptyState kind="error" title="Couldn't open the CLPs" body={err} action={<button type="button" className="btn-sec" onClick={() => setTick(t => t + 1)}>Try again</button>} />
+        : !list ? <p className="text-sm text-slate-500">Loading…</p>
+        : !rows.length ? <EmptyState kind="none" title="Nothing to review yet" body={`When ${scheme} sends a CLP to ${group}, it is listed here and you get an email.`} />
+        : narrow ? (
+          <ul className="space-y-3" data-review-cards="1">{rows.map(c => (
+            <li key={c.id} className="card p-4" data-review-row={c.id}>
+              <div className="font-semibold text-slate-800">{c.name}</div>
+              <div className="text-[13px] text-slate-500">{c.team_name} · Issue {c.issue_no} · sent {clpDay(c.sent_at)}</div>
+              <div className="mt-2"><RowStatus word={rvDecision(c.state, c.decided_by, c.decided_at)} tone={RV_STATE[c.state] ? RV_STATE[c.state][1] : "none"} more={0} /></div>
+              <button type="button" className="btn-sec mt-3" onClick={() => show(c.id)} aria-label={`Open ${c.name}`}>Open</button>
+            </li>))}</ul>
+        ) : (
+          <div className="card overflow-x-auto">
+            <table className="tbl" data-review-table="1">
+              <thead><tr><th scope="col">CLP</th><th scope="col">Issue</th><th scope="col">Sent</th><th scope="col">Your group's decision</th><th scope="col"><span className="sr-only">Open</span></th></tr></thead>
+              <tbody>{rows.map(c => (
+                <tr key={c.id} data-review-row={c.id}>
+                  <td style={{ whiteSpace: "normal", minWidth: 220 }}><button type="button" className="row-open" aria-label={`Open ${c.name}`} onClick={() => show(c.id)}>{c.name}</button>
+                    <span className="block text-[12px] text-slate-500">{c.team_name}</span></td>
+                  <td className="tabular-nums">Issue {c.issue_no}</td>
+                  <td>{clpDay(c.sent_at)}{c.sent_by ? <span className="block text-[12px] text-slate-500">by {c.sent_by}</span> : null}</td>
+                  <td className="rd-status" style={{ whiteSpace: "normal" }}><RowStatus word={rvDecision(c.state, c.decided_by, c.decided_at)} tone={RV_STATE[c.state] ? RV_STATE[c.state][1] : "none"} more={0} /></td>
+                  <td><button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 12px" }} onClick={() => show(c.id)}>Open</button></td>
+                </tr>))}</tbody>
+            </table>
+          </div>
+        )}
+      <p className="text-[13px] text-slate-500 mt-3">You see only what {scheme} has sent to {group}. Your downloads, comments and decisions are recorded with your name.</p>
+    </div>
+  );
+}
+
 // ================================================================= Users (G3, 14 Oct 2026)
 // Admins only (D57). Three parts: People (every login: add, change team or role, disable, send a link, extend a demo
 // login), Leads (the demo requests with each lead's own login and what they opened, HU14; "Send a personal login"
@@ -6137,7 +6392,7 @@ function describeActivity(r){
                   "password-changed": "Changed their password", "demo-link": "Opened their demo link",
                   "two-step-on": "Turned on two-step sign-in", "recovery-codes-new": "Made new recovery codes",
                   "signin-code-refused": "Wrong sign-in code", "first-admin": "Made the first admin",
-                  "recovery-command": "Recovery command run" };
+                  "recovery-command": "Recovery command run", "review-download": "Downloaded a CLP issue to review" };
   if(words[r.kind]) return words[r.kind];
   if(r.kind === "page") return "Opened " + (r.target || "a page");
   const p = (r.path || "").replace(/^\/api\//, "");
@@ -6149,7 +6404,10 @@ function describeActivity(r){
     [/^admin\/config\/factors\/reset$/, "Reset the configuration to the defaults"], [/^admin\/config\/factors$/, "Saved the configuration"],
     [/^admin\/teams\/[^/]+$/, "Changed a " + TEAM().toLowerCase()], [/^admin\/teams$/, "Added a " + TEAM().toLowerCase()],
     [/^admin\/users\/[^/]+\/reset$/, "Sent a login its link"], [/^admin\/users\/[^/]+\/two-step-reset$/, "Reset a login's two-step sign-in"], [/^admin\/users\/[^/]+$/, "Changed a login"], [/^admin\/users$/, "Added a login"],
-    [/^admin\/leads\/[^/]+\/login$/, "Gave a lead a personal login"], [/^admin\/tenant\/import$/, "Imported the organisation's data"]];
+    [/^admin\/leads\/[^/]+\/login$/, "Gave a lead a personal login"], [/^admin\/tenant\/import$/, "Imported the organisation's data"],
+    [/^review\/clps\/[^/]+\/decision$/, "Accepted or returned a CLP issue"], [/^review\/clps\/[^/]+\/comments$/, "Commented on a CLP"],
+    [/^clp\/documents\/[^/]+\/review-send$/, "Sent a CLP issue to a client's reviewers"],
+    [/^admin\/reviewer-groups/, "Changed a client's reviewer group"], [/^admin\/reviewers/, "Changed a client reviewer's login"]];
   for(const [rx, w] of known){ if(rx.test(p)) return w; }
   const verb = { POST: "Added", PUT: "Changed", PATCH: "Changed", DELETE: "Removed" }[r.method] || "Changed";
   return verb + " · " + p.replace(/^admin\//, "");
@@ -6170,6 +6428,11 @@ function UsersPage({ access }){
   const [teamRows, setTeamRows] = useState(null);
   const [newTeam, setNewTeam] = useState("");
   const [editTeam, setEditTeam] = useState(null);   // {id, label}
+  // 31 Oct 2026 (task 4a, PR 3c) — the Client reviewers tab (admins only): a group per client organisation, its reviewer logins
+  const [rv, setRv] = useState(null);
+  const [newGroup, setNewGroup] = useState("");
+  const [editGroup, setEditGroup] = useState(null);   // {id, name}
+  const [rvForm, setRvForm] = useState({ name: "", email: "", group_id: "", ends_on: "" });
   const call = async (path, method, body) => {
     const r = await fetch(`${API}${path}`, { method: method || "GET", headers: body ? { "Content-Type": "application/json" } : undefined,
                                              body: body ? JSON.stringify(body) : undefined });
@@ -6181,7 +6444,8 @@ function UsersPage({ access }){
   const loadRows = () => call(`/admin/audit${qs(who ? { user: who } : {})}`).then(j => setRows(j.rows || [])).catch(e => setErr(e.message));
   useEffect(() => { load(); }, []);
   const loadTeams = () => call(`/admin/teams${qs()}`).then(j => setTeamRows(j)).catch(e => setErr(e.message));
-  useEffect(() => { if(tab === "leads") loadLeads(); if(tab === "activity") loadRows(); if(tab === "teams") loadTeams(); }, [tab, who]);
+  const loadRv = () => call(`/admin/reviewers${qs()}`).then(j => setRv(j)).catch(e => setErr(e.message));
+  useEffect(() => { if(tab === "leads") loadLeads(); if(tab === "activity"){ loadRows(); if(!rv) loadRv(); } if(tab === "teams") loadTeams(); if(tab === "reviewers") loadRv(); }, [tab, who]);
   const teams = (data && data.teams) || [];
   const teamLabel = (id) => (teams.find(t => t.id === id) || {}).label || teamName(id);
   const choices = [...teams.map(t => ["team:" + t.id, t.label]), ["planner", "Planner"], ["admin", "Admin"]];
@@ -6222,10 +6486,41 @@ function UsersPage({ access }){
     const j = await call(`/admin/teams/${t.id}${qs()}`, "PATCH", { active: on });
     teamDone(j, on ? `${t.label} is in use again.` : `${t.label} is stopped. Its lines stay.`); await load();
   });
+  // the reviewer writes answer with the whole tab again
+  const addGroup = () => act(async () => {
+    if(!newGroup.trim()) throw new Error("Type the organisation's name, for example National Highways.");
+    setRv(await call(`/admin/reviewer-groups${qs()}`, "POST", { name: newGroup.trim() }));
+    setNote({ ok: true, text: `Added ${newGroup.trim()}. Add its reviewers below.` }); setNewGroup("");
+  });
+  const saveGroup = () => act(async () => {
+    setRv(await call(`/admin/reviewer-groups/${editGroup.id}${qs()}`, "PATCH", { name: editGroup.name }));
+    setNote({ ok: true, text: `Renamed to ${editGroup.name.trim()}.` }); setEditGroup(null);
+  });
+  const stopGroup = (g, on) => {
+    if(!on && !window.confirm(`Stop ${g.name}? Its reviewers are signed out and cannot sign in until it is started again.`)) return;
+    act(async () => { setRv(await call(`/admin/reviewer-groups/${g.id}${qs()}`, "PATCH", { stopped: !on }));
+      setNote({ ok: true, text: on ? `${g.name} can review again.` : `${g.name} is stopped. What it said stays in the history.` }); });
+  };
+  const delGroup = (g) => { if(window.confirm(`Delete ${g.name}?`)) act(async () => { setRv(await call(`/admin/reviewer-groups/${g.id}${qs()}`, "DELETE")); setNote({ ok: true, text: "Deleted." }); }); };
+  const addRv = () => act(async () => {
+    const f = rvForm;
+    if(!f.name.trim() || !f.email.trim() || !f.group_id) throw new Error("Fill in the name, the email and the group.");
+    const j = await call(`/admin/reviewers${qs()}`, "POST", { name: f.name.trim(), email: f.email.trim(), group_id: f.group_id, ends_on: f.ends_on || null });
+    setRv(j); setRvForm({ name: "", email: "", group_id: f.group_id, ends_on: "" });
+    setNote({ ...sent(j, j.user.name), text: `Added ${j.user.name}. ` + sent(j, j.user.name).text });
+  });
+  const changeRv = (u, body, done) => act(async () => { const j = await call(`/admin/reviewers/${u.id}${qs()}`, "PATCH", body); setRv(j); setNote({ ok: true, text: done }); });
+  const delRv = (u) => { if(window.confirm(`Delete ${u.name}'s login? Their comments and decisions stay, under their name.`))
+    act(async () => { setRv(await call(`/admin/reviewers/${u.id}${qs()}`, "DELETE")); setNote({ ok: true, text: `${u.name}'s login is deleted.` }); }); };
+  const rvLink = (u) => act(async () => { const j = await call(`/admin/users/${u.id}/reset${qs()}`, "POST"); setNote(sent(j, u.name)); });
+  const rvTwoStep = (u) => {
+    if(!window.confirm(`Reset two-step sign-in for ${u.name}? They set it up again next time they sign in.`)) return;
+    act(async () => { await call(`/admin/users/${u.id}/two-step-reset${qs()}`, "POST"); setNote({ ok: true, text: `${u.name} sets up two-step sign-in again at their next sign-in.` }); await loadRv(); });
+  };
   const leadLogin = (l) => act(async () => { const j = await call(`/admin/leads/${l.id}/login${qs()}`, "POST"); setNote(sent(j, l.name)); await loadLeads(); await load(); });
   const people = (data && data.users) || [];
   const staff = people.filter(u => u.kind !== "demo"), demos = people.filter(u => u.kind === "demo");
-  const tabs = [["people", "People"], ["teams", TEAMS()], ["leads", "Demo leads"], ["activity", "Activity"]];
+  const tabs = [["people", "People"], ["teams", TEAMS()], ["reviewers", "Client reviewers"], ["leads", "Demo leads"], ["activity", "Activity"]];
   const csvHref = (path, extra) => `${API}${path}${qs(extra)}`;
   const statusOf = (u) => { const [st, label] = USER_STATUS[u.status] || ["none", u.status]; return <StatusWord status={st} label={label} />; };
   return (
@@ -6247,7 +6542,7 @@ function UsersPage({ access }){
       )}
       {data && (
         <>
-          <nav className="flex gap-2 mb-4" aria-label="Users sections">
+          <nav className="flex flex-wrap gap-2 mb-4" aria-label="Users sections">
             {tabs.map(([k, l]) => <button key={k} type="button" onClick={() => setTab(k)} className={tab === k ? "btn-pri" : "btn-sec"} aria-current={tab === k ? "page" : undefined}>{l}</button>)}
           </nav>
           {tab === "people" && (
@@ -6382,6 +6677,98 @@ function UsersPage({ access }){
               </div>
             </div>
           )}
+          {tab === "reviewers" && rv && (
+            <div data-users-reviewers="1">
+              <div className="card overflow-auto mb-4">
+                <table className="tbl" data-rv-groups="1">
+                  <caption><b>Groups</b> · {rv.groups.length} · one for each client organisation</caption>
+                  <thead><tr>{["Group", "Reviewers", "CLPs sent to it", "Status", ""].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
+                  <tbody>
+                    {rv.groups.map(g => (
+                      <tr key={g.id} data-rv-group={g.id}>
+                        <td>{editGroup && editGroup.id === g.id
+                          ? <input className="ctl ctl-sm" style={{ minWidth: 220 }} maxLength={80} value={editGroup.name} autoFocus
+                              onChange={e => setEditGroup({ ...editGroup, name: e.target.value })} aria-label={`New name for ${g.name}`} />
+                          : <span className={g.stopped ? "font-medium text-slate-500" : "font-medium text-slate-800"}>{g.name}</span>}</td>
+                        <td className="text-sm">{g.reviewers}</td>
+                        <td className="text-sm">{g.sent}</td>
+                        <td><StatusWord status={g.stopped ? "none" : "Approved"} label={g.stopped ? "Stopped" : "In use"} /></td>
+                        <td className="text-right whitespace-nowrap">
+                          {editGroup && editGroup.id === g.id ? <>
+                            <button type="button" className="btn-pri" disabled={busy} onClick={saveGroup}>Save</button>{" "}
+                            <button type="button" className="btn-sec" disabled={busy} onClick={() => setEditGroup(null)}>Cancel</button>
+                          </> : (
+                            <RowMenu name={g.name}>
+                              <button type="button" disabled={busy} onClick={() => setEditGroup({ id: g.id, name: g.name })} aria-label={`Rename ${g.name}`}>Rename</button>
+                              {g.stopped
+                                ? <button type="button" disabled={busy} onClick={() => stopGroup(g, true)} aria-label={`Start ${g.name} again`}>Start again</button>
+                                : <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => stopGroup(g, false)} aria-label={`Stop ${g.name}`}>Stop…</button>}
+                              {g.can_delete && <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => delGroup(g)} aria-label={`Delete ${g.name}`}>Delete…</button>}
+                            </RowMenu>)}
+                        </td>
+                      </tr>
+                    ))}
+                    {!rv.groups.length && <tr><td colSpan={5} className="text-sm text-slate-500">No groups yet. Add the client's organisation below.</td></tr>}
+                  </tbody>
+                </table>
+                <div className="flex flex-wrap gap-2 items-end p-3">
+                  <label className="text-sm">Organisation<br /><input className="ctl ctl-sm" style={{ minWidth: 260 }} maxLength={80} value={newGroup} placeholder="e.g. National Highways"
+                    onChange={e => setNewGroup(e.target.value)} aria-label="New group's organisation" /></label>
+                  <button type="button" className="btn-sec" disabled={busy} onClick={addGroup} data-rv-add-group="1">+ Add group</button>
+                </div>
+              </div>
+              <div className="card p-4 mb-4">
+                <h3 className="text-[15px] font-semibold text-slate-800 mb-2">Add a reviewer</h3>
+                <div className="flex flex-wrap gap-2 items-end">
+                  <label className="text-sm">Name<br /><input className="ctl ctl-sm" value={rvForm.name} onChange={e => setRvForm({ ...rvForm, name: e.target.value })} aria-label="Reviewer's name" /></label>
+                  <label className="text-sm">Email<br /><input className="ctl ctl-sm" type="email" value={rvForm.email} onChange={e => setRvForm({ ...rvForm, email: e.target.value })} aria-label="Reviewer's email" /></label>
+                  <label className="text-sm">Group<br />
+                    <select className="ctl ctl-sm" value={rvForm.group_id} onChange={e => setRvForm({ ...rvForm, group_id: e.target.value })} aria-label="Reviewer's group">
+                      <option value="">Choose…</option>
+                      {rv.groups.filter(g => !g.stopped).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select></label>
+                  <label className="text-sm">Ends on (optional)<br /><input className="ctl ctl-sm" type="date" value={rvForm.ends_on} onChange={e => setRvForm({ ...rvForm, ends_on: e.target.value })} aria-label="The login ends on" /></label>
+                  <button type="button" className="btn-pri" disabled={busy} onClick={addRv} data-rv-add="1">Add and send the link</button>
+                </div>
+                <p className="text-[13px] text-slate-500 mt-2">They get a link to choose their password, then set up two-step sign-in. A reviewer sees only the CLPs sent to their group.{rv.mail ? "" : " Email is not set up here, so the link is shown to you instead."}</p>
+              </div>
+              <div className="card overflow-auto">
+                <table className="tbl" data-rv-logins="1">
+                  <caption><b>Reviewers</b> · {rv.reviewers.length}</caption>
+                  <thead><tr>{["Reviewer", "Group", "Status", "Ends", "Two-step", ""].map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
+                  <tbody>
+                    {rv.reviewers.map(u => (
+                      <tr key={u.id} data-rv-login={u.id}>
+                        <td><div className="font-medium text-slate-800">{u.name}</div><div className="text-[13px] text-slate-500">{u.email}</div></td>
+                        <td>
+                          <select className="ctl ctl-sm" value={u.review_group || ""} disabled={busy} aria-label={`${u.name}: group`}
+                            onChange={e => changeRv(u, { group_id: e.target.value }, `${u.name} now reviews for ${(rv.groups.find(g => g.id === e.target.value) || {}).name}. They sign in again.`)}>
+                            {rv.groups.filter(g => !g.stopped || g.id === u.review_group).map(g => <option key={g.id} value={g.id}>{g.name}{g.stopped ? " (stopped)" : ""}</option>)}
+                          </select>
+                        </td>
+                        <td>{statusOf(u)}<div className="text-[13px] text-slate-500 whitespace-nowrap">{u.last_sign_in_at ? "Last in " + fmtWhen(u.last_sign_in_at) : "Never signed in"}</div></td>
+                        <td><input type="date" className="ctl ctl-sm" disabled={busy} aria-label={`${u.name}: the login ends on`}
+                          value={u.expires_at ? String(u.expires_at).slice(0, 10) : ""}
+                          onChange={e => changeRv(u, { ends_on: e.target.value || null }, e.target.value ? `${u.name}'s login ends on ${longDate(e.target.value)}.` : `${u.name}'s login has no end date.`)} /></td>
+                        <td>{u.two_step ? <StatusWord status="Approved" label="On" /> : <StatusWord status="Pending" label="Not set up" />}</td>
+                        <td className="text-right whitespace-nowrap">
+                          <RowMenu name={u.name}>
+                            {!u.disabled && <button type="button" disabled={busy} onClick={() => rvLink(u)}>{u.has_password ? "Send reset link" : "Send invite again"}</button>}
+                            {u.two_step && !u.disabled && <button type="button" disabled={busy} onClick={() => rvTwoStep(u)} aria-label={`Reset two-step sign-in for ${u.name}`}>Reset two-step</button>}
+                            <button type="button" disabled={busy} style={u.disabled ? undefined : { color: "var(--red)" }}
+                              onClick={() => changeRv(u, { disabled: !u.disabled }, u.disabled ? `${u.name} can sign in again.` : `${u.name} is signed out everywhere and cannot sign in.`)}>
+                              {u.disabled ? "Enable" : "Disable"}</button>
+                            <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => delRv(u)}>Delete…</button>
+                          </RowMenu>
+                        </td>
+                      </tr>
+                    ))}
+                    {!rv.reviewers.length && <tr><td colSpan={6} className="text-sm text-slate-500">No reviewers yet.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           {tab === "leads" && (
             <div className="card overflow-auto">
               <table className="tbl">
@@ -6413,6 +6800,7 @@ function UsersPage({ access }){
                   <select className="ctl ctl-sm" value={who} onChange={e => setWhoF(e.target.value)} aria-label="Person">
                     <option value="">Everyone</option>
                     {people.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    {((rv && rv.reviewers) || []).map(u => <option key={u.id} value={u.id}>{u.name} · {u.group_name}</option>)}
                   </select></label>
                 <a className="link-btn" href={csvHref("/admin/audit.csv", who ? { user: who } : {})}>Download as a spreadsheet</a>
                 <span className="text-slate-500">Every change anyone made, every sign-in, and the pages demo visitors opened. Newest first.</span>

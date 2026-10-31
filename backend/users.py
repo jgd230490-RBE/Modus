@@ -1265,6 +1265,9 @@ def codes_enabled():
 def _make_admin(user_id):
     sql = "UPDATE users SET role = 'admin', team = NULL, kind = 'staff', expires_at = NULL, disabled = 0, review_group = NULL WHERE tenant_id = ? AND id = ?"
     db.execute(sql, (_tenant(), user_id))
+    # 31 Oct 2026 (PR 3c security review): a cookie made before the promotion — a client reviewer's, say — never
+    # carries on as an admin's; they sign in again
+    end_all_sessions(user_id)
 
 
 def ensure_first_admin(now=None):

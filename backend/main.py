@@ -5266,6 +5266,12 @@ def clp_documents_approve(clp_id: str, body: ClpNoteIn):
     return out
 
 
+@app.get("/api/clp/documents/{clp_id}/review-send")
+def clp_documents_review_options(clp_id: str):
+    """What ⋯ → Send Issue N to reviewers… offers: the last issue and the live groups. Planners and admins."""
+    return _clp_out(clp_reviews.send_options(clp_id, _require_access()))
+
+
 @app.post("/api/clp/documents/{clp_id}/review-send")
 def clp_documents_review_send(clp_id: str, body: ClpReviewSendIn):
     """⋯ → Send Issue N to reviewers…: an issued CLP (the stored file) to one or more client groups. Planners and admins."""

@@ -417,6 +417,15 @@ ok("4. 🔴 a group a CLP went to cannot be deleted", "Stop it instead" in (clp_
 ok("4. the contractor's thread shows the send as a grey line",
    any(n["kind"] == "step" and n["step"] == "review-sent" and n["step_word"] == "Issue 1 sent to National Highways"
        and n["by"] == "Pat Planner" for n in clp_notes.thread(Y_ALL, PAT)["notes"]))
+_so = main.clp_documents_review_options(Y_ALL)
+ok("4. ⭐ ⋯ → Send Issue N to reviewers… reads the last issue and the live groups, National Highways marked as having it",
+   _so["issue_no"] == 1 and [(g["name"], g["has_this"], g["had_issue"]) for g in _so["groups"]]
+   == [("Harborough District Council", False, None), ("National Highways", True, 1)], str(_so))
+ok("4. 🔴 ...a CLP with no issue answers 422 (nothing to send), one that does not exist 404",
+   status_of(lambda: main.clp_documents_review_options(Y_N)) == 422 and status_of(lambda: main.clp_documents_review_options("clp-nope")) == 404)
+as_(NORA)
+ok("4. 🔴 ...a team cannot read the send options", status_of(lambda: main.clp_documents_review_options(Y_ALL)) == 403)
+as_(PAT)
 
 # =========================================================================== #
 #  5. 🔴 THE WALL on the review reads                                          #
@@ -547,10 +556,11 @@ ok("7. 🔴 an older issue can no longer be decided", status_of(lambda: main.rev
     Y_ALL, main.ReviewDecisionIn(issue_no=1, decision="returned", words="late"))) == 422)
 ok("7. both issues download", main.review_clp_issue(Y_ALL, 2, _Request()).body and main.review_clp_issue(Y_ALL, 1, _Request()).body)
 _hist = clp_records.doc_history(Y_ALL)
+# NARROWED 31 Oct 2026 (security review, finding 1): the group only, no reviewer's own name in the issued file
 ok("7. ⭐ the Document history prints the group's decision on Issue 1 (Q10)",
-   any(h["no"] == 1 and h["words"] == "Accepted by National Highways (Sam Reviewer)." for h in _hist)
+   any(h["no"] == 1 and h["words"] == "Accepted by National Highways." for h in _hist)
    and not any("Returned by" in (h.get("words") or "") for h in _hist), str(_hist))
-ok("7. ...and the Word file of Issue 2 carries it", "Accepted by National Highways (Sam Reviewer)." in "\n".join(
+ok("7. ...and the Word file of Issue 2 carries it", "Accepted by National Highways." in "\n".join(
     p.text for t in __import__("docx").Document(io.BytesIO(main.review_clp_issue(Y_ALL, 2, _Request()).body)).tables
     for row in t.rows for p in row.cells[-1].paragraphs))
 ok("7. ⭐🔴 a reviewer's whole visit built NOTHING (no Word file, no gather)", BUILDS["n"] == 0, str(BUILDS))
@@ -643,6 +653,65 @@ ok("11. 🔴 resolve_session refuses a reviewer before anything else is read",
 ok("11. 🔴 a reviewer cookie write needs the app's header (the middleware)", "or access.reviewer() is not None" in MAIN)
 ok("11. 🔴 the gate never opens for a reviewer: it asks access.current() only",
    "has_valid_code=bool(access.current())," in MAIN)
+
+# =========================================================================== #
+# 12. The security review's findings (31 Oct 2026), each fixed                  #
+# =========================================================================== #
+as_(NORA)
+clp_records.send(Y_N, "Team only: Bob still owes the gate B hours", NORA, factors)
+as_(PAT)
+_apn = clp_records.approve(Y_N, None, PAT, factors, 22.0, build_fast)
+SENT.clear()
+_sn = clp_reviews.send_issue(Y_N, _apn["last_issue"]["no"], [NH["id"]], PAT, factors)
+ok("12. 🔴 (finding 2) the team's note to the approver never reaches the client — not in the email",
+   _sn["sent"] and SENT and not any("Bob still owes" in m.get_content() for m in SENT), str([m.get_content()[:200] for m in SENT]))
+as_rev(REV_SAM)
+ok("12. 🔴 (finding 2) ...nor on the review page (an issue approved with no note shows none)",
+   main.review_clp(Y_N)["latest"]["note"] is None and "Bob still owes" not in json.dumps(main.review_clp(Y_N)))
+as_(NORA)
+ok("12. 🔴 (finding 3) a team login cannot show a note to the client's reviewers (403), nor is it offered the groups",
+   clp_notes.add_note(Y_N, "Team words for the client", NORA, factors, show_to=NH["id"]).get("status") == 403
+   and clp_notes.thread(Y_N, NORA)["show_to"] == []
+   and not any("Team words for the client" in (n.get("words") or "") for n in clp_notes.thread(Y_N, NORA)["notes"]))
+ok("12. ...a team's plain note still works", "id" in clp_notes.add_note(Y_N, "A plain team note", NORA, factors))
+as_(PAT)
+ok("12. ...a planner is offered the group the CLP went to", [g["name"] for g in clp_notes.thread(Y_N, PAT)["show_to"]] == ["National Highways"])
+_hist2 = clp_records.doc_history(Y_ALL)
+ok("12. 🔴 (finding 1) the issued file names no reviewer, only their group while the CLP went to that one group alone",
+   any(h["no"] == 1 and h["words"] == "Accepted by National Highways." for h in _hist2)
+   and not any("Sam Reviewer" in (h.get("words") or "") or "(" in (h.get("words") or "") for h in _hist2 if h.get("no") == 1 and not h.get("by")), str(_hist2))
+clp_reviews.send_issue(Y_ALL, 2, [HDC["id"]], PAT, factors)
+_hist3 = clp_records.doc_history(Y_ALL)
+ok("12. 🔴 (finding 1) once the CLP went to a second group, a decision line names no group: 'by the client's reviewers'",
+   any(h["no"] == 1 and h["words"] == "Accepted by the client's reviewers." for h in _hist3)
+   and not any("National Highways" in (h.get("words") or "") for h in _hist3 if not h.get("by")), str(_hist3))
+ok("12. 🔴 (finding 4) a group name with a line break is refused; a reviewer's name too",
+   clp_reviews.add_group("Evil\r\nBcc: x@evil.test", "Ada Admin")[1] == "Write the name on one line."
+   and clp_reviews.change_group(NH["id"], name="NH\nBcc: x@evil.test")[1] == "Write the name on one line."
+   and clp_reviews.add_reviewer("ev@example.org", "Eve\r\nBcc: x@evil.test", NH["id"], by="Ada Admin")[1] == "Write the name on one line.")
+_cn = clp_records.create({"name": "Yard\r\nBcc: x@evil.test", "location_ids": [YARD]}, PAT, factors)
+ok("12. 🔴 (finding 4) a CLP's name is kept on one line", _cn.get("name") == "Yard Bcc: x@evil.test", str(_cn)[:200])
+_ok_rev = users.get_user(SAM["id"])
+ok("12. 🔴 (finding 4) an email header never takes a line break, and a message that cannot be built is a failed email, never a raise",
+   "\n" not in clp_reviews.send_message(_ok_rev, {"name": "A\r\nB", "team": None}, {"issue_no": 1}, "Pat",
+                                        {"DEMO_FROM": "a@example.org", "reply_to": "a@example.org"}, "G")["Subject"])
+_real_sm = clp_reviews.send_message
+clp_reviews.send_message = lambda *a, **k: (_ for _ in ()).throw(ValueError("bad header"))
+_real_ms = users.mail_settings
+users.mail_settings = lambda: {"DEMO_FROM": "a@example.org", "reply_to": "a@example.org"}
+try:
+    _t = clp_reviews.email_reviewers(NH["id"], {"name": "Yard East", "team": None}, {"issue_no": 1}, "Pat")
+finally:
+    clp_reviews.send_message, users.mail_settings = _real_sm, _real_ms
+ok("12. ...email_reviewers counts it failed", _t["failed"] >= 1 and _t["sent"] == 0, str(_t))
+_before = users.get_user(HAL["id"])["name"]
+_u, err = clp_reviews.change_reviewer(HAL["id"], {"name": "Hal Renamed", "group_id": "rg-nope"})
+ok("12. 🔴 (finding 6) a refused group move saves nothing else", err == "Pick a group that is not stopped."
+   and users.get_user(HAL["id"])["name"] == _before)
+_raw = users.create_session(SAM["id"])[0]
+users._make_admin(SAM["id"])
+ok("12. 🔴 (finding 5) a promotion to admin ends every session the login had (a reviewer's cookie never becomes an admin's)",
+   users.resolve_session(_raw) == (None, None) and users.resolve_reviewer(_raw) == (None, None))
 
 print(f"test_clp_reviewers: {PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

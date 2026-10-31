@@ -302,7 +302,7 @@ def thread(clp_id, acc, factors=None):
     items.sort(key=lambda i: (i["at"] or "", i.get("id") or ""))
     return {"id": rec["id"], "tasks": tasks, "notes": items, "lines": lines,
             "for_options": for_options(rec, acc, labels), "can_moderate": access.can_approve(acc), "today": today,
-            "show_to": _show_to_options(rec["id"])}
+            "show_to": (_show_to_options(rec["id"]) if access.can_approve(acc) else [])}
 
 
 def _group_names():
@@ -404,6 +404,8 @@ def add_note(clp_id, words, acc, factors=None, show_to=None):
     p = _words_problem(words)
     if p:
         return {"error": p, "status": 422}
+    if show_to not in (None, "") and not access.can_approve(acc):
+        return {"error": "Only a planner or an admin shows a note to the client's reviewers.", "status": 403}
     if show_to not in (None, "") and str(show_to) not in {g["id"] for g in _show_to_options(rec["id"])}:
         return {"error": "This CLP was not sent to that group.", "status": 422}
     nid = _insert({"clp_id": rec["id"], "kind": "note", "words": words, "written_by": clp_records.who(acc),

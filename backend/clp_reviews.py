@@ -163,9 +163,16 @@ def listing():
             "mail": users.mail_settings() is not None}
 
 
+def _one_line(v):
+    """Control characters (a line break, a tab) become one space: for every name that reaches an email header."""
+    return re.sub(r"[\x00-\x1f\x7f]+", " ", str(v or "")).strip()
+
+
 def _name_problem(name, skip_id=None):
     if not name:
         return "Enter the organisation's name."
+    if _one_line(name) != name:
+        return "Write the name on one line."
     if len(name) > NAME_MAX:
         return f"At most {NAME_MAX} characters."
     p = _banned(name)
@@ -256,6 +263,8 @@ def add_reviewer(email, name, group_id, ends_on=None, by=None):
         return None, "Pick the client's group."
     if g.get("stopped_at"):
         return None, "This group is stopped. Start it again first."
+    if _one_line(name) != (name or "").strip():
+        return None, "Write the name on one line."
     exp, err = ends_at(ends_on)
     if err:
         return None, err
@@ -269,6 +278,13 @@ def change_reviewer(user_id, fields, by_user_id=None):
     u = users.get_user(user_id)
     if not u or not users.is_reviewer(u):
         return None, "No such login."
+    g = None
+    if "group_id" in fields and fields["group_id"] != u.get("review_group"):
+        g = _groups().get(str(fields["group_id"] or ""))
+        if not g or g.get("stopped_at"):
+            return None, "Pick a group that is not stopped."
+    if "name" in fields and _one_line(fields["name"]) != (fields["name"] or "").strip():
+        return None, "Write the name on one line."
     out = {}
     if "name" in fields:
         out["name"] = fields["name"]
@@ -282,10 +298,7 @@ def change_reviewer(user_id, fields, by_user_id=None):
     user, err = users.update_user(user_id, out, by_user_id=by_user_id) if out else (u, None)
     if err:
         return None, err
-    if "group_id" in fields and fields["group_id"] != u.get("review_group"):
-        g = _groups().get(str(fields["group_id"] or ""))
-        if not g or g.get("stopped_at"):
-            return None, "Pick a group that is not stopped."
+    if g:
         db.execute("UPDATE users SET review_group = ? WHERE tenant_id = ? AND id = ?", (g["id"], _tenant(), user_id))
         users.end_all_sessions(user_id)
         user = users.get_user(user_id)
@@ -382,15 +395,19 @@ def marker(clp_id):
 
 def history_rows(clp_id):
     """The Document history's group lines (Q10): {no, date, by, words} for each group's standing decision on each issue,
-    e.g. 'Returned by National Highways (Alex Example).'"""
+    e.g. 'Returned by National Highways.' The issued file can go to more than one client, so (security review, 31 Oct):
+    no reviewer's own name is printed, and a group is named only while this CLP was never sent to any other group —
+    otherwise the line reads 'by the client's reviewers'. Who decided stays on the contractor's screen (the notes)."""
     names = group_names()
+    groups_sent = {r["group_id"] for r in _review_rows(clp_id, "sent")}
     out = []
     for (cid, no, gid), s in sorted(_standing(_review_rows(clp_id)).items(), key=lambda kv: (kv[0][1], kv[0][2])):
         d = s.get("decision")
         if not d or d.get("decision") not in DECISIONS:
             continue
+        who = (names.get(gid) or "the client's reviewers") if groups_sent <= {gid} else "the client's reviewers"
         out.append({"no": no, "date": str(d.get("at") or "")[:10], "by": "",
-                    "words": f"{DECISION_WORDS[d['decision']]} by {names.get(gid) or 'the client'} ({d.get('by_name') or ''})."})
+                    "words": f"{DECISION_WORDS[d['decision']]} by {who}."})
     return out
 
 
@@ -417,6 +434,20 @@ def _insert_review(row):
     db.execute(f"INSERT INTO clp_reviews (tenant_id, {REVIEW_COLS}) VALUES ({', '.join(['?'] * (len(cols) + 1))})",
                tuple([_tenant()] + [row.get(c) for c in cols]))
     return row
+
+
+def send_options(clp_id, acc, factors=None):
+    """⋯ → Send Issue N to reviewers…: the last issue and the live groups (each with whether it has that issue already)."""
+    import clp_records
+    if not access.can_approve(acc):
+        return {"error": "Only a planner or an admin sends a CLP to the client's reviewers.", "status": 403}
+    rec = clp_records._record(clp_id, acc, factors)
+    if not rec:
+        return {"error": "No such CLP.", "status": 404}
+    no = _latest_issue_no(rec["id"])
+    if not no:
+        return {"error": "Only an approved issue goes to the client's reviewers. Approve this CLP first.", "status": 422}
+    return {"issue_no": no, "groups": groups_for_send(rec["id"], no)}
 
 
 def send_issue(clp_id, issue_no, group_ids, acc, factors=None):
@@ -467,11 +498,11 @@ def send_message(user, rec, issue, by, settings, group_name, notice=None):
     team = taxonomy.team_name(rec["team"]) if rec.get("team") else "All teams"
     place = rec.get("name") or "a site"
     msg = EmailMessage()
-    msg["Subject"] = f"A CLP to review: {place}, Issue {issue['issue_no']}"
+    msg["Subject"] = _one_line(f"A CLP to review: {place}, Issue {issue['issue_no']}")
     msg["From"] = settings["DEMO_FROM"]
     msg["To"] = user["email"]
     msg["Reply-To"] = settings["reply_to"]
-    note = (issue.get("approver_note") or issue.get("sent_note") or "").strip()
+    note = (issue.get("approver_note") or "").strip()     # never sent_note: the team's note to the approver
     body = (f"{by} of {scheme_name()} sent {group_name} Issue {issue['issue_no']} of the Construction Logistics Plan for "
             f"{place} ({team}) to review.\n\n")
     if note:
@@ -505,7 +536,13 @@ def email_reviewers(group_id, rec, issue, by):
         if settings is None:
             tally["unsent"] += 1
             continue
-        tally[_send_mail(send_message(u, rec, issue, by, settings, gname, notice), settings)] += 1
+        try:
+            msg = send_message(u, rec, issue, by, settings, gname, notice)
+        except Exception as e:  # noqa: BLE001
+            print(f"clp_reviews: email not built {e.__class__.__name__}: {str(e)[:200]}")
+            tally["failed"] += 1
+            continue
+        tally[_send_mail(msg, settings)] += 1
     return tally
 
 
@@ -516,7 +553,7 @@ def decided_message(sender, rec, issue_no, decision, words, rev, settings, notic
     place = rec.get("name") or "a site"
     word = DECISION_WORDS[decision]
     msg = EmailMessage()
-    msg["Subject"] = f"{word} by {rev['group_name']}: {place}, Issue {issue_no}"
+    msg["Subject"] = _one_line(f"{word} by {rev['group_name']}: {place}, Issue {issue_no}")
     msg["From"] = settings["DEMO_FROM"]
     msg["To"] = sender["email"]
     msg["Reply-To"] = settings["reply_to"]
@@ -539,7 +576,12 @@ def email_sender(sent_row, rec, issue_no, decision, words, rev):
     settings = users.mail_settings()
     if settings is None:
         return "unsent"
-    return _send_mail(decided_message(u, rec, issue_no, decision, words, rev, settings, _demo_notice()), settings)
+    try:
+        msg = decided_message(u, rec, issue_no, decision, words, rev, settings, _demo_notice())
+    except Exception as e:  # noqa: BLE001
+        print(f"clp_reviews: email not built {e.__class__.__name__}: {str(e)[:200]}")
+        return "failed"
+    return _send_mail(msg, settings)
 
 
 # --------------------------------------------------------------------------- #
@@ -617,7 +659,7 @@ def clp_for_reviewer(clp_id, rev):
         st = _state_out(cid, no, rev["group_id"], s, names)
         row = _issue_row(cid, no) or {}
         issues.append({"no": no, "sent_at": st["sent_at"], "sent_by": st["sent_by"],
-                       "note": (row.get("approver_note") or row.get("sent_note") or None),
+                       "note": (row.get("approver_note") or None),     # never sent_note (the team's own)
                        "state": st["state"], "by": st["by"], "at": st["at"], "words": st["words"],
                        "decisions": [{"decision": d["decision"], "word": DECISION_WORDS.get(d["decision"], ""),
                                       "by": d.get("by_name"), "at": d.get("at"), "words": d.get("words")}

@@ -284,6 +284,12 @@ def _clean(v, most):
     return v[:most]
 
 
+def _clean_name(v, most):
+    """A CLP's name on one line (it reaches an email's subject): control characters become one space."""
+    import re
+    return re.sub(r"[\x00-\x1f\x7f]+", " ", _clean(v, most)).strip()
+
+
 def cover_problem(cover):
     if cover is None:
         return None
@@ -349,7 +355,7 @@ def create(body, acc, factors=None):
         p = "Impact must be higher or medium."
     if p:
         return {"error": p, "status": 422}
-    name = _clean(body.get("name"), NAME_MAX) or ", ".join((locs.get(i) or {}).get("name") or i for i in ids)
+    name = _clean_name(body.get("name"), NAME_MAX) or ", ".join((locs.get(i) or {}).get("name") or i for i in ids)
     rec = {"id": "clp-" + secrets.token_hex(4), "name": name, "location_ids": ids, "team": team or None,
            "impact": body.get("impact") or "higher",
            "cover": {k: _clean(v, COVER_MAX.get(k, TEXT_MAX)) for k, v in (body.get("cover") or {}).items()},
@@ -381,7 +387,7 @@ def update(clp_id, body, acc, factors=None):
         nxt["cover"] = c
     if appr:
         if "name" in body:
-            nxt["name"] = _clean(body.get("name"), NAME_MAX) or rec["name"]
+            nxt["name"] = _clean_name(body.get("name"), NAME_MAX) or rec["name"]
         if "impact" in body:
             if body["impact"] not in clp_doc.IMPACT:
                 return {"error": "Impact must be higher or medium.", "status": 422}
