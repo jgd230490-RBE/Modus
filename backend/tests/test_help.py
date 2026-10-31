@@ -925,7 +925,8 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 31 Oct 2026 (task 4a, PR 3b): + 18.5 Notes and tasks (84); + T1 "CLP notes and tasks" (35)
    # NARROWED 31 Oct 2026 (task 4a, PR 3c): + 18.6 The client's reviewers (85); + T1 "CLP client reviewers" (36)
    # NARROWED 31 Oct 2026 (task 4c PR 2): + 19.2 Drawing (86)
-   len(re.findall(r'<li class="l[12]"', src)) == 86 and len(re.findall(r'<li class="l[12]"', _tg2)) == 36   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   len(re.findall(r'<li class="l[12]"', src)) == 87 and   # NARROWED 31 Oct 2026 (task 4c PR 5): + 19.5 On paper (87)
+   len(re.findall(r'<li class="l[12]"', _tg2)) == 36   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,
@@ -1252,12 +1253,27 @@ ok3("SITE LAYOUTS: #t1-layouts holds the units rule, the leave-outs, footprints,
     "<code>FOOTPRINT_M</code>" in _tgv2 and "<code>site_layouts.MAX_HOLES</code>" in _tgv2 and "Terra Draw 1.37 refuses a polygon with holes" in _tgv2
     and "<code>contractor-style-mm.dxf</code>" in _tgv2 and "<code>$INSUNITS</code> must be 6" not in _tgv2)
 
+# 31 Oct 2026 (task 4c PR 5, the approved mockup notes\\site-layout-paper-mockup-1031): 19.5 On paper, few words; #t1-layouts-paper the detail
+_d195 = _ch19[_ch19.index('<h2 id="19-5-on-paper">'):] if '<h2 id="19-5-on-paper">' in _ch19 else ""
+ok3("⭐ SITE LAYOUTS (PR 5): 19.5 On paper says Print…, the page, scale and map, PDF or PNG, 100 %, what is left out, and the CLP's Site plan",
+    all(t in _d195 for t in ("<strong>⋯ → Print…</strong>", "A3 or A4, landscape", "<strong>Fitted</strong>", "1:200 to 1:5,000",
+                             "Streets, Light, Outdoors or Aerial", "<strong>PDF</strong> or <strong>PNG</strong>", "printed at 100 %",
+                             "Security and CCTV symbols are on the sheet", "the phase in force in the site&#39;s busiest month",
+                             "&ldquo;No site layout drawn&rdquo; to complete"))
+    and '<a href="#19-5-on-paper">19.5 On paper</a>' in _ug, _d195[:200])
+ok3("SITE LAYOUTS (PR 5): 19.5 names no back end; #t1-layouts-paper holds the endpoints, solo, the vector symbols and the CLP hook",
+    _d195 and not re.search(r"\b(API|endpoint|server|JSON|ReportLab|SVG|solo|dpi|Mapbox|422|503)\b", _d195)
+    and 'id="t1-layouts-paper"' in _tgv2 and "<code>GET /api/locations/{id}/site-layout/sheet?phase=</code>" in _tgv2
+    and "<code>heavy_reads.solo(&quot;site-layout-read&quot;)</code>" in _tgv2 and "<code>backend/site_layout_svg.py</code>" in _tgv2
+    and "<code>ROUTE_MAP_PANEL_MAX_LAYOUT</code> 12" in _tgv2 and "Pins and the sheet come in later PRs" not in _tgv2)
+
 # 31 Oct 2026 (task 4c PR 2, the approved mockup notes\\site-layout-draw-mockup-1031): 19.2 Drawing, few words; #t1-layouts-draw the detail
 _d192 = _ch19[_ch19.index('<h2 id="19-4-drawing">'):_ch19.index('<h2 id="19-2-bringing-in-a-drawing">')] if '<h2 id="19-4-drawing">' in _ch19 else ""
 ok3("⭐ SITE LAYOUTS (PR 2): 19.2 Drawing says how to draw, select, turn and resize, the snapping, layers, holes, the keys, Save / Discard, the words from zoom 15",
     all(t in _d192 for t in ("<strong>Draw</strong>", "hold R and drag to turn it, S to resize it", "<strong>15° steps</strong>", "hidden or locked while you draw",
                              "an area with holes keeps them", "Ctrl+Z undo, Ctrl+Y redo, Ctrl+D duplicate, Ctrl+S save", "<strong>Discard</strong>", "from zoom 15, on both maps"))
-    and "<strong>Name and months</strong>, <strong>Copy to a new phase</strong>" in _ch19 and "<strong>Show the whole drawing</strong>" in _ch19
+    # NARROWED 31 Oct 2026 (task 4c PR 5): Print… (19.5) sits between them in the ⋯ list
+    and "<strong>Name and months</strong>, <strong>Print…</strong> (19.5), <strong>Copy to a new phase</strong>" in _ch19 and "<strong>Show the whole drawing</strong>" in _ch19
     and "<strong>Edit</strong> changes its name and months" not in _ch19, _d192[:200])
 ok3("SITE LAYOUTS (PR 2): 19.2 names no library or back end (Terra Draw, uuid, version, PUT live in the technical guide)",
     _d192 and not re.search(r"\b(API|endpoint|server|JSON|Terra|uuid|PUT|409|Mapbox|version)\b", _d192)

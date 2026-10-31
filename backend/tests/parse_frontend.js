@@ -4635,7 +4635,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && card.includes("/site-layout/phases`") && card.includes('method: "PATCH"') && card.includes("?version=${p.version}`, { method: \"DELETE\" }")
      && card.includes("version: edit.version") && card.includes("if(j.ask_grid){"));
   ok("SITE LAYOUT: every failure through errSay / errMsg (no status number, no raw reply)",
-     (card.match(/errSay\("/g) || []).length === 7 &&   // NARROWED 31 Oct 2026: 7 — PR 2's "Not copied." and PR 4's "Not changed." (the public switch)
+     (card.match(/errSay\("/g) || []).length === 9 &&   // NARROWED 31 Oct 2026 (PR 5): 9 — the Print panel's settings read and sheet. NARROWED 31 Oct 2026: 7 — PR 2's "Not copied." and PR 4's "Not changed." (the public switch)
  card.includes("setFit({ error: errMsg(e) })") && !/\$\{e\}|\.status\b|r\.status/.test(card));
   ok("SITE LAYOUT: the words are few and name no back end (no transform, grid file, library or endpoint)",
      !/OSTN|pyproj|ezdxf|EPSG|transform|endpoint|\bAPI\b|server|\bheld\b|\bhold\b/i.test(card.replace(/\$\{API\}/g, "").replace(/"Content-Type"/g, ""))

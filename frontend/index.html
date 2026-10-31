@@ -16513,6 +16513,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
   const [keep, setKeep] = useState(false);
   const [anyway, setAnyway] = useState(false);
   const [busy, setBusy] = useState("");
+  const [prt, setPrt] = useState(null);           // 31 Oct 2026 (4c PR 5): the Print panel {id, name, page, scale, style, pages}
   const fileRef = useRef(null);
 
   const load = async (keepShown) => {
@@ -16637,6 +16638,36 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       setEdit(null); setMsg(`Deleted “${p.name}”.`); await load();
     } catch(e){ setMsg(errSay("Not deleted.", e)); }
   };
+  // 31 Oct 2026 (task 4c PR 5): Print… = one phase as an A3 / A4 sheet, PDF or PNG, drawn on the server
+  const openPrint = async (p) => {
+    setMsg(""); setEdit(null);
+    setPrt({ id: p.id, name: p.name, page: "a3", scale: "", style: "streets", pages: null });
+    try {
+      const j = await okJSON(await fetch(`${API}/locations/${encodeURIComponent(locId)}/site-layout/sheet?phase=${encodeURIComponent(p.id)}`));
+      setPrt(x => x && x.id === p.id ? { ...x, pages: j.pages, scales: j.scales } : x);
+    } catch(e){ setMsg(errSay("The print settings could not be read.", e)); }
+  };
+  const printSheet = async (kind) => {
+    if(!prt) return;
+    setBusy("print"); setMsg("");
+    try {
+      const q = new URLSearchParams({ phase: prt.id, page: prt.page, style: prt.style });
+      if(prt.scale) q.set("scale", prt.scale);
+      const r = await fetch(`${API}/locations/${encodeURIComponent(locId)}/site-layout/sheet.${kind}?${q.toString()}`);
+      if(!r.ok){
+        throw await errFrom(r);
+      }
+      const blob = await r.blob();
+      const cd = r.headers.get("content-disposition") || "";
+      const fm = cd.match(/filename="([^"]+)"/);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = fm ? fm[1] : `site-layout.${kind}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ setMsg(errSay("The sheet could not be made.", e)); }
+    setBusy("");
+  };
   // 31 Oct 2026 (task 4c PR 4): "Show on the public map" (the layout's version: someone else's change first is refused)
   const setPublic = async (on) => {
     setBusy("public"); setMsg("");
@@ -16689,7 +16720,8 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
                 <span className="ml-auto flex items-center gap-1.5">
                   {onDraw && <button onClick={() => onDraw(p.id)} className="px-2.5 py-1 rounded-lg text-white font-semibold text-[13px]" style={{ background: "var(--navy)" }} aria-label={`Draw ${p.name}`}>Draw</button>}
                   <RowMenu name={p.name}>
-                    <button type="button" onClick={() => setEdit({ id: p.id, name: p.name, month_from: p.month_from || "", month_to: p.month_to || "", version: p.version })}>Name and months</button>
+                    <button type="button" onClick={() => { setPrt(null); setEdit({ id: p.id, name: p.name, month_from: p.month_from || "", month_to: p.month_to || "", version: p.version }); }}>Name and months</button>
+                    <button type="button" onClick={() => openPrint(p)}>Print…</button>
                     <button type="button" onClick={() => copyPhase(p)}>Copy to a new phase</button>
                     <button type="button" style={{ color: "var(--red)" }} onClick={() => deletePhase(p)}>Delete…</button>
                   </RowMenu>
@@ -16697,6 +16729,37 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
               )}
             </li>))}
         </ul>
+      )}
+      {prt && !edit && !imp && (
+        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2" data-site-layout-print="1">
+          <span className="block text-sm font-medium text-slate-700">Print {prt.name}</span>
+          <div className="grid items-center gap-x-2 gap-y-1.5 text-[13px]" style={{ gridTemplateColumns: "4.5rem 1fr" }}>
+            <span className="text-slate-500">Page</span>
+            <span className="inline-flex rounded-lg border border-slate-300 overflow-hidden w-max" role="group" aria-label="Page">
+              {[["a3", "A3"], ["a4", "A4"]].map(([k, t]) => (
+                <button key={k} type="button" aria-pressed={prt.page === k} onClick={() => setPrt(x => ({ ...x, page: k }))}
+                  className={"px-3 py-1 font-semibold " + (prt.page === k ? "text-white" : "text-slate-700 bg-white hover:bg-slate-50")}
+                  style={prt.page === k ? { background: "var(--navy)" } : undefined}>{t}</button>))}
+            </span>
+            <span className="text-slate-500">Scale</span>
+            <select value={prt.scale} onChange={e => setPrt(x => ({ ...x, scale: e.target.value }))} aria-label="Scale"
+              className="border border-slate-300 rounded-lg px-2 py-1 text-[13px] bg-white w-max">
+              {(() => { const f = (prt.pages || []).find(g => g.key === prt.page); return <option value="">{f && f.fitted ? `Fitted (1:${Number(f.fitted).toLocaleString("en-GB")})` : "Fitted"}</option>; })()}
+              {(prt.scales || []).filter(n => n <= 5000).map(n => <option key={n} value={String(n)}>1:{Number(n).toLocaleString("en-GB")}</option>)}
+            </select>
+            <span className="text-slate-500">Map</span>
+            <select value={prt.style} onChange={e => setPrt(x => ({ ...x, style: e.target.value }))} aria-label="Map style"
+              className="border border-slate-300 rounded-lg px-2 py-1 text-[13px] bg-white w-max">
+              <option value="streets">Streets</option><option value="light">Light</option>
+              <option value="outdoors">Outdoors</option><option value="aerial">Aerial (with names)</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => printSheet("pdf")} disabled={busy !== ""} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs disabled:opacity-50" style={{ background: "var(--navy)" }}>{busy === "print" ? "Making…" : "PDF"}</button>
+            <button onClick={() => printSheet("png")} disabled={busy !== ""} className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 disabled:opacity-50">PNG</button>
+            <button onClick={() => setPrt(null)} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
+          </div>
+        </div>
       )}
       {edit && (
         <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2" data-site-layout-phase-form="1">

@@ -57,6 +57,7 @@ import gate_arrivals
 import gate_hours
 import gates
 import site_areas
+import site_layout_paper  # 31 Oct 2026 (4c PR 5): the site's layout phase for §4
 import taxonomy
 import weeks
 
@@ -763,6 +764,12 @@ def file_name(data, when=None):
     return f"CLP {base} {when:%Y-%m-%d}.docx"
 
 
+def _lower_lead(words):
+    """'Every month' / 'From Mar 2027' / 'Until …' mid-sentence; a month name keeps its capital."""
+    first = words.split(" ", 1)[0]
+    return words[0].lower() + words[1:] if first in ("Every", "From", "Until") else words
+
+
 def build(data, impact="higher", pictures=True, acc=None):
     """The .docx bytes for gather()'s data. `impact` picks the §5 checklist (higher or medium). `pictures` adds the
     charts and the three plans (clp_doc_pictures; the plans call the basemap); `acc` is the caller's access."""
@@ -1090,6 +1097,13 @@ def build(data, impact="higher", pictures=True, acc=None):
             D.table(["Area", "Activity", "Bays", "Minutes a lorry", "Level"],
                     [[a["name"], a["activity"], n(a["bays"]), (f"{a['minutes']:g}" if a["minutes"] is not None else "—"),
                       a["level"] or ""] for a in s["areas"]], widths=[5, 3, 1.5, 3, 4.5], numeric=(2, 3))
+        # 31 Oct 2026 (4c PR 5): the site's layout phase in force in its busiest month (the month its site plan shows)
+        LY = site_layout_paper.for_plan(s["id"], PIC._site_month(d, s["id"]) or T["peak_month"])             if T.get("peak_month") else None
+        if LY and LY["things"]:
+            where = " is drawn on its site plan in 2.2" if pictures else ""
+            D.p(f"The site layout for {s['name']}{where}: phase {LY['phase']}, {_lower_lead(LY['months'])}.")
+        else:
+            D.todo(f"No site layout drawn for {s['name']}. Draw one on Locations, or attach the contractor's drawing.", "4")
     D.src("From Data → Locations: gates, their hours and the work areas.")
     if any(pp["site"] for pp in plan_pics):
         D.p("The local and site plans of each site are in 2.2.")

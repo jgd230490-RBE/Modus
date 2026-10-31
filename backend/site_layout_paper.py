@@ -434,7 +434,8 @@ def legend_rows(prepared, inside=None):
         for q in ps:
             cols[q.get("color")] = cols.get(q.get("color"), 0) + 1
         top = max(cols, key=cols.get) if cols else None
-        label = (styles.AREA_STYLES.get(k) or styles.LINE_STYLES.get(k) or styles.SYMBOL_KEYS.get(k) or {}).get("label", k)
+        table = {"area": styles.AREA_STYLES, "line": styles.LINE_STYLES, "sym": styles.SYMBOL_KEYS}[kd]
+        label = (table.get(k) or {}).get("label", k)      # by kind: the symbol "welfare" is a cabin, the area a compound
         sample = dict(ps[0])
         if top:
             sample["color"] = top
@@ -566,12 +567,18 @@ def month_of_index(month_index):
 
 
 def phase_in_force(location_id, month):
-    """The first phase (in the layout's order) of a site's layout that applies in 'YYYY-MM', or None."""
+    """The phase of a site's layout in force in 'YYYY-MM', or None. Where phases overlap (the map draws them all), a
+    dated phase wins over an every-month one and the later start over the earlier: a "Deck" phase for Jun to Aug is
+    the plan for those months, not the every-month "Site logistics" under it."""
     import site_layouts as SL
     lay = SL.get(location_id)
     if not lay:
         return None
-    return next((p for p in lay["phases"] if SL.in_month(p, month) and p.get("things")), None)
+    hits = [p for p in lay["phases"] if SL.in_month(p, month) and p.get("things")]
+    if not hits:
+        return None
+    return max(enumerate(hits), key=lambda ip: (bool(ip[1].get("month_from") or ip[1].get("month_to")),
+                                                ip[1].get("month_from") or "", ip[0]))[1]
 
 
 def for_plan(location_id, month_index, private=False):

@@ -591,6 +591,29 @@ ok("a tenant that is not a demo: no DEMO line anywhere", "DEMO" not in "\n".join
 config.save(_doc, by="tester")
 config.invalidate()
 
+# ---- 5b. §4 and the site layout (31 Oct 2026, task 4c PR 5) -------------------------------------------------------
+NO_LAYOUT = "To complete: No site layout drawn for Yard East. Draw one on Locations, or attach the contractor's drawing."
+ok("⭐ §4 with no layout drawn: 'No site layout drawn for Yard East' to complete, listed in Still to complete",
+   NO_LAYOUT in [p.text for p in paras]
+   and any(x.endswith(": " + NO_LAYOUT[len("To complete: "):]) for x in JOINED.split("\n")))
+import site_layouts as SL  # noqa: E402
+_lay_things = [
+    {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[-0.8830, 52.6440], [-0.8815, 52.6440]]},
+     "properties": {"style": "hoarding"}},
+    {"type": "Feature", "geometry": {"type": "Point", "coordinates": [-0.8822, 52.6447]},
+     "properties": {"style": "sym", "sym": "security"}}]
+SL.add_phase(YARD, {"name": "Yard set-up", "features": _lay_things}, "harness")
+WL = Document(io.BytesIO(clp_doc.build(D1)))
+LT = [p.text for p in WL.paragraphs]
+ok("⭐ §4 with a layout: one sentence naming the phase and its months, pointing at the site plan in 2.2; nothing to complete",
+   "The site layout for Yard East is drawn on its site plan in 2.2: phase Yard set-up, every month." in LT
+   and NO_LAYOUT not in LT, str([t for t in LT if "site layout" in t]))
+WLn = Document(io.BytesIO(clp_doc.build(D1, pictures=False)))
+ok("§4 without the pictures: the sentence names the phase without pointing at a plan",
+   "The site layout for Yard East: phase Yard set-up, every month." in [p.text for p in WLn.paragraphs])
+ok("🔴 the CLP never says security or CCTV (left out of a document that leaves the company)",
+   not re.search(r"\b(CCTV|Security point|security)\b", "\n".join(all_text(WL))))
+
 # =========================================================================== #
 #  6. The OS grid reference                                                    #
 # =========================================================================== #

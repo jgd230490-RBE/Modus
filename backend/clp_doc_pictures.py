@@ -336,12 +336,16 @@ def plans(data, acc=None):
             if not any(p.get("at") and p["name"].strip().lower() == s["name"].strip().lower() for p in S["places"]):
                 import bulletin_doc
                 S["places"].append({"letter": bulletin_doc._letters(len(S["places"])), "name": s["name"],
-                                    "at": [float(s["lon"]), float(s["lat"])], "end": "dest"})
+                                    "at": [float(s["lon"]), float(s["lat"])], "end": "dest", "loc_id": s["id"]})
             rme.plan(S, kind, None, at=s["name"])
             P = S["plan"]
             if not P["view"]:
                 continue
+            LY = P.get("layout") or {}
+            # 31 Oct 2026 (4c PR 5): the Site plan draws the site's layout phase in force in that month; §4 names it
             out.append({"kind": kind, "name": P["name"], "scale": P["scale_words"], "site": s["name"], "month": mi,
+                        "site_id": s["id"], "layout": LY.get("phase") if LY.get("things") else None,
+                        "layout_months": LY.get("months") if LY.get("things") else None,
                         "jpg": draw(S, kind, PLAN_STYLE[kind]),
                         "alt": f"{P['name']} of {s['name']}, {P['scale_words']}, routes in {clp_doc.month_label(mi)}."})
     return out
