@@ -582,8 +582,10 @@ _tl = {t["id"]: t for t in th(Y1, NORA)["tasks"]}[T_LINE]
 ok("⭐ a later build without the line: the task says so, and is NOT ticked by itself (Q8)",
    _tl["line_gone_at"] and not _tl["done"], str(_tl))
 ok("...one kept list a CLP", len(clp_notes._rows(Y1, ("lines",))) == 1)
+# NARROWED 31 Oct 2026 (the Chrome check): the words start with a capital, so a task from "Cover, landowner: who owns …" reads as a sentence
 ok("split_line names the section", clp_notes.split_line("2.4.1: Melton BC: the code") == ("2.4.1", "Melton BC: the code")
-   and clp_notes.split_line("no section") == ("", "no section"))
+   and clp_notes.split_line("no section") == ("", "No section")
+   and clp_notes.split_line("Cover, landowner: who owns the land the site sits on.") == ("Cover, landowner", "Who owns the land the site sits on."))
 _doc_text = "\n".join(p.text for p in __import__("docx").Document(io.BytesIO(clp_records.issue_file(Y1, 1, PAT)[1])).paragraphs)
 ok("🔴 nothing of a note or a task prints in the Word file (Q11)",
    "Saturday hours to section 7" not in _doc_text and "Melton BC for their code" not in _doc_text

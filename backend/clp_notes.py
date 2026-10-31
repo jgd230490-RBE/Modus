@@ -185,7 +185,9 @@ def keep_lines(clp_id, todos):
 def split_line(item):
     """'2.4.1: Melton BC: the code …' -> ('2.4.1', 'Melton BC: the code …'); the section is what Still to complete names."""
     where, _, what = str(item or "").partition(": ")
-    return (where, what) if what else ("", str(item or ""))
+    if not what:
+        where, what = "", str(item or "")
+    return where, what[:1].upper() + what[1:]     # a task reads as a sentence: "Who owns the land …"
 
 
 def _lines(rows):
