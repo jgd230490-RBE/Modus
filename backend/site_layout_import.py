@@ -9,6 +9,14 @@ shows the report and the "in the file -> becomes" table, and site_layouts.place(
 
   DXF, National Grid     ezdxf 1.4.5; EPSG:27700 -> WGS 84 by pyproj with OS's OSTN15 grid (backend/data/proj)
   DXF, site grid         the same reader; placed by 2+ survey points (fit(): turn, scale, shift, no stretch)
+
+  31 Oct 2026 (plan §6 revised after two contractor-style test drawings, notes site-layouts-mockup-1030 / imports):
+  a DXF in millimetres, centimetres, inches or feet is SCALED (no units: metres or millimetres from where it sits
+  within 50 km of the site, else ask); left out and counted: hidden or frozen layers, layers bound in from another
+  drawing, references to drawings not sent, a drawing sheet drawn in model space (its key, title block and border),
+  anything over 1 km from the site, the same thing twice, points / leaders / masks / pictures / solid fills /
+  dimensions; a block 2 m or more each way is a FOOTPRINT (its outline as an area, as inserted); attribute values
+  label a symbol; a hatch keeps its holes; a gradient's first colour is its colour.
   KML / KMZ              Python's own XML reader (fastkml is LGPL)
   GeoJSON                Python's own JSON reader; a file whose crs names another grid is refused
   Shapefile zip          pyshp 3.1.6 + each file's .prj; no .prj is refused
@@ -46,8 +54,9 @@ GRID_FILE = "uk_os_OSTN15_NTv2_OSGBtoETRS.tif"
 
 #: the words each format keeps and leaves out (the page shows them under the report)
 KEEPS = {
-    "DXF": "Keeps layers, colours, line types, widths, words and their angle, blocks, hatched and closed shapes, "
-           "circles, arcs and curves. Leaves out dimensions, pictures, 3D and the title block.",
+    "DXF": "Keeps layers, colours, line types, widths, words and their angle, blocks, hatched and closed shapes "
+           "(with their holes), circles, arcs and curves. Leaves out dimensions, pictures, 3D, hidden layers, base "
+           "mapping, the key and the title block.",
     "KML": "Keeps folders as layers, names, line colour and width, fill colour and icons. Leaves out dashes, "
            "descriptions, heights and pictures laid on the ground.",
     "KMZ": "A KML in a zip: the same as KML.",
@@ -121,7 +130,9 @@ def _thing(geom, **p):
 
 
 def row_key(p):
-    """The mapping table's row for a thing: its block, its symbol, else its layer."""
+    """The mapping table's row for a thing: its block, a footprint block's outline, its symbol, else its layer."""
+    if p.get("outline"):
+        return "outline " + str(p["outline"])
     if p.get("block"):
         return "block " + str(p["block"])
     if p.get("sym_hint"):
@@ -135,9 +146,45 @@ def kind_of(t):
 
 
 # --------------------------------------------------------------------------------------------------------- DXF
-def read_dxf(data, grid="auto", near=None):
-    """`grid`: 'bng' (EPSG:27700 metres), 'site' (left in the drawing's metres + its survey points) or 'auto'."""
+#: $INSUNITS -> (words, metres per drawing unit). 31 Oct 2026 (plan §6, revised): a drawing in millimetres is scaled,
+#: not refused — most UK CAD is in millimetres.
+UNITS = {1: ("inches", 0.0254), 2: ("feet", 0.3048), 4: ("millimetres", 0.001), 5: ("centimetres", 0.01), 6: ("metres", 1.0)}
+#: a footprint block (a welfare cabin drawn as a block) is at least this many metres each way
+FOOTPRINT_M = 2.0
+#: anything whose middle is further than this from the site is left out (a stray line from 0,0)
+FAR_M = 1000.0
+#: the types a logistics plan never needs, each counted in the report
+LEFT_TYPES = {"DIMENSION": "Dimensions", "ARC_DIMENSION": "Dimensions", "IMAGE": "Pictures (the picture file is not sent)",
+              "WIPEOUT": "Masks behind words", "LEADER": "Leader arrows", "MULTILEADER": "Leader arrows",
+              "SOLID": "Solid fills (arrowheads)", "3DFACE": "3D shapes", "3DSOLID": "3D shapes", "MESH": "3D shapes",
+              "VIEWPORT": "Viewports", "XLINE": "Endless lines", "RAY": "Endless lines", "OLE2FRAME": "Embedded objects",
+              "ATTDEF": "Block attributes", "POINT": "Points"}
+
+
+def _inside(pt, ring):
+    """Is a point inside a closed ring (even-odd)?"""
+    x, y, c = pt[0], pt[1], False
+    for (xi, yi), (xj, yj) in zip(ring, ring[1:]):
+        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi:
+            c = not c
+    return c
+
+
+def _bound_layer(name):
+    """A layer bound in from another drawing (OS base mapping and the like): 'NAME$0$layer' or 'NAME|layer'."""
+    n = str(name or "")
+    return n.split("$0$")[0].split("|")[0] if ("$0$" in n or "|" in n) else None
+
+
+def read_dxf(data, grid="auto", near=None, site=None):
+    """
+    `grid`: 'bng' (EPSG:27700), 'site' (left in the drawing's metres + its survey points) or 'auto'. `site`: the
+    location's own position and its gates as [lon, lat] (the far rule and the units guess measure from them); `near`:
+    the organisation's locations (the National Grid guess). Every coordinate, height, width and radius comes out in
+    METRES, whatever the drawing's units.
+    """
     import ezdxf
+    from ezdxf import bbox as ezbbox
     from ezdxf import colors as ezcolors
     from ezdxf import path as ezpath
     head = data[:4096]
@@ -156,15 +203,106 @@ def read_dxf(data, grid="auto", near=None):
             os.remove(tmp)
         except OSError:
             pass
-    units = doc.header.get("$INSUNITS", 0)
-    if units != 6:
-        w = UNIT_WORDS.get(units)
-        if w is None:
-            raise Refused("This drawing does not say it is in metres. Set its units to metres in your CAD program and save it again.")
-        raise Refused(f"This drawing is in {w}, not metres. Save it in metres and send it again.")
+    msp = doc.modelspace()
     layer_info = {l.dxf.name: l for l in doc.layers}
+    left_out = {}
 
-    def colour(e):
+    def lo(k, n=1):
+        left_out[k] = left_out.get(k, 0) + n
+
+    def hidden(layer):
+        ly = layer_info.get(layer)
+        try:
+            return ly is not None and (not ly.is_on() or ly.is_frozen())
+        except Exception:
+            return False
+
+    def is_xref(e):
+        try:
+            blk = doc.blocks.get(e.dxf.name)
+            return blk is None or bool(blk.block_record.is_xref)
+        except Exception:
+            return False
+
+    def usable(e):
+        lay = e.dxf.layer
+        return not hidden(lay) and not _bound_layer(lay) and not (e.dxftype() == "INSERT" and is_xref(e))
+
+    # ---- where the drawing sits: the middle (median) of its inserts, words and line starts, in drawing units
+    sample = []
+    for e in msp:
+        try:
+            if not usable(e):
+                continue
+            t = e.dxftype()
+            if t in ("INSERT", "TEXT", "MTEXT"):
+                sample.append((e.dxf.insert[0], e.dxf.insert[1]))
+            elif t == "LINE":
+                sample.append((e.dxf.start[0], e.dxf.start[1]))
+            elif t in ("LWPOLYLINE", "POLYLINE"):
+                v = next(iter(e.points()))
+                sample.append((v[0], v[1]))
+            elif t in ("CIRCLE", "ARC"):
+                sample.append((e.dxf.center[0], e.dxf.center[1]))
+            elif t == "HATCH" and e.paths and getattr(e.paths[0], "vertices", None):
+                v = e.paths[0].vertices[0]
+                sample.append((v[0], v[1]))
+        except Exception:
+            pass
+    mid = ((sorted(v[0] for v in sample)[len(sample) // 2], sorted(v[1] for v in sample)[len(sample) // 2])
+           if sample else None)
+    has_control = any(_is_control_layer(e.dxf.layer) for e in msp.query("POINT"))
+
+    # the site (and the organisation's places) on National Grid, for the units guess and the far rule
+    site_bng, near_bng = [], []
+    try:
+        to_bng = _proj().Transformer.from_crs(4326, 27700, always_xy=True)
+        site_bng = [to_bng.transform(p[0], p[1]) for p in (site or [])]
+        near_bng = [to_bng.transform(p[0], p[1]) for p in (near or [])]
+    except Exception:
+        pass
+
+    def near_m(xy, pts):
+        return min((math.hypot(xy[0] - q[0], xy[1] - q[1]) for q in pts), default=float("inf"))
+
+    # ---- units
+    code = doc.header.get("$INSUNITS", 0)
+    if code in UNITS:
+        uname, k = UNITS[code]
+        units_words = f"{uname}, from the file"
+    elif code == 0:
+        k = None
+        if mid and grid != "site":
+            for f in (1.0, 0.001):
+                if near_m((mid[0] * f, mid[1] * f), site_bng or near_bng) <= NEAR_KM * 1000:
+                    k = f
+                    break
+        if k is not None:
+            uname = "metres" if k == 1 else "millimetres"
+            units_words = f"{uname}, from where the drawing sits (no units in the file)"
+        elif grid == "site" or has_control:
+            k, units_words = 1.0, "metres (no units in the file; the survey points check it)"
+        elif grid == "bng":
+            raise Refused("This drawing has no units and does not sit near the site. Set its units in your CAD "
+                          "program and save it again.")
+        else:
+            raise AskGrid("Is this drawing on National Grid, or on the site's own grid?")
+    else:
+        w = UNIT_WORDS.get(code) or "units Wayscope does not read"
+        raise Refused(f"This drawing is in {w}. Save it in metres or millimetres and send it again.")
+
+    # ---- which grid
+    if grid == "auto":
+        if mid and near_m((mid[0] * k, mid[1] * k), site_bng or near_bng) <= NEAR_KM * 1000:
+            grid = "bng"
+        elif has_control:
+            grid = "site"
+        else:
+            raise AskGrid("Is this drawing on National Grid, or on the site's own grid?")
+    # the far rule's centre, in metres: the site on National Grid, else the drawing's own middle
+    centres = site_bng if (grid == "bng" and site_bng) else [(mid[0] * k, mid[1] * k)] if mid else []
+
+    def colour(e, lay=None):
         try:
             if e.dxf.hasattr("true_color"):
                 return "#%02X%02X%02X" % tuple(e.rgb)
@@ -172,58 +310,179 @@ def read_dxf(data, grid="auto", near=None):
             pass
         aci = e.dxf.get("color", 256)
         if aci in (0, 256):
-            lay = layer_info.get(e.dxf.layer)
-            aci = abs(lay.dxf.color) if lay else 7
+            ly = layer_info.get(lay or e.dxf.layer)
+            aci = abs(ly.dxf.color) if ly else 7
         return "#%02X%02X%02X" % tuple(ezcolors.aci2rgb(aci)) if 0 < aci < 256 else None
 
     def linetype(e):
         lt = e.dxf.get("linetype", "BYLAYER")
         if lt.upper() in ("BYLAYER", "BYBLOCK"):
-            lay = layer_info.get(e.dxf.layer)
-            lt = lay.dxf.linetype if lay else "CONTINUOUS"
+            ly = layer_info.get(e.dxf.layer)
+            lt = ly.dxf.linetype if ly else "CONTINUOUS"
         return lt.upper()
 
-    raw, left_out, control, ctl_text = [], {}, [], []
+    # ---- a drawing sheet drawn in model space: its key, its title block and its border's layer
+    def box(e):
+        p = [(v[0], v[1]) for v in e.get_points("xy")]
+        return (min(q[0] for q in p), min(q[1] for q in p), max(q[0] for q in p), max(q[1] for q in p))
 
-    def lo(k):
-        left_out[k] = left_out.get(k, 0) + 1
+    rects = []
+    for e in msp.query("LWPOLYLINE"):
+        try:
+            if e.closed and len(e) == 4 and usable(e):
+                rects.append((box(e), e))
+        except Exception:
+            pass
 
-    for e in doc.modelspace():
-        t, layer = e.dxftype(), e.dxf.layer
+    def around(v):
+        inside = [(b, e) for b, e in rects if b[0] <= v[0] <= b[2] and b[1] <= v[1] <= b[3]]
+        return min(inside, key=lambda be: (be[0][2] - be[0][0]) * (be[0][3] - be[0][1])) if inside else None
+
+    zones = {}
+    for tx in msp.query("TEXT MTEXT"):
+        try:
+            if not usable(tx):
+                continue
+            words = (tx.plain_text() if tx.dxftype() == "MTEXT" else tx.dxf.text).strip().upper()
+            v = tx.dxf.insert
+        except Exception:
+            continue
+        if words in ("KEY", "LEGEND"):
+            hit = around(v)
+            if hit:
+                zones["In the drawing's key (its sample lines and symbols)"] = hit[0]
+        elif re.search(r"SCALE\s+1\s*:|\bDRG\b|DRAWING NO|\bREV\b", words):
+            hit = around(v)
+            if hit:
+                zones["In the title block"] = hit[0]
+    sheet_layer = None
+    tb = zones.get("In the title block")
+    if tb:
+        big = [(b, e) for b, e in rects if (b[2] - b[0]) * k > 200 and b[0] <= tb[0] and b[2] >= tb[2]
+               and b[1] <= tb[1] and b[3] >= tb[3]]
+        if big:
+            sheet_layer = max(big, key=lambda be: be[0][2] - be[0][0])[1].dxf.layer
+
+    def extents(e):
+        try:
+            ext = ezbbox.extents([e])
+            return ext if ext.has_data else None
+        except Exception:
+            return None
+
+    def in_zone(ext):
+        if ext is None:
+            return None
+        for why, b in zones.items():
+            if b[0] <= ext.extmin.x and ext.extmax.x <= b[2] and b[1] <= ext.extmin.y and ext.extmax.y <= b[3]:
+                return why
+        return None
+
+    def where(e, ext):
+        if e.dxf.hasattr("insert"):
+            return e.dxf.insert
+        t = e.dxftype()
+        if t == "LINE":
+            return e.dxf.start.lerp(e.dxf.end)
+        if t == "CIRCLE":
+            return e.dxf.center
+        return ext.center if ext is not None else None
+
+    M = lambda v: (v[0] * k, v[1] * k)            # drawing units -> metres (still on the drawing's grid)
+    flat = FLATTEN_M / k                           # the flattening tolerance in drawing units
+
+    def ring_of(path):
+        r = [M(v) for v in path.flattening(flat)]
+        if len(r) >= 3 and r[0] != r[-1]:
+            r.append(r[0])
+        return r if len(r) >= 4 else None
+
+    def area2(r):
+        return abs(sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(r, r[1:])))
+
+    raw, control, ctl_text, seen = [], [], [], set()
+    blocks, mirrored = {}, 0
+    for e in msp:
+        extra = []                                   # a hatch's separate islands, each its own area
+        try:
+            t, layer = e.dxftype(), e.dxf.layer
+        except Exception:
+            lo("Things that could not be read")
+            continue
         if len(raw) > MAX_THINGS:
             raise Refused(f"This drawing has more than {MAX_THINGS:,} things. Send the logistics layers only.")
-        base = dict(src_layer=layer, src_type=t, color=colour(e), linetype=linetype(e))
         try:
+            if hidden(layer):
+                lo(f"On a hidden layer ({layer})")
+                continue
+            if _bound_layer(layer):
+                lo(f"Base mapping from another drawing ({_bound_layer(layer)})")
+                continue
+            if t == "INSERT" and is_xref(e):
+                lo(f"A drawing referred to but not sent ({e.dxf.name})")
+                continue
+            if sheet_layer and layer == sheet_layer:
+                lo(f"The drawing sheet's border ({layer})")
+                continue
+            if t == "POINT":
+                loc = e.dxf.location
+                if _is_control_layer(layer) and grid == "site":
+                    control.append(M(loc))
+                else:
+                    lo("Survey points" if _is_control_layer(layer) else "Points")
+                continue
+            if t in LEFT_TYPES:
+                lo(LEFT_TYPES[t])
+                continue
+            ext = extents(e)
+            z = in_zone(ext)
+            if z:
+                lo(z)
+                continue
+            w = where(e, ext)
+            if w is not None and centres and near_m(M(w), centres) > FAR_M:
+                lo("Over 1 km from the site")
+                continue
+            base = dict(src_layer=layer, src_type=t, color=colour(e), linetype=linetype(e))
             if t in ("LINE", "LWPOLYLINE", "POLYLINE", "ARC", "SPLINE", "ELLIPSE"):
                 if t == "POLYLINE" and (e.is_3d_polyline is False and e.is_2d_polyline is False):
                     lo("3D shapes")
                     continue
-                pts = [(v[0], v[1]) for v in ezpath.make_path(e).flattening(FLATTEN_M)]
+                pts = [M(v) for v in ezpath.make_path(e).flattening(flat)]
                 if len(pts) < 2:
                     continue
                 closed = (t == "LWPOLYLINE" and e.closed) or (t == "POLYLINE" and e.is_closed)
-                w = e.dxf.get("const_width", 0) if t == "LWPOLYLINE" else 0
+                wid = (e.dxf.get("const_width", 0) if t == "LWPOLYLINE" else 0) * k
                 if closed and len(pts) >= 3:
                     if pts[0] != pts[-1]:
                         pts.append(pts[0])
-                    raw.append(("Polygon", [pts], dict(base, width_m=round(w, 2) or None)))
+                    item = ("Polygon", [pts], dict(base, width_m=round(wid, 2) or None))
                 else:
-                    raw.append(("LineString", pts, dict(base, width_m=round(w, 2) or None)))
+                    item = ("LineString", pts, dict(base, width_m=round(wid, 2) or None))
             elif t == "HATCH":
-                paths = list(ezpath.from_hatch(e))
-                if not paths:
+                rings = [r for r in (ring_of(p) for p in ezpath.from_hatch(e)) if r]
+                if not rings:
                     lo("Hatches with no edge")
                     continue
-                ring = [(v[0], v[1]) for v in paths[0].flattening(FLATTEN_M)]
-                if len(ring) < 3:
-                    continue
-                if ring[0] != ring[-1]:
-                    ring.append(ring[0])
-                raw.append(("Polygon", [ring], dict(base, hatch=e.dxf.pattern_name)))
+                rings.sort(key=lambda r: -area2(r))      # the biggest is the outside
+                # a ring inside the outside (and not inside a hole) is a hole; any other is an island of its own
+                # (seen 31 Oct on a contractor-style drawing: a pad cut out beside the zone, not in it)
+                outer, holes, islands = rings[0], [], []
+                for r in rings[1:]:
+                    (holes if _inside(r[0], outer) and not any(_inside(r[0], h) for h in holes) else islands).append(r)
+                p = dict(base, hatch=e.dxf.pattern_name)
+                if e.gradient is not None:
+                    try:
+                        p["color"] = "#%02X%02X%02X" % tuple(e.gradient.color1)
+                    except Exception:
+                        pass
+                    p["hatch"] = "GRADIENT"
+                item = ("Polygon", [outer] + holes[:50], p)
+                extra = [("Polygon", [r], dict(p)) for r in islands[:50]]
             elif t == "CIRCLE":
                 c, r = e.dxf.center, e.dxf.radius
-                ring = [(c[0] + r * math.cos(2 * math.pi * i / 64), c[1] + r * math.sin(2 * math.pi * i / 64)) for i in range(64)]
-                raw.append(("Polygon", [ring + [ring[0]]], dict(base, radius_m=round(r, 2))))
+                ring = [M((c[0] + r * math.cos(2 * math.pi * i / 64), c[1] + r * math.sin(2 * math.pi * i / 64))) for i in range(64)]
+                item = ("Polygon", [ring + [ring[0]]], dict(base, radius_m=round(r * k, 2)))
             elif t in ("TEXT", "MTEXT"):
                 if t == "TEXT":
                     v = e.get_placement()[1]
@@ -232,43 +491,68 @@ def read_dxf(data, grid="auto", near=None):
                     v = e.dxf.insert
                     txt, hgt, rot = e.plain_text(), e.dxf.get("char_height", 2.5), e.get_rotation()
                 if _is_control_layer(layer):
-                    ctl_text.append((txt, (v[0], v[1])))
+                    ctl_text.append((txt, M(v)))
                     continue
-                txt = (txt or "").strip()
-                if not txt:
+                txt = re.sub(r"\s+", " ", txt or "").strip()
+                if not txt or not re.search(r"\w", txt):
                     continue
-                raw.append(("Point", (v[0], v[1]), dict(base, text=txt[:200], height_m=round(hgt, 2), dxf_rot=rot)))
+                item = ("Point", M(v), dict(base, text=txt[:200], height_m=round(hgt * k, 2), dxf_rot=rot))
             elif t == "INSERT":
-                v = e.dxf.insert
-                raw.append(("Point", (v[0], v[1]), dict(base, block=e.dxf.name, scale=round(e.dxf.get("xscale", 1.0), 3),
-                                                       dxf_rot=e.dxf.get("rotation", 0.0))))
-            elif t == "POINT" and _is_control_layer(layer):
-                loc = e.dxf.location
-                control.append((loc[0], loc[1]))
+                name = e.dxf.name
+                shown = "(a dynamic block)" if name.startswith("*U") else name
+                label = " / ".join(a.dxf.text.strip() for a in e.attribs if (a.dxf.text or "").strip())[:80] or None
+                xs, ys = e.dxf.get("xscale", 1.0), e.dxf.get("yscale", 1.0)
+                if xs * ys < 0:
+                    mirrored += 1
+                blk = doc.blocks.get(name)
+                outs = [b for b in blk if (b.dxftype() == "LWPOLYLINE" and b.closed)
+                        or (b.dxftype() == "POLYLINE" and b.is_closed)] if blk is not None else []
+                local = ezbbox.extents(outs) if outs else None
+                bw = local.size.x * abs(xs) * k if local is not None and local.has_data else 0
+                bh = local.size.y * abs(ys) * k if local is not None and local.has_data else 0
+                if bw >= FOOTPRINT_M and bh >= FOOTPRINT_M:
+                    m44 = e.matrix44()                    # turned, scaled and mirrored as inserted
+                    big = max(outs, key=lambda b: area2([(v[0], v[1]) for v in ezpath.make_path(b).flattening(flat)] or [(0, 0)]))
+                    ring = [M(m44.transform((v[0], v[1], 0))) for v in ezpath.make_path(big).flattening(flat)]
+                    if ring and ring[0] != ring[-1]:
+                        ring.append(ring[0])
+                    blocks[f"{shown}: an outline, {bw:.1f} × {bh:.1f} m"] = blocks.get(f"{shown}: an outline, {bw:.1f} × {bh:.1f} m", 0) + 1
+                    item = ("Polygon", [ring], dict(base, outline=shown, name=label))
+                else:
+                    v = e.dxf.insert
+                    blocks[f"{shown}: a symbol"] = blocks.get(f"{shown}: a symbol", 0) + 1
+                    item = ("Point", M(v), dict(base, block=shown, name=label, attribs=label,
+                                                scale=round(xs, 3), dxf_rot=e.dxf.get("rotation", 0.0)))
             else:
-                lo({"DIMENSION": "Dimensions", "POINT": "Points", "IMAGE": "Pictures", "3DFACE": "3D shapes",
-                    "3DSOLID": "3D shapes", "MESH": "3D shapes", "LEADER": "Leaders", "MULTILEADER": "Leaders",
-                    "SOLID": "Filled triangles", "VIEWPORT": "Viewports", "XLINE": "Endless lines", "RAY": "Endless lines",
-                    "WIPEOUT": "Wipeouts", "OLE2FRAME": "Embedded objects", "ATTDEF": "Block attributes"}.get(t, t.title()))
+                lo(t.title())
+                continue
+            sig = (layer, t, json.dumps(item[1], default=list))
+            if sig in seen:
+                lo("The same thing twice")
+                continue
+            seen.add(sig)
+            raw.append(item)
+            raw.extend(extra)
         except Refused:
             raise
         except Exception:
             lo("Things that could not be read")
     paper = sum(len(lay) for lay in doc.layouts if lay.name != "Model")
     if paper:
-        left_out["The title block and anything else in paper space"] = paper
+        lo("The title block and anything else in paper space", paper)
     if not raw:
         raise Refused("This drawing has nothing Wayscope can place in model space.")
 
-    xs = [c[0] for g, cs, _ in raw for c in _flat(g, cs)]
-    ys = [c[1] for g, cs, _ in raw for c in _flat(g, cs)]
-    bbox = (min(xs), min(ys), max(xs), max(ys))
-    if grid == "auto":
-        grid = _which_grid(bbox, near, bool(control))
-    rep = {"format": "DXF", "version": doc.dxfversion, "units": "metres", "left_out": left_out}
+    rep = {"format": "DXF", "version": doc.dxfversion, "units": units_words, "left_out": left_out}
+    if blocks:
+        rep["blocks"] = blocks
+    if mirrored:
+        rep["mirrored_blocks"] = mirrored
     things = []
     if grid == "bng":
-        if not (-1000 <= bbox[0] and bbox[2] <= 800_000 and -1000 <= bbox[1] and bbox[3] <= 1_400_000):
+        xs_ = [c[0] for g, cs, _ in raw for c in _flat(g, cs)]
+        ys_ = [c[1] for g, cs, _ in raw for c in _flat(g, cs)]
+        if not (-1000 <= min(xs_) and max(xs_) <= 800_000 and -1000 <= min(ys_) and max(ys_) <= 1_400_000):
             raise Refused("This drawing is not on National Grid: its coordinates are outside Great Britain. "
                           "Bring it in as a site-grid drawing.")
         tr = transformer(27700)
@@ -282,16 +566,16 @@ def read_dxf(data, grid="auto", near=None):
             elif g == "LineString":
                 things.append(_thing({"type": "LineString", "coordinates": [P(v) for v in cs]}, **p))
             else:
-                things.append(_thing({"type": "Polygon", "coordinates": [[P(v) for v in cs[0]]]}, **p))
+                things.append(_thing({"type": "Polygon", "coordinates": [[P(v) for v in r] for r in cs]}, **p))
         rep.update(grid="bng", crs="British National Grid", transform=_op_words(tr))
     else:
+        r3 = lambda v: [round(v[0], 3), round(v[1], 3)]
         for g, cs, p in raw:
             if "dxf_rot" in p:
                 p["rot"] = round(-p.pop("dxf_rot"), 2)          # the fitted turn is taken off at place()
-            r3 = lambda v: [round(v[0], 3), round(v[1], 3)]
             geom = ({"type": "Point", "coordinates": r3(cs)} if g == "Point" else
                     {"type": "LineString", "coordinates": [r3(v) for v in cs]} if g == "LineString" else
-                    {"type": "Polygon", "coordinates": [[r3(v) for v in cs[0]]]})
+                    {"type": "Polygon", "coordinates": [[r3(v) for v in r] for r in cs]})
             things.append(_thing(geom, **p))
         if len(control) < 2:
             raise Refused("This drawing is on its own site grid and has fewer than two survey points, so it cannot be "
@@ -327,23 +611,6 @@ def _bearing_rot(tr, v, dxf_rot, a0):
     a1 = tr.transform(q[0], q[1])
     dx = (a1[0] - a0[0]) * math.cos(math.radians(a0[1]))
     return round((math.degrees(math.atan2(dx, a1[1] - a0[1])) + 360) % 360 - 90, 2)
-
-
-def _which_grid(bbox, near, has_control):
-    """National Grid when the drawing's middle lands within NEAR_KM of the organisation's own locations; else a site
-    grid when it carries survey points; else ask."""
-    cx, cy = (bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2
-    in_gb = 0 <= cx <= 700_000 and 0 <= cy <= 1_300_000 and (bbox[2] - bbox[0]) < 100_000
-    if in_gb and near:
-        try:
-            ll = transformer(27700).transform(cx, cy)
-            if min(metres(ll, n) for n in near) <= NEAR_KM * 1000:
-                return "bng"
-        except Exception:
-            pass
-    if has_control:
-        return "site"
-    raise AskGrid("Is this drawing on National Grid, or on the site's own grid?")
 
 
 # --------------------------------------------------------------------------------------------------------- KML / KMZ
@@ -605,10 +872,11 @@ def _zip_read(z, name):
 
 
 # --------------------------------------------------------------------------------------------------------- one entry
-def read(data, file_name, grid="auto", near=None):
+def read(data, file_name, grid="auto", near=None, site=None):
     """
     The file's things and report: {"things": [...], "report": {...}}. Raises Refused (plain words) or AskGrid.
-    `near` = the organisation's locations as [lon, lat] (a DXF on National Grid lands near one of them).
+    `near` = the organisation's locations as [lon, lat] (a DXF on National Grid lands near one of them); `site` = the
+    location itself and its gates (a DXF's units guess and its 1 km rule measure from them).
     """
     if not grid_ready():
         raise Refused("Drawings cannot be brought in on this server yet. Ask your admin.")
@@ -621,7 +889,7 @@ def read(data, file_name, grid="auto", near=None):
     if ext == "dwg":
         raise Refused("Wayscope cannot read DWG. Save it as DXF in your CAD program and send that.")
     if ext == "dxf":
-        things, rep = read_dxf(data, grid=grid, near=near)
+        things, rep = read_dxf(data, grid=grid, near=near, site=site)
     elif ext == "kml":
         things, rep = read_kml(data)
     elif ext == "kmz":
@@ -736,7 +1004,7 @@ def fitted(things, ft):
         elif g["type"] == "LineString":
             ng = {"type": "LineString", "coordinates": [ft["f"](*c) for c in g["coordinates"]]}
         else:
-            ng = {"type": "Polygon", "coordinates": [[ft["f"](*c) for c in g["coordinates"][0]]]}
+            ng = {"type": "Polygon", "coordinates": [[ft["f"](*c) for c in r] for r in g["coordinates"]]}
         if "rot" in p:
             p["rot"] = round(p["rot"] - ft["turn"], 2)
         out.append({"geometry": ng, "properties": p})

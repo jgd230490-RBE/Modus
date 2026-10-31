@@ -87,8 +87,13 @@ def _pt(c):
     return [round(x, 7), round(y, 7)]
 
 
+#: an area keeps at most this many holes (a hatch with more keeps the biggest)
+MAX_HOLES = 50
+
+
 def clean_geometry(g):
-    """A Point, LineString (2+ points) or Polygon (one closed ring of 4+ points), rounded to 7 dp; None if not."""
+    """A Point, LineString (2+ points) or Polygon (a closed outer ring of 4+ points and up to MAX_HOLES holes, each
+    closed), rounded to 7 dp; None if not. A hole too small to be a ring is dropped, never the area."""
     if not isinstance(g, dict):
         return None
     t, c = g.get("type"), g.get("coordinates")
@@ -103,14 +108,25 @@ def clean_geometry(g):
     if t == "Polygon":
         if not isinstance(c, list) or not c or not isinstance(c[0], list):
             return None
-        ring = [_pt(x) for x in c[0]]
-        if None in ring or len(ring) < 3 or len(ring) > 5000:
+        rings = []
+        for i, rc in enumerate(c[:MAX_HOLES + 1]):
+            ring = [_pt(x) for x in rc] if isinstance(rc, list) else [None]
+            ok = None not in ring and 3 <= len(ring) <= 5000
+            if ok and ring[0] != ring[-1]:
+                ring.append(list(ring[0]))
+            if not ok or len(ring) < 4:
+                if i == 0:
+                    return None
+                continue
+            rings.append(ring)
+        if sum(len(r) for r in rings) > 5000:
             return None
-        if ring[0] != ring[-1]:
-            ring.append(list(ring[0]))
-        if len(ring) < 4:
-            return None
-        return {"type": "Polygon", "coordinates": [ring]}
+        # the map tells a hole from a second area by its winding: the outside anticlockwise, every hole clockwise
+        for i, r in enumerate(rings):
+            sa = sum(p[0] * q[1] - q[0] * p[1] for p, q in zip(r, r[1:]))
+            if (sa < 0) if i == 0 else (sa > 0):
+                r.reverse()
+        return {"type": "Polygon", "coordinates": rings}
     return None
 
 
@@ -510,10 +526,12 @@ def _near_points():
 def read_file(location_id, data, file_name, grid="auto", by=None):
     """Read an uploaded drawing and HOLD it for place(): {import_id, report, rows, control, gate_check, bounds}.
     Raises site_layout_import.Refused / AskGrid / Problem."""
-    _location(location_id)
+    loc = _location(location_id)
     if grid not in ("auto", "bng", "site"):
         grid = "auto"
-    res = imp.read(data, file_name, grid=grid, near=_near_points())
+    site = ([[float(loc["lon"]), float(loc["lat"])]] if loc.get("lat") is not None and loc.get("lon") is not None else []) \
+        + [[g["lon"], g["lat"]] for g in _site_gates(location_id)]
+    res = imp.read(data, file_name, grid=grid, near=_near_points(), site=site)
     things, rep = res["things"], res["report"]
     rows = imp.rows(things, import_map())
     gates = []
@@ -605,7 +623,9 @@ def placed_things(things, choice, keep_colours, source, turn=0.0):
             new = (g, dict(extra, text=p.get("text") or p.get("name"),
                            size=round(p["height_m"] * 1.35, 2) if p.get("height_m") else 3, rot=rot, bold=False))
         elif kind == "sym" and g["type"] == "Point":
-            new = (g, dict(extra, rot=rot, label=p["name"] if p.get("name") and re.search("gate", p["name"], re.I) else ""))
+            # 31 Oct 2026: a block's attribute values label it (GATE_TAG -> "GATE 1 (IN)"); else a gate keeps its name
+            lab = p.get("attribs") or (p["name"] if p.get("name") and re.search("gate", p["name"], re.I) else "")
+            new = (g, dict(extra, rot=rot, label=lab))
         if new is None:
             continue
         props = _default_props(kind, val if kind != "text" else None)

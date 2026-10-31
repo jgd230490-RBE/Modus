@@ -16126,7 +16126,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       )}
       {imp && imp.import_id && (
         <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2" data-site-layout-import="1">
-          <p className="text-[13px] text-slate-700"><strong>{imp.report.file}</strong>: {imp.report.things} things on {imp.report.layers} layers.</p>
+          <p className="text-[13px] text-slate-700"><strong>{imp.report.file}</strong>: {imp.report.things} things on {imp.report.layers} layers{imp.report.units ? `, in ${imp.report.units}` : ""}.</p>
           {leftOut.length > 0 && <p className="text-[13px] text-slate-500">Left out: {leftOut.map(([k, n]) => `${k} (${n})`).join(", ")}.</p>}
           {(imp.gate_check || []).map((g, i) => <p key={i} className="text-[13px] text-slate-500" data-gate-check="1">{g.thing} is {g.m.toFixed(2)} m from {g.gate}.</p>)}
           <ul className="text-xs divide-y divide-slate-200 border-y border-slate-200" data-site-layout-map="1" aria-label="What each layer becomes">

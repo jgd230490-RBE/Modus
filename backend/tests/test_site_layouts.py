@@ -9,6 +9,10 @@ Viaduct site (L019), written by backend/tools/make_site_layout_samples.py around
 measured them (40 of 40 from the National Grid DXF with Gate 1 0.00 m from G020; 32 of 32 from the others; the
 site-grid fit turn 27.61°, scale 1.0003, worst miss 0.01 m) and this harness holds the build to the same figures.
 
+31 Oct 2026 (PR 1b, plan §6 revised): two contractor-style drawings (fixtures contractor-style-mm.dxf and
+contractor-style-r12-unitless.dxf, written by backend/tools/make_contractor_style.py): units scaled or worked out,
+the leave-outs counted, block footprints, attribute labels, holes (section 2b).
+
 WHAT THIS DOES NOT PROVE: the screens (parse_frontend / dom_frontend / the UI audit), the Route map layer (parse_map),
 Postgres, the HTTP layer (stubbed), the memory on Render (measured by hand before the merge).
 Run (PowerShell):  $env:PYTHONUTF8 = "1"; .venv-tests\\Scripts\\python backend/tests/test_site_layouts.py
@@ -219,10 +223,22 @@ P = ST.payload()
 ok("0. the payload the page reads carries the layers, lines, areas, symbols, glyphs and the choices with their words",
    {"layers", "lines", "areas", "symbols", "glyphs", "choices", "fills", "private_symbols"} <= set(P)
    and len(P["choices"]) == 54 and all(c.get("label") for c in P["choices"]), str(sorted(P)))
-ok("0. guesses: a hoarding layer, a GATE block, a crane radius, a drainage layer (imported line), a text layer",
+# NARROWED 31 Oct 2026 (PR 1b, plan §6 revised): a drainage layer is now guessed "leave out" (the mockup's LAYER_WORDS);
+# an unknown layer is still an imported line (C-SETTING-OUT)
+ok("0. guesses: a hoarding layer, a GATE block, a crane radius, a drainage layer (leave out), a text layer, an unknown line",
    ST.guess("C-HOARDING", {"LineString"}) == "line:hoarding" and ST.guess("block GATE", {"Point"}) == "sym:gate"
-   and ST.guess("C-CRANE-RADIUS", {"Polygon"}) == "area:crane_radius" and ST.guess("C-DRAINAGE", {"LineString"}) == "line:imported"
-   and ST.guess("C-TEXT", {"Text"}) == "text")
+   and ST.guess("C-CRANE-RADIUS", {"Polygon"}) == "area:crane_radius" and ST.guess("C-DRAINAGE", {"LineString"}) == "skip"
+   and ST.guess("C-TEXT", {"Text"}) == "text" and ST.guess("C-SETTING-OUT", {"LineString"}) == "line:imported")
+ok("0. guesses from a contractor's words: lifting zone, office, canteen, walkway, banksman, muster point, 5 mph",
+   ST.guess("TW_LIFTING ZONE", {"Polygon"}) == "area:exclusion" and ST.guess("TW_SITE OFFICE", {"Polygon"}) == "area:welfare"
+   and ST.guess("TW_CANTEEN", {"Polygon"}) == "area:welfare" and ST.guess("TW_WALKWAY", {"LineString"}) == "line:ped"
+   and ST.guess("block BANKSMAN", {"Point"}) == "sym:marshal" and ST.guess("block MUSTER_PT", {"Point"}) == "sym:assembly"
+   and ST.guess("block SIGN_5MPH", {"Point"}) == "sym:speed5")
+ok("0. existing and survey layers are left out, even their words (EX_, SV_, levels)",
+   ST.guess("EX_DRAINAGE", {"LineString"}) == "skip" and ST.guess("SV_LEVELS", {"Text"}) == "skip"
+   and ST.guess("SV_TOP OF BANK", {"LineString"}) == "skip" and ST.guess("EXISTING SERVICES", {"LineString"}) == "skip")
+ok("0. a block footprint's outline row is guessed from its name as an area; a block that carries words is text",
+   ST.guess("outline WELFARE_UNIT_32x10", {"Polygon"}) == "area:welfare" and ST.guess("block GATE_TAG", {"Point"}) == "text")
 
 # =========================================================================== #
 #  1. The grid and the six samples                                             #
@@ -251,8 +267,10 @@ ok("1. ...the first haul road starts where the mockup put it (7 decimals)",
 ok("1. ...the dimension and the title block are left out and said so",
    bng["report"]["left_out"].get("Dimensions") == 1
    and bng["report"]["left_out"].get("The title block and anything else in paper space") == 1, str(bng["report"]["left_out"]))
-ok("1. ...units metres, the DXF version and what DXF keeps", bng["report"]["units"] == "metres" and bng["report"]["version"]
-   and "Leaves out dimensions" in bng["report"]["keeps"])
+# NARROWED 31 Oct 2026 (PR 1b): the units say where they came from ("metres, from the file")
+ok("1. ...units metres, the DXF version and what DXF keeps", bng["report"]["units"] == "metres, from the file"
+   and bng["report"]["version"] and "Leaves out dimensions" in bng["report"]["keeps"]
+   and "(with their holes)" in bng["report"]["keeps"] and "hidden layers" in bng["report"]["keeps"])
 for f in ("tilton-logistics.kml", "tilton-logistics.kmz", "tilton-logistics.geojson", "tilton-logistics-shp.zip"):
     ok(f"1. {f}: 32 things on 12 layers, the haul road on the same spot",
        R[f]["report"]["things"] == 32 and R[f]["report"]["layers"] == 12
@@ -325,16 +343,141 @@ e = raises(lambda: SI.fit([pairs[0], dict(pairs[1], x=pairs[0]["x"], y=pairs[0][
 ok("2. two points on top of each other are refused", isinstance(e, SI.Refused) and "on top of each other" in str(e))
 
 # =========================================================================== #
+#  2b. Two contractor-style drawings (31 Oct 2026, PR 1b; plan §6 revised)      #
+# =========================================================================== #
+# Fictional, written by backend/tools/make_contractor_style.py round the demo's L019: a drawing as a contractor's CAD
+# office sends it (millimetres on National Grid x 1000, OS base mapping bound in, a hidden layer, a reference to a
+# drawing not sent, the sheet drawn in model space with its key and title block, duplicates, dimensions, leaders, masks,
+# a picture, arrowheads, blocks with attributes, a dynamic block, a mirrored welfare unit, a hatch with a hole, a
+# gradient fill) and the same plan as an R12 file with no units. The parent session's reference reader measured 68 and
+# 39 things, both with Gate 1 0.00 m from G020; this harness holds the build to the same figures.
+SITE_PTS = [[L019["lon"], L019["lat"]]] + [[g["lon"], g["lat"]] for g in GATES]
+C1 = SI.read(fx("contractor-style-mm.dxf"), "contractor-style-mm.dxf", near=NEAR, site=SITE_PTS)
+C2 = SI.read(fx("contractor-style-r12-unitless.dxf"), "contractor-style-r12-unitless.dxf", near=NEAR, site=SITE_PTS)
+c1, c2 = C1["report"], C2["report"]
+ok("2b. the millimetre drawing: 68 things on 17 layers, on National Grid by OSTN15, its units from the file",
+   c1["things"] == 68 and c1["layers"] == 17 and c1["grid"] == "bng" and c1["units"] == "millimetres, from the file"
+   and c1["transform"] == "Inverse of British National Grid + OSGB36 to WGS 84 (9)" and c1["version"] == "AC1032", str(c1)[:300])
+LO = c1["left_out"]
+for label, key, n in [
+        ("the OS base mapping bound in from another drawing", "Base mapping from another drawing (OSBASE)", 118),
+        ("a hidden layer (OSBASE's words)", "On a hidden layer (OSBASE$0$Text)", 15),
+        ("a frozen layer (OSBASE's spot heights)", "On a hidden layer (OSBASE$0$Spot Heights)", 50),
+        ("a reference to a drawing that was not sent", "A drawing referred to but not sent (OS_Base_SK7303)", 1),
+        ("the survey points", "Points", 20),
+        ("a dimension", "Dimensions", 1),
+        ("a leader arrow", "Leader arrows", 1),
+        ("a mask behind words", "Masks behind words", 1),
+        ("a picture", "Pictures (the picture file is not sent)", 1),
+        ("an arrowhead fill", "Solid fills (arrowheads)", 1),
+        ("the same thing twice on one layer", "The same thing twice", 3),
+        ("the sheet's border layer", "The drawing sheet's border (Z_SHEET)", 8),
+        ("the title block", "In the title block", 5),
+        ("the key's sample lines and symbols", "In the drawing's key (its sample lines and symbols)", 14),
+        ("anything over 1 km from the site", "Over 1 km from the site", 2)]:
+    ok(f"2b. ...left out and counted: {label} ({n})", LO.get(key) == n, str(LO.get(key)))
+ok("2b. ...and nothing else left out (241 in all, 15 reasons)", sum(LO.values()) == 241 and len(LO) == 15, str(LO))
+ok("2b. ...every block named with what it became; the 32 x 10 welfare units (9.8 x 3.0 m) are outlines",
+   c1["blocks"].get("WELFARE_UNIT_32x10: an outline, 9.8 × 3.0 m") == 4 and c1["blocks"].get("GATE: a symbol") == 2
+   and c1["blocks"].get("GATE_TAG: a symbol") == 2 and c1["blocks"].get("(a dynamic block): a symbol") == 1
+   and len(c1["blocks"]) == 13 and sum(c1["blocks"].values()) == 19, str(c1["blocks"]))
+ok("2b. ...one block drawn mirrored, counted", c1.get("mirrored_blocks") == 1)
+outl = [t for t in C1["things"] if t["properties"].get("outline") == "WELFARE_UNIT_32x10"]
+ok("2b. a footprint block is its outline as an area, turned as inserted (4 units, each about 9.8 x 3.0 m)",
+   len(outl) == 4 and all(t["geometry"]["type"] == "Polygon" for t in outl)
+   and all(abs(metres(t["geometry"]["coordinates"][0][0], t["geometry"]["coordinates"][0][1]) - 9.8) < 0.15
+           or abs(metres(t["geometry"]["coordinates"][0][0], t["geometry"]["coordinates"][0][1]) - 3.0) < 0.15 for t in outl),
+   str([t["geometry"]["coordinates"][0][:2] for t in outl][:1]))
+tags = sorted(t["properties"]["attribs"] for t in C1["things"] if t["properties"].get("attribs"))
+ok("2b. a block's attribute values are its label (the two gate tags)", tags == ["GATE 1 (IN)", "GATE 2 (OUT)"], str(tags))
+holed = [t for t in C1["things"] if t["geometry"]["type"] == "Polygon" and len(t["geometry"]["coordinates"]) > 1]
+ok("2b. a hatch keeps its hole as an inner ring (the exclusion zone round the pier)", len(holed) == 1
+   and holed[0]["properties"]["src_layer"] == "TW_EXCLUSION ZONE" and len(holed[0]["geometry"]["coordinates"]) == 2)
+ok("2b. ...and the hole lies inside its area (31 Oct, seen in Chrome: the generator had cut it beside the zone)",
+   all(SI._inside(p, holed[0]["geometry"]["coordinates"][0]) for p in holed[0]["geometry"]["coordinates"][1]))
+
+
+def hatch_dxf(rings):
+    import ezdxf
+    d = ezdxf.new("R2018")
+    d.header["$INSUNITS"] = 6
+    h = d.modelspace().add_hatch(dxfattribs={"layer": "C-EXCLUSION"})
+    for i, r in enumerate(rings):
+        h.paths.add_polyline_path(r, is_closed=True, flags=1 if i == 0 else 16)
+    s_ = io.StringIO()
+    d.write(s_)
+    return s_.getvalue().encode("utf-8")
+
+
+X1, Y1 = 475879.5, 305620.0
+box = lambda x, y, d: [(x, y), (x + d, y), (x + d, y + d), (x, y + d)]
+hz = SI.read(hatch_dxf([box(X1, Y1, 30), box(X1 + 10, Y1 + 10, 6), box(X1 + 40, Y1, 8)]), "h.dxf", near=NEAR, site=SITE_PTS)
+ok("2b. a hatch's ring inside its area is a hole; a ring beside it is an area of its own (not a hole outside the area)",
+   hz["report"]["things"] == 2 and sorted(len(t["geometry"]["coordinates"]) for t in hz["things"]) == [1, 2]
+   and all(t["properties"]["src_layer"] == "C-EXCLUSION" for t in hz["things"]), str(hz["report"]))
+hz = SI.read(hatch_dxf([box(X1, Y1, 30), box(X1 + 5, Y1 + 5, 20), box(X1 + 10, Y1 + 10, 6)]), "h.dxf", near=NEAR, site=SITE_PTS)
+ok("2b. ...an island inside a hole (a target) is an area of its own too",
+   hz["report"]["things"] == 2 and sorted(len(t["geometry"]["coordinates"]) for t in hz["things"]) == [1, 2])
+
+grad = [t for t in C1["things"] if t["properties"].get("hatch") == "GRADIENT"]
+ok("2b. a gradient fill takes its first colour", len(grad) == 1 and grad[0]["properties"]["color"] == "#C8DCFF", str(grad))
+crow = {r["key"]: r for r in SI.rows(C1["things"])}
+want = {"TW_HAUL ROAD": "line:twoway", "TW_HAUL ROAD ONE WAY": "line:oneway", "TW_HOARDING 2.4m": "line:hoarding",
+        "TW_HERAS": "line:heras", "TW_BARRIER": "line:barrier", "TW_PED ROUTE": "line:ped", "TW_CAR PARK": "area:parking",
+        "TW_LOADING BAY": "area:loading", "TW_EXCLUSION ZONE": "area:exclusion", "TW_CRANE RADIUS": "area:crane_radius",
+        "EX_DRAINAGE": "skip", "SV_TOP OF BANK": "skip", "SV_LEVELS": "skip", "Z_TEXT": "text",
+        "outline WELFARE_UNIT_32x10": "area:welfare", "block GATE_TAG": "text", "block GATE": "sym:gate",
+        "block MARSHAL": "sym:marshal", "block SPEED_5": "sym:speed5", "block WHEEL_WASH": "sym:wheelwash",
+        "block MOBILE_CRANE": "sym:mobilecrane", "block FIRST_AID": "sym:first_aid", "block FIRE_POINT": "sym:fire_point",
+        "block TOILETS": "sym:toilets", "block ASSEMBLY": "sym:assembly", "block PED_CROSSING": "sym:pedx",
+        "block (a dynamic block)": "sym:warning"}
+ok("2b. the table's 27 rows are each guessed right from the contractor's words, before anyone chooses",
+   {k: r["becomes"] for k, r in crow.items()} == want,
+   str({k: (r["becomes"], want.get(k)) for k, r in crow.items() if r["becomes"] != want.get(k)}))
+gc1 = SI.gate_checks(C1["things"], [{"name": g["name"], "lon": g["lon"], "lat": g["lat"]} for g in (G020, G021)])
+ok("2b. ...Gate 1 lands 0.00 m from G020 (and Gate 2 on G021)", len(gc1) == 2 and max(g["m"] for g in gc1) <= 0.005, str(gc1))
+ok("2b. the R12 drawing with no units: 39 things on 14 layers, read in metres from where it sits",
+   c2["things"] == 39 and c2["layers"] == 14 and c2["grid"] == "bng" and c2["version"] == "AC1009"
+   and c2["units"] == "metres, from where the drawing sits (no units in the file)" and c2["left_out"] == {}, str(c2)[:300])
+gc2 = SI.gate_checks(C2["things"], [{"name": g["name"], "lon": g["lon"], "lat": g["lat"]} for g in (G020, G021)])
+ok("2b. ...its gates land 0.00 m from G020 / G021", len(gc2) == 2 and max(g["m"] for g in gc2) <= 0.005, str(gc2))
+ok("2b. ...and its haul road on the millimetre drawing's (the same plan, two ways of saving it)",
+   metres(C2["things"][0]["geometry"]["coordinates"][0], C1["things"][0]["geometry"]["coordinates"][0]) < 0.01)
+far = SI.read(fx("contractor-style-mm.dxf"), "c.dxf", near=NEAR)
+ok("2b. with no site given (only the organisation's places), the far rule measures from the drawing's middle",
+   far["report"]["grid"] == "bng" and far["report"]["things"] >= 68)
+
+# ---- the holes on the way to the map: kept, wound for Mapbox, a broken one dropped (never the area)
+sq = lambda x0, y0, d, ccw=True: ([[x0, y0], [x0 + d, y0], [x0 + d, y0 + d], [x0, y0 + d], [x0, y0]] if ccw
+                                  else [[x0, y0], [x0, y0 + d], [x0 + d, y0 + d], [x0 + d, y0], [x0, y0]])
+
+
+def area2(r):
+    return sum(p[0] * q[1] - q[0] * p[1] for p, q in zip(r, r[1:]))
+
+
+g = SL.clean_geometry({"type": "Polygon", "coordinates": [sq(-0.88, 52.64, 0.001, ccw=False), sq(-0.8798, 52.6402, 0.0002)]})
+ok("2b. clean_geometry keeps a hole and winds it for the map: the outside anticlockwise, the hole clockwise",
+   g and len(g["coordinates"]) == 2 and area2(g["coordinates"][0]) > 0 and area2(g["coordinates"][1]) < 0, str(g))
+g = SL.clean_geometry({"type": "Polygon", "coordinates": [sq(-0.88, 52.64, 0.001), [[-0.8799, 52.6401], [-0.8798, 52.6401]]]})
+ok("2b. ...a hole too short to be a ring is dropped, the area kept", g and len(g["coordinates"]) == 1)
+ok("2b. ...a broken outside ring is refused", SL.clean_geometry({"type": "Polygon", "coordinates": [[[0, 0], [1, 1]]]}) is None)
+g = SL.clean_geometry({"type": "Polygon", "coordinates": [sq(-0.88, 52.64, 0.01)] + [sq(-0.8799 + i * 0.0001, 52.6401, 0.00005)
+                                                                                     for i in range(SL.MAX_HOLES + 5)]})
+ok(f"2b. ...at most {SL.MAX_HOLES} holes are kept", g and len(g["coordinates"]) == SL.MAX_HOLES + 1)
+
+# =========================================================================== #
 #  3. Refusals, in plain words                                                 #
 # =========================================================================== #
 import ezdxf  # noqa: E402
 
 
-def dxf_bytes(units=6, x=475879.5, y=305620.0, control=False):
+def dxf_bytes(units=6, x=475879.5, y=305620.0, control=False, k=1.0):
+    """A one-line DXF; `k` = metres a drawing unit (31 Oct 2026: the line is 50 x 20 m whatever the units)."""
     d = ezdxf.new("R2010")
     d.header["$INSUNITS"] = units
     m = d.modelspace()
-    m.add_line((x, y), (x + 50, y + 20), dxfattribs={"layer": "C-HAUL-ROAD"})
+    m.add_line((x, y), (x + 50 / k, y + 20 / k), dxfattribs={"layer": "C-HAUL-ROAD"})
     if control:
         m.add_point((x, y), dxfattribs={"layer": "SURVEY-CONTROL"})
         m.add_point((x + 100, y), dxfattribs={"layer": "SURVEY-CONTROL"})
@@ -350,9 +493,10 @@ def refused(data, name, *words, **k):
 
 for label, args in [
     ("DWG", (b"AC1032xxxx", "plan.dwg", "Save it as DXF in your CAD program")),
-    ("a drawing in inches", (dxf_bytes(units=1), "plan.dxf", "This drawing is in inches, not metres")),
-    ("a drawing in millimetres", (dxf_bytes(units=4), "plan.dxf", "millimetres")),
-    ("a drawing that does not say its units", (dxf_bytes(units=0), "plan.dxf", "does not say it is in metres")),
+    # REVERSED 31 Oct 2026 (PR 1b, plan §6 revised): inches, millimetres and no units are read (checked after this
+    # loop); a unit Wayscope does not read is the refusal now
+    ("a drawing in decimetres", (dxf_bytes(units=14), "plan.dxf", "This drawing is in decimetres", "metres or millimetres")),
+    ("a drawing in miles", (dxf_bytes(units=3), "plan.dxf", "This drawing is in miles")),
     ("a file that is not a DXF", (b"hello world", "plan.dxf", "not a DXF")),
     ("an empty file", (b"", "plan.kml", "empty")),
     ("a file over 10 MB", (b" " * (SI.MAX_BYTES + 1), "plan.geojson", "over 10 MB")),
@@ -364,6 +508,36 @@ for label, args in [
 ]:
     good, why = refused(*args)
     ok(f"3. refused in words: {label}", good, why)
+
+# REVERSED 31 Oct 2026 (PR 1b): a drawing in inches, millimetres or centimetres is scaled to metres and lands where the
+# same drawing in metres does; one with no units is read in metres or millimetres from where it sits near the site
+X0, Y0 = 475879.5, 305620.0
+SITE = [[L019["lon"], L019["lat"]]] + [[g["lon"], g["lat"]] for g in GATES]
+inm = SI.read(dxf_bytes(), "m.dxf", near=NEAR, site=SITE)
+for code, k, word in ((1, 0.0254, "inches"), (2, 0.3048, "feet"), (4, 0.001, "millimetres"), (5, 0.01, "centimetres")):
+    r = SI.read(dxf_bytes(units=code, x=X0 / k, y=Y0 / k, k=k), f"{word}.dxf", near=NEAR, site=SITE)
+    ok(f"3. a drawing in {word} is scaled to metres: the same place, the same length, the units said",
+       r["report"]["units"] == f"{word}, from the file" and r["report"]["grid"] == "bng"
+       and metres(r["things"][0]["geometry"]["coordinates"][0], inm["things"][0]["geometry"]["coordinates"][0]) < 0.01
+       and metres(r["things"][0]["geometry"]["coordinates"][1], inm["things"][0]["geometry"]["coordinates"][1]) < 0.01,
+       str(r["report"]["units"]))
+r = SI.read(dxf_bytes(units=0), "nounits.dxf", near=NEAR, site=SITE)
+ok("3. no units, sitting on the site in metres: read in metres, and said so",
+   r["report"]["units"] == "metres, from where the drawing sits (no units in the file)"
+   and r["things"][0]["geometry"]["coordinates"][0] == inm["things"][0]["geometry"]["coordinates"][0], r["report"]["units"])
+r = SI.read(dxf_bytes(units=0, x=X0 * 1000, y=Y0 * 1000, k=0.001), "nounits-mm.dxf", near=NEAR, site=SITE)
+ok("3. no units, on the site only if read in millimetres: read in millimetres",
+   r["report"]["units"] == "millimetres, from where the drawing sits (no units in the file)"
+   and metres(r["things"][0]["geometry"]["coordinates"][0], inm["things"][0]["geometry"]["coordinates"][0]) < 0.01)
+e = raises(lambda: SI.read(dxf_bytes(units=0, x=200000.0, y=900000.0), "far.dxf", near=NEAR, site=SITE))
+ok("3. no units and not near the site in metres or millimetres, no survey points: the page asks",
+   isinstance(e, SI.AskGrid), repr(e))
+good, why = refused(dxf_bytes(units=0, x=200000.0, y=900000.0), "far.dxf", "has no units and does not sit near the site",
+                    grid="bng", near=NEAR, site=SITE)
+ok("3. ...answered National Grid, refused in words (its units cannot be told)", good, why)
+ok("3. text heights and line widths are scaled too (a 7 m haul road in millimetres is 7 m)",
+   SI.read(fx("contractor-style-mm.dxf"), "c.dxf", near=NEAR, site=SITE)["things"][0]["properties"].get("width_m")
+   == bng["things"][0]["properties"].get("width_m") == 7.0)
 
 zb = io.BytesIO()
 with zipfile.ZipFile(zb, "w") as z:
@@ -663,6 +837,31 @@ ok("7. every write needs a planner or an admin (_require_approver), reads any si
    all(re.search(r'def ' + fn + r'\([^)]*\):\n(?:    """[\s\S]*?"""\n)?    _require_approver\(\)', mainsrc)
        for fn in ("site_layout_fit", "place_site_layout", "add_site_layout_phase", "edit_site_layout_phase",
                   "save_site_layout_things", "delete_site_layout_phase")))
+
+# =========================================================================== #
+#  8. The contractor's drawing placed (31 Oct 2026, PR 1b)                     #
+# =========================================================================== #
+as_code("planner123")
+# 31 Oct 2026 (PR 1b): the contractor's millimetre drawing through the endpoints, on a phase of its own, as guessed
+st, rdc = read_ep(fx("contractor-style-mm.dxf"), "contractor-style-mm.dxf")
+ok("8. the contractor's drawing is held: 27 rows, the gate check 0.00 m, the report's units and leave-outs",
+   st == 200 and len(rdc["rows"]) == 27 and rdc["gate_check"] and rdc["gate_check"][0]["m"] <= 0.005
+   and rdc["report"]["units"] == "millimetres, from the file" and sum(rdc["report"]["left_out"].values()) == 241,
+   str(rdc)[:300])
+st, plc = http(main.place_site_layout, "L019", main.SiteLayoutPlaceIn(import_id=rdc["import_id"], where="new",
+                                                                      phase={"name": "Contractor (31 Oct)"}))
+cf = [f for p in main.get_site_layout("L019")["layout"]["phases"] if p["name"] == "Contractor (31 Oct)"
+      for f in p["features"]["features"]]
+ok("8. placed as guessed: 46 things (the 22 the table leaves out not placed)",
+   st == 200 and plc["placed"] == 46 and len(cf) == 46, str(plc)[:300])
+hz = [f for f in cf if f["properties"]["style"] == "exclusion"]
+ok("8. ...the exclusion zone is saved with its hole, wound for the map",
+   len(hz) == 1 and len(hz[0]["geometry"]["coordinates"]) == 2 and area2(hz[0]["geometry"]["coordinates"][0]) > 0
+   and area2(hz[0]["geometry"]["coordinates"][1]) < 0)
+ok("8. ...the four welfare units are welfare areas; the gate tags are words reading GATE 1 (IN) / GATE 2 (OUT)",
+   sum(1 for f in cf if f["properties"]["style"] == "welfare") == 4
+   and sorted(f["properties"]["text"] for f in cf if f["properties"]["style"] == "text" and "(IN)" in f["properties"]["text"]
+              or f["properties"]["style"] == "text" and "(OUT)" in f["properties"]["text"]) == ["GATE 1 (IN)", "GATE 2 (OUT)"])
 
 as_code(None)
 print()

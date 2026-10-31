@@ -177,6 +177,10 @@ GUESS_LAYER = [
     (("STOCKPILE",), "area:stockpile"), (("HOLDING",), "area:holding"), (("SERVICE",), "area:services"),
     (("HAUL",), "line:twoway"), (("ROAD",), "line:twoway"), (("TEXT",), "text"), (("LABEL",), "text"),
     (("NOTE",), "text"), (("DIM",), "skip"),
+    # 31 Oct 2026 (the mockup's LAYER_WORDS, checked on two contractor-style drawings): more of a CAD office's words
+    (("LIFT", "ZONE"), "area:exclusion"), (("CRANE",), "area:crane_radius"), (("WALK",), "line:ped"),
+    (("OFFICE",), "area:welfare"), (("CANTEEN",), "area:welfare"), (("DRAIN",), "skip"), (("EXIST",), "skip"),
+    (("LEVEL",), "skip"),
 ]
 GUESS_SYMBOL = [
     (("WHEEL",), "wheelwash"), (("WASH", "OUT"), "washout"), (("WASHOUT",), "washout"), (("GATE",), "gate"),
@@ -189,6 +193,7 @@ GUESS_SYMBOL = [
     (("FIRST_AID",), "first_aid"), (("DEFIB",), "defib"), (("ASSEMBLY",), "assembly"), (("FIRE",), "fire_point"),
     (("SPILL",), "spill"), (("PPE",), "ppe"), (("SECURITY",), "security"), (("CCTV",), "cctv"), (("SKIP",), "skip"),
     (("WASTE",), "skip"),
+    (("BANKS",), "marshal"), (("MUSTER",), "assembly"), (("MPH",), "speed5"),
 ]
 
 
@@ -203,18 +208,24 @@ def guess(key, kinds):
     layer name); `kinds` the shapes on that row ({"Point", "LineString", "Polygon"} and "Text" for words).
     """
     kinds = set(kinds or ())
-    if key.startswith("block ") or key.startswith("symbol "):
+    if key.startswith("outline "):              # a footprint block (a cabin drawn as a block): an area by its name
+        key, kinds = key.split(" ", 1)[1], {"Polygon"}
+    elif key.startswith("block ") or key.startswith("symbol "):
         name = key.split(" ", 1)[1]
         if name in SYMBOL_KEYS:
             return "sym:" + name
         w = " " + _words(name) + " "
+        if any(" " + n + " " in w for n in ("TAG", "LABEL", "TITLE")):   # a block that carries words (GATE_TAG)
+            return "text"
         for need, sym in GUESS_SYMBOL:
             if all((" " + n + " " in w) if n.isdigit() else (n in w) for n in need):
                 return "sym:" + sym
         return "sym:warning"
+    w = _words(key)
+    if w.startswith("EX ") or w.startswith("SV ") or "EXIST" in w:   # existing features and survey: not the logistics plan
+        return "skip"
     if kinds == {"Text"}:
         return "text"
-    w = _words(key)
     for need, ch in GUESS_LAYER:
         if all(n in w for n in need):
             if ch.startswith("area:") and "Polygon" not in kinds and "LineString" not in kinds:
