@@ -1490,9 +1490,10 @@ def build(with_areas=False, out=None):
 # stored lines they matched — copied with route_geometry, so a refresh keeps both or neither
 # 31 Oct 2026 (task 4a, PR 3a): + clp_documents and clp_issues, the CLPs people type, send and approve on live (an issue
 # keeps its Word file): a refresh must not drop an approved issue
+# 31 Oct 2026 (task 4a, PR 3b): + clp_notes, the notes and tasks people leave on those CLPs
 LIVE_TABLES = ("route_geometry", "route_sections", "route_area_km", "areas", "route_choice",
                "community_features", "community_meta", "collision_records", "collision_meta", "traffic_counts",
-               "route_hour_times", "clp_documents", "clp_issues")
+               "route_hour_times", "clp_documents", "clp_issues", "clp_notes")
 
 # 28 Oct 2026 (F6): an abnormal load is generated here but DRAWN on live (Draw the route, Check the roads again), in the
 # same row. A refresh keeps live's drawing for a load whose ends and size are unchanged; any other load stays undrawn.

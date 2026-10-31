@@ -229,6 +229,12 @@ def list_for(acc, factors=None):
     issues = _issues_by_clp()
     labels = taxonomy.team_labels()
     out = [_decorate(r, locs, months, issues, labels) for r in rows.values() if visible(r, acc)]
+    import clp_notes
+    tally = clp_notes.counts_for(acc)
+    for d in out:
+        t = tally.get(d["id"]) or {}
+        d["tasks"] = {k: t.get(k, 0) for k in ("open", "overdue", "notes", "done", "mine_open")}
+        d["tasks"]["next_due"] = t.get("next_due")
     sent_first = can_approve(acc)
     out.sort(key=lambda d: (not (sent_first and d["status"] == "sent"), d["name"].lower(),
                             d["team_name"] is not None, d["team_name"] or "", d["id"]))
@@ -407,6 +413,11 @@ def delete(clp_id, acc, factors=None):
         return {"error": "This CLP has an approved issue, so it is kept.", "status": 422}
     if rec.get("saved"):
         db.execute("DELETE FROM clp_documents WHERE tenant_id = ? AND id = ?", (db.current_tenant(), rec["id"]))
+    if not rec["id"].startswith("auto-"):
+        # 31 Oct 2026 (PR 3b, Q12): a CLP made with + New CLP goes with its notes and tasks; a listed row is only cleared
+        # of its typed details and keeps them
+        import clp_notes
+        clp_notes.drop_all(rec["id"])
     return {"deleted": rec["id"], "cleared": rec["id"].startswith("auto-")}
 
 
@@ -422,11 +433,14 @@ def send(clp_id, note, acc, factors=None):
         return {"error": f"Please do not use the word \"{w}\" on a CLP.", "status": 422}
     nxt = dict(rec, status="sent", sent_by=who(acc), sent_at=_now(), sent_note=note or None)
     _write(nxt, who(acc))
+    import clp_notes
+    clp_notes.add_step(rec["id"], "sent", who(acc), nxt["sent_at"], note or None)
     return get(nxt["id"], acc, factors)
 
 
-def ask_changes(clp_id, note, acc, factors=None):
-    """A planner or an admin sends it back to the team, with a note (required)."""
+def ask_changes(clp_id, note, acc, factors=None, task=None):
+    """A planner or an admin sends it back to the team, with a note (required). `task` = {"due": …} also adds the note
+    as a task for the CLP's team (the planners and admins on an every-team CLP; PR 3b, Q9)."""
     if not can_approve(acc):
         return {"error": "Only a planner or an admin asks for changes.", "status": 403}
     rec = _record(clp_id, acc, factors)
@@ -437,8 +451,18 @@ def ask_changes(clp_id, note, acc, factors=None):
         return {"error": "Say what needs changing.", "status": 422}
     for w in clp_doc.banned_words(note):
         return {"error": f"Please do not use the word \"{w}\" on a CLP.", "status": 422}
+    if task is not None:
+        import clp_notes
+        bad = clp_notes._due_problem((task or {}).get("due") or None)
+        if bad:
+            return {"error": bad, "status": 422}
     nxt = dict(rec, status="changes", changes_by=who(acc), changes_at=_now(), changes_note=note)
     _write(nxt, who(acc))
+    import clp_notes
+    clp_notes.add_step(rec["id"], "changes", who(acc), nxt["changes_at"], note)
+    if task is not None:
+        clp_notes.add_task(rec["id"], {"words": note, "for": "team" if rec.get("team") else "approvers",
+                                       "due": (task or {}).get("due") or None}, acc, factors, mail=False)
     return get(nxt["id"], acc, factors)
 
 
@@ -552,7 +576,8 @@ def preview(clp_id, acc, factors, working_days):
     return {"id": rec["id"], "next_issue": (last["issue_no"] + 1) if last else 1,
             "last_issue": ({"no": last["issue_no"], "date": str(last["approved_at"])[:10]} if last else None),
             "sent": rec["status"] == "sent", "sent_by": rec.get("sent_by"), "sent_at": rec.get("sent_at"),
-            "sent_note": rec.get("sent_note"), "changes": changes(prev, summary(data))}
+            "sent_note": rec.get("sent_note"), "changes": changes(prev, summary(data)),
+            "tasks": __import__("clp_notes").open_summary(rec["id"])}
 
 
 def approve(clp_id, note, acc, factors, working_days, build):
@@ -586,12 +611,16 @@ def approve(clp_id, note, acc, factors, working_days, build):
     data["history"] = doc_history(rec["id"], extra=this)
     body = build(data, rec)
     name = clp_doc.file_name(data).replace(".docx", f" Issue {no}.docx")
+    at = _now()
     db.execute("INSERT INTO clp_issues (tenant_id, clp_id, issue_no, approved_at, approved_by, sent_by, sent_note, "
                "approver_note, changes, summary, file_name, file_size, file_b64) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-               (db.current_tenant(), rec["id"], no, _now(), by, sent_by, sent_note, note or None, json.dumps(ch),
+               (db.current_tenant(), rec["id"], no, at, by, sent_by, sent_note, note or None, json.dumps(ch),
                 json.dumps(summ), name, len(body), base64.b64encode(body).decode("ascii")))
     nxt = dict(rec, status="approved", changes_by=None, changes_at=None, changes_note=None)
     _write(nxt, by)
+    import clp_notes
+    clp_notes.add_step(rec["id"], "approved", by, at, note or None, issue_no=no)
+    clp_notes.keep_lines(rec["id"], data.get("todos"))
     return get(rec["id"], acc, factors)
 
 

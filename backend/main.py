@@ -70,6 +70,8 @@ import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" sectio
 import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts as a PDF and an XLSX for a month
 import clp_doc  # 30 Oct 2026 (task 4a) — the outline Construction Logistics Plan as a Word file, for a site or a set
 import clp_records  # 31 Oct 2026 (task 4a, PR 3a) — the CLPs as records: each team's own, the approval step, the issues
+import clp_notes  # 31 Oct 2026 (task 4a, PR 3b) — notes and tasks on each CLP
+import re
 import site_areas  # 28 Oct 2026 (simulation v2): the areas inside a site
 import pours  # 29 Oct 2026 (task 3a): concrete pours
 import holding  # 29 Oct 2026 (task 3c): vehicle holding areas
@@ -435,7 +437,7 @@ if _Request is not None and hasattr(app, "middleware"):
                 # 22 Oct 2026 (read_cache): every write that reached an endpoint, worked or not, ends every cached
                 # read. db.note_write already bumps on each committed statement; this is the second net for a path
                 # that writes some other way. The skipped paths (sign-in, page opens, previews) change no figure.
-                if write and _audited(path):
+                if write and _audited(path) and not _CLP_NOTES_PATH.match(path):
                     db.bump_data_version()
 
             # G3 (D55): every write that worked, with who did it and what was sent (secrets removed).
@@ -5070,6 +5072,7 @@ class ClpIn(BaseModel):
 
 class ClpNoteIn(BaseModel):
     note: Optional[str] = None
+    task: Optional[dict] = None     # 31 Oct 2026 (PR 3b): Ask for changes may add its note as a task {"due": …}
 
 
 def _fields_set_dict(model):
@@ -5120,7 +5123,8 @@ def clp_documents_send(clp_id: str, body: ClpNoteIn):
 
 @app.post("/api/clp/documents/{clp_id}/changes")
 def clp_documents_changes(clp_id: str, body: ClpNoteIn):
-    return _clp_out(clp_records.ask_changes(clp_id, body.note, _require_access()))
+    return _clp_out(clp_records.ask_changes(clp_id, body.note, _require_access(),
+                                            task=(body.task if "task" in _fields_set(body) else None)))
 
 
 @app.get("/api/clp/documents/{clp_id}/approve-preview")
@@ -5156,9 +5160,67 @@ def clp_documents_draft(clp_id: str):
     if rec is None:
         raise HTTPException(404, "No such CLP.")
     misses = basemap.MISSES[0]
-    body = _staff_bytes("clp/draft.docx", {"id": rec["id"]}, lambda: _clp_build(data, rec["impact"], acc), acc=acc,
-                        keep=lambda: basemap.MISSES[0] == misses)
+
+    def _build():
+        out = _clp_build(data, rec["impact"], acc)
+        clp_notes.keep_lines(rec["id"], data.get("todos"))   # PR 3b: the lines a task can start from (writes no version)
+        return out
+    body = _staff_bytes("clp/draft.docx", {"id": rec["id"]}, _build, acc=acc, keep=lambda: basemap.MISSES[0] == misses)
     return _docx_reply(body, clp_doc.file_name(data).replace(".docx", " DRAFT.docx"))
+
+
+# ---- 31 Oct 2026 (task 4a, PR 3b): notes and tasks on each CLP (clp_notes.py; mockup notes/clp-notes-mockup-1031/) ---- #
+# Anyone who can see the CLP reads, writes a note, adds a task and ticks one; its writer, a planner or an admin deletes a
+# note or changes / deletes a task. Audited like every write, but a note ends no kept read (_CLP_NOTES_PATH, NO_DATA_TABLES).
+_CLP_NOTES_PATH = re.compile(r"^/api/clp/documents/[^/]+/(notes|tasks)(/|$)")
+
+
+class ClpTaskIn(BaseModel):
+    words: Optional[str] = None
+    due: Optional[str] = None
+    from_line: Optional[str] = None
+    done: Optional[bool] = None
+    model_config = {"extra": "allow"}
+
+
+def _task_body(body):
+    """Only what the client sent; `for` arrives as an extra field (a Python keyword)."""
+    out = _fields_set_dict(body)
+    extra = getattr(body, "model_extra", None) or getattr(body, "__pydantic_extra__", None) or {}
+    if "for" in extra:
+        out["for"] = extra["for"]
+    return out
+
+
+@app.get("/api/clp/documents/{clp_id}/notes")
+def clp_notes_read(clp_id: str):
+    acc = _require_access()
+    return _clp_out(clp_notes.thread(clp_id, acc))
+
+
+@app.post("/api/clp/documents/{clp_id}/notes")
+def clp_notes_add(clp_id: str, body: ClpNoteIn):
+    return _clp_out(clp_notes.add_note(clp_id, body.note, _require_access()))
+
+
+@app.delete("/api/clp/documents/{clp_id}/notes/{item_id}")
+def clp_notes_delete(clp_id: str, item_id: str):
+    return _clp_out(clp_notes.remove(clp_id, item_id, _require_access()))
+
+
+@app.post("/api/clp/documents/{clp_id}/tasks")
+def clp_tasks_add(clp_id: str, body: ClpTaskIn):
+    return _clp_out(clp_notes.add_task(clp_id, _task_body(body), _require_access()))
+
+
+@app.patch("/api/clp/documents/{clp_id}/tasks/{task_id}")
+def clp_tasks_change(clp_id: str, task_id: str, body: ClpTaskIn):
+    return _clp_out(clp_notes.change_task(clp_id, task_id, _task_body(body), _require_access()))
+
+
+@app.delete("/api/clp/documents/{clp_id}/tasks/{task_id}")
+def clp_tasks_delete(clp_id: str, task_id: str):
+    return _clp_out(clp_notes.remove(clp_id, task_id, _require_access()))
 
 
 @app.get("/api/clp/documents/{clp_id}/issues/{issue_no}.docx")
