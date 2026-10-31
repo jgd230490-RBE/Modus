@@ -8341,14 +8341,13 @@ function ConfigPage({ meta, who, access }){
                           onChange={() => upd(d => { d.planning = d.planning || {}; d.planning.clp = { programme: v }; })} /> {l}</label>))}
                     </div>
                     <table className="tbl" data-clp-stage-table="1">
-                      <thead><tr><th scope="col">No.</th><th scope="col">Stage</th><th scope="col">Kinds of work in it</th><th scope="col"><span className="sr-only">Remove</span></th></tr></thead>
+                      <thead><tr><th scope="col">No.</th><th scope="col">Stage and the kinds of work in it</th><th scope="col"><span className="sr-only">Remove</span></th></tr></thead>
                       <tbody>{stages.map((st, i) => (
                         <tr key={i} data-clp-stage={i}>
                           <td className="tabular-nums">{prefix}.{i + 1}</td>
-                          <td><input className="ctl w-full" value={st.name || ""} aria-label={`Stage ${i + 1} name`}
-                            onChange={e => { const v = e.target.value; change(c => { c.stages[i].name = v; }); }} /></td>
-                          <td style={{ whiteSpace: "normal" }}>
-                            <div className="flex flex-wrap items-center gap-1.5">
+                          <td style={{ whiteSpace: "normal", width: "100%" }}><input className="ctl w-full" value={st.name || ""} aria-label={`Stage ${i + 1} name`}
+                            onChange={e => { const v = e.target.value; change(c => { c.stages[i].name = v; }); }} />
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                               {(st.disciplines || []).filter(dd => discs.some(x => x.id === dd)).map(dd => (
                                 <span key={dd} className="row-st rs-none">{dLabel(dd)}
                                   <button type="button" className="row-x" aria-label={`Take ${dLabel(dd)} out of stage ${i + 1}`} title="Remove"

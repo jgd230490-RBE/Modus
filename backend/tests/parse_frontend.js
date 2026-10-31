@@ -4624,6 +4624,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      cf.includes('const dLabel = (id) => (discs.find(x => x.id === id) || {}).label || "";')
      && cf.includes("(st.disciplines || []).filter(dd => discs.some(x => x.id === dd)).map(dd => (")
      && cf.includes("discs.filter(x => !used.has(x.id)).map(x => <option key={x.id} value={x.id}>{x.label}</option>)"));
+  ok("CLP STAGES: a stage's kinds of work sit under its name in one cell, so the name box takes the card's width (the UI audit read the template's 45-character name clipped beside a third column)",
+     cf.includes('<th scope="col">Stage and the kinds of work in it</th>') && !cf.includes('<th scope="col">Kinds of work in it</th>')
+     && cf.includes('<td style={{ whiteSpace: "normal", width: "100%" }}><input className="ctl w-full" value={st.name || ""} aria-label={`Stage ${i + 1} name`}')
+     && cf.includes('<div className="flex flex-wrap items-center gap-1.5 mt-1.5">'));
 }
 
 console.log();
