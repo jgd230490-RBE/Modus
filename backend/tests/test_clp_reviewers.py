@@ -507,17 +507,24 @@ ok("6. ⭐ the contractor's list says where it stands with the group",
                                    by="Sam Reviewer", issue_no=1)] and _lst[P_ALL]["reviews"] == [], str(_lst[Y_ALL]["reviews"]))
 ok("6. the list says when there are groups (the Reviewers filter)", clp_records.list_for(PAT)["review_groups"] is True)
 _th = clp_notes.thread(Y_ALL, PAT)
-_rn = [n for n in _th["notes"] if n["kind"] == "note" and n.get("reviewer")]
-ok("6. ⭐ in the contractor's notes: the comment with the group badge, Make a task for a planner, never deleted",
-   _rn and _rn[0]["group_name"] == "National Highways" and _rn[0]["can_task"] and not _rn[0]["can_delete"])
+# NARROWED 31 Oct 2026 (PR 3d, Q3): the comment is in National Highways' own tab (`clients`), no longer the contractor's
+_cl = {c["name"]: c for c in _th["clients"]}
+_rn = [n for n in _cl["National Highways"]["notes"] if n["kind"] == "note" and n.get("reviewer")]
+ok("6. ⭐ in the client's tab: the comment with the group, Make a task for a planner, never deleted",
+   _rn and _rn[0]["org"] == "National Highways" and _rn[0]["can_task"] and not _rn[0]["can_delete"])
+ok("6. 🔴 PR 3d (Q3): the contractor's own notes hold no client comment",
+   not any(n["kind"] == "note" and "Saturday hours" in (n.get("words") or "") for n in _th["notes"]))
 ok("6. the decisions as grey lines", [n["step_word"] for n in _th["notes"] if n["kind"] == "step"
                                       and n["step"].startswith("review-")] == ["Issue 1 sent to National Highways",
                                                                                "Issue 1 returned", "Issue 1 accepted"])
 ok("6. 🔴 a planner cannot delete a reviewer's comment", clp_notes.remove(Y_ALL, _rn[0]["id"], PAT).get("status") == 403)
 _t = clp_notes.add_task(Y_ALL, {"words": "Put the Saturday hours in 4.1", "for": "approvers", "from_note": _rn[0]["id"]},
                         PAT, factors)
-ok("6. ⭐ Make a task from a reviewer's comment: the task says where it came from",
-   "id" in _t and [t for t in _t["thread"]["tasks"] if t["id"] == _t["id"]][0]["from_group"] == "National Highways")
+# NARROWED 31 Oct 2026 (PR 3d, Q6): the task lands in the client's tab and says whose note it came from
+ok("6. ⭐ Make a task from a reviewer's comment: in the client's tab, it says whose note it came from",
+   "id" in _t and [t for t in {c["name"]: c for c in _t["thread"]["clients"]}["National Highways"]["tasks"]
+                   if t["id"] == _t["id"]][0]["from_note_by"] == "Alex Example"
+   and not any(t["id"] == _t["id"] for t in _t["thread"]["tasks"]))
 as_(NORA)
 ok("6. 🔴 a team cannot make a task from the client's comment (planners and admins)",
    clp_notes.add_task(Y_ALL, {"words": "x", "for": "approvers", "from_note": _rn[0]["id"]}, NORA, factors).get("status") in (403, 404))
@@ -526,9 +533,14 @@ _n1 = clp_notes.add_note(Y_ALL, "Gate B's Saturday shift is not agreed yet.", PA
 _n2 = clp_notes.add_note(Y_ALL, "Saturday 08:00-13:00 is now in 4.1.", PAT, factors, show_to=NH["id"])
 ok("6. 🔴 a note shown to a group the CLP was not sent to is refused",
    clp_notes.add_note(Y_ALL, "x", PAT, factors, show_to=HDC["id"]).get("status") == 422)
-ok("6. a contractor note shown to the group says so", any(n.get("shown_to") == "National Highways" for n in _n2["thread"]["notes"]))
+# NARROWED 31 Oct 2026 (PR 3d, Q2): "Show to" now writes in the group's tab; the contractor's tab no longer has it
+ok("6. a contractor note shown to the group is in the group's tab",
+   any(n.get("words") == "Saturday 08:00-13:00 is now in 4.1." for n in {c["name"]: c for c in _n2["thread"]["clients"]}["National Highways"]["notes"])
+   and not any(n.get("words") == "Saturday 08:00-13:00 is now in 4.1." for n in _n2["thread"]["notes"]))
 as_rev(REV_SAM)
 _rt = main.review_clp(Y_ALL)["thread"]
+# NARROWED 31 Oct 2026 (PR 3d, Q5): the reviewer now reads the group's TASKS too (a separate list); never the
+# contractor's own notes or tasks
 ok("6. ⭐🔴 a reviewer reads their group's comments, the lines and the note shown to them — never a task or another note",
    any(n.get("words") == "Saturday 08:00-13:00 is now in 4.1." and n.get("org") == "Test contractor" for n in _rt)
    and not any("not agreed" in (n.get("words") or "") for n in _rt)
@@ -609,9 +621,10 @@ ok("9. moving a reviewer to another group signs them out", not err and _u["revie
    and users.resolve_reviewer(RAW_HAL) == (None, None))
 ok("9. a staff login is not changed through the reviewer endpoints", clp_reviews.change_reviewer(U_PAT["id"], {"name": "x"})[1] == "No such login."
    and clp_reviews.delete_reviewer(U_PAT["id"]) == "No such login.")
+# NARROWED 31 Oct 2026 (PR 3d): the comments are in the group's tab; the decisions stay grey lines in both
 ok("9. deleting a reviewer keeps their comments and decisions", clp_reviews.delete_reviewer(ALEX["id"]) is None
    and users.get_user(ALEX["id"]) is None
-   and any(n.get("by") == "Alex Example" for n in clp_notes.thread(Y_ALL, PAT)["notes"]))
+   and any(n.get("by") == "Alex Example" for c in clp_notes.thread(Y_ALL, PAT)["clients"] for n in c["notes"]))
 ok("9. a reviewer's sign-out opens nothing else (no map cookie), by source",
    'if rev:\n            # PR 3c: a reviewer signs out with nothing else opened (never the public map\'s cookie)' in
    open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read())
@@ -642,7 +655,8 @@ MAIN = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
 REV = open(os.path.join(BACKEND, "clp_reviews.py"), encoding="utf-8").read().split('"""', 2)[2]   # the code, not the docstring
 REV = "\n".join(l for l in REV.splitlines() if not l.strip().startswith("#"))
 _review_eps = re.findall(r'@app\.(?:get|post|patch|delete)\("/api/review/[^"]*"\)\ndef (\w+)\(([^)]*)\):\n((?:    .*\n|\n)+?)(?=\n\S|\Z)', MAIN)
-ok("11. five review endpoints", len(_review_eps) == 5, str([e[0] for e in _review_eps]))
+# NARROWED 31 Oct 2026 (PR 3d): + the reviewer's task add / change / delete and their own note's delete
+ok("11. nine review endpoints", len(_review_eps) == 9, str([e[0] for e in _review_eps]))
 ok("11. 🔴 every review endpoint takes the reviewer and never the staff access",
    all("_require_reviewer()" in body and "_require_access" not in body and "access.current" not in body
        for _n, _a, body in _review_eps))
@@ -669,13 +683,15 @@ as_rev(REV_SAM)
 ok("12. 🔴 (finding 2) ...nor on the review page (an issue approved with no note shows none)",
    main.review_clp(Y_N)["latest"]["note"] is None and "Bob still owes" not in json.dumps(main.review_clp(Y_N)))
 as_(NORA)
+# NARROWED 31 Oct 2026 (PR 3d, Q4): the team has no client tabs at all
 ok("12. 🔴 (finding 3) a team login cannot show a note to the client's reviewers (403), nor is it offered the groups",
    clp_notes.add_note(Y_N, "Team words for the client", NORA, factors, show_to=NH["id"]).get("status") == 403
-   and clp_notes.thread(Y_N, NORA)["show_to"] == []
+   and clp_notes.thread(Y_N, NORA)["clients"] == []
    and not any("Team words for the client" in (n.get("words") or "") for n in clp_notes.thread(Y_N, NORA)["notes"]))
 ok("12. ...a team's plain note still works", "id" in clp_notes.add_note(Y_N, "A plain team note", NORA, factors))
 as_(PAT)
-ok("12. ...a planner is offered the group the CLP went to", [g["name"] for g in clp_notes.thread(Y_N, PAT)["show_to"]] == ["National Highways"])
+# NARROWED 31 Oct 2026 (PR 3d): the group the CLP went to is a tab
+ok("12. ...a planner is offered the group the CLP went to", [g["name"] for g in clp_notes.thread(Y_N, PAT)["clients"]] == ["National Highways"])
 _hist2 = clp_records.doc_history(Y_ALL)
 ok("12. 🔴 (finding 1) the issued file names no reviewer, only their group while the CLP went to that one group alone",
    any(h["no"] == 1 and h["words"] == "Accepted by National Highways." for h in _hist2)
