@@ -47,6 +47,7 @@ import datetime
 import io
 import re
 
+import access
 import config
 import conversions
 import db
@@ -238,10 +239,12 @@ def _figures(row, factors):
     return int(f["trips"]), float(f["tonnes"])
 
 
-def gather(location_ids, factors=None, working_days=None, now=None, layers=True):
+def gather(location_ids, factors=None, working_days=None, now=None, layers=True, team=None):
     """
     Every figure the document prints, as data (test_clp_doc compares the .docx with this, and this with the modules
     that own each figure). ValueError for an empty or unknown location.
+    31 Oct 2026 (PR 3a, John: "each section only see their clp"): `team` = a team slot counts that team's
+    lines only — every figure, route, plan, gate and collision row follows from `lines`; None = every team.
     """
     factors = factors or conversions.load_factors()
     wd = float(working_days or gate_arrivals.working_days(factors))
@@ -252,6 +255,7 @@ def gather(location_ids, factors=None, working_days=None, now=None, layers=True)
             ids.append(x)
     if not ids:
         raise ValueError("Pick at least one location.")
+    team = access.canonical_ipt(team) if team else None
     tenant_id = db.current_tenant()
     all_locs = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?", (tenant_id,))}
     missing = [x for x in ids if x not in all_locs]
@@ -277,6 +281,8 @@ def gather(location_ids, factors=None, working_days=None, now=None, layers=True)
     for row in rows:
         r = touching.get(row.get("route_id"))
         if not r:
+            continue
+        if team and access.canonical_ipt(row.get("ipt")) != team:
             continue
         if row.get("status") != "Approved":
             pending += 1
@@ -438,10 +444,20 @@ def gather(location_ids, factors=None, working_days=None, now=None, layers=True)
         pm = min(sm, key=lambda m: (-sm[m], m))
         site["peak_month"], site["peak_trips"] = pm, sm[pm]
         if pm not in ar_by_month:
-            ar_by_month[pm] = gate_arrivals.arrivals(pm, {"role": "planner"}, factors=factors, working_days=wd)
+            ar_by_month[pm] = gate_arrivals.arrivals(pm, ({"role": "ipt", "ipt": team} if team else {"role": "planner"}),
+                                                     factors=factors, working_days=wd)
         for g in ar_by_month[pm]["gates"]:
             if g["location_id"] != site["id"] or not g["arrivals_per_day"]:
                 continue
+            if team:
+                # 31 Oct 2026 (PR 3a): the team's own lorries at the gate (gate_arrivals' per-team figure); the gate's
+                # load against its capacity stays every team's, and the document says so
+                mine = (g.get("per_team") or [{}])[0].get("arrivals_per_day") or 0.0
+                if not mine:
+                    continue
+                share = mine / g["arrivals_per_day"]
+                g = dict(g, arrivals_per_day=mine, laden_per_day=r1(g["laden_per_day"] * share),
+                         empty_per_day=r1(g["empty_per_day"] * share))
             grow = gate_by_id.get(g["gate_id"]) or gates.get_gate(g["gate_id"]) or {}
             iv = gate_hours.open_minutes(grow, factors)["intervals"]
             total_open = sum(b - a for a, b in iv)
@@ -454,7 +470,7 @@ def gather(location_ids, factors=None, working_days=None, now=None, layers=True)
             hourly.append({"gate": g["gate_name"], "site": g["location_name"], "month": pm,
                            "arrivals_per_day": g["arrivals_per_day"], "laden_per_day": g["laden_per_day"],
                            "empty_per_day": g["empty_per_day"], "capacity_pct": g["capacity_pct"],
-                           "hours": g["open_hours"], "per_hour": per})
+                           "hours": g["open_hours"], "per_hour": per, "all_teams_pct": bool(team)})
 
     # ---- §5 evidence ---------------------------------------------------------------------------------------- #
     measures = _measures(lines, route_rows, factors, peak_bands, touching, all_locs, vlabel)
@@ -467,6 +483,9 @@ def gather(location_ids, factors=None, working_days=None, now=None, layers=True)
                          for rid_end in (r.get("origin_id"), r.get("dest_id")) if rid_end not in inset})
     out = {
         "name": name, "site_names": [s["name"] for s in sites], "location_ids": ids,
+        "team": team, "team_name": (taxonomy.team_name(team) if team else None),
+        # PR 3a: what the CLP record adds (cover details, the issue, the history); build() reads them, gather() never
+        "cover": {}, "issue": None, "history": [],
         "scheme": tenant.get("name") or "", "demo_notice": tenant.get("demo_notice") or None,
         "snapshot": when, "working_days": wd, "programme": st["programme"], "prefix": st["prefix"],
         "stages": stages, "lines": lines, "by_month": by_month, "totals": totals, "routes": route_rows,
@@ -758,45 +777,65 @@ def build(data, impact="higher", pictures=True, acc=None):
     when = d["snapshot"]
     snap_words = f"{when.day} {MONTHS[when.month - 1]} {when.year} at {when:%H:%M}"
     snap_short = f"{when.day} {MONTHS[when.month - 1]} {when.year}"
-    title = d["name"]
+    title = d.get("title") or d["name"]
     demo = f"DEMO · {d['demo_notice']}" if d["demo_notice"] else None
+    # 31 Oct 2026 (PR 3a): a draft says so on every page and keeps nothing; an approved issue carries its number and date
+    iss = d.get("issue")
+    issue_words = (f"Issue {iss['no']} · approved {_date_words(iss['date'])}" if iss else "DRAFT · not issued")
+    cover = d.get("cover") or {}
+    team_name = d.get("team_name")
     sites_word = "these sites" if len(d["sites"]) > 1 else "this site"
     wd = d["working_days"]
 
     # header and footer on every page
     sec = D.d.sections[0]
-    if demo:
-        hp = sec.header.paragraphs[0]
-        hp.text = demo
-        hp.alignment = 2
+    hp = sec.header.paragraphs[0]
+    hp.text = " · ".join(x for x in (demo, issue_words) if x)
+    hp.alignment = 2
     fp = sec.footer.paragraphs[0]
     fp.style = D.d.styles[SOURCE_STYLE]
-    fp.add_run(" · ".join(x for x in (demo, f"CLP {title}", "Draft", f"snapshot {snap_short}") if x) + " · page ")
+    fp.add_run(" · ".join(x for x in (demo, f"CLP {title}" + (f" · {team_name}" if team_name else ""),
+                                      (f"Issue {iss['no']}" if iss else "Draft"), f"snapshot {snap_short}") if x)
+               + " · page ")
     D.field(fp, "PAGE", "1")
 
     # ---------------------------------------------------------------- cover
     D.p("Construction Logistics Plan: outline", size=12)
     D.d.add_heading(title, level=0)
+    if team_name:
+        D.p(team_name, size=12, bold=True)
     if d["scheme"]:
         D.p(d["scheme"], size=12)
-    todo_rows = (("Landowner", "who owns the land the site sits on."),
-                 ("Site address", "the postal address of the site entrance."),
-                 ("Site postcode", "the postcode."),
-                 ("Existing site use", "what the land is used for now."),
-                 ("Summary of works", "one or two sentences on what is built here."))
+    if team_name:
+        # 31 Oct 2026 (PR 3a, John's Q4): a team's plan counts the team's lorries only, and says so
+        D.p(f"This plan covers the {team_name}'s lorries only. Other teams' lorries to {sites_word} are in their own "
+            f"plans, and all of them together are in the plan for all teams.", italic=True)
+    # PR 3a: the cover details typed on the CLP documents page fill these; a blank one stays a yellow "To complete"
+    todo_rows = (("Landowner", "landowner", "who owns the land the site sits on."),
+                 ("Site address", "address", "the postal address of the site entrance."),
+                 ("Site postcode", "postcode", "the postcode."),
+                 ("Existing site use", "site_use", "what the land is used for now."),
+                 ("Summary of works", "summary", "one or two sentences on what is built here."))
     t = D.kv([("Development name", f"{d['scheme']}: {title}" if d["scheme"] else title)]
-             + [(label, "") for label, _w in todo_rows]
+             + [(label, str(cover.get(key) or "").strip()) for label, key, _w in todo_rows]
              + [("Site position", "; ".join(f"{s['name']}: {_grid_words(s['lat'], s['lon'])}" for s in d["sites"]))])
-    for i, (label, what) in enumerate(todo_rows):
-        D.todo_cell(t.rows[i + 1].cells[1], what, f"Cover, {label.lower()}")
-    t2 = D.kv([("Construction logistics manager", ""), ("Logistics provider contact", "")])
-    for i, label in enumerate(("Construction logistics manager", "Logistics provider contact")):
-        D.todo_cell(t2.rows[i].cells[1], "name, phone and email.", f"Cover, {label.lower()}")
+    for i, (label, key, what) in enumerate(todo_rows):
+        if not str(cover.get(key) or "").strip():
+            D.todo_cell(t.rows[i + 1].cells[1], what, f"Cover, {label.lower()}")
+    people = (("Construction logistics manager", "manager"), ("Logistics provider contact", "provider"))
+    t2 = D.kv([(label, contact_words(cover, key)) for label, key in people])
+    for i, (label, key) in enumerate(people):
+        if not contact_words(cover, key):
+            D.todo_cell(t2.rows[i].cells[1], "name, phone and email.", f"Cover, {label.lower()}")
     D.table(["CLP produced by", "Name", "Signature", "Date"],
             [["", "", "", ""], ["CLP accreditation date", "", "", ""]], widths=[5, 4, 4, 4])
     D.table(["CLP reviewed by", "Name", "Signature", "Date"],
             [["", "", "", ""], ["CLP accreditation date", "", "", ""]], widths=[5, 4, 4, 4])
-    D.p(f"Draft · a snapshot of the approved plan in Wayscope on {snap_words}.", bold=True)
+    if iss:
+        D.p(f"Issue {iss['no']} · approved by {iss.get('by') or 'a planner'} on {_date_words(iss['date'])} · a snapshot "
+            f"of the approved plan in Wayscope on {snap_words}.", bold=True)
+    else:
+        D.p(f"DRAFT · not issued · a snapshot of the approved plan in Wayscope on {snap_words}.", bold=True)
     D.p("The figures change as the plan changes; download a new copy to bring them up to date.")
     D.p("Produced by Wayscope. The section numbers follow the CLOCS outline CLP template so a reviewer can find each "
         "part; this is not a CLOCS publication.")
@@ -808,6 +847,13 @@ def build(data, impact="higher", pictures=True, acc=None):
     D.h("Still to complete", 1)
     D.p("Wayscope filled what it holds. These parts need a person; each is shaded yellow where it stands.")
     anchor = D.p("")
+    hist = d.get("history") or []
+    if hist:
+        # 31 Oct 2026 (PR 3a, Q8 / Q9): every issue, newest first, with what changed (worked out by Wayscope) and the notes
+        D.h("Document history", 1)
+        D.table(["Issue", "Date", "Approved by", "What changed"],
+                [[str(h["no"]), _date_words(h["date"]), h.get("by") or "", h.get("words") or ""] for h in hist],
+                widths=[1.4, 3, 3, 9.6])
     D.h("Contents", 1)
     D.field(D.p(), 'TOC \\o "1-3" \\h \\z \\u', "Word fills the contents and page numbers when the file is opened.")
     D.page_break()
@@ -821,7 +867,8 @@ def build(data, impact="higher", pictures=True, acc=None):
     for h in d["hourly"]:
         if h["capacity_pct"] is not None:
             obj.append(f"{h['gate']} kept under 85 % of its capacity; in its busiest month ({month_label(h['month'])}) "
-                       f"the plan uses {h['capacity_pct']} %.")
+                       f"the plan uses {h['capacity_pct']} %" + (", every team's lorries together." if h.get("all_teams_pct")
+                                                                 else "."))
     if d["routes"]:
         obj.append(f"Every lorry on its designated route: {len(d['routes'])} route{'s' if len(d['routes']) != 1 else ''}, "
                    "a driver route sheet for each.")
@@ -937,13 +984,19 @@ def build(data, impact="higher", pictures=True, acc=None):
     D.h("2.4.2 Schools, hospitals and other sensitive places", 3)
     if C.get("stored"):
         labels = C["labels"]
-        if C["places"]:
-            D.p(f"Places {strip_words}, nearest first:")
-            D.table(["Place", "What", "Nearest", "Metres"],
-                    [[x["name"] or "unnamed", labels.get(x["kind"], x["kind"]), x["where"], n(x["metres"])]
-                     for x in C["places"]], widths=[6.5, 4, 4.5, 2], numeric=(3,))
+        unnamed = C.get("places_unnamed") or []
+        if C["places"] or unnamed:
+            if C["places"]:
+                D.p(f"Places {strip_words}: schools, hospitals and health centres first, then the others, each nearest "
+                    "first:")
+                D.table(["Place", "What", "Nearest", "Metres"],
+                        [[x["name"], labels.get(x["kind"], x["kind"]), x["where"], n(x["metres"])]
+                         for x in C["places"]], widths=[6.5, 4, 4.5, 2], numeric=(3,))
             if C["places_more"]:
-                D.p(f"{n(C['places_more'])} more further away.")
+                D.p(f"{n(C['places_more'])} more named place{'s' if C['places_more'] != 1 else ''} further away.")
+            if unnamed:
+                D.p("With no name on the map: " + ", ".join(
+                    f"{n(u['count'])} {_unnamed_word(u)}" for u in unnamed) + ".")
         else:
             D.p(f"No schools, hospitals, health or community centres or sports facilities recorded {strip_words}.")
         if C["residential"]:
@@ -1115,7 +1168,7 @@ def build(data, impact="higher", pictures=True, acc=None):
             split = ", ".join(x for x in ((f"{h['laden_per_day']:g} loaded" if h["laden_per_day"] else ""),
                                          (f"{h['empty_per_day']:g} coming to load" if h["empty_per_day"] else "")) if x)
             D.p(f"{h['gate']}, {h['site']}, {month_label(h['month'])} (its busiest month): {h['arrivals_per_day']:g} "
-                f"lorries a day ({split}), open {h['hours']}.")
+                f"{TEAM_LORRIES if h.get('all_teams_pct') else 'lorries'} a day ({split}), open {h['hours']}.")
             if pictures:
                 ch = PIC.hourly_chart(h)
                 if ch:
@@ -1161,6 +1214,27 @@ def build(data, impact="higher", pictures=True, acc=None):
     out = io.BytesIO()
     D.d.save(out)
     return out.getvalue()
+
+
+TEAM_LORRIES = "of this team's lorries"
+#: 31 Oct 2026 (PR 3a): the cover details a CLP record holds, in the order the page and the cover print them
+COVER_FIELDS = (("address", "Site address"), ("postcode", "Postcode"), ("landowner", "Landowner"),
+                ("site_use", "Existing site use"), ("summary", "Summary of works"),
+                ("manager_name", "Logistics manager"), ("manager_phone", "Logistics manager's phone"),
+                ("manager_email", "Logistics manager's email"),
+                ("provider_name", "Logistics provider"), ("provider_phone", "Logistics provider's phone"),
+                ("provider_email", "Logistics provider's email"))
+
+
+def contact_words(cover, who):
+    """'A. Example · 07700 900123 · a@example.com' from the typed parts, or '' when none is typed."""
+    return " · ".join(x for x in (str((cover or {}).get(f"{who}_{k}") or "").strip() for k in ("name", "phone", "email")) if x)
+
+
+def _unnamed_word(u):
+    import clp_doc_layers
+    one, many = clp_doc_layers.UNNAMED_WORDS.get(u["kind"], (u["kind"], u["kind"]))
+    return one if u["count"] == 1 else many
 
 
 def _date_words(v):

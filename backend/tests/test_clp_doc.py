@@ -485,10 +485,11 @@ _snap = D1["snapshot"]
 _snap_short = f"{_snap.day} {clp_doc.MONTHS[_snap.month - 1]} {_snap.year}"
 _foot = W.sections[0].footer.paragraphs[0].text
 ok("⭐ a dated snapshot on the cover; the footer: demo line, CLP, Draft, snapshot date, page",
-   f"Draft · a snapshot of the approved plan in Wayscope on {_snap_short} at {_snap:%H:%M}." in JOINED
+   # 31 Oct 2026 (PR 3a): a draft now says "DRAFT · not issued" (an approved issue says its number)
+   f"DRAFT · not issued · a snapshot of the approved plan in Wayscope on {_snap_short} at {_snap:%H:%M}." in JOINED
    and _foot.startswith(f"DEMO · Fictional scheme · CLP Yard East · Draft · snapshot {_snap_short} · page "), _foot)
 ok("...the demo line heads every page and the cover says the figures are fictional",
-   W.sections[0].header.paragraphs[0].text == "DEMO · Fictional scheme"
+   W.sections[0].header.paragraphs[0].text == "DEMO · Fictional scheme · DRAFT · not issued"   # PR 3a: + the draft mark
    and "DEMO · Fictional scheme: every site, route and figure in this document is fictional." in JOINED)
 todo_paras = [p for p in paras if p.text.startswith("To complete: ")]
 todo_cells = [c for t in W.tables for row in t.rows for c in row.cells if c.text.startswith("To complete: ")]
