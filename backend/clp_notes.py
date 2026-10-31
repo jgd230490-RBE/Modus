@@ -20,6 +20,15 @@ ONE TABLE, FOUR KINDS OF ROW (clp_notes)
             (keep_lines). Nothing is built just for this list (Q7). A task whose line is no longer in a later list says so;
             it is never ticked by itself (Q8).
 
+THE CLIENT'S REVIEWERS (31 Oct 2026, PR 3c, clp_reviews.py)
+-----------------------------------------------------------
+`review_group` on a row = the reviewer group it is shown to. A reviewer's COMMENT is a note with written_key 'r:<login>'
+and its group; the send / accept / return lines are steps 'review-sent' / 'review-accepted' / 'review-returned' with the
+group. A contractor's note reaches a group only when its writer ticks "Show to <group>" (a group the CLP was sent to;
+off by default). Tasks, the kept lines and every other note are NEVER in review_thread(), whatever their review_group
+(a task made from a reviewer's comment keeps the group only to say where it came from). A contractor never deletes a
+reviewer's comment.
+
 RULES
 -----
 * Notes and tasks never print in the Word file (Q11). Deleting a CLP made with + New CLP removes them; clearing a listed
@@ -45,10 +54,11 @@ import clp_records
 
 KINDS = ("note", "task", "step", "lines")
 STEPS = {"sent": "Sent for approval", "changes": "Changes asked", "approved": "Approved"}
+REVIEW_STEPS = ("review-sent", "review-accepted", "review-returned")
 WORDS_MAX = 1000
 LINE_MAX = 600
 COLS = ("id, clp_id, kind, words, for_kind, for_team, for_user, due, from_line, done_by, done_at, step, issue_no, "
-        "written_by, written_key, written_at, updated_at")
+        "written_by, written_key, written_at, updated_at, review_group")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -205,7 +215,13 @@ def _lines(rows):
 # --------------------------------------------------------------------------- #
 #  Reading                                                                     #
 # --------------------------------------------------------------------------- #
+def _is_review_comment(row):
+    return str(row.get("written_key") or "").startswith("r:")
+
+
 def _can_change(row, acc):
+    if _is_review_comment(row):
+        return False        # PR 3c: the client's words stay as written
     return access.can_approve(acc) or row.get("written_key") == key_of(acc)
 
 
@@ -220,6 +236,7 @@ def _task_out(row, rec, acc, labels, names, lines, today):
             "done_by": row.get("done_by"), "done_at": row.get("done_at"),
             "from_line": row.get("from_line"), "from_section": (split_line(row["from_line"])[0] if row.get("from_line") else None),
             "line_gone_at": gone, "written_by": row.get("written_by"), "written_at": row.get("written_at"),
+            "from_group": (_group_names().get(row["review_group"]) if row.get("review_group") else None),
             "mine": _mine(row, acc), "can_change": _can_change(row, acc)}
 
 
@@ -256,16 +273,25 @@ def thread(clp_id, acc, factors=None):
     today = _today()
     tasks = [_task_out(r, rec, acc, labels, names, lines, today) for r in rows if r.get("kind") == "task"]
     tasks.sort(key=lambda t: (t["done"], t["done_at"] or "" if t["done"] else "", t["due"] or "9999", t["written_at"] or ""))
+    groups = _group_names()
+    appr = access.can_approve(acc)
     items = []
     for r in rows:
         if r.get("kind") == "note":
+            rv = _is_review_comment(r)
             items.append({"kind": "note", "id": r["id"], "words": r.get("words") or "", "by": r.get("written_by"),
-                          "at": r.get("written_at"), "can_delete": _can_change(r, acc)})
+                          "at": r.get("written_at"), "can_delete": _can_change(r, acc),
+                          # PR 3c: a reviewer's comment carries its group's badge (+ Make a task for an approver);
+                          # a contractor note ticked "Show to …" names the group it went to
+                          "reviewer": rv, "group_name": (groups.get(r.get("review_group")) if rv else None),
+                          "shown_to": (groups.get(r.get("review_group")) if r.get("review_group") and not rv else None),
+                          "can_task": bool(rv and appr)})
     written = {(r.get("step"), r.get("written_at")) for r in rows if r.get("kind") == "step"}
     written_issues = {r.get("issue_no") for r in rows if r.get("kind") == "step" and r.get("step") == "approved"}
     for r in rows:
         if r.get("kind") == "step":
-            items.append({"kind": "step", "id": r["id"], "step": r.get("step"), "step_word": _step_word(r.get("step"), r.get("issue_no")),
+            items.append({"kind": "step", "id": r["id"], "step": r.get("step"),
+                          "step_word": _step_word(r.get("step"), r.get("issue_no"), groups.get(r.get("review_group"))),
                           "issue_no": r.get("issue_no"), "by": r.get("written_by"), "at": r.get("written_at"),
                           "words": r.get("words") or ""})
     for s in _steps_from_record(rec, clp_records._issue_rows(rec["id"])):
@@ -275,7 +301,42 @@ def thread(clp_id, acc, factors=None):
                       "issue_no": s["issue_no"], "by": s["by"], "at": s["at"], "words": s["words"] or ""})
     items.sort(key=lambda i: (i["at"] or "", i.get("id") or ""))
     return {"id": rec["id"], "tasks": tasks, "notes": items, "lines": lines,
-            "for_options": for_options(rec, acc, labels), "can_moderate": access.can_approve(acc), "today": today}
+            "for_options": for_options(rec, acc, labels), "can_moderate": access.can_approve(acc), "today": today,
+            "show_to": _show_to_options(rec["id"])}
+
+
+def _group_names():
+    import clp_reviews
+    return clp_reviews.group_names()
+
+
+def _show_to_options(clp_id):
+    """PR 3c: the groups a note on this CLP can be shown to: the live groups an issue of it was sent to."""
+    import clp_reviews
+    sent = {r["group_id"] for r in clp_reviews._review_rows(clp_id, "sent")}
+    return [{"id": g["id"], "name": g["name"]} for g in clp_reviews.groups_for_send(clp_id) if g["id"] in sent]
+
+
+def review_thread(clp_id, group_id, names=None):
+    """PR 3c: what a REVIEWER of `group_id` reads on this CLP: their group's comments, the send / decision lines for the
+    group, and the contractor's notes shown to the group. Never a task, the kept lines, or any other note."""
+    import clp_reviews
+    names = names if names is not None else _group_names()
+    scheme = clp_reviews.scheme_name()
+    out = []
+    for r in _rows(clp_id, ("note", "step")):
+        if not group_id or r.get("review_group") != group_id:
+            continue
+        if r["kind"] == "note":
+            rv = _is_review_comment(r)
+            out.append({"kind": "note", "id": r["id"], "words": r.get("words") or "", "by": r.get("written_by"),
+                        "org": (names.get(group_id) if rv else scheme), "reviewer": rv, "at": r.get("written_at")})
+        elif r.get("step") in REVIEW_STEPS:
+            out.append({"kind": "step", "id": r["id"], "step": r["step"],
+                        "step_word": _step_word(r["step"], r.get("issue_no"), names.get(group_id)),
+                        "by": r.get("written_by"), "at": r.get("written_at")})
+    out.sort(key=lambda i: (i["at"] or "", i["id"]))
+    return out
 
 
 def _all_users():
@@ -283,9 +344,15 @@ def _all_users():
     return users.list_users()
 
 
-def _step_word(step, issue_no):
+def _step_word(step, issue_no, group_name=None):
     if step == "approved":
         return f"Approved as Issue {issue_no}" if issue_no else "Approved"
+    if step == "review-sent":
+        return f"Issue {issue_no} sent to {group_name or 'the client'}"
+    if step == "review-accepted":
+        return f"Issue {issue_no} accepted"
+    if step == "review-returned":
+        return f"Issue {issue_no} returned"
     return STEPS.get(step, step or "")
 
 
@@ -328,7 +395,8 @@ def open_summary(clp_id):
 # --------------------------------------------------------------------------- #
 #  Writing                                                                     #
 # --------------------------------------------------------------------------- #
-def add_note(clp_id, words, acc, factors=None):
+def add_note(clp_id, words, acc, factors=None, show_to=None):
+    """A note; `show_to` = one reviewer group the CLP was sent to, which then reads it too (PR 3c, off by default)."""
     rec = clp_records._record(clp_id, acc, factors)
     if not rec:
         return {"error": "No such CLP.", "status": 404}
@@ -336,8 +404,10 @@ def add_note(clp_id, words, acc, factors=None):
     p = _words_problem(words)
     if p:
         return {"error": p, "status": 422}
+    if show_to not in (None, "") and str(show_to) not in {g["id"] for g in _show_to_options(rec["id"])}:
+        return {"error": "This CLP was not sent to that group.", "status": 422}
     nid = _insert({"clp_id": rec["id"], "kind": "note", "words": words, "written_by": clp_records.who(acc),
-                   "written_key": key_of(acc)})
+                   "written_key": key_of(acc), "review_group": (str(show_to) if show_to not in (None, "") else None)})
     return {"id": nid, "thread": thread(rec["id"], acc, factors)}
 
 
@@ -393,9 +463,18 @@ def add_task(clp_id, body, acc, factors=None, mail=True):
     if p:
         return {"error": p, "status": 422}
     line = _clean(body.get("from_line"), LINE_MAX) or None
+    group = None
+    if body.get("from_note"):
+        # PR 3c: Make a task from a reviewer's comment (planners and admins): the task says whose comment it came from
+        if not access.can_approve(acc):
+            return {"error": "A planner or an admin makes a task from the client's comment.", "status": 403}
+        src = [r for r in _rows(rec["id"], ("note",)) if r["id"] == str(body["from_note"]) and _is_review_comment(r)]
+        if not src:
+            return {"error": "No such comment.", "status": 404}
+        group = src[0].get("review_group")
     nid = _insert({"clp_id": rec["id"], "kind": "task", "words": words, "for_kind": f[0], "for_team": f[1],
                    "for_user": f[2], "due": due, "from_line": line, "written_by": clp_records.who(acc),
-                   "written_key": key_of(acc)})
+                   "written_key": key_of(acc), "review_group": group})
     sent = None
     if mail and f[0] == "person" and str(f[2]) != str((acc or {}).get("user_id") or ""):
         sent = email_task(f[2], rec, words, due, clp_records.who(acc))
@@ -471,6 +550,21 @@ def add_step(clp_id, step, by, at, words=None, issue_no=None):
     """The chain writes its steps here as they happen (clp_records.send / ask_changes / approve)."""
     _insert({"clp_id": clp_id, "kind": "step", "step": step, "issue_no": issue_no, "words": (words or None),
              "written_by": by, "written_key": "step", "written_at": at})
+
+
+def add_review_step(clp_id, step, by, at, group_id, issue_no):
+    """PR 3c: a send / accept / return line, read by the contractor and by the group (review_thread)."""
+    _insert({"clp_id": clp_id, "kind": "step", "step": step, "issue_no": issue_no, "words": None, "written_by": by,
+             "written_key": "step", "written_at": at, "review_group": group_id})
+
+
+def add_review_note(clp_id, words, rev, at=None):
+    """PR 3c: a reviewer's comment (clp_reviews.comment / decide checked the reviewer and the CLP)."""
+    row = {"clp_id": clp_id, "kind": "note", "words": words, "written_by": rev["name"],
+           "written_key": f"r:{rev['user_id']}", "review_group": rev["group_id"]}
+    if at:
+        row["written_at"] = at
+    return _insert(row)
 
 
 def drop_all(clp_id):

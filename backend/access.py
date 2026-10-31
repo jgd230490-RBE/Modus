@@ -85,6 +85,10 @@ DEMO_CODES = {
 }
 
 _ACCESS = contextvars.ContextVar("access", default=None)
+# 31 Oct 2026 (task 4a PR 3c): a client REVIEWER's session lives in its own context. It never reaches _ACCESS, so
+# current() is None for a reviewer and every staff guard and read refuses them as it refuses a visitor not signed in.
+# Only the review reads (main.py /api/review/*) ask reviewer().
+_REVIEWER = contextvars.ContextVar("reviewer", default=None)
 
 
 def canonical_ipt(value):
@@ -201,23 +205,56 @@ def resolve_request(code, session_token=None):
     return None
 
 
+def resolve_reviewer_request(session_token=None):
+    """PR 3c: the reviewer for a request's `wayscope_session` cookie, or None. Never an access dict."""
+    if not session_token:
+        return None
+    try:
+        import users
+        rev, _user = users.resolve_reviewer(session_token)
+        return rev
+    except Exception as e:  # noqa: BLE001 — a broken session store must not open anything
+        print(f"access: reviewer lookup failed {e.__class__.__name__}: {str(e)[:200]}")
+        return None
+
+
 def set_current(code, session_token=None):
-    """Resolve a request into the context. Returns the token to reset with."""
-    return _ACCESS.set(resolve_request(code, session_token))
+    """Resolve a request into the context. Returns the token(s) to reset with. A request with staff access never
+    carries a reviewer as well; a reviewer's request carries no staff access (PR 3c)."""
+    acc = resolve_request(code, session_token)
+    rev = None if acc else resolve_reviewer_request(session_token)
+    return (_ACCESS.set(acc), _REVIEWER.set(rev))
 
 
 def reset_current(token):
-    _ACCESS.reset(token)
+    if isinstance(token, tuple):
+        _ACCESS.reset(token[0])
+        _REVIEWER.reset(token[1])
+    else:
+        _ACCESS.reset(token)
+
+
+def reviewer():
+    """PR 3c: the client reviewer signed in on this request, or None. Only the review reads read it."""
+    return _REVIEWER.get()
 
 
 def current():
     """The access for this request, or None when no valid code was sent."""
-    return _ACCESS.get()
+    acc = _ACCESS.get()
+    if acc and acc.get("via") == "reviewer":    # PR 3c: belt and braces — never a staff access for a reviewer
+        return None
+    return acc
+
+
+def is_staff(acc):
+    """An access dict that grants staff access: never a reviewer's (PR 3c)."""
+    return bool(acc) and acc.get("via") != "reviewer" and acc.get("role") != "reviewer"
 
 
 def can_approve(acc=None):
     acc = acc if acc is not None else current()
-    return bool(acc) and acc["role"] in ("planner", "admin")
+    return is_staff(acc) and acc["role"] in ("planner", "admin")
 
 
 def ipt_scope(acc=None):
@@ -238,7 +275,7 @@ def line_visible(row, acc=None):
     valid code sees all.
     """
     acc = acc if acc is not None else current()
-    if not acc:
+    if not is_staff(acc):
         return False
     scope = acc.get("ipt")
     if not scope:
@@ -274,7 +311,7 @@ def ipt_for_save(requested, acc=None):
     Returns (ipt, error).
     """
     acc = acc if acc is not None else current()
-    if not acc:
+    if not is_staff(acc):
         return None, "no access code"
     if acc.get("ipt"):
         return acc["ipt"], None
@@ -293,7 +330,7 @@ def ipt_for_save(requested, acc=None):
 def describe(acc=None):
     """What the frontend needs after sign-in: role, scope, and the rules."""
     acc = acc if acc is not None else current()
-    if not acc:
+    if not is_staff(acc):
         return None
     out = {
         "role": acc["role"], "label": acc["label"], "ipt": acc.get("ipt"),

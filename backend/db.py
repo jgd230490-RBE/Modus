@@ -72,6 +72,9 @@ TENANTED_TABLES = {
     # 31 Oct 2026 (task 4a, PR 3b): the notes, tasks, approval steps and kept "Still to complete" lines on each CLP.
     # Per tenant, in the package, same rule, same edit.
     "clp_notes",
+    # 31 Oct 2026 (task 4a, PR 3c): the client's reviewer groups (one per client organisation) and each issue sent to a
+    # group with the group's decision on it. Per tenant, in the package, same rule, same edit.
+    "clp_review_groups", "clp_reviews",
     # 2.5b, 2026-09-03. The editable copy of factors.json. Per tenant: two clients
     # will not share a payload table.
     "config",
@@ -300,8 +303,10 @@ def _run(sql, params, fetch):
 #    process's writes, and the version must then move into the database.
 # 31 Oct 2026 (task 4a, PR 3b): + clp_notes. No figure and no kept read is built from a CLP's notes and tasks, and a
 # note must not throw away the kept CLP drafts (each a heavy build).
+# 31 Oct 2026 (task 4a, PR 3c): + clp_review_groups, clp_reviews. A send to the client's reviewers or their decision is no
+# figure; the one kept read that prints a decision (a CLP's draft, its Document history) carries the decisions in its key.
 NO_DATA_TABLES = frozenset({"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users",
-                            "demo_requests", "clp_notes"})
+                            "demo_requests", "clp_notes", "clp_review_groups", "clp_reviews"})
 _DATA_VERSION = [0]
 _WRITE_TABLE_RE = None
 
@@ -910,7 +915,20 @@ def init_weeks_db():
         _create_tenanted(cur, "clp_issues")
         # 31 Oct 2026 (task 4a, PR 3b): the notes and tasks on each CLP
         _create_tenanted(cur, "clp_notes")
+        # 31 Oct 2026 (task 4a, PR 3c): the client's reviewer groups and the issues sent to them
+        _create_tenanted(cur, "clp_review_groups")
+        _create_tenanted(cur, "clp_reviews")
         conn.commit()
+        # PR 3c: a note's reviewer group — the group a reviewer's comment came from, or the group a contractor's note is
+        # shown to (NULL: only the contractor's people see it). Plain ADD COLUMN.
+        try:
+            if IS_PG:
+                cur.execute("ALTER TABLE clp_notes ADD COLUMN IF NOT EXISTS review_group TEXT")
+            else:
+                cur.execute("ALTER TABLE clp_notes ADD COLUMN review_group TEXT")
+            conn.commit()
+        except Exception:
+            conn.rollback()  # column already present — fine
         try:
             if IS_PG:
                 cur.execute("ALTER TABLE stockpile_weeks ADD COLUMN IF NOT EXISTS measured_qty REAL")
@@ -1194,7 +1212,9 @@ def init_users_db():
         # Pilot readiness (27 Oct 2026, F3 b): two-step sign-in. The authenticator key (base32), the key
         # offered while it is being set up, the last 30-second step accepted (a code works once), when it
         # was turned on, and the recovery codes as a JSON list of SHA-256 hashes. Plain ADD COLUMN.
-        for col in ("totp_secret", "totp_pending", "totp_on_at", "recovery_hashes", "totp_last_step"):
+        # 31 Oct 2026 (task 4a, PR 3c): `review_group`, the client reviewer group a reviewer login belongs to (kind
+        # 'reviewer'; NULL for every other login).
+        for col in ("totp_secret", "totp_pending", "totp_on_at", "recovery_hashes", "totp_last_step", "review_group"):
             typ = "INTEGER" if col == "totp_last_step" else "TEXT"
             try:
                 if IS_PG:
@@ -2158,6 +2178,42 @@ _TENANT_DDL = {
             written_key    TEXT,
             written_at     TEXT NOT NULL,
             updated_at     TEXT,
+            review_group   TEXT,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
+    # 31 Oct 2026 (task 4a, PR 3c; clp_reviews.py). One client reviewer group: an organisation (National Highways, HS2, a
+    # council) whose reviewers read the CLPs sent to it. `stopped_at` set = stopped (its reviewers cannot sign in); a group
+    # a CLP was ever sent to is never deleted.
+    "clp_review_groups": """
+        CREATE TABLE clp_review_groups (
+            tenant_id   TEXT NOT NULL DEFAULT 'default',
+            id          TEXT NOT NULL,
+            name        TEXT NOT NULL,
+            created_by  TEXT,
+            created_at  TEXT,
+            updated_at  TEXT,
+            stopped_by  TEXT,
+            stopped_at  TEXT,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
+    # 31 Oct 2026 (task 4a, PR 3c). One event between a CLP's issue and a reviewer group: `kind` 'sent' (a planner or an
+    # admin sent the issue to the group) or 'decision' (`decision` accepted | returned, by one reviewer for the group, with
+    # their words). The group's decision on an issue is its LAST decision row; every row is kept.
+    "clp_reviews": """
+        CREATE TABLE clp_reviews (
+            tenant_id   TEXT NOT NULL DEFAULT 'default',
+            id          TEXT NOT NULL,
+            clp_id      TEXT NOT NULL,
+            issue_no    INTEGER NOT NULL,
+            group_id    TEXT NOT NULL,
+            kind        TEXT NOT NULL,
+            decision    TEXT,
+            words       TEXT,
+            by_name     TEXT,
+            by_user     TEXT,
+            at          TEXT NOT NULL,
             PRIMARY KEY (tenant_id, id)
         )
     """,
@@ -2208,6 +2264,8 @@ _TENANT_PK = {
     "clp_documents": "(tenant_id, id)",
     "clp_issues": "(tenant_id, clp_id, issue_no)",
     "clp_notes": "(tenant_id, id)",
+    "clp_review_groups": "(tenant_id, id)",
+    "clp_reviews": "(tenant_id, id)",
     "config": "(tenant_id, key)",
     "forecast_days": "(tenant_id, route_id, month_index, discipline, section_id, "
                      "day_date)",
