@@ -4646,7 +4646,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && card.includes("/site-layout/phases`") && card.includes('method: "PATCH"') && card.includes("?version=${p.version}`, { method: \"DELETE\" }")
      && card.includes("version: edit.version") && card.includes("if(j.ask_grid){"));
   ok("SITE LAYOUT: every failure through errSay / errMsg (no status number, no raw reply)",
-     (card.match(/errSay\("/g) || []).length === 7 &&   // NARROWED 31 Oct 2026: 7 — PR 2's "Not copied." and PR 4's "Not changed." (the public switch)
+     (card.match(/errSay\("/g) || []).length === 9 &&   // NARROWED 31 Oct 2026 (PR 5): 9 — the Print panel's settings read and sheet. NARROWED 31 Oct 2026: 7 — PR 2's "Not copied." and PR 4's "Not changed." (the public switch)
  card.includes("setFit({ error: errMsg(e) })") && !/\$\{e\}|\.status\b|r\.status/.test(card));
   ok("SITE LAYOUT: the words are few and name no back end (no transform, grid file, library or endpoint)",
      !/OSTN|pyproj|ezdxf|EPSG|transform|endpoint|\bAPI\b|server|\bheld\b|\bhold\b/i.test(card.replace(/\$\{API\}/g, "").replace(/"Content-Type"/g, ""))
@@ -4777,8 +4777,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && ed.includes("Drag the numbered corners onto points you know; ✥ moves it whole, ⟳ turns it. Drawing is paused.")
      && ed.includes("<button onClick={cornersDone}") && ed.includes("<button onClick={cornersCancel} className={tb}>Cancel</button>")
      && ed.includes('...(corner ? { opacity: 0.45, pointerEvents: "none" } : {})') && ed.includes("if(e.cm) return;   // moving a picture's corners"));
-  ok("⭐ PICTURES: corners, opacity, name and every phase are kept by the ONE Save (Q8), one write each with its own version (409 = Reload); adding and deleting are written at once",
-     ed.includes("const picKey = (p) => JSON.stringify([p.corners, p.opacity, p.name, !!p.every]);")
+  // NARROWED 31 Oct 2026 (task 4c PR 5): the key also carries the "Print under the layout" tick (on_sheet)
+  ok("⭐ PICTURES: corners, opacity, name, every phase and the sheet tick are kept by the ONE Save (Q8), one write each with its own version (409 = Reload); adding and deleting are written at once",
+     ed.includes("const picKey = (p) => JSON.stringify([p.corners, p.opacity, p.name, !!p.every, !!p.on_sheet]);")
      && ed.includes('fetch(`${API}/site-layouts/pictures/${encodeURIComponent(p.id)}`, { method: "PATCH"')
      && ed.includes('say("Someone else changed a picture. Reload to see their changes.", true)')
      && ed.includes('fetch(`${API}/site-layouts/pictures/${encodeURIComponent(p.id)}?version=${v}`, { method: "DELETE" })')

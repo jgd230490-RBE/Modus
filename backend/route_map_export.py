@@ -134,7 +134,7 @@ def sheet(month_index, route_ids=None, team=None, acc=None, now=None, origin=Non
             key = loc_id or name
             if key and key not in letter_of:
                 letter_of[key] = bulletin_doc._letters(len(places))
-                places.append({"letter": letter_of[key], "name": name or "", "at": at, "end": end})
+                places.append({"letter": letter_of[key], "name": name or "", "at": at, "end": end, "loc_id": loc_id})
 
     def letters(r):
         g = geo.get(r["route_id"])
@@ -164,7 +164,7 @@ def sheet(month_index, route_ids=None, team=None, acc=None, now=None, origin=Non
     narrowed = [w for w in ((f"from {origin}" if origin else None), (f"to {dest}" if dest else None),
                             (discipline if discipline else None)) if w]
     return {
-        "title": f"Route map · {month_long}",
+        "title": f"Route map · {month_long}", "month_index": mi,
         "tenant": export._tenant_name() or "Wayscope",
         "demo_notice": notice, "map_demo_tag": bulletin_doc.DEMO_MAP_TAG if notice else None,
         "month_long": month_long, "team_words": team_words,
@@ -186,13 +186,15 @@ def centre_choices(S):
     return [p["name"] for p in sorted(ps, key=lambda p: (p.get("end") != "dest", p["letter"]))]
 
 
-def plan(S, kind="regional", scale=None, at=None, community=True, collisions=False):
+def plan(S, kind="regional", scale=None, at=None, community=True, collisions=False, layout=True):
     """
     Adds S["plan"]: which plan, its stated scale, the basemap view drawn exactly at that scale (FRAME_W_MM wide), the
     place it is centred on, and the places inside the frame (the panel lists those). Raises PlanError on a plan, scale or
     place it does not offer. 14 Oct 2026: `community` (on unless the card's box leaves it out) adds the community
     considerations in the frame (community_in_frame), which the PDF draws and lists. 16 Oct 2026 (CLOCS v5 C1):
     `collisions` (off unless the card's box adds it) adds the collision history in the frame (collisions_in_frame).
+    31 Oct 2026 (task 4c PR 5): a SITE plan centred on a site with a layout carries the phase in force in the sheet's
+    month (site_layout_paper.for_plan, without security / CCTV), drawn under the routes; `layout=False` leaves it off.
     """
     import basemap
     import bulletin_doc
@@ -250,6 +252,12 @@ def plan(S, kind="regional", scale=None, at=None, community=True, collisions=Fal
     P["community_asked"] = bool(community)
     P["collisions"] = collisions_in_frame(P["view"], kind) if (collisions and P["view"]) else None
     P["collisions_asked"] = bool(collisions)
+    P["layout"] = None
+    if layout and kind == "site" and P["view"] and P.get("centre"):
+        loc = next((p.get("loc_id") for p in S["places"] if p.get("at") and p["name"] == P["centre"]), None)
+        if loc and S.get("month_index"):
+            import site_layout_paper
+            P["layout"] = site_layout_paper.for_plan(loc, S["month_index"])
     S["plan"] = P
     return S
 

@@ -747,7 +747,8 @@ ok("7: outlines are a 22 % tint with the full colour as the edge (the colour sys
    and main.community_layer(request=_Request())["fill_alpha"] == 0.22)
 _rp = read("backend/route_map_export.py")
 # NARROWED 16 Oct 2026: plan() also takes collisions=False (CLOCS v5 C1) after community=True
-ok("7: plan() adds the layer unless asked not to", "def plan(S, kind=\"regional\", scale=None, at=None, community=True, collisions=False):" in _rp
+# NARROWED 31 Oct 2026 (task 4c PR 5): plan() also takes layout=True (the site layout on the Site plan)
+ok("7: plan() adds the layer unless asked not to", "def plan(S, kind=\"regional\", scale=None, at=None, community=True, collisions=False, layout=True):" in _rp
    # NARROWED 15 Oct 2026: the plan's own omissions (bus stops off the regional plan) ride along
    and 'P["community"] = community_in_frame(P["view"], omit=PLAN_OMITS.get(kind, ())) if (community and P["view"]) else None' in _rp)
 

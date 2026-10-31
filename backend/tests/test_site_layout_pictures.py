@@ -556,10 +556,11 @@ ok("4. no public read in main.py calls the pictures, the staff layout reads or t
    not [p for p, b in bodies.items() if re.search(r"site_layout_pictures|site_layouts\.(get|for_map|summary)\(|"
                                                   r"site_layout_picture_image|/pictures/", b)],
    str([p for p, b in bodies.items() if "site_layout" in b]))
-ok("4. site_layout_pictures is read only by main.py's staff endpoints and site_layouts' staff reads (no other module)",
+# NARROWED 31 Oct 2026 (task 4c PR 5): + site_layout_paper.py — the sheet (planners and admins) draws the ticked pictures
+ok("4. site_layout_pictures is read only by main.py's staff endpoints, site_layouts' staff reads and the staff sheet (no other module)",
    sorted(f for f in os.listdir(BACKEND) if f.endswith(".py") and f != "site_layout_pictures.py"
           and re.search(r"import site_layout_pictures", open(os.path.join(BACKEND, f), encoding="utf-8").read()))
-   == ["main.py", "site_layouts.py"])
+   == ["main.py", "site_layout_paper.py", "site_layouts.py"])
 if hasattr(SL, "for_public_map"):    # PR 4 (claude/site-layout-public): the public layer has an allow-list of its own
     pubsl = json.dumps(SL.for_public_map("2027-08"))
     ok("4. the public site layout layer (PR 4) carries no picture", "PI00" not in pubsl and "picture" not in pubsl)

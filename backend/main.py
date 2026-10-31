@@ -79,6 +79,7 @@ import holding  # 29 Oct 2026 (task 3c): vehicle holding areas
 import site_layouts  # 31 Oct 2026 (task 4c PR 1): a site's logistics layout, its phases and the drawings brought in
 import site_layout_import  # 31 Oct 2026 (task 4c PR 1): DXF / KML / KMZ / GeoJSON / shapefile zip read into map things
 import site_layout_styles  # 31 Oct 2026 (task 4c PR 1): the one style table (11 lines, 10 areas, 31 symbols, 8 layers)
+import site_layout_paper  # 31 Oct 2026 (task 4c PR 5): a site layout phase as an A3 / A4 sheet, PDF or PNG
 import site_layout_pictures  # 31 Oct 2026 (task 4c PR 3): pictures / PDF pages pinned on a layout by four corners (staff)
 import sim  # 16 Oct 2026 (S3) — the haulage simulation: an average day lorry by lorry at every gate (staff only, D86)
 import heavy_reads  # 21 Oct 2026 — the public map's heavy reads a few at a time, one memory line each (live OOM kills)
@@ -4879,6 +4880,72 @@ def get_site_layout(location_id: str):
     return {"layout": site_layouts.get(location_id), "ready": site_layout_import.grid_ready()}
 
 
+def _layout_sheet(location_id, phase, page, scale, style):
+    """4c PR 5: the site layout sheet's plan (site_layout_paper.sheet) or a 422 in words. Planner or admin."""
+    _require_approver()
+    sk = _export_style(style)
+    try:
+        return site_layout_paper.sheet(location_id, phase or None, page, scale, sk)
+    except site_layout_paper.SheetError as e:
+        raise HTTPException(422, str(e))
+
+
+def _layout_sheet_file(S, ext):
+    tail = f"-1-{S['denom']}" if S.get("denom") else ""
+    safe = re.sub(r"[^A-Za-z0-9]+", "-", f"{S['location_id']} {S['phase']['name']}").strip("-")[:60]
+    return f"site-layout-{safe}-{S['page']}{tail}.{ext}"
+
+
+@app.get("/api/locations/{location_id}/site-layout/sheet")
+def site_layout_sheet_info(location_id: str, phase: Optional[str] = None):
+    """What the Print panel offers for a phase: the pages, each page's fitted scale, the scales and map styles. Nothing
+    drawn, no map fetched. Planner or admin."""
+    out = {"pages": [], "scales": list(site_layout_paper.SCALES), "styles": list(basemap.STYLES),
+           "style": site_layout_paper.DEFAULT_STYLE}
+    for pg in site_layout_paper.PAGES:
+        S = _layout_sheet(location_id, phase, pg, None, None)
+        out["pages"].append({"key": pg, "name": S["spec"]["name"], "fitted": S["denom"]})
+    return out
+
+
+def _layout_sheet_bytes(location_id, phase, page, scale, style, png):
+    """The sheet drawn ALONE (heavy_reads.solo, the drawing reads' name: both hold ezdxf / pyproj-sized memory)."""
+    S = _layout_sheet(location_id, phase, page, scale, style)
+    with heavy_reads.solo("site-layout-read", busy=lambda: HTTPException(
+            503, "Another site layout is being drawn. Try again in a minute.", headers={"Retry-After": "30"})):
+        try:
+            data = site_layout_paper.build_pdf(S)
+            if png:
+                data = site_layout_paper.build_png(data)
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+    return S, data
+
+
+@app.get("/api/locations/{location_id}/site-layout/sheet.pdf")
+def site_layout_sheet_pdf(location_id: str, phase: Optional[str] = None, page: str = "a3",
+                          scale: Optional[str] = None, style: Optional[str] = None):
+    """One phase of a site's layout as one landscape page (A3 or A4), at its stated scale when printed at 100 %:
+    `scale` = the N of 1:N (site_layout_paper.SCALES) or blank = fitted; `style` = light | streets | outdoors | aerial
+    (blank = streets). Security / CCTV symbols ARE printed: staff only. Stores nothing."""
+    from fastapi.responses import Response
+    S, data = _layout_sheet_bytes(location_id, phase, page, scale, style, False)
+    return Response(content=data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{_layout_sheet_file(S, "pdf")}"',
+                             "Cache-Control": "no-store"})
+
+
+@app.get("/api/locations/{location_id}/site-layout/sheet.png")
+def site_layout_sheet_png(location_id: str, phase: Optional[str] = None, page: str = "a3",
+                          scale: Optional[str] = None, style: Optional[str] = None):
+    """The same sheet as a PNG at 200 dpi for a Word document: the PDF page rasterised, so the two never differ."""
+    from fastapi.responses import Response
+    S, data = _layout_sheet_bytes(location_id, phase, page, scale, style, True)
+    return Response(content=data, media_type="image/png",
+                    headers={"Content-Disposition": f'attachment; filename="{_layout_sheet_file(S, "png")}"',
+                             "Cache-Control": "no-store"})
+
+
 @app.get("/api/site-layouts/map")
 def site_layouts_map(month: Optional[str] = None, request: Request = None):
     """The staff Route map's "Site layouts" layer: every site's phases that apply in `month` ('YYYY-MM', default this
@@ -5067,11 +5134,13 @@ class SiteLayoutPictureIn(BaseModel):
     name: Optional[str] = None
     phase_id: Optional[str] = None
     every: Optional[bool] = None
+    on_sheet: Optional[bool] = None   # 31 Oct 2026 (task 4c PR 5): "Print under the layout"
 
 
 @app.patch("/api/site-layouts/pictures/{picture_id}")
 def edit_site_layout_picture(picture_id: str, body: SiteLayoutPictureIn):
-    """Move a picture's corners, set its opacity, rename it or give it a phase / every phase. Carries its version: 409
+    """Move a picture's corners, set its opacity, rename it, give it a phase / every phase or tick it for the sheet.
+    Carries its version: 409
     when someone else saved first. Planner or admin."""
     _require_approver()
     sent = set(_fields_set(body))

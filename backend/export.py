@@ -2354,6 +2354,7 @@ def bulletin_charted(S):
 # in frame, what it is, the credit), the scale bar bottom right, the demo tag top left. The PNG for a Word document is
 # this page rasterised (route_map_png), so the two never differ. Staff only. Never a screenshot of the browser map.
 ROUTE_MAP_PANEL_MAX_PLACES = 16          # sites listed in the panel; more say "+N more sites"
+ROUTE_MAP_PANEL_MAX_LAYOUT = 12          # 31 Oct 2026 (4c PR 5): a site layout's styles listed; more say "+N more"
 ROUTE_MAP_PNG_DPI = 228                  # the frame (285 mm) comes out ≈ 2,560 px wide: the basemap's own @2x pixels
 
 
@@ -2422,6 +2423,21 @@ def _plan_panel(c, S, fw, fh, basemap_ok):
             items.append((10, site))
         if len(places) > len(shown):
             text(f"+{len(places) - len(shown)} more sites", R, 7.4, 9.2, GREY)
+    # 31 Oct 2026 (task 4c PR 5): the site's layout in the frame — its phase, then only the styles in view
+    LY = PL.get("layout")
+    if LY and LY.get("legend") is not None:
+        import site_layout_paper
+        gap(4)
+        text(f"Site layout · {LY['phase']}", B, 7.8, 10)
+        rows = LY["legend"]
+        for kd, key, label, sample in rows[:ROUTE_MAP_PANEL_MAX_LAYOUT]:
+            items.append((9.6, lambda x, y, kd=kd, key=key, label=label, sample=sample: (
+                site_layout_paper.draw_legend_swatch(c, kd, key, sample, x, y - 8.4, 14, 7),
+                c.setFillColorRGB(*NAVY_RGB), c.setFont(R, 7.4), c.drawString(x + 19, y - 7.4, _pdf_safe(label)[:40]))))
+        if len(rows) > ROUTE_MAP_PANEL_MAX_LAYOUT:
+            text(f"+{len(rows) - ROUTE_MAP_PANEL_MAX_LAYOUT} more on the site layout sheet", R, 7.2, 9, GREY)
+        if not rows:
+            text("Nothing of it inside this frame.", R, 7.2, 9, GREY)
     # 14 Oct 2026: the community considerations in the frame — only the kinds in view, each with its symbol
     CM = PL.get("community") or {}
     if CM.get("kinds") or CM.get("left_out"):
@@ -2637,6 +2653,11 @@ def build_route_map_pdf(S):
             x, y = basemap.project(v, lon, lat)
             return x * k, fh - y * k
         _draw_community(c, PL, P, "under")       # 14 Oct 2026: outlines and cycle routes under the routes
+        LY = PL.get("layout")
+        if LY and LY.get("things"):               # 31 Oct 2026 (task 4c PR 5): the site's layout, under the routes
+            import site_layout_paper
+            T = site_layout_paper.draw(c, LY["things"], P, k / basemap.m_per_px(v["lat"], v["zoom"]))
+            LY["legend"] = site_layout_paper.legend_rows(T, lambda x, y: 0 <= x <= fw and 0 <= y <= fh)
         _draw_bulletin_schematic(c, S, 0, 0, fw, fh, P=P)
         _draw_community(c, PL, P, "over")        # the symbols over them
         for sev in (3, 2, 1):                     # 16 Oct 2026 (CLOCS v5 C1): the collision history, KSI on top

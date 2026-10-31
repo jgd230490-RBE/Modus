@@ -397,7 +397,8 @@ def add(location_id, data, name, opts, by):
 
 
 def edit(pic_id, body, by):
-    """Change a picture's corners, opacity, name or phase (body carries its `version`). Returns the picture."""
+    """Change a picture's corners, opacity, name, phase or "Print under the layout" tick (`on_sheet`, task 4c PR 5) (body
+    carries its `version`). Returns the picture."""
     cur = _row(pic_id)
     try:
         v = int(body.get("version"))
@@ -415,6 +416,9 @@ def edit(pic_id, body, by):
     if body.get("name") is not None:
         sets.append("name = ?")
         params.append(_name(body["name"]))
+    if body.get("on_sheet") is not None:   # a Python bool: BOOLEAN on Postgres, never 1 / 0
+        sets.append("on_sheet = ?")
+        params.append(bool(SL._truthy(body["on_sheet"])))
     if body.get("every") is not None or body.get("phase_id") is not None:
         if body.get("every"):
             phase_id = None

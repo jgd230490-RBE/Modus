@@ -222,7 +222,7 @@ ok("7: the route sheet names the chosen style's layer and the fetch passes it",
    exp.count("before_layer=basemap.labels_layer()") == 2 and "basemap.LABELS_LAYER if overlays" not in exp)
 mn = read("backend", "main.py")
 ok("7: main.py: both map-export endpoints take `style`, validated before the read; blank = the tenant's setting",
-   mn.count("style: Optional[str] = None, request: Request = None):") == 2 and mn.count("sk = _export_style(style)") == 2
+   mn.count("style: Optional[str] = None, request: Request = None):") == 2 and mn.count("sk = _export_style(style)") == 3   # NARROWED 31 Oct 2026 (task 4c PR 5): + the site layout sheet
    and mn.count("with basemap.use(sk):") == 2
    and 'raise HTTPException(422, "style must be light, streets, outdoors or aerial")' in mn
    and "import basemap " in mn)
