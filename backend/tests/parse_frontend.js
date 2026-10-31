@@ -1507,7 +1507,11 @@ ok("...and it collapses with the rail like every other item (label behind railSh
 {
   const a0 = src.indexOf("// ================================================================= Abnormal loads (22 Oct 2026, S16 / B5)");
   const a1 = src.indexOf("// ================================================================= Public map\n");
-  const alSrc = a0 > 0 && a1 > a0 ? src.slice(a0, a1) : "";
+  // NARROWED 31 Oct 2026 (task 4a, PR 3a): the Plan → CLP documents section (between Pours and Stockpiles) is cut out of the
+  // slice — it has its own checks below, and "Approved by" is the right words for a CLP's issue
+  const c0 = src.indexOf("// ================================================================= Plan → CLP documents");
+  const c1 = src.indexOf("// ================================================================= Plan → Stockpiles");
+  const alSrc = a0 > 0 && a1 > a0 ? (c0 > a0 && c1 > c0 && a1 > c1 ? src.slice(a0, c0) + src.slice(c1, a1) : src.slice(a0, a1)) : "";
   const al = alSrc.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
   ok("⭐ AL: the page exists as one section before the Public map, with its component and its helpers", alSrc.length > 8000
      && /function AbnormalPage\(\{ meta, access, who \}\)/.test(al) && /function AlAdvice\(/.test(al) && /function alClass\(adv\)/.test(al));
@@ -1515,7 +1519,8 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   // NARROWED 29 Oct 2026 (task 3a): the Plan group goes on with Pours after Stockpiles
   ok("⭐ AL: a Plan-group rail item after the Carbon planner, its own line icon, and the page switch on a desk only (a phone gets the desk-only card)",
      // NARROWED 29 Oct 2026 (the Simulation's own page): + Simulation after Pours, the last of the Plan group
-     /\{ id: "abnormal", label: "Abnormal loads", glyph: "⬌" \},\s*(\/\/[^\n]*\s*)?\{ id: "stockpiles", label: "Stockpiles", glyph: "▲" \},\s*(\/\/[^\n]*\s*)?\{ id: "pours", label: "Pours", glyph: "◒" \},\s*(\/\/[^\n]*\s*)?\{ id: "simulation", label: "Simulation", glyph: "▶" \},\n  \]\},/.test(code) && /\n  abnormal: "M/.test(code)
+     // NARROWED 31 Oct 2026 (task 4a, PR 3a): + CLP documents after the Simulation, now the last
+     /\{ id: "abnormal", label: "Abnormal loads", glyph: "⬌" \},\s*(\/\/[^\n]*\s*)?\{ id: "stockpiles", label: "Stockpiles", glyph: "▲" \},\s*(\/\/[^\n]*\s*)?\{ id: "pours", label: "Pours", glyph: "◒" \},\s*(\/\/[^\n]*\s*)?\{ id: "simulation", label: "Simulation", glyph: "▶" \},\s*(\/\/[^\n]*\s*)?\{ id: "clp", label: "CLP documents", glyph: "▤" \},\n  \]\},/.test(code) && /\n  abnormal: "M/.test(code)
      && code.includes('{page === "abnormal" && !narrow && <AbnormalPage meta={meta} access={role} who={who} />}')
      && !/PHONE_PAGES = \[[^\]]*abnormal/.test(code));
   ok("🔴 AL: ONE read of the page (/abnormal), the preview from /abnormal/rules, and the writes: plan (POST), change (PUT), status, delete, the holidays fetch, the time bans",
@@ -4400,8 +4405,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      html.includes(".al-tbl td[data-al-actions]{white-space:nowrap;}"));
   const menus = (src.match(/<RowMenu name=\{[^}]+\}/g) || []);
   // NARROWED 29 Oct 2026 (task 3a): + Plan → Pours (Edit, Cancel the pour / Plan again, Delete…) — nine
+  // NARROWED 31 Oct 2026 (task 4a, PR 3a): + Plan → CLP documents — ten
   ok("⭐ 27 Oct: the '⋯' on six tables — Abnormal loads (with its note), Routes, Zones, the gates list, the logins, the demo leads, the teams",
-     menus.length === 9 && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
+     menus.length === 10 && src.includes('<RowMenu name={c.name + " · " + teamWord(c)}>') && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
      && src.includes("<RowMenu name={g.name || g.id}>") && (src.match(/<RowMenu name=\{u\.name\}>/g) || []).length === 2 && src.includes("<RowMenu name={t.label}>"), String(menus.length));
   ok("⭐ 27 Oct: Abnormal loads — one filled button for the forward step (AL_FORWARD: pending → approved → notified → moved; withdrawn → pending), the rest in the menu, Withdraw and Delete red and asking first",
      src.includes('const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved", withdrawn: "pending" };')
@@ -4411,8 +4417,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && src.includes('{canDelete(m) && <button type="button" disabled={busy} style={{ color: "var(--red)" }} onClick={() => del(m)}>Delete…</button>}')
      && src.includes('const withdraw = (m) => { if (!window.confirm(`Withdraw "${m.name}"?') && !src.includes('className="link-btn" disabled={busy} onClick={() => startEdit(m)}>Edit</button>'));
   // NARROWED 29 Oct 2026 (3b-2): 5 — + a Reinforcement ratios row on Config → Materials
+  // NARROWED 31 Oct 2026 (task 4a, PR 3a): 6 — + a stage row on Config → Planning → CLP document
   ok("27 Oct: a list row that only loses a line has a named '×' (.row-x): the time bans, the typed pinch points, the peak bands, a gate's shut times, a reinforcement ratio; no red Remove link is left",
-     (src.match(/className="row-x" aria-label=\{`Remove /g) || []).length === 5 && html.includes(".row-x{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;")
+     (src.match(/className="row-x" aria-label=\{`Remove /g) || []).length === 6 && html.includes(".row-x{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;")
      && !src.includes('className="link-btn" style={{ color: "var(--red)" }}') && !src.includes(">Remove</button>"));
   ok("27 Oct: the Routes column head is for a screen reader only; the Delete and Withdraw items end in an ellipsis because a confirm follows",
      src.includes('<th className="px-3 py-2 text-right font-semibold"><span className="sr-only">Actions</span></th>')
@@ -4572,6 +4579,51 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
     src.includes("{!zoneForm.location_id && <p className=\"text-[13px] text-amber-800\">\n                      Does nothing until it is <strong>attached to a route</strong>"));
   ok("SIM V2 polish: an area's coordinates open in the form rounded to 6 decimals (no float noise such as -0.8874029999999999)",
     src.includes('lat: a.point ? String(Math.round(a.point[1] * 1e6) / 1e6) : ""') && src.includes('lon: a.point ? String(Math.round(a.point[0] * 1e6) / 1e6) : ""'));
+}
+
+// 31 Oct 2026 (task 4a, PR 3a; the approved mockup notes\clp-screens-mockup-1031): Plan → CLP documents and Config's CLP stages
+{
+  const c0 = src.indexOf("// ================================================================= Plan → CLP documents");
+  const c1 = src.indexOf("// ================================================================= Plan → Stockpiles");
+  const cp = c0 > 0 && c1 > c0 ? src.slice(c0, c1) : "";
+  const cpx = cp.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n");
+  ok("⭐ CLP DOCS: the page is its own section (ClpPage), a Plan-group rail item after the Simulation for every login, desk only (a phone gets the desk-only card)",
+     cp.length > 6000 && /function ClpPage\(\{ access \}\)/.test(cp) && code.includes('{ id: "clp", label: "CLP documents", glyph: "▤" },')
+     && code.includes('{page === "clp" && !narrow && <ClpPage access={role} />}') && /\n  clp: "M/.test(code)
+     && !/PHONE_PAGES = \[[^\]]*clp/.test(code) && !/PHONE_READ_PAGES = \[[^\]]*clp/.test(code));
+  ok("⭐ CLP DOCS: ONE list read; the writes are the record's own calls (POST new, PATCH, DELETE, send, changes, approve) and the files are fetched as blobs (draft, issue)",
+     (cpx.match(/fetch\(`\$\{API\}\/clp\/documents`\)/g) || []).length === 1
+     && cpx.includes('send("POST", "/clp/documents", body') && cpx.includes('send("PATCH", `/clp/documents/${encodeURIComponent(c.id)}`, body')
+     && cpx.includes('send("DELETE", `/clp/documents/${encodeURIComponent(c.id)}`, null') && cpx.includes("/send`, { note: form.note || null }")
+     && cpx.includes("/changes`, { note: form.note || \"\" }") && cpx.includes("/approve`, { note: form.note || null }")
+     && cpx.includes('download(c, "draft.docx"') && cpx.includes("`issues/${i.no}.docx`") && cpx.includes("/approve-preview`)"));
+  ok("🔴 CLP DOCS: who may do what is the server's — the page reads access.can_approve; a team's body is the cover only; places and team only on a CLP Wayscope did not list",
+     cpx.includes("const appr = !!(access && access.can_approve);") && cpx.includes("const body = { cover: f.cover };")
+     && cpx.includes("if(!c || !c.auto){ body.location_ids = f.places; body.team = f.team || null; }")
+     && cpx.includes("const canEdit = appr || !!data.team;"));
+  ok("🔴 CLP DOCS: every failure goes through errSay (no status number, no raw reply on the page)",
+     (cpx.match(/errSay\(/g) || []).length >= 4 && !/\$\{e\}|e\.message|\.status\}|\(\$\{r\.status/.test(cpx));
+  const cpStrings = (cpx.match(/'[^'\n]*'|"[^"\n]*"|`[^`\n]*`/g) || []).concat(cpx.match(/>[^<>{}]+</g) || []);
+  const cpBanned = (x) => !x.includes("${API}") && x !== '"application/json"' && /\b(API|endpoint|server|backend|JSON|database|secure|real-time|predict\w*|optimi[sz]\w*|trucks?|IPT\d|token|cached)\b/i.test(x) || /\bAI\b/.test(x);
+  ok("🔴 CLP DOCS: none of the banned or back-end words, and no team id, in anything a person reads",
+     cpStrings.length > 60 && !cpStrings.some(x => cpBanned(x.replace(/\$\{API\}\/clp\/documents|"\/clp\/documents"|`\/clp\/documents[^`]*`/g, ""))),
+     cpStrings.filter(x => cpBanned(x.replace(/\$\{API\}\/clp\/documents|"\/clp\/documents"|`\/clp\/documents[^`]*`/g, ""))).join(" | "));
+  ok("CLP DOCS: the words — the status tones (Sent / Changes amber, Approved green), 'Approve as Issue N…', 'Building… about a minute', the blank-line rule, the exact-file promise",
+     cp.includes('const CLP_TONE = { draft: "none", sent: "warn", changes: "warn", approved: "ok" };') && cp.includes("Approve as Issue {c.next_issue}…")
+     && cp.includes('const busyWords = "Building… about a minute";') && cp.includes('Anything left blank stays a yellow "To complete" line.')
+     && cp.includes("Download gives back the file exactly as approved."));
+  ok("CLP DOCS: the editor's CSS lives in the page (.clp-form grid, .clp-places)", html.includes(".clp-form{") && html.includes(".clp-places"));
+  // Config → Planning → CLP document
+  const cf = src.slice(src.indexOf('data-cfg="clp-stages"') - 2500, src.indexOf('data-cfg="clp-stages"') + 6000);
+  ok("⭐ CLP STAGES: Config → Planning has the CLP document card — the programme type, the stages table (No., name, the kinds of work), + Add a stage up to 8, the template's stages from meta until changed",
+     src.includes('data-cfg="clp-stages"') && cf.includes('const DEF = (meta && meta.clp_stage_defaults) || {};')
+     && cf.includes('{[["infrastructure", "Infrastructure"], ["building", "Building"]].map(') && cf.includes("{stages.length < 8 && (")
+     && cf.includes(">+ Add a stage</button>") && cf.includes("Up to 8. A kind of work in no stage gets a stage of its own after the last.")
+     && cf.includes('const prefix = prog === "building" ? "3.1" : "3.2";'));
+  ok("CLP STAGES: a kind of work shows by its label only (an unknown one is kept but not shown: never an id on screen); a kind of work is offered for one stage only",
+     cf.includes('const dLabel = (id) => (discs.find(x => x.id === id) || {}).label || "";')
+     && cf.includes("(st.disciplines || []).filter(dd => discs.some(x => x.id === dd)).map(dd => (")
+     && cf.includes("discs.filter(x => !used.has(x.id)).map(x => <option key={x.id} value={x.id}>{x.label}</option>)"));
 }
 
 console.log();

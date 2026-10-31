@@ -959,7 +959,8 @@ def build(data, impact="higher", pictures=True, acc=None):
     D.h("2.3.3 Bus routes", 3)
     if C.get("stored"):
         D.p(f"{n(C['bus_stops'])} bus stop{'s' if C['bus_stops'] != 1 else ''} {strip_words}"
-            + (f", {n(C['bus_stops_near_sites'])} of them nearest {sites_word}." if C["bus_stops"] else "."))
+            # 31 Oct 2026 (PR 3a): "0 of them nearest this site" read oddly (live L019) — the clause only when some are
+            + (f", {n(C['bus_stops_near_sites'])} of them nearer {sites_word} than any route." if C["bus_stops_near_sites"] else "."))
     D.todo("the bus routes affected, and the precautions taken.", "2.3.3")
     D.h("2.3.4 Cycling", 3)
     if C.get("stored"):

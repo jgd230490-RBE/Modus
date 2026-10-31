@@ -1297,6 +1297,8 @@ def meta(request: Request = None):
         "materials": conversions.material_names(factors),
         # 29 Oct 2026 (3b): kept for old lines, left out of the pickers for new ones
         "retired_materials": conversions.retired_materials(factors),
+        # 31 Oct 2026 (task 4a, PR 3a): the CLP template's stages for each programme type, shown on Config until changed
+        "clp_stage_defaults": clp_doc.DEFAULT_STAGES,
         # every vehicle in the live document, unchanged and in its own order: baked
         # geometry is keyed on vehicle_profile and every saved line names a vehicle, so a
         # list that dropped one would strand those routes and lines.

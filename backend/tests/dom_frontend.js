@@ -1734,7 +1734,8 @@ async function phoneShellDom(){
      // NARROWED 27 Oct 2026 (stockpile forecast, D4 a): + Stockpiles, a Plan-group desk page a team reads
      // NARROWED 29 Oct 2026 (task 3a): + Pours, a Plan-group desk page a team plans on its own lines
      // NARROWED 29 Oct 2026 (the Simulation's own page): Simulation first, under "Read here, plan on a desktop"; the desk pages under "Made for a desktop"
-     && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Simulation|Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours"
+     // NARROWED 31 Oct 2026 (task 4a, PR 3a): + CLP documents, a Plan-group desk page every login has (a team: its own CLPs)
+     && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Simulation|Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours|CLP documents"
      && [...sheet().querySelectorAll("h3")].map(h => h.textContent).join("|") === "Read here, plan on a desktop|Made for a desktop"
      && !!sheet().querySelector('a[href^="/help/?role="][target="_blank"]'));
   ok("PHONE: ...a team code's sheet holds no Data or Config page (the role's own pages only)", !/Locations|Routes|Zones|Config/.test(sheet().textContent));
@@ -1768,7 +1769,8 @@ async function phoneShellDom(){
      // NARROWED 27 Oct 2026 (stockpile forecast): + Stockpiles after Abnormal loads
      // NARROWED 29 Oct 2026 (task 3a): + Pours after Stockpiles
      // NARROWED 29 Oct 2026 (the Simulation's own page): + Simulation first (it reads on a phone)
-     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Simulation|Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours|Locations|Routes|Zones|Config");
+     // NARROWED 31 Oct 2026 (task 4a, PR 3a): + CLP documents after Pours
+     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Simulation|Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours|CLP documents|Locations|Routes|Zones|Config");
   ok("PHONE (with G3): ...and with no Users item, the Users page cannot be reached on a phone by a planner",
      ![...p.el.querySelectorAll("#phone-more button.phone-more-item")].some(b => /Users/.test(b.textContent)));
   click([...p.el.querySelectorAll("#phone-more button.phone-more-item")].find(b => /Config/.test(b.textContent)));
@@ -2852,6 +2854,98 @@ async function todayFitDom(){
   }
 }
 
+// ---- 31 Oct 2026 (task 4a, PR 3a): Plan → CLP documents, mounted — a team sees its own, a planner all and approves ----
+async function clpDocsDom(){
+  const FIELDS = [["address", "Site address"], ["postcode", "Postcode"], ["landowner", "Landowner"], ["site_use", "What the site is for"],
+    ["summary", "Summary"], ["manager_name", "Site manager"], ["manager_phone", "Site manager's phone"], ["manager_email", "Site manager's email"],
+    ["provider_name", "Logistics provider"], ["provider_phone", "Logistics provider's phone"], ["provider_email", "Logistics provider's email"]]
+    .map(([key, label]) => ({ key, label }));
+  const row = (id, team, team_name, status, extra) => ({ id, name: "Tilton Viaduct site", auto: id.startsWith("auto-"), saved: false,
+    location_ids: ["L019"], places: [{ id: "L019", name: "Tilton Viaduct site", type: "site" }], types: ["site"], team, team_name,
+    impact: "higher", cover: {}, cover_typed: 0, cover_total: 11, status, status_word: { draft: "Draft", sent: "Sent", changes: "Changes asked", approved: "Approved" }[status],
+    sent_by: null, sent_at: null, sent_note: null, changes_by: null, changes_at: null, changes_note: null, updated_at: null,
+    busiest_month: 7, busiest_label: "Apr 2027", issues: 0, last_issue: null, next_issue: 1, ...(extra || {}) });
+  const ALL = [row("auto-L019-IPT1", "IPT1", "North Team", "sent", { saved: true, sent_by: "Nora North", sent_at: "2026-10-31T09:00:00Z", sent_note: "Ready",
+                   issues: 1, last_issue: { no: 1, date: "2026-10-20", by: "Pat Planner" }, next_issue: 2, cover: { postcode: "LE7 9XX", landowner: "Fictional Estates" }, cover_typed: 2 }),
+               row("auto-L019-all", null, null, "draft"),
+               row("auto-L019-IPT2", "IPT2", "Central Team", "approved", { issues: 1, last_issue: { no: 1, date: "2026-10-25", by: "Pat Planner" }, next_issue: 2 })];
+  const base = { cover_fields: FIELDS, places: [{ id: "L019", name: "Tilton Viaduct site", type: "site" }, { id: "L006", name: "Langton Compound", type: "compound" }],
+    teams: [{ id: "IPT1", name: "North Team" }, { id: "IPT2", name: "Central Team" }],
+    statuses: ["draft", "sent", "changes", "approved"].map(k => ({ key: k, word: { draft: "Draft", sent: "Sent", changes: "Changes asked", approved: "Approved" }[k] })) };
+  const listFor = (acc) => acc.ipt ? { ...base, clps: ALL.filter(c => c.team === acc.ipt), can_approve: false, team: acc.ipt, team_name: "North Team" }
+                                   : { ...base, clps: ALL, can_approve: true, team: null, team_name: null };
+  const calls = []; let acc = plannerAcc;
+  w.fetch = (url, opt) => {
+    const method = (opt && opt.method) || "GET"; calls.push({ url, method, body: opt && opt.body ? JSON.parse(opt.body) : null });
+    if (url === "/api/clp/documents" && method === "GET") return reply(200, listFor(acc));
+    if (/\/approve-preview$/.test(url)) return reply(200, { id: "auto-L019-IPT1", next_issue: 2, last_issue: { no: 1, date: "2026-10-20" }, sent: true,
+      sent_by: "Nora North", sent_at: "2026-10-31T09:00:00Z", sent_note: "Ready", changes: ["Lorry trips 1,695 → 1,820", "Postcode typed"] });
+    if (/\/approve$/.test(url) && method === "POST") return reply(200, { ok: true, issue_no: 2 });
+    if (/\/send$/.test(url) && method === "POST") return reply(200, { ok: true });
+    if (/^\/api\/clp\/documents\/[^/]+$/.test(url) && method === "PATCH") return reply(200, { ok: true });
+    return reply(404, { detail: "no" });
+  };
+  const mount = async (role) => { acc = role; calls.length = 0; const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+    await act(async () => { r.render(w.React.createElement(w.ClpPage, { access: role })); }); await settle(20);
+    return { el, done: async () => { await act(async () => { r.unmount(); }); el.remove(); } }; };
+  const TEAM_N = { role: "ipt", label: "North Team", ipt: "IPT1", can_approve: false, ipt_locked: true, ipt_required: false, demo: false, ipts: ["IPT1", "IPT2"] };
+  const rows = (el) => [...el.querySelectorAll("[data-clp-row]")];
+  const press = async (b) => { await act(async () => { b.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); await settle(10); };
+  const byText = (el, re) => [...el.querySelectorAll("button")].find(b => re.test(b.textContent.trim()));
+
+  // -- a planner: every CLP, the filters, + New CLP; the sent one first with "Approve as Issue 2…"
+  const p = await mount(plannerAcc);
+  ok("⭐ CLP DOCS DOM: a planner — ONE read of /api/clp/documents, the header, + New CLP, the Team and Status filters, every team's row (3)",
+     calls.filter(c => c.url === "/api/clp/documents").length === 1 && p.el.querySelector("h2").textContent === "CLP documents"
+     && !!p.el.querySelector("[data-clp-add]") && !!p.el.querySelector("[data-clp-filters]") && rows(p.el).length === 3);
+  ok("⭐ CLP DOCS DOM: the sent row's next step is 'Approve as Issue 2…'; the others' is Download draft; the Covers column names the team or All teams, never an id; the Cover column counts typed details",
+     rows(p.el)[0].querySelector("[data-clp-primary]").textContent === "Approve as Issue 2…"
+     && rows(p.el)[1].querySelector("[data-clp-primary]").textContent === "Download draft"
+     && rows(p.el).map(r => r.querySelectorAll("td")[1].textContent).join("|") === "North Team|All teams|Central Team"
+     && rows(p.el)[0].querySelectorAll("td")[4].textContent === "2 of 11" && !/IPT\d/.test(p.el.textContent),
+     rows(p.el).map(r => r.querySelectorAll("td")[1].textContent).join("|"));
+  const teamSel = p.el.querySelector("[data-clp-filters] select");
+  await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set; set.call(teamSel, "IPT2"); teamSel.dispatchEvent(new w.Event("change", { bubbles: true })); });
+  ok("CLP DOCS DOM: the Team filter narrows the list to that team's CLP", rows(p.el).length === 1 && rows(p.el)[0].getAttribute("data-clp-row") === "auto-L019-IPT2");
+  await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set; set.call(teamSel, ""); teamSel.dispatchEvent(new w.Event("change", { bubbles: true })); });
+  await press(rows(p.el)[0].querySelector("[data-clp-primary]"));
+  const card = () => p.el.querySelector("[data-clp-approve]");
+  ok("⭐ CLP DOCS DOM: Approve opens the card: who sent it and their note, what changed since Issue 1 (the server's words), Approve and issue",
+     !!card() && calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1/approve-preview" && c.method === "GET")
+     && card().textContent.includes("From Nora North") && card().textContent.includes("“Ready”")
+     && [...card().querySelectorAll("[data-clp-changes] li")].map(l => l.textContent).join("|") === "Lorry trips 1,695 → 1,820|Postcode typed"
+     && !!card().querySelector("[data-clp-approve-go]") && !card().querySelector("[data-clp-approve-go]").disabled);
+  const ta = card().querySelector("#clp-anote");
+  await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value").set; set.call(ta, "Agreed at the meeting"); ta.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  await press(card().querySelector("[data-clp-approve-go]"));
+  ok("⭐ CLP DOCS DOM: Approve and issue POSTs the note to /approve, says 'Approved as Issue 2.' and reads the list again",
+     calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1/approve" && c.method === "POST" && c.body && c.body.note === "Agreed at the meeting")
+     && p.el.textContent.includes("Approved as Issue 2.") && calls.filter(c => c.url === "/api/clp/documents").length === 2 && !card());
+  await p.done();
+
+  // -- a team: its own CLP only, no filters, no + New CLP, no Covers column; the menu edits the cover and sends
+  const t = await mount(TEAM_N);
+  ok("⭐ CLP DOCS DOM: a team — its own team's CLP only, the team named in the header, no + New CLP, no filters, no Covers or Cover column",
+     rows(t.el).length === 1 && rows(t.el)[0].getAttribute("data-clp-row") === "auto-L019-IPT1" && !t.el.querySelector("[data-clp-add]")
+     && !t.el.querySelector("[data-clp-filters]") && t.el.querySelector("header, [data-page='clp']").textContent.includes("North Team")
+     && t.el.querySelectorAll("[data-clp-table] thead th").length === 4 && !/IPT\d/.test(t.el.textContent));
+  ok("CLP DOCS DOM: a team's next step is Download draft (never Approve), its menu holds Edit cover details and Send for approval (sent), no Delete",
+     rows(t.el)[0].querySelector("[data-clp-primary]").textContent === "Download draft"
+     && !!byText(t.el, /^Edit cover details$/) && !!byText(t.el, /^Send for approval \(sent\)$/) && !byText(t.el, /^(Delete…|Clear typed details…|Approve as Issue)/));
+  await press(rows(t.el)[0].querySelector("button.row-open"));
+  const ed = () => t.el.querySelector("[data-clp-editor]");
+  ok("⭐ CLP DOCS DOM: a team's editor is the eleven cover details only (no Name, Covers, Impact or Places), the typed ones filled in",
+     !!ed() && !ed().querySelector("#clp-name, #clp-team, [data-clp-places]") && ed().querySelectorAll("[data-clp-cover] input, [data-clp-cover] textarea").length === 11
+     && ed().querySelector("#clp-c-postcode").value === "LE7 9XX");
+  const lo = ed().querySelector("#clp-c-landowner");
+  await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set; set.call(lo, "Fictional Estates Ltd"); lo.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  await press(ed().querySelector("[data-clp-save]"));
+  ok("🔴 CLP DOCS DOM: a team's Save PATCHes the cover ONLY (no name, places, team or impact in the body)",
+     calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1" && c.method === "PATCH" && c.body && Object.keys(c.body).join(",") === "cover"
+                     && c.body.cover.landowner === "Fictional Estates Ltd" && c.body.cover.postcode === "LE7 9XX"));
+  await t.done();
+}
+
 (async () => {
   try { await routesDriversDom(); ok("ROUTES DOM: the section ran to the end", true); }
   catch (e) { ok("ROUTES DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
@@ -2892,6 +2986,9 @@ async function todayFitDom(){
   catch (e) { ok("AL DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   try { await abnormalScreensDom(); ok("AL2 DOM: the section ran to the end", true); }
   catch (e) { ok("AL2 DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  // 31 Oct 2026 (task 4a, PR 3a): Plan → CLP documents
+  try { await clpDocsDom(); ok("CLP DOCS DOM: the section ran to the end", true); }
+  catch (e) { ok("CLP DOCS DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   // 22 Oct 2026 (UI fix 6, card 5): the big screen's Today list fitted to its box
   try { await todayFitDom(); ok("TODAY FIT: the section ran to the end", true); }
   catch (e) { ok("TODAY FIT: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }

@@ -743,6 +743,11 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .pour-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 14px;margin-top:8px;}
   .pour-fld label{display:block;font-size:13px;color:var(--muted);margin-bottom:2px;}
   .pour-wide{grid-column:span 4;}
+  /* 31 Oct 2026 (task 4a, PR 3a): Plan → CLP documents — the editor's fields and the places by group */
+  .clp-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 14px;margin-top:8px;}
+  .clp-fld label,.clp-fld legend{display:block;font-size:13px;color:var(--muted);margin-bottom:2px;}
+  .clp-wide{grid-column:1 / -1;}
+  .clp-places{margin-bottom:6px;}
   .pour-figs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:4px 0 10px;}
   .pour-figs div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;}
   .pour-figs b{display:block;font-size:20px;line-height:1.2;font-variant-numeric:tabular-nums;color:var(--ink);}
@@ -4745,6 +4750,280 @@ function PoursPage({ meta, access, who }){
   );
 }
 
+// ================================================================= Plan → CLP documents (31 Oct 2026, task 4a, PR 3a)
+// The approved mockup notes\clp-screens-mockup-1031\ (John, 31 Oct: "each section only see their clp but planners and admins see
+// all and are able to edit and approve it", Q1–Q11 as recommended). One row a CLP: an every-team CLP for each compound, site and
+// stockpile and one for each team with lorries there (the server lists them; opening the page writes nothing), plus any made with
+// + New CLP. A team login sees its own team's only. One filled button a row (Approve as Issue N… when sent, else Download draft) and
+// the "⋯" menu. The server builds every file (one at a time across the app); this page never works a figure out.
+const CLP_TONE = { draft: "none", sent: "warn", changes: "warn", approved: "ok" };
+const CLP_GROUPS = [["Sites and compounds", ["Site", "Compound"]], ["Stockpiles and holding areas", ["Stockpile", "Holding area"]]];
+const clpDay = (iso) => iso ? longDate(String(iso).slice(0, 10)) : "";
+function clpGroupOf(type){ const g = CLP_GROUPS.find(([, ts]) => ts.includes(type)); return g ? g[0] : "Quarries, plants and others"; }
+function ClpPage({ access }){
+  const appr = !!(access && access.can_approve);
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [tick, setTick] = useState(0);
+  const [fTeam, setFTeam] = useState("");
+  const [fStatus, setFStatus] = useState("");
+  const [panel, setPanel] = useState(null);       // null | { kind: "edit" | "new" | "send" | "approve" | "changes" | "history", clp }
+  const [form, setForm] = useState({});
+  const [pv, setPv] = useState(null);             // the approve card's preview, or the history
+  const [building, setBuilding] = useState("");   // the id whose file is being made
+  const [note, setNote] = useState(null);
+  const headRef = useRef(null);
+  useEffect(() => {
+    let live = true;
+    fetch(`${API}/clp/documents`).then(okJSON).then(d => { if(live){ setData(d); setErr(""); } })
+      .catch(e => { if(live) setErr(errSay("The CLPs did not load.", e)); });
+    return () => { live = false; };
+  }, [tick]);
+  useEffect(() => { if(panel && headRef.current) headRef.current.focus(); }, [panel]);
+  const say = (ok, text) => { setNote({ ok, text }); if(ok) setTimeout(() => setNote(null), 3000); };
+  if(err) return <div className="max-w-7xl mx-auto p-6"><EmptyState kind="error" title="Couldn't open the CLPs" body={err} action={<button type="button" className="btn-sec" onClick={() => setTick(t => t + 1)}>Try again</button>} /></div>;
+  if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;
+  const fields = data.cover_fields || [];
+  const teamWord = (c) => c.team_name || "All teams";
+  const list = (data.clps || []).filter(c => (!fTeam || (fTeam === "all" ? !c.team : c.team === fTeam)) && (!fStatus || c.status === fStatus));
+  const close = () => { setPanel(null); setPv(null); };
+  const send = (method, path, body, what, done) => fetch(`${API}${path}`, { method, headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined }).then(okJSON)
+    .then(() => { say(true, done || "Saved."); setTick(t => t + 1); return true; })
+    .catch(e => { say(false, errSay(what, e)); return false; });
+  const download = async (c, path, what) => {
+    setBuilding(c.id); setNote(null);
+    try {
+      const r = await fetch(`${API}/clp/documents/${encodeURIComponent(c.id)}/${path}`);
+      if(!r.ok) throw await errFrom(r);
+      const blob = await r.blob();
+      const fm = (r.headers.get("content-disposition") || "").match(/filename="([^"]+)"/);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = fm ? fm[1] : "CLP.docx";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ say(false, errSay(what, e)); }
+    setBuilding("");
+  };
+  const draft = (c) => download(c, "draft.docx", "The draft was not made.");
+  const openEdit = (c) => {
+    setPv(null);
+    setPanel({ kind: c ? "edit" : "new", clp: c });
+    setForm(c ? { name: c.name, team: c.team || "", impact: c.impact, places: [...c.location_ids], cover: { ...(c.cover || {}) } }
+              : { name: "", team: "", impact: "higher", places: [], cover: {} });
+  };
+  const openSend = (c) => { setPv(null); setPanel({ kind: "send", clp: c }); setForm({ note: c.sent_note || "" }); };
+  const openChanges = (c) => { setPv(null); setPanel({ kind: "changes", clp: c }); setForm({ note: "" }); };
+  const openApprove = (c) => {
+    setPanel({ kind: "approve", clp: c }); setForm({ note: "" }); setPv(null);
+    fetch(`${API}/clp/documents/${encodeURIComponent(c.id)}/approve-preview`).then(okJSON).then(setPv)
+      .catch(e => setPv({ problem: errSay("What changed could not be worked out.", e) }));
+  };
+  const openHistory = (c) => {
+    setPanel({ kind: "history", clp: c }); setPv(null);
+    fetch(`${API}/clp/documents/${encodeURIComponent(c.id)}/history`).then(okJSON).then(setPv)
+      .catch(e => setPv({ problem: errSay("The history did not load.", e) }));
+  };
+  const save = () => {
+    const c = panel.clp, f = form;
+    const body = { cover: f.cover };
+    if(appr){
+      body.name = f.name; body.impact = f.impact;
+      if(!c || !c.auto){ body.location_ids = f.places; body.team = f.team || null; }
+    }
+    const go = panel.kind === "new" ? send("POST", "/clp/documents", body, "The CLP was not made.", "CLP made.")
+                                    : send("PATCH", `/clp/documents/${encodeURIComponent(c.id)}`, body, "The CLP was not saved.");
+    go.then(ok => { if(ok) close(); });
+  };
+  const doSend = () => send("POST", `/clp/documents/${encodeURIComponent(panel.clp.id)}/send`, { note: form.note || null },
+    "The CLP was not sent.", "Sent for approval.").then(ok => { if(ok) close(); });
+  const doChanges = () => send("POST", `/clp/documents/${encodeURIComponent(panel.clp.id)}/changes`, { note: form.note || "" },
+    "The CLP was not sent back.", "Sent back to the team.").then(ok => { if(ok) close(); });
+  const doApprove = () => {
+    const c = panel.clp;
+    setBuilding(c.id);
+    send("POST", `/clp/documents/${encodeURIComponent(c.id)}/approve`, { note: form.note || null }, "The CLP was not approved.",
+         `Approved as Issue ${c.next_issue}.`).then(ok => { setBuilding(""); if(ok) close(); });
+  };
+  const remove = (c) => {
+    const ask = c.auto ? `Clear what was typed for "${c.name}"? It stays in the list, blank.` : `Delete the CLP "${c.name}"? This cannot be undone.`;
+    if(window.confirm(ask)) send("DELETE", `/clp/documents/${encodeURIComponent(c.id)}`, null, "The CLP was not deleted.", c.auto ? "Cleared." : "Deleted.");
+  };
+  const setCover = (k, v) => setForm(f => ({ ...f, cover: { ...f.cover, [k]: v } }));
+  const togglePlace = (id) => setForm(f => ({ ...f, places: f.places.includes(id) ? f.places.filter(x => x !== id) : [...f.places, id] }));
+  const busyWords = "Building… about a minute";
+  const canEdit = appr || !!data.team;      // a sign-in with no team that cannot approve only reads
+  const editor = panel && (panel.kind === "edit" || panel.kind === "new") && (() => {
+    const c = panel.clp, fixed = !!(c && c.auto), full = appr;
+    const byGroup = {};
+    (data.places || []).forEach(p => { const g = clpGroupOf(p.type); (byGroup[g] = byGroup[g] || []).push(p); });
+    return (
+      <div className="card p-4 mb-4" data-clp-editor="1">
+        <h2 className="text-lg font-semibold text-slate-800 mb-1" tabIndex={-1} ref={headRef}>
+          {panel.kind === "new" ? "New CLP" : `${c.name} · ${teamWord(c)}`}</h2>
+        {full && (
+          <div className="clp-form">
+            <div className="clp-fld clp-wide"><label htmlFor="clp-name">Name</label>
+              <input id="clp-name" className="ctl w-full" value={form.name} maxLength={120} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+            <div className="clp-fld"><label htmlFor="clp-team">Covers</label>
+              <select id="clp-team" className="ctl w-full" value={form.team} disabled={fixed} onChange={e => setForm(f => ({ ...f, team: e.target.value }))}>
+                <option value="">All teams</option>
+                {(data.teams || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select></div>
+            <fieldset className="clp-fld"><legend>Impact</legend>
+              <div className="flex gap-4 text-sm">{[["higher", "Higher"], ["medium", "Medium"]].map(([v, l]) => (
+                <label key={v} className="inline-flex items-center gap-1.5"><input type="radio" name="clp-impact" checked={form.impact === v} onChange={() => setForm(f => ({ ...f, impact: v }))} /> {l}</label>))}</div>
+            </fieldset>
+            <fieldset className="clp-fld clp-wide" data-clp-places="1"><legend>Places</legend>
+              {fixed ? <p className="text-sm text-slate-600">{c.places.map(p => p.name).join(", ")}<span className="block text-[13px] text-slate-500">Listed by Wayscope for this place. Use + New CLP for another set.</span></p>
+                : ["Sites and compounds", "Stockpiles and holding areas", "Quarries, plants and others"].filter(g => byGroup[g]).map(g => (
+                  <div key={g} className="clp-places"><div className="clp-sub">{g}</div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">{byGroup[g].map(p => (
+                      <label key={p.id} className="inline-flex items-center gap-1.5 text-sm"><input type="checkbox" checked={form.places.includes(p.id)} onChange={() => togglePlace(p.id)} /> {p.name}</label>))}</div>
+                  </div>))}
+            </fieldset>
+          </div>
+        )}
+        <div className="clp-form" data-clp-cover="1">
+          {fields.map(({ key, label }) => (
+            <div key={key} className={"clp-fld" + (key === "summary" ? " clp-wide" : "")}><label htmlFor={"clp-c-" + key}>{label}</label>
+              {key === "summary"
+                ? <textarea id={"clp-c-" + key} className="ctl w-full" rows={2} maxLength={1200} value={form.cover[key] || ""} onChange={e => setCover(key, e.target.value)} />
+                : <input id={"clp-c-" + key} className="ctl w-full" maxLength={400} value={form.cover[key] || ""} onChange={e => setCover(key, e.target.value)} />}
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <button type="button" className="btn-pri" onClick={save} data-clp-save="1">Save</button>
+          <button type="button" className="btn-sec" onClick={close}>Cancel</button>
+          <span className="text-[13px] text-slate-500">Anything left blank stays a yellow "To complete" line.</span>
+        </div>
+      </div>
+    );
+  })();
+  const noteCard = panel && (panel.kind === "send" || panel.kind === "changes") && (
+    <div className="card p-4 mb-4" data-clp-note={panel.kind}>
+      <h2 className="text-lg font-semibold text-slate-800 mb-2" tabIndex={-1} ref={headRef}>
+        {panel.kind === "send" ? "Send for approval" : "Ask for changes"} · {panel.clp.name} · {teamWord(panel.clp)}</h2>
+      <label htmlFor="clp-note" className="block text-[13px] text-slate-500 mb-1">{panel.kind === "send" ? "A note for the approver (optional)" : "What needs changing"}</label>
+      <textarea id="clp-note" className="ctl w-full" rows={2} maxLength={1000} value={form.note || ""} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} />
+      <div className="flex flex-wrap items-center gap-2 mt-3">
+        <button type="button" className="btn-pri" onClick={panel.kind === "send" ? doSend : doChanges} disabled={panel.kind === "changes" && !(form.note || "").trim()}>
+          {panel.kind === "send" ? "Send for approval" : "Send back to the team"}</button>
+        <button type="button" className="btn-sec" onClick={close}>Cancel</button>
+        {panel.kind === "send" && <span className="text-[13px] text-slate-500">Planners and admins see it at the top of their list.</span>}
+      </div>
+    </div>
+  );
+  const approveCard = panel && panel.kind === "approve" && (
+    <div className="card p-4 mb-4" data-clp-approve="1">
+      <h2 className="text-lg font-semibold text-slate-800 mb-2" tabIndex={-1} ref={headRef}>Approve as Issue {panel.clp.next_issue} · {panel.clp.name} · {teamWord(panel.clp)}</h2>
+      {!pv ? <p className="text-sm text-slate-500">Working out what changed…</p> : pv.problem ? <p className="text-sm" style={{ color: "var(--bad-text)" }}>{pv.problem}</p> : (
+        <div className="text-sm">
+          {pv.sent && <p className="mb-2">From {pv.sent_by}, {clpDay(pv.sent_at)}{pv.sent_note ? <>: “{pv.sent_note}”</> : "."}</p>}
+          <p className="font-medium text-slate-700">{pv.last_issue ? `Changed in the plan since Issue ${pv.last_issue.no} (${clpDay(pv.last_issue.date)}):` : "The first issue."}</p>
+          {pv.last_issue && <ul className="list-disc pl-5 mt-1 text-slate-700" data-clp-changes="1">{(pv.changes || []).map((x, i) => <li key={i}>{x}</li>)}</ul>}
+        </div>
+      )}
+      <label htmlFor="clp-anote" className="block text-[13px] text-slate-500 mt-3 mb-1">Your note (optional, printed in the history)</label>
+      <textarea id="clp-anote" className="ctl w-full" rows={2} maxLength={1000} value={form.note || ""} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} />
+      <div className="flex flex-wrap items-center gap-2 mt-3">
+        <button type="button" className="btn-pri" onClick={doApprove} disabled={building === panel.clp.id || !pv || !!pv.problem} data-clp-approve-go="1">
+          {building === panel.clp.id ? busyWords : "Approve and issue"}</button>
+        {panel.clp.status === "sent" && <button type="button" className="btn-sec" onClick={() => openChanges(panel.clp)} disabled={building === panel.clp.id}>Ask for changes</button>}
+        <button type="button" className="btn-sec" onClick={close} disabled={building === panel.clp.id}>Cancel</button>
+        <span className="text-[13px] text-slate-500">Approving builds the file, keeps it as Issue {panel.clp.next_issue} and records who and when.</span>
+      </div>
+    </div>
+  );
+  const historyCard = panel && panel.kind === "history" && (
+    <div className="card p-4 mb-4" data-clp-history="1">
+      <h2 className="text-lg font-semibold text-slate-800 mb-2" tabIndex={-1} ref={headRef}>Document history · {panel.clp.name} · {teamWord(panel.clp)}</h2>
+      {!pv ? <p className="text-sm text-slate-500">Loading…</p> : pv.problem ? <p className="text-sm" style={{ color: "var(--bad-text)" }}>{pv.problem}</p>
+        : !(pv.issues || []).length ? <p className="text-sm text-slate-500">No issue yet.</p> : (
+        <div className="overflow-x-auto"><table className="tbl">
+          <thead><tr><th scope="col">Issue</th><th scope="col">Date</th><th scope="col">Sent by</th><th scope="col">Approved by</th><th scope="col">What changed</th><th scope="col"><span className="sr-only">Download</span></th></tr></thead>
+          <tbody>{pv.issues.map(i => (
+            <tr key={i.no}><td className="tabular-nums">{i.no}</td><td>{clpDay(i.date)}</td><td>{i.sent_by || "—"}</td><td>{i.approved_by || "—"}</td>
+              <td style={{ whiteSpace: "normal", minWidth: 260 }}>{i.words}</td>
+              <td><button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "4px 10px" }} aria-label={`Download Issue ${i.no}`}
+                onClick={() => download(panel.clp, `issues/${i.no}.docx`, "The issue did not download.")}>Download</button></td></tr>))}</tbody>
+        </table></div>
+      )}
+      <p className="text-[13px] text-slate-500 mt-2">Download gives back the file exactly as approved.</p>
+      <button type="button" className="btn-sec mt-2" onClick={close}>Close</button>
+    </div>
+  );
+  const sub = (c) => [c.types.join(", "), appr ? (c.impact === "medium" ? "Medium impact" : "Higher impact") : null,
+                      c.busiest_label ? `busiest ${c.busiest_label}` : "no approved lorries"].filter(Boolean).join(" · ");
+  const statusLine = (c) => c.status === "sent" ? `by ${c.sent_by || "the team"} · ${clpDay(c.sent_at)}`
+    : c.status === "changes" ? (c.changes_note ? `“${c.changes_note}”` : "") : "";
+  const primary = (c) => {
+    if(building === c.id) return <button type="button" className="btn-sec" disabled>{busyWords}</button>;
+    if(appr && c.status === "sent") return <button type="button" className="btn-pri" onClick={() => openApprove(c)} data-clp-primary="approve">Approve as Issue {c.next_issue}…</button>;
+    return <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 12px" }} onClick={() => draft(c)} disabled={!!building} data-clp-primary="draft">Download draft</button>;
+  };
+  return (
+    <div className="max-w-7xl mx-auto p-6 pb-2" data-page="clp">
+      <PageHeader title="CLP documents" kicker="Plan"
+        subtitle={appr ? "A Construction Logistics Plan for any site or set of sites, filled from the plan." : "Your team's Construction Logistics Plans."}
+        actions={appr ? <button type="button" className="btn-pri" onClick={() => openEdit(null)} data-clp-add="1">+ New CLP</button>
+                      : (data.team_name ? <span className="row-st rs-none">{data.team_name}</span> : null)} />
+      {note && <p className="text-sm mb-3" style={{ color: note.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{note.text}</p>}
+      {editor}{noteCard}{approveCard}{historyCard}
+      {appr && (
+        <div className="flex flex-wrap items-center gap-3 mb-3 text-sm" data-clp-filters="1">
+          <label className="inline-flex items-center gap-1.5">Team
+            <select className="ctl" value={fTeam} onChange={e => setFTeam(e.target.value)}>
+              <option value="">Any</option><option value="all">All teams</option>
+              {(data.teams || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select></label>
+          <label className="inline-flex items-center gap-1.5">Status
+            <select className="ctl" value={fStatus} onChange={e => setFStatus(e.target.value)}>
+              <option value="">Any</option>{(data.statuses || []).map(s => <option key={s.key} value={s.key}>{s.word}</option>)}
+            </select></label>
+        </div>
+      )}
+      {!list.length ? (
+        <EmptyState kind={(data.clps || []).length ? "nomatch" : "none"} title={(data.clps || []).length ? "No CLP matches" : "No CLPs yet"}
+          body={(data.clps || []).length ? "Change the team or the status." : (appr ? "Add a compound, site or stockpile on Data → Locations, or make one with + New CLP." : "Your team has no lorries at a compound, site or stockpile yet.")} />
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="tbl" data-clp-table="1">
+            <thead><tr><th scope="col">CLP</th>{appr && <th scope="col">Covers</th>}<th scope="col">Status</th><th scope="col">Last issue</th>{appr && <th scope="col" className="num">Cover</th>}<th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+            <tbody>
+              {list.map(c => (
+                <tr key={c.id} data-clp-row={c.id}>
+                  <td style={{ whiteSpace: "normal", minWidth: 220 }}>
+                    {canEdit ? <button type="button" className="row-open" aria-label={`Edit ${c.name}`} onClick={() => openEdit(c)}>{c.name}</button>
+                             : <span className="font-medium text-slate-800">{c.name}</span>}
+                    <span className="block text-[12px] text-slate-500">{sub(c)}</span>
+                  </td>
+                  {appr && <td>{teamWord(c)}</td>}
+                  <td className="rd-status" style={{ whiteSpace: "normal" }}><RowStatus word={c.status_word} tone={CLP_TONE[c.status]} more={0} />
+                    {statusLine(c) && <span className="block text-[12px] text-slate-500">{statusLine(c)}</span>}</td>
+                  <td>{c.last_issue ? <>Issue {c.last_issue.no} · {clpDay(c.last_issue.date)}{appr && c.last_issue.by ? <span className="block text-[12px] text-slate-500">{c.last_issue.by}</span> : null}</> : "—"}</td>
+                  {appr && <td className="num tabular-nums">{c.cover_typed} of {c.cover_total}</td>}
+                  <td><div className="flex items-center gap-2 justify-end">{primary(c)}
+                    <RowMenu name={c.name + " · " + teamWord(c)}>
+                      {appr && c.status === "sent" && <button type="button" onClick={() => draft(c)} disabled={!!building}>Download draft</button>}
+                      {appr && c.status !== "sent" && <button type="button" onClick={() => openApprove(c)} disabled={!!building}>Approve as Issue {c.next_issue}…</button>}
+                      {appr && c.status === "sent" && <button type="button" onClick={() => openChanges(c)}>Ask for changes…</button>}
+                      {canEdit && <button type="button" onClick={() => openEdit(c)}>{appr ? "Edit" : "Edit cover details"}</button>}
+                      {!appr && data.team && <button type="button" onClick={() => openSend(c)}>{c.status === "sent" ? "Send for approval (sent)" : "Send for approval…"}</button>}
+                      {c.issues > 0 && <button type="button" onClick={() => openHistory(c)}>Document history</button>}
+                      {appr && c.issues === 0 && (!c.auto || c.saved) && <button type="button" style={{ color: "var(--red)" }} onClick={() => remove(c)}>{c.auto ? "Clear typed details…" : "Delete…"}</button>}
+                    </RowMenu></div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ================================================================= Plan → Stockpiles
 // 27 Oct 2026 (stockpile forecast, John's D4 a; the approved mockup notes\stockpile-forecast-mockup-1027\, card 1): one
 // place per stockpile for its plan — capacity and opening, the PLANNED USE by month ("Same each month from … to …"), a
@@ -6034,6 +6313,8 @@ const NAV = [
     { id: "pours", label: "Pours", glyph: "◒" },
     // 29 Oct 2026 (the user: "the simulation needs its own page now"): after the planning views; #simulation
     { id: "simulation", label: "Simulation", glyph: "▶" },
+    // 31 Oct 2026 (task 4a, PR 3a): the Construction Logistics Plans — every login; a team sees its own team's only
+    { id: "clp", label: "CLP documents", glyph: "▤" },
   ]},
   { group: "Track", items: [
     { id: "lookahead", label: "Look-ahead", glyph: "◔" },
@@ -6068,6 +6349,7 @@ const NAV_ICON = {
   pours: "M4 15h11l3-5h2v5h-1M4 15V9l6-3 5 3v6M7 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
   abnormal: "M4 14h16M6 14v3M18 14v3M3 17h2M8 17h8M19 17h2M5 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 14V8h10v6M2 11h3M19 11h3",
   simulation: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM10 8.5l6 3.5-6 3.5z",
+  clp: "M7 3h7l5 5v13H7zM14 3v5h5M10 12h6M10 15.5h6M10 19h4",
 };
 function NavIcon({ id }){
   return <svg className="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={NAV_ICON[id] || NAV_ICON.forecasts} /></svg>;
@@ -6414,6 +6696,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
         {page === "abnormal" && !narrow && <AbnormalPage meta={meta} access={role} who={who} />}
         {page === "stockpiles" && !narrow && <StockpilesPage meta={meta} access={role} who={who} />}
         {page === "pours" && !narrow && <PoursPage meta={meta} access={role} who={who} />}
+        {page === "clp" && !narrow && <ClpPage access={role} />}
         {/* 29 Oct 2026: the Simulation's own page; on a phone its read-only phone page (PhoneSimulation), never the desk-only card */}
         {page === "simulation" && !narrow && <SimulationPage meta={meta} months={meta.months} />}
         {page === "simulation" && narrow && <PhoneSimulation meta={meta} months={meta.months} />}
@@ -8030,6 +8313,65 @@ function ConfigPage({ meta, who, access }){
                   <div className="hint">{help}</div>
                 </div>
               ))}
+              {/* 31 Oct 2026 (task 4a, PR 3a; approved 30 Oct): the CLP document's programme type and its stages, each made of
+                  Wayscope's kinds of work (planning.clp; backend clp_doc.settings). Absent = the template's stages for the type
+                  (meta.clp_stage_defaults). Checked by the server on Save. */}
+              {(() => {
+                const DEF = (meta && meta.clp_stage_defaults) || {};
+                const cur = (doc.planning || {}).clp || null;
+                const prog = (cur && cur.programme) || "infrastructure";
+                const stages = (cur && cur.stages) || DEF[prog] || [];
+                const prefix = prog === "building" ? "3.1" : "3.2";
+                const discs = (meta && meta.disciplines) || [];
+                // a kind of work this organisation does not have is kept but not shown (never an id on screen)
+                const dLabel = (id) => (discs.find(x => x.id === id) || {}).label || "";
+                const used = new Set(stages.flatMap(st => st.disciplines || []));
+                // the first change copies the stages shown into planning.clp, so a planner edits what they see
+                const change = (fn) => upd(d => { d.planning = d.planning || {};
+                  const c = d.planning.clp = d.planning.clp || { programme: prog };
+                  if(!c.stages) c.stages = (DEF[c.programme || "infrastructure"] || []).map(x => ({ name: x.name, disciplines: [...(x.disciplines || [])] }));
+                  fn(c); c.stages.forEach((x, i) => { x.number = `${c.programme === "building" ? "3.1" : "3.2"}.${i + 1}`; }); });
+                return (
+                  <div className="field" data-cfg="clp-stages">
+                    <label>CLP document</label>
+                    <div className="flex items-center gap-4 text-sm mb-2" role="radiogroup" aria-label="Programme type">
+                      <span className="text-slate-600">Programme type</span>
+                      {[["infrastructure", "Infrastructure"], ["building", "Building"]].map(([v, l]) => (
+                        <label key={v} className="inline-flex items-center gap-1.5"><input type="radio" name="cfg-clp-prog" checked={prog === v}
+                          onChange={() => upd(d => { d.planning = d.planning || {}; d.planning.clp = { programme: v }; })} /> {l}</label>))}
+                    </div>
+                    <table className="tbl" data-clp-stage-table="1">
+                      <thead><tr><th scope="col">No.</th><th scope="col">Stage</th><th scope="col">Kinds of work in it</th><th scope="col"><span className="sr-only">Remove</span></th></tr></thead>
+                      <tbody>{stages.map((st, i) => (
+                        <tr key={i} data-clp-stage={i}>
+                          <td className="tabular-nums">{prefix}.{i + 1}</td>
+                          <td><input className="ctl w-full" value={st.name || ""} aria-label={`Stage ${i + 1} name`}
+                            onChange={e => { const v = e.target.value; change(c => { c.stages[i].name = v; }); }} /></td>
+                          <td style={{ whiteSpace: "normal" }}>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {(st.disciplines || []).filter(dd => discs.some(x => x.id === dd)).map(dd => (
+                                <span key={dd} className="row-st rs-none">{dLabel(dd)}
+                                  <button type="button" className="row-x" aria-label={`Take ${dLabel(dd)} out of stage ${i + 1}`} title="Remove"
+                                    onClick={() => change(c => { c.stages[i].disciplines = c.stages[i].disciplines.filter(x => x !== dd); })}></button></span>))}
+                              {discs.some(x => !used.has(x.id)) && (
+                                <select className="ctl" value="" aria-label={`Add a kind of work to stage ${i + 1}`}
+                                  onChange={e => { const v = e.target.value; if(v) change(c => { c.stages[i].disciplines = [...(c.stages[i].disciplines || []), v]; }); }}>
+                                  <option value="">+ Add</option>
+                                  {discs.filter(x => !used.has(x.id)).map(x => <option key={x.id} value={x.id}>{x.label}</option>)}
+                                </select>)}
+                            </div>
+                          </td>
+                          <td className="text-right"><button type="button" className="row-x" aria-label={`Remove stage ${i + 1}`} title="Remove"
+                            onClick={() => change(c => { c.stages.splice(i, 1); })} disabled={stages.length <= 1}></button></td>
+                        </tr>))}</tbody>
+                    </table>
+                    {stages.length < 8 && (
+                      <button type="button" className="btn-sec mt-2" style={{ width: "auto", height: "auto", padding: "5px 12px" }}
+                        onClick={() => change(c => { c.stages.push({ name: "", disciplines: [] }); })}>+ Add a stage</button>)}
+                    <div className="hint">Up to 8. A kind of work in no stage gets a stage of its own after the last.</div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

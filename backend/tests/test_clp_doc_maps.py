@@ -532,7 +532,8 @@ ok("2.3.1: the councils table, the limits, the closure and the diversion with it
    and "last checked 2026-10-29" in TX, "")
 ok("2.3.2–2.3.4: the station, the bus stops, the cycle routes, from the strip",
    "Yard Halt (200 m from R001)" in TX.replace("199 m", "200 m").replace("201 m", "200 m")
-   and "2 bus stops within 250 m of this plan's routes or 500 m of this site, 1 of them nearest this site." in TX
+   and "2 bus stops within 250 m of this plan's routes or 500 m of this site, 1 of them nearer this site than any route." in TX   # NARROWED 31 Oct 2026 (PR 3a): the clause reworded, and left out when none are
+   and "of them nearest" not in TX
    and "NCN 64, 1 unnamed cycle path" in TX, "")
 ok("2.4.1: one line a council, by name", sum(1 for t in P1 if t.startswith("To complete: Harborough: the code")) == 1
    and sum(1 for t in P1 if t.startswith("To complete: Rutland: the code")) == 1)
