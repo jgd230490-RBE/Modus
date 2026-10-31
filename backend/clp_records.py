@@ -537,13 +537,15 @@ def _issue_rows(clp_id):
                     (db.current_tenant(), clp_id))
 
 
-def _words_of(row):
+def _words_of(row, team_note=True):
+    """An issue's 'what changed' words. team_note=False for the Word file (John, 31 Oct): the file goes to the client's
+    reviewers, so it never prints the team's note to the approver — only the changes and the approver's note."""
     try:
         ch = json.loads(row.get("changes") or "[]")
     except (TypeError, ValueError):
         ch = []
     bits = ["; ".join(ch)] if ch else []
-    for k in ("sent_note", "approver_note"):
+    for k in (("sent_note", "approver_note") if team_note else ("approver_note",)):
         if (row.get(k) or "").strip():
             bits.append(row[k].strip())
     w = ". ".join(b.rstrip(".") for b in bits if b)
@@ -571,7 +573,7 @@ def doc_history(clp_id, extra=None):
     rows = []
     for r in _issue_rows(clp_id):
         rows.append({"no": r["issue_no"], "date": str(r["approved_at"])[:10], "by": r.get("approved_by"),
-                     "words": _words_of(r)})
+                     "words": _words_of(r, team_note=False)})
         rows += decided.get(r["issue_no"], [])
     if extra:
         rows.append(extra)
@@ -627,7 +629,7 @@ def approve(clp_id, note, acc, factors, working_days, build):
     sent_note = rec.get("sent_note") if rec["status"] == "sent" else None
     sent_by = rec.get("sent_by") if rec["status"] == "sent" else None
     this = {"no": no, "date": today, "by": by,
-            "words": _words_of({"changes": json.dumps(ch), "sent_note": sent_note, "approver_note": note})}
+            "words": _words_of({"changes": json.dumps(ch), "sent_note": sent_note, "approver_note": note}, team_note=False)}
     data["issue"] = {"no": no, "date": today, "by": by}
     data["history"] = doc_history(rec["id"], extra=this)
     body = build(data, rec)
