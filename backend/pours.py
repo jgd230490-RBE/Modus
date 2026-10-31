@@ -19,7 +19,9 @@ FLAGS (codes; the screens' words in WORDS)
   POUR_COLD_JOINT red    the face waits longer than the cold-joint gap (planning.pours.cold_joint_min, 30)
   POUR_TRANSIT    red    transit longer than planning.pours.transit_limit_min (120)
   POUR_SHORT      amber  fewer mixers booked than needed, no cold joint: the pour ends later
-  POUR_BAND       amber  mixers arriving at the gate in a no-delivery band or one of the gate's shut times (Q8)
+  POUR_BAND       amber  mixers arriving at the gate in a no-delivery band or one of the gate's shut times (Q8),
+                         or (31 Oct 2026, John: "your recommendation") reaching the PLANT's gate to load in one of
+                         its no-delivery times — the Simulation holds them there and they reach the site later
   POUR_OVER_PLAN  amber  the line's pours that month add up to more than the line's month (Q5)
 No plant output check (John, 29 Oct: "plant output not needed").
 
@@ -139,12 +141,15 @@ def limits_problem(v):
 
 # --------------------------------------------------------------------------------------------- the arithmetic
 def figures(m3, rate, start, m3_per_load, load_min, laden_min, check_in, washout, back_min, booked=None,
-            transit_limit=TRANSIT_DEFAULT, cold_joint=COLD_JOINT_DEFAULT, bands=None):
+            transit_limit=TRANSIT_DEFAULT, cold_joint=COLD_JOINT_DEFAULT, bands=None, plant_bands=None,
+            plant_check_in=0):
     """
     One pour's figures (minutes; `start` = minutes after midnight the first mixer starts discharging). Pure.
     `bands` = [(from_min, to_min)] when deliveries are barred at the gate (no-delivery bands, the gate's shut times).
+    `plant_bands` the same at the plant's gate, `plant_check_in` its check-in: each mixer reaches it loading +
+    drive + the plant's check-in before it reaches the site's gate (31 Oct 2026).
     Returns {loads, last_load_m3, gap, discharge, cycle, needed, needed_exact, transit, booked, real_gap, face_wait,
-    first_loads, last_arrives, ends, ends_planned, late_by, in_band, flags: [{code, text}]}.
+    first_loads, last_arrives, ends, ends_planned, late_by, in_band, in_band_plant, flags: [{code, text}]}.
     """
     m3, rate, m3_per_load = float(m3), float(rate), float(m3_per_load)
     loads = max(1, math.ceil(m3 / m3_per_load - EPS))
@@ -168,6 +173,8 @@ def figures(m3, rate, start, m3_per_load, load_min, laden_min, check_in, washout
     # the gate sees each mixer check-in minutes before it starts discharging
     at_gate = [start + i * real_gap - check_in for i in range(loads)]
     in_band = sum(1 for t in at_gate if any(a <= (t % 1440) < z for a, z in (bands or [])))
+    at_plant = [t - laden_min - load_min - float(plant_check_in or 0) for t in at_gate]
+    in_plant = sum(1 for t in at_plant if any(a <= (t % 1440) < z for a, z in (plant_bands or [])))
     flags = []
     if transit > float(transit_limit) + EPS:
         flags.append({"code": "POUR_TRANSIT",
@@ -179,15 +186,18 @@ def figures(m3, rate, start, m3_per_load, load_min, laden_min, check_in, washout
     elif short:
         flags.append({"code": "POUR_SHORT",
                       "text": f"{b} of {needed} mixers: the pour ends {clock(ends)}, {hm(ends - ends_planned)} later."})
-    if in_band:
-        flags.append({"code": "POUR_BAND",
-                      "text": f"{in_band} mixer{'s' if in_band != 1 else ''} at the gate in a no-delivery time."})
+    if in_band or in_plant:
+        mx = lambda n: f"{n} mixer{'s' if n != 1 else ''}"      # noqa: E731
+        where = (f"{mx(in_band)} at the gate and {in_plant} at the plant" if in_band and in_plant
+                 else f"{mx(in_band)} at the gate" if in_band else f"{mx(in_plant)} at the plant")
+        flags.append({"code": "POUR_BAND", "text": f"{where} in a no-delivery time."})
     r1 = lambda x: round(x, 1)      # noqa: E731
     return {"loads": loads, "last_load_m3": last_load, "m3_per_load": m3_per_load, "gap": r1(dis),
             "discharge": r1(dis), "cycle": r1(cycle), "needed": needed, "needed_exact": round(needed_exact, 2),
             "transit": r1(transit), "booked": b, "real_gap": r1(real_gap), "face_wait": r1(face_wait),
             "first_loads": clock(first_loads), "last_arrives": clock(last_arrives), "ends": clock(ends),
             "ends_planned": clock(ends_planned), "late_by": r1(max(0.0, ends - ends_planned)), "in_band": in_band,
+            "in_band_plant": in_plant,
             "parts": {"loading": r1(load_min), "there": r1(laden_min), "check_in": r1(check_in),
                       "discharge": r1(dis), "washout": r1(washout), "back": r1(back_min)},
             "start_min": start, "ends_min": r1(ends), "first_loads_min": r1(first_loads),
@@ -464,12 +474,13 @@ def drive_times(route_id, vehicle, month_index, depart_mins, cache=None):
     return round(a, 1), round(b, 1), "hours", [h for _a, _b, h in got]
 
 
-def _gate_for(route, locations, gbl, on):
+def _gate_for(route, locations, gbl, on, end="dest"):
+    """The gate a route's mixers use at the site (`end` dest) or at the plant (`end` origin), as the Simulation picks it."""
     import gate_arrivals
-    loc = locations.get(route.get("dest_id"))
+    loc = locations.get(route.get(f"{end}_id"))
     if not loc:
         return None
-    r, _blocked = gate_arrivals.entry_gate(loc, route.get("dest_gate_id"), gbl.get(loc["id"]) or [], on=on)
+    r, _blocked = gate_arrivals.entry_gate(loc, route.get(f"{end}_gate_id"), gbl.get(loc["id"]) or [], on=on)
     gid = r.get("gate_id")
     for g in gbl.get(loc["id"]) or []:
         if g.get("id") == gid:
@@ -501,8 +512,9 @@ def decorate(rows, factors=None, cache=None, exclude_ids=()):
     routes = {r["id"]: r for r in db.query(
         "SELECT id, origin_id, dest_id, origin_gate_id, dest_gate_id FROM routes WHERE tenant_id = ?",
         (db.current_tenant(),))}
-    locations = {l["id"]: l for l in db.query("SELECT id, name, loc_type FROM locations WHERE tenant_id = ?",
-                                              (db.current_tenant(),))}
+    # 31 Oct 2026: the position too — a plant with no gate row resolves to its own point (gates.resolve)
+    locations = {l["id"]: l for l in db.query("SELECT id, name, loc_type, lat, lon, gate_lat, gate_lon FROM locations "
+                                              "WHERE tenant_id = ?", (db.current_tenant(),))}
     gbl = _gates.gates_by_location()
     lines = {(f["route_id"], int(f["month_index"]), f["discipline"] or "", f["section_id"] or ""): f
              for f in db.query("SELECT route_id, month_index, discipline, section_id, quantity, unit, vehicle_type, "
@@ -528,11 +540,13 @@ def decorate(rows, factors=None, cache=None, exclude_ids=()):
         vrow = ((factors.get("vehicles") or {}).get(veh)) or {}
         d = datetime.date.fromisoformat(p["pour_date"])
         gate = _gate_for(route, locations, gbl, d) if route else None
+        plant_gate = _gate_for(route, locations, gbl, d, end="origin") if route else None
         start = minutes_of(p["start"]) or 0
         m3pl = float(vrow.get("payload_m3") or 0)
         p["origin_name"] = (locations.get(route.get("origin_id")) or {}).get("name")
         p["dest_name"] = (locations.get(route.get("dest_id")) or {}).get("name")
         p["gate_name"] = (gate or {}).get("name")
+        p["plant_gate_name"] = (plant_gate or {}).get("name")
         p["vehicle"] = veh
         p["vehicle_name"] = conversions.vehicle_label(factors, veh) if veh else None
         p["line_m3"] = float(line.get("quantity") or 0) if line else None
@@ -559,7 +573,8 @@ def decorate(rows, factors=None, cache=None, exclude_ids=()):
         there, back, basis, hrs = drive_times(p["route_id"], veh, p["month_index"], departs, cache=cache)
         fig = figures(p["m3"], p["rate_m3h"], start, m3pl, load_m, there, chk, p.get("washout_min") or 0, back,
                       booked=p.get("mixers_booked"), transit_limit=lim["transit_min"], cold_joint=lim["cold_joint_min"],
-                      bands=_bands(gate, factors))
+                      bands=_bands(gate, factors), plant_bands=_bands(plant_gate, factors) if plant_gate else None,
+                      plant_check_in=float((plant_gate or {}).get("safety_minutes") or 0))
         flags = list(fig.pop("flags"))
         if line and month_sum.get(k, 0.0) > float(line.get("quantity") or 0) + 1e-6 and p["status"] in LIVE:
             flags.append({"code": "POUR_OVER_PLAN",

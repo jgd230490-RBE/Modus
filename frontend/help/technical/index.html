@@ -330,7 +330,9 @@ booked < needed:  real gap = cycle ÷ booked; face waits = real gap − discharg
 COLD JOINT  face waits > planning.pours.cold_joint_min (30)        red
 TRANSIT     transit > planning.pours.transit_limit_min (120)       red
 MIXERS SHORT booked < needed, no cold joint                         amber
-IN A BAND   a mixer at the gate (check-in before its discharge) inside planning.peak_bands or the gate's shut windows   amber
+IN A BAND   a mixer at the gate (check-in before its discharge) inside planning.peak_bands or the gate's shut windows,
+            or at the plant's gate (loading + drive + the plant's check-in before that) inside the bands or the plant
+            gate's own shut windows (31 Oct 2026; figures() in_band_plant)   amber
 OVER PLAN   the line's live pours in the month &gt; the line's quantity   amber</pre>
 <p><strong>Drive times.</strong> <code>derived.cycle_for(route, mixer, month)</code> (a dated diversion counts), then the
 busy-hour times (<code>hour_times.times_for</code>, task 0f) at the HOURS nearest each laden departure — the worst
@@ -345,6 +347,16 @@ After the gate (and the site's area, where one takes concrete) the mixers discha
 loading → end of discharge = end − gate arrival + planned drive + loading, against <code>transit_limit_min</code>; the
 pump's stand between mixers against <code>cold_joint_min</code> (<code>sim.pump</code>). Month and Week keep the typed
 what-if only.</p>
+<p><strong>Held at the plant (31 Oct 2026, John: "your recommendation").</strong> The plant's gate is queued first
+(<code>sim.queue</code>, the same lane rules: shut before it opens, in a band or a shut time; one lane at its check-in). A
+mixer starts loading when its check-in at the plant's gate is done; it was planned to start <code>there</code> +
+<code>loading</code> before the site's gate. The difference (never below 0) is its <code>plant_wait</code>:
+it loads that much later and reaches the site's gate that much later, so the pump, the cold-joint gap and the end follow. The transit is
+from loading, so the wait at the plant is not in it; mixers held together reach the site together and wait for the pump,
+which is. The reply carries <code>plant_gate</code>, <code>plant_gate_name</code> and <code>plant_wait_max</code>; the
+sentence says "held up to … at the plant's gate before loading", and a note counts the mixers that reach the plant's gate
+while it is shut. Before 31 Oct the plant's wait was counted at the plant only and the mixer still reached the site on
+time. A plant gate with no check-in typed never queues (step 5), so holds nobody.</p>
 <p><strong>The split (Q5).</strong> <code>split_month</code>: each derived week = its pours + (month − all pours) ÷ the
 month's weeks. <code>split_days</code>: a pour day = its pours; the other weekdays share (week − the week's pours); a
 weekend pour carries its m³. Edited and confirmed weeks and days hold what was typed (<code>weeks._materialise_parent</code>,

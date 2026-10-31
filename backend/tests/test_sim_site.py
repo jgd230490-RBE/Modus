@@ -547,9 +547,13 @@ ok("the month scale carries the day choices too (the screen offers them before t
 ok("the day choices: the ten weekdays of the two weeks, commit then next",
    len(Ddy["day_choices"]) == 10 and Ddy["day_choices"][0]["date"] == "2026-09-14" and Ddy["day_choices"][-1]["date"] == "2026-09-25"
    and Ddy["day_choices"][5]["bucket"] == "next" and Ddy["day_choices"][2]["words"] == "Wed 16 Sep 2026")
-ok("🔴 refused in words: a Saturday, a day outside the two weeks, a date that is not one",
-   "is not a weekday of the week of" in str(raises(lambda: sim.day(9, acc_planner, factors=factors, working_days=WD, scale="day", date="2026-09-19", today=TODAY)))
-   and "is not a weekday of the week of" in str(raises(lambda: sim.day(9, acc_planner, factors=factors, working_days=WD, scale="day", date="2026-10-14", today=TODAY)))
+# 31 Oct 2026: narrowed — a day outside both weeks now names the two weeks (it named this week only)
+ok("🔴 refused in words: a Saturday, a day outside the two weeks (the two weeks named), a date that is not one",
+   "Sat 19 Sep 2026 is not in the Look-ahead's two weeks (Mon 14 Sep 2026 to Fri 25 Sep 2026): pick one of their weekdays."
+   == str(raises(lambda: sim.day(9, acc_planner, factors=factors, working_days=WD, scale="day", date="2026-09-19", today=TODAY)))
+   and "Wed 14 Oct 2026 is not in the Look-ahead's two weeks (Mon 14 Sep 2026 to Fri 25 Sep 2026)"
+   in str(raises(lambda: sim.day(9, acc_planner, factors=factors, working_days=WD, scale="day", date="2026-10-14", today=TODAY)))
+   and "is not a weekday of the week of" not in str(raises(lambda: sim.day(9, acc_planner, factors=factors, working_days=WD, scale="day", date="2026-10-14", today=TODAY)))
    and "must be a date" in str(raises(lambda: sim.day(9, acc_planner, factors=factors, working_days=WD, scale="day", date="soon", today=TODAY))))
 ok("the sites' chains run at the week and day scales too, and the closure applies on the day (Sep: out by A)",
    Dwk["sites"][0]["lorries_out"] == Dwk["sites"][0]["lorries_in"] and Ddy["sites"][0]["lorries_out"] == Ddy["sites"][0]["lorries_in"]
