@@ -1213,7 +1213,8 @@ _ch19 = _ug[_ug.index('<h1 id="19-site-layouts">'):_ug.index('<h1 id="appendix-a
 ok3("⭐ SITE LAYOUTS: the user guide has chapter 19 with 19.1-19.3 in the nav and the text (phases, bringing in a drawing, the public map for staff); 9.1 points to it",
     all(t in _ug for t in ('<a href="#19-site-layouts">19. Site layouts</a>', '<a href="#19-1-phases">19.1', '<a href="#19-2-bringing-in-a-drawing">19.2', '<a href="#19-3-on-the-public-map">19.3'))
     and all(t in _ch19 for t in ("<strong>Bring in a drawing</strong>", "<strong>+ Add a phase</strong>", "<strong>Place anyway</strong>", "<strong>Keep the file&#39;s colours</strong>",
-                                 "Save a DWG as DXF first.", "Planners and admins change it", "Visitors with the map password do not see it."))
+                                 "Save a DWG as DXF first.", "Planners and admins change it", "Untick it and visitors with the map password do not see it."))
+    # NARROWED 31 Oct 2026 (task 4c PR 4): "... do not see it" now follows "Untick it and" (a ticked layout is public)
     and "is under its areas: chapter 19." in _ug, _ch19[:200])
 ok3("SITE LAYOUTS: chapter 19 names no library, grid file, rule code or back-end word",
     not re.search(r"\b(API|endpoint|server|JSON|OSTN15|pyproj|ezdxf|EPSG|PROJ|Mapbox|HERE|held|trucks?)\b", _ch19))
@@ -1228,6 +1229,19 @@ ok3("SITE LAYOUTS: 19.2 says a DXF may be in millimetres, inches or feet, what i
 ok3("SITE LAYOUTS: #t1-layouts holds the units rule, the leave-outs, footprints, holes and the Terra Draw note for PR 2",
     "<code>FOOTPRINT_M</code>" in _tgv2 and "<code>site_layouts.MAX_HOLES</code>" in _tgv2 and "Terra Draw 1.37 refuses a polygon with holes" in _tgv2
     and "<code>contractor-style-mm.dxf</code>" in _tgv2 and "<code>$INSUNITS</code> must be 6" not in _tgv2)
+
+# ---- 31 Oct 2026 (task 4c PR 4): the public site layouts in 8.2, 19.3 and #t1-layouts
+_ug82 = _ug[_ug.index('id="8-2-filters-basemaps-and-overlays"'):_ug.index('id="8-4-the-forecast-timeline-and-kpi-panel"')]
+ok3("⭐ PUBLIC LAYOUTS: 8.2 lists Site layouts (zoom in close, the popup's button) and 19.3 the tick, Every site layout and no security / CCTV",
+    "<li><strong>Site layouts</strong>" in _ug82 and "<strong>Show the site layout</strong>" in _ug82 and "Zoom in close" in _ug82
+    and "<strong>Show on the public map</strong>" in _ch19 and "<strong>Every site layout</strong>" in _ch19
+    and "Security and CCTV symbols never show there." in _ch19 and "Untick it and visitors with the map password do not see it." in _ch19)
+ok3("PUBLIC LAYOUTS: the guide's new lines name no back end (zoom figures, cache, allow-list stay in the technical guide)",
+    not re.search(r"\b(API|endpoint|server|cache|allow-list|zoom 1[67]|JSON)\b", _ch19 + _ug82[_ug82.index("<li><strong>Site layouts</strong>"):_ug82.index("<li><strong>Site layouts</strong>") + 400]))
+ok3("PUBLIC LAYOUTS: #t1-layouts holds the switch, the public read, the allow-list, the cache and zoom 16",
+    "PATCH /api/locations/{id}/site-layout" in _tgv2 and "GET /api/public/site-layouts?month=YYYY-MM" in _tgv2
+    and "<code>site_layouts.public_thing</code>" in _tgv2 and "<code>read_cache.cached()</code>" in _tgv2 and "{minzoom: 16}" in _tgv2
+    and "<code>site_layout_styles.public_payload()</code>" in _tgv2 and "the public layer and the sheet come in later PRs" not in _tgv2)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
