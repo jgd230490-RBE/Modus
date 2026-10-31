@@ -763,9 +763,10 @@ ok("the lifespan creates the login tables after the demo requests and before ini
    0 < MAIN.find("db.init_demo_requests_db()") < MAIN.find("db.init_users_db()") < MAIN.find("db.init_tenant()"))
 ok("⭐ the middleware reads the session cookie into the request's access",
    "access.set_current(request.headers.get(access.HEADER),\n                                   request.cookies.get(users.SESSION_COOKIE))" in MAIN)
+# NARROWED 31 Oct 2026 (task 4a PR 3c): a client reviewer's session cookie needs the header too
 ok("⭐ a cookie-authenticated write without the app's header is refused (and every /api/auth/ POST needs it)",
    'GUARD_HEADER = "X-Wayscope"' in MAIN
-   and re.search(r'if write and request\.headers\.get\(GUARD_HEADER\) != "1" and \(\n\s+\(acc_now and acc_now\.get\("via"\) == "login"\) or path\.startswith\("/api/auth/"\)\):', MAIN))
+   and re.search(r'if write and request\.headers\.get\(GUARD_HEADER\) != "1" and \(\n\s+\(acc_now and acc_now\.get\("via"\) == "login"\) or access\.reviewer\(\) is not None\n\s+or path\.startswith\("/api/auth/"\)\):', MAIN))
 ok("⭐ the middleware writes one audit row per write that worked",
    re.search(r"if write and _audited\(path\) and 200 <= getattr\(response, \"status_code\", 0\) < 300:\n\s+_audit_write\(", MAIN))
 ok("...skipping only the POSTs that change nothing and the paths that log themselves",

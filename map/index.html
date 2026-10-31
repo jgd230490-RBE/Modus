@@ -23,7 +23,7 @@
          ?v= because this file and index.html are a matched pair. -->
     <script src="overlay.js?v=1"></script>
     <!-- 31 Oct 2026 (task 4c PR 1): the site layouts' drawing, shared with the Locations page (one look in one place) -->
-    <script src="site-layouts.js?v=1"></script>
+    <script src="site-layouts.js?v=3"></script>
     <style>
         :root{
             --navy:#2563EB; --navy-deep:#1F2024; --ink:#1E293B; --muted:#64748B;
@@ -1072,6 +1072,11 @@
              legs is a lot of line, and this answers a question nobody asks
              continuously. -->
         <div class="control-item"><label><input type="checkbox" id="layer-alts" onchange="toggleAlts(this.checked)"> Alternative routes <span class="lim-n" id="alts-note"></span></label><span class="color-dot" style="background:#94a3b8; opacity:.6;"></span></div>
+        <!-- 31 Oct 2026 (task 4c PR 4): the site layouts a planner chose to show the public ("Show on the public map" on
+             Data -> Locations), the phase in force in the month on screen, drawn from zoom 16 only. For everyone; on by
+             default; the row is hidden until /api/public/site-layouts says some layout shows in some month. -->
+        <div class="control-item" id="site-layouts-public-row" hidden><label><input type="checkbox" id="layer-site-layouts-public" checked onchange="togglePublicLayouts(this.checked)"> Site layouts <span class="lim-n" id="site-layouts-public-count"></span></label><button type="button" class="info-i" aria-expanded="false" aria-controls="info-site-layouts-public" onclick="toggleInfo(this)" title="About the site layouts" aria-label="About the site layouts"><span aria-hidden="true">i</span></button></div>
+        <div class="info-pop" id="info-site-layouts-public" hidden><p>Each site's layout this month, from close in.</p></div>
     </div>
     <!-- 14 Oct 2026: the community considerations layer (the CLOCS CLP template's "community considerations").
          STAFF ONLY: hidden in the markup and shown only when /api/public/whoami answers level "staff" (as the
@@ -1088,8 +1093,8 @@
          STAFF ONLY like the groups round it: hidden in the markup, shown only when whoami says staff; /api/site-layouts/map
          refuses the map password's cookie. Off by default; read only when ticked; read only (drawn on the Locations page). -->
     <div class="control-group" id="site-layouts-group" hidden>
-        <div class="control-item"><label><input type="checkbox" id="layer-site-layouts" onchange="toggleSiteLayouts(this.checked)"> Site layouts <span class="lim-n" id="site-layouts-count"></span></label><button type="button" class="info-i" aria-expanded="false" aria-controls="info-site-layouts" onclick="toggleInfo(this)" title="About the site layouts" aria-label="About the site layouts"><span aria-hidden="true">i</span></button></div>
-        <div class="info-pop" id="info-site-layouts" hidden><p>Each site's layout in the month on screen. Draw and change them on Data → Locations.</p></div>
+        <div class="control-item"><label><input type="checkbox" id="layer-site-layouts" onchange="toggleSiteLayouts(this.checked)"> Every site layout <span class="lim-n" id="site-layouts-count"></span></label><button type="button" class="info-i" aria-expanded="false" aria-controls="info-site-layouts" onclick="toggleInfo(this)" title="About every site layout" aria-label="About every site layout"><span aria-hidden="true">i</span></button></div>
+        <div class="info-pop" id="info-site-layouts" hidden><p>Every layout, shown on the public map or not. Draw and change them on Data → Locations.</p></div>
     </div>
 
     <!-- 16 Oct 2026 (CLOCS v5 C1): the collision history — the police-reported injury collisions (DfT STATS19) along the
@@ -2753,6 +2758,11 @@
         // check has said there is imagery. Empty until then, and it stays empty for a
         // location Google has never driven past, which is most quarry gates.
         h += `<div id="${svId}" style="margin-top:8px;"></div>`;
+        // 31 Oct 2026 (task 4c PR 4): a site whose layout shows this month gets "Show the site layout" (no phase name)
+        if (typeof publicLayoutSite === 'function' && publicLayoutSite(props.id)) {
+            const sid = String(props.id).replace(/[^A-Za-z0-9_-]/g, '');
+            h += `<button onclick="showSiteLayout('${sid}')" style="margin-top:10px; width:100%; background:#fff; color:#2563EB; border:1px solid #2563EB; padding:7px; border-radius:4px; font-weight:bold; cursor:pointer;">Show the site layout</button>`;
+        }
         const safe = String(props.name || '').replace(/'/g, "\\'");
         // 29 Oct 2026 (task 3c): no route starts or ends at a holding area, so nothing to filter to
         h += kind === 'Holding' ? '</div>' : `<button onclick="filterByNode('${safe}', '${kind}')" style="margin-top:10px; width:100%; background:#2563EB; color:#fff; border:none; padding:8px; border-radius:4px; font-weight:bold; cursor:pointer;">Filter Routes to this Location</button></div>`;
@@ -3297,6 +3307,7 @@
         syncFilterReset();
         try { applyStockMonth(); } catch (e) {}      // 27 Oct 2026: and so do the stockpile gauges
         try { if (typeof SLY !== 'undefined' && SLY.on) refreshSiteLayouts(); } catch (e) {}   // 31 Oct 2026 (task 4c): and the site layouts' phases
+        try { if (typeof PSL !== 'undefined') refreshPublicLayouts(); } catch (e) {}           // 31 Oct 2026 (task 4c PR 4): and the public ones
         const inVis = document.getElementById('layer-inbound').checked; const outVis = document.getElementById('layer-outbound').checked;
 
         calculateKPIs(o, d, disc, i);
@@ -3975,6 +3986,8 @@
         if (typeof ABP !== 'undefined' && ABP.data) ensureAbnormalPublicLayers();
         // 31 Oct 2026 (task 4c): and the site layouts (staff only; their pictures go with the style too)
         if (typeof SLY !== 'undefined' && SLY.h) ensureSiteLayoutLayers();
+        // 31 Oct 2026 (task 4c PR 4): and the public site layouts
+        if (typeof PSL !== 'undefined' && PSL.h) ensurePublicLayoutLayers(true);
         // and so do the Tark Tee restriction layers. Already-fetched data is re-added
         // from the cached FeatureCollection rather than re-requested — a basemap switch
         // must not cost another round trip to a government service.
@@ -9627,6 +9640,7 @@
         const g = document.getElementById('site-layouts-group');
         if (g) g.hidden = !SLY.staff;
         if (!SLY.staff) { SLY.on = false; if (SLY.h) { try { SLY.h.setVisible(false); } catch (e) {} } }
+        try { showPublicLayouts(); } catch (e) {}
     }
     function siteLayoutMonth() {
         const m = (typeof mapModeMonth === 'function') ? mapModeMonth() : null;
@@ -9678,6 +9692,77 @@
         SLY.failed = undefined;
         if (SLY.h) SLY.h.setVisible(SLY.on);
         if (SLY.on) refreshSiteLayouts();
+        showPublicLayouts();      // 31 Oct 2026 (task 4c PR 4): "Every site layout" draws in place of the public set
+    }
+    // ---------------------------------------------------------------- the public map's site layouts (31 Oct 2026, task 4c PR 4)
+    // The layouts a planner switched "Show on the public map" on, the phase in force in the month on screen (no month:
+    // this month), read from /api/public/site-layouts (behind the map password like every public read; the server drops
+    // the security / CCTV symbols and anything else not on its allow-list) and drawn by site-layouts.js from ZOOM 16 ONLY.
+    // For everyone, on by default ("Site layouts" under Haul routes); hidden while a staff login ticks "Every site layout",
+    // which draws the same and more. Re-added on style.load through styleReady(), like every overlay.
+    const PSL = { on: true, styles: null, data: null, h: null, month: undefined, loading: false };
+    const PSL_MINZOOM = 16;
+    function publicLayoutsShown() { return PSL.on && !SLY.on; }
+    function showPublicLayouts() { if (PSL.h) PSL.h.setVisible(publicLayoutsShown()); }
+    function ensurePublicLayoutLayers(again) {
+        if (!PSL.styles || !window.WSLayouts) return;
+        if (!styleReady()) return;
+        if (!PSL.h) {
+            PSL.h = WSLayouts.install(map, PSL.styles, { prefix: 'site-layout-public', before: () => labelAnchor(),
+                                                         visible: publicLayoutsShown(), minzoom: PSL_MINZOOM });
+            PSL.h.ready.then(() => { if (PSL.data) PSL.h.setData(PSL.data.features); });
+        } else if (again) {
+            PSL.h.reinstall();
+            showPublicLayouts();
+        }
+    }
+    async function refreshPublicLayouts() {
+        const month = siteLayoutMonth();
+        const key = month || '';
+        if (PSL.loading || (PSL.data && PSL.month === key) || PSL.failed === key) return;
+        PSL.loading = true;
+        PSL.tried = key;
+        try {
+            const r = await fetch('/api/public/site-layouts' + (month ? '?month=' + encodeURIComponent(month) : ''),
+                                  { credentials: 'same-origin' });
+            if (!r.ok) throw new Error('public site layouts ' + r.status);
+            const j = await r.json();
+            if (!PSL.styles) PSL.styles = j.styles;
+            PSL.data = j;
+            PSL.month = key;
+            const row = document.getElementById('site-layouts-public-row');
+            if (row) row.hidden = !j.any;
+            const cnt = document.getElementById('site-layouts-public-count');
+            if (cnt) cnt.textContent = j.sites.length ? String(j.sites.length) : '';
+            ensurePublicLayoutLayers();
+            if (PSL.h) PSL.h.ready.then(() => PSL.h.setData(PSL.data.features));
+        } catch (e) {
+            console.warn('Wayscope: public site layouts', e);
+            PSL.failed = key;     // once a month: no retry on every filter pass
+        } finally {
+            PSL.loading = false;
+            if (PSL.tried !== (siteLayoutMonth() || '')) refreshPublicLayouts();
+        }
+    }
+    function togglePublicLayouts(on) {
+        PSL.on = !!on;
+        showPublicLayouts();
+    }
+    // the site whose layout shows this month, or null (the popup's button)
+    function publicLayoutSite(id) {
+        return (PSL.data && (PSL.data.sites || []).find(s => s.location_id === id)) || null;
+    }
+    // the popup's "Show the site layout": the layer on, the map to zoom 17 over the layout
+    function showSiteLayout(id) {
+        const s = publicLayoutSite(id);
+        if (!s) return;
+        if (!PSL.on && !SLY.on) {
+            const cb = document.getElementById('layer-site-layouts-public');
+            if (cb) cb.checked = true;
+            togglePublicLayouts(true);
+        }
+        document.querySelectorAll('.mapboxgl-popup').forEach(p => p.remove());
+        map.flyTo({ center: s.middle, zoom: Math.max(17, map.getZoom()) });
     }
     function toggleAbnormal(on) {
         ABN.on = !!on;

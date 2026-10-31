@@ -91,7 +91,7 @@ def visible(rec, acc):
     t = team_of(acc)
     if t:
         return access.canonical_ipt(rec.get("team")) == t
-    return bool(acc)
+    return access.is_staff(acc)      # PR 3c: never a client reviewer (they read through clp_reviews only)
 
 
 # --------------------------------------------------------------------------- #
@@ -235,6 +235,11 @@ def list_for(acc, factors=None):
         t = tally.get(d["id"]) or {}
         d["tasks"] = {k: t.get(k, 0) for k in ("open", "overdue", "notes", "done", "mine_open")}
         d["tasks"]["next_due"] = t.get("next_due")
+    # 31 Oct 2026 (PR 3c): where the last issue sent to each client group stands (With … / Accepted by … / Returned by …)
+    import clp_reviews
+    rv = clp_reviews.for_list({d["id"] for d in out})
+    for d in out:
+        d["reviews"] = rv.get(d["id"], [])
     sent_first = can_approve(acc)
     out.sort(key=lambda d: (not (sent_first and d["status"] == "sent"), d["name"].lower(),
                             d["team_name"] is not None, d["team_name"] or "", d["id"]))
@@ -244,7 +249,8 @@ def list_for(acc, factors=None):
             "places": [{"id": lid, "name": l.get("name") or lid, "type": _type_of(l)}
                        for lid, l in sorted(locs.items(), key=lambda kv: (kv[1].get("name") or kv[0]).lower())],
             "teams": [{"id": t, "name": taxonomy.team_name(t, labels)} for t in _active_teams()],
-            "statuses": [{"key": k, "word": STATUS_WORDS[k]} for k in STATUSES]}
+            "statuses": [{"key": k, "word": STATUS_WORDS[k]} for k in STATUSES],
+            "review_groups": (bool(clp_reviews.group_names()) if can_approve(acc) else False)}
 
 
 def _active_teams():
@@ -276,6 +282,12 @@ def _record(clp_id, acc, factors=None):
 def _clean(v, most):
     v = str(v or "").strip()
     return v[:most]
+
+
+def _clean_name(v, most):
+    """A CLP's name on one line (it reaches an email's subject): control characters become one space."""
+    import re
+    return re.sub(r"[\x00-\x1f\x7f]+", " ", _clean(v, most)).strip()
 
 
 def cover_problem(cover):
@@ -343,7 +355,7 @@ def create(body, acc, factors=None):
         p = "Impact must be higher or medium."
     if p:
         return {"error": p, "status": 422}
-    name = _clean(body.get("name"), NAME_MAX) or ", ".join((locs.get(i) or {}).get("name") or i for i in ids)
+    name = _clean_name(body.get("name"), NAME_MAX) or ", ".join((locs.get(i) or {}).get("name") or i for i in ids)
     rec = {"id": "clp-" + secrets.token_hex(4), "name": name, "location_ids": ids, "team": team or None,
            "impact": body.get("impact") or "higher",
            "cover": {k: _clean(v, COVER_MAX.get(k, TEXT_MAX)) for k, v in (body.get("cover") or {}).items()},
@@ -375,7 +387,7 @@ def update(clp_id, body, acc, factors=None):
         nxt["cover"] = c
     if appr:
         if "name" in body:
-            nxt["name"] = _clean(body.get("name"), NAME_MAX) or rec["name"]
+            nxt["name"] = _clean_name(body.get("name"), NAME_MAX) or rec["name"]
         if "impact" in body:
             if body["impact"] not in clp_doc.IMPACT:
                 return {"error": "Impact must be higher or medium.", "status": 422}
@@ -552,8 +564,15 @@ def history(clp_id, acc, factors=None):
 
 def doc_history(clp_id, extra=None):
     """The Document history table the file prints: every issue newest first (+ the one being approved)."""
-    rows = [{"no": r["issue_no"], "date": str(r["approved_at"])[:10], "by": r.get("approved_by"), "words": _words_of(r)}
-            for r in _issue_rows(clp_id)]
+    import clp_reviews
+    decided = {}
+    for d in clp_reviews.history_rows(clp_id):     # PR 3c (Q10): each client group's decision under its issue
+        decided.setdefault(d["no"], []).append(d)
+    rows = []
+    for r in _issue_rows(clp_id):
+        rows.append({"no": r["issue_no"], "date": str(r["approved_at"])[:10], "by": r.get("approved_by"),
+                     "words": _words_of(r)})
+        rows += decided.get(r["issue_no"], [])
     if extra:
         rows.append(extra)
     return list(reversed(rows))
@@ -577,7 +596,9 @@ def preview(clp_id, acc, factors, working_days):
             "last_issue": ({"no": last["issue_no"], "date": str(last["approved_at"])[:10]} if last else None),
             "sent": rec["status"] == "sent", "sent_by": rec.get("sent_by"), "sent_at": rec.get("sent_at"),
             "sent_note": rec.get("sent_note"), "changes": changes(prev, summary(data)),
-            "tasks": __import__("clp_notes").open_summary(rec["id"])}
+            "tasks": __import__("clp_notes").open_summary(rec["id"]),
+            # PR 3c: the approve card's "Send to the client's reviewers" ticks (a group that had the last issue ticked)
+            "review_groups": __import__("clp_reviews").groups_for_send(rec["id"])}
 
 
 def approve(clp_id, note, acc, factors, working_days, build):

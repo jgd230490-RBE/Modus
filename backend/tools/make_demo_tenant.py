@@ -396,6 +396,9 @@ FEED_DESC = "Crushed rock for the asphalt plant (coarse and fine aggregate)"
 
 # The approval step (§1.9): one Pending and one Rejected line, each on its own line key (approval acts on every month
 # of a line). (route, discipline, section, t, material description, reason)
+#: 31 Oct 2026 (task 4a PR 3c, Q11): the demo's one client reviewer group (id, name, when made); no reviewer logins
+DEMO_REVIEW_GROUP = ("rg-demo", "Highways client (fictional)", "2026-10-31T00:00:00Z")
+
 #: 29 Oct 2026 (task 3a, John's Q10 "as recommended"): the planned concrete pours, on the batching plant's lines. When:
 #: "as-of thursday" / "next tuesday" follow the as-of date (so the Look-ahead's this week / next week each show one), or a
 #: fixed date. A pour whose line does not run in that month is left out (an as-of outside the line's months). The mixers
@@ -1042,6 +1045,13 @@ def build(with_areas=False, out=None):
             # the line does not run that month (an as-of outside its months): no pour, said on the console
             print(f"  pour left out ({place}, {pd}): {res['error']}")
 
+    # --- the client's reviewers (31 Oct 2026, task 4a PR 3c, John's Q11): one fictional group, NO logins (a shared
+    # reviewer login would be a code by another name). John adds his own second address as a reviewer to show it.
+    db.execute("INSERT INTO clp_review_groups (tenant_id, id, name, created_by, created_at, updated_at, stopped_by, "
+               "stopped_at) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)",
+               (db.current_tenant(), DEMO_REVIEW_GROUP[0], DEMO_REVIEW_GROUP[1], "Wayscope demo",
+                DEMO_REVIEW_GROUP[2], DEMO_REVIEW_GROUP[2]))
+
     # --- the history up to the as-of date (§1.9) -------------------------------------------------------------
     # Only weeks that carry history ship: every approved month up to the as-of month is materialised; later weeks
     # materialise on read, as on any deployment.
@@ -1491,9 +1501,14 @@ def build(with_areas=False, out=None):
 # 31 Oct 2026 (task 4a, PR 3a): + clp_documents and clp_issues, the CLPs people type, send and approve on live (an issue
 # keeps its Word file): a refresh must not drop an approved issue
 # 31 Oct 2026 (task 4a, PR 3b): + clp_notes, the notes and tasks people leave on those CLPs
+# 31 Oct 2026 (task 4a, PR 3c): + clp_reviews, the issues sent to the client's reviewers and their decisions on live.
+# The groups (clp_review_groups) are merged instead: the generator's fictional group plus every group made on live
+# 31 Oct 2026 (found by test_demo_programme F6 when PR 3c regenerated the package): + the site layouts (task 4c), brought
+# in on live (the demo's "Site logistics" layout of Tilton Viaduct, 31 Oct): a refresh must not drop them
 LIVE_TABLES = ("route_geometry", "route_sections", "route_area_km", "areas", "route_choice",
                "community_features", "community_meta", "collision_records", "collision_meta", "traffic_counts",
-               "route_hour_times", "clp_documents", "clp_issues", "clp_notes")
+               "route_hour_times", "clp_documents", "clp_issues", "clp_notes", "clp_reviews",
+               "site_layouts", "site_layout_phases", "site_layout_imports")
 
 # 28 Oct 2026 (F6): an abnormal load is generated here but DRAWN on live (Draw the route, Check the roads again), in the
 # same row. A refresh keeps live's drawing for a load whose ends and size are unchanged; any other load stays undrawn.
@@ -1550,6 +1565,10 @@ def copy_live_tables(pkg, path):
         raise SystemExit("--live-export refused: " + "; ".join(problems) + ". Re-bake on live instead (§4.2).")
     for t in LIVE_TABLES:
         nt[t] = list(lt.get(t) or [])
+    # PR 3c: the reviewer groups by id: live's own (a send names one) and the generator's fictional one
+    have = {r.get("id") for r in lt.get("clp_review_groups") or []}
+    nt["clp_review_groups"] = list(lt.get("clp_review_groups") or []) + [
+        r for r in nt.get("clp_review_groups") or [] if r.get("id") not in have]
     copy_abnormal_drawings(lt.get("abnormal_loads"), nt.get("abnormal_loads"))
     row = [r for r in lt.get("config") or [] if r.get("key") == "carbon_target"]
     nt["config"] = [r for r in nt["config"] if r.get("key") != "carbon_target"] + row

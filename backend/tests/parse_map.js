@@ -1740,7 +1740,8 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   ok("🔴 ONE Mapbox instance, never removed: the guide adds no map and no map.remove()",
      (code.match(/new mapboxgl\.Map\(/g) || []).length === 1 && !/map\.remove\(\)/.test(code));
   // NARROWED 31 Oct 2026 (task 4c PR 1): a fourth tag, site-layouts.js, the site layouts' drawing shared with the Locations page; the guide is still in-page
-  ok("🔴 no new script tag: the guide is in-page (four script src tags: + site-layouts.js, 31 Oct)", (html.match(/<script src=/g) || []).length === 4 && html.includes('<script src="site-layouts.js?v=1"></script>'));
+  // NARROWED 31 Oct 2026 (task 4c PR 2): site-layouts.js?v=3 (the words from zoom 15; data sent again when shown; PR 4's v=2 the minzoom option)
+  ok("🔴 no new script tag: the guide is in-page (four script src tags: + site-layouts.js, 31 Oct)", (html.match(/<script src=/g) || []).length === 4 && html.includes('<script src="site-layouts.js?v=3"></script>'));
   ok("the card and ring are fixed overlays over the map, not inside it",
      /#guide-ring\{position:fixed;z-index:9000;pointer-events:none;/.test(html) && /#guide-card\{position:fixed;z-index:9001;/.test(html));
   ok("the anchor is scrolled into view before measuring, and the card is clamped into the window (seen live: an off-screen card)",
@@ -6092,7 +6093,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      /\.info-i\{ position:relative; flex:none; display:inline-grid; place-items:center; width:18px; height:18px;/.test(html)
      && html.includes(".info-i::after{ content:\"\"; position:absolute; inset:-13px; }")
      // named by aria-label (the UI audit, 19 Oct: a hidden .sr-only span counted as 1 px clipped text on every map stop)
-     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z-]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 13   // NARROWED 31 Oct 2026 (task 4c PR 1): + site layouts. NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): + Labels, zones, community, collisions, abnormal (staff and public), closures, limits
+     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z-]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 14   // NARROWED 31 Oct 2026 (task 4c PR 4): + the public site layouts. NARROWED 31 Oct 2026 (task 4c PR 1): + site layouts. NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): + Labels, zones, community, collisions, abnormal (staff and public), closures, limits
      && !/class="info-i"[^>]*>[^]*?<span class="sr-only">About/.test(html.slice(0, html.indexOf('id="month-text"'))));
   ok("19 Oct (UI audit): on a phone the folds' summary rows are 44 px tall (By council, What's moving, More layers)",
      /@media \(max-width:767px\)[\s\S]*?\.layers-box > summary\{ min-height:44px; display:flex; align-items:center; flex-wrap:wrap; padding:2px 0; \}/.test(html));
@@ -7277,10 +7278,12 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
 // ---- 31 Oct 2026 (task 4c PR 1): the staff Route map's read-only "Site layouts" layer ----
 {
   const grp = html.slice(html.indexOf('<div class="control-group" id="site-layouts-group" hidden>'), html.indexOf('<!-- 16 Oct 2026 (CLOCS v5 C1): the collision history'));
+  // NARROWED 31 Oct 2026 (task 4c PR 4, the approved mockup card 5): the staff box reads "Every site layout" (the public
+  // "Site layouts" tick is everyone's now) and its i box says it shows the ones not on the public map too
   ok("⭐ SITE LAYOUTS: a group HIDDEN in the markup with one tick, a count and an 'i'; before the collision history",
-     grp.length > 200 && grp.includes('<input type="checkbox" id="layer-site-layouts" onchange="toggleSiteLayouts(this.checked)"> Site layouts')
+     grp.length > 200 && grp.includes('<input type="checkbox" id="layer-site-layouts" onchange="toggleSiteLayouts(this.checked)"> Every site layout')
      && grp.includes('id="site-layouts-count"') && grp.includes('aria-controls="info-site-layouts"')
-     && grp.includes("Each site's layout in the month on screen. Draw and change them on Data → Locations."));
+     && grp.includes("Every layout, shown on the public map or not. Draw and change them on Data → Locations."));
   ok("🔴 SITE LAYOUTS: staff only (siteLayoutsStaff from checkRouteExportStaff); off by default; read only when ticked, for the month on screen",
      src.includes("siteLayoutsStaff(RME.staff); })") && src.includes("if (g) g.hidden = !SLY.staff;")
      && src.includes("const SLY = { on: false, staff: false, styles: null, data: null, h: null, month: undefined, loading: false };")
@@ -7292,7 +7295,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && src.includes("if (typeof SLY !== 'undefined' && SLY.h) ensureSiteLayoutLayers();"));
   const js = fs.readFileSync(path.join(__dirname, "..", "..", "map", "site-layouts.js"), "utf8").replace(/\r\n?/g, "\n");
   ok("SITE LAYOUTS: site-layouts.js draws from the style table it is given; sizes in metres with zoom top-level (GL drops a nested zoom)",
-     js.includes("window.WSLayouts = { install, metres, centroid, areaM2, bearing };") && !/once\(['"]idle/.test(js)
+     // NARROWED 31 Oct 2026 (task 4c PR 2): + geo (the drawing tools' geometry) and WORDS_Z
+     js.includes("window.WSLayouts = { install, metres, centroid, areaM2, bearing, geo, WORDS_Z };") && !/once\(['"]idle/.test(js)
      && /\["coalesce", \["get", "_m"\], 1\.6\]/.test(js) && !/\["\*",[^\]]*\["zoom"\]/.test(js));
   ok("SITE LAYOUTS: a basemap switch puts back the features as sent (not the prepared copy)",
      js.includes("raw = list;") && js.includes("setData(raw);"));
@@ -7302,6 +7306,107 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
         slyFn.includes("SLY.failed === month") && slyFn.includes("SLY.failed = month;")
         && slyFn.includes("SLY.tried !== siteLayoutMonth()") && !slyFn.includes("SLY.month !== siteLayoutMonth()")
         && /function toggleSiteLayouts\(on\) \{\s*SLY\.on = !!on;\s*SLY\.failed = undefined;/.test(html));
+}
+
+// 31 Oct 2026 (task 4c PR 2, the approved mockup notes\site-layout-draw-mockup-1031, Q5): the layout's WORDS show from zoom 15 on
+// both maps (the live test L1: at the whole-scheme zoom they printed as a smudge), and geo: the drawing tools' geometry, run here
+{
+  const js = fs.readFileSync(path.join(__dirname, "..", "..", "map", "site-layouts.js"), "utf8").replace(/\r\n?/g, "\n");
+  ok("⭐ SITE LAYOUTS (PR 2): the words — text things, area names, symbol labels — show from zoom 15 only (WORDS_Z), the pictures always",
+     js.includes("const WORDS_Z = 15;")
+     && /id: "d-alabel", type: "symbol", source: DRV, minzoom: WORDS_Z,/.test(js)
+     && /id: bold \? "t-bold" : "t-reg", type: "symbol", source: SRC, minzoom: WORDS_Z,/.test(js)
+     && js.includes('"text-field": ["step", ["zoom"], "", WORDS_Z, ["coalesce", ["get", "label"], ""]]')
+     && !/id: "s-icons"[^\n]*minzoom/.test(js) && !/id: "d-icons"[^\n]*minzoom/.test(js));
+  // the Chrome check, 31 Oct: after Done, the things drawn while the card was hidden showed their words but not their lines
+  ok("🔴 SITE LAYOUTS (PR 2): setVisible(true) sends the data again (GL JS v3 keeps stale tiles of a source set while hidden)",
+     /function setVisible\(on\) \{[\s\S]{0,400}if \(visible\) \{ const s = src\(SRC\), d = src\(DRV\); if \(s\) s\.setData\(data\); if \(d\) d\.setData\(derived\); \}/.test(js));
+  // the Chrome check, 31 Oct (also on main since PR 1): Sign out with a site's layout card open blanked the app — the card's
+  // clean-up called setData after DataManagement had removed the map, and Mapbox's getSource threw
+  ok("🔴 SITE LAYOUTS: setData / setVisible / remove never throw once the map is gone (getSource / getLayer guarded)",
+     js.includes("const src = (id) => { try { return map.getSource(id); } catch (e) { return null; } };")
+     && js.includes("const lyr = (id) => { try { return map.getLayer(id); } catch (e) { return null; } };")
+     && !/function (setData|setVisible|remove)\([^)]*\) \{[^}]*map\.get(Source|Layer)\(/.test(js));
+  {
+    const vm2 = require("vm"), box2 = { window: {}, Image: function () {}, document: {} };
+    vm2.createContext(box2); vm2.runInContext(js, box2);
+    const deadMap = { getSource() { throw new TypeError("Cannot read properties of undefined (reading 'getOwnSource')"); }, getLayer() { throw new TypeError("gone"); },
+                      hasImage() { return false; }, addImage() {}, on() {}, off() {} };
+    let threw = null;
+    try { const h = box2.window.WSLayouts.install(deadMap, { lines: [], areas: [], symbols: [] }, { prefix: "x" }); h.setData([]); h.setVisible(true); h.setVisible(false); h.remove(); }
+    catch (e) { threw = e; }
+    ok("🔴 SITE LAYOUTS: on a removed map (getSource throws) setData([]), setVisible and remove do not throw", threw === null, threw && threw.message);
+  }
+  // the file in a sandbox, with a window and no map: geo is pure
+  const vm = require("vm"), box = { window: {}, Image: function () {}, document: {} };
+  vm.createContext(box); vm.runInContext(js, box);
+  const G = box.window.WSLayouts && box.window.WSLayouts.geo;
+  const sq = (c, h) => [[c[0] - h, c[1] - h], [c[0] + h, c[1] - h], [c[0] + h, c[1] + h], [c[0] - h, c[1] + h], [c[0] - h, c[1] - h]];
+  const O = [-0.8836, 52.6452], outer = sq(O, 0.0004), hole = sq(O, 0.0001);
+  const near = (a, b, m) => a.every((p, i) => { const d = G.toM(p, b[i]); return Math.hypot(d[0], d[1]) <= m; });
+  ok("SITE LAYOUTS (PR 2): geo is there for the drawing tools (turn, resize, shift, fit, holes, 7 dp)",
+     !!G && ["round7", "mapGeom", "rotate", "scale", "shift", "fit", "inRing", "holesFollow", "toM", "fromM", "lengthM"].every(k => typeof G[k] === "function"));
+  if (G) {
+    const turned = G.rotate({ type: "Polygon", coordinates: [outer] }, 30, O).coordinates[0];
+    const r1 = G.holesFollow([hole], outer, turned);
+    ok("⭐ SITE LAYOUTS (PR 2): a hole TURNS with its area (the outside edge turned 30° about the middle -> the hole turned the same, within 1 cm)",
+       r1.dropped === 0 && r1.holes.length === 1 && near(r1.holes[0], G.rotate({ type: "Polygon", coordinates: [hole] }, 30, O).coordinates[0], 0.01));
+    const moved = G.shift({ type: "Polygon", coordinates: [outer] }, 25, -10).coordinates[0];
+    const big = G.scale({ type: "Polygon", coordinates: [outer] }, 1.1, O).coordinates[0];
+    ok("SITE LAYOUTS (PR 2): ...MOVES and RESIZES with it too",
+       near(G.holesFollow([hole], outer, moved).holes[0], G.shift({ type: "Polygon", coordinates: [hole] }, 25, -10).coordinates[0], 0.01)
+       && near(G.holesFollow([hole], outer, big).holes[0], G.scale({ type: "Polygon", coordinates: [hole] }, 1.1, O).coordinates[0], 0.01));
+    const corner = outer.map((p, i) => i === 2 ? [p[0] + 0.0002, p[1] + 0.0002] : p);
+    ok("SITE LAYOUTS (PR 2): one corner dragged leaves the hole where it was (not a move, a turn or a resize)",
+       JSON.stringify(G.holesFollow([hole], outer, corner).holes[0]) === JSON.stringify(hole));
+    // the two left corners dragged right past the hole: not a move / turn / resize, and the hole is no longer inside
+    const narrow = outer.map(p => p[0] < O[0] ? [O[0] + 0.0002, p[1]] : p);
+    const r2 = G.holesFollow([hole], outer, narrow);
+    ok("SITE LAYOUTS (PR 2): a hole left outside the edge is dropped and counted (the editor says so; Undo puts it back)",
+       r2.holes.length === 0 && r2.dropped === 1);
+    const added = outer.slice(0, 2).concat([[O[0] + 0.0004, O[1]]], outer.slice(2));
+    ok("SITE LAYOUTS (PR 2): a corner added keeps the hole (still inside)", G.holesFollow([hole], outer, added).holes.length === 1
+       && JSON.stringify(G.holesFollow([hole], outer, added).holes[0]) === JSON.stringify(hole));
+    const g7 = G.round7({ type: "LineString", coordinates: [[-0.123456789, 52.987654321]] }).coordinates[0];
+    ok("SITE LAYOUTS (PR 2): coordinates rounded to 7 dp", g7[0] === -0.1234568 && g7[1] === 52.9876543);
+    ok("SITE LAYOUTS (PR 2): lengthM measures in metres (100 m north is 100 m, within 1 m)",
+       Math.abs(G.lengthM([O, [O[0], O[1] + 100 / 110574]]) - 100) < 1);
+  }
+}
+
+// ---- 31 Oct 2026 (task 4c PR 4, the approved mockup notes\site-layout-public-mockup-1031\): the PUBLIC site layouts ----
+{
+  const row = html.slice(html.indexOf('<div class="control-item" id="site-layouts-public-row" hidden>'), html.indexOf('<div class="info-pop" id="info-site-layouts-public" hidden>') + 120);
+  ok("⭐ PUBLIC LAYOUTS: one 'Site layouts' tick for everyone, ON by default, under Haul routes, its row hidden until a layout shows",
+     row.length > 200 && row.includes('<input type="checkbox" id="layer-site-layouts-public" checked onchange="togglePublicLayouts(this.checked)"> Site layouts')
+     && row.includes('id="site-layouts-public-count"') && row.includes("Each site's layout this month, from close in.")
+     && html.indexOf('id="site-layouts-public-row"') > html.indexOf('id="layer-alts"')
+     && html.indexOf('id="site-layouts-public-row"') < html.indexOf('id="community-group"'));
+  const psl = cut0(src, "const PSL = {", "\n    function toggleAbnormal(");
+  ok("🔴 PUBLIC LAYOUTS: read from /api/public/site-layouts for the month on screen, NEVER the staff read; the style table comes with it",
+     psl.includes("fetch('/api/public/site-layouts' + (month ? '?month=' + encodeURIComponent(month) : '')")
+     && !psl.includes("/api/site-layouts/map") && !psl.includes("/api/site-layouts/styles") && psl.includes("if (!PSL.styles) PSL.styles = j.styles;")
+     && psl.includes("if (row) row.hidden = !j.any;"));
+  ok("🔴 PUBLIC LAYOUTS: drawn from ZOOM 16 only (WSLayouts' minzoom), under the names (labelAnchor), re-added on style.load through styleReady()",
+     src.includes("const PSL_MINZOOM = 16;") && psl.includes("minzoom: PSL_MINZOOM") && psl.includes("before: () => labelAnchor()")
+     && /function ensurePublicLayoutLayers\(again\) \{[\s\S]{0,120}if \(!styleReady\(\)\) return;/.test(psl)
+     && src.includes("if (typeof PSL !== 'undefined' && PSL.h) ensurePublicLayoutLayers(true);") && !/once\(['"]idle/.test(psl));
+  ok("PUBLIC LAYOUTS: they follow the month (applyFilters), and a failed month is not read again on every pass",
+     /function applyFilters\(\) \{[\s\S]{0,1500}if \(typeof PSL !== 'undefined'\) refreshPublicLayouts\(\);/.test(src)
+     && psl.includes("PSL.failed === key") && psl.includes("PSL.failed = key;"));
+  ok("PUBLIC LAYOUTS: hidden while a staff login ticks 'Every site layout' (it draws the same and more), shown again after",
+     src.includes("function publicLayoutsShown() { return PSL.on && !SLY.on; }")
+     && /function toggleSiteLayouts\(on\) \{[\s\S]{0,200}showPublicLayouts\(\);/.test(src) && /function siteLayoutsStaff\(staff\) \{[\s\S]{0,400}showPublicLayouts\(\);/.test(src));
+  const pop = cut0(src, "function locationPopupHTML(", "\n    }\n");
+  ok("⭐ PUBLIC LAYOUTS: the site popup's 'Show the site layout' (only while its layout shows that month; no phase name), zoom 17",
+     pop.includes("if (typeof publicLayoutSite === 'function' && publicLayoutSite(props.id))") && pop.includes(">Show the site layout</button>")
+     && pop.indexOf("Show the site layout") < pop.indexOf("Filter Routes to this Location") && !/phase/i.test(pop.slice(pop.indexOf("publicLayoutSite(props.id)"), pop.indexOf(">Show the site layout</button>")))
+     && psl.includes("map.flyTo({ center: s.middle, zoom: Math.max(17, map.getZoom()) });"));
+  const js = fs.readFileSync(path.join(__dirname, "..", "..", "map", "site-layouts.js"), "utf8").replace(/\r\n?/g, "\n");
+  ok("PUBLIC LAYOUTS: site-layouts.js takes a minzoom for every layer it adds",
+     js.includes("if (opts.minzoom != null) o.minzoom = Math.max(o.minzoom || 0, opts.minzoom);"));
+  ok("🔴 PUBLIC LAYOUTS: no banned public words in the new lines",
+     !/\b(secure|real-time|AI|optimi[sz]e|predict|live tracking|truck)\b/i.test(row + pop.slice(pop.indexOf("Show the site layout") - 400, pop.indexOf("Show the site layout") + 40)));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

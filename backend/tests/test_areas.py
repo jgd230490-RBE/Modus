@@ -967,13 +967,14 @@ db.execute_atomic([("DELETE FROM auth_attempts WHERE tenant_id = ? AND id = ?", 
 months_body()
 ok("6b. ⭐ a session touch and the sign-in throttle (NO_DATA_TABLES) leave the version and the cached read alone",
    db.data_version() == _v and read_cache.STATS["builds"] == _b)
+# NARROWED 31 Oct 2026 (task 4a PR 3c): + clp_review_groups, clp_reviews (the client's reviewers; no figure is built from them)
 # NARROWED 31 Oct 2026 (task 4a PR 3b): + clp_notes, the notes and tasks on each CLP (no kept read is built from them,
 # and a note must not end a kept CLP draft)
 # NARROWED 31 Oct 2026 (task 4c PR 3): + site_layout_pictures, the pinned pictures (the staff map reads them fresh; moving
 # one must not end the kept staff reads)
-ok("6b. the tables that do not bump are exactly the account / audit / lead tables, the CLP notes and the pinned pictures",
+ok("6b. the tables that do not bump are exactly the account / audit / lead tables, the CLP notes, the reviewers and the pinned pictures",
    db.NO_DATA_TABLES == {"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users", "demo_requests", "clp_notes",
-                         "site_layout_pictures"})
+                         "clp_review_groups", "clp_reviews", "site_layout_pictures"})
 ok("6b. ⭐ written_table(): INSERT / INSERT OR REPLACE / REPLACE / UPDATE / DELETE name their table; anything else is None (and bumps)",
    db.written_table("INSERT INTO forecasts (a) VALUES (?)") == "forecasts"
    and db.written_table("  insert or replace into Audit_Log (a) values (?)") == "audit_log"
@@ -1071,8 +1072,10 @@ _mw = src_main[src_main.index("async def _access_middleware("):src_main.index("G
 ok("6b. ⭐ the middleware bumps the version after EVERY audited /api/ write, worked or not (in a finally round call_next)",
    "try:\n                response = await call_next(request)\n            finally:" in _mw
    # NARROWED 31 Oct 2026 (task 4a PR 3b): every audited write but a CLP's notes and tasks (_CLP_NOTES_PATH)
+   # NARROWED 31 Oct 2026 (task 4a PR 3c): nor the client reviewers' writes (_REVIEW_PATH)
    # NARROWED 31 Oct 2026 (task 4c PR 3): ...and a pinned picture's writes (_PICTURE_PATH; nothing is built from a picture)
-   and ("if write and _audited(path) and not _CLP_NOTES_PATH.match(path) and not _PICTURE_PATH.match(path):\n"
+   and ("if (write and _audited(path) and not _CLP_NOTES_PATH.match(path) and not _REVIEW_PATH.match(path)\n"
+        "                        and not _PICTURE_PATH.match(path)):\n"
         "                    db.bump_data_version()") in _mw
    and '_PICTURE_PATH = re.compile(r"^/api/(site-layouts/pictures/[^/]+|locations/[^/]+/site-layout/pictures)$")' in src_main
    and '_CLP_NOTES_PATH = re.compile(r"^/api/clp/documents/[^/]+/(notes|tasks)(/|$)")' in src_main)

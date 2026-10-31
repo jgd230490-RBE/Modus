@@ -71,6 +71,7 @@ import clp_pack  # 14 Oct 2026 (bundle G, W10) — the CLP pack: the same charts
 import clp_doc  # 30 Oct 2026 (task 4a) — the outline Construction Logistics Plan as a Word file, for a site or a set
 import clp_records  # 31 Oct 2026 (task 4a, PR 3a) — the CLPs as records: each team's own, the approval step, the issues
 import clp_notes  # 31 Oct 2026 (task 4a, PR 3b) — notes and tasks on each CLP
+import clp_reviews  # 31 Oct 2026 (task 4a, PR 3c) — the client's reviewers: groups, the issues sent, accept / return
 import re
 import site_areas  # 28 Oct 2026 (simulation v2): the areas inside a site
 import pours  # 29 Oct 2026 (task 3a): concrete pours
@@ -420,8 +421,10 @@ if _Request is not None and hasattr(app, "middleware"):
             # nothing more. The new /api/auth/* calls always need it (no signing a person in or
             # out from another page).
             acc_now = access.current()
+            # 31 Oct 2026 (PR 3c): a client reviewer's session is a cookie too
             if write and request.headers.get(GUARD_HEADER) != "1" and (
-                    (acc_now and acc_now.get("via") == "login") or path.startswith("/api/auth/")):
+                    (acc_now and acc_now.get("via") == "login") or access.reviewer() is not None
+                    or path.startswith("/api/auth/")):
                 return _JSON({"detail": "refused: this request did not come from the Wayscope app"},
                              status_code=403)
 
@@ -438,7 +441,8 @@ if _Request is not None and hasattr(app, "middleware"):
                 # 22 Oct 2026 (read_cache): every write that reached an endpoint, worked or not, ends every cached
                 # read. db.note_write already bumps on each committed statement; this is the second net for a path
                 # that writes some other way. The skipped paths (sign-in, page opens, previews) change no figure.
-                if write and _audited(path) and not _CLP_NOTES_PATH.match(path) and not _PICTURE_PATH.match(path):
+                if (write and _audited(path) and not _CLP_NOTES_PATH.match(path) and not _REVIEW_PATH.match(path)
+                        and not _PICTURE_PATH.match(path)):
                     db.bump_data_version()
 
             # G3 (D55): every write that worked, with who did it and what was sent (secrets removed).
@@ -529,9 +533,9 @@ def _audit_write(request, path, method, status, body):
                     detail["body_bytes"] = len(body)
             else:
                 detail["body_bytes"] = len(body)
-        acc = access.current()
+        acc = access.current() or access.reviewer()     # PR 3c: a reviewer's write names them and their group
         # the token counts only where a LOGIN did not already pass _check_admin
-        token_used = bool(q.get("token")) and not (acc and acc.get("via") == "login")
+        token_used = bool(q.get("token")) and not (acc and acc.get("via") in ("login", "reviewer"))
         users.audit("write", acc=acc, method=method, path=path, status=status,
                     detail=detail or None, ip=_client_ip(request), token_used=token_used)
     except Exception as e:  # noqa: BLE001
@@ -725,8 +729,13 @@ def _session_answer(user, request, remember=False, payload_extra=None):
     """A JSONResponse carrying the new session cookie and what the person can do (access.describe)."""
     from fastapi.responses import JSONResponse as _J
     raw, ttl = users.create_session(user["id"], remember=remember, ip=_client_ip(request), ua=_ua(request))
-    acc, _u = users.resolve_session(raw)
-    payload = access.describe(acc)
+    if users.is_reviewer(user):
+        # 31 Oct 2026 (PR 3c): a client reviewer gets the review page only; never an access dict
+        rev, _u = users.resolve_reviewer(raw)
+        payload = users.describe_reviewer(rev) or {}
+    else:
+        acc, _u = users.resolve_session(raw)
+        payload = access.describe(acc)
     if payload_extra:
         payload.update(payload_extra)
     r = _J(payload)
@@ -771,22 +780,32 @@ def auth_setup(body: CodeIn, request: Request = None):
 @app.post("/api/auth/recovery-codes")
 def auth_recovery_codes(body: OwnCodeIn, request: Request = None):
     """New recovery codes for the signed-in person (the old ones stop working); a code from the app first."""
-    acc = access.current()
-    if not acc or acc.get("via") != "login":
-        raise HTTPException(401, "Sign in with your email first.")
-    user = users.get_user(acc["user_id"])
+    user = _own_login()
     codes, err, status = users.renew_recovery_codes(user, body.code, ip=_client_ip(request))
     if not codes:
         raise HTTPException(status, err)
     return {"recovery_codes": codes}
 
 
+def _own_login():
+    """The signed-in person's own login (staff or a client reviewer, PR 3c), for their account menu. 401 otherwise."""
+    acc = access.current()
+    if acc and acc.get("via") == "login":
+        return users.get_user(acc["user_id"])
+    rev = access.reviewer()
+    if rev:
+        return users.get_user(rev["user_id"])
+    raise HTTPException(401, "Sign in with your email first.")
+
+
 @app.get("/api/auth/me")
 def auth_me():
     """Who this browser is signed in as, and whether the shared codes are still on (D49) — the
-    sign-in screen offers the code form only while they work."""
+    sign-in screen offers the code form only while they work. A client reviewer (PR 3c): `reviewer`, no access."""
     acc = access.current()
-    return {"signed_in": bool(acc), "access": access.describe(acc) if acc else None,
+    rev = None if acc else access.reviewer()
+    return {"signed_in": bool(acc or rev), "access": access.describe(acc) if acc else None,
+            "reviewer": users.describe_reviewer(rev) if rev else None,
             "codes": users.codes_enabled()}
 
 
@@ -805,10 +824,15 @@ def auth_signout(request: Request = None):
     map_kw = gate.downgrade_kwargs(cookies.get(gate.COOKIE))
     if raw:
         acc = access.current()
+        rev = None if acc else access.reviewer()
         exp = users.session_expiry(raw)
         users.end_session(raw)
         if acc and acc.get("via") == "login":
             users.audit_event("signout", user=users.get_user(acc["user_id"]), ip=_client_ip(request))
+        if rev:
+            # PR 3c: a reviewer signs out with nothing else opened (never the public map's cookie)
+            users.audit_event("signout", user=users.get_user(rev["user_id"]), ip=_client_ip(request))
+            exp = None
         if exp and not map_kw:
             ttl = min(max(1, int((exp - users._now()).total_seconds())), gate.MAP_TTL_S)
             value = gate.sign(gate.LEVEL_MAP, ttl_s=ttl)
@@ -920,10 +944,7 @@ def auth_link(body: TokenIn, request: Request = None):
 def auth_password(body: PasswordIn, request: Request = None):
     """Change your own password. A wrong current password counts towards the sign-in limit. Every
     other browser is signed out; this one gets a fresh session."""
-    acc = access.current()
-    if not acc or acc.get("via") != "login":
-        raise HTTPException(401, "Sign in with your email first.")
-    user = users.get_user(acc["user_id"])
+    user = _own_login()
     ip = _client_ip(request)
     if users.signin_blocked(user["email"], ip):
         raise HTTPException(429, users.SIGNIN_LOCKED)
@@ -1033,7 +1054,7 @@ def admin_users(token: Optional[str] = None):
     """Every login of this tenant (no password hashes), the teams by NAME, whether the shared codes
     are still on and whether email can be sent."""
     _check_admin(token)
-    return {"users": [users.public(u) for u in users.list_users()], "teams": _teams(),
+    return {"users": [users.public(u) for u in users.list_users() if not users.is_reviewer(u)], "teams": _teams(),
             "codes": users.codes_enabled(), "mail": users.mail_settings() is not None, "me": _me_id()}
 
 
@@ -1066,6 +1087,9 @@ def admin_user_change(user_id: str, body: UserPatch, token: Optional[str] = None
         _team_ok(body.role or "team", body.team)
     if body.role is not None and body.role != "team":
         fields["team"] = None
+    tgt = users.get_user(user_id)
+    if tgt and users.is_reviewer(tgt) and (body.role is not None or body.team is not None):
+        raise HTTPException(400, "A client reviewer stays a client reviewer.")
     if body.extend_days is not None:
         u = users.get_user(user_id)
         if not u or u.get("kind") != "demo":
@@ -1146,6 +1170,95 @@ def admin_user_two_step_reset(user_id: str, token: Optional[str] = None):
         raise HTTPException(400, "This login has not set up two-step sign-in yet.")
     users.reset_two_step(user_id)   # the middleware's audit row records who did it (as every admin write)
     return {"user": users.public(users.get_user(user_id))}
+
+
+# ---- 31 Oct 2026 (task 4a PR 3c): Users → Client reviewers (admins only; clp_reviews.py) --------------------------- #
+class ReviewGroupIn(BaseModel):
+    name: str
+
+
+class ReviewGroupPatch(BaseModel):
+    name: Optional[str] = None
+    stopped: Optional[bool] = None
+
+
+class ReviewerIn(BaseModel):
+    email: str
+    name: str
+    group_id: str
+    ends_on: Optional[str] = None
+
+
+class ReviewerPatch(BaseModel):
+    name: Optional[str] = None
+    disabled: Optional[bool] = None
+    group_id: Optional[str] = None
+    ends_on: Optional[str] = None
+
+
+@app.get("/api/admin/reviewers")
+def admin_reviewers(token: Optional[str] = None):
+    """The client's reviewer groups and their logins."""
+    _check_admin(token)
+    return clp_reviews.listing()
+
+
+@app.post("/api/admin/reviewer-groups")
+def admin_review_group_add(body: ReviewGroupIn, token: Optional[str] = None):
+    _check_admin(token)
+    g, err = clp_reviews.add_group(body.name, _admin_actor()[2])
+    if err:
+        raise HTTPException(400, err)
+    return clp_reviews.listing()
+
+
+@app.patch("/api/admin/reviewer-groups/{group_id}")
+def admin_review_group_change(group_id: str, body: ReviewGroupPatch, token: Optional[str] = None):
+    """Rename, stop (every reviewer of it is signed out at once) or start again."""
+    _check_admin(token)
+    g, err = clp_reviews.change_group(group_id, name=body.name, stopped=body.stopped, by=_admin_actor()[2])
+    if err:
+        raise HTTPException(404 if err == "No such group." else 400, err)
+    return clp_reviews.listing()
+
+
+@app.delete("/api/admin/reviewer-groups/{group_id}")
+def admin_review_group_delete(group_id: str, token: Optional[str] = None):
+    """Only a group no CLP was sent to and with no reviewer."""
+    _check_admin(token)
+    err = clp_reviews.delete_group(group_id)
+    if err:
+        raise HTTPException(404 if err == "No such group." else 400, err)
+    return clp_reviews.listing()
+
+
+@app.post("/api/admin/reviewers")
+def admin_reviewer_add(body: ReviewerIn, token: Optional[str] = None):
+    """A reviewer login in a group, and its invite (set a password, then two-step sign-in)."""
+    _check_admin(token)
+    user, err = clp_reviews.add_reviewer(body.email, body.name, body.group_id, body.ends_on, by=_admin_actor()[2])
+    if err:
+        raise HTTPException(400, err)
+    return {"user": users.public(user), **_invite_or_reset(user), **clp_reviews.listing()}
+
+
+@app.patch("/api/admin/reviewers/{user_id}")
+def admin_reviewer_change(user_id: str, body: ReviewerPatch, token: Optional[str] = None):
+    _check_admin(token)
+    user, err = clp_reviews.change_reviewer(user_id, _fields_set_dict(body), by_user_id=_me_id())
+    if err:
+        raise HTTPException(404 if err == "No such login." else 400, err)
+    return {"user": users.public(user), **clp_reviews.listing()}
+
+
+@app.delete("/api/admin/reviewers/{user_id}")
+def admin_reviewer_delete(user_id: str, token: Optional[str] = None):
+    """The login goes; its comments and decisions stay under the reviewer's name."""
+    _check_admin(token)
+    err = clp_reviews.delete_reviewer(user_id)
+    if err:
+        raise HTTPException(404, err)
+    return clp_reviews.listing()
 
 
 @app.get("/api/admin/leads")
@@ -4838,6 +4951,47 @@ def add_site_layout_phase(location_id: str, body: SiteLayoutPhaseIn):
     return {"phase_id": pid, "layout": site_layouts.get(location_id)}
 
 
+class SiteLayoutPublicIn(BaseModel):
+    public: bool
+    version: int
+
+
+@app.patch("/api/locations/{location_id}/site-layout")
+def set_site_layout_public(location_id: str, body: SiteLayoutPublicIn):
+    """31 Oct 2026 (task 4c PR 4): "Show on the public map" on or off (planners and admins). Carries the layout's
+    version: 409 when someone else changed it first."""
+    _require_approver()
+    return {"layout": _layout_call(site_layouts.set_public, location_id,
+                                   {"public": body.public, "version": body.version}, _by(None))}
+
+
+#: 31 Oct 2026 (task 4c PR 4): one kept public read a month (read_cache), until the next write
+SITE_LAYOUTS_PUBLIC_CACHE = "site-layouts/public|"
+
+
+@app.get("/api/public/site-layouts")
+def public_site_layouts(month: Optional[str] = None):
+    """
+    31 Oct 2026 (task 4c PR 4): the PUBLIC map's site layouts — only layouts with "Show on the public map" on, the
+    phase in force in `month` ('YYYY-MM', default this month), each thing through site_layouts.public_thing (an
+    allow-list: the security / CCTV symbols, the drawing's file name and anything not named there never leave the
+    server), and the style table without the private symbols. Behind the map gate like all of /api/public/. Kept in
+    memory per month until the next write.
+    """
+    import datetime as _dt
+    if month and not site_layouts.MONTH_RE.match(month):
+        raise HTTPException(400, "month must be YYYY-MM")
+    month = month or _dt.date.today().strftime("%Y-%m")
+
+    def build():
+        out = site_layouts.for_public_map(month)
+        out["styles"] = site_layout_styles.public_payload()
+        return read_cache.json_bytes(out)
+
+    body = read_cache.cached(SITE_LAYOUTS_PUBLIC_CACHE + month, month, build)
+    return Response(content=body, media_type="application/json")
+
+
 @app.patch("/api/site-layouts/phases/{phase_id}")
 def edit_site_layout_phase(phase_id: str, body: SiteLayoutPhaseIn):
     """Rename a phase or set its months. Carries the phase's version: 409 when someone else saved first."""
@@ -4853,6 +5007,14 @@ def save_site_layout_things(phase_id: str, body: SiteLayoutThingsIn):
     _require_approver()
     return _layout_call(site_layouts.save_things, phase_id, {"version": body.version, "features": body.features or {}},
                         _by(None))
+
+
+@app.post("/api/site-layouts/phases/{phase_id}/copy")
+def copy_site_layout_phase(phase_id: str):
+    """Copy a phase to a NEW phase of the same layout (every thing; " (copy)" after the name; no months). Planner or
+    admin; one audited write (4c PR 2)."""
+    _require_approver()
+    return {"phase": _layout_call(site_layouts.copy_phase, phase_id, _by(None))}
 
 
 @app.delete("/api/site-layouts/phases/{phase_id}")
@@ -5160,6 +5322,13 @@ class ClpIn(BaseModel):
 class ClpNoteIn(BaseModel):
     note: Optional[str] = None
     task: Optional[dict] = None     # 31 Oct 2026 (PR 3b): Ask for changes may add its note as a task {"due": …}
+    send_to: Optional[List[str]] = None     # PR 3c: Approve … and send the new issue to these reviewer groups
+    show_to: Optional[str] = None           # PR 3c: a note shown to one reviewer group the CLP was sent to
+
+
+class ClpReviewSendIn(BaseModel):
+    groups: List[str]
+    issue_no: Optional[int] = None
 
 
 def _fields_set_dict(model):
@@ -5226,8 +5395,25 @@ def clp_documents_approve(clp_id: str, body: ClpNoteIn):
     """Build the file as Issue N (alone, like every CLP build), keep it and record who and when."""
     acc = _require_access()
     factors = conversions.load_factors()
-    return _clp_out(clp_records.approve(clp_id, body.note, acc, factors, _working_days(factors),
-                                        lambda data, rec: _clp_build(data, rec["impact"], acc)))
+    out = _clp_out(clp_records.approve(clp_id, body.note, acc, factors, _working_days(factors),
+                                       lambda data, rec: _clp_build(data, rec["impact"], acc)))
+    if body.send_to:
+        # PR 3c: the ticked groups get the issue just kept (the stored file; nothing more is built)
+        out = dict(out, review_send=clp_reviews.send_issue(clp_id, None, body.send_to, acc, factors))
+    return out
+
+
+@app.get("/api/clp/documents/{clp_id}/review-send")
+def clp_documents_review_options(clp_id: str):
+    """What ⋯ → Send Issue N to reviewers… offers: the last issue and the live groups. Planners and admins."""
+    return _clp_out(clp_reviews.send_options(clp_id, _require_access()))
+
+
+@app.post("/api/clp/documents/{clp_id}/review-send")
+def clp_documents_review_send(clp_id: str, body: ClpReviewSendIn):
+    """⋯ → Send Issue N to reviewers…: an issued CLP (the stored file) to one or more client groups. Planners and admins."""
+    acc = _require_access()
+    return _clp_out(clp_reviews.send_issue(clp_id, body.issue_no, body.groups, acc))
 
 
 @app.get("/api/clp/documents/{clp_id}/history")
@@ -5252,7 +5438,8 @@ def clp_documents_draft(clp_id: str):
         out = _clp_build(data, rec["impact"], acc)
         clp_notes.keep_lines(rec["id"], data.get("todos"))   # PR 3b: the lines a task can start from (writes no version)
         return out
-    body = _staff_bytes("clp/draft.docx", {"id": rec["id"]}, _build, acc=acc, keep=lambda: basemap.MISSES[0] == misses)
+    body = _staff_bytes("clp/draft.docx", {"id": rec["id"], "reviews": clp_reviews.marker(rec["id"])}, _build, acc=acc,
+                        keep=lambda: basemap.MISSES[0] == misses)
     return _docx_reply(body, clp_doc.file_name(data).replace(".docx", " DRAFT.docx"))
 
 
@@ -5260,12 +5447,16 @@ def clp_documents_draft(clp_id: str):
 # Anyone who can see the CLP reads, writes a note, adds a task and ticks one; its writer, a planner or an admin deletes a
 # note or changes / deletes a task. Audited like every write, but a note ends no kept read (_CLP_NOTES_PATH, NO_DATA_TABLES).
 _CLP_NOTES_PATH = re.compile(r"^/api/clp/documents/[^/]+/(notes|tasks)(/|$)")
+#: 31 Oct 2026 (PR 3c): the client reviewers' writes (groups, logins, sends, comments, decisions) build no figure either
+#: (clp_reviews' tables are NO_DATA_TABLES; a kept draft carries clp_reviews.marker() in its key instead)
+_REVIEW_PATH = re.compile(r"^/api/(review/|admin/reviewer|clp/documents/[^/]+/review-send(/|$))")
 
 
 class ClpTaskIn(BaseModel):
     words: Optional[str] = None
     due: Optional[str] = None
     from_line: Optional[str] = None
+    from_note: Optional[str] = None         # PR 3c: Make a task from a client reviewer's comment
     done: Optional[bool] = None
     model_config = {"extra": "allow"}
 
@@ -5287,7 +5478,7 @@ def clp_notes_read(clp_id: str):
 
 @app.post("/api/clp/documents/{clp_id}/notes")
 def clp_notes_add(clp_id: str, body: ClpNoteIn):
-    return _clp_out(clp_notes.add_note(clp_id, body.note, _require_access()))
+    return _clp_out(clp_notes.add_note(clp_id, body.note, _require_access(), show_to=body.show_to))
 
 
 @app.delete("/api/clp/documents/{clp_id}/notes/{item_id}")
@@ -5308,6 +5499,68 @@ def clp_tasks_change(clp_id: str, task_id: str, body: ClpTaskIn):
 @app.delete("/api/clp/documents/{clp_id}/tasks/{task_id}")
 def clp_tasks_delete(clp_id: str, task_id: str):
     return _clp_out(clp_notes.remove(clp_id, task_id, _require_access()))
+
+
+# ---- 31 Oct 2026 (task 4a PR 3c): the client reviewer's page (clp_reviews.py) --------------------------------------- #
+# 🔴 THE WALL: these are the ONLY reads and writes a reviewer's session reaches. They take access.reviewer(), never
+# access.current() (which is None for a reviewer, so every other guard refuses them), and look each CLP up through the
+# group's sends: a CLP, a draft or an issue not sent to the group is a 404 like one that does not exist. Nothing here
+# builds a file. Each write is audited by the middleware with the reviewer's name and group; a download here.
+class ReviewCommentIn(BaseModel):
+    words: str
+
+
+class ReviewDecisionIn(BaseModel):
+    issue_no: int
+    decision: str
+    words: Optional[str] = None
+
+
+def _require_reviewer():
+    rev = access.reviewer()
+    if not rev:
+        raise HTTPException(401, "Sign in first.")
+    return rev
+
+
+def _review_out(out):
+    if out is None:
+        raise HTTPException(404, "No such CLP.")
+    if isinstance(out, dict) and out.get("error"):
+        raise HTTPException(int(out.get("status") or 422), out["error"])
+    return out
+
+
+@app.get("/api/review/clps")
+def review_clps():
+    return _review_out(clp_reviews.list_for_reviewer(_require_reviewer()))
+
+
+@app.get("/api/review/clps/{clp_id}")
+def review_clp(clp_id: str):
+    return _review_out(clp_reviews.clp_for_reviewer(clp_id, _require_reviewer()))
+
+
+@app.get("/api/review/clps/{clp_id}/issues/{issue_no}.docx")
+def review_clp_issue(clp_id: str, issue_no: int, request: Request = None):
+    """The issue's Word file exactly as approved (the stored file)."""
+    rev = _require_reviewer()
+    got = clp_reviews.issue_file_for_reviewer(clp_id, issue_no, rev)
+    if not got:
+        raise HTTPException(404, "No such issue.")
+    users.audit("review-download", acc=rev, method="GET", path=f"/api/review/clps/{clp_id}/issues/{issue_no}.docx",
+                target=str(clp_id), status=200, ip=_client_ip(request))
+    return _docx_reply(got[1], got[0])
+
+
+@app.post("/api/review/clps/{clp_id}/comments")
+def review_clp_comment(clp_id: str, body: ReviewCommentIn):
+    return _review_out(clp_reviews.comment(clp_id, body.words, _require_reviewer()))
+
+
+@app.post("/api/review/clps/{clp_id}/decision")
+def review_clp_decision(clp_id: str, body: ReviewDecisionIn):
+    return _review_out(clp_reviews.decide(clp_id, body.issue_no, body.decision, body.words, _require_reviewer()))
 
 
 @app.get("/api/clp/documents/{clp_id}/issues/{issue_no}.docx")

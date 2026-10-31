@@ -923,7 +923,9 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 31 Oct 2026 (task 4a, PR 3a): + chapter 18 CLP documents and its four sections (79); + T1 "CLP documents" (33)
    # NARROWED 31 Oct 2026 (task 4c PR 1): + chapter 19 Site layouts and its three sections (83); + T1 "Site layouts" (34)
    # NARROWED 31 Oct 2026 (task 4a, PR 3b): + 18.5 Notes and tasks (84); + T1 "CLP notes and tasks" (35)
-   len(re.findall(r'<li class="l[12]"', src)) == 84 and len(re.findall(r'<li class="l[12]"', _tg2)) == 35   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   # NARROWED 31 Oct 2026 (task 4a, PR 3c): + 18.6 The client's reviewers (85); + T1 "CLP client reviewers" (36)
+   # NARROWED 31 Oct 2026 (task 4c PR 2): + 19.2 Drawing (86)
+   len(re.findall(r'<li class="l[12]"', src)) == 86 and len(re.findall(r'<li class="l[12]"', _tg2)) == 36   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,
@@ -1203,6 +1205,24 @@ ok3("CLP NOTES: the technical guide #t1-clp-notes holds the detail (the table, w
     and "clp_notes  (tenant_id, id)" in _tgv2 and "<code>db.NO_DATA_TABLES</code>" in _tgv2 and "<code>_CLP_NOTES_PATH</code>" in _tgv2
     and "<code>keep_lines</code>" in _tgv2 and "<code>email_task</code>" in _tgv2 and "PATCH  /api/clp/documents/{id}/tasks/{tid}" in _tgv2
     and "Notes and tasks on a plan (PR 3b)" not in _tgv2)
+# ---- 31 Oct 2026 (task 4a, PR 3c): the client's reviewers — 18.6 in plain words; T1 #t1-clp-reviewers the detail
+_ch186 = _ch18[_ch18.index('<h2 id="18-6-the-client-s-reviewers">'):]
+ok3("⭐ CLP REVIEWERS: 18.6 'The client's reviewers' in the nav and the text — only an issued plan; groups and reviewers by an admin; own password + two-step, never a code; stopped never deleted; the approve ticks and ⋯ → Send; one page CLPs for review; Accept / Return needs a comment; one decision per group; the list lines and filter; Make a task; Show to; tasks never shown; the two emails",
+    '<a href="#18-6-the-client-s-reviewers">18.6 The client&#39;s reviewers</a>' in _ug
+    and all(t in _ch186 for t in ("Only an issued plan is ever sent to them; a draft never is.", "<strong>Users → Client reviewers</strong>",
+        "sets up two-step sign-in the first time; reviewers never use a shared code", "is stopped, never deleted", "signs them out at once",
+        "<strong>⋯ → Send Issue N to reviewers…</strong>", "a group that had the last issue is ticked already", "No file is attached.",
+        "<strong>CLPs for review</strong>", "<strong>Return with comments</strong>. Returning needs a comment.", "the first reviewer&#39;s decision stands",
+        "A newer issue starts again.", "<strong>Returned by …</strong> in red", "<strong>Waiting</strong>, <strong>Accepted</strong> or <strong>Returned</strong>",
+        "<strong>Make a task</strong>", "<strong>Show to</strong>", "Tasks and the team&#39;s other notes are never shown to reviewers.",
+        "Comments send no email.", "Document history")), _ch186[:200])
+ok3("🔴 CLP REVIEWERS: 18.6 names no back-end word, team id or supplier and never says secure",
+    not re.search(r"\b(API|endpoint|server|JSON|database|session|token|cookie|IPT\d|secure|AI|Q\d+|D\d{2,3})\b", _ch186))
+ok3("CLP REVIEWERS: the technical guide #t1-clp-reviewers holds the detail (the tables, the wall, the sweep, decisions, emails, audit, the routes, the demo group)",
+    'id="t1-clp-reviewers"' in _tgv2 and '<a href="#t1-clp-reviewers">CLP client reviewers</a>' in _tgv2 and "<code>backend/clp_reviews.py</code>" in _tgv2
+    and "clp_review_groups  (tenant_id, id)" in _tgv2 and "<code>access.reviewer()</code>" in _tgv2 and "<code>backend/tests/smoke_reviewer_wall.py</code>" in _tgv2
+    and "<code>review-download</code>" in _tgv2 and "POST   /api/review/clps/{id}/decision" in _tgv2 and "GET    /api/clp/documents/{id}/review-send" in _tgv2
+    and "<em>Highways client (fictional)</em>" in _tgv2 and "The client's reviewers (PR 3c);" not in _tgv2)
 ok3("CLP DOCS: the technical guide #t1-clp-records holds the detail (the two tables, the listed rows' ids, who may do what, the team cut, the approve build, the endpoints, the stages)",
     'id="t1-clp-records"' in _tgv2 and '<a href="#t1-clp-records">CLP documents</a>' in _tgv2 and "<code>backend/clp_records.py</code>" in _tgv2
     and "clp_documents" in _tgv2 and "clp_issues" in _tgv2 and "<code>auto-&lt;loc&gt;-all</code>" in _tgv2 and "<code>heavy_reads.solo</code>" in _tgv2
@@ -1211,9 +1231,11 @@ ok3("CLP DOCS: the technical guide #t1-clp-records holds the detail (the two tab
 # ---- 31 Oct 2026 (task 4c PR 1): chapter 19 Site layouts (few words, no back end); T1 #t1-layouts the detail
 _ch19 = _ug[_ug.index('<h1 id="19-site-layouts">'):_ug.index('<h1 id="appendix-a-methods-and-assumptions">')]
 ok3("⭐ SITE LAYOUTS: the user guide has chapter 19 with 19.1-19.3 in the nav and the text (phases, bringing in a drawing, the public map for staff); 9.1 points to it",
-    all(t in _ug for t in ('<a href="#19-site-layouts">19. Site layouts</a>', '<a href="#19-1-phases">19.1', '<a href="#19-2-bringing-in-a-drawing">19.2', '<a href="#19-3-on-the-public-map">19.3'))
+    # NARROWED 31 Oct 2026 (task 4c PR 2): + 19.2 Drawing; Bringing in a drawing is 19.3, the public map 19.4 (their ids kept)
+    all(t in _ug for t in ('<a href="#19-site-layouts">19. Site layouts</a>', '<a href="#19-1-phases">19.1', '<a href="#19-4-drawing">19.2 Drawing', '<a href="#19-2-bringing-in-a-drawing">19.3', '<a href="#19-3-on-the-public-map">19.4'))
     and all(t in _ch19 for t in ("<strong>Bring in a drawing</strong>", "<strong>+ Add a phase</strong>", "<strong>Place anyway</strong>", "<strong>Keep the file&#39;s colours</strong>",
-                                 "Save a DWG as DXF first.", "Planners and admins change it", "Visitors with the map password do not see it."))
+                                 "Save a DWG as DXF first.", "Planners and admins change it", "Untick it and visitors with the map password do not see it."))
+    # NARROWED 31 Oct 2026 (task 4c PR 4): "... do not see it" now follows "Untick it and" (a ticked layout is public)
     and "is under its areas: chapter 19." in _ug, _ch19[:200])
 ok3("SITE LAYOUTS: chapter 19 names no library, grid file, rule code or back-end word",
     not re.search(r"\b(API|endpoint|server|JSON|OSTN15|pyproj|ezdxf|EPSG|PROJ|Mapbox|HERE|held|trucks?)\b", _ch19))
@@ -1228,6 +1250,31 @@ ok3("SITE LAYOUTS: 19.2 says a DXF may be in millimetres, inches or feet, what i
 ok3("SITE LAYOUTS: #t1-layouts holds the units rule, the leave-outs, footprints, holes and the Terra Draw note for PR 2",
     "<code>FOOTPRINT_M</code>" in _tgv2 and "<code>site_layouts.MAX_HOLES</code>" in _tgv2 and "Terra Draw 1.37 refuses a polygon with holes" in _tgv2
     and "<code>contractor-style-mm.dxf</code>" in _tgv2 and "<code>$INSUNITS</code> must be 6" not in _tgv2)
+
+# 31 Oct 2026 (task 4c PR 2, the approved mockup notes\\site-layout-draw-mockup-1031): 19.2 Drawing, few words; #t1-layouts-draw the detail
+_d192 = _ch19[_ch19.index('<h2 id="19-4-drawing">'):_ch19.index('<h2 id="19-2-bringing-in-a-drawing">')] if '<h2 id="19-4-drawing">' in _ch19 else ""
+ok3("⭐ SITE LAYOUTS (PR 2): 19.2 Drawing says how to draw, select, turn and resize, the snapping, layers, holes, the keys, Save / Discard, the words from zoom 15",
+    all(t in _d192 for t in ("<strong>Draw</strong>", "hold R and drag to turn it, S to resize it", "<strong>15° steps</strong>", "hidden or locked while you draw",
+                             "an area with holes keeps them", "Ctrl+Z undo, Ctrl+Y redo, Ctrl+D duplicate, Ctrl+S save", "<strong>Discard</strong>", "from zoom 15, on both maps"))
+    and "<strong>Name and months</strong>, <strong>Copy to a new phase</strong>" in _ch19 and "<strong>Show the whole drawing</strong>" in _ch19
+    and "<strong>Edit</strong> changes its name and months" not in _ch19, _d192[:200])
+ok3("SITE LAYOUTS (PR 2): 19.2 names no library or back end (Terra Draw, uuid, version, PUT live in the technical guide)",
+    _d192 and not re.search(r"\b(API|endpoint|server|JSON|Terra|uuid|PUT|409|Mapbox|version)\b", _d192)
+    and 'id="t1-layouts-draw"' in _tgv2 and "Terra Draw 1.39.0 and terra-draw-mapbox-gl-adapter 1.5.0" in _tgv2
+    and "<code>WSLayouts.geo.holesFollow</code>" in _tgv2 and "<code>POST /api/site-layouts/phases/{id}/copy</code>" in _tgv2
+    and "<code>LAYOUT_LEAVE</code>" in _tgv2 and "<code>WORDS_Z</code> 15" in _tgv2 and "Drawing tools, pins" not in _tgv2)
+# ---- 31 Oct 2026 (task 4c PR 4): the public site layouts in 8.2, 19.3 and #t1-layouts
+_ug82 = _ug[_ug.index('id="8-2-filters-basemaps-and-overlays"'):_ug.index('id="8-4-the-forecast-timeline-and-kpi-panel"')]
+ok3("⭐ PUBLIC LAYOUTS: 8.2 lists Site layouts (zoom in close, the popup's button) and 19.3 the tick, Every site layout and no security / CCTV",
+    "<li><strong>Site layouts</strong>" in _ug82 and "<strong>Show the site layout</strong>" in _ug82 and "Zoom in close" in _ug82
+    and "<strong>Show on the public map</strong>" in _ch19 and "<strong>Every site layout</strong>" in _ch19
+    and "Security and CCTV symbols never show there." in _ch19 and "Untick it and visitors with the map password do not see it." in _ch19)
+ok3("PUBLIC LAYOUTS: the guide's new lines name no back end (zoom figures, cache, allow-list stay in the technical guide)",
+    not re.search(r"\b(API|endpoint|server|cache|allow-list|zoom 1[67]|JSON)\b", _ch19 + _ug82[_ug82.index("<li><strong>Site layouts</strong>"):_ug82.index("<li><strong>Site layouts</strong>") + 400]))
+ok3("PUBLIC LAYOUTS: #t1-layouts holds the switch, the public read, the allow-list, the cache and zoom 16",
+    "PATCH /api/locations/{id}/site-layout" in _tgv2 and "GET /api/public/site-layouts?month=YYYY-MM" in _tgv2
+    and "<code>site_layouts.public_thing</code>" in _tgv2 and "<code>read_cache.cached()</code>" in _tgv2 and "{minzoom: 16}" in _tgv2
+    and "<code>site_layout_styles.public_payload()</code>" in _tgv2 and "the public layer and the sheet come in later PRs" not in _tgv2)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

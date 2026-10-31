@@ -6,14 +6,18 @@
 # the ones an earlier blueprint created under other names. Retire those by hand, after
 # exporting anything you need from them.
 #
-# ⚠️ THE PLAN VALUES ARE MONEY. `starter` and `basic-256mb` are paid plans. Change them
+# ⚠️ THE PLAN VALUES ARE MONEY. `standard` and `basic-256mb` are paid plans. Change them
 #    to what you intend to buy BEFORE the first sync, and never move a database to a
 #    smaller or free plan by editing this file — on Render a free database expires.
+# 31 Oct 2026: the web service moved from `starter` (0.5 CPU, 512 MB) to `standard`
+#    (Render's compute plan 1c-2g: 1 CPU, 2 GB). Changed on Render first; this file
+#    matches it so a blueprint sync cannot move it back. A pilot's own web service is
+#    the same plan.
 services:
   - type: web
     name: modus-web
     runtime: python
-    plan: starter
+    plan: standard
     buildCommand: "pip install -r backend/requirements.txt"
     startCommand: "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /api/health

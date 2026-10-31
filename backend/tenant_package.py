@@ -85,6 +85,9 @@ ORDER = [
     # 31 Oct 2026 (task 4a, PR 3a): the CLP records name locations and a team; each issue names its CLP, so after it
     "clp_documents", "clp_issues",
     "clp_notes",            # 31 Oct 2026 (task 4a, PR 3b): the notes and tasks on each CLP, so after clp_documents
+    # 31 Oct 2026 (task 4a, PR 3c): the client's reviewer groups, and the issues sent to them with their decisions (each
+    # names a CLP and a group). The reviewer LOGINS are people, like the staff logins: never in the file
+    "clp_review_groups", "clp_reviews",
     "stockpile_weeks",
     "stockpile_plan",       # 27 Oct 2026 (stockpile forecast): each pile's planned use by month
     # 14 Oct 2026: the community considerations layer (fetched along the routes; no foreign keys)

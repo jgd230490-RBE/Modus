@@ -2023,7 +2023,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("G3: an unknown address is the one refusal, 401", r.status_code == 401 and "don't match" in r.text, r.text[:120])
     r = c.get("/api/auth/me")
     ok("G3: /api/auth/me signed out says so, and that the shared codes are still on (they are set here)",
-       r.status_code == 200 and r.json() == {"signed_in": False, "access": None, "codes": True}, r.text[:200])
+       # NARROWED 31 Oct 2026 (task 4a, PR 3c): + "reviewer": None (a client reviewer's sign-in answers there, never in access)
+       r.status_code == 200 and r.json() == {"signed_in": False, "access": None, "reviewer": None, "codes": True}, r.text[:200])
     # the first admin, D47: the admin token on the Users endpoints
     r = c.post("/api/admin/users", params=TOKEN, json={"email": "Ada@Example.org", "name": "Ada Lovelace", "role": "admin"})
     ok("⭐ G3 D47: the admin token adds the first admin; with no sender the invite link comes back",

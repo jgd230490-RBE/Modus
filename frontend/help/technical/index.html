@@ -54,7 +54,7 @@ main:focus{outline:0}
 <li class="l2"><a href="#t1-baf">Fuel index and BAF</a></li>
 <li class="l2"><a href="#t1-gates">Gate arrivals</a></li>
 <li class="l2"><a href="#t1-stock">Stockpiles</a></li><li class="l2"><a href="#t1-pours">Concrete pours</a></li>
-<li class="l2"><a href="#t1-clp">CLP monitoring</a></li><li class="l2"><a href="#t1-clp-records">CLP documents</a></li><li class="l2"><a href="#t1-clp-notes">CLP notes and tasks</a></li><li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li><li class="l2"><a href="#t1-layouts">Site layouts</a></li>
+<li class="l2"><a href="#t1-clp">CLP monitoring</a></li><li class="l2"><a href="#t1-clp-records">CLP documents</a></li><li class="l2"><a href="#t1-clp-notes">CLP notes and tasks</a></li><li class="l2"><a href="#t1-clp-reviewers">CLP client reviewers</a></li><li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li><li class="l2"><a href="#t1-layouts">Site layouts</a></li>
 <li class="l1"><a href="#t2-routing">T2 Routing with HERE</a></li>
 <li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>
 <li class="l1"><a href="#t3-sources">T3 Where each screen reads from</a></li>
@@ -436,7 +436,7 @@ template's stages for the programme, <code>clp_doc.DEFAULT_STAGES</code>, sent t
 (<code>clp_doc.settings_problem</code>, checked on Config save). A discipline in no stage gets a stage of its own after the
 last. 2.4.2 lists named schools, hospitals and health centres first (<code>clp_doc_layers.SENSITIVE_KINDS</code>), then the
 other named places, nearest first; places with no name are counted per kind (<code>places_unnamed</code>).</p>
-<p><strong>Not yet built.</strong> The client's reviewers (PR 3c); the appendices (PR 4). Notes and tasks (PR 3b): the next section.</p>
+<p><strong>Not yet built.</strong> The appendices (PR 4). Notes and tasks (PR 3b) and the client's reviewers (PR 3c): the next two sections.</p>
 <h2 id="t1-clp-notes">CLP notes and tasks</h2>
 <p>31 Oct 2026 (task 4a, PR 3b; mockup <code>notes/clp-notes-mockup-1031</code>, Q1–Q12 as recommended). <code>backend/clp_notes.py</code>
 over one tenanted table, in the organisation file (after <code>clp_issues</code>) and kept by a demo refresh:</p>
@@ -476,6 +476,51 @@ DELETE /api/clp/documents/{id}/tasks/{tid}      a task (writer / planner / admin
 <p>The list's rows carry <code>tasks = {open, overdue, next_due, notes, done, mine_open}</code> (one read for every plan);
 <code>approve-preview</code> carries <code>tasks = {open, overdue, first_overdue}</code>. Deleting a plan made with + New CLP
 deletes its rows (<code>drop_all</code>); clearing a listed row keeps them. Nothing of this table reaches the Word file.</p>
+<h2 id="t1-clp-reviewers">CLP client reviewers</h2>
+<p>31 Oct 2026 (task 4a, PR 3c; mockup <code>notes/clp-reviewers-mockup-1031</code>, Q1–Q12 as recommended). <code>backend/clp_reviews.py</code>
+over two tenanted tables, both in the organisation file (the logins are not) and both in <code>db.NO_DATA_TABLES</code> (no
+figure is built from them; a kept draft carries <code>clp_reviews.marker()</code> in its key instead):</p>
+<pre>clp_review_groups  (tenant_id, id) — name, created_by / created_at, updated_at, stopped_by / stopped_at
+clp_reviews        (tenant_id, id) — clp_id, issue_no, group_id, kind sent | decision, decision accepted | returned,
+                   words, by_name, by_user, at
+users.review_group     the group of a login of kind 'reviewer'
+clp_notes.review_group a reviewer's comment, a send / decision step, or a contractor note ticked "Show to &lt;group&gt;"</pre>
+<p><strong>The wall.</strong> A reviewer is a login of kind <code>reviewer</code>: an invite, their own password, two-step from the
+first sign-in, the same lock-out, reset and end date as any login, never a code. <code>users.resolve_session</code> answers
+<code>(None, None)</code> for a reviewer's session, so <code>access.current()</code> is None and every staff guard refuses them
+exactly as it refuses a visitor; only <code>users.resolve_reviewer</code> reads it, into the separate <code>access.reviewer()</code>
+context. The five <code>/api/review/*</code> routes (<code>_require_reviewer</code>) are the only ones that take it, and they look
+a CLP up only through the group's <code>sent</code> rows: a CLP, a draft or an issue not sent to the group, or another group's,
+is the same 404 as one that does not exist. A download is the stored <code>clp_issues.file_b64</code>; nothing a reviewer does
+builds a file. Stopping a group, disabling or deleting a reviewer, or moving them to another group ends their sessions. The
+landing form never makes a reviewer. <code>backend/tests/smoke_reviewer_wall.py</code> calls every <code>/api</code> route of the
+real app (the OpenAPI list and the hidden ones) as nobody and as a signed-in reviewer, with and without the map cookie, and
+fails on any difference in the status or the body.</p>
+<p><strong>Decisions.</strong> One standing decision per group per issue: the first stands with its name; another reviewer of
+the group may change it while the issue is the latest sent to that group (<code>can_decide</code>); every row is kept; a newer
+issue starts with none. The contractor's list rows carry <code>reviews = [{group_id, group_name, issue_no, state waiting |
+accepted | returned, sent_at, at}]</code>, the last issue sent to each group; <code>review_groups</code> on the list is a flag
+(planners and admins, any group). The Document history's group lines come from <code>clp_reviews.history_rows</code>: no reviewer's name, and the group named only while the CLP was never sent to another group (else "by the client's reviewers"), because one issued file can go to several clients.</p>
+<p><strong>From the security review (31 Oct).</strong> The client reads the approver's note only (<code>approver_note</code>), never the team's note to the approver (<code>sent_note</code>), on the page and in the email; only <code>access.can_approve</code> may tick Show to (a team gets no groups offered and a 403); group, reviewer and CLP names are kept on one line (<code>_one_line</code>, <code>_clean_name</code>) and a message that cannot be built counts as a failed email instead of failing a write half-done; a refused group move saves nothing; <code>users._make_admin</code> ends every session of the login.</p>
+<p><strong>Email.</strong> One to each reviewer of the group on a send (no attachment; the link opens <code>#review</code>), one
+to the sender when the group decides. Comments send nothing. <strong>Audit.</strong> Every write is in <code>audit_log</code>
+with the reviewer's name, email and group (<code>access.current() or access.reviewer()</code> in the middleware); a download is
+the row <code>review-download</code>.</p>
+<pre>GET    /api/admin/reviewers                      groups + reviewer logins (admins)
+POST   /api/admin/reviewer-groups                {name}
+PATCH  /api/admin/reviewer-groups/{gid}          {name} | {stopped}
+DELETE /api/admin/reviewer-groups/{gid}          only while no CLP was sent to it
+POST   /api/admin/reviewers                      {name, email, group_id, ends_on}
+PATCH  /api/admin/reviewers/{uid}                {group_id} | {ends_on} | {disabled}
+DELETE /api/admin/reviewers/{uid}                the login (their comments and decisions stay, by name)
+GET    /api/clp/documents/{id}/review-send       the last issue and the live groups (planners / admins)
+POST   /api/clp/documents/{id}/review-send       {groups, issue_no}; also approve's {send_to}
+GET    /api/review/clps                          a reviewer: the CLPs sent to their group
+GET    /api/review/clps/{id}                     one: latest, issues with decisions, the thread they may see
+GET    /api/review/clps/{id}/issues/{no}.docx    the issue as approved
+POST   /api/review/clps/{id}/comments            {words}
+POST   /api/review/clps/{id}/decision            {issue_no, decision accepted | returned, words}</pre>
+<p>The demo carries one group, <em>Highways client (fictional)</em>, with no logins.</p>
 <h2 id="t1-abnormal">Abnormal loads (S16 / B5, 22 Oct 2026)</h2>
 <p>Each abnormal load is its own row in <code>abnormal_loads</code> (one tenant's, carried in its package), never a forecast line: nothing of it reaches the tonnes, trips, vehicles, CLP caps, gate capacity or carbon figures (D70, D71). The rules engine is <code>backend/abnormal_rules.py</code>, every threshold a named constant with its source, and <code>test_abnormal.py</code> asserts each on both sides.</p>
 <ul><li><strong>When a load is abnormal.</strong> Over 44 t gross, over 2.9 m wide, over 18.65 m rigid, over 10 t on an axle (11.5 t driving): the Road Vehicles (Authorised Weight) Regulations 1998 and the Construction and Use Regulations 1986 as the National Highways aide memoire reads them. Construction and Use covers up to 4.3 m wide and 27.4 m long; STGO 2003 Schedule 1 gives Category 1 (up to 50 t on 5 or 6 axles), 2 (80 t, 6 or more) and 3 (150 t), with 12.5 / 12 / 16.5 t axle limits, 1.35 m minimum spacing and the tonnes-a-metre rule; over 150 t, 6.1 m wide or 30 m long is a Special Order (BE16). Width over 5.0 m (to 6.1 m) is a VR1.</li>
@@ -494,7 +539,9 @@ deletes its rows (<code>drop_all</code>); clearing a listed row keeps them. Noth
 <li><strong>The site grid.</strong> <code>GET /api/site-layouts/fit?location_id=&amp;import_id=&amp;pts=NAME:lon,lat;…</code>: a similarity fit (turn, one scale, shift; least squares from three or more points) on the WGS 84 radii at the site; each point&#39;s miss; over 1 m (<code>MISS_LIMIT_M</code>) needs <code>place_anyway</code>; a scale outside 0.999–1.001 is named. The gate check lists the six closest pairs of an imported gate symbol and a stored gate.</li>
 <li><strong>Placing and saving.</strong> <code>POST /api/locations/{id}/site-layout/place</code> (the table&#39;s choices, the points, <code>where</code> = <code>new</code> or a phase id with its <code>version</code>); the choices are saved to Config <code>site_layouts.import_map</code> for the organisation&#39;s next drawing. <code>POST …/site-layout/phases</code>, <code>PATCH /api/site-layouts/phases/{id}</code>, <code>PUT …/features</code>, <code>DELETE …?version=</code>: each carries the phase&#39;s version; a stale one is 409 "Someone else saved this layout. Reload to see their changes." Planner or admin (<code>_require_approver</code>); reads need any sign-in.</li>
 <li><strong>The map.</strong> <code>GET /api/site-layouts/map?month=YYYY-MM</code> (default this month): every phase that applies, staff only (the map password&#39;s cookie is 401). The public map&#39;s <code>#site-layouts-group</code> is shown by <code>siteLayoutsStaff</code>, read only when ticked, re-added on <code>style.load</code> through <code>styleReady()</code>, under the basemap&#39;s names (<code>labelAnchor()</code>). Data → Locations loads <code>/map/site-layouts.js</code> once, when a site is opened.</li>
-<li><strong>Not yet.</strong> Drawing tools, pins, the public layer and the sheet come in later PRs. Harness: <code>test_site_layouts.py</code> (the six samples in <code>backend/tests/fixtures/site_layouts/</code>, made by <code>backend/tools/make_site_layout_samples.py</code>).</li></ul>
+<li id="t1-layouts-draw"><strong>The drawing tools (31 Oct 2026, PR 2).</strong> <code>SiteLayoutDraw</code> in <code>frontend/index.html</code>, on the Locations page&#39;s one map (the grid places the same map div in its middle column; the panel is hidden, not unmounted). Terra Draw 1.39.0 and terra-draw-mapbox-gl-adapter 1.5.0 (MIT) are added from jsDelivr, exact and with their sha384 (pinned in <code>test_hardening.py</code>), only when Draw is pressed. Terra Draw moves geometry; every look stays <code>WSLayouts</code>&#39; (prefix <code>dm-draw</code>), Terra Draw&#39;s own lines drawn only while a thing is drawn or selected. Terra Draw 1.37 refuses a polygon with holes (1.39 too): it is given the outer ring, the holes wait beside it and follow through <code>WSLayouts.geo.holesFollow</code> (a similarity fit of the ring&#39;s corners; within 5 cm the holes move with it, else they stay; one left outside the ring is dropped and said). A thing Terra Draw refuses is drawn and saved unchanged. Ids are uuid v4 (Terra Draw takes no other; the server drops them); coordinates 7 dp. Snapping: 12 px to every corner and edge of the layout, the site&#39;s gates and its zones. Undo keeps 80 steps until the editor closes. Save is <code>PUT …/features</code> with the version (409 = Reload); <code>POST /api/site-layouts/phases/{id}/copy</code> copies a phase (one audited write, the 24-phase limit, &ldquo;(copy)&rdquo;, no months). Unsaved changes: <code>LAYOUT_LEAVE</code> is asked by the app&#39;s page change and the hash, and <code>beforeunload</code>. A basemap switch stops and re-creates Terra Draw with the things as they are. The words (<code>d-alabel</code>, <code>t-bold</code>, <code>t-reg</code>, the symbol labels) show from <code>WORDS_Z</code> 15 on both maps; the survey-point fit no longer moves the map.</li>
+<li><strong>The public map (31 Oct 2026, PR 4).</strong> <code>PATCH /api/locations/{id}/site-layout</code> <code>{public, version}</code> (planners and admins; the layout&#39;s version, 409 with the STALE sentence if someone saved first; 400 &ldquo;This site has no layout yet.&rdquo;) sets <code>site_layouts.public</code>. <code>GET /api/public/site-layouts?month=YYYY-MM</code> (default this month; 400 on a bad month) is behind the map password like every <code>/api/public/</code> read and kept by <code>read_cache.cached()</code> (one entry a month, until the next write). It answers <code>{month, any, sites: [{location_id, name, middle, bounds}], features, styles}</code>: only layouts switched on, only the phase in the month, and every thing passed through an ALLOW-LIST (<code>site_layouts.public_thing</code>): a known style whose geometry is its kind&#39;s, a symbol not in <code>PRIVATE_SYMBOLS</code> (security, CCTV), and only the drawing keys in <code>site_layouts.PUBLIC_KEYS</code> (no source file, layer name, note, picture, phase name or id). The style table comes with the answer (<code>site_layout_styles.public_payload()</code>, the private symbols left out), since <code>/api/site-layouts/styles</code> is staff only. The map&#39;s <code>PSL</code> block reads it for the month on screen (<code>applyFilters</code>), draws it with <code>WSLayouts.install(…, {minzoom: 16})</code> (prefix <code>site-layout-public</code>), re-adds it on <code>style.load</code> through <code>styleReady()</code>, hides it while a staff login ticks <em>Every site layout</em>, and adds <em>Show the site layout</em> (zoom 17) to the popup of a site in the answer.</li>
+<li><strong>Not yet.</strong> Pins and the sheet come in later PRs (the drawing tools: PR 2; the public layer: PR 4, above). Harness: <code>test_site_layouts.py</code> (the six samples in <code>backend/tests/fixtures/site_layouts/</code>, made by <code>backend/tools/make_site_layout_samples.py</code>).</li></ul>
 <h1 id="t2-routing">T2 Routing with HERE</h1>
 <p>The screens say a route is <em>routed</em> or <em>not routed yet</em>. In the code and the data this is
 <strong>baking</strong>: a call to HERE Routing v8 with the vehicle's truck profile (gross weight, height, width,

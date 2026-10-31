@@ -121,6 +121,9 @@ TENANTED = {
     "clp_notes",
     # 31 Oct 2026 (task 4c PR 3, site_layout_pictures.py): the pictures pinned on a layout. Same edit.
     "site_layout_pictures",
+    # 31 Oct 2026 (task 4a, PR 3c, clp_reviews.py): the client's reviewer groups, and the issues sent to them with their
+    # decisions. Same edit.
+    "clp_review_groups", "clp_reviews",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is

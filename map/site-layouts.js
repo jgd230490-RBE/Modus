@@ -11,10 +11,14 @@
  * the top-level input of every expression (GL drops a layer whose zoom expression sits inside arithmetic); each
  * thing carries `_m` = 1 / cos(its latitude), so a metre is a metre anywhere.
  *
- *   const h = WSLayouts.install(map, styles, { prefix: "sl", before: () => "some-layer-id" });
+ *   const h = WSLayouts.install(map, styles, { prefix: "sl", before: () => "some-layer-id", minzoom: 16 });
  *   await h.ready;            // the symbol pictures are loaded
  *   h.setData(features);      // a GeoJSON FeatureCollection or a list of things
  *   h.setVisible(false);  h.reinstall();   // after map.setStyle (every layer and picture is dropped)
+ *
+ * 31 Oct 2026 (PR 2): the layout's WORDS (text things, area names, symbol labels) show only from zoom WORDS_Z (15), on
+ * both maps — at the whole-scheme zoom they printed as a smudge over the site (the live test L1). And `geo`: the pure
+ * geometry the drawing tools use (turn, resize, round to 7 dp, the holes that follow an area), testable in Node.
  */
 (function () {
   "use strict";
@@ -77,6 +81,57 @@
     return Math.abs(s / 2);
   }
   const pt = (c, props) => ({ type: "Feature", geometry: { type: "Point", coordinates: c }, properties: props });
+  const WORDS_Z = 15;
+
+  // ---------------------------------------------------------------- geometry for the drawing tools (PR 2)
+  const fromM = (m, o) => [o[0] + m[0] / (111320 * Math.cos(o[1] * Math.PI / 180)), o[1] + m[1] / KY];
+  const r7 = (v) => Math.round(v * 1e7) / 1e7;
+  function mapGeom(g, fn) {
+    if (g.type === "Point") return { type: "Point", coordinates: fn(g.coordinates) };
+    if (g.type === "LineString") return { type: "LineString", coordinates: g.coordinates.map(fn) };
+    return { type: "Polygon", coordinates: g.coordinates.map((r) => r.map(fn)) };
+  }
+  const round7 = (g) => mapGeom(g, (p) => [r7(p[0]), r7(p[1])]);
+  // turn by `deg` clockwise / resize by `k` / shift by e, n metres, about the thing's middle
+  function rotate(g, deg, about) {
+    const o = about || centroid(g), a = -deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+    return mapGeom(g, (p) => { const m = toM(p, o); return fromM([m[0] * c - m[1] * s, m[0] * s + m[1] * c], o); });
+  }
+  function scale(g, k, about) { const o = about || centroid(g); return mapGeom(g, (p) => { const m = toM(p, o); return fromM([m[0] * k, m[1] * k], o); }); }
+  function shift(g, e, n) { return mapGeom(g, (p) => fromM([e, n], p)); }
+  // the turn + resize + shift that best takes points `a` onto points `b` (least squares; the survey points' fit)
+  function fit(a, b) {
+    const o = a[0], P = a.map((p, i) => [toM(p, o), toM(b[i], o)]), n = P.length;
+    const mx = P.reduce((s, q) => s + q[0][0], 0) / n, my = P.reduce((s, q) => s + q[0][1], 0) / n;
+    const MX = P.reduce((s, q) => s + q[1][0], 0) / n, MY = P.reduce((s, q) => s + q[1][1], 0) / n;
+    let sxx = 0, A = 0, B = 0;
+    for (const [[x0, y0], [X0, Y0]] of P) { const x = x0 - mx, y = y0 - my, X = X0 - MX, Y = Y0 - MY; sxx += x * x + y * y; A += x * X + y * Y; B += x * Y - y * X; }
+    if (!sxx) { A = 1; B = 0; } else { A /= sxx; B /= sxx; }
+    const f = (x, y) => [A * (x - mx) - B * (y - my) + MX, B * (x - mx) + A * (y - my) + MY];
+    const worst = Math.max(0, ...P.map(([[x, y], [X, Y]]) => { const q = f(x, y); return Math.hypot(q[0] - X, q[1] - Y); }));
+    return { worst, apply: (p) => { const m = toM(p, o); return fromM(f(m[0], m[1]), o); } };
+  }
+  function inRing(q, ring) {
+    let c = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      if ((yi > q[1]) !== (yj > q[1]) && q[0] < (xj - xi) * (q[1] - yi) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  }
+  // An area's holes when its OUTSIDE edge went from `was` to `now` (the drawing tool holds no holes): moved, turned or
+  // resized as a whole (every corner fits within 5 cm) the holes go with it; a corner moved, added or deleted leaves
+  // them; a hole no longer inside the edge is dropped. -> { holes, dropped }
+  function holesFollow(holes, was, now) {
+    let out = holes;
+    if (was && now && was.length === now.length && was.length > 3) {
+      const t = fit(was.slice(0, -1), now.slice(0, -1));
+      if (t.worst <= 0.05) out = holes.map((r) => r.map((q) => { const p = t.apply(q); return [r7(p[0]), r7(p[1])]; }));
+    }
+    const kept = out.filter((r) => r.every((q) => inRing(q, now || was)));
+    return { holes: kept, dropped: out.length - kept.length };
+  }
+  const geo = { round7, mapGeom, rotate, scale, shift, fit, inRing, holesFollow, toM, fromM, lengthM: (cs) => cs.slice(1).reduce((s, p, i) => { const m = toM(p, cs[i]); return s + Math.hypot(m[0], m[1]); }, 0) };
 
   function install(map, styles, opts) {
     opts = opts || {};
@@ -98,13 +153,14 @@
     function before() { const b = typeof opts.before === "function" ? opts.before() : opts.before; return b && map.getLayer(b) ? b : undefined; }
 
     function addAll() {
-      if (!pics || map.getSource(SRC)) return;
+      try { if (!pics || map.getSource(SRC)) return; } catch (e) { return; }   // the map went before the pictures came
       for (const [id, im] of pics) img(id, im);
       map.addSource(SRC, { type: "geojson", data });
       map.addSource(DRV, { type: "geojson", data: derived });
       ids.length = 0;
       const b = before();
-      const L = (o) => { o.id = P + o.id; o.layout = Object.assign({ visibility: visible ? "visible" : "none" }, o.layout || {}); map.addLayer(o, b); ids.push(o.id); };
+      // opts.minzoom (31 Oct 2026, task 4c PR 4): nothing of the layout below this zoom (the public map: 16)
+      const L = (o) => { o.id = P + o.id; o.layout = Object.assign({ visibility: visible ? "visible" : "none" }, o.layout || {}); if (opts.minzoom != null) o.minzoom = Math.max(o.minzoom || 0, opts.minzoom); map.addLayer(o, b); ids.push(o.id); };
       // ---- areas
       L({ id: "a-fill", type: "fill", source: SRC, filter: ["all", isArea, ["==", ["get", "fill"], "solid"]], layout: { "fill-sort-key": ["get", "z"] }, paint: { "fill-color": ["get", "color"], "fill-opacity": OP } });
       L({ id: "a-pat", type: "fill", source: SRC, filter: ["all", isArea, ["has", "pat"]], layout: { "fill-sort-key": ["get", "z"] }, paint: { "fill-pattern": ["get", "pat"], "fill-opacity": ["min", 1, ["+", 0.25, OP]] } });
@@ -140,18 +196,18 @@
         layout: { "icon-image": ["match", ["get", "d"], "head", P + "g-head", "headw", P + "g-headw", "lights", P + "g-lights", P + "s-mobilecrane"],
           "icon-size": metres(["coalesce", ["get", "sz"], 6], 0.22, 0, 64), "icon-rotate": ["coalesce", ["get", "rot"], 0],
           "icon-rotation-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true } });
-      L({ id: "d-alabel", type: "symbol", source: DRV, filter: ["==", ["get", "d"], "alabel"],
+      L({ id: "d-alabel", type: "symbol", source: DRV, minzoom: WORDS_Z, filter: ["==", ["get", "d"], "alabel"],
         layout: { "text-field": ["get", "text"], "text-font": ["DIN Pro Bold", "Arial Unicode MS Bold"], "text-size": metres(["get", "size"], 10), "text-allow-overlap": true, "text-ignore-placement": true, "text-rotation-alignment": "map", "text-letter-spacing": 0.06 },
         paint: { "text-color": ["get", "color"], "text-halo-color": "#FFFFFF", "text-halo-width": 1.6 } });
       // ---- symbols and words
       L({ id: "s-icons", type: "symbol", source: SRC, filter: ["==", ["get", "style"], "sym"],
         layout: { "icon-image": ["concat", P + "s-", ["get", "sym"]], "icon-size": metres(["coalesce", ["get", "size"], 3], 0.3, 0, 64), "icon-rotate": ["coalesce", ["get", "rot"], 0],
           "icon-rotation-alignment": "map", "icon-pitch-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "z"],
-          "text-field": ["coalesce", ["get", "label"], ""], "text-font": ["DIN Pro Bold", "Arial Unicode MS Bold"], "text-size": metres(1.4, 10), "text-anchor": "top",
+          "text-field": ["step", ["zoom"], "", WORDS_Z, ["coalesce", ["get", "label"], ""]], "text-font": ["DIN Pro Bold", "Arial Unicode MS Bold"], "text-size": metres(1.4, 10), "text-anchor": "top",
           "text-offset": [0, 1.4], "text-allow-overlap": true, "text-ignore-placement": true },
         paint: { "text-color": "#111827", "text-halo-color": "#FFFFFF", "text-halo-width": 1.6 } });
       for (const bold of [true, false]) {
-        L({ id: bold ? "t-bold" : "t-reg", type: "symbol", source: SRC, filter: ["all", ["==", ["get", "style"], "text"], bold ? ["==", ["get", "bold"], true] : ["!=", ["get", "bold"], true]],
+        L({ id: bold ? "t-bold" : "t-reg", type: "symbol", source: SRC, minzoom: WORDS_Z, filter: ["all", ["==", ["get", "style"], "text"], bold ? ["==", ["get", "bold"], true] : ["!=", ["get", "bold"], true]],
           layout: { "text-field": ["get", "text"], "text-font": bold ? ["DIN Pro Bold", "Arial Unicode MS Bold"] : ["DIN Pro Regular", "Arial Unicode MS Regular"],
             "text-size": metres(["coalesce", ["get", "size"], 2.2], 9), "text-rotate": ["coalesce", ["get", "rot"], 0], "text-rotation-alignment": "map", "text-pitch-alignment": "map",
             "text-allow-overlap": true, "text-ignore-placement": true, "text-max-width": 40, "text-line-height": 1.15, "symbol-sort-key": ["get", "z"] },
@@ -200,21 +256,27 @@
     }
 
     let raw = [];
+    // a page that closes may call these after its map is gone (Mapbox throws from getSource / getLayer then)
+    const src = (id) => { try { return map.getSource(id); } catch (e) { return null; } };
+    const lyr = (id) => { try { return map.getLayer(id); } catch (e) { return null; } };
     function setData(fc) {
       const list = Array.isArray(fc) ? fc : ((fc && fc.features) || []);
       raw = list;
       [data, derived] = prepare(list);
-      const s = map.getSource(SRC), d = map.getSource(DRV);
+      const s = src(SRC), d = src(DRV);
       if (s) s.setData(data);
       if (d) d.setData(derived);
     }
     function setVisible(on) {
       visible = !!on;
-      for (const id of ids) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+      for (const id of ids) if (lyr(id)) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+      // data set while hidden can leave the old tiles on show (GL JS v3 does not reload a source none of whose
+      // layers is visible): send it again as the layers come back
+      if (visible) { const s = src(SRC), d = src(DRV); if (s) s.setData(data); if (d) d.setData(derived); }
     }
     function remove() {
-      for (const id of ids.slice().reverse()) if (map.getLayer(id)) map.removeLayer(id);
-      for (const s of [SRC, DRV]) if (map.getSource(s)) map.removeSource(s);
+      for (const id of ids.slice().reverse()) if (lyr(id)) map.removeLayer(id);
+      for (const s of [SRC, DRV]) if (src(s)) map.removeSource(s);
       ids.length = 0;
     }
     // after map.setStyle: the layers, sources and pictures are gone; put them back with the last data
@@ -227,5 +289,5 @@
     return { ready, setData, setVisible, remove, reinstall, layerIds: () => ids.slice(), prefix: P, count: () => data.features.length };
   }
 
-  window.WSLayouts = { install, metres, centroid, areaM2, bearing };
+  window.WSLayouts = { install, metres, centroid, areaM2, bearing, geo, WORDS_Z };
 })();
