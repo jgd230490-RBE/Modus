@@ -1161,7 +1161,9 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # flag's sentence (red COLD JOINT / TRANSIT, amber the rest) and a pour with no figures (amber)
    # NARROWED 29 Oct 2026 (task 3a PR C): bad-text 25 -> 26 — the Simulation's planned-pour flag line (.sim-pp-flag)
    # NARROWED 29 Oct 2026 (task 3c): warn-text 14 -> 15 — the Routes row's amber "Route again: does not pass the holding area" chip
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 29 and   # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
+   # NARROWED 31 Oct 2026 (task 4a, PR 3b): bad-text 29 -> 34 — Notes and tasks: the panel's load error and failed-action line,
+   # a task's "overdue", the approve card's "N overdue" and the list's Tasks cell "N overdue"
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 34 and   # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
    _fe_wo.count("var(--warn-text)") == 15
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
