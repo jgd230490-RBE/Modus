@@ -4944,6 +4944,47 @@ def add_site_layout_phase(location_id: str, body: SiteLayoutPhaseIn):
     return {"phase_id": pid, "layout": site_layouts.get(location_id)}
 
 
+class SiteLayoutPublicIn(BaseModel):
+    public: bool
+    version: int
+
+
+@app.patch("/api/locations/{location_id}/site-layout")
+def set_site_layout_public(location_id: str, body: SiteLayoutPublicIn):
+    """31 Oct 2026 (task 4c PR 4): "Show on the public map" on or off (planners and admins). Carries the layout's
+    version: 409 when someone else changed it first."""
+    _require_approver()
+    return {"layout": _layout_call(site_layouts.set_public, location_id,
+                                   {"public": body.public, "version": body.version}, _by(None))}
+
+
+#: 31 Oct 2026 (task 4c PR 4): one kept public read a month (read_cache), until the next write
+SITE_LAYOUTS_PUBLIC_CACHE = "site-layouts/public|"
+
+
+@app.get("/api/public/site-layouts")
+def public_site_layouts(month: Optional[str] = None):
+    """
+    31 Oct 2026 (task 4c PR 4): the PUBLIC map's site layouts — only layouts with "Show on the public map" on, the
+    phase in force in `month` ('YYYY-MM', default this month), each thing through site_layouts.public_thing (an
+    allow-list: the security / CCTV symbols, the drawing's file name and anything not named there never leave the
+    server), and the style table without the private symbols. Behind the map gate like all of /api/public/. Kept in
+    memory per month until the next write.
+    """
+    import datetime as _dt
+    if month and not site_layouts.MONTH_RE.match(month):
+        raise HTTPException(400, "month must be YYYY-MM")
+    month = month or _dt.date.today().strftime("%Y-%m")
+
+    def build():
+        out = site_layouts.for_public_map(month)
+        out["styles"] = site_layout_styles.public_payload()
+        return read_cache.json_bytes(out)
+
+    body = read_cache.cached(SITE_LAYOUTS_PUBLIC_CACHE + month, month, build)
+    return Response(content=body, media_type="application/json")
+
+
 @app.patch("/api/site-layouts/phases/{phase_id}")
 def edit_site_layout_phase(phase_id: str, body: SiteLayoutPhaseIn):
     """Rename a phase or set its months. Carries the phase's version: 409 when someone else saved first."""

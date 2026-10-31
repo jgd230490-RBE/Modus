@@ -16465,7 +16465,7 @@ function loadSiteLayoutsJs(){
   if(window.WSLayouts) return Promise.resolve(true);
   if(!SL_JS) SL_JS = new Promise((res) => {
     const s = document.createElement("script");
-    s.src = "/map/site-layouts.js?v=1"; s.onload = () => res(true); s.onerror = () => { SL_JS = null; res(false); };
+    s.src = "/map/site-layouts.js?v=2"; s.onload = () => res(true); s.onerror = () => { SL_JS = null; res(false); };
     document.head.appendChild(s);
   });
   return SL_JS;
@@ -16607,6 +16607,16 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       setEdit(null); setMsg(`Deleted “${p.name}”.`); await load();
     } catch(e){ setMsg(errSay("Not deleted.", e)); }
   };
+  // 31 Oct 2026 (task 4c PR 4): "Show on the public map" (the layout's version: someone else's change first is refused)
+  const setPublic = async (on) => {
+    setBusy("public"); setMsg("");
+    try {
+      const j = await okJSON(await fetch(`${API}/locations/${encodeURIComponent(locId)}/site-layout`,
+        { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ public: !!on, version: lay.version }) }));
+      setLay(j.layout);
+    } catch(e){ setMsg(errSay("Not changed.", e)); await load(shown); }
+    finally { setBusy(""); }
+  };
 
   const groups = useMemo(() => {
     const g = { line: [], area: [], sym: [], other: [] };
@@ -16629,6 +16639,15 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       <input ref={fileRef} type="file" accept=".dxf,.dwg,.kml,.kmz,.geojson,.json,.zip" style={{ display: "none" }} aria-label="Drawing to bring in" tabIndex={-1}
         onChange={e => readFile(e.target.files && e.target.files[0])} />
       {!phases.length && !imp && !edit && <p className="text-[13px] text-slate-500 mt-1">No layout yet.</p>}
+      {lay && phases.length > 0 && !imp && !edit && (
+        <div className="mt-1.5" data-site-layout-public="1">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+            <input type="checkbox" checked={!!lay.public} disabled={!canLayout || busy !== ""} onChange={e => setPublic(e.target.checked)} />
+            Show on the public map
+          </label>
+          {lay.public && <p className="text-[13px] text-slate-500 mt-0.5">From close in. Security and CCTV stay off it.</p>}
+        </div>
+      )}
       {phases.length > 0 && (
         <ul className="mt-1 space-y-1" data-site-layout-phases="1">
           {phases.map(p => (

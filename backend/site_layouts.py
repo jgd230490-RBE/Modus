@@ -328,6 +328,75 @@ def for_map(month=None):
     return {"month": month, "sites": sorted(sites.values(), key=lambda s: s["name"] or ""), "features": _fc(feats)}
 
 
+# ---- 31 Oct 2026 (task 4c PR 4): the PUBLIC map's layer -------------------------------------------------------------
+#: what a thing may carry on the public map. An ALLOW-LIST: a property not named here (the drawing's file name `source`,
+#: its CAD layer `src_layer`, anything a later PR adds) never leaves the server on a public read.
+PUBLIC_KEYS = ("style", "layer", "color", "w", "opacity", "fill", "outline", "sym", "size", "rot", "text", "bold", "halo",
+               "halo_color", "label", "z")
+
+
+def public_thing(f):
+    """A saved thing as the public map may see it, or None. Only the style table's line and area styles, words, and the
+    symbols not in PRIVATE_SYMBOLS pass (an allow-list: a new kind of thing stays staff-only until it is added here), in
+    the shape its style needs, with PUBLIC_KEYS only."""
+    if not isinstance(f, dict) or not isinstance(f.get("geometry"), dict):
+        return None
+    p = f.get("properties") if isinstance(f.get("properties"), dict) else {}
+    k = kind_of(p.get("style"))
+    if k is None or f["geometry"].get("type") != GEOM_FOR[k]:
+        return None
+    if k == "sym" and (p.get("sym") not in styles.SYMBOL_KEYS or p.get("sym") in styles.PRIVATE_SYMBOLS):
+        return None
+    return {"type": "Feature", "geometry": f["geometry"],
+            "properties": {key: p[key] for key in PUBLIC_KEYS if key in p}}
+
+
+def for_public_map(month):
+    """The public map's layer for `month` ('YYYY-MM'): only layouts with "Show on the public map" on, the phases that
+    apply that month, each thing through public_thing(). Per site: its name and the middle of what is drawn (the popup's
+    "Show the site layout"). No phase names, ids, who or when."""
+    tenant = db.current_tenant()
+    lays = {l["id"]: l for l in db.query("SELECT id, location_id, public FROM site_layouts WHERE tenant_id = ?", (tenant,))
+            if _truthy(l.get("public"))}
+    if not lays:
+        return {"month": month, "any": False, "sites": [], "features": _fc([])}
+    names = {r["id"]: r.get("name") for r in db.query("SELECT id, name FROM locations WHERE tenant_id = ?", (tenant,))}
+    feats, box, anywhen = [], {}, False
+    for p in db.query("SELECT layout_id, month_from, month_to, features_json FROM site_layout_phases WHERE tenant_id = ? "
+                      "ORDER BY sort, id", (tenant,)):
+        lay = lays.get(p["layout_id"])
+        if not lay:
+            continue
+        try:
+            fc = json.loads(p.get("features_json") or "{}")
+        except Exception:
+            fc = {}
+        things = [t for t in (public_thing(f) for f in (fc.get("features") if isinstance(fc, dict) else None) or []) if t]
+        anywhen = anywhen or bool(things)       # `any`: a layout shows in SOME month (the map's tick shows only then)
+        if not in_month(p, month):
+            continue
+        site = lay["location_id"]
+        for t in things:
+            t["properties"]["site"] = site
+            feats.append(t)
+            b = box.setdefault(site, [180.0, 90.0, -180.0, -90.0])
+            for x, y in _coords(t["geometry"]):
+                b[0], b[1], b[2], b[3] = min(b[0], x), min(b[1], y), max(b[2], x), max(b[3], y)
+    sites = [{"location_id": s, "name": names.get(s) or s,
+              "middle": [round((b[0] + b[2]) / 2, 7), round((b[1] + b[3]) / 2, 7)],
+              "bounds": [round(v, 7) for v in b]} for s, b in box.items()]
+    return {"month": month, "any": anywhen, "sites": sorted(sites, key=lambda s: s["name"] or ""), "features": _fc(feats)}
+
+
+def _coords(g):
+    c = g.get("coordinates") or []
+    if g.get("type") == "Point":
+        return [c]
+    if g.get("type") == "LineString":
+        return c
+    return [pt for ring in c for pt in ring]
+
+
 # --------------------------------------------------------------------------------------------------------- writes
 def _location(location_id):
     rows = db.query("SELECT id, name, lat, lon FROM locations WHERE tenant_id = ? AND id = ?",
@@ -431,6 +500,29 @@ def save_things(phase_id, body, by):
     out = _phase_out(r)
     out["left_out"] = why
     return out
+
+
+def set_public(location_id, body, by):
+    """31 Oct 2026 (task 4c PR 4): "Show on the public map" on or off. Carries the LAYOUT's version (STALE when someone
+    else changed it first) and moves it on."""
+    lay = _layout_row(location_id)
+    if not lay:
+        raise Problem("This site has no layout yet.")
+    try:
+        v = int(body.get("version"))
+    except (TypeError, ValueError):
+        raise Problem(STALE)
+    if v != int(lay.get("version") or 1):
+        raise Problem(STALE)
+    on = bool(body.get("public")) and body.get("public") not in ("0", "false")
+    # the stamp to the microsecond tells this save from another that also moved the version on (as _bump)
+    stamp = datetime.datetime.utcnow().isoformat(timespec="microseconds") + "Z"
+    db.execute("UPDATE site_layouts SET public = ?, updated_at = ?, version = version + 1 "
+               "WHERE tenant_id = ? AND id = ? AND version = ?", (on, stamp, db.current_tenant(), lay["id"], v))
+    after = _layout_row(location_id)
+    if int(after.get("version") or 0) != v + 1 or after.get("updated_at") != stamp:
+        raise Problem(STALE)
+    return get(location_id)
 
 
 def delete_phase(phase_id, version):
