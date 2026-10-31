@@ -65,6 +65,9 @@ TENANTED_TABLES = {
     # 31 Oct 2026 (task 4c PR 1, site layout designs): a site's layout, its phases (each a set of map things) and the
     # log of drawings brought in — per tenant, in the package, same rule, same edit.
     "site_layouts", "site_layout_phases", "site_layout_imports",
+    # 31 Oct 2026 (task 4c PR 3): the pictures and PDF pages pinned on a layout by their four corners (staff only).
+    # Per tenant, in the package, same rule, same edit.
+    "site_layout_pictures",
     # 31 Oct 2026 (task 4a, PR 3a): each Construction Logistics Plan (its places, one team or all, the cover details, the
     # approval step) and each approved issue (its number, who sent and approved it, what changed, the Word file itself).
     # Per tenant, in the package, same rule, same edit.
@@ -300,8 +303,10 @@ def _run(sql, params, fetch):
 #    process's writes, and the version must then move into the database.
 # 31 Oct 2026 (task 4a, PR 3b): + clp_notes. No figure and no kept read is built from a CLP's notes and tasks, and a
 # note must not throw away the kept CLP drafts (each a heavy build).
+# 31 Oct 2026 (task 4c PR 3): + site_layout_pictures. No figure and no kept read is built from a pinned picture (the
+# staff map reads them fresh), and moving one must not throw away the kept staff reads.
 NO_DATA_TABLES = frozenset({"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users",
-                            "demo_requests", "clp_notes"})
+                            "demo_requests", "clp_notes", "site_layout_pictures"})
 _DATA_VERSION = [0]
 _WRITE_TABLE_RE = None
 
@@ -905,6 +910,8 @@ def init_weeks_db():
         _create_tenanted(cur, "site_layouts")
         _create_tenanted(cur, "site_layout_phases")
         _create_tenanted(cur, "site_layout_imports")
+        # 31 Oct 2026 (task 4c PR 3): the pinned pictures
+        _create_tenanted(cur, "site_layout_pictures")
         # 31 Oct 2026 (task 4a, PR 3a): the CLP records and their issues
         _create_tenanted(cur, "clp_documents")
         _create_tenanted(cur, "clp_issues")
@@ -2084,6 +2091,36 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, id)
         )
     """,
+    # 31 Oct 2026 (task 4c PR 3; site_layout_pictures.py). A picture or one PDF page pinned on a layout by its four
+    # corners (`corners_json` 4 x [lon, lat]: top-left, top-right, bottom-right, bottom-left). `phase_id` NULL = every
+    # phase. The picture as made when it was added (`image_b64`, base64 PNG or JPEG, at most 4,096 dots a side and
+    # 5 MB); the file itself is not kept. `on_sheet` is for the 1:500 sheet (PR 5). STAFF ONLY: never in a public read.
+    "site_layout_pictures": """
+        CREATE TABLE site_layout_pictures (
+            tenant_id    TEXT NOT NULL DEFAULT 'default',
+            id           TEXT NOT NULL,
+            layout_id    TEXT NOT NULL,
+            phase_id     TEXT,
+            name         TEXT,
+            kind         TEXT,
+            page         INTEGER NOT NULL DEFAULT 1,
+            mime         TEXT,
+            width        INTEGER NOT NULL DEFAULT 0,
+            height       INTEGER NOT NULL DEFAULT 0,
+            bytes        INTEGER NOT NULL DEFAULT 0,
+            image_b64    TEXT,
+            corners_json TEXT,
+            opacity      REAL NOT NULL DEFAULT 0.6,
+            see_through  BOOLEAN NOT NULL DEFAULT FALSE,
+            on_sheet     BOOLEAN NOT NULL DEFAULT FALSE,
+            version      INTEGER NOT NULL DEFAULT 1,
+            created_by   TEXT,
+            created_at   TEXT,
+            updated_by   TEXT,
+            updated_at   TEXT,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
     # 31 Oct 2026 (task 4a, PR 3a; clp_records.py). One CLP: `location_ids` a JSON list of location ids, `team` a team
     # slot (NULL = every team), `impact` higher | medium, `cover` a JSON block of the typed cover details, `status`
     # draft | sent | changes | approved, with who sent it / asked for changes and their notes. A row whose id starts
@@ -2205,6 +2242,7 @@ _TENANT_PK = {
     "site_layouts": "(tenant_id, id)",
     "site_layout_phases": "(tenant_id, id)",
     "site_layout_imports": "(tenant_id, id)",
+    "site_layout_pictures": "(tenant_id, id)",
     "clp_documents": "(tenant_id, id)",
     "clp_issues": "(tenant_id, clp_id, issue_no)",
     "clp_notes": "(tenant_id, id)",

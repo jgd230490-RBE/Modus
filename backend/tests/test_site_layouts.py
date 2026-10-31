@@ -800,7 +800,9 @@ st, mbad = http(main.site_layouts_map, "Aug", _Request())
 ok("6. a month must be YYYY-MM", st == 400)
 st, mnow = http(main.site_layouts_map, None, _Request())
 ok("6. no month: this month", st == 200 and re.fullmatch(r"\d{4}-\d{2}", mnow["month"]))
-ok("6. the summary for the Locations list", main.site_layout_summary()["sites"] == {"L019": {"phases": 2, "things": 117}})
+# NARROWED 31 Oct 2026 (task 4c PR 3): the summary also counts the site's pinned pictures (none here)
+ok("6. the summary for the Locations list",
+   main.site_layout_summary()["sites"] == {"L019": {"phases": 2, "things": 117, "pictures": 0}})
 
 # =========================================================================== #
 #  7. The organisation file, Config's check, the dependencies                  #
