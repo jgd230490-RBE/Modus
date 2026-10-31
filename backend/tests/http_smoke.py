@@ -1132,7 +1132,10 @@ with TestClient(main.app, base_url="https://testserver") as c:
        r.status_code == 200 and sdy.get("scale") == "day" and sdy.get("date") == _d and sdy.get("working_days") == 1
        and (sdy.get("rounding") or {}).get("exact") is True and sdy.get("checks", {}).get("table_equals_arrivals") is True, r.text[:300])
     r = c.get("/api/sim/day?scale=day&date=2030-12-31", headers=PLAN)
-    ok("🔴 v2: a day outside the Look-ahead's two weeks is refused in words — 400", r.status_code == 400 and "pick a day" in r.text, r.text[:200])
+    # 31 Oct 2026: narrowed — the refusal names the two weeks ("pick a day of the Look-ahead's two weeks" before)
+    ok("🔴 v2: a day outside the Look-ahead's two weeks is refused in words, naming both weeks — 400",
+       r.status_code == 400 and "Tue 31 Dec 2030 is not in the Look-ahead's two weeks (" in r.text
+       and "pick one of their weekdays" in r.text, r.text[:200])
     # ---- 29 Oct 2026: the morning rush (a scenario where lorries bottleneck AT THE GATE; on screen only, D86)
     r = c.get("/api/sim/day?month=16&arrivals=rush&rush_share=30&rush_minutes=30", headers=PLAN)
     sr = r.json() if r.status_code == 200 else {}

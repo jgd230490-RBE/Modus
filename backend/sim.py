@@ -37,10 +37,13 @@ WHAT A DAY IS (each step is one function below)
    pour's mixers: each reaches the site's gate when pours.figures plans it (first discharge − the gate's planned
    check-in, one every `real_gap`), having loaded at the plant `loading` + `there` minutes before (its arrival at the
    plant's gate is placed that early again, less the plant's check-in). A mixer is kind "pour" with its `pour_id`; it
-   drives the route's whole laden leg from the plant. After the gate (and the site's stations where an area takes
-   concrete) each mixer discharges at the pour's rate, one at a time (one pump): loading → end of discharge, with
-   every wait, against the scheme's transit limit, and the pump's longest stand between mixers against the cold-joint
-   gap (pours.limits). Month and week keep the typed what-if only.
+   drives the route's whole laden leg from the plant. A mixer held at the PLANT's gate (a no-delivery band, a shut
+   time, a queue: step 5's rules) loads that much later and so reaches the site's gate that much later (31 Oct 2026,
+   John: "your recommendation"; the Pours page flags the plant's no-delivery times as IN A BAND). After the gate (and
+   the site's stations where an area takes concrete) each mixer discharges at the pour's rate, one at a time (one
+   pump): loading → end of discharge, with every wait after loading, against the scheme's transit limit, and the
+   pump's longest stand between mixers against the cold-joint gap (pours.limits). Month and week keep the typed
+   what-if only.
 5. THE QUEUE. One lane at each gate, first come first served, each lorry taking the gate's check-in minutes
    (`safety_minutes`). A lorry that comes while the gate is shut (before it opens, in a no-delivery band or in one of
    the gate's shut windows) waits for it to open. One still waiting after the last open minute is checked in late and COUNTED (D89), queue or not.
@@ -712,21 +715,42 @@ def simulate(inp, scen):
             by_gate[p["gate"]].append({"gate": p["gate"], "kind": "pour", "line": None, "route": None, "phase": None,
                                        "leg": approach, "t": t})
 
-    # 4a. the planned pours' mixers at the site's gate as planned, and at the plant's gate to load (placed, not spread)
+    # 4a. the planned pours' mixers at the plant's gate to load (placed, not spread), then at the site's gate
     for pp in planned:
         li = pp["line"]
         l = lines[li]
+        pg = l.get("empty_gate")
+        piv = ivs.get(pg) or []
+        pp["plant_shut"] = sum(1 for t in pp["plant_times"] if not any(a <= t < z for a, z in piv)) if pg in by_gate else 0
+        pp["plant_at"] = []
+        for j, t in enumerate(pp["plant_times"]):
+            if pg in by_gate:
+                a = {"gate": pg, "kind": "empty", "line": li, "route": l["route_id"], "phase": None,
+                     "leg": l.get("empty_leg"), "t": t, "pour_id": pp["id"], "pour_j": j}
+                by_gate[pg].append(a)
+                pp["plant_at"].append(a)
+    # 31 Oct 2026 (John: "your recommendation"): a mixer held at the plant's gate — a no-delivery band, a shut time or
+    # a queue (step 5's one lane, run here for the plants first) — starts loading that much later, so it reaches the
+    # site's gate that much later. Loading starts when its check-in at the plant is done; planned, `there` + `loading`
+    # before the site. Step 5 runs the same queue again: the plant's arrivals do not move, so it gives the same answer.
+    for g in {lines[pp["line"]].get("empty_gate") for pp in planned} & set(by_gate):
+        queue(by_gate[g], ivs[g], G[g]["check_in"])
+    for pp in planned:
+        li = pp["line"]
+        l = lines[li]
+        pp["plant_waits"] = [0.0] * len(pp["times"])
+        for a in pp["plant_at"]:
+            j = a["pour_j"]
+            planned_load = pp["times"][j] - pp["there"] - pp["loading"]
+            pp["plant_waits"][j] = max(0.0, a["done"] - planned_load) if a.get("done") is not None else 0.0
+        times = [t + w for t, w in zip(pp["times"], pp["plant_waits"])]
         iv = ivs.get(l.get("laden_gate")) or []
-        pp["while_shut"] = sum(1 for t in pp["times"] if not any(a <= t < z for a, z in iv))
-        for j, t in enumerate(pp["times"]):
+        pp["while_shut"] = sum(1 for t in times if not any(a <= t < z for a, z in iv))
+        for j, t in enumerate(times):
             if l.get("laden_gate") in by_gate:
                 by_gate[l["laden_gate"]].append({"gate": l["laden_gate"], "kind": "pour", "line": li, "route": l["route_id"],
                                                  "phase": None, "leg": l.get("laden_leg"), "t": t,
-                                                 "pour_id": pp["id"], "pour_j": j})
-            if l.get("empty_gate") in by_gate:
-                by_gate[l["empty_gate"]].append({"gate": l["empty_gate"], "kind": "empty", "line": li, "route": l["route_id"],
-                                                 "phase": None, "leg": l.get("empty_leg"), "t": pp["plant_times"][j],
-                                                 "pour_id": pp["id"], "pour_j": j})
+                                                 "pour_id": pp["id"], "pour_j": j, "plant_wait": pp["plant_waits"][j]})
 
     # 4b. 29 Oct 2026 (task 3c): the holding areas — the served sites' gates and stations run in sim_holding's one loop
     # (a call forward depends on a bay starting and a lane clearing); with the holding areas off, nothing here runs
@@ -836,11 +860,12 @@ def pump(pp, mixers):
         stand = 0.0 if prev is None else max(0.0, ds - prev)
         de = ds + dur
         rows.append({"j": a["pour_j"], "at": a["t"], "wait": a["wait"], "start": ds, "end": de, "stand": stand,
-                     "transit": de - a["t"] + pp["there"] + pp["loading"]})
+                     "transit": de - a["t"] + pp["there"] + pp["loading"], "plant_wait": a.get("plant_wait") or 0.0})
         prev = de
     lim, cj = pp["transit_limit"], pp["cold_joint"]
     return {"id": pp["id"], "line": pp["line"], "loads": pp["loads"], "mixers": rows,
-            "extra": pp.get("extra", 0), "while_shut": pp.get("while_shut", 0),
+            "extra": pp.get("extra", 0), "while_shut": pp.get("while_shut", 0), "plant_shut": pp.get("plant_shut", 0),
+            "plant_wait_max": max([0.0] + [r["plant_wait"] for r in rows]),
             "first": (rows[0]["start"] if rows else None), "end": (rows[-1]["end"] if rows else None),
             "worst_wait": max([0.0] + [r["wait"] for r in rows]),
             "transit_max": max([0.0] + [r["transit"] for r in rows]),
@@ -1179,10 +1204,20 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
     if scale == "day":
         # 29 Oct 2026 (task 3a, PR C): the day's own week — the screen sends the date only, so a day of NEXT week was
         # refused as "not a weekday of the week of" this one (the planned pours live mostly in next week)
-        for c in day_choices_for(today):
+        cs = day_choices_for(today)
+        for c in cs:
             if c["date"] == str(date)[:10]:
                 bucket = c["bucket"]
                 break
+        else:
+            # 31 Oct 2026: a day outside both weeks names the two weeks (it had named this week only)
+            try:
+                asked = _day_words(datetime.date.fromisoformat(str(date)[:10]))
+            except ValueError:
+                raise ValueError("The day must be a date such as 2027-04-14.")
+            if cs:
+                raise ValueError(f"{asked} is not in the Look-ahead's two weeks ({cs[0]['words']} to {cs[-1]['words']}): "
+                                 f"pick one of their weekdays.")
 
     week_block, day_choices, chosen = None, [], None
     if scale == "month":
@@ -1619,8 +1654,11 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         own = mine(r["line"])
         late = (r["end"] - float(fig["ends_min"])) if r["end"] is not None else 0.0
         ww = js_round(r["worst_wait"])
+        pw = js_round(r["plant_wait_max"])
         words = (f"Longest loading → end of discharge: {_pours.hm(r['transit_max'])}"
                  + (f" (a {ww} min wait at {pr.get('gate_name') or 'the gate'})" if ww >= 1 else "")
+                 + (f" · held up to {_pours.hm(pw)} at {pr.get('plant_gate_name') or 'the plant'} before loading"
+                    if pw >= 1 else "")
                  + (f" · ends {hhmm(r['end'])}, {_pours.hm(late)} later than planned" if late >= 1 else ""))
         flags = []
         if r["over_limit"]:
@@ -1639,6 +1677,8 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
             "start": pr.get("start"), "first": hhmm(r["first"]), "end": hhmm(r["end"]),
             "end_planned": fig["ends"], "late_by": _r2(max(0.0, late)),
             "worst_wait": _r2(r["worst_wait"]), "transit_max": _r2(r["transit_max"]),
+            "plant_gate": lines[r["line"]].get("empty_gate"), "plant_gate_name": pr.get("plant_gate_name"),
+            "plant_wait_max": _r2(r["plant_wait_max"]),
             "transit_limit": lim["transit_min"], "over_limit": r["over_limit"],
             "stand_max": _r2(r["stand_max"]), "cold_joint": lim["cold_joint_min"], "cold": r["cold"],
             "words": words, "flags": flags})
@@ -1646,6 +1686,10 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         if r["while_shut"]:
             notes.append(f"{who}: {r['while_shut']} of its {r['loads']} mixers reach {pr.get('gate_name') or 'the gate'} "
                          f"while it is shut (before it opens, in a no-delivery band or a shut time); they wait for it to open.")
+        if r["plant_shut"]:
+            notes.append(f"{who}: {r['plant_shut']} of its {r['loads']} mixers reach {pr.get('plant_gate_name') or 'the plant'} "
+                         f"to load while it is shut (before it opens, in a no-delivery band or a shut time); they load "
+                         f"when it opens and reach the site that much later.")
         if r["extra"]:
             notes.append(f"{who}: {r['extra']} more mixer{'s' if r['extra'] != 1 else ''} than its line's day as typed; "
                          f"the simulation runs the pour as planned.")
