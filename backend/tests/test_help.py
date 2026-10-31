@@ -923,7 +923,8 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 31 Oct 2026 (task 4a, PR 3a): + chapter 18 CLP documents and its four sections (79); + T1 "CLP documents" (33)
    # NARROWED 31 Oct 2026 (task 4c PR 1): + chapter 19 Site layouts and its three sections (83); + T1 "Site layouts" (34)
    # NARROWED 31 Oct 2026 (task 4a, PR 3b): + 18.5 Notes and tasks (84); + T1 "CLP notes and tasks" (35)
-   len(re.findall(r'<li class="l[12]"', src)) == 84 and len(re.findall(r'<li class="l[12]"', _tg2)) == 35   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   # NARROWED 31 Oct 2026 (task 4a, PR 3c): + 18.6 The client's reviewers (85); + T1 "CLP client reviewers" (36)
+   len(re.findall(r'<li class="l[12]"', src)) == 85 and len(re.findall(r'<li class="l[12]"', _tg2)) == 36   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,
@@ -1203,6 +1204,24 @@ ok3("CLP NOTES: the technical guide #t1-clp-notes holds the detail (the table, w
     and "clp_notes  (tenant_id, id)" in _tgv2 and "<code>db.NO_DATA_TABLES</code>" in _tgv2 and "<code>_CLP_NOTES_PATH</code>" in _tgv2
     and "<code>keep_lines</code>" in _tgv2 and "<code>email_task</code>" in _tgv2 and "PATCH  /api/clp/documents/{id}/tasks/{tid}" in _tgv2
     and "Notes and tasks on a plan (PR 3b)" not in _tgv2)
+# ---- 31 Oct 2026 (task 4a, PR 3c): the client's reviewers — 18.6 in plain words; T1 #t1-clp-reviewers the detail
+_ch186 = _ch18[_ch18.index('<h2 id="18-6-the-client-s-reviewers">'):]
+ok3("⭐ CLP REVIEWERS: 18.6 'The client's reviewers' in the nav and the text — only an issued plan; groups and reviewers by an admin; own password + two-step, never a code; stopped never deleted; the approve ticks and ⋯ → Send; one page CLPs for review; Accept / Return needs a comment; one decision per group; the list lines and filter; Make a task; Show to; tasks never shown; the two emails",
+    '<a href="#18-6-the-client-s-reviewers">18.6 The client&#39;s reviewers</a>' in _ug
+    and all(t in _ch186 for t in ("Only an issued plan is ever sent to them; a draft never is.", "<strong>Users → Client reviewers</strong>",
+        "sets up two-step sign-in the first time; reviewers never use a shared code", "is stopped, never deleted", "signs them out at once",
+        "<strong>⋯ → Send Issue N to reviewers…</strong>", "a group that had the last issue is ticked already", "No file is attached.",
+        "<strong>CLPs for review</strong>", "<strong>Return with comments</strong>. Returning needs a comment.", "the first reviewer&#39;s decision stands",
+        "A newer issue starts again.", "<strong>Returned by …</strong> in red", "<strong>Waiting</strong>, <strong>Accepted</strong> or <strong>Returned</strong>",
+        "<strong>Make a task</strong>", "<strong>Show to</strong>", "Tasks and the team&#39;s other notes are never shown to reviewers.",
+        "Comments send no email.", "Document history")), _ch186[:200])
+ok3("🔴 CLP REVIEWERS: 18.6 names no back-end word, team id or supplier and never says secure",
+    not re.search(r"\b(API|endpoint|server|JSON|database|session|token|cookie|IPT\d|secure|AI|Q\d+|D\d{2,3})\b", _ch186))
+ok3("CLP REVIEWERS: the technical guide #t1-clp-reviewers holds the detail (the tables, the wall, the sweep, decisions, emails, audit, the routes, the demo group)",
+    'id="t1-clp-reviewers"' in _tgv2 and '<a href="#t1-clp-reviewers">CLP client reviewers</a>' in _tgv2 and "<code>backend/clp_reviews.py</code>" in _tgv2
+    and "clp_review_groups  (tenant_id, id)" in _tgv2 and "<code>access.reviewer()</code>" in _tgv2 and "<code>backend/tests/smoke_reviewer_wall.py</code>" in _tgv2
+    and "<code>review-download</code>" in _tgv2 and "POST   /api/review/clps/{id}/decision" in _tgv2 and "GET    /api/clp/documents/{id}/review-send" in _tgv2
+    and "<em>Highways client (fictional)</em>" in _tgv2 and "The client's reviewers (PR 3c);" not in _tgv2)
 ok3("CLP DOCS: the technical guide #t1-clp-records holds the detail (the two tables, the listed rows' ids, who may do what, the team cut, the approve build, the endpoints, the stages)",
     'id="t1-clp-records"' in _tgv2 and '<a href="#t1-clp-records">CLP documents</a>' in _tgv2 and "<code>backend/clp_records.py</code>" in _tgv2
     and "clp_documents" in _tgv2 and "clp_issues" in _tgv2 and "<code>auto-&lt;loc&gt;-all</code>" in _tgv2 and "<code>heavy_reads.solo</code>" in _tgv2

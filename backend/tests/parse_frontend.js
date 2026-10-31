@@ -250,8 +250,9 @@ ok("tables show the label, and the full NAME (never the stored id) beside a shor
 ok("the header carries the control", /VEH_LANGS\.filter\(\(\[k\]\) => vehLangShown\(k\)\)\.map\(\(\[k, l\]\) =>/.test(code));
 // 11 Oct 2026: ...but only when there is a CHOICE — one offered language draws no buttons (the GB demo showed a
 // lone "English" button until then)
+// NARROWED 31 Oct 2026 (task 4a, PR 3c): never for a client reviewer (the review page names no vehicle)
 ok("11 Oct 2026: the header draws the vehicle-name buttons only when more than one language is shown",
-  /\{VEH_LANGS\.filter\(\(\[k\]\) => vehLangShown\(k\)\)\.length > 1 && \(\s*<span className="hidden md:inline-flex rounded-md overflow-hidden hdr-seg/.test(code));
+  /\{role\.via !== "reviewer" && VEH_LANGS\.filter\(\(\[k\]\) => vehLangShown\(k\)\)\.length > 1 && \(\s*<span className="hidden md:inline-flex rounded-md overflow-hidden hdr-seg/.test(code));
 // NARROWED (H1, 29 Sep): EN always; EE only for an Estonian tenant; EU for everyone EXCEPT a
 // British tenant, whose EU-named vehicles are hidden, so the option would label nothing.
 // NARROWED 11 Oct 2026 (EU vehicles removed): both country rules stand, AND a language is shown only when the
@@ -2089,7 +2090,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     ok("⭐ ...so it is on every view once /api/meta has answered: the public map (and its password page), sign-in, and every Portal page (not over Loading or the service error; the embedded map keeps its own strip when the bar is absent)",
       appCode.indexOf("<DemoBar ") > 0
       && appCode.indexOf("<DemoBar ") < appCode.indexOf('{view === "public" && <PublicMap')
-      && appCode.indexOf("<DemoBar ") < appCode.indexOf('{view === "login" && <Login') && appCode.indexOf("<DemoBar ") < appCode.indexOf('{view === "portal" && ('));
+      && appCode.indexOf("<DemoBar ") < appCode.indexOf('{view === "login" && <Login') && appCode.indexOf("<DemoBar ") < appCode.indexOf('{view === "portal" && !(role && role.via === "reviewer") && ('));   // NARROWED 31 Oct 2026 (PR 3c): the staff app never for a client reviewer
     ok("🔴 keyed on TENANT.demo_notice: a real tenant (no notice) gets no bar at all",
       barFn.startsWith("\n  if(!TENANT.demo_notice) return null;") && !/use[A-Z]\w*\(/.test(barFn));
     ok("the bar shows the tenant's own words (uppercased by CSS, the full text on hover) and the Guide only when there is a tour to replay",
@@ -2124,14 +2125,17 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
       appFn.includes('const onMap = view === "public" || (view === "portal" && page === "map");')
       // 11 Oct: "resume" (signing back in after a reload) has no guide either, like the sign-in view
       // NARROWED 14 Oct 2026 (G3): the set-password and dead-link views have no tour either
-      && appFn.includes('const barGuide = (view === "login" || view === "resume" || view === "setpw" || view === "linkerr") ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;'));
+      // NARROWED 31 Oct 2026 (task 4a, PR 3c): nor the client reviewer's page
+      && appFn.includes('const barGuide = (view === "login" || view === "resume" || view === "setpw" || view === "linkerr" || view === "review") ? null : onMap ? (mapTour ? startMapTour : null) : replayAppGuide;'));
     ok("🔴 a reload with a stored code starts on resume and re-checks it with /api/auth, never trusting it unchecked",
       // NARROWED 14 Oct 2026 (G3): a set-password link opens "setpw"; a lead's link, a stored code or a browser that
       // signed in with a login before (the hint) starts on "resume"; anything else the public map, as before
-      appFn.includes('const [view, setView] = useState(() => (START_LINK && START_LINK.purpose !== "demo") ? "setpw"\n    : (START_LINK || ACCESS.code || hasAuthHint()) ? "resume" : "public");')
+      // NARROWED 31 Oct 2026 (task 4a, PR 3c): the reviewers' email links to #review, which opens the sign-in (not the map) for someone not signed in here
+      appFn.includes('const [view, setView] = useState(() => (START_LINK && START_LINK.purpose !== "demo") ? "setpw"\n    : (START_LINK || ACCESS.code || hasAuthHint()) ? "resume" : ((typeof location !== "undefined" && location.hash === "#review") ? "login" : "public"));')
       && appFn.includes('body: JSON.stringify({ code: ACCESS.code }) })')
       && appFn.includes('.then(info => { ACCESS.info = info; setRole(info); setView("portal"); })')
-      && (appFn.match(/setView\("portal"\)/g) || []).length === 3);   // signIn(), the checked code resume and (G3) the checked session resume
+      // NARROWED 31 Oct 2026 (PR 3c): signIn() opens the review page for a client reviewer, else the portal (2 + that one)
+      && (appFn.match(/setView\("portal"\)/g) || []).length === 2 && appFn.includes('setView(info && info.via === "reviewer" ? "review" : "portal");'));   // signIn(), the checked code resume and (G3) the checked session resume
     ok("...a 401 / 403 forgets the stored code; the public map is the fallback either way",
       appFn.includes('if(e === 401 || e === 403){ ACCESS.code = ""; try { sessionStorage.removeItem("modus_access_code"); } catch(x){} }')
       && /\.catch\(e => \{[\s\S]{0,400}setView\("public"\);\s*\}\);/.test(appFn));
@@ -3675,7 +3679,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      wrap.includes('o.headers = { ...(o.headers || {}), "X-Wayscope": "1", ...(ACCESS.code ? { "X-Access-Code": ACCESS.code } : {}) };')
      && (code.match(/"X-Wayscope"/g) || []).length === 1);
   ok("G3: a 401 to a login (not on a sign-in call) ends the session in the app, once, by one event",
-     wrap.includes('if(r.status === 401 && ACCESS.info && ACCESS.info.via === "login" && !u.startsWith(API + "/auth/"))')
+     // NARROWED 31 Oct 2026 (task 4a, PR 3c): a client reviewer's ended session too
+     wrap.includes('if(r.status === 401 && ACCESS.info && (ACCESS.info.via === "login" || ACCESS.info.via === "reviewer") && !u.startsWith(API + "/auth/"))')
      && code.includes('const SESSION_ENDED = "wayscope-session-ended";'));
   ok("⭐ G3: an emailed link is read from the FRAGMENT once, only its own characters, and taken off the address at once",
      /const START_LINK = \(function\(\)\{[\s\S]{0,400}\/\^#\(invite\|reset\|demo\)=\(\[A-Za-z0-9_-\]\{20,200\}\)\$\/[\s\S]{0,200}history\.replaceState\(null, "", window\.location\.pathname \+ window\.location\.search\);/.test(code));
@@ -3721,11 +3726,13 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      am.includes("const team = role.ipt ? teamName(role.ipt) : role.label;") && am.includes("{!demo && (")
      && am.includes('postJSON("/auth/password", { current: cur, new: nw })'));
   ok("G3: the header shows the account menu for a login and the old team/role line for a code",
-     code.includes('{role.via === "login" ? <AccountMenu role={role} onSignOut={signOut} />'));
+     // NARROWED 31 Oct 2026 (task 4a, PR 3c): and for a client reviewer (their name and group)
+     code.includes('{(role.via === "login" || role.via === "reviewer") ? <AccountMenu role={role} onSignOut={signOut} />'));
   ok("G3 (phone): below 640 px a login's name becomes its initials, its Sign out moves into the menu, and the menu is pinned on screen",
      html.includes(".hdr-signout-login{display:none;} .acct-signout{display:block;} }") && html.includes(".acct-btn .acct-name{display:none;} .acct-btn .acct-ini{display:inline;}")
      && html.includes(".acct-menu{position:fixed;left:8px;right:8px;top:60px;min-width:0;}")
-     && code.includes('(role.via === "login" ? " hdr-signout-login" : "")') && code.includes('aria-label={`Your account: ${role.name}`}'));
+     // NARROWED 31 Oct 2026 (task 4a, PR 3c): a reviewer's Sign out moves into the menu too
+     && code.includes('((role.via === "login" || role.via === "reviewer") ? " hdr-signout-login" : "")') && code.includes('aria-label={`Your account: ${role.name}`}'));
 }
 
 // ---- 14 Oct 2026 (backlog item 2): the route map export from the Routes page --------------------------------------------
@@ -4359,7 +4366,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      pill.includes("{teamName(k)}</span>") && !/title=\{k\}/.test(pill) && !/title=/.test(pill));
   const up = (code.match(/function UsersPage\(\{ access \}\)\{[\s\S]*?\n\}\n/) || [""])[0];
   ok("TEAMS: the Users page has a Teams tab (the tenant's word), between People and Demo leads",
-     up.includes('const tabs = [["people", "People"], ["teams", TEAMS()], ["leads", "Demo leads"], ["activity", "Activity"]];'));
+     // NARROWED 31 Oct 2026 (task 4a, PR 3c): + Client reviewers, between the teams and Demo leads
+     up.includes('const tabs = [["people", "People"], ["teams", TEAMS()], ["reviewers", "Client reviewers"], ["leads", "Demo leads"], ["activity", "Activity"]];'));
   ok("TEAMS: the tab reads and writes /admin/teams with the same qs() as the rest of Users (the token only for a code sign-in)",
      up.includes("call(`/admin/teams${qs()}`)") && up.includes('call(`/admin/teams${qs()}`, "POST", { label: newTeam.trim() })')
      && up.includes('call(`/admin/teams/${editTeam.id}${qs()}`, "PATCH", { label: editTeam.label })')
@@ -4415,9 +4423,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // NARROWED 29 Oct 2026 (task 3a): + Plan → Pours (Edit, Cancel the pour / Plan again, Delete…) — nine
   // NARROWED 31 Oct 2026 (task 4a, PR 3a): + Plan → CLP documents — ten
   // NARROWED 31 Oct 2026 (task 4a, PR 3b): 11 — + each open task's "⋯" (Edit, Delete…) in a CLP's Notes and tasks
+  // NARROWED 31 Oct 2026 (task 4a, PR 3c): 13 — + Users → Client reviewers: the groups' and the reviewers' "⋯"
   ok("⭐ 27 Oct: the '⋯' on six tables — Abnormal loads (with its note), Routes, Zones, the gates list, the logins, the demo leads, the teams",
-     menus.length === 11 && src.includes("<RowMenu name={x.words.slice(0, 60)}>") && src.includes('<RowMenu name={c.name + " · " + teamWord(c)}>') && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
-     && src.includes("<RowMenu name={g.name || g.id}>") && (src.match(/<RowMenu name=\{u\.name\}>/g) || []).length === 2 && src.includes("<RowMenu name={t.label}>"), String(menus.length));
+     menus.length === 13 && src.includes("<RowMenu name={g.name}>") && src.includes("<RowMenu name={x.words.slice(0, 60)}>") && src.includes('<RowMenu name={c.name + " · " + teamWord(c)}>') && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
+     && src.includes("<RowMenu name={g.name || g.id}>") && (src.match(/<RowMenu name=\{u\.name\}>/g) || []).length === 3 && src.includes("<RowMenu name={t.label}>"), String(menus.length));
   ok("⭐ 27 Oct: Abnormal loads — one filled button for the forward step (AL_FORWARD: pending → approved → notified → moved; withdrawn → pending), the rest in the menu, Withdraw and Delete red and asking first",
      src.includes('const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved", withdrawn: "pending" };')
      && src.includes("const forwardOf = (m) => (canApprove && nextOf(m).includes(AL_FORWARD[m.status])) ? AL_FORWARD[m.status] : null;")
@@ -4434,7 +4443,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      src.includes('<th className="px-3 py-2 text-right font-semibold"><span className="sr-only">Actions</span></th>')
      // NARROWED 29 Oct 2026 (task 3a): + the Pours page's Delete… — five
      // NARROWED 31 Oct 2026 (task 4a, PR 3b): + a CLP task's Delete… — six
-     && (src.match(/>Delete…<\/button>/g) || []).length === 6 && src.includes('onClick={() => delTask(x)}>Delete…</button>') && src.includes('onClick={() => deleteRoute(r.id)}>Delete…</button>')
+     // NARROWED 31 Oct 2026 (task 4a, PR 3c): + a client group's and a reviewer's Delete… — eight
+     && (src.match(/>Delete…<\/button>/g) || []).length === 8 && src.includes('onClick={() => delTask(x)}>Delete…</button>') && src.includes('onClick={() => deleteRoute(r.id)}>Delete…</button>')
      && src.includes('onClick={() => remove(p)}>Delete…</button>'));
   ok("⭐ 27 Oct: the words — every lead is one line; the foot of Abnormal loads prints the advice line only; no screen prints a decision code in brackets",
      src.includes('? "Approve or reject each line; approved lines feed the public map, the Look-ahead and the Dashboard."')
@@ -4657,7 +4667,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && cpx.includes('send("POST", "/clp/documents", body') && cpx.includes('send("PATCH", `/clp/documents/${encodeURIComponent(c.id)}`, body')
      && cpx.includes('send("DELETE", `/clp/documents/${encodeURIComponent(c.id)}`, null') && cpx.includes("/send`, { note: form.note || null }")
      // NARROWED 31 Oct 2026 (PR 3b): Ask for changes may carry its note as a task
-     && cpx.includes("/changes`,\n    { note: form.note || \"\", ...(form.asTask ? { task: { due: form.due || null } } : {}) }") && cpx.includes("/approve`, { note: form.note || null }")
+     && cpx.includes("/changes`,\n    { note: form.note || \"\", ...(form.asTask ? { task: { due: form.due || null } } : {}) }") && cpx.includes("/approve`, { method: \"POST\"") && cpx.includes("body: JSON.stringify({ note: form.note || null, send_to: (form.sendTo || []).length ? form.sendTo : null }) }).then(okJSON)")   // NARROWED 31 Oct 2026 (PR 3c): + the ticked reviewer groups
      && cpx.includes('download(c, "draft.docx"') && cpx.includes("`issues/${i.no}.docx`") && cpx.includes("/approve-preview`)"));
   ok("🔴 CLP DOCS: who may do what is the server's — the page reads access.can_approve; a team's body is the cover only; places and team only on a CLP Wayscope did not list",
      cpx.includes("const appr = !!(access && access.can_approve);") && cpx.includes("const body = { cover: f.cover };")
@@ -4679,7 +4689,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const cn = cp.slice(cp.indexOf("function ClpNotes("), cp.indexOf("function ClpPage("));
   ok("⭐ CLP NOTES: one read of the thread (GET …/notes) and its own writes (POST notes, POST tasks, PATCH and DELETE a task, DELETE a note); the reply's thread is drawn",
      cn.length > 4000 && (cn.match(/fetch\(`\$\{base\}\/notes`\)/g) || []).length === 1 && cn.includes("const base = `${API}/clp/documents/${encodeURIComponent(clp.id)}`;")
-     && cn.includes('call("POST", "notes", { note: words }') && cn.includes('call("POST", "tasks", { ...body, from_line: tf.from_line || null }')
+     && cn.includes('call("POST", "notes", { note: words, show_to: showTo || null }')   // NARROWED 31 Oct 2026 (PR 3c): + Show to <group> && cn.includes('call("POST", "tasks", { ...body, from_line: tf.from_line || null }')
      && cn.includes('call("PATCH", `tasks/${encodeURIComponent(tf.id)}`, body') && cn.includes('call("PATCH", `tasks/${encodeURIComponent(x.id)}`, { done: !x.done }')
      && cn.includes('call("DELETE", `tasks/${encodeURIComponent(x.id)}`, null') && cn.includes('call("DELETE", `notes/${encodeURIComponent(n.id)}`, null')
      && cn.includes("if(d && d.thread) setT(d.thread);"));
@@ -4689,7 +4699,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("CLP NOTES: the panel's words — the heading, 'N open · M done', the done ones folded, '+ Add a task', For / Due (optional), 'Add note', the note box's placeholder, the steps as grey ↗ lines",
      cn.includes("Notes and tasks · {clp.name} · {teamWord(clp)}") && cn.includes('{open.length} open{done.length ? ` · ${done.length} done` : ""}')
      && cn.includes('<details className="mt-2" data-clp-done="1">') && cn.includes(">+ Add a task</button>") && cn.includes(">Due (optional)</label>")
-     && cn.includes('placeholder="Write a note for everyone who can see this CLP"') && cn.includes('className="clp-step" data-clp-step={n.step}>↗ {n.step_word} by'));
+     && cn.includes('placeholder="Write a note for everyone who can see this CLP"') && cn.includes('className="clp-step" data-clp-step={n.step}>{n.step === "review-returned" ? "↩" : n.step === "review-accepted" ? "✓" : "↗"} {n.step_word} by'));   // NARROWED 31 Oct 2026 (PR 3c): ↩ / ✓ for a client's return / acceptance
   ok("⭐ CLP NOTES: a task from a To complete line — the last built draft's lines, four then '… N more lines from the draft of …', choosing one fills the words; none built yet says to download the draft once; a gone line is shown, never ticked",
      cn.includes("(allLines ? lines : lines.slice(0, 4)).map(l => (") && cn.includes("more lines from the draft of {clpWhen(t.lines.at)}")
      && cn.includes("onChange={() => setTf(f => ({ ...f, from_line: l.line, words: l.words }))}")
@@ -4726,6 +4736,44 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      cf.includes('<th scope="col">Stage and the kinds of work in it</th>') && !cf.includes('<th scope="col">Kinds of work in it</th>')
      && cf.includes('<td style={{ whiteSpace: "normal", width: "100%" }}><input className="ctl w-full" value={st.name || ""} aria-label={`Stage ${i + 1} name`}')
      && cf.includes('<div className="flex flex-wrap items-center gap-1.5 mt-1.5">'));
+}
+
+// ---- 31 Oct 2026 (task 4a, PR 3c): a client reviewer's Wayscope is ONE page; the server's wall is test_clp_reviewers /
+// smoke_reviewer_wall, this is the page's own share of it
+{
+  const fnB = (name) => { const i = code.indexOf(`function ${name}(`); if (i < 0) return ""; const j = code.indexOf("\nfunction ", i + 10); return code.slice(i, j < 0 ? undefined : j); };
+  const rp = fnB("ReviewPage").split("\nconst USER_STATUS")[0];   // the Users section's tables follow it
+  const paths = [...rp.matchAll(/\$\{API\}([^`"]*)/g)].map(m => m[1]);
+  ok("⭐ REVIEW PAGE: ReviewPage exists and every read and write it makes is under /review/ (five of them)",
+     rp.length > 2000 && paths.length >= 4 && paths.every(p => p.startsWith("/review/")), paths.join(" , "));
+  ok("🔴 REVIEW PAGE: it draws no rail, no Dashboard, no map, no Portal, no task and no Approve",
+     !/RailNav|Portal|Dashboard|PublicMap|mapboxgl|ClpNotes|Approve/.test(rp));
+  ok("🔴 REVIEW PAGE: every failure goes through errSay / errFrom (no status number, no raw reply)",
+     (rp.match(/errSay\(/g) || []).length >= 4 && rp.includes("throw await errFrom(r);") && !/\.status\}|\(\$\{e\}\)|e\.message/.test(rp));
+  const rpWords = [...rp.matchAll(/>([^<>{}]+)</g)].map(m => m[1]).join(" ") + " " + [...rp.matchAll(/"([A-Z][^"]{8,})"/g)].map(m => m[1]).join(" ")
+                + " " + [...rp.matchAll(/`([^`]{8,})`/g)].map(m => m[1]).join(" ");
+  ok("🔴 REVIEW PAGE: its words name no API, server, token, endpoint, database or team id, and never say secure",
+     !/\b(API|server|token|endpoint|database|cached|backend|IPT\d|secure)\b/i.test(rpWords.replace(/\$\{API\}[^ ]*/g, "")),
+     (rpWords.match(/\b(API|server|token|endpoint|database|cached|backend|IPT\d|secure)\b/i) || [""])[0]);
+  ok("⭐ REVIEW PAGE: the App opens it only for a reviewer, and the staff app never for one",
+     code.includes('{view === "review" && role && role.via === "reviewer" && <ReviewPage role={role} />}')
+     && code.includes('{view === "portal" && !(role && role.via === "reviewer") && (')
+     && code.includes('setView(info && info.via === "reviewer" ? "review" : "portal");')
+     && code.includes('if(j && j.signed_in && j.reviewer){ ACCESS.info = j.reviewer; setRole(j.reviewer); setWho(j.reviewer.name || ""); setView("review"); }'));
+  ok("REVIEW PAGE: Accept asks once; Return needs a comment; a newer unsent issue says so",
+     rp.includes("window.confirm(`Accept Issue ${n} of the ${open.name} CLP for ${open.group_name}?`)")
+     && rp.includes('setMsg({ ok: false, text: "Write what needs changing in the comment box first." }); return;')
+     && rp.includes("The contractor has a newer issue that is not sent to {open.group_name} yet."));
+  ok("REVIEW PAGE: a phone card's Open button is a 44 px tap (the UI audit's targets-44px row, 31 Oct)",
+     rp.includes('className="btn-sec mt-3" style={{ minHeight: 44 }} onClick={() => show(c.id)}'));
+  ok("REVIEW PAGE: the sign-in card is 'Sign in' and says reviewers from a client sign in here too",
+     code.includes("Reviewers from a client sign in here too."));
+  const up = fnB("UsersPage");
+  ok("⭐ CLIENT REVIEWERS: the Users tab reads and writes /admin/reviewers and /admin/reviewer-groups; a group's Delete only when the reply allows it",
+     up.includes("call(`/admin/reviewers${qs()}`)") && up.includes('call(`/admin/reviewer-groups${qs()}`, "POST", { name: newGroup.trim() })')
+     && up.includes("{g.can_delete && <button") && up.includes('data-users-reviewers="1"'));
+  ok("🔴 CLIENT REVIEWERS: a reviewer is added with a name, email, group and end date — no role, team or code",
+     up.includes('call(`/admin/reviewers${qs()}`, "POST", { name: f.name.trim(), email: f.email.trim(), group_id: f.group_id, ends_on: f.ends_on || null })'));
 }
 
 console.log();

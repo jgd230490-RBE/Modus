@@ -2257,6 +2257,12 @@ async function g3LoginsDom(){
                        used: 2, max: 6, can_add: true };
   const TEAMS_FULL = { teams: [...TEAMS_LIST.teams, { id: "IPT3", label: "Drainage package", named: true, active: true, logins: 0, lines: 0 }],
                        used: 6, max: 6, can_add: false };
+  // 31 Oct 2026 (task 4a, PR 3c): the Client reviewers tab as GET /api/admin/reviewers answers
+  const RV_TAB = { mail: false,
+    groups: [{ id: "G1", name: "Highways client (fictional)", reviewers: 1, sent: 2, stopped: false, can_delete: false },
+             { id: "G2", name: "Old client", reviewers: 0, sent: 0, stopped: true, can_delete: true }],
+    reviewers: [{ id: "r1", name: "Hana Highways", email: "hana@client.example", review_group: "G1", status: "active", disabled: false,
+                  has_password: true, two_step: true, expires_at: "2027-03-31T23:59:00Z", last_sign_in_at: "2026-10-30T10:00:00Z" }] };
   let signinAnswer = () => answer(200, ADMIN), meAnswer = () => answer(200, { signed_in: false, access: null, codes: false });
   w.fetch = (url, o) => {
     const u = String(url); calls.push({ u, o });
@@ -2270,6 +2276,13 @@ async function g3LoginsDom(){
     if (/\/api\/admin\/teams\/IPT2/.test(u) && JSON.parse(o.body).active === false) return answer(400, { detail: "Move or disable its 1 login first." });
     if (/\/api\/admin\/teams\/IPT2/.test(u)) return answer(200, { team: { id: "IPT2", label: "Central Civils", active: true },
       ...TEAMS_FULL, teams: TEAMS_FULL.teams.map(t => t.id === "IPT2" ? { ...t, label: "Central Civils" } : t) });
+    // 31 Oct 2026 (task 4a, PR 3c): Users → Client reviewers
+    if (/\/api\/admin\/reviewer-groups(\?|$)/.test(u) && o && o.method === "POST")
+      return answer(200, { ...RV_TAB, groups: [...RV_TAB.groups, { id: "G9", name: "Rail client (fictional)", reviewers: 0, sent: 0, stopped: false, can_delete: true }] });
+    if (/\/api\/admin\/reviewers(\?|$)/.test(u) && o && o.method === "POST")
+      return answer(200, { ...RV_TAB, user: { id: "r9", name: "Rae Reviewer" }, email: "unsent", purpose: "invite",
+                           link: "https://app.wayscope.co.uk/#invite=reviewerlinkreviewerlinkrev" });
+    if (/\/api\/admin\/reviewers(\?|$)/.test(u)) return answer(200, RV_TAB);
     if (/\/api\/admin\/users(\?|$)/.test(u) && !(o && o.method === "POST")) return answer(200, USERS);
     if (/\/api\/admin\/users(\?|$)/.test(u)) return answer(200, { user: { ...USERS.users[1], id: "u9", name: "Cy New" }, email: "unsent", purpose: "invite",
                                                                     link: "https://app.wayscope.co.uk/#invite=abcdefghijklmnopqrstuvwxyz" });
@@ -2349,8 +2362,9 @@ async function g3LoginsDom(){
   ok("G3 USERS: with no email set up, the page shows the invite link to pass on, with Copy",
      /pass this link/.test(a.box.textContent) && /#invite=abcdefghijklmnopqrstuvwxyz/.test(a.box.textContent) && !!btnT(a.box, "Copy"));
   // the Teams tab (23 Oct 2026)
+  // NARROWED 31 Oct 2026 (task 4a, PR 3c): + Client reviewers after the teams
   ok("TEAMS: the Users page has a Teams tab between People and Demo leads",
-     [...a.box.querySelectorAll('nav[aria-label="Users sections"] button')].map(b => b.textContent.trim()).join("|") === "People|Teams|Demo leads|Activity");
+     [...a.box.querySelectorAll('nav[aria-label="Users sections"] button')].map(b => b.textContent.trim()).join("|") === "People|Teams|Client reviewers|Demo leads|Activity");
   click(btnT(a.box, "Teams")); await tick(); await tick();
   const teamsBox = () => a.box.querySelector('[data-users-teams="1"]');
   ok("⭐ TEAMS: the tab lists each team by NAME with its logins and lines, and how many of six are used",
@@ -2381,6 +2395,42 @@ async function g3LoginsDom(){
   click(a.box.querySelector('button[aria-label="Stop using Central Civils"]')); await tick(); await tick();
   ok("TEAMS: a refused stop shows the server's sentence (its logins first)", /Move or disable its 1 login first\./.test(a.box.textContent)
      && calls.some(c => /\/api\/admin\/teams\/IPT2/.test(c.u) && JSON.parse(c.o.body).active === false));
+  // 31 Oct 2026 (task 4a, PR 3c): the Client reviewers tab
+  click(btnT(a.box, "Client reviewers")); await tick(); await tick();
+  const rvBox = () => a.box.querySelector('[data-users-reviewers="1"]');
+  ok("⭐ CLIENT REVIEWERS: the tab reads /api/admin/reviewers and lists the groups (in use / stopped) and the reviewers with their group, end date and two-step",
+     !!rvBox() && calls.some(c => /\/api\/admin\/reviewers(\?|$)/.test(c.u) && !/token=/.test(c.u))
+     && [...rvBox().querySelectorAll("[data-rv-group]")].map(r => r.getAttribute("data-rv-group")).join("|") === "G1|G2"
+     && /In use/.test(rvBox().querySelector('[data-rv-group="G1"]').textContent) && /Stopped/.test(rvBox().querySelector('[data-rv-group="G2"]').textContent)
+     && /Hana Highways/.test(rvBox().querySelector('[data-rv-login="r1"]').textContent)
+     && rvBox().querySelector('[data-rv-login="r1"] select').value === "G1" && rvBox().querySelector('[data-rv-login="r1"] input[type="date"]').value === "2027-03-31"
+     && /On/.test(rvBox().querySelector('[data-rv-login="r1"]').textContent));
+  ok("🔴 CLIENT REVIEWERS: a group that had a CLP sent offers no Delete (stopped, never deleted); a stopped one with none does; no team id",
+     !a.box.querySelector('button[aria-label="Delete Highways client (fictional)"]') && !!a.box.querySelector('button[aria-label="Stop Highways client (fictional)"]')
+     && !!a.box.querySelector('button[aria-label="Delete Old client"]') && !!a.box.querySelector('button[aria-label="Start Old client again"]')
+     && !/IPT ?\d/.test(rvBox().textContent));
+  ok("CLIENT REVIEWERS: the Add a reviewer group list offers only the groups in use",
+     [...a.box.querySelectorAll('select[aria-label="Reviewer\'s group"] option')].map(x => x.textContent).join("|") === "Choose…|Highways client (fictional)");
+  await setVal(a.box.querySelector('input[aria-label="New group\'s organisation"]'), "  Rail client (fictional) ");
+  await act(async () => { a.box.querySelector("[data-rv-add-group]").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick(); await tick();
+  const gadd = calls.find(c => /\/api\/admin\/reviewer-groups(\?|$)/.test(c.u) && c.o && c.o.method === "POST");
+  ok("⭐ CLIENT REVIEWERS: + Add group posts the trimmed organisation name only, and the new group is listed",
+     gadd && JSON.stringify(JSON.parse(gadd.o.body)) === JSON.stringify({ name: "Rail client (fictional)" })
+     && !!rvBox().querySelector('[data-rv-group="G9"]') && /Added Rail client \(fictional\)\. Add its reviewers below\./.test(a.box.textContent));
+  await setVal(a.box.querySelector('input[aria-label="Reviewer\'s name"]'), "Rae Reviewer");
+  await setVal(a.box.querySelector('input[aria-label="Reviewer\'s email"]'), "rae@client.example");
+  const rsel = a.box.querySelector('select[aria-label="Reviewer\'s group"]');
+  await act(async () => { rsel.value = "G1"; rsel.dispatchEvent(new w.Event("change", { bubbles: true })); });
+  const rend = a.box.querySelector('input[aria-label="The login ends on"]');
+  await setVal(rend, "2027-06-30");
+  await act(async () => { a.box.querySelector("[data-rv-add]").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick(); await tick();
+  const radd = calls.find(c => /\/api\/admin\/reviewers(\?|$)/.test(c.u) && c.o && c.o.method === "POST");
+  ok("⭐ CLIENT REVIEWERS: Add and send the link posts the name, email, group and end date — no role, team or code",
+     radd && JSON.stringify(JSON.parse(radd.o.body)) === JSON.stringify({ name: "Rae Reviewer", email: "rae@client.example", group_id: "G1", ends_on: "2027-06-30" }));
+  ok("CLIENT REVIEWERS: with no email set up the invite link is shown to pass on",
+     /Added Rae Reviewer\./.test(a.box.textContent) && /#invite=reviewerlinkreviewerlinkrev/.test(a.box.textContent));
   click(btnT(a.box, "Demo leads")); await tick(); await tick();
   ok("G3 USERS → Demo leads: a lead who had the shared code gets 'Send a personal login'",
      /Old Lead/.test(a.box.textContent) && /had the shared code/.test(a.box.textContent) && !!btnT(a.box, "Send a personal login"));
@@ -2890,21 +2940,32 @@ async function clpDocsDom(){
   const base = { cover_fields: FIELDS, places: [{ id: "L019", name: "Tilton Viaduct site", type: "site" }, { id: "L006", name: "Langton Compound", type: "compound" }],
     teams: [{ id: "IPT1", name: "North Team" }, { id: "IPT2", name: "Central Team" }],
     statuses: ["draft", "sent", "changes", "approved"].map(k => ({ key: k, word: { draft: "Draft", sent: "Sent", changes: "Changes asked", approved: "Approved" }[k] })) };
-  const listFor = (acc) => acc.ipt ? { ...base, clps: ALL.filter(c => c.team === acc.ipt), can_approve: false, team: acc.ipt, team_name: "North Team" }
-                                   : { ...base, clps: ALL, can_approve: true, team: null, team_name: null };
+  // 31 Oct 2026 (PR 3c): with rvOn the list carries the client groups' lines (Returned in red)
+  let rvOn = false;
+  const RV_LINES = { "auto-L019-IPT1": [{ group_id: "G1", group_name: "Highways client (fictional)", issue_no: 1, state: "waiting", sent_at: "2026-10-21T10:00:00Z" },
+                                        { group_id: "G2", group_name: "Rail client (fictional)", issue_no: 1, state: "returned", at: "2026-10-29T10:00:00Z" }],
+                     "auto-L019-IPT2": [{ group_id: "G1", group_name: "Highways client (fictional)", issue_no: 1, state: "accepted", at: "2026-10-27T10:00:00Z" }] };
+  const withRv = (c) => rvOn ? { ...c, reviews: RV_LINES[c.id] || [] } : c;
+  const listFor = (acc) => acc.ipt ? { ...base, clps: ALL.filter(c => c.team === acc.ipt).map(withRv), can_approve: false, team: acc.ipt, team_name: "North Team", review_groups: false }
+                                   : { ...base, clps: ALL.map(withRv), can_approve: true, team: null, team_name: null, review_groups: rvOn };
+  const RV_GROUPS = [{ id: "G1", name: "Highways client (fictional)", reviewers: 2, had_issue: 1, has_this: false },
+                     { id: "G2", name: "Rail client (fictional)", reviewers: 1, had_issue: null, has_this: false }];
   const calls = []; let acc = plannerAcc;
   w.fetch = (url, opt) => {
     const method = (opt && opt.method) || "GET"; calls.push({ url, method, body: opt && opt.body ? JSON.parse(opt.body) : null });
     if (url === "/api/clp/documents" && method === "GET") return reply(200, listFor(acc));
     if (/\/approve-preview$/.test(url)) return reply(200, { id: "auto-L019-IPT1", next_issue: 2, last_issue: { no: 1, date: "2026-10-20" }, sent: true,
       sent_by: "Nora North", sent_at: "2026-10-31T09:00:00Z", sent_note: "Ready", changes: ["Lorry trips 1,695 → 1,820", "Postcode typed"],
-      tasks: { open: 2, overdue: 1, first_overdue: "Ask Melton BC which code applies" } });
+      tasks: { open: 2, overdue: 1, first_overdue: "Ask Melton BC which code applies" }, ...(rvOn ? { review_groups: RV_GROUPS } : {}) });
+    if (/\/review-send$/.test(url) && method === "GET") return reply(200, { issue_no: 1, groups: [{ ...RV_GROUPS[0], has_this: true }, RV_GROUPS[1]] });
+    if (/\/review-send$/.test(url) && method === "POST") return reply(200, { sent: [{ group_id: "G2", group_name: "Rail client (fictional)", email: { sent: 1 } }], skipped: [] });
     if (/\/notes$/.test(url) && method === "GET") return reply(200, THREAD);
     if (/\/notes$/.test(url) && method === "POST") return reply(200, { id: "n-9", thread: THREAD });
     if (/\/tasks$/.test(url) && method === "POST") return reply(200, { id: "n-8", email: "sent", thread: THREAD });
     if (/\/(tasks|notes)\/[^/]+$/.test(url) && (method === "PATCH" || method === "DELETE")) return reply(200, { thread: THREAD });
     if (/\/changes$/.test(url) && method === "POST") return reply(200, { ok: true });
-    if (/\/approve$/.test(url) && method === "POST") return reply(200, { ok: true, issue_no: 2 });
+    if (/\/approve$/.test(url) && method === "POST") return reply(200, { ok: true, issue_no: 2,
+      ...(rvOn ? { review_send: { sent: [{ group_id: "G1", group_name: "Highways client (fictional)", email: { sent: 2 } }], skipped: [] } } : {}) });
     if (/\/send$/.test(url) && method === "POST") return reply(200, { ok: true });
     if (/^\/api\/clp\/documents\/[^/]+$/.test(url) && method === "PATCH") return reply(200, { ok: true });
     return reply(404, { detail: "no" });
@@ -3042,6 +3103,8 @@ async function clpDocsDom(){
      && !t.el.querySelector("[data-clp-filters]") && t.el.querySelector("header, [data-page='clp']").textContent.includes("North Team")
      // NARROWED 31 Oct 2026 (PR 3b): five heads — + Tasks (the mockup's card 4)
      && t.el.querySelectorAll("[data-clp-table] thead th").length === 5 && !/IPT\d/.test(t.el.textContent));
+  ok("🔴 CLP REVIEWERS DOM: with no client group the list has no review line, no Reviewers filter and no 'Send … to reviewers' (a team, and the planner before)",
+     !t.el.querySelector("[data-clp-review-line]") && !t.el.querySelector("[data-clp-reviewers-filter]") && !byText(t.el, /to reviewers…$/));
   ok("CLP DOCS DOM: a team's next step is Download draft (never Approve), its menu holds Edit cover details and Send for approval (sent), no Delete",
      rows(t.el)[0].querySelector("[data-clp-primary]").textContent === "Download draft"
      && !!byText(t.el, /^Edit cover details$/) && !!byText(t.el, /^Send for approval \(sent\)$/) && !byText(t.el, /^(Delete…|Clear typed details…|Approve as Issue)/));
@@ -3057,6 +3120,172 @@ async function clpDocsDom(){
      calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1" && c.method === "PATCH" && c.body && Object.keys(c.body).join(",") === "cover"
                      && c.body.cover.landowner === "Fictional Estates Ltd" && c.body.cover.postcode === "LE7 9XX"));
   await t.done();
+
+  // -- 31 Oct 2026 (task 4a, PR 3c): the client's reviewers on the contractor's list
+  rvOn = true;
+  const rv = await mount(plannerAcc);
+  const lines = (id) => [...rv.el.querySelectorAll(`[data-clp-row="${id}"] [data-clp-review-line]`)];
+  ok("⭐ CLP REVIEWERS DOM: under Status a line per group — 'With … · since', 'Returned by …' in red, '✓ Accepted by …' in green",
+     lines("auto-L019-IPT1").map(l => l.textContent).join("|") === "With Highways client (fictional) · since 21 Oct|Returned by Rail client (fictional) · 29 Oct"
+     && lines("auto-L019-IPT1")[1].style.color === "var(--bad-text)" && lines("auto-L019-IPT2")[0].textContent === "✓ Accepted by Highways client (fictional) · 27 Oct"
+     && lines("auto-L019-IPT2")[0].style.color === "var(--ok-text)" && lines("auto-L019-all").length === 0,
+     lines("auto-L019-IPT1").map(l => l.textContent).join("|"));
+  const rf = rv.el.querySelector("[data-clp-reviewers-filter]");
+  const pickRv = async (v) => { await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set; set.call(rf, v); rf.dispatchEvent(new w.Event("change", { bubbles: true })); }); };
+  const ids = () => rows(rv.el).map(r => r.getAttribute("data-clp-row")).join("|");
+  await pickRv("waiting"); const fw = ids(); await pickRv("returned"); const fr = ids(); await pickRv("accepted"); const fa = ids(); await pickRv("");
+  ok("⭐ CLP REVIEWERS DOM: the Reviewers filter (Any · Waiting · Accepted · Returned) narrows by the groups' lines",
+     !!rf && [...rf.querySelectorAll("option")].map(o => o.textContent).join("|") === "Any|Waiting|Accepted|Returned"
+     && fw === "auto-L019-IPT1" && fr === "auto-L019-IPT1" && fa === "auto-L019-IPT2" && rows(rv.el).length === 3, [fw, fr, fa].join(" / "));
+  ok("CLP REVIEWERS DOM: a CLP with an issue has '⋯ → Send Issue 1 to reviewers…'; the one with none does not",
+     !!rv.el.querySelector('[data-clp-row="auto-L019-IPT1"]') && [...rv.el.querySelectorAll('[data-clp-row="auto-L019-IPT1"] button')].some(b => b.textContent === "Send Issue 1 to reviewers…")
+     && ![...rv.el.querySelectorAll('[data-clp-row="auto-L019-all"] button')].some(b => /to reviewers…$/.test(b.textContent)));
+  await press(rows(rv.el)[0].querySelector("[data-clp-primary]"));
+  const st2 = () => rv.el.querySelector("[data-clp-send-to]");
+  const ticks = () => [...st2().querySelectorAll('input[type="checkbox"]')].map(x => x.checked);
+  ok("⭐ CLP REVIEWERS DOM: the approve card lists the client groups; the one that had Issue 1 is ticked for Issue 2, the other not",
+     !!st2() && /Highways client \(fictional\) · 2 reviewers · had Issue 1/.test(st2().textContent) && /Rail client \(fictional\) · 1 reviewer$/.test(st2().querySelectorAll("label")[1].textContent)
+     && ticks().join(",") === "true,false" && /The ticked groups get Issue 2 to review\./.test(rv.el.querySelector("[data-clp-approve]").textContent));
+  await press(rv.el.querySelector("[data-clp-approve-go]"));
+  const apc = calls.find(c => c.url === "/api/clp/documents/auto-L019-IPT1/approve" && c.method === "POST");
+  ok("⭐ CLP REVIEWERS DOM: Approve and issue sends the ticked group ids with the note, and says who it went to",
+     apc && JSON.stringify(apc.body) === JSON.stringify({ note: null, send_to: ["G1"] }) && rv.el.textContent.includes("Approved as Issue 2. Sent to Highways client (fictional)."),
+     apc ? JSON.stringify(apc.body) : "no call");
+  await press([...rv.el.querySelectorAll('[data-clp-row="auto-L019-IPT1"] button')].find(b => b.textContent === "Send Issue 1 to reviewers…"));
+  const sp = () => rv.el.querySelector("[data-clp-review-send]");
+  const sbox = () => [...sp().querySelectorAll('input[type="checkbox"]')];
+  ok("⭐ CLP REVIEWERS DOM: '⋯ → Send Issue 1 to reviewers…' reads the groups; the one that has it is ticked and fixed, the other free",
+     !!sp() && calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1/review-send" && c.method === "GET")
+     && sbox()[0].checked && sbox()[0].disabled && !sbox()[1].checked && !sbox()[1].disabled && /has Issue 1/.test(sp().textContent)
+     && sp().querySelector("[data-clp-review-go]").disabled);
+  await press(sbox()[1]);
+  await press(sp().querySelector("[data-clp-review-go]"));
+  const rsc = calls.find(c => c.url === "/api/clp/documents/auto-L019-IPT1/review-send" && c.method === "POST");
+  ok("⭐ CLP REVIEWERS DOM: Send posts the ticked group and the issue number, and says it went",
+     rsc && JSON.stringify(rsc.body) === JSON.stringify({ groups: ["G2"], issue_no: 1 }) && rv.el.textContent.includes("Issue 1: Sent to Rail client (fictional).") && !sp());
+  ok("🔴 CLP REVIEWERS DOM: no team id anywhere", !/IPT\d/.test(rv.el.textContent));
+  await rv.done();
+  rvOn = false;
+}
+
+// ---- 31 Oct 2026 (task 4a, PR 3c): a client reviewer's Wayscope — ONE page, CLPs for review
+async function reviewerDom(){
+  const REVIEWER = { via: "reviewer", reviewer: true, name: "Hana Highways", email: "hana@client.example", label: "Highways client (fictional)",
+    group_name: "Highways client (fictional)", kind: "reviewer", role: null, can_approve: false, two_step: true, user_id: "r1", ipts: [] };
+  const LIST = { group_name: "Highways client (fictional)", scheme: "Wolds Link",
+    clps: [{ id: "auto-L019-IPT1", name: "Tilton Viaduct site", team_name: "North Team", issue_no: 2, sent_at: "2026-10-31T09:00:00Z", sent_by: "Pat Planner", state: "waiting" },
+           { id: "auto-L006-all", name: "Langton Compound", team_name: "All teams", issue_no: 1, sent_at: "2026-10-20T09:00:00Z", sent_by: "Pat Planner", state: "accepted",
+             decided_by: "Hana Highways", decided_at: "2026-10-22T09:00:00Z" }] };
+  const ONE = (extra) => ({ id: "auto-L019-IPT1", name: "Tilton Viaduct site", team_name: "North Team", group_name: "Highways client (fictional)", can_decide: true,
+    latest: { no: 2, sent_at: "2026-10-31T09:00:00Z", sent_by: "Pat Planner", note: "Gate hours added", state: "waiting" },
+    issues: [{ no: 2, sent_at: "2026-10-31T09:00:00Z", sent_by: "Pat Planner", decisions: [] },
+             { no: 1, sent_at: "2026-10-20T09:00:00Z", sent_by: "Pat Planner", at: "2026-10-24T09:00:00Z",
+               decisions: [{ decision: "returned", word: "Returned", by: "Hana Highways", words: "Add the Saturday hours" }] }],
+    thread: [{ kind: "step", id: "s1", step: "review-sent", step_word: "Issue 2 sent to Highways client (fictional)", by: "Pat Planner", at: "2026-10-31T09:00:00Z" },
+             { kind: "note", id: "c1", words: "Saturday hours are now in 4.1.", by: "Pat Planner", org: "Wolds Link", at: "2026-10-31T09:01:00Z" }], ...(extra || {}) });
+  const calls = []; let one = ONE();
+  const answer = (status, data) => Promise.resolve({ ok: status < 300, status, json: () => Promise.resolve(data), text: () => Promise.resolve(JSON.stringify(data)),
+    blob: () => Promise.resolve(new w.Blob(["docx"])), headers: { get: (h) => /disposition/i.test(h) ? 'attachment; filename="Tilton CLP Issue 2.docx"' : null } });
+  w.fetch = (url, o) => {
+    const u = String(url), method = (o && o.method) || "GET"; calls.push({ u, method, body: o && o.body ? JSON.parse(o.body) : null });
+    if (/\/api\/meta$/.test(u)) return respond(META);
+    if (/\/api\/auth\/me$/.test(u)) return answer(200, { signed_in: false, access: null, codes: false });
+    if (/\/api\/auth\/signin$/.test(u)) return answer(200, REVIEWER);
+    if (/\/api\/auth\/signout$/.test(u)) return answer(200, { ok: true });
+    if (/\/api\/review\/clps$/.test(u)) return answer(200, LIST);
+    if (/\/api\/review\/clps\/auto-L019-IPT1$/.test(u)) return answer(200, one);
+    if (/\/api\/review\/clps\/auto-L019-IPT1\/issues\/2\.docx$/.test(u)) return answer(200, null);
+    if (/\/api\/review\/clps\/auto-L019-IPT1\/comments$/.test(u)) return answer(200, ONE({ thread: [...one.thread, { kind: "note", id: "c9", words: "Thanks", by: "Hana Highways", org: "Highways client (fictional)", at: "2026-10-31T10:00:00Z" }] }));
+    if (/\/api\/review\/clps\/auto-L019-IPT1\/decision$/.test(u)) return answer(200, ONE({ latest: { ...one.latest, state: "accepted", by: "Hana Highways", at: "2026-10-31T10:05:00Z" } }));
+    if (/\/api\/activity$/.test(u)) return answer(200, { ok: true, recorded: true });
+    return new Promise(() => {});
+  };
+  const btnT = (box, t) => [...box.querySelectorAll("button")].find(b => b.textContent.trim() === t);
+  const setVal = (el, v) => act(() => { Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(el, v); el.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  const setText = (el, v) => act(() => { Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value").set.call(el, v); el.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  const press = async (b) => { await act(async () => { b.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); await tick(); await tick(); };
+  w.__ACCESS.code = ""; w.__ACCESS.info = null; w.sessionStorage.removeItem("modus_access_code"); w.localStorage.removeItem("wayscope_signed_in");
+  w.localStorage.setItem("modus_page", "dashboard");
+  const box = w.document.createElement("div"); w.document.body.appendChild(box);
+  const root = w.ReactDOM.createRoot(box);
+  await act(async () => { root.render(w.React.createElement(w.App)); }); await tick(); await tick();
+  click(btnT(box, "Staff sign in")); await tick();
+  ok("⭐ REVIEWER DOM: the sign-in card reads 'Sign in' and says reviewers from a client sign in here too",
+     [...box.querySelectorAll("h1, h2")].some(h => h.textContent.trim() === "Sign in") && /Reviewers from a client sign in here too\./.test(box.textContent));
+  await setVal(box.querySelector("input#auth-email"), "hana@client.example");
+  await setVal(box.querySelector("input#auth-pass"), "a long reviewer password");
+  await act(async () => { btnT(box, "Sign in").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await tick(); await tick(); await tick();
+  const page = () => box.querySelector('[data-page="review"]');
+  ok("⭐ REVIEWER DOM: a reviewer lands on ONE page, CLPs for review — no rail, no Dashboard, no map, no vehicle-name buttons",
+     !!page() && /CLPs for review/.test(page().textContent) && !box.querySelector(".rail-item") && !box.querySelector("#map, .mapboxgl-map")
+     && !/Dashboard/.test(box.textContent.replace(/CLPs for review/g, "")) && w.__ACCESS.info === REVIEWER);
+  ok("REVIEWER DOM: the page reads ONLY /api/review/ (and the sign-in, meta and page-open note)",
+     calls.filter(c => /\/api\//.test(c.u)).every(c => /\/api\/(review\/|auth\/|meta$|activity$)/.test(c.u)),
+     calls.map(c => c.u).filter(u => !/\/api\/(review\/|auth\/|meta$|activity$)/.test(u)).join(", "));
+  ok("⭐ REVIEWER DOM: the header names the person in the account menu; the subtitle names the scheme and the group",
+     !!box.querySelector(".acct-btn") && /Hana Highways/.test(box.querySelector(".acct-btn").textContent)
+     && /Construction Logistics Plans Wolds Link has sent to Highways client \(fictional\)\./.test(page().textContent));
+  const trs = () => [...page().querySelectorAll("[data-review-row]")];
+  ok("⭐ REVIEWER DOM: the list — each CLP with its team NAME, issue, who sent it, and the group's decision",
+     !!page().querySelector("[data-review-table]") && trs().length === 2 && /North Team/.test(trs()[0].textContent) && /Issue 2/.test(trs()[0].textContent)
+     && /Waiting for your group/.test(trs()[0].textContent) && /Accepted by Hana Highways · 22 Oct/.test(trs()[1].textContent) && !/IPT\d/.test(page().textContent));
+  await press(trs()[0].querySelector("button.row-open"));
+  const clp = () => box.querySelector('[data-review-clp="auto-L019-IPT1"]');
+  ok("⭐ REVIEWER DOM: opening a CLP — its name, team and issue; Download Issue 2 (Word); the history with Issue 1's return; the comments with the grey sent line",
+     !!clp() && /Tilton Viaduct site · North Team · Issue 2/.test(clp().querySelector("h2").textContent)
+     && clp().querySelector("[data-review-download]").textContent === "Download Issue 2 (Word)"
+     && clp().querySelectorAll("[data-review-history] tbody tr").length === 2 && /Returned by Hana Highways: “Add the Saturday hours”/.test(clp().querySelector("[data-review-history]").textContent)
+     && /^↗ Issue 2 sent to Highways client \(fictional\) by Pat Planner/.test(clp().querySelector('[data-review-step="review-sent"]').textContent)
+     && /Saturday hours are now in 4\.1\./.test(clp().querySelector("[data-review-thread]").textContent));
+  ok("🔴 REVIEWER DOM: the open CLP shows no task, no team note box, no Approve and no edit", !/Tasks|Approve|Edit cover|Notes and tasks/.test(clp().textContent));
+  w.URL.createObjectURL = () => "blob:x"; w.URL.revokeObjectURL = () => {};
+  await press(clp().querySelector("[data-review-download]"));
+  ok("⭐ REVIEWER DOM: Download reads the review copy of Issue 2 (never the staff download)",
+     calls.some(c => /\/api\/review\/clps\/auto-L019-IPT1\/issues\/2\.docx$/.test(c.u)) && !calls.some(c => /\/api\/clp\//.test(c.u)));
+  await press(clp().querySelector("[data-review-return]"));
+  ok("🔴 REVIEWER DOM: Return with comments with an empty box sends nothing and asks for the comment first",
+     !calls.some(c => /\/decision$/.test(c.u)) && /Write what needs changing in the comment box first\./.test(clp().textContent));
+  await setText(clp().querySelector("#rv-words"), "Thanks");
+  await press(clp().querySelector("[data-review-comment]"));
+  const cc = calls.find(c => /\/comments$/.test(c.u) && c.method === "POST");
+  ok("⭐ REVIEWER DOM: Add comment posts the words only and the thread shows it",
+     cc && JSON.stringify(cc.body) === JSON.stringify({ words: "Thanks" }) && /Comment added\./.test(clp().textContent) && clp().querySelector("#rv-words").value === "");
+  let asked = ""; const oldConfirm = w.confirm; w.confirm = (q) => { asked = q; return false; };
+  await press(clp().querySelector("[data-review-accept]"));
+  ok("🔴 REVIEWER DOM: Accept asks once — 'Accept Issue 2 of the Tilton Viaduct site CLP for Highways client (fictional)?' — and a No sends nothing",
+     asked === "Accept Issue 2 of the Tilton Viaduct site CLP for Highways client (fictional)?" && !calls.some(c => /\/decision$/.test(c.u)), asked);
+  w.confirm = () => true;
+  await press(clp().querySelector("[data-review-accept]"));
+  w.confirm = oldConfirm;
+  const dc = calls.find(c => /\/decision$/.test(c.u) && c.method === "POST");
+  ok("⭐ REVIEWER DOM: a Yes posts the issue number and 'accepted', and the page says so",
+     dc && dc.body.issue_no === 2 && dc.body.decision === "accepted" && dc.body.words === null && /Issue 2 accepted\./.test(clp().textContent)
+     && /Accepted by Hana Highways/.test(clp().textContent));
+  await press(btnT(clp(), "← CLPs for review"));
+  ok("REVIEWER DOM: ← CLPs for review goes back to the list", !!page() && !!page().querySelector("[data-review-table]"));
+  await act(async () => { root.unmount(); }); box.remove();
+
+  // a newer issue not sent to the group yet: no Accept / Return
+  one = ONE({ can_decide: false });
+  const el2 = w.document.createElement("div"); w.document.body.appendChild(el2); const r2 = w.ReactDOM.createRoot(el2);
+  await act(async () => { r2.render(w.React.createElement(w.ReviewPage, { role: REVIEWER })); }); await tick(); await tick();
+  await press(el2.querySelector('[data-review-row="auto-L019-IPT1"] button.row-open'));
+  ok("🔴 REVIEWER DOM: once the contractor has a newer issue not sent to the group, the old one cannot be decided",
+     !el2.querySelector("[data-review-accept]") && !el2.querySelector("[data-review-return]")
+     && /The contractor has a newer issue that is not sent to Highways client \(fictional\) yet\./.test(el2.textContent));
+  await act(async () => { r2.unmount(); }); el2.remove();
+
+  // a phone: cards, not a table
+  const oldMM = w.matchMedia;
+  w.matchMedia = (q) => ({ matches: /max-width: 767px/.test(q), addEventListener(){}, removeEventListener(){}, addListener(){}, removeListener(){} });
+  const el3 = w.document.createElement("div"); w.document.body.appendChild(el3); const r3 = w.ReactDOM.createRoot(el3);
+  await act(async () => { r3.render(w.React.createElement(w.ReviewPage, { role: REVIEWER })); }); await tick(); await tick();
+  ok("⭐ REVIEWER DOM: on a phone the list is cards (name, team · issue · sent, the decision, Open), no table",
+     !!el3.querySelector("[data-review-cards]") && !el3.querySelector("[data-review-table]") && el3.querySelectorAll("[data-review-cards] > li").length === 2
+     && /North Team · Issue 2 · sent 31 Oct/.test(el3.textContent) && !!el3.querySelector('button[aria-label="Open Tilton Viaduct site"]'));
+  await act(async () => { r3.unmount(); }); el3.remove();
+  w.matchMedia = oldMM;
 }
 
 (async () => {
@@ -3102,6 +3331,9 @@ async function clpDocsDom(){
   // 31 Oct 2026 (task 4a, PR 3a): Plan → CLP documents
   try { await clpDocsDom(); ok("CLP DOCS DOM: the section ran to the end", true); }
   catch (e) { ok("CLP DOCS DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  // 31 Oct 2026 (task 4a, PR 3c): a client reviewer's one page
+  try { await reviewerDom(); ok("REVIEWER DOM: the section ran to the end", true); }
+  catch (e) { ok("REVIEWER DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   // 22 Oct 2026 (UI fix 6, card 5): the big screen's Today list fitted to its box
   try { await todayFitDom(); ok("TODAY FIT: the section ran to the end", true); }
   catch (e) { ok("TODAY FIT: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }

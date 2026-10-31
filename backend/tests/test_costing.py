@@ -240,8 +240,9 @@ ok("the tenant's settings live in the tenanted config table under one key, no ne
    # NARROWED 29 Oct 2026: and pours (task 3a, concrete pours)
    # NARROWED 31 Oct 2026: and the three site layout tables (task 4c PR 1)
    # NARROWED 31 Oct 2026: and clp_notes (task 4a PR 3b, the notes and tasks on each CLP)
-   costing.KEY == "costing" and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours", "clp_documents", "clp_issues", "site_layouts", "site_layout_phases", "site_layout_imports", "clp_notes"}) == 16
-   and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours", "clp_documents", "clp_issues", "site_layouts", "site_layout_phases", "site_layout_imports", "clp_notes"} <= db.TENANTED_TABLES)
+   # NARROWED 31 Oct 2026: and clp_review_groups + clp_reviews (task 4a PR 3c, the client's reviewers)
+   costing.KEY == "costing" and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours", "clp_documents", "clp_issues", "site_layouts", "site_layout_phases", "site_layout_imports", "clp_notes", "clp_review_groups", "clp_reviews"}) == 16
+   and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours", "clp_documents", "clp_issues", "site_layouts", "site_layout_phases", "site_layout_imports", "clp_notes", "clp_review_groups", "clp_reviews"} <= db.TENANTED_TABLES)
 ok("nothing is seeded: no target rate, no share, no base, no yard, no index row",
    costing.settings()["target"] == {k: None for k in costing.TARGET_FIELDS}
    and costing.settings()["fuel"]["share_pct"] is None and costing.settings()["fuel"]["baf_base_eur_per_l"] is None
