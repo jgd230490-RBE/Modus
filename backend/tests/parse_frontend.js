@@ -4628,6 +4628,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // 31 Oct: the UI audit read the sr-only file input as clipped text; the button opens it, so it is not drawn at all
   ok("SITE LAYOUT: the drawing's file input is opened by the button and not drawn (display none, out of the tab order)",
      card.includes('style={{ display: "none" }} aria-label="Drawing to bring in" tabIndex={-1}') && card.includes("fileRef.current.click()"));
+  // 31 Oct 2026 (PR 1b, plan §6 revised): a drawing in millimetres, inches or with no units is scaled; the card says how it was read
+  ok("SITE LAYOUT: the first line says the drawing's units and where they came from ('in millimetres, from the file')",
+     card.includes("{imp.report.things} things on {imp.report.layers} layers{imp.report.units ? `, in ${imp.report.units}` : \"\"}.</p>"));
 }
 // 31 Oct 2026 (task 4a, PR 3a; the approved mockup notes\clp-screens-mockup-1031): Plan → CLP documents and Config's CLP stages
 {

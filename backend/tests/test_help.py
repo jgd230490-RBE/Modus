@@ -1208,6 +1208,13 @@ ok3("SITE LAYOUTS: the technical guide #t1-layouts holds the detail (the three t
     'id="t1-layouts"' in _tgv2 and '<a href="#t1-layouts">Site layouts</a>' in _tgv2 and "<code>site_layout_phases</code>" in _tgv2
     and "/api/site-layouts/read?" in _tgv2 and "/api/site-layouts/fit?" in _tgv2 and "OSTN15" in _tgv2 and "10 MB" in _tgv2
     and "Someone else saved this layout. Reload to see their changes." in _tgv2 and "<code>site_layouts.import_map</code>" in _tgv2)
+# 31 Oct 2026 (PR 1b, plan §6 revised): a CAD office's DXF is scaled and tidied, and both guides say so
+ok3("SITE LAYOUTS: 19.2 says a DXF may be in millimetres, inches or feet, what is left out, and that a cabin comes in as its outline",
+    "in metres, millimetres, centimetres, inches or feet" in _ch19 and "anything over 1 km from the site" in _ch19
+    and "comes in as its outline" in _ch19 and "DXF in metres," not in _ch19)
+ok3("SITE LAYOUTS: #t1-layouts holds the units rule, the leave-outs, footprints, holes and the Terra Draw note for PR 2",
+    "<code>FOOTPRINT_M</code>" in _tgv2 and "<code>site_layouts.MAX_HOLES</code>" in _tgv2 and "Terra Draw 1.37 refuses a polygon with holes" in _tgv2
+    and "<code>contractor-style-mm.dxf</code>" in _tgv2 and "<code>$INSUNITS</code> must be 6" not in _tgv2)
 
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
