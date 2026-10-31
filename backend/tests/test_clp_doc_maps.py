@@ -8,7 +8,7 @@ the stored lorry-limit and closure checks, the dated diversions, the community p
 a site with the nearest one and how far, the collisions on and near each route; "not fetched" is never printed as a
 zero. The charts (programme, monthly with a day scale at round numbers, hourly per gate) and the plans (a regional
 plan, then each site's local and site plan in the Streets style) as pictures with their alternative text. The .docx
-read back: the pictures inline with their descriptions, the tables, the word rule. The endpoint: a heavy slot, kept
+read back: the pictures inline with their descriptions, the tables, the word rule. The endpoint: built alone (31 Oct), kept
 until the next write only when every plan had its basemap.
 
 WHAT THIS DOES NOT PROVE
@@ -527,7 +527,7 @@ ok("pictures=False: the same text, no pictures (the fast path the tests and a fu
    len(Document(io.BytesIO(clp_doc.build(D1, pictures=False))).inline_shapes) == 0)
 
 # =========================================================================== #
-#  5. The endpoint: a heavy slot; kept only when every plan had its basemap    #
+#  5. The endpoint: alone; kept only when every plan had its basemap         #
 # =========================================================================== #
 _builds = [0]
 _real_build = clp_doc.build
@@ -554,11 +554,103 @@ config.mapbox_token = _tok
 clp_doc.build = _real_build
 MAIN = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
 _ep = MAIN[MAIN.index('@app.get("/api/clp/document.docx")'):MAIN.index('@app.post("/api/admin/gates")')]
-ok("the build runs in a heavy slot of its own, busy in words", 'heavy_reads.slot("clp-document"' in _ep
-   and '"Wayscope is busy; try again in a minute."' in _ep and "keep=lambda: basemap.MISSES[0] == misses" in _ep)
+# 31 Oct 2026 (narrowed, not deleted): it was a PUBLIC heavy slot ('heavy_reads.slot("clp-document"', "Wayscope is busy;
+# try again in a minute."); on live one build held that slot for minutes and the map's month figures queued behind it
+ok("the build runs ALONE, outside the public map's slots, busy in words", 'heavy_reads.solo("clp-document"' in _ep
+   and 'heavy_reads.slot("clp-document"' not in _ep
+   and '"Another CLP document is being made. Try again in a minute."' in _ep
+   and "keep=lambda: basemap.MISSES[0] == misses" in _ep)
+ok("...and reads the councils from the public map's kept copy (area_month), not worked out again",
+   "clp_doc_layers.gather(data, area_month=_clp_area_month)" in _ep
+   and "read_cache.cached(AREAS_MONTHS_CACHE" in MAIN[MAIN.index("def _clp_area_month"):MAIN.index('@app.get("/api/clp/document.docx")')])
 
+_stub_area_load = areas.area_load
 areas.area_load, limits.stored_checks = _real["area_load"], _real["lim"]
 restrictions.stored_checks, route_choice.periods = _real["res"], _real["per"]
+
+# =========================================================================== #
+#  5b. 31 Oct 2026 — the memory: one build at a time, less held while it runs  #
+# =========================================================================== #
+import heavy_reads  # noqa: E402
+import threading  # noqa: E402
+_held, _go, _res = threading.Event(), threading.Event(), {}
+
+
+def _hold():
+    with heavy_reads.solo("harness-solo"):
+        _res["inner_free"] = heavy_reads._sem._value        # an inner heavy read takes no public slot
+        with heavy_reads.slot("inner-read"):
+            _res["inner_free_in"] = heavy_reads._sem._value
+        _held.set()
+        _go.wait(10)
+
+
+_t = threading.Thread(target=_hold)
+_t.start()
+_held.wait(10)
+try:
+    with heavy_reads.solo("harness-solo", wait_s=0.2):
+        _res["second"] = "ran"
+except heavy_reads.Busy:
+    _res["second"] = "busy"
+_free_meanwhile = heavy_reads._sem._value
+with heavy_reads.slot("public-read"):                       # the public map's reads are not held up by it
+    _res["public"] = "ran"
+_go.set()
+_t.join(10)
+ok("⭐ a solo job: a second one while it runs is answered busy (no queue of builds)", _res.get("second") == "busy",
+   str(_res))
+ok("⭐ ...it takes none of the public map's slots, and a heavy read inside it runs in it (no public slot either)",
+   _free_meanwhile == heavy_reads.SLOTS and _res.get("inner_free") == heavy_reads.SLOTS
+   and _res.get("inner_free_in") == heavy_reads.SLOTS and _res.get("public") == "ran", str(_res))
+with heavy_reads.solo("harness-solo", wait_s=0.2):
+    _res["after"] = "ran"
+ok("...and the next one runs once it has finished", _res.get("after") == "ran")
+ok("trim(): the freed memory handed back on Linux (Render, CI), a no-op elsewhere, never an error",
+   heavy_reads.trim() == sys.platform.startswith("linux"))
+
+ok("⭐ the plans are drawn at PLAN_DPI (150: ~250 dpi as Word shows them), not the export's 228",
+   PIC.PLAN_DPI == 150 and all(Image.open(io.BytesIO(p["jpg"])).info.get("dpi", (0, 0))[0] == 150 for p in PL)
+   and all(Image.open(io.BytesIO(p["jpg"])).width < 1800 for p in PL),
+   str([Image.open(io.BytesIO(p["jpg"])).size for p in PL]))
+_SP = open(os.path.join(BACKEND, "clp_doc_pictures.py"), encoding="utf-8").read()
+ok("🔴 ...straight from the page to a JPEG: no PNG made and decoded again", "route_map_png(" not in _SP
+   and "_plan_jpeg(export.build_route_map_pdf(S))" in _SP)
+
+C1_COLL = L1["collisions"]
+_calls = {"records": 0, "bbox": []}
+_real_records, _real_feats = collisions.records, community.features
+
+
+def _count_records(*a, **k):
+    _calls["records"] += 1
+    return _real_records(*a, **k)
+
+
+def _rec_feats(*a, **k):
+    _calls["bbox"].append(k.get("bbox"))
+    return _real_feats(*a, **k)
+
+
+collisions.records, community.features = _count_records, _rec_feats
+_areas_asked = []
+L2 = clp_doc_layers.gather(D1, area_month=lambda m: (_areas_asked.append(m) or {"areas": [
+    {"name": "Kept Council", "tier_words": "district", "highway_authority": "Kept HA", "routes": ["R001"], "sites": []}]}))
+collisions.records, community.features = _real_records, _real_feats
+ok("⭐ collisions read once (was twice: by route, then all), with the same counts",
+   _calls["records"] == 1 and L2["collisions"] == C1_COLL, str(_calls["records"]))
+ok("⭐ community places: only those touching the strip's own box are loaded, with the same places",
+   len(_calls["bbox"]) == 1 and _calls["bbox"][0] and L2["community"]["places"] == C1["places"], str(_calls["bbox"]))
+ok("councils from the copy passed in (area_month), asked for the busiest month",
+   _areas_asked == [D1["totals"]["peak_month"]] and [c["name"] for c in L2["councils"]] == ["Kept Council"])
+areas.area_load = _stub_area_load
+L3 = clp_doc_layers.gather(D1, area_month=lambda m: None)
+areas.area_load = _real["area_load"]
+ok("...and worked out as before when that copy cannot be had", L3["councils"] == L1["councils"], str(L3["councils"]))
+ok("a multi-part line touching the box is in it (community._geom_touches)",
+   community._geom_touches({"type": "MultiLineString", "coordinates": [[[5, 5], [6, 6]], [[0.5, 0.5], [0.6, 0.6]]]},
+                           [0, 0, 1, 1])
+   and not community._geom_touches({"type": "MultiLineString", "coordinates": [[[5, 5], [6, 6]]]}, [0, 0, 1, 1]))
 
 # =========================================================================== #
 #  6. The source                                                               #
