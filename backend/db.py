@@ -65,6 +65,10 @@ TENANTED_TABLES = {
     # 31 Oct 2026 (task 4c PR 1, site layout designs): a site's layout, its phases (each a set of map things) and the
     # log of drawings brought in — per tenant, in the package, same rule, same edit.
     "site_layouts", "site_layout_phases", "site_layout_imports",
+    # 31 Oct 2026 (task 4a, PR 3a): each Construction Logistics Plan (its places, one team or all, the cover details, the
+    # approval step) and each approved issue (its number, who sent and approved it, what changed, the Word file itself).
+    # Per tenant, in the package, same rule, same edit.
+    "clp_documents", "clp_issues",
     # 2.5b, 2026-09-03. The editable copy of factors.json. Per tenant: two clients
     # will not share a payload table.
     "config",
@@ -896,6 +900,9 @@ def init_weeks_db():
         _create_tenanted(cur, "site_layouts")
         _create_tenanted(cur, "site_layout_phases")
         _create_tenanted(cur, "site_layout_imports")
+        # 31 Oct 2026 (task 4a, PR 3a): the CLP records and their issues
+        _create_tenanted(cur, "clp_documents")
+        _create_tenanted(cur, "clp_issues")
         conn.commit()
         try:
             if IS_PG:
@@ -2070,6 +2077,56 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, id)
         )
     """,
+    # 31 Oct 2026 (task 4a, PR 3a; clp_records.py). One CLP: `location_ids` a JSON list of location ids, `team` a team
+    # slot (NULL = every team), `impact` higher | medium, `cover` a JSON block of the typed cover details, `status`
+    # draft | sent | changes | approved, with who sent it / asked for changes and their notes. A row whose id starts
+    # "auto-" is one Wayscope lists by itself for a compound, site or stockpile; it is written the first time anyone
+    # edits, sends or approves it. Nothing derived is stored: the figures come from the plan when the file is built.
+    "clp_documents": """
+        CREATE TABLE clp_documents (
+            tenant_id     TEXT NOT NULL DEFAULT 'default',
+            id            TEXT NOT NULL,
+            name          TEXT NOT NULL,
+            location_ids  TEXT NOT NULL,
+            team          TEXT,
+            impact        TEXT NOT NULL DEFAULT 'higher',
+            cover         TEXT,
+            status        TEXT NOT NULL DEFAULT 'draft',
+            sent_by       TEXT,
+            sent_at       TEXT,
+            sent_note     TEXT,
+            changes_by    TEXT,
+            changes_at    TEXT,
+            changes_note  TEXT,
+            created_by    TEXT,
+            created_at    TEXT,
+            updated_by    TEXT,
+            updated_at    TEXT,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
+    # 31 Oct 2026 (task 4a, PR 3a). One approved issue of a CLP: its number, when and by whom, the team's note and the
+    # approver's, `changes` (JSON words, worked out against the issue before), `summary` (JSON figures the next issue
+    # compares with) and the Word file exactly as approved (`file_b64`, base64 text: one column type on SQLite and
+    # Postgres, and the organisation file is JSON).
+    "clp_issues": """
+        CREATE TABLE clp_issues (
+            tenant_id      TEXT NOT NULL DEFAULT 'default',
+            clp_id         TEXT NOT NULL,
+            issue_no       INTEGER NOT NULL,
+            approved_at    TEXT NOT NULL,
+            approved_by    TEXT,
+            sent_by        TEXT,
+            sent_note      TEXT,
+            approver_note  TEXT,
+            changes        TEXT,
+            summary        TEXT,
+            file_name      TEXT,
+            file_size      INTEGER,
+            file_b64       TEXT,
+            PRIMARY KEY (tenant_id, clp_id, issue_no)
+        )
+    """,
     # ----------------------------------------------------------------------- #
     #  2.5b — config: the editable copy of factors.json                        #
     # ----------------------------------------------------------------------- #
@@ -2114,6 +2171,8 @@ _TENANT_PK = {
     "site_layouts": "(tenant_id, id)",
     "site_layout_phases": "(tenant_id, id)",
     "site_layout_imports": "(tenant_id, id)",
+    "clp_documents": "(tenant_id, id)",
+    "clp_issues": "(tenant_id, clp_id, issue_no)",
     "config": "(tenant_id, key)",
     "forecast_days": "(tenant_id, route_id, month_index, discipline, section_id, "
                      "day_date)",

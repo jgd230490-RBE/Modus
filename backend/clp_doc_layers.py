@@ -21,7 +21,14 @@ import db
 
 #: community kinds printed as a list of places in 2.4.2 (the rest are counted in 2.3.x)
 PLACE_KINDS = ("schools", "hospitals", "health", "community", "sports")
-MAX_PLACES = 40            # 2.4.2 lists the nearest; the rest are counted
+# 31 Oct 2026 (PR 3a, Q11: on live 23 of the viaduct's 40 rows were unnamed sports pitches, pushing schools and a hospital
+# down): the sensitive kinds first, then the other NAMED places, each nearest first; an unnamed place is only counted
+SENSITIVE_KINDS = ("schools", "hospitals", "health")
+MAX_PLACES = 40            # 2.4.2 lists the first 40 named; the rest are counted
+#: an unnamed place's words when counted (one, many)
+UNNAMED_WORDS = {"schools": ("school", "schools"), "hospitals": ("hospital", "hospitals"),
+                 "health": ("health centre", "health centres"), "community": ("community centre", "community centres"),
+                 "sports": ("sports facility", "sports facilities")}
 LIMIT_SHOWN = ("exceeds", "at_limit", "unknown")
 
 
@@ -248,13 +255,20 @@ def gather(data, area_month=None):
     by_kind = {}
     for x in near:
         by_kind.setdefault(x["kind"], []).append(x)
-    places = [x for x in near if x["kind"] in PLACE_KINDS]
+    named = [x for x in near if x["kind"] in PLACE_KINDS and x["name"]]
+    named.sort(key=lambda x: (x["kind"] not in SENSITIVE_KINDS, x["metres"], x["kind"], x["name"]))
+    unnamed = {}
+    for x in near:
+        if x["kind"] in PLACE_KINDS and not x["name"]:
+            unnamed[x["kind"]] = unnamed.get(x["kind"], 0) + 1
+    places = named
     labels = {k["key"]: k["label"] for k in community.KINDS}
     out["community"] = {
         "stored": bool(feats), "route_m": community.STRIP_ROUTE_M, "site_m": community.STRIP_SITE_M,
         "drawn_routes": sorted({k for k, _l in lines}),
         "counts": {k: len(v) for k, v in by_kind.items()}, "labels": labels,
         "places": places[:MAX_PLACES], "places_more": max(0, len(places) - MAX_PLACES),
+        "places_unnamed": [{"kind": k, "count": unnamed[k]} for k in PLACE_KINDS if unnamed.get(k)],
         "stations": by_kind.get("stations", []), "bus_stops": len(by_kind.get("bus_stops", [])),
         "bus_stops_near_sites": sum(1 for x in by_kind.get("bus_stops", []) if x["where"] in site_names.values()),
         "cycle": sorted({x["name"] for x in by_kind.get("cycle", []) if x["name"]}),

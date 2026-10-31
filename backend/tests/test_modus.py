@@ -1204,6 +1204,10 @@ ok("ui_audit.js audits Plan > Simulation: in the portal and team pages, its head
    re.search(r'const PORTAL_PAGES = [^\n]*"pours", "simulation"', _audit) is not None
    and re.search(r'const TEAM_PAGES = \[[^\n]*"simulation"', _audit) is not None
    and 'simulation: "Simulation"' in _audit and 'meta("simulation+site", w)' in _audit and "[data-sim-state=\"set\"]" in _audit)
+# 31 Oct 2026 (task 4a, PR 3a): the audit walks Plan > CLP documents for every role and opens the first CLP's editor
+ok("UI AUDIT: Plan > CLP documents is a portal and team page with its title, and its deep stop opens the first CLP's editor (clp+edit)",
+   re.search(r'const PORTAL_PAGES = [^\n]*"simulation", "clp"', _audit) is not None and re.search(r'const TEAM_PAGES = \[[^\n]*"clp"', _audit) is not None and 'clp: "CLP documents"' in _audit
+   and 'meta("clp+edit", w)' in _audit and "'[data-clp-table] .row-open'" in _audit)
 ok("ui_audit.js strips the harness's server origin from the compare keys (finding #34: the port is picked per run)",
    'const noOrigin = (s) => String(s).replace(/^https?:\\/\\/(127\\.0\\.0\\.1|localhost|\\[::1\\])(:\\d+)?/, "")' in _audit
    and "(x.url ? noOrigin(x.url) : null)" in _audit and "noOrigin(x).slice(0, 80)" in _audit)

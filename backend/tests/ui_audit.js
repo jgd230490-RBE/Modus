@@ -149,7 +149,7 @@ const HEIGHT = { 320: 568, 360: 780, 390: 844, 768: 1024, 1024: 768, 1366: 768, 
 const WIDTHS = OPT.widths || (OPT.full ? [320, 360, 390, 768, 1024, 1366, 1920] : [390, 1366]);
 const LOOKS = OPT.looks || (OPT.full ? ["ink", "light", "dark"] : ["ink", "dark"]);
 const EXTRA_ACCENTS = OPT.accents || (OPT.full ? ["blue", "blue-shades", "orange-shades"] : []);
-const PORTAL_PAGES = OPT.pages || ["dashboard", "submit", "forecasts", "carbon", "abnormal", "stockpiles", "pours", "simulation", "lookahead", "locations", "routes", "zones", "config", "users", "map"];   // 22 Oct 2026: + abnormal (S16 / B5); 28 Oct 2026: + stockpiles (Plan > Stockpiles, PR #144); 29 Oct 2026: + pours (Plan > Pours, task 3a); 29 Oct 2026: + simulation (its own page)
+const PORTAL_PAGES = OPT.pages || ["dashboard", "submit", "forecasts", "carbon", "abnormal", "stockpiles", "pours", "simulation", "clp", "lookahead", "locations", "routes", "zones", "config", "users", "map"];   // 22 Oct 2026: + abnormal (S16 / B5); 28 Oct 2026: + stockpiles (Plan > Stockpiles, PR #144); 29 Oct 2026: + pours (Plan > Pours, task 3a); 29 Oct 2026: + simulation (its own page)   // 31 Oct 2026: + clp (Plan > CLP documents, PR 3a)
 const DESK_W = Math.max(...WIDTHS);           // where the deep stops and the keyboard pass run
 // decision 15 (17 Oct 2026): one more pass, the Dark look with the Blue accent at the desk width (1366 in the quick shape, 1920
 // in --full): the Blue accent's --navy is #5B8FF0 in Dark, where white figures on it fail (3.17:1) — a pair no other pass
@@ -160,9 +160,9 @@ const EXTRA_PASSES = (OPT.looks || OPT.accents) ? [] : [{ look: "dark", accent: 
 const PHONE_W = Math.min(...WIDTHS);
 const CONFIG_TABS = ["Vehicles", "Materials", "Planning", "Costing · fuel", "Seasonal restrictions", "Map and bulletin", "Everything (JSON)"];
 // what the page header says on each portal page (the NAV labels, except Config); the map page has no header
-const PAGE_TITLE = { dashboard: "Dashboard", submit: "Submit forecast", forecasts: "Forecasts", carbon: "Carbon planner", abnormal: "Abnormal loads", stockpiles: "Stockpiles", pours: "Pours", simulation: "Simulation", lookahead: "Look-ahead",
+const PAGE_TITLE = { dashboard: "Dashboard", submit: "Submit forecast", forecasts: "Forecasts", carbon: "Carbon planner", abnormal: "Abnormal loads", stockpiles: "Stockpiles", pours: "Pours", simulation: "Simulation", clp: "CLP documents", lookahead: "Look-ahead",
                      locations: "Locations", routes: "Routes", zones: "Zones", config: "Configuration", users: "Users" };
-const TEAM_PAGES = ["dashboard", "submit", "forecasts", "carbon", "abnormal", "stockpiles", "pours", "simulation", "lookahead", "map"];   // 29 Oct 2026: + simulation (a team reads its own lines)   // 22 Oct 2026: + abnormal (a team plans its own); 28 Oct 2026: + stockpiles (read-only for a team)
+const TEAM_PAGES = ["dashboard", "submit", "forecasts", "carbon", "abnormal", "stockpiles", "pours", "simulation", "clp", "lookahead", "map"];   // 31 Oct 2026: + clp (a team sees its own CLPs)   // 29 Oct 2026: + simulation (a team reads its own lines)   // 22 Oct 2026: + abnormal (a team plans its own); 28 Oct 2026: + stockpiles (read-only for a team)
 const PHONE_PAGES = ["dashboard", "lookahead", "map"];   // what a phone shows as itself (frontend PHONE_PAGES); the rest is the desk-only card
 // the screens a visitor meets signed out: a 401 / 403 there is the gate working, anywhere else it is a defect
 const SIGNED_OUT = /^(public|login|login-wrong|login-forgot|login-code|setpw|linkerr|map-password|map-password-wrong|map-public|landing|privacy|thanks|landing-error)$/;
@@ -1033,6 +1033,12 @@ async function deepStops(page, store, meta, id, w) {
       await audit(page, store, meta("simulation+site", w));
       await page.selectOption('select[data-sim-site]', { index: 0 }).catch(() => {});
     }
+  }
+  // 31 Oct 2026 (task 4a, PR 3a): Plan > CLP documents, the first CLP's editor opened (a planner: name, covers, impact, places
+  // and the eleven cover details; a team: the cover details only)
+  if (id === "clp" && await tryClick(page, '[data-clp-table] .row-open')) {
+    await page.waitForTimeout(600);
+    await audit(page, store, meta("clp+edit", w));
   }
   if (id === "locations" && await tryClick(page, "main table tbody tr:visible")) { await page.waitForTimeout(500); await audit(page, store, meta("locations+edit", w)); }
   // 31 Oct 2026 (task 4c PR 1): the demo's Tilton Viaduct site, its Site layout card. A planner or admin brings in the KML

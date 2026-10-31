@@ -414,6 +414,27 @@ C1b = clp_doc_layers.gather(D1)["community"]
 clp_doc_layers.MAX_PLACES = _mp
 ok("past MAX_PLACES the nearest are listed and the rest counted", [x["name"] for x in C1b["places"]] == ["Wolds Hospital"]
    and C1b["places_more"] == 1)
+ok("...and no unnamed place on this plan (none counted)", C1["places_unnamed"] == [])
+# 31 Oct 2026 (PR 3a, Q11): on live 23 of the viaduct's 40 rows were unnamed sports pitches, nearer than the schools and
+# the hospital. Now: schools, hospitals and health centres first, then the other NAMED places, each nearest first; an
+# unnamed place only counted. Three more features for this check only, taken out again after it.
+feat("q1", "sports", "osm", "", pt(off(P_AT, Y_AT, 0.5, 20)))                    # unnamed, 20 m: nearer than any school
+feat("q2", "sports", "osm", "", pt(off(P_AT, Y_AT, 0.6, 30)))
+feat("q3", "sports", "osm", "Yard Cricket Club", pt(off(P_AT, Y_AT, 0.45, 10)))  # named, the nearest of all
+feat("q4", "health", "osm", "", pt(off(P_AT, Y_AT, 0.55, 40)))                   # an unnamed health centre
+C1q = clp_doc_layers.gather(D1)["community"]
+ok("⭐ Q11: schools / hospitals / health centres first, then the other named places, each nearest first",
+   [x["name"] for x in C1q["places"]] == ["Wolds Hospital", "Near School", "Yard Cricket Club"],
+   str([x["name"] for x in C1q["places"]]))
+ok("⭐ ...an unnamed place is never a row, only counted by kind", all(x["name"] for x in C1q["places"])
+   and C1q["places_unnamed"] == [{"kind": "health", "count": 1}, {"kind": "sports", "count": 2}], str(C1q["places_unnamed"]))
+_Dq = dict(D1, layers=dict(clp_doc_layers.gather(D1), community=C1q))
+_Tq = " ".join(p.text for p in Document(io.BytesIO(clp_doc.build(_Dq, pictures=False))).paragraphs)
+ok("...the file says so: the order in words, and 'With no name on the map: 1 health centre, 2 sports facilities.'",
+   "schools, hospitals and health centres first, then the others, each nearest first" in _Tq
+   and "With no name on the map: 1 health centre, 2 sports facilities." in _Tq,
+   _Tq[_Tq.find("Places within"):][:300])
+db.execute("DELETE FROM community_features WHERE tenant_id = ? AND feature_id IN ('q1', 'q2', 'q3', 'q4')", (TEN,))
 CO = L1["collisions"]
 rows = {r["route_id"]: r for r in CO["rows"]}
 ok("⭐ collisions per route: on the route (within 25 m) and within 250 m, the killed or seriously injured, a person on "
@@ -511,7 +532,8 @@ ok("2.3.1: the councils table, the limits, the closure and the diversion with it
    and "last checked 2026-10-29" in TX, "")
 ok("2.3.2–2.3.4: the station, the bus stops, the cycle routes, from the strip",
    "Yard Halt (200 m from R001)" in TX.replace("199 m", "200 m").replace("201 m", "200 m")
-   and "2 bus stops within 250 m of this plan's routes or 500 m of this site, 1 of them nearest this site." in TX
+   and "2 bus stops within 250 m of this plan's routes or 500 m of this site, 1 of them nearer this site than any route." in TX   # NARROWED 31 Oct 2026 (PR 3a): the clause reworded, and left out when none are
+   and "of them nearest" not in TX
    and "NCN 64, 1 unnamed cycle path" in TX, "")
 ok("2.4.1: one line a council, by name", sum(1 for t in P1 if t.startswith("To complete: Harborough: the code")) == 1
    and sum(1 for t in P1 if t.startswith("To complete: Rutland: the code")) == 1)

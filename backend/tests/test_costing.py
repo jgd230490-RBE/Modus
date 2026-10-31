@@ -239,8 +239,8 @@ ok("the tenant's settings live in the tenanted config table under one key, no ne
    # NARROWED again 12 Oct 2026: areas and route_area_km (§2.2b, D27) are the two added after it
    # NARROWED 29 Oct 2026: and pours (task 3a, concrete pours)
    # NARROWED 31 Oct 2026: and the three site layout tables (task 4c PR 1)
-   costing.KEY == "costing" and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours", "site_layouts", "site_layout_phases", "site_layout_imports"}) == 16
-   and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours", "site_layouts", "site_layout_phases", "site_layout_imports"} <= db.TENANTED_TABLES)
+   costing.KEY == "costing" and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours", "clp_documents", "clp_issues", "site_layouts", "site_layout_phases", "site_layout_imports"}) == 16
+   and {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours", "clp_documents", "clp_issues", "site_layouts", "site_layout_phases", "site_layout_imports"} <= db.TENANTED_TABLES)
 ok("nothing is seeded: no target rate, no share, no base, no yard, no index row",
    costing.settings()["target"] == {k: None for k in costing.TARGET_FIELDS}
    and costing.settings()["fuel"]["share_pct"] is None and costing.settings()["fuel"]["baf_base_eur_per_l"] is None

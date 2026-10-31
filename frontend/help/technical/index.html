@@ -54,7 +54,7 @@ main:focus{outline:0}
 <li class="l2"><a href="#t1-baf">Fuel index and BAF</a></li>
 <li class="l2"><a href="#t1-gates">Gate arrivals</a></li>
 <li class="l2"><a href="#t1-stock">Stockpiles</a></li><li class="l2"><a href="#t1-pours">Concrete pours</a></li>
-<li class="l2"><a href="#t1-clp">CLP monitoring</a></li><li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li><li class="l2"><a href="#t1-layouts">Site layouts</a></li>
+<li class="l2"><a href="#t1-clp">CLP monitoring</a></li><li class="l2"><a href="#t1-clp-records">CLP documents</a></li><li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li><li class="l2"><a href="#t1-layouts">Site layouts</a></li>
 <li class="l1"><a href="#t2-routing">T2 Routing with HERE</a></li>
 <li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>
 <li class="l1"><a href="#t3-sources">T3 Where each screen reads from</a></li>
@@ -378,6 +378,53 @@ heads every sheet.</p>
 <p>Scope: the vehicle, carbon and trip charts are the caller's visible lines (a team code: its own, and its share of the
 target); the caps and councils are the scheme's. No figure is observed: no gate log is held (decision D42).</p>
 
+<h2 id="t1-clp-records">CLP documents</h2>
+<p>31 Oct 2026 (task 4a, PR 3a; the user: "each section only see their CLP but planners and admins see all and are able to
+edit and approve it"). The Word file is <code>backend/clp_doc.py</code> (<code>gather</code> then <code>build</code>; the
+pictures <code>clp_doc_pictures.py</code>, the stored layers <code>clp_doc_layers.py</code>); the records are
+<code>backend/clp_records.py</code> over two tenanted tables, both in the organisation file and kept by a demo refresh:</p>
+<pre>clp_documents  (tenant_id, id) — name, location_ids (JSON), team (an IPT slot or NULL = all teams), impact,
+               cover (JSON, the 11 COVER_FIELDS), status draft | sent | changes | approved, sent_* / changes_*, created_* / updated_*
+clp_issues     (tenant_id, clp_id, issue_no) — approved_at / by, sent_by / note, approver_note, changes (JSON words),
+               summary (JSON: the figures "What changed" compares), file_name, file_size, file_b64 (the .docx as approved)</pre>
+<p><strong>Listed rows.</strong> <code>list_for(acc)</code> lists an every-team row <code>auto-&lt;loc&gt;-all</code> for each
+compound, site and stockpile, and <code>auto-&lt;loc&gt;-&lt;team&gt;</code> for each active team with approved trips there
+(<code>_team_months</code>, the same rows as <code>gather</code>). A listed row is written only when someone types on it,
+sends or approves it; listing writes nothing. A custom row is <code>clp-&lt;8 hex&gt;</code>.</p>
+<p><strong>Who.</strong> A team login (<code>role</code> ipt) sees and opens only rows whose <code>team</code> is its own slot —
+another team's id is a 404, never a 403, so the list cannot be probed — edits only <code>cover</code>, and sends. Planners and
+admins (<code>access.can_approve</code>) see every row, make, change places / team / impact / name (not on a listed row),
+ask for changes (a note is required) and approve (sent or not). Delete is refused once an issue exists; on a listed row it
+clears the typed cover. Saving an approved row sets it back to draft. Every typed word passes
+<code>clp_doc.banned_words</code>.</p>
+<p><strong>The team cut.</strong> <code>gather(..., team=X)</code> keeps the forecast rows whose canonical team is X; the hourly
+profile is <code>gate_arrivals.arrivals(month, {role: ipt, ipt: X})</code>'s <code>per_team</code> share of the gate (laden and
+empty scaled by it), and each hour carries <code>all_teams_pct</code>. The cover says the plan counts that team's lorries only.</p>
+<p><strong>Approving.</strong> <code>approve()</code> builds the file inside <code>heavy_reads.solo</code> (one CLP build at a
+time), compares <code>summary(data)</code> with the last issue's (<code>changes(prev, cur)</code>: trips, loads, routes, places,
+busiest month, peak a day, team, impact, cover fields), stores the base64 bytes as "&lt;name&gt; Issue N.docx" and sets the
+row approved. <code>GET /api/clp/documents/{id}/issues/{n}.docx</code> returns those bytes unchanged. The draft
+(<code>/draft.docx</code>) goes through <code>_staff_bytes</code>, so a second download before the next write is instant.</p>
+<pre>GET    /api/clp/documents                      the list for the caller (+ teams, statuses, cover_fields, can_approve)
+POST   /api/clp/documents                      new (planner / admin)
+GET    /api/clp/documents/{id}                 one row
+PATCH  /api/clp/documents/{id}                 cover (team) · name, places, team, impact (planner / admin)
+DELETE /api/clp/documents/{id}                 no issue yet; a listed row is cleared
+POST   /api/clp/documents/{id}/send            team, optional note
+POST   /api/clp/documents/{id}/changes         planner / admin, note required
+GET    /api/clp/documents/{id}/approve-preview what would change at Issue N
+POST   /api/clp/documents/{id}/approve         builds and keeps Issue N
+GET    /api/clp/documents/{id}/history         the issues
+GET    /api/clp/documents/{id}/draft.docx      DRAFT · not issued
+GET    /api/clp/documents/{id}/issues/{n}.docx the file as approved
+GET    /api/clp/document.docx?locations=…      the PR 1 read, unchanged (no record)</pre>
+<p><strong>Stages.</strong> <code>planning.clp = {programme, stages: [{number, name, disciplines}]}</code> (absent = the
+template's stages for the programme, <code>clp_doc.DEFAULT_STAGES</code>, sent to the page as
+<code>/api/meta</code> <code>clp_stage_defaults</code>), at most 8 stages, a discipline in one stage only
+(<code>clp_doc.settings_problem</code>, checked on Config save). A discipline in no stage gets a stage of its own after the
+last. 2.4.2 lists named schools, hospitals and health centres first (<code>clp_doc_layers.SENSITIVE_KINDS</code>), then the
+other named places, nearest first; places with no name are counted per kind (<code>places_unnamed</code>).</p>
+<p><strong>Not yet built.</strong> Notes and tasks on a plan (PR 3b); the client's reviewers (PR 3c); the appendices (PR 4).</p>
 <h2 id="t1-abnormal">Abnormal loads (S16 / B5, 22 Oct 2026)</h2>
 <p>Each abnormal load is its own row in <code>abnormal_loads</code> (one tenant's, carried in its package), never a forecast line: nothing of it reaches the tonnes, trips, vehicles, CLP caps, gate capacity or carbon figures (D70, D71). The rules engine is <code>backend/abnormal_rules.py</code>, every threshold a named constant with its source, and <code>test_abnormal.py</code> asserts each on both sides.</p>
 <ul><li><strong>When a load is abnormal.</strong> Over 44 t gross, over 2.9 m wide, over 18.65 m rigid, over 10 t on an axle (11.5 t driving): the Road Vehicles (Authorised Weight) Regulations 1998 and the Construction and Use Regulations 1986 as the National Highways aide memoire reads them. Construction and Use covers up to 4.3 m wide and 27.4 m long; STGO 2003 Schedule 1 gives Category 1 (up to 50 t on 5 or 6 axles), 2 (80 t, 6 or more) and 3 (150 t), with 12.5 / 12 / 16.5 t axle limits, 1.35 m minimum spacing and the tonnes-a-metre rule; over 150 t, 6.1 m wide or 30 m long is a Special Order (BE16). Width over 5.0 m (to 6.1 m) is a VR1.</li>
