@@ -4756,6 +4756,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      rp.includes("window.confirm(`Accept Issue ${n} of the ${open.name} CLP for ${open.group_name}?`)")
      && rp.includes('setMsg({ ok: false, text: "Write what needs changing in the comment box first." }); return;')
      && rp.includes("The contractor has a newer issue that is not sent to {open.group_name} yet."));
+  ok("REVIEW PAGE: a phone card's Open button is a 44 px tap (the UI audit's targets-44px row, 31 Oct)",
+     rp.includes('className="btn-sec mt-3" style={{ minHeight: 44 }} onClick={() => show(c.id)}'));
   ok("REVIEW PAGE: the sign-in card is 'Sign in' and says reviewers from a client sign in here too",
      code.includes("Reviewers from a client sign in here too."));
   const up = fnB("UsersPage");
