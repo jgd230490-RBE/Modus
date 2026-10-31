@@ -521,7 +521,9 @@ MAIN = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
 ok("🔴 approve and the draft build through _clp_build (alone, outside the public slots)",
    'lambda data, rec: _clp_build(data, rec["impact"], acc)' in MAIN
    # NARROWED 31 Oct 2026 (PR 3b): the draft builds in a small _build() that keeps its Still to complete lines
-   and 'out = _clp_build(data, rec["impact"], acc)' in MAIN and '"clp/draft.docx", {"id": rec["id"]}, _build, acc=acc' in MAIN
+   # NARROWED 31 Oct 2026 (PR 3c): the kept draft's key carries the client groups' decisions (printed in its history)
+   and 'out = _clp_build(data, rec["impact"], acc)' in MAIN
+   and '"clp/draft.docx", {"id": rec["id"], "reviews": clp_reviews.marker(rec["id"])}, _build, acc=acc' in MAIN
    and 'with heavy_reads.solo("clp-document"' in MAIN)
 _e = _raises(lambda: main.clp_documents_changes(Y1, main.ClpNoteIn(note="")))
 ok("🔴 changes with no note: 422 in words", getattr(_e, "status_code", None) == 422 and "Say what" in str(_e), str(_e))

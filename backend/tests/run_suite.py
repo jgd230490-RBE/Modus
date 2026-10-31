@@ -10,7 +10,8 @@ What it runs, in this order (the order CLAUDE.md "Tests" gives):
   1. every backend/tests/*.js except BROWSER_ONLY (each of those says in its header that it needs a
      real browser and is not part of the default suite) — with --node;
   2. every backend/tests/test_*.py — with --py, the interpreter WITHOUT FastAPI (the harnesses stub it);
-  3. backend/tests/http_smoke.py — with --smoke-py, the interpreter with backend/requirements.txt.
+  3. backend/tests/http_smoke.py, then every backend/tests/smoke_*.py — with --smoke-py, the interpreter with
+     backend/requirements.txt.
 A new harness that follows the naming is picked up without editing this file.
 
 A harness FAILS when any of these is true — so a harness that quietly did nothing cannot pass:
@@ -53,6 +54,8 @@ def harnesses(args):
     py = sorted(glob.glob(os.path.join(HERE, "test_*.py")))
     out = [(f, [args.node, f]) for f in js] + [(f, [args.py, f]) for f in py]
     out.append((os.path.join(HERE, "http_smoke.py"), [args.smoke_py, os.path.join(HERE, "http_smoke.py")]))
+    # 31 Oct 2026 (task 4a PR 3c): every smoke_*.py also boots the real app, with --smoke-py
+    out += [(f, [args.smoke_py, f]) for f in sorted(glob.glob(os.path.join(HERE, "smoke_*.py")))]
     if args.only:
         out = [h for h in out if os.path.splitext(os.path.basename(h[0]))[0] in args.only]
     return out

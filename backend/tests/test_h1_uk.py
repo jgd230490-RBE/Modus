@@ -1165,9 +1165,11 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 29 Oct 2026 (task 3c): warn-text 14 -> 15 — the Routes row's amber "Route again: does not pass the holding area" chip
    # NARROWED 31 Oct 2026 (task 4a, PR 3b): bad-text 29 -> 34 — Notes and tasks: the panel's load error and failed-action line,
    # a task's "overdue", the approve card's "N overdue" and the list's Tasks cell "N overdue"
-   # NARROWED 31 Oct 2026 (task 4c PR 2): bad-text 34 -> 35, warn-text 15 -> 16 — the drawing tools' save line (red when a
+   # NARROWED 31 Oct 2026 (task 4a, PR 3c): bad-text 34 -> 40 — the client's reviewers: the list's "Returned by …" line, the
+   # send panel's problem line, and the review page's error, message, history's returned decision and Return button
+   # NARROWED 31 Oct 2026 (task 4c PR 2): bad-text 40 -> 41, warn-text 15 -> 16 — the drawing tools' save line (red when a
    # save fails) and "Unsaved changes" (amber)
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 35 and   # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 41 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
    _fe_wo.count("var(--warn-text)") == 16
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe

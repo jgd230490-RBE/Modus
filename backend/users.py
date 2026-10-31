@@ -41,6 +41,15 @@ step instead, and a session of such a login does not resolve (resolve_session), 
 signed in before this shipped sets it up at their next sign-in. Ten recovery codes, each usable
 once, stored as SHA-256. Demo logins (leads, a fictional scheme) are exempt.
 
+CLIENT REVIEWERS (31 Oct 2026, task 4a PR 3c)
+--------------------------------------------
+A third kind of login, `reviewer`: a person at the contractor's client (National Highways, HS2, a council) in one reviewer
+group (`review_group`, clp_reviews.py), with its own password, two-step sign-in from the first sign-in, the same lock-out,
+reset and optional end date as a staff login, and no code ever. 🔴 A reviewer's session NEVER resolves to an access dict:
+resolve_session() answers (None, None) for it, so access.current() stays None and every staff guard and read refuses it
+exactly as it refuses a visitor who is not signed in. resolve_reviewer() is the only way to it, and only the review reads
+(main.py /api/review/*) ask. A stopped group, like a disabled login, cannot sign in (usable()).
+
 WHAT THIS IS NOT
 ----------------
 No single sign-on, no per-section permission (D7: a login belongs to a team).
@@ -85,7 +94,9 @@ RESET_PER_EMAIL = 3
 RESET_PER_IP = 10
 
 ROLES = ("team", "planner", "admin")
-KINDS = ("staff", "demo")
+#: 31 Oct 2026 (PR 3c): + reviewer — a client's reviewer (role 'reviewer', no team, one reviewer group)
+KINDS = ("staff", "demo", "reviewer")
+REVIEWER_ROLE = "reviewer"
 TEAM_SLOTS = ("IPT1", "IPT2", "IPT3", "IPT4", "IPT5", "IPT6")
 PURPOSES = ("invite", "reset", "demo", "mfa")
 #: purposes a link or ticket can be used for once only
@@ -244,7 +255,7 @@ def canonical_team(value):
 # --------------------------------------------------------------------------- the people
 
 PUBLIC_FIELDS = ("id", "email", "name", "role", "team", "disabled", "kind", "expires_at",
-                 "created_at", "created_by", "last_sign_in_at", "password_set_at")
+                 "created_at", "created_by", "last_sign_in_at", "password_set_at", "review_group")
 
 
 def public(user):
@@ -263,6 +274,8 @@ def public(user):
 
 
 def role_label(user):
+    if user.get("kind") == "reviewer":
+        return "Client reviewer"
     if user.get("role") == "team":
         return team_label(user.get("team"))
     return {"planner": "Planner", "admin": "Admin"}.get(user.get("role"), user.get("role"))
@@ -318,27 +331,34 @@ def _check_role(role, team):
 
 
 def create_user(email, name, role, team=None, kind="staff", expires_at=None, created_by=None,
-                demo_request_id=None):
-    """(user, error). The email is unique per tenant; a duplicate is an error, not an update."""
+                demo_request_id=None, review_group=None):
+    """(user, error). The email is unique per tenant; a duplicate is an error, not an update. A reviewer login (PR 3c) is
+    made only with kind 'reviewer' and a review_group; its role is always 'reviewer' and it has no team."""
     email = norm_email(email)
     name = (name or "").strip()
     if not email_ok(email):
         return None, "That email address doesn't look right."
     if not name or len(name) > 120:
         return None, "Enter the person's name (at most 120 characters)."
-    role, slot, err = _check_role(role, team)
-    if err:
-        return None, err
     if kind not in KINDS:
         return None, "unknown kind"
+    if kind == "reviewer":
+        if not review_group:
+            return None, "Pick the client's group."
+        role, slot = REVIEWER_ROLE, None
+    else:
+        role, slot, err = _check_role(role, team)
+        if err:
+            return None, err
+        review_group = None
     if find_by_email(email):
         return None, "There is already a login for that email address."
     uid = uuid.uuid4().hex
     db.execute(
         "INSERT INTO users (tenant_id, id, email, name, role, team, password_hash, disabled, kind, expires_at, "
-        "demo_request_id, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, NULL, 0, ?, ?, ?, ?, ?)",
+        "demo_request_id, created_at, created_by, review_group) VALUES (?, ?, ?, ?, ?, ?, NULL, 0, ?, ?, ?, ?, ?, ?)",
         (_tenant(), uid, email, name, role, slot, kind, expires_at, demo_request_id, _iso(_now()),
-         (created_by or "")[:200] or None))
+         (created_by or "")[:200] or None, review_group))
     return get_user(uid), None
 
 
@@ -349,6 +369,9 @@ def update_user(user_id, fields, by_user_id=None):
     user = get_user(user_id)
     if not user:
         return None, "No such login."
+    if user.get("kind") == "reviewer" and ("role" in fields or "team" in fields):
+        # 31 Oct 2026 (PR 3c): a client's reviewer never becomes a staff login
+        return None, "A client reviewer stays a client reviewer."
     sets, params = [], []
     end_sessions = False
     if "name" in fields:
@@ -427,13 +450,36 @@ def set_password(user_id, pw):
 
 
 def usable(user, now=None):
-    """Can this login sign in at all (password aside)?"""
-    return bool(user) and not user.get("disabled") and not expired(user, now)
+    """Can this login sign in at all (password aside)? A reviewer also needs its group, and the group not stopped."""
+    if not user or user.get("disabled") or expired(user, now):
+        return False
+    if user.get("kind") == "reviewer":
+        return user.get("role") == REVIEWER_ROLE and not user.get("team") and review_group_live(user.get("review_group"))
+    return user.get("role") != REVIEWER_ROLE
+
+
+def review_group_row(group_id):
+    if not group_id:
+        return None
+    rows = db.query("SELECT id, name, stopped_at FROM clp_review_groups WHERE tenant_id = ? AND id = ?",
+                    (_tenant(), group_id))
+    return rows[0] if rows else None
+
+
+def review_group_live(group_id):
+    g = review_group_row(group_id)
+    return bool(g) and not g.get("stopped_at")
+
+
+def is_reviewer(user):
+    return bool(user) and (user.get("kind") == "reviewer" or user.get("role") == REVIEWER_ROLE)
 
 
 def access_for(user):
     """What a session grants: the access.resolve() shape, plus the person. `label` is what a
-    person reads — the team's NAME for a team login."""
+    person reads — the team's NAME for a team login. Never for a reviewer (PR 3c: reviewer_for)."""
+    if is_reviewer(user):
+        raise ValueError("a client reviewer has no staff access")
     role = user["role"]
     acc_role = "ipt" if role == "team" else role
     label = team_label(user["team"]) if role == "team" else role_label(user)
@@ -464,9 +510,65 @@ def create_session(user_id, remember=False, ip=None, ua=None, now=None):
     return raw, ttl
 
 
+def reviewer_for(user):
+    """PR 3c: what a REVIEWER's session gives the review reads — who they are and their group. It is not an access
+    dict (no role, no team): nothing in access.py or any staff guard reads it. `via` 'reviewer' makes actor_of name them."""
+    g = review_group_row(user.get("review_group")) or {}
+    return {"via": "reviewer", "kind": "reviewer", "user_id": user["id"], "name": user["name"], "email": user["email"],
+            "group_id": user.get("review_group"), "group_name": g.get("name") or "",
+            "expires_at": user.get("expires_at"), "two_step": two_step_on(user), "recovery_left": recovery_left(user)}
+
+
+def describe_reviewer(rev):
+    """What the app needs after a reviewer signs in (the review page only)."""
+    if not rev:
+        return None
+    return {"via": "reviewer", "reviewer": True, "name": rev["name"], "email": rev["email"], "label": rev["group_name"],
+            "group_name": rev["group_name"], "kind": "reviewer", "role": None, "ipt": None, "can_approve": False,
+            "expires_at": rev.get("expires_at"), "session_expires_at": rev.get("session_expires_at"),
+            "two_step": bool(rev.get("two_step")), "recovery_left": rev.get("recovery_left") or 0,
+            "user_id": rev["user_id"]}
+
+
+def _live_session(raw, now):
+    """(session row, user) for a live session of a usable login with two-step where it needs it, else (None, None)."""
+    if not raw or not isinstance(raw, str) or len(raw) > 200:
+        return None, None
+    th = _hash_token(raw)
+    rows = db.query("SELECT * FROM user_sessions WHERE tenant_id = ? AND token_hash = ?", (_tenant(), th))
+    if not rows:
+        return None, None
+    s = rows[0]
+    exp = _parse(s["expires_at"])
+    if not exp or exp <= now:
+        db.execute("DELETE FROM user_sessions WHERE tenant_id = ? AND token_hash = ?", (_tenant(), th))
+        return None, None
+    user = get_user(s["user_id"])
+    if not usable(user, now):
+        return None, None
+    if needs_two_step(user) and not two_step_on(user):
+        return None, None
+    seen = _parse(s.get("last_seen_at"))
+    if not seen or (now - seen).total_seconds() >= TOUCH_EVERY_S:
+        db.execute("UPDATE user_sessions SET last_seen_at = ? WHERE tenant_id = ? AND token_hash = ?",
+                   (_iso(now), _tenant(), th))
+    return s, user
+
+
+def resolve_reviewer(raw, now=None):
+    """(reviewer, user) for a live session of a usable REVIEWER login, else (None, None). The only door to the review
+    reads (access.reviewer())."""
+    s, user = _live_session(raw, now or _now())
+    if not user or not is_reviewer(user):
+        return None, None
+    rev = reviewer_for(user)
+    rev["session_expires_at"] = s["expires_at"]
+    return rev, user
+
+
 def resolve_session(raw, now=None):
     """(access, user) for a live session of a usable login, else (None, None). Touches last_seen_at
-    at most every TOUCH_EVERY_S."""
+    at most every TOUCH_EVERY_S. 🔴 A REVIEWER's session answers (None, None) here, always (PR 3c)."""
     if not raw or not isinstance(raw, str) or len(raw) > 200:
         return None, None
     now = now or _now()
@@ -480,7 +582,7 @@ def resolve_session(raw, now=None):
         db.execute("DELETE FROM user_sessions WHERE tenant_id = ? AND token_hash = ?", (_tenant(), th))
         return None, None
     user = get_user(s["user_id"])
-    if not usable(user, now):
+    if not usable(user, now) or is_reviewer(user):
         return None, None
     if needs_two_step(user) and not two_step_on(user):
         # signed in before two-step shipped, or an admin reset it: sign in again and set it up
@@ -934,6 +1036,9 @@ def actor_of(acc, token_used=False):
     """(actor_kind, actor_id, actor_label) for an access dict. A login names the person; a shared
     code says which code (the typed name, when there is one, is in the request body); the admin
     token says so."""
+    if acc and acc.get("via") == "reviewer":
+        return ("reviewer", acc.get("user_id"),
+                f"{acc.get('name')} <{acc.get('email')}> · {acc.get('group_name') or 'client reviewer'}")
     if acc and acc.get("via") == "login":
         return "user", acc.get("user_id"), f"{acc.get('name')} <{acc.get('email')}>"
     if acc:
@@ -973,6 +1078,8 @@ def audit(kind, acc=None, method=None, path=None, target=None, status=None, deta
 def audit_event(kind, user=None, label=None, ip=None, detail=None, now=None, actor=None):
     """An account event (sign-in, reset, a login added or changed) about `user`. `actor` is
     actor_of(...) for whoever did it when that is not the person themself (an admin, the token)."""
+    if actor is None and is_reviewer(user):
+        actor = reviewer_actor(user)     # PR 3c: a reviewer's own sign-in events name their group too
     if actor is None:
         actor = (("user", user["id"], f"{user['name']} <{user['email']}>") if user
                  else ("anonymous", None, label or "not signed in"))
@@ -981,6 +1088,12 @@ def audit_event(kind, user=None, label=None, ip=None, detail=None, now=None, act
         d.setdefault("login", f"{user['name']} <{user['email']}>")
     audit(kind, detail=d or None, ip=ip, now=now, actor=actor,
           target=user["id"] if user else None)
+
+
+def reviewer_actor(user):
+    """(actor_kind, actor_id, actor_label) for a reviewer login: their name, address and group."""
+    g = review_group_row(user.get("review_group")) or {}
+    return "reviewer", user["id"], f"{user['name']} <{user['email']}> · {g.get('name') or 'client reviewer'}"
 
 
 def record_page(acc, page, now=None):
@@ -1099,7 +1212,14 @@ def account_message(purpose, user, url, settings):
     """The invite or the reset email. Plain words, the link, how long it lasts."""
     from email.message import EmailMessage
     first = (user.get("name") or "").split(" ")[0] or "there"
-    if purpose == "invite":
+    if purpose == "invite" and is_reviewer(user):
+        # PR 3c: a client's reviewer — what the login is for, and that two-step sign-in comes next
+        g = review_group_row(user.get("review_group")) or {}
+        subject = "Your Wayscope sign-in to review CLPs"
+        lead = (f"Hello {first},\n\nYou have a Wayscope login for {user['email']} to review the Construction Logistics "
+                f"Plans sent to {g.get('name') or 'your organisation'}. Set your password here, then set up two-step sign-in:")
+        last = "The link works once and for 72 hours. After that, ask the contractor to send a new one."
+    elif purpose == "invite":
         subject = "Your Wayscope sign-in"
         lead = f"Hello {first},\n\nYou have a Wayscope login for {user['email']}. Set your password here:"
         last = "The link works once and for 72 hours. After that, ask your administrator to send a new one."
@@ -1143,8 +1263,11 @@ def codes_enabled():
 # --------------------------------------------------------------------------- the first admin, and recovery (27 Oct 2026, F3 c)
 
 def _make_admin(user_id):
-    sql = "UPDATE users SET role = 'admin', team = NULL, kind = 'staff', expires_at = NULL, disabled = 0 WHERE tenant_id = ? AND id = ?"
+    sql = "UPDATE users SET role = 'admin', team = NULL, kind = 'staff', expires_at = NULL, disabled = 0, review_group = NULL WHERE tenant_id = ? AND id = ?"
     db.execute(sql, (_tenant(), user_id))
+    # 31 Oct 2026 (PR 3c security review): a cookie made before the promotion — a client reviewer's, say — never
+    # carries on as an admin's; they sign in again
+    end_all_sessions(user_id)
 
 
 def ensure_first_admin(now=None):

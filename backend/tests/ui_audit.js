@@ -1241,6 +1241,88 @@ async function walkLogin(browser, base) {
   }
 }
 
+// 31 Oct 2026 (task 4a, PR 3c): a client reviewer's Wayscope — ONE page, CLPs for review. The harness's server issues a
+// listed CLP (the planner code), adds a reviewer to the demo's fictional group (the admin token), sends the issue, then
+// the reviewer's invite → password → two-step set-up → the list and one CLP at the desk, the list as cards on a phone.
+// The reviewer reaches only /api/review/* (and the sign-in): a stop that reads anything else fails "review-reads-only".
+async function walkReviewer(browser, base) {
+  const look = LOOKS[0];
+  const H = { "Content-Type": "application/json", "X-Wayscope": "1" };
+  const T = "?token=ui-audit-admin-token";
+  const made = await (async () => {
+    try {
+      const lst = await (await fetch(base + "/api/clp/documents", { headers: { "X-Access-Code": OPT.code } })).json();
+      const c = (lst.clps || []).find(x => x.auto && /-all$/.test(x.id) && x.busiest_label) || (lst.clps || []).find(x => x.auto && /-all$/.test(x.id));
+      if (!c) { note("reviewer walk skipped: no listed CLP to issue"); return null; }
+      let no = c.last_issue ? c.last_issue.no : 0;
+      if (!no) {
+        const ap = await fetch(base + `/api/clp/documents/${encodeURIComponent(c.id)}/approve`, { method: "POST", headers: { ...H, "X-Access-Code": OPT.code }, body: JSON.stringify({ note: "UI audit" }) });
+        if (!ap.ok) { note("reviewer walk skipped: approving the CLP answered " + ap.status); return null; }
+        no = ((await ap.json()).last_issue || {}).no || 1;
+      }
+      let tab = await (await fetch(base + "/api/admin/reviewers" + T)).json();
+      let g = (tab.groups || []).find(x => !x.stopped);
+      if (!g) { tab = await (await fetch(base + "/api/admin/reviewer-groups" + T, { method: "POST", headers: H, body: JSON.stringify({ name: "Highways client (fictional)" }) })).json(); g = tab.groups[0]; }
+      const r = await fetch(base + "/api/admin/reviewers" + T, { method: "POST", headers: H, body: JSON.stringify({ name: "UI audit reviewer", email: "ui-audit-reviewer@example.test", group_id: g.id }) });
+      if (!r.ok) { note("reviewer walk skipped: POST /api/admin/reviewers answered " + r.status); return null; }
+      const j = await r.json();
+      if (!j.link) { note("reviewer walk skipped: the invite answered without a link (a sender is set?)"); return null; }
+      const sd = await fetch(base + `/api/clp/documents/${encodeURIComponent(c.id)}/review-send`, { method: "POST", headers: { ...H, "X-Access-Code": OPT.code }, body: JSON.stringify({ groups: [g.id], issue_no: no }) });
+      if (!sd.ok) { note("reviewer walk skipped: sending the issue answered " + sd.status); return null; }
+      return { link: j.link.replace(/^https?:\/\/[^/]+/, base), clp: c.id };
+    } catch (e) { note("reviewer walk skipped: " + String(e.message || e).slice(0, 160)); return null; }
+  })();
+  if (!made) return;
+  const codes = [];
+  for (const w of [DESK_W, PHONE_W].filter((x, i, a) => a.indexOf(x) === i)) {
+    const ctx = await newContext(browser, look, "orange", w);
+    const page = await ctx.newPage(); const store = newStore(); watch(page, store);
+    const apiSeen = []; page.on("request", rq => { if (rq.url().startsWith(base + "/api/")) apiSeen.push(rq.url()); });
+    const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, accent: "orange", base, ...(extra || {}) });
+    try {
+      if (w === DESK_W) {
+        await page.goto(made.link, { waitUntil: "domcontentloaded" });
+        await page.waitForSelector("#set-pw", { timeout: 30000 });
+        await page.fill("#set-pw", "ui-audit-reviewer-pw-1"); await page.fill("#set-pw2", "ui-audit-reviewer-pw-1");
+        await page.getByRole("button", { name: "Save and sign in" }).click();
+        await page.waitForSelector(".auth-qr svg", { timeout: 30000 });
+        const key = (await page.locator(".auth-key").textContent()).trim();
+        await page.fill("#auth-otp", totpNow(key));
+        await page.getByRole("button", { name: "Turn on" }).click();
+        await page.waitForSelector(".recovery-codes li", { timeout: 30000 });
+        codes.push(...(await page.locator(".recovery-codes li").allTextContents()).map(t => t.trim()));
+        await page.locator(".auth-check input").check();
+        await page.getByRole("button", { name: "Continue" }).click();
+      } else {
+        await page.goto(base + "/#review", { waitUntil: "domcontentloaded" });
+        await page.waitForSelector("#auth-email", { timeout: 30000 });
+        await page.fill("#auth-email", "ui-audit-reviewer@example.test"); await page.fill("#auth-pass", "ui-audit-reviewer-pw-1");
+        await page.getByRole("button", { name: "Sign in", exact: true }).click();
+        await page.waitForSelector("#auth-otp", { timeout: 30000 });
+        await page.getByRole("button", { name: "Use a recovery code instead" }).click();
+        await page.fill("#auth-otp", codes.shift());
+        await page.getByRole("button", { name: "Sign in", exact: true }).click();
+      }
+      await page.waitForSelector('[data-page="review"] [data-review-row]', { timeout: 30000 });
+    } catch (e) { note(`reviewer walk @${w}: did not reach the review page — ` + String(e.message || e).split("\n")[0].slice(0, 160)); await ctx.close(); continue; }
+    drain(store);
+    const one = await page.evaluate(() => ({ rail: !!document.querySelector('[data-guide="rail"], .rail-item, .phone-tabs'), title: (document.querySelector('[data-page="review"] h2') || {}).textContent || "",
+                                             cards: !!document.querySelector("[data-review-cards]"), table: !!document.querySelector("[data-review-table]") }));
+    ok(`review-list @${w}: ONE page, "CLPs for review", no rail or tab bar; ${w < 768 ? "cards" : "a table"}`,
+       !one.rail && one.title.trim() === "CLPs for review" && (w < 768 ? one.cards && !one.table : one.table && !one.cards), JSON.stringify(one));
+    await audit(page, store, meta("review-list", { page: "review" }));
+    if (w === DESK_W) {
+      await page.locator('[data-review-row] button.row-open').first().click();
+      await page.waitForSelector("[data-review-download]", { timeout: 20000 }).catch(() => {});
+      await audit(page, store, meta("review-clp", { page: "review" }));
+      if (OPT.deep) await keyboardPass(page, meta("review-clp"));
+    }
+    const strays = apiSeen.filter(u => !/\/api\/(review\/|auth\/|meta(\?|$)|activity(\?|$)|health(\?|$))/.test(u.replace(base, "")));
+    ok(`review-reads-only @${w}: the reviewer's page asked for nothing outside /api/review/ and the sign-in`, strays.length === 0, strays.slice(0, 5).join(", "));
+    await ctx.close();
+  }
+}
+
 // a tenant with no data: the boots-empty app
 async function walkEmpty(browser) {
   let server;
@@ -1515,7 +1597,7 @@ draw();
     for (const p of EXTRA_PASSES) await walkPortal(browser, server.base, p.look, p.accent, false, p.widths);
     if (OPT.deep) {
       await walkTeam(browser, server.base);
-      if (!server.external) { await walkLogin(browser, server.base); await walkEmpty(browser); }
+      if (!server.external) { await walkLogin(browser, server.base); await walkReviewer(browser, server.base); await walkEmpty(browser); }
       else note("login-user and empty-tenant walks need the harness's own server (not --base)");
     }
     await walkUnsigned(browser, server.base);
