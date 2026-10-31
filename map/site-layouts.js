@@ -11,7 +11,7 @@
  * the top-level input of every expression (GL drops a layer whose zoom expression sits inside arithmetic); each
  * thing carries `_m` = 1 / cos(its latitude), so a metre is a metre anywhere.
  *
- *   const h = WSLayouts.install(map, styles, { prefix: "sl", before: () => "some-layer-id" });
+ *   const h = WSLayouts.install(map, styles, { prefix: "sl", before: () => "some-layer-id", minzoom: 16 });
  *   await h.ready;            // the symbol pictures are loaded
  *   h.setData(features);      // a GeoJSON FeatureCollection or a list of things
  *   h.setVisible(false);  h.reinstall();   // after map.setStyle (every layer and picture is dropped)
@@ -104,7 +104,8 @@
       map.addSource(DRV, { type: "geojson", data: derived });
       ids.length = 0;
       const b = before();
-      const L = (o) => { o.id = P + o.id; o.layout = Object.assign({ visibility: visible ? "visible" : "none" }, o.layout || {}); map.addLayer(o, b); ids.push(o.id); };
+      // opts.minzoom (31 Oct 2026, task 4c PR 4): nothing of the layout below this zoom (the public map: 16)
+      const L = (o) => { o.id = P + o.id; o.layout = Object.assign({ visibility: visible ? "visible" : "none" }, o.layout || {}); if (opts.minzoom != null) o.minzoom = Math.max(o.minzoom || 0, opts.minzoom); map.addLayer(o, b); ids.push(o.id); };
       // ---- areas
       L({ id: "a-fill", type: "fill", source: SRC, filter: ["all", isArea, ["==", ["get", "fill"], "solid"]], layout: { "fill-sort-key": ["get", "z"] }, paint: { "fill-color": ["get", "color"], "fill-opacity": OP } });
       L({ id: "a-pat", type: "fill", source: SRC, filter: ["all", isArea, ["has", "pat"]], layout: { "fill-sort-key": ["get", "z"] }, paint: { "fill-pattern": ["get", "pat"], "fill-opacity": ["min", 1, ["+", 0.25, OP]] } });

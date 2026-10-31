@@ -13,6 +13,10 @@ site-grid fit turn 27.61°, scale 1.0003, worst miss 0.01 m) and this harness ho
 contractor-style-r12-unitless.dxf, written by backend/tools/make_contractor_style.py): units scaled or worked out,
 the leave-outs counted, block footprints, attribute labels, holes (section 2b).
 
+31 Oct 2026 (PR 4): the public map (section 9) — the "Show on the public map" switch (planners / admins, the layout's
+version), /api/public/site-layouts as an allow-list (no security / CCTV, no file name, no phase name, nothing a later
+kind of thing writes), kept until the next write.
+
 WHAT THIS DOES NOT PROVE: the screens (parse_frontend / dom_frontend / the UI audit), the Route map layer (parse_map),
 Postgres, the HTTP layer (stubbed), the memory on Render (measured by hand before the merge).
 Run (PowerShell):  $env:PYTHONUTF8 = "1"; .venv-tests\\Scripts\\python backend/tests/test_site_layouts.py
@@ -862,6 +866,123 @@ ok("8. ...the four welfare units are welfare areas; the gate tags are words read
    sum(1 for f in cf if f["properties"]["style"] == "welfare") == 4
    and sorted(f["properties"]["text"] for f in cf if f["properties"]["style"] == "text" and "(IN)" in f["properties"]["text"]
               or f["properties"]["style"] == "text" and "(OUT)" in f["properties"]["text"]) == ["GATE 1 (IN)", "GATE 2 (OUT)"])
+
+# =========================================================================== #
+#  9. The public map (31 Oct 2026, PR 4; mockup site-layout-public-mockup-1031) #
+# =========================================================================== #
+# A site of its own (L050) so the counts here do not move with the sections above.
+import read_cache  # noqa: E402
+db.execute("INSERT INTO locations (tenant_id, id, name, loc_type, role, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?)",
+           (T, "L050", "Gorse Lane depot (fictional)", "Site", "destination", 52.65, -0.89))
+as_code("planner123")
+
+
+def F(geom, **props):
+    return {"type": "Feature", "geometry": geom, "properties": props}
+
+
+P1 = {"type": "Point", "coordinates": [-0.8900, 52.6500]}
+LN = {"type": "LineString", "coordinates": [[-0.8910, 52.6495], [-0.8890, 52.6505]]}
+AR = {"type": "Polygon", "coordinates": [[[-0.8905, 52.6498], [-0.8895, 52.6498], [-0.8895, 52.6502], [-0.8905, 52.6498]]]}
+pub_things = {"features": [
+    F(LN, style="barrier", source="CONTRACTOR-LOGISTICS-REV-C.dxf", src_layer="TW_BARRIER"),
+    F(AR, style="laydown", text="LAYDOWN"),
+    F(P1, style="sym", sym="first_aid", label="First aid"),
+    F(P1, style="sym", sym="security", label="Security"),
+    F(P1, style="sym", sym="cctv"),
+    F(P1, style="text", text="ALL DELIVERIES BOOKED", bold=True),
+]}
+st, ph1 = http(main.add_site_layout_phase, "L050", main.SiteLayoutPhaseIn(name="L1 test: internal only", month_from="2027-03",
+                                                                          month_to="2027-06"))
+lay50 = ph1["layout"]
+cur50 = lay50["phases"][0]
+st, sv50 = http(main.save_site_layout_things, ph1["phase_id"], main.SiteLayoutThingsIn(version=cur50["version"],
+                                                                                        features=pub_things))
+ok("9. a layout on L050: six things saved, the switch off when made", st == 200 and sv50["things"] == 6
+   and lay50["public"] is False)
+# a thing a LATER kind of thing might add (a pinned picture, an unknown style) written straight into the phase, as a
+# future PR could: the public read must leave it out even though the save path never made it
+raw = json.loads(db.query("SELECT features_json FROM site_layout_phases WHERE tenant_id = ? AND id = ?",
+                          (T, ph1["phase_id"]))[0]["features_json"])
+raw["features"] += [F(AR, style="picture", image="data:image/png;base64,AAAA", corners=[[0, 0]]),
+                    F(P1, style="sym", sym="dragon"), F(LN, style="sym", sym="first_aid"),
+                    F(P1, style="text", text="secret", note="staff only", by="jdavis")]
+db.execute("UPDATE site_layout_phases SET features_json = ? WHERE tenant_id = ? AND id = ?",
+           (json.dumps(raw), T, ph1["phase_id"]))
+
+as_code(None)
+st, off = http(main.public_site_layouts, "2027-04")
+offj = json.loads(off.body)
+ok("9. switched off: the public read sends no site and no thing", st == 200 and offj["sites"] == []
+   and offj["features"]["features"] == [] and offj["any"] is False)
+ok("9. the public read needs no code (it sits behind the map gate as every /api/public/ read)",
+   any("/api/public/site-layouts".startswith(p) for p in __import__("gate").MAP_DATA_PREFIXES))
+
+as_code("submitter123")
+st, e_team = http(main.set_site_layout_public, "L050", main.SiteLayoutPublicIn(public=True, version=1))
+ok("9. a team code cannot switch it (403)", st == 403, str((st, e_team)))
+as_code("planner123")
+v0 = main.get_site_layout("L050")["layout"]["version"]
+st, stale_p = http(main.set_site_layout_public, "L050", main.SiteLayoutPublicIn(public=True, version=v0 + 5))
+ok("9. a switch behind someone else's change is refused (409) with the sentence", st == 409 and stale_p == SL.STALE)
+st, e_none = http(main.set_site_layout_public, "L001", main.SiteLayoutPublicIn(public=True, version=1))
+ok("9. a site with no layout cannot be switched", st == 400 and "no layout" in e_none)
+ver_before = db.data_version()
+st, on = http(main.set_site_layout_public, "L050", main.SiteLayoutPublicIn(public=True, version=v0))
+ok("9. a planner switches it on; the layout's version moves on; the write counts as a change",
+   st == 200 and on["layout"]["public"] is True and on["layout"]["version"] == v0 + 1 and db.data_version() > ver_before)
+
+as_code(None)
+st, pa = http(main.public_site_layouts, "2027-04")
+pj = json.loads(pa.body)
+pf = pj["features"]["features"]
+ok("9. April 2027: L050 only (L019's layout is still off), with its name and the middle of what is drawn",
+   st == 200 and [s["location_id"] for s in pj["sites"]] == ["L050"] and pj["sites"][0]["name"] == "Gorse Lane depot (fictional)"
+   and len(pj["sites"][0]["middle"]) == 2 and pj["any"] is True, str(pj["sites"]))
+ok("9. ...five things go: the barrier, the laydown, first aid and the two sets of words (the written-in one stripped)",
+   sorted(f["properties"]["style"] + ":" + f["properties"].get("sym", "") for f in pf)
+   == ["barrier:", "laydown:", "sym:first_aid", "text:", "text:"], str([f["properties"] for f in pf]))
+ok("9. ...the security cabin and CCTV never go (the server takes them off)",
+   not any(f["properties"].get("sym") in ("security", "cctv") for f in pf) and "security" not in pa.body.decode()
+   and '"cctv"' not in pa.body.decode())
+ok("9. ...nor the picture, an unknown symbol, a symbol drawn as a line, or words with staff notes on them",
+   not any(f["properties"]["style"] == "picture" or f["properties"].get("sym") == "dragon" for f in pf)
+   and sum(1 for f in pf if f["properties"].get("sym") == "first_aid") == 1
+   and "data:image" not in pa.body.decode() and "staff only" not in pa.body.decode() and "jdavis" not in pa.body.decode())
+ok("9. ...nor the drawing's file name, its CAD layer, the phase's name or id",
+   "CONTRACTOR-LOGISTICS" not in pa.body.decode() and "TW_BARRIER" not in pa.body.decode()
+   and "L1 test" not in pa.body.decode() and ph1["phase_id"] not in pa.body.decode())
+ok("9. ...each thing carries only the allow-listed look properties and its site",
+   all(set(f["properties"]) <= set(SL.PUBLIC_KEYS) | {"site"} and f["properties"]["site"] == "L050" for f in pf))
+ok("9. the style table sent: every line and area style, 29 symbols (no security, no CCTV), no import choices",
+   len(pj["styles"]["lines"]) == len(ST.LINE_STYLES) and len(pj["styles"]["areas"]) == len(ST.AREA_STYLES)
+   and len(pj["styles"]["symbols"]) == len(ST.SYMBOLS) - 2 == 29
+   and not ({s["key"] for s in pj["styles"]["symbols"]} & set(ST.PRIVATE_SYMBOLS)) and "choices" not in pj["styles"])
+st, pj8 = http(main.public_site_layouts, "2027-08")
+pj8 = json.loads(pj8.body)
+ok("9. August 2027: outside the phase's months, nothing drawn, but `any` keeps the map's tick", pj8["sites"] == []
+   and pj8["features"]["features"] == [] and pj8["any"] is True)
+st, pbad = http(main.public_site_layouts, "2027-4")
+ok("9. a month must be YYYY-MM", st == 400)
+st, pnow = http(main.public_site_layouts, None)
+ok("9. no month: this month", st == 200 and re.fullmatch(r"\d{4}-\d{2}", json.loads(pnow.body)["month"]))
+
+# kept until the next write, then built again
+read_cache.clear()
+b0 = read_cache.STATS["builds"]
+http(main.public_site_layouts, "2027-04")
+http(main.public_site_layouts, "2027-04")
+ok("9. the read is kept: two reads, one build", read_cache.STATS["builds"] - b0 == 1)
+as_code("planner123")
+v1 = main.get_site_layout("L050")["layout"]["version"]
+http(main.set_site_layout_public, "L050", main.SiteLayoutPublicIn(public=False, version=v1))
+as_code(None)
+st, after_off = http(main.public_site_layouts, "2027-04")
+ok("9. switched off again: the next read is built afresh and sends nothing",
+   read_cache.STATS["builds"] - b0 == 2 and json.loads(after_off.body)["features"]["features"] == [])
+ok("9. public_thing: a thing with no geometry or a symbol not in the table is None",
+   SL.public_thing({"properties": {"style": "heras"}}) is None
+   and SL.public_thing(F(P1, style="sym", sym="cctv")) is None and SL.public_thing("x") is None)
 
 as_code(None)
 print()
