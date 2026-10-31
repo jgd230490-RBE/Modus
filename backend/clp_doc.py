@@ -238,7 +238,7 @@ def _figures(row, factors):
     return int(f["trips"]), float(f["tonnes"])
 
 
-def gather(location_ids, factors=None, working_days=None, now=None):
+def gather(location_ids, factors=None, working_days=None, now=None, layers=True):
     """
     Every figure the document prints, as data (test_clp_doc compares the .docx with this, and this with the modules
     that own each figure). ValueError for an empty or unknown location.
@@ -381,6 +381,7 @@ def gather(location_ids, factors=None, working_days=None, now=None):
             "route_id": rid, "direction": e["dir"],
             "from": (all_locs.get(r.get("origin_id")) or {}).get("name") or r.get("origin_id") or "",
             "to": (all_locs.get(r.get("dest_id")) or {}).get("name") or r.get("dest_id") or "",
+            "from_id": r.get("origin_id"), "to_id": r.get("dest_id"),
             "distance": (None if dist is None else r1(dist)), "unit": unit, "routed": km is not None,
             "vehicles": [vlabel(v) for v, _k in sorted(e["veh"].items(), key=lambda kv: (-kv[1], kv[0]))],
             "materials": [m for m, _t in sorted(e["mat"].items(), key=lambda kv: -kv[1])],
@@ -464,15 +465,20 @@ def gather(location_ids, factors=None, working_days=None, now=None):
     other_ends = sorted({(all_locs.get(rid_end) or {}).get("name") or rid_end
                          for r in touching.values() if r["id"] in rl
                          for rid_end in (r.get("origin_id"), r.get("dest_id")) if rid_end not in inset})
-    return {
+    out = {
         "name": name, "site_names": [s["name"] for s in sites], "location_ids": ids,
         "scheme": tenant.get("name") or "", "demo_notice": tenant.get("demo_notice") or None,
         "snapshot": when, "working_days": wd, "programme": st["programme"], "prefix": st["prefix"],
         "stages": stages, "lines": lines, "by_month": by_month, "totals": totals, "routes": route_rows,
         "materials": materials, "sites": sites, "hourly": hourly, "peak_bands": peak_bands,
         "peak_band_words": gate_hours.peak_words(peak_bands), "measures": measures, "other_ends": other_ends,
-        "unit": unit,
+        "unit": unit, "layers": None,
     }
+    if layers:
+        # 30 Oct 2026 (PR 2): §2.3 / §2.4 from what is stored along these routes (clp_doc_layers)
+        import clp_doc_layers
+        out["layers"] = clp_doc_layers.gather(out)
+    return out
 
 
 def _london():
@@ -597,6 +603,7 @@ class _Doc:
         src.font.color.rgb = RGBColor(0x5B, 0x64, 0x70)
         self.todos = []
         self.section = ""
+        self.pictures = 0
 
     # -- text ---------------------------------------------------------------------------------------------------- #
     def h(self, text, level=1):
@@ -719,6 +726,16 @@ class _Doc:
         from docx.enum.text import WD_BREAK
         self.d.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
+    def picture(self, data, width_cm, alt, caption=None):
+        """A picture (PNG or JPEG bytes) `width_cm` wide with its alternative text, and a caption in the source style."""
+        para = self.d.add_paragraph()
+        shape = para.add_run().add_picture(io.BytesIO(data), width=self.Cm(width_cm))
+        shape._inline.docPr.set("descr", alt)
+        self.pictures += 1
+        if caption:
+            self.src(caption)
+        return para
+
 
 def file_name(data, when=None):
     when = when or data["snapshot"]
@@ -727,12 +744,16 @@ def file_name(data, when=None):
     return f"CLP {base} {when:%Y-%m-%d}.docx"
 
 
-def build(data, impact="higher"):
-    """The .docx bytes for gather()'s data. `impact` picks the §5 checklist (higher or medium)."""
+def build(data, impact="higher", pictures=True, acc=None):
+    """The .docx bytes for gather()'s data. `impact` picks the §5 checklist (higher or medium). `pictures` adds the
+    charts and the three plans (clp_doc_pictures; the plans call the basemap); `acc` is the caller's access."""
     if impact not in IMPACT:
         raise ValueError("impact must be higher or medium")
     D = _Doc()
     d = data
+    import clp_doc_pictures as PIC
+    plan_pics = PIC.plans(d, acc=acc) if pictures else []
+    L = d.get("layers") or {}
     T = d["totals"]
     when = d["snapshot"]
     snap_words = f"{when.day} {MONTHS[when.month - 1]} {when.year} at {when:%H:%M}"
@@ -837,26 +858,111 @@ def build(data, impact="higher"):
     D.h("2.1 Policy context", 2)
     D.todo("the national and local policies, plans and planning conditions this plan answers to.", "2.1")
     D.h("2.2 Three plans at different scales", 2)
-    D.todo("a regional plan (1:15,000 or smaller), a local plan (1:2,000 to 1:3,000) and a site plan (1:500 to 1:1,000) "
-           "with the routes, the gates and the places that need care. Wayscope's Route map export draws all three.", "2.2")
+    if plan_pics:
+        D.p("Drawn by Wayscope from the approved plan. Each picture carries its own scale bar: use it, not the stated "
+            "ratio, once the picture is resized to fit the page.")
+        for pp in plan_pics:
+            where = f" of {pp['site']}" if pp["site"] else ""
+            D.picture(pp["jpg"], 17.0, pp["alt"], f"{pp['name']}{where} · {pp['scale']} · routes in use in "
+                                                   f"{month_label(pp['month'])}.")
+    else:
+        D.todo("a regional plan (1:15,000 or smaller), a local plan (1:2,000 to 1:3,000) and a site plan (1:500 to 1:1,000) "
+               "with the routes, the gates and the places that need care.", "2.2")
     D.todo("consolidation centres, the nearest wharf, and areas where lorries could be marshalled.", "2.2")
     D.h("2.3 Local access including highway, public transport, cycling, walking and waterways", 2)
-    for no, name, what in (("2.3.1", "Highways, carriageways and footways",
-                            "closures, weight and width limits, Traffic Regulation Orders needed, and roads or footways "
-                            "that need extra care."),
-                           ("2.3.2", "Railway / underground", "railway lines near the site or its routes, and the "
-                                                              "precautions taken."),
-                           ("2.3.3", "Bus routes", "the bus routes and stops affected, and the precautions taken."),
-                           ("2.3.4", "Cycling", "cycle routes affected, and precautions for people cycling."),
-                           ("2.3.5", "Waterways", "waterways near the site, and the precautions taken.")):
-        D.h(f"{no} {name}", 3)
-        D.todo(what, no)
+    C = L.get("community") or {}
+    strip_words = (f"within {C.get('route_m', 250)} m of this plan's routes or {C.get('site_m', 500)} m of "
+                   f"{sites_word}")
+    D.h("2.3.1 Highways, carriageways and footways", 3)
+    if L.get("councils"):
+        D.p(f"The routes run through these councils in {month_label(L['councils_month'])}, the busiest month:")
+        D.table(["Council", "Highway authority", "Routes"],
+                [[f"{c['name']} ({c['tier']})" if c["tier"] else c["name"], c["highway_authority"] or "—",
+                  ", ".join(c["routes"]) or "the site only"] for c in L["councils"]], widths=[6, 6, 5])
+    lim = L.get("limits") or {}
+    if lim.get("checked"):
+        if lim["rows"]:
+            vw = {"exceeds": "over the limit", "at_limit": "at the limit", "unknown": "to be checked"}
+            D.p("Signed and mapped lorry limits on the routes that need a look:")
+            D.table(["Limit", "Lorry", "Routes"],
+                    [[e["what"], f"{', '.join(e['lorries']) or 'all'}: {vw[e['verdict']]}", ", ".join(e["routes"])]
+                     for e in lim["rows"]], widths=[8, 5, 4])
+        w = lim["within"]
+        D.p(f"{n(w)} other lorry limit{'s' if w != 1 else ''} on the routes {'are' if w != 1 else 'is'} within every "
+            "lorry's size and weight." if w else "No other lorry limits are recorded on the routes.")
+        D.src("Lorry limits as last checked in Wayscope: a planning check from mapped and signed limits, not a survey.")
+    cl = L.get("closures") or {}
+    if cl.get("checked"):
+        if cl["rows"]:
+            D.bullets([f"{e['what']} ({', '.join(e['routes'])})" for e in cl["rows"]])
+        else:
+            D.p("No National Highways closures on the routes when last checked.")
+        D.src(f"National Highways closures, last checked {str(cl['checked_at'])[:10]}.")
+    if L.get("diversions"):
+        D.p("Dated diversions round a closure or works on these routes:")
+        D.table(["Route", "Round", "From", "To"],
+                [[g["route_id"], ", ".join(g["zones"]) or "a closed area", _date_words(g["from"]), _date_words(g["to"])]
+                 for g in L["diversions"]], widths=[2, 8, 3.5, 3.5])
+    D.todo("Traffic Regulation Orders needed, suspensions, and roads or footways that need extra care.", "2.3.1")
+    D.h("2.3.2 Railway / underground", 3)
+    if C.get("stations"):
+        D.p(f"Stations and tram stops {strip_words}: " + ", ".join(
+            f"{x['name'] or 'unnamed'} ({n(x['metres'])} m from {x['where']})" for x in C["stations"]) + ".")
+    D.todo("railway lines and bridges near the site or its routes, and the precautions taken.", "2.3.2")
+    D.h("2.3.3 Bus routes", 3)
+    if C.get("stored"):
+        D.p(f"{n(C['bus_stops'])} bus stop{'s' if C['bus_stops'] != 1 else ''} {strip_words}"
+            + (f", {n(C['bus_stops_near_sites'])} of them nearest {sites_word}." if C["bus_stops"] else "."))
+    D.todo("the bus routes affected, and the precautions taken.", "2.3.3")
+    D.h("2.3.4 Cycling", 3)
+    if C.get("stored"):
+        if C["cycle"] or C["cycle_unnamed"]:
+            D.p(f"Cycle routes {strip_words}: " + ", ".join(C["cycle"] + (
+                [f"{n(C['cycle_unnamed'])} unnamed cycle path{'s' if C['cycle_unnamed'] != 1 else ''}"]
+                if C["cycle_unnamed"] else [])) + ".")
+        else:
+            D.p(f"No cycle routes recorded {strip_words}.")
+    D.todo("precautions for people cycling (crossings, marshals, signs).", "2.3.4")
+    D.h("2.3.5 Waterways", 3)
+    D.todo("waterways near the site, and the precautions taken.", "2.3.5")
+    if C.get("credit"):
+        D.src(C["credit"])
     D.h("2.4 Community considerations", 2)
     D.h("2.4.1 Local policy", 3)
-    D.todo("each council's code of construction practice or local rule this plan follows.", "2.4.1")
+    if L.get("councils"):
+        for c in L["councils"]:
+            D.todo(f"{c['name']}: the code of construction practice or local rule this plan follows.", "2.4.1")
+    else:
+        D.todo("each council's code of construction practice or local rule this plan follows.", "2.4.1")
     D.h("2.4.2 Schools, hospitals and other sensitive places", 3)
-    D.todo("schools, hospitals and other sensitive places near the site and its routes, and how lorries will be "
-           "managed near them (times, speeds, marshals, signs).", "2.4.2")
+    if C.get("stored"):
+        labels = C["labels"]
+        if C["places"]:
+            D.p(f"Places {strip_words}, nearest first:")
+            D.table(["Place", "What", "Nearest", "Metres"],
+                    [[x["name"] or "unnamed", labels.get(x["kind"], x["kind"]), x["where"], n(x["metres"])]
+                     for x in C["places"]], widths=[6.5, 4, 4.5, 2], numeric=(3,))
+            if C["places_more"]:
+                D.p(f"{n(C['places_more'])} more further away.")
+        else:
+            D.p(f"No schools, hospitals, health or community centres or sports facilities recorded {strip_words}.")
+        if C["residential"]:
+            D.p(f"{n(C['residential'])} residential area{'s' if C['residential'] != 1 else ''} {strip_words}.")
+        if C.get("credit"):
+            D.src(C["credit"])
+    co = L.get("collisions") or {}
+    if co.get("fetched") and co["rows"]:
+        D.p(f"Injury collisions reported to the police, {co['period']}:")
+        D.table(["Route", "On the route", "Killed or seriously injured", "Within 250 m",
+                 "A person on foot, cycle or motorcycle hurt", "A goods vehicle over 3.5 t involved"],
+                [[r["route_id"], n(r["on_all"]), n(r["on_ksi"]), n(r["near_all"]), n(r["near_vru"]), n(r["near_goods"])]
+                 for r in co["rows"]], widths=[1.8, 2.4, 3.2, 2.4, 4, 3.2], numeric=(1, 2, 3, 4, 5))
+        for sc in co["sites"]:
+            D.p(f"Within 500 m of {sc['name']}: {n(sc['all'])} collision{'s' if sc['all'] != 1 else ''}, "
+                f"{n(sc['ksi'])} killed or seriously injured.")
+        D.src("Counts, not a rate: the traffic on each road is not the same. Each route's collision evidence sheet "
+              "gives the detail. " + co["credit"])
+    D.todo("how lorries will be managed near these places (times, speeds, marshals, signs).", "2.4.2")
 
     # ---------------------------------------------------------------- 3
     D.h("3 Construction programme and methodology", 1)
@@ -869,6 +975,10 @@ def build(data, impact="higher"):
               n(s["trips_total"]) if s["trips_total"] else ""] for s in d["stages"]],
             widths=[6, 4.5, 2.5, 2.5, 1.5], numeric=(4,))
     D.src("From the approved plan.")
+    if pictures:
+        ch = PIC.programme_chart(d)
+        if ch:
+            D.picture(ch["png"], 17.0, ch["alt"], "The construction programme at " + sites_word + ".")
     other = "3.1 (stages of a building programme)" if d["programme"] == "infrastructure" else \
         "3.2 (stages of an infrastructure programme)"
     D.p(f"{other} is left out: this programme is set as {d['programme']}.", italic=True)
@@ -927,6 +1037,8 @@ def build(data, impact="higher"):
                     [[a["name"], a["activity"], n(a["bays"]), (f"{a['minutes']:g}" if a["minutes"] is not None else "—"),
                       a["level"] or ""] for a in s["areas"]], widths=[5, 3, 1.5, 3, 4.5], numeric=(2, 3))
     D.src("From Data → Locations: gates, their hours and the work areas.")
+    if any(pp["site"] for pp in plan_pics):
+        D.p("The local and site plans of each site are in 2.2.")
     D.todo("hoarding lines and gates for vehicles, people on foot and cycles; routes for people on foot and on cycles "
            "into and around the site; changes to roads and footways; swept paths; crane positions; where conflicts could "
            "happen and where marshals stand; parking, loading and unloading.", "4")
@@ -979,6 +1091,10 @@ def build(data, impact="higher"):
     D.table(["Construction stage", "Period of stage", "No. of trips (busiest month)", "Peak no. of trips (daily)"], rows,
             widths=[6, 4, 4, 3], numeric=(2, 3))
     D.src(f"From the approved plan: {n(T['trips'])} trips" + (f", {period_words(T['first'], T['last'])}." if T["first"] else "."))
+    if pictures:
+        ch = PIC.monthly_chart(d)
+        if ch:
+            D.picture(ch["png"], 17.0, ch["alt"], "Trips a month by stage; the right-hand scale is the same trips a day.")
     if T["pending_lines"]:
         D.p(f"{T['pending_lines']} line{'s' if T['pending_lines'] != 1 else ''} waiting for approval "
             f"{'are' if T['pending_lines'] != 1 else 'is'} not in these figures.", italic=True)
@@ -1000,6 +1116,10 @@ def build(data, impact="higher"):
                                          (f"{h['empty_per_day']:g} coming to load" if h["empty_per_day"] else "")) if x)
             D.p(f"{h['gate']}, {h['site']}, {month_label(h['month'])} (its busiest month): {h['arrivals_per_day']:g} "
                 f"lorries a day ({split}), open {h['hours']}.")
+            if pictures:
+                ch = PIC.hourly_chart(h)
+                if ch:
+                    D.picture(ch["png"], 17.0, ch["alt"])
             D.table(["Hour", "Lorries arriving", "Minutes between arrivals"],
                     [[f"{x['hour']:02d}:00–{x['hour'] + 1:02d}:00", f"{x['lorries']:g}",
                       (f"{x['minutes_between']:g}" if x["minutes_between"] is not None else "—")] for x in open_rows],
@@ -1041,6 +1161,15 @@ def build(data, impact="higher"):
     out = io.BytesIO()
     D.d.save(out)
     return out.getvalue()
+
+
+def _date_words(v):
+    """'2027-12-20' -> '20 Dec 2027'; anything else as it is."""
+    try:
+        dt = datetime.date.fromisoformat(str(v)[:10])
+        return f"{dt.day} {MONTHS[dt.month - 1]} {dt.year}"
+    except (TypeError, ValueError):
+        return str(v or "")
 
 
 def _group_no(group):
