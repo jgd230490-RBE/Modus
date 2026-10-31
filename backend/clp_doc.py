@@ -1206,6 +1206,7 @@ def build(data, impact="higher", pictures=True, acc=None):
            "and when the plan is reviewed.", "7")
 
     # the Still to complete list, now every placeholder is known: inserted before the Contents heading
+    data["todos"] = list(D.todos)   # 31 Oct 2026 (PR 3b): kept after the build, so a task can start from a line
     for item in D.todos:
         anchor.insert_paragraph_before(item, style="List Number")
     anchor._p.getparent().remove(anchor._p)

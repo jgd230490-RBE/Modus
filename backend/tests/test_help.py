@@ -922,7 +922,8 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 29 Oct 2026 (the Simulation's own page): + chapter 17 The Simulation and its three sections (74)
    # NARROWED 31 Oct 2026 (task 4a, PR 3a): + chapter 18 CLP documents and its four sections (79); + T1 "CLP documents" (33)
    # NARROWED 31 Oct 2026 (task 4c PR 1): + chapter 19 Site layouts and its three sections (83); + T1 "Site layouts" (34)
-   len(re.findall(r'<li class="l[12]"', src)) == 83 and len(re.findall(r'<li class="l[12]"', _tg2)) == 34   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   # NARROWED 31 Oct 2026 (task 4a, PR 3b): + 18.5 Notes and tasks (84); + T1 "CLP notes and tasks" (35)
+   len(re.findall(r'<li class="l[12]"', src)) == 84 and len(re.findall(r'<li class="l[12]"', _tg2)) == 35   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,
@@ -1190,6 +1191,18 @@ ok3("⭐ CLP DOCS: the user guide has chapter 18 'CLP documents' with 18.1–18.
 ok3("CLP DOCS: chapter 18 names no supplier, decision code, team id or back-end word, says lorry never truck; the phone list (2.4) names CLP documents among the desktop pages",
     not re.search(r"\b(API|endpoint|server|JSON|database|HERE|Mapbox|IPT\d|predict\w*|real-time|trucks?|secure|AI|Q\d+|D\d{2,3})\b", _ch18)
     and "Stockpiles, Pours, CLP documents and, for planners and admins" in _ug, _ch18[-200:])
+# ---- 31 Oct 2026 (task 4a, PR 3b): notes and tasks — 18.5 in plain words; T1 #t1-clp-notes the detail
+ok3("⭐ CLP NOTES: 18.5 'Notes and tasks' in the nav and the text — everyone who can see a plan, a team its own only; For; ticks; from a To complete line, never ticked by itself; notes deleted not edited; the grey steps; the Tasks column and filter; never blocking; one email; delete vs clear; never in the Word file",
+    '<a href="#18-5-notes-and-tasks">18.5 Notes and tasks</a>' in _ug and '<h2 id="18-5-notes-and-tasks">18.5 Notes and tasks</h2>' in _ch18
+    and all(t in _ch18 for t in ("<strong>⋯ → Notes and tasks</strong>", "own team&#39;s plans only", "never print in the Word file",
+        "<strong>Planners and admins</strong>", "ticks a task done, or back", "<strong>overdue</strong>", "it is not ticked by itself",
+        "but not edited", "as grey lines", "<strong>Given to me</strong>", "they never stop an approval", "sends that person one email",
+        "Nothing else sends an email.", "deletes its notes and tasks too", "filter by team, by status and by tasks", "notes and tasks, the document history")))
+ok3("CLP NOTES: the technical guide #t1-clp-notes holds the detail (the table, who, the steps, the kept lines, the kept reads, the email, the endpoints)",
+    'id="t1-clp-notes"' in _tgv2 and '<a href="#t1-clp-notes">CLP notes and tasks</a>' in _tgv2 and "<code>backend/clp_notes.py</code>" in _tgv2
+    and "clp_notes  (tenant_id, id)" in _tgv2 and "<code>db.NO_DATA_TABLES</code>" in _tgv2 and "<code>_CLP_NOTES_PATH</code>" in _tgv2
+    and "<code>keep_lines</code>" in _tgv2 and "<code>email_task</code>" in _tgv2 and "PATCH  /api/clp/documents/{id}/tasks/{tid}" in _tgv2
+    and "Notes and tasks on a plan (PR 3b)" not in _tgv2)
 ok3("CLP DOCS: the technical guide #t1-clp-records holds the detail (the two tables, the listed rows' ids, who may do what, the team cut, the approve build, the endpoints, the stages)",
     'id="t1-clp-records"' in _tgv2 and '<a href="#t1-clp-records">CLP documents</a>' in _tgv2 and "<code>backend/clp_records.py</code>" in _tgv2
     and "clp_documents" in _tgv2 and "clp_issues" in _tgv2 and "<code>auto-&lt;loc&gt;-all</code>" in _tgv2 and "<code>heavy_reads.solo</code>" in _tgv2

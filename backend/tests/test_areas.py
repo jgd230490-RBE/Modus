@@ -967,8 +967,10 @@ db.execute_atomic([("DELETE FROM auth_attempts WHERE tenant_id = ? AND id = ?", 
 months_body()
 ok("6b. ⭐ a session touch and the sign-in throttle (NO_DATA_TABLES) leave the version and the cached read alone",
    db.data_version() == _v and read_cache.STATS["builds"] == _b)
-ok("6b. the tables that do not bump are exactly the account / audit / lead tables",
-   db.NO_DATA_TABLES == {"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users", "demo_requests"})
+# NARROWED 31 Oct 2026 (task 4a PR 3b): + clp_notes, the notes and tasks on each CLP (no kept read is built from them,
+# and a note must not end a kept CLP draft)
+ok("6b. the tables that do not bump are exactly the account / audit / lead tables and the CLP notes",
+   db.NO_DATA_TABLES == {"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users", "demo_requests", "clp_notes"})
 ok("6b. ⭐ written_table(): INSERT / INSERT OR REPLACE / REPLACE / UPDATE / DELETE name their table; anything else is None (and bumps)",
    db.written_table("INSERT INTO forecasts (a) VALUES (?)") == "forecasts"
    and db.written_table("  insert or replace into Audit_Log (a) values (?)") == "audit_log"
@@ -1065,7 +1067,9 @@ ok("6b. the warmer starts only from main's lifespan (never on import) and WAYSCO
 _mw = src_main[src_main.index("async def _access_middleware("):src_main.index("GUARD_HEADER = ")]
 ok("6b. ⭐ the middleware bumps the version after EVERY audited /api/ write, worked or not (in a finally round call_next)",
    "try:\n                response = await call_next(request)\n            finally:" in _mw
-   and "if write and _audited(path):\n                    db.bump_data_version()" in _mw)
+   # NARROWED 31 Oct 2026 (task 4a PR 3b): every audited write but a CLP's notes and tasks (_CLP_NOTES_PATH)
+   and "if write and _audited(path) and not _CLP_NOTES_PATH.match(path):\n                    db.bump_data_version()" in _mw
+   and '_CLP_NOTES_PATH = re.compile(r"^/api/clp/documents/[^/]+/(notes|tasks)(/|$)")' in src_main)
 ok("6b. ⭐ db._run bumps after the commit and execute_atomic after its commit (not before: a reader could re-cache old figures)",
    "conn.commit()\n            note_write(sql)" in read("backend/db.py")
    and "conn.commit()\n            if any(written_table(step[0]) not in NO_DATA_TABLES for step in steps):\n                bump_data_version()" in read("backend/db.py"))

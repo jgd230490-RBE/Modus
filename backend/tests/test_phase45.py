@@ -263,8 +263,9 @@ reset_db()
 # NARROWED 29 Oct 2026: and without pours (task 3a: concrete pours) — thirty
 # NARROWED 31 Oct 2026: and without clp_documents, clp_issues (task 4a, PR 3a: the CLPs as records) — thirty-two
 # NARROWED 31 Oct 2026: 32 -> 35, and the three site layout tables (task 4c PR 1)
-ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 35
-   and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours", "clp_documents", "clp_issues", "site_layouts", "site_layout_phases", "site_layout_imports"}) == 16,
+# NARROWED 31 Oct 2026: 35 -> 36, and clp_notes (task 4a PR 3b: notes and tasks on each CLP)
+ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 36
+   and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours", "clp_documents", "clp_issues", "site_layouts", "site_layout_phases", "site_layout_imports", "clp_notes"}) == 16,
    f"got {len(db.TENANTED_TABLES)}")
 
 for t in sorted(db.TENANTED_TABLES):

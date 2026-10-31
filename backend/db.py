@@ -69,6 +69,9 @@ TENANTED_TABLES = {
     # approval step) and each approved issue (its number, who sent and approved it, what changed, the Word file itself).
     # Per tenant, in the package, same rule, same edit.
     "clp_documents", "clp_issues",
+    # 31 Oct 2026 (task 4a, PR 3b): the notes, tasks, approval steps and kept "Still to complete" lines on each CLP.
+    # Per tenant, in the package, same rule, same edit.
+    "clp_notes",
     # 2.5b, 2026-09-03. The editable copy of factors.json. Per tenant: two clients
     # will not share a payload table.
     "config",
@@ -295,8 +298,10 @@ def _run(sql, params, fetch):
 # ⚠️ Per PROCESS. Render runs one uvicorn process (render.yaml's startCommand has no
 #    --workers; test_areas.py holds that). A second worker or instance would not see this
 #    process's writes, and the version must then move into the database.
+# 31 Oct 2026 (task 4a, PR 3b): + clp_notes. No figure and no kept read is built from a CLP's notes and tasks, and a
+# note must not throw away the kept CLP drafts (each a heavy build).
 NO_DATA_TABLES = frozenset({"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users",
-                            "demo_requests"})
+                            "demo_requests", "clp_notes"})
 _DATA_VERSION = [0]
 _WRITE_TABLE_RE = None
 
@@ -903,6 +908,8 @@ def init_weeks_db():
         # 31 Oct 2026 (task 4a, PR 3a): the CLP records and their issues
         _create_tenanted(cur, "clp_documents")
         _create_tenanted(cur, "clp_issues")
+        # 31 Oct 2026 (task 4a, PR 3b): the notes and tasks on each CLP
+        _create_tenanted(cur, "clp_notes")
         conn.commit()
         try:
             if IS_PG:
@@ -2127,6 +2134,33 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, clp_id, issue_no)
         )
     """,
+    # 31 Oct 2026 (task 4a, PR 3b; clp_notes.py). One row on a CLP: a note, a task (For the team / the planners and admins /
+    # one login, an optional due date, the "To complete" line it started from, who ticked it done), a step of the approval
+    # chain (sent / changes / approved, with its issue number) or the kept "Still to complete" list of the last draft or
+    # issue built (`lines`, JSON words). `written_key` is who may delete or change it (the login, or the code's role).
+    "clp_notes": """
+        CREATE TABLE clp_notes (
+            tenant_id      TEXT NOT NULL DEFAULT 'default',
+            id             TEXT NOT NULL,
+            clp_id         TEXT NOT NULL,
+            kind           TEXT NOT NULL,
+            words          TEXT,
+            for_kind       TEXT,
+            for_team       TEXT,
+            for_user       TEXT,
+            due            TEXT,
+            from_line      TEXT,
+            done_by        TEXT,
+            done_at        TEXT,
+            step           TEXT,
+            issue_no       INTEGER,
+            written_by     TEXT,
+            written_key    TEXT,
+            written_at     TEXT NOT NULL,
+            updated_at     TEXT,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
     # ----------------------------------------------------------------------- #
     #  2.5b — config: the editable copy of factors.json                        #
     # ----------------------------------------------------------------------- #
@@ -2173,6 +2207,7 @@ _TENANT_PK = {
     "site_layout_imports": "(tenant_id, id)",
     "clp_documents": "(tenant_id, id)",
     "clp_issues": "(tenant_id, clp_id, issue_no)",
+    "clp_notes": "(tenant_id, id)",
     "config": "(tenant_id, key)",
     "forecast_days": "(tenant_id, route_id, month_index, discipline, section_id, "
                      "day_date)",

@@ -117,6 +117,8 @@ TENANTED = {
     "site_layouts", "site_layout_phases", "site_layout_imports",
     # 31 Oct 2026 (task 4a, PR 3a, clp_records.py): each CLP and each approved issue. Registered in the same edit.
     "clp_documents", "clp_issues",
+    # 31 Oct 2026 (task 4a, PR 3b, clp_notes.py): the notes, tasks, steps and kept lines on each CLP. Same edit.
+    "clp_notes",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is
