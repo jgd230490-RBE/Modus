@@ -294,6 +294,11 @@ _ry = read("render.yaml")
 ok("the build and start commands and the Python version are render.yaml's",
    f'buildCommand: "{neworg.BUILD}"' in _ry and f'startCommand: "{neworg.START}"' in _ry
    and f'value: "{neworg.PYTHON_VERSION}"' in _ry)
+# 31 Oct 2026: the demo's web service is on the 2 GB plan (was the 512 MB starter); render.yaml matches what
+# Render runs, so a blueprint sync cannot move it back, and it is the plan a pilot's steps name
+ok("render.yaml's web service is the 2 GB plan (standard), the same as a pilot's; never the 512 MB starter",
+   re.search(r"type: web\n\s+name: modus-web\n\s+runtime: python\n\s+plan: standard\n", _ry) is not None
+   and "plan: starter" not in _ry and neworg.WEB_PLAN == "Standard (1 CPU, 2 GB)")
 _rh = neworg.steps("rehearsal", "Rehearsal", "jd@wayscope.co.uk", branch="claude/pilot-deploy")
 ok("a rehearsal may follow another branch, and the steps say it is one",
    "Branch: claude/pilot-deploy (a REHEARSAL" in _rh and "pilot-release" not in _rh.split("Branch:")[1].splitlines()[0])

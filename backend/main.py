@@ -5002,6 +5002,14 @@ def save_site_layout_things(phase_id: str, body: SiteLayoutThingsIn):
                         _by(None))
 
 
+@app.post("/api/site-layouts/phases/{phase_id}/copy")
+def copy_site_layout_phase(phase_id: str):
+    """Copy a phase to a NEW phase of the same layout (every thing; " (copy)" after the name; no months). Planner or
+    admin; one audited write (4c PR 2)."""
+    _require_approver()
+    return {"phase": _layout_call(site_layouts.copy_phase, phase_id, _by(None))}
+
+
 @app.delete("/api/site-layouts/phases/{phase_id}")
 def delete_site_layout_phase(phase_id: str, version: int):
     """Delete a phase. Carries its version: 409 when someone else saved first."""

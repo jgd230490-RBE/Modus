@@ -144,6 +144,15 @@ FE = read("frontend/index.html")
 ok("🔴 no floating version left: React and ReactDOM are 18.3.1, never @18/",
    "unpkg.com/react@18.3.1/umd/react.production.min.js" in FE and "unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" in FE
    and "@18/" not in FE)
+# 31 Oct 2026 (task 4c PR 2): the drawing tools' two scripts are added by the page only when Draw is pressed (no <script> tag
+# for the scan above), so they are pinned here: exact versions, their sha384, crossorigin, from a host script-src allows
+TD = re.findall(r'\["(https://cdn\.jsdelivr\.net/npm/terra-draw[^"]+)", "(sha384-[A-Za-z0-9+/=]+)"\]', FE)
+ok("⭐ the drawing tools: Terra Draw 1.39.0 and its Mapbox GL adapter 1.5.0, exact, each with its sha384, crossorigin, an allowed host",
+   [u for u, _ in TD] == ["https://cdn.jsdelivr.net/npm/terra-draw@1.39.0/dist/terra-draw.umd.js",
+                          "https://cdn.jsdelivr.net/npm/terra-draw-mapbox-gl-adapter@1.5.0/dist/terra-draw-mapbox-gl-adapter.umd.js"]
+   and [h for _, h in TD] == ["sha384-BYX+VrYUWlI8gkZmqa4X/LehJtIn0mekS+68XTZttM5Oz/POAS6k3aDdunjdIJU9",
+                              "sha384-S6yiHn1kodvJhcIDd6r2ExC8pY0GBFyjtflUBIv2GCFL49gwiNG84703xT1t+NLs"]
+   and 's.src = src; s.integrity = sri; s.crossOrigin = "anonymous";' in FE and all(allowed(u, "script-src") for u, _ in TD), str(TD))
 ok("🔴 no script from cdn.tailwindcss.com; the app serves Tailwind 3.4.17 itself",
    'src="https://cdn.tailwindcss.com' not in FE and '<script src="/vendor/tailwind-play-3.4.17.js"></script>' in FE)
 for page in ("frontend/index.html", "map/index.html"):
