@@ -114,6 +114,7 @@ TENANTED = {
     "route_hour_times",
     # 29 Oct 2026 (task 3a, pours.py): each planned concrete pour. Registered in the same edit as the table.
     "pours",
+    "site_layouts", "site_layout_phases", "site_layout_imports",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is

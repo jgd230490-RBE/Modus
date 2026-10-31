@@ -1739,7 +1739,8 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
      && /function guideOff\(\)\{ guideWrite\('off'\); guideEnd\(true\); \}/.test(code));
   ok("🔴 ONE Mapbox instance, never removed: the guide adds no map and no map.remove()",
      (code.match(/new mapboxgl\.Map\(/g) || []).length === 1 && !/map\.remove\(\)/.test(code));
-  ok("🔴 no new script tag: the guide is in-page (three script src tags, as before)", (html.match(/<script src=/g) || []).length === 3);
+  // NARROWED 31 Oct 2026 (task 4c PR 1): a fourth tag, site-layouts.js, the site layouts' drawing shared with the Locations page; the guide is still in-page
+  ok("🔴 no new script tag: the guide is in-page (four script src tags: + site-layouts.js, 31 Oct)", (html.match(/<script src=/g) || []).length === 4 && html.includes('<script src="site-layouts.js?v=1"></script>'));
   ok("the card and ring are fixed overlays over the map, not inside it",
      /#guide-ring\{position:fixed;z-index:9000;pointer-events:none;/.test(html) && /#guide-card\{position:fixed;z-index:9001;/.test(html));
   ok("the anchor is scrolled into view before measuring, and the card is clamped into the window (seen live: an off-screen card)",
@@ -3935,8 +3936,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && html.includes("It still asks for the map password."));
   ok("C3 (D29): no PNG export — no preserveDrawingBuffer, no map canvas toDataURL, no toBlob, no download (the legend's swatch canvas is not the map)",
      !/preserveDrawingBuffer|getCanvas\(\)\.toDataURL|toBlob|\bdownload=/.test(code + html) && (code.match(/toDataURL\(/g) || []).length === 1 && code.includes("return c.toDataURL();"));
+  // NARROWED 31 Oct 2026 (task 4c PR 1): four script tags (+ site-layouts.js); still no QR library
   ok("C3 QR: drawn in the page — no QR library, no new <script src>",
-     (html.match(/<script src=/g) || []).length === 3 && !/qrcode|qrious|kjua/i.test(html.replace(/qrSvg|qrMatrix|share-qr|QR code|QR_M_/g, "")));
+     (html.match(/<script src=/g) || []).length === 4 && !/qrcode|qrious|kjua/i.test(html.replace(/qrSvg|qrMatrix|share-qr|QR code|QR_M_/g, "")));
   // ---- (6) the text view and "Report a concern" ---------------------------------------------------------------------
   ok("C3 text view: an aside beside the map, named by its heading; on the desktop the map gives it its width (the map is BESIDE it, not under it)",
      html.includes('<aside id="month-text" aria-labelledby="mt-title" hidden>') && wide.includes("body.month-text-open #map{ right:420px; }")
@@ -6090,7 +6092,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      /\.info-i\{ position:relative; flex:none; display:inline-grid; place-items:center; width:18px; height:18px;/.test(html)
      && html.includes(".info-i::after{ content:\"\"; position:absolute; inset:-13px; }")
      // named by aria-label (the UI audit, 19 Oct: a hidden .sr-only span counted as 1 px clipped text on every map stop)
-     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z-]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 12   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): + Labels, zones, community, collisions, abnormal (staff and public), closures, limits
+     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z-]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 13   // NARROWED 31 Oct 2026 (task 4c PR 1): + site layouts. NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): + Labels, zones, community, collisions, abnormal (staff and public), closures, limits
      && !/class="info-i"[^>]*>[^]*?<span class="sr-only">About/.test(html.slice(0, html.indexOf('id="month-text"'))));
   ok("19 Oct (UI audit): on a phone the folds' summary rows are 44 px tall (By council, What's moving, More layers)",
      /@media \(max-width:767px\)[\s\S]*?\.layers-box > summary\{ min-height:44px; display:flex; align-items:center; flex-wrap:wrap; padding:2px 0; \}/.test(html));
@@ -6258,7 +6260,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && grp.includes('<div id="abnormal-filters" hidden>') && grp.includes('id="abn-dots" checked') && grp.includes('id="abn-approved"')
      && grp.includes('id="abnormal-legend"') && grp.includes('id="abnormal-when"'));
   ok("🔴 ABN: shown only when whoami says staff (abnormalStaff from checkRouteExportStaff, beside the community and collision groups); off by default; read only when ticked, from /api/abnormal/geojson",
-     src.includes("communityStaff(RME.staff); collisionStaff(RME.staff); abnormalStaff(RME.staff); })")
+     src.includes("communityStaff(RME.staff); collisionStaff(RME.staff); abnormalStaff(RME.staff); siteLayoutsStaff(RME.staff); })")   // NARROWED 31 Oct 2026 (task 4c PR 1): + the site layouts' group
      && src.includes("function abnormalStaff(staff) {") && src.includes("if (g) g.hidden = !ABN.staff;")
      && src.includes("const ABN = { staff: false, on: false, data: null, loading: false, dots: true, approved: false };")
      && src.includes("if (ABN.on && !ABN.data) loadAbnormal();") && src.includes("fetch('/api/abnormal/geojson', { credentials: 'same-origin' })")
@@ -7270,6 +7272,36 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   ok("HOLD: the legend line, hidden until the scheme has a holding area; no purple and no dash came with it; lorries, never trucks",
      html.includes('<div class="control-item" id="holding-legend" hidden>') && html.includes("Holding area · <b>›››</b> called forward to the gate")
      && !/7c3aed|9572ee|violet|line-dasharray/i.test(hc) && !/\btruck/i.test(hc));
+}
+
+// ---- 31 Oct 2026 (task 4c PR 1): the staff Route map's read-only "Site layouts" layer ----
+{
+  const grp = html.slice(html.indexOf('<div class="control-group" id="site-layouts-group" hidden>'), html.indexOf('<!-- 16 Oct 2026 (CLOCS v5 C1): the collision history'));
+  ok("⭐ SITE LAYOUTS: a group HIDDEN in the markup with one tick, a count and an 'i'; before the collision history",
+     grp.length > 200 && grp.includes('<input type="checkbox" id="layer-site-layouts" onchange="toggleSiteLayouts(this.checked)"> Site layouts')
+     && grp.includes('id="site-layouts-count"') && grp.includes('aria-controls="info-site-layouts"')
+     && grp.includes("Each site's layout in the month on screen. Draw and change them on Data → Locations."));
+  ok("🔴 SITE LAYOUTS: staff only (siteLayoutsStaff from checkRouteExportStaff); off by default; read only when ticked, for the month on screen",
+     src.includes("siteLayoutsStaff(RME.staff); })") && src.includes("if (g) g.hidden = !SLY.staff;")
+     && src.includes("const SLY = { on: false, staff: false, styles: null, data: null, h: null, month: undefined, loading: false };")
+     && src.includes("fetch('/api/site-layouts/map' + q, { credentials: 'same-origin' })") && src.includes("if (SLY.on) refreshSiteLayouts();")
+     && /function applyFilters\(\) \{[\s\S]{0,1200}if \(typeof SLY !== 'undefined' && SLY\.on\) refreshSiteLayouts\(\);/.test(src));
+  const ens = cut0(src, "function ensureSiteLayoutLayers(", "\n    }\n");
+  ok("SITE LAYOUTS: re-added on style.load through styleReady(), under the basemap's names (labelAnchor)",
+     /if\s*\(\s*!styleReady\(\)\s*\)\s*return;/.test(ens) && ens.includes("before: () => labelAnchor()") && ens.includes("SLY.h.reinstall();")
+     && src.includes("if (typeof SLY !== 'undefined' && SLY.h) ensureSiteLayoutLayers();"));
+  const js = fs.readFileSync(path.join(__dirname, "..", "..", "map", "site-layouts.js"), "utf8").replace(/\r\n?/g, "\n");
+  ok("SITE LAYOUTS: site-layouts.js draws from the style table it is given; sizes in metres with zoom top-level (GL drops a nested zoom)",
+     js.includes("window.WSLayouts = { install, metres, centroid, areaM2, bearing };") && !/once\(['"]idle/.test(js)
+     && /\["coalesce", \["get", "_m"\], 1\.6\]/.test(js) && !/\["\*",[^\]]*\["zoom"\]/.test(js));
+  ok("SITE LAYOUTS: a basemap switch puts back the features as sent (not the prepared copy)",
+     js.includes("raw = list;") && js.includes("setData(raw);"));
+  // 31 Oct: a refused read had re-run itself from its own finally (SLY.month never set) - hundreds of 401s a second.
+  const slyFn = html.slice(html.indexOf("async function refreshSiteLayouts"), html.indexOf("function toggleSiteLayouts"));
+  ok("SITE LAYOUTS: a failed read is not retried for the same month until the box is ticked again",
+        slyFn.includes("SLY.failed === month") && slyFn.includes("SLY.failed = month;")
+        && slyFn.includes("SLY.tried !== siteLayoutMonth()") && !slyFn.includes("SLY.month !== siteLayoutMonth()")
+        && /function toggleSiteLayouts\(on\) \{\s*SLY\.on = !!on;\s*SLY\.failed = undefined;/.test(html));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

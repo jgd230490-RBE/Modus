@@ -789,10 +789,18 @@ for (const banned of ["FormData(", "multipart/form-data"]) {
   const _of0 = code.indexOf("function OrgFile(");
   const _of1 = code.indexOf("\nfunction ", _of0 + 10);
   const _ofBody = _of0 < 0 ? "" : code.slice(_of0, _of1);
+  // NARROWED 31 Oct 2026 (task 4c PR 1, approved mockup): a SECOND chooser, Data -> Locations -> Site layout -> Bring
+  // in a drawing (planners and admins). It sends the drawing itself as the request body (no FormData, no multipart),
+  // which the server reads, holds and places only when told; still no spreadsheet or ticket upload, no OCR.
+  const _sl0 = code.indexOf("function SiteLayoutCard(");
+  const _sl1 = code.indexOf("\nfunction ", _sl0 + 10);
+  const _slBody = _sl0 < 0 ? "" : code.slice(_sl0, _sl1);
   for (const banned of ['type="file"', ".files["]) {
-    ok(`no upload path: ${banned} appears only in the organisation file chooser`,
-       code.split(banned).length - 1 === 1 && _ofBody.includes(banned));
+    ok(`no upload path: ${banned} appears only in the organisation file chooser and the site layout's drawing chooser`,
+       code.split(banned).length - 1 === 2 && _ofBody.includes(banned) && _slBody.includes(banned));
   }
+  ok("...the drawing goes as the body to /site-layouts/read (no FormData)",
+     _slBody.includes("/site-layouts/read?") && _slBody.includes('"Content-Type": "application/octet-stream" }, body: file'));
   ok("...which reads the file as text and posts JSON (no FormData, no multipart)",
      _ofBody.includes("f.text()") && _ofBody.includes('postJSON("/admin/tenant/import?replace=1", file.pkg)'));
 }
@@ -4572,6 +4580,47 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
     src.includes("{!zoneForm.location_id && <p className=\"text-[13px] text-amber-800\">\n                      Does nothing until it is <strong>attached to a route</strong>"));
   ok("SIM V2 polish: an area's coordinates open in the form rounded to 6 decimals (no float noise such as -0.8874029999999999)",
     src.includes('lat: a.point ? String(Math.round(a.point[1] * 1e6) / 1e6) : ""') && src.includes('lon: a.point ? String(Math.round(a.point[0] * 1e6) / 1e6) : ""'));
+}
+
+// 31 Oct 2026 (task 4c PR 1, the approved mockup notes\site-layouts-mockup-1030\): the Site layout card on Data -> Locations
+{
+  const a = code.indexOf("function SiteLayoutCard(");
+  const b = code.indexOf("\nfunction ", a + 10);
+  const card = a < 0 ? "" : code.slice(a, b);
+  ok("⭐ SITE LAYOUT: a card under Site areas for a saved location, with the page's ONE map and the three refs",
+     card.length > 3000 && src.includes('{form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef} />}')
+     && src.lastIndexOf("<SiteLayoutCard ") > src.indexOf('data-site-areas="1"') && card.includes('data-site-layout="1"'));
+  ok("SITE LAYOUT: a reader (no Locations editor, P5) gets the card for the site they located, so a planner can change it (seen in Chrome)",
+     src.includes("if(!canEdit && feat) setReadLoc({ id, name: feat.properties.name || id });")
+     && src.includes('{!form && readLoc && (') && src.includes('<SiteLayoutCard locId={readLoc.id} mapRef={mapObj}')
+     && (src.match(/<SiteLayoutCard /g) || []).length === 2);
+  ok("SITE LAYOUT: planners and admins change it (Q6: can_approve), not only an admin login",
+     card.includes("const canLayout = !!(ACCESS.info && ACCESS.info.can_approve);") && !card.includes("isAdminLogin"));
+  ok("SITE LAYOUT: the drawing code is the map's own file, loaded once when needed (one look in one place)",
+     code.includes('s.src = "/map/site-layouts.js?v=1";') && card.includes("WSLayouts.install(m, styles, { prefix: \"dm-layout\" })")
+     && !/<script src="\/map\/site-layouts\.js/.test(html));
+  ok("SITE LAYOUT: put back after a basemap switch (the page's style.load), and cleared when the card closes",
+     src.includes('m.on("style.load", () => { addNetworkLayers(m); if(layoutReinstallRef.current) layoutReinstallRef.current(); });')
+     && card.includes("if(handleRef.current) handleRef.current.setData([]); pickRef.current = null;"));
+  ok("SITE LAYOUT: a survey point is placed by the map click, ahead of route and node picks",
+     src.indexOf("if(layoutPickRef.current){ layoutPickRef.current(e.lngLat.lng, e.lngLat.lat); return; }") > src.indexOf("if(areaPlaceRef.current){")
+     && src.indexOf("if(layoutPickRef.current){") < src.indexOf('if(modeRef.current === "add"){ (cbRef.current.placeAt'));
+  ok("SITE LAYOUT: read -> table -> survey points -> place; phases added, edited and deleted with their version",
+     card.includes("${API}/site-layouts/read?") && card.includes("${API}/site-layouts/fit?") && card.includes("/site-layout/place`")
+     && card.includes("/site-layout/phases`") && card.includes('method: "PATCH"') && card.includes("?version=${p.version}`, { method: \"DELETE\" }")
+     && card.includes("version: edit.version") && card.includes("if(j.ask_grid){"));
+  ok("SITE LAYOUT: every failure through errSay / errMsg (no status number, no raw reply)",
+     (card.match(/errSay\("/g) || []).length === 5 && card.includes("setFit({ error: errMsg(e) })") && !/\$\{e\}|\.status\b|r\.status/.test(card));
+  ok("SITE LAYOUT: the words are few and name no back end (no transform, grid file, library or endpoint)",
+     !/OSTN|pyproj|ezdxf|EPSG|transform|endpoint|\bAPI\b|server|\bheld\b|\bhold\b/i.test(card.replace(/\$\{API\}/g, "").replace(/"Content-Type"/g, ""))
+     && card.includes(">Site layout<") && card.includes("No layout yet.") && card.includes("Bring in a drawing") && card.includes("Place two or more survey points on the map."));
+  ok("SITE LAYOUT: the table's choices come from the server's one style table, grouped Lines / Areas / Symbols / Other",
+     card.includes("${API}/site-layouts/styles") && ["Lines", "Areas", "Symbols", "Other"].every(g => card.includes(`<optgroup label="${g}">`)));
+  ok("SITE LAYOUT: a fit over the limit or with a flagged scale needs 'Place anyway'; the gate check is shown",
+     card.includes("(!siteGrid || (fit && !fit.error && (!(fit.over || fit.scale_flag) || anyway)))") && card.includes("{fit && (fit.over || fit.scale_flag) && <label") && card.includes("Place anyway") && card.includes("m from {g.gate}."));
+  // 31 Oct: the UI audit read the sr-only file input as clipped text; the button opens it, so it is not drawn at all
+  ok("SITE LAYOUT: the drawing's file input is opened by the button and not drawn (display none, out of the tab order)",
+     card.includes('style={{ display: "none" }} aria-label="Drawing to bring in" tabIndex={-1}') && card.includes("fileRef.current.click()"));
 }
 
 console.log();

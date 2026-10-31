@@ -35,6 +35,7 @@ Run:  python3 backend/tests/test_week1.py
 """
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -1025,9 +1026,18 @@ _backend_src = ""
 for _fn in sorted(os.listdir(BACKEND)):
     if _fn.endswith(".py"):
         _backend_src += open(os.path.join(BACKEND, _fn), encoding="utf-8").read()
+# NARROWED 31 Oct 2026 (task 4c PR 1, the approved site layouts plan): 'File(' is FastAPI's form-file marker, not
+# zipfile.ZipFile( (a shapefile zip / KMZ read in memory). The one way a file reaches the server is the site layout's
+# drawing, sent as the raw request body to /api/site-layouts/read (no form, no multipart), read in a stream capped at 10 MB.
 for _banned in ("UploadFile", "File(", "multipart", "python-multipart"):
+    _hits = len(re.findall(r"(?<!Zip)File\(", _backend_src)) if _banned == "File(" else _backend_src.count(_banned)
     ok(f"⭐ no upload path in the backend: {_banned!r} is absent",
-       _banned not in _backend_src, "found in backend/*.py")
+       _hits == 0, "found in backend/*.py")
+_main_src = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
+ok("⭐ ...the one file the server takes is the site layout's drawing, as the raw body of /api/site-layouts/read, capped at 10 MB",
+   _main_src.count("request.stream()") == 1 and '@app.post("/api/site-layouts/read")' in _main_src
+   and _main_src.index("request.stream()") > _main_src.index('@app.post("/api/site-layouts/read")')
+   and "if len(buf) > site_layout_import.MAX_BYTES:" in _main_src)
 _reqs = open(os.path.join(BACKEND, "requirements.txt"), encoding="utf-8").read()
 ok("⭐ ...and python-multipart is not a dependency", "multipart" not in _reqs)
 

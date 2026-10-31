@@ -726,6 +726,16 @@ def validate(doc, network=None):
                     for k in cb:
                         if k not in COUNCIL_BREAK_MEASURES:
                             p.append(f"tenant.council_breaks.{k} is not a measure (movements or carbon)")
+    # 31 Oct 2026 (task 4c): the organisation's "in the file -> becomes" table for drawings brought in
+    sl = doc.get("site_layouts")
+    if sl is not None:
+        if not isinstance(sl, dict):
+            p.append("site_layouts must be an object")
+        else:
+            import site_layouts as _sl
+            mp = _sl.import_map_problem(sl.get("import_map"))
+            if mp:
+                p.append(mp)
     for w in doc.get("seasonal_restrictions") or []:
         if not isinstance(w, dict) or not w.get("name"):
             p.append("every seasonal restriction needs a name")

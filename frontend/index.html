@@ -12773,6 +12773,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // init, and closes over whatever it can see then.
   const gatePlaceRef = useRef(false);
   const areaPlaceRef = useRef(false);     // 28 Oct 2026 (simulation v2): the next map click places an area
+  // 31 Oct 2026 (task 4c): the site layout card's drawing on this map, its survey-point click, its re-add after a basemap switch
+  const layoutHandle = useRef(null), layoutPickRef = useRef(null), layoutReinstallRef = useRef(null);
+  // the location a reader located (no editor for them, P5): its Site layout card, which a planner changes (Q6)
+  const [readLoc, setReadLoc] = useState(null);
 
   // ---- location management (Phase 1) ----
   const [mode, setMode] = useState("view");        // 'view' | 'add' | 'edit'
@@ -12951,6 +12955,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         // gate can be dropped on top of the site it belongs to without selecting it
         if(gatePlaceRef.current){ (cbRef.current.placeGateAt || (()=>{}))(e.lngLat.lng, e.lngLat.lat); return; }
         if(areaPlaceRef.current){ (cbRef.current.placeAreaAt || (()=>{}))(e.lngLat.lng, e.lngLat.lat); return; }
+        if(layoutPickRef.current){ layoutPickRef.current(e.lngLat.lng, e.lngLat.lat); return; }
         if(modeRef.current === "add"){ (cbRef.current.placeAt || (()=>{}))(e.lngLat.lng, e.lngLat.lat); return; }
         if(justDragged.current) return;
         const box = [[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]];
@@ -12966,7 +12971,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       m.on("mouseleave", "route-line", () => { m.getCanvas().style.cursor = modeRef.current === "add" ? "crosshair" : ""; });
       setMapReady(true);
     });
-    m.on("style.load", () => { addNetworkLayers(m); });  // re-add after a basemap switch
+    m.on("style.load", () => { addNetworkLayers(m); if(layoutReinstallRef.current) layoutReinstallRef.current(); });  // re-add after a basemap switch
     // Mapbox measures its container on init, before the flex/grid layout has settled,
     // so nudge it to re-measure once things are laid out (and whenever the window resizes).
     const doResize = () => { try { m.resize(); } catch(e){} };
@@ -13220,6 +13225,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const locateNode = (id) => {
     const feat = nodesFC.current.features.find(f => f.properties.id === id);
     openEditForNode(id);
+    if(!canEdit && feat) setReadLoc({ id, name: feat.properties.name || id });
     const m = mapObj.current;
     if(feat && m) m.easeTo({ center: feat.geometry.coordinates, zoom: Math.max(m.getZoom(), 11), duration: 700 });
   };
@@ -14307,6 +14313,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               <p className="text-[13px] text-slate-400">Click a marker to edit it, or drag it to move it. Deleting a location deletes its routes.</p>
             )}
 
+            {/* 31 Oct 2026 (task 4c PR 1): a reader has no editor; the site they located shows its Site layout */}
+            {!form && readLoc && (
+              <div className="space-y-3" data-read-loc={readLoc.id}>
+                <div className="text-sm font-medium text-slate-700">{readLoc.name}</div>
+                <SiteLayoutCard locId={readLoc.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef} />
+              </div>
+            )}
             {form && (
               <div className="space-y-3">
                 <div ref={locHeadRef} tabIndex={-1} className="ed-head text-sm font-medium text-slate-700">{form.id ? `Editing ${form.id}` : "New location"}</div>
@@ -14827,6 +14840,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   {areaMsg && <p className="text-[13px] text-slate-500 mt-1.5">{areaMsg}</p>}
                 </div>
                 )}
+                {/* 31 Oct 2026 (task 4c PR 1): the site's logistics layout, its phases and drawings brought in */}
+                {form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef} />}
                 {!form.id && (
                   <p className="text-[13px] text-slate-400">
                     Gates can be added once the location has been created.
@@ -15544,6 +15559,298 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         </div>
       </div>
       )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ 31 Oct 2026 (task 4c PR 1): site layouts
+// A site's logistics layout on Data -> Locations: its phases (months, rename, delete) and "Bring in a drawing" (DXF,
+// KML, KMZ, GeoJSON, a shapefile zip): the server reads the file and holds it, the table says what each layer becomes
+// (pre-filled from the organisation's last choices), a site-grid drawing is placed by its survey points, then it is
+// placed on a phase. Drawn on the page's ONE map by /map/site-layouts.js (the Route map draws with the same file).
+// Planners and admins change it (Q6); everyone else who opens the page reads it. The drawing tools come in PR 2.
+let SL_STYLES = null;
+let SL_JS = null;
+function loadSiteLayoutsJs(){
+  if(window.WSLayouts) return Promise.resolve(true);
+  if(!SL_JS) SL_JS = new Promise((res) => {
+    const s = document.createElement("script");
+    s.src = "/map/site-layouts.js?v=1"; s.onload = () => res(true); s.onerror = () => { SL_JS = null; res(false); };
+    document.head.appendChild(s);
+  });
+  return SL_JS;
+}
+const SL_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function slMonth(v){ const m = /^(\d{4})-(\d{2})$/.exec(v || ""); return m ? `${SL_MONTHS[+m[2] - 1]} ${m[1]}` : ""; }
+function slMonths(p){
+  if(!p.month_from && !p.month_to) return "every month";
+  if(p.month_from && p.month_to) return `${slMonth(p.month_from)} – ${slMonth(p.month_to)}`;
+  return p.month_from ? `from ${slMonth(p.month_from)}` : `to ${slMonth(p.month_to)}`;
+}
+function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstallRef }){
+  const canLayout = !!(ACCESS.info && ACCESS.info.can_approve);
+  const [styles, setStyles] = useState(SL_STYLES);
+  const [lay, setLay] = useState(null);
+  const [shown, setShown] = useState("");
+  const [msg, setMsg] = useState("");
+  const [edit, setEdit] = useState(null);
+  const [imp, setImp] = useState(null);
+  const [choices, setChoices] = useState({});
+  const [pts, setPts] = useState({});
+  const [picking, setPicking] = useState("");
+  const [fit, setFit] = useState(null);
+  const [where, setWhere] = useState("new");
+  const [ph, setPh] = useState({ name: "", month_from: "", month_to: "" });
+  const [keep, setKeep] = useState(false);
+  const [anyway, setAnyway] = useState(false);
+  const [busy, setBusy] = useState("");
+  const fileRef = useRef(null);
+
+  const load = async (keepShown) => {
+    try {
+      const j = await okJSON(await fetch(`${API}/locations/${encodeURIComponent(locId)}/site-layout`));
+      setLay(j.layout);
+      const ids = ((j.layout && j.layout.phases) || []).map(p => p.id);
+      setShown(s => (keepShown && ids.includes(keepShown)) ? keepShown : (ids.includes(s) ? s : (ids[0] || "")));
+    } catch(e){ setLay(null); setMsg(errSay("Couldn't load the layout.", e)); }
+  };
+  useEffect(() => {
+    setImp(null); setEdit(null); setMsg(""); setPts({}); setFit(null); setPicking(""); setShown("");
+    load();
+    if(!SL_STYLES) fetch(`${API}/site-layouts/styles`).then(okJSON).then(j => { SL_STYLES = j; setStyles(j); }).catch(e => console.warn("Wayscope:", e));
+  }, [locId]);
+
+  // the shown phase on the map; cleared when the card goes
+  useEffect(() => {
+    const m = mapRef.current;
+    if(!m || !mapReady || !styles) return;
+    let gone = false;
+    loadSiteLayoutsJs().then(ok => {
+      if(!ok || gone || !window.WSLayouts) return;
+      if(!handleRef.current) handleRef.current = WSLayouts.install(m, styles, { prefix: "dm-layout" });
+      const h = handleRef.current;
+      reinstallRef.current = () => { try { h.reinstall(); } catch(e){ console.warn("Wayscope:", e); } };
+      const p = ((lay && lay.phases) || []).find(x => x.id === shown);
+      h.ready.then(() => { if(!gone) h.setData(p ? p.features : []); });
+    });
+    return () => { gone = true; };
+  }, [lay, shown, styles, mapReady]);
+  useEffect(() => () => { if(handleRef.current) handleRef.current.setData([]); pickRef.current = null; }, []);
+  useEffect(() => {
+    pickRef.current = picking ? (lon, lat) => { setPts(p => ({ ...p, [picking]: { lon: +lon.toFixed(7), lat: +lat.toFixed(7) } })); setPicking(""); } : null;
+    const m = mapRef.current;
+    try { if(m) m.getCanvas().style.cursor = picking ? "crosshair" : ""; } catch(e){}
+  }, [picking]);
+
+  const fitTo = (b) => { const m = mapRef.current; if(m && b) try { m.fitBounds(b, { padding: 40, duration: 600, maxZoom: 19 }); } catch(e){} };
+  const phases = (lay && lay.phases) || [];
+
+  const readFile = async (file, grid) => {
+    if(!file) return;
+    setBusy("read"); setMsg(""); setFit(null); setPts({}); setPicking("");
+    try {
+      const q = new URLSearchParams({ location_id: locId, name: file.name, grid: grid || "auto" });
+      const res = await fetch(`${API}/site-layouts/read?${q}`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file });
+      const j = await okJSON(res);
+      if(j.ask_grid){ setImp({ file, ask: j.ask_grid }); return; }
+      setImp({ file, ...j });
+      setChoices(Object.fromEntries(j.rows.map(r => [r.key, r.becomes])));
+      setWhere("new"); setAnyway(false);
+      setPh({ name: file.name.replace(/\.[^.]+$/, "").slice(0, 80), month_from: "", month_to: "" });
+      fitTo(j.bounds);
+    } catch(e){ setImp(null); setMsg(errSay("Couldn't read the drawing.", e)); }
+    finally { setBusy(""); if(fileRef.current) fileRef.current.value = ""; }
+  };
+
+  // the survey-point fit, from the points placed so far (two or more)
+  useEffect(() => {
+    if(!imp || !imp.import_id || !(imp.control || []).length) return;
+    const placed = Object.entries(pts).filter(([, v]) => v && isFinite(v.lon) && isFinite(v.lat));
+    if(placed.length < 2){ setFit(null); return; }
+    const q = new URLSearchParams({ location_id: locId, import_id: imp.import_id, pts: placed.map(([k, v]) => `${k}:${v.lon},${v.lat}`).join(";") });
+    let gone = false;
+    fetch(`${API}/site-layouts/fit?${q}`).then(okJSON).then(j => { if(!gone){ setFit(j); fitTo(j.bounds); } })
+      .catch(e => { if(!gone) setFit({ error: errMsg(e) }); });
+    return () => { gone = true; };
+  }, [pts, imp && imp.import_id]);
+
+  const siteGrid = !!(imp && (imp.control || []).length);
+  const canPlace = imp && imp.import_id && (!siteGrid || (fit && !fit.error && (!(fit.over || fit.scale_flag) || anyway))) && busy === "";
+  const place = async () => {
+    if(!canPlace) return;
+    setBusy("place"); setMsg("");
+    const target = phases.find(p => p.id === where);
+    const body = { import_id: imp.import_id, choices, keep_colours: keep, place_anyway: anyway, where,
+      points: Object.entries(pts).map(([name, v]) => ({ name, lon: v.lon, lat: v.lat })),
+      phase: where === "new" ? { name: ph.name, month_from: ph.month_from || null, month_to: ph.month_to || null } : null,
+      version: target ? target.version : null };
+    try {
+      const j = await okJSON(await fetch(`${API}/locations/${encodeURIComponent(locId)}/site-layout/place`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+      setImp(null); setFit(null); setPts({});
+      setMsg(`Placed ${j.placed} on “${j.phase.name}”.`);
+      await load(j.phase.id);
+    } catch(e){ setMsg(errSay("Not placed.", e)); }
+    finally { setBusy(""); }
+  };
+
+  const savePhase = async () => {
+    if(!edit) return;
+    const body = { name: edit.name, month_from: edit.month_from || null, month_to: edit.month_to || null };
+    try {
+      if(edit.id){
+        await okJSON(await fetch(`${API}/site-layouts/phases/${encodeURIComponent(edit.id)}`,
+          { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, version: edit.version }) }));
+        setEdit(null); await load(edit.id);
+      } else {
+        const j = await okJSON(await fetch(`${API}/locations/${encodeURIComponent(locId)}/site-layout/phases`,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+        setEdit(null); await load(j.phase_id);
+      }
+      setMsg("Saved.");
+    } catch(e){ setMsg(errSay("Not saved.", e)); }
+  };
+  const deletePhase = async (p) => {
+    if(!confirm(`Delete “${p.name}” and its ${p.things} things?`)) return;
+    try {
+      await okJSON(await fetch(`${API}/site-layouts/phases/${encodeURIComponent(p.id)}?version=${p.version}`, { method: "DELETE" }));
+      setEdit(null); setMsg(`Deleted “${p.name}”.`); await load();
+    } catch(e){ setMsg(errSay("Not deleted.", e)); }
+  };
+
+  const groups = useMemo(() => {
+    const g = { line: [], area: [], sym: [], other: [] };
+    ((styles && styles.choices) || []).forEach(c => { const k = c.value.split(":")[0]; (g[k] || g.other).push(c); });
+    return g;
+  }, [styles]);
+  const leftOut = imp && imp.report ? Object.entries(imp.report.left_out || {}) : [];
+
+  return (
+    <div className="rounded-lg border border-slate-200 p-2.5" data-site-layout="1">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="block text-sm font-medium text-slate-700">Site layout</span>
+        {canLayout && !imp && !edit && (
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1" style={{ whiteSpace: "nowrap" }}>
+            <button onClick={() => setEdit({ id: null, name: "", month_from: "", month_to: "" })} className="text-[13px] font-semibold text-[color:var(--navy)] hover:underline">+ Add a phase</button>
+            {<button onClick={() => fileRef.current && fileRef.current.click()} disabled={busy !== ""} className="text-[13px] font-semibold text-[color:var(--navy)] hover:underline disabled:opacity-50">{busy === "read" ? "Reading…" : "Bring in a drawing"}</button>}
+          </span>
+        )}
+      </div>
+      <input ref={fileRef} type="file" accept=".dxf,.dwg,.kml,.kmz,.geojson,.json,.zip" style={{ display: "none" }} aria-label="Drawing to bring in" tabIndex={-1}
+        onChange={e => readFile(e.target.files && e.target.files[0])} />
+      {!phases.length && !imp && !edit && <p className="text-[13px] text-slate-500 mt-1">No layout yet.</p>}
+      {phases.length > 0 && (
+        <ul className="mt-1 space-y-1" data-site-layout-phases="1">
+          {phases.map(p => (
+            <li key={p.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs rounded px-1.5 py-1 hover:bg-slate-50" data-site-layout-phase={p.id}>
+              <button onClick={() => setShown(p.id)} aria-pressed={shown === p.id} className={"font-medium text-left " + (shown === p.id ? "text-[color:var(--navy)] underline" : "text-slate-700 hover:underline")}
+                title="Show on the map">{p.name}</button>
+              <span className="text-slate-500">{slMonths(p)} · {p.things} things</span>
+              {canLayout && !edit && !imp && (
+                <span className="ml-auto flex items-center gap-2">
+                  <button onClick={() => setEdit({ id: p.id, name: p.name, month_from: p.month_from || "", month_to: p.month_to || "", version: p.version })} className="text-[13px] font-semibold text-[color:var(--navy)] hover:underline" aria-label={`Edit ${p.name}`}>Edit</button>
+                  <button onClick={() => deletePhase(p)} className="text-[13px] font-semibold hover:underline" style={{ color: "var(--red)" }} aria-label={`Delete ${p.name}`}>Delete</button>
+                </span>
+              )}
+            </li>))}
+        </ul>
+      )}
+      {edit && (
+        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2" data-site-layout-phase-form="1">
+          <input value={edit.name} onChange={e => setEdit(x => ({ ...x, name: e.target.value }))} placeholder="Phase name (e.g. Piling and pier bases)" aria-label="Phase name" maxLength={80}
+            className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm" />
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block"><span className="text-sm font-medium text-slate-700">From</span>
+              <input type="month" value={edit.month_from} onChange={e => setEdit(x => ({ ...x, month_from: e.target.value }))} aria-label="Phase from month"
+                className="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm" /></label>
+            <label className="block"><span className="text-sm font-medium text-slate-700">To</span>
+              <input type="month" value={edit.month_to} onChange={e => setEdit(x => ({ ...x, month_to: e.target.value }))} aria-label="Phase to month"
+                className="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm" /></label>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={savePhase} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs" style={{ background: "var(--navy)" }}>{edit.id ? "Save phase" : "Add phase"}</button>
+            <button onClick={() => setEdit(null)} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
+          </div>
+        </div>
+      )}
+      {imp && imp.ask && (
+        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2" data-site-layout-ask="1">
+          <p className="text-[13px] text-slate-700">{imp.ask}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => readFile(imp.file, "bng")} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs" style={{ background: "var(--navy)" }}>On National Grid</button>
+            <button onClick={() => readFile(imp.file, "site")} className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50">On the site's own grid</button>
+            <button onClick={() => setImp(null)} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
+          </div>
+        </div>
+      )}
+      {imp && imp.import_id && (
+        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2" data-site-layout-import="1">
+          <p className="text-[13px] text-slate-700"><strong>{imp.report.file}</strong>: {imp.report.things} things on {imp.report.layers} layers.</p>
+          {leftOut.length > 0 && <p className="text-[13px] text-slate-500">Left out: {leftOut.map(([k, n]) => `${k} (${n})`).join(", ")}.</p>}
+          {(imp.gate_check || []).map((g, i) => <p key={i} className="text-[13px] text-slate-500" data-gate-check="1">{g.thing} is {g.m.toFixed(2)} m from {g.gate}.</p>)}
+          <ul className="text-xs divide-y divide-slate-200 border-y border-slate-200" data-site-layout-map="1" aria-label="What each layer becomes">
+            {imp.rows.map(r => (
+              <li key={r.key} className="py-1.5 space-y-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-slate-700 break-all">{r.color && <span aria-hidden="true" className="inline-block w-2.5 h-2.5 rounded-sm mr-1.5 align-middle" style={{ background: r.color }}></span>}{r.key}</span>
+                  <span className="tabular-nums text-slate-500">{r.n}</span>
+                </div>
+                <select value={choices[r.key] || "skip"} onChange={e => setChoices(c => ({ ...c, [r.key]: e.target.value }))} aria-label={`${r.key} becomes`}
+                  className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs bg-white">
+                  <optgroup label="Lines">{groups.line.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</optgroup>
+                  <optgroup label="Areas">{groups.area.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</optgroup>
+                  <optgroup label="Symbols">{groups.sym.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</optgroup>
+                  <optgroup label="Other">{groups.other.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</optgroup>
+                </select>
+              </li>))}
+          </ul>
+          {siteGrid && (
+            <div className="space-y-1.5" data-site-layout-points="1">
+              <span className="block text-sm font-medium text-slate-700">Where is it?</span>
+              <p className="text-[13px] text-slate-500">Place two or more survey points on the map.</p>
+              {imp.control.map(c => {
+                const v = pts[c.name], miss = fit && fit.misses ? (fit.misses.find(x => x.name === c.name) || null) : null;
+                return (
+                  <div key={c.name} className="flex flex-wrap items-center gap-2 text-xs" data-survey-point={c.name}>
+                    <span className="font-medium text-slate-700 w-12">{c.name}</span>
+                    <span className="text-slate-500">{v ? `${v.lat.toFixed(6)}, ${v.lon.toFixed(6)}` : "not placed"}</span>
+                    {miss && <span className="text-slate-500">misses {miss.m.toFixed(2)} m</span>}
+                    <button onClick={() => setPicking(p => p === c.name ? "" : c.name)} className={"ml-auto rounded-lg px-2 py-1 text-xs font-semibold border " + (picking === c.name ? "text-white border-transparent" : "border-slate-300 text-slate-600 hover:bg-slate-50")}
+                      style={picking === c.name ? { background: "var(--blue)" } : undefined} aria-label={`Place ${c.name} on the map`}>{picking === c.name ? "Click the map…" : "Place"}</button>
+                  </div>);
+              })}
+              {fit && fit.words && <p className="text-[13px] text-slate-700" data-fit-words="1">{fit.words}</p>}
+              {fit && fit.error && <p className="text-[13px]" style={{ color: "var(--red)" }}>{fit.error}</p>}
+              {fit && (fit.gate_check || []).map((g, i) => <p key={i} className="text-[13px] text-slate-500">{g.thing} is {g.m.toFixed(2)} m from {g.gate}.</p>)}
+              {fit && (fit.over || fit.scale_flag) && <label className="flex items-center gap-1.5 text-xs text-slate-700"><input type="checkbox" checked={anyway} onChange={e => setAnyway(e.target.checked)} />Place anyway</label>}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block col-span-2"><span className="text-sm font-medium text-slate-700">Place on</span>
+              <select value={where} onChange={e => setWhere(e.target.value)} aria-label="Place on"
+                className="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+                <option value="new">A new phase</option>
+                {phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select></label>
+            {where === "new" && <>
+              <input value={ph.name} onChange={e => setPh(x => ({ ...x, name: e.target.value }))} placeholder="Phase name" aria-label="New phase name" maxLength={80}
+                className="col-span-2 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm" />
+              <label className="block"><span className="text-sm font-medium text-slate-700">From</span>
+                <input type="month" value={ph.month_from} onChange={e => setPh(x => ({ ...x, month_from: e.target.value }))} aria-label="New phase from month"
+                  className="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm" /></label>
+              <label className="block"><span className="text-sm font-medium text-slate-700">To</span>
+                <input type="month" value={ph.month_to} onChange={e => setPh(x => ({ ...x, month_to: e.target.value }))} aria-label="New phase to month"
+                  className="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm" /></label>
+            </>}
+          </div>
+          <label className="flex items-center gap-1.5 text-xs text-slate-700"><input type="checkbox" checked={keep} onChange={e => setKeep(e.target.checked)} />Keep the file's colours</label>
+          <div className="flex items-center gap-2">
+            <button onClick={place} disabled={!canPlace} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs disabled:opacity-50" style={{ background: "var(--navy)" }}>{busy === "place" ? "Placing…" : "Place it"}</button>
+            <button onClick={() => { setImp(null); setFit(null); setPts({}); setPicking(""); }} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
+          </div>
+        </div>
+      )}
+      {msg && <p className="text-[13px] text-slate-500 mt-1.5" role="status">{msg}</p>}
     </div>
   );
 }

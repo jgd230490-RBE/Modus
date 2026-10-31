@@ -1,0 +1,778 @@
+{
+ "type": "FeatureCollection",
+ "name": "tilton-logistics",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Haul roads",
+    "name": "Top road and terrace ramp",
+    "stroke": "#D97706",
+    "stroke-width": 4
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -0.880001,
+      52.643043
+     ],
+     [
+      -0.880889,
+      52.643851
+     ],
+     [
+      -0.882666,
+      52.64466
+     ],
+     [
+      -0.884442,
+      52.645199
+     ],
+     [
+      -0.886219,
+      52.646097
+     ],
+     [
+      -0.887403,
+      52.646726
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Haul roads",
+    "name": "Spoil spur",
+    "stroke": "#D97706",
+    "stroke-width": 4
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -0.886219,
+      52.646097
+     ],
+     [
+      -0.885479,
+      52.646996
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Haul roads",
+    "name": "Laydown spur",
+    "stroke": "#D97706",
+    "stroke-width": 4
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -0.882666,
+      52.64466
+     ],
+     [
+      -0.882074,
+      52.645828
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "One-way",
+    "name": "Exit loop",
+    "stroke": "#B45309",
+    "stroke-width": 3
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -0.880889,
+      52.643851
+     ],
+     [
+      -0.882356,
+      52.64451
+     ],
+     [
+      -0.883392,
+      52.643701
+     ],
+     [
+      -0.883984,
+      52.642713
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Hoarding",
+    "name": "Hoarding 1",
+    "stroke": "#1E3A8A",
+    "stroke-width": 3
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -0.8855413,
+      52.6436726
+     ],
+     [
+      -0.8853018,
+      52.6426038
+     ],
+     [
+      -0.8840499,
+      52.6427075
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Hoarding",
+    "name": "Hoarding 2",
+    "stroke": "#1E3A8A",
+    "stroke-width": 3
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -0.8839181,
+      52.6427185
+     ],
+     [
+      -0.8800669,
+      52.6430375
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Hoarding",
+    "name": "Hoarding 3",
+    "stroke": "#1E3A8A",
+    "stroke-width": 3
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -0.8799351,
+      52.6430485
+     ],
+     [
+      -0.8786832,
+      52.6431522
+     ],
+     [
+      -0.8789224,
+      52.644221
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Heras fencing",
+    "name": "Deck laydown fence",
+    "stroke": "#6B7280",
+    "stroke-width": 2
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -0.8810856,
+      52.6462777
+     ],
+     [
+      -0.8810856,
+      52.6453783
+     ],
+     [
+      -0.8830624,
+      52.6453783
+     ],
+     [
+      -0.8830624,
+      52.6462777
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Heras fencing",
+    "name": "Pier bases fence",
+    "stroke": "#6B7280",
+    "stroke-width": 2
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -0.8885706,
+      52.6472827
+     ],
+     [
+      -0.8862354,
+      52.6472827
+     ],
+     [
+      -0.8862354,
+      52.6461693
+     ],
+     [
+      -0.8885706,
+      52.6461693
+     ],
+     [
+      -0.8885706,
+      52.6472827
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Barriers",
+    "name": "Ramp barrier",
+    "stroke": "#DC2626",
+    "stroke-width": 3
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -0.8826231,
+      52.6447123
+     ],
+     [
+      -0.8843991,
+      52.6452513
+     ],
+     [
+      -0.8861576,
+      52.6461419
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Pedestrian route",
+    "name": "Welfare to deck",
+    "stroke": "#16A34A",
+    "stroke-width": 2
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -0.8797293,
+      52.6434284
+     ],
+     [
+      -0.8816886,
+      52.644215
+     ],
+     [
+      -0.8824588,
+      52.6450688
+     ],
+     [
+      -0.8828742,
+      52.6461952
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Welfare",
+    "name": "Cabin 1",
+    "stroke": "#0E7490",
+    "fill": "#67E8F9",
+    "fill-opacity": 0.5
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -0.8795667,
+       52.6434282
+      ],
+      [
+       -0.8795727,
+       52.643455
+      ],
+      [
+       -0.8797162,
+       52.6434431
+      ],
+      [
+       -0.8797102,
+       52.6434164
+      ],
+      [
+       -0.8795667,
+       52.6434282
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Welfare",
+    "name": "Cabin 2",
+    "stroke": "#0E7490",
+    "fill": "#67E8F9",
+    "fill-opacity": 0.5
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -0.8795082,
+       52.6434331
+      ],
+      [
+       -0.8795142,
+       52.6434598
+      ],
+      [
+       -0.8796576,
+       52.6434479
+      ],
+      [
+       -0.8796517,
+       52.6434212
+      ],
+      [
+       -0.8795082,
+       52.6434331
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Welfare",
+    "name": "Cabin 3",
+    "stroke": "#0E7490",
+    "fill": "#67E8F9",
+    "fill-opacity": 0.5
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -0.8794496,
+       52.643438
+      ],
+      [
+       -0.8794556,
+       52.6434647
+      ],
+      [
+       -0.8795991,
+       52.6434528
+      ],
+      [
+       -0.8795931,
+       52.6434261
+      ],
+      [
+       -0.8794496,
+       52.643438
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Welfare",
+    "name": "Cabin 4",
+    "stroke": "#0E7490",
+    "fill": "#67E8F9",
+    "fill-opacity": 0.5
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -0.879391,
+       52.6434428
+      ],
+      [
+       -0.879397,
+       52.6434695
+      ],
+      [
+       -0.8795405,
+       52.6434576
+      ],
+      [
+       -0.8795345,
+       52.6434309
+      ],
+      [
+       -0.879391,
+       52.6434428
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Parking",
+    "name": "Staff parking",
+    "stroke": "#4338CA",
+    "fill": "#A5B4FC",
+    "fill-opacity": 0.4
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -0.8793167,
+       52.6434438
+      ],
+      [
+       -0.8788774,
+       52.6434802
+      ],
+      [
+       -0.8789093,
+       52.6436227
+      ],
+      [
+       -0.8793486,
+       52.6435863
+      ],
+      [
+       -0.8793167,
+       52.6434438
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Loading",
+    "name": "Spoil loading bay",
+    "stroke": "#B45309",
+    "fill": "#FCD34D",
+    "fill-opacity": 0.45
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -0.8854924,
+       52.6468392
+      ],
+      [
+       -0.8852806,
+       52.6470964
+      ],
+      [
+       -0.8854656,
+       52.6471528
+      ],
+      [
+       -0.8856774,
+       52.6468956
+      ],
+      [
+       -0.8854924,
+       52.6468392
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Exclusion",
+    "name": "Lift exclusion zone",
+    "stroke": "#DC2626",
+    "fill": "#FCA5A5",
+    "fill-opacity": 0.45
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -0.886915,
+       52.6466502
+      ],
+      [
+       -0.8872106,
+       52.6467996
+      ],
+      [
+       -0.8873617,
+       52.6466889
+      ],
+      [
+       -0.8870662,
+       52.6465396
+      ],
+      [
+       -0.886915,
+       52.6466502
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Signs and points",
+    "name": "Gate 1 (in)",
+    "marker-symbol": "gate"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.880001,
+     52.643043
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Signs and points",
+    "name": "Gate 2 (out)",
+    "marker-symbol": "gate"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.883984,
+     52.642713
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Signs and points",
+    "name": "Marshal",
+    "marker-symbol": "marshal"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.8800169,
+     52.6431143
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Signs and points",
+    "name": "Marshal",
+    "marker-symbol": "marshal"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.884,
+     52.6427843
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Signs and points",
+    "name": "5 mph",
+    "marker-symbol": "speed5"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.880235,
+     52.6432984
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Signs and points",
+    "name": "Wheel wash",
+    "marker-symbol": "wheelwash"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.883392,
+     52.643701
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Signs and points",
+    "name": "Mobile crane",
+    "marker-symbol": "mobilecrane"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.887403,
+     52.646726
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Signs and points",
+    "name": "First aid",
+    "marker-symbol": "first_aid"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.8797746,
+     52.6434972
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Signs and points",
+    "name": "Fire point",
+    "marker-symbol": "fire_point"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.8797546,
+     52.6434082
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Signs and points",
+    "name": "Toilets",
+    "marker-symbol": "toilets"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.8793779,
+     52.6434575
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Signs and points",
+    "name": "Assembly point",
+    "marker-symbol": "assembly"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.8793605,
+     52.6436398
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Labels",
+    "name": "Deck and laydown"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.882074,
+     52.645828
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Labels",
+    "name": "Pier bases"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.887398,
+     52.6469237
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "Labels",
+    "name": "Spoil loading"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.8854817,
+     52.6468881
+    ]
+   }
+  }
+ ]
+}

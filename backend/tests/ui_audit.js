@@ -1035,6 +1035,24 @@ async function deepStops(page, store, meta, id, w) {
     }
   }
   if (id === "locations" && await tryClick(page, "main table tbody tr:visible")) { await page.waitForTimeout(500); await audit(page, store, meta("locations+edit", w)); }
+  // 31 Oct 2026 (task 4c PR 1): the demo's Tilton Viaduct site, its Site layout card. A planner or admin brings in the KML
+  // sample (the drawing chooser, on the run's DB COPY), so the table is measured, then places it on a new phase, so the
+  // phase list and the drawing on the map are; a reader is pictured as it reads
+  if (id === "locations" && await tryClick(page, 'main table tbody tr:visible:has-text("Tilton Viaduct site")')) {
+    await page.waitForSelector('[data-site-layout="1"]', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(600);
+    const chooser = page.locator('input[aria-label="Drawing to bring in"]');
+    if (await page.locator('[data-site-layout="1"] button', { hasText: "Bring in a drawing" }).count() && await chooser.count()) {
+      await chooser.setInputFiles(path.join(__dirname, "fixtures", "site_layouts", "tilton-logistics.kml")).catch(() => {});
+      await page.waitForSelector('[data-site-layout-import="1"]', { timeout: 20000 }).catch(() => {});
+      await audit(page, store, meta("locations+layout-import", w));
+      if (await clickText(page, '[data-site-layout-import="1"] button', "Place it")) {
+        await page.waitForSelector('[data-site-layout-phase]', { timeout: 15000 }).catch(() => {});
+        await page.waitForTimeout(1200);
+      }
+    }
+    await audit(page, store, meta("locations+site-layout", w));
+  }
   if (id === "lookahead") {
     for (const [k, t] of [["account", "Account"], ["horizon", "Horizon"]]) if (await clickText(page, '[data-guide="lookahead-tabs"] button', t)) await audit(page, store, meta("lookahead-" + k, w));
     await clickText(page, '[data-guide="lookahead-tabs"] button', "Commit");
