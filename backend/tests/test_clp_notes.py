@@ -435,6 +435,7 @@ ok("⭐ ...and that person gets ONE email (Q10) with the task, the CLP and the d
    and "Ask Melton BC" in SENT[0].get_content() and "Yard East" in SENT[0].get_content()
    and "Due 6 Nov 2026" in SENT[0].get_content() and "Nora North gave you a task" in SENT[0].get_content()
    and "#clp" in SENT[0].get_content(), str(SENT[0] if SENT else None)[:500])
+ok("...and on the demo it says so (the tenant's demo notice)", "DEMO · Fictional scheme" in (SENT[0].get_content() if SENT else ""))
 ok("🔴 the email names no team id", not re.search(r"IPT ?[1-6]", SENT[0].as_string() if SENT else "IPT1"))
 SENT.clear()
 r = clp_notes.add_task(Y1, {"words": "Type the Saturday hours on the gate", "for": "team"}, NORA, factors)

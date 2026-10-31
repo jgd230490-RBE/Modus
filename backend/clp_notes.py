@@ -479,7 +479,7 @@ def drop_all(clp_id):
 # --------------------------------------------------------------------------- #
 #  The one email (Q10)                                                         #
 # --------------------------------------------------------------------------- #
-def task_message(user, rec, words, due, by, settings):
+def task_message(user, rec, words, due, by, settings, demo_notice=None):
     from email.message import EmailMessage
     import users
     team = taxonomy.team_name(rec["team"]) if rec.get("team") else "All teams"
@@ -495,6 +495,8 @@ def task_message(user, rec, words, due, by, settings):
         due_words = f"Due {d.day} {clp_doc.MONTHS[d.month - 1]} {d.year}.\n\n"
     body = (f"{by} gave you a task on the CLP for {place} · {team}:\n\n{words}\n\n{due_words}"
             f"Open it: Plan → CLP documents, {users.app_url()}/#clp\n\n")
+    if demo_notice:
+        body += f"DEMO · {demo_notice}\n\n"
     msg.set_content(body + "Wayscope\n")
     return msg
 
@@ -509,8 +511,14 @@ def email_task(user_id, rec, words, due, by):
     if settings is None:
         return "unsent"
     try:
+        import config
+        import conversions
+        notice = ((config.load(conversions) or {}).get("tenant") or {}).get("demo_notice")
+    except Exception:  # noqa: BLE001
+        notice = None
+    try:
         import demo_request
-        demo_request.send(task_message(u, rec, words, due, by, settings), settings)
+        demo_request.send(task_message(u, rec, words, due, by, settings, notice), settings)
         return "sent"
     except Exception as e:  # noqa: BLE001
         print(f"clp_notes: task email FAILED {e.__class__.__name__}: {str(e)[:200]}")

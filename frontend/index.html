@@ -748,6 +748,15 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .clp-fld label,.clp-fld legend{display:block;font-size:13px;color:var(--muted);margin-bottom:2px;}
   .clp-wide{grid-column:1 / -1;}
   .clp-places{margin-bottom:6px;}
+  /* 31 Oct 2026 (task 4a, PR 3b): the Notes and tasks panel — the thread (notes, the chain's grey steps), the To complete lines */
+  .clp-h3{font-size:14px;font-weight:600;color:var(--ink);margin:14px 0 4px;}
+  .clp-thread{list-style:none;padding:0;margin:0 0 8px;}
+  .clp-thread > li{border-top:1px solid var(--line);padding:7px 0;}
+  .clp-step{font-size:13px;color:var(--muted);}
+  .clp-words{font-size:14px;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere;}
+  .clp-line{display:flex;gap:6px;align-items:baseline;font-size:13px;padding:3px 0;color:var(--ink);}
+  .clp-line b{white-space:nowrap;}
+  .clp-tasks td{vertical-align:top;}
   .pour-figs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:4px 0 10px;}
   .pour-figs div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;}
   .pour-figs b{display:block;font-size:20px;line-height:1.2;font-variant-numeric:tabular-nums;color:var(--ink);}
@@ -4760,6 +4769,132 @@ const CLP_TONE = { draft: "none", sent: "warn", changes: "warn", approved: "ok" 
 const CLP_GROUPS = [["Sites and compounds", ["Site", "Compound"]], ["Stockpiles and holding areas", ["Stockpile", "Holding area"]]];
 const clpDay = (iso) => iso ? longDate(String(iso).slice(0, 10)) : "";
 function clpGroupOf(type){ const g = CLP_GROUPS.find(([, ts]) => ts.includes(type)); return g ? g[0] : "Quarries, plants and others"; }
+// 31 Oct 2026 (task 4a, PR 3b): notes and tasks on each CLP — the approved mockup notes\clp-notes-mockup-1031\ (Q1–Q12 as
+// recommended). Anyone who can see the CLP writes a note, adds a task and ticks one; its writer, a planner or an admin deletes a
+// note (never edits it) or changes a task. The chain's steps are grey lines in the thread. A task can start from a yellow "To
+// complete" line of the LAST draft or issue built (none is built for the list). The server decides who may do what; this panel
+// shows what the reply allows. Nothing here prints in the Word file.
+const clpShort = (ymd) => { if(!ymd) return ""; const d = new Date(String(ymd).slice(0, 10) + "T00:00:00"); return isNaN(d) ? "" : `${d.getDate()} ${MONTHS[d.getMonth()]}`; };
+const clpWhen = (iso) => { const d = new Date(iso); if(!iso || isNaN(d)) return "";
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}, ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+function ClpNotes({ clp, teamWord, headRef, onClose, onChanged }){
+  const [t, setT] = useState(null);
+  const [err, setErr] = useState("");
+  const [msg, setMsg] = useState(null);
+  const [words, setWords] = useState("");
+  const [tf, setTf] = useState(null);             // the task form: null | { id?, words, for, due, from_line }
+  const [allLines, setAllLines] = useState(false);
+  const base = `${API}/clp/documents/${encodeURIComponent(clp.id)}`;
+  useEffect(() => {
+    let live = true;
+    fetch(`${base}/notes`).then(okJSON).then(d => { if(live){ setT(d); setErr(""); } })
+      .catch(e => { if(live) setErr(errSay("The notes and tasks did not load.", e)); });
+    return () => { live = false; };
+  }, [clp.id]);
+  const call = (method, path, body, what, done) => fetch(`${base}/${path}`, { method, headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined }).then(okJSON)
+    .then(d => { if(d && d.thread) setT(d.thread); setMsg(done ? { ok: true, text: done(d) } : null); if(onChanged) onChanged(); return d; })
+    .catch(e => { setMsg({ ok: false, text: errSay(what, e) }); return null; });
+  const mailed = (first) => (d) => d.email === "sent" ? `${first} They have an email about it.`
+    : (d.email === "unsent" || d.email === "failed") ? `${first} The email to them did not go.` : first;
+  const head = <h2 className="text-lg font-semibold text-slate-800 mb-1" tabIndex={-1} ref={headRef}>Notes and tasks · {clp.name} · {teamWord(clp)}</h2>;
+  if(err) return <div className="card p-4 mb-4" data-clp-notes="1">{head}<p className="text-sm" style={{ color: "var(--bad-text)" }}>{err}</p>
+    <button type="button" className="btn-sec mt-2" onClick={onClose}>Close</button></div>;
+  if(!t) return <div className="card p-4 mb-4" data-clp-notes="1">{head}<p className="text-sm text-slate-500">Loading…</p></div>;
+  const open = t.tasks.filter(x => !x.done), done = t.tasks.filter(x => x.done);
+  const forOpts = t.for_options || [];
+  const lines = (t.lines && t.lines.items) || [];
+  const startTask = () => { setAllLines(false); setTf({ words: "", for: forOpts[0] ? forOpts[0].key : "approvers", due: "", from_line: "" }); };
+  const editTask = (x) => setTf({ id: x.id, words: x.words, for: x.for, due: x.due || "", from_line: x.from_line || "" });
+  const saveTask = () => {
+    const body = { words: tf.words, for: tf.for, due: tf.due || null };
+    const go = tf.id ? call("PATCH", `tasks/${encodeURIComponent(tf.id)}`, body, "The task was not saved.", mailed("Saved."))
+                     : call("POST", "tasks", { ...body, from_line: tf.from_line || null }, "The task was not added.", mailed("Task added."));
+    go.then(d => { if(d) setTf(null); });
+  };
+  const tick = (x) => call("PATCH", `tasks/${encodeURIComponent(x.id)}`, { done: !x.done }, x.done ? "The task was not ticked back." : "The task was not ticked done.");
+  const delTask = (x) => { if(window.confirm(`Delete the task "${x.words.slice(0, 80)}"?`)) call("DELETE", `tasks/${encodeURIComponent(x.id)}`, null, "The task was not deleted.", () => "Deleted."); };
+  const delNote = (n) => { if(window.confirm("Delete this note?")) call("DELETE", `notes/${encodeURIComponent(n.id)}`, null, "The note was not deleted.", () => "Deleted."); };
+  const addNote = () => call("POST", "notes", { note: words }, "The note was not saved.", () => "Note added.").then(d => { if(d) setWords(""); });
+  return (
+    <div className="card p-4 mb-4" data-clp-notes="1">
+      {head}
+      {msg && <p className="text-sm mb-1" style={{ color: msg.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{msg.text}</p>}
+      <h3 className="clp-h3">Tasks <span className="font-normal text-slate-500">{open.length} open{done.length ? ` · ${done.length} done` : ""}</span></h3>
+      {open.length > 0 && (
+        <div className="overflow-x-auto"><table className="tbl clp-tasks" data-clp-tasks="1">
+          <thead><tr><th scope="col"><span className="sr-only">Done</span></th><th scope="col">Task</th><th scope="col">For</th><th scope="col">Due</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+          <tbody>{open.map(x => (
+            <tr key={x.id} data-clp-task={x.id}>
+              <td style={{ width: 36 }}><input type="checkbox" checked={false} aria-label={`Done: ${x.words}`} onChange={() => tick(x)} /></td>
+              <td style={{ whiteSpace: "normal", minWidth: 240 }}><span className="clp-words">{x.words}</span>
+                {x.from_section && <span className="rd-chip ml-1.5">To complete · {x.from_section}</span>}
+                {x.line_gone_at && <span className="block text-[12px]" style={{ color: "var(--ok-text)" }}>✓ no longer in the draft of {clpShort(x.line_gone_at)}</span>}</td>
+              <td>{x.for_word}</td>
+              <td className="tabular-nums">{x.due ? clpShort(x.due) : "—"}{x.overdue && <span className="block text-[12px] font-semibold" style={{ color: "var(--bad-text)" }}>overdue</span>}</td>
+              <td>{x.can_change && <RowMenu name={x.words.slice(0, 60)}>
+                <button type="button" onClick={() => editTask(x)}>Edit</button>
+                <button type="button" style={{ color: "var(--red)" }} onClick={() => delTask(x)}>Delete…</button></RowMenu>}</td>
+            </tr>))}</tbody>
+        </table></div>
+      )}
+      {done.length > 0 && (
+        <details className="mt-2" data-clp-done="1"><summary className="text-[13px] text-slate-600 cursor-pointer">{done.length} done</summary>
+          <ul className="mt-1">{done.map(x => (
+            <li key={x.id} className="flex items-start gap-2 text-sm py-1" data-clp-task={x.id}>
+              <input type="checkbox" checked aria-label={`Done: ${x.words}. Tick back`} onChange={() => tick(x)} className="mt-1" />
+              <span><span className="clp-words">{x.words}</span> <span className="text-[12px] text-slate-500">done by {x.done_by}, {clpShort(x.done_at)}</span></span>
+            </li>))}</ul>
+        </details>
+      )}
+      {tf ? (
+        <div className="mt-3" data-clp-task-form="1">
+          <div className="clp-form">
+            <div className="clp-fld clp-wide"><label htmlFor="clp-tw">Task</label>
+              <textarea id="clp-tw" className="ctl w-full" rows={2} maxLength={1000} value={tf.words} onChange={e => setTf(f => ({ ...f, words: e.target.value }))} /></div>
+            <div className="clp-fld"><label htmlFor="clp-tf">For</label>
+              <select id="clp-tf" className="ctl w-full" value={tf.for} onChange={e => setTf(f => ({ ...f, for: e.target.value }))}>
+                {forOpts.map(o => <option key={o.key} value={o.key}>{o.word}</option>)}</select></div>
+            <div className="clp-fld"><label htmlFor="clp-td">Due (optional)</label>
+              <input id="clp-td" type="date" className="ctl w-full" value={tf.due || ""} onChange={e => setTf(f => ({ ...f, due: e.target.value }))} /></div>
+          </div>
+          {!tf.id && (
+            <fieldset className="mt-3" data-clp-lines="1"><legend className="text-[13px] text-slate-500 mb-1">From a “To complete” line (optional)</legend>
+              {!lines.length ? <p className="text-[13px] text-slate-500">No draft built yet. Download the draft once, then its yellow lines are listed here.</p> : (<>
+                {(allLines ? lines : lines.slice(0, 4)).map(l => (
+                  <label key={l.line} className="clp-line"><input type="radio" name="clp-line" checked={tf.from_line === l.line}
+                    onChange={() => setTf(f => ({ ...f, from_line: l.line, words: l.words }))} /> <b>{l.section}</b> <span>{l.words}</span></label>))}
+                {lines.length > 4 && !allLines && <button type="button" className="link-btn text-[13px]" onClick={() => setAllLines(true)}>… {lines.length - 4} more lines from the draft of {clpWhen(t.lines.at)}</button>}
+              </>)}
+            </fieldset>
+          )}
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            <button type="button" className="btn-pri" onClick={saveTask} disabled={!(tf.words || "").trim()} data-clp-task-save="1">{tf.id ? "Save task" : "Add task"}</button>
+            <button type="button" className="btn-sec" onClick={() => setTf(null)}>Cancel</button>
+          </div>
+        </div>
+      ) : <button type="button" className="btn-sec mt-2" onClick={startTask} data-clp-add-task="1">+ Add a task</button>}
+      <h3 className="clp-h3">Notes</h3>
+      <ol className="clp-thread" data-clp-thread="1">
+        {!t.notes.length && <li className="text-[13px] text-slate-500">No notes yet.</li>}
+        {t.notes.map(n => n.kind === "step" ? (
+          <li key={n.id || n.step + n.at} className="clp-step" data-clp-step={n.step}>↗ {n.step_word} by {n.by || "—"} · {clpWhen(n.at)}{n.words ? <> · “{n.words}”</> : null}</li>
+        ) : (
+          <li key={n.id} data-clp-note-row={n.id}>
+            <div className="text-[12px] text-slate-500">{n.by} · {clpWhen(n.at)}
+              {n.can_delete && <button type="button" className="link-btn text-[12px] ml-2" aria-label={`Delete the note by ${n.by}, ${clpWhen(n.at)}`} onClick={() => delNote(n)}>Delete</button>}</div>
+            <div className="clp-words">{n.words}</div>
+          </li>))}
+      </ol>
+      <label htmlFor="clp-nn" className="block text-[13px] text-slate-500 mb-1">Add a note</label>
+      <textarea id="clp-nn" className="ctl w-full" rows={2} maxLength={1000} placeholder="Write a note for everyone who can see this CLP" value={words} onChange={e => setWords(e.target.value)} />
+      <div className="flex flex-wrap items-center gap-2 mt-2">
+        <button type="button" className="btn-pri" onClick={addNote} disabled={!words.trim()} data-clp-note-add="1">Add note</button>
+        <button type="button" className="btn-sec" onClick={onClose}>Close</button>
+      </div>
+    </div>
+  );
+}
 function ClpPage({ access }){
   const appr = !!(access && access.can_approve);
   const [data, setData] = useState(null);
@@ -4767,7 +4902,8 @@ function ClpPage({ access }){
   const [tick, setTick] = useState(0);
   const [fTeam, setFTeam] = useState("");
   const [fStatus, setFStatus] = useState("");
-  const [panel, setPanel] = useState(null);       // null | { kind: "edit" | "new" | "send" | "approve" | "changes" | "history", clp }
+  const [fTasks, setFTasks] = useState("");       // PR 3b: "" | open | mine | overdue
+  const [panel, setPanel] = useState(null);       // null | { kind: "edit" | "new" | "send" | "approve" | "changes" | "history" | "notes", clp }
   const [form, setForm] = useState({});
   const [pv, setPv] = useState(null);             // the approve card's preview, or the history
   const [building, setBuilding] = useState("");   // the id whose file is being made
@@ -4785,7 +4921,9 @@ function ClpPage({ access }){
   if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;
   const fields = data.cover_fields || [];
   const teamWord = (c) => c.team_name || "All teams";
-  const list = (data.clps || []).filter(c => (!fTeam || (fTeam === "all" ? !c.team : c.team === fTeam)) && (!fStatus || c.status === fStatus));
+  const tk = (c) => c.tasks || {};
+  const list = (data.clps || []).filter(c => (!fTeam || (fTeam === "all" ? !c.team : c.team === fTeam)) && (!fStatus || c.status === fStatus)
+    && (!fTasks || (fTasks === "open" ? tk(c).open > 0 : fTasks === "mine" ? tk(c).mine_open > 0 : tk(c).overdue > 0)));
   const close = () => { setPanel(null); setPv(null); };
   const send = (method, path, body, what, done) => fetch(`${API}${path}`, { method, headers: { "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : undefined }).then(okJSON)
@@ -4813,7 +4951,8 @@ function ClpPage({ access }){
               : { name: "", team: "", impact: "higher", places: [], cover: {} });
   };
   const openSend = (c) => { setPv(null); setPanel({ kind: "send", clp: c }); setForm({ note: c.sent_note || "" }); };
-  const openChanges = (c) => { setPv(null); setPanel({ kind: "changes", clp: c }); setForm({ note: "" }); };
+  const openChanges = (c) => { setPv(null); setPanel({ kind: "changes", clp: c }); setForm({ note: "", asTask: false, due: "" }); };
+  const openNotes = (c) => { setPv(null); setPanel({ kind: "notes", clp: c }); };
   const openApprove = (c) => {
     setPanel({ kind: "approve", clp: c }); setForm({ note: "" }); setPv(null);
     fetch(`${API}/clp/documents/${encodeURIComponent(c.id)}/approve-preview`).then(okJSON).then(setPv)
@@ -4837,7 +4976,8 @@ function ClpPage({ access }){
   };
   const doSend = () => send("POST", `/clp/documents/${encodeURIComponent(panel.clp.id)}/send`, { note: form.note || null },
     "The CLP was not sent.", "Sent for approval.").then(ok => { if(ok) close(); });
-  const doChanges = () => send("POST", `/clp/documents/${encodeURIComponent(panel.clp.id)}/changes`, { note: form.note || "" },
+  const doChanges = () => send("POST", `/clp/documents/${encodeURIComponent(panel.clp.id)}/changes`,
+    { note: form.note || "", ...(form.asTask ? { task: { due: form.due || null } } : {}) },
     "The CLP was not sent back.", "Sent back to the team.").then(ok => { if(ok) close(); });
   const doApprove = () => {
     const c = panel.clp;
@@ -4846,7 +4986,10 @@ function ClpPage({ access }){
          `Approved as Issue ${c.next_issue}.`).then(ok => { setBuilding(""); if(ok) close(); });
   };
   const remove = (c) => {
-    const ask = c.auto ? `Clear what was typed for "${c.name}"? It stays in the list, blank.` : `Delete the CLP "${c.name}"? This cannot be undone.`;
+    const n = tk(c).notes || 0, t = (tk(c).open || 0) + (tk(c).done || 0);
+    const also = [n ? `${n} note${n === 1 ? "" : "s"}` : "", t ? `${t} task${t === 1 ? "" : "s"}` : ""].filter(Boolean).join(" and ");
+    const ask = c.auto ? `Clear what was typed for "${c.name}"? It stays in the list, blank${also ? `, with its ${also}` : ""}.`
+                       : `Delete the CLP "${c.name}"${also ? `, its ${also}` : ""}? This cannot be undone.`;
     if(window.confirm(ask)) send("DELETE", `/clp/documents/${encodeURIComponent(c.id)}`, null, "The CLP was not deleted.", c.auto ? "Cleared." : "Deleted.");
   };
   const setCover = (k, v) => setForm(f => ({ ...f, cover: { ...f.cover, [k]: v } }));
@@ -4908,6 +5051,13 @@ function ClpPage({ access }){
       <label htmlFor="clp-note" className="block text-[13px] text-slate-500 mb-1">{panel.kind === "send" ? "A note for the approver (optional)" : "What needs changing"}</label>
       <textarea id="clp-note" className="ctl w-full" rows={2} maxLength={1000} value={form.note || ""} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} />
       <div className="flex flex-wrap items-center gap-2 mt-3">
+        {panel.kind === "changes" && (
+          <div className="w-full flex flex-wrap items-center gap-2 text-sm mb-1" data-clp-changes-task="1">
+            <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={!!form.asTask} onChange={e => setForm(f => ({ ...f, asTask: e.target.checked }))} />
+              Also add it as a task for {panel.clp.team_name || "planners and admins"}</label>
+            {form.asTask && <label className="inline-flex items-center gap-1.5">due <input type="date" className="ctl" aria-label="Due date of the task" value={form.due || ""} onChange={e => setForm(f => ({ ...f, due: e.target.value }))} /></label>}
+          </div>
+        )}
         <button type="button" className="btn-pri" onClick={panel.kind === "send" ? doSend : doChanges} disabled={panel.kind === "changes" && !(form.note || "").trim()}>
           {panel.kind === "send" ? "Send for approval" : "Send back to the team"}</button>
         <button type="button" className="btn-sec" onClick={close}>Cancel</button>
@@ -4921,6 +5071,9 @@ function ClpPage({ access }){
       {!pv ? <p className="text-sm text-slate-500">Working out what changed…</p> : pv.problem ? <p className="text-sm" style={{ color: "var(--bad-text)" }}>{pv.problem}</p> : (
         <div className="text-sm">
           {pv.sent && <p className="mb-2">From {pv.sent_by}, {clpDay(pv.sent_at)}{pv.sent_note ? <>: “{pv.sent_note}”</> : "."}</p>}
+          {pv.tasks && pv.tasks.open > 0 && <p className="mb-2" data-clp-approve-tasks="1">
+            <b>{pv.tasks.open} task{pv.tasks.open === 1 ? "" : "s"} still open</b>{pv.tasks.overdue ? <>, <span style={{ color: "var(--bad-text)" }}>{pv.tasks.overdue} overdue</span>{pv.tasks.first_overdue ? <>: “{pv.tasks.first_overdue}”</> : null}</> : null}.{" "}
+            <button type="button" className="link-btn" onClick={() => openNotes(panel.clp)}>See the tasks</button></p>}
           <p className="font-medium text-slate-700">{pv.last_issue ? `Changed in the plan since Issue ${pv.last_issue.no} (${clpDay(pv.last_issue.date)}):` : "The first issue."}</p>
           {pv.last_issue && <ul className="list-disc pl-5 mt-1 text-slate-700" data-clp-changes="1">{(pv.changes || []).map((x, i) => <li key={i}>{x}</li>)}</ul>}
         </div>
@@ -4971,26 +5124,29 @@ function ClpPage({ access }){
                       : (data.team_name ? <span className="row-st rs-none">{data.team_name}</span> : null)} />
       {note && <p className="text-sm mb-3" style={{ color: note.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{note.text}</p>}
       {editor}{noteCard}{approveCard}{historyCard}
-      {appr && (
-        <div className="flex flex-wrap items-center gap-3 mb-3 text-sm" data-clp-filters="1">
-          <label className="inline-flex items-center gap-1.5">Team
-            <select className="ctl" value={fTeam} onChange={e => setFTeam(e.target.value)}>
-              <option value="">Any</option><option value="all">All teams</option>
-              {(data.teams || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select></label>
-          <label className="inline-flex items-center gap-1.5">Status
-            <select className="ctl" value={fStatus} onChange={e => setFStatus(e.target.value)}>
-              <option value="">Any</option>{(data.statuses || []).map(s => <option key={s.key} value={s.key}>{s.word}</option>)}
-            </select></label>
-        </div>
-      )}
+      {panel && panel.kind === "notes" && <ClpNotes key={panel.clp.id} clp={panel.clp} teamWord={teamWord} headRef={headRef} onClose={close} onChanged={() => setTick(t => t + 1)} />}
+      {appr && <div className="flex flex-wrap items-center gap-3 mb-3 text-sm" data-clp-filters="1">
+        <label className="inline-flex items-center gap-1.5">Team
+          <select className="ctl" value={fTeam} onChange={e => setFTeam(e.target.value)}>
+            <option value="">Any</option><option value="all">All teams</option>
+            {(data.teams || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select></label>
+        <label className="inline-flex items-center gap-1.5">Status
+          <select className="ctl" value={fStatus} onChange={e => setFStatus(e.target.value)}>
+            <option value="">Any</option>{(data.statuses || []).map(s => <option key={s.key} value={s.key}>{s.word}</option>)}
+          </select></label>
+        <label className="inline-flex items-center gap-1.5">Tasks
+          <select className="ctl" value={fTasks} onChange={e => setFTasks(e.target.value)} data-clp-tasks-filter="1">
+            <option value="">Any</option><option value="open">Open</option><option value="mine">Given to me</option><option value="overdue">Overdue</option>
+          </select></label>
+      </div>}
       {!list.length ? (
         <EmptyState kind={(data.clps || []).length ? "nomatch" : "none"} title={(data.clps || []).length ? "No CLP matches" : "No CLPs yet"}
-          body={(data.clps || []).length ? "Change the team or the status." : (appr ? "Add a compound, site or stockpile on Data → Locations, or make one with + New CLP." : "Your team has no lorries at a compound, site or stockpile yet.")} />
+          body={(data.clps || []).length ? "Change the team, the status or the tasks." : (appr ? "Add a compound, site or stockpile on Data → Locations, or make one with + New CLP." : "Your team has no lorries at a compound, site or stockpile yet.")} />
       ) : (
         <div className="card overflow-x-auto">
           <table className="tbl" data-clp-table="1">
-            <thead><tr><th scope="col">CLP</th>{appr && <th scope="col">Covers</th>}<th scope="col">Status</th><th scope="col">Last issue</th>{appr && <th scope="col" className="num">Cover</th>}<th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th scope="col">CLP</th>{appr && <th scope="col">Covers</th>}<th scope="col">Status</th><th scope="col">Last issue</th><th scope="col">Tasks</th>{appr && <th scope="col" className="num">Cover</th>}<th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
               {list.map(c => (
                 <tr key={c.id} data-clp-row={c.id}>
@@ -5003,6 +5159,10 @@ function ClpPage({ access }){
                   <td className="rd-status" style={{ whiteSpace: "normal" }}><RowStatus word={c.status_word} tone={CLP_TONE[c.status]} more={0} />
                     {statusLine(c) && <span className="block text-[12px] text-slate-500">{statusLine(c)}</span>}</td>
                   <td>{c.last_issue ? <>Issue {c.last_issue.no} · {clpDay(c.last_issue.date)}{appr && c.last_issue.by ? <span className="block text-[12px] text-slate-500">{c.last_issue.by}</span> : null}</> : "—"}</td>
+                  <td data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open
+                      {tk(c).overdue > 0 ? <span className="block text-[12px] font-semibold" style={{ color: "var(--bad-text)" }}>{tk(c).overdue} overdue</span>
+                        : tk(c).next_due ? <span className="block text-[12px] text-slate-500">due {clpShort(tk(c).next_due)}</span> : null}</>
+                    : tk(c).notes > 0 ? <span className="text-slate-600">{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}</span> : "—"}</td>
                   {appr && <td className="num tabular-nums">{c.cover_typed} of {c.cover_total}</td>}
                   <td><div className="flex items-center gap-2 justify-end">{primary(c)}
                     <RowMenu name={c.name + " · " + teamWord(c)}>
@@ -5011,6 +5171,7 @@ function ClpPage({ access }){
                       {appr && c.status === "sent" && <button type="button" onClick={() => openChanges(c)}>Ask for changes…</button>}
                       {canEdit && <button type="button" onClick={() => openEdit(c)}>{appr ? "Edit" : "Edit cover details"}</button>}
                       {!appr && data.team && <button type="button" onClick={() => openSend(c)}>{c.status === "sent" ? "Send for approval (sent)" : "Send for approval…"}</button>}
+                      <button type="button" onClick={() => openNotes(c)}>Notes and tasks{tk(c).open > 0 ? ` (${tk(c).open} open)` : ""}</button>
                       {c.issues > 0 && <button type="button" onClick={() => openHistory(c)}>Document history</button>}
                       {appr && c.issues === 0 && (!c.auto || c.saved) && <button type="button" style={{ color: "var(--red)" }} onClick={() => remove(c)}>{c.auto ? "Clear typed details…" : "Delete…"}</button>}
                     </RowMenu></div></td>

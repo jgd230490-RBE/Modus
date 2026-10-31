@@ -4414,8 +4414,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const menus = (src.match(/<RowMenu name=\{[^}]+\}/g) || []);
   // NARROWED 29 Oct 2026 (task 3a): + Plan → Pours (Edit, Cancel the pour / Plan again, Delete…) — nine
   // NARROWED 31 Oct 2026 (task 4a, PR 3a): + Plan → CLP documents — ten
+  // NARROWED 31 Oct 2026 (task 4a, PR 3b): 11 — + each open task's "⋯" (Edit, Delete…) in a CLP's Notes and tasks
   ok("⭐ 27 Oct: the '⋯' on six tables — Abnormal loads (with its note), Routes, Zones, the gates list, the logins, the demo leads, the teams",
-     menus.length === 10 && src.includes('<RowMenu name={c.name + " · " + teamWord(c)}>') && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
+     menus.length === 11 && src.includes("<RowMenu name={x.words.slice(0, 60)}>") && src.includes('<RowMenu name={c.name + " · " + teamWord(c)}>') && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
      && src.includes("<RowMenu name={g.name || g.id}>") && (src.match(/<RowMenu name=\{u\.name\}>/g) || []).length === 2 && src.includes("<RowMenu name={t.label}>"), String(menus.length));
   ok("⭐ 27 Oct: Abnormal loads — one filled button for the forward step (AL_FORWARD: pending → approved → notified → moved; withdrawn → pending), the rest in the menu, Withdraw and Delete red and asking first",
      src.includes('const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved", withdrawn: "pending" };')
@@ -4432,7 +4433,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("27 Oct: the Routes column head is for a screen reader only; the Delete and Withdraw items end in an ellipsis because a confirm follows",
      src.includes('<th className="px-3 py-2 text-right font-semibold"><span className="sr-only">Actions</span></th>')
      // NARROWED 29 Oct 2026 (task 3a): + the Pours page's Delete… — five
-     && (src.match(/>Delete…<\/button>/g) || []).length === 5 && src.includes('onClick={() => deleteRoute(r.id)}>Delete…</button>')
+     // NARROWED 31 Oct 2026 (task 4a, PR 3b): + a CLP task's Delete… — six
+     && (src.match(/>Delete…<\/button>/g) || []).length === 6 && src.includes('onClick={() => delTask(x)}>Delete…</button>') && src.includes('onClick={() => deleteRoute(r.id)}>Delete…</button>')
      && src.includes('onClick={() => remove(p)}>Delete…</button>'));
   ok("⭐ 27 Oct: the words — every lead is one line; the foot of Abnormal loads prints the advice line only; no screen prints a decision code in brackets",
      src.includes('? "Approve or reject each line; approved lines feed the public map, the Look-ahead and the Dashboard."')
@@ -4646,7 +4648,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      (cpx.match(/fetch\(`\$\{API\}\/clp\/documents`\)/g) || []).length === 1
      && cpx.includes('send("POST", "/clp/documents", body') && cpx.includes('send("PATCH", `/clp/documents/${encodeURIComponent(c.id)}`, body')
      && cpx.includes('send("DELETE", `/clp/documents/${encodeURIComponent(c.id)}`, null') && cpx.includes("/send`, { note: form.note || null }")
-     && cpx.includes("/changes`, { note: form.note || \"\" }") && cpx.includes("/approve`, { note: form.note || null }")
+     // NARROWED 31 Oct 2026 (PR 3b): Ask for changes may carry its note as a task
+     && cpx.includes("/changes`,\n    { note: form.note || \"\", ...(form.asTask ? { task: { due: form.due || null } } : {}) }") && cpx.includes("/approve`, { note: form.note || null }")
      && cpx.includes('download(c, "draft.docx"') && cpx.includes("`issues/${i.no}.docx`") && cpx.includes("/approve-preview`)"));
   ok("🔴 CLP DOCS: who may do what is the server's — the page reads access.can_approve; a team's body is the cover only; places and team only on a CLP Wayscope did not list",
      cpx.includes("const appr = !!(access && access.can_approve);") && cpx.includes("const body = { cover: f.cover };")
@@ -4664,6 +4667,42 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && cp.includes('const busyWords = "Building… about a minute";') && cp.includes('Anything left blank stays a yellow "To complete" line.')
      && cp.includes("Download gives back the file exactly as approved."));
   ok("CLP DOCS: the editor's CSS lives in the page (.clp-form grid, .clp-places)", html.includes(".clp-form{") && html.includes(".clp-places"));
+  // 31 Oct 2026 (task 4a, PR 3b; the approved mockup notes\clp-notes-mockup-1031, Q1–Q12): notes and tasks on each CLP
+  const cn = cp.slice(cp.indexOf("function ClpNotes("), cp.indexOf("function ClpPage("));
+  ok("⭐ CLP NOTES: one read of the thread (GET …/notes) and its own writes (POST notes, POST tasks, PATCH and DELETE a task, DELETE a note); the reply's thread is drawn",
+     cn.length > 4000 && (cn.match(/fetch\(`\$\{base\}\/notes`\)/g) || []).length === 1 && cn.includes("const base = `${API}/clp/documents/${encodeURIComponent(clp.id)}`;")
+     && cn.includes('call("POST", "notes", { note: words }') && cn.includes('call("POST", "tasks", { ...body, from_line: tf.from_line || null }')
+     && cn.includes('call("PATCH", `tasks/${encodeURIComponent(tf.id)}`, body') && cn.includes('call("PATCH", `tasks/${encodeURIComponent(x.id)}`, { done: !x.done }')
+     && cn.includes('call("DELETE", `tasks/${encodeURIComponent(x.id)}`, null') && cn.includes('call("DELETE", `notes/${encodeURIComponent(n.id)}`, null')
+     && cn.includes("if(d && d.thread) setT(d.thread);"));
+  ok("🔴 CLP NOTES: who may do what is the server's — Delete on a note only when it says can_delete, a task's ⋯ only when can_change; every open task has a Done box",
+     cn.includes("{n.can_delete && <button") && cn.includes("{x.can_change && <RowMenu name={x.words.slice(0, 60)}>")
+     && cn.includes('<input type="checkbox" checked={false} aria-label={`Done: ${x.words}`} onChange={() => tick(x)} />'));
+  ok("CLP NOTES: the panel's words — the heading, 'N open · M done', the done ones folded, '+ Add a task', For / Due (optional), 'Add note', the note box's placeholder, the steps as grey ↗ lines",
+     cn.includes("Notes and tasks · {clp.name} · {teamWord(clp)}") && cn.includes('{open.length} open{done.length ? ` · ${done.length} done` : ""}')
+     && cn.includes('<details className="mt-2" data-clp-done="1">') && cn.includes(">+ Add a task</button>") && cn.includes(">Due (optional)</label>")
+     && cn.includes('placeholder="Write a note for everyone who can see this CLP"') && cn.includes('className="clp-step" data-clp-step={n.step}>↗ {n.step_word} by'));
+  ok("⭐ CLP NOTES: a task from a To complete line — the last built draft's lines, four then '… N more lines from the draft of …', choosing one fills the words; none built yet says to download the draft once; a gone line is shown, never ticked",
+     cn.includes("(allLines ? lines : lines.slice(0, 4)).map(l => (") && cn.includes("more lines from the draft of {clpWhen(t.lines.at)}")
+     && cn.includes("onChange={() => setTf(f => ({ ...f, from_line: l.line, words: l.words }))}")
+     && cn.includes("No draft built yet. Download the draft once, then its yellow lines are listed here.")
+     && cn.includes("✓ no longer in the draft of {clpShort(x.line_gone_at)}") && cn.includes("To complete · {x.from_section}"));
+  ok("CLP NOTES: the one email's result in words ('They have an email about it.' / 'The email to them did not go.'), never a code",
+     cn.includes('d.email === "sent" ? `${first} They have an email about it.`') && cn.includes('`${first} The email to them did not go.`'));
+  ok("⭐ CLP NOTES: the list — a Tasks column (open, then overdue in red or the next due date, else the notes count), the Tasks filter (Any · Open · Given to me · Overdue) and 'Notes and tasks (N open)' in every row's ⋯",
+     cp.includes('<th scope="col">Last issue</th><th scope="col">Tasks</th>') && cp.includes('<td data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open')
+     && cp.includes("{tk(c).overdue} overdue</span>") && cp.includes("due {clpShort(tk(c).next_due)}") && cp.includes('{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}')
+     && cp.includes('<option value="">Any</option><option value="open">Open</option><option value="mine">Given to me</option><option value="overdue">Overdue</option>')
+     && cp.includes('fTasks === "open" ? tk(c).open > 0 : fTasks === "mine" ? tk(c).mine_open > 0 : tk(c).overdue > 0')
+     && cp.includes('<button type="button" onClick={() => openNotes(c)}>Notes and tasks{tk(c).open > 0 ? ` (${tk(c).open} open)` : ""}</button>'));
+  ok("CLP NOTES: the approve card names the open tasks and the first overdue one with 'See the tasks', and never blocks (Approve's disabled test is unchanged); Ask for changes' tick names the team",
+     cp.includes('{pv.tasks && pv.tasks.open > 0 && <p className="mb-2" data-clp-approve-tasks="1">') && cp.includes(">See the tasks</button>")
+     && cp.includes("disabled={building === panel.clp.id || !pv || !!pv.problem} data-clp-approve-go=\"1\"")
+     && cp.includes('Also add it as a task for {panel.clp.team_name || "planners and admins"}</label>'));
+  ok("CLP NOTES: Delete names the notes and tasks going with the CLP; Clear says they stay",
+     cp.includes('`Delete the CLP "${c.name}"${also ? `, its ${also}` : ""}? This cannot be undone.`')
+     && cp.includes('It stays in the list, blank${also ? `, with its ${also}` : ""}.'));
+  ok("CLP NOTES: the thread's CSS lives in the page", html.includes(".clp-thread{") && html.includes(".clp-step{") && html.includes(".clp-line{"));
   // Config → Planning → CLP document
   const cf = src.slice(src.indexOf('data-cfg="clp-stages"') - 2500, src.indexOf('data-cfg="clp-stages"') + 6000);
   ok("⭐ CLP STAGES: Config → Planning has the CLP document card — the programme type, the stages table (No., name, the kinds of work), + Add a stage up to 8, the template's stages from meta until changed",

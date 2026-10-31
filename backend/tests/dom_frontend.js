@@ -2864,11 +2864,29 @@ async function clpDocsDom(){
     location_ids: ["L019"], places: [{ id: "L019", name: "Tilton Viaduct site", type: "site" }], types: ["site"], team, team_name,
     impact: "higher", cover: {}, cover_typed: 0, cover_total: 11, status, status_word: { draft: "Draft", sent: "Sent", changes: "Changes asked", approved: "Approved" }[status],
     sent_by: null, sent_at: null, sent_note: null, changes_by: null, changes_at: null, changes_note: null, updated_at: null,
-    busiest_month: 7, busiest_label: "Apr 2027", issues: 0, last_issue: null, next_issue: 1, ...(extra || {}) });
+    busiest_month: 7, busiest_label: "Apr 2027", issues: 0, last_issue: null, next_issue: 1,
+    tasks: { open: 0, overdue: 0, next_due: null, notes: 0, done: 0, mine_open: 0 }, ...(extra || {}) });
   const ALL = [row("auto-L019-IPT1", "IPT1", "North Team", "sent", { saved: true, sent_by: "Nora North", sent_at: "2026-10-31T09:00:00Z", sent_note: "Ready",
-                   issues: 1, last_issue: { no: 1, date: "2026-10-20", by: "Pat Planner" }, next_issue: 2, cover: { postcode: "LE7 9XX", landowner: "Fictional Estates" }, cover_typed: 2 }),
-               row("auto-L019-all", null, null, "draft"),
-               row("auto-L019-IPT2", "IPT2", "Central Team", "approved", { issues: 1, last_issue: { no: 1, date: "2026-10-25", by: "Pat Planner" }, next_issue: 2 })];
+                   issues: 1, last_issue: { no: 1, date: "2026-10-20", by: "Pat Planner" }, next_issue: 2, cover: { postcode: "LE7 9XX", landowner: "Fictional Estates" }, cover_typed: 2,
+                   tasks: { open: 2, overdue: 1, next_due: "2026-11-07", notes: 2, done: 1, mine_open: 1 } }),
+               row("auto-L019-all", null, null, "draft", { tasks: { open: 0, overdue: 0, next_due: null, notes: 1, done: 0, mine_open: 0 } }),
+               row("auto-L019-IPT2", "IPT2", "Central Team", "approved", { issues: 1, last_issue: { no: 1, date: "2026-10-25", by: "Pat Planner" }, next_issue: 2,
+                   tasks: { open: 1, overdue: 0, next_due: "2026-11-07", notes: 0, done: 0, mine_open: 0 } })];
+  // 31 Oct 2026 (PR 3b): one CLP's notes and tasks, as GET …/notes answers
+  const LINES = ["2.4.1: Melton BC: the code of construction practice", "1.1: Any other aim of this plan", "2.3.1: Traffic Regulation Orders needed",
+    "3.2.5: Services and systems installation", "7: a CLP cap for Tilton Viaduct site", "7: how this plan is put in place"]
+    .map(l => ({ line: l, section: l.split(": ")[0], words: l.split(": ").slice(1).join(": ") }));
+  const THREAD = { id: "auto-L019-IPT1", today: "2026-10-31", can_moderate: true, lines: { at: "2026-10-31T14:02:00Z", items: LINES },
+    for_options: [{ key: "team", word: "North Team" }, { key: "approvers", word: "Planners and admins" }, { key: "user:u1", word: "Nora North" }],
+    tasks: [{ id: "n-1", words: "Ask Melton BC which code applies", for: "team", for_word: "North Team", due: "2026-10-28", overdue: true, done: false,
+              from_line: LINES[0].line, from_section: "2.4.1", line_gone_at: null, written_by: "Nora North", mine: true, can_change: true },
+            { id: "n-2", words: "Type the manager's phone", for: "approvers", for_word: "Planners and admins", due: "2026-11-07", overdue: false, done: false,
+              from_line: "1: Site manager's phone", from_section: "1", line_gone_at: "2026-11-02T10:00:00Z", written_by: "Ned North", mine: true, can_change: false },
+            { id: "n-3", words: "Agree the Saturday hours", for: "team", for_word: "North Team", due: null, overdue: false, done: true,
+              done_by: "North Team", done_at: "2026-10-30T12:00:00Z", can_change: true }],
+    notes: [{ kind: "note", id: "n-4", words: "The council wants the Saturday hours in 4.1.", by: "Pat Planner", at: "2026-10-29T16:10:00Z", can_delete: true },
+            { kind: "step", id: "n-5", step: "sent", step_word: "Sent for approval", by: "North Team", at: "2026-10-31T09:02:00Z", words: "Gate hours added" },
+            { kind: "note", id: "n-6", words: "Saturday hours now in the site rules.", by: "North Team", at: "2026-10-31T09:05:00Z", can_delete: false }] };
   const base = { cover_fields: FIELDS, places: [{ id: "L019", name: "Tilton Viaduct site", type: "site" }, { id: "L006", name: "Langton Compound", type: "compound" }],
     teams: [{ id: "IPT1", name: "North Team" }, { id: "IPT2", name: "Central Team" }],
     statuses: ["draft", "sent", "changes", "approved"].map(k => ({ key: k, word: { draft: "Draft", sent: "Sent", changes: "Changes asked", approved: "Approved" }[k] })) };
@@ -2879,7 +2897,13 @@ async function clpDocsDom(){
     const method = (opt && opt.method) || "GET"; calls.push({ url, method, body: opt && opt.body ? JSON.parse(opt.body) : null });
     if (url === "/api/clp/documents" && method === "GET") return reply(200, listFor(acc));
     if (/\/approve-preview$/.test(url)) return reply(200, { id: "auto-L019-IPT1", next_issue: 2, last_issue: { no: 1, date: "2026-10-20" }, sent: true,
-      sent_by: "Nora North", sent_at: "2026-10-31T09:00:00Z", sent_note: "Ready", changes: ["Lorry trips 1,695 → 1,820", "Postcode typed"] });
+      sent_by: "Nora North", sent_at: "2026-10-31T09:00:00Z", sent_note: "Ready", changes: ["Lorry trips 1,695 → 1,820", "Postcode typed"],
+      tasks: { open: 2, overdue: 1, first_overdue: "Ask Melton BC which code applies" } });
+    if (/\/notes$/.test(url) && method === "GET") return reply(200, THREAD);
+    if (/\/notes$/.test(url) && method === "POST") return reply(200, { id: "n-9", thread: THREAD });
+    if (/\/tasks$/.test(url) && method === "POST") return reply(200, { id: "n-8", email: "sent", thread: THREAD });
+    if (/\/(tasks|notes)\/[^/]+$/.test(url) && (method === "PATCH" || method === "DELETE")) return reply(200, { thread: THREAD });
+    if (/\/changes$/.test(url) && method === "POST") return reply(200, { ok: true });
     if (/\/approve$/.test(url) && method === "POST") return reply(200, { ok: true, issue_no: 2 });
     if (/\/send$/.test(url) && method === "POST") return reply(200, { ok: true });
     if (/^\/api\/clp\/documents\/[^/]+$/.test(url) && method === "PATCH") return reply(200, { ok: true });
@@ -2902,7 +2926,8 @@ async function clpDocsDom(){
      rows(p.el)[0].querySelector("[data-clp-primary]").textContent === "Approve as Issue 2…"
      && rows(p.el)[1].querySelector("[data-clp-primary]").textContent === "Download draft"
      && rows(p.el).map(r => r.querySelectorAll("td")[1].textContent).join("|") === "North Team|All teams|Central Team"
-     && rows(p.el)[0].querySelectorAll("td")[4].textContent === "2 of 11" && !/IPT\d/.test(p.el.textContent),
+     // NARROWED 31 Oct 2026 (PR 3b): the Cover column is the sixth now, after the new Tasks column
+     && rows(p.el)[0].querySelectorAll("td")[5].textContent === "2 of 11" && !/IPT\d/.test(p.el.textContent),
      rows(p.el).map(r => r.querySelectorAll("td")[1].textContent).join("|"));
   const teamSel = p.el.querySelector("[data-clp-filters] select");
   await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set; set.call(teamSel, "IPT2"); teamSel.dispatchEvent(new w.Event("change", { bubbles: true })); });
@@ -2923,12 +2948,100 @@ async function clpDocsDom(){
      && p.el.textContent.includes("Approved as Issue 2.") && calls.filter(c => c.url === "/api/clp/documents").length === 2 && !card());
   await p.done();
 
+  // -- 31 Oct 2026 (PR 3b): notes and tasks — the column, the filter, the panel, the approve and changes cards
+  const n = await mount(plannerAcc);
+  const cellOf = (id) => n.el.querySelector(`[data-clp-row="${id}"] [data-clp-tasks-cell]`).textContent;
+  ok("⭐ CLP NOTES DOM: the Tasks column — '2 open' and '1 overdue' in red; '1 open' due 7 Nov; a CLP with only a note says '1 note'",
+     cellOf("auto-L019-IPT1") === "2 open1 overdue" && cellOf("auto-L019-IPT2") === "1 opendue 7 Nov" && cellOf("auto-L019-all") === "1 note",
+     [cellOf("auto-L019-IPT1"), cellOf("auto-L019-IPT2"), cellOf("auto-L019-all")].join(" | "));
+  const tf = n.el.querySelector("[data-clp-tasks-filter]");
+  const pickSel = async (sel, v) => { await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set; set.call(sel, v); sel.dispatchEvent(new w.Event("change", { bubbles: true })); }); };
+  await pickSel(tf, "overdue");
+  const ovd = rows(n.el).map(r => r.getAttribute("data-clp-row")).join("|");
+  await pickSel(tf, "open");
+  const opn = rows(n.el).map(r => r.getAttribute("data-clp-row")).join("|");
+  await pickSel(tf, "mine");
+  const mine = rows(n.el).map(r => r.getAttribute("data-clp-row")).join("|");
+  await pickSel(tf, "");
+  ok("⭐ CLP NOTES DOM: the Tasks filter — Overdue and Given to me the North Team's CLP only, Open both team CLPs, Any all three",
+     ovd === "auto-L019-IPT1" && mine === "auto-L019-IPT1" && opn === "auto-L019-IPT1|auto-L019-IPT2" && rows(n.el).length === 3, [ovd, opn, mine].join(" / "));
+  const nb = byText(n.el, /^Notes and tasks \(2 open\)$/);
+  ok("CLP NOTES DOM: each row's ⋯ has 'Notes and tasks', with the open count", !!nb && !!byText(n.el, /^Notes and tasks$/));
+  await press(nb);
+  const pn = () => n.el.querySelector("[data-clp-notes]");
+  ok("⭐ CLP NOTES DOM: it opens the panel above the table and reads …/notes once", !!pn()
+     && calls.filter(c => c.url === "/api/clp/documents/auto-L019-IPT1/notes" && c.method === "GET").length === 1
+     && pn().querySelector("h2").textContent === "Notes and tasks · Tilton Viaduct site · North Team");
+  const trs = () => [...pn().querySelectorAll("[data-clp-tasks] tbody tr")];
+  ok("⭐ CLP NOTES DOM: the open tasks — words, the To complete chip, For, the due date and 'overdue'; a gone line says so; the done one folded",
+     trs().length === 2 && trs()[0].textContent.includes("To complete · 2.4.1") && trs()[0].textContent.includes("North Team")
+     && trs()[0].textContent.includes("28 Oct") && trs()[0].textContent.includes("overdue")
+     && trs()[1].textContent.includes("✓ no longer in the draft of 2 Nov") && pn().querySelector("[data-clp-done] summary").textContent === "1 done"
+     && pn().textContent.includes("2 open · 1 done"), trs().map(r => r.textContent).join(" | "));
+  ok("🔴 CLP NOTES DOM: a task's ⋯ only where the reply allows a change (n-2 has none); Delete only on the note that can be deleted",
+     !!trs()[0].querySelector("details.row-menu") && !trs()[1].querySelector("details.row-menu")
+     && !!pn().querySelector('[data-clp-note-row="n-4"] button') && !pn().querySelector('[data-clp-note-row="n-6"] button'));
+  const st = pn().querySelector('[data-clp-step="sent"]');
+  ok("⭐ CLP NOTES DOM: the thread — notes with who and when, the chain's step as a grey ↗ line with its note",
+     pn().querySelectorAll("[data-clp-thread] > li").length === 3 && !!st && st.textContent.startsWith("↗ Sent for approval by North Team · 31 Oct, ")
+     && st.textContent.endsWith("· “Gate hours added”") && pn().querySelector('[data-clp-note-row="n-4"]').textContent.includes("Pat Planner · 29 Oct, "), st ? st.textContent : "no step");
+  await press(trs()[0].querySelector('input[type="checkbox"]'));
+  ok("⭐ CLP NOTES DOM: ticking a task PATCHes done: true and nothing else",
+     calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1/tasks/n-1" && c.method === "PATCH" && c.body && Object.keys(c.body).join(",") === "done" && c.body.done === true));
+  const nn = pn().querySelector("#clp-nn");
+  await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value").set; set.call(nn, "Gate B shut Friday"); nn.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  await press(pn().querySelector("[data-clp-note-add]"));
+  ok("⭐ CLP NOTES DOM: Add note POSTs the words, says 'Note added.', empties the box and reads the list again (the counts)",
+     calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1/notes" && c.method === "POST" && c.body && c.body.note === "Gate B shut Friday")
+     && pn().textContent.includes("Note added.") && pn().querySelector("#clp-nn").value === "" && calls.filter(c => c.url === "/api/clp/documents").length >= 3);
+  await press(pn().querySelector("[data-clp-add-task]"));
+  const fm = () => pn().querySelector("[data-clp-task-form]");
+  ok("CLP NOTES DOM: + Add a task — the For list is the reply's (the team, planners and admins, a person), four To complete lines then '… 2 more lines'",
+     !!fm() && [...fm().querySelectorAll("#clp-tf option")].map(o => o.textContent).join("|") === "North Team|Planners and admins|Nora North"
+     && fm().querySelectorAll('input[name="clp-line"]').length === 4 && !!byText(fm(), /^… 2 more lines from the draft of 31 Oct, /));
+  await press(fm().querySelectorAll('input[name="clp-line"]')[0]);
+  ok("⭐ CLP NOTES DOM: choosing a line fills the Task box with its words (which can still be changed)", fm().querySelector("#clp-tw").value === "Melton BC: the code of construction practice");
+  await pickSel(fm().querySelector("#clp-tf"), "user:u1");
+  const dd = fm().querySelector("#clp-td");
+  await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set; set.call(dd, "2026-11-06"); dd.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  await press(fm().querySelector("[data-clp-task-save]"));
+  ok("⭐ CLP NOTES DOM: Add task POSTs the words, For, due and the line; the one email is reported in words",
+     calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1/tasks" && c.method === "POST" && c.body && c.body.for === "user:u1" && c.body.due === "2026-11-06"
+                     && c.body.from_line === LINES[0].line && c.body.words === "Melton BC: the code of construction practice")
+     && pn().textContent.includes("Task added. They have an email about it.") && !fm());
+  await press(byText(pn(), /^Close$/));
+  ok("CLP NOTES DOM: Close shuts the panel", !pn());
+  await press(rows(n.el)[0].querySelector("[data-clp-primary]"));
+  const ap = () => n.el.querySelector("[data-clp-approve]");
+  const apt = () => n.el.querySelector("[data-clp-approve-tasks]");
+  ok("⭐ CLP NOTES DOM: the approve card names the open tasks and the first overdue one, and Approve stays pressable (never blocking)",
+     !!apt() && apt().textContent.startsWith("2 tasks still open, 1 overdue: “Ask Melton BC which code applies”.")
+     && !ap().querySelector("[data-clp-approve-go]").disabled, apt() ? apt().textContent : "no line");
+  await press(byText(apt(), /^See the tasks$/));
+  ok("CLP NOTES DOM: 'See the tasks' opens the notes and tasks", !!pn() && !ap());
+  await press(byText(n.el, /^Ask for changes…$/));
+  const cc = () => n.el.querySelector('[data-clp-note="changes"]');
+  const ctask = () => cc().querySelector("[data-clp-changes-task]");
+  ok("CLP NOTES DOM: Ask for changes offers 'Also add it as a task for North Team'", !!cc() && ctask().textContent.includes("Also add it as a task for North Team"));
+  const cn2 = cc().querySelector("#clp-note");
+  await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value").set; set.call(cn2, "Put the Saturday hours in 4.1"); cn2.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  await press(ctask().querySelector('input[type="checkbox"]'));
+  const cdue = ctask().querySelector('input[type="date"]');
+  await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set; set.call(cdue, "2026-11-07"); cdue.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  await press(byText(cc(), /^Send back to the team$/));
+  ok("⭐ CLP NOTES DOM: Send back with the tick POSTs the note and the task's due date",
+     calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1/changes" && c.method === "POST" && c.body && c.body.note === "Put the Saturday hours in 4.1"
+                     && c.body.task && c.body.task.due === "2026-11-07"));
+  ok("🔴 CLP NOTES DOM: no team id anywhere on the page", !/IPT\d/.test(n.el.textContent));
+  await n.done();
+
   // -- a team: its own CLP only, no filters, no + New CLP, no Covers column; the menu edits the cover and sends
   const t = await mount(TEAM_N);
   ok("⭐ CLP DOCS DOM: a team — its own team's CLP only, the team named in the header, no + New CLP, no filters, no Covers or Cover column",
      rows(t.el).length === 1 && rows(t.el)[0].getAttribute("data-clp-row") === "auto-L019-IPT1" && !t.el.querySelector("[data-clp-add]")
      && !t.el.querySelector("[data-clp-filters]") && t.el.querySelector("header, [data-page='clp']").textContent.includes("North Team")
-     && t.el.querySelectorAll("[data-clp-table] thead th").length === 4 && !/IPT\d/.test(t.el.textContent));
+     // NARROWED 31 Oct 2026 (PR 3b): five heads — + Tasks (the mockup's card 4)
+     && t.el.querySelectorAll("[data-clp-table] thead th").length === 5 && !/IPT\d/.test(t.el.textContent));
   ok("CLP DOCS DOM: a team's next step is Download draft (never Approve), its menu holds Edit cover details and Send for approval (sent), no Delete",
      rows(t.el)[0].querySelector("[data-clp-primary]").textContent === "Download draft"
      && !!byText(t.el, /^Edit cover details$/) && !!byText(t.el, /^Send for approval \(sent\)$/) && !byText(t.el, /^(Delete…|Clear typed details…|Approve as Issue)/));
