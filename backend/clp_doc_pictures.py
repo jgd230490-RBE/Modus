@@ -12,7 +12,8 @@ PLANS (route_map_export's three, CLOCS outline CLP template §2.2 / §4)
   * one Regional plan of every route in this CLP, in the CLP's busiest month (fitted, 1:20,000 or smaller);
   * per site a Local plan (1:2,500) and a Site plan (1:1,000), centred on the site, in the Streets style (the Light
     style is nearly blank at those scales, notes/session-1030-clp-document.md §11), in that site's busiest month.
-The plan's PDF page → PNG (export.route_map_png) → JPEG (a 2,560 px map is ~4 MB as PNG, ~0.6 MB as JPEG).
+The plan's PDF page → JPEG straight from the rasterised page (31 Oct 2026: at PLAN_DPI, not the 2,560 px of the
+route map export's PNG, and never through a PNG: less to hold while a plan is drawn).
 A plan whose basemap did not come is drawn on its plain background (export's own fallback) and the caller is told
 (basemap.MISSES), so a copy without the map is never kept in the read cache.
 """
@@ -27,6 +28,9 @@ INK, GRID, MUTED, BAND = "#1E293B", "#E2E8F0", "#5B6470", "#F1F5F9"
 CHART_W_MM = 170.0
 DPI = 200
 JPEG_QUALITY = 85
+#: 31 Oct 2026: the plans' raster. The frame is 285 mm wide and Word shows it about 170 mm wide, so 150 dpi here is
+#: about 250 dpi on the page — sharp in print — at 0.43 times the pixels (and memory) of the export's 228 dpi.
+PLAN_DPI = 150
 
 
 def _rgb(hx):
@@ -248,12 +252,26 @@ def hourly_chart(h):
 PLAN_STYLE = {"regional": None, "local": "streets", "site": "streets"}   # None = the tenant's "Maps on paper" style
 
 
-def _jpeg(png):
-    from PIL import Image
-    im = Image.open(io.BytesIO(png)).convert("RGB")
-    dpi = im.info.get("dpi") or (228, 228)
+def _plan_jpeg(pdf_bytes, dpi=PLAN_DPI):
+    """The plan's one-page PDF as a JPEG: rasterised at `dpi`, the white margin cut off (as export.route_map_png), the
+    DPI written into the file so Word places it at its printed width. One bitmap at a time, closed as soon as the
+    JPEG is written."""
+    import pypdfium2 as pdfium
+    import route_map_export as rme
+    pdf = pdfium.PdfDocument(pdf_bytes)
+    try:
+        page = pdf[0]
+        bitmap = page.render(scale=dpi / 72.0)
+        img = bitmap.to_pil()
+        page.close()
+    finally:
+        pdf.close()
+    cut = max(0, int(round(rme.MARGIN_MM / 25.4 * dpi)) - 1)      # keep the frame's keyline
+    img = img.crop((cut, cut, img.width - cut, img.height - cut)).convert("RGB")
     out = io.BytesIO()
-    im.save(out, "JPEG", quality=JPEG_QUALITY, optimize=True, dpi=tuple(int(round(d)) for d in dpi[:2]))
+    img.save(out, "JPEG", quality=JPEG_QUALITY, optimize=True, dpi=(dpi, dpi))
+    img.close()
+    del bitmap
     return out.getvalue()
 
 
@@ -294,8 +312,8 @@ def plans(data, acc=None):
         try:
             if style:
                 with basemap.use(style):
-                    return _jpeg(export.route_map_png(export.build_route_map_pdf(S)))
-            return _jpeg(export.route_map_png(export.build_route_map_pdf(S)))
+                    return _plan_jpeg(export.build_route_map_pdf(S))
+            return _plan_jpeg(export.build_route_map_pdf(S))
         finally:
             rl_config.useA85 = was
 

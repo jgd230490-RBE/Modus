@@ -350,6 +350,8 @@ def _geom_touches(g, bbox):
         cs = [g["coordinates"]]
     elif t == "LineString":
         cs = g["coordinates"]
+    elif t == "MultiLineString":           # 31 Oct 2026: the CLP document filters by box; a multi-part line touched nothing
+        cs = [c for part in g["coordinates"] for c in part]
     else:
         cs = [c for p in polygons_of(g) for ring in p for c in ring]
     xs, ys = [c[0] for c in cs], [c[1] for c in cs]

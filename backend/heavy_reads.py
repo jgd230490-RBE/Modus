@@ -121,3 +121,58 @@ def slot(name, busy=None):
             running, waiting = _state["running"], _state["waiting"]
         _sem.release()
         print(line(name, before, after, ran, waited, running, waiting), flush=True)
+
+
+# ---- 31 Oct 2026: a job that runs ALONE, outside the public slots ------------------------------------------------ #
+# The CLP document (task 4a) held one of the two slots above for minutes and the public map's month figures queued
+# behind it; two at once doubled its memory. A solo job has a lock of its own: one at a time
+# (a second is answered busy after SOLO_WAIT_S), never a public slot, and the heavy reads it calls run inside it.
+SOLO_WAIT_S = 5.0
+_solo_locks = {}
+
+
+def trim():
+    """Hand the memory a big job freed back to the system (glibc malloc_trim; Linux only, a no-op elsewhere): without
+    it the process keeps its peak, and the next job starts from there. True when it ran."""
+    import gc
+    gc.collect()
+    if not sys.platform.startswith("linux"):
+        return False
+    try:
+        import ctypes
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+        return True
+    except Exception:
+        return False
+
+
+@contextmanager
+def solo(name, busy=None, wait_s=None):
+    """Run the body as the one `name` job running: wait at most wait_s (SOLO_WAIT_S) for the last one to finish, then
+    raise busy() or Busy. Logs the same one line as a slot; trims the freed memory afterwards."""
+    if getattr(_local, "depth", 0):              # already inside a heavy read: run in it
+        with slot(name, busy=busy):
+            yield
+        return
+    with _lock:
+        lk = _solo_locks.setdefault(name, threading.Lock())
+    t0 = time.perf_counter()
+    got = lk.acquire(timeout=SOLO_WAIT_S if wait_s is None else wait_s)
+    waited = time.perf_counter() - t0
+    if not got:
+        print(f"🧮 heavy read {name}: another one is running, answered busy", flush=True)
+        raise (busy() if busy else Busy(name))
+    before = memory_mb()
+    t1 = time.perf_counter()
+    _local.depth = 1
+    try:
+        yield
+    finally:
+        _local.depth = 0
+        ran = time.perf_counter() - t1
+        trim()
+        after = memory_mb()
+        with _lock:
+            running, waiting = _state["running"], _state["waiting"]
+        lk.release()
+        print(line(name + " (alone)", before, after, ran, waited, running, waiting), flush=True)

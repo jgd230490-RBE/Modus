@@ -131,8 +131,10 @@ def _nearest(index, g, site_names):
     return best
 
 
-def gather(data):
-    """The layers part of the CLP's data: {councils, limits, closures, diversions, community, collisions}."""
+def gather(data, area_month=None):
+    """The layers part of the CLP's data: {councils, limits, closures, diversions, community, collisions}.
+    area_month(month) -> areas.area_load(month, geometry=False) as the public map has it; the endpoint passes the
+    copy the map already keeps in memory (31 Oct 2026: working it out again cost +22 MB a build), else it is read."""
     import collisions
     import community
     route_ids = [r["route_id"] for r in data["routes"]]
@@ -146,7 +148,7 @@ def gather(data):
     if pm:
         try:
             import areas
-            A = areas.area_load(pm, working_days=data["working_days"], geometry=False)
+            A = (area_month(pm) if area_month else None)                 or areas.area_load(pm, working_days=data["working_days"], geometry=False)
             names = {s["name"] for s in data["sites"]}
             ends = {}                              # a location's name -> this CLP's routes with an end there
             for r in data["routes"]:
@@ -225,7 +227,9 @@ def gather(data):
     lines = _lines(route_ids)
     index = collisions.RouteIndex(lines, [(s["id"], s["name"], float(s["lon"]), float(s["lat"])) for s in sites],
                                   route_m=community.STRIP_ROUTE_M, site_m=community.STRIP_SITE_M)
-    feats = community.features() if (lines or sites) else []
+    # 31 Oct 2026: only the places that touch the strip's own box are loaded (the scheme's others were read, kept and
+    # then skipped one by one)
+    feats = community.features(bbox=index.bbox) if index.bbox else []
     near = []
     for f in feats:
         g = f.get("geometry") or {}
@@ -263,13 +267,13 @@ def gather(data):
     coll = {"fetched": bool(st.get("fetched_at")), "period": st.get("period") or "", "rows": [], "sites": [],
             "credit": collisions.credit_line() if st.get("fetched_at") else ""}
     if coll["fetched"] and route_ids:
-        recs = collisions.records(route_keys=route_ids)
+        all_recs = collisions.records()            # 31 Oct 2026: read once (was twice: by route, then all)
+        recs = [c for c in all_recs if any(k in c["routes"] for k in route_ids)]
         for rid in route_ids:
             c = collisions.counts_for(recs, rid)
             coll["rows"].append({"route_id": rid, "on_all": c["on"]["all"], "on_ksi": c["on"]["ksi"],
                                  "near_all": c["near"]["all"], "near_ksi": c["near"]["ksi"],
                                  "near_vru": c["near"]["vru_any"], "near_goods": c["near"]["goods"]})
-        all_recs = collisions.records()
         for s in sites:
             ns = [c for c in all_recs if s["id"] in (c.get("sites") or {})]
             coll["sites"].append({"name": s["name"], "all": len(ns), "ksi": sum(1 for c in ns if c["ksi"])})

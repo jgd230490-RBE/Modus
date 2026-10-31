@@ -4843,14 +4843,25 @@ def clp_pack_xlsx(month: Optional[int] = None):
                     headers={"Content-Disposition": f'attachment; filename="{clp_pack.file_name(m, "xlsx")}"'})
 
 
+def _clp_area_month(month):
+    """31 Oct 2026: one month of the councils as the public map's every-month read keeps it (read_cache, warmed),
+    so the CLP document does not work it out again; None when it cannot be had (the caller then reads it)."""
+    try:
+        packed = json.loads(read_cache.cached(AREAS_MONTHS_CACHE, _areas_months_key(), _areas_months_build))
+        return areas.unpack_month(packed, month)
+    except Exception:                                        # noqa: BLE001  no council boundaries, no working days
+        return None
+
+
 @app.get("/api/clp/document.docx")
 def clp_document_docx(locations: Optional[str] = None, impact: Optional[str] = None):
     """30 Oct 2026 (task 4a, PR 1) — the outline Construction Logistics Plan as a Word file for one location or a set
     (`locations` = ids, comma-separated): every figure Wayscope holds filled in, a yellow "To complete" wherever only a
     person can write, a dated snapshot. Planner or admin. `impact` = higher (default) or medium picks §5's checklist.
     422 for no location, an unknown one or an unknown impact. Kept until the next write, like the CLP pack.
-    PR 2: the charts, the three plans per site (the basemap) and §2.3 / §2.4 from the stored layers; built in a heavy
-    slot (one memory line, a 503 when busy), and not kept when a plan was drawn without its basemap."""
+    PR 2: the charts, the three plans per site (the basemap) and §2.3 / §2.4 from the stored layers; built ALONE
+    (heavy_reads.solo, 31 Oct: one at a time, outside the public slots; one memory line, a 503 in words while another
+    is being made), and not kept when a plan was drawn without its basemap."""
     acc = _require_approver()
     ids = [x.strip() for x in str(locations or "").split(",") if x.strip()]
     imp = (impact or "higher").strip().lower()
@@ -4865,9 +4876,11 @@ def clp_document_docx(locations: Optional[str] = None, impact: Optional[str] = N
 
     def build():
         import clp_doc_layers
-        with heavy_reads.slot("clp-document", busy=lambda: HTTPException(
-                503, "Wayscope is busy; try again in a minute.", headers={"Retry-After": "30"})):
-            data["layers"] = clp_doc_layers.gather(data)
+        # 31 Oct 2026: alone, outside the public map's slots (one build held a slot for minutes, and two at once
+        # doubled the memory); a second press while one is being made is answered busy at once
+        with heavy_reads.solo("clp-document", busy=lambda: HTTPException(
+                503, "Another CLP document is being made. Try again in a minute.", headers={"Retry-After": "60"})):
+            data["layers"] = clp_doc_layers.gather(data, area_month=_clp_area_month)
             return clp_doc.build(data, impact=imp, acc=acc)
     body = _staff_bytes("clp/document.docx", {"locations": ids, "impact": imp}, build, acc=acc,
                         keep=lambda: basemap.MISSES[0] == misses)
