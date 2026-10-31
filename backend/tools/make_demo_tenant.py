@@ -137,6 +137,9 @@ DEMO_CONTACT = {"concern_email": "hello@wayscope.co.uk",
                 "other_formats": "email hello@wayscope.co.uk"}
 START_YEAR = 2026
 N_MONTHS = 60                     # Jan 2026 – Dec 2030: month_index = (year − 2026) × 12 + month
+#: 31 Oct 2026 (task 4c PR 6): the drawing the demo's Tilton Viaduct layout is placed from, and what it must place
+LAYOUT_SAMPLE = os.path.join(BACKEND, "tests", "fixtures", "site_layouts", "tilton-logistics-bng.dxf")
+LAYOUT_THINGS = 39
 SHIPPED_AS_OF = "2026-11-26"      # D96: Thursday, November week 4 — the shipped history; --as-of moves it (outside the checkout)
 AS_OF = SHIPPED_AS_OF             # set by --as-of
 LIVE_EXPORT = None                # set by --live-export
@@ -1370,6 +1373,16 @@ def build(with_areas=False, out=None):
     assert a["id"] == "A004", a
     res = network.set_site_speed(vs, 8.0)         # 5 mph
     assert "error" not in res, res
+
+    # --- the site's logistics layout (31 Oct 2026, task 4c PR 6): the sample National Grid drawing in the repo's test
+    # fixtures, placed on the viaduct site as one phase with no months (every month), so a re-import keeps what the live
+    # demo shows. Built from the repo's own file, not from a live export.
+    import site_layouts
+    with open(LAYOUT_SAMPLE, "rb") as f:
+        held = site_layouts.read_file(vs, f.read(), os.path.basename(LAYOUT_SAMPLE), by="tools/make_demo_tenant.py")
+    placed = site_layouts.place(vs, {"import_id": held["import_id"], "where": "new",
+                                     "phase": {"name": "Site logistics"}}, by="tools/make_demo_tenant.py")
+    assert placed["placed"] == LAYOUT_THINGS, placed
 
     # --- §1.8: the ADVISORY zones of the programme (Z033 on), created after the access roads and the site's inside ---------
     # Advisory: drawn on the map by month and listed in the bulletin's local controls; the router is not told.

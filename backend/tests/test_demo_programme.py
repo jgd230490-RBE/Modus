@@ -372,6 +372,26 @@ ok("...route_choice (the diversions, task 0c) and traffic_counts are among them"
    # 29 Oct 2026 (task 0f-2): and the busy-hour times, which only live works out
    and "route_hour_times" in GEN.LIVE_TABLES)
 
+# 31 Oct 2026 (task 4c PR 6): the viaduct site's logistics layout ships in the package, so a re-import keeps what live shows
+_lay = [x for x in T["site_layouts"]]
+_ph = [x for x in T["site_layout_phases"]]
+_im = [x for x in T["site_layout_imports"]]
+_ph_things = json.loads(_ph[0]["features_json"])["features"] if _ph else []
+_gc = (json.loads(_im[0]["report_json"]).get("gate_check") or []) if _im else []
+_vs_gates = {g["name"] for g in T["location_gates"] if g["location_id"] == "L019"}
+ok("⭐ PR 6: the package carries ONE site layout, on Tilton Viaduct site (L019), with ONE phase 'Site logistics' for every "
+   "month (no months set) of 39 things, not on the public map",
+   len(_lay) == 1 and _lay[0]["location_id"] == "L019" and not _lay[0]["public"]
+   and len(_ph) == 1 and _ph[0]["layout_id"] == _lay[0]["id"] and _ph[0]["name"] == "Site logistics"
+   and _ph[0]["month_from"] is None and _ph[0]["month_to"] is None and len(_ph_things) == GEN.LAYOUT_THINGS == 39,
+   str((len(_lay), len(_ph), len(_ph_things))))
+ok("...it was placed from the repo's own National Grid sample, and its two gate symbols sit on L019's two gates (0.05 m or less)",
+   len(_im) == 1 and _im[0]["file_name"] == "tilton-logistics-bng.dxf" and _im[0]["things"] == 39
+   and len(_gc) == 2 and {g["gate"] for g in _gc} == _vs_gates and all(g["m"] <= 0.05 for g in _gc),
+   str(_gc))
+ok("...and a refresh keeps live's layout tables (they are LIVE_TABLES)",
+   {"site_layouts", "site_layout_phases", "site_layout_imports"} <= set(GEN.LIVE_TABLES))
+
 
 def _live_export(mutate=None):
     """A stand-in for a live export: the shipped package as Postgres hands it out (BOOLEAN columns true / false), with
