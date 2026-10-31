@@ -1315,6 +1315,8 @@ ok("PICTURES: technical T1 — the table, the limits, the endpoints, the image r
                           "/api/site-layouts/pictures/{id}/image", "NEVER PUBLIC", "<code>POST /api/locations/{id}/site-layout/pictures</code> (query", "<code>WSLayouts.pictures</code>", "<code>blob:</code>", "<code>on_sheet</code>")))
 
 
+ok("SITE LAYOUTS (PR 5): the sheet's file name is said in words, not one long unbroken token (it clipped at 390 px; UI audit 31 Oct)",
+   "site-layout-&lt;id&gt;-&lt;phase&gt;" not in _tg2 and "the file named for the site&#39;s id, the phase, the page and the scale" in _tg2)
 ok("PICTURES: ...and its upload address is not one long unbroken token (it pushed the guide 24 px sideways at 390 px; UI audit 31 Oct)",
    "/site-layout/pictures?name=" not in _tg2)
 print("test_help.py: %d passed, %d failed" % (passed, failed))
