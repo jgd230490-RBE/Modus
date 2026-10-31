@@ -420,13 +420,14 @@ ok("H2: the tenant carries the demo notice, /api/meta serves it, and it validate
    and 'DEMO_NOTICE = "Fictional scheme"' in open(os.path.join(BACKEND, "tools", "make_demo_tenant.py"), encoding="utf-8").read()
    and config.validate(dict(json.loads(DEMO["tables"]["config"][[c["key"] for c in DEMO["tables"]["config"]].index("factors")]["value"]), tenant={"name": "x", "demo_notice": "y" * 121})) != []
    and "demo_notice" in config.TENANT_DEFAULTS)
-# 12 Oct 2026 (map review 2.1 / 2.3): "Report a concern" on the public map writes to a TYPED tenant address. The demo
-# types none, so the map says no address has been typed; nothing invents one. One plain address or null.
+# 12 Oct 2026 (map review 2.1 / 2.3): "Report a concern" on the public map writes to a TYPED tenant address. One plain
+# address or null. NARROWED 30 Oct 2026 (3d, John): the demo package types the company's own address; the product seed
+# (factors.json) and the default still type none, so a new tenant shows the placeholder and nothing is invented.
 _fac = dict(json.loads(DEMO["tables"]["config"][[c["key"] for c in DEMO["tables"]["config"]].index("factors")]["value"]))
-ok("concern_email: a tenant field defaulting to null, and the demo tenant types none (the map shows a placeholder, never an invented address)",
+ok("concern_email: a tenant field defaulting to null; the seed types none; the demo package types only the company's address",
    "concern_email" in config.TENANT_DEFAULTS and config.TENANT_DEFAULTS["concern_email"] is None
-   and main.meta()["tenant"]["concern_email"] is None
-   and not (_fac.get("tenant") or {}).get("concern_email"))
+   and main.meta()["tenant"]["concern_email"] in (None, "hello@wayscope.co.uk")
+   and (_fac.get("tenant") or {}).get("concern_email") == "hello@wayscope.co.uk")
 ok("concern_email: validated as ONE plain address or null — a list, a query string or a bare word is refused",
    config.validate(dict(_fac, tenant={"name": "x", "concern_email": "contact@scheme.example"})) == []
    and config.validate(dict(_fac, tenant={"name": "x", "concern_email": None})) == []
