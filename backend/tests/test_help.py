@@ -1213,10 +1213,23 @@ ok3("⭐ CLP REVIEWERS: 18.6 'The client's reviewers' in the nav and the text �
     and all(t in _ch186 for t in ("Only an issued plan is ever sent to them; a draft never is.", "<strong>Users → Client reviewers</strong>",
         "sets up two-step sign-in the first time; reviewers never use a shared code", "is stopped, never deleted", "signs them out at once",
         "<strong>⋯ → Send Issue N to reviewers…</strong>", "a group that had the last issue is ticked already", "No file is attached.",
-        "<strong>CLPs for review</strong>", "<strong>Return with comments</strong>. Returning needs a comment.", "the first reviewer&#39;s decision stands",
+        # NARROWED 31 Oct 2026 (PR 3d, Q7): returning needs a NOTE
+        "<strong>CLPs for review</strong>", "<strong>Return with comments</strong>. Returning needs a note.", "the first reviewer&#39;s decision stands",
         "A newer issue starts again.", "<strong>Returned by …</strong> in red", "<strong>Waiting</strong>, <strong>Accepted</strong> or <strong>Returned</strong>",
-        "<strong>Make a task</strong>", "<strong>Show to</strong>", "Tasks and the team&#39;s other notes are never shown to reviewers.",
-        "Comments send no email.", "Document history")), _ch186[:200])
+        # NARROWED 31 Oct 2026 (PR 3d, Q2, Q4, Q9): Show to is gone; the Contractor tab is never shown to reviewers; notes send no email
+        "<strong>Make a task</strong>", "nothing in the Contractor tab is ever shown to reviewers",
+        "notes send none.", "Document history")) and "Show to" not in _ch186, _ch186[:200])
+ok3("⭐ CLP CLIENT THREAD (PR 3d): 18.5 names the tabs; 18.6 says who reads a group's tab, both sides write and give tasks, each ticks its own, the delete rule, the reviewer's task count, one email for a named person",
+    all(t in _ch18 for t in ("<strong>The client&#39;s tabs</strong>", "a <strong>Contractor</strong> tab and one tab for each client group",
+        "the team sees only that one", "a second line counts the tasks open with the client"))
+    and all(t in _ch186 for t in ("<strong>Notes and tasks with the client</strong>", "read by that group&#39;s reviewers and by planners and admins",
+        "The team does not see it", "each side ticks only the tasks given to it", "The contractor never deletes what a reviewer wrote; a reviewer deletes only their own.",
+        "write notes and tasks", "how many tasks are open for their group", "A task given to one named person sends that person one email")))
+ok3("CLP CLIENT THREAD (PR 3d): technical T1 holds the detail (two threads, the For keys, who ticks and deletes, the nine routes, Show to gone)",
+    "<strong>Two threads (31 Oct, PR 3d;" in _tgv2 and "<code>client_thread()</code>" in _tgv2 and "<code>_client_can_tick</code>" in _tgv2
+    and "<code>r:&lt;login&gt;</code>" in _tgv2 and "The nine <code>/api/review/*</code> routes" in _tgv2
+    and "DELETE /api/review/clps/{id}/notes/{nid}" in _tgv2 and "PATCH  /api/review/clps/{id}/tasks/{tid}" in _tgv2
+    and "The \"Show to\" tick of\nPR 3c is gone." in _tgv2)
 ok3("🔴 CLP REVIEWERS: 18.6 names no back-end word, team id or supplier and never says secure",
     not re.search(r"\b(API|endpoint|server|JSON|database|session|token|cookie|IPT\d|secure|AI|Q\d+|D\d{2,3})\b", _ch186))
 ok3("CLP REVIEWERS: the technical guide #t1-clp-reviewers holds the detail (the tables, the wall, the sweep, decisions, emails, audit, the routes, the demo group)",

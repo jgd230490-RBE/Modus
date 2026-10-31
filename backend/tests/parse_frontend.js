@@ -4780,17 +4780,25 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const cn = cp.slice(cp.indexOf("function ClpNotes("), cp.indexOf("function ClpPage("));
   ok("⭐ CLP NOTES: one read of the thread (GET …/notes) and its own writes (POST notes, POST tasks, PATCH and DELETE a task, DELETE a note); the reply's thread is drawn",
      cn.length > 4000 && (cn.match(/fetch\(`\$\{base\}\/notes`\)/g) || []).length === 1 && cn.includes("const base = `${API}/clp/documents/${encodeURIComponent(clp.id)}`;")
-     && cn.includes('call("POST", "notes", { note: words, show_to: showTo || null }')   // NARROWED 31 Oct 2026 (PR 3c): + Show to <group> && cn.includes('call("POST", "tasks", { ...body, from_line: tf.from_line || null }')
+     // NARROWED 31 Oct 2026 (PR 3c): + Show to <group>. NARROWED 31 Oct 2026 (PR 3d, Q2): Show to is gone; a note and a task
+     // carry the client tab's group (`grp`, empty on the Contractor tab). (The POST tasks check had sat inside 3c's comment.)
+     && cn.includes('call("POST", "notes", { note: words, ...grp }') && cn.includes('call("POST", "tasks", { ...body, from_line: tf.from_line || null, ...grp }')
+     && cn.includes('const grp = V.group ? { group: V.group } : {};')
      && cn.includes('call("PATCH", `tasks/${encodeURIComponent(tf.id)}`, body') && cn.includes('call("PATCH", `tasks/${encodeURIComponent(x.id)}`, { done: !x.done }')
      && cn.includes('call("DELETE", `tasks/${encodeURIComponent(x.id)}`, null') && cn.includes('call("DELETE", `notes/${encodeURIComponent(n.id)}`, null')
      && cn.includes("if(d && d.thread) setT(d.thread);"));
   ok("🔴 CLP NOTES: who may do what is the server's — Delete on a note only when it says can_delete, a task's ⋯ only when can_change; every open task has a Done box",
-     cn.includes("{n.can_delete && <button") && cn.includes("{x.can_change && <RowMenu name={x.words.slice(0, 60)}>")
-     && cn.includes('<input type="checkbox" checked={false} aria-label={`Done: ${x.words}`} onChange={() => tick(x)} />'));
+     // NARROWED 31 Oct 2026 (PR 3d, Q5): in a client tab the server also says can_tick (each side ticks its own) and a
+     // stopped group's tab writes nothing (V.can_write)
+     cn.includes("{n.can_delete && V.can_write && <button") && cn.includes("{x.can_change && V.can_write && <RowMenu name={x.words.slice(0, 60)}>")
+     && cn.includes('<input type="checkbox" checked={false} aria-label={`Done: ${x.words}`} onChange={() => tick(x)} />')
+     && cn.includes("const ourOpen = (x) => !x.done && x.can_tick !== false;")
+     && cn.includes('<input type="checkbox" checked={false} disabled aria-label={`Done: ${x.words}. The client ticks it`} />'));
   ok("CLP NOTES: the panel's words — the heading, 'N open · M done', the done ones folded, '+ Add a task', For / Due (optional), 'Add note', the note box's placeholder, the steps as grey ↗ lines",
      cn.includes("Notes and tasks · {clp.name} · {teamWord(clp)}") && cn.includes('{open.length} open{done.length ? ` · ${done.length} done` : ""}')
      && cn.includes('<details className="mt-2" data-clp-done="1">') && cn.includes(">+ Add a task</button>") && cn.includes(">Due (optional)</label>")
-     && cn.includes('placeholder="Write a note for everyone who can see this CLP"') && cn.includes('className="clp-step" data-clp-step={n.step}>{n.step === "review-returned" ? "↩" : n.step === "review-accepted" ? "✓" : "↗"} {n.step_word} by'));   // NARROWED 31 Oct 2026 (PR 3c): ↩ / ✓ for a client's return / acceptance
+     // NARROWED 31 Oct 2026 (PR 3d): the placeholder names who reads the tab once the CLP has client tabs
+     && cn.includes('placeholder={who ? `Write a note for ${who}` : "Write a note for everyone who can see this CLP"}') && cn.includes('className="clp-step" data-clp-step={n.step}>{n.step === "review-returned" ? "↩" : n.step === "review-accepted" ? "✓" : "↗"} {n.step_word} by'));   // NARROWED 31 Oct 2026 (PR 3c): ↩ / ✓ for a client's return / acceptance
   ok("⭐ CLP NOTES: a task from a To complete line — the last built draft's lines, four then '… N more lines from the draft of …', choosing one fills the words; none built yet says to download the draft once; a gone line is shown, never ticked",
      cn.includes("(allLines ? lines : lines.slice(0, 4)).map(l => (") && cn.includes("more lines from the draft of {clpWhen(t.lines.at)}")
      && cn.includes("onChange={() => setTf(f => ({ ...f, from_line: l.line, words: l.words }))}")
@@ -4801,8 +4809,12 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ CLP NOTES: the list — a Tasks column (open, then overdue in red or the next due date, else the notes count), the Tasks filter (Any · Open · Given to me · Overdue) and 'Notes and tasks (N open)' in every row's ⋯",
      cp.includes('<th scope="col">Last issue</th><th scope="col">Tasks</th>') && cp.includes('<td data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open')
      && cp.includes("{tk(c).overdue} overdue</span>") && cp.includes("due {clpShort(tk(c).next_due)}") && cp.includes('{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}')
+     && cp.includes('+ {tk(c).client_open} with the client</span>}')   // NARROWED 31 Oct 2026 (PR 3d, Q8): the second line
+    
      && cp.includes('<option value="">Any</option><option value="open">Open</option><option value="mine">Given to me</option><option value="overdue">Overdue</option>')
-     && cp.includes('fTasks === "open" ? tk(c).open > 0 : fTasks === "mine" ? tk(c).mine_open > 0 : tk(c).overdue > 0')
+     // NARROWED 31 Oct 2026 (PR 3d, Q8): the filter adds the client tabs' tasks
+     && cp.includes('fTasks === "open" ? tk(c).open + (tk(c).client_open || 0) > 0 : fTasks === "mine" ? tk(c).mine_open + (tk(c).client_mine_open || 0) > 0')
+     && cp.includes(': tk(c).overdue + (tk(c).client_overdue || 0) > 0))')
      && cp.includes('<button type="button" onClick={() => openNotes(c)}>Notes and tasks{tk(c).open > 0 ? ` (${tk(c).open} open)` : ""}</button>'));
   ok("CLP NOTES: the approve card names the open tasks and the first overdue one with 'See the tasks', and never blocks (Approve's disabled test is unchanged); Ask for changes' tick names the team",
      cp.includes('{pv.tasks && pv.tasks.open > 0 && <p className="mb-2" data-clp-approve-tasks="1">') && cp.includes(">See the tasks</button>")
@@ -4853,10 +4865,34 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && code.includes('if(j && j.signed_in && j.reviewer){ ACCESS.info = j.reviewer; setRole(j.reviewer); setWho(j.reviewer.name || ""); setView("review"); }'));
   ok("REVIEW PAGE: Accept asks once; Return needs a comment; a newer unsent issue says so",
      rp.includes("window.confirm(`Accept Issue ${n} of the ${open.name} CLP for ${open.group_name}?`)")
-     && rp.includes('setMsg({ ok: false, text: "Write what needs changing in the comment box first." }); return;')
+     // NARROWED 31 Oct 2026 (PR 3d, Q7): "Comments" is "Notes" on the reviewer's page
+     && rp.includes('setMsg({ ok: false, text: "Write what needs changing in the note box first." }); return;')
      && rp.includes("The contractor has a newer issue that is not sent to {open.group_name} yet."));
   ok("REVIEW PAGE: a phone card's Open button is a 44 px tap (the UI audit's targets-44px row, 31 Oct)",
      rp.includes('className="btn-sec mt-3" style={{ minHeight: 44 }} onClick={() => show(c.id)}'));
+  // 31 Oct 2026 (task 4a, PR 3d; notes\clp-client-thread-mockup-1031, Q1–Q10): the client's own notes and tasks
+  ok("⭐ REVIEW PAGE (PR 3d): Notes and tasks — the group's tasks both ways, a Done box only where the server says can_tick, Delete only on their own",
+     rp.includes('<h3 className="clp-h3" style={{ marginTop: 0 }}>Notes and tasks</h3>')
+     && rp.includes("{tc.ours} open for your group · {tc.theirs} open for the contractor")
+     && rp.includes("<td style={{ width: 36 }}>{x.can_tick")
+     && rp.includes("aria-label={`Done: ${x.words}. The contractor ticks it`}") && rp.includes("{x.can_change && <button")
+     && rp.includes("{x.can_delete && <button") && rp.includes('send("POST", "tasks", { words: rtf.words, for: rtf.for, due: rtf.due || null }'));
+  ok("REVIEW PAGE (PR 3d, Q7): Comments became Notes", !/Add comment|Add a comment|No comments yet|Comment added/.test(rp)
+     && rp.includes(">Add note</button>") && rp.includes(">Add a note</label>") && rp.includes("No notes yet."));
+  ok("REVIEW PAGE (PR 3d, Q8): the list says how many tasks are for the group, on a desk and a phone",
+     (rp.match(/\{c\.tasks_open\} task\{c\.tasks_open === 1 \? "" : "s"\} for your group/g) || []).length === 2);
+  const cnB = code.slice(code.indexOf("function ClpNotes("), code.indexOf("function ClpPage("));
+  ok("⭐ CLP NOTES (PR 3d, Q1): a tab for the Contractor and each client group, only once the CLP was sent; the line under it says who reads it",
+     cnB.includes('{clients.length > 0 && (') && cnB.includes('role="tablist" aria-label="Whose notes and tasks" data-clp-tabs="1"')
+     && cnB.includes('{ id: "", name: "Contractor", open: t.tasks.filter(x => !x.done).length }')
+     && cnB.includes("The client never sees this tab.") && cnB.includes("does not see this tab.") && cnB.includes("The teams do not see this tab."));
+  ok("🔴 CLP NOTES (PR 3d, Q2): the Show to tick is gone", !/show_to|showTo|Show to |shown_to/.test(cnB) && !cnB.includes("data-clp-show-to"));
+  ok("CLP NOTES (PR 3d, Q3, Q6): the Contractor tab's grey send line opens the group's tab; Make a task is for the planners and admins, in the client's tab",
+     cnB.includes("data-clp-open-tab={n.group_id}>Open its tab</button>")
+     && cnB.includes('call("POST", "tasks", { words: n.words, for: "approvers", from_note: n.id }')
+     && cnB.includes("From {x.from_note_by}'s note") && !cnB.includes("x.from_group"));
+  ok("CLP NOTES (PR 3d): the approve card counts the client's open tasks on their own line",
+     code.includes('{pv.tasks && pv.tasks.client_open > 0 && <p className="mb-2" data-clp-approve-client="1">'));
   ok("REVIEW PAGE: the sign-in card is 'Sign in' and says reviewers from a client sign in here too",
      code.includes("Reviewers from a client sign in here too."));
   const up = fnB("UsersPage");

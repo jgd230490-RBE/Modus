@@ -251,9 +251,12 @@ with TestClient(main.app, base_url=BASE) as admin:
     ok("2. ...and the reviewer was signed in the whole time", r.json().get("reviewer") is not None)
 
     # ---- the review routes ----------------------------------------------------------------------------------------- #
+    # NARROWED 31 Oct 2026 (PR 3d): + the group's tasks and the reviewer's own deletes (four routes, three paths)
     ok("3. five review routes, no more", sorted(set(review_routes)) == sorted({
         "/api/review/clps", "/api/review/clps/{clp_id}", "/api/review/clps/{clp_id}/issues/{issue_no}.docx",
-        "/api/review/clps/{clp_id}/comments", "/api/review/clps/{clp_id}/decision"}), str(sorted(set(review_routes))))
+        "/api/review/clps/{clp_id}/comments", "/api/review/clps/{clp_id}/decision",
+        "/api/review/clps/{clp_id}/tasks", "/api/review/clps/{clp_id}/tasks/{task_id}", "/api/review/clps/{clp_id}/notes/{item_id}"}),
+       str(sorted(set(review_routes))))
     nobody = TestClient(main.app, base_url=BASE)
     ok("3. 🔴 nobody signed in gets nothing from them",
        all(nobody.get(u).status_code == 401 for u in ("/api/review/clps", f"/api/review/clps/{CLP}",

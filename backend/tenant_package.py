@@ -283,6 +283,8 @@ def import_tenant(pkg, replace=False):
             live_set = set(live)
             gone = set()
             n = 0
+            if t == "clp_notes":
+                rows = [db.pre_3d_clp_note(r) for r in rows]   # PR 3d: a file from before the client tabs
             for r in rows:
                 cols = [c for c in r.keys() if c in live_set and c != "tenant_id"]
                 gone |= {c for c in r.keys() if c not in live_set and c != "tenant_id"}

@@ -2937,6 +2937,21 @@ async function clpDocsDom(){
     notes: [{ kind: "note", id: "n-4", words: "The council wants the Saturday hours in 4.1.", by: "Pat Planner", at: "2026-10-29T16:10:00Z", can_delete: true },
             { kind: "step", id: "n-5", step: "sent", step_word: "Sent for approval", by: "North Team", at: "2026-10-31T09:02:00Z", words: "Gate hours added" },
             { kind: "note", id: "n-6", words: "Saturday hours now in the site rules.", by: "North Team", at: "2026-10-31T09:05:00Z", can_delete: false }] };
+  // 31 Oct 2026 (PR 3d): with thOn the thread has the Highways client's own tab
+  let thOn = false;
+  const CLIENT_TAB = { id: "G1", name: "Highways client (fictional)", stopped: false, can_write: true, open: 2, overdue: 0, today: "2026-10-31",
+    for_options: [{ key: "approvers", word: "Planners and admins" }, { key: "group", word: "Highways client (fictional) — all its reviewers" },
+                  { key: "reviewer:r1", word: "Sam Example" }, { key: "user:u9", word: "Pat Planner" }],
+    tasks: [{ id: "c-1", words: "Show the Saturday hours in section 5", for: "approvers", for_word: "Planners and admins", for_side: "contractor", due: "2026-11-07",
+              overdue: false, done: false, written_by: "Sam Example", by_client: true, from_note_by: null, mine: true, can_tick: true, can_change: false },
+            { id: "c-2", words: "Confirm who signs off the traffic plan", for: "group", for_word: "Highways client (fictional)", for_side: "client", due: null,
+              overdue: false, done: false, written_by: "Pat Planner", by_client: false, from_note_by: "Sam Example", mine: false, can_tick: false, can_change: true }],
+    notes: [{ kind: "step", id: "c-3", step: "review-sent", step_word: "Issue 1 sent to Highways client (fictional)", by: "Pat Planner", at: "2026-10-31T18:50:00Z" },
+            { kind: "note", id: "c-4", words: "Please show the Saturday hours for Gate B.", by: "Sam Example", org: "Highways client (fictional)", reviewer: true,
+              at: "2026-10-31T18:51:00Z", can_delete: false, can_task: true }] };
+  const THREAD_CL = { ...THREAD, clients: [CLIENT_TAB], notes: [...THREAD.notes,
+    { kind: "step", id: "n-7", step: "review-sent", step_word: "Issue 1 sent to Highways client (fictional)", by: "Pat Planner", at: "2026-10-31T18:50:00Z", words: "", group_id: "G1" }] };
+  const th = () => thOn ? THREAD_CL : THREAD;
   const base = { cover_fields: FIELDS, places: [{ id: "L019", name: "Tilton Viaduct site", type: "site" }, { id: "L006", name: "Langton Compound", type: "compound" }],
     teams: [{ id: "IPT1", name: "North Team" }, { id: "IPT2", name: "Central Team" }],
     statuses: ["draft", "sent", "changes", "approved"].map(k => ({ key: k, word: { draft: "Draft", sent: "Sent", changes: "Changes asked", approved: "Approved" }[k] })) };
@@ -2959,10 +2974,10 @@ async function clpDocsDom(){
       tasks: { open: 2, overdue: 1, first_overdue: "Ask Melton BC which code applies" }, ...(rvOn ? { review_groups: RV_GROUPS } : {}) });
     if (/\/review-send$/.test(url) && method === "GET") return reply(200, { issue_no: 1, groups: [{ ...RV_GROUPS[0], has_this: true }, RV_GROUPS[1]] });
     if (/\/review-send$/.test(url) && method === "POST") return reply(200, { sent: [{ group_id: "G2", group_name: "Rail client (fictional)", email: { sent: 1 } }], skipped: [] });
-    if (/\/notes$/.test(url) && method === "GET") return reply(200, THREAD);
-    if (/\/notes$/.test(url) && method === "POST") return reply(200, { id: "n-9", thread: THREAD });
-    if (/\/tasks$/.test(url) && method === "POST") return reply(200, { id: "n-8", email: "sent", thread: THREAD });
-    if (/\/(tasks|notes)\/[^/]+$/.test(url) && (method === "PATCH" || method === "DELETE")) return reply(200, { thread: THREAD });
+    if (/\/notes$/.test(url) && method === "GET") return reply(200, th());
+    if (/\/notes$/.test(url) && method === "POST") return reply(200, { id: "n-9", thread: th() });
+    if (/\/tasks$/.test(url) && method === "POST") return reply(200, { id: "n-8", email: "sent", thread: th() });
+    if (/\/(tasks|notes)\/[^/]+$/.test(url) && (method === "PATCH" || method === "DELETE")) return reply(200, { thread: th() });
     if (/\/changes$/.test(url) && method === "POST") return reply(200, { ok: true });
     if (/\/approve$/.test(url) && method === "POST") return reply(200, { ok: true, issue_no: 2,
       ...(rvOn ? { review_send: { sent: [{ group_id: "G1", group_name: "Highways client (fictional)", email: { sent: 2 } }], skipped: [] } } : {}) });
@@ -3033,6 +3048,8 @@ async function clpDocsDom(){
   ok("⭐ CLP NOTES DOM: it opens the panel above the table and reads …/notes once", !!pn()
      && calls.filter(c => c.url === "/api/clp/documents/auto-L019-IPT1/notes" && c.method === "GET").length === 1
      && pn().querySelector("h2").textContent === "Notes and tasks · Tilton Viaduct site · North Team");
+  ok("CLP NOTES DOM (PR 3d): a CLP never sent to a client has no tabs, no who-reads line and no Show to tick",
+     !pn().querySelector("[data-clp-tabs]") && !pn().querySelector("[data-clp-who]") && !pn().querySelector("[data-clp-show-to]"));
   const trs = () => [...pn().querySelectorAll("[data-clp-tasks] tbody tr")];
   ok("⭐ CLP NOTES DOM: the open tasks — words, the To complete chip, For, the due date and 'overdue'; a gone line says so; the done one folded",
      trs().length === 2 && trs()[0].textContent.includes("To complete · 2.4.1") && trs()[0].textContent.includes("North Team")
@@ -3095,6 +3112,61 @@ async function clpDocsDom(){
                      && c.body.task && c.body.task.due === "2026-11-07"));
   ok("🔴 CLP NOTES DOM: no team id anywhere on the page", !/IPT\d/.test(n.el.textContent));
   await n.done();
+
+  // -- 31 Oct 2026 (PR 3d): the client's own tab (planners and admins)
+  thOn = true;
+  const q = await mount(plannerAcc);
+  await press(byText(q.el, /^Notes and tasks \(2 open\)$/));
+  const qp = () => q.el.querySelector("[data-clp-notes]");
+  const tabsOf = () => [...qp().querySelectorAll("[data-clp-tabs] [role=tab]")];
+  ok("⭐ CLIENT TAB DOM: two tabs, Contractor (2 open) and the client (2 open); the Contractor one chosen; its line says the client never sees it",
+     tabsOf().map(b => b.textContent).join("|") === "Contractor · 2 open|Highways client (fictional) · 2 open"
+     && tabsOf()[0].getAttribute("aria-selected") === "true" && /The client never sees this tab\./.test(qp().querySelector("[data-clp-who]").textContent)
+     && qp().querySelector("#clp-nn").placeholder === "Write a note for North Team, planners and admins", tabsOf().map(b => b.textContent).join("|"));
+  ok("CLIENT TAB DOM: the Contractor tab's grey send line opens the client's tab", !!qp().querySelector('[data-clp-open-tab="G1"]')
+     && !qp().textContent.includes("Please show the Saturday hours for Gate B."));
+  await press(qp().querySelector('[data-clp-open-tab="G1"]'));
+  ok("⭐ CLIENT TAB DOM: the client's tab — its own tasks and notes, the line naming who reads it (not the team)",
+     tabsOf()[1].getAttribute("aria-selected") === "true" && /Highways client \(fictional\)'s reviewers, planners and admins\. North Team does not see this tab\./.test(qp().querySelector("[data-clp-who]").textContent)
+     && qp().textContent.includes("Please show the Saturday hours for Gate B.") && !qp().textContent.includes("Ask Melton BC which code applies")
+     && !!qp().querySelector('[data-clp-thread="G1"] [data-clp-org]'));
+  const qtr = () => [...qp().querySelectorAll("[data-clp-tasks] tbody tr")];
+  ok("🔴 CLIENT TAB DOM: each side ticks its own — the client's task for us has a Done box; ours for the client a greyed one; no ⋯ on the client's words",
+     !qtr()[0].querySelector('input[type="checkbox"]').disabled && qtr()[1].querySelector('input[type="checkbox"]').disabled
+     && !qtr()[0].querySelector("details.row-menu") && !!qtr()[1].querySelector("details.row-menu")
+     && qtr()[1].textContent.includes("From Sam Example's note") && qtr()[0].textContent.includes("Sam Example"));
+  await press(qp().querySelector("[data-clp-add-task]"));
+  ok("CLIENT TAB DOM: + Add a task — the For list is the tab's own; no To complete lines here",
+     [...qp().querySelectorAll("#clp-tf option")].map(o => o.textContent).join("|") === "Planners and admins|Highways client (fictional) — all its reviewers|Sam Example|Pat Planner"
+     && !qp().querySelector("[data-clp-lines]"));
+  const qtw = qp().querySelector("#clp-tw");
+  await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value").set; set.call(qtw, "Send the agreed hours"); qtw.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  await pickSel(qp().querySelector("#clp-tf"), "reviewer:r1");
+  await press(qp().querySelector("[data-clp-task-save]"));
+  ok("⭐ CLIENT TAB DOM: Add task POSTs the words, For and the tab's group",
+     calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1/tasks" && c.method === "POST" && c.body && c.body.group === "G1" && c.body.for === "reviewer:r1"
+                     && c.body.words === "Send the agreed hours"));
+  const qnn = qp().querySelector("#clp-nn");
+  ok("CLIENT TAB DOM: the note box names the client", qnn.placeholder === "Write a note for Highways client (fictional), planners and admins");
+  await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value").set; set.call(qnn, "We will add them"); qnn.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  await press(qp().querySelector("[data-clp-note-add]"));
+  ok("⭐ CLIENT TAB DOM: Add note POSTs the words with the tab's group (and no Show to)",
+     calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1/notes" && c.method === "POST" && c.body && c.body.note === "We will add them" && c.body.group === "G1"
+                     && !("show_to" in c.body)));
+  await press(qp().querySelector("[data-clp-make-task]"));
+  ok("CLIENT TAB DOM: Make a task POSTs the client's words for the planners and admins, from that note",
+     calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1/tasks" && c.method === "POST" && c.body && c.body.from_note === "c-4" && c.body.for === "approvers"));
+  await press(tabsOf()[0]);
+  const ctab = calls.filter(c => c.url === "/api/clp/documents/auto-L019-IPT1/notes" && c.method === "POST").length;
+  const qnn2 = qp().querySelector("#clp-nn");
+  await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value").set; set.call(qnn2, "Team only"); qnn2.dispatchEvent(new w.Event("input", { bubbles: true })); });
+  await press(qp().querySelector("[data-clp-note-add]"));
+  ok("🔴 CLIENT TAB DOM: back on the Contractor tab a note carries no group",
+     calls.filter(c => c.url === "/api/clp/documents/auto-L019-IPT1/notes" && c.method === "POST").length === ctab + 1
+     && calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1/notes" && c.method === "POST" && c.body && c.body.note === "Team only" && !("group" in c.body)));
+  ok("🔴 CLIENT TAB DOM: no team id anywhere", !/IPT\d/.test(q.el.textContent));
+  await q.done();
+  thOn = false;
 
   // -- a team: its own CLP only, no filters, no + New CLP, no Covers column; the menu edits the cover and sends
   const t = await mount(TEAM_N);
@@ -3173,7 +3245,7 @@ async function reviewerDom(){
   const REVIEWER = { via: "reviewer", reviewer: true, name: "Hana Highways", email: "hana@client.example", label: "Highways client (fictional)",
     group_name: "Highways client (fictional)", kind: "reviewer", role: null, can_approve: false, two_step: true, user_id: "r1", ipts: [] };
   const LIST = { group_name: "Highways client (fictional)", scheme: "Wolds Link",
-    clps: [{ id: "auto-L019-IPT1", name: "Tilton Viaduct site", team_name: "North Team", issue_no: 2, sent_at: "2026-10-31T09:00:00Z", sent_by: "Pat Planner", state: "waiting" },
+    clps: [{ id: "auto-L019-IPT1", name: "Tilton Viaduct site", team_name: "North Team", issue_no: 2, sent_at: "2026-10-31T09:00:00Z", sent_by: "Pat Planner", state: "waiting", tasks_open: 1 },
            { id: "auto-L006-all", name: "Langton Compound", team_name: "All teams", issue_no: 1, sent_at: "2026-10-20T09:00:00Z", sent_by: "Pat Planner", state: "accepted",
              decided_by: "Hana Highways", decided_at: "2026-10-22T09:00:00Z" }] };
   const ONE = (extra) => ({ id: "auto-L019-IPT1", name: "Tilton Viaduct site", team_name: "North Team", group_name: "Highways client (fictional)", can_decide: true,
@@ -3182,7 +3254,14 @@ async function reviewerDom(){
              { no: 1, sent_at: "2026-10-20T09:00:00Z", sent_by: "Pat Planner", at: "2026-10-24T09:00:00Z",
                decisions: [{ decision: "returned", word: "Returned", by: "Hana Highways", words: "Add the Saturday hours" }] }],
     thread: [{ kind: "step", id: "s1", step: "review-sent", step_word: "Issue 2 sent to Highways client (fictional)", by: "Pat Planner", at: "2026-10-31T09:00:00Z" },
-             { kind: "note", id: "c1", words: "Saturday hours are now in 4.1.", by: "Pat Planner", org: "Wolds Link", at: "2026-10-31T09:01:00Z" }], ...(extra || {}) });
+             { kind: "note", id: "c1", words: "Saturday hours are now in 4.1.", by: "Pat Planner", org: "Wolds Link", at: "2026-10-31T09:01:00Z" }],
+    // 31 Oct 2026 (PR 3d): the group's own tasks — one for the group (theirs to tick), one they gave the contractor (theirs to delete)
+    tasks: [{ id: "t1", words: "Send back the agreed gate hours", for: "group", for_word: "Your group", for_side: "client", due: "2026-11-05", overdue: false,
+              done: false, written_by: "Pat Planner", mine: true, can_tick: true, can_change: false },
+            { id: "t2", words: "Show the Saturday hours in section 5", for: "approvers", for_word: "The contractor", for_side: "contractor", due: null, overdue: false,
+              done: false, written_by: "Hana Highways", mine: false, can_tick: false, can_change: true }],
+    for_options: [{ key: "approvers", word: "The contractor (planners and admins)" }, { key: "group", word: "Your group" }, { key: "reviewer:r2", word: "Alex Example" }],
+    task_counts: { ours: 1, theirs: 1 }, ...(extra || {}) });
   const calls = []; let one = ONE();
   const answer = (status, data) => Promise.resolve({ ok: status < 300, status, json: () => Promise.resolve(data), text: () => Promise.resolve(JSON.stringify(data)),
     blob: () => Promise.resolve(new w.Blob(["docx"])), headers: { get: (h) => /disposition/i.test(h) ? 'attachment; filename="Tilton CLP Issue 2.docx"' : null } });
@@ -3197,6 +3276,7 @@ async function reviewerDom(){
     if (/\/api\/review\/clps\/auto-L019-IPT1\/issues\/2\.docx$/.test(u)) return answer(200, null);
     if (/\/api\/review\/clps\/auto-L019-IPT1\/comments$/.test(u)) return answer(200, ONE({ thread: [...one.thread, { kind: "note", id: "c9", words: "Thanks", by: "Hana Highways", org: "Highways client (fictional)", at: "2026-10-31T10:00:00Z" }] }));
     if (/\/api\/review\/clps\/auto-L019-IPT1\/decision$/.test(u)) return answer(200, ONE({ latest: { ...one.latest, state: "accepted", by: "Hana Highways", at: "2026-10-31T10:05:00Z" } }));
+    if (/\/api\/review\/clps\/auto-L019-IPT1\/tasks(\/[^/]+)?$/.test(u)) return answer(200, ONE());
     if (/\/api\/activity$/.test(u)) return answer(200, { ok: true, recorded: true });
     return new Promise(() => {});
   };
@@ -3230,6 +3310,8 @@ async function reviewerDom(){
   ok("⭐ REVIEWER DOM: the list — each CLP with its team NAME, issue, who sent it, and the group's decision",
      !!page().querySelector("[data-review-table]") && trs().length === 2 && /North Team/.test(trs()[0].textContent) && /Issue 2/.test(trs()[0].textContent)
      && /Waiting for your group/.test(trs()[0].textContent) && /Accepted by Hana Highways · 22 Oct/.test(trs()[1].textContent) && !/IPT\d/.test(page().textContent));
+  ok("REVIEWER DOM (PR 3d, Q8): the list says '1 task for your group' on that CLP only",
+     /1 task for your group/.test(trs()[0].textContent) && !/for your group/.test(trs()[1].textContent.replace(/Waiting for your group/, "")));
   await press(trs()[0].querySelector("button.row-open"));
   const clp = () => box.querySelector('[data-review-clp="auto-L019-IPT1"]');
   ok("⭐ REVIEWER DOM: opening a CLP — its name, team and issue; Download Issue 2 (Word); the history with Issue 1's return; the comments with the grey sent line",
@@ -3238,19 +3320,40 @@ async function reviewerDom(){
      && clp().querySelectorAll("[data-review-history] tbody tr").length === 2 && /Returned by Hana Highways: “Add the Saturday hours”/.test(clp().querySelector("[data-review-history]").textContent)
      && /^↗ Issue 2 sent to Highways client \(fictional\) by Pat Planner/.test(clp().querySelector('[data-review-step="review-sent"]').textContent)
      && /Saturday hours are now in 4\.1\./.test(clp().querySelector("[data-review-thread]").textContent));
-  ok("🔴 REVIEWER DOM: the open CLP shows no task, no team note box, no Approve and no edit", !/Tasks|Approve|Edit cover|Notes and tasks/.test(clp().textContent));
+  // NARROWED 31 Oct 2026 (PR 3d, Q5): the reviewer now has their GROUP's tasks (Notes and tasks); still no contractor task, no
+  // team note box, no Approve and no edit
+  ok("🔴 REVIEWER DOM: the open CLP shows no contractor task, no team note box, no Approve and no edit",
+     !/Approve|Edit cover|Ask Melton|To complete|\+ Add a note for/.test(clp().textContent) && !clp().querySelector("[data-clp-notes], [data-clp-tasks]"));
+  const rtr = () => [...clp().querySelectorAll("[data-review-tasks] tbody tr")];
+  ok("⭐ REVIEWER DOM (PR 3d): Notes and tasks — '1 open for your group · 1 open for the contractor'; the group's task has a Done box, the contractor's a greyed one; Delete only on their own",
+     /Notes and tasks/.test(clp().textContent) && /1 open for your group · 1 open for the contractor/.test(clp().textContent) && rtr().length === 2
+     && !rtr()[0].querySelector('input[type="checkbox"]').disabled && rtr()[1].querySelector('input[type="checkbox"]').disabled
+     && !rtr()[0].querySelector("button") && !!rtr()[1].querySelector("button") && /from Pat Planner/.test(rtr()[0].textContent));
+  await press(rtr()[0].querySelector('input[type="checkbox"]'));
+  ok("⭐ REVIEWER DOM (PR 3d): ticking the group's task PATCHes done: true under /review/",
+     calls.some(c => /\/api\/review\/clps\/auto-L019-IPT1\/tasks\/t1$/.test(c.u) && c.method === "PATCH" && c.body && c.body.done === true && Object.keys(c.body).join() === "done"));
+  await press(clp().querySelector("[data-review-add-task]"));
+  ok("REVIEWER DOM (PR 3d): + Add a task — For: the contractor, the group, the other reviewer",
+     [...clp().querySelectorAll("#rv-tf option")].map(o => o.textContent).join("|") === "The contractor (planners and admins)|Your group|Alex Example");
+  await setText(clp().querySelector("#rv-tw"), "Send us the gate plan");
+  await press(clp().querySelector("[data-review-task-save]"));
+  ok("⭐ REVIEWER DOM (PR 3d): Add task POSTs words, For and due under /review/ and says so",
+     calls.some(c => /\/api\/review\/clps\/auto-L019-IPT1\/tasks$/.test(c.u) && c.method === "POST" && c.body && c.body.words === "Send us the gate plan"
+                     && c.body.for === "approvers" && c.body.due === null) && /Task added\./.test(clp().textContent) && !clp().querySelector("[data-review-task-form]"));
   w.URL.createObjectURL = () => "blob:x"; w.URL.revokeObjectURL = () => {};
   await press(clp().querySelector("[data-review-download]"));
   ok("⭐ REVIEWER DOM: Download reads the review copy of Issue 2 (never the staff download)",
      calls.some(c => /\/api\/review\/clps\/auto-L019-IPT1\/issues\/2\.docx$/.test(c.u)) && !calls.some(c => /\/api\/clp\//.test(c.u)));
   await press(clp().querySelector("[data-review-return]"));
+  // NARROWED 31 Oct 2026 (PR 3d, Q7): "comment box" is "note box"
   ok("🔴 REVIEWER DOM: Return with comments with an empty box sends nothing and asks for the comment first",
-     !calls.some(c => /\/decision$/.test(c.u)) && /Write what needs changing in the comment box first\./.test(clp().textContent));
+     !calls.some(c => /\/decision$/.test(c.u)) && /Write what needs changing in the note box first\./.test(clp().textContent));
   await setText(clp().querySelector("#rv-words"), "Thanks");
   await press(clp().querySelector("[data-review-comment]"));
   const cc = calls.find(c => /\/comments$/.test(c.u) && c.method === "POST");
+  // NARROWED 31 Oct 2026 (PR 3d, Q7): Add comment is Add note, "Note added."
   ok("⭐ REVIEWER DOM: Add comment posts the words only and the thread shows it",
-     cc && JSON.stringify(cc.body) === JSON.stringify({ words: "Thanks" }) && /Comment added\./.test(clp().textContent) && clp().querySelector("#rv-words").value === "");
+     cc && JSON.stringify(cc.body) === JSON.stringify({ words: "Thanks" }) && /Note added\./.test(clp().textContent) && clp().querySelector("#rv-words").value === "");
   let asked = ""; const oldConfirm = w.confirm; w.confirm = (q) => { asked = q; return false; };
   await press(clp().querySelector("[data-review-accept]"));
   ok("🔴 REVIEWER DOM: Accept asks once — 'Accept Issue 2 of the Tilton Viaduct site CLP for Highways client (fictional)?' — and a No sends nothing",

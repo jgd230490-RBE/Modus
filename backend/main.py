@@ -5235,7 +5235,8 @@ class ClpNoteIn(BaseModel):
     note: Optional[str] = None
     task: Optional[dict] = None     # 31 Oct 2026 (PR 3b): Ask for changes may add its note as a task {"due": …}
     send_to: Optional[List[str]] = None     # PR 3c: Approve … and send the new issue to these reviewer groups
-    show_to: Optional[str] = None           # PR 3c: a note shown to one reviewer group the CLP was sent to
+    show_to: Optional[str] = None           # PR 3c: a note shown to one reviewer group (PR 3d: = `group`)
+    group: Optional[str] = None             # PR 3d: write in that client group's thread (planners and admins)
 
 
 class ClpReviewSendIn(BaseModel):
@@ -5369,6 +5370,7 @@ class ClpTaskIn(BaseModel):
     due: Optional[str] = None
     from_line: Optional[str] = None
     from_note: Optional[str] = None         # PR 3c: Make a task from a client reviewer's comment
+    group: Optional[str] = None             # PR 3d: a task in that client group's thread
     done: Optional[bool] = None
     model_config = {"extra": "allow"}
 
@@ -5390,7 +5392,7 @@ def clp_notes_read(clp_id: str):
 
 @app.post("/api/clp/documents/{clp_id}/notes")
 def clp_notes_add(clp_id: str, body: ClpNoteIn):
-    return _clp_out(clp_notes.add_note(clp_id, body.note, _require_access(), show_to=body.show_to))
+    return _clp_out(clp_notes.add_note(clp_id, body.note, _require_access(), show_to=body.show_to, group=body.group))
 
 
 @app.delete("/api/clp/documents/{clp_id}/notes/{item_id}")
@@ -5468,6 +5470,34 @@ def review_clp_issue(clp_id: str, issue_no: int, request: Request = None):
 @app.post("/api/review/clps/{clp_id}/comments")
 def review_clp_comment(clp_id: str, body: ReviewCommentIn):
     return _review_out(clp_reviews.comment(clp_id, body.words, _require_reviewer()))
+
+
+class ReviewTaskIn(BaseModel):
+    words: Optional[str] = None
+    due: Optional[str] = None
+    done: Optional[bool] = None
+    model_config = {"extra": "allow"}
+
+
+# PR 3d: the reviewer's tasks and deletes, in their group's thread only (clp_reviews.task / change_task / remove)
+@app.post("/api/review/clps/{clp_id}/tasks")
+def review_clp_task(clp_id: str, body: ReviewTaskIn):
+    return _review_out(clp_reviews.task(clp_id, _task_body(body), _require_reviewer()))
+
+
+@app.patch("/api/review/clps/{clp_id}/tasks/{task_id}")
+def review_clp_task_change(clp_id: str, task_id: str, body: ReviewTaskIn):
+    return _review_out(clp_reviews.change_task(clp_id, task_id, _task_body(body), _require_reviewer()))
+
+
+@app.delete("/api/review/clps/{clp_id}/notes/{item_id}")
+def review_clp_note_delete(clp_id: str, item_id: str):
+    return _review_out(clp_reviews.remove(clp_id, item_id, _require_reviewer()))
+
+
+@app.delete("/api/review/clps/{clp_id}/tasks/{task_id}")
+def review_clp_task_delete(clp_id: str, task_id: str):
+    return _review_out(clp_reviews.remove(clp_id, task_id, _require_reviewer()))
 
 
 @app.post("/api/review/clps/{clp_id}/decision")

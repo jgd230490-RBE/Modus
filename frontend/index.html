@@ -4790,7 +4790,7 @@ function ClpNotes({ clp, teamWord, headRef, onClose, onChanged }){
   const [words, setWords] = useState("");
   const [tf, setTf] = useState(null);             // the task form: null | { id?, words, for, due, from_line }
   const [allLines, setAllLines] = useState(false);
-  const [showTo, setShowTo] = useState("");       // PR 3c: a contractor note shown to one reviewer group ("" = only us)
+  const [tab, setTab] = useState("");             // PR 3d: "" = the contractor's thread, else a client group's id
   const base = `${API}/clp/documents/${encodeURIComponent(clp.id)}`;
   useEffect(() => {
     let live = true;
@@ -4808,43 +4808,67 @@ function ClpNotes({ clp, teamWord, headRef, onClose, onChanged }){
   if(err) return <div className="card p-4 mb-4" data-clp-notes="1">{head}<p className="text-sm" style={{ color: "var(--bad-text)" }}>{err}</p>
     <button type="button" className="btn-sec mt-2" onClick={onClose}>Close</button></div>;
   if(!t) return <div className="card p-4 mb-4" data-clp-notes="1">{head}<p className="text-sm text-slate-500">Loading…</p></div>;
-  const open = t.tasks.filter(x => !x.done), done = t.tasks.filter(x => x.done);
-  const forOpts = t.for_options || [];
-  const lines = (t.lines && t.lines.items) || [];
+  // PR 3d (Q1): a tab for each client group the CLP was sent to (planners and admins only); none sent = no tabs, as before
+  const clients = t.clients || [];
+  const cl = tab ? clients.find(c => c.id === tab) : null;
+  const pick = (id) => { setTab(id); setTf(null); setWords(""); setMsg(null); };
+  const V = cl ? { tasks: cl.tasks, notes: cl.notes, for_options: cl.for_options, lines: null, group: cl.id, can_write: cl.can_write }
+               : { tasks: t.tasks, notes: t.notes, for_options: t.for_options, lines: t.lines, group: null, can_write: true };
+  const open = V.tasks.filter(x => !x.done), done = V.tasks.filter(x => x.done);
+  const forOpts = V.for_options || [];
+  const lines = (V.lines && V.lines.items) || [];
+  const grp = V.group ? { group: V.group } : {};
+  const ourOpen = (x) => !x.done && x.can_tick !== false;
   const startTask = () => { setAllLines(false); setTf({ words: "", for: forOpts[0] ? forOpts[0].key : "approvers", due: "", from_line: "" }); };
   const editTask = (x) => setTf({ id: x.id, words: x.words, for: x.for, due: x.due || "", from_line: x.from_line || "" });
   const saveTask = () => {
     const body = { words: tf.words, for: tf.for, due: tf.due || null };
     const go = tf.id ? call("PATCH", `tasks/${encodeURIComponent(tf.id)}`, body, "The task was not saved.", mailed("Saved."))
-                     : call("POST", "tasks", { ...body, from_line: tf.from_line || null }, "The task was not added.", mailed("Task added."));
+                     : call("POST", "tasks", { ...body, from_line: tf.from_line || null, ...grp }, "The task was not added.", mailed("Task added."));
     go.then(d => { if(d) setTf(null); });
   };
   const tick = (x) => call("PATCH", `tasks/${encodeURIComponent(x.id)}`, { done: !x.done }, x.done ? "The task was not ticked back." : "The task was not ticked done.");
   const delTask = (x) => { if(window.confirm(`Delete the task "${x.words.slice(0, 80)}"?`)) call("DELETE", `tasks/${encodeURIComponent(x.id)}`, null, "The task was not deleted.", () => "Deleted."); };
   const delNote = (n) => { if(window.confirm("Delete this note?")) call("DELETE", `notes/${encodeURIComponent(n.id)}`, null, "The note was not deleted.", () => "Deleted."); };
-  const addNote = () => call("POST", "notes", { note: words, show_to: showTo || null }, "The note was not saved.", () => "Note added.").then(d => { if(d){ setWords(""); setShowTo(""); } });
-  // PR 3c: a reviewer's comment made into a task (planners and admins); the task names the group it came from
-  const taskFrom = (n) => call("POST", "tasks", { words: n.words, for: forOpts[0] ? forOpts[0].key : "approvers", from_note: n.id },
+  const addNote = () => call("POST", "notes", { note: words, ...grp }, "The note was not saved.", () => "Note added.").then(d => { if(d) setWords(""); });
+  // PR 3c / 3d (Q6): a client's note made into a task in that client's tab, for the planners and admins
+  const taskFrom = (n) => call("POST", "tasks", { words: n.words, for: "approvers", from_note: n.id },
     "The task was not added.", mailed("Task added."));
-  const showOpts = t.show_to || [];
+  const team = teamWord(clp);
+  const who = cl ? `${cl.name}, planners and admins` : (clients.length ? `${team}, planners and admins` : null);
   return (
     <div className="card p-4 mb-4" data-clp-notes="1">
       {head}
+      {clients.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2 mb-1" role="tablist" aria-label="Whose notes and tasks" data-clp-tabs="1">
+          {[{ id: "", name: "Contractor", open: t.tasks.filter(x => !x.done).length }, ...clients].map(c => (
+            <button key={c.id || "contractor"} type="button" role="tab" aria-selected={tab === c.id} data-clp-tab={c.id || "contractor"}
+              className={"rounded-full px-3 py-1 text-[13px] font-semibold " + (tab === c.id ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}
+              style={tab === c.id ? { background: "var(--navy)" } : undefined} onClick={() => pick(c.id)}>
+              {c.name}{c.open ? <span className="font-normal"> · {c.open} open</span> : null}</button>))}
+        </div>
+      )}
+      {who && <p className="text-[13px] text-slate-500 mb-1" data-clp-who="1">{cl
+        ? <>{cl.name}'s reviewers, planners and admins. {clp.team ? `${team} does not see this tab.` : "The teams do not see this tab."}{cl.stopped ? " The group is stopped: nothing new can be written here." : ""}</>
+        : <>{team}, planners and admins. The client never sees this tab.</>}</p>}
       {msg && <p className="text-sm mb-1" style={{ color: msg.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{msg.text}</p>}
-      <h3 className="clp-h3">Tasks <span className="font-normal text-slate-500">{open.length} open{done.length ? ` · ${done.length} done` : ""}{showOpts.length ? " · never shown to the client's reviewers" : ""}</span></h3>
+      <h3 className="clp-h3">Tasks <span className="font-normal text-slate-500">{open.length} open{done.length ? ` · ${done.length} done` : ""}</span></h3>
       {open.length > 0 && (
         <div className="overflow-x-auto"><table className="tbl clp-tasks" data-clp-tasks="1">
           <thead><tr><th scope="col"><span className="sr-only">Done</span></th><th scope="col">Task</th><th scope="col">For</th><th scope="col">Due</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
           <tbody>{open.map(x => (
             <tr key={x.id} data-clp-task={x.id}>
-              <td style={{ width: 36 }}><input type="checkbox" checked={false} aria-label={`Done: ${x.words}`} onChange={() => tick(x)} /></td>
+              <td style={{ width: 36 }}>{ourOpen(x)
+                ? <input type="checkbox" checked={false} aria-label={`Done: ${x.words}`} onChange={() => tick(x)} />
+                : <input type="checkbox" checked={false} disabled aria-label={`Done: ${x.words}. The client ticks it`} />}</td>
               <td style={{ whiteSpace: "normal", minWidth: 240 }}><span className="clp-words">{x.words}</span>
                 {x.from_section && <span className="rd-chip ml-1.5">To complete · {x.from_section}</span>}
-                {x.from_group && <span className="block text-[12px] text-slate-500">From {x.from_group}'s comment</span>}
+                {x.from_note_by && <span className="block text-[12px] text-slate-500">From {x.from_note_by}'s note</span>}
+                {x.by_client && <span className="block text-[12px] text-slate-500"><span className="clp-org">{cl ? cl.name : ""}</span>{x.written_by}</span>}
                 {x.line_gone_at && <span className="block text-[12px]" style={{ color: "var(--ok-text)" }}>✓ no longer in the draft of {clpShort(x.line_gone_at)}</span>}</td>
               <td>{x.for_word}</td>
               <td className="tabular-nums">{x.due ? clpShort(x.due) : "—"}{x.overdue && <span className="block text-[12px] font-semibold" style={{ color: "var(--bad-text)" }}>overdue</span>}</td>
-              <td>{x.can_change && <RowMenu name={x.words.slice(0, 60)}>
+              <td>{x.can_change && V.can_write && <RowMenu name={x.words.slice(0, 60)}>
                 <button type="button" onClick={() => editTask(x)}>Edit</button>
                 <button type="button" style={{ color: "var(--red)" }} onClick={() => delTask(x)}>Delete…</button></RowMenu>}</td>
             </tr>))}</tbody>
@@ -4854,12 +4878,14 @@ function ClpNotes({ clp, teamWord, headRef, onClose, onChanged }){
         <details className="mt-2" data-clp-done="1"><summary className="text-[13px] text-slate-600 cursor-pointer">{done.length} done</summary>
           <ul className="mt-1">{done.map(x => (
             <li key={x.id} className="flex items-start gap-2 text-sm py-1" data-clp-task={x.id}>
-              <input type="checkbox" checked aria-label={`Done: ${x.words}. Tick back`} onChange={() => tick(x)} className="mt-1" />
+              {x.can_tick !== false && V.can_write
+                ? <input type="checkbox" checked aria-label={`Done: ${x.words}. Tick back`} onChange={() => tick(x)} className="mt-1" />
+                : <input type="checkbox" checked disabled aria-label={`Done: ${x.words}`} className="mt-1" />}
               <span><span className="clp-words">{x.words}</span> <span className="text-[12px] text-slate-500">done by {x.done_by}, {clpShort(x.done_at)}</span></span>
             </li>))}</ul>
         </details>
       )}
-      {tf ? (
+      {!V.can_write ? null : tf ? (
         <div className="mt-3" data-clp-task-form="1">
           <div className="clp-form">
             <div className="clp-fld clp-wide"><label htmlFor="clp-tw">Task</label>
@@ -4870,7 +4896,7 @@ function ClpNotes({ clp, teamWord, headRef, onClose, onChanged }){
             <div className="clp-fld"><label htmlFor="clp-td">Due (optional)</label>
               <input id="clp-td" type="date" className="ctl w-full" value={tf.due || ""} onChange={e => setTf(f => ({ ...f, due: e.target.value }))} /></div>
           </div>
-          {!tf.id && (
+          {!tf.id && !V.group && (
             <fieldset className="mt-3" data-clp-lines="1"><legend className="text-[13px] text-slate-500 mb-1">From a “To complete” line (optional)</legend>
               {!lines.length ? <p className="text-[13px] text-slate-500">No draft built yet. Download the draft once, then its yellow lines are listed here.</p> : (<>
                 {(allLines ? lines : lines.slice(0, 4)).map(l => (
@@ -4887,29 +4913,25 @@ function ClpNotes({ clp, teamWord, headRef, onClose, onChanged }){
         </div>
       ) : <button type="button" className="btn-sec mt-2" onClick={startTask} data-clp-add-task="1">+ Add a task</button>}
       <h3 className="clp-h3">Notes</h3>
-      <ol className="clp-thread" data-clp-thread="1">
-        {!t.notes.length && <li className="text-[13px] text-slate-500">No notes yet.</li>}
-        {t.notes.map(n => n.kind === "step" ? (
-          <li key={n.id || n.step + n.at} className="clp-step" data-clp-step={n.step}>{n.step === "review-returned" ? "↩" : n.step === "review-accepted" ? "✓" : "↗"} {n.step_word} by {n.by || "—"} · {clpWhen(n.at)}{n.words ? <> · “{n.words}”</> : null}</li>
+      <ol className="clp-thread" data-clp-thread={cl ? cl.id : "1"}>
+        {!V.notes.length && <li className="text-[13px] text-slate-500">No notes yet.</li>}
+        {V.notes.map(n => n.kind === "step" ? (
+          <li key={n.id || n.step + n.at} className="clp-step" data-clp-step={n.step}>{n.step === "review-returned" ? "↩" : n.step === "review-accepted" ? "✓" : "↗"} {n.step_word} by {n.by || "—"} · {clpWhen(n.at)}{n.words ? <> · “{n.words}”</> : null}
+            {!cl && n.group_id && clients.some(c => c.id === n.group_id) && <button type="button" className="link-btn text-[12px] ml-2" onClick={() => pick(n.group_id)} data-clp-open-tab={n.group_id}>Open its tab</button>}</li>
         ) : (
           <li key={n.id} data-clp-note-row={n.id}>
-            <div className="text-[12px] text-slate-500">{n.reviewer && n.group_name ? <span className="clp-org" data-clp-org="1">{n.group_name}</span> : null}{n.by} · {clpWhen(n.at)}
-              {n.shown_to && <span className="ml-1">· shown to {n.shown_to}</span>}
-              {n.can_task && <button type="button" className="link-btn text-[12px] ml-2" aria-label={`Make a task from the comment by ${n.by}`} onClick={() => taskFrom(n)} data-clp-make-task="1">Make a task</button>}
-              {n.can_delete && <button type="button" className="link-btn text-[12px] ml-2" aria-label={`Delete the note by ${n.by}, ${clpWhen(n.at)}`} onClick={() => delNote(n)}>Delete</button>}</div>
+            <div className="text-[12px] text-slate-500">{n.reviewer ? <span className="clp-org" data-clp-org="1">{n.org}</span> : null}{n.by} · {clpWhen(n.at)}
+              {n.can_task && <button type="button" className="link-btn text-[12px] ml-2" aria-label={`Make a task from the note by ${n.by}`} onClick={() => taskFrom(n)} data-clp-make-task="1">Make a task</button>}
+              {n.can_delete && V.can_write && <button type="button" className="link-btn text-[12px] ml-2" aria-label={`Delete the note by ${n.by}, ${clpWhen(n.at)}`} onClick={() => delNote(n)}>Delete</button>}</div>
             <div className="clp-words">{n.words}</div>
           </li>))}
       </ol>
-      <label htmlFor="clp-nn" className="block text-[13px] text-slate-500 mb-1">Add a note</label>
-      <textarea id="clp-nn" className="ctl w-full" rows={2} maxLength={1000} placeholder="Write a note for everyone who can see this CLP" value={words} onChange={e => setWords(e.target.value)} />
-      {showOpts.length > 0 && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm" data-clp-show-to="1">{showOpts.map(o => (
-          <label key={o.id} className="inline-flex items-center gap-1.5"><input type="checkbox" checked={showTo === o.id} onChange={e => setShowTo(e.target.checked ? o.id : "")} />
-            Show to {o.name}</label>))}
-          <span className="text-[13px] text-slate-500">Off: only {TENANT.name && TENANT.name !== "Wayscope" ? TENANT.name + "'s" : "the contractor's"} people see it.</span></div>
-      )}
+      {V.can_write && <>
+        <label htmlFor="clp-nn" className="block text-[13px] text-slate-500 mb-1">Add a note</label>
+        <textarea id="clp-nn" className="ctl w-full" rows={2} maxLength={1000} placeholder={who ? `Write a note for ${who}` : "Write a note for everyone who can see this CLP"} value={words} onChange={e => setWords(e.target.value)} />
+      </>}
       <div className="flex flex-wrap items-center gap-2 mt-2">
-        <button type="button" className="btn-pri" onClick={addNote} disabled={!words.trim()} data-clp-note-add="1">Add note</button>
+        {V.can_write && <button type="button" className="btn-pri" onClick={addNote} disabled={!words.trim()} data-clp-note-add="1">Add note</button>}
         <button type="button" className="btn-sec" onClick={onClose}>Close</button>
       </div>
     </div>
@@ -4944,7 +4966,8 @@ function ClpPage({ access }){
   const teamWord = (c) => c.team_name || "All teams";
   const tk = (c) => c.tasks || {};
   const list = (data.clps || []).filter(c => (!fTeam || (fTeam === "all" ? !c.team : c.team === fTeam)) && (!fStatus || c.status === fStatus)
-    && (!fTasks || (fTasks === "open" ? tk(c).open > 0 : fTasks === "mine" ? tk(c).mine_open > 0 : tk(c).overdue > 0))
+    && (!fTasks || (fTasks === "open" ? tk(c).open + (tk(c).client_open || 0) > 0 : fTasks === "mine" ? tk(c).mine_open + (tk(c).client_mine_open || 0) > 0
+      : tk(c).overdue + (tk(c).client_overdue || 0) > 0))   // PR 3d (Q8): + the client tabs' tasks
     && (!fRev || (c.reviews || []).some(r => r.state === fRev)));
   const close = () => { setPanel(null); setPv(null); };
   const send = (method, path, body, what, done) => fetch(`${API}${path}`, { method, headers: { "Content-Type": "application/json" },
@@ -5126,6 +5149,7 @@ function ClpPage({ access }){
           {pv.tasks && pv.tasks.open > 0 && <p className="mb-2" data-clp-approve-tasks="1">
             <b>{pv.tasks.open} task{pv.tasks.open === 1 ? "" : "s"} still open</b>{pv.tasks.overdue ? <>, <span style={{ color: "var(--bad-text)" }}>{pv.tasks.overdue} overdue</span>{pv.tasks.first_overdue ? <>: “{pv.tasks.first_overdue}”</> : null}</> : null}.{" "}
             <button type="button" className="link-btn" onClick={() => openNotes(panel.clp)}>See the tasks</button></p>}
+          {pv.tasks && pv.tasks.client_open > 0 && <p className="mb-2" data-clp-approve-client="1">{pv.tasks.client_open} task{pv.tasks.client_open === 1 ? "" : "s"} open with the client.</p>}
           <p className="font-medium text-slate-700">{pv.last_issue ? `Changed in the plan since Issue ${pv.last_issue.no} (${clpDay(pv.last_issue.date)}):` : "The first issue."}</p>
           {pv.last_issue && <ul className="list-disc pl-5 mt-1 text-slate-700" data-clp-changes="1">{(pv.changes || []).map((x, i) => <li key={i}>{x}</li>)}</ul>}
         </div>
@@ -5249,7 +5273,8 @@ function ClpPage({ access }){
                   <td data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open
                       {tk(c).overdue > 0 ? <span className="block text-[12px] font-semibold" style={{ color: "var(--bad-text)" }}>{tk(c).overdue} overdue</span>
                         : tk(c).next_due ? <span className="block text-[12px] text-slate-500">due {clpShort(tk(c).next_due)}</span> : null}</>
-                    : tk(c).notes > 0 ? <span className="text-slate-600">{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}</span> : "—"}</td>
+                    : tk(c).notes > 0 ? <span className="text-slate-600">{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}</span> : tk(c).client_open > 0 ? null : "—"}
+                    {tk(c).client_open > 0 && <span className="block text-[12px] text-slate-600" data-clp-tasks-client="1">+ {tk(c).client_open} with the client</span>}</td>
                   {appr && <td className="num tabular-nums">{c.cover_typed} of {c.cover_total}</td>}
                   <td><div className="flex items-center gap-2 justify-end">{primary(c)}
                     <RowMenu name={c.name + " · " + teamWord(c)}>
@@ -6231,6 +6256,7 @@ function ReviewPage({ role }){
   const [words, setWords] = useState("");
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [rtf, setRtf] = useState(null);          // PR 3d: the task form, null | { words, for, due }
   const [narrow, setNarrow] = useState(() => { try { return !!(window.matchMedia && window.matchMedia("(max-width: 767px)").matches); } catch(e){ return false; } });
   const headRef = useRef(null);
   useEffect(() => {
@@ -6248,19 +6274,21 @@ function ReviewPage({ role }){
   }, [tick]);
   useEffect(() => { if((open || openErr) && headRef.current) headRef.current.focus(); }, [open && open.id, openErr]);
   const show = (id) => {
-    setOpenErr(""); setMsg(null); setWords("");
+    setOpenErr(""); setMsg(null); setWords(""); setRtf(null);
     fetch(`${API}/review/clps/${encodeURIComponent(id)}`).then(okJSON).then(setOpen)
       .catch(e => setOpenErr(errSay("The CLP did not open.", e)));
   };
-  const back = () => { setOpen(null); setOpenErr(""); setMsg(null); setWords(""); };
-  const post = (path, body, what, done) => {
+  const back = () => { setOpen(null); setOpenErr(""); setMsg(null); setWords(""); setRtf(null); };
+  // PR 3d: tasks (add, tick, delete) and a note's delete go the same way; only a note or a decision empties the box
+  const send = (method, path, body, what, done, clear) => {
     setBusy(true); setMsg(null);
-    return fetch(`${API}/review/clps/${encodeURIComponent(open.id)}/${path}`, { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body) }).then(okJSON)
-      .then(d => { setOpen(d); setMsg({ ok: true, text: done }); setWords(""); setTick(t => t + 1); return true; })
+    return fetch(`${API}/review/clps/${encodeURIComponent(open.id)}/${path}`, { method, headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined }).then(okJSON)
+      .then(d => { setOpen(d); setMsg({ ok: true, text: done }); if(clear) setWords(""); setTick(t => t + 1); return true; })
       .catch(e => { setMsg({ ok: false, text: errSay(what, e) }); return false; })
       .finally(() => setBusy(false));
   };
+  const post = (path, body, what, done) => send("POST", path, body, what, done, true);
   const download = async (no) => {
     setMsg(null);
     try {
@@ -6285,6 +6313,11 @@ function ReviewPage({ role }){
         <button type="button" className="btn-sec" onClick={back}>Back to the list</button>
       </div>);
     const L = open.latest, n = L.no;
+    const tasks = open.tasks || [], openT = tasks.filter(x => !x.done), doneT = tasks.filter(x => x.done);
+    const tc = open.task_counts || { ours: 0, theirs: 0 };
+    const rtick = (x) => send("PATCH", `tasks/${encodeURIComponent(x.id)}`, { done: !x.done }, x.done ? "The task was not ticked back." : "The task was not ticked done.",
+      x.done ? "Ticked back." : "Ticked done.");
+    const rdel = (kind, id, word) => { if(window.confirm(`Delete this ${word}?`)) send("DELETE", `${kind}/${encodeURIComponent(id)}`, null, `The ${word} was not deleted.`, "Deleted."); };
     return (
       <div className="max-w-5xl mx-auto p-6 pb-2" data-page="review" data-review-clp={open.id}>
         <button type="button" className="link-btn text-sm mb-2" onClick={back}>← CLPs for review</button>
@@ -6310,31 +6343,80 @@ function ReviewPage({ role }){
                   aria-label={`Download Issue ${i.no}`} onClick={() => download(i.no)}>Download</button>}</td></tr>))}</tbody>
           </table></div>
         </div>
-        <div className="card p-4 mb-4">
-          <h3 className="clp-h3" style={{ marginTop: 0 }}>Comments</h3>
+        <div className="card p-4 mb-4" data-review-notes="1">
+          <h3 className="clp-h3" style={{ marginTop: 0 }}>Notes and tasks</h3>
+          <p className="text-[13px] text-slate-500 mb-1">Your group and {scheme}'s planners and admins.</p>
+          <h3 className="clp-h3">Tasks <span className="font-normal text-slate-500">{tc.ours} open for your group · {tc.theirs} open for the contractor</span></h3>
+          {openT.length > 0 && (
+            <div className="overflow-x-auto"><table className="tbl clp-tasks" data-review-tasks="1">
+              <thead><tr><th scope="col"><span className="sr-only">Done</span></th><th scope="col">Task</th><th scope="col">For</th><th scope="col">Due</th><th scope="col"><span className="sr-only">Delete</span></th></tr></thead>
+              <tbody>{openT.map(x => (
+                <tr key={x.id} data-review-task={x.id}>
+                  <td style={{ width: 36 }}>{x.can_tick
+                    ? <input type="checkbox" checked={false} disabled={busy} aria-label={`Done: ${x.words}`} onChange={() => rtick(x)} />
+                    : <input type="checkbox" checked={false} disabled aria-label={`Done: ${x.words}. The contractor ticks it`} />}</td>
+                  <td style={{ whiteSpace: "normal", minWidth: 220 }}><span className="clp-words">{x.words}</span>
+                    {!x.can_change && x.written_by && <span className="block text-[12px] text-slate-500">from {x.written_by}</span>}</td>
+                  <td>{x.for_word}</td>
+                  <td className="tabular-nums">{x.due ? clpShort(x.due) : "—"}{x.overdue && <span className="block text-[12px] font-semibold" style={{ color: "var(--bad-text)" }}>overdue</span>}</td>
+                  <td>{x.can_change && <button type="button" className="link-btn text-[12px]" aria-label={`Delete the task ${x.words.slice(0, 60)}`} onClick={() => rdel("tasks", x.id, "task")}>Delete</button>}</td>
+                </tr>))}</tbody>
+            </table></div>
+          )}
+          {doneT.length > 0 && (
+            <details className="mt-2" data-review-done="1"><summary className="text-[13px] text-slate-600 cursor-pointer">{doneT.length} done</summary>
+              <ul className="mt-1">{doneT.map(x => (
+                <li key={x.id} className="flex items-start gap-2 text-sm py-1" data-review-task={x.id}>
+                  {x.can_tick ? <input type="checkbox" checked disabled={busy} aria-label={`Done: ${x.words}. Tick back`} onChange={() => rtick(x)} className="mt-1" />
+                    : <input type="checkbox" checked disabled aria-label={`Done: ${x.words}`} className="mt-1" />}
+                  <span><span className="clp-words">{x.words}</span> <span className="text-[12px] text-slate-500">done by {x.done_by}, {clpShort(x.done_at)}</span></span>
+                </li>))}</ul>
+            </details>
+          )}
+          {rtf ? (
+            <div className="mt-3" data-review-task-form="1">
+              <div className="clp-form">
+                <div className="clp-fld clp-wide"><label htmlFor="rv-tw">Task</label>
+                  <textarea id="rv-tw" className="ctl w-full" rows={2} maxLength={1000} value={rtf.words} onChange={e => setRtf(f => ({ ...f, words: e.target.value }))} /></div>
+                <div className="clp-fld"><label htmlFor="rv-tf">For</label>
+                  <select id="rv-tf" className="ctl w-full" value={rtf.for} onChange={e => setRtf(f => ({ ...f, for: e.target.value }))}>
+                    {(open.for_options || []).map(o => <option key={o.key} value={o.key}>{o.word}</option>)}</select></div>
+                <div className="clp-fld"><label htmlFor="rv-td">Due (optional)</label>
+                  <input id="rv-td" type="date" className="ctl w-full" value={rtf.due || ""} onChange={e => setRtf(f => ({ ...f, due: e.target.value }))} /></div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <button type="button" className="btn-pri" disabled={busy || !(rtf.words || "").trim()} data-review-task-save="1"
+                  onClick={() => send("POST", "tasks", { words: rtf.words, for: rtf.for, due: rtf.due || null }, "The task was not added.", "Task added.").then(okd => { if(okd) setRtf(null); })}>Add task</button>
+                <button type="button" className="btn-sec" onClick={() => setRtf(null)}>Cancel</button>
+              </div>
+            </div>
+          ) : <button type="button" className="btn-sec mt-2" data-review-add-task="1"
+              onClick={() => setRtf({ words: "", for: ((open.for_options || [])[0] || { key: "approvers" }).key, due: "" })}>+ Add a task</button>}
+          <h3 className="clp-h3">Notes</h3>
           <ol className="clp-thread" data-review-thread="1">
-            {!open.thread.length && <li className="text-[13px] text-slate-500">No comments yet.</li>}
+            {!open.thread.length && <li className="text-[13px] text-slate-500">No notes yet.</li>}
             {open.thread.map(x => x.kind === "step" ? (
               <li key={x.id} className="clp-step" data-review-step={x.step}>{x.step === "review-returned" ? "↩" : x.step === "review-accepted" ? "✓" : "↗"} {x.step_word} by {x.by || "—"} · {clpWhen(x.at)}</li>
             ) : (
               <li key={x.id}>
-                <div className="text-[12px] text-slate-500">{x.by} · {x.org} · {clpWhen(x.at)}</div>
+                <div className="text-[12px] text-slate-500">{x.by} · {x.org} · {clpWhen(x.at)}
+                  {x.can_delete && <button type="button" className="link-btn text-[12px] ml-2" aria-label={`Delete your note of ${clpWhen(x.at)}`} onClick={() => rdel("notes", x.id, "note")}>Delete</button>}</div>
                 <div className="clp-words">{x.words}</div>
               </li>))}
           </ol>
-          <label htmlFor="rv-words" className="block text-[13px] text-slate-500 mb-1">Add a comment</label>
+          <label htmlFor="rv-words" className="block text-[13px] text-slate-500 mb-1">Add a note</label>
           <textarea id="rv-words" className="ctl w-full" rows={3} maxLength={2000} value={words} onChange={e => setWords(e.target.value)}
-            placeholder="Your comment goes to the contractor and to the other reviewers in your group" />
+            placeholder="Your note goes to the contractor and to the other reviewers in your group" />
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <button type="button" className="btn-sec" disabled={busy || !words.trim()} data-review-comment="1"
-              onClick={() => post("comments", { words }, "The comment was not saved.", "Comment added.")}>Add comment</button>
+              onClick={() => post("comments", { words }, "The note was not saved.", "Note added.")}>Add note</button>
             {open.can_decide ? <>
               <button type="button" className="btn-pri" disabled={busy} data-review-accept={n}
                 onClick={() => { if(window.confirm(`Accept Issue ${n} of the ${open.name} CLP for ${open.group_name}?`))
                   post("decision", { issue_no: n, decision: "accepted", words: words.trim() || null }, "Not accepted.", `Issue ${n} accepted.`); }}>Accept Issue {n}…</button>
               <button type="button" className="btn-sec" disabled={busy} data-review-return={n} style={{ color: "var(--bad-text)" }}
-                onClick={() => { if(!words.trim()){ setMsg({ ok: false, text: "Write what needs changing in the comment box first." }); return; }
-                  post("decision", { issue_no: n, decision: "returned", words }, "Not returned.", `Issue ${n} returned with your comment.`); }}>Return with comments…</button>
+                onClick={() => { if(!words.trim()){ setMsg({ ok: false, text: "Write what needs changing in the note box first." }); return; }
+                  post("decision", { issue_no: n, decision: "returned", words }, "Not returned.", `Issue ${n} returned with your note.`); }}>Return with comments…</button>
             </> : <span className="text-[13px] text-slate-500">The contractor has a newer issue that is not sent to {open.group_name} yet.</span>}
           </div>
         </div>
@@ -6353,6 +6435,7 @@ function ReviewPage({ role }){
             <li key={c.id} className="card p-4" data-review-row={c.id}>
               <div className="font-semibold text-slate-800">{c.name}</div>
               <div className="text-[13px] text-slate-500">{c.team_name} · Issue {c.issue_no} · sent {clpDay(c.sent_at)}</div>
+              {c.tasks_open > 0 && <div className="text-[13px] text-slate-600" data-review-tasks-open="1">{c.tasks_open} task{c.tasks_open === 1 ? "" : "s"} for your group</div>}
               <div className="mt-2"><RowStatus word={rvDecision(c.state, c.decided_by, c.decided_at)} tone={RV_STATE[c.state] ? RV_STATE[c.state][1] : "none"} more={0} /></div>
               <button type="button" className="btn-sec mt-3" style={{ minHeight: 44 }} onClick={() => show(c.id)} aria-label={`Open ${c.name}`}>Open</button>
             </li>))}</ul>
@@ -6363,7 +6446,8 @@ function ReviewPage({ role }){
               <tbody>{rows.map(c => (
                 <tr key={c.id} data-review-row={c.id}>
                   <td style={{ whiteSpace: "normal", minWidth: 220 }}><button type="button" className="row-open" aria-label={`Open ${c.name}`} onClick={() => show(c.id)}>{c.name}</button>
-                    <span className="block text-[12px] text-slate-500">{c.team_name}</span></td>
+                    <span className="block text-[12px] text-slate-500">{c.team_name}</span>
+                    {c.tasks_open > 0 && <span className="block text-[12px] text-slate-600" data-review-tasks-open="1">{c.tasks_open} task{c.tasks_open === 1 ? "" : "s"} for your group</span>}</td>
                   <td className="tabular-nums">Issue {c.issue_no}</td>
                   <td>{clpDay(c.sent_at)}{c.sent_by ? <span className="block text-[12px] text-slate-500">by {c.sent_by}</span> : null}</td>
                   <td className="rd-status" style={{ whiteSpace: "normal" }}><RowStatus word={rvDecision(c.state, c.decided_by, c.decided_at)} tone={RV_STATE[c.state] ? RV_STATE[c.state][1] : "none"} more={0} /></td>
@@ -6372,7 +6456,7 @@ function ReviewPage({ role }){
             </table>
           </div>
         )}
-      <p className="text-[13px] text-slate-500 mt-3">You see only what {scheme} has sent to {group}. Your downloads, comments and decisions are recorded with your name.</p>
+      <p className="text-[13px] text-slate-500 mt-3">You see only what {scheme} has sent to {group}. Your downloads, notes, tasks and decisions are recorded with your name.</p>
     </div>
   );
 }

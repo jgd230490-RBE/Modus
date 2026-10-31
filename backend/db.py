@@ -688,6 +688,21 @@ def _migrate_route_geometry_key(conn, cur):
         conn.rollback()
 
 
+def _migrate_pre_3d_tasks(cur):
+    """PR 3d, once at boot, every tenant: a task the contractor wrote before the client tabs existed belongs to the
+    contractor's thread (PR 3c's reviewers never wrote a task)."""
+    cur.execute("UPDATE clp_notes SET review_group = NULL WHERE kind = 'task' AND review_group IS NOT NULL "
+                "AND (written_key IS NULL OR written_key NOT LIKE 'r:%')")
+
+
+def pre_3d_clp_note(row):
+    """The same rule for an organisation file written before PR 3d (its clp_notes rows carry no `from_note`)."""
+    if ("from_note" not in row and row.get("kind") == "task" and row.get("review_group")
+            and not str(row.get("written_key") or "").startswith("r:")):
+        return {**row, "review_group": None}
+    return row
+
+
 def _has_column(cur, table, column):
     """True if `table` already has `column`. Used to make migrations idempotent."""
     try:
@@ -926,6 +941,21 @@ def init_weeks_db():
                 cur.execute("ALTER TABLE clp_notes ADD COLUMN IF NOT EXISTS review_group TEXT")
             else:
                 cur.execute("ALTER TABLE clp_notes ADD COLUMN review_group TEXT")
+            conn.commit()
+        except Exception:
+            conn.rollback()  # column already present — fine
+        # PR 3d (31 Oct 2026): a client-thread task made from a note keeps the note's id (the screen says whose it was).
+        # The first start of 3d (the column not there yet) also moves PR 3c's tasks back to the contractor's thread: 3c's
+        # "Make a task" from a reviewer's comment kept the comment's group on the task only to say where it came from, and
+        # in 3d a group on a row means the client's own tab (shown to the client). 3c's reviewers never wrote a task.
+        try:
+            first_3d = not _has_column(cur, "clp_notes", "from_note")
+            if IS_PG:
+                cur.execute("ALTER TABLE clp_notes ADD COLUMN IF NOT EXISTS from_note TEXT")
+            else:
+                cur.execute("ALTER TABLE clp_notes ADD COLUMN from_note TEXT")
+            if first_3d:
+                _migrate_pre_3d_tasks(cur)
             conn.commit()
         except Exception:
             conn.rollback()  # column already present — fine
@@ -2179,6 +2209,7 @@ _TENANT_DDL = {
             written_at     TEXT NOT NULL,
             updated_at     TEXT,
             review_group   TEXT,
+            from_note      TEXT,
             PRIMARY KEY (tenant_id, id)
         )
     """,
