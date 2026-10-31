@@ -395,9 +395,13 @@ pic = a1["picture"]
 ok("3. ...it lands 210 m wide on the site, north up, in plain words",
    abs(PIC._metres(pic["corners"][0], pic["corners"][1]) - 210) < 0.5
    and a1["words"] == "Added at its true size (1:500: 210 × 148.5 m), north up. Move it onto its place.", a1["words"])
-ok("3. ...its name is the file's without .pdf; opacity 0.6; not on the sheet; its address carries the version",
-   pic["name"] == "Lift plan" and pic["opacity"] == 0.6 and pic["on_sheet"] is False
-   and pic["url"] == "/api/site-layouts/pictures/PI001/image?v=1")
+# NARROWED 31 Oct 2026 (the editor): the address carries when it was added, not the version (moving the corners must
+# not fetch the image again; a re-used id must not be served from the browser's old copy)
+STAMP1 = PIC._stamp(db.query("SELECT created_at FROM site_layout_pictures WHERE tenant_id = ? AND id = 'PI001'",
+                             (db.current_tenant(),))[0]["created_at"])
+ok("3. ...its name is the file's without .pdf; opacity 0.6; not on the sheet; its address carries when it was added",
+   pic["name"] == "Lift plan" and pic["opacity"] == 0.6 and pic["on_sheet"] is False and len(STAMP1) >= 14
+   and pic["url"] == "/api/site-layouts/pictures/PI001/image?v=" + STAMP1, pic["url"])
 aud = db.query("SELECT path, detail FROM audit_log WHERE tenant_id = ? ORDER BY rowid DESC LIMIT 1", (db.current_tenant(),))
 ok("3. ...one audit row, with the query and no file in it",
    len(db.query("SELECT id FROM audit_log WHERE tenant_id = ?", (db.current_tenant(),))) == audit_before + 1
@@ -475,10 +479,10 @@ ok("3. ...in a month with no phase of the site in force, none (an every-phase pi
 
 # --- the image --------------------------------------------------------------------------------------------------------
 st, r = http(main.site_layout_picture_image, "PI001", _Request(cookies=STAFF))
-ok("3. the staff gate cookie reads the image: a PNG, private, its ETag by version",
+ok("3. the staff gate cookie reads the image: a PNG, private, its ETag by when it was added",
    st == 200 and r.media_type == "image/png" and r.body[:8] == b"\x89PNG\r\n\x1a\n"
-   and r.headers["Cache-Control"].startswith("private") and r.headers["ETag"] == '"PI001-1"')
-st, r304 = http(main.site_layout_picture_image, "PI001", _Request({"If-None-Match": '"PI001-1"'}, cookies=STAFF))
+   and r.headers["Cache-Control"].startswith("private") and r.headers["ETag"] == f'"PI001-{STAMP1}"')
+st, r304 = http(main.site_layout_picture_image, "PI001", _Request({"If-None-Match": f'"PI001-{STAMP1}"'}, cookies=STAFF))
 ok("3. ...and answers 304 to its own ETag", st == 200 and r304.status_code == 304 and r304.body is None)
 ok("3. the map password's cookie and no credential get 401 for the image",
    http(main.site_layout_picture_image, "PI001", _Request(cookies=MAPC))[0] == 401
@@ -498,10 +502,10 @@ turned = [[c[0] + 0.0001, c[1]] for c in pic["corners"]]
 v0 = db.data_version()
 st, e1 = http(main.edit_site_layout_picture, "PI001", main.SiteLayoutPictureIn(version=1, corners=turned, opacity=0.8,
                                                                               name="Lift plan rev B"))
-ok("3. a planner moves the corners, sets the opacity and renames it: version 2, a new address",
+ok("3. a planner moves the corners, sets the opacity and renames it: version 2, the SAME address (the image is unchanged)",
    st == 200 and e1["picture"]["version"] == 2 and e1["picture"]["opacity"] == 0.8
    and e1["picture"]["name"] == "Lift plan rev B" and e1["picture"]["corners"][0] == [round(turned[0][0], 7), turned[0][1]]
-   and e1["picture"]["url"].endswith("?v=2"), str(e1)[:300])
+   and e1["picture"]["url"] == pic["url"], str(e1)[:300])
 ok("3. ...no kept read thrown away", db.data_version() == v0)
 ok("3. the old version is refused in words (409)",
    http(main.edit_site_layout_picture, "PI001", main.SiteLayoutPictureIn(version=1, opacity=0.3)) == (409, SL.STALE))

@@ -925,7 +925,8 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 31 Oct 2026 (task 4a, PR 3b): + 18.5 Notes and tasks (84); + T1 "CLP notes and tasks" (35)
    # NARROWED 31 Oct 2026 (task 4a, PR 3c): + 18.6 The client's reviewers (85); + T1 "CLP client reviewers" (36)
    # NARROWED 31 Oct 2026 (task 4c PR 2): + 19.2 Drawing (86)
-   len(re.findall(r'<li class="l[12]"', src)) == 86 and len(re.findall(r'<li class="l[12]"', _tg2)) == 36   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   # NARROWED 31 Oct 2026 (task 4c PR 3): + 19.5 Pinned pictures (87); the technical entry is inside T1 "Site layouts" (no new row)
+   len(re.findall(r'<li class="l[12]"', src)) == 87 and len(re.findall(r'<li class="l[12]"', _tg2)) == 36   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,
@@ -1276,5 +1277,25 @@ ok3("PUBLIC LAYOUTS: #t1-layouts holds the switch, the public read, the allow-li
     and "<code>site_layouts.public_thing</code>" in _tgv2 and "<code>read_cache.cached()</code>" in _tgv2 and "{minzoom: 16}" in _tgv2
     and "<code>site_layout_styles.public_payload()</code>" in _tgv2 and "the public layer and the sheet come in later PRs" not in _tgv2)
 
+# 31 Oct 2026 (task 4c PR 3, the approved mockup): the pinned pictures — the user guide says what a person does, in a few
+# words and with no back end; the technical guide's T1 Site layouts holds the detail
+_pp = src[src.index('<h2 id="19-5-pinned-pictures">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')] if '<h2 id="19-5-pinned-pictures">' in src and '<h1 id="appendix-a-methods-and-assumptions">' in src else ""
+ok("PICTURES: user guide 19.5 Pinned pictures — in the contents; adding (PDF page and scale, white see-through, this / every phase), Move corners, opacity, saving, the staff tick",
+   '<li class="l2"><a href="#19-5-pinned-pictures">19.5 Pinned pictures</a></li>' in src and len(_pp) > 1500
+   and "never show on the public map" in _pp and "type its scale, such as 1:500" in _pp and "<strong>Make white see-through</strong>" in _pp
+   and "<strong>Every phase</strong>" in _pp and "<strong>Move corners</strong>" in _pp and "<strong>Pinned pictures</strong>" in _pp
+   and "A site can have 10 pictures." in _pp)
+ok("PICTURES: ...and 19.5 names no back end (no address, table, library, cookie, base64 or supplier)",
+   not re.search(r"/api/|site_layout_pictures|pypdfium|Pillow|base64|cookie|Mapbox|Terra Draw|blob:|heavy_reads", _pp))
+_tp = _tg2[_tg2.index('<li id="t1-layouts-pictures">'):] if '<li id="t1-layouts-pictures">' in _tg2 else ""
+_tp = _tp[:_tp.index("</li>")] if "</li>" in _tp else ""
+ok("PICTURES: technical T1 — the table, the limits, the endpoints, the image read staff only, never public, both maps, the code sign-in's copy",
+   all(w in _tp for w in ("<code>site_layout_pictures</code>", "<code>db.NO_DATA_TABLES</code>", "200 dpi", "4,096 dots", "256-row bands",
+                          "heavy_reads.solo(&quot;site-layout-read&quot;)" if "&quot;" in _tp else 'heavy_reads.solo("site-layout-read")',
+                          "/api/site-layouts/pictures/{id}/image", "NEVER PUBLIC", "<code>POST /api/locations/{id}/site-layout/pictures</code> (query", "<code>WSLayouts.pictures</code>", "<code>blob:</code>", "<code>on_sheet</code>")))
+
+
+ok("PICTURES: ...and its upload address is not one long unbroken token (it pushed the guide 24 px sideways at 390 px; UI audit 31 Oct)",
+   "/site-layout/pictures?name=" not in _tg2)
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

@@ -23,7 +23,7 @@
          ?v= because this file and index.html are a matched pair. -->
     <script src="overlay.js?v=1"></script>
     <!-- 31 Oct 2026 (task 4c PR 1): the site layouts' drawing, shared with the Locations page (one look in one place) -->
-    <script src="site-layouts.js?v=3"></script>
+    <script src="site-layouts.js?v=4"></script>
     <style>
         :root{
             --navy:#2563EB; --navy-deep:#1F2024; --ink:#1E293B; --muted:#64748B;
@@ -1095,6 +1095,10 @@
     <div class="control-group" id="site-layouts-group" hidden>
         <div class="control-item"><label><input type="checkbox" id="layer-site-layouts" onchange="toggleSiteLayouts(this.checked)"> Every site layout <span class="lim-n" id="site-layouts-count"></span></label><button type="button" class="info-i" aria-expanded="false" aria-controls="info-site-layouts" onclick="toggleInfo(this)" title="About every site layout" aria-label="About every site layout"><span aria-hidden="true">i</span></button></div>
         <div class="info-pop" id="info-site-layouts" hidden><p>Every layout, shown on the public map or not. Draw and change them on Data → Locations.</p></div>
+        <!-- 31 Oct 2026 (task 4c PR 3, the mockup John approved, Q9): the contractors' drawings and PDF pages pinned on the
+             layouts, under them. Staff only (their images 401 the map password's cookie); off when the map opens. -->
+        <div class="control-item"><label><input type="checkbox" id="layer-site-pictures" onchange="toggleSitePictures(this.checked)"> Pinned pictures <span class="lim-n" id="site-pictures-count"></span></label><button type="button" class="info-i" aria-expanded="false" aria-controls="info-site-pictures" onclick="toggleInfo(this)" title="About the pinned pictures" aria-label="About the pinned pictures"><span aria-hidden="true">i</span></button></div>
+        <div class="info-pop" id="info-site-pictures" hidden><p>Drawings and PDF pages pinned on the layouts, under them. Staff only. Pin them in Draw on Data → Locations.</p></div>
     </div>
 
     <!-- 16 Oct 2026 (CLOCS v5 C1): the collision history — the police-reported injury collisions (DfT STATS19) along the
@@ -3306,7 +3310,7 @@
         const disc = document.getElementById('filter-discipline').value; const i = document.getElementById('filter-ipt').value;
         syncFilterReset();
         try { applyStockMonth(); } catch (e) {}      // 27 Oct 2026: and so do the stockpile gauges
-        try { if (typeof SLY !== 'undefined' && SLY.on) refreshSiteLayouts(); } catch (e) {}   // 31 Oct 2026 (task 4c): and the site layouts' phases
+        try { if (typeof SLY !== 'undefined' && (SLY.on || SLY.picsOn)) refreshSiteLayouts(); } catch (e) {}   // 31 Oct 2026 (task 4c): and the site layouts' phases
         try { if (typeof PSL !== 'undefined') refreshPublicLayouts(); } catch (e) {}           // 31 Oct 2026 (task 4c PR 4): and the public ones
         const inVis = document.getElementById('layer-inbound').checked; const outVis = document.getElementById('layer-outbound').checked;
 
@@ -9634,12 +9638,14 @@
     // Each site's logistics layout, read from /api/site-layouts/map for the month on screen (no month: this month), drawn
     // by site-layouts.js (WSLayouts) from the server's one style table. Read only here; drawn on Data -> Locations.
     // Re-added on style.load through styleReady(), like every overlay (never on an idle wait).
-    const SLY = { on: false, staff: false, styles: null, data: null, h: null, month: undefined, loading: false };
+    const SLY = { on: false, staff: false, styles: null, data: null, h: null, month: undefined, loading: false,
+                  picsOn: false, pics: null };   // 31 Oct 2026 (task 4c PR 3): the pinned pictures, under the layouts
     function siteLayoutsStaff(staff) {
         SLY.staff = !!staff;
         const g = document.getElementById('site-layouts-group');
         if (g) g.hidden = !SLY.staff;
-        if (!SLY.staff) { SLY.on = false; if (SLY.h) { try { SLY.h.setVisible(false); } catch (e) {} } }
+        if (!SLY.staff) { SLY.on = false; SLY.picsOn = false; if (SLY.h) { try { SLY.h.setVisible(false); } catch (e) {} }
+                          if (SLY.pics) { try { SLY.pics.setVisible(false); } catch (e) {} } }
         try { showPublicLayouts(); } catch (e) {}
     }
     function siteLayoutMonth() {
@@ -9657,6 +9663,16 @@
             SLY.h.reinstall();
             SLY.h.setVisible(SLY.on);
         }
+        ensureSitePictures();
+    }
+    // the pinned pictures (task 4c PR 3): one image source a picture, under the layouts' first layer. set() adds back any
+    // the new style dropped (and moves only what changed), so a basemap switch and a month change both come through here
+    function ensureSitePictures() {
+        if (!window.WSLayouts || !WSLayouts.pictures || !styleReady()) return;
+        if (!SLY.pics) SLY.pics = WSLayouts.pictures(map, { prefix: 'site-picture', visible: SLY.picsOn,
+            before: () => (SLY.h && SLY.h.layerIds()[0]) || labelAnchor() });
+        SLY.pics.set((SLY.data && SLY.data.pictures) || []);
+        SLY.pics.setVisible(SLY.picsOn);
     }
     async function refreshSiteLayouts() {
         const month = siteLayoutMonth();
@@ -9676,16 +9692,24 @@
             SLY.data = await r2.json();
             SLY.month = month;
             if (cnt) cnt.textContent = SLY.data.sites.length ? String(SLY.data.sites.length) : '0';
+            const pc = document.getElementById('site-pictures-count');
+            if (pc) pc.textContent = String((SLY.data.pictures || []).length);
             ensureSiteLayoutLayers();
-            if (SLY.h) SLY.h.ready.then(() => SLY.h.setData(SLY.data.features));
+            if (SLY.h) SLY.h.ready.then(() => { SLY.h.setData(SLY.data.features); if (SLY.pics) SLY.pics.order(); });
         } catch (e) {
             console.warn('Wayscope: site layouts', e);
             SLY.failed = month;   // once a month: no retry storm on every filter pass (ticking the box again retries)
             if (cnt) cnt.textContent = '';
         } finally {
             SLY.loading = false;
-            if (SLY.on && SLY.tried !== siteLayoutMonth()) refreshSiteLayouts();
+            if ((SLY.on || SLY.picsOn) && SLY.tried !== siteLayoutMonth()) refreshSiteLayouts();
         }
+    }
+    function toggleSitePictures(on) {
+        SLY.picsOn = !!on;
+        SLY.failed = undefined;
+        if (SLY.pics) SLY.pics.setVisible(SLY.picsOn);
+        if (SLY.picsOn) refreshSiteLayouts();
     }
     function toggleSiteLayouts(on) {
         SLY.on = !!on;

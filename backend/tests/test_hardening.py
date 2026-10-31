@@ -68,6 +68,9 @@ ok("...the honest limit is written down: inline script and eval stay (in-browser
 ok("...Mapbox's workers from blob:, its tiles and events in connect-src",
    "blob:" in d["worker-src"] and all(h in d["connect-src"] for h in
                                       ("https://api.mapbox.com", "https://*.tiles.mapbox.com", "https://events.mapbox.com")))
+# 31 Oct 2026 (task 4c PR 3): the drawing tools hand the map a copy of a pinned picture for a code sign-in
+ok("...and blob: in connect-src (a pinned picture's copy, read by the app, fetched by the map), only in connect / worker / child / img",
+   "blob:" in d["connect-src"] and all("blob:" not in d[k] for k in ("script-src", "style-src", "frame-src", "default-src")))
 ok("🔴 the Tailwind CDN is NOT allowed any more (the file is served from the app)", "https://cdn.tailwindcss.com" not in CSP)
 h1 = sh.apply("/", {})
 ok("apply() sets every header on a page", all(h1.get(k) == v for k, v in H.items()) and "Cache-Control" not in h1)

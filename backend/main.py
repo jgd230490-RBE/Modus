@@ -5091,14 +5091,15 @@ def delete_site_layout_picture(picture_id: str, version: int):
 def site_layout_picture_image(picture_id: str, request: Request = None):
     """A pinned picture's image (PNG or JPEG). STAFF ONLY: a code or login, or the staff gate cookie (the map's image
     source sends cookies, not the code header); the map password's cookie and no credential get 401. Kept by the browser
-    for this person only (`private`); the address carries the version, so a moved or replaced picture is a new one."""
+    for this person only (`private`); the address carries when it was added (the image never changes after that, so a
+    moved picture keeps its copy, and a new picture under a re-used id is a new address)."""
     if not _staff_request(request):
         raise HTTPException(401, "sign in — the site layouts are for staff")
     try:
-        mime, data, version = site_layout_pictures.image(picture_id)
+        mime, data, stamp = site_layout_pictures.image(picture_id)
     except site_layout_pictures.Problem as e:
         raise HTTPException(404, str(e))
-    etag = f'"{picture_id}-{version}"'
+    etag = f'"{picture_id}-{stamp}"'
     head = {"Cache-Control": "private, max-age=86400", "ETag": etag}
     if request is not None and (request.headers.get("if-none-match") or "") == etag:
         return Response(status_code=304, headers=head)

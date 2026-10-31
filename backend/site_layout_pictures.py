@@ -292,7 +292,14 @@ def _out(r):
             "clear": SL._truthy(r.get("see_through")), "on_sheet": SL._truthy(r.get("on_sheet")),
             "version": int(r.get("version") or 1), "by": r.get("updated_by") or r.get("created_by"),
             "at": r.get("updated_at") or r.get("created_at"),
-            "url": f"/api/site-layouts/pictures/{r['id']}/image?v={int(r.get('version') or 1)}"}
+            "url": f"/api/site-layouts/pictures/{r['id']}/image?v={_stamp(r.get('created_at'))}"}
+
+
+def _stamp(created_at):
+    """The image's mark in its address and ETag: when it was added, as digits. Never the version: the image never
+    changes after it is added (moving its corners bumps the version and must not fetch the image again), and a deleted
+    picture's id can come back on a new one, which must not be served from the browser's copy of the old."""
+    return "".join(ch for ch in str(created_at or "") if ch.isdigit()) or "0"
 
 
 def _row(pic_id):
@@ -323,12 +330,12 @@ def counts(layout_ids=None):
 
 
 def image(pic_id):
-    """(mime, bytes, version) of a picture's image."""
-    rows = db.query("SELECT mime, image_b64, version FROM site_layout_pictures WHERE tenant_id = ? AND id = ?",
+    """(mime, bytes, stamp) of a picture's image (the stamp: `_stamp`, the same as in its address)."""
+    rows = db.query("SELECT mime, image_b64, created_at FROM site_layout_pictures WHERE tenant_id = ? AND id = ?",
                     (db.current_tenant(), str(pic_id or "")))
     if not rows or not rows[0].get("image_b64"):
         raise Problem("That picture is not there any more. Reload to see the layout.")
-    return rows[0]["mime"], base64.b64decode(rows[0]["image_b64"]), int(rows[0].get("version") or 1)
+    return rows[0]["mime"], base64.b64decode(rows[0]["image_b64"]), _stamp(rows[0].get("created_at"))
 
 
 def _layout_phase(location_id, phase_id, every, by):
