@@ -4803,6 +4803,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && ed.includes("mover.on(\"dragend\", () => { moveTo(); put(); });") && ed.includes("const t = G.toM(turnAt(base), o);")
      && ed.includes("k.on(\"dragend\", () => { cs[i] = k.getLngLat().toArray(); show(); put(); });")
      && !ed.includes("last = mover.getLngLat()") && !ed.includes("G.toM(turner.getLngLat().toArray(), o); a0"));
+  ok("PICTURES: Done on unmoved corners says 'not moved' (not 'Save to keep them' beside a greyed Save — seen in Chrome, 31 Oct)",
+     ed.includes("JSON.stringify(b.corners) === JSON.stringify(p.corners) ? `${p.name}: not moved.` : `${p.name}: corners set. Save to keep them.`"));
   ok("PICTURES: leaving with a picture changed and not saved asks Save or Discard, as the drawing does",
      ed.includes("if(e.dirty || e.pdirty){ ev.preventDefault(); ev.returnValue = \"\"; }") && ed.includes("const done = () => { if(e.cm) stopCorners(true); if(e.dirty || e.pdirty){"));
 }

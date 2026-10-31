@@ -17097,7 +17097,8 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
     setTool(e.tool);
     return c.id;
   };
-  const cornersDone = () => { const id = stopCorners(true), p = e.picList.find(x => x.id === id); if(p) say(`${p.name}: corners set. Save to keep them.`); };
+  const cornersDone = () => { const id = stopCorners(true), p = e.picList.find(x => x.id === id), b = e.picBase[id];
+    if(p) say(b && JSON.stringify(b.corners) === JSON.stringify(p.corners) ? `${p.name}: not moved.` : `${p.name}: corners set. Save to keep them.`); };
   const cornersCancel = () => { stopCorners(false); say("Corners put back."); };
   const fitPic = (p) => { const m = mapRef.current, b = new mapboxgl.LngLatBounds(); p.corners.forEach(c => b.extend(c)); try { m.fitBounds(b, { padding: 60, duration: 500, maxZoom: 20 }); } catch(x){} };
   const eyePic = (id) => { const on = !picOff.includes(id); setPicOff(o => on ? [...o, id] : o.filter(x => x !== id)); if(e.pics) e.pics.hide(id, on); };
