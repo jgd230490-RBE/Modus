@@ -479,8 +479,10 @@ ok("⭐ the list carries each CLP's open, overdue and next due tasks, its notes 
    and _rn["mine_open"] == 2 and _rn["done"] == 0, str(_rn))
 ok("...the planner's own count differs (the task by name and the one for the planners and admins)",
    row_of(Y1, PAT)["tasks"]["mine_open"] == 2)
+# NARROWED 31 Oct 2026 (PR 3d): + the client threads' three counts, zero here too
 ok("...a CLP with none reads zeros", row_of(Y2, PAT)["tasks"] == {"open": 0, "overdue": 0, "notes": 0, "done": 0,
-                                                                     "mine_open": 0, "next_due": None}, str(row_of(Y2, PAT)["tasks"]))
+                                                                     "mine_open": 0, "next_due": None, "client_open": 0,
+                                                                     "client_overdue": 0, "client_mine_open": 0}, str(row_of(Y2, PAT)["tasks"]))
 
 # =========================================================================== #
 #  6. Tick, untick, change (Q3, Q5)                                            #

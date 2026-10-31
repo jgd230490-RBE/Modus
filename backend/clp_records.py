@@ -233,7 +233,8 @@ def list_for(acc, factors=None):
     tally = clp_notes.counts_for(acc)
     for d in out:
         t = tally.get(d["id"]) or {}
-        d["tasks"] = {k: t.get(k, 0) for k in ("open", "overdue", "notes", "done", "mine_open")}
+        d["tasks"] = {k: t.get(k, 0) for k in ("open", "overdue", "notes", "done", "mine_open",
+                                               "client_open", "client_overdue", "client_mine_open")}   # PR 3d (Q8)
         d["tasks"]["next_due"] = t.get("next_due")
     # 31 Oct 2026 (PR 3c): where the last issue sent to each client group stands (With … / Accepted by … / Returned by …)
     import clp_reviews

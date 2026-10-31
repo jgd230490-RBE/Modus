@@ -443,7 +443,8 @@ over one tenanted table, in the organisation file (after <code>clp_issues</code>
 <pre>clp_notes  (tenant_id, id) — clp_id, kind note | task | step | lines, words, for_kind team | approvers | person, for_team,
            for_user (a login id), due (YYYY-MM-DD), from_line, done_by / done_at, step sent | changes | approved, issue_no,
            written_by (the name shown), written_key (u:&lt;login&gt; or c:&lt;role&gt;:&lt;team&gt;: who may delete or change it),
-           written_at, updated_at</pre>
+           written_at, updated_at, review_group (a client group's tab; empty = the Contractor tab), from_note (the note a task
+           was made from)</pre>
 <p><strong>Who.</strong> Every read and write goes through <code>clp_records._record(id, acc)</code>, so a team reaches only its
 own team's plans (another's is a 404, as for the plan). Anyone who sees the plan writes a note, adds a task and ticks one
 (<code>done</code>, recorded with who and when); the writer (<code>written_key</code>) or <code>access.can_approve</code> deletes a
@@ -484,12 +485,29 @@ figure is built from them; a kept draft carries <code>clp_reviews.marker()</code
 clp_reviews        (tenant_id, id) — clp_id, issue_no, group_id, kind sent | decision, decision accepted | returned,
                    words, by_name, by_user, at
 users.review_group     the group of a login of kind 'reviewer'
-clp_notes.review_group a reviewer's comment, a send / decision step, or a contractor note ticked "Show to &lt;group&gt;"</pre>
+clp_notes.review_group the client tab a row belongs to: a note or task by either side, a send / decision step</pre>
+<p><strong>Two threads (31 Oct, PR 3d; mockup <code>notes/clp-client-thread-mockup-1031</code>, Q1–Q10).</strong> A row with no
+<code>review_group</code> is the contractor's thread (the team, planners, admins); a row with one is that group's client thread
+(its reviewers, planners, admins). <code>clp_notes.thread()</code> gives a team the contractor rows only; an approver also gets
+<code>clients</code>, one <code>client_thread()</code> a group the CLP was sent to (<code>sent_groups</code>). A reviewer reads the same
+function from their side through <code>clp_reviews.clp_for_reviewer</code>. Client For kinds: <code>approvers</code>,
+<code>person</code> (a planner / admin, <code>for_user</code>), <code>group</code>, <code>reviewer</code> (<code>for_user</code>); keys
+<code>approvers | group | user:&lt;id&gt; | reviewer:&lt;id&gt;</code>. Each side ticks the tasks given to it (<code>_client_can_tick</code>);
+a row a reviewer wrote has <code>written_key</code> <code>r:&lt;login&gt;</code>, and only that reviewer changes or deletes it
+(<code>_client_can_change</code>); the contractor never does. A team's write with a <code>group</code>, or a team reaching a client
+row by id, is a 403 / 404. Every reviewer write checks the CLP is in the group's sent rows first and finds a row by
+<code>rev["group_id"]</code> only (<code>client_row</code>); a stopped group's tab reads but takes no write. The "Show to" tick of
+PR 3c is gone. PR 3c's tasks made from a comment carried the comment's group only to say where they came from: on 3d's first
+start (<code>from_note</code> not there yet) <code>db._migrate_pre_3d_tasks</code> puts every contractor-written task back in the
+contractor's thread, and an organisation file from before 3d is read the same way (<code>db.pre_3d_clp_note</code>). The note
+that goes with a reviewer's Accept or Return carries its step word and cannot be deleted; a stopped group's tab takes no delete
+either. The list rows add <code>client_open</code>, <code>client_overdue</code>, <code>client_mine_open</code> (zero for a
+team); a reviewer's list rows <code>tasks_open</code>. The review writes skip the version bump like the notes writes.</p>
 <p><strong>The wall.</strong> A reviewer is a login of kind <code>reviewer</code>: an invite, their own password, two-step from the
 first sign-in, the same lock-out, reset and end date as any login, never a code. <code>users.resolve_session</code> answers
 <code>(None, None)</code> for a reviewer's session, so <code>access.current()</code> is None and every staff guard refuses them
 exactly as it refuses a visitor; only <code>users.resolve_reviewer</code> reads it, into the separate <code>access.reviewer()</code>
-context. The five <code>/api/review/*</code> routes (<code>_require_reviewer</code>) are the only ones that take it, and they look
+context. The nine <code>/api/review/*</code> routes (<code>_require_reviewer</code>; five in PR 3c, four task and delete routes in PR 3d) are the only ones that take it, and they look
 a CLP up only through the group's <code>sent</code> rows: a CLP, a draft or an issue not sent to the group, or another group's,
 is the same 404 as one that does not exist. A download is the stored <code>clp_issues.file_b64</code>; nothing a reviewer does
 builds a file. Stopping a group, disabling or deleting a reviewer, or moving them to another group ends their sessions. The
@@ -501,9 +519,9 @@ the group may change it while the issue is the latest sent to that group (<code>
 issue starts with none. The contractor's list rows carry <code>reviews = [{group_id, group_name, issue_no, state waiting |
 accepted | returned, sent_at, at}]</code>, the last issue sent to each group; <code>review_groups</code> on the list is a flag
 (planners and admins, any group). The Document history's group lines come from <code>clp_reviews.history_rows</code>: no reviewer's name, and the group named only while the CLP was never sent to another group (else "by the client's reviewers"), because one issued file can go to several clients. The file's issue rows print the changes and the approver's note only, never the team's <code>sent_note</code> (<code>clp_records._words_of(row, team_note=False)</code>, 31 Oct); the contractor's own history on screen keeps it.</p>
-<p><strong>From the security review (31 Oct).</strong> The client reads the approver's note only (<code>approver_note</code>), never the team's note to the approver (<code>sent_note</code>), on the page and in the email; only <code>access.can_approve</code> may tick Show to (a team gets no groups offered and a 403); group, reviewer and CLP names are kept on one line (<code>_one_line</code>, <code>_clean_name</code>) and a message that cannot be built counts as a failed email instead of failing a write half-done; a refused group move saves nothing; <code>users._make_admin</code> ends every session of the login.</p>
+<p><strong>From the security review (31 Oct).</strong> The client reads the approver's note only (<code>approver_note</code>), never the team's note to the approver (<code>sent_note</code>), on the page and in the email; only <code>access.can_approve</code> may tick Show to (a team gets no groups offered and a 403; PR 3d replaced the tick with the client tabs, where a team's write with a group is the same 403); group, reviewer and CLP names are kept on one line (<code>_one_line</code>, <code>_clean_name</code>) and a message that cannot be built counts as a failed email instead of failing a write half-done; a refused group move saves nothing; <code>users._make_admin</code> ends every session of the login.</p>
 <p><strong>Email.</strong> One to each reviewer of the group on a send (no attachment; the link opens <code>#review</code>), one
-to the sender when the group decides. Comments send nothing. <strong>Audit.</strong> Every write is in <code>audit_log</code>
+to the sender when the group decides; since PR 3d one for a task given to one named person (a reviewer's link opens <code>#review</code>, a planner's <code>#clp</code>; never to the writer). Notes send nothing. <strong>Audit.</strong> Every write is in <code>audit_log</code>
 with the reviewer's name, email and group (<code>access.current() or access.reviewer()</code> in the middleware); a download is
 the row <code>review-download</code>.</p>
 <pre>GET    /api/admin/reviewers                      groups + reviewer logins (admins)
@@ -518,8 +536,13 @@ POST   /api/clp/documents/{id}/review-send       {groups, issue_no}; also approv
 GET    /api/review/clps                          a reviewer: the CLPs sent to their group
 GET    /api/review/clps/{id}                     one: latest, issues with decisions, the thread they may see
 GET    /api/review/clps/{id}/issues/{no}.docx    the issue as approved
-POST   /api/review/clps/{id}/comments            {words}
-POST   /api/review/clps/{id}/decision            {issue_no, decision accepted | returned, words}</pre>
+POST   /api/review/clps/{id}/comments            {words} (a note in the group's tab)
+POST   /api/review/clps/{id}/decision            {issue_no, decision accepted | returned, words}
+POST   /api/review/clps/{id}/tasks               {words, for: approvers | group | reviewer:&lt;id&gt;, due}
+PATCH  /api/review/clps/{id}/tasks/{tid}         {done} the side it is given to · {words, for, due} its writer
+DELETE /api/review/clps/{id}/tasks/{tid}         its writer
+DELETE /api/review/clps/{id}/notes/{nid}         its writer
+POST   /api/clp/documents/{id}/notes|tasks       + {group}: a write in that client tab (planners / admins); tasks + {from_note}</pre>
 <p>The demo carries one group, <em>Highways client (fictional)</em>, with no logins.</p>
 <h2 id="t1-abnormal">Abnormal loads (S16 / B5, 22 Oct 2026)</h2>
 <p>Each abnormal load is its own row in <code>abnormal_loads</code> (one tenant's, carried in its package), never a forecast line: nothing of it reaches the tonnes, trips, vehicles, CLP caps, gate capacity or carbon figures (D70, D71). The rules engine is <code>backend/abnormal_rules.py</code>, every threshold a named constant with its source, and <code>test_abnormal.py</code> asserts each on both sides.</p>

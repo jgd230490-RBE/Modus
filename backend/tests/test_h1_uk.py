@@ -1069,8 +1069,9 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    # (navy) and its survey point's Place while picking (blue)
    # NARROWED 31 Oct 2026 (task 4c PR 2): 21 — the drawing tools' picked tool in the palette (PalBtn), their Save and the card's Draw (navy)
    # NARROWED 31 Oct 2026 (task 4c PR 3): 23 — the pinned pictures' Done (Move corners) and Add (navy)
-   # NARROWED 31 Oct 2026 (task 4c PR 5): 25 (after PR 3) — the Print panel's picked page (A3 / A4) and its PDF button (navy)
-   len(_sites.get("navy", [])) == 25 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
+   # NARROWED 31 Oct 2026 (task 4a PR 3d): 24 — the CLP Notes and tasks panel's picked tab (Contractor / a client group, navy)
+   # NARROWED 31 Oct 2026 (task 4c PR 5): 26 (after PR 3 and 4a PR 3d) — the Print panel's picked page (A3 / A4) and its PDF button (navy)
+   len(_sites.get("navy", [])) == 26 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
    and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
 ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",
@@ -1175,7 +1176,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # send panel's problem line, and the review page's error, message, history's returned decision and Return button
    # NARROWED 31 Oct 2026 (task 4c PR 2): bad-text 40 -> 41, warn-text 15 -> 16 — the drawing tools' save line (red when a
    # save fails) and "Unsaved changes" (amber)
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 41 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
+   # NARROWED 31 Oct 2026 (task 4a PR 3d): bad-text 41 -> 42 — the reviewer page's task "overdue"
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 42 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
    _fe_wo.count("var(--warn-text)") == 16
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe

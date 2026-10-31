@@ -29,8 +29,9 @@ TABLES
   * clp_reviews       — kind 'sent' (an issue sent to a group: who, when) and kind 'decision' (accepted / returned, the
                         comment, who, when). Kept for good: the history on both sides and the next issue's Document history.
 Both are NO_DATA_TABLES (no figure is built from them); a draft's kept file carries `marker()` in its key instead.
-Reviewer COMMENTS and the send / decision lines are rows of clp_notes (review_group = the group), so they sit in the CLP's
-thread; a contractor note reaches a group only when its writer ticks "Show to <group>" (clp_notes.review_group too).
+Reviewer notes and the send / decision lines are rows of clp_notes (review_group = the group). Since PR 3d each group has
+its OWN thread with the contractor's planners and admins — notes and tasks both ways (clp_notes "TWO THREADS"); the team
+never reads it, and a reviewer never reads the contractor's thread.
 
 EMAIL (Q7)
 ----------
@@ -625,6 +626,8 @@ def list_for_reviewer(rev):
     stand = _standing(_review_rows())
     names = group_names()
     labels = taxonomy.team_labels()
+    import clp_notes
+    ours = clp_notes.review_counts(rev["group_id"], rev["user_id"])     # PR 3d (Q8): "N tasks for your group"
     out = []
     for cid, nos in sent.items():
         rec = _clp_record(cid)
@@ -634,7 +637,7 @@ def list_for_reviewer(rev):
         s = stand.get((cid, no, rev["group_id"])) or {"sent": None, "decision": None}
         st = _state_out(cid, no, rev["group_id"], s, names)
         out.append(dict(_rec_out(rec, labels), issue_no=no, sent_at=st["sent_at"], sent_by=st["sent_by"],
-                        state=st["state"], decided_by=st["by"], decided_at=st["at"]))
+                        state=st["state"], decided_by=st["by"], decided_at=st["at"], tasks_open=ours.get(cid, 0)))
     out.sort(key=lambda d: d["sent_at"] or "", reverse=True)      # newest first, then the waiting ones on top
     out.sort(key=lambda d: d["state"] != "waiting")
     return {"group_name": rev.get("group_name") or "", "scheme": scheme_name(), "clps": out}
@@ -665,9 +668,15 @@ def clp_for_reviewer(clp_id, rev):
                                       "by": d.get("by_name"), "at": d.get("at"), "words": d.get("words")}
                                      for d in s.get("decisions", [])]})
     last = issues[-1]
+    # PR 3d: the group's own thread — notes AND tasks both ways with the contractor's planners and admins
+    g = {"id": rev["group_id"], "name": rev.get("group_name") or names.get(rev["group_id"]) or "", "stopped": False}
+    ct = clp_notes.client_thread(rec, g, clp_notes._rows(cid), "client", rev)
     return dict(_rec_out(rec), group_name=rev.get("group_name") or "", scheme=scheme_name(),
                 issues=list(reversed(issues)), latest=last,
-                can_decide=(last["no"] == latest), thread=clp_notes.review_thread(cid, rev["group_id"], names))
+                can_decide=(last["no"] == latest), thread=ct["notes"], tasks=ct["tasks"],
+                for_options=ct["for_options"], today=ct["today"],
+                task_counts={"ours": sum(1 for t in ct["tasks"] if not t["done"] and t["for_side"] == "client"),
+                             "theirs": sum(1 for t in ct["tasks"] if not t["done"] and t["for_side"] == "contractor")})
 
 
 def issue_file_for_reviewer(clp_id, issue_no, rev):
@@ -687,8 +696,60 @@ def issue_file_for_reviewer(clp_id, issue_no, rev):
     return rows[0]["file_name"], base64.b64decode(rows[0]["file_b64"])
 
 
+def _client_g(rev):
+    return {"id": rev["group_id"], "name": rev.get("group_name") or group_names().get(rev["group_id"]) or "",
+            "stopped": False}
+
+
+def task(clp_id, body, rev):
+    """PR 3d: a reviewer adds a task in their group's thread (For the contractor, the group or one of its reviewers)."""
+    import clp_notes
+    cid = str(clp_id or "")
+    if cid not in _sent_to(rev):
+        return {"error": "No such CLP.", "status": 404}
+    rec = _clp_record(cid)
+    out = clp_notes.client_add_task(rec, _client_g(rev), {k: (body or {}).get(k) for k in ("words", "for", "due")},
+                                    "client", rev)
+    if "error" in out:
+        return out
+    return clp_for_reviewer(cid, rev)
+
+
+def change_task(clp_id, task_id, body, rev):
+    """PR 3d: tick a task for the group or for themself; change one they wrote. Only their group's thread."""
+    import clp_notes
+    cid = str(clp_id or "")
+    if cid not in _sent_to(rev):
+        return {"error": "No such CLP.", "status": 404}
+    row = clp_notes.client_row(cid, task_id, rev["group_id"], ("task",))
+    if not row:
+        return {"error": "No such task.", "status": 404}
+    out = clp_notes.client_change_task(_clp_record(cid), _client_g(rev), row,
+                                       {k: v for k, v in (body or {}).items() if k in ("words", "for", "due", "done")},
+                                       "client", rev)
+    if "error" in out:
+        return out
+    return clp_for_reviewer(cid, rev)
+
+
+def remove(clp_id, item_id, rev):
+    """PR 3d (Q10): a reviewer deletes only their own note or task, in their group's thread."""
+    import clp_notes
+    cid = str(clp_id or "")
+    if cid not in _sent_to(rev):
+        return {"error": "No such CLP.", "status": 404}
+    row = clp_notes.client_row(cid, item_id, rev["group_id"])
+    if not row:
+        return {"error": "No such note or task.", "status": 404}
+    out = clp_notes.client_remove(_clp_record(cid), row, "client", rev)
+    if "error" in out:
+        return out
+    return clp_for_reviewer(cid, rev)
+
+
 def comment(clp_id, words, rev):
-    """A reviewer's comment: a note in the CLP's thread for the contractor and the group. Sends nothing (Q7)."""
+    """A reviewer's note (the page calls it a note since PR 3d): in the group's thread, for the contractor's planners and
+    admins and the group. Sends nothing (Q7)."""
     import clp_notes
     cid = str(clp_id or "")
     if cid not in _sent_to(rev):
@@ -735,7 +796,7 @@ def decide(clp_id, issue_no, decision, words, rev):
                           "decision": decision, "words": words or None, "by_name": rev["name"],
                           "by_user": rev["user_id"]})
     if words:
-        clp_notes.add_review_note(cid, words, rev, at=row["at"])
+        clp_notes.add_review_note(cid, words, rev, at=row["at"], decision=decision)
     clp_notes.add_review_step(cid, "review-" + decision, f"{rev['name']} ({rev.get('group_name') or ''})", row["at"],
                               rev["group_id"], no)
     rec = _clp_record(cid)
