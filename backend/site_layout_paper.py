@@ -598,6 +598,72 @@ def for_plan(location_id, month_index, private=False):
             "phase_id": ph["id"], "months": month_words(ph), "things": things}
 
 
+PICTURE_DPI = 200   # a pinned picture is warped onto the sheet at this many dots an inch (the PNG's own resolution)
+
+
+def sheet_pictures(layout_id, phase_id):
+    """The phase's pinned pictures ticked "Print under the layout" (PR 3's `on_sheet`; this phase's and every-phase ones),
+    oldest first as on the map. Metadata only. The sheet alone draws them: never the CLP or the Routes plans (Q6)."""
+    import site_layout_pictures as SLP
+    return [p for p in SLP.for_layout(layout_id)
+            if p.get("on_sheet") and (p.get("every") or p.get("phase_id") == phase_id) and len(p.get("corners") or []) == 4]
+
+
+def _solve(A, b):
+    """A x = b for a small square system (Gaussian elimination, partial pivoting). ValueError when it has no one answer."""
+    n = len(b)
+    M = [list(row) + [bb] for row, bb in zip(A, b)]
+    for i in range(n):
+        piv = max(range(i, n), key=lambda r: abs(M[r][i]))
+        if abs(M[piv][i]) < 1e-12:
+            raise ValueError("folded")
+        M[i], M[piv] = M[piv], M[i]
+        for r in range(n):
+            if r != i and M[r][i]:
+                f = M[r][i] / M[i][i]
+                M[r] = [a - f * c for a, c in zip(M[r], M[i])]
+    return [M[i][n] / M[i][i] for i in range(n)]
+
+
+def homography(src, dst):
+    """The 8 coefficients that send each `dst` point to its `src` point — Pillow's PERSPECTIVE wants output → input.
+    Four corners may be any quadrilateral (PR 3's corners move one at a time), so this is a true warp, not an affine."""
+    A, b = [], []
+    for (x, y), (u, v) in zip(dst, src):
+        A.append([x, y, 1, 0, 0, 0, -u * x, -u * y])
+        b.append(u)
+        A.append([0, 0, 0, x, y, 1, -v * x, -v * y])
+        b.append(v)
+    return _solve(A, b)
+
+
+def draw_picture(c, pic, data, P, frame):
+    """Warp a pinned picture (`data`: its PNG / JPEG) onto the sheet between its four corners (TL, TR, BR, BL as
+    [lon, lat]) at its opacity, clipped to the map frame (x, y, w, h in points). False when it misses the frame."""
+    from PIL import Image
+    from reportlab.lib.utils import ImageReader
+    fx, fy, fw, fh = frame
+    q = [P(float(lon), float(lat)) for lon, lat in pic["corners"]]
+    x0, x1 = max(fx, min(x for x, _ in q)), min(fx + fw, max(x for x, _ in q))
+    y0, y1 = max(fy, min(y for _, y in q)), min(fy + fh, max(y for _, y in q))
+    if x1 - x0 < 1 or y1 - y0 < 1:
+        return False
+    k = PICTURE_DPI / 72.0
+    w_px, h_px = max(1, int(round((x1 - x0) * k))), max(1, int(round((y1 - y0) * k)))
+    im = Image.open(io.BytesIO(data)).convert("RGBA")
+    iw, ih = im.size
+    dst = [((x - x0) * k, (y1 - y) * k) for x, y in q]          # output pixels, y down
+    co = homography([(0, 0), (iw, 0), (iw, ih), (0, ih)], dst)
+    out = im.transform((w_px, h_px), Image.PERSPECTIVE, co, Image.BILINEAR, fillcolor=(0, 0, 0, 0))
+    op = max(0.0, min(1.0, float(pic.get("opacity") or 1.0)))
+    if op < 1.0:
+        out.putalpha(out.getchannel("A").point(lambda a: int(a * op + 0.5)))
+    b = io.BytesIO()
+    out.save(b, "PNG")
+    c.drawImage(ImageReader(io.BytesIO(b.getvalue())), x0, y0, width=x1 - x0, height=y1 - y0, mask="auto")
+    return True
+
+
 def sheet(location_id, phase_id=None, page=None, scale=None, style=None, now=None):
     """Everything the sheet draws: the site, the phase (its things), the page and frame, the view at the stated or
     fitted scale. Raises SheetError in words."""
@@ -637,7 +703,7 @@ def sheet(location_id, phase_id=None, page=None, scale=None, style=None, now=Non
     notice = export._demo_notice() or None
     import bulletin_doc
     return {"location_id": location_id, "site": loc.get("name") or location_id, "phase": ph, "things": things,
-            "page": pg, "spec": spec, "frame_w_mm": fw, "frame_h_mm": fh, "view": v, "denom": n, "fitted": not scale,
+            "pictures": sheet_pictures(lay["id"], ph["id"]), "page": pg, "spec": spec, "frame_w_mm": fw, "frame_h_mm": fh, "view": v, "denom": n, "fitted": not scale,
             "style": st, "tenant": export._tenant_name() or "Wayscope", "demo_notice": notice,
             "map_demo_tag": bulletin_doc.DEMO_MAP_TAG if notice else None,
             "drawn": f"{(now or datetime.date.today()):%d %b %Y}".lstrip("0")}
@@ -680,6 +746,15 @@ def build_pdf(S):
     else:
         c.setFillColorRGB(0.965, 0.969, 0.973)
         c.rect(m, m, fw, fh, stroke=0, fill=1)
+    S["pictures_drawn"] = []
+    if S.get("pictures"):
+        import site_layout_pictures as SLP
+        for p in S["pictures"]:
+            try:
+                if draw_picture(c, p, SLP.image(p["id"])[1], P, (m, m, fw, fh)):
+                    S["pictures_drawn"].append(p["id"])
+            except Exception as e:  # noqa: BLE001 — a picture that will not draw leaves the rest of the sheet
+                print(f"🖼️ site layout sheet: picture {p.get('id')} not drawn: {type(e).__name__}", flush=True)
     T = draw(c, S["things"], P, ppm, F)
     c.restoreState()
     inside = lambda x, y: m <= x <= m + fw and m <= y <= m + fh

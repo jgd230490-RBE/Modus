@@ -479,6 +479,82 @@ ok("5. the symbol 'welfare' is named Welfare cabin in the legend, the area 'welf
    ("sym", "welfare", "Welfare cabin") in [r[:3] for r in rows] and ("area", "welfare", "Welfare compound") in [r[:3] for r in rows])
 
 # =========================================================================== #
+#  5b. Pinned pictures under the layout on the sheet (Q6; PR 3's on_sheet)     #
+# =========================================================================== #
+import site_layout_pictures as SLP  # noqa: E402
+access.set_current("planner123")
+_b = io.BytesIO()
+Image.new("RGB", (400, 300), (220, 20, 20)).save(_b, "PNG")      # a solid red "drawing", 150 m wide where it lands
+REDPNG = _b.getvalue()
+PIC = SLP.add("L019", REDPNG, "contractor-drawing.png", {"phase_id": PH, "centre": [L019["lon"], L019["lat"]]}, "harness")["picture"]
+ok("5b. a picture lands unticked: not on the sheet", PIC["on_sheet"] is False and SP.sheet("L019", PH)["pictures"] == [])
+
+
+def reddish(png):   # pixels where red leads green and blue by 90+ (the 0.6-opacity red over the grey is ~230, 111, 116)
+    from PIL import ImageChops
+    r, g, b = Image.open(io.BytesIO(png)).convert("RGB").split()
+    m = ImageChops.multiply(ImageChops.subtract(r, g).point(lambda v: 255 if v > 90 else 0),
+                            ImageChops.subtract(r, b).point(lambda v: 255 if v > 90 else 0))
+    return m.histogram()[255]
+
+
+S_off = SP.sheet("L019", PH)
+PNG_off = SP.build_png(SP.build_pdf(S_off))
+ok("5b. ...and the sheet draws no picture", S_off["pictures_drawn"] == [])
+# through the page's own PATCH (the request model must carry on_sheet, or pydantic drops it: found in Chrome, 31 Oct)
+_st, _r = http(main.edit_site_layout_picture, PIC["id"], main.SiteLayoutPictureIn(version=PIC["version"], on_sheet=True))
+PIC2 = (_r or {}).get("picture") if isinstance(_r, dict) else {}
+row = db.query("SELECT on_sheet FROM site_layout_pictures WHERE tenant_id = ? AND id = ?", (TEN, PIC["id"]))[0]
+ok("⭐ 5b. the tick saves through the PATCH: on_sheet true, the version up (the page's Save sends it like the opacity)",
+   _st == 200 and PIC2.get("on_sheet") is True and PIC2["version"] == PIC["version"] + 1 and SL._truthy(row["on_sheet"]))
+S_on = SP.sheet("L019", PH)
+PDF_on = SP.build_pdf(S_on)
+PNG_on = SP.build_png(PDF_on)
+r_off, r_on = reddish(PNG_off), reddish(PNG_on)
+ok("⭐ 5b. ticked: the sheet draws it under the layout (an image more in the PDF; ~150 m of red at 1:2,500 on the page)",
+   [p["id"] for p in S_on["pictures"]] == [PIC["id"]] and S_on["pictures_drawn"] == [PIC["id"]]
+   and r_on > r_off + 20000, f"{r_off} -> {r_on}")
+ok("5b. ...and the sheet's words are unchanged by it", " ".join(pdf_text(PDF_on).split()) == " ".join(pdf_text(SP.build_pdf(S_off)).split()))
+PIC3 = SLP.edit(PIC["id"], {"version": PIC2["version"], "phase_id": PH2}, "harness")
+ok("5b. a picture of another phase is not on this phase's sheet; on its own phase's it is",
+   SP.sheet("L019", PH)["pictures"] == [] and [p["id"] for p in SP.sheet("L019", PH2)["pictures"]] == [PIC["id"]])
+PIC4 = SLP.edit(PIC["id"], {"version": PIC3["version"], "every": True}, "harness")
+ok("5b. an every-phase picture, ticked: on every phase's sheet",
+   all([p["id"] for p in SP.sheet("L019", x)["pictures"]] == [PIC["id"]] for x in (PH, PH2)))
+far = [[c[0] + 0.5, c[1]] for c in PIC4["corners"]]
+PIC5 = SLP.edit(PIC["id"], {"version": PIC4["version"], "corners": far}, "harness")
+S_far = SP.sheet("L019", PH)
+SP.build_pdf(S_far)
+ok("5b. a ticked picture outside the frame: listed, not drawn (nothing to clip)",
+   len(S_far["pictures"]) == 1 and S_far["pictures_drawn"] == [])
+SLP.edit(PIC["id"], {"version": PIC5["version"], "corners": PIC4["corners"], "on_sheet": False}, "harness")
+ok("5b. unticked again: off the sheet", SP.sheet("L019", PH)["pictures"] == [])
+# the warp: any four corners (PR 3 moves them one at a time), each sent exactly to its image corner
+_src = [(0, 0), (400, 0), (400, 300), (0, 300)]
+_dst = [(12.0, 7.0), (380.0, 40.0), (350.0, 260.0), (30.0, 300.0)]
+_co = SP.homography(_src, _dst)
+
+
+def _back(x, y):
+    d = _co[6] * x + _co[7] * y + 1
+    return ((_co[0] * x + _co[1] * y + _co[2]) / d, (_co[3] * x + _co[4] * y + _co[5]) / d)
+
+
+ok("5b. the warp sends each of four free corners to its image corner (a true perspective, not an affine)",
+   all(abs(_back(*d)[0] - s_[0]) < 1e-6 and abs(_back(*d)[1] - s_[1]) < 1e-6 for d, s_ in zip(_dst, _src)))
+ok("5b. folded corners: refused, not drawn", isinstance(raises(lambda: SP.homography(_src, [(0, 0)] * 4)), ValueError))
+_plan = SP.for_plan("L019", None)
+_srcs = {n: open(os.path.join(BACKEND, n), encoding="utf-8").read()
+         for n in ("route_map_export.py", "export.py", "clp_doc_pictures.py", "clp_doc.py")}
+ok("🔴 5b. never on the CLP or the Routes plans: for_plan carries no picture, and no plan code reads them (Q6)",
+   (_plan is None or "pictures" not in _plan)
+   and not any("sheet_pictures" in t or "site_layout_pictures" in t or "draw_picture" in t for t in _srcs.values()))
+_SLP = open(os.path.join(BACKEND, "site_layout_pictures.py"), encoding="utf-8").read()
+ok("5b. the tick is written as a Python bool (BOOLEAN on Postgres), never 1 / 0 in SQL",
+   'params.append(bool(SL._truthy(body["on_sheet"])))' in _SLP
+   and not re.search(r"on_sheet\s*=\s*[01]\b", _SLP + open(os.path.join(BACKEND, "site_layout_paper.py"), encoding="utf-8").read()))
+
+# =========================================================================== #
 #  6. The hooks, at source level                                               #
 # =========================================================================== #
 RME = open(os.path.join(BACKEND, "route_map_export.py"), encoding="utf-8").read()
@@ -505,6 +581,9 @@ ok("6. the page: Print… in each phase's ⋯ menu, the panel's Page / Scale / M
    "onClick={() => openPrint(p)}>Print…</button>" in APP and 'data-site-layout-print="1"' in APP
    and "/site-layout/sheet.${kind}?" in APP and "/site-layout/sheet?phase=" in APP
    and 'aria-label="Page"' in APP and 'printSheet("pdf")' in APP and 'printSheet("png")' in APP)
+ok("6. the page: each picture's detail has 'Print under the layout', kept by Save with the picture's other changes",
+   "Print under the layout</label>" in APP and 'checked={!!p.on_sheet} onChange={ev => updPic(p.id, { on_sheet: ev.target.checked })}' in APP
+   and "!!p.every, !!p.on_sheet]);" in APP and "phase_id: p.every ? null : phase.id, on_sheet: !!p.on_sheet })" in APP)
 ok("6. the panel's failure goes through errSay (no status number on a screen)",
    'errSay("The sheet could not be made.", e)' in APP and 'errSay("The print settings could not be read.", e)' in APP)
 MAIN = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()

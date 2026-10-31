@@ -796,10 +796,18 @@ for (const banned of ["FormData(", "multipart/form-data"]) {
   const _sl0 = code.indexOf("function SiteLayoutCard(");
   const _sl1 = code.indexOf("\nfunction ", _sl0 + 10);
   const _slBody = _sl0 < 0 ? "" : code.slice(_sl0, _sl1);
+  // NARROWED 31 Oct 2026 (task 4c PR 3, approved mockup): a THIRD, the drawing tools' + Add a picture (a PNG, JPG or PDF
+  // page pinned under the layout; planners and admins), sent the same way: the file itself as the body, no FormData.
+  const _sd0 = code.indexOf("function SiteLayoutDraw(");
+  const _sd1 = code.indexOf("\nfunction ", _sd0 + 10);
+  const _sdBody = _sd0 < 0 ? "" : code.slice(_sd0, _sd1);
   for (const banned of ['type="file"', ".files["]) {
-    ok(`no upload path: ${banned} appears only in the organisation file chooser and the site layout's drawing chooser`,
-       code.split(banned).length - 1 === 2 && _ofBody.includes(banned) && _slBody.includes(banned));
+    ok(`no upload path: ${banned} appears only in the organisation file chooser, the site layout's drawing chooser and the drawing tools' picture chooser`,
+       code.split(banned).length - 1 === 3 && _ofBody.includes(banned) && _slBody.includes(banned) && _sdBody.includes(banned));
   }
+  ok("...the picture goes as the body to /site-layout/pictures (no FormData)",
+     _sdBody.includes("/site-layout/pictures?${q}`") && _sdBody.includes('{ method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: f }')
+     && !code.includes("FormData"));
   ok("...the drawing goes as the body to /site-layouts/read (no FormData)",
      _slBody.includes("/site-layouts/read?") && _slBody.includes('"Content-Type": "application/octet-stream" }, body: file'));
   ok("...which reads the file as text and posts JSON (no FormData, no multipart)",
@@ -4425,8 +4433,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // NARROWED 31 Oct 2026 (task 4a, PR 3b): 11 — + each open task's "⋯" (Edit, Delete…) in a CLP's Notes and tasks
   // NARROWED 31 Oct 2026 (task 4a, PR 3c): 13 — + Users → Client reviewers: the groups' and the reviewers' "⋯"
   // NARROWED 31 Oct 2026 (task 4c, PR 2): 14 — + each Site layout phase's "⋯" (Name and months, Copy to a new phase, Delete…)
+  // NARROWED 31 Oct 2026 (task 4c, PR 3): 15 — + each pinned picture's "⋯" (Move corners, Fit to screen, Rename, every phase, Delete…)
   ok("⭐ 27 Oct: the '⋯' on six tables — Abnormal loads (with its note), Routes, Zones, the gates list, the logins, the demo leads, the teams",
-     menus.length === 14 && src.includes("<RowMenu name={p.name}>") && src.includes("<RowMenu name={g.name}>") && src.includes("<RowMenu name={x.words.slice(0, 60)}>") && src.includes('<RowMenu name={c.name + " · " + teamWord(c)}>') && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
+     menus.length === 15 && src.includes("<RowMenu name={p.name}>") && src.includes("<RowMenu name={g.name}>") && src.includes("<RowMenu name={x.words.slice(0, 60)}>") && src.includes('<RowMenu name={c.name + " · " + teamWord(c)}>') && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
      && src.includes("<RowMenu name={g.name || g.id}>") && (src.match(/<RowMenu name=\{u\.name\}>/g) || []).length === 3 && src.includes("<RowMenu name={t.label}>"), String(menus.length));
   ok("⭐ 27 Oct: Abnormal loads — one filled button for the forward step (AL_FORWARD: pending → approved → notified → moved; withdrawn → pending), the rest in the menu, Withdraw and Delete red and asking first",
      src.includes('const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved", withdrawn: "pending" };')
@@ -4446,7 +4455,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      // NARROWED 31 Oct 2026 (task 4a, PR 3b): + a CLP task's Delete… — six
      // NARROWED 31 Oct 2026 (task 4a, PR 3c): + a client group's and a reviewer's Delete… — eight
      // NARROWED 31 Oct 2026 (task 4c, PR 2): + a Site layout phase's Delete… — nine
-     && (src.match(/>Delete…<\/button>/g) || []).length === 9 && src.includes('onClick={() => deletePhase(p)}>Delete…</button>') && src.includes('onClick={() => delTask(x)}>Delete…</button>') && src.includes('onClick={() => deleteRoute(r.id)}>Delete…</button>')
+     // NARROWED 31 Oct 2026 (task 4c, PR 3): + a pinned picture's Delete… — ten (asked in the panel: the editor has no pop-ups)
+     && (src.match(/>Delete…<\/button>/g) || []).length === 10 && src.includes('onClick={() => deletePhase(p)}>Delete…</button>') && src.includes('onClick={() => setPicAsk(p.id)}>Delete…</button>') && src.includes('onClick={() => delTask(x)}>Delete…</button>') && src.includes('onClick={() => deleteRoute(r.id)}>Delete…</button>')
      && src.includes('onClick={() => remove(p)}>Delete…</button>'));
   ok("⭐ 27 Oct: the words — every lead is one line; the foot of Abnormal loads prints the advice line only; no screen prints a decision code in brackets",
      src.includes('? "Approve or reject each line; approved lines feed the public map, the Look-ahead and the Dashboard."')
@@ -4621,7 +4631,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      card.includes("const canLayout = !!(ACCESS.info && ACCESS.info.can_approve);") && !card.includes("isAdminLogin"));
   ok("SITE LAYOUT: the drawing code is the map's own file, loaded once when needed (one look in one place)",
      // NARROWED 31 Oct 2026 (PR 2): v=3, the words from zoom 15 and geo (PR 4 had made it v=2, the minzoom option)
-     code.includes('s.src = "/map/site-layouts.js?v=3";') && card.includes("WSLayouts.install(m, styles, { prefix: \"dm-layout\" })")
+     // NARROWED 31 Oct 2026 (PR 3): v=4, + WSLayouts.pictures (the pinned pictures, both maps)
+     code.includes('s.src = "/map/site-layouts.js?v=4";') && card.includes("WSLayouts.install(m, styles, { prefix: \"dm-layout\" })")
      && !/<script src="\/map\/site-layouts\.js/.test(html));
   ok("SITE LAYOUT: put back after a basemap switch (the page's style.load), and cleared when the card closes",
      // NARROWED 31 Oct 2026 (PR 2): + the drawing tools' own put-back
@@ -4691,9 +4702,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ DRAW: one Save, version-checked: a 409 shows PR 1's words with Reload; Unsaved changes / All changes saved",
      ed.includes('method: "PUT"') && ed.includes("/features`") && ed.includes("JSON.stringify({ version: e.ver, features: { type: \"FeatureCollection\", features: list } })")
      && ed.includes('if(res.status === 409){ setStale(true); say("Someone else saved this layout. Reload to see their changes.", true); return; }')
-     && ed.includes("{stale && <button onClick={reload} className={tb}>Reload</button>}") && ed.includes('{dirty ? "Unsaved changes" : "All changes saved"}'));
+     // NARROWED 31 Oct 2026 (PR 3): the things only when they changed; a picture's change counts as unsaved too
+     && ed.includes("if(e.dirty){") && ed.includes("{stale && <button onClick={reload} className={tb}>Reload</button>}") && ed.includes('{dirty || pdirty ? "Unsaved changes" : "All changes saved"}'));
   ok("⭐ DRAW: leaving with unsaved changes asks Save or Discard — Done, a phase switch, a page change, the hash, closing the tab",
-     ed.includes('LAYOUT_LEAVE = () => { if(!e.dirty) return false; setAsk(true); say("Save or discard your changes first.", true); return true; };')
+     // NARROWED 31 Oct 2026 (PR 3): ...or a picture changed and not saved (e.pdirty)
+     ed.includes('LAYOUT_LEAVE = () => { if(!e.dirty && !e.pdirty) return false; setAsk(true); say("Save or discard your changes first.", true); return true; };')
      && src.includes("if(LAYOUT_LEAVE && p !== page && LAYOUT_LEAVE()) return;") && src.includes('if(h && h !== page && LAYOUT_LEAVE && LAYOUT_LEAVE()){ try { history.replaceState(null, "", "#" + page); } catch(e){} return; }')
      && ed.includes('window.addEventListener("beforeunload", unload);') && ed.includes("<button onClick={discard} className={tb} style={{ color: \"var(--red)\" }}>Discard</button>")
      && !/confirm\(/.test(ed));
@@ -4726,7 +4739,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("DRAW: on open (only) the map goes to the phase's drawing, unless already at zoom 15 or closer (the Chrome check, 31 Oct)",
      ed.includes("// once, on open: the map goes to the phase's drawing (never again while drawing)")
      && ed.includes("if(!b.isEmpty() && m.getZoom() < 15) m.fitBounds(b, { padding: 40, maxZoom: 18, duration: 0 });")
-     && (ed.match(/fitBounds\(/g) || []).length === 1);
+     // NARROWED 31 Oct 2026 (PR 3): and a pinned picture's "Fit to screen" (asked for, never on its own)
+     && (ed.match(/fitBounds\(/g) || []).length === 2 && ed.includes("const fitPic = (p) => {") && ed.includes("onClick={() => fitPic(p)}>Fit to screen</button>"));
   ok("DRAW: the palette's tool button is ONE module-level component (a click never remounts it, so the focus stays), white on an inline navy when picked (the Dark look's rule)",
      (src.match(/const PalBtn = /g) || []).length === 1 && src.includes('const PalBtn = ({ on, ...r }) => <button {...r} aria-pressed={on} className=')
      && src.includes('style={on ? { background: "var(--navy)" } : undefined} />;') && src.indexOf("const PalBtn = ") < src.indexOf("function SiteLayoutDraw(")
@@ -4740,8 +4754,60 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("DRAW: while drawing the card's own drawing is hidden, and read again on Done",
      card.includes("h.setVisible(!drawing);") && card.includes("if(wasDrawing.current && !drawing) load(wasDrawing.current);"));
   ok("DRAW: the words are few and name no back end; every failure through errSay",
-     !/terra|mapbox|\bAPI\b|server|endpoint|uuid|json/i.test((edc.match(/>[^<>{}\n]{3,}</g) || []).join(" ")) && (ed.match(/errSay\("/g) || []).length === 4
-     && !/\$\{x\}|\.status\b/.test(ed.replace("res.status === 409", "")));
+     // NARROWED 31 Oct 2026 (PR 3): 6 errSay — + "Not added." / "Not deleted." for a picture; the pictures' Save has its own 409
+     !/terra|mapbox|\bAPI\b|server|endpoint|uuid|json/i.test((edc.match(/>[^<>{}\n]{3,}</g) || []).join(" ")) && (ed.match(/errSay\("/g) || []).length === 6
+     && !/\$\{x\}|\.status\b/.test(ed.split("res.status === 409").join("")));
+}
+// 31 Oct 2026 (task 4c PR 3, the mockup John approved: notes site-layout-pictures-mockup-1031, Q1-Q11 as recommended):
+// the drawing tools' Pictures — a picture or one PDF page pinned under the layout by its four corners. Staff only.
+{
+  const cut = (t, name) => { const a = t.indexOf("function " + name + "("); return a < 0 ? "" : t.slice(a, t.indexOf("\nfunction ", a + 10)); };
+  const ed = cut(src, "SiteLayoutDraw"), card = cut(src, "SiteLayoutCard");
+  ok("⭐ PICTURES: a Pictures card in the drawing tools (Q1), between Selected and Layers; + Add a picture; one line when there are none",
+     ed.includes('data-site-layout-pictures="1"') && ed.indexOf('data-site-layout-selected="1"') < ed.indexOf('data-site-layout-pictures="1"')
+     && ed.indexOf('data-site-layout-pictures="1"') < ed.indexOf('data-site-layout-layers="1"')
+     && ed.includes(">+ Add a picture</button>") && ed.includes("A PNG, JPG or PDF page, pinned under the layout."));
+  ok("PICTURES: adding — a PNG, JPG or PDF up to 10 MB; a PDF's page and scale 1:N; white see-through ticked for a PDF (Q5); this phase or every phase (Q2)",
+     ed.includes('accept=".png,.jpg,.jpeg,.pdf"') && ed.includes("PNG, JPG or PDF, up to 10 MB.") && ed.includes(">Page<input") && ed.includes(">Scale 1:<input")
+     && ed.includes("clear: f ? /\\.pdf$/i.test(f.name) : x.clear") && ed.includes("Make white see-through") && ed.includes(">This phase</label>") && ed.includes(">Every phase</label>"));
+  ok("PICTURES: it lands in the middle of the screen (lon / lat of the map's centre) and opens straight into Move corners",
+     ed.includes("lon: String(c.lng), lat: String(c.lat)") && ed.includes("say(j.words);\n      startCorners(np.id);"));
+  ok("⭐ PICTURES: Move corners pauses drawing (Terra Draw's static mode, the palette dimmed): numbered corners, ✥ moves it whole, ⟳ turns it; Done / Cancel (Q6)",
+     ed.includes('try { e.draw.setMode("static"); } catch(x){}') && ed.includes('mk("slp-corner", "", String(i + 1))') && ed.includes('mk("slp-mover", "✥")') && ed.includes('mk("slp-turner", "⟳")')
+     && ed.includes("Drag the numbered corners onto points you know; ✥ moves it whole, ⟳ turns it. Drawing is paused.")
+     && ed.includes("<button onClick={cornersDone}") && ed.includes("<button onClick={cornersCancel} className={tb}>Cancel</button>")
+     && ed.includes('...(corner ? { opacity: 0.45, pointerEvents: "none" } : {})') && ed.includes("if(e.cm) return;   // moving a picture's corners"));
+  // NARROWED 31 Oct 2026 (task 4c PR 5): the key also carries the "Print under the layout" tick (on_sheet)
+  ok("⭐ PICTURES: corners, opacity, name, every phase and the sheet tick are kept by the ONE Save (Q8), one write each with its own version (409 = Reload); adding and deleting are written at once",
+     ed.includes("const picKey = (p) => JSON.stringify([p.corners, p.opacity, p.name, !!p.every, !!p.on_sheet]);")
+     && ed.includes('fetch(`${API}/site-layouts/pictures/${encodeURIComponent(p.id)}`, { method: "PATCH"')
+     && ed.includes('say("Someone else changed a picture. Reload to see their changes.", true)')
+     && ed.includes('fetch(`${API}/site-layouts/pictures/${encodeURIComponent(p.id)}?version=${v}`, { method: "DELETE" })')
+     && ed.includes("setPics(e.picList.filter(p => e.picBase[p.id]).map(p => picCopy(e.picBase[p.id])));"));
+  ok("PICTURES: each row — an eye (hide while drawing, not saved), the name, 'every phase', and a ⋯ with Move corners, Fit to screen, Rename, every phase, Delete…",
+     ed.includes('className="slp-eye" aria-pressed={!hid} aria-label={`${hid ? "Show" : "Hide"} ${p.name}`}')
+     && ed.includes(">Move corners</button>") && ed.includes(">Fit to screen</button>") && ed.includes(">Rename</button>")
+     && ed.includes('{p.every ? "Show in this phase only" : "Show in every phase"}') && ed.includes("Delete “{p.name}”?")
+     && html.includes('.slp-eye::before{content:"◉";}') && !/confirm\(/.test(ed));
+  ok("PICTURES: drawn by the map's own file (WSLayouts.pictures) UNDER the layout; put back after a basemap switch; gone when the tools close",
+     ed.includes('e.pics = WSLayouts.pictures(m, { prefix: "dm-pic", before: () => e.h && e.h.layerIds()[0], url: picUrl });')
+     && ed.includes("if(e.pics) e.pics.set(e.picList);   // the new style dropped them") && ed.includes("try { if(e.pics) e.pics.remove(); } catch(x){}")
+     && ed.includes("e.blobs.forEach(u => URL.revokeObjectURL(u));"));
+  ok("PICTURES: a code sign-in (its code in a header the map's image read cannot send) reads the image through the app and hands the map a copy",
+     ed.includes("const picUrl = (p) => !ACCESS.code ? p.url : fetch(p.url)") && ed.includes("URL.createObjectURL(b)"));
+  ok("PICTURES: the phase row says ' · 1 picture' (its own and every phase's); nothing else on Locations changes (card 1)",
+     src.includes('const slPicWords = (n) => n ? ` · ${n} picture${n === 1 ? "" : "s"}` : "";')
+     && card.includes("{slPicWords((p.pictures || 0) + ((lay && lay.pictures) || []).filter(x => x.every).length)}")
+     && !card.includes("site-layout/pictures"));
+  ok("PICTURES: ✥ and ⟳ measure from where the handle sat before the drag (Mapbox's dragstart comes after the first step), and every handle settles on dragend",
+     ed.includes("mover.on(\"dragstart\", () => { from = cs.map(c => c.slice()); start = mid4(from); });")
+     && ed.includes("mover.on(\"dragend\", () => { moveTo(); put(); });") && ed.includes("const t = G.toM(turnAt(base), o);")
+     && ed.includes("k.on(\"dragend\", () => { cs[i] = k.getLngLat().toArray(); show(); put(); });")
+     && !ed.includes("last = mover.getLngLat()") && !ed.includes("G.toM(turner.getLngLat().toArray(), o); a0"));
+  ok("PICTURES: Done on unmoved corners says 'not moved' (not 'Save to keep them' beside a greyed Save — seen in Chrome, 31 Oct)",
+     ed.includes("JSON.stringify(b.corners) === JSON.stringify(p.corners) ? `${p.name}: not moved.` : `${p.name}: corners set. Save to keep them.`"));
+  ok("PICTURES: leaving with a picture changed and not saved asks Save or Discard, as the drawing does",
+     ed.includes("if(e.dirty || e.pdirty){ ev.preventDefault(); ev.returnValue = \"\"; }") && ed.includes("const done = () => { if(e.cm) stopCorners(true); if(e.dirty || e.pdirty){"));
 }
 // 31 Oct 2026 (task 4a, PR 3a; the approved mockup notes\clp-screens-mockup-1031): Plan → CLP documents and Config's CLP stages
 {

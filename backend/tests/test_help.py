@@ -925,7 +925,8 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 31 Oct 2026 (task 4a, PR 3b): + 18.5 Notes and tasks (84); + T1 "CLP notes and tasks" (35)
    # NARROWED 31 Oct 2026 (task 4a, PR 3c): + 18.6 The client's reviewers (85); + T1 "CLP client reviewers" (36)
    # NARROWED 31 Oct 2026 (task 4c PR 2): + 19.2 Drawing (86)
-   len(re.findall(r'<li class="l[12]"', src)) == 87 and   # NARROWED 31 Oct 2026 (task 4c PR 5): + 19.5 On paper (87)
+   # NARROWED 31 Oct 2026 (task 4c PR 3): + 19.5 Pinned pictures (87); the technical entry is inside T1 "Site layouts" (no new row)
+   len(re.findall(r'<li class="l[12]"', src)) == 88 and   # NARROWED 31 Oct 2026 (task 4c PR 5): + 19.6 On paper (88)
    len(re.findall(r'<li class="l[12]"', _tg2)) == 36   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
@@ -1253,27 +1254,30 @@ ok3("SITE LAYOUTS: #t1-layouts holds the units rule, the leave-outs, footprints,
     "<code>FOOTPRINT_M</code>" in _tgv2 and "<code>site_layouts.MAX_HOLES</code>" in _tgv2 and "Terra Draw 1.37 refuses a polygon with holes" in _tgv2
     and "<code>contractor-style-mm.dxf</code>" in _tgv2 and "<code>$INSUNITS</code> must be 6" not in _tgv2)
 
-# 31 Oct 2026 (task 4c PR 5, the approved mockup notes\\site-layout-paper-mockup-1031): 19.5 On paper, few words; #t1-layouts-paper the detail
-_d195 = _ch19[_ch19.index('<h2 id="19-5-on-paper">'):] if '<h2 id="19-5-on-paper">' in _ch19 else ""
-ok3("⭐ SITE LAYOUTS (PR 5): 19.5 On paper says Print…, the page, scale and map, PDF or PNG, 100 %, what is left out, and the CLP's Site plan",
+# 31 Oct 2026 (task 4c PR 5, the approved mockup notes\\site-layout-paper-mockup-1031): 19.6 On paper (19.5 is PR 3's pictures), few words; #t1-layouts-paper the detail
+_d195 = _ch19[_ch19.index('<h2 id="19-6-on-paper">'):] if '<h2 id="19-6-on-paper">' in _ch19 else ""
+ok3("⭐ SITE LAYOUTS (PR 5): 19.6 On paper says Print…, the page, scale and map, PDF or PNG, 100 %, what is left out, and the CLP's Site plan",
     all(t in _d195 for t in ("<strong>⋯ → Print…</strong>", "A3 or A4, landscape", "<strong>Fitted</strong>", "1:200 to 1:5,000",
                              "Streets, Light, Outdoors or Aerial", "<strong>PDF</strong> or <strong>PNG</strong>", "printed at 100 %",
                              "Security and CCTV symbols are on the sheet", "the phase in force in the site&#39;s busiest month",
-                             "&ldquo;No site layout drawn&rdquo; to complete"))
-    and '<a href="#19-5-on-paper">19.5 On paper</a>' in _ug, _d195[:200])
-ok3("SITE LAYOUTS (PR 5): 19.5 names no back end; #t1-layouts-paper holds the endpoints, solo, the vector symbols and the CLP hook",
+                             "&ldquo;No site layout drawn&rdquo; to complete",
+                             "<strong>Print under the layout</strong> is ticked", "without security or CCTV symbols or pictures"))
+    and '<a href="#19-6-on-paper">19.6 On paper</a>' in _ug, _d195[:200])
+ok3("SITE LAYOUTS (PR 5): 19.6 names no back end; #t1-layouts-paper holds the endpoints, solo, the vector symbols and the CLP hook",
     _d195 and not re.search(r"\b(API|endpoint|server|JSON|ReportLab|SVG|solo|dpi|Mapbox|422|503)\b", _d195)
     and 'id="t1-layouts-paper"' in _tgv2 and "<code>GET /api/locations/{id}/site-layout/sheet?phase=</code>" in _tgv2
     and "<code>heavy_reads.solo(&quot;site-layout-read&quot;)</code>" in _tgv2 and "<code>backend/site_layout_svg.py</code>" in _tgv2
-    and "<code>ROUTE_MAP_PANEL_MAX_LAYOUT</code> 12" in _tgv2 and "Pins and the sheet come in later PRs" not in _tgv2)
+    and "<code>ROUTE_MAP_PANEL_MAX_LAYOUT</code> 12" in _tgv2 and "Pins and the sheet come in later PRs" not in _tgv2
+    and "<code>site_layout_paper.sheet_pictures</code>" in _tgv2 and "<code>PICTURE_DPI</code> 200" in _tgv2
+    and "The CLP and the Routes plans never draw pictures." in _tgv2 and "Not yet: pinned pictures under the layout" not in _tgv2)
 
 # 31 Oct 2026 (task 4c PR 2, the approved mockup notes\\site-layout-draw-mockup-1031): 19.2 Drawing, few words; #t1-layouts-draw the detail
 _d192 = _ch19[_ch19.index('<h2 id="19-4-drawing">'):_ch19.index('<h2 id="19-2-bringing-in-a-drawing">')] if '<h2 id="19-4-drawing">' in _ch19 else ""
 ok3("⭐ SITE LAYOUTS (PR 2): 19.2 Drawing says how to draw, select, turn and resize, the snapping, layers, holes, the keys, Save / Discard, the words from zoom 15",
     all(t in _d192 for t in ("<strong>Draw</strong>", "hold R and drag to turn it, S to resize it", "<strong>15° steps</strong>", "hidden or locked while you draw",
                              "an area with holes keeps them", "Ctrl+Z undo, Ctrl+Y redo, Ctrl+D duplicate, Ctrl+S save", "<strong>Discard</strong>", "from zoom 15, on both maps"))
-    # NARROWED 31 Oct 2026 (task 4c PR 5): Print… (19.5) sits between them in the ⋯ list
-    and "<strong>Name and months</strong>, <strong>Print…</strong> (19.5), <strong>Copy to a new phase</strong>" in _ch19 and "<strong>Show the whole drawing</strong>" in _ch19
+    # NARROWED 31 Oct 2026 (task 4c PR 5): Print… (19.6) sits between them in the ⋯ list
+    and "<strong>Name and months</strong>, <strong>Print…</strong> (19.6), <strong>Copy to a new phase</strong>" in _ch19 and "<strong>Show the whole drawing</strong>" in _ch19
     and "<strong>Edit</strong> changes its name and months" not in _ch19, _d192[:200])
 ok3("SITE LAYOUTS (PR 2): 19.2 names no library or back end (Terra Draw, uuid, version, PUT live in the technical guide)",
     _d192 and not re.search(r"\b(API|endpoint|server|JSON|Terra|uuid|PUT|409|Mapbox|version)\b", _d192)
@@ -1293,5 +1297,25 @@ ok3("PUBLIC LAYOUTS: #t1-layouts holds the switch, the public read, the allow-li
     and "<code>site_layouts.public_thing</code>" in _tgv2 and "<code>read_cache.cached()</code>" in _tgv2 and "{minzoom: 16}" in _tgv2
     and "<code>site_layout_styles.public_payload()</code>" in _tgv2 and "the public layer and the sheet come in later PRs" not in _tgv2)
 
+# 31 Oct 2026 (task 4c PR 3, the approved mockup): the pinned pictures — the user guide says what a person does, in a few
+# words and with no back end; the technical guide's T1 Site layouts holds the detail
+_pp = src[src.index('<h2 id="19-5-pinned-pictures">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')] if '<h2 id="19-5-pinned-pictures">' in src and '<h1 id="appendix-a-methods-and-assumptions">' in src else ""
+ok("PICTURES: user guide 19.5 Pinned pictures — in the contents; adding (PDF page and scale, white see-through, this / every phase), Move corners, opacity, saving, the staff tick",
+   '<li class="l2"><a href="#19-5-pinned-pictures">19.5 Pinned pictures</a></li>' in src and len(_pp) > 1500
+   and "never show on the public map" in _pp and "type its scale, such as 1:500" in _pp and "<strong>Make white see-through</strong>" in _pp
+   and "<strong>Every phase</strong>" in _pp and "<strong>Move corners</strong>" in _pp and "<strong>Pinned pictures</strong>" in _pp
+   and "A site can have 10 pictures." in _pp)
+ok("PICTURES: ...and 19.5 names no back end (no address, table, library, cookie, base64 or supplier)",
+   not re.search(r"/api/|site_layout_pictures|pypdfium|Pillow|base64|cookie|Mapbox|Terra Draw|blob:|heavy_reads", _pp))
+_tp = _tg2[_tg2.index('<li id="t1-layouts-pictures">'):] if '<li id="t1-layouts-pictures">' in _tg2 else ""
+_tp = _tp[:_tp.index("</li>")] if "</li>" in _tp else ""
+ok("PICTURES: technical T1 — the table, the limits, the endpoints, the image read staff only, never public, both maps, the code sign-in's copy",
+   all(w in _tp for w in ("<code>site_layout_pictures</code>", "<code>db.NO_DATA_TABLES</code>", "200 dpi", "4,096 dots", "256-row bands",
+                          "heavy_reads.solo(&quot;site-layout-read&quot;)" if "&quot;" in _tp else 'heavy_reads.solo("site-layout-read")',
+                          "/api/site-layouts/pictures/{id}/image", "NEVER PUBLIC", "<code>POST /api/locations/{id}/site-layout/pictures</code> (query", "<code>WSLayouts.pictures</code>", "<code>blob:</code>", "<code>on_sheet</code>")))
+
+
+ok("PICTURES: ...and its upload address is not one long unbroken token (it pushed the guide 24 px sideways at 390 px; UI audit 31 Oct)",
+   "/site-layout/pictures?name=" not in _tg2)
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

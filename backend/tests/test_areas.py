@@ -970,9 +970,11 @@ ok("6b. ⭐ a session touch and the sign-in throttle (NO_DATA_TABLES) leave the 
 # NARROWED 31 Oct 2026 (task 4a PR 3c): + clp_review_groups, clp_reviews (the client's reviewers; no figure is built from them)
 # NARROWED 31 Oct 2026 (task 4a PR 3b): + clp_notes, the notes and tasks on each CLP (no kept read is built from them,
 # and a note must not end a kept CLP draft)
-ok("6b. the tables that do not bump are exactly the account / audit / lead tables and the CLP notes",
+# NARROWED 31 Oct 2026 (task 4c PR 3): + site_layout_pictures, the pinned pictures (the staff map reads them fresh; moving
+# one must not end the kept staff reads)
+ok("6b. the tables that do not bump are exactly the account / audit / lead tables, the CLP notes, the reviewers and the pinned pictures",
    db.NO_DATA_TABLES == {"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users", "demo_requests", "clp_notes",
-                         "clp_review_groups", "clp_reviews"})
+                         "clp_review_groups", "clp_reviews", "site_layout_pictures"})
 ok("6b. ⭐ written_table(): INSERT / INSERT OR REPLACE / REPLACE / UPDATE / DELETE name their table; anything else is None (and bumps)",
    db.written_table("INSERT INTO forecasts (a) VALUES (?)") == "forecasts"
    and db.written_table("  insert or replace into Audit_Log (a) values (?)") == "audit_log"
@@ -1071,7 +1073,11 @@ ok("6b. ⭐ the middleware bumps the version after EVERY audited /api/ write, wo
    "try:\n                response = await call_next(request)\n            finally:" in _mw
    # NARROWED 31 Oct 2026 (task 4a PR 3b): every audited write but a CLP's notes and tasks (_CLP_NOTES_PATH)
    # NARROWED 31 Oct 2026 (task 4a PR 3c): nor the client reviewers' writes (_REVIEW_PATH)
-   and "if write and _audited(path) and not _CLP_NOTES_PATH.match(path) and not _REVIEW_PATH.match(path):\n                    db.bump_data_version()" in _mw
+   # NARROWED 31 Oct 2026 (task 4c PR 3): ...and a pinned picture's writes (_PICTURE_PATH; nothing is built from a picture)
+   and ("if (write and _audited(path) and not _CLP_NOTES_PATH.match(path) and not _REVIEW_PATH.match(path)\n"
+        "                        and not _PICTURE_PATH.match(path)):\n"
+        "                    db.bump_data_version()") in _mw
+   and '_PICTURE_PATH = re.compile(r"^/api/(site-layouts/pictures/[^/]+|locations/[^/]+/site-layout/pictures)$")' in src_main
    and '_CLP_NOTES_PATH = re.compile(r"^/api/clp/documents/[^/]+/(notes|tasks)(/|$)")' in src_main)
 ok("6b. ⭐ db._run bumps after the commit and execute_atomic after its commit (not before: a reader could re-cache old figures)",
    "conn.commit()\n            note_write(sql)" in read("backend/db.py")

@@ -33,7 +33,9 @@ CSP_SOURCES = {
     # listed here: it is typed on Config, so csp(extra_connect) adds that one host to the MAP page's policy only. Google Fonts'
     # CSS too: accessibility checkers (axe, which the UI audit runs) re-read every stylesheet with fetch(), and the policy
     # refused it on every page (UI audit run 2026-10-27_230343); it serves font CSS only.
-    "connect-src": ["'self'", "https://api.mapbox.com", "https://*.tiles.mapbox.com", "https://events.mapbox.com",
+    # blob: (31 Oct 2026, task 4c PR 3): a pinned picture read by the app for a code sign-in (its code goes in a header,
+    # which the map's own image read cannot send) is handed to the map as a copy in this browser, which the map fetches
+    "connect-src": ["'self'", "blob:", "https://api.mapbox.com", "https://*.tiles.mapbox.com", "https://events.mapbox.com",
                     "https://tiles.maaamet.ee", "https://api.os.uk", "https://fonts.googleapis.com"],
     # Mapbox GL runs its workers from blob: URLs
     "worker-src": ["'self'", "blob:"],

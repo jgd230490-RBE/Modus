@@ -698,7 +698,8 @@ ok("🔴 every fitBounds in the app is inside a try (30 Sep: a NaN bounds on the
    # NARROWED 28 Oct 2026 (simulation v2): seven, the site view frames the chosen site and the whole scheme again
    # NARROWED 31 Oct 2026 (task 4c PR 1): eight, the Site layout card frames a drawing brought in and its fitted place
    # NARROWED 31 Oct 2026 (task 4c PR 2): 8 -> 9 — the drawing tools go to the phase's drawing once, on open
-   len(_fits) == 9 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
+   # NARROWED 31 Oct 2026 (task 4c PR 3): 9 -> 10 — a pinned picture's "Fit to screen" (fitPic)
+   len(_fits) == 10 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
    and "try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); store.framed = true; } catch(e){}" in fe, str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
 # --- 5 Oct 2026: Appearance (Ink / Light / Dark) ------------------------------------------
 _PAL = re.compile(r'(?:(?:hover|focus|disabled|group-hover|sm|md|lg):)?(?:bg|text|border|divide|ring|placeholder)-(?:white|black|transparent|current|\[color:[^\]]+\]|\[#[0-9a-fA-F]{3,8}\]|\[rgba?\([^\]]+\)\]|(?:slate|gray|red|amber|blue|emerald|green)-\d{2,3})(?:/\d{1,3})?')
@@ -732,7 +733,10 @@ ok("APPEARANCE: cards, the big-screen bar and the Look-ahead's white buttons rea
    ".card{background:var(--surface);" in fe and ".dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);" in fe
    # NARROWED 27 Oct 2026 (pilot readiness F3 b): one exemption, the two-step QR code's frame — a QR code must be dark on
    # WHITE in either look or a phone camera cannot read it
-   and 'background: "white"' not in fe and fe.count("background:#fff;") == 1 and ".auth-qr{display:inline-block;background:#fff;" in fe)
+   # NARROWED 31 Oct 2026 (task 4c PR 3): + the pinned pictures' corner and turn handles — they sit ON THE MAP (a drawing or
+   # an aerial photo), not on a card, so they keep a white fill in either look or they vanish on a dark picture
+   and 'background: "white"' not in fe and fe.count("background:#fff;") == 3 and ".auth-qr{display:inline-block;background:#fff;" in fe
+   and ".slp-corner{width:18px;height:18px;border-radius:50%;background:#fff;" in fe and ".slp-turner{width:26px;height:26px;border-radius:50%;background:#fff;" in fe)
 ok("APPEARANCE: the map's dark basemap and the exports are untouched — the exports keep the print palette (export.py has no theme code)",
    "data-theme" not in read("backend/export.py") and '["Dark", "mapbox://styles/mapbox/dark-v11"]' in fe)
 ok("🔴 the Dashboard status line reads the tenant's unit word and dates the index 'published' / 'typed', never 'bulletin'",
@@ -1064,8 +1068,9 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    # NARROWED 31 Oct 2026 (task 4c PR 1): 18 and 3 — the Site layout card's Save / Add phase, On National Grid and Place it
    # (navy) and its survey point's Place while picking (blue)
    # NARROWED 31 Oct 2026 (task 4c PR 2): 21 — the drawing tools' picked tool in the palette (PalBtn), their Save and the card's Draw (navy)
-   # NARROWED 31 Oct 2026 (task 4c PR 5): 23 — the Print panel's picked page (A3 / A4) and its PDF button (navy)
-   len(_sites.get("navy", [])) == 23 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
+   # NARROWED 31 Oct 2026 (task 4c PR 3): 23 — the pinned pictures' Done (Move corners) and Add (navy)
+   # NARROWED 31 Oct 2026 (task 4c PR 5): 25 (after PR 3) — the Print panel's picked page (A3 / A4) and its PDF button (navy)
+   len(_sites.get("navy", [])) == 25 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
    and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
 ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",
