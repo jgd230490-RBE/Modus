@@ -443,9 +443,15 @@ ok("⭐ the file says Issue 1 · approved on every page, not DRAFT", "Issue 1 ·
    and "Issue 1" in _ft1, _h1)
 ok("...the typed cover details fill the cover (no 'To complete' for them)", "1 Yard Lane" in _t1 and "LE7 9XX" in _t1
    and "A. Example · 07700 900123" in _t1 and "Cover, site address" not in _t1 and "Cover, landowner" in _t1)
-ok("...its Document history: Issue 1, First issue, the notes", "Document history" in _t1
-   and re.search(r"1 \| \d+ \w{3} 20\d\d \| Pat Planner \| First issue\. Saturday hours added\. Approved with the gate dates\.", _t1)
+# NARROWED 31 Oct 2026 (John: the issued file goes to the client's reviewers, so the team's note to the approver
+# comes out of it): the history row is the changes + the APPROVER's note only
+ok("...its Document history: Issue 1, First issue, the approver's note", "Document history" in _t1
+   and re.search(r"1 \| \d+ \w{3} 20\d\d \| Pat Planner \| First issue\. Approved with the gate dates\.", _t1)
    is not None, _t1[_t1.find("Document history"):][:300])
+ok("🔴 ...and never the team's note to the approver (the file goes to the client)",
+   "Saturday hours added" not in _t1, _t1[_t1.find("Document history"):][:300])
+ok("...while the contractor's own history on screen keeps the team's note",
+   "Saturday hours added" in (clp_records.history(Y1, PLANNER, factors) or {"issues": [{}]})["issues"][0].get("words", ""))
 ok("...the title is the CLP's name", "Yard East (North)" in _t1)
 H = clp_records.history(Y1, NORTH, factors)
 ok("⭐ the team reads the history", bool(H) and H["issues"][0]["no"] == 1 and H["issues"][0]["approved_by"] == "Pat Planner")
