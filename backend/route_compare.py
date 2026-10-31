@@ -55,6 +55,25 @@ def _points(g):
     return []
 
 
+def near_counts(index, keys):
+    """{route_key: {kind: how many}} for the route keys asked: the stored community considerations whose nearest point
+    is within NEAR_M[kind] of that key's line (both legs, every lorry type). One pass over the stored features; the
+    same rule the Routes page's "Near the route" column (route_community.py) shares with compare()."""
+    com = {k: {kind: 0 for kind in KINDS} for k in keys}
+    for f in community.features(KINDS):
+        kind = f["properties"]["kind"]
+        best = {}
+        for p in _points(f.get("geometry")):
+            near, _sites = index.near(p[0], p[1])
+            for k, d in near.items():
+                if k in com and (k not in best or d < best[k]):
+                    best[k] = d
+        for k, d in best.items():
+            if d <= NEAR_M[kind]:
+                com[k][kind] += 1
+    return com
+
+
 def compare(profile=PROFILE):
     index = collisions.index_from_db()
     tenant = db.current_tenant()
@@ -75,18 +94,7 @@ def compare(profile=PROFILE):
                 col[k]["vru_ksi"] += 1 if c.get("vru_ksi") else 0
                 col[k]["cyclist"] += 1 if "cyclist" in (c.get("vru") or []) else 0
     # the community considerations near each option: one pass over the stored features
-    com = {k: {kind: 0 for kind in KINDS} for k in keys}
-    for f in community.features(KINDS):
-        kind = f["properties"]["kind"]
-        best = {}
-        for p in _points(f.get("geometry")):
-            near, _sites = index.near(p[0], p[1])
-            for k, d in near.items():
-                if k in com and (k not in best or d < best[k]):
-                    best[k] = d
-        for k, d in best.items():
-            if d <= NEAR_M[kind]:
-                com[k][kind] += 1
+    com = near_counts(index, keys)
     cl = collisions.cycle_lines()
     grid = collisions._SegGrid(index, cl) if cl else None
     rows = []

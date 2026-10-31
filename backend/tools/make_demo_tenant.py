@@ -129,6 +129,12 @@ OUT = os.path.join(ROOT, "demo", "uk-corridor.package.json")
 AREAS_SEED = os.path.join(BACKEND, "data", "areas_demo.geojson")   # --with-areas (§2.2b)
 TENANT_NAME = "Wolds Link dualling — demo scheme"
 DEMO_NOTICE = "Fictional scheme"   # 15 Oct 2026 (the user): the bar reads DEMO · FICTIONAL SCHEME (its badge says DEMO)
+# 30 Oct 2026 (task 4b, John's yes): the contact lines the bulletin and the leaflet print, and the address behind the public map's
+# "Report a concern" (John, 29 Oct: hello@wayscope.co.uk). The hours are the demo compounds' own (COMPOUND_HOURS below, DCO core
+# hours); no phone and no newsletter link (the demo has no public page).
+DEMO_CONTACT = {"concern_email": "hello@wayscope.co.uk",
+                "working_hours": "Monday to Friday 07:30-18:00 (fictional scheme)",
+                "other_formats": "email hello@wayscope.co.uk"}
 START_YEAR = 2026
 N_MONTHS = 60                     # Jan 2026 – Dec 2030: month_index = (year − 2026) × 12 + month
 SHIPPED_AS_OF = "2026-11-26"      # D96: Thursday, November week 4 — the shipped history; --as-of moves it (outside the checkout)
@@ -593,9 +599,9 @@ def build(with_areas=False, out=None):
     doc["tenant"] = {"name": TENANT_NAME, "team_label": "Team", "currency": "GBP", "country": "GB",
                      "distance_unit": "mi", "demo_notice": DEMO_NOTICE,
                      # 30 Oct 2026 (3d, John): where the public map's "Report a concern" link goes. The company's
-                     # own address, not a person's; before this it was never saved on live.
-                     "concern_email": "hello@wayscope.co.uk",
-                     "council_breaks": {"movements": [25, 50, 100], "carbon": [10, 25, 50]}}
+                     # own address, not a person's; before this it was never saved on live. Task 4b: DEMO_CONTACT holds
+                     # it with the leaflet's hours and other formats.
+                     "council_breaks": {"movements": [25, 50, 100], "carbon": [10, 25, 50]}, **DEMO_CONTACT}
     # D106: NO seasonal windows — the product's are scheme-wide by calendar month and meant for statutory
     # restrictions; Market Harborough's Christmas trading goes in as an advisory zone each December instead.
     doc["seasonal_restrictions"] = []

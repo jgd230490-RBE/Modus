@@ -782,6 +782,17 @@ own account, never in the repository. Give each new organisation's deployment fr
 (<code>osm_structures</code>), &ldquo;Schools&rdquo; = DfE Get Information about Schools, &ldquo;Bus stops and stations&rdquo; =
 DfT NaPTAN. Config no longer prints the credit line; the licence credits are on the Route map layer (its attribution) and
 on every PDF that draws the layer (<code>community.credit_line</code>). A source's error is not shown on the page.</p>
+<p id="t8-route-counts">Per route (30 Oct 2026, task 4b): <code>GET /api/routes/community-counts</code> counts, for every route with a drawn line,
+the stored features within <code>route_compare.NEAR_M</code> of it (250 m; bus stops and residential areas 100 m; both legs, every lorry
+type, <code>RouteIndex</code> key = the route id; an alternative or a way round is not counted) with the same pass as the route comparison
+(<code>route_compare.near_counts</code>), so the number equals the one on the collision evidence for the main line. Kept in the read cache
+until the next write; one heavy-read slot. <code>fetched_at</code> is null until the layer has been fetched. Cycle routes are lines, not
+counted. The Routes page's three chips are schools, hospitals + health centres ("health") and bus stops.</p>
+<p id="t8-contact-lines">The bulletin's contact lines (task 4b): flat <code>tenant</code> keys <code>concern_email</code>, <code>contact_phone</code> (40),
+<code>working_hours</code> (160), <code>other_formats</code> (160), <code>newsletter_url</code> (https only, 300). <code>config.validate</code> refuses
+a &lt; or &gt;, a line break, an over-length text and a non-https or hostless link on Save; <code>tenant_settings</code> serves each cleaned or
+null. <code>bulletin_doc.report_lines</code> builds the report box for the page, both PDFs and the leaflet; an empty line is left out, the report
+line apart. The values also reach <code>/api/meta</code>'s tenant block (they are public wording).</p>
 <p>Staff only (14 Oct 2026). <code>GET /api/community</code> serves what is stored as one GeoJSON FeatureCollection with the
 kinds, each source's date and the credit line; <code>GET /api/community/status</code> the same without the features. Both
 answer 401 to the map password's cookie and to no credential. <code>POST /api/community/refresh</code> (a planner or an

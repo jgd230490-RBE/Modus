@@ -8034,7 +8034,27 @@ function ConfigPage({ meta, who, access }){
           )}
 
           {tab === "mapbulletin" && (
-            <div className="px-6 pb-6 max-w-xl" data-cfg="council-breaks">
+            <div className="px-6 pb-6 max-w-xl">
+              {/* 30 Oct 2026 (task 4b): the contact lines the bulletin and the resident leaflet print. The address also switches on
+                  "Report a concern" on the public map. An empty box leaves its line out. Checked by the server on Save. */}
+              <div data-cfg="contact-lines" className="mb-6 pb-5 border-b border-slate-200">
+                <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Contact lines</h3>
+                <p className="text-[14px] text-slate-600 mb-3">Printed on the bulletin and the resident leaflet. Leave a box empty to leave its line out.</p>
+                {[["concern_email", "cfg-contact-email", "Where to report a lorry or a concern (one email address)", 254, "name@scheme.example", "Also the address behind Report a concern on the public map."],
+                  ["contact_phone", "cfg-contact-phone", "Phone number (optional)", 40, "0116 000 0000", ""],
+                  ["working_hours", "cfg-contact-hours", "Working hours", 160, "Monday to Friday 07:30–18:00", "As in the scheme's consent."],
+                  ["other_formats", "cfg-contact-formats", "Large print and other formats", 160, "email name@scheme.example", ""],
+                  ["newsletter_url", "cfg-contact-link", "Public newsletter link (optional)", 300, "https://…", "Where residents can read the bulletin: the scheme's own web page."]].map(([k, id, l, mx, ph, help]) => (
+                  <div key={k} className="field" style={{ marginBottom: 8 }}>
+                    <label htmlFor={id}>{l}</label>
+                    <input id={id} className="ctl w-full" maxLength={mx} placeholder={ph} data-contact={k}
+                      value={(doc.tenant || {})[k] || ""} onChange={e => upd(d => { setTenantText(d, k, e.target.value); })} />
+                    {help && <div className="hint">{help}</div>}
+                  </div>
+                ))}
+              </div>
+              <div data-cfg="council-breaks">
+              <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Council colours</h3>
               <p className="text-[14px] text-slate-600 mb-4">Colours for By council on the public map and in the bulletin. Three rising figures; blank keeps the defaults.</p>
               {[["movements", "Movements by council: two-way movements a day", "The blue colours. Defaults 50, 100, 200 a day."],
                 ["carbon", "Carbon by council: t CO₂e in the month", "The orange colours. Defaults 50, 100, 200 t. Pick figures that spread your districts across the four colours."]].map(([m, l, help]) => {
@@ -8053,6 +8073,7 @@ function ConfigPage({ meta, who, access }){
                   </div>
                 );
               })}
+              </div>
               {/* 28 Oct 2026 (8b): the tenant's own aerial imagery as a public-map basemap. Blank address = no line in the Basemap
                   list. The checking of the address is the server's, on Save (config.imagery_url_problem). */}
               <div className="field" data-cfg="imagery">
@@ -12356,6 +12377,47 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
 }
 
 
+// 30 Oct 2026 (task 4b): the Routes page's "Near the route" column and its opened-row list. The counts are the server's
+// (route_community.py: the stored community considerations within 250 m of the drawn line, both legs; bus stops and homes
+// 100 m): the same numbers the collision evidence prints. Counts only: nothing is scored or ranked.
+const NEAR_CHIPS = [["schools", ["school", "schools"]], ["health", ["health", "health"]], ["bus_stops", ["bus stop", "bus stops"]]];
+function nearChipCounts(c){
+  return NEAR_CHIPS.map(([k, w]) => {
+    const n = k === "health" ? (c.hospitals || 0) + (c.health || 0) : (c[k] || 0);
+    return n ? { k, n, w: n === 1 ? w[0] : w[1] } : null;
+  }).filter(Boolean);
+}
+function NearCell({ data, id }){
+  if(data === null) return <span className="text-slate-500">…</span>;
+  if(data === false) return <span className="text-slate-500">—</span>;
+  if(!data.fetched_at) return <span className="text-slate-500" title="Fetch the community considerations on Config → Map and bulletin.">Not fetched</span>;
+  const c = (data.routes || {})[id];
+  if(!c) return <span className="text-slate-500" title="Not routed yet.">—</span>;
+  const chips = nearChipCounts(c);
+  if(!chips.length) return <span className="text-slate-500">None of these</span>;
+  return <span className="inline-flex flex-wrap gap-1">{chips.map(x => (
+    <span key={x.k} className="text-[12px] px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-700 whitespace-nowrap"><b>{x.n}</b> {x.w}</span>))}</span>;
+}
+function NearDetails({ data, id, colSpan }){
+  const c = data && data.fetched_at && (data.routes || {})[id];
+  if(!c) return null;
+  const when = new Date(data.fetched_at.length > 10 ? data.fetched_at : data.fetched_at + "T12:00:00Z");
+  const near = data.near_m || {};
+  return (
+    <tr data-route-near={id}><td colSpan={colSpan} className="px-3 pb-2">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+        <p className="text-[13px] font-semibold text-slate-700 mb-1">Near {id}: within {near.schools || 250} m of its drawn line, both legs</p>
+        <div className="grid gap-x-6 gap-y-0.5 text-[13px] text-slate-700" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+          {(data.kinds || []).map(k => (
+            <span key={k.key} className="flex justify-between border-b border-dotted border-slate-300">
+              <span>{k.label}</span><b className={c[k.key] ? "" : "text-slate-500"}>{c[k.key] || 0}</b></span>))}
+        </div>
+        <p className="text-[13px] text-slate-600 mt-1.5">Bus stops and homes count within {near.bus_stops || 100} m. Fetched {isNaN(when) ? "" : when.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}. Counts only: nothing is scored or ranked.</p>
+      </div>
+    </td></tr>
+  );
+}
+
 function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting, leg,
                         haulRoads, token, onHaulChanged, originId, destId, gateBlockers }){
   const [data, setData] = useState(null);
@@ -12685,6 +12747,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // Routes page and the panel after a zone save), and what "Find a way round" would cost now
   const [zoneDiv, setZoneDiv] = useState({});
   const [divPeriods, setDivPeriods] = useState([]);
+  // 30 Oct 2026 (task 4b): the community considerations near each route's drawn line — the "Near the route" column
+  const [nearData, setNearData] = useState(null);
   const [holdSum, setHoldSum] = useState(null);       // 29 Oct 2026 (task 3c): the holding areas and each route's state
   const [wayRound, setWayRound] = useState({ legs: 0, here_calls: 0, routes: [] });
   const [divZone, setDivZone] = useState(null);     // the zone whose diversions show under the form after a save
@@ -12751,8 +12815,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     }).catch(() => {});
   };
 
+  const loadNear = () =>
+    fetch(`${API}/routes/community-counts`).then(okJSON).then(j => setNearData(j)).catch(e => { console.warn("Wayscope:", e); setNearData(false); });
+
   const fetchStatus = () => {
     loadDiversions();
+    loadNear();
     return Promise.all([
       fetch(`${API}/routes/status`).then(r => r.json()),
       fetch(`${API}/routes/summary`).then(r => r.json()),
@@ -15247,6 +15315,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 <th className={th}>Route</th>
                 <th className={th}>From → to</th>
                 <th className={th}>{TEAM()}</th>
+                <th className={th}>Near the route</th>
                 <th className="px-3 py-2 text-right font-semibold">{DU()} ({vehShort(showProfile)})</th>
                 <th className={th}>Vehicles</th>
                 <th className="px-3 py-2 text-right font-semibold"><span className="sr-only">Actions</span></th>
@@ -15318,8 +15387,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{r.origin} → {r.dest}</td>
+                    <td className="px-3 py-2 text-slate-500">{r.origin} → {r.dest}</td>   {/* 30 Oct 2026 (4b): may wrap, so the Near the route column does not push the row's buttons off a 1280 px screen */}
                     <td className="px-3 py-2 text-slate-500">{teamText(r.ipt) || "—"}</td>
+                    <td className="px-3 py-2" data-route-near-cell={r.id}><NearCell data={nearData} id={r.id} /></td>
                     <td className="px-3 py-2 text-right tabular-nums">{pinfo && pinfo.distance_km != null ? fmtDist(pinfo.distance_km, 1) : "—"}</td>
                     <td className="px-3 py-2"><VehChips profiles={r.profiles} /></td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
@@ -15341,7 +15411,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       </>}
                     </td>
                   </tr>
-                  {open && <RouteAnalysis routeId={r.id} colSpan={7}
+                  {open && <NearDetails data={nearData} id={r.id} colSpan={8} />}
+                  {open && <RouteAnalysis routeId={r.id} colSpan={8}
                     originId={r.origin_id} destId={r.dest_id}
                     gateBlockers={r.gate_blockers}
                     active={selected === r.id ? activeGeom : null}
@@ -15353,7 +15424,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     token={tokenRef.current}
                     onHaulChanged={rebakeAfterZone} />}
                   {open && (divPeriods || []).some(p => p.route_id === r.id) && (
-                    <tr data-route-diversions={r.id}><td colSpan={7} className="px-3 pb-3">
+                    <tr data-route-diversions={r.id}><td colSpan={8} className="px-3 pb-3">
                       <p className="text-xs font-semibold text-slate-700 mt-1">Diversions</p>
                       <DivRows rows={(divPeriods || []).filter(p => p.route_id === r.id)} prof={showProfile} canEdit={canEdit}
                         busy={divBusy} onKeep={keepMain} routes={status} />
@@ -15361,8 +15432,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </React.Fragment>
                 );
               })}
-              {status && status.length === 0 && <tr><td colSpan="7" className="px-3 py-6 text-center text-slate-400">No routes yet — author one with “Create route”.</td></tr>}
-              {!status && <tr><td colSpan="7" className="px-3 py-6 text-center text-slate-400">Loading…</td></tr>}
+              {status && status.length === 0 && <tr><td colSpan="8" className="px-3 py-6 text-center text-slate-400">No routes yet — author one with “Create route”.</td></tr>}
+              {!status && <tr><td colSpan="8" className="px-3 py-6 text-center text-slate-400">Loading…</td></tr>}
             </tbody>
           </table>
         </div>

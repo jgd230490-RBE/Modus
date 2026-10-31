@@ -60,9 +60,10 @@ RULES KEPT
 WHAT IT DOES NOT DO
 -------------------
 No stored snapshot (D28 asks for one per issued bulletin: a new tenanted table, not built), no
-actuals (plan only), no figure per road (needs the shared-section layer, §2.2d), no email, no
-tenant `bulletin` block for the typed fields (hours, contact, other formats print as
-placeholders), and the HGV threshold line is left out until D28 settles it.
+actuals (plan only), no figure per road (needs the shared-section layer, §2.2d), no email, and the
+HGV threshold line is left out until D28 settles it. (30 Oct 2026, task 4b: the typed contact lines — address, phone,
+working hours, other formats, newsletter link — are the tenant's, typed on Config -> Map and bulletin; an empty line is left
+out, the report line apart: report_lines().)
 """
 import datetime
 import math
@@ -597,7 +598,27 @@ def _lot(mi, month_long, prev_long, R, prev, H, council, acc, demo):
 BRAND_TITLE = "Lorry movements bulletin"
 DEMO_MAP_TAG = "Demo - fictional scheme"        # D41: on each map itself as well as in the page bar (15 Oct 2026, the user:
                                                 # "DEMO - FICTIONAL SCHEME"; was "Fictional demo scheme")
-NEWSLETTER_URL_PLACEHOLDER = f"[link {PLACEHOLDER}]"
+NEWSLETTER_LINE = "Every route, the councils and the carbon are in the monthly newsletter:"
+
+
+def report_lines(page):
+    """30 Oct 2026 (task 4b): the "how to report" lines from the tenant's typed contact lines (Config -> Map and bulletin).
+    lorry = the one line that always prints (a visible gap while no address or phone is typed, so a leaflet cannot go out
+    with nowhere to report to); hours / formats = None while empty, and the page and PDFs leave that line out."""
+    em, ph = page.get("concern_email"), page.get("contact_phone")
+    lead = "Report a lorry off route: the date, time, place, direction and registration, "
+    if em and ph:
+        lorry = f"{lead}to {em} or on {ph}."
+    elif em:
+        lorry = f"{lead}to {em}."
+    elif ph:
+        lorry = f"{lead}on {ph}."
+    else:
+        lorry = f"{lead}to [contact {PLACEHOLDER}]."
+    hours, fmts = page.get("working_hours"), page.get("other_formats")
+    return {"lorry": lorry,
+            "hours": f"Working hours: {hours.rstrip('.')}." if hours else None,
+            "formats": f"Large print and other formats: {fmts.rstrip('.')}." if fmts else None}
 
 
 def _brief(month_long, prev_long, H, prev, routes_view, works, controls, never_all, council_mv, lot):
@@ -987,7 +1008,8 @@ def sheet(month_index, acc=None, now=None):
         "map_title": f"Planned lorry routes, {month_long}",
         "brief": brief, "map_demo_tag": demo_tag,
         "sources": _sources(lot, council, council_mv, page, carbon, wd),
-        "newsletter_where": NEWSLETTER_URL_PLACEHOLDER,
+        # 30 Oct 2026 (task 4b): the public newsletter link, typed; no link, no line (it would point nowhere)
+        "newsletter_url": page.get("newsletter_url"),
         "leaflet_pdf_href": f"/api/bulletin/leaflet.pdf?month={mi}",
         "leaflet_href": f"/bulletin/leaflet/?month={mi}",
         "volume_legend": volume_legend(),
@@ -995,13 +1017,9 @@ def sheet(month_index, acc=None, now=None):
         "map_legend_title": "Two-way movements a day",
         "change_rows": change_rows, "change_text": change_text,
         "terms": terms, "caveats": [c for c in caveats if c],
-        # 12 Oct 2026 (Track C review): the tenant's typed concern_email (the map's "Report a concern"
-        # address) when set; the placeholder only while it is not
-        "report": {"lorry": f"Report a lorry off route: the date, time, place, direction and registration, to "
-                            + (f"{page['concern_email']}." if page.get("concern_email")
-                               else f"[contact {PLACEHOLDER}]."),
-                   "hours": f"Working hours: [{PLACEHOLDER}].",
-                   "formats": f"Large print and other formats: [{PLACEHOLDER}]."},
+        # 12 Oct 2026 (Track C review): the tenant's typed concern_email (the map's "Report a concern" address);
+        # 30 Oct 2026 (task 4b): with the typed phone, hours and other formats (report_lines)
+        "report": report_lines(page),
         "carbon_stamp": carbon.get("stamp"),
         "foot": "Planned figures, not counts · prepared with Wayscope",
         "pdf_href": f"/api/bulletin/month.pdf?month={mi}",
@@ -1266,13 +1284,19 @@ def leaflet_html(S):
             + f'<p class="def">{e(S["definition"])}</p>'
             + _map_block_html(S)
             + _brief_html(S)
-            + f'<div class="report"><p><b>{e(S["report"]["lorry"])}</b></p><p>{e(S["report"]["hours"])}</p>'
-              f'<p>{e(S["report"]["formats"])}</p></div>'
-            + f'<p>Every route, the councils and the carbon are in the monthly newsletter: <a href="/bulletin/?month='
-              f'{S["month_index"]}">open it here</a> (staff) · {e(S["newsletter_where"])}</p>'
+            + _report_html(S)
+            + (f'<p>{e(NEWSLETTER_LINE)} <a href="{e(S["newsletter_url"])}">{e(S["newsletter_url"])}</a></p>'
+               if S.get("newsletter_url") else "")
             + f'<p class="actions"><a class="btn" href="{e(S["leaflet_pdf_href"])}">Download the leaflet (PDF)</a></p>'
             + f'<p class="muted">{e(_co2(S.get("carbon_stamp") or ""))}</p>'
             + f'<footer>{notice} {_mark_html()} {e(S["foot"])} · wayscope.co.uk</footer></main></body></html>')
+
+
+def _report_html(S):
+    """The "how to report" box: the report line, then the hours and the other formats when they are typed."""
+    r = S["report"]
+    return ('<div class="report"><p><b>' + _html.escape(r["lorry"]) + '</b></p>'
+            + "".join(f'<p>{_html.escape(r[k])}</p>' for k in ("hours", "formats") if r.get(k)) + '</div>')
 
 
 # 13 Oct 2026 (D43): the leaflet page's own stylesheet — the newsletter page's rules it needs, nothing below 14 px
@@ -1492,7 +1516,7 @@ def html(S):
         "month_long": e(S["month_long"]),
         "works": works or '<tr><td colspan="3" class="muted">Nothing listed for this month.</td></tr>',
         "change_text": e(_co2(S["change_text"])),
-        "rep_lorry": e(S["report"]["lorry"]), "rep_hours": e(S["report"]["hours"]), "rep_formats": e(S["report"]["formats"]),
+        "report_box": _report_html(S),
         "foot": e(S["foot"]), "map_block": _map_block_html(S), "routes": _routes_html(S),
         "band": _band_html(S, "monthly newsletter"), "brief": _brief_html(S), "mark": _mark_html(),
         "leaflet_href": e(S["leaflet_href"]), "leaflet_pdf_href": e(S["leaflet_pdf_href"]),
@@ -1590,7 +1614,7 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 <p class="def">{definition}</p>
 {map_block}
 {brief}
-<div class="report"><p><b>{rep_lorry}</b></p><p>{rep_hours}</p><p>{rep_formats}</p></div>
+{report_box}
 
 <p class="kick">02 Routes and roads</p>
 <h2>Every route this month</h2>
@@ -1632,7 +1656,7 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 
 {sources}
 
-<div class="report"><p><b>{rep_lorry}</b></p><p>{rep_hours}</p><p>{rep_formats}</p></div>
+{report_box}
 
 <footer>{notice} {mark} {foot} · wayscope.co.uk</footer>
 </main></body></html>""".format(**v)
