@@ -7085,6 +7085,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
     try { return localStorage.getItem("modus_page") || "dashboard"; } catch(e){ return "dashboard"; }
   });
   const setPage = (p) => {
+    if(LAYOUT_LEAVE && p !== page && LAYOUT_LEAVE()) return;   // 31 Oct 2026 (4c PR 2): unsaved drawing: Save or Discard first
     setPageState(p);
     try { localStorage.setItem("modus_page", p); } catch(e){}
     // replace, not push: the rail is not browser history, and a back button that walked
@@ -7096,7 +7097,11 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   useEffect(() => { if(onPage) onPage(page); }, [page]);
   // someone edits the hash, or follows a second link from the guide into the same tab
   useEffect(() => {
-    const onHash = () => { const h = pageFromHash(); if(h && h !== page) setPageState(h); };
+    const onHash = () => {
+      const h = pageFromHash();
+      if(h && h !== page && LAYOUT_LEAVE && LAYOUT_LEAVE()){ try { history.replaceState(null, "", "#" + page); } catch(e){} return; }
+      if(h && h !== page) setPageState(h);
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, [page]);
@@ -13665,6 +13670,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const areaPlaceRef = useRef(false);     // 28 Oct 2026 (simulation v2): the next map click places an area
   // 31 Oct 2026 (task 4c): the site layout card's drawing on this map, its survey-point click, its re-add after a basemap switch
   const layoutHandle = useRef(null), layoutPickRef = useRef(null), layoutReinstallRef = useRef(null);
+  // 31 Oct 2026 (4c PR 2): the drawing tools open on this page's map: { locId, phaseId } while open. drawRef keeps the map's
+  // own clicks (select a site, drag a marker, pick a route) away from them; drawReinstallRef puts them back after a basemap switch.
+  const [drawing, setDrawing] = useState(null);
+  const drawRef = useRef(null), drawReinstallRef = useRef(null);
+  useEffect(() => { drawRef.current = drawing; const m = mapObj.current; if(m) setTimeout(() => { try { m.resize(); } catch(e){} }, 0); }, [drawing]);
   // the location a reader located (no editor for them, P5): its Site layout card, which a planner changes (Q6)
   const [readLoc, setReadLoc] = useState(null);
 
@@ -13829,7 +13839,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       addNetworkLayers(m);
       // node drag (only in view/edit; add-mode clicks drop new points)
       m.on("mousedown", "node-dots", (e) => {
-        if(modeRef.current === "add" || !canEdit) return;
+        if(drawRef.current || modeRef.current === "add" || !canEdit) return;
         e.preventDefault();
         drag.id = e.features[0].properties.id; drag.moved = false;
         m.getCanvas().style.cursor = "grabbing";
@@ -13840,6 +13850,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       // Zone drawing is checked first because it takes over the map entirely — while it
       // is on, a click must never also select a route underneath the shape being drawn.
       m.on("click", (e) => {
+        if(drawRef.current) return;   // the drawing tools take the map's clicks
         if(zoneDrawRef.current){ (cbRef.current.addVertex || (()=>{}))(e.lngLat.lng, e.lngLat.lat); return; }
         // Phase 5a: placing a gate takes the click before node/route selection, so a
         // gate can be dropped on top of the site it belongs to without selecting it
@@ -13861,7 +13872,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       m.on("mouseleave", "route-line", () => { m.getCanvas().style.cursor = modeRef.current === "add" ? "crosshair" : ""; });
       setMapReady(true);
     });
-    m.on("style.load", () => { addNetworkLayers(m); if(layoutReinstallRef.current) layoutReinstallRef.current(); });  // re-add after a basemap switch
+    m.on("style.load", () => { addNetworkLayers(m); if(layoutReinstallRef.current) layoutReinstallRef.current(); if(drawReinstallRef.current) drawReinstallRef.current(); });  // re-add after a basemap switch
     // Mapbox measures its container on init, before the flex/grid layout has settled,
     // so nudge it to re-measure once things are laid out (and whenever the window resizes).
     const doResize = () => { try { m.resize(); } catch(e){} };
@@ -15182,14 +15193,16 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         </div>
       )}
 
-      <div className="grid lg:grid-cols-3 gap-4">
+      {/* 31 Oct 2026 (4c PR 2): while drawing, the same grid holds the editor — its top bar across, the palette left, the map in
+          the middle (the SAME div, placed by grid column, so the map is never unmounted), its settings right; the panel is hidden */}
+      <div className={drawing ? "grid gap-3" : "grid lg:grid-cols-3 gap-4"} style={drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined} data-drawing={drawing ? "1" : undefined}>
         {/* ONE map instance, shared by both sub-tabs — this div is never unmounted */}
-        <div className="lg:col-span-2 card overflow-hidden">
-          <div ref={mapDiv} style={{ height: MAP_H, width: "100%" }} />
+        <div className={drawing ? "card overflow-hidden" : "lg:col-span-2 card overflow-hidden"} style={drawing && isWide ? { gridColumn: 2, gridRow: 2 } : undefined}>
+          <div ref={mapDiv} style={{ height: drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />
         </div>
 
         {/* 27 Oct 2026 (P5): read-only, the panel may hold no control at all, so it is a tab stop itself to scroll by keyboard */}
-        <div className="space-y-4" style={panelStyle} {...(canEdit ? {} : { tabIndex: 0, role: "region", "aria-label": onLoc ? "Locations panel" : onZones ? "Zones panel" : "Routes panel" })}>
+        <div className="space-y-4" style={drawing ? { display: "none" } : panelStyle} {...(canEdit ? {} : { tabIndex: 0, role: "region", "aria-label": onLoc ? "Locations panel" : onZones ? "Zones panel" : "Routes panel" })}>
           {onLoc && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
@@ -15207,7 +15220,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             {!form && readLoc && (
               <div className="space-y-3" data-read-loc={readLoc.id}>
                 <div className="text-sm font-medium text-slate-700">{readLoc.name}</div>
-                <SiteLayoutCard locId={readLoc.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef} />
+                <SiteLayoutCard locId={readLoc.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef}
+                  drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: readLoc.id, phaseId: pid }) : null} />
               </div>
             )}
             {form && (
@@ -15731,7 +15745,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 </div>
                 )}
                 {/* 31 Oct 2026 (task 4c PR 1): the site's logistics layout, its phases and drawings brought in */}
-                {form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef} />}
+                {form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef}
+                  drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: form.id, phaseId: pid }) : null} />}
                 {!form.id && (
                   <p className="text-[13px] text-slate-400">
                     Gates can be added once the location has been created.
@@ -16107,9 +16122,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             <p className="text-[13px] text-slate-400 mt-1">Tip: switch the basemap to {String(TENANT.country || "").toUpperCase() === "GB" ? "Aerial" : String(TENANT.country || "").toUpperCase() === "EE" ? "Satellite or Estonia aerial photo" : "Satellite"} to see routes sit exactly on the roads.</p>
           </div>
         </div>
+        {drawing && styles_ok(SL_STYLES) && <SiteLayoutDraw key={drawing.locId} mapRef={mapObj} styles={SL_STYLES} locId={drawing.locId} phaseId={drawing.phaseId} wide={isWide}
+          roads={(zoneList || []).filter(z => z.location_id === drawing.locId)} reinstallRef={drawReinstallRef} onDone={() => setDrawing(null)} />}
       </div>
 
-      {onLoc ? (
+      {drawing ? null : onLoc ? (
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
           <span className="text-sm font-semibold text-slate-700">Locations <span className="text-slate-400 font-normal">· click a row to locate it on the map{canEdit ? " and open it for editing" : ""}</span></span>
@@ -16452,20 +16469,22 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     </div>
   );
 }
+const styles_ok = (st) => !!(st && st.lines && st.areas && st.symbols);
 
 // ------------------------------------------------------------------ 31 Oct 2026 (task 4c PR 1): site layouts
 // A site's logistics layout on Data -> Locations: its phases (months, rename, delete) and "Bring in a drawing" (DXF,
 // KML, KMZ, GeoJSON, a shapefile zip): the server reads the file and holds it, the table says what each layer becomes
 // (pre-filled from the organisation's last choices), a site-grid drawing is placed by its survey points, then it is
 // placed on a phase. Drawn on the page's ONE map by /map/site-layouts.js (the Route map draws with the same file).
-// Planners and admins change it (Q6); everyone else who opens the page reads it. The drawing tools come in PR 2.
+// Planners and admins change it (Q6); everyone else who opens the page reads it. A phase's Draw opens the drawing tools
+// (SiteLayoutDraw, PR 2); while it is open this card's own drawing is hidden, and read again when it closes.
 let SL_STYLES = null;
 let SL_JS = null;
 function loadSiteLayoutsJs(){
   if(window.WSLayouts) return Promise.resolve(true);
   if(!SL_JS) SL_JS = new Promise((res) => {
     const s = document.createElement("script");
-    s.src = "/map/site-layouts.js?v=2"; s.onload = () => res(true); s.onerror = () => { SL_JS = null; res(false); };
+    s.src = "/map/site-layouts.js?v=3"; s.onload = () => res(true); s.onerror = () => { SL_JS = null; res(false); };
     document.head.appendChild(s);
   });
   return SL_JS;
@@ -16477,7 +16496,7 @@ function slMonths(p){
   if(p.month_from && p.month_to) return `${slMonth(p.month_from)} – ${slMonth(p.month_to)}`;
   return p.month_from ? `from ${slMonth(p.month_from)}` : `to ${slMonth(p.month_to)}`;
 }
-function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstallRef }){
+function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstallRef, drawing, onDraw }){
   const canLayout = !!(ACCESS.info && ACCESS.info.can_approve);
   const [styles, setStyles] = useState(SL_STYLES);
   const [lay, setLay] = useState(null);
@@ -16521,10 +16540,13 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       const h = handleRef.current;
       reinstallRef.current = () => { try { h.reinstall(); } catch(e){ console.warn("Wayscope:", e); } };
       const p = ((lay && lay.phases) || []).find(x => x.id === shown);
-      h.ready.then(() => { if(!gone) h.setData(p ? p.features : []); });
+      h.ready.then(() => { if(!gone){ h.setData(p ? p.features : []); h.setVisible(!drawing); } });
     });
     return () => { gone = true; };
-  }, [lay, shown, styles, mapReady]);
+  }, [lay, shown, styles, mapReady, drawing]);
+  // the drawing tools closed: read the layout again (their saves), on the phase that was drawn
+  const wasDrawing = useRef(null);
+  useEffect(() => { if(wasDrawing.current && !drawing) load(wasDrawing.current); wasDrawing.current = drawing || null; }, [drawing]);
   useEffect(() => () => { if(handleRef.current) handleRef.current.setData([]); pickRef.current = null; }, []);
   useEffect(() => {
     pickRef.current = picking ? (lon, lat) => { setPts(p => ({ ...p, [picking]: { lon: +lon.toFixed(7), lat: +lat.toFixed(7) } })); setPicking(""); } : null;
@@ -16559,7 +16581,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
     if(placed.length < 2){ setFit(null); return; }
     const q = new URLSearchParams({ location_id: locId, import_id: imp.import_id, pts: placed.map(([k, v]) => `${k}:${v.lon},${v.lat}`).join(";") });
     let gone = false;
-    fetch(`${API}/site-layouts/fit?${q}`).then(okJSON).then(j => { if(!gone){ setFit(j); fitTo(j.bounds); } })
+    fetch(`${API}/site-layouts/fit?${q}`).then(okJSON).then(j => { if(!gone) setFit(j); })   // the map keeps still while points are placed (L1)
       .catch(e => { if(!gone) setFit({ error: errMsg(e) }); });
     return () => { gone = true; };
   }, [pts, imp && imp.import_id]);
@@ -16599,6 +16621,14 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       }
       setMsg("Saved.");
     } catch(e){ setMsg(errSay("Not saved.", e)); }
+  };
+  const copyPhase = async (p) => {
+    setMsg("");
+    try {
+      const j = await okJSON(await fetch(`${API}/site-layouts/phases/${encodeURIComponent(p.id)}/copy`, { method: "POST" }));
+      await load(j.phase.id);
+      if(onDraw) onDraw(j.phase.id);
+    } catch(e){ setMsg(errSay("Not copied.", e)); }
   };
   const deletePhase = async (p) => {
     if(!confirm(`Delete “${p.name}” and its ${p.things} things?`)) return;
@@ -16656,9 +16686,13 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
                 title="Show on the map">{p.name}</button>
               <span className="text-slate-500">{slMonths(p)} · {p.things} things</span>
               {canLayout && !edit && !imp && (
-                <span className="ml-auto flex items-center gap-2">
-                  <button onClick={() => setEdit({ id: p.id, name: p.name, month_from: p.month_from || "", month_to: p.month_to || "", version: p.version })} className="text-[13px] font-semibold text-[color:var(--navy)] hover:underline" aria-label={`Edit ${p.name}`}>Edit</button>
-                  <button onClick={() => deletePhase(p)} className="text-[13px] font-semibold hover:underline" style={{ color: "var(--red)" }} aria-label={`Delete ${p.name}`}>Delete</button>
+                <span className="ml-auto flex items-center gap-1.5">
+                  {onDraw && <button onClick={() => onDraw(p.id)} className="px-2.5 py-1 rounded-lg text-white font-semibold text-[13px]" style={{ background: "var(--navy)" }} aria-label={`Draw ${p.name}`}>Draw</button>}
+                  <RowMenu name={p.name}>
+                    <button type="button" onClick={() => setEdit({ id: p.id, name: p.name, month_from: p.month_from || "", month_to: p.month_to || "", version: p.version })}>Name and months</button>
+                    <button type="button" onClick={() => copyPhase(p)}>Copy to a new phase</button>
+                    <button type="button" style={{ color: "var(--red)" }} onClick={() => deletePhase(p)}>Delete…</button>
+                  </RowMenu>
                 </span>
               )}
             </li>))}
@@ -16729,6 +16763,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
                   </div>);
               })}
               {fit && fit.words && <p className="text-[13px] text-slate-700" data-fit-words="1">{fit.words}</p>}
+              {fit && fit.bounds && <button onClick={() => fitTo(fit.bounds)} className="text-[13px] font-semibold text-[color:var(--navy)] hover:underline" data-show-whole="1">Show the whole drawing</button>}
               {fit && fit.error && <p className="text-[13px]" style={{ color: "var(--red)" }}>{fit.error}</p>}
               {fit && (fit.gate_check || []).map((g, i) => <p key={i} className="text-[13px] text-slate-500">{g.thing} is {g.m.toFixed(2)} m from {g.gate}.</p>)}
               {fit && (fit.over || fit.scale_flag) && <label className="flex items-center gap-1.5 text-xs text-slate-700"><input type="checkbox" checked={anyway} onChange={e => setAnyway(e.target.checked)} />Place anyway</label>}
@@ -16762,6 +16797,464 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       {msg && <p className="text-[13px] text-slate-500 mt-1.5" role="status">{msg}</p>}
     </div>
   );
+}
+
+// 31 Oct 2026 (task 4c PR 2, the mockup John approved: notes site-layout-draw-mockup-1031, "yes as recommended"): the DRAWING
+// TOOLS. A phase's Draw turns the Locations page into the editor on the page's ONE map (the map div grows; never a second map):
+// the palette left, Save / Done on top, what is selected / the layers / the map's aids right. Terra Draw 1.39.0 + its Mapbox GL
+// adapter 1.5.0 (exact, SRI; loaded only when Draw is pressed) MOVES geometry and nothing else: every look is WSLayouts' (the
+// same layers as the Route map), Terra Draw's own lines show only while a thing is drawn or selected. Terra Draw refuses an
+// area with holes, so it is given the outside edge; the holes wait in E.holes and follow a move / turn / resize (WSLayouts.geo).
+// A thing Terra Draw refuses is kept as it is and saved unchanged. One Save a phase, version-checked (409 = someone saved first:
+// Reload); leaving with unsaved changes asks Save or Discard (LAYOUT_LEAVE, asked by the app's page change). Coordinates 7 dp.
+const TD_SRC = [
+  ["https://cdn.jsdelivr.net/npm/terra-draw@1.39.0/dist/terra-draw.umd.js", "sha384-BYX+VrYUWlI8gkZmqa4X/LehJtIn0mekS+68XTZttM5Oz/POAS6k3aDdunjdIJU9"],
+  ["https://cdn.jsdelivr.net/npm/terra-draw-mapbox-gl-adapter@1.5.0/dist/terra-draw-mapbox-gl-adapter.umd.js", "sha384-S6yiHn1kodvJhcIDd6r2ExC8pY0GBFyjtflUBIv2GCFL49gwiNG84703xT1t+NLs"],
+];
+let TD_JS = null;
+function loadTerraDraw(){
+  if(window.terraDraw && window.terraDrawMapboxGlAdapter) return Promise.resolve(true);
+  if(!TD_JS) TD_JS = TD_SRC.reduce((p, [src, sri]) => p.then(ok => ok && new Promise(res => {
+    const s = document.createElement("script");
+    s.src = src; s.integrity = sri; s.crossOrigin = "anonymous";
+    s.onload = () => res(true); s.onerror = () => res(false);
+    document.head.appendChild(s);
+  })), Promise.resolve(true)).then(ok => { if(!ok) TD_JS = null; return ok; });
+  return TD_JS;
+}
+// the open editor's "save or discard first" check; App's page change and the hash ask it (true = stay)
+let LAYOUT_LEAVE = null;
+const SL_TRANSIENT = ["selected", "currentlyDrawing", "edited", "provisionalCoordinateCount", "committedCoordinateCount", "closingPoint", "snappingPoint",
+  "coordinatePoint", "coordinatePointIds", "midPoint", "selectionPoint", "selectionPointFeatureId", "midPointFeatureId"];
+const slId = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID()   // Terra Draw takes uuid v4 ids only
+  : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); });
+const slGeo = () => window.WSLayouts.geo;
+const SL_DRAW_H = "max(560px, calc(100vh - 230px))";   // the map and the two side columns while drawing
+const slSvg = (inner) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="128" height="128">' + inner + "</svg>");
+const SL_SHAPES = [["polygon", "Any shape"], ["rectangle", "Rectangle"], ["angled-rectangle", "Turned rectangle"], ["circle", "Circle"]];
+const SL_HINT = { select: "Click a thing to select it. Drag to move it, drag a corner, hold R to turn, S to resize.",
+  line: "Click each point; click the last one again to finish.", polygon: "Click each corner; click the first to close.",
+  rectangle: "Click one corner, then the opposite one.", "angled-rectangle": "Click two points along one side, then the width.",
+  circle: "Click the centre, then the edge.", sym: "Click where it goes.", text: "Click where the words go." };
+
+// the drawing tools' palette: one tool a row, the picked one white on navy
+const PalBtn = ({ on, ...r }) => <button {...r} aria-pressed={on} className={"w-full flex items-center gap-2 text-left text-[13px] rounded px-1.5 py-1 " + (on ? "text-white" : "text-slate-700 hover:bg-slate-100")} style={on ? { background: "var(--navy)" } : undefined} />;
+function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstallRef, onDone }){
+  const E = useRef(null);
+  if(!E.current) E.current = { draw: null, h: null, holes: new Map(), last: new Map(), kept: [], hist: [], fut: [], saved: "[]",
+    hidden: new Set(), locked: new Set(), snap: true, angle: false, tool: { kind: "select" }, sel: null, ver: null, ctx: [], pend: 0, pushT: 0, dirty: false };
+  const e = E.current;
+  const [phase, setPhase] = useState(null);
+  const [phases, setPhases] = useState([]);
+  const [busy, setBusy] = useState("load");
+  const [tool, setToolS] = useState({ kind: "select" });
+  const [shape, setShape] = useState("polygon");
+  const [sel, setSel] = useState(null);
+  const [counts, setCounts] = useState({});
+  const [dirty, setDirtyS] = useState(false);
+  const [msg, setMsgS] = useState({ t: "", bad: false });
+  const [stale, setStale] = useState(false);
+  const [ask, setAsk] = useState(false);
+  const [hist, setHist] = useState({ undo: false, redo: false });
+  const [hidden, setHidden] = useState([]);
+  const [locked, setLocked] = useState([]);
+  const [snap, setSnap] = useState(true);
+  const [angle, setAngle] = useState(false);
+  const say = (t, bad) => setMsgS({ t, bad: !!bad });
+  const LINES = useMemo(() => (styles.lines || []).filter(s => s.key !== "imported"), [styles]);
+  const AREAS = useMemo(() => (styles.areas || []).filter(s => s.key !== "imported_area"), [styles]);
+  const LSTY = useMemo(() => Object.fromEntries((styles.lines || []).map(s => [s.key, s])), [styles]);
+  const ASTY = useMemo(() => Object.fromEntries((styles.areas || []).map(s => [s.key, s])), [styles]);
+  const SYMS = useMemo(() => Object.fromEntries((styles.symbols || []).map(s => [s.key, s])), [styles]);
+  const groups = useMemo(() => [...new Set((styles.symbols || []).map(s => s.group))], [styles]);
+  const kindOf = (p) => !p ? null : p.style === "sym" ? "sym" : p.style === "text" ? "text" : ASTY[p.style] ? "area" : LSTY[p.style] ? "line" : null;
+  const defaultsFor = (t) => {
+    if(t.kind === "line"){ const s = LSTY[t.style]; return { style: t.style, layer: s.layer, color: s.color, w: s.w, opacity: 1 }; }
+    if(t.kind === "area"){ const s = ASTY[t.style]; return { style: t.style, layer: "Areas", color: s.color, opacity: s.opacity, fill: s.fill, outline: s.outline, text: t.style === "crane_radius" ? "" : (s.text || "") }; }
+    if(t.kind === "sym"){ const s = SYMS[t.sym]; return { style: "sym", sym: t.sym, layer: s.layer, size: s.size, rot: 0, label: "" }; }
+    if(t.kind === "text") return { style: "text", layer: "Text and notes", text: "Text", size: 2.2, color: "#111827", bold: true, halo: true, halo_color: "#FFFFFF", rot: 0 };
+    return {};
+  };
+
+  // ---- the things as kept: Terra Draw's, with their holes, plus the ones it refused (unchanged)
+  const live = (drawing) => !e.draw ? [] : e.draw.getSnapshot().filter(f => f.properties && (f.properties.style || (drawing && f.properties.currentlyDrawing)));
+  const withHoles = (f) => { const h = e.holes.get(f.id); return h && h.length && f.geometry.type === "Polygon" ? { ...f, geometry: { type: "Polygon", coordinates: [f.geometry.coordinates[0], ...h] } } : f; };
+  const clean = (f) => { const p = { ...f.properties }; SL_TRANSIENT.forEach(k => delete p[k]); return { type: "Feature", id: f.id, geometry: slGeo().round7(withHoles(f).geometry), properties: p }; };
+  const things = () => live().map(clean).concat(e.kept);
+  const render = () => {
+    e.pend = 0;
+    if(!e.h) return;
+    const list = live(true).map(f => f.properties.style ? withHoles(f) : { ...f, properties: { ...f.properties, ...defaultsFor(e.tool) } }).concat(e.kept)
+      .filter(f => !e.hidden.has(f.properties.layer));
+    e.h.setData(list);
+    const c = {}; things().forEach(f => { c[f.properties.layer] = (c[f.properties.layer] || 0) + 1; });
+    setCounts(c);
+  };
+  const schedule = () => { if(!e.pend) e.pend = requestAnimationFrame(render); };
+  const setDirty = (on) => { e.dirty = on; setDirtyS(on); };
+  const push = () => {
+    clearTimeout(e.pushT); e.pushT = 0;
+    const s = JSON.stringify(things());
+    if(e.hist[e.hist.length - 1] !== s){ e.hist.push(s); if(e.hist.length > 81) e.hist.shift(); e.fut = []; }
+    setDirty(s !== e.saved); setHist({ undo: e.hist.length > 1, redo: e.fut.length > 0 });
+  };
+  const pushSoon = () => { clearTimeout(e.pushT); e.pushT = setTimeout(push, 400); };
+  const loadThings = (list) => {
+    e.draw.clear(); e.holes.clear(); e.last.clear(); e.kept = [];
+    const give = list.map(f => {
+      const g = slGeo().round7(f.geometry), id = f.id || slId();
+      if(g.type === "Polygon" && g.coordinates.length > 1){ e.holes.set(id, g.coordinates.slice(1)); e.last.set(id, g.coordinates[0]); }
+      const props = { ...f.properties, mode: g.type === "Point" ? "point" : g.type === "LineString" ? "linestring" : "polygon" };
+      return { type: "Feature", id, geometry: g.type === "Polygon" ? { type: "Polygon", coordinates: [g.coordinates[0]] } : g, properties: props };
+    });
+    const res = e.draw.addFeatures(give);
+    res.forEach((r, i) => { if(!r.valid){ const f = give[i]; e.kept.push({ ...f, geometry: list[i].geometry && slGeo().round7(list[i].geometry) }); e.holes.delete(f.id); } });
+    if(e.kept.length) console.warn("Wayscope: the drawing tool refused", res.filter(r => !r.valid));
+    e.sel = null; setSel(null);
+    schedule();
+    return e.kept.length;
+  };
+  const undo = () => { if(e.hist.length < 2) return; e.fut.push(e.hist.pop()); loadThings(JSON.parse(e.hist[e.hist.length - 1])); setDirty(e.hist[e.hist.length - 1] !== e.saved); setHist({ undo: e.hist.length > 1, redo: true }); };
+  const redo = () => { const s = e.fut.pop(); if(!s) return; e.hist.push(s); loadThings(JSON.parse(s)); setDirty(s !== e.saved); setHist({ undo: true, redo: e.fut.length > 0 }); };
+
+  // ---- snapping: every corner and edge of the layout and of the site's own roads and gates, within 12 px
+  const snapFn = (ev, ctx) => {
+    if(!e.snap) return undefined;
+    const m = mapRef.current, P = [ev.containerX, ev.containerY], cand = [];
+    for(const f of live()) if(!ctx || f.id !== ctx.currentId){ const g = f.geometry; (g.type === "Point" ? [[g.coordinates]] : g.type === "LineString" ? [g.coordinates] : g.coordinates).forEach(r => cand.push(r)); }
+    e.ctx.forEach(r => cand.push(r));
+    let best = null, bd = 12;
+    for(const cs of cand) for(const c of cs){ const q = m.project(c), d = Math.hypot(q.x - P[0], q.y - P[1]); if(d < bd){ bd = d; best = c; } }
+    if(best) return best;
+    bd = 9.6;
+    for(const cs of cand) for(let i = 1; i < cs.length; i++){
+      const a = m.project(cs[i - 1]), b = m.project(cs[i]), dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy;
+      if(!L2) continue;
+      const t = Math.max(0, Math.min(1, ((P[0] - a.x) * dx + (P[1] - a.y) * dy) / L2)), x = a.x + t * dx, y = a.y + t * dy, d = Math.hypot(x - P[0], y - P[1]);
+      if(d < bd){ bd = d; best = m.unproject([x, y]).toArray(); }
+    }
+    return best || undefined;
+  };
+  const snapping = () => ({ toCustom: snapFn, ...(e.angle ? { toDegree: { degree: 15 } } : {}) });
+
+  const makeDraw = () => {
+    const TD = window.terraDraw, m = mapRef.current;
+    const drawing = { lineStringColor: "#1D4ED8", lineStringWidth: 2, lineStringOpacity: ({ properties }) => properties.currentlyDrawing ? 0.9 : 0,
+      fillColor: "#1D4ED8", fillOpacity: 0, outlineColor: "#1D4ED8", outlineWidth: 2, outlineOpacity: ({ properties }) => properties.currentlyDrawing ? 0.9 : 0,
+      closingPointColor: "#FFFFFF", closingPointOutlineColor: "#1D4ED8", closingPointWidth: 4, closingPointOutlineWidth: 2,
+      snappingPointColor: "#FFFFFF", snappingPointOutlineColor: "#DB2777", snappingPointWidth: 5, snappingPointOutlineWidth: 2 };
+    const edit = { feature: { draggable: true, rotateable: true, scaleable: true, coordinates: { draggable: true, midpoints: true, deletable: true, snappable: { toCustom: snapFn } } } };
+    const d = new TD.TerraDraw({
+      adapter: new window.terraDrawMapboxGlAdapter.TerraDrawMapboxGLAdapter({ map: m, coordinatePrecision: 9 }),
+      modes: [
+        new TD.TerraDrawSelectMode({
+          keyEvents: { deselect: "Escape", delete: "Delete", rotate: ["r"], scale: ["s"] },
+          flags: { linestring: edit, polygon: edit,
+            rectangle: { feature: { draggable: true, rotateable: true, scaleable: true, coordinates: { resizable: "opposite" } } },
+            "angled-rectangle": { feature: { draggable: true, rotateable: true, scaleable: true, coordinates: { draggable: true } } },
+            circle: { feature: { draggable: true, scaleable: true, coordinates: { resizable: "center-fixed" } } },
+            point: { feature: { draggable: true } } },
+          styles: { selectedLineStringColor: "#1D4ED8", selectedLineStringWidth: 2, selectedPolygonColor: "#1D4ED8", selectedPolygonFillOpacity: 0.05,
+            selectedPolygonOutlineColor: "#1D4ED8", selectedPolygonOutlineWidth: 2, selectedPointColor: "#1D4ED8", selectedPointWidth: 9,
+            selectedPointOutlineColor: "#FFFFFF", selectedPointOutlineWidth: 3, selectionPointColor: "#FFFFFF", selectionPointWidth: 5,
+            selectionPointOutlineColor: "#1D4ED8", selectionPointOutlineWidth: 2, midPointColor: "#1D4ED8", midPointWidth: 3, midPointOutlineColor: "#FFFFFF", midPointOutlineWidth: 1 },
+        }),
+        new TD.TerraDrawLineStringMode({ snapping: snapping(), styles: drawing }),
+        new TD.TerraDrawPolygonMode({ snapping: snapping(), styles: drawing }),
+        new TD.TerraDrawRectangleMode({ styles: drawing }),
+        new TD.TerraDrawAngledRectangleMode({ styles: drawing }),
+        new TD.TerraDrawCircleMode({ styles: drawing }),
+        new TD.TerraDrawPointMode({ snapping: { toCustom: snapFn }, styles: { pointColor: "#1D4ED8", pointOpacity: 0, pointWidth: 6, pointOutlineOpacity: 0, pointOutlineWidth: 0 } }),
+      ],
+    });
+    d.start();
+    d.on("change", (ids, type) => {
+      for(const id of ids || []){
+        if(!e.holes.has(id)) continue;
+        const f = d.getSnapshotFeature(id);
+        if(!f){ e.holes.delete(id); e.last.delete(id); continue; }
+        const now = f.geometry.coordinates[0], r = slGeo().holesFollow(e.holes.get(id), e.last.get(id), now);
+        e.last.set(id, now); e.holes.set(id, r.holes);
+        if(r.dropped) say(`${r.dropped === 1 ? "A hole" : r.dropped + " holes"} left outside the edge, so taken out. Undo puts ${r.dropped === 1 ? "it" : "them"} back.`);
+      }
+      if(type === "delete") setTimeout(push, 0);
+      if(e.sel && (ids || []).includes(e.sel)) setSel(d.getSnapshotFeature(e.sel) || null);
+      schedule();
+    });
+    d.on("finish", (id, ctx) => {
+      if(ctx && ctx.action === "draw"){
+        d.updateFeatureProperties(id, defaultsFor(e.tool));
+        if(e.tool.kind === "text" || e.tool.kind === "sym"){ setTool({ kind: "select" }); d.selectFeature(id); }
+      }
+      push();
+    });
+    d.on("select", (id) => {
+      const f = d.getSnapshotFeature(id);
+      // a locked or hidden layer's thing is let go a tick later (inside its own select event Terra Draw ignores it)
+      if(f && (e.locked.has(f.properties.layer) || e.hidden.has(f.properties.layer))){ setTimeout(() => { try { d.deselectFeature(id); } catch(x){} }, 0); return; }
+      e.sel = id; setSel(f || null);
+    });
+    d.on("deselect", () => { e.sel = null; setSel(null); });
+    e.draw = d;
+  };
+  const setTool = (t) => {
+    e.tool = t; setToolS(t);
+    if(!e.draw) return;
+    if(e.sel){ try { e.draw.deselectFeature(e.sel); } catch(x){} }
+    e.draw.setMode(t.kind === "select" ? "select" : t.kind === "line" ? "linestring" : t.kind === "area" ? (t.style === "crane_radius" ? "circle" : (t.shape || "polygon")) : "point");
+  };
+
+  // ---- open: the scripts, the phase, the site's gates; close: everything put back
+  const loadPhase = async (id) => {
+    const j = await okJSON(await fetch(`${API}/locations/${encodeURIComponent(locId)}/site-layout`));
+    const ps = (j.layout && j.layout.phases) || [];
+    const p = ps.find(x => x.id === id);
+    if(!p) throw new Error("That phase is gone.");
+    setPhases(ps); setPhase(p); e.ver = p.version;
+    const refused = loadThings(p.features.features || []);
+    e.saved = JSON.stringify(things()); e.hist = [e.saved]; e.fut = [];
+    setDirty(false); setHist({ undo: false, redo: false }); setStale(false); setAsk(false);
+    say(refused ? `${refused === 1 ? "1 thing" : refused + " things"} can't be changed here; kept as they are.` : "");
+  };
+  useEffect(() => {
+    let gone = false;
+    const m = mapRef.current;
+    (async () => {
+      const ok = await loadSiteLayoutsJs() && await loadTerraDraw();
+      if(gone) return;
+      if(!ok || !window.terraDraw || !window.WSLayouts){ setBusy("fail"); say("The drawing tools didn't load. Check the connection and try again.", true); return; }
+      try {
+        e.h = WSLayouts.install(m, styles, { prefix: "dm-draw" });
+        await e.h.ready;
+        if(gone) return;
+        makeDraw(); setTool({ kind: "select" });
+        try {
+          const gs = await okJSON(await fetch(`${API}/gates?location_id=${encodeURIComponent(locId)}`));
+          e.ctx = (Array.isArray(gs) ? gs : (gs.gates || [])).filter(g => g.lon != null && g.lat != null).map(g => [[+g.lon, +g.lat]]);
+        } catch(x){ e.ctx = []; }
+        (roads || []).forEach(z => { const g = z.geometry; if(g && g.type === "LineString") e.ctx.push(g.coordinates); if(g && g.type === "Polygon") e.ctx.push(g.coordinates[0]); });
+        await loadPhase(phaseId);
+        if(gone) return;
+        setBusy("");
+        // once, on open: the map goes to the phase's drawing (never again while drawing)
+        const b = new mapboxgl.LngLatBounds();
+        const walk = (c) => { if(typeof c[0] === "number") b.extend(c); else c.forEach(walk); };
+        things().forEach(f => { if(f && f.geometry) walk(f.geometry.coordinates); });
+        try { if(!b.isEmpty() && m.getZoom() < 15) m.fitBounds(b, { padding: 40, maxZoom: 18, duration: 0 }); } catch(x){}
+      } catch(x){ if(!gone){ setBusy("fail"); say(errSay("Couldn't open the drawing.", x), true); } }
+    })();
+    const unload = (ev) => { if(e.dirty){ ev.preventDefault(); ev.returnValue = ""; } };
+    window.addEventListener("beforeunload", unload);
+    LAYOUT_LEAVE = () => { if(!e.dirty) return false; setAsk(true); say("Save or discard your changes first.", true); return true; };
+    reinstallRef.current = () => {   // a basemap switch drops every layer, Terra Draw's too: put both back with the things as they are
+      if(!e.draw || !e.h) return;
+      const now = things();
+      try { e.draw.stop(); } catch(x){}
+      e.h.reinstall(); makeDraw(); loadThings(now); setTool(e.tool);
+    };
+    return () => {
+      gone = true; LAYOUT_LEAVE = null; reinstallRef.current = null;
+      window.removeEventListener("beforeunload", unload);
+      clearTimeout(e.pushT); if(e.pend) cancelAnimationFrame(e.pend);
+      try { if(e.draw) e.draw.stop(); } catch(x){}
+      try { if(e.h) e.h.remove(); } catch(x){}
+      e.draw = null; e.h = null;
+    };
+  }, []);
+
+  // ---- keys: undo / redo, duplicate, save (Delete, Esc, R and S are the select tool's own)
+  useEffect(() => {
+    const onKey = (ev) => {
+      if(!(ev.ctrlKey || ev.metaKey)) return;
+      const k = ev.key.toLowerCase();
+      if(k === "s"){ ev.preventDefault(); save(); return; }
+      if(/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || "")) return;
+      if(k === "z"){ ev.preventDefault(); ev.shiftKey ? redo() : undo(); }
+      else if(k === "y"){ ev.preventDefault(); redo(); }
+      else if(k === "d"){ ev.preventDefault(); duplicate(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  });
+
+  // ---- saving (one write; the version is checked)
+  const save = async () => {
+    if(busy || !phase || !e.draw) return;
+    if(e.pushT) push();
+    setBusy("save"); setAsk(false);
+    try {
+      const list = things().map(f => ({ type: "Feature", geometry: f.geometry, properties: f.properties }));
+      const res = await fetch(`${API}/site-layouts/phases/${encodeURIComponent(phase.id)}/features`,
+        { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: e.ver, features: { type: "FeatureCollection", features: list } }) });
+      if(res.status === 409){ setStale(true); say("Someone else saved this layout. Reload to see their changes.", true); return; }
+      const j = await okJSON(res);
+      e.ver = j.version; setPhase(p => ({ ...p, version: j.version, things: j.things }));
+      e.saved = e.hist[e.hist.length - 1] = JSON.stringify(things()); setDirty(false);
+      const lost = (j.left_out || []).length;
+      say(`Saved: ${j.things.toLocaleString("en-GB")} things.` + (lost ? ` ${lost} not kept: ${j.left_out[0]}.` : ""), lost > 0);
+    } catch(x){ say(errSay("Not saved.", x), true); }
+    finally { setBusy(""); }
+  };
+  const reload = async () => {
+    setBusy("load");
+    try { await loadPhase(phase.id); say("Reloaded: their changes are shown. Yours were not kept."); }
+    catch(x){ say(errSay("Couldn't reload.", x), true); }
+    finally { setBusy(""); }
+  };
+  const discard = () => {
+    loadThings(JSON.parse(e.saved)); e.hist = [e.saved]; e.fut = []; setHist({ undo: false, redo: false });
+    setDirty(false); setAsk(false); say("Changes thrown away.");
+  };
+  const done = () => { if(e.dirty){ setAsk(true); say("Save or discard your changes first.", true); return; } onDone(phase && phase.id); };
+  const switchPhase = async (id) => {
+    if(e.dirty){ setAsk(true); say("Save or discard your changes first.", true); return; }
+    setBusy("load");
+    try { await loadPhase(id); } catch(x){ say(errSay("Couldn't open that phase.", x), true); }
+    finally { setBusy(""); }
+  };
+
+  // ---- the selected thing
+  const upd = (props, soon) => { if(!e.sel || !e.draw) return; e.draw.updateFeatureProperties(e.sel, props); setSel(e.draw.getSnapshotFeature(e.sel)); schedule(); soon ? pushSoon() : push(); };
+  const geom = (fn) => {
+    if(!e.sel) return;
+    const f = e.draw.getSnapshotFeature(e.sel); if(!f) return;
+    e.draw.updateFeatureGeometry(e.sel, slGeo().round7(fn(f.geometry)));
+    setSel(e.draw.getSnapshotFeature(e.sel)); schedule(); push();
+  };
+  const duplicate = () => {
+    const f = e.sel && e.draw && e.draw.getSnapshotFeature(e.sel); if(!f) return;
+    const c = clean(f), id = slId();
+    const g = slGeo().round7(slGeo().shift(c.geometry, 6, -6)), holes = g.type === "Polygon" ? g.coordinates.slice(1) : [];
+    const r = e.draw.addFeatures([{ type: "Feature", id, geometry: holes.length ? { type: "Polygon", coordinates: [g.coordinates[0]] } : g, properties: c.properties }]);
+    if(r[0] && r[0].valid){ if(holes.length){ e.holes.set(id, holes); e.last.set(id, g.coordinates[0]); } e.draw.deselectFeature(e.sel); e.draw.selectFeature(id); }
+    schedule(); push();
+  };
+  const remove = () => { const id = e.sel; if(!id) return; e.draw.deselectFeature(id); e.draw.removeFeatures([id]); e.holes.delete(id); e.sel = null; setSel(null); schedule(); push(); };
+  const toggle = (set, setS, l) => { set.has(l) ? set.delete(l) : set.add(l); setS([...set]); if(e.sel){ try { e.draw.deselectFeature(e.sel); } catch(x){} } schedule(); };
+
+  const raw = sel && sel.properties, k = kindOf(raw);
+  // what the map draws: a thing with no colour, fill, edge or opacity of its own takes its type's (as WSLayouts does)
+  const st0 = k === "area" ? ASTY[raw.style] : k === "line" ? LSTY[raw.style] : null;
+  const p = !st0 ? raw : k === "line" ? { ...raw, color: raw.color || st0.color, w: raw.w || st0.w }
+    : { ...raw, color: raw.color || st0.color, fill: raw.fill || st0.fill, outline: raw.outline || st0.outline, opacity: raw.opacity == null ? st0.opacity : raw.opacity,
+        text: raw.text == null ? (raw.style === "crane_radius" ? "" : (st0.text || "")) : raw.text };
+  const sname = !p ? "" : k === "sym" ? (SYMS[p.sym] || {}).label : k === "text" ? "Words" : ((LSTY[p.style] || ASTY[p.style] || {}).label || "");
+  const nHoles = sel ? (e.holes.get(sel.id) || []).length : 0;
+  const meas = !sel ? "" : sel.geometry.type === "LineString" ? `${Math.round(slGeo().lengthM(sel.geometry.coordinates)).toLocaleString("en-GB")} m long`
+    : sel.geometry.type === "Polygon" ? `${Math.round(withHoles(sel).geometry.coordinates.reduce((s, r, i) => s + (i ? -1 : 1) * window.WSLayouts.areaM2(r), 0)).toLocaleString("en-GB")} m²` : "";   // less the holes
+  const place = (c, r) => wide ? { gridColumn: c, gridRow: r } : undefined;
+  const lab = "block text-[13px] font-medium text-slate-700";
+  const inp = "mt-0.5 w-full border border-slate-300 rounded px-2 py-1 text-[13px] bg-white";
+  const tb = "px-2.5 py-1 rounded-lg border border-slate-300 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40";
+  const tk = tool.kind === "select" ? "select" : tool.kind === "line" ? "line:" + tool.style : tool.kind === "area" ? "area:" + tool.style : tool.kind === "sym" ? "sym:" + tool.sym : "text";
+  const hint = SL_HINT[tool.kind === "area" ? (tool.style === "crane_radius" ? "circle" : (tool.shape || "polygon")) : tool.kind];
+
+  return <>
+    <div className="card p-2.5 flex flex-wrap items-center gap-x-3 gap-y-2" style={place("1 / -1", 1)} data-site-layout-draw="1" role="toolbar" aria-label="Drawing the site layout">
+      <span className="text-sm font-semibold text-slate-800">Drawing</span>
+      <select value={phase ? phase.id : ""} onChange={ev => switchPhase(ev.target.value)} disabled={busy !== ""} aria-label="Phase drawn"
+        className="border border-slate-300 rounded-lg px-2 py-1 text-[13px] bg-white">
+        {phases.map(x => <option key={x.id} value={x.id}>{x.name} ({slMonths(x)})</option>)}
+      </select>
+      <span className="text-[13px]" style={{ color: dirty ? "var(--warn-text)" : "var(--muted)" }} data-save-state={dirty ? "dirty" : "clean"}>{dirty ? "Unsaved changes" : "All changes saved"}</span>
+      <span className="ml-auto flex flex-wrap items-center gap-2">
+        <button onClick={undo} disabled={!hist.undo || busy !== ""} className={tb} title="Undo (Ctrl+Z)">Undo</button>
+        <button onClick={redo} disabled={!hist.redo || busy !== ""} className={tb} title="Redo (Ctrl+Y)">Redo</button>
+        <button onClick={save} disabled={!dirty || busy !== ""} className="px-3 py-1 rounded-lg text-white font-semibold text-[13px] disabled:opacity-50" style={{ background: "var(--navy)" }} title="Save (Ctrl+S)">{busy === "save" ? "Saving…" : "Save"}</button>
+        <button onClick={done} className={tb}>Done</button>
+      </span>
+      {(msg.t || stale || ask) && (
+        <p className="basis-full text-[13px] flex flex-wrap items-center gap-2" role="status" style={{ color: msg.bad ? "var(--bad-text)" : "var(--muted)" }}>
+          <span>{msg.t}</span>
+          {stale && <button onClick={reload} className={tb}>Reload</button>}
+          {ask && <><button onClick={save} className={tb}>Save</button><button onClick={discard} className={tb} style={{ color: "var(--red)" }}>Discard</button></>}
+        </p>
+      )}
+    </div>
+    <div className="card p-2 space-y-2" style={{ ...place(1, 2), maxHeight: wide ? SL_DRAW_H : undefined, overflowY: "auto" }} data-site-layout-palette="1" aria-label="What to draw" role="region" tabIndex={0}>
+      <PalBtn onClick={() => setTool({ kind: "select" })} on={tk === "select"}>↖ Select</PalBtn>
+      <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 pt-1">Lines</div>
+      {LINES.map(s => <PalBtn key={s.key} onClick={() => setTool({ kind: "line", style: s.key })} on={tk === "line:" + s.key}>
+        <span aria-hidden="true" style={{ width: 18, height: 4, background: s.color, borderRadius: 2, flex: "none" }}></span>{s.label}</PalBtn>)}
+      <div className="flex items-center justify-between pt-1">
+        <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">Areas</span>
+        <select value={shape} onChange={ev => { setShape(ev.target.value); if(tool.kind === "area") setTool({ ...tool, shape: ev.target.value }); }} aria-label="Area shape" className="border border-slate-300 rounded px-1 py-0.5 text-[12px] bg-white">
+          {SL_SHAPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      </div>
+      {AREAS.map(s => <PalBtn key={s.key} onClick={() => setTool({ kind: "area", style: s.key, shape })} on={tk === "area:" + s.key}>
+        <span aria-hidden="true" style={{ width: 14, height: 14, background: s.color, opacity: Math.max(0.35, s.opacity), border: `1.5px ${s.outline === "dashed" ? "dashed" : "solid"} ${s.color}`, borderRadius: 2, flex: "none" }}></span>{s.label}</PalBtn>)}
+      <PalBtn onClick={() => setTool({ kind: "text" })} on={tk === "text"}><span aria-hidden="true" className="font-bold" style={{ width: 18, textAlign: "center" }}>T</span>Words</PalBtn>
+      {groups.map(g => <div key={g}>
+        <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 pt-1">{g}</div>
+        <div className="grid grid-cols-5 gap-1 mt-1">
+          {(styles.symbols || []).filter(s => s.group === g).map(s => <button key={s.key} onClick={() => setTool({ kind: "sym", sym: s.key })} aria-pressed={tk === "sym:" + s.key} aria-label={s.label} title={s.label}
+            className={"rounded border p-0.5 " + (tk === "sym:" + s.key ? "border-[color:var(--navy)] ring-2 ring-[color:var(--navy)]" : "border-slate-200 hover:bg-slate-50")} style={{ minHeight: 34 }}>
+            <img alt="" src={slSvg(s.svg)} style={{ width: 28, height: 28, display: "block", margin: "0 auto" }} /></button>)}
+        </div>
+      </div>)}
+    </div>
+    <div className="space-y-3" style={{ ...place(3, 2), maxHeight: wide ? SL_DRAW_H : undefined, overflowY: "auto" }} data-site-layout-side="1" role="region" aria-label="Drawing settings" tabIndex={0}>
+      <div className="card p-3 space-y-2" data-site-layout-selected="1">
+        <div className="text-sm font-semibold text-slate-700">{sel ? sname : "Selected"}</div>
+        <p className="text-[13px] text-slate-500">{busy === "load" ? "Opening…" : hint}</p>
+        {!sel ? null : <>
+          {k === "line" && <label className={lab}>Type<select value={p.style} onChange={ev => { const s = LSTY[ev.target.value]; upd({ style: s.key, color: s.color, w: s.w, layer: s.layer }); }} className={inp}>
+            {(styles.lines || []).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select></label>}
+          {k === "area" && <label className={lab}>Type<select value={p.style} onChange={ev => { const s = ASTY[ev.target.value]; upd({ style: s.key, color: s.color, fill: s.fill, outline: s.outline, opacity: s.opacity, text: s.key === "crane_radius" ? "" : (s.text || "") }); }} className={inp}>
+            {(styles.areas || []).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select></label>}
+          {k === "sym" && <label className={lab}>Symbol<select value={p.sym} onChange={ev => upd({ sym: ev.target.value, size: SYMS[ev.target.value].size })} className={inp}>
+            {(styles.symbols || []).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select></label>}
+          {k === "text" && <label className={lab}>Words<textarea rows={2} value={p.text || ""} maxLength={200} onChange={ev => upd({ text: ev.target.value }, true)} className={inp} /></label>}
+          {(k === "area" || k === "sym") && <label className={lab}>Label<input value={(k === "area" ? p.text : p.label) || ""} maxLength={k === "area" ? 200 : 80} onChange={ev => upd(k === "area" ? { text: ev.target.value } : { label: ev.target.value }, true)} className={inp} /></label>}
+          {k !== "sym" && <label className={lab}>Colour<input type="color" value={p.color || "#111827"} onChange={ev => upd({ color: ev.target.value.toUpperCase() }, true)} className="mt-0.5 block h-7 w-14 border border-slate-300 rounded" /></label>}
+          {k === "line" && <label className={lab}>Width {(+p.w || 0).toFixed(2)} m<input type="range" min="0.05" max="10" step="0.05" value={p.w || 0.3} onChange={ev => upd({ w: +ev.target.value }, true)} className="w-full" /></label>}
+          {(k === "line" || k === "area") && <label className={lab}>Opacity {Math.round((p.opacity == null ? 1 : p.opacity) * 100)} %<input type="range" min="0" max="1" step="0.05" value={p.opacity == null ? 1 : p.opacity} onChange={ev => upd({ opacity: +ev.target.value }, true)} className="w-full" /></label>}
+          {k === "area" && <div className="grid grid-cols-2 gap-2">
+            <label className={lab}>Fill<select value={p.fill || "solid"} onChange={ev => upd({ fill: ev.target.value })} className={inp}>{Object.entries(styles.fills || {}).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+            <label className={lab}>Edge<select value={p.outline || "solid"} onChange={ev => upd({ outline: ev.target.value })} className={inp}><option value="solid">Solid</option><option value="dashed">Dashed</option></select></label>
+          </div>}
+          {nHoles > 0 && <p className="text-[13px] text-slate-600" data-holes={nHoles}>{nHoles === 1 ? "1 hole" : nHoles + " holes"}: moves, turns and resizes with the area. Drag the outside corners only.</p>}
+          {(k === "sym" || k === "text") && <>
+            <label className={lab}>{k === "sym" ? "Size across" : "Height"} {(+p.size || 0).toFixed(1)} m<input type="range" min={k === "sym" ? 0.5 : 0.5} max={k === "sym" ? 30 : 12} step={k === "sym" ? 0.5 : 0.1} value={p.size || 2} onChange={ev => upd({ size: +ev.target.value }, true)} className="w-full" /></label>
+            <label className={lab}>Turn {Math.round(p.rot || 0)}°<input type="range" min="-180" max="180" step="1" value={p.rot || 0} onChange={ev => upd({ rot: +ev.target.value }, true)} className="w-full" /></label>
+          </>}
+          {k === "text" && <div className="flex flex-wrap items-center gap-3 text-[13px] text-slate-700">
+            <label className="flex items-center gap-1"><input type="checkbox" checked={!!p.bold} onChange={ev => upd({ bold: ev.target.checked })} />Bold</label>
+            <label className="flex items-center gap-1"><input type="checkbox" checked={!!p.halo} onChange={ev => upd({ halo: ev.target.checked })} />Halo</label>
+            <button onClick={() => setTool({ kind: "line", style: "leader" })} className={tb}>+ Leader arrow</button>
+          </div>}
+          <label className={lab}>Layer<select value={p.layer} onChange={ev => upd({ layer: ev.target.value })} className={inp}>{(styles.layers || []).map(l => <option key={l} value={l}>{l}</option>)}</select></label>
+          {meas && <p className="text-[13px] text-slate-500" data-measure="1">{meas}</p>}
+          {(k === "line" || k === "area") && <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => geom(g => slGeo().rotate(g, -15))} className={tb} aria-label="Turn 15° anticlockwise">⟲ 15°</button>
+            <button onClick={() => geom(g => slGeo().rotate(g, 15))} className={tb} aria-label="Turn 15° clockwise">⟳ 15°</button>
+            <button onClick={() => geom(g => slGeo().scale(g, 1 / 1.1))} className={tb} aria-label="10 % smaller">− 10 %</button>
+            <button onClick={() => geom(g => slGeo().scale(g, 1.1))} className={tb} aria-label="10 % bigger">+ 10 %</button>
+          </div>}
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => upd({ z: (p.z || 0) + 1 })} className={tb}>Bring forward</button>
+            <button onClick={duplicate} className={tb} title="Duplicate (Ctrl+D)">Duplicate</button>
+            <button onClick={remove} className={tb} style={{ color: "var(--red)" }} title="Delete">Delete</button>
+          </div>
+        </>}
+      </div>
+      <div className="card p-3" data-site-layout-layers="1">
+        <div className="text-sm font-semibold text-slate-700 mb-1">Layers</div>
+        {(styles.layers || []).map(l => <div key={l} className="flex items-center gap-2 text-[13px] text-slate-700 py-0.5">
+          <label className="flex items-center gap-1.5 flex-1"><input type="checkbox" checked={!hidden.includes(l)} onChange={() => toggle(e.hidden, setHidden, l)} aria-label={`Show ${l}`} />{l}</label>
+          <span className="tabular-nums text-slate-500">{counts[l] || 0}</span>
+          <label className="flex items-center gap-1" title="Locked: can't be selected"><input type="checkbox" checked={locked.includes(l)} onChange={() => toggle(e.locked, setLocked, l)} aria-label={`Lock ${l}`} /><span aria-hidden="true">🔒</span></label>
+        </div>)}
+      </div>
+      <div className="card p-3 space-y-1.5 text-[13px] text-slate-700" data-site-layout-aids="1">
+        <div className="text-sm font-semibold text-slate-700">Map</div>
+        <label className="flex items-center gap-1.5"><input type="checkbox" checked={snap} onChange={ev => { e.snap = ev.target.checked; setSnap(ev.target.checked); }} />Snap to corners and edges</label>
+        <label className="flex items-center gap-1.5"><input type="checkbox" checked={angle} onChange={ev => { e.angle = ev.target.checked; setAngle(ev.target.checked); if(e.draw) ["linestring", "polygon"].forEach(md => e.draw.updateModeOptions(md, { snapping: snapping() })); }} />15° steps</label>
+        <p className="text-slate-500">Words show from zoom {(window.WSLayouts && window.WSLayouts.WORDS_Z) || 15}.</p>
+      </div>
+    </div>
+  </>;
 }
 
 // ---- little presentational helpers ----

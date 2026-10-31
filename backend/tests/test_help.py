@@ -924,7 +924,8 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 31 Oct 2026 (task 4c PR 1): + chapter 19 Site layouts and its three sections (83); + T1 "Site layouts" (34)
    # NARROWED 31 Oct 2026 (task 4a, PR 3b): + 18.5 Notes and tasks (84); + T1 "CLP notes and tasks" (35)
    # NARROWED 31 Oct 2026 (task 4a, PR 3c): + 18.6 The client's reviewers (85); + T1 "CLP client reviewers" (36)
-   len(re.findall(r'<li class="l[12]"', src)) == 85 and len(re.findall(r'<li class="l[12]"', _tg2)) == 36   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   # NARROWED 31 Oct 2026 (task 4c PR 2): + 19.2 Drawing (86)
+   len(re.findall(r'<li class="l[12]"', src)) == 86 and len(re.findall(r'<li class="l[12]"', _tg2)) == 36   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,
@@ -1187,6 +1188,7 @@ ok3("⭐ CLP DOCS: the user guide has chapter 18 'CLP documents' with 18.1–18.
     and all(t in _ch18 for t in ("<strong>Plan → CLP documents</strong>", "A team sees its own team&#39;s plans", "<strong>All teams</strong>", "<strong>+ New CLP</strong>",
         "<strong>DRAFT · not issued</strong>", "<strong>Edit cover details</strong>", "<strong>To complete</strong>", "<strong>Send for approval</strong>",
         "<strong>Approve as Issue N</strong>", "<strong>Ask for changes</strong>", "<strong>Document history</strong>", "exactly as approved",
+        "without the team's note to the approver: the file can go to the client.",
         "only while a plan has no issue", "<strong>Configuration → Planning → CLP document</strong>", "up to 8 stages", "not an approved CLP"))
     , _ch18[:200])
 ok3("CLP DOCS: chapter 18 names no supplier, decision code, team id or back-end word, says lorry never truck; the phone list (2.4) names CLP documents among the desktop pages",
@@ -1230,7 +1232,8 @@ ok3("CLP DOCS: the technical guide #t1-clp-records holds the detail (the two tab
 # ---- 31 Oct 2026 (task 4c PR 1): chapter 19 Site layouts (few words, no back end); T1 #t1-layouts the detail
 _ch19 = _ug[_ug.index('<h1 id="19-site-layouts">'):_ug.index('<h1 id="appendix-a-methods-and-assumptions">')]
 ok3("⭐ SITE LAYOUTS: the user guide has chapter 19 with 19.1-19.3 in the nav and the text (phases, bringing in a drawing, the public map for staff); 9.1 points to it",
-    all(t in _ug for t in ('<a href="#19-site-layouts">19. Site layouts</a>', '<a href="#19-1-phases">19.1', '<a href="#19-2-bringing-in-a-drawing">19.2', '<a href="#19-3-on-the-public-map">19.3'))
+    # NARROWED 31 Oct 2026 (task 4c PR 2): + 19.2 Drawing; Bringing in a drawing is 19.3, the public map 19.4 (their ids kept)
+    all(t in _ug for t in ('<a href="#19-site-layouts">19. Site layouts</a>', '<a href="#19-1-phases">19.1', '<a href="#19-4-drawing">19.2 Drawing', '<a href="#19-2-bringing-in-a-drawing">19.3', '<a href="#19-3-on-the-public-map">19.4'))
     and all(t in _ch19 for t in ("<strong>Bring in a drawing</strong>", "<strong>+ Add a phase</strong>", "<strong>Place anyway</strong>", "<strong>Keep the file&#39;s colours</strong>",
                                  "Save a DWG as DXF first.", "Planners and admins change it", "Untick it and visitors with the map password do not see it."))
     # NARROWED 31 Oct 2026 (task 4c PR 4): "... do not see it" now follows "Untick it and" (a ticked layout is public)
@@ -1249,6 +1252,18 @@ ok3("SITE LAYOUTS: #t1-layouts holds the units rule, the leave-outs, footprints,
     "<code>FOOTPRINT_M</code>" in _tgv2 and "<code>site_layouts.MAX_HOLES</code>" in _tgv2 and "Terra Draw 1.37 refuses a polygon with holes" in _tgv2
     and "<code>contractor-style-mm.dxf</code>" in _tgv2 and "<code>$INSUNITS</code> must be 6" not in _tgv2)
 
+# 31 Oct 2026 (task 4c PR 2, the approved mockup notes\\site-layout-draw-mockup-1031): 19.2 Drawing, few words; #t1-layouts-draw the detail
+_d192 = _ch19[_ch19.index('<h2 id="19-4-drawing">'):_ch19.index('<h2 id="19-2-bringing-in-a-drawing">')] if '<h2 id="19-4-drawing">' in _ch19 else ""
+ok3("⭐ SITE LAYOUTS (PR 2): 19.2 Drawing says how to draw, select, turn and resize, the snapping, layers, holes, the keys, Save / Discard, the words from zoom 15",
+    all(t in _d192 for t in ("<strong>Draw</strong>", "hold R and drag to turn it, S to resize it", "<strong>15° steps</strong>", "hidden or locked while you draw",
+                             "an area with holes keeps them", "Ctrl+Z undo, Ctrl+Y redo, Ctrl+D duplicate, Ctrl+S save", "<strong>Discard</strong>", "from zoom 15, on both maps"))
+    and "<strong>Name and months</strong>, <strong>Copy to a new phase</strong>" in _ch19 and "<strong>Show the whole drawing</strong>" in _ch19
+    and "<strong>Edit</strong> changes its name and months" not in _ch19, _d192[:200])
+ok3("SITE LAYOUTS (PR 2): 19.2 names no library or back end (Terra Draw, uuid, version, PUT live in the technical guide)",
+    _d192 and not re.search(r"\b(API|endpoint|server|JSON|Terra|uuid|PUT|409|Mapbox|version)\b", _d192)
+    and 'id="t1-layouts-draw"' in _tgv2 and "Terra Draw 1.39.0 and terra-draw-mapbox-gl-adapter 1.5.0" in _tgv2
+    and "<code>WSLayouts.geo.holesFollow</code>" in _tgv2 and "<code>POST /api/site-layouts/phases/{id}/copy</code>" in _tgv2
+    and "<code>LAYOUT_LEAVE</code>" in _tgv2 and "<code>WORDS_Z</code> 15" in _tgv2 and "Drawing tools, pins" not in _tgv2)
 # ---- 31 Oct 2026 (task 4c PR 4): the public site layouts in 8.2, 19.3 and #t1-layouts
 _ug82 = _ug[_ug.index('id="8-2-filters-basemaps-and-overlays"'):_ug.index('id="8-4-the-forecast-timeline-and-kpi-panel"')]
 ok3("⭐ PUBLIC LAYOUTS: 8.2 lists Site layouts (zoom in close, the popup's button) and 19.3 the tick, Every site layout and no security / CCTV",
