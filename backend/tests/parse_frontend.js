@@ -4610,7 +4610,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("SITE LAYOUT: planners and admins change it (Q6: can_approve), not only an admin login",
      card.includes("const canLayout = !!(ACCESS.info && ACCESS.info.can_approve);") && !card.includes("isAdminLogin"));
   ok("SITE LAYOUT: the drawing code is the map's own file, loaded once when needed (one look in one place)",
-     // NARROWED 31 Oct 2026 (PR 2): v=2, the words from zoom 15 and geo
+     // NARROWED 31 Oct 2026 (PR 2): v=3, the words from zoom 15 and geo (PR 4 had made it v=2, the minzoom option)
      code.includes('s.src = "/map/site-layouts.js?v=3";') && card.includes("WSLayouts.install(m, styles, { prefix: \"dm-layout\" })")
      && !/<script src="\/map\/site-layouts\.js/.test(html));
   ok("SITE LAYOUT: put back after a basemap switch (the page's style.load), and cleared when the card closes",
@@ -4625,7 +4625,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && card.includes("/site-layout/phases`") && card.includes('method: "PATCH"') && card.includes("?version=${p.version}`, { method: \"DELETE\" }")
      && card.includes("version: edit.version") && card.includes("if(j.ask_grid){"));
   ok("SITE LAYOUT: every failure through errSay / errMsg (no status number, no raw reply)",
-     (card.match(/errSay\("/g) || []).length === 6 &&   // NARROWED 31 Oct 2026 (PR 2): + "Not copied."
+     (card.match(/errSay\("/g) || []).length === 7 &&   // NARROWED 31 Oct 2026: 7 — PR 2's "Not copied." and PR 4's "Not changed." (the public switch)
  card.includes("setFit({ error: errMsg(e) })") && !/\$\{e\}|\.status\b|r\.status/.test(card));
   ok("SITE LAYOUT: the words are few and name no back end (no transform, grid file, library or endpoint)",
      !/OSTN|pyproj|ezdxf|EPSG|transform|endpoint|\bAPI\b|server|\bheld\b|\bhold\b/i.test(card.replace(/\$\{API\}/g, "").replace(/"Content-Type"/g, ""))
@@ -4640,6 +4640,14 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // 31 Oct 2026 (PR 1b, plan §6 revised): a drawing in millimetres, inches or with no units is scaled; the card says how it was read
   ok("SITE LAYOUT: the first line says the drawing's units and where they came from ('in millimetres, from the file')",
      card.includes("{imp.report.things} things on {imp.report.layers} layers{imp.report.units ? `, in ${imp.report.units}` : \"\"}.</p>"));
+  // 31 Oct 2026 (task 4c PR 4, the approved mockup notes\site-layout-public-mockup-1031\): "Show on the public map"
+  ok("⭐ SITE LAYOUT: one 'Show on the public map' tick (planners / admins; with the layout's version), shown when the layout has a phase",
+     card.includes('data-site-layout-public="1"') && card.includes("Show on the public map")
+     && card.includes("disabled={!canLayout || busy !== \"\"} onChange={e => setPublic(e.target.checked)}")
+     && card.includes("/site-layout`,") && card.includes("JSON.stringify({ public: !!on, version: lay.version })")
+     && card.includes("{lay && phases.length > 0 && !imp && !edit && ("));
+  ok("SITE LAYOUT: the tick's one line says what the public sees (from close in, no security / CCTV) and names no back end",
+     card.includes("From close in. Security and CCTV stay off it.") && !/endpoint|cache|zoom 16|allow-list/i.test(card));
 }
 // 31 Oct 2026 (task 4c PR 2, the approved mockup notes\site-layout-draw-mockup-1031, Q1-Q10 as recommended): the drawing tools
 {

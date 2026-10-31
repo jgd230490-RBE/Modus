@@ -253,3 +253,15 @@ def payload():
         "choices": [{"value": c, "label": choice_label(c)} for c in choices()],
         "private_symbols": list(PRIVATE_SYMBOLS),
     }
+
+
+def public_payload():
+    """31 Oct 2026 (task 4c PR 4): the table the PUBLIC map draws from — the same looks, without the private symbols'
+    pictures and without the import table's choices (the staff read stays staff-only)."""
+    return {
+        "layers": LAYERS, "fills": FILLS,
+        "lines": [{"key": k, **v} for k, v in LINE_STYLES.items()],
+        "areas": [{"key": k, **v} for k, v in AREA_STYLES.items()],
+        "symbols": [{**s, "layer": SYMBOL_LAYER[s["group"]]} for s in SYMBOLS if s["key"] not in PRIVATE_SYMBOLS],
+        "glyphs": GLYPHS,
+    }
