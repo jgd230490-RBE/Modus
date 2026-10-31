@@ -1189,6 +1189,7 @@ ok3("⭐ CLP DOCS: the user guide has chapter 18 'CLP documents' with 18.1–18.
     and all(t in _ch18 for t in ("<strong>Plan → CLP documents</strong>", "A team sees its own team&#39;s plans", "<strong>All teams</strong>", "<strong>+ New CLP</strong>",
         "<strong>DRAFT · not issued</strong>", "<strong>Edit cover details</strong>", "<strong>To complete</strong>", "<strong>Send for approval</strong>",
         "<strong>Approve as Issue N</strong>", "<strong>Ask for changes</strong>", "<strong>Document history</strong>", "exactly as approved",
+        "without the team's note to the approver: the file can go to the client.",
         "only while a plan has no issue", "<strong>Configuration → Planning → CLP document</strong>", "up to 8 stages", "not an approved CLP"))
     , _ch18[:200])
 ok3("CLP DOCS: chapter 18 names no supplier, decision code, team id or back-end word, says lorry never truck; the phone list (2.4) names CLP documents among the desktop pages",
