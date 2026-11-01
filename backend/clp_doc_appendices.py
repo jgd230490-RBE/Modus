@@ -349,7 +349,7 @@ def _h_collisions(d, ctx):
             bh = collisions.busy_hours(rid, acc=_acc(d.get("team")))
         except Exception:                              # noqa: BLE001  EvidenceError: a route this caller may not read
             continue
-        if bh.get("shown"):
+        if bh.get("shown") and bh.get("offers"):
             out.append({"route_id": rid, "period": bh.get("period") or "",
                         "offers": [collisions.offer_words(o, bh.get("period") or "") for o in bh.get("offers") or []]})
     return {"routes": [r["route_id"] for r in co["rows"]], "busy": out, "period": co.get("period") or ""}

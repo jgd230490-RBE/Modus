@@ -28,7 +28,7 @@ def _date_words(iso):
 def _hm(minutes):
     if minutes is None:
         return "—"
-    return f"{int(minutes) // 60}:{int(minutes) % 60:02d}"
+    return f"{int(minutes) // 60:02d}:{int(minutes) % 60:02d}"
 
 
 def _more_line(D, k):
