@@ -298,7 +298,10 @@ ok("🔴 nothing fetched: community 'not stored' and collisions 'not fetched', n
    L0["community"]["stored"] is False and L0["collisions"]["fetched"] is False and L0["collisions"]["rows"] == []
    and L0["limits"]["checked"] is False and L0["closures"]["checked"] is False, str(L0["community"]["stored"]))
 W0 = Document(io.BytesIO(clp_doc.build(D0, pictures=False)))
-T0 = "\n".join(p.text for p in W0.paragraphs)
+_t0_all = [p.text for p in W0.paragraphs]
+# NARROWED 1 Nov 2026 (task 4a PR 4): the appendices' method page (N) names the stored sources in general words; this check
+# is about sections 1 to 7, so it reads the text before the "Appendices" heading
+T0 = "\n".join(_t0_all[:_t0_all.index("Appendices")] if "Appendices" in _t0_all else _t0_all)
 ok("...and the document says nothing it does not hold: no bus stop count, no collision table, no limit line",
    "bus stop" not in T0 and "Injury collisions" not in T0 and "lorry limits" not in T0
    and "No National Highways closures" not in T0, "")

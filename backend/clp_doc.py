@@ -770,7 +770,7 @@ def _lower_lead(words):
     return words[0].lower() + words[1:] if first in ("Every", "From", "Until") else words
 
 
-def build(data, impact="higher", pictures=True, acc=None):
+def build(data, impact="higher", pictures=True, acc=None, appendices=True):
     """The .docx bytes for gather()'s data. `impact` picks the §5 checklist (higher or medium). `pictures` adds the
     charts and the three plans (clp_doc_pictures; the plans call the basemap); `acc` is the caller's access."""
     if impact not in IMPACT:
@@ -1218,6 +1218,15 @@ def build(data, impact="higher", pictures=True, acc=None):
     D.src("From CLP monitoring and Gate arrivals. The CLP pack prints them for any month.")
     D.todo("how this plan is put in place on site, who checks it and how often, how complaints are taken and answered, "
            "and when the plan is reviewed.", "7")
+
+    # ---------------------------------------------------------------- appendices A-O (task 4a PR 4): stored data only,
+    # each printed only where the plan has figures for it
+    if appendices:
+        import clp_doc_appendices as APP
+        import clp_doc_appendices_render as APR
+        A = APP.gather(d)
+        d["appendix_letters"] = APR.render(D, d, A)
+        d["appendices_skipped"] = A.get("_skipped") or []
 
     # the Still to complete list, now every placeholder is known: inserted before the Contents heading
     data["todos"] = list(D.todos)   # 31 Oct 2026 (PR 3b): kept after the build, so a task can start from a line

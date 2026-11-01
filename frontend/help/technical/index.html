@@ -54,7 +54,7 @@ main:focus{outline:0}
 <li class="l2"><a href="#t1-baf">Fuel index and BAF</a></li>
 <li class="l2"><a href="#t1-gates">Gate arrivals</a></li>
 <li class="l2"><a href="#t1-stock">Stockpiles</a></li><li class="l2"><a href="#t1-pours">Concrete pours</a></li>
-<li class="l2"><a href="#t1-clp">CLP monitoring</a></li><li class="l2"><a href="#t1-clp-records">CLP documents</a></li><li class="l2"><a href="#t1-clp-notes">CLP notes and tasks</a></li><li class="l2"><a href="#t1-clp-reviewers">CLP client reviewers</a></li><li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li><li class="l2"><a href="#t1-layouts">Site layouts</a></li>
+<li class="l2"><a href="#t1-clp">CLP monitoring</a></li><li class="l2"><a href="#t1-clp-records">CLP documents</a></li><li class="l2"><a href="#t1-clp-appendices">CLP appendices</a></li><li class="l2"><a href="#t1-clp-notes">CLP notes and tasks</a></li><li class="l2"><a href="#t1-clp-reviewers">CLP client reviewers</a></li><li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li><li class="l2"><a href="#t1-layouts">Site layouts</a></li>
 <li class="l1"><a href="#t2-routing">T2 Routing with HERE</a></li>
 <li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>
 <li class="l1"><a href="#t3-sources">T3 Where each screen reads from</a></li>
@@ -437,6 +437,17 @@ template's stages for the programme, <code>clp_doc.DEFAULT_STAGES</code>, sent t
 last. 2.4.2 lists named schools, hospitals and health centres first (<code>clp_doc_layers.SENSITIVE_KINDS</code>), then the
 other named places, nearest first; places with no name are counted per kind (<code>places_unnamed</code>).</p>
 <p><strong>Not yet built.</strong> The appendices (PR 4). Notes and tasks (PR 3b) and the client's reviewers (PR 3c): the next two sections.</p>
+<h2 id="t1-clp-appendices">CLP appendices</h2>
+<p>1 Nov 2026 (task 4a, PR 4). Appendices A to O after section 7 of the Word file: <code>backend/clp_doc_appendices.py</code> reads
+(<code>gather(data)</code> returns {letter: block}, a letter only when the plan has data for it) and
+<code>clp_doc_appendices_render.py</code> prints; <code>clp_doc.build(..., appendices=True)</code> calls them inside the same
+one-at-a-time lock as the rest of the build. Stored data only: nothing is fetched, no routing or map service is called. The sources:
+the routes' typed words and <code>hour_times.evidence_block</code> (A), <code>holding.summary</code> and <code>site_layouts</code> (B),
+<code>route_choice.periods</code> (C), <code>pours.decorate</code> (D), <code>abnormal.decorate</code> (E), <code>stockpiles.balances</code> (F),
+<code>carbon.scenario</code> lines on the plan&#39;s routes and <code>carbon_target.status</code> (G), <code>collisions.busy_hours</code> (H), the stored places (I),
+<code>areas.clip_table</code> (J), <code>sim.day</code> in each site&#39;s busiest month (K), <code>gate_arrivals.arrivals</code> per month (L),
+<code>derived.cycle_for</code> with <code>carbon.lorries_for</code> (M). A team&#39;s plan cuts pours and abnormal loads to the team, shows the
+team&#39;s share of each gate&#39;s arrivals and leaves K out. A read that fails is named in <code>appendices_skipped</code> and its appendix left out.</p>
 <h2 id="t1-clp-notes">CLP notes and tasks</h2>
 <p>31 Oct 2026 (task 4a, PR 3b; mockup <code>notes/clp-notes-mockup-1031</code>, Q1–Q12 as recommended). <code>backend/clp_notes.py</code>
 over one tenanted table, in the organisation file (after <code>clp_issues</code>) and kept by a demo refresh:</p>
