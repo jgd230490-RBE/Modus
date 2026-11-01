@@ -464,6 +464,23 @@ ok("a team's file has appendices too, and none of the other team's pour or load"
    any(p.text == "Appendices" for p in Document(io.BytesIO(clp_doc.build(tm, pictures=False))).paragraphs))
 ok("data keeps the letters printed", BIG.get("appendix_letters") and "N" in BIG["appendix_letters"] and BIG["appendices_skipped"] == [])
 
+# ---- found on live 1 Nov 2026 (L019): an H line for a route with no offers, and clock times without a leading zero ---- #
+import collisions                           # noqa: E402
+_fake = {"layers": {"collisions": {"fetched": True, "rows": [{"route_id": "R001"}], "period": "2021 to 2025"}},
+         "routes": [{"route_id": "R001"}], "team": None}
+_real_bh = collisions.busy_hours
+collisions.busy_hours = lambda rid, acc=None: {"shown": True, "offers": [], "period": "2021 to 2025"}
+try:
+    _h0 = APP._h_collisions(_fake, {})
+    collisions.busy_hours = lambda rid, acc=None: {"shown": True, "offers": [{"label": "Alternative 1", "alt": 1, "bands": [
+        {"from": "07:00", "to": "10:00", "route": 17, "alt": 5}], "midday": None}], "period": "2021 to 2025"}
+    _h1 = APP._h_collisions(_fake, {})
+finally:
+    collisions.busy_hours = _real_bh
+ok("⭐ H: a route whose busy-hour read shows no offer is not a line (no empty 'R001:'); one with an offer is, in words",
+   _h0["busy"] == [] and [b["route_id"] for b in _h1["busy"]] == ["R001"] and "5 against 17" in _h1["busy"][0]["offers"][0], str((_h0, _h1)))
+ok("a clock time prints with two digits for the hour (07:47, not 7:47)", APR._hm(467.88) == "07:47" and APR._hm(None) == "—")
+
 # ---- the source ---------------------------------------------------------------------------------------------- #
 for nm in ("clp_doc_appendices.py", "clp_doc_appendices_render.py"):
     src = open(os.path.join(BACKEND, nm), encoding="utf-8").read()
