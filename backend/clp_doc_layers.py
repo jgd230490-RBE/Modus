@@ -267,6 +267,8 @@ def gather(data, area_month=None):
         "stored": bool(feats), "route_m": community.STRIP_ROUTE_M, "site_m": community.STRIP_SITE_M,
         "drawn_routes": sorted({k for k, _l in lines}),
         "counts": {k: len(v) for k, v in by_kind.items()}, "labels": labels,
+        # 1 Nov 2026 (PR 4, Appendix I): the nearest place of each kind (`near` is sorted nearest first)
+        "nearest": {k: {"name": v[0]["name"], "metres": v[0]["metres"], "where": v[0]["where"]} for k, v in by_kind.items()},
         "places": places[:MAX_PLACES], "places_more": max(0, len(places) - MAX_PLACES),
         "places_unnamed": [{"kind": k, "count": unnamed[k]} for k in PLACE_KINDS if unnamed.get(k)],
         "stations": by_kind.get("stations", []), "bus_stops": len(by_kind.get("bus_stops", [])),
