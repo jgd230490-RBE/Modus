@@ -1550,6 +1550,36 @@ def _draw_bulletin_schematic(c, S, x, y, w, h, P=None):
             c.setFillColorRGB(*NAVY_RGB); c.circle(px, py, 4.6, stroke=1, fill=1)
             c.setFillColorRGB(1, 1, 1); c.setFont(_BF("bold"), 7)
             c.drawCentredString(px, py - 2.5, p["letter"])
+    if S.get("pin_names"):
+        # 2 Nov 2026 (John, the CLP's regional plan): every place's NAME beside its letter, so the map reads without
+        # the key. White halo so it reads on the basemap; to the right of the pin, or to the left near the right-hand
+        # edge or the panel; a name that would sit on an earlier one steps below, then above.
+        import route_map_export as rme
+        right_edge = x + w - (rme.PANEL_W_MM * mm + 10 if P is not None else 0)
+        taken = []
+        c.setFont(_BF("bold"), 6.8)
+        for p in S["places"]:
+            if not (p.get("at") and p.get("letter") and (p.get("name") or "").strip()):
+                continue
+            px, py = P(*p["at"])
+            label = _pdf_safe(p["name"].strip())[:40]
+            tw = c.stringWidth(label, _BF("bold"), 6.8)
+            lx = px + 7 if px + 7 + tw <= right_edge else px - 7 - tw
+            lx = max(x + 2, min(lx, x + w - tw - 2))
+            for ly in (py - 2.4, py - 11.6, py + 6.8):
+                box = (lx - 1, ly - 1.5, lx + tw + 1, ly + 7)
+                if not any(box[0] < t[2] and box[2] > t[0] and box[1] < t[3] and box[3] > t[1] for t in taken):
+                    break
+            taken.append(box)
+            # the halo: the same string stroked in white (text render mode 1), then filled in navy over it — two
+            # copies in the PDF's text, never nine shifted ones (pdftotext read those as "YYaarrdd")
+            c.saveState()
+            c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(1.5); c.setLineJoin(1)
+            t = c.beginText(lx, ly); t.setFont(_BF("bold"), 6.8); t.setTextRenderMode(1); t.textOut(label)
+            c.drawText(t)
+            c.restoreState()
+            c.setFillColorRGB(*NAVY_RGB); c.setFont(_BF("bold"), 6.8)
+            c.drawString(lx, ly, label)
     # 14 Oct 2026 (the publishing check): a control on a site covered its letter; it now steps off (up, then round
     # the clock) to the first clear spot, with a thin leader back to where it is
     for z in S["controls"]:
@@ -2409,7 +2439,8 @@ def _plan_panel(c, S, fw, fh, basemap_ok):
             c.drawString(x + 21, y - 7.6, _pdf_safe(g["label"]))
         items.append((9.6, sw))
     places = [p for p in PL.get("places") or [] if p.get("letter")]
-    shown = places[:ROUTE_MAP_PANEL_MAX_PLACES]
+    # 2 Nov 2026 (John, the CLP's regional plan): every supplier and site listed, never "+N more sites"
+    shown = places if S.get("panel_all_places") else places[:ROUTE_MAP_PANEL_MAX_PLACES]
     if shown:
         gap(4)
         text("Sites", B, 7.8, 10)

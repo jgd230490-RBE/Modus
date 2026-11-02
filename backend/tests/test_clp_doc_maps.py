@@ -552,6 +552,92 @@ ok("pictures=False: the same text, no pictures (the fast path the tests and a fu
    len(Document(io.BytesIO(clp_doc.build(D1, pictures=False))).inline_shapes) == 0)
 
 # =========================================================================== #
+#  4b. 2 Nov 2026 (John) — the regional plan: EVERY route to and from the site, the names on the map, no places   #
+# =========================================================================== #
+import route_map_export as rme  # noqa: E402
+from portable import pdf_text  # noqa: E402
+import bulletin_doc  # noqa: E402
+_ACC = {"role": "planner"}
+R6 = network.create_route(TIP, PIT, material_category=BAL, route_id="R006", ipt="IPT1")["id"]   # a route with no line yet
+add_geom(R6, T_AT, P_AT)
+DT2 = clp_doc.gather([TIP], factors=factors, working_days=WD, layers=False)
+pmT = DT2["totals"]["peak_month"]
+_drawnT = [r["route_id"] for r in DT2["routes"] if r["routed"]]
+oldT = rme.sheet(pmT, route_ids=_drawnT, acc=_ACC)
+ok("the Tip's busiest month is Oct 2026 and the export's month sheet (the regional plan until now) draws only the "
+   "route in use that month", pmT == 10 and [r["route_id"] for r in oldT["rows"]] == ["R005"],
+   f"{pmT} {[r['route_id'] for r in oldT['rows']]}")
+ok("⭐ gather() lists the routes with an end at the site and no approved line yet (drawn or not), never in a figure",
+   [(r["route_id"], r["from"], r["to"], r["routed"]) for r in DT2["routes_no_lines"]] == [("R006", "Tip South", "Pit West", True)]
+   and DT2["totals"]["trips"] == sum(r["trips"] for r in DT2["routes"]), str(DT2["routes_no_lines"]))
+ok("...a team's CLP leaves out another team's unused route",
+   clp_doc.gather([TIP], factors=factors, working_days=WD, layers=False, team="IPT2")["routes_no_lines"] == [])
+SA = PIC.regional_sheet(DT2, pmT, _ACC, oldT)
+_ids = [r["route_id"] for r in SA["rows"]]
+ok("⭐ the CLP's regional plan draws EVERY route to and from the site: the two with lines in any month first, busiest "
+   "first, then the one with no line yet, last and grey",
+   sorted(_ids[:2]) == ["R002", "R005"] and _ids[2] == "R006" and SA["rows"][0]["a_day"] >= SA["rows"][1]["a_day"] > 0
+   and SA["rows"][2]["a_day"] == 0 and SA["rows"][2]["color"] == PIC.NO_LINES_FILL and SA["rows"][2]["a_day_text"] == "—",
+   str([(r["route_id"], r["a_day"], r["color"]) for r in SA["rows"]]))
+_r2 = next(r for r in SA["rows"] if r["route_id"] == "R002")
+_m2 = {}
+for _l in DT2["lines"]:
+    if _l["route_id"] == "R002":
+        _m2[_l["month"]] = _m2.get(_l["month"], 0) + _l["trips"]
+ok("...each route coloured by its OWN busiest month's two-way movements a day (R002: Nov 2026, not the Tip's October)",
+   _r2["busiest"] == 11 and abs(_r2["a_day"] - _m2[11] / WD) < 1e-9
+   and _r2["color"] == bulletin_doc.VOLUME_RAMP[bulletin_doc.volume_class(_r2["a_day"])], str(_r2))
+ok("...every supplier and site lettered, the busiest route's ends first, each with its name and position",
+   sorted(p["name"] for p in SA["places"]) == ["Pit West", "Tip South", "Yard East"]
+   and [p["letter"] for p in SA["places"]] == ["A", "B", "C"] and all(p["at"] and p["loc_id"] for p in SA["places"])
+   and all(r["letters"] for r in SA["rows"]), str(SA["places"]))
+ok("...the names go on the map and every place in the key; the legend gains the grey row; the words say so",
+   SA["pin_names"] is True and SA["panel_all_places"] is True
+   and SA["volume_legend"][-1] == {"label": PIC.NO_LINES_LABEL, "fill": PIC.NO_LINES_FILL}
+   and SA["map_legend_title"] == "Two-way movements a day, each route's busiest month"
+   and SA["filter_words"] == "3 routes to and from Tip South · every month of the plan · All teams · approved lines only · "
+                             "1 with no approved line yet", SA["filter_words"])
+ok("...and no grey row when every route has a line", not any(
+    g["label"] == PIC.NO_LINES_LABEL for g in PIC.regional_sheet(D1, D1["totals"]["peak_month"], _ACC, oldT)["volume_legend"]))
+rme.plan(SA, "regional", community=False)
+ok("the regional plan is fitted to every route, with no community places (the local plan carries them)",
+   SA["plan"]["view"] and SA["plan"]["fitted"] and SA["plan"]["community"] is None
+   and len(SA["plan"]["places"]) == 3, str(SA["plan"].get("scale_words")))
+_pdfA = export.build_route_map_pdf(SA)
+_txtA = " ".join(pdf_text(_pdfA, fallback="", raw=True).split())     # the order drawn; the panel's wraps joined
+_pdfO = export.build_route_map_pdf(rme.plan(dict(SA, pin_names=False, panel_all_places=False), "regional", community=False))
+_txtO = " ".join(pdf_text(_pdfO, fallback="", raw=True).split())
+ok("⭐ the PDF prints each place's name on the map beside its letter (a white-stroked copy under a filled one) AND "
+   "in the key: two copies more than the old plan (the words under the title name the site once on both)",
+   (not _txtA) or all(_txtA.count(nm) == _txtO.count(nm) + 2 and _txtO.count(nm) >= 1
+                      for nm in ("Pit West", "Tip South", "Yard East")),
+   str([(nm, _txtA.count(nm), _txtO.count(nm)) for nm in ("Pit West", "Tip South", "Yard East")]))
+ok("...with the grey legend row and the words under the title",
+   (not _txtA) or ("No approved lines yet" in _txtA and "3 routes to and from Tip South" in _txtA
+                   and "each route's busiest month" in _txtA), "")
+_calls = []
+_real_plan = rme.plan
+
+
+def _rec_plan(S, kind="regional", *a, **k):
+    _calls.append((kind, k.get("community", True)))
+    return _real_plan(S, kind, *a, **k)
+
+
+rme.plan = _rec_plan
+PLT = PIC.plans(DT2)
+rme.plan = _real_plan
+ok("⭐ plans(): the regional plan is the every-route sheet drawn without community places; the local and site plans "
+   "keep them", [c for c in _calls if c[0] == "regional"] == [("regional", False)]
+   and all(c[1] for c in _calls if c[0] != "regional") and PLT[0]["every_month"] is True
+   and PLT[0]["alt"] == f"Regional plan, {PLT[0]['scale']}: every route to and from Tip South, each coloured by its busiest month."
+   and not PL[1].get("every_month"), str(_calls) + " " + PLT[0]["alt"])
+ok("...the Word file captions it so (2.2), the local plan still by its month",
+   any(t.startswith("Regional plan · 1:") and t.endswith("every route to and from this site, each coloured by its busiest month.")
+       for t in P1)
+   and any(t.startswith("Local plan of Yard East · 1:2,") and "routes in use in " in t for t in P1), "")
+
+# =========================================================================== #
 #  5. The endpoint: alone; kept only when every plan had its basemap         #
 # =========================================================================== #
 _builds = [0]
