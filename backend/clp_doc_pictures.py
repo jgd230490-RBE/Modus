@@ -285,6 +285,84 @@ def _site_month(data, site_id):
     return min(sm, key=lambda m: (-sm[m], m)) if sm else None
 
 
+NO_LINES_FILL = "#9CA3AF"       # a route with no approved line yet, on the regional plan
+NO_LINES_LABEL = "No approved lines yet"
+
+
+def _sites_word(data):
+    names = list(data.get("site_names") or [])
+    return (", ".join(names[:-1]) + " and " + names[-1]) if len(names) > 1 else (names[0] if names else "the site")
+
+
+def regional_sheet(data, pm, acc, S):
+    """
+    2 Nov 2026 (John: "the regional map should have all inbound and outbound routes to that site, not forecasted, and
+    leave all supplier and site labels on"). The CLP's regional plan is EVERY stored lorry route with an end at one of
+    its sites — the routes with approved lines in any month of the plan, each coloured by its own busiest month's two-way
+    movements a day, and the routes with no approved line yet in grey — not only the routes in use in the busiest
+    month, which is what the export's month sheet gives. Every supplier and site is lettered AND named on the map
+    (`pin_names`) and every one is listed in the key (`panel_all_places`). `S` is the month sheet (the frame's tenant,
+    notice, legend and footer words); its rows, routes and places are replaced.
+    """
+    import bulletin_doc
+    import route_map_export as rme
+    wd = float(S.get("working_days") or data.get("working_days") or 22.0)
+    with_lines = [r for r in data["routes"] if r["routed"]]
+    no_lines = [r for r in (data.get("routes_no_lines") or []) if r.get("routed")]
+    ids = [r["route_id"] for r in with_lines] + [r["route_id"] for r in no_lines]
+    geo = bulletin_doc._geometries(ids)                  # the usual line of each route, no month
+    per_month = {}
+    for l in data["lines"]:
+        pm_r = per_month.setdefault(l["route_id"], {})
+        pm_r[l["month"]] = pm_r.get(l["month"], 0.0) + float(l["trips"])
+    n0 = bulletin_doc.n0
+    rows = []
+    for r in with_lines + no_lines:
+        rid = r["route_id"]
+        if rid not in geo:
+            continue
+        pm_r = per_month.get(rid) or {}
+        busiest = max(pm_r, key=lambda m: (pm_r[m], -m)) if pm_r else None
+        a_day = (pm_r[busiest] / wd) if busiest else 0.0
+        rows.append({"route_id": rid, "places": f"{r.get('from') or ''} → {r.get('to') or ''}".strip(" →"),
+                     "a_day": a_day, "a_day_text": n0(a_day) if busiest else "—",
+                     "loads_text": n0(pm_r[busiest]) if busiest else "—", "tonnes_text": "—", "busiest": busiest,
+                     "color": (bulletin_doc.VOLUME_RAMP[bulletin_doc.volume_class(a_day)] if busiest else NO_LINES_FILL),
+                     "from_id": r.get("from_id"), "to_id": r.get("to_id"), "from": r.get("from"), "to": r.get("to")})
+    rows.sort(key=lambda x: (-x["a_day"], x["route_id"]))
+    places, letter_of = [], {}
+    for x in rows:                                        # the busiest route's ends first, as the month sheet letters them
+        g = geo[x["route_id"]]
+        for name, loc_id, at, end in ((x["from"], g[1] or x["from_id"], g[0][0], "origin"),
+                                      (x["to"], g[2] or x["to_id"], g[0][-1], "dest")):
+            key = loc_id or name
+            if key and key not in letter_of:
+                letter_of[key] = bulletin_doc._letters(len(places))
+                places.append({"letter": letter_of[key], "name": name or "", "at": at, "end": end, "loc_id": loc_id})
+    for x in rows:
+        g = geo[x["route_id"]]
+        o, d = letter_of.get(g[1] or x["from_id"], ""), letter_of.get(g[2] or x["to_id"], "")
+        x["letters"] = f"{o} → {d}" if o and d else ""
+    S = dict(S)
+    S["rows"] = rows
+    S["map_routes"] = sorted(({"route_id": x["route_id"], "coords": geo[x["route_id"]][0], "a_day": x["a_day"],
+                               "color": x["color"]} for x in rows), key=lambda x: (x["a_day"], x["route_id"]))
+    S["places"] = places
+    S["map_sections"] = []
+    S["pin_names"] = True
+    S["panel_all_places"] = True
+    S["map_legend_title"] = "Two-way movements a day, each route's busiest month"
+    S["volume_legend"] = list(bulletin_doc.volume_legend()) + (
+        [{"label": NO_LINES_LABEL, "fill": NO_LINES_FILL}] if any(x["busiest"] is None for x in rows) else [])
+    n_r, n_grey = len(rows), sum(1 for x in rows if x["busiest"] is None)
+    S["filter_words"] = " · ".join([f"{n_r} route{'s' if n_r != 1 else ''} to and from {_sites_word(data)}",
+                                    "every month of the plan", S.get("team_words") or "All teams", "approved lines only"]
+                                   + ([f"{n_grey} with no approved line yet"] if n_grey else []))
+    S["title"] = f"Regional plan · {_sites_word(data)}"
+    S["empty"] = not rows
+    return S
+
+
 def plans(data, acc=None):
     """[{kind, name, scale, site, month, jpg, alt, note}] — the regional plan, then each site's local and site plans.
     Empty when no route of this CLP is drawn. acc: the caller's access (rolls up the whole scheme for planner / admin)."""
@@ -319,14 +397,16 @@ def plans(data, acc=None):
 
     out = []
     pm = data["totals"]["peak_month"]
-    S = sheet(pm)
+    S = regional_sheet(data, pm, acc, sheet(pm))
     if S["map_routes"]:
-        rme.plan(S, "regional")
+        # 2 Nov 2026 (John): no community places on the regional plan (the local plan carries them)
+        rme.plan(S, "regional", community=False)
         P = S["plan"]
         if P["view"]:
             out.append({"kind": "regional", "name": P["name"], "scale": P["scale_words"], "site": None, "month": pm,
-                        "jpg": draw(S, "regional", PLAN_STYLE["regional"]),
-                        "alt": f"{P['name']}, {P['scale_words']}: this plan's routes in {clp_doc.month_label(pm)}."})
+                        "every_month": True, "jpg": draw(S, "regional", PLAN_STYLE["regional"]),
+                        "alt": f"{P['name']}, {P['scale_words']}: every route to and from {_sites_word(data)}, each "
+                               f"coloured by its busiest month."})
     for s in data["sites"]:
         if s.get("lat") is None or s.get("lon") is None:
             continue

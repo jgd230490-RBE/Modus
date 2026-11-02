@@ -393,6 +393,20 @@ def gather(location_ids, factors=None, working_days=None, now=None, layers=True,
             "vehicles": [vlabel(v) for v, _k in sorted(e["veh"].items(), key=lambda kv: (-kv[1], kv[0]))],
             "materials": [m for m, _t in sorted(e["mat"].items(), key=lambda kv: -kv[1])],
             "first": min(e["months"]), "last": max(e["months"]), "trips": e["trips"], "tonnes": round(e["tonnes"], 1)})
+    # 2 Nov 2026 (John: the regional plan shows "all inbound and outbound routes to that site, not forecasted"): the
+    # routes with an end in the set and NO approved line yet (or none of this team's), so the regional plan can draw them
+    # too. Drawn only when a lorry route is stored for some vehicle; never counted in a figure.
+    import bulletin
+    geo_any = {rid for rid, _v in geo}
+    no_lines = []
+    for rid in sorted(touching):
+        r = touching[rid]
+        if rid in rl or (team and not bulletin._route_in_scope(r.get("ipt"), team)):
+            continue
+        no_lines.append({"route_id": rid,
+                         "from": (all_locs.get(r.get("origin_id")) or {}).get("name") or r.get("origin_id") or "",
+                         "to": (all_locs.get(r.get("dest_id")) or {}).get("name") or r.get("dest_id") or "",
+                         "from_id": r.get("origin_id"), "to_id": r.get("dest_id"), "routed": rid in geo_any})
 
     # ---- materials ------------------------------------------------------------------------------------------ #
     mats = {}
@@ -490,7 +504,7 @@ def gather(location_ids, factors=None, working_days=None, now=None, layers=True,
         "scheme": tenant.get("name") or "", "demo_notice": tenant.get("demo_notice") or None,
         "snapshot": when, "working_days": wd, "programme": st["programme"], "prefix": st["prefix"],
         "stages": stages, "lines": lines, "by_month": by_month, "totals": totals, "routes": route_rows,
-        "materials": materials, "sites": sites, "hourly": hourly, "peak_bands": peak_bands,
+        "routes_no_lines": no_lines, "materials": materials, "sites": sites, "hourly": hourly, "peak_bands": peak_bands,
         "peak_band_words": gate_hours.peak_words(peak_bands), "measures": measures, "other_ends": other_ends,
         "unit": unit, "layers": None,
     }
@@ -917,8 +931,10 @@ def build(data, impact="higher", pictures=True, acc=None, appendices=True):
             "ratio, once the picture is resized to fit the page.")
         for pp in plan_pics:
             where = f" of {pp['site']}" if pp["site"] else ""
-            D.picture(pp["jpg"], 17.0, pp["alt"], f"{pp['name']}{where} · {pp['scale']} · routes in use in "
-                                                   f"{month_label(pp['month'])}.")
+            # 2 Nov 2026 (John): the regional plan is every route to and from the site, whatever month
+            tail = (f"every route to and from {sites_word}, each coloured by its busiest month." if pp.get("every_month")
+                    else f"routes in use in {month_label(pp['month'])}.")
+            D.picture(pp["jpg"], 17.0, pp["alt"], f"{pp['name']}{where} · {pp['scale']} · {tail}")
     else:
         D.todo("a regional plan (1:15,000 or smaller), a local plan (1:2,000 to 1:3,000) and a site plan (1:500 to 1:1,000) "
                "with the routes, the gates and the places that need care.", "2.2")
