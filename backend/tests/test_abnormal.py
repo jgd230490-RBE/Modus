@@ -868,6 +868,15 @@ ok("⭐ SUMMARY (the Dashboard's strip): loads in the next 4 weeks (all three, 1
    "apply for (the beams, apply by 1 Feb), limits exceeded (none), the counted-apart words",
    _sm["today"] == "2027-03-20" and _sm["weeks_ahead"] == 4 and _sm["ahead"] == 3 and _sm["planned"] == 3
    and _sm["to_apply"] == 1 and _sm["notices_due"] == 0 and _sm["road_limit"] == 0 and "Counted apart" in _sm["words"], str(_sm))
+# 2 Nov 2026 (the Dashboard's Sites filter): `sites` keeps the loads that start or end at a picked location
+_ends = {x for m in A.page(PLANNER, today="2027-03-20")["movements"] for x in (m.get("origin_id"), m.get("dest_id")) if x}
+_one = sorted(_ends)[0] if _ends else "none"
+_sx = A.summary(PLANNER, today="2027-03-20", sites=[_one])
+ok("⭐ SUMMARY with sites: a picked end keeps the loads that start or end there; an unknown place keeps none; no sites keeps all three",
+   _ends and 1 <= _sx["planned"] <= 3 and A.summary(PLANNER, today="2027-03-20", sites=["NOWHERE"])["planned"] == 0
+   and A.summary(PLANNER, today="2027-03-20", sites=[])["planned"] == 3 and A.summary(PLANNER, today="2027-03-20", sites=sorted(_ends))["planned"] == 3, str(_sx))
+ok("SUMMARY with sites: the endpoint takes ?sites= (comma separated) and hands the ids on",
+   'def abnormal_summary(sites: Optional[str] = None):' in open(os.path.join(os.path.dirname(__file__), "..", "main.py"), encoding="utf-8").read() and "abnormal.summary(acc, sites=ids)" in open(os.path.join(os.path.dirname(__file__), "..", "main.py"), encoding="utf-8").read())
 ok("SUMMARY: on Wed 7 Apr 2027 the beams' notice (by 6 Apr, calendar days) is late; the units' (police 2 STGO days: by Wed 7 Apr) and the "
    "crane's (authorities 2 days: by Wed 7 Apr) are due that day: 3 due or late, 1 late",
    A.summary(PLANNER, today="2027-04-07")["notices_due"] == 3 and A.summary(PLANNER, today="2027-04-07")["notices_late"] == 1)
@@ -1044,7 +1053,7 @@ ok("CALENDAR: the permission words per row — the beams a Special Order (BE16),
    next(r for r in _C["rows"] if r["id"] == _b["id"])["permission"].startswith("Special Order (BE16)") and _u_row["permission"] == "none beyond the notices")
 _main3 = read("backend/main.py")
 ok("ENDPOINTS: GET /api/abnormal/summary (any sign-in) and PUT /api/abnormal/{id}/pinch (an approver), the summary before the {movement_id} read",
-   re.search(r'@app\.get\("/api/abnormal/summary"\)\ndef \w+\(\):\n(?:\s+""".*?"""\n)?\s+acc = _require_access\(\)', _main3, re.S)
+   re.search(r'@app\.get\("/api/abnormal/summary"\)\ndef \w+\((?:sites: Optional\[str\] = None)?\):\n(?:\s+""".*?"""\n)?\s+acc = _require_access\(\)', _main3, re.S)
    and re.search(r'@app\.put\("/api/abnormal/\{movement_id\}/pinch"\)\ndef \w+\(movement_id: str, body: PinchIn\):\n(?:\s+""".*?"""\n)?\s+acc = _require_approver\(\)', _main3, re.S)
    and _main3.index('"/api/abnormal/summary"') < _main3.index('@app.get("/api/abnormal/{movement_id}")'))
 ok("ENDPOINTS (phase 3): POST /api/abnormal/{id}/structures (an approver, no HERE call) and GET /api/public/abnormal — behind the map gate, the approved-or-later movements through the staff view, the public words only",

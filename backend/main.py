@@ -3660,11 +3660,13 @@ def abnormal_calendar_pdf():
 
 
 @app.get("/api/abnormal/summary")
-def abnormal_summary():
+def abnormal_summary(sites: Optional[str] = None):
     """The Dashboard's strip (phase 2): loads in the next 4 weeks, notices due or late this week, permissions still to
-    apply for, limits exceeded — the caller's own movements (a team code its team's). Counted apart from the lorries."""
+    apply for, limits exceeded — the caller's own movements (a team code its team's). Counted apart from the lorries.
+    2 Nov 2026: `sites` = location ids, comma separated; only loads that start or end at one of them."""
     acc = _require_access()
-    return abnormal.summary(acc)
+    ids = [x.strip() for x in (sites or "").split(",") if x.strip()][:60]
+    return abnormal.summary(acc, sites=ids)
 
 
 class PinchIn(BaseModel):
