@@ -377,8 +377,16 @@ ok("...the cycle the model used is the line's own (context.cycle_min)", c1["fair
    and abs(c1["fair"]["time_eur"] - round(c1["cycle_min"] / 60.0 * (20.0 + 16.0), 2)) < 0.011)
 # NARROWED 11 Oct 2026 (EU vehicles removed): R2 runs on the Artic Tipper (44t), 29 t (was V12, 26 t, whose laden
 # figure was exactly the ICCT 34.0): laden = empty 23.6 + 0.4 × 29 = 35.2
-ok("R2 (artic, 29 t) prices as an artic", L["WS2"]["context"]["vehicle_class"] == "artic"
-   and abs(L["WS2"]["context"]["fair"]["l_per_100km_laden"] - 35.2) < 1e-9)
+# NARROWED 2 Nov 2026: the line's month is the commit week's calendar month (today's), so from November to March the
+# laden figure carries the seed's winter uplift (+8 %: 35.2 × 1.08 = 38.0) and the WINTER flag — the check held only
+# from April to October (CI went red on Mon 2 Nov 2026, the first commit week in November). The flag and the figure
+# must agree; the un-uplifted figure is still asserted, through the uplift the model itself reports.
+_f2 = L["WS2"]["context"]["fair"]
+_up2 = (1.0 + float((P.get("season") or {}).get("winter_consumption_uplift_pct") or 0) / 100.0) if "WINTER" in _f2["flags"] else 1.0
+ok("R2 (artic, 29 t) prices as an artic (35.2 l/100 km laden, × the winter uplift in a winter month)",
+   L["WS2"]["context"]["vehicle_class"] == "artic" and abs(_f2["l_per_100km_laden"] - round(35.2 * _up2, 1)) < 1e-9
+   and (("WINTER" in _f2["flags"]) == fairprice.is_winter(_f2["month"], P)),
+   str((_f2["l_per_100km_laden"], _f2["flags"], _f2["month"])))
 ok("🔴 R3 (unbaked) has NO fair price — no distance, nothing invented", L["WS3"]["context"]["fair"] is None
    and all(d["derived"]["fair_eur"] is None for d in L["WS3"]["days"]) and L["WS3"]["week_derived"]["fair_eur"] is None)
 ok("week and totals sum the fair figure over the lines that have one: 2 of 3",
