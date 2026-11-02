@@ -475,6 +475,16 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .chart-box{position:relative;width:100%;min-width:0;height:clamp(200px,28vh,420px);}
   .chart-box.is-lg{height:clamp(220px,32vh,480px);}
   .chart-box>canvas{display:block;}
+  /* 2 Nov 2026: Copy and Download on every chart - 30 px, always visible, sitting on the title row above the chart; not on the big screen or a phone */
+  .chart-tools{position:absolute;top:-36px;right:0;display:flex;gap:4px;z-index:3;}
+  .chart-tools.is-inline{position:static;}
+  .chart-tool{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--muted);font-size:16px;line-height:1;cursor:pointer;}
+  .chart-tool:hover{color:var(--ink);border-color:var(--muted);}
+  .chart-tool-copy::before{content:"\29C9";} .chart-tool-dl::before{content:"\2193";}
+  .chart-card:has(.chart-tools) .chart-title, .ga-strip:has(.chart-tools) .ga-head, .clp-card:has(.chart-tools) .clp-sub{padding-right:72px;}
+  .dash-wall .chart-tools, .sim-wall .chart-tools{display:none;}
+  @media (max-width:767px){ .chart-tools{display:none;} }
+  .ws-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:200;max-width:min(560px,92vw);padding:10px 16px;border-radius:8px;background:var(--popover-bg);color:var(--popover-fg);font-size:14px;box-shadow:0 10px 28px rgba(0,0,0,.28);}
   .fig-val{font-size:clamp(1.1rem,1.45vw,1.7rem);}   /* a KPI figure: nowrap, never truncated, sized by clamp() */
   .chart-card{display:flex;flex-direction:column;min-width:0;}
   .chart-card>.chart-box{flex:1 1 auto;}
@@ -552,6 +562,14 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   @media (prefers-reduced-motion:reduce){.dash-rot>i{animation:none;width:100%;opacity:.35;}}
   .wall-charts{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);}
   @media (min-width:1024px){.wall-charts{grid-template-columns:repeat(2,minmax(0,1fr));}}   /* 14 Oct: four charts a section, 2 × 2 */
+  .sites-list{min-width:260px;max-height:min(420px,70vh);overflow:auto;white-space:normal;}
+  .sites-head{font-size:12px;color:var(--popover-muted);padding:6px 10px 4px;}
+  .sites-type{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--popover-muted);padding:8px 10px 2px;}
+  .sites-opt{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:14px;border-radius:6px;cursor:pointer;}
+  .sites-opt:hover{background:rgba(255,255,255,.06);} .sites-opt input{width:16px;height:16px;flex:none;}
+  .sites-empty{font-size:13px;padding:6px 10px;color:var(--popover-muted);}
+  .sites-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;bottom:-6px;background:var(--popover-bg);border-top:1px solid var(--popover-line);margin-top:6px;padding:8px 10px 2px;font-size:12px;color:var(--popover-muted);}
+  .sites-list .sites-clear{display:inline-block;width:auto;padding:4px 10px;font-size:13px;}
   .dash-filters label{display:block;padding:6px 10px;}
   .dash-filters label span{display:block;font-size:12px;color:var(--popover-muted);margin-bottom:4px;}
   /* 12 Oct 2026 (C4): the Monthly bulletin menu on the Dashboard — the 14 px floor for its words */
@@ -611,6 +629,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-main>.sim-map-wrap{align-self:stretch;}   /* the map takes its column's width (a flex column would shrink it to nothing) */
   /* 1024–1279 px: the narrower column wraps the lines above the map, so the map gives back 40 px to keep the queues on screen */
   @media (min-width:1024px) and (max-width:1279px){.sim-main .sim-map{height:62vh;}}
+  .sim-tl-top{display:flex;align-items:center;justify-content:space-between;gap:8px;} .sim-tl-top .sim-tl-head{flex:1 1 auto;min-width:0;}
   .sim-tl-head{font-size:13px;color:var(--muted);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .sim-tl-head b{color:var(--ink);font-weight:600;}
   .sim-fold{margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:0 12px;background:var(--surface);}
@@ -1707,14 +1726,161 @@ function fitChartConfig(config, vw){
   }
   return { ...config, options: o };
 }
+// ---- 2 Nov 2026: Copy and Download on every chart ------------------------------------------------------------------
+// One pair of 30 px buttons at the top right of each chart (ChartTools, drawn by ChartCanvas and by the Simulation's timeline).
+// Copy puts a PNG on the clipboard; Download saves the same PNG. The picture is made in the browser at twice the screen's
+// pixels on a WHITE ground whatever the look (the chart is drawn again off screen with dark text), with the chart's title above
+// and ONE scope line below (the scheme, what the page was showing, "Wayscope, <date>", the demo notice) so a pasted chart never
+// loses its scope. Firefox cannot write an image to the clipboard by default: Copy then saves the file and says "Saved instead".
+const CHART_PNG_SCALE = 2;
+const CHART_INK = "#1F2937", CHART_MUTED = "#475569", CHART_GRID = "rgba(100,116,139,.22)";
+const localIsoDate = (d) => { const x = d || new Date(); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
+// the page's own parts (months, status, sites or team) go first; the scheme leads, the brand and the demo notice close
+function chartScopeLine(parts){
+  const out = [];
+  if(TENANT.name && TENANT.name !== "Wayscope") out.push(TENANT.name);
+  (parts || []).filter(Boolean).forEach(x => out.push(x));
+  out.push(`Wayscope, ${longDate(localIsoDate())}`);
+  if(TENANT.demo_notice) out.push(`DEMO · ${TENANT.demo_notice}`);
+  return out.join(" · ");
+}
+function chartTitleOf(el){
+  const card = el && el.closest && el.closest(".chart-card");
+  const t = card && card.querySelector(".chart-title");
+  if(!t) return "";
+  const c = t.cloneNode(true);
+  c.querySelectorAll("button,[aria-hidden='true']").forEach(n => n.remove());
+  return c.textContent.replace(/\s+/g, " ").trim();
+}
+function chartToast(text){
+  try {
+    document.querySelectorAll(".ws-toast").forEach(n => n.remove());
+    const el = document.createElement("div");
+    el.className = "ws-toast"; el.setAttribute("role", "status"); el.textContent = text;
+    document.body.appendChild(el);
+    setTimeout(() => { try { el.remove(); } catch(e){} }, 4500);
+  } catch(e){}
+}
+const chartFileName = (title) => (String(title || "chart").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "chart") + "-" + localIsoDate() + ".png";
+function chartSaveBlob(blob, name){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+// the chart drawn again off screen, in a laid-out box of the same size, light text, no animation, twice the pixels
+function drawChartLight(config, w, h){
+  const C = window.Chart;
+  if(!C || !(w > 0 && h > 0)) return Promise.reject(new Error("no chart"));
+  const host = document.createElement("div");
+  host.style.cssText = `position:fixed;left:-10000px;top:0;width:${w}px;height:${h}px;pointer-events:none;`;
+  const cv = document.createElement("canvas");
+  host.appendChild(cv); document.body.appendChild(host);
+  const prev = { color: C.defaults.color, borderColor: C.defaults.borderColor };
+  let ch = null;
+  try {
+    C.defaults.color = CHART_MUTED; C.defaults.borderColor = CHART_GRID;
+    const cfg = fitChartConfig(config, (typeof window !== "undefined" && window.innerWidth) || 1280);
+    ch = new C(cv, { ...cfg, options: { ...(cfg.options || {}), responsive: true, maintainAspectRatio: false, animation: false, devicePixelRatio: CHART_PNG_SCALE, events: [] } });
+    ch.update("none");
+    const out = document.createElement("canvas");
+    out.width = cv.width; out.height = cv.height;
+    out.getContext("2d").drawImage(cv, 0, 0);
+    return Promise.resolve(out);
+  } catch(e){ return Promise.reject(e); }
+  finally {
+    C.defaults.color = prev.color; C.defaults.borderColor = prev.borderColor;
+    try { if(ch) ch.destroy(); } catch(e){}
+    host.remove();
+  }
+}
+// an SVG on screen (the Simulation's timeline) drawn to a canvas: its CSS classes are copied in as inline styles first
+function drawSvgPlain(svg){
+  const rect = svg.getBoundingClientRect();
+  const w = Math.round(rect.width), h = Math.round(rect.height);
+  if(!(w > 0 && h > 0)) return Promise.reject(new Error("no chart"));
+  const clone = svg.cloneNode(true);
+  const keep = ["fill", "stroke", "stroke-width", "stroke-dasharray", "opacity", "fill-opacity", "stroke-opacity", "font-size", "font-family", "font-weight", "text-anchor", "dominant-baseline", "visibility"];
+  const src = [svg, ...svg.querySelectorAll("*")], dst = [clone, ...clone.querySelectorAll("*")];
+  src.forEach((n, i) => { const cs = getComputedStyle(n), d = dst[i]; if(d && d.style) keep.forEach(k => { const v = cs.getPropertyValue(k); if(v) d.style.setProperty(k, v); }); });
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute("width", String(w)); clone.setAttribute("height", String(h));
+  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: "image/svg+xml;charset=utf-8" }));
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const out = document.createElement("canvas");
+      out.width = w * CHART_PNG_SCALE; out.height = h * CHART_PNG_SCALE;
+      const x = out.getContext("2d"); x.fillStyle = "#FFFFFF"; x.fillRect(0, 0, out.width, out.height);
+      x.drawImage(img, 0, 0, out.width, out.height);
+      URL.revokeObjectURL(url); resolve({ canvas: out, w, h });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("no picture")); };
+    img.src = url;
+  });
+}
+function chartWrapText(ctx, text, maxW){
+  const words = String(text).split(" "), lines = [];
+  let line = "";
+  words.forEach(w => { const t = line ? line + " " + w : w; if(line && ctx.measureText(t).width > maxW){ lines.push(line); line = w; } else line = t; });
+  if(line) lines.push(line);
+  return lines;
+}
+// title above, the plot, ONE scope line below (wrapped when the chart is narrow), on white, at twice the pixels
+function composeChartPng(plot, title, scope){
+  const S = CHART_PNG_SCALE, pad = 16, font = "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif";
+  const W = Math.max(plot.w, 420) + pad * 2, inner = W - pad * 2;
+  const m = document.createElement("canvas").getContext("2d");
+  m.font = `600 16px ${font}`; const tl = chartWrapText(m, title, inner);
+  m.font = `12px ${font}`; const sl = chartWrapText(m, scope, inner);
+  const tH = tl.length * 21, sH = sl.length * 16;
+  const H = pad + tH + 8 + plot.h + 10 + sH + pad;
+  const out = document.createElement("canvas");
+  out.width = W * S; out.height = H * S;
+  const x = out.getContext("2d");
+  x.scale(S, S); x.fillStyle = "#FFFFFF"; x.fillRect(0, 0, W, H);
+  x.textBaseline = "top"; x.fillStyle = CHART_INK; x.font = `600 16px ${font}`;
+  tl.forEach((t, i) => x.fillText(t, pad, pad + i * 21));
+  const left = pad + Math.max(0, (inner - plot.w) / 2);
+  x.drawImage(plot.canvas, left, pad + tH + 8, plot.w, plot.h);
+  x.fillStyle = CHART_MUTED; x.font = `12px ${font}`;
+  sl.forEach((t, i) => x.fillText(t, pad, pad + tH + 8 + plot.h + 10 + i * 16));
+  return new Promise((resolve, reject) => out.toBlob(b => b ? resolve(b) : reject(new Error("no picture")), "image/png"));
+}
+// getPlot: async () => ({ canvas, w, h }) - the chart as drawn light; title; scope: the page's own parts (an array of words)
+function ChartTools({ title, scope, getPlot, inline }){
+  const t = title || "Chart";
+  const make = async () => composeChartPng(await getPlot(), t, chartScopeLine(scope));
+  const word = (scope || []).filter(Boolean);
+  const say = (lead) => `${lead}: ${t}${word.length ? " · " + word.join(" · ") : ""}`;
+  const download = async (lead) => {
+    try { chartSaveBlob(await make(), chartFileName(t)); chartToast(say(lead)); }
+    catch(e){ console.warn("Wayscope: chart picture", e); chartToast("Couldn't make the picture of this chart."); }
+  };
+  const copy = async () => {
+    const canCopy = typeof ClipboardItem !== "undefined" && typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.write;
+    if(canCopy){
+      try { await navigator.clipboard.write([new ClipboardItem({ "image/png": make() })]); chartToast(say("Copied")); return; }
+      catch(e){ console.warn("Wayscope: chart copy", e); }
+    }
+    await download("Saved instead");
+  };
+  return (
+    <div className={"chart-tools" + (inline ? " is-inline" : "")} data-chart-tools="1">
+      <button type="button" className="chart-tool chart-tool-copy" aria-label={`Copy chart: ${t}`} title="Copy the chart as a picture" onClick={copy}></button>
+      <button type="button" className="chart-tool chart-tool-dl" aria-label={`Download chart: ${t}`} title="Save the chart as a PNG" onClick={() => download("Saved")}></button>
+    </div>
+  );
+}
 // Chart.js wrapper — recreates the chart when its serialised config, the look or the accent changes.
 // 13 Oct 2026 (W5): the box is `position:relative` and sized by CSS (.chart-box; `size="lg"` for the taller pair).
 // A chart is BUILT only once its box has a size, so a chart in a collapsed section (or a hidden big-screen
 // section) is built the first time it is opened, not at 0 × 0 while hidden. A ResizeObserver on the box resizes it
 // (and moves the legend when the screen crosses 768 / 1024 px); the two window `resize` dispatches that used to
 // nudge Chart.js are gone. `height` is kept for the stockpile chart, whose height follows its row count.
-function ChartCanvas({ config, height, size }){
+function ChartCanvas({ config, height, size, title, scope, notools }){
   const box = useRef(null);
+  const [autoTitle, setAutoTitle] = useState("");
   const ref = useRef(null);
   const inst = useRef(null);
   const [theme] = useTheme();          // 5 Oct 2026: axes, grid and legend follow the look
@@ -1722,6 +1888,8 @@ function ChartCanvas({ config, height, size }){
   const [sized, setSized] = useState(false);
   const cfgRef = useRef(config); cfgRef.current = config;
   const vwNow = () => (typeof window !== "undefined" && window.innerWidth) || 1280;
+  useEffect(() => { if(!title && box.current) setAutoTitle(chartTitleOf(box.current)); }, [title]);
+  const getPlot = () => { const el = box.current; return drawChartLight(cfgRef.current, el ? el.clientWidth : 0, el ? el.clientHeight : 0).then(canvas => ({ canvas, w: el.clientWidth, h: el.clientHeight })); };
   useEffect(() => {
     const el = box.current;
     if(!el) return;
@@ -1749,7 +1917,7 @@ function ChartCanvas({ config, height, size }){
     inst.current = new window.Chart(ref.current, fitChartConfig(config, vwNow()));
     return () => { if(inst.current){ inst.current.destroy(); inst.current = null; } };
   }, [JSON.stringify(config), theme, accent, sized]);
-  return <div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>;
+  return <div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} />}</div>;
 }
 
 // ================================================================= Dashboard
@@ -1909,7 +2077,7 @@ const gaBusyWords = (b) => {
   return `${b.lorries} lorr${b.lorries === 1 ? "y" : "ies"} arriving in the busiest clock hour (${when}) of an average working day. `
     + (b.per_hour == null ? "No check-in time typed, so nothing is compared." : `The gate can check in ${gaN1(b.per_hour)} an hour.`);
 };
-function GateArrivalsPanel({ ga, err, month, months, onMonth }){
+function GateArrivalsPanel({ ga, err, month, months, onMonth, sited }){
   const [gaOpen, gaToggle] = useRowOpen("gates");
   if(!ga) return err
     ? <div className="ct-strip ga-strip" data-gate-arrivals="error" data-guide="dash-gates"><span className="ct-line">The gate arrivals did not load.</span></div>
@@ -1976,14 +2144,14 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth }){
         </select></label>
       </div>
       <div className="ct-line">{ga.label}: lorries a day at each gate, all {TEAMS().toLowerCase()} together, {GA_SPREAD} across each gate's open hours{anyDefault ? ` (${ga.default_hours}, the default, where none are typed)` : ""}.</div>
-      {state === "none" && <EmptyState kind="none" title={`No approved lines in ${ga.label}`} body="Pick another month. Pending lines appear as a note until they are approved, then in the figures." />}
+      {state === "none" && <EmptyState kind="none" title={sited ? `No gates at these sites in ${ga.label}` : `No approved lines in ${ga.label}`} body={sited ? "Pick another month or more sites." : "Pick another month. Pending lines appear as a note until they are approved, then in the figures."} />}
       {state === "set" && rowsC.length > 0 && (
         <div className="ga-chart" data-ga-chart="1">
           <div className="ga-head">
             <span className="ga-head-v" style={nOverG ? { color: "var(--red)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}</span>
             <span className="ga-key" aria-hidden="true"><i className="ga-key-bar"></i>planned arrivals a day <i className="ga-key-track"></i><i className="ga-key-cap"></i>capacity: the open hours ÷ the check-in time a lorry <i className="ga-key-gold"></i>{GA_NEAR} % or more: queue likely <i className="ga-key-red"></i>more than it can check in <i className="ga-key-none"></i>no check-in time typed</span>
           </div>
-          <ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />
+          <ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} title="Gate arrivals: lorries a day at each gate" scope={[ga.label, sited || null]} />
         </div>
       )}
       {state === "set" && (
@@ -2141,7 +2309,7 @@ function ctFig(ct, err){
 }
 
 // The Dashboard's strip under the six cards. Nothing while the read is on its way.
-function CarbonTargetStrip({ ct, err, onOpen }){
+function CarbonTargetStrip({ ct, err, onOpen, scheme }){
   if(!ct) return err ? <div className="ct-strip" data-carbon-target="error"><span className="ct-line">The carbon target did not load.</span></div> : null;
   if(!ctOk(ct)) return (
     <div className="ct-strip ct-row" data-carbon-target="none">
@@ -2153,7 +2321,7 @@ function CarbonTargetStrip({ ct, err, onOpen }){
   const words = t.lever_words || [];
   return (
     <section className="ct-strip" data-carbon-target="set" aria-label="Carbon target">
-      <div className="ct-row"><h3 className="ct-h">Carbon target<InfoTip id="dash.target" /></h3>{by && <span className="ct-note" style={{ marginTop: 0 }}>{by}</span>}
+      <div className="ct-row"><h3 className="ct-h">Carbon target{scheme ? " · scheme-wide" : ""}<InfoTip id="dash.target" /></h3>{by && <span className="ct-note" style={{ marginTop: 0 }}>{by}</span>}
         {onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}</div>
       <div className="ct-line"><b>{ctTargetLine(ct)}</b></div>
       <div className="ct-line">{p1}</div>
@@ -2190,7 +2358,7 @@ function CarbonTargetLine({ ct, err, pendingN }){
   );
 }
 
-function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, onWall, onOpen, phone }){
+function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone }){
   const { materials, vehicles, units, months, factors } = meta;
   const [data, setData] = useState(initialData || null);
   const [week, setWeek] = useState(initialWeek || null);
@@ -2212,6 +2380,26 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const [sortKey, setSortKey] = useState("t");
   const [sortDir, setSortDir] = useState("desc");
   const [lineKey, setLineKey] = useState(null);      // a clicked route row narrows the charts and figures
+  // 2 Nov 2026: the Sites filter. A forecast line counts when its route starts OR ends at a picked location (the CLP's rule).
+  // The pick lives in the address ("#dashboard?sites=L019,L004") so a bookmark or a pinned big-screen display keeps it.
+  const [sites, setSitesState] = useState(() => sitesFromHash());
+  const setSites = (ids) => { setSitesState(ids); writeSitesToHash(ids); };
+  const [locList, setLocList] = useState(initialLocations || null);   // every location: { id, name, loc_type }
+  useEffect(() => {
+    if(initialLocations) return;
+    let live = true;
+    fetch(`${API}/locations/geojson`).then(okJSON).then(j => {
+      if(live) setLocList(((j && j.features) || []).map(f => f.properties || {}).filter(p => p.id));
+    }).catch(() => { if(live) setLocList([]); });
+    return () => { live = false; };
+  }, []);
+  // a place in the address that is not a location here (a typo, or one since deleted) is dropped once the list is read
+  useEffect(() => {
+    if(!locList || !locList.length || !sites.length) return;
+    const known = new Set(locList.map(l => l.id));
+    const kept = sites.filter(x => known.has(x));
+    if(kept.length !== sites.length) setSites(kept);
+  }, [locList]);
   const [unitSel, setUnitSel] = useUnits("dashboard");    // 13 Oct 2026 (W6): the route table's Loads | Tonnes | Lorries
   const [rowOpen, rowToggle] = useRowOpen("dashboard");
   const [wall, setWall] = useState(false);           // big-screen mode
@@ -2367,6 +2555,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       (vehicle === "All" || r.vehicle_type === vehicle) &&
       (ipt === "All" || (ipt === "none" ? !r.ipt : r.ipt === ipt)) &&
       (discipline === "All" || r.discipline === discipline) &&
+      (!sites.length || sites.includes(r.origin_id) || sites.includes(r.dest_id)) &&
       r.month_index >= lo && r.month_index <= hi
     );
     // the route table always shows every filtered line; the charts and figures narrow
@@ -2443,7 +2632,18 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       lines: narrowed.length, baked: T.baked, unbakedRoutes: routeRows.filter(r => !r.baked).length,
       empty: filtered.length === 0,
     };
-  }, [data, status, material, vehicle, ipt, discipline, fromM, toM, unit, factors, months, lineKey]);
+  }, [data, status, material, vehicle, ipt, discipline, fromM, toM, unit, factors, months, lineKey, sites.join(",")]);
+
+  // 2 Nov 2026: with sites picked, the Look-ahead's week, last week's account, the gates and the Simulation line follow the same
+  // cut. The week and the account carry no ends of their own, so they are cut by ROUTE: the routes whose lines start or end at a pick.
+  const siteRoutes = useMemo(() => {
+    if(!sites.length) return null;
+    const out = new Set();
+    rows.forEach(r => { if(sites.includes(r.origin_id) || sites.includes(r.dest_id)) out.add(r.route_id); });
+    return out;
+  }, [rows, sites.join(",")]);
+  const weekShown = useMemo(() => cutWeekBySites(week, siteRoutes), [week, siteRoutes]);
+  const gaShown = useMemo(() => cutGatesBySites(ga, sites), [ga, sites.join(",")]);
 
   if(err) return <div className="p-8 text-center text-slate-500">Couldn't load the forecast figures.</div>;
   if(!data || !D) return <div className="p-8 text-center text-slate-400">Loading dashboard…</div>;
@@ -2534,6 +2734,10 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     </div>
   );
   const rangeLabel = D.lo === D.hi ? D.labels[0] : (monthLabelAbs(D.lo, months.start_year) + " – " + monthLabelAbs(D.hi, months.start_year));
+  // 2 Nov 2026: what a copied chart says about itself, under the picture
+  const dashScope = [rangeLabel, status === "All" ? "all forecasts" : status.toLowerCase() + " lines",
+    ipt !== "All" ? (ipt === "none" ? "no " + TEAM().toLowerCase() : teamText(ipt)) : null, discipline !== "All" ? discipline : null,
+    sites.length ? sitesWords(sites, locList) : null, selected ? selected.route_id + (selected.discipline ? " · " + selected.discipline : "") : null];
   const scopeNote = `${status === "All" ? "all forecasts" : status.toLowerCase() + " only"}${ipt !== "All" ? " · " + (ipt === "none" ? "no " + TEAM().toLowerCase() : teamText(ipt)) : ""}${discipline !== "All" ? " · " + discipline : ""}${selected ? " · " + selected.route_id + (selected.discipline ? " · " + selected.discipline : "") : ""}`;
   const plannedVsFair = (K.planned && K.fair && K.fair.eur > 0 && K.plannedN === K.fairN) ? (K.planned.eur - K.fair.eur) * 100 / K.fair.eur : null;
   const hhmm = (d) => d ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "";
@@ -2545,8 +2749,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const wdPerMonth = +(((factors || {}).planning || {}).working_days_per_month || 22);
   const nMonths = Math.max(1, D.hi - D.lo + 1);
   const loadsPerDay = K.totTrips / (nMonths * wdPerMonth);
-  const wkTot = (week && week.commit && week.commit.totals) || null;
-  const acct = (week && week.account) || null;
+  const wkTot = (weekShown && weekShown.commit && weekShown.commit.totals) || null;
+  const acct = (weekShown && weekShown.account) || null;
   const Card = ({ label, value, sub, info, tone }) => (
     <div className="card dash-card min-w-0">
       <div className="dash-card-l">{label}{info && <InfoTip id={info.id} label={label} value={info.value} />}</div>
@@ -2561,11 +2765,12 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     unit !== "t" && { k: "unit", label: `Unit: ${unitLabel}` },
     material !== "All" && { k: "material", label: `Material: ${material}` },
     vehicle !== "All" && { k: "vehicle", label: `Vehicle: ${vehLabel(vehicle)}` },
+    sites.length > 0 && { k: "sites", label: `Sites: ${sitesWords(sites, locList)}` },
     selected && { k: "line", label: `${selected.route_id}${selected.discipline ? " · " + selected.discipline : ""} only` },
   ].filter(Boolean);
-  const clearOne = (k) => ({ status: () => setStatus("Approved"), ipt: () => setIpt("All"), discipline: () => setDiscipline("All"), unit: () => setUnit("t"),
+  const clearOne = (k) => ({ sites: () => setSites([]), status: () => setStatus("Approved"), ipt: () => setIpt("All"), discipline: () => setDiscipline("All"), unit: () => setUnit("t"),
                              material: () => setMaterial("All"), vehicle: () => setVehicle("All"), line: () => setLineKey(null) })[k]();
-  const clearAll = () => { setStatus("Approved"); setIpt("All"); setDiscipline("All"); setUnit("t"); setMaterial("All"); setVehicle("All"); setLineKey(null); };
+  const clearAll = () => { setSites([]); setStatus("Approved"); setIpt("All"); setDiscipline("All"); setUnit("t"); setMaterial("All"); setVehicle("All"); setLineKey(null); };
 
   return (
     // 13 Oct 2026 (W5): the working view is up to 1680 px wide (it was 1280, max-w-7xl), so a 1920 px screen uses its
@@ -2575,7 +2780,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           chips under the header (the old subtitle repeated both) */}
       {/* 14 Oct 2026: on a filled big screen the page header folds into the big-screen bar (range, updated, clock,
           Exit), so a 1366 × 768 TV keeps its height for the figures */}
-      {!fill && <PageHeader title="Dashboard" kicker={`${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}`}
+      {!fill && <PageHeader title="Dashboard" kicker={`${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}${sites.length ? ` · ${sites.length} site${sites.length === 1 ? "" : "s"}` : ""}`}
         actions={<div className="flex flex-wrap gap-2 items-center">
           {!wall && <>
             <select className={sel + " dash-sel"} value={fromM} onChange={e => setFromM(+e.target.value)} aria-label="From month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
@@ -2591,6 +2796,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                   title="Show every month of the programme">Whole programme</button>}
             <select className={sel} value={ipt} onChange={e => setIpt(e.target.value)} title={TEAM()} aria-label={TEAM()}><option value="All">All {TEAMS()}</option>{ipts.map(i => <option key={i} value={i}>{teamText(i)}</option>)}{rows.some(r => !r.ipt) && <option value="none">No {TEAM().toLowerCase()} set</option>}</select>
             <select className={sel} value={status} onChange={e => setStatus(e.target.value)} aria-label="Status">{["Approved", "Pending", "All"].map(s => <option key={s}>{s}</option>)}</select>
+            <SitesMenu locList={locList} sites={sites} onChange={setSites} />
             <details className="row-menu">
               <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }}>More filters ▾</summary>
               <div className="row-menu-list dash-filters">
@@ -2649,7 +2855,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
             {Array.from({ length: (months && months.count) || 60 }, (_, i) => i + 1).map(i => <option key={i} value={String(i)}>{monthLabelAbs(i, (months && months.start_year) || 2026)}</option>)}
           </select></label>}
         {wallLayout === "single" && !fill && <span className="dash-wallbar-note">this screen is showing section {wallSection + 1} of {DASH_SECTIONS.length} · open <code>#dashboard/{wallSection + 1}</code> on another display to pin it there</span>}
-        {fill && wallSection !== simIdx && <span className="dash-wallbar-note" title={`Pin a display to this section with #dashboard/${wallSection + 1}`}>{rangeLabel} · {status === "All" ? "all forecasts" : status.toLowerCase()}{stamp ? ` · updated ${hhmm(stamp)}` : ""}</span>}
+        {fill && wallSection !== simIdx && <span className="dash-wallbar-note" title={`Pin a display to this section with #dashboard/${wallSection + 1}`}>{rangeLabel} · {status === "All" ? "all forecasts" : status.toLowerCase()}{sites.length ? ` · ${sitesWords(sites, locList)}` : ""}{stamp ? ` · updated ${hhmm(stamp)}` : ""}</span>}
         {/* 14 Oct 2026: a clock, as wall dashboards carry, at the bar's right end (the data's own time is "updated" above) */}
         <span className="dash-clock" data-wall-clock="1">{hhmm(clock)}</span>
         {fill && <button type="button" className="dash-wallbar-btn" onClick={toggleWall} title="Back to the working view (Esc)">Exit</button>}
@@ -2664,43 +2870,43 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                   info={{ id: "dash.deliveries", value: `${grp(K.totTrips)} loaded trips ÷ (${nMonths} month${nMonths === 1 ? "" : "s"} × ${wdPerMonth} working days)` }} />
             <Card label="Vehicles needed" value={K.peakFleet ? grp(K.peakFleet) : "—"} sub={K.peakFleet ? `peak · ${K.peakFleetMonth}` : "needs routes worked out"}
                   info={{ id: "dash.vehicles", value: K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth}` : NO_ROUTES_YET }} />
-            <Card label="Planned this week" value={wkTot ? `${bigNum(wkTot.planned_t || 0)} t` : "—"} sub={wkTot ? `${grp(wkTot.trips || 0)} loads${acct && acct.lines ? ` · last week ${acct.delivered} of ${acct.lines} lines held` : ""}` : (weekErr ? "this week did not load" : "loading this week")}
+            <Card label="Planned this week" value={wkTot ? `${bigNum(wkTot.planned_t || 0)} t` : "—"} sub={wkTot ? `${grp(wkTot.trips || 0)} loads${acct && acct.lines ? ` · last week ${acct.delivered} of ${acct.lines} lines held` : ""}${sites.length ? " · at these sites" : ""}` : (weekErr ? "this week did not load" : "loading this week")}
                   info={{ id: "dash.week" }} />
             <Card label="Delivered against plan" value={K.deliveredPct == null ? "—" : `${K.deliveredPct.toFixed(0)} %`} sub={K.actualT == null ? "nothing reported yet" : `${bigNum(K.actualT)} t of ${bigNum(K.totT)} t`}
                   info={{ id: "dash.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `${grp(K.actualT)} t delivered ÷ ${grp(K.totT)} t planned` }} />
             <Card label="Transport carbon" value={`${K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} t`} sub={`CO₂e${K.intensity == null ? "" : ` · ${K.intensity.toFixed(1)} kg/t`} · DESNZ 2026`}
                   info={{ id: "dash.carbon", value: `Exactly ${grp(K.totCo2, 1)} t CO₂e` }} />
           </div>
-          <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} />
+          <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} />
       {D.empty && <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Widen the month range or clear a filter to see the plan." />}
           <div className="dash-charts" data-dash-charts="1">
             <div className="card p-4 chart-card c-demand">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.demand" /></div>
-          <ChartCanvas config={demandCfg} size="lg" />
+          <ChartCanvas config={demandCfg} size="lg" title={`Material demand over time (${unitLabel})`} scope={dashScope} />
         </div>
             <div className="card p-4 chart-card c-top">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Top routes by tonnage <span className="text-slate-400 font-normal">· click a bar to focus</span><InfoTip id="dash.chart.top" /></div>
-          <ChartCanvas config={topCfg} />
+          <ChartCanvas config={topCfg} title={"Top routes by tonnage"} scope={dashScope} />
         </div>
             <div className="card p-4 chart-card c-progress">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Delivered against plan <span className="text-slate-400 font-normal">(t · reported actuals)</span><InfoTip id="dash.chart.progress" /></div>
-          <ChartCanvas config={progressCfg} size="lg" />
+          <ChartCanvas config={progressCfg} size="lg" title={"Delivered against plan (t, reported actuals)"} scope={dashScope} />
         </div>
             <div className="card p-4 chart-card c-cost">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span><InfoTip id="dash.chart.cost" /></div>
-          <ChartCanvas config={costCfg} />
+          <ChartCanvas config={costCfg} title={`Cost over time (${CUR()}, planned vs fair)`} scope={dashScope} />
         </div>
           </div>
           {/* 14 Oct 2026 (the user took the recommendation): Gate arrivals moved from above the charts to
               below them, so the four key charts are on the first screen at 1920 x 1080 */}
-          <GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />
-          {!wall && !phone && <AbnormalStrip onOpen={onOpen} />}
+          <GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : ""} />
+          {!wall && !phone && <AbnormalStrip onOpen={onOpen} sites={sites} />}
           {/* 29 Oct 2026: the Simulation has its own page (Plan → Simulation); the Dashboard keeps one line under Gate arrivals,
               the busiest gate from the Gate arrivals reply (no second simulation run here) */}
-          <SimDashLine ga={ga} month={gaMonth} months={months} onOpen={onOpen} />
+          <SimDashLine ga={gaShown} month={gaMonth} months={months} onOpen={onOpen} />
           <details className="dash-more">
             <summary>This week and today, with the Look-ahead's map</summary>
-            <div className="pt-3"><DashboardToday meta={meta} week={week} err={weekErr} wall={wall} /></div>
+            <div className="pt-3"><DashboardToday meta={meta} week={weekShown} err={weekErr} wall={wall} /></div>
           </details>
           <details className="dash-more">
             <summary>All the figures: delivered to date, volume, cost, carbon</summary>
@@ -2746,19 +2952,19 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
             <div className="pt-3 dash-more-charts">
               <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Trips over time<InfoTip id="dash.chart.trips" /></div>
-          <ChartCanvas config={tripsCfg} />
+          <ChartCanvas config={tripsCfg} title={"Trips over time"} scope={dashScope} />
         </div>
               <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Vehicles needed over time <span className="text-slate-400 font-normal">(routed lines)</span><InfoTip id="dash.chart.fleet" /></div>
-          <ChartCanvas config={fleetCfg} />
+          <ChartCanvas config={fleetCfg} title={"Vehicles needed over time"} scope={dashScope} />
         </div>
               <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Carbon over time <span className="text-slate-400 font-normal">(tCO₂e)</span><InfoTip id="dash.chart.co2" /></div>
-          <ChartCanvas config={co2Cfg} />
+          <ChartCanvas config={co2Cfg} title={"Carbon over time (tCO₂e)"} scope={dashScope} />
         </div>
               <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material split <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.split" /></div>
-          <ChartCanvas config={splitCfg} />
+          <ChartCanvas config={splitCfg} title={`Material split (${unitLabel})`} scope={dashScope} />
         </div>
             </div>
           </details>
@@ -2850,7 +3056,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       ) : (
         <>
       <WallSection show={sectionShown(0)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[0].title}>
-        <DashboardToday meta={meta} week={week} err={weekErr} wall={wall} fill={fill} />
+        <DashboardToday meta={meta} week={weekShown} err={weekErr} wall={wall} fill={fill} />
       </WallSection>
 
       <WallSection show={sectionShown(1)} divider={wall && wallLayout === "all"} title={DASH_SECTIONS[1].title}>
@@ -2968,14 +3174,15 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
 // 22 Oct 2026 (abnormal loads, phase 2): one strip under Gate arrivals — loads in the next four weeks, notices due or late
 // this week, permissions still to apply for — and the way to the page. One read (GET /abnormal/summary). Counted apart:
 // nothing here is in the six cards, the charts or the carbon target (decisions D70 and D71). Not on the big screen, not on a phone.
-function AbnormalStrip({ onOpen }){
+function AbnormalStrip({ onOpen, sites }){
   const [s, setS] = useState(null);
   const [err, setErr] = useState(false);
+  const siteQ = (sites && sites.length) ? "?sites=" + sites.map(encodeURIComponent).join(",") : "";
   useEffect(() => {
     let live = true;
-    fetch(`${API}/abnormal/summary`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => { if(live){ setS(j); setErr(false); } }).catch(() => { if(live) setErr(true); });
+    fetch(`${API}/abnormal/summary${siteQ}`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => { if(live){ setS(j); setErr(false); } }).catch(() => { if(live) setErr(true); });
     return () => { live = false; };
-  }, []);
+  }, [siteQ]);
   if(err) return <div className="al-strip" data-abnormal-strip="error"><span className="text-slate-500">The abnormal loads did not load.</span></div>;
   if(!s) return null;
   const open = () => { if(onOpen) onOpen("abnormal"); };
@@ -3289,7 +3496,7 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick, from, to }){
       ) : (
         <div className="stock-body">
           <div className="stock-plot">
-            {withCap.length ? (fill ? <ChartCanvas config={cfg} size="fill" /> : <ChartCanvas config={cfg} />)
+            {withCap.length ? (fill ? <ChartCanvas config={cfg} size="fill" title="Stockpile capacity, % full by week" /> : <ChartCanvas config={cfg} title="Stockpile capacity, % full by week" />)
                             : <div className="text-sm text-slate-400 p-4">No stockpile has a capacity recorded — set one on the Locations page to see how full it is.</div>}
           </div>
           {!fill && withCap.length > 0 && <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[13px] text-slate-500" data-stock-key="1">
@@ -3523,8 +3730,8 @@ function ClpMonitoring({ months, initial }){
             </ClpCard>
             <ClpCard c={C.carbon_rate} info={<InfoTip id="clp.carbon_rate" />} wide>
               <div className="clp-pair">
-                <div><div className="clp-sub">Per tonne</div><ChartCanvas config={clpCarbonCfg(C.carbon_rate, "tonne")} /></div>
-                <div><div className="clp-sub">Per load</div><ChartCanvas config={clpCarbonCfg(C.carbon_rate, "load")} /></div>
+                <div><div className="clp-sub">Per tonne</div><ChartCanvas config={clpCarbonCfg(C.carbon_rate, "tonne")} title={`${C.carbon_rate.title}: per tonne`} /></div>
+                <div><div className="clp-sub">Per load</div><ChartCanvas config={clpCarbonCfg(C.carbon_rate, "load")} title={`${C.carbon_rate.title}: per load`} /></div>
               </div>
               {C.carbon_rate.target_note && <div className="clp-note" data-clp-no-target="1">{C.carbon_rate.target_note}</div>}
               {C.carbon_rate.invalid && <div className="clp-note">{C.carbon_rate.invalid}</div>}
@@ -5486,7 +5693,7 @@ function StockpilesPage({ meta, access, who }){
               : "No stock count yet."}</p>
 
           <h3 className="text-sm font-semibold text-slate-700 mt-4 mb-1">Forecast <span className="font-normal text-slate-500">% full, solid recorded, dashed planned</span></h3>
-          {chartCfg ? <ChartCanvas config={chartCfg} /> : <p className="text-sm text-slate-500">Give it a capacity to see how full it gets.</p>}
+          {chartCfg ? <ChartCanvas config={chartCfg} title={`Stockpile forecast, % full: ${sp.name}`} /> : <p className="text-sm text-slate-500">Give it a capacity to see how full it gets.</p>}
           <p className="text-[13px] text-slate-500 mt-2">{canPlan ? "Saves as you type." : "Planners set the plan. Type what came out each week on Look-ahead → Account."}</p>
         </div>
       </>)}
@@ -7080,12 +7287,33 @@ const PAGE_IDS = new Set(NAV.flatMap(g => g.items.map(i => i.id)));
 // to the plain page rather than to nothing.
 function hashParts(){
   try {
-    const raw = decodeURIComponent((window.location.hash || "").replace(/^#\/?/, "")).trim();
+    // 2 Nov 2026: "#dashboard?sites=L019,L004" - a query after the page (and its screen number) is read apart
+    const full = decodeURIComponent((window.location.hash || "").replace(/^#\/?/, "")).trim();
+    const qa = full.indexOf("?");
+    const raw = qa === -1 ? full : full.slice(0, qa);
     const cut = raw.indexOf("/");
     const id = cut === -1 ? raw : raw.slice(0, cut);
     const rest = cut === -1 ? "" : raw.slice(cut + 1);
-    return PAGE_IDS.has(id) ? { page: id, rest } : { page: null, rest: "" };
-  } catch(e){ return { page: null, rest: "" }; }
+    return PAGE_IDS.has(id) ? { page: id, rest, query: qa === -1 ? "" : full.slice(qa + 1) } : { page: null, rest: "", query: "" };
+  } catch(e){ return { page: null, rest: "", query: "" }; }
+}
+// the sites in the address: "#dashboard?sites=L019,L004" -> ["L019", "L004"]
+function sitesFromHash(){
+  try {
+    const { page, query } = hashParts();
+    if(page !== "dashboard" || !query) return [];
+    const v = new URLSearchParams(query).get("sites") || "";
+    return [...new Set(v.split(",").map(x => x.trim()).filter(Boolean))].slice(0, 60);
+  } catch(e){ return []; }
+}
+// put the sites in the address (replace, never push), keeping the page and a pinned screen number
+function writeSitesToHash(ids){
+  try {
+    const { page, rest } = hashParts();
+    if(page !== "dashboard") return;
+    const next = "#dashboard" + (rest ? "/" + rest : "") + (ids.length ? "?sites=" + ids.map(encodeURIComponent).join(",") : "");
+    if(window.location.hash !== next) history.replaceState(null, "", next);
+  } catch(e){}
 }
 function pageFromHash(){ return hashParts().page; }
 //: 1-based screen number from "#dashboard/3", or null. Out of range is null, not a clamp:
@@ -7095,6 +7323,66 @@ function screenFromHash(max){
   if(!page || !/^[0-9]+$/.test(rest)) return null;
   const n = parseInt(rest, 10);
   return (n >= 1 && n <= max) ? n : null;
+}
+
+// ---- 2 Nov 2026: the Dashboard's Sites filter ---------------------------------------------------------------
+// Gate arrivals keep only the picked locations' gates; the Look-ahead's week and last week's account keep only the routes
+// whose lines start or end at a pick (`routes`, a Set of route ids; null = no pick).
+function cutGatesBySites(ga, sites){
+  if(!ga || !sites || !sites.length) return ga;
+  const keep = (g) => sites.includes(g.location_id);
+  return { ...ga, gates: (ga.gates || []).filter(keep), closed_gates: (ga.closed_gates || []).filter(keep) };
+}
+function cutWeekBySites(week, routes){
+  if(!week || !routes) return week;
+  const c = week.commit || {};
+  const lines = (c.lines || []).filter(l => routes.has(l.route_id));
+  const sum = (k) => lines.reduce((s, l) => s + ((l.week_derived || {})[k] || 0), 0);
+  const commit = { ...c, lines, totals: { ...(c.totals || {}), planned_t: sum("tonnes"), trips: sum("trips"), lines: lines.length } };
+  let account = week.account;
+  if(account){
+    const rs = (account.rows || []).filter(r => routes.has(r.route_id));
+    const tOf = (r) => (r.actual_qty != null && r.planned_qty > 0) ? (r.planned_t || 0) * r.actual_qty / r.planned_qty : 0;
+    account = { ...account, rows: rs, lines: rs.length, reported: rs.filter(r => r.actual_qty != null).length, delivered: rs.filter(r => r.held).length,
+                shortfall: rs.reduce((s, r) => s + (r.remaining_short || 0), 0), actual_t: rs.reduce((s, r) => s + tOf(r), 0) };
+  }
+  return { ...week, commit, account };
+}
+// "Sites: A, B" for the chip and the big-screen bar; three names, then "and N more"
+function sitesWords(sites, locList){
+  const name = (id) => ((locList || []).find(l => l.id === id) || {}).name || id;
+  const names = sites.map(name);
+  return names.length > 3 ? names.slice(0, 3).join(", ") + ` and ${names.length - 3} more` : names.join(", ");
+}
+// The button and its tick-box menu, grouped by the type typed on Data → Locations (LOC_TYPES order, any other type after).
+function SitesMenu({ locList, sites, onChange }){
+  const n = sites.length;
+  const groups = useMemo(() => {
+    const by = {};
+    (locList || []).forEach(l => { const t = locTypeOf(l.loc_type) || "Other"; (by[t] = by[t] || []).push(l); });
+    const order = [...LOC_TYPES.filter(t => by[t]), ...Object.keys(by).filter(t => !LOC_TYPES.includes(t)).sort()];
+    return order.map(t => [t, by[t].slice().sort((a, b) => String(a.name).localeCompare(String(b.name)))]);
+  }, [locList]);
+  const toggle = (id) => onChange(sites.includes(id) ? sites.filter(x => x !== id) : [...sites, id]);
+  return (
+    <details className="row-menu" data-sites-menu="1">
+      <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }}>{n ? `${n} site${n === 1 ? "" : "s"}` : "All sites"} ▾</summary>
+      <div className="row-menu-list sites-list" role="group" aria-label="Lorries to or from">
+        <div className="sites-head">Lorries to or from</div>
+        {(locList || []).length === 0 && <div className="sites-empty">No locations yet.</div>}
+        {groups.map(([t, ls]) => (
+          <div key={t} className="sites-grp">
+            <div className="sites-type">{t}</div>
+            {ls.map(l => (
+              <label key={l.id} className="sites-opt"><input type="checkbox" checked={sites.includes(l.id)} onChange={() => toggle(l.id)} /><span>{l.name}</span></label>
+            ))}
+          </div>
+        ))}
+        <div className="sites-foot"><span>{n ? `${n} of ${(locList || []).length} picked` : "None picked: every site"}</span>
+          {n > 0 && <button type="button" className="sites-clear" onClick={() => onChange([])}>Clear</button>}</div>
+      </div>
+    </details>
+  );
 }
 
 // One header for every page: title, one line of purpose, actions on the right.
@@ -10100,7 +10388,7 @@ function GatesWeek({ gw }){
             <div className="clp-note">{g.no_open_time ? "No open time: the no-delivery bands and this gate's shut times cover all its hours."
               : g.capacity_per_day == null ? "No check-in time typed: nothing is compared."
               : `Can check in ${grp(g.capacity_per_day)} a day (open ${g.open_hours}${g.open_basis === "default" ? " by default" : ""}${g.peak_minutes ? `, less ${g.peak_minutes} min of peak bands` : ""}${g.shut_minutes ? `, less ${g.shut_minutes} min shut` : ""} ÷ ${+g.check_in_minutes} min a lorry)${g.closed_days ? `, ${g.closed_days}` : ""}.`}</div>
-            <ChartCanvas config={gwCfg(g, gw.days)} />
+            <ChartCanvas config={gwCfg(g, gw.days)} title={`Gates this week: ${[g.location_name, g.gate_name].filter(Boolean).join(", ")}`} />
             <div className="gw-days">
               {g.days.filter(d => d.flag).map(d => (
                 <span key={d.date} className="gw-day" data-gw-day={d.date}><RowStatus word={`${d.day}: ${d.status_word}${d.pct != null ? ` (${d.pct} %)` : d.open ? "" : " (closed)"}`} tone={d.flag === "red" ? "bad" : "warn"} /></span>
@@ -11873,8 +12161,12 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open }){
           </div>}
         </div>
       </div>
-      <div className="sim-tl-head" title="Shaded = lorries waiting. Red mark = the bottleneck. Click to move the clock."><b>When queues start</b> · the red mark is the bottleneck</div>
-      <SimTimeline D={D} t={t} onSeek={(m) => { setPlaying(false); seek(m); }} site={site} />
+      <div className="sim-tl-top">
+        <div className="sim-tl-head" title="Shaded = lorries waiting. Red mark = the bottleneck. Click to move the clock."><b>When queues start</b> · the red mark is the bottleneck</div>
+        <ChartTools inline title="Simulation: when queues start" scope={[D.label]}
+                    getPlot={() => { const svg = document.querySelector('[data-sim-tl-wrap="1"] svg'); return svg ? drawSvgPlain(svg) : Promise.reject(new Error("no chart")); }} />
+      </div>
+      <div data-sim-tl-wrap="1"><SimTimeline D={D} t={t} onSeek={(m) => { setPlaying(false); seek(m); }} site={site} /></div>
       {scenario && <div className="sim-band">{scenario}</div>}
     </div>
   );

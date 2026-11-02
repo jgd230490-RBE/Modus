@@ -688,10 +688,14 @@ def week(dates, acc=None, today=None):
             "words": "Counted apart from the week's figures. What each needs is advice from its typed figures."}
 
 
-def summary(acc=None, today=None, weeks_ahead=4):
-    """The Dashboard's strip: loads in the next N weeks, notices due or late this week, permissions still to apply for."""
+def summary(acc=None, today=None, weeks_ahead=4, sites=None):
+    """The Dashboard's strip: loads in the next N weeks, notices due or late this week, permissions still to apply for.
+    2 Nov 2026: `sites` (location ids) keeps the loads that start or end at one of them, the CLP's rule."""
     t = _today(today)
     pg = page(acc, today=t)
+    picked = {str(x) for x in (sites or []) if x}
+    if picked:
+        pg = dict(pg, movements=[m for m in pg["movements"] if m.get("origin_id") in picked or m.get("dest_id") in picked])
     live = [m for m in pg["movements"] if m.get("status") in ("pending", "approved", "notified")]
     ahead = [m for m in live if window_overlaps(m, t, t + datetime.timedelta(days=7 * weeks_ahead))]
     due = [m for m in live if any(f.get("code") in ("NOTICE_DUE", "NOTICE_LATE") for f in m.get("flags") or [])]

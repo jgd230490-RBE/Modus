@@ -1320,7 +1320,8 @@ ok("🔴 delivered to date is the SERVER's actual_tonnes summed — never a shar
   _dbBody.includes("if(r.actual_tonnes != null){ T.actualT = (T.actualT || 0) + r.actual_tonnes;") && _dbBody.includes('K.actualT == null ? "—"')
   && !_dbBody.includes("actual_qty *") );
 ok("the Today strip reads /api/lookahead (commit bucket, restrictions OFF) in its own fetch, and a failure never hides the programme figures",
-  _dbBody.includes("fetch(`${API}/lookahead?bucket=commit&restrictions_on=0`)") && _dbBody.includes("setWeekErr(") && _dbBody.includes("<DashboardToday meta={meta} week={week} err={weekErr}"));
+  _dbBody.includes("fetch(`${API}/lookahead?bucket=commit&restrictions_on=0`)") && _dbBody.includes("setWeekErr(") && _dbBody.includes("<DashboardToday meta={meta} week={weekShown} err={weekErr}")   // NARROWED 2 Nov 2026 (Sites filter): the week the Dashboard shows is cut by the sites picked
+  );
 ok("...today's rows are the day rows whose date is the server's `today` — the server's tonnes, trips, vehicles per day, nothing derived",
   _tdBody.includes("d.day_date !== today") && _tdBody.includes("tonnes: dv.tonnes, trips: dv.trips, vehicles: dv.vehicles")
   && !_tdBody.includes("/ payload") && !_tdBody.includes("payload_t *"));
@@ -1371,7 +1372,7 @@ ok("\u2b50 the hash names the page, and the id list is DERIVED from NAV so the t
 // screen suffix, so the id check moved into hashParts(); it is still a PAGE_IDS check and
 // an unknown id still yields null.
 ok("...an unknown hash is ignored rather than blanking the app",
-   /PAGE_IDS\.has\(id\) \? \{ page: id, rest \} : \{ page: null, rest: "" \}/.test(src)
+   /PAGE_IDS\.has\(id\) \? \{ page: id, rest, query: [^}]*\} : \{ page: null, rest: "", query: "" \}/.test(src)   // NARROWED 2 Nov 2026: hashParts also reads a "?sites=" query
    && /function pageFromHash\(\)\{ return hashParts\(\)\.page; \}/.test(src));
 ok("...the hash wins over the remembered page on first load, and the remembered page is "
    + "still the fallback",
@@ -1707,14 +1708,14 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("AL2 rail: the four words in the rail's tables (NOTICE DUE a gold warning, the other three red)",
      src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
      && src.includes('code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";'));
-  const st0 = src.indexOf("function AbnormalStrip({ onOpen }){"), st1 = src.indexOf("function DashboardToday({ meta, week, err, wall, fill }){");
+  const st0 = src.indexOf("function AbnormalStrip({ onOpen, sites }){"), st1 = src.indexOf("function DashboardToday({ meta, week, err, wall, fill }){");
   const st = src.slice(st0, st1);
   ok("⭐ AL2 Dashboard: one strip under Gate arrivals (not on the big screen, not on a phone): ONE read of /abnormal/summary, the next-4-weeks count, notices due with the chip, " +
      "permissions to apply for with the chip, limits over, the button to the page through the Portal's switch, the counted-apart words; a failed read is one line",
-     st0 > 0 && st1 > st0 && (st.match(/fetch\(/g) || []).length === 1 && st.includes("fetch(`${API}/abnormal/summary`)")
+     st0 > 0 && st1 > st0 && (st.match(/fetch\(/g) || []).length === 1 && st.includes("fetch(`${API}/abnormal/summary${siteQ}`)")
      && st.includes('data-abnormal-strip="set"') && st.includes("in the next {s.weeks_ahead} weeks") && st.includes('<AlChip tone="warn">NOTICE DUE</AlChip>')
      && st.includes('<AlChip tone="bad">SO LEAD TIME</AlChip>') && st.includes('onOpen("abnormal")') && st.includes("{s.words}")
-     && st.includes("The abnormal loads did not load.") && code.includes("{!wall && !phone && <AbnormalStrip onOpen={onOpen} />}"));
+     && st.includes("The abnormal loads did not load.") && code.includes("{!wall && !phone && <AbnormalStrip onOpen={onOpen} sites={sites} />}"));
   const gac = src.slice(src.indexOf("function GateArrivalsPanel("), src.indexOf("function CarbonTargetStrip("));
   ok("⭐ AL2 Gate arrivals: a marker on the gate's row for its abnormal loads (count and windows; the hover names each and says counted apart); the figures untouched",
      gac.includes("{(g.abnormal || []).length > 0 && <span className=\"al-chip al-so al-mark\" data-ga-abnormal={g.abnormal.length}")
@@ -2334,7 +2335,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const mxCt = _mxc.slice(_mxc.indexOf("{cost && cost.carbon && (() => {"), _mxc.indexOf("{ctCellsTarget(ct)}</div>}") + 26);
   const GETS = /fetch\(`\$\{API\}\/carbon\/target`\)/g;
   ok("⭐ CARBON TARGET: one block of helpers before the Dashboard — the strip, the Forecasts line and the word helpers",
-    ctSrc.length > 3000 && ctc.includes("function CarbonTargetStrip({ ct, err, onOpen })") && ctc.includes("function CarbonTargetLine({ ct, err, pendingN })")
+    ctSrc.length > 3000 && ctc.includes("function CarbonTargetStrip({ ct, err, onOpen, scheme })") && ctc.includes("function CarbonTargetLine({ ct, err, pendingN })")
     && ["ctGap", "ctTargetLine", "ctProgress", "ctScopeNote", "ctSetBy", "ctCellsTarget", "ctFig"].every(f => ctc.includes(`function ${f}(`)));
   ok("🔴 ...each of the three surfaces reads it in its OWN read, a GET with no method: nothing on them writes the target",
     [_dbc, _fcc, _mxc].every(b => (b.match(GETS) || []).length === 1 && !/carbon\/target`,/.test(b))
@@ -2348,7 +2349,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     _dbc.indexOf("const [ct, setCt]") > 0 && _dbc.indexOf("const [ct, setCt]") < _dbc.indexOf("if(err) return")
     && _dbc.indexOf("fetch(`${API}/carbon/target`)") < _dbc.indexOf("if(err) return"));
   ok("⭐ Dashboard: a strip under the six cards, NOT a seventh card; with no target, a button opens the Carbon planner through the Portal's page switch",
-    _dbW.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} />") && (_dbW.match(/<Card label=/g) || []).length === 6
+    _dbW.includes("<CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} />") && (_dbW.match(/<Card label=/g) || []).length === 6
     && _dbW.indexOf("<CarbonTargetStrip") > _dbW.indexOf('<div className="dash-cards" data-guide="dash-figures">')
     && _dbW.indexOf("<CarbonTargetStrip") < _dbW.indexOf('<details className="dash-more"')
     // 14 Oct 2026 (narrowed): onWall also tells the Portal the big screen is on (no tour over it)
@@ -2358,7 +2359,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // NARROWED 14 Oct 2026 (bundle G, W7: the render harness's prop initialClp joins the signature too; merged with D9's phone)
     // NARROWED 16 Oct 2026 (S7: the render harness's prop initialSim joins the signature)
     // RE-PINNED 29 Oct 2026 (the Simulation's own page): initialSim leaves the Dashboard; SimulationPage takes `initial`
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, onWall, onOpen, phone })")
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
@@ -2459,7 +2460,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const ctSrc = src.slice(g1, src.indexOf("function Dashboard("));
   const gaIdsStripped = gac.replace(/key=\{g\.gate_id\}|data-ga-gate=\{g\.gate_id\}/g, "");
   ok("⭐ GATE ARRIVALS: one block before the carbon target's, holding the panel and its word helpers",
-    gaSrc.length > 1500 && gac.includes("function GateArrivalsPanel({ ga, err, month, months, onMonth })")
+    gaSrc.length > 1500 && gac.includes("function GateArrivalsPanel({ ga, err, month, months, onMonth, sited })")
     && gac.includes("const gaMonthToday = (months) => {") && gac.includes("const gaFlagWord = (g) =>")
     && ctSrc.startsWith("// ---- 11 Oct 2026: the carbon target") && !ctSrc.includes("GateArrivalsPanel"));
   // NARROWED 11 Oct 2026 (review): the read is also skipped on the big screen, where the panel is not rendered
@@ -2472,7 +2473,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 14 Oct 2026 (the user took the recommendation): the panel moved from under the carbon strip to under the
   // four charts, so the charts are on the first screen at 1920 x 1080; still before the first collapsed section
   ok("⭐ the panel sits under the four key charts and before the first collapsed section; the six cards, five sections, eight charts are untouched",
-    _dbW.includes("<GateArrivalsPanel ga={ga} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} />")
+    _dbW.includes("<GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : \"\"} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<ChartCanvas config={costCfg} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf('<div className="dash-charts" data-dash-charts="1">')
@@ -2517,7 +2518,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     gac.includes('data-gate-arrivals="error"') && gac.includes('data-gate-arrivals={state}') && gac.includes('const state = gates.length === 0 ? "none" : "set";')
     && (gac.match(/data-guide="dash-gates"/g) || []).length === 2 && gac.includes('if(!ga) return err'));
   ok("the empty state is the EmptyState family (kind none) and the error line copies the carbon strip's shape",
-    gac.includes('<EmptyState kind="none" title={`No approved lines in ${ga.label}`}')
+    gac.includes('<EmptyState kind="none" title={sited ? `No gates at these sites in ${ga.label}` : `No approved lines in ${ga.label}`}')
     && gac.includes('<div className="ct-strip ga-strip" data-gate-arrivals="error" data-guide="dash-gates"><span className="ct-line">The gate arrivals did not load.</span></div>'));
   ok("the CSS is tokens: 14 px table text, --ink / --line, no Tailwind colour in the block",
     /\.ga-table\{[^}]*font-size:14px;[^}]*color:var\(--ink\)/.test(html) && /\.ga-table th\{font-size:14px/.test(html) && /\.ga-table td\{font-size:14px/.test(html)
@@ -2603,7 +2604,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // RE-PINNED 29 Oct 2026 (the Simulation's own page, card 1): the Dashboard keeps ONE line under Gate arrivals (the busiest gate from the
   // Gate arrivals reply, no second simulation run) with a button to the page; the page itself mounts on a desk and, as PhoneSimulation, on a phone
   ok("⭐ S7: one line under Gate arrivals on the desk Dashboard, before the folded sections; never on the big screen; the page mounted from the Portal",
-    _dbSW.includes("<SimDashLine ga={ga} month={gaMonth} months={months} onOpen={onOpen} />")
+    _dbSW.includes("<SimDashLine ga={gaShown} month={gaMonth} months={months} onOpen={onOpen} />")
     && _dbSW.indexOf("<SimDashLine") > _dbSW.indexOf("<GateArrivalsPanel") && _dbSW.indexOf("<SimDashLine") < _dbSW.indexOf('<details className="dash-more"')
     && !_dbSWl.includes("<SimDashLine") && !code.includes("<SimulationPanel") && (code.match(/<SimDashLine /g) || []).length === 1
     && code.includes('{page === "simulation" && !narrow && <SimulationPage meta={meta} months={meta.months} />}')
@@ -2724,7 +2725,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // RE-PINNED 29 Oct 2026 (the page, card 2): the timeline is FULL WIDTH under the grid, the scenario a band under it; the map the app's height
     fn("SimPlayer", "const SimScenario").includes('<SimMap meta={meta} D={D} store={store} frame={f} site={site} />')
     && /<div className="sim-main">\s*<SimMap [^\n]*\n\s*<\/div>\s*<div className="sim-side">/.test(fn("SimPlayer", "const SimScenario"))
-    && /<\/div>\s*<\/div>\s*<div className="sim-tl-head"[^\n]*\n\s*<SimTimeline D=\{D\} t=\{t\}[^\n]*\n\s*\{scenario && <div className="sim-band">\{scenario\}<\/div>\}/.test(fn("SimPlayer", "const SimScenario"))
+    && /<\/div>\s*<\/div>\s*<div className="sim-tl-top">\s*<div className="sim-tl-head"[^\n]*\n\s*<ChartTools [\s\S]*?<\/div>\s*<div data-sim-tl-wrap="1"><SimTimeline D=\{D\} t=\{t\}[^\n]*<\/div>\s*\{scenario && <div className="sim-band">\{scenario\}<\/div>\}/.test(fn("SimPlayer", "const SimScenario"))
     && /@media \(min-width:1024px\)\{\.sim-grid\{grid-template-columns:minmax\(0,1fr\) 300px;align-items:start;\}\n\s*\.sim-main \.sim-map\{height:62vh;min-height:360px;max-height:720px;\}\}/.test(html)
     && /\n  \.sim-map\{height:62vh;min-height:360px;max-height:720px;/.test(html)
     // found in Chrome: in the flex column the map's box shrank to nothing (align-self:start); it stretches across its column
@@ -3196,7 +3197,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      /\.chart-box\{position:relative;width:100%;min-width:0;height:clamp\(200px,28vh,420px\);\}/.test(html)
      && /\.chart-box\.is-lg\{height:clamp\(220px,32vh,480px\);\}/.test(html)
      // (14 Oct: a third size, "fill", for a chart that takes its card on the big screen)
-     && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas></div>'));
+     && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} />}</div>'));   // NARROWED 2 Nov 2026: + the Copy / Download buttons, drawn after the canvas
   // 14 Oct 2026 (narrowed): the gate chart joins the stockpile chart — its height follows its rows too (one a gate)
   // NARROWED 14 Oct 2026 (bundle G, W7): + the CLP section's three row charts (routes, sites, councils), one row each too
   // NARROWED 27 Oct 2026 (stockpile forecast, D10 a): the stockpile chart is a line chart now and takes the box's own height
@@ -3204,7 +3205,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("W5: 🔴 no Dashboard chart has a fixed px height any more (only the gate and CLP row charts, whose height follows their rows)",
      (src.match(/<ChartCanvas [^>]*height=/g) || []).length === 4
      && src.includes('height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />') && src.includes('height={Math.max(150, 46 * capped(C.site_caps.rows).length + 50)} />')
-     && src.includes('height={Math.max(170, 40 * (C.councils.rows || []).length + 80)} />') && src.includes("<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />") && !/<ChartCanvas config=\{cfg\} height=/.test(src)
+     && src.includes('height={Math.max(170, 40 * (C.councils.rows || []).length + 80)} />') && src.includes('<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} title="Gate arrivals: lorries a day at each gate"') && !/<ChartCanvas config=\{cfg\} height=/.test(src)
      && !/height=\{wall \? \d+ : \d+\} \/>/.test(_db.replace(/<CommitMap[^>]*>/g, "")));
   ok("W5: a chart is built only once its box has a size; a ResizeObserver resizes it and moves the legend across 768 / 1024 px",
      _cc.includes("const ro = new ResizeObserver(") && _cc.includes("if(!sized || !ref.current || !window.Chart) return;")
@@ -3353,7 +3354,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // REVERSED 27 Oct 2026 (stockpile forecast, D10 a): the big screen shows the same weekly LINE chart filled; the message in
   // big type says which stockpile goes over and when (no hover on a TV), the text follows the screen's height
   ok("BIG SCREEN: the stockpile chart takes its card, and its message says which stockpile goes over and when (no hover on a TV)",
-     _sc.includes('{withCap.length ? (fill ? <ChartCanvas config={cfg} size="fill" /> : <ChartCanvas config={cfg} />)')
+     _sc.includes('{withCap.length ? (fill ? <ChartCanvas config={cfg} size="fill" title="Stockpile capacity, % full by week" /> : <ChartCanvas config={cfg} title="Stockpile capacity, % full by week" />)')
      && _sc.includes('<span className={fill ? "ch-val kpi-num" : "text-lg font-bold"} style={msgStyle}>{msg.text}</span>') && _sc.includes("plugins: [capLine] };")
      && _sc.includes("const fs = wall ? sf : 11;")
      && /\.chart-box\.is-fill\{height:100%;min-height:0;\}/.test(html));
@@ -3411,7 +3412,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
 {
   const _ga = (src.match(/function GateArrivalsPanel\([\s\S]*?\n\}\n/) || [""])[0];
   ok("GATE CHART: the panel opens with a chart, one row a gate (fullest first), above the table, which folds under 'Gate by gate'",
-     _ga.includes('<div className="ga-chart" data-ga-chart="1">') && _ga.includes("<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} />")
+     _ga.includes('<div className="ga-chart" data-ga-chart="1">') && _ga.includes('<ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} title="Gate arrivals: lorries a day at each gate"')
      && _ga.indexOf('data-ga-chart="1"') < _ga.indexOf('data-rd-table="gates"') && _ga.includes('<details className="ga-more" data-ga-table="1"><summary>Gate by gate:')
      && _ga.includes("((b.pct == null ? -1 : b.pct) - (a.pct == null ? -1 : a.pct)) || (b.g.arrivals_per_day - a.g.arrivals_per_day)"));
   ok("GATE CHART: a bullet chart — a pale track to the gate's capacity, the planned arrivals inside it, a marker with an arrow at capacity",
@@ -4967,6 +4968,50 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && up.includes("{g.can_delete && <button") && up.includes('data-users-reviewers="1"'));
   ok("🔴 CLIENT REVIEWERS: a reviewer is added with a name, email, group and end date — no role, team or code",
      up.includes('call(`/admin/reviewers${qs()}`, "POST", { name: f.name.trim(), email: f.email.trim(), group_id: f.group_id, ends_on: f.ends_on || null })'));
+}
+
+// ---- 2 Nov 2026: the Dashboard's Sites filter, and Copy / Download on every chart (the approved mockup notes\dashboard-site-mockup-1102) ----
+{
+  const dash = code.slice(code.indexOf("function Dashboard("), code.indexOf("function DashboardToday("));
+  const dashPre = dash.slice(0, dash.indexOf("if(err) return"));
+  ok("⭐ SITES: the pick is read from, and written to, the ADDRESS ('#dashboard?sites=L019,L004'), keeping a pinned screen number; hashParts reads the query apart",
+     /function sitesFromHash\(\)\{/.test(code) && code.includes('new URLSearchParams(query).get("sites")') && code.includes("function writeSitesToHash(ids){")
+     && code.includes('"#dashboard" + (rest ? "/" + rest : "") + (ids.length ? "?sites=" + ids.map(encodeURIComponent).join(",") : "")')
+     && code.includes("history.replaceState(null, \"\", next)") && dash.includes("useState(() => sitesFromHash())"));
+  ok("⭐ SITES: a forecast line counts when its route starts OR ends at a picked location (the CLP's rule); the pick is a dependency of the figures",
+     dash.includes("(!sites.length || sites.includes(r.origin_id) || sites.includes(r.dest_id)) &&") && dash.includes("lineKey, sites.join(\",\")]);")
+     && dash.includes("if(sites.includes(r.origin_id) || sites.includes(r.dest_id)) out.add(r.route_id);"));
+  ok("🔴 SITES: the new hooks sit before the early returns (React #310), and the locations come from the existing locations read only",
+     dashPre.includes("const [sites, setSitesState]") && dashPre.includes("const weekShown = useMemo(") && dashPre.includes("const gaShown = useMemo(")
+     && dashPre.includes("fetch(`${API}/locations/geojson`).then(okJSON)") && (dash.match(/locations\/geojson/g) || []).length === 1);
+  ok("SITES: one button 'All sites' / 'N sites' with a tick-box menu of EVERY location grouped by type (LOC_TYPES order), a count, Clear; the chip and the kicker say the pick",
+     code.includes("function SitesMenu({ locList, sites, onChange }){") && code.includes('{n ? `${n} site${n === 1 ? "" : "s"}` : "All sites"} ▾') && code.includes('data-sites-menu="1"')
+     && code.includes('<input type="checkbox" checked={sites.includes(l.id)} onChange={() => toggle(l.id)} />') && code.includes("None picked: every site")
+     && dash.includes("<SitesMenu locList={locList} sites={sites} onChange={setSites} />") && dash.includes("`Sites: ${sitesWords(sites, locList)}`")
+     && dash.includes("sites: () => setSites([])") && dash.includes("const clearAll = () => { setSites([]);"));
+  ok("SITES: the week, last week's account, Gate arrivals and the Simulation line follow the pick; the abnormal strip asks the server with ?sites=; the carbon target stays scheme-wide and says so",
+     code.includes("function cutGatesBySites(ga, sites){") && code.includes("function cutWeekBySites(week, routes){")
+     && dash.includes("<GateArrivalsPanel ga={gaShown}") && dash.includes("<SimDashLine ga={gaShown}") && (dash.match(/<DashboardToday meta=\{meta\} week=\{weekShown\}/g) || []).length === 2
+     && dash.includes("const wkTot = (weekShown && weekShown.commit") && dash.includes('<AbnormalStrip onOpen={onOpen} sites={sites} />')
+     && code.includes('const siteQ = (sites && sites.length) ? "?sites=" + sites.map(encodeURIComponent).join(",") : "";')
+     && code.includes('Carbon target{scheme ? " · scheme-wide" : ""}') && !/<BulletinMenu[^>]*sites/.test(dash)
+     && dash.includes("{sites.length ? ` · ${sitesWords(sites, locList)}` : \"\"}"));
+  ok("CHART BUTTONS: ONE component (ChartTools) drawn by ChartCanvas; Copy writes a PNG to the clipboard and falls back to a download that says 'Saved instead'; Download saves the same PNG",
+     code.includes("function ChartTools({ title, scope, getPlot, inline }){") && code.includes('new ClipboardItem({ "image/png": make() })') && code.includes('await download("Saved instead")')
+     && code.includes('chartToast(say("Copied"))') && code.includes("a.download = name;") && (code.match(/<ChartTools /g) || []).length === 2
+     && code.includes("{!notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} />}"));
+  ok("CHART BUTTONS: the picture is drawn at 2x on WHITE, redrawn light off screen, the title above and ONE scope line below (scheme, the page's parts, 'Wayscope, <date>', the demo notice)",
+     code.includes("const CHART_PNG_SCALE = 2;") && code.includes('x.fillStyle = "#FFFFFF"; x.fillRect(0, 0, W, H);') && code.includes("C.defaults.color = CHART_MUTED; C.defaults.borderColor = CHART_GRID;")
+     && code.includes("animation: false, devicePixelRatio: CHART_PNG_SCALE") && code.includes("out.push(`Wayscope, ${longDate(localIsoDate())}`);") && code.includes("out.push(`DEMO · ${TENANT.demo_notice}`);")
+     && code.includes("function drawSvgPlain(svg){"));
+  ok("CHART BUTTONS: 30 px, named, the glyph drawn by CSS (::before), not on the big screen or a phone",
+     /\.chart-tool\{width:30px;height:30px;/.test(html) && html.includes('.chart-tool-copy::before{content:"\\29C9";}') && html.includes('.chart-tool-dl::before{content:"\\2193";}')
+     && html.includes(".dash-wall .chart-tools, .sim-wall .chart-tools{display:none;}") && /@media \(max-width:767px\)\{ \.chart-tools\{display:none;\} \}/.test(html)
+     && src.includes('aria-label={`Copy chart: ${t}`}') && src.includes('aria-label={`Download chart: ${t}`}'));
+  ok("CHART BUTTONS: the Dashboard's eight working charts, Gate arrivals, the stockpile charts, the CLP carbon pair and the Simulation's timeline each carry a title; the page's own scope rides on the Dashboard's",
+     (dash.match(/<ChartCanvas config=\{\w+\}[^\n]*title=\{[^\n]*scope=\{dashScope\} \/>/g) || []).length === 8
+     && code.includes('title="Gate arrivals: lorries a day at each gate" scope={[ga.label, sited || null]}') && code.includes('title="Simulation: when queues start" scope={[D.label]}')
+     && code.includes("const dashScope = [rangeLabel,"));
 }
 
 console.log();

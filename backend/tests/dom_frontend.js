@@ -1423,6 +1423,41 @@ async function rowDetailsDom(){
      d0.querySelector(".rd-i.rd-wide dt").textContent === "ROAD LIMIT" && d0.textContent.includes(limText) && d0.querySelectorAll(".rd-i.rd-wide.rd-bad").length >= kinds0 + 1);
   la3.done();
 
+  // ============================== 2a. the Dashboard's Sites filter and the chart buttons (2 Nov 2026) ==============================
+  {
+    const LOCS = [{ id: "L1", name: "Alpha Quarry", loc_type: "Quarry" }, { id: "L2", name: "Beta Compound", loc_type: "Compound" }, { id: "L9", name: "Zed Site", loc_type: "Site" }];
+    const dS = mount(w.Dashboard, { meta: dMeta, initialData: CL, initialGates: JSON.parse(JSON.stringify(GA)), initialWeek: WK, initialTarget: CTX, initialLocations: LOCS });
+    await settle(30);
+    const menu = () => dS.el.querySelector('[data-sites-menu="1"]');
+    const summ = () => menu().querySelector("summary").textContent.trim();
+    const boxFor = (name) => [...menu().querySelectorAll(".sites-opt")].find(l => l.textContent.includes(name)).querySelector("input");
+    ok("SITES · the filter row has one button reading 'All sites', and a tick box for EVERY location, grouped by the type typed on Locations",
+       summ() === "All sites ▾" && menu().querySelectorAll(".sites-opt input").length === 3
+       && [...menu().querySelectorAll(".sites-type")].map(x => x.textContent).join("|") === "Quarry|Compound|Site"
+       && dS.el.querySelector(".fchip") == null);
+    const lines0 = (dS.el.querySelector(".applied-row") || {}).textContent || "";
+    click(boxFor("Alpha"));
+    await settle(10);
+    ok("SITES · a site both ends of the fixture's lines touch keeps every line; the button, the chip and the kicker say one site",
+       summ() === "1 site ▾" && /Sites: Alpha Quarry/.test(dS.el.querySelector(".fchip").textContent) && /1 SITE/i.test(dS.el.querySelector(".kicker").textContent)
+       && (dS.el.querySelector(".applied-row").textContent.match(/(\d+) forecast month/) || [])[1] === (lines0.match(/(\d+) forecast month/) || [])[1]);
+    click(boxFor("Alpha")); click(boxFor("Zed"));
+    await settle(10);
+    ok("SITES · a site no line starts or ends at leaves no lines (the CLP's rule), narrows Gate arrivals to its gates, and the carbon target says scheme-wide",
+       /^0 forecast months in view|0 forecast month/.test(dS.el.querySelector(".applied-row").textContent) && dS.el.querySelector("[data-gate-arrivals]").getAttribute("data-gate-arrivals") === "none"
+       && /No gates at these sites/.test(dS.el.querySelector("[data-gate-arrivals]").textContent)
+       && /scheme-wide/.test(dS.el.querySelector("[data-carbon-target]").textContent));
+    click([...dS.el.querySelectorAll(".fchip button")][0]);
+    await settle(10);
+    ok("SITES · the chip's × and the menu's Clear put every site back",
+       summ() === "All sites ▾" && dS.el.querySelector(".fchip") == null && !/scheme-wide/.test(dS.el.querySelector("[data-carbon-target]").textContent));
+    const tools = [...dS.el.querySelectorAll("[data-chart-tools] button")];
+    ok("CHART BUTTONS · every chart on the Dashboard has a Copy and a Download button, each named for a screen reader with the chart's title",
+       tools.length >= 16 && tools.every(b => /^(Copy|Download) chart: \S/.test(b.getAttribute("aria-label"))) && tools.filter(b => b.className.includes("chart-tool-copy")).length === tools.length / 2
+       && tools.some(b => b.getAttribute("aria-label") === "Copy chart: Top routes by tonnage"));
+    dS.done();
+  }
+
   // ============================== 2. the Dashboard: gates, Today, the route table ==============================
   const GA2 = JSON.parse(JSON.stringify(GA));
   const d = mount(w.Dashboard, { meta: dMeta, initialData: CL, initialGates: GA2, initialWeek: WK, initialTarget: CTX });
