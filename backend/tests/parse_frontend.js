@@ -5030,8 +5030,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && ed.includes('keyEvents: { deselect: "Escape", delete: "Delete", rotate: ["r"], scale: ["s"] }'));
   ok("⭐ FULL SCREEN: ⤢ is a map control of its own added BEFORE + / − (so above them, Q3): a named button, ⤡ 'Leave full screen' when in",
      dmc.indexOf('g.setAttribute("data-full-ctl", "1")') > 0 && dmc.indexOf('g.setAttribute("data-full-ctl", "1")') < dmc.indexOf("m.addControl(new window.mapboxgl.NavigationControl(), \"top-right\");")
-     && dmc.includes('c.btn.textContent = full ? "⤡" : "⤢";') && dmc.includes('c.btn.setAttribute("aria-label", full ? "Leave full screen" : "Full screen");')
-     && /\.mapboxgl-ctrl-group button\.sl-full-btn\{/.test(html));
+     && dmc.includes('c.btn.setAttribute("aria-label", full ? "Leave full screen" : "Full screen");') && /\.mapboxgl-ctrl-group button\.sl-full-btn\{/.test(html)
+     // the UI audit (label-content-name-mismatch): the glyph is drawn by CSS, the button holds no text
+     && html.includes('.sl-full-btn::before{content:"⤢";} .sl-full-btn[aria-pressed="true"]::before{content:"⤡";}') && !/btn\.textContent/.test(dmc));
   ok("⭐ FULL SCREEN: only at a desk (>= 1,024 px), on Locations, with a site's layout open or drawing (Q4); otherwise it leaves",
      dmc.includes('const fullOk = isWide && subTab === "locations" && !!(drawing || (!form && readLoc) || (form && form.id));')
      && dmc.includes("useEffect(() => { if(full && !fullOk) leaveFull(); }, [full, fullOk]);") && dmc.includes('c.box.style.display = fullOk ? "" : "none";'));

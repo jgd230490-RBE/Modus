@@ -358,7 +358,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .slp-eye:hover{background:var(--surface-2);} .slp-eye::before{content:"◉";} .slp-eye[aria-pressed="false"]::before{content:"○";}
   /* 5 Nov 2026: a site's layout full screen — the Locations grid over the whole window (z 70: under the i boxes and messages) */
   .sl-full{position:fixed;inset:0;z-index:70;margin:0 !important;padding:8px;gap:8px !important;background:var(--surface-3);align-content:stretch;}
-  .mapboxgl-ctrl-group button.sl-full-btn{font-size:17px;line-height:1;color:#111827;}
+  .mapboxgl-ctrl-group button.sl-full-btn{font-size:17px;line-height:1;color:#111827;} .sl-full-btn::before{content:"⤢";} .sl-full-btn[aria-pressed="true"]::before{content:"⤡";}
   .sl-fold{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;}
   .sl-fold:hover{background:var(--surface-2);}
   .sl-demo-pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;background:var(--demo-bg);color:var(--demo-fg);font:700 12px/1 Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;box-shadow:inset 0 0 0 1px var(--demo-rule);}
@@ -14111,7 +14111,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const c = fullCtl.current; c.toggle = () => (full ? leaveFull() : enterFull());
     if(!c.box) return;
     c.box.style.display = fullOk ? "" : "none";
-    c.btn.textContent = full ? "⤡" : "⤢";
     c.btn.setAttribute("aria-label", full ? "Leave full screen" : "Full screen");
     c.btn.title = full ? "Leave full screen" : "Full screen";
     c.btn.setAttribute("aria-pressed", full ? "true" : "false");
@@ -14249,7 +14248,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     m.addControl({
       onAdd(){
         const g = document.createElement("div"); g.className = "mapboxgl-ctrl mapboxgl-ctrl-group"; g.setAttribute("data-full-ctl", "1"); g.style.display = "none";
-        const b = document.createElement("button"); b.type = "button"; b.className = "sl-full-btn"; b.textContent = "⤢"; b.setAttribute("aria-label", "Full screen");
+        const b = document.createElement("button"); b.type = "button"; b.className = "sl-full-btn"; b.setAttribute("aria-label", "Full screen"); b.setAttribute("aria-pressed", "false");   // the glyph is CSS (::before)
         b.addEventListener("click", () => { const c = fullCtl.current; if(c.toggle) c.toggle(); });
         g.appendChild(b); fullCtl.current.box = g; fullCtl.current.btn = b; return g;
       },

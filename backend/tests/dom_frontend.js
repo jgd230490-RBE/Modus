@@ -2866,8 +2866,8 @@ async function fullScreenDom(){
   try {
     await act(async () => { r.render(w.React.createElement(w.DataManagement, { meta: META, who: "t", subTab: "locations", onSubTab(){} })); });
     mounted = true; await settle();
-    ok("⭐ FULL SCREEN: the map carries ONE control of its own for it, a named <button> (⤢ 'Full screen'), hidden while no site's layout is open",
-       ctlBox.querySelectorAll("[data-full-ctl]").length === 1 && !!btn() && btn().type === "button" && btn().textContent === "⤢"
+    ok("⭐ FULL SCREEN: the map carries ONE control of its own for it, a named <button> ('Full screen', its ⤢ drawn by CSS), hidden while no site's layout is open",
+       ctlBox.querySelectorAll("[data-full-ctl]").length === 1 && !!btn() && btn().type === "button" && btn().textContent === "" && btn().getAttribute("aria-pressed") === "false"
        && btn().getAttribute("aria-label") === "Full screen" && box().style.display === "none" && /mapboxgl-ctrl-group/.test(box().className));
     await press(el.querySelector('button[data-loc-open="L003"]'));
     ok("⭐ FULL SCREEN: opening a site (its Site layout card) shows the button; nothing is full screen yet",
@@ -2883,18 +2883,18 @@ async function fullScreenDom(){
     ok("FULL SCREEN: before Draw the map takes the window less a 380 px column for the site's panel (Q4); the SAME map div fills its card",
        !!g && g.style.gridTemplateColumns === "minmax(0, 1fr) 380px" && card.style.gridColumn === "1" && panel.style.gridColumn === "2"
        && panel.style.overflowY === "auto" && mapDiv.style.height === "100%");
-    ok("FULL SCREEN: the button turns into ⤡ 'Leave full screen' (pressed)",
-       btn().textContent === "⤡" && btn().getAttribute("aria-label") === "Leave full screen" && btn().getAttribute("aria-pressed") === "true");
+    ok("FULL SCREEN: the button turns into 'Leave full screen' (pressed; CSS draws ⤡)",
+       btn().textContent === "" && btn().getAttribute("aria-label") === "Leave full screen" && btn().getAttribute("aria-pressed") === "true");
     const notice = w.__TENANT.demo_notice, pill = el.querySelector(".sl-demo-on-map");
     ok("FULL SCREEN: the demo notice stays on screen while the header is covered (Q6): a DEMO pill on the map, only on a demo",
        notice ? (!!pill && pill.textContent === "DEMO" + notice) : !pill, String(notice));
     await act(async () => { doc.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); }); await settle();
     ok("⭐ FULL SCREEN: Esc does not leave it (Q2: Esc stays the drawing's)", !!grid());
     await act(async () => { fsEl = null; doc.dispatchEvent(new w.Event("fullscreenchange")); }); await settle();
-    ok("⭐ FULL SCREEN: Chrome leaving its own full screen (its Esc, F11) keeps the layout over the window (Q2)", !!grid() && btn().textContent === "⤡");
+    ok("⭐ FULL SCREEN: Chrome leaving its own full screen (its Esc, F11) keeps the layout over the window (Q2)", !!grid() && btn().getAttribute("aria-pressed") === "true");
     await press(btn());
     ok("FULL SCREEN: ⤡ leaves; Chrome is not asked again when it had already left (exitFullscreen 0); the page is no longer inert",
-       !grid() && FS.exit === 0 && btn().textContent === "⤢" && box().style.display === "" && !under.hasAttribute("inert") && !doc.querySelector("[inert]"));
+       !grid() && FS.exit === 0 && btn().getAttribute("aria-pressed") === "false" && box().style.display === "" && !under.hasAttribute("inert") && !doc.querySelector("[inert]"));
     under.remove();
     await press(btn());
     await press(btn());
