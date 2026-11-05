@@ -1805,7 +1805,8 @@ async function phoneShellDom(){
      // NARROWED 29 Oct 2026 (task 3a): + Pours after Stockpiles
      // NARROWED 29 Oct 2026 (the Simulation's own page): + Simulation first (it reads on a phone)
      // NARROWED 31 Oct 2026 (task 4a, PR 3a): + CLP documents after Pours
-     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Simulation|Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours|CLP documents|Locations|Routes|Zones|Config");
+     // NARROWED 5 Nov 2026 (group 6): + Concerns (Track, planners and admins) after CLP documents, a desk page
+     [...p.el.querySelectorAll("#phone-more button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Simulation|Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours|CLP documents|Concerns|Locations|Routes|Zones|Config");
   ok("PHONE (with G3): ...and with no Users item, the Users page cannot be reached on a phone by a planner",
      ![...p.el.querySelectorAll("#phone-more button.phone-more-item")].some(b => /Users/.test(b.textContent)));
   click([...p.el.querySelectorAll("#phone-more button.phone-more-item")].find(b => /Config/.test(b.textContent)));

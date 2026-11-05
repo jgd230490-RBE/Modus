@@ -2025,7 +2025,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && code.includes('className={"rail shrink-0 flex flex-col transition-[width] duration-150 "')
     && code.includes('className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}')
     && !code.includes('border-[color:var(--navy)] bg-slate-50 text-[color:var(--navy)] font-semibold'));
-  ok("...and the pending count is a muted number, not a gold badge", code.includes('<span className="rail-count" title={`${badge} line(s) waiting for approval`}>{badge}</span>'));
+  // NARROWED 5 Nov 2026 (group 6): the same muted count also carries the new concerns, with its own title
+  ok("...and the pending count is a muted number, not a gold badge", code.includes('<span className="rail-count" title={it.id === "concerns" ? `${badge} new concern(s)` : `${badge} line(s) waiting for approval`}>{badge}</span>'));
   // 11 Oct 2026 — the fresher shell (fresh-directions.html: A with B's orange button and kicker)
   ok("the action colour is its own token: deep orange with white text in the light looks (5.2:1), brand orange with ink text in dark (7.0:1)",
     /--action:#C2410C; --action-fg:#FFFFFF;/.test(html) && /--action:#FF8C14; --action-fg:#1F2024;/.test(html)
@@ -3728,7 +3729,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 14 Oct 2026 (merged with the mobile shell, D9): and only at 768 px and up; on a phone it is the desk card
   ok("G3: Users is an admin-only item, rendered only for an admin",
      code.includes('{ id: "users", label: "Users", glyph: "☺", adminOnly: true }') && code.includes('{page === "users" && isAdmin && !narrow && <UsersPage access={role} />}')
-     && code.includes(".map(g => ({ ...g, items: g.items.filter(i => !i.adminOnly || isAdmin) }))"));
+     // NARROWED 5 Nov 2026 (group 6): the same filter also drops an approverOnly item (Concerns) for a team code
+     && code.includes(".map(g => ({ ...g, items: g.items.filter(i => (!i.adminOnly || isAdmin) && (!i.approverOnly || canApprove)) }))"));
   ok("G3 (D51): only a DEMO login reports page opens", /if\(!role \|\| role\.kind !== "demo"\) return;\s*\n\s*fetch\(`\$\{API\}\/activity`/.test(code));
   const am = fnBody("AccountMenu");
   ok("G3: the account menu shows the team by NAME and offers a password change to staff logins only",
@@ -4435,8 +4437,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // NARROWED 31 Oct 2026 (task 4a, PR 3c): 13 — + Users → Client reviewers: the groups' and the reviewers' "⋯"
   // NARROWED 31 Oct 2026 (task 4c, PR 2): 14 — + each Site layout phase's "⋯" (Name and months, Copy to a new phase, Delete…)
   // NARROWED 31 Oct 2026 (task 4c, PR 3): 15 — + each pinned picture's "⋯" (Move corners, Fit to screen, Rename, every phase, Delete…)
+  // NARROWED 5 Nov 2026 (group 6): 16 — + each concern's "⋯" (Open, Reopen, Delete the personal details…)
   ok("⭐ 27 Oct: the '⋯' on six tables — Abnormal loads (with its note), Routes, Zones, the gates list, the logins, the demo leads, the teams",
-     menus.length === 15 && src.includes("<RowMenu name={p.name}>") && src.includes("<RowMenu name={g.name}>") && src.includes("<RowMenu name={x.words.slice(0, 60)}>") && src.includes('<RowMenu name={c.name + " · " + teamWord(c)}>') && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
+     menus.length === 16 && src.includes("<RowMenu name={c.id}>") && src.includes("<RowMenu name={p.name}>") && src.includes("<RowMenu name={g.name}>") && src.includes("<RowMenu name={x.words.slice(0, 60)}>") && src.includes('<RowMenu name={c.name + " · " + teamWord(c)}>') && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
      && src.includes("<RowMenu name={g.name || g.id}>") && (src.match(/<RowMenu name=\{u\.name\}>/g) || []).length === 3 && src.includes("<RowMenu name={t.label}>"), String(menus.length));
   ok("⭐ 27 Oct: Abnormal loads — one filled button for the forward step (AL_FORWARD: pending → approved → notified → moved; withdrawn → pending), the rest in the menu, Withdraw and Delete red and asking first",
      src.includes('const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved", withdrawn: "pending" };')

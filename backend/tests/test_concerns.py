@@ -251,6 +251,10 @@ ok("ticking on a real scheme without a privacy link keeps the form off", set_ten
    and concerns.settings()["form"] is False)
 ok("a privacy link turns the form on",
    set_tenant(concern_privacy_url="https://example.org/privacy") == [] and concerns.settings()["form"] is True)
+ok("🔴 outside the demo a send without the privacy tick is refused (Q12)",
+   refused(lambda: concerns.submit(form(), "ip-a", NOW), 422, "privacy notice") is not None and concerns.new_count() == 0)
+ok("... and with it, it is taken", concerns.submit(form(privacy_ok=True), "ip-a", NOW)["ref"] == "C-0001")
+db.execute("DELETE FROM concerns WHERE tenant_id = ?", (db.current_tenant(),))
 ok("the demo uses Wayscope's notice when none is typed",
    set_tenant(concern_privacy_url=None, demo_notice="Fictional scheme") == []
    and concerns.settings()["privacy_url"] == concerns.DEMO_PRIVACY_URL and concerns.settings()["form"] is True)

@@ -698,6 +698,44 @@
         #share-qr svg{ width:220px; height:220px; }
         #share-url{ width:100%; font:14px Inter,system-ui,sans-serif; padding:8px 10px; border:1px solid #D6D3D1; border-radius:6px; color:var(--ink); }
         #share-status{ min-height:20px; font-size:14px; color:var(--green); margin-top:6px; }
+        /* 5 Nov 2026 (group 6, mockup notes/report-concern-mockup-1105 cards 1-3): Report a concern. A button where the email
+           link was; the form a card on the right of the map (the whole screen on a phone); a click on the map drops the pin
+           (desk), a cross at the map's centre on a phone ("Use this place"). */
+        .concern-btn{ margin-top:8px; }
+        .concern-or{ margin:6px 0 0; font-size:14px; color:var(--note); }
+        .concern-or a{ color:var(--navy); }
+        #concern-panel{ position:fixed; z-index:42; top:0; right:0; bottom:0; width:min(400px, 100vw); background:#fff; border-left:1px solid var(--line);
+                        box-shadow:-8px 0 28px rgba(16,24,40,.12); display:flex; flex-direction:column; font-size:14px; line-height:1.45; color:var(--ink); }
+        #concern-panel[hidden]{ display:none; }
+        body.has-demo-notice #concern-panel{ top:var(--notice-h, 26px); }
+        body.wall-mode #concern-panel, body.wall-mode #cn-pick{ display:none; }
+        #concern-panel .cn-field{ margin:0 0 12px; }
+        #concern-panel .cn-lbl{ display:block; font-weight:600; margin-bottom:4px; color:var(--navy-deep); }
+        #concern-panel select, #concern-panel input[type=text], #concern-panel input[type=date], #concern-panel input[type=time],
+        #concern-panel input[type=email], #concern-panel textarea{ width:100%; box-sizing:border-box; min-height:44px; font:14px Inter,system-ui,sans-serif;
+                        padding:8px 10px; border:1px solid #A8A29E; border-radius:6px; color:var(--ink); background:#fff; }
+        #concern-panel textarea{ min-height:110px; resize:vertical; }
+        #concern-panel .cn-row{ display:flex; gap:10px; } #concern-panel .cn-row > .cn-field{ flex:1 1 0; min-width:0; }
+        #concern-panel .cn-hint{ margin:4px 0 0; font-size:14px; color:var(--note); }
+        #concern-panel .cn-check{ display:flex; gap:8px; align-items:center; min-height:44px; font-weight:600; color:var(--navy-deep); }
+        #concern-panel .cn-check input{ width:20px; height:20px; margin:0; }
+        #concern-panel .cn-demo{ margin:0 0 12px; padding:8px 10px; border-radius:6px; background:var(--surface-2); border:1px solid var(--line); }
+        #concern-panel .cn-pin{ padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface-2); }
+        #concern-panel .cn-pin b{ color:var(--navy-deep); }
+        #concern-panel .cn-actions{ display:flex; gap:8px; margin-top:6px; }
+        #concern-panel .cn-actions .btn{ flex:1 1 auto; width:auto; }
+        #concern-panel .cn-err{ margin:0 0 12px; padding:8px 10px; border-radius:6px; background:#FEF2F2; border:1px solid #FECACA; color:#B91C1C; }
+        #concern-panel .cn-err[hidden]{ display:none; }
+        #concern-panel .cn-trap{ position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden; }
+        #concern-panel .cn-ref{ font-size:20px; font-weight:700; color:var(--navy-deep); }
+        #cn-pick{ position:fixed; z-index:43; left:50%; bottom:calc(16px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); width:min(360px, calc(100vw - 24px));
+                  background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 28px rgba(16,24,40,.22); padding:10px 12px; font-size:14px; }
+        #cn-pick[hidden], #cn-cross[hidden]{ display:none; }
+        #cn-pick p{ margin:0 0 8px; color:var(--navy-deep); }
+        #cn-pick .cn-actions{ display:flex; gap:8px; } #cn-pick .btn{ flex:1 1 auto; width:auto; }
+        #cn-cross{ position:fixed; z-index:41; left:50%; top:50%; width:44px; height:44px; margin:-22px 0 0 -22px; pointer-events:none; }
+        #cn-cross::before, #cn-cross::after{ content:''; position:absolute; background:var(--action); box-shadow:0 0 0 2px #fff; }
+        #cn-cross::before{ left:21px; top:0; width:2px; height:44px; } #cn-cross::after{ top:21px; left:0; height:2px; width:44px; }
         /* ---- the PHONE SHELL (D30: the sheet at 767 and below; the stacked bar stays for 768-1023; 1024 and up unchanged) ----
            A full-screen map, one Layers button, one bottom sheet (peek: the month, the two lead figures, the conditions
            count; half: busiest routes and conditions; full: the filters and layers, which is the panel opened as a
@@ -1357,6 +1395,20 @@
   <div id="share-status" role="status" aria-live="polite"></div>
   <p class="mt-note" id="share-note">The link opens the map on this month with these layers and filters. It still asks for the map password.</p>
   <div class="concern-slot"></div>
+</div>
+
+<!-- 5 Nov 2026 (group 6, mockup notes/report-concern-mockup-1105 cards 2-3): the Report a concern form. Filled by
+     openConcernForm(); sent to /api/public/concerns (behind the map password), which answers with a reference only. -->
+<aside id="concern-panel" role="dialog" aria-labelledby="cn-title" hidden>
+  <div class="mt-head"><h2 id="cn-title" tabindex="-1">Report a concern</h2>
+    <button type="button" class="mt-close" onclick="closeConcernForm()" aria-label="Close the form" title="Close">&times;</button></div>
+  <div class="mt-body" id="cn-body"></div>
+</aside>
+<div id="cn-cross" aria-hidden="true" hidden></div>
+<div id="cn-pick" role="status" hidden>
+  <p id="cn-pick-words">Move the map so the cross is on the place.</p>
+  <div class="cn-actions"><button type="button" class="btn" onclick="concernUseCentre()">Use this place</button>
+    <button type="button" class="btn btn-ghost" onclick="concernPickCancel()">Back to the form</button></div>
 </div>
 
 <!-- 14 Oct 2026 (backlog item 2): the route map export — the routes the filters show, one month, two options. Staff only. -->
@@ -10103,15 +10155,220 @@
             + (monthLbl ? 'Month on the map: ' + monthLbl + '\n' : '') + (link ? 'The map view: ' + link + '\n' : '');
         return 'mailto:' + encodeURIComponent(addr).replace(/%40/g, '@') + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
     }
+    // 5 Nov 2026 (group 6, mockup notes/report-concern-mockup-1105 cards 1-3; John: "Yes, as recommended"): when the
+    // scheme has ticked Report a concern on (Config → Map and bulletin) AND has a privacy notice (the demo uses Wayscope's),
+    // each slot is a button that opens the form, with the email line under it for anyone who would rather email (Q1).
+    // Otherwise the slot keeps the email link of 12 Oct.
+    const CONCERN_KINDS = [['off_route', 'Lorry off its route'], ['driving', 'Driving or speed'], ['parked', 'Parked or waiting on the road'],
+        ['mud', 'Mud or debris on the road'], ['noise', 'Noise, dust or working hours'], ['damage', 'Damage to a road, verge or property'],
+        ['other', 'Something else']];
+    const CONCERN_DEMO_PRIVACY = 'https://wayscope.co.uk/privacy.html#concerns';
+    function concernPrivacyUrl(t) {
+        const u = t && typeof t.concern_privacy_url === 'string' ? t.concern_privacy_url.trim() : '';
+        return /^https:\/\/[^\s<>"']+$/.test(u) ? u : (t && t.demo_notice ? CONCERN_DEMO_PRIVACY : null);
+    }
+    function concernFormOn(t) { return !!(t && t.concerns_on === true && concernPrivacyUrl(t)); }
     function renderConcernLinks() {
-        const addr = concernAddress(TENANT);
+        const addr = concernAddress(TENANT), form = concernFormOn(TENANT);
         document.querySelectorAll('.concern-slot').forEach(slot => {
-            const html = addr
+            let html;
+            if (form) html = '<button type="button" class="btn btn-ghost concern-btn" onclick="openConcernForm()">Report a concern</button>'
+                + (addr ? '<p class="concern-or">or email <a href="' + escHtml(concernMailto(addr, TENANT.name, TL.on ? monthLabel(TL.month) : null, VIEW.ready ? shareUrl() : null)) + '">' + escHtml(addr) + '</a></p>' : '');
+            else html = addr
                 ? '<a class="concern-link" href="' + escHtml(concernMailto(addr, TENANT.name, TL.on ? monthLabel(TL.month) : null, VIEW.ready ? shareUrl() : null)) + '">Report a concern by email</a>'
                 : '<span class="concern-unset">Report a concern: no contact address yet'
                   + (TENANT.demo_notice ? ' (fictional demo)' : '') + '.</span>';
             if (slot.innerHTML !== html) slot.innerHTML = html;
         });
+    }
+
+    // The form. The person picks a place (desk: a click on the map; phone: a cross at the map's centre, "Use this place"),
+    // a kind, the date, what happened; a registration and contact details only if they want to. No photos or files (Q11).
+    // The server checks everything again and answers with the reference only (Q5): no list, no other person's concern.
+    const CN = { open: false, opener: null, pin: null, marker: null, picking: false, down: null, sending: false };
+    function cnToday() {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    function concernRouteOptions(rid) {
+        const rp = routePropsById();
+        return '<option value="">Not sure</option>' + Object.keys(rp).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+            .map(k => '<option value="' + escHtml(k) + '"' + (k === rid ? ' selected' : '') + '>'
+                + escHtml((rp[k].origin || '—') + ' → ' + (rp[k].dest || '—')) + '</option>').join('');
+    }
+    function concernFormHTML(rid) {
+        const demo = !!TENANT.demo_notice, priv = concernPrivacyUrl(TENANT);
+        const months = Number(TENANT.concern_keep_months) > 0 ? Number(TENANT.concern_keep_months) : 12;
+        return '<form id="cn-form" novalidate onsubmit="event.preventDefault(); sendConcern();">'
+            + (demo ? '<p class="cn-demo">This is a fictional demo scheme. What you send reaches Wayscope, not a real project.</p>' : '')
+            + '<p class="cn-err" id="cn-err" role="alert" hidden></p>'
+            + '<div class="cn-field"><span class="cn-lbl">Where</span>'
+            + '<div class="cn-pin" id="cn-pin"></div>'
+            + '<button type="button" class="btn btn-ghost" id="cn-move" onclick="concernPickStart()" style="margin-top:6px">Move the pin</button></div>'
+            + '<div class="cn-field"><label class="cn-lbl" for="cn-route">Which route, if you know</label><select id="cn-route">' + concernRouteOptions(rid) + '</select></div>'
+            + '<div class="cn-field"><label class="cn-lbl" for="cn-kind">What kind</label><select id="cn-kind" required><option value="">Pick one</option>'
+            + CONCERN_KINDS.map(k => '<option value="' + k[0] + '">' + escHtml(k[1]) + '</option>').join('') + '</select></div>'
+            + '<div class="cn-row"><div class="cn-field"><label class="cn-lbl" for="cn-date">Date</label><input type="date" id="cn-date" required max="' + cnToday() + '" value="' + cnToday() + '"></div>'
+            + '<div class="cn-field"><label class="cn-lbl" for="cn-time">Time, if known</label><input type="time" id="cn-time"></div></div>'
+            + '<div class="cn-field"><label class="cn-lbl" for="cn-words">What happened</label><textarea id="cn-words" maxlength="1000" required aria-describedby="cn-words-hint"></textarea>'
+            + '<p class="cn-hint" id="cn-words-hint">Up to 1,000 characters, no web links. Please leave out anything about your health or other people.</p></div>'
+            + '<div class="cn-field"><label class="cn-lbl" for="cn-reg">Lorry registration, if seen</label><input type="text" id="cn-reg" maxlength="10" autocomplete="off"></div>'
+            + '<div class="cn-field"><label class="cn-check"><input type="checkbox" id="cn-wants" onchange="concernWantsReply()"> I would like a reply</label></div>'
+            + '<div id="cn-contact" hidden><div class="cn-row"><div class="cn-field"><label class="cn-lbl" for="cn-name">Name</label><input type="text" id="cn-name" maxlength="120" autocomplete="name"></div>'
+            + '<div class="cn-field"><label class="cn-lbl" for="cn-reach">Email or phone</label><input type="text" id="cn-reach" maxlength="200" autocomplete="email"></div></div></div>'
+            + '<p class="cn-hint">Your contact details are used only to answer you and are deleted ' + months + ' months after the concern is closed. '
+            + '<a href="' + escHtml(priv) + '" target="_blank" rel="noopener">Privacy notice</a></p>'
+            + (demo ? '' : '<div class="cn-field"><label class="cn-check"><input type="checkbox" id="cn-privacy"> I have read the privacy notice</label></div>')
+            + '<div class="cn-trap" aria-hidden="true"><label for="cn-website">Leave this empty</label><input type="text" id="cn-website" name="website" tabindex="-1" autocomplete="off"></div>'
+            + '<div class="cn-actions"><button type="submit" class="btn" id="cn-send">Send</button>'
+            + '<button type="button" class="btn btn-ghost" onclick="closeConcernForm()">Cancel</button></div>'
+            + '</form>';
+    }
+    function concernWantsReply() {
+        const w = document.getElementById('cn-wants'), c = document.getElementById('cn-contact');
+        if (w && c) c.hidden = !w.checked;
+    }
+    function concernPinWords() {
+        const box = document.getElementById('cn-pin'), move = document.getElementById('cn-move');
+        if (!box) return;
+        if (CN.pin) box.innerHTML = '<b>Pin placed</b> on the map.' + (isPhoneShell() && CN.pin.centre ? ' It is at the map’s centre: move it to where it happened.' : '');
+        else box.innerHTML = isPhoneShell() ? 'Press Move the pin, then put the cross on the place.' : '<b>Click the map</b> where it happened.';
+        if (move) { move.hidden = !isPhoneShell(); move.textContent = CN.pin ? 'Move the pin' : 'Place the pin'; }
+        if (CN.pin && !isPhoneShell()) box.innerHTML += ' Click the map again to move it.';
+    }
+    function concernSetPin(lngLat, centre) {
+        if (!lngLat || !isFinite(lngLat.lng) || !isFinite(lngLat.lat)) return;
+        CN.pin = { lng: Math.round(lngLat.lng * 1e6) / 1e6, lat: Math.round(lngLat.lat * 1e6) / 1e6, centre: !!centre };
+        try {
+            if (!CN.marker && typeof mapboxgl !== 'undefined' && mapboxgl.Marker) CN.marker = new mapboxgl.Marker({ color: '#C2410C' });
+            if (CN.marker) CN.marker.setLngLat([CN.pin.lng, CN.pin.lat]).addTo(map);
+        } catch (e) {}
+        concernPinWords();
+    }
+    function openConcernForm(rid) {
+        if (!concernFormOn(TENANT)) return;
+        const panel = document.getElementById('concern-panel'), body = document.getElementById('cn-body');
+        if (!panel || !body) return;
+        if (typeof closeSharePanel === 'function') closeSharePanel();
+        if (typeof closeMonthText === 'function') closeMonthText();
+        CN.opener = document.activeElement;
+        CN.open = true; CN.sending = false;
+        body.innerHTML = concernFormHTML(rid ? String(rid) : '');
+        document.getElementById('cn-title').textContent = 'Report a concern';
+        if (!CN.pin && isPhoneShell()) { try { concernSetPin(map.getCenter(), true); } catch (e) {} }
+        concernPinWords();
+        panel.hidden = false;
+        const h = document.getElementById('cn-title'); if (h) h.focus();
+    }
+    function closeConcernForm() {
+        const panel = document.getElementById('concern-panel');
+        concernPickCancel(true);
+        if (!panel || panel.hidden) return;
+        panel.hidden = true; CN.open = false; CN.pin = null;
+        try { if (CN.marker) CN.marker.remove(); } catch (e) {}
+        if (CN.opener && CN.opener.focus && document.body.contains(CN.opener)) { try { CN.opener.focus(); } catch (e) {} }
+    }
+    // the phone: the form steps aside, a cross marks the map's centre, the person moves the map under it
+    function concernPickStart() {
+        if (!isPhoneShell()) { concernPinWords(); const m = document.getElementById('cn-move'); if (m) m.blur(); return; }
+        CN.picking = true;
+        const panel = document.getElementById('concern-panel'); if (panel) panel.hidden = true;
+        const cross = document.getElementById('cn-cross'), pick = document.getElementById('cn-pick');
+        if (CN.pin) { try { map.setCenter([CN.pin.lng, CN.pin.lat]); } catch (e) {} }
+        if (cross) cross.hidden = false;
+        if (pick) { pick.hidden = false; const b = pick.querySelector('.btn'); if (b) b.focus(); }
+    }
+    function concernUseCentre() {
+        try { concernSetPin(map.getCenter(), false); } catch (e) {}
+        concernPickCancel();
+    }
+    function concernPickCancel(closing) {
+        const cross = document.getElementById('cn-cross'), pick = document.getElementById('cn-pick');
+        if (cross) cross.hidden = true;
+        if (pick) pick.hidden = true;
+        if (!CN.picking) return;
+        CN.picking = false;
+        if (closing === true) return;
+        const panel = document.getElementById('concern-panel');
+        if (panel && CN.open) { panel.hidden = false; const m = document.getElementById('cn-move'); if (m) m.focus(); }
+    }
+    // the desk: while the form is open a click on the map drops the pin and nothing else (no route card, no popup). The
+    // click is taken before the map sees it; a drag of the map is not a click (it moved more than 6 px).
+    document.addEventListener('mousedown', e => { CN.down = { x: e.clientX, y: e.clientY }; }, true);
+    document.addEventListener('click', e => {
+        if (!CN.open || isPhoneShell() || !map || typeof map.getCanvasContainer !== 'function') return;
+        const cc = map.getCanvasContainer();
+        if (!cc || !cc.contains(e.target)) return;
+        const d = CN.down;
+        if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6) return;
+        e.stopPropagation(); e.preventDefault();
+        const r = cc.getBoundingClientRect();
+        try { concernSetPin(map.unproject([e.clientX - r.left, e.clientY - r.top]), false); } catch (err) {}
+    }, true);
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        if (CN.picking) { concernPickCancel(); return; }
+        if (CN.open) closeConcernForm();
+    });
+    function concernSay(words) {
+        const el = document.getElementById('cn-err');
+        if (!el) return;
+        el.textContent = words || ''; el.hidden = !words;
+        if (words) try { el.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+    }
+    function concernBody() {
+        const v = id => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+        const wants = !!(document.getElementById('cn-wants') || {}).checked;
+        const reach = wants ? v('cn-reach') : '';
+        const body = { kind: v('cn-kind'), words: v('cn-words'), happened_on: v('cn-date'), happened_time: v('cn-time') || null,
+            registration: v('cn-reg') || null, route_id: v('cn-route') || null, wants_reply: wants,
+            name: wants ? (v('cn-name') || null) : null, email: reach.indexOf('@') >= 0 ? reach : null,
+            phone: reach && reach.indexOf('@') < 0 ? reach : null, website: v('cn-website') };
+        if (CN.pin) { body.lat = CN.pin.lat; body.lon = CN.pin.lng; }
+        const pv = document.getElementById('cn-privacy');
+        if (pv) body.privacy_ok = !!pv.checked;
+        return body;
+    }
+    // the first problem in the form, in words, or '' (the server checks it all again)
+    function concernProblem(b) {
+        if (b.lat == null && !b.route_id) return isPhoneShell() ? 'Put the pin on the place, or pick a route.' : 'Click the map where it happened, or pick a route.';
+        if (!b.kind) return 'Pick what kind of concern it is.';
+        if (!b.happened_on) return 'Give the date it happened.';
+        if (!b.words) return 'Say what happened.';
+        if (b.wants_reply && !b.email && !b.phone) return 'To get a reply, give an email address or a phone number.';
+        if (b.privacy_ok === false) return 'Please tick that you have read the privacy notice.';
+        return '';
+    }
+    function sendConcern() {
+        if (CN.sending) return;
+        const b = concernBody(), problem = concernProblem(b);
+        if (problem) { concernSay(problem); return; }
+        concernSay('');
+        CN.sending = true;
+        const btn = document.getElementById('cn-send'); if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+        fetch('/api/public/concerns', { method: 'POST', credentials: 'same-origin',
+                                        headers: { 'Content-Type': 'application/json', 'X-Wayscope': '1' }, body: JSON.stringify(b) })
+            .then(r => r.json().catch(() => ({})).then(j => ({ r, j })))
+            .then(({ r, j }) => {
+                if (r.ok && j && j.ok) { concernThanks(j.ref); return; }
+                const said = j && typeof j.detail === 'string' && j.detail.length < 300 && r.status !== 403 ? j.detail : '';
+                concernSay(r.status === 401 ? 'Your map sign-in has ended. Reload the page and sign in again; nothing was sent.'
+                    : said ? 'Not sent. ' + said : 'Not sent. Wayscope could not take it just now. Try again in a minute.');
+                if (!said && r.status >= 500) console.warn('Wayscope: concern send', r.status);
+            })
+            .catch(() => concernSay('Not sent. Check your connection and try again.'))
+            .finally(() => { CN.sending = false; const b2 = document.getElementById('cn-send'); if (b2) { b2.disabled = false; b2.textContent = 'Send'; } });
+    }
+    function concernThanks(ref) {
+        const body = document.getElementById('cn-body'), title = document.getElementById('cn-title');
+        if (!body) return;
+        const days = Number(TENANT.concern_reply_days) > 0 ? Number(TENANT.concern_reply_days) : null;
+        if (title) title.textContent = 'Thank you';
+        body.innerHTML = (ref ? '<p>Your reference is <span class="cn-ref">' + escHtml(ref) + '</span>.</p>' : '<p>Thank you, it has been sent.</p>')
+            + (days ? '<p class="cn-hint">The team will reply within ' + days + ' working day' + (days === 1 ? '' : 's') + ' if you left a way to reach you.</p>' : '')
+            + '<div class="cn-actions"><button type="button" class="btn btn-ghost" onclick="closeConcernForm()">Back to the map</button></div>';
+        try { if (CN.marker) CN.marker.remove(); } catch (e) {}
+        if (title) title.focus();
     }
 
     // ---------------------------------------------------------------- the month as text (review 2.1 third row, 2.3)
@@ -10447,6 +10704,7 @@
         html += routeWordsHTML(rid);
         html += '<p class="mt-note">Hours, responsible organisation, consent reference: not given yet'
               + (TENANT.demo_notice ? ' (fictional demo)' : '') + '.</p>'
+              + (concernFormOn(TENANT) ? '<button type="button" class="btn btn-ghost" data-concern-route="' + escHtml(rid) + '" onclick="openConcernForm(this.dataset.concernRoute)">Report a concern about this route</button>' : '')
               + '<button type="button" class="btn btn-ghost" onclick="closeRouteCard()">Close the route card</button>';
         return html;
     }

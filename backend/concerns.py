@@ -376,6 +376,9 @@ def submit(form, ip_hash, now=None):
     if hp and (not isinstance(hp, str) or hp.strip()):
         return {"ok": True, "ref": None}
     c = _checked(f, today=now.date())
+    # Q12: outside the demo the form carries the privacy notice's tick, and the server holds it to that
+    if not st["demo"] and f.get("privacy_ok") is not True:
+        raise Refused("Please tick that you have read the privacy notice.")
     msg = over_limit(ip_hash, now)
     if msg:
         raise Refused(msg + (f" Please email {st['email']}." if st["email"] else ""), 429)
@@ -449,7 +452,17 @@ def listing(status=None, kind=None, route=None, month=None, now=None):
         " ORDER BY received_at DESC, id DESC"
     st = settings()
     rows = [_row(r, st["reply_days"]) for r in db.query(sql, (db.current_tenant(),) + tuple(params))]
-    return {"concerns": rows, "new": new_count(), "kinds": KINDS, "outcomes": OUTCOMES, "settings": st}
+    return {"concerns": rows, "new": new_count(), "kinds": KINDS, "outcomes": OUTCOMES, "settings": st,
+            "routes": route_names()}
+
+
+def route_names():
+    """Every route as {id, words: "Origin → Destination"} for the page's route picker and its Where column."""
+    names = {r["id"]: r["name"] for r in db.query("SELECT id, name FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
+    rows = db.query("SELECT id, origin_id, dest_id FROM routes WHERE tenant_id = ?", (db.current_tenant(),))
+    out = [{"id": r["id"], "words": f"{names.get(r['origin_id'], r['origin_id'])} → {names.get(r['dest_id'], r['dest_id'])}"}
+           for r in rows]
+    return sorted(out, key=lambda x: [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", str(x["id"]))])
 
 
 def new_count():

@@ -4656,6 +4656,232 @@ function fmtWhen(iso){
       + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); } catch(e){ return iso || ""; }
 }
 
+// ================================================================= Track → Concerns (5 Nov 2026, group 6)
+// The approved mockup notes\report-concern-mockup-1105\ cards 4–5 (John: "Yes, as recommended"). Planners and admins
+// only (Q4): a concern holds a member of the public's words and contact. One row a concern, newest first; the name
+// (the reference) opens it; one next step + the "⋯" menu. Replies are RECORDED here and sent from the person's own email
+// or phone (Q6): Wayscope emails no member of the public. The first reply recorded starts the KPI clock.
+const CN_STATUS = { new: ["New", "warn"], answered: ["Answered", "ok"], closed: ["Closed", "none"] };
+function cnNowLocal(){
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function cnDay(iso){
+  try { const d = new Date(iso.length === 10 ? iso + "T12:00:00" : iso); if(isNaN(d)) return iso || "";
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); } catch(e){ return iso || ""; }
+}
+function cnDays(n){ return n == null ? "—" : `${n} day${n === 1 ? "" : "s"}`; }
+const CN_BLANK = { kind: "", words: "", happened_on: "", happened_time: "", registration: "", route_id: "", source: "email",
+                   wants_reply: false, name: "", email: "", phone: "" };
+function ConcernsPage({ onCount }){
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [tick, setTick] = useState(0);
+  const [flt, setFlt] = useState({ status: "open", kind: "", route: "", month: "" });
+  const [openId, setOpenId] = useState(null);
+  const [one, setOne] = useState(null);
+  const [reply, setReply] = useState({ words: "", at: cnNowLocal() });
+  const [outcome, setOutcome] = useState("");
+  const [routePick, setRoutePick] = useState("");
+  const [adding, setAdding] = useState(null);
+  const [note, setNote] = useState(null);
+  const headRef = useRef(null), addRef = useRef(null), openerRef = useRef(null);
+  useEffect(() => {
+    let live = true;
+    const q = new URLSearchParams();
+    Object.entries(flt).forEach(([k, v]) => { if(v) q.set(k, v); });
+    fetch(`${API}/concerns?${q}`).then(okJSON)
+      .then(d => { if(live){ setData(d); setErr(""); if(onCount) onCount(d.new || 0); } })
+      .catch(e => { if(live) setErr(errSay("The concerns did not load.", e)); });
+    return () => { live = false; };
+  }, [tick, flt]);
+  useEffect(() => {
+    if(!openId){ setOne(null); return; }
+    let live = true;
+    fetch(`${API}/concerns/${encodeURIComponent(openId)}`).then(okJSON)
+      .then(c => { if(live){ setOne(c); setRoutePick(c.route_id || ""); } })
+      .catch(e => { if(live){ setOne(null); say(false, errSay("The concern did not open.", e)); } });
+    return () => { live = false; };
+  }, [openId, tick]);
+  useEffect(() => { if(one && headRef.current) headRef.current.focus(); }, [one && one.id]);
+  useEffect(() => { if(adding && addRef.current) addRef.current.focus(); }, [!!adding]);
+  const say = (ok, text) => { setNote({ ok, text }); if(ok) setTimeout(() => setNote(null), 2500); };
+  if(err) return <div className="max-w-7xl mx-auto p-6"><EmptyState kind="error" title="Couldn't open the concerns" body={err} action={<button type="button" className="btn-sec" onClick={() => setTick(t => t + 1)}>Try again</button>} /></div>;
+  if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;
+  const list = data.concerns || [], kinds = data.kinds || {}, outcomes = data.outcomes || {}, st = data.settings || {};
+  const routes = data.routes || [], routeWords = (id) => ((routes.find(r => r.id === id) || {}).words || "");
+  const where = (c) => [c.route_id ? `${c.route_id}${routeWords(c.route_id) ? " " + routeWords(c.route_id) : ""}` : "", c.area_name].filter(Boolean).join(" · ") || (c.lat != null ? "Pin, no route near" : "—");
+  const openOne = (c, e) => { openerRef.current = e && e.currentTarget; setAdding(null); setReply({ words: "", at: cnNowLocal() }); setOutcome(""); setOpenId(c.id); };
+  const closeOne = () => { setOpenId(null); setOne(null); if(openerRef.current && openerRef.current.focus) try { openerRef.current.focus(); } catch(e){} };
+  const act = (path, body, what, done) => postJSON(path, body)
+    .then(c => { say(true, done || "Saved."); setOne(c && c.id ? c : null); setTick(t => t + 1); return true; })
+    .catch(e => { say(false, errSay(what, e)); return false; });
+  const saveReply = () => {
+    if(!reply.words.trim()){ say(false, "Not saved. Say what was said."); return; }
+    const at = reply.at ? new Date(reply.at).toISOString() : null;
+    act(`/concerns/${one.id}/reply`, { words: reply.words, at }, "The reply was not saved.", "Reply recorded.")
+      .then(ok => { if(ok) setReply({ words: "", at: cnNowLocal() }); });
+  };
+  const closeIt = () => { if(!outcome){ say(false, "Not closed. Pick an outcome."); return; }
+    act(`/concerns/${one.id}/close`, { outcome }, "The concern was not closed.", "Closed."); };
+  const forget = (c) => { if(window.confirm(`Delete the personal details of ${c.id} now? The name, contact, words, registration and reply notes go; the kind, date and route stay for the figures. This cannot be undone.`))
+    act(`/concerns/${c.id}/forget`, {}, "The personal details were not deleted.", "Personal details deleted."); };
+  const saveAdd = () => {
+    const f = adding;
+    postJSON("/concerns", { ...f, route_id: f.route_id || null, happened_time: f.happened_time || null, registration: f.registration || null })
+      .then(c => { say(true, `Added as ${c.id}.`); setAdding(null); setTick(t => t + 1); setOpenId(c.id); })
+      .catch(e => say(false, errSay("The concern was not added.", e)));
+  };
+  const setF = (k) => (e) => setFlt(f => ({ ...f, [k]: e.target.value }));
+  const setA = (k) => (e) => { const v = e.target.type === "checkbox" ? e.target.checked : e.target.value; setAdding(a => ({ ...a, [k]: v })); };
+  const fld = (k, label, attrs) => (
+    <div className="pour-fld"><label htmlFor={"cn-add-" + k}>{label}</label>
+      <input id={"cn-add-" + k} className="ctl w-full" value={adding[k]} onChange={setA(k)} {...(attrs || {})} /></div>
+  );
+  return (
+    <div className="max-w-7xl mx-auto p-6 pb-2" data-page="concerns">
+      <PageHeader title="Concerns" kicker="Track" subtitle="From the public map, email, phone or in person."
+        actions={<button type="button" className="btn-pri" data-concern-add="1" onClick={() => { setOpenId(null); setAdding({ ...CN_BLANK, happened_on: cnNowLocal().slice(0, 10) }); }}>+ Add a concern</button>} />
+      {note && <p className="text-sm mb-3" style={{ color: note.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{note.text}</p>}
+      {!st.on && <p className="text-sm text-slate-600 mb-3" data-concern-off="1">The public map's form is off. Switch it on in Config → Map and bulletin → Contact lines.</p>}
+      {adding && (
+        <div className="card p-4 mb-4" data-concern-editor="1">
+          <h2 className="text-lg font-semibold text-slate-800 mb-1" tabIndex={-1} ref={addRef}>New concern</h2>
+          <div className="pour-form">
+            <div className="pour-fld"><label htmlFor="cn-add-source">Came in by</label>
+              <select id="cn-add-source" className="ctl w-full" value={adding.source} onChange={setA("source")}>
+                <option value="email">Email</option><option value="phone">Phone</option><option value="person">In person</option></select></div>
+            <div className="pour-fld"><label htmlFor="cn-add-kind">Kind</label>
+              <select id="cn-add-kind" className="ctl w-full" value={adding.kind} onChange={setA("kind")}>
+                <option value="">Pick one</option>{Object.entries(kinds).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+            {fld("happened_on", "Date", { type: "date" })}
+            {fld("happened_time", "Time, if known", { type: "time" })}
+            <div className="pour-fld pour-wide"><label htmlFor="cn-add-route">Route</label>
+              <select id="cn-add-route" className="ctl w-full" value={adding.route_id} onChange={setA("route_id")}>
+                <option value="">Choose a route…</option>{routes.map(r => <option key={r.id} value={r.id}>{r.id} {r.words}</option>)}</select></div>
+            <div className="pour-fld pour-wide"><label htmlFor="cn-add-words">What happened</label>
+              <textarea id="cn-add-words" className="ctl w-full" rows={3} maxLength={1000} value={adding.words} onChange={setA("words")} /></div>
+            {fld("registration", "Registration", { maxLength: 10 })}
+            <div className="pour-fld"><label className="flex items-center gap-2" style={{ minHeight: 44 }}>
+              <input type="checkbox" checked={adding.wants_reply} onChange={setA("wants_reply")} /> Wants a reply</label></div>
+            {adding.wants_reply && fld("name", "Name", { maxLength: 120 })}
+            {adding.wants_reply && fld("email", "Email", { type: "email", maxLength: 200 })}
+            {adding.wants_reply && fld("phone", "Phone", { maxLength: 30 })}
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button type="button" className="btn-pri" onClick={saveAdd} data-concern-save="1">Add</button>
+            <button type="button" className="btn-sec" onClick={() => setAdding(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {one && (
+        <div className="card p-4 mb-4" data-concern-detail={one.id}>
+          <div className="flex flex-wrap items-center gap-3 mb-2">
+            <h2 className="text-lg font-semibold text-slate-800 flex-1" tabIndex={-1} ref={headRef}>{one.id} · {one.kind_text}</h2>
+            <RowStatus word={(CN_STATUS[one.status] || [one.status])[0]} tone={(CN_STATUS[one.status] || [])[1]} />
+            <button type="button" className="btn-sec" onClick={closeOne}>Close the panel</button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-sm mb-2"><b>{cnDay(one.happened_on)}{one.happened_time ? `, about ${one.happened_time}` : ""}.</b>{" "}
+                {one.words || <span className="text-slate-500">The words were deleted with the personal details.</span>}</p>
+              <p className="text-[13px] text-slate-500 mb-2">{where(one)}{one.route_set_by === "pin" ? " (nearest to the pin)" : ""}
+                {one.lat != null ? ` · pin ${Number(one.lat).toFixed(4)}, ${Number(one.lon).toFixed(4)}` : ""}</p>
+              <p className="text-[13px] text-slate-500 mb-3">Registration: {one.registration || "not given"}. Received {fmtWhen(one.received_at)} by {one.source_text}.</p>
+              <h3 className="font-semibold text-slate-800 mb-1">Contact</h3>
+              {one.personal_deleted_at || one.contact_deleted_at
+                ? <p className="text-sm text-slate-600 mb-3">Personal details deleted on {cnDay(one.personal_deleted_at || one.contact_deleted_at)}.</p>
+                : !one.wants_reply ? <p className="text-sm text-slate-600 mb-3">No reply asked for; no contact kept.</p>
+                : <div className="text-sm mb-3" data-concern-contact="1">
+                    <p>{[one.name, one.email, one.phone].filter(Boolean).join(" · ")}</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {one.email && <a className="btn-sec" href={`mailto:${one.email}?subject=${encodeURIComponent("Your concern " + one.id)}`}>Email the reporter</a>}
+                      {one.phone && <a className="btn-sec" href={`tel:${String(one.phone).replace(/[^0-9+]/g, "")}`}>Call the reporter</a>}
+                    </div>
+                    <p className="text-[13px] text-slate-500 mt-1">Deleted {st.keep_months || 12} months after closing.{" "}
+                      <button type="button" className="link-btn" onClick={() => forget(one)}>Delete now</button></p>
+                  </div>}
+              <h3 className="font-semibold text-slate-800 mb-1">History</h3>
+              <ul className="text-[13px] text-slate-600 list-none p-0 m-0" data-concern-history="1">
+                {(one.history || []).map((h, i) => <li key={i} className="mb-1">{fmtWhen(h.at)} · {h.what}{h.by ? ` · ${h.by}` : ""}{h.words ? <span className="block text-slate-700">{h.words}</span> : null}</li>)}
+              </ul>
+            </div>
+            <div>
+              <div className="pour-fld mb-3"><label htmlFor="cn-route-pick">Route</label>
+                <div className="flex gap-2">
+                  <select id="cn-route-pick" className="ctl w-full" value={routePick} onChange={e => setRoutePick(e.target.value)}>
+                    <option value="">No route</option>{routes.map(r => <option key={r.id} value={r.id}>{r.id} {r.words}</option>)}</select>
+                  <button type="button" className="btn-sec" disabled={routePick === (one.route_id || "") || !routePick}
+                    onClick={() => act(`/concerns/${one.id}/route`, { route_id: routePick }, "The route was not changed.")}>Save</button></div></div>
+              {one.status !== "closed" ? <>
+                <div className="pour-fld mb-2"><label htmlFor="cn-reply">Record a reply</label>
+                  <textarea id="cn-reply" className="ctl w-full" rows={3} maxLength={1000} value={reply.words} placeholder="What was said, and by what means"
+                    onChange={e => setReply(r => ({ ...r, words: e.target.value }))} /></div>
+                <div className="pour-fld mb-2"><label htmlFor="cn-reply-at">Replied on</label>
+                  <input id="cn-reply-at" type="datetime-local" className="ctl w-full" value={reply.at} max={cnNowLocal()} onChange={e => setReply(r => ({ ...r, at: e.target.value }))} /></div>
+                <button type="button" className="btn-pri mb-4" onClick={saveReply} data-concern-reply="1">Save the reply</button>
+                <div className="pour-fld mb-2"><label htmlFor="cn-outcome">Close with</label>
+                  <select id="cn-outcome" className="ctl w-full" value={outcome} onChange={e => setOutcome(e.target.value)}>
+                    <option value="">Pick an outcome</option>{Object.entries(outcomes).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+                <button type="button" className="btn-sec" onClick={closeIt} data-concern-close="1">Close the concern</button>
+              </> : <>
+                <p className="text-sm mb-2">Closed on {cnDay(one.closed_at)}: {one.outcome_text}.</p>
+                {!one.personal_deleted_at && <button type="button" className="btn-sec" onClick={() => act(`/concerns/${one.id}/reopen`, {}, "The concern was not reopened.", "Reopened.")}>Reopen</button>}
+              </>}
+              <p className="text-[13px] text-slate-500 mt-3">First reply: {cnDays(one.first_reply_days)} · to close: {cnDays(one.close_days)} (working days).</p>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2 mb-3" data-concern-filters="1">
+        <select className="ctl" aria-label="Status" value={flt.status} onChange={setF("status")}>
+          <option value="open">Open</option><option value="new">New</option><option value="answered">Answered</option><option value="closed">Closed</option><option value="">All</option></select>
+        <select className="ctl" aria-label="Kind" value={flt.kind} onChange={setF("kind")}>
+          <option value="">Every kind</option>{Object.entries(kinds).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+        <select className="ctl" aria-label="Route" value={flt.route} onChange={setF("route")}>
+          <option value="">Every route</option>{routes.map(r => <option key={r.id} value={r.id}>{r.id} {r.words}</option>)}</select>
+        <input className="ctl" type="month" aria-label="Month received" value={flt.month} onChange={setF("month")} />
+        <span className="ml-auto text-sm text-slate-500 tabular-nums">{list.length} shown · {data.new || 0} new</span>
+      </div>
+      {!list.length ? (
+        <EmptyState kind={flt.status === "open" && !flt.kind && !flt.route && !flt.month ? "none" : "nomatch"}
+          title={flt.status === "open" ? "No open concerns" : "No concerns match"} body="New ones from the public map appear here." />
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="tbl" data-concerns-table="1">
+            <thead><tr><th>Concern</th><th>Kind</th><th>Where</th><th>Status</th><th className="num">First reply</th><th className="w-10"><span className="sr-only">Actions</span></th></tr></thead>
+            <tbody>
+              {list.map(c => {
+                const [word, tone] = CN_STATUS[c.status] || [c.status, "none"];
+                return (
+                  <tr key={c.id} data-concern-row={c.id}>
+                    <td style={{ whiteSpace: "normal" }}>
+                      <button type="button" className="row-open" aria-label={`Open ${c.id}`} onClick={(e) => openOne(c, e)}>{c.id}</button>
+                      <span className="block text-[12px] text-slate-500">{fmtWhen(c.received_at)} · {c.source_text}</span>
+                    </td>
+                    <td style={{ whiteSpace: "normal" }}>{c.kind_text}</td>
+                    <td style={{ whiteSpace: "normal" }}>{where(c)}</td>
+                    <td className="rd-status"><RowStatus word={word} tone={c.late ? "bad" : tone} />
+                      {c.late && <span className="block text-[12px]" style={{ color: "var(--bad-text)" }} data-concern-late="1">{cnDays(c.waiting_days)} waiting</span>}</td>
+                    <td className="num tabular-nums">{cnDays(c.first_reply_days)}</td>
+                    <td><div className="flex items-center gap-1 justify-end">
+                      {c.status === "new" && <button type="button" className="btn-pri" style={{ padding: "4px 10px" }} onClick={(e) => openOne(c, e)}>Open</button>}
+                      <RowMenu name={c.id}>
+                        <button type="button" onClick={(e) => openOne(c, e)}>Open</button>
+                        {c.status === "closed" && !c.personal_deleted_at && <button type="button" onClick={() => act(`/concerns/${c.id}/reopen`, {}, "The concern was not reopened.", "Reopened.")}>Reopen</button>}
+                        {!c.personal_deleted_at && <button type="button" style={{ color: "var(--red)" }} onClick={() => forget(c)}>Delete the personal details…</button>}
+                      </RowMenu></div></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ================================================================= Abnormal loads (22 Oct 2026, S16 / B5)
 //
 // Each abnormal load is its own planned movement (D66a): what it is, the team, from and to (gate), a window and a
@@ -7166,6 +7392,8 @@ const NAV = [
   ]},
   { group: "Track", items: [
     { id: "lookahead", label: "Look-ahead", glyph: "◔" },
+    // 5 Nov 2026 (group 6): concerns from the public map, email, phone or in person — planners and admins only (Q4)
+    { id: "concerns", label: "Concerns", glyph: "!", approverOnly: true },
   ]},
   { group: "Data", admin: true, items: [
     { id: "locations", label: "Locations", glyph: "◉" },
@@ -7198,6 +7426,7 @@ const NAV_ICON = {
   abnormal: "M4 14h16M6 14v3M18 14v3M3 17h2M8 17h8M19 17h2M5 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 14V8h10v6M2 11h3M19 11h3",
   simulation: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM10 8.5l6 3.5-6 3.5z",
   clp: "M7 3h7l5 5v13H7zM14 3v5h5M10 12h6M10 15.5h6M10 19h4",
+  concerns: "M4 5h16v11H10l-5 4v-4H4zM12 8v4M12 14.5h.01",
 };
 function NavIcon({ id }){
   return <svg className="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={NAV_ICON[id] || NAV_ICON.forecasts} /></svg>;
@@ -7233,7 +7462,7 @@ function PhoneTabs({ groups, page, onPick, moreOpen, onMore, pending }){
     </nav>
   );
 }
-function PhoneMore({ groups, page, onPick, onClose, role, who, pending }){
+function PhoneMore({ groups, page, onPick, onClose, role, who, pending, concernNew }){
   const all = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));
   const reads = all.filter(it => PHONE_READ_PAGES.includes(it.id)), desk = all.filter(it => !PHONE_READ_PAGES.includes(it.id));
   const first = useRef(null);
@@ -7256,6 +7485,7 @@ function PhoneMore({ groups, page, onPick, onClose, role, who, pending }){
             aria-current={page === it.id ? "page" : undefined} onClick={() => onPick(it.id)}>
             <NavIcon id={it.id} /><span>{it.label}</span>
             {it.id === "forecasts" && pending > 0 && <span className="pm-note">{pending} waiting</span>}
+            {it.id === "concerns" && concernNew > 0 && <span className="pm-note">{concernNew} new</span>}
           </button>
         ))}
         <a className="phone-more-item" href={"/help/?role=" + encodeURIComponent((role && role.role) || "")} target="_blank" rel="noopener noreferrer">
@@ -7525,6 +7755,12 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
       .catch(() => {});
   };
   useEffect(() => { refreshPending(); }, [canApprove, page]);
+  // 5 Nov 2026 (group 6): concerns still New, for the rail's count (planners and admins; 0 for anyone else)
+  const [concernNew, setConcernNew] = useState(0);
+  useEffect(() => {
+    if(!canApprove){ setConcernNew(0); return; }
+    fetch(`${API}/concerns/new-count`).then(r => r.ok ? r.json() : { new: 0 }).then(j => setConcernNew((j && j.new) || 0)).catch(() => {});
+  }, [canApprove, page]);
 
   // a page the role cannot see falls back to the dashboard rather than a blank
   const [navQ, setNavQ] = useState("");
@@ -7537,7 +7773,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   // token is gone from the screens, and a shared code (even the admin code) never passed the server's admin check.
   const isAdmin = isAdminLogin(role);
   const visible = NAV.filter(g => !g.admin || canApprove)
-    .map(g => ({ ...g, items: g.items.filter(i => !i.adminOnly || isAdmin) })).filter(g => g.items.length);
+    .map(g => ({ ...g, items: g.items.filter(i => (!i.adminOnly || isAdmin) && (!i.approverOnly || canApprove)) })).filter(g => g.items.length);
   const navMatch = (it) => !navQ || it.label.toLowerCase().includes(navQ.toLowerCase());
   const navFirst = visible.flatMap(g => g.items).find(navMatch);
   const allowed = new Set(visible.flatMap(g => g.items.map(i => i.id)));
@@ -7582,14 +7818,15 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
               {railShown && <div className="rail-group px-4 pb-1">{g.group}</div>}
               {g.items.filter(navMatch).map(it => {
                 const active = page === it.id;
-                const badge = it.id === "forecasts" && canApprove && pending > 0 ? pending : null;
+                const badge = it.id === "forecasts" && canApprove && pending > 0 ? pending
+                            : it.id === "concerns" && canApprove && concernNew > 0 ? concernNew : null;
                 return (
                   <button key={it.id} onClick={() => setPage(it.id)} title={railShown ? undefined : it.label}
                     className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}>
                     <NavIcon id={it.id} />
                     {railShown && <span className="truncate flex-1">{it.label}</span>}
                     {badge != null && railShown && (
-                      <span className="rail-count" title={`${badge} line(s) waiting for approval`}>{badge}</span>
+                      <span className="rail-count" title={it.id === "concerns" ? `${badge} new concern(s)` : `${badge} line(s) waiting for approval`}>{badge}</span>
                     )}
                   </button>
                 );
@@ -7636,6 +7873,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
         {page === "simulation" && narrow && <PhoneSimulation meta={meta} months={meta.months} />}
         {page === "lookahead" && !narrow && <LookAhead meta={meta} who={who} access={role} />}
         {page === "lookahead" && narrow && <PhoneLookAhead meta={meta} />}
+        {page === "concerns" && canApprove && !narrow && <ConcernsPage onCount={setConcernNew} />}
         {/* one mounted instance across the three data pages — see the note at the top */}
         {DATA_PAGES.includes(page) && canApprove && !narrow && (
           <DataManagement meta={meta} who={who} subTab={page} onSubTab={(t) => setPage(t)} />
@@ -7649,7 +7887,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
       {narrow && <PhoneTabs groups={visible} page={page} onPick={pickPage} moreOpen={moreOpen}
                             onMore={() => setMoreOpen(o => !o)} pending={canApprove ? pending : 0} />}
       {narrow && moreOpen && <PhoneMore groups={visible} page={page} onPick={pickPage} onClose={() => setMoreOpen(false)}
-                                        role={role} who={who} pending={canApprove ? pending : 0} />}
+                                        role={role} who={who} pending={canApprove ? pending : 0} concernNew={canApprove ? concernNew : 0} />}
       {/* H10: the coach-mark guide for this page; renders nothing unless TENANT.demo_notice is set.
           11 Oct 2026 (the demo bar): not on the Route map, whose embedded map runs its own guide (its strip under
           its bar, its dots, its tour). That was two "New here?" strips on one screen, and the app's guide there
@@ -9327,6 +9565,34 @@ function ConfigPage({ meta, who, access }){
                     {help && <div className="hint">{help}</div>}
                   </div>
                 ))}
+                {/* 5 Nov 2026 (group 6, mockup card 8): the public map's Report a concern form. Off until ticked; outside the demo
+                    it also needs the scheme's own privacy notice (Q12). Months and days are whole numbers, checked on Save. */}
+                <div data-cfg="concern-form" className="mt-4">
+                  <label className="flex items-center gap-2 font-semibold text-slate-800" style={{ minHeight: 44 }}>
+                    <input type="checkbox" id="cfg-concerns-on" checked={(doc.tenant || {}).concerns_on === true}
+                      onChange={e => upd(d => { d.tenant = d.tenant || {}; if(e.target.checked) d.tenant.concerns_on = true; else delete d.tenant.concerns_on; })} />
+                    Report a concern form on the public map</label>
+                  {[["concern_privacy_url", "cfg-concern-privacy", "Privacy notice link", 300, "https://…", (doc.tenant || {}).demo_notice ? "Blank on the demo: Wayscope's own notice." : "Needed before the form shows: the page that says how concerns are kept."]].map(([k, id, l, mx, ph, help]) => (
+                    <div key={k} className="field" style={{ marginBottom: 8 }}>
+                      <label htmlFor={id}>{l}</label>
+                      <input id={id} className="ctl w-full" maxLength={mx} placeholder={ph} data-contact={k}
+                        value={(doc.tenant || {})[k] || ""} onChange={e => upd(d => { setTenantText(d, k, e.target.value); })} />
+                      <div className="hint">{help}</div>
+                    </div>
+                  ))}
+                  <div className="flex flex-wrap gap-4">
+                    {[["concern_keep_months", "cfg-concern-keep", "Keep contact details for (months)", "12", "After the concern is closed. 1 to 72."],
+                      ["concern_reply_days", "cfg-concern-reply", "First reply within (working days)", "", "Blank: no target. Late ones show in red."]].map(([k, id, l, ph, help]) => (
+                      <div key={k} className="field" style={{ marginBottom: 8, flex: "1 1 200px" }}>
+                        <label htmlFor={id}>{l}</label>
+                        <input id={id} className="ctl w-24 tabular-nums text-right" inputMode="numeric" placeholder={ph}
+                          value={(doc.tenant || {})[k] ?? ""} onChange={e => upd(d => { d.tenant = d.tenant || {}; const v = e.target.value.trim();
+                            if(v === "") delete d.tenant[k]; else d.tenant[k] = /^\d+$/.test(v) ? parseInt(v, 10) : v; })} />
+                        <div className="hint">{help}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div data-cfg="council-breaks">
               <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Council colours</h3>
