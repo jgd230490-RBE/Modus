@@ -771,6 +771,49 @@ class _Doc:
         return para
 
 
+def concern_words(d):
+    """
+    5 Nov 2026 (group 6, PR 2): section 7's paragraph on concerns from the public, or None when the scheme has neither
+    the map's form nor a report address (the section then keeps its To complete line).
+    """
+    import concerns
+    try:
+        st = concerns.settings()
+    except Exception:
+        return None
+    if not st["form"] and not st["email"]:
+        return None
+    if st["form"] and st["email"]:
+        how = f"on the scheme's public map (Report a concern) and by email to {st['email']}"
+    elif st["form"]:
+        how = "on the scheme's public map (Report a concern)"
+    else:
+        how = f"by email to {st['email']}"
+    each = (f"Each gets a reference, a first reply within {st['reply_days']} working day{'' if st['reply_days'] == 1 else 's'} "
+            "where the person left a way to reach them, and is closed with an outcome." if st["reply_days"]
+            else "Each gets a reference and is closed with an outcome.")
+    snap = d.get("snapshot") or datetime.datetime.now(_london())
+    hi = f"{snap.year:04d}-{snap.month:02d}"
+    lo_y, lo_m = (snap.year, snap.month - 11) if snap.month > 11 else (snap.year - 1, snap.month + 1)
+    lo = f"{lo_y:04d}-{lo_m:02d}"
+    try:
+        F = concerns.figures(lo, hi, sites=d.get("location_ids") or None)
+    except Exception:
+        F = None
+    where = d.get("name") or "these sites"
+    month = snap.strftime("%B %Y")
+    if F is None:
+        counts = ""
+    elif F["received"] == 0:
+        counts = f" In the 12 months to {month}, none was received about the routes to and from {where}."
+    else:
+        med = F["first_reply_median"]
+        counts = (f" In the 12 months to {month}, on the routes to and from {where}: {F['received']} received, "
+                  f"{F['closed_of_received']} closed" + (f", median first reply {med:g} working day{'' if med == 1 else 's'}" if med is not None else "")
+                  + ".")
+    return f"Concerns from the public are taken {how}. {each}{counts}"
+
+
 def file_name(data, when=None):
     when = when or data["snapshot"]
     base = data["site_names"][0] if len(data["site_names"]) == 1 else data["name"]
@@ -1232,8 +1275,15 @@ def build(data, impact="higher", pictures=True, acc=None, appendices=True):
         D.todo(f"a CLP cap (lorry visits a day) for {', '.join(no_cap)}, if one is agreed. Typed on Data → Locations, it "
                "fills the next copy.", "7")
     D.src("From CLP monitoring and Gate arrivals. The CLP pack prints them for any month.")
-    D.todo("how this plan is put in place on site, who checks it and how often, how complaints are taken and answered, "
-           "and when the plan is reviewed.", "7")
+    # 5 Nov 2026 (group 6, PR 2; card 7): how concerns from the public are taken, from Config, and the counts for these
+    # sites' routes over the 12 months to the snapshot; counts only. Without a way in, the paragraph stays To complete.
+    cw = concern_words(d)
+    if cw:
+        D.p(cw)
+        D.todo("how this plan is put in place on site, who checks it and how often, and when the plan is reviewed.", "7")
+    else:
+        D.todo("how this plan is put in place on site, who checks it and how often, how complaints are taken and answered, "
+               "and when the plan is reviewed.", "7")
 
     # ---------------------------------------------------------------- appendices A-O (task 4a PR 4): stored data only,
     # each printed only where the plan has figures for it

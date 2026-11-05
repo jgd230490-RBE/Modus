@@ -2373,7 +2373,7 @@ function CarbonTargetLine({ ct, err, pendingN }){
   );
 }
 
-function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone }){
+function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone, canApprove }){
   const { materials, vehicles, units, months, factors } = meta;
   const [data, setData] = useState(initialData || null);
   const [week, setWeek] = useState(initialWeek || null);
@@ -2919,6 +2919,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           {/* 29 Oct 2026: the Simulation has its own page (Plan → Simulation); the Dashboard keeps one line under Gate arrivals,
               the busiest gate from the Gate arrivals reply (no second simulation run here) */}
           <SimDashLine ga={gaShown} month={gaMonth} months={months} onOpen={onOpen} />
+          {/* 5 Nov 2026 (group 6, PR 2): the concerns from the public, planners and admins only */}
+          {canApprove && !wall && !phone && <ConcernsDash months={months} lo={D.lo} hi={D.hi} sites={sites} sitesLabel={sites.length ? sitesWords(sites, locList) : ""} tripsM={D.tripsM} onOpen={onOpen} />}
           <details className="dash-more">
             <summary>This week and today, with the Look-ahead's map</summary>
             <div className="pt-3"><DashboardToday meta={meta} week={weekShown} err={weekErr} wall={wall} /></div>
@@ -3422,6 +3424,86 @@ function stockMessage(sps){
                                    : `${h.sp.name} runs out in the week of ${stockWeekWord(h.w.from)}`,
            tone: h.kind === "over" ? "bad" : "warn", hits };
 }
+// 5 Nov 2026 (group 6, PR 2; card 6 of the approved mockup): the Dashboard's Concerns section, planners and admins only,
+// folded and read the first time it is opened. It follows the Dashboard's month range and its Sites cut; counts only
+// (GET /api/concerns/figures). "Not a concern" is never counted.
+const cnYm = (idx, startYear) => `${startYear + Math.floor((idx - 1) / 12)}-${String(((idx - 1) % 12) + 1).padStart(2, "0")}`;
+const cnD = (v) => v == null ? "—" : (Math.round(v * 10) / 10).toLocaleString("en-GB", { maximumFractionDigits: 1 });
+function ConcernsDash({ months, lo, hi, sites, sitesLabel, tripsM, onOpen }){
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(false);
+  const sy = (months && months.start_year) || 2026;
+  const q = `from=${cnYm(lo, sy)}&to=${cnYm(hi, sy)}` + ((sites && sites.length) ? "&sites=" + sites.map(encodeURIComponent).join(",") : "");
+  useEffect(() => {
+    if(!open) return;
+    if(data && data._q === q) return;
+    let live = true;
+    setErr(false);
+    fetch(`${API}/concerns/figures?${q}`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => { if(live) setData({ ...j, _q: q }); })
+      .catch(() => { if(live) setErr(true); });
+    return () => { live = false; };
+  }, [open, q]);
+  const range = lo === hi ? monthLabelAbs(lo, sy) : `${monthLabelAbs(lo, sy)} – ${monthLabelAbs(hi, sy)}`;
+  const scope = [range, sitesLabel || null];
+  const C1 = tok("--chart-1", "#E8590C");
+  // per 1,000 planned two-way lorry movements over the whole range on screen (a load is two movements: there and back);
+  // the last month alone read 0 beside a chart showing concerns in earlier months
+  let rate = null;
+  if(data && tripsM && tripsM.length){
+    const moves = 2 * tripsM.reduce((a, t) => a + (t || 0), 0);
+    if(moves > 0) rate = { v: data.received * 1000 / moves, m: range };
+  }
+  const Tile = ({ v, label }) => (
+    <div className="min-w-0" data-concern-fig="1"><div className="kpi-num font-bold fig-val" style={{ color: "var(--navy-deep)", lineHeight: 1.15 }}>{v}</div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mt-0.5">{label}</div></div>);
+  const cfg = data ? { type: "bar", data: { labels: data.by_month.map(r => monthLabelAbs(cnIdx(r.month, sy), sy)),
+      datasets: [{ label: "concerns", data: data.by_month.map(r => r.received), backgroundColor: C1, borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+               scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 } } } } } : null;
+  return (
+    <details className="dash-more" data-concerns-dash="1" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>
+      <summary>Concerns from the public</summary>
+      <div className="pt-3">
+        <div className="ct-row mb-2"><span className="ct-line">Concerns · {range}{sitesLabel ? " · " + sitesLabel : ""}</span>
+          <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "6px 12px" }} onClick={() => onOpen && onOpen("concerns")}>Open Concerns</button></div>
+        {err && <div className="ct-line" data-concerns-dash-error="1">The concern figures did not load.</div>}
+        {!data && !err && <div className="ct-line">Loading the concern figures…</div>}
+        {data && <>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
+            <Tile v={data.received.toLocaleString("en-GB")} label="received" />
+            <Tile v={data.open_now.toLocaleString("en-GB")} label="open now" />
+            <Tile v={cnD(data.first_reply_median)} label="working days to first reply (median)" />
+            <Tile v={cnD(data.close_median)} label="working days to close (median)" />
+            {data.reply_days ? <Tile v={data.within && data.within.pct != null ? data.within.pct + " %" : "—"} label={`replied within ${data.reply_days} working days`} /> : null}
+          </div>
+          {data.received === 0 ? <div className="ct-line" data-concerns-dash-none="1">No concerns in these months.</div> : <>
+            <div className="card p-4 chart-card mb-3">
+              <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Concerns received a month</div>
+              <ChartCanvas config={cfg} title="Concerns received a month" scope={scope} />
+              {rate && <div className="text-xs text-slate-500 mt-1" data-concern-rate="1">Per 1,000 planned two-way lorry movements: {(Math.round(rate.v * 100) / 100).toLocaleString("en-GB", { maximumFractionDigits: 2 })} over {rate.m}.</div>}
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              <div className="overflow-auto"><table className="ga-table" data-concern-kinds="1">
+                <caption className="text-left text-sm font-semibold text-slate-700 pb-1">By kind</caption>
+                <thead><tr><th scope="col">Kind</th><th scope="col" className="num">Received</th><th scope="col" className="num">Closed</th></tr></thead>
+                <tbody>{data.by_kind.map(k => <tr key={k.kind}><td>{k.kind_text}</td><td className="num">{k.received}</td><td className="num">{k.closed}</td></tr>)}</tbody>
+              </table></div>
+              <div className="overflow-auto"><table className="ga-table" data-concern-routes="1">
+                <caption className="text-left text-sm font-semibold text-slate-700 pb-1">Busiest routes for concerns</caption>
+                <thead><tr><th scope="col">Route</th><th scope="col" className="num">Received</th></tr></thead>
+                <tbody>{data.routes.length ? data.routes.map(r => <tr key={r.route_id}><td>{r.route_id} · {r.words}</td><td className="num">{r.received}</td></tr>)
+                  : <tr><td colSpan={2} className="text-slate-500">No concern names a route.</td></tr>}</tbody>
+              </table></div>
+            </div>
+          </>}
+        </>}
+      </div>
+    </details>
+  );
+}
+const cnIdx = (ym, startYear) => (parseInt(ym.slice(0, 4), 10) - startYear) * 12 + parseInt(ym.slice(5, 7), 10);
+
 function DashboardStockChart({ meta, weekNow, wall, fill, tick, from, to }){
   const { months } = meta;
   const [data, setData] = useState(null);
@@ -7875,7 +7957,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
         {/* 14 Oct 2026 (D9): on a phone a desk page is this card, never the page itself (its write controls are
             not rendered at all, not disabled) */}
         {phoneDesk && <DeskOnly label={current.label} onHome={() => pickPage("dashboard")} />}
-        {page === "dashboard" && <Dashboard meta={meta} phone={narrow} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />}
+        {page === "dashboard" && <Dashboard meta={meta} phone={narrow} canApprove={canApprove} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />}
         {page === "submit" && !narrow && <Matrix meta={meta} who={who} editTarget={editTarget} vehLang={vehLang} access={role} />}
         {page === "forecasts" && !narrow && <Forecasts meta={meta} who={who} access={role} onEdit={editInMatrix} onChanged={refreshPending} />}
         {page === "carbon" && !narrow && <CarbonPage meta={meta} access={role} who={who} />}

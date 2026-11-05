@@ -2306,9 +2306,13 @@ def _glance_flow(K, S):
                            ("TOPPADDING", (0, 0), (-1, -1), 1.3), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.3),
                            ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]))
     # NARROWED 14 Oct 2026 (the publishing check): one short line under the table, at 7.5 pt
-    return [P("This month at a glance", K.st_sec), t,
-            P("Not reported: needs observed records (counts, gate or camera records). A forecast has none, so the line "
-              "is left empty, never estimated.", K.st_grey)]
+    out = [P("This month at a glance", K.st_sec), t,
+           P("Not reported: needs observed records (counts, gate or camera records). A forecast has none, so the line "
+             "is left empty, never estimated.", K.st_grey)]
+    # 5 Nov 2026 (group 6, PR 2; card 7): on paper the month's concerns are the glance row only (received · closed). The page
+    # holding this table has no room: a table of kinds, then even one grey line of them, took the newsletter to five pages
+    # (D43 keeps it at four). The kinds and the median first reply are on the web bulletin, under the same table.
+    return out
 
 
 def _lot_flow(K, L):

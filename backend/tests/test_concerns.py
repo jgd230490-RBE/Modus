@@ -556,6 +556,121 @@ _words = " ".join(list(concerns.KINDS.values()) + list(concerns.OUTCOMES.values(
                   re.findall(r'Refused\(\s*f?"([^"]+)"', SRC))
 ok("🔴 no banned public word in what a person reads", not _BAN.search(_words), str(_BAN.findall(_words)))
 
+
+# =========================================================================== #
+#  13. The figures (PR 2: the Dashboard, the bulletin, the CLP)                #
+# =========================================================================== #
+db.execute("DELETE FROM concerns WHERE tenant_id = ?", (db.current_tenant(),))
+OUT1 = network.create_location("Tip North", "origin", lat=52.70, lon=-0.80, loc_type="Quarry", supplies=["aggregate"], receives=["aggregate"])["id"]
+OUT2 = network.create_location("Hub South", "destination", lat=52.50, lon=-1.00, loc_type="Compound", supplies=["aggregate"], receives=["aggregate"])["id"]
+R3 = network.create_route(OUT1, OUT2, route_id="R003", ipt="IPT1")["id"]
+
+
+def seed2(cid, received, kind="mud", route=None, status="new", first=None, closed=None, outcome=None, wants=1, loc=None):
+    db.execute("INSERT INTO concerns (tenant_id, id, received_at, source, kind, happened_on, lat, lon, route_id, location_id, "
+               "words, wants_reply, name, email, status, first_reply_at, closed_at, outcome, history_json) "
+               "VALUES (?, ?, ?, 'map', ?, '2026-10-01', 52.6, -0.9, ?, ?, 'Secret words here', ?, 'Secret Name', "
+               "'secret@example.org', ?, ?, ?, ?, '[]')",
+               (db.current_tenant(), cid, received, kind, route, loc, wants, status, first, closed, outcome))
+
+
+# Mon 5 Oct 2026 09:00 is the clock's start; a reply at 09:00 on Tue is 1.0 working day, on Mon 12th 5.0
+seed2("C-0101", "2026-10-05T09:00:00Z", "mud", R1, "closed", "2026-10-06T09:00:00Z", "2026-10-07T09:00:00Z", "action")
+seed2("C-0102", "2026-10-05T09:00:00Z", "mud", R2, "closed", "2026-10-13T09:00:00Z", "2026-10-14T09:00:00Z", "no_action")
+seed2("C-0103", "2026-10-05T09:00:00Z", "driving", R1, "answered", "2026-10-05T21:00:00Z")
+seed2("C-0104", "2026-09-07T09:00:00Z", "noise", R3, "closed", "2026-09-08T09:00:00Z", "2026-10-02T09:00:00Z", "not_ours")
+seed2("C-0105", "2026-10-05T09:00:00Z", "other", R1, "closed", None, "2026-10-05T10:00:00Z", "spam")   # never counted
+seed2("C-0106", "2026-10-20T09:00:00Z", "parked", None, "new", wants=1, loc=YARD)                       # pinned at the yard
+seed2("C-0107", "2026-08-03T09:00:00Z", "mud", R1, "new", wants=0)                                      # outside the range
+set_tenant(concerns_on=True, concern_reply_days=5, concern_email="team@example.org")
+FNOW = datetime.datetime(2026, 11, 5, 9, 0, tzinfo=datetime.timezone.utc)
+F = concerns.figures("2026-09", "2026-10", now=FNOW)
+ok("⭐ FIGURES: received in the range, 'Not a concern' never counted", F["received"] == 5, str(F["received"]))
+ok("FIGURES: a month for every month of the range, in order", [m["month"] for m in F["by_month"]] == ["2026-09", "2026-10"]
+   and [m["received"] for m in F["by_month"]] == [1, 4], str(F["by_month"]))
+ok("FIGURES: closed counts the closings in the range; open now counts every open one (the range does not narrow it)",
+   F["closed"] == 3 and F["open_now"] == 3 and F["closed_of_received"] == 3, f'{F["closed"]} {F["open_now"]}')
+ok("FIGURES: the medians in working days (first reply 1.0, 5.0, 0.5, 1.0 → 1.0; close 2.0, 7.0, 19.0 → 7.0)",
+   F["first_reply_median"] == 1.0 and F["close_median"] == 7.0, f'{F["first_reply_median"]} {F["close_median"]}')
+ok("FIGURES: replied within the target (5 working days): 3 of the 5 that asked and are due (C-0102 took 6; C-0106 has waited past 5 with none)",
+   F["within"] == {"n": 5, "yes": 3, "pct": 60}, str(F["within"]))
+ok("FIGURES: by kind, the busiest first, with how many are closed",
+   [(k["kind"], k["received"], k["closed"]) for k in F["by_kind"]][:2] == [("mud", 2, 2), ("driving", 1, 0)]
+   and {k["kind"] for k in F["by_kind"]} == {"mud", "driving", "noise", "parked"}, str(F["by_kind"]))
+ok("FIGURES: the busiest routes, at most five, with their words",
+   [(r["route_id"], r["received"]) for r in F["routes"]] == [("R001", 2), ("R002", 1), ("R003", 1)]
+   and F["routes"][0]["words"] == "Pit West → Yard East", str(F["routes"]))
+ok("🔴 FIGURES: counts only — no words, name, email or place in the answer",
+   not any(w in json.dumps(F) for w in ("Secret words", "Secret Name", "secret@example.org", "52.6", "-0.9")))
+FS = concerns.figures("2026-09", "2026-10", sites=[YARD], now=FNOW)
+ok("⭐ FIGURES (Sites): a site keeps the routes that start or end there and the concerns pinned there",
+   FS["received"] == 4 and all(r["route_id"] != "R003" for r in FS["routes"]), str(FS["received"]))
+ok("FIGURES (Sites): a site with no route and no pin has none", concerns.figures("2026-09", "2026-10", sites=["L999"])["received"] == 0)
+ok("FIGURES: no reply target, no 'within' figure", set_tenant(concern_reply_days=None) == []
+   and concerns.figures("2026-09", "2026-10")["within"] is None)
+set_tenant(concern_reply_days=5)
+ok("🔴 FIGURES: a bad range is refused in words", refused(lambda: concerns.figures("2026-10", "2026-09"))
+   and refused(lambda: concerns.figures("Oct", "2026-10")))
+_fig = MAIN[MAIN.find("def concern_figures("):MAIN.find("def concern_figures(") + 700]
+ok("🔴 FIGURES: the endpoint asks for a planner or admin and is matched before /api/concerns/{cid}",
+   "_require_approver()" in _fig and 0 < MAIN.find('"/api/concerns/figures"') < MAIN.find('"/api/concerns/{cid}"'))
+ok("FIGURES: read fresh, never kept (no read_cache / _staff_json on it)",
+   "_staff_json" not in _fig and "read_cache" not in _fig)
+
+# the bulletin's glance row and short table (card 7)
+import bulletin_doc  # noqa: E402
+_cm = bulletin_doc.concern_month(10)            # October 2026
+ok("⭐ BULLETIN: October's concerns — received, closed, by kind, the median first reply",
+   _cm is not None and _cm["received"] == 4 and _cm["closed"] == 3 and _cm["kinds"][0] == {"kind": "Mud or debris on the road", "received": 2, "closed": 2},
+   str(_cm))
+_g = bulletin_doc._glance({}, {}, [], [], [], None, [], None, "October 2026", _cm)
+# NARROWED 5 Nov 2026 (the newsletter stays at four pages, D43): the item carries "received · closed", the figure only the two
+# counts, the data cell a short "Map and email records", so no cell wraps in the PDF's narrow columns
+ok("BULLETIN: the glance row reads 'Concerns from the public, received · closed: 4 · 3', marked as a record",
+   any(r["item"] == "Concerns from the public, received · closed" and r["figure"] == "4 · 3" and not r["not_reported"]
+       and r["data"] == "Map and email records" for r in _g), str(_g[-1]))
+ok("BULLETIN: ...each cell short enough for one line in the PDF (figure ≤ 12 characters like 'Not reported', data ≤ 22)",
+   all(len(r["figure"]) <= 12 and len(r["data"]) <= 22 for r in _g if r["item"].startswith("Concerns")))
+_g0 = bulletin_doc._glance({}, {}, [], [], [], None, [], None, "October 2026", None)
+ok("BULLETIN: ...and without concerns it is still 'Enquiries and complaints: Not reported'",
+   _g0[-1] == {"item": "Enquiries and complaints", "figure": "Not reported", "data": "Not in this bulletin", "not_reported": True})
+ok("BULLETIN: the line under the table", bulletin_doc.concern_reply_line(_cm) == "First reply: median 1 working day."
+   and bulletin_doc.concern_reply_line({"first_reply_median": 2.5}) == "First reply: median 2.5 working days."
+   and bulletin_doc.concern_reply_line({}) == "")
+ok("🔴 BULLETIN: counts only — no words, name or email", not any(w in json.dumps(_cm) for w in ("Secret", "secret@")))
+_EXP = open(os.path.join(BACKEND, "export.py"), encoding="utf-8").read()
+_GLF = _EXP[_EXP.index("def _glance_flow(K, S):"):_EXP.index("def _lot_flow(")]
+ok("BULLETIN (paper): the concerns are the glance row only — no table and no line of kinds in the PDF (the newsletter stays at four pages, D43)",
+   "LongTable(ck" not in _EXP and "concern_kinds_line" not in _EXP and 'S.get("concerns")' not in _GLF)
+
+db.execute("DELETE FROM concerns WHERE tenant_id = ? AND id LIKE 'C-01%'", (db.current_tenant(),))
+set_tenant(concerns_on=False)
+ok("BULLETIN: a scheme with no form and none recorded keeps the row Not reported", bulletin_doc.concern_month(10) is None)
+
+# the CLP's section 7 paragraph (card 7)
+import clp_doc  # noqa: E402
+seed2("C-0201", "2026-06-01T09:00:00Z", "mud", R1, "closed", "2026-06-02T09:00:00Z", "2026-06-03T09:00:00Z", "action")
+seed2("C-0202", "2026-10-01T09:00:00Z", "mud", R3, "closed", "2026-10-02T09:00:00Z", "2026-10-03T09:00:00Z", "action")
+seed2("C-0203", "2025-10-01T09:00:00Z", "mud", R1, "closed", "2025-10-02T09:00:00Z", "2025-10-03T09:00:00Z", "action")
+_d = {"snapshot": datetime.datetime(2026, 11, 5, 9, 0), "location_ids": [YARD], "name": "Yard East"}
+set_tenant(concerns_on=True, concern_reply_days=5, concern_email="team@example.org")
+_cw = clp_doc.concern_words(_d)
+ok("⭐ CLP §7: how concerns are taken (map and email), the reply target, the 12 months' counts for the sites' routes",
+   _cw == ("Concerns from the public are taken on the scheme's public map (Report a concern) and by email to team@example.org. "
+           "Each gets a reference, a first reply within 5 working days where the person left a way to reach them, and is "
+           "closed with an outcome. In the 12 months to November 2026, on the routes to and from Yard East: 1 received, "
+           "1 closed, median first reply 1 working day."), _cw)
+set_tenant(concerns_on=False)
+ok("CLP §7: email only", clp_doc.concern_words(_d).startswith("Concerns from the public are taken by email to team@example.org."))
+set_tenant(concern_email=None)
+ok("CLP §7: no way in → None (the To complete line stays)", clp_doc.concern_words(_d) is None)
+_CLPSRC = open(os.path.join(BACKEND, "clp_doc.py"), encoding="utf-8").read()
+ok("CLP §7: the paragraph replaces only the complaints part of the To complete line",
+   'D.todo("how this plan is put in place on site, who checks it and how often, and when the plan is reviewed.", "7")' in _CLPSRC
+   and "how complaints are taken and answered" in _CLPSRC)
+set_tenant(concerns_on=True, concern_email="team@example.org")
+db.execute("DELETE FROM concerns WHERE tenant_id = ? AND id LIKE 'C-02%'", (db.current_tenant(),))
+
 print()
 for f in FAIL:
     print("  FAIL:", f)

@@ -6843,6 +6843,19 @@ def concern_new_count():
     return {"new": concerns.new_count()}
 
 
+@app.get("/api/concerns/figures")
+def concern_figures(start: Optional[str] = Query(None, alias="from"), end: Optional[str] = Query(None, alias="to"),
+                    sites: Optional[str] = None):
+    """5 Nov 2026 (group 6, PR 2): the Dashboard's Concerns section — counts for a month range, the Sites cut
+    (planners and admins; read fresh, never kept)."""
+    _require_approver()
+    picks = [s for s in (sites or "").split(",") if s.strip()][:200] or None
+    try:
+        return concerns.figures(start, end, sites=picks)
+    except concerns.Refused as e:
+        raise HTTPException(e.status, str(e))
+
+
 @app.get("/api/concerns/{cid}")
 def concern_one(cid: str):
     _require_approver()

@@ -2279,6 +2279,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // 1. the one-screen Dashboard
   ok("Dashboard: the working view is six cards, four charts, and five collapsed sections; the big screen keeps its four WallSections",
     (_dbWork.match(/<Card label=/g) || []).length === 6 && _dbWork.includes('<div className="dash-cards" data-guide="dash-figures">')
+    // NARROWED 5 Nov 2026 (group 6, PR 2): the Concerns section's own <details> lives in ConcernsDash, so still five here
     && (_dbWork.match(/<details className="dash-more"/g) || []).length === 5 && (_dbWork.match(/<ChartCanvas config=/g) || []).length === 8
     // 14 Oct 2026 (narrowed): five WallSections; the same eight charts, four in Charts and four in More charts
     // 17 Oct 2026 (narrowed): six WallSections — the sixth is the Simulation (SimWall), no chart in it
@@ -2357,12 +2358,14 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && _dbW.indexOf("<CarbonTargetStrip") < _dbW.indexOf('<details className="dash-more"')
     // 14 Oct 2026 (narrowed): onWall also tells the Portal the big screen is on (no tour over it)
     // 14 Oct 2026 (narrowed, D9): the Portal tells the Dashboard it is on a phone (no big screen there)
-    && code.includes("<Dashboard meta={meta} phone={narrow} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />")
+    // NARROWED 5 Nov 2026 (group 6, PR 2): + canApprove (the Concerns section is for planners and admins)
+    && code.includes("<Dashboard meta={meta} phone={narrow} canApprove={canApprove} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />")
     // NARROWED 11 Oct 2026 (gate arrivals: the render harness's prop initialGates joins the signature); 14 Oct 2026: + phone
     // NARROWED 14 Oct 2026 (bundle G, W7: the render harness's prop initialClp joins the signature too; merged with D9's phone)
     // NARROWED 16 Oct 2026 (S7: the render harness's prop initialSim joins the signature)
     // RE-PINNED 29 Oct 2026 (the Simulation's own page): initialSim leaves the Dashboard; SimulationPage takes `initial`
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone })")
+    // NARROWED 5 Nov 2026 (group 6, PR 2): + canApprove
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone, canApprove })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
@@ -5059,6 +5062,29 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && code.includes("`Busy-hours road (${simBusyUses(D).map(u => `${u.route} Alt ${u.alt}, weekdays ${u.from}–${u.to}`).join(\"; \")})`")
      && /\.sim-busy-note\{position:absolute;/.test(html) && /\.sim-line-busy\{border-top:3px solid var\(--navy\);/.test(html));
   ok("BUSY HOURS, Simulation: the frame carries its time (the map's tint reads it)", code.includes("return { t, feats, laden, empty, mixers, waiting, onSite, gates, stations, held, heldBy, heldLost };"));
+}
+
+// 5 Nov 2026 (group 6, PR 2; card 6): the Dashboard's Concerns section — planners and admins only, folded and read on first
+// open, the Dashboard's months and Sites, counts only, Copy / Download on its chart
+{
+  const cd = code.slice(code.indexOf("function ConcernsDash("), code.indexOf("function DashboardStockChart("));
+  ok("CONCERNS DASH: the section exists, reads /api/concerns/figures with the range and the Sites, only once opened",
+     cd.length > 1500 && cd.includes("fetch(`${API}/concerns/figures?${q}`)") && cd.includes("if(!open) return;")
+     && cd.includes('"&sites=" + sites.map(encodeURIComponent).join(",")') && cd.includes("<summary>Concerns from the public</summary>"));
+  ok("CONCERNS DASH: shown only to planners and admins, never on the big screen or a phone; the App passes canApprove",
+     code.includes("{canApprove && !wall && !phone && <ConcernsDash months={months} lo={D.lo} hi={D.hi} sites={sites}")
+     && code.includes('<Dashboard meta={meta} phone={narrow} canApprove={canApprove}')
+     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone, canApprove }){"));
+  ok("CONCERNS DASH: the five figures, the monthly chart with a title and scope (Copy / Download), by kind, busiest routes",
+     ['label="received"', 'label="open now"', 'label="working days to first reply (median)"', 'label="working days to close (median)"',
+      "replied within ${data.reply_days} working days"].every(w => cd.includes(w))
+     && cd.includes('<ChartCanvas config={cfg} title="Concerns received a month" scope={scope} />')
+     && cd.includes('data-concern-kinds="1"') && cd.includes('data-concern-routes="1"') && cd.includes("Per 1,000 planned two-way lorry movements"));
+  ok("CONCERNS DASH: the per-1,000 line is over the whole range on screen (the range's received ÷ its planned two-way movements), never the last month alone",
+     cd.includes("const moves = 2 * tripsM.reduce((a, t) => a + (t || 0), 0);") && cd.includes("rate = { v: data.received * 1000 / moves, m: range };")
+     && cd.includes("maximumFractionDigits: 2 })} over {rate.m}.") && !cd.includes("tripsM[tripsM.length - 1]"));
+  ok("🔴 CONCERNS DASH: counts only — the section never prints a concern's words, name, email or place",
+     !/\.(words|name|email|phone|lat|lon|registration)\b/.test(cd.replace(/r\.words|k\.kind_text/g, "")));
 }
 
 // 5 Nov 2026 (the mockup John approved, notes layout-fullscreen-mockup-1105, Q1-Q8 as recommended): a site's layout full screen

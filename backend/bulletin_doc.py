@@ -689,7 +689,36 @@ def _sources(lot, council, council_mv, page, carbon, wd=None):
     return out
 
 
-def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, month_long):
+def concern_month(mi):
+    """
+    5 Nov 2026 (group 6, PR 2; card 7): the month's concerns from the public for the glance row and the short table —
+    counts only (no words, no place, no person; "Not a concern" never counted). None when the scheme takes no concerns
+    on the map and has none recorded, so the row stays Not reported.
+    """
+    import concerns
+    import weeks
+    try:
+        y, m = weeks._month_of(mi)
+        ym = f"{y:04d}-{m:02d}"
+        F = concerns.figures(ym, ym)
+        ever = concerns.figures("2000-01", "2999-12")["received"]
+    except Exception:
+        return None
+    if not F["taking"]["form"] and not ever:
+        return None
+    return {"received": F["received"], "closed": F["closed"], "first_reply_median": F["first_reply_median"],
+            "kinds": [{"kind": k["kind_text"], "received": k["received"], "closed": k["closed"]} for k in F["by_kind"]]}
+
+
+def concern_reply_line(cm):
+    """The line under the short table: the median first reply, in working days (or nothing)."""
+    v = (cm or {}).get("first_reply_median")
+    if v is None:
+        return ""
+    return f"First reply: median {v:g} working day{'' if v == 1 else 's'}."
+
+
+def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, month_long, concerns_m=None):
     """
     "This month at a glance" in the Sizewell C tracker's shape: the item, this month's figure and the kind of
     data. What a monitoring report fills from observed records is listed, and marked Not reported.
@@ -723,7 +752,11 @@ def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, mo
         ("Vehicle and operator standards (FORS, CLOCS, Euro VI, Direct Vision Standard)", NOT_REPORTED,
          "Not in this bulletin"),
         ("Collisions and near misses", NOT_REPORTED, "Not in this bulletin"),
-        ("Enquiries and complaints", NOT_REPORTED, "Not in this bulletin"),
+        # NARROWED 5 Nov 2026 (group 6, PR 2): the scheme's own record when it takes concerns (counts only). Short enough that
+        # each cell stays on ONE line in the PDF's narrow figure / data columns: a two-line row took the newsletter to five pages
+        (("Concerns from the public, received · closed", f"{concerns_m['received']} · {concerns_m['closed']}",
+          "Map and email records") if concerns_m is not None
+         else ("Enquiries and complaints", NOT_REPORTED, "Not in this bulletin")),
     ]
     return [{"item": a, "figure": b, "data": d, "not_reported": b == NOT_REPORTED} for a, b, d in rows]
 
@@ -925,7 +958,9 @@ def sheet(month_index, acc=None, now=None):
                          + (f" ({len(gone)} finished)" if gone else ""))
         change_text = f"Since {prev_long}: " + "; ".join(parts) + "."
 
-    glance = _glance(H, R, routes_view, works, controls, rs.get("status"), never, rs.get("checked_at"), month_long)
+    concerns_m = concern_month(mi)
+    glance = _glance(H, R, routes_view, works, controls, rs.get("status"), never, rs.get("checked_at"), month_long,
+                     concerns_m)
     # 13 Oct 2026 (W13): the month's areas read ONCE for both council sections (and last month's, figures only)
     import areas
     import config
@@ -999,6 +1034,7 @@ def sheet(month_index, acc=None, now=None):
                         "t_day": n0((H.get("tonnes") / wd) if H.get("tonnes") is not None and wd else None)},
         "works": works, "checks": checks, "others": others,
         "glance": glance, "council": council, "council_mv": council_mv, "lot": lot,
+        "concerns": concerns_m,
         # 13 Oct 2026 (W15, D43): the newsletter's masthead and page 1, the leaflet, the D41 map tag
         "brand_title": f"{BRAND_TITLE} · {month_long}",
         "issued": f"Issued {_date_long(today)}",
@@ -1507,6 +1543,16 @@ def html(S):
     empty = (f'<p class="empty">{e(S["empty_note"])}</p>' if S["empty"] and S["empty_note"] else "")
     glance = "".join(f'<tr class="{"nr" if g["not_reported"] else ""}"><td>{e(_co2(g["item"]))}</td><td class="n">{e(_co2(g["figure"]))}</td>'
                      f'<td>{e(_co2(g["data"]))}</td></tr>' for g in S["glance"])
+    # 5 Nov 2026 (group 6, PR 2): the month's concerns by kind, counts only, under the glance table
+    cm = S.get("concerns") or {}
+    concerns_html = ""
+    if cm.get("kinds"):
+        concerns_html = ('<h3>Concerns this month</h3><div class="tw"><table data-bulletin="concerns"><thead><tr><th>Kind</th>'
+                         '<th class="n">Received</th><th class="n">Closed</th></tr></thead><tbody>'
+                         + "".join(f'<tr><td>{e(k["kind"])}</td><td class="n">{k["received"]}</td><td class="n">{k["closed"]}</td></tr>'
+                                   for k in cm["kinds"])
+                         + "</tbody></table></div>"
+                         + (f'<p class="muted">{e(concern_reply_line(cm))}</p>' if concern_reply_line(cm) else ""))
     M, C = S.get("council_mv"), S["council"]
     v = {
         "page_title": e(S["title"]) + " · " + e(S["tenant"]) + ((" · " + e(S["demo_notice"])) if S["demo_notice"] else ""),
@@ -1520,7 +1566,7 @@ def html(S):
         "foot": e(S["foot"]), "map_block": _map_block_html(S), "routes": _routes_html(S),
         "band": _band_html(S, "monthly newsletter"), "brief": _brief_html(S), "mark": _mark_html(),
         "leaflet_href": e(S["leaflet_href"]), "leaflet_pdf_href": e(S["leaflet_pdf_href"]),
-        "glance": glance, "council": _council_html(C), "council_mv": _council_mv_html(M),
+        "glance": glance, "concerns_html": concerns_html, "council": _council_html(C), "council_mv": _council_mv_html(M),
         "councils_kicker": '<p class="kick">03 Councils</p>' if (M or C) else "",
         "lot": _lot_html(S.get("lot")), "sources": _sources_html(S),
         "notice": notice, "nav": nav, "empty": empty, "head": head,
@@ -1647,6 +1693,7 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 <div class="tw"><table data-bulletin="glance"><thead><tr><th>Item</th><th class="n">This month</th><th>Data</th></tr></thead>
 <tbody>{glance}</tbody></table></div>
 <p class="muted">Not reported: needs observed records (counts, gate or camera records). A forecast has none, so the line is left empty, never estimated.</p>
+{concerns_html}
 
 <h2>Terms</h2>
 <dl class="terms">{terms}</dl>

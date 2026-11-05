@@ -927,7 +927,8 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 31 Oct 2026 (task 4c PR 2): + 19.2 Drawing (86)
    # NARROWED 31 Oct 2026 (task 4c PR 3): + 19.5 Pinned pictures (87); the technical entry is inside T1 "Site layouts" (no new row)
    # NARROWED 5 Nov 2026 (group 6, Report a concern): + chapter 20 Concerns from the public and its three sections (92); + T1 "Concerns from the public" (38)
-   len(re.findall(r'<li class="l[12]"', src)) == 92 and   # NARROWED 31 Oct 2026 (task 4c PR 5): + 19.6 On paper (88)
+   # NARROWED 5 Nov 2026 (group 6, PR 2): + 20.4 The figures (93)
+   len(re.findall(r'<li class="l[12]"', src)) == 93 and   # NARROWED 31 Oct 2026 (task 4c PR 5): + 19.6 On paper (88)
    # NARROWED 5 Nov 2026 (task 0d-2): + T1 "Busy-hours roads" (39)
    len(re.findall(r'<li class="l[12]"', _tg2)) == 39   # NARROWED 1 Nov 2026 (task 4a PR 4): + T1 "CLP appendices" (37)   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
@@ -1364,6 +1365,14 @@ ok("CONCERNS: technical T1 — in the contents; the table, the public send and i
                               "<code>X-Wayscope: 1</code>", "8 KB", "5 an hour", "20 a day", "300 a day", "10 km", "500 m",
                               "<code>_require_approver()</code>", "<code>AUDIT_SKIP</code>", "<code>tenant.concern_keep_months</code>",
                               "<code>privacy_ok: true</code>", "no name, contact or words")))
+
+ok("CONCERNS (PR 2): 20.4 The figures — counts only, spam never counted, the Dashboard section and its Sites pick, the bulletin, the CLP",
+   '<li class="l2"><a href="#20-4-the-figures">20.4 The figures</a></li>' in src and "Counts only" in _cn
+   and "<strong>Concerns from the public</strong>" in _cn and "<strong>Sites</strong>" in _cn and "<strong>This month at a glance</strong>" in _cn
+   and "section 7" in _cn)
+ok("CONCERNS (PR 2): technical T1 names the figures read, its endpoint and the bulletin / CLP helpers",
+   all(w in _tc for w in ("<code>concerns.figures(lo, hi, sites=)</code>", "GET /api/concerns/figures", "<code>bulletin_doc.concern_month(mi)</code>",
+                          "<code>clp_doc.concern_words(d)</code>")))
 
 # 5 Nov 2026 (task 0d-2): busy-hours roads in both guides
 _ug0d = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
