@@ -1399,11 +1399,11 @@
 
 <!-- 5 Nov 2026 (group 6, mockup notes/report-concern-mockup-1105 cards 2-3): the Report a concern form. Filled by
      openConcernForm(); sent to /api/public/concerns (behind the map password), which answers with a reference only. -->
-<aside id="concern-panel" role="dialog" aria-labelledby="cn-title" hidden>
+<div id="concern-panel" role="dialog" aria-labelledby="cn-title" hidden>
   <div class="mt-head"><h2 id="cn-title" tabindex="-1">Report a concern</h2>
     <button type="button" class="mt-close" onclick="closeConcernForm()" aria-label="Close the form" title="Close">&times;</button></div>
   <div class="mt-body" id="cn-body"></div>
-</aside>
+</div>
 <div id="cn-cross" aria-hidden="true" hidden></div>
 <div id="cn-pick" role="status" hidden>
   <p id="cn-pick-words">Move the map so the cross is on the place.</p>
