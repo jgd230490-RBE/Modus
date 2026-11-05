@@ -4683,10 +4683,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && ed.includes("await loadSiteLayoutsJs() && await loadTerraDraw()"));
   ok("⭐ DRAW: no second map — the editor draws on the page's ONE map (mapRef) and the map div keeps its place in the grid",
      !/new mapboxgl\.Map/.test(ed) && ed.includes("const m = mapRef.current;") && (dm.match(/<div ref=\{mapDiv\}/g) || []).length === 1
-     && src.includes('<div ref={mapDiv} style={{ height: drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />')
-     && src.includes('style={drawing && isWide ? { gridColumn: 2, gridRow: 2 } : undefined}')
-     && src.includes('style={drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined}')
-     && src.includes('style={drawing ? { display: "none" } : panelStyle}') && src.includes("{drawing ? null : onLoc ? ("));
+     // NARROWED 5 Nov 2026 (full screen): each of the four takes a full-screen branch first; outside full screen they read as before
+     && src.includes('<div ref={mapDiv} style={{ height: full ? "100%" : drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />')
+     && src.includes(': drawing && isWide ? { gridColumn: 2, gridRow: 2 } : undefined}>')
+     && src.includes(': drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined}>')
+     && src.includes('style={drawing ? { display: "none" } : full ? { gridColumn: 2, gridRow: 1, minHeight: 0, overflowY: "auto" } : panelStyle}') && src.includes("{drawing ? null : onLoc ? ("));
   ok("DRAW: every look is WSLayouts' (its own prefix); Terra Draw's lines show only while drawing or selected",
      ed.includes('e.h = WSLayouts.install(m, styles, { prefix: "dm-draw" });') && ed.includes("lineStringOpacity: ({ properties }) => properties.currentlyDrawing ? 0.9 : 0")
      && ed.includes("outlineOpacity: ({ properties }) => properties.currentlyDrawing ? 0.9 : 0") && ed.includes("pointOpacity: 0"));
@@ -5012,6 +5013,52 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      (dash.match(/<ChartCanvas config=\{\w+\}[^\n]*title=\{[^\n]*scope=\{dashScope\} \/>/g) || []).length === 8
      && code.includes('title="Gate arrivals: lorries a day at each gate" scope={[ga.label, sited || null]}') && code.includes('title="Simulation: when queues start" scope={[D.label]}')
      && code.includes("const dashScope = [rangeLabel,"));
+}
+
+// 5 Nov 2026 (the mockup John approved, notes layout-fullscreen-mockup-1105, Q1-Q8 as recommended): a site's layout full screen
+{
+  const cut = (t, name) => { const a = t.indexOf("function " + name + "("); return a < 0 ? "" : t.slice(a, t.indexOf("\nfunction ", a + 10)); };
+  const ed = cut(src, "SiteLayoutDraw"), edc = cut(code, "SiteLayoutDraw"), dm = cut(src, "DataManagement"), dmc = cut(code, "DataManagement");
+  ok("⭐ FULL SCREEN: the same grid that holds the ONE map is laid over the window (sl-full, fixed, inset 0) — no second map, no portal",
+     dm.includes('+ (full ? " sl-full" : "")') && dm.includes('data-full={full ? "1" : undefined}') && (dm.match(/<div ref=\{mapDiv\}/g) || []).length === 1
+     && /\.sl-full\{position:fixed;inset:0;z-index:70;margin:0 !important;/.test(html) && !/createPortal/.test(dm));
+  ok("⭐ FULL SCREEN: Chrome is asked for its own full screen too (Q1), as the big screen does; leaving asks it back only when this page asked",
+     dmc.includes("document.documentElement.requestFullscreen().catch(() => { fsAsked.current = false; })")
+     && dmc.includes("if(fsAsked.current && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});"));
+  ok("⭐ FULL SCREEN: Esc is never this page's way out (Q2): no Escape handler in DataManagement; Chrome's own exit leaves the layout over the window",
+     !/Escape/.test(dmc) && dmc.includes('const onFs = () => { if(!document.fullscreenElement) fsAsked.current = false; };')
+     && ed.includes('keyEvents: { deselect: "Escape", delete: "Delete", rotate: ["r"], scale: ["s"] }'));
+  ok("⭐ FULL SCREEN: ⤢ is a map control of its own added BEFORE + / − (so above them, Q3): a named button, ⤡ 'Leave full screen' when in",
+     dmc.indexOf('g.setAttribute("data-full-ctl", "1")') > 0 && dmc.indexOf('g.setAttribute("data-full-ctl", "1")') < dmc.indexOf("m.addControl(new window.mapboxgl.NavigationControl(), \"top-right\");")
+     && dmc.includes('c.btn.textContent = full ? "⤡" : "⤢";') && dmc.includes('c.btn.setAttribute("aria-label", full ? "Leave full screen" : "Full screen");')
+     && /\.mapboxgl-ctrl-group button\.sl-full-btn\{/.test(html));
+  ok("⭐ FULL SCREEN: only at a desk (>= 1,024 px), on Locations, with a site's layout open or drawing (Q4); otherwise it leaves",
+     dmc.includes('const fullOk = isWide && subTab === "locations" && !!(drawing || (!form && readLoc) || (form && form.id));')
+     && dmc.includes("useEffect(() => { if(full && !fullOk) leaveFull(); }, [full, fullOk]);") && dmc.includes('c.box.style.display = fullOk ? "" : "none";'));
+  ok("FULL SCREEN: before Draw, the map | a 380 px column for the site's panel; while drawing, the Drawing bar across, then palette | map | settings filling the height",
+     dm.includes('{ gridTemplateColumns: "minmax(0, 1fr) 380px", gridTemplateRows: "minmax(0, 1fr)" }')
+     && dm.includes('gridTemplateColumns: `${fold.l ? 44 : 232}px minmax(0, 1fr) ${fold.r ? 44 : 300}px`, gridTemplateRows: "auto minmax(0, 1fr)"')
+     && ed.includes('const colH = full ? { height: "100%", minHeight: 0 } : { maxHeight: wide ? SL_DRAW_H : undefined };')
+     && (ed.match(/\.\.\.colH/g) || []).length === 2 && !/maxHeight: wide \? SL_DRAW_H/.test(ed.replace("{ maxHeight: wide ? SL_DRAW_H : undefined }", "")));
+  ok("⭐ FULL SCREEN: « / » fold either side column to a 44 px strip (Q5), named buttons that say what they show, opening unfolded each time",
+     ed.includes('aria-label={fold.l ? "Show what to draw" : "Hide what to draw"}') && ed.includes('aria-label={fold.r ? "Show the settings" : "Hide the settings"}')
+     && ed.includes("aria-expanded={!fold.l}") && ed.includes("aria-expanded={!fold.r}") && ed.includes("{!(full && fold.l) && <>") && ed.includes("{!(full && fold.r) && <>")
+     && dmc.includes("setFold({ l: false, r: false }); setFull(true);") && /\.sl-fold\{width:28px;height:28px;/.test(html));
+  ok("⭐ FULL SCREEN: the site's name and, on a demo only, the DEMO pill in the Drawing bar (Q6); the pill on the map before Draw — the header's notice is covered",
+     ed.includes('{full && site && <span className="text-[13px] text-slate-700" data-full-site="1">{site}</span>}')
+     && ed.includes('{full && TENANT.demo_notice && <span className="sl-demo-pill" role="note"><b>DEMO</b>{TENANT.demo_notice}</span>}')
+     && dm.includes('{full && !drawing && TENANT.demo_notice && <span className="sl-demo-pill sl-demo-on-map" role="note"><b>DEMO</b>{TENANT.demo_notice}</span>}')
+     && src.includes('site={(locs.find(l => l.id === drawing.locId) || {}).name || ""}') && /\.sl-demo-pill\{[^}]*background:var\(--demo-bg\);color:var\(--demo-fg\);/.test(html));
+  ok("⭐ FULL SCREEN: Done leaves both (after its own Save / Discard question, unchanged); ⤡ leaves full screen only — unsaved work is never touched",
+     src.includes("onDone={() => { setDrawing(null); leaveFull(); }}") && ed.includes("if(e.dirty || e.pdirty){ setAsk(true); say(\"Save or discard your changes first.\", true); return; } onDone(phase && phase.id);")
+     && !/setDrawing|e\.dirty|discard/i.test(dmc.slice(dmc.indexOf("const leaveFull = () => {"), dmc.indexOf("const leaveFull = () => {") + 300)));
+  ok("FULL SCREEN: the page around the grid is inert while covered, put back on leaving (Tab stays in the full screen)",
+     dmc.includes('x.setAttribute("inert", ""); off.push(x);') && dmc.includes('return () => off.forEach(x => x.removeAttribute("inert"));')
+     && dm.includes("<div ref={fullGrid} className="));
+  ok("FULL SCREEN: no new shortcut key (Q7) — the drawing's keys are unchanged and nothing listens for F",
+     !/k === "f"|key === "f"|key === "F"/.test(edc + dmc) && !/keydown[^\n]*full/i.test(dmc));
+  ok("FULL SCREEN: the words are few and name no back end; the map control's look is the map's own group",
+     !/fullscreen|requestFullscreen|API|server/i.test((edc.match(/>[^<>{}\n]{3,}</g) || []).join(" ")) && dmc.includes('g.className = "mapboxgl-ctrl mapboxgl-ctrl-group";'));
 }
 
 console.log();

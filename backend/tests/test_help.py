@@ -1297,6 +1297,14 @@ ok3("SITE LAYOUTS (PR 2): 19.2 names no library or back end (Terra Draw, uuid, v
     and 'id="t1-layouts-draw"' in _tgv2 and "Terra Draw 1.39.0 and terra-draw-mapbox-gl-adapter 1.5.0" in _tgv2
     and "<code>WSLayouts.geo.holesFollow</code>" in _tgv2 and "<code>POST /api/site-layouts/phases/{id}/copy</code>" in _tgv2
     and "<code>LAYOUT_LEAVE</code>" in _tgv2 and "<code>WORDS_Z</code> 15" in _tgv2 and "Drawing tools, pins" not in _tgv2)
+# 5 Nov 2026 (the mockup John approved, notes\\layout-fullscreen-mockup-1105): full screen, one line in 19.2; the detail in #t1-layouts-full
+ok3("⭐ SITE LAYOUTS (full screen): 19.2 says ⤢ fills the screen before or while drawing, « » fold the columns, ⤡ or Done come back, Esc only gives the browser its bars",
+    "<strong>⤢</strong> on the map&#39;s corner fills the screen with the site&#39;s layout, before or while you draw; « and » fold the side columns." in _d192
+    and "<strong>⤡</strong> or <strong>Done</strong> brings the page back. Esc only gives the browser its bars back; your changes stay as they are." in _d192
+    and not re.search(r"(?i)fullscreen|requestFullscreen|z-index|overlay", _d192))
+ok3("SITE LAYOUTS (full screen): #t1-layouts-full holds how it is built (sl-full, requestFullscreen, the control, fullOk, Esc, the fold, the page under it inert)",
+    'id="t1-layouts-full"' in _tgv2 and "<code>sl-full</code>" in _tgv2 and "<code>document.documentElement.requestFullscreen()</code>" in _tgv2
+    and "<code>[data-full-ctl]</code>" in _tgv2 and "<code>fullOk</code>" in _tgv2 and "is <code>inert</code>, so Tab and a screen reader stay in it" in _tgv2)
 # ---- 31 Oct 2026 (task 4c PR 4): the public site layouts in 8.2, 19.3 and #t1-layouts
 _ug82 = _ug[_ug.index('id="8-2-filters-basemaps-and-overlays"'):_ug.index('id="8-4-the-forecast-timeline-and-kpi-panel"')]
 ok3("⭐ PUBLIC LAYOUTS: 8.2 lists Site layouts (zoom in close, the popup's button) and 19.3 the tick, Every site layout and no security / CCTV",
