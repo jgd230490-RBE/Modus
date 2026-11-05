@@ -53,6 +53,7 @@ import fuel          # 10 Sep evening — the EU Weekly Oil Bulletin diesel inde
 import costlines     # 11 Sep — one read of every forecast line's volume, haul and cost figures (Dashboard, Forecasts)
 import security_headers  # 27 Oct 2026 (pilot readiness phase 2): the headers on every answer
 import demo_request  # H9, 8 Oct — the landing page's demo-request form: store, email or show the access details
+import concerns  # 5 Nov 2026 (group 6): concerns from the public, stored per scheme, answered and counted by staff
 import users         # G3, 14 Oct 2026 — per-person logins, sessions, reset links, the audit trail
 import carbon        # 10 Oct 2026 — the carbon planner: baseline vs alternatives, drivers ranked by tCO2e moved
 import carbon_target  # 11 Oct 2026 — the programme's carbon target (config key 'carbon_target'), all-in tCO2e
@@ -177,6 +178,8 @@ async def lifespan(app: FastAPI):
             print(line)
     except Exception as e:  # noqa: BLE001
         print("deployment: check skipped:", e.__class__.__name__, str(e)[:200])
+    # 5 Nov 2026 (group 6): the concerns' clean-up once at start-up (then at most hourly, from a send or a staff read)
+    concerns.maybe_sweep()
     # 22 Oct 2026: the start-up migrations above commit on their own connections; nothing is cached yet, but say so.
     db.bump_data_version()
     # ... and build the map's council figures in the background, so the first viewer after a deploy does not wait
@@ -495,8 +498,11 @@ AUDIT_SKIP = ("/api/costing/preview", "/api/carbon/scenario", "/api/carbon/summa
               "/api/activity",
               # 31 Oct 2026 (task 4c): reading a drawing saves nothing (it is held for the place step, which is audited);
               # skipped so the middleware does not keep a 10 MB upload in memory a second time
-              "/api/site-layouts/read")
-AUDIT_SKIP_PREFIXES = ("/api/auth/",)
+              "/api/site-layouts/read",
+              # 5 Nov 2026 (group 6): a concern's body is a member of the public's words and contact; the endpoint writes
+              # its own audit row (the reference and the step), so the log never keeps them past the clean-up
+              "/api/public/concerns", "/api/concerns")
+AUDIT_SKIP_PREFIXES = ("/api/auth/", "/api/concerns/")
 #: 31 Oct 2026 (task 4c PR 3): adding a pinned picture (a file of up to 10 MB as the body) writes its OWN audit row, so
 #: the middleware does not keep the upload in memory a second time (as /api/site-layouts/read)
 _PICTURE_UPLOAD_PATH = re.compile(r"^/api/locations/[^/]+/site-layout/pictures$")
@@ -6719,6 +6725,199 @@ def demo_requests_csv(token: Optional[str] = None):
                     headers={"Content-Disposition": 'attachment; filename="demo-requests.csv"',
                              "Cache-Control": "no-store"})
 
+
+# --------------------------------------------------------------------------- #
+#  5 Nov 2026 (group 6) — Report a concern: the public send and the staff page #
+# --------------------------------------------------------------------------- #
+# Mockup notes/report-concern-mockup-1105/ (John: "Yes, as recommended"). The public send is under /api/public/, so the
+# map password guards it (gate.MAP_DATA_PREFIXES); it also needs the app's X-Wayscope header and a JSON body of at most
+# 8 KB, and it answers with the reference only (no read of any concern under /api/public/). The staff calls are planners'
+# and admins' (the record holds a member of the public's contact; Q4). Every call writes its own audit row with the
+# reference and the step, never the words or the contact (AUDIT_SKIP).
+
+def _concern_audit(step, cid, status=200):
+    users.audit("write", acc=access.current(), method="POST", path=f"/api/concerns/{cid or ''}", target=cid,
+                status=status, detail={"concern": cid, "step": step})
+
+
+def _concern_refused(e):
+    raise HTTPException(e.status, e.words)
+
+
+def concern_public_send(raw, headers, ip):
+    """The public send without the HTTP (the harness calls it). Returns the answer dict; raises HTTPException."""
+    h = {str(k).lower(): v for k, v in (headers or {}).items()}
+    if h.get(GUARD_HEADER.lower()) != "1":
+        raise HTTPException(403, "refused: this request did not come from the Wayscope map")
+    if "json" not in (h.get("content-type") or "").lower():
+        raise HTTPException(415, "Send the form as JSON.")
+    if raw is None or len(raw) > concerns.MAX_BODY:
+        raise HTTPException(413, "The report is too long.")
+    try:
+        form = json.loads(raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else raw)
+    except Exception:
+        raise HTTPException(422, "Something in the form could not be read. Please try again.")
+    if not isinstance(form, dict):
+        raise HTTPException(422, "Something in the form could not be read. Please try again.")
+    try:
+        out = concerns.submit(form, demo_request.ip_hash(ip) if ip else None)
+    except concerns.Refused as e:
+        _concern_refused(e)
+    if out.get("ref"):
+        users.audit("write", acc=None, method="POST", path="/api/public/concerns", target=out["ref"], status=200,
+                    detail={"concern": out["ref"], "step": "received"}, ip=ip)
+    return out
+
+
+@app.post("/api/public/concerns")
+async def concern_public(request: Request):
+    """The public map's Report a concern. {"ok": true, "ref": "C-0042"}; nothing else is ever sent back."""
+    raw = await request.body()
+    out = concern_public_send(raw, request.headers, _client_ip(request))
+    if out.get("ref"):
+        try:
+            from fastapi.responses import JSONResponse as _J
+            from starlette.background import BackgroundTask as _BT
+            return _J(out, background=_BT(concerns.send_alert, out["ref"]), headers={"Cache-Control": "no-store"})
+        except Exception:
+            return out
+    return out
+
+
+class ConcernIn(BaseModel):
+    kind: Optional[str] = None
+    words: Optional[str] = None
+    happened_on: Optional[str] = None
+    happened_time: Optional[str] = None
+    registration: Optional[str] = None
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    route_id: Optional[str] = None
+    wants_reply: Optional[bool] = False
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    source: Optional[str] = None
+
+
+class ConcernReplyIn(BaseModel):
+    words: Optional[str] = None
+    at: Optional[str] = None
+
+
+class ConcernCloseIn(BaseModel):
+    outcome: Optional[str] = None
+
+
+class ConcernRouteIn(BaseModel):
+    route_id: Optional[str] = None
+
+
+def _concern_by():
+    acc = access.current() or {}
+    return _by(acc.get("label")) or acc.get("label") or "staff"
+
+
+def _body_dict(body):
+    if hasattr(body, "model_dump"):
+        return body.model_dump()
+    if hasattr(body, "dict"):
+        return body.dict()
+    return dict(body or {})
+
+
+@app.get("/api/concerns")
+def concern_list(status: Optional[str] = None, kind: Optional[str] = None, route: Optional[str] = None,
+                 month: Optional[str] = None):
+    """Track → Concerns: the list (planners and admins)."""
+    _require_approver()
+    return concerns.listing(status=status, kind=kind, route=route, month=month)
+
+
+@app.get("/api/concerns/new-count")
+def concern_new_count():
+    """The rail's red count: concerns still New (planners and admins; 0 for everyone else)."""
+    acc = access.current()
+    if not acc or not access.can_approve(acc):
+        return {"new": 0}
+    return {"new": concerns.new_count()}
+
+
+@app.get("/api/concerns/{cid}")
+def concern_one(cid: str):
+    _require_approver()
+    try:
+        return concerns.one(cid)
+    except concerns.Refused as e:
+        _concern_refused(e)
+
+
+@app.post("/api/concerns")
+def concern_add(body: ConcernIn):
+    """One that came in by email, phone or in person, typed by a planner or admin."""
+    _require_approver()
+    try:
+        cid = concerns.add_by_staff(_body_dict(body), _concern_by())
+    except concerns.Refused as e:
+        _concern_refused(e)
+    _concern_audit("added", cid)
+    return concerns.one(cid)
+
+
+@app.post("/api/concerns/{cid}/reply")
+def concern_reply(cid: str, body: ConcernReplyIn):
+    _require_approver()
+    try:
+        out = concerns.reply(cid, body.words, body.at, _concern_by())
+    except concerns.Refused as e:
+        _concern_refused(e)
+    _concern_audit("reply", cid)
+    return out
+
+
+@app.post("/api/concerns/{cid}/close")
+def concern_close(cid: str, body: ConcernCloseIn):
+    _require_approver()
+    try:
+        out = concerns.close(cid, body.outcome, _concern_by())
+    except concerns.Refused as e:
+        _concern_refused(e)
+    _concern_audit("closed", cid)
+    return out
+
+
+@app.post("/api/concerns/{cid}/reopen")
+def concern_reopen(cid: str):
+    _require_approver()
+    try:
+        out = concerns.reopen(cid, _concern_by())
+    except concerns.Refused as e:
+        _concern_refused(e)
+    _concern_audit("reopened", cid)
+    return out
+
+
+@app.post("/api/concerns/{cid}/route")
+def concern_route(cid: str, body: ConcernRouteIn):
+    _require_approver()
+    try:
+        out = concerns.set_route(cid, body.route_id, _concern_by())
+    except concerns.Refused as e:
+        _concern_refused(e)
+    _concern_audit("route", cid)
+    return out
+
+
+@app.post("/api/concerns/{cid}/forget")
+def concern_forget(cid: str):
+    """"Delete the personal details now": contact, words, registration, time of day, reply notes; the pin rounded."""
+    _require_approver()
+    try:
+        out = concerns.forget(cid, _concern_by())
+    except concerns.Refused as e:
+        _concern_refused(e)
+    _concern_audit("personal details deleted", cid)
+    return out
 
 # 6 Oct 2026 (H5) — the public landing page at /landing/ for PREVIEW on this service. The
 # page lives in landing/ at the repo root so the same folder deploys as a Render static

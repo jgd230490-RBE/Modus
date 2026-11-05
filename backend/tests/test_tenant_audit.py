@@ -124,6 +124,8 @@ TENANTED = {
     # 31 Oct 2026 (task 4a, PR 3c, clp_reviews.py): the client's reviewer groups, and the issues sent to them with their
     # decisions. Same edit.
     "clp_review_groups", "clp_reviews",
+    # 5 Nov 2026 (group 6, concerns.py): concerns from the public, answered and counted by staff. Same edit.
+    "concerns",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is

@@ -356,6 +356,14 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .slp-turner{width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #1E3A8A;cursor:grab;display:grid;place-items:center;font-size:15px;color:#1E3A8A;}
   .slp-eye{width:28px;height:28px;border-radius:6px;display:inline-grid;place-items:center;color:var(--muted);flex:none;}
   .slp-eye:hover{background:var(--surface-2);} .slp-eye::before{content:"◉";} .slp-eye[aria-pressed="false"]::before{content:"○";}
+  /* 5 Nov 2026: a site's layout full screen — the Locations grid over the whole window (z 70: under the i boxes and messages) */
+  .sl-full{position:fixed;inset:0;z-index:70;margin:0 !important;padding:8px;gap:8px !important;background:var(--surface-3);align-content:stretch;}
+  .mapboxgl-ctrl-group button.sl-full-btn{font-size:17px;line-height:1;color:#111827;} .sl-full-btn::before{content:"⤢";} .sl-full-btn[aria-pressed="true"]::before{content:"⤡";}
+  .sl-fold{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;}
+  .sl-fold:hover{background:var(--surface-2);}
+  .sl-demo-pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;background:var(--demo-bg);color:var(--demo-fg);font:700 12px/1 Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;box-shadow:inset 0 0 0 1px var(--demo-rule);}
+  .sl-demo-pill b{padding:0 5px;border-radius:3px;background:var(--demo-tag-bg);color:var(--demo-tag-fg);line-height:16px;letter-spacing:.08em;}
+  .sl-demo-on-map{position:absolute;top:10px;left:10px;z-index:3;}
   .row-menu-list{position:absolute;right:0;top:32px;z-index:20;min-width:220px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:8px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.28);text-align:left;white-space:nowrap;}
   .row-menu-list button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--popover-fg);font:inherit;font-size:14px;padding:7px 10px;border-radius:6px;cursor:pointer;}
   .row-menu-list button:hover{background:rgba(255,255,255,.06);} .row-menu-list button:disabled{opacity:.5;}
@@ -4663,6 +4671,232 @@ function fmtWhen(iso){
       + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); } catch(e){ return iso || ""; }
 }
 
+// ================================================================= Track → Concerns (5 Nov 2026, group 6)
+// The approved mockup notes\report-concern-mockup-1105\ cards 4–5 (John: "Yes, as recommended"). Planners and admins
+// only (Q4): a concern holds a member of the public's words and contact. One row a concern, newest first; the name
+// (the reference) opens it; one next step + the "⋯" menu. Replies are RECORDED here and sent from the person's own email
+// or phone (Q6): Wayscope emails no member of the public. The first reply recorded starts the KPI clock.
+const CN_STATUS = { new: ["New", "warn"], answered: ["Answered", "ok"], closed: ["Closed", "none"] };
+function cnNowLocal(){
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function cnDay(iso){
+  try { const d = new Date(iso.length === 10 ? iso + "T12:00:00" : iso); if(isNaN(d)) return iso || "";
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); } catch(e){ return iso || ""; }
+}
+function cnDays(n){ return n == null ? "—" : `${n} day${n === 1 ? "" : "s"}`; }
+const CN_BLANK = { kind: "", words: "", happened_on: "", happened_time: "", registration: "", route_id: "", source: "email",
+                   wants_reply: false, name: "", email: "", phone: "" };
+function ConcernsPage({ onCount }){
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [tick, setTick] = useState(0);
+  const [flt, setFlt] = useState({ status: "open", kind: "", route: "", month: "" });
+  const [openId, setOpenId] = useState(null);
+  const [one, setOne] = useState(null);
+  const [reply, setReply] = useState({ words: "", at: cnNowLocal() });
+  const [outcome, setOutcome] = useState("");
+  const [routePick, setRoutePick] = useState("");
+  const [adding, setAdding] = useState(null);
+  const [note, setNote] = useState(null);
+  const headRef = useRef(null), addRef = useRef(null), openerRef = useRef(null);
+  useEffect(() => {
+    let live = true;
+    const q = new URLSearchParams();
+    Object.entries(flt).forEach(([k, v]) => { if(v) q.set(k, v); });
+    fetch(`${API}/concerns?${q}`).then(okJSON)
+      .then(d => { if(live){ setData(d); setErr(""); if(onCount) onCount(d.new || 0); } })
+      .catch(e => { if(live) setErr(errSay("The concerns did not load.", e)); });
+    return () => { live = false; };
+  }, [tick, flt]);
+  useEffect(() => {
+    if(!openId){ setOne(null); return; }
+    let live = true;
+    fetch(`${API}/concerns/${encodeURIComponent(openId)}`).then(okJSON)
+      .then(c => { if(live){ setOne(c); setRoutePick(c.route_id || ""); } })
+      .catch(e => { if(live){ setOne(null); say(false, errSay("The concern did not open.", e)); } });
+    return () => { live = false; };
+  }, [openId, tick]);
+  useEffect(() => { if(one && headRef.current) headRef.current.focus(); }, [one && one.id]);
+  useEffect(() => { if(adding && addRef.current) addRef.current.focus(); }, [!!adding]);
+  const say = (ok, text) => { setNote({ ok, text }); if(ok) setTimeout(() => setNote(null), 2500); };
+  if(err) return <div className="max-w-7xl mx-auto p-6"><EmptyState kind="error" title="Couldn't open the concerns" body={err} action={<button type="button" className="btn-sec" onClick={() => setTick(t => t + 1)}>Try again</button>} /></div>;
+  if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;
+  const list = data.concerns || [], kinds = data.kinds || {}, outcomes = data.outcomes || {}, st = data.settings || {};
+  const routes = data.routes || [], routeWords = (id) => ((routes.find(r => r.id === id) || {}).words || "");
+  const where = (c) => [c.route_id ? `${c.route_id}${routeWords(c.route_id) ? " " + routeWords(c.route_id) : ""}` : "", c.area_name].filter(Boolean).join(" · ") || (c.lat != null ? "Pin, no route near" : "—");
+  const openOne = (c, e) => { openerRef.current = e && e.currentTarget; setAdding(null); setReply({ words: "", at: cnNowLocal() }); setOutcome(""); setOpenId(c.id); };
+  const closeOne = () => { setOpenId(null); setOne(null); if(openerRef.current && openerRef.current.focus) try { openerRef.current.focus(); } catch(e){} };
+  const act = (path, body, what, done) => postJSON(path, body)
+    .then(c => { say(true, done || "Saved."); setOne(c && c.id ? c : null); setTick(t => t + 1); return true; })
+    .catch(e => { say(false, errSay(what, e)); return false; });
+  const saveReply = () => {
+    if(!reply.words.trim()){ say(false, "Not saved. Say what was said."); return; }
+    const at = reply.at ? new Date(reply.at).toISOString() : null;
+    act(`/concerns/${one.id}/reply`, { words: reply.words, at }, "The reply was not saved.", "Reply recorded.")
+      .then(ok => { if(ok) setReply({ words: "", at: cnNowLocal() }); });
+  };
+  const closeIt = () => { if(!outcome){ say(false, "Not closed. Pick an outcome."); return; }
+    act(`/concerns/${one.id}/close`, { outcome }, "The concern was not closed.", "Closed."); };
+  const forget = (c) => { if(window.confirm(`Delete the personal details of ${c.id} now? The name, contact, words, registration and reply notes go; the kind, date and route stay for the figures. This cannot be undone.`))
+    act(`/concerns/${c.id}/forget`, {}, "The personal details were not deleted.", "Personal details deleted."); };
+  const saveAdd = () => {
+    const f = adding;
+    postJSON("/concerns", { ...f, route_id: f.route_id || null, happened_time: f.happened_time || null, registration: f.registration || null })
+      .then(c => { say(true, `Added as ${c.id}.`); setAdding(null); setTick(t => t + 1); setOpenId(c.id); })
+      .catch(e => say(false, errSay("The concern was not added.", e)));
+  };
+  const setF = (k) => (e) => setFlt(f => ({ ...f, [k]: e.target.value }));
+  const setA = (k) => (e) => { const v = e.target.type === "checkbox" ? e.target.checked : e.target.value; setAdding(a => ({ ...a, [k]: v })); };
+  const fld = (k, label, attrs) => (
+    <div className="pour-fld"><label htmlFor={"cn-add-" + k}>{label}</label>
+      <input id={"cn-add-" + k} className="ctl w-full" value={adding[k]} onChange={setA(k)} {...(attrs || {})} /></div>
+  );
+  return (
+    <div className="max-w-7xl mx-auto p-6 pb-2" data-page="concerns">
+      <PageHeader title="Concerns" kicker="Track" subtitle="From the public map, email, phone or in person."
+        actions={<button type="button" className="btn-pri" data-concern-add="1" onClick={() => { setOpenId(null); setAdding({ ...CN_BLANK, happened_on: cnNowLocal().slice(0, 10) }); }}>+ Add a concern</button>} />
+      {note && <p className="text-sm mb-3" style={{ color: note.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{note.text}</p>}
+      {!st.on && <p className="text-sm text-slate-600 mb-3" data-concern-off="1">The public map's form is off. Switch it on in Config → Map and bulletin → Contact lines.</p>}
+      {adding && (
+        <div className="card p-4 mb-4" data-concern-editor="1">
+          <h2 className="text-lg font-semibold text-slate-800 mb-1" tabIndex={-1} ref={addRef}>New concern</h2>
+          <div className="pour-form">
+            <div className="pour-fld"><label htmlFor="cn-add-source">Came in by</label>
+              <select id="cn-add-source" className="ctl w-full" value={adding.source} onChange={setA("source")}>
+                <option value="email">Email</option><option value="phone">Phone</option><option value="person">In person</option></select></div>
+            <div className="pour-fld"><label htmlFor="cn-add-kind">Kind</label>
+              <select id="cn-add-kind" className="ctl w-full" value={adding.kind} onChange={setA("kind")}>
+                <option value="">Pick one</option>{Object.entries(kinds).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+            {fld("happened_on", "Date", { type: "date" })}
+            {fld("happened_time", "Time, if known", { type: "time" })}
+            <div className="pour-fld pour-wide"><label htmlFor="cn-add-route">Route</label>
+              <select id="cn-add-route" className="ctl w-full" value={adding.route_id} onChange={setA("route_id")}>
+                <option value="">Choose a route…</option>{routes.map(r => <option key={r.id} value={r.id}>{r.id} {r.words}</option>)}</select></div>
+            <div className="pour-fld pour-wide"><label htmlFor="cn-add-words">What happened</label>
+              <textarea id="cn-add-words" className="ctl w-full" rows={3} maxLength={1000} value={adding.words} onChange={setA("words")} /></div>
+            {fld("registration", "Registration", { maxLength: 10 })}
+            <div className="pour-fld"><label className="flex items-center gap-2" style={{ minHeight: 44 }}>
+              <input type="checkbox" checked={adding.wants_reply} onChange={setA("wants_reply")} /> Wants a reply</label></div>
+            {adding.wants_reply && fld("name", "Name", { maxLength: 120 })}
+            {adding.wants_reply && fld("email", "Email", { type: "email", maxLength: 200 })}
+            {adding.wants_reply && fld("phone", "Phone", { maxLength: 30 })}
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button type="button" className="btn-pri" onClick={saveAdd} data-concern-save="1">Add</button>
+            <button type="button" className="btn-sec" onClick={() => setAdding(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {one && (
+        <div className="card p-4 mb-4" data-concern-detail={one.id}>
+          <div className="flex flex-wrap items-center gap-3 mb-2">
+            <h2 className="text-lg font-semibold text-slate-800 flex-1" tabIndex={-1} ref={headRef}>{one.id} · {one.kind_text}</h2>
+            <RowStatus word={(CN_STATUS[one.status] || [one.status])[0]} tone={(CN_STATUS[one.status] || [])[1]} />
+            <button type="button" className="btn-sec" onClick={closeOne}>Close the panel</button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-sm mb-2"><b>{cnDay(one.happened_on)}{one.happened_time ? `, about ${one.happened_time}` : ""}.</b>{" "}
+                {one.words || <span className="text-slate-500">The words were deleted with the personal details.</span>}</p>
+              <p className="text-[13px] text-slate-500 mb-2">{where(one)}{one.route_set_by === "pin" ? " (nearest to the pin)" : ""}
+                {one.lat != null ? ` · pin ${Number(one.lat).toFixed(4)}, ${Number(one.lon).toFixed(4)}` : ""}</p>
+              <p className="text-[13px] text-slate-500 mb-3">Registration: {one.registration || "not given"}. Received {fmtWhen(one.received_at)} by {one.source_text}.</p>
+              <h3 className="font-semibold text-slate-800 mb-1">Contact</h3>
+              {one.personal_deleted_at || one.contact_deleted_at
+                ? <p className="text-sm text-slate-600 mb-3">Personal details deleted on {cnDay(one.personal_deleted_at || one.contact_deleted_at)}.</p>
+                : !one.wants_reply ? <p className="text-sm text-slate-600 mb-3">No reply asked for; no contact kept.</p>
+                : <div className="text-sm mb-3" data-concern-contact="1">
+                    <p>{[one.name, one.email, one.phone].filter(Boolean).join(" · ")}</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {one.email && <a className="btn-sec" href={`mailto:${one.email}?subject=${encodeURIComponent("Your concern " + one.id)}`}>Email the reporter</a>}
+                      {one.phone && <a className="btn-sec" href={`tel:${String(one.phone).replace(/[^0-9+]/g, "")}`}>Call the reporter</a>}
+                    </div>
+                    <p className="text-[13px] text-slate-500 mt-1">Deleted {st.keep_months || 12} months after closing.{" "}
+                      <button type="button" className="link-btn" onClick={() => forget(one)}>Delete now</button></p>
+                  </div>}
+              <h3 className="font-semibold text-slate-800 mb-1">History</h3>
+              <ul className="text-[13px] text-slate-600 list-none p-0 m-0" data-concern-history="1">
+                {(one.history || []).map((h, i) => <li key={i} className="mb-1">{fmtWhen(h.at)} · {h.what}{h.by ? ` · ${h.by}` : ""}{h.words ? <span className="block text-slate-700">{h.words}</span> : null}</li>)}
+              </ul>
+            </div>
+            <div>
+              <div className="pour-fld mb-3"><label htmlFor="cn-route-pick">Route</label>
+                <div className="flex gap-2">
+                  <select id="cn-route-pick" className="ctl w-full" value={routePick} onChange={e => setRoutePick(e.target.value)}>
+                    <option value="">No route</option>{routes.map(r => <option key={r.id} value={r.id}>{r.id} {r.words}</option>)}</select>
+                  <button type="button" className="btn-sec" disabled={routePick === (one.route_id || "") || !routePick}
+                    onClick={() => act(`/concerns/${one.id}/route`, { route_id: routePick }, "The route was not changed.")}>Save</button></div></div>
+              {one.status !== "closed" ? <>
+                <div className="pour-fld mb-2"><label htmlFor="cn-reply">Record a reply</label>
+                  <textarea id="cn-reply" className="ctl w-full" rows={3} maxLength={1000} value={reply.words} placeholder="What was said, and by what means"
+                    onChange={e => setReply(r => ({ ...r, words: e.target.value }))} /></div>
+                <div className="pour-fld mb-2"><label htmlFor="cn-reply-at">Replied on</label>
+                  <input id="cn-reply-at" type="datetime-local" className="ctl w-full" value={reply.at} max={cnNowLocal()} onChange={e => setReply(r => ({ ...r, at: e.target.value }))} /></div>
+                <button type="button" className="btn-pri mb-4" onClick={saveReply} data-concern-reply="1">Save the reply</button>
+                <div className="pour-fld mb-2"><label htmlFor="cn-outcome">Close with</label>
+                  <select id="cn-outcome" className="ctl w-full" value={outcome} onChange={e => setOutcome(e.target.value)}>
+                    <option value="">Pick an outcome</option>{Object.entries(outcomes).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+                <button type="button" className="btn-sec" onClick={closeIt} data-concern-close="1">Close the concern</button>
+              </> : <>
+                <p className="text-sm mb-2">Closed on {cnDay(one.closed_at)}: {one.outcome_text}.</p>
+                {!one.personal_deleted_at && <button type="button" className="btn-sec" onClick={() => act(`/concerns/${one.id}/reopen`, {}, "The concern was not reopened.", "Reopened.")}>Reopen</button>}
+              </>}
+              <p className="text-[13px] text-slate-500 mt-3">First reply: {cnDays(one.first_reply_days)} · to close: {cnDays(one.close_days)} (working days).</p>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2 mb-3" data-concern-filters="1">
+        <select className="ctl" aria-label="Status" value={flt.status} onChange={setF("status")}>
+          <option value="open">Open</option><option value="new">New</option><option value="answered">Answered</option><option value="closed">Closed</option><option value="">All</option></select>
+        <select className="ctl" aria-label="Kind" value={flt.kind} onChange={setF("kind")}>
+          <option value="">Every kind</option>{Object.entries(kinds).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+        <select className="ctl" aria-label="Route" value={flt.route} onChange={setF("route")}>
+          <option value="">Every route</option>{routes.map(r => <option key={r.id} value={r.id}>{r.id} {r.words}</option>)}</select>
+        <input className="ctl" type="month" aria-label="Month received" value={flt.month} onChange={setF("month")} />
+        <span className="ml-auto text-sm text-slate-500 tabular-nums">{list.length} shown · {data.new || 0} new</span>
+      </div>
+      {!list.length ? (
+        <EmptyState kind={flt.status === "open" && !flt.kind && !flt.route && !flt.month ? "none" : "nomatch"}
+          title={flt.status === "open" ? "No open concerns" : "No concerns match"} body="New ones from the public map appear here." />
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="tbl" data-concerns-table="1">
+            <thead><tr><th>Concern</th><th>Kind</th><th>Where</th><th>Status</th><th className="num">First reply</th><th className="w-10"><span className="sr-only">Actions</span></th></tr></thead>
+            <tbody>
+              {list.map(c => {
+                const [word, tone] = CN_STATUS[c.status] || [c.status, "none"];
+                return (
+                  <tr key={c.id} data-concern-row={c.id}>
+                    <td style={{ whiteSpace: "normal" }}>
+                      <button type="button" className="row-open" aria-label={`Open ${c.id}`} onClick={(e) => openOne(c, e)}>{c.id}</button>
+                      <span className="block text-[12px] text-slate-500">{fmtWhen(c.received_at)} · {c.source_text}</span>
+                    </td>
+                    <td style={{ whiteSpace: "normal" }}>{c.kind_text}</td>
+                    <td style={{ whiteSpace: "normal" }}>{where(c)}</td>
+                    <td className="rd-status"><RowStatus word={word} tone={c.late ? "bad" : tone} />
+                      {c.late && <span className="block text-[12px]" style={{ color: "var(--bad-text)" }} data-concern-late="1">{cnDays(c.waiting_days)} waiting</span>}</td>
+                    <td className="num tabular-nums">{cnDays(c.first_reply_days)}</td>
+                    <td><div className="flex items-center gap-1 justify-end">
+                      {c.status === "new" && <button type="button" className="btn-pri" style={{ padding: "4px 10px" }} onClick={(e) => openOne(c, e)}>Open</button>}
+                      <RowMenu name={c.id}>
+                        <button type="button" onClick={(e) => openOne(c, e)}>Open</button>
+                        {c.status === "closed" && !c.personal_deleted_at && <button type="button" onClick={() => act(`/concerns/${c.id}/reopen`, {}, "The concern was not reopened.", "Reopened.")}>Reopen</button>}
+                        {!c.personal_deleted_at && <button type="button" style={{ color: "var(--red)" }} onClick={() => forget(c)}>Delete the personal details…</button>}
+                      </RowMenu></div></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ================================================================= Abnormal loads (22 Oct 2026, S16 / B5)
 //
 // Each abnormal load is its own planned movement (D66a): what it is, the team, from and to (gate), a window and a
@@ -7173,6 +7407,8 @@ const NAV = [
   ]},
   { group: "Track", items: [
     { id: "lookahead", label: "Look-ahead", glyph: "◔" },
+    // 5 Nov 2026 (group 6): concerns from the public map, email, phone or in person — planners and admins only (Q4)
+    { id: "concerns", label: "Concerns", glyph: "!", approverOnly: true },
   ]},
   { group: "Data", admin: true, items: [
     { id: "locations", label: "Locations", glyph: "◉" },
@@ -7205,6 +7441,7 @@ const NAV_ICON = {
   abnormal: "M4 14h16M6 14v3M18 14v3M3 17h2M8 17h8M19 17h2M5 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 14V8h10v6M2 11h3M19 11h3",
   simulation: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM10 8.5l6 3.5-6 3.5z",
   clp: "M7 3h7l5 5v13H7zM14 3v5h5M10 12h6M10 15.5h6M10 19h4",
+  concerns: "M4 5h16v11H10l-5 4v-4H4zM12 8v4M12 14.5h.01",
 };
 function NavIcon({ id }){
   return <svg className="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={NAV_ICON[id] || NAV_ICON.forecasts} /></svg>;
@@ -7240,7 +7477,7 @@ function PhoneTabs({ groups, page, onPick, moreOpen, onMore, pending }){
     </nav>
   );
 }
-function PhoneMore({ groups, page, onPick, onClose, role, who, pending }){
+function PhoneMore({ groups, page, onPick, onClose, role, who, pending, concernNew }){
   const all = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));
   const reads = all.filter(it => PHONE_READ_PAGES.includes(it.id)), desk = all.filter(it => !PHONE_READ_PAGES.includes(it.id));
   const first = useRef(null);
@@ -7263,6 +7500,7 @@ function PhoneMore({ groups, page, onPick, onClose, role, who, pending }){
             aria-current={page === it.id ? "page" : undefined} onClick={() => onPick(it.id)}>
             <NavIcon id={it.id} /><span>{it.label}</span>
             {it.id === "forecasts" && pending > 0 && <span className="pm-note">{pending} waiting</span>}
+            {it.id === "concerns" && concernNew > 0 && <span className="pm-note">{concernNew} new</span>}
           </button>
         ))}
         <a className="phone-more-item" href={"/help/?role=" + encodeURIComponent((role && role.role) || "")} target="_blank" rel="noopener noreferrer">
@@ -7532,6 +7770,12 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
       .catch(() => {});
   };
   useEffect(() => { refreshPending(); }, [canApprove, page]);
+  // 5 Nov 2026 (group 6): concerns still New, for the rail's count (planners and admins; 0 for anyone else)
+  const [concernNew, setConcernNew] = useState(0);
+  useEffect(() => {
+    if(!canApprove){ setConcernNew(0); return; }
+    fetch(`${API}/concerns/new-count`).then(r => r.ok ? r.json() : { new: 0 }).then(j => setConcernNew((j && j.new) || 0)).catch(() => {});
+  }, [canApprove, page]);
 
   // a page the role cannot see falls back to the dashboard rather than a blank
   const [navQ, setNavQ] = useState("");
@@ -7544,7 +7788,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   // token is gone from the screens, and a shared code (even the admin code) never passed the server's admin check.
   const isAdmin = isAdminLogin(role);
   const visible = NAV.filter(g => !g.admin || canApprove)
-    .map(g => ({ ...g, items: g.items.filter(i => !i.adminOnly || isAdmin) })).filter(g => g.items.length);
+    .map(g => ({ ...g, items: g.items.filter(i => (!i.adminOnly || isAdmin) && (!i.approverOnly || canApprove)) })).filter(g => g.items.length);
   const navMatch = (it) => !navQ || it.label.toLowerCase().includes(navQ.toLowerCase());
   const navFirst = visible.flatMap(g => g.items).find(navMatch);
   const allowed = new Set(visible.flatMap(g => g.items.map(i => i.id)));
@@ -7589,14 +7833,15 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
               {railShown && <div className="rail-group px-4 pb-1">{g.group}</div>}
               {g.items.filter(navMatch).map(it => {
                 const active = page === it.id;
-                const badge = it.id === "forecasts" && canApprove && pending > 0 ? pending : null;
+                const badge = it.id === "forecasts" && canApprove && pending > 0 ? pending
+                            : it.id === "concerns" && canApprove && concernNew > 0 ? concernNew : null;
                 return (
                   <button key={it.id} onClick={() => setPage(it.id)} title={railShown ? undefined : it.label}
                     className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}>
                     <NavIcon id={it.id} />
                     {railShown && <span className="truncate flex-1">{it.label}</span>}
                     {badge != null && railShown && (
-                      <span className="rail-count" title={`${badge} line(s) waiting for approval`}>{badge}</span>
+                      <span className="rail-count" title={it.id === "concerns" ? `${badge} new concern(s)` : `${badge} line(s) waiting for approval`}>{badge}</span>
                     )}
                   </button>
                 );
@@ -7643,6 +7888,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
         {page === "simulation" && narrow && <PhoneSimulation meta={meta} months={meta.months} />}
         {page === "lookahead" && !narrow && <LookAhead meta={meta} who={who} access={role} />}
         {page === "lookahead" && narrow && <PhoneLookAhead meta={meta} />}
+        {page === "concerns" && canApprove && !narrow && <ConcernsPage onCount={setConcernNew} />}
         {/* one mounted instance across the three data pages — see the note at the top */}
         {DATA_PAGES.includes(page) && canApprove && !narrow && (
           <DataManagement meta={meta} who={who} subTab={page} onSubTab={(t) => setPage(t)} />
@@ -7656,7 +7902,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
       {narrow && <PhoneTabs groups={visible} page={page} onPick={pickPage} moreOpen={moreOpen}
                             onMore={() => setMoreOpen(o => !o)} pending={canApprove ? pending : 0} />}
       {narrow && moreOpen && <PhoneMore groups={visible} page={page} onPick={pickPage} onClose={() => setMoreOpen(false)}
-                                        role={role} who={who} pending={canApprove ? pending : 0} />}
+                                        role={role} who={who} pending={canApprove ? pending : 0} concernNew={canApprove ? concernNew : 0} />}
       {/* H10: the coach-mark guide for this page; renders nothing unless TENANT.demo_notice is set.
           11 Oct 2026 (the demo bar): not on the Route map, whose embedded map runs its own guide (its strip under
           its bar, its dots, its tour). That was two "New here?" strips on one screen, and the app's guide there
@@ -9339,6 +9585,34 @@ function ConfigPage({ meta, who, access }){
                     {help && <div className="hint">{help}</div>}
                   </div>
                 ))}
+                {/* 5 Nov 2026 (group 6, mockup card 8): the public map's Report a concern form. Off until ticked; outside the demo
+                    it also needs the scheme's own privacy notice (Q12). Months and days are whole numbers, checked on Save. */}
+                <div data-cfg="concern-form" className="mt-4">
+                  <label className="flex items-center gap-2 font-semibold text-slate-800" style={{ minHeight: 44 }}>
+                    <input type="checkbox" id="cfg-concerns-on" checked={(doc.tenant || {}).concerns_on === true}
+                      onChange={e => upd(d => { d.tenant = d.tenant || {}; if(e.target.checked) d.tenant.concerns_on = true; else delete d.tenant.concerns_on; })} />
+                    Report a concern form on the public map</label>
+                  {[["concern_privacy_url", "cfg-concern-privacy", "Privacy notice link", 300, "https://…", (doc.tenant || {}).demo_notice ? "Blank on the demo: Wayscope's own notice." : "Needed before the form shows: the page that says how concerns are kept."]].map(([k, id, l, mx, ph, help]) => (
+                    <div key={k} className="field" style={{ marginBottom: 8 }}>
+                      <label htmlFor={id}>{l}</label>
+                      <input id={id} className="ctl w-full" maxLength={mx} placeholder={ph} data-contact={k}
+                        value={(doc.tenant || {})[k] || ""} onChange={e => upd(d => { setTenantText(d, k, e.target.value); })} />
+                      <div className="hint">{help}</div>
+                    </div>
+                  ))}
+                  <div className="flex flex-wrap gap-4">
+                    {[["concern_keep_months", "cfg-concern-keep", "Keep contact details for (months)", "12", "After the concern is closed. 1 to 72."],
+                      ["concern_reply_days", "cfg-concern-reply", "First reply within (working days)", "", "Blank: no target. Late ones show in red."]].map(([k, id, l, ph, help]) => (
+                      <div key={k} className="field" style={{ marginBottom: 8, flex: "1 1 200px" }}>
+                        <label htmlFor={id}>{l}</label>
+                        <input id={id} className="ctl w-24 tabular-nums text-right" inputMode="numeric" placeholder={ph}
+                          value={(doc.tenant || {})[k] ?? ""} onChange={e => upd(d => { d.tenant = d.tenant || {}; const v = e.target.value.trim();
+                            if(v === "") delete d.tenant[k]; else d.tenant[k] = /^\d+$/.test(v) ? parseInt(v, 10) : v; })} />
+                        <div className="hint">{help}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div data-cfg="council-breaks">
               <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Council colours</h3>
@@ -14284,6 +14558,48 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // ---- location management (Phase 1) ----
   const [mode, setMode] = useState("view");        // 'view' | 'add' | 'edit'
   const [form, setForm] = useState(null);          // {id?, name, role, loc_type, supplies[], receives[], lat, lon}
+  // 5 Nov 2026 (the mockup John approved, notes layout-fullscreen-mockup-1105, Q1-Q8): a site's layout full screen — the grid
+  // that holds the ONE map laid over the whole window, and Chrome asked to hide its bars too. Only at a desk (>= 1,024 px), on
+  // Locations with a site's layout card open or drawing. Leaving: ⤡, Done, a narrower window. Esc stays the drawing's (Chrome
+  // takes the first Esc for its own bars); unsaved work is never touched.
+  const [full, setFull] = useState(false);
+  const [fold, setFold] = useState({ l: false, r: false });   // the drawing's two side columns, folded in full screen
+  const fullCtl = useRef({ box: null, btn: null, toggle: null }), fsAsked = useRef(false), fullGrid = useRef(null);
+  const fullOk = isWide && subTab === "locations" && !!(drawing || (!form && readLoc) || (form && form.id));
+  const enterFull = () => {
+    setFold({ l: false, r: false }); setFull(true);
+    try { if(document.documentElement.requestFullscreen && !document.fullscreenElement){ fsAsked.current = true; document.documentElement.requestFullscreen().catch(() => { fsAsked.current = false; }); } }
+    catch(e){ fsAsked.current = false; }   // Chrome's own full screen is a courtesy, never a requirement
+  };
+  const leaveFull = () => {
+    setFull(false);
+    try { if(fsAsked.current && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); } catch(e){}
+    fsAsked.current = false;
+  };
+  useEffect(() => { if(full && !fullOk) leaveFull(); }, [full, fullOk]);
+  // the page under it is out of reach while it is covered (Tab, a screen reader), and back after
+  useEffect(() => {
+    if(!full || !fullGrid.current) return;
+    const off = [];
+    for(let n = fullGrid.current; n.parentElement && n !== document.body; n = n.parentElement)
+      for(const x of n.parentElement.children) if(x !== n && !x.hasAttribute("inert") && !/^(SCRIPT|STYLE|LINK)$/.test(x.tagName)){ x.setAttribute("inert", ""); off.push(x); }
+    return () => off.forEach(x => x.removeAttribute("inert"));
+  }, [full]);
+  useEffect(() => {
+    // Esc or F11 gives Chrome its bars back; the layout stays over the window
+    const onFs = () => { if(!document.fullscreenElement) fsAsked.current = false; };
+    document.addEventListener("fullscreenchange", onFs);
+    return () => { document.removeEventListener("fullscreenchange", onFs); try { if(fsAsked.current && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch(e){} };
+  }, []);
+  // the ⤢ / ⤡ map control (made with the map, above + / −) follows the page
+  useEffect(() => {
+    const c = fullCtl.current; c.toggle = () => (full ? leaveFull() : enterFull());
+    if(!c.box) return;
+    c.box.style.display = fullOk ? "" : "none";
+    c.btn.setAttribute("aria-label", full ? "Leave full screen" : "Full screen");
+    c.btn.title = full ? "Leave full screen" : "Full screen";
+    c.btn.setAttribute("aria-pressed", full ? "true" : "false");
+  });
   const [savingLoc, setSavingLoc] = useState(false);
   const [locMsg, setLocMsg] = useState("");
   // ---- Phase 5a: gates ----
@@ -14413,6 +14729,16 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(mapObj.current || !mapDiv.current || !window.mapboxgl) return;
     window.mapboxgl.accessToken = mapbox_token;
     const m = new window.mapboxgl.Map({ container: mapDiv.current, style: basemap, center: UK_VIEW.center, zoom: UK_VIEW.zoom });
+    // 5 Nov 2026: the full-screen control of its own, above + / − (hidden until a site's layout is open)
+    m.addControl({
+      onAdd(){
+        const g = document.createElement("div"); g.className = "mapboxgl-ctrl mapboxgl-ctrl-group"; g.setAttribute("data-full-ctl", "1"); g.style.display = "none";
+        const b = document.createElement("button"); b.type = "button"; b.className = "sl-full-btn"; b.setAttribute("aria-label", "Full screen"); b.setAttribute("aria-pressed", "false");   // the glyph is CSS (::before)
+        b.addEventListener("click", () => { const c = fullCtl.current; if(c.toggle) c.toggle(); });
+        g.appendChild(b); fullCtl.current.box = g; fullCtl.current.btn = b; return g;
+      },
+      onRemove(){ const c = fullCtl.current; if(c.box && c.box.parentNode) c.box.parentNode.removeChild(c.box); c.box = null; c.btn = null; }
+    }, "top-right");
     m.addControl(new window.mapboxgl.NavigationControl(), "top-right");
     // drag bookkeeping for moving a node
     const drag = { id: null, moved: false };
@@ -15798,14 +16124,21 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
       {/* 31 Oct 2026 (4c PR 2): while drawing, the same grid holds the editor — its top bar across, the palette left, the map in
           the middle (the SAME div, placed by grid column, so the map is never unmounted), its settings right; the panel is hidden */}
-      <div className={drawing ? "grid gap-3" : "grid lg:grid-cols-3 gap-4"} style={drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined} data-drawing={drawing ? "1" : undefined}>
+      {/* 5 Nov 2026: in full screen (sl-full) the same grid lies over the whole window: the Drawing bar, then palette | map |
+          settings filling the height (either side folds to a strip); before Draw, the map | the site's panel */}
+      <div ref={fullGrid} className={(drawing ? "grid gap-3" : "grid lg:grid-cols-3 gap-4") + (full ? " sl-full" : "")} data-drawing={drawing ? "1" : undefined} data-full={full ? "1" : undefined}
+        style={full ? (drawing ? { gridTemplateColumns: `${fold.l ? 44 : 232}px minmax(0, 1fr) ${fold.r ? 44 : 300}px`, gridTemplateRows: "auto minmax(0, 1fr)" }
+          : { gridTemplateColumns: "minmax(0, 1fr) 380px", gridTemplateRows: "minmax(0, 1fr)" })
+          : drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined}>
         {/* ONE map instance, shared by both sub-tabs — this div is never unmounted */}
-        <div className={drawing ? "card overflow-hidden" : "lg:col-span-2 card overflow-hidden"} style={drawing && isWide ? { gridColumn: 2, gridRow: 2 } : undefined}>
-          <div ref={mapDiv} style={{ height: drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />
+        <div className={drawing ? "card overflow-hidden" : "lg:col-span-2 card overflow-hidden"}
+          style={full ? { gridColumn: drawing ? 2 : 1, gridRow: drawing ? 2 : 1, minHeight: 0, position: "relative" } : drawing && isWide ? { gridColumn: 2, gridRow: 2 } : undefined}>
+          <div ref={mapDiv} style={{ height: full ? "100%" : drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />
+          {full && !drawing && TENANT.demo_notice && <span className="sl-demo-pill sl-demo-on-map" role="note"><b>DEMO</b>{TENANT.demo_notice}</span>}
         </div>
 
         {/* 27 Oct 2026 (P5): read-only, the panel may hold no control at all, so it is a tab stop itself to scroll by keyboard */}
-        <div className="space-y-4" style={drawing ? { display: "none" } : panelStyle} {...(canEdit ? {} : { tabIndex: 0, role: "region", "aria-label": onLoc ? "Locations panel" : onZones ? "Zones panel" : "Routes panel" })}>
+        <div className="space-y-4" style={drawing ? { display: "none" } : full ? { gridColumn: 2, gridRow: 1, minHeight: 0, overflowY: "auto" } : panelStyle} {...(canEdit ? {} : { tabIndex: 0, role: "region", "aria-label": onLoc ? "Locations panel" : onZones ? "Zones panel" : "Routes panel" })}>
           {onLoc && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
@@ -16726,7 +17059,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           </div>
         </div>
         {drawing && styles_ok(SL_STYLES) && <SiteLayoutDraw key={drawing.locId} mapRef={mapObj} styles={SL_STYLES} locId={drawing.locId} phaseId={drawing.phaseId} wide={isWide}
-          roads={(zoneList || []).filter(z => z.location_id === drawing.locId)} reinstallRef={drawReinstallRef} onDone={() => setDrawing(null)} />}
+          roads={(zoneList || []).filter(z => z.location_id === drawing.locId)} reinstallRef={drawReinstallRef} onDone={() => { setDrawing(null); leaveFull(); }}
+          full={full} fold={fold} onFold={(s) => setFold(f => ({ ...f, [s]: !f[s] }))} site={(locs.find(l => l.id === drawing.locId) || {}).name || ""} />}
       </div>
 
       {drawing ? null : onLoc ? (
@@ -17514,7 +17848,7 @@ const SL_HINT = { select: "Click a thing to select it. Drag to move it, drag a c
 
 // the drawing tools' palette: one tool a row, the picked one white on navy
 const PalBtn = ({ on, ...r }) => <button {...r} aria-pressed={on} className={"w-full flex items-center gap-2 text-left text-[13px] rounded px-1.5 py-1 " + (on ? "text-white" : "text-slate-700 hover:bg-slate-100")} style={on ? { background: "var(--navy)" } : undefined} />;
-function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstallRef, onDone }){
+function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstallRef, onDone, full, fold, onFold, site }){
   const E = useRef(null);
   if(!E.current) E.current = { draw: null, h: null, holes: new Map(), last: new Map(), kept: [], hist: [], fut: [], saved: "[]",
     hidden: new Set(), locked: new Set(), snap: true, angle: false, tool: { kind: "select" }, sel: null, ver: null, ctx: [], pend: 0, pushT: 0, dirty: false,
@@ -17972,6 +18306,7 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
   const meas = !sel ? "" : sel.geometry.type === "LineString" ? `${Math.round(slGeo().lengthM(sel.geometry.coordinates)).toLocaleString("en-GB")} m long`
     : sel.geometry.type === "Polygon" ? `${Math.round(withHoles(sel).geometry.coordinates.reduce((s, r, i) => s + (i ? -1 : 1) * window.WSLayouts.areaM2(r), 0)).toLocaleString("en-GB")} m²` : "";   // less the holes
   const place = (c, r) => wide ? { gridColumn: c, gridRow: r } : undefined;
+  const colH = full ? { height: "100%", minHeight: 0 } : { maxHeight: wide ? SL_DRAW_H : undefined };   // full screen: the columns fill the height
   const lab = "block text-[13px] font-medium text-slate-700";
   const inp = "mt-0.5 w-full border border-slate-300 rounded px-2 py-1 text-[13px] bg-white";
   const tb = "px-2.5 py-1 rounded-lg border border-slate-300 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40";
@@ -17981,12 +18316,14 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
   return <>
     <div className="card p-2.5 flex flex-wrap items-center gap-x-3 gap-y-2" style={place("1 / -1", 1)} data-site-layout-draw="1" role="toolbar" aria-label="Drawing the site layout">
       <span className="text-sm font-semibold text-slate-800">Drawing</span>
+      {full && site && <span className="text-[13px] text-slate-700" data-full-site="1">{site}</span>}
       <select value={phase ? phase.id : ""} onChange={ev => switchPhase(ev.target.value)} disabled={busy !== ""} aria-label="Phase drawn"
         className="border border-slate-300 rounded-lg px-2 py-1 text-[13px] bg-white">
         {phases.map(x => <option key={x.id} value={x.id}>{x.name} ({slMonths(x)})</option>)}
       </select>
       <span className="text-[13px]" style={{ color: dirty || pdirty ? "var(--warn-text)" : "var(--muted)" }} data-save-state={dirty || pdirty ? "dirty" : "clean"}>{dirty || pdirty ? "Unsaved changes" : "All changes saved"}</span>
       <span className="ml-auto flex flex-wrap items-center gap-2">
+        {full && TENANT.demo_notice && <span className="sl-demo-pill" role="note"><b>DEMO</b>{TENANT.demo_notice}</span>}
         <button onClick={undo} disabled={!hist.undo || busy !== ""} className={tb} title="Undo (Ctrl+Z)">Undo</button>
         <button onClick={redo} disabled={!hist.redo || busy !== ""} className={tb} title="Redo (Ctrl+Y)">Redo</button>
         <button onClick={save} disabled={!(dirty || pdirty) || busy !== ""} className="px-3 py-1 rounded-lg text-white font-semibold text-[13px] disabled:opacity-50" style={{ background: "var(--navy)" }} title="Save (Ctrl+S)">{busy === "save" ? "Saving…" : "Save"}</button>
@@ -18007,7 +18344,10 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
         </p>
       )}
     </div>
-    <div className="card p-2 space-y-2" style={{ ...place(1, 2), maxHeight: wide ? SL_DRAW_H : undefined, overflowY: "auto", ...(corner ? { opacity: 0.45, pointerEvents: "none" } : {}) }} data-site-layout-palette="1" aria-label="What to draw" role="region" tabIndex={0} aria-disabled={corner ? "true" : undefined}>
+    <div className="card p-2 space-y-2" style={{ ...place(1, 2), ...colH, overflowY: "auto", ...(corner ? { opacity: 0.45, pointerEvents: "none" } : {}) }} data-site-layout-palette="1" aria-label="What to draw" role="region" tabIndex={0} aria-disabled={corner ? "true" : undefined}>
+      {full && <div className="flex justify-end"><button type="button" className="sl-fold" onClick={() => onFold("l")} aria-expanded={!fold.l}
+        aria-label={fold.l ? "Show what to draw" : "Hide what to draw"} title={fold.l ? "Show what to draw" : "Hide what to draw"}>{fold.l ? "»" : "«"}</button></div>}
+      {!(full && fold.l) && <>
       <PalBtn onClick={() => setTool({ kind: "select" })} on={tk === "select"}>↖ Select</PalBtn>
       <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 pt-1">Lines</div>
       {LINES.map(s => <PalBtn key={s.key} onClick={() => setTool({ kind: "line", style: s.key })} on={tk === "line:" + s.key}>
@@ -18029,8 +18369,12 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
             <img alt="" src={slSvg(s.svg)} style={{ width: 28, height: 28, display: "block", margin: "0 auto" }} /></button>)}
         </div>
       </div>)}
+      </>}
     </div>
-    <div className="space-y-3" style={{ ...place(3, 2), maxHeight: wide ? SL_DRAW_H : undefined, overflowY: "auto" }} data-site-layout-side="1" role="region" aria-label="Drawing settings" tabIndex={0}>
+    <div className={"space-y-3" + (full && fold.r ? " card p-2" : "")} style={{ ...place(3, 2), ...colH, overflowY: "auto" }} data-site-layout-side="1" role="region" aria-label="Drawing settings" tabIndex={0}>
+      {full && <div className="flex"><button type="button" className="sl-fold" onClick={() => onFold("r")} aria-expanded={!fold.r}
+        aria-label={fold.r ? "Show the settings" : "Hide the settings"} title={fold.r ? "Show the settings" : "Hide the settings"}>{fold.r ? "«" : "»"}</button></div>}
+      {!(full && fold.r) && <>
       <div className="card p-3 space-y-2" data-site-layout-selected="1">
         <div className="text-sm font-semibold text-slate-700">{sel ? sname : "Selected"}</div>
         <p className="text-[13px] text-slate-500">{busy === "load" ? "Opening…" : hint}</p>
@@ -18147,6 +18491,7 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
         <label className="flex items-center gap-1.5"><input type="checkbox" checked={angle} onChange={ev => { e.angle = ev.target.checked; setAngle(ev.target.checked); if(e.draw) ["linestring", "polygon"].forEach(md => e.draw.updateModeOptions(md, { snapping: snapping() })); }} />15° steps</label>
         <p className="text-slate-500">Words show from zoom {(window.WSLayouts && window.WSLayouts.WORDS_Z) || 15}.</p>
       </div>
+      </>}
     </div>
   </>;
 }

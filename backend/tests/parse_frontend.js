@@ -2027,7 +2027,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && code.includes('className={"rail shrink-0 flex flex-col transition-[width] duration-150 "')
     && code.includes('className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}')
     && !code.includes('border-[color:var(--navy)] bg-slate-50 text-[color:var(--navy)] font-semibold'));
-  ok("...and the pending count is a muted number, not a gold badge", code.includes('<span className="rail-count" title={`${badge} line(s) waiting for approval`}>{badge}</span>'));
+  // NARROWED 5 Nov 2026 (group 6): the same muted count also carries the new concerns, with its own title
+  ok("...and the pending count is a muted number, not a gold badge", code.includes('<span className="rail-count" title={it.id === "concerns" ? `${badge} new concern(s)` : `${badge} line(s) waiting for approval`}>{badge}</span>'));
   // 11 Oct 2026 — the fresher shell (fresh-directions.html: A with B's orange button and kicker)
   ok("the action colour is its own token: deep orange with white text in the light looks (5.2:1), brand orange with ink text in dark (7.0:1)",
     /--action:#C2410C; --action-fg:#FFFFFF;/.test(html) && /--action:#FF8C14; --action-fg:#1F2024;/.test(html)
@@ -3730,7 +3731,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 14 Oct 2026 (merged with the mobile shell, D9): and only at 768 px and up; on a phone it is the desk card
   ok("G3: Users is an admin-only item, rendered only for an admin",
      code.includes('{ id: "users", label: "Users", glyph: "☺", adminOnly: true }') && code.includes('{page === "users" && isAdmin && !narrow && <UsersPage access={role} />}')
-     && code.includes(".map(g => ({ ...g, items: g.items.filter(i => !i.adminOnly || isAdmin) }))"));
+     // NARROWED 5 Nov 2026 (group 6): the same filter also drops an approverOnly item (Concerns) for a team code
+     && code.includes(".map(g => ({ ...g, items: g.items.filter(i => (!i.adminOnly || isAdmin) && (!i.approverOnly || canApprove)) }))"));
   ok("G3 (D51): only a DEMO login reports page opens", /if\(!role \|\| role\.kind !== "demo"\) return;\s*\n\s*fetch\(`\$\{API\}\/activity`/.test(code));
   const am = fnBody("AccountMenu");
   ok("G3: the account menu shows the team by NAME and offers a password change to staff logins only",
@@ -4439,8 +4441,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // NARROWED 31 Oct 2026 (task 4a, PR 3c): 13 — + Users → Client reviewers: the groups' and the reviewers' "⋯"
   // NARROWED 31 Oct 2026 (task 4c, PR 2): 14 — + each Site layout phase's "⋯" (Name and months, Copy to a new phase, Delete…)
   // NARROWED 31 Oct 2026 (task 4c, PR 3): 15 — + each pinned picture's "⋯" (Move corners, Fit to screen, Rename, every phase, Delete…)
+  // NARROWED 5 Nov 2026 (group 6): 16 — + each concern's "⋯" (Open, Reopen, Delete the personal details…)
   ok("⭐ 27 Oct: the '⋯' on six tables — Abnormal loads (with its note), Routes, Zones, the gates list, the logins, the demo leads, the teams",
-     menus.length === 15 && src.includes("<RowMenu name={p.name}>") && src.includes("<RowMenu name={g.name}>") && src.includes("<RowMenu name={x.words.slice(0, 60)}>") && src.includes('<RowMenu name={c.name + " · " + teamWord(c)}>') && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
+     menus.length === 16 && src.includes("<RowMenu name={c.id}>") && src.includes("<RowMenu name={p.name}>") && src.includes("<RowMenu name={g.name}>") && src.includes("<RowMenu name={x.words.slice(0, 60)}>") && src.includes('<RowMenu name={c.name + " · " + teamWord(c)}>') && src.includes("<RowMenu name={p.place || p.id}>") && src.includes("<RowMenu name={g.routeId} note={`Submitted by ") && src.includes("<RowMenu name={m.name} note={m.created_by ?") && src.includes("<RowMenu name={r.id}>") && src.includes("<RowMenu name={z.name || z.id}>")
      && src.includes("<RowMenu name={g.name || g.id}>") && (src.match(/<RowMenu name=\{u\.name\}>/g) || []).length === 3 && src.includes("<RowMenu name={t.label}>"), String(menus.length));
   ok("⭐ 27 Oct: Abnormal loads — one filled button for the forward step (AL_FORWARD: pending → approved → notified → moved; withdrawn → pending), the rest in the menu, Withdraw and Delete red and asking first",
      src.includes('const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved", withdrawn: "pending" };')
@@ -4687,10 +4690,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && ed.includes("await loadSiteLayoutsJs() && await loadTerraDraw()"));
   ok("⭐ DRAW: no second map — the editor draws on the page's ONE map (mapRef) and the map div keeps its place in the grid",
      !/new mapboxgl\.Map/.test(ed) && ed.includes("const m = mapRef.current;") && (dm.match(/<div ref=\{mapDiv\}/g) || []).length === 1
-     && src.includes('<div ref={mapDiv} style={{ height: drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />')
-     && src.includes('style={drawing && isWide ? { gridColumn: 2, gridRow: 2 } : undefined}')
-     && src.includes('style={drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined}')
-     && src.includes('style={drawing ? { display: "none" } : panelStyle}') && src.includes("{drawing ? null : onLoc ? ("));
+     // NARROWED 5 Nov 2026 (full screen): each of the four takes a full-screen branch first; outside full screen they read as before
+     && src.includes('<div ref={mapDiv} style={{ height: full ? "100%" : drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />')
+     && src.includes(': drawing && isWide ? { gridColumn: 2, gridRow: 2 } : undefined}>')
+     && src.includes(': drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined}>')
+     && src.includes('style={drawing ? { display: "none" } : full ? { gridColumn: 2, gridRow: 1, minHeight: 0, overflowY: "auto" } : panelStyle}') && src.includes("{drawing ? null : onLoc ? ("));
   ok("DRAW: every look is WSLayouts' (its own prefix); Terra Draw's lines show only while drawing or selected",
      ed.includes('e.h = WSLayouts.install(m, styles, { prefix: "dm-draw" });') && ed.includes("lineStringOpacity: ({ properties }) => properties.currentlyDrawing ? 0.9 : 0")
      && ed.includes("outlineOpacity: ({ properties }) => properties.currentlyDrawing ? 0.9 : 0") && ed.includes("pointOpacity: 0"));
@@ -5055,6 +5059,53 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && code.includes("`Busy-hours road (${simBusyUses(D).map(u => `${u.route} Alt ${u.alt}, weekdays ${u.from}–${u.to}`).join(\"; \")})`")
      && /\.sim-busy-note\{position:absolute;/.test(html) && /\.sim-line-busy\{border-top:3px solid var\(--navy\);/.test(html));
   ok("BUSY HOURS, Simulation: the frame carries its time (the map's tint reads it)", code.includes("return { t, feats, laden, empty, mixers, waiting, onSite, gates, stations, held, heldBy, heldLost };"));
+}
+
+// 5 Nov 2026 (the mockup John approved, notes layout-fullscreen-mockup-1105, Q1-Q8 as recommended): a site's layout full screen
+{
+  const cut = (t, name) => { const a = t.indexOf("function " + name + "("); return a < 0 ? "" : t.slice(a, t.indexOf("\nfunction ", a + 10)); };
+  const ed = cut(src, "SiteLayoutDraw"), edc = cut(code, "SiteLayoutDraw"), dm = cut(src, "DataManagement"), dmc = cut(code, "DataManagement");
+  ok("⭐ FULL SCREEN: the same grid that holds the ONE map is laid over the window (sl-full, fixed, inset 0) — no second map, no portal",
+     dm.includes('+ (full ? " sl-full" : "")') && dm.includes('data-full={full ? "1" : undefined}') && (dm.match(/<div ref=\{mapDiv\}/g) || []).length === 1
+     && /\.sl-full\{position:fixed;inset:0;z-index:70;margin:0 !important;/.test(html) && !/createPortal/.test(dm));
+  ok("⭐ FULL SCREEN: Chrome is asked for its own full screen too (Q1), as the big screen does; leaving asks it back only when this page asked",
+     dmc.includes("document.documentElement.requestFullscreen().catch(() => { fsAsked.current = false; })")
+     && dmc.includes("if(fsAsked.current && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});"));
+  ok("⭐ FULL SCREEN: Esc is never this page's way out (Q2): no Escape handler in DataManagement; Chrome's own exit leaves the layout over the window",
+     !/Escape/.test(dmc) && dmc.includes('const onFs = () => { if(!document.fullscreenElement) fsAsked.current = false; };')
+     && ed.includes('keyEvents: { deselect: "Escape", delete: "Delete", rotate: ["r"], scale: ["s"] }'));
+  ok("⭐ FULL SCREEN: ⤢ is a map control of its own added BEFORE + / − (so above them, Q3): a named button, ⤡ 'Leave full screen' when in",
+     dmc.indexOf('g.setAttribute("data-full-ctl", "1")') > 0 && dmc.indexOf('g.setAttribute("data-full-ctl", "1")') < dmc.indexOf("m.addControl(new window.mapboxgl.NavigationControl(), \"top-right\");")
+     && dmc.includes('c.btn.setAttribute("aria-label", full ? "Leave full screen" : "Full screen");') && /\.mapboxgl-ctrl-group button\.sl-full-btn\{/.test(html)
+     // the UI audit (label-content-name-mismatch): the glyph is drawn by CSS, the button holds no text
+     && html.includes('.sl-full-btn::before{content:"⤢";} .sl-full-btn[aria-pressed="true"]::before{content:"⤡";}') && !/btn\.textContent/.test(dmc));
+  ok("⭐ FULL SCREEN: only at a desk (>= 1,024 px), on Locations, with a site's layout open or drawing (Q4); otherwise it leaves",
+     dmc.includes('const fullOk = isWide && subTab === "locations" && !!(drawing || (!form && readLoc) || (form && form.id));')
+     && dmc.includes("useEffect(() => { if(full && !fullOk) leaveFull(); }, [full, fullOk]);") && dmc.includes('c.box.style.display = fullOk ? "" : "none";'));
+  ok("FULL SCREEN: before Draw, the map | a 380 px column for the site's panel; while drawing, the Drawing bar across, then palette | map | settings filling the height",
+     dm.includes('{ gridTemplateColumns: "minmax(0, 1fr) 380px", gridTemplateRows: "minmax(0, 1fr)" }')
+     && dm.includes('gridTemplateColumns: `${fold.l ? 44 : 232}px minmax(0, 1fr) ${fold.r ? 44 : 300}px`, gridTemplateRows: "auto minmax(0, 1fr)"')
+     && ed.includes('const colH = full ? { height: "100%", minHeight: 0 } : { maxHeight: wide ? SL_DRAW_H : undefined };')
+     && (ed.match(/\.\.\.colH/g) || []).length === 2 && !/maxHeight: wide \? SL_DRAW_H/.test(ed.replace("{ maxHeight: wide ? SL_DRAW_H : undefined }", "")));
+  ok("⭐ FULL SCREEN: « / » fold either side column to a 44 px strip (Q5), named buttons that say what they show, opening unfolded each time",
+     ed.includes('aria-label={fold.l ? "Show what to draw" : "Hide what to draw"}') && ed.includes('aria-label={fold.r ? "Show the settings" : "Hide the settings"}')
+     && ed.includes("aria-expanded={!fold.l}") && ed.includes("aria-expanded={!fold.r}") && ed.includes("{!(full && fold.l) && <>") && ed.includes("{!(full && fold.r) && <>")
+     && dmc.includes("setFold({ l: false, r: false }); setFull(true);") && /\.sl-fold\{width:28px;height:28px;/.test(html));
+  ok("⭐ FULL SCREEN: the site's name and, on a demo only, the DEMO pill in the Drawing bar (Q6); the pill on the map before Draw — the header's notice is covered",
+     ed.includes('{full && site && <span className="text-[13px] text-slate-700" data-full-site="1">{site}</span>}')
+     && ed.includes('{full && TENANT.demo_notice && <span className="sl-demo-pill" role="note"><b>DEMO</b>{TENANT.demo_notice}</span>}')
+     && dm.includes('{full && !drawing && TENANT.demo_notice && <span className="sl-demo-pill sl-demo-on-map" role="note"><b>DEMO</b>{TENANT.demo_notice}</span>}')
+     && src.includes('site={(locs.find(l => l.id === drawing.locId) || {}).name || ""}') && /\.sl-demo-pill\{[^}]*background:var\(--demo-bg\);color:var\(--demo-fg\);/.test(html));
+  ok("⭐ FULL SCREEN: Done leaves both (after its own Save / Discard question, unchanged); ⤡ leaves full screen only — unsaved work is never touched",
+     src.includes("onDone={() => { setDrawing(null); leaveFull(); }}") && ed.includes("if(e.dirty || e.pdirty){ setAsk(true); say(\"Save or discard your changes first.\", true); return; } onDone(phase && phase.id);")
+     && !/setDrawing|e\.dirty|discard/i.test(dmc.slice(dmc.indexOf("const leaveFull = () => {"), dmc.indexOf("const leaveFull = () => {") + 300)));
+  ok("FULL SCREEN: the page around the grid is inert while covered, put back on leaving (Tab stays in the full screen)",
+     dmc.includes('x.setAttribute("inert", ""); off.push(x);') && dmc.includes('return () => off.forEach(x => x.removeAttribute("inert"));')
+     && dm.includes("<div ref={fullGrid} className="));
+  ok("FULL SCREEN: no new shortcut key (Q7) — the drawing's keys are unchanged and nothing listens for F",
+     !/k === "f"|key === "f"|key === "F"/.test(edc + dmc) && !/keydown[^\n]*full/i.test(dmc));
+  ok("FULL SCREEN: the words are few and name no back end; the map control's look is the map's own group",
+     !/fullscreen|requestFullscreen|API|server/i.test((edc.match(/>[^<>{}\n]{3,}</g) || []).join(" ")) && dmc.includes('g.className = "mapboxgl-ctrl mapboxgl-ctrl-group";'));
 }
 
 console.log();

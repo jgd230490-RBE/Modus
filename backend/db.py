@@ -111,6 +111,9 @@ TENANTED_TABLES = {
     # 29 Oct 2026 (task 0f-2, hour_times.py): each route's drive times for a lorry setting off at set weekday hours, one
     # row a HERE option, named by the stored option it matched. One tenant's routes, carried in its package.
     "route_hour_times",
+    # 5 Nov 2026 (group 6, concerns.py): the concerns the public reports on the public map (and staff add from an email or
+    # a call), with the scheme's triage. Per tenant, in the package, same rule, same edit.
+    "concerns",
 }
 
 # A contextvar rather than a module global, so Phase 6 can make the tenant
@@ -310,9 +313,11 @@ def _run(sql, params, fetch):
 # figure; the one kept read that prints a decision (a CLP's draft, its Document history) carries the decisions in its key.
 # 31 Oct 2026 (task 4c PR 3): + site_layout_pictures. No figure and no kept read is built from a pinned picture (the
 # staff map reads them fresh), and moving one must not throw away the kept staff reads.
+# 5 Nov 2026 (group 6): + concerns. A PUBLIC send writes it: it must not throw away the kept staff reads (a flood of
+# reports would otherwise make every heavy read rebuild); the concern figures are read fresh.
 NO_DATA_TABLES = frozenset({"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users",
                             "demo_requests", "clp_notes", "clp_review_groups", "clp_reviews",
-                            "site_layout_pictures"})
+                            "site_layout_pictures", "concerns"})
 _DATA_VERSION = [0]
 _WRITE_TABLE_RE = None
 
@@ -949,6 +954,8 @@ def init_weeks_db():
         # 31 Oct 2026 (task 4a, PR 3c): the client's reviewer groups and the issues sent to them
         _create_tenanted(cur, "clp_review_groups")
         _create_tenanted(cur, "clp_reviews")
+        # 5 Nov 2026 (group 6): the concerns from the public
+        _create_tenanted(cur, "concerns")
         conn.commit()
         # PR 3c: a note's reviewer group — the group a reviewer's comment came from, or the group a contractor's note is
         # shown to (NULL: only the contractor's people see it). Plain ADD COLUMN.
@@ -2297,6 +2304,44 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, id)
         )
     """,
+    # 5 Nov 2026 (group 6, concerns.py). One concern from the public: what kind, where (a pin and / or a route), when, the
+    # words, the contact only if a reply was asked for, the triage (status, first reply, close, outcome) and its history.
+    # INTEGER flags, never BOOLEAN (SQLite hides a Postgres boolean compared with 1). The clean-up blanks the personal
+    # columns and rounds the pin (concerns.sweep); `ip_hash` is the rate limit's only, dropped after 30 days.
+    "concerns": """
+        CREATE TABLE concerns (
+            tenant_id           TEXT NOT NULL DEFAULT 'default',
+            id                  TEXT NOT NULL,
+            received_at         TEXT NOT NULL,
+            source              TEXT NOT NULL,
+            kind                TEXT NOT NULL,
+            happened_on         TEXT,
+            happened_time       TEXT,
+            lat                 DOUBLE PRECISION,
+            lon                 DOUBLE PRECISION,
+            route_id            TEXT,
+            route_set_by        TEXT,
+            location_id         TEXT,
+            area_name           TEXT,
+            words               TEXT,
+            registration        TEXT,
+            wants_reply         INTEGER NOT NULL DEFAULT 0,
+            name                TEXT,
+            email               TEXT,
+            phone               TEXT,
+            ip_hash             TEXT,
+            status              TEXT NOT NULL,
+            first_reply_at      TEXT,
+            closed_at           TEXT,
+            outcome             TEXT,
+            personal_deleted_at TEXT,
+            contact_deleted_at  TEXT,
+            history_json        TEXT,
+            fictional           INTEGER NOT NULL DEFAULT 0,
+            updated_at          TEXT,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
     # ----------------------------------------------------------------------- #
     #  2.5b — config: the editable copy of factors.json                        #
     # ----------------------------------------------------------------------- #
@@ -2347,6 +2392,7 @@ _TENANT_PK = {
     "clp_notes": "(tenant_id, id)",
     "clp_review_groups": "(tenant_id, id)",
     "clp_reviews": "(tenant_id, id)",
+    "concerns": "(tenant_id, id)",
     "config": "(tenant_id, key)",
     "forecast_days": "(tenant_id, route_id, month_index, discipline, section_id, "
                      "day_date)",
