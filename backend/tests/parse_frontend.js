@@ -5037,6 +5037,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
       "replied within ${data.reply_days} working days"].every(w => cd.includes(w))
      && cd.includes('<ChartCanvas config={cfg} title="Concerns received a month" scope={scope} />')
      && cd.includes('data-concern-kinds="1"') && cd.includes('data-concern-routes="1"') && cd.includes("Per 1,000 planned two-way lorry movements"));
+  ok("CONCERNS DASH: the per-1,000 line is over the whole range on screen (the range's received ÷ its planned two-way movements), never the last month alone",
+     cd.includes("const moves = 2 * tripsM.reduce((a, t) => a + (t || 0), 0);") && cd.includes("rate = { v: data.received * 1000 / moves, m: range };")
+     && cd.includes("maximumFractionDigits: 2 })} over {rate.m}.") && !cd.includes("tripsM[tripsM.length - 1]"));
   ok("🔴 CONCERNS DASH: counts only — the section never prints a concern's words, name, email or place",
      !/\.(words|name|email|phone|lat|lon|registration)\b/.test(cd.replace(/r\.words|k\.kind_text/g, "")));
 }
