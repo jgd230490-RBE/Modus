@@ -2251,6 +2251,57 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("🔴 phase 3: the form check (its trap field only) stores no request, form on or off", _n_req2 == _n_req,
        f"{_n_req} -> {_n_req2}")
 
+
+    # 5 Nov 2026 (group 6, Report a concern): the NO-LEAK smoke on the real app. A concern goes in through the public map
+    # with a name, an email, a phone, words and a registration; the answer is the reference only, every public read the map
+    # makes (and the map and app pages) carries none of it, and the staff list refuses the map cookie and a team code
+    import config as _cfg_cn, conversions as _conv_cn
+    _cdoc = json.loads(json.dumps(_cfg_cn.load(_conv_cn, use_cache=False)))
+    _cdoc.setdefault("tenant", {})["concerns_on"] = True
+    _cfg_cn.save(_cdoc, by="http_smoke")
+    from fastapi.testclient import TestClient as _TC_cn
+    _mc = _TC_cn(main.app, base_url="https://testserver")
+    ok("CONCERNS: the map password signs a fresh visitor in", _mc.post("/api/map-auth", json={"password": "map-pass-xyz"}).status_code == 200)
+    _pin = db.query("SELECT lat, lon FROM locations WHERE lat IS NOT NULL AND lon IS NOT NULL LIMIT 1")[0]
+    _secret = {"name": "Zebedee Quillfeather", "email": "zebedee.q@example.org", "phone": "07700 900461",
+               "words": "Wobblesprocket lorry idling outside the bakery", "registration": "QX19 ZZQ"}
+    _body = {"kind": "parked", "happened_on": str(DEMO_AS_OF), "lat": float(_pin["lat"]) + 0.001, "lon": float(_pin["lon"]),
+             "words": _secret["words"], "registration": _secret["registration"], "wants_reply": True,
+             "name": _secret["name"], "email": _secret["email"], "phone": _secret["phone"], "privacy_ok": True}
+    ok("🔴 CONCERNS: the public send without the app header is refused (403) and stores nothing",
+       _mc.post("/api/public/concerns", json=_body).status_code == 403)
+    _rs = _mc.post("/api/public/concerns", json=_body, headers={"X-Wayscope": "1"})
+    _rj = _rs.json() if _rs.headers.get("content-type", "").startswith("application/json") else {}
+    ok("⭐ CONCERNS: the public send answers 200 with the reference ONLY", _rs.status_code == 200
+       and set(_rj) == {"ok", "ref"} and re.fullmatch(r"C-\d{4}", str(_rj.get("ref") or "")), _rs.text[:200])
+    _leak = []
+    for _path in ("/api/public/alignment", "/api/public/map-data", "/api/public/whoami", "/api/public/month-kpis?month=10",
+                  "/api/public/month-kpis/months", "/api/public/route-forecasts", "/api/public/forecast-matrix",
+                  "/api/public/abnormal", "/api/public/road-load", "/api/public/limits", "/api/public/areas",
+                  "/api/public/areas/months", "/api/public/stockpile-timeline", "/api/public/route-alternatives",
+                  "/api/public/site-layouts?month=10", "/api/public/concerns", "/map/", "/"):
+        _r = _mc.get(_path)
+        _t = _r.text
+        if any(v in _t for v in _secret.values()) or (_rj.get("ref") and _path != "/" and _rj["ref"] in _t):
+            _leak.append(_path)
+    ok("🔴 CONCERNS (no leak): no public read, nor the map or app page, carries the name, email, phone, words, registration or reference",
+       not _leak, str(_leak))
+    ok("🔴 CONCERNS: there is no public GET of concerns (405)", _mc.get("/api/public/concerns").status_code == 405)
+    ok("🔴 CONCERNS: the staff list refuses the map cookie (401) and a team code (403)",
+       _mc.get("/api/concerns").status_code == 401 and c.get("/api/concerns", headers=NORTH).status_code == 403)
+    _lst = c.get("/api/concerns", headers=PLAN)
+    _one = c.get("/api/concerns/" + str(_rj.get("ref")), headers=PLAN)
+    ok("CONCERNS: ...and a planner sees it, with the contact the person gave",
+       _lst.status_code == 200 and _one.status_code == 200 and _secret["email"] in _one.text and _secret["words"] in _one.text,
+       f"{_lst.status_code} {_one.status_code}")
+    _aud = db.query("SELECT * FROM audit_log")
+    ok("🔴 CONCERNS: the audit log holds none of what the person typed",
+       not any(v in json.dumps(_aud, default=str) for v in _secret.values()))
+    _cdoc["tenant"]["concerns_on"] = False
+    _cfg_cn.save(_cdoc, by="http_smoke")
+    ok("CONCERNS: switched off again, the public send is a 404",
+       _mc.post("/api/public/concerns", json=_body, headers={"X-Wayscope": "1"}).status_code == 404)
+
 print()
 for f in FAIL:
     print("  FAIL:", f)
