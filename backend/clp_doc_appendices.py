@@ -352,7 +352,20 @@ def _h_collisions(d, ctx):
         if bh.get("shown") and bh.get("offers"):
             out.append({"route_id": rid, "period": bh.get("period") or "",
                         "offers": [collisions.offer_words(o, bh.get("period") or "") for o in bh.get("offers") or []]})
-    return {"routes": [r["route_id"] for r in co["rows"]], "busy": out, "period": co.get("period") or ""}
+    # 5 Nov 2026 (task 0d-2, Q17): an offer a planner put in use — one sentence each (stored figures only)
+    in_use = []
+    try:
+        import busy_savings
+        for rid in _route_ids(d):
+            for u in busy_savings.for_route(rid):
+                if u["status"] != "in_use":
+                    continue
+                kg = ((u.get("savings") or {}).get("planned") or {}).get("kg")
+                since = str(u.get("decided_at") or "")[:10]
+                in_use.append({"route_id": rid, "alt": u["alt"], "from": u["from"], "to": u["to"], "since": since, "kg": kg})
+    except Exception as e:                             # noqa: BLE001  the sentence is an extra
+        print("clp appendix H: busy-hours uses left out:", str(e)[:160])
+    return {"routes": [r["route_id"] for r in co["rows"]], "busy": out, "in_use": in_use, "period": co.get("period") or ""}
 
 
 # --------------------------------------------------------------------------- #

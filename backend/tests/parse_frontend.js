@@ -1747,6 +1747,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 11 Oct 2026 (after the show, item 11): + the one summary download, which the server draws from the same read
   // NARROWED 11 Oct 2026 (the process layout, step 6): + ONE call to /api/carbon/target, whose three verbs (GET, PUT, DELETE)
   // go through one helper; the scenario is still the page's only read of carbon figures
+  // NARROWED 5 Nov 2026 (task 0d-2, Q17): the page also shows <CarbonRouteChoices />, defined OUTSIDE the page with one
+  // read of its own (GET /api/busy-hours: the server's figures, no arithmetic but the server's totals) — pinned below
   ok("🔴 ONE read: POST /api/carbon/scenario, and no other fetch on the page but the summary PDF download and the target's one call",
      cb.length > 5000 && (cb.match(/fetch\(/g) || []).length === 3 && cb.includes('fetch(`${API}/carbon/scenario`, { method: "POST"')
      && cb.includes('fetch(`${API}/carbon/summary.pdf`, { method: "POST"')
@@ -3824,9 +3826,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("🔴 #15: the Locations table's scroll box is a named region a keyboard user can Tab to (tabindex 0, role region, 'Locations table'), with a ring",
      src.includes('<div className="overflow-auto kb-scroll" style={{ maxHeight: "40vh" }} tabIndex={0} role="region" aria-label="Locations table">')
      && html.includes(".kb-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}"));
+  // RE-PINNED 5 Nov 2026 (task 0d-2): + the Carbon planner's Route choices table (four)
   const _regions = [...src.matchAll(/<div className="([^"]*)"[^\n]*tabIndex=\{0\} role="region" aria-label="([^"]*)"/g)];
   ok("#15: every scroll region with tabindex 0 carries a focus-ring class (kb-scroll or sim-scroll) and a name that passes the word rule",
-     _regions.length === 3 && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
+     _regions.length === 4 && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
        && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(m[2])), String(_regions.length));
   // REVERSED 23 Oct 2026 (UI fix 9, decision 16): the rows are no longer mouse-only — the name in the first cell is a button
   // (the UI FIX 9 block at the end). What stays true, and is still checked here: the row click is kept for a mouse, and the
@@ -3913,7 +3916,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && code.includes('className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"\n                          style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>')
      // NARROWED 28 Oct 2026 (task 0c): + the Routes row's "Diverted" chip, the same house chip (three)
      // RE-PINNED 29 Oct 2026 (task 3c): + the Routes row's holding-area chip, the same house chip (four)
-     && (code.match(/className="ml-1\.5 text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 4
+     // RE-PINNED 5 Nov 2026 (task 0d-2): + the Routes row's "Busy hours: Alt N" chip, the same house chip (five)
+     && (code.match(/className="ml-1\.5 text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 5
      && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
      && (code.match(/text-\[9px\]/g) || []).length === 0
      && code.includes('<div className={"text-xs uppercase tracking-wide " + (role === "commit" ? "text-slate-600" : "text-slate-400")}>{roleLbl[role] || "\u00a0"}</div>'));
@@ -5019,6 +5023,45 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      (dash.match(/<ChartCanvas config=\{\w+\}[^\n]*title=\{[^\n]*scope=\{dashScope\} \/>/g) || []).length === 8
      && code.includes('title="Gate arrivals: lorries a day at each gate" scope={[ga.label, sited || null]}') && code.includes('title="Simulation: when queues start" scope={[D.label]}')
      && code.includes("const dashScope = [rangeLabel,"));
+  // 5 Nov 2026 (task 0d-2, the user: "Yes, as recommended" to notes\busy-hours-apply-mockup-1105 Q1-Q20)
+  ok("BUSY HOURS: the Routes page offers 'Use Alt N on weekdays HH–HH' to a planner / admin (can_use) and says when Make primary may suit better (Q3)",
+     code.includes("Use {o.label} on weekdays {b.from}–{b.to}") && code.includes("busy.can_use && (o.bands || []).filter(b => !(o.in_use || []).includes(b.from))")
+     && code.includes("{o.label} is also shorter and quicker all day: Make primary may suit better.")
+     && code.includes("postJSON(`/routes/${encodeURIComponent(routeId)}/busy-hours`, body)"));
+  ok("BUSY HOURS: the in-use line — its hours, since / by, Stop, Use again when paused (Q11), 'No longer offered' (Q12), the share of trips, what it saves or ADDS in red (Q19)",
+     code.includes('{u.status === "in_use" ? "In use" : "Paused"} on weekdays {u.from}–{u.to}') && code.includes('busyPost({ stop: true, from: u.from }, "It was not stopped.")')
+     && code.includes("Alt {u.alt} is a different road since the last Route all: check it again.") && code.includes("No longer offered after the latest collision history.")
+     && code.includes("% of this route's trips set off then (its gates are open {u.open[0]}–{u.open[1]}), so the plan's figures use Alt {u.alt} for them.")
+     && code.includes('style={sw.adds ? { color: "var(--bad-text)" } : {}}') && code.includes("over the approved plan ({Math.round(sv.trips)} of {Math.round(sv.of)} trips).")
+     && code.includes("So far, from recorded loads:") && code.includes("(estimated)."));
+  ok("BUSY HOURS: busyWords says 'Saves about …' when every figure is down, 'Adds about …' when every figure is up, and each one's way when they differ",
+     code.includes("function busyWords(s){") && code.includes("text: `Saves about ${list(parts.map(([v, f]) => f(v)))}`")
+     && code.includes("text: `Adds about ${list(parts.map(([v, f]) => f(v)))}`") && code.includes('`${f(v)} ${v > 0 ? "more" : "less"}`')
+     // the local Chrome check (5 Nov): a mixed sentence was red throughout, the saved hours too — now only the added figures
+     && code.includes("return { adds: false, mixed: words, text: list(words.map(x => x.w)) };")
+     && code.includes('<span style={x.more ? { color: "var(--bad-text)" } : {}} data-busy-more={x.more ? "1" : undefined}>{x.w}</span>')
+     && code.includes("{sw.mixed ? <BusyMixed words={sw.mixed} /> : sw.text} over the approved plan"));
+  ok("BUSY HOURS: the Routes row's chip 'Busy hours: Alt N' (hover: the hours; amber while paused) from the diversions read; the Look-ahead's chip from the line context",
+     code.includes("setBusyUses(dv.busy || [])") && code.includes('data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}')
+     && code.includes("Busy hours: Alt {u.alt}</span>))}") && code.includes("(c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null"));
+  ok("BUSY HOURS: the Carbon planner's 'Route choices' block reads /api/busy-hours, shows nothing with no use, sums them, and says it is already in the total (Q17)",
+     code.includes("function CarbonRouteChoices(){") && code.includes("fetch(`${API}/busy-hours`)") && code.includes("if(!uses.length) return null;")
+     && code.includes("All route choices") && code.includes("Planned, to the end of the approved plan. Already inside the carbon total and the target.")
+     && code.includes("<CarbonRouteChoices />"));
+  ok("BUSY HOURS: the Forecasts spreadsheet gains the two busy-hours columns, summed over the line's months",
+     code.includes('"Busy-hours road: trips", `Busy-hours road: saved / added ${CUR()}, kg CO2e`') && code.includes("const b = e.busy || (e.busy = { trips: 0, kg: 0, eur: 0 });"));
+  ok("BUSY HOURS, Simulation (Q14 = C): the busy road in the navy with a glow only in its hours, the main stretch it replaces faded, painted only when that changes; never drawn with the grey routes",
+     code.includes('m.addLayer({ id: "sim-busy", type: "line", source: "sim-busy"') && code.includes('m.addLayer({ id: "sim-busy-glow", type: "line", source: "sim-busy"')
+     && code.includes('m.setPaintProperty("sim-busy-main", "line-opacity", ["case", ["all", act, ["==", ["get", "own"], 1]], 0.25, 0.75]);')
+     && code.includes("if(sig !== busyOn.current){") && code.includes("if(lg.alt) return;") && code.includes("if(!busyMain[k]) lines.push("));
+  ok("BUSY HOURS, Simulation: a notice when the hours start or end that fades after 4.5 s (a status region), the band and both marks on the timeline, one key line",
+     code.includes("lorries now take Alt ${on[0].alt} (busy hours, weekdays)`") && code.includes("back on ${off.length === 1 ? \"its\" : \"their\"} usual road`")
+     && code.includes("noteTimer.current = setTimeout(() => setNote(n => ({ ...n, on: false })), 4500);")
+     && code.includes('<div className={"sim-busy-note" + (note.on ? " on" : "")} role="status" aria-live="polite" data-sim-busy-note="1">')
+     && code.includes("data-sim-tl-busy={u.band}") && code.includes("`${u.from} ${u.route} Alt ${u.alt}`") && code.includes("`${u.to} back`")
+     && code.includes("`Busy-hours road (${simBusyUses(D).map(u => `${u.route} Alt ${u.alt}, weekdays ${u.from}–${u.to}`).join(\"; \")})`")
+     && /\.sim-busy-note\{position:absolute;/.test(html) && /\.sim-line-busy\{border-top:3px solid var\(--navy\);/.test(html));
+  ok("BUSY HOURS, Simulation: the frame carries its time (the map's tint reads it)", code.includes("return { t, feats, laden, empty, mixers, waiting, onSite, gates, stations, held, heldBy, heldLost };"));
 }
 
 // 5 Nov 2026 (group 6, PR 2; card 6): the Dashboard's Concerns section — planners and admins only, folded and read on first

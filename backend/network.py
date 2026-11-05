@@ -974,6 +974,13 @@ def public_map_data(profile=None):
         feats.extend(_diversion_features(geo, profile))
     except Exception as e:
         print("map data: diversions left out:", str(e)[:160])
+    # 5 Nov 2026 (task 0d-2, Q15 = P2): the busy-hours roads in use, type 'BusyHours' (no origin / dest keys, no layer
+    # draws the type by itself): the map draws one only while its route is picked, with its hours, and the route card
+    # says it in one line. Flow lanes and the busiest-roads view stay on the main road (Q16).
+    try:
+        feats.extend(_busy_features(geo, profile))
+    except Exception as e:
+        print("map data: busy-hours roads left out:", str(e)[:160])
 
     # Phase 4: temporary haul roads, drawn as themselves. Only those in force and
     # affecting routing — a haul road that is inactive, out of date range or flagged
@@ -1154,6 +1161,36 @@ def _diversion_features(geo_primary, profile=None):
                 "zones": zids, "because": [names.get(z) or z for z in zids],
                 "distance_km": g[0]["distance_km"], "duration_hr": g[0]["duration_hr"],
                 "main_km": ((geo_primary.get(rid) or {}).get(used, {}).get(leg) or {}).get("distance_km"),
+            },
+            "geometry": {"type": "LineString", "coordinates": json.loads(g[0]["geometry"])},
+        })
+    return out
+
+
+def _busy_features(geo_primary, profile=None):
+    """public_map_data's busy-hours features: one per (route, leg, hours) in use on the profile the map draws."""
+    rows = [r for rs in route_choice._rows_by_route().values() for r in rs
+            if r.get("reason_kind") == "peak" and r.get("status") == "in_use" and int(r.get("alt_index") or 0)]
+    out = []
+    want = profile or DEFAULT_PROFILE
+    for r in sorted(rows, key=lambda r: (r["route_id"], r.get("hours_from") or "", r["leg"])):
+        per = geo_primary.get(r["route_id"]) or {}
+        if not per:
+            continue
+        used = want if want in per else sorted(per)[0]
+        if r.get("vehicle_profile") not in (None, "", used):
+            continue
+        g = db.query("SELECT geometry, distance_km FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND "
+                     "vehicle_profile = ? AND leg = ? AND alt_index = ? AND geometry IS NOT NULL",
+                     (db.current_tenant(), r["route_id"], used, r["leg"], int(r["alt_index"])))
+        if not g:
+            continue
+        out.append({
+            "type": "Feature",
+            "properties": {
+                "type": "BusyHours", "route_id": r["route_id"], "leg": r["leg"], "alt_index": int(r["alt_index"]),
+                "from": r.get("hours_from"), "to": r.get("hours_to"), "distance_km": g[0]["distance_km"],
+                "main_km": ((geo_primary.get(r["route_id"]) or {}).get(used, {}).get(r["leg"]) or {}).get("distance_km"),
             },
             "geometry": {"type": "LineString", "coordinates": json.loads(g[0]["geometry"])},
         })

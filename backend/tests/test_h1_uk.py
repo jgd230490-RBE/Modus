@@ -1178,8 +1178,12 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # save fails) and "Unsaved changes" (amber)
    # NARROWED 31 Oct 2026 (task 4a PR 3d): bad-text 41 -> 42 — the reviewer page's task "overdue"
    # NARROWED 5 Nov 2026 (group 6): bad-text 42 -> 44 — Track → Concerns: a failed step's line and a late concern's "N waiting"
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 44 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
-   _fe_wo.count("var(--warn-text)") == 16
+   # NARROWED 5 Nov 2026 (task 0d-2): bad-text 42 -> 46, warn-text 16 -> 19 — busy-hours roads: the Routes row's saves / adds
+   # line and its added figures, the Carbon planner's Route choices figures, a failed Use / Stop (bad); the paused chip on the
+   # row and in the opened row, and the "different road since the last Route all" line (warn)
+   # (both together, merged 5 Nov: 42 + 2 concerns + 4 busy hours = 48)
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 48 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
+   _fe_wo.count("var(--warn-text)") == 19
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe
