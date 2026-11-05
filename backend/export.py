@@ -982,9 +982,20 @@ def day_sheet_rows(page, day):
             "codes": [x.get("code") for x in flags],
             # the flag's own sentence already names the route's places, so it is printed as it is (team ids in words)
             "flag_texts": [f"{_day_flag_word(x)}: {name(x.get('text') or '')}" for x in flags],
+            # 5 Nov 2026 (task 0d-2): the busy-hours road the line's lorries take, setting off in those hours
+            "busy": day_sheet_busy(c),
         })
     out.sort(key=lambda r: (-(r["tonnes"] or 0), str(r["route_id"])))
     return out
+
+
+def day_sheet_busy(ctx):
+    """5 Nov 2026 (task 0d-2): "Busy hours: Alt 2, weekdays 16:00–19:00" for a line whose route has a busy-hours road
+    in use (the line context's busy_hours, derived.line_context), else None."""
+    opts = ((ctx or {}).get("busy_hours") or {}).get("options") or []
+    if not opts:
+        return None
+    return "; ".join(f"Busy hours: Alt {o['alt']}, weekdays {o['from']}–{o['to']}" for o in opts)
 
 
 def day_sheet_pours(page, day):
@@ -1110,7 +1121,8 @@ def build_day_sheet_pdf(page, day):
         for r in rows:
             plan = f"{_n(r['qty'], 1 if r['unit'] != 't' else 0)} {E(r['unit'])}".strip()
             sub = " · ".join(x for x in (r["route_id"], r["section"]) if x)
-            row = [P(f"<b>{E(r['origin'])}</b> to <b>{E(r['dest'])}</b>"),
+            row = [P(f"<b>{E(r['origin'])}</b> to <b>{E(r['dest'])}</b>"
+                     + (f"<br/><font size=6.5 color='#1D4ED8'>{E(r['busy'])}</font>" if r.get("busy") else "")),
                    P(E(r["team"]) + (f"<br/><font size=6.5 color='#64748B'>{E(sub)}</font>" if sub else "")),
                    P(E(r["material"]) + f"<br/><font size=6.5 color='#64748B'>{E(r['vehicle'])}</font>")]
             row += [P(plan + (" †" if r["typed"] else ""), st_r)] if plan_col else []
@@ -3222,7 +3234,8 @@ def _route_sheet_diversion_page(c, S, dv, m, cw, W, H, R, B, size):
     import basemap
     import route_sheet as rs
     y = H - m
-    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 18); c.drawString(m, y - 18, _pdf_safe(f"Diversion: {dv['when']}"))
+    # 5 Nov 2026 (task 0d-2): a busy-hours road's page carries its own heading
+    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 18); c.drawString(m, y - 18, _pdf_safe(dv.get("title") or f"Diversion: {dv['when']}"))
     if S.get("demo_notice"):
         c.setFillColorRGB(*DEMO_FG_RGB); c.setFont(B, 8)
         c.drawRightString(W - m, y - 9, _pdf_safe("DEMO · " + S["demo_notice"]))
@@ -3238,7 +3251,7 @@ def _route_sheet_diversion_page(c, S, dv, m, cw, W, H, R, B, size):
             pins=((dv["loaded"][0] if dv["loaded"] else None, "A"), (dv["loaded"][-1] if dv["loaded"] else None, "B")),
             empty_words="No road route to draw.")
     y -= h1 + 6
-    blocks = [("Why", [", ".join(dv["because"]) + ". In these dates this route goes the way above."]),
+    blocks = [("Why", [dv["why"] if dv.get("why") else ", ".join(dv["because"]) + ". In these dates this route goes the way above."]),
               ("Loaded, A to B", [dv.get("loaded_words") or "—"]),
               ("Empty, back to A", [dv.get("return_words") or "—"])]
     lim_head = {"over": "Lorry limits: this lorry is over", "look": "Lorry limits to look at"}.get(dv["limits_status"], "Lorry limits")
@@ -3248,9 +3261,9 @@ def _route_sheet_diversion_page(c, S, dv, m, cw, W, H, R, B, size):
         hs = [_rs_block(c, m + j * (colw + 6 * mm), y, colw, head, body, size, True)
               for j, (head, body) in enumerate(blocks[i:i + 2])]
         y -= max(hs)
-    if dv.get("back_on"):
+    if dv.get("back_on") or dv.get("other_times"):
         c.setFillColorRGB(*GREY); c.setFont(R, 8.4)
-        c.drawString(m, y - 10, _pdf_safe(f"Back to page 1's route from {dv['back_on']}."))
+        c.drawString(m, y - 10, _pdf_safe(dv.get("other_times") or f"Back to page 1's route from {dv['back_on']}."))
 
 
 # --------------------------------------------------------------------------- #

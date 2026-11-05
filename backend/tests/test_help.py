@@ -928,7 +928,8 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 31 Oct 2026 (task 4c PR 3): + 19.5 Pinned pictures (87); the technical entry is inside T1 "Site layouts" (no new row)
    # NARROWED 5 Nov 2026 (group 6, Report a concern): + chapter 20 Concerns from the public and its three sections (92); + T1 "Concerns from the public" (38)
    len(re.findall(r'<li class="l[12]"', src)) == 92 and   # NARROWED 31 Oct 2026 (task 4c PR 5): + 19.6 On paper (88)
-   len(re.findall(r'<li class="l[12]"', _tg2)) == 38   # NARROWED 1 Nov 2026 (task 4a PR 4): + T1 "CLP appendices" (37)   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   # NARROWED 5 Nov 2026 (task 0d-2): + T1 "Busy-hours roads" (39)
+   len(re.findall(r'<li class="l[12]"', _tg2)) == 39   # NARROWED 1 Nov 2026 (task 4a PR 4): + T1 "CLP appendices" (37)   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,
@@ -1364,5 +1365,24 @@ ok("CONCERNS: technical T1 — in the contents; the table, the public send and i
                               "<code>_require_approver()</code>", "<code>AUDIT_SKIP</code>", "<code>tenant.concern_keep_months</code>",
                               "<code>privacy_ok: true</code>", "no name, contact or words")))
 
+# 5 Nov 2026 (task 0d-2): busy-hours roads in both guides
+_ug0d = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+_tg0d = open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()
+ok("BUSY HOURS: user guide 9.2 says how to take an offer, what changes, Stop, paused / Use again, no longer offered, where else it shows",
+   'id="ug-busy-hours"' in _ug0d and "<strong>Use Alt 2 on weekdays 16:00&ndash;19:00</strong> (planners and admins)" in _ug0d
+   and "<strong>Stop</strong> puts the usual road back." in _ug0d and "until you press <strong>Use again</strong>" in _ug0d
+   and "it stays in use until you stop it" in _ug0d and "In a closure&#39;s dates its diversion comes first." in _ug0d)
+ok("BUSY HOURS: the collision history line no longer says nothing can be switched; the map, Simulation and Carbon planner say it in a sentence each",
+   "nothing is switched until a planner or admin takes it there, &sect;9.2)" in _ug0d and "nothing is switched)" not in _ug0d
+   and 'id="ug-map-busy"' in _ug0d and 'id="ug-sim-busy"' in _ug0d and 'id="ug-carbon-route-choices"' in _ug0d)
+_ug0d_new = "".join(_ug0d[_ug0d.index('id="%s"' % k):][:1500].split("</li>")[0].split("</p>")[0]
+                    for k in ("ug-busy-hours", "ug-map-busy", "ug-sim-busy", "ug-carbon-route-choices"))
+ok("BUSY HOURS: ...and the new user guide words name no back end (no address, table, field or code)",
+   not re.search(r"/api/|route_choice|reason_kind|line_fp|<code>|\b(server|endpoint|token|cached|geometry|bake|baked|HERE)\b", _ug0d_new))
+ok("BUSY HOURS: technical T1 #t1-busy-hours holds the detail (the call, the rows, the share, the savings, the Simulation's swap, the other outputs)",
+   'id="t1-busy-hours"' in _tg0d and "<code>POST /api/routes/{id}/busy-hours</code>" in _tg0d and "<code>line_fp</code>" in _tg0d
+   and "<code>route_choice.busy_share(from, to, span)</code>" in _tg0d and "<code>backend/busy_savings.py</code>" in _tg0d
+   and "<code>sim._busy_legs</code>" in _tg0d and "<code>BusyHours</code>" in _tg0d
+   and '<li class="l2"><a href="#t1-busy-hours">Busy-hours roads</a></li>' in _tg0d)
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

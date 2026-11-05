@@ -589,6 +589,14 @@ def init_network_db():
         conn.commit()
         _create_tenanted(cur, "route_choice")       # 28 Oct 2026 (task 0c). Born with tenant_id in the key.
         conn.commit()
+        try:                                        # 5 Nov 2026 (task 0d-2): the busy-hours road's line, when put in use
+            if IS_PG:
+                cur.execute("ALTER TABLE route_choice ADD COLUMN IF NOT EXISTS line_fp TEXT")
+            else:
+                cur.execute("ALTER TABLE route_choice ADD COLUMN line_fp TEXT")
+            conn.commit()
+        except Exception:
+            conn.rollback()  # column already present — fine
         _create_tenanted(cur, "route_hour_times")   # 29 Oct 2026 (task 0f-2). Born with tenant_id in the key.
         conn.commit()
         # 22 Oct 2026 (evidence v3): the vehicle details, NULL until the next fetch
@@ -1585,6 +1593,9 @@ _TENANT_DDL = {
             decided_at      TEXT,
             created_at      TEXT,
             updated_at      TEXT,
+            -- 5 Nov 2026 (task 0d-2): a 'peak' row's stored line when it was put in use (here_routing._fingerprint);
+            -- a Route all that changes that line pauses the use. ALTERed in init_db() too.
+            line_fp         TEXT,
             PRIMARY KEY (tenant_id, id)
         )
     """,

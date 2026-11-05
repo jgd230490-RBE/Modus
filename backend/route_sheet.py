@@ -261,7 +261,9 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
         "issued": f"{as_at:%d %b %Y}".lstrip("0"),
         "drawn": bool(loaded),
         # 28 Oct 2026 (task 0c, the user's Q6): one more page per diversion, in date order
-        "diversions": _diversions(route_id, used, legs, leg_words, vehicle_text) if used else [],
+        "diversions": (_diversions(route_id, used, legs, leg_words, vehicle_text)
+                       # 5 Nov 2026 (task 0d-2, Q7): and one per busy-hours road in use, after the dated ones
+                       + _busy_roads(route_id, used, legs, leg_words, vehicle_text, o.get("name"))) if used else [],
     }
 
 
@@ -383,6 +385,55 @@ def _diversions(route_id, used, legs, leg_words, vehicle_text):
             "return": _coords(drawn["return"]["geometry"]) if drawn.get("return") else [],
             "loaded_words": leg_words(drawn.get("loaded")), "return_words": leg_words(drawn.get("return")),
             "back_on": back, "limits_status": lim_status, "limits_lines": lim_lines,
+        })
+    return out
+
+
+def _busy_roads(route_id, used, legs, leg_words, vehicle_text, origin_name=None):
+    """5 Nov 2026 (task 0d-2, Q7): one page per busy-hours road in use for the lorry drawn — "Weekdays 16:00–19:00: take
+    this road" — each leg its Alt N where it has one (Q1), else the main line; why in one sentence, and page 1 at other
+    times. Same shape as _diversions (the page is drawn by the same function)."""
+    import db
+    import route_choice
+    tenant = db.current_tenant()
+    uses = [u for u in route_choice.busy_uses(route_id) if u["status"] == "in_use"]
+    out = []
+    for u in uses:
+        mine = {l["leg"] for l in u["legs"] if l.get("status") == "in_use" and l.get("vehicle_profile") in (None, "", used)}
+        if not mine:
+            continue
+        drawn = {}
+        for leg in ("loaded", "return"):
+            g = None
+            if leg in mine:
+                g = db.query("SELECT * FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ? "
+                             "AND leg = ? AND alt_index = ?", (tenant, route_id, used, leg, int(u["alt"])))
+            drawn[leg] = g[0] if g else legs.get(leg)
+        counts = ""
+        try:
+            import collisions
+            hb = collisions.busy_hours(route_id)
+            for o in hb.get("offers") or []:
+                for b in o.get("bands") or []:
+                    if o.get("alt") == u["alt"] and b.get("from") == u["from"]:
+                        counts = f" ({b['alt']} against {b['route']}, {hb.get('period')})"
+        except Exception:
+            counts = ""
+        both = "both ways" if mine == {"loaded", "return"} else ("there" if mine == {"loaded"} else "back")
+        alts = sorted({0, int(u["alt"])})
+        lim_status, lim_lines = _limits_words(route_id, used, vehicle_text, alts=alts)
+        out.append({
+            "kind": "busy", "from": None, "to": None,
+            "when": f"Weekdays {u['from']}–{u['to']}",
+            "title": f"Weekdays {u['from']}–{u['to']}: take this road",
+            "why": (f"Leaving {origin_name or 'A'} between {u['from']} and {u['to']} on a weekday? Use this road {both}. "
+                    f"Fewer collisions on it at these times{counts}."),
+            "because": [],
+            "loaded": _coords(drawn["loaded"]["geometry"]) if drawn.get("loaded") else [],
+            "return": _coords(drawn["return"]["geometry"]) if drawn.get("return") else [],
+            "loaded_words": leg_words(drawn.get("loaded")), "return_words": leg_words(drawn.get("return")),
+            "back_on": None, "other_times": "At other times, page 1's route.",
+            "limits_status": lim_status, "limits_lines": lim_lines,
         })
     return out
 

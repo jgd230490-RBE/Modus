@@ -374,7 +374,7 @@ def polylines_for(leg, profile, diversions=True):
     if diversions:
         try:
             import route_choice
-            use = {(rid, lg): alts for (rid, _p, lg), alts in route_choice.in_use(profile).items()}
+            use = {(rid, lg): alts for (rid, _p, lg), alts in route_choice.in_use(profile, kinds=("zone",)).items()}
         except Exception:
             use = {}
     for g in db.query(

@@ -489,7 +489,7 @@ def compute():
     # (route_choice.leg_key), so a diverted month's km and carbon fall in the councils the diversion crosses
     try:
         import route_choice
-        use = route_choice.in_use()
+        use = route_choice.in_use(kinds=("zone",))   # 5 Nov 2026 (0d-2, Q9): councils stay on the zones
     except Exception:
         use = {}
     for g in db.query(
@@ -678,7 +678,7 @@ def _month_context(drawn=None):
     sites, sites_placed = _sites_in(prepared)
     try:
         import route_choice
-        diverted = {rid for (rid, _p, _l) in route_choice.in_use()}     # 29 Oct 2026 (task 0c, PR B)
+        diverted = {rid for (rid, _p, _l) in route_choice.in_use(kinds=("zone",))}     # 29 Oct 2026 (task 0c, PR B)
     except Exception:
         diverted = set()
     return {"drawn": drawn, "clips": clip_table(), "areas": areas, "sites": sites, "sites_placed": sites_placed,
