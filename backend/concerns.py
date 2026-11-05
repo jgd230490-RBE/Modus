@@ -469,6 +469,101 @@ def new_count():
     return _count("status = 'new'", ())
 
 
+# --------------------------------------------------------------------------- the figures (PR 2: Dashboard, bulletin, CLP)
+
+def _median(xs):
+    xs = sorted(x for x in xs if x is not None)
+    if not xs:
+        return None
+    m = len(xs) // 2
+    return round(xs[m] if len(xs) % 2 else (xs[m - 1] + xs[m]) / 2.0, 1)
+
+
+def _yms(lo, hi):
+    """Every "YYYY-MM" from lo to hi, both included."""
+    y, m = int(lo[:4]), int(lo[5:7])
+    out = []
+    while f"{y:04d}-{m:02d}" <= hi and len(out) < 600:
+        out.append(f"{y:04d}-{m:02d}")
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return out
+
+
+def site_routes(sites):
+    """The routes that start or end at one of `sites` (the Dashboard's Sites cut), as a set of ids."""
+    want = set(sites or ())
+    rows = db.query("SELECT id, origin_id, dest_id FROM routes WHERE tenant_id = ?", (db.current_tenant(),))
+    return {r["id"] for r in rows if r["origin_id"] in want or r["dest_id"] in want}
+
+
+def figures(lo, hi, sites=None, routes=None, now=None):
+    """
+    5 Nov 2026 (group 6, PR 2): the counts for the months lo..hi ("YYYY-MM", both included), the same ones the Dashboard,
+    the bulletin and the CLP print. Counts only: no words, no place, no person. A concern closed as "Not a concern (spam)"
+    is never counted. `sites` keeps the concerns on a route that starts or ends at one of them, or pinned at one;
+    `routes` keeps those on one of the routes named. Read fresh (concerns are in NO_DATA_TABLES, so no kept read holds them).
+    """
+    st = settings()
+    if not (re.match(r"^\d{4}-\d{2}$", str(lo or "")) and re.match(r"^\d{4}-\d{2}$", str(hi or ""))) or lo > hi:
+        raise Refused("Pick a month range.")
+    rows = db.query("SELECT id, received_at, kind, route_id, location_id, wants_reply, status, first_reply_at, closed_at, "
+                    "outcome FROM concerns WHERE tenant_id = ?", (db.current_tenant(),))
+    rows = [r for r in rows if r.get("outcome") != "spam"]
+    if sites:
+        keep_r, keep_s = site_routes(sites), set(sites)
+        rows = [r for r in rows if r.get("route_id") in keep_r or r.get("location_id") in keep_s]
+    if routes is not None:
+        keep = set(routes)
+        rows = [r for r in rows if r.get("route_id") in keep]
+    ym = lambda v: str(v or "")[:7]
+    inr = [r for r in rows if lo <= ym(r["received_at"]) <= hi]
+    reply_days = st["reply_days"]
+    first = [working_days(r["received_at"], r.get("first_reply_at")) for r in inr]
+    close = [working_days(r["received_at"], r.get("closed_at")) for r in inr]
+    within = None
+    if reply_days:
+        now_iso = _iso(now or _now())
+        asked = [r for r in inr if r.get("wants_reply")]
+        due = []
+        for r in asked:
+            got = working_days(r["received_at"], r.get("first_reply_at"))
+            if got is not None:
+                due.append(got <= float(reply_days))
+            elif (working_days(r["received_at"], now_iso) or 0) > float(reply_days):
+                due.append(False)
+        within = {"n": len(due), "yes": sum(1 for d in due if d),
+                  "pct": round(100.0 * sum(1 for d in due if d) / len(due)) if due else None}
+    months = _yms(lo, hi)
+    by_m = {m: 0 for m in months}
+    for r in inr:
+        by_m[ym(r["received_at"])] = by_m.get(ym(r["received_at"]), 0) + 1
+    kinds = {}
+    for r in inr:
+        k = kinds.setdefault(r["kind"], {"kind": r["kind"], "kind_text": KINDS.get(r["kind"], r["kind"]), "received": 0,
+                                         "closed": 0})
+        k["received"] += 1
+        if r["status"] == "closed":
+            k["closed"] += 1
+    names = {x["id"]: x["words"] for x in route_names()}
+    per_route = {}
+    for r in inr:
+        if r.get("route_id"):
+            per_route[r["route_id"]] = per_route.get(r["route_id"], 0) + 1
+    top = sorted(per_route.items(), key=lambda kv: (-kv[1], kv[0]))[:5]
+    return {
+        "from": lo, "to": hi, "received": len(inr),
+        "closed": sum(1 for r in rows if r["status"] == "closed" and lo <= ym(r.get("closed_at")) <= hi),
+        "closed_of_received": sum(1 for r in inr if r["status"] == "closed"),
+        "open_now": sum(1 for r in rows if r["status"] != "closed"),
+        "first_reply_median": _median(first), "close_median": _median(close),
+        "reply_days": reply_days, "within": within,
+        "by_month": [{"month": m, "received": by_m[m]} for m in months],
+        "by_kind": sorted(kinds.values(), key=lambda k: (-k["received"], list(KINDS).index(k["kind"]) if k["kind"] in KINDS else 99)),
+        "routes": [{"route_id": rid, "words": names.get(rid, rid), "received": n} for rid, n in top],
+        "taking": {"form": st["form"], "email": st["email"]},
+    }
+
+
 # --------------------------------------------------------------------------- what staff do
 
 def _load(cid):

@@ -477,7 +477,14 @@ first reply / close leave out Saturdays and Sundays (not bank holidays); <code>l
 reference and a link to <code>#concerns</code>; no name, contact or words.</li>
 <li><strong>The clean-up</strong> (<code>concerns.sweep</code>, at start-up and at most hourly on a read or send): spam closed 30 days ago deleted; the hash
 nulled after 30 days; closed + <code>tenant.concern_keep_months</code> (1–72, default 12): name, email, phone, words, registration, time of day and reply
-notes blanked, the pin rounded to 3 decimal places; open 24 months: the contact blanked. <code>…/forget</code> does the first at once.</li></ul>
+notes blanked, the pin rounded to 3 decimal places; open 24 months: the contact blanked. <code>…/forget</code> does the first at once.</li>
+<li><strong>The figures</strong> (PR 2) — <code>concerns.figures(lo, hi, sites=)</code> over months <code>YYYY-MM</code>: received (by
+<code>received_at</code>), closed (by <code>closed_at</code>), open now, the medians of the working days to first reply and to close,
+<code>within</code> (of those that asked a reply and are due: replied within <code>concern_reply_days</code>), by month, by kind, the five
+busiest routes. <code>outcome = spam</code> never counted; a site keeps the routes that start or end there and the concerns pinned there.
+<code>GET /api/concerns/figures?from=&amp;to=&amp;sites=</code> (planners and admins; read fresh, never kept). The bulletin&#39;s glance row
+and table: <code>bulletin_doc.concern_month(mi)</code> (None when the form is off and none was ever recorded: the row stays Not reported);
+the CLP&#39;s §7: <code>clp_doc.concern_words(d)</code> (12 months to the snapshot, the plan&#39;s sites).</li></ul>
 <h2 id="t1-clp-notes">CLP notes and tasks</h2>
 <p>31 Oct 2026 (task 4a, PR 3b; mockup <code>notes/clp-notes-mockup-1031</code>, Q1–Q12 as recommended). <code>backend/clp_notes.py</code>
 over one tenanted table, in the organisation file (after <code>clp_issues</code>) and kept by a demo refresh:</p>

@@ -402,6 +402,40 @@ FEED_DESC = "Crushed rock for the asphalt plant (coarse and fine aggregate)"
 #: 31 Oct 2026 (task 4a PR 3c, Q11): the demo's one client reviewer group (id, name, when made); no reviewer logins
 DEMO_REVIEW_GROUP = ("rg-demo", "Highways client (fictional)", "2026-10-31T00:00:00Z")
 
+#: 5 Nov 2026 (group 6, PR 2; John's Q14 "as recommended"): 26 FICTIONAL concerns from the public, dated back from the as-of
+#: date so they follow --as-of. No real person: the few that asked for a reply carry an example.org address and a name
+#: marked (fictional). Each row: (days before the as-of date, time received, route, kind, what happened, a reply asked,
+#: what became of it: "new" / "answered" / an outcome key, working hours to the first reply, working days to close).
+#: The two newest stay open (one New, one Answered) so the rail's count and the page's open list show something.
+DEMO_CONCERNS = [
+    (1, "08:31", ("BP", "VS", READY), "mud", "Mud on Tilton Lane by the viaduct gate after the morning mixers (fictional).", True, "new", None, None),
+    (3, "17:05", ("RH", "C4", GENERAL), "parked", "Two lorries waiting on the A606 verge before the compound opened (fictional).", True, "answered", 5, None),
+    (9, "09:40", ("RH", "C4", GENERAL), "mud", "Debris on the A606 by the Melton gate (fictional).", False, "action", 3, 1),
+    (12, "07:12", ("Q1", "C1", BALLAST), "driving", "A tipper took the bend at Kibworth too fast (fictional).", True, "action", 6, 2),
+    (16, "13:20", ("BP", "VS", READY), "noise", "Reversing alarms before 7 at the viaduct site (fictional).", True, "action", 4, 3),
+    (20, "10:02", ("VS", "TIP", EARTH), "mud", "Clay on the road out of the viaduct site (fictional).", False, "action", 2, 1),
+    (27, "16:44", ("RH", "C4", GENERAL), "driving", "A flatbed overtook on the hill into Melton (fictional).", False, "not_ours", 8, 2),
+    (33, "11:15", ("Q2", "C3", SMALL), "parked", "A lorry parked in the lay-by all morning (fictional).", False, "no_action", 7, 4),
+    (39, "08:05", ("BP", "VS", READY), "mud", "Wet concrete spilt at the Tilton junction (fictional).", True, "action", 2, 1),
+    (46, "14:30", ("RH", "C4", GENERAL), "noise", "Gate opening before the working hours (fictional).", True, "no_action", 9, 5),
+    (52, "09:55", ("Q1", "C1", BALLAST), "off_route", "A lorry going through the village instead of the bypass (fictional).", True, "action", 5, 3),
+    (60, "12:40", ("RH", "C4", GENERAL), "damage", "Verge rutted by the compound entrance (fictional).", False, "action", 10, 6),
+    (68, "07:50", ("VS", "TIP", EARTH), "mud", "Mud on the A47 near the tip (fictional).", False, "action", 3, 2),
+    (75, "15:10", ("Q3", "C2", EARTH), "driving", "A tipper close behind a cyclist (fictional).", True, "no_detail", 12, 4),
+    (83, "10:25", ("BP", "VS", READY), "parked", "Mixers queuing on Tilton Lane (fictional).", False, "action", 6, 2),
+    (95, "09:00", ("Q1", "C1", BALLAST), "other", "A question about how long the works will last (fictional).", True, "no_action", 4, 2),
+    (104, "13:45", ("RH", "C4", GENERAL), "mud", "Mud on the road after rain (fictional).", False, "action", 2, 1),
+    (118, "08:20", ("Q2", "C3", SMALL), "noise", "Dust from the stockpile on a windy day (fictional).", False, "action", 7, 4),
+    (131, "16:00", ("AP", "C4", ASPHALT), "driving", "A lorry ran the lights at the Melton crossing (fictional).", True, "not_ours", 9, 3),
+    (145, "11:30", ("RH", "C4", GENERAL), "other", "Asking where the haul road will go (fictional).", False, "no_action", 5, 2),
+    (162, "10:10", ("Q3", "C2", EARTH), "mud", "Mud on the Langton road (fictional).", False, "action", 3, 1),
+    (180, "14:05", ("Q1", "C1", BALLAST), "parked", "A lorry parked across a drive for ten minutes (fictional).", True, "action", 6, 2),
+    (197, "09:35", ("RH", "C1", PRECAST), "damage", "A kerb clipped at the Harborough junction (fictional).", False, "action", 11, 8),
+    (215, "07:40", ("Q2", "C3", SMALL), "driving", "Speeding on the B6047 early morning (fictional).", False, "duplicate", 4, 1),
+    (236, "12:15", ("RH", "C1", PRECAST), "other", "Asking about the road closure dates (fictional).", True, "no_action", 3, 1),
+    (262, "15:50", ("Q1", "C1", BALLAST), "mud", "Debris on the A6 by the Harborough gate (fictional).", False, "action", 4, 2),
+]
+
 #: 29 Oct 2026 (task 3a, John's Q10 "as recommended"): the planned concrete pours, on the batching plant's lines. When:
 #: "as-of thursday" / "next tuesday" follow the as-of date (so the Look-ahead's this week / next week each show one), or a
 #: fixed date. A pour whose line does not run in that month is left out (an as-of outside the line's months). The mixers
@@ -607,7 +641,10 @@ def build(with_areas=False, out=None):
                      # 30 Oct 2026 (3d, John): where the public map's "Report a concern" link goes. The company's
                      # own address, not a person's; before this it was never saved on live. Task 4b: DEMO_CONTACT holds
                      # it with the leaflet's hours and other formats.
-                     "council_breaks": {"movements": [25, 50, 100], "carbon": [10, 25, 50]}, **DEMO_CONTACT}
+                     "council_breaks": {"movements": [25, 50, 100], "carbon": [10, 25, 50]}, **DEMO_CONTACT,
+                     # 5 Nov 2026 (group 6, Q2 / Q9): the Report a concern form on the demo map, a first reply within 5
+                     # working days (the privacy link is Wayscope's own on the demo)
+                     "concerns_on": True, "concern_reply_days": 5}
     # D106: NO seasonal windows — the product's are scheme-wide by calendar month and meant for statutory
     # restrictions; Market Harborough's Christmas trading goes in as an advisory zone each December instead.
     doc["seasonal_restrictions"] = []
@@ -1054,6 +1091,61 @@ def build(with_areas=False, out=None):
                "stopped_at) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)",
                (db.current_tenant(), DEMO_REVIEW_GROUP[0], DEMO_REVIEW_GROUP[1], "Wayscope demo",
                 DEMO_REVIEW_GROUP[2], DEMO_REVIEW_GROUP[2]))
+
+    # --- the concerns from the public (5 Nov 2026, group 6, PR 2): fictional, flagged so, dated back from the as-of date;
+    # each pinned a little short of its route's far end, its first reply and closing in working time
+    import concerns as _cn
+    locs = {r["id"]: r for r in db.query("SELECT id, lat, lon FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
+    rts = {r["id"]: r for r in db.query("SELECT id, origin_id, dest_id FROM routes WHERE tenant_id = ?", (db.current_tenant(),))}
+
+    def _work_ahead(t, hours=0.0, days=0):
+        """t moved on by working hours (Mon-Fri, 08:00-17:00) and then whole working days."""
+        left = float(hours)
+        while left > 0:
+            if t.weekday() >= 5 or t.hour >= 17:
+                t = (t + datetime.timedelta(days=1)).replace(hour=8, minute=0)
+                continue
+            if t.hour < 8:
+                t = t.replace(hour=8, minute=0)
+            step = min(left, 17 - (t.hour + t.minute / 60.0))
+            t += datetime.timedelta(hours=step)
+            left -= step
+        for _ in range(int(days)):
+            t += datetime.timedelta(days=1)
+            while t.weekday() >= 5:
+                t += datetime.timedelta(days=1)
+        return t
+
+    for n, (back, at, rkey, kind, words, wants, fate, reply_h, close_d) in enumerate(DEMO_CONCERNS, start=1):
+        assert kind in _cn.KINDS and (fate in ("new", "answered") or fate in _cn.OUTCOMES), (kind, fate)
+        rid = ROUTE_ID[rkey]
+        day = as_of - datetime.timedelta(days=back)
+        got = datetime.datetime(day.year, day.month, day.day, int(at[:2]), int(at[3:]), tzinfo=datetime.timezone.utc)
+        end = locs[rts[rid]["dest_id"]]
+        lat, lon = round(float(end["lat"]) + 0.004, 6), round(float(end["lon"]) - 0.003, 6)
+        iso = lambda t: t.strftime("%Y-%m-%dT%H:%M:%SZ")
+        hist = [{"at": iso(got), "by": "the public map", "what": "received"}]
+        first = closed = None
+        status = "new"
+        if fate != "new":
+            first = _work_ahead(got, hours=reply_h)
+            hist.append({"at": iso(first), "by": "Wayscope demo", "what": "reply",
+                         "words": "Thank you: we have passed this to the site team (fictional)."})
+            status = "answered"
+        if fate not in ("new", "answered"):
+            closed = _work_ahead(first, days=close_d)
+            hist.append({"at": iso(closed), "by": "Wayscope demo", "what": "closed", "words": _cn.OUTCOMES[fate]})
+            status = "closed"
+        db.execute(
+            "INSERT INTO concerns (tenant_id, id, received_at, source, kind, happened_on, happened_time, lat, lon, "
+            "route_id, route_set_by, location_id, area_name, words, registration, wants_reply, name, email, phone, "
+            "ip_hash, status, first_reply_at, closed_at, outcome, history_json, fictional, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (db.current_tenant(), f"C-{n:04d}", iso(got), "map" if n % 4 else "email", kind, day.isoformat(), None,
+             lat, lon, rid, "pin", None, None, words, None, int(bool(wants)),
+             (f"Resident {n} (fictional)" if wants else None), (f"resident{n}@example.org" if wants else None), None,
+             None, status, iso(first) if first else None, iso(closed) if closed else None,
+             fate if status == "closed" else None, json.dumps(hist), 1, iso(closed or first or got)))
 
     # --- the history up to the as-of date (§1.9) -------------------------------------------------------------
     # Only weeks that carry history ship: every approved month up to the as-of month is materialised; later weeks
