@@ -972,9 +972,11 @@ ok("6b. ⭐ a session touch and the sign-in throttle (NO_DATA_TABLES) leave the 
 # and a note must not end a kept CLP draft)
 # NARROWED 31 Oct 2026 (task 4c PR 3): + site_layout_pictures, the pinned pictures (the staff map reads them fresh; moving
 # one must not end the kept staff reads)
-ok("6b. the tables that do not bump are exactly the account / audit / lead tables, the CLP notes, the reviewers and the pinned pictures",
+# NARROWED 5 Nov 2026 (group 6): + concerns, the public's reports (no kept read is built from them, and a public send
+# must not end every kept map read)
+ok("6b. the tables that do not bump are exactly the account / audit / lead tables, the CLP notes, the reviewers, the pinned pictures and the concerns",
    db.NO_DATA_TABLES == {"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users", "demo_requests", "clp_notes",
-                         "clp_review_groups", "clp_reviews", "site_layout_pictures"})
+                         "clp_review_groups", "clp_reviews", "site_layout_pictures", "concerns"})
 ok("6b. ⭐ written_table(): INSERT / INSERT OR REPLACE / REPLACE / UPDATE / DELETE name their table; anything else is None (and bumps)",
    db.written_table("INSERT INTO forecasts (a) VALUES (?)") == "forecasts"
    and db.written_table("  insert or replace into Audit_Log (a) values (?)") == "audit_log"

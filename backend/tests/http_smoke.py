@@ -2270,10 +2270,13 @@ with TestClient(main.app, base_url="https://testserver") as c:
              "name": _secret["name"], "email": _secret["email"], "phone": _secret["phone"], "privacy_ok": True}
     ok("🔴 CONCERNS: the public send without the app header is refused (403) and stores nothing",
        _mc.post("/api/public/concerns", json=_body).status_code == 403)
+    _ver_cn = db.data_version()
     _rs = _mc.post("/api/public/concerns", json=_body, headers={"X-Wayscope": "1"})
     _rj = _rs.json() if _rs.headers.get("content-type", "").startswith("application/json") else {}
     ok("⭐ CONCERNS: the public send answers 200 with the reference ONLY", _rs.status_code == 200
        and set(_rj) == {"ok", "ref"} and re.fullmatch(r"C-\d{4}", str(_rj.get("ref") or "")), _rs.text[:200])
+    ok("🔴 CONCERNS: a public send ends no kept read (the data version is unchanged)", db.data_version() == _ver_cn,
+       f"{_ver_cn} -> {db.data_version()}")
     _leak = []
     for _path in ("/api/public/alignment", "/api/public/map-data", "/api/public/whoami", "/api/public/month-kpis?month=10",
                   "/api/public/month-kpis/months", "/api/public/route-forecasts", "/api/public/forecast-matrix",

@@ -533,6 +533,11 @@ ok("send_alert without a mail sender returns False and does not raise", concerns
 SRC = open(os.path.join(BACKEND, "concerns.py"), encoding="utf-8").read()
 MAIN = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
 _calls = [SRC[m.end():m.end() + 400] for m in re.finditer(r"db\.(?:query|execute)\(", SRC)]
+# NARROWED 5 Nov 2026: the list's one statement is built in `sql` a line above (its filters are optional); that line names
+# tenant_id, and is checked here instead of the call
+_calls = [c for c in _calls if not c.startswith("sql,")]
+ok("🔴 ...the list's statement, built in `sql`, starts from the tenant's rows",
+   'sql = f"SELECT {COLS} FROM concerns WHERE tenant_id = ?"' in SRC and SRC.count("db.query(sql,") == 1)
 ok("🔴 every statement in concerns.py names tenant_id", len(_calls) >= 10 and all("tenant_id" in c for c in _calls),
    str(len(_calls)))
 ok("🔴 no BOOLEAN compared with a number", not re.search(r"\"[^\"\n]*\b(active|disabled|wants_reply|fictional)\s*=\s*[01]\b", SRC))
