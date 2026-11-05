@@ -6293,7 +6293,7 @@
         (a1_data.features||[]).forEach(f=>{
             if(f.geometry && (f.geometry.type==='LineString'||f.geometry.type==='MultiLineString')){
                 const rid=(f.properties.route_id||'').toString().trim().toLowerCase();
-                if(!rid) return;
+                if(!rid || f.properties.type==='BusyHours') return;   // 5 Nov 2026 (task 0d-2): the route's own lines only
                 // the network reports the routed distance; only fall back to measuring
                 // the drawn line when it is missing
                 const L=(typeof f.properties.distance_km==='number')
@@ -6354,7 +6354,8 @@
     function selectRoute(routeId){
         selectedRouteId=routeId;
         const rl=(routeId||'').toString().trim().toLowerCase();
-        const feats=(a1_data.features||[]).filter(f=>f.geometry&&(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString')&&(f.properties.route_id||'').toString().trim().toLowerCase()===rl);
+        // (5 Nov 2026, task 0d-2: never the route's busy-hours road, which showBusyRoad draws thinner beside it)
+        const feats=(a1_data.features||[]).filter(f=>f.geometry&&(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString')&&f.properties.type!=='BusyHours'&&(f.properties.route_id||'').toString().trim().toLowerCase()===rl);
         ensureSelectionLayers();
         const src=map.getSource('selected-route'); if(src) src.setData({type:'FeatureCollection',features:feats});
         showBusyRoad(rl);

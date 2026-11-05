@@ -7455,8 +7455,12 @@ ok("BUSY HOURS: a picked route's busy-hours road ('BusyHours' features) is drawn
 ok("BUSY HOURS: the route card says it in one line — 'Weekdays 16:00–19:00' / 'Another road, X mi shorter.' — no collision words",
    code.includes("rows.unshift(['Weekdays ' + p.from + '–' + p.to, how.charAt(0).toUpperCase() + how.slice(1)]);")
    && code.includes("'another road, ' + fmtDist(Math.abs(d), 1) + ' ' + DU() + (d < 0 ? ' shorter.' : ' longer.')"));
-ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road — no layer but the pick's reads 'BusyHours'",
-   (code.match(/'BusyHours'/g) || []).length === 2);
+// NARROWED 5 Nov 2026 (the local Chrome check): two more reads of 'BusyHours', each to LEAVE it out — the picked route's own
+// highlight (it had drawn the busy road as the route) and the route info (it took the longest line, the busy road's, as the distance)
+ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road — no layer but the pick's reads 'BusyHours'; the pick's highlight and the route info leave it out",
+   (code.match(/'BusyHours'/g) || []).length === 4
+   && code.includes("&&f.properties.type!=='BusyHours'&&(f.properties.route_id||'').toString().trim().toLowerCase()===rl);")
+   && code.includes("if(!rid || f.properties.type==='BusyHours') return;"));
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();

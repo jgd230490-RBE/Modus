@@ -5029,7 +5029,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && code.includes("So far, from recorded loads:") && code.includes("(estimated)."));
   ok("BUSY HOURS: busyWords says 'Saves about …' when every figure is down, 'Adds about …' when every figure is up, and each one's way when they differ",
      code.includes("function busyWords(s){") && code.includes("text: `Saves about ${list(parts.map(([v, f]) => f(v)))}`")
-     && code.includes("text: `Adds about ${list(parts.map(([v, f]) => f(v)))}`") && code.includes('`${f(v)} ${v > 0 ? "more" : "less"}`'));
+     && code.includes("text: `Adds about ${list(parts.map(([v, f]) => f(v)))}`") && code.includes('`${f(v)} ${v > 0 ? "more" : "less"}`')
+     // the local Chrome check (5 Nov): a mixed sentence was red throughout, the saved hours too — now only the added figures
+     && code.includes("return { adds: false, mixed: words, text: list(words.map(x => x.w)) };")
+     && code.includes('<span style={x.more ? { color: "var(--bad-text)" } : {}} data-busy-more={x.more ? "1" : undefined}>{x.w}</span>')
+     && code.includes("{sw.mixed ? <BusyMixed words={sw.mixed} /> : sw.text} over the approved plan"));
   ok("BUSY HOURS: the Routes row's chip 'Busy hours: Alt N' (hover: the hours; amber while paused) from the diversions read; the Look-ahead's chip from the line context",
      code.includes("setBusyUses(dv.busy || [])") && code.includes('data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}')
      && code.includes("Busy hours: Alt {u.alt}</span>))}") && code.includes("(c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null"));

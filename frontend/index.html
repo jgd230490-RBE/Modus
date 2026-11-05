@@ -13814,7 +13814,13 @@ function busyWords(s){
   const list = (xs) => xs.length > 1 ? xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1] : xs[0] || "";
   if(less) return { adds: false, text: `Saves about ${list(parts.map(([v, f]) => f(v)))}` };
   if(more) return { adds: true, text: `Adds about ${list(parts.map(([v, f]) => f(v)))}` };
-  return { adds: parts.some(([v], i) => i === 0 && v > 0), text: list(parts.map(([v, f]) => `${f(v)} ${v > 0 ? "more" : "less"}`)) };
+  // the figures go different ways: each its own way, and only the added ones in red (Q19)
+  const words = parts.map(([v, f]) => ({ w: `${f(v)} ${v > 0 ? "more" : "less"}`, more: v > 0 }));
+  return { adds: false, mixed: words, text: list(words.map(x => x.w)) };
+}
+function BusyMixed({ words }){
+  return <>{words.map((x, i) => <React.Fragment key={i}>{i ? (i === words.length - 1 ? " and " : ", ") : ""}
+    <span style={x.more ? { color: "var(--bad-text)" } : {}} data-busy-more={x.more ? "1" : undefined}>{x.w}</span></React.Fragment>)}</>;
 }
 
 // 5 Nov 2026 (task 0d-2, Q17): what each busy-hours road in use saves or adds against its route's main road, over the
@@ -14102,8 +14108,8 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                   {u.status === "in_use" && u.share != null && (
                     <p className="mt-1 text-slate-600">About {Math.round(u.share * 100)} % of this route's trips set off then (its gates are open {u.open[0]}–{u.open[1]}), so the plan's figures use Alt {u.alt} for them.</p>)}
                   {u.status === "in_use" && sw && sv.of > 0 && (
-                    <p className="mt-1" data-busy-saves={sw.adds ? "adds" : "saves"} style={sw.adds ? { color: "var(--bad-text)" } : {}}>
-                      {sw.text} over the approved plan ({Math.round(sv.trips)} of {Math.round(sv.of)} trips).</p>)}
+                    <p className="mt-1" data-busy-saves={sw.mixed ? "mixed" : sw.adds ? "adds" : "saves"} style={sw.adds ? { color: "var(--bad-text)" } : {}}>
+                      {sw.mixed ? <BusyMixed words={sw.mixed} /> : sw.text} over the approved plan ({Math.round(sv.trips)} of {Math.round(sv.of)} trips).</p>)}
                   {u.status === "in_use" && sfw && sf.of > 0 && (
                     <p className="mt-1 text-slate-600">So far, from recorded loads: {sfw.text.replace(/^Saves about |^Adds about /, (m) => m.toLowerCase())} (estimated).</p>)}
                 </div>);
