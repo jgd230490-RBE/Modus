@@ -2810,6 +2810,118 @@ async function rowsDom(){
   } finally { w.fetch = fetchWas; w.mapboxgl.Map = MapWas; w.__ACCESS.info = infoWas; }
 }
 
+// 5 Nov 2026 (the mockup John approved, notes layout-fullscreen-mockup-1105, Q1-Q8): a site's layout full screen on Locations.
+// The ⤢ map control (made by the map's addControl, so the stub calls onAdd), the grid laid over the window, Chrome asked for its
+// own full screen, and the ways out: ⤡, a window under 1,024 px, the site's card closing, leaving the page. Esc and Chrome's own
+// exit keep the layout over the window. NOT covered here: the drawing tools in full screen (Terra Draw needs a browser: the
+// Chrome check, notes layout-fullscreen-mockup-1105\built\), the look (the UI audit).
+async function fullScreenDom(){
+  const MapWas = w.mapboxgl.Map, mmWas = w.matchMedia;
+  const ctlBox = w.document.createElement("div"); w.document.body.appendChild(ctlBox);
+  w.mapboxgl.Map = function(){
+    const m = new Proxy({}, { get: (t, k) => {
+      if (k === "on") return (ev, a, b) => { const fn = typeof a === "function" ? a : b; if (ev === "load") setTimeout(() => fn(), 0); return m; };
+      if (k === "addControl") return (c) => { if (c && c.onAdd){ const n = c.onAdd(m); if (n) ctlBox.appendChild(n); } return m; };
+      if (k === "getCanvas" || k === "getCanvasContainer" || k === "getContainer") return () => ({ style: {}, addEventListener(){}, removeEventListener(){} });
+      if (k === "getZoom") return () => 10;
+      if (k === "getCenter") return () => ({ lng: 0, lat: 0 });
+      if (k === "getBounds") return () => ({ getWest: () => 0, getEast: () => 1, getSouth: () => 0, getNorth: () => 1 });
+      if (k === "getSource" || k === "getLayer" || k === "getStyle") return () => null;
+      if (k === "queryRenderedFeatures") return () => [];
+      if (k === "isStyleLoaded" || k === "loaded") return () => true;
+      if (k === "then") return undefined;
+      return () => m;
+    } });
+    return m;
+  };
+  // a desk window that can be narrowed: matchMedia's change listener is kept
+  let wide = true; const mqOn = [];
+  const isDesk = (q) => /min-width: 1024px/.test(q);
+  w.matchMedia = (q) => ({ get matches(){ return isDesk(q) ? wide : false; }, media: q,
+    addEventListener(t, f){ if (isDesk(q)) mqOn.push(f); }, removeEventListener(){}, addListener(f){ if (isDesk(q)) mqOn.push(f); }, removeListener(){} });
+  // Chrome's own full screen, counted
+  const doc = w.document, de = doc.documentElement; let fsEl = null; const FS = { req: 0, exit: 0 };
+  const fsWas = Object.getOwnPropertyDescriptor(doc, "fullscreenElement"), reqWas = de.requestFullscreen, exitWas = doc.exitFullscreen;
+  Object.defineProperty(doc, "fullscreenElement", { configurable: true, get: () => fsEl });
+  de.requestFullscreen = () => { FS.req++; fsEl = de; doc.dispatchEvent(new w.Event("fullscreenchange")); return Promise.resolve(); };
+  doc.exitFullscreen = () => { FS.exit++; fsEl = null; doc.dispatchEvent(new w.Event("fullscreenchange")); return Promise.resolve(); };
+  const LOCS = { type: "FeatureCollection", features: [["L001", "Kilby Ridge Quarry", -1.238, 52.561], ["L003", "Brook Pit", -0.752, 52.694]]
+    .map(([id, name, lon, lat]) => ({ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] },
+      properties: { id, name, role: "origin", loc_type: "Quarry", supplies: ["Small aggregate"], receives: [] } })) };
+  const fetchWas = w.fetch;
+  w.fetch = (url) => { const u = String(url);
+    if (/\/locations\/geojson$/.test(u)) return respond(LOCS);
+    if (/\/routes\/status$/.test(u)) return respond([]);
+    if (/\/routes\/summary$/.test(u)) return respond({ here_configured: true });
+    if (/\/zones$/.test(u)) return respond({ zones: [], haul_links: {} });
+    if (/\/gates\?/.test(u)) return respond({ gates: [] });
+    return new Promise(() => {}); };
+  const infoWas = w.__ACCESS.info;
+  w.__ACCESS.info = { role: "admin", label: "Admin", via: "login", can_approve: true, ipt: null, name: "Ada", email: "ada@example.org" };
+  const el = doc.createElement("div"); doc.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+  const settle = async () => { for (let i = 0; i < 5; i++) await tick(); };
+  const press = async (b) => { await act(async () => { b.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); await settle(); };
+  const btn = () => ctlBox.querySelector("[data-full-ctl] button"), box = () => ctlBox.querySelector("[data-full-ctl]");
+  const grid = () => el.querySelector("[data-full]");
+  let mounted = false;
+  try {
+    await act(async () => { r.render(w.React.createElement(w.DataManagement, { meta: META, who: "t", subTab: "locations", onSubTab(){} })); });
+    mounted = true; await settle();
+    ok("⭐ FULL SCREEN: the map carries ONE control of its own for it, a named <button> ('Full screen', its ⤢ drawn by CSS), hidden while no site's layout is open",
+       ctlBox.querySelectorAll("[data-full-ctl]").length === 1 && !!btn() && btn().type === "button" && btn().textContent === "" && btn().getAttribute("aria-pressed") === "false"
+       && btn().getAttribute("aria-label") === "Full screen" && box().style.display === "none" && /mapboxgl-ctrl-group/.test(box().className));
+    await press(el.querySelector('button[data-loc-open="L003"]'));
+    ok("⭐ FULL SCREEN: opening a site (its Site layout card) shows the button; nothing is full screen yet",
+       box().style.display === "" && !grid() && FS.req === 0);
+    const under = doc.createElement("button"); under.textContent = "Covered"; doc.body.insertBefore(under, el);
+    await press(btn());
+    const g = grid(), card = g && g.firstElementChild, mapDiv = card && card.firstElementChild, panel = g && g.children[1];
+    const upChain = []; for (let n = g; n && n !== doc.body; n = n.parentElement) upChain.push(n);
+    ok("⭐ FULL SCREEN: the page under it is inert while covered (Tab and a screen reader stay in the full screen); the grid and its own parents are not",
+       !!g && under.hasAttribute("inert") && upChain.every(n => !n.hasAttribute("inert")) && !g.querySelector("[inert]"));
+    ok("⭐ FULL SCREEN: ⤢ lays the Locations grid over the window (sl-full) and asks Chrome for its own full screen once (Q1)",
+       !!g && / sl-full$/.test(g.className) && FS.req === 1 && fsEl === de);
+    ok("FULL SCREEN: before Draw the map takes the window less a 380 px column for the site's panel (Q4); the SAME map div fills its card",
+       !!g && g.style.gridTemplateColumns === "minmax(0, 1fr) 380px" && card.style.gridColumn === "1" && panel.style.gridColumn === "2"
+       && panel.style.overflowY === "auto" && mapDiv.style.height === "100%");
+    ok("FULL SCREEN: the button turns into 'Leave full screen' (pressed; CSS draws ⤡)",
+       btn().textContent === "" && btn().getAttribute("aria-label") === "Leave full screen" && btn().getAttribute("aria-pressed") === "true");
+    const notice = w.__TENANT.demo_notice, pill = el.querySelector(".sl-demo-on-map");
+    ok("FULL SCREEN: the demo notice stays on screen while the header is covered (Q6): a DEMO pill on the map, only on a demo",
+       notice ? (!!pill && pill.textContent === "DEMO" + notice) : !pill, String(notice));
+    await act(async () => { doc.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); }); await settle();
+    ok("⭐ FULL SCREEN: Esc does not leave it (Q2: Esc stays the drawing's)", !!grid());
+    await act(async () => { fsEl = null; doc.dispatchEvent(new w.Event("fullscreenchange")); }); await settle();
+    ok("⭐ FULL SCREEN: Chrome leaving its own full screen (its Esc, F11) keeps the layout over the window (Q2)", !!grid() && btn().getAttribute("aria-pressed") === "true");
+    await press(btn());
+    ok("FULL SCREEN: ⤡ leaves; Chrome is not asked again when it had already left (exitFullscreen 0); the page is no longer inert",
+       !grid() && FS.exit === 0 && btn().getAttribute("aria-pressed") === "false" && box().style.display === "" && !under.hasAttribute("inert") && !doc.querySelector("[inert]"));
+    under.remove();
+    await press(btn());
+    await press(btn());
+    ok("⭐ FULL SCREEN: ⤢ then ⤡ asks Chrome to leave its full screen too (exitFullscreen 1); the map is back at its page height",
+       !grid() && FS.req === 2 && FS.exit === 1 && fsEl === null && !!el.querySelector('div[style*="62vh"]'));
+    await press(btn());
+    await act(async () => { wide = false; mqOn.forEach(f => f()); }); await settle();
+    ok("⭐ FULL SCREEN: a window narrowed under 1,024 px leaves it, and the button goes (no phone, no narrow window)",
+       !grid() && FS.exit === 2 && box().style.display === "none");
+    await act(async () => { wide = true; mqOn.forEach(f => f()); }); await settle();
+    await press(btn());
+    const cancel = [...el.querySelectorAll("button")].find(b => b.textContent === "Cancel");
+    await press(cancel);
+    ok("FULL SCREEN: closing the site's card leaves it (nothing left to show full screen)", !grid() && FS.exit === 3 && box().style.display === "none");
+    await press(el.querySelector('button[data-loc-open="L003"]'));
+    await press(btn());
+    await act(async () => { r.unmount(); }); mounted = false; await settle();
+    ok("FULL SCREEN: leaving the page while full screen gives Chrome its bars back", FS.exit === 4 && fsEl === null);
+  } finally {
+    if (mounted) await act(async () => { r.unmount(); });
+    el.remove(); ctlBox.remove(); w.fetch = fetchWas; w.mapboxgl.Map = MapWas; w.matchMedia = mmWas; w.__ACCESS.info = infoWas;
+    de.requestFullscreen = reqWas; doc.exitFullscreen = exitWas;
+    if (fsWas) Object.defineProperty(doc, "fullscreenElement", fsWas); else delete doc.fullscreenElement;
+  }
+}
+
 async function todayFitDom(){
   const tf = w.todayFit;
   ok("UI FIX 6 card 5: todayFit is a global helper", typeof tf === "function");
@@ -3479,6 +3591,9 @@ async function reviewerDom(){
   // 23 Oct 2026 (UI fix 9, decision 16): the Data tables' rows open from the keyboard
   try { await rowsDom(); ok("UI FIX 9 ROWS: the section ran to the end", true); }
   catch (e) { ok("UI FIX 9 ROWS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  // 5 Nov 2026: a site's layout full screen on Locations
+  try { await fullScreenDom(); ok("FULL SCREEN DOM: the section ran to the end", true); }
+  catch (e) { ok("FULL SCREEN DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);
