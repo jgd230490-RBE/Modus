@@ -82,7 +82,13 @@ TENANT_DEFAULTS = {"name": "Wayscope", "team_label": "Team", "currency": "EUR", 
                    "concern_email": None,
                    # 30 Oct 2026 (task 4b): the bulletin's and the resident leaflet's other typed lines. Plain text or null;
                    # an empty one is left out of the page and the PDFs (contact_text / newsletter_link check them).
-                   "contact_phone": None, "working_hours": None, "other_formats": None, "newsletter_url": None}
+                   "contact_phone": None, "working_hours": None, "other_formats": None, "newsletter_url": None,
+                   # 5 Nov 2026 (group 6, concerns.py; mockup card 8): the public map's Report a concern form. Off until
+                   # ticked; outside the demo it shows only with the scheme's own privacy notice link (Q12). How long a
+                   # concern's personal details are kept after closing (months, 1-72, default 12: Q8), and the first-reply
+                   # target in working days (blank: no target, Q9).
+                   "concerns_on": None, "concern_privacy_url": None, "concern_keep_months": None,
+                   "concern_reply_days": None}
 
 CURRENCIES = {
     "EUR": {"symbol": "€", "name": "euro"},
@@ -155,6 +161,11 @@ def tenant_settings(conversions=None, doc=None):
     for k in CONTACT_TEXT_MAX:
         t[k] = contact_text((block or {}).get(k) if isinstance(block, dict) else None, k)
     t["newsletter_url"] = newsletter_link((block or {}).get("newsletter_url") if isinstance(block, dict) else None)
+    b = block if isinstance(block, dict) else {}
+    t["concerns_on"] = b.get("concerns_on") is True
+    t["concern_privacy_url"] = newsletter_link(b.get("concern_privacy_url"))
+    t["concern_keep_months"] = concern_months(b.get("concern_keep_months"))
+    t["concern_reply_days"] = concern_reply_days(b.get("concern_reply_days"))
     t["council_breaks"] = council_breaks(doc=doc)
     return t
 
@@ -228,6 +239,20 @@ def contact_text(v, key):
     if not t or len(t) > CONTACT_TEXT_MAX[key] or any(c in t for c in "<>\r\n"):
         return None
     return t
+
+
+def concern_months(v):
+    """The months a closed concern's personal details are kept (1-72), or None (= the default, 12)."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or float(v) != int(v):
+        return None
+    return int(v) if 1 <= int(v) <= 72 else None
+
+
+def concern_reply_days(v):
+    """The first-reply target in working days (1-30), or None (no target)."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or float(v) != int(v):
+        return None
+    return int(v) if 1 <= int(v) <= 30 else None
 
 
 def newsletter_link(v):
@@ -703,6 +728,17 @@ def validate(doc, network=None):
             nu = tb.get("newsletter_url")
             if nu is not None and nu != "" and newsletter_link(nu) is None:
                 p.append(f"The newsletter link must be one https:// address of at most {NEWSLETTER_URL_MAX} characters")
+            if tb.get("concerns_on") not in (None, True, False):
+                p.append("tenant.concerns_on must be true or false")
+            pu = tb.get("concern_privacy_url")
+            if pu is not None and pu != "" and newsletter_link(pu) is None:
+                p.append(f"The privacy notice link must be one https:// address of at most {NEWSLETTER_URL_MAX} characters")
+            km = tb.get("concern_keep_months")
+            if km is not None and km != "" and concern_months(km) is None:
+                p.append("Keep contact details for: a whole number of months from 1 to 72")
+            rd = tb.get("concern_reply_days")
+            if rd is not None and rd != "" and concern_reply_days(rd) is None:
+                p.append("First reply within: a whole number of working days from 1 to 30, or blank")
             iu = tb.get("imagery_url")
             if iu is not None and iu != "":
                 pr = imagery_url_problem(iu)

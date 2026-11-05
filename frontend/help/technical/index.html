@@ -54,7 +54,8 @@ main:focus{outline:0}
 <li class="l2"><a href="#t1-baf">Fuel index and BAF</a></li>
 <li class="l2"><a href="#t1-gates">Gate arrivals</a></li>
 <li class="l2"><a href="#t1-stock">Stockpiles</a></li><li class="l2"><a href="#t1-pours">Concrete pours</a></li>
-<li class="l2"><a href="#t1-clp">CLP monitoring</a></li><li class="l2"><a href="#t1-clp-records">CLP documents</a></li><li class="l2"><a href="#t1-clp-appendices">CLP appendices</a></li><li class="l2"><a href="#t1-clp-notes">CLP notes and tasks</a></li><li class="l2"><a href="#t1-clp-reviewers">CLP client reviewers</a></li><li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li><li class="l2"><a href="#t1-layouts">Site layouts</a></li>
+<li class="l2"><a href="#t1-clp">CLP monitoring</a></li><li class="l2"><a href="#t1-clp-records">CLP documents</a></li><li class="l2"><a href="#t1-clp-appendices">CLP appendices</a></li><li class="l2"><a href="#t1-concerns">Concerns from the public</a></li>
+<li class="l2"><a href="#t1-clp-notes">CLP notes and tasks</a></li><li class="l2"><a href="#t1-clp-reviewers">CLP client reviewers</a></li><li class="l2"><a href="#t1-abnormal">Abnormal loads</a></li><li class="l2"><a href="#t1-layouts">Site layouts</a></li>
 <li class="l1"><a href="#t2-routing">T2 Routing with HERE</a></li>
 <li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>
 <li class="l1"><a href="#t3-sources">T3 Where each screen reads from</a></li>
@@ -448,6 +449,35 @@ the routes' typed words and <code>hour_times.evidence_block</code> (A), <code>ho
 <code>areas.clip_table</code> (J), <code>sim.day</code> in each site&#39;s busiest month (K), <code>gate_arrivals.arrivals</code> per month (L),
 <code>derived.cycle_for</code> with <code>carbon.lorries_for</code> (M). A team&#39;s plan cuts pours and abnormal loads to the team, shows the
 team&#39;s share of each gate&#39;s arrivals and leaves K out. A read that fails is named in <code>appendices_skipped</code> and its appendix left out.</p>
+<h2 id="t1-concerns">Concerns from the public</h2>
+<p>5 Nov 2026 (group 6). <code>backend/concerns.py</code> over one
+tenanted table, in the organisation file (after <code>clp_reviews</code>) and in <code>db.NO_DATA_TABLES</code>, so a public send never throws away a kept read:</p>
+<pre>concerns  (tenant_id, id C-0001…) — received_at, source map | email | phone | person, kind (seven), happened_on, happened_time,
+          lat / lon (DOUBLE PRECISION), route_id, route_set_by pin | form | staff, location_id, area_name, words, registration,
+          wants_reply, name, email, phone, ip_hash, status new | answered | closed, first_reply_at, closed_at, outcome (six),
+          personal_deleted_at, contact_deleted_at, history_json, fictional, updated_at</pre>
+<ul><li><strong>The public send</strong> — <code>POST /api/public/concerns</code>, behind the map password (<code>gate.MAP_DATA_PREFIXES</code>; not an open
+path). It needs <code>X-Wayscope: 1</code> (403), a JSON body (415) of at most 8 KB (413), and answers <code>{"ok": true, "ref": "C-0042"}</code> only.
+No GET under <code>/api/public/</code> reads a concern. Off (404) until <code>tenant.concerns_on</code> is true and a privacy link exists
+(<code>tenant.concern_privacy_url</code>; the demo falls back to <code>wayscope.co.uk/privacy.html#concerns</code>); outside the demo the body must carry
+<code>privacy_ok: true</code>. Checks: kind, words ≤ 1,000 with no web link, no <code>&lt;</code> or <code>&gt;</code>, control characters stripped, the date
+not in the future and within 366 days, hh:mm, a registration of letters, numbers and spaces, a finite pin within 10 km of the routes and sites, a known
+route, a contact only when a reply is asked for. The trap field <code>website</code> is thanked with <code>ref: null</code> and stored nowhere. Limits: 5 an hour
+and 20 a day per hashed address (<code>demo_request.ip_hash</code>), 300 a day for the scheme (429 with the report address).</li>
+<li><strong>The place</strong> — <code>collisions.index_from_db</code> at 500 m names the route (an abnormal load&#39;s line is dropped) and site;
+<code>areas.stored_areas</code> the district. Kept per <code>db.data_version()</code>.</li>
+<li><strong>Staff</strong> — <code>GET /api/concerns</code> (status / open, kind, route, month), <code>GET /api/concerns/new-count</code> (0 for anyone but a
+planner or admin), <code>GET /api/concerns/{id}</code>, <code>POST /api/concerns</code> (source email / phone / person), and <code>…/reply</code>,
+<code>…/close</code>, <code>…/reopen</code>, <code>…/route</code>, <code>…/forget</code> — all <code>_require_approver()</code>. Working days between received and
+first reply / close leave out Saturdays and Sundays (not bank holidays); <code>late</code> when a reply was asked, none is recorded and
+<code>tenant.concern_reply_days</code> has passed.</li>
+<li><strong>The audit</strong> — the paths are in <code>AUDIT_SKIP</code> / <code>AUDIT_SKIP_PREFIXES</code>, so the middleware never copies a body into
+<code>audit_log</code>; each call writes its own row with the reference and the step only.</li>
+<li><strong>The alert</strong> — one email per new concern to <code>tenant.concern_email</code> (a background task after the answer): the kind, the route, the
+reference and a link to <code>#concerns</code>; no name, contact or words.</li>
+<li><strong>The clean-up</strong> (<code>concerns.sweep</code>, at start-up and at most hourly on a read or send): spam closed 30 days ago deleted; the hash
+nulled after 30 days; closed + <code>tenant.concern_keep_months</code> (1–72, default 12): name, email, phone, words, registration, time of day and reply
+notes blanked, the pin rounded to 3 decimal places; open 24 months: the contact blanked. <code>…/forget</code> does the first at once.</li></ul>
 <h2 id="t1-clp-notes">CLP notes and tasks</h2>
 <p>31 Oct 2026 (task 4a, PR 3b; mockup <code>notes/clp-notes-mockup-1031</code>, Q1–Q12 as recommended). <code>backend/clp_notes.py</code>
 over one tenanted table, in the organisation file (after <code>clp_issues</code>) and kept by a demo refresh:</p>

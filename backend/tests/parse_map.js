@@ -1186,7 +1186,10 @@ ok("filterByNode treats a Railhead as an origin",
 // Every guarantee it made survives; it now makes them for all seven types.
 ok("§A: locations are a real SYMBOL layer, not a circle and not a DOM marker",
   /id: 'locations', type: 'symbol'/.test(code)
-  && !/id: 'railheads'/.test(code) && !/new mapboxgl\.Marker/.test(code));
+  // NARROWED 5 Nov 2026 (group 6): one DOM marker is allowed — the pin a person places in the Report a concern form (it is
+  // not a location, and a DOM marker keeps its place through a basemap switch); still no marker for a location
+  && !/id: 'railheads'/.test(code) && (code.match(/new mapboxgl\.Marker/g) || []).length === 1
+  && /function concernSetPin\([\s\S]{0,400}new mapboxgl\.Marker\(\{ color: '#C2410C' \}\)/.test(code));
 // 2026-09-08 (pm): locGlyph gained a fourth argument. A stockpile's image depends on
 // its STOCK LEVEL, not only on its type, so the level has to reach the painter.
 ok("§A: the marks are generated on a canvas, one image per type",
@@ -3952,7 +3955,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      code.includes("const wd = kp.working_days > 0 ? kp.working_days : FORECAST_WORKING_DAYS;") && !/\b22\b/.test(newBlockCode().replace(/const QR_M_ECC = \[[^\]]*\];/, "")));   // (the QR code's EC table is not a day count)
   ok("C3 concern: no address is typed into the page — no mailto: with an address in the source, the address comes from TENANT.concern_email only",
      !/mailto:[^'"?\s]*@/.test(html) && code.includes("const a = t && typeof t.concern_email === 'string' ? t.concern_email.trim() : '';")
-     && code.includes("const addr = concernAddress(TENANT);"));
+     // NARROWED 5 Nov 2026 (group 6): the same line also reads whether the form is on
+     && code.includes("const addr = concernAddress(TENANT), form = concernFormOn(TENANT);"));
   // ---- (7) the wording of everything new ---------------------------------------------------------------------------
   {
     const lits = t => (t.match(/'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`|"(?:[^"\\\n]|\\.)*"/g) || []).join(" ");
@@ -6074,7 +6078,12 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && /function toggleAreaTier\(tier, on\) \{\s*(\/\/[^\n]*\n\s*)?if \(on\) \{ const fold = document\.getElementById\('council-fold'\); if \(fold && !fold\.open\) fold\.open = true; \}/.test(code));
   ok("19 Oct: the share row carries Month as text, Link and QR code, the detail table and (staff) the plan export; 'Report a concern' is in the share card",
      /<div class="control-group share-group" id="share-group">\s*<div class="share-row">\s*<button[^>]*id="btn-month-text"[^>]*>Month as text<\/button>\s*<button[^>]*id="btn-share"[^>]*>Link and QR code<\/button>\s*<button[^>]*id="btn-detail"[^>]*>Forecast detail table<\/button>/.test(sb)
-     && /<div class="concern-slot"><\/div>\s*<\/div>\s*\n\s*<!-- 14 Oct 2026 \(backlog item 2\): the route map export/.test(html)
+     // NARROWED 5 Nov 2026 (group 6): the share card's slot is now followed by the Report a concern form, then the export card
+     && /<div class="concern-slot"><\/div>\s*<\/div>\s*\n\s*<!-- 5 Nov 2026 \(group 6, mockup notes\/report-concern-mockup-1105 cards 2-3\): the Report a concern form\./.test(html)
+     // NARROWED 5 Nov 2026 (group 6, UI audit): the panel is a <div role="dialog"> like the share and export panels; an <aside> may not
+     // carry role="dialog" (axe aria-allowed-role on every map stop)
+     && html.indexOf('<div id="concern-panel" role="dialog" aria-labelledby="cn-title" hidden>') > 0
+     && html.indexOf('<div id="concern-panel"') < html.indexOf('<div id="rme-panel"') && !/<aside id="concern-panel"/.test(html)
      && (html.match(/id="btn-detail"/g) || []).length === 1);
   // ---- the wording ----
   const pops = (sb + html.slice(html.indexOf('<div class="control-group fc-box" id="fc-box">'), html.indexOf("</div>`;", html.indexOf('id="fc-box"'))));

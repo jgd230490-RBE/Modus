@@ -926,8 +926,9 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 31 Oct 2026 (task 4a, PR 3c): + 18.6 The client's reviewers (85); + T1 "CLP client reviewers" (36)
    # NARROWED 31 Oct 2026 (task 4c PR 2): + 19.2 Drawing (86)
    # NARROWED 31 Oct 2026 (task 4c PR 3): + 19.5 Pinned pictures (87); the technical entry is inside T1 "Site layouts" (no new row)
-   len(re.findall(r'<li class="l[12]"', src)) == 88 and   # NARROWED 31 Oct 2026 (task 4c PR 5): + 19.6 On paper (88)
-   len(re.findall(r'<li class="l[12]"', _tg2)) == 37   # NARROWED 1 Nov 2026 (task 4a PR 4): + T1 "CLP appendices" (37)   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   # NARROWED 5 Nov 2026 (group 6, Report a concern): + chapter 20 Concerns from the public and its three sections (92); + T1 "Concerns from the public" (38)
+   len(re.findall(r'<li class="l[12]"', src)) == 92 and   # NARROWED 31 Oct 2026 (task 4c PR 5): + 19.6 On paper (88)
+   len(re.findall(r'<li class="l[12]"', _tg2)) == 38   # NARROWED 1 Nov 2026 (task 4a PR 4): + T1 "CLP appendices" (37)   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,
@@ -1340,5 +1341,28 @@ ok("SITE LAYOUTS (PR 5): the sheet's file name is said in words, not one long un
    "site-layout-&lt;id&gt;-&lt;phase&gt;" not in _tg2 and "the file named for the site&#39;s id, the phase, the page and the scale" in _tg2)
 ok("PICTURES: ...and its upload address is not one long unbroken token (it pushed the guide 24 px sideways at 390 px; UI audit 31 Oct)",
    "/site-layout/pictures?name=" not in _tg2)
+# 5 Nov 2026 (group 6, Report a concern; the approved mockup): user guide chapter 20 says what a person does and what is kept,
+# in a few words and with no back end; the technical guide's T1 "Concerns from the public" holds the detail
+_cn = src[src.index('<h1 id="20-concerns">'):src.index('<h1 id="appendix-a-methods-and-assumptions">')] if '<h1 id="20-concerns">' in src and '<h1 id="appendix-a-methods-and-assumptions">' in src else ""
+ok("CONCERNS: user guide chapter 20 — in the contents with its three sections; the form, the pin, the reference, Track → Concerns for planners and admins",
+   '<li class="l1"><a href="#20-concerns">20. Concerns from the public</a></li>' in src and '<li class="l2"><a href="#20-3-what-is-kept">' in src
+   and len(_cn) > 2500 and "<strong>Track → Concerns</strong>" in _cn and "<strong>Use this place</strong>" in _cn
+   and "there is no public list" in _cn and "<strong>I would like a reply</strong>" in _cn and "No photos or files" in _cn)
+ok("CONCERNS: ...answering — record a reply, close with an outcome, reopen, add one from email or phone, Wayscope emails no member of the public",
+   all(w in _cn for w in ("<strong>Record a reply</strong>", "<strong>Close the concern</strong>", "<strong>Reopen</strong>",
+                          "<strong>+ Add a concern</strong>", "Wayscope emails no member of the public")))
+ok("CONCERNS: ...what is kept — 12 months after closing, the box on Config, about 100 m, Delete now, 24 months, 30 days, the client decides",
+   all(w in _cn for w in ("<strong>12 months</strong>", "<strong>Keep contact details for</strong>", "about 100 m", "<strong>Delete now</strong>",
+                          "24 months", "30 days", "decides the period")))
+ok("CONCERNS: ...and chapter 20 names no back end (no address, table, header, status number or hashing)",
+   not re.search(r"/api/|concerns_on|NO_DATA|X-Wayscope|\b(API|endpoint|server|JSON|hash|403|404|413|429)\b", _cn))
+_tc = _tg2[_tg2.index('<h2 id="t1-concerns">'):_tg2.index('<h2 id="t1-clp-notes">')] if '<h2 id="t1-concerns">' in _tg2 and '<h2 id="t1-clp-notes">' in _tg2 else ""
+ok("CONCERNS: technical T1 — in the contents; the table, the public send and its refusals, the limits, the staff routes, the audit, the alert, the clean-up",
+   '<li class="l2"><a href="#t1-concerns">Concerns from the public</a></li>' in _tg2
+   and all(w in _tc for w in ("<code>backend/concerns.py</code>", "<code>db.NO_DATA_TABLES</code>", "<code>POST /api/public/concerns</code>",
+                              "<code>X-Wayscope: 1</code>", "8 KB", "5 an hour", "20 a day", "300 a day", "10 km", "500 m",
+                              "<code>_require_approver()</code>", "<code>AUDIT_SKIP</code>", "<code>tenant.concern_keep_months</code>",
+                              "<code>privacy_ok: true</code>", "no name, contact or words")))
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
