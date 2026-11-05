@@ -305,6 +305,9 @@ def _blended_row(route_id, vehicle, m, cache):
                         "options": [{"loaded": p[0], "return": p[1], "share": round(w, 4)} for p, w in m["pairs"]]}
     if m["problems"]:
         out["diversion_problems"] = m["problems"]
+    if m.get("busy"):
+        # 5 Nov 2026 (task 0d-2): the share of the trips that set off in a busy-hours use's hours and take its road
+        out["busy_hours"] = m["busy"]
     return out
 
 
@@ -399,6 +402,7 @@ def line_context(line, factors, routes=None, cache=None, cost=None):
         # 28 Oct 2026 (task 0c): the share of the line's days on a diversion and the zones that cause it, and the days a
         # zone in force crosses the line used (no way round / kept) — None / [] on a route no dated zone touches
         "diversion": (row.get("diversion") if baked else None),
+        "busy_hours": (row.get("busy_hours") if baked else None),   # 5 Nov 2026 (0d-2): the Look-ahead's chip
         "diversion_problems": ((row.get("diversion_problems") or []) if baked else []),
     }
 

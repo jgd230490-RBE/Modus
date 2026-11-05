@@ -25,6 +25,17 @@ Statuses of a zone row, each for a run of dates on one (route, lorry type, leg):
 
 Days: a month's figures weigh each option by its share of the month's WORKING days (Mon–Fri; bank holidays are
 not taken off), the user's Q2 answer of 28 Oct.
+
+5 Nov 2026 (task 0d-2, the user's Q1-Q20, all as recommended): a planner can USE a collision busy-hours offer
+(collisions.busy_offers): a 'peak' row per (route, lorry type, leg) that has its own Alt N, hours_from / hours_to = the
+offered band, days '1111100' (weekdays), source 'planner'. Statuses of a peak row:
+  in_use     lorries setting off in those hours take Alt N (a leg that SETS OFF in the hours: Q2)
+  paused     a Route all changed Alt N's line since it was put in use (line_fp): the main line, until Use again (Q11)
+  stopped    the planner pressed Stop
+A zone row still beats a peak row (Q10). A day's figures give an in-use peak row the share of the route's open window
+(collisions.gate_span: earliest gate open to latest shut at either end) its hours cover (Q4) — mix(peaks=True), which
+derived.cycle_for reads; month_weights (the shared-road index and the council clip) and periods (the Diversions list)
+stay on the zone rows (Q9).
 """
 import datetime
 import json
@@ -242,6 +253,10 @@ def refresh_zones():
             limits.store_checks(touched)
     except Exception as e:
         print("route_choice: lorry limits not re-checked:", str(e)[:120])
+    try:
+        check_busy()                     # 5 Nov 2026 (task 0d-2, Q11): a changed Alt N pauses its busy-hours use
+    except Exception as e:
+        print("route_choice: busy-hours uses not checked:", str(e)[:120])
     return summary(rows)
 
 
@@ -379,24 +394,47 @@ def months_of(starts_on, ends_on, horizon=HORIZON_MONTHS):
     return out
 
 
-def mix(route_id, profile, days, rows=None):
+def mix(route_id, profile, days, rows=None, peaks=True):
     """
     How a set of working days splits between options: {"pairs": [((loaded_alt, return_alt), share), …],
     "diverted": share of the days on any option but the main line, "zones": [zone ids that diverted],
     "problems": [{"zone": ids, "status": …, "from": iso, "to": iso}]} — problems are the days a zone in force
     crosses the line actually used. One pair of (0, 0) and nothing else when no row touches the route.
+
+    5 Nov 2026 (task 0d-2): with `peaks` (the default), on a day no zone row decides a leg, an in-use busy-hours row
+    takes the share of the route's open window its hours cover (busy_share), the rest of the day the main line. The
+    result then carries "busy": {"share": of the trips, "options": [{"alt", "from", "to", "share"}]}; "diverted" stays
+    the zones' share only.
     """
     rows = _rows_by_route() if rows is None else rows
     days = list(days)
     if not days or not has_rows(route_id, rows):
         return {"pairs": [((0, 0), 1.0)], "diverted": 0.0, "zones": [], "problems": []}
-    count, zs, probs = {}, set(), {}
+    count, zs, probs, busy = {}, set(), {}, {}
+    span = busy_span(route_id) if peaks and _has_peak(route_id, rows) else None
     for day in days:
         cl = choice_on(route_id, profile, "loaded", day, rows=rows)
         cr = choice_on(route_id, profile, "return", day, rows=rows)
         la = int(cl["alt_index"]) if cl and cl.get("status") == "in_use" else 0
         ra = int(cr["alt_index"]) if cr and cr.get("status") == "in_use" else 0
-        count[(la, ra)] = count.get((la, ra), 0) + 1
+        left = 1.0
+        if span:
+            bands = {}
+            for leg, decided in (("loaded", cl), ("return", cr)):
+                if decided is not None:
+                    continue                             # Q10: a zone row decides this leg on this day
+                for r in _peaks_on(route_id, profile, leg, day, rows):
+                    bands.setdefault((r["hours_from"], r["hours_to"]), {})[leg] = int(r["alt_index"])
+            for (hf, ht), by_leg in sorted(bands.items()):
+                f = min(left, busy_share(hf, ht, span))
+                if f <= 0:
+                    continue
+                pair = (by_leg.get("loaded", la), by_leg.get("return", ra))
+                count[pair] = count.get(pair, 0) + f
+                left -= f
+                alt = by_leg.get("loaded", by_leg.get("return"))
+                busy[(alt, hf, ht)] = busy.get((alt, hf, ht), 0.0) + f
+        count[(la, ra)] = count.get((la, ra), 0) + left
         for c in (cl, cr):
             if not c:
                 continue
@@ -408,9 +446,15 @@ def mix(route_id, profile, days, rows=None):
                                          "from": day.isoformat(), "to": day.isoformat()})
                 p["to"] = day.isoformat()
     n = float(len(days))
-    pairs = sorted(((k, v / n) for k, v in count.items()), key=lambda kv: kv[0])
-    return {"pairs": pairs, "diverted": round(sum(v for k, v in pairs if k != (0, 0)), 4),
-            "zones": sorted(zs), "problems": list(probs.values())}
+    pairs = sorted(((k, v / n) for k, v in count.items() if v > 1e-12), key=lambda kv: kv[0])
+    busy_total = sum(busy.values()) / n
+    out = {"pairs": pairs, "diverted": round(max(0.0, sum(v for k, v in pairs if k != (0, 0)) - busy_total), 4),
+           "zones": sorted(zs), "problems": list(probs.values())}
+    if busy:
+        out["busy"] = {"share": round(busy_total, 4),
+                       "options": [{"alt": a, "from": hf, "to": ht, "share": round(v / n, 4)}
+                                   for (a, hf, ht), v in sorted(busy.items())]}
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -439,7 +483,8 @@ def periods(route_id=None):
     """The zone rows (and accepted / offered peak rows) for one route or all, with the zone's name — the Routes
     page's Diversions list. Grouped by (zone set, dates, status) across lorry types and legs, each group listing
     its legs; km_delta per group is the main lorry type's laden leg where there is one."""
-    rows = [r for r in _all_rows() if r.get("status") != "keep_main" and (route_id is None or r["route_id"] == route_id)]
+    rows = [r for r in _all_rows() if r.get("status") != "keep_main" and (route_id is None or r["route_id"] == route_id)
+            and r.get("reason_kind") != "peak"]     # 5 Nov 2026 (0d-2): busy-hours roads are busy_uses(), not a diversion
     names = {}
     try:
         names = {z["id"]: z.get("name") for z in zones.list_zones()}
@@ -508,14 +553,18 @@ def base_of(key):
     return str(key).split("@", 1)[0]
 
 
-def in_use(profile=None, rows=None):
+def in_use(profile=None, rows=None, kinds=("zone", "peak")):
     """{(route_id, profile, leg): {alt, …}} — the stored options a zone row has IN USE (alt ≠ 0) on some day; with
-    `profile`, only the rows that apply to it (a row for every lorry type, or that one)."""
+    `profile`, only the rows that apply to it (a row for every lorry type, or that one). 5 Nov 2026 (task 0d-2, Q9):
+    `kinds` — the collision and community strips take the busy-hours roads too (the default); the shared-road index
+    and the council clip pass ("zone",)."""
     rows = _rows_by_route() if rows is None else rows
     out = {}
     for rid, rs in rows.items():
         for r in rs:
             if r.get("status") != "in_use" or not int(r.get("alt_index") or 0):
+                continue
+            if r.get("reason_kind") not in kinds:
                 continue
             prof = r.get("vehicle_profile")
             if profile is not None and prof not in (None, "", profile):
@@ -537,7 +586,7 @@ def month_weights(route_id, profile, month_index, rows=None):
     "pairs": [((loaded_alt, return_alt), share)]} — mix() over the month's days. A route no row touches is
     {"loaded": {0: 1.0}, "return": {0: 1.0}, "pairs": [((0, 0), 1.0)]}.
     """
-    m = mix(route_id, profile, month_days(int(month_index)), rows=rows)
+    m = mix(route_id, profile, month_days(int(month_index)), rows=rows, peaks=False)   # 0d-2: Q9, zones only
     out = {"loaded": {}, "return": {}, "pairs": m["pairs"]}
     for (la, ra), w in m["pairs"]:
         out["loaded"][la] = out["loaded"].get(la, 0.0) + w
@@ -556,3 +605,204 @@ def majority_alt(route_id, profile, leg, days, rows=None):
         a = alt_on(route_id, profile, leg, d, rows=rows)
         n[a] = n.get(a, 0) + 1
     return max(sorted(n), key=lambda a: (n[a], a == 0))
+
+
+# --------------------------------------------------------------------------- #
+#  5 Nov 2026 (task 0d-2): use Alt N in the weekday busy hours                 #
+# --------------------------------------------------------------------------- #
+#: the days a busy-hours use applies on (the offer counted weekdays only)
+BUSY_DAYS = "1111100"
+#: statuses of a 'peak' row
+BUSY_STATUSES = ("in_use", "paused", "stopped")
+
+
+def _mins(hhmm):
+    try:
+        h, m = str(hhmm).split(":")[:2]
+        return int(h) * 60 + int(m)
+    except Exception:
+        return None
+
+
+def busy_share(hours_from, hours_to, span):
+    """The share of a day's trips that set off between hours_from and hours_to, trips spread evenly over `span`
+    ((from, to) minutes, the route's open window): the overlap over the window. 0 when they do not meet."""
+    a, b = _mins(hours_from), _mins(hours_to)
+    if a is None or b is None or not span or span[1] <= span[0]:
+        return 0.0
+    lo, hi = max(a, span[0]), min(b, span[1])
+    return max(0.0, (hi - lo) / float(span[1] - span[0]))
+
+
+_SPAN = {}
+
+
+def busy_span(route_id):
+    """collisions.gate_span for the route, (from, to) minutes; one read per tenant, data version and route."""
+    key = (db.current_tenant(), db.data_version(), route_id)
+    if key in _SPAN:
+        return _SPAN[key]
+    span = None
+    try:
+        import collisions
+        r = db.query("SELECT * FROM routes WHERE tenant_id = ? AND id = ?", (db.current_tenant(), route_id))
+        if r:
+            span = collisions.gate_span(r[0])
+    except Exception as e:
+        print("route_choice: no open window for", route_id, str(e)[:120])
+    if len(_SPAN) > 2000:
+        _SPAN.clear()
+    _SPAN[key] = span
+    return span
+
+
+def _has_peak(route_id, rows):
+    return any(r.get("reason_kind") == "peak" and r.get("status") == "in_use" for r in rows.get(route_id) or [])
+
+
+def _peaks_on(route_id, profile, leg, day, rows):
+    """The in-use peak rows that apply to this leg on this day, whatever the hour."""
+    out = []
+    for r in rows.get(route_id) or []:
+        if r.get("reason_kind") != "peak" or r.get("status") != "in_use":
+            continue
+        if _applies(dict(r, hours_from=None, hours_to=None), profile, leg, day):
+            out.append(r)
+    return out
+
+
+def busy_alt_at(route_id, profile, leg, day, minute, rows=None):
+    """The option a leg SETTING OFF at `minute` (from midnight) on `day` takes (Q2): a zone row first (Q10), then an
+    in-use busy-hours row whose hours hold that minute, else the main line. The Simulation's per-trip road."""
+    rows = _rows_by_route() if rows is None else rows
+    day = _d(day)
+    c = choice_on(route_id, profile, leg, day, rows=rows)
+    if c is not None:
+        return int(c["alt_index"]) if c.get("status") == "in_use" else 0
+    for r in _peaks_on(route_id, profile, leg, day, rows):
+        a, b = _mins(r.get("hours_from")), _mins(r.get("hours_to"))
+        if a is not None and b is not None and a <= minute < b:
+            return int(r["alt_index"])
+    return 0
+
+
+def _fp(raw):
+    try:
+        import here_routing
+        return here_routing._fingerprint(_line_of(raw))
+    except Exception:
+        return None
+
+
+def _stored_alt(route_id, alt):
+    """[(profile, leg, row)] of the stored lines of option `alt` on this route."""
+    return [(g["vehicle_profile"], g["leg"], g) for g in db.query(
+        "SELECT vehicle_profile, leg, alt_index, geometry, distance_km FROM route_geometry WHERE tenant_id = ? "
+        "AND route_id = ? AND alt_index = ? AND geometry IS NOT NULL", (db.current_tenant(), route_id, int(alt)))]
+
+
+def _busy_id(route_id, profile, leg, hours_from):
+    return f"P:{route_id}:{profile}:{leg}:{hours_from}"
+
+
+class BusyError(ValueError):
+    """A Use / Stop that cannot be done, in words for the screen."""
+
+
+def use_busy(route_id, alt, hours_from, hours_to, who=None):
+    """
+    Put Alt N in use on weekdays between hours_from and hours_to (Q1: every lorry type and leg that has its own Alt N;
+    a type without one stays on the main route). One row per (lorry type, leg) and band: a second Use of the same band
+    replaces the first. Returns the number of legs.
+    """
+    alt = int(alt)
+    if alt <= 0:
+        raise BusyError("Pick one of the other roads.")
+    if _mins(hours_from) is None or _mins(hours_to) is None or _mins(hours_to) <= _mins(hours_from):
+        raise BusyError("Those hours do not read as a time of day.")
+    legs = _stored_alt(route_id, alt)
+    main = {(p, l): g for p, l, g in _stored_alt(route_id, 0)}
+    if not legs:
+        raise BusyError("That road is not stored for this route any more. Route it again first.")
+    now = _now()
+    for prof, leg, g in legs:
+        rid = _busy_id(route_id, prof, leg, hours_from)
+        db.execute("DELETE FROM route_choice WHERE tenant_id = ? AND id = ?", (db.current_tenant(), rid))
+        m = main.get((prof, leg))
+        km_delta = (round(float(g["distance_km"] or 0) - float(m["distance_km"] or 0), 3)
+                    if m and g.get("distance_km") is not None and m.get("distance_km") is not None else None)
+        db.execute(
+            "INSERT INTO route_choice (tenant_id, id, route_id, vehicle_profile, leg, alt_index, starts_on, ends_on, "
+            "hours_from, hours_to, days, reason_kind, reason_ref, status, source, km_delta, decided_by, decided_at, "
+            "created_at, updated_at, line_fp) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, 'peak', ?, 'in_use', "
+            "'planner', ?, ?, ?, ?, ?, ?)",
+            (db.current_tenant(), rid, route_id, prof, leg, alt, hours_from, hours_to, BUSY_DAYS,
+             f"{hours_from}-{hours_to}", km_delta, who, now, now, now, _fp(g["geometry"])))
+    return len(legs)
+
+
+def stop_busy(route_id, hours_from, who=None):
+    """Stop the busy-hours use of this band (every lorry type and leg). Returns the number of rows stopped."""
+    rows = [r for r in _all_rows() if r["route_id"] == route_id and r.get("reason_kind") == "peak"
+            and r.get("hours_from") == hours_from and r.get("status") != "stopped"]
+    if not rows:
+        raise BusyError("Nothing is in use in those hours.")
+    now = _now()
+    for r in rows:
+        db.execute("UPDATE route_choice SET status = 'stopped', decided_by = ?, decided_at = ?, updated_at = ? "
+                   "WHERE tenant_id = ? AND id = ?", (who, now, now, db.current_tenant(), r["id"]))
+    return len(rows)
+
+
+def check_busy():
+    """
+    After a bake (refresh_zones): an in-use busy-hours row whose Alt N line is gone or is another road than when it
+    was put in use is PAUSED (Q11) — the figures go back to the main line until a planner looks and presses Use again.
+    Returns the route ids paused.
+    """
+    rows = [r for r in _all_rows() if r.get("reason_kind") == "peak" and r.get("status") == "in_use"]
+    if not rows:
+        return []
+    cur = {}
+    for g in db.query("SELECT route_id, vehicle_profile, leg, alt_index, geometry FROM route_geometry WHERE tenant_id = ? "
+                      "AND alt_index > 0 AND geometry IS NOT NULL", (db.current_tenant(),)):
+        cur[(g["route_id"], g["vehicle_profile"], g["leg"], int(g["alt_index"]))] = g["geometry"]
+    paused, now = set(), _now()
+    for r in rows:
+        raw = cur.get((r["route_id"], r["vehicle_profile"], r["leg"], int(r["alt_index"])))
+        if raw is not None and r.get("line_fp") and _fp(raw) == r["line_fp"]:
+            continue
+        db.execute("UPDATE route_choice SET status = 'paused', updated_at = ? WHERE tenant_id = ? AND id = ?",
+                   (now, db.current_tenant(), r["id"]))
+        paused.add(r["route_id"])
+    if paused:
+        print(f"route_choice: busy-hours use paused, the road changed: {', '.join(sorted(paused))}")
+    return sorted(paused)
+
+
+def busy_uses(route_id=None):
+    """
+    The busy-hours uses, one per (route, band): [{"route_id", "alt", "from", "to", "status", "decided_by",
+    "decided_at", "legs": [{"vehicle_profile", "leg", "km_delta", "status"}]}] — paused when any leg is paused, stopped
+    only when every leg is.
+    """
+    groups = {}
+    for r in _all_rows():
+        if r.get("reason_kind") != "peak" or (route_id and r["route_id"] != route_id):
+            continue
+        g = groups.setdefault((r["route_id"], r.get("hours_from")), {
+            "route_id": r["route_id"], "alt": int(r["alt_index"] or 0), "from": r.get("hours_from"),
+            "to": r.get("hours_to"), "statuses": set(), "decided_by": r.get("decided_by"),
+            "decided_at": r.get("decided_at"), "legs": []})
+        g["statuses"].add(r.get("status"))
+        if (r.get("decided_at") or "") > (g["decided_at"] or ""):
+            g.update(decided_by=r.get("decided_by"), decided_at=r.get("decided_at"), alt=int(r["alt_index"] or 0))
+        g["legs"].append({"vehicle_profile": r.get("vehicle_profile"), "leg": r.get("leg"),
+                          "km_delta": r.get("km_delta"), "status": r.get("status")})
+    out = []
+    for g in groups.values():
+        st = g.pop("statuses")
+        g["status"] = "paused" if "paused" in st else ("in_use" if "in_use" in st else "stopped")
+        out.append(g)
+    out.sort(key=lambda g: (g["route_id"], g["from"] or ""))
+    return out

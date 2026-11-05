@@ -3823,9 +3823,85 @@ def collision_hours(route_id: str, request: Request = None):
     if not _staff_request(request):
         raise HTTPException(401, "sign in — the collision history is for staff")
     try:
-        return collisions.busy_hours(route_id, acc=access.current())
+        out = collisions.busy_hours(route_id, acc=access.current())
     except collisions.EvidenceError as e:
         raise HTTPException(404, str(e))
+    return _with_busy_uses(route_id, out)
+
+
+def _with_busy_uses(route_id, out):
+    """5 Nov 2026 (task 0d-2): the collision-hours answer + the route's busy-hours uses (route_choice.busy_uses) with
+    what each saves or adds (busy_savings), each offer's "in_use" / "better_all_day" (Q3) and each use's
+    "offered" (Q12: kept in use when the latest collision history no longer offers it, and said)."""
+    import busy_savings
+    uses = busy_savings.for_route(route_id)
+    for o in out.get("offers") or []:
+        o["better_all_day"] = busy_savings.better_all_day(route_id, o["alt"])
+        o["in_use"] = [b["from"] for b in o.get("bands") or []
+                       if any(u["from"] == b["from"] and u["alt"] == o["alt"] and u["status"] == "in_use" for u in uses)]
+    offered = {(o["alt"], b["from"]) for o in out.get("offers") or [] for b in o.get("bands") or []}
+    for u in uses:
+        u["offered"] = (u["alt"], u["from"]) in offered if out.get("shown") else None
+    out["uses"] = uses
+    out["can_use"] = (access.current() or {}).get("role") in ("planner", "admin")
+    return out
+
+
+def _require_planner_or_admin(what):
+    acc = access.current()
+    if not acc:
+        raise HTTPException(401, "sign in — a valid access code is required")
+    if acc.get("role") not in ("planner", "admin"):
+        raise HTTPException(403, f"only a planner or an admin can {what}")
+    return acc
+
+
+@app.post("/api/routes/{route_id}/busy-hours")
+def busy_hours_use(route_id: str, body: dict, request: Request = None):
+    """
+    5 Nov 2026 (task 0d-2, Q1-Q13): "Use Alt N on weekdays in these hours" — {alt, from, to} — for every lorry type and
+    leg that has its own Alt N; or {stop: true, from} to stop it. Planners and admins (Q13); audited like every write.
+    Use needs the band to be offered now (collisions.busy_hours) or to be in use / paused already (Use again).
+    """
+    _require_planner_or_admin("use another road in the busy hours")
+    import route_choice
+    if not db.query("SELECT id FROM routes WHERE tenant_id = ? AND id = ?", (db.current_tenant(), route_id)):
+        raise HTTPException(404, "That route is not here.")
+    hf, ht = str(body.get("from") or "").strip(), str(body.get("to") or "").strip()
+    try:
+        if body.get("stop"):
+            route_choice.stop_busy(route_id, hf, who=_by())
+        else:
+            alt = int(body.get("alt") or 0)
+            known = any(u["alt"] == alt and u["from"] == hf and u["to"] == ht and u["status"] != "stopped"
+                        for u in route_choice.busy_uses(route_id))
+            if not known:
+                offers = collisions.busy_hours(route_id, acc=access.current()).get("offers") or []
+                if not any(o["alt"] == alt and any(b["from"] == hf and b["to"] == ht for b in o.get("bands") or [])
+                           for o in offers):
+                    raise HTTPException(409, "That road is not offered for those hours now.")
+            route_choice.use_busy(route_id, alt, hf, ht, who=_by())
+    except route_choice.BusyError as e:
+        raise HTTPException(409, str(e))
+    except collisions.EvidenceError as e:
+        raise HTTPException(404, str(e))
+    try:
+        import limits
+        limits.store_checks([route_id])   # the busy-hours road's lorry limits are checked like a diversion's
+    except Exception as e:
+        print("busy hours: lorry limits not re-checked:", str(e)[:120])
+    return _with_busy_uses(route_id, collisions.busy_hours(route_id, acc=access.current()))
+
+
+@app.get("/api/busy-hours")
+def busy_hours_all(request: Request = None):
+    """5 Nov 2026 (task 0d-2, Q17): every busy-hours road in use with what it saves or adds over the approved plan and
+    so far (estimated) — the Carbon planner's "Route choices" block. Staff, every role (the figures are scheme-wide,
+    like the carbon total)."""
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — this is for staff")
+    import busy_savings
+    return _staff_json("busy-hours", {}, busy_savings.all_uses)
 
 
 @app.get("/api/routes/{route_id}/collision-evidence.pdf")
