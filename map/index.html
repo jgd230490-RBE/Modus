@@ -6340,6 +6340,12 @@
     const SEL_LEGS = ['in', ['get', 'type'], ['literal', ['Inbound Highway', 'Outbound Highway']]];
     function ensureSelectionLayers(){
         if(!map.getSource('selected-route')) map.addSource('selected-route',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+        // 5 Nov 2026 (task 0d-2, Q15 = P2): a picked route's busy-hours road, thin blue with a white edge, under the pick
+        if(!map.getSource('busy-route')) map.addSource('busy-route',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+        if(!map.getLayer('busy-casing')) map.addLayer({id:'busy-casing',type:'line',source:'busy-route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-width':5.5,'line-offset':SEL_OFFSET}}, labelAnchor());
+        if(!map.getLayer('busy-core')) map.addLayer({id:'busy-core',type:'line',source:'busy-route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':BUSY_ROAD_COLOR,'line-width':2.6,'line-offset':SEL_OFFSET}}, labelAnchor());
+        if(!map.getSource('busy-hours-at')) map.addSource('busy-hours-at',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+        if(!map.getLayer('busy-hours-at')) map.addLayer({id:'busy-hours-at',type:'symbol',source:'busy-hours-at',layout:{'symbol-placement':'point','text-field':['get','hours'],'text-size':12,'text-font':['literal',BADGE_FONT],'text-anchor':'right','text-offset':[-0.8,0],'text-allow-overlap':true},paint:{'text-color':'#1D4ED8','text-halo-color':'#ffffff','text-halo-width':2}});
         if(!map.getLayer('sel-glow')) map.addLayer({id:'sel-glow',type:'line',source:'selected-route',filter:SEL_LEGS,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':CONFIG.COLORS.brand,'line-width':14,'line-opacity':0.28,'line-blur':3,'line-offset':SEL_OFFSET}}, labelAnchor());
         if(!map.getLayer('sel-casing')) map.addLayer({id:'sel-casing',type:'line',source:'selected-route',filter:SEL_LEGS,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-width':SEL_CASING_WIDTH,'line-opacity':1,'line-offset':SEL_OFFSET}}, labelAnchor());
         if(!map.getLayer('sel-core')) map.addLayer({id:'sel-core',type:'line',source:'selected-route',filter:SEL_LEGS,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['match',['get','type'],'Inbound Highway','#059669','Outbound Highway','#f59e0b',CONFIG.COLORS.brand],'line-width':SEL_CORE_WIDTH,'line-opacity':1,'line-offset':SEL_OFFSET}}, labelAnchor());
@@ -6351,13 +6357,31 @@
         const feats=(a1_data.features||[]).filter(f=>f.geometry&&(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString')&&(f.properties.route_id||'').toString().trim().toLowerCase()===rl);
         ensureSelectionLayers();
         const src=map.getSource('selected-route'); if(src) src.setData({type:'FeatureCollection',features:feats});
-        ['sel-glow', 'sel-casing', 'sel-core'].forEach(l => { if(map.getLayer(l)) { try { map.moveLayer(l, labelAnchor()); } catch(e){} } });
+        showBusyRoad(rl);
+        ['busy-casing', 'busy-core', 'sel-glow', 'sel-casing', 'sel-core', 'busy-hours-at'].forEach(l => { if(map.getLayer(l)) { try { map.moveLayer(l, labelAnchor()); } catch(e){} } });
         setRouteDim(routeId);
     }
     function clearSelection(){
         selectedRouteId=null;
         const src=map.getSource('selected-route'); if(src) src.setData({type:'FeatureCollection',features:[]});
+        showBusyRoad(null);
         setRouteDim(null);
+    }
+    // 5 Nov 2026 (task 0d-2, Q15 = P2): the picked route's busy-hours roads ('BusyHours' features), drawn while it is
+    // picked, with a pill of its hours beside the loaded leg; nothing for a route without one
+    const BUSY_ROAD_COLOR = CONFIG.COLORS.forecast;     // the plan blue, thinner (the forecast layers keep their own)
+    function busyFeatures(rl){
+        return (a1_data.features||[]).filter(f=>f.properties&&f.properties.type==='BusyHours'&&f.geometry
+            &&(f.properties.route_id||'').toString().trim().toLowerCase()===rl);
+    }
+    function showBusyRoad(rl){
+        const feats = rl ? busyFeatures(rl) : [];
+        const src = map.getSource('busy-route'); if (src) src.setData({ type: 'FeatureCollection', features: feats });
+        // its hours beside the middle of the loaded leg's road, a text with a white halo (no DOM marker on this map)
+        const pts = feats.filter(f => f.properties.leg === 'loaded' && (f.geometry.coordinates || []).length > 1).map(f => ({
+            type: 'Feature', properties: { hours: f.properties.from + '–' + f.properties.to },
+            geometry: { type: 'Point', coordinates: f.geometry.coordinates[Math.floor(f.geometry.coordinates.length / 2)] } }));
+        const at = map.getSource('busy-hours-at'); if (at) at.setData({ type: 'FeatureCollection', features: pts });
     }
 
     function showDrawerTab(tab){
@@ -10409,6 +10433,16 @@
         const rp = routePropsById()[rid] || {};
         const rows = [['Why this route', rp.route_reason], ['Permitted diversions', rp.permitted_deviations]]
             .filter(r => r[1] && String(r[1]).trim());
+        // 5 Nov 2026 (task 0d-2, Q15): a busy-hours road in use, one line (no collision words on the public map)
+        const seenB = {};
+        (a1_data.features || []).forEach(f => {
+            const p = f.properties || {};
+            if (p.type !== 'BusyHours' || p.leg !== 'loaded' || String(p.route_id).trim().toLowerCase() !== String(rid).trim().toLowerCase() || seenB[p.from]) return;
+            seenB[p.from] = 1;
+            const d = (p.main_km != null && p.distance_km != null) ? Number(p.distance_km) - Number(p.main_km) : null;
+            const how = d == null || Math.abs(d) < 0.05 ? 'another road.' : 'another road, ' + fmtDist(Math.abs(d), 1) + ' ' + DU() + (d < 0 ? ' shorter.' : ' longer.');
+            rows.unshift(['Weekdays ' + p.from + '–' + p.to, how.charAt(0).toUpperCase() + how.slice(1)]);
+        });
         // 28 Oct 2026 (task 0c): in a month a dated zone diverts it, the card says so first
         if (rp.div_when) rows.unshift(['Diverted ' + rp.div_when, (rp.div_because ? rp.div_because + '. ' : '')
             + fmtDist(rp.distance_km, 1) + ' ' + DU() + (rp.div_main_km != null ? ', was ' + fmtDist(rp.div_main_km, 1) + ' ' + DU() : '') + '.']);

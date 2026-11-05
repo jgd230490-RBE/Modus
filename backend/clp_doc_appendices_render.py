@@ -234,6 +234,19 @@ def render(D, d, A):
         else:
             D.p("No stored alternative had clearly fewer collisions in the busy hours on these routes.")
             D.src("Each route's collision evidence sheet has the counts by hour.")
+        # 5 Nov 2026 (task 0d-2, Q17): the offers a planner put in use, one sentence each
+        for u in h.get("in_use") or []:
+            when = ""
+            try:
+                import datetime as _dt
+                dd = _dt.date.fromisoformat(u["since"])
+                when = f" since {dd.day} {dd:%b %Y}"
+            except Exception:                          # noqa: BLE001
+                pass
+            kg = u.get("kg")
+            fig = ("" if kg is None or abs(kg) < 0.5 else
+                   f"; {'saves' if kg < 0 else 'adds'} about {_n(round(abs(kg)))} kg CO₂e over the plan")
+            D.p(f"{u['route_id']}: Alt {u['alt']} in use on weekdays {u['from']}–{u['to']}{when}{fig}.", size=10)
 
     # ---- I
     if "I" in A:

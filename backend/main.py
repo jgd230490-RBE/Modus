@@ -3276,7 +3276,9 @@ def routes_diversions(route_id: Optional[str] = None):
     """
     return _staff_json("routes/diversions", {"route_id": route_id},
                        lambda: {"periods": route_choice.periods(route_id),
-                                "way_round": network.way_round_calls(route_id)})
+                                "way_round": network.way_round_calls(route_id),
+                                # 5 Nov 2026 (task 0d-2): the busy-hours uses, for the Routes row's chip
+                                "busy": route_choice.busy_uses(route_id)})
 
 
 @app.post("/api/admin/route-diversions/keep-main")
@@ -3840,8 +3842,13 @@ def _with_busy_uses(route_id, out):
         o["in_use"] = [b["from"] for b in o.get("bands") or []
                        if any(u["from"] == b["from"] and u["alt"] == o["alt"] and u["status"] == "in_use" for u in uses)]
     offered = {(o["alt"], b["from"]) for o in out.get("offers") or [] for b in o.get("bands") or []}
+    import route_choice
+    span = route_choice.busy_span(route_id)
     for u in uses:
         u["offered"] = (u["alt"], u["from"]) in offered if out.get("shown") else None
+        # the share of the route's trips that set off in the hours, within its open window (the plan's weight, Q4)
+        u["share"] = round(route_choice.busy_share(u["from"], u["to"], span), 4)
+        u["open"] = [f"{span[0] // 60:02d}:{span[0] % 60:02d}", f"{span[1] // 60:02d}:{span[1] % 60:02d}"]
     out["uses"] = uses
     out["can_use"] = (access.current() or {}).get("role") in ("planner", "admin")
     return out

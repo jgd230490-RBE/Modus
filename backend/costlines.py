@@ -109,6 +109,16 @@ def _limit(stored_entry, vehicle_type, baked):
             "checked_at": (stored_entry or {}).get("checked_at")}
 
 
+def _busy_line(r, ctx, f, cost, factors, cache):
+    try:
+        import busy_savings
+        return busy_savings.line_figures(r["route_id"], r.get("vehicle_type"), int(r["month_index"]), f["trips"], cost,
+                                         factors, cache)
+    except Exception as e:
+        print("cost lines: busy hours left out:", r["route_id"], str(e)[:160])
+        return None
+
+
 def lines(acc=None, from_month=None, to_month=None, status=None, factors=None):
     """
     {lines: [...], totals: {...}, costing: {...}} for the caller's visible forecast rows.
@@ -188,6 +198,8 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None):
             "weeks_reported": act["weeks"],
             "flags": list(ctx.get("flags") or []),
             "limit": _limit(stored_limits.get(r["route_id"]), r.get("vehicle_type"), baked),
+            # 5 Nov 2026 (task 0d-2, Q17): the trips on a busy-hours road and what they save (negative) or add
+            "busy": (_busy_line(r, ctx, f, cost, factors, cache) if (baked and ctx.get("busy_hours")) else None),
         })
         if actual_t is not None:
             tot["actual_t"] = (tot["actual_t"] or 0.0) + actual_t; tot["reported_lines"] += 1

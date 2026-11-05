@@ -704,6 +704,10 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-line{display:inline-block;width:18px;height:0;flex:0 0 auto;}
   .sim-line-end{border-top:1.5px dashed #94A3B8;}
   .sim-line-haul{border-top:3px dashed #7C3AED;}
+  .sim-line-busy{border-top:3px solid var(--navy);box-shadow:0 0 6px 2px rgba(29,78,216,.25);}   /* 5 Nov 2026 (task 0d-2) */
+  .sim-busy-note{position:absolute;top:10px;left:10px;z-index:3;max-width:calc(100% - 70px);background:#FFFFFF;color:#1E293B;border-left:4px solid var(--navy);border-radius:6px;box-shadow:0 4px 14px rgba(15,23,42,.18);padding:8px 12px;font-size:13px;font-weight:600;opacity:0;transform:translateY(-6px);transition:opacity .35s,transform .35s;pointer-events:none;}
+  .sim-busy-note.on{opacity:1;transform:none;}
+  .sim-wall .sim-busy-note{font-size:clamp(13px,1.6vh,26px);}
   .sim-badge{background:#FFFFFF;border:1px solid #DC2626;color:#B91C1C;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.12);}
   /* 29 Oct 2026 (task 3c): the holding area's mark — a blue square H (the lorry-park sign's look), on the map and in the tables */
   .sim-hbadge,.hbadge{display:inline-flex;align-items:center;justify-content:center;background:#1D4ED8;color:#FFFFFF;font-weight:700;border:1.5px solid #FFFFFF;box-shadow:0 0 0 1px #1D4ED8;border-radius:3px;}
@@ -749,6 +753,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-tl svg{display:block;}
   .sim-tl-open{fill:rgba(5,150,105,.07);}
   .sim-tl-pour{fill:var(--sim-mixer);}
+  .sim-tl-busy{fill:var(--navy);opacity:.08;}
+  .sim-tl-busymark{stroke:var(--navy);stroke-width:1.5;}
+  .sim-tl-busytext{font-size:12px;font-weight:600;fill:var(--navy);}
   .sim-tl-grid{stroke:var(--line);}
   .sim-tl-hour{font-size:12px;fill:var(--muted);}
   .sim-tl-name{font-size:13px;fill:var(--ink);}
@@ -8469,6 +8476,8 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
       if(r.limit && !e.limit) e.limit = r.limit;
       if(r.planned && r.planned.eur != null){ e.planned = (e.planned || 0) + r.planned.eur; e.source = r.planned.source; }
       if(r.fair && r.fair.eur != null){ e.fair = (e.fair || 0) + r.fair.eur; (r.fair.flags || []).forEach(x => e.flags.add(x)); }
+      // 5 Nov 2026 (task 0d-2): the busy-hours road's trips and what they save / add, over the line's months
+      if(r.busy){ const b = e.busy || (e.busy = { trips: 0, kg: 0, eur: 0 }); b.trips += r.busy.trips || 0; b.kg += r.busy.kg || 0; if(r.busy.eur == null) b.eur = null; else if(b.eur != null) b.eur += r.busy.eur; }
     });
     const per = (eur, e) => eur == null ? null : { eur, per_t: e.t > 0 ? eur / e.t : null, per_trip: e.trips > 0 ? eur / e.trips : null, per_km: e.bkm > 0 ? eur / e.bkm : null };
     Object.values(m).forEach(e => { e.plannedU = per(e.planned, e); e.fairU = per(e.fair, e); e.flags = [...e.flags]; });
@@ -8545,7 +8554,9 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
   const exportCsv = () => {
     const cols = ["Route", "From", "To", "Years", TEAM(), "Discipline", "Section", "Material", "Description",
                   "Vehicle", "Unit", "Quantity", "Months", "Status", "Submitted by", "Rejection reason",
-                  "Tonnes", "Trips", `Planned ${CUR()}`, "Planned source", `Planned ${CUR()}/t`, `Fair ${CUR()} (model)`, `Fair ${CUR()}/t`, `Fair ${CUR()}/trip`, `Fair ${CUR()}/${DU()}`];
+                  "Tonnes", "Trips", `Planned ${CUR()}`, "Planned source", `Planned ${CUR()}/t`, `Fair ${CUR()} (model)`, `Fair ${CUR()}/t`, `Fair ${CUR()}/trip`, `Fair ${CUR()}/${DU()}`,
+                  // 5 Nov 2026 (task 0d-2, Q17): the busy-hours road — its trips, and what they save (−) or add (+)
+                  "Busy-hours road: trips", `Busy-hours road: saved / added ${CUR()}, kg CO2e`];
     const esc = (v) => { const s = (v == null ? "" : String(v)); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const lines = [cols.join(",")];
     shown.forEach(g => {
@@ -8556,7 +8567,8 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
         g.material || "", g.material_description || "", vehLabel(g.vehicle), g.unit || "",
         Math.round(g.quantity * 10) / 10, g.months, g.status, teamText(g.submittedBy), g.rejectReason || "",
         r2(c.t), c.trips ?? "", r2(c.planned), c.source || "", r2(c.plannedU && c.plannedU.per_t),
-        r2(c.fair), r2(c.fairU && c.fairU.per_t), r2(c.fairU && c.fairU.per_trip), r2(c.fairU && distRate(c.fairU.per_km))].map(esc).join(","));
+        r2(c.fair), r2(c.fairU && c.fairU.per_t), r2(c.fairU && c.fairU.per_trip), r2(c.fairU && distRate(c.fairU.per_km)),
+        c.busy ? r2(c.busy.trips) : "", c.busy ? `${c.busy.eur == null ? "—" : r2(c.busy.eur)} / ${r2(c.busy.kg)}` : ""].map(esc).join(","));
     });
     const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -10188,6 +10200,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
           {tMsg && <p className="text-sm text-slate-700 mt-2" role="status">{tMsg}</p>}
         </CarbonStep>
       </ol>
+      <CarbonRouteChoices />
 
       {(A || err) && (
         <div className="sticky bottom-0 z-10 mt-4" data-sticky-foot="">
@@ -10961,7 +10974,9 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                           summary={<>{c.origin_name || line.route_id} <span className="text-slate-400 font-normal">→</span> {c.dest_name || "—"}</>}
                           chips={[teamWord, c.material_type || null,
                                   /* 28 Oct 2026 (task 0c): a dated zone diverts the route on some of this week's days */
-                                  (c.diversion && c.diversion.share > 0) ? "Diverted" : null]}
+                                  (c.diversion && c.diversion.share > 0) ? "Diverted" : null,
+                                  /* 5 Nov 2026 (task 0d-2): the route's lorries take another road in the busy hours */
+                                  (c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null]}
                           cells={<>
                             <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>
                             {weekdaysOf(line).map(d => {
@@ -11695,6 +11710,25 @@ function simSites(D){
 // drawing: every lorry on the road, in a gate's lane or on site at minute t; each gate's and each station's waiting
 // and minutes lost so far. On site a lorry runs the hops and stops the server sent (sim_site): along a path at the
 // parts' speeds, waiting back along the path into its station 25 m apart, or at the station being served.
+// 5 Nov 2026 (task 0d-2): the busy-hours roads of the day, one a route and hours (both legs together), in words
+function simBusyUses(D){
+  const seen = {}, out = [];
+  (D.busy_hours || []).forEach(u => {
+    const k = `${u.route_id}|${u.from_min}`;
+    if(seen[k]) return;
+    seen[k] = 1;
+    out.push({ band: k, route: u.route_id, alt: u.alt, from: u.from, to: u.to, from_min: u.from_min, to_min: u.to_min });
+  });
+  return out;
+}
+// the stretch of `line` that is not shared with `other` at either end (the mockup's "own" part)
+function simOwnPart(line, other){
+  const same = (p, q) => p && q && Math.abs(p[0] - q[0]) < 1e-7 && Math.abs(p[1] - q[1]) < 1e-7;
+  let i = 0; while(i < line.length && i < other.length && same(line[i], other[i])) i++;
+  let j = 0; while(j < line.length - i && j < other.length - i && same(line[line.length - 1 - j], other[other.length - 1 - j])) j++;
+  return { head: line.slice(0, Math.max(1, i)), own: line.slice(Math.max(0, i - 1), line.length - Math.max(0, j - 1)), tail: line.slice(line.length - Math.max(1, j)) };
+}
+
 function simFrame(D, legs, t){
   const lanes = {}, gates = {};
   (D.gates || []).forEach(g => { gates[g.gate_id] = { w: 0, lost: 0 }; });
@@ -11773,7 +11807,7 @@ function simFrame(D, legs, t){
   }
   const heldBy = {};
   Object.keys(heldNow).forEach(h => { heldBy[h] = heldNow[h].length; });
-  return { feats, laden, empty, mixers, waiting, onSite, gates, stations, held, heldBy, heldLost };
+  return { t, feats, laden, empty, mixers, waiting, onSite, gates, stations, held, heldBy, heldLost };
 }
 // 29 Oct 2026 (task 3c): a held lorry's place in the holding area's field — five abreast, about 20 m apart, south of its mark
 const simHoldSlot = (pt, q) => pt ? [pt[0] + ((Math.max(0, q) % 5) - 2) * 0.00028, pt[1] - 0.00014 - Math.floor(Math.max(0, q) / 5) * 0.00018] : null;
@@ -11804,6 +11838,8 @@ const simMapStyle = () => (typeof document !== "undefined" && document.documentE
 // big screen (the key stays a box over the map there; on the page it is a row under it)
 function SimMap({ meta, D, store, frame, site, wall }){
   const div = useRef(null), mapObj = useRef(null), badges = useRef({});
+  const busyOn = useRef(null), busyNote = useRef(null), noteTimer = useRef(null);   // 5 Nov 2026 (task 0d-2)
+  const [note, setNote] = useState({ text: "", on: false });
   const [ready, setReady] = useState(false);
   const [styleN, setStyleN] = useState(0);
   const [mapErr, setMapErr] = useState("");
@@ -11820,8 +11856,13 @@ function SimMap({ meta, D, store, frame, site, wall }){
     m.on("style.load", () => {
       if(m.getSource("sim-routes")) return;
       const empty = { type: "FeatureCollection", features: [] };
-      ["sim-routes", "sim-ends", "sim-haul", "sim-gates", "sim-lorries", "sim-areas", "sim-area-pts", "sim-wash", "sim-called"].forEach(s => m.addSource(s, { type: "geojson", data: empty }));
+      ["sim-routes", "sim-ends", "sim-haul", "sim-gates", "sim-lorries", "sim-areas", "sim-area-pts", "sim-wash", "sim-called", "sim-busy", "sim-busy-main"].forEach(s => m.addSource(s, { type: "geojson", data: empty }));
       m.addLayer({ id: "sim-routes", type: "line", source: "sim-routes", paint: { "line-color": "#94A3B8", "line-width": 1.6, "line-opacity": 0.75 } });
+      // 5 Nov 2026 (task 0d-2, Q14 = C): a busy-hours road shows only in its hours, in the navy with a soft glow, and
+      // the stretch of the main road it replaces fades (the frame sets both); its main road is drawn here, not in sim-routes
+      m.addLayer({ id: "sim-busy-main", type: "line", source: "sim-busy-main", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#94A3B8", "line-width": 1.6, "line-opacity": 0.75 } });
+      m.addLayer({ id: "sim-busy-glow", type: "line", source: "sim-busy", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": tok("--navy", "#1D4ED8"), "line-width": 12, "line-blur": 6, "line-opacity": 0 } });
+      m.addLayer({ id: "sim-busy", type: "line", source: "sim-busy", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": tok("--navy", "#1D4ED8"), "line-width": 2.6, "line-opacity": 0 } });
       m.addLayer({ id: "sim-ends", type: "line", source: "sim-ends", paint: { "line-color": "#94A3B8", "line-width": 1, "line-dasharray": [2, 2] } });
       m.addLayer({ id: "sim-haul", type: "line", source: "sim-haul", paint: { "line-color": tok("--chart-4", "#7C3AED"), "line-width": 4, "line-dasharray": [1.5, 1] } });
       m.addLayer({ id: "sim-haul-label", type: "symbol", source: "sim-haul", layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-size": 12, "text-offset": [0, -1] },
@@ -11876,10 +11917,23 @@ function SimMap({ meta, D, store, frame, site, wall }){
     const lines = [], ends = [], b = new window.mapboxgl.LngLatBounds();
     const legGate = {};
     (D.lines || []).forEach(l => { if(l.laden_leg) legGate[l.laden_leg] = l.laden_gate; if(l.empty_leg) legGate[l.empty_leg] = l.empty_gate; });
+    // 5 Nov 2026 (task 0d-2): each busy-hours road's own stretch, and its main road split into shared / replaced parts
+    const busyF = [], busyMainF = [], busyMain = {};
+    (D.busy_hours || []).forEach(u => {
+      const a = legs[u.key], mn = legs[u.main_key];
+      if(!a || !mn || !a.coords || !mn.coords || a.coords.length < 2 || mn.coords.length < 2) return;
+      const band = `${u.route_id}|${u.from_min}`;
+      busyF.push({ type: "Feature", properties: { band }, geometry: { type: "LineString", coordinates: simOwnPart(a.coords, mn.coords).own } });
+      if(busyMain[u.main_key]) return;
+      busyMain[u.main_key] = 1;
+      const p = simOwnPart(mn.coords, a.coords);
+      [["head", 0], ["own", 1], ["tail", 0]].forEach(([w, own]) => { if(p[w].length > 1) busyMainF.push({ type: "Feature", properties: { band, own }, geometry: { type: "LineString", coordinates: p[w] } }); });
+    });
     Object.keys(legs).forEach(k => {
       const lg = legs[k];
       if(!lg || !lg.coords || lg.coords.length < 2) return;
-      lines.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: lg.coords } });
+      if(lg.alt) return;                                         // a busy-hours road is drawn by its own layer
+      if(!busyMain[k]) lines.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: lg.coords } });
       lg.coords.forEach(c => b.extend(c));
       const g = gateBy[legGate[k]];
       if(g && g.lon != null && g.lat != null) ends.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [lg.coords[lg.coords.length - 1], [+g.lon, +g.lat]] } });
@@ -11908,6 +11962,9 @@ function SimMap({ meta, D, store, frame, site, wall }){
     m.getSource("sim-area-pts").setData({ type: "FeatureCollection", features: areaPts });
     m.getSource("sim-wash").setData({ type: "FeatureCollection", features: wash });
     m.getSource("sim-routes").setData({ type: "FeatureCollection", features: lines });
+    m.getSource("sim-busy").setData({ type: "FeatureCollection", features: busyF });
+    m.getSource("sim-busy-main").setData({ type: "FeatureCollection", features: busyMainF });
+    busyOn.current = null;                                       // the frame paints them again
     m.getSource("sim-ends").setData({ type: "FeatureCollection", features: ends });
     m.getSource("sim-haul").setData({ type: "FeatureCollection", features: haul });
     m.getSource("sim-gates").setData({ type: "FeatureCollection", features: gpts });
@@ -11969,6 +12026,34 @@ function SimMap({ meta, D, store, frame, site, wall }){
     if(!m || !ready || !D || !store || !frame) return;
     const f = frame;
     try { m.getSource("sim-lorries").setData({ type: "FeatureCollection", features: f.feats }); } catch(e){}
+    // 5 Nov 2026 (task 0d-2, Q14 = C): the busy-hours roads in their hours (painted only when that changes), and a
+    // notice when the hours start or end that fades after a few seconds
+    const uses = simBusyUses(D);
+    if(uses.length && f.t != null){
+      const now = uses.filter(u => u.from_min <= f.t && f.t < u.to_min);
+      const sig = now.map(u => u.band).join(",");
+      if(sig !== busyOn.current){
+        const act = ["in", ["get", "band"], ["literal", now.map(u => u.band)]];
+        try {
+          m.setPaintProperty("sim-busy", "line-opacity", ["case", act, 0.95, 0]);
+          m.setPaintProperty("sim-busy-glow", "line-opacity", ["case", act, 0.16, 0]);
+          m.setPaintProperty("sim-busy-main", "line-opacity", ["case", ["all", act, ["==", ["get", "own"], 1]], 0.25, 0.75]);
+        } catch(e){}
+        busyOn.current = sig;
+      }
+      const was = busyNote.current;
+      if(was != null && was !== sig){
+        const on = now.filter(u => !was.split(",").includes(u.band)), off = uses.filter(u => was.split(",").includes(u.band) && !sig.split(",").includes(u.band));
+        const w = on.length ? `${on[0].from} · ${on.map(u => u.route).join(", ")} lorries now take Alt ${on[0].alt} (busy hours, weekdays)`
+                : off.length ? `${off[0].to} · ${off.map(u => u.route).join(", ")} back on ${off.length === 1 ? "its" : "their"} usual road` : "";
+        if(w){
+          setNote({ text: w, on: true });
+          clearTimeout(noteTimer.current);
+          noteTimer.current = setTimeout(() => setNote(n => ({ ...n, on: false })), 4500);
+        }
+      }
+      busyNote.current = sig;
+    }
     Object.keys(badges.current).forEach(gid => {
       const x = badges.current[gid];
       if(x.fixed) return;                                       // 29 Oct 2026 (task 3c): the H badge stays
@@ -11988,10 +12073,15 @@ function SimMap({ meta, D, store, frame, site, wall }){
     ["sim-dot sim-dot-gate", "Gate"],
     (D.sites || []).length > 0 && ["sim-dot sim-dot-area", "Area on site"],
     (D.sites || []).some(x => x.wash) && ["sim-dot sim-dot-wash", "Wheel wash"],
-    ["sim-line sim-line-end", "Route end to its gate"], ["sim-line sim-line-haul", "Haul road (assigned speed)"]].filter(Boolean);
+    ["sim-line sim-line-end", "Route end to its gate"], ["sim-line sim-line-haul", "Haul road (assigned speed)"],
+    // 5 Nov 2026 (task 0d-2): one line for the busy-hours roads of the day
+    simBusyUses(D).length > 0 && ["sim-line sim-line-busy", simBusyUses(D).length <= 2
+      ? `Busy-hours road (${simBusyUses(D).map(u => `${u.route} Alt ${u.alt}, weekdays ${u.from}–${u.to}`).join("; ")})`
+      : `Busy-hours roads (${simBusyUses(D).length} routes, weekdays)`]].filter(Boolean);
   return (
     <div className="sim-map-wrap">
       <div ref={div} className="sim-map" role="region" aria-label="Simulation map" />
+      {simBusyUses(D).length > 0 && <div className={"sim-busy-note" + (note.on ? " on" : "")} role="status" aria-live="polite" data-sim-busy-note="1">{note.text}</div>}
       {wall
         ? <div className="sim-legend" role="group" aria-label="Map key">{key.map(([c, w]) => <div key={w}><i className={c} aria-hidden="true"></i>{w}</div>)}</div>
         : <ul className="sim-key" aria-label="Key" data-sim-key="1">{key.map(([c, w]) => <li key={w}><i className={c} aria-hidden="true"></i>{w}</li>)}</ul>}
@@ -12016,7 +12106,8 @@ function SimTimeline({ D, t, onSeek, site }){
   const s0 = D.window.start, s1 = D.window.end;
   const tx = (m) => SIM_TL_LEFT + (m - s0) / Math.max(1, s1 - s0) * (W - SIM_TL_LEFT - SIM_TL_RIGHT);
   const qg = simTlRows(D, site);
-  const rowH = 32, H = 34 + Math.max(1, qg.length) * rowH + 8;
+  const busyU = simBusyUses(D).filter(u => u.to_min > s0 && u.from_min < s1);   // 5 Nov 2026 (task 0d-2)
+  const rowH = 32, H = 34 + Math.max(1, qg.length) * rowH + 8 + (busyU.length ? 16 : 0);
   const still = useMemo(() => {
     const parts = [];
     const iv = (D.gates[0] || {}).intervals || [];
@@ -12026,6 +12117,15 @@ function SimTimeline({ D, t, onSeek, site }){
     else qg.forEach((g, i) => (g.intervals || iv || []).forEach(([a, b], j) => parts.push(<rect key={"o" + i + "-" + j} x={tx(a)} y={34 + i * rowH} width={Math.max(0, tx(b) - tx(a))} height={rowH - 4} className="sim-tl-open" />)));
     const pourAt = D.arrivals.filter(a => a.kind === "pour").map(a => a.at);
     if(pourAt.length) parts.push(<rect key="pour" x={tx(pourAt[0])} y={13} height={4} width={Math.max(2, tx(pourAt[pourAt.length - 1]) - tx(pourAt[0]))} className="sim-tl-pour" />);
+    // 5 Nov 2026 (task 0d-2): each busy-hours use's band, with its start and end marked under the rows
+    busyU.forEach((u, i) => {
+      const a = Math.max(s0, u.from_min), b = Math.min(s1, u.to_min), yb = H - 6;
+      parts.push(<g key={"busy" + i} data-sim-tl-busy={u.band}>
+        <rect x={tx(a)} y={18} width={Math.max(0, tx(b) - tx(a))} height={H - 26 - 16} className="sim-tl-busy"><title>{`${u.route} Alt ${u.alt}, weekdays ${u.from}–${u.to}`}</title></rect>
+        {u.from_min >= s0 && <line x1={tx(u.from_min)} x2={tx(u.from_min)} y1={18} y2={yb - 10} className="sim-tl-busymark" />}
+        {u.to_min <= s1 && <line x1={tx(u.to_min)} x2={tx(u.to_min)} y1={18} y2={yb - 10} className="sim-tl-busymark" />}
+      </g>);
+    });
     // 29 Oct 2026 (card 6): one label an hour where there is room, every second hour under 900 px, every fourth under 500
     const hStep = W < 500 ? 4 : W < 900 ? 2 : 1;
     for(let h = Math.ceil(s0 / 60); h <= Math.floor(s1 / 60); h++){
@@ -12035,6 +12135,11 @@ function SimTimeline({ D, t, onSeek, site }){
     if(!qg.length) parts.push(<text key="none" x={SIM_TL_LEFT} y={34 + rowH / 2} className="sim-tl-ok">{site ? "No lorry waits anywhere on this site on this day." : "No lorry waits at any gate on this day."}</text>);
     // a mark's words flip to the left of the mark when they would run past the right edge (card 6)
     const words = (x, txt, y, cls) => { const flip = x + 4 + txt.length * 6.4 > W - 4; return <text x={flip ? x - 4 : x + 4} y={y} className={cls} textAnchor={flip ? "end" : "start"}>{txt}</text>; };
+    busyU.forEach((u, i) => {
+      const yb = H - 6;
+      if(u.from_min >= s0) parts.push(<g key={"busyw" + i}>{words(tx(u.from_min), `${u.from} ${u.route} Alt ${u.alt}`, yb, "sim-tl-busytext")}</g>);
+      if(u.to_min <= s1) parts.push(<g key={"busyx" + i}>{words(tx(u.to_min), `${u.to} back`, yb, "sim-tl-busytext")}</g>);
+    });
     qg.forEach((g, i) => {
       const y0 = 34 + i * rowH, base = y0 + rowH - 6, mx = Math.max(1, g.most_waiting);
       const arr = g.items;
@@ -13697,11 +13802,81 @@ function NearDetails({ data, id, colSpan }){
   );
 }
 
+// 5 Nov 2026 (task 0d-2, Q17-Q19): what a busy-hours road saves or adds, in one sentence. Negative = a saving; a road
+// that costs more says "Adds", never hidden. `s` = busy_savings' figure block {trips, of, km, min, kg, eur}.
+function busyMoney(v){ return `${CUR()}${Math.round(Math.abs(v)).toLocaleString("en-GB")}`; }
+function busyMins(v){ const m = Math.abs(v); return m >= 90 ? `${(m / 60).toFixed(1)} h` : `${Math.round(m)} min`; }
+function busyKg(v){ const k = Math.abs(v); return k >= 1000 ? `${(k / 1000).toFixed(2)} t CO₂e` : `${Math.round(k)} kg CO₂e`; }
+function busyWords(s){
+  if(!s) return null;
+  const parts = [[s.eur, busyMoney], [s.min, busyMins], [s.kg, busyKg]].filter(([v], i) => !(i === 0 && s.eur_missing));
+  const less = parts.every(([v]) => v <= 0), more = parts.every(([v]) => v >= 0);
+  const list = (xs) => xs.length > 1 ? xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1] : xs[0] || "";
+  if(less) return { adds: false, text: `Saves about ${list(parts.map(([v, f]) => f(v)))}` };
+  if(more) return { adds: true, text: `Adds about ${list(parts.map(([v, f]) => f(v)))}` };
+  return { adds: parts.some(([v], i) => i === 0 && v > 0), text: list(parts.map(([v, f]) => `${f(v)} ${v > 0 ? "more" : "less"}`)) };
+}
+
+// 5 Nov 2026 (task 0d-2, Q17): what each busy-hours road in use saves or adds against its route's main road, over the
+// approved plan from the day it was put in use (GET /api/busy-hours). Nothing shows while no route has one. A figure
+// below nought is a saving; one above is what the road adds (Q19), in red.
+function CarbonRouteChoices(){
+  const [d, setD] = useState(null);
+  useEffect(() => {
+    let live = true;
+    fetch(`${API}/busy-hours`).then(okJSON).then(j => { if(live) setD(j); }).catch(e => console.warn("Wayscope:", e));
+    return () => { live = false; };
+  }, []);
+  const uses = ((d && d.uses) || []).filter(u => u.savings && u.savings.planned);
+  if(!uses.length) return null;
+  const sign = (v, f) => (v > 0 ? "+" : v < 0 ? "−" : "") + f(v);
+  const tone = (v) => v > 0 ? { color: "var(--bad-text)" } : {};
+  const cells = (s) => <>
+    <td className="text-right tabular-nums" style={tone(s.kg)}>{sign(s.kg, busyKg).replace(" CO₂e", "")}</td>
+    <td className="text-right tabular-nums" style={tone(s.eur)}>{s.eur_missing ? "—" : sign(s.eur, busyMoney)}</td>
+    <td className="text-right tabular-nums" style={tone(s.min)}>{sign(s.min, busyMins)}</td></>;
+  const T = d.totals && d.totals.planned;
+  return (
+    <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 mt-4" data-carbon-route-choices="1" aria-labelledby="carbon-route-choices-h">
+      <h2 id="carbon-route-choices-h" className="text-lg font-semibold text-slate-800">Route choices <span className="text-sm font-normal text-slate-500">· against each route's main road</span></h2>
+      <div className="overflow-x-auto mt-2 kb-scroll" tabIndex={0} role="region" aria-label="Route choices">
+        <table className="tbl">
+          <caption className="sr-only">Route choices against each route's main road</caption>
+          <thead><tr>
+            <th>Route</th><th>Choice</th><th className="text-right">CO2e</th><th className="text-right">Cost</th><th className="text-right">Time</th></tr></thead>
+          <tbody>
+            {uses.map(u => (
+              <tr key={u.route_id + u.from}>
+                <td>{u.route_id}</td>
+                <td>Alt {u.alt}, weekdays {u.from}–{u.to}</td>
+                {cells(u.savings.planned)}
+              </tr>))}
+            {uses.length > 1 && T && (
+              <tr className="font-semibold"><td colSpan={2}>All route choices</td>{cells(T)}</tr>)}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[13px] text-slate-600 mt-2">Planned, to the end of the approved plan. Already inside the carbon total and the target.</p>
+    </section>
+  );
+}
+
+
 function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting, leg,
-                        haulRoads, token, onHaulChanged, originId, destId, gateBlockers }){
+                        haulRoads, token, onHaulChanged, originId, destId, gateBlockers, onBusyChanged }){
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(null);
+  const [busyMsg, setBusyMsg] = useState(null);
+  const [busyWorking, setBusyWorking] = useState(false);
+  // 5 Nov 2026 (task 0d-2): Use / Stop a busy-hours road (planners and admins); the answer is the same read as below
+  const busyPost = (body, what) => {
+    setBusyWorking(true); setBusyMsg(null);
+    postJSON(`/routes/${encodeURIComponent(routeId)}/busy-hours`, body)
+      .then(j => { setBusy(j); if(onBusyChanged) onBusyChanged(); })
+      .catch(e => setBusyMsg(errSay(what, e)))
+      .finally(() => setBusyWorking(false));
+  };
 
   // 28 Oct 2026 (task 0d): an alternative with clearly fewer collisions on it in the weekday busy hours, offered under the
   // options; nothing is switched. A failed read shows nothing (the line is an extra).
@@ -13897,6 +14072,43 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                 <span className="text-slate-400">{busy.period}.</span>{busyGap(o.alt)}
               </p>
             ))}
+            {busy && busy.shown && (busy.offers || []).map(o => (
+              // 5 Nov 2026 (task 0d-2, Q1-Q3): take the offer for the busy hours; say when Make primary may suit better
+              <div key={"use" + o.alt} className="text-[13px] mt-1 flex flex-wrap items-center gap-2" data-busy-offer={o.alt}>
+                {busy.can_use && (o.bands || []).filter(b => !(o.in_use || []).includes(b.from)).map(b => (
+                  <button key={b.from} className="btn-sec" disabled={busyWorking} data-busy-use-btn={`${o.alt}|${b.from}`}
+                    onClick={(e) => { e.stopPropagation(); busyPost({ alt: o.alt, from: b.from, to: b.to }, `${o.label} was not put in use.`); }}>
+                    Use {o.label} on weekdays {b.from}–{b.to}
+                  </button>))}
+                {o.better_all_day && <span className="text-slate-600">{o.label} is also shorter and quicker all day: Make primary may suit better.</span>}
+              </div>
+            ))}
+            {busy && (busy.uses || []).filter(u => u.status !== "stopped").map(u => {
+              const sv = u.savings && u.savings.planned, sw = busyWords(sv), sf = u.savings && u.savings.so_far;
+              const sfw = busyWords(sf);
+              const since = u.decided_at ? new Date(u.decided_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
+              return (
+                <div key={"u" + u.from} className="text-[13px] mt-2" data-busy-in-use={u.from} data-busy-status={u.status}>
+                  <p className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                      style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }}>
+                      Busy hours: Alt {u.alt}{u.status === "paused" ? " · paused" : ""}</span>
+                    <span>{u.status === "in_use" ? "In use" : "Paused"} on weekdays {u.from}–{u.to}{since ? ` since ${since}` : ""}{u.decided_by ? `, by ${u.decided_by}` : ""}.</span>
+                    {busy.can_use && u.status === "paused" && <button className="btn-sec" disabled={busyWorking} onClick={(e) => { e.stopPropagation(); busyPost({ alt: u.alt, from: u.from, to: u.to }, "It was not put back in use."); }}>Use again</button>}
+                    {busy.can_use && <button className="btn-sec" disabled={busyWorking} data-busy-stop={u.from} onClick={(e) => { e.stopPropagation(); busyPost({ stop: true, from: u.from }, "It was not stopped."); }}>Stop</button>}
+                  </p>
+                  {u.status === "paused" && <p className="mt-1" style={{ color: "var(--warn-text)" }}>Alt {u.alt} is a different road since the last Route all: check it again.</p>}
+                  {u.offered === false && <p className="mt-1 text-slate-600">No longer offered after the latest collision history.</p>}
+                  {u.status === "in_use" && u.share != null && (
+                    <p className="mt-1 text-slate-600">About {Math.round(u.share * 100)} % of this route's trips set off then (its gates are open {u.open[0]}–{u.open[1]}), so the plan's figures use Alt {u.alt} for them.</p>)}
+                  {u.status === "in_use" && sw && sv.of > 0 && (
+                    <p className="mt-1" data-busy-saves={sw.adds ? "adds" : "saves"} style={sw.adds ? { color: "var(--bad-text)" } : {}}>
+                      {sw.text} over the approved plan ({Math.round(sv.trips)} of {Math.round(sv.of)} trips).</p>)}
+                  {u.status === "in_use" && sfw && sf.of > 0 && (
+                    <p className="mt-1 text-slate-600">So far, from recorded loads: {sfw.text.replace(/^Saves about |^Adds about /, (m) => m.toLowerCase())} (estimated).</p>)}
+                </div>);
+            })}
+            {busyMsg && <p className="text-[13px] mt-1" style={{ color: "var(--bad-text)" }} role="status">{busyMsg}</p>}
           </div>
         )}
       </td>
@@ -14026,6 +14238,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // Routes page and the panel after a zone save), and what "Find a way round" would cost now
   const [zoneDiv, setZoneDiv] = useState({});
   const [divPeriods, setDivPeriods] = useState([]);
+  const [busyUses, setBusyUses] = useState([]);          // 5 Nov 2026 (task 0d-2): the busy-hours uses (row chip)
   // 30 Oct 2026 (task 4b): the community considerations near each route's drawn line — the "Near the route" column
   const [nearData, setNearData] = useState(null);
   const [holdSum, setHoldSum] = useState(null);       // 29 Oct 2026 (task 3c): the holding areas and each route's state
@@ -14099,7 +14312,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const loadDiversions = () => {
     fetch(`${API}/holding`).then(r => r.ok ? r.json() : null).then(hs => { if(hs) setHoldSum(hs); }).catch(() => {});
     fetch(`${API}/routes/diversions`).then(r => r.ok ? r.json() : null).then(dv => {
-      if(dv){ setDivPeriods(dv.periods || []); setWayRound(dv.way_round || { legs: 0, here_calls: 0, routes: [] }); }
+      if(dv){ setDivPeriods(dv.periods || []); setWayRound(dv.way_round || { legs: 0, here_calls: 0, routes: [] }); setBusyUses(dv.busy || []); }
     }).catch(() => {});
   };
 
@@ -16669,6 +16882,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                           style={hr.state === "route_again" ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" } : { background: "rgba(29,78,216,.10)", color: "var(--navy)" }}>{words}</span>;
                       })()}
+                      {(busyUses || []).filter(u => u.route_id === r.id && u.status !== "stopped").map(u => (
+                        // 5 Nov 2026 (task 0d-2): "Busy hours: Alt 2", hover for the hours; amber while paused
+                        <span key={"bh" + u.from} data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}${u.status === "paused" ? " · paused: the road changed" : ""}`}
+                          className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }}>
+                          Busy hours: Alt {u.alt}</span>))}
                       {(() => {
                         // 28 Oct 2026 (task 0c): "Diverted Dec 2027" when a dated zone diverts it; red when one crosses it with no way round
                         const ps = (divPeriods || []).filter(p => p.route_id === r.id);
@@ -16725,6 +16944,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     leg={showLeg}
                     onFocus={selected === r.id ? focusGeom : (p, a) => { selectRoute(r.id); focusGeom(p, a); }}
                     onPromote={selected === r.id && canEdit ? promoteAlt : null}
+                    onBusyChanged={loadDiversions}
                     promoting={promoting}
                     haulRoads={haulRoadList}
                     token={tokenRef.current}

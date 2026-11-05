@@ -153,6 +153,37 @@ def for_use(use, factors=None, cost=None, routes=None, cache=None):
             "since": since.isoformat()}
 
 
+def line_figures(route_id, profile, month_index, trips, cost, factors, cache):
+    """5 Nov 2026 (task 0d-2, Q17): one forecast line's busy-hours figures for the cost lines (the Forecasts page's
+    spreadsheet): {"trips": the line's trips on a busy-hours road, "kg", "eur": what they save (negative) or add}, or
+    None when the route has no busy-hours road in use. `cache` is the caller's (one per read)."""
+    uses = cache.setdefault("__busy_uses__", None)
+    if uses is None:
+        uses = cache["__busy_uses__"] = [u for u in route_choice.busy_uses() if u["status"] == "in_use"]
+    mine = [u for u in uses if u["route_id"] == route_id]
+    if not mine or not trips:
+        return None
+    pre = cache.setdefault("__route_analysis_pre__", {})
+    out = {"trips": 0.0, "kg": 0.0, "eur": 0.0, "eur_missing": False}
+    for u in mine:
+        pair = _pair_for(u, profile)
+        key = ("__busy_pt__", route_id, profile, pair, int(month_index))
+        if key not in cache:
+            cache[key] = per_trip(route_id, profile, pair, int(month_index), cost, factors, pre)
+        d = cache[key]
+        if d is None:
+            continue
+        n = trips * _share(route_id, profile, month_index, u)
+        out["trips"] += n
+        out["kg"] += n * d["kg"]
+        if d.get("eur") is None:
+            out["eur_missing"] = True
+        else:
+            out["eur"] += n * d["eur"]
+    return {"trips": round(out["trips"], 1), "kg": round(out["kg"], 1),
+            "eur": (None if out["eur_missing"] else round(out["eur"], 2))}
+
+
 def for_route(route_id, **kw):
     """Every busy-hours use of a route, with its figures when in use: [use + {"savings": …}]."""
     out = []

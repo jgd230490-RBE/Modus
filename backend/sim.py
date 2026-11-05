@@ -792,6 +792,17 @@ def simulate(inp, scen):
     journeys = []
     for g, f in out_g.items():
         for a in f["queued"]:
+            # 5 Nov 2026 (task 0d-2): a lorry that SETS OFF (its main road's time before the gate) in a busy-hours use's
+            # hours takes that road; its arrival at the gate stays where D59 placed it. Not a pour's mixer, not one
+            # called off from a holding area (both keep their road).
+            bz = (inp.get("busy") or {}).get(a.get("leg")) if a.get("leg") else None
+            if bz and a["kind"] in ("laden", "empty") and not a.get("held") and not a.get("pour_id") \
+                    and a.get("t") is not None and inp["leg_minutes"].get(a["leg"]):
+                dep = a["t"] - inp["leg_minutes"][a["leg"]]
+                for b in bz:
+                    if b["from"] <= dep < b["to"] and inp["leg_minutes"].get(b["key"]):
+                        a["main_leg"], a["leg"], a["busy_alt"] = a["leg"], b["key"], b["alt"]
+                        break
             leg = legs.get(a.get("leg")) if a.get("leg") else None
             a["from_m"], a["t_from"] = 0.0, 0.0
             if leg:
@@ -1094,6 +1105,79 @@ def _legs_for(route_ids, want_lines, days=None):
     return per, zone_rows
 
 
+def _busy_legs(lines, per, bday, with_lines, zone_rows, speed, legs, leg_minutes, leg_meta, used_zones):
+    """
+    5 Nov 2026 (task 0d-2): each busy-hours road the day can use. For every leg of the day with an in-use busy-hours
+    row on `bday` (and no zone deciding it), Alt N's stored line is built beside the main one under "<key>@<alt>".
+    Returns {main leg key: [{"alt", "key", "from", "to"}]} (minutes from midnight); simulate() swaps a lorry onto it
+    when it SETS OFF in those hours (route_choice.busy_alt_at's rule).
+    """
+    import route_choice
+    rows = route_choice._rows_by_route()
+    if not any(r.get("reason_kind") == "peak" and r.get("status") == "in_use" for rr in rows.values() for r in rr):
+        return {}
+    out = {}
+    cols = "duration_hr, distance_km, haul_zones" + (", geometry" if with_lines else "")
+    for l in lines:
+        used = l.get("vehicle_drawn")
+        if not used:
+            continue
+        for kind, leg_name in (("laden", "loaded"), ("empty", "return")):
+            key = l.get(f"{kind}_leg")
+            if not key or key in out or not leg_minutes.get(key):
+                continue
+            rid = l["route_id"]
+            if route_choice.choice_on(rid, used, leg_name, bday, rows=rows) is not None:
+                continue                                     # a zone decides this leg today (Q10)
+            for r in route_choice._peaks_on(rid, used, leg_name, bday, rows):
+                a, b = route_choice._mins(r.get("hours_from")), route_choice._mins(r.get("hours_to"))
+                alt = int(r.get("alt_index") or 0)
+                if a is None or b is None or not alt:
+                    continue
+                g = db.query(f"SELECT {cols} FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND "
+                             "vehicle_profile = ? AND leg = ? AND alt_index = ?",
+                             (db.current_tenant(), rid, used, leg_name, alt))
+                src = g[0] if g else None
+                mins = (float(src["duration_hr"]) * 60.0) if (src and src.get("duration_hr")) else None
+                if not mins:
+                    continue
+                k2 = f"{key}@{alt}"
+                leg_minutes[k2] = mins
+                leg_meta[k2] = dict(leg_meta.get(key) or {}, minutes=mins, reversed=False, alt=alt,
+                                    busy={"from": hhmm(a), "to": hhmm(b)},
+                                    distance_km=(float(src["distance_km"]) if src.get("distance_km") is not None else None))
+                legs[k2] = None
+                if with_lines and src.get("geometry"):
+                    try:
+                        coords = [[float(p[0]), float(p[1])] for p in json.loads(src["geometry"])]
+                    except Exception:
+                        coords = None
+                    hz = [z for z in (src.get("haul_zones") or "").split(",") if z]
+                    roads = {z: zones.as_line(zone_rows[z]["geometry"]) for z in hz if z in zone_rows}
+                    used_zones.update(roads)
+                    legs[k2] = build_leg(coords, mins, roads, speed) if coords else None
+                out.setdefault(key, []).append({"alt": alt, "key": k2, "from": a, "to": b})
+    return out
+
+
+def _busy_reply(busy, leg_meta, arrivals):
+    took = {}
+    for a in arrivals:
+        if a.get("busy_alt"):
+            took[a["leg"]] = took.get(a["leg"], 0) + 1
+    out = []
+    for main, opts in busy.items():
+        m = leg_meta.get(main) or {}
+        for b in opts:
+            bm = leg_meta.get(b["key"]) or {}
+            out.append({"route_id": m.get("route_id"), "vehicle": m.get("vehicle"), "leg": m.get("leg"),
+                        "alt": b["alt"], "from": (bm.get("busy") or {}).get("from"), "to": (bm.get("busy") or {}).get("to"),
+                        "from_min": b["from"], "to_min": b["to"], "main_key": main, "key": b["key"],
+                        "lorries": took.get(b["key"], 0)})
+    out.sort(key=lambda u: (u["route_id"] or "", u["from_min"], u["leg"] or ""))
+    return out
+
+
 def _weekday_dates(iso_from, iso_to):
     a, b = datetime.date.fromisoformat(iso_from), datetime.date.fromisoformat(iso_to)
     out = []
@@ -1324,6 +1408,17 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
             else:
                 legs[key] = None
 
+    # 5 Nov 2026 (task 0d-2): the busy-hours roads; the day the scale stands for is the date, else the period's first
+    # weekday (a busy-hours use runs on weekdays only)
+    busy = {}
+    try:
+        bday = chosen if scale == "day" else next((d for d in (span_days or []) if d.weekday() < 5), None)
+        if bday is not None:
+            busy = _busy_legs(lines, per, bday, with_lines, zone_rows, speed, legs, leg_minutes, leg_meta, used_zones)
+    except Exception as e:
+        print("sim busy hours:", str(e)[:160])
+        busy = {}
+
     # the gates of the day: every entry gate a line arrives by, plus the pour's
     gate_ids = []
     for l in lines:
@@ -1489,7 +1584,9 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
            "haul_roads": {z: zone_rows[z] for z in sorted(used_zones - access_ids)} if with_lines else {},
            "sites": sites, "gate_loc": gate_loc, "factors": factors, "planned_pours": planned,
            # 29 Oct 2026 (task 3c): the holding areas of the day (served sites only)
-           "holding": hold_in}
+           "holding": hold_in,
+           # 5 Nov 2026 (task 0d-2): the busy-hours roads (main leg key -> its options in their hours)
+           "busy": busy}
     if p:
         sc = dict(sc, pour=p)
     pattern = sc.get("arrivals") or {"kind": "even"}
@@ -1586,6 +1683,8 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
             arrivals.append({"gate": gid, "kind": a["kind"], "pour_id": a.get("pour_id"),
                              "line": a["line"] if (a["line"] is None or mine(a["line"])) else None,
                              "route": a["route"], "leg": a.get("leg"),
+                             # 5 Nov 2026 (task 0d-2): set off in a busy-hours use's hours, on Alt N
+                             "busy_alt": a.get("busy_alt"),
                              "at": _r2(a["t"]), "start": _r2(a["start"]), "wait": _r2(a["wait"]),
                              "done": _r2(a["done"]), "depart": _r2(a.get("depart")),
                              "from_m": _r2(a.get("from_m")), "t_from": _r2(a.get("t_from")),
@@ -1831,6 +1930,9 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         # 17 Oct 2026: where a pour can go (working sites only), busiest first; the first is the screen's default
         "pour_gates": pgates, "pour_default": (pgates[0]["gate_id"] if pgates else None),
         "legs": out_legs,
+        # 5 Nov 2026 (task 0d-2): the busy-hours roads of the day — route, option, hours, the two leg keys, and how many
+        # of the day's lorries set off in the hours and took it
+        "busy_hours": _busy_reply(busy, leg_meta, arrivals),
         # routes the drawing cannot show: no route worked out for any vehicle (their lorries still count at the gates)
         "not_drawn": (sorted({l["route_id"] for l in lines if not (l["laden_leg"] and legs.get(l["laden_leg"]))})
                       if with_lines else None),

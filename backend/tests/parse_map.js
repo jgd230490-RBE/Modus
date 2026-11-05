@@ -7446,6 +7446,18 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      !/\b(secure|real-time|AI|optimi[sz]e|predict|live tracking|truck)\b/i.test(row + pop.slice(pop.indexOf("Show the site layout") - 400, pop.indexOf("Show the site layout") + 40)));
 }
 
+// 5 Nov 2026 (task 0d-2, Q15 = P2, Q16): the busy-hours road on the public map
+ok("BUSY HOURS: a picked route's busy-hours road ('BusyHours' features) is drawn thin blue with a white edge under the pick, its hours as a text beside it (no DOM marker); cleared with the pick",
+   code.includes("if(!map.getLayer('busy-casing')) map.addLayer({id:'busy-casing',type:'line',source:'busy-route'")
+   && code.includes("'line-color':BUSY_ROAD_COLOR,'line-width':2.6") && code.includes("const BUSY_ROAD_COLOR = CONFIG.COLORS.forecast;")
+   && code.includes("type:'symbol',source:'busy-hours-at'") && code.includes("hours: f.properties.from + '–' + f.properties.to")
+   && code.includes("        showBusyRoad(rl);\n") && code.includes("        showBusyRoad(null);\n") && !/new mapboxgl\.Marker/.test(code));
+ok("BUSY HOURS: the route card says it in one line — 'Weekdays 16:00–19:00' / 'Another road, X mi shorter.' — no collision words",
+   code.includes("rows.unshift(['Weekdays ' + p.from + '–' + p.to, how.charAt(0).toUpperCase() + how.slice(1)]);")
+   && code.includes("'another road, ' + fmtDist(Math.abs(d), 1) + ' ' + DU() + (d < 0 ? ' shorter.' : ' longer.')"));
+ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road — no layer but the pick's reads 'BusyHours'",
+   (code.match(/'BusyHours'/g) || []).length === 2);
+
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();
   for (const f of fail) console.log("  FAIL:", f);

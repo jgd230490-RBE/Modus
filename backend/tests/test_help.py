@@ -1332,5 +1332,23 @@ ok("SITE LAYOUTS (PR 5): the sheet's file name is said in words, not one long un
    "site-layout-&lt;id&gt;-&lt;phase&gt;" not in _tg2 and "the file named for the site&#39;s id, the phase, the page and the scale" in _tg2)
 ok("PICTURES: ...and its upload address is not one long unbroken token (it pushed the guide 24 px sideways at 390 px; UI audit 31 Oct)",
    "/site-layout/pictures?name=" not in _tg2)
+# 5 Nov 2026 (task 0d-2): busy-hours roads in both guides
+_ug0d = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+_tg0d = open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()
+ok("BUSY HOURS: user guide 9.2 says how to take an offer, what changes, Stop, paused / Use again, no longer offered, where else it shows",
+   'id="ug-busy-hours"' in _ug0d and "<strong>Use Alt 2 on weekdays 16:00&ndash;19:00</strong> (planners and admins)" in _ug0d
+   and "<strong>Stop</strong> puts the usual road back." in _ug0d and "until you press <strong>Use again</strong>" in _ug0d
+   and "it stays in use until you stop it" in _ug0d and "In a closure&#39;s dates its diversion comes first." in _ug0d)
+ok("BUSY HOURS: the collision history line no longer says nothing can be switched; the map, Simulation and Carbon planner say it in a sentence each",
+   "nothing is switched until a planner or admin takes it there, &sect;9.2)" in _ug0d and "nothing is switched)" not in _ug0d
+   and 'id="ug-map-busy"' in _ug0d and 'id="ug-sim-busy"' in _ug0d and 'id="ug-carbon-route-choices"' in _ug0d)
+_ug0d_new = "".join(_ug0d[_ug0d.index('id="%s"' % k):][:1500].split("</li>")[0].split("</p>")[0]
+                    for k in ("ug-busy-hours", "ug-map-busy", "ug-sim-busy", "ug-carbon-route-choices"))
+ok("BUSY HOURS: ...and the new user guide words name no back end (no address, table, field or code)",
+   not re.search(r"/api/|route_choice|reason_kind|line_fp|<code>|\b(server|endpoint|token|cached|geometry|bake|baked|HERE)\b", _ug0d_new))
+ok("BUSY HOURS: technical T1 #t1-busy-hours holds the detail (the call, the rows, the share, the savings, the Simulation's swap, the other outputs)",
+   'id="t1-busy-hours"' in _tg0d and "<code>POST /api/routes/{id}/busy-hours</code>" in _tg0d and "<code>line_fp</code>" in _tg0d
+   and "<code>route_choice.busy_share(from, to, span)</code>" in _tg0d and "<code>backend/busy_savings.py</code>" in _tg0d
+   and "<code>sim._busy_legs</code>" in _tg0d and "<code>BusyHours</code>" in _tg0d)
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

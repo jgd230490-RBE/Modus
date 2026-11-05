@@ -15,7 +15,12 @@ WHAT IS ASSERTED
   * a Route all that changes Alt N pauses the use (Q11); Use again; Stop (Q13 roles: planner yes, submitter no);
   * busy_savings: planned trips in the hours x the difference a trip makes, a dearer road ADDS (Q19), recorded loads
     from the Use date as "so far" (Q18); better_all_day (Q3);
-  * the endpoint answers: uses, offered (Q12), can_use; source guards for the readers that must not follow.
+  * the endpoint answers: uses, offered (Q12), can_use; source guards for the readers that must not follow;
+  * the Simulation (sim.day): a lorry SETTING OFF in the hours takes Alt N's line and time, the others the main road,
+    the day lists its busy-hours roads and counts them; a zone's month has none on that leg (Q10); Stop clears it;
+  * the public map data's 'BusyHours' features (Q15), the route sheet's extra page (Q7, and the PDF), the Day sheet's
+    words, the cost lines' busy figures (Q17), each use's share and open hours; source guards for the diversions read
+    and the CLP's appendix H.
 
 WHAT THIS DOES NOT PROVE
 ------------------------
@@ -361,6 +366,99 @@ ok("...the use reads paused, and the busy hours on the loaded leg go back to the
    and route_choice.busy_alt_at("R1", ART, "loaded", MON, 990) == 0 and route_choice.busy_alt_at("R1", ART, "return", MON, 990) == 2)
 route_choice.use_busy("R1", 2, "16:00", "19:00", who="Pat")
 ok("...Use again takes the new line and is in use", route_choice.busy_uses("R1")[0]["status"] == "in_use")
+
+# =========================================================================== #
+#  8. The Simulation: a lorry that sets off in the hours takes Alt 2          #
+# =========================================================================== #
+import gates  # noqa: E402
+import sim  # noqa: E402
+for gid, loc, lon in (("G1", "L1", -1.0), ("G2", "L2", -0.9)):
+    r = gates.create_gate(loc, "Main gate", LAT, lon, direction="both", is_default=True, gate_id=gid)
+    ok(f"fixture: gate {gid}", not r.get("error"), str(r))
+gates.set_route_gates("R1", origin_gate_id="G1", dest_gate_id="G2", origin_given=True, dest_given=True)
+db.execute("INSERT INTO forecasts (id, route_id, month_index, discipline, section_id, quantity, unit, material_type, "
+           "vehicle_type, status, ipt) VALUES ('F3', 'R1', ?, 'drainage', 'WS1', 29000, 't', 'Small aggregate', ?, "
+           "'Approved', 'IPT1')", (NOV27, ART))
+WDAYS = main._working_days(FAC)
+SD = sim.day(NOV27, access.current(), factors=FAC, working_days=WDAYS, send_lines=True)
+BH = SD.get("busy_hours") or []
+MK = f"R1|{ART}|loaded"
+ok("⭐ the day names its busy-hours roads: R1 Alt 2, both legs, 16:00–19:00",
+   sorted((u["route_id"], u["leg"], u["alt"], u["from"], u["to"]) for u in BH)
+   == [("R1", "loaded", 2, "16:00", "19:00"), ("R1", "return", 2, "16:00", "19:00")], str(BH))
+ok("...with Alt 2's own line and time beside the main one (send_lines)",
+   (SD["legs"].get(MK + "@2") or {}).get("drawn") is True and SD["legs"][MK + "@2"].get("alt") == 2
+   and abs(SD["legs"][MK + "@2"]["minutes"] - 0.24 * 60) < 1e-6 and abs(SD["legs"][MK]["minutes"] - 0.20 * 60) < 1e-6)
+mins = {k: v["minutes"] for k, v in SD["legs"].items()}
+arr = [a for a in SD["arrivals"] if a["kind"] in ("laden", "empty") and a.get("leg")]
+took = [a for a in arr if a.get("busy_alt")]
+main_ = [a for a in arr if not a.get("busy_alt")]
+base = lambda a: a["leg"].split("@")[0]
+ok("⭐ Q2: every lorry on Alt 2 SET OFF (its main road's time before the gate) between 16:00 and 19:00",
+   took and all(960 - 0.02 <= a["at"] - mins[base(a)] < 1140 for a in took), str([(a["at"], a["leg"]) for a in took][:6]))
+ok("...and every other lorry set off outside those hours, on the main road",
+   main_ and all(not (960 <= a["at"] - mins[a["leg"]] < 1140) and "@" not in a["leg"] for a in main_))
+ok("...the lorries on Alt 2 drive Alt 2's time (they set off earlier to reach the gate when D59 placed them)",
+   all(abs(a["depart"] - (a["at"] - mins[a["leg"]])) < 0.02 for a in took))
+ok("...the day counts them per road", sum(u["lorries"] for u in BH) == len(took) and len(took) > 0)
+DEC27 = NOV27 + 1
+SDd = sim.day(DEC27, access.current(), factors=FAC, working_days=WDAYS)
+dec_first = route_choice.month_days(DEC27)[0]
+zone_legs = {lg for lg in ("loaded", "return") if route_choice.choice_on("R1", ART, lg, dec_first) is not None}
+ok("⭐ Q10: in a month a dated zone decides a leg, that leg has no busy-hours road",
+   zone_legs and not any(u["leg"] in zone_legs for u in (SDd.get("busy_hours") or [])), str((zone_legs, SDd.get("busy_hours"))))
+route_choice.stop_busy("R1", "16:00", who="Pat")
+SD2 = sim.day(NOV27, access.current(), factors=FAC, working_days=WDAYS)
+ok("⭐ Stop: the next day has no busy-hours road and no lorry on Alt 2",
+   SD2["busy_hours"] == [] and not any(a.get("busy_alt") for a in SD2["arrivals"]))
+route_choice.use_busy("R1", 2, "16:00", "19:00", who="Pat")
+
+# =========================================================================== #
+#  9. The documents and the public map                                         #
+# =========================================================================== #
+import export  # noqa: E402
+import route_sheet  # noqa: E402
+import costlines  # noqa: E402
+from portable import offline, pdf_text  # noqa: E402
+ok("fixture: R1's busy hours back in use for section 9", route_choice.busy_uses("R1")[0]["status"] == "in_use")
+md = network.public_map_data()
+bf = [f for f in md["features"] if (f.get("properties") or {}).get("type") == "BusyHours"]
+ok("⭐ Q15: the public map data carries R1's busy-hours road, both legs, with its hours and the two lengths",
+   sorted(f["properties"]["leg"] for f in bf) == ["loaded", "return"]
+   and all(f["properties"]["route_id"] == "R1" and f["properties"]["alt_index"] == 2 and f["properties"]["from"] == "16:00"
+           and f["properties"]["to"] == "19:00" and f["properties"]["main_km"] == 7.0 for f in bf), str([f["properties"] for f in bf]))
+ok("...as its own type with no origin / dest keys (never drawn as a route of its own, never in the filters)",
+   all("origin" not in f["properties"] and "dest" not in f["properties"] for f in bf))
+S = route_sheet.sheet("R1", vehicle=ART)
+bp = [p for p in S["diversions"] if p.get("kind") == "busy"]
+ok("⭐ Q7: the route sheet has one more page for the busy-hours road, its heading and its words",
+   len(bp) == 1 and bp[0]["title"] == "Weekdays 16:00–19:00: take this road"
+   and "between 16:00 and 19:00 on a weekday? Use this road both ways." in bp[0]["why"]
+   and bp[0]["other_times"] == "At other times, page 1's route." and len(bp[0]["loaded"]) > 1, str(bp)[:300])
+offline(export)                         # Mapbox is never called: no basemap in the PDF
+txt = pdf_text(export.build_route_sheet_pdf(S))
+ok("...and the PDF prints that page", "take this road" in txt and "At other times, page 1" in txt, txt[-400:])
+S_f = route_sheet.sheet("R1", vehicle=FLAT)
+ok("...a lorry type with no Alt 2 gets no such page (Q1)", not [p for p in S_f["diversions"] if p.get("kind") == "busy"])
+ok("⭐ the Day sheet's words for a line whose route has a busy-hours road",
+   export.day_sheet_busy({"busy_hours": {"share": 0.1, "options": [{"alt": 2, "from": "16:00", "to": "19:00", "share": 0.1}]}})
+   == "Busy hours: Alt 2, weekdays 16:00–19:00" and export.day_sheet_busy({}) is None)
+CL = costlines.lines({"role": "planner"}, from_month=NOV27, to_month=NOV27, status="Approved")
+r1 = [l for l in CL["lines"] if l["route_id"] == "R1" and l["vehicle_type"] == ART]
+# the fixture's costing context has no fuel price, so the cost is None ("—" on the sheet); section 5 prices it
+ok("⭐ Q17: the cost lines carry each line's busy-hours trips and what they ADD (Alt 2 is longer: + kg; no fuel price: no cost)",
+   r1 and all(l["busy"] and l["busy"]["trips"] > 0 and l["busy"]["kg"] > 0 and (l["busy"]["eur"] is None or l["busy"]["eur"] > 0)
+              for l in r1),
+   str([l.get("busy") for l in r1]))
+_real_busy2 = collisions.busy_hours
+collisions.busy_hours = lambda rid, acc=None: {"shown": True, "period": "2021–2025", "offers": []}
+out = main._with_busy_uses("R1", collisions.busy_hours("R1"))
+collisions.busy_hours = _real_busy2
+ok("⭐ each use says its share of the route's trips and the route's open hours (the Routes page's sentence)",
+   abs(out["uses"][0]["share"] - round(1 / 9, 4)) < 1e-9 and out["uses"][0]["open"] == ["08:00", "17:00"], str(out["uses"][0]))
+ok("🔴 the diversions read carries the busy-hours uses (the Routes row's chip)", '"busy": route_choice.busy_uses(route_id)' in read("backend/main.py"))
+ok("🔴 the CLP's appendix H says a busy-hours road in use", "in use on weekdays" in read("backend/clp_doc_appendices_render.py")
+   and "busy_savings.for_route(rid)" in read("backend/clp_doc_appendices.py"))
 
 # =========================================================================== #
 #  7. Source guards                                                            #
