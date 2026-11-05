@@ -356,6 +356,14 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .slp-turner{width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #1E3A8A;cursor:grab;display:grid;place-items:center;font-size:15px;color:#1E3A8A;}
   .slp-eye{width:28px;height:28px;border-radius:6px;display:inline-grid;place-items:center;color:var(--muted);flex:none;}
   .slp-eye:hover{background:var(--surface-2);} .slp-eye::before{content:"◉";} .slp-eye[aria-pressed="false"]::before{content:"○";}
+  /* 5 Nov 2026: a site's layout full screen — the Locations grid over the whole window (z 70: under the i boxes and messages) */
+  .sl-full{position:fixed;inset:0;z-index:70;margin:0 !important;padding:8px;gap:8px !important;background:var(--surface-3);align-content:stretch;}
+  .mapboxgl-ctrl-group button.sl-full-btn{font-size:17px;line-height:1;color:#111827;} .sl-full-btn::before{content:"⤢";} .sl-full-btn[aria-pressed="true"]::before{content:"⤡";}
+  .sl-fold{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;}
+  .sl-fold:hover{background:var(--surface-2);}
+  .sl-demo-pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;background:var(--demo-bg);color:var(--demo-fg);font:700 12px/1 Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;box-shadow:inset 0 0 0 1px var(--demo-rule);}
+  .sl-demo-pill b{padding:0 5px;border-radius:3px;background:var(--demo-tag-bg);color:var(--demo-tag-fg);line-height:16px;letter-spacing:.08em;}
+  .sl-demo-on-map{position:absolute;top:10px;left:10px;z-index:3;}
   .row-menu-list{position:absolute;right:0;top:32px;z-index:20;min-width:220px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:8px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.28);text-align:left;white-space:nowrap;}
   .row-menu-list button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--popover-fg);font:inherit;font-size:14px;padding:7px 10px;border-radius:6px;cursor:pointer;}
   .row-menu-list button:hover{background:rgba(255,255,255,.06);} .row-menu-list button:disabled{opacity:.5;}
@@ -14065,6 +14073,48 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // ---- location management (Phase 1) ----
   const [mode, setMode] = useState("view");        // 'view' | 'add' | 'edit'
   const [form, setForm] = useState(null);          // {id?, name, role, loc_type, supplies[], receives[], lat, lon}
+  // 5 Nov 2026 (the mockup John approved, notes layout-fullscreen-mockup-1105, Q1-Q8): a site's layout full screen — the grid
+  // that holds the ONE map laid over the whole window, and Chrome asked to hide its bars too. Only at a desk (>= 1,024 px), on
+  // Locations with a site's layout card open or drawing. Leaving: ⤡, Done, a narrower window. Esc stays the drawing's (Chrome
+  // takes the first Esc for its own bars); unsaved work is never touched.
+  const [full, setFull] = useState(false);
+  const [fold, setFold] = useState({ l: false, r: false });   // the drawing's two side columns, folded in full screen
+  const fullCtl = useRef({ box: null, btn: null, toggle: null }), fsAsked = useRef(false), fullGrid = useRef(null);
+  const fullOk = isWide && subTab === "locations" && !!(drawing || (!form && readLoc) || (form && form.id));
+  const enterFull = () => {
+    setFold({ l: false, r: false }); setFull(true);
+    try { if(document.documentElement.requestFullscreen && !document.fullscreenElement){ fsAsked.current = true; document.documentElement.requestFullscreen().catch(() => { fsAsked.current = false; }); } }
+    catch(e){ fsAsked.current = false; }   // Chrome's own full screen is a courtesy, never a requirement
+  };
+  const leaveFull = () => {
+    setFull(false);
+    try { if(fsAsked.current && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); } catch(e){}
+    fsAsked.current = false;
+  };
+  useEffect(() => { if(full && !fullOk) leaveFull(); }, [full, fullOk]);
+  // the page under it is out of reach while it is covered (Tab, a screen reader), and back after
+  useEffect(() => {
+    if(!full || !fullGrid.current) return;
+    const off = [];
+    for(let n = fullGrid.current; n.parentElement && n !== document.body; n = n.parentElement)
+      for(const x of n.parentElement.children) if(x !== n && !x.hasAttribute("inert") && !/^(SCRIPT|STYLE|LINK)$/.test(x.tagName)){ x.setAttribute("inert", ""); off.push(x); }
+    return () => off.forEach(x => x.removeAttribute("inert"));
+  }, [full]);
+  useEffect(() => {
+    // Esc or F11 gives Chrome its bars back; the layout stays over the window
+    const onFs = () => { if(!document.fullscreenElement) fsAsked.current = false; };
+    document.addEventListener("fullscreenchange", onFs);
+    return () => { document.removeEventListener("fullscreenchange", onFs); try { if(fsAsked.current && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch(e){} };
+  }, []);
+  // the ⤢ / ⤡ map control (made with the map, above + / −) follows the page
+  useEffect(() => {
+    const c = fullCtl.current; c.toggle = () => (full ? leaveFull() : enterFull());
+    if(!c.box) return;
+    c.box.style.display = fullOk ? "" : "none";
+    c.btn.setAttribute("aria-label", full ? "Leave full screen" : "Full screen");
+    c.btn.title = full ? "Leave full screen" : "Full screen";
+    c.btn.setAttribute("aria-pressed", full ? "true" : "false");
+  });
   const [savingLoc, setSavingLoc] = useState(false);
   const [locMsg, setLocMsg] = useState("");
   // ---- Phase 5a: gates ----
@@ -14194,6 +14244,16 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(mapObj.current || !mapDiv.current || !window.mapboxgl) return;
     window.mapboxgl.accessToken = mapbox_token;
     const m = new window.mapboxgl.Map({ container: mapDiv.current, style: basemap, center: UK_VIEW.center, zoom: UK_VIEW.zoom });
+    // 5 Nov 2026: the full-screen control of its own, above + / − (hidden until a site's layout is open)
+    m.addControl({
+      onAdd(){
+        const g = document.createElement("div"); g.className = "mapboxgl-ctrl mapboxgl-ctrl-group"; g.setAttribute("data-full-ctl", "1"); g.style.display = "none";
+        const b = document.createElement("button"); b.type = "button"; b.className = "sl-full-btn"; b.setAttribute("aria-label", "Full screen"); b.setAttribute("aria-pressed", "false");   // the glyph is CSS (::before)
+        b.addEventListener("click", () => { const c = fullCtl.current; if(c.toggle) c.toggle(); });
+        g.appendChild(b); fullCtl.current.box = g; fullCtl.current.btn = b; return g;
+      },
+      onRemove(){ const c = fullCtl.current; if(c.box && c.box.parentNode) c.box.parentNode.removeChild(c.box); c.box = null; c.btn = null; }
+    }, "top-right");
     m.addControl(new window.mapboxgl.NavigationControl(), "top-right");
     // drag bookkeeping for moving a node
     const drag = { id: null, moved: false };
@@ -15579,14 +15639,21 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
       {/* 31 Oct 2026 (4c PR 2): while drawing, the same grid holds the editor — its top bar across, the palette left, the map in
           the middle (the SAME div, placed by grid column, so the map is never unmounted), its settings right; the panel is hidden */}
-      <div className={drawing ? "grid gap-3" : "grid lg:grid-cols-3 gap-4"} style={drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined} data-drawing={drawing ? "1" : undefined}>
+      {/* 5 Nov 2026: in full screen (sl-full) the same grid lies over the whole window: the Drawing bar, then palette | map |
+          settings filling the height (either side folds to a strip); before Draw, the map | the site's panel */}
+      <div ref={fullGrid} className={(drawing ? "grid gap-3" : "grid lg:grid-cols-3 gap-4") + (full ? " sl-full" : "")} data-drawing={drawing ? "1" : undefined} data-full={full ? "1" : undefined}
+        style={full ? (drawing ? { gridTemplateColumns: `${fold.l ? 44 : 232}px minmax(0, 1fr) ${fold.r ? 44 : 300}px`, gridTemplateRows: "auto minmax(0, 1fr)" }
+          : { gridTemplateColumns: "minmax(0, 1fr) 380px", gridTemplateRows: "minmax(0, 1fr)" })
+          : drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined}>
         {/* ONE map instance, shared by both sub-tabs — this div is never unmounted */}
-        <div className={drawing ? "card overflow-hidden" : "lg:col-span-2 card overflow-hidden"} style={drawing && isWide ? { gridColumn: 2, gridRow: 2 } : undefined}>
-          <div ref={mapDiv} style={{ height: drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />
+        <div className={drawing ? "card overflow-hidden" : "lg:col-span-2 card overflow-hidden"}
+          style={full ? { gridColumn: drawing ? 2 : 1, gridRow: drawing ? 2 : 1, minHeight: 0, position: "relative" } : drawing && isWide ? { gridColumn: 2, gridRow: 2 } : undefined}>
+          <div ref={mapDiv} style={{ height: full ? "100%" : drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />
+          {full && !drawing && TENANT.demo_notice && <span className="sl-demo-pill sl-demo-on-map" role="note"><b>DEMO</b>{TENANT.demo_notice}</span>}
         </div>
 
         {/* 27 Oct 2026 (P5): read-only, the panel may hold no control at all, so it is a tab stop itself to scroll by keyboard */}
-        <div className="space-y-4" style={drawing ? { display: "none" } : panelStyle} {...(canEdit ? {} : { tabIndex: 0, role: "region", "aria-label": onLoc ? "Locations panel" : onZones ? "Zones panel" : "Routes panel" })}>
+        <div className="space-y-4" style={drawing ? { display: "none" } : full ? { gridColumn: 2, gridRow: 1, minHeight: 0, overflowY: "auto" } : panelStyle} {...(canEdit ? {} : { tabIndex: 0, role: "region", "aria-label": onLoc ? "Locations panel" : onZones ? "Zones panel" : "Routes panel" })}>
           {onLoc && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
@@ -16507,7 +16574,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           </div>
         </div>
         {drawing && styles_ok(SL_STYLES) && <SiteLayoutDraw key={drawing.locId} mapRef={mapObj} styles={SL_STYLES} locId={drawing.locId} phaseId={drawing.phaseId} wide={isWide}
-          roads={(zoneList || []).filter(z => z.location_id === drawing.locId)} reinstallRef={drawReinstallRef} onDone={() => setDrawing(null)} />}
+          roads={(zoneList || []).filter(z => z.location_id === drawing.locId)} reinstallRef={drawReinstallRef} onDone={() => { setDrawing(null); leaveFull(); }}
+          full={full} fold={fold} onFold={(s) => setFold(f => ({ ...f, [s]: !f[s] }))} site={(locs.find(l => l.id === drawing.locId) || {}).name || ""} />}
       </div>
 
       {drawing ? null : onLoc ? (
@@ -17288,7 +17356,7 @@ const SL_HINT = { select: "Click a thing to select it. Drag to move it, drag a c
 
 // the drawing tools' palette: one tool a row, the picked one white on navy
 const PalBtn = ({ on, ...r }) => <button {...r} aria-pressed={on} className={"w-full flex items-center gap-2 text-left text-[13px] rounded px-1.5 py-1 " + (on ? "text-white" : "text-slate-700 hover:bg-slate-100")} style={on ? { background: "var(--navy)" } : undefined} />;
-function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstallRef, onDone }){
+function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstallRef, onDone, full, fold, onFold, site }){
   const E = useRef(null);
   if(!E.current) E.current = { draw: null, h: null, holes: new Map(), last: new Map(), kept: [], hist: [], fut: [], saved: "[]",
     hidden: new Set(), locked: new Set(), snap: true, angle: false, tool: { kind: "select" }, sel: null, ver: null, ctx: [], pend: 0, pushT: 0, dirty: false,
@@ -17746,6 +17814,7 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
   const meas = !sel ? "" : sel.geometry.type === "LineString" ? `${Math.round(slGeo().lengthM(sel.geometry.coordinates)).toLocaleString("en-GB")} m long`
     : sel.geometry.type === "Polygon" ? `${Math.round(withHoles(sel).geometry.coordinates.reduce((s, r, i) => s + (i ? -1 : 1) * window.WSLayouts.areaM2(r), 0)).toLocaleString("en-GB")} m²` : "";   // less the holes
   const place = (c, r) => wide ? { gridColumn: c, gridRow: r } : undefined;
+  const colH = full ? { height: "100%", minHeight: 0 } : { maxHeight: wide ? SL_DRAW_H : undefined };   // full screen: the columns fill the height
   const lab = "block text-[13px] font-medium text-slate-700";
   const inp = "mt-0.5 w-full border border-slate-300 rounded px-2 py-1 text-[13px] bg-white";
   const tb = "px-2.5 py-1 rounded-lg border border-slate-300 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40";
@@ -17755,12 +17824,14 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
   return <>
     <div className="card p-2.5 flex flex-wrap items-center gap-x-3 gap-y-2" style={place("1 / -1", 1)} data-site-layout-draw="1" role="toolbar" aria-label="Drawing the site layout">
       <span className="text-sm font-semibold text-slate-800">Drawing</span>
+      {full && site && <span className="text-[13px] text-slate-700" data-full-site="1">{site}</span>}
       <select value={phase ? phase.id : ""} onChange={ev => switchPhase(ev.target.value)} disabled={busy !== ""} aria-label="Phase drawn"
         className="border border-slate-300 rounded-lg px-2 py-1 text-[13px] bg-white">
         {phases.map(x => <option key={x.id} value={x.id}>{x.name} ({slMonths(x)})</option>)}
       </select>
       <span className="text-[13px]" style={{ color: dirty || pdirty ? "var(--warn-text)" : "var(--muted)" }} data-save-state={dirty || pdirty ? "dirty" : "clean"}>{dirty || pdirty ? "Unsaved changes" : "All changes saved"}</span>
       <span className="ml-auto flex flex-wrap items-center gap-2">
+        {full && TENANT.demo_notice && <span className="sl-demo-pill" role="note"><b>DEMO</b>{TENANT.demo_notice}</span>}
         <button onClick={undo} disabled={!hist.undo || busy !== ""} className={tb} title="Undo (Ctrl+Z)">Undo</button>
         <button onClick={redo} disabled={!hist.redo || busy !== ""} className={tb} title="Redo (Ctrl+Y)">Redo</button>
         <button onClick={save} disabled={!(dirty || pdirty) || busy !== ""} className="px-3 py-1 rounded-lg text-white font-semibold text-[13px] disabled:opacity-50" style={{ background: "var(--navy)" }} title="Save (Ctrl+S)">{busy === "save" ? "Saving…" : "Save"}</button>
@@ -17781,7 +17852,10 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
         </p>
       )}
     </div>
-    <div className="card p-2 space-y-2" style={{ ...place(1, 2), maxHeight: wide ? SL_DRAW_H : undefined, overflowY: "auto", ...(corner ? { opacity: 0.45, pointerEvents: "none" } : {}) }} data-site-layout-palette="1" aria-label="What to draw" role="region" tabIndex={0} aria-disabled={corner ? "true" : undefined}>
+    <div className="card p-2 space-y-2" style={{ ...place(1, 2), ...colH, overflowY: "auto", ...(corner ? { opacity: 0.45, pointerEvents: "none" } : {}) }} data-site-layout-palette="1" aria-label="What to draw" role="region" tabIndex={0} aria-disabled={corner ? "true" : undefined}>
+      {full && <div className="flex justify-end"><button type="button" className="sl-fold" onClick={() => onFold("l")} aria-expanded={!fold.l}
+        aria-label={fold.l ? "Show what to draw" : "Hide what to draw"} title={fold.l ? "Show what to draw" : "Hide what to draw"}>{fold.l ? "»" : "«"}</button></div>}
+      {!(full && fold.l) && <>
       <PalBtn onClick={() => setTool({ kind: "select" })} on={tk === "select"}>↖ Select</PalBtn>
       <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-500 pt-1">Lines</div>
       {LINES.map(s => <PalBtn key={s.key} onClick={() => setTool({ kind: "line", style: s.key })} on={tk === "line:" + s.key}>
@@ -17803,8 +17877,12 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
             <img alt="" src={slSvg(s.svg)} style={{ width: 28, height: 28, display: "block", margin: "0 auto" }} /></button>)}
         </div>
       </div>)}
+      </>}
     </div>
-    <div className="space-y-3" style={{ ...place(3, 2), maxHeight: wide ? SL_DRAW_H : undefined, overflowY: "auto" }} data-site-layout-side="1" role="region" aria-label="Drawing settings" tabIndex={0}>
+    <div className={"space-y-3" + (full && fold.r ? " card p-2" : "")} style={{ ...place(3, 2), ...colH, overflowY: "auto" }} data-site-layout-side="1" role="region" aria-label="Drawing settings" tabIndex={0}>
+      {full && <div className="flex"><button type="button" className="sl-fold" onClick={() => onFold("r")} aria-expanded={!fold.r}
+        aria-label={fold.r ? "Show the settings" : "Hide the settings"} title={fold.r ? "Show the settings" : "Hide the settings"}>{fold.r ? "«" : "»"}</button></div>}
+      {!(full && fold.r) && <>
       <div className="card p-3 space-y-2" data-site-layout-selected="1">
         <div className="text-sm font-semibold text-slate-700">{sel ? sname : "Selected"}</div>
         <p className="text-[13px] text-slate-500">{busy === "load" ? "Opening…" : hint}</p>
@@ -17921,6 +17999,7 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
         <label className="flex items-center gap-1.5"><input type="checkbox" checked={angle} onChange={ev => { e.angle = ev.target.checked; setAngle(ev.target.checked); if(e.draw) ["linestring", "polygon"].forEach(md => e.draw.updateModeOptions(md, { snapping: snapping() })); }} />15° steps</label>
         <p className="text-slate-500">Words show from zoom {(window.WSLayouts && window.WSLayouts.WORDS_Z) || 15}.</p>
       </div>
+      </>}
     </div>
   </>;
 }
