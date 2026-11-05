@@ -483,7 +483,8 @@ notes blanked, the pin rounded to 3 decimal places; open 24 months: the contact 
 <code>within</code> (of those that asked a reply and are due: replied within <code>concern_reply_days</code>), by month, by kind, the five
 busiest routes. <code>outcome = spam</code> never counted; a site keeps the routes that start or end there and the concerns pinned there.
 <code>GET /api/concerns/figures?from=&amp;to=&amp;sites=</code> (planners and admins; read fresh, never kept). The bulletin&#39;s glance row
-and table: <code>bulletin_doc.concern_month(mi)</code> (None when the form is off and none was ever recorded: the row stays Not reported);
+(both the web page and the PDF) and the kinds table (the web page only: the PDF newsletter has no room for it at four pages):
+<code>bulletin_doc.concern_month(mi)</code> (None when the form is off and none was ever recorded: the row stays Not reported);
 the CLP&#39;s §7: <code>clp_doc.concern_words(d)</code> (12 months to the snapshot, the plan&#39;s sites).</li></ul>
 <h2 id="t1-clp-notes">CLP notes and tasks</h2>
 <p>31 Oct 2026 (task 4a, PR 3b; mockup <code>notes/clp-notes-mockup-1031</code>, Q1–Q12 as recommended). <code>backend/clp_notes.py</code>

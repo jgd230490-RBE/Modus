@@ -752,9 +752,10 @@ def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, mo
         ("Vehicle and operator standards (FORS, CLOCS, Euro VI, Direct Vision Standard)", NOT_REPORTED,
          "Not in this bulletin"),
         ("Collisions and near misses", NOT_REPORTED, "Not in this bulletin"),
-        # NARROWED 5 Nov 2026 (group 6, PR 2): the scheme's own record when it takes concerns (counts only)
-        (("Concerns from the public", f"{concerns_m['received']} received · {concerns_m['closed']} closed",
-          "Recorded: reported on the map or by email") if concerns_m is not None
+        # NARROWED 5 Nov 2026 (group 6, PR 2): the scheme's own record when it takes concerns (counts only). Short enough that
+        # each cell stays on ONE line in the PDF's narrow figure / data columns: a two-line row took the newsletter to five pages
+        (("Concerns from the public, received · closed", f"{concerns_m['received']} · {concerns_m['closed']}",
+          "Map and email records") if concerns_m is not None
          else ("Enquiries and complaints", NOT_REPORTED, "Not in this bulletin")),
     ]
     return [{"item": a, "figure": b, "data": d, "not_reported": b == NOT_REPORTED} for a, b, d in rows]

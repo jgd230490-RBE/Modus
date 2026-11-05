@@ -2297,22 +2297,9 @@ def _glance_flow(K, S):
     out = [P("This month at a glance", K.st_sec), t,
            P("Not reported: needs observed records (counts, gate or camera records). A forecast has none, so the line "
              "is left empty, never estimated.", K.st_grey)]
-    # 5 Nov 2026 (group 6, PR 2; card 7): the month's concerns by kind, counts only, when there are any
-    cm = S.get("concerns") or {}
-    if cm.get("kinds"):
-        import bulletin_doc
-        ck = [[P("Concerns this month", hd), P("Received", ParagraphStyle("glhr2", parent=hd, alignment=2)),
-               P("Closed", ParagraphStyle("glhr3", parent=hd, alignment=2))]]
-        for k in cm["kinds"]:
-            ck.append([P(E(k["kind"]), sm), P(str(k["received"]), smr), P(str(k["closed"]), smr)])
-        t2 = LongTable(ck, colWidths=[K.usable * 0.57, K.usable * 0.14, K.usable * 0.14], repeatRows=1)
-        t2.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [
-                               ("TOPPADDING", (0, 0), (-1, -1), 1.3), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.3),
-                               ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]))
-        out.append(t2)
-        line = bulletin_doc.concern_reply_line(cm)
-        if line:
-            out.append(P(E(line), K.st_grey))
+    # 5 Nov 2026 (group 6, PR 2; card 7): on paper the month's concerns are the glance row only (received · closed). The page
+    # holding this table has no room: a table of kinds, then even one grey line of them, took the newsletter to five pages
+    # (D43 keeps it at four). The kinds and the median first reply are on the web bulletin, under the same table.
     return out
 
 

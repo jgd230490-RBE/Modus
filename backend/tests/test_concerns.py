@@ -624,9 +624,13 @@ ok("⭐ BULLETIN: October's concerns — received, closed, by kind, the median f
    _cm is not None and _cm["received"] == 4 and _cm["closed"] == 3 and _cm["kinds"][0] == {"kind": "Mud or debris on the road", "received": 2, "closed": 2},
    str(_cm))
 _g = bulletin_doc._glance({}, {}, [], [], [], None, [], None, "October 2026", _cm)
-ok("BULLETIN: the glance row reads 'Concerns from the public: 4 received · 3 closed', marked as a record",
-   any(r["item"] == "Concerns from the public" and r["figure"] == "4 received · 3 closed" and not r["not_reported"]
-       and r["data"].startswith("Recorded") for r in _g), str(_g[-1]))
+# NARROWED 5 Nov 2026 (the newsletter stays at four pages, D43): the item carries "received · closed", the figure only the two
+# counts, the data cell a short "Map and email records", so no cell wraps in the PDF's narrow columns
+ok("BULLETIN: the glance row reads 'Concerns from the public, received · closed: 4 · 3', marked as a record",
+   any(r["item"] == "Concerns from the public, received · closed" and r["figure"] == "4 · 3" and not r["not_reported"]
+       and r["data"] == "Map and email records" for r in _g), str(_g[-1]))
+ok("BULLETIN: ...each cell short enough for one line in the PDF (figure ≤ 12 characters like 'Not reported', data ≤ 22)",
+   all(len(r["figure"]) <= 12 and len(r["data"]) <= 22 for r in _g if r["item"].startswith("Concerns")))
 _g0 = bulletin_doc._glance({}, {}, [], [], [], None, [], None, "October 2026", None)
 ok("BULLETIN: ...and without concerns it is still 'Enquiries and complaints: Not reported'",
    _g0[-1] == {"item": "Enquiries and complaints", "figure": "Not reported", "data": "Not in this bulletin", "not_reported": True})
@@ -634,6 +638,11 @@ ok("BULLETIN: the line under the table", bulletin_doc.concern_reply_line(_cm) ==
    and bulletin_doc.concern_reply_line({"first_reply_median": 2.5}) == "First reply: median 2.5 working days."
    and bulletin_doc.concern_reply_line({}) == "")
 ok("🔴 BULLETIN: counts only — no words, name or email", not any(w in json.dumps(_cm) for w in ("Secret", "secret@")))
+_EXP = open(os.path.join(BACKEND, "export.py"), encoding="utf-8").read()
+_GLF = _EXP[_EXP.index("def _glance_flow(K, S):"):_EXP.index("def _lot_flow(")]
+ok("BULLETIN (paper): the concerns are the glance row only — no table and no line of kinds in the PDF (the newsletter stays at four pages, D43)",
+   "LongTable(ck" not in _EXP and "concern_kinds_line" not in _EXP and 'S.get("concerns")' not in _GLF)
+
 db.execute("DELETE FROM concerns WHERE tenant_id = ? AND id LIKE 'C-01%'", (db.current_tenant(),))
 set_tenant(concerns_on=False)
 ok("BULLETIN: a scheme with no form and none recorded keeps the row Not reported", bulletin_doc.concern_month(10) is None)
