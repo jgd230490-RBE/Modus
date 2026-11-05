@@ -6080,7 +6080,10 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      /<div class="control-group share-group" id="share-group">\s*<div class="share-row">\s*<button[^>]*id="btn-month-text"[^>]*>Month as text<\/button>\s*<button[^>]*id="btn-share"[^>]*>Link and QR code<\/button>\s*<button[^>]*id="btn-detail"[^>]*>Forecast detail table<\/button>/.test(sb)
      // NARROWED 5 Nov 2026 (group 6): the share card's slot is now followed by the Report a concern form, then the export card
      && /<div class="concern-slot"><\/div>\s*<\/div>\s*\n\s*<!-- 5 Nov 2026 \(group 6, mockup notes\/report-concern-mockup-1105 cards 2-3\): the Report a concern form\./.test(html)
-     && html.indexOf('<aside id="concern-panel"') > 0 && html.indexOf('<aside id="concern-panel"') < html.indexOf('<div id="rme-panel"')
+     // NARROWED 5 Nov 2026 (group 6, UI audit): the panel is a <div role="dialog"> like the share and export panels; an <aside> may not
+     // carry role="dialog" (axe aria-allowed-role on every map stop)
+     && html.indexOf('<div id="concern-panel" role="dialog" aria-labelledby="cn-title" hidden>') > 0
+     && html.indexOf('<div id="concern-panel"') < html.indexOf('<div id="rme-panel"') && !/<aside id="concern-panel"/.test(html)
      && (html.match(/id="btn-detail"/g) || []).length === 1);
   // ---- the wording ----
   const pops = (sb + html.slice(html.indexOf('<div class="control-group fc-box" id="fc-box">'), html.indexOf("</div>`;", html.indexOf('id="fc-box"'))));
