@@ -3176,86 +3176,6 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
 // 22 Oct 2026 (abnormal loads, phase 2): one strip under Gate arrivals — loads in the next four weeks, notices due or late
 // this week, permissions still to apply for — and the way to the page. One read (GET /abnormal/summary). Counted apart:
 // nothing here is in the six cards, the charts or the carbon target (decisions D70 and D71). Not on the big screen, not on a phone.
-// 5 Nov 2026 (group 6, PR 2; card 6 of the approved mockup): the Dashboard's Concerns section, planners and admins only,
-// folded and read the first time it is opened. It follows the Dashboard's month range and its Sites cut; counts only
-// (GET /api/concerns/figures). "Not a concern" is never counted.
-const cnYm = (idx, startYear) => `${startYear + Math.floor((idx - 1) / 12)}-${String(((idx - 1) % 12) + 1).padStart(2, "0")}`;
-const cnD = (v) => v == null ? "—" : (Math.round(v * 10) / 10).toLocaleString("en-GB", { maximumFractionDigits: 1 });
-function ConcernsDash({ months, lo, hi, sites, sitesLabel, tripsM, onOpen }){
-  const [open, setOpen] = useState(false);
-  const [data, setData] = useState(null);
-  const [err, setErr] = useState(false);
-  const sy = (months && months.start_year) || 2026;
-  const q = `from=${cnYm(lo, sy)}&to=${cnYm(hi, sy)}` + ((sites && sites.length) ? "&sites=" + sites.map(encodeURIComponent).join(",") : "");
-  useEffect(() => {
-    if(!open) return;
-    if(data && data._q === q) return;
-    let live = true;
-    setErr(false);
-    fetch(`${API}/concerns/figures?${q}`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => { if(live) setData({ ...j, _q: q }); })
-      .catch(() => { if(live) setErr(true); });
-    return () => { live = false; };
-  }, [open, q]);
-  const range = lo === hi ? monthLabelAbs(lo, sy) : `${monthLabelAbs(lo, sy)} – ${monthLabelAbs(hi, sy)}`;
-  const scope = [range, sitesLabel || null];
-  const C1 = tok("--chart-1", "#E8590C");
-  // per 1,000 planned two-way lorry movements, in the range's last month (a load is two movements: there and back)
-  let rate = null;
-  if(data && tripsM && tripsM.length){
-    const last = (data.by_month || [])[data.by_month.length - 1];
-    const moves = 2 * (tripsM[tripsM.length - 1] || 0);
-    if(last && moves > 0) rate = { v: last.received * 1000 / moves, m: monthLabelAbs(hi, sy) };
-  }
-  const Tile = ({ v, label }) => (
-    <div className="min-w-0" data-concern-fig="1"><div className="kpi-num font-bold fig-val" style={{ color: "var(--navy-deep)", lineHeight: 1.15 }}>{v}</div>
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mt-0.5 fig-label">{label}</div></div>);
-  const cfg = data ? { type: "bar", data: { labels: data.by_month.map(r => monthLabelAbs(cnIdx(r.month, sy), sy)),
-      datasets: [{ label: "concerns", data: data.by_month.map(r => r.received), backgroundColor: C1, borderWidth: 0 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-               scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 } } } } } : null;
-  return (
-    <details className="dash-more" data-concerns-dash="1" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>
-      <summary>Concerns from the public</summary>
-      <div className="pt-3">
-        <div className="ct-row mb-2"><span className="ct-line">Concerns · {range}{sitesLabel ? " · " + sitesLabel : ""}</span>
-          <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "6px 12px" }} onClick={() => onOpen && onOpen("concerns")}>Open Concerns</button></div>
-        {err && <div className="ct-line" data-concerns-dash-error="1">The concern figures did not load.</div>}
-        {!data && !err && <div className="ct-line">Loading the concern figures…</div>}
-        {data && <>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
-            <Tile v={data.received.toLocaleString("en-GB")} label="received" />
-            <Tile v={data.open_now.toLocaleString("en-GB")} label="open now" />
-            <Tile v={cnD(data.first_reply_median)} label="working days to first reply (median)" />
-            <Tile v={cnD(data.close_median)} label="working days to close (median)" />
-            {data.reply_days ? <Tile v={data.within && data.within.pct != null ? data.within.pct + " %" : "—"} label={`replied within ${data.reply_days} working days`} /> : null}
-          </div>
-          {data.received === 0 ? <div className="ct-line" data-concerns-dash-none="1">No concerns in these months.</div> : <>
-            <div className="card p-4 chart-card mb-3">
-              <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Concerns received a month</div>
-              <ChartCanvas config={cfg} title="Concerns received a month" scope={scope} />
-              {rate && <div className="text-xs text-slate-500 mt-1" data-concern-rate="1">Per 1,000 planned two-way lorry movements: {cnD(rate.v)} in {rate.m}.</div>}
-            </div>
-            <div className="grid md:grid-cols-2 gap-3">
-              <div className="overflow-auto"><table className="ga-table" data-concern-kinds="1">
-                <caption className="text-left text-sm font-semibold text-slate-700 pb-1">By kind</caption>
-                <thead><tr><th scope="col">Kind</th><th scope="col" className="num">Received</th><th scope="col" className="num">Closed</th></tr></thead>
-                <tbody>{data.by_kind.map(k => <tr key={k.kind}><td>{k.kind_text}</td><td className="num">{k.received}</td><td className="num">{k.closed}</td></tr>)}</tbody>
-              </table></div>
-              <div className="overflow-auto"><table className="ga-table" data-concern-routes="1">
-                <caption className="text-left text-sm font-semibold text-slate-700 pb-1">Busiest routes for concerns</caption>
-                <thead><tr><th scope="col">Route</th><th scope="col" className="num">Received</th></tr></thead>
-                <tbody>{data.routes.length ? data.routes.map(r => <tr key={r.route_id}><td>{r.route_id} · {r.words}</td><td className="num">{r.received}</td></tr>)
-                  : <tr><td colSpan={2} className="text-slate-500">No concern names a route.</td></tr>}</tbody>
-              </table></div>
-            </div>
-          </>}
-        </>}
-      </div>
-    </details>
-  );
-}
-const cnIdx = (ym, startYear) => (parseInt(ym.slice(0, 4), 10) - startYear) * 12 + parseInt(ym.slice(5, 7), 10);
-
 function AbnormalStrip({ onOpen, sites }){
   const [s, setS] = useState(null);
   const [err, setErr] = useState(false);
@@ -3489,6 +3409,86 @@ function stockMessage(sps){
                                    : `${h.sp.name} runs out in the week of ${stockWeekWord(h.w.from)}`,
            tone: h.kind === "over" ? "bad" : "warn", hits };
 }
+// 5 Nov 2026 (group 6, PR 2; card 6 of the approved mockup): the Dashboard's Concerns section, planners and admins only,
+// folded and read the first time it is opened. It follows the Dashboard's month range and its Sites cut; counts only
+// (GET /api/concerns/figures). "Not a concern" is never counted.
+const cnYm = (idx, startYear) => `${startYear + Math.floor((idx - 1) / 12)}-${String(((idx - 1) % 12) + 1).padStart(2, "0")}`;
+const cnD = (v) => v == null ? "—" : (Math.round(v * 10) / 10).toLocaleString("en-GB", { maximumFractionDigits: 1 });
+function ConcernsDash({ months, lo, hi, sites, sitesLabel, tripsM, onOpen }){
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(false);
+  const sy = (months && months.start_year) || 2026;
+  const q = `from=${cnYm(lo, sy)}&to=${cnYm(hi, sy)}` + ((sites && sites.length) ? "&sites=" + sites.map(encodeURIComponent).join(",") : "");
+  useEffect(() => {
+    if(!open) return;
+    if(data && data._q === q) return;
+    let live = true;
+    setErr(false);
+    fetch(`${API}/concerns/figures?${q}`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => { if(live) setData({ ...j, _q: q }); })
+      .catch(() => { if(live) setErr(true); });
+    return () => { live = false; };
+  }, [open, q]);
+  const range = lo === hi ? monthLabelAbs(lo, sy) : `${monthLabelAbs(lo, sy)} – ${monthLabelAbs(hi, sy)}`;
+  const scope = [range, sitesLabel || null];
+  const C1 = tok("--chart-1", "#E8590C");
+  // per 1,000 planned two-way lorry movements, in the range's last month (a load is two movements: there and back)
+  let rate = null;
+  if(data && tripsM && tripsM.length){
+    const last = (data.by_month || [])[data.by_month.length - 1];
+    const moves = 2 * (tripsM[tripsM.length - 1] || 0);
+    if(last && moves > 0) rate = { v: last.received * 1000 / moves, m: monthLabelAbs(hi, sy) };
+  }
+  const Tile = ({ v, label }) => (
+    <div className="min-w-0" data-concern-fig="1"><div className="kpi-num font-bold fig-val" style={{ color: "var(--navy-deep)", lineHeight: 1.15 }}>{v}</div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mt-0.5">{label}</div></div>);
+  const cfg = data ? { type: "bar", data: { labels: data.by_month.map(r => monthLabelAbs(cnIdx(r.month, sy), sy)),
+      datasets: [{ label: "concerns", data: data.by_month.map(r => r.received), backgroundColor: C1, borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+               scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 } } } } } : null;
+  return (
+    <details className="dash-more" data-concerns-dash="1" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>
+      <summary>Concerns from the public</summary>
+      <div className="pt-3">
+        <div className="ct-row mb-2"><span className="ct-line">Concerns · {range}{sitesLabel ? " · " + sitesLabel : ""}</span>
+          <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "6px 12px" }} onClick={() => onOpen && onOpen("concerns")}>Open Concerns</button></div>
+        {err && <div className="ct-line" data-concerns-dash-error="1">The concern figures did not load.</div>}
+        {!data && !err && <div className="ct-line">Loading the concern figures…</div>}
+        {data && <>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
+            <Tile v={data.received.toLocaleString("en-GB")} label="received" />
+            <Tile v={data.open_now.toLocaleString("en-GB")} label="open now" />
+            <Tile v={cnD(data.first_reply_median)} label="working days to first reply (median)" />
+            <Tile v={cnD(data.close_median)} label="working days to close (median)" />
+            {data.reply_days ? <Tile v={data.within && data.within.pct != null ? data.within.pct + " %" : "—"} label={`replied within ${data.reply_days} working days`} /> : null}
+          </div>
+          {data.received === 0 ? <div className="ct-line" data-concerns-dash-none="1">No concerns in these months.</div> : <>
+            <div className="card p-4 chart-card mb-3">
+              <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Concerns received a month</div>
+              <ChartCanvas config={cfg} title="Concerns received a month" scope={scope} />
+              {rate && <div className="text-xs text-slate-500 mt-1" data-concern-rate="1">Per 1,000 planned two-way lorry movements: {cnD(rate.v)} in {rate.m}.</div>}
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              <div className="overflow-auto"><table className="ga-table" data-concern-kinds="1">
+                <caption className="text-left text-sm font-semibold text-slate-700 pb-1">By kind</caption>
+                <thead><tr><th scope="col">Kind</th><th scope="col" className="num">Received</th><th scope="col" className="num">Closed</th></tr></thead>
+                <tbody>{data.by_kind.map(k => <tr key={k.kind}><td>{k.kind_text}</td><td className="num">{k.received}</td><td className="num">{k.closed}</td></tr>)}</tbody>
+              </table></div>
+              <div className="overflow-auto"><table className="ga-table" data-concern-routes="1">
+                <caption className="text-left text-sm font-semibold text-slate-700 pb-1">Busiest routes for concerns</caption>
+                <thead><tr><th scope="col">Route</th><th scope="col" className="num">Received</th></tr></thead>
+                <tbody>{data.routes.length ? data.routes.map(r => <tr key={r.route_id}><td>{r.route_id} · {r.words}</td><td className="num">{r.received}</td></tr>)
+                  : <tr><td colSpan={2} className="text-slate-500">No concern names a route.</td></tr>}</tbody>
+              </table></div>
+            </div>
+          </>}
+        </>}
+      </div>
+    </details>
+  );
+}
+const cnIdx = (ym, startYear) => (parseInt(ym.slice(0, 4), 10) - startYear) * 12 + parseInt(ym.slice(5, 7), 10);
+
 function DashboardStockChart({ meta, weekNow, wall, fill, tick, from, to }){
   const { months } = meta;
   const [data, setData] = useState(null);
