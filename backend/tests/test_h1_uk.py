@@ -1177,7 +1177,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 31 Oct 2026 (task 4c PR 2): bad-text 40 -> 41, warn-text 15 -> 16 — the drawing tools' save line (red when a
    # save fails) and "Unsaved changes" (amber)
    # NARROWED 31 Oct 2026 (task 4a PR 3d): bad-text 41 -> 42 — the reviewer page's task "overdue"
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 42 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
+   # NARROWED 5 Nov 2026 (group 6): bad-text 42 -> 44 — Track → Concerns: a failed step's line and a late concern's "N waiting"
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 44 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
    _fe_wo.count("var(--warn-text)") == 16
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe

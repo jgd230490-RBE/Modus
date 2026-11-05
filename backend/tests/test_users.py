@@ -773,7 +773,12 @@ ok("...skipping only the POSTs that change nothing and the paths that log themse
    set(main.AUDIT_SKIP) == {"/api/costing/preview", "/api/carbon/scenario", "/api/carbon/summary.pdf",
                             "/api/public/demo-request", "/api/map-auth", "/api/gate-signout", "/api/auth", "/api/activity",
                             # NARROWED 31 Oct 2026 (task 4c PR 1): reading a drawing saves nothing (it is held; the place is audited)
-                            "/api/site-layouts/read"}
+                            "/api/site-layouts/read",
+                            # NARROWED 5 Nov 2026 (group 6): a concern's body is a member of the public's words and contact;
+                            # its endpoints write their own audit row (the reference and the step, never the words)
+                            "/api/public/concerns", "/api/concerns"}
+   and main.AUDIT_SKIP_PREFIXES == ("/api/auth/", "/api/concerns/")
+   and not main._audited("/api/concerns/C-0001/reply") and not main._audited("/api/public/concerns")
    and main._audited("/api/locations/L1/site-layout/place")
    and main._audited("/api/forecasts/bulk") and main._audited("/api/admin/config/factors")
    and main._audited("/api/routes/R1/status") and not main._audited("/api/auth/signin"))
