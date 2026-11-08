@@ -201,8 +201,10 @@ ok("\U0001f534 the placeholder figures no longer claim to be live captures \u201
 # rewrite says, each statement checked against the code on 11 Oct 2026, and what it no longer says.
 # What they do not prove: that the screens still read this way after a later change to the app, or how
 # the page looks in a browser (help_browser_check.js, not in the default suite).
-ok("guide update: the version line is v2.1 of 11 October 2026 and links to the PUBLIC map by that name",
-   "User guide v2.1 · 11 October 2026" in src and '<a href="/map/">public map</a>' in src
+# NARROWED 8 Nov 2026 (v2 closed, John): the line names the release, not a guide revision, so it cannot be read as
+# v2.1 (the next release); the 11 Oct revision label is gone.
+ok("guide update: the version line is Wayscope v2 of 8 November 2026 and links to the PUBLIC map by that name",
+   "User guide · Wayscope v2 · 8 November 2026" in src and "User guide v2.1 · 11 October 2026" not in src and '<a href="/map/">public map</a>' in src
    and '<a href="/map/">route map</a>' not in src and "v2.0 · 16 September 2026" not in src)
 ok("...the map is the public map: the heading, the callout and the nav say so; the menu's Route map is explained",
    '<h1 id="8-the-public-map">8. The public map</h1>' in src and "8. The route map" not in src
