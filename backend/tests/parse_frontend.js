@@ -5270,6 +5270,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // the Chrome check (8 Nov): in full screen the DEMO pill sat over Out · Back · Both, and the detail table pushed the column sideways
   ok("ROUTES PAGE (2.1-8): in full screen on a demo the map's box sits under the DEMO pill; the detail table scrolls inside the right column",
      dmr.includes("<RouteMapBox low={full && !!TENANT.demo_notice}") && box.includes("top: low ? 44 : 8")
+     && box.includes('background: "var(--navy)", color: "var(--control-fg)"') && !box.includes('color: "#fff"')   // the audit: white on the Dark look's orange was 2.32:1
      && det.includes('<div className="overflow-x-auto" data-route-full-analysis="1"><table className="text-sm" style={{ tableLayout: "fixed", width: "100%" }}>'));
 }
 

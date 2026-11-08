@@ -14542,7 +14542,7 @@ function RouteMapBox({ leg, onLeg, on, counts, onTick, msg, low }){
       <div className="inline-flex rounded-lg overflow-hidden border border-slate-300 shadow-sm" role="group" aria-label="Direction drawn" style={{ background: "var(--surface)" }}>
         {LEGS.map(([v, l]) => (
           <button key={v} type="button" data-leg-pick={v} aria-pressed={leg === v ? "true" : "false"} onClick={() => onLeg(v)}
-            className="px-3 text-[13px] font-semibold" style={{ minHeight: 28, ...(leg === v ? { background: "var(--navy)", color: "#fff" } : { color: "var(--ink)" }) }}>{l}</button>
+            className="px-3 text-[13px] font-semibold" style={{ minHeight: 28, ...(leg === v ? { background: "var(--navy)", color: "var(--control-fg)" } : { color: "var(--ink)" }) }}>{l}</button>
         ))}
       </div>
       <details className="rounded-lg border border-slate-300 shadow-sm text-[13px]" style={{ background: "var(--surface)" }} data-route-layers="1">
