@@ -208,8 +208,13 @@ def by_phase():
     """{phase id: {zone_id, name, state}} for the layout card — state 'same' | 'layout_changed' | 'zone_changed'.
     One zone per phase (the lowest id when more than one was made from it)."""
     tenant = db.current_tenant()
-    vers = {r["id"]: int(r.get("version") or 1) for r in
-            db.query("SELECT id, version FROM site_layout_phases WHERE tenant_id = ?", (tenant,))}
+    try:
+        vers = {r["id"]: int(r.get("version") or 1) for r in
+                db.query("SELECT id, version FROM site_layout_phases WHERE tenant_id = ?", (tenant,))}
+    except Exception as e:
+        if _no_layout_tables(e):
+            return {}
+        raise
     out = {}
     for z in db.query("SELECT id, name, from_phase_id, from_phase_version FROM zones WHERE tenant_id = ? "
                       "AND from_phase_id IS NOT NULL ORDER BY id", (tenant,)):
@@ -222,13 +227,30 @@ def by_phase():
     return out
 
 
+
+def _no_layout_tables(e):
+    """True when a read failed only because this database has no site layout tables (an old harness schema); a real
+    deployment always has them (db.init)."""
+    m = str(e).lower()
+    return ("no such table" in m or "does not exist" in m) and "site_layout" in m
+
+
 def sources():
     """{zone id: {location_id, site}} for the Zones table's "From the <site> site layout" line (zones whose phase still
     exists)."""
     tenant = db.current_tenant()
-    rows = db.query("SELECT z.id AS zone_id, l.location_id, loc.name AS site FROM zones z "
+    try:
+        rows = _sources_rows(tenant)
+    except Exception as e:
+        if _no_layout_tables(e):
+            return {}
+        raise
+    return {r["zone_id"]: {"location_id": r["location_id"], "site": r.get("site") or r["location_id"]} for r in rows}
+
+
+def _sources_rows(tenant):
+    return db.query("SELECT z.id AS zone_id, l.location_id, loc.name AS site FROM zones z "
                     "JOIN site_layout_phases p ON p.tenant_id = z.tenant_id AND p.id = z.from_phase_id "
                     "JOIN site_layouts l ON l.tenant_id = p.tenant_id AND l.id = p.layout_id "
                     "LEFT JOIN locations loc ON loc.tenant_id = l.tenant_id AND loc.id = l.location_id "
                     "WHERE z.tenant_id = ?", (tenant,))
-    return {r["zone_id"]: {"location_id": r["location_id"], "site": r.get("site") or r["location_id"]} for r in rows}

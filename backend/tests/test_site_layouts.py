@@ -219,14 +219,15 @@ ok("0. every line style sits on one of the eight layers; every colour is #RRGGBB
    all(v["layer"] in ST.LAYERS and re.fullmatch(r"#[0-9A-F]{6}", v["color"]) for v in ST.LINE_STYLES.values())
    and all(re.fullmatch(r"#[0-9A-F]{6}", v["color"]) and v["fill"] in ST.FILLS and v["outline"] in ST.OUTLINES
            for v in ST.AREA_STYLES.values()))
-ok("0. the import table offers 11 + 10 + 31 + text + leave out = 54 choices", len(ST.choices()) == 54
+# NARROWED 8 Nov 2026 (task 2.1-12): + the Site boundary area style (areas 10 -> 11)
+ok("0. the import table offers 11 + 11 + 31 + text + leave out = 55 choices", len(ST.choices()) == 55
    and "skip" in ST.choices() and "text" in ST.choices() and not ST.choice_ok("line:flying") and not ST.choice_ok(None))
 ok("0. security and CCTV are the two symbols never on the public map (Q7)",
    set(ST.PRIVATE_SYMBOLS) == {"security", "cctv"} and all(k in ST.SYMBOL_KEYS for k in ST.PRIVATE_SYMBOLS))
 P = ST.payload()
 ok("0. the payload the page reads carries the layers, lines, areas, symbols, glyphs and the choices with their words",
    {"layers", "lines", "areas", "symbols", "glyphs", "choices", "fills", "private_symbols"} <= set(P)
-   and len(P["choices"]) == 54 and all(c.get("label") for c in P["choices"]), str(sorted(P)))
+   and len(P["choices"]) == 55 and all(c.get("label") for c in P["choices"]), str(sorted(P)))
 # NARROWED 31 Oct 2026 (PR 1b, plan §6 revised): a drainage layer is now guessed "leave out" (the mockup's LAYER_WORDS);
 # an unknown layer is still an imported line (C-SETTING-OUT)
 ok("0. guesses: a hoarding layer, a GATE block, a crane radius, a drainage layer (leave out), a text layer, an unknown line",

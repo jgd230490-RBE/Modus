@@ -1071,7 +1071,8 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    # NARROWED 31 Oct 2026 (task 4c PR 3): 23 — the pinned pictures' Done (Move corners) and Add (navy)
    # NARROWED 31 Oct 2026 (task 4a PR 3d): 24 — the CLP Notes and tasks panel's picked tab (Contractor / a client group, navy)
    # NARROWED 31 Oct 2026 (task 4c PR 5): 26 (after PR 3 and 4a PR 3d) — the Print panel's picked page (A3 / A4) and its PDF button (navy)
-   len(_sites.get("navy", [])) == 26 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
+   # NARROWED 8 Nov 2026 (task 2.1-12): 27 — the works-area panel's "Save the works area" (navy)
+   len(_sites.get("navy", [])) == 27 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
    and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
 ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",
@@ -1183,7 +1184,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # row and in the opened row, and the "different road since the last Route all" line (warn)
    # (both together, merged 5 Nov: 42 + 2 concerns + 4 busy hours = 48)
    and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 48 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
-   _fe_wo.count("var(--warn-text)") == 19
+   # NARROWED 8 Nov 2026 (task 2.1-12): warn-text 19 -> 20 — the site layout phase row's amber "layout changed since"
+   _fe_wo.count("var(--warn-text)") == 20
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe

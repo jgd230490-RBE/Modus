@@ -477,6 +477,14 @@ ok("13. the write goes through the Zones write (same re-routing)", "update_zone(
 ok("13. a Zones outline edit marks the zone as changed", "works_from_layout.zone_outline_edited(zone_id)" in src)
 
 as_(None)
+# 14. a database with no site layout tables (an older harness schema): the Zones read and the layout card's read answer
+# "none", any other failure still raises
+ok("14. no site layout table reads as none (SQLite and Postgres words); another error does not",
+   WL._no_layout_tables(Exception("no such table: site_layout_phases"))
+   and WL._no_layout_tables(Exception('relation "site_layouts" does not exist'))
+   and not WL._no_layout_tables(Exception("no such table: zones"))
+   and not WL._no_layout_tables(Exception("database is locked")))
+
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)
