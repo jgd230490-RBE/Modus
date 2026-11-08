@@ -201,8 +201,10 @@ ok("\U0001f534 the placeholder figures no longer claim to be live captures \u201
 # rewrite says, each statement checked against the code on 11 Oct 2026, and what it no longer says.
 # What they do not prove: that the screens still read this way after a later change to the app, or how
 # the page looks in a browser (help_browser_check.js, not in the default suite).
-ok("guide update: the version line is v2.1 of 11 October 2026 and links to the PUBLIC map by that name",
-   "User guide v2.1 · 11 October 2026" in src and '<a href="/map/">public map</a>' in src
+# NARROWED 8 Nov 2026 (v2 closed, John): the line names the release, not a guide revision, so it cannot be read as
+# v2.1 (the next release); the 11 Oct revision label is gone.
+ok("guide update: the version line is Wayscope v2 of 8 November 2026 and links to the PUBLIC map by that name",
+   "User guide · Wayscope v2 · 8 November 2026" in src and "User guide v2.1 · 11 October 2026" not in src and '<a href="/map/">public map</a>' in src
    and '<a href="/map/">route map</a>' not in src and "v2.0 · 16 September 2026" not in src)
 ok("...the map is the public map: the heading, the callout and the nav say so; the menu's Route map is explained",
    '<h1 id="8-the-public-map">8. The public map</h1>' in src and "8. The route map" not in src
@@ -272,7 +274,9 @@ ok("⭐ G3: the guide's sign-in is email and password, with the 72-hour invite, 
    all(s in src for s in ("<strong>Email</strong>", "<strong>Password</strong>", "<strong>Forgot your password?</strong>",
                            "<strong>Keep me signed in on this device for 30 days</strong>", "<strong>Sign in with a team code instead</strong>"))
    and "once, for 72 hours" in text and "once, for 60 minutes" in text and "five wrong passwords" in text
-   and "Until Saturday 31 October 2026, the shared team codes still work." in text)
+   # NARROWED 8 Nov 2026 (guides brought up to date): the codes have no end date in the guide any more; the link shows
+   # only while the server still reports codes (codesOn), so the guide says "where your organisation still has" them
+   and "Where your organisation still has shared team codes," in text and "Until Saturday 31 October 2026" not in text)
 ok("⭐ G3: Users (9.6) is in the guide for admins only, in the nav too, and names its three parts and the first-admin steps",
    '<h2 id="9-6-users" data-role="admin">9.6 Users and activity (admins)</h2>' in src
    and '<li class="l2" data-navrole="admin"><a href="#9-6-users">' in src
@@ -315,7 +319,8 @@ ok("⭐ G3: the technical guide explains the session, the links, the limits, the
    and "those actions are open to anyone who can reach them" not in _tg)
 ok("the menu as it is: four groups with the Carbon planner under PLAN, Find a page, Ctrl K, User guide, Collapse",
    # NARROWED 29 Oct 2026 (the Simulation's own page): the PLAN list names every planning view
-   "<strong>PLAN</strong> (Dashboard, Submit forecast, Forecasts, Carbon planner, Abnormal loads, Stockpiles, Pours, Simulation)" in src
+   # NARROWED 8 Nov 2026 (guides brought up to date): CLP documents joined PLAN on 31 Oct (task 4a PR 3a)
+   "<strong>PLAN</strong> (Dashboard, Submit forecast, Forecasts, Carbon planner, Abnormal loads, Stockpiles, Pours, Simulation, CLP documents)" in src
    and "Find a page…" in src and "Ctrl K" in src and "<strong>User guide</strong>" in src and "‹ Collapse" in src)
 # NARROWED 11 Oct 2026 (EU vehicles removed): the header no longer offers vehicle names "by country" (English
 # always, European everywhere except Great Britain, Estonian in Estonia). The vehicles are named in English and
@@ -873,10 +878,11 @@ ok("\U0001f534 27 Oct 2026 (audit #44): T2 names no hyphenated code token that b
 _tgr = re.findall(r'<div class="tbl"( tabindex="0" role="region" aria-label="([^"]*)")?>', _tg2)
 ok3("\U0001f534 #15 the three tables that scroll on a phone (T3 sources, T6 words, T8 sources) are named regions with tabindex 0, the other two plain; a ring on focus",
    # NARROWED 27 Oct 2026 (pilot readiness phase 2): + the key table in t7-hardening, a named region like the other wide tables
-   [l for _, l in _tgr] == ["Where each screen reads from", "Errors and what they mean", "Old words, new words", "Sourced and assumed figures", "Keys and when to change them", "The community considerations layer: sources", ""]   # NARROWED 22 Oct 2026 (words sweep): T5 (longer now) and T7's sourcing table (from Appendix D) scroll on a phone too, so they are named regions (the UI audit's axe found them)
+   [l for _, l in _tgr] == ["Where each screen reads from", "Settings the app reads", "Errors and what they mean",   # NARROWED 8 Nov 2026: + T4 "Settings the app reads", a named region (wide on a phone)
+    "Old words, new words", "Sourced and assumed figures", "Keys and when to change them", "The community considerations layer: sources", ""]   # NARROWED 22 Oct 2026 (words sweep): T5 (longer now) and T7's sourcing table (from Appendix D) scroll on a phone too, so they are named regions (the UI audit's axe found them)
    # NARROWED 18 Oct 2026 (decision 10): the fourth tabindex is main's -1, the "Skip to the text" link's target
-   and ".tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}" in _tg2 and _tg2.count('tabindex="0"') == 6
-   and _tg2.count("tabindex=") == 7, str(_tgr))   # NARROWED 27 Oct 2026: six tables + main's -1
+   and ".tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}" in _tg2 and _tg2.count('tabindex="0"') == 7
+   and _tg2.count("tabindex=") == 8, str(_tgr))   # NARROWED 8 Nov 2026: seven tables + main's -1   # NARROWED 27 Oct 2026: six tables + main's -1
 # RE-PINNED 17 Oct 2026 (D114 fix): the opening sentence now also names the fallback (no approved line in the window ->
 # the months that have them), and the big-screen sentence says "the months the page opened on" instead of "this month ± 6"
 ok("⭐ D114 (17 Oct 2026): the guide says the Dashboard opens on this month ± 6, and how to see the whole programme and back",
@@ -930,7 +936,8 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 5 Nov 2026 (group 6, PR 2): + 20.4 The figures (93)
    len(re.findall(r'<li class="l[12]"', src)) == 93 and   # NARROWED 31 Oct 2026 (task 4c PR 5): + 19.6 On paper (88)
    # NARROWED 5 Nov 2026 (task 0d-2): + T1 "Busy-hours roads" (39)
-   len(re.findall(r'<li class="l[12]"', _tg2)) == 39   # NARROWED 1 Nov 2026 (task 4a PR 4): + T1 "CLP appendices" (37)   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   # NARROWED 8 Nov 2026 (guides brought up to date): + T4 "Settings the app reads" and "Kept reads and heavy jobs" (41)
+   len(re.findall(r'<li class="l[12]"', _tg2)) == 41   # NARROWED 1 Nov 2026 (task 4a PR 4): + T1 "CLP appendices" (37)   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,
@@ -1393,6 +1400,54 @@ ok("BUSY HOURS: technical T1 #t1-busy-hours holds the detail (the call, the rows
    and "<code>route_choice.busy_share(from, to, span)</code>" in _tg0d and "<code>backend/busy_savings.py</code>" in _tg0d
    and "<code>sim._busy_legs</code>" in _tg0d and "<code>BusyHours</code>" in _tg0d
    and '<li class="l2"><a href="#t1-busy-hours">Busy-hours roads</a></li>' in _tg0d)
+# 8 Nov 2026 (v2 closed, John: "ensure guides are upto date"): both guides checked against main cf06661; the stale
+# statements below were found by two read-only audits and fixed. Each check fails on the old guides.
+_ug8 = open(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "help", "index.html"), encoding="utf-8").read()
+_tg8 = open(TECH, encoding="utf-8").read()
+ok3("8 Nov: no date for the shared codes left in the user guide (they end per deployment)",
+    "31 October 2026" not in _ug8 and "stops working on 31 October" not in _ug8)
+ok3("8 Nov: the rail lists CLP documents under Plan and Concerns under Track",
+    "Pours, Simulation, CLP documents), <strong>TRACK</strong> (Look-ahead; Concerns" in _ug8)
+ok3("8 Nov: the big screen has six sections (#dashboard/6), the Dashboard's Sites filter, chart Copy / Download and the Concerns fold",
+    "<code>#dashboard/6</code>" in _ug8 and "<code>#dashboard/5</code> to the address" not in _ug8
+    and "the <strong>Sites</strong> (tick one or more places" in _ug8 and "<strong>Copy</strong> and <strong>Download</strong>: a picture of the chart" in _ug8
+    and "a sixth, <strong>Concerns</strong>" in _ug8)
+ok3("8 Nov: the map legend: legs solid (dotted only on a haul road), the diversion edge, the abnormal load, the holding area",
+    "<td>Dotted green and amber lines</td>" not in _ug8 and "solid on public roads, dotted and thinner on a haul road" in _ug8
+    and "<td>Soft amber edge on a route</td>" in _ug8 and "<td>Raspberry line with rings</td>" in _ug8 and "<td>H and ›››</td>" in _ug8)
+ok3("8 Nov: §9.3's list is one list again (no </ul><li>, each item once), and Site speed / Site areas sits in §9.1",
+    "</ul><li>" not in _ug8 and _ug8.count("<li><strong>Temporary haul road</strong>") == 1
+    and _ug8.index("<strong>Site speed</strong> and <strong>Site areas</strong>") < _ug8.index('id="7-2-routes"')
+    and "The Dashboard&#39;s Simulation" not in _ug8 and "the Dashboard&#39;s Simulation" not in _ug8)
+ok3("8 Nov: no back-end words for a zone's box (the words sweep's rule)",
+    "the exact box that will be sent" not in _ug8 and "the service takes boxes" not in _ug8
+    and "The panel shows the area routes will avoid before you save" in _ug8)
+ok3("8 Nov: Users has five tabs, Client reviewers among them",
+    "It has five tabs: People, Teams, Client reviewers, Demo leads and Activity." in _ug8
+    and "<li><strong>Client reviewers</strong> — the client's review groups" in _ug8 and "It has three parts." not in _ug8)
+ok3("8 Nov: a week with nothing recorded uses the plan (test_stockpile_forecast D2), not nothing",
+    "A week nobody reported counts as nothing in" not in _ug8 and "the plan stands in (§15.3)" in _ug8)
+ok3("8 Nov: the clash rail table has NO WAY ROUND and names the pour flags",
+    "<tr><td>NO WAY ROUND</td>" in _ug8 and "ROAD LIMIT ranks first, then NO WAY ROUND" in _ug8 and "COLD JOINT, TRANSIT, MIXERS SHORT, IN A BAND, OVER PLAN" in _ug8)
+ok3("8 Nov: the CLP's regional plan is every route, grey when idle, every supplier and site named (PR #216)",
+    "Its regional plan draws every route to and from the places whatever the month" in _ug8)
+ok3("8 Nov: technical guide: busy hours are applied now (0d-2), peak statuses in_use / paused / stopped",
+    "Offered, never applied" not in _tg8 and "(<code>offered</code> until accepted)" not in _tg8
+    and "a peak row is <code>in_use</code>, <code>paused</code> or <code>stopped</code>" in _tg8)
+ok3("8 Nov: technical guide: no 'Not yet built' over built appendices / notes / reviewers; pictures print (PR 5)",
+    "<strong>Not yet built.</strong> The appendices (PR 4)" not in _tg8 and "A picture is not on any PDF yet" not in _tg8)
+ok3("8 Nov: technical guide: admin calls on an admin login; no 'admin token rejected' row; kind reviewer; Terra Draw listed",
+    "admin token rejected" not in _tg8 and "Not allowed: sign in as an admin." in _tg8
+    and "diagnostics/factors?token=" not in _tg8 and "with the admin token" not in _tg8
+    and "<code>reviewer</code>" in _tg8 and "Terra Draw 1.39.0 and terra-draw-mapbox-gl-adapter 1.5.0" in _tg8)
+ok3("8 Nov: technical guide T10: the Standard basemaps, &light= and &labels= in the share link",
+    "nav-night, standard, standard-satellite, os, imagery" in _tg8 and "<code>&amp;light=</code>" in _tg8 and "<code>&amp;labels=</code>" in _tg8)
+_tg8 = open(TECH, encoding="utf-8").read()
+ok3("8 Nov: T4 lists every setting the app reads, and the kept reads / heavy jobs with their limits (both in the nav)",
+    'id="t4-env"' in _tg8 and 'id="t4-kept-reads"' in _tg8 and '<a href="#t4-env">' in _tg8 and '<a href="#t4-kept-reads">' in _tg8
+    and all("<code>%s</code>" % k in _tg8 for k in ("DB_POOL_MAX", "WAYSCOPE_WARM_CACHE", "DEMO_FROM", "DEMO_REPLY_TO", "OS_MAPS_KEY",
+                                                  "FIRST_ADMIN_EMAIL", "DEMO_LEADS", "LANDING_URL", "APP_URL", "TENANT_ID"))
+    and "<code>MAX_ENTRIES</code> = 60" in _tg8 and "<code>SLOTS</code> = 2" in _tg8 and "<code>SOLO_WAIT_S</code> = 5 s" in _tg8)
 # 8 Nov 2026 (v2.1 task 2.1-13): the two week maps' words (no team colours, no dark / red dot pair any more)
 ok("2.1-13: the guide says what the Dashboard's Today map shows: bold today, green out / amber back, the week faded, names, gates, tags, the key",
       all(w in _ug0d for w in ("<strong>Today on the map</strong>", "out (loaded) in green and back (empty) in amber",
