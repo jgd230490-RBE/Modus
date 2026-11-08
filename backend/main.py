@@ -3422,7 +3422,8 @@ def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan
     and `routes` (comma-separated ids, the Routes page's list). `plan` = regional | local | site; `scale` = the N of 1:N
     (one the plan offers; regional is fitted to the routes without one); `at` = the place a local or site plan is
     centred on (by name; the busiest route's site end without one). A team code gets its own team's routes whatever it
-    asks for. Approved lines only (D11). Stores nothing.
+    asks for. Approved lines only (D11). Stores nothing. 8 Nov 2026 (v2.1 item 2.1-2): no `month` = "Approved routes,
+    no month" (route_map_export.sheet_no_month: every approved route, the legs as the map draws them, no figures).
     """
     if not _staff_request(request):
         raise HTTPException(401, "sign in — the route map export is for staff")
@@ -3439,14 +3440,16 @@ def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan
 
 
 def _route_map_file(S, month, ext):
-    y, m = weeks._month_of(month)
     PL = S["plan"]
     tail = f"-1-{PL['denom']}" if PL.get("denom") else ""
+    if month is None:          # 8 Nov 2026 (v2.1 item 2.1-2): "Approved routes, no month"
+        return f"route-map-approved-{PL['kind']}{tail}.{ext}"
+    y, m = weeks._month_of(month)
     return f"route-map-{y}-{m:02d}-{PL['kind']}{tail}.{ext}"
 
 
 @app.get("/api/routes/map-export.pdf")
-def route_map_export_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
+def route_map_export_pdf(month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
                          dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
                          routes: Optional[str] = None, plan: str = "regional", scale: Optional[str] = None,
                          at: Optional[str] = None, community: int = 1, collisions: int = 0,
@@ -3467,7 +3470,7 @@ def route_map_export_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: 
 
 
 @app.get("/api/routes/map-export.png")
-def route_map_export_png(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
+def route_map_export_png(month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
                          dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
                          routes: Optional[str] = None, plan: str = "regional", scale: Optional[str] = None,
                          at: Optional[str] = None, community: int = 1, collisions: int = 0,
@@ -3487,7 +3490,7 @@ def route_map_export_png(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: 
 
 
 @app.get("/api/routes/map-export/places")
-def route_map_export_places(month: int = Query(..., ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
+def route_map_export_places(month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT), origin: Optional[str] = None,
                             dest: Optional[str] = None, discipline: Optional[str] = None, team: Optional[str] = None,
                             routes: Optional[str] = None, request: Request = None):
     """What the export card offers for these filters: the three plans with their scales, and the places a local or site

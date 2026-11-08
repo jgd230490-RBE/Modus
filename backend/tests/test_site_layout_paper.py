@@ -564,8 +564,10 @@ EXP = open(os.path.join(BACKEND, "export.py"), encoding="utf-8").read()
 PIC = open(os.path.join(BACKEND, "clp_doc_pictures.py"), encoding="utf-8").read()
 DOC = open(os.path.join(BACKEND, "clp_doc.py"), encoding="utf-8").read()
 APP = open(os.path.join(ROOT, "frontend", "index.html"), encoding="utf-8").read()
-ok("6. route_map_export: the layout only on the Site plan, the phase in force in the plan's month, never raising",
-   'if layout and kind == "site"' in RME and "site_layout_paper.for_plan(loc, S[\"month_index\"])" in RME
+# NARROWED 8 Nov 2026 (v2.1 item 2.1-2): with no month ("Approved routes, no month") the phase in force today (layout_month)
+ok("6. route_map_export: the layout only on the Site plan, the phase in force in the plan's month (no month: today's), never raising",
+   'if layout and kind == "site"' in RME and 'lm = S.get("month_index") or S.get("layout_month")' in RME
+   and "site_layout_paper.for_plan(loc, lm)" in RME
    and '"loc_id": loc_id' in RME)
 ok("6. export: the layout drawn under the routes on the plan, the panel's rows only what is in the frame, at most 12",
    "site_layout_paper.draw(c, LY[\"things\"]" in EXP and "ROUTE_MAP_PANEL_MAX_LAYOUT = 12" in EXP

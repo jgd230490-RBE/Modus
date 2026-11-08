@@ -95,6 +95,9 @@ def sheet(month_index, route_ids=None, team=None, acc=None, now=None, origin=Non
     and calculateKPIs): origin, destination and team from the ROUTE, discipline from the LINE; `route_ids` narrows
     further (the Routes page sends the routes it lists). Reads only.
     """
+    if month_index is None:          # 8 Nov 2026 (v2.1 item 2.1-2): "Approved routes, no month"
+        return sheet_no_month(route_ids=route_ids, team=team, acc=acc, now=now, origin=origin, dest=dest,
+                              discipline=discipline)
     import access
     import bulletin
     import bulletin_doc
@@ -179,6 +182,160 @@ def sheet(month_index, route_ids=None, team=None, acc=None, now=None, origin=Non
     }
 
 
+# 8 Nov 2026 (v2.1 item 2.1-2; mockup notes/map-export-default-mockup-1108, John: "the approved route should be the same
+# as whats on the map, green and orange and should also include if they use alternatives"). With no month on screen the
+# export is "Approved routes, no month": every route with an Approved line in ANY month that the filters let through,
+# drawn as the public map draws it — the laden leg out green, the empty return amber, each left of its own travel with a
+# white edge — plus the alternatives in use: the busy-hours roads (thin plan blue) and the dated ways round a closure
+# (the legs with the map's soft amber edge), each named in the key with when it applies. No movement figures.
+LEG_LADEN = "#059669"            # the public map's "Laden (out)"
+LEG_EMPTY = "#f59e0b"            # …and "Empty (return)"
+BUSY_ROAD = "#3B82F6"            # the map's busy-hours road (BUSY_ROAD_COLOR = the plan blue)
+DIVERSION_EDGE = "#F59E0B"       # the map's soft amber edge round a diverted stretch (DIV_EDGE.colour)
+NO_MONTH_WORDS = "approved routes, no month"
+ALTERNATIVES_MAX = 12            # the key lists this many alternatives, then "and N more"
+LEG_LEGEND = [
+    {"kind": "laden", "label": "Laden (out)"},
+    {"kind": "empty", "label": "Empty (return)"},
+    {"kind": "busy", "label": "Busy-hours road"},
+    {"kind": "diversion", "label": "Way round a closure"},
+]
+
+
+def _period_words(months):
+    """'Dec 2027' / 'Dec 2027 to Feb 2028' for a diversion's months (month indexes)."""
+    import bulletin
+    ms = sorted({int(m) for m in months or []})
+    if not ms:
+        return ""
+    a, b = bulletin.month_label(ms[0]), bulletin.month_label(ms[-1])
+    return a if a == b else f"{a} to {b}"
+
+
+def sheet_no_month(route_ids=None, team=None, acc=None, now=None, origin=None, dest=None, discipline=None):
+    """The routes the filters let through with an Approved line in any month of the programme, each leg as the public
+    map draws it (network.public_map_data: 'Inbound Highway' = laden, 'Outbound Highway' = empty), the busy-hours
+    roads in use ('BusyHours', weekdays: route_choice's peak rows are 1111100) and every dated way round a closure
+    ('Diversion'). The same keys as sheet() so plan() and the PDF work unchanged; `legs` and `alternatives` are what
+    the PDF draws and lists in place of the Volume colours. Reads only."""
+    import access
+    import bulletin_doc
+    import db
+    import network
+    own = (acc or {}).get("ipt") if isinstance(acc, dict) else None
+    team = own or team_id(team)
+    norm = lambda v: None if (v is None or str(v).upper() == "ALL" or v == "") else v
+    origin, dest, discipline = norm(origin), norm(dest), norm(discipline)
+    want = set(route_ids) if route_ids else None
+    approved = {}
+    for r in db.query("SELECT DISTINCT route_id, discipline FROM forecasts WHERE tenant_id = ? AND status = 'Approved'",
+                      (db.current_tenant(),)):
+        approved.setdefault(r["route_id"], set()).add(r.get("discipline"))
+    feats = (network.public_map_data() or {}).get("features", []) or []
+    laden, empty, busy, div = {}, {}, [], []
+    for f in feats:
+        p, g = f.get("properties") or {}, f.get("geometry") or {}
+        if g.get("type") != "LineString" or not p.get("route_id"):
+            continue
+        cs = [(float(c[0]), float(c[1])) for c in g.get("coordinates") or [] if len(c) >= 2]
+        if len(cs) < 2:
+            continue
+        t = p.get("type")
+        if t == "Inbound Highway":
+            laden[p["route_id"]] = (cs, p)
+        elif t == "Outbound Highway":
+            empty[p["route_id"]] = cs
+        elif t == "BusyHours":
+            busy.append((p, cs))
+        elif t == "Diversion":
+            div.append((p, cs))
+
+    def route_ok(rid):
+        if rid not in approved or (want is not None and rid not in want):
+            return False
+        if discipline and discipline not in approved[rid]:
+            return False
+        rp = (laden.get(rid) or (None, None))[1]
+        if rp is None:              # not drawn: named as not drawn, unless a route filter would have left it out
+            return not (origin or dest or team)
+        return ((not origin or rp.get("origin") == origin) and (not dest or rp.get("dest") == dest)
+                and (not team or (access.canonical_ipt(rp.get("ipt")) or rp.get("ipt")) == team))
+    ids = sorted(r for r in approved if route_ok(r))
+    drawn = [r for r in ids if r in laden]
+    not_drawn = [r for r in ids if r not in laden]
+
+    places, letter_of = [], {}
+    for rid in drawn:
+        cs, p = laden[rid]
+        for name, loc_id, at, end in ((p.get("origin"), p.get("origin_id"), cs[0], "origin"),
+                                      (p.get("dest"), p.get("dest_id"), cs[-1], "dest")):
+            key = loc_id or name
+            if key and key not in letter_of:
+                letter_of[key] = bulletin_doc._letters(len(places))
+                places.append({"letter": letter_of[key], "name": name or "", "at": at, "end": end, "loc_id": loc_id})
+
+    rows, legs, alts = [], [], []
+    for rid in drawn:
+        cs, p = laden[rid]
+        o = letter_of.get(p.get("origin_id") or p.get("origin"), "")
+        d = letter_of.get(p.get("dest_id") or p.get("dest"), "")
+        rows.append({"route_id": rid, "letters": f"{o} → {d}" if o and d else "",
+                     "places": f"{p.get('origin') or ''} → {p.get('dest') or ''}".strip(" →")})
+        legs.append({"route_id": rid, "kind": "laden", "coords": cs})
+        if rid in empty:
+            legs.append({"route_id": rid, "kind": "empty", "coords": empty[rid]})
+    keep, seen = set(drawn), set()
+    for p, cs in div:
+        if p["route_id"] not in keep:
+            continue
+        legs.append({"route_id": p["route_id"], "kind": "diversion-" + ("laden" if p.get("leg") == "loaded" else "empty"),
+                     "coords": cs})
+        k = ("d", p["route_id"], tuple(p.get("months") or []))
+        if k not in seen:
+            seen.add(k)
+            why = ", ".join(p.get("because") or []) or "a closure"
+            when = _period_words(p.get("months"))
+            alts.append({"route_id": p["route_id"], "kind": "diversion",
+                         "words": f"{p['route_id']}: round {why}" + (f", {when}" if when else "")})
+    for p, cs in busy:
+        if p["route_id"] not in keep:
+            continue
+        legs.append({"route_id": p["route_id"], "kind": "busy", "coords": cs, "leg": p.get("leg")})
+        k = ("b", p["route_id"], p.get("alt_index"), p.get("from"), p.get("to"))
+        if k not in seen:
+            seen.add(k)
+            hours = f" {p.get('from')}–{p.get('to')}" if p.get("from") and p.get("to") else ""
+            alts.append({"route_id": p["route_id"], "kind": "busy",
+                         "words": f"{p['route_id']} Alt {p.get('alt_index')}: weekdays{hours}"})
+    alts.sort(key=lambda a: (a["route_id"], a["kind"], a["words"]))
+    import export      # the tenant's name and demo notice exactly as every other PDF reads them
+    import weeks
+    notice = export._demo_notice() or None
+    team_words = _team_text(team) if team else "All teams"
+    narrowed = [w for w in ((f"from {origin}" if origin else None), (f"to {dest}" if dest else None),
+                            (discipline if discipline else None)) if w]
+    today = now or datetime.date.today()
+    return {
+        "title": "Route map · Approved routes", "month_index": None, "no_month": True,
+        "layout_month": weeks.month_index_of(today),
+        "tenant": export._tenant_name() or "Wayscope",
+        "demo_notice": notice, "map_demo_tag": bulletin_doc.DEMO_MAP_TAG if notice else None,
+        "month_long": "Approved routes", "team_words": team_words,
+        "filter_words": " · ".join([f"{len(rows)} route{'s' if len(rows) != 1 else ''}", team_words, *narrowed,
+                                    NO_MONTH_WORDS, "approved lines only"]),
+        "as_at": f"Approved plan as at {today:%d %b %Y}".replace(" 0", " "),
+        "working_days": None,
+        "rows": rows,
+        # map_routes: every leg's line, for the frame (bulletin_doc.map_points); the PDF draws `legs` in their place
+        "map_routes": [{"route_id": l["route_id"], "coords": l["coords"], "a_day": 0, "color": LEG_LADEN} for l in legs],
+        "legs": legs, "alternatives": alts, "leg_legend": LEG_LEGEND,
+        "map_sections": [], "places": places, "controls": [],
+        "volume_legend": [], "map_legend_title": "Routes",
+        "not_drawn": not_drawn,
+        "empty": not rows,
+    }
+
+
 def centre_choices(S):
     """The places a local or site plan can be centred on: the ends of the chosen routes that have a stored road route,
     the sites (route destinations) first, then by letter. Names only (never an id)."""
@@ -255,9 +412,10 @@ def plan(S, kind="regional", scale=None, at=None, community=True, collisions=Fal
     P["layout"] = None
     if layout and kind == "site" and P["view"] and P.get("centre"):
         loc = next((p.get("loc_id") for p in S["places"] if p.get("at") and p["name"] == P["centre"]), None)
-        if loc and S.get("month_index"):
+        lm = S.get("month_index") or S.get("layout_month")      # 8 Nov 2026: no month = the phase in force today
+        if loc and lm:
             import site_layout_paper
-            P["layout"] = site_layout_paper.for_plan(loc, S["month_index"])
+            P["layout"] = site_layout_paper.for_plan(loc, lm)
     S["plan"] = P
     return S
 

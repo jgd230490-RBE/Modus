@@ -1518,6 +1518,78 @@ def bulletin_doc_casing():
     return bulletin_doc.ROUTE_CASING.lstrip("#")
 
 
+# 8 Nov 2026 (v2.1 item 2.1-2; John: "the same as whats on the map, green and orange … and if they use alternatives"):
+# the no-month route map draws each leg as the public map does. Widths in page points.
+PLAN_LEG_W, PLAN_LEG_EDGE = 2.2, 1.4          # a leg and how much wider its white edge is
+PLAN_LEG_OFFSET = 1.5                         # each leg this far left of its own travel (both directions show)
+PLAN_BUSY_W, PLAN_BUSY_EDGE = 1.2, 1.4        # the busy-hours road: thinner, the plan blue, a white edge
+PLAN_DIV_HALO_W, PLAN_DIV_HALO_ALPHA = 7.0, 0.5   # the soft amber edge under a way round a closure
+
+
+def _plan_leg_colour(kind):
+    import route_map_export as rme
+    return {"laden": rme.LEG_LADEN, "empty": rme.LEG_EMPTY, "busy": rme.BUSY_ROAD}.get(
+        kind.replace("diversion-", ""), rme.LEG_LADEN)
+
+
+def _draw_plan_legs(c, legs, P):
+    """The no-month plan's legs, bottom to top: the soft amber edge under each way round a closure, every white edge,
+    the laden (green) and empty (amber) legs and the diversions' legs, each left of its own travel, then the busy-hours
+    roads (thin plan blue with a white edge) on top."""
+    import route_map_export as rme
+
+    def path(pts):
+        p = c.beginPath()
+        p.moveTo(*pts[0])
+        for q in pts[1:]:
+            p.lineTo(*q)
+        return p
+    drawn = [(lg, path(_rs_offset([P(*q) for q in lg["coords"]], PLAN_LEG_OFFSET)))
+             for lg in legs if len(lg.get("coords") or []) >= 2]
+    c.saveState()
+    c.setLineCap(1); c.setLineJoin(1)
+    c.setStrokeColorRGB(*_hex_rgb(rme.DIVERSION_EDGE)); c.setStrokeAlpha(PLAN_DIV_HALO_ALPHA)
+    c.setLineWidth(PLAN_DIV_HALO_W)
+    for lg, p in drawn:
+        if lg["kind"].startswith("diversion-"):
+            c.drawPath(p, stroke=1, fill=0)
+    c.setStrokeAlpha(1)
+    road = [(lg, p) for lg, p in drawn if lg["kind"] != "busy"]
+    busy = [(lg, p) for lg, p in drawn if lg["kind"] == "busy"]
+    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(PLAN_LEG_W + PLAN_LEG_EDGE)
+    for _, p in road:
+        c.drawPath(p, stroke=1, fill=0)
+    c.setLineWidth(PLAN_LEG_W)
+    for lg, p in road:
+        c.setStrokeColorRGB(*_hex_rgb(_plan_leg_colour(lg["kind"])))
+        c.drawPath(p, stroke=1, fill=0)
+    for _, p in busy:
+        c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(PLAN_BUSY_W + PLAN_BUSY_EDGE)
+        c.drawPath(p, stroke=1, fill=0)
+        c.setStrokeColorRGB(*_hex_rgb(rme.BUSY_ROAD)); c.setLineWidth(PLAN_BUSY_W)
+        c.drawPath(p, stroke=1, fill=0)
+    c.restoreState()
+
+
+def _plan_leg_swatch(c, kind, x, y):
+    """A key swatch for a leg kind: a short line as the map draws it, 16 pt wide."""
+    import route_map_export as rme
+    yy = y - 4.6
+    c.saveState()
+    c.setLineCap(1)
+    if kind == "diversion":
+        c.setStrokeColorRGB(*_hex_rgb(rme.DIVERSION_EDGE)); c.setStrokeAlpha(PLAN_DIV_HALO_ALPHA)
+        c.setLineWidth(PLAN_DIV_HALO_W); c.line(x + 2, yy, x + 14, yy); c.setStrokeAlpha(1)
+    w = PLAN_BUSY_W if kind == "busy" else PLAN_LEG_W
+    c.setStrokeColorRGB(*_hex_rgb("#1F2024")); c.setLineWidth(w + PLAN_LEG_EDGE + 0.4)    # a keyline so white reads
+    c.line(x + 1, yy, x + 15, yy)
+    c.setStrokeColorRGB(1, 1, 1); c.setLineWidth(w + PLAN_LEG_EDGE)
+    c.line(x + 1, yy, x + 15, yy)
+    c.setStrokeColorRGB(*_hex_rgb(_plan_leg_colour("laden" if kind == "diversion" else kind))); c.setLineWidth(w)
+    c.line(x + 1, yy, x + 15, yy)
+    c.restoreState()
+
+
 def _draw_bulletin_schematic(c, S, x, y, w, h, P=None):
     """The routes, shared sections, sites and controls in the box: over the basemap with its projection `P`, or — with
     no basemap — scaled into a framed box (bulletin_doc.projector), the schematic."""
@@ -1539,14 +1611,18 @@ def _draw_bulletin_schematic(c, S, x, y, w, h, P=None):
         for p in r["coords"][1:]:
             path.lineTo(*P(*p))
         return path
-    # W11: the casing under every route, then each route in its Volume colour at one width, quietest first
-    c.setStrokeColorRGB(*_hex_rgb(bulletin_doc.ROUTE_CASING)); c.setLineWidth(3.4)
-    for r in S["map_routes"]:
-        c.drawPath(line(r), stroke=1, fill=0)
-    c.setLineWidth(2.2)
-    for r in S["map_routes"]:
-        c.setStrokeColorRGB(*_hex_rgb(r["color"]))
-        c.drawPath(line(r), stroke=1, fill=0)
+    if S.get("legs") is not None:
+        # 8 Nov 2026 (v2.1 item 2.1-2, "Approved routes, no month"): the legs as the public map draws them
+        _draw_plan_legs(c, S["legs"], P)
+    else:
+        # W11: the casing under every route, then each route in its Volume colour at one width, quietest first
+        c.setStrokeColorRGB(*_hex_rgb(bulletin_doc.ROUTE_CASING)); c.setLineWidth(3.4)
+        for r in S["map_routes"]:
+            c.drawPath(line(r), stroke=1, fill=0)
+        c.setLineWidth(2.2)
+        for r in S["map_routes"]:
+            c.setStrokeColorRGB(*_hex_rgb(r["color"]))
+            c.drawPath(line(r), stroke=1, fill=0)
     # the shared sections on top, each casing then its summed colour (the map's road-load layer)
     for sct in S.get("map_sections") or []:
         c.setStrokeColorRGB(*_hex_rgb(bulletin_doc.ROUTE_CASING)); c.setLineWidth(3.4)
@@ -2447,6 +2523,23 @@ def _plan_panel(c, S, fw, fh, basemap_ok):
     text(S["filter_words"], R, 7.2, 9, GREY)
     gap(4)
     text(S["map_legend_title"], B, 7.8, 10)
+    if S.get("leg_legend"):
+        # 8 Nov 2026 (v2.1 item 2.1-2): the no-month plan's key — the kinds drawn, then the alternatives in use
+        kinds = {lg["kind"].replace("diversion-", "") if not lg["kind"].startswith("diversion-") else "diversion"
+                 for lg in S.get("legs") or []}
+        for row in S["leg_legend"]:
+            if row["kind"] in ("laden", "empty") or row["kind"] in kinds:
+                items.append((9.6, lambda x, y, row=row: (_plan_leg_swatch(c, row["kind"], x, y),
+                                                          c.setFillColorRGB(*NAVY_RGB), c.setFont(R, 7.4),
+                                                          c.drawString(x + 21, y - 7.0, _pdf_safe(row["label"])))))
+        alts = S.get("alternatives") or []
+        if alts:
+            gap(4)
+            text("Alternatives in use", B, 7.8, 10)
+            for a in alts[:rme.ALTERNATIVES_MAX]:
+                text(a["words"], R, 7.2, 9)
+            if len(alts) > rme.ALTERNATIVES_MAX:
+                text(f"and {len(alts) - rme.ALTERNATIVES_MAX} more", R, 7.2, 9, GREY)
     for g in S["volume_legend"]:
         def sw(x, y, g=g):
             c.setFillColorRGB(*_hex_rgb(g["fill"])); c.setStrokeColorRGB(*_hex_rgb("#1F2024")); c.setLineWidth(0.6)
@@ -2713,7 +2806,9 @@ def build_route_map_pdf(S):
                     _ce_dot(c, *P(r["lon"], r["lat"]), sev)
     else:
         c.setFillColorRGB(*GREY); c.setFont(_BF("regular"), 10)
-        c.drawCentredString((fw - rme.PANEL_W_MM * mm) / 2, fh / 2, "No approved line on the chosen routes in this month.")
+        c.drawCentredString((fw - rme.PANEL_W_MM * mm) / 2, fh / 2,
+                            "No approved route for these filters." if S.get("no_month")
+                            else "No approved line on the chosen routes in this month.")
     c.restoreState()
     PL["drawn"] = "mapbox" if png else ("routes only" if v else "empty")
     _map_tag(c, S.get("map_demo_tag"), fw, fh)

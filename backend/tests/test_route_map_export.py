@@ -521,6 +521,129 @@ ok("both files are named by month, plan and scale (route-map-2026-10-local-1-250
 ok("one read, nothing stored: the module writes nothing", "db.execute" not in read("backend/route_map_export.py")
    and "INSERT" not in read("backend/route_map_export.py") and "UPDATE" not in read("backend/route_map_export.py"))
 
+# ---- 8. "Approved routes, no month" (8 Nov 2026, v2.1 items 2.1-2 / 2.1-3) -----------------------------------
+# John: "the approved route should be the same as whats on the map, green and orange and should also include if they
+# use alternatives". The fixture's R1 and R2 have Approved lines (months 10, 11), R3 is not drawn; R4 is drawn but has
+# only a Pending line, so it is not an approved route.
+db.execute("INSERT INTO routes (id, origin_id, dest_id, material_category, ipt) VALUES (?, ?, ?, ?, ?)",
+           ("R4", "L3", "L4", "Small aggregate", "IPT 2"))
+_geom("R4", ART, "loaded", 12, 0.3); _geom("R4", ART, "return", 12, 0.3)
+_line("R4", 14, "earthworks", "WS1", 5000, ART, "IPT2", status="Pending")
+_real_pmd = network.public_map_data
+
+
+def _pmd_with_alternatives(profile=None):
+    """The real map data plus one dated way round a closure on R1 (both legs, Oct 2027 and Nov 2027) and one busy-hours
+    road on R1 and one on R4 — the feature shapes network._diversion_features / _busy_features write."""
+    d = _real_pmd(profile)
+    feats = list(d.get("features") or [])
+    feats += [
+        {"type": "Feature", "properties": {"type": "Diversion", "route_id": "R1", "leg": "loaded", "alt_index": 10,
+                                           "months": [22, 23], "because": ["Christmas trading"], "zones": ["Z9"]},
+         "geometry": {"type": "LineString", "coordinates": [[-1, 52.5], [-1.05, 52.58], [-1.1, 52.6]]}},
+        {"type": "Feature", "properties": {"type": "Diversion", "route_id": "R1", "leg": "return", "alt_index": 10,
+                                           "months": [22, 23], "because": ["Christmas trading"], "zones": ["Z9"]},
+         "geometry": {"type": "LineString", "coordinates": [[-1.1, 52.6], [-1.05, 52.58], [-1, 52.5]]}},
+        {"type": "Feature", "properties": {"type": "BusyHours", "route_id": "R1", "leg": "loaded", "alt_index": 2,
+                                           "from": "16:00", "to": "19:00"},
+         "geometry": {"type": "LineString", "coordinates": [[-1, 52.5], [-0.98, 52.56], [-1.1, 52.6]]}},
+        {"type": "Feature", "properties": {"type": "BusyHours", "route_id": "R4", "leg": "loaded", "alt_index": 1,
+                                           "from": "07:00", "to": "10:00"},
+         "geometry": {"type": "LineString", "coordinates": [[-1, 52.5], [-1.1, 52.6]]}},
+    ]
+    return dict(d, features=feats)
+
+
+SN = rme.sheet(None, acc=PLANNER, now=datetime.date(2026, 11, 8))
+ok("⭐ NO MONTH: every route with an Approved line in ANY month (R1, R2) — a route with only a Pending line (R4) is not "
+   "an approved route; a route the map does not draw (R3) is named, never drawn",
+   [r["route_id"] for r in SN["rows"]] == ["R1", "R2"] and SN["not_drawn"] == ["R3"] and SN["no_month"] is True
+   and SN["month_index"] is None, f"{[r['route_id'] for r in SN['rows']]} {SN['not_drawn']}")
+ok("⭐ ...each drawn as the public map draws it: its laden leg ('Inbound Highway') green and its empty return "
+   "('Outbound Highway') amber — the map's own colours, never a Volume colour",
+   sorted((l["route_id"], l["kind"]) for l in SN["legs"]) == [("R1", "empty"), ("R1", "laden"), ("R2", "empty"), ("R2", "laden")]
+   and rme.LEG_LADEN.lower() == "#059669" and rme.LEG_EMPTY.lower() == "#f59e0b"
+   and '<span class="color-dot" style="background:#059669;"></span>' in read("map/index.html")
+   and '<span class="color-dot" style="background:#f59e0b;"></span>' in read("map/index.html"))
+ok("...no movement figures: no Volume legend, the key titled Routes, the words say no month and approved lines only",
+   SN["volume_legend"] == [] and SN["map_legend_title"] == "Routes"
+   and SN["filter_words"] == "2 routes · All teams · approved routes, no month · approved lines only"
+   and SN["month_long"] == "Approved routes" and SN["title"] == "Route map · Approved routes"
+   and not any("a_day_text" in r or "loads_text" in r for r in SN["rows"]), SN["filter_words"])
+ok("...the frame takes every leg (map_points reads map_routes, one per leg), the places lettered once each",
+   len(SN["map_routes"]) == 4 and [p["name"] for p in SN["places"]] == ["Kelsey Quarry", "Mill Compound", "Ridge Pit"]
+   and SN["rows"][0]["letters"] == "A → B" and SN["rows"][1]["letters"] == "C → B")
+ok("...the filters as the map applies them: discipline from the LINE in any month, team from the ROUTE, the Routes "
+   "list, origin; a team code held to its own team",
+   [r["route_id"] for r in rme.sheet(None, acc=PLANNER, discipline="structures")["rows"]] == ["R1"]
+   and [r["route_id"] for r in rme.sheet(None, acc=PLANNER, team="IPT2")["rows"]] == ["R2"]
+   and [r["route_id"] for r in rme.sheet(None, acc=PLANNER, route_ids=["R2", "R4"])["rows"]] == ["R2"]
+   and [r["route_id"] for r in rme.sheet(None, acc=PLANNER, origin="Ridge Pit")["rows"]] == ["R2"]
+   and [r["route_id"] for r in rme.sheet(None, acc=TEAM1, team="IPT2")["rows"]] == ["R1"]
+   and rme.sheet(None, acc=TEAM1)["not_drawn"] == [])
+ok("...with a month the sheet is as before (Volume colours, figures, no legs)",
+   "legs" not in rme.sheet(10, acc=PLANNER) and rme.sheet(10, acc=PLANNER)["volume_legend"]
+   and rme.sheet(10, acc=PLANNER)["map_legend_title"] == "Two-way movements a day")
+
+network.public_map_data = _pmd_with_alternatives
+try:
+    SA = rme.sheet(None, acc=PLANNER, now=datetime.date(2026, 11, 8))
+    SA_R2 = rme.sheet(None, acc=PLANNER, route_ids=["R2"])
+finally:
+    network.public_map_data = _real_pmd
+_kinds = sorted((l["route_id"], l["kind"]) for l in SA["legs"])
+ok("⭐ ALTERNATIVES IN USE: R1's way round a closure (both legs) and its busy-hours road are drawn with the legs; R4's "
+   "busy-hours road is not (R4 is not an approved route)",
+   ("R1", "diversion-laden") in _kinds and ("R1", "diversion-empty") in _kinds and ("R1", "busy") in _kinds
+   and not any(r == "R4" for r, _ in _kinds) and len(SA["legs"]) == 7, f"{_kinds}")
+ok("⭐ ...each named once in the key with when it applies (the diversion's months as a period, the busy hours on "
+   "weekdays — route_choice's peak rows are 1111100)",
+   [a["words"] for a in SA["alternatives"]] == ["R1 Alt 2: weekdays 16:00–19:00", "R1: round Christmas trading, Oct 2027 to Nov 2027"],
+   f"{[a['words'] for a in SA['alternatives']]}")
+ok("...a filter that leaves R1 out leaves its alternatives out too", SA_R2["alternatives"] == []
+   and not any(l["kind"] in ("busy", "diversion-laden") for l in SA_R2["legs"]))
+
+SAP = rme.plan(SA, "regional")
+TN = " ".join(pdf_text(export.build_route_map_pdf(SAP)).split())
+ok("⭐ THE PDF: the key's line kinds (laden, empty, busy-hours, way round a closure), the alternatives in use, no "
+   "movement bands; the heading names no month",
+   all(w in TN for w in ("Routes", "Laden (out)", "Empty (return)", "Busy-hours road", "Way round a closure",
+                         "Alternatives in use", "R1 Alt 2: weekdays 16:00", "Christmas trading",
+                         "approved routes, no month"))
+   and "Two-way movements a day" not in TN and "under 10" not in TN, TN[:600])
+TN0 = " ".join(pdf_text(export.build_route_map_pdf(rme.plan(rme.sheet(None, acc=PLANNER), "regional"))).split())
+ok("...with no alternative stored the key lists only the two legs (no busy-hours or closure row, no alternatives heading)",
+   "Laden (out)" in TN0 and "Empty (return)" in TN0 and "Busy-hours road" not in TN0 and "Way round a closure" not in TN0
+   and "Alternatives in use" not in TN0)
+_many_alts = dict(SA, alternatives=[{"route_id": f"R{i:02d}", "kind": "busy", "words": f"R{i:02d} Alt 1: weekdays 07:00–10:00"}
+                                    for i in range(1, 16)])
+_many_alts.pop("plan", None)
+TM = " ".join(pdf_text(export.build_route_map_pdf(rme.plan(_many_alts, "regional"))).split())
+ok("...the key lists up to twelve alternatives, then 'and N more' (Q5)", rme.ALTERNATIVES_MAX == 12
+   and "R12 Alt 1" in TM and "R13 Alt 1" not in TM and "and 3 more" in TM, TM[-500:])
+TE = " ".join(pdf_text(export.build_route_map_pdf(rme.plan(rme.sheet(None, acc=PLANNER, route_ids=["R3"]), "regional"))).split())
+ok("...no approved route for these filters says so", "No approved route for these filters." in TE, TE[:300])
+_ex = read("backend/export.py")
+_dl = _ex[_ex.index("def _draw_plan_legs("):_ex.index("def _plan_leg_swatch(")]
+ok("...drawn bottom to top as the map: the soft amber edge under a way round, every white edge, the legs each left of "
+   "its own travel (_rs_offset), the busy-hours roads thin on top",
+   _dl.index("DIVERSION_EDGE") < _dl.index("PLAN_LEG_W + PLAN_LEG_EDGE") < _dl.index("_plan_leg_colour(lg[\"kind\"])")
+   < _dl.index("rme.BUSY_ROAD") and "_rs_offset([P(*q) for q in lg[\"coords\"]], PLAN_LEG_OFFSET)" in _dl
+   and export.PLAN_BUSY_W < export.PLAN_LEG_W)
+_SS = rme.plan(rme.sheet(None, acc=PLANNER, now=datetime.date(2026, 11, 8)), "site", 1000)
+ok("...a site plan with no month looks for the site layout in force TODAY (layout_month), not none",
+   _SS.get("layout_month") == weeks.month_index_of(datetime.date(2026, 11, 8)) == 11
+   and 'lm = S.get("month_index") or S.get("layout_month")' in read("backend/route_map_export.py"))
+_mn8 = read("backend/main.py")
+_ep8 = _mn8[_mn8.index("def _route_map_file("):_mn8.index('@app.get("/api/community")')]
+ok("⭐ THE ENDPOINTS: month is optional on the PDF, the PNG and the card's places (none = no month); the file is "
+   "route-map-approved-<plan>",
+   _ep8.count("month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT)") == 3
+   and "month: int = Query(..., ge=1, le=MONTH_COUNT)" not in _ep8
+   and 'return f"route-map-approved-{PL[\'kind\']}{tail}.{ext}"' in _ep8
+   and main._route_map_file({"plan": {"kind": "regional", "denom": 200000}}, None, "pdf") == "route-map-approved-regional-1-200000.pdf"
+   and main._route_map_file({"plan": {"kind": "local", "denom": 2500}}, 10, "png") == "route-map-2026-10-local-1-2500.png")
+
 # =========================================================================== #
 print()
 for f_ in FAIL:
