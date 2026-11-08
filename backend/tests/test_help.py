@@ -1474,5 +1474,22 @@ ok("2.1-13: the guide says what the Dashboard's Today map shows: bold today, gre
 ok("2.1-13: the Look-ahead's week map no longer reads as team colours with a dark and a red dot",
       "draws this week's lines in their team colour, with a dark dot at the origin and a red dot" not in _ug0d
       and "draws this week's lines, out (loaded) in green, with the week's load on a tag" in _ug0d)
+# 8 Nov 2026 (v2.1 tasks 2.1-5 + 2.1-7 + 2.1-8): 9.2's map item, few words, no back end; technical T1 "The Routes page's map"
+_ug25 = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+_tg25 = open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()
+_i25 = _ug25.find('<li id="ug-routes-map">'); _m25 = _ug25[_i25:_ug25.find("</li>", _i25)] if _i25 >= 0 else ""
+ok("ROUTES PAGE (2.1-7): 9.2 says out green, back amber side by side, Out · Back · Both, the blue halo, and the table's Out / Back minutes",
+   all(w in _m25 for w in ("out (laden) in green and back (empty) in amber", "<strong>Out &middot; Back &middot; Both</strong>",
+                           "blue halo", "distance and minutes, <strong>Out</strong> and <strong>Back</strong>")))
+ok("ROUTES PAGE (2.1-5): 9.2 names the five layers, all off each visit, from what was last fetched",
+   all(w in _m25 for w in ("planned road closures, lorry limits, community places, collisions and cycle routes", "all are off each time you open the page",
+                           "Config &rarr; Map and bulletin")))
+ok("ROUTES PAGE (2.1-8): 9.2 says the full screen: the routes left, the map, the route picked right; « and » fold; ⤡ leaves",
+   "fills the window: the routes on the left, the map, the route you pick on the right" in _m25 and "&laquo; and &raquo; fold either side" in _m25)
+ok("ROUTES PAGE: 9.2's map item names no back end (no API, endpoint, geometry, server, token, HERE)",
+   bool(_m25) and not re.search(r"\b(API|endpoint|geometry|server|token|HERE|/api/)\b", _m25))
+ok("ROUTES PAGE: technical T1 has the reads, the layer names and the full-screen columns",
+   all(w in _tg25 for w in ('id="t1-routes-page"', "<code>GET /api/routes/geojson?profile=&amp;leg=&amp;alt_index=</code>", "<code>rlEnsure()</code>",
+                            "<code>/api/community</code>", "<code>/api/collisions</code>", "<code>300px | map | 380px</code>", "<code>routesPageDom</code>")))
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

@@ -212,7 +212,7 @@
       "labels": {
         "en": "Rigid 7.5t"
       },
-      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>3.5–7.5 tonnes)', kg CO2e per vehicle-km: 0% laden 0.46656, 100% laden 0.54675, AVERAGE laden 0.49944 (used). Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3109_4_1 / 5_304_3111_4_1 / 5_304_3112_4_1. Replaced the untraced pre-H1 figure 0.55 on 10 Oct 2026. Not a haulage vehicle on any current route; hidden for GB. The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
+      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>3.5–7.5 tonnes)', kg CO2e per vehicle-km: 0% laden 0.46656, 100% laden 0.54675, AVERAGE laden 0.49944 (used). Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3109_4_1 / 5_304_3111_4_1 / 5_304_3112_4_1. Replaced the untraced pre-H1 figure 0.55 on 10 Oct 2026. Not a haulage vehicle on any current route; hidden for GB. The _empty/_laden pair is READ since 8 Nov 2026 (return_journey.py): the loaded leg at _laden, the way back at _empty x the route's return share; the AVERAGE figure stays the fallback and the Config display.",
       "fuel": "diesel",
       "emissions_kg_co2e_per_km_empty": 0.46656,
       "emissions_kg_co2e_per_km_laden": 0.54675
@@ -237,7 +237,7 @@
       },
       "emissions_kg_co2e_per_km_empty": 0.7791,
       "emissions_kg_co2e_per_km_laden": 1.11639,
-      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>17 tonnes)', kg CO2e per vehicle-km: 0% laden 0.77910, 100% laden 1.11639, AVERAGE laden 0.99773 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3117_4_1 / 5_304_3119_4_1 / 5_304_3120_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.75–0.95 flat figures on 29 Sep 2026 (H1). The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
+      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>17 tonnes)', kg CO2e per vehicle-km: 0% laden 0.77910, 100% laden 1.11639, AVERAGE laden 0.99773 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3117_4_1 / 5_304_3119_4_1 / 5_304_3120_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.75–0.95 flat figures on 29 Sep 2026 (H1). The _empty/_laden pair is READ since 8 Nov 2026 (return_journey.py): the loaded leg at _laden, the way back at _empty x the route's return share; the AVERAGE figure stays the fallback and the Config display.",
       "fuel": "diesel"
     },
     "Rigid 6-wheeler (26t)": {
@@ -261,7 +261,7 @@
       },
       "emissions_kg_co2e_per_km_empty": 0.7791,
       "emissions_kg_co2e_per_km_laden": 1.11639,
-      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>17 tonnes)', kg CO2e per vehicle-km: 0% laden 0.77910, 100% laden 1.11639, AVERAGE laden 0.99773 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3117_4_1 / 5_304_3119_4_1 / 5_304_3120_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.75–0.95 flat figures on 29 Sep 2026 (H1). The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
+      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>17 tonnes)', kg CO2e per vehicle-km: 0% laden 0.77910, 100% laden 1.11639, AVERAGE laden 0.99773 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3117_4_1 / 5_304_3119_4_1 / 5_304_3120_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.75–0.95 flat figures on 29 Sep 2026 (H1). The _empty/_laden pair is READ since 8 Nov 2026 (return_journey.py): the loaded leg at _laden, the way back at _empty x the route's return share; the AVERAGE figure stays the fallback and the Config display.",
       "fuel": "diesel"
     },
     "Rigid 8-wheeler (32t)": {
@@ -285,7 +285,7 @@
       },
       "emissions_kg_co2e_per_km_empty": 0.7791,
       "emissions_kg_co2e_per_km_laden": 1.11639,
-      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>17 tonnes)', kg CO2e per vehicle-km: 0% laden 0.77910, 100% laden 1.11639, AVERAGE laden 0.99773 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3117_4_1 / 5_304_3119_4_1 / 5_304_3120_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.75–0.95 flat figures on 29 Sep 2026 (H1). The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
+      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>17 tonnes)', kg CO2e per vehicle-km: 0% laden 0.77910, 100% laden 1.11639, AVERAGE laden 0.99773 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3117_4_1 / 5_304_3119_4_1 / 5_304_3120_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.75–0.95 flat figures on 29 Sep 2026 (H1). The _empty/_laden pair is READ since 8 Nov 2026 (return_journey.py): the loaded leg at _laden, the way back at _empty x the route's return share; the AVERAGE figure stays the fallback and the Config display.",
       "fuel": "diesel"
     },
     "Artic Tipper (44t)": {
@@ -309,7 +309,7 @@
       },
       "emissions_kg_co2e_per_km_empty": 0.65383,
       "emissions_kg_co2e_per_km_laden": 1.08004,
-      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — articulated (>33 t)', kg CO2e per vehicle-km: 0% laden 0.65383, 100% laden 1.08004, AVERAGE laden 0.93939 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3129_4_1 / 5_304_3131_4_1 / 5_304_3132_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.89 on 29 Sep 2026 (H1). The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
+      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — articulated (>33 t)', kg CO2e per vehicle-km: 0% laden 0.65383, 100% laden 1.08004, AVERAGE laden 0.93939 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3129_4_1 / 5_304_3131_4_1 / 5_304_3132_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.89 on 29 Sep 2026 (H1). The _empty/_laden pair is READ since 8 Nov 2026 (return_journey.py): the loaded leg at _laden, the way back at _empty x the route's return share; the AVERAGE figure stays the fallback and the Config display.",
       "fuel": "diesel"
     },
     "Artic Flatbed (44t)": {
@@ -333,7 +333,7 @@
       },
       "emissions_kg_co2e_per_km_empty": 0.65383,
       "emissions_kg_co2e_per_km_laden": 1.08004,
-      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — articulated (>33 t)', kg CO2e per vehicle-km: 0% laden 0.65383, 100% laden 1.08004, AVERAGE laden 0.93939 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3129_4_1 / 5_304_3131_4_1 / 5_304_3132_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.89 on 29 Sep 2026 (H1). The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
+      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — articulated (>33 t)', kg CO2e per vehicle-km: 0% laden 0.65383, 100% laden 1.08004, AVERAGE laden 0.93939 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3129_4_1 / 5_304_3131_4_1 / 5_304_3132_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.89 on 29 Sep 2026 (H1). The _empty/_laden pair is READ since 8 Nov 2026 (return_journey.py): the loaded leg at _laden, the way back at _empty x the route's return share; the AVERAGE figure stays the fallback and the Config display.",
       "fuel": "diesel"
     },
     "_default": {
@@ -355,7 +355,7 @@
       "emissions_kg_co2e_per_km": 0.99773,
       "emissions_kg_co2e_per_km_empty": 0.7791,
       "emissions_kg_co2e_per_km_laden": 1.11639,
-      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>17 tonnes)', kg CO2e per vehicle-km: 0% laden 0.77910, 100% laden 1.11639, AVERAGE laden 0.99773 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3117_4_1 / 5_304_3119_4_1 / 5_304_3120_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.75–0.95 flat figures on 29 Sep 2026 (H1). The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
+      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>17 tonnes)', kg CO2e per vehicle-km: 0% laden 0.77910, 100% laden 1.11639, AVERAGE laden 0.99773 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3117_4_1 / 5_304_3119_4_1 / 5_304_3120_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.75–0.95 flat figures on 29 Sep 2026 (H1). The _empty/_laden pair is READ since 8 Nov 2026 (return_journey.py): the loaded leg at _laden, the way back at _empty x the route's return share; the AVERAGE figure stays the fallback and the Config display.",
       "routing": {
         "gross_weight_kg": 32000,
         "height_cm": 390,
@@ -385,7 +385,7 @@
       "emissions_kg_co2e_per_km": 0.99773,
       "emissions_kg_co2e_per_km_empty": 0.7791,
       "emissions_kg_co2e_per_km_laden": 1.11639,
-      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>17 tonnes)', kg CO2e per vehicle-km: 0% laden 0.77910, 100% laden 1.11639, AVERAGE laden 0.99773 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3117_4_1 / 5_304_3119_4_1 / 5_304_3120_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.75–0.95 flat figures on 29 Sep 2026 (H1). The _empty/_laden pair is stored for a later per-leg calculation and is NOT read by code yet.",
+      "_emissions_basis": "DESNZ/DEFRA 2026 GHG conversion factors, 'HGV (non-refrigerated, all diesel) — rigid (>17 tonnes)', kg CO2e per vehicle-km: 0% laden 0.77910, 100% laden 1.11639, AVERAGE laden 0.99773 (used). Read from a secondary copy of the 2026 full set on 26 Sep 2026; Verified 10 Oct 2026 against the gov.uk flat file v1.2 (ghg-conversion-factors-2026-flat-format-revised.xlsx, file dated 10 Jul 2026, page updated 31 Jul 2026): IDs 5_304_3117_4_1 / 5_304_3119_4_1 / 5_304_3120_4_1 (Scope 1, delivery vehicles). Replaced the 2025-basis 0.75–0.95 flat figures on 29 Sep 2026 (H1). The _empty/_laden pair is READ since 8 Nov 2026 (return_journey.py): the loaded leg at _laden, the way back at _empty x the route's return share; the AVERAGE figure stays the fallback and the Config display.",
       "routing": {
         "gross_weight_kg": 26000,
         "height_cm": 390,
@@ -418,7 +418,7 @@
       "battery_kwh_usable": 500,
       "charge_kw": 350,
       "_electric_basis": "ASSUMPTION — usable battery and charger power typical of 2026 battery-electric HGVs (ZEHID-funded sites charge at 43 kW to 5 MW). Used only by the carbon planner's fleet-size comparison. Replace with the fleet's and the compound's figures.",
-      "_emissions_basis": "DERIVED: the UK Government 2026 set has NO electric HGV factor (its HGV rows are all diesel; the EV rows are cars and vans). Carbon = kWh/km × UK electricity: generation 0.13096 (7_400_4000_5_1, Scope 2) + transmission and distribution 0.01299 (13_402_4000_5_1, Scope 3) = 0.14395 kg CO2e per kWh, 2026, verified 10 Oct 2026 against the gov.uk flat file v1.2; computed by conversions._emissions() from kwh_per_km, never stored here. Well-to-wheel adds WTT 0.03682 + 0.00359 (0.18436 in all) and is shown separately; the diesel figures on this page are tank-to-wheel. The empty/laden pair does not exist for an electric lorry; the per-leg method is NOT read by code yet.",
+      "_emissions_basis": "DERIVED: the UK Government 2026 set has NO electric HGV factor (its HGV rows are all diesel; the EV rows are cars and vans). Carbon = kWh/km × UK electricity: generation 0.13096 (7_400_4000_5_1, Scope 2) + transmission and distribution 0.01299 (13_402_4000_5_1, Scope 3) = 0.14395 kg CO2e per kWh, 2026, verified 10 Oct 2026 against the gov.uk flat file v1.2; computed by conversions._emissions() from kwh_per_km, never stored here. Well-to-wheel adds WTT 0.03682 + 0.00359 (0.18436 in all) and is shown separately; the diesel figures on this page are tank-to-wheel. The empty/laden pair does not exist for an electric lorry: since 8 Nov 2026 (return_journey.py) both legs take its one derived figure, the way back x the route's return share.",
       "routing": {
         "gross_weight_kg": 44000,
         "height_cm": 400,
@@ -448,7 +448,7 @@
       "battery_kwh_usable": 500,
       "charge_kw": 350,
       "_electric_basis": "ASSUMPTION — usable battery and charger power typical of 2026 battery-electric HGVs (ZEHID-funded sites charge at 43 kW to 5 MW). Used only by the carbon planner's fleet-size comparison. Replace with the fleet's and the compound's figures.",
-      "_emissions_basis": "DERIVED: the UK Government 2026 set has NO electric HGV factor (its HGV rows are all diesel; the EV rows are cars and vans). Carbon = kWh/km × UK electricity: generation 0.13096 (7_400_4000_5_1, Scope 2) + transmission and distribution 0.01299 (13_402_4000_5_1, Scope 3) = 0.14395 kg CO2e per kWh, 2026, verified 10 Oct 2026 against the gov.uk flat file v1.2; computed by conversions._emissions() from kwh_per_km, never stored here. Well-to-wheel adds WTT 0.03682 + 0.00359 (0.18436 in all) and is shown separately; the diesel figures on this page are tank-to-wheel. The empty/laden pair does not exist for an electric lorry; the per-leg method is NOT read by code yet.",
+      "_emissions_basis": "DERIVED: the UK Government 2026 set has NO electric HGV factor (its HGV rows are all diesel; the EV rows are cars and vans). Carbon = kWh/km × UK electricity: generation 0.13096 (7_400_4000_5_1, Scope 2) + transmission and distribution 0.01299 (13_402_4000_5_1, Scope 3) = 0.14395 kg CO2e per kWh, 2026, verified 10 Oct 2026 against the gov.uk flat file v1.2; computed by conversions._emissions() from kwh_per_km, never stored here. Well-to-wheel adds WTT 0.03682 + 0.00359 (0.18436 in all) and is shown separately; the diesel figures on this page are tank-to-wheel. The empty/laden pair does not exist for an electric lorry: since 8 Nov 2026 (return_journey.py) both legs take its one derived figure, the way back x the route's return share.",
       "routing": {
         "gross_weight_kg": 44000,
         "height_cm": 400,
@@ -478,7 +478,7 @@
       "battery_kwh_usable": 400,
       "charge_kw": 350,
       "_electric_basis": "ASSUMPTION — usable battery and charger power typical of 2026 battery-electric HGVs (ZEHID-funded sites charge at 43 kW to 5 MW). Used only by the carbon planner's fleet-size comparison. Replace with the fleet's and the compound's figures.",
-      "_emissions_basis": "DERIVED: the UK Government 2026 set has NO electric HGV factor (its HGV rows are all diesel; the EV rows are cars and vans). Carbon = kWh/km × UK electricity: generation 0.13096 (7_400_4000_5_1, Scope 2) + transmission and distribution 0.01299 (13_402_4000_5_1, Scope 3) = 0.14395 kg CO2e per kWh, 2026, verified 10 Oct 2026 against the gov.uk flat file v1.2; computed by conversions._emissions() from kwh_per_km, never stored here. Well-to-wheel adds WTT 0.03682 + 0.00359 (0.18436 in all) and is shown separately; the diesel figures on this page are tank-to-wheel. The empty/laden pair does not exist for an electric lorry; the per-leg method is NOT read by code yet.",
+      "_emissions_basis": "DERIVED: the UK Government 2026 set has NO electric HGV factor (its HGV rows are all diesel; the EV rows are cars and vans). Carbon = kWh/km × UK electricity: generation 0.13096 (7_400_4000_5_1, Scope 2) + transmission and distribution 0.01299 (13_402_4000_5_1, Scope 3) = 0.14395 kg CO2e per kWh, 2026, verified 10 Oct 2026 against the gov.uk flat file v1.2; computed by conversions._emissions() from kwh_per_km, never stored here. Well-to-wheel adds WTT 0.03682 + 0.00359 (0.18436 in all) and is shown separately; the diesel figures on this page are tank-to-wheel. The empty/laden pair does not exist for an electric lorry: since 8 Nov 2026 (return_journey.py) both legs take its one derived figure, the way back x the route's return share.",
       "routing": {
         "gross_weight_kg": 32000,
         "height_cm": 380,
@@ -511,6 +511,13 @@
     "unload_minutes": 8,
     "working_days_per_month": 22,
     "shift_hours_per_day": 10,
+    "_return_journeys_note": "8 Nov 2026 (v2.1; John, 8 Nov): how much of a lorry's EMPTY way back the carbon charges, by route (Data > Routes) or these defaults. supplier = a route from a quarry / plant / works / depot / railhead / port ('part': the lorry may take other work; RICS Whole life carbon assessment 2nd ed. 2023 s5.1.3 module A4, UK default 43 %); scheme = any other start, a haul from a site or muck-away ('empty': the whole return, RICS 100 % where no return load is possible; the National Highways Carbon Tool v2.7 s5.3.2 adds the whole return to every haul); mixers = a concrete mixer whatever the route ('empty'). 'oneway' (GLEC v3: a vehicle chartered for a one-way journey) is offered per route and is never a default. Read by return_journey.py; the loaded leg takes the vehicle's 100 % laden factor and the way back its 0 % laden factor (DESNZ 2026).",
+    "return_journeys": {
+      "supplier": "part",
+      "part_share_pct": 43,
+      "scheme": "empty",
+      "mixers": "empty"
+    },
     "rebar_ratios": [
       {
         "id": "pile_caps",

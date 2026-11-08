@@ -968,9 +968,9 @@ ok("⭐ whole movements (12 Oct, evening): the terms say the total is shown to t
 # REVERSED 14 Oct 2026 (the user took the recommendation): the PDF prints CO₂e with the subscript (Inter has U+2082); the
 # view model still says CO2e, and only the Helvetica fallback keeps CO2e (pinned below)
 ok("⭐ carbon carries the stamp: planning estimate, DESNZ 2026 basis, not Carbon Tool figures; CO₂e with its subscript in the PDF",
-   "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in T10J and "CO₂e = routed km" in T10J
-   and "CO2e = routed km" not in T10J
-   and "₂" not in "".join(v for _, v in S10["terms"]) and "CO₂e = routed km" in HTML_TEXT
+   "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in T10J and "CO₂e = each leg's routed km" in T10J
+   and "CO2e = each leg" not in T10J   # RE-PINNED 8 Nov 2026 (the return journey): the rule names each leg
+   and "₂" not in "".join(v for _, v in S10["terms"]) and "CO₂e = each leg's routed km" in HTML_TEXT
    and "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in HTML_TEXT)
 import brand_pdf as _bpdf
 _st = dict(_bpdf.fonts())

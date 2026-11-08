@@ -155,8 +155,11 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None):
         baked = bool(ctx.get("baked"))
         km = f.get("km_day") if baked else None                       # trips × km_trip
         basis_km_total = (float(ctx.get("basis_km") or 0) * f["trips"]) if baked else None
-        co2_t = (round(km * conversions._emissions(factors, r.get("vehicle_type")) / 1000.0, 3)
-                 if km is not None else None)
+        # 8 Nov 2026 (v2.1, the return journey): trips × one trip's kg CO2e with the two legs apart (derived.line_context,
+        # return_journey.py) — was km_day × the vehicle's average-laden figure
+        co2_t = (round(f["trips"] * float(ctx.get("co2_kg_trip") or 0.0) / 1000.0, 3) if km is not None else None)
+        co2_loaded_t = (round(f["trips"] * float(ctx.get("co2_loaded_kg_trip") or 0.0) / 1000.0, 3) if km is not None else None)
+        co2_empty_t = (round(f["trips"] * float(ctx.get("co2_empty_kg_trip") or 0.0) / 1000.0, 3) if km is not None else None)
         cycles = int(ctx.get("cycles_per_vehicle_day") or 0)
         # the fleet this month needs: trips spread over the working days, at what one
         # vehicle can do in a shift on this route — None when unbaked (no cycle)
@@ -193,6 +196,8 @@ def lines(acc=None, from_month=None, to_month=None, status=None, factors=None):
             # 17 Oct 2026: the driving minutes of one cycle (the Carbon planner's electric day reads it)
             "drive_min": ctx.get("drive_min"), "other_work_min": ctx.get("other_work_min"),
             "km": km, "tonne_km": f.get("tonne_km"), "co2_t": co2_t,
+            # 8 Nov 2026: the two legs apart (the Dashboard card's second line), and what the route charges of the way back
+            "co2_loaded_t": co2_loaded_t, "co2_empty_t": co2_empty_t, "return_share": ctx.get("return_share"),
             "planned": planned, "fair": fair,
             "actual_qty": act["qty"], "actual_tonnes": actual_t, "actual_eur": act["eur"],
             "weeks_reported": act["weeks"],
@@ -277,7 +282,7 @@ def preview(route_id, vehicle_type, material_type, unit, cells, factors=None):
         if baked:
             # 11 Oct 2026 (carbon target): transport carbon by the SAME formula as lines() above,
             # km_day × the vehicle's kg CO2e per km ÷ 1000, rounded per cell as each saved line-month is
-            co2_t += round(float(f.get("km_day") or 0.0) * conversions._emissions(factors, vehicle_type) / 1000.0, 3)
+            co2_t += round(f["trips"] * float(ctx.get("co2_kg_trip") or 0.0) / 1000.0, 3)   # 8 Nov 2026: the one trip rule
         bk = (float(ctx.get("basis_km") or 0) * f["trips"]) if baked else None
         planned = unit_prices(f.get("eur"), f["tonnes"], f["trips"], bk)
         planned["source"] = rate_source; planned["partial"] = bool(f.get("eur_partial"))

@@ -6023,6 +6023,7 @@ class RoutePlanning(BaseModel):
     rate_eur_per_t: Optional[float] = None
     rate_eur_per_km: Optional[float] = None
     km_basis: Optional[str] = None
+    return_mode: Optional[str] = None           # 8 Nov 2026 (v2.1): empty | part | oneway; null = guessed from the route
 
 
 @app.put("/api/admin/routes/{route_id}/planning")

@@ -1075,6 +1075,8 @@ def init_lookahead_db():
                                 ("locations", "holding_exempt", "TEXT"),
                                 ("locations", "holding_id", "TEXT"),
                                 ("routes", "skip_holding", "INTEGER"),
+                                # 8 Nov 2026 (v2.1): the return journey a route charges (return_journey.py); NULL = guessed
+                                ("routes", "return_mode", "TEXT"),
                                 ("route_geometry", "holding_id", "TEXT"),
                                 ("route_geometry", "holding_at_km", "REAL"),
                                 ("route_geometry", "holding_tail_hr", "REAL")):
@@ -1405,6 +1407,9 @@ _TENANT_DDL = {
             -- 29 Oct 2026 (task 3c): 1 = this route's lorries never call off at a holding area (the user's Q4).
             -- ALTERed in init_lookahead_db() too.
             skip_holding      INTEGER,
+            -- 8 Nov 2026 (v2.1): how much of the empty way back this route's carbon charges: 'empty' | 'part' |
+            -- 'oneway'; NULL = guessed from the route's start (return_journey.py). ALTERed in init_lookahead_db() too.
+            return_mode       TEXT,
             -- 2026-09-09 (Look-ahead v2 slices 3-5). All nullable and never seeded.
             -- A typed planning cap (a flag never a block) and three contract rates
             -- which are SUMMED where filled. km_basis says which distance the

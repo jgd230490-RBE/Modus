@@ -212,8 +212,9 @@ async function carbonTargetDom(){
   const elec = [...host.querySelectorAll("label")].find(l => /Battery electric lorries/.test(l.textContent)).querySelector("input");
   act(() => { elec.click(); });
   await settle(450);
+  // RE-PINNED 8 Nov 2026 (the return journey): the carbon fixtures' figures moved (test_carbon.py hand-works them)
   ok("CARBON DOM: a choice that lowers carbon gives a result (the strip at the foot reads it)",
-     (host.querySelector("[data-sticky-foot]") || { textContent: "" }).textContent.includes("Result: 32.8 tCO2e"));
+     (host.querySelector("[data-sticky-foot]") || { textContent: "" }).textContent.includes("Result: 32.5 tCO2e"));
   act(() => { setBtn().click(); });
   await settle(50);
   ok("🔴 CARBON DOM: ...but Set stays disabled, and a click sends NO PUT (it would have replaced a target it could not see, without asking)",
@@ -223,7 +224,7 @@ async function carbonTargetDom(){
   await settle(100);
   ok("⭐ CARBON DOM: Try again reads it again (a second GET); the target shows and Set is enabled",
      calls.filter(c => c.url === "/api/carbon/target" && c.method === "GET").length === 2
-     && step6().textContent.includes("Target: 73.1% below the approved plan = 43.4 tCO2e") && !setBtn().disabled && !byText(step6(), "button", "Try again"));
+     && step6().textContent.includes("Target: 74.0% below the approved plan = 41.4 tCO2e") && !setBtn().disabled && !byText(step6(), "button", "Try again"));
   act(() => { setBtn().click(); });
   await settle(50);
   ok("🔴 CARBON DOM: with a target there, Set asks first; answering no sends nothing",
@@ -318,7 +319,7 @@ async function carbonTargetDom(){
   const go3 = byText(d3.el, "button", "Open the Carbon planner");
   if (go3) act(() => { go3.click(); });
   ok("CARBON DOM: with a target set, the strip reads it and still offers the Carbon planner",
-     !!d3.el.querySelector('[data-carbon-target="set"]') && d3.el.textContent.includes("With the agreed decisions: 43.4 tCO2e, on target")
+     !!d3.el.querySelector('[data-carbon-target="set"]') && d3.el.textContent.includes("With the agreed decisions: 41.4 tCO2e, on target")
      && opened.length === 2 && opened[1] === "carbon");
   d3.done();
 
@@ -2922,6 +2923,184 @@ async function fullScreenDom(){
   }
 }
 
+// 8 Nov 2026 (v2.1 tasks 2.1-5 + 2.1-7 + 2.1-8, the mockup John approved: notes routes-page-layout-mockup-1108, Q1-Q7): the Routes
+// page — Out · Back · Both on the map, the five layers read only when ticked, each leg's distance and time in the table, full screen
+async function routesPageDom(){
+  const MapWas = w.mapboxgl.Map, mmWas = w.matchMedia, popWas = w.mapboxgl.Popup;
+  const ctlBox = w.document.createElement("div"); w.document.body.appendChild(ctlBox);
+  const L = {}, S = {}, VIS = {}, FILT = {};
+  w.mapboxgl.Popup = function(){ const p = { setLngLat: () => p, setHTML: () => p, addTo: () => p, remove(){} }; return p; };
+  w.mapboxgl.Map = function(){
+    const m = new Proxy({}, { get: (t, k) => {
+      if (k === "on") return (ev, a, b) => { const fn = typeof a === "function" ? a : b; if (ev === "load") setTimeout(() => fn(), 0); return m; };
+      if (k === "addControl") return (c) => { if (c && c.onAdd){ const n = c.onAdd(m); if (n) ctlBox.appendChild(n); } return m; };
+      if (k === "getCanvas" || k === "getCanvasContainer" || k === "getContainer") return () => ({ style: {}, addEventListener(){}, removeEventListener(){} });
+      if (k === "getZoom") return () => 10;
+      if (k === "getCenter") return () => ({ lng: 0, lat: 0 });
+      if (k === "getBounds") return () => ({ getWest: () => 0, getEast: () => 1, getSouth: () => 0, getNorth: () => 1 });
+      if (k === "addLayer") return (l) => { L[l.id] = l; VIS[l.id] = (l.layout && l.layout.visibility) || "visible"; return m; };
+      if (k === "getLayer") return (id) => L[id];
+      if (k === "addSource") return (id, s) => { S[id] = { ...s, setData(d){ this.data = d; } }; return m; };
+      if (k === "getSource") return (id) => S[id];
+      if (k === "setLayoutProperty") return (id, p, v) => { if (p === "visibility") VIS[id] = v; return m; };
+      if (k === "getLayoutProperty") return (id, p) => (p === "visibility" ? VIS[id] : undefined);
+      if (k === "setFilter") return (id, f) => { FILT[id] = f; return m; };
+      if (k === "hasImage") return () => false;
+      if (k === "getStyle") return () => ({ layers: [] });
+      if (k === "queryRenderedFeatures") return () => [];
+      if (k === "isStyleLoaded" || k === "loaded") return () => true;
+      if (k === "then") return undefined;
+      return () => m;
+    } });
+    return m;
+  };
+  let wide = true; const mqOn = [];
+  const isDesk = (q) => /min-width: 1024px/.test(q);
+  w.matchMedia = (q) => ({ get matches(){ return isDesk(q) ? wide : false; }, media: q,
+    addEventListener(t, f){ if (isDesk(q)) mqOn.push(f); }, removeEventListener(){}, addListener(f){ if (isDesk(q)) mqOn.push(f); }, removeListener(){} });
+  const doc = w.document, de = doc.documentElement; let fsEl = null;
+  const fsWas = Object.getOwnPropertyDescriptor(doc, "fullscreenElement"), reqWas = de.requestFullscreen, exitWas = doc.exitFullscreen;
+  Object.defineProperty(doc, "fullscreenElement", { configurable: true, get: () => fsEl });
+  de.requestFullscreen = () => { fsEl = de; return Promise.resolve(); };
+  doc.exitFullscreen = () => { fsEl = null; return Promise.resolve(); };
+  const LOCS = { type: "FeatureCollection", features: [["L001", "Kilby Ridge Quarry", -1.238, 52.561], ["L003", "Brook Pit", -0.752, 52.694]]
+    .map(([id, name, lon, lat]) => ({ type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] },
+      properties: { id, name, role: "origin", loc_type: "Quarry", supplies: ["Small aggregate"], receives: [] } })) };
+  const leg = (km, hr, alt) => ({ alt_index: alt || 0, baked: true, distance_km: km, duration_hr: hr, error: null, haul_zones: [], haul_recorded: true });
+  const P = "Artic Tipper (44t)";
+  const STATUS = [
+    { id: "R001", origin: "Kilby Ridge Quarry", dest: "Brook Pit", origin_id: "L001", dest_id: "L003", ipt: null, haul_roads: [], gate_blockers: [],
+      profiles: { [P]: { baked: true, distance_km: 40, duration_hr: 0.75, legs: { loaded: [leg(40, 0.75), leg(44, 0.8, 1)], return: [leg(42, 0.5)] }, return_baked: true, alt_count: 2 } } },
+    { id: "R002", origin: "Brook Pit", dest: "Kilby Ridge Quarry", origin_id: "L003", dest_id: "L001", ipt: null, haul_roads: [], gate_blockers: [],
+      profiles: { [P]: { baked: true, distance_km: 12, duration_hr: 0.25, legs: { loaded: [leg(12, 0.25)] }, return_baked: false, alt_count: 1 } } },
+  ];
+  const line = (id, lg) => ({ type: "Feature", geometry: { type: "LineString", coordinates: [[-1.2, 52.5], [-0.8, 52.7]] }, properties: { route_id: id, leg: lg } });
+  const COMM = { kinds: [{ key: "school", label: "School", colour: "#7C3AED", symbol: "triangle" }, { key: "cycle", label: "Cycle route", colour: "#0EA5E9", symbol: "line" }],
+    features: [{ type: "Feature", geometry: { type: "Point", coordinates: [-1, 52.6] }, properties: { kind: "school", name: "Brook School" } },
+               { type: "Feature", geometry: { type: "Point", coordinates: [-1.1, 52.6] }, properties: { kind: "school", name: "Ridge School" } },
+               { type: "Feature", geometry: { type: "LineString", coordinates: [[-1, 52.6], [-0.9, 52.65]] }, properties: { kind: "cycle", name: "NCN 6" } }] };
+  const COLL = { features: [{ type: "Feature", geometry: { type: "Point", coordinates: [-1, 52.6] }, properties: { severity: 2, severity_word: "Serious", along: "route" } },
+                            { type: "Feature", geometry: { type: "Point", coordinates: [-1, 52.61] }, properties: { severity: 3, severity_word: "Slight", along: "alternative" } }] };
+  const seen = [];
+  const fetchWas = w.fetch;
+  w.fetch = (url) => { const u = String(url); seen.push(u);
+    if (/\/locations\/geojson$/.test(u)) return respond(LOCS);
+    if (/\/routes\/status$/.test(u)) return respond(STATUS);
+    if (/\/routes\/summary$/.test(u)) return respond({ here_configured: true });
+    if (/\/zones$/.test(u)) return respond({ zones: [], haul_links: {} });
+    if (/\/routes\/geojson\?/.test(u)){ const lg = new URLSearchParams(u.split("?")[1]).get("leg");
+      return respond({ type: "FeatureCollection", features: STATUS.filter(r => r.profiles[P].legs[lg]).map(r => line(r.id, lg)) }); }
+    if (/\/api\/community$/.test(u)) return respond(COMM);
+    if (/\/api\/collisions$/.test(u)) return respond(COLL);
+    return new Promise(() => {}); };
+  const infoWas = w.__ACCESS.info;
+  w.__ACCESS.info = { role: "admin", label: "Admin", via: "login", can_approve: true, ipt: null, name: "Ada", email: "ada@example.org" };
+  const el = doc.createElement("div"); doc.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+  const settle = async () => { for (let i = 0; i < 8; i++) await tick(); };
+  const press = async (b) => { await act(async () => { b.dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }); await settle(); };
+  const render = async (sub) => { await act(async () => { r.render(w.React.createElement(w.DataManagement, { meta: META, who: "t", subTab: sub, onSubTab(){} })); }); await settle(); };
+  const geo = (lg) => seen.filter(u => /\/routes\/geojson\?/.test(u) && u.includes("leg=" + lg)).length;
+  const btn = () => ctlBox.querySelector("[data-full-ctl] button"), box = () => ctlBox.querySelector("[data-full-ctl]");
+  let mounted = false;
+  try {
+    await render("routes"); mounted = true;
+    const legBtns = [...el.querySelectorAll("[data-leg-pick]")];
+    ok("⭐ 2.1-7: the Routes map carries Out · Back · Both as one named group of three buttons, Both pressed first (Q2)",
+       legBtns.length === 3 && !!el.querySelector('[role="group"][aria-label="Direction drawn"]')
+       && legBtns.map(b => b.textContent).join("|") === "Both|Out|Back" && legBtns[0].getAttribute("aria-pressed") === "true"
+       && legBtns.slice(1).every(b => b.getAttribute("aria-pressed") === "false"));
+    ok("🔴 2.1-7: the header's Laden out / Empty back select is gone",
+       ![...el.querySelectorAll("select")].some(s => s.getAttribute("aria-label") === "Direction drawn") && !/Laden out|Empty back/.test(el.textContent));
+    ok("⭐ 2.1-7: Both reads both legs (one read each) and the routes source's lines carry their leg (green out, amber back)",
+       geo("loaded") >= 1 && geo("return") >= 1 && !!S.routes && (S.routes.data.features || []).some(f => f.properties.leg === "return")
+       && (S.routes.data.features || []).some(f => f.properties.leg === "loaded"));
+    const rl = L["route-line"], ra = L["route-arrows"];
+    ok("⭐ 2.1-7: the lines are solid, coloured by leg (out #059669, back #F59E0B), each offset LEFT of its travel; arrows ride along them",
+       !!rl && JSON.stringify(rl.paint["line-color"]) === JSON.stringify(["match", ["get", "leg"], "return", "#F59E0B", "#059669"])
+       && !rl.paint["line-dasharray"] && JSON.stringify(rl.paint["line-offset"]).includes("-2.2") && !!ra && ra.layout["symbol-placement"] === "line");
+    ok("2.1-7: the picked route is a blue halo, never red (Q3)", !!L["sel-line"] && L["sel-line"].paint["line-color"] === "#1D4ED8");
+    const n0 = geo("loaded"), r0 = geo("return");
+    await press(legBtns[1]);
+    ok("2.1-7: Out draws the laden leg alone (no read of the leg back) and is pressed",
+       geo("loaded") === n0 + 1 && geo("return") === r0 && el.querySelector('[data-leg-pick="loaded"]').getAttribute("aria-pressed") === "true");
+    await press(el.querySelector('[data-leg-pick="both"]'));
+    // the table
+    const heads = [...el.querySelectorAll("th[data-leg-col]")].map(t => t.textContent);
+    const unit = heads[0] ? heads[0].replace("Out ", "") : "";
+    ok("⭐ 2.1-7: the table shows Out / Back side by side, distance and minutes, in place of the one distance column (Q7)",
+       heads.length === 4 && /^(mi|km)$/.test(unit) && heads.join("|") === `Out ${unit}|Out min|Back ${unit}|Back min`);
+    const rowOf = (id) => el.querySelector(`[data-leg-out="${id}"]`).parentElement;
+    const cells = (id) => [...rowOf(id).querySelectorAll("td")].map(t => t.textContent);
+    const c1 = cells("R001"), i1 = c1.indexOf(el.querySelector('[data-leg-out="R001"]').textContent);
+    ok("2.1-7: R001's legs read as typed: out 45 min, back 30 min (the shown vehicle, the primary)",
+       c1[i1 + 1] === "45" && c1[i1 + 3] === "30" && c1[i1] !== "—" && c1[i1 + 2] !== "—");
+    const c2 = cells("R002"), i2 = c2.indexOf(el.querySelector('[data-leg-out="R002"]').textContent);
+    ok("2.1-7: a leg not routed reads '—' (R002 has no leg back)", c2[i2 + 1] === "15" && c2[i2 + 2] === "—" && c2[i2 + 3] === "—");
+    const altSel = [...el.querySelectorAll("select")].find(s => s.getAttribute("aria-label") === "Route option drawn");
+    await act(async () => { w.React && altSel && (Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(altSel, "1"), altSel.dispatchEvent(new w.Event("change", { bubbles: true }))); }); await settle();
+    const c3 = cells("R001"), i3 = c3.indexOf(el.querySelector('[data-leg-out="R001"]').textContent);
+    ok("2.1-7: the table follows the option drawn (Alt 1: out 48 min, no Alt 1 back)", c3[i3 + 1] === "48" && c3[i3 + 3] === "—");
+    await act(async () => { Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(altSel, "0"); altSel.dispatchEvent(new w.Event("change", { bubbles: true })); }); await settle();
+    // the layers
+    const ticks = [...el.querySelectorAll("input[data-route-layer]")];
+    ok("⭐ 2.1-5: a Layers box on the Routes map with five ticks, all off (Q4), and nothing read until one is ticked",
+       ticks.map(t => t.getAttribute("data-route-layer")).join("|") === "closures|limits|places|collisions|cycle" && ticks.every(t => !t.checked)
+       && !seen.some(u => /\/api\/(community|collisions|restrictions|public\/limits)/.test(u)) && !L["rl-places"]);
+    ok("2.1-5: the ticks name the layers in words", /Planned road closures/.test(el.textContent) && /Lorry limits/.test(el.textContent)
+       && /Community places/.test(el.textContent) && /Collisions/.test(el.textContent) && /Cycle routes/.test(el.textContent));
+    await act(async () => { ticks[2].click(); }); await settle();
+    const lab = (k) => el.querySelector(`input[data-route-layer="${k}"]`).parentElement.textContent;
+    ok("⭐ 2.1-5: ticking Community places reads the staff map's own places once and shows them; the count beside the tick (2 places)",
+       seen.filter(u => /\/api\/community$/.test(u)).length === 1 && VIS["rl-places"] === "visible" && VIS["rl-cycle"] === "none" && /Community places2$/.test(lab("places")));
+    await act(async () => { el.querySelector('input[data-route-layer="cycle"]').click(); }); await settle();
+    ok("2.1-5: Cycle routes is its own tick (Q6) and reads nothing more (the same places read): 1 cycle route",
+       seen.filter(u => /\/api\/community$/.test(u)).length === 1 && VIS["rl-cycle"] === "visible" && /Cycle routes1$/.test(lab("cycle")));
+    await act(async () => { el.querySelector('input[data-route-layer="collisions"]').click(); }); await settle();
+    ok("⭐ 2.1-5: Collisions as the staff map: every severity drawn, those near an alternative hidden while none is drawn (Q5); the count is the route's",
+       seen.filter(u => /\/api\/collisions$/.test(u)).length === 1 && VIS["rl-coll"] === "visible"
+       && JSON.stringify(FILT["rl-coll"]) === JSON.stringify(["==", ["get", "along"], "route"]) && /Collisions1$/.test(lab("collisions")));
+    await act(async () => { el.querySelector('input[data-route-layer="places"]').click(); }); await settle();
+    ok("2.1-5: unticking hides it (the read is kept)", VIS["rl-places"] === "none" && seen.filter(u => /\/api\/community$/.test(u)).length === 1);
+    await render("locations");
+    ok("⭐ 2.1-5: the layers are the Routes page's only: on Locations every one is hidden and the box is gone",
+       ["rl-cycle", "rl-coll", "rl-places"].every(id => VIS[id] === "none") && !el.querySelector("[data-route-map-box]"));
+    await render("routes");
+    ok("2.1-5: back on Routes the ticked ones show again", VIS["rl-cycle"] === "visible" && VIS["rl-coll"] === "visible");
+    // full screen
+    ok("⭐ 2.1-8: the ⤢ control shows on the Routes page at a desk (Q1)", !!box() && box().style.display === "");
+    await press(btn());
+    const g = el.querySelector("[data-full]");
+    ok("⭐ 2.1-8: ⤢ lays the page over the window: the route list | the map | the chosen route (300 px | map | 380 px), the panel hidden",
+       !!g && / sl-full$/.test(g.className) && g.style.gridTemplateColumns === "300px minmax(0, 1fr) 380px"
+       && !!el.querySelector("[data-route-full-list]") && !!el.querySelector("[data-route-full-details]") && fsEl === de);
+    ok("2.1-8: the list holds every route with its two legs", el.querySelectorAll("[data-route-full-pick]").length === 2
+       && /Out .*Back /.test(el.querySelector('[data-route-full-pick="R001"]').textContent));
+    ok("2.1-8: with nothing picked the right column says how to pick one", /Pick a route on the map or in the list\./.test(el.querySelector("[data-route-full-details]").textContent));
+    await press(el.querySelector('[data-route-full-pick="R001"]'));
+    const det = el.querySelector("[data-route-full-details]");
+    ok("⭐ 2.1-8: picking a route puts its two legs on the right (45 min out, 30 min back), with the route sheet and collision evidence buttons",
+       /R001 · Kilby Ridge Quarry → Brook Pit/.test(det.textContent) && /45 min/.test(det.querySelector('[data-route-full-leg="loaded"]').textContent)
+       && /30 min/.test(det.querySelector('[data-route-full-leg="return"]').textContent)
+       && el.querySelector('[data-route-full-pick="R001"]').getAttribute("aria-current") === "true");
+    const folds = [...g.querySelectorAll("button.sl-fold")];
+    await press(folds[0]);
+    ok("2.1-8: « folds the list to a strip", g.style.gridTemplateColumns === "44px minmax(0, 1fr) 380px" && !el.querySelector("[data-route-full-pick]"));
+    await press([...g.querySelectorAll("button.sl-fold")][1]);
+    ok("2.1-8: » folds the chosen route to a strip", g.style.gridTemplateColumns === "44px minmax(0, 1fr) 44px");
+    await act(async () => { wide = false; mqOn.forEach(f => f()); }); await settle();
+    ok("⭐ 2.1-8: a window under 1,024 px leaves it, and the button goes", !el.querySelector("[data-full]") && box().style.display === "none");
+    await act(async () => { wide = true; mqOn.forEach(f => f()); }); await settle();
+    await press(btn());
+    await press(btn());
+    ok("2.1-8: ⤡ leaves; the table is back", !el.querySelector("[data-full]") && !!el.querySelector('[data-leg-out="R001"]'));
+  } finally {
+    if (mounted) await act(async () => { r.unmount(); });
+    el.remove(); ctlBox.remove(); w.fetch = fetchWas; w.mapboxgl.Map = MapWas; w.mapboxgl.Popup = popWas; w.matchMedia = mmWas; w.__ACCESS.info = infoWas;
+    de.requestFullscreen = reqWas; doc.exitFullscreen = exitWas;
+    if (fsWas) Object.defineProperty(doc, "fullscreenElement", fsWas); else delete doc.fullscreenElement;
+  }
+}
+
 // 8 Nov 2026 (v2.1 task 2.1-13): the week maps' figures — which routes are on today's plan, and each tag's words
 async function commitMapFigsDom(){
   const f = w.commitMapFigs;
@@ -3704,6 +3883,9 @@ async function reviewerDom(){
   // 5 Nov 2026: a site's layout full screen on Locations
   try { await fullScreenDom(); ok("FULL SCREEN DOM: the section ran to the end", true); }
   catch (e) { ok("FULL SCREEN DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  // 8 Nov 2026 (v2.1 2.1-5 / 2.1-7 / 2.1-8): the Routes page's layers, out and back, full screen
+  try { await routesPageDom(); ok("ROUTES PAGE DOM: the section ran to the end", true); }
+  catch (e) { ok("ROUTES PAGE DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));
   process.exit(fail.length ? 1 : 0);

@@ -4,9 +4,9 @@
    "benchmarks": {
     "desnz_kg_co2e_per_tkm": 0.07835,
     "excluded_lines": 0,
-    "kg_co2e_per_t_all_in": 3.386,
-    "kg_co2e_per_t_delivered": 0.217,
-    "kg_co2e_per_tkm": 0.01415,
+    "kg_co2e_per_t_all_in": 3.35,
+    "kg_co2e_per_t_delivered": 0.177,
+    "kg_co2e_per_tkm": 0.01152,
     "laden_share_pct": 50.0,
     "nh_kpi": {
      "checked": "2026-10-11",
@@ -20,8 +20,8 @@
      "url": "https://nationalhighways.co.uk/media/1oabu3i2/net-zero-highways-annual-progress-report-2025-26.pdf"
     },
     "nh_target": "National Highways commitment: \"100% electric or hydrogen heavy vehicles deliver to our sites by 2040\" (Net Zero Highways annual progress report 2025-26)",
-    "t_co2e_per_gbp_m": 16.42,
-    "vs_national_average_pct": -81.9,
+    "t_co2e_per_gbp_m": 16.25,
+    "vs_national_average_pct": -85.3,
     "zero_emission_share_pct": 100.0
    },
    "by_category": [
@@ -32,8 +32,8 @@
      "material_t": 25.074,
      "sheet": "Bulk Materials",
      "tonnes": 3900.0,
-     "total_t": 26.305,
-     "transport_t": 1.231
+     "total_t": 25.954,
+     "transport_t": 0.88
     },
     {
      "carbon_material": "soils",
@@ -50,8 +50,8 @@
     {
      "lorries": 2,
      "month_index": 10,
-     "total_t": 32.843,
-     "transport_t": 1.887,
+     "total_t": 32.492,
+     "transport_t": 1.536,
      "trips": 382
     }
    ],
@@ -59,8 +59,8 @@
     {
      "route_id": "R1",
      "tonnes": 2900.0,
-     "total_t": 19.876,
-     "transport_t": 1.231,
+     "total_t": 19.525,
+     "transport_t": 0.88,
      "vehicles": [
       "Artic Tipper (44t) — electric"
      ]
@@ -84,14 +84,14 @@
      ]
     }
    ],
-   "delta_pct": -79.1,
-   "delta_t": -124.153,
+   "delta_pct": -79.0,
+   "delta_t": -122.371,
    "delta_trips": 47,
    "delta_vkm_km": -3512.0,
    "drivers": [
     {
-     "delta_pct": -71.4,
-     "delta_t": -112.04,
+     "delta_pct": -72.1,
+     "delta_t": -111.692,
      "delta_trips": 0,
      "delta_vkm_km": -4800.0,
      "driver": "disposal",
@@ -99,8 +99,8 @@
      "lines_changed": 1
     },
     {
-     "delta_pct": -6.5,
-     "delta_t": -10.28,
+     "delta_pct": -5.5,
+     "delta_t": -8.498,
      "delta_trips": 47,
      "delta_vkm_km": 1960.0,
      "driver": "fuel",
@@ -108,7 +108,7 @@
      "lines_changed": 2
     },
     {
-     "delta_pct": -3.4,
+     "delta_pct": -3.5,
      "delta_t": -5.358,
      "delta_trips": 0,
      "delta_vkm_km": 0.0,
@@ -121,11 +121,11 @@
     "kwh": 13110.0,
     "lorries_peak": 2,
     "peak_month": 10,
-    "transport_t": 1.887,
+    "transport_t": 1.536,
     "trips": 382,
     "unsized_lines": 1
    },
-   "interaction_t": 3.524,
+   "interaction_t": 3.177,
    "lever_words": [
     "Recycled content 30% — Small aggregate",
     "Receiving site: Soil hub (route R4) — route R3: Compound → Tip",
@@ -154,14 +154,14 @@
    "name": "Greener",
    "notes": [],
    "sheets": {
-    "Bulk Materials": 26.305,
+    "Bulk Materials": 25.954,
     "Earthworks": 0.0,
     "Waste": 6.537,
     "unclassed": 0.0
    },
    "stages": {
     "A1-A3": 25.074,
-    "A4": 1.231,
+    "A4": 0.88,
     "A5": 6.537
    },
    "totals": {
@@ -170,6 +170,7 @@
     "disposal_excluded_tonnes": 0.0,
     "disposal_t": 5.881,
     "electric_trips": 382,
+    "empty_km": 3294.6,
     "excludes_unbaked": true,
     "flags": {
      "UNBAKED": 1
@@ -183,12 +184,14 @@
     "material_t": 25.074,
     "tkm": 133400.0,
     "tonnes": 9700.0,
-    "total_t": 32.843,
+    "total_t": 32.492,
+    "transport_empty_t": 0.593,
+    "transport_loaded_t": 0.944,
     "transport_nh_t": 30.371,
-    "transport_t": 1.887,
+    "transport_t": 1.536,
     "transport_tkm_t": 10.452,
-    "transport_wtt_t": 0.53,
-    "transport_wtw_t": 2.417,
+    "transport_wtt_t": 0.431,
+    "transport_wtw_t": 1.968,
     "trips": 382,
     "vkm": 10488.0,
     "wtw_lines_out": 0
@@ -199,9 +202,9 @@
   "benchmarks": {
    "desnz_kg_co2e_per_tkm": 0.07835,
    "excluded_lines": 0,
-   "kg_co2e_per_t_all_in": 16.185,
-   "kg_co2e_per_t_delivered": 1.512,
-   "kg_co2e_per_tkm": 0.06479,
+   "kg_co2e_per_t_all_in": 15.965,
+   "kg_co2e_per_t_delivered": 1.267,
+   "kg_co2e_per_tkm": 0.05428,
    "laden_share_pct": 50.0,
    "nh_kpi": {
     "checked": "2026-10-11",
@@ -215,8 +218,8 @@
     "url": "https://nationalhighways.co.uk/media/1oabu3i2/net-zero-highways-annual-progress-report-2025-26.pdf"
    },
    "nh_target": "National Highways commitment: \"100% electric or hydrogen heavy vehicles deliver to our sites by 2040\" (Net Zero Highways annual progress report 2025-26)",
-   "t_co2e_per_gbp_m": 78.5,
-   "vs_national_average_pct": -17.3,
+   "t_co2e_per_gbp_m": 77.43,
+   "vs_national_average_pct": -30.7,
    "zero_emission_share_pct": 0.0
   },
   "by_category": [
@@ -227,8 +230,8 @@
     "material_t": 0.0,
     "sheet": "Waste",
     "tonnes": 5800.0,
-    "total_t": 120.927,
-    "transport_t": 7.515
+    "total_t": 120.347,
+    "transport_t": 6.935
    },
    {
     "carbon_material": "aggregates",
@@ -237,16 +240,16 @@
     "material_t": 30.432,
     "sheet": "Bulk Materials",
     "tonnes": 3900.0,
-    "total_t": 36.068,
-    "transport_t": 5.636
+    "total_t": 34.516,
+    "transport_t": 4.084
    }
   ],
   "by_month": [
    {
     "lorries": 3,
     "month_index": 10,
-    "total_t": 156.995,
-    "transport_t": 13.151,
+    "total_t": 154.863,
+    "transport_t": 11.019,
     "trips": 335
    }
   ],
@@ -254,8 +257,8 @@
    {
     "route_id": "R3",
     "tonnes": 5800.0,
-    "total_t": 120.927,
-    "transport_t": 7.515,
+    "total_t": 120.347,
+    "transport_t": 6.935,
     "vehicles": [
      "Artic Tipper (44t)"
     ]
@@ -263,8 +266,8 @@
    {
     "route_id": "R1",
     "tonnes": 2900.0,
-    "total_t": 28.265,
-    "transport_t": 5.636,
+    "total_t": 26.712,
+    "transport_t": 4.084,
     "vehicles": [
      "Artic Tipper (44t)"
     ]
@@ -283,21 +286,21 @@
    "kwh": 0.0,
    "lorries_peak": 3,
    "peak_month": 10,
-   "transport_t": 13.151,
+   "transport_t": 11.019,
    "trips": 335,
    "unsized_lines": 1
   },
   "notes": [],
   "sheets": {
-   "Bulk Materials": 36.068,
+   "Bulk Materials": 34.516,
    "Earthworks": 0.0,
-   "Waste": 120.927,
+   "Waste": 120.347,
    "unclassed": 0.0
   },
   "stages": {
    "A1-A3": 30.432,
-   "A4": 5.636,
-   "A5": 120.927
+   "A4": 4.084,
+   "A5": 120.347
   },
   "totals": {
    "baked_lines": 2,
@@ -305,6 +308,7 @@
    "disposal_excluded_tonnes": 0.0,
    "disposal_t": 113.412,
    "electric_trips": 0,
+   "empty_km": 5290.0,
    "excludes_unbaked": true,
    "flags": {
     "UNBAKED": 1
@@ -318,12 +322,14 @@
    "material_t": 30.432,
    "tkm": 203000.0,
    "tonnes": 9700.0,
-   "total_t": 156.995,
+   "total_t": 154.863,
+   "transport_empty_t": 3.459,
+   "transport_loaded_t": 7.56,
    "transport_nh_t": 46.217,
-   "transport_t": 13.151,
+   "transport_t": 11.019,
    "transport_tkm_t": 15.905,
-   "transport_wtt_t": 3.088,
-   "transport_wtw_t": 16.24,
+   "transport_wtt_t": 2.711,
+   "transport_wtw_t": 13.73,
    "trips": 335,
    "vkm": 14000.0,
    "wtw_lines_out": 0
@@ -543,12 +549,12 @@
  ],
  "fleet_compare": {
   "charges_per_lorry_day_max": 0,
-  "delta_t": -10.28,
+  "delta_t": -8.498,
   "diesel": {
    "kwh": 0.0,
    "lorries_peak": 3,
    "peak_month": 10,
-   "transport_t": 13.151,
+   "transport_t": 11.019,
    "trips": 300,
    "unsized_lines": 0
   },
@@ -556,7 +562,7 @@
    "kwh": 19950.0,
    "lorries_peak": 3,
    "peak_month": 10,
-   "transport_t": 2.872,
+   "transport_t": 2.521,
    "trips": 342,
    "unsized_lines": 0
   },
@@ -614,10 +620,10 @@
    "route_id": "R1",
    "sheet": "Bulk Materials",
    "tonnes": 2900.0,
-   "total_t": 28.265,
+   "total_t": 26.712,
    "transport_nh_t": 19.807,
-   "transport_t": 5.636,
-   "transport_wtt_t": 1.323,
+   "transport_t": 4.084,
+   "transport_wtt_t": 0.946,
    "trips": 100,
    "vehicle": "Artic Tipper (44t)"
   },
@@ -644,9 +650,9 @@
    "route_id": "R3",
    "sheet": "Waste",
    "tonnes": 5800.0,
-   "total_t": 120.927,
+   "total_t": 120.347,
    "transport_nh_t": 26.41,
-   "transport_t": 7.515,
+   "transport_t": 6.935,
    "transport_wtt_t": 1.765,
    "trips": 200,
    "vehicle": "Artic Tipper (44t)"
@@ -685,7 +691,7 @@
   }
  ],
  "methods": {
-  "headline": "vehicle-km: trips × routed km of both legs × the vehicle's kg CO2e per vehicle-km (DESNZ 2026, tank-to-wheel)",
+  "headline": "vehicle-km: trips × (loaded km × the vehicle's laden factor + return km × the route's return share × its empty factor), DESNZ 2026 per vehicle-km, tank-to-wheel; the return share is the route's Return journey (Data → Routes): the whole way back, 43 % of it, or none",
   "nh_tool": "NH Carbon Tool v2.7 basis: tonnes × one-way km × (laden + unladen) ÷ 2 × 2, 2024 factors with well-to-tank",
   "tonne_km": "DESNZ 2026 tonne-km for each vehicle's size class, average laden — what a tonne-km calculator gives for the same haul",
   "well_to_wheel": "the vehicle-km figure plus producing the fuel or electricity: DESNZ 2026 well-to-tank per vehicle-km for diesel, kWh/km × the electricity well-to-tank rows for electric"
