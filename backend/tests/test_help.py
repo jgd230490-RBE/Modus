@@ -934,7 +934,8 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    # NARROWED 31 Oct 2026 (task 4c PR 3): + 19.5 Pinned pictures (87); the technical entry is inside T1 "Site layouts" (no new row)
    # NARROWED 5 Nov 2026 (group 6, Report a concern): + chapter 20 Concerns from the public and its three sections (92); + T1 "Concerns from the public" (38)
    # NARROWED 5 Nov 2026 (group 6, PR 2): + 20.4 The figures (93)
-   len(re.findall(r'<li class="l[12]"', src)) == 93 and   # NARROWED 31 Oct 2026 (task 4c PR 5): + 19.6 On paper (88)
+   # NARROWED 8 Nov 2026 (task 2.1-12): + 19.7 A works area from the layout (94); the technical entry is inside T1 "Site layouts" (no new row)
+   len(re.findall(r'<li class="l[12]"', src)) == 94 and   # NARROWED 31 Oct 2026 (task 4c PR 5): + 19.6 On paper (88)
    # NARROWED 5 Nov 2026 (task 0d-2): + T1 "Busy-hours roads" (39)
    # NARROWED 8 Nov 2026 (guides brought up to date): + T4 "Settings the app reads" and "Kept reads and heavy jobs" (41)
    len(re.findall(r'<li class="l[12]"', _tg2)) == 42   # NARROWED 8 Nov 2026 (v2.1 task 2.1-10): + T1 "Supplier orders" (42)   # NARROWED 1 Nov 2026 (task 4a PR 4): + T1 "CLP appendices" (37)   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
@@ -1300,7 +1301,8 @@ ok3("⭐ SITE LAYOUTS (PR 2): 19.2 Drawing says how to draw, select, turn and re
     all(t in _d192 for t in ("<strong>Draw</strong>", "hold R and drag to turn it, S to resize it", "<strong>15° steps</strong>", "hidden or locked while you draw",
                              "an area with holes keeps them", "Ctrl+Z undo, Ctrl+Y redo, Ctrl+D duplicate, Ctrl+S save", "<strong>Discard</strong>", "from zoom 15, on both maps"))
     # NARROWED 31 Oct 2026 (task 4c PR 5): Print… (19.6) sits between them in the ⋯ list
-    and "<strong>Name and months</strong>, <strong>Print…</strong> (19.6), <strong>Copy to a new phase</strong>" in _ch19 and "<strong>Show the whole drawing</strong>" in _ch19
+    # NARROWED 8 Nov 2026 (task 2.1-12): and Make a works area… (19.7, admins) after Print…
+    and "<strong>Name and months</strong>, <strong>Print…</strong> (19.6), <strong>Make a works area…</strong> (19.7, admins), <strong>Copy to a new phase</strong>" in _ch19 and "<strong>Show the whole drawing</strong>" in _ch19
     and "<strong>Edit</strong> changes its name and months" not in _ch19, _d192[:200])
 ok3("SITE LAYOUTS (PR 2): 19.2 names no library or back end (Terra Draw, uuid, version, PUT live in the technical guide)",
     _d192 and not re.search(r"\b(API|endpoint|server|JSON|Terra|uuid|PUT|409|Mapbox|version)\b", _d192)
@@ -1448,5 +1450,22 @@ ok3("8 Nov: T4 lists every setting the app reads, and the kept reads / heavy job
     and all("<code>%s</code>" % k in _tg8 for k in ("DB_POOL_MAX", "WAYSCOPE_WARM_CACHE", "DEMO_FROM", "DEMO_REPLY_TO", "OS_MAPS_KEY",
                                                   "FIRST_ADMIN_EMAIL", "DEMO_LEADS", "LANDING_URL", "APP_URL", "TENANT_ID"))
     and "<code>MAX_ENTRIES</code> = 60" in _tg8 and "<code>SLOTS</code> = 2" in _tg8 and "<code>SOLO_WAIT_S</code> = 5 s" in _tg8)
+
+# 8 Nov 2026 (task 2.1-12, the approved mockup notes\\works-from-layout-mockup-1108): 19.7 A works area from the layout, few words
+_ug212 = open(os.path.join(ROOT, "frontend", "help", "index.html"), encoding="utf-8").read()
+_tg212 = open(os.path.join(ROOT, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()
+_s197 = _ug212[_ug212.index('<h2 id="19-7-a-works-area-from-the-layout">'):_ug212.index('<h1 id="20-concerns">')] if '<h2 id="19-7-a-works-area-from-the-layout">' in _ug212 else ""
+ok3("WORKS AREA (2.1-12): 19.7 says admins make it from the phase's ⋯, the two outlines, the existing one first, Affects routing off, Update",
+   all(w in _s197 for w in ("<strong>⋯ → Make a works area…</strong>", "<strong>Around everything drawn</strong>", "<strong>The Site boundary area</strong>",
+                             "<strong>Give it this outline</strong>", "keeps its name, dates and routing", "<strong>Affects routing</strong>",
+                             "<strong>layout changed since</strong>", "<strong>changed on Zones</strong>", "<strong>Update</strong>", "an admin"))
+   and '<a href="#19-7-a-works-area-from-the-layout">19.7 A works area from the layout</a>' in _ug212, _s197[:200])
+ok3("WORKS AREA (2.1-12): 19.1's ⋯ list names Make a works area… (19.7, admins)", "<strong>Make a works area…</strong> (19.7, admins)" in _ug212)
+ok3("WORKS AREA (2.1-12): the user guide names no back end in 19.7 (no API, endpoint, hull, geometry, version, zone id)",
+   _s197 and not re.search(r"\b(API|endpoint|hull|geometry|version|polygon|Z0\d\d|/api/)\b", _s197, re.I))
+ok3("WORKS AREA (2.1-12): technical T1 has the two addresses, the outline rule and the two zone columns",
+   all(w in _tg212 for w in ('id="t1-layouts-works"', "<code>GET /api/admin/site-layouts/phases/{id}/works-area</code>", "<code>MARGIN_M</code> 10 m",
+                             "<code>zones.from_phase_id</code> / <code>from_phase_version</code>", "<code>layout_changed</code>", "<code>zone_changed</code>")))
+
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

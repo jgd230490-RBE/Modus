@@ -827,7 +827,9 @@ def init_zones_db():
         #               whether HERE's map knows the road exists, which is a fact about
         #               the world, not a preference.
         # 28 Oct 2026 (simulation v2): location_id = a road inside a site (also in init_lookahead_db)
-        for col, typ in (("speed_kph", "REAL"), ("haul_mode", "TEXT"), ("location_id", "TEXT")):
+        # 8 Nov 2026 (task 2.1-12): a works area made from a site layout's phase remembers the phase and its version
+        for col, typ in (("speed_kph", "REAL"), ("haul_mode", "TEXT"), ("location_id", "TEXT"),
+                         ("from_phase_id", "TEXT"), ("from_phase_version", "INTEGER")):
             try:
                 if IS_PG:
                     cur.execute(f"ALTER TABLE zones ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -1063,6 +1065,9 @@ def init_lookahead_db():
                                 ("location_gates", "closed_to", "TEXT"),
                                 ("locations", "site_speed_kph", "REAL"),
                                 ("zones", "location_id", "TEXT"),
+                                # 8 Nov 2026 (task 2.1-12): a works area's site layout phase and its version
+                                ("zones", "from_phase_id", "TEXT"),
+                                ("zones", "from_phase_version", "INTEGER"),
                                 # 29 Oct 2026 (task 3c, holding areas): the holding area's fields, a site's choice,
                                 # a route's tick, and the mark on every stored line
                                 ("locations", "holding_spaces", "INTEGER"),
