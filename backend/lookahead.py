@@ -179,6 +179,11 @@ def week_geometry(route_ids, vehicles=None, days=None):
 
     29 Oct 2026 (task 0c, PR B): with `days` (the week's dates), a route a dated zone diverts on most of them is drawn
     on that diversion (route_choice.majority_alt) and its distance is the diversion's.
+
+    8 Nov 2026 (v2.1 task 2.1-13): each route also carries `return_geometry` (the empty way back, same vehicle profile,
+    the week's majority option for that leg; null when not worked out) and each end its active `gates`
+    ([{id, name, lat, lon}]), for the Dashboard's Today map and the week map's key. Readers that do not draw them
+    (the PDFs) ignore them.
     """
     ids = [r for r in dict.fromkeys(route_ids or []) if r]
     if not ids:
@@ -203,6 +208,26 @@ def week_geometry(route_ids, vehicles=None, days=None):
             alts[(g["route_id"], g["vehicle_profile"], int(g["alt_index"]))] = g
         else:
             geo.setdefault(g["route_id"], {})[g["vehicle_profile"]] = g
+    # 8 Nov 2026 (2.1-13): the empty way back, same shape as the loaded read
+    rgeo, ralts = {}, {}
+    for g in db.query(
+            f"SELECT route_id, vehicle_profile, alt_index, geometry FROM route_geometry "
+            f"WHERE tenant_id = ? AND leg = 'return' AND geometry IS NOT NULL "
+            f"AND route_id IN ({marks})", (db.current_tenant(), *ids)):
+        if int(g.get("alt_index") or 0):
+            ralts[(g["route_id"], g["vehicle_profile"], int(g["alt_index"]))] = g
+        else:
+            rgeo.setdefault(g["route_id"], {})[g["vehicle_profile"]] = g
+    gates = {}
+    if loc_ids:
+        gm = ",".join("?" * len(loc_ids))
+        for g in db.query(
+                f"SELECT id, location_id, name, lat, lon, active FROM location_gates WHERE tenant_id = ? "
+                f"AND location_id IN ({gm}) ORDER BY id", (db.current_tenant(), *loc_ids)):
+            if not g.get("active") or g.get("lat") is None or g.get("lon") is None:     # BOOLEAN on Postgres: in Python
+                continue
+            gates.setdefault(g["location_id"], []).append(
+                {"id": g["id"], "name": g.get("name") or g["id"], "lat": float(g["lat"]), "lon": float(g["lon"])})
     if days and alts:
         import route_choice
         wd = route_choice.working_days(days)
@@ -211,12 +236,21 @@ def week_geometry(route_ids, vehicles=None, days=None):
                 a = route_choice.majority_alt(rid, prof, "loaded", wd)
                 if a and (rid, prof, a) in alts:
                     per[prof] = alts[(rid, prof, a)]
+    if days and ralts:
+        import route_choice
+        wd = route_choice.working_days(days)
+        for rid, per in rgeo.items():
+            for prof in list(per):
+                a = route_choice.majority_alt(rid, prof, "return", wd)
+                if a and (rid, prof, a) in ralts:
+                    per[prof] = ralts[(rid, prof, a)]
 
     def end(loc_id):
         l = locs.get(loc_id) or {}
         return {"id": loc_id, "name": l.get("name") or loc_id, "loc_type": l.get("loc_type"),
                 "lat": (float(l["lat"]) if l.get("lat") is not None else None),
-                "lon": (float(l["lon"]) if l.get("lon") is not None else None)}
+                "lon": (float(l["lon"]) if l.get("lon") is not None else None),
+                "gates": gates.get(loc_id, [])}
 
     out = []
     for rid in ids:
@@ -232,11 +266,18 @@ def week_geometry(route_ids, vehicles=None, days=None):
                 coords = [[float(p[0]), float(p[1])] for p in json.loads(per[used]["geometry"])]
             except Exception:
                 coords = None
+        back = None
+        rper = rgeo.get(rid, {})
+        if used and used in rper:
+            try:
+                back = [[float(p[0]), float(p[1])] for p in json.loads(rper[used]["geometry"])]
+            except Exception:
+                back = None
         out.append({"route_id": rid, "ipt": r.get("ipt"),
                     "origin": end(r.get("origin_id")), "dest": end(r.get("dest_id")),
                     "vehicle_profile": used, "vehicle_as_planned": (used == want) if used else None,
                     "distance_km": (float(per[used]["distance_km"]) if used and per[used].get("distance_km") is not None else None),
-                    "geometry": coords})
+                    "geometry": coords, "return_geometry": back})
     return out
 
 

@@ -1393,5 +1393,12 @@ ok("BUSY HOURS: technical T1 #t1-busy-hours holds the detail (the call, the rows
    and "<code>route_choice.busy_share(from, to, span)</code>" in _tg0d and "<code>backend/busy_savings.py</code>" in _tg0d
    and "<code>sim._busy_legs</code>" in _tg0d and "<code>BusyHours</code>" in _tg0d
    and '<li class="l2"><a href="#t1-busy-hours">Busy-hours roads</a></li>' in _tg0d)
+# 8 Nov 2026 (v2.1 task 2.1-13): the two week maps' words (no team colours, no dark / red dot pair any more)
+ok("2.1-13: the guide says what the Dashboard's Today map shows: bold today, green out / amber back, the week faded, names, gates, tags, the key",
+      all(w in _ug0d for w in ("<strong>Today on the map</strong>", "out (loaded) in green and back (empty) in amber",
+                               "lines later this week faded grey", "zoom in for the gates", "The key is under the map.")))
+ok("2.1-13: the Look-ahead's week map no longer reads as team colours with a dark and a red dot",
+      "draws this week's lines in their team colour, with a dark dot at the origin and a red dot" not in _ug0d
+      and "draws this week's lines, out (loaded) in green, with the week's load on a tag" in _ug0d)
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

@@ -489,6 +489,13 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .chart-tool{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--muted);font-size:16px;line-height:1;cursor:pointer;}
   .chart-tool:hover{color:var(--ink);border-color:var(--muted);}
   .chart-tool-copy::before{content:"\29C9";} .chart-tool-dl::before{content:"\2193";}
+  /* 8 Nov 2026 (2.1-13): the week maps' key row */
+  .cm-key > span{display:inline-flex;align-items:center;gap:6px;}
+  .cm-k{display:inline-block;flex:none;width:22px;border-radius:2px;}
+  .cm-k-out{height:4px;background:#059669;} .cm-k-back{height:3px;background:#f59e0b;} .cm-k-faded{height:2px;background:#9CA3AF;opacity:.7;}
+  .cm-k-site{width:10px;height:10px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--ink);}
+  .cm-k-gate{width:8px;height:8px;border-radius:0;background:var(--ink);}
+  .cm-k-load{font-style:normal;font-size:12px;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:0 4px;}
   .chart-card:has(.chart-tools) .chart-title, .ga-strip:has(.chart-tools) .ga-head, .clp-card:has(.chart-tools) .clp-sub{padding-right:72px;}
   .dash-wall .chart-tools, .sim-wall .chart-tools{display:none;}
   @media (max-width:767px){ .chart-tools{display:none;} }
@@ -1451,6 +1458,9 @@ const INFO = {
   // 14 Oct 2026 (bundle G, W17)
   "la.gates": { title: "Gates this week", text: "Each gate's planned lorries a day this week, every team together, against what it can check in. Gold, Queue likely, from 85 %; red, Over gate capacity, past it or on a closed day.",
     how: "What a gate can check in = its open minutes (its hours, or the default gate hours where none are typed, less its shut times and the no-delivery peak bands) ÷ its check-in minutes a lorry. Planned arrivals spread evenly; no hourly peak is known.", guide: "6-3-commit-view-this-week-by-day", tech: "t1-gates" },
+  // 8 Nov 2026 (2.1-13): the week maps' "i" boxes (the hover hint left the key row)
+  "map.commit.today": { title: "Today on the map", text: "Bold: today's lines, green out and amber back. Faded grey: later this week. A line's tag is today's load. Zoom in for the gates; point at a line for its figures and team.", guide: "3-3-charts-and-the-folded-sections" },
+  "map.commit.week": { title: "This week's movements", text: "Each line of the week, out (loaded) in green. The tag on a line is its load this week. Zoom in for the gates; point at a line for its figures and team.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.today": { title: "Today", text: "What the Look-ahead plans for today. Each line says reported (an actual is typed), confirmed, edited (not yet confirmed) or planned (follows the week, not yet confirmed).", guide: "6-3-commit-view-this-week-by-day" },
   "dash.today_t": { title: "Tonnes today", text: "Each line's planned quantity for today, in tonnes, from the Look-ahead's commit week.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.today_trips": { title: "Trips today", text: "Loaded trips today: tonnes ÷ payload, rounded up for each line, and the lorry distance on lines with a route.", tech: "t1-trips" },
@@ -3388,7 +3398,7 @@ function DashboardToday({ meta, week, err, wall, fill }){
         </>}
       </div>
       <div className="card p-0 overflow-hidden lg:col-span-3 today-map">
-        {week ? <CommitMap meta={meta} bucket="commit" tick={0} lines={lines} title="This week's lines on the map" height={wall ? 460 : 380} flush fill={fill} />
+        {week ? <CommitMap meta={meta} bucket="commit" tick={0} lines={lines} today={today} title="Today on the map" sub="the rest of this week faded" height={wall ? 460 : 380} flush fill={fill} />
               : <div className="p-6 text-sm text-slate-400">Loading the map…</div>}
       </div>
     </div>
@@ -13105,7 +13115,7 @@ function SimWall({ meta, month, show, pass, loop, fill, tick }){
   );
 }
 
-function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){
+function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, today, sub }){
   const mapDiv = useRef(null);
   const mapObj = useRef(null);
   const [geo, setGeo] = useState(null);
@@ -13118,6 +13128,7 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){
     lines.forEach(l => (g[l.route_id] || (g[l.route_id] = [])).push(l));
     return g;
   }, [lines]);
+  const figs = useMemo(() => commitMapFigs(lines, today), [lines, today]);
 
   useEffect(() => {
     let live = true;
@@ -13146,21 +13157,44 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){
     }
     m.addControl(new window.mapboxgl.NavigationControl({ showCompass: false }), "top-right");
     m.on("load", () => {
-      m.addSource("la-routes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      m.addSource("la-ends", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-      m.addLayer({ id: "la-routes-casing", type: "line", source: "la-routes",
-                   paint: { "line-color": "#ffffff", "line-width": 6, "line-opacity": 0.9 } });
-      m.addLayer({ id: "la-routes", type: "line", source: "la-routes",
-                   paint: { "line-color": ["get", "color"], "line-width": 3.5 } });
+      const empty = { type: "FeatureCollection", features: [] };
+      ["la-routes", "la-ends", "la-gates", "la-tags"].forEach(id => m.addSource(id, { type: "geojson", data: empty }));
+      // 8 Nov 2026 (2.1-13): the lines go under the basemap's own place names (as on the public map); ours on top
+      const st = m.getStyle ? m.getStyle() : null;
+      const under = ((st && st.layers) || []).find(l => l.type === "symbol");
+      const before = under ? under.id : undefined;
+      const OFF = ["interpolate", ["linear"], ["zoom"], 8, -1.5, 12, -4];    // each leg left of its own travel (UK)
+      const round = { "line-cap": "round", "line-join": "round" };
+      m.addLayer({ id: "la-faded", type: "line", source: "la-routes", filter: ["==", ["get", "kind"], "faded"], layout: round,
+                   paint: { "line-color": CM_FADED, "line-width": 2, "line-opacity": 0.55 } }, before);
+      m.addLayer({ id: "la-routes-casing", type: "line", source: "la-routes", filter: ["!=", ["get", "kind"], "faded"], layout: round,
+                   paint: { "line-color": "#ffffff", "line-width": ["match", ["get", "kind"], "out", 6.5, 5], "line-opacity": 0.9, "line-offset": OFF } }, before);
+      m.addLayer({ id: "la-back", type: "line", source: "la-routes", filter: ["==", ["get", "kind"], "back"], layout: round,
+                   paint: { "line-color": CM_BACK, "line-width": 2.5, "line-offset": OFF } }, before);
+      m.addLayer({ id: "la-routes", type: "line", source: "la-routes", filter: ["==", ["get", "kind"], "out"], layout: round,
+                   paint: { "line-color": CM_OUT, "line-width": 4, "line-offset": OFF } }, before);
       m.addLayer({ id: "la-ends", type: "circle", source: "la-ends",
-                   paint: { "circle-radius": 5, "circle-color": ["get", "color"], "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.5 } });
+                   paint: { "circle-radius": 5.5, "circle-color": "#1F2024", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } });
+      m.addLayer({ id: "la-gates", type: "symbol", source: "la-gates", minzoom: CM_GATE_ZOOM,
+                   layout: { "text-field": ["concat", "▪ ", ["get", "name"]], "text-size": 12, "text-anchor": "left", "text-offset": [0.2, 0], "text-optional": true },
+                   paint: { "text-color": "#1F2024", "text-halo-color": "#ffffff", "text-halo-width": 1.5 } });
+      m.addLayer({ id: "la-tags", type: "symbol", source: "la-tags",
+                   layout: { "text-field": ["get", "text"], "text-size": 12, "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
+                             "symbol-sort-key": ["get", "sort"], "text-padding": 4 },
+                   paint: { "text-color": "#1F2024", "text-halo-color": "#ffffff", "text-halo-width": 3 } });
+      m.addLayer({ id: "la-names", type: "symbol", source: "la-ends",
+                   layout: { "text-field": ["get", "name"], "text-size": 13, "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
+                             "text-anchor": "top", "text-offset": [0, 0.7], "text-max-width": 9 },
+                   paint: { "text-color": "#1F2024", "text-halo-color": "#ffffff", "text-halo-width": 1.8 } });
       const popup = new window.mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
-      m.on("mousemove", "la-routes", (e) => {
-        m.getCanvas().style.cursor = "pointer";
-        const f = e.features && e.features[0];
-        if(f) popup.setLngLat(e.lngLat).setHTML(f.properties.label).addTo(m);
+      ["la-routes", "la-back", "la-faded"].forEach(id => {
+        m.on("mousemove", id, (e) => {
+          m.getCanvas().style.cursor = "pointer";
+          const f = e.features && e.features[0];
+          if(f) popup.setLngLat(e.lngLat).setHTML(f.properties.label).addTo(m);
+        });
+        m.on("mouseleave", id, () => { m.getCanvas().style.cursor = ""; popup.remove(); });
       });
-      m.on("mouseleave", "la-routes", () => { m.getCanvas().style.cursor = ""; popup.remove(); });
       setReady(true);
     });
     mapObj.current = m;
@@ -13177,44 +13211,61 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){
   useEffect(() => {
     const m = mapObj.current;
     if(!m || !ready || !geo) return;
-    const feats = [], ends = [], b = new window.mapboxgl.LngLatBounds();
+    const feats = [], ends = {}, gates = {}, tags = [], b = new window.mapboxgl.LngLatBounds();
     (geo.routes || []).forEach(r => {
       const ls = byRoute[r.route_id] || [];
-      const color = IPT_PALETTE_C[iptKey(r.ipt || (ls[0] || {}).ipt)] || "#1F2024";
+      const fg = figs[r.route_id] || { today: true, todayText: "", tag: "", sort: 0 };
+      const team = teamText(r.ipt || (ls[0] || {}).ipt) || "";
       const wk = ls.map(l => `${grp((l.week || {}).planned_qty, 0)} ${unitLbl(l.unit)} · ${grp((l.week_derived || {}).trips)} trips`).join("<br>");
-      const label = `<div style="font:12px system-ui"><b>${r.route_id}</b> · ${r.origin.name} → ${r.dest.name}<br>${wk}${r.vehicle_as_planned === false ? `<br><i>drawn for ${vehLabel(r.vehicle_profile)}, not the planned vehicle</i>` : ""}</div>`;
+      const head = today ? (fg.todayText ? `Today: ${fg.todayText}<br>This week:<br>` : "Not today. This week:<br>") : "";
+      const label = `<div style="font:12px system-ui"><b>${r.route_id}</b> · ${r.origin.name} → ${r.dest.name}<br>${head}${wk}${team ? `<br><span style="color:#475569">${team}</span>` : ""}${r.vehicle_as_planned === false ? `<br><i>drawn for ${vehLabel(r.vehicle_profile)}, not the planned vehicle</i>` : ""}</div>`;
       if(r.geometry && r.geometry.length > 1){
-        feats.push({ type: "Feature", properties: { route_id: r.route_id, color, label }, geometry: { type: "LineString", coordinates: r.geometry } });
+        feats.push({ type: "Feature", properties: { route_id: r.route_id, kind: fg.today ? "out" : "faded", label }, geometry: { type: "LineString", coordinates: r.geometry } });
+        // the way back only for today's lines on the Dashboard (Q3); the Look-ahead draws the week out only (Q6)
+        if(today && fg.today && r.return_geometry && r.return_geometry.length > 1)
+          feats.push({ type: "Feature", properties: { route_id: r.route_id, kind: "back", label }, geometry: { type: "LineString", coordinates: r.return_geometry } });
+        if(fg.today && fg.tag)
+          tags.push({ type: "Feature", properties: { text: fg.tag, sort: fg.sort }, geometry: { type: "Point", coordinates: r.geometry[Math.floor(r.geometry.length * 0.55)] } });
         r.geometry.forEach(c => b.extend(c));
       }
-      [["origin", "#1F2024"], ["dest", "#DC2626"]].forEach(([k, c]) => {
+      ["origin", "dest"].forEach(k => {
         const e = r[k];
         if(e && e.lon != null && e.lat != null){
-          ends.push({ type: "Feature", properties: { color: c, name: e.name }, geometry: { type: "Point", coordinates: [e.lon, e.lat] } });
+          // one dot a place, whichever end it is (a compound is both a start and an end)
+          ends[e.id || e.name] = { type: "Feature", properties: { name: e.name }, geometry: { type: "Point", coordinates: [e.lon, e.lat] } };
           b.extend([e.lon, e.lat]);
+          (e.gates || []).forEach(g => { gates[g.id] = { type: "Feature", properties: { name: g.name }, geometry: { type: "Point", coordinates: [g.lon, g.lat] } }; });
         }
       });
     });
     m.getSource("la-routes").setData({ type: "FeatureCollection", features: feats });
-    m.getSource("la-ends").setData({ type: "FeatureCollection", features: ends });
+    m.getSource("la-ends").setData({ type: "FeatureCollection", features: Object.values(ends) });
+    m.getSource("la-gates").setData({ type: "FeatureCollection", features: Object.values(gates) });
+    m.getSource("la-tags").setData({ type: "FeatureCollection", features: tags });
     // 30 Sep 2026: fitBounds throws "Invalid LngLat object: (NaN, NaN)" when the map's
     // container has no size yet (a page switch or a viewport change mid-render); uncaught
     // in an effect it unmounted the WHOLE app to a white page on the live site. Never let
     // a camera move take the page down.
     if(!b.isEmpty()) { try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); } catch(e){} }
-  }, [geo, ready, byRoute]);
+  }, [geo, ready, byRoute, figs, today]);
 
   const unbaked = (geo && geo.routes || []).filter(r => !r.geometry).map(r => r.route_id);
   // 11 Sep: the Dashboard mounts this too (`flush` inside its own card, its own title
   // and height); the Look-ahead's rendering is unchanged by the defaults.
+  // 8 Nov 2026 (2.1-13): the grey sentence under the map is now a key row; the hover hint is in the "i" box
   return (
     <div className={(flush ? "" : "mt-4") + (fill ? " h-full flex flex-col min-h-0" : "")}>
-      <div className={"text-sm font-semibold text-slate-700 mb-2" + (flush ? " px-4 pt-3 chart-title" : "")}>{title || "This week's movements"}</div>
+      <div className={"text-sm font-semibold text-slate-700 mb-2" + (flush ? " px-4 pt-3 chart-title" : "")}>{title || "This week's movements"}{sub && <span className="font-normal text-slate-500"> · {sub}</span>}{today ? <InfoTip id="map.commit.today" /> : <InfoTip id="map.commit.week" />}</div>
       <div className={(flush ? "" : "bg-white rounded-xl border border-slate-200 overflow-hidden") + (fill ? " flex-1 flex flex-col min-h-0" : "")}>
         {/* 14 Oct 2026: on a filled big screen the map takes the whole card; its ResizeObserver follows */}
         <div ref={mapDiv} style={fill ? { flex: "1 1 auto", minHeight: 0 } : { height: height || 380 }} />
-        <div className="px-3 py-2 text-[13px] text-slate-400 border-t border-slate-100 flex flex-wrap gap-x-3">
-          <span>Routed loaded leg per line, coloured by {TEAM().toLowerCase()} · dark dot = origin · red dot = destination · hover a line for its week.</span>
+        <div className="cm-key px-3 py-2 text-[13px] text-slate-600 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1" data-commit-key={today ? "today" : "week"}>
+          <span data-key="out"><i className="cm-k cm-k-out" aria-hidden="true" />{today ? "Today, out (loaded)" : "Out (loaded)"}</span>
+          {today && <span data-key="back"><i className="cm-k cm-k-back" aria-hidden="true" />Today, back (empty)</span>}
+          {today && <span data-key="faded"><i className="cm-k cm-k-faded" aria-hidden="true" />Later this week</span>}
+          <span data-key="site"><i className="cm-k cm-k-site" aria-hidden="true" />Site</span>
+          <span data-key="gate"><i className="cm-k cm-k-gate" aria-hidden="true" />Gate (zoom in)</span>
+          <span data-key="load"><i className="cm-k-load" aria-hidden="true">t · trips</i>{today ? "Today's load" : "This week's load"}</span>
           {unbaked.length > 0 && <span className="text-amber-700">Not drawn (no route worked out): {unbaked.join(", ")}</span>}
           {err && <span style={{ color: "var(--red)" }}>{err}</span>}
         </div>
@@ -13223,6 +13274,44 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill }){
   );
 }
 
+
+// ---- 8 Nov 2026 (v2.1 task 2.1-13): the week map's key, names and loads ------------------------------------------------
+// From John's approved mockup (notes/dashboard-today-map-mockup-1108, Q1-Q6 as recommended). One rule for both maps:
+// the Dashboard passes `today` (an ISO date) and gets today's lines bold with both legs, the rest of the week faded; the
+// Look-ahead passes none and every line of the week is drawn at full strength, out only. Colours by leg as on the public
+// map and the route sheet (out #059669, back #f59e0b, each left of its own travel); the team is in the hover box. One dot a
+// place with its name; gates (with names) from town-level zoom; a tag on each drawn line with its load.
+const CM_OUT = "#059669", CM_BACK = "#f59e0b", CM_FADED = "#9CA3AF";
+const CM_GATE_ZOOM = 11.5;
+// Per route: is it on today's plan, and the words of its tag (today's on the Dashboard, the week's on the Look-ahead).
+// Pure, so dom_frontend tests it. Quantities in the lines' own unit when they share one (m³ for concrete), else tonnes.
+function commitMapFigs(lines, today){
+  const by = {};
+  (lines || []).forEach(l => {
+    const r = by[l.route_id] || (by[l.route_id] = { today: false, units: {}, tQty: 0, tT: 0, tTrips: 0, wQty: 0, wT: 0, wTrips: 0 });
+    r.units[l.unit || "t"] = 1;
+    const wk = l.week || {}, wd = l.week_derived || {};
+    r.wQty += +wk.planned_qty || 0; r.wT += +wd.tonnes || 0; r.wTrips += +wd.trips || 0;
+    if(today){
+      (l.days || []).forEach(d => {
+        if(d.day_date !== today || !((d.planned_qty || 0) > 0 || d.actual_qty != null)) return;
+        const dv = d.derived || {};
+        r.today = true; r.tQty += +d.planned_qty || 0; r.tT += +dv.tonnes || 0; r.tTrips += +dv.trips || 0;
+      });
+    }
+  });
+  const out = {};
+  Object.keys(by).forEach(id => {
+    const r = by[id], us = Object.keys(r.units), one = us.length === 1;
+    const words = (qty, t, trips) => `${grp(one ? qty : t, 0)} ${one ? unitLbl(us[0]) : "t"} · ${grp(trips, 0)} trip${Math.round(trips) === 1 ? "" : "s"}`;
+    out[id] = { today: today ? r.today : true,
+                todayText: r.today ? words(r.tQty, r.tT, r.tTrips) : "",
+                weekText: words(r.wQty, r.wT, r.wTrips),
+                tag: today ? (r.today ? words(r.tQty, r.tT, r.tTrips) : "") : words(r.wQty, r.wT, r.wTrips),
+                sort: -(today ? r.tT : r.wT) };
+  });
+  return out;
+}
 
 // ---- Look-ahead v2 slices 3-5: the typed planning cap and contract rates on ONE route --
 // Its own save, separate from the endpoint/vehicle form above: these are planning inputs
