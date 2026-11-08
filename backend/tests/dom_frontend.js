@@ -2922,6 +2922,36 @@ async function fullScreenDom(){
   }
 }
 
+// 8 Nov 2026 (v2.1 task 2.1-13): the week maps' figures — which routes are on today's plan, and each tag's words
+async function commitMapFigsDom(){
+  const f = w.commitMapFigs;
+  ok("2.1-13: commitMapFigs is a global helper", typeof f === "function");
+  const T = "2026-11-05", Y = "2026-11-04";
+  const day = (date, q, t, trips) => ({ day_date: date, planned_qty: q, actual_qty: null, derived: { tonnes: t, trips } });
+  const lines = [
+    { route_id: "R1", unit: "t", week: { planned_qty: 500 }, week_derived: { tonnes: 500, trips: 20 }, days: [day(Y, 100, 100, 4), day(T, 120, 120, 5)] },
+    { route_id: "R1", unit: "t", week: { planned_qty: 50 }, week_derived: { tonnes: 50, trips: 2 }, days: [day(T, 10, 10, 1)] },
+    { route_id: "R2", unit: "m3", week: { planned_qty: 80 }, week_derived: { tonnes: 192, trips: 10 }, days: [day(T, 16, 38.4, 2)] },
+    { route_id: "R3", unit: "t", week: { planned_qty: 75 }, week_derived: { tonnes: 75, trips: 3 }, days: [day(Y, 75, 75, 3), day(T, 0, 0, 0)] },
+    { route_id: "R4", unit: "t", week: { planned_qty: 30 }, week_derived: { tonnes: 30, trips: 1 }, days: [day(T, 0, 0, 0)] },
+    { route_id: "R4", unit: "m3", week: { planned_qty: 10 }, week_derived: { tonnes: 24, trips: 2 }, days: [day(T, 0, 0, 0)] },
+  ];
+  const d = f(lines, T);
+  ok("⭐ 2.1-13: a route with a load on today's date is today's (two lines summed: 130 t · 6 trips); m³ stays m³",
+     d.R1.today === true && d.R1.tag === "130 t · 6 trips" && d.R2.today === true && d.R2.tag === "16 m³ · 2 trips", JSON.stringify([d.R1, d.R2]));
+  ok("⭐ 2.1-13: a route with nothing today is drawn faded and has no tag; its week's figures stay for the hover box",
+     d.R3.today === false && d.R3.tag === "" && d.R3.todayText === "" && d.R3.weekText === "75 t · 3 trips", JSON.stringify(d.R3));
+  ok("2.1-13: busiest today first (sort is minus today's tonnes); a route mixing units is counted in tonnes",
+     d.R1.sort === -130 && d.R2.sort === -38.4 && d.R4.weekText === "54 t · 3 trips", JSON.stringify([d.R1.sort, d.R2.sort, d.R4.weekText]));
+  const wk = f(lines);
+  ok("⭐ 2.1-13 (Q6): with no today (the Look-ahead) every route is drawn and its tag is the week's",
+     Object.values(wk).every(x => x.today === true) && wk.R1.tag === "550 t · 22 trips" && wk.R3.tag === "75 t · 3 trips" && wk.R1.sort === -550, JSON.stringify(wk.R1));
+  ok("2.1-13: a day with an actual but no plan still counts as today; one trip reads 'trip'",
+     f([{ route_id: "R9", unit: "t", week: { planned_qty: 5 }, week_derived: { tonnes: 5, trips: 1 }, days: [{ day_date: T, planned_qty: 0, actual_qty: 5, derived: { tonnes: 0, trips: 1 } }] }], T).R9.today === true
+     && f([{ route_id: "R9", unit: "t", week: {}, week_derived: { tonnes: 5, trips: 1 }, days: [] }]).R9.tag === "0 t · 1 trip");
+  ok("2.1-13: no lines, no routes", Object.keys(f([], T)).length === 0 && Object.keys(f(null, T)).length === 0);
+}
+
 async function todayFitDom(){
   const tf = w.todayFit;
   ok("UI FIX 6 card 5: todayFit is a global helper", typeof tf === "function");
@@ -3591,6 +3621,9 @@ async function reviewerDom(){
   // 23 Oct 2026 (UI fix 9, decision 16): the Data tables' rows open from the keyboard
   try { await rowsDom(); ok("UI FIX 9 ROWS: the section ran to the end", true); }
   catch (e) { ok("UI FIX 9 ROWS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  // 8 Nov 2026 (2.1-13): the week maps' figures
+  try { await commitMapFigsDom(); ok("2.1-13 MAP FIGS: the section ran to the end", true); }
+  catch (e) { ok("2.1-13 MAP FIGS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   // 5 Nov 2026: a site's layout full screen on Locations
   try { await fullScreenDom(); ok("FULL SCREEN DOM: the section ran to the end", true); }
   catch (e) { ok("FULL SCREEN DOM: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }

@@ -1723,6 +1723,22 @@ ok("⭐ R3 asked for a vehicle it is NOT baked for: drawn for the one that is, a
    gm[1]["geometry"] is not None and gm[1]["vehicle_profile"] == V8 and gm[1]["vehicle_as_planned"] is False)
 ok("🔴 R9 has no baked geometry: geometry is null — never a straight line pretending to be a road",
    gm[2]["geometry"] is None and gm[2]["vehicle_profile"] is None and gm[2]["origin"]["name"] == "Site")
+# 8 Nov 2026 (v2.1 task 2.1-13): the way back and each end's gates, for the Dashboard's Today map and the maps' key
+_geom2("R9", V8, "loaded", 12.0, 0.3)                    # R9: the way out only
+gm1 = lookahead.week_geometry(["R1", "R3", "R9"], {"R1": V8, "R3": "Ghost truck"})
+ok("⭐ 2.1-13: R1 and R3 carry their way back for the vehicle drawn; R9 has none worked out, so null (never a reversed copy)",
+   gm1[0]["return_geometry"] == [[24.0, 58.5], [24.4, 58.6]] and gm1[1]["return_geometry"] == [[24.0, 58.5], [24.4, 58.6]]
+   and gm1[2]["geometry"] is not None and gm1[2]["return_geometry"] is None, str([g.get("return_geometry") for g in gm1]))
+db.execute("DELETE FROM route_geometry WHERE route_id = 'R9'")
+db.execute("INSERT INTO location_gates (tenant_id, id, location_id, name, direction, lat, lon, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+           ("default", "G2A", "L2", "Main gate", "access", 58.601, 24.401, True))
+db.execute("INSERT INTO location_gates (tenant_id, id, location_id, name, direction, lat, lon, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+           ("default", "G2B", "L2", "Old gate", "access", 58.602, 24.402, False))
+gm2 = lookahead.week_geometry(["R1"])
+ok("⭐ 2.1-13: each end lists its ACTIVE, placed gates with name and coordinates (a stopped gate is left out)",
+   gm2[0]["dest"]["gates"] == [{"id": "G2A", "name": "Main gate", "lat": 58.601, "lon": 24.401}]
+   and gm2[0]["origin"]["gates"] == [], str(gm2[0]["dest"]["gates"]))
+db.execute("DELETE FROM location_gates WHERE id IN ('G2A', 'G2B', 'G2C')")
 ok("the endpoint parses ids and aligned vehicles, and needs a code",
    [g["route_id"] for g in main.lookahead_geometry(ids="R1,R2", vehicles=V8 + ",")["routes"]] == ["R1", "R2"])
 _as(None)

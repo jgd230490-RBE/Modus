@@ -402,8 +402,11 @@ if (loaded) {
       ok("...this week to date and last week's account are printed with their bars",
         wOut.includes("This week to date") && wOut.includes("Last week") && (wOut.match(/h-2 rounded-full bg-slate-100/g) || []).length === 2
         && wOut.includes(`${wk.account.reported} of ${wk.account.lines} lines reported`));
-      ok("...the map card carries the Look-ahead's CommitMap with the Dashboard's title, and no € anywhere in the Today strip",
-        wOut.includes("This week&#x27;s lines on the map") && !/€/.test(wOut.slice(wOut.indexOf("Today · "), wOut.indexOf("Delivered to date"))));
+      // NARROWED 8 Nov 2026 (2.1-13): the Dashboard's map is "Today on the map · the rest of this week faded", with its key row
+      ok("...the map card carries the Look-ahead's CommitMap with the Dashboard's title and today's key, and no € anywhere in the Today strip",
+        wOut.includes("Today on the map") && wOut.includes("the rest of this week faded") && wOut.includes('data-commit-key="today"')
+        && wOut.includes("Today, back (empty)") && wOut.includes("Later this week")
+        && !/€/.test(wOut.slice(wOut.indexOf("Today · "), wOut.indexOf("Delivered to date"))));
       ok("...nothing renders as undefined or NaN", !/undefined|NaN/.test(wOut));
       ok("...and a weekday's strip never says \"nothing planned today\"", !wOut.includes("nothing planned today"));
       // 22 Oct 2026 (UI fix 6, card 5; decision 6): the Today card on the big screen. Effects never run here, so nothing is
