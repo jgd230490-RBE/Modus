@@ -4,8 +4,8 @@
   "basis": "Making the material at the UK Government 2026 factor for aggregates; transport there and back on the routed distance.",
   "disposal_t": null,
   "material_t": 22.629,
-  "total_t": 28.265,
-  "transport_t": 5.636,
+  "total_t": 26.713,
+  "transport_t": 4.084,
   "unrouted": false
  },
  "cells": [

@@ -646,16 +646,19 @@ ok("🔴 a scenario writes nothing", _q["x"] == 0, str(_q))
 ok("...and stays inside a sane statement budget", _q["n"] <= 80, str(_q))
 
 B = S["baseline"]["totals"]
-# R1: material 2900 × 7.80307 = 22.628903; transport 100 × 60 × 0.93939 = 5.63634
-# R3: disposal (to a Landfill) 5800 × 19.55376 = 113.411808; transport 200 × 40 × 0.93939 = 7.51512
+# RE-PINNED 8 Nov 2026 (the return journey, return_journey.py): the loaded leg at the vehicle's 100 % laden factor and the way
+# back at its 0 % laden factor × the route's return share (a quarry's route 43 %, a haul from a site or muck-away 100 %), in
+# place of the average-laden figure on both legs — every transport figure below moved; material and disposal did not.
+# R1: material 2900 × 7.80307 = 22.628903; transport 100 × (30 × 1.08004 + 30 × 0.43 × 0.65383) = 4.08356 (Pit A is a quarry: 43 %)
+# R3: disposal (to a Landfill) 5800 × 19.55376 = 113.411808; transport 200 × (20 × 1.08004 + 20 × 0.65383) = 6.93548 (the whole return)
 # R5: material 1000 × 7.80307 = 7.80307; transport NONE (not baked)
-ok("⭐ baseline total 156.995 t = material 30.432 + transport 13.151 + disposal 113.412",
-   near(B["total_t"], 156.995, 0.002) and near(B["material_t"], 30.432, 0.002) and near(B["transport_t"], 13.151, 0.002)
+ok("⭐ baseline total 154.863 t = material 30.432 + transport 11.019 + disposal 113.412",
+   near(B["total_t"], 154.863, 0.002) and near(B["material_t"], 30.432, 0.002) and near(B["transport_t"], 11.019, 0.002)
    and near(B["disposal_t"], 113.412, 0.002), str(B))
 CL = {l["route_id"]: l for l in costlines.lines(status="Approved")["lines"]}
 LN = {l["route_id"]: l for l in S["lines"]}
-ok("⭐ ONE number: the baseline's transport on R1 equals the Dashboard's costlines.co2_t (5.636)",
-   near(LN["R1"]["transport_t"], CL["R1"]["co2_t"], 0.0006) and near(CL["R1"]["co2_t"], 5.636, 0.0005))
+ok("⭐ ONE number: the baseline's transport on R1 equals the Dashboard's costlines.co2_t (4.084)",
+   near(LN["R1"]["transport_t"], CL["R1"]["co2_t"], 0.0006) and near(CL["R1"]["co2_t"], 4.084, 0.0005))
 ok("🔴 the unbaked line has NO transport carbon and is excluded (and the totals say so); its material still counts",
    LN["R5"]["transport_t"] is None and "UNBAKED" in LN["R5"]["flags"] and B["excludes_unbaked"] and B["baked_lines"] == 2
    and near(LN["R5"]["material_t"], 7.80307, 0.001))
@@ -665,20 +668,20 @@ ok("the NH tool basis is shown beside, never in, the headline: R1 30 km × 2,900
    near(LN["R1"]["transport_nh_t"], 19.807, 0.001) and near(B["transport_nh_t"], 19.807 + 20 * 5800 * 0.000227668667, 0.002))
 # REVERSED (10 Oct 2026, review): the soil line goes to a LANDFILL — the NH tool reports soil
 # exported off site under Waste, so it is the Waste sheet, not Earthworks
-ok("sheets: Bulk Materials 36.068 (the aggregate lines) and Waste 120.927 (the soil to landfill) — together the total",
-   near(S["baseline"]["sheets"]["Bulk Materials"], 36.068, 0.002) and near(S["baseline"]["sheets"]["Waste"], 120.927, 0.002)
+ok("sheets: Bulk Materials 34.516 (the aggregate lines) and Waste 120.347 (the soil to landfill) — together the total",
+   near(S["baseline"]["sheets"]["Bulk Materials"], 34.516, 0.002) and near(S["baseline"]["sheets"]["Waste"], 120.347, 0.002)
    and near(S["baseline"]["sheets"]["Earthworks"], 0.0) and LN["R3"]["sheet"] == "Waste"
    and near(S["baseline"]["sheets"]["Bulk Materials"] + S["baseline"]["sheets"]["Waste"], B["total_t"], 0.003))
 AL = S["baseline"]["allocation"]
-ok("allocation: Small aggregate's 36.068 t at 60 % Road Pavements / 30 % Drainage; the rest Not Allocated",
-   near(AL["Road Pavements"], 21.641, 0.002) and near(AL["Drainage"], 10.820, 0.002) and near(AL["Not Allocated"], 124.534, 0.003))
+ok("allocation: Small aggregate's 34.516 t at 60 % Road Pavements / 30 % Drainage; the rest Not Allocated",
+   near(AL["Road Pavements"], 20.709, 0.002) and near(AL["Drainage"], 10.355, 0.002) and near(AL["Not Allocated"], 123.799, 0.003))
 BM = S["baseline"]["benchmarks"]
-# 13.15146 t over 8,700 baked t; 203,000 t·km against the artic 0.07835; laden 7,000 of 14,000 km
-ok("benchmarks: 1.512 kg per tonne delivered; 0.06479 kg per t·km vs DESNZ artic 0.07835 → 17.3 % below the national average",
-   near(BM["kg_co2e_per_t_delivered"], 1.512, 0.001) and near(BM["kg_co2e_per_tkm"], 0.06479, 0.00001)
-   and BM["desnz_kg_co2e_per_tkm"] == 0.07835 and BM["vs_national_average_pct"] == -17.3, str(BM))
-ok("...laden share 50 %, zero-emission deliveries 0 %, 78.5 tCO2e per £m on £2m typed, NH's restated 159 → 181 beside it",
-   BM["laden_share_pct"] == 50.0 and BM["zero_emission_share_pct"] == 0.0 and BM["t_co2e_per_gbp_m"] == 78.5
+# 11.01904 t over 8,700 baked t; 203,000 t·km against the artic 0.07835; laden 7,000 of 14,000 km driven (the share charges, it does not shorten)
+ok("benchmarks: 1.267 kg per tonne delivered; 0.05428 kg per t·km vs DESNZ artic 0.07835 → 30.7 % below the national average",
+   near(BM["kg_co2e_per_t_delivered"], 1.267, 0.001) and near(BM["kg_co2e_per_tkm"], 0.05428, 0.00001)
+   and BM["desnz_kg_co2e_per_tkm"] == 0.07835 and BM["vs_national_average_pct"] == -30.7, str(BM))
+ok("...laden share 50 %, zero-emission deliveries 0 %, 77.4 tCO2e per £m on £2m typed, NH's restated 159 → 181 beside it",
+   BM["laden_share_pct"] == 50.0 and BM["zero_emission_share_pct"] == 0.0 and BM["t_co2e_per_gbp_m"] == 77.43
    # REVERSED 11 Oct 2026: NH restated its intensity at 2023 prices (annual progress report 2025-26, §4 fn 1):
    # 159 (2024/25) → 181 (2025/26), a RISE — it replaces the superseded 210 → 148 of the 2025 update
    and BM["nh_kpi"]["series"] == {"2024_25": 159, "2025_26": 181} and BM["nh_kpi"]["price_base"] == "2023 prices"
@@ -690,39 +693,39 @@ ok("baseline fleet: 3 artics in the peak month (1 on R1, 2 on R3); the unbaked l
 
 A = {a["name"]: a for a in S["alternatives"]}
 G = A["Greener"]
-# R1 18.645095 + 1.230773 (114 electric trips × 60 km × 0.1799375); R3→R4 0.656412 + 5.881084; R5 6.429343
-ok("⭐ alternative 'Greener' = 32.843 t, 124.153 t (79.1 %) below the baseline",
-   near(G["totals"]["total_t"], 32.843, 0.002) and near(G["delta_t"], -124.153, 0.003) and G["delta_pct"] == -79.1, str(G["totals"]))
-ok("⭐ drivers RANKED by tCO2e moved: disposal −112.040, diesel→electric −10.280, recycled −5.358",
+# R1 18.645095 + 0.879995 (114 electric trips × (30 + 30 × 0.43) km × 0.1799375: an electric lorry has no pair, one figure both legs); R3→R4 0.656412 + 5.881084; R5 6.429343
+ok("⭐ alternative 'Greener' = 32.492 t, 122.371 t (79.0 %) below the baseline",
+   near(G["totals"]["total_t"], 32.492, 0.002) and near(G["delta_t"], -122.371, 0.003) and G["delta_pct"] == -79.0, str(G["totals"]))
+ok("⭐ drivers RANKED by tCO2e moved: disposal −111.692, diesel→electric −8.498, recycled −5.358",
    [d["driver"] for d in G["drivers"]] == ["disposal", "fuel", "recycled"]
-   and near(G["drivers"][0]["delta_t"], -112.040, 0.002) and near(G["drivers"][1]["delta_t"], -10.280, 0.002)
+   and near(G["drivers"][0]["delta_t"], -111.692, 0.002) and near(G["drivers"][1]["delta_t"], -8.498, 0.002)
    and near(G["drivers"][2]["delta_t"], -5.358, 0.002), str(G["drivers"]))
-ok("...each driver is its levers ALONE on the baseline; the interaction (+3.524) is shown, not hidden",
-   near(G["interaction_t"], 3.524, 0.003) and near(sum(d["delta_t"] for d in G["drivers"]) + G["interaction_t"], G["delta_t"], 0.003))
+ok("...each driver is its levers ALONE on the baseline; the interaction (+3.177) is shown, not hidden",
+   near(G["interaction_t"], 3.177, 0.003) and near(sum(d["delta_t"] for d in G["drivers"]) + G["interaction_t"], G["delta_t"], 0.003))
 ok("...all deliveries zero-emission in 'Greener' (every artic has an electric variant)",
    G["benchmarks"]["zero_emission_share_pct"] == 100.0 and G["totals"]["electric_trips"] == G["totals"]["trips"])
 ok("...an alternative keeps the baseline's baked set (2 of 3) — no line dropped to look like a saving",
    G["totals"]["baked_lines"] == B["baked_lines"])
-ok("vehicle: rigid 8-wheelers on R1 cost MORE — 145 trips × 60 × 0.99773 = 8.680 vs 5.636 (+3.044)",
-   near(A["Rigids"]["delta_t"], 3.044, 0.002))
+ok("vehicle: rigid 8-wheelers on R1 cost MORE — 145 trips × (30 × 1.11639 + 30 × 0.43 × 0.7791) = 6.314 vs 4.084 (+2.230)",
+   near(A["Rigids"]["delta_t"], 2.230, 0.002))
 ok("🔴 a vehicle with no baked geometry keeps the line, on the baseline vehicle's km, FLAGGED",
-   near(A["Six-wheelers"]["delta_t"], 10.895 - 5.636, 0.002) and A["Six-wheelers"]["totals"]["flags"].get("KM_FROM_BASELINE_VEHICLE") == 1)
-ok("haul route: HERE alternative 1 (25 + 25 km) saves 0.939 t", near(A["Alt route"]["delta_t"], -0.939, 0.001))
+   near(A["Six-wheelers"]["delta_t"], 7.925 - 4.084, 0.002) and A["Six-wheelers"]["totals"]["flags"].get("KM_FROM_BASELINE_VEHICLE") == 1)
+ok("haul route: HERE alternative 1 (25 + 25 km) saves 0.681 t", near(A["Alt route"]["delta_t"], -0.681, 0.001))
 ok("...an alternative that is not baked is flagged and changes nothing",
    near(A["Alt 2"]["delta_t"], 0.0, 0.0005) and A["Alt 2"]["totals"]["flags"].get("ALT_ROUTE_NOT_BAKED") == 1)
-ok("source: the nearer supplier (R2, 10 + 10 km to the same compound) saves 3.758 t",
-   near(A["Nearer pit"]["delta_t"], -3.758, 0.001))
-ok("source: 80 % of the baked distance saves 1.127 t and is flagged as a typed scaling",
-   near(A["80 %"]["delta_t"], -1.127, 0.001) and A["80 %"]["totals"]["flags"].get("KM_SCALED") == 1)
+ok("source: the nearer supplier (R2, 10 + 10 km to the same compound) saves 2.722 t",
+   near(A["Nearer pit"]["delta_t"], -2.722, 0.001))
+ok("source: 80 % of the baked distance saves 0.817 t and is flagged as a typed scaling",
+   near(A["80 %"]["delta_t"], -0.817, 0.001) and A["80 %"]["totals"]["flags"].get("KM_SCALED") == 1)
 ok("material: a supplier EPD of 5.0 kg/t on the aggregates saves (7.80307 − 5) × 3.9 = 10.932 t",
    near(A["EPD"]["delta_t"], -10.932, 0.002))
 FC = S["fleet_compare"]
 # R1: 114 electric trips at 25.5 t, 90-min cycle, 75 kWh a trip → 6 a day → 1; R3: 228 trips, 69-min, 50 kWh → 8 → 2
-ok("⭐ diesel vs electric, same tonnage: 300 → 342 trips, 3 → 3 lorries, 13.151 → 2.872 t, 19,950 kWh",
+ok("⭐ diesel vs electric, same tonnage: 300 → 342 trips, 3 → 3 lorries, 11.019 → 2.521 t, 19,950 kWh",
    FC["lines"] == 2 and FC["diesel"]["trips"] == 300 and FC["electric"]["trips"] == 342
    and FC["diesel"]["lorries_peak"] == 3 and FC["electric"]["lorries_peak"] == 3
-   and near(FC["diesel"]["transport_t"], 13.151, 0.002) and near(FC["electric"]["transport_t"], 2.872, 0.002)
-   and near(FC["electric"]["kwh"], 19950.0, 0.1) and near(FC["delta_t"], -10.280, 0.002), json.dumps(FC)[:600])
+   and near(FC["diesel"]["transport_t"], 11.019, 0.002) and near(FC["electric"]["transport_t"], 2.521, 0.002)
+   and near(FC["electric"]["kwh"], 19950.0, 0.1) and near(FC["delta_t"], -8.498, 0.002), json.dumps(FC)[:600])
 ok("...with the electric day stated: payload 25.5 t (twin 29), 500 kWh, 350 kW, 400 km on one charge, no charge needed",
    FC["electric_profiles"][0]["payload_t"] == 25.5 and FC["electric_profiles"][0]["twin_payload_t"] == 29
    and FC["range_per_charge_km_min"] == 400.0 and FC["charges_per_lorry_day_max"] == 0 and FC["infeasible_lines"] == 0
@@ -799,8 +802,8 @@ ok("(a 50 kWh battery saves)", config.save(_lv, by="harness", network=network)["
 config.invalidate()
 SE = carbon.scenario(alternatives=[{"name": "e", "levers": [{"driver": "fuel", "fuel": "electric"}]}])
 FE = SE["fleet_compare"]
-ok("🔴 review: an electric trip that needs more than one battery is NOT credited — R1 stays diesel; only R3 moves (−5.874)",
-   near(SE["alternatives"][0]["drivers"][0]["delta_t"], -5.874, 0.002) and SE["alternatives"][0]["totals"]["flags"].get("EV_TRIP_EXCEEDS_BATTERY") == 1)
+ok("🔴 review: an electric trip that needs more than one battery is NOT credited — R1 stays diesel; only R3 moves (−5.294)",
+   near(SE["alternatives"][0]["drivers"][0]["delta_t"], -5.294, 0.002) and SE["alternatives"][0]["totals"]["flags"].get("EV_TRIP_EXCEEDS_BATTERY") == 1)
 ok("...and it is left out of BOTH sides of the diesel/electric comparison (1 line compared, 1 infeasible)",
    FE["lines"] == 1 and FE["infeasible_lines"] == 1 and FE["diesel"]["trips"] == 200 and FE["electric"]["trips"] == 228, json.dumps(FE)[:300])
 config.reset_to_file(conversions, by="harness")
@@ -880,9 +883,9 @@ _bm = carbon.benchmarks({"total_t": 0.3, "tonnes": 200.0, "electric_trips": 0, "
 ok("🔴 review: a line counting its loaded leg only is left OUT of the benchmarks (it would read as empty-free), and counted",
    _bm["kg_co2e_per_t_delivered"] == 2.0 and _bm["kg_co2e_per_tkm"] == 0.2 and _bm["laden_share_pct"] == 50.0 and _bm["excluded_lines"] == 1, str(_bm))
 SA2 = carbon.scenario(allocation={"R1": {"Road Pavements": 100}, SA: {"Drainage": 50}})["baseline"]["allocation"]
-# R1 (22.628903 + 5.63634) all to Road Pavements; R5 (Small aggregate, no route key) 50 % Drainage; the soil line unallocated
-ok("review: allocation is per ROW where a route is named (R1 → Road Pavements 28.265), else per category (R5 → Drainage 3.902)",
-   near(SA2["Road Pavements"], 28.265, 0.002) and near(SA2["Drainage"], 3.902, 0.002) and near(SA2["Not Allocated"], 124.828, 0.003), str(SA2))
+# R1 (22.628903 + 4.08356) all to Road Pavements; R5 (Small aggregate, no route key) 50 % Drainage; the soil line unallocated
+ok("review: allocation is per ROW where a route is named (R1 → Road Pavements 26.712), else per category (R5 → Drainage 3.902)",
+   near(SA2["Road Pavements"], 26.712, 0.002) and near(SA2["Drainage"], 3.902, 0.002) and near(SA2["Not Allocated"], 124.248, 0.003), str(SA2))
 _pk2 = {f["key"]: f for f in S["factors"]}
 ok("review: the factors list carries what the ALTERNATIVES used — the 30 % blend (DERIVED, 6.42934) and the typed EPD (ASSUMPTION)",
    _pk2.get("blend:aggregates:30.0", {}).get("status") == "DERIVED" and near(_pk2["blend:aggregates:30.0"]["value"], 6.42934, 1e-5)
@@ -939,19 +942,19 @@ ok("🔴 ...and a live document still carrying the old key can never feed it: th
    == {"2024_25": 159, "2025_26": 181})
 
 # after the show (11 Oct 2026, notes/carbon-ui-1011 items 8, 9, 11–14): every figure hand-worked from the fixture
-ok("item 12 ⭐ well-to-wheel: artic WTT 0.22058 per km × (R1 6,000 + R3 8,000 km) = 3.088 t, beside 13.151 tank-to-wheel → 16.240",
-   near(B["transport_wtt_t"], 3.08812, 0.0005) and near(B["transport_wtw_t"], 16.23958, 0.0005) and B["wtw_lines_out"] == 0
-   and near(LN["R1"]["transport_wtt_t"], 1.32348, 0.0005) and LN["R5"]["transport_wtt_t"] is None, str(B))
+ok("item 12 ⭐ well-to-wheel: artic WTT 0.22058 per km × the CHARGED km (R1 4,290 + R3 8,000) = 2.711 t, beside 11.019 tank-to-wheel → 13.730",
+   near(B["transport_wtt_t"], 2.71093, 0.0005) and near(B["transport_wtw_t"], 13.72997, 0.0005) and B["wtw_lines_out"] == 0
+   and near(LN["R1"]["transport_wtt_t"], 0.94629, 0.0005) and LN["R5"]["transport_wtt_t"] is None, str(B))
 ok("🔴 ...never in the total: the total is still material + transport + disposal",
-   near(B["total_t"], B["material_t"] + B["transport_t"] + B["disposal_t"], 0.002) and near(B["total_t"], 156.995, 0.002))
-# Greener: R1 114 × 60 km and R4 228 × 16 km electric = 10,488 km × 0.0505125
-ok("...electric well-to-tank: 'Greener' 10,488 km × 0.0505125 = 0.530 t, well-to-wheel 1.887 + 0.530 = 2.417",
-   near(G["totals"]["transport_wtt_t"], 0.529775, 0.0005) and near(G["totals"]["transport_wtw_t"], 2.41696, 0.0006), str(G["totals"]))
-ok("item 14 ⭐ life-cycle modules add up to the total: A1–A3 30.432 (material), A4 5.636 (R1 delivered), A5 120.927 (R3's muck-away + disposal)",
-   near(S["baseline"]["stages"]["A1-A3"], 30.432, 0.002) and near(S["baseline"]["stages"]["A4"], 5.636, 0.002)
-   and near(S["baseline"]["stages"]["A5"], 120.927, 0.002) and near(sum(S["baseline"]["stages"].values()), B["total_t"], 0.003))
-ok("...and on 'Greener': A1–A3 25.074 (30 % recycled), A4 1.231 (electric R1), A5 6.537 (to the soil hub)",
-   near(G["stages"]["A1-A3"], 25.074, 0.002) and near(G["stages"]["A4"], 1.231, 0.002) and near(G["stages"]["A5"], 6.537, 0.002)
+   near(B["total_t"], B["material_t"] + B["transport_t"] + B["disposal_t"], 0.002) and near(B["total_t"], 154.863, 0.002))
+# Greener: R1 114 × 60 km and R4 228 × 16 km electric = 10,488 km driven, 8,539 charged (R1's way back at 43 %) × 0.0505125
+ok("...electric well-to-tank: 'Greener' 8,539 charged km × 0.0505125 = 0.431 t, well-to-wheel 1.536 + 0.431 = 1.968",
+   near(G["totals"]["transport_wtt_t"], 0.431306, 0.0005) and near(G["totals"]["transport_wtw_t"], 1.96772, 0.0006), str(G["totals"]))
+ok("item 14 ⭐ life-cycle modules add up to the total: A1–A3 30.432 (material), A4 4.084 (R1 delivered), A5 120.347 (R3's muck-away + disposal)",
+   near(S["baseline"]["stages"]["A1-A3"], 30.432, 0.002) and near(S["baseline"]["stages"]["A4"], 4.084, 0.002)
+   and near(S["baseline"]["stages"]["A5"], 120.347, 0.002) and near(sum(S["baseline"]["stages"].values()), B["total_t"], 0.003))
+ok("...and on 'Greener': A1–A3 25.074 (30 % recycled), A4 0.880 (electric R1), A5 6.537 (to the soil hub)",
+   near(G["stages"]["A1-A3"], 25.074, 0.002) and near(G["stages"]["A4"], 0.880, 0.002) and near(G["stages"]["A5"], 6.537, 0.002)
    and near(sum(G["stages"].values()), G["totals"]["total_t"], 0.003), str(G["stages"]))
 _GD = {d["driver"]: d for d in G["drivers"]}
 ok("item 9 ⭐ each decision's lorry effect on its own: the soil hub 0 loads and 4,800 fewer km (200 × 16 against 200 × 40); "
@@ -989,8 +992,8 @@ try:
 finally:
     os.environ.pop("IPT2_CODE", None)
     access.set_current("planner123")
-ok("🔴 a team code's scenario holds only its own lines (the soil line: 120.927 t)",
-   [l["route_id"] for l in ST["lines"]] == ["R3"] and near(ST["baseline"]["totals"]["total_t"], 120.927, 0.002))
+ok("🔴 a team code's scenario holds only its own lines (the soil line: 120.347 t)",
+   [l["route_id"] for l in ST["lines"]] == ["R3"] and near(ST["baseline"]["totals"]["total_t"], 120.347, 0.002))
 
 # a live document seeded before 10 Oct: no carbon block, no electric profiles, no carbon_material
 _live = json.loads(json.dumps(config.load(conversions, use_cache=False)))
@@ -1003,7 +1006,7 @@ config.invalidate()
 S2 = carbon.scenario(alternatives=[{"name": "e", "levers": [{"driver": "fuel", "fuel": "electric"}]}])
 ok("⭐ a tenant seeded before 10 Oct gets the same baseline and the electric alternative, from the file",
    near(S2["baseline"]["totals"]["total_t"], B["total_t"], 0.001)
-   and near(S2["alternatives"][0]["drivers"][0]["delta_t"], -10.280, 0.002))
+   and near(S2["alternatives"][0]["drivers"][0]["delta_t"], -8.498, 0.002))
 config.reset_to_file(conversions, by="harness")
 config.invalidate()
 
@@ -1014,8 +1017,8 @@ R = main.carbon_scenario(main.CarbonScenarioIn(spend_gbp_m=2.0, alternatives=[ma
     name="Greener", levers=[{"driver": "recycled", "scope": {"category": SA}, "pct": 30},
                             {"driver": "disposal", "scope": {"route_id": "R3"}, "to_route": "R4"},
                             {"driver": "fuel", "fuel": "electric"}])]))
-ok("⭐ the endpoint returns the engine's answer unchanged (baseline 156.995, Greener −124.153)",
-   near(R["baseline"]["totals"]["total_t"], 156.995, 0.002) and near(R["alternatives"][0]["delta_t"], -124.153, 0.003))
+ok("⭐ the endpoint returns the engine's answer unchanged (baseline 154.863, Greener −122.371)",
+   near(R["baseline"]["totals"]["total_t"], 154.863, 0.002) and near(R["alternatives"][0]["delta_t"], -122.371, 0.003))
 for _label, _body, _want in (
         ("an allocation over 100 %", main.CarbonScenarioIn(allocation={SA: {"Fencing": 60, "Waste": 60}}), "120"),
         ("an EPD without its source", main.CarbonScenarioIn(alternatives=[main.CarbonAlternative(levers=[{"driver": "material", "scope": {"category": SA}, "epd": {"kg_per_t": 3}}])]), "source"),
@@ -1052,9 +1055,9 @@ ok("⭐ the summary is a PDF download, ONE page", _pr.media_type == "application
 ok("🔴 ...stamped: a Wayscope planning estimate on the DESNZ 2026 basis, not Carbon Tool figures; the demo notice on it",
    "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures" in _flat
    and "Fictional demo scheme" in _flat and "Not a National Highways Carbon Tool return" in _flat)
-ok("...the scenario's own figures: 157.0 against 32.8, the change in words with the lorry loads and lorry-km",
-   "157.0" in _flat and "32.8" in _flat and "124.2 tCO2e lower (79.1%) · 47 more lorry loads · 3 512 fewer lorry-km" in _flat
-   and "16.2" in _flat and "2.4" in _flat, _flat[:600])
+ok("...the scenario's own figures: 154.9 against 32.5, the change in words with the lorry loads and lorry-km",
+   "154.9" in _flat and "32.5" in _flat and "122.4 tCO2e lower (79.0%) · 47 more lorry loads · 3 512 fewer lorry-km" in _flat
+   and "13.7" in _flat and "2.0" in _flat, _flat[:600])
 ok("...the decisions in words (the arrow written 'to', which Helvetica can print) and ranked with their lorry effect",
    "Recycled content 30% — Small aggregate" in _flat and "Receiving site: Soil hub (route R4) — route R3: Compound to Tip" in _flat
    and "Receiving site and disposal method" in _flat and "4 800 fewer lorry-km" in _flat and "→" not in _pt)

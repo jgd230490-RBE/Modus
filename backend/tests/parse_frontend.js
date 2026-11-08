@@ -1515,7 +1515,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   // 13 Oct 2026 (W3, narrowed): the carbon sentence moved from the tooltip to the info box (source line) and the technical guide
   ok("the carbon info box and the Config sub-line say DESNZ 2026, not DEFRA (checked against gov.uk 9 Oct 2026)",
      !/DEFRA/.test(src) && src.includes('source: "DESNZ greenhouse gas conversion factors, 2026"')
-     && /DESNZ 2026 kg CO₂e per vehicle-km \(average laden, both legs, from Config\)/.test(_tg));
+     && /DESNZ 2026 kg CO₂e per vehicle-km at 100 % and 0 % laden \(Config → Vehicles\)/.test(_tg));   // RE-PINNED 8 Nov 2026 (the return journey)
   ok("the Dashboard figure and the Routes table say lorry-<unit>, the bake table says HGV params",
      // 13 Oct 2026 (W6, narrowed): the route table's lorry-distance is a details line and a "Sort by" choice
      /label=\{`lorry-\$\{DU\(\)\}`\}/.test(src) && src.includes('<RdItem t={`Lorry-${DU()}`}>{r.baked ? grp(dist(r.km))') && src.includes('["km", `Lorry-${DU()}`]')
@@ -1844,7 +1844,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      cb.includes("const nhKpi = bm(B).nh_kpi || null;") && cb.includes("Context only: this page counts materials, haulage and waste disposal, not the same scope.")
      && !cb.includes("nh_kpi_t_co2e_per_gbp_m") && !cb.includes("2023_24"));
   ok("the methods are named in full: 'National Highways Carbon Tool method (for comparison)'; laden share says how it is counted",
-     cb.includes("National Highways Carbon Tool method (for comparison)") && cb.includes("Wayscope: per vehicle-km, both legs")
+     cb.includes("National Highways Carbon Tool method (for comparison)") && cb.includes("Wayscope: per vehicle-km, each leg at its own factor")   // RE-PINNED 8 Nov 2026
      && cb.includes("Every return leg is counted empty: back-loads are not modelled") && !cb.includes("Laden share of km"));
   // NARROWED 11 Oct 2026 (the process layout: the "By material" table became step 2's one row per category, with the NH
   // category on the name's hover; three tables remain, each inside a closed details)
@@ -3923,7 +3923,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      // NARROWED 28 Oct 2026 (task 0c): + the Routes row's "Diverted" chip, the same house chip (three)
      // RE-PINNED 29 Oct 2026 (task 3c): + the Routes row's holding-area chip, the same house chip (four)
      // RE-PINNED 5 Nov 2026 (task 0d-2): + the Routes row's "Busy hours: Alt N" chip, the same house chip (five)
+     // 8 Nov 2026 (the return journey): the Routes row's return chip is the same house chip, its className a template (the guessed
+     // state adds bg-slate-100 text-slate-600), so the literal count stays five and the chip is asserted by its own line
      && (code.match(/className="ml-1\.5 text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 5
+     && code.includes('className={"ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}')
      && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
      && (code.match(/text-\[9px\]/g) || []).length === 0
      && code.includes('<div className={"text-xs uppercase tracking-wide " + (role === "commit" ? "text-slate-600" : "text-slate-400")}>{roleLbl[role] || "\u00a0"}</div>'));

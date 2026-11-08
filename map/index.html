@@ -3382,7 +3382,7 @@
                 .map(([rid, b, mv]) => `<button type="button" class="busy-row" onclick="selectRoute('${esc(rid)}')" title="Show ${esc(rid)} on the map">` +
                     `<span>${esc((b.rp.origin || rid) + ' \u2192 ' + (b.rp.dest || ''))}</span><span class="chip-n">${fmtN(mv, 0)} two-way a day</span></button>`).join('');
             setHTML('kpi-busiest', busiest);
-            set('kpi-note', `Approved forecast, ${label}${n > 1 ? `, average of ${n} months` : ''}. Two-way movements = deliveries a working day (out laden, back empty). Vehicles = lorries needed in a driver's day (a planning figure)${n > 1 ? ', busiest month' : ''}. CO\u2082e = road km × the lorry's factor.`
+            set('kpi-note', `Approved forecast, ${label}${n > 1 ? `, average of ${n} months` : ''}. Two-way movements = deliveries a working day (out laden, back empty). Vehicles = lorries needed in a driver's day (a planning figure)${n > 1 ? ', busiest month' : ''}. CO\u2082e = each leg's road km × the lorry's factor (the way back as the route charges it).`
                 + (fellBack ? ` ${fellBack} line(s) use the ${fbName} payload (no payload set for their lorry).` : ''));
             // the method note reads as a tooltip on the month, not as a paragraph in the bar
             const tt = document.getElementById('kpi-title'); if (tt) tt.title = document.getElementById('kpi-note').innerText;

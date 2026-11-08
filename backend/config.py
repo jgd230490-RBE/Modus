@@ -571,6 +571,11 @@ def validate(doc, network=None):
         if dg:
             # worded for the field a person sees (Config → Planning → Default gate hours), not the setting's path
             p.append(dg)
+        # 8 Nov 2026 (v2.1): the return journeys' defaults and the part share (absent = return_journey.DEFAULTS)
+        import return_journey as _rj
+        rjp = _rj.settings_problem(plan.get("return_journeys"))
+        if rjp:
+            p.append(rjp)
         # 29 Oct 2026 (task 3a): the concrete pours' two limits (absent = 120 and 30 minutes; pours.limits)
         import pours as _pours
         pp = _pours.limits_problem(plan.get("pours"))

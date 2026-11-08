@@ -82,6 +82,7 @@ import db
 import derived
 import fairprice
 import network
+import return_journey     # 8 Nov 2026 (v2.1): the empty way back as each route charges it
 
 KM_PER_MILE = 1.609344
 SHEET_BULK, SHEET_EARTHWORKS, SHEET_WASTE = "Bulk Materials", "Earthworks", "Waste"
@@ -875,13 +876,23 @@ def _eval(line, s, ctx):
     vf = vehicle_factor(doc, cp, veh)
     vclass = fairprice.vehicle_class(veh, doc)
     tcls = tkm_class(vclass, v.get("gvw_t"))
-    tr_t = transport_vehicle_km_t(trips, km_trip, vf["kg_per_km"]) if base_baked else None
+    # 8 Nov 2026 (v2.1, the return journey): the loaded leg at the laden figure, the way back at the empty figure × the
+    # share the route charges (return_journey.py — the same rule as the Dashboard's cost lines); the lorry still drives
+    # back, so vkm, the cycle and the EV day keep the whole return
+    rj_route = routes.get(s["route_id"]) or routes.get(line["route_id"]) or {}
+    rj_origin = locs.get(rj_route.get("origin_id")) or {}
+    rj_mode, _rj_src = return_journey.mode_for(rj_route, rj_origin.get("loc_type"), veh, doc)
+    rj_share = return_journey.share(rj_mode, doc)
+    rj = return_journey.trip_kg(doc, veh, one_way or 0.0, ret or 0.0, rj_share) if base_baked else None
+    tr_t = (trips * rj["kg"] / 1000.0) if rj else None
+    charged_km = rj["charged_km"] if rj else km_trip
     wf = wtt_factor(doc, cp, veh, vf)                         # item 12: beside the total, never in it
-    wtt_t = transport_vehicle_km_t(trips, km_trip, wf["kg_per_km"]) if (base_baked and wf is not None) else None
+    wtt_t = transport_vehicle_km_t(trips, charged_km, wf["kg_per_km"]) if (base_baked and wf is not None) else None
     nh_t = transport_nh_t(one_way, tonnes, cp) if base_baked else None
     tkm_t = transport_tkm_t(one_way, tonnes, cp, tcls) if base_baked else None
     vkm = trips * km_trip if (base_baked and km_trip is not None) else None
     laden_km = trips * one_way if (base_baked and one_way is not None) else None
+    empty_km = (trips * float(ret or 0.0) * rj_share) if base_baked else None       # the CHARGED empty km
     kwh = (vkm * float(v.get("kwh_per_km") or 0)) if (electric and vkm is not None) else 0.0
 
     # ---- fleet ----------------------------------------------------------------------
@@ -918,6 +929,10 @@ def _eval(line, s, ctx):
         "vehicle": veh, "fuel": "electric" if electric else "diesel", "vehicle_class": vclass, "tkm_class": tcls,
         "tonnes": tonnes, "trips": trips, "payload_t": payload, "baked": base_baked,
         "one_way_km": one_way, "return_km": ret, "km_trip": km_trip, "vkm": vkm, "laden_km": laden_km,
+        # 8 Nov 2026: the empty km charged (return × the route's share), the share, and the transport carbon's two legs
+        "empty_km": empty_km, "return_share": rj_share, "return_mode": rj_mode,
+        "transport_loaded_t": (trips * rj["loaded_kg"] / 1000.0) if rj else None,
+        "transport_empty_t": (trips * rj["empty_kg"] / 1000.0) if rj else None,
         "cycle_min": cycle_min, "cycles_per_day": cycles, "lorries": lorries, "kwh": kwh,
         "ev": ev, "kg_per_km": vf["kg_per_km"], "factor_status": vf["status"],
         "material_kg_per_t": mat.get("kg_per_t"), "material_method": mat.get("method"),
@@ -948,7 +963,8 @@ def _totals(evals, cp, spend_m=None, allocation=None):
          "vkm": 0.0, "laden_km": 0.0, "tkm": 0.0, "kwh": 0.0, "material_t": 0.0, "transport_t": 0.0,
          "transport_nh_t": 0.0, "transport_tkm_t": 0.0, "disposal_t": 0.0, "total_t": 0.0,
          "material_excluded_tonnes": 0.0, "disposal_excluded_tonnes": 0.0, "flags": {},
-         "transport_wtt_t": 0.0, "wtw_lines_out": 0}
+         "transport_wtt_t": 0.0, "wtw_lines_out": 0,
+         "empty_km": 0.0, "transport_loaded_t": 0.0, "transport_empty_t": 0.0}     # 8 Nov 2026: the two legs apart
     stages = {k: 0.0 for k in STAGES}
     by_cat, by_route, by_month, sheets = {}, {}, {}, []
     alloc = {k: 0.0 for k in ALLOCATION + (NOT_ALLOCATED,)} if allocation else None
@@ -964,6 +980,9 @@ def _totals(evals, cp, spend_m=None, allocation=None):
             t["laden_km"] += e["laden_km"] or 0.0
             t["tkm"] += (e["tonnes"] * (e["one_way_km"] or 0.0))
             t["transport_t"] += e["transport_t"] or 0.0
+            t["empty_km"] += e.get("empty_km") or 0.0
+            t["transport_loaded_t"] += e.get("transport_loaded_t") or 0.0
+            t["transport_empty_t"] += e.get("transport_empty_t") or 0.0
             t["transport_nh_t"] += e["transport_nh_t"] or 0.0
             t["transport_tkm_t"] += e["transport_tkm_t"] or 0.0
             t["kwh"] += e["kwh"] or 0.0
@@ -1180,7 +1199,9 @@ def scenario(acc=None, alternatives=None, baseline_levers=None, from_month=None,
         "waste_hierarchy_source": WASTE_HIERARCHY_SOURCE,
         "planned": list(((cp.get("planned") or {}).get("items")) or []),
         "methods": {
-            "headline": "vehicle-km: trips × routed km of both legs × the vehicle's kg CO2e per vehicle-km (DESNZ 2026, tank-to-wheel)",
+            "headline": ("vehicle-km: trips × (loaded km × the vehicle's laden factor + return km × the route's return share × its "
+                         "empty factor), DESNZ 2026 per vehicle-km, tank-to-wheel; the return share is the route's Return journey "
+                         "(Data → Routes): the whole way back, 43 % of it, or none"),
             "nh_tool": "NH Carbon Tool v2.7 basis: tonnes × one-way km × (laden + unladen) ÷ 2 × 2, 2024 factors with well-to-tank",
             "tonne_km": "DESNZ 2026 tonne-km for each vehicle's size class, average laden — what a tonne-km calculator gives for the same haul",
             "well_to_wheel": "the vehicle-km figure plus producing the fuel or electricity: DESNZ 2026 well-to-tank per vehicle-km for diesel, kWh/km × the electricity well-to-tank rows for electric",
