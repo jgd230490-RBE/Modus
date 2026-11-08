@@ -405,6 +405,32 @@
         .filter-grid{ display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); column-gap:6px; }
         .filter-grid select{ min-width:0; font-size:13px; padding:8px 6px; grid-column:span 7; }      /* "All destinations" whole (seen in Chrome, 19 Oct; cut again in a 119 px column, 27 Oct): the wordier select of each row takes seven twelfths (140 px of 244), the other five (98 px) */
         .filter-grid #filter-origin, .filter-grid #filter-ipt{ grid-column:span 5; }
+        /* 8 Nov 2026 (v2.1 item 2.1-3, mockup notes/map-export-default-mockup-1108 card 3): the Routes picker, the grid's
+           full width under the four selects; its list opens in place (the sidebar is the Layers sheet on a phone) */
+        .filter-grid .route-pick-btn{ grid-column:1 / -1; margin-top:6px; min-height:36px; display:flex; justify-content:space-between; align-items:center;
+                        gap:6px; padding:8px 8px; border:1px solid #A8A29E; border-radius:6px; background:#fff; color:var(--ink);
+                        font:600 13px Inter,system-ui,sans-serif; text-align:left; cursor:pointer; }
+        .route-pick-btn span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+        .route-pick-btn::after{ content:"\25BE"; color:var(--muted); font-weight:400; flex:none; }
+        .route-pick-btn:focus-visible{ outline:2px solid var(--navy); outline-offset:1px; }
+        .route-pick{ margin-top:6px; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(16,24,40,.14); padding:8px; background:#fff; }
+        .route-pick[hidden]{ display:none; }
+        .route-pick input[type=search]{ width:100%; box-sizing:border-box; min-height:40px; border:1px solid #A8A29E; border-radius:6px; padding:6px 10px;
+                        font:14px Inter,system-ui,sans-serif; color:var(--ink); margin-bottom:4px; }
+        .route-pick-list{ max-height:260px; overflow:auto; }
+        .route-pick-row{ display:flex; gap:8px; align-items:flex-start; min-height:32px; padding:4px 2px; font-size:13px; line-height:1.35; cursor:pointer; }
+        .route-pick-row input{ width:18px; height:18px; margin:1px 0 0; flex:none; }
+        .route-pick-row b{ color:var(--navy-deep); }
+        .route-pick-row .rp-where{ color:var(--muted); }
+        .route-pick-row.rp-hidden{ opacity:.55; }
+        .route-pick-none{ margin:6px 2px; font-size:13px; color:var(--muted); }
+        .route-pick-foot{ display:flex; justify-content:space-between; align-items:center; gap:8px; border-top:1px solid var(--line); padding-top:6px;
+                        margin-top:4px; font-size:13px; color:var(--muted); }
+        .route-pick-foot button{ background:none; border:0; padding:8px 4px; font:600 13px Inter,system-ui,sans-serif; color:var(--navy); cursor:pointer; }
+        @media (max-width: 767px), (pointer: coarse){      /* a phone's 44 px taps (the UI audit's strict rule) */
+            .filter-grid .route-pick-btn, .route-pick input[type=search], .route-pick-row, .route-pick-foot button{ min-height:44px; }
+            .route-pick-row{ align-items:center; }
+        }
         .share-group .share-row .btn{ font-size:13px; padding:8px 10px; }      /* two to a row at 300 px (were one each at 14 px) */
         .layers-box > summary small{ margin-left:6px; font-size:13px; font-weight:500; color:var(--muted); }
         /* the number badges' key (the badges on the map are drawn by pillBadgeImage) */
@@ -947,6 +973,13 @@
              so it stays disabled until some exist. -->
         <select id="filter-discipline" onchange="applyFilters()" aria-label="Discipline"><option value="ALL">All disciplines</option></select>
         <select id="filter-ipt" onchange="applyFilters()" aria-label="Team"><option value="ALL">All teams</option></select>
+        <!-- 8 Nov 2026 (v2.1 item 2.1-3): pick routes by their reference; in the share link and the export -->
+        <button type="button" class="route-pick-btn" id="filter-routes" aria-expanded="false" aria-controls="route-pick" onclick="toggleRoutePick()"><span id="filter-routes-text">All routes</span></button>
+        </div>
+        <div class="route-pick" id="route-pick" role="group" aria-label="Pick routes" hidden onkeydown="if(event.key==='Escape'){event.stopPropagation();closeRoutePick();}">
+            <input type="search" id="route-pick-q" placeholder="Find a route" aria-label="Find a route" oninput="renderRoutePick()">
+            <div class="route-pick-list" id="route-pick-list"></div>
+            <div class="route-pick-foot"><button type="button" onclick="clearRoutePick()">Clear</button><span id="route-pick-n" aria-live="polite"></span><button type="button" onclick="closeRoutePick()">Done</button></div>
         </div>
         <!-- 19 Oct 2026: shown only while a filter is set (syncFilterReset) -->
         <button class="btn btn-ghost" id="filter-reset" hidden onclick="resetFilters()">Reset filters</button>
@@ -2839,7 +2872,71 @@
         const o = document.getElementById('filter-origin').value, d = document.getElementById('filter-dest').value;
         const disc = document.getElementById('filter-discipline').value, i = document.getElementById('filter-ipt').value;
         return (o === 'ALL' || p.origin === o) && (d === 'ALL' || p.dest === d)
+            && (disc === 'ALL' || (p.disciplines || []).includes(disc)) && (i === 'ALL' || p.ipt === i)
+            && routePicked(p.route_id);
+    }
+    // 8 Nov 2026 (v2.1 item 2.1-3): the Routes filter. Empty = every route (no filter); otherwise only the ticked ones,
+    // AND the other four. Every place the four apply reads routePicked() too.
+    const ROUTE_PICK = { sel: new Set(), open: false };
+    function routePicked(rid) { return !ROUTE_PICK.sel.size || ROUTE_PICK.sel.has(rid); }
+    function routePickList() { return [...ROUTE_PICK.sel].sort(); }
+    function routePickWords() {
+        const ids = routePickList();
+        if (!ids.length) return 'All routes';
+        if (ids.length === 1) return ids[0];
+        return ids.length + ' routes: ' + ids.slice(0, 3).join(', ') + (ids.length > 3 ? ', …' : '');
+    }
+    function syncRoutePickButton() {
+        const t = document.getElementById('filter-routes-text'); if (t) t.textContent = routePickWords();
+        const n = document.getElementById('route-pick-n'); if (n) n.textContent = ROUTE_PICK.sel.size ? ROUTE_PICK.sel.size + ' ticked' : '';
+    }
+    // every drawn route once (its laden leg), by reference; a route the other four filters hide is greyed, never dropped
+    function routePickRoutes() {
+        const out = {};
+        ((typeof a1_data !== 'undefined' && a1_data && a1_data.features) || []).forEach(f => {
+            const p = f.properties || {};
+            if (p.type === 'Inbound Highway' && p.route_id && !out[p.route_id]) out[p.route_id] = p;
+        });
+        return Object.keys(out).sort().map(k => out[k]);
+    }
+    function otherFiltersPass(p) {
+        const v = id => { const el = document.getElementById(id); return el ? el.value : 'ALL'; };
+        const o = v('filter-origin'), d = v('filter-dest'), disc = v('filter-discipline'), i = v('filter-ipt');
+        return (o === 'ALL' || p.origin === o) && (d === 'ALL' || p.dest === d)
             && (disc === 'ALL' || (p.disciplines || []).includes(disc)) && (i === 'ALL' || p.ipt === i);
+    }
+    function renderRoutePick() {
+        const box = document.getElementById('route-pick-list'); if (!box) return;
+        const q = ((document.getElementById('route-pick-q') || {}).value || '').trim().toLowerCase();
+        const rows = routePickRoutes().filter(p => !q || [p.route_id, p.origin, p.dest].some(x => String(x || '').toLowerCase().includes(q)));
+        box.innerHTML = rows.length ? rows.map(p => {
+            const hid = !otherFiltersPass(p);
+            return '<label class="route-pick-row' + (hid ? ' rp-hidden' : '') + '"><input type="checkbox" value="' + escHtml(p.route_id) + '"'
+                + (ROUTE_PICK.sel.has(p.route_id) ? ' checked' : '') + ' onchange="pickRoute(this.value, this.checked)"><span><b>' + escHtml(p.route_id)
+                + '</b> <span class="rp-where">' + escHtml((p.origin || '') + ' → ' + (p.dest || '')) + (hid ? ' · hidden by the other filters' : '') + '</span></span></label>';
+        }).join('') : '<p class="route-pick-none">No route matches.</p>';
+        syncRoutePickButton();
+    }
+    function pickRoute(rid, on) {
+        if (on) ROUTE_PICK.sel.add(rid); else ROUTE_PICK.sel.delete(rid);
+        syncRoutePickButton();
+        applyFilters();
+    }
+    function toggleRoutePick() { if (ROUTE_PICK.open) closeRoutePick(); else openRoutePick(); }
+    function openRoutePick() {
+        const p = document.getElementById('route-pick'), b = document.getElementById('filter-routes'); if (!p) return;
+        ROUTE_PICK.open = true; p.hidden = false; if (b) b.setAttribute('aria-expanded', 'true');
+        renderRoutePick();
+        const q = document.getElementById('route-pick-q'); if (q) q.focus();
+    }
+    function closeRoutePick() {
+        const p = document.getElementById('route-pick'), b = document.getElementById('filter-routes'); if (!p) return;
+        ROUTE_PICK.open = false; p.hidden = true; if (b) { b.setAttribute('aria-expanded', 'false'); b.focus(); }
+    }
+    function clearRoutePick() {
+        ROUTE_PICK.sel.clear();
+        renderRoutePick();
+        applyFilters();
     }
     // ===== 2026-09-08 (§C) — the ends of the live routes, as ICONS ==================
     //
@@ -3092,7 +3189,10 @@
         // 12 Oct 2026 (fix pass, F1 seen in Chrome): a stale fetch must not overwrite a newer month, but the guard is
         // now the months AND filters on screen, not a call counter. With a counter, every fetch that took longer than
         // one tick was dropped, so during Play the bar kept "No month on screen" and dashes for whole loops.
-        const onScreen = months.join(',') + '|' + [oFilter, dFilter, discFilter, iFilter].join('|');
+        // 8 Nov 2026 (2.1-3): and the Routes filter (guarded: the harness runs this function on its own)
+        const picked = (typeof routePicked === 'function') ? routePicked : () => true;
+        const pickedKey = (typeof routePickList === 'function') ? routePickList().join(',') : '';
+        const onScreen = months.join(',') + '|' + [oFilter, dFilter, discFilter, iFilter, pickedKey].join('|');
         KPI.onScreen = onScreen;
         const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
         const setHTML = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
@@ -3172,7 +3272,7 @@
                     if (!rp) return;                       // unbaked: not drawn, not counted
                     if ((oFilter !== 'ALL' && rp.origin !== oFilter) || (dFilter !== 'ALL' && rp.dest !== dFilter)
                         || (iFilter !== 'ALL' && rp.ipt !== iFilter)
-                        || (discFilter !== 'ALL' && l.discipline !== discFilter)) return;
+                        || (discFilter !== 'ALL' && l.discipline !== discFilter) || !picked(l.route_id)) return;
                     any = true; veh += l.vehicle_loads; qty += l.qty_unit; mRoutes.add(l.route_id);
                     if (l.co2_t != null) co2 += l.co2_t; else co2Unbaked++;
                     if (l.trips_per_vehicle_day > 0) fleet += Math.ceil((l.vehicle_loads / wd) / l.trips_per_vehicle_day);
@@ -3197,7 +3297,7 @@
                 if (!rp) return;
                 if ((oFilter !== 'ALL' && rp.origin !== oFilter) || (dFilter !== 'ALL' && rp.dest !== dFilter)
                     || (iFilter !== 'ALL' && rp.ipt !== iFilter)
-                    || (discFilter !== 'ALL' && c.discipline !== discFilter)) return;
+                    || (discFilter !== 'ALL' && c.discipline !== discFilter) || !picked(c.route_id)) return;
                 co2ToDate += c.co2_t || 0;
             });
             if (!mVeh.length) {
@@ -3317,7 +3417,8 @@
     // 19 Oct 2026: "Reset filters" shows only while one of the four is set
     function syncFilterReset() {
         const b = document.getElementById('filter-reset');
-        if (b) b.hidden = ['filter-origin', 'filter-dest', 'filter-discipline', 'filter-ipt'].every(id => { const el = document.getElementById(id); return !el || el.value === 'ALL'; });
+        if (b) b.hidden = ['filter-origin', 'filter-dest', 'filter-discipline', 'filter-ipt'].every(id => { const el = document.getElementById(id); return !el || el.value === 'ALL'; })
+            && !(typeof ROUTE_PICK !== 'undefined' && ROUTE_PICK.sel.size);
     }
     // 23 Oct 2026 (the user): the approved abnormal loads moving in the month(s) on screen, each counted ONCE across them
     // (a load counts 1, in and out alike), from the month figures' abnormal_loads ids; "—" with no month or while loading;
@@ -3374,6 +3475,9 @@
         // a route can carry SEVERAL disciplines — that is the point of the widened
         // forecast key — so this is a membership test, not an equality
         if (disc !== 'ALL') filterArr.push(['in', disc, ['get', 'disciplines']]);
+        if (ROUTE_PICK.sel.size) filterArr.push(['in', ['get', 'route_id'], ['literal', routePickList()]]);   // 8 Nov 2026 (2.1-3)
+        syncRoutePickButton();
+        if (ROUTE_PICK.open) renderRoutePick();       // the greyed rows follow the other four
 
         const none = ['==', ['get', 'type'], 'NONE'];
         if (map.getLayer('inbound-lines')) map.setFilter('inbound-lines',
@@ -3415,6 +3519,8 @@
     function resetFilters() {
         document.getElementById('filter-origin').value = 'ALL'; document.getElementById('filter-dest').value = 'ALL';
         document.getElementById('filter-discipline').value = 'ALL'; document.getElementById('filter-ipt').value = 'ALL';
+        ROUTE_PICK.sel.clear();                         // 8 Nov 2026 (2.1-3): and the Routes filter
+        if (ROUTE_PICK.open) renderRoutePick();
         applyFilters();
     }
 
@@ -7840,6 +7946,7 @@
         if (d && d.value !== 'ALL') f.push(['==', ['get', 'dest'], d.value]);
         if (i && i.value !== 'ALL') f.push(['==', ['get', 'ipt'], i.value]);
         if (disc && disc.value !== 'ALL') f.push(['in', disc.value, ['get', 'disciplines']]);
+        if (typeof ROUTE_PICK !== 'undefined' && ROUTE_PICK.sel.size) f.push(['in', ['get', 'route_id'], ['literal', routePickList()]]);
         if (typeof TL !== 'undefined' && TL.on) f.push(['==', ['get', 'is_forecast'], true]);   // in a month: the routes carrying movements
         return f;
     }
@@ -8841,7 +8948,7 @@
     // ?month=2026-10 (the timeline's month; absent when no month is on screen)
     // &layers=chainage.-gates (what differs from the page's defaults: a box ticked, or "-" a default box unticked; dots,
     //   so the link needs no escaping and stays short enough for a QR code)
-    // &filters=origin:<name>|dest:<name>|discipline:<name>|team:<the team's NAME, never its id>
+    // &filters=origin:<name>|dest:<name>|discipline:<name>|team:<the team's NAME, never its id>|routes:R001,R004 (8 Nov 2026)
     // Read once the network is in (onNetworkReady), written on every change (applyFilters, a layer box, a stop of
     // playback) with history.replaceState — never during Play, which would write the address every tick.
     const VIEW = { ready: false, timer: null, defaults: [], pendingRestr: [] };
@@ -8867,7 +8974,7 @@
         const m = (Number(r[1]) - CONFIG.START_YEAR) * 12 + mm;
         return (m >= 1 && m <= (CONFIG.MONTH_COUNT || 60)) ? m : null;
     }
-    const VIEW_FILTER_KEYS = ['origin', 'dest', 'discipline', 'team'];
+    const VIEW_FILTER_KEYS = ['origin', 'dest', 'discipline', 'team', 'routes'];
     function encodeView(v, defaults) {
         const q = new URLSearchParams();
         if (v.month) q.set('month', monthParam(v.month));
@@ -8910,7 +9017,8 @@
         const val = id => { const el = document.getElementById(id); return el && el.value !== 'ALL' ? el.value : null; };
         return { month: TL.on ? TL.month : null, layers: layersOn(),
                  filters: { origin: val('filter-origin'), dest: val('filter-dest'), discipline: val('filter-discipline'),
-                            team: selectedText('filter-ipt') },       // the team's NAME as the option shows it
+                            team: selectedText('filter-ipt'),         // the team's NAME as the option shows it
+                            routes: (typeof ROUTE_PICK !== 'undefined' && ROUTE_PICK.sel.size) ? routePickList().join(',') : null },   // 8 Nov 2026 (2.1-3)
                  // 13 Oct 2026: the districts' colouring, only while By council is on (a carbon colouring left behind is not a view)
                  council: (typeof councilFocus === 'function' && councilFocus() && typeof AREAS !== 'undefined' && AREAS.mode === 'carbon') ? 'carbon' : null,
                  marks: (typeof locDotsOn === 'function' && locDotsOn()) ? 'dots' : null,
@@ -8963,6 +9071,8 @@
         if (v.month) { TL.month = v.month; TL.chosen = true; }
         setSel('filter-origin', v.filters.origin); setSel('filter-dest', v.filters.dest);
         setSel('filter-discipline', v.filters.discipline); setSel('filter-ipt', v.filters.team, true);
+        // 8 Nov 2026 (2.1-3): the link's routes, references only (a name that is not one is dropped)
+        if (v.filters.routes && typeof ROUTE_PICK !== 'undefined') { ROUTE_PICK.sel = new Set(v.filters.routes.split(',').map(x => x.trim()).filter(x => /^[A-Za-z0-9_-]{1,32}$/.test(x))); syncRoutePickButton(); }
         // 13 Oct 2026: the colouring before the boxes, so the districts' first paint is the shared one
         if (v.council === 'carbon' && typeof AREAS !== 'undefined') AREAS.mode = 'carbon';
         // 16 Oct 2026 (V7): dots before the boxes; the change event runs toggleLocDots and the link listener
@@ -9183,8 +9293,10 @@
     // STAFF ONLY (the user, 14 Oct). The button is shown once /api/public/whoami answers "staff" (a code, or the staff
     // cookie the app's iframe carries); the map password's visitor never sees it, and the endpoint refuses them anyway.
     // The request carries the Route filtering as the map applies it (origin, destination, team: the select's values;
-    // discipline) and ONE month: the month on screen, else the first month with volume. The PDF is drawn on the server.
+    // discipline; since 8 Nov 2026 the Routes filter) and ONE month: the month on screen, else none = "Approved routes,
+    // no month" (8 Nov 2026, v2.1 item 2.1-2; it was the first month with volume). The PDF is drawn on the server.
     const RME = { staff: false, opener: null, plans: [], places: [], fitted: null };
+    const RME_NO_MONTH = 'Approved routes, no month';      // 8 Nov 2026 (v2.1 item 2.1-2)
     function checkRouteExportStaff() {
         try {
             fetch('/api/public/whoami', { credentials: 'same-origin' })
@@ -9196,7 +9308,8 @@
     }
     function routeExportFilters() {
         const val = id => { const el = document.getElementById(id); return el && el.value !== 'ALL' ? el.value : null; };
-        return { origin: val('filter-origin'), dest: val('filter-dest'), discipline: val('filter-discipline'), team: val('filter-ipt') };
+        return { origin: val('filter-origin'), dest: val('filter-dest'), discipline: val('filter-discipline'), team: val('filter-ipt'),
+                 routes: (typeof ROUTE_PICK !== 'undefined' && ROUTE_PICK.sel.size) ? routePickList().join(',') : null };      // 8 Nov 2026 (2.1-3): the server's routes=
     }
     function routeExportWords() {
         const f = routeExportFilters();
@@ -9204,6 +9317,7 @@
         if (f.origin) parts.push('from ' + f.origin);
         if (f.dest) parts.push('to ' + f.dest);
         if (f.discipline) parts.push(f.discipline);
+        if (f.routes) { const ids = routePickList(); parts.push(ids.length === 1 ? ids[0] : ids.length + ' routes (' + ids.join(', ') + ')'); }
         return 'The routes the filters show: ' + parts.join(' · ') + '.';
     }
     // 14 Oct 2026, evening (the user: "just the map … certain scales as in the CLP template"): the card offers the CLOCS
@@ -9212,7 +9326,8 @@
     function routeExportQuery() {
         const f = routeExportFilters();
         const q = new URLSearchParams();
-        q.set('month', document.getElementById('rme-month').value);
+        const mv = document.getElementById('rme-month').value;
+        if (mv) q.set('month', mv);       // 8 Nov 2026 (2.1-2): blank = "Approved routes, no month" (the server's no-month plan)
         Object.keys(f).forEach(k => { if (f[k]) q.set(k, f[k]); });
         return q;
     }
@@ -9252,9 +9367,13 @@
         RME.opener = document.activeElement;
         const months = chipMonths();
         const sel = document.getElementById('rme-month');
-        const want = (TL.on && TL.month) ? TL.month : (months[0] || null);
+        // 8 Nov 2026 (v2.1 item 2.1-2, John): with no month on screen the default is "Approved routes, no month" (every
+        // approved route the filters let through, drawn as the map draws them, no figures), kept at the top of the list.
+        // It was months[0], the first month with volume (the demo's Jan 2026: 2 routes of 50).
+        const want = (TL.on && TL.month) ? TL.month : null;
         if (sel) {
-            sel.innerHTML = months.map(m => '<option value="' + m + '"' + (m === want ? ' selected' : '') + '>' + escHtml(monthLabel(m)) + '</option>').join('');
+            sel.innerHTML = '<option value=""' + (want == null ? ' selected' : '') + '>' + RME_NO_MONTH + '</option>'
+                + months.map(m => '<option value="' + m + '"' + (m === want ? ' selected' : '') + '>' + escHtml(monthLabel(m)) + '</option>').join('');
         }
         const w = document.getElementById('rme-what'); if (w) w.textContent = months.length ? routeExportWords() : 'No month carries approved volume yet.';
         ['rme-go', 'rme-go-png'].forEach(id => { const b = document.getElementById(id); if (b) b.hidden = !months.length; });
@@ -10400,7 +10519,8 @@
     const MT = { opener: null };
     function currentFilters() {
         const v = id => { const el = document.getElementById(id); return el ? el.value : 'ALL'; };
-        return { o: v('filter-origin'), d: v('filter-dest'), disc: v('filter-discipline'), i: v('filter-ipt') };
+        return { o: v('filter-origin'), d: v('filter-dest'), disc: v('filter-discipline'), i: v('filter-ipt'),
+                 r: (typeof ROUTE_PICK !== 'undefined') ? routePickList() : [] };     // 8 Nov 2026 (2.1-3)
     }
     // one row per drawn route in the month, with the bar's rules (pure: the harness runs it): two-way movements a day =
     // the route's loads ÷ the month's working days (fractional loads summed, one load = one two-way movement, never
@@ -10413,7 +10533,8 @@
             const rp = routes[l.route_id];
             if (!rp) { if (l.route_id) undrawn.add(l.route_id); return; }
             if ((flt.o !== 'ALL' && rp.origin !== flt.o) || (flt.d !== 'ALL' && rp.dest !== flt.d)
-                || (flt.i !== 'ALL' && rp.ipt !== flt.i) || (flt.disc !== 'ALL' && l.discipline !== flt.disc)) return;
+                || (flt.i !== 'ALL' && rp.ipt !== flt.i) || (flt.disc !== 'ALL' && l.discipline !== flt.disc)
+                || (flt.r && flt.r.length && !flt.r.includes(l.route_id))) return;
             const a = acc[l.route_id] || (acc[l.route_id] = { rid: l.route_id, origin: rp.origin || '', dest: rp.dest || '', ipt: rp.ipt || '',
                                                               loads: 0, vehicles: 0, unbaked: 0 });
             const vl = Number(l.vehicle_loads) || 0;
