@@ -49,6 +49,8 @@ AREA_STYLES = {
     "services":      {"label": "Buried services", "color": "#DB2777", "opacity": 0.5, "fill": "hatch", "outline": "dashed", "text": "BURIED SERVICES"},
     "crane_radius":  {"label": "Crane swing radius", "color": "#DC2626", "opacity": 0.07, "fill": "solid", "outline": "dashed", "text": ""},
     "imported_area": {"label": "Imported area", "color": "#6B7280", "opacity": 0.15, "fill": "solid", "outline": "solid", "text": ""},
+    # 8 Nov 2026 (task 2.1-12): the site's red line. "Make a works area" can take it as the works area's outline.
+    "boundary":      {"label": "Site boundary", "color": "#111827", "opacity": 0.0, "fill": "none", "outline": "dashed", "text": ""},
 }
 
 #: the symbol groups -> the layer a symbol sits on
@@ -168,6 +170,8 @@ def choice_label(v):
 #: a first guess for a source layer / block / symbol nobody has mapped yet, by words in its name (upper case,
 #: first match wins). The organisation's saved table always wins over a guess.
 GUESS_LAYER = [
+    # 8 Nov 2026 (task 2.1-12): a drawing's red line / site boundary layer lands on the Site boundary area
+    (("BOUNDARY",), "area:boundary"), (("RED", "LINE"), "area:boundary"), (("REDLINE",), "area:boundary"),
     (("EXCLUSION",), "area:exclusion"), (("CRANE", "RADIUS"), "area:crane_radius"), (("SWING",), "area:crane_radius"),
     (("ONE", "WAY"), "line:oneway"), (("ONEWAY",), "line:oneway"), (("HERAS",), "line:heras"), (("FENC",), "line:heras"),
     (("HOARD",), "line:hoarding"), (("BARRIER",), "line:barrier"), (("CONE",), "line:cones"), (("LIGHTS",), "line:lights"),

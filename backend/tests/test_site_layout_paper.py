@@ -248,7 +248,7 @@ def one_of_each():
         out.append({"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[lon0, y], [lon0 + 0.001, y]]},
                     "properties": {"style": k}})
     for i, k in enumerate(ST.AREA_STYLES):
-        x = lon0 - 0.003 + 0.0003 * i
+        x = lon0 - 0.003 + 0.00025 * i      # 8 Nov 2026 (task 2.1-12): 0.0003 -> 0.00025, so 11 area styles still sit west of the frame
         ring = [[x, lat0], [x + 0.0002, lat0], [x + 0.0002, lat0 + 0.0002], [x, lat0 + 0.0002], [x, lat0]]
         out.append({"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [ring]},
                     "properties": {"style": k, **({"radius": 45} if k == "crane_radius" else {})}})
@@ -269,7 +269,8 @@ def P(lon, lat):                       # a plain projection for the drawing chec
 
 
 T = SP.prepare(ALL, P)
-ok("2. prepare keeps every line, area, symbol and the words (11 + 10 + 31 + 1)", len(T) == 53, str(len(T)))
+# NARROWED 8 Nov 2026 (task 2.1-12): + the Site boundary area style (areas 10 -> 11)
+ok("2. prepare keeps every line, area, symbol and the words (11 + 11 + 31 + 1)", len(T) == 54, str(len(T)))
 ok("2. prepare fills a line's colour and width and an area's fill, outline and opacity from the table",
    all(t["p"]["color"] == ST.LINE_STYLES[t["style"]]["color"] and t["p"]["w"] == ST.LINE_STYLES[t["style"]]["w"]
        for t in T if t["kind"] == "line")
@@ -287,7 +288,8 @@ ok("⭐ 2. every line style, area style and symbol draws (one of each)", err is 
 rows = SP.legend_rows(T)
 kinds = [r[0] for r in rows]
 ok("2. the legend: one row a style used, areas then lines then symbols",
-   len(rows) == 52 and kinds == sorted(kinds, key=["area", "line", "sym"].index), str(len(rows)))
+   len(rows) == 53 and kinds  # NARROWED 8 Nov 2026 (task 2.1-12): 52 -> 53, the Site boundary area
+    == sorted(kinds, key=["area", "line", "sym"].index), str(len(rows)))
 ok("2. ...each row named as the style table names it",
    {r[2] for r in rows if r[0] == "line"} == {v["label"] for v in ST.LINE_STYLES.values()}
    and {r[2] for r in rows if r[0] == "sym"} == {s["label"] for s in ST.SYMBOLS}, str([r[2] for r in rows][:6]))

@@ -78,6 +78,7 @@ import site_areas  # 28 Oct 2026 (simulation v2): the areas inside a site
 import pours  # 29 Oct 2026 (task 3a): concrete pours
 import holding  # 29 Oct 2026 (task 3c): vehicle holding areas
 import site_layouts  # 31 Oct 2026 (task 4c PR 1): a site's logistics layout, its phases and the drawings brought in
+import works_from_layout  # 8 Nov 2026 (task 2.1-12): a works area zone made from a site layout
 import site_layout_import  # 31 Oct 2026 (task 4c PR 1): DXF / KML / KMZ / GeoJSON / shapefile zip read into map things
 import site_layout_styles  # 31 Oct 2026 (task 4c PR 1): the one style table (11 lines, 10 areas, 31 symbols, 8 layers)
 import site_layout_paper  # 31 Oct 2026 (task 4c PR 5): a site layout phase as an A3 / A4 sheet, PDF or PNG
@@ -5030,7 +5031,12 @@ def site_layout_summary():
 def get_site_layout(location_id: str):
     """A site's layout: its phases with their things and the drawings brought in. Signed in."""
     _require_access()
-    return {"layout": site_layouts.get(location_id), "ready": site_layout_import.grid_ready()}
+    lay = site_layouts.get(location_id)
+    if lay:
+        made = works_from_layout.by_phase()           # 8 Nov 2026 (task 2.1-12): the works area each phase made
+        for ph in lay["phases"]:
+            ph["works_area"] = made.get(ph["id"])
+    return {"layout": lay, "ready": site_layout_import.grid_ready()}
 
 
 def _layout_sheet(location_id, phase, page, scale, style):
@@ -6218,7 +6224,9 @@ def list_zones(on: Optional[str] = None, include_inactive: bool = True):
             "haul_kind": zones.HAUL_KIND,
             "haul_links": haul.link_counts(),
             # 28 Oct 2026 (task 0c): per dated routing zone, the routes it diverts and those with no way round
-            "diversions": route_choice.summary()["by_zone"]}
+            "diversions": route_choice.summary()["by_zone"],
+            # 8 Nov 2026 (task 2.1-12): {zone id: {location_id, site}} for a works area made from a site layout
+            "from_layout": works_from_layout.sources()}
 
 
 @app.get("/api/zones/{zone_id}")
@@ -6285,6 +6293,8 @@ def update_zone(zone_id: str, body: ZoneIn, token: Optional[str] = None):
     z = zones.update_zone(zone_id, **fields)
     if z.get("error"):
         raise HTTPException(400, z["error"])
+    if "geometry" in fields and fields["geometry"] != before.get("geometry"):
+        works_from_layout.zone_outline_edited(zone_id)    # 8 Nov 2026 (task 2.1-12): "changed on Zones" on the layout
 
     # A haul road edit is exact — see haul.invalidate_for_zone(). It covers the case
     # where a zone was a haul road and has just stopped being one, because the legs baked
@@ -6308,6 +6318,62 @@ def update_zone(zone_id: str, body: ZoneIn, token: Optional[str] = None):
         old_geometry=(before["geometry"] if was_routes else None),
     )
     return _zone_write_result(z, inval, zone_id)
+
+
+class WorksAreaIn(BaseModel):
+    """8 Nov 2026 (task 2.1-12): make or update a works area from a site layout phase. zone_id = give that works area
+    the outline (its name, dates and routing kept); blank = a new works area with name / dates / affects_routing."""
+    outline: str = "all"                     # 'all' (around everything drawn) | 'boundary' (the Site boundary area)
+    zone_id: Optional[str] = None
+    name: Optional[str] = None
+    starts_on: Optional[str] = None
+    ends_on: Optional[str] = None
+    affects_routing: bool = False
+    version: Optional[int] = None            # the phase's version the panel was opened on
+
+
+@app.get("/api/admin/site-layouts/phases/{phase_id}/works-area")
+def works_area_plan(phase_id: str, token: Optional[str] = None):
+    """8 Nov 2026 (task 2.1-12): what "Make a works area" offers for this phase — both outlines, the name and dates,
+    the works areas it overlaps. Admins (as Zones)."""
+    _check_admin(token)
+    out = works_from_layout.plan(phase_id)
+    if not out:
+        raise HTTPException(404, "No such layout phase.")
+    return out
+
+
+@app.post("/api/admin/site-layouts/phases/{phase_id}/works-area")
+def works_area_make(phase_id: str, body: WorksAreaIn, token: Optional[str] = None):
+    """8 Nov 2026 (task 2.1-12): give a works area this phase's outline, or make a new one. The zone write is the
+    ordinary Zones write (so it re-routes exactly as a Zones save would), then the zone remembers the phase + version."""
+    _check_admin(token)
+    pl = works_from_layout.plan(phase_id)
+    if not pl:
+        raise HTTPException(404, "No such layout phase.")
+    if body.version is not None and int(body.version) != pl["version"]:
+        raise HTTPException(409, "Someone saved this layout since. Open it again.")
+    if body.outline not in ("all", "boundary"):
+        raise HTTPException(422, "Pick an outline.")
+    geom = pl["outlines"].get(body.outline)
+    if not geom:
+        raise HTTPException(422, "This phase has no Site boundary area." if body.outline == "boundary"
+                            else "Nothing is drawn on this phase yet.")
+    if body.zone_id:
+        z0 = zones.get_zone(body.zone_id)
+        if not z0 or z0["kind"] != "works":
+            raise HTTPException(404, "No such works area.")
+        res = update_zone(body.zone_id, ZoneIn(name=z0["name"], geometry=geom), token)
+        zid = body.zone_id
+    else:
+        name = (body.name or "").strip() or pl["name"]
+        res = create_zone(ZoneIn(name=name, geometry=geom, kind="works", affects_routing=bool(body.affects_routing),
+                                 starts_on=body.starts_on or None, ends_on=body.ends_on or None), token)
+        zid = res["zone"]["id"]
+    works_from_layout.set_source(zid, phase_id, pl["version"])
+    res["zone"] = zones.get_zone(zid)
+    res["works_area"] = works_from_layout.by_phase().get(phase_id)
+    return res
 
 
 @app.delete("/api/admin/zones/{zone_id}")

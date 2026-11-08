@@ -1503,10 +1503,22 @@ def build(with_areas=False, out=None):
     # its dates, as ticked on live that evening (R003, R012, R038, R040 in Dec 2027); a live refresh compares the zones'
     # affects_routing, so the package says what live says. 2028 stays advisory, as on live.
     ROUTING_IN_DATES = {"Market Harborough town centre: Christmas trading 2027"}
+    made = {}
     for name, geom, kind, s_on, e_on, note in ADVISORY:
         z = zones.create_zone(name, geom, kind=kind, affects_routing=name in ROUTING_IN_DATES,
                               starts_on=s_on, ends_on=e_on, note=note)
         assert "error" not in z, z
+        made[name] = z["id"]
+    # 8 Nov 2026 (task 2.1-12, John: "do this for the current site layouts we already have in the demo"): the viaduct's
+    # works area takes the outline of its site layout (around everything drawn, 10 m out) instead of the typed box, and
+    # remembers the phase, as "Make a works area" on the layout card does. Advisory, so nothing is re-routed.
+    import works_from_layout
+    wa_plan = works_from_layout.plan(placed["phase"]["id"])
+    wz = made["Tilton viaduct works area"]
+    assert wa_plan["works_areas"][0]["id"] == wz, wa_plan["works_areas"]
+    z = zones.update_zone(wz, geometry=wa_plan["outlines"]["all"])
+    assert "error" not in z, z
+    works_from_layout.set_source(wz, wa_plan["phase_id"], wa_plan["version"])
     # 29 Oct 2026 (task 3c): the holding area's access road, the last zone (see access_road above)
     z = access_road(next(g for g in gates.list_gates() if g["location_id"] == loc["HA"]))
     assert z["id"] == "Z040", z
