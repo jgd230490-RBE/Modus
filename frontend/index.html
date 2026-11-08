@@ -367,6 +367,13 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .row-menu-list{position:absolute;right:0;top:32px;z-index:20;min-width:220px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:8px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.28);text-align:left;white-space:nowrap;}
   .row-menu-list button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--popover-fg);font:inherit;font-size:14px;padding:7px 10px;border-radius:6px;cursor:pointer;}
   .row-menu-list button:hover{background:rgba(255,255,255,.06);} .row-menu-list button:disabled{opacity:.5;}
+  /* 8 Nov 2026 (task 2.1-10): the Look-ahead's Supplier orders list — one row a supplier, PDF and XLSX at the right */
+  .so-list{min-width:380px;max-width:440px;white-space:normal;}
+  .so-head{font-weight:600;font-size:14px;padding:6px 10px 0;}
+  .so-row{display:flex;align-items:center;gap:4px;border-top:1px solid var(--popover-line);padding:4px 0 4px 10px;}
+  .so-name{flex:1;min-width:0;font-size:14px;} .so-name small{display:block;font-size:12px;color:var(--popover-muted);}
+  .row-menu-list .so-row button{display:inline-block;width:auto;padding:7px 10px;text-decoration:underline;font-weight:600;}
+  .row-menu-list button.so-all{margin-top:6px;text-align:center;background:var(--navy);color:var(--control-fg);font-weight:600;}
   .row-menu-note{font-size:12px;color:var(--popover-muted);padding:6px 10px 4px;border-top:1px solid var(--popover-line);margin-top:4px;white-space:normal;}
   /* 27 Oct 2026 (the final UI pass, card 1): the one row-action pattern — a filled next step + the "⋯" menu (RowMenu) on every
      table; a list row that only ever loses a line gets a named "×" instead of a red Remove link */
@@ -5075,6 +5082,69 @@ function RowMenu({ name, note, children }) {
       {/* 27 Oct 2026 (audit #41 / #42): the "⋯" is CSS content, so the summary has no visible text for axe to weigh against its name */}
       <summary className="row-dots" aria-label={`More actions for ${name}`} title="More actions"></summary>
       <div className="row-menu-list" onClick={pick}>{children}{note ? <div className="row-menu-note">{note}</div> : null}</div>
+    </details>
+  );
+}
+// 8 Nov 2026 (v2.1 task 2.1-10, mockup notes/supplier-orders-mockup-1108, John: yes as recommended): the commit week's
+// "Supplier orders ▾" — one order sheet per supplier (a route's origin, not one of the scheme's own places) from the
+// CONFIRMED lines, PDF or XLSX each, or all of them in a zip. The list is read when the menu opens; nothing is sent.
+function SupplierOrdersMenu({ bucket, disabled }){
+  const [list, setList] = useState(null);
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+  const load = async () => {
+    setErr("");
+    try {
+      const r = await fetch(`${API}/forecast-weeks/supplier-orders?bucket=${bucket}`);
+      if(!r.ok) throw await errFrom(r);
+      setList(await r.json());
+    } catch(e){ setErr(errSay("The suppliers could not be read.", e)); }
+  };
+  const dl = async (format, s) => {
+    const key = format + (s ? s.location_id : "");
+    setBusy(key); setErr("");
+    try {
+      const q = `format=${format}&bucket=${bucket}` + (s ? `&location_id=${encodeURIComponent(s.location_id)}` : "");
+      const r = await fetch(`${API}/forecast-weeks/supplier-orders/download?${q}`);
+      if(!r.ok) throw await errFrom(r);
+      const blob = await r.blob();
+      const cd = r.headers.get("content-disposition") || "";
+      const m = cd.match(/filename="([^"]+)"/);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = m ? m[1] : `supplier-order.${format}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ setErr(errSay("The order was not made.", e)); }
+    setBusy("");
+  };
+  const sups = (list && list.suppliers) || [];
+  const left = (list && list.left_out) || {};
+  const total = s => (s.totals || []).map(t => `${grp(t.qty)} ${t.unit}`).join(" + ");
+  return (
+    <details className="row-menu" data-supplier-orders="1" onToggle={e => { if(e.currentTarget.open) load(); }}>
+      <summary className="px-4 py-2 rounded-lg text-sm font-semibold border" aria-disabled={disabled ? "true" : undefined}
+        onClick={e => { if(disabled) e.preventDefault(); }}
+        title={disabled ? "Confirm at least one line first" : "One order sheet per supplier, from the confirmed lines"}
+        style={{ width: "auto", height: "auto", borderColor: "var(--navy)", color: "var(--navy)", background: "var(--surface)", opacity: disabled ? 0.4 : 1 }}>Supplier orders ▾</summary>
+      <div className="row-menu-list so-list" role="group" aria-label="Supplier orders">
+        <div className="so-head">Supplier orders{list && list.week && list.week.from ? ` · ${spanLabel(list.week.from, list.week.to)}` : ""}</div>
+        <div className="row-menu-note" style={{ borderTop: 0, marginTop: 0 }}>From the confirmed lines only{list && list.team_only ? `, ${list.team_only}'s lines` : ""}. Wayscope sends nothing: download and send them yourself.</div>
+        {!list && !err && <div className="row-menu-note">Reading…</div>}
+        {err && <div className="row-menu-note" role="alert">{err}</div>}
+        {list && !sups.length && <div className="row-menu-note">No confirmed lines from a supplier this week.</div>}
+        {sups.map(s => (
+          <div key={s.location_id} className="so-row" data-so-supplier={s.location_id}>
+            <span className="so-name"><b>{s.name}</b><small>{[s.vendor, `${s.deliveries} deliver${s.deliveries === 1 ? "y" : "ies"}`, total(s)].filter(Boolean).join(" · ")}</small></span>
+            <button type="button" onClick={() => dl("pdf", s)} disabled={!!busy} aria-label={`${s.name}: PDF`}>{busy === "pdf" + s.location_id ? "…" : "PDF"}</button>
+            <button type="button" onClick={() => dl("xlsx", s)} disabled={!!busy} aria-label={`${s.name}: XLSX`}>{busy === "xlsx" + s.location_id ? "…" : "XLSX"}</button>
+          </div>
+        ))}
+        {(left.not_confirmed > 0 || left.own > 0) && <div className="row-menu-note" data-so-left="1">Not on an order: {[
+          left.not_confirmed ? `${left.not_confirmed} line${left.not_confirmed === 1 ? "" : "s"} not confirmed yet: ${(left.not_confirmed_places || []).join(", ")}` : null,
+          left.own ? `${left.own} line${left.own === 1 ? "" : "s"} from your own site${left.own === 1 ? "" : "s"}: ${(left.own_places || []).join(", ")}` : null].filter(Boolean).join(" · ")}</div>}
+        {sups.length > 1 && <button type="button" className="so-all" onClick={() => dl("zip")} disabled={!!busy} data-so-zip="1">{busy === "zip" ? "Making the zip…" : `All ${sups.length} suppliers (zip)`}</button>}
+      </div>
     </details>
   );
 }
@@ -11207,6 +11277,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               className="px-3 py-2 rounded-lg text-sm font-semibold border disabled:opacity-40"
               title="The one-page commitment sheet, grouped by origin"
               style={{ borderColor: "var(--line)", color: "var(--muted)", background: "var(--surface)" }}>PDF</button>
+            <SupplierOrdersMenu bucket={bucket} disabled={!anyConfirmed} />
             {allConfirmed ? (
               <button onClick={doReopen} disabled={!!busy}
                 className="px-4 py-2 rounded-lg text-sm font-semibold border disabled:opacity-40"

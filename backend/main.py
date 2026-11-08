@@ -2179,6 +2179,65 @@ def forecast_week_day_sheet(day: str, bucket: str = "commit", route_id: Optional
                     headers={"Content-Disposition": f'attachment; filename="day-sheet-{day}.pdf"'})
 
 
+def _supplier_orders_data(bucket):
+    """8 Nov 2026 (v2.1 task 2.1-10): the week's supplier orders for this caller, from the Look-ahead's own kept read
+    (the same _staff_json entry /api/lookahead fills), so the list and the files never disagree with the page."""
+    import supplier_orders
+    acc = _require_access()
+    b = "next" if bucket == "next" else "commit"
+    pg = _staff_json("lookahead", {"bucket": b, "route_id": None, "on": True},
+                     lambda: lookahead.page(bucket=b, route_id=None, acc=acc, with_restrictions=True), acc)
+    pg = dict(pg, bucket=b)
+    return supplier_orders.orders(pg, acc=acc)
+
+
+@app.get("/api/forecast-weeks/supplier-orders")
+def forecast_week_supplier_orders(bucket: str = "commit"):
+    """
+    8 Nov 2026 (v2.1 task 2.1-10): the week's suppliers (a route's origin that is not one of the scheme's own places)
+    with their confirmed deliveries, and what was left out (lines not confirmed, the scheme's own places). Any staff
+    code or login, scoped like the Look-ahead: a team sees its own lines only. Wayscope sends nothing.
+    """
+    import supplier_orders
+    return supplier_orders.summary(_supplier_orders_data(bucket))
+
+
+@app.get("/api/forecast-weeks/supplier-orders/download")
+def forecast_week_supplier_order_file(format: str = "pdf", location_id: Optional[str] = None, bucket: str = "commit"):
+    """
+    One supplier's order as a PDF or an XLSX (`location_id` = the supplier's location), or `format=zip` for every
+    supplier's PDF and XLSX. Made fresh on each download from the kept Look-ahead read (the sheet carries who made it
+    and when). No price on any sheet; nothing is sent.
+    """
+    from fastapi.responses import Response       # not in the test stub; imported here
+    import supplier_orders
+    if format not in ("pdf", "xlsx", "zip"):
+        raise HTTPException(400, "format must be pdf, xlsx or zip")
+    data = _supplier_orders_data(bucket)
+    try:
+        if format == "zip":
+            if not data["suppliers"]:
+                raise HTTPException(404, "No confirmed lines to order this week.")
+            body, mime, name = (supplier_orders.build_zip(data), "application/zip", supplier_orders.zip_name(data))
+        else:
+            if not location_id:
+                raise HTTPException(400, "Say which supplier.")
+            try:
+                s = supplier_orders.find(data, location_id)
+            except supplier_orders.OrderError as e:
+                raise HTTPException(404, str(e))
+            if format == "pdf":
+                body, mime = supplier_orders.build_pdf(data, s), "application/pdf"
+            else:
+                body, mime = (supplier_orders.build_xlsx(data, s),
+                              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            name = f"{s['file_stem']}.{format}"
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=body, media_type=mime,
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+
+
 @app.put("/api/forecast-days")
 def edit_forecast_day(body: DayEdit):
     """Type one day's planned quantity. The day and (if it was derived) its week go `edited`."""

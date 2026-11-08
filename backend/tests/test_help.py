@@ -938,7 +938,7 @@ ok("decision 10: the only new visible words are the two skip links; the guides' 
    len(re.findall(r'<li class="l[12]"', src)) == 94 and   # NARROWED 31 Oct 2026 (task 4c PR 5): + 19.6 On paper (88)
    # NARROWED 5 Nov 2026 (task 0d-2): + T1 "Busy-hours roads" (39)
    # NARROWED 8 Nov 2026 (guides brought up to date): + T4 "Settings the app reads" and "Kept reads and heavy jobs" (41)
-   len(re.findall(r'<li class="l[12]"', _tg2)) == 41   # NARROWED 1 Nov 2026 (task 4a PR 4): + T1 "CLP appendices" (37)   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
+   len(re.findall(r'<li class="l[12]"', _tg2)) == 42   # NARROWED 8 Nov 2026 (v2.1 task 2.1-10): + T1 "Supplier orders" (42)   # NARROWED 1 Nov 2026 (task 4a PR 4): + T1 "CLP appendices" (37)   # NARROWED 28 Oct 2026: + "A deployment per organisation" (pilot readiness phase 3)   # NARROWED 27 Oct 2026: + "Headers, scripts and keys" (pilot readiness phase 2)   # NARROWED 22 Oct 2026 (words sweep; the user: no back-end detail in the user guide): the guide lost Appendix D's row; the technical guide gained T7's four parts, T8, T9, T10 and the BAF section
    and '<li class="l2"><a href="#t2-left-out">What the screens leave out</a></li>' in _tg2)
 
 # 27 Oct 2026 — stockpile balances that run forward (claude/stockpile-forecast): the guide says how the balance is worked out,
