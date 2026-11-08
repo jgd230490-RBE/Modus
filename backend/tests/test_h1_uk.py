@@ -1183,9 +1183,11 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # line and its added figures, the Carbon planner's Route choices figures, a failed Use / Stop (bad); the paused chip on the
    # row and in the opened row, and the "different road since the last Route all" line (warn)
    # (both together, merged 5 Nov: 42 + 2 concerns + 4 busy hours = 48)
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 48 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
+   # NARROWED 8 Nov 2026 (v2.1 task 2.1-9): bad-text 48 -> 50, warn-text 20 -> 21 — the Lorry plan panel's read error and
+   # failed-download / failed-apply line (bad); a compressed move's CAP / GATE flag words (warn)
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 50 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
    # NARROWED 8 Nov 2026 (task 2.1-12): warn-text 19 -> 20 — the site layout phase row's amber "layout changed since"
-   _fe_wo.count("var(--warn-text)") == 20
+   _fe_wo.count("var(--warn-text)") == 21
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe

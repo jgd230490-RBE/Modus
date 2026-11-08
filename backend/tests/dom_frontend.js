@@ -2952,6 +2952,80 @@ async function commitMapFigsDom(){
   ok("2.1-13: no lines, no routes", Object.keys(f([], T)).length === 0 && Object.keys(f(null, T)).length === 0);
 }
 
+// ---- 8 Nov 2026 (v2.1 task 2.1-9): the Lorry plan panel MOUNTED — rows, words, views, Apply ----
+async function lorryPlanDom(){
+  const DAYS = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06"];
+  const row = (n, trips, free, words, blocks) => ({ n, trips, places: ["Melton Compound"], blocks, start: "07:00", end: "15:40",
+    driving_minutes: 300, work_minutes: 500, break_minutes: 45, free_minutes: free, room_for: 0, used_pct: 90, free_words: words });
+  const trip = (start, route) => ({ kind: "trip", route_id: route, dest_id: "L1", dest_name: "Melton Compound", line_key: route + "|11||", start, minutes: 91, qty: 29, unit: "t", material: "Small aggregate" });
+  const yard = (day) => ({ origin_id: "L002", name: "Northfield Quarry", vehicle: "Artic Tipper (44t)", vehicle_short: "Tipper", gate: "Weighbridge", day,
+    loads: 7, booked: 2, kept: 0, count: 2, places: ["Melton Compound"],
+    lorries: [row(1, 6, 9, "Full day", [trip("07:00", "R011"), trip("08:31", "R011"), trip("10:02", "R011"), trip("11:33", "R011"), { kind: "break", start: "13:04", minutes: 45 }, trip("13:49", "R011"), trip("15:20", "R011")]),
+              row(2, 1, 509, "8 h 29 free · room for 5 more trips", [trip("07:00", "R011")])] });
+  const byDay = (n) => Object.fromEntries(DAYS.map(d => [d, n]));
+  const view = (n, saved) => ({ by_day: byDay(n), week: n * 5, saved_week: saved, days: Object.fromEntries(DAYS.map(d => [d, [yard(d)]])) });
+  const PLAN = { week: { from: "2026-11-02", to: "2026-11-08", bucket: "commit" }, days: DAYS, today: "2026-11-04", view_default: "chained", views: ["booked", "chained", "compressed"],
+    shift_hours: 10, team_only: null, made_by: "Planner", made_at: "8 Nov 2026 20:00", week_confirmed: false, any_confirmed: false,
+    booked: { by_day: byDay(27), week: 135 }, chained: view(16, 55), compressed: { ...view(14, 68), moves: [
+      { line_key: "R018|11||", route_id: "R018", origin_name: "Northfield Quarry", dest_name: "Stockpile North", day: "2026-11-02", trips_from: 7, trips_to: 9, qty_from: 200, qty_to: 257.1, unit: "t", flags: ["CAP: 9 loads, the route's most a day is 8"] }], lines: { "R018|11||": {} }, flags: [] },
+    day_hire: { rates: {}, typed: false, chained: null, compressed: null },
+    words: { rule: "Each lorry's day: its trips as routed, the break the UK drivers' hours rules require, driving at most 9 h, inside the shift.", planning: "A planning figure.", compress: "A suggestion until Apply.", one_yard: "", not_modelled: "", sends_nothing: "", estimate: "" } };
+  let gets = 0;
+  w.fetch = (url) => { gets += /forecast-weeks\/lorry-plan\?/.test(String(url)) ? 1 : 0;
+    return Promise.resolve({ ok: true, status: 200, headers: { get: () => "application/json" }, json: () => Promise.resolve(JSON.parse(JSON.stringify(PLAN))), text: () => Promise.resolve(JSON.stringify(PLAN)) }); };
+  const norm = (t) => String(t || "").replace(/\s+/g, " ").trim();
+  const mount = (props) => { const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
+    act(() => { r.render(w.React.createElement(w.LorryPlan, { bucket: "commit", tick: 0, access: { role: "planner" }, onData: () => {}, weekConfirmed: false, ...props })); });
+    return { el, done: () => { act(() => { r.unmount(); }); el.remove(); } }; };
+  const settle = async () => { for (let i = 0; i < 6; i++) await act(async () => { await new Promise(r => setTimeout(r, 0)); }); };
+  const m = mount({});
+  await settle();
+  const sec = () => m.el.querySelector("[data-lorry-plan]");
+  ok("⭐ 2.1-9 DOM: the panel mounts folded with its head line: the week's lorry-days chained vs booked; one GET",
+     !!sec() && norm(m.el.querySelector("[data-lp-head]") && m.el.querySelector("[data-lp-head]").textContent) === "80 lorry-days this week with each yard's lorries chained, 135 as booked"
+     && gets === 1 && !m.el.querySelector(".lp-row"));
+  act(() => { m.el.querySelector("[data-lp-toggle]").click(); });
+  ok("⭐ 2.1-9 DOM: opened: Chained by yard, today's chip (Wed 4) pressed, the day's yard block with two lorry rows, no Apply in this view",
+     sec().getAttribute("data-lp-view") === "chained" && [...m.el.querySelectorAll('[aria-label="Day"] button')].find(b => b.getAttribute("aria-pressed") === "true").textContent === "Wed 4"
+     && m.el.querySelectorAll(".lp-row").length === 2 && !m.el.querySelector("[data-lp-apply]"));
+  const kp = [...m.el.querySelectorAll(".lp-kpi")].map(e => norm(e.textContent));
+  ok("⭐ 2.1-9 DOM: the four figures: 16 lorries chained on Wed 4, 27 booked, 11 lorry-days saved this day · 55 this week, £ — with where to type a rate",
+     kp[0].startsWith("16 lorries") && kp[1].startsWith("27") && kp[2].startsWith("11 lorry-days saved") && kp[2].includes("55 this week") && kp[3].startsWith("£ —") && kp[3].includes("Config → Costing · fuel"), kp.join(" | "));
+  const r1 = m.el.querySelector('[data-lp-lorry="1"]'), r2 = m.el.querySelector('[data-lp-lorry="2"]');
+  ok("⭐ 2.1-9 DOM: lorry 1: six trip blocks and a hatched break, its free words 'Full day'; lorry 2: one trip, '8 h 29 free · room for 5 more trips'",
+     r1.querySelectorAll(".lp-blk").length === 7 && r1.querySelectorAll(".lp-blk.is-break").length === 1 && norm(r1.querySelector(".lp-free").textContent) === "Full day"
+     && r2.querySelectorAll(".lp-blk").length === 1 && norm(r2.querySelector(".lp-free").textContent) === "8 h 29 free · room for 5 more trips");
+  const blk = r1.querySelector(".lp-blk");
+  ok("⭐ 2.1-9 DOM: a trip block sits at its start time across a 06:00–19:00 track (07:00 = 7.7 %, 91 min = 11.7 % wide) and the track carries the words for a screen reader",
+     Math.abs(parseFloat(blk.style.left) - 7.69) < 0.1 && Math.abs(parseFloat(blk.style.width) - 11.67) < 0.1 && /Lorry 1: 07:00 R011 → Melton Compound, 29 t/.test(r1.querySelector(".lp-track").getAttribute("aria-label")));
+  ok("2.1-9 DOM: the yard's line: loads, places, booked vs chained, saved; the key names the place, the break and free",
+     norm(m.el.querySelector(".lp-sub").textContent) === "7 loads to 1 place · the lines book 2 lorries · 2 chained" && norm(m.el.querySelector("[data-lp-key]").textContent).includes("required break"));
+  act(() => { [...m.el.querySelectorAll('[aria-label="View"] button')].find(b => b.textContent === "Week compressed").click(); });
+  ok("⭐ 2.1-9 DOM (Q12): Week compressed: Apply drawn for a planner on an unconfirmed week with moves, the moves fold says 1 move · 1 would raise a flag",
+     sec().getAttribute("data-lp-view") === "compressed" && !!m.el.querySelector("[data-lp-apply]") && !m.el.querySelector("[data-lp-apply]").disabled
+     && norm(m.el.querySelector("[data-lp-moves] button").textContent).includes("1 move this week · 1 would raise a flag"));
+  act(() => { m.el.querySelector("[data-lp-moves] button").click(); });
+  ok("2.1-9 DOM: the move row: the day, the line, loads and quantity from → to, the CAP flag in amber words",
+     /Mon 2 ?R018 Northfield Quarry → Stockpile North ?7 → 9 loads · 200(\.0)? → 257\.1 t ?CAP: 9 loads/.test(norm(m.el.querySelector("[data-lp-move]").textContent)), norm(m.el.querySelector("[data-lp-move]").textContent));
+  act(() => { [...m.el.querySelectorAll('[aria-label="View"] button')].find(b => b.textContent === "As booked").click(); });
+  ok("2.1-9 DOM: As booked: no rows, no sheets, the note that it is the grid's own figure",
+     !m.el.querySelector(".lp-row") && !m.el.querySelector("[data-lp-sheets]") && norm(sec().textContent).includes("Each line's own whole lorries"));
+  m.done();
+  const t = mount({ access: { role: "team", ipt: "IPT1" }, weekConfirmed: true });
+  await settle();
+  act(() => { t.el.querySelector("[data-lp-toggle]").click(); });
+  act(() => { [...t.el.querySelectorAll('[aria-label="View"] button')].find(b => b.textContent === "Week compressed").click(); });
+  ok("⭐ 2.1-9 DOM (Q10, Q12): a team login never sees Apply", !t.el.querySelector("[data-lp-apply]"));
+  t.done();
+  const c = mount({ weekConfirmed: true });
+  await settle();
+  act(() => { c.el.querySelector("[data-lp-toggle]").click(); });
+  act(() => { [...c.el.querySelectorAll('[aria-label="View"] button')].find(b => b.textContent === "Week compressed").click(); });
+  ok("⭐ 2.1-9 DOM (Q12): on a confirmed week a planner's Apply is drawn but disabled, saying to re-open the week",
+     c.el.querySelector("[data-lp-apply]") && c.el.querySelector("[data-lp-apply]").disabled && /re-open/.test(c.el.querySelector("[data-lp-apply]").title));
+  c.done();
+}
+
 async function todayFitDom(){
   const tf = w.todayFit;
   ok("UI FIX 6 card 5: todayFit is a global helper", typeof tf === "function");
@@ -3621,6 +3695,9 @@ async function reviewerDom(){
   // 23 Oct 2026 (UI fix 9, decision 16): the Data tables' rows open from the keyboard
   try { await rowsDom(); ok("UI FIX 9 ROWS: the section ran to the end", true); }
   catch (e) { ok("UI FIX 9 ROWS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
+  // 8 Nov 2026 (2.1-9): the Lorry plan panel
+  try { await lorryPlanDom(); ok("2.1-9 LORRY PLAN: the section ran to the end", true); }
+  catch (e) { ok("2.1-9 LORRY PLAN: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   // 8 Nov 2026 (2.1-13): the week maps' figures
   try { await commitMapFigsDom(); ok("2.1-13 MAP FIGS: the section ran to the end", true); }
   catch (e) { ok("2.1-13 MAP FIGS: the section ran to the end", false, String(e && e.stack || e).slice(0, 600)); }

@@ -2238,6 +2238,71 @@ def forecast_week_supplier_order_file(format: str = "pdf", location_id: Optional
                     headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
 
+def _lorry_plan_data(bucket):
+    """8 Nov 2026 (v2.1 task 2.1-9): the week's lorry plan for this caller, from the Look-ahead's own kept read (the same
+    _staff_json entry /api/lookahead fills), so the panel, the sheets and the grid never disagree."""
+    import lorry_plan
+    acc = _require_access()
+    b = "next" if bucket == "next" else "commit"
+    pg = _staff_json("lookahead", {"bucket": b, "route_id": None, "on": True},
+                     lambda: lookahead.page(bucket=b, route_id=None, acc=acc, with_restrictions=True), acc)
+    pg = dict(pg, bucket=b)
+    return _staff_json("lorry-plan", {"bucket": b}, lambda: lorry_plan.plan(pg, acc=acc), acc)
+
+
+@app.get("/api/forecast-weeks/lorry-plan")
+def forecast_week_lorry_plan(bucket: str = "commit"):
+    """
+    8 Nov 2026 (v2.1 task 2.1-9, mockup v2 + addendum, John: yes as recommended): each lorry's day used to the full.
+    Three views of the commit week (this week or next): `booked` (each line's whole lorries, as the grid), `chained`
+    (each day's loads from one yard in one kind of lorry chained into full lorry-days under the drivers' hours rule)
+    and `compressed` (the week's loads of a yard pooled, so a part-used last lorry each day becomes one full lorry on
+    fewer days; a suggestion until applied). Any staff code or login, scoped like the Look-ahead. Nothing changes.
+    """
+    return _lorry_plan_data(bucket)
+
+
+@app.get("/api/forecast-weeks/lorry-plan/download")
+def forecast_week_lorry_plan_file(day: str, format: str = "pdf", view: str = "chained", bucket: str = "commit"):
+    """The day's driver sheets (one A4 page a lorry, PDF) or the day's trips (XLSX), for the chained or compressed view.
+    Made fresh on each download; the sheet carries who made it and when. Nothing is sent."""
+    from fastapi.responses import Response       # not in the test stub; imported here
+    import lorry_plan
+    if format not in ("pdf", "xlsx"):
+        raise HTTPException(400, "format must be pdf or xlsx")
+    data = _lorry_plan_data(bucket)
+    try:
+        if format == "pdf":
+            body, mime = lorry_plan.build_pdf(data, view, day), "application/pdf"
+        else:
+            body, mime = (lorry_plan.build_xlsx(data, view, day),
+                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    except lorry_plan.PlanError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    name = f"{lorry_plan.file_stem(data, view, day)}.{format}"
+    return Response(content=body, media_type=mime,
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+
+
+@app.post("/api/forecast-weeks/lorry-plan/apply")
+def forecast_week_lorry_plan_apply(bucket: str = "commit"):
+    """
+    Apply the compressed view (Q12): write its day quantities into the week's cells, a load only within its own line
+    and week, through the same write a typed cell uses (days.set_day; an unconfirmed week only). Planners and admins;
+    audited like every write. Reset = type the cells back, or re-derive the week.
+    """
+    import lorry_plan
+    acc = _require_planner_or_admin("move a week's loads between its days")
+    data = _lorry_plan_data(bucket)
+    try:
+        res = lorry_plan.apply(None, data, by=_by(None))
+    except lorry_plan.PlanError as e:
+        raise HTTPException(409, str(e))
+    return res
+
+
 @app.put("/api/forecast-days")
 def edit_forecast_day(body: DayEdit):
     """Type one day's planned quantity. The day and (if it was derived) its week go `edited`."""

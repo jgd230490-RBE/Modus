@@ -605,6 +605,35 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   /* 11 Oct 2026 — the carbon target on the Dashboard, Forecasts and Submit forecast (tokens only, so every look follows) */
   .ct-strip{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px;color:var(--ink);}
   .ct-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 16px;}
+  /* 8 Nov 2026 (v2.1 task 2.1-9): the Lorry plan panel — one row a lorry, its trips across the day */
+  .lp-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:8px 0 4px}
+  @media (min-width:900px){.lp-kpis{grid-template-columns:repeat(4,1fr)}}
+  .lp-kpi{border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .lp-kpi b{display:block;font-size:20px;line-height:1.2}
+  .lp-kpi span{display:block;font-size:13px;color:var(--muted)}
+  .lp-kpi.ok b{color:var(--ok-text)}
+  .lp-yard{padding:8px 0 2px;border-top:1px solid var(--line)}
+  .lp-yard h4{margin:0;font-size:14px;font-weight:600}
+  .lp-yard .lp-sub{font-size:13px;color:var(--muted);margin:0 0 4px}
+  .lp-row{display:grid;grid-template-columns:140px 1fr 150px;gap:10px;align-items:center;padding:3px 0}
+  @media (max-width:767px){.lp-row{grid-template-columns:1fr;gap:2px}.lp-row .lp-free{text-align:left}}
+  .lp-nm{font-size:13px;font-weight:600}
+  .lp-nm small{display:block;color:var(--muted);font-weight:500;font-size:12px}
+  .lp-track{position:relative;height:26px;background:var(--soft,#F1F5F9);border-radius:5px;overflow:hidden}
+  .lp-blk{position:absolute;top:2px;bottom:2px;border-radius:3px;font-size:12px;line-height:22px;color:#fff;overflow:hidden;white-space:nowrap;padding:0 4px;box-sizing:border-box;border-right:1px solid rgba(255,255,255,.6);background:var(--navy)}
+  .lp-blk.is-break{background:repeating-linear-gradient(135deg,#CBD5E1 0 4px,#E2E8F0 4px 8px);color:#334155}
+  .lp-free{font-size:13px;color:var(--muted);text-align:right}
+  .lp-axis{display:grid;grid-template-columns:140px 1fr 150px;gap:10px;color:var(--muted);font-size:12px;padding:2px 0 6px}
+  @media (max-width:767px){.lp-axis{display:none}}
+  .lp-ticks{position:relative;height:14px}
+  .lp-ticks span{position:absolute;transform:translateX(-50%)}
+  .lp-key{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:4px 0}
+  .lp-key i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+  .lp-moves{font-size:13px;margin-top:6px}
+  .lp-moves td{padding:2px 10px 2px 0;border-top:1px solid var(--line);vertical-align:top}
+  .lp-moves .lp-flag{color:var(--warn-text);font-weight:600}
+  .ph-lp{border-top:1px solid var(--line);padding:9px 0;font-size:14px}
+  .ph-lp small{display:block;color:var(--muted);font-size:13px}
   .ct-h{font-size:16px;font-weight:600;color:var(--ink);margin:0;}
   .ct-line{font-size:14px;line-height:1.5;color:var(--ink);font-variant-numeric:tabular-nums;}
   .ct-note{font-size:13px;line-height:1.45;color:var(--muted);margin-top:4px;}
@@ -1463,6 +1492,8 @@ const INFO = {
   "clp.trips_avoided": { title: "Lorry trips avoided", text: "Loads each month as planned and with the decisions agreed with the carbon target, and the difference.",
     how: "Only a decision that changes the lorry, the supplier or the route changes trips; one that changes only the material does not.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   // 14 Oct 2026 (bundle G, W17)
+  "la.lorryplan": { title: "Lorry plan", text: "Each lorry's day used to the full: one day's loads leaving one yard in one kind of lorry, chained into as few lorry-days as the UK drivers' hours rule allows, each lorry's trips in the driver's order.",
+    how: "As booked is each line's own whole lorries, as the grid counts them. Chained by yard keeps the same loads on the same days with fewer lorries. Week compressed pools the week's loads so a part-used last lorry becomes one full lorry on fewer days: a suggestion until Apply. A planning figure, never a check of anyone's hours.", guide: "ug-lorry-plan", tech: "t1-lorry-plan" },
   "la.gates": { title: "Gates this week", text: "Each gate's planned lorries a day this week, every team together, against what it can check in. Gold, Queue likely, from 85 %; red, Over gate capacity, past it or on a closed day.",
     how: "What a gate can check in = its open minutes (its hours, or the default gate hours where none are typed, less its shut times and the no-delivery peak bands) ÷ its check-in minutes a lorry. Planned arrivals spread evenly; no hourly peak is known.", guide: "6-3-commit-view-this-week-by-day", tech: "t1-gates" },
   // 8 Nov 2026 (2.1-13): the week maps' "i" boxes (the hover hint left the key row)
@@ -9249,6 +9280,30 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
         <FuelWidget mode="config" who={who} access={access} initial={data && data.summary} onChanged={load} />
       </div>
       <FairPriceSection doc={doc} upd={upd} fileDoc={fileDoc} summary={data && data.summary && data.summary.fair} />
+      <DayHireSection doc={doc} upd={upd} />
+    </div>
+  );
+}
+
+// ---- 8 Nov 2026 (v2.1 task 2.1-9): a day-hire rate per lorry type — typed, never seeded; the Lorry plan's saving in money ----
+function DayHireSection({ doc, upd }){
+  const vehicles = Object.keys((doc && doc.vehicles) || {}).filter(k => !k.startsWith("_"));
+  const dh = (doc && doc.day_hire) || {};
+  const inp = "ctl ctl-sm w-full tabular-nums";
+  const set = (k, v) => upd && upd(d => { d.day_hire = d.day_hire || {}; if(v === "" || v == null) delete d.day_hire[k]; else d.day_hire[k] = (isNaN(+v) ? v : +v); });
+  if(!vehicles.length) return null;
+  return (
+    <div data-day-hire-section="1">
+      <div className="text-[15px] font-semibold text-slate-800">Day hire, with driver</div>
+      <p className="text-[13px] text-slate-500 mt-0.5 mb-3 max-w-3xl">Optional. Puts a value on the lorry-days the Look-ahead's Lorry plan saves, as an estimate. Blank = the saving in lorry-days only. Not used in the cost lines or the fair price.</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl">
+        {vehicles.map(k => (
+          <label key={k} className="block">
+            <span className="block text-sm font-medium text-slate-700 mb-1">{vehLabel(k)}</span>
+            <input className={inp + " mt-1"} inputMode="decimal" placeholder={`${CUR()} a day`} value={dh[k] ?? ""} onChange={e => set(k, e.target.value)} />
+          </label>
+        ))}
+      </div>
     </div>
   );
 }
@@ -10816,6 +10871,170 @@ function AbnormalWeek({ ab }){
     </div>
   );
 }
+// ---- 8 Nov 2026 (v2.1 task 2.1-9): the Lorry plan — each lorry's day used to the full (mockup notes/drivers-day-fill-mockup-1108 v2) ----
+const LP_VIEW_WORDS = { booked: "As booked", chained: "Chained by yard", compressed: "Week compressed" };
+const LP_DAY_FROM = 6 * 60, LP_DAY_TO = 19 * 60;    // the track: 06:00 to 19:00 (the demo's yards open 06:00–07:30)
+const lpMin = (hm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+const lpShort = (n) => String(n || "").replace(" (fictional)", "").replace("Rail Freight Terminal", "RFT");
+// destination colours: the chart tokens first (every look and accent), then five more data colours
+const lpPalette = () => [1, 2, 3, 4, 5].map(i => tok(`--chart-${i}`, "#1E3A8A")).concat(["#9D174D", "#0F766E", "#B45309", "#4338CA", "#C2410C"]);
+function lpDayWords(iso){ return iso ? `${dayName(iso)} ${dayNum(iso)}` : ""; }
+function LorryPlanRow({ r, yard, colour }){
+  const span = LP_DAY_TO - LP_DAY_FROM;
+  const title = r.blocks.map(b => b.kind === "break" ? `${b.start} break ${b.minutes} min` : `${b.start} ${b.route_id} → ${lpShort(b.dest_name)}, ${b.qty} ${unitLbl(b.unit)}`).join(" · ");
+  return (
+    <div className="lp-row" data-lp-lorry={r.n}>
+      <div className="lp-nm">Lorry {r.n}<small>{r.trips} trip{r.trips === 1 ? "" : "s"} · {r.places.map(lpShort).join(", ")}</small></div>
+      <div className="lp-track" role="img" aria-label={`Lorry ${r.n}: ${title}; ${r.free_words}`} title={title}>
+        {r.blocks.map((b, i) => {
+          const st = lpMin(b.start); if(st == null) return null;
+          const left = Math.max(0, (st - LP_DAY_FROM) / span * 100), width = Math.max(0.6, b.minutes / span * 100);
+          return <div key={i} className={"lp-blk" + (b.kind === "break" ? " is-break" : "")} aria-hidden="true"
+            style={{ left: `${left}%`, width: `${Math.min(width, 100 - left)}%`, background: b.kind === "break" ? undefined : colour(b.dest_name) }}>{b.kind === "break" ? "break" : b.route_id}</div>;
+        })}
+      </div>
+      <div className="lp-free" data-lp-free={r.free_minutes}>{r.free_words}</div>
+    </div>
+  );
+}
+function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState("chained");
+  const [day, setDay] = useState(null);
+  const [busy, setBusy] = useState("");
+  const [moves, setMoves] = useState(false);
+  const [note, setNote] = useState(null);
+  const canApply = !!(access && (access.role === "planner" || access.role === "admin"));
+  useEffect(() => {
+    let live = true;
+    fetch(`${API}/forecast-weeks/lorry-plan?bucket=${bucket}`).then(okJSON)
+      .then(j => { if(!live) return; setData(j); setErr(""); if(onData) onData(j); })
+      .catch(e => { if(live){ setData(null); setErr(errSay("The lorry plan could not be read.", e)); if(onData) onData(null); } });
+    return () => { live = false; };
+  }, [bucket, tick]);
+  if(!data && !err) return null;
+  const days = (data && data.days) || [];
+  const shown = (day && days.includes(day)) ? day : (days.includes(data && data.today) ? data.today : days[0]);
+  const v = data ? data[view] : null;
+  const blocks = (view !== "booked" && v && v.days && v.days[shown]) || [];
+  const dests = {};
+  const pal = lpPalette();
+  const colour = (d) => { if(!(d in dests)) dests[d] = pal[Object.keys(dests).length % pal.length]; return dests[d]; };
+  const booked = data ? data.booked : null;
+  const dayBooked = booked ? (booked.by_day[shown] || 0) : 0;
+  const dayN = v && v.by_day ? (v.by_day[shown] || 0) : dayBooked;
+  const savedDay = dayBooked - dayN, savedWeek = v && v.saved_week != null ? v.saved_week : 0;
+  const money = data && data.day_hire && view !== "booked" ? data.day_hire[view] : null;
+  const download = async (fmt) => {
+    setBusy(fmt); setNote(null);
+    try {
+      const r = await fetch(`${API}/forecast-weeks/lorry-plan/download?bucket=${bucket}&view=${view}&day=${shown}&format=${fmt}`);
+      if(!r.ok) throw await errFrom(r);
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = `lorry-plan-${shown}-${view}.${fmt}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ setNote({ ok: false, text: errSay("The sheets did not download.", e) }); }
+    setBusy("");
+  };
+  const apply = async () => {
+    if(!window.confirm("Move this week's loads between its days as the compressed view shows? The cells can be typed back afterwards.")) return;
+    setBusy("apply"); setNote(null);
+    try {
+      const r = await fetch(`${API}/forecast-weeks/lorry-plan/apply?bucket=${bucket}`, { method: "POST", headers: { "Content-Type": "application/json" } });
+      if(!r.ok) throw await errFrom(r);
+      const j = await r.json();
+      setNote({ ok: true, text: `${j.written} day cell${j.written === 1 ? "" : "s"} on ${j.lines} line${j.lines === 1 ? "" : "s"} moved.` });
+      if(onData) onData(null);
+      window.dispatchEvent(new CustomEvent("wayscope:lookahead-refresh"));
+    } catch(e){ setNote({ ok: false, text: errSay("The loads were not moved.", e) }); }
+    setBusy("");
+  };
+  const mv = (data && data.compressed && data.compressed.moves) || [];
+  const flagged = mv.filter(m => m.flags && m.flags.length).length;
+  return (
+    <section className="card p-4 mb-3" data-lorry-plan="1" data-lp-view={view} aria-label="Lorry plan">
+      <div className="ct-row">
+        <h3 className="ct-h">
+          <button type="button" className="font-semibold" aria-expanded={open ? "true" : "false"} onClick={() => setOpen(o => !o)} data-lp-toggle="1">
+            <span aria-hidden="true">{open ? "▾" : "▸"}</span> Lorry plan
+          </button>
+          <InfoTip id="la.lorryplan" />
+        </h3>
+        {data && <span className="clp-head" data-lp-head="1">
+          {data.chained.saved_week > 0 ? `${data.chained.week} lorry-days this week with each yard's lorries chained, ${data.booked.week} as booked`
+            : "Every lorry's day is as full as the chaining allows"}
+        </span>}
+      </div>
+      {err && <div className="clp-note" style={{ color: "var(--bad-text)" }}>{err}</div>}
+      {open && data && (
+        <>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <span className="inline-flex rounded-lg border text-[13px] overflow-hidden" role="group" aria-label="View" style={{ borderColor: "var(--line)" }}>
+              {["booked", "chained", "compressed"].map(k => (
+                <button key={k} type="button" aria-pressed={view === k ? "true" : "false"} onClick={() => setView(k)} className="px-2.5 py-1.5 font-semibold"
+                  style={view === k ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}>{LP_VIEW_WORDS[k]}</button>
+              ))}
+            </span>
+            <span className="inline-flex rounded-lg border text-[13px] overflow-hidden" role="group" aria-label="Day" style={{ borderColor: "var(--line)" }}>
+              {days.map(d => (
+                <button key={d} type="button" aria-pressed={d === shown ? "true" : "false"} onClick={() => setDay(d)} className="px-2.5 py-1.5 font-semibold"
+                  style={d === shown ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}>{lpDayWords(d)}</button>
+              ))}
+            </span>
+            {view !== "booked" && <span className="ml-auto flex items-center gap-2">
+              <button type="button" className="btn-sec" onClick={() => download("pdf")} disabled={!!busy || !blocks.length} data-lp-sheets="1">{busy === "pdf" ? "Preparing…" : "Driver sheets (PDF)"}</button>
+              <button type="button" className="btn-sec" onClick={() => download("xlsx")} disabled={!!busy || !blocks.length}>XLSX</button>
+              {view === "compressed" && canApply && <button type="button" className="btn-pri" onClick={apply} data-lp-apply="1"
+                disabled={!!busy || weekConfirmed || !mv.length} title={weekConfirmed ? "The week is confirmed: re-open it first" : "Write the moved day quantities into the cells"}>{busy === "apply" ? "Moving…" : "Apply"}</button>}
+            </span>}
+          </div>
+          {note && <div className="clp-note mt-1" role="status" style={{ color: note.ok ? "var(--ok-text)" : "var(--bad-text)" }}>{note.text}</div>}
+          <div className="lp-kpis" data-lp-kpis={view}>
+            <div className={"lp-kpi" + (view !== "booked" ? " ok" : "")}><b>{grp(dayN)} lorr{dayN === 1 ? "y" : "ies"}</b><span>{view === "booked" ? `the lines book on ${lpDayWords(shown)}` : `on ${lpDayWords(shown)} with ${view === "chained" ? "each yard's trips chained" : "the week compressed"}`}</span></div>
+            <div className="lp-kpi"><b>{grp(dayBooked)}</b><span>the lines book on their own</span></div>
+            <div className={"lp-kpi" + (savedWeek > 0 ? " ok" : "")}><b>{view === "booked" ? "—" : `${grp(Math.max(0, savedDay))} lorry-day${savedDay === 1 ? "" : "s"} saved`}</b><span>{view === "booked" ? "no saving in this view" : `this day · ${grp(Math.max(0, savedWeek))} this week`}</span></div>
+            <div className="lp-kpi"><b>{money && money.eur != null && data.day_hire.typed ? `${CUR()} ${grp(money.eur)}` : `${CUR()} —`}</b>
+              <span>{data.day_hire.typed ? `saved this week, an estimate${money && money.missing && money.missing.length ? ` · no rate for ${money.missing.map(x => vehLabel(x)).join(", ")}` : ""}` : "at a day-hire rate on Config → Costing · fuel (none typed)"}</span></div>
+          </div>
+          {view === "booked" ? (
+            <div className="clp-note">Each line's own whole lorries, as the grid above, the CLP and the gate figures count them. Switch to Chained by yard to see them filled.</div>
+          ) : (
+            <>
+              {blocks.map(y => (
+                <div key={y.origin_id + "|" + y.vehicle} className="lp-yard" data-lp-yard={y.origin_id}>
+                  <h4>{lpShort(y.name)} · {vehLabel(y.vehicle)}</h4>
+                  <div className="lp-sub">{grp(y.loads)} load{y.loads === 1 ? "" : "s"} to {y.places.length} place{y.places.length === 1 ? "" : "s"} · the lines book {grp(y.booked)} lorr{y.booked === 1 ? "y" : "ies"} · <b>{grp(y.lorries.length)} chained</b>{y.kept ? ` · ${y.kept} kept for a pour` : ""}{y.booked > y.count ? ` · ${y.booked - y.count} saved` : ""}</div>
+                  {y.lorries.map(r => <LorryPlanRow key={r.n} r={r} yard={y} colour={colour} />)}
+                </div>
+              ))}
+              <div className="lp-axis" aria-hidden="true"><span></span><div className="lp-ticks">{Array.from({ length: (LP_DAY_TO - LP_DAY_FROM) / 60 + 1 }, (_, i) => <span key={i} style={{ left: `${i * 60 / (LP_DAY_TO - LP_DAY_FROM) * 100}%` }}>{String(LP_DAY_FROM / 60 + i).padStart(2, "0")}:00</span>)}</div><span></span></div>
+              <div className="lp-key" data-lp-key="1">{Object.entries(dests).map(([d, c]) => <span key={d}><i style={{ background: c }}></i>{lpShort(d)}</span>)}<span><i style={{ background: "repeating-linear-gradient(135deg,#CBD5E1 0 4px,#E2E8F0 4px 8px)" }}></i>required break</span><span><i style={{ background: "var(--soft,#F1F5F9)", border: "1px solid #CBD5E1" }}></i>free</span></div>
+              {view === "compressed" && (
+                <div className="lp-moves" data-lp-moves={mv.length}>
+                  <button type="button" className="font-semibold" aria-expanded={moves ? "true" : "false"} onClick={() => setMoves(m => !m)}>
+                    <span aria-hidden="true">{moves ? "▾" : "▸"}</span> {mv.length} move{mv.length === 1 ? "" : "s"} this week{flagged ? ` · ${flagged} would raise a flag` : ""}
+                  </button>
+                  {moves && (mv.length ? (
+                    <table><tbody>{mv.map((m, i) => (
+                      <tr key={i} data-lp-move={m.line_key + "|" + m.day}><td>{lpDayWords(m.day)}</td><td>{m.route_id} {lpShort(m.origin_name)} → {lpShort(m.dest_name)}</td>
+                        <td className="tabular-nums">{m.trips_from} → {m.trips_to} loads · {grp(m.qty_from, 1)} → {grp(m.qty_to, 1)} {unitLbl(m.unit)}</td>
+                        <td>{(m.flags || []).map((f, j) => <div key={j} className="lp-flag">{f}</div>)}</td></tr>))}</tbody></table>
+                  ) : <div className="clp-note">Nothing to move: the week is already as full as the chaining allows.</div>)}
+                </div>
+              )}
+            </>
+          )}
+          <div className="ct-note">{data.words.rule} {view === "compressed" ? data.words.compress : data.words.planning}{data.team_only ? ` ${data.team_only}'s lines only.` : ""}</div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function GatesWeek({ gw }){
   if(!gw || !(gw.gates || []).length) return null;
   const gs = gw.gates;
@@ -11184,6 +11403,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   const anyConfirmed = lines.some(l => l.week && l.week.status === "confirmed");
 
   // ---- writes ------------------------------------------------------------------
+  const [lorryPlan, setLorryPlan] = useState(null);     // 8 Nov 2026 (2.1-9): the Lorry plan's figures, for the KPI caption
+  useEffect(() => { const f = () => setTick(t => t + 1); window.addEventListener("wayscope:lookahead-refresh", f); return () => window.removeEventListener("wayscope:lookahead-refresh", f); }, []);
   const saveDay = (line, d) => {
     const k = `${lineKeyOf(line)}|${d.day_date}|p`;
     const v = draft[k];
@@ -11312,7 +11533,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
           <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3">
             <LaKpi value={`${grp(totals.planned_t)} t`} caption="planned this week" />
             <LaKpi value={grp(totals.trips)} caption="trips" />
-            <LaKpi value={grp(totals.vehicles_peak)} caption={"vehicles / day peak" + (totals.excludes_unbaked ? " · lines not routed yet left out" : "")} />
+            <LaKpi value={grp(totals.vehicles_peak)} caption={"vehicles / day peak" + (totals.excludes_unbaked ? " · lines not routed yet left out" : "") + (lorryPlan && lorryPlan.chained && lorryPlan.chained.saved_week > 0 ? ` · ${grp(Math.max(...Object.values(lorryPlan.chained.by_day)))} with each yard's lorries chained` : "")} />
             <LaKpi value={grp(dist(totals.tonne_km))} caption={`${TKM()} · route basis`} />
             {/* 10 Sep evening: the diesel index, right of t·km — the same widget as Account and Config */}
             <FuelWidget mode="compact" who={who} access={access} initial={page && page.costing} onChanged={() => setTick(t => t + 1)} />
@@ -11522,6 +11743,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
 
           {/* 14 Oct 2026 (bundle G, W17): the committed week at each gate, against what it can check in */}
           {lines.length > 0 && <GatesWeek gw={page && page.gates_week} />}
+          {/* 8 Nov 2026 (v2.1 task 2.1-9): each lorry's day used to the full */}
+          {lines.length > 0 && !initialPage && <LorryPlan bucket={bucket} tick={tick} access={access} onData={setLorryPlan} weekConfirmed={allConfirmed} />}
           {page && page.abnormal && page.abnormal.count > 0 && <AbnormalWeek ab={page.abnormal} />}
           {/* 10 Sep: this week's movements on a map, in place of the stock card (now on
               the Dashboard). Drawn from the baked geometry of the lines on this page;
@@ -11929,6 +12152,14 @@ function PhoneLookAhead({ meta, initialPage }){
   const [opened, setOpened] = useState({});   // line key -> its facts shown
   const [all, setAll] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [lp, setLp] = useState(null);           // 8 Nov 2026 (2.1-9): the Lorry plan, read-only on a phone
+  const [lpAll, setLpAll] = useState(false);
+  useEffect(() => {
+    if(initialPage) return;
+    let live = true;
+    fetch(`${API}/forecast-weeks/lorry-plan?bucket=${bucket}`).then(okJSON).then(j => { if(live) setLp(j); }).catch(() => { if(live) setLp(null); });
+    return () => { live = false; };
+  }, [bucket]);
   useEffect(() => {
     if(initialPage) return;
     let live = true;
@@ -12020,6 +12251,9 @@ function PhoneLookAhead({ meta, initialPage }){
               </div>
               <div className="ph-note">{weekWords}{flagged ? ` · ${flagged} line${flagged === 1 ? "" : "s"} flagged` : ""}{rows.length > routed.length ? ` · ${rows.length - routed.length} not routed yet` : ""}</div>
               {!rows.length && <div className="ph-note">Nothing planned on this day.</div>}
+              {lp && lp.chained && lp.chained.by_day && lp.chained.by_day[shown] != null && lp.chained.saved_week > 0 && (
+                <div className="ph-note" data-ph-lorry-plan={shown}>{grp(lp.chained.by_day[shown])} lorries with each yard's trips chained · {grp((lp.booked.by_day[shown] || 0) - lp.chained.by_day[shown])} lorry-day{(lp.booked.by_day[shown] || 0) - lp.chained.by_day[shown] === 1 ? "" : "s"} saved</div>
+              )}
               {list.map(r => {
                 const isOpen = !!opened[r.lk];
                 const own = r.line.unit && r.line.unit !== "t" ? unitLbl(r.line.unit) : "t";
@@ -12053,6 +12287,18 @@ function PhoneLookAhead({ meta, initialPage }){
                   {all ? "Show fewer lines" : `Show ${rows.length - PH_FIRST} more line${rows.length - PH_FIRST === 1 ? "" : "s"}`}
                 </button>
               )}
+              {lp && lp.chained && lp.chained.days && (lp.chained.days[shown] || []).length > 0 && (() => {
+                const flat = []; (lp.chained.days[shown] || []).forEach(y => y.lorries.forEach(L => flat.push({ y, L })));
+                const some = lpAll ? flat : flat.slice(0, 4);
+                return (
+                  <div data-ph-lorry-list="1">
+                    <div className="ph-card-h mt-2"><b>Lorry plan</b><span>{flat.length} lorr{flat.length === 1 ? "y" : "ies"} chained by yard</span></div>
+                    {some.map(({ y, L }) => <div key={y.origin_id + y.vehicle + L.n} className="ph-lp"><b>{lpShort(y.name)} · lorry {L.n}</b><small>{vehLabel(y.vehicle)} · {L.trips} trip{L.trips === 1 ? "" : "s"}: {L.places.map(lpShort).join(", ")} · {L.free_words.toLowerCase()}</small></div>)}
+                    {flat.length > 4 && <button type="button" className="ph-more" onClick={() => setLpAll(a => !a)}>{lpAll ? "Show fewer lorries" : `Show ${flat.length - 4} more lorr${flat.length - 4 === 1 ? "y" : "ies"}`}</button>}
+                    <div className="ph-note">The driver sheets are printed from a desktop.</div>
+                  </div>
+                );
+              })()}
               <div className="ph-actions">
                 <button type="button" className="btn-sec" data-guide="ph-sheet" onClick={daySheet} disabled={busy || !rows.length}>{busy ? "Preparing…" : "Day sheet (PDF)"}</button>
               </div>

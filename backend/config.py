@@ -448,6 +448,13 @@ def validate(doc, network=None):
             for v in c.get("vehicles") or []:
                 if isinstance(vs, dict) and v not in vs:
                     p.append(f"material '{k}' lists vehicle '{v}', which does not exist")
+    # 8 Nov 2026 (v2.1 task 2.1-9): `day_hire` — a day-hire rate per vehicle type (typed, never seeded; the Lorry plan's
+    # lorry-days saved in money). Blank or absent = lorry-days only.
+    if "day_hire" in doc:
+        import lorry_plan
+        dp = lorry_plan.day_hire_problem(doc.get("day_hire"), vs if isinstance(vs, dict) else None)
+        if dp:
+            p.append(dp)
     # 29 Oct 2026 (3b-2): planning.rebar_ratios — kg of reinforcement per m³ of concrete by structure type
     rr = plan.get("rebar_ratios") if isinstance(plan, dict) else None
     if rr is not None:
