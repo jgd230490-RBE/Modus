@@ -1183,7 +1183,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # line and its added figures, the Carbon planner's Route choices figures, a failed Use / Stop (bad); the paused chip on the
    # row and in the opened row, and the "different road since the last Route all" line (warn)
    # (both together, merged 5 Nov: 42 + 2 concerns + 4 busy hours = 48)
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 48 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
+   # NARROWED 8 Nov 2026 (v2.1 task 2.1-5): bad-text 48 -> 49 — the Routes map's Layers box: a layer that could not be shown
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 49 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
    # NARROWED 8 Nov 2026 (task 2.1-12): warn-text 19 -> 20 — the site layout phase row's amber "layout changed since"
    _fe_wo.count("var(--warn-text)") == 20
    and ".sim-pp-flag{color:var(--bad-text);" in fe

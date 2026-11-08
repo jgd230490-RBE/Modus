@@ -861,10 +861,11 @@ ok("9: the endpoint sits before the {route_id} paths, takes a heavy-read slot an
    _SRC9.index('@app.get("/api/routes/community-counts")') < _SRC9.index('@app.get("/api/routes/{route_id}/route-sheet.pdf")')
    and 'with _heavy("routes/community-counts")' in _SRC9 and '_staff_json("routes/community-counts"' in _SRC9)
 _FE9 = read("frontend/index.html")
-ok("9: the Routes page: a Near the route column after the team, the cell and the opened-row list, the table's colSpan 8 throughout",
+# NARROWED 8 Nov 2026 (v2.1 task 2.1-7): colSpan 8 -> 11, the one distance column became Out / Back distance and minutes
+ok("9: the Routes page: a Near the route column after the team, the cell and the opened-row list, the table's colSpan 11 throughout",
    '<th className={th}>Near the route</th>' in _FE9 and "<NearCell data={nearData} id={r.id} />" in _FE9
-   and "<NearDetails data={nearData} id={r.id} colSpan={8} />" in _FE9 and "<RouteAnalysis routeId={r.id} colSpan={8}" in _FE9
-   and 'data-route-diversions={r.id}><td colSpan={8}' in _FE9 and "Not fetched" in _FE9 and "None of these" in _FE9
+   and "<NearDetails data={nearData} id={r.id} colSpan={11} />" in _FE9 and "<RouteAnalysis routeId={r.id} colSpan={11}" in _FE9
+   and 'data-route-diversions={r.id}><td colSpan={11}' in _FE9 and "colSpan={8}" not in _FE9[_FE9.find('data-route-near-cell'):_FE9.find('data-route-near-cell') + 6000] and "Not fetched" in _FE9 and "None of these" in _FE9
    and "fetch(`${API}/routes/community-counts`)" in _FE9)
 ok("9: ...three chips (schools, health, bus stops), counts only: no score, no ranking; the guides say so",
    'const NEAR_CHIPS = [["schools"' in _FE9 and "nothing is scored or ranked" in _FE9 and "Near the route" in GUIDE
