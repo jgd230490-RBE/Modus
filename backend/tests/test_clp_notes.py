@@ -311,6 +311,10 @@ def count_rows():
 import clp_notes  # noqa: E402
 import users  # noqa: E402
 import demo_request  # noqa: E402
+# 8 Nov 2026: the due dates below (6 Nov, 9 Nov, 13 Nov) were written on 31 Oct and read against the real calendar,
+# so from 7 Nov the 6 Nov task read overdue and two checks failed on every branch. Today is pinned to 31 Oct 2026.
+from portable import pin_today  # noqa: E402
+_PINNED = pin_today(__import__('datetime').date(2026, 10, 31))
 db.init_users_db()
 
 def login(email, name, role, team=None, kind="staff"):

@@ -831,7 +831,9 @@ for (const keep of [
 // its two checks are the same admin addresses, written in the technical guide (T2, "What the screens leave out")
 ok("the diagnostics panel is gone from the Data pages; the technical guide names its two checks",
   !src.includes("function Diagnostics(") && !src.includes("<Diagnostics ") && !src.includes("Check factors.json") && !src.includes("Probe HERE")
-  && _tg.includes("/api/admin/diagnostics/factors?token=") && _tg.includes("/api/admin/diagnostics/compare/{route_id}?probe=true"));
+  // NARROWED 8 Nov 2026 (guides brought up to date): the checks run on an admin login; ?token= only where ADMIN_TOKEN is still set
+  && _tg.includes("/api/admin/diagnostics/factors") && !_tg.includes("/api/admin/diagnostics/factors?token=")
+  && _tg.includes("/api/admin/diagnostics/compare/{route_id}?probe=true"));
 
 // ---- 7. Phase 3: zones ---------------------------------------------------------
 // Source-level again, and here that is not a compromise but the only option: the whole
