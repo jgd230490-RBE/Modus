@@ -4638,14 +4638,17 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ SITE LAYOUT: a card under Site areas for a saved location, with the page's ONE map and the three refs",
      // NARROWED 31 Oct 2026 (PR 2): the card also gets `drawing` and `onDraw` (planners and admins only)
      card.length > 3000 && src.includes('{form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef}\n')
-     && src.includes('drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: form.id, phaseId: pid }) : null} />}')
+     // NARROWED 8 Nov 2026 (task 2.1-12): + onZones (the Zones list read again after a works area is saved)
+     && src.includes('drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: form.id, phaseId: pid }) : null}\n                  onZones={() => reloadZones().catch(e => console.warn("Wayscope:", e))} />}')
      && src.lastIndexOf("<SiteLayoutCard ") > src.indexOf('data-site-areas="1"') && card.includes('data-site-layout="1"'));
   ok("SITE LAYOUT: a reader (no Locations editor, P5) gets the card for the site they located, so a planner can change it (seen in Chrome)",
      src.includes("if(!canEdit && feat) setReadLoc({ id, name: feat.properties.name || id });")
      && src.includes('{!form && readLoc && (') && src.includes('<SiteLayoutCard locId={readLoc.id} mapRef={mapObj}')
      && (src.match(/<SiteLayoutCard /g) || []).length === 2);
   ok("SITE LAYOUT: planners and admins change it (Q6: can_approve), not only an admin login",
-     card.includes("const canLayout = !!(ACCESS.info && ACCESS.info.can_approve);") && !card.includes("isAdminLogin"));
+     // NARROWED 8 Nov 2026 (task 2.1-12, Q7): isAdminLogin appears ONCE, for "Make a works area…" (a zone: admins only); the layout stays can_approve
+     card.includes("const canLayout = !!(ACCESS.info && ACCESS.info.can_approve);") && (card.match(/isAdminLogin/g) || []).length === 1
+     && card.includes("const canWorks = isAdminLogin(ACCESS.info);") && !/canWorks/.test(card.slice(card.indexOf("onDraw && <button"), card.indexOf("onDraw && <button") + 300)));
   ok("SITE LAYOUT: the drawing code is the map's own file, loaded once when needed (one look in one place)",
      // NARROWED 31 Oct 2026 (PR 2): v=3, the words from zoom 15 and geo (PR 4 had made it v=2, the minzoom option)
      // NARROWED 31 Oct 2026 (PR 3): v=4, + WSLayouts.pictures (the pinned pictures, both maps)
@@ -4663,7 +4666,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && card.includes("/site-layout/phases`") && card.includes('method: "PATCH"') && card.includes("?version=${p.version}`, { method: \"DELETE\" }")
      && card.includes("version: edit.version") && card.includes("if(j.ask_grid){"));
   ok("SITE LAYOUT: every failure through errSay / errMsg (no status number, no raw reply)",
-     (card.match(/errSay\("/g) || []).length === 9 &&   // NARROWED 31 Oct 2026 (PR 5): 9 — the Print panel's settings read and sheet. NARROWED 31 Oct 2026: 7 — PR 2's "Not copied." and PR 4's "Not changed." (the public switch)
+     (card.match(/errSay\("/g) || []).length === 11 &&   // NARROWED 8 Nov 2026 (task 2.1-12): 11 — the works area's plan read and its save
+   // NARROWED 31 Oct 2026 (PR 5): 9 — the Print panel's settings read and sheet. NARROWED 31 Oct 2026: 7 — PR 2's "Not copied." and PR 4's "Not changed." (the public switch)
  card.includes("setFit({ error: errMsg(e) })") && !/\$\{e\}|\.status\b|r\.status/.test(card));
   ok("SITE LAYOUT: the words are few and name no back end (no transform, grid file, library or endpoint)",
      !/OSTN|pyproj|ezdxf|EPSG|transform|endpoint|\bAPI\b|server|\bheld\b|\bhold\b/i.test(card.replace(/\$\{API\}/g, "").replace(/"Content-Type"/g, ""))
@@ -5140,6 +5144,45 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      !/fullscreen|requestFullscreen|API|server/i.test((edc.match(/>[^<>{}\n]{3,}</g) || []).join(" ")) && dmc.includes('g.className = "mapboxgl-ctrl mapboxgl-ctrl-group";'));
 }
 
+// ---- 8 Nov 2026 (task 2.1-12): Make a works area from a site layout (mockup works-from-layout-mockup-1108, Q1–Q8) ----
+{
+  const cut = (t, name) => { const a = t.indexOf("function " + name + "("); return a < 0 ? "" : t.slice(a, t.indexOf("\nfunction ", a + 10)); };
+  const card = cut(src, "SiteLayoutCard"), cardc = cut(code, "SiteLayoutCard"), dm = cut(src, "DataManagement");
+  ok("⭐ WORKS AREA: the phase's ⋯ menu has 'Make a works area…', after Print… and only for an admin LOGIN (Q7, as Zones)",
+     card.includes('{canWorks && <button type="button" onClick={() => openWorks(p)}>Make a works area…</button>}')
+     && card.indexOf("Make a works area…</button>") > card.indexOf(">Print…</button>")
+     && card.includes("const canWorks = isAdminLogin(ACCESS.info);"));
+  ok("⭐ WORKS AREA: the panel reads the plan and writes through the admin works-area address (never the Zones form)",
+     cardc.includes("`${API}/admin/site-layouts/phases/${encodeURIComponent(p.id)}/works-area`")
+     && cardc.includes("`${API}/admin/site-layouts/phases/${encodeURIComponent(wa.plan.phase_id)}/works-area`")
+     && cardc.includes('method: "POST"') && cardc.includes("version: wa.plan.version"));
+  ok("WORKS AREA: the outline choice (around everything drawn / the Site boundary area, off when the phase has none, said in words)",
+     card.includes("Around everything drawn") && card.includes("The Site boundary area") && card.includes("disabled={!P.outlines.boundary}")
+     && card.includes("No Site boundary area on this phase."));
+  ok("⭐ WORKS AREA: a works area already over the site is offered first (Q6) and keeping it keeps its name, dates and routing",
+     card.includes("const first = (j.works_areas || [])[0];") && card.includes('target: first ? first.id : "new"')
+     && card.includes("Give {z.name} this outline") && card.includes("Make a new one") && card.includes("Keeps its name, dates and routing.")
+     && card.includes('...(wa.target !== "new" ? { zone_id: wa.target }'));
+  ok("⭐ WORKS AREA: a new one has the plan's name and dates (Q2, Q3) and Affects routing OFF (Q4), with the re-routing warning when ticked",
+     card.includes('name: j.name, starts_on: j.starts_on || "", ends_on: j.ends_on || "", routing: false')
+     && card.includes("affects_routing: !!wa.routing") && card.includes(" Routes that cross it will need routing again."));
+  ok("WORKS AREA: the outline previewed on the map while the panel is open (amber dashed), dropped on close and put back after a basemap change",
+     cardc.includes('const SRC = "dm-works-preview";') && cardc.includes('"line-dasharray": [3, 2]') && cardc.includes('m.on("style.load", add);')
+     && cardc.includes('return () => { try { m.off("style.load", add); } catch(e){} drop(); };'));
+  ok("⭐ WORKS AREA: the phase row says which works area it made; 'layout changed since' / 'changed on Zones' + Update (Q5: nothing moves by itself)",
+     card.includes("Works area: <a href=\"#zones\"") && card.includes('p.works_area.state === "layout_changed"') && card.includes("layout changed since")
+     && card.includes('p.works_area.state === "zone_changed"') && card.includes("changed on Zones")
+     && card.includes('{p.works_area.state !== "same" && canWorks && !edit && !imp && <> · <button type="button" onClick={() => openWorks(p)}'));
+  ok("WORKS AREA: the Zones table says 'From the <site> site layout' under the name; the card reloads Zones after a save",
+     dm.includes("setZoneFrom(j.from_layout || {});") && dm.includes("From the {zoneFrom[z.id].site} site layout")
+     && (dm.match(/onZones=\{\(\) => reloadZones\(\)/g) || []).length === 2 && card.includes("if(onZones) onZones();"));
+  ok("WORKS AREA: failures go through errSay; Print, Name and months and a new site close the panel",
+     card.includes('errSay("The works area could not be worked out.", e)') && card.includes('errSay("The works area was not saved.", e)')
+     && card.includes("setMsg(\"\"); setEdit(null); setWa(null);") && card.includes("setPrt(null); setWa(null); setEdit(")
+     && card.includes('setShown(""); setWa(null);'));
+  ok("WORKS AREA: few words, no back end (no zone id, no 'API' / 'server' / 'geometry' / 'polygon' on screen)",
+     !/\b(API|server|geometry|polygon|hull|endpoint|Z0\d\d)\b/i.test((cardc.slice(cardc.indexOf("const openWorks"), cardc.indexOf("const openPrint")).match(/>[^<>{}\n]{3,}</g) || []).join(" ")
+       + (card.slice(card.indexOf("data-site-layout-works-panel"), card.indexOf("data-site-layout-print")).match(/>[^<>{}\n]{3,}</g) || []).join(" ")));
 // ---- 8 Nov 2026 (v2.1 task 2.1-13): the week maps' key, names and loads (mockup notes/dashboard-today-map-mockup-1108) ----
 {
   // from src (the end marker is a comment), then its comments stripped like `code`

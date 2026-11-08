@@ -367,6 +367,13 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .row-menu-list{position:absolute;right:0;top:32px;z-index:20;min-width:220px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:8px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.28);text-align:left;white-space:nowrap;}
   .row-menu-list button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--popover-fg);font:inherit;font-size:14px;padding:7px 10px;border-radius:6px;cursor:pointer;}
   .row-menu-list button:hover{background:rgba(255,255,255,.06);} .row-menu-list button:disabled{opacity:.5;}
+  /* 8 Nov 2026 (task 2.1-10): the Look-ahead's Supplier orders list — one row a supplier, PDF and XLSX at the right */
+  .so-list{min-width:380px;max-width:440px;white-space:normal;}
+  .so-head{font-weight:600;font-size:14px;padding:6px 10px 0;}
+  .so-row{display:flex;align-items:center;gap:4px;border-top:1px solid var(--popover-line);padding:4px 0 4px 10px;}
+  .so-name{flex:1;min-width:0;font-size:14px;} .so-name small{display:block;font-size:12px;color:var(--popover-muted);}
+  .row-menu-list .so-row button{display:inline-block;width:auto;padding:7px 10px;text-decoration:underline;font-weight:600;}
+  .row-menu-list button.so-all{margin-top:6px;text-align:center;background:var(--navy);color:var(--control-fg);font-weight:600;}
   .row-menu-note{font-size:12px;color:var(--popover-muted);padding:6px 10px 4px;border-top:1px solid var(--popover-line);margin-top:4px;white-space:normal;}
   /* 27 Oct 2026 (the final UI pass, card 1): the one row-action pattern — a filled next step + the "⋯" menu (RowMenu) on every
      table; a list row that only ever loses a line gets a named "×" instead of a red Remove link */
@@ -5085,6 +5092,69 @@ function RowMenu({ name, note, children }) {
       {/* 27 Oct 2026 (audit #41 / #42): the "⋯" is CSS content, so the summary has no visible text for axe to weigh against its name */}
       <summary className="row-dots" aria-label={`More actions for ${name}`} title="More actions"></summary>
       <div className="row-menu-list" onClick={pick}>{children}{note ? <div className="row-menu-note">{note}</div> : null}</div>
+    </details>
+  );
+}
+// 8 Nov 2026 (v2.1 task 2.1-10, mockup notes/supplier-orders-mockup-1108, John: yes as recommended): the commit week's
+// "Supplier orders ▾" — one order sheet per supplier (a route's origin, not one of the scheme's own places) from the
+// CONFIRMED lines, PDF or XLSX each, or all of them in a zip. The list is read when the menu opens; nothing is sent.
+function SupplierOrdersMenu({ bucket, disabled }){
+  const [list, setList] = useState(null);
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+  const load = async () => {
+    setErr("");
+    try {
+      const r = await fetch(`${API}/forecast-weeks/supplier-orders?bucket=${bucket}`);
+      if(!r.ok) throw await errFrom(r);
+      setList(await r.json());
+    } catch(e){ setErr(errSay("The suppliers could not be read.", e)); }
+  };
+  const dl = async (format, s) => {
+    const key = format + (s ? s.location_id : "");
+    setBusy(key); setErr("");
+    try {
+      const q = `format=${format}&bucket=${bucket}` + (s ? `&location_id=${encodeURIComponent(s.location_id)}` : "");
+      const r = await fetch(`${API}/forecast-weeks/supplier-orders/download?${q}`);
+      if(!r.ok) throw await errFrom(r);
+      const blob = await r.blob();
+      const cd = r.headers.get("content-disposition") || "";
+      const m = cd.match(/filename="([^"]+)"/);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = m ? m[1] : `supplier-order.${format}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ setErr(errSay("The order was not made.", e)); }
+    setBusy("");
+  };
+  const sups = (list && list.suppliers) || [];
+  const left = (list && list.left_out) || {};
+  const total = s => (s.totals || []).map(t => `${grp(t.qty)} ${t.unit}`).join(" + ");
+  return (
+    <details className="row-menu" data-supplier-orders="1" onToggle={e => { if(e.currentTarget.open) load(); }}>
+      <summary className="px-4 py-2 rounded-lg text-sm font-semibold border" aria-disabled={disabled ? "true" : undefined}
+        onClick={e => { if(disabled) e.preventDefault(); }}
+        title={disabled ? "Confirm at least one line first" : "One order sheet per supplier, from the confirmed lines"}
+        style={{ width: "auto", height: "auto", borderColor: "var(--navy)", color: "var(--navy)", background: "var(--surface)", opacity: disabled ? 0.4 : 1 }}>Supplier orders ▾</summary>
+      <div className="row-menu-list so-list" role="group" aria-label="Supplier orders">
+        <div className="so-head">Supplier orders{list && list.week && list.week.from ? ` · ${spanLabel(list.week.from, list.week.to)}` : ""}</div>
+        <div className="row-menu-note" style={{ borderTop: 0, marginTop: 0 }}>From the confirmed lines only{list && list.team_only ? `, ${list.team_only}'s lines` : ""}. Wayscope sends nothing: download and send them yourself.</div>
+        {!list && !err && <div className="row-menu-note">Reading…</div>}
+        {err && <div className="row-menu-note" role="alert">{err}</div>}
+        {list && !sups.length && <div className="row-menu-note">No confirmed lines from a supplier this week.</div>}
+        {sups.map(s => (
+          <div key={s.location_id} className="so-row" data-so-supplier={s.location_id}>
+            <span className="so-name"><b>{s.name}</b><small>{[s.vendor, `${s.deliveries} deliver${s.deliveries === 1 ? "y" : "ies"}`, total(s)].filter(Boolean).join(" · ")}</small></span>
+            <button type="button" onClick={() => dl("pdf", s)} disabled={!!busy} aria-label={`${s.name}: PDF`}>{busy === "pdf" + s.location_id ? "…" : "PDF"}</button>
+            <button type="button" onClick={() => dl("xlsx", s)} disabled={!!busy} aria-label={`${s.name}: XLSX`}>{busy === "xlsx" + s.location_id ? "…" : "XLSX"}</button>
+          </div>
+        ))}
+        {(left.not_confirmed > 0 || left.own > 0) && <div className="row-menu-note" data-so-left="1">Not on an order: {[
+          left.not_confirmed ? `${left.not_confirmed} line${left.not_confirmed === 1 ? "" : "s"} not confirmed yet: ${(left.not_confirmed_places || []).join(", ")}` : null,
+          left.own ? `${left.own} line${left.own === 1 ? "" : "s"} from your own site${left.own === 1 ? "" : "s"}: ${(left.own_places || []).join(", ")}` : null].filter(Boolean).join(" · ")}</div>}
+        {sups.length > 1 && <button type="button" className="so-all" onClick={() => dl("zip")} disabled={!!busy} data-so-zip="1">{busy === "zip" ? "Making the zip…" : `All ${sups.length} suppliers (zip)`}</button>}
+      </div>
     </details>
   );
 }
@@ -11217,6 +11287,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               className="px-3 py-2 rounded-lg text-sm font-semibold border disabled:opacity-40"
               title="The one-page commitment sheet, grouped by origin"
               style={{ borderColor: "var(--line)", color: "var(--muted)", background: "var(--surface)" }}>PDF</button>
+            <SupplierOrdersMenu bucket={bucket} disabled={!anyConfirmed} />
             {allConfirmed ? (
               <button onClick={doReopen} disabled={!!busy}
                 className="px-4 py-2 rounded-lg text-sm font-semibold border disabled:opacity-40"
@@ -14688,6 +14759,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // 28 Oct 2026 (task 0c): the dated zones' diversions — per zone (the Used by column), per route and dates (the
   // Routes page and the panel after a zone save), and what "Find a way round" would cost now
   const [zoneDiv, setZoneDiv] = useState({});
+  const [zoneFrom, setZoneFrom] = useState({});    // 8 Nov 2026 (task 2.1-12): {zone id: {location_id, site}}
   const [divPeriods, setDivPeriods] = useState([]);
   const [busyUses, setBusyUses] = useState([]);          // 5 Nov 2026 (task 0d-2): the busy-hours uses (row chip)
   // 30 Oct 2026 (task 4b): the community considerations near each route's drawn line — the "Near the route" column
@@ -15883,6 +15955,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     fetch(`${API}/zones`).then(r => r.json()).then(j => {
       setZoneList(j.zones || []);
       setZoneDiv(j.diversions || {});     // 28 Oct 2026 (task 0c): per dated zone, the routes it diverts
+      setZoneFrom(j.from_layout || {});   // 8 Nov 2026 (task 2.1-12): a works area made from a site layout
       // Phase 4: zone_id -> number of routes attached. A haul road on no route is the
       // commonest reason one "does nothing", and the table has to say so rather than
       // leaving it to be discovered after a bake that changed nothing.
@@ -16328,7 +16401,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               <div className="space-y-3" data-read-loc={readLoc.id}>
                 <div className="text-sm font-medium text-slate-700">{readLoc.name}</div>
                 <SiteLayoutCard locId={readLoc.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef}
-                  drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: readLoc.id, phaseId: pid }) : null} />
+                  drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: readLoc.id, phaseId: pid }) : null}
+                  onZones={() => reloadZones().catch(e => console.warn("Wayscope:", e))} />
               </div>
             )}
             {form && (
@@ -16853,7 +16927,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 )}
                 {/* 31 Oct 2026 (task 4c PR 1): the site's logistics layout, its phases and drawings brought in */}
                 {form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef}
-                  drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: form.id, phaseId: pid }) : null} />}
+                  drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: form.id, phaseId: pid }) : null}
+                  onZones={() => reloadZones().catch(e => console.warn("Wayscope:", e))} />}
                 {!form.id && (
                   <p className="text-[13px] text-slate-400">
                     Gates can be added once the location has been created.
@@ -17511,6 +17586,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       <button type="button" className="row-open" data-zone-open={z.id} aria-label={canEdit ? `Edit ${z.name}` : `Show ${z.name} on the map`}
                         aria-current={zoneSel === z.id ? "true" : undefined}
                         onClick={(e) => { e.stopPropagation(); openZoneFromKeys(z); }}>{z.name}</button>
+                      {zoneFrom[z.id] && <span className="block text-xs font-normal text-slate-500" data-zone-from-layout={z.id}>From the {zoneFrom[z.id].site} site layout</span>}
                     </td>
                     <td className="px-3 py-2 text-slate-500">{(ZONE_KINDS.find(k => k[0] === z.kind) || [null, z.kind])[1]}</td>
                     <td className="px-3 py-2">
@@ -17613,8 +17689,9 @@ function slMonths(p){
 }
 // 31 Oct 2026 (task 4c PR 3): " · 1 picture" in a phase's row (its own pictures and those shown in every phase)
 const slPicWords = (n) => n ? ` · ${n} picture${n === 1 ? "" : "s"}` : "";
-function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstallRef, drawing, onDraw }){
+function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstallRef, drawing, onDraw, onZones }){
   const canLayout = !!(ACCESS.info && ACCESS.info.can_approve);
+  const canWorks = isAdminLogin(ACCESS.info);     // 8 Nov 2026 (task 2.1-12, Q7): a works area is a zone: admins only
   const [styles, setStyles] = useState(SL_STYLES);
   const [lay, setLay] = useState(null);
   const [shown, setShown] = useState("");
@@ -17631,6 +17708,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
   const [anyway, setAnyway] = useState(false);
   const [busy, setBusy] = useState("");
   const [prt, setPrt] = useState(null);           // 31 Oct 2026 (4c PR 5): the Print panel {id, name, page, scale, style, pages}
+  const [wa, setWa] = useState(null);             // 8 Nov 2026 (task 2.1-12): the Make a works area panel
   const fileRef = useRef(null);
 
   const load = async (keepShown) => {
@@ -17642,7 +17720,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
     } catch(e){ setLay(null); setMsg(errSay("Couldn't load the layout.", e)); }
   };
   useEffect(() => {
-    setImp(null); setEdit(null); setMsg(""); setPts({}); setFit(null); setPicking(""); setShown("");
+    setImp(null); setEdit(null); setMsg(""); setPts({}); setFit(null); setPicking(""); setShown(""); setWa(null);
     load();
     if(!SL_STYLES) fetch(`${API}/site-layouts/styles`).then(okJSON).then(j => { SL_STYLES = j; setStyles(j); }).catch(e => console.warn("Wayscope:", e));
   }, [locId]);
@@ -17755,9 +17833,62 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       setEdit(null); setMsg(`Deleted “${p.name}”.`); await load();
     } catch(e){ setMsg(errSay("Not deleted.", e)); }
   };
+  // 8 Nov 2026 (task 2.1-12): Make a works area… = the phase's outline as a works area zone (admins). The outline is
+  // worked out on the server; the panel previews it on the map; a works area already over the site is offered first.
+  const openWorks = async (p) => {
+    setMsg(""); setEdit(null); setPrt(null);
+    try {
+      const j = await okJSON(await fetch(`${API}/admin/site-layouts/phases/${encodeURIComponent(p.id)}/works-area`));
+      const first = (j.works_areas || [])[0];
+      setWa({ plan: j, outline: j.default_outline, target: first ? first.id : "new",
+              name: j.name, starts_on: j.starts_on || "", ends_on: j.ends_on || "", routing: false });
+    } catch(e){ setMsg(errSay("The works area could not be worked out.", e)); }
+  };
+  const saveWorks = async () => {
+    if(!wa) return;
+    setBusy("works"); setMsg("");
+    const body = { outline: wa.outline, version: wa.plan.version,
+      ...(wa.target !== "new" ? { zone_id: wa.target }
+        : { name: wa.name, starts_on: wa.starts_on || null, ends_on: wa.ends_on || null, affects_routing: !!wa.routing }) };
+    try {
+      const j = await okJSON(await fetch(`${API}/admin/site-layouts/phases/${encodeURIComponent(wa.plan.phase_id)}/works-area`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+      setWa(null);
+      setMsg(j.rebake_required ? `Saved “${j.zone.name}”. Routes cross it: route them again on Routes.` : `Saved “${j.zone.name}”.`);
+      await load(wa.plan.phase_id);
+      if(onZones) onZones();
+    } catch(e){ setMsg(errSay("The works area was not saved.", e)); }
+    finally { setBusy(""); }
+  };
+  // the outline on the map while the panel is open (amber, dashed), gone when it closes
+  useEffect(() => {
+    const m = mapRef.current;
+    if(!m || !mapReady) return;
+    const SRC = "dm-works-preview";
+    const g = wa && wa.plan && wa.plan.outlines ? wa.plan.outlines[wa.outline] : null;
+    const add = () => {
+      try {
+        if(!g) return;
+        const fc = { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: g }] };
+        if(m.getSource(SRC)) m.getSource(SRC).setData(fc);
+        else m.addSource(SRC, { type: "geojson", data: fc });
+        if(!m.getLayer(SRC + "-fill")) m.addLayer({ id: SRC + "-fill", type: "fill", source: SRC, paint: { "fill-color": "#F59E0B", "fill-opacity": 0.12 } });
+        if(!m.getLayer(SRC + "-line")) m.addLayer({ id: SRC + "-line", type: "line", source: SRC, paint: { "line-color": "#B45309", "line-width": 2.5, "line-dasharray": [3, 2] } });
+      } catch(e){ console.warn("Wayscope:", e); }
+    };
+    const drop = () => {
+      try { [SRC + "-line", SRC + "-fill"].forEach(id => { if(m.getLayer(id)) m.removeLayer(id); }); if(m.getSource(SRC)) m.removeSource(SRC); }
+      catch(e){ /* the map went first */ }
+    };
+    if(!g){ drop(); return; }
+    add();
+    m.on("style.load", add);
+    return () => { try { m.off("style.load", add); } catch(e){} drop(); };
+  }, [wa && wa.outline, wa && wa.plan, mapReady]);
+
   // 31 Oct 2026 (task 4c PR 5): Print… = one phase as an A3 / A4 sheet, PDF or PNG, drawn on the server
   const openPrint = async (p) => {
-    setMsg(""); setEdit(null);
+    setMsg(""); setEdit(null); setWa(null);
     setPrt({ id: p.id, name: p.name, page: "a3", scale: "", style: "streets", pages: null });
     try {
       const j = await okJSON(await fetch(`${API}/locations/${encodeURIComponent(locId)}/site-layout/sheet?phase=${encodeURIComponent(p.id)}`));
@@ -17837,16 +17968,74 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
                 <span className="ml-auto flex items-center gap-1.5">
                   {onDraw && <button onClick={() => onDraw(p.id)} className="px-2.5 py-1 rounded-lg text-white font-semibold text-[13px]" style={{ background: "var(--navy)" }} aria-label={`Draw ${p.name}`}>Draw</button>}
                   <RowMenu name={p.name}>
-                    <button type="button" onClick={() => { setPrt(null); setEdit({ id: p.id, name: p.name, month_from: p.month_from || "", month_to: p.month_to || "", version: p.version }); }}>Name and months</button>
+                    <button type="button" onClick={() => { setPrt(null); setWa(null); setEdit({ id: p.id, name: p.name, month_from: p.month_from || "", month_to: p.month_to || "", version: p.version }); }}>Name and months</button>
                     <button type="button" onClick={() => openPrint(p)}>Print…</button>
+                    {canWorks && <button type="button" onClick={() => openWorks(p)}>Make a works area…</button>}
                     <button type="button" onClick={() => copyPhase(p)}>Copy to a new phase</button>
                     <button type="button" style={{ color: "var(--red)" }} onClick={() => deletePhase(p)}>Delete…</button>
                   </RowMenu>
                 </span>
               )}
+              {p.works_area && (
+                <span className="basis-full text-xs text-slate-600" data-site-layout-works={p.id}>
+                  Works area: <a href="#zones" className="font-semibold text-[color:var(--navy)] hover:underline">{p.works_area.name}</a>
+                  {p.works_area.state === "layout_changed" && <> · <span className="font-semibold text-[color:var(--warn-text)]">layout changed since</span></>}
+                  {p.works_area.state === "zone_changed" && <> · changed on Zones</>}
+                  {p.works_area.state !== "same" && canWorks && !edit && !imp && <> · <button type="button" onClick={() => openWorks(p)}
+                    className="font-semibold text-[color:var(--navy)] hover:underline">Update</button></>}
+                </span>
+              )}
             </li>))}
         </ul>
       )}
+      {wa && !edit && !imp && (() => {
+        const P = wa.plan, near = P.works_areas || [], keep = near.find(z => z.id === wa.target);
+        const ha = P.hectares[wa.outline];
+        return (
+        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2" data-site-layout-works-panel="1">
+          <span className="block text-sm font-medium text-slate-700">Make a works area from {P.phase_name}</span>
+          <div className="grid items-start gap-x-2 gap-y-1.5 text-[13px]" style={{ gridTemplateColumns: "5.5rem 1fr" }}>
+            <span className="text-slate-500 pt-0.5">Outline</span>
+            <div role="radiogroup" aria-label="Outline">
+              <label className="flex items-center gap-1.5"><input type="radio" name="wa-outline" checked={wa.outline === "all"} onChange={() => setWa(x => ({ ...x, outline: "all" }))} /> Around everything drawn</label>
+              <label className={"flex items-center gap-1.5 " + (P.outlines.boundary ? "" : "text-slate-500")}><input type="radio" name="wa-outline" disabled={!P.outlines.boundary}
+                checked={wa.outline === "boundary"} onChange={() => setWa(x => ({ ...x, outline: "boundary" }))} /> The Site boundary area</label>
+              {!P.outlines.boundary && <span className="block text-xs text-slate-500">No Site boundary area on this phase.</span>}
+            </div>
+            {near.length > 0 && <>
+              <span className="text-slate-500 pt-0.5">Works area</span>
+              <div role="radiogroup" aria-label="Works area">
+                {near.map(z => <label key={z.id} className="flex items-center gap-1.5"><input type="radio" name="wa-target" checked={wa.target === z.id}
+                  onChange={() => setWa(x => ({ ...x, target: z.id }))} /> Give {z.name} this outline</label>)}
+                <label className="flex items-center gap-1.5"><input type="radio" name="wa-target" checked={wa.target === "new"} onChange={() => setWa(x => ({ ...x, target: "new" }))} /> Make a new one</label>
+              </div>
+            </>}
+            {wa.target === "new" ? <>
+              <span className="text-slate-500 pt-1">Name</span>
+              <input value={wa.name} onChange={e => setWa(x => ({ ...x, name: e.target.value }))} aria-label="Works area name" maxLength={120}
+                className="border border-slate-300 rounded-lg px-2 py-1 text-[13px] bg-white" />
+              <span className="text-slate-500 pt-1">From</span>
+              <input type="date" value={wa.starts_on} onChange={e => setWa(x => ({ ...x, starts_on: e.target.value }))} aria-label="From"
+                className="border border-slate-300 rounded-lg px-2 py-1 text-[13px] bg-white w-max" />
+              <span className="text-slate-500 pt-1">To</span>
+              <input type="date" value={wa.ends_on} onChange={e => setWa(x => ({ ...x, ends_on: e.target.value }))} aria-label="To"
+                className="border border-slate-300 rounded-lg px-2 py-1 text-[13px] bg-white w-max" />
+              <span></span>
+              <label className="flex items-center gap-1.5"><input type="checkbox" checked={wa.routing} onChange={e => setWa(x => ({ ...x, routing: e.target.checked }))} /> Affects routing</label>
+            </> : <>
+              <span></span>
+              <span className="text-xs text-slate-500">Keeps its name, dates and routing.</span>
+            </>}
+          </div>
+          <p className="text-xs text-slate-500">{ha != null ? `${ha.toLocaleString("en-GB")} ha. ` : ""}Shown on the public map.
+            {((wa.target === "new" && wa.routing) || (keep && keep.affects_routing)) && " Routes that cross it will need routing again."}</p>
+          <div className="flex items-center gap-2">
+            <button onClick={saveWorks} disabled={busy !== "" || (wa.target === "new" && !wa.name.trim())} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs disabled:opacity-50"
+              style={{ background: "var(--navy)" }}>{busy === "works" ? "Saving…" : "Save the works area"}</button>
+            <button onClick={() => setWa(null)} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
+          </div>
+        </div>);
+      })()}
       {prt && !edit && !imp && (
         <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2" data-site-layout-print="1">
           <span className="block text-sm font-medium text-slate-700">Print {prt.name}</span>

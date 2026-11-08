@@ -78,6 +78,7 @@ import site_areas  # 28 Oct 2026 (simulation v2): the areas inside a site
 import pours  # 29 Oct 2026 (task 3a): concrete pours
 import holding  # 29 Oct 2026 (task 3c): vehicle holding areas
 import site_layouts  # 31 Oct 2026 (task 4c PR 1): a site's logistics layout, its phases and the drawings brought in
+import works_from_layout  # 8 Nov 2026 (task 2.1-12): a works area zone made from a site layout
 import site_layout_import  # 31 Oct 2026 (task 4c PR 1): DXF / KML / KMZ / GeoJSON / shapefile zip read into map things
 import site_layout_styles  # 31 Oct 2026 (task 4c PR 1): the one style table (11 lines, 10 areas, 31 symbols, 8 layers)
 import site_layout_paper  # 31 Oct 2026 (task 4c PR 5): a site layout phase as an A3 / A4 sheet, PDF or PNG
@@ -2176,6 +2177,65 @@ def forecast_week_day_sheet(day: str, bucket: str = "commit", route_id: Optional
         raise HTTPException(503, str(e))
     return Response(content=data, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="day-sheet-{day}.pdf"'})
+
+
+def _supplier_orders_data(bucket):
+    """8 Nov 2026 (v2.1 task 2.1-10): the week's supplier orders for this caller, from the Look-ahead's own kept read
+    (the same _staff_json entry /api/lookahead fills), so the list and the files never disagree with the page."""
+    import supplier_orders
+    acc = _require_access()
+    b = "next" if bucket == "next" else "commit"
+    pg = _staff_json("lookahead", {"bucket": b, "route_id": None, "on": True},
+                     lambda: lookahead.page(bucket=b, route_id=None, acc=acc, with_restrictions=True), acc)
+    pg = dict(pg, bucket=b)
+    return supplier_orders.orders(pg, acc=acc)
+
+
+@app.get("/api/forecast-weeks/supplier-orders")
+def forecast_week_supplier_orders(bucket: str = "commit"):
+    """
+    8 Nov 2026 (v2.1 task 2.1-10): the week's suppliers (a route's origin that is not one of the scheme's own places)
+    with their confirmed deliveries, and what was left out (lines not confirmed, the scheme's own places). Any staff
+    code or login, scoped like the Look-ahead: a team sees its own lines only. Wayscope sends nothing.
+    """
+    import supplier_orders
+    return supplier_orders.summary(_supplier_orders_data(bucket))
+
+
+@app.get("/api/forecast-weeks/supplier-orders/download")
+def forecast_week_supplier_order_file(format: str = "pdf", location_id: Optional[str] = None, bucket: str = "commit"):
+    """
+    One supplier's order as a PDF or an XLSX (`location_id` = the supplier's location), or `format=zip` for every
+    supplier's PDF and XLSX. Made fresh on each download from the kept Look-ahead read (the sheet carries who made it
+    and when). No price on any sheet; nothing is sent.
+    """
+    from fastapi.responses import Response       # not in the test stub; imported here
+    import supplier_orders
+    if format not in ("pdf", "xlsx", "zip"):
+        raise HTTPException(400, "format must be pdf, xlsx or zip")
+    data = _supplier_orders_data(bucket)
+    try:
+        if format == "zip":
+            if not data["suppliers"]:
+                raise HTTPException(404, "No confirmed lines to order this week.")
+            body, mime, name = (supplier_orders.build_zip(data), "application/zip", supplier_orders.zip_name(data))
+        else:
+            if not location_id:
+                raise HTTPException(400, "Say which supplier.")
+            try:
+                s = supplier_orders.find(data, location_id)
+            except supplier_orders.OrderError as e:
+                raise HTTPException(404, str(e))
+            if format == "pdf":
+                body, mime = supplier_orders.build_pdf(data, s), "application/pdf"
+            else:
+                body, mime = (supplier_orders.build_xlsx(data, s),
+                              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            name = f"{s['file_stem']}.{format}"
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=body, media_type=mime,
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
 
 @app.put("/api/forecast-days")
@@ -4968,7 +5028,12 @@ def site_layout_summary():
 def get_site_layout(location_id: str):
     """A site's layout: its phases with their things and the drawings brought in. Signed in."""
     _require_access()
-    return {"layout": site_layouts.get(location_id), "ready": site_layout_import.grid_ready()}
+    lay = site_layouts.get(location_id)
+    if lay:
+        made = works_from_layout.by_phase()           # 8 Nov 2026 (task 2.1-12): the works area each phase made
+        for ph in lay["phases"]:
+            ph["works_area"] = made.get(ph["id"])
+    return {"layout": lay, "ready": site_layout_import.grid_ready()}
 
 
 def _layout_sheet(location_id, phase, page, scale, style):
@@ -6156,7 +6221,9 @@ def list_zones(on: Optional[str] = None, include_inactive: bool = True):
             "haul_kind": zones.HAUL_KIND,
             "haul_links": haul.link_counts(),
             # 28 Oct 2026 (task 0c): per dated routing zone, the routes it diverts and those with no way round
-            "diversions": route_choice.summary()["by_zone"]}
+            "diversions": route_choice.summary()["by_zone"],
+            # 8 Nov 2026 (task 2.1-12): {zone id: {location_id, site}} for a works area made from a site layout
+            "from_layout": works_from_layout.sources()}
 
 
 @app.get("/api/zones/{zone_id}")
@@ -6223,6 +6290,8 @@ def update_zone(zone_id: str, body: ZoneIn, token: Optional[str] = None):
     z = zones.update_zone(zone_id, **fields)
     if z.get("error"):
         raise HTTPException(400, z["error"])
+    if "geometry" in fields and fields["geometry"] != before.get("geometry"):
+        works_from_layout.zone_outline_edited(zone_id)    # 8 Nov 2026 (task 2.1-12): "changed on Zones" on the layout
 
     # A haul road edit is exact — see haul.invalidate_for_zone(). It covers the case
     # where a zone was a haul road and has just stopped being one, because the legs baked
@@ -6246,6 +6315,62 @@ def update_zone(zone_id: str, body: ZoneIn, token: Optional[str] = None):
         old_geometry=(before["geometry"] if was_routes else None),
     )
     return _zone_write_result(z, inval, zone_id)
+
+
+class WorksAreaIn(BaseModel):
+    """8 Nov 2026 (task 2.1-12): make or update a works area from a site layout phase. zone_id = give that works area
+    the outline (its name, dates and routing kept); blank = a new works area with name / dates / affects_routing."""
+    outline: str = "all"                     # 'all' (around everything drawn) | 'boundary' (the Site boundary area)
+    zone_id: Optional[str] = None
+    name: Optional[str] = None
+    starts_on: Optional[str] = None
+    ends_on: Optional[str] = None
+    affects_routing: bool = False
+    version: Optional[int] = None            # the phase's version the panel was opened on
+
+
+@app.get("/api/admin/site-layouts/phases/{phase_id}/works-area")
+def works_area_plan(phase_id: str, token: Optional[str] = None):
+    """8 Nov 2026 (task 2.1-12): what "Make a works area" offers for this phase — both outlines, the name and dates,
+    the works areas it overlaps. Admins (as Zones)."""
+    _check_admin(token)
+    out = works_from_layout.plan(phase_id)
+    if not out:
+        raise HTTPException(404, "No such layout phase.")
+    return out
+
+
+@app.post("/api/admin/site-layouts/phases/{phase_id}/works-area")
+def works_area_make(phase_id: str, body: WorksAreaIn, token: Optional[str] = None):
+    """8 Nov 2026 (task 2.1-12): give a works area this phase's outline, or make a new one. The zone write is the
+    ordinary Zones write (so it re-routes exactly as a Zones save would), then the zone remembers the phase + version."""
+    _check_admin(token)
+    pl = works_from_layout.plan(phase_id)
+    if not pl:
+        raise HTTPException(404, "No such layout phase.")
+    if body.version is not None and int(body.version) != pl["version"]:
+        raise HTTPException(409, "Someone saved this layout since. Open it again.")
+    if body.outline not in ("all", "boundary"):
+        raise HTTPException(422, "Pick an outline.")
+    geom = pl["outlines"].get(body.outline)
+    if not geom:
+        raise HTTPException(422, "This phase has no Site boundary area." if body.outline == "boundary"
+                            else "Nothing is drawn on this phase yet.")
+    if body.zone_id:
+        z0 = zones.get_zone(body.zone_id)
+        if not z0 or z0["kind"] != "works":
+            raise HTTPException(404, "No such works area.")
+        res = update_zone(body.zone_id, ZoneIn(name=z0["name"], geometry=geom), token)
+        zid = body.zone_id
+    else:
+        name = (body.name or "").strip() or pl["name"]
+        res = create_zone(ZoneIn(name=name, geometry=geom, kind="works", affects_routing=bool(body.affects_routing),
+                                 starts_on=body.starts_on or None, ends_on=body.ends_on or None), token)
+        zid = res["zone"]["id"]
+    works_from_layout.set_source(zid, phase_id, pl["version"])
+    res["zone"] = zones.get_zone(zid)
+    res["works_area"] = works_from_layout.by_phase().get(phase_id)
+    return res
 
 
 @app.delete("/api/admin/zones/{zone_id}")

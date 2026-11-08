@@ -209,8 +209,8 @@ NEAR = [[L019["lon"], L019["lat"]]]
 # =========================================================================== #
 #  0. The style table                                                          #
 # =========================================================================== #
-ok("0. 11 line styles, 10 area styles, 31 symbols, 8 layers",
-   (len(ST.LINE_STYLES), len(ST.AREA_STYLES), len(ST.SYMBOLS), len(ST.LAYERS)) == (11, 10, 31, 8),
+ok("0. 11 line styles, 11 area styles (8 Nov 2026, task 2.1-12: + Site boundary), 31 symbols, 8 layers",
+   (len(ST.LINE_STYLES), len(ST.AREA_STYLES), len(ST.SYMBOLS), len(ST.LAYERS)) == (11, 11, 31, 8),
    str((len(ST.LINE_STYLES), len(ST.AREA_STYLES), len(ST.SYMBOLS), len(ST.LAYERS))))
 ok("0. every symbol key once, each an SVG in a 64 box with a size in metres and a group the layers know",
    len(ST.SYMBOL_KEYS) == 31 and all(s["svg"].strip().startswith("<") and s["size"] > 0 and s["group"] in ST.SYMBOL_LAYER
@@ -219,14 +219,15 @@ ok("0. every line style sits on one of the eight layers; every colour is #RRGGBB
    all(v["layer"] in ST.LAYERS and re.fullmatch(r"#[0-9A-F]{6}", v["color"]) for v in ST.LINE_STYLES.values())
    and all(re.fullmatch(r"#[0-9A-F]{6}", v["color"]) and v["fill"] in ST.FILLS and v["outline"] in ST.OUTLINES
            for v in ST.AREA_STYLES.values()))
-ok("0. the import table offers 11 + 10 + 31 + text + leave out = 54 choices", len(ST.choices()) == 54
+# NARROWED 8 Nov 2026 (task 2.1-12): + the Site boundary area style (areas 10 -> 11)
+ok("0. the import table offers 11 + 11 + 31 + text + leave out = 55 choices", len(ST.choices()) == 55
    and "skip" in ST.choices() and "text" in ST.choices() and not ST.choice_ok("line:flying") and not ST.choice_ok(None))
 ok("0. security and CCTV are the two symbols never on the public map (Q7)",
    set(ST.PRIVATE_SYMBOLS) == {"security", "cctv"} and all(k in ST.SYMBOL_KEYS for k in ST.PRIVATE_SYMBOLS))
 P = ST.payload()
 ok("0. the payload the page reads carries the layers, lines, areas, symbols, glyphs and the choices with their words",
    {"layers", "lines", "areas", "symbols", "glyphs", "choices", "fills", "private_symbols"} <= set(P)
-   and len(P["choices"]) == 54 and all(c.get("label") for c in P["choices"]), str(sorted(P)))
+   and len(P["choices"]) == 55 and all(c.get("label") for c in P["choices"]), str(sorted(P)))
 # NARROWED 31 Oct 2026 (PR 1b, plan §6 revised): a drainage layer is now guessed "leave out" (the mockup's LAYER_WORDS);
 # an unknown layer is still an imported line (C-SETTING-OUT)
 ok("0. guesses: a hoarding layer, a GATE block, a crane radius, a drainage layer (leave out), a text layer, an unknown line",
