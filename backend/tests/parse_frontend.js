@@ -3797,18 +3797,21 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
 {
   const _h0 = src.indexOf('<span className="text-xs text-slate-400">Basemap</span>');
   const _hd = _h0 < 0 ? "" : src.slice(_h0, src.indexOf("</>}>", _h0));   // NARROWED 27 Oct 2026: the token box that ended it is gone
-  ok("names #14: the header of Locations / Routes / Zones is one block with four selects (Basemap, Show, direction, route option)",
-     _h0 > 0 && _hd.length > 200 && _hd.length < 2500 && (_hd.match(/<select\b/g) || []).length === 4, String(_hd.length));
+  // NARROWED 8 Nov 2026 (v2.1 task 2.1-7): three selects — the direction is the Routes map's own Out · Back · Both buttons now
+  ok("names #14: the header of Locations / Routes / Zones is one block with three selects (Basemap, Show, route option)",
+     _h0 > 0 && _hd.length > 200 && _hd.length < 2500 && (_hd.match(/<select\b/g) || []).length === 3, String(_hd.length));
   ok("🔴 names #14: the Basemap select is named Basemap, the word shown beside it",
      _hd.includes('<span className="text-xs text-slate-400">Basemap</span>\n          <select value={basemap} onChange={e => changeStyle(e.target.value)} className={sel} aria-label="Basemap">'));
   ok("🔴 names #14: the vehicle select is named 'Show vehicle' — the visible word 'Show' first in the name (2.5.3)",
      _hd.includes('<span className="text-xs text-slate-400 ml-1">Show</span>\n          <select value={showProfile} onChange={e => setShowProfile(e.target.value)} className={sel} aria-label="Show vehicle">'));
   ok("🔴 names #14: the two selects that had only a title carry names — Direction drawn, Route option drawn — and keep their titles",
-     _hd.includes('<select value={showLeg} onChange={e => setShowLeg(e.target.value)} className={sel} title="Which direction to draw" aria-label="Direction drawn">')
+     // NARROWED 8 Nov 2026 (task 2.1-7): the direction select is gone; its name "Direction drawn" is the map's button group's
+     !_hd.includes('<select value={showLeg}') && src.includes('role="group" aria-label="Direction drawn"')
      && _hd.includes('<select value={showAlt} onChange={e => setShowAlt(+e.target.value)} className={sel} title="Which route option to draw" aria-label="Route option drawn">'));   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): no HERE
   const _names = [..._hd.matchAll(/<select [^\n]*aria-label="([^"]*)"/g)].map(m => m[1]);
-  ok("names #14: all four are named, in words that pass the word rule (no bake, server, endpoint, token, cached, geometry) and say lorry never truck",
-     _names.length === 4 && _names.every(n => n.length > 3 && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(n)), JSON.stringify(_names));
+  // NARROWED 8 Nov 2026 (task 2.1-7): three
+  ok("names #14: all three are named, in words that pass the word rule (no bake, server, endpoint, token, cached, geometry) and say lorry never truck",
+     _names.length === 3 && _names.every(n => n.length > 3 && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(n)), JSON.stringify(_names));
   const _rw = src.slice(src.indexOf('{tab === "raw" && ('), src.indexOf('<div className="savebar" data-cfg-savebar="1">'));
   ok('🔴 names #14: the Config "Everything (JSON)" textarea is named exactly "Everything (JSON)" — the tab\'s own words, the one JSON wording the word rule exempts',
      (_rw.match(/<textarea\b/g) || []).length === 1
@@ -4659,7 +4662,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && !/<script src="\/map\/site-layouts\.js/.test(html));
   ok("SITE LAYOUT: put back after a basemap switch (the page's style.load), and cleared when the card closes",
      // NARROWED 31 Oct 2026 (PR 2): + the drawing tools' own put-back
-     src.includes('m.on("style.load", () => { addNetworkLayers(m); if(layoutReinstallRef.current) layoutReinstallRef.current(); if(drawReinstallRef.current) drawReinstallRef.current(); });')
+     // NARROWED 8 Nov 2026 (task 2.1-5): + the Routes map's layers put back first
+     src.includes('m.on("style.load", () => { addNetworkLayers(m); if(cbRef.current.rlReinstall) cbRef.current.rlReinstall(); if(layoutReinstallRef.current) layoutReinstallRef.current(); if(drawReinstallRef.current) drawReinstallRef.current(); });')
      && card.includes("if(handleRef.current) handleRef.current.setData([]); pickRef.current = null;"));
   ok("SITE LAYOUT: a survey point is placed by the map click, ahead of route and node picks",
      src.indexOf("if(layoutPickRef.current){ layoutPickRef.current(e.lngLat.lng, e.lngLat.lat); return; }") > src.indexOf("if(areaPlaceRef.current){")
@@ -4708,9 +4712,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      !/new mapboxgl\.Map/.test(ed) && ed.includes("const m = mapRef.current;") && (dm.match(/<div ref=\{mapDiv\}/g) || []).length === 1
      // NARROWED 5 Nov 2026 (full screen): each of the four takes a full-screen branch first; outside full screen they read as before
      && src.includes('<div ref={mapDiv} style={{ height: full ? "100%" : drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />')
-     && src.includes(': drawing && isWide ? { gridColumn: 2, gridRow: 2 } : undefined}>')
+     // NARROWED 8 Nov 2026 (task 2.1-5): the card is positioned in every branch (the Routes map's own box sits on it)
+     && src.includes(': drawing && isWide ? { gridColumn: 2, gridRow: 2, position: "relative" } : { position: "relative" }}>')
      && src.includes(': drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined}>')
-     && src.includes('style={drawing ? { display: "none" } : full ? { gridColumn: 2, gridRow: 1, minHeight: 0, overflowY: "auto" } : panelStyle}') && src.includes("{drawing ? null : onLoc ? ("));
+     // NARROWED 8 Nov 2026 (task 2.1-8): the panel is hidden in the Routes full screen too (its list and details take the sides)
+     && src.includes('style={drawing || (full && onRoutes) ? { display: "none" } : full ? { gridColumn: 2, gridRow: 1, minHeight: 0, overflowY: "auto" } : panelStyle}') && src.includes("{drawing ? null : onLoc ? ("));
   ok("DRAW: every look is WSLayouts' (its own prefix); Terra Draw's lines show only while drawing or selected",
      ed.includes('e.h = WSLayouts.install(m, styles, { prefix: "dm-draw" });') && ed.includes("lineStringOpacity: ({ properties }) => properties.currentlyDrawing ? 0.9 : 0")
      && ed.includes("outlineOpacity: ({ properties }) => properties.currentlyDrawing ? 0.9 : 0") && ed.includes("pointOpacity: 0"));
@@ -5119,7 +5125,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      // the UI audit (label-content-name-mismatch): the glyph is drawn by CSS, the button holds no text
      && html.includes('.sl-full-btn::before{content:"⤢";} .sl-full-btn[aria-pressed="true"]::before{content:"⤡";}') && !/btn\.textContent/.test(dmc));
   ok("⭐ FULL SCREEN: only at a desk (>= 1,024 px), on Locations, with a site's layout open or drawing (Q4); otherwise it leaves",
-     dmc.includes('const fullOk = isWide && subTab === "locations" && !!(drawing || (!form && readLoc) || (form && form.id));')
+     // NARROWED 8 Nov 2026 (v2.1 task 2.1-8): the Routes page too, whenever it is not drawing
+     dmc.includes('const fullOk = isWide && ((subTab === "locations" && !!(drawing || (!form && readLoc) || (form && form.id))) || (subTab === "routes" && !drawing));')
      && dmc.includes("useEffect(() => { if(full && !fullOk) leaveFull(); }, [full, fullOk]);") && dmc.includes('c.box.style.display = fullOk ? "" : "none";'));
   ok("FULL SCREEN: before Draw, the map | a 380 px column for the site's panel; while drawing, the Drawing bar across, then palette | map | settings filling the height",
      dm.includes('{ gridTemplateColumns: "minmax(0, 1fr) 380px", gridTemplateRows: "minmax(0, 1fr)" }')
@@ -5215,6 +5222,59 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("🔴 2.1-13: the map still prints no cost, no team id (the team through teamText) and no word-rule word",
      !/€|\beur\b|_eur|fair|rate_|\brates?\b/i.test(cm) && !/IPT[1-6]/.test(cm) && !/\b(geometry|server|endpoint|token)\b/.test(cm.slice(cm.indexOf("return (\n"))));
   ok("2.1-13: the key's swatches are CSS (no images)", html.includes(".cm-k-out{height:4px;background:#059669;}") && html.includes(".cm-k-back{height:3px;background:#f59e0b;}"));
+}
+
+// ---- 8 Nov 2026 (v2.1 tasks 2.1-5 + 2.1-7 + 2.1-8, the mockup John approved: notes routes-page-layout-mockup-1108, Q1-Q7) ----
+// ROUTES PAGE: the Routes map's five layers, out and back side by side, each leg's distance and time, full screen
+{
+  const fnOf = (name) => { const a = code.indexOf("function " + name + "("); return a < 0 ? "" : code.slice(a, code.indexOf("\nfunction ", a + 10)); };
+  const ens = fnOf("rlEnsure"), pop = fnOf("rlPopup"), box = fnOf("RouteMapBox"), lst = fnOf("RouteFullList"), det = fnOf("RouteFullDetails");
+  const dmr = fnOf("DataManagement");
+  ok("⭐ ROUTES PAGE (2.1-5): the five layers are read from what the staff Route map reads — no new address, nothing fetched before a tick",
+     dmr.includes("D.closures = await get(`${API}/restrictions${q}`);") && dmr.includes("D.limits = await get(`${API}/public/limits`);")
+     && dmr.includes("D.community = await get(`${API}/community`);") && dmr.includes("D.collisions = await get(`${API}/collisions`);")
+     && dmr.includes('if(k === "closures" && !D.closures)') && dmr.includes("if(!on) return;"));
+  ok("⭐ ROUTES PAGE (2.1-5, Q4): all five start off, on every visit (in the page's state, never in browser storage)",
+     dmr.includes("useState({ closures: false, limits: false, places: false, collisions: false, cycle: false })")
+     && !/localStorage[^\n]*rLayers|rLayers[^\n]*localStorage/.test(dmr));
+  ok("⭐ ROUTES PAGE (2.1-5): drawn only on the Routes page, under the routes (lines) and over them (symbols), put back after a basemap switch",
+     dmr.includes('rlEnsure(mapObj.current, rLayerData.current, rLayersRef.current, subTabRef.current === "routes", rlAltRef.current)')
+     && ens.includes('const vis = (k) => (on[k] && onRoutes) ? "visible" : "none";') && ens.includes('const under = "route-casing"')
+     && dmr.includes("if(cbRef.current.rlReinstall) cbRef.current.rlReinstall();"));
+  ok("ROUTES PAGE (2.1-5, Q5): collisions near an alternative only while an alternative is drawn; slight ones a hollow ring",
+     ens.includes('m.setFilter("rl-coll", altShown ? null : ["==", ["get", "along"], "route"]);')
+     && ens.includes('"circle-color": ["case", ["==", ["get", "severity"], 3], "#FFFFFF", RL_COLL_INK]'));
+  ok("ROUTES PAGE (2.1-5, Q6): one tick for every community kind, cycle routes their own (the kind 'cycle')",
+     ens.includes('filter: ["all", isLine, ["==", ["get", "kind"], "cycle"]]') && code.includes('places: ["rl-res-fill", "rl-places"], collisions: ["rl-coll"], cycle: ["rl-cycle"]'));
+  ok("ROUTES PAGE (2.1-5): a ticked layer's thing opens its own popup before the route under it is picked",
+     dmr.indexOf("if(cbRef.current.layerPopup && cbRef.current.layerPopup(e)) return;") > 0
+     && dmr.indexOf("if(cbRef.current.layerPopup && cbRef.current.layerPopup(e)) return;") < dmr.indexOf('const hitRoute = m.queryRenderedFeatures(e.point, { layers });'));
+  ok("🔴 ROUTES PAGE: the box, the popups and the full screen columns print no back-end word and no status number",
+     ![box, pop, lst, det].some(s => /\b(api|endpoint|server|token|cached|geometry|bake[ds]?|HERE)\b/.test(s.replace(/data-[a-z-]+=|\/\/[^\n]*/g, "")))
+     && !/r\.status/.test(dmr.slice(dmr.indexOf("const rlRead"), dmr.indexOf("const toggleRLayer"))));
+  ok("⭐ ROUTES PAGE (2.1-7): out green, back amber, solid, each left of its travel, white arrows on the leg's colour; the picked route a blue halo",
+     code.includes('const LEG_OUT = "#059669", LEG_BACK = "#F59E0B", SEL_HALO = "#1D4ED8";')
+     && code.includes('const LEG_COLOR_EXPR = ["match", ["get", "leg"], "return", LEG_BACK, LEG_OUT];')
+     && code.includes('const LEG_OFFSET = ["interpolate", ["linear"], ["zoom"], 9, -2.2, 14, -4.5];')
+     && dmr.includes('id: "route-arrows", type: "symbol"') && dmr.includes('"icon-halo-color": LEG_COLOR_EXPR'));
+  ok("🔴 ROUTES PAGE (2.1-7, Q3): the picked route and the analysis row's mark are no longer red",
+     !/sel-line[^\n]*FAILED_COLOR|"line-color": "#DC2626"[^\n]*sel/.test(dmr) && !code.includes('ring-[color:var(--red)]/40') && !code.includes('<span style={{ color: "var(--red)" }} title="Shown on the map">'));
+  ok("⭐ ROUTES PAGE (2.1-7, Q2): Out · Back · Both on the map, Both first (the default); Both reads each leg once",
+     box.includes('const LEGS = [["both", "Both"], ["loaded", "Out"], ["return", "Back"]];') && dmr.includes('const [showLeg, setShowLeg] = useState("both");')
+     && dmr.includes('const legs = showLeg === "both" ? ["loaded", "return"] : [oneLeg(showLeg)];'));
+  ok("⭐ ROUTES PAGE (2.1-7, Q7): each leg's distance and minutes from the routes' own figures (no new read), the shown vehicle and option",
+     code.includes("const l = ((pinfo && pinfo.legs && pinfo.legs[leg]) || []).find(x => x.alt_index === (alt || 0));")
+     && dmr.includes('const o = legFig(pinfo, "loaded", showAlt), b = legFig(pinfo, "return", showAlt);')
+     && code.includes("{r.loaded_hr != null ? Math.round(r.loaded_hr * 60) : \"—\"}") && code.includes("{r.return_hr != null ? Math.round(r.return_hr * 60) : \"—\"}"));
+  ok("⭐ ROUTES PAGE (2.1-8, Q1): full screen only on ⤢, the route list | the map | the chosen route, each side folding",
+     dmr.includes('onRoutes ? { gridTemplateColumns: `${fold.l ? 44 : 300}px minmax(0, 1fr) ${fold.r ? 44 : 380}px`, gridTemplateRows: "minmax(0, 1fr)" }')
+     && dmr.includes("{full && onRoutes && !drawing && <>") && lst.includes("gridColumn: 1") && det.includes("gridColumn: 3")
+     && det.includes("<RouteSheetButton routeId={r.id} /><CollisionEvidenceButton routeId={r.id} />"));
+  // the Chrome check (8 Nov): in full screen the DEMO pill sat over Out · Back · Both, and the detail table pushed the column sideways
+  ok("ROUTES PAGE (2.1-8): in full screen on a demo the map's box sits under the DEMO pill; the detail table scrolls inside the right column",
+     dmr.includes("<RouteMapBox low={full && !!TENANT.demo_notice}") && box.includes("top: low ? 44 : 8")
+     && box.includes('background: "var(--navy)", color: "var(--control-fg)"') && !box.includes('color: "#fff"')   // the audit: white on the Dark look's orange was 2.32:1
+     && det.includes('<div className="overflow-x-auto" data-route-full-analysis="1"><table className="text-sm" style={{ tableLayout: "fixed", width: "100%" }}>'));
 }
 
 console.log();

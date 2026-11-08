@@ -13652,6 +13652,155 @@ const ROUTE_COLOR = "#2563EB";
 // pairs HERE could not route — drawn dashed straight so 'impossible' reads differently
 // from 'not baked yet', which used to look identical (both simply absent)
 const FAILED_COLOR = "#DC2626";
+// 8 Nov 2026 (v2.1 task 2.1-7, notes routes-page-layout-mockup-1108): the two legs in the public map's own colours, out green and
+// back amber; each drawn LEFT of its own travel (UK); the picked route a blue halo
+const LEG_OUT = "#059669", LEG_BACK = "#F59E0B", SEL_HALO = "#1D4ED8";
+const LEG_COLOR_EXPR = ["match", ["get", "leg"], "return", LEG_BACK, LEG_OUT];
+const LEG_OFFSET = ["interpolate", ["linear"], ["zoom"], 9, -2.2, 14, -4.5];
+// a chevron pointing the way the line is drawn (an SDF: the map tints it white with the leg's colour round it)
+function legArrowImage(){
+  const s = 32, cv = document.createElement("canvas"); cv.width = cv.height = s;
+  const x = cv.getContext("2d");
+  x.lineCap = "round"; x.lineJoin = "round"; x.strokeStyle = "#000"; x.lineWidth = 6;
+  x.beginPath(); x.moveTo(11, 8); x.lineTo(21, 16); x.lineTo(11, 24); x.stroke();
+  return x.getImageData(0, 0, s, s);
+}
+// 8 Nov 2026 (v2.1 task 2.1-5, the mockup John approved: notes routes-page-layout-mockup-1108, Q4-Q6): the Routes map's own
+// layers — planned road closures, lorry limits, community places, collisions, cycle routes. The SAME reads the staff Route map
+// makes (what a planner fetched; nothing new is fetched), each read only when its box is first ticked, all off on every visit.
+// Drawn only on the Routes page (the map is shared with Locations and Zones). The symbols follow the staff Route map's.
+const RL_KEYS = ["closures", "limits", "places", "collisions", "cycle"];
+const RL_LABEL = { closures: "Planned road closures", limits: "Lorry limits", places: "Community places", collisions: "Collisions", cycle: "Cycle routes" };
+const RL_LAYERS = {
+  closures: ["rl-closure-line", "rl-closure-pt"], limits: ["rl-limit-line", "rl-limit-sign"],
+  places: ["rl-res-fill", "rl-places"], collisions: ["rl-coll"], cycle: ["rl-cycle"],
+};
+const RL_LIMIT_RED = "#C8102E", RL_COLL_INK = "#27272A";
+function rlPlaceShape(x, symbol, s){
+  const c = s / 2, r = s * 0.36;
+  x.beginPath();
+  if(symbol === "triangle"){ x.moveTo(c, c - r); x.lineTo(c + r, c + r * 0.8); x.lineTo(c - r, c + r * 0.8); x.closePath(); }
+  else if(symbol === "diamond"){ x.moveTo(c, c - r); x.lineTo(c + r, c); x.lineTo(c, c + r); x.lineTo(c - r, c); x.closePath(); }
+  else if(symbol === "square" || symbol === "square-h"){ x.rect(c - r * 0.85, c - r * 0.85, r * 1.7, r * 1.7); }
+  else if(symbol === "cross"){ const w = r * 0.42; x.rect(c - w, c - r, w * 2, r * 2); x.rect(c - r, c - w, r * 2, w * 2); }
+  else if(symbol === "dot"){ x.arc(c, c, r * 0.62, 0, Math.PI * 2); }
+  else { x.arc(c, c, r * 0.85, 0, Math.PI * 2); }
+}
+function rlPlaceImage(symbol, colour){
+  const s = 40, cv = document.createElement("canvas"); cv.width = cv.height = s;
+  const x = cv.getContext("2d");
+  rlPlaceShape(x, symbol, s); x.lineWidth = 6; x.strokeStyle = "#FFFFFF"; x.lineJoin = "round"; x.stroke();
+  rlPlaceShape(x, symbol, s); x.fillStyle = colour; x.fill();
+  if(symbol === "square-h"){ x.fillStyle = "#FFFFFF"; x.font = "bold 20px system-ui, sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("H", s / 2, s / 2 + 1); }
+  return x.getImageData(0, 0, s, s);
+}
+// the round sign: a white face, a red ring, the limit in black
+function rlSignImage(text){
+  const s = 64, cv = document.createElement("canvas"); cv.width = cv.height = s;
+  const x = cv.getContext("2d");
+  x.beginPath(); x.arc(32, 32, 27, 0, Math.PI * 2); x.fillStyle = "#FFFFFF"; x.fill();
+  x.lineWidth = 7; x.strokeStyle = RL_LIMIT_RED; x.stroke();
+  x.fillStyle = "#111111"; x.font = `bold ${String(text).length > 4 ? 13 : 16}px system-ui, sans-serif`;
+  x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(String(text), 32, 33);
+  return x.getImageData(0, 0, s, s);
+}
+// add what is read (idempotent: called after a read, after a tick, after a basemap switch) and show what is ticked
+function rlEnsure(m, D, on, onRoutes, altShown){
+  if(!m || !m.getLayer || !m.getLayer("route-casing")) return;
+  const vis = (k) => (on[k] && onRoutes) ? "visible" : "none";
+  const under = "route-casing", over = m.getLayer("node-dots") ? "node-dots" : undefined;
+  const src = (id, fc) => { if(!m.getSource(id)) m.addSource(id, { type: "geojson", data: fc }); };
+  const isLine = ["in", ["geometry-type"], ["literal", ["LineString", "MultiLineString"]]];
+  const isPoly = ["in", ["geometry-type"], ["literal", ["Polygon", "MultiPolygon"]]];
+  try {
+    if(D.closures){
+      src("rl-closures", D.closures);
+      if(!m.getLayer("rl-closure-line")) m.addLayer({ id: "rl-closure-line", type: "line", source: "rl-closures", filter: ["any", isLine, isPoly],
+        layout: { "line-cap": "round" }, paint: { "line-color": ["coalesce", ["get", "_colour"], "#DC2626"], "line-width": 4, "line-opacity": 0.85 } }, under);
+      if(!m.getLayer("rl-closure-pt")) m.addLayer({ id: "rl-closure-pt", type: "circle", source: "rl-closures", filter: ["==", ["geometry-type"], "Point"],
+        paint: { "circle-radius": 6, "circle-color": ["coalesce", ["get", "_colour"], "#DC2626"], "circle-stroke-color": "#FFFFFF", "circle-stroke-width": 1.5 } }, over);
+    }
+    if(D.limits){
+      const signs = { type: "FeatureCollection", features: (D.limits.features || []).filter(f => f.properties && Array.isArray(f.properties.anchor))
+        .map(f => ({ type: "Feature", properties: { ...f.properties, sign: String(f.properties.icon_text || f.properties.value || "") }, geometry: { type: "Point", coordinates: f.properties.anchor } })) };
+      [...new Set(signs.features.map(f => f.properties.sign))].forEach(t => { try { if(!m.hasImage("rl-sign-" + t)) m.addImage("rl-sign-" + t, rlSignImage(t), { pixelRatio: 2 }); } catch(e){} });
+      src("rl-limits", D.limits); src("rl-limit-signs", signs);
+      if(!m.getLayer("rl-limit-line")) m.addLayer({ id: "rl-limit-line", type: "line", source: "rl-limits", filter: isLine,
+        paint: { "line-color": RL_LIMIT_RED, "line-width": 3, "line-dasharray": [2, 1.5] } }, under);
+      if(!m.getLayer("rl-limit-sign")) m.addLayer({ id: "rl-limit-sign", type: "symbol", source: "rl-limit-signs",
+        layout: { "icon-image": ["concat", "rl-sign-", ["get", "sign"]], "icon-allow-overlap": true,
+                  "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.45, 14, 0.8] } }, over);
+    }
+    if(D.community){
+      (D.community.kinds || []).forEach(k => { try { if(!m.hasImage("rl-k-" + k.key)) m.addImage("rl-k-" + k.key, rlPlaceImage(k.symbol, k.colour), { pixelRatio: 2 }); } catch(e){} });
+      const pairs = []; (D.community.kinds || []).forEach(k => pairs.push(k.key, k.colour));
+      const colour = pairs.length ? ["match", ["get", "kind"], ...pairs, "#64748B"] : "#64748B";
+      src("rl-community", { type: "FeatureCollection", features: D.community.features || [] });
+      if(!m.getLayer("rl-res-fill")) m.addLayer({ id: "rl-res-fill", type: "fill", source: "rl-community", filter: isPoly,
+        paint: { "fill-color": colour, "fill-opacity": D.community.fill_alpha || 0.12, "fill-outline-color": colour } }, under);
+      if(!m.getLayer("rl-cycle")) m.addLayer({ id: "rl-cycle", type: "line", source: "rl-community",
+        filter: ["all", isLine, ["==", ["get", "kind"], "cycle"]], layout: { "line-cap": "round" },
+        paint: { "line-color": colour, "line-width": 2.5, "line-dasharray": [2, 1.5] } }, under);
+      if(!m.getLayer("rl-places")) m.addLayer({ id: "rl-places", type: "symbol", source: "rl-community", filter: ["==", ["geometry-type"], "Point"],
+        layout: { "icon-image": ["concat", "rl-k-", ["get", "kind"]], "icon-allow-overlap": true,
+                  "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.7, 14, 1] } }, over);
+    }
+    if(D.collisions){
+      src("rl-collisions", { type: "FeatureCollection", features: D.collisions.features || [] });
+      if(!m.getLayer("rl-coll")) m.addLayer({ id: "rl-coll", type: "circle", source: "rl-collisions",
+        layout: { "circle-sort-key": ["-", 4, ["get", "severity"]] },
+        paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, ["match", ["get", "severity"], 1, 4.5, 2, 3.4, 2.2],
+                                    15, ["match", ["get", "severity"], 1, 8, 2, 6, 4.5]],
+                 "circle-color": ["case", ["==", ["get", "severity"], 3], "#FFFFFF", RL_COLL_INK],
+                 "circle-stroke-color": ["case", ["==", ["get", "severity"], 3], RL_COLL_INK, "#FFFFFF"],
+                 "circle-stroke-width": 1.3 } }, over);
+      // Q5: the ones near an alternative only while an alternative is drawn
+      m.setFilter("rl-coll", altShown ? null : ["==", ["get", "along"], "route"]);
+    }
+    RL_KEYS.forEach(k => RL_LAYERS[k].forEach(l => { if(m.getLayer(l)) m.setLayoutProperty(l, "visibility", vis(k)); }));
+    // places and cycle routes share a source; each tick shows its own part
+  } catch(e){ console.warn("Wayscope:", e); }
+}
+// the count beside each tick, once read
+function rlCounts(D){
+  const c = {};
+  if(D.closures) c.closures = (D.closures.features || []).length;
+  if(D.limits) c.limits = (D.limits.features || []).length;
+  if(D.community){ const fs = D.community.features || []; c.cycle = fs.filter(f => (f.properties || {}).kind === "cycle").length; c.places = fs.length - c.cycle; }
+  if(D.collisions) c.collisions = (D.collisions.features || []).filter(f => (f.properties || {}).along === "route").length;
+  return c;
+}
+// one popup for whichever of these layers was clicked (true = handled, so the route under it is not picked)
+function rlPopup(m, e, D, popRef){
+  const order = ["rl-limit-sign", "rl-places", "rl-coll", "rl-closure-pt", "rl-closure-line", "rl-cycle", "rl-limit-line", "rl-res-fill"]
+    .filter(l => m.getLayer(l) && m.getLayoutProperty(l, "visibility") === "visible");
+  if(!order.length) return false;
+  const box = [[e.point.x - 4, e.point.y - 4], [e.point.x + 4, e.point.y + 4]];
+  let f = null, layer = null;
+  for(const l of order){ const hit = m.queryRenderedFeatures(box, { layers: [l] }); if(hit.length){ f = hit[0]; layer = l; break; } }
+  if(!f) return false;
+  const p = f.properties || {};
+  const kind = ((D.community && D.community.kinds) || []).find(k => k.key === p.kind) || {};
+  const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+  let html = "";
+  if(layer === "rl-limit-sign" || layer === "rl-limit-line") html = `<b>${esc(p.headline || p.label || "Lorry limit")}</b><div style="color:#64748B">Advisory: routes are not changed by it.</div>`;
+  else if(layer === "rl-coll"){
+    const month = p.month ? new Date(p.month + "-15T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : String(p.year || "");
+    const road = [p.road, p.road2].filter(x => x && x !== "null").join(" / ");
+    html = `<b>${esc(p.severity_word || "")} injury collision</b><div>${esc(month)}</div>${road ? `<div>${esc(road)}</div>` : ""}<div style="color:#64748B">Reported to the police.</div>`;
+  }
+  else if(layer === "rl-closure-pt" || layer === "rl-closure-line") html = `<b>${esc(p._headline || p._label || "Planned road closure")}</b><div style="color:#64748B">For information: routes do not avoid it.</div>`;
+  else html = `<b>${esc(p.name || kind.label || "")}</b>${p.name && kind.label ? `<div>${esc(kind.label)}</div>` : ""}${p.detail ? `<div>${esc(p.detail)}</div>` : ""}`;
+  try { if(popRef.current) popRef.current.remove(); } catch(err){}
+  popRef.current = new window.mapboxgl.Popup({ closeButton: true, maxWidth: "280px" }).setLngLat(e.lngLat)
+    .setHTML(`<div style="font:14px system-ui;max-width:260px">${html}</div>`).addTo(m);
+  return true;
+}
+// 8 Nov 2026 (task 2.1-7, Q7): one leg's distance and time for a vehicle and option, from /api/routes/status (no new read)
+function legFig(pinfo, leg, alt){
+  const l = ((pinfo && pinfo.legs && pinfo.legs[leg]) || []).find(x => x.alt_index === (alt || 0));
+  return (l && l.baked && l.distance_km != null) ? { km: l.distance_km, min: l.duration_hr != null ? Math.round(l.duration_hr * 60) : null } : null;
+}
 // the selected route's other options, drawn behind the chosen line
 const ALT_COLOR = "#94A3B8";
 const MAP_H = "62vh";     // map height — the right-hand column matches it and scrolls inside
@@ -14441,6 +14590,87 @@ function CarbonRouteChoices(){
 }
 
 
+// 8 Nov 2026 (v2.1 tasks 2.1-5 + 2.1-7, the mockup John approved: notes routes-page-layout-mockup-1108): on the Routes map,
+// Out · Back · Both (Both first, Q2) and the Layers box (five ticks, all off on every visit, Q4; a count once read)
+function RouteMapBox({ leg, onLeg, on, counts, onTick, msg, low }){
+  const LEGS = [["both", "Both"], ["loaded", "Out"], ["return", "Back"]];
+  return (
+    <div className="absolute left-2 flex flex-col items-start gap-1.5" style={{ zIndex: 3, maxWidth: 260, top: low ? 44 : 8 }} data-route-map-box="1">
+      <div className="inline-flex rounded-lg overflow-hidden border border-slate-300 shadow-sm" role="group" aria-label="Direction drawn" style={{ background: "var(--surface)" }}>
+        {LEGS.map(([v, l]) => (
+          <button key={v} type="button" data-leg-pick={v} aria-pressed={leg === v ? "true" : "false"} onClick={() => onLeg(v)}
+            className="px-3 text-[13px] font-semibold" style={{ minHeight: 28, ...(leg === v ? { background: "var(--navy)", color: "var(--control-fg)" } : { color: "var(--ink)" }) }}>{l}</button>
+        ))}
+      </div>
+      <details className="rounded-lg border border-slate-300 shadow-sm text-[13px]" style={{ background: "var(--surface)" }} data-route-layers="1">
+        <summary className="px-3 font-semibold cursor-pointer" style={{ minHeight: 28, display: "flex", alignItems: "center" }}>Layers</summary>
+        <div className="px-3 pb-2 space-y-0.5">
+          {RL_KEYS.map(k => (
+            <label key={k} className="flex items-center gap-2 min-h-6 whitespace-nowrap">
+              <input type="checkbox" checked={!!on[k]} onChange={e => onTick(k, e.target.checked)} data-route-layer={k} style={{ accentColor: "var(--navy)" }} />
+              {RL_LABEL[k]}{counts[k] != null && <span className="text-slate-500">{counts[k]}</span>}
+            </label>
+          ))}
+          {msg && <p className="text-[13px]" style={{ color: "var(--bad-text)" }} role="status">{msg}</p>}
+        </div>
+      </details>
+    </div>
+  );
+}
+// 8 Nov 2026 (task 2.1-8): the Routes page in full screen — the route list on the left (« folds it) ...
+function RouteFullList({ routes, prof, alt, selected, onPick, folded, onFold }){
+  return (
+    <div className="card p-2" style={{ gridColumn: 1, gridRow: 1, minHeight: 0, overflowY: "auto" }} role="region" aria-label="Routes list" tabIndex={0} data-route-full-list="1">
+      <div className="flex items-center justify-between gap-2 mb-1">
+        {!folded && <span className="text-sm font-semibold text-slate-700 px-1">Routes</span>}
+        <button type="button" className="sl-fold" onClick={onFold} aria-expanded={!folded}
+          aria-label={folded ? "Show the routes" : "Hide the routes"} title={folded ? "Show the routes" : "Hide the routes"}>{folded ? "»" : "«"}</button>
+      </div>
+      {!folded && routes.map(r => {
+        const o = legFig(r.profiles[prof], "loaded", alt), b = legFig(r.profiles[prof], "return", alt);
+        return (
+          <button key={r.id} type="button" onClick={() => onPick(r.id)} data-route-full-pick={r.id} aria-current={selected === r.id ? "true" : undefined}
+            className={"w-full text-left rounded-md px-2 py-1.5 text-[13px] " + (selected === r.id ? "bg-blue-50 ring-1 ring-inset ring-[color:var(--navy)]" : "hover:bg-slate-50")}>
+            <span className="font-semibold text-slate-800">{r.id}</span> <span className="text-slate-600">{r.origin} → {r.dest}</span>
+            <span className="block text-slate-500 tabular-nums">{o ? `Out ${fmtDist(o.km, 1)} ${DU()}` : "Out —"} · {b ? `Back ${fmtDist(b.km, 1)} ${DU()}` : "Back —"}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+// ... and the chosen route on the right (» folds it): the two legs, near the route, the buttons, then the vehicle table
+function RouteFullDetails({ route, prof, alt, folded, onFold, near, analysis, diversions }){
+  const r = route;
+  const leg = (key, word, colour) => {
+    const f = r ? legFig(r.profiles[prof], key, alt) : null;
+    return (
+      <div className="flex items-center gap-2 text-[13px]" data-route-full-leg={key}>
+        <span aria-hidden="true" style={{ width: 16, height: 4, borderRadius: 2, background: colour, flex: "none" }}></span>
+        <span className="font-semibold w-10">{word}</span>
+        <span className="tabular-nums">{f ? `${fmtDist(f.km, 1)} ${DU()}` : "—"}</span>
+        <span className="tabular-nums text-slate-500">{f && f.min != null ? `${f.min} min` : ""}</span>
+      </div>
+    );
+  };
+  return (
+    <div className="card p-3 space-y-3" style={{ gridColumn: 3, gridRow: 1, minHeight: 0, overflowY: "auto" }} role="region" aria-label="The chosen route" tabIndex={0} data-route-full-details="1">
+      <div className="flex items-center gap-2">
+        <button type="button" className="sl-fold" onClick={onFold} aria-expanded={!folded}
+          aria-label={folded ? "Show the route" : "Hide the route"} title={folded ? "Show the route" : "Hide the route"}>{folded ? "«" : "»"}</button>
+        {!folded && r && <span className="text-sm font-semibold text-slate-700">{r.id} · {r.origin} → {r.dest}</span>}
+      </div>
+      {!folded && (!r ? <p className="text-[13px] text-slate-500">Pick a route on the map or in the list.</p> : <>
+        <div className="space-y-1">{leg("loaded", "Out", LEG_OUT)}{leg("return", "Back", LEG_BACK)}
+          <p className="text-[13px] text-slate-500">{vehLabel(prof)}{alt ? ` · Alt ${alt}` : ""}</p></div>
+        <div className="text-[13px]"><span className="font-semibold text-slate-700">Near the route </span><NearCell data={near} id={r.id} /></div>
+        <div className="flex flex-wrap gap-2"><RouteSheetButton routeId={r.id} /><CollisionEvidenceButton routeId={r.id} /></div>
+        {analysis && <div className="overflow-x-auto" data-route-full-analysis="1"><table className="text-sm" style={{ tableLayout: "fixed", width: "100%" }}><tbody>{analysis}</tbody></table></div>}
+        {diversions && <div><p className="text-xs font-semibold text-slate-700">Diversions</p>{diversions}</div>}
+      </>)}
+    </div>
+  );
+}
 function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting, leg,
                         haulRoads, token, onHaulChanged, originId, destId, gateBlockers, onBusyChanged }){
   const [data, setData] = useState(null);
@@ -14530,7 +14760,9 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                   <th className="px-2 py-1 text-left font-semibold">Vehicle</th>
                   <th className="px-2 py-1 text-left font-semibold">Option</th>
                   <th className={head}>Out {DU()}</th>
+                  <th className={head} data-an-col="out-min">Out min</th>
                   <th className={head}>Back {DU()}</th>
+                  <th className={head} data-an-col="back-min">Back min</th>
                   <th className={head}>Turn</th>
                   <th className={head}>Cycle</th>
                   {hourCols.map(h => <th key={h} className={head} data-hour-col={h}>{h}</th>)}
@@ -14550,22 +14782,24 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                     onClick={() => onFocus && onFocus(r.profile, r.alt_index)}
                     title="Show this option on the map"
                     className={"border-t border-slate-200/70 cursor-pointer "
-                      + (isActive ? "bg-white ring-1 ring-inset ring-[color:var(--red)]/40 "
+                      + (isActive ? "bg-white ring-1 ring-inset ring-[color:var(--navy)]/40 "
                                   : "hover:bg-white ")
                       + (r.alt_index === 0 ? "" : "text-slate-500")}>
                     <td className="px-2 py-1 whitespace-nowrap">
                       {r.alt_index === 0 ? vehShort(r.profile) : ""}
                     </td>
                     <td className="px-2 py-1 whitespace-nowrap">
-                      {isActive && <span style={{ color: "var(--red)" }} title="Shown on the map">● </span>}
+                      {isActive && <span style={{ color: "var(--navy)" }} title="Shown on the map">● </span>}
                       {r.alt_index === 0
                         ? <span className="font-semibold" style={{ color: "var(--navy)" }}>Primary</span>
                         : `Alt ${r.alt_index}`}
                     </td>
                     <td className={cell}>{fmtDist(r.loaded_km, 1)}</td>
+                    <td className={cell}>{r.loaded_hr != null ? Math.round(r.loaded_hr * 60) : "—"}</td>
                     <td className={cell} title={r.return_estimated ? "Return leg not routed — assumed same as outbound" : undefined}>
                       {fmtDist(r.return_km, 1)}{r.return_estimated ? "*" : ""}
                     </td>
+                    <td className={cell}>{r.return_hr != null ? Math.round(r.return_hr * 60) : "—"}{r.return_estimated && r.return_hr != null ? "*" : ""}</td>
                     <td className={cell} title={(() => {
                       // B4: the total is the backend's, and the tooltip explains it from
                       // the backend's own parts. Nothing here re-adds them — the dashboard
@@ -14733,8 +14967,18 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [showProfile, setShowProfile] = useState(vehicles.includes("Artic Tipper (44t)") ? "Artic Tipper (44t)" : vehicles[0]);
   // which of the baked geometries the map draws. A route now has two directions and up
   // to three HERE options each, so without a pick the map would stack six lines per route.
-  const [showLeg, setShowLeg] = useState("loaded");
+  // 8 Nov 2026 (v2.1 task 2.1-7, the mockup John approved: notes routes-page-layout-mockup-1108, Q2): "both" draws the laden leg
+  // out (green) and the empty leg back (amber) side by side, each left of its own travel, with arrows; Out / Back draw one.
+  const [showLeg, setShowLeg] = useState("both");
+  const showLegRef = useRef("both");
+  useEffect(() => { showLegRef.current = showLeg; }, [showLeg]);
+  // a leg the server understands: a pick that names one, else the laden leg (promote, the analysis row's focus)
+  const oneLeg = (l) => (l === "loaded" || l === "return") ? l : "loaded";
   const [showAlt, setShowAlt] = useState(0);
+  // 8 Nov 2026 (task 2.1-5, Q4-Q6): the Routes map's five layers, off on every visit; each read only when first ticked
+  const [rLayers, setRLayers] = useState({ closures: false, limits: false, places: false, collisions: false, cycle: false });
+  const rLayerData = useRef({});   // { closures, limits, community, collisions } as read
+  const [rLayerCounts, setRLayerCounts] = useState({});
   // which Routes row has its analysis panel open (Step C)
   const [openRow, setOpenRow] = useState(null);
   // every cached option for the selected route, and which one is currently in focus.
@@ -14745,6 +14989,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [token, setToken] = useState("");
   const [bakeBusy, setBakeBusy] = useState("");   // route id currently being (re-)baked
   const [selected, setSelected] = useState(null);
+  const selectedRef = useRef(null);   // 8 Nov 2026: read by applyEmphasis (the fade), which runs from map events too
 
   // ---- the page: Locations | Routes | Zones ----
   //
@@ -14865,7 +15110,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [full, setFull] = useState(false);
   const [fold, setFold] = useState({ l: false, r: false });   // the drawing's two side columns, folded in full screen
   const fullCtl = useRef({ box: null, btn: null, toggle: null }), fsAsked = useRef(false), fullGrid = useRef(null);
-  const fullOk = isWide && subTab === "locations" && !!(drawing || (!form && readLoc) || (form && form.id));
+  // 8 Nov 2026 (v2.1 task 2.1-8, Q1): the Routes page too, at any time: the route list left, the map, the chosen route right
+  const fullOk = isWide && ((subTab === "locations" && !!(drawing || (!form && readLoc) || (form && form.id))) || (subTab === "routes" && !drawing));
   const enterFull = () => {
     setFold({ l: false, r: false }); setFull(true);
     try { if(document.documentElement.requestFullscreen && !document.fullscreenElement){ fsAsked.current = true; document.documentElement.requestFullscreen().catch(() => { fsAsked.current = false; }); } }
@@ -14955,10 +15201,17 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // lean the shared map towards the active sub-tab (paint only — no layer churn)
   const applyEmphasis = (m) => {
     const E = EMPHASIS[subTabRef.current] || EMPHASIS.routes;
+    // 8 Nov 2026 (task 2.1-7, Q3): a picked route keeps its weight, the rest fade to 30 % of the page's own
+    const sel = selectedRef.current;
+    const dim = (base) => sel ? ["case", ["==", ["get", "route_id"], sel], base, base * 0.3] : base;
     try {
       m.setPaintProperty("route-line", "line-width", E.route);
-      m.setPaintProperty("route-line", "line-opacity", E.routeOp);
-      m.setPaintProperty("route-casing", "line-opacity", E.casingOp);
+      m.setPaintProperty("route-line", "line-opacity", dim(E.routeOp));
+      m.setPaintProperty("route-casing", "line-opacity", dim(E.casingOp));
+      if(m.getLayer("route-arrows")){
+        m.setPaintProperty("route-arrows", "icon-opacity", dim(1));
+        m.setLayoutProperty("route-arrows", "visibility", subTabRef.current === "routes" ? "visible" : "none");
+      }
       m.setPaintProperty("node-dots", "circle-radius", E.node);
       m.setPaintProperty("node-dots", "circle-stroke-width", E.nodeStroke);
     } catch(e){}
@@ -14977,12 +15230,21 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(!m.getSource("draw")) m.addSource("draw", { type: "geojson", data: drawFC.current });
     // failed routes share the source but are filtered apart, so an unroutable pair is
     // visibly impossible rather than simply absent
+    // 8 Nov 2026 (v2.1 task 2.1-7): the laden leg out green, the empty leg back amber, solid, each LEFT of its own travel
+    // (UK traffic side, as the public map) so a road used both ways shows both colours side by side; arrows the way it runs
     if(!m.getLayer("route-casing")) m.addLayer({ id: "route-casing", type: "line", source: "routes",
-      filter: ["!=", ["get", "failed"], true],
-      paint: { "line-color": "#ffffff", "line-width": 5, "line-opacity": 0.85 } });
+      filter: ["!=", ["get", "failed"], true], layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#ffffff", "line-width": 5, "line-opacity": 0.85, "line-offset": LEG_OFFSET } });
     if(!m.getLayer("route-line")) m.addLayer({ id: "route-line", type: "line", source: "routes",
+      filter: ["!=", ["get", "failed"], true], layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": LEG_COLOR_EXPR, "line-width": 3, "line-offset": LEG_OFFSET } });
+    try { if(!m.hasImage("leg-arrow")) m.addImage("leg-arrow", legArrowImage(), { pixelRatio: 2, sdf: true }); } catch(e){}
+    if(!m.getLayer("route-arrows")) m.addLayer({ id: "route-arrows", type: "symbol", source: "routes",
       filter: ["!=", ["get", "failed"], true],
-      paint: { "line-color": ROUTE_COLOR, "line-width": 3 } });
+      layout: { "symbol-placement": "line", "symbol-spacing": 110, "icon-image": "leg-arrow", "icon-allow-overlap": true,
+                "icon-rotation-alignment": "map", "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 14, 1.1],
+                "icon-offset": ["interpolate", ["linear"], ["zoom"], 9, ["literal", [0, -5]], 14, ["literal", [0, -8]]] },
+      paint: { "icon-color": "#ffffff", "icon-halo-color": LEG_COLOR_EXPR, "icon-halo-width": 2 } });
     if(!m.getLayer("route-failed")) m.addLayer({ id: "route-failed", type: "line", source: "routes",
       filter: ["==", ["get", "failed"], true],
       paint: { "line-color": FAILED_COLOR, "line-width": 2, "line-opacity": 0.9,
@@ -14990,8 +15252,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     // alternatives sit *under* the chosen line, so the primary always reads on top
     if(!m.getLayer("alt-line")) m.addLayer({ id: "alt-line", type: "line", source: "alts",
       paint: { "line-color": ALT_COLOR, "line-width": 4, "line-opacity": 0.8 } });
+    // 8 Nov 2026 (task 2.1-7, Q3): the picked route is a blue halo UNDER its own coloured legs, not a red line over them
     if(!m.getLayer("sel-line")) m.addLayer({ id: "sel-line", type: "line", source: "sel",
-      paint: { "line-color": "#DC2626", "line-width": 5 } });
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": SEL_HALO, "line-opacity": 0.32, "line-width": ["interpolate", ["linear"], ["zoom"], 9, 11, 14, 16],
+               "line-offset": LEG_OFFSET } }, "route-casing");
     if(!m.getLayer("selnode-ring")) m.addLayer({ id: "selnode-ring", type: "circle", source: "selnode",
       paint: { "circle-radius": 11, "circle-color": "rgba(0,0,0,0)", "circle-stroke-width": 3, "circle-stroke-color": "#DC2626" } });
     if(!m.getLayer("node-dots")) m.addLayer({ id: "node-dots", type: "circle", source: "nodes",
@@ -15091,6 +15356,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         const box = [[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]];
         const hitNode = m.queryRenderedFeatures(box, { layers: ["node-dots"] });
         if(hitNode.length) return;    // node taps are handled by mousedown/up
+        if(cbRef.current.layerPopup && cbRef.current.layerPopup(e)) return;   // 2.1-5: a ticked layer's thing, not the route under it
         const layers = ["route-line", "route-failed"].filter(l => m.getLayer(l));
         const hitRoute = m.queryRenderedFeatures(e.point, { layers });
         if(hitRoute.length) (cbRef.current.selectRoute || (()=>{}))(hitRoute[0].properties.route_id);
@@ -15101,7 +15367,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       m.on("mouseleave", "route-line", () => { m.getCanvas().style.cursor = modeRef.current === "add" ? "crosshair" : ""; });
       setMapReady(true);
     });
-    m.on("style.load", () => { addNetworkLayers(m); if(layoutReinstallRef.current) layoutReinstallRef.current(); if(drawReinstallRef.current) drawReinstallRef.current(); });  // re-add after a basemap switch
+    m.on("style.load", () => { addNetworkLayers(m); if(cbRef.current.rlReinstall) cbRef.current.rlReinstall(); if(layoutReinstallRef.current) layoutReinstallRef.current(); if(drawReinstallRef.current) drawReinstallRef.current(); });  // re-add after a basemap switch
     // Mapbox measures its container on init, before the flex/grid layout has settled,
     // so nudge it to re-measure once things are laid out (and whenever the window resizes).
     const doResize = () => { try { m.resize(); } catch(e){} };
@@ -15133,11 +15399,18 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   useEffect(() => {
     if(!mapReady) return;
     const m = mapObj.current;
-    const q = new URLSearchParams({ profile: showProfile, leg: showLeg, alt_index: String(showAlt) });
-    fetch(`${API}/routes/geojson?${q.toString()}`).then(r => r.json()).then(gj => {
+    // 8 Nov 2026 (task 2.1-7): one read per leg drawn, each feature stamped with its leg (the colour, the arrows, the filter)
+    const legs = showLeg === "both" ? ["loaded", "return"] : [oneLeg(showLeg)];
+    Promise.all(legs.map(leg => {
+      const q = new URLSearchParams({ profile: showProfile, leg, alt_index: String(showAlt) });
+      return fetch(`${API}/routes/geojson?${q.toString()}`).then(r => r.json())
+        .then(gj => (gj.features || []).map(f => ({ ...f, properties: { ...f.properties, leg } })));
+    })).then(parts => {
+      const gj = { type: "FeatureCollection", features: [].concat(...parts) };
       routesFC.current = gj;
       geoCache.current = {};
-      (gj.features || []).forEach(f => { geoCache.current[f.properties.route_id] = f.geometry.coordinates; });
+      // the fit uses every drawn point of a route, both legs when both are drawn
+      gj.features.forEach(f => { const id = f.properties.route_id; geoCache.current[id] = (geoCache.current[id] || []).concat(f.geometry.coordinates || []); });
       if(m.getSource("routes")) m.getSource("routes").setData(gj);
       // the selection highlight is owned by the selected-options effect below, which
       // reacts to showProfile/showLeg itself — nothing to re-sync here
@@ -15165,7 +15438,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // showing, so the alternatives can be drawn alongside the chosen line.
   const selectRoute = (id) => {
     setSelected(id);
-    setActiveGeom({ profile: showProfile, leg: showLeg, alt_index: 0 });
+    setActiveGeom({ profile: showProfile, leg: showLegRef.current, alt_index: 0 });
     setSelGeoms(null);
     const m = mapObj.current;
     const coords = geoCache.current[id];
@@ -15182,41 +15455,81 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     setActiveGeom({ profile, alt_index, leg: leg || showLeg });
 
   const sameGeom = (f, a) => a && f.properties.vehicle_profile === a.profile
-    && f.properties.leg === a.leg && f.properties.alt_index === a.alt_index;
+    && (a.leg === "both" || f.properties.leg === a.leg) && f.properties.alt_index === a.alt_index;
 
-  // paint the selected route's options: focused one red, its siblings grey
+  // paint the selected route's options: the focused one under a blue halo (8 Nov 2026, task 2.1-7, Q3: no red), its siblings grey,
+  // every other route faded
   useEffect(() => {
     const m = mapObj.current; if(!m || !mapReady) return;
     const selSrc = m.getSource("sel"), altSrc = m.getSource("alts");
     if(!selSrc || !altSrc) return;
+    selectedRef.current = selected;
+    applyEmphasis(m);   // the rest of the network fades while a route is picked
 
     if(!selected || !selGeoms){
       // nothing selected — fall back to the plain highlight from the shown geometry
-      const coords = selected ? geoCache.current[selected] : null;
-      selFC.current = coords
-        ? { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } }
-        : { type: "FeatureCollection", features: [] };
+      selFC.current = { type: "FeatureCollection", features: selected
+        ? (routesFC.current.features || []).filter(f => f.properties.route_id === selected && !f.properties.failed) : [] };
       altFC.current = { type: "FeatureCollection", features: [] };
       selSrc.setData(selFC.current); altSrc.setData(altFC.current);
       return;
     }
 
     const feats = selGeoms.features || [];
-    // only the focused vehicle's options for the shown direction — drawing every
+    // only the focused vehicle's options for the shown direction(s) — drawing every
     // vehicle's alternatives at once would be a thicket, not information
     const prof = (activeGeom && activeGeom.profile) || showProfile;
-    const leg = (activeGeom && activeGeom.leg) || showLeg;
-    const mine = feats.filter(f => f.properties.vehicle_profile === prof && f.properties.leg === leg);
-    const focused = mine.find(f => sameGeom(f, activeGeom))
-                 || mine.find(f => f.properties.alt_index === 0);
+    const leg = showLeg === "both" ? "both" : ((activeGeom && activeGeom.leg !== "both" && activeGeom.leg) || showLeg);
+    const alt = activeGeom ? activeGeom.alt_index : 0;
+    const mine = feats.filter(f => f.properties.vehicle_profile === prof && (leg === "both" || f.properties.leg === leg));
+    // one focused line per leg drawn: the picked option where it exists, else that leg's primary
+    const focused = [...new Set(mine.map(f => f.properties.leg))].map(l => {
+      const ofLeg = mine.filter(f => f.properties.leg === l);
+      return ofLeg.find(f => f.properties.alt_index === alt) || ofLeg.find(f => f.properties.alt_index === 0);
+    }).filter(Boolean);
 
-    selFC.current = focused
-      ? { type: "FeatureCollection", features: [focused] }
-      : { type: "FeatureCollection", features: [] };
+    selFC.current = { type: "FeatureCollection", features: focused };
     altFC.current = { type: "FeatureCollection",
-                      features: mine.filter(f => f !== focused) };
+                      features: mine.filter(f => !focused.includes(f)) };
     selSrc.setData(selFC.current); altSrc.setData(altFC.current);
-  }, [selected, selGeoms, activeGeom, showProfile, showLeg, mapReady]);
+  }, [selected, selGeoms, activeGeom, showProfile, showLeg, mapReady, subTab]);
+
+  // 8 Nov 2026 (task 2.1-5): the five layers. A box's first tick reads what the staff Route map reads (nothing new is fetched);
+  // every change, a page switch and a basemap switch (rlReinstall) draws them again. Shown on the Routes page only.
+  const rlPop = useRef(null);
+  const rlAltShown = !!(selected && selGeoms && (selGeoms.features || []).some(f => f.properties.alt_index > 0));
+  const rlDraw = () => rlEnsure(mapObj.current, rLayerData.current, rLayersRef.current, subTabRef.current === "routes", rlAltRef.current);
+  const rLayersRef = useRef(rLayers); rLayersRef.current = rLayers;
+  const rlAltRef = useRef(false); rlAltRef.current = rlAltShown;
+  cbRef.current.rlReinstall = rlDraw;
+  cbRef.current.layerPopup = (e) => subTabRef.current === "routes" && rlPopup(mapObj.current, e, rLayerData.current, rlPop);
+  const rlRead = async (k) => {
+    const D = rLayerData.current;
+    const get = async (u) => { const r = await fetch(u, { credentials: "same-origin" }); if(!r.ok) throw await errFrom(r); return r.json(); };
+    if(k === "closures" && !D.closures){
+      const pts = (nodesFC.current.features || []).map(f => f.geometry && f.geometry.coordinates).filter(Array.isArray);
+      let q = "";
+      if(pts.length){
+        const xs = pts.map(c => c[0]), ys = pts.map(c => c[1]);
+        const midLat = (Math.min(...ys) + Math.max(...ys)) / 2, dLat = 20 / 111, dLon = 20 / (111 * Math.max(0.2, Math.cos(midLat * Math.PI / 180)));
+        q = "?bbox=" + [Math.min(...xs) - dLon, Math.min(...ys) - dLat, Math.max(...xs) + dLon, Math.max(...ys) + dLat].map(v => v.toFixed(4)).join(",");
+      }
+      D.closures = await get(`${API}/restrictions${q}`);
+    }
+    if(k === "limits" && !D.limits) D.limits = await get(`${API}/public/limits`);
+    if((k === "places" || k === "cycle") && !D.community) D.community = await get(`${API}/community`);
+    if(k === "collisions" && !D.collisions) D.collisions = await get(`${API}/collisions`);
+  };
+  const [rlMsg, setRlMsg] = useState("");
+  const toggleRLayer = async (k, on) => {
+    setRLayers(v => ({ ...v, [k]: on }));
+    if(!on) return;
+    try { await rlRead(k); setRLayerCounts(rlCounts(rLayerData.current)); setRlMsg(""); }
+    catch(e){ console.warn("Wayscope:", e); setRlMsg(`${RL_LABEL[k]} could not be shown just now.`); setRLayers(v => ({ ...v, [k]: false })); }
+    rlDraw();
+  };
+  useEffect(() => { if(mapReady) rlDraw(); if(subTab !== "routes" && rlPop.current){ try { rlPop.current.remove(); } catch(e){} } },
+    [rLayers, subTab, rlAltShown, mapReady]);
 
   // clearing the selection clears its options too
   useEffect(() => {
@@ -15228,7 +15541,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     const key = `${profile}|${alt_index}`;
     setPromoting(key);
     try {
-      const p = new URLSearchParams({ profile, alt_index: String(alt_index), leg: leg || showLeg });
+      const p = new URLSearchParams({ profile, alt_index: String(alt_index), leg: oneLeg(leg || showLeg) });
       if(tokenRef.current) p.set("token", tokenRef.current);
       const res = await fetch(`${API}/admin/routes/${encodeURIComponent(selected)}/promote-alt?${p}`,
         { method: "POST" });
@@ -16385,11 +16698,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           <select value={showProfile} onChange={e => setShowProfile(e.target.value)} className={sel} aria-label="Show vehicle">
             {vehicles.filter(v => vehShown(v, showProfile)).map(v => <option key={v} value={v}>{vehLabel(v)}</option>)}
           </select>
-          {/* the map can only draw one of the baked geometries at a time */}
-          <select value={showLeg} onChange={e => setShowLeg(e.target.value)} className={sel} title="Which direction to draw" aria-label="Direction drawn">
-            <option value="loaded">Laden out</option>
-            <option value="return">Empty back</option>
-          </select>
+          {/* 8 Nov 2026 (task 2.1-7): the direction is the map's own Out · Back · Both switch now (the header select is gone) */}
           <select value={showAlt} onChange={e => setShowAlt(+e.target.value)} className={sel} title="Which route option to draw" aria-label="Route option drawn">
             <option value={0}>Primary route</option>
             <option value={1}>Alt 1</option>
@@ -16429,17 +16738,33 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           settings filling the height (either side folds to a strip); before Draw, the map | the site's panel */}
       <div ref={fullGrid} className={(drawing ? "grid gap-3" : "grid lg:grid-cols-3 gap-4") + (full ? " sl-full" : "")} data-drawing={drawing ? "1" : undefined} data-full={full ? "1" : undefined}
         style={full ? (drawing ? { gridTemplateColumns: `${fold.l ? 44 : 232}px minmax(0, 1fr) ${fold.r ? 44 : 300}px`, gridTemplateRows: "auto minmax(0, 1fr)" }
+          : onRoutes ? { gridTemplateColumns: `${fold.l ? 44 : 300}px minmax(0, 1fr) ${fold.r ? 44 : 380}px`, gridTemplateRows: "minmax(0, 1fr)" }
           : { gridTemplateColumns: "minmax(0, 1fr) 380px", gridTemplateRows: "minmax(0, 1fr)" })
           : drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined}>
         {/* ONE map instance, shared by both sub-tabs — this div is never unmounted */}
         <div className={drawing ? "card overflow-hidden" : "lg:col-span-2 card overflow-hidden"}
-          style={full ? { gridColumn: drawing ? 2 : 1, gridRow: drawing ? 2 : 1, minHeight: 0, position: "relative" } : drawing && isWide ? { gridColumn: 2, gridRow: 2 } : undefined}>
+          style={full ? { gridColumn: (drawing || onRoutes) ? 2 : 1, gridRow: drawing ? 2 : 1, minHeight: 0, position: "relative" } : drawing && isWide ? { gridColumn: 2, gridRow: 2, position: "relative" } : { position: "relative" }}>
           <div ref={mapDiv} style={{ height: full ? "100%" : drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />
+          {onRoutes && !drawing && <RouteMapBox low={full && !!TENANT.demo_notice} leg={showLeg} onLeg={setShowLeg} on={rLayers} counts={rLayerCounts} onTick={toggleRLayer} msg={rlMsg} />}
           {full && !drawing && TENANT.demo_notice && <span className="sl-demo-pill sl-demo-on-map" role="note"><b>DEMO</b>{TENANT.demo_notice}</span>}
         </div>
 
+        {full && onRoutes && !drawing && <>
+          <RouteFullList routes={status || []} prof={showProfile} alt={showAlt} selected={selected} onPick={selectRoute}
+            folded={fold.l} onFold={() => setFold(f => ({ ...f, l: !f.l }))} />
+          <RouteFullDetails route={(status || []).find(r => r.id === selected) || null} prof={showProfile} alt={showAlt}
+            folded={fold.r} onFold={() => setFold(f => ({ ...f, r: !f.r }))} near={nearData}
+            analysis={selected ? <RouteAnalysis routeId={selected} colSpan={1}
+              originId={((status || []).find(r => r.id === selected) || {}).origin_id} destId={((status || []).find(r => r.id === selected) || {}).dest_id}
+              gateBlockers={((status || []).find(r => r.id === selected) || {}).gate_blockers}
+              active={activeGeom} leg={showLeg} onFocus={focusGeom} onPromote={canEdit ? promoteAlt : null}
+              onBusyChanged={loadDiversions} promoting={promoting} haulRoads={haulRoadList} token={tokenRef.current}
+              onHaulChanged={rebakeAfterZone} /> : null}
+            diversions={selected && (divPeriods || []).some(p => p.route_id === selected)
+              ? <DivRows rows={(divPeriods || []).filter(p => p.route_id === selected)} prof={showProfile} canEdit={canEdit} busy={divBusy} onKeep={keepMain} routes={status} /> : null} />
+        </>}
         {/* 27 Oct 2026 (P5): read-only, the panel may hold no control at all, so it is a tab stop itself to scroll by keyboard */}
-        <div className="space-y-4" style={drawing ? { display: "none" } : full ? { gridColumn: 2, gridRow: 1, minHeight: 0, overflowY: "auto" } : panelStyle} {...(canEdit ? {} : { tabIndex: 0, role: "region", "aria-label": onLoc ? "Locations panel" : onZones ? "Zones panel" : "Routes panel" })}>
+        <div className="space-y-4" style={drawing || (full && onRoutes) ? { display: "none" } : full ? { gridColumn: 2, gridRow: 1, minHeight: 0, overflowY: "auto" } : panelStyle} {...(canEdit ? {} : { tabIndex: 0, role: "region", "aria-label": onLoc ? "Locations panel" : onZones ? "Zones panel" : "Routes panel" })}>
           {onLoc && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
@@ -17340,11 +17665,15 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <span style={{ background: v, width: 10, height: 10, borderRadius: 999, display: "inline-block" }} />{k}
                 </span>
               ))}
-              <span className="inline-flex items-center gap-1.5">
-                <span style={{ background: ROUTE_COLOR, width: 14, height: 3, borderRadius: 2, display: "inline-block" }} />Route
+              {/* 8 Nov 2026 (task 2.1-7): out green, back amber, the picked route a blue halo */}
+              <span className="inline-flex items-center gap-1.5" data-legend-leg="out">
+                <span style={{ background: LEG_OUT, width: 14, height: 4, borderRadius: 2, display: "inline-block" }} />Out
               </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span style={{ background: "var(--red)", width: 14, height: 3, borderRadius: 2, display: "inline-block" }} />Selected
+              <span className="inline-flex items-center gap-1.5" data-legend-leg="back">
+                <span style={{ background: LEG_BACK, width: 14, height: 4, borderRadius: 2, display: "inline-block" }} />Back
+              </span>
+              <span className="inline-flex items-center gap-1.5" data-legend-leg="picked">
+                <span style={{ background: "rgba(29,78,216,.32)", width: 14, height: 8, borderRadius: 4, display: "inline-block" }} />Picked
               </span>
               <span className="inline-flex items-center gap-1.5" title="Other ways this route could go, for the selected vehicle">
                 <span style={{ background: ALT_COLOR, width: 14, height: 3, borderRadius: 2, display: "inline-block" }} />Alternative
@@ -17478,7 +17807,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 <th className={th}>From → to</th>
                 <th className={th}>{TEAM()}</th>
                 <th className={th}>Near the route</th>
-                <th className="px-3 py-2 text-right font-semibold">{DU()} ({vehShort(showProfile)})</th>
+                {/* 8 Nov 2026 (task 2.1-7, Q7): each leg's distance and time side by side, for the shown vehicle and option */}
+                <th className="px-3 py-2 text-right font-semibold" data-leg-col="out-dist" title={vehLabel(showProfile)}>Out {DU()}</th>
+                <th className="px-3 py-2 text-right font-semibold" data-leg-col="out-min">Out min</th>
+                <th className="px-3 py-2 text-right font-semibold" data-leg-col="back-dist">Back {DU()}</th>
+                <th className="px-3 py-2 text-right font-semibold" data-leg-col="back-min">Back min</th>
                 <th className={th}>Vehicles</th>
                 <th className="px-3 py-2 text-right font-semibold"><span className="sr-only">Actions</span></th>
               </tr>
@@ -17569,7 +17902,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <td className="px-3 py-2 text-slate-500">{r.origin} → {r.dest}</td>   {/* 30 Oct 2026 (4b): may wrap, so the Near the route column does not push the row's buttons off a 1280 px screen */}
                     <td className="px-3 py-2 text-slate-500">{teamText(r.ipt) || "—"}</td>
                     <td className="px-3 py-2" data-route-near-cell={r.id}><NearCell data={nearData} id={r.id} /></td>
-                    <td className="px-3 py-2 text-right tabular-nums">{pinfo && pinfo.distance_km != null ? fmtDist(pinfo.distance_km, 1) : "—"}</td>
+                    {(() => { const o = legFig(pinfo, "loaded", showAlt), b = legFig(pinfo, "return", showAlt);
+                      return <>
+                        <td className="px-3 py-2 text-right tabular-nums" data-leg-out={r.id}>{o ? fmtDist(o.km, 1) : "—"}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{o && o.min != null ? o.min : "—"}</td>
+                        <td className="px-3 py-2 text-right tabular-nums" data-leg-back={r.id}>{b ? fmtDist(b.km, 1) : "—"}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{b && b.min != null ? b.min : "—"}</td>
+                      </>; })()}
                     <td className="px-3 py-2"><VehChips profiles={r.profiles} /></td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       {canEdit && <>
@@ -17590,8 +17929,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       </>}
                     </td>
                   </tr>
-                  {open && <NearDetails data={nearData} id={r.id} colSpan={8} />}
-                  {open && <RouteAnalysis routeId={r.id} colSpan={8}
+                  {open && <NearDetails data={nearData} id={r.id} colSpan={11} />}
+                  {open && <RouteAnalysis routeId={r.id} colSpan={11}
                     originId={r.origin_id} destId={r.dest_id}
                     gateBlockers={r.gate_blockers}
                     active={selected === r.id ? activeGeom : null}
@@ -17604,7 +17943,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     token={tokenRef.current}
                     onHaulChanged={rebakeAfterZone} />}
                   {open && (divPeriods || []).some(p => p.route_id === r.id) && (
-                    <tr data-route-diversions={r.id}><td colSpan={8} className="px-3 pb-3">
+                    <tr data-route-diversions={r.id}><td colSpan={11} className="px-3 pb-3">
                       <p className="text-xs font-semibold text-slate-700 mt-1">Diversions</p>
                       <DivRows rows={(divPeriods || []).filter(p => p.route_id === r.id)} prof={showProfile} canEdit={canEdit}
                         busy={divBusy} onKeep={keepMain} routes={status} />
@@ -17612,8 +17951,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </React.Fragment>
                 );
               })}
-              {status && status.length === 0 && <tr><td colSpan="8" className="px-3 py-6 text-center text-slate-400">No routes yet — author one with “Create route”.</td></tr>}
-              {!status && <tr><td colSpan="8" className="px-3 py-6 text-center text-slate-400">Loading…</td></tr>}
+              {status && status.length === 0 && <tr><td colSpan="11" className="px-3 py-6 text-center text-slate-400">No routes yet — author one with “Create route”.</td></tr>}
+              {!status && <tr><td colSpan="11" className="px-3 py-6 text-center text-slate-400">Loading…</td></tr>}
             </tbody>
           </table>
         </div>
