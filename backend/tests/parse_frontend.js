@@ -5183,6 +5183,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("WORKS AREA: few words, no back end (no zone id, no 'API' / 'server' / 'geometry' / 'polygon' on screen)",
      !/\b(API|server|geometry|polygon|hull|endpoint|Z0\d\d)\b/i.test((cardc.slice(cardc.indexOf("const openWorks"), cardc.indexOf("const openPrint")).match(/>[^<>{}\n]{3,}</g) || []).join(" ")
        + (card.slice(card.indexOf("data-site-layout-works-panel"), card.indexOf("data-site-layout-print")).match(/>[^<>{}\n]{3,}</g) || []).join(" ")));
+}
+
 // ---- 8 Nov 2026 (v2.1 task 2.1-13): the week maps' key, names and loads (mockup notes/dashboard-today-map-mockup-1108) ----
 {
   // from src (the end marker is a comment), then its comments stripped like `code`
