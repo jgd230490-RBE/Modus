@@ -3636,8 +3636,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      _po.includes('const k = (e) => { if(e.key === "Escape") setMoreOpen(false); };') && _pm.includes('className="phone-more-back" aria-label="Close More" tabIndex={-1} onClick={onClose}')
      && _po.includes("if(window.matchMedia && window.matchMedia(NARROW_Q).matches){ setMoreOpen(true); return; }"));
   ok("⭐ PHONE WATCHER: the Dashboard's big-screen switch is not drawn on a phone", src.includes('{!phone && <button type="button" data-guide="dash-wall" onClick={toggleWall}'));
-  ok("⭐ PHONE WATCHER: the phone Look-ahead only READS — one GET of /lookahead and the Day sheet's GET; no method, no send(), no input, no Confirm",
-     _pl.length > 3000 && (_pl.match(/fetch\(/g) || []).length === 2 && _pl.includes("fetch(`${API}/lookahead?bucket=${bucket}`)")
+  // NARROWED 8 Nov 2026 (v2.1 task 2.1-9): + one GET of the Lorry plan (read-only)
+  ok("⭐ PHONE WATCHER: the phone Look-ahead only READS — one GET of /lookahead, one of the Lorry plan and the Day sheet's GET; no method, no send(), no input, no Confirm",
+     _pl.length > 3000 && (_pl.match(/fetch\(/g) || []).length === 3 && _pl.includes("fetch(`${API}/lookahead?bucket=${bucket}`)")
+     && _pl.includes("fetch(`${API}/forecast-weeks/lorry-plan?bucket=${bucket}`)")
      && _pl.includes("fetch(`${API}/forecast-weeks/day-sheet?bucket=${bucket}&day=${shown}`)")
      && !/method|send\(|<input|<select|<textarea|Confirm week|Re-open|saveDay|saveActual|doConfirm|doSpread|refreshTarkTee/.test(_pl));
   ok("PHONE LOOK-AHEAD: a date strip of the week's weekdays (today first, today marked), one card for the chosen day",
@@ -5222,6 +5224,45 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("🔴 2.1-13: the map still prints no cost, no team id (the team through teamText) and no word-rule word",
      !/€|\beur\b|_eur|fair|rate_|\brates?\b/i.test(cm) && !/IPT[1-6]/.test(cm) && !/\b(geometry|server|endpoint|token)\b/.test(cm.slice(cm.indexOf("return (\n"))));
   ok("2.1-13: the key's swatches are CSS (no images)", html.includes(".cm-k-out{height:4px;background:#059669;}") && html.includes(".cm-k-back{height:3px;background:#f59e0b;}"));
+}
+
+// ---- 8 Nov 2026 (v2.1 task 2.1-9): the Lorry plan — each lorry's day used to the full (mockup notes/drivers-day-fill-mockup-1108 v2 + addendum) ----
+{
+  const lpc = code.slice(code.indexOf("function LorryPlanRow({"), code.indexOf("function GatesWeek({"));
+  ok("⭐ 2.1-9: the panel reads one GET of the Lorry plan per bucket and tick, folded by default, and hands its figures up for the KPI caption",
+     lpc.includes("fetch(`${API}/forecast-weeks/lorry-plan?bucket=${bucket}`)") && lpc.includes("const [open, setOpen] = useState(false);")
+     && lpc.includes("if(onData) onData(j);") && code.includes("onData={setLorryPlan} weekConfirmed={allConfirmed}"));
+  ok("⭐ 2.1-9 (Q1, Q11): three views, Chained by yard the default; the weekday chips are the week's own days from the server",
+     lpc.includes('const [view, setView] = useState("chained");') && lpc.includes('["booked", "chained", "compressed"].map(k =>')
+     && lpc.includes("const shown = (day && days.includes(day)) ? day : (days.includes(data && data.today) ? data.today : days[0]);"));
+  ok("⭐ 2.1-9 (card 1): one row a lorry, trips as blocks across 06:00–19:00 by their start and minutes, the break hatched, a role=img with the words",
+     code.includes("const LP_DAY_FROM = 6 * 60, LP_DAY_TO = 19 * 60;") && lpc.includes('className="lp-track" role="img" aria-label={`Lorry ${r.n}: ${title}; ${r.free_words}`}')
+     && lpc.includes("const left = Math.max(0, (st - LP_DAY_FROM) / span * 100), width = Math.max(0.6, b.minutes / span * 100);")
+     && html.includes(".lp-blk.is-break{background:repeating-linear-gradient(135deg,#CBD5E1 0 4px,#E2E8F0 4px 8px);color:#334155}"));
+  ok("⭐ 2.1-9 (Q8): the free time in the server's words at the row's end; destination colours from the chart tokens (no hard-coded control blue)",
+     lpc.includes('<div className="lp-free" data-lp-free={r.free_minutes}>{r.free_words}</div>') && code.includes("const lpPalette = () => [1, 2, 3, 4, 5].map(i => tok(`--chart-${i}`"));
+  ok("⭐ 2.1-9 (Q12): Apply only in the compressed view, planners / admins, never on a confirmed week or with nothing to move, and asks first; the grid re-reads after",
+     lpc.includes('{view === "compressed" && canApply && <button type="button" className="btn-pri" onClick={apply} data-lp-apply="1"')
+     && lpc.includes("disabled={!!busy || weekConfirmed || !mv.length}") && lpc.includes('if(!window.confirm("Move this week\'s loads between its days as the compressed view shows?')
+     && lpc.includes('window.dispatchEvent(new CustomEvent("wayscope:lookahead-refresh"));') && code.includes('window.addEventListener("wayscope:lookahead-refresh", f)'));
+  ok("⭐ 2.1-9 (Q5): Driver sheets (PDF) and XLSX for the day shown, not in the booked view; the moves list with its flags, folded",
+     lpc.includes("`${API}/forecast-weeks/lorry-plan/download?bucket=${bucket}&view=${view}&day=${shown}&format=${fmt}`")
+     && lpc.includes('{view !== "booked" && <span className="ml-auto flex items-center gap-2">') && lpc.includes('data-lp-moves={mv.length}')
+     && lpc.includes('{(m.flags || []).map((f, j) => <div key={j} className="lp-flag">{f}</div>)}'));
+  ok("⭐ 2.1-9 (Q4): the money card reads the typed day-hire rate, names the types with no rate, else says where to type one",
+     lpc.includes("saved this week, an estimate") && lpc.includes("no rate for ${money.missing.map(x => vehLabel(x))") && lpc.includes("at a day-hire rate on Config → Costing · fuel (none typed)"));
+  ok("⭐ 2.1-9 (card 3): the KPI caption gains the chained peak only when the chaining saves something",
+     code.includes("lorryPlan && lorryPlan.chained && lorryPlan.chained.saved_week > 0 ? ` · ${grp(Math.max(...Object.values(lorryPlan.chained.by_day)))} with each yard's lorries chained` : \"\""));
+  ok("⭐ 2.1-9 (Q9): the phone reads the plan once and lists the day's lorries read-only; the sheets stay a desktop download",
+     code.includes("data-ph-lorry-plan={shown}") && code.includes('data-ph-lorry-list="1"') && code.includes("The driver sheets are printed from a desktop."));
+  ok("⭐ 2.1-9 (card 4): Config → Costing · fuel has a Day hire row per vehicle, blank by default, under the fair-price model",
+     code.includes("function DayHireSection({ doc, upd })") && code.includes("<DayHireSection doc={doc} upd={upd} />")
+     && code.includes('d.day_hire = d.day_hire || {}; if(v === "" || v == null) delete d.day_hire[k];') && code.includes("Not used in the cost lines or the fair price."));
+  const words = lpc + code.slice(code.indexOf('"la.lorryplan": {'), code.indexOf('"la.gates": {'));
+  ok("🔴 2.1-9: the panel's words — never compliant, utilisation, fill rate or movements; no back-end words; no team id",
+     !/compliant|utilisation|fill rate|movement|endpoint|server|cache|token/i.test(words) && !/IPT[1-6]/.test(words));
+  ok("2.1-9: the panel's type is 12 px or more (the 13 px floor's glyph rule keeps to the three glyphs)",
+     !/\.lp-[a-z-]*\{[^}]*font-size:(9|10|11)px/.test(html));
 }
 
 // ---- 8 Nov 2026 (v2.1 tasks 2.1-5 + 2.1-7 + 2.1-8, the mockup John approved: notes routes-page-layout-mockup-1108, Q1-Q7) ----
