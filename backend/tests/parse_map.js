@@ -7516,6 +7516,8 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("ROUTES FILTER: in the export (the server's routes=) and its words ('2 routes (R001, R004)')",
      rfn("routeExportFilters").includes("routes: (typeof ROUTE_PICK !== 'undefined' && ROUTE_PICK.sel.size) ? routePickList().join(',') : null };")
      && rfn("routeExportWords").includes("ids.length + ' routes (' + ids.join(', ') + ')'"));
+  ok("ROUTES FILTER: on a phone the button, search, rows and Clear / Done are 44 px taps (UI audit, 8 Nov 2026)",
+     html.includes(".filter-grid .route-pick-btn, .route-pick input[type=search], .route-pick-row, .route-pick-foot button{ min-height:44px; }"));
   ok("🔴 ROUTES FILTER: no banned public words in the new control",
      !/\b(secure|real-time|AI|optimi[sz]e|predict|live tracking|truck)\b/i.test(html.slice(html.indexOf('id="filter-routes"') - 200, html.indexOf('id="filter-reset"'))));
 }

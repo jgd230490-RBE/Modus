@@ -427,6 +427,10 @@
         .route-pick-foot{ display:flex; justify-content:space-between; align-items:center; gap:8px; border-top:1px solid var(--line); padding-top:6px;
                         margin-top:4px; font-size:13px; color:var(--muted); }
         .route-pick-foot button{ background:none; border:0; padding:8px 4px; font:600 13px Inter,system-ui,sans-serif; color:var(--navy); cursor:pointer; }
+        @media (max-width: 767px), (pointer: coarse){      /* a phone's 44 px taps (the UI audit's strict rule) */
+            .filter-grid .route-pick-btn, .route-pick input[type=search], .route-pick-row, .route-pick-foot button{ min-height:44px; }
+            .route-pick-row{ align-items:center; }
+        }
         .share-group .share-row .btn{ font-size:13px; padding:8px 10px; }      /* two to a row at 300 px (were one each at 14 px) */
         .layers-box > summary small{ margin-left:6px; font-size:13px; font-weight:500; color:var(--muted); }
         /* the number badges' key (the badges on the map are drawn by pillBadgeImage) */
