@@ -2826,7 +2826,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
           // a filter change on the same month: the older call's late fetch cannot paint the old filter over the new one
           TL.month = 13; api.calculateKPIs("ALL", "ALL", "ALL", "ALL"); api.calculateKPIs("Q", "ALL", "ALL", "ALL");
           const keyNow = KPI.onScreen; deferred[13](pay(13, 400)); await flush(); await flush();
-          ok("F1: two calls for one month and different filters: only the one on screen renders", keyNow.endsWith("|Q|ALL|ALL|ALL") && el("kpi-title").innerHTML.includes("Jan 2027"));
+          // NARROWED 8 Nov 2026 (v2.1 item 2.1-3): the key carries the Routes filter as a fifth part (empty: none picked)
+          ok("F1: two calls for one month and different filters: only the one on screen renders", keyNow.endsWith("|Q|ALL|ALL|ALL|") && el("kpi-title").innerHTML.includes("Jan 2027"));
         })());
       }
     }
@@ -5307,9 +5308,12 @@ function qrRead(mod) {
   const url = fnSrc("routeExportUrl"), filt = fnSrc("routeExportFilters"), rq = fnSrc("routeExportQuery");
   // NARROWED 14 Oct 2026, evening: the filters and the month are built once (routeExportQuery) for the export and the
   // card's list of places; the URL is the PDF's or the PNG's
-  ok("⭐ ...the request carries the map's Route filtering (the select values applyFilters reads) and ONE month",
+  // NARROWED 8 Nov 2026 (v2.1 items 2.1-2 / 2.1-3): the month is sent only when one is picked (blank = "Approved
+  // routes, no month"), and the Routes filter travels as the server's routes=
+  ok("⭐ ...the request carries the map's Route filtering (the select values applyFilters reads) and at most ONE month",
      filt.includes("origin: val('filter-origin'), dest: val('filter-dest'), discipline: val('filter-discipline'), team: val('filter-ipt')")
-     && rq.includes("q.set('month', document.getElementById('rme-month').value);") && url.includes("const q = routeExportQuery();")
+     && rq.includes("const mv = document.getElementById('rme-month').value;") && rq.includes("if (mv) q.set('month', mv);")
+     && url.includes("const q = routeExportQuery();")
      && url.includes("return '/api/routes/map-export.' + (kind === 'png' ? 'png' : 'pdf') + '?' + q.toString();"));
   // REVERSED 14 Oct 2026, evening (the user: "the only map export to be just the map"; the tables, the scheme's block
   // and the Carbon Tool rows were removed with their consent): no option asks for them any more
@@ -5335,8 +5339,13 @@ function qrRead(mod) {
      html.includes(`onclick="downloadRouteExport('pdf')">Download PDF</button>`) && html.includes(`onclick="downloadRouteExport('png')">Download PNG</button>`)
      && html.includes("PDF: to scale on A4 at 100 %. PNG: for Word; after resizing, use the scale bar."));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
   const open = fnSrc("openRouteExport");
-  ok("...the month list is the months with volume (the chips); the month on screen is picked, else the first",
-     open.includes("const months = chipMonths();") && open.includes("const want = (TL.on && TL.month) ? TL.month : (months[0] || null);"));
+  // REVERSED 8 Nov 2026 (v2.1 item 2.1-2, John: yes to the mockup): with no month on screen the card no longer takes the
+  // first month with volume (the demo's Jan 2026, 2 routes of 50); "Approved routes, no month" heads the list and is picked
+  ok("...the month list is 'Approved routes, no month' then the months with volume (the chips); the month on screen is picked, else no month",
+     open.includes("const months = chipMonths();") && open.includes("const want = (TL.on && TL.month) ? TL.month : null;")
+     && !open.includes("(months[0] || null)")
+     && open.includes("sel.innerHTML = '<option value=\"\"' + (want == null ? ' selected' : '') + '>' + RME_NO_MONTH + '</option>'")
+     && src.includes("const RME_NO_MONTH = 'Approved routes, no month';"));
   // NARROWED 14 Oct 2026, evening: the two tick-boxes gave way to the plan, scale and centre selects
   ok("...the card: a dialog with a month, the plan, Download, and what it is (approved lines, not an approved CLP)",
      /<div id="rme-panel" role="dialog" aria-labelledby="rme-title" hidden>/.test(html)
@@ -7472,6 +7481,44 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
    (code.match(/'BusyHours'/g) || []).length === 4
    && code.includes("&&f.properties.type!=='BusyHours'&&(f.properties.route_id||'').toString().trim().toLowerCase()===rl);")
    && code.includes("if(!rid || f.properties.type==='BusyHours') return;"));
+
+// 8 Nov 2026 (v2.1 items 2.1-2 / 2.1-3; mockup notes/map-export-default-mockup-1108, John: "Yes, as recommended")
+{
+  const rfn = name => { const i = code.indexOf("function " + name + "("); return i < 0 ? "" : code.slice(i, code.indexOf("\n    }\n", i) + 6); };
+  ok("ROUTES FILTER: a full-width 'All routes' button in Filter routes opens a list in place (search + tick boxes, Clear / Done)",
+     html.includes('<button type="button" class="route-pick-btn" id="filter-routes" aria-expanded="false" aria-controls="route-pick" onclick="toggleRoutePick()"><span id="filter-routes-text">All routes</span></button>')
+     && html.includes('<div class="route-pick" id="route-pick" role="group" aria-label="Pick routes" hidden')
+     && html.includes('<input type="search" id="route-pick-q" placeholder="Find a route" aria-label="Find a route" oninput="renderRoutePick()">')
+     && html.includes('<button type="button" onclick="clearRoutePick()">Clear</button>') && html.includes('<button type="button" onclick="closeRoutePick()">Done</button>')
+     && html.indexOf('id="filter-routes"') > html.indexOf('id="filter-ipt"') && html.indexOf('id="route-pick"') < html.indexOf('id="filter-reset"'));
+  ok("ROUTES FILTER: empty = every route; the shared test (routePassesFilters) ANDs it with the other four",
+     code.includes("function routePicked(rid) { return !ROUTE_PICK.sel.size || ROUTE_PICK.sel.has(rid); }")
+     && rfn("routePassesFilters").includes("&& routePicked(p.route_id);"));
+  ok("ROUTES FILTER: the layers (legs, casings, haul pieces through filterArr; the holding chevrons), the bar's figures and its to-date carbon, Month as text",
+     rfn("applyFilters").includes("if (ROUTE_PICK.sel.size) filterArr.push(['in', ['get', 'route_id'], ['literal', routePickList()]]);")
+     && code.includes("if (typeof ROUTE_PICK !== 'undefined' && ROUTE_PICK.sel.size) f.push(['in', ['get', 'route_id'], ['literal', routePickList()]]);")
+     && code.includes("|| (discFilter !== 'ALL' && l.discipline !== discFilter) || !picked(l.route_id)) return;")
+     && code.includes("|| (discFilter !== 'ALL' && c.discipline !== discFilter) || !picked(c.route_id)) return;")
+     && code.includes("[oFilter, dFilter, discFilter, iFilter, pickedKey].join('|')")
+     && code.includes("|| (flt.r && flt.r.length && !flt.r.includes(l.route_id))) return;"));
+  ok("ROUTES FILTER: every drawn route listed by reference with both ends; one the other filters hide is greyed with words, never dropped; search by reference or place",
+     rfn("routePickRoutes").includes("if (p.type === 'Inbound Highway' && p.route_id && !out[p.route_id]) out[p.route_id] = p;")
+     && rfn("renderRoutePick").includes("' · hidden by the other filters'") && rfn("renderRoutePick").includes("[p.route_id, p.origin, p.dest].some(x =>")
+     && rfn("renderRoutePick").includes("escHtml(p.route_id)"));
+  ok("ROUTES FILTER: the button says what is picked ('All routes', 'R001', '3 routes: R001, R004, R010'); Reset filters clears it and shows while it is set",
+     rfn("routePickWords").includes("return ids.length + ' routes: ' + ids.slice(0, 3).join(', ') + (ids.length > 3 ? ', …' : '');")
+     && rfn("resetFilters").includes("ROUTE_PICK.sel.clear();")
+     && rfn("syncFilterReset").includes("&& !(typeof ROUTE_PICK !== 'undefined' && ROUTE_PICK.sel.size);"));
+  ok("ROUTES FILTER: in the share link (filters=…|routes:R001,R004), read back as references only",
+     code.includes("const VIEW_FILTER_KEYS = ['origin', 'dest', 'discipline', 'team', 'routes'];")
+     && code.includes("routes: (typeof ROUTE_PICK !== 'undefined' && ROUTE_PICK.sel.size) ? routePickList().join(',') : null },")
+     && code.includes(".filter(x => /^[A-Za-z0-9_-]{1,32}$/.test(x))"));
+  ok("ROUTES FILTER: in the export (the server's routes=) and its words ('2 routes (R001, R004)')",
+     rfn("routeExportFilters").includes("routes: (typeof ROUTE_PICK !== 'undefined' && ROUTE_PICK.sel.size) ? routePickList().join(',') : null };")
+     && rfn("routeExportWords").includes("ids.length + ' routes (' + ids.join(', ') + ')'"));
+  ok("🔴 ROUTES FILTER: no banned public words in the new control",
+     !/\b(secure|real-time|AI|optimi[sz]e|predict|live tracking|truck)\b/i.test(html.slice(html.indexOf('id="filter-routes"') - 200, html.indexOf('id="filter-reset"'))));
+}
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
   console.log();
