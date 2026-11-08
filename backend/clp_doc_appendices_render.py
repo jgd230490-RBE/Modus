@@ -201,7 +201,8 @@ def render(D, d, A):
     if "G" in A:
         g = A["G"]
         head("G", "Tonnes of carbon dioxide equivalent (CO2e) for the lorries on these routes, and all-in with the materials "
-                  "and disposal on the same lines.")
+                  "and disposal on the same lines. Lorry carbon counts the loaded leg and the empty way back as each route "
+                  "charges it (the whole return unless the route says the lorry may take other work).")
         if g["target"] and not g["target"]["invalid"]:
             t = g["target"]
             scope = "this team's share of the scheme's carbon target" if t["scope"] == "team" else "the scheme's carbon target"

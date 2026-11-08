@@ -548,8 +548,12 @@ with TestClient(main.app, base_url="https://testserver") as c:
         _q001 = [float(x["quantity"]) for x in _r001]
         _trips001 = sum(math.ceil(q / 29.0 - 1e-9) for q in _q001)
         _vkm001 = _trips001 * (18.4 + 19.1)
-        _tr001 = _vkm001 * 0.93939 / 1000.0
-        ok("⭐ R001 baked by hand: its 9 approved line-months (90,500 t), transport = trips × both legs × 0.93939 kg/km, over HTTP",
+        # RE-PINNED 8 Nov 2026 (the return journey, return_journey.py): R001 starts at a quarry, so its way back is charged at 43 %
+        # (May take other work) at the artic's 0 % laden figure, the loaded leg at its 100 % figure (the pair on factors.json);
+        # the charged km drive the well-to-tank row too. Was trips × both legs × the average-laden 0.93939.
+        _ckm001 = _trips001 * (18.4 + 19.1 * 0.43)
+        _tr001 = _trips001 * (18.4 * 1.08004 + 19.1 * 0.43 * 0.65383) / 1000.0
+        ok("⭐ R001 baked by hand: its 9 approved line-months (90,500 t), transport = trips × (18.4 km × 1.08004 + 19.1 km × 0.43 × 0.65383), over HTTP",
            len(_r001) == 9 and abs(sum(_q001) - 90500) < 1e-6 and bt.get("baked_lines") == 9
            and abs(bt.get("transport_t", 0) - _tr001) < 0.01, f"{bt.get('baked_lines')} {bt.get('transport_t')} vs {_tr001}")
         ok("⭐ ...the SAME figure the Dashboard reads from /api/costing/lines (one number)", abs(bt.get("transport_t", 0) - cl_r001) < 0.002,
@@ -605,8 +609,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
            and fc.get("lines") == 9 and fc["electric"]["trips"] > fc["diesel"]["trips"], str(alt.get("drivers"))[:200])   # RE-PINNED 17 Oct 2026: R001's 9 lines
         # after the show (11 Oct 2026, items 12 and 14): well-to-wheel and the modules, over HTTP.
         # RE-PINNED 17 Oct 2026 (R2): R001's artic-km × the 0.22058 kg/km well-to-tank row, computed from its own rows
-        _wtt001 = _vkm001 * 0.22058 / 1000.0
-        ok("⭐ well-to-wheel over HTTP: R001's tank-to-wheel + well-to-tank (artic-km × 0.22058), beside the total (not in it)",
+        _wtt001 = _ckm001 * 0.22058 / 1000.0
+        ok("⭐ well-to-wheel over HTTP: R001's tank-to-wheel + well-to-tank (the charged artic-km × 0.22058), beside the total (not in it)",
            abs(bt.get("transport_wtt_t", 0) - _wtt001) < 0.01 and abs(bt.get("transport_wtw_t", 0) - (_tr001 + _wtt001)) < 0.02
            and abs(bt.get("total_t", 0) - (bt.get("material_t", 0) + bt.get("transport_t", 0) + bt.get("disposal_t", 0))) < 0.01,
            f"{bt.get('transport_wtt_t')} {bt.get('transport_wtw_t')}")

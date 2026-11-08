@@ -437,7 +437,7 @@ def _carbon_block(co2_month, co2_day, co2_unbaked, payloads, routes, wd, co2_lin
         "label_day": ("CO₂e a day" + (f" (excl. {co2_unbaked} {_lines(co2_unbaked)} not routed yet)"
                                       if co2_unbaked else "")),
         "stamp": carbon.SUMMARY_STAMP,
-        "rule": "CO₂e = routed km × the vehicle's kg CO₂e/km, approved plan only.",
+        "rule": "CO₂e = each leg's routed km × the vehicle's kg CO₂e/km, approved plan only.",   # 8 Nov 2026: the two legs apart
     }
 
 

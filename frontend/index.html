@@ -1420,8 +1420,13 @@ const INFO = {
   "dash.week": { title: "Planned this week", text: "The tonnes and loads planned for the commit week on the Look-ahead, and how many lines held their plan last week. It is the Look-ahead's own figure.", guide: "6-3-commit-view-this-week-by-day" },
   "dash.delivered": { title: "Delivered against plan", text: "Tonnes reported delivered, as a share of the tonnes planned in view. A month nobody has reported counts as not yet delivered: nothing is assumed.",
     how: "Actuals are typed each week on Look-ahead → Account. A day's actual rolls into its week.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
-  "dash.carbon": { title: "Transport carbon", text: "The lorry carbon of the routed lines in view, in tonnes of CO₂e, both legs: there loaded and back empty. Lines with no route yet are left out.",
-    how: "Distance × each vehicle's government factor in kg CO₂e per vehicle-km (average laden), set on Config → Vehicles.", source: "DESNZ greenhouse gas conversion factors, 2026", guide: "3-1-filters-and-the-six-cards", tech: "t1-carbon" },
+  "dash.carbon": { title: "Transport carbon", text: "The lorry carbon of the routed lines in view, in tonnes of CO₂e: the loaded leg there, and as much of the empty way back as each route charges (Data → Routes). Lines with no route yet are left out.",
+    how: "Trips × (loaded km × the vehicle's laden factor + return km × the route's return share × its empty factor). The factors are the government's per vehicle-km, 100 % and 0 % laden, on Config → Vehicles.", source: "DESNZ greenhouse gas conversion factors, 2026", guide: "3-1-filters-and-the-six-cards", tech: "t1-return" },
+  // 8 Nov 2026 (v2.1): the return journey, on a route's planning figures and on Config → Planning
+  "routes.return": { title: "Return journey", text: "How much of the lorry's empty way back this route's carbon charges: all of it, a share (43 % unless Config says otherwise) for a lorry that may find another job after unloading, or none.",
+    how: "Until you choose, Wayscope guesses from the route's start: a quarry, plant, works or depot → May take other work; a site, compound or stockpile → Comes back empty. A concrete mixer always comes back empty. Cycle time, trips and lorries needed do not change: the lorry still drives back.", source: "RICS Whole life carbon assessment, 2023 (the 43 % and the 100 %); the National Highways Carbon Tool charges the whole return", guide: "7-2-routes", tech: "t1-return" },
+  "cfg.return": { title: "Return journeys", text: "The guess for a route that has no choice of its own on Data → Routes, and the share May take other work charges.",
+    how: "A route from a supplier's end (quarry, plant, works, depot, railhead, port) takes the first choice; any other start, such as a haul from a site or muck-away, the second; a concrete mixer the third whatever its route.", source: "RICS Whole life carbon assessment, 2023: 43 % of the loaded distance as the UK default, 100 % where no return load is possible", tech: "t1-return" },
   "dash.coverage": { title: "Lines with a route", text: "A line's distance, carbon and fair cost need its route worked out for its vehicle, on Data → Routes. Until then those totals leave the line out; they never guess.", tech: "t2-routing" },
   "dash.diesel": { title: "Diesel price", text: "The diesel price the fair cost uses: the latest government weekly figure, or one typed on Config → Costing · fuel. With no price there is no fair cost.", guide: "9-5-money-settings", tech: "t1-fair" },
   "dash.moved": { title: "Tonnes moved", text: "The tonnes reported delivered on the lines in view, from the week actuals typed on Look-ahead → Account. Nothing is assumed delivered.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
@@ -1979,6 +1984,8 @@ function ChartCanvas({ config, height, size, title, scope, notools }){
 const eurK = (n) => (n == null || isNaN(+n)) ? "—" : (Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(2) + " M" : Math.abs(n) >= 1e4 ? grp(Math.round(n / 1e3)) + " k" : grp(Math.round(n)));
 // a KPI figure that never overflows its cell: millions compact, the exact value on hover
 const bigNum = (n, d) => (n == null || isNaN(+n)) ? "—" : (Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(2) + " M" : grp(n, d == null ? 0 : d));
+// 8 Nov 2026: a tonnes-of-CO2e figure for a card's second line: one decimal under 10,000, else bigNum
+const co2T = (n) => (n == null || isNaN(+n)) ? "—" : ((+n >= 1e4 ? bigNum(+n) : (+n).toFixed(1)) + " t");
 const pctOf = (a, b) => (a == null || !b) ? null : a * 100 / b;
 const unitTriple = (u, opts) => {
   if(!u || u.eur == null) return null;
@@ -2605,7 +2612,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     const tripsM = Z(), co2M = Z(), tonnesM = Z(), plannedM = Z(), fairM = Z(), vehM = Z(), actualM = Z();
     const split = {}; mats.forEach(m => split[m] = 0);
     const rAgg = {};
-    const T = { t: 0, trips: 0, km: 0, co2: 0, tkm: 0, planned: 0, plannedT: 0, plannedTrips: 0, plannedKm: 0, plannedN: 0, targetN: 0,
+    const T = { t: 0, trips: 0, km: 0, co2: 0, co2L: 0, co2E: 0, tkm: 0, planned: 0, plannedT: 0, plannedTrips: 0, plannedKm: 0, plannedN: 0, targetN: 0,
                 fair: 0, fairT: 0, fairTrips: 0, fairKm: 0, fairN: 0, baked: 0, bakedT: 0,
                 actualT: null, actualEur: null, reportedN: 0, reportedT: 0 };
     filtered.forEach(r => {
@@ -2634,6 +2641,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       plannedM[k] += (r.planned && r.planned.eur) || 0; fairM[k] += (r.fair && r.fair.eur) || 0;
       actualM[k] += r.actual_tonnes || 0;
       T.t += r.tonnes; T.trips += r.trips; T.km += r.km || 0; T.co2 += r.co2_t || 0; T.tkm += r.tonne_km || 0;
+      T.co2L += r.co2_loaded_t || 0; T.co2E += r.co2_empty_t || 0;       // 8 Nov 2026: the two legs apart
       const bk = (r.basis_km || 0) * r.trips;
       if(r.baked){ T.baked += 1; T.bakedT += r.tonnes; }
       if(r.planned && r.planned.eur != null){ T.planned += r.planned.eur; T.plannedT += r.tonnes; T.plannedTrips += r.trips; T.plannedKm += bk; T.plannedN += 1; if(r.planned.source === "target") T.targetN += 1; }
@@ -2652,7 +2660,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     let fleetIdx = 0; for(let i = 1; i < n; i++) if(vehM[i] > vehM[fleetIdx]) fleetIdx = i;
     return {
       lo, hi, labels, mats, demand, tripsM, co2M, tonnesM, plannedM, fairM, vehM, actualM, split, routeRows,
-      kpis: { totT: T.t, totTrips: T.trips, totKm: T.km, totCo2: T.co2, totTkm: T.tkm,
+      kpis: { totT: T.t, totTrips: T.trips, totKm: T.km, totCo2: T.co2, totCo2L: T.co2L, totCo2E: T.co2E, totTkm: T.tkm,
               intensity: T.bakedT > 0 ? T.co2 * 1000 / T.bakedT : null,
               peakMonth: tonnesM.some(x => x > 0) ? labels[peakIdx] : "—", peakMonthT: tonnesM[peakIdx],
               peakFleet: vehM.some(x => x > 0) ? vehM[fleetIdx] : 0, peakFleetMonth: vehM.some(x => x > 0) ? labels[fleetIdx] : "—",
@@ -2906,7 +2914,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                   info={{ id: "dash.week" }} />
             <Card label="Delivered against plan" value={K.deliveredPct == null ? "—" : `${K.deliveredPct.toFixed(0)} %`} sub={K.actualT == null ? "nothing reported yet" : `${bigNum(K.actualT)} t of ${bigNum(K.totT)} t`}
                   info={{ id: "dash.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `${grp(K.actualT)} t delivered ÷ ${grp(K.totT)} t planned` }} />
-            <Card label="Transport carbon" value={`${K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} t`} sub={`CO₂e${K.intensity == null ? "" : ` · ${K.intensity.toFixed(1)} kg/t`} · DESNZ 2026`}
+            <Card label="Transport carbon" value={`${K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} t`}
+                  sub={`CO₂e${K.intensity == null ? "" : ` · ${K.intensity.toFixed(1)} kg/t`}${K.totCo2 > 0 ? ` · loaded ${co2T(K.totCo2L)} · empty ${co2T(K.totCo2E)}` : " · DESNZ 2026"}`}
                   info={{ id: "dash.carbon", value: `Exactly ${grp(K.totCo2, 1)} t CO₂e` }} />
           </div>
           <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} />
@@ -9667,6 +9676,36 @@ function ConfigPage({ meta, who, access }){
                   <div className="hint">{help}</div>
                 </div>
               ))}
+              {/* 8 Nov 2026 (v2.1, the return journey; the mockup John approved): the guess for a route with no choice of its own
+                  and the share "May take other work" charges (planning.return_journeys; backend return_journey.settings). */}
+              {(() => {
+                const RJ = { supplier: "part", part_share_pct: 43, scheme: "empty", mixers: "empty", ...(((doc.planning || {}).return_journeys) || {}) };
+                const set = (k, val) => upd(d => { d.planning = d.planning || {}; const r = d.planning.return_journeys = { ...RJ, ...(d.planning.return_journeys || {}) };
+                  if(val == null || val === "") delete r[k]; else r[k] = val;
+                  if(!Object.keys(r).length) delete d.planning.return_journeys; });
+                const Sel = ({ k, label }) => (
+                  <label className="block text-sm text-slate-700">
+                    <span className="block mb-0.5">{label}</span>
+                    <select className="ctl w-56" aria-label={label} value={RJ[k]} onChange={e => set(k, e.target.value)}>
+                      {Object.entries(RETURN_WORDS).map(([val, words]) => <option key={val} value={val}>{words}</option>)}
+                    </select>
+                  </label>);
+                return (
+                  <div className="field" data-cfg="return-journeys">
+                    <label>Return journeys<InfoTip id="cfg.return" /></label>
+                    <div className="space-y-2 max-w-md">
+                      <Sel k="supplier" label="From a supplier's yard, quarry or plant" />
+                      <Sel k="scheme" label="From a site, compound or stockpile" />
+                      <Sel k="mixers" label="Concrete mixers" />
+                      <label className="block text-sm text-slate-700">
+                        <span className="block mb-0.5">May take other work charges</span>
+                        <span className="inline-flex items-center gap-1.5"><input className="ctl w-20 tabular-nums" inputMode="decimal" aria-label="Share of the way back charged, per cent"
+                          value={RJ.part_share_pct ?? ""} onChange={e => set("part_share_pct", num(e.target.value))} /> % of the way back</span>
+                      </label>
+                    </div>
+                    <div className="hint">For routes with no choice of their own (Data → Routes).</div>
+                  </div>);
+              })()}
               {/* 31 Oct 2026 (task 4a, PR 3a; approved 30 Oct): the CLP document's programme type and its stages, each made of
                   Wayscope's kinds of work (planning.clp; backend clp_doc.settings). Absent = the template's stages for the type
                   (meta.clp_stage_defaults). Checked by the server on Save. */}
@@ -10558,7 +10597,7 @@ function CarbonPage({ meta, access, who, initialData, initialTarget }){
                   <caption><b>Transport only</b> · tCO2e, by method</caption>
                   <thead><tr><th scope="col">Method</th><th scope="col" className="num">Approved plan</th><th scope="col" className="num">Alternative</th></tr></thead>
                   <tbody>
-                    <tr title={(data.methods || {}).headline}><td><b>Wayscope: per vehicle-km, both legs</b> (the figure on this page)<div className={hint}>Diesel is exhaust only (tank-to-wheel); electric is the grid electricity used</div></td><td className="num">{t1(B.totals.transport_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_t))}</td></tr>
+                    <tr title={(data.methods || {}).headline}><td><b>Wayscope: per vehicle-km, each leg at its own factor</b> (the figure on this page)<div className={hint}>Loaded leg at the laden factor; the empty way back as each route charges it (Data → Routes). Diesel is exhaust only (tank-to-wheel); electric is the grid electricity used</div></td><td className="num">{t1(B.totals.transport_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_t))}</td></tr>
                     <tr title={(data.methods || {}).well_to_wheel}><td>Wayscope, well-to-wheel (adds producing the fuel or electricity)<div className={hint}>FORS Silver and Gold require operators to report well-to-wheel; Bronze recommends it</div></td><td className="num">{t1(B.totals.transport_wtw_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_wtw_t))}</td></tr>
                     <tr title={(data.methods || {}).nh_tool + "\n" + prov(fx["nh_tool"])}><td>National Highways Carbon Tool method (for comparison)<div className={hint}>Tonnes × one-way distance, return added, 2024 factors with well-to-tank</div></td><td className="num">{t1(B.totals.transport_nh_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_nh_t))}</td></tr>
                     <tr title={(data.methods || {}).tonne_km}><td>Tonne-km method: DESNZ 2026, average load<div className={hint}>What a tonne-km calculator gives for the same haul</div></td><td className="num">{t1(B.totals.transport_tkm_t)}</td><td className="num">{altCell(a => t1(a.totals.transport_tkm_t))}</td></tr>
@@ -13389,14 +13428,17 @@ function commitMapFigs(lines, today){
 // that touch no geometry. Nothing is seeded — an empty field means "no rate typed" and the
 // Look-ahead prints "rate not set" rather than €0. The cap is a FLAG on the Look-ahead,
 // never a block (brief L2). km basis decides what the per-km rate and t·km multiply.
+// 8 Nov 2026 (v2.1): the return journey's three choices, as every screen words them (backend return_journey.WORDS)
+const RETURN_WORDS = { empty: "Comes back empty", part: "May take other work", oneway: "One way only" };
 function RoutePlanning({ route, token, onSaved }){
-  const [v, setV] = useState({ max_vehicles_per_day: "", rate_eur_per_load: "", rate_eur_per_t: "", rate_eur_per_km: "", km_basis: "round_trip", skip_holding: false });
+  const [v, setV] = useState({ max_vehicles_per_day: "", rate_eur_per_load: "", rate_eur_per_t: "", rate_eur_per_km: "", km_basis: "round_trip", skip_holding: false, return_mode: "" });
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     setV({ max_vehicles_per_day: route.max_vehicles_per_day ?? "", rate_eur_per_load: route.rate_eur_per_load ?? "",
            rate_eur_per_t: route.rate_eur_per_t ?? "", rate_eur_per_km: route.rate_eur_per_km == null ? "" : +(+distRate(route.rate_eur_per_km)).toFixed(4),
-           km_basis: route.km_basis || "round_trip", skip_holding: !!route.skip_holding });
+           km_basis: route.km_basis || "round_trip", skip_holding: !!route.skip_holding,
+           return_mode: route.return_mode || "" });                   // 8 Nov 2026: "" = guessed from the route
     setMsg("");
   }, [route.id]);
   const save = async () => {
@@ -13409,6 +13451,7 @@ function RoutePlanning({ route, token, onSaved }){
       });
       body.km_basis = v.km_basis;
       body.skip_holding = v.skip_holding ? 1 : 0;              // 29 Oct 2026 (task 3c)
+      body.return_mode = v.return_mode || null;                 // 8 Nov 2026 (v2.1): null = back to the guess
       const res = await fetch(`${API}/admin/routes/${encodeURIComponent(route.id)}/planning${qs}`, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if(!res.ok) throw await errFrom(res);
@@ -13448,6 +13491,20 @@ function RoutePlanning({ route, token, onSaved }){
           <input type="checkbox" checked={!!v.skip_holding} onChange={e => setV(x => ({ ...x, skip_holding: e.target.checked }))} style={{ accentColor: "#1D4ED8" }} />
           Does not call off at a holding area
         </label>
+        {/* 8 Nov 2026 (v2.1, the return journey; the mockup John approved): how much of the empty way back the carbon
+            charges. Blank = the guess from the route's start (route.return_default); a mixer's rows guess 'empty' anyway. */}
+        <fieldset className="col-span-2 mt-1" data-route-return="1">
+          <legend className="text-sm font-medium text-slate-700 mb-1">Return journey<InfoTip id="routes.return" /></legend>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
+            {[["", `Guess: ${RETURN_WORDS[route.return_default] || "Comes back empty"}`], ["empty", "Comes back empty"],
+              ["part", `May take other work · ${route.return_part_pct ?? 43} %`], ["oneway", "One way only"]].map(([val, words]) => (
+              <label key={val || "guess"} className="inline-flex items-center gap-1.5 min-h-6">
+                <input type="radio" name={`ret-${route.id}`} value={val} checked={v.return_mode === val}
+                  onChange={() => setV(x => ({ ...x, return_mode: val }))} style={{ accentColor: "#1D4ED8" }} />
+                {words}
+              </label>))}
+          </div>
+        </fieldset>
       </div>
       <button onClick={save} disabled={busy}
         className="w-full py-2 rounded-lg text-sm font-semibold border disabled:opacity-50"
@@ -14712,7 +14769,7 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                   <th className={head}>Trips/day</th>
                   <th className={head}>t/day</th>
                   <th className={head}>t/month</th>
-                  <th className={head}>CO₂ kg/trip</th>
+                  <th className={head} title="Loaded leg at the laden factor + the way back as the route charges it">CO₂ kg/trip</th>
                   <th className="px-2 py-1"></th>
                 </tr>
               </thead>
@@ -17807,6 +17864,17 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                           style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }}>
                           Busy hours: Alt {u.alt}</span>))}
+                      {(() => {
+                        // 8 Nov 2026 (v2.1): the return journey the route's carbon charges; muted while it is the guess
+                        const typed = !!r.return_mode, mode = r.return_mode || r.return_default || "empty";
+                        const words = mode === "part" ? `Part return · ${r.return_part_pct ?? 43} %` : RETURN_WORDS[mode];
+                        // the guessed chip takes the house grey pair (bg-slate-100 text-slate-600, as the "target" chip): --muted on the
+                        // tint read 4.09:1 in the audit
+                        return <span data-route-return={mode} data-route-return-typed={typed ? "1" : "0"}
+                          title={typed ? "Chosen in the row's planning figures" : "Guessed from the route's start; choose in the row's planning figures"}
+                          className={"ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}
+                          style={typed ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : undefined}>{words}</span>;
+                      })()}
                       {(() => {
                         // 28 Oct 2026 (task 0c): "Diverted Dec 2027" when a dated zone diverts it; red when one crosses it with no way round
                         const ps = (divPeriods || []).filter(p => p.route_id === r.id);

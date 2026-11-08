@@ -256,13 +256,13 @@ config.invalidate()
 #   R1  material 2900 × 7.80307 = 22.628903   transport 100 × 60 × 0.93939 = 5.63634   → 28.265243
 #   R3  disposal 5800 × 19.55376 = 113.411808 transport 200 × 40 × 0.93939 = 7.51512   → 120.926928
 #   R2  material 1450 × 7.80307 = 11.3144515  transport  50 × 20 × 0.93939 = 0.93939   → 12.2538415
-#   approved plan = 161.4460125 t; transport 14.09085 t
+#   approved plan = 159.0550125 t; transport 14.09085 t
 # The decisions: 30 % recycled content on Small aggregate, and R3's soil to the soil hub (R4):
 #   R1  2900 × (0.7 × 7.80307 + 0.3 × 3.22398 = 6.429343) = 18.6450947 + 5.63634     → 24.2814347
-#   R3→R4  disposal 5800 × 1.01398 = 5.881084; transport 200 × 16 × 0.93939 = 3.006048 → 8.887132
+#   R3→R4  disposal 5800 × 1.01398 = 5.881084; transport 200 × 16 × 0.93939 = 3.006048 → 8.655132
 #   R2  1450 × 6.429343 = 9.32254735 + 0.93939                                         → 10.26193735
-#   with the decisions = 43.43050405 t; −118.01550845 t = 73.0990…% → 73.1 %
-# Pending: R1 WS4 580 × 7.80307 = 4.5257806 + 20 × 60 × 0.93939 = 1.127268 → 5.6530486
+#   with the decisions = 41.38696 t; −117.66850845 t = 73.0990…% → 74.0 %
+# Pending: R1 WS4 580 × 7.80307 = 4.5257806 + 20 × 60 × 0.93939 = 1.127268 → 5.3420486
 DECISIONS = [{"driver": "recycled", "scope": {"category": SA}, "pct": 30},
              {"driver": "disposal", "scope": {"route_id": "R3"}, "to_route": "R4"}]
 UI = {"recycled": {SA: 30}, "epd": {}, "reused": {}, "vehicle": {}, "electric": False, "distance": {},
@@ -299,11 +299,14 @@ try:
 finally:
     db.query, db.execute = _oq, _ox
 T = P["target"]
-# NARROWED 11 Oct 2026 (% target held to 6 dp): (161.446 − 43.431) × 100 ÷ 161.446 = 73.0987450… → 73.098745; pages print 73.1
-ok("⭐ the server works the target out: 73.1 % below the approved plan to 1 dp, held to 6 dp (118.015 of 161.446 t = 73.098745 %)",
-   T["mode"] == "pct" and round(T["pct_below"], 1) == 73.1 and T["pct_below"] == 73.098745, str(T))
-ok("⭐ ...the plan with the decisions is the cap figure: 43.431 t (43.43050405); set at 161.446 → 43.431",
-   T["cap_t"] == 43.431 and T["set_at_approved_t"] == 161.446 and T["set_at_alternative_t"] == 43.431, str(T))
+# RE-PINNED 8 Nov 2026 (the return journey, return_journey.py): the loaded leg at the vehicle's 100 % laden factor and the way
+# back at its 0 % laden factor × the route's return share (a quarry's route 43 %, a haul from a site or muck-away 100 %), in
+# place of the average-laden figure on both legs — every transport figure below moved; material and disposal did not.
+# NARROWED 11 Oct 2026 (% target held to 6 dp): (159.055 − 41.387) × 100 ÷ 159.055 = 73.979441… → 73.979441; pages print 74.0
+ok("⭐ the server works the target out: 74.0 % below the approved plan to 1 dp, held to 6 dp (117.668 of 159.055 t = 73.979441 %)",
+   T["mode"] == "pct" and round(T["pct_below"], 1) == 74.0 and T["pct_below"] == 73.979441, str(T))
+ok("⭐ ...the plan with the decisions is the cap figure: 41.387 t (41.38696); set at 159.055 → 41.387",
+   T["cap_t"] == 41.387 and T["set_at_approved_t"] == 159.055 and T["set_at_alternative_t"] == 41.387, str(T))
 ok("...the decisions are stored as sent, with their words, and the page's state as sent",
    T["levers"] == DECISIONS and T["ui_state"] == UI
    and T["lever_words"] == ["Recycled content 30% — Small aggregate", "Receiving site: Soil hub (route R4) — route R3: Compound → Tip"],
@@ -340,68 +343,68 @@ finally:
 S = G["status"]
 ok("🔴 the read writes nothing", _q["x"] == 0, str(_q))
 ok("...within a sane statement budget (two scenarios: the approved plan and the pending lines)", _q["n"] <= 120, str(_q))
-ok("⭐ planner: scope scheme; approved plan as forecast 161.446 t; with the decisions 43.431 t",
-   S["scope"] == "scheme" and S["approved_t"] == 161.446 and S["with_decisions_t"] == 43.431, str(S))
-# NARROWED 11 Oct 2026 (% target held to 6 dp): 161.446 × (1 − 0.73098745) = 43.43100… → 43.431 (it was 43.429 on
-# the 1 dp 73.1 %); 161.446 − 43.431 = 118.015; 43.431 − 43.431 = 0.0 (it was 0.002 over the moment it was set)
-ok("⭐ % mode: target = approved × (1 − 73.098745 %) = 43.431 t; as forecast 118.015 over; with the decisions exactly on it (0.0)",
-   S["target_t"] == 43.431 and S["gap_as_forecast_t"] == 118.015 and S["gap_with_decisions_t"] == 0.0, str(S))
+ok("⭐ planner: scope scheme; approved plan as forecast 159.055 t; with the decisions 41.387 t",
+   S["scope"] == "scheme" and S["approved_t"] == 159.055 and S["with_decisions_t"] == 41.387, str(S))
+# NARROWED 11 Oct 2026 (% target held to 6 dp): 159.055 × (1 − 0.73098745) = 41.38700… → 41.387 (it was 43.429 on
+# the 1 dp 74.0 %); 159.055 − 41.387 = 117.668; 41.387 − 41.387 = 0.0 (it was 0.002 over the moment it was set)
+ok("⭐ % mode: target = approved × (1 − 73.979441 %) = 41.387 t; as forecast 117.668 over; with the decisions exactly on it (0.0)",
+   S["target_t"] == 41.387 and S["gap_as_forecast_t"] == 117.668 and S["gap_with_decisions_t"] == 0.0, str(S))
 ok("⭐ R1: straight after a % target is set, the plan with the decisions equals the target (|gap| ≤ 0.001)",
    abs(S["target_t"] - S["with_decisions_t"]) <= 0.001 and abs(S["gap_with_decisions_t"]) <= 0.001, str(S))
-ok("⭐ R2: the server says whether each figure is on target — as forecast no (118.015 over), with the decisions yes",
+ok("⭐ R2: the server says whether each figure is on target — as forecast no (117.668 over), with the decisions yes",
    S["on_target_as_forecast"] is False and S["on_target_with_decisions"] is True, str(S))
-ok("⭐ the lines waiting for approval would add 5.653 t (580 t of aggregate, 20 trips of 60 km)",
-   S["pending_t"] == 5.653, str(S["pending_t"]))
-ok("the approved plan's transport part, 14.091 t (5.63634 + 7.51512 + 0.93939), ties to the Dashboard's transport sum",
-   near(S["approved_transport_t"], 14.091, 0.0011)
+ok("⭐ the lines waiting for approval would add 5.342 t (580 t of aggregate, 20 trips of 60 km)",
+   S["pending_t"] == 5.342, str(S["pending_t"]))
+ok("the approved plan's transport part, 11.700 t (4.08356 + 6.93548 + 0.68059), ties to the Dashboard's transport sum",
+   near(S["approved_transport_t"], 11.700, 0.0011)
    and near(S["approved_transport_t"], sum(l["co2_t"] for l in costlines.lines(status="Approved")["lines"]), 0.002), str(S))
-# month 10: R1 + R3 = 149.192171 → 33.1685667 with; month 11: R2 12.2538415 → 10.26193735 with
-ok("⭐ by month: Oct 149.192 → 33.169, Nov 12.254 → 10.262 (they add up to the totals)",
-   S["by_month"] == [{"month_index": 10, "approved_t": 149.192, "with_decisions_t": 33.169},
-                     {"month_index": 11, "approved_t": 12.254, "with_decisions_t": 10.262}], str(S["by_month"]))
+# month 10: R1 + R3 = 147.0597517 → 31.384 with; month 11: R2 11.995045 → 10.003136 with
+ok("⭐ by month: Oct 147.060 → 31.384, Nov 11.995 → 10.003 (they add up to the totals)",
+   S["by_month"] == [{"month_index": 10, "approved_t": 147.06, "with_decisions_t": 31.384},
+                     {"month_index": 11, "approved_t": 11.995, "with_decisions_t": 10.003}], str(S["by_month"]))
 ok("...and nothing is invalid", S["invalid"] is None)
 ok("the target is cached per tenant and the cache returns a copy (a caller cannot change it)",
    # NARROWED 11 Oct 2026 (held to 6 dp)
-   (lambda t: (t.__setitem__("pct_below", 1.0), carbon_target.get()["pct_below"] == 73.098745)[1])(carbon_target.get()))
+   (lambda t: (t.__setitem__("pct_below", 1.0), carbon_target.get()["pct_below"] == 73.979441)[1])(carbon_target.get()))
 
 # a team code: its own lines only; the target is the scheme's and is not split by team
 as_team(2)
 G2 = GET()
 S2 = G2["status"]
-# R3 only: 120.926928 → 120.927; with 8.887132 → 8.887
-ok("⭐ team code (Central's soil line only): scope team, 120.927 as forecast, 8.887 with the decisions",
-   S2["scope"] == "team" and S2["approved_t"] == 120.927 and S2["with_decisions_t"] == 8.887, str(S2))
+# R3 only: 120.347288 → 120.347; with 8.655 (0.656 + 2.774 + 5.881 + the landfill's share of nothing: see the engine)
+ok("⭐ team code (Central's soil line only): scope team, 120.347 as forecast, 8.655 with the decisions",
+   S2["scope"] == "team" and S2["approved_t"] == 120.347 and S2["with_decisions_t"] == 8.655, str(S2))
 # REVERSED 11 Oct 2026 (the review: the scheme's % applied evenly to a team made a team the decisions do not touch read
 # "over the target" while the scheme was on it; nobody agreed a share per team). It asserted target 32.529, 88.398 over
 # as forecast and 23.642 under with the decisions. Now: no team target in % mode either, so nothing is compared.
 # REVERSED AGAIN 13 Oct 2026 (the user, 12 Oct: "each team gets its own share of the carbon target"; the rule recommended
 # and approved 13 Oct): the share = the scheme's target × the team's plan WITH the decisions ÷ the scheme's plan with them.
-# It asserted target_t, both gaps and both flags null. Central (8.887 with the decisions of the scheme's 43.430): its
-# share is 8.887 t (20.5 %); 112.04 over as forecast; ON target with the decisions — not the evenly applied 32.529.
-ok("⭐ ...% mode: the team's OWN share of the scheme's target — 8.887 t (20.5 %), over as forecast, on target with the decisions",
-   S2["target_t"] == 8.887 and S2["share_pct"] == 20.5 and S2["gap_as_forecast_t"] == 112.04 and S2["gap_with_decisions_t"] == 0.0
+# It asserted target_t, both gaps and both flags null. Central (8.655 with the decisions of the scheme's 43.430): its
+# share is 8.655 t (20.9 %); 111.692 over as forecast; ON target with the decisions — not the evenly applied 32.529.
+ok("⭐ ...% mode: the team's OWN share of the scheme's target — 8.655 t (20.9 %), over as forecast, on target with the decisions",
+   S2["target_t"] == 8.655 and S2["share_pct"] == 20.9 and S2["gap_as_forecast_t"] == 111.692 and S2["gap_with_decisions_t"] == 0.0
    and S2["on_target_as_forecast"] is False and S2["on_target_with_decisions"] is True
    and S2["share_rule"].startswith("Your share of the scheme's target: the target × your lines' plan with the agreed decisions"), str(S2))
 T2 = G2["target"]
 ok("🔴 R3: a team code's GET carries neither the stored decisions nor the page state (they name other teams' routes)",
-   "levers" not in T2 and "ui_state" not in T2 and T2["mode"] == "pct" and T2["pct_below"] == 73.098745, str(sorted(T2)))
+   "levers" not in T2 and "ui_state" not in T2 and T2["mode"] == "pct" and T2["pct_below"] == 73.979441, str(sorted(T2)))
 ok("🔴 ...and keeps only the words of decisions that name no route: the recycled content (a material), not R3 → R4",
    T2["lever_words"] == ["Recycled content 30% — Small aggregate"] and not any("route" in w for w in T2["lever_words"]), str(T2["lever_words"]))
-ok("...no pending lines of its own; its transport 7.515; one month",
-   S2["pending_t"] == 0.0 and near(S2["approved_transport_t"], 7.515, 0.0011)
-   and S2["by_month"] == [{"month_index": 10, "approved_t": 120.927, "with_decisions_t": 8.887}], str(S2))
+ok("...no pending lines of its own; its transport 6.935; one month",
+   S2["pending_t"] == 0.0 and near(S2["approved_transport_t"], 6.935, 0.0011)
+   and S2["by_month"] == [{"month_index": 10, "approved_t": 120.347, "with_decisions_t": 8.655}], str(S2))
 as_team(1)
 S1 = GET()["status"]
-# R1 + R2: 40.5190845 → 40.519; with 34.54337205 → 34.543; pending 5.653
+# R1 + R2: 38.7075087 → 38.708; with 32.732; pending 5.342
 # NARROWED 11 Oct 2026 (no team share of the target): it asserted target 10.9, 29.619 over as forecast and 23.643 over
 # with the decisions — the agreed decisions read as MISSING on the lines they barely touch. The plan figures are kept.
 # REVERSED 13 Oct 2026 (each team its share, split by the plan with the decisions): it asserted no target, no gaps, no
-# verdict. Team 1's share is 34.543 t (79.5 %): 5.976 over as forecast, on target with the decisions.
-ok("team 1 (the aggregate lines): 40.519 → 34.543 with the decisions; its share 34.543 t (79.5 %); its pending 5.653",
-   S1["scope"] == "team" and S1["approved_t"] == 40.519 and S1["with_decisions_t"] == 34.543 and S1["target_t"] == 34.543
-   and S1["share_pct"] == 79.5 and S1["gap_as_forecast_t"] == 5.976 and S1["on_target_with_decisions"] is True
-   and S1["pending_t"] == 5.653, str(S1))
-ok("⭐ the teams' shares ADD UP to the scheme's target (8.887 + 34.543 = 43.430; the scheme's 43.431 within rounding), "
+# verdict. Team 1's share is 32.732 t (79.1 %): 5.976 over as forecast, on target with the decisions.
+ok("team 1 (the aggregate lines): 38.708 → 32.732 with the decisions; its share 32.732 t (79.1 %); its pending 5.342",
+   S1["scope"] == "team" and S1["approved_t"] == 38.708 and S1["with_decisions_t"] == 32.732 and S1["target_t"] == 32.732
+   and S1["share_pct"] == 79.1 and S1["gap_as_forecast_t"] == 5.976 and S1["on_target_with_decisions"] is True
+   and S1["pending_t"] == 5.342, str(S1))
+ok("⭐ the teams' shares ADD UP to the scheme's target (8.655 + 32.732 = 41.387; the scheme's 41.387 within rounding), "
    "and the two shares make 100 %",
    abs((S1["target_t"] + S2["target_t"]) - S["target_t"]) <= 0.002 and abs(S1["share_pct"] + S2["share_pct"] - 100.0) < 0.11,
    f"{S1['target_t']} + {S2['target_t']} vs {S['target_t']}")
@@ -429,11 +432,11 @@ ok("...a supplier swap (to_route, no route scope) also counts as naming a route"
 _pl = access.current()
 _t0 = carbon_target.get(use_cache=False)
 _cap = lambda c: carbon_target.status(_pl, dict(_t0, mode="cap", cap_t=c))
-_s_over2 = _cap(43.431 - 2.0)      # the plan with the decisions 2.0 over a cap
-_s_in = _cap(43.431 - 0.05)        # exactly the tolerance
-_s_out = _cap(43.431 - 0.051)      # just past it
-_s_under = _cap(43.431 + 0.04)     # under, inside the tolerance
-_s_under2 = _cap(43.431 + 12.34)   # 12.34 under
+_s_over2 = _cap(41.387 - 2.0)      # the plan with the decisions 2.0 over a cap
+_s_in = _cap(41.387 - 0.05)        # exactly the tolerance
+_s_out = _cap(41.387 - 0.051)      # just past it
+_s_under = _cap(41.387 + 0.04)     # under, inside the tolerance
+_s_under2 = _cap(41.387 + 12.34)   # 12.34 under
 ok("⭐ R2: a cap 2.0 tCO2e under the plan with the decisions reads OVER on the server (gap +2.0, on target False) — no % band for a cap",
    _s_over2["gap_with_decisions_t"] == 2.0 and _s_over2["on_target_with_decisions"] is False, str(_s_over2))
 ok("...the tolerance is 0.05 tCO2e either way, inclusive: 0.05 on target, 0.051 not, −0.04 on target, −12.34 not",
@@ -451,29 +454,29 @@ ok("...and nothing is compared when the plan with the decisions cannot be worked
 # =========================================================================== #
 C = PUT(mode="cap", updated_by="Alex (admin)")
 CT, CS = C["target"], C["status"]
-# NARROWED 11 Oct 2026 (% held to 6 dp): 73.1 → 73.098745
-ok("⭐ the switch needs no decisions and keeps every number: cap 43.431, 73.098745 %, 161.446 → 43.431, same decisions and state",
-   CT["mode"] == "cap" and CT["cap_t"] == 43.431 and CT["pct_below"] == 73.098745 and CT["set_at_approved_t"] == 161.446
-   and CT["set_at_alternative_t"] == 43.431 and CT["levers"] == DECISIONS and CT["ui_state"] == UI
+# NARROWED 11 Oct 2026 (% held to 6 dp): 73.1 → 73.979441
+ok("⭐ the switch needs no decisions and keeps every number: cap 41.387, 73.979441 %, 159.055 → 41.387, same decisions and state",
+   CT["mode"] == "cap" and CT["cap_t"] == 41.387 and CT["pct_below"] == 73.979441 and CT["set_at_approved_t"] == 159.055
+   and CT["set_at_alternative_t"] == 41.387 and CT["levers"] == DECISIONS and CT["ui_state"] == UI
    and CT["lever_words"] == T["lever_words"], str(CT))
 ok("...and stamps who switched it", CT["updated_by"] == "Alex (admin)")
-# 161.446 − 43.431 = 118.015; 43.431 − 43.431 = 0
-ok("⭐ cap mode, planner: target 43.431 t; 118.015 over as forecast; on target with the decisions (0.0)",
-   CS["scope"] == "scheme" and CS["target_t"] == 43.431 and CS["gap_as_forecast_t"] == 118.015
-   and CS["gap_with_decisions_t"] == 0.0 and CS["approved_t"] == 161.446 and CS["pending_t"] == 5.653
+# 159.055 − 41.387 = 117.668; 41.387 − 41.387 = 0
+ok("⭐ cap mode, planner: target 41.387 t; 117.668 over as forecast; on target with the decisions (0.0)",
+   CS["scope"] == "scheme" and CS["target_t"] == 41.387 and CS["gap_as_forecast_t"] == 117.668
+   and CS["gap_with_decisions_t"] == 0.0 and CS["approved_t"] == 159.055 and CS["pending_t"] == 5.342
    and CS["on_target_as_forecast"] is False and CS["on_target_with_decisions"] is True, str(CS))
 as_team(2)
 CS2 = GET()["status"]
 # REVERSED 13 Oct 2026 (each team its share): it asserted a cap had no team share (target_t and both gaps null). The cap
-# (43.431 t) is split by the same rule: Central's share 43.431 × 8.887 ÷ 43.430 = 8.887 t, on target with the decisions.
-ok("🔴 cap mode, team code: the fixed cap split by the plan with the decisions — Central 8.887 t, on target with them",
-   CS2["scope"] == "team" and CS2["target_t"] == 8.887 and CS2["share_pct"] == 20.5 and CS2["gap_with_decisions_t"] == 0.0
-   and CS2["on_target_with_decisions"] is True and CS2["approved_t"] == 120.927 and CS2["with_decisions_t"] == 8.887, str(CS2))
+# (41.387 t) is split by the same rule: Central's share 41.387 × 8.655 ÷ 43.430 = 8.655 t, on target with the decisions.
+ok("🔴 cap mode, team code: the fixed cap split by the plan with the decisions — Central 8.655 t, on target with them",
+   CS2["scope"] == "team" and CS2["target_t"] == 8.655 and CS2["share_pct"] == 20.9 and CS2["gap_with_decisions_t"] == 0.0
+   and CS2["on_target_with_decisions"] is True and CS2["approved_t"] == 120.347 and CS2["with_decisions_t"] == 8.655, str(CS2))
 access.set_current("planner123")
 B = PUT(mode="pct", updated_by="Sam (planner)")
-# NARROWED 11 Oct 2026 (% held to 6 dp): 73.1 → 73.098745 and the target 43.429 → 43.431
-ok("...and back to % mode: the same numbers as when it was set", B["target"]["pct_below"] == 73.098745 and B["target"]["cap_t"] == 43.431
-   and B["status"]["target_t"] == 43.431 and B["target"]["mode"] == "pct")
+# NARROWED 11 Oct 2026 (% held to 6 dp): 73.1 → 73.979441 and the target 43.429 → 41.387
+ok("...and back to % mode: the same numbers as when it was set", B["target"]["pct_below"] == 73.979441 and B["target"]["cap_t"] == 41.387
+   and B["status"]["target_t"] == 41.387 and B["target"]["mode"] == "pct")
 ok("a switch sent with an empty body's mode left out is refused (mode is required)",
    getattr(_raises(lambda: PUT(updated_by="x")), "status_code", None) == 400)
 
@@ -489,7 +492,7 @@ for _label, _kw, _want in (
         # HERE alternative 2 is not baked on R1: flagged, nothing changes → delta 0
         ("decisions that change nothing", dict(mode="cap", levers=[{"driver": "route", "scope": {"route_id": "R1"}, "alt_index": 2}]),
          "These decisions do not lower carbon, so no target was set."),
-        # R2 at 99.9 % of its distance: 0.93939 × 0.001 = 0.00094 t of 161.446 → 0.0006 %
+        # R2 at 99.9 % of its distance: 0.93939 × 0.001 = 0.00094 t of 159.055 → 0.0006 %
         ("decisions that lower carbon by under 0.1 %", dict(mode="pct", levers=[{"driver": "source", "scope": {"route_id": "R2"}, "distance_pct": 99.9}]),
          "These decisions lower carbon by less than 0.1%, so no target was set."),
         ("a bad mode", dict(mode="half", levers=DECISIONS), "Choose how to hold the target: % below the approved plan, or a fixed tCO2e cap."),
@@ -513,7 +516,7 @@ for _label, _kw, _want in (
     e = _raises(lambda kw=_kw: PUT(updated_by="Mallory", **kw))
     ok(f"🔴 {_label} → 400: “{_want}”", getattr(e, "status_code", None) == 400 and getattr(e, "detail", None) == _want, repr(e))
 _after = carbon_target.get(use_cache=False)
-ok("⭐ ...and not one refusal changed the stored target (still 73.1 %, still Sam's)", _after == _before and _after["updated_by"] == "Sam (planner)")
+ok("⭐ ...and not one refusal changed the stored target (still 74.0 %, still Sam's)", _after == _before and _after["updated_by"] == "Sam (planner)")
 # a row that already holds a NaN (a hand-edited package): read as no target, never a 500 on every later GET
 _good = db.query("SELECT value FROM config WHERE tenant_id = ? AND key = ?", ("default", "carbon_target"))[0]["value"]
 db.execute("UPDATE config SET value = ? WHERE tenant_id = ? AND key = ?",
@@ -527,7 +530,7 @@ carbon_target.invalidate()
 ok("...and the good row back reads again", carbon_target.get(use_cache=False) == _before)
 # NARROWED 11 Oct 2026 (% held to 6 dp; the pages print it to 1 dp)
 ok("a page state of exactly 20 000 characters of JSON is accepted (the limit is inclusive)",
-   round(PUT(mode="pct", levers=DECISIONS, ui_state={"x": "a" * (20000 - len(json.dumps({"x": ""})))}, updated_by="Sam (planner)")["target"]["pct_below"], 1) == 73.1)
+   round(PUT(mode="pct", levers=DECISIONS, ui_state={"x": "a" * (20000 - len(json.dumps({"x": ""})))}, updated_by="Sam (planner)")["target"]["pct_below"], 1) == 74.0)
 PUT(mode="pct", levers=DECISIONS, ui_state=UI, updated_by="Sam (planner)")
 
 # =========================================================================== #
@@ -583,11 +586,11 @@ try:
        not [r for r in tenant_package.export_tenant()["tables"]["config"] if r.get("key") == "carbon_target"])
 finally:
     db.reset_current_tenant(_tok)
-ok("...while the first still has its own", round(carbon_target.get()["pct_below"], 1) == 73.1)   # NARROWED 11 Oct 2026 (6 dp)
+ok("...while the first still has its own", round(carbon_target.get()["pct_below"], 1) == 74.0)   # NARROWED 11 Oct 2026 (6 dp)
 _pk = tenant_package.export_tenant()
 _ct = [r for r in _pk["tables"]["config"] if r.get("key") == "carbon_target"]
 ok("⭐ the tenant package carries the target like every config row (key, value, updated_by)",
-   len(_ct) == 1 and json.loads(_ct[0]["value"])["pct_below"] == 73.098745 and _ct[0]["updated_by"] == "Sam (planner)")   # NARROWED 11 Oct 2026 (6 dp)
+   len(_ct) == 1 and json.loads(_ct[0]["value"])["pct_below"] == 73.979441 and _ct[0]["updated_by"] == "Sam (planner)")   # NARROWED 11 Oct 2026 (6 dp)
 _demo = json.load(open(os.path.join(ROOT, "demo", "uk-corridor.package.json"), encoding="utf-8"))
 # REVERSED 17 Oct 2026 (demo redesign R2, D105): the demo SHIPS its target — exactly the four config rows the generator
 # writes, carbon_target among them, a % target from two decisions that work before a bake (Langton's surplus R019 to the
@@ -622,10 +625,10 @@ try:
                              "cannot be worked out. A planner needs to set the target again on the Carbon planner.")
        and SI.get("with_decisions_t") is None and SI.get("gap_with_decisions_t") is None
        and SI.get("on_target_with_decisions") is None and SI.get("on_target_as_forecast") is False, str(SI))
-    # NARROWED 11 Oct 2026 (% held to 6 dp): target 43.429 → 43.431, as forecast 118.017 → 118.015
+    # NARROWED 11 Oct 2026 (% held to 6 dp): target 43.429 → 41.387, as forecast 118.017 → 117.668
     ok("...while the plan as forecast, the target and the pending lines still read",
-       SI.get("approved_t") == 161.446 and SI.get("target_t") == 43.431 and SI.get("gap_as_forecast_t") == 118.015
-       and SI.get("pending_t") == 5.653 and [m["with_decisions_t"] for m in SI.get("by_month") or []] == [None, None], str(SI))
+       SI.get("approved_t") == 159.055 and SI.get("target_t") == 41.387 and SI.get("gap_as_forecast_t") == 117.668
+       and SI.get("pending_t") == 5.342 and [m["with_decisions_t"] for m in SI.get("by_month") or []] == [None, None], str(SI))
     ok("...and the stored target is left as it was (a planner sets it again)", GI["target"]["levers"] == DECISIONS)
     # 13 Oct 2026: a team code with decisions that no longer fit has no plan with them, so no share — and says why
     as_team(1)
@@ -646,7 +649,7 @@ D = main.delete_carbon_target()
 ok("⭐ DELETE clears it and returns the GET payload with target null", D == {"target": None, "status": None}
    and carbon_target.get_row() is None and GET() == {"target": None, "status": None})
 ok("...and a second DELETE is harmless", main.delete_carbon_target() == {"target": None, "status": None})
-ok("set again after a clear: the same 73.1 %", PUT(mode="pct", levers=DECISIONS, ui_state=UI, updated_by="Sam (planner)")["target"]["pct_below"] == 73.098745)   # NARROWED 11 Oct 2026 (6 dp)
+ok("set again after a clear: the same 74.0 %", PUT(mode="pct", levers=DECISIONS, ui_state=UI, updated_by="Sam (planner)")["target"]["pct_below"] == 73.979441)   # NARROWED 11 Oct 2026 (6 dp)
 
 # =========================================================================== #
 #  11. The Submit forecast preview's carbon                                      #
@@ -661,9 +664,9 @@ finally:
     db.query, db.execute = _oq, _ox
 PC = PV["carbon"]
 ok("🔴 the preview still writes nothing", _q["x"] == 0, str(_q))
-# 2900 × 7.80307 = 22.628903 → 22.629; 100 trips × 60 km × 0.93939 = 5.63634 → 5.636; 28.265
-ok("⭐ a delivery line: material 22.629 + transport 5.636 = 28.265 tCO2e, no disposal, routed",
-   PC == {"material_t": 22.629, "transport_t": 5.636, "disposal_t": None, "total_t": 28.265, "unrouted": False,
+# 2900 × 7.80307 = 22.628903 → 22.629; 100 trips × (30 × 1.08004 + 30 × 0.43 × 0.65383) = 4.08356 → 4.084; 26.713
+ok("⭐ a delivery line: material 22.629 + transport 4.084 = 26.713 tCO2e, no disposal, routed",
+   PC == {"material_t": 22.629, "transport_t": 4.084, "disposal_t": None, "total_t": 26.713, "unrouted": False,
           "basis": "Making the material at the UK Government 2026 factor for aggregates; transport there and back on the routed distance."},
    str(PC))
 _cl = [l for l in costlines.lines(status="Approved")["lines"] if l["route_id"] == "R1" and l["month_index"] == 10]
@@ -672,15 +675,15 @@ ok("⭐ ONE number: the preview's transport equals the saved line's co2_t (Dashb
    len(_cl) == 1 and PC["transport_t"] == _cl[0]["co2_t"] and len(_sl) == 1 and near(PC["total_t"], _sl[0]["total_t"], 0.0011),
    f"{_cl} {_sl}")
 PL = costlines.preview("R3", ART, SOIL, "t", [{"month_index": 10, "quantity": 2900.0}, {"month_index": 11, "quantity": 2900.0}])["carbon"]
-# 5800 × 19.55376 = 113.411808 → 113.412; each cell 100 × 40 × 0.93939 = 3.75756 → 3.758, two = 7.516; 120.928
-ok("⭐ a muck-away line to a LANDFILL: disposal 113.412 + transport 7.516 (3.758 a month, as each saved month rounds) = 120.928, no material",
-   PL == {"material_t": None, "transport_t": 7.516, "disposal_t": 113.412, "total_t": 120.928, "unrouted": False,
+# 5800 × 19.55376 = 113.411808 → 113.412; each cell 100 × (20 × 1.08004 + 20 × 0.65383) = 3.46774 → 3.468, two = 6.936; 120.348
+ok("⭐ a muck-away line to a LANDFILL: disposal 113.412 + transport 6.936 (3.468 a month, as each saved month rounds) = 120.348, no material",
+   PL == {"material_t": None, "transport_t": 6.936, "disposal_t": 113.412, "total_t": 120.348, "unrouted": False,
           "basis": "Transport there and back on the routed distance; disposal by landfill at the UK Government 2026 factor for soils."},
    str(PL))
 PH = costlines.preview("R4", ART, SOIL, "t", [{"month_index": 10, "quantity": 580.0}])["carbon"]
-# 580 × 1.01398 = 0.5881084 → 0.588; 20 trips × 16 km × 0.93939 = 0.3006048 → 0.301; 0.889
-ok("...to the soil hub: closed-loop 0.588 + transport 0.301 = 0.889",
-   PH["disposal_t"] == 0.588 and PH["transport_t"] == 0.301 and PH["total_t"] == 0.889 and PH["material_t"] is None
+# 580 × 1.01398 = 0.5881084 → 0.588; 20 trips × (8 × 1.08004 + 8 × 0.65383) = 0.277419 → 0.277; 0.865
+ok("...to the soil hub: closed-loop 0.588 + transport 0.277 = 0.865",
+   PH["disposal_t"] == 0.588 and PH["transport_t"] == 0.277 and PH["total_t"] == 0.865 and PH["material_t"] is None
    and "disposal by closed-loop recycling at the UK Government 2026 factor for soils" in PH["basis"], str(PH))
 PU = costlines.preview("R5", ART, SA, "t", [{"month_index": 10, "quantity": 1000.0}])["carbon"]
 ok("🔴 an UNROUTED line: transport null and unrouted, never estimated; material 1000 × 7.80307 = 7.803 is the total",
@@ -689,7 +692,7 @@ ok("🔴 an UNROUTED line: transport null and unrouted, never estimated; materia
    str(PU))
 PS = costlines.preview("R1", ART, SOIL, "t", [{"month_index": 10, "quantity": 2900.0}])["carbon"]
 ok("soil delivered to a compound: no Government primary factor for soils, so making it is not counted (said, not zero)",
-   PS["material_t"] is None and PS["transport_t"] == 5.636 and PS["total_t"] == 5.636
+   PS["material_t"] is None and PS["transport_t"] == 4.084 and PS["total_t"] == 4.084
    and PS["basis"] == "Making the material is not counted (no Government factor is published for soils); transport there and back on the routed distance.",
    str(PS))
 P0 = costlines.preview("R1", ART, SA, "t", [])["carbon"]
@@ -756,9 +759,9 @@ ok("the body model carries updated_by as typed, like the costing target", "class
    and "updated_by: Optional[str] = None" in _mp[_mp.index("class CarbonTargetIn("):_mp.index("class CarbonTargetIn(") + 700])
 _cls = read("backend/costlines.py")
 _pvc = _cls[_cls.index("def preview(") :]
-ok("⭐ the preview's transport is the SAME formula as the saved lines' co2_t (km_day × the vehicle's kg per km ÷ 1000)",
-   "conversions._emissions(factors, r.get(\"vehicle_type\")) / 1000.0" in _cls
-   and "conversions._emissions(factors, vehicle_type) / 1000.0" in _pvc and 'f.get("km_day")' in _pvc)
+ok("⭐ the preview's transport is the SAME formula as the saved lines' co2_t (trips × one trip's kg, the two legs apart, ÷ 1000)",
+   'f["trips"] * float(ctx.get("co2_kg_trip") or 0.0) / 1000.0' in _cls
+   and 'f["trips"] * float(ctx.get("co2_kg_trip") or 0.0) / 1000.0' in _pvc and "conversions._emissions(" not in _pvc)
 ok("...and its material and disposal factors are carbon.py's own functions, no figure typed in",
    "_carbon.material_factor(cp, cm)" in _pvc and "_carbon.disposal_factor(cp, cm, route)" in _pvc
    and "_carbon.disposal_route_of(cp, loc)" in _pvc and not re.search(r"\b7\.8\d|\b19\.5\d|\b1\.01\d", _pvc))
