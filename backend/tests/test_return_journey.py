@@ -389,7 +389,7 @@ ok("6. the technical guide: t1-return with the rule, the sources and the Pairing
    'id="t1-return"' in tg and "return_journey.py" in tg and "RICS Whole life carbon" in tg and "GLEC" in tg and "Pairings" in tg
    and "loaded km × laden factor + return km × return share × empty factor" in tg)
 ok("6. the public map's note, the bulletin's rule and CLP appendix G say the way back is charged as the route says",
-   "the way back as the route charges it" in read("map/index.html") and "loaded and empty apart" in read("backend/bulletin.py")
+   "the way back as the route charges it" in read("map/index.html") and "CO₂e = each leg's routed km" in read("backend/bulletin.py")
    and "as each route" in read("backend/clp_doc_appendices_render.py"))
 ok("6. the user guide names the anchor the i box points at", 'id="7-2-routes"' in ug and 'guide: "7-2-routes"' in fe)
 

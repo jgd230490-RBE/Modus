@@ -17535,10 +17535,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         // 8 Nov 2026 (v2.1): the return journey the route's carbon charges; muted while it is the guess
                         const typed = !!r.return_mode, mode = r.return_mode || r.return_default || "empty";
                         const words = mode === "part" ? `Part return · ${r.return_part_pct ?? 43} %` : RETURN_WORDS[mode];
+                        // the guessed chip takes the house grey pair (bg-slate-100 text-slate-600, as the "target" chip): --muted on the
+                        // tint read 4.09:1 in the audit
                         return <span data-route-return={mode} data-route-return-typed={typed ? "1" : "0"}
                           title={typed ? "Chosen in the row's planning figures" : "Guessed from the route's start; choose in the row's planning figures"}
-                          className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                          style={typed ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(100,116,139,.12)", color: "var(--muted)" }}>{words}</span>;
+                          className={"ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}
+                          style={typed ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : undefined}>{words}</span>;
                       })()}
                       {(() => {
                         // 28 Oct 2026 (task 0c): "Diverted Dec 2027" when a dated zone diverts it; red when one crosses it with no way round
