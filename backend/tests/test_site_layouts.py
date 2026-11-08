@@ -209,8 +209,8 @@ NEAR = [[L019["lon"], L019["lat"]]]
 # =========================================================================== #
 #  0. The style table                                                          #
 # =========================================================================== #
-ok("0. 11 line styles, 10 area styles, 31 symbols, 8 layers",
-   (len(ST.LINE_STYLES), len(ST.AREA_STYLES), len(ST.SYMBOLS), len(ST.LAYERS)) == (11, 10, 31, 8),
+ok("0. 11 line styles, 11 area styles (8 Nov 2026, task 2.1-12: + Site boundary), 31 symbols, 8 layers",
+   (len(ST.LINE_STYLES), len(ST.AREA_STYLES), len(ST.SYMBOLS), len(ST.LAYERS)) == (11, 11, 31, 8),
    str((len(ST.LINE_STYLES), len(ST.AREA_STYLES), len(ST.SYMBOLS), len(ST.LAYERS))))
 ok("0. every symbol key once, each an SVG in a 64 box with a size in metres and a group the layers know",
    len(ST.SYMBOL_KEYS) == 31 and all(s["svg"].strip().startswith("<") and s["size"] > 0 and s["group"] in ST.SYMBOL_LAYER
