@@ -1319,10 +1319,10 @@ _ug_ct = _ug[_ug.index("<em>By time of day</em>"):_ug.index("<em>By time of day<
 ok("12: the user guide: By time of day in a few words (the busy hours, the Routes line, nothing is switched), no method or API",
    "07:00&ndash;10:00 and 16:00&ndash;19:00" in _ug_ct and "nothing is switched" in _ug_ct and "under the route&rsquo;s options" in _ug_ct
    and not re.search(r"Binomial|exact test|/api/|detail_json|OFFER_", _ug_ct), _ug_ct[:200])
-ok("12: the technical guide T9 holds the method: the fields read, the bands, 10 and 0.05, the test, the endpoint, offered only",
+ok("12: the technical guide T9 holds the method: the fields read, the bands, 10 and 0.05, the test, the endpoint, offered first",   # NARROWED 8 Nov 2026: applied since 0d-2 (5 Nov)
    'id="t9-time-of-day"' in _tg and "<code>OFFER_MIN</code> = 10" in _tg and "<code>OFFER_P</code> = 0.05" in _tg
    and "Binomial(route + alternative, &frac12;)" in _tg and "/api/routes/{id}/collision-hours" in _tg
-   and "Offered, never applied" in _tg and _tg.index('id="t9-time-of-day"') < _tg.index('id="t10-public-map"'))
+   and "Offered first: nothing changes until a planner or admin presses Use" in _tg and "Offered, never applied" not in _tg and _tg.index('id="t9-time-of-day"') < _tg.index('id="t10-public-map"'))
 # 28 Oct 2026 (found on live after PR #160: the evidence answered 500) — location_gates.active is BOOLEAN on Postgres and an
 # integer in SQLite, so "active = 1" in SQL broke the sheet on live only. No backend query compares `active` in SQL now.
 _active_sql = []
