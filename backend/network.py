@@ -20,6 +20,7 @@ import route_choice   # 28 Oct 2026 (task 0c) — which stored option a route us
 import haul           # Phase 4 — threads temporary haul roads into the bake path
 import road_sections  # 12 Oct 2026 (§2.2d) — the shared-section index, rebuilt when a primary geometry changes
 import gates          # Phase 5a — resolves which gate each leg enters and leaves by
+import return_journey # 8 Nov 2026 — the charged share of the empty way back (the one carbon rule)
 import drivers_hours  # 17 Oct 2026 — trips a lorry a day under the UK drivers' hours (the one rule)
 
 DEFAULT_PROFILE = "Artic Tipper (44t)"
@@ -1904,6 +1905,7 @@ def routes_status():
     """
     locs = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?",
                                         (db.current_tenant(),))}
+    _rs_factors = conversions.load_factors()      # 8 Nov 2026: the return journeys' defaults (planning.return_journeys)
     geoms = {}
     for g in db.query("SELECT * FROM route_geometry WHERE tenant_id = ? "
                       "ORDER BY route_id, vehicle_profile, leg, alt_index",
@@ -1979,6 +1981,11 @@ def routes_status():
             "rate_eur_per_t": r.get("rate_eur_per_t"),
             "rate_eur_per_km": r.get("rate_eur_per_km"),
             "km_basis": (r.get("km_basis") or "round_trip"),
+            # 8 Nov 2026 (v2.1): the return journey as typed (None = guessed) and the guess for this route's start
+            # (a concrete mixer's rows guess 'empty' whatever this says: the Routes table's rows carry their own)
+            "return_mode": (r.get("return_mode") if r.get("return_mode") in return_journey.MODES else None),
+            "return_default": return_journey.default_mode((o or {}).get("loc_type"), None, _rs_factors),
+            "return_part_pct": return_journey.settings(_rs_factors)["part_share_pct"],
             # 16 Oct 2026 (CLOCS v5 C2): the route sheet's words, as typed; None = not typed
             "route_reason": r.get("route_reason"),
             "permitted_deviations": r.get("permitted_deviations"),
@@ -1989,7 +1996,7 @@ def routes_status():
 
 
 PLANNING_FIELDS = ("max_vehicles_per_day", "rate_eur_per_load", "rate_eur_per_t",
-                   "rate_eur_per_km", "km_basis", "skip_holding")
+                   "rate_eur_per_km", "km_basis", "skip_holding", "return_mode")
 
 
 def set_route_planning(route_id, given, **vals):
@@ -2017,6 +2024,10 @@ def set_route_planning(route_id, given, **vals):
             if v not in ("round_trip", "loaded"):
                 return {"error": "km_basis must be round_trip or loaded"}
             new[f] = v
+        elif f == "return_mode":             # 8 Nov 2026 (v2.1): the return journey; blank = guessed from the route
+            if v not in return_journey.MODES:
+                return {"error": "The return journey must be " + ", ".join(return_journey.WORDS[m] for m in return_journey.MODES)}
+            new[f] = v
         elif f == "max_vehicles_per_day":
             try:
                 iv = int(v)
@@ -2037,9 +2048,9 @@ def set_route_planning(route_id, given, **vals):
             new[f] = fv
     db.execute(
         "UPDATE routes SET max_vehicles_per_day = ?, rate_eur_per_load = ?, rate_eur_per_t = ?, "
-        "rate_eur_per_km = ?, km_basis = ?, skip_holding = ? WHERE tenant_id = ? AND id = ?",
+        "rate_eur_per_km = ?, km_basis = ?, skip_holding = ?, return_mode = ? WHERE tenant_id = ? AND id = ?",
         (new["max_vehicles_per_day"], new["rate_eur_per_load"], new["rate_eur_per_t"],
-         new["rate_eur_per_km"], new["km_basis"], (new["skip_holding"] or 0), tenant, route_id))
+         new["rate_eur_per_km"], new["km_basis"], (new["skip_holding"] or 0), new["return_mode"], tenant, route_id))
     if "skip_holding" in given:
         try:
             import holding as _holding
@@ -3043,6 +3054,11 @@ def route_analysis(route_id, profiles=None, pre=None, pairs=None):
             day = drivers_hours.lorry_day(shift_hr, drive_min, other_min, typed_shift_h=typed_shift_hr)
             trips = day["trips"]
             total_km = round(l_km + r_km, 2)
+            # 8 Nov 2026 (v2.1, the return journey): the loaded leg at the vehicle's laden figure, the empty way back at
+            # its empty figure × the share this route charges (return_journey.py, the one rule every carbon figure reads)
+            rj_mode, rj_source = return_journey.mode_for(route_row, (o_loc or {}).get("loc_type"), prof, factors)
+            rj_share = return_journey.share(rj_mode, factors)
+            rj = return_journey.trip_kg(factors, prof, l_km, r_km, rj_share)
             row = {
                 "profile": prof, "alt_index": alt,
                 "loaded_km": round(l_km, 2), "return_km": round(r_km, 2),
@@ -3052,8 +3068,12 @@ def route_analysis(route_id, profiles=None, pre=None, pairs=None):
                 "trips_per_day": trips,
                 "tonnes_per_day": round(trips * payload_t, 1),
                 "tonnes_per_month": round(trips * payload_t * work_days, 1),
-                "co2_kg_per_trip": round(total_km * co2_per_km, 1),
-                "co2_kg_per_day": round(total_km * co2_per_km * trips, 1),
+                "co2_kg_per_trip": round(rj["kg"], 1),
+                "co2_kg_per_day": round(rj["kg"] * trips, 1),
+                # the two legs apart, and what this route charges of the way back (Data → Routes; NULL = guessed)
+                "co2_loaded_kg_per_trip": round(rj["loaded_kg"], 1),
+                "co2_empty_kg_per_trip": round(rj["empty_kg"], 1),
+                "return_mode": rj_mode, "return_mode_source": rj_source, "return_share": rj_share,
                 "payload_t": payload_t,
                 "co2_kg_per_km": co2_per_km,
                 "load_minutes": load_m, "unload_minutes": unload_m,

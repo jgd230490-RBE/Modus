@@ -84,6 +84,7 @@ import fairprice
 import fuel
 import network
 import route_choice       # 28 Oct 2026 (task 0c): a dated zone diverts a route for some days
+import return_journey     # 8 Nov 2026 (v2.1): the two legs' carbon apart, the empty way back as the route charges it
 
 #: The one flag this slice raises. The full set is slice 3's.
 FLAG_UNBAKED = "UNBAKED"
@@ -215,7 +216,8 @@ def costing_context():
 
 #: 28 Oct 2026 (task 0c): the figures of a diverted period are each option's weighted by its share of the working days
 _BLEND = ("loaded_km", "return_km", "total_km", "loaded_hr", "return_hr", "cycle_hr", "co2_kg_per_trip", "haul_km",
-          "drive_min", "other_work_min", "turnaround_hr")
+          "drive_min", "other_work_min", "turnaround_hr",
+          "co2_loaded_kg_per_trip", "co2_empty_kg_per_trip")    # 8 Nov 2026: the two legs' carbon blend too
 
 
 def _period_days(month_index=None, week_index=None):
@@ -334,6 +336,16 @@ def line_context(line, factors, routes=None, cache=None, cost=None):
     ret = float(row.get("return_km") or 0) if return_baked else None
     km_trip = (dist + (ret if return_baked else 0.0)) if baked else None
     cycle_min = round(float(row.get("cycle_hr") or 0) * 60.0, 1) if baked else None
+    # 8 Nov 2026 (v2.1, the return journey): one trip's carbon with the two legs apart — the loaded leg at the
+    # vehicle's laden figure, the way back at its empty figure × the share this route charges (the row carries the
+    # route's share from route_analysis; return_journey.py is the one rule). A return leg not routed yet charges the
+    # loaded leg only, as km_trip does. costlines turns this into each line-month's co2_t: every surface one figure.
+    rj = None
+    if baked:
+        rj_share = row.get("return_share")
+        if rj_share is None:
+            rj_share = return_journey.share(return_journey.mode_for(rt, None, veh, factors)[0], factors)
+        rj = return_journey.trip_kg(factors, veh, dist, (ret if return_baked else 0.0), rj_share)
     week_qty = float((line.get("week") or {}).get("planned_qty") or 0)
     flags = []
     if not baked and week_qty > 0:
@@ -373,6 +385,12 @@ def line_context(line, factors, routes=None, cache=None, cost=None):
         "distance_km": round(dist, 2) if dist is not None else None,
         "return_km": round(ret, 2) if ret is not None else None,
         "km_trip": round(km_trip, 2) if km_trip is not None else None,
+        # 8 Nov 2026: one trip's kg CO2e and its two legs; what this route charges of the empty way back (0–1)
+        "co2_kg_trip": (round(rj["kg"], 4) if rj else None),
+        "co2_loaded_kg_trip": (round(rj["loaded_kg"], 4) if rj else None),
+        "co2_empty_kg_trip": (round(rj["empty_kg"], 4) if rj else None),
+        "return_share": (row.get("return_share") if baked else None),
+        "return_mode": (row.get("return_mode") if baked else None),
         "cycle_min": cycle_min,
         # 'here' = both legs baked · 'here_return_estimated' = the return stood in for by
         # the outbound and the cycle is marked ‡ · None = not baked, no cycle at all

@@ -150,13 +150,41 @@ on reported months = delivered t ÷ planned t on the forecast months that carry 
 never assumed. The Today panel's &ldquo;this week to date&rdquo; counts line-days (one day of one line).</p>
 
 <h2 id="t1-carbon">Carbon</h2>
-<pre>CO₂e (t)      = km × the vehicle's per-km factor ÷ 1000
-              — DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config)
+<pre>CO₂e (t)      = trips × (loaded km × laden factor + return km × return share × empty factor) ÷ 1000
+              — DESNZ 2026 kg CO₂e per vehicle-km at 100 % and 0 % laden (Config → Vehicles); see Return journeys
 kg CO₂e per t = tCO₂e × 1000 ÷ the tonnes on baked lines
 tonne-km      = tonnes × the route's basis km, baked lines</pre>
-<p>The factor is set per vehicle on Config → Vehicles and <strong>stored per km whatever unit the tenant reads</strong>
-(miles are converted for display only). Tailpipe only, one average-laden factor on both legs. The Carbon planner's
-all-in figure (materials and waste as well) is a different total: see the user guide, section 6.</p>
+<p>The factors are set per vehicle on Config → Vehicles and <strong>stored per km whatever unit the tenant reads</strong>
+(miles are converted for display only). Tailpipe only. A vehicle with no laden / empty pair (an electric lorry, or one
+typed without the pair) uses its one figure for both legs; a stored 0 is a figure (no tailpipe carbon) on both. Until 8 Nov 2026 the
+rule was DESNZ 2026 kg CO₂e per vehicle-km (average laden, both legs, from Config). The Carbon planner's all-in figure (materials and waste as well) is a different total: see the user guide,
+section 6.</p>
+
+<h2 id="t1-return">Return journeys (the empty way back)</h2>
+<p>8 Nov 2026 (v2.1). <code>backend/return_journey.py</code> is the one rule; <code>network.route_analysis</code> (the
+Routes table's rows, <code>co2_kg_per_trip</code>, <code>co2_loaded_kg_per_trip</code>, <code>co2_empty_kg_per_trip</code>,
+<code>return_mode</code>, <code>return_share</code>), <code>derived.line_context</code> → <code>costlines</code> (every
+line-month's <code>co2_t</code>, <code>co2_loaded_t</code>, <code>co2_empty_t</code>: the Dashboard, the Look-ahead, the
+public map's figures and the bulletin) and <code>carbon._eval</code> (the Carbon planner, the carbon target) all read
+<code>trip_kg()</code>. The National Highways Carbon Tool figure and the tonne-km benchmark beside them are untouched.</p>
+<pre>share  = 1.0 (Comes back empty) | planning.return_journeys.part_share_pct ÷ 100 (May take other work) | 0 (One way only)
+mode   = routes.return_mode, or when NULL the guess:
+         a concrete mixer                               → planning.return_journeys.mixers   (seed: empty)
+         the route's start is a quarry / plant / works /
+           depot / railhead / port (return_journey.SUPPLIER_WORDS) → …supplier (seed: part, 43 %)
+         any other start                                → …scheme   (seed: empty)
+trip   = loaded km × emissions_kg_co2e_per_km_laden + return km × share × emissions_kg_co2e_per_km_empty
+         (the vehicle's single figure for both when the pair is missing; a return leg not routed charges nothing)</pre>
+<p>The cycle, trips a day, lorries needed, lorry-km (<code>vkm</code>) and the electric day keep the whole return: the lorry
+drives back whatever is charged. <code>PUT /api/admin/routes/{id}/planning</code> takes <code>return_mode</code>
+(<code>empty</code> | <code>part</code> | <code>oneway</code> | null = the guess); the route list carries
+<code>return_mode</code>, <code>return_default</code> and <code>return_part_pct</code>. Sources: RICS Whole life carbon
+assessment for the built environment, 2nd ed. (2023) §5.1.3 module A4 — the return must be included, 43 % of the loaded
+distance the UK default, 100 % where no return load is possible (concrete mixers); National Highways Carbon Tool v2.7
+§5.3.2 — the return is added to every haul; GLEC Framework v3 — a dedicated vehicle carries its whole round trip, one way
+only when chartered for a one-way journey. The DESNZ tonne-km factors already include the fleet's empty running, which is
+why the tonne-km benchmark takes the loaded distance only. A later Pairings feature (v3) replaces the charged return km
+per week for paired loads: keep <code>share</code> the one number the figures multiply the return km by.</p>
 
 <h2 id="t1-cost">Planned cost</h2>
 <p>Planned £ = the route's typed rates (summed: per load, per tonne and per km), or the Config target rate where the

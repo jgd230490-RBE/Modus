@@ -212,8 +212,9 @@ async function carbonTargetDom(){
   const elec = [...host.querySelectorAll("label")].find(l => /Battery electric lorries/.test(l.textContent)).querySelector("input");
   act(() => { elec.click(); });
   await settle(450);
+  // RE-PINNED 8 Nov 2026 (the return journey): the carbon fixtures' figures moved (test_carbon.py hand-works them)
   ok("CARBON DOM: a choice that lowers carbon gives a result (the strip at the foot reads it)",
-     (host.querySelector("[data-sticky-foot]") || { textContent: "" }).textContent.includes("Result: 32.8 tCO2e"));
+     (host.querySelector("[data-sticky-foot]") || { textContent: "" }).textContent.includes("Result: 32.5 tCO2e"));
   act(() => { setBtn().click(); });
   await settle(50);
   ok("🔴 CARBON DOM: ...but Set stays disabled, and a click sends NO PUT (it would have replaced a target it could not see, without asking)",
@@ -223,7 +224,7 @@ async function carbonTargetDom(){
   await settle(100);
   ok("⭐ CARBON DOM: Try again reads it again (a second GET); the target shows and Set is enabled",
      calls.filter(c => c.url === "/api/carbon/target" && c.method === "GET").length === 2
-     && step6().textContent.includes("Target: 73.1% below the approved plan = 43.4 tCO2e") && !setBtn().disabled && !byText(step6(), "button", "Try again"));
+     && step6().textContent.includes("Target: 74.0% below the approved plan = 41.4 tCO2e") && !setBtn().disabled && !byText(step6(), "button", "Try again"));
   act(() => { setBtn().click(); });
   await settle(50);
   ok("🔴 CARBON DOM: with a target there, Set asks first; answering no sends nothing",
@@ -318,7 +319,7 @@ async function carbonTargetDom(){
   const go3 = byText(d3.el, "button", "Open the Carbon planner");
   if (go3) act(() => { go3.click(); });
   ok("CARBON DOM: with a target set, the strip reads it and still offers the Carbon planner",
-     !!d3.el.querySelector('[data-carbon-target="set"]') && d3.el.textContent.includes("With the agreed decisions: 43.4 tCO2e, on target")
+     !!d3.el.querySelector('[data-carbon-target="set"]') && d3.el.textContent.includes("With the agreed decisions: 41.4 tCO2e, on target")
      && opened.length === 2 && opened[1] === "carbon");
   d3.done();
 

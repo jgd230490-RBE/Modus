@@ -1,33 +1,33 @@
 {
  "status": {
-  "approved_t": 161.446,
-  "approved_transport_t": 14.091,
+  "approved_t": 159.055,
+  "approved_transport_t": 11.7,
   "by_month": [
    {
-    "approved_t": 149.192,
+    "approved_t": 147.06,
     "month_index": 10,
-    "with_decisions_t": 33.169
+    "with_decisions_t": 31.384
    },
    {
-    "approved_t": 12.254,
+    "approved_t": 11.995,
     "month_index": 11,
-    "with_decisions_t": 10.262
+    "with_decisions_t": 10.003
    }
   ],
-  "gap_as_forecast_t": 118.015,
+  "gap_as_forecast_t": 117.668,
   "gap_with_decisions_t": 0.0,
   "invalid": null,
   "on_target_as_forecast": false,
   "on_target_with_decisions": true,
-  "pending_t": 5.653,
+  "pending_t": 5.342,
   "scope": "scheme",
   "share_pct": null,
   "share_rule": null,
-  "target_t": 43.431,
-  "with_decisions_t": 43.431
+  "target_t": 41.387,
+  "with_decisions_t": 41.387
  },
  "target": {
-  "cap_t": 43.431,
+  "cap_t": 41.387,
   "lever_words": [
    "Recycled content 30% — Small aggregate",
    "Receiving site: Soil hub (route R4) — route R3: Compound → Tip"
@@ -49,9 +49,9 @@
    }
   ],
   "mode": "pct",
-  "pct_below": 73.098745,
-  "set_at_alternative_t": 43.431,
-  "set_at_approved_t": 161.446,
+  "pct_below": 73.979441,
+  "set_at_alternative_t": 41.387,
+  "set_at_approved_t": 159.055,
   "ui_state": {
    "alt": {},
    "disposal": {

@@ -284,8 +284,12 @@ ok("km = trips × km/trip (60 km round trip) on a baked line; t·km on the route
    r1["baked"] is True and r1["km_trip"] == 60.0 and abs(r1["km"] - 201 * 60.0) < 0.01 and abs(r1["tonne_km"] - 4010.0 * 60.0) < 0.1)
 # NARROWED (H1, 29 Sep 2026): the 32 t rigid's factor is the DESNZ 2026 rigid >17 t average-
 # laden figure 0.99773 (was the 2025-basis 0.95); the arithmetic is unchanged.
-ok("CO₂ = km × the vehicle's kg CO₂e/km ÷ 1000 (0.99773 for the 32 t rigid, DESNZ 2026)",
-   abs(r1["co2_t"] - round(201 * 60.0 * 0.99773 / 1000.0, 3)) < 0.002)
+# RE-PINNED 8 Nov 2026 (the return journey, return_journey.py): the loaded leg at the vehicle's 100 % laden factor and the way
+# back at its 0 % laden factor × the route's return share (a quarry's route 43 %, a haul from a site or muck-away 100 %), in
+# place of the average-laden figure on both legs — every transport figure below moved; material and disposal did not.
+# (the Pit has no kind, so the route comes back empty: the whole return at the 0 % figure)
+ok("CO₂ = trips × (30 km × 1.11639 laden + 30 km × 0.7791 empty) ÷ 1000 (the 32 t rigid's DESNZ 2026 pair; was 60 km × 0.99773 average)",
+   abs(r1["co2_t"] - round(201 * (30.0 * 1.11639 + 30.0 * 0.7791) / 1000.0, 3)) < 0.002)
 ok("vehicles = trips ÷ (working days × cycles per vehicle-day), rounded up: 201 ÷ (22 × 5) → 2",
    r1["cycles_per_vehicle_day"] == 5 and r1["vehicles"] == 2)
 ok("🔴 the UNBAKED line has no km, t·km, CO₂, vehicles or fair € — and is flagged, not estimated",

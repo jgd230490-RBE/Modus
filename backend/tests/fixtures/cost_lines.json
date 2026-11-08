@@ -33,7 +33,10 @@
    "other_work_min": 20.0,
    "km": 12060.0,
    "tonne_km": 240600.0,
-   "co2_t": 12.033,
+   "co2_t": 11.43,
+   "co2_loaded_t": 6.732,
+   "co2_empty_t": 4.698,
+   "return_share": 1.0,
    "planned": {
     "eur": 27135.0,
     "per_t": 6.77,
@@ -56,7 +59,8 @@
    "actual_eur": 3300.0,
    "weeks_reported": 2,
    "flags": [],
-   "limit": null
+   "limit": null,
+   "busy": null
   },
   {
    "route_id": "R1",
@@ -91,7 +95,10 @@
    "other_work_min": 20.0,
    "km": 12060.0,
    "tonne_km": 240600.0,
-   "co2_t": 12.033,
+   "co2_t": 11.43,
+   "co2_loaded_t": 6.732,
+   "co2_empty_t": 4.698,
+   "return_share": 1.0,
    "planned": {
     "eur": 27135.0,
     "per_t": 6.77,
@@ -114,7 +121,8 @@
    "actual_eur": null,
    "weeks_reported": 0,
    "flags": [],
-   "limit": null
+   "limit": null,
+   "busy": null
   },
   {
    "route_id": "R1",
@@ -149,7 +157,10 @@
    "other_work_min": 20.0,
    "km": 12060.0,
    "tonne_km": 240600.0,
-   "co2_t": 12.033,
+   "co2_t": 11.43,
+   "co2_loaded_t": 6.732,
+   "co2_empty_t": 4.698,
+   "return_share": 1.0,
    "planned": {
     "eur": 27135.0,
     "per_t": 6.77,
@@ -174,7 +185,8 @@
    "actual_eur": null,
    "weeks_reported": 0,
    "flags": [],
-   "limit": null
+   "limit": null,
+   "busy": null
   },
   {
    "route_id": "R2",
@@ -209,7 +221,10 @@
    "other_work_min": 24.0,
    "km": 5400.0,
    "tonne_km": 156000.0,
-   "co2_t": 5.073,
+   "co2_t": 4.681,
+   "co2_loaded_t": 2.916,
+   "co2_empty_t": 1.765,
+   "return_share": 1.0,
    "planned": {
     "eur": 7800.0,
     "per_t": 3.0,
@@ -232,7 +247,8 @@
    "actual_eur": null,
    "weeks_reported": 1,
    "flags": [],
-   "limit": null
+   "limit": null,
+   "busy": null
   },
   {
    "route_id": "R2",
@@ -267,7 +283,10 @@
    "other_work_min": 24.0,
    "km": 5400.0,
    "tonne_km": 156000.0,
-   "co2_t": 5.073,
+   "co2_t": 4.681,
+   "co2_loaded_t": 2.916,
+   "co2_empty_t": 1.765,
+   "return_share": 1.0,
    "planned": {
     "eur": 7800.0,
     "per_t": 3.0,
@@ -290,7 +309,8 @@
    "actual_eur": null,
    "weeks_reported": 0,
    "flags": [],
-   "limit": null
+   "limit": null,
+   "busy": null
   },
   {
    "route_id": "R2",
@@ -325,7 +345,10 @@
    "other_work_min": 24.0,
    "km": 5400.0,
    "tonne_km": 156000.0,
-   "co2_t": 5.073,
+   "co2_t": 4.681,
+   "co2_loaded_t": 2.916,
+   "co2_empty_t": 1.765,
+   "return_share": 1.0,
    "planned": {
     "eur": 7800.0,
     "per_t": 3.0,
@@ -350,7 +373,8 @@
    "actual_eur": null,
    "weeks_reported": 0,
    "flags": [],
-   "limit": null
+   "limit": null,
+   "busy": null
   },
   {
    "route_id": "R3",
@@ -386,6 +410,9 @@
    "km": null,
    "tonne_km": null,
    "co2_t": null,
+   "co2_loaded_t": null,
+   "co2_empty_t": null,
+   "return_share": null,
    "planned": {
     "eur": 2025.0,
     "per_t": 2.25,
@@ -410,7 +437,8 @@
    "flags": [
     "UNBAKED"
    ],
-   "limit": null
+   "limit": null,
+   "busy": null
   },
   {
    "route_id": "R3",
@@ -446,6 +474,9 @@
    "km": null,
    "tonne_km": null,
    "co2_t": null,
+   "co2_loaded_t": null,
+   "co2_empty_t": null,
+   "return_share": null,
    "planned": {
     "eur": 2025.0,
     "per_t": 2.25,
@@ -470,7 +501,8 @@
    "flags": [
     "UNBAKED"
    ],
-   "limit": null
+   "limit": null,
+   "busy": null
   },
   {
    "route_id": "R3",
@@ -506,6 +538,9 @@
    "km": null,
    "tonne_km": null,
    "co2_t": null,
+   "co2_loaded_t": null,
+   "co2_empty_t": null,
+   "return_share": null,
    "planned": {
     "eur": 2025.0,
     "per_t": 2.25,
@@ -530,7 +565,8 @@
    "flags": [
     "UNBAKED"
    ],
-   "limit": null
+   "limit": null,
+   "busy": null
   },
   {
    "route_id": "R4",
@@ -565,7 +601,10 @@
    "other_work_min": 20.0,
    "km": 3000.0,
    "tonne_km": 60000.0,
-   "co2_t": 2.993,
+   "co2_t": 2.843,
+   "co2_loaded_t": 1.675,
+   "co2_empty_t": 1.169,
+   "return_share": 1.0,
    "planned": {
     "eur": 6750.0,
     "per_t": 6.75,
@@ -588,7 +627,8 @@
    "actual_eur": null,
    "weeks_reported": 0,
    "flags": [],
-   "limit": null
+   "limit": null,
+   "busy": null
   },
   {
    "route_id": "R4",
@@ -623,7 +663,10 @@
    "other_work_min": 20.0,
    "km": 3000.0,
    "tonne_km": 60000.0,
-   "co2_t": 2.993,
+   "co2_t": 2.843,
+   "co2_loaded_t": 1.675,
+   "co2_empty_t": 1.169,
+   "return_share": 1.0,
    "planned": {
     "eur": 6750.0,
     "per_t": 6.75,
@@ -646,7 +689,8 @@
    "actual_eur": null,
    "weeks_reported": 0,
    "flags": [],
-   "limit": null
+   "limit": null,
+   "busy": null
   },
   {
    "route_id": "R4",
@@ -681,7 +725,10 @@
    "other_work_min": 20.0,
    "km": 3000.0,
    "tonne_km": 60000.0,
-   "co2_t": 2.993,
+   "co2_t": 2.843,
+   "co2_loaded_t": 1.675,
+   "co2_empty_t": 1.169,
+   "return_share": 1.0,
    "planned": {
     "eur": 6750.0,
     "per_t": 6.75,
@@ -706,7 +753,8 @@
    "actual_eur": null,
    "weeks_reported": 0,
    "flags": [],
-   "limit": null
+   "limit": null,
+   "busy": null
   }
  ],
  "totals": {
@@ -717,8 +765,8 @@
   "trips": 1158,
   "km": 61380.0,
   "tonne_km": 1369800.0,
-  "co2_t": 60.297,
-  "co2_kg_per_t": 2.64,
+  "co2_t": 56.862,
+  "co2_kg_per_t": 2.49,
   "planned": {
    "eur": 131130.0,
    "per_t": 5.14,
@@ -761,12 +809,19 @@
   "baf_pct": null,
   "baf_reason": "no base",
   "fair_params": {
-   "vehicle_standing_eur_per_h": 16.0,
+   "consumption": {
+    "l_per_100km_per_tonne": 0.4,
+    "artic": {
+     "l_per_100km_empty": 23.6
+    },
+    "rigid": {
+     "l_per_100km_empty": 27.0
+    }
+   },
+   "running_eur_per_km": 0.12,
+   "driver_eur_per_h": 20.0,
+   "margin_pct": 8.0,
    "season": {
-    "thaw_months": [
-     3,
-     4
-    ],
     "winter_months": [
      11,
      12,
@@ -774,21 +829,14 @@
      2,
      3
     ],
+    "thaw_months": [
+     3,
+     4
+    ],
     "winter_consumption_uplift_pct": 8.0
    },
-   "consumption": {
-    "rigid": {
-     "l_per_100km_empty": 27.0
-    },
-    "l_per_100km_per_tonne": 0.4,
-    "artic": {
-     "l_per_100km_empty": 23.6
-    }
-   },
-   "driver_eur_per_h": 20.0,
-   "margin_pct": 8.0,
-   "running_eur_per_km": 0.12,
-   "vehicle_new_price_eur": 190000
+   "vehicle_new_price_eur": 190000,
+   "vehicle_standing_eur_per_h": 16.0
   },
   "fair": {
    "index_eur_per_l": 1.922,
