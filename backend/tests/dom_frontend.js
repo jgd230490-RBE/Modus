@@ -2804,9 +2804,11 @@ async function rowsDom(){
        && !/Create route/.test(PR.el.textContent)
        && ![...PR.el.querySelectorAll("button")].some(b => /^Route all|^Clear all routes$|^Edit$|^Delete…?$|^Route$/.test(b.textContent.trim()))
        && !PR.el.querySelector("tbody details.row-menu"));
-    ok("P5 ROUTES (planner): the route sheet, collision evidence and the route map stay",
+    // NARROWED 9 Nov 2026 (v2.1 task 2.1-6): the collision evidence is section C of the Route analysis menu now
+    ok("P5 ROUTES (planner): the route sheet, the route analysis (collision evidence is its section C) and the route map stay",
        [...PR.el.querySelectorAll("button")].some(b => b.textContent === "Route sheet (drivers)")
-       && [...PR.el.querySelectorAll("button")].some(b => /Collision evidence/.test(b.textContent)));
+       && [...PR.el.querySelectorAll("[data-route-analysis] summary")].some(s => /Route analysis/.test(s.textContent))
+       && ![...PR.el.querySelectorAll("button")].some(b => /Collision evidence/.test(b.textContent)));
     await PR.done();
   } finally { w.fetch = fetchWas; w.mapboxgl.Map = MapWas; w.__ACCESS.info = infoWas; }
 }

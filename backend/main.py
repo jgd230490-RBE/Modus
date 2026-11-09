@@ -4081,6 +4081,54 @@ def collision_evidence_xlsx(route_id: str, request: Request = None):
                              "Cache-Control": "no-store"})
 
 
+# ---- 9 Nov 2026 (v2.1 task 2.1-6): the ROUTE ANALYSIS (route_analysis_doc.py + route_analysis_render.py; mockup
+# notes/route-analysis-mockup-1108/). One PDF or XLSX for one route or up to 12 picked together, for one lorry, with the
+# ticked sections A-F + the page for the assessor. Stored data only: nothing is fetched for it. Staff only; a team login
+# reads its own team's routes (404 for another's). Built one at a time (heavy_reads.solo): a second press is busy.
+# The /collision-evidence.pdf|xlsx addresses above keep answering (Q13); the Routes page's buttons are this one now.
+def _route_analysis(request, routes, lorry, sections, ext):
+    import route_analysis_doc
+    import route_analysis_render
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the route analysis is for staff")
+    if lorry:
+        known = (conversions.load_factors() or {}).get("vehicles") or {}
+        if lorry not in known:
+            raise HTTPException(422, "Pick a lorry from the list.")
+    with heavy_reads.solo("route-analysis", busy=lambda: HTTPException(
+            503, "Another route analysis is being made. Try again in a minute.", headers={"Retry-After": "60"})):
+        try:
+            D = route_analysis_doc.gather(routes, lorry=lorry or None, sections=sections, acc=access.current())
+            data = route_analysis_render.build_pdf(D) if ext == "pdf" else route_analysis_render.build_xlsx(D)
+        except route_analysis_doc.AnalysisError as e:
+            raise HTTPException(404, str(e))
+        except route_analysis_doc.AskError as e:
+            raise HTTPException(422, str(e))
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+    media = ("application/pdf" if ext == "pdf"
+             else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return Response(content=data, media_type=media,
+                    headers={"Content-Disposition": f'attachment; filename="{route_analysis_doc.file_name(D, ext)}"',
+                             "Cache-Control": "no-store"})
+
+
+@app.get("/api/routes/analysis.pdf")
+def route_analysis_pdf(routes: str = "", lorry: Optional[str] = None, sections: Optional[str] = None,
+                       request: Request = None):
+    """The route analysis as a PDF: `routes` = R001 or R001,R013 (up to 12, in that order), `lorry` = a vehicle key
+    (blank = the first route's busiest in the plan), `sections` = limits,community,collisions,cycle,hours,diversions,
+    assessor (blank = all). Section C is the route collision evidence's own pages."""
+    return _route_analysis(request, routes, lorry, sections, "pdf")
+
+
+@app.get("/api/routes/analysis.xlsx")
+def route_analysis_xlsx(routes: str = "", lorry: Optional[str] = None, sections: Optional[str] = None,
+                        request: Request = None):
+    """The same as a workbook: a sheet per section (a ticked one only), the route in every sheet's first column."""
+    return _route_analysis(request, routes, lorry, sections, "xlsx")
+
+
 @app.get("/api/public/route-alternatives")
 def public_route_alternatives(profile: Optional[str] = None):
     """Every non-primary baked option, for the public map's grey underlay.

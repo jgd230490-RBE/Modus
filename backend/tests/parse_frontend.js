@@ -5310,7 +5310,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ ROUTES PAGE (2.1-8, Q1): full screen only on ⤢, the route list | the map | the chosen route, each side folding",
      dmr.includes('onRoutes ? { gridTemplateColumns: `${fold.l ? 44 : 300}px minmax(0, 1fr) ${fold.r ? 44 : 380}px`, gridTemplateRows: "minmax(0, 1fr)" }')
      && dmr.includes("{full && onRoutes && !drawing && <>") && lst.includes("gridColumn: 1") && det.includes("gridColumn: 3")
-     && det.includes("<RouteSheetButton routeId={r.id} /><CollisionEvidenceButton routeId={r.id} />"));
+     && det.includes("<RouteSheetButton routeId={r.id} /><RouteAnalysisMenu routes={routes} picked={r.id} vehicles={vehicles} />"));   // NARROWED 9 Nov 2026 (2.1-6): the route analysis replaces the collision evidence buttons
   // the Chrome check (8 Nov): in full screen the DEMO pill sat over Out · Back · Both, and the detail table pushed the column sideways
   ok("ROUTES PAGE (2.1-8): in full screen on a demo the map's box sits under the DEMO pill; the detail table scrolls inside the right column",
      dmr.includes("<RouteMapBox low={full && !!TENANT.demo_notice}") && box.includes("top: low ? 44 : 8")
