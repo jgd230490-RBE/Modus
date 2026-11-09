@@ -6425,8 +6425,8 @@ def create_zone(body: ZoneIn, token: Optional[str] = None):
         body.name, body.geometry, kind=body.kind, affects_routing=body.affects_routing,
         starts_on=body.starts_on, ends_on=body.ends_on, note=body.note, active=body.active,
         speed_kph=body.speed_kph, haul_mode=body.haul_mode, location_id=getattr(body, "location_id", None),
-        limit_value=body.limit_value, limit_counts=body.limit_counts, limit_basis=body.limit_basis,
-        limit_public=body.limit_public)
+        limit_value=getattr(body, "limit_value", None), limit_counts=getattr(body, "limit_counts", None),
+        limit_basis=getattr(body, "limit_basis", None), limit_public=getattr(body, "limit_public", None))
     if z.get("error"):
         raise HTTPException(400, z["error"])
     if z["kind"] == zones.HAUL_KIND:
