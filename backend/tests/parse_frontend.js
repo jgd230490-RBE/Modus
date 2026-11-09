@@ -863,8 +863,10 @@ ok("the drawn ring is explicitly closed before it is sent", code.includes("const
 // than being deleted.
 ok("a minimum vertex count is enforced before save",
   code.includes("drawPts.length < minPts(zoneForm)"));
+// NARROWED 9 Nov 2026 (v2.1 task 2.1-1): a traffic limit drawn as a line takes two points like a haul road (isLineZone)
 ok("a zone still needs three corners and a haul road two",
-  /minPts\s*=\s*\(f\)\s*=>\s*isHaul\(f\)\s*\?\s*2\s*:\s*3/.test(code));
+  /minPts\s*=\s*\(f\)\s*=>\s*isLineZone\(f\)\s*\?\s*2\s*:\s*3/.test(code)
+  && code.includes('const isLineZone = (f) => isHaul(f) || (isLimit(f) && f.limit_shape === "line");'));
 
 ok("saving re-bakes what it invalidated", code.includes("rebakeAfterZone"));
 ok("the re-bake drives the existing batch endpoint rather than a new one",
@@ -1710,9 +1712,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && code.includes("{page && page.abnormal && page.abnormal.count > 0 && <AbnormalWeek ab={page.abnormal} />}"));
   // NARROWED 27 Oct 2026 (stockpile forecast, D7): the two amber stockpile warnings join the gold list after NOTICE_DUE
   // NARROWED 29 Oct 2026 (task 3a): the tone's last line is the pour's three warnings
+  // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): the tone goes on with TRAFFIC_NEAR (amber)
   ok("AL2 rail: the four words in the rail's tables (NOTICE DUE a gold warning, the other three red)",
      src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
-     && src.includes('code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";'));
+     && src.includes('code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";'));
   const st0 = src.indexOf("function AbnormalStrip({ onOpen, sites }){"), st1 = src.indexOf("function DashboardToday({ meta, week, err, wall, fill }){");
   const st = src.slice(st0, st1);
   ok("⭐ AL2 Dashboard: one strip under Gate arrivals (not on the big screen, not on a phone): ONE read of /abnormal/summary, the next-4-weeks count, notices due with the chip, " +
@@ -3547,6 +3550,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      src.includes('backgroundColor: g.days.map(d => d.flag === "red" ? RED : d.flag === "amber" ? GOLD : (g.capacity_per_day == null ? NONE : C1)) }];')
      && src.includes('stepped: "middle", order: 1 });') && src.includes("data: g.days.map(d => d.open ? g.near_per_day : 0), borderColor: GOLD, borderWidth: 1.5, borderDash: [4, 3]")
      && src.includes('<RowStatus word={`${d.day}: ${d.status_word}${d.pct != null ? ` (${d.pct} %)` : d.open ? "" : " (closed)"}`} tone={d.flag === "red" ? "bad" : "warn"} />'));
+  // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): the tone goes on with TRAFFIC_NEAR (amber)
   ok("⭐ W17: the rail names GATE OVER CAPACITY / GATE NEAR CAPACITY (as the exports do); near is a gold warning, over red",
      // NARROWED 22 Oct 2026 (abnormal loads, phase 2): the rail's table goes on with the four abnormal-load words after GATE NEAR CAPACITY
      // NARROWED 28 Oct 2026 (task 0c): both tables go on with NO_WAY_ROUND after the last entry
@@ -3554,7 +3558,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      src.includes('GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",') && src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT",')
      // NARROWED 27 Oct 2026 (stockpile forecast, D7): the grid's table and the tone go on with STOCKPILE SOON / EMPTY (amber)
      && src.includes('GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",')
-     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";')
+     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";')
      && src.includes('<i style={{ background: laTone(f.code) === "warn" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i>')
      && /"GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"/.test(fs.readFileSync(path.join(ROOT, "backend", "export.py"), "utf8")));
   // W8: the data fields
@@ -4606,10 +4610,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      src.includes('<tbody data-horizon-stock="1">') && src.includes('const tone = c.over ? "over" : c.pct >= 90 ? "near" : "ok";')
      && src.includes(`Stockpiles <span className="font-normal text-slate-500">% full at the week's end</span>`));
   // NARROWED 29 Oct 2026 (task 3a): the tone goes on with the pour's three warnings
+  // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): the tone goes on with TRAFFIC_NEAR (amber)
   ok("RAIL: STOCKPILE SOON / STOCKPILE EMPTY are words in both tables, amber, ranked with the warnings",
      // NARROWED 28 Oct 2026 (task 0c): the rank table goes on with NO_WAY_ROUND
      src.includes('STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",') && src.includes('STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7,')
-     && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";'));
+     && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";'));
   ok("DASHBOARD: a stockpile with no planned use never leads the message (as the rail's STOCKPILE SOON)",
      /function stockMessage\(sps\)\{[\s\S]{0,400}if\(!sp\.use_planned\) return;/.test(src));
   ok("DASHBOARD: the 'No use planned yet' line names a stockpile with a capacity and no plan",
@@ -5135,7 +5140,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
 // 5 Nov 2026 (group 6, PR 2; card 6): the Dashboard's Concerns section — planners and admins only, folded and read on first
 // open, the Dashboard's months and Sites, counts only, Copy / Download on its chart
 {
-  const cd = code.slice(code.indexOf("function ConcernsDash("), code.indexOf("function DashboardStockChart("));
+  // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): TrafficDash follows ConcernsDash; the slice ends where it starts
+  const cd = code.slice(code.indexOf("function ConcernsDash("), code.indexOf("const TL_STATE = "));
   ok("CONCERNS DASH: the section exists, reads /api/concerns/figures with the range and the Sites, only once opened",
      cd.length > 1500 && cd.includes("fetch(`${API}/concerns/figures?${q}`)") && cd.includes("if(!open) return;")
      && cd.includes('"&sites=" + sites.map(encodeURIComponent).join(",")') && cd.includes("<summary>Concerns from the public</summary>"));
@@ -5423,6 +5429,44 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && ram.includes('window.addEventListener("scroll", onScroll, true); window.addEventListener("resize", place);')
      && ram.includes('window.removeEventListener("scroll", onScroll, true); window.removeEventListener("resize", place);')
      && !/d\.open = false/.test(ram));
+}
+// ---- 9 Nov 2026 (v2.1 task 2.1-1): traffic limits on a road or an area ----
+{
+  ok("TRAFFIC LIMIT: Zones offers the kind, a limit with its unit, the basis, line or area, the public tick and the one sentence",
+     code.includes('["traffic_limit", "Traffic limit"]') && code.includes('const LIMIT_KIND = "traffic_limit";')
+     && code.includes('["movements", "lorry movements a day, in and out counted separately"], ["visits", "lorry visits a day"]')
+     && code.includes('[["average", "Daily average in the month"], ["busiest_day", "Busiest day"]]')
+     && code.includes('[["line", "Line along the road"], ["area", "Area"]]') && code.includes("Show on the public map")
+     && code.includes("Wayscope flags it; it never moves a route."));
+  ok("🔴 TRAFFIC LIMIT: a limit never routes — saved with affects_routing false, its Affects routing tick not drawn",
+     code.includes("affects_routing: limitNow ? false : !!zoneForm.affects_routing")
+     && code.includes("{!isLimit(zoneForm) && <label") && code.includes("zoneForm.affects_routing && !isHaul(zoneForm) && !isLimit(zoneForm)"));
+  ok("TRAFFIC LIMIT: a line is a LineString, the limit fields go in the body, a missing number is refused in words",
+     code.includes("geometry: lineNow") && code.includes("limit_value: Number(zoneForm.limit_value), limit_counts: zoneForm.limit_counts,")
+     && code.includes('setZoneMsg("Type the limit: a number of lorries a day.")'));
+  ok("TRAFFIC LIMIT: the Zones table's Routing cell is the limit and Used by the routes this month (read beside the diversions)",
+     code.includes("data-zone-limit-chip={z.id}") && code.includes("`Limit ${limitNum(lim.value)} / day`")
+     && code.includes("data-zone-limit-use={z.id}") && code.includes("const loadLimitUse = () => {")
+     && (code.match(/loadLimitUse\(\)/g) || []).length >= 2);
+  const td = code.slice(code.indexOf("function TrafficDash("), code.indexOf("function DashboardStockChart("));
+  ok("TRAFFIC DASH: a fold for planners and admins under Gate arrivals, read on first open, following the months and Sites",
+     td.includes("<summary>Traffic limits</summary>") && td.includes("if(!open) return;")
+     && td.includes("fetch(`${API}/traffic-limits?${q}`)") && td.includes('"&sites=" + sites.map(encodeURIComponent).join(",")')
+     && code.includes("{canApprove && !wall && !phone && <TrafficDash months={months} lo={D.lo} hi={D.hi} sites={sites}")
+     && code.indexOf("<TrafficDash ") > code.indexOf("<GateArrivalsPanel ") && code.indexOf("<TrafficDash ") < code.indexOf("<ConcernsDash "));
+  ok("TRAFFIC DASH: a table (road, this month, limit, months over) and a chart a limit with Copy / Download (title and scope)",
+     td.includes('data-traffic-table="1"') && td.includes(">Months over</th>") && td.includes("data-traffic-chart={L.id}")
+     && td.includes("<ChartCanvas config={bar(L)} title={") && td.includes("scope={scope} />")
+     && td.includes('label: "limit", data: ms.map(() => L.limit.value)'));
+  ok("SIM: 'Traffic limits on this day' lists the reply's limits with OVER / NEAR in words",
+     code.includes("Traffic limits on this day") && code.includes("(D.traffic_limits || []).map(t =>")
+     && code.includes('t.state === "over" ? "OVER" : "NEAR"'));
+  ok("RAIL: TRAFFIC LIMIT red and TRAFFIC NEAR amber, words in both tables, ranked",
+     code.includes('TRAFFIC_LIMIT: "TRAFFIC LIMIT"') && code.includes('TRAFFIC_NEAR: "TRAFFIC NEAR"')
+     && code.includes("TRAFFIC_LIMIT: 3.6") && code.includes("TRAFFIC_NEAR: 8.4") && code.includes('|| code === "TRAFFIC_NEAR") ? "warn" : "bad";'));
+  ok("🔴 TRAFFIC LIMIT: no back-end words on the new screens",
+     !/\b(api|endpoint|cache|server|geometry|LineString)\b/i.test(td.replace(/fetch\(`\$\{API\}[^`]*`\)/g, "")
+       .replace(/[A-Za-z_.]*geometry[A-Za-z_.]*/g, "")));
 }
 console.log();
 for (const f of fail) console.log("  FAIL:", f);

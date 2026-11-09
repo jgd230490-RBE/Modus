@@ -34,6 +34,7 @@ import here_routing
 import taxonomy
 import teams
 import zones
+import traffic_limits
 import haul          # Phase 4 — temporary haul roads
 import restrictions  # Phase 2.5a Tark Tee; H1 (29 Sep) a provider per country (NH closures for GB)
 import streetview    # Phase 2.5a — Google Street View proxy (key stays server-side)
@@ -6343,6 +6344,12 @@ class ZoneIn(BaseModel):
     haul_mode: Optional[str] = None
     # 28 Oct 2026 (simulation v2): a haul road INSIDE this site (mode internal; never spliced into a public route)
     location_id: Optional[str] = None
+    # 9 Nov 2026 (v2.1 task 2.1-1): kind 'traffic_limit' only — the limit, its unit (movements | visits), basis
+    # (average | busiest_day) and the public tick. A traffic limit is stored with affects_routing off (Q11).
+    limit_value: Optional[float] = None
+    limit_counts: Optional[str] = None
+    limit_basis: Optional[str] = None
+    limit_public: Optional[bool] = None
 
 
 def _zone_write_result(zone, inval, zone_id=None):
@@ -6389,7 +6396,9 @@ def list_zones(on: Optional[str] = None, include_inactive: bool = True):
             # 28 Oct 2026 (task 0c): per dated routing zone, the routes it diverts and those with no way round
             "diversions": route_choice.summary()["by_zone"],
             # 8 Nov 2026 (task 2.1-12): {zone id: {location_id, site}} for a works area made from a site layout
-            "from_layout": works_from_layout.sources()}
+            "from_layout": works_from_layout.sources(),
+            # 9 Nov 2026 (v2.1 task 2.1-1): the traffic limit kind and its words
+            "traffic_limit_kind": traffic_limits.KIND}
 
 
 @app.get("/api/zones/{zone_id}")
@@ -6415,7 +6424,9 @@ def create_zone(body: ZoneIn, token: Optional[str] = None):
     z = zones.create_zone(
         body.name, body.geometry, kind=body.kind, affects_routing=body.affects_routing,
         starts_on=body.starts_on, ends_on=body.ends_on, note=body.note, active=body.active,
-        speed_kph=body.speed_kph, haul_mode=body.haul_mode, location_id=getattr(body, "location_id", None))
+        speed_kph=body.speed_kph, haul_mode=body.haul_mode, location_id=getattr(body, "location_id", None),
+        limit_value=body.limit_value, limit_counts=body.limit_counts, limit_basis=body.limit_basis,
+        limit_public=body.limit_public)
     if z.get("error"):
         raise HTTPException(400, z["error"])
     if z["kind"] == zones.HAUL_KIND:
@@ -6452,7 +6463,8 @@ def update_zone(zone_id: str, body: ZoneIn, token: Optional[str] = None):
     sent = set(_fields_set(body))
     fields = {k: getattr(body, k) for k in
               ("name", "geometry", "kind", "affects_routing", "starts_on", "ends_on",
-               "note", "active", "speed_kph", "haul_mode", "location_id") if k in sent}
+               "note", "active", "speed_kph", "haul_mode", "location_id",
+               "limit_value", "limit_counts", "limit_basis", "limit_public") if k in sent}
     z = zones.update_zone(zone_id, **fields)
     if z.get("error"):
         raise HTTPException(400, z["error"])
@@ -7145,6 +7157,57 @@ def concern_figures(start: Optional[str] = Query(None, alias="from"), end: Optio
         return concerns.figures(start, end, sites=picks)
     except concerns.Refused as e:
         raise HTTPException(e.status, str(e))
+
+
+# ------------------------------------------------------------------ traffic limits (v2.1 task 2.1-1)
+@app.get("/api/traffic-limits")
+def traffic_limits_read(start: Optional[int] = Query(None, alias="from"), end: Optional[int] = Query(None, alias="to"),
+                        sites: Optional[str] = None):
+    """9 Nov 2026 (v2.1 task 2.1-1): the Dashboard's Traffic limits — every limit (public or not) with its months in
+    the range, the approved plan. `sites` (location ids) keeps the lorries of routes that start or end at one; the
+    limit is unchanged. Planners and admins; kept until the next write."""
+    acc = _require_approver()
+    lo = max(1, int(start or 1))
+    hi = min(MONTH_COUNT, int(end or MONTH_COUNT))
+    if hi < lo:
+        raise HTTPException(400, "the range ends before it starts")
+    picks = sorted({x.strip() for x in (sites or "").split(",") if x.strip()})[:200]
+
+    def build():
+        flt = None
+        if picks:
+            flt = {r["id"] for r in db.query("SELECT id, origin_id, dest_id FROM routes WHERE tenant_id = ?",
+                                             (db.current_tenant(),))
+                   if r.get("origin_id") in picks or r.get("dest_id") in picks}
+        out = traffic_limits.summary(range(lo, hi + 1), route_filter=flt)
+        out.update({"from": lo, "to": hi, "sites": picks,
+                    "current_month": max(1, min(MONTH_COUNT, weeks.month_index_of(__import__("datetime").date.today())))})
+        return out
+    return _staff_json("traffic-limits", (lo, hi, tuple(picks)), build, acc)
+
+
+#: 9 Nov 2026 (2.1-1): /api/public/traffic-limits kept in memory (read_cache) until the next write, like the councils
+TRAFFIC_LIMITS_CACHE = "traffic-limits/public"
+
+
+@app.get("/api/public/traffic-limits")
+def public_traffic_limits():
+    """9 Nov 2026 (v2.1 task 2.1-1): the public map's traffic limits — only those ticked "Show on the public map" (Q6),
+    every month in one read (the map filters by the month on screen). Behind the map gate; no note, no team names."""
+    def build():
+        with _heavy("traffic-limits"):
+            body = traffic_limits.summary(public_only=True, with_routes=True)
+            for lim in body["limits"]:
+                lim["limit"] = {k: lim["limit"][k] for k in ("value", "counts", "basis")}
+                mv = lim["limit"]["counts"] == "movements"
+                for v in lim["months"].values():
+                    # the popup's route table: each route's own figure a day, in the limit's unit (nothing else)
+                    v["routes"] = [{"route_id": r["route_id"],
+                                    "a_day": round(r["in_per_day"] + r["out_per_day"] if mv else r["visits_per_day"], 1)}
+                                   for r in v.get("routes") or []]
+            return read_cache.json_bytes(body)
+    body = read_cache.cached(TRAFFIC_LIMITS_CACHE, (MONTH_COUNT,), build)
+    return Response(content=body, media_type="application/json")
 
 
 @app.get("/api/concerns/{cid}")

@@ -1212,6 +1212,16 @@
         <div class="area-note" id="abnormal-public-when"></div>
     </div>
 
+    <!-- 9 Nov 2026 (v2.1 task 2.1-1, card 4): TRAFFIC LIMITS — a road or an area's limit on lorries a day, as the scheme drew
+         it on Zones and ticked "Show on the public map", against this scheme's approved plan in the month on screen. A
+         layer-* box, so it travels in a shared link; on by default; hidden until a public limit exists. -->
+    <div class="control-group" id="traffic-limits-group" hidden>
+        <h3>Traffic limits</h3>
+        <div class="control-item"><label><input type="checkbox" id="layer-traffic-limits" onchange="toggleTrafficLimits(this.checked)" checked> Traffic limits</label><button type="button" class="info-i" aria-expanded="false" aria-controls="info-traffic-limits" onclick="toggleInfo(this)" title="About the traffic limits" aria-label="About the traffic limits"><span aria-hidden="true">i</span></button></div>
+        <div class="info-pop" id="info-traffic-limits" hidden><p>A limit on lorries a day on a road or in an area, against this scheme's approved plan for the month on screen. Red: over. Amber: near. Grey: within.</p></div>
+        <div class="area-note" id="traffic-limits-when"></div>
+    </div>
+
     <div class="control-group" id="restrictions-group" hidden>
         <!-- 22 Oct 2026 (UI fix 6, card 9): the source's name at 13 px in the muted grey (4.76:1), as the fold's other captions (was #8a9099 at the small's ~10.8 px, 3.22:1) -->
         <div class="ctl-head"><h3><span id="restriction-heading">Road restrictions</span> <small id="restriction-provider" style="font-weight:500;font-size:13px;text-transform:none;letter-spacing:0;color:var(--muted);"></small></h3><button type="button" class="info-i" aria-expanded="false" aria-controls="info-restrictions" onclick="toggleInfo(this)" title="About the road closures" aria-label="About the road closures"><span aria-hidden="true">i</span></button></div>
@@ -3482,6 +3492,7 @@
         const disc = document.getElementById('filter-discipline').value; const i = document.getElementById('filter-ipt').value;
         syncFilterReset();
         try { applyStockMonth(); } catch (e) {}      // 27 Oct 2026: and so do the stockpile gauges
+        try { if (typeof TLIM !== 'undefined' && TLIM.data) applyTrafficMonth(); } catch (e) {}      // 9 Nov 2026 (2.1-1): and the traffic limits
         try { if (typeof SLY !== 'undefined' && (SLY.on || SLY.picsOn)) refreshSiteLayouts(); } catch (e) {}   // 31 Oct 2026 (task 4c): and the site layouts' phases
         try { if (typeof PSL !== 'undefined') refreshPublicLayouts(); } catch (e) {}           // 31 Oct 2026 (task 4c PR 4): and the public ones
         const inVis = document.getElementById('layer-inbound').checked; const outVis = document.getElementById('layer-outbound').checked;
@@ -4165,6 +4176,8 @@
         // 22 Oct 2026: and the abnormal loads (staff only)
         if (typeof ABN !== 'undefined' && ABN.data) ensureAbnormalLayers();
         if (typeof ABP !== 'undefined' && ABP.data) ensureAbnormalPublicLayers();
+        // 9 Nov 2026 (v2.1 task 2.1-1): and the traffic limits
+        if (typeof TLIM !== 'undefined' && TLIM.data) ensureTrafficLimitLayers();
         // 31 Oct 2026 (task 4c): and the site layouts (staff only; their pictures go with the style too)
         if (typeof SLY !== 'undefined' && SLY.h) ensureSiteLayoutLayers();
         // 31 Oct 2026 (task 4c PR 4): and the public site layouts
@@ -9166,6 +9179,8 @@
     function presetLayers(p) {
         const on = new Set(VIEW.defaults);
         on.add('forecast');
+        // 9 Nov 2026 (v2.1 task 2.1-1, card 4): the traffic limits are on in Busiest roads and Everything only
+        if (p.key !== 'busiest-roads' && p.key !== 'everything') on.delete('traffic-limits');
         if (p.closures) layerBoxes().forEach(cb => {
             const k = layerKey(cb.id);
             if (k === 'zones' || k.indexOf('zone-') === 0 || k.indexOf('restr-') === 0) on.add(k);
@@ -10162,8 +10177,133 @@
         ensureAbnormalLayers();
     }
 
+    // ---------------------------------------------------------------- traffic limits (9 Nov 2026, v2.1 task 2.1-1, card 4)
+    // /api/public/traffic-limits (behind the map password): the limits ticked "Show on the public map", every month in one
+    // read. Each is drawn as a thin dashed edge (red over, amber near, grey within; grey with no month on screen) over a
+    // soft band, with a badge "212 / 200 a day" from zoom 11, all under the road names (labelAnchor). The popup names the
+    // routes that pass. This scheme's lorries only, from the approved plan; a limit never moves a route.
+    const TLIM = { on: true, data: null, loading: false, month: null };
+    const TLIM_COL = { over: '#B91C1C', near: '#B45309', ok: '#64748B', none: '#64748B' };
+    const TLIM_LAYERS = ['traffic-limit-band', 'traffic-limit-fill', 'traffic-limit-edge', 'traffic-limit-badge'];
+    const tlimN = (v) => v == null ? '—' : Math.round(Number(v)).toLocaleString('en-GB');
+    function tlimUnit(L) { return L.limit.counts === 'movements' ? 'movements' : 'visits'; }
+    function tlimPoint(g) {
+        // the badge's place: the middle point of a line, the middle of an area's box
+        if (!g) return null;
+        if (g.type === 'LineString') { const c = g.coordinates; return c[Math.floor((c.length - 1) / 2)]; }
+        const ring = (g.coordinates || [])[0] || [];
+        if (!ring.length) return null;
+        let a = 180, b = 90, c = -180, d = -90;
+        ring.forEach(p => { a = Math.min(a, p[0]); b = Math.min(b, p[1]); c = Math.max(c, p[0]); d = Math.max(d, p[1]); });
+        return [(a + c) / 2, (b + d) / 2];
+    }
+    function trafficFeatures() {
+        const m = TLIM.month, shapes = [], badges = [];
+        ((TLIM.data && TLIM.data.limits) || []).forEach(L => {
+            const r = m ? (L.months || {})[String(m)] : null;
+            if (m && !r) return;                      // a dated limit not in force this month: not drawn
+            const state = r ? r.state : 'none';
+            const props = { id: L.id, name: L.name, state, colour: TLIM_COL[state] || TLIM_COL.none,
+                            badge: r ? tlimN(r.value) + ' / ' + tlimN(L.limit.value) + ' a day' : L.name };
+            shapes.push({ type: 'Feature', properties: props, geometry: L.geometry });
+            const pt = tlimPoint(L.geometry);
+            if (pt) badges.push({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: pt } });
+        });
+        return { shapes: { type: 'FeatureCollection', features: shapes }, badges: { type: 'FeatureCollection', features: badges } };
+    }
+    function ensureTrafficLimitLayers() {
+        if (!TLIM.data) return;
+        const vis = TLIM.on ? 'visible' : 'none';
+        if (map.getLayer('traffic-limit-edge')) {
+            try { TLIM_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', vis); }); } catch (e) {}
+            applyTrafficMonth(); return;
+        }
+        if (!styleReady()) return;
+        const fc = trafficFeatures();
+        if (!map.getSource('traffic-limit-source')) map.addSource('traffic-limit-source', { type: 'geojson', data: fc.shapes });
+        if (!map.getSource('traffic-limit-badges')) map.addSource('traffic-limit-badges', { type: 'geojson', data: fc.badges });
+        map.addLayer({ id: 'traffic-limit-fill', type: 'fill', source: 'traffic-limit-source', filter: ['==', ['geometry-type'], 'Polygon'],
+            layout: { visibility: vis }, paint: { 'fill-color': ['get', 'colour'], 'fill-opacity': 0.08 } }, labelAnchor());
+        map.addLayer({ id: 'traffic-limit-band', type: 'line', source: 'traffic-limit-source', filter: ['==', ['geometry-type'], 'LineString'],
+            layout: { 'line-cap': 'round', 'line-join': 'round', visibility: vis },
+            paint: { 'line-color': ['get', 'colour'], 'line-width': 16, 'line-opacity': 0.14 } }, labelAnchor());
+        map.addLayer({ id: 'traffic-limit-edge', type: 'line', source: 'traffic-limit-source',
+            layout: { 'line-join': 'round', visibility: vis },
+            paint: { 'line-color': ['get', 'colour'], 'line-width': 2, 'line-dasharray': [3, 2] } }, labelAnchor());
+        map.addLayer({ id: 'traffic-limit-badge', type: 'symbol', source: 'traffic-limit-badges', minzoom: 11,
+            layout: { 'text-field': ['get', 'badge'], 'text-size': 13, 'text-font': ['literal', BADGE_FONT],
+                      'text-allow-overlap': false, visibility: vis },
+            paint: { 'text-color': ['get', 'colour'], 'text-halo-color': '#ffffff', 'text-halo-width': 2 } }, labelAnchor());
+        ['traffic-limit-edge', 'traffic-limit-band', 'traffic-limit-fill', 'traffic-limit-badge'].forEach(l => {
+            map.on('click', l, e => trafficLimitPopup(e));
+            map.on('mouseenter', l, () => { map.getCanvas().style.cursor = 'pointer'; });
+            map.on('mouseleave', l, () => { map.getCanvas().style.cursor = ''; });
+        });
+        applyTrafficMonth();
+    }
+    function applyTrafficMonth() {
+        TLIM.month = (typeof mapModeMonth === 'function') ? mapModeMonth() : null;
+        if (map.getSource && map.getSource('traffic-limit-source')) {
+            const fc = trafficFeatures();
+            try { map.getSource('traffic-limit-source').setData(fc.shapes); map.getSource('traffic-limit-badges').setData(fc.badges); } catch (e) {}
+            // above the month's blue routes (added later when the timeline opens), still under the road names
+            try { ['traffic-limit-fill', 'traffic-limit-band', 'traffic-limit-edge', 'traffic-limit-badge'].forEach(l => map.moveLayer(l, labelAnchor())); } catch (e) {}
+        }
+        renderTrafficPanel();
+    }
+    function renderTrafficPanel() {
+        const g = document.getElementById('traffic-limits-group'), when = document.getElementById('traffic-limits-when');
+        const lims = (TLIM.data && TLIM.data.limits) || [];
+        if (g) g.hidden = !lims.length;
+        if (!when) return;
+        if (!lims.length || !TLIM.on) { when.textContent = ''; return; }
+        if (!TLIM.month) { when.textContent = 'Pick a month'; return; }
+        let over = 0, near = 0, inForce = 0;
+        lims.forEach(L => { const r = (L.months || {})[String(TLIM.month)]; if (!r) return; inForce++; if (r.state === 'over') over++; else if (r.state === 'near') near++; });
+        when.textContent = inForce ? `${monthLabel(TLIM.month)}: ${over} over, ${near} near` : `None in ${monthLabel(TLIM.month)}`;
+    }
+    function trafficLimitPopup(e) {
+        const f = e.features && e.features[0]; if (!f) return;
+        const L = ((TLIM.data && TLIM.data.limits) || []).find(x => String(x.id) === String((f.properties || {}).id)); if (!L) return;
+        const m = TLIM.month, r = m ? (L.months || {})[String(m)] : null, u = tlimUnit(L);
+        let body;
+        if (!m) body = `Limit ${tlimN(L.limit.value)} lorry ${u} a day.<br><span style="color:#475569">Pick a month to see the plan against it.</span>`;
+        else if (!r) body = `Not in force in ${monthLabel(m)}.`;
+        else {
+            const col = TLIM_COL[r.state] || TLIM_COL.none;
+            const rp = routePropsById();
+            const rows = (r.routes || []).map(x => {
+                const p = rp[x.route_id] || {};
+                return `<tr><td style="padding:1px 6px 1px 0">${escHtml(x.route_id)}</td><td style="padding:1px 6px 1px 0">${escHtml((p.origin || '') + ' → ' + (p.dest || ''))}</td><td style="text-align:right">${tlimN(x.a_day)}</td></tr>`;
+            }).join('');
+            body = `<span style="color:${col};font-weight:700">${tlimN(r.value)} lorry ${u} a day</span> in ${monthLabel(m)} · limit ${tlimN(L.limit.value)}<br>` +
+                (u === 'movements' ? `<span style="color:#475569">${tlimN(r.in_per_day)} in, ${tlimN(r.out_per_day)} out · in and out counted separately · daily average</span><br>`
+                                   : `<span style="color:#475569">daily average</span><br>`) +
+                (L.limit.basis === 'busiest_day' ? '<span style="color:#475569">The limit is for the busiest day; this is the month\'s daily average.</span><br>' : '') +
+                (rows ? `<table style="margin-top:4px;font-size:13px;border-collapse:collapse"><thead><tr><th style="text-align:left">Route</th><th style="text-align:left">From → to</th><th style="text-align:right">A day</th></tr></thead><tbody>${rows}</tbody></table>` : '');
+        }
+        const html = `<div style="font:14px system-ui;max-width:320px"><b>Traffic limit · ${escHtml(L.name)}</b><br>${body}` +
+            `<div style="color:#475569;margin-top:4px">This scheme's lorries only. Approved plan.</div></div>`;
+        new mapboxgl.Popup({ maxWidth: '340px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
+    }
+    function loadTrafficLimits() {
+        if (TLIM.loading) return;
+        TLIM.loading = true;
+        fetch('/api/public/traffic-limits', { credentials: 'same-origin' })
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(j => { TLIM.data = j; TLIM.loading = false; renderTrafficPanel(); ensureTrafficLimitLayers(); })
+            .catch(() => { TLIM.loading = false; });
+    }
+    function toggleTrafficLimits(on) {
+        TLIM.on = !!on;
+        if (TLIM.on && !TLIM.data) loadTrafficLimits();
+        renderTrafficPanel();
+        if (TLIM.data) ensureTrafficLimitLayers();
+    }
+
     checkRouteExportStaff();
-    loadAbnormalPublic();   // 23 Oct 2026 (the user): the approved loads on the map from the start — in the month on screen, and the bar's count
+    loadAbnormalPublic();
+    loadTrafficLimits();    // 9 Nov 2026 (v2.1 task 2.1-1)   // 23 Oct 2026 (the user): the approved loads on the map from the start — in the month on screen, and the bar's count
 
     // ---------------------------------------------------------------- the QR code, drawn here (ISO/IEC 18004; no library)
     // Byte mode, error correction level M, versions 1-10 (up to 213 bytes of link). The harness decodes what this draws

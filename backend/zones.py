@@ -43,7 +43,11 @@ import db
 # need to; lower it and a wide detour is left pointing at a zone that no longer exists.
 DETOUR_PAD_KM = 3.0
 
-KINDS = ("closure", "weight_limit", "works", "haul_road", "other")
+KINDS = ("closure", "weight_limit", "works", "haul_road", "other", "traffic_limit")
+
+# 9 Nov 2026 (v2.1 task 2.1-1): a limit on the lorries a road or an area may carry — a flag, NEVER a routing zone
+# (traffic_limits.py). Its affects_routing is stored off whatever is sent, so no reader that routes ever sees it.
+TRAFFIC_LIMIT_KIND = "traffic_limit"
 
 # A haul road is the one kind that is not an obstacle. Every other kind, with
 # affects_routing on, becomes an avoid[areas] box: "route around this". A haul road with
@@ -407,6 +411,8 @@ def _row(z):
         "haul_mode": (z.get("haul_mode") or None),
         # 28 Oct 2026 (simulation v2): a haul road INSIDE this site (never spliced into a public route)
         "location_id": (z.get("location_id") or None),
+        # 9 Nov 2026 (2.1-1): a traffic limit's value, unit, basis and public tick (None for every other kind)
+        "limit": _limit_of(z),
         "length_km": (round(line_length_km(as_line(geom)), 3)
                       if geom and as_line(geom) else None),
         # what the router would actually receive, exposed so the difference between the
@@ -415,6 +421,11 @@ def _row(z):
         "bbox": list(bb) if bb else None,
         "avoid_area": _avoid_str(bb) if bb else None,
     }
+
+
+def _limit_of(z):
+    import traffic_limits
+    return traffic_limits.shape(z)
 
 
 def list_zones(include_inactive=True, on=None):
@@ -466,7 +477,8 @@ def _internal_problem(location_id, kind):
 
 def create_zone(name, geometry, kind=None, affects_routing=True,
                 starts_on=None, ends_on=None, note=None, active=True, zone_id=None,
-                speed_kph=None, haul_mode=None, location_id=None):
+                speed_kph=None, haul_mode=None, location_id=None,
+                limit_value=None, limit_counts=None, limit_basis=None, limit_public=None):
     if not (name or "").strip():
         return {"error": "name is required"}
     ip = _internal_problem(location_id, kind or "other")
@@ -480,6 +492,12 @@ def create_zone(name, geometry, kind=None, affects_routing=True,
     if kind == HAUL_KIND and not as_line(geometry):
         return {"error": "a haul road must be drawn as a LineString — it is travelled "
                          "along, and a closed shape has no entry or exit"}
+    import traffic_limits
+    lim, lerr = traffic_limits.clean_fields(kind, limit_value, limit_counts, limit_basis, limit_public)
+    if lerr:
+        return {"error": lerr}
+    if kind == TRAFFIC_LIMIT_KIND:
+        affects_routing = False          # Q11: a traffic limit never moves a route
     zid = (zone_id or "").strip() or _next_zone_id()
     # the id clash that matters is one within this tenant — the primary key is
     # (tenant_id, id), so two tenants may each hold a Z001
@@ -489,12 +507,14 @@ def create_zone(name, geometry, kind=None, affects_routing=True,
     now = _now()
     db.execute(
         "INSERT INTO zones (tenant_id, id, name, kind, geometry, affects_routing, "
-        "starts_on, ends_on, note, active, created_at, updated_at, speed_kph, haul_mode, location_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "starts_on, ends_on, note, active, created_at, updated_at, speed_kph, haul_mode, location_id, "
+        "limit_value, limit_counts, limit_basis, limit_public) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (db.current_tenant(), zid, name.strip(), kind, json.dumps(geometry),
          bool(affects_routing), _clean_date(starts_on), _clean_date(ends_on),
          (note or None), bool(active), now, now,
-         _clean_speed(speed_kph), _clean_mode(haul_mode), (str(location_id).strip() if location_id not in (None, "") else None)),
+         _clean_speed(speed_kph), _clean_mode(haul_mode), (str(location_id).strip() if location_id not in (None, "") else None),
+         lim.get("limit_value"), lim.get("limit_counts"), lim.get("limit_basis"), lim.get("limit_public")),
     )
     return get_zone(zid)
 
@@ -543,6 +563,24 @@ def update_zone(zone_id, **fields):
     elif "haul_mode" in fields or "location_id" in fields:
         m = _clean_mode(fields.get("haul_mode", cur[0].get("haul_mode")))
         sets.append("haul_mode = ?"); params.append(None if m == "internal" else m)
+    # 9 Nov 2026 (2.1-1): a traffic limit's fields; a zone that stops being one loses them, one that becomes one
+    # needs a number; a traffic limit never routes
+    import traffic_limits
+    was_limit = (cur[0].get("kind") or "") == TRAFFIC_LIMIT_KIND
+    lim_keys = ("limit_value", "limit_counts", "limit_basis", "limit_public")
+    if new_kind == TRAFFIC_LIMIT_KIND:
+        given = {k: fields.get(k) for k in lim_keys}
+        if not was_limit and given["limit_value"] is None:
+            return {"error": "a traffic limit needs a number (lorries a day)"}
+        lim, lerr = traffic_limits.clean_fields(new_kind, partial=was_limit, **given)
+        if lerr:
+            return {"error": lerr}
+        for k, v in lim.items():
+            sets.append(f"{k} = ?"); params.append(v)
+        fields["affects_routing"] = False
+    elif was_limit:
+        for k in lim_keys:
+            sets.append(f"{k} = ?"); params.append(None)
     if "affects_routing" in fields:
         sets.append("affects_routing = ?"); params.append(bool(fields["affects_routing"]))
     if "starts_on" in fields:
