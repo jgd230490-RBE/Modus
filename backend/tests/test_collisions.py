@@ -1100,10 +1100,14 @@ ok("10: app — Config → Map and bulletin carries the panel; a planner or admi
 ok("10: app — the panel says it is not the assessment, staff only, never the public map or bulletin, and when to fetch again",
    "Evidence, not the assessment." in _cp and "Staff only." in _cp and "Fetch again after changing routes, and each August." in _cp   # NARROWED 27 Oct 2026 (the final UI pass): fewer words   # NARROWED 22 Oct 2026 (words sweep; the user: few words on screens): the panel is three short sentences; where it never shows is in the guide and T9
    and "never on the public map or the bulletin" in read("frontend/help/index.html"))
-_cb = APP.split("function CollisionEvidenceButton(")[1].split("\nfunction ")[0]
-ok("10: app — the Routes page's buttons (PDF and XLSX) for the route picked in the list",
-   "<CollisionEvidenceButton routeId={selected} />" in APP and 'go("pdf")' in _cb and 'go("xlsx")' in _cb
-   and "collision-evidence.${kind}" in APP)
+# REVERSED 9 Nov 2026 (v2.1 task 2.1-6, Q13): the two buttons are gone from the Routes page; the evidence is section C of
+# the Route analysis (PDF and XLSX) for the route picked in the list, and the old addresses keep answering (section 8).
+_cb = APP.split("function RouteAnalysisMenu(")[1].split("\nfunction ")[0]
+ok("10: app — the Routes page's Route analysis (PDF and XLSX) for the route picked in the list; the evidence buttons gone",
+   "<RouteAnalysisMenu routes={status || []} picked={selected} vehicles={vehicles} />" in APP
+   and 'download("pdf")' in _cb and 'download("xlsx")' in _cb and "routes/analysis.${kind}" in _cb
+   and "function CollisionEvidenceButton(" not in APP and "CollisionEvidenceButton" not in APP
+   and "collision-evidence." not in APP and "Collision evidence (PDF)" not in APP)
 ok("10: app — the Routes page export menu's box", 'if(addColl) q.set("collisions", "1");' in APP and "data-rme-collisions" in APP
    and "useState(false);   // 16 Oct 2026 (CLOCS v5 C1)" in APP)
 ok("10: app — no verdict word on the panel or the buttons", not VERDICT.search(_cp + _cb), str(VERDICT.findall(_cp + _cb)))
@@ -1119,7 +1123,9 @@ _g = GUIDE.split("<li><strong>Collision history</strong>")[1].split("</li>")[0] 
 ok("10: the user guide says what it is, who sees it, where it comes from, what it cannot tell you, and that it is not the assessment",
    _g and "staff only" in _g and "the government&rsquo;s road safety figures" in _g and "STATS19" not in _g and "250 m" in _g and "not the assessment" in _g   # NARROWED 28 Oct 2026 (the user: no data-set names in the user guide): STATS19 is named in technical #t1-guide-sources
    and "safety data (STATS19), released each late July" in TECH
-   and "police" in _g and "2016" in _g and "never the day or time" in _g and "Collision evidence (PDF)" in _g)
+   and "police" in _g and "2016" in _g and "never the day or time" in _g
+   # NARROWED 9 Nov 2026 (v2.1 task 2.1-6): the two buttons are gone; the guide points at the Route analysis's section C
+   and "Collision evidence (PDF)" not in _g and "section C of the <em>Route analysis</em>" in _g)
 ok("10: v2 (22 Oct 2026): the user guide describes the stretches, the strip, the lorries beside (never a rate), the fold "
    "and the appendix's Nearby rule; the technical guide the rules behind them",
    "<em>stretch by stretch</em>" in _g and "never divided into a rate" in _g   # NARROWED 22 Oct 2026 (words sweep; the user: few words in the user guide): the fold, the Nearby rule and the sheet are in T9

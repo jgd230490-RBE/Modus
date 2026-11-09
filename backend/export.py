@@ -3885,13 +3885,18 @@ def ce_cycle_words(Q):
     return lead + (" " + "; ".join(gaps) + "." if gaps else "")
 
 
-def build_collision_evidence_pdf(S):
+def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
     """
     The Route collision evidence (collisions.evidence) as A4 portrait pages. 22 Oct 2026, v2 (the user's yes to
     notes\\collision-evidence-v2-mockup-1022): page 1 is the route — the map (collisions ON the route only, the
     stretches labelled, an inset where they bunch), the strip from A to B and the route stretch by stretch with the
     plan's lorries beside the counts (never divided into them); then the counts table (rows 0 in every column folded
     into a sentence); then the appendix, every place with more than one collision, under its stretch.
+
+    9 Nov 2026 (v2.1 task 2.1-6, the Route analysis): with `canvas` the pages are drawn into that file (section C of a
+    route analysis) from page `page_start`, and the next page number is returned instead of bytes; `skip` leaves
+    out "cycle" (cycle routes and left turns, then in section D), "cycle_by_hour" (then in section E) and
+    "assessor" (the analysis has its own last page). With no canvas and no skip the file is exactly as before.
     """
     if rl_canvas is None:
         raise RuntimeError("reportlab is not installed: " + MISSING.get("pdf", ""))
@@ -3902,12 +3907,16 @@ def build_collision_evidence_pdf(S):
     cw = W - 2 * m
     R, B = _BF("regular"), _BF("bold")
     buf = io.BytesIO()
-    c = rl_canvas.Canvas(buf, pagesize=A4)
-    c.setTitle(_pdf_safe(f"{S['tenant']} · {S['title']} · {S['route_id']}"))
-    c.setAuthor("Wayscope")
+    own = canvas is None
+    c = rl_canvas.Canvas(buf, pagesize=A4) if own else canvas
+    if own:
+        c.setTitle(_pdf_safe(f"{S['tenant']} · {S['title']} · {S['route_id']}"))
+        c.setAuthor("Wayscope")
+    else:
+        c.setPageSize(A4)
     footer_h = 64
-    page = [1]
-    S["pages"] = 1
+    page = [page_start]
+    S["pages"] = page_start
     du = S.get("unit") or "km"
 
     def footer():
@@ -4203,7 +4212,10 @@ def build_collision_evidence_pdf(S):
     y = para(t, y, 7.6) - 6
 
     if not S["fetched"]:
-        footer(); c.showPage(); c.save()
+        footer(); c.showPage()
+        if not own:
+            return page[0] + 1
+        c.save()
         return buf.getvalue()
 
     # the strip, A to B (v2)
@@ -4303,7 +4315,8 @@ def build_collision_evidence_pdf(S):
     # no-delivery bands hatched, the busy bands marked under the axis; one sentence only where the gap is clear
     y = _ce_time_of_day(c, S, m, y, cw, R, B, para, new_page, footer_h)
     # 29 Oct 2026 (task 0f-2, card 4): the cycle hour by hour, the quicker option marked; only when the times are worked out
-    y = _ce_cycle_by_hour(c, S, m, y, cw, R, B, para, new_page, footer_h)
+    if "cycle_by_hour" not in skip:
+        y = _ce_cycle_by_hour(c, S, m, y, cw, R, B, para, new_page, footer_h)
 
     # compared with roads like these — 22 Oct 2026 (v3 part 2; the user: "nothing to compare it to"; R5 reversed for this
     # one comparison, at the user's word): a count and the range a typical road would show, never a ratio or a verdict
@@ -4370,34 +4383,35 @@ def build_collision_evidence_pdf(S):
                       "assessor, not a verdict on the road.")
         y = para(" ".join(notes_), y - 2, 6.6) - 8
 
-    # cycle routes and the route's own left turns — 22 Oct 2026 (v3; the user asked for cycle routes and the turns where
-    # a lorry could cut across a cyclist: said as a fact, never as a verdict on the turn)
-    if y - 70 < m + footer_h:
-        y = new_page()
-    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 10.5); c.drawString(m, y - 10.5, "Cycle routes and the route's left turns")
-    y -= 14
-    turns = S.get("turns") or []
-    if S.get("cycle_shown"):
-        meets = (S.get("cycle") or {}).get("meets") or []
-        y = para(f"{(S.get('cycle') or {}).get('beside')} {du} of this route run beside a cycle route (within {cl.CYCLE_BESIDE_M} m); "
-                 f"a cycle route meets it (within {cl.CYCLE_MEETS_M} m) at {len(meets)} place{'' if len(meets) == 1 else 's'}"
-                 + (": at " + ", ".join(x["words"] for x in meets[:24]) + (" …" if len(meets) > 24 else "") if meets else "") + ".",
-                 y, 7.4, NAVY_RGB)
-    else:
-        y = para("No cycle routes: the community considerations have not been fetched (Config, Map and bulletin).", y, 7.4, NAVY_RGB)
-    tw = ", ".join(x["words"] + (f" ({x['cycle']} {x['cycle_m']} m)" if x.get("cycle") else "") for x in turns)
-    near_n = sum(1 for x in turns if x.get("cycle"))
-    y = para(f"The route makes {len(turns)} left turn{'' if len(turns) == 1 else 's'} of {cl.TURN_MIN_DEG}° or more"
-             + (f": at {tw}" if turns else "") + "."
-             + (f" {near_n} of them {'is' if near_n == 1 else 'are'} within {cl.TURN_CYCLE_M} m of a cycle route, where a lorry "
-                "turning left crosses the cyclist's path." if S.get("cycle_shown") else ""), y, 7.4, NAVY_RGB)
-    if S.get("details"):
-        n_cl = (S["columns"][0]["on"] or {}).get("cyclist_left", 0)
-        y = para(f"In {n_cl} of the collisions on the route a cyclist was hurt while a vehicle was turning or waiting to turn left.",
-                 y, 7.4, NAVY_RGB)
-    y = para(f"Left turns are worked out from the stored road route (the heading over the next {cl.TURN_WINDOW_M} m against the last), "
-             "so a roundabout's gentle entry may not count. Cycle routes are OpenStreetMap's National Cycle Network and cycle paths "
-             "(the community layer), mapped by volunteers: one can be missing.", y - 1, 6.6) - 8
+    if "cycle" not in skip:
+        # cycle routes and the route's own left turns — 22 Oct 2026 (v3; the user asked for cycle routes and the turns where
+        # a lorry could cut across a cyclist: said as a fact, never as a verdict on the turn)
+        if y - 70 < m + footer_h:
+            y = new_page()
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 10.5); c.drawString(m, y - 10.5, "Cycle routes and the route's left turns")
+        y -= 14
+        turns = S.get("turns") or []
+        if S.get("cycle_shown"):
+            meets = (S.get("cycle") or {}).get("meets") or []
+            y = para(f"{(S.get('cycle') or {}).get('beside')} {du} of this route run beside a cycle route (within {cl.CYCLE_BESIDE_M} m); "
+                     f"a cycle route meets it (within {cl.CYCLE_MEETS_M} m) at {len(meets)} place{'' if len(meets) == 1 else 's'}"
+                     + (": at " + ", ".join(x["words"] for x in meets[:24]) + (" …" if len(meets) > 24 else "") if meets else "") + ".",
+                     y, 7.4, NAVY_RGB)
+        else:
+            y = para("No cycle routes: the community considerations have not been fetched (Config, Map and bulletin).", y, 7.4, NAVY_RGB)
+        tw = ", ".join(x["words"] + (f" ({x['cycle']} {x['cycle_m']} m)" if x.get("cycle") else "") for x in turns)
+        near_n = sum(1 for x in turns if x.get("cycle"))
+        y = para(f"The route makes {len(turns)} left turn{'' if len(turns) == 1 else 's'} of {cl.TURN_MIN_DEG}° or more"
+                 + (f": at {tw}" if turns else "") + "."
+                 + (f" {near_n} of them {'is' if near_n == 1 else 'are'} within {cl.TURN_CYCLE_M} m of a cycle route, where a lorry "
+                    "turning left crosses the cyclist's path." if S.get("cycle_shown") else ""), y, 7.4, NAVY_RGB)
+        if S.get("details"):
+            n_cl = (S["columns"][0]["on"] or {}).get("cyclist_left", 0)
+            y = para(f"In {n_cl} of the collisions on the route a cyclist was hurt while a vehicle was turning or waiting to turn left.",
+                     y, 7.4, NAVY_RGB)
+        y = para(f"Left turns are worked out from the stored road route (the heading over the next {cl.TURN_WINDOW_M} m against the last), "
+                 "so a roundabout's gentle entry may not count. Cycle routes are OpenStreetMap's National Cycle Network and cycle paths "
+                 "(the community layer), mapped by volunteers: one can be missing.", y - 1, 6.6) - 8
 
     # the collisions on the route involving a goods vehicle over 3.5 t, listed — 22 Oct 2026 (v3)
     ll = S.get("lorry_list") or []
@@ -4539,39 +4553,42 @@ def build_collision_evidence_pdf(S):
             c.setStrokeColorRGB(*BAND_GREY_RGB); c.setLineWidth(0.4); c.line(m, y - hgt, W - m, y - hgt)
             y -= hgt + 1
 
-    # the last page: for the route risk assessment — 22 Oct 2026 (v3)
-    y = new_page()
-    c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 13); c.drawString(m, y - 13, "For the route risk assessment")
-    y -= 18
-    y = para("Questions drawn from CLOCS Standard v5 clauses 4.1a, 5.1a, 5.2c and 5.6a; not a CLOCS form. "
-             f"{S['not_a_verdict']} The boxes are the assessor's.", y, 7.4, NAVY_RGB) - 4
-    for i, (q, ev, b1, b2) in enumerate(ASSESSOR_QUESTIONS, 1):
-        ql = _wrap(f"{i}. {q}", B, 7.6, cw)
-        el = _wrap("Evidence: " + ev, R, 6.6, cw)
-        need = len(ql) * 9 + len(el) * 8 + 36
-        if y - need < m + footer_h:
-            y = new_page()
-        for ln in ql:
-            c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 7.6); c.drawString(m, y - 7.6, ln); y -= 9
-        for ln in el:
-            c.setFillColorRGB(*GREY); c.setFont(R, 6.6); c.drawString(m, y - 6.6, ln); y -= 8
-        bw2 = (cw - 8) / 2
-        for k, lab in enumerate((b1, b2)):
-            bx2 = m + k * (bw2 + 8)
-            c.saveState(); c.setStrokeColorRGB(0.63, 0.63, 0.67); c.setLineWidth(0.6); c.setDash(2, 2)
-            c.rect(bx2, y - 30, bw2, 28, stroke=1, fill=0); c.restoreState()
-            c.setFillColorRGB(*GREY); c.setFont(R, 6.2); c.drawString(bx2 + 3, y - 9, lab)
-        y -= 36
-    if y - 30 < m + footer_h:
+    if "assessor" not in skip:
+        # the last page: for the route risk assessment — 22 Oct 2026 (v3)
         y = new_page()
-    y -= 6
-    for k, lab in enumerate(("Assessed by", "Role", "Date", "Review before phase")):
-        bx2 = m + k * (cw / 4)
-        c.setStrokeColorRGB(0.63, 0.63, 0.67); c.setLineWidth(0.6); c.line(bx2, y - 18, bx2 + cw / 4 - 10, y - 18)
-        c.setFillColorRGB(*GREY); c.setFont(R, 6.4); c.drawString(bx2, y - 26, lab)
-    S["assessor_page"] = page[0]
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 13); c.drawString(m, y - 13, "For the route risk assessment")
+        y -= 18
+        y = para("Questions drawn from CLOCS Standard v5 clauses 4.1a, 5.1a, 5.2c and 5.6a; not a CLOCS form. "
+                 f"{S['not_a_verdict']} The boxes are the assessor's.", y, 7.4, NAVY_RGB) - 4
+        for i, (q, ev, b1, b2) in enumerate(ASSESSOR_QUESTIONS, 1):
+            ql = _wrap(f"{i}. {q}", B, 7.6, cw)
+            el = _wrap("Evidence: " + ev, R, 6.6, cw)
+            need = len(ql) * 9 + len(el) * 8 + 36
+            if y - need < m + footer_h:
+                y = new_page()
+            for ln in ql:
+                c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 7.6); c.drawString(m, y - 7.6, ln); y -= 9
+            for ln in el:
+                c.setFillColorRGB(*GREY); c.setFont(R, 6.6); c.drawString(m, y - 6.6, ln); y -= 8
+            bw2 = (cw - 8) / 2
+            for k, lab in enumerate((b1, b2)):
+                bx2 = m + k * (bw2 + 8)
+                c.saveState(); c.setStrokeColorRGB(0.63, 0.63, 0.67); c.setLineWidth(0.6); c.setDash(2, 2)
+                c.rect(bx2, y - 30, bw2, 28, stroke=1, fill=0); c.restoreState()
+                c.setFillColorRGB(*GREY); c.setFont(R, 6.2); c.drawString(bx2 + 3, y - 9, lab)
+            y -= 36
+        if y - 30 < m + footer_h:
+            y = new_page()
+        y -= 6
+        for k, lab in enumerate(("Assessed by", "Role", "Date", "Review before phase")):
+            bx2 = m + k * (cw / 4)
+            c.setStrokeColorRGB(0.63, 0.63, 0.67); c.setLineWidth(0.6); c.line(bx2, y - 18, bx2 + cw / 4 - 10, y - 18)
+            c.setFillColorRGB(*GREY); c.setFont(R, 6.4); c.drawString(bx2, y - 26, lab)
+        S["assessor_page"] = page[0]
     footer()
     c.showPage()
+    if not own:
+        return page[0] + 1
     c.save()
     return buf.getvalue()
 
