@@ -158,8 +158,11 @@ if (loaded) {
       h(Portal, { role: planner, who: "tester", meta, metaErr: false, vehLang: "en" }));
     if (page === "map") ok("...the map page is an iframe", out.includes("<iframe"));
     // REVERSED 27 Oct 2026 (F3 c / P5): no admin token box anywhere; a planner reads Config and cannot save it
+    // NARROWED 9 Nov 2026 (UI critique card 10): the planner's page is read-only from the top — one line says so, the fields
+    // sit in a disabled fieldset (asserted mounted, in ui_fix_configclp.js: this static render is the loading state), and the foot no longer carries a Save bar or "Only an admin can save the configuration."
     if (page === "config") ok("...the config page asks for no admin token; a planner reads it, 'Only an admin can save the configuration.'",
-      !out.includes("Admin token") && out.includes("Only an admin can save the configuration.") && !out.includes(">Save</button>"));
+      !out.includes("Admin token") && out.includes("You can read the configuration. An admin changes it.")
+      && !out.includes("Only an admin can save the configuration.") && !out.includes(">Save</button>"));
     if (page === "carbon") ok("...the carbon page waits for its one read (no figures before the server answers)", out.includes("Loading the carbon planner"));
   }
 
