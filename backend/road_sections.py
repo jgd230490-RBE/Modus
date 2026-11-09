@@ -42,6 +42,7 @@ whenever a primary geometry is upserted or cleared, on import, or on demand.
 THE MONTH READ (road_load)
 --------------------------
 One load = one two-way movement, never doubled. The LOADED leg carries the figure, and
+(REVISED 9 Nov 2026, v2.1 2.1-11b: each leg now counts where it runs, in the organisation's count; counting.py.)
 the figure is the PUBLIC MAP BAR's: the per-route numbers come from the same per-line
 payload the bar and the bulletin read (/api/public/month-kpis called as a function), over
 the same routes — the ones the map draws; a line on a route with no stored laden road route
@@ -612,6 +613,55 @@ def key_weights(owners, month, leg, profile, cache=None):
     return out
 
 
+#: 9 Nov 2026 (2.1-11b): a run is on a route's OTHER leg when at least this share of its segments are on that leg
+OTHER_LEG_COVER = 0.5
+_COVER_CACHE = {}
+
+
+def other_leg_cover(leg, profile):
+    """
+    9 Nov 2026 (v2.1 2.1-11b, question A — each pass of a leg is a movement). {run id of `leg`: [owner keys of the
+    OTHER leg whose polyline runs along it]} — on the loaded index, which routes' empty way back also uses each stored
+    run (the run's "out" movements). A key covers a run when at least OTHER_LEG_COVER of the run's segments are
+    segments of the key's polyline (either direction; the same vertex matching as build_runs). Kept until the next
+    write (db.data_version) per tenant, profile and leg.
+    """
+    other = "return" if leg == "loaded" else "loaded"
+    ck = (db.current_tenant(), db.data_version(), profile, leg)
+    if ck in _COVER_CACHE:
+        return _COVER_CACHE[ck]
+    V = _Vertices()
+    segs = {}
+    for key, pts in polylines_for(other, profile).items():
+        ids, ss = [], set()
+        for p in pts:
+            vid = V.resolve(p)
+            if ids and ids[-1] == vid:
+                continue
+            if ids:
+                ss.add((min(ids[-1], vid), max(ids[-1], vid)))
+            ids.append(vid)
+        if ss:
+            segs[key] = ss
+    out = {}
+    for run in stored_runs(leg):
+        ids = []
+        for p in run["geometry"] or []:
+            vid = V.resolve(p)
+            if not ids or ids[-1] != vid:
+                ids.append(vid)
+        rs = {(min(a, b), max(a, b)) for a, b in zip(ids, ids[1:])}
+        if not rs:
+            continue
+        keys = sorted(k for k, ss in segs.items() if len(rs & ss) >= OTHER_LEG_COVER * len(rs))
+        if keys:
+            out[run["id"]] = keys
+    if len(_COVER_CACHE) > 16:
+        _COVER_CACHE.clear()
+    _COVER_CACHE[ck] = out
+    return out
+
+
 _NO_VOLUME = {"loads": 0.0, "trips": 0, "vehicles": 0, "co2_t": 0.0, "lines": 0,
               "unbaked_lines": 0, "co2_lines": 0, "co2_lines_unbaked": 0}
 
@@ -679,7 +729,7 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
     laden geometry is named in `routes_not_drawn` and left out, as the bar and the
     bulletin's rule 1 do; until then the totals counted it and exceeded the bar):
       loads              Σ the lines' vehicle_loads — tonnes ÷ payload, as typed, fractional
-      movements_per_day  loads ÷ working days: two-way movements, one per load, never
+      movements_per_day  loads ÷ working days × the passes (9 Nov 2026: in the organisation's count), never
                          doubled, never rounded per line (the bar's rule)
       vehicles           Σ per line ceil((loads ÷ working days) ÷ what one vehicle can do a
                          day on that route) — the bar's rule; a line whose route has no
@@ -781,6 +831,13 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
     # Each key carries its route's month volume × its share of the month's working days (key_weights), and the run
     # lists ROUTES — one entry a route, its keys' shares summed (a route on both its main line and its diversion in
     # one run has the whole month). A key with no share in this month is not on the run this month.
+    import counting
+    pv = counting.per_visit()
+    other = "return" if leg == "loaded" else "loaded"
+    try:
+        cover = other_leg_cover(leg, profile)
+    except Exception:
+        cover = {}
     wcache = {}
     runs_out = []
     for run in stored_runs(leg):
@@ -791,11 +848,21 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
                 rw[_base(k)] = rw.get(_base(k), 0.0) + w
         owners = sorted(rw)
         loads = sum(per_route.get(r, _NO_VOLUME)["loads"] * min(1.0, rw[r]) for r in owners)
-        if loads <= 0:
+        # 9 Nov 2026 (2.1-11b): the routes whose OTHER leg runs here too, with that leg's share of the month
+        ow = {}
+        for k, w in key_weights(cover.get(run["id"], []), month, other, profile, wcache).items():
+            if w > 0:
+                ow[_base(k)] = ow.get(_base(k), 0.0) + w
+        o_loads = sum(per_route.get(r, _NO_VOLUME)["loads"] * min(1.0, w) for r, w in ow.items())
+        any_loads = sum(per_route.get(r, _NO_VOLUME)["loads"] * min(1.0, max(rw.get(r, 0.0), ow.get(r, 0.0)))
+                        for r in set(rw) | set(ow))
+        if loads <= 0 and o_loads <= 0:
             continue
+        this_in = leg == "loaded"
+        v_in, v_out = (loads, o_loads) if this_in else (o_loads, loads)
         co2, co2_known = 0.0, False
         routes_out = []
-        for r in owners:
+        for r in owners + sorted(r for r in ow if r not in rw):
             pr = per_route.get(r, _NO_VOLUME)
             share = None
             for k, w in kw.items():
@@ -809,12 +876,21 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
                 if pr["loads"] > 0:
                     co2_known = True
             rl = lens.get(r) or {}
+            here = pr["loads"] * min(1.0, rw.get(r, 0.0))          # this leg's loads on the run
+            there = pr["loads"] * min(1.0, ow.get(r, 0.0))         # the other leg's
+            r_in, r_out = (here, there) if this_in else (there, here)
+            r_any = pr["loads"] * min(1.0, max(rw.get(r, 0.0), ow.get(r, 0.0)))
             routes_out.append({
                 "route_id": r,
                 "teams": team_names(r),
-                "loads": round(pr["loads"] * min(1.0, rw[r]), 3),
+                "loads": round(here, 3),
                 "trips": pr["trips"],
-                "movements_per_day": round(pr["loads"] * min(1.0, rw[r]) / wd, 2),
+                # 9 Nov 2026 (2.1-11b): in the organisation's unit (counting.py)
+                "movements_per_day": round(((r_in + r_out) if pv == 2 else r_any) / wd, 2),
+                "visits_per_day": round(r_any / wd, 2),
+                "in_per_day": round(r_in / wd, 2),
+                "out_per_day": round(r_out / wd, 2),
+                "other_leg_only": r not in rw,
                 "vehicles": pr["vehicles"],
                 "co2_t": (None if share is None else round(share, 3)),
                 "co2_lines_unbaked": pr["co2_lines_unbaked"],
@@ -829,7 +905,12 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
             "teams": sorted({t for r in owners for t in team_names(r)}),
             "loads": round(loads, 3),
             "trips": sum(per_route.get(r, _NO_VOLUME)["trips"] for r in owners),
-            "movements_per_day": round(loads / wd, 2),
+            # 9 Nov 2026 (2.1-11b): in the organisation's unit — in + out movements, or each route's lorries once
+            "movements_per_day": round(((v_in + v_out) if pv == 2 else any_loads) / wd, 2),
+            "in_per_day": round(v_in / wd, 2),
+            "out_per_day": round(v_out / wd, 2),
+            "visits_per_day": round(any_loads / wd, 2),
+            "other_leg_routes": sorted(r for r in ow if r not in rw),
             "vehicles": sum(per_route.get(r, _NO_VOLUME)["vehicles"] for r in owners),
             "co2_t": (round(co2, 3) if (co2_known and not co2_failed) else None),
             "co2_lines_unbaked": sum(per_route.get(r, _NO_VOLUME)["co2_lines_unbaked"] for r in owners),
@@ -851,7 +932,8 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
         "routes_in_runs": len({r for run in runs_out for r in run["routes"]}),
         "loads": round(total_loads, 3),
         "trips": sum(pr["trips"] for pr in per_route.values()),
-        "movements_per_day": round(total_loads / wd, 2),
+        "movements_per_day": round(total_loads * pv / wd, 2),
+        "visits_per_day": round(total_loads / wd, 2),
         "vehicles": sum(pr["vehicles"] for pr in per_route.values()),
         "co2_t": (None if (co2_failed or (co2_unb and not co2_lines))
                   else round(sum(pr["co2_t"] for pr in per_route.values()), 3)),
@@ -882,18 +964,15 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
         notes.append(f"{len(off_index)} route(s) have no {conversions.vehicle_label(conversions.load_factors(), profile)} route, "
                      "so are on no shared road (they are in the totals).")
     if leg == "return":
-        notes.append("Return leg: the same loads running back empty. These are not "
-                     "additional movements and are never added to the loaded figure.")
+        notes.append("Return leg: the same lorries running back empty, counted as out movements.")
     out = {
         "month": month,
         "leg": leg,
         "working_days": wd,
         "profile": profile,
-        "basis": "two-way movements a day: one load = one two-way movement; the month's "
-                 "approved loads (tonnes ÷ payload, as typed, not rounded per line) / working "
-                 "days, summed over the routes that share the section — the public map bar's "
-                 "figure, over the routes the map draws. `trips` is the Dashboard's rounded-up "
-                 "count, shown beside it.",
+        "basis": counting.road_basis(pv) + " Over the routes the map draws. `trips` is the Dashboard's "
+                 "rounded-up count, shown beside it.",
+        "counting": counting.words_for(pv),
         "co2_basis": "CO2e on a section = Σ each route's month CO2e (routed km × the vehicle's "
                      "kg CO2e/km, both legs) × section length / the route's two-way length "
                      "(loaded + stored return): the carbon emitted on the section.",

@@ -594,7 +594,8 @@ ok("...every supplier and site lettered, the busiest route's ends first, each wi
 ok("...the names go on the map and every place in the key; the legend gains the grey row; the words say so",
    SA["pin_names"] is True and SA["panel_all_places"] is True
    and SA["volume_legend"][-1] == {"label": PIC.NO_LINES_LABEL, "fill": PIC.NO_LINES_FILL}
-   and SA["map_legend_title"] == "Two-way movements a day, each route's busiest month"
+   # REVERSED 9 Nov 2026 (2.1-11b, question G): a CLP counts visits
+   and SA["map_legend_title"] == "Lorry visits a day, each route's busiest month"
    and SA["filter_words"] == "3 routes to and from Tip South · every month of the plan · All teams · approved lines only · "
                              "1 with no approved line yet", SA["filter_words"])
 ok("...and no grey row when every route has a line", not any(

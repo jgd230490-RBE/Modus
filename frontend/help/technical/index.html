@@ -103,7 +103,8 @@ exact figure.</p>
 <pre>trips (per forecast month)  = ceil(tonnes ÷ planning payload)        — rounded up per line-month
 deliveries a day            = Σ trips ÷ (months in view × working days per month)</pre>
 <p>Working days per month is <code>planning.working_days_per_month</code> on Config → Planning (22 by default). Each
-delivery is a two-way movement. The Look-ahead and the Today panel use the same rule per day.</p>
+delivery is one visit. The card prints deliveries a day × <code>counting.per_visit()</code> (2 by default; T1 "The movement
+count"). The Look-ahead and the Today panel use the same rule per day, in deliveries.</p>
 
 <h2 id="t1-distance">Distance and the cycle</h2>
 <pre>lorry-km      = trips × the routed (baked) route distance, both legs, for the line's vehicle
@@ -185,6 +186,32 @@ distance the UK default, 100 % where no return load is possible (concrete mixers
 only when chartered for a one-way journey. The DESNZ tonne-km factors already include the fleet's empty running, which is
 why the tonne-km benchmark takes the loaded distance only. A later Pairings feature (v3) replaces the charged return km
 per week for paired loads: keep <code>share</code> the one number the figures multiply the return km by.</p>
+
+<h2 id="t1-counting">The movement count (9 Nov 2026)</h2>
+<p>v2.1 task 2.1-11b. <code>backend/counting.py</code> is the one rule. <code>planning.count_visit_as</code> on Config &rarr;
+Planning is 2 (a lorry coming and going is 2 movements, as councils count them; absent = 2) or 1 (one visit).
+<code>config.validate</code> refuses anything else.</p>
+<pre>visit (load, delivery)  = one lorry in laden and out empty
+movements a day         = visits a day × 2            (count_visit_as 2)
+visits a day            = loads ÷ working days        (count_visit_as 1)
+on a road or in an area: count_visit_as 2 → each leg counts where it runs (loaded leg "in", empty leg "out")
+                         count_visit_as 1 → a route's loads count once where either leg runs
+counting.convert(n, from_unit, to_unit)   the one place a figure changes unit (2.1-1's road limits call it)</pre>
+<p>What follows the count: the public map's figures bar, route labels and cards, the shared road sections
+(<code>road_sections</code>: <code>movements_per_day</code> in the count, <code>in_per_day</code>,
+<code>out_per_day</code>, <code>visits_per_day</code>), the council view (<code>areas</code>: per pass, ENTER_KM 200 m),
+the bulletin (headline with its in / out split, routes, councils, the sources line), the route map export, the
+Dashboard's second card and the concerns rate. The council colours' movements bands carry
+<code>tenant.council_breaks.movements_unit</code>; bands with none, and the defaults (50 / 100 / 200), are visits and are
+read &times; 2 under count 2 (<code>config.council_breaks</code>); switching on Config converts the typed bands. The
+Volume heat map's route stops (10 / 25 / 50 / 100) stay in visits; the shared sections are coloured on those stops
+&times; the count, so the same lorries keep the same colour. The flow lanes are unchanged.</p>
+<p>What does not: the CLP document's &sect;6 and CLP monitoring's vehicle charts, Gate arrivals, the Look-ahead and the
+Simulation count vehicles and visits. A route's cap (<code>max_vehicles_per_day</code>) is typed and compared in lorry
+visits a day; on the bulletin's bar it is drawn at cap &times; the count (<code>cap_at</code>). The setting reaches the
+pages through <code>/api/meta</code> and <code>/api/public/alignment</code> (<code>counting.words()</code>). Keys kept
+for old readers: <code>two_way_a_day</code> in the bulletin roll-up is still visits; the printed figure is
+<code>count_a_day</code>.</p>
 
 <h2 id="t1-cost">Planned cost</h2>
 <p>Planned £ = the route's typed rates (summed: per load, per tonne and per km), or the Config target rate where the
@@ -1272,8 +1299,9 @@ passes (community 30 min, collisions 45 min).</p>
 <p>What the map's screens leave out since 22 Oct 2026 (the words sweep).</p>
 <ul>
 <li><strong>The style of the server-drawn maps</strong> (28 Oct 2026, task 8e): <code>basemap.STYLES</code> holds four (light, streets, outdoors, aerial) with each style's road-name layer, which the sheet's route lines are drawn under, and its credit. The style is the request's <code>style</code> (the CLP map export), else the tenant's <code>tenant.export_map_style</code>, else light; a refused style falls back to Light at once. The satellite style answers a JPEG, not a PNG. The bulletin always asks for Light.</li>
-<li><strong>Movements a day.</strong> One load = one two-way movement (out laden, back empty, counted once): the month's
-approved loads &divide; its working days. With Show forecast routes on, the figure is averaged over the months with
+<li><strong>Movements a day.</strong> The month's approved loads &divide; its working days &times; <code>PV()</code> (the
+organisation's count from <code>TENANT.counting</code>: 2 movements a load by default, 1 under &ldquo;1 visit&rdquo;; T1
+&ldquo;The movement count&rdquo;). With Show forecast routes on, the figure is averaged over the months with
 volume. Vehicles are rounded up per line on the busiest month, using the drivers' hours rule (T1 Vehicles). A line not
 routed yet is counted in the movements, left out of the vehicles and the carbon, and named (&ldquo;not routed yet&rdquo;).
 A line whose vehicle has no payload in <code>factors.json</code> uses the fallback payload, and the bar's note says how

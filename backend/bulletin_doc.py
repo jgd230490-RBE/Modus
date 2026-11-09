@@ -49,7 +49,8 @@ notes/bulletin-research-1013.md):
 
 RULES KEPT
 ----------
-* One load = one two-way movement, never doubled: every figure here is bulletin.py's.
+* One load = one visit; the printed figures are in the organisation's count (counting.py: 2 movements a visit by
+  default, 9 Nov 2026): every figure here is bulletin.py's.
 * Working days come from the roll-up (main._working_days); this module carries no day count.
 * A typed cap is a "planning flag", never a limit or a block.
 * No team appears: the per-team rows of the roll-up are not printed (a tenant choice, D33).
@@ -82,13 +83,26 @@ CLOSURE_AMBER = "#D97706"
 MUTED = "#57534E"
 
 TITLE_WORD = "Lorry movements in"
-COUNTING_LINE = ("Counts are two-way movements: one lorry out laden and back empty is one delivery, "
-                 "counted once, never doubled. Approved plan only: no lorry was counted.")
+# REVERSED 9 Nov 2026 (v2.1 2.1-11b, John's Q2 + Q7): "two-way movements" is retired as a label (councils read it as
+# half the figure); the counting words follow the organisation's setting (counting.py), read when a page is made
+def counting_line():
+    import counting
+    return counting.words()["note"] + " Approved plan only: no lorry was counted."
+
+
+# the default (2 movements a visit) words; a page reads counting_line() for its organisation
+COUNTING_LINE = ("A lorry coming and going is 2 movements, as councils count them. "
+                 "Approved plan only: no lorry was counted.")
 # NARROWED 14 Oct 2026 (the publishing check): "[a typed field this scheme has not set yet]" read as an error
 PLACEHOLDER = "not set yet"
 # 14 Oct 2026 (the publishing check): the ONE definition, printed once under the figures (it was printed seven times)
-DEFINITION = ("One two-way movement = one lorry there and back, counted once. Planned figures from the approved plan: "
-              "no lorry was counted.")
+def definition():
+    import counting
+    return counting.words()["note"] + " Planned figures from the approved plan: no lorry was counted."
+
+
+DEFINITION = ("A lorry coming and going is 2 movements, as councils count them. "
+              "Planned figures from the approved plan: no lorry was counted.")   # the default; a page reads definition()
 CHART_MAX_ROUTES = 24
 ZONE_WORDS = {"closure": "closure", "weight_limit": "weight limit", "works": "works area", "other": "local control"}
 # 13 Oct 2026: the council layer's carbon colouring, the public map's own (map/index.html AREA_RAMP_CARBON,
@@ -128,9 +142,24 @@ def wd_text(wd):
 
 
 def two_way_sentence(wd):
-    """The public map's kpi-note sentence, verbatim (map/index.html, calculateKPIs)."""
-    return (f"Two-way movements = loads (deliveries) per working day ({wd_text(wd)}/month); "
-            "each is a lorry out laden and back empty.")
+    """The counting rule in one sentence (the name kept for its readers; 9 Nov 2026: the organisation's words)."""
+    import counting
+    w = counting.words()
+    if w["per_visit"] == 2:
+        return f"{w['label']} = 2 × deliveries per working day ({wd_text(wd)}/month)."
+    return f"{w['label']} = deliveries per working day ({wd_text(wd)}/month): each lorry once."
+
+
+def per_visit():
+    import counting
+    return counting.per_visit()
+
+
+def _count_term():
+    """The glossary row for the organisation's unit (2.1-11b)."""
+    if per_visit() == 2:
+        return ("Movement", "one lorry arriving or leaving: a delivery is 2 movements. ")
+    return ("Visit", "one lorry there and back, counted once (2 movements as councils count them). ")
 
 
 def _date_long(d):
@@ -202,7 +231,7 @@ def map_note(n_sections):
     """NARROWED 14 Oct 2026 (the publishing check: legends too wordy): one short sentence. It said the map's Volume legend
     foot word for word ("Each route is painted by its own figure; N shared sections … summed.")."""
     return ("Where routes share a road, its colour shows their total." if n_sections else
-            "Each route is coloured by its own two-way movements a day.")
+            "Each route is coloured by its own lorry " + ("movements" if per_visit() == 2 else "visits") + " a day.")
 
 
 def _controls(span_from, span_to):
@@ -251,10 +280,17 @@ def council_fill(cls, ramp=COUNCIL_RAMP):
     return COUNCIL_NONE if cls == "none" else (HATCH_PAPER if cls == "nofig" else ramp[cls])
 
 
-def volume_class(a_day):
-    """The map's volumeColor() step for a route's two-way movements a day: 0-4 on VOLUME_STOPS (a Mapbox step:
-    at or over a stop takes the next colour)."""
-    return sum(1 for s in VOLUME_STOPS if (a_day or 0) >= s)
+def volume_stops(pv=None):
+    """9 Nov 2026 (2.1-11b, question B): VOLUME_STOPS are lorry VISITS a day; a figure in movements takes them doubled,
+    so a road keeps its colour whichever way the organisation counts."""
+    pv = per_visit() if pv is None else pv
+    return tuple(x * pv for x in VOLUME_STOPS)
+
+
+def volume_class(a_day, stops=None):
+    """The map's volumeColor() step: 0-4 on the stops (a Mapbox step: at or over a stop takes the next colour).
+    Default stops = VOLUME_STOPS, i.e. `a_day` in visits; a figure in the organisation's unit passes volume_stops()."""
+    return sum(1 for s in (stops or VOLUME_STOPS) if (a_day or 0) >= s)
 
 
 def step_ranges(stops, unit=""):
@@ -264,8 +300,9 @@ def step_ranges(stops, unit=""):
             f"{s[3]}{unit} and over"]
 
 
-def volume_legend():
-    return [{"label": t, "fill": VOLUME_RAMP[i]} for i, t in enumerate(step_ranges(VOLUME_STOPS))]
+def volume_legend(pv=None):
+    """The Volume key in the organisation's unit; pv=1 = lorry visits a day (the CLP's maps)."""
+    return [{"label": t, "fill": VOLUME_RAMP[i]} for i, t in enumerate(step_ranges(volume_stops(pv)))]
 
 
 def _t(v):
@@ -381,7 +418,7 @@ def _council_carbon(mi, wd, month_long, A=None):
 
 
 def _mv(v):
-    """Two-way movements a day as a page people read prints them: whole movements; "under 1" for a sliver."""
+    """Movements (or visits) a day as a page people read prints them: whole numbers; "under 1" for a sliver."""
     if v is None:
         return "—"
     return "under 1" if 0 < v < 0.5 else n0(v)
@@ -401,7 +438,7 @@ def _change_words(now, was):
 
 def _council_movements(mi, wd, month_long, A=None, prev=None, prev_long=None, distance_unit="km"):
     """
-    13 Oct 2026 (W13): two-way movements a day, lorry-miles (or lorry-km) and the change since last month for each
+    13 Oct 2026 (W13): lorry movements a day (9 Nov 2026: the organisation's count, 2.1-11b), lorry-miles (or lorry-km) and the change since last month for each
     local authority district, from the SAME areas.area_load the public map's By council layer reads (per area the
     approved loads of every route whose laden leg enters it ÷ the working days; the lorry distance on the roads
     inside, laden and empty). `A` / `prev` are this month's and last month's reads (or the exception a read raised);
@@ -437,7 +474,7 @@ def _council_movements(mi, wd, month_long, A=None, prev=None, prev_long=None, di
         if cls == "nofig":
             text = "no figure yet"
         elif cls == "none":
-            text = "empties only" if a.get("return_only_routes") else "no approved laden route"
+            text = "empties only" if a.get("return_only_routes") else "no approved route"
         else:
             text = _mv(v)
         if mi <= 1:
@@ -455,16 +492,19 @@ def _council_movements(mi, wd, month_long, A=None, prev=None, prev_long=None, di
                           "change": change})
     districts.sort(key=lambda d: (-(d["a_day"] or 0), d["name"]))
     tot = A.get("totals") or {}
-    county_lines = [f"{a.get('highway_authority') or a['name']} roads: {_mv(a.get('movements_per_day'))} two-way "
-                    "movements a day." for a in A.get("areas") or [] if a["tier"] == "county"]
+    import counting
+    cw = counting.words()
+    county_lines = [f"{a.get('highway_authority') or a['name']} roads: {_mv(a.get('movements_per_day'))} "
+                    f"{cw['lower']}." for a in A.get("areas") or [] if a["tier"] == "county"]
     return {
         "error": None, "title": title,
-        "lede": f"Two-way movements a day on each district's roads in {month_long}.",
+        "col": cw["label"],
+        "lede": f"{cw['label']} on each district's roads in {month_long}.",
         "districts": districts, "stops": list(stops),
-        "legend": _council_legend(stops, COUNCIL_RAMP_MOVEMENTS, "", "no approved laden route"),
+        "legend": _council_legend(stops, COUNCIL_RAMP_MOVEMENTS, "", "no approved route"),     # 9 Nov 2026 (2.1-11b): each leg counts where it runs
         "distance_head": f"Lorry-{mi_words} in the month",
         "change_head": f"Change since {prev_long}" if prev_long else "Change since last month",
-        "scheme_line": f"Whole scheme: {_mv(tot.get('movements_per_day'))} two-way movements a day.",
+        "scheme_line": f"Whole scheme: {_mv(tot.get('movements_per_day'))} {cw['lower']}.",
         "footnote": (areas.DOUBLE_COUNT + f" Lorry-{mi_words}: loaded and empty, on the district's roads."),
         "county_lines": county_lines,
         "notes": [x for x in (A.get("notes") or []) if "not placed in a council" in x or "not routed yet" in x],
@@ -580,7 +620,7 @@ def _lot(mi, month_long, prev_long, R, prev, H, council, acc, demo):
     if tn:
         per.append(f"{1000.0 * c / tn:,.1f} kg CO2e per tonne moved")
     if mv:
-        per.append(f"{1000.0 * c / mv:,.0f} kg per two-way movement")
+        per.append(f"{1000.0 * c / mv:,.0f} kg per delivery (there and back)")
     rows.append({"label": "Per tonne, per movement", "text": (" and ".join(per) + ".") if per else
                  "No tonnes or movements to divide by this month.", "status": None, "source": LOT_SOURCE_OWN})
     return {
@@ -629,26 +669,28 @@ def _brief(month_long, prev_long, H, prev, routes_view, works, controls, never_a
     # REVERSED 14 Oct 2026 (the publishing check): shorter, plain, no "laden legs"; the road-works warning lives once,
     # under the works table (it was printed four times)
     out = []
-    now = n0(H.get("two_way_a_day"))
+    import counting
+    lw = counting.words()["lower"]
+    now = n0(H.get("count_a_day"))
     if routes_view:
         b = routes_view[0]
-        out.append(f"Busiest route: {b['label']}, {b['a_day_text']} two-way movements a day"
+        out.append(f"Busiest route: {b['label']}, {b['a_day_text']} {lw}"
                    + (f", above its planning flag of {b['cap']:,}." if b["over_flag"] else "."))
     if prev is not None:
         ph = (prev.get("headline") or {})
-        if prev.get("empty") or ph.get("two_way_a_day") is None:
-            out.append(f"{now} two-way movements a day; no approved lorries in {prev_long}.")
+        if prev.get("empty") or ph.get("count_a_day") is None:
+            out.append(f"{now} {lw}; no approved lorries in {prev_long}.")
         else:
-            was = ph.get("two_way_a_day") or 0
-            nowv = H.get("two_way_a_day") or 0
+            was = ph.get("count_a_day") or 0
+            nowv = H.get("count_a_day") or 0
             side = "up from" if round(nowv) > round(was) else ("down from" if round(nowv) < round(was) else "the same as")
-            out.append(f"{now} two-way movements a day, {side} {n0(was)} in {prev_long}.")
+            out.append(f"{now} {lw}, {side} {n0(was)} in {prev_long}.")
     n = len(works) + len(controls)
     out.append(f"{n} road work{'s' if n != 1 else ''}, closure{'s' if n != 1 else ''} or local limit{'s' if n != 1 else ''} "
                f"on or near the routes." if n else "No road works, closures or local limits are listed.")
     ds = [d for d in ((council_mv or {}).get("districts") or []) if (d.get("a_day") or 0) > 0]
     if ds:
-        out.append(f"{ds[0]['name']} district sees the most: {ds[0]['text']} two-way movements a day.")
+        out.append(f"{ds[0]['name']} district sees the most: {ds[0]['text']} {lw}.")
     if lot:
         import comparisons
         eq = comparisons.car_equivalents(lot["co2_t"])
@@ -679,13 +721,14 @@ def _sources(lot, council, council_mv, page, carbon, wd=None):
         add(council.get("la_source"))
         add(" ".join(council.get("sources") or []) + " " + " ".join(council.get("attribution") or []))
     if council_mv and not council_mv.get("error"):
-        add("Council movements: a route counts in a district when at least 200 m of its loaded leg is inside; a route "
-            "inside by less adds its distance there, not its movements.")
+        add("Council figures: a leg counts in a district when at least 200 m of it is inside; a route inside by "
+            "less adds its distance there, not its movements.")
     add(page["terms"]["other_schemes"])
     # the counting rule (the map's kpi-note sentence, verbatim) and D28, once: they were printed on page 1 and in a long
     # "Forecast" term; the map's own credit is in its caption, only when a basemap is drawn
-    add(f"Counting: {COUNTING_LINE} {two_way_sentence(wd)} The month's loads are summed as typed (fractional), not "
-        "rounded per line; the total is then shown to the nearest whole movement. Working days are the scheme's settings.")
+    import counting
+    add(counting.words()["sources"] + f" {two_way_sentence(wd)} The month's loads are summed as typed (fractional), not "
+        "rounded per line; the total is then shown to the nearest whole number. Working days are the scheme's settings.")
     return out
 
 
@@ -737,8 +780,9 @@ def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, mo
     else:
         rw = (listed, f"Checked {_iso_short(checked_at)}" if checked_at else "Checked")
     rows = [
-        ("Two-way lorry movements a day", n0(H.get("two_way_a_day")), fc),
-        ("Lorry movements in the month", n0(H.get("movements_in_month")), fc),
+        (H.get("count_label") or "Lorry movements a day", n0(H.get("count_a_day")), fc),
+        ((H.get("count_month") or "movements in the month").replace("movements", "Lorry movements", 1).replace(
+            "visits", "Lorry visits", 1), n0(H.get("count_in_month")), fc),
         ("Routes in use", n0(H.get("routes_in_use")) if H.get("routes_in_use") is not None else "—", fc),
         ("Routes planned above their planning flag",
          (f"{len(over)} of {len(flagged)}" if flagged else "no planning flag set"), "Forecast against the scheme's flags"),
@@ -766,16 +810,16 @@ def flag_short(cap, over):
     ("no planning cap typed" wrapped to three lines in every row)."""
     if cap is None:
         return "—"
-    return f"{cap:,} · above" if over else f"{cap:,}"
+    return f"{cap:,} visits · above" if over else f"{cap:,} visits"
 
 
 def _flag_text(row):
     cap = row.get("cap")
     if cap is None:
         return row.get("cap_wording") or "no planning cap typed"
-    a_day = row.get("two_way_a_day") or 0
+    a_day = row.get("two_way_a_day") or 0            # visits: a cap is typed in lorry visits a day (2.1-11b Q4)
     side = "plan is above it" if a_day > cap else "plan is within it"
-    return f"{cap:,} a day · {side}"
+    return f"{cap:,} visits a day · {side}"
 
 
 def sheet(month_index, acc=None, now=None):
@@ -823,12 +867,15 @@ def sheet(month_index, acc=None, now=None):
     def route_view(r):
         pr = prev_rows.get(r["route_id"])
         last = ("no earlier month in the programme" if mi <= 1 else
-                (f"{n0(pr['two_way_a_day'])} a day" if pr else "none planned"))
+                (f"{n0(pr['count_a_day'])} a day" if pr else "none planned"))
         return {"route_id": r["route_id"], "label": r.get("label") or r["route_id"], "letters": letters_of(r),
-                "a_day": r.get("two_way_a_day"), "a_day_text": n0(r.get("two_way_a_day")),
+                # 9 Nov 2026 (2.1-11b): the figure in the organisation's unit; `visits` for the cap and the colour
+                "a_day": r.get("count_a_day"), "a_day_text": n0(r.get("count_a_day")), "visits": r.get("two_way_a_day"),
+                # the cap is typed in visits; on the bar (drawn in the organisation's count) it sits at cap × per visit
+                "cap_at": (r["cap"] * per_visit() if r.get("cap") is not None else None),
                 # 12 Oct 2026 (the user, evening): a page people read prints WHOLE movements ("6,874", never
                 # "6,873.8"); the figure is still the fractional sum, rounded once for display
-                "in_month_text": n0(r.get("movements_in_month")), "last_month_text": last,
+                "in_month_text": n0(r.get("count_in_month")), "last_month_text": last,
                 "cap": r.get("cap"), "flag_text": _flag_text(r),
                 # 14 Oct 2026 (the publishing check): the route's map colour, so the table's bar matches its line
                 "color": VOLUME_RAMP[volume_class(r.get("two_way_a_day"))],
@@ -841,7 +888,7 @@ def sheet(month_index, acc=None, now=None):
     # meant different volumes in different months); each route takes the public map's Volume colour for its two-way
     # movements a day, at one width. Drawn quietest first, so the busiest sit on top.
     map_routes = sorted(({"route_id": r["route_id"], "coords": geo[r["route_id"]][0], "a_day": r["a_day"] or 0,
-                          "step": volume_class(r["a_day"]), "color": VOLUME_RAMP[volume_class(r["a_day"])]}
+                          "step": volume_class(r["visits"]), "color": VOLUME_RAMP[volume_class(r["visits"])]}
                          for r in routes_view if r["route_id"] in geo), key=lambda r: (r["a_day"], r["route_id"]))
     controls = _controls(span_from, span_to)
     # 13 Oct 2026 (W11, the map's Volume heat map held equal): the shared road sections — a stretch two or more routes
@@ -854,18 +901,21 @@ def sheet(month_index, acc=None, now=None):
             cs = _coords_of(run.get("geometry"))
             if len(cs) >= 2:
                 v = float(run.get("movements_per_day") or 0.0)
-                map_sections.append({"coords": cs, "a_day": v, "step": volume_class(v),
-                                     "color": VOLUME_RAMP[volume_class(v)], "routes": len(run.get("routes") or [])})
+                vs = volume_stops()                                 # v is in the organisation's unit (2.1-11b)
+                map_sections.append({"coords": cs, "a_day": v, "step": volume_class(v, vs),
+                                     "color": VOLUME_RAMP[volume_class(v, vs)], "routes": len(run.get("routes") or [])})
         map_sections.sort(key=lambda x: x["a_day"])
     except Exception as e:
         sections_note = (f"The shared road sections could not be read ({type(e).__name__}): each route is painted by its "
                          "own figure only.")
 
     headline = [
-        {"key": "two_way_a_day", "value": n0(H.get("two_way_a_day")),
-         "label": "two-way movements a day"},
-        {"key": "movements_in_month", "value": n0(H.get("movements_in_month")),
-         "label": f"movements in the month ({wd_text(wd)} working days)"},
+        {"key": "count_a_day", "value": n0(H.get("count_a_day")),
+         "label": (H.get("count_lower") or "lorry movements a day") + (
+             f" ({_mv(H.get('in_a_day'))} in, {_mv(H.get('out_a_day'))} out)"
+             if H.get("in_a_day") is not None and per_visit() == 2 else "")},
+        {"key": "count_in_month", "value": n0(H.get("count_in_month")),
+         "label": f"{H.get('count_month') or 'movements in the month'} ({wd_text(wd)} working days)"},
         {"key": "routes_in_use", "value": n0(H.get("routes_in_use")) if H.get("routes_in_use") is not None else "—",
          "label": "routes in use"},
         {"key": "tonnes", "value": (n0(H.get("tonnes")) + " t") if H.get("tonnes") is not None else "—",
@@ -875,7 +925,7 @@ def sheet(month_index, acc=None, now=None):
     # what is being moved: the bar's own panel, by discipline; rows add up to the headline. 17 Oct 2026: each row is
     # the tenant's discipline LABEL (bulletin.discipline_names) under a "Discipline" heading — it read the ids
     # ("superstructure") under "Material"
-    moved = [{"name": d["name"], "a_day": n0(d["two_way_a_day"]), "vehicles": n0(d["vehicles_a_day"]),
+    moved = [{"name": d["name"], "a_day": n0(d["count_a_day"]), "vehicles": n0(d["vehicles_a_day"]),
               "t_day": n0(d["tonnes_a_day"])} for d in (R.get("breakdown") or {}).get("discipline") or []]
 
     # works affecting the roads this month
@@ -925,7 +975,7 @@ def sheet(month_index, acc=None, now=None):
     for e in (C.get("route_caps") or {}).get("exceeded") or []:
         # 14 Oct 2026: the route by its places, never its id
         others.append({"kind": "Planning flag", "text": f"{_label.get(e['route_id'], 'One route')}: "
-                       f"{n0(e['two_way_a_day'])} a day planned, above its planning flag of {e['cap']:,} a day."})
+                       f"{n0(e['two_way_a_day'])} lorry visits a day planned, above its planning flag of {e['cap']:,} a day."})
 
     # what changed since last month — plan against plan
     def month_row(label, ro, this=False):
@@ -933,7 +983,7 @@ def sheet(month_index, acc=None, now=None):
             return None
         h = ro.get("headline") or {}
         c = ro.get("carbon") or {}
-        return {"label": label, "this": this, "a_day": n0(h.get("two_way_a_day")),
+        return {"label": label, "this": this, "a_day": n0(h.get("count_a_day")),
                 "vehicles": n0((ro.get("vehicles") or {}).get("fleet")),
                 "co2_day": (n1(c.get("co2_t_a_day")) + " t") if c.get("co2_t_a_day") is not None else "—",
                 "routes": n0(h.get("routes_in_use")) if h.get("routes_in_use") is not None else "—"}
@@ -946,7 +996,7 @@ def sheet(month_index, acc=None, now=None):
         ph, pv = prev.get("headline") or {}, prev.get("vehicles") or {}
         was = set(prev.get("routes_in_use") or [])
         now_r = set(R.get("routes_in_use") or [])
-        parts = [f"Two-way movements a day {n0(ph.get('two_way_a_day'))} → {n0(H.get('two_way_a_day'))}",
+        parts = [f"{H.get('count_label') or 'Lorry movements a day'} {n0(ph.get('count_a_day'))} → {n0(H.get('count_a_day'))}",
                  f"lorries needed {n0(pv.get('fleet'))} → {n0((R.get('vehicles') or {}).get('fleet'))}",
                  f"CO2e a day {n1((prev.get('carbon') or {}).get('co2_t_a_day'))} → "
                  f"{n1((R.get('carbon') or {}).get('co2_t_a_day'))} t"]
@@ -990,8 +1040,7 @@ def sheet(month_index, acc=None, now=None):
     # REVERSED 14 Oct 2026 (the publishing check): five long terms that repeated the definition, the vehicle rule's
     # "baked cycle" and the carbon stamp are four one-liners; the method and the stamp are in the sources
     terms = [
-        ("Two-way movement", "one lorry there and back (out loaded, back empty), counted once. "
-         + page["terms"]["other_schemes"].split(":")[0] + "."),
+        (_count_term()[0], _count_term()[1] + page["terms"]["other_schemes"].split(":")[0] + "."),
         ("Forecast", f"the month's approved plan spread over its {wd_text(wd)} working days: planned, not counted."),
         ("Lorries needed", "how many lorries the plan needs on a working day, from each route's round-trip time and a "
                            "driver's day under the UK drivers' hours (break taken, at most 9 h driving; a planning figure)."),
@@ -1020,7 +1069,7 @@ def sheet(month_index, acc=None, now=None):
         "tenant": page.get("tenant_name") or "Wayscope",
         "demo_notice": page.get("demo_notice"),
         "as_at": f"Approved plan as at {_date_long(today)}",
-        "counting_line": COUNTING_LINE,
+        "counting_line": counting_line(),
         "two_way_sentence": two_way_sentence(wd),
         "other_schemes": page["terms"]["other_schemes"],
         "working_days": wd,
@@ -1030,7 +1079,7 @@ def sheet(month_index, acc=None, now=None):
         "flagged_routes": sum(1 for r in routes_view if r["cap"] is not None),
         "places": places, "controls": controls, "map_routes": map_routes,
         "moved": moved,
-        "moved_total": {"a_day": n0(H.get("two_way_a_day")), "vehicles": n0(veh.get("fleet")),
+        "moved_total": {"a_day": n0(H.get("count_a_day")), "vehicles": n0(veh.get("fleet")),
                         "t_day": n0((H.get("tonnes") / wd) if H.get("tonnes") is not None and wd else None)},
         "works": works, "checks": checks, "others": others,
         "glance": glance, "council": council, "council_mv": council_mv, "lot": lot,
@@ -1040,7 +1089,7 @@ def sheet(month_index, acc=None, now=None):
         "issued": f"Issued {_date_long(today)}",
         "lede": (f"The lorries {page.get('tenant_name') or 'this scheme'} plans for {month_long}: how many, where they go, "
                  "and their carbon."),
-        "definition": DEFINITION,
+        "definition": definition(),
         "map_title": f"Planned lorry routes, {month_long}",
         "brief": brief, "map_demo_tag": demo_tag,
         "sources": _sources(lot, council, council_mv, page, carbon, wd),
@@ -1050,7 +1099,9 @@ def sheet(month_index, acc=None, now=None):
         "leaflet_href": f"/bulletin/leaflet/?month={mi}",
         "volume_legend": volume_legend(),
         "map_sections": map_sections, "sections_note": sections_note, "map_note": map_note(len(map_sections)),
-        "map_legend_title": "Two-way movements a day",
+        "map_legend_title": H.get("count_label") or "Lorry movements a day",
+        "count_lower": H.get("count_lower") or "lorry movements a day",
+        "count_col": H.get("count_col") or "Movements a day",
         "change_rows": change_rows, "change_text": change_text,
         "terms": terms, "caveats": [c for c in caveats if c],
         # 12 Oct 2026 (Track C review): the tenant's typed concern_email (the map's "Report a concern" address);
@@ -1200,7 +1251,7 @@ def _svg_map(S, w=720, h=420):
     for r, pts in lines:
         out.append(f'<polyline points="{pts}" fill="none" stroke="{r["color"]}" stroke-width="{ROUTE_LINE_W}" '
                    f'stroke-linecap="round" stroke-linejoin="round"><title>{_e(r["route_id"])}: '
-                   f'{_e(n0(r["a_day"]))} two-way movements a day</title></polyline>')
+                   f'{_e(n0(r["a_day"]))} {_e(S.get("count_lower") or "lorry movements a day")}</title></polyline>')
     # the shared sections on top, each by its routes summed (the map's road-load layer), quietest first
     for sct in S.get("map_sections") or []:
         pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in (P(*c) for c in sct["coords"]))
@@ -1208,7 +1259,7 @@ def _svg_map(S, w=720, h=420):
                    'stroke-opacity="0.9" stroke-linecap="round" stroke-linejoin="round" class="sec"/>'
                    f'<polyline points="{pts}" fill="none" stroke="{sct["color"]}" stroke-width="{ROUTE_LINE_W}" '
                    f'stroke-linecap="round" stroke-linejoin="round" class="sec"><title>shared by {sct["routes"]} routes: '
-                   f'{_e(n0(sct["a_day"]))} two-way movements a day</title></polyline>')
+                   f'{_e(n0(sct["a_day"]))} {_e(S.get("count_lower") or "lorry movements a day")}</title></polyline>')
     pins = []
     for p in S["places"]:
         if not p.get("at") or not p["letter"]:
@@ -1424,9 +1475,9 @@ def _council_mv_html(M):
     return (f'<h2>{e(M["title"])}</h2>'
             f'<p>{e(M["lede"])}</p>'
             f'<div class="tw" tabindex="0" role="region" aria-label="{e(M["title"])}"><table data-bulletin="council-movements"><thead><tr><th>District</th>'
-            f'<th class="n">Two-way movements a day</th><th class="n">Routes</th><th class="n">{e(M["distance_head"])}</th><th>{e(M["change_head"])}</th>'
+            f'<th class="n">{e(M.get("col") or "Lorry movements a day")}</th><th class="n">Routes</th><th class="n">{e(M["distance_head"])}</th><th>{e(M["change_head"])}</th>'
             f'</tr></thead><tbody>{rows}</tbody></table></div>'
-            f'<p class="legend cc-legend">Two-way movements a day: {sw}</p>'
+            f'<p class="legend cc-legend">{e(M.get("col") or "Lorry movements a day")}: {sw}</p>'
             f'<p>{e(M["scheme_line"])}</p>'
             + (f'<ul>{notes}</ul>' if notes else "")
             + f'<p class="muted" data-bulletin="double-count">{e(M["footnote"])}</p>')
@@ -1485,18 +1536,20 @@ def _routes_html(S):
     rows = S["routes"]
     if not rows:
         return '<p class="muted">No worked-out route carries approved lorries this month.</p>'
-    vmax = max([r["a_day"] or 0 for r in rows] + [r["cap"] or 0 for r in rows] + [1])
+    vmax = max([r["a_day"] or 0 for r in rows] + [r.get("cap_at", r["cap"]) or 0 for r in rows] + [1])
     prev = (S["prev_long"] or "")[:3] or "Last month"
     out = []
     for r in rows:
-        cap = (f'<span class="bc" style="left:{100 * r["cap"] / vmax:.1f}%" title="planning flag {r["cap"]:,} a day"></span>'
+        cap = (f'<span class="bc" style="left:{100 * r.get("cap_at", r["cap"]) / vmax:.1f}%" '
+               f'title="planning flag {r["cap"]:,} lorry visits a day"></span>'
                if r["cap"] is not None else "")
         out.append(f'<tr><td class="lt">{e(r["letters"].replace(" → ", "–"))}</td><td>{e(r["label"])}</td>'
                    f'<td class="bar"><span class="bn">{e(r["a_day_text"])}</span><span class="bt"><span class="bf" '
                    f'style="width:{100 * (r["a_day"] or 0) / vmax:.1f}%;background:{r["color"]}"></span>{cap}</span></td>'
                    f'<td class="n">{e(r["in_month_text"])}</td><td class="n">{e(r["last_month_text"].replace(" a day", ""))}</td>'
                    f'<td class="n{" flag" if r["over_flag"] else ""}">{e(r["flag_short"])}</td></tr>')
-    return ('<div class="tw" tabindex="0" role="region" aria-label="Every route this month"><table data-bulletin="routes"><thead><tr><th>Map</th><th>Route</th><th>Two-way movements a day</th>'
+    return ('<div class="tw" tabindex="0" role="region" aria-label="Every route this month"><table data-bulletin="routes"><thead><tr><th>Map</th><th>Route</th>'
+            f'<th>{e(S.get("map_legend_title") or "Lorry movements a day")}</th>'
             f'<th class="n">In the month</th><th class="n">{e(prev)}</th><th class="n">Planning flag</th></tr></thead>'
             f'<tbody>{"".join(out)}</tbody></table></div>'
             f'<p class="legend">Bars in each route\'s map colour. Planning flag: the scheme\'s own daily limit, the dashed red '
@@ -1558,6 +1611,7 @@ def html(S):
         "page_title": e(S["title"]) + " · " + e(S["tenant"]) + ((" · " + e(S["demo_notice"])) if S["demo_notice"] else ""),
         "title": e(S["title"]), "tenant": e(S["tenant"]), "as_at": e(S["as_at"]), "pdf_href": e(S["pdf_href"]),
         "lede": e(S["lede"]), "definition": e(S["definition"]),
+        "count_col": e(S.get("count_col") or "Movements a day"),
         "mt_a_day": e(mt["a_day"]), "mt_vehicles": e(mt["vehicles"]), "mt_t_day": e(mt["t_day"]),
         "month_long": e(S["month_long"]),
         "works": works or '<tr><td colspan="3" class="muted">Nothing listed for this month.</td></tr>',
@@ -1667,7 +1721,7 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 {routes}
 
 <h2>What is being moved</h2>
-<div class="tw" tabindex="0" role="region" aria-label="What is being moved"><table data-bulletin="moved"><thead><tr><th>Discipline</th><th class="n">Two-way a day</th><th class="n">Lorries</th><th class="n">Tonnes a day</th></tr></thead>
+<div class="tw" tabindex="0" role="region" aria-label="What is being moved"><table data-bulletin="moved"><thead><tr><th>Discipline</th><th class="n">{count_col}</th><th class="n">Lorries</th><th class="n">Tonnes a day</th></tr></thead>
 <tbody>{moved}<tr class="this"><td>All routes</td><td class="n">{mt_a_day}</td><td class="n">{mt_vehicles}</td>
 <td class="n">{mt_t_day}</td></tr></tbody></table></div>
 
@@ -1677,7 +1731,7 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 <ul>{checks}{others}</ul>
 
 <h2>What changed since last month</h2>
-<div class="tw" tabindex="0" role="region" aria-label="What changed since last month"><table><thead><tr><th>Month</th><th class="n">Two-way a day</th><th class="n">Lorries</th><th class="n">CO₂e a day</th><th class="n">Routes</th></tr></thead>
+<div class="tw" tabindex="0" role="region" aria-label="What changed since last month"><table><thead><tr><th>Month</th><th class="n">{count_col}</th><th class="n">Lorries</th><th class="n">CO₂e a day</th><th class="n">Routes</th></tr></thead>
 <tbody>{change}</tbody></table></div>
 <p>{change_text} <span class="muted">Each month's approved plan as it stands today.</span></p>
 

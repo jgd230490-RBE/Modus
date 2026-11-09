@@ -44,6 +44,19 @@ blocks.forEach((b, i) => {
 });
 
 const src = blocks.join("\n");
+// 9 Nov 2026 (v2.1 2.1-11b): the map's count helpers PV() / CW() (the organisation's count, from TENANT.counting) are read
+// off the page and made global, so every sandbox below that runs a slice using them finds the page's own definitions.
+// globalThis.COUNT_TENANT stands for TENANT (a check may set counting.per_visit 1 and put it back).
+globalThis.COUNT_TENANT = {};
+(() => {
+  const a = src.indexOf("    const PV = () =>"), b = src.indexOf("line: 'visits / day', note:", a);
+  const e = src.indexOf("});", b) + 3;
+  if (a > 0 && b > a) {
+    const f = new Function("TENANT", src.slice(a, e).replace(/^\s+/, "") + "\nreturn { PV, CW };");
+    globalThis.PV = () => f(globalThis.COUNT_TENANT).PV();
+    globalThis.CW = () => f(globalThis.COUNT_TENANT).CW();
+  }
+})();
 // comment-stripped, so an assertion cannot pass by matching the prose that explains
 // why something was removed
 const code = src
@@ -316,8 +329,11 @@ ok("§9: vehicles/day = vehicle-loads over months with volume, per working day",
 // 2026-10-06: the label reads "Movements a day" (sentence case, no slash) — NARROWED
 // 11 Oct 2026 NARROWED (the user): one load = one delivery = one TWO-WAY movement; the figure is loads per
 // working day, NEVER doubled, and the label says "Two-way movements a day"
-ok("§9: two-way movements/day is the loads-per-working-day figure, not doubled", /set\('kpi-trips', fmtN\(vehDay, 0\)\)/.test(code)
-  && />Two-way movements a day</.test(html) && !/MOVES_PER_LOAD/.test(code) && !/vehDay \* 2/.test(code));
+// REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): the figure is loads per working day × the
+// organisation's count (PV(): 2 by default), never a literal 2; the label is the organisation's ("Lorry movements a day")
+ok("§9: lorry movements/day is the loads-per-working-day figure × the organisation's count, never a literal × 2", /set\('kpi-trips', fmtN\(vehDay \* PV\(\), 0\)\)/.test(code)
+  && />Lorry movements a day</.test(html) && !/MOVES_PER_LOAD/.test(code) && !/vehDay \* 2/.test(code)
+  && code.includes("if (tl) { tl.textContent = CW().label; tl.title = CW().note; }"));
 ok("§9: ⭐ vehicles needed is ceil(movements ÷ trips-per-vehicle-day) per line, from the route's cycle",
   /fleet \+= Math\.ceil\(\(l\.vehicle_loads \/ wd\) \/ l\.trips_per_vehicle_day\)/.test(code));
 // NARROWED 12 Oct 2026 (the base merge): the words a person reads are "no stored route" / "with no stored road route"
@@ -1459,7 +1475,8 @@ ok("the breakdown is chips, not a faint run-on line",
 // same number — printing both would put the 04 Sep correction back on screen.
 // 11 Oct 2026 NARROWED: the middle figure is called two-way movements (the user), still three quantities
 ok("⭐ §D: every chip carries vehicles, two-way movements AND tonnes",
-  /veh\/d/.test(code) && /two-way\/d/.test(code) && /t\/d<\/span>/.test(code)
+  // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): "mvts/d" (or "visits/d" under 1)
+  /veh\/d/.test(code) && code.includes("${PV() === 2 ? 'mvts' : 'visits'}/d") && !/two-way\/d/.test(code) && /t\/d<\/span>/.test(code)
   && /g\.t \+= \(l\.qty_t \|\| 0\)/.test(code));
 // vehicles ceil() PER LINE, exactly as the headline does — a vehicle on one route
 // cannot also be on another, and the groups must add up to the card above them
@@ -1615,10 +1632,12 @@ ok("§E: dismissals are keyed per month, so changing month brings them back",
 // 412 is not 412 lorries, it is 412 loads out and back.
 // ⚠️ 2026-09-15 — NARROWED, NOT DELETED (lesson 1). The label is still not "vehicles";
 // it now also carries the rate, because the figure beside it became a daily one.
-ok("§F1: the forecast route label says Two-way, not vehicles",
-  /const FORECAST_LABEL_UNIT = 'Two-way \/ day';/.test(code)
+// REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): the label is the count's own ("movements / day"),
+// built once by forecastLabelField() and used at both label layers
+ok("§F1: the forecast route label says movements, not vehicles",
+  /const FORECAST_LABEL_UNIT = 'movements \/ day';/.test(code)
   && !/const FORECAST_LABEL_UNIT = '[^']*vehicles/i.test(code)
-  && (code.match(/\['concat', \['get', 'f_avg'\], ' ', FORECAST_LABEL_UNIT\]/g) || []).length === 2
+  && (code.match(/'text-field': ?forecastLabelField\(\)/g) || []).length === 2
   && !/\['get', 'f_unit'\]\]/.test(code));
 ok("§F1: ...and the FIGURE is untouched — f_unit still rides on the feature",
   /f\.properties\.f_unit = m\.unit/.test(code) && /f\.properties\.f_unit=unit/.test(code));
@@ -1934,7 +1953,8 @@ ok("the two headline cards lead: two-way movements and vehicles needed",
   // NARROWED 11 Oct 2026: the map's CSS scopes the wrapping label rule to the cards (#kpi-cards .kpi-label),
   // so the bar's own labels are not touched; the assertion was written before that edit landed on main
   && /@media \(min-width:1024px\)\{ #kpi-cards, \.kpi-row\{ gap:18px; \} #kpi-cards \.kpi-label\{ white-space:normal; max-width:104px; \} \}/.test(html));
-ok("the side-panel rows say two-way, not trips", code.includes("two-way/d \\u00b7 ") && !code.includes("} trips/d \\u00b7"));
+// REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits)
+ok("the side-panel rows say movements (or visits), not trips", code.includes("${PV() === 2 ? 'mvts' : 'visits'}/d \\u00b7 ") && !code.includes("} trips/d \\u00b7"));
 ok("basemap, overlays and haul routes sit in one closed 'Layers and basemap' fold; the panel stays 300 px",
   html.indexOf('<details class="layers-box" id="layers-box">') < html.indexOf('<h3>Basemap</h3>')
   && html.indexOf('<h3>Haul routes</h3>') < html.indexOf('</details>', html.indexOf('id="layers-box"'))
@@ -1979,7 +1999,9 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
 {
   const gsM = (code.match(/const MAP_GUIDE_STEPS = \[([\s\S]*?)\n\s*\];/) || ["", ""])[1];
   ok("guide update: the bar step names what the bar shows (no material card in a vehicles unit)",
-     gsM.includes('body: "shows the month in view: two-way movements a day, vehicles needed, routes in use and CO₂e." }')
+     // REVERSED 9 Nov 2026 (v2.1 2.1-11b Q2): "two-way" retired
+     gsM.includes('body: "shows the month in view: lorry movements a day, vehicles needed, routes in use and CO₂e." }')
+     && code.includes("trips.trim() + ' ' + CW().lower : 'Nothing approved'") && !/'[^']*two-way movements a day'/i.test(code)
      && !/movements, vehicles, material, routes/.test(gsM));
   ok("...the Conditions step says it appears with the timeline and names a closure, not only a mass limit",
      gsM.includes("appears while the timeline is open") && gsM.includes("a road closure or limit on a route")
@@ -2204,7 +2226,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
     ].join(" ");
     const must = ["nothing approved", "loading figures", "Paused at ", "playback paused: ", "Over a planning flag",
                   // NARROWED 27 Oct 2026 (stockpile forecast): "nothing recorded since" is gone; a future month says "forecast at the end of"
-                  "two-way movements a day against a planning flag of", "routes over planning flags", "forecast at the end of",
+                  // REVERSED 9 Nov 2026 (2.1-11b Q4): a cap is in lorry visits
+                  "lorry visits a day against a planning flag of", "routes over planning flags", "forecast at the end of",
                   "Full horizon", "Advisory", "Weight / height limit"];
     const missing = must.filter(w => !readable.includes(w));
     ok("wording: nothing a person reads in the new strings says truck, real-time, live tracking, AI, optimise, predict or secure",
@@ -2507,7 +2530,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
 
   // 5. D21 / D33 — the planning-flag condition
   // 12 Oct fix pass — NARROWED: the sentence names its unit and is built by capSentence()
-  const capWhat = (code.match(/return `\$\{rid\}: \$\{shown\} two-way movements a day against a planning flag of \$\{cap\}`;/) || [""])[0];
+  // REVERSED 9 Nov 2026 (2.1-11b Q4): a cap is typed in lorry visits a day, whatever the organisation's count
+  const capWhat = (code.match(/return `\$\{rid\}: \$\{shown\} lorry visits a day against a planning flag of \$\{cap\}`;/) || [""])[0];
   ok("D21: a fourth source compares the month's loaded-leg movements a day with max_vehicles_per_day",
      code.includes("const cap = Number(p.max_vehicles_per_day);")
      && code.includes("loadsByRoute[l.route_id] = (loadsByRoute[l.route_id] || 0) + (Number(l.vehicle_loads) || 0);")
@@ -2773,7 +2797,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
         KPI.cache[10] = pay(10, 400);
         api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
         ok("⭐ F1: a month already in the cache renders in the same tick (title and figures), not a promise later",
-           el("kpi-title").innerHTML.includes("Oct 2026") && el("kpi-trips").innerText === "20", el("kpi-title").innerHTML + " / " + el("kpi-trips").innerText);
+           // REVERSED 9 Nov 2026 (2.1-11b): 20 deliveries a day = 40 lorry movements (the default count)
+           el("kpi-title").innerHTML.includes("Oct 2026") && el("kpi-trips").innerText === "40", el("kpi-title").innerHTML + " / " + el("kpi-trips").innerText);
         TL.month = 11; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
         ok("⭐ F1: a month still loading says so at once — '<Month> · loading figures' — and the previous month's figures are cleared",
            el("kpi-title").innerText === "Nov 2026 · loading figures" && el("kpi-trips").innerText === "—", el("kpi-title").innerText);
@@ -2796,7 +2821,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
           ok("⭐ base merge: month-kpis' co2_error puts a dash in both carbon cards and 'carbon could not be read' in their labels, never '0.0 t' or '(excl. N …)'",
              el("kpi-co2-day").innerText === "—" && el("kpi-co2-total").innerText === "—"
              && el("kpi-co2-day-label").innerText === "CO\u2082e a day (carbon could not be read)"
-             && el("kpi-co2-total-label").innerText === "CO\u2082e to date (carbon could not be read)" && el("kpi-trips").innerText === "20",
+             && el("kpi-co2-total-label").innerText === "CO\u2082e to date (carbon could not be read)" && el("kpi-trips").innerText === "40",   // 9 Nov 2026: ×2
              JSON.stringify([el("kpi-co2-day").innerText, el("kpi-co2-day-label").innerText, el("kpi-co2-total-label").innerText]));
           const p21 = pay(21, 400);
           p21.lines.push({ route_id: "R1", vehicle_loads: 40, qty_unit: 40, qty_t: 800, trips_per_vehicle_day: 0, discipline: "Drainage", co2_t: null });
@@ -2818,11 +2843,11 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
           ok("F1: a fetch that lands after the playhead moved on does not overwrite the month on screen",
              el("kpi-title").innerText === "Dec 2026 · loading figures" && KPI.cache[11] && el("kpi-trips").innerText === "—");
           deferred[12](pay(12, 600)); await flush(); await flush();
-          ok("⭐ F1: the fetch for the month on screen renders it when it lands", el("kpi-title").innerHTML.includes("Dec 2026") && el("kpi-trips").innerText === "30",
+          ok("⭐ F1: the fetch for the month on screen renders it when it lands", el("kpi-title").innerHTML.includes("Dec 2026") && el("kpi-trips").innerText === "60",   // 9 Nov 2026 (2.1-11b): ×2
              el("kpi-title").innerHTML + " / " + el("kpi-trips").innerText);
           // the second loop: every month is cached now, so every tick renders in the same tick
           TL.month = 11; api.calculateKPIs("ALL", "ALL", "ALL", "ALL");
-          ok("F1: on the next loop a month fetched earlier renders at once", el("kpi-title").innerHTML.includes("Nov 2026") && el("kpi-trips").innerText === "10");
+          ok("F1: on the next loop a month fetched earlier renders at once", el("kpi-title").innerHTML.includes("Nov 2026") && el("kpi-trips").innerText === "20");   // 9 Nov 2026 (2.1-11b): ×2
           // a filter change on the same month: the older call's late fetch cannot paint the old filter over the new one
           TL.month = 13; api.calculateKPIs("ALL", "ALL", "ALL", "ALL"); api.calculateKPIs("Q", "ALL", "ALL", "ALL");
           const keyNow = KPI.onScreen; deferred[13](pay(13, 400)); await flush(); await flush();
@@ -2872,17 +2897,18 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
                      // 27 Oct 2026 (stockpile forecast): each month carries its basis (the timeline's); a staff read, so `over` is there
                      months: { "9": { balance_end: 30000, over: false, basis: "recorded" }, "10": { balance_end: 40510, over: true, basis: "recorded" }, "11": { balance_end: 40510, over: true, basis: "forecast" }, "12": { balance_end: 40510, over: true, basis: "forecast" } } }];
         // the pure helpers
-        ok("⭐ the cap sentence names its unit and the flag: 'R016: 32 two-way movements a day against a planning flag of 20'",
-           api.capSentence("R016", 32.2, 20) === "R016: 32 two-way movements a day against a planning flag of 20");
+        // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits)
+        ok("⭐ the cap sentence names its unit and the flag: 'R016: 32 lorry visits a day against a planning flag of 20'",
+           api.capSentence("R016", 32.2, 20) === "R016: 32 lorry visits a day against a planning flag of 20");
         ok("...and keeps a decimal when the round would land on the flag (20.3 over 20 never reads '20 … of 20')",
-           api.capSentence("R1", 20.3, 20) === "R1: 20.3 two-way movements a day against a planning flag of 20");
+           api.capSentence("R1", 20.3, 20) === "R1: 20.3 lorry visits a day against a planning flag of 20");
         // 12 Oct second fix pass (the sceptic): 441 loads / 22 days = 20.045 printed "20.0 … against a planning flag of 20"
         ok("⭐ ...nor '20.0 … of 20': a figure just over the flag takes the decimals it needs (20.045 → 20.05, 20.04 → 20.04)",
-           api.capSentence("R1", 441 / 22, 20) === "R1: 20.05 two-way movements a day against a planning flag of 20"
-           && api.capSentence("R1", 20.04, 20) === "R1: 20.04 two-way movements a day against a planning flag of 20",
+           api.capSentence("R1", 441 / 22, 20) === "R1: 20.05 lorry visits a day against a planning flag of 20"
+           && api.capSentence("R1", 20.04, 20) === "R1: 20.04 lorry visits a day against a planning flag of 20",
            api.capSentence("R1", 441 / 22, 20));
         ok("...and a figure too close to show reads 'just over 20', never '20.000'",
-           api.capSentence("R1", 20.0001, 20) === "R1: just over 20 two-way movements a day against a planning flag of 20");
+           api.capSentence("R1", 20.0001, 20) === "R1: just over 20 lorry visits a day against a planning flag of 20");
         // REVERSED 27 Oct 2026 (stockpile forecast): no "last recorded month" any more — each month says what its figure is
         ok("the stockpile sentence of a FUTURE month says 'forecast at the end of', of a past one 'recorded at the end of'",
            api.pileSentence(W.piles[0], 12, "t").endsWith(" t forecast at the end of Dec 2026.")
@@ -2899,7 +2925,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
              box().includes("showCondition('h','E1|R2')") && box().includes("showCondition('h','E1|R5')"), box().slice(0, 300));
           ok("...the event maps to both routes and is highlighted once", JSON.stringify(W.hitRoute.E1) === '["R2","R5"]' && JSON.stringify(rec.hits[rec.hits.length - 1]) === '["E1"]');
           ok("⭐ the planning-flag row: one noun, the unit in the sentence", box().includes("<b>Over a planning flag</b>")
-             && box().includes("R2: 32 two-way movements a day against a planning flag of 20") && !box().includes("planning cap"));
+             && box().includes("R2: 32 lorry visits a day against a planning flag of 20") && !box().includes("planning cap"));   // REVERSED 9 Nov 2026 (Q4)
           ok("...and the pill counts it as '1 route over a planning flag'", pill().includes("1 route over a planning flag"), pill());
           // NARROWED 12 Oct 2026 (the base merge; Track B's bulletin wording): "has a capacity of N t;", not "holds N t."
           // NARROWED 27 Oct 2026 (stockpile forecast): "recorded at the end of" (the "in it" went with the forecast wording)
@@ -3030,7 +3056,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   const stops = e => e.slice(3).filter((x, i) => i % 2 === 0);
   ok("⭐ §2.2b: a Mapbox step on FIXED literal stops in ascending order, the neutral below the first",
      fm[0] === "step" && JSON.stringify(fm[1]) === '["get","v"]' && fm[2] === AREA_NONE
-     && JSON.stringify(stops(fm)) === "[0.01,50,100,200]" && JSON.stringify(stops(fc)) === "[0.01,50,100,200]"
+     // REVERSED 9 Nov 2026 (2.1-11b question B): the movements default (50 / 100 / 200 visits) reads ×2 under 2 movements a visit
+     && JSON.stringify(stops(fm)) === "[0.01,100,200,400]" && JSON.stringify(stops(fc)) === "[0.01,50,100,200]"
      && JSON.stringify(fm.slice(4).filter((x, i) => i % 2 === 0)) === JSON.stringify(ramp), JSON.stringify(fm));
   ok("§2.2b: the stops are literals in the source, not worked out from the data (no max, no quantiles)",
      /const AREA_STOPS = \{ movements: \[50, 100, 200\], carbon: \[50, 100, 200\] \};/.test(blk)
@@ -3052,14 +3079,16 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && /const AREA_LABEL_PAINT = \{ 'text-color': AREA_INK, 'text-halo-width': 0 \};/.test(blk)
      && /'icon-text-fit': 'both'/.test(blk) && !/'font-scale': 0\.\d/.test(blk));
   ok("§2.2b: the colour-by switch has two modes, movements first (D27: movements first, carbon second)",
-     /mode: 'movements'/.test(blk) && /\[\['movements', 'Two-way movements a day'\], \['carbon', 't CO(?:₂|\\u2082)e this month'\]\]/.test(blk)
+     // REVERSED 9 Nov 2026 (v2.1 2.1-11b: each leg counts where it runs, in the organisation's count, 2 movements a visit by default)
+     /mode: 'movements'/.test(blk) && /\[\['movements', CW\(\)\.label\], \['carbon', 't CO(?:₂|\\u2082)e this month'\]\]/.test(blk)
      && /function setAreaMode\(mode\)/.test(blk));
   // the legend, as the page builds it
   const legend = mkArea("areaLegendHTML", null);
   const lgM = legend("movements", "Oct 2026"), lgC = legend("carbon", "Oct 2026");
-  ok("⭐ §2.2b: the legend row per mode — movements titled for laden legs, five rows (four blues and the neutral)",
-     lgM.includes("Two-way movements a day on roads a laden leg uses") && (lgM.match(/class="area-lg"/g) || []).length === 5
-     && lgM.includes("under 50") && lgM.includes("200 and over") && lgM.includes("no approved laden route")
+  // REVERSED 9 Nov 2026 (v2.1 2.1-11b: each leg counts where it runs, in the organisation's count, 2 movements a visit by default): the default bands read ×2 (50 / 100 / 200 visits = 100 / 200 / 400 movements)
+  ok("⭐ §2.2b: the legend row per mode — movements on the roads inside, five rows (four blues and the neutral)",
+     lgM.includes("Lorry movements a day on the roads inside") && (lgM.match(/class="area-lg"/g) || []).length === 5
+     && lgM.includes("under 100") && lgM.includes("400 and over") && lgM.includes("no approved route") && !lgM.includes("laden route")
      && ramp.every(c => lgM.includes(c)), lgM);
   ok("⭐ §2.2b: ...and carbon titled with the month and the split, in t (never kg per tonne)",
      lgC.includes("t CO₂e in Oct 2026, split by the km inside each district") && lgC.includes("200 t and over")
@@ -3080,7 +3109,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      /out\.stops = \(figs && figs\.stops\) \|\| \(shapes && shapes\.stops\) \|\| null;/.test(blk)
      && /const s = areaStops\(mode\);/.test(blk) && /const s = areaStops\(mode\), t = mode === 'carbon' \? ' t' : '';/.test(blk));
   ok("🔴 W12: the old fixed read is gone from the fill and the legend (AREA_STOPS is only areaStops' fallback)",
-     (blk.match(/AREA_STOPS\[mode\]/g) || []).length === 1 && /return ok \? s : \(AREA_STOPS\[mode\] \|\| AREA_STOPS\.movements\);/.test(blk));
+     // NARROWED 9 Nov 2026 (2.1-11b question B): the fallback's movements bands are visits, read in the organisation's count
+     !/AREA_STOPS\[mode\]/.test(blk.replace("return ok ? s : (mode === 'carbon' ? AREA_STOPS.carbon : AREA_STOPS.movements.map(x => x * PV()));", ""))
+     && blk.includes("return ok ? s : (mode === 'carbon' ? AREA_STOPS.carbon : AREA_STOPS.movements.map(x => x * PV()));"));
   // the attribution: the source carries the dataset's licence lines; the group prints them
   const seedTxt = fs.readFileSync(path.join(ROOT, "backend", "data", "areas_demo.geojson"), "utf8");
   const seed = JSON.parse(seedTxt);
@@ -3104,8 +3135,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   const ch = card(A, P, "Oct 2026");
   ok("⭐ §2.2b: the per-council card: the name, the tier and the highway authority, movements with the rule, CO2e of the month's total",
      ch.includes("Harborough") && ch.includes("Local authority district") && ch.includes("highway authority: Leicestershire County Council")
-     && ch.includes("Two-way movements a day") && ch.includes("<b>12.3</b>") && ch.includes("2 of the 18 routes with approved volume in Oct 2026 enter it laden")
-     && ch.includes("1 more run back through it empty") && ch.includes("one load = one two-way movement")
+     // REVERSED 9 Nov 2026 (v2.1 2.1-11b: each leg counts where it runs, in the organisation's count, 2 movements a visit by default)
+     && ch.includes("Lorry movements a day") && ch.includes("<b>12.3</b>") && ch.includes("2 of the 18 routes with approved volume in Oct 2026 enter it laden")
+     && ch.includes("1 more run back through it empty") && ch.includes("A lorry coming and going is 2 movements, as councils count them.")
+     && !ch.includes("two-way")
      && ch.includes("30.5 t of 482 t") && ch.includes("split by the km inside") && ch.includes("Lorry-km in Oct 2026"), ch);
   ok("§2.2b: ...the planning-estimate stamp from the server, and every name escaped",
      ch.includes(P.carbon.stamp) && ch.includes("&lt;b>x&lt;/b>") && !ch.includes("<b>x</b>"));
@@ -3236,7 +3269,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()"> Volume</label>')
      && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-carbon" onchange="toggleCarbon()"> Carbon</label>')
      && /<div class="heat-seg">\s*<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off"/.test(code)
-     && code.includes('<p><b>Volume</b>: two-way movements a day.</p><p><b>Carbon</b>: t CO₂e in the month.</p>')   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)
+     && code.includes('<p><b>Volume</b>: <span id="heat-count-words">lorry movements a day</span>.</p><p><b>Carbon</b>: t CO₂e in the month.</p>')   // 9 Nov 2026 (2.1-11b)   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)
      && !code.includes('<span class="mode-sub">')
      && !/type="checkbox" id="toggle-(road-load|carbon)"/.test(code) && !code.includes("> Road load</label>")
      && !/id="toggle-road-load"[^>]*checked/.test(code) && !/id="toggle-carbon"[^>]*checked/.test(code)
@@ -3369,7 +3402,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      blkCode.includes("rlEsc(teamText((sh.teams || []).join(', ')) || '—')")
      && !/\.ipt\b/.test(blkCode) && !/\bipt\b/.test(blkCode)
      && blkCode.includes("if (RL.wired) return;") && blkCode.includes("map.on('click', 'road-load-line', (e) => {")
-     && blkCode.includes("Loaded leg counted once (one load = one two-way movement)."));
+     // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): each leg counts where it runs
+     && blkCode.includes("Loaded lorries in, empty ones out, each where it runs.") && !blkCode.includes("Loaded leg counted once"));
   ok("C1: a click on a shared section answers with the section card, not the route card underneath",
      code.includes("if(typeof roadLoadHitAt === 'function' && roadLoadHitAt(e.point)) return;"));
   ok("C1: the sidebar filters re-cut the cached month (no fetch) through applyForecastFilter",
@@ -3411,7 +3445,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      // NARROWED 12 Oct 2026 (night): the council view (By council on) paints the routes thin and grey before either mode
      blkCode.includes("const paint = focus ? COUNCIL_ROUTE_COLOR : vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS) : co2 ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast;")
      && blkCode.includes("map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : heat ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);")
-     && blkCode.includes("map.setPaintProperty('road-load-line', 'line-color', volumeColor('rl_mv', VOLUME_STOPS));")
+     // REVERSED 9 Nov 2026 (v2.1 2.1-11b: each leg counts where it runs, in the organisation's count, 2 movements a visit by default): the sections on the stops in the count (rlStops(): VOLUME_STOPS × PV())
+     && blkCode.includes("map.setPaintProperty('road-load-line', 'line-color', volumeColor('rl_mv', rlStops()));")
      && !blkCode.includes("carbonColor('rl_co2'") && !blkCode.includes("paintRuns")
      // the two forecast addLayer sites keep the plan blue; carbon is a paint change, not a third forecast layer
      && (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
@@ -3592,7 +3627,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
       const pop = B.roadLoadPopupHTML(RUNS[10].runs[0], 10, null);
       ok("⭐ C1: the section card lists both routes with origin → destination and team NAMES; no team id reaches it",
          pop.includes("R1") && pop.includes("R2") && pop.includes("Kilby Ridge Quarry → Harborough Compound") && pop.includes("North Team")
-         && pop.includes("South Team") && !/IPT\s*\d/i.test(pop) && pop.includes("46 two-way movements a day · 2 routes")
+         // REVERSED 9 Nov 2026 (2.1-11b): the count's words; a reply with no in / out (this one) prints no split, never "0 in, 0 out"
+         && pop.includes("South Team") && !/IPT\s*\d/i.test(pop) && pop.includes("46 lorry movements a day · 2 routes") && !pop.includes("0 in, 0 out")
          && pop.indexOf("R2") < pop.indexOf("R1"), pop.slice(0, 300));
       ok("C1: ...and names the routes on the section that the filters leave out", B.roadLoadPopupHTML(RUNS[10].runs[0], 10, { R1: true }).includes("outside the filters: R2"));
       // the month
@@ -3635,20 +3671,22 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
            fmap.log.filter(x => x.startsWith("on:")).join(",") === "on:mouseenter:road-load-line,on:mouseleave:road-load-line,on:click:road-load-line");
         // NARROWED 12 Oct 2026 (evening): the legend is the five-step ramp on the fixed volume stops, not three widths
         ok("C1: the legend says the month, the five colour steps of the volume stops and the counting rule",
-           el("road-load-legend").hidden === false && el("road-load-legend").innerHTML.includes("Volume · two-way movements a day in Oct 2026")
-           && el("road-load-legend").innerHTML.includes("under 10") && el("road-load-legend").innerHTML.includes("100 and over")
+           // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): the stretches' stops in movements (the visit stops × 2)
+           el("road-load-legend").hidden === false && el("road-load-legend").innerHTML.includes("Volume · lorry movements a day in Oct 2026")
+           && el("road-load-legend").innerHTML.includes("under 20") && el("road-load-legend").innerHTML.includes("200 and over")
            && el("road-load-legend").innerHTML.includes("ml-steps") && !el("road-load-legend").innerHTML.includes("ml-w")
            // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the counting rule is behind the heat map's "i" (#heat-info-more); the legend
            // carries the badge's key instead
            && !el("heat-info-more").innerHTML.includes("the loaded leg is counted once")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the counting rule is in T10
            && el("heat-info-more").innerHTML.includes("Where routes share a road, its colour shows their total.")
-           && el("road-load-legend").innerHTML.includes("two-way lorry movements a day on that stretch</div>")
+           && el("road-load-legend").innerHTML.includes("lorry movements a day on that stretch</div>")
            && el("road-load-legend").innerHTML.includes('<span class="mv-pill">') && !el("road-load-legend").innerHTML.includes("ml-foot"));
         {
           const fl0 = fmap.layers["forecast-layer"].paint, rl0 = fmap.layers["road-load-line"].paint;
           ok("⭐ heat map (Volume): the routes are painted by f_avg and the sections by rl_mv on the SAME five blues and stops [10, 25, 50, 100], one width",
              JSON.stringify(fl0["line-color"]) === JSON.stringify(["step", ["to-number", ["get", "f_avg"], 0], "#94BBF9", 10, "#5A96F6", 25, "#2071F3", 50, "#0B55CB", 100, "#073888"])
-             && JSON.stringify(rl0["line-color"]) === JSON.stringify(B.volumeColor("rl_mv", [10, 25, 50, 100]))
+             // REVERSED 9 Nov 2026 (2.1-11b question B): the sections are in movements, on the stops × 2 (the same blues for the same lorries)
+             && JSON.stringify(rl0["line-color"]) === JSON.stringify(B.volumeColor("rl_mv", [20, 50, 100, 200]))
              // NARROWED 16 Oct 2026 (D115): one width, 6 / 8.5 px (were 5 / 7.5), so the flow's lanes fit
              && fl0["line-width"] === 6 && rl0["line-width"] === 6 && fmap.layers["forecast-casing"].paint["line-width"] === 8.5
              && !fmap.layers["carbon-route-labels"] && B.heatMode() === "volume", JSON.stringify(fl0));
@@ -3949,9 +3987,11 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      html.includes('<aside id="month-text" aria-labelledby="mt-title" hidden>') && wide.includes("body.month-text-open #map{ right:420px; }")
      && /<h2 id="mt-title" tabindex="-1">This month as text<\/h2>/.test(html) && code.includes("setTimeout(() => { try { map.resize(); } catch (e) {} }, 0);"));
   ok("C3 text view: the figures are COPIED from the bar's own elements (one source), and the table's four columns are route, two-way a day, vehicles, conditions",
-     /const pairs = \[\['Two-way movements a day', txt\('kpi-trips'\)\], \[txt\('kpi-vehicles-label'\), txt\('kpi-vehicles'\)\]\];/.test(code)
+     // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): the count's own label and column
+     /const pairs = \[\[CW\(\)\.label, txt\('kpi-trips'\)\], \[txt\('kpi-vehicles-label'\), txt\('kpi-vehicles'\)\]\];/.test(code)
      && code.includes("pairs.push([txt('kpi-routes-label'), txt('kpi-routes')], [txt('kpi-co2-day-label'), txt('kpi-co2-day')], [txt('kpi-co2-total-label'), txt('kpi-co2-total')]);")
-     && code.includes('<th scope="col">Route</th><th scope="col" class="num">Two-way a day</th><th scope="col" class="num">Vehicles</th><th scope="col">Conditions</th>'));
+     && code.includes(`<th scope="col">Route</th><th scope="col" class="num">' + CW().col + '</th><th scope="col" class="num">Vehicles</th><th scope="col">Conditions</th>`)
+     && code.includes("escHtml(fmtN(r.twoWay * PV(), 0))"));
   ok("C3 text view: working days from the month's API figure, never a literal 22 in the new block",
      code.includes("const wd = kp.working_days > 0 ? kp.working_days : FORECAST_WORKING_DAYS;") && !/\b22\b/.test(newBlockCode().replace(/const QR_M_ECC = \[[^\]]*\];/, "")));   // (the QR code's EC table is not a day count)
   ok("C3 concern: no address is typed into the page — no mailto: with an address in the source, the address comes from TENANT.concern_email only",
@@ -3963,9 +4003,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
     const lits = t => (t.match(/'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`|"(?:[^"\\\n]|\\.)*"/g) || []).join(" ");
     const readable = lits(newBlockCode()) + " " + sec + " " + sheetHtml + " " + cut0(html, '<aside id="month-text"', '<div id="map"></div>')
       + " " + cut0(code, "<h3>Forecast traffic volume</h3>", "sidebar.insertAdjacentHTML");
-    ok("C3 wording: nothing new a person reads says truck, real-time, live tracking, telematics, AI, optimise, predict or secure; it says lorry and two-way movements",
+    ok("C3 wording: nothing new a person reads says truck, real-time, live tracking, telematics, AI, optimise, predict or secure; it says lorry and the count's words",
        readable.length > 5000 && !/truck|real-time|live tracking|telematics|optimi[sz]e|predict|\bsecure\b/i.test(readable) && !/\bAI\b/.test(readable)
-       && /Lorry registration/.test(readable) && /two-way movements a day/.test(readable));
+       // REVERSED 9 Nov 2026 (v2.1 2.1-11b Q2): "two-way" retired; the words come from CW() (lorry movements / visits)
+       && /Lorry registration/.test(readable) && !/two-way movements a day/i.test(readable) && /CW\(\)\.(label|lower|col)/.test(newBlockCode()));
     ok("C3 wording: a team is shown by its name (teamText), never its slot id — no 'IPT' in the new block's words",
        !/IPT[1-6]/.test(lits(newBlockCode())) && (newBlockCode().match(/teamText\(/g) || []).length >= 3);
   }
@@ -4064,7 +4105,8 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
     // ---- the hover card's words ----
     const hv = api.routeHoverView({ route_id: 'R014', origin: 'Brook Pit', dest: 'Langton Compound', ipt: 'IPT2', type: 'Inbound Highway', is_forecast: true, f_avg: 35 }, 'Oct 2026', 'vehicles');
     ok("⭐ C3 hover: the card names the route, its team by NAME and the leg, and prints the route's movements a day ONCE (one load = one two-way movement)",
-       hv.title === 'Brook Pit → Langton Compound' && hv.sub === 'R014 · Central Team · laden' && hv.fig === '35 two-way movements a day · Oct 2026'
+       // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): 35 deliveries a day = 70 lorry movements, printed once
+       hv.title === 'Brook Pit → Langton Compound' && hv.sub === 'R014 · Central Team · laden' && hv.fig === '70 lorry movements a day · Oct 2026'
        && !/IPT/.test(JSON.stringify(hv)) && hv.hint === 'Click for the route analysis', JSON.stringify(hv));
     const hvR = api.routeHoverView({ route_id: 'R014', origin: 'A', dest: 'B', ipt: 'IPT2', type: 'Outbound Highway', is_forecast: true, f_avg: 35 }, 'Oct 2026', 'vehicles');
     ok("C3 hover: the return leg shows the SAME figure (never doubled, never 70) and says it is the empty return", hvR.fig === hv.fig && /empty return/.test(hvR.sub));
@@ -4076,9 +4118,10 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
     // Track C review: a shared section under the pointer gets the SECTION's card, never one route's
     const rv = api.runHoverView({ id: 'S1', rl_mv: 46.27, rl_mv_text: '46', rl_routes_text: '2 routes', rl_co2_text: '3.2 t CO₂e' }, 'Oct 2026', true);
     ok("⭐ Track C review: the hover over a shared section is the section's: its two-way figure, its routes, the month, 'Click for the routes on this section'",
-       rv.title === 'Shared road section' && rv.sub === '2 routes · Oct 2026' && rv.fig === '46 two-way movements a day · 3.2 t CO₂e'
+       // REVERSED 9 Nov 2026 (2.1-11b): the section's figure is already in the count (the server's movements_per_day)
+       rv.title === 'Shared road section' && rv.sub === '2 routes · Oct 2026' && rv.fig === '46 lorry movements a day · 3.2 t CO₂e'
        && rv.hint === 'Click for the routes on this section' && rv.hint !== 'Click for the route analysis', JSON.stringify(rv));
-    ok("Track C review: ...without carbon on, no tonnes", api.runHoverView({ rl_mv_text: 'under 1', rl_routes_text: '3 routes' }, 'Oct 2026', false).fig === 'under 1 two-way movements a day');
+    ok("Track C review: ...without carbon on, no tonnes", api.runHoverView({ rl_mv_text: 'under 1', rl_routes_text: '3 routes' }, 'Oct 2026', false).fig === 'under 1 lorry movements a day');   // 9 Nov 2026 (2.1-11b)
     // ---- the deep link ----
     // Track C review: "Show forecast routes" travels as layers=forecast (a link from the forecast view opened bare)
     {
@@ -4639,8 +4682,9 @@ function qrRead(mod) {
       // the figures line
       els["kpi-trips"].textContent = "303"; els["kpi-routes"].textContent = "18"; els["kpi-co2-day"].textContent = "21.9 t"; els["kpi-title"].textContent = "Oct 2026Approved plan · forecast";
       TL.month = 10; TL.figsFallback = "18 routes · 6664 trips this month"; M.syncTlFigs();
-      ok("⭐ M3 figures: the line under the month copies the figures bar — '303 two-way movements a day · 18 routes · 21.9 t CO₂e a day'",
-         els["tl-figs"].textContent === "303 two-way movements a day · 18 routes · 21.9 t CO₂e a day", els["tl-figs"].textContent);
+      // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): the bar's own figure with the count's words
+      ok("⭐ M3 figures: the line under the month copies the figures bar — '303 lorry movements a day · 18 routes · 21.9 t CO₂e a day'",
+         els["tl-figs"].textContent === "303 lorry movements a day · 18 routes · 21.9 t CO₂e a day", els["tl-figs"].textContent);
       els["kpi-title"].textContent = "Sep 2026 · loading figures"; M.syncTlFigs();
       ok("M3 figures: ...never another month's figures: until the bar reaches this month the line is the month's routes and trips",
          els["tl-figs"].textContent === "18 routes · 6664 trips this month");
@@ -4651,7 +4695,7 @@ function qrRead(mod) {
          els["tl-figs"].textContent === "Nothing approved in this view");
       els["kpi-title"].textContent = "Oct 2026Approved plan"; els["kpi-routes"].textContent = "1"; els["kpi-co2-day"].textContent = "—"; M.syncTlFigs();
       ok("M3 figures: one route is '1 route'; a carbon dash is left out, never printed as a figure",
-         els["tl-figs"].textContent === "303 two-way movements a day · 1 route" && els["wall-figs"].textContent === els["tl-figs"].textContent && els["wall-month"].textContent === "October 2026");
+         els["tl-figs"].textContent === "303 lorry movements a day · 1 route" && els["wall-figs"].textContent === els["tl-figs"].textContent && els["wall-month"].textContent === "October 2026");   // 9 Nov 2026 (2.1-11b): the count's words
       // the pause message
       M.showClashToast(10, [{ noun: "Over capacity", what: "Stockpile <Tilton> 40,510 t", kind: "s", id: "N7" }]);
       ok("⭐ M3 pause message: names the condition (escaped), shows itself, and its Show on map goes to that condition",
@@ -5464,7 +5508,8 @@ function qrRead(mod) {
     ok("⭐ V3 carbon: the figure with its unit and nothing under it — no month name repeated on every district",
        c.lb_fig === '1.4 t CO₂e' && c.lb_sub === '' && c.lb_badge === 'area-badge-carbon' && !/2026|Oct/.test(JSON.stringify(c)), JSON.stringify(c));
     ok("V3: the legend still names what the figure counts (so the card can stay short)",
-       /'Two-way movements a day on roads a laden leg uses'/.test(src) && /'t CO₂e' \+ \(when \? ' in ' \+ when : ' in the month'\)/.test(src));
+       // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): each leg counts where it runs
+       /CW\(\)\.label \+ ' on the roads inside'/.test(src) && /'t CO₂e' \+ \(when \? ' in ' \+ when : ' in the month'\)/.test(src));
     ok("V3: the numbers round as areaFigureText does (whole from 10, one decimal below)",
        P.areaNum(150.4) === '150' && P.areaNum(9.96) === '10' && P.areaNum(1234) === '1,234' && P.areaNum(0.44) === '0.4');
     ok("⭐ V3: a gap stays a gap, in words, with no figure: no month, no carbon figure, not clipped yet, no route, empties only",
@@ -6098,7 +6143,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   const pops = (sb + html.slice(html.indexOf('<div class="control-group fc-box" id="fc-box">'), html.indexOf("</div>`;", html.indexOf('id="fc-box"'))));
   ok("⭐ 19 Oct wording: each explanation sits behind an 'i' — Month, Heat map, Views, the council figures — word for word",
      pops.includes('<div class="info-pop" id="info-views" hidden>Each sets the layers, the heat map and the council colouring together. Link and QR code shares the view.</div>')
-     && pops.includes('<div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: two-way movements a day.</p>')   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)
+     // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): the count's words, filled from TENANT.counting
+     && pops.includes('<div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: <span id="heat-count-words">lorry movements a day</span>.</p>')   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)
      && pops.includes('<div class="info-pop" id="info-month" hidden><p>Approved forecasts only. A grey month has none.</p></div>')   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
      && /<div class="info-pop" id="info-council" hidden>\s*<div class="area-note" id="area-unitary-note"><\/div>\s*<div class="area-note" id="area-focus-note" hidden>/.test(sb)
      && ['info-month', 'info-heat', 'info-views', 'info-council'].every(id => (html.match(new RegExp('aria-controls="' + id + '"', "g")) || []).length === 1));

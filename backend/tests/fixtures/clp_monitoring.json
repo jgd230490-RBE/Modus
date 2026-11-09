@@ -64,8 +64,8 @@
    "routes_without_cap": 2,
    "over": 1,
    "headline": "1 route over its cap",
-   "subtitle": "two-way movements a day, Oct 2026",
-   "basis": "Two-way movements a day: one load = one movement; the month's approved loads ÷ 22 working days, against the cap typed on the route. A flag, never a block. The Look-ahead's ROUTE CAP flag compares the same cap with the lorries needed on a day; this chart, like the bulletin, compares it with movements a day.",
+   "subtitle": "lorry visits a day, Oct 2026",
+   "basis": "Lorry visits a day: one load = one visit; the month's approved loads ÷ 22 working days, against the cap typed on the route. A flag, never a block. The Look-ahead's ROUTE CAP flag compares the same cap with the lorries needed on a day; this chart, like the bulletin, compares it with lorry visits a day.",
    "source": "Wayscope: the approved plan and each route's typed cap"
   },
   "site_caps": {
@@ -275,7 +275,7 @@
     {
      "area_id": "W",
      "council": "Westshire",
-     "movements_per_day": 9.1,
+     "movements_per_day": 18.2,
      "laden_distance": 743.5,
      "empty_distance": 2117.2,
      "distance": 2860.7,
@@ -284,7 +284,7 @@
     {
      "area_id": "S",
      "council": "Southshire",
-     "movements_per_day": 0.0,
+     "movements_per_day": 4.5,
      "laden_distance": 0.0,
      "empty_distance": 1518.6,
      "distance": 1518.6,
@@ -293,7 +293,7 @@
     {
      "area_id": "E",
      "council": "Eastshire",
-     "movements_per_day": 4.5,
+     "movements_per_day": 9.1,
      "laden_distance": 338.1,
      "empty_distance": 338.0,
      "distance": 676.1,
@@ -303,11 +303,11 @@
    "tier": "district",
    "unit": "km",
    "distance_word": "lorry-km",
-   "scheme_movements_per_day": 9.1,
-   "headline": "Westshire takes the most: 9.1 movements a day",
-   "subtitle": "lorry-km in Oct 2026, laden and empty, and two-way movements a day",
-   "basis": "Two-way movements a day: one load = one two-way movement. An area counts the month's approved loads of every route whose laden leg enters it, divided by the working days; the empty return adds none. A route counts in every area its laden leg enters, so the areas' figures add up to more than the scheme's. A laden leg enters an area when at least 200 m of it is inside (the boundaries are generalised to 200 m); a route inside by less adds its km and carbon there, not its movements. Distance: every lorry-km driven inside the area, laden and empty.",
-   "double_count": "A route counts in every area its laden leg enters, so the areas' figures add up to more than the scheme's.",
+   "scheme_movements_per_day": 18.2,
+   "headline": "Westshire takes the most: 18.2 movements a day",
+   "subtitle": "lorry-km in Oct 2026, laden and empty, and lorry movements a day",
+   "basis": "Lorry movements a day: each leg of a route that enters an area is one movement a load (the loaded leg in, the empty way back out), the month's approved loads divided by the working days. A route counts in every area its legs enter, so the areas' figures add up to more than the scheme's. A leg enters an area when at least 200 m of it is inside (the boundaries are generalised to 200 m); a route inside by less adds its km and carbon there, not its movements. Distance: every lorry-km driven inside the area, laden and empty.",
+   "double_count": "A route counts in every area its legs enter, so the areas' figures add up to more than the scheme's.",
    "attribution": [
     "Source: Office for National Statistics licensed under the Open Government Licence v.3.0",
     "Contains OS data © Crown copyright and database right 2026"

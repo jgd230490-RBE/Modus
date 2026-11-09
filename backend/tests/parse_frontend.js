@@ -2265,10 +2265,15 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     _cfBody.includes('["seasonal", "Seasonal restrictions"], ["mapbulletin", "Map and bulletin"], ["raw", "Everything (JSON)"]')
     && _cfBody.includes('{tab === "mapbulletin" && (') && _cfBody.includes('data-cfg="council-breaks"')
     && _cfBody.includes('{[0, 1, 2].map(i => (') && _cfBody.includes('aria-label={`${l}, band ${i + 1} of 3`}')
-    && _cfBody.includes('placeholder={String(COUNCIL_BREAKS_DEFAULT[m][i])}')
-    && _cfBody.includes('"Movements by council: two-way movements a day"') && _cfBody.includes('"Carbon by council: t CO₂e in the month"'));
+    // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default): the movements row in the organisation's count, its defaults read in that count
+    && _cfBody.includes('placeholder={String(COUNCIL_BREAKS_DEFAULT[m][i] * (m === "movements" ? countPV(cfgCountMeta(doc)) : 1))}')
+    && _cfBody.includes('`Movements by council: ${countLabel(cfgCountMeta(doc)).toLowerCase()}`') && _cfBody.includes('"Carbon by council: t CO₂e in the month"')
+    && !_cfBody.includes("two-way movements a day"));
+  // 9 Nov 2026 (2.1-11b): the helpers the Config page's band and count writers use, read off the page
+  const _cntSrc = ["const countPV", "const countLabel", "const cfgCountMeta", "const breaksIn"].map(k => {
+    const a = code.indexOf(k); return a < 0 ? "" : code.slice(a, code.indexOf("\n", a)); }).join("\n");
   const _sbSrc = (_cfBody.match(/const setBreak = \(d, m, i, v\) => \{[\s\S]*?\n  \};/) || [""])[0];
-  const setBreak = _sbSrc ? new Function(_sbSrc + "; return setBreak;")() : null;
+  const setBreak = _sbSrc ? new Function(_cntSrc + "\n" + _sbSrc + "; return setBreak;")() : null;
   const _d1 = { tenant: { name: "X" } };
   if (setBreak) { setBreak(_d1, "carbon", 0, 20); setBreak(_d1, "carbon", 1, 50); setBreak(_d1, "carbon", 2, 100); }
   const _d2 = JSON.parse(JSON.stringify(_d1));
@@ -2277,8 +2282,46 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   if (setBreak) setBreak(_d3, "movements", 1, 80);
   ok("⭐ W12: the fields write tenant.council_breaks (three per measure); clearing all three removes the row, so the default applies",
     !!setBreak && JSON.stringify(_d1.tenant.council_breaks) === '{"carbon":[20,50,100]}' && _d1.tenant.name === "X"
-    && _d2.tenant.council_breaks === undefined && JSON.stringify(_d3.tenant.council_breaks) === '{"movements":[null,80,null]}',
+    // REVERSED 9 Nov 2026 (2.1-11b question B): typed movements bands say their unit (the organisation's count)
+    && _d2.tenant.council_breaks === undefined && JSON.stringify(_d3.tenant.council_breaks) === '{"movements":[null,80,null],"movements_unit":"movements"}',
     JSON.stringify([_d1, _d2, _d3]));
+  // 9 Nov 2026 (v2.1 2.1-11b, John's Q1 and questions B, F): Config → Planning's count switch
+  {
+    const _scSrc = (_cfBody.match(/const setCount = \(d, pv\) => \{[\s\S]*?\n  \};/) || [""])[0];
+    const setCount = _scSrc ? new Function(_cntSrc + "\n" + _scSrc + "; return setCount;")() : null;
+    const a = { tenant: { council_breaks: { movements: [50, 100, 200] } } };     // typed before the setting: visits
+    if (setCount) setCount(a, 2);
+    const b = JSON.parse(JSON.stringify(a)); if (setCount) setCount(b, 1);
+    const c = {}; if (setCount) setCount(c, 1);
+    const e = { planning: { count_visit_as: 1 }, tenant: { council_breaks: { movements: [25, 50, 100], movements_unit: "visits" } } };
+    if (setCount) setCount(e, 2);
+    ok("⭐ 2.1-11b: Config → Planning carries the count switch: 'Count a lorry coming and going as' 2 movements, in and out / 1 visit",
+      _cfBody.includes('data-cfg="count-visit-as"') && _cfBody.includes('<label id="cfg-count-label">Count a lorry coming and going as</label>')
+      && _cfBody.includes('[[2, "2 movements, in and out"], [1, "1 visit"]]') && _cfBody.includes("onChange={() => upd(d => { setCount(d, pv); })}")
+      && _cfBody.includes('<div className="hint">Councils count 2. Changes the map, bulletin and Dashboard figures.</div>')
+      && _cfBody.indexOf('data-cfg="count-visit-as"') > _cfBody.indexOf('data-cfg="return-journeys"'));
+    ok("⭐ 2.1-11b: switching converts the typed movements bands so the same lorries keep the same colour (×2 to movements, ÷2 back)",
+      // typed before the setting (no unit = visits) and read ×2 already: switching to 2 writes them in movements, the same colours
+      !!setCount && a.planning.count_visit_as === 2 && JSON.stringify(a.tenant.council_breaks) === '{"movements":[100,200,400],"movements_unit":"movements"}'
+      && b.planning.count_visit_as === 1 && JSON.stringify(b.tenant.council_breaks) === '{"movements":[50,100,200],"movements_unit":"visits"}'
+      && c.planning.count_visit_as === 1 && c.tenant === undefined
+      && JSON.stringify(e.tenant.council_breaks) === '{"movements":[50,100,200],"movements_unit":"movements"}',
+      JSON.stringify([a, b, c, e]));
+    {
+      const g = { tenant: { council_breaks: { movements: [25, 50, 100] } } };      // live's bands (typed as visits), the default count
+      if (setBreak) setBreak(g, "movements", 2, 300);
+      ok("⭐ 2.1-11b: the band fields show and write the bands in the organisation's count (25 / 50 / 100 visits read 50 / 100 / 200 movements)",
+        code.includes('const cur = (m === "movements" ? breaksIn(doc, countPV(cfgCountMeta(doc))) : ((doc.tenant || {}).council_breaks || {})[m]) || [];')
+        && JSON.stringify(g.tenant.council_breaks) === '{"movements":[50,100,300],"movements_unit":"movements"}', JSON.stringify(g));
+    }
+    ok("2.1-11b: the count is read from meta.counting (the Dashboard) or the document being edited (Config); absent = 2",
+      code.includes("const countPV = (meta) => (meta && meta.counting && Number(meta.counting.per_visit) === 1 ? 1 : 2);")
+      && code.includes("const cfgCountMeta = (doc) => ({ counting: { per_visit: Number(((doc || {}).planning || {}).count_visit_as) === 1 ? 1 : 2 } });"));
+    ok("2.1-11b (Q4): a route's cap is typed in lorry visits", code.includes('<F k="max_vehicles_per_day" label="Max lorry visits a day (flag only)" />')
+      && !code.includes("Max vehicles / day"));
+    ok("2.1-11b (Q2): 'two-way' is retired from every string a person reads in the app",
+      !/["'`][^"'`\n]*two-way[^"'`\n]*["'`]/i.test(code), (code.match(/["'`][^"'`\n]*two-way[^"'`\n]*["'`]/i) || [""])[0]);
+  }
   ok("🔴 W12: the section's words follow the word rule (no bake, server, endpoint, token or cached on this screen)",
     !/\b(bake|baked|server|endpoint|token|cached|geometry)\b/i.test(_cfBody.slice(_cfBody.indexOf('{tab === "mapbulletin"'), _cfBody.indexOf('{tab === "costing"'))));
   // 1. the one-screen Dashboard
@@ -2290,8 +2333,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // 17 Oct 2026 (narrowed): six WallSections — the sixth is the Simulation (SimWall), no chart in it
     && (_dbWall.match(/<WallSection show=\{sectionShown\(/g) || []).length === 6 && (_dbWall.match(/<ChartCanvas config=/g) || []).length === 8
     && (_dbWall.match(/<div className="wall-charts">/g) || []).length === 2);
-  ok("...the six cards: material, deliveries a day (11 Oct: one delivery = one two-way movement; working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
-    ['label="Material in view"', 'label="Deliveries a day"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
+  // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default) (question E): the second card is the organisation's count, deliveries under it
+  ok("...the six cards: material, lorry movements a day (deliveries × the count; working days from Config), vehicles needed, planned this week, delivered against plan, transport carbon",
+    _dbWork.includes("<Card label={countLabel(meta)} value={grp(Math.round(loadsPerDay * countPV(meta)))}")
+    && _dbWork.includes("`${grp(Math.round(loadsPerDay))} deliveries, each in and out`") && !_dbWork.includes('label="Deliveries a day"') &&
+    ['label="Material in view"', 'label="Vehicles needed"', 'label="Planned this week"', 'label="Delivered against plan"', 'label="Transport carbon"'].every(t => _dbWork.includes(t))
     && _dbBody.includes("const wdPerMonth = +(((factors || {}).planning || {}).working_days_per_month || 22);") && _dbBody.includes("const loadsPerDay = K.totTrips / (nMonths * wdPerMonth);"));
   // 13 Oct 2026 (W5): narrowed — no onToggle handler any more; a chart in a collapsed section is built when its box
   // first has a size (ChartCanvas's ResizeObserver), so it is measured right on the first open
@@ -5101,9 +5147,13 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      ['label="received"', 'label="open now"', 'label="working days to first reply (median)"', 'label="working days to close (median)"',
       "replied within ${data.reply_days} working days"].every(w => cd.includes(w))
      && cd.includes('<ChartCanvas config={cfg} title="Concerns received a month" scope={scope} />')
-     && cd.includes('data-concern-kinds="1"') && cd.includes('data-concern-routes="1"') && cd.includes("Per 1,000 planned two-way lorry movements"));
-  ok("CONCERNS DASH: the per-1,000 line is over the whole range on screen (the range's received ÷ its planned two-way movements), never the last month alone",
-     cd.includes("const moves = 2 * tripsM.reduce((a, t) => a + (t || 0), 0);") && cd.includes("rate = { v: data.received * 1000 / moves, m: range };")
+     // REVERSED 9 Nov 2026 (v2.1 2.1-11b): per 1,000 lorry movements, or visits (the organisation's count)
+     && cd.includes('data-concern-kinds="1"') && cd.includes('data-concern-routes="1"') && cd.includes('Per 1,000 planned lorry {per === 2 ? "movements" : "visits"}')
+     && !cd.includes("two-way"));
+  // NARROWED 9 Nov 2026 (v2.1 2.1-11b): the deliveries × the organisation's count (pv from the Dashboard's meta), not a literal 2
+  ok("CONCERNS DASH: the per-1,000 line is over the whole range on screen (the range's received ÷ its planned movements), never the last month alone",
+     cd.includes("const moves = per * tripsM.reduce((a, t) => a + (t || 0), 0);") && cd.includes("const per = pv === 1 ? 1 : 2;")
+     && code.includes("tripsM={D.tripsM} pv={countPV(meta)} onOpen={onOpen} />") && cd.includes("rate = { v: data.received * 1000 / moves, m: range };")
      && cd.includes("maximumFractionDigits: 2 })} over {rate.m}.") && !cd.includes("tripsM[tripsM.length - 1]"));
   ok("🔴 CONCERNS DASH: counts only — the section never prints a concern's words, name, email or place",
      !/\.(words|name|email|phone|lat|lon|registration)\b/.test(cd.replace(/r\.words|k\.kind_text/g, "")));

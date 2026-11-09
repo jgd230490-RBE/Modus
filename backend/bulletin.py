@@ -16,8 +16,8 @@ the same payload the browser gets and assert equality)
   1. A line whose route is not drawn on the map (no baked laden geometry for any vehicle)
      is NOT counted — the map never sees it. It is NAMED here (`routes_not_drawn`), never
      silently dropped and never counted as zero.
-  2. Two-way movements a day = the FRACTIONAL vehicle-loads of the month summed, ÷ working
-     days. One load = one delivery = one two-way movement (out laden, back empty), never
+  2. Visits a day (`two_way_a_day`, the key kept) = the FRACTIONAL vehicle-loads of the month summed, ÷ working
+     days. One load = one delivery = one visit (in laden, out empty), never
      doubled, never rounded per line.
   3. Vehicles needed = Σ per LINE ceil((loads ÷ working days) ÷ what one vehicle can do a
      day on THAT route). Ceil per line, never once over the total: a vehicle on one route
@@ -68,6 +68,7 @@ import carbon
 import clashes
 import config
 import conversions
+import counting
 import db
 import restrictions
 import stockpiles
@@ -179,7 +180,7 @@ def _r(v, dp=3):
 
 
 def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None,
-                    team_word=None, section_names=None, discipline_names=None):
+                    team_word=None, section_names=None, discipline_names=None, per_visit=None):
     """
     The eleven rules over one or more month payloads (each the dict
     `/api/public/month-kpis` returns), `routes` = drawn_routes(), `wd` = working_days().
@@ -187,6 +188,12 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
     by side. `acc` limits the per-team rows only.
     """
     wd = float(wd)
+    # 9 Nov 2026 (v2.1 2.1-11b): the organisation's count — 2 movements a visit (default) or 1 visit. `two_way_a_day`
+    # stays the VISITS figure (loads ÷ working days, the key's name kept for its readers); `count_a_day` is the figure
+    # a page prints, in `count_unit`, with the in / out split (a whole route always runs both legs: in = out = visits)
+    import counting
+    pv = counting.per_visit() if per_visit is None else int(per_visit)
+    cw = counting.words_for(pv)
     scope = (acc or {}).get("ipt")
     labels = taxonomy.team_labels() if labels is None else labels
     word = team_word or taxonomy._team_word()
@@ -283,6 +290,9 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
                       "not routed yet, listed below and not counted.")
         return {"empty": True, "months_with_volume": 0, "working_days": wd,
                 "headline": {"two_way_a_day": None, "movements_in_month": None,
+                             "count_a_day": None, "count_in_month": None, "in_a_day": None, "out_a_day": None,
+                             "count_unit": cw["unit"], "per_visit": pv, "count_label": cw["label"], "count_lower": cw["lower"],
+                             "count_month": cw["month"], "count_col": cw["col"],
                              "working_days": wd, "routes_in_use": 0, "tonnes": None},
                 "vehicles": {"fleet": None, "excludes_unbaked_lines": 0, "label": "Vehicles needed",
                              "not_baked": False},
@@ -311,6 +321,8 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
             "label": f"{rp.get('origin') or rid} → {rp.get('dest') or ''}".strip(),
             "two_way_a_day": _r(veh_sum / gm / wd),
             "movements_in_month": _r(veh_sum / gm),
+            "count_a_day": _r(veh_sum * pv / gm / wd),
+            "count_in_month": _r(veh_sum * pv / gm),
             "vehicles": max(x["fleet"] for x in ms.values()),
             "vehicles_excludes_unbaked_lines": max(x["unbaked"] for x in ms.values()),
             "co2_t": _r(sum(x["co2"] for x in ms.values()) / gm),
@@ -334,6 +346,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
             gm = max(1, len(g["months"]))
             row = {"key": key, "name": key,
                    "vehicles_a_day": _r(g["fleet"] / gm), "two_way_a_day": _r(g["veh"] / gm / wd),
+                   "count_a_day": _r(g["veh"] * pv / gm / wd),
                    "tonnes_a_day": _r(g["t"] / gm / wd), "months_with_volume": len(g["months"])}
             if by == "section" and key in section_names:
                 row["name"] = section_names[key]
@@ -354,11 +367,18 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
             # the bar's fractional-sum figure, and the rule named beside it (D28)
             "two_way_a_day": _r(two_way_a_day),
             "movements_in_month": _r(_avg(m_veh)),
+            "count_a_day": _r(two_way_a_day * pv),
+            "count_in_month": _r(_avg(m_veh) * pv),
+            "in_a_day": (_r(two_way_a_day) if pv == 2 else None),
+            "out_a_day": (_r(two_way_a_day) if pv == 2 else None),
+            "count_unit": cw["unit"], "per_visit": pv, "count_label": cw["label"], "count_lower": cw["lower"],
+                             "count_month": cw["month"], "count_col": cw["col"],
             "working_days": wd,
             "routes_in_use": len(routes_in),
             "tonnes": _r(_avg(m_t)),
-            "rule": ("Two-way movements = loads (deliveries) per working day; each is a lorry out laden "
-                     "and back empty. The month's loads are summed as typed (fractional), not rounded per line."),
+            "rule": (cw["label"] + (" = 2 × deliveries per working day (in and out)." if pv == 2
+                                    else " = deliveries per working day, each lorry once.")
+                     + " The month's loads are summed as typed (fractional), not rounded per line."),
         },
         "vehicles": {
             "fleet": fleet_peak,
@@ -374,7 +394,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
             "shown": unit != "vehicles",                         # rule 8
             "unit": unit,
             "per_day": _r(_avg(m_qty) / wd),
-            "note": ("In a vehicles unit loads a day is the two-way movements figure, so the card is shown "
+            "note": ("In a vehicles unit loads a day is the deliveries figure, so the card is shown "
                      "for tonnes / m³ only."),
         },
         "carbon": _carbon_block(_avg(m_co2), _avg(m_co2) / wd, co2_unbaked, payloads, routes, wd,
@@ -496,8 +516,9 @@ def loads_by_route_of(payload):
 def route_cap_rows(loads_by_route, wd):
     """
     14 Oct 2026 (bundle G): the Conditions panel's cap rule as ONE function, read by conditions_of_month and
-    by the CLP section's chart 1 — every route with a typed cap AND approved volume in the month: two-way
-    movements a day (one load = one movement; the month's loads ÷ working days) against the cap. A flag,
+    by the CLP section's chart 1 — every route with a typed cap AND approved volume in the month: lorry
+    VISITS a day (one load = one visit; the month's loads ÷ working days) against the cap, whatever the
+    organisation's count (9 Nov 2026, 2.1-11b Q4: a cap is typed in visits). A flag,
     never a block. The Look-ahead's ROUTE_CAP counts the lorries needed on a day instead (the user, 14 Oct:
     "keep both as now").
     """
@@ -510,7 +531,7 @@ def route_cap_rows(loads_by_route, wd):
         a_day = loads_by_route[r["id"]] / wd
         cap = int(r["max_vehicles_per_day"])
         over = a_day > cap
-        out.append({"route_id": r["id"], "cap": cap, "two_way_a_day": _r(a_day), "over": over,
+        out.append({"route_id": r["id"], "cap": cap, "two_way_a_day": _r(a_day), "visits_a_day": _r(a_day), "over": over,
                      "over_by": (_r(a_day - cap) if over else None), "pct": (round(a_day * 100.0 / cap) if cap > 0 else None)})
     out.sort(key=lambda x: x["route_id"])
     return out
@@ -526,7 +547,7 @@ def conditions_of_month(month_index, payload=None, factors=None):
                     of the month wins), from stockpiles.balances
       seasonal      the factors.json windows that name this calendar month and a vehicle
                     the month's lines use (or no vehicle, so every route)
-      route_caps    two-way movements a day (one load = one movement; the month's loads
+      route_caps    lorry visits a day (one load = one visit; the month's loads
                     ÷ working days) against the daily cap typed on the route — a planning
                     flag, never a block
     Routes are the month's approved routes, drawn or not: a condition on the plan does not
@@ -622,13 +643,13 @@ def conditions_of_month(month_index, payload=None, factors=None):
             seasonal.append({"name": w.get("name"), "message": w.get("message"),
                              "months": w.get("months"), "restricted_vehicles": rv, "routes": applies})
 
-    # 4. typed caps against the month's two-way movements a day (14 Oct 2026: route_cap_rows, shared with the CLP section)
+    # 4. typed caps against the month's lorry visits a day (14 Oct 2026: route_cap_rows, shared with the CLP section)
     rows_cap = route_cap_rows(loads_by_route, wd)
     checked_caps = len(rows_cap)
     exceeded = [{"route_id": r["route_id"], "cap": r["cap"], "two_way_a_day": r["two_way_a_day"],
                  "over_by": r["over_by"], "wording": CAP_WORDING} for r in rows_cap if r["over"]]
     route_caps = {"wording": CAP_WORDING, "exceeded": exceeded, "routes_with_cap": checked_caps,
-                  "note": ("Two-way movements a day (one load = one movement; the month's loads ÷ working "
+                  "note": ("Lorry visits a day (one load = one visit; the month's loads ÷ working "
                            "days) against the daily cap typed on the route — a planning flag, never a block.")}
 
     return {"month": mi, "calendar_month": cal, "span": [span_from.isoformat(), span_to.isoformat()],
@@ -696,11 +717,12 @@ def month_page(month_index, acc):
         "plan_only": True,
         "terms": {
             "two_way_movements": rollup["headline"].get("rule") if not rollup.get("empty") else
-            "Two-way movements = loads (deliveries) per working day; each is a lorry out laden and back empty.",
+            counting.words()["label"] + " = deliveries per working day" + (" × 2 (in and out)." if counting.per_visit() == 2 else "."),
+            "counting": counting.words()["sources"],
             "working_days": f"Working days a month: {wd:g}, from the tenant's planning settings.",
             "cap": f"A typed route cap is a {CAP_WORDING}, never a block; a route without one reads \"{NO_CAP_WORDING}\".",
             "other_schemes": ("Other schemes count differently: HS2 prints HGVs visiting the site (one count per lorry); "
-                              "EKFB 2020 printed maximum HGV each way. Wayscope prints two-way movements."),
+                              "EKFB 2020 printed maximum HGV each way."),
             "carbon": carbon.SUMMARY_STAMP,
         },
         "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),

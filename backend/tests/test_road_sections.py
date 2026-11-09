@@ -569,19 +569,31 @@ ok("5. fixture: the bar's payload gives A 100 loads and B 50 (whole numbers here
 pay = road_sections.road_load(M, factors=factors, working_days=WD)
 ok("5. the October read serves the loaded leg, the working days and a basis sentence",
    pay["month"] == 10 and pay["leg"] == "loaded" and pay["working_days"] == WD
-   and "one load = one two-way movement" in pay["basis"], str({k: pay[k] for k in ("month", "leg", "working_days")}))
+   and "lorry movements a day" in pay["basis"] and pay["counting"]["unit"] == "movements"
+   and "two-way" not in pay["basis"], str({k: pay[k] for k in ("month", "leg", "working_days")}))
 ok("5. one run carries volume (A+B); the A+B+C run has no C volume but still carries A and B",
    len(pay["runs"]) == 2 and sorted(tuple(x["routes"]) for x in pay["runs"]) == [("R001", "R002"), ("R001", "R002", "R003")],
    str([(x["routes"], x["trips"]) for x in pay["runs"]]))
 ab = [x for x in pay["runs"] if x["routes"] == ["R001", "R002"]][0]
 abc = [x for x in pay["runs"] if x["routes"] == ["R001", "R002", "R003"]][0]
-ok("5. ⭐ movements on the run = (100 + 50) trips / working days — the two routes' loaded trips, NEVER doubled",
-   ab["trips"] == 150 and ab["movements_per_day"] == round(150 / WD, 2), f"{ab['trips']} {ab['movements_per_day']}")
+# NARROWED 9 Nov 2026 (v2.1 2.1-11b): the visits on the run are still the loaded trips counted once, never doubled; the
+# printed figure is now in the organisation's unit (2 = movements, the default): each PASS of a leg is one movement
+ok("5. ⭐ visits on the run = (100 + 50) trips / working days — the two routes' loaded trips, NEVER doubled",
+   ab["trips"] == 150 and ab["visits_per_day"] == round(150 / WD, 2), f"{ab['trips']} {ab['visits_per_day']}")
+ok("5. ⭐ 2.1-11b: movements on the run = in (A 100 + B 50 loaded) + out (A's 100 empties come back along it; B's do not)",
+   ab["in_per_day"] == round(150 / WD, 2) and ab["out_per_day"] == round(100 / WD, 2)
+   and ab["movements_per_day"] == round(250 / WD, 2), f"{ab['in_per_day']} {ab['out_per_day']} {ab['movements_per_day']}")
+ok("5. ⭐ 2.1-11b: on the A+B+C run both routes' empties pass too (B's way back joins at V5): 150 in + 150 out",
+   abc["in_per_day"] == round(150 / WD, 2) and abc["out_per_day"] == round(150 / WD, 2)
+   and abc["movements_per_day"] == round(300 / WD, 2), str(abc["movements_per_day"]))
 ok("5. ...equal to the sum of the per-route figures the payload also lists",
    abs(sum(s["movements_per_day"] for s in ab["route_shares"]) - ab["movements_per_day"]) < 0.02
    and [s["route_id"] for s in ab["route_shares"]] == ["R001", "R002"])
-ok("5. ...and NOT the per-route figure times two (the A8 bug on the label)",
-   ab["movements_per_day"] != round(2 * 150 / WD, 2) and ab["movements_per_day"] < 2 * per_route["R001"]["trips"] / WD)
+# NARROWED 9 Nov 2026 (2.1-11b): the A8 bug was doubling a VISITS figure; movements are now counted per pass, so the
+# run is NOT simply loads × 2 where an empty leg goes back another way
+ok("5. ...and NOT the per-route figure times two (the A8 bug on the label): visits stay once, movements count passes",
+   ab["visits_per_day"] != round(2 * 150 / WD, 2) and ab["visits_per_day"] < 2 * per_route["R001"]["trips"] / WD
+   and ab["movements_per_day"] != round(2 * 150 / WD, 2))
 ok("5. the other month's line and the Pending line do not count (150, not 160 or 1149)", ab["trips"] == 150 and abc["trips"] == 150)
 ok("5. vehicles on the run = the sum of the lines' rounded-up vehicles, as the bar does",
    ab["vehicles"] == per_route["R001"]["vehicles"] + per_route["R002"]["vehicles"] and ab["vehicles"] >= 2, str(ab["vehicles"]))
@@ -635,7 +647,8 @@ ok("5. ...an unnamed slot reads 'Team 4', not its id",
 ok("5. 🔴 no team id anywhere in the payload", not TEAM_ID.search(blob) and "IPT" not in blob)
 tot = pay["totals"]
 ok("5. totals are per ROUTE (150 trips, 2 routes with volume), not a sum over runs (which would be 300)",
-   tot["trips"] == 150 and tot["routes_with_volume"] == 2 and tot["movements_per_day"] == round(150 / WD, 2)
+   tot["trips"] == 150 and tot["routes_with_volume"] == 2 and tot["visits_per_day"] == round(150 / WD, 2)
+   and tot["movements_per_day"] == round(2 * 150 / WD, 2)
    and tot["runs"] == 2 and tot["routes_in_runs"] == 3, str(tot))
 ok("5. totals' CO2e is the routes' month CO2e", abs(tot["co2_t"] - round(per_route["R001"]["co2_t"] + per_route["R002"]["co2_t"], 3)) < 2e-3)
 ok("5. totals carry the shared km", abs(tot["shared_km"] - round(ab["length_km"] + abc["length_km"], 3)) < 2e-3)
@@ -650,9 +663,11 @@ ok("5. November: A's 10 trips alone still show on the shared runs (10 / wd), B c
 ok("5. working_days not given: the payload's figure (main._working_days, the one reader) is used",
    road_sections.road_load(M, factors=factors)["working_days"] == WD == P10["working_days"])
 ret = road_sections.road_load(M, factors=factors, working_days=WD, leg="return")
-ok("5. the return leg is served separately: its own run (V5..V7), the same 150 loads, and a note that they are not added",
+# NARROWED 9 Nov 2026 (2.1-11b): the empties are now counted as OUT movements where they run (each pass a movement)
+ok("5. the return leg is served separately: its own run (V5..V7), the same 150 loads, and a note that they are out movements",
    ret["leg"] == "return" and len(ret["runs"]) == 1 and ret["runs"][0]["trips"] == 150
-   and ret["runs"][0]["geometry"] == [V(7), V(6), V(5)] and any("never added" in n for n in ret["notes"]), str(ret["notes"]))
+   and ret["runs"][0]["geometry"] == [V(7), V(6), V(5)] and any("out movements" in n for n in ret["notes"])
+   and ret["runs"][0]["out_per_day"] == round(150 / WD, 2), str(ret["notes"]))
 ok("5. ...and the loaded read never contains the return run", not any(x["geometry"] == [V(7), V(6), V(5)] for x in pay["runs"]))
 try:
     road_sections.road_load(M, leg="sideways")
@@ -676,7 +691,8 @@ ok("5. ⭐ ...it is NAMED in routes_not_drawn (lines, routes, a sentence), never
 import bulletin  # noqa: E402
 _bar_m = bulletin.rollup_payloads([main.public_month_kpis(month=M, unit="vehicles")], bulletin.drawn_routes(), WD)
 ok("5. ⭐ ...so the feed's totals equal the bar's own roll-up for the month (the bulletin's: movements, loads, routes, vehicles)",
-   pay2["totals"]["movements_per_day"] == round(_bar_m["headline"]["two_way_a_day"], 2)
+   pay2["totals"]["visits_per_day"] == round(_bar_m["headline"]["two_way_a_day"], 2)
+   and pay2["totals"]["movements_per_day"] == round(_bar_m["headline"]["count_a_day"], 2)
    and pay2["totals"]["loads"] == _bar_m["headline"]["movements_in_month"]
    and pay2["totals"]["routes_with_volume"] == _bar_m["headline"]["routes_in_use"]
    and pay2["totals"]["vehicles"] == _bar_m["vehicles"]["fleet"]
@@ -703,11 +719,12 @@ bar12 = sum(l["vehicle_loads"] for l in P12["lines"] if l["route_id"] in ("R001"
 dec = road_sections.road_load(12, factors=factors, working_days=WD)
 dab = [x for x in dec["runs"] if x["routes"] == ["R001", "R002"]][0]
 ok("5. ⭐ December: the run's loads are the bar's 10.9 (10.4 + 0.5), and movements a day = 10.9 / working days",
-   abs(dab["loads"] - 10.9) < 1e-6 and abs(bar12 - 10.9) < 1e-6 and dab["movements_per_day"] == round(10.9 / WD, 2),
-   f"{dab['loads']} {dab['movements_per_day']} bar {bar12}")
+   abs(dab["loads"] - 10.9) < 1e-6 and abs(bar12 - 10.9) < 1e-6 and dab["visits_per_day"] == round(10.9 / WD, 2)
+   and dab["in_per_day"] == round(10.9 / WD, 2),
+   f"{dab['loads']} {dab['visits_per_day']} bar {bar12}")
 ok("5. 🔴 ...NOT Σ ceil per line (12 / working days): the public map's run and its bar cannot disagree by rounding",
-   dab["trips"] == 12 and dab["movements_per_day"] != round(12 / WD, 2) and dec["totals"]["loads"] == round(10.9, 3)
-   and dec["totals"]["movements_per_day"] == round(10.9 / WD, 2), f"{dab['trips']} {dab['movements_per_day']} vs {round(12 / WD, 2)}")
+   dab["trips"] == 12 and dab["visits_per_day"] != round(12 / WD, 2) and dec["totals"]["loads"] == round(10.9, 3)
+   and dec["totals"]["visits_per_day"] == round(10.9 / WD, 2), f"{dab['trips']} {dab['visits_per_day']} vs {round(12 / WD, 2)}")
 ok("5. ...the per-route shares carry the fractional loads too (10.4 and 0.5) and the basis sentence names the rule",
    [s["loads"] for s in dab["route_shares"]] == [10.4, 0.5] and "not rounded per line" in dec["basis"]
    and "two-way length" in dec["co2_basis"])

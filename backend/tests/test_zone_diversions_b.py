@@ -250,7 +250,8 @@ ok("⭐ Dec 2027: the northern run carries R3's whole month and R1's 13/23 of it
    str([(r["routes"], r["loads"]) for r in dec["runs"]]))
 ok("...R1's entry says its share: 130 loads, 6.5 movements a day",
    run_d and next(x for x in run_d["route_shares"] if x["route_id"] == "R1")["loads"] == 130.0
-   and next(x for x in run_d["route_shares"] if x["route_id"] == "R1")["movements_per_day"] == 6.5)
+   and next(x for x in run_d["route_shares"] if x["route_id"] == "R1")["visits_per_day"] == 6.5
+   and next(x for x in run_d["route_shares"] if x["route_id"] == "R1")["in_per_day"] == 6.5)   # NARROWED 9 Nov 2026 (2.1-11b)
 ok("⭐ Nov 2027: no diversion, so the northern road carries R3 only", all("R1" not in r["routes"] for r in nov["runs"]),
    str([(r["routes"], r["loads"]) for r in nov["runs"]]))
 ok("🔴 no run lists an index key: the feed names routes", all("@" not in k for r in dec["runs"] for k in r["routes"]))

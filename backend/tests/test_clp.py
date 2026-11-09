@@ -494,8 +494,13 @@ ok("⭐ chart 6 is area_load's districts (the county row left out), sorted by di
 ok("chart 6: laden + empty = the area's lorry-km (to the rounding), the double-count sentence and the licence lines ride along",
    all(abs((r["laden_distance"] or 0) + (r["empty_distance"] or 0) - round(_ald[r["council"]]["lorry_km"], 1)) <= 0.11 for r in CO["rows"])
    and CO["double_count"] == areas.DOUBLE_COUNT and CO["attribution"] == ATTR and CO["distance_word"] == "lorry-km")
-ok("chart 6: Southshire carries R002's empty return only — distance, no movements",
-   {r["council"]: r for r in CO["rows"]}.get("Southshire", {}).get("movements_per_day") == 0.0
+# REVERSED 9 Nov 2026 (v2.1 2.1-11b, question A): each PASS of a leg counts, so the empty way back through Southshire
+# is its "out" movements; under 2 movements a visit it equals the loads ÷ working days of that leg (area_load's own figure)
+ok("chart 6: Southshire carries R002's empty return only — its out movements and its distance, no laden km",
+   ({r["council"]: r for r in CO["rows"]}.get("Southshire", {}).get("movements_per_day") or 0) > 0
+   and {r["council"]: r for r in CO["rows"]}["Southshire"]["movements_per_day"]
+       == round(_ald["Southshire"].get("out_per_day") or 0, 1)
+   and {r["council"]: r for r in CO["rows"]}["Southshire"]["laden_distance"] == 0.0
    and ({r["council"]: r for r in CO["rows"]}.get("Southshire", {}).get("empty_distance") or 0) > 0, str(CO["rows"]))
 # chart 10 with the target
 CR2 = C2["carbon_rate"]

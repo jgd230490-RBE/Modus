@@ -1545,7 +1545,8 @@ ok("⭐ DAY SHEET PDF: A4 PORTRAIT, ONE page, the day in words, the draft stamp,
 ok("DAY SHEET PDF: the columns and the totals row as the page shows them; the flags spelt out under a count per kind",
    all(k in _dtxt for k in ("FROM / TO", "MATERIAL / VEHICLE", "TONNES", "LOADS", "LORRIES", "FLAG")) and "Total · 3 lines" in _dtxt
    and "Flags (a flag, never a stop)" in _dtxt and re.search(r"on \d+ lines?", _dtxt) is not None
-   and "each a two-way movement" in _dtxt and "Loads are loaded trips" in _dtxt)
+   # REVERSED 9 Nov 2026 (v2.1 2.1-11b Q2): "two-way" retired; the Look-ahead stays in deliveries (Q3)
+   and "each a delivery there and back" in " ".join(_dtxt.split()) and "two-way" not in _dtxt and "Loads are loaded trips" in _dtxt)
 ok("🔴 DAY SHEET PDF: no team id, no 'truck', no 'baked' (the words a person reads)",
    not re.search(r"\bIPT ?\d\b", _dtxt) and not re.search(r"\btrucks?\b", _dtxt, re.I) and not re.search(r"\b(un)?baked?\b", _dtxt, re.I))
 import export as _exm

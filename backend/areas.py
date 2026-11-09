@@ -55,6 +55,7 @@ the map draws, each on the profile the map draws it with (bulletin.drawn_routes,
 browser's routePropsById). Per area:
   movements_per_day  Σ the month's approved LOADS (tonnes ÷ payload, fractional, the bar's
                      rule) of the routes whose LADEN leg enters the area ÷ the working days.
+                     (REVISED 9 Nov 2026, v2.1 2.1-11b: each leg now counts where it runs, in the organisation's count; counting.py.)
                      One load = one two-way movement, never doubled; the empty return leg
                      never adds a movement. A route counts in EVERY area its laden leg
                      enters, so the district figures add up to more than the scheme's —
@@ -617,7 +618,7 @@ def _sites_in(prepared):
 
 # 13 Oct 2026 (W13): the double count, in ONE sentence the area payload's basis, the bulletin's movements-by-council
 # footnote and (its first clause) the map's district card all print. test_bulletin.py holds the three equal.
-DOUBLE_COUNT = ("A route counts in every area its laden leg enters, so the areas' figures add up to more than "
+DOUBLE_COUNT = ("A route counts in every area its legs enter, so the areas' figures add up to more than "
                 "the scheme's.")
 
 
@@ -681,8 +682,9 @@ def _month_context(drawn=None):
         diverted = {rid for (rid, _p, _l) in route_choice.in_use(kinds=("zone",))}     # 29 Oct 2026 (task 0c, PR B)
     except Exception:
         diverted = set()
+    import counting
     return {"drawn": drawn, "clips": clip_table(), "areas": areas, "sites": sites, "sites_placed": sites_placed,
-            "stops": _stops(), "diverted": diverted}
+            "stops": _stops(), "diverted": diverted, "per_visit": counting.per_visit()}
 
 
 def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
@@ -742,25 +744,33 @@ def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
             opts.append((w, (lp.get("loaded") or {}), (rp.get("return") or {})))
         legs_of[rid] = opts
 
+    import counting
+    pv = ctx.get("per_visit") or counting.per_visit()
     out_areas = []
     for a in areas:
         aid = a["area_id"]
         loads = laden_km = lorry_km = co2 = 0.0
+        v_in = v_out = v_any = 0.0          # 9 Nov 2026 (2.1-11b, question A): loads whose loaded / empty / either leg enters
         co2_known, co2_unbaked = False, []
         routes, return_only, edge = [], [], []
         for rid, opts in legs_of.items():
             # one (share, laden clip, empty clip) a pair of options the month uses; a route no zone touches has one
             w_in = sum(w for w, L, Rt in opts if L.get(aid, 0.0) >= ENTER_KM)
+            w_out = sum(w for w, L, Rt in opts if Rt.get(aid, 0.0) >= ENTER_KM)
+            w_any = sum(w for w, L, Rt in opts if L.get(aid, 0.0) >= ENTER_KM or Rt.get(aid, 0.0) >= ENTER_KM)
             touched = [(w, L.get(aid, 0.0), Rt.get(aid, 0.0), L, Rt) for w, L, Rt in opts
                        if L.get(aid, 0.0) > 0 or Rt.get(aid, 0.0) > 0]
             if not touched:
                 continue
             ld = per_route[rid]["loads"]
+            v_in += ld * w_in
+            v_out += ld * w_out
+            v_any += ld * w_any
             if w_in > 0:
                 routes.append(rid)
-                loads += ld * w_in                  # one load = one two-way movement, laden leg only
+                loads += ld * w_in                  # the loaded leg's loads (the visits it brings in)
             elif all(lin <= 0 and rin >= ENTER_KM for _w, lin, rin, _L, _R in touched):
-                return_only.append(rid)             # empties only: no movement added
+                return_only.append(rid)             # empties only: counted as out movements (2.1-11b)
             else:
                 edge.append(rid)                    # under 200 m inside: km and carbon, no movement
             laden_km += ld * sum(w * lin for w, lin, _rin, _L, _R in touched)
@@ -780,7 +790,12 @@ def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
             "area_id": aid, "name": a["name"], "tier": a["tier"],
             "tier_words": TIER_WORDS.get(a["tier"], a["tier"]),
             "highway_authority": a["highway_authority"], "source": a["source"],
-            "movements_per_day": round(loads / wd, 2),
+            # 9 Nov 2026 (2.1-11b): in the organisation's unit (counting.py): each leg that enters is one movement
+            # (in = loaded, out = empty) under 2; a route's lorries once if either leg enters under 1
+            "movements_per_day": round(((v_in + v_out) if pv == 2 else v_any) / wd, 2),
+            "in_per_day": round(v_in / wd, 2),
+            "out_per_day": round(v_out / wd, 2),
+            "visits_per_day": round(v_any / wd, 2),
             "loads": round(loads, 3),
             "routes": sorted(routes), "routes_count": len(routes),
             "return_only_routes": sorted(return_only),
@@ -830,18 +845,18 @@ def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
         "month": month,
         "working_days": wd,
         "enter_km": ENTER_KM,
-        "basis": "Two-way movements a day: one load = one two-way movement. An area counts the month's approved "
-                 "loads of every route whose laden leg enters it, divided by the working days; the empty return "
-                 "adds none. " + DOUBLE_COUNT + " A laden leg enters an area when at least 200 m of it is inside (the "
-                 "boundaries are generalised to 200 m); a route inside by less adds its km and carbon there, "
-                 "not its movements.",
+        "basis": counting.area_basis(pv) + " " + DOUBLE_COUNT + " A leg enters an area when at least 200 m of it is "
+                 "inside (the boundaries are generalised to 200 m); a route inside by less adds its km and carbon "
+                 "there, not its movements.",
+        "counting": counting.words_for(pv),
         "co2_basis": "CO2e in an area = each route's month CO2e (routed km × the vehicle's kg CO2e/km, both legs) × "
                      "its km inside the area (laden and return) ÷ its two-way length: the carbon emitted inside "
                      "the area, the DESNZ split by boundary. Over the areas of one tier that cover a route it adds "
                      "up to the route's figure. Never kg per tonne per council.",
         "areas": out_areas,
         "totals": {
-            "movements_per_day": round(total_loads / wd, 2),
+            "movements_per_day": round(total_loads * pv / wd, 2),
+            "visits_per_day": round(total_loads / wd, 2),
             "loads": round(total_loads, 3),
             "routes_with_volume": len(with_volume),
             "sites": sites_placed,
@@ -868,7 +883,7 @@ def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
 #  19 Oct 2026 — every month in one read                                       #
 # --------------------------------------------------------------------------- #
 #: the payload keys that are the same in every month: sent once, under "common"
-ALL_COMMON_KEYS = ("working_days", "enter_km", "basis", "co2_basis", "stops", "attribution", "carbon")
+ALL_COMMON_KEYS = ("working_days", "enter_km", "basis", "co2_basis", "stops", "attribution", "carbon", "counting")
 #: an area's keys that do not change with the month: sent once per area, under "area_fixed"
 ALL_AREA_FIXED_KEYS = ("name", "tier", "tier_words", "highway_authority", "source", "sites", "sites_count")
 

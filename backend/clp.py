@@ -12,7 +12,7 @@ pack export (PDF and XLSX) both call monitoring(), so a screen and a printed pac
 
 THE CHARTS (numbers as in the outside brief's item 5 table)
 -----------------------------------------------------------
-  1   route_caps     two-way movements a day per route (one load = one movement; loads ÷ working days)
+  1   route_caps     lorry visits a day per route (one load = one visit; loads ÷ working days)
                      against the route's typed planning cap — bulletin.route_cap_rows, the Conditions
                      panel's rule (the Look-ahead's ROUTE_CAP counts lorries needed on a day: the user
                      kept both, 14 Oct). Routes with volume and no cap are listed, never compared.
@@ -45,6 +45,7 @@ import carbon
 import carbon_target
 import config
 import conversions
+import counting
 import db
 import gate_arrivals
 import gate_hours
@@ -76,7 +77,7 @@ CHARTS = {
 }
 
 CAP_DIFF = ("The Look-ahead's ROUTE CAP flag compares the same cap with the lorries needed on a day; this chart, "
-            "like the bulletin, compares it with movements a day.")
+            "like the bulletin, compares it with lorry visits a day.")
 SPREAD = "Planned figures, not observed: Wayscope holds no gate log or arrival times."
 
 
@@ -171,8 +172,9 @@ def route_caps(mi, wd, payload, locs, routes):
                   over=n_over,
                   headline=(f"{n_over} route{'' if n_over == 1 else 's'} over {'its' if n_over == 1 else 'their'} cap"
                             if n_over else f"Every capped route within its cap ({n_cap} of {len(rows)} capped)"),
-                  subtitle=f"two-way movements a day, {label}",
-                  basis=("Two-way movements a day: one load = one movement; the month's approved loads ÷ "
+                  # REVERSED 9 Nov 2026 (2.1-11b Q4 / G): a cap is typed in lorry visits a day, whatever the count
+                  subtitle=f"lorry visits a day, {label}",
+                  basis=("Lorry visits a day: one load = one visit; the month's approved loads ÷ "
                          f"{wd:g} working days, against the cap typed on the route. A flag, never a block. "
                          + CAP_DIFF),
                   source="Wayscope: the approved plan and each route's typed cap")
@@ -388,8 +390,10 @@ def councils(mi, wd, unit):
     top = max(rows, key=lambda x: x["movements_per_day"] or 0)
     return _chart("councils", "set", rows=rows, tier=tier, unit=unit, distance_word=word,
                   scheme_movements_per_day=_r1((al.get("totals") or {}).get("movements_per_day")),
-                  headline=f"{top['council']} takes the most: {top['movements_per_day']:g} movements a day",
-                  subtitle=f"{word} in {label}, laden and empty, and two-way movements a day",
+                  # 9 Nov 2026 (2.1-11b): the council figure is in the organisation's count (areas.py)
+                  headline=f"{top['council']} takes the most: {top['movements_per_day']:g} "
+                           f"{counting.words()['short']}",
+                  subtitle=f"{word} in {label}, laden and empty, and {counting.words()['lower']}",
                   basis=(al.get("basis") or "") + " " + ("Distance: every lorry-mile driven inside the area, laden and "
                                                          "empty." if unit == "mi" else
                                                          "Distance: every lorry-km driven inside the area, laden and empty."),

@@ -1070,7 +1070,7 @@ def build_day_sheet_pdf(page, day):
     lor = ("—" if tot["lorries"] is None else _n(tot["lorries"]))
     lor_note = (f" (the {tot['routed']} routed lines)" if tot["lorries"] is not None and tot["routed"] < tot["lines"] else "")
     story.append(P(f"<b>{tot['lines']}</b> line{'' if tot['lines'] == 1 else 's'} · <b>{_n(tot['tonnes'])} t</b> · "
-                   f"<b>{_n(tot['loads'])}</b> loads, each a two-way movement · <b>{lor}</b> lorries{lor_note}"
+                   f"<b>{_n(tot['loads'])}</b> loads, each a delivery there and back · <b>{lor}</b> lorries{lor_note}"
                    + (f" · {tot['flagged']} flagged" if tot["flagged"] else ""), st_figs))
     story.append(Spacer(1, 3 * mm))
 
@@ -1179,7 +1179,7 @@ def build_day_sheet_pdf(page, day):
     story.append(KeepTogether(fl))
     story.append(Spacer(1, 2 * mm))
 
-    story.append(P("Loads are loaded trips: each is one delivery and one two-way movement. Lorries are the vehicles the day "
+    story.append(P("Loads are loaded trips: each is one delivery, there and back. Lorries are the vehicles the day "
                    "needs from each route's worked-out cycle (none where the route is not worked out yet). † = typed by hand. "
                    "Planning figures, not plated weights. Road restrictions are the stored check, not re-read for this sheet. "
                    + ("This week is confirmed. " if tot["confirmed"] else "This week is not confirmed yet: the plan can still change. ")
@@ -1508,9 +1508,14 @@ def bulletin_doc_status(ok):
 
 
 def _route_color(r):
-    """A map route's Volume colour: the view model's `color`, else worked out from its two-way movements a day."""
+    """A map route's Volume colour: the view model's `color`, else worked out from its lorry visits a day (`visits`),
+    else from `a_day` in the organisation's count on the stops in that count (9 Nov 2026, 2.1-11b)."""
     import bulletin_doc
-    return r.get("color") or bulletin_doc.VOLUME_RAMP[bulletin_doc.volume_class(r.get("a_day"))]
+    if r.get("color"):
+        return r["color"]
+    if r.get("visits") is not None:
+        return bulletin_doc.VOLUME_RAMP[bulletin_doc.volume_class(r["visits"])]
+    return bulletin_doc.VOLUME_RAMP[bulletin_doc.volume_class(r.get("a_day"), bulletin_doc.volume_stops())]
 
 
 def bulletin_doc_casing():
@@ -1935,7 +1940,7 @@ def _council_legend(C, width, title="t CO2e in the month:"):
     title = _co2_pdf(title)   # 14 Oct 2026: before it is measured
     d = Drawing(width, 12)
     d.add(String(0, 2.5, title, fontName=_BF("bold"), fontSize=7.5, fillColor=colors.Color(*NAVY_RGB)))
-    # 13 Oct 2026 (the rendered PDF): equal slots let "no approved laden route" run into the next swatch and the
+    # 13 Oct 2026 (the rendered PDF): equal slots let "no approved route" run into the next swatch and the
     # swatches cut the title; each slot is now its swatch + its label + a gap, after the measured title
     # NARROWED 14 Oct 2026 (the publishing check: nothing under 7.5 pt): it shrank to 5.5 pt; now 7.5, down to 7 at most
     x0 = rl_pdfmetrics_width(title, _BF("bold"), 7.5) + 3 * mm
@@ -1984,7 +1989,7 @@ def _route_bar(r, width, vmax):
     d.add(Rect(num_w + 2, 1.5, max(lw, 0.5), 6.5, fillColor=colors.Color(*_hex_rgb(r.get("color") or "#5A96F6")),
                strokeColor=None))
     if r.get("cap") is not None:
-        cx = num_w + 2 + bw * r["cap"] / (vmax or 1)
+        cx = num_w + 2 + bw * (r.get("cap_at") or r["cap"]) / (vmax or 1)     # cap_at: the cap in the bar's count
         d.add(Line(cx, 0, cx, 9.5, strokeColor=colors.Color(*RED_RGB), strokeWidth=1.2, strokeDashArray=[2, 1.5]))
     return d
 
@@ -2092,12 +2097,13 @@ class _Kit:
         E, P, st_h, st_r = self.E, self.P, self.st_h, self.st_r
         st_hr = self.st_hr
         bar_w = self.usable * 0.25
-        vmax = max([r["a_day"] or 0 for r in S["routes"]] + [r["cap"] or 0 for r in S["routes"]] + [1])
+        vmax = max([r["a_day"] or 0 for r in S["routes"]] + [r.get("cap_at") or r["cap"] or 0 for r in S["routes"]] + [1])
         sm = ParagraphStyle("rt", parent=self.st, fontSize=8, leading=9.8)
         smr = ParagraphStyle("rtr", parent=sm, alignment=2)
         prev = (S["prev_long"] or "Last month")[:3] if S.get("prev_long") else "Last month"
         smg = ParagraphStyle("rtg", parent=sm, textColor=colors.Color(*GREY))
-        rows = [[P("Map", st_h), P("Route", st_h), P("Two-way movements a day", st_h), P("In the month", st_hr),
+        rows = [[P("Map", st_h), P("Route", st_h), P(E(S.get("map_legend_title") or "Lorry movements a day"), st_h),
+                 P("In the month", st_hr),
                  P(E(prev), st_hr), P("Planning flag", st_hr)]]
         for r in S["routes"]:
             rows.append([P(E(r["letters"].replace(" to ", "–").replace(" → ", "–")), smg), P(E(r["label"]), sm),
@@ -2161,7 +2167,7 @@ def _band(S, kind):
     import brand_pdf
     return {"height": 26 * mm, "fonts": brand_pdf.fonts(),
             "title": _pdf_safe(S["brand_title"]),
-            "sub": _pdf_safe(f"{S['tenant']} · {kind} · counts are two-way movements"),
+            "sub": _pdf_safe(f"{S['tenant']} · {kind} · counts are " + __import__("counting").words()["many"]),
             "right": _pdf_safe(f"{S['as_at']} · {S['issued']}"),
             # 14 Oct 2026 (the publishing check): pages 2 on carry a slim running head, not the full band again
             "running": 10.5 * mm, "right_later": _pdf_safe(f"{S['tenant']} · {kind}")}
@@ -2271,7 +2277,7 @@ def _newsletter(S, map_h, pages=None):
     story.append(P(E(f"Bars in each route's map colour. Planning flag: the scheme's own daily limit, the dashed red mark "
                      f"({S['flagged_routes']} of {len(S['routes'])} routes have one)."), st_grey))
     story.append(P("What is being moved", st_sec))
-    mv = [[P("Discipline", st_h), P("Two-way a day", st_hr), P("Lorries", st_hr), P("Tonnes a day", st_hr)]]
+    mv = [[P("Discipline", st_h), P(E(S.get("count_col") or "Movements a day"), st_hr), P("Lorries", st_hr), P("Tonnes a day", st_hr)]]
     for m in S["moved"]:
         mv.append([P(E(m["name"])), P(E(m["a_day"]), st_r), P(E(m["vehicles"]), st_r), P(E(m["t_day"]), st_r)])
     mt = S["moved_total"]
@@ -2305,7 +2311,7 @@ def _newsletter(S, map_h, pages=None):
         if M.get("error"):
             story += [P(E(M["title"]), st_sec), P(E(M["error"]), st_grey)]
         else:
-            mvc = [["", P("District", st_h), P("Two-way a day", st_hr), P("Routes", st_hr),
+            mvc = [["", P("District", st_h), P(E(S.get("count_col") or "Movements a day"), st_hr), P("Routes", st_hr),
                     P(E(M["distance_head"]), st_hr), P(E(M["change_head"]), st_h)]]
             for d in M["districts"]:
                 mvc.append([_swatch(d["fill"], d["cls"] == "nofig"), P(E(d["name"])), P(E(d["text"]), st_r),
@@ -2313,7 +2319,7 @@ def _newsletter(S, map_h, pages=None):
             story.append(KeepTogether([P(E(M["title"]), st_sec), P(E(M["lede"])), Spacer(1, 1.5 * mm),
                                        grid(mvc, [6 * mm, usable * 0.28, usable * 0.15, usable * 0.09, usable * 0.17,
                                                   usable * 0.31 - 6 * mm]),
-                                       Spacer(1, 1 * mm), _council_legend(M, usable, "Two-way movements a day:")]))
+                                       Spacer(1, 1 * mm), _council_legend(M, usable, (M.get("col") or "Lorry movements a day") + ":")]))
             story.append(P(E(" ".join([M["scheme_line"]] + M["county_lines"])), st_grey))
             for line in M["notes"]:
                 story.append(P(E(line), st_grey))
