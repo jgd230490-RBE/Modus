@@ -393,7 +393,6 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .cfg-ro-note{border:1px solid var(--line);background:var(--navy-soft);color:var(--ink);border-radius:8px;padding:10px 14px;font-size:14px;margin:0 0 16px;}
   .cfg-ro input:not([type=checkbox]):not([type=radio]),.cfg-ro select,.cfg-ro textarea{border-color:transparent;background:transparent;box-shadow:none;color:var(--ink);-webkit-text-fill-color:var(--ink);opacity:1;cursor:default;-webkit-appearance:none;appearance:none;resize:none;}
   .cfg-ro input::placeholder,.cfg-ro textarea::placeholder{color:var(--muted);-webkit-text-fill-color:var(--muted);}
-  .cfg-ro [data-ph-example]::placeholder{color:transparent;-webkit-text-fill-color:transparent;}   /* a made-up example ("name@scheme.example"), never a value */
   .cfg-ro input::-webkit-calendar-picker-indicator{display:none;}
   .cfg-ro input[type=checkbox]:not(.hidden){-webkit-appearance:none;appearance:none;display:inline-block;width:auto;height:auto;min-width:1em;margin:0;border:0;background:none;font:inherit;font-weight:700;color:var(--muted);text-align:center;vertical-align:baseline;}
   .cfg-ro input[type=checkbox]:not(.hidden)::before{content:"–";}
@@ -9417,6 +9416,7 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc, ro }){
 
 // ---- 8 Nov 2026 (v2.1 task 2.1-9): a day-hire rate per lorry type — typed, never seeded; the Lorry plan's saving in money ----
 function DayHireSection({ doc, upd }){
+  const ro = React.useContext(CfgRO);
   const vehicles = Object.keys((doc && doc.vehicles) || {}).filter(k => !k.startsWith("_"));
   const dh = (doc && doc.day_hire) || {};
   const inp = "ctl ctl-sm w-full tabular-nums";
@@ -9430,7 +9430,7 @@ function DayHireSection({ doc, upd }){
         {vehicles.map(k => (
           <label key={k} className="block">
             <span className="block text-sm font-medium text-slate-700 mb-1">{vehLabel(k)}</span>
-            <input className={inp + " mt-1"} inputMode="decimal" data-ph-example="1" placeholder={`${CUR()} a day`} value={dh[k] ?? ""} onChange={e => set(k, e.target.value)} />
+            <input className={inp + " mt-1"} inputMode="decimal" data-ph-example="1" placeholder={ro ? "—" : `${CUR()} a day`} value={dh[k] ?? ""} onChange={e => set(k, e.target.value)} />
           </label>
         ))}
       </div>
@@ -9561,8 +9561,10 @@ const isTonnesOnly = (c) => !!(c && Array.isArray(c.units) && c.units.length ===
 // and .cfg-ro draws them as plain text (no boxes, a ✓ or – for a tick, no + Add / × / Remove). A field added later inside a
 // CfgFields is read-only for a reader with no work of its own. What a planner may still do on the page (the fuel settings,
 // Fetch now) is rendered outside it.
+// 9 Nov 2026 (card 10): a field with a made-up example placeholder ("name@scheme.example") reads "—" when empty for a reader
+const CfgRO = React.createContext(false);
 function CfgFields({ ro, children }){
-  return <fieldset className={"cfg-fs" + (ro ? " cfg-ro" : "")} disabled={!!ro} data-cfg-fields={ro ? "read" : "edit"}>{children}</fieldset>;
+  return <fieldset className={"cfg-fs" + (ro ? " cfg-ro" : "")} disabled={!!ro} data-cfg-fields={ro ? "read" : "edit"}><CfgRO.Provider value={!!ro}>{children}</CfgRO.Provider></fieldset>;
 }
 
 function ConfigPage({ meta, who, access }){
@@ -10019,7 +10021,7 @@ function ConfigPage({ meta, who, access }){
                   ["newsletter_url", "cfg-contact-link", "Public newsletter link (optional)", 300, "https://…", "Where residents can read the bulletin: the scheme's own web page."]].map(([k, id, l, mx, ph, help]) => (
                   <div key={k} className="field" style={{ marginBottom: 8 }}>
                     <label htmlFor={id}>{l}</label>
-                    <input id={id} className="ctl w-full" maxLength={mx} placeholder={ph} data-contact={k} data-ph-example="1"
+                    <input id={id} className="ctl w-full" maxLength={mx} placeholder={ro ? "—" : ph} data-contact={k} data-ph-example="1"
                       value={(doc.tenant || {})[k] || ""} onChange={e => upd(d => { setTenantText(d, k, e.target.value); })} />
                     {help && <div className="hint">{help}</div>}
                   </div>
@@ -10034,7 +10036,7 @@ function ConfigPage({ meta, who, access }){
                   {[["concern_privacy_url", "cfg-concern-privacy", "Privacy notice link", 300, "https://…", (doc.tenant || {}).demo_notice ? "Blank on the demo: Wayscope's own notice." : "Needed before the form shows: the page that says how concerns are kept."]].map(([k, id, l, mx, ph, help]) => (
                     <div key={k} className="field" style={{ marginBottom: 8 }}>
                       <label htmlFor={id}>{l}</label>
-                      <input id={id} className="ctl w-full" maxLength={mx} placeholder={ph} data-contact={k} data-ph-example="1"
+                      <input id={id} className="ctl w-full" maxLength={mx} placeholder={ro ? "—" : ph} data-contact={k} data-ph-example="1"
                         value={(doc.tenant || {})[k] || ""} onChange={e => upd(d => { setTenantText(d, k, e.target.value); })} />
                       <div className="hint">{help}</div>
                     </div>
@@ -10081,18 +10083,18 @@ function ConfigPage({ meta, who, access }){
                 <div className="hint">Shown in the Basemap list on the public map. Leave the address empty to hide it.</div>
                 <div className="field" style={{ marginBottom: 8 }}>
                   <label htmlFor="cfg-imagery-name">Name in the list</label>
-                  <input id="cfg-imagery-name" data-ph-example="1" className="ctl w-full" maxLength={40} placeholder="Client imagery"
+                  <input id="cfg-imagery-name" data-ph-example="1" className="ctl w-full" maxLength={40} placeholder={ro ? "—" : "Client imagery"}
                     value={(doc.tenant || {}).imagery_name || ""} onChange={e => upd(d => { setTenantText(d, "imagery_name", e.target.value); })} />
                 </div>
                 <div className="field" style={{ marginBottom: 8 }}>
                   <label htmlFor="cfg-imagery-url">Address</label>
-                  <input id="cfg-imagery-url" data-ph-example="1" className="ctl w-full" maxLength={600} placeholder="https://…/{z}/{x}/{y}.jpg"
+                  <input id="cfg-imagery-url" data-ph-example="1" className="ctl w-full" maxLength={600} placeholder={ro ? "—" : "https://…/{z}/{x}/{y}.jpg"}
                     value={(doc.tenant || {}).imagery_url || ""} onChange={e => upd(d => { setTenantText(d, "imagery_url", e.target.value); })} />
                   <div className="hint">An address with {"{z}/{x}/{y}"}, or a WMS address. Web Mercator only.</div>
                 </div>
                 <div className="field" style={{ marginBottom: 8 }}>
                   <label htmlFor="cfg-imagery-credit">Credit shown on the map</label>
-                  <input id="cfg-imagery-credit" data-ph-example="1" className="ctl w-full" maxLength={160} placeholder="© Example Council 2025"
+                  <input id="cfg-imagery-credit" data-ph-example="1" className="ctl w-full" maxLength={160} placeholder={ro ? "—" : "© Example Council 2025"}
                     value={(doc.tenant || {}).imagery_credit || ""} onChange={e => upd(d => { setTenantText(d, "imagery_credit", e.target.value); })} />
                   <div className="hint">Most aerial licences ask for it.</div>
                 </div>

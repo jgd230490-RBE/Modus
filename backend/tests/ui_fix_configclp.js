@@ -101,6 +101,10 @@ async function configReadOnly(){
     const ta = m.el.querySelector(".cfg-main textarea");
     ok(`CONFIG RO: ${who} — Everything (JSON) is read only`, !!ta && ta.readOnly === true);
     ok(`CONFIG RO: ${who} — no Organisation file tab (admins only)`, !btnT(m.el, /^Organisation file$/));
+    await tab(m, "Map and bulletin");
+    const ex = [...m.el.querySelectorAll(".cfg-main [data-ph-example]")];
+    ok(`CONFIG RO: ${who} — Map and bulletin's empty example fields read '—' (no made-up example shown as a value)`,
+       ex.length >= 3 && ex.filter(x => !x.value).every(x => x.placeholder === "—"), ex.map(x => x.placeholder).join("|"));
     await m.done();
   }
 
@@ -162,7 +166,7 @@ async function configReadOnly(){
 // ================================================================ 2. the source rules behind it
 function sourceRules(){
   ok("⭐ CONFIG RO (source): one CfgFields component — a fieldset, disabled for a reader, the read-only look by class",
-     src.includes('function CfgFields({ ro, children }){') && src.includes('<fieldset className={"cfg-fs" + (ro ? " cfg-ro" : "")} disabled={!!ro} data-cfg-fields={ro ? "read" : "edit"}>{children}</fieldset>'));
+     src.includes('function CfgFields({ ro, children }){') && src.includes('<fieldset className={"cfg-fs" + (ro ? " cfg-ro" : "")} disabled={!!ro} data-cfg-fields={ro ? "read" : "edit"}><CfgRO.Provider value={!!ro}>{children}</CfgRO.Provider></fieldset>'));
   ok("CONFIG RO (source): read-only = not an admin login (the server's own rule for saving)", src.includes("const canSave = isAdminLogin(access);") && src.includes("const ro = !canSave;"));
   ok("⭐ CONFIG RO (source): the Save bar is an admin's only; the planner's foot line is gone",
      src.includes('{tab !== "orgfile" && canSave && (') && !src.includes("Only an admin can save the configuration."));
@@ -171,10 +175,11 @@ function sourceRules(){
      && /<\/div><\/CfgFields>\n\s*\{\/\* 9 Nov 2026 \(card 10\): the fuel settings[^\n]*\*\/\}\n\s*<div>\n[^\n]*\n\s*<FuelWidget mode="config"/.test(src));
   ok("⭐ CONFIG RO (CSS): the read-only look — fields as text, ticks as ✓ / –, the chosen radio only, buttons hidden, examples hidden",
      html.includes(".cfg-fs{border:0;margin:0;padding:0;min-width:0;}") && html.includes(".cfg-ro-note{")
-     && /\.cfg-ro button,\s*\.cfg-ro \[data-ro-hide\]\{display:none;\}/.test(html) && html.includes("[data-ph-example]::placeholder")
+     && /\.cfg-ro button,\s*\.cfg-ro \[data-ro-hide\]\{display:none;\}/.test(html)
      && /\.cfg-ro input\[type=checkbox\]:not\(\.hidden\)\{[^}]*appearance:none/.test(html) && /content:"✓"/.test(html) && /content:"–"/.test(html));
-  ok("CONFIG RO (source): the made-up examples (contact, privacy, imagery, day hire) are marked data-ph-example, so a reader is not shown them as values",
-     (src.match(/data-ph-example="1"/g) || []).length >= 6);
+  ok("CONFIG RO (source): the made-up examples (contact, privacy, imagery, day hire) are marked data-ph-example and read '—' for a reader, never as values",
+     (src.match(/data-ph-example="1"/g) || []).length >= 6 && (src.match(/placeholder=\{ro \? "—" : /g) || []).length === 6
+     && src.includes("const CfgRO = React.createContext(false);") && src.includes("const ro = React.useContext(CfgRO);"));
 
   // CLP list (card 11)
   ok("⭐ CLP LIST (source): the Covers and Cover columns are gone; five heads — CLP, Status, Last issue, Tasks, Next step (for a screen reader)",
