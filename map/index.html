@@ -675,9 +675,9 @@
         .share-row{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
         .share-row .btn{ flex:1 1 auto; width:auto; }
         .concern-link{ display:block; margin-top:8px; font-size:14px; font-weight:500; color:var(--navy); }
-        /* 9 Nov 2026 (finding 18): the panel's own Report a concern, a desk's; a phone has it in the sheet already */
-        .concern-panel-slot .concern-btn{ width:100%; margin-top:6px; font-size:13px; padding:8px 10px; }
-        @media (max-width:767px){ .concern-panel-slot{ display:none; } }
+        /* 9 Nov 2026 (finding 18): the panel's own Report a concern, a desk's; a phone has it in the sheet already (the
+           phone block below hides it) */
+        .concern-panel-slot .concern-btn{ width:100%; margin-top:6px; font-size:14px; padding:8px 10px; }
         .concern-unset{ display:block; margin-top:8px; font-size:14px; color:var(--note); line-height:1.45; }
         #route-hover-card{ position:fixed; z-index:35; pointer-events:none; max-width:300px; background:#fff; border:1px solid var(--line);
                            border-radius:10px; box-shadow:0 8px 28px rgba(16,24,40,.14); padding:10px 12px; font:14px/1.4 Inter,system-ui,sans-serif; color:var(--ink); }
@@ -788,6 +788,7 @@
         #m-full-btn::before{ content:"\2922"; content:"\2922" / ""; } #m-full-exit::before{ content:"\2921"; content:"\2921" / ""; }
         @media (max-width:767px){
             #kpi-hud, #menu-toggle, #timeline-bar, #tl-warnings, #route-drawer, #btn-detail{ display:none !important; }
+            .concern-panel-slot{ display:none; }   /* 9 Nov 2026 (finding 18): the sheet carries Report a concern on a phone */
             #tl-toast, #wall-hud, #wall-hint{ display:none !important; }   /* M3 (12 Oct evening): the sheet carries the month and Play */
             .custom-map-widget{ display:none !important; }   /* the basemap widget is off on phones; the Layers sheet has the basemap */
             .light-btn{ min-height:44px; }                   /* 28 Oct 2026 (8d): the Light buttons are finger-sized on a phone */

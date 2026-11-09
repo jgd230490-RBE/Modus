@@ -90,8 +90,10 @@ ok("C2 it sits after the share row's buttons (Month as text, Link and QR code, E
 ok("C3 the Link and QR card keeps its own slot", /<p class="mt-note" id="share-note">[^<]*<\/p>\s*<div class="concern-slot"><\/div>\s*<\/div>/.test(html));
 ok("C4 the phone sheet keeps its own slot", /onclick="sheetTo\('full'\)">Filters and layers<\/button>\s*<div class="concern-slot"><\/div>/.test(html));
 const phoneHide = mediaInner.find(r => r.sel === ".concern-panel-slot");
-ok("C5 below 768 px the panel's slot is hidden (the sheet carries it there)",
-   phoneHide && decl(phoneHide.body, "display").includes("none") && /@media \(max-width:767px\)\{ \.concern-panel-slot\{ display:none; \} \}/.test(css));
+ok("C5 below 768 px the panel's slot is hidden (the sheet carries it there), inside the one phone block",
+   phoneHide && decl(phoneHide.body, "display").includes("none")
+   && /@media \(max-width:767px\)\{\n {12}#kpi-hud, #menu-toggle, #timeline-bar, #tl-warnings, #route-drawer, #btn-detail\{ display:none !important; \}\n {12}\.concern-panel-slot\{ display:none; \}/.test(css)
+   && (css.match(/@media \(max-width:767px\)/g) || []).length === 1);   // inside the ONE phone block (parse_map C3 counts it)
 ok("C6 the slot is filled by the one renderer (every .concern-slot)", /document\.querySelectorAll\('\.concern-slot'\)\.forEach\(slot =>/.test(html));
 ok("C7 the panel's button fills the panel's width", /\.concern-panel-slot \.concern-btn\{ width:100%;/.test(css));
 ok("C8 the panel's comment no longer says the concern is only in the Link and QR card",
