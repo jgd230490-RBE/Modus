@@ -2303,6 +2303,48 @@ def forecast_week_lorry_plan_apply(bucket: str = "commit"):
     return res
 
 
+class LorryMoveIn(BaseModel):
+    view: str
+    yard_id: str
+    vehicle: str
+    line_key: str
+    from_day: str
+    from_lorry: int
+    to_day: str
+    to_lorry: int = 0
+
+
+@app.post("/api/forecast-weeks/lorry-plan/move")
+def forecast_week_lorry_plan_move(body: LorryMoveIn, bucket: str = "commit"):
+    """
+    9 Nov 2026 (v2.1 task 2.1-9b, mockup card 9; John: "Yes, build it"): one trip dragged to another lorry of the same yard
+    (or, in the compressed view, to another day; `to_lorry` 0 = the first lorry there that takes it, else a new one).
+    Checked against the drivers' hours rule first: a drop that does not fit answers 409 with the reason and nothing is
+    saved. A move that fits saves the yard's whole arrangement for the week (lorry_plan_moves), used by the plan while
+    the week's loads are unchanged. Planners and admins; audited like every write.
+    """
+    import lorry_plan
+    acc = _require_planner_or_admin("move a trip between lorries")
+    b = "next" if bucket == "next" else "commit"
+    pg = _staff_json("lookahead", {"bucket": b, "route_id": None, "on": True},
+                     lambda: lookahead.page(bucket=b, route_id=None, acc=acc, with_restrictions=True), acc)
+    try:
+        return lorry_plan.move(dict(pg, bucket=b), body.dict(), by=_by(None))
+    except lorry_plan.PlanError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.post("/api/forecast-weeks/lorry-plan/reset")
+def forecast_week_lorry_plan_reset(bucket: str = "commit", view: str = ""):
+    """Reset to Wayscope's plan: delete the week's saved arrangements (one view, or both). Planners and admins."""
+    import lorry_plan
+    acc = _require_planner_or_admin("reset the lorry plan")
+    b = "next" if bucket == "next" else "commit"
+    pg = _staff_json("lookahead", {"bucket": b, "route_id": None, "on": True},
+                     lambda: lookahead.page(bucket=b, route_id=None, acc=acc, with_restrictions=True), acc)
+    return lorry_plan.reset((pg.get("commit_week") or {}).get("from"), view or None)
+
+
 @app.put("/api/forecast-days")
 def edit_forecast_day(body: DayEdit):
     """Type one day's planned quantity. The day and (if it was derived) its week go `edited`."""

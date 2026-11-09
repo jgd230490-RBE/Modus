@@ -4445,7 +4445,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && html.includes('.row-menu summary.row-dots::before{content:"⋯";}') && !html.includes('.row-menu summary::before') && html.includes('.row-x::before{content:"×";}')   // NARROWED 27 Oct 2026 (audit #41 / #42): the glyphs are CSS content
      && (src.match(/className="row-x"[^\n]*?>×<\/button>/g) || []).length === 0   // the info / guide / chip × buttons keep their text (not row controls)
      && src.includes('<div className="row-menu-list" onClick={pick}>{children}{note ? <div className="row-menu-note">{note}</div> : null}</div>')
-     && src.includes('l.style.position = "fixed"; l.style.left = "auto";') && src.includes('window.addEventListener("scroll", shut, true); window.addEventListener("resize", shut);')
+     && src.includes('l.style.position = "fixed";') && src.includes('else { l.style.left = "auto"; l.style.right = Math.max(8, vw - r.right) + "px"; }')   // NARROWED 9 Nov 2026 (2.1-9b): the pinning is one shared hook, useRowMenuPlace; a trip's menu opens under its left edge
+     && src.includes('window.addEventListener("scroll", shut, true); window.addEventListener("resize", shut);')
      && src.includes("if (b && !b.disabled && ref.current) ref.current.open = false;")
      && src.includes('document.addEventListener("click", e => { document.querySelectorAll("details.row-menu[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; }); });')
      && src.includes('if (e.key === "Escape") document.querySelectorAll("details.row-menu[open]").forEach(d => { d.open = false; });'));   // 27 Oct, after the Chrome check: pinned to the screen, closes after a pick / on scroll / a click elsewhere / Escape
@@ -5235,8 +5236,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ 2.1-9 (Q1, Q11): three views, Chained by yard the default; the weekday chips are the week's own days from the server",
      lpc.includes('const [view, setView] = useState("chained");') && lpc.includes('["booked", "chained", "compressed"].map(k =>')
      && lpc.includes("const shown = (day && days.includes(day)) ? day : (days.includes(data && data.today) ? data.today : days[0]);"));
-  ok("⭐ 2.1-9 (card 1): one row a lorry, trips as blocks across 06:00–19:00 by their start and minutes, the break hatched, a role=img with the words",
-     code.includes("const LP_DAY_FROM = 6 * 60, LP_DAY_TO = 19 * 60;") && lpc.includes('className="lp-track" role="img" aria-label={`Lorry ${r.n}: ${title}; ${r.free_words}`}')
+  // NARROWED 9 Nov 2026 (2.1-9b): the track is role=img with the words for a reader of the plan; for a planner, whose trips are
+  // controls (card 9), it is a named group — the same words either way
+  ok("⭐ 2.1-9 (card 1): one row a lorry, trips as blocks across 06:00–19:00 by their start and minutes, the break hatched, a role=img (a group for a planner) with the words",
+     code.includes("const LP_DAY_FROM = 6 * 60, LP_DAY_TO = 19 * 60;") && lpc.includes('role={can ? "group" : "img"} aria-label={`Lorry ${r.n}: ${title}; ${r.free_words}`}')
      && lpc.includes("const left = Math.max(0, (st - LP_DAY_FROM) / span * 100), width = Math.max(0.6, b.minutes / span * 100);")
      && html.includes(".lp-blk.is-break{background:repeating-linear-gradient(135deg,#CBD5E1 0 4px,#E2E8F0 4px 8px);color:#334155}"));
   ok("⭐ 2.1-9 (Q8): the free time in the server's words at the row's end; destination colours from the chart tokens (no hard-coded control blue)",
@@ -5263,6 +5266,41 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      !/compliant|utilisation|fill rate|movement|endpoint|server|cache|token/i.test(words) && !/IPT[1-6]/.test(words));
   ok("2.1-9: the panel's type is 12 px or more (the 13 px floor's glyph rule keeps to the three glyphs)",
      !/\.lp-[a-z-]*\{[^}]*font-size:(9|10|11)px/.test(html));
+
+  // ---- 9 Nov 2026 (v2.1 task 2.1-9b, mockup card 9 + Q14; John: "Yes, build it"): drag and drop between lorries ----
+  const trip = code.slice(code.indexOf("function LpTrip({"), code.indexOf("function LorryPlanRow({"));
+  ok("⭐ 2.1-9b (card 9): for a planner a trip is a draggable details whose summary is the block, named for a screen reader, with a menu of the other lorries (and, compressed, the days)",
+     trip.includes('draggable="true" onDragStart={e => dnd.start(e, trip)} onDragEnd={dnd.end} data-lp-trip={b.line_key}')
+     && trip.includes('<summary className="lp-blk" aria-label={`${label}: move…`}') && trip.includes("const items = dnd.targets(trip);")
+     && lpc.includes("out.push({ label: `Move to lorry ${row.n}`, to: { day: trip.day, lorry: row.n }, ok: f.ok, hard: true, words: f.words });")
+     && lpc.includes('if(view === "compressed") days.filter(d => d !== trip.day).forEach(d => out.push({ label: `Move to ${lpDayWords(d)}`, to: { day: d, lorry: 0 }, ok: true, words: "" }));'));
+  ok("⭐ 2.1-9b (card 9): the page looks at a drop with the drivers' hours rule first (the same six figures as backend/drivers_hours.py) and a row that cannot take it reads red; the server's answer is the one that counts",
+     code.includes("const LP_RULE = { driveMax: 540, driveBreak: 270, breakLong: 45, workShort: 360, workLong: 540, breakShort: 30 };")
+     && code.includes("function lpBreak(dr, wk){ return dr > LP_RULE.driveBreak || wk > LP_RULE.workLong ? LP_RULE.breakLong : (wk > LP_RULE.workShort ? LP_RULE.breakShort : 0); }")
+     && lpc.includes("const f = lpFits(row, drag, shiftMin);") && lpc.includes('if(!f.ok){ setRefused({ ...target, words: `Not moved: ${f.words}.` }); setDrag(null); return; }')
+     && html.includes(".lp-track.is-over.is-no{box-shadow:inset 0 0 0 2px var(--bad-text)}") && html.includes(".lp-track.is-over{box-shadow:inset 0 0 0 2px var(--ok-text)}"));
+  ok("⭐ 2.1-9b (card 9): a drop POSTs one move (view, yard, lorry type, the trip's line and day, from and to) and re-reads the plan; a 409 shows the server's reason on that lorry for five seconds",
+     lpc.includes("const body = { view, yard_id: trip.yard, vehicle: trip.vehicle, line_key: trip.lk, from_day: trip.day, from_lorry: trip.lorry, to_day: to.day, to_lorry: to.lorry || 0 };")
+     && lpc.includes("fetch(`${API}/forecast-weeks/lorry-plan/move?bucket=${bucket}`, { method: \"POST\"") && lpc.includes("setRev(x => x + 1);")
+     && lpc.includes('if(e && e.status === 409 && to.lorry) setRefused({ ...to, yard: trip.yard, words: e.message || "Not moved." });')
+     && trip.includes("const trip = { lk: b.line_key, day: yard.day, lorry: r.n, yard: yard.yard_id, vehicle: yard.vehicle,")
+     && lpc.includes("const t = setTimeout(() => setRefused(null), 5000);") && lpc.includes("}, [bucket, tick, rev]);"));
+  ok("⭐ 2.1-9b (card 9): a drop only lands on a lorry of the same yard and lorry type — on its own day in Chained, on any day in Compressed (the day chips take a drop too)",
+     lpc.includes('if(!drag || drag.yard !== target.yard || drag.vehicle !== target.vehicle || (view === "chained" && drag.day !== target.day)) return;')
+     && lpc.includes('hoverDay: (e, dayIso) => { if(!drag || view !== "compressed" || dayIso === drag.day) return;')
+     && lpc.includes("onDragOver={canMove ? (e => dnd.hoverDay(e, d)) : undefined} onDragLeave={canMove ? dnd.leave : undefined} onDrop={canMove ? (e => dnd.dropDay(e, d)) : undefined}"));
+  ok("⭐ 2.1-9b (card 9): an arranged yard carries a badge and the panel's words; Reset to Wayscope's plan (planners / admins, asks first) only while something is arranged in the view",
+     lpc.includes('{canMove && arrangedHere && <button type="button" className="btn-sec" onClick={resetPlan} disabled={!!busy} data-lp-reset="1"')
+     && lpc.includes('if(!window.confirm("Put Wayscope\'s plan back for this week? Your moves in this view are forgotten.")) return;')
+     && lpc.includes("fetch(`${API}/forecast-weeks/lorry-plan/reset?bucket=${bucket}&view=${view}`") && lpc.includes('<span className="lp-badge" title={y.moved_by ? `Arranged by ${y.moved_by}` : "Arranged by a planner"}>your arrangement</span>')
+     && lpc.includes("{arrangedHere ? ` ${data.words.arranged}` : \"\"}"));
+  ok("⭐ 2.1-9b (Q10): a team's panel is the plain picture — moves are planners' and admins' (the same test as Apply)",
+     lpc.includes("const canMove = canApply;") && lpc.includes('role={can ? "group" : "img"}') && lpc.includes('if(can && b.kind === "trip") return <LpTrip'));
+  ok("2.1-9b: the trip menus pin themselves like every row menu (one shared hook), and a trip block is at least 24 px tall and wide for the pointer",
+     code.includes("function useRowMenuPlace(ref, alignLeft) {") && code.includes("function RowMenu({ name, note, children }) {\n  const ref = useRef(null);\n  useRowMenuPlace(ref);")
+     && trip.includes("useRowMenuPlace(ref, true);") && code.includes('if (alignLeft) { l.style.right = "auto"; l.style.left = Math.max(8, Math.min(r.left, vw - 8 - w)) + "px"; }')
+     && html.includes(".lp-trip{position:absolute;top:2px;bottom:2px;min-width:24px;overflow:visible}")
+     && html.includes(".lp-trip summary.lp-blk{position:static;height:24px;"));
 }
 
 // ---- 8 Nov 2026 (v2.1 tasks 2.1-5 + 2.1-7 + 2.1-8, the mockup John approved: notes routes-page-layout-mockup-1108, Q1-Q7) ----

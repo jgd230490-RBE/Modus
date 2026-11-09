@@ -3136,13 +3136,14 @@ async function commitMapFigsDom(){
 // ---- 8 Nov 2026 (v2.1 task 2.1-9): the Lorry plan panel MOUNTED — rows, words, views, Apply ----
 async function lorryPlanDom(){
   const DAYS = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06"];
-  const row = (n, trips, free, words, blocks) => ({ n, trips, places: ["Melton Compound"], blocks, start: "07:00", end: "15:40",
-    driving_minutes: 300, work_minutes: 500, break_minutes: 45, free_minutes: free, room_for: 0, used_pct: 90, free_words: words });
-  const trip = (start, route) => ({ kind: "trip", route_id: route, dest_id: "L1", dest_name: "Melton Compound", line_key: route + "|11||", start, minutes: 91, qty: 29, unit: "t", material: "Small aggregate" });
-  const yard = (day) => ({ origin_id: "L002", name: "Northfield Quarry", vehicle: "Artic Tipper (44t)", vehicle_short: "Tipper", gate: "Weighbridge", day,
+  // 9 Nov 2026 (2.1-9b): each row's driving / work and each trip's drive / other, as the server sends them (the page's drop check reads them)
+  const row = (n, trips, free, words, blocks, driving, work) => ({ n, trips, places: ["Melton Compound"], blocks, start: "07:00", end: "15:40",
+    driving_minutes: driving == null ? 300 : driving, work_minutes: work == null ? 500 : work, break_minutes: 45, free_minutes: free, room_for: 0, used_pct: 90, free_words: words });
+  const trip = (start, route) => ({ kind: "trip", route_id: route, dest_id: "L1", dest_name: "Melton Compound", line_key: route + "|11||", start, minutes: 91, qty: 29, unit: "t", material: "Small aggregate", day: "2026-11-04", drive: 64, other: 27 });
+  const yard = (day) => ({ origin_id: "L002", yard_id: "L002", name: "Northfield Quarry", vehicle: "Artic Tipper (44t)", vehicle_short: "Tipper", gate: "Weighbridge", day,
     loads: 7, booked: 2, kept: 0, count: 2, places: ["Melton Compound"],
     lorries: [row(1, 6, 9, "Full day", [trip("07:00", "R011"), trip("08:31", "R011"), trip("10:02", "R011"), trip("11:33", "R011"), { kind: "break", start: "13:04", minutes: 45 }, trip("13:49", "R011"), trip("15:20", "R011")]),
-              row(2, 1, 509, "8 h 29 free · room for 5 more trips", [trip("07:00", "R011")])] });
+              row(2, 1, 509, "8 h 29 free · room for 5 more trips", [trip("07:00", "R011")], 64, 91)] });
   const byDay = (n) => Object.fromEntries(DAYS.map(d => [d, n]));
   const view = (n, saved) => ({ by_day: byDay(n), week: n * 5, saved_week: saved, days: Object.fromEntries(DAYS.map(d => [d, [yard(d)]])) });
   const PLAN = { week: { from: "2026-11-02", to: "2026-11-08", bucket: "commit" }, days: DAYS, today: "2026-11-04", view_default: "chained", views: ["booked", "chained", "compressed"],
@@ -3176,7 +3177,8 @@ async function lorryPlanDom(){
   ok("⭐ 2.1-9 DOM: lorry 1: six trip blocks and a hatched break, its free words 'Full day'; lorry 2: one trip, '8 h 29 free · room for 5 more trips'",
      r1.querySelectorAll(".lp-blk").length === 7 && r1.querySelectorAll(".lp-blk.is-break").length === 1 && norm(r1.querySelector(".lp-free").textContent) === "Full day"
      && r2.querySelectorAll(".lp-blk").length === 1 && norm(r2.querySelector(".lp-free").textContent) === "8 h 29 free · room for 5 more trips");
-  const blk = r1.querySelector(".lp-blk");
+  // NARROWED 9 Nov 2026 (2.1-9b): for a planner a trip is a draggable details (.lp-trip) whose summary is the block face; the position sits on the details
+  const blk = r1.querySelector(".lp-trip, .lp-blk");
   ok("⭐ 2.1-9 DOM: a trip block sits at its start time across a 06:00–19:00 track (07:00 = 7.7 %, 91 min = 11.7 % wide) and the track carries the words for a screen reader",
      Math.abs(parseFloat(blk.style.left) - 7.69) < 0.1 && Math.abs(parseFloat(blk.style.width) - 11.67) < 0.1 && /Lorry 1: 07:00 R011 → Melton Compound, 29 t/.test(r1.querySelector(".lp-track").getAttribute("aria-label")));
   ok("2.1-9 DOM: the yard's line: loads, places, booked vs chained, saved; the key names the place, the break and free",
@@ -3205,6 +3207,75 @@ async function lorryPlanDom(){
   ok("⭐ 2.1-9 DOM (Q12): on a confirmed week a planner's Apply is drawn but disabled, saying to re-open the week",
      c.el.querySelector("[data-lp-apply]") && c.el.querySelector("[data-lp-apply]").disabled && /re-open/.test(c.el.querySelector("[data-lp-apply]").title));
   c.done();
+
+  // ---- 9 Nov 2026 (2.1-9b, card 9): drag and drop between lorries, the trip menu, the saved arrangement and Reset ----
+  const posts = [];
+  let answer = () => ({ ok: true, status: 200, body: { ok: true, view: "chained", day: "2026-11-04", lorry: 2, lorries: {} } });
+  w.fetch = (url, opt) => {
+    const u = String(url);
+    if (opt && opt.method === "POST") { posts.push({ u, body: opt.body ? JSON.parse(opt.body) : null }); const a = answer();
+      return Promise.resolve({ ok: a.ok, status: a.status, url: u, headers: { get: () => "application/json" }, json: () => Promise.resolve(a.body), text: () => Promise.resolve(JSON.stringify(a.body)) }); }
+    gets += /forecast-weeks\/lorry-plan\?/.test(u) ? 1 : 0;
+    return Promise.resolve({ ok: true, status: 200, headers: { get: () => "application/json" }, json: () => Promise.resolve(JSON.parse(JSON.stringify(PLAN))), text: () => Promise.resolve(JSON.stringify(PLAN)) });
+  };
+  const d = mount({});
+  await settle();
+  act(() => { d.el.querySelector("[data-lp-toggle]").click(); });
+  const trips = [...d.el.querySelectorAll(".lp-trip")];
+  const L1 = d.el.querySelector('[data-lp-lorry="1"]'), L2 = d.el.querySelector('[data-lp-lorry="2"]');
+  ok("⭐ 2.1-9b DOM (card 9): for a planner every trip is a draggable block with a name for a screen reader, the break is not; the track is a named group, not a picture",
+     trips.length === 7 && trips.every(t => t.getAttribute("draggable") === "true" && /R011 → Melton Compound, lorry \d: move…$/.test(t.querySelector("summary").getAttribute("aria-label")))
+     && L1.querySelectorAll(".lp-blk.is-break").length === 1 && !L1.querySelector(".lp-blk.is-break[draggable]") && L1.querySelector(".lp-track").getAttribute("role") === "group"
+     && !!d.el.querySelector("[data-lp-drag-hint]"));
+  const menu = L2.querySelector(".lp-trip .row-menu-list");
+  const items = [...menu.querySelectorAll("button")].map(b => ({ t: norm(b.textContent), off: b.disabled }));
+  ok("⭐ 2.1-9b DOM (card 9): lorry 2's one trip's menu offers lorry 1 and says why it cannot take it (the page's own look at the rule: 91 min into 9 min free); no day in the chained view",
+     items.length === 1 && /^Move to lorry 1 · would pass the 10 h shift by \d+ min$/.test(items[0].t) && items[0].off === true, JSON.stringify(items));
+  const g0 = gets;
+  const m1 = [...L1.querySelector(".lp-trip .row-menu-list").querySelectorAll("button")];
+  ok("⭐ 2.1-9b DOM (card 9): lorry 1's trip can go to lorry 2 (8 h 29 free) from the keyboard: the item is live", m1.length === 1 && norm(m1[0].textContent) === "Move to lorry 2" && !m1[0].disabled);
+  await act(async () => { m1[0].click(); await new Promise(r => setTimeout(r, 0)); });
+  await settle();
+  ok("⭐ 2.1-9b DOM: the pick POSTs one move — the view, the yard and lorry type, the trip's line and day, from lorry 1 to lorry 2 on the same day — then re-reads the plan and says where it landed",
+     posts.length === 1 && /forecast-weeks\/lorry-plan\/move\?bucket=commit$/.test(posts[0].u)
+     && JSON.stringify(posts[0].body) === JSON.stringify({ view: "chained", yard_id: "L002", vehicle: "Artic Tipper (44t)", line_key: "R011|11||", from_day: "2026-11-04", from_lorry: 1, to_day: "2026-11-04", to_lorry: 2 })
+     && gets === g0 + 1 && norm(d.el.querySelector('[role="status"]') && d.el.querySelector('[role="status"]').textContent) === "Moved to Wed 4, lorry 2.", JSON.stringify(posts[0]) + " gets " + gets);
+  // a refusal from the server: the row's red words, nothing else changes
+  answer = () => ({ ok: false, status: 409, body: { detail: "Would pass the 10 h shift by 13 min." } });
+  await act(async () => { [...d.el.querySelector('[data-lp-lorry="1"] .lp-trip .row-menu-list').querySelectorAll("button")][0].click(); await new Promise(r => setTimeout(r, 0)); });
+  await settle();
+  const ref = d.el.querySelector("[data-lp-refused]");
+  ok("⭐ 2.1-9b DOM (card 9): a drop the server refuses shows the reason in red on the lorry it was dropped on, in the server's words, and the block stays where it was",
+     posts.length === 2 && !!ref && norm(ref.textContent) === "Would pass the 10 h shift by 13 min." && ref.closest(".lp-row").getAttribute("data-lp-lorry") === "2"
+     && d.el.querySelectorAll('[data-lp-lorry="1"] .lp-trip').length === 6, ref && norm(ref.textContent));
+  ok("2.1-9b DOM: no Reset while nothing is arranged", !d.el.querySelector("[data-lp-reset]"));
+  d.done();
+  // a saved arrangement in the data: the badge, the words and Reset (asked first)
+  PLAN.arranged = { chained: ["Northfield Quarry"], compressed: [] };
+  PLAN.chained.days["2026-11-04"][0].arranged = true; PLAN.chained.days["2026-11-04"][0].moved_by = "Planner";
+  PLAN.words.arranged = "Your arrangement, kept for this week until its loads change; Reset puts Wayscope's plan back.";
+  posts.length = 0; answer = () => ({ ok: true, status: 200, body: { deleted: 1 } });
+  let asked = 0; const realConfirm = w.confirm; w.confirm = () => { asked++; return true; };
+  const a = mount({});
+  await settle();
+  act(() => { a.el.querySelector("[data-lp-toggle]").click(); });
+  ok("⭐ 2.1-9b DOM (card 9): an arranged yard carries the badge 'your arrangement' and the panel's note says it is kept until the loads change; Reset is drawn",
+     !!a.el.querySelector('[data-lp-arranged="1"] .lp-badge') && norm(a.el.querySelector('[data-lp-arranged="1"] .lp-badge').textContent) === "your arrangement"
+     && norm(a.el.querySelector(".ct-note").textContent).includes("kept for this week until its loads change") && !!a.el.querySelector("[data-lp-reset]"));
+  await act(async () => { a.el.querySelector("[data-lp-reset]").click(); await new Promise(r => setTimeout(r, 0)); });
+  await settle();
+  ok("⭐ 2.1-9b DOM (card 9): Reset asks first, then POSTs the reset for this view and re-reads the plan",
+     asked === 1 && posts.length === 1 && /lorry-plan\/reset\?bucket=commit&view=chained$/.test(posts[0].u), posts.map(p => p.u).join(" "));
+  w.confirm = realConfirm;
+  a.done();
+  // a team: the plain picture, nothing to drag, no menu, no Reset
+  const tm = mount({ access: { role: "team", ipt: "IPT1" } });
+  await settle();
+  act(() => { tm.el.querySelector("[data-lp-toggle]").click(); });
+  ok("⭐ 2.1-9b DOM (Q10): a team sees the plan as a picture — no draggable trip, no menu, no Reset, the track role=img",
+     !tm.el.querySelector(".lp-trip") && !tm.el.querySelector("[data-lp-reset]") && tm.el.querySelector(".lp-track").getAttribute("role") === "img" && tm.el.querySelectorAll('[data-lp-lorry="1"] .lp-blk').length === 7);
+  tm.done();
+  delete PLAN.arranged; delete PLAN.chained.days["2026-11-04"][0].arranged;
 }
 
 async function todayFitDom(){
