@@ -34,6 +34,13 @@
         }
         *{ box-sizing:border-box; }
         body { margin:0; padding:0; font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--ink); overflow:hidden; -webkit-font-smoothing:antialiased; }
+        /* 9 Nov 2026 (UI critique finding 2, card 2): the page never scrolls. body's overflow:hidden only stopped the wheel:
+           the parked route drawer (translated below the window) made the page 80 px taller, and focus, a scrollIntoView or
+           a script lifted the whole map — the DEMO bar off screen, the figures bar cut. Now the window holds html, body is
+           the box every absolute panel sits in (position:relative, the window's size) and CLIPS what pokes out, so there is
+           nothing to scroll to. Old browsers without clip keep hidden. */
+        html{ height:100%; overflow:hidden; }
+        html body{ position:relative; height:100%; overflow:hidden; overflow:clip; }
         #map { position:absolute; top:0; bottom:0; right:0; left:300px; transition:left .25s ease; }
         body.sidebar-closed #map, .sidebar.closed ~ #map { left:0; }
 
@@ -446,14 +453,17 @@
         .rb-popup-btn{ margin-top:10px; width:100%; background:var(--navy); color:#fff; border:none; padding:8px; border-radius:6px; font-weight:600; font-size:12px; cursor:pointer; }
 
         /* Bottom drawer: route analysis + forecast detail */
-        #route-drawer{ position:absolute; left:300px; right:0; bottom:0; z-index:20; background:#fff; border-top:1px solid var(--line); box-shadow:0 -8px 28px rgba(16,24,40,.10); transform:translateY(100%); transition:transform .28s ease; max-height:46vh; display:flex; flex-direction:column; }
-        #route-drawer.open{ transform:translateY(0); }
+        #route-drawer{ position:absolute; left:300px; right:0; bottom:0; z-index:20; background:#fff; border-top:1px solid var(--line); box-shadow:0 -8px 28px rgba(16,24,40,.10); transform:translateY(100%); transition:transform .28s ease, visibility 0s linear .28s; visibility:hidden; height:46vh; max-height:46vh; display:flex; flex-direction:column; }
+        #route-drawer.open{ transform:translateY(0); visibility:visible; transition:transform .28s ease; }
+        /* 9 Nov 2026 (card 2): the drawer opens at one height over the bottom of the map and its tab scrolls inside it
+           (a flex child keeps its content's height unless min-height is 0: the tables ran out of the drawer). Parked, it
+           is hidden, so Tab never lands on a control below the window. */
         body.sidebar-closed #route-drawer{ left:0; }
         .drawer-head{ display:flex; align-items:center; gap:4px; padding:10px 16px; border-bottom:1px solid var(--line); }
         .drawer-tab{ border:none; background:none; font-size:12.5px; font-weight:600; color:var(--muted); padding:6px 10px; cursor:pointer; border-radius:6px; }
         .drawer-tab.active{ color:var(--navy); background:#eef3fb; }
         .drawer-close{ position:relative; margin-left:auto; border:none; background:none; font-size:20px; line-height:1; color:var(--muted); cursor:pointer; padding:2px 8px; }
-        .drawer-body{ overflow:auto; padding:16px; }
+        .drawer-body{ overflow:auto; padding:16px; flex:1 1 auto; min-height:0; }
         .an-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; }
         .an-card{ border:1px solid var(--line); border-radius:9px; padding:11px 13px; }
         .an-val{ font-size:19px; font-weight:700; color:var(--navy-deep); letter-spacing:-.02em; }
@@ -665,6 +675,9 @@
         .share-row{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
         .share-row .btn{ flex:1 1 auto; width:auto; }
         .concern-link{ display:block; margin-top:8px; font-size:14px; font-weight:500; color:var(--navy); }
+        /* 9 Nov 2026 (finding 18): the panel's own Report a concern, a desk's; a phone has it in the sheet already */
+        .concern-panel-slot .concern-btn{ width:100%; margin-top:6px; font-size:13px; padding:8px 10px; }
+        @media (max-width:767px){ .concern-panel-slot{ display:none; } }
         .concern-unset{ display:block; margin-top:8px; font-size:14px; color:var(--note); line-height:1.45; }
         #route-hover-card{ position:fixed; z-index:35; pointer-events:none; max-width:300px; background:#fff; border:1px solid var(--line);
                            border-radius:10px; box-shadow:0 8px 28px rgba(16,24,40,.14); padding:10px 12px; font:14px/1.4 Inter,system-ui,sans-serif; color:var(--ink); }
@@ -1237,7 +1250,8 @@
 
     </details>
 
-    <!-- 19 Oct 2026 (the user): the share row at the foot of the panel; "Report a concern" is in the Link and QR card -->
+    <!-- 19 Oct 2026 (the user): the share row at the foot of the panel. 9 Nov 2026 (UI critique finding 18): "Report a
+         concern" stands here too on a desk, as it does in the phone's sheet (it was only inside the Link and QR card) -->
     <div class="control-group share-group" id="share-group">
         <div class="share-row">
             <button type="button" class="btn btn-ghost" id="btn-month-text" onclick="openMonthText()">Month as text</button>
@@ -1249,6 +1263,7 @@
             <!-- 28 Oct 2026 (card 2): on a phone the Guide is here, not on the map -->
             <button type="button" class="btn btn-ghost" id="btn-guide-sheet" hidden onclick="closeLayersSheet(); guideStart();">Guide</button>
         </div>
+        <div class="concern-slot concern-panel-slot"></div>
     </div>
 
     <!-- 12 Oct 2026 (mockup 7): on a phone the sheet ends with "Show map" (CSS order puts it last, after the forecast box) -->
@@ -9415,6 +9430,9 @@
         const w = document.getElementById('rme-what'); if (w) w.textContent = months.length ? routeExportWords() : 'No month carries approved volume yet.';
         ['rme-go', 'rme-go-png'].forEach(id => { const b = document.getElementById(id); if (b) b.hidden = !months.length; });
         const st = document.getElementById('rme-status'); if (st) st.textContent = '';
+        // 9 Nov 2026 (UI critique finding 18): the Scale says what it is at once (the regional plan: fitted to the routes);
+        // it was blank until the places read came back, and stayed blank if it never did
+        syncRouteExport();
         p.hidden = false;
         const c = p.querySelector('.share-close'); if (c) c.focus();
         if (months.length) loadRouteExportPlaces();
