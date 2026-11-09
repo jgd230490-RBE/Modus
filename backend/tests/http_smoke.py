@@ -725,7 +725,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
                and r.content.count(b"/Type /Page\n") == 1
                and re.search(r'filename="route-map-2026-10-regional(-1-\d+)?\.pdf"', r.headers.get("content-disposition", "")) is not None
                and r.headers.get("cache-control") == "no-store"
-               and "Regional plan" in _rt and "Demo - fictional scheme" in _rt and "Two-way movements a day" in _rt   # NARROWED 15 Oct 2026
+               and "Regional plan" in _rt and "Demo - fictional scheme" in _rt and "Lorry movements a day" in _rt   # NARROWED 15 Oct 2026; REVERSED 9 Nov 2026 (2.1-11b Q2)
                and "not an approved CLP" in _rt, f"{r.status_code} {r.headers.get('content-disposition')} {_rt[:300]}")
             ok("🔴 ...no team id, no 'truck', no 'baked' in it; no table, no scheme's block, no Carbon Tool rows (just the map)",
                not re.search(r"\bIPT ?[1-6]\b", _rt) and not re.search(r"\btrucks?\b", _rt, re.I)
@@ -800,7 +800,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
             _bj = " ".join(_bt.split())
             r_pdf_bytes = r.content if r.status_code == 200 else b""
             # NARROWED 12 Oct 2026 (the user, evening): movements in the month print whole ("583", was "582.8")
-            _figs = (f"{hl['two_way_a_day']:,.0f}", f"{hl['movements_in_month']:,.0f}", f"{hl['routes_in_use']:,}", f"{hl['tonnes']:,.0f} t")
+            # REVERSED 9 Nov 2026 (v2.1 2.1-11b): the printed figures are in the organisation's count (count_*), 2 movements a delivery
+            _figs = (f"{hl['count_a_day']:,.0f}", f"{hl['count_in_month']:,.0f}", f"{hl['routes_in_use']:,}", f"{hl['tonnes']:,.0f} t")
             ok("⭐ the bulletin PDF over HTTP: a PDF named for the month, not cached, \"fictional demo scheme\" on every page",
                r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf") and r.content[:5] == b"%PDF-"
                and r.headers.get("content-disposition") == 'attachment; filename="bulletin-2026-10.pdf"'
@@ -841,7 +842,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
                and "demo fictional scheme" in " ".join(_lp[0].split()).lower() and all(f in _lp[0] for f in _figs) and "Key points" in _lp[0],     # NARROWED 14 Oct 2026; and 15 Oct (the wording)
                f"{r.status_code} {len(_lp)}")
             ok("⭐ D43 the newsletter PDF over HTTP is four pages, the brand band on each",
-               len(_bp) == 4 and all("Lorry movements bulletin · October 2026" in x for x in _bp), f"{len(_bp)}")
+               len(_bp) == 4 and all("Lorry movements bulletin · October 2026" in x for x in _bp), f"{len(_bp)} " + " || ".join(x[:160] for x in _bp))
             r = c.get("/bulletin/leaflet/?month=10", headers=PLAN)
             ok("⭐ the leaflet page over HTTP with a code: HTML, not cached, the band, the figures, a link to its PDF",
                r.status_code == 200 and r.headers.get("content-type", "").startswith("text/html")
@@ -1513,8 +1514,10 @@ with TestClient(main.app, base_url="https://testserver") as c:
     # NARROWED 13 Oct 2026 (bundle C regenerated the demo package once with carbon 20 / 50 / 100): the demo's own bands
     # RE-PINNED 18 Oct 2026 (demo redesign R3b): the package now carries both measures, re-chosen from the live four-year
     # demo's district figures — movements 25 / 50 / 100 a day, carbon 10 / 25 / 50 t in the month
-    ok("⭐ W12: both area payloads carry the scheme's bands — the demo package's (movements 25 / 50 / 100, carbon 10 / 25 / 50)",
-       sh.get("stops") == {"movements": [25, 50, 100], "carbon": [10, 25, 50]} and ar.get("stops") == sh.get("stops"),
+    # REVERSED 9 Nov 2026 (v2.1 2.1-11b question B): the package's movements bands carry no unit = lorry visits, read ×2
+    # under the default count (50 / 100 / 200 movements), so each council keeps its colour
+    ok("⭐ W12: both area payloads carry the scheme's bands — the demo package's (movements 25 / 50 / 100 visits = 50 / 100 / 200 movements, carbon 10 / 25 / 50)",
+       sh.get("stops") == {"movements": [50, 100, 200], "carbon": [10, 25, 50]} and ar.get("stops") == sh.get("stops"),
        str((sh.get("stops"), ar.get("stops"))))
     _cfg = c.get("/api/config/factors", headers=PLAN).json()["doc"]
     _bad = json.loads(json.dumps(_cfg)); _bad.setdefault("tenant", {})["council_breaks"] = {"carbon": [100, 50, 20]}
@@ -1528,13 +1531,13 @@ with TestClient(main.app, base_url="https://testserver") as c:
     _cfgmod.invalidate()
     _s2 = c.get("/api/public/areas/shapes").json().get("stops")
     _a2 = c.get("/api/public/areas", params={"month": 10, "geometry": 0}).json().get("stops")
-    ok("⭐ W12: saved bands (carbon 25 / 60 / 120) reach both payloads the map reads; movements keep the default",
-       r.status_code == 200 and _s2 == _a2 == {"movements": [50, 100, 200], "carbon": [25, 60, 120]}, str((r.status_code, _s2, _a2)))
+    ok("⭐ W12: saved bands (carbon 25 / 60 / 120) reach both payloads the map reads; movements keep the default (in movements: 100 / 200 / 400)",
+       r.status_code == 200 and _s2 == _a2 == {"movements": [100, 200, 400], "carbon": [25, 60, 120]}, str((r.status_code, _s2, _a2)))   # 9 Nov 2026: ×2
     r = c.put("/api/admin/config/factors", params=TOKEN, json={"doc": _cfg, "updated_by": "smoke"})
     _cfgmod.invalidate()
     # RE-PINNED 18 Oct 2026 (R3b): the demo's bands are movements 25 / 50 / 100 and carbon 10 / 25 / 50, both put back
     ok("W12: ...and the document put back reads the demo's bands again", r.status_code == 200
-       and c.get("/api/public/areas/shapes").json().get("stops") == {"movements": [25, 50, 100], "carbon": [10, 25, 50]})
+       and c.get("/api/public/areas/shapes").json().get("stops") == {"movements": [50, 100, 200], "carbon": [10, 25, 50]})   # 9 Nov 2026: ×2
     # 22 Oct 2026 (read_cache): the every-month council read is kept until the next write — here through the REAL
     # middleware and endpoints, which test_areas.py's stubbed HTTP layer cannot run
     import read_cache as _rc

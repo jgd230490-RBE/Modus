@@ -265,9 +265,11 @@ n0 = bulletin_doc.n0
 
 # ---- 1. the figures are the roll-up's, per route ------------------------------------------------
 S = rme.sheet(10, acc=PLANNER)
-ok("⭐ every drawn route of the month, busiest first, with the bulletin roll-up's own figures (two-way a day, loads, tonnes)",
+# REVERSED 9 Nov 2026 (v2.1 2.1-11b): the a-day figure is the organisation's count (default 2 movements a visit)
+ok("⭐ every drawn route of the month, busiest first, with the bulletin roll-up's own figures (movements a day, loads, tonnes)",
    [r["route_id"] for r in S["rows"]] == [r["route_id"] for r in R10["by_route"]] == ["R1", "R2"]
-   and all(r["a_day_text"] == n0(BYR[r["route_id"]]["two_way_a_day"]) and r["loads_text"] == n0(BYR[r["route_id"]]["movements_in_month"])
+   and all(r["a_day_text"] == n0(BYR[r["route_id"]]["count_a_day"])
+           and abs(BYR[r["route_id"]]["count_a_day"] - 2 * BYR[r["route_id"]]["two_way_a_day"]) < 0.01 and r["loads_text"] == n0(BYR[r["route_id"]]["movements_in_month"])
            and r["tonnes_text"] == n0(BYR[r["route_id"]]["tonnes"]) + " t" for r in S["rows"]),
    str([(r["route_id"], r["a_day_text"], r["loads_text"], r["tonnes_text"]) for r in S["rows"]]))
 ok("...hand: R1's loads in the month = 40,000 ÷ 29 + 4,400 ÷ 20 + 1,500 ÷ 29 (fractional, rounded once), its tonnes 45,900",
@@ -417,7 +419,8 @@ ok("⭐ ONE A4 LANDSCAPE page; the panel on the map: the plan, the scheme, its s
    and "Regional plan" in T and f"Scale {SR['scale_words']} at A4 (fitted to the routes)" in T
    and "2 routes · All teams · October 2026 · approved lines only" in T, T[:500])
 ok("...the legend (the map's Volume steps) and every site in the frame by its letter",
-   "Two-way movements a day" in T and all(g["label"] in T for g in bulletin_doc.volume_legend()) and "Sites" in T
+   "Lorry movements a day" in T and "Two-way" not in T     # REVERSED 9 Nov 2026 (2.1-11b Q2)
+   and all(g["label"] in T for g in bulletin_doc.volume_legend()) and "Sites" in T
    and all(p["name"] in T for p in SR["places"]))
 ok("⭐ 'a planning document, not an approved CLP', approved lines only, the as-at date",
    "A planning document, not an approved CLP." in T and "Approved lines only." in T and "Approved plan as at" in T)
@@ -583,7 +586,7 @@ ok("...the filters as the map applies them: discipline from the LINE in any mont
    and rme.sheet(None, acc=TEAM1)["not_drawn"] == [])
 ok("...with a month the sheet is as before (Volume colours, figures, no legs)",
    "legs" not in rme.sheet(10, acc=PLANNER) and rme.sheet(10, acc=PLANNER)["volume_legend"]
-   and rme.sheet(10, acc=PLANNER)["map_legend_title"] == "Two-way movements a day")
+   and rme.sheet(10, acc=PLANNER)["map_legend_title"] == "Lorry movements a day")    # REVERSED 9 Nov 2026 (2.1-11b Q2)
 
 network.public_map_data = _pmd_with_alternatives
 try:

@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import conversions
+import counting    # 9 Nov 2026 (v2.1 2.1-11b): the organisation's movement count
 import db
 import route_compare  # 29 Oct 2026: the route options compared (a study read, admin)
 import hour_times   # 29 Oct 2026 (task 0f-2): drive times by departure hour
@@ -1432,6 +1433,8 @@ def meta(request: Request = None):
         "materials": conversions.material_names(factors),
         # 29 Oct 2026 (3b): kept for old lines, left out of the pickers for new ones
         "retired_materials": conversions.retired_materials(factors),
+        # 9 Nov 2026 (v2.1 2.1-11b): how the organisation counts a lorry coming and going (2 movements, or 1 visit)
+        "counting": counting.words(factors),
         # 31 Oct 2026 (task 4a, PR 3a): the CLP template's stages for each programme type, shown on Config until changed
         "clp_stage_defaults": clp_doc.DEFAULT_STAGES,
         # every vehicle in the live document, unchanged and in its own order: baked
@@ -4550,6 +4553,10 @@ def public_alignment(request: Request):
     # imagery (name, address, credit) and the OS map key. In the ETag's hash below, so a new key or address is seen at once.
     tenant["imagery"] = config.imagery_settings(conversions)
     tenant["os_maps_key"] = config.os_maps_key()
+    # 9 Nov 2026 (v2.1 2.1-11b): how the organisation counts a lorry coming and going (counting.py) — the bar, the shared
+    # sections and the council view print in it; in the ETag's hash, so a Config change is seen at once
+    import counting
+    tenant["counting"] = counting.words()
     # the tenant's names for its team slots, so the map shows "North Team", not an id
     # 23 Oct 2026: an unnamed team is "<team word> n" (taxonomy.team_name), never its id
     team_rows = [{"id": r["id"], "label": taxonomy.team_name(r["id"])}

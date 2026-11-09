@@ -511,6 +511,8 @@
     "unload_minutes": 8,
     "working_days_per_month": 22,
     "shift_hours_per_day": 10,
+    "_count_visit_as_note": "9 Nov 2026 (v2.1 2.1-11b; John's Q1-Q7 of 8 Nov): a lorry coming to a site and leaving = 2 movements (councils, DCO caps, transport assessments) or 1 visit (CLPs, CLOCS). Drives the public map bar, the road sections, the council view, the bulletin and the Dashboard; CLP, Gate arrivals, Look-ahead, Simulation and route caps stay visits. Read by counting.py.",
+    "count_visit_as": 2,
     "_return_journeys_note": "8 Nov 2026 (v2.1; John, 8 Nov): how much of a lorry's EMPTY way back the carbon charges, by route (Data > Routes) or these defaults. supplier = a route from a quarry / plant / works / depot / railhead / port ('part': the lorry may take other work; RICS Whole life carbon assessment 2nd ed. 2023 s5.1.3 module A4, UK default 43 %); scheme = any other start, a haul from a site or muck-away ('empty': the whole return, RICS 100 % where no return load is possible; the National Highways Carbon Tool v2.7 s5.3.2 adds the whole return to every haul); mixers = a concrete mixer whatever the route ('empty'). 'oneway' (GLEC v3: a vehicle chartered for a one-way journey) is offered per route and is never a default. Read by return_journey.py; the loaded leg takes the vehicle's 100 % laden factor and the way back its 0 % laden factor (DESNZ 2026).",
     "return_journeys": {
       "supplier": "part",

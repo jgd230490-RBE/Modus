@@ -341,7 +341,8 @@ ok("⭐ the demo bar and its Guide button, the New here? box, the dots, Don't sh
 
 # the Dashboard after the UI pass
 ok("the Dashboard: the six cards by name, More filters, the four charts, the folded sections, Big screen",
-   all(s in src for s in ("Material in view", "Deliveries a day", "Vehicles needed", "Planned this week",
+   # REVERSED 9 Nov 2026 (v2.1 2.1-11b, question E): the second card is Lorry movements a day
+   all(s in src for s in ("Material in view", "Lorry movements a day", "Vehicles needed", "Planned this week",
                            "Delivered against plan", "Transport carbon", "More filters ▾", "Cost over time",
                            "This week and today, with the Look-ahead's map", "Route planning detail",
                            # 14 Oct 2026 (narrowed): "All four" became "All sections" (a fifth section, More charts)
@@ -394,7 +395,8 @@ ok("...the first confirm locks the fuel-surcharge base, and a team code confirms
 ok("⭐ the map: More layers, What's moving, Busiest routes, the figures bar's names, Conditions",
    "<strong>Layers and basemap</strong>" not in src and "Route filtering" not in src
    and all(s in src for s in ("<strong>More layers</strong>", "<strong>What's moving</strong>", "<strong>Busiest routes</strong>",
-                           "<strong>Two-way movements a day</strong>", "<strong>CO₂e a day</strong>", "<strong>CO₂e to date</strong>",
+                           # REVERSED 9 Nov 2026 (v2.1 2.1-11b Q2): "two-way" retired; the organisation's count
+                           "<strong>Lorry movements a day</strong>", "<strong>CO₂e a day</strong>", "<strong>CO₂e to date</strong>",
                            "<strong>Conditions in [month]</strong>", "<strong>Show on map</strong>")))
 ok("🔴 ...the retired map parts are gone: the KPI panel, the callouts, the warning stack's levels, the Street View button, the legend message",
    "KPI panel" not in text and "callouts" not in text and "<strong>Clash</strong>" not in src and "<strong>Caution</strong>" not in src
@@ -407,7 +409,7 @@ ok("...Play: the timeline runs through the months of the programme; Conditions o
 ok("19 Oct: the guide describes the month picker, the info buttons, the badges and the council labels as built",
    "press a year, then a month, to show that month on the map" in text
    and "A small <strong>i</strong> beside a heading opens a short explanation" in src
-   and "a small white badge with a two-way arrow sits on each stretch of road" in text and "(none is shown under 1 a day)" in text
+   and "a small white badge with a double arrow sits on each stretch of road" in text and "(none is shown under 1 a day)" in text   # 9 Nov 2026 (2.1-11b)
    and "a green <strong>CO₂</strong> badge on each route" in src and 'the labels say "reading…"' in text
    and "Reset filters</strong> appears once a filter is set" in src)
 ok("🔴 ...and it is honest that a planned closure is listed in every month its route carries volume, whatever its dates",
@@ -1491,5 +1493,15 @@ ok("ROUTES PAGE: 9.2's map item names no back end (no API, endpoint, geometry, s
 ok("ROUTES PAGE: technical T1 has the reads, the layer names and the full-screen columns",
    all(w in _tg25 for w in ('id="t1-routes-page"', "<code>GET /api/routes/geojson?profile=&amp;leg=&amp;alt_index=</code>", "<code>rlEnsure()</code>",
                             "<code>/api/community</code>", "<code>/api/collisions</code>", "<code>300px | map | 380px</code>", "<code>routesPageDom</code>")))
+# 9 Nov 2026 (v2.1 2.1-11b): the movement count, in both guides; "two-way" retired from the user guide
+_tg_cnt = open(TECH, encoding="utf-8").read()
+ok("COUNT (2.1-11b): the user guide names the Config switch and what it changes, and the Dashboard card",
+   "<strong>Count a lorry coming and going as</strong> (2 movements, in and out, as councils count them, the default; or 1 visit)" in src
+   and "<td>Lorry movements a day</td><td>Deliveries per working day × 2" in src
+   and "<strong>Max lorry visits a day (flag only)</strong>" in src and "Max vehicles / day" not in src)
+ok("COUNT (2.1-11b Q2): 'two-way movement' is gone from the user guide", "two-way movement" not in text.lower())
+ok("COUNT (2.1-11b): technical T1 has the rule, counting.convert for 2.1-1 and what keeps vehicles / visits",
+   all(w in _tg_cnt for w in ('id="t1-counting"', "<code>planning.count_visit_as</code>", "counting.convert(n, from_unit, to_unit)",
+                              "<code>tenant.council_breaks.movements_unit</code>", "Gate arrivals, the Look-ahead and the")))
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

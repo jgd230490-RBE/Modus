@@ -148,14 +148,14 @@ def sheet(month_index, route_ids=None, team=None, acc=None, now=None, origin=Non
     n0 = bulletin_doc.n0
     out_rows = []
     for r in rows:
-        a_day = r.get("two_way_a_day") or 0
+        a_day = r.get("count_a_day") or 0       # 9 Nov 2026 (2.1-11b): the organisation's count; colour from visits
         out_rows.append({
             "route_id": r["route_id"], "letters": letters(r),
             "places": f"{r.get('origin') or ''} → {r.get('dest') or ''}".strip(" →"),
             "a_day": a_day, "a_day_text": n0(a_day),
             "loads_text": n0(r.get("movements_in_month")),
             "tonnes_text": (n0(r.get("tonnes")) + " t") if r.get("tonnes") is not None else "—",
-            "color": bulletin_doc.VOLUME_RAMP[bulletin_doc.volume_class(a_day)],
+            "color": bulletin_doc.VOLUME_RAMP[bulletin_doc.volume_class(r.get("two_way_a_day") or 0)],
         })
     map_routes = sorted(({"route_id": r["route_id"], "coords": geo[r["route_id"]][0], "a_day": r["a_day"],
                           "color": r["color"]} for r in out_rows if r["route_id"] in geo),
@@ -176,7 +176,7 @@ def sheet(month_index, route_ids=None, team=None, acc=None, now=None, origin=Non
         "as_at": f"Approved plan as at {(now or datetime.date.today()):%d %b %Y}".replace(" 0", " "),
         "working_days": wd,
         "rows": out_rows, "map_routes": map_routes, "map_sections": [], "places": places, "controls": [],
-        "volume_legend": bulletin_doc.volume_legend(), "map_legend_title": "Two-way movements a day",
+        "volume_legend": bulletin_doc.volume_legend(), "map_legend_title": __import__("counting").words()["label"],
         "not_drawn": [r for r in (R.get("routes_not_drawn") or {}).get("routes") or []],
         "empty": not out_rows,
     }

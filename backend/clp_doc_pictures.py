@@ -351,8 +351,9 @@ def regional_sheet(data, pm, acc, S):
     S["map_sections"] = []
     S["pin_names"] = True
     S["panel_all_places"] = True
-    S["map_legend_title"] = "Two-way movements a day, each route's busiest month"
-    S["volume_legend"] = list(bulletin_doc.volume_legend()) + (
+    # REVERSED 9 Nov 2026 (2.1-11b, question G): a CLP counts lorries once, as visits, whatever the organisation's count
+    S["map_legend_title"] = "Lorry visits a day, each route's busiest month"
+    S["volume_legend"] = list(bulletin_doc.volume_legend(pv=1)) + (
         [{"label": NO_LINES_LABEL, "fill": NO_LINES_FILL}] if any(x["busiest"] is None for x in rows) else [])
     n_r, n_grey = len(rows), sum(1 for x in rows if x["busiest"] is None)
     S["filter_words"] = " · ".join([f"{n_r} route{'s' if n_r != 1 else ''} to and from {_sites_word(data)}",

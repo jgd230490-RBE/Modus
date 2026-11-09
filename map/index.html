@@ -1266,7 +1266,7 @@
         <div class="kpi-row">
             <div class="kpi-card lead">
                 <div class="kpi-value" id="kpi-trips">—</div>
-                <div class="kpi-label" title="One two-way movement = one delivery: a lorry out laden and back empty">Two-way movements a day</div>
+                <div class="kpi-label" id="kpi-trips-label" title="A lorry coming and going is 2 movements, as councils count them.">Lorry movements a day</div>
             </div>
             <div class="kpi-card lead">
                 <div class="kpi-value" id="kpi-vehicles">—</div>
@@ -1320,7 +1320,7 @@
      space"): the bar OPENS MINIMAL (class tl-compact): the buttons, the month, the speed, "Horizon" and close over a thin
      month strip. "Horizon" shows the rest (Pause on clash, Plan months / Full horizon, Wall mode, the loop label, the full
      rail, the years, the keys and the legend). Wall mode always shows its own full view. The figures line under the month
-     ("290 two-way movements a day · 18 routes · …") is gone from the bar; the figures bar at the top carries them. -->
+     ("290 lorry movements a day · 18 routes · …") is gone from the bar; the figures bar at the top carries them. -->
 <div id="timeline-bar" class="tl-compact" role="group" aria-label="Forecast timeline" tabindex="0">
   <div class="tl-row1">
   <button type="button" class="tl-btn" id="tl-prev" onclick="stepTimeline(-1)" title="Previous month" aria-label="Previous month">◀</button>
@@ -1410,7 +1410,7 @@
 </section>
 
 <!-- 12 Oct 2026 (review 2.1 third row, 2.3): the month AS TEXT, beside the map — the bar's figures (copied from the
-     bar, so the two cannot disagree) and a table: route, two-way movements a day, vehicles, conditions. -->
+     bar, so the two cannot disagree) and a table: route, lorry movements (or visits) a day, vehicles, conditions. -->
 <aside id="month-text" aria-labelledby="mt-title" hidden>
   <div class="mt-head"><h2 id="mt-title" tabindex="-1">This month as text</h2>
     <button type="button" class="mt-close" onclick="closeMonthText()" aria-label="Close the text view" title="Close the text view">&times;</button></div>
@@ -1520,6 +1520,15 @@
     const SPD = () => (DU() === 'mi' ? 'mph' : 'km/h');
     const distU = (km) => (DU() === 'mi' ? km / KM_PER_MI : km);
     const fmtDist = (km, dp) => (km == null ? '—' : distU(Number(km)).toFixed(dp == null ? 1 : dp));
+    // 9 Nov 2026 (v2.1 2.1-11b): how the organisation counts a lorry coming and going on the road figures, from
+    // /api/public/alignment tenant.counting (counting.py): 2 = movements, in and out (the default), 1 = visits.
+    // A route's loads (f_avg, the server's) are visits; a figure shown is visits × PV(). Route caps stay in visits.
+    const PV = () => (TENANT.counting && Number(TENANT.counting.per_visit) === 1 ? 1 : 2);
+    const CW = () => (PV() === 2
+        ? { label: 'Lorry movements a day', lower: 'lorry movements a day', short: 'movements a day', col: 'Movements a day',
+            line: 'movements / day', note: 'A lorry coming and going is 2 movements, as councils count them.' }
+        : { label: 'Lorry visits a day', lower: 'lorry visits a day', short: 'visits a day', col: 'Visits a day',
+            line: 'visits / day', note: 'A lorry coming and going is 1 visit (2 movements as councils count them).' });
     // The tenant's names for its team slots ("IPT3" -> "North Team"), from the overlay
     // response. Ids never reach the screen: every team value shown goes through teamText().
     const TEAM_LABELS = {};
@@ -1596,6 +1605,9 @@
         const v = document.getElementById('overlay-version');
         if (v) v.textContent = window.OVERLAY_VERSION ? ('overlay ' + window.OVERLAY_VERSION) : 'no alignment in this tenant';
         if (typeof KPI_BY !== 'undefined') KPI_BY[1][1] = TEAM;
+        const tl = document.getElementById('kpi-trips-label');      // 9 Nov 2026 (2.1-11b): the organisation's count
+        if (tl) { tl.textContent = CW().label; tl.title = CW().note; }
+        const hc = document.getElementById('heat-count-words'); if (hc) hc.textContent = CW().lower;
     }
     // 11 Oct 2026 (review): is the app's demo bar drawn above this iframe? Embedded only (EMBED), and asked of the
     // parent page itself (same origin): the bar is a .demo-bar element there. Any error (no parent document, a
@@ -1617,7 +1629,7 @@
     // 12 Oct 2026 (review 2.8 row 2): on a phone (the sheet, 767 px and below) each step anchors on the sheet instead —
     // `phone` names that anchor, `phoneTitle` / `phoneBody` the words, because the bar and the side panel are not there
     const MAP_GUIDE_STEPS = [
-        { anchor: "kpi-hud", phone: "m-peek", phoneTitle: "The sheet along the bottom", title: "The bar along the top", body: "shows the month in view: two-way movements a day, vehicles needed, routes in use and CO₂e." },
+        { anchor: "kpi-hud", phone: "m-peek", phoneTitle: "The sheet along the bottom", title: "The bar along the top", body: "shows the month in view: lorry movements a day, vehicles needed, routes in use and CO₂e." },
         { anchor: "tl-play", alt: "tl-open", phone: "m-play", title: "Press Play", body: "to step through the programme month by month." },
         { anchor: "kpi-conditions", phone: "m-handle", phoneBody: "appears while a month is on screen: tap the handle to list anything that needs attention that month, such as an over-capacity stockpile or a road closure on a route. Use \"Show on map\" to jump to it.", title: "Conditions", body: "appears while the timeline is open and lists anything that needs attention that month, such as an over-capacity stockpile or a road closure or limit on a route. Use \"Show on map\" to jump to it." },
         { anchor: "kpi-moving", phone: "m-layers-btn", phoneTitle: "Layers", phoneBody: "opens the filters, the map layers and what's moving this month by discipline and team.", title: "The side panel", body: "shows what's moving this month by discipline and team." },
@@ -2150,7 +2162,14 @@
     // MOVEMENTS / DAY". Two rates on one screen, two orders of magnitude apart.
     // 🔴 The division is the SERVER's (`per_day` / `working_days` on both public feeds),
     // not this file's: lesson 25, one config value one reader.
-    const FORECAST_LABEL_UNIT = 'Two-way / day';
+    // REVERSED 9 Nov 2026 (2.1-11b Q2): "Two-way" is retired; the line reads the organisation's count
+    // (forecastLabelField(): f_avg × PV() in a vehicles unit, the unit's own figure otherwise)
+    const FORECAST_LABEL_UNIT = 'movements / day';
+    function forecastLabelField() {
+        const u = CONFIG.FORECAST_UNIT || 'vehicles';
+        if (u !== 'vehicles') return ['concat', ['get', 'f_avg'], ' ', (u === 'm3' ? 'm³' : u) + ' / day'];
+        return ['concat', ['to-string', ['round', ['*', ['to-number', ['get', 'f_avg'], 0], PV()]]], ' ', CW().line];
+    }
     // 12 Oct 2026 (the user, evening): "line width by volume leave out and change to heat map like the carbon
     // (toggle between carbon and volume)". The fix pass's width by volume (f_avg on fixed stops) is gone: the
     // forecast line is ONE width again (3.5 px on a 6 px casing), and volume is shown by COLOUR in the Volume heat
@@ -3320,9 +3339,9 @@
             const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
             const n = mVeh.length;                         // months with volume
             const vehDay = avg(mVeh) / wd, qtyDay = avg(mQty) / wd;
-            // 11 Oct 2026 (the user): one load = one delivery = one TWO-WAY movement (out laden, back
-            // empty). The figure is loads per working day, not doubled; the label says two-way.
-            set('kpi-trips', fmtN(vehDay, 0));
+            // REVERSED 9 Nov 2026 (v2.1 2.1-11b, John's Q1-Q2): loads per working day × the organisation's count —
+            // 2 movements a delivery (in and out, as councils count) unless it counts visits
+            set('kpi-trips', fmtN(vehDay * PV(), 0));
             // fleet = the busiest month's requirement, not the average: a fleet that
             // is one truck short in the peak month is short
             const fleet = Math.max(...mFleet);
@@ -3371,18 +3390,18 @@
                     const gm = Math.max(1, g.months.size);
                     return `<span class="kpi-chip"><span>${esc(k)}</span><span class="chip-n">` +
                            `${fmtN(g.fleet / gm, 0)} veh/d \u00b7 ` +
-                           `${fmtN(g.veh / gm / wd, 0)} two-way/d \u00b7 ` +
+                           `${fmtN(g.veh * PV() / gm / wd, 0)} ${PV() === 2 ? 'mvts' : 'visits'}/d \u00b7 ` +
                            `${fmtN(g.t / gm / wd, 0)} t/d</span></span>`;
                 }).join('');
             setHTML('kpi-breakdown', chips);
             positionWarnStack();          // the card just changed height
-            // 11 Oct 2026 — the five busiest routes in two-way movements a day; a click selects the route
+            // 11 Oct 2026 — the five busiest routes in the organisation's count a day; a click selects the route
             const busiest = Object.entries(byRoute).map(([rid, b]) => [rid, b, b.veh / Math.max(1, b.months.size) / wd])
                 .sort((a, b) => b[2] - a[2]).slice(0, 5)
                 .map(([rid, b, mv]) => `<button type="button" class="busy-row" onclick="selectRoute('${esc(rid)}')" title="Show ${esc(rid)} on the map">` +
-                    `<span>${esc((b.rp.origin || rid) + ' \u2192 ' + (b.rp.dest || ''))}</span><span class="chip-n">${fmtN(mv, 0)} two-way a day</span></button>`).join('');
+                    `<span>${esc((b.rp.origin || rid) + ' \u2192 ' + (b.rp.dest || ''))}</span><span class="chip-n">${fmtN(mv * PV(), 0)} ${CW().short}</span></button>`).join('');
             setHTML('kpi-busiest', busiest);
-            set('kpi-note', `Approved forecast, ${label}${n > 1 ? `, average of ${n} months` : ''}. Two-way movements = deliveries a working day (out laden, back empty). Vehicles = lorries needed in a driver's day (a planning figure)${n > 1 ? ', busiest month' : ''}. CO\u2082e = each leg's road km × the lorry's factor (the way back as the route charges it).`
+            set('kpi-note', `Approved forecast, ${label}${n > 1 ? `, average of ${n} months` : ''}. ${CW().label} = ${PV() === 2 ? '2 × deliveries a working day (in and out)' : 'deliveries a working day'}. Vehicles = lorries needed in a driver's day (a planning figure)${n > 1 ? ', busiest month' : ''}. CO\u2082e = each leg's road km × the lorry's factor (the way back as the route charges it).`
                 + (fellBack ? ` ${fellBack} line(s) use the ${fbName} payload (no payload set for their lorry).` : ''));
             // the method note reads as a tooltip on the month, not as a paragraph in the bar
             const tt = document.getElementById('kpi-title'); if (tt) tt.title = document.getElementById('kpi-note').innerText;
@@ -4743,7 +4762,7 @@
     // A knowing change to D26 for the council layer only: By council switches the road network off, so the amber return
     // leg is not drawn beside it unless ticked back by hand. The routes' own carbon heat map stays blue.
     const AREA_RAMP_CARBON = ['#EE9150', '#E8590C', '#B8470A', '#7C2D06'];
-    const AREA_NONE = '#E7E5E4';                                         // no approved laden route, or no figure
+    const AREA_NONE = '#E7E5E4';                                         // no approved route, or no figure
     const AREA_STOPS = { movements: [50, 100, 200], carbon: [50, 100, 200] };   // fixed, ascending: a day / t in the month
     // 13 Oct 2026 (W12): AREA_STOPS is now the product default (config.COUNCIL_BREAKS_DEFAULT, held equal by the
     // harnesses). A scheme types its own bands on Config → Map and bulletin; the server sends them with the areas
@@ -4757,7 +4776,8 @@
     function areaStops(mode) {
         const s = AREAS.data && AREAS.data.stops && AREAS.data.stops[mode];
         const ok = Array.isArray(s) && s.length === 3 && s.every(x => Number.isInteger(x) && x >= 1) && s[0] < s[1] && s[1] < s[2];
-        return ok ? s : (AREA_STOPS[mode] || AREA_STOPS.movements);
+        // 9 Nov 2026 (2.1-11b question B): the product default is in lorry visits; read in the organisation's count
+        return ok ? s : (mode === 'carbon' ? AREA_STOPS.carbon : AREA_STOPS.movements.map(x => x * PV()));
     }
     function areaFillExpr(mode) {
         const s = areaStops(mode);
@@ -4806,7 +4826,7 @@
         }
         if (!(a.movements_per_day > 0) && a.unclipped) { out.lb_sub = 'no figure yet'; return out; }
         if (!(a.movements_per_day > 0)) { out.lb_sub = (a.return_only_routes || []).length ? 'empties only' : 'none'; return out; }
-        // "two-way movements a day" is the legend's title and the bar's; on the card it would wrap and hide neighbours
+        // the count ("lorry movements a day") is the legend's title and the bar's; on the card it would wrap and hide neighbours
         out.lb_fig = areaNum(a.movements_per_day) + ' a day';
         return out;
     }
@@ -4874,10 +4894,10 @@
         const r = mode === 'carbon' ? AREA_RAMP_CARBON : AREA_RAMP;
         const rows = [['under ' + s[0] + t, r[0]], [s[0] + ' – ' + (s[1] - 1) + t, r[1]],
                       [s[1] + ' – ' + (s[2] - 1) + t, r[2]], [s[2] + t + ' and over', r[3]],
-                      [mode === 'carbon' ? 'no approved route or no figure' : 'no approved laden route', AREA_NONE]];
+                      [mode === 'carbon' ? 'no approved route or no figure' : 'no approved route', AREA_NONE]];
         const title = mode === 'carbon'
             ? 't CO₂e' + (when ? ' in ' + when : ' in the month') + ', split by the km inside each district'
-            : 'Two-way movements a day on roads a laden leg uses';
+            : CW().label + ' on the roads inside';
         return '<div class="area-legend-title">' + title + '</div>'
             + rows.map(r => '<div class="area-lg"><span class="area-sw" style="background:' + r[1] + '"></span>' + r[0] + '</div>').join('')
             // Track C review: two carbon ramps can be on the map at once; this one is not the route / section legend's
@@ -4896,12 +4916,14 @@
         if (a.nofig) return h + '<div class="area-cs">Shows one month: press Play or pick a month.</div></div>';
         const carbonFirst = typeof AREAS !== 'undefined' && AREAS.mode === 'carbon';   // lead with what the map is coloured by
         let mv = '', co = '';
-        mv += row('Two-way movements a day', a.movements_per_day > 0 ? fmt(a.movements_per_day, 1) : '0',
-                 nRoutes + ' of the ' + nAll + ' routes with approved volume' + (when ? ' in ' + esc(when) : '') + ' enter it laden'
+        // 9 Nov 2026 (2.1-11b question A): each leg that enters counts (in = loaded, out = empty)
+        mv += row(CW().label, a.movements_per_day > 0 ? fmt(a.movements_per_day, 1) : '0',
+                 (PV() === 2 && a.in_per_day != null ? fmt(a.in_per_day, 1) + ' in, ' + fmt(a.out_per_day || 0, 1) + ' out · ' : '')
+                 + nRoutes + ' of the ' + nAll + ' routes with approved volume' + (when ? ' in ' + esc(when) : '') + ' enter it laden'
                  + ((a.return_only_routes || []).length ? ' · ' + a.return_only_routes.length + ' more run back through it empty' : '')
                  + ((a.edge_routes || []).length ? ' · ' + a.edge_routes.length + ' more only cross its edge (under 200 m inside): their km and carbon count here, not their movements' : '')
                  + (a.unclipped ? ' · ' + a.unclipped + ' route' + (a.unclipped === 1 ? '' : 's') + ' with volume not yet placed in a council' : '')
-                 + ' · one load = one two-way movement');
+                 + ' · ' + CW().note);
         if (a.co2_t === null || a.co2_t === undefined) co += row('CO₂e' + (when ? ' in ' + esc(when) : ''), 'no figure', 'no carbon figure for the routes here yet');
         else co += row('CO₂e' + (when ? ' in ' + esc(when) : ''), fmt(a.co2_t, 1) + ' t' + (tot.co2_t ? ' of ' + fmt(tot.co2_t, 0) + ' t' : ''),
                       fmt(a.co2_t_per_day || 0, 2) + ' t a day · split by the km inside'
@@ -4910,7 +4932,7 @@
         h += carbonFirst ? co + mv : mv + co;
         h += row('Lorry-km' + (when ? ' in ' + esc(when) : ''), fmt(a.lorry_km || 0, 0), 'laden and empty, on the km inside');
         h += row('Sites inside', String(a.sites_count || 0) + (tot.sites ? ' of ' + tot.sites : ''), (a.sites || []).slice(0, 4).map(esc).join(' · ') + ((a.sites || []).length > 4 ? ' …' : ''));
-        h += '<div class="area-cf">Approved plan' + (when ? ' · ' + esc(when) : '') + ' · a route counts in every area its laden leg enters'
+        h += '<div class="area-cf">Approved plan' + (when ? ' · ' + esc(when) : '') + ' · a route counts in every area its legs enter'
             + ((payload && payload.carbon && payload.carbon.stamp) ? ' · ' + esc(payload.carbon.stamp) : '') + '</div></div>';
         return h;
     }
@@ -5040,7 +5062,7 @@
         if (fs) { const nd = j.areas.filter(a => a.tier === 'district').length; fs.textContent = nd ? nd + ' council' + (nd === 1 ? '' : 's') : ''; }
         // the group: the colour-by switch, one row per district with its own box and figure, the legend, the lines
         const sw = document.getElementById('area-mode');
-        if (sw) sw.innerHTML = [['movements', 'Two-way movements a day'], ['carbon', 't CO₂e this month']].map(([k, l]) =>
+        if (sw) sw.innerHTML = [['movements', CW().label], ['carbon', 't CO₂e this month']].map(([k, l]) =>
             '<button type="button" class="' + (AREAS.mode === k ? 'on' : '') + '" onclick="setAreaMode(\'' + k + '\')">' + l + '</button>').join('');
         if (sw) sw.hidden = !areaTierOn('district');
         const swT = document.getElementById('area-mode-title');
@@ -6143,7 +6165,7 @@
                          19 Oct 2026: drawn as one segmented control, the explanations behind its "i" -->
                     <div class="heat-group" role="radiogroup" aria-labelledby="heat-label">
                     <div class="ctl-head"><div class="heat-label" id="heat-label">Heat map</div><button type="button" class="info-i" aria-expanded="false" aria-controls="info-heat" onclick="toggleInfo(this)" title="About the heat map" aria-label="About the heat map"><span aria-hidden="true">i</span></button></div>
-                    <div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: two-way movements a day.</p><p><b>Carbon</b>: t CO₂e in the month.</p><p id="heat-info-more"></p></div>
+                    <div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: <span id="heat-count-words">lorry movements a day</span>.</p><p><b>Carbon</b>: t CO₂e in the month.</p><p id="heat-info-more"></p></div>
                     <div class="heat-seg">
                     <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off" onchange="toggleHeatOff()" checked> Off</label>
                     <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()"> Volume</label>
@@ -6388,7 +6410,7 @@
                     map.addLayer({
                         id: 'forecast-labels', type: 'symbol', source: 'routes-source',
                         filter: ['==', 'is_forecast', true],
-                        layout: { 'symbol-placement': 'line-center', 'text-field': ['concat', ['get', 'f_avg'], ' ', FORECAST_LABEL_UNIT], 'text-size': 12, 'text-offset': [0,-1] },
+                        layout: { 'symbol-placement': 'line-center', 'text-field': forecastLabelField(), 'text-size': 12, 'text-offset': [0,-1] },
                         paint: { 'text-color': '#ffffff', 'text-halo-color': CONFIG.COLORS.forecastLabelHalo, 'text-halo-width': 2 }
                     });
                 }
@@ -6746,7 +6768,7 @@
         const f = forecastLayerFilter();
         map.addLayer({id:'forecast-casing',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecastCasing,'line-width':FORECAST_CASING_WIDTH,'line-opacity':0.9}}, labelAnchor());
         map.addLayer({id:'forecast-layer',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecast,'line-width':FORECAST_LINE_WIDTH,'line-opacity':0.95}}, labelAnchor());
-        map.addLayer({id:'forecast-labels',type:'symbol',source:'routes-source',filter:f,layout:{'symbol-placement':'line-center','text-field':['concat', ['get', 'f_avg'], ' ', FORECAST_LABEL_UNIT],'text-size':12,'text-offset':[0,-1]},paint:{'text-color':'#ffffff','text-halo-color':CONFIG.COLORS.forecastLabelHalo,'text-halo-width':2}});
+        map.addLayer({id:'forecast-labels',type:'symbol',source:'routes-source',filter:f,layout:{'symbol-placement':'line-center','text-field':forecastLabelField(),'text-size':12,'text-offset':[0,-1]},paint:{'text-color':'#ffffff','text-halo-color':CONFIG.COLORS.forecastLabelHalo,'text-halo-width':2}});
         if (typeof ensureDiversionEdge === 'function') ensureDiversionEdge();   // 29 Oct 2026: with the overlay it edges
         raiseMarks();
         ensureCapBadgeLayer();
@@ -6815,6 +6837,9 @@
     //: every scheme): under 10 · 10-25 · 25-50 · 50-100 · 100 and over. A shared section's figure is a sum of routes,
     //: so the top step is reached mostly on shared roads.
     const VOLUME_STOPS = [10, 25, 50, 100];
+    //: 9 Nov 2026 (2.1-11b, question B): VOLUME_STOPS are lorry VISITS; a shared section's figure (rl_mv) is in the
+    //: organisation's count, so its stops are VOLUME_STOPS × PV() and a road keeps its colour whichever way it counts
+    const rlStops = () => VOLUME_STOPS.map(x => x * PV());
     //: the routes' own stops: the same, unless the map's forecast unit is not vehicle loads (t or m³ a day, about a
     //: 20 t load), in which case they are twenty times larger and the legend names the unit
     const ROUTE_VOLUME_STOPS = (CONFIG.FORECAST_UNIT && CONFIG.FORECAST_UNIT !== 'vehicles') ? VOLUME_STOPS.map(s => s * 20) : VOLUME_STOPS;
@@ -6950,6 +6975,7 @@
     // One feature per run. The figure is the sum over the run's routes that pass the sidebar filters (all of them when
     // no filter is set, which is the server's own run figure): two-way movements a day (loaded leg, never doubled) and
     // the run's t CO2e share. A run none of whose routes pass is not drawn.
+    const rlN = x => (x > 0 && x < 1 ? 'under 1' : String(Math.round(x || 0)));
     function roadLoadFeatures(data, passing){
         const feats = [];
         ((data && data.runs) || []).forEach(r => {
@@ -6959,6 +6985,9 @@
             if (!shares.length) return;
             const all = shares.length === (r.route_shares || []).length;
             const mv = all ? Number(r.movements_per_day) || 0 : shares.reduce((a, sh) => a + (Number(sh.movements_per_day) || 0), 0);
+            // 9 Nov 2026 (2.1-11b Q6): the loaded legs in, the empty legs out, each where it runs
+            const rin = all ? Number(r.in_per_day) || 0 : shares.reduce((a, sh) => a + (Number(sh.in_per_day) || 0), 0);
+            const rout = all ? Number(r.out_per_day) || 0 : shares.reduce((a, sh) => a + (Number(sh.out_per_day) || 0), 0);
             const known = shares.filter(sh => sh.co2_t != null);
             const co2 = all ? (r.co2_t == null ? null : Number(r.co2_t))
                             : (known.length ? known.reduce((a, sh) => a + Number(sh.co2_t), 0) : null);
@@ -6966,6 +6995,9 @@
             feats.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords },
                 properties: { id: r.id, rl_km: (r.length_km == null ? null : Number(r.length_km)),
                               rl_mv: mv, rl_mv_text: (mv > 0 && mv < 1) ? 'under 1' : String(Math.round(mv)),
+                              // no split when the reply carries none (an older answer): never "0 in, 0 out"
+                              rl_in_text: (r.in_per_day == null && !shares.some(sh => sh.in_per_day != null)) ? null : rlN(rin),
+                              rl_out_text: rlN(rout),
                               rl_routes: n, rl_routes_text: n + (n === 1 ? ' route' : ' routes'),
                               rl_co2: (co2 == null ? null : Math.round(co2 * 10) / 10),
                               rl_co2_text: (co2 == null ? 'no carbon figure' : fmtTonnes(co2) + ' CO₂e') } });
@@ -7144,7 +7176,7 @@
             if (map.getSource(CARBON_LABEL_SOURCE)) map.removeSource(CARBON_LABEL_SOURCE);
         }
         if (map.getLayer('road-load-line')) {
-            map.setPaintProperty('road-load-line', 'line-color', volumeColor('rl_mv', VOLUME_STOPS));
+            map.setPaintProperty('road-load-line', 'line-color', volumeColor('rl_mv', rlStops()));
             map.setPaintProperty('road-load-line', 'line-width', ROAD_LOAD_LINE_WIDTH);
             if (map.getLayer('road-load-casing')) map.setPaintProperty('road-load-casing', 'line-width', ROAD_LOAD_CASING_WIDTH);
             if (map.getLayer('road-load-labels')) map.setLayoutProperty('road-load-labels', 'text-field', ROAD_LOAD_LABEL);
@@ -7166,11 +7198,11 @@
                 else {
                     const n = roadLoadFeatures(data, modeRoutesPassing()).length;
                     const other = ROUTE_VOLUME_STOPS !== VOLUME_STOPS;
-                    rlBox.innerHTML = '<b>Volume · two-way movements a day in ' + rlEsc(monthLabel(m)) + '</b>' +
+                    rlBox.innerHTML = '<b>Volume · ' + CW().lower + ' in ' + rlEsc(monthLabel(m)) + '</b>' +
                         '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
-                        stepRanges(VOLUME_STOPS, '').map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
+                        stepRanges(rlStops(), '').map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
                         // 19 Oct 2026: the badges' key — what the number on the road is
-                        '<div class="ml-row ml-key">' + MV_PILL_HTML + 'two-way lorry movements a day on that stretch</div>';
+                        '<div class="ml-row ml-key">' + MV_PILL_HTML + CW().lower + ' on that stretch</div>';
                     // 14 Oct 2026 (the user took the recommendation): shortened to match the bulletin's map note — its first
                     // sentence is bulletin_doc.map_note() word for word; the rest keeps only the facts a reader needs
                     // 22 Oct 2026 (words sweep): cut to what a reader needs; the shared-section count, one load = one movement
@@ -7279,21 +7311,24 @@
         const rows = shares.map(sh => {
             const info = (typeof ROUTEINFO !== 'undefined' && ROUTEINFO[(sh.route_id || '').toString().trim().toLowerCase()]) || {};
             const mv = Number(sh.movements_per_day) || 0;
+            const io = PV() === 2 && sh.in_per_day != null ? '<div style="color:#6b7280;">' + rlN(Number(sh.in_per_day)) + ' in, ' + rlN(Number(sh.out_per_day)) + ' out</div>' : '';
             return '<tr><td style="padding:2px 8px 2px 0;font-weight:600;">' + rlEsc(sh.route_id) + '</td>' +
                 '<td style="padding:2px 8px 2px 0;">' + rlEsc(info.origin || '—') + ' → ' + rlEsc(info.dest || '—') +
                 '<div style="color:#6b7280;">' + rlEsc(teamText((sh.teams || []).join(', ')) || '—') + '</div></td>' +
-                '<td style="padding:2px 0;text-align:right;font-variant-numeric:tabular-nums;">' + (mv > 0 && mv < 1 ? 'under 1' : Math.round(mv)) +
+                '<td style="padding:2px 0;text-align:right;font-variant-numeric:tabular-nums;">' + (mv > 0 && mv < 1 ? 'under 1' : Math.round(mv)) + io +
                 (co2On ? '<div style="color:#6b7280;">' + (sh.co2_t == null ? 'no figure' : fmtTonnes(Number(sh.co2_t))) + '</div>' : '') + '</td></tr>';
         }).join('');
         return '<div style="min-width:240px;max-width:340px;font-size:14px;">' +
             '<h4 style="margin:0 0 4px;color:' + CONFIG.COLORS.brandDark + ';font-size:14px;">Shared road section · ' + rlEsc(monthLabel(m)) + '</h4>' +
-            '<div style="margin-bottom:6px;">' + (f ? f.properties.rl_mv_text : '0') + ' two-way movements a day · ' + (f ? f.properties.rl_routes_text : '') +
+            '<div style="margin-bottom:6px;">' + (f ? f.properties.rl_mv_text : '0') + ' ' + CW().lower +
+            (f && PV() === 2 && f.properties.rl_in_text != null ? ' (' + f.properties.rl_in_text + ' in, ' + f.properties.rl_out_text + ' out)' : '') +
+            ' · ' + (f ? f.properties.rl_routes_text : '') +
             (co2On && f ? ' · ' + rlEsc(f.properties.rl_co2_text) : '') + '</div>' +
             '<table style="border-collapse:collapse;width:100%;font-size:14px;"><thead><tr style="color:#6b7280;text-align:left;">' +
-            '<th style="font-weight:500;">Route</th><th style="font-weight:500;">From → to · team</th><th style="font-weight:500;text-align:right;">Two-way / day</th></tr></thead>' +
+            '<th style="font-weight:500;">Route</th><th style="font-weight:500;">From → to · team</th><th style="font-weight:500;text-align:right;">' + CW().col + '</th></tr></thead>' +
             '<tbody>' + rows + '</tbody></table>' +
             (left.length ? '<div style="color:#6b7280;margin-top:6px;">Also on this section, outside the filters: ' + left.map(rlEsc).join(', ') + '.</div>' : '') +
-            '<div style="color:#6b7280;margin-top:6px;">Loaded leg counted once (one load = one two-way movement). ' +
+            '<div style="color:#6b7280;margin-top:6px;">' + (PV() === 2 ? 'Loaded lorries in, empty ones out, each where it runs. ' : 'Each lorry counted once. ') +
             (Number(run.length_km) > 0 ? 'Section ' + fmtDist(Number(run.length_km), 1) + ' ' + DU() + '. ' : '') + 'Approved plan only.' +
             (co2On && RL.cache[m] && RL.cache[m].carbon && RL.cache[m].carbon.stamp ? ' ' + rlEsc(RL.cache[m].carbon.stamp) + '.' : '') + '</div></div>';
     }
@@ -8215,7 +8250,8 @@
         let shown = r > cap ? String(r) : null;
         for (let d = 1; shown === null && d <= 3; d++) { const s = perDay.toFixed(d); if (Number(s) > cap) shown = s; }
         if (shown === null) shown = 'just over ' + cap;
-        return `${rid}: ${shown} two-way movements a day against a planning flag of ${cap}`;
+        // 9 Nov 2026 (2.1-11b Q4): a cap is typed in lorry visits a day, whatever the count
+        return `${rid}: ${shown} lorry visits a day against a planning flag of ${cap}`;
     }
     function pileSentence(sp, month, u) {
         const mm = sp.months[String(month)];
@@ -8672,7 +8708,7 @@
         else if (txt('kpi-title').indexOf(monthLabel(m)) === 0 && txt('kpi-title').indexOf('nothing approved') >= 0) line = 'nothing approved in this view';
         else if (TL.matrix && line === 'nothing approved this month') line = 'loading figures';   // the month has volume: never "nothing" while it loads
         else if (trips && trips !== '—' && txt('kpi-title').indexOf(monthLabel(m)) === 0) {
-            const parts = [trips + ' two-way movements a day', routes + (routes === '1' ? ' route' : ' routes')];
+            const parts = [trips + ' ' + CW().lower, routes + (routes === '1' ? ' route' : ' routes')];
             if (co2 && co2 !== '—') parts.push(co2 + ' CO₂e a day');
             line = parts.join(' · ');
         }
@@ -8888,11 +8924,12 @@
         p = p || {};
         const team = p.ipt && p.ipt !== 'Unknown_IPT' ? teamText(p.ipt) : '';
         const leg = p.type === 'Outbound Highway' ? 'empty return' : (p.type === 'Inbound Highway' ? 'laden' : '');
-        const word = (!unit || unit === 'vehicles') ? 'two-way movements a day' : (unit === 'm3' ? 'm³ a day' : unit + ' a day');
+        const word = (!unit || unit === 'vehicles') ? CW().lower : (unit === 'm3' ? 'm³ a day' : unit + ' a day');
+        const k = (!unit || unit === 'vehicles') ? PV() : 1;          // 9 Nov 2026 (2.1-11b): loads × the count
         const on = p.is_forecast === true || p.is_forecast === 'true';
         let fig;
         if (!when) fig = 'Pick a month to see its movements a day';
-        else if (on && p.f_avg != null) fig = Number(p.f_avg).toLocaleString() + ' ' + word + ' · ' + when;
+        else if (on && p.f_avg != null) fig = Math.round(Number(p.f_avg) * k).toLocaleString() + ' ' + word + ' · ' + when;
         else fig = 'Nothing approved on this route · ' + when;
         return { title: (p.origin || '—') + ' → ' + (p.dest || '—'),
                  sub: [p.route_id, team, leg].filter(Boolean).join(' · '),
@@ -8904,7 +8941,7 @@
         p = p || {};
         return { title: 'Shared road section',
                  sub: [p.rl_routes_text, when].filter(Boolean).join(' · '),
-                 fig: (p.rl_mv_text != null ? p.rl_mv_text : '0') + ' two-way movements a day' + (co2On && p.rl_co2_text ? ' · ' + p.rl_co2_text : ''),
+                 fig: (p.rl_mv_text != null ? p.rl_mv_text : '0') + ' ' + CW().lower + (co2On && p.rl_co2_text ? ' · ' + p.rl_co2_text : ''),
                  hint: 'Click for the routes on this section' };
     }
     function setRouteHover(f, e) {
@@ -10583,7 +10620,7 @@
         const kp = KPI.cache[month];
         // the bar's figures, COPIED from the bar: the text and the bar cannot disagree
         const txt = id => { const e = document.getElementById(id); return e ? e.textContent.trim() : ''; };
-        const pairs = [['Two-way movements a day', txt('kpi-trips')], [txt('kpi-vehicles-label'), txt('kpi-vehicles')]];
+        const pairs = [[CW().label, txt('kpi-trips')], [txt('kpi-vehicles-label'), txt('kpi-vehicles')]];
         const mc = document.getElementById('kpi-material-card');
         if (mc && !mc.hidden) pairs.push([txt('kpi-material-label'), txt('kpi-material')]);
         pairs.push([txt('kpi-routes-label'), txt('kpi-routes')], [txt('kpi-co2-day-label'), txt('kpi-co2-day')], [txt('kpi-co2-total-label'), txt('kpi-co2-total')]);
@@ -10596,15 +10633,16 @@
         const t = monthTableRows(kp.lines, routePropsById(), currentFilters(), wd, live);
         if (!t.rows.length) html += '<p>No approved movements on the routes in the filter in ' + escHtml(monthLabel(month)) + '.</p>';
         else html += '<table class="mt-table"><caption>Routes in ' + escHtml(monthLabel(month)) + ', busiest first</caption>'
-            + '<thead><tr><th scope="col">Route</th><th scope="col" class="num">Two-way a day</th><th scope="col" class="num">Vehicles</th><th scope="col">Conditions</th></tr></thead><tbody>'
+            + '<thead><tr><th scope="col">Route</th><th scope="col" class="num">' + CW().col + '</th><th scope="col" class="num">Vehicles</th><th scope="col">Conditions</th></tr></thead><tbody>'
             + t.rows.map(r => '<tr><th scope="row">' + escHtml(r.origin + ' → ' + r.dest) + '<br><span class="mt-note">' + escHtml([r.rid, r.ipt && r.ipt !== 'Unknown_IPT' ? teamText(r.ipt) : ''].filter(Boolean).join(' · ')) + '</span></th>'
-                + '<td class="num">' + escHtml(fmtN(r.twoWay, 0)) + '</td><td class="num">' + escHtml(vehiclesText(r)) + '</td>'
+                + '<td class="num">' + escHtml(fmtN(r.twoWay * PV(), 0)) + '</td><td class="num">' + escHtml(vehiclesText(r)) + '</td>'
                 + '<td>' + escHtml(r.conditions.length ? r.conditions.join('; ') : 'none') + '</td></tr>').join('')
             + '</tbody></table>';
         const sites = live.filter(i => i.kind === 's');
         if (sites.length) html += '<p><b>Sites:</b> ' + sites.map(i => escHtml(i.noun + ' — ' + i.what)).join(' ') + '</p>';
         if (t.undrawn.length) html += '<p class="mt-note">Not on the map and not counted (not routed yet): ' + escHtml(t.undrawn.join(', ')) + '.</p>';
-        html += '<p class="mt-note">Two-way movements = deliveries ÷ ' + escHtml(String(wd)) + ' working days; each is a lorry out laden and back empty. '
+        // 9 Nov 2026 (2.1-11b): the organisation's count
+        html += '<p class="mt-note">' + CW().label + ' = ' + (PV() === 2 ? '2 × ' : '') + 'deliveries ÷ ' + escHtml(String(wd)) + ' working days; each delivery is a lorry in laden and out empty. '
             + 'Vehicles: a planning figure, rounded up per line. Rows are rounded, so may not add up to the bar.</p>';
         html += '<div class="concern-slot"></div>';
         body.innerHTML = html;
@@ -10624,7 +10662,7 @@
         const m = document.getElementById('m-full-month'), f = document.getElementById('m-full-fig');
         const trips = (document.getElementById('kpi-trips') || {}).textContent || '';
         const mt = TL.on ? monthLabel(TL.month) : 'No month on screen';
-        const ft = TL.on ? ((trips.trim() && trips.trim() !== '—') ? trips.trim() + ' two-way movements a day' : 'Nothing approved') : 'Press ▶ to play the months';
+        const ft = TL.on ? ((trips.trim() && trips.trim() !== '—') ? trips.trim() + ' ' + CW().lower : 'Nothing approved') : 'Press ▶ to play the months';
         if (m && m.textContent !== mt) m.textContent = mt;
         if (f && f.textContent !== ft) f.textContent = ft;
     }
@@ -10849,7 +10887,7 @@
         else {
             const wd = kp.working_days > 0 ? kp.working_days : FORECAST_WORKING_DAYS, f = routeFigures(kp.lines, rid, wd);
             html += f.lines
-                ? '<dl><dt>Two-way movements a day, ' + escHtml(monthLabel(month)) + '</dt><dd>' + escHtml(fmtN(f.twoWay, 0)) + '</dd>'
+                ? '<dl><dt>' + CW().label + ', ' + escHtml(monthLabel(month)) + '</dt><dd>' + escHtml(fmtN(f.twoWay * PV(), 0)) + '</dd>'
                   + '<dt>Vehicles needed</dt><dd>' + escHtml(vehiclesText(f)) + '</dd>'
                   + '<dt>Material a day</dt><dd>' + escHtml(fmtN(f.tonnesDay, 0)) + ' t</dd>'
                   + (info.distance_km ? '<dt>One way</dt><dd>' + escHtml(fmtDist(info.distance_km, 1) + ' ' + DU()) + '</dd>' : '') + '</dl>'

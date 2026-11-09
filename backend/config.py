@@ -213,6 +213,17 @@ def council_breaks(doc=None, conversions=None):
     for m in COUNCIL_BREAK_MEASURES:
         v = typed.get(m) if isinstance(typed, dict) else None
         out[m] = [int(x) for x in v] if council_breaks_problem(v) is None else list(COUNCIL_BREAKS_DEFAULT[m])
+    # 9 Nov 2026 (v2.1 2.1-11b, question B): the movements bands are in the unit of the road figures. Bands typed
+    # before then (no `movements_unit`) and the defaults are lorry VISITS a day; under count_visit_as 2 they double, so
+    # every council keeps its colour whichever way the organisation counts.
+    import counting
+    have = typed.get("movements_unit") if isinstance(typed, dict) else None
+    if council_breaks_problem(typed.get("movements") if isinstance(typed, dict) else None) is not None:
+        have = counting.VISITS
+    have = have if have in counting.UNITS else counting.VISITS
+    want = counting.unit(doc)
+    if have != want:
+        out["movements"] = [int(round(counting.convert(x, have, want))) or 1 for x in out["movements"]]
     return out
 
 
@@ -583,6 +594,11 @@ def validate(doc, network=None):
         rjp = _rj.settings_problem(plan.get("return_journeys"))
         if rjp:
             p.append(rjp)
+        # 9 Nov 2026 (v2.1 2.1-11b): how a lorry visit is counted on the road figures (absent = 2 movements)
+        import counting as _counting
+        cvp = _counting.setting_problem(plan.get("count_visit_as"))
+        if cvp:
+            p.append(cvp)
         # 29 Oct 2026 (task 3a): the concrete pours' two limits (absent = 120 and 30 minutes; pours.limits)
         import pours as _pours
         pp = _pours.limits_problem(plan.get("pours"))
@@ -771,8 +787,11 @@ def validate(doc, network=None):
                     for m in COUNCIL_BREAK_MEASURES:
                         if cb.get(m) is not None and council_breaks_problem(cb[m]):
                             p.append(f"tenant.council_breaks.{m} {council_breaks_problem(cb[m])}")
+                    mu = cb.get("movements_unit")
+                    if mu is not None and mu not in ("movements", "visits"):
+                        p.append("tenant.council_breaks.movements_unit must be movements or visits")
                     for k in cb:
-                        if k not in COUNCIL_BREAK_MEASURES:
+                        if k not in COUNCIL_BREAK_MEASURES and k != "movements_unit":
                             p.append(f"tenant.council_breaks.{k} is not a measure (movements or carbon)")
     # 31 Oct 2026 (task 4c): the organisation's "in the file -> becomes" table for drawings brought in
     sl = doc.get("site_layouts")

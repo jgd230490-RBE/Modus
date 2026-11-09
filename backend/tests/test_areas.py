@@ -576,13 +576,21 @@ A_ = {a["area_id"]: a for a in pay["areas"]}
 ok("5. one entry per area, districts before the county", [a["area_id"] for a in pay["areas"]] == ["E", "S", "W", "C"],
    str([a["area_id"] for a in pay["areas"]]))
 ok("5. ⭐ Westshire: R001 (100) and R002 (50) both enter laden: (100 + 50) loads / working days",
-   A_["W"]["routes"] == ["R001", "R002"] and A_["W"]["loads"] == 150 and A_["W"]["movements_per_day"] == round(150 / WD, 2))
+   A_["W"]["routes"] == ["R001", "R002"] and A_["W"]["loads"] == 150 and A_["W"]["in_per_day"] == round(150 / WD, 2)
+   and A_["W"]["visits_per_day"] == round(150 / WD, 2))   # NARROWED 9 Nov 2026 (2.1-11b): the loaded legs are the "in"
 ok("5. ⭐ Eastshire: R001's 100 loads count there too — a route counts in every area its laden leg enters",
-   A_["E"]["routes"] == ["R001"] and A_["E"]["movements_per_day"] == round(100 / WD, 2))
-ok("5. 🔴 ...and NEVER doubled for the return leg: Westshire is not (100 + 50) × 2",
-   A_["W"]["movements_per_day"] != round(300 / WD, 2) and A_["E"]["movements_per_day"] != round(200 / WD, 2))
-ok("5. ⭐ Southshire, where only R002's EMPTY return runs: no movement, the route named as return-only",
-   A_["S"]["movements_per_day"] == 0 and A_["S"]["routes"] == [] and A_["S"]["return_only_routes"] == ["R002"])
+   A_["E"]["routes"] == ["R001"] and A_["E"]["visits_per_day"] == round(100 / WD, 2))
+# REVERSED 9 Nov 2026 (v2.1 2.1-11b, John's Q1 + question A): a lorry visit is 2 movements by default and each leg that
+# enters an area is one of them. The VISITS figure is still never doubled.
+ok("5. 🔴 ...the VISITS are never doubled for the return leg: Westshire's visits are not (100 + 50) × 2",
+   A_["W"]["visits_per_day"] != round(300 / WD, 2) and A_["E"]["visits_per_day"] != round(200 / WD, 2))
+ok("5. ⭐ 2.1-11b: Westshire's MOVEMENTS = 150 in (both laden legs) + 150 out (R001 back the same road, R002's way back crosses it)",
+   A_["W"]["out_per_day"] == round(150 / WD, 2) and A_["W"]["movements_per_day"] == round(300 / WD, 2)
+   and A_["E"]["movements_per_day"] == round(200 / WD, 2) and pay["counting"]["unit"] == "movements")
+# NARROWED 9 Nov 2026 (2.1-11b): no LADEN movement there, but the empties are 50 out movements (and 50 visits)
+ok("5. ⭐ Southshire, where only R002's EMPTY return runs: nothing in, 50 out, the route named as return-only",
+   A_["S"]["in_per_day"] == 0 and A_["S"]["out_per_day"] == round(50 / WD, 2)
+   and A_["S"]["movements_per_day"] == round(50 / WD, 2) and A_["S"]["routes"] == [] and A_["S"]["return_only_routes"] == ["R002"])
 ok("5. ...but its lorry-km are there (50 loads × the return km inside), and no laden lorry-km",
    abs(A_["S"]["lorry_km"] - round(50 * s_ret, 1)) <= 0.11 and A_["S"]["laden_lorry_km"] == 0,
    f"{A_['S']['lorry_km']} vs {50 * s_ret}")
@@ -590,10 +598,12 @@ ok("5. Westshire's lorry-km: laden and empty km inside × loads",
    abs(A_["W"]["lorry_km"] - round(100 * (half + half) + 50 * (plen(R2) + w_ret), 1)) <= 0.11
    and abs(A_["W"]["laden_lorry_km"] - round(100 * half + 50 * plen(R2), 1)) <= 0.11)
 ok("5. ⭐ the county counts each laden route once: (100 + 50) / wd, the same as the scheme's drawn routes in it",
-   A_["C"]["movements_per_day"] == round(150 / WD, 2) and A_["C"]["routes"] == ["R001", "R002"])
+   A_["C"]["visits_per_day"] == round(150 / WD, 2) and A_["C"]["movements_per_day"] == round(300 / WD, 2)
+   and A_["C"]["routes"] == ["R001", "R002"])
 ok("5. the districts' movements add up to MORE than the scheme's — and the basis sentence says so",
    A_["W"]["loads"] + A_["E"]["loads"] + A_["S"]["loads"] == 250 and pay["totals"]["loads"] == 170
-   and "add up to more than the scheme's" in pay["basis"] and "one load = one two-way movement" in pay["basis"])
+   and "add up to more than the scheme's" in pay["basis"] and "lorry movements a day" in pay["basis"].lower()
+   and "two-way" not in pay["basis"])
 ok("5. ⭐ the unbaked line (R003) is in no area and in no figure — named in routes_not_drawn",
    all("R003" not in a["routes"] + a["return_only_routes"] for a in pay["areas"])
    and pay["routes_not_drawn"] == ["R003"] and pay["totals"]["loads"] == 170

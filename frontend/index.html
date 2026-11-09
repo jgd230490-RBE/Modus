@@ -1465,7 +1465,7 @@ const colorOf = (i) => tok(CHART_SLOTS[i] || "--chart-none", "#A8A29E");
 // the exact, unrounded figure the old hover tooltip showed, so moving a figure here loses nothing.
 const INFO = {
   "dash.material": { title: "Material in view", text: "The planned quantity of every forecast month in view, in tonnes. Cubic metres and lorry loads become tonnes through each line's own conversion.", guide: "3-1-filters-and-the-six-cards", tech: "t1-volume" },
-  "dash.deliveries": { title: "Deliveries a day", text: "Loaded trips in the months in view, divided by the working days in those months. Each delivery is a two-way movement: there loaded, back empty.",
+  "dash.deliveries": { title: "Lorry movements a day", text: "Deliveries in the months in view, divided by the working days in those months. A lorry coming and going is 2 movements, as councils count them (or 1 visit, if set so on Config → Planning).",
     how: "Trips are worked out for each month of each line: tonnes ÷ the vehicle's payload, rounded up. The working days in a month are set on Config → Planning.", guide: "3-1-filters-and-the-six-cards", tech: "t1-trips" },
   "dash.vehicles": { title: "Vehicles needed", text: "The most vehicles any one month needs, adding up every line in view. A line whose route is not worked out yet has no figure, so it is left out, never guessed.",
     how: "For each line: its trips a day ÷ the trips one vehicle can do in a driver's day on its route (there, back and the time to load and unload): the shift less the break the UK drivers' hours rules require, with at most 9 hours of driving.", guide: "3-1-filters-and-the-six-cards", tech: "t1-vehicles" },
@@ -1503,16 +1503,16 @@ const INFO = {
     how: "Never on the public map. The no-delivery bands and the gate's shut times are taken off its day. Loads are rounded to whole loads. No lorry arrives before its gate opens; one that arrives while it is shut waits. The bottleneck is the first lorry that waits longer than the station's own minutes. On a site with areas a lorry drives on to its area, the wash and out; a gate closed for a period hands both directions to the site's other gate. Congestion on the public road is not modelled, and a lorry held up at a gate is not late for its next trip. Press Jump to, or the arrow keys on the slider, to move the clock.", tech: "t1-gates" },
   "dash.clp": { title: "CLP monitoring", text: "The Construction Logistics Plan's figures from the approved plan: caps, vehicles, councils, carbon and trips avoided. Planned, not observed: Wayscope holds no gate log or arrival times.",
     how: "Each chart says what is missing when it cannot be drawn. The CLP pack prints the same charts for a month.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
-  "clp.route_caps": { title: "Routes against their planning cap", text: "Two-way movements a day on each route in the month against the cap typed on the route. Red past the cap. A flag, never a block.",
-    how: "One load is one movement: the month's approved loads ÷ working days, as the bulletin counts. The Look-ahead's ROUTE CAP compares the same cap with the lorries needed on a day.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  "clp.route_caps": { title: "Routes against their planning cap", text: "Lorry visits a day on each route in the month against the cap typed on the route. Red past the cap. A flag, never a block.",
+    how: "One load is one visit, a lorry in and out: the month's approved loads ÷ working days. The Look-ahead's ROUTE CAP compares the same cap with the lorries needed on a day.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   "clp.site_caps": { title: "Sites against their CLP cap", text: "Lorry visits a day at each site against the CLP cap typed on the location. A visit is one lorry in and out. Red past the cap.",
     how: "Deliveries where the site is the destination plus lorries coming to load where it is the origin, every team together, ÷ working days.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   "clp.vehicle_types": { title: "Movements by vehicle type", text: "Each vehicle type's share of the approved loads, month by month.",
-    how: "Loads are trips rounded up per forecast month, the Dashboard's trips. One load is one movement.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+    how: "Loads are trips rounded up per forecast month, the Dashboard's trips. One load is one visit, a lorry in and out.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   "clp.euro_class": { title: "Movements by Euro class", text: "The approved loads by the Euro class typed for each vehicle type on Config → Vehicles: an assumption about the hauliers' fleets, not a check. Untyped vehicles show as Not typed.",
     guide: "3-5-clp-monitoring", tech: "t1-clp" },
-  "clp.councils": { title: "Movements and lorry distance by council", text: "Two-way movements a day and the lorry distance driven, laden and empty, inside each council area in the month.",
-    how: "The bulletin's figures: a route counts in every area its laden leg enters, so the areas add up to more than the scheme.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  "clp.councils": { title: "Movements and lorry distance by council", text: "Lorry movements a day and the lorry distance driven, laden and empty, inside each council area in the month.",
+    how: "The bulletin's figures: each leg counts in every area it enters, so the areas add up to more than the scheme.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   "clp.carbon_rate": { title: "Carbon per delivery and per tonne", text: "All-in carbon (making the material, transport and waste) a tonne and a load each month, as planned and with the agreed decisions, against the carbon target shared out over the tonnes.",
     how: "Per load has no target line: moving material to a bigger lorry makes fewer, heavier loads, so the carbon a load can rise while the total falls.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   "clp.holding_areas": { title: "Holding areas", text: "Each holding area's spaces, hours, the sites it serves, the lorries that go straight to the gate, the lorries a day that call off there this month, and the most held at once on the Simulation's average day.",
@@ -2960,8 +2960,10 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <div className="dash-cards" data-guide="dash-figures">
             <Card label="Material in view" value={`${bigNum(K.totT)} t`} sub={`${D.lines} forecast month${D.lines === 1 ? "" : "s"} · ${D.routeRows.length} route line${D.routeRows.length === 1 ? "" : "s"}`}
                   info={{ id: "dash.material", value: `Exactly ${grp(K.totT)} t` }} />
-            <Card label="Deliveries a day" value={grp(Math.round(loadsPerDay))} sub={`each a two-way movement · ${grp(K.totTrips)} over ${grp(nMonths * wdPerMonth)} working days`}
-                  info={{ id: "dash.deliveries", value: `${grp(K.totTrips)} loaded trips ÷ (${nMonths} month${nMonths === 1 ? "" : "s"} × ${wdPerMonth} working days)` }} />
+            {/* 9 Nov 2026 (v2.1 2.1-11b, question E): the organisation's count, deliveries under it */}
+            <Card label={countLabel(meta)} value={grp(Math.round(loadsPerDay * countPV(meta)))}
+                  sub={countPV(meta) === 2 ? `${grp(Math.round(loadsPerDay))} deliveries, each in and out` : `${grp(K.totTrips)} deliveries over ${grp(nMonths * wdPerMonth)} working days`}
+                  info={{ id: "dash.deliveries", value: `${countPV(meta) === 2 ? "2 × " : ""}${grp(K.totTrips)} deliveries ÷ (${nMonths} month${nMonths === 1 ? "" : "s"} × ${wdPerMonth} working days)` }} />
             <Card label="Vehicles needed" value={K.peakFleet ? grp(K.peakFleet) : "—"} sub={K.peakFleet ? `peak · ${K.peakFleetMonth}` : "needs routes worked out"}
                   info={{ id: "dash.vehicles", value: K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth}` : NO_ROUTES_YET }} />
             <Card label="Planned this week" value={wkTot ? `${bigNum(wkTot.planned_t || 0)} t` : "—"} sub={wkTot ? `${grp(wkTot.trips || 0)} loads${acct && acct.lines ? ` · last week ${acct.delivered} of ${acct.lines} lines held` : ""}${sites.length ? " · at these sites" : ""}` : (weekErr ? "this week did not load" : "loading this week")}
@@ -3000,7 +3002,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
               the busiest gate from the Gate arrivals reply (no second simulation run here) */}
           <SimDashLine ga={gaShown} month={gaMonth} months={months} onOpen={onOpen} />
           {/* 5 Nov 2026 (group 6, PR 2): the concerns from the public, planners and admins only */}
-          {canApprove && !wall && !phone && <ConcernsDash months={months} lo={D.lo} hi={D.hi} sites={sites} sitesLabel={sites.length ? sitesWords(sites, locList) : ""} tripsM={D.tripsM} onOpen={onOpen} />}
+          {canApprove && !wall && !phone && <ConcernsDash months={months} lo={D.lo} hi={D.hi} sites={sites} sitesLabel={sites.length ? sitesWords(sites, locList) : ""} tripsM={D.tripsM} pv={countPV(meta)} onOpen={onOpen} />}
           <details className="dash-more">
             <summary>This week and today, with the Look-ahead's map</summary>
             <div className="pt-3"><DashboardToday meta={meta} week={weekShown} err={weekErr} wall={wall} /></div>
@@ -3509,7 +3511,7 @@ function stockMessage(sps){
 // (GET /api/concerns/figures). "Not a concern" is never counted.
 const cnYm = (idx, startYear) => `${startYear + Math.floor((idx - 1) / 12)}-${String(((idx - 1) % 12) + 1).padStart(2, "0")}`;
 const cnD = (v) => v == null ? "—" : (Math.round(v * 10) / 10).toLocaleString("en-GB", { maximumFractionDigits: 1 });
-function ConcernsDash({ months, lo, hi, sites, sitesLabel, tripsM, onOpen }){
+function ConcernsDash({ months, lo, hi, sites, sitesLabel, tripsM, pv, onOpen }){
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
   const [err, setErr] = useState(false);
@@ -3527,11 +3529,12 @@ function ConcernsDash({ months, lo, hi, sites, sitesLabel, tripsM, onOpen }){
   const range = lo === hi ? monthLabelAbs(lo, sy) : `${monthLabelAbs(lo, sy)} – ${monthLabelAbs(hi, sy)}`;
   const scope = [range, sitesLabel || null];
   const C1 = tok("--chart-1", "#E8590C");
-  // per 1,000 planned two-way lorry movements over the whole range on screen (a load is two movements: there and back);
+  // per 1,000 planned lorry movements (or visits: the organisation's count, pv) over the whole range on screen;
   // the last month alone read 0 beside a chart showing concerns in earlier months
   let rate = null;
+  const per = pv === 1 ? 1 : 2;
   if(data && tripsM && tripsM.length){
-    const moves = 2 * tripsM.reduce((a, t) => a + (t || 0), 0);
+    const moves = per * tripsM.reduce((a, t) => a + (t || 0), 0);
     if(moves > 0) rate = { v: data.received * 1000 / moves, m: range };
   }
   const Tile = ({ v, label }) => (
@@ -3561,7 +3564,7 @@ function ConcernsDash({ months, lo, hi, sites, sitesLabel, tripsM, onOpen }){
             <div className="card p-4 chart-card mb-3">
               <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Concerns received a month</div>
               <ChartCanvas config={cfg} title="Concerns received a month" scope={scope} />
-              {rate && <div className="text-xs text-slate-500 mt-1" data-concern-rate="1">Per 1,000 planned two-way lorry movements: {(Math.round(rate.v * 100) / 100).toLocaleString("en-GB", { maximumFractionDigits: 2 })} over {rate.m}.</div>}
+              {rate && <div className="text-xs text-slate-500 mt-1" data-concern-rate="1">Per 1,000 planned lorry {per === 2 ? "movements" : "visits"}: {(Math.round(rate.v * 100) / 100).toLocaleString("en-GB", { maximumFractionDigits: 2 })} over {rate.m}.</div>}
             </div>
             <div className="grid md:grid-cols-2 gap-3">
               <div className="overflow-auto"><table className="ga-table" data-concern-kinds="1">
@@ -9443,6 +9446,15 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
 
 // 13 Oct 2026 (W12): the council colour bands a scheme reads until it types its own (backend config.COUNCIL_BREAKS_DEFAULT)
 const COUNCIL_BREAKS_DEFAULT = { movements: [50, 100, 200], carbon: [50, 100, 200] };
+// 9 Nov 2026 (v2.1 2.1-11b): how the organisation counts a lorry coming and going: 2 movements (councils' count, the
+// default) or 1 visit (planning.count_visit_as; backend counting.py). The movements bands above are visits; the
+// organisation reads them in its own count (backend config.council_breaks).
+const countPV = (meta) => (meta && meta.counting && Number(meta.counting.per_visit) === 1 ? 1 : 2);
+const countLabel = (meta) => countPV(meta) === 2 ? "Lorry movements a day" : "Lorry visits a day";
+// the Config page reads the count from the document being edited (planning.count_visit_as; absent = 2)
+const cfgCountMeta = (doc) => ({ counting: { per_visit: Number(((doc || {}).planning || {}).count_visit_as) === 1 ? 1 : 2 } });
+// the typed movements bands in the count pv (stored with movements_unit; none = visits, as typed before 9 Nov 2026), or null
+const breaksIn = (doc, pv) => { const cb = ((doc || {}).tenant || {}).council_breaks; if(!cb || !Array.isArray(cb.movements)) return null; const have = cb.movements_unit === "movements" ? 2 : 1; return cb.movements.map(x => x == null ? x : Math.max(1, Math.round(x * pv / have))); };
 // 29 Oct 2026 (3b, the steel split): a RETIRED category stays valid on what already carries it but is not offered for new
 // use. pickMaterials(all, meta, keep) = the list a picker shows: every category that is not retired, plus any retired one
 // in `keep` (the line's / record's own value), so editing an old line never blanks its material.
@@ -9525,10 +9537,22 @@ function ConfigPage({ meta, who, access }){
   const setBreak = (d, m, i, v) => {
     d.tenant = d.tenant || {};
     const cb = d.tenant.council_breaks = d.tenant.council_breaks || {};
+    // 9 Nov 2026 (v2.1 2.1-11b): the movements bands are edited in the organisation's count (the fields show them so)
+    if(m === "movements" && Array.isArray(cb.movements)) cb.movements = breaksIn(d, countPV(cfgCountMeta(d)));
     const arr = (cb[m] || []).slice(0, 3); while(arr.length < 3) arr.push(null);
     arr[i] = v;
     if(arr.every(x => x == null)) delete cb[m]; else cb[m] = arr;
+    // 9 Nov 2026 (v2.1 2.1-11b): typed movements bands are in the organisation's count, and say so
+    if(m === "movements"){ if(cb.movements) cb.movements_unit = countPV(cfgCountMeta(d)) === 2 ? "movements" : "visits"; else delete cb.movements_unit; }
     if(!Object.keys(cb).length) delete d.tenant.council_breaks;
+  };
+  // 9 Nov 2026 (v2.1 2.1-11b, questions B and F): switching the count converts the typed movements bands (×2 or ÷2) so the
+  // same lorries keep the same colour
+  const setCount = (d, pv) => {
+    d.planning = d.planning || {};
+    d.planning.count_visit_as = pv;
+    const cb = (d.tenant || {}).council_breaks;
+    if(cb && Array.isArray(cb.movements)){ cb.movements = breaksIn(d, pv); cb.movements_unit = pv === 2 ? "movements" : "visits"; }
   };
   // 28 Oct 2026 (8b): the tenant's own aerial imagery, three plain text fields in the tenant block; a blank one is removed
   const setTenantText = (d, k, v) => {
@@ -9790,6 +9814,18 @@ function ConfigPage({ meta, who, access }){
                     <div className="hint">For routes with no choice of their own (Data → Routes).</div>
                   </div>);
               })()}
+              {/* 9 Nov 2026 (v2.1 2.1-11b, John's Q1: a per-organisation setting, default 2 movements a visit) */}
+              <div className="field" data-cfg="count-visit-as" role="radiogroup" aria-labelledby="cfg-count-label">
+                <label id="cfg-count-label">Count a lorry coming and going as</label>
+                <div className="flex flex-wrap gap-4">
+                  {[[2, "2 movements, in and out"], [1, "1 visit"]].map(([pv, words]) => (
+                    <label key={pv} className="inline-flex items-center gap-1.5 text-sm text-slate-700">
+                      <input type="radio" name="cfg-count-visit-as" checked={countPV(cfgCountMeta(doc)) === pv}
+                        onChange={() => upd(d => { setCount(d, pv); })} /> {words}
+                    </label>))}
+                </div>
+                <div className="hint">Councils count 2. Changes the map, bulletin and Dashboard figures.</div>
+              </div>
               {/* 31 Oct 2026 (task 4a, PR 3a; approved 30 Oct): the CLP document's programme type and its stages, each made of
                   Wayscope's kinds of work (planning.clp; backend clp_doc.settings). Absent = the template's stages for the type
                   (meta.clp_stage_defaults). Checked by the server on Save. */}
@@ -9902,16 +9938,16 @@ function ConfigPage({ meta, who, access }){
               <div data-cfg="council-breaks">
               <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Council colours</h3>
               <p className="text-[14px] text-slate-600 mb-4">Colours for By council on the public map and in the bulletin. Three rising figures; blank keeps the defaults.</p>
-              {[["movements", "Movements by council: two-way movements a day", "The blue colours. Defaults 50, 100, 200 a day."],
+              {[["movements", `Movements by council: ${countLabel(cfgCountMeta(doc)).toLowerCase()}`, `The blue colours. Defaults ${COUNCIL_BREAKS_DEFAULT.movements.map(x => x * countPV(cfgCountMeta(doc))).join(", ")} a day.`],
                 ["carbon", "Carbon by council: t CO₂e in the month", "The orange colours. Defaults 50, 100, 200 t. Pick figures that spread your districts across the four colours."]].map(([m, l, help]) => {
-                const cur = ((doc.tenant || {}).council_breaks || {})[m] || [];
+                const cur = (m === "movements" ? breaksIn(doc, countPV(cfgCountMeta(doc))) : ((doc.tenant || {}).council_breaks || {})[m]) || [];
                 return (
                   <div key={m} className="field">
                     <label id={"cfg-cb-" + m}>{l}</label>
                     <div className="flex gap-2">
                       {[0, 1, 2].map(i => (
                         <input key={i} className="ctl w-24 tabular-nums text-right" inputMode="numeric" aria-label={`${l}, band ${i + 1} of 3`}
-                          placeholder={String(COUNCIL_BREAKS_DEFAULT[m][i])} value={cur[i] ?? ""}
+                          placeholder={String(COUNCIL_BREAKS_DEFAULT[m][i] * (m === "movements" ? countPV(cfgCountMeta(doc)) : 1))} value={cur[i] ?? ""}
                           onChange={e => upd(d => { setBreak(d, m, i, num(e.target.value)); })} />
                       ))}
                     </div>
@@ -13862,7 +13898,7 @@ function RoutePlanning({ route, token, onSaved }){
       <div className="text-sm font-semibold text-slate-700">Planning · Look-ahead</div>
       <p className="text-[13px] text-slate-400">Rates are added together. Blank = the target rate from Config, marked "target".</p>
       <div className="grid grid-cols-2 gap-2">
-        <F k="max_vehicles_per_day" label="Max vehicles / day (flag only)" />
+        <F k="max_vehicles_per_day" label="Max lorry visits a day (flag only)" />
         <label className="block">
           <span className="block text-sm font-medium text-slate-700 mb-1">distance basis · {CUR()}/{DU()} and {TKM()}</span>
           <select className={inp} value={v.km_basis} onChange={e => setV(x => ({ ...x, km_basis: e.target.value }))}>
