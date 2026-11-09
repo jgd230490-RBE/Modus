@@ -82,6 +82,7 @@ ORDER = [
     "route_hour_times",     # 29 Oct 2026 (task 0f-2): drive times by hour, named by the stored option, so after route_geometry
     "forecasts", "forecast_weeks", "forecast_days",
     "pours",                # 29 Oct 2026 (task 3a): names a forecast line's key, so after forecasts
+    "lorry_plan_moves",     # 9 Nov 2026 (v2.1 task 2.1-9b): names a week's lines and yards, so after forecasts and locations
     # 31 Oct 2026 (task 4a, PR 3a): the CLP records name locations and a team; each issue names its CLP, so after it
     "clp_documents", "clp_issues",
     "clp_notes",            # 31 Oct 2026 (task 4a, PR 3b): the notes and tasks on each CLP, so after clp_documents

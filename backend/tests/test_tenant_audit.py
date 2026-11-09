@@ -126,6 +126,8 @@ TENANTED = {
     "clp_review_groups", "clp_reviews",
     # 5 Nov 2026 (group 6, concerns.py): concerns from the public, answered and counted by staff. Same edit.
     "concerns",
+    # 9 Nov 2026 (v2.1 task 2.1-9b, lorry_plan.py PR 2): a planner's arrangement of a yard's lorries for a week. Same edit.
+    "lorry_plan_moves",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is
