@@ -251,6 +251,9 @@
         #tl-warnings{ display:none; position:absolute; top:84px; right:12px; z-index:24; width:min(360px, calc(100vw - 24px));
                       max-height:min(60vh, 520px); overflow:auto; background:#fff; border:1px solid var(--line);
                       border-radius:12px; padding:14px 18px 6px; flex-direction:column; pointer-events:auto; }
+        /* 9 Nov 2026 (card 2): at a desk the open conditions panel covered the zoom buttons (top 98 / 110, right 10 / 12) —
+           hidden while the page was lifted 80 px. It sits left of the zoom stack now (10 px margin + 29 px + a gap). */
+        @media (min-width:1024px){ body #tl-warnings{ right:52px; } }
         .tl-head{ display:flex; align-items:baseline; justify-content:space-between; padding-bottom:10px; }
         .tl-head b{ font-size:14px; font-weight:600; color:var(--navy-deep); }
         .tl-head .x{ position:relative; border:none; background:none; color:var(--muted); cursor:pointer; font-size:18px; line-height:1; padding:2px 4px; }

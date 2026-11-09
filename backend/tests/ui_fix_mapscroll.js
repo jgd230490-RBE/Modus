@@ -80,6 +80,10 @@ ok("B6 the drawer markup is unchanged: two tabs, a close, two bodies",
    /<div id="route-drawer">\s*<div class="drawer-head">[\s\S]*?id="tab-analysis"[\s\S]*?id="tab-detail"[\s\S]*?class="drawer-close"[\s\S]*?<\/div>\s*<div class="drawer-body" id="drawer-analysis"><\/div>\s*<div class="drawer-body" id="drawer-detail" style="display:none;"><\/div>\s*<\/div>/.test(html));
 ok("B7 the drawer still opens and closes by the class only", /classList\.add\('open'\);\s*\n\s*\}\s*\n\s*function closeDrawer\(\)\{ document\.getElementById\('route-drawer'\)\.classList\.remove\('open'\); \}/.test(html));
 
+ok("B8 at a desk the conditions panel sits left of the zoom buttons (right 52 px), the month text's 432 px kept",
+   /@media \(min-width:1024px\)\{ body #tl-warnings\{ right:52px; \} \}/.test(css) && /body\.month-text-open #tl-warnings\{ right:432px; \}/.test(css)
+   && /#tl-warnings\{[^}]*top:84px;[^}]*right:12px/.test(css));
+
 console.log("C. Report a concern in the panel on a desk");
 const share = (() => { const i = html.indexOf('<div class="control-group share-group" id="share-group">'); return i >= 0 ? html.slice(i, html.indexOf("</div>\n    </div>", i) + 20) : ""; })();
 const shareBlock = (() => { const i = html.indexOf('<div class="control-group share-group" id="share-group">'); if (i < 0) return ""; let d = 0, j = i; const re = /<\/?div\b/g; re.lastIndex = i;
