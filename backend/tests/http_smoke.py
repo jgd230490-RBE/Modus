@@ -2124,7 +2124,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
     c.cookies.clear()
     r = c.post("/api/auth/reset", json={"token": _bob_inv, "password": "bob's long password"}, headers=W)
     _bob_key = r.json()["key"].replace(" ", "")
-    r = c.post("/api/auth/setup", json={"ticket": r.json()["ticket"], "code": _users.totp_at(_bob_key, _users.totp_step())}, headers=W)
+    # 9 Nov 2026: keep the exact code sent here, so the reuse check below sends THIS code even if the 30 s step rolls over
+    _bob_setup_code = _users.totp_at(_bob_key, _users.totp_step())
+    r = c.post("/api/auth/setup", json={"ticket": r.json()["ticket"], "code": _bob_setup_code}, headers=W)
     _bob_codes = r.json().get("recovery_codes") or []
     ok("G3: Bob sets his password and is signed in as his team", r.status_code == 200 and r.json()["ipt"] == "IPT1"
        and r.json()["ipt_locked"] is True)
@@ -2149,7 +2151,7 @@ with TestClient(main.app, base_url="https://testserver") as c:
     _t = r.json()["ticket"]
     ok("🔴 F3 b: the ticket alone opens nothing", c.get("/api/auth/me").json()["signed_in"] is False
        and c.get("/api/forecasts", cookies={"wayscope_session": _t}).status_code in (401, 403))
-    r = c.post("/api/auth/code", json={"ticket": _t, "code": _users.totp_at(_bob_key, _users.totp_step())}, headers=W)
+    r = c.post("/api/auth/code", json={"ticket": _t, "code": _bob_setup_code}, headers=W)
     ok("🔴 F3 b: the code used seconds ago at set-up is refused (a code works once)", r.status_code == 401, r.text[:120])
     r = c.post("/api/auth/code", json={"ticket": _t, "code": _bob_codes[0]}, headers=W)
     ok("⭐ F3 b: a recovery code signs Bob in; nine left", r.status_code == 200 and r.json()["recovery_left"] == 9
