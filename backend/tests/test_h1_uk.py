@@ -762,8 +762,10 @@ ok("🔴 the route form's rate help names no country and reads the tenant's unit
 # NARROWED 11 Oct 2026 (review): the column is gated on vehLangEditable("ee") — the COUNTRY rule alone. Gated on
 # vehLangShown("ee") it also needed a vehicle to carry an Estonian name already, so an Estonian organisation on
 # the new seed (English names only) could never type its first one. The header buttons keep vehLangShown.
+# NARROWED 9 Nov 2026 (UI critique card 10): the same filter also leaves the English typing column out for a reader
+# (`&& !(ro && h === "English")`); the Estonian half is unchanged.
 ok("🔴 Config → Vehicles shows the Estonian label column to an Estonian tenant only",
-   '.filter(h => h !== "Estonian" || vehLangEditable("ee"))' in fe and '{vehLangEditable("ee") && <td' in fe
+   '.filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English"))' in fe and '{vehLangEditable("ee") && <td' in fe
    and 'const vehLangEditable = (k) => k === "en" || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE");' in fe
    and 'h !== "Estonian" || vehLangShown("ee")' not in fe and '{vehLangShown("ee") && <td' not in fe)
 ok("🔴 the Submit form never defaults to a hidden vehicle (first SHOWN of the category's list)",
