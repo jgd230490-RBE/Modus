@@ -267,7 +267,8 @@ reset_db()
 # NARROWED 31 Oct 2026: 36 -> 39, and clp_review_groups + clp_reviews (task 4a PR 3c: the client's reviewers) and site_layout_pictures (task 4c PR 3)
 ok("db.py names the tenanted tables in one place", len(db.TENANTED_TABLES) == 40
    # NARROWED 5 Nov 2026 (group 6): + concerns, the public's reports (one new tenanted table)
-   and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours", "clp_documents", "clp_issues", "site_layouts", "site_layout_phases", "site_layout_imports", "clp_notes", "clp_review_groups", "clp_reviews", "site_layout_pictures", "concerns"}) == 16,
+   # NARROWED 9 Nov 2026 (v2.1 task 2.1-9b): + lorry_plan_moves, the Lorry plan's saved arrangements
+   and len(db.TENANTED_TABLES - {"route_sections", "areas", "route_area_km", "community_features", "community_meta", "collision_records", "collision_meta", "abnormal_loads", "traffic_counts", "stockpile_plan", "site_areas", "route_choice", "route_hour_times", "pours", "clp_documents", "clp_issues", "site_layouts", "site_layout_phases", "site_layout_imports", "clp_notes", "clp_review_groups", "clp_reviews", "site_layout_pictures", "concerns", "lorry_plan_moves"}) == 16,
    f"got {len(db.TENANTED_TABLES)}")
 
 for t in sorted(db.TENANTED_TABLES):
