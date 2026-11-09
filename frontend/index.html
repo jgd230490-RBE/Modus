@@ -601,7 +601,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ra-menu{min-width:300px;max-width:min(360px,92vw);white-space:normal;}
   .ra-menu .ra-head{font-size:12px;color:var(--popover-muted);padding:6px 10px 2px;}
   .ra-menu .ra-head span{float:right;}
-  .ra-menu .ra-routes{max-height:180px;overflow-y:auto;margin:0 4px;border:1px solid var(--popover-line);border-radius:6px;}
+  .ra-menu .ra-foot{position:sticky;bottom:-6px;background:var(--popover-bg);border-top:1px solid var(--popover-line);margin:6px -6px -6px;padding:6px;}
+  .ra-menu .ra-routes{max-height:min(180px,24vh);overflow-y:auto;margin:0 4px;border:1px solid var(--popover-line);border-radius:6px;}
   .ra-menu label.ra-tick{display:flex;gap:8px;align-items:flex-start;padding:5px 10px;font-size:14px;min-height:24px;}
   .ra-menu label.ra-tick input{margin-top:3px;}
   .bulletin-menu .bm-err{white-space:normal;max-width:260px;font-size:14px;color:#FCA5A5;padding:4px 10px;}
@@ -13984,6 +13985,21 @@ function raSaved(){
   try { const v = JSON.parse(localStorage.getItem(RA_KEY) || "null"); if(Array.isArray(v) && v.length) return v; } catch(e){}
   return RA_SECTIONS.map(x => x[0]);
 }
+// Pins the open Route analysis menu inside the window: below its button, or above when there is more room there, as tall
+// as the room allows (never under 200 px); right edges lined up, kept 8 px inside the window.
+function raPlace(d){
+  const l = d.querySelector(".ra-menu"), s = d.querySelector("summary"); if(!l || !s) return;
+  const r = s.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+  l.style.position = "fixed"; l.style.maxHeight = "none"; l.style.overflowY = "auto";
+  const full = l.scrollHeight, w = l.offsetWidth;
+  const below = vh - r.bottom - 12, above = r.top - 12;
+  const down = full <= below || below >= above;
+  const h = Math.min(full, Math.max(200, down ? below : above));
+  l.style.maxHeight = h + "px";
+  l.style.top = Math.max(8, down ? r.bottom + 4 : r.top - 4 - h) + "px";
+  l.style.right = "auto";
+  l.style.left = Math.max(8, Math.min(r.right - w, vw - 8 - w)) + "px";
+}
 function RouteAnalysisMenu({ routes, picked, vehicles }){
   const [open, setOpen] = useState(false);
   const [ids, setIds] = useState(picked ? [picked] : []);
@@ -13992,6 +14008,19 @@ function RouteAnalysisMenu({ routes, picked, vehicles }){
   const [busy, setBusy] = useState(null);
   const [err, setErr] = useState(null);
   useEffect(() => { if(picked) setIds(v => v.includes(picked) ? v : [picked, ...v].slice(0, RA_MAX)); }, [picked]);
+  // 9 Nov 2026 (John, on live: "unable to select the download button as it's cut off the screen"): the open menu is pinned to
+  // the screen (raPlace), opens upwards when there is more room above, is never taller than the room it has (the middle
+  // scrolls) and keeps Download PDF / XLSX in a footer that is always in view. A page scroll or a resize places it again;
+  // scrolling inside the menu (the routes list) is its own and leaves it be.
+  const ref = useRef(null);
+  useEffect(() => {
+    const d = ref.current; if(!open || !d) return;
+    const place = () => raPlace(d);
+    place();
+    const onScroll = (e) => { const l = d.querySelector(".ra-menu"); if(l && e && e.target instanceof Node && l.contains(e.target)) return; place(); };
+    window.addEventListener("scroll", onScroll, true); window.addEventListener("resize", place);
+    return () => { window.removeEventListener("scroll", onScroll, true); window.removeEventListener("resize", place); };
+  }, [open]);
   const list = (routes || []).filter(r => r && r.id);
   const tick = (id) => setIds(v => v.includes(id) ? v.filter(x => x !== id) : (v.length >= RA_MAX ? v : [...v, id]));
   const tickSec = (k) => setSecs(v => {
@@ -14025,7 +14054,7 @@ function RouteAnalysisMenu({ routes, picked, vehicles }){
   };
   const first = chosen[0];
   return (
-    <details className="row-menu bulletin-menu" data-route-analysis="1" onToggle={e => setOpen(e.currentTarget.open)}>
+    <details className="row-menu bulletin-menu" data-route-analysis="1" ref={ref} onToggle={e => setOpen(e.currentTarget.open)}>
       <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 10px", fontWeight: 500 }}
                title="Evidence for the route risk assessment, as a PDF or a spreadsheet">Route analysis ▾</summary>
       {open && <div className="row-menu-list dash-filters ra-menu">
@@ -14044,12 +14073,14 @@ function RouteAnalysisMenu({ routes, picked, vehicles }){
         {RA_SECTIONS.map(([k, l, t]) => (
           <label key={k} className="ra-tick"><input type="checkbox" checked={secs.includes(k)} onChange={() => tickSec(k)} data-ra-section={k} /> {l ? `${l} · ` : ""}{t}</label>
         ))}
-        <button type="button" onClick={() => download("pdf")} disabled={!!busy || !chosen.length || noSection}>
-          {busy === "pdf" ? `Making the file${chosen.length > 1 ? ` (${chosen.length} routes)` : ""}…` : "Download PDF"}</button>
-        <button type="button" onClick={() => download("xlsx")} disabled={!!busy || !chosen.length || noSection}>
-          {busy === "xlsx" ? "Making the file…" : "Download XLSX"}</button>
-        <div className="row-menu-note">{!chosen.length ? "Tick a route." : noSection ? "Tick a section." : "Made from what Wayscope holds. Evidence for the assessment, not the assessment."}</div>
-        {err && <div className="bm-err" role="alert">{err}</div>}
+        <div className="ra-foot" data-ra-foot="1">
+          <button type="button" onClick={() => download("pdf")} disabled={!!busy || !chosen.length || noSection}>
+            {busy === "pdf" ? `Making the file${chosen.length > 1 ? ` (${chosen.length} routes)` : ""}…` : "Download PDF"}</button>
+          <button type="button" onClick={() => download("xlsx")} disabled={!!busy || !chosen.length || noSection}>
+            {busy === "xlsx" ? "Making the file…" : "Download XLSX"}</button>
+          <div className="row-menu-note">{!chosen.length ? "Tick a route." : noSection ? "Tick a section." : "Made from what Wayscope holds. Evidence for the assessment, not the assessment."}</div>
+          {err && <div className="bm-err" role="alert">{err}</div>}
+        </div>
       </div>}
     </details>
   );
