@@ -111,6 +111,10 @@ TENANTED_TABLES = {
     # 29 Oct 2026 (task 0f-2, hour_times.py): each route's drive times for a lorry setting off at set weekday hours, one
     # row a HERE option, named by the stored option it matched. One tenant's routes, carried in its package.
     "route_hour_times",
+    # 9 Nov 2026 (v2.1 task 2.1-9b, lorry_plan.py PR 2): a planner's own arrangement of a yard's lorries for one week of the
+    # Lorry plan (which trip on which lorry, which day), kept until the week's loads change. Per tenant, in the package,
+    # same rule, same edit.
+    "lorry_plan_moves",
     # 5 Nov 2026 (group 6, concerns.py): the concerns the public reports on the public map (and staff add from an email or
     # a call), with the scheme's triage. Per tenant, in the package, same rule, same edit.
     "concerns",
@@ -958,6 +962,8 @@ def init_weeks_db():
         _create_tenanted(cur, "clp_reviews")
         # 5 Nov 2026 (group 6): the concerns from the public
         _create_tenanted(cur, "concerns")
+        # 9 Nov 2026 (v2.1 task 2.1-9b): the Lorry plan's saved arrangements
+        _create_tenanted(cur, "lorry_plan_moves")
         conn.commit()
         # PR 3c: a note's reviewer group — the group a reviewer's comment came from, or the group a contractor's note is
         # shown to (NULL: only the contractor's people see it). Plain ADD COLUMN.
@@ -2314,6 +2320,26 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, id)
         )
     """,
+    # 9 Nov 2026 (v2.1 task 2.1-9b, lorry_plan.py PR 2). One row per yard (origin + lorry type), view and week of the Lorry
+    # plan: the planner's whole arrangement of that yard's lorries (`lorries_json` = {day: {fp, lorries: [[{lk, d}…]…]}},
+    # each lorry a list of trip references: the line's key and the day the trip is booked on) and `pool_fp`, a fingerprint
+    # of the trips it was made from. plan() uses the row only while the fingerprint still matches; nothing derived is
+    # stored. `id` = week_from|view|origin_id|vehicle, so a new move replaces the last.
+    "lorry_plan_moves": """
+        CREATE TABLE lorry_plan_moves (
+            tenant_id      TEXT NOT NULL DEFAULT 'default',
+            id             TEXT NOT NULL,
+            week_from      TEXT NOT NULL,
+            view           TEXT NOT NULL,
+            origin_id      TEXT NOT NULL,
+            vehicle        TEXT NOT NULL,
+            pool_fp        TEXT NOT NULL,
+            lorries_json   TEXT NOT NULL,
+            moved_by       TEXT,
+            moved_at       TEXT NOT NULL,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
     # 5 Nov 2026 (group 6, concerns.py). One concern from the public: what kind, where (a pin and / or a route), when, the
     # words, the contact only if a reply was asked for, the triage (status, first reply, close, outcome) and its history.
     # INTEGER flags, never BOOLEAN (SQLite hides a Postgres boolean compared with 1). The clean-up blanks the personal
@@ -2403,6 +2429,7 @@ _TENANT_PK = {
     "clp_review_groups": "(tenant_id, id)",
     "clp_reviews": "(tenant_id, id)",
     "concerns": "(tenant_id, id)",
+    "lorry_plan_moves": "(tenant_id, id)",
     "config": "(tenant_id, key)",
     "forecast_days": "(tenant_id, route_id, month_index, discipline, section_id, "
                      "day_date)",

@@ -501,8 +501,9 @@ ok("7: the panel: folded, the three views, the weekday chips, the sheets, Apply 
    'data-lorry-plan="1"' in panel and 'LP_VIEW_WORDS = { booked: "As booked", chained: "Chained by yard", compressed: "Week compressed" }' in APP
    and 'data-lp-sheets="1"' in panel and 'data-lp-apply="1"' in panel and 'disabled={!!busy || weekConfirmed || !mv.length}' in panel
    and 'const canApply = !!(access && (access.role === "planner" || access.role === "admin"));' in panel)
+# NARROWED 9 Nov 2026 (2.1-9b): the track is role=img for a reader of the plan and a named group for a planner, whose trips are controls
 ok("7: one row a lorry, its trips as blocks across the day, the break hatched, the free words at the end",
-   'className="lp-track" role="img"' in APP and 'className={"lp-blk" + (b.kind === "break" ? " is-break" : "")}' in APP and 'data-lp-free={r.free_minutes}' in APP)
+   'role={can ? "group" : "img"}' in APP and 'className={"lp-blk" + (b.kind === "break" ? " is-break" : "")}' in APP and 'data-lp-free={r.free_minutes}' in APP)
 ok("7: the panel sits under Gates this week; the KPI caption gains the chained figure; the phone reads it",
    "<LorryPlan bucket={bucket} tick={tick} access={access} onData={setLorryPlan} weekConfirmed={allConfirmed} />" in APP
    and "with each yard's lorries chained` : \"\")} />" in APP and 'data-ph-lorry-plan={shown}' in APP and 'data-ph-lorry-list="1"' in APP)
@@ -516,6 +517,220 @@ ok("7: the user guide §7 and the technical T1", 'id="ug-lorry-plan"' in UG and 
    and 'href="#t1-lorry-plan"' in TECH)
 ok("7: the module's words", "compliant" not in lp.RULE_WORDS + lp.PLANNING_WORDS + lp.COMPRESS_WORDS and "movement" not in (lp.RULE_WORDS + lp.PLANNING_WORDS + lp.COMPRESS_WORDS).lower())
 ok("7: Config validates day_hire through the module", "lorry_plan.day_hire_problem(doc.get(\"day_hire\")" in read("backend/config.py"))
+
+# --------------------------------------------------------------------------- 8. drag and drop (PR 2, 9 Nov 2026, card 9 + Q14)
+# A planner moves one trip to another lorry of the same yard (chained; compressed also to another day). The drop is
+# checked by the same rule; a move that fits is saved as the yard's arrangement for the week and used in place of
+# pack() while the trips it was made from are unchanged. Everything on the baked demo week (PG), planner access.
+access.set_current("planner123")
+import read_cache  # noqa: E402,F811
+ok("8: the table is tenanted, in the package order, in the audit's registry and among the tables a refresh keeps from live",
+   lp.TABLE == "lorry_plan_moves" and lp.TABLE in db.TENANTED_TABLES and lp.TABLE in tenant_package.ORDER and lp.TABLE in db._TENANT_DDL
+   and lp.TABLE in db._TENANT_PK and lp.TABLE in read("backend/tests/test_tenant_audit.py") and f'"{lp.TABLE}")' in read("backend/tools/make_demo_tenant.py"))
+ok("8: the table is NOT among the no-data tables: a move changes what the plan shows, so the kept reads must refresh", lp.TABLE not in db.NO_DATA_TABLES)
+ok("8: the trips carry their booked day and their own driving / other minutes, for the page's own look at a drop",
+   all("day" in b and "drive" in b and "other" in b for blk in C["days"][DAY] for r in blk["lorries"] for b in r["blocks"] if b["kind"] == "trip")
+   and all(b["day"] == DAY for blk in C["days"][DAY] for r in blk["lorries"] for b in r["blocks"] if b["kind"] == "trip")
+   and D["shift_minutes"] == D["shift_hours"] * 60 and D["arranged"] == {"chained": [], "compressed": []})
+ok("8: every block names its yard (yard_id, the plan's own key) and says it is not arranged",
+   all(blk.get("yard_id") and blk["arranged"] is False for d in DAYS for blk in C["days"][d]))
+
+# the fingerprint
+_t = [{"line_key": "A|1||", "day": DAY}, {"line_key": "A|1||", "day": DAY}, {"line_key": "B|1||", "day": DAY}]
+ok("8: pool_fp is the count of each (line, day), whatever the order; one trip more or less changes it",
+   lp.pool_fp(_t) == lp.pool_fp(list(reversed(_t))) and lp.pool_fp(_t) != lp.pool_fp(_t[:2]) and lp.pool_fp(_t) != lp.pool_fp(_t + [_t[0]])
+   and lp.pool_fp(_t) != lp.pool_fp([dict(x, day="2026-11-24") for x in _t]) and len(lp.pool_fp(_t)) == 20)
+
+# a yard on the pinned day with at least two lorries: lorry 1 is the fullest (first fit, longest first), the last the emptiest
+_blk = next(b for b in C["days"][DAY] if len(b["lorries"]) >= 2)
+_yid, _veh = _blk["yard_id"], _blk["vehicle"]
+_src = _blk["lorries"][-1]
+_trip = next(b for b in _src["blocks"] if b["kind"] == "trip")
+SHIFT = D["shift_minutes"]
+
+
+def fits(row, b):
+    return lp._fits(row["driving_minutes"], row["work_minutes"], b["drive"], b["other"], SHIFT)
+
+
+_no = next((r for r in _blk["lorries"][:-1] if not fits(r, _trip)), None)
+_yes = next((r for r in _blk["lorries"][:-1] if fits(r, _trip)), None)
+ok("8: the stand-in week has a yard where the last lorry's trip does NOT fit the fullest lorry (the refusal case)", _no is not None and _no["n"] == 1, str(_blk["name"]))
+
+
+def body(**k):
+    b = {"view": "chained", "yard_id": _yid, "vehicle": _veh, "line_key": _trip["line_key"], "from_day": DAY, "from_lorry": _src["n"], "to_day": DAY, "to_lorry": _no["n"]}
+    b.update(k)
+    return b
+
+
+try:
+    lp.move(PG, body(), by="Pat")
+    ok("8: a drop that does not fit is refused", False, "no refusal")
+except lp.PlanError as e:
+    ok("8: a drop that does not fit is refused in words with the minutes over (nothing saved)",
+       re.match(r"^Would pass (the \d+(\.\d+)? h shift|9 h of driving) by \d+ min\.$", str(e)) is not None and not db.query(f"SELECT id FROM {lp.TABLE}"), str(e))
+for bad, words in ((body(to_day="2026-11-24"), lp.SAME_DAY_WORDS), (body(from_lorry=99), lp.CHANGED_WORDS), (body(line_key="R999|1||"), lp.CHANGED_WORDS),
+                   (body(yard_id="L999"), "not in this week's plan"), (body(to_day="2026-12-01"), "not in this week"), (body(view="booked"), "chained or compressed"),
+                   (body(to_lorry=_src["n"]), "already on that lorry")):
+    try:
+        lp.move(PG, bad)
+        ok(f"8: refused: {words}", False, "no refusal")
+    except lp.PlanError as e:
+        ok(f"8: refused in words: {words}", words in str(e), str(e))
+ok("8: ...and none of those saved anything", not db.query(f"SELECT id FROM {lp.TABLE}"))
+
+# a move that fits: a trip of a fuller lorry onto the yard's emptiest (the last; first fit leaves it the most free) — found
+# by the rule itself over the pinned day, so the case is real, not assumed
+_fit = None
+for _b in C["days"][DAY]:
+    for _r in _b["lorries"][:-1]:
+        for _x in _r["blocks"]:
+            if _x["kind"] == "trip" and fits(_b["lorries"][-1], _x):
+                _fit = (_b, _r, _x, _b["lorries"][-1])
+                break
+        if _fit:
+            break
+    if _fit:
+        break
+ok("8: the stand-in week has a lorry whose trip FITS its yard's emptiest lorry (the landing case)", _fit is not None)
+_blk, _fsrc, _ftrip, _tgt = _fit
+_yid, _veh = _blk["yard_id"], _blk["vehicle"]
+
+
+def fbody(**k):
+    b = {"view": "chained", "yard_id": _yid, "vehicle": _veh, "line_key": _ftrip["line_key"], "from_day": DAY, "from_lorry": _fsrc["n"], "to_day": DAY, "to_lorry": _tgt["n"]}
+    b.update(k)
+    return b
+
+
+_pre_count = C["by_day"][DAY]
+_v0 = db.data_version()
+res = lp.move(PG, fbody(), by="Pat", now=datetime.datetime(2026, 11, 23, 9, 30))
+_rows = db.query(f"SELECT * FROM {lp.TABLE}")
+ok("8: a move that fits answers where the trip landed and saves ONE row for the yard, view and week, by Pat, with the week's fingerprint",
+   res["ok"] is True and res["view"] == "chained" and res["day"] == DAY and res["lorry"] == _tgt["n"] and len(_rows) == 1
+   and _rows[0]["id"] == f"2026-11-23|chained|{_yid}|{_veh}" and _rows[0]["moved_by"] == "Pat" and _rows[0]["moved_at"] == "2026-11-23T09:30"
+   and _rows[0]["week_from"] == "2026-11-23" and len(_rows[0]["pool_fp"]) == 20, str(res))
+ok("8: the write bumps the data version (so the kept plan read is rebuilt)", db.data_version() > _v0)
+_saved = json.loads(_rows[0]["lorries_json"])
+ok("8: the saved chained arrangement holds the day touched only (the other days stay Wayscope's), with that day's own fingerprint and its lorries as lists of (line, day) references",
+   set(_saved.keys()) == {DAY} and "fp" in _saved[DAY] and isinstance(_saved[DAY]["lorries"], list)
+   and all(set(ref.keys()) == {"lk", "d"} for L in _saved[DAY]["lorries"] for ref in L)
+   and sum(len(L) for L in _saved[DAY]["lorries"]) == sum(r["trips"] for r in _blk["lorries"]))
+D2 = lp.plan(PG, acc=PLANNER)
+C2 = D2["chained"]
+_blk2 = next(b for b in C2["days"][DAY] if b["yard_id"] == _yid and b["vehicle"] == _veh)
+_t2 = next(r for r in _blk2["lorries"] if r["n"] == _tgt["n"])
+ok("8: plan() now shows the arrangement on that day: the target lorry has one trip more, the yard is flagged arranged (by Pat), the yard named at the top",
+   _blk2["arranged"] is True and _blk2["moved_by"] == "Pat" and _t2["trips"] == _tgt["trips"] + 1 and D2["arranged"]["chained"] == [_blk["name"]]
+   and D2["arranged"]["compressed"] == [], f"{_t2['trips']} vs {_tgt['trips']}")
+ok("8: ...the source lorry has one trip fewer, or is gone when it had only the one; the day's count never rises",
+   (len(_blk2["lorries"]) == len(_blk["lorries"]) - 1 if _fsrc["trips"] == 1 else next(r for r in _blk2["lorries"] if r["n"] == _fsrc["n"])["trips"] == _fsrc["trips"] - 1)
+   and C2["by_day"][DAY] <= _pre_count)
+ok("8: ...the other days of that yard are Wayscope's plan still (each day stands on its own fingerprint in the chained view)",
+   all(b["arranged"] is False for d in DAYS if d != DAY for b in C2["days"][d] if b["yard_id"] == _yid and b["vehicle"] == _veh))
+ok("8: ...every load is still on exactly one lorry", trips_in(C2, DAY) == trips_in(C, DAY))
+ok("8: ...the words say the arrangement is kept until the loads change", "until its loads change" in D2["words"]["arranged"] and "Reset" in D2["words"]["arranged"])
+ok("8: the driver sheets print the arranged day (the target lorry's page has one trip more)",
+   str(_t2["trips"]) in pdf_text(lp.build_pdf(D2, "chained", DAY)))
+
+# the loads change: the arrangement gives way
+PG3 = copy.deepcopy(PG)
+for l in PG3["commit"]["lines"]:
+    if lp.line_key(l) == _ftrip["line_key"]:
+        for x in l["days"]:
+            if x["day_date"] == DAY:
+                x["derived"]["trips"] = int(x["derived"]["trips"]) + 1
+                x["planned_qty"] = _f(x.get("planned_qty")) * (x["derived"]["trips"]) / (x["derived"]["trips"] - 1) if False else x.get("planned_qty")
+D3 = lp.plan(PG3, acc=PLANNER)
+_blk3 = next(b for b in D3["chained"]["days"][DAY] if b["yard_id"] == _yid and b["vehicle"] == _veh)
+ok("8: one load more on that line that day and the saved arrangement is not used (Wayscope's plan shows, nothing deleted)",
+   _blk3["arranged"] is False and D3["arranged"]["chained"] == [] and len(db.query(f"SELECT id FROM {lp.TABLE}")) == 1)
+
+# compressed: to another day, lorry 0 = the first lorry there that takes it, else a new one
+X0 = D2["compressed"]
+_xblk = next(b for b in X0["days"][DAY] if b["yard_id"] == _yid and b["vehicle"] == _veh)
+_xsrc = _xblk["lorries"][-1]
+_xtrip = next(b for b in _xsrc["blocks"] if b["kind"] == "trip")
+_to = "2026-11-24" if DAY != "2026-11-24" else "2026-11-25"
+res2 = lp.move(PG, {"view": "compressed", "yard_id": _yid, "vehicle": _veh, "line_key": _xtrip["line_key"], "from_day": DAY, "from_lorry": _xsrc["n"],
+                    "to_day": _to, "to_lorry": 0}, by="Pat")
+D4 = lp.plan(PG, acc=PLANNER)
+X4 = D4["compressed"]
+_xto = next((b for b in X4["days"][_to] if b["yard_id"] == _yid and b["vehicle"] == _veh), None)
+ok("8 (compressed): a trip dropped on another day lands on that day — on the first lorry there with room, else a new one — and the view is arranged",
+   res2["ok"] and res2["day"] == _to and _xto is not None and _xto["arranged"] is True and D4["arranged"]["compressed"] == [_blk["name"]]
+   and sum(1 for r in _xto["lorries"] for b in r["blocks"] if b["kind"] == "trip" and b["line_key"] == _xtrip["line_key"] and b["day"] == _xtrip["day"]) >= 1
+   and len(db.query(f"SELECT id FROM {lp.TABLE}")) == 2, str(res2))
+ok("8 (compressed): the moved trip keeps the day it is booked on in its reference, so the moves list (what Apply writes) follows the arrangement",
+   any(m["line_key"] == _xtrip["line_key"] and m["day"] == _to for m in X4["moves"]) or (_xtrip["line_key"] in X4["lines"] and X4["lines"][_xtrip["line_key"]]["days"][_to]["trips_to"] >= 1))
+ok("8 (compressed): the week carries the same loads", sum(trips_in(X4, d) for d in DAYS) == sum(trips_in(X0, d) for d in DAYS))
+ok("8 (compressed): the chained view is untouched by a compressed move", D4["arranged"]["chained"] == [_blk["name"]] and D4["chained"]["by_day"] == C2["by_day"])
+
+# reset
+ok("8: reset of one view deletes that view's row only", lp.reset("2026-11-23", "chained") == {"deleted": 1} and [r["view"] for r in db.query(f"SELECT view FROM {lp.TABLE}")] == ["compressed"])
+ok("8: reset of the week deletes the rest; nothing left = 0", lp.reset("2026-11-23") == {"deleted": 1} and lp.reset("2026-11-23") == {"deleted": 0} and not db.query(f"SELECT id FROM {lp.TABLE}"))
+ok("8: plan() is Wayscope's again", lp.plan(PG, acc=PLANNER)["arranged"] == {"chained": [], "compressed": []})
+
+# the endpoints (stubbed FastAPI): the plan read is kept and rebuilt after a move
+lookahead.page = lambda **k: bake(_real_page(**k))
+read_cache.clear() if hasattr(read_cache, "clear") else None
+
+
+class _Body:
+    def __init__(self, **k):
+        self.__dict__.update(k)
+
+    def dict(self):
+        return dict(self.__dict__)
+
+
+R0 = main.forecast_week_lorry_plan(bucket="commit")
+ok("8 (endpoint): the kept plan read starts as Wayscope's", R0["arranged"] == {"chained": [], "compressed": []})
+r = main.forecast_week_lorry_plan_move(_Body(**fbody()), bucket="commit")
+R1 = main.forecast_week_lorry_plan(bucket="commit")
+ok("8 (endpoint): POST …/lorry-plan/move saves the arrangement and the next read of the kept plan shows it (the write bumps the data version)",
+   r["ok"] is True and R1["arranged"]["chained"] == [_blk["name"]] and R1 is not R0)
+_nb = next(b for b in R1["chained"]["days"][DAY] if len(b["lorries"]) >= 2 and not fits(b["lorries"][0], next(x for x in b["lorries"][-1]["blocks"] if x["kind"] == "trip")))
+_nt = next(x for x in _nb["lorries"][-1]["blocks"] if x["kind"] == "trip")
+try:
+    main.forecast_week_lorry_plan_move(_Body(view="chained", yard_id=_nb["yard_id"], vehicle=_nb["vehicle"], line_key=_nt["line_key"], from_day=DAY,
+                                             from_lorry=_nb["lorries"][-1]["n"], to_day=DAY, to_lorry=1), bucket="commit")
+    ok("8 (endpoint): a refused drop", False)
+except _HTTPException as e:
+    ok("8 (endpoint): a refused drop answers 409 with the reason", e.status_code == 409 and str(e.detail).startswith("Would pass"), f"{e.status_code} {e.detail}")
+_tok = access._ACCESS.set(TEAM)
+for fn, kw in ((main.forecast_week_lorry_plan_move, {"body": _Body(**body()), "bucket": "commit"}), (main.forecast_week_lorry_plan_reset, {"bucket": "commit"})):
+    try:
+        fn(**kw)
+        ok(f"8 (endpoint): a team cannot {fn.__name__}", False)
+    except _HTTPException as e:
+        ok(f"8 (endpoint): a team cannot {fn.__name__.split('_')[-1]} (403)", e.status_code == 403, str(e.status_code))
+access._ACCESS.reset(_tok)
+access.set_current(None)
+try:
+    main.forecast_week_lorry_plan_move(_Body(**body()), bucket="commit")
+    ok("8 (endpoint): signed out", False)
+except _HTTPException as e:
+    ok("8 (endpoint): signed out -> 401", e.status_code == 401)
+access.set_current("planner123")
+rr = main.forecast_week_lorry_plan_reset(bucket="commit", view="chained")
+ok("8 (endpoint): POST …/lorry-plan/reset deletes the view's arrangement and the kept read is Wayscope's again",
+   rr == {"deleted": 1} and main.forecast_week_lorry_plan(bucket="commit")["arranged"]["chained"] == [])
+lookahead.page = _real_page
+ok("8: the routes are planners' and admins'", '_require_planner_or_admin("move a trip between lorries")' in MAIN and '_require_planner_or_admin("reset the lorry plan")' in MAIN
+   and '@app.post("/api/forecast-weeks/lorry-plan/move")' in MAIN and '@app.post("/api/forecast-weeks/lorry-plan/reset")' in MAIN)
+
+# the page's own look at the rule = the module's constants (one rule, drivers_hours.py)
+_m = re.search(r"const LP_RULE = \{ driveMax: (\d+), driveBreak: (\d+), breakLong: (\d+), workShort: (\d+), workLong: (\d+), breakShort: (\d+) \};", APP)
+ok("8: the page's six rule figures are drivers_hours.py's (driving 540, break after 270, 45; work 360 / 540, 30)",
+   _m is not None and [int(x) for x in _m.groups()] == [int(dh.DRIVING_MAX_MIN), int(dh.DRIVING_BEFORE_BREAK_MIN), int(dh.BREAK_LONG_MIN),
+                                                        int(dh.WORK_SHORT_BREAK_AFTER_MIN), int(dh.WORK_LONG_BREAK_AFTER_MIN), int(dh.BREAK_SHORT_MIN)])
+ok("8: the screen (source): draggable trips with a menu, the drop targets, Reset, the badge; the guides say so",
+   'data-lp-trip={b.line_key}' in APP and 'data-lp-reset="1"' in APP and '<span className="lp-badge"' in APP and "function LpTrip({" in APP
+   and "drag a trip" in UG.lower() and "lorry_plan_moves" in TECH and "/api/forecast-weeks/lorry-plan/move" in TECH)
+ok("8: no 'movement' or 'compliant' in the new words", not re.search(r"movement|compliant", lp.ARRANGED_WORDS + lp.CHANGED_WORDS + lp.SAME_DAY_WORDS, re.I))
 
 print(f"\ntest_lorry_plan.py: {PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

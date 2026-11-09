@@ -619,9 +619,25 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   @media (max-width:767px){.lp-row{grid-template-columns:1fr;gap:2px}.lp-row .lp-free{text-align:left}}
   .lp-nm{font-size:13px;font-weight:600}
   .lp-nm small{display:block;color:var(--muted);font-weight:500;font-size:12px}
-  .lp-track{position:relative;height:26px;background:var(--soft,#F1F5F9);border-radius:5px;overflow:hidden}
-  .lp-blk{position:absolute;top:2px;bottom:2px;border-radius:3px;font-size:12px;line-height:22px;color:#fff;overflow:hidden;white-space:nowrap;padding:0 4px;box-sizing:border-box;border-right:1px solid rgba(255,255,255,.6);background:var(--navy)}
+  .lp-track{position:relative;height:28px;background:var(--soft,#F1F5F9);border-radius:5px;overflow:hidden}
+  .lp-blk{position:absolute;top:2px;bottom:2px;border-radius:3px;font-size:12px;line-height:24px;color:#fff;overflow:hidden;white-space:nowrap;padding:0 4px;box-sizing:border-box;border-right:1px solid rgba(255,255,255,.6);background:var(--navy)}
   .lp-blk.is-break{background:repeating-linear-gradient(135deg,#CBD5E1 0 4px,#E2E8F0 4px 8px);color:#334155}
+  /* 9 Nov 2026 (2.1-9b, card 9): a trip a planner can drag or move from its menu — a details whose summary is the block face */
+  .lp-trip{position:absolute;top:2px;bottom:2px;min-width:24px;overflow:visible}
+  .lp-trip summary.lp-blk{position:static;height:24px;display:block;list-style:none;cursor:grab;border:0;margin:0}
+  .lp-trip summary::-webkit-details-marker{display:none}
+  .lp-trip[open] summary.lp-blk{box-shadow:inset 0 0 0 2px #fff}
+  .lp-trip summary.lp-blk:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+  .lp-trip.is-dragging summary.lp-blk{opacity:.45;cursor:grabbing}
+  .lp-trip .row-menu-list{top:28px;left:0;right:auto;font-size:13px}
+  .lp-trip .row-menu-list button{font-size:13px}
+  .lp-trip .row-menu-list button.is-no{opacity:.55}
+  .lp-trip .row-menu-list .lp-menu-h{font-size:12px;color:var(--popover-muted);padding:4px 10px 2px;white-space:normal}
+  .lp-track.is-over{box-shadow:inset 0 0 0 2px var(--ok-text)}
+  .lp-track.is-over.is-no{box-shadow:inset 0 0 0 2px var(--bad-text)}
+  .lp-refused{font-size:12px;color:var(--bad-text);font-weight:600;grid-column:2}
+  .lp-day-over{box-shadow:inset 0 0 0 2px var(--ok-text)}
+  .lp-badge{display:inline-block;font-size:12px;font-weight:600;color:var(--navy);background:var(--navy-soft);border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:1px}
   .lp-free{font-size:13px;color:var(--muted);text-align:right}
   .lp-axis{display:grid;grid-template-columns:140px 1fr 150px;gap:10px;color:var(--muted);font-size:12px;padding:2px 0 6px}
   @media (max-width:767px){.lp-axis{display:none}}
@@ -1498,7 +1514,7 @@ const INFO = {
     how: "Only a decision that changes the lorry, the supplier or the route changes trips; one that changes only the material does not.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
   // 14 Oct 2026 (bundle G, W17)
   "la.lorryplan": { title: "Lorry plan", text: "Each lorry's day used to the full: one day's loads leaving one yard in one kind of lorry, chained into as few lorry-days as the UK drivers' hours rule allows, each lorry's trips in the driver's order.",
-    how: "As booked is each line's own whole lorries, as the grid counts them. Chained by yard keeps the same loads on the same days with fewer lorries. Week compressed pools the week's loads so a part-used last lorry becomes one full lorry on fewer days: a suggestion until Apply. A planning figure, never a check of anyone's hours.", guide: "ug-lorry-plan", tech: "t1-lorry-plan" },
+    how: "As booked is each line's own whole lorries, as the grid counts them. Chained by yard keeps the same loads on the same days with fewer lorries. Week compressed pools the week's loads so a part-used last lorry becomes one full lorry on fewer days: a suggestion until Apply. Planners and admins can drag a trip to another lorry of its yard (or, compressed, to another day); a drop that would pass the driver's day is refused, and the arrangement is kept for the week until its loads change. A planning figure, never a check of anyone's hours.", guide: "ug-lorry-plan", tech: "t1-lorry-plan" },
   "la.gates": { title: "Gates this week", text: "Each gate's planned lorries a day this week, every team together, against what it can check in. Gold, Queue likely, from 85 %; red, Over gate capacity, past it or on a closed day.",
     how: "What a gate can check in = its open minutes (its hours, or the default gate hours where none are typed, less its shut times and the no-delivery peak bands) ÷ its check-in minutes a lorry. Planned arrivals spread evenly; no hourly peak is known.", guide: "6-3-commit-view-this-week-by-day", tech: "t1-gates" },
   // 8 Nov 2026 (2.1-13): the week maps' "i" boxes (the hover hint left the key row)
@@ -5107,8 +5123,8 @@ const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved
 // general. `name` names the row for a screen reader; the items are plain buttons (red for Delete / Withdraw, which confirm). The open
 // list is pinned to the screen beside its "⋯" (a table's card scrolls, and clipped the list), flips upward near the bottom edge, and
 // closes after a pick or on a scroll; a click elsewhere or Escape closes every details.row-menu (below).
-function RowMenu({ name, note, children }) {
-  const ref = useRef(null);
+// 9 Nov 2026 (2.1-9b): the pinning of an open row menu, shared with the Lorry plan's trip menus (useRowMenuPlace)
+function useRowMenuPlace(ref) {
   useEffect(() => {
     const d = ref.current; if (!d) return;
     const list = () => d.querySelector(".row-menu-list");
@@ -5126,6 +5142,10 @@ function RowMenu({ name, note, children }) {
     window.addEventListener("scroll", shut, true); window.addEventListener("resize", shut);
     return () => { d.removeEventListener("toggle", onToggle); window.removeEventListener("scroll", shut, true); window.removeEventListener("resize", shut); };
   }, []);
+}
+function RowMenu({ name, note, children }) {
+  const ref = useRef(null);
+  useRowMenuPlace(ref);
   const pick = e => { const b = e.target.closest ? e.target.closest("button") : null; if (b && !b.disabled && ref.current) ref.current.open = false; };
   return (
     <details className="row-menu" ref={ref}>
@@ -10918,21 +10938,58 @@ const lpShort = (n) => String(n || "").replace(" (fictional)", "").replace("Rail
 // destination colours: the chart tokens first (every look and accent), then five more data colours
 const lpPalette = () => [1, 2, 3, 4, 5].map(i => tok(`--chart-${i}`, "#1E3A8A")).concat(["#9D174D", "#0F766E", "#B45309", "#4338CA", "#C2410C"]);
 function lpDayWords(iso){ return iso ? `${dayName(iso)} ${dayNum(iso)}` : ""; }
-function LorryPlanRow({ r, yard, colour }){
+// 9 Nov 2026 (2.1-9b, card 9): the page's own look at a drop before the server's answer — the same rule as
+// backend/drivers_hours.py (test_lorry_plan pins these six figures to its constants); the server's check is the one that counts.
+const LP_RULE = { driveMax: 540, driveBreak: 270, breakLong: 45, workShort: 360, workLong: 540, breakShort: 30 };
+function lpBreak(dr, wk){ return dr > LP_RULE.driveBreak || wk > LP_RULE.workLong ? LP_RULE.breakLong : (wk > LP_RULE.workShort ? LP_RULE.breakShort : 0); }
+function lpFits(row, b, shiftMin){
+  const dr = row.driving_minutes + (b.drive || 0), wk = row.work_minutes + (b.drive || 0) + (b.other || 0);
+  if(dr > LP_RULE.driveMax) return { ok: false, words: `would pass 9 h of driving by ${Math.round(dr - LP_RULE.driveMax)} min` };
+  const over = wk + lpBreak(dr, wk) - shiftMin;
+  return over > 0 ? { ok: false, words: `would pass the ${+(shiftMin / 60).toFixed(1)} h shift by ${Math.round(over)} min` } : { ok: true, words: "" };
+}
+// one trip block a planner can drag, with its menu (⋯ → Move to lorry 2 · Move to Thu 5) for the keyboard and a screen reader
+function LpTrip({ b, r, yard, style, colour, label, dnd }){
+  const ref = useRef(null);
+  useRowMenuPlace(ref);
+  const pick = e => { const btn = e.target.closest ? e.target.closest("button") : null; if(btn && !btn.disabled && ref.current) ref.current.open = false; };
+  const trip = { lk: b.line_key, day: b.day || yard.day, lorry: r.n, yard: yard.yard_id, vehicle: yard.vehicle, drive: b.drive || 0, other: b.other || 0, minutes: b.minutes, route: b.route_id };
+  const items = dnd.targets(trip);
+  return (
+    <details className={"row-menu lp-trip" + (dnd.drag && dnd.drag.lk === trip.lk && dnd.drag.lorry === trip.lorry && dnd.drag.day === trip.day ? " is-dragging" : "")} ref={ref} style={style}
+      draggable="true" onDragStart={e => dnd.start(e, trip)} onDragEnd={dnd.end} data-lp-trip={b.line_key}>
+      <summary className="lp-blk" aria-label={`${label}: move…`} title={`${label} — drag to another lorry, or open for the choices`} style={{ background: colour(b.dest_name) }}>{b.route_id}</summary>
+      <div className="row-menu-list" onClick={pick} role="group" aria-label={`Move ${label}`}>
+        <div className="lp-menu-h">{label}</div>
+        {items.map((it, i) => <button key={i} type="button" className={it.ok ? "" : "is-no"} disabled={!it.ok && it.hard} onClick={() => dnd.go(trip, it.to)} title={it.ok ? "" : it.words}>{it.label}{it.ok ? "" : ` · ${it.words}`}</button>)}
+        {!items.length && <div className="lp-menu-h">Nowhere else to put it this day.</div>}
+      </div>
+    </details>
+  );
+}
+function LorryPlanRow({ r, yard, colour, dnd }){
   const span = LP_DAY_TO - LP_DAY_FROM;
   const title = r.blocks.map(b => b.kind === "break" ? `${b.start} break ${b.minutes} min` : `${b.start} ${b.route_id} → ${lpShort(b.dest_name)}, ${b.qty} ${unitLbl(b.unit)}`).join(" · ");
+  const can = !!(dnd && dnd.can);
+  const over = can && dnd.over && dnd.over.day === yard.day && dnd.over.yard === yard.yard_id && dnd.over.lorry === r.n ? dnd.over : null;
+  const refused = can && dnd.refused && dnd.refused.day === yard.day && dnd.refused.yard === yard.yard_id && dnd.refused.lorry === r.n ? dnd.refused : null;
+  const target = { yard: yard.yard_id, vehicle: yard.vehicle, day: yard.day, lorry: r.n };
   return (
     <div className="lp-row" data-lp-lorry={r.n}>
       <div className="lp-nm">Lorry {r.n}<small>{r.trips} trip{r.trips === 1 ? "" : "s"} · {r.places.map(lpShort).join(", ")}</small></div>
-      <div className="lp-track" role="img" aria-label={`Lorry ${r.n}: ${title}; ${r.free_words}`} title={title}>
+      <div className={"lp-track" + (over ? " is-over" + (over.ok ? "" : " is-no") : "")} role={can ? "group" : "img"} aria-label={`Lorry ${r.n}: ${title}; ${r.free_words}`} title={can ? undefined : title}
+        onDragOver={can ? (e => dnd.hover(e, r, target)) : undefined} onDragLeave={can ? dnd.leave : undefined} onDrop={can ? (e => dnd.drop(e, r, target)) : undefined}>
         {r.blocks.map((b, i) => {
           const st = lpMin(b.start); if(st == null) return null;
           const left = Math.max(0, (st - LP_DAY_FROM) / span * 100), width = Math.max(0.6, b.minutes / span * 100);
+          const style = { left: `${left}%`, width: `${Math.min(width, 100 - left)}%` };
+          if(can && b.kind === "trip") return <LpTrip key={i} b={b} r={r} yard={yard} style={style} colour={colour} dnd={dnd} label={`${b.start} ${b.route_id} → ${lpShort(b.dest_name)}, lorry ${r.n}`} />;
           return <div key={i} className={"lp-blk" + (b.kind === "break" ? " is-break" : "")} aria-hidden="true"
-            style={{ left: `${left}%`, width: `${Math.min(width, 100 - left)}%`, background: b.kind === "break" ? undefined : colour(b.dest_name) }}>{b.kind === "break" ? "break" : b.route_id}</div>;
+            style={{ ...style, background: b.kind === "break" ? undefined : colour(b.dest_name) }}>{b.kind === "break" ? "break" : b.route_id}</div>;
         })}
       </div>
       <div className="lp-free" data-lp-free={r.free_minutes}>{r.free_words}</div>
+      {refused && <div className="lp-refused" role="status" data-lp-refused="1">{refused.words}</div>}
     </div>
   );
 }
@@ -10945,19 +11002,89 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
   const [busy, setBusy] = useState("");
   const [moves, setMoves] = useState(false);
   const [note, setNote] = useState(null);
+  // 9 Nov 2026 (2.1-9b, card 9): a planner's own moves — the trip being dragged, the row under it, a refused drop, a re-read
+  const [rev, setRev] = useState(0);
+  const [drag, setDrag] = useState(null);
+  const [over, setOver] = useState(null);
+  const [refused, setRefused] = useState(null);
   const canApply = !!(access && (access.role === "planner" || access.role === "admin"));
+  const canMove = canApply;
   useEffect(() => {
     let live = true;
     fetch(`${API}/forecast-weeks/lorry-plan?bucket=${bucket}`).then(okJSON)
       .then(j => { if(!live) return; setData(j); setErr(""); if(onData) onData(j); })
       .catch(e => { if(live){ setData(null); setErr(errSay("The lorry plan could not be read.", e)); if(onData) onData(null); } });
     return () => { live = false; };
-  }, [bucket, tick]);
+  }, [bucket, tick, rev]);
+  useEffect(() => { if(!refused) return; const t = setTimeout(() => setRefused(null), 5000); return () => clearTimeout(t); }, [refused]);
   if(!data && !err) return null;
   const days = (data && data.days) || [];
   const shown = (day && days.includes(day)) ? day : (days.includes(data && data.today) ? data.today : days[0]);
   const v = data ? data[view] : null;
   const blocks = (view !== "booked" && v && v.days && v.days[shown]) || [];
+  const shiftMin = (data && data.shift_minutes) || ((data && data.shift_hours) || 10) * 60;
+  const arrangedHere = view !== "booked" && data && data.arranged && (data.arranged[view] || []).length > 0;
+  const rowsOf = (dayIso, yardId) => { const y = (v && v.days && v.days[dayIso] || []).find(b => b.yard_id === yardId); return y ? y.lorries : []; };
+  const postMove = async (trip, to) => {
+    setBusy("move"); setNote(null); setRefused(null);
+    const body = { view, yard_id: trip.yard, vehicle: trip.vehicle, line_key: trip.lk, from_day: trip.day, from_lorry: trip.lorry, to_day: to.day, to_lorry: to.lorry || 0 };
+    try {
+      const r = await fetch(`${API}/forecast-weeks/lorry-plan/move?bucket=${bucket}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if(!r.ok) throw await errFrom(r);
+      const j = await r.json();
+      setNote({ ok: true, text: `Moved to ${lpDayWords(j.day)}, lorry ${j.lorry}.` });
+      if(to.day !== shown) setDay(to.day);
+      setRev(x => x + 1);
+    } catch(e){
+      if(e && e.status === 409) setRefused({ ...to, yard: trip.yard, words: e.message || "Not moved." });
+      else setNote({ ok: false, text: errSay("The trip was not moved.", e) });
+    }
+    setBusy("");
+  };
+  const dnd = {
+    can: canMove && !busy, drag, over, refused,
+    start: (e, trip) => { try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", trip.route); } catch(_){} setDrag(trip); },
+    end: () => { setDrag(null); setOver(null); },
+    hover: (e, row, target) => {
+      if(!drag || drag.yard !== target.yard || drag.vehicle !== target.vehicle || (view === "chained" && drag.day !== target.day)) return;
+      if(drag.day === target.day && drag.lorry === target.lorry) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = "move";
+      const f = lpFits(row, drag, shiftMin);
+      if(!over || over.lorry !== target.lorry || over.day !== target.day || over.ok !== f.ok) setOver({ ...target, ok: f.ok, words: f.words });
+    },
+    leave: () => setOver(null),
+    drop: (e, row, target) => {
+      e.preventDefault(); setOver(null);
+      if(!drag) return;
+      const f = lpFits(row, drag, shiftMin);
+      if(!f.ok){ setRefused({ ...target, words: `Not moved: ${f.words}.` }); setDrag(null); return; }
+      const t = drag; setDrag(null); postMove(t, { day: target.day, lorry: target.lorry });
+    },
+    hoverDay: (e, dayIso) => { if(!drag || view !== "compressed" || dayIso === drag.day) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; if(!over || over.dayChip !== dayIso) setOver({ dayChip: dayIso, ok: true }); },
+    dropDay: (e, dayIso) => { e.preventDefault(); setOver(null); if(!drag) return; const t = drag; setDrag(null); postMove(t, { day: dayIso, lorry: 0 }); },
+    go: (trip, to) => postMove(trip, to),
+    targets: (trip) => {
+      const out = [];
+      rowsOf(trip.day, trip.yard).forEach(row => {
+        if(row.n === trip.lorry) return;
+        const f = lpFits(row, trip, shiftMin);
+        out.push({ label: `Move to lorry ${row.n}`, to: { day: trip.day, lorry: row.n }, ok: f.ok, hard: true, words: f.words });
+      });
+      if(view === "compressed") days.filter(d => d !== trip.day).forEach(d => out.push({ label: `Move to ${lpDayWords(d)}`, to: { day: d, lorry: 0 }, ok: true, words: "" }));
+      return out;
+    },
+  };
+  const resetPlan = async () => {
+    if(!window.confirm("Put Wayscope's plan back for this week? Your moves in this view are forgotten.")) return;
+    setBusy("reset"); setNote(null);
+    try {
+      const r = await fetch(`${API}/forecast-weeks/lorry-plan/reset?bucket=${bucket}&view=${view}`, { method: "POST", headers: { "Content-Type": "application/json" } });
+      if(!r.ok) throw await errFrom(r);
+      setNote({ ok: true, text: "Wayscope's plan is back." });
+      setRev(x => x + 1);
+    } catch(e){ setNote({ ok: false, text: errSay("The plan was not reset.", e) }); }
+    setBusy("");
+  };
   const dests = {};
   const pal = lpPalette();
   const colour = (d) => { if(!(d in dests)) dests[d] = pal[Object.keys(dests).length % pal.length]; return dests[d]; };
@@ -11020,11 +11147,13 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
             </span>
             <span className="inline-flex rounded-lg border text-[13px] overflow-hidden" role="group" aria-label="Day" style={{ borderColor: "var(--line)" }}>
               {days.map(d => (
-                <button key={d} type="button" aria-pressed={d === shown ? "true" : "false"} onClick={() => setDay(d)} className="px-2.5 py-1.5 font-semibold"
+                <button key={d} type="button" aria-pressed={d === shown ? "true" : "false"} onClick={() => setDay(d)} className={"px-2.5 py-1.5 font-semibold" + (over && over.dayChip === d ? " lp-day-over" : "")}
+                  onDragOver={canMove ? (e => dnd.hoverDay(e, d)) : undefined} onDragLeave={canMove ? dnd.leave : undefined} onDrop={canMove ? (e => dnd.dropDay(e, d)) : undefined}
                   style={d === shown ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}>{lpDayWords(d)}</button>
               ))}
             </span>
             {view !== "booked" && <span className="ml-auto flex items-center gap-2">
+              {canMove && arrangedHere && <button type="button" className="btn-sec" onClick={resetPlan} disabled={!!busy} data-lp-reset="1" title="Forget your moves in this view and show Wayscope's plan">{busy === "reset" ? "Resetting…" : "Reset to Wayscope's plan"}</button>}
               <button type="button" className="btn-sec" onClick={() => download("pdf")} disabled={!!busy || !blocks.length} data-lp-sheets="1">{busy === "pdf" ? "Preparing…" : "Driver sheets (PDF)"}</button>
               <button type="button" className="btn-sec" onClick={() => download("xlsx")} disabled={!!busy || !blocks.length}>XLSX</button>
               {view === "compressed" && canApply && <button type="button" className="btn-pri" onClick={apply} data-lp-apply="1"
@@ -11044,12 +11173,13 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
           ) : (
             <>
               {blocks.map(y => (
-                <div key={y.origin_id + "|" + y.vehicle} className="lp-yard" data-lp-yard={y.origin_id}>
-                  <h4>{lpShort(y.name)} · {vehLabel(y.vehicle)}</h4>
+                <div key={y.origin_id + "|" + y.vehicle} className="lp-yard" data-lp-yard={y.origin_id} data-lp-arranged={y.arranged ? "1" : undefined}>
+                  <h4>{lpShort(y.name)} · {vehLabel(y.vehicle)}{y.arranged && <span className="lp-badge" title={y.moved_by ? `Arranged by ${y.moved_by}` : "Arranged by a planner"}>your arrangement</span>}</h4>
                   <div className="lp-sub">{grp(y.loads)} load{y.loads === 1 ? "" : "s"} to {y.places.length} place{y.places.length === 1 ? "" : "s"} · the lines book {grp(y.booked)} lorr{y.booked === 1 ? "y" : "ies"} · <b>{grp(y.lorries.length)} chained</b>{y.kept ? ` · ${y.kept} kept for a pour` : ""}{y.booked > y.count ? ` · ${y.booked - y.count} saved` : ""}</div>
-                  {y.lorries.map(r => <LorryPlanRow key={r.n} r={r} yard={y} colour={colour} />)}
+                  {y.lorries.map(r => <LorryPlanRow key={r.n} r={r} yard={y} colour={colour} dnd={dnd} />)}
                 </div>
               ))}
+              {canMove && blocks.length > 0 && <div className="clp-note" data-lp-drag-hint="1">Drag a trip to another lorry of its yard{view === "compressed" ? ", or to a day above" : ""}; a drop that would pass the driver's day is refused. Each trip's menu does the same from the keyboard.</div>}
               <div className="lp-axis" aria-hidden="true"><span></span><div className="lp-ticks">{Array.from({ length: (LP_DAY_TO - LP_DAY_FROM) / 60 + 1 }, (_, i) => <span key={i} style={{ left: `${i * 60 / (LP_DAY_TO - LP_DAY_FROM) * 100}%` }}>{String(LP_DAY_FROM / 60 + i).padStart(2, "0")}:00</span>)}</div><span></span></div>
               <div className="lp-key" data-lp-key="1">{Object.entries(dests).map(([d, c]) => <span key={d}><i style={{ background: c }}></i>{lpShort(d)}</span>)}<span><i style={{ background: "repeating-linear-gradient(135deg,#CBD5E1 0 4px,#E2E8F0 4px 8px)" }}></i>required break</span><span><i style={{ background: "var(--soft,#F1F5F9)", border: "1px solid #CBD5E1" }}></i>free</span></div>
               {view === "compressed" && (
@@ -11067,7 +11197,7 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
               )}
             </>
           )}
-          <div className="ct-note">{data.words.rule} {view === "compressed" ? data.words.compress : data.words.planning}{data.team_only ? ` ${data.team_only}'s lines only.` : ""}</div>
+          <div className="ct-note">{data.words.rule} {view === "compressed" ? data.words.compress : data.words.planning}{arrangedHere ? ` ${data.words.arranged}` : ""}{data.team_only ? ` ${data.team_only}'s lines only.` : ""}</div>
         </>
       )}
     </section>

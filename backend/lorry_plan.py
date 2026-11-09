@@ -30,9 +30,20 @@ Words (Q8): "Lorry plan", "chained", "free", "room for N more trips", "lorry-day
 "utilisation", "fill rate", "compliant" (NOT_MODELLED_WORDS say what the figure leaves out) or "movements".
 Scope (Q10): the page this is built from is already the caller's (a team its lines only); the sheet says whose it is.
 Pure over the page it is given, plus the tenant's locations, routes and gates for the sheets. Wayscope sends nothing.
+
+PR 2 (9 Nov 2026, v2.1 task 2.1-9b, mockup card 9 + Q14; John: "Yes, build it"): A PLANNER'S OWN ARRANGEMENT. A trip
+block can be dragged to another lorry of the same yard (chained and compressed) or, in the compressed view, to another
+day. move() checks the drop against the same rule (_fits) and refuses in words ("Would pass the 10 h shift by 13 min");
+a move that fits is saved per yard and week in the tenanted table `lorry_plan_moves` as the yard's whole arrangement
+(each lorry a list of trip references {lk, d}) with a fingerprint of the trips it was made from, and plan() uses it in
+place of pack() while that fingerprint still matches (chained: a day at a time; compressed: the yard's week). Once the
+loads change the arrangement is simply not used (the words say so); reset() deletes it. Planners and admins only: a
+team sees Wayscope's plan of its own lines.
 """
 import datetime
+import hashlib
 import io
+import json
 import math
 import re
 
@@ -50,7 +61,13 @@ COMPRESS_WORDS = ("A suggestion until Apply: a load moves only within its own li
 SENDS_NOTHING = "Wayscope sends nothing: download the sheets and hand them to the haulier."
 #: Q2: never chained across yards or lorry types
 ONE_YARD_WORDS = "One yard and one kind of lorry a lorry-day."
+#: PR 2 (card 9): the panel's words when a saved arrangement is in use, and the refusals
+ARRANGED_WORDS = ("Your arrangement, kept for this week until its loads change; Reset puts Wayscope's plan back. "
+                  "A dropped trip is checked against the same rule first.")
+CHANGED_WORDS = "The plan has changed since the page was read: reload and try again."
+SAME_DAY_WORDS = "In Chained by yard a trip stays on its day: use Week compressed to move it to another day."
 EPS = 1e-6
+TABLE = "lorry_plan_moves"
 
 
 class PlanError(Exception):
@@ -177,7 +194,10 @@ def _lorry_rows(lorries, shift_min, start_min):
             blocks.append({"kind": "trip", "route_id": t["route_id"], "dest_id": t.get("dest_id"),
                            "dest_name": t.get("dest_name"), "line_key": t["line_key"], "start": _hm(t0),
                            "minutes": round(_f(t["cyc"]), 1), "qty": t.get("qty"), "unit": t.get("unit"),
-                           "material": t.get("material")})
+                           "material": t.get("material"),
+                           # PR 2: the day the trip is booked on and its own driving / other minutes, so a drop can
+                           # be checked on the page before the server's answer (the same rule, drivers_hours)
+                           "day": t.get("day"), "drive": round(_f(t["drive"]), 1), "other": round(_f(t["other"]), 1)})
             t0 += _f(t["cyc"])
             dr += _f(t["drive"])
             wk += _f(t["drive"]) + _f(t["other"])
@@ -277,20 +297,255 @@ def _collect(page, factors):
             per = q / n if n else 0.0
             trip = {"route_id": l.get("route_id"), "line_key": lk, "dest_id": c.get("dest_id"), "dest_name": c.get("dest_name"),
                     "drive": _f(c.get("drive_min")), "other": _f(c.get("other_work_min")), "cyc": _f(c.get("cycle_min")),
-                    "qty": round(per, 2), "unit": li["unit"], "material": c.get("material_type")}
+                    "qty": round(per, 2), "unit": li["unit"], "material": c.get("material_type"), "day": dd}
             if trip["cyc"] <= 0:
                 trip["cyc"] = trip["drive"] + trip["other"]
             y["days"].setdefault(dd, []).extend([dict(trip) for _ in range(n)])
     return yards, line_info
 
 
-def _yard_block(y, lorries, shift_min, start_min, gate_name, day):
+def _yard_block(y, lorries, shift_min, start_min, gate_name, day, key=None, arranged=None):
     rows = _lorry_rows(lorries, shift_min, start_min)
     loads = sum(r["trips"] for r in rows)
-    return {"origin_id": y["origin_id"], "name": y["name"], "vehicle": y["vehicle"], "vehicle_short": y["vehicle_short"],
+    return {"origin_id": y["origin_id"], "yard_id": (key or (y["origin_id"], y["vehicle"]))[0],
+            "name": y["name"], "vehicle": y["vehicle"], "vehicle_short": y["vehicle_short"],
             "gate": gate_name, "day": day, "loads": loads, "booked": y["booked"].get(day, 0),
             "kept": y["kept"].get(day, 0), "lorries": rows, "count": len(rows) + y["kept"].get(day, 0),
-            "places": sorted({p for r in rows for p in r["places"] if p})}
+            "places": sorted({p for r in rows for p in r["places"] if p}),
+            # PR 2: True when this day's lorries are a planner's saved arrangement, not pack()'s
+            "arranged": bool(arranged), "moved_by": (arranged or {}).get("moved_by"),
+            "moved_at": (arranged or {}).get("moved_at")}
+
+
+# ----------------------------------------------------------------------------------------------- the arrangement (PR 2)
+def pool_fp(trips):
+    """A fingerprint of a set of trips: how many of each (line, booked day). The saved arrangement is used only while
+    the trips it was made from are exactly these — a typed cell, an Apply or a re-route changes it and the arrangement
+    quietly gives way to Wayscope's plan (the words on the panel say so)."""
+    counts = {}
+    for t in trips:
+        k = f"{t['line_key']}|{t.get('day')}"
+        counts[k] = counts.get(k, 0) + 1
+    raw = "\n".join(f"{k}={counts[k]}" for k in sorted(counts))
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:20]
+
+
+def _row_id(week_from, view, key):
+    return f"{week_from}|{view}|{key[0]}|{key[1]}"
+
+
+def _saved_rows(week_from):
+    """{(view, yard_id, vehicle): {pool_fp, days: {d: {fp, lorries: [[{lk, d}…]…]}}, moved_by, moved_at}} for the week."""
+    if not week_from:
+        return {}
+    try:
+        import db
+        rows = db.query(f"SELECT view, origin_id, vehicle, pool_fp, lorries_json, moved_by, moved_at FROM {TABLE} "
+                        "WHERE tenant_id = ? AND week_from = ?", (db.current_tenant(), week_from))
+    except Exception:                                            # noqa: BLE001 — a bare page with no tables
+        return {}
+    out = {}
+    for r in rows:
+        try:
+            days = json.loads(r.get("lorries_json") or "{}")
+        except ValueError:
+            continue
+        out[(r["view"], r["origin_id"], r["vehicle"])] = {"pool_fp": r.get("pool_fp"), "days": days,
+                                                            "moved_by": r.get("moved_by"), "moved_at": r.get("moved_at")}
+    return out
+
+
+def _rebuild(trips, refs_by_lorry):
+    """The lorries [[{lk, d}…]…] rebuilt from `trips`: None unless every reference finds a trip and every trip is placed."""
+    buckets = {}
+    for t in trips:
+        buckets.setdefault((t["line_key"], t.get("day")), []).append(t)
+    lorries = []
+    for refs in refs_by_lorry or []:
+        L = {"trips": [], "drive": 0.0, "work": 0.0}
+        for ref in refs or []:
+            b = buckets.get((ref.get("lk"), ref.get("d")))
+            if not b:
+                return None
+            t = b.pop()
+            L["trips"].append(t)
+            L["drive"] += _f(t["drive"])
+            L["work"] += _f(t["drive"]) + _f(t["other"])
+        if L["trips"]:
+            lorries.append(L)
+    if any(buckets.values()):
+        return None
+    return lorries
+
+
+def _yard_lorries(y, view, shift_min, days_, saved=None):
+    """
+    {day: [lorry…]} for one yard in one view, and which days are the saved arrangement's.
+    Chained packs each day on its own; a saved day is used in place of pack() while its own fingerprint matches.
+    Compressed packs the week's pool and lays the lorries over the weekdays round-robin, busiest first; the saved
+    arrangement is used while the week's fingerprint matches. Returns (per_day, {day: True} of the days arranged).
+    """
+    per_day, arranged = {d: [] for d in days_}, {}
+    if view == "compressed":
+        pool = [t for d in days_ for t in (y["days"].get(d) or [])]
+        if saved and saved.get("pool_fp") == pool_fp(pool) and set((saved.get("days") or {}).keys()) <= set(days_):
+            refs = {d: (saved["days"].get(d) or {}).get("lorries") or [] for d in days_}
+            flat = [L for d in days_ for L in refs[d]]
+            built = _rebuild(pool, flat)
+            if built is not None:
+                # _rebuild leaves an empty lorry out, so walk the two lists together by the non-empty ones
+                j = 0
+                for d in days_:
+                    for lorry_refs in refs[d]:
+                        if lorry_refs:
+                            per_day[d].append(built[j])
+                            j += 1
+                for d in days_:
+                    if per_day[d]:
+                        arranged[d] = True
+                return per_day, arranged
+        packed = sorted(pack(pool, shift_min), key=lambda L: -L["work"]) if pool else []
+        for i, L in enumerate(packed):
+            per_day[days_[i % len(days_)]].append(L)
+        return per_day, arranged
+    for d in days_:
+        trips = y["days"].get(d) or []
+        sd = ((saved or {}).get("days") or {}).get(d)
+        if trips and sd and sd.get("fp") == pool_fp(trips):
+            built = _rebuild(trips, sd.get("lorries") or [])
+            if built is not None:
+                per_day[d] = built
+                arranged[d] = True
+                continue
+        per_day[d] = pack(trips, shift_min) if trips else []
+    return per_day, arranged
+
+
+def _refs(per_day, days_, view, y, only=None):
+    """The arrangement as saved: {day: {fp (chained), lorries: [[{lk, d}…]…]}}. In the chained view only the days a
+    planner has touched are saved (`only`), so the other days stay Wayscope's plan and carry no badge; the compressed
+    view is the yard's whole week."""
+    out = {}
+    for d in days_:
+        if only is not None and d not in only:
+            continue
+        entry = {"lorries": [[{"lk": t["line_key"], "d": t.get("day")} for t in L["trips"]] for L in per_day.get(d) or []]}
+        if view == "chained":
+            entry["fp"] = pool_fp(y["days"].get(d) or [])
+        out[d] = entry
+    return out
+
+
+def _refusal(L, t, shift_min):
+    dr = L["drive"] + _f(t["drive"])
+    wk = L["work"] + _f(t["drive"]) + _f(t["other"])
+    if dr > dh.DRIVING_MAX_MIN + EPS:
+        return f"Would pass 9 h of driving by {int(round(dr - dh.DRIVING_MAX_MIN))} min."
+    over = wk + dh.break_minutes(dr, wk) - shift_min
+    return f"Would pass the {shift_min / 60.0:g} h shift by {int(round(over))} min."
+
+
+def move(page, body, by=None, now=None, factors=None):
+    """
+    PR 2 (card 9): one trip of one lorry to another lorry of the same yard (`to_lorry` 1-based), or to another day in
+    the compressed view (`to_lorry` 0 = the first lorry of that day that takes it, else a new one). Checked against the
+    rule first; a drop that does not fit raises PlanError with the reason. A move that fits saves the yard's whole
+    arrangement for the week (replacing the last) and returns where the trip landed.
+    body: {view, yard_id, vehicle, line_key, from_day, from_lorry, to_day, to_lorry}.
+    """
+    import conversions
+    factors = factors or conversions.load_factors()
+    view = (body or {}).get("view")
+    if view not in ("chained", "compressed"):
+        raise PlanError("Moves are for the chained or compressed view.")
+    cw = page.get("commit_week") or {}
+    days_ = _weekdays(cw)
+    week_from = cw.get("from")
+    shift_h, _capped = dh.shift_hours(factors)
+    shift_min = shift_h * 60.0
+    yards, _line_info = _collect(page, factors)
+    key = (body.get("yard_id"), body.get("vehicle"))
+    y = yards.get(key)
+    if y is None:
+        raise PlanError("That yard is not in this week's plan.")
+    fd, td = body.get("from_day"), body.get("to_day")
+    if fd not in days_ or td not in days_:
+        raise PlanError("That day is not in this week.")
+    if view == "chained" and td != fd:
+        raise PlanError(SAME_DAY_WORDS)
+    saved = _saved_rows(week_from)
+    per_day, _arr = _yard_lorries(y, view, shift_min, days_, saved.get((view,) + key))
+    try:
+        src = per_day[fd][int(body.get("from_lorry")) - 1] if int(body.get("from_lorry")) >= 1 else None
+    except (TypeError, ValueError, IndexError):
+        src = None
+    if src is None:
+        raise PlanError(CHANGED_WORDS)
+    lk = body.get("line_key")
+    t = next((x for x in src["trips"] if x["line_key"] == lk), None)
+    if t is None:
+        raise PlanError(CHANGED_WORDS)
+    try:
+        to_l = int(body.get("to_lorry") or 0)
+    except (TypeError, ValueError):
+        to_l = 0
+    if to_l > 0:
+        if to_l > len(per_day[td]):
+            raise PlanError(CHANGED_WORDS)
+        tgt = per_day[td][to_l - 1]
+        if tgt is src:
+            raise PlanError("The trip is already on that lorry.")
+        if not _fits(tgt["drive"], tgt["work"], _f(t["drive"]), _f(t["other"]), shift_min):
+            raise PlanError(_refusal(tgt, t, shift_min))
+    else:
+        tgt = next((L for L in per_day[td] if L is not src and _fits(L["drive"], L["work"], _f(t["drive"]), _f(t["other"]), shift_min)), None)
+        if tgt is None:
+            if not _fits(0.0, 0.0, _f(t["drive"]), _f(t["other"]), shift_min):
+                raise PlanError(_refusal({"drive": 0.0, "work": 0.0}, t, shift_min))
+            tgt = {"trips": [], "drive": 0.0, "work": 0.0}
+            per_day[td].append(tgt)
+    src["trips"].remove(t)
+    src["drive"] -= _f(t["drive"])
+    src["work"] -= _f(t["drive"]) + _f(t["other"])
+    if not src["trips"]:
+        per_day[fd].remove(src)
+    tgt["trips"].append(t)
+    tgt["drive"] += _f(t["drive"])
+    tgt["work"] += _f(t["drive"]) + _f(t["other"])
+    _save(week_from, view, key, y, per_day, days_, by, now, only=(set(_arr) | {fd, td}) if view == "chained" else None)
+    return {"ok": True, "view": view, "day": td, "lorry": per_day[td].index(tgt) + 1,
+            "lorries": {d: len(per_day[d]) for d in days_}}
+
+
+def _save(week_from, view, key, y, per_day, days_, by, now, only=None):
+    import db
+    import supplier_orders
+    tenant = db.current_tenant()
+    pool = [t for d in days_ for t in (y["days"].get(d) or [])]
+    rid = _row_id(week_from, view, key)
+    db.execute_atomic([
+        (f"DELETE FROM {TABLE} WHERE tenant_id = ? AND id = ?", (tenant, rid)),
+        (f"INSERT INTO {TABLE} (tenant_id, id, week_from, view, origin_id, vehicle, pool_fp, lorries_json, moved_by, moved_at) "
+         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         (tenant, rid, week_from, view, key[0], key[1], pool_fp(pool), json.dumps(_refs(per_day, days_, view, y, only), separators=(",", ":")),
+          by, (now or supplier_orders._now()).strftime("%Y-%m-%dT%H:%M"))),
+    ])
+
+
+def reset(week_from, view=None):
+    """Delete the week's saved arrangements (one view, or both). Returns {"deleted": n}."""
+    import db
+    tenant = db.current_tenant()
+    if not week_from:
+        return {"deleted": 0}
+    where, params = f"tenant_id = ? AND week_from = ?", [tenant, week_from]
+    if view in ("chained", "compressed"):
+        where += " AND view = ?"
+        params.append(view)
+    n = len(db.query(f"SELECT id FROM {TABLE} WHERE {where}", tuple(params)))
+    if n:
+        db.execute(f"DELETE FROM {TABLE} WHERE {where}", tuple(params))
+    return {"deleted": n}
 
 
 def plan(page, factors=None, acc=None, now=None):
@@ -326,6 +581,8 @@ def plan(page, factors=None, acc=None, now=None):
     chained = {"by_day": {d: 0 for d in days_}, "days": {d: [] for d in days_}}
     compressed = {"by_day": {d: 0 for d in days_}, "days": {d: [] for d in days_}, "moves": [], "lines": {}, "flags": []}
     saved_by_vehicle = {"chained": {}, "compressed": {}}
+    saved = _saved_rows(cw.get("from"))                          # PR 2: the planners' own arrangements for the week
+    arranged_yards = {"chained": [], "compressed": []}
     for key, y in sorted(yards.items(), key=lambda kv: (-sum(len(v) for v in kv[1]["days"].values()), kv[1]["name"])):
         og = None
         for li in y["lines"].values():
@@ -333,29 +590,32 @@ def plan(page, factors=None, acc=None, now=None):
         start_min, gate_name = _yard_start(y["origin_id"], og, locs, gbl, factors)
         week_booked = 0
         week_chained = 0
-        # chained: day by day
+        # chained: day by day (a saved day in place of pack() while its trips are unchanged)
+        per_c, arr_c = _yard_lorries(y, "chained", shift_min, days_, saved.get(("chained",) + key))
+        if arr_c:
+            arranged_yards["chained"].append(y["name"])
         for d in days_:
             booked_by_day[d] += y["booked"].get(d, 0)
             week_booked += y["booked"].get(d, 0)
-            trips = y["days"].get(d) or []
-            if not trips and not y["kept"].get(d):
+            if not per_c[d] and not y["kept"].get(d):
                 continue
-            blk = _yard_block(y, pack(trips, shift_min) if trips else [], shift_min, start_min, gate_name, d)
+            blk = _yard_block(y, per_c[d], shift_min, start_min, gate_name, d, key,
+                              saved.get(("chained",) + key) if arr_c.get(d) else None)
             chained["days"][d].append(blk)
             chained["by_day"][d] += blk["count"]
             week_chained += blk["count"]
         saved_by_vehicle["chained"][y["vehicle"]] = saved_by_vehicle["chained"].get(y["vehicle"], 0) + week_booked - week_chained
-        # compressed: the week's trips pooled, packed, then laid over the weekdays round-robin (busiest lorries first)
-        pool = [t for d in days_ for t in (y["days"].get(d) or [])]
-        packed = sorted(pack(pool, shift_min), key=lambda L: -L["work"]) if pool else []
-        per_day = {d: [] for d in days_}
-        for i, L in enumerate(packed):
-            per_day[days_[i % len(days_)]].append(L)
+        # compressed: the week's trips pooled, packed, then laid over the weekdays round-robin (busiest lorries first);
+        # or the saved arrangement of the week while its trips are unchanged
+        per_day, arr_x = _yard_lorries(y, "compressed", shift_min, days_, saved.get(("compressed",) + key))
+        if arr_x:
+            arranged_yards["compressed"].append(y["name"])
         week_comp = 0
         for d in days_:
             if not per_day[d] and not y["kept"].get(d):
                 continue
-            blk = _yard_block(y, per_day[d], shift_min, start_min, gate_name, d)
+            blk = _yard_block(y, per_day[d], shift_min, start_min, gate_name, d, key,
+                              saved.get(("compressed",) + key) if arr_x.get(d) else None)
             compressed["days"][d].append(blk)
             compressed["by_day"][d] += blk["count"]
             week_comp += blk["count"]
@@ -437,6 +697,8 @@ def plan(page, factors=None, acc=None, now=None):
     return {
         "week": {"from": cw.get("from"), "to": cw.get("to"), "bucket": page.get("bucket")},
         "days": days_, "view_default": DEFAULT_VIEW, "views": list(VIEWS), "shift_hours": shift_h,
+        "shift_minutes": shift_min,                               # PR 2: the page checks a drop against the rule first
+        "arranged": arranged_yards,                              # PR 2: the yards shown as a planner arranged them
         "team_only": team, "made_by": supplier_orders.made_by(acc),
         "made_at": (now or supplier_orders._now()).strftime("%d %b %Y %H:%M").lstrip("0"),
         "week_confirmed": bool(line_info) and len(confirmed) == len(line_info),
@@ -445,7 +707,7 @@ def plan(page, factors=None, acc=None, now=None):
         "chained": chained, "compressed": compressed,
         "day_hire": {"rates": rates, "typed": bool(rates), "chained": money("chained"), "compressed": money("compressed")},
         "words": {"rule": RULE_WORDS, "planning": PLANNING_WORDS, "compress": COMPRESS_WORDS, "one_yard": ONE_YARD_WORDS,
-                  "not_modelled": dh.NOT_MODELLED_WORDS, "sends_nothing": SENDS_NOTHING,
+                  "not_modelled": dh.NOT_MODELLED_WORDS, "sends_nothing": SENDS_NOTHING, "arranged": ARRANGED_WORDS,
                   "estimate": "An estimate at the day-hire rate typed on Config → Costing · fuel."},
     }
 

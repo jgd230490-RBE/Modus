@@ -1623,10 +1623,12 @@ def build(with_areas=False, out=None):
 # 31 Oct 2026 (found by test_demo_programme F6 when PR 3c regenerated the package): + the site layouts (task 4c), brought
 # in on live (the demo's "Site logistics" layout of Tilton Viaduct, 31 Oct): a refresh must not drop them
 # 31 Oct 2026 (task 4c PR 3): + site_layout_pictures, the plans pinned on a phase on live (the package ships none)
+# 9 Nov 2026 (v2.1 task 2.1-9b): + lorry_plan_moves, the planners' own arrangements of the Lorry plan made on live (the
+# package ships none; a refresh must not drop a week a planner has arranged)
 LIVE_TABLES = ("route_geometry", "route_sections", "route_area_km", "areas", "route_choice",
                "community_features", "community_meta", "collision_records", "collision_meta", "traffic_counts",
                "route_hour_times", "clp_documents", "clp_issues", "clp_notes", "clp_reviews",
-               "site_layouts", "site_layout_phases", "site_layout_imports", "site_layout_pictures")
+               "site_layouts", "site_layout_phases", "site_layout_imports", "site_layout_pictures", "lorry_plan_moves")
 
 # 28 Oct 2026 (F6): an abnormal load is generated here but DRAWN on live (Draw the route, Check the roads again), in the
 # same row. A refresh keeps live's drawing for a load whose ends and size are unchanged; any other load stays undrawn.
