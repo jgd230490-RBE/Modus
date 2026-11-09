@@ -672,6 +672,20 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ga-key{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px;color:var(--muted);}
   .ga-key i{display:inline-block;vertical-align:middle;margin-left:8px;}
   .ga-key i:first-child{margin-left:0;}
+  /* 9 Nov 2026 (UI critique 8): a phone reads Gate arrivals as a list, not the chart — the gate's whole name, its lorries a day and
+     the share of its own capacity, a thin bar under it (amber from 85 %, red past 100 %), no key */
+  .ga-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:14px;}
+  .ga-li-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;}
+  .ga-li-name{min-width:0;font-size:14px;font-weight:600;color:var(--ink);overflow-wrap:anywhere;}
+  .ga-li-name small{display:block;font-size:13px;font-weight:400;color:var(--muted);}
+  .ga-li-fig{flex:none;max-width:48%;text-align:right;font-size:13px;color:var(--muted);}
+  .ga-li-fig b{font-weight:600;color:var(--ink);}
+  .ga-li-warn .ga-li-fig{color:var(--warn-text);}
+  .ga-li-bad .ga-li-fig{color:var(--bad-text);}
+  .ga-pbar{height:6px;margin-top:6px;border-radius:3px;background:var(--surface-3);overflow:hidden;}
+  .ga-pbar i{display:block;height:100%;border-radius:3px;background:var(--chart-1);}
+  .ga-li-warn .ga-pbar i{background:var(--gold);}
+  .ga-li-bad .ga-pbar i{background:var(--red);}
   .ga-key-bar{width:16px;height:10px;border-radius:2px;background:var(--chart-1);}
   .ga-key-cap{width:3px;height:14px;background:var(--ink);margin-left:0 !important;}
   .ga-key-track{width:18px;height:12px;border-radius:2px;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--grey);}
@@ -2170,7 +2184,7 @@ const gaBusyWords = (b) => {
   return `${b.lorries} lorr${b.lorries === 1 ? "y" : "ies"} arriving in the busiest clock hour (${when}) of an average working day. `
     + (b.per_hour == null ? "No check-in time typed, so nothing is compared." : `The gate can check in ${gaN1(b.per_hour)} an hour.`);
 };
-function GateArrivalsPanel({ ga, err, month, months, onMonth, sited }){
+function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone }){
   const [gaOpen, gaToggle] = useRowOpen("gates");
   if(!ga) return err
     ? <div className="ct-strip ga-strip" data-gate-arrivals="error" data-guide="dash-gates"><span className="ct-line">The gate arrivals did not load.</span></div>
@@ -2238,7 +2252,25 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited }){
       </div>
       <div className="ct-line">{ga.label}: lorries a day at each gate, all {TEAMS().toLowerCase()} together, {GA_SPREAD} across each gate's open hours{anyDefault ? ` (${ga.default_hours}, the default, where none are typed)` : ""}.</div>
       {state === "none" && <EmptyState kind="none" title={sited ? `No gates at these sites in ${ga.label}` : `No approved lines in ${ga.label}`} body={sited ? "Pick another month or more sites." : "Pick another month. Pending lines appear as a note until they are approved, then in the figures."} />}
-      {state === "set" && rowsC.length > 0 && (
+      {state === "set" && rowsC.length > 0 && phone && (
+        <div className="ga-chart" data-ga-list="1">
+          <div className="ga-head">
+            <span className="ga-head-v" style={nOverG ? { color: "var(--bad-text)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}</span>
+          </div>
+          <ul className="ga-list" aria-label="Gates, fullest first">
+            {rowsC.map(r => (
+              <li key={r.g.gate_id} className={"ga-li" + (r.over ? " ga-li-bad" : r.near ? " ga-li-warn" : "")} data-ga-li={r.g.gate_id} data-ga-pct={r.pct == null ? "" : r.pct}>
+                <div className="ga-li-top">
+                  <span className="ga-li-name">{r.g.location_name}{r.g.gate_name && r.g.gate_name !== r.g.location_name && <small>{r.g.gate_name}</small>}</span>
+                  <span className="ga-li-fig"><b>{gaN1(r.g.arrivals_per_day)}</b> a day{r.pct == null ? " · no check-in time typed" : ` · ${r.pct} %`}{r.over ? " · over capacity" : r.near ? " · queue likely" : ""}</span>
+                </div>
+                {r.pct != null && <div className="ga-pbar" aria-hidden="true"><i style={{ width: Math.max(2, Math.min(100, r.pct)) + "%" }}></i></div>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {state === "set" && rowsC.length > 0 && !phone && (
         <div className="ga-chart" data-ga-chart="1">
           <div className="ga-head">
             <span className="ga-head-v" style={nOverG ? { color: "var(--red)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}</span>
@@ -3011,7 +3043,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           </div>
           {/* 14 Oct 2026 (the user took the recommendation): Gate arrivals moved from above the charts to
               below them, so the four key charts are on the first screen at 1920 x 1080 */}
-          <GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : ""} />
+          <GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : ""} phone={!!phone} />
           {!wall && !phone && <AbnormalStrip onOpen={onOpen} sites={sites} />}
           {/* 29 Oct 2026: the Simulation has its own page (Plan → Simulation); the Dashboard keeps one line under Gate arrivals,
               the busiest gate from the Gate arrivals reply (no second simulation run here) */}
@@ -4134,8 +4166,10 @@ function Guide({ page, groups, phone }){
   useEffect(() => {
     // 18 Oct 2026 (UI audit decision 17): no dots on a phone — 10 px targets on the page's features; the strip's "Take the
     // tour" carries the tips there, as on the map (decision 8). A desk keeps its dots.
-    if(!hints || steps.length || phone){ setDots([]); return; }
-    const own = stepsOf();
+    // 9 Nov 2026: the strip is still placed on a phone (the 18 Oct early return left it at the desk's 240 px start, a
+    // 70 px column over the tab bar); only the dots are left out.
+    if(!hints || steps.length){ setDots([]); return; }
+    const own = phone ? [] : stepsOf();
     const place = () => {
       const rail = document.querySelector('[data-guide="rail"]');
       // 14 Oct 2026 (D9): on a phone the "rail" anchor is the tab bar along the foot, so the strip starts at the edge
