@@ -5356,6 +5356,24 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && det.includes('<div className="overflow-x-auto" data-route-full-analysis="1"><table className="text-sm" style={{ tableLayout: "fixed", width: "100%" }}>'));
 }
 
+// ---- 9 Nov 2026 (John, on live: the Route analysis menu's Download buttons were cut off the screen) ----
+{
+  const fnOf = (name) => { const a = code.indexOf("function " + name + "("); return a < 0 ? "" : code.slice(a, code.indexOf("\nfunction ", a + 10)); };
+  const pl = fnOf("raPlace"), ram = fnOf("RouteAnalysisMenu");
+  ok("⭐ ROUTE ANALYSIS FIT: the open menu is pinned to the screen, opens upwards when there is more room above, and is never taller than the room it has",
+     pl.includes('l.style.position = "fixed"') && pl.includes("const down = full <= below || below >= above;")
+     && pl.includes('l.style.maxHeight = h + "px"') && pl.includes('l.style.overflowY = "auto"')
+     && pl.includes("Math.max(8, Math.min(r.right - w, vw - 8 - w))"));
+  ok("⭐ ROUTE ANALYSIS FIT: Download PDF and Download XLSX sit in a footer that stays in view (sticky at the menu's bottom)",
+     /<div className="ra-foot" data-ra-foot="1">\s*<button type="button" onClick=\{\(\) => download\("pdf"\)\}[\s\S]*download\("xlsx"\)[\s\S]*?<\/div>\s*<\/div>\}/.test(ram)
+     && html.includes(".ra-menu .ra-foot{position:sticky;bottom:-6px;background:var(--popover-bg);"));
+  ok("ROUTE ANALYSIS FIT: placed when it opens, again on a page scroll or a resize; a scroll inside the menu (the routes list) leaves it be and does not close it",
+     ram.includes('<details className="row-menu bulletin-menu" data-route-analysis="1" ref={ref}')
+     && ram.includes("const place = () => raPlace(d);") && ram.includes("if(l && e && e.target instanceof Node && l.contains(e.target)) return;")
+     && ram.includes('window.addEventListener("scroll", onScroll, true); window.addEventListener("resize", place);')
+     && ram.includes('window.removeEventListener("scroll", onScroll, true); window.removeEventListener("resize", place);')
+     && !/d\.open = false/.test(ram));
+}
 console.log();
 for (const f of fail) console.log("  FAIL:", f);
 
