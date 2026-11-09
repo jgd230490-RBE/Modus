@@ -5124,17 +5124,19 @@ const AL_FORWARD = { pending: "approved", approved: "notified", notified: "moved
 // list is pinned to the screen beside its "⋯" (a table's card scrolls, and clipped the list), flips upward near the bottom edge, and
 // closes after a pick or on a scroll; a click elsewhere or Escape closes every details.row-menu (below).
 // 9 Nov 2026 (2.1-9b): the pinning of an open row menu, shared with the Lorry plan's trip menus (useRowMenuPlace)
-function useRowMenuPlace(ref) {
+function useRowMenuPlace(ref, alignLeft) {
   useEffect(() => {
     const d = ref.current; if (!d) return;
     const list = () => d.querySelector(".row-menu-list");
     const place = () => {
       const l = list(), s = d.querySelector("summary"); if (!l || !s) return;
       const r = s.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
-      l.style.position = "fixed"; l.style.left = "auto"; l.style.right = Math.max(8, vw - r.right) + "px";
+      l.style.position = "fixed";
       const h = l.offsetHeight, w = l.offsetWidth;
+      if (alignLeft) { l.style.right = "auto"; l.style.left = Math.max(8, Math.min(r.left, vw - 8 - w)) + "px"; }   // 2.1-9b: a trip's menu opens under its own left edge
+      else { l.style.left = "auto"; l.style.right = Math.max(8, vw - r.right) + "px"; }
       l.style.top = (r.bottom + 4 + h <= vh - 8 || r.top - 4 - h < 8 ? r.bottom + 4 : r.top - 4 - h) + "px";
-      if (vw - parseFloat(l.style.right) - w < 8) l.style.right = Math.max(8, vw - 8 - w) + "px";
+      if (!alignLeft && vw - parseFloat(l.style.right) - w < 8) l.style.right = Math.max(8, vw - 8 - w) + "px";
     };
     const onToggle = () => { if (d.open) place(); else { const l = list(); if (l) l.removeAttribute("style"); } };
     const shut = () => { if (d.open) d.open = false; };
@@ -10951,9 +10953,10 @@ function lpFits(row, b, shiftMin){
 // one trip block a planner can drag, with its menu (⋯ → Move to lorry 2 · Move to Thu 5) for the keyboard and a screen reader
 function LpTrip({ b, r, yard, style, colour, label, dnd }){
   const ref = useRef(null);
-  useRowMenuPlace(ref);
+  useRowMenuPlace(ref, true);
   const pick = e => { const btn = e.target.closest ? e.target.closest("button") : null; if(btn && !btn.disabled && ref.current) ref.current.open = false; };
-  const trip = { lk: b.line_key, day: b.day || yard.day, lorry: r.n, yard: yard.yard_id, vehicle: yard.vehicle, drive: b.drive || 0, other: b.other || 0, minutes: b.minutes, route: b.route_id };
+  // the trip is named by its line and the DAY ITS LORRY IS SHOWN ON (in the compressed view a lorry carries trips booked on other days)
+  const trip = { lk: b.line_key, day: yard.day, lorry: r.n, yard: yard.yard_id, vehicle: yard.vehicle, drive: b.drive || 0, other: b.other || 0, minutes: b.minutes, route: b.route_id };
   const items = dnd.targets(trip);
   return (
     <details className={"row-menu lp-trip" + (dnd.drag && dnd.drag.lk === trip.lk && dnd.drag.lorry === trip.lorry && dnd.drag.day === trip.day ? " is-dragging" : "")} ref={ref} style={style}
@@ -11036,8 +11039,8 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
       if(to.day !== shown) setDay(to.day);
       setRev(x => x + 1);
     } catch(e){
-      if(e && e.status === 409) setRefused({ ...to, yard: trip.yard, words: e.message || "Not moved." });
-      else setNote({ ok: false, text: errSay("The trip was not moved.", e) });
+      if(e && e.status === 409 && to.lorry) setRefused({ ...to, yard: trip.yard, words: e.message || "Not moved." });   // on the lorry it was dropped on
+      else setNote({ ok: false, text: errSay("The trip was not moved.", e) });                                           // a day drop, or any other failure
     }
     setBusy("");
   };

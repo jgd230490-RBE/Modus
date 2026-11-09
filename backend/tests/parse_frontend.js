@@ -4445,7 +4445,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && html.includes('.row-menu summary.row-dots::before{content:"⋯";}') && !html.includes('.row-menu summary::before') && html.includes('.row-x::before{content:"×";}')   // NARROWED 27 Oct 2026 (audit #41 / #42): the glyphs are CSS content
      && (src.match(/className="row-x"[^\n]*?>×<\/button>/g) || []).length === 0   // the info / guide / chip × buttons keep their text (not row controls)
      && src.includes('<div className="row-menu-list" onClick={pick}>{children}{note ? <div className="row-menu-note">{note}</div> : null}</div>')
-     && src.includes('l.style.position = "fixed"; l.style.left = "auto";') && src.includes('window.addEventListener("scroll", shut, true); window.addEventListener("resize", shut);')
+     && src.includes('l.style.position = "fixed";') && src.includes('else { l.style.left = "auto"; l.style.right = Math.max(8, vw - r.right) + "px"; }')   // NARROWED 9 Nov 2026 (2.1-9b): the pinning is one shared hook, useRowMenuPlace; a trip's menu opens under its left edge
+     && src.includes('window.addEventListener("scroll", shut, true); window.addEventListener("resize", shut);')
      && src.includes("if (b && !b.disabled && ref.current) ref.current.open = false;")
      && src.includes('document.addEventListener("click", e => { document.querySelectorAll("details.row-menu[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; }); });')
      && src.includes('if (e.key === "Escape") document.querySelectorAll("details.row-menu[open]").forEach(d => { d.open = false; });'));   // 27 Oct, after the Chrome check: pinned to the screen, closes after a pick / on scroll / a click elsewhere / Escape
@@ -5281,7 +5282,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ 2.1-9b (card 9): a drop POSTs one move (view, yard, lorry type, the trip's line and day, from and to) and re-reads the plan; a 409 shows the server's reason on that lorry for five seconds",
      lpc.includes("const body = { view, yard_id: trip.yard, vehicle: trip.vehicle, line_key: trip.lk, from_day: trip.day, from_lorry: trip.lorry, to_day: to.day, to_lorry: to.lorry || 0 };")
      && lpc.includes("fetch(`${API}/forecast-weeks/lorry-plan/move?bucket=${bucket}`, { method: \"POST\"") && lpc.includes("setRev(x => x + 1);")
-     && lpc.includes('if(e && e.status === 409) setRefused({ ...to, yard: trip.yard, words: e.message || "Not moved." });')
+     && lpc.includes('if(e && e.status === 409 && to.lorry) setRefused({ ...to, yard: trip.yard, words: e.message || "Not moved." });')
+     && trip.includes("const trip = { lk: b.line_key, day: yard.day, lorry: r.n, yard: yard.yard_id, vehicle: yard.vehicle,")
      && lpc.includes("const t = setTimeout(() => setRefused(null), 5000);") && lpc.includes("}, [bucket, tick, rev]);"));
   ok("⭐ 2.1-9b (card 9): a drop only lands on a lorry of the same yard and lorry type — on its own day in Chained, on any day in Compressed (the day chips take a drop too)",
      lpc.includes('if(!drag || drag.yard !== target.yard || drag.vehicle !== target.vehicle || (view === "chained" && drag.day !== target.day)) return;')
@@ -5295,8 +5297,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ 2.1-9b (Q10): a team's panel is the plain picture — moves are planners' and admins' (the same test as Apply)",
      lpc.includes("const canMove = canApply;") && lpc.includes('role={can ? "group" : "img"}') && lpc.includes('if(can && b.kind === "trip") return <LpTrip'));
   ok("2.1-9b: the trip menus pin themselves like every row menu (one shared hook), and a trip block is at least 24 px tall and wide for the pointer",
-     code.includes("function useRowMenuPlace(ref) {") && code.includes("function RowMenu({ name, note, children }) {\n  const ref = useRef(null);\n  useRowMenuPlace(ref);")
-     && trip.includes("useRowMenuPlace(ref);") && html.includes(".lp-trip{position:absolute;top:2px;bottom:2px;min-width:24px;overflow:visible}")
+     code.includes("function useRowMenuPlace(ref, alignLeft) {") && code.includes("function RowMenu({ name, note, children }) {\n  const ref = useRef(null);\n  useRowMenuPlace(ref);")
+     && trip.includes("useRowMenuPlace(ref, true);") && code.includes('if (alignLeft) { l.style.right = "auto"; l.style.left = Math.max(8, Math.min(r.left, vw - 8 - w)) + "px"; }')
+     && html.includes(".lp-trip{position:absolute;top:2px;bottom:2px;min-width:24px;overflow:visible}")
      && html.includes(".lp-trip summary.lp-blk{position:static;height:24px;"));
 }
 
