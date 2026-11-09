@@ -85,7 +85,6 @@ ok("B8 at a desk the conditions panel sits left of the zoom buttons (right 52 px
    && /#tl-warnings\{[^}]*top:84px;[^}]*right:12px/.test(css));
 
 console.log("C. Report a concern in the panel on a desk");
-const share = (() => { const i = html.indexOf('<div class="control-group share-group" id="share-group">'); return i >= 0 ? html.slice(i, html.indexOf("</div>\n    </div>", i) + 20) : ""; })();
 const shareBlock = (() => { const i = html.indexOf('<div class="control-group share-group" id="share-group">'); if (i < 0) return ""; let d = 0, j = i; const re = /<\/?div\b/g; re.lastIndex = i;
   let m; while ((m = re.exec(html))) { d += m[0] === "<div" ? 1 : -1; if (d === 0) { j = m.index; break; } } return html.slice(i, j); })();
 ok("C1 the panel's share group carries a concern slot of its own", /<div class="concern-slot concern-panel-slot"><\/div>/.test(shareBlock), shareBlock.slice(-200));
