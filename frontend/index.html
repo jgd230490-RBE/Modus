@@ -820,6 +820,16 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-ctl input:not([type=checkbox]),.sim-table input{font:inherit;font-size:14px;border:1px solid var(--grey);border-radius:6px;padding:2px 6px;color:var(--ink);background:var(--surface);min-height:28px;}
   .sim-ctl input[type=time],.sim-table input[type=time]{width:108px;}
   .sim-num{width:76px;}
+  .sp-tab-flag{margin-left:8px;font-weight:600;font-size:12px;display:inline-flex;align-items:center;gap:5px;}
+  .sp-dot{display:inline-block;width:8px;height:8px;border-radius:50%;}
+  .sp-dot-bad{background:var(--red,#DC2626);box-shadow:0 0 0 1.5px #fff;}.sp-dot-warn{background:#F59E0B;box-shadow:0 0 0 1.5px #fff;}
+  .sim-head{font-size:16px;color:var(--ink);line-height:1.4;margin:2px 0 4px;}   /* 9 Nov 2026 (finding 9): the headline first */
+  .sim-head-none{font-size:14px;color:var(--muted);}
+  .sim-link{background:none;border:0;padding:0;color:var(--navy);font:inherit;font-weight:600;text-decoration:underline;cursor:pointer;}
+  .sim-lbl-txt{font-size:14px;color:var(--muted);}
+  .sim-hold-fold>summary{font-size:13px;cursor:pointer;color:var(--ink);margin:4px 0;}
+  .sim-hc .sim-lbl{display:flex;width:100%;}
+  .sim-hc .sim-lbl .ga-sel{flex:1 1 0;min-width:0;max-width:100%;}
   .sim-hold-row{flex-wrap:wrap;row-gap:2px;}   /* 30 Oct 2026 (task 3c): the holding row wraps; its note is a line under it, never a flex item beside it */
   .sim-msg{color:var(--red);font-size:14px;font-weight:600;}
   .sim-h4{font-size:15px;font-weight:600;color:var(--ink);margin:16px 0 2px;}
@@ -5995,6 +6005,24 @@ function ClpPage({ access }){
 // boxes. Capacity and opening are master data: admins type them here or on Locations (the same call). Nothing is stored
 // that the balance works out: GET /stockpiles reads it, PUT /stockpiles/plan and /stockpiles/count write what people type.
 function stockUnit(u){ return u === "m3" ? "m³" : (u || "t"); }
+// 9 Nov 2026 (UI critique finding 24): one number format on the page — thousands with a space, "11 000", in the boxes too;
+// what is typed is read with the spaces taken out
+const stockTxt = (v) => { if(v == null || v === "") return ""; const r = Math.round(+v * 10) / 10; return grp(r, Number.isInteger(r) ? 0 : 1); };
+const stockNum = (v) => numOr(String(v == null ? "" : v).replace(/\s+/g, ""), NaN);
+// the first problem a stockpile has: over its capacity, else (with a use planned) running out; { kind, from } or null
+function stockProblem(sp){
+  if(sp.first_over) return { kind: "over", from: sp.first_over.from };
+  if(sp.first_empty && sp.use_planned) return { kind: "empty", from: sp.first_empty.from };
+  return null;
+}
+// the weeks a stockpile stays over from its first week over, to the end of the plan
+function stockOverWeeks(sp){
+  const i = sp.first_over ? sp.weeks.findIndex(w => w.from === sp.first_over.from) : -1;
+  if(i < 0) return 0;
+  let n = 0;
+  for(let k = i; k < sp.weeks.length && sp.weeks[k].over; k++) n++;
+  return n;
+}
 function StockpilesPage({ meta, access, who }){
   const { months } = meta;
   const canPlan = !!(access && access.can_approve);
@@ -6019,7 +6047,9 @@ function StockpilesPage({ meta, access, who }){
   }, [tick]);
   // the stockpiles this page plans: a capacity, a plan, or the type Stockpile
   const stockList = ((data && data.stockpiles) || []).filter(sp => sp.forecast || sp.loc_type === "Stockpile");
-  const sp = stockList.find(x => x.location_id === pick) || stockList[0];
+  // opens on the stockpile with the earliest problem (finding 24), else the first
+  const firstProblem = stockList.filter(x => stockProblem(x)).sort((a, b) => (stockProblem(a).from < stockProblem(b).from ? -1 : stockProblem(a).from > stockProblem(b).from ? 1 : 0))[0];
+  const sp = stockList.find(x => x.location_id === pick) || firstProblem || stockList[0];
   const cw = data && data.current_week;
   const sy = months.start_year;
   const years = Array.from(new Set(Array.from({ length: months.count }, (_, i) => sy + Math.floor(i / 12))));
@@ -6035,13 +6065,13 @@ function StockpilesPage({ meta, access, who }){
   const savePlan = (m) => {
     const k = `${sp.location_id}|${m}`, v = draft[k];
     if(v === undefined) return;
-    const q = v === "" ? null : numOr(v, NaN);
+    const q = String(v).trim() === "" ? null : stockNum(v);
     if(q !== null && !(q >= 0)){ say(false, "Planned use must be a number, 0 or more."); return; }
     put("/stockpiles/plan", { location_id: sp.location_id, from_month: m, planned_qty: q, updated_by: who || null }, "The planned use was not saved.")
       .then(ok => { if(ok) setDraft(d => { const n = { ...d }; delete n[k]; return n; }); });
   };
   const doFill = () => {
-    const a = +fill.from, b = +fill.to, q = numOr(fill.qty, NaN);
+    const a = +fill.from, b = +fill.to, q = stockNum(fill.qty);
     if(!a || !b || !(q >= 0)){ say(false, "Pick both months and type a figure, 0 or more."); return; }
     put("/stockpiles/plan", { location_id: sp.location_id, from_month: Math.min(a, b), to_month: Math.max(a, b), planned_qty: q, updated_by: who || null },
         "The planned use was not saved.").then(ok => { if(ok) setFill({ from: "", to: "", qty: "" }); });
@@ -6049,13 +6079,13 @@ function StockpilesPage({ meta, access, who }){
   const pastWeeks = sp ? sp.weeks.filter(w => cw && (w.month_index < cw.month_index || (w.month_index === cw.month_index && w.week_index < cw.week_index))).slice(-12).reverse() : [];
   const saveCount = () => {
     const w = pastWeeks.find(x => `${x.month_index}|${x.week_index}` === (count.week || (pastWeeks[0] && `${pastWeeks[0].month_index}|${pastWeeks[0].week_index}`)));
-    const q = numOr(count.qty, NaN);
+    const q = stockNum(count.qty);
     if(!w || !(q >= 0)){ say(false, "Type the measured stock, 0 or more."); return; }
     put("/stockpiles/count", { location_id: sp.location_id, month_index: w.month_index, week_index: w.week_index, measured_qty: q, updated_by: who || null },
         "The stock count was not saved.").then(ok => { if(ok) setCount({ qty: "", week: "" }); });
   };
   const saveCap = (field, v) => {
-    const q = v === "" ? null : numOr(v, NaN);
+    const q = String(v).trim() === "" ? null : stockNum(v);
     if(q !== null && !(q >= 0)){ say(false, "Type a number, 0 or more."); return; }
     const body = { capacity_qty: sp.capacity_qty, capacity_unit: sp.capacity_unit, opening_qty: sp.opening_qty, [field]: q };
     put(`/locations/${encodeURIComponent(sp.location_id)}/capacity`, body, "The capacity was not saved.");
@@ -6063,7 +6093,7 @@ function StockpilesPage({ meta, access, who }){
   const lastCount = sp ? [...sp.weeks].reverse().find(w => w.count != null) : null;
   // the status line: the forward balance's own summary of this stockpile
   const status = !sp ? null : !sp.capacity_qty ? { tone: null, text: "No capacity recorded" }
-    : sp.first_over ? { tone: "bad", text: `Goes over in the week of ${stockWeekWord(sp.first_over.from)} ${sp.first_over.from.slice(0, 4)}` }
+    : sp.first_over ? { tone: "bad", text: `Goes over capacity in the week of ${stockWeekWord(sp.first_over.from)} ${sp.first_over.from.slice(0, 4)}${stockOverWeeks(sp) > 0 ? ` and stays over for ${stockOverWeeks(sp)} ${stockOverWeeks(sp) === 1 ? "week" : "weeks"}` : ""}` }
     : sp.first_empty && sp.use_planned ? { tone: "warn", text: `Runs out in the week of ${stockWeekWord(sp.first_empty.from)} ${sp.first_empty.from.slice(0, 4)}` }
     : sp.peak_pct != null && sp.peak_pct >= 90 ? { tone: "warn", text: `Nearly full: ${Math.round(sp.peak_pct)} % in the week of ${stockWeekWord(sp.peak.from)} ${sp.peak.from.slice(0, 4)}` }
     : sp.peak_pct != null ? { tone: "ok", text: `Never over: ${Math.round(sp.peak_pct)} % at most` } : null;
@@ -6099,7 +6129,9 @@ function StockpilesPage({ meta, access, who }){
         <div className="flex flex-wrap gap-1.5 mb-3" role="tablist" aria-label="Stockpile">
           {stockList.map(x => <button key={x.location_id} type="button" role="tab" aria-selected={x === sp}
             className={"rounded-full px-3 py-1 text-[13px] font-semibold " + (x === sp ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}
-            style={x === sp ? { background: "var(--navy)" } : undefined} onClick={() => setPick(x.location_id)}>{x.name}</button>)}
+            style={x === sp ? { background: "var(--navy)" } : undefined} onClick={() => setPick(x.location_id)}>{x.name}{(() => { const pr = stockProblem(x); if(!pr) return null;
+              const bad = pr.kind === "over", word = `${bad ? "over" : "runs out"} ${stockWeekWord(pr.from)} ${pr.from.slice(0, 4)}`;
+              return <span className="sp-tab-flag" data-stock-tab-flag={pr.kind}><i aria-hidden="true" className={"sp-dot " + (bad ? "sp-dot-bad" : "sp-dot-warn")} />{word}</span>; })()}</button>)}
         </div>
         <div className="card p-4" data-stockpile-card="1">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -6108,12 +6140,16 @@ function StockpilesPage({ meta, access, who }){
               {status && <div className="text-sm font-semibold" data-stock-status={status.tone || "none"}
                 style={{ color: status.tone === "bad" ? "var(--bad-text)" : status.tone === "warn" ? "var(--warn-text)" : status.tone === "ok" ? "var(--ok-text)" : "var(--muted)" }}>{status.text}</div>}
               {sp.forecast && !sp.use_planned && <div className="text-[13px] text-slate-500">No use planned yet.</div>}
+              {(() => { const pr = stockProblem(sp), w = pr && sp.weeks.find(x => x.from === pr.from);
+                if(!w || !sp.capacity_qty) return null;
+                const pu = planOf(w.month_index), mw = `${MONTHS[(w.month_index - 1) % 12]} ${sy + Math.floor((w.month_index - 1) / 12)}`;
+                return <div className="text-[13px] text-slate-500" data-stock-sub="1">{pu > 0 ? `Planned use, ${mw}: ${stockTxt(pu)} ${u} · ` : ""}Capacity {stockTxt(sp.capacity_qty)} {u}</div>; })()}
             </div>
             <div className="flex flex-wrap gap-4">
               {[["capacity_qty", "Capacity", sp.capacity_qty], ["opening_qty", "Opening, " + monthLabelAbs(1, sy), sp.opening_qty]].map(([f, lab, v]) => (
                 <label key={f} className="block text-[13px] text-slate-500">{lab}
                   {canCap ? <span className="flex items-center gap-1 mt-0.5"><input className="ctl ctl-sm w-28 text-right" inputMode="decimal" aria-label={lab}
-                      defaultValue={v == null ? "" : v} key={`${sp.location_id}|${f}|${v}`} onBlur={e => { if(String(e.target.value) !== String(v == null ? "" : v)) saveCap(f, e.target.value); }} /> {u}</span>
+                      defaultValue={stockTxt(v)} key={`${sp.location_id}|${f}|${v}`} onBlur={e => { if(e.target.value.trim() !== stockTxt(v)) saveCap(f, e.target.value); }} /> {u}</span>
                     : <span className="block mt-0.5 text-sm text-slate-800 tabular-nums">{v == null ? "—" : `${grp(v)} ${u}`}</span>}
                 </label>))}
             </div>
@@ -6132,7 +6168,7 @@ function StockpilesPage({ meta, access, who }){
               return (
                 <label key={i} className="block text-[13px] text-slate-500">{MONTHS[i]}
                   {canPlan ? <input className="ctl ctl-sm w-full text-right mt-0.5" inputMode="decimal" disabled={!inProg} aria-label={`Planned use ${MONTHS[i]} ${yr}`}
-                      placeholder={u} value={draft[k] ?? (v == null ? "" : String(Math.round(v * 10) / 10))}
+                      placeholder={u} value={draft[k] ?? stockTxt(v)}
                       onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))} onBlur={() => savePlan(m)} />
                     : <span className="block mt-0.5 text-sm text-slate-800 tabular-nums text-right">{v == null ? "—" : grp(v)}</span>}
                 </label>);
@@ -13070,8 +13106,18 @@ function SimTimeline({ D, t, onSeek, site }){
 
 // the player: the controls row (the page's scale / period / site, then Play / Restart / Speed and the clock), the map with
 // its key, the Now card and Gates / Stations now beside it, the timeline full width, then the scenario band (card 2)
-function SimPlayer({ meta, D, store, scenario, controls, site, open }){
-  const [t, setT] = useState(D.window.start);
+function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt }){
+  // 9 Nov 2026 (finding 9): the clock opens at the day's busiest point, and again when the month, week or day changes
+  // (not on a scenario change: the clock stays where you put it)
+  const [t, setT] = useState(() => (startAt != null && startAt >= D.window.start && startAt <= D.window.end) ? startAt : D.window.start);
+  const dayKey = `${D.scale}|${D.label}`, keyRef = useRef(dayKey), startRef = useRef(startAt);
+  startRef.current = startAt;
+  useEffect(() => {
+    if(keyRef.current === dayKey) return;
+    keyRef.current = dayKey;
+    const a = startRef.current;
+    setPlaying(false); setT(a != null && a >= D.window.start && a <= D.window.end ? a : D.window.start);
+  }, [dayKey]);
   const [playing, setPlaying] = useState(false);
   const [sp, setSp] = useState("1");
   const raf = useRef(null), last = useRef(null), tRef = useRef(t), spRef = useRef(1);
@@ -13133,7 +13179,8 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open }){
             const kg = (s) => M.idle_g_per_min ? (mins(s) * M.idle_g_per_min / 1000) : null;
             return <div key={h.id} className="sim-card" data-sim-holding-card={h.id}>
               <div className="sim-card-h"><span className="hbadge" aria-hidden="true">H</span>{h.name}</div>
-              <div className="ct-note">{h.held} held this day · most {h.most}{h.most_at != null ? ` at ${simHM(h.most_at)}` : ""}{h.spaces ? ` of ${h.spaces} spaces` : ""}{h.over_spaces ? <b className="sim-red"> · {h.over_spaces} over</b> : null}{h.first != null ? ` · call-off from ${simHM(h.first)}` : ""}</div>
+              <div className="ct-note" data-sim-hold-words="1">{simHoldWords(h)}</div>
+              <details className="sim-hold-fold" open={!!h.most}><summary>With and without the holding area</summary>
               <table className="sim-now sim-cmp"><thead><tr><th scope="col">This day</th><th scope="col" className="num">Without</th><th scope="col" className="num">With</th></tr></thead><tbody>
                 <tr><td>Most waiting on site</td><td className="num">{wo.site_most == null ? "—" : wo.site_most}</td><td className="num"><b>{w.site_most == null ? "—" : w.site_most}</b></td></tr>
                 <tr><td>Most waiting at the gate</td><td className="num">{wo.gate_most == null ? "—" : wo.gate_most}</td><td className="num"><b>{w.gate_most == null ? "—" : w.gate_most}</b></td></tr>
@@ -13145,6 +13192,7 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open }){
                 {kg(wo) != null && <tr><td>Idling, if every waiting engine runs<div className="sim-sub">{M.idle_words}</div></td><td className="num">{kg(wo).toFixed(1)} kg CO₂</td><td className="num"><b>{kg(w).toFixed(1)} kg CO₂</b></td></tr>}
               </tbody></table>
               <div className="ct-note">A holding area moves the waiting off the site and the lane; it does not remove it.</div>
+              </details>
             </div>; })}
           {site
             ? <div className="sim-card" data-sim-stations-now="1">
@@ -13320,7 +13368,7 @@ const SimTable = React.memo(function SimTable({ D }){
         const bh = hs.length > 1 ? `${String(hs[0]).padStart(2, "0")}:00 +${hs.length - 1}` : (hs.length ? `${String(hs[0]).padStart(2, "0")}:00` : "");
         return (
           <tr key={g.gate_id} data-sim-gate={g.gate_id} data-sim-flag={g.flag || "none"} title={(g.teams || []).length ? `${TEAMS()}: ${(g.teams || []).map(x => teamText(x)).join(", ")}` : undefined}>
-            <td><b>{g.location_name}</b><div className="sim-sub">{g.gate_name}</div>{g.origin_share_note && <div className="sim-sub sim-warn">{g.origin_share_note}</div>}</td>
+            <td><b>{g.location_name}</b><div className="sim-sub">{g.gate_name}</div></td>
             <td className="num" title={`${g.laden} laden · ${g.empty} empty · ${g.pour} pour · Dashboard average ${simN1(g.panel_per_day)} a day${g.even_rate != null ? ` · even spread ${simN1(g.even_rate)} an hour` : ""}`}><b>{g.arrivals}</b></td>
             <td className="num" data-sim-busy={g.busiest}><b>{g.busiest}</b><div className="sim-sub">{bh}</div></td>
             <td>{simQueueCell(g)}
@@ -13352,13 +13400,12 @@ function SimPhoneList({ D }){
     if(site) seen.add(site.location_id);
     return (
       <li key={g.gate_id} className="sim-pcard" data-sim-gate={g.gate_id} data-sim-flag={g.flag || "none"}>
-        <div className="sim-pc-h"><b>{g.location_name}</b><RowStatus word={simWord(g)} tone={simTone(g)} /></div>
+        <div className="sim-pc-h"><b>{g.location_name}</b>{g.flag === "red" || g.flag === "amber" ? <RowStatus word={simWord(g)} tone={simTone(g)} /> : null}</div>
         <div className="sim-pline">{g.gate_name} · {g.arrivals} lorr{g.arrivals === 1 ? "y" : "ies"}{g.pour ? ` (${g.pour} mixers)` : ""} · busiest <span data-sim-busy={g.busiest}>{g.busiest ? `${g.busiest} at ${g.busiest_hour}` : "—"}</span> · {simPhoneQueue(g)}{g.minutes_lost > 0.5 ? ` · ${Math.round(g.minutes_lost)} min lost` : ""}</div>
         {g.late > 0 && <div className="sim-sub sim-warn">{g.late} checked in after the last open minute</div>}
-        {g.origin_share_note && <div className="sim-sub sim-warn">{g.origin_share_note}</div>}
         {site && <ul className="sim-pstations" aria-label={`${site.name}: stations`}>{(site.stations || []).filter(st => st.kind !== "gate").map(st => (
           <li key={st.key} data-sim-station={st.key} data-sim-flag={st.flag || "none"}>
-            <div className="sim-pc-h"><b>{st.name}</b><RowStatus word={st.status_word} tone={st.flag === "red" ? "bad" : st.flag === "amber" ? "warn" : "none"} /></div>
+            <div className="sim-pc-h"><b>{st.name}</b>{st.flag === "red" || st.flag === "amber" ? <RowStatus word={st.status_word} tone={st.flag === "red" ? "bad" : "warn"} /> : null}</div>
             <div className="sim-pline">{st.arrivals} lorr{st.arrivals === 1 ? "y" : "ies"} · {simPhoneQueue(st)}{st.minutes_lost > 0.5 ? ` · ${Math.round(st.minutes_lost)} min lost` : ""}</div>
           </li>))}</ul>}
       </li>);
@@ -13367,15 +13414,41 @@ function SimPhoneList({ D }){
   return (
     <ul className="sim-plist" data-sim-table="1" aria-label="Gates and stations">
       {(D.holding || []).filter(h => h.on).map(h => <li key={"h" + h.id} className="sim-pcard" data-sim-phone-holding={h.id}>
-        <div className="sim-pc-h"><b>{h.name}</b><RowStatus word={h.over_spaces ? "Over its spaces" : "Holding area"} tone={h.over_spaces ? "bad" : "none"} /></div>
-        <div className="sim-pline">{h.held} held · most {h.most}{h.most_at != null ? ` at ${simHM(h.most_at)}` : ""}{h.spaces ? ` of ${h.spaces} spaces` : ""} · {Math.round(h.minutes_held)} min held</div>
+        <div className="sim-pc-h"><b>{h.name}</b>{h.over_spaces ? <RowStatus word="Over its spaces" tone="bad" /> : null}</div>
+        <div className="sim-pline">{simHoldWords(h)}</div>
       </li>)}
       {main.map(card)}
+      {order.some(g => g.origin_share_note) && <li className="ct-note" data-sim-other-customers="1">{SIM_OTHER_CUSTOMERS}</li>}
       {small.length > 0 && <li><details className="sim-pmore"><summary>{small.length} more gate{small.length === 1 ? "" : "s"}, fewer than 5 lorries a day</summary>
         <ul className="sim-plist">{small.map(card)}</ul></details></li>}
     </ul>
   );
 }
+
+// 9 Nov 2026 (finding 9): the busiest point of the day on screen — the gate or station with the most lorries waiting at
+// once, and when (the earliest when two tie). `site` (the page's site pick) limits it to that site's stations and gates.
+// null when nobody waits. avg = that site's gate in → gate out minutes, when the point is on a site.
+function simPeak(D, site){
+  const c = [];
+  const onSite = new Set();
+  (D.sites || []).forEach(x => (x.stations || []).forEach(st => { if(st.kind === "gate" && st.gate_id) onSite.add(st.gate_id); }));
+  (D.gates || []).forEach(g => { if((site && g.location_id !== site.d.location_id) || onSite.has(g.gate_id)) return;
+    c.push({ n: g.most_waiting || 0, at: g.most_at, name: simGateName(g), avg: null }); });
+  (D.sites || []).forEach(x => { if(site && x.location_id !== site.d.location_id) return;
+    (x.stations || []).forEach(st => c.push({ n: st.most_waiting || 0, at: st.most_at, avg: x.avg_on_site,
+      name: st.kind === "gate" ? `${x.name}, ${st.name === x.name ? "gate in" : st.name.toLowerCase()}` : st.name })); });
+  const hit = c.filter(k => k.n >= 1 && k.at != null).sort((a, b) => (b.n - a.n) || (a.at - b.at))[0];
+  return hit || null;
+}
+// the holding area's day in plain words
+function simHoldWords(h){
+  const n = h.held || 0;
+  if(!n) return "No lorry called off here this day.";
+  if(!h.most) return `${n} ${n === 1 ? "lorry" : "lorries"} passed through · none waited.`;
+  return `${n} ${n === 1 ? "lorry" : "lorries"} waited here · most ${h.most} at once${h.most_at != null ? ` at ${simHM(h.most_at)}` : ""}${h.spaces ? `, of ${h.spaces} spaces` : ""}${h.over_spaces ? `, ${h.over_spaces} over` : ""}.`;
+}
+// the quarries' caveat, said once
+const SIM_OTHER_CUSTOMERS = "Quarries and plants serve other customers too: only this scheme's lorries are counted, so a queue there is the least it could be.";
 
 // ---- 29 Oct 2026: the Simulation's own PAGE (Plan → Simulation, #simulation; mockup notes/sim-page-mockup-1029) -------------
 // Read on mount (one GET of /api/sim/day, the lines once a month), keyed on the month and the scenario; nothing saved (D86).
@@ -13383,6 +13456,21 @@ function SimPhoneList({ D }){
 function SimulationPage({ meta, months, phone, initial }){
   const open = true;
   const [month, setMonth] = useState(() => (initial && initial.month) || gaMonthToday(months));
+  // 9 Nov 2026 (UI critique finding 9, decision 7): the page opens on the programme's BUSIEST month, found by one cheap read
+  // before the first day is worked out; if that read fails it opens on this month as before
+  const [busiestM, setBusiestM] = useState(null);
+  const [ready, setReady] = useState(!!initial);
+  useEffect(() => {
+    if(ready) return;
+    let live = true;
+    fetch(`${API}/sim/busiest-month`).then(okJSON).then(j => {
+      if(!live) return;
+      const b = j && j.busiest;
+      if(b && b.month_index >= 1){ setBusiestM(b); setMonth(b.month_index); }
+      setReady(true);
+    }).catch(() => { if(live) setReady(true); });
+    return () => { live = false; };
+  }, []);
   const [sc, setSc] = useState(SIM_SC0);
   const [data, setData] = useState(initial || null);
   const [store, setStore] = useState(() => initial ? { month: initial.month, legs: initial.legs, haul: initial.haul_roads } : null);
@@ -13397,6 +13485,7 @@ function SimulationPage({ meta, months, phone, initial }){
   const shown = useRef(initial ? `${initial.month}|${JSON.stringify(SIM_SC0())}` : null);
   useEffect(() => {
     const key = `${month}|${scKey}`;
+    if(!ready) return;
     if(data && shown.current === key) return;
     let live = true;
     const wantLines = !phone && !(store && store.month === month);
@@ -13422,7 +13511,7 @@ function SimulationPage({ meta, months, phone, initial }){
     };
     const h = setTimeout(go, data ? 300 : 0);
     return () => { live = false; clearTimeout(h); };
-  }, [month, scKey]);
+  }, [month, scKey, ready]);
   // the Hours and check-in card (card 9): one gate, or every gate; refused on the screen in words (D93) before anything is read
   const onGate = (gid, f, t, c) => {
     const g = (D && D.gates || []).find(x => x.gate_id === gid);
@@ -13452,16 +13541,17 @@ function SimulationPage({ meta, months, phone, initial }){
   // the controls row (card 4): scale → period → site, left to right; the playback beside them in SimPlayer
   const controls = <>
     {/* 28 Oct 2026 (v2): the scale — the forecast month's average day, the Look-ahead week's average weekday, or one planned day */}
+    <span className="sim-lbl-txt" aria-hidden="true">Scale</span>
     <div className="sim-seg" role="group" aria-label="Simulation scale" data-sim-scale={sc.scale}>
       {SIM_SCALES.map(([v, w]) => <button key={v} type="button" className={sc.scale === v ? "on" : ""} aria-pressed={sc.scale === v}
         onClick={() => { if(sc.scale === v) return; const d = D && D.day_choices && D.day_choices.length ? D.day_choices : [];
           setMsg(""); setSc(x => ({ ...x, scale: v, date: v === "day" ? (x.date || (d[0] || {}).date || "") : x.date })); }}>{w}</button>)}
     </div>
-    {sc.scale === "month" && <label className="ct-line">Month <select className="ga-sel" value={month} onChange={e => { setMonth(+e.target.value); }} aria-label="Simulation month">
+    {sc.scale === "month" && <label className="ct-line">Which month <select className="ga-sel" value={month} onChange={e => { setMonth(+e.target.value); }} aria-label="Simulation month">
       {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}</select></label>}
-    {sc.scale === "week" && <label className="ct-line">Week <select className="ga-sel" value={sc.bucket} onChange={e => setSc(x => ({ ...x, bucket: e.target.value }))} aria-label="Simulation week">
+    {sc.scale === "week" && <label className="ct-line">Which week <select className="ga-sel" value={sc.bucket} onChange={e => setSc(x => ({ ...x, bucket: e.target.value }))} aria-label="Simulation week">
       <option value="commit">This week</option><option value="next">Next week</option></select></label>}
-    {sc.scale === "day" && <label className="ct-line">Day <select className="ga-sel" value={sc.date} onChange={e => setSc(x => ({ ...x, date: e.target.value }))} aria-label="Simulation day">
+    {sc.scale === "day" && <label className="ct-line">Which day <select className="ga-sel" value={sc.date} onChange={e => setSc(x => ({ ...x, date: e.target.value }))} aria-label="Simulation day">
       {((D && D.day_choices) || []).map(c => <option key={c.date} value={c.date}>{c.words}{c.bucket === "next" ? " (next week)" : ""}</option>)}</select></label>}
     {!phone && D && (D.sites || []).length > 0 && <label className="ct-line">Site <select className="ga-sel" value={siteId} onChange={e => setSiteId(e.target.value)} aria-label="Simulation site" data-sim-site="1">
       <option value="">Whole scheme</option>{(D.sites || []).map(x => <option key={x.location_id} value={x.location_id}>{x.name}</option>)}</select></label>}
@@ -13472,6 +13562,7 @@ function SimulationPage({ meta, months, phone, initial }){
     D.checks.largest_panel_difference != null && [D.checks.largest_panel_difference < 1, `Leaving out the pour, every gate is within ${simN1(D.checks.largest_panel_difference)} of a lorry of the ${D.scale === "month" ? "Dashboard's" : "Look-ahead's"} ${D.label} average: a day has whole lorries, the average a decimal.`],
     (D.sites || []).length > 0 && [D.checks.sites_add_up, "On site, every lorry checked in left by a gate or is named as having no area."]].filter(Boolean) : [];
   const nOk = checks.filter(c => c[0]).length, allOk = nOk === checks.length;
+  const peak = D && D.loads > 0 ? simPeak(D, site) : null;
   return (
     <div className="max-w-7xl mx-auto p-6 pb-2" data-page="simulation" data-sim="1">
       <PageHeader title="Simulation" subtitle="An average working day, lorry by lorry, at every gate and on site. Staff only."
@@ -13484,16 +13575,22 @@ function SimulationPage({ meta, months, phone, initial }){
           <EmptyState kind="none" title={`No approved lines in ${D.label}`} body="Pick another month. The simulation plays the approved lines of a month's average working day." /></>}
         {D && D.loads > 0 && <>
           {phone && <div className="sim-ctl-row" data-sim-controls="1"><div className="sim-ctl-left">{controls}</div></div>}
+          {/* 9 Nov 2026 (finding 9): the headline first — the busiest point of this day — or one line saying nothing queues */}
+          {peak
+            ? <div className="sim-head" data-sim-head="queue"><b>{peak.n} {peak.n === 1 ? "lorry" : "lorries"} waiting at {peak.name} at {simHM(peak.at)}</b> — the busiest point of this day.{peak.avg != null ? ` Gate in → gate out ${Math.round(peak.avg)} min on average.` : ""}</div>
+            : <div className="sim-head sim-head-none" data-sim-head="none">Nothing queues on this day ({D.label}).{busiestM && busiestM.label !== D.label
+                ? <> <button type="button" className="sim-link" data-sim-busiest="1" onClick={() => { setMsg(""); setSc(x => ({ ...x, scale: "month" })); setMonth(busiestM.month_index); }}>Show the busiest day ({busiestM.label})</button></> : null}</div>}
           {/* the figures line (card 3): few words; the rules are in the i box */}
           <div className="sim-figs" data-sim-lead="1">{D.label} · {simDayWords(D)} · {grp(D.loads)} loads · {grp(D.gate_arrivals)} arrivals{pourN ? `, ${pourN} of them mixers` : ""} · {(D.arrival_pattern && D.arrival_pattern.kind === "rush") ? D.arrival_pattern.words : "spread evenly"}{D.bands.on ? ` · bands ${D.bands.words} off` : ""}{(D.gates || []).some(g => g.shut_words) ? " · shut times off" : ""}{busy ? " · working it out…" : ""}</div>
           {(D.notes || []).map((n, i) => <div key={i} className="ct-note" data-sim-note="1">{n}</div>)}
           {phone
             ? <><div className="ct-note" data-sim-phone="1">The plan's day, read-only here.</div><SimPhoneList D={D} /></>
             : <>
-              <SimPlayer meta={meta} D={D} store={store} open={open} site={site} controls={controls}
+              <SimPlayer meta={meta} D={D} store={store} open={open} site={site} controls={controls} startAt={peak ? peak.at : null}
                 scenario={<SimScenario key={resetN} D={D} sc={sc} onChange={onScenario} onGate={onGate} onReset={() => { setMsg(""); setSc(SIM_SC0()); setResetN(n => n + 1); setSiteId(""); }} msg={msg} />} />
               <details className="sim-fold" data-sim-fold="table"><summary>Busiest hour at each gate</summary>
               <SimTable D={D} />
+              {(D.gates || []).some(g => g.origin_share_note) && <p className="ct-note" data-sim-other-customers="1">{SIM_OTHER_CUSTOMERS}</p>}
               </details>
               {(D.haul_roads || []).length > 0 && <details className="sim-fold" data-sim-fold="haul"><summary>Haul roads</summary>
                 <p className="ct-note">Lorries on each drawn haul road, both ways. No capacity is typed for a haul road, so none is flagged here.</p>

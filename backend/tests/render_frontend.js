@@ -753,7 +753,9 @@ if (loaded) {
         && dOut.indexOf("data-sim-dash=") > dOut.indexOf("data-gate-arrivals") && dOut.indexOf("data-sim-dash=") < dOut.indexOf("<summary>This week and today"));
       ok("⭐ SIM: the figures line, the controls row (scale, month, Play, Restart, speed, the clock), the Now card's jump slider, the scenario band and the map's key as a row",
         sTxt.includes("Sep 2026 · an average working day · 312 loads · 646 arrivals, 22 of them mixers · spread evenly")
-        && sP.includes('data-sim-controls="1"') && sP.includes('aria-label="Simulation month"') && sP.includes(`data-sim-clock="1">${SIMF.window.from}<`)
+        && sP.includes('data-sim-controls="1"') && sP.includes('aria-label="Simulation month"') && sP.includes('data-sim-clock="1">12:38<')
+        /* RE-PINNED 9 Nov 2026 (finding 9): the clock opens at the busiest point, and the headline names it */
+        && sTxt.includes("12 lorries waiting at Harborough Compound at 12:38 — the busiest point of this day.")
         && sP.includes('data-sim-play="1">Play<') && sP.includes(">Restart<")
         && sP.includes('aria-label="Playback speed"') && sP.includes('aria-label="Jump to a time of day"') && sP.includes('data-sim-scenario="1"')
         && sP.includes('<ul class="sim-key" aria-label="Key" data-sim-key="1">') && !sP.includes('class="sim-legend"')
@@ -774,7 +776,7 @@ if (loaded) {
         && sTxt.includes("the table counts 646 lorry arrivals and the map plays 646 between 05:30 and 17:30")
         && sTxt.includes(`every gate is within ${(+SIMF.checks.largest_panel_difference).toFixed(1)} of a lorry of the Dashboard's Sep 2026 average`));
       ok("SIM: the quarries and the railhead say they serve other customers; the flatbed lines say they are drawn on the tipper's route",
-        (sP.match(/Serves other customers too: only this scheme&#x27;s lorries are counted/g) || []).length === 4
+        /* NARROWED 9 Nov 2026 (finding 9): said once, not on each of the four quarry and railhead rows */ (sP.match(/Quarries and plants serve other customers too: only this scheme&#x27;s lorries are counted/g) || []).length === 1 && !sP.includes("Serves other customers too")
         && sP.includes("Drawn on another vehicle&#x27;s route (none worked out for their own): R003 (Artic Flatbed (44t), drawn as Artic Tipper (44t)); R006 ")
         && (sP.match(/drawn as Artic Tipper \(44t\)/g) || []).length === 4);
       ok("SIM: the haul roads table: Langton haul road 148 lorries, Stockpile North haul road 78, both ways",

@@ -2654,7 +2654,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("⭐ S7: one block before CommitMap holding the panel, its player, map, timeline, scenario, table and phone list",
     // RE-PINNED 29 Oct 2026 (its own page): SimulationPage (+ PhoneSimulation, SimDashLine); the player takes the page's controls and site; the map `wall`
     simSrc.length > 20000 && ["function SimulationPage({ meta, months, phone, initial })", "function PhoneSimulation({ meta, months })", "function SimDashLine({ ga, month, months, onOpen })",
-      "function SimPlayer({ meta, D, store, scenario, controls, site, open })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
+      "function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
       // RE-PINNED 28 Oct 2026 (simulation v2): the map and the timeline take the chosen site
       "function SimMap({ meta, D, store, frame, site, wall })", "function SimTimeline({ D, t, onSeek, site })", "const SimScenario = React.memo(function SimScenario(",
       "const SimTable = React.memo(function SimTable(", "function SimPhoneList({ D })", "function simFrame(D, legs, t)", "function simQS(month, sc, legs)"].every(f => simSrc.includes(f))
@@ -2672,10 +2672,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // RE-PINNED 29 Oct 2026 (its own page): read on MOUNT (the page is the fold), keyed on the month and the scenario
   ok("⭐ S7: its own page, read on mount with one GET of /api/sim/day (the lines once a month), keyed on the month and the scenario",
     panelSrc.includes('<div className="max-w-7xl mx-auto p-6 pb-2" data-page="simulation" data-sim="1">') && !panelSrc.includes("<details className=\"dash-more\"")
-    && panelSrc.includes("fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`)") && panelSrc.includes("}, [month, scKey]);")
-    && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (panelSrc.match(/fetch\(/g) || []).length === 1
+    && panelSrc.includes("fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`)") && panelSrc.includes("}, [month, scKey, ready]);")   // NARROWED 9 Nov 2026: and once the busiest month is known
+    && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (panelSrc.match(/fetch\(/g) || []).length === 2 && panelSrc.includes("fetch(`${API}/sim/busiest-month`)")   // NARROWED 9 Nov 2026: the busiest-month read first, then the one day read
     // NARROWED 17 Oct 2026: the block holds the big screen's SimWall too, with its own one read (the plain month, with the lines)
-    && (simc.match(/fetch\(/g) || []).length === 2 && fn("SimWall", "function CommitMap(").includes("fetch(`${API}/sim/day?month=${month}&legs=1`)"));
+    && (simc.match(/fetch\(/g) || []).length === 3 /* NARROWED 9 Nov 2026: and the busiest-month read */ && fn("SimWall", "function CommitMap(").includes("fetch(`${API}/sim/day?month=${month}&legs=1`)"));
   ok("🔴 S7 (D86): nothing written, nothing kept, nothing in the address — no method, no storage, no history, no location in the block",
     !/method:|localStorage|sessionStorage|history\.|location\.|postJSON|navigator\.clipboard/.test(simc));
   ok("⭐ S7: the scenario reaches the server only as the query its parser reads (hours, check_in, bands, pour_*, legs=1)",
@@ -2816,12 +2816,12 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
         "`bays=${encodeURIComponent(a + \"=\" + sc.bays[a])}`", '`wash=${sc.wash ? "on" : "off"}`'].every(t => simSrc.includes(t)));
   ok("⭐ SIM V2: the scale switch is a named group of three pressed buttons; the Month select shows for the month, a Week select (this / next) for the week, a Day select of the server's day choices for the day",
     panelSrc.includes('<div className="sim-seg" role="group" aria-label="Simulation scale" data-sim-scale={sc.scale}>')
-    && panelSrc.includes('aria-pressed={sc.scale === v}') && panelSrc.includes('{sc.scale === "month" && <label className="ct-line">Month <select className="ga-sel" value={month}')
+    && panelSrc.includes('aria-pressed={sc.scale === v}') && panelSrc.includes('{sc.scale === "month" && <label className="ct-line">Which month <select className="ga-sel" value={month}')
     && panelSrc.includes('aria-label="Simulation week">') && panelSrc.includes('<option value="commit">This week</option><option value="next">Next week</option>')
     && panelSrc.includes('aria-label="Simulation day">') && panelSrc.includes('{((D && D.day_choices) || []).map(c => <option key={c.date} value={c.date}>{c.words}'));
   ok("🔴 SIM V2: a week or a day is the server's month — the panel takes j.month and reads the lines once for it; still ONE fetch call",
     panelSrc.includes('if(sc.scale !== "month" && j.month !== month){ shown.current = (store && store.month === j.month) ? `${j.month}|${scKey}` : null; setMonth(j.month); }')
-    && (panelSrc.match(/fetch\(/g) || []).length === 1);
+    && (panelSrc.match(/fetch\(/g) || []).length === 2);   // NARROWED 9 Nov 2026: the busiest-month read, then the day: still ONE day read
   ok("⭐ SIM V2: the site view — a named Site select (Whole scheme first), the map and the timeline take the site, Stations now replaces Gates now for it, 'on site' in the now line",
     // RE-PINNED 29 Oct 2026 (the page, card 4): the Site select is in the page's controls row (scale → period → site), the player takes the site
     panelSrc.includes('aria-label="Simulation site" data-sim-site="1">') && panelSrc.includes('<option value="">Whole scheme</option>') && panelSrc.includes("site={site} controls={controls}")
@@ -4582,11 +4582,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      _sp.includes('Planned use <span className="font-normal text-slate-500">{u} a month, laid on the works</span>')
      && _sp.includes("Same each month from") && _sp.includes("from_month: Math.min(a, b), to_month: Math.max(a, b), planned_qty: q"));
   ok("STOCKPILES: an emptied month clears it (null, not 0); a negative figure is refused in words",
-     _sp.includes('const q = v === "" ? null : numOr(v, NaN);') && _sp.includes('say(false, "Planned use must be a number, 0 or more.")'));
+     _sp.includes('const q = String(v).trim() === "" ? null : stockNum(v);')   /* NARROWED 9 Nov 2026: typed with spaces ("11 000") is read */ && _sp.includes('say(false, "Planned use must be a number, 0 or more.")'));
   ok("STOCKPILES: the stock count names the week, and the last count says how far it was from the worked-out figure",
      _sp.includes("At the end of the week of") && _sp.includes('than worked out` : "")') && _sp.includes('"No stock count yet."'));
   ok("STOCKPILES: the status line — goes over (red) / runs out (amber) / nearly full (amber) / never over (green) — and its own forecast line",
-     _sp.includes("`Goes over in the week of ${stockWeekWord(sp.first_over.from)}") && _sp.includes("`Runs out in the week of ${stockWeekWord(sp.first_empty.from)}")
+     _sp.includes("`Goes over capacity in the week of ${stockWeekWord(sp.first_over.from)}")   /* NARROWED 9 Nov 2026: "capacity" and how long it stays over */ && _sp.includes("`Runs out in the week of ${stockWeekWord(sp.first_empty.from)}")
      && _sp.includes("`Nearly full: ${Math.round(sp.peak_pct)} %") && _sp.includes("`Never over: ${Math.round(sp.peak_pct)} % at most`")
      && _sp.includes("segment: { borderDash: (c) => (c.p0DataIndex >= cut ? [6, 4] : undefined) }"));
   ok("STOCKPILES: failures in words (errSay), never a status number", _sp.includes('errSay("The stockpiles did not load.", e)')
