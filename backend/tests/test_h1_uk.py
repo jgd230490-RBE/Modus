@@ -842,7 +842,7 @@ ok("DESNZ 2026: rigid >17 t 0.99773 and artic >33 t 0.93939 kg CO₂e/km, averag
    and all(V[k]["emissions_kg_co2e_per_km"] == 0.93939 and "DESNZ/DEFRA 2026" in V[k]["_emissions_basis"] for k in _artic))
 ok("...the laden/empty pair is stored with the figure and says it is not read by code yet",
    V["Rigid 8-wheeler (32t)"]["emissions_kg_co2e_per_km_empty"] == 0.77910 and V["Rigid 8-wheeler (32t)"]["emissions_kg_co2e_per_km_laden"] == 1.11639
-   and V["Artic Tipper (44t)"]["emissions_kg_co2e_per_km_empty"] == 0.65383 and "NOT read by code yet" in V["Artic Tipper (44t)"]["_emissions_basis"])
+   and V["Artic Tipper (44t)"]["emissions_kg_co2e_per_km_empty"] == 0.65383 and "0% laden 0.65383" in V["Artic Tipper (44t)"]["_emissions_basis"])   # NARROWED 9 Nov 2026: the pair IS read by code since the return journey (PR #227)
 # REVERSED (10 Oct 2026, carbon planner): the flat file v1.2 has been read; the note says so, with the row IDs
 ok("...and the file says the figures were VERIFIED on 10 Oct 2026 against the gov.uk flat file, with the row IDs",
    "Verified 10 Oct 2026 against the gov.uk flat file v1.2" in V["Rigid 8-wheeler (32t)"]["_emissions_basis"]

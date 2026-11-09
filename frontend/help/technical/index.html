@@ -25,7 +25,7 @@ h2{color:var(--deep);font-size:19px;margin:30px 0 8px}h3{color:#1D4ED8;font-size
 p{margin:0 0 10px}code{font:13px/1.4 Consolas,ui-monospace,monospace;background:#EEF1F5;padding:1px 4px;border-radius:4px}
 pre{background:#F5F7FA;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12.5px/1.45 Consolas,ui-monospace,monospace}
 ul{margin:0 0 12px;padding-left:22px}li{margin:0 0 6px}
-.tbl{overflow-x:auto;margin:6px 0 18px}.tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}table{border-collapse:collapse;width:100%;font-size:13.5px}
+li>code,p>code{overflow-wrap:anywhere}.tbl{overflow-x:auto;margin:6px 0 18px}.tbl:focus-visible{outline:2px solid var(--blue);outline-offset:2px}table{border-collapse:collapse;width:100%;font-size:13.5px}
 th{background:var(--navy);color:#fff;text-align:left;padding:7px 9px;font-weight:600}td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}tbody tr:nth-child(even) td{background:var(--panel)}td.k{font-weight:600;color:var(--navy);white-space:nowrap}
 .callout{border-left:5px solid;border-radius:8px;padding:10px 14px;margin:12px 0 18px}.callout .ct{font-weight:700;margin-bottom:4px}.callout p{margin:0 0 6px}
 .callout.note{background:#EEF4FB;border-color:var(--blue)}.callout.note .ct{color:#1D4ED8}.callout.warn{background:#FDF2F5;border-color:var(--red)}.callout.warn .ct{color:#B91C1C}
@@ -666,7 +666,7 @@ PATCH  /api/review/clps/{id}/tasks/{tid}         {done} the side it is given to 
 DELETE /api/review/clps/{id}/tasks/{tid}         its writer
 DELETE /api/review/clps/{id}/notes/{nid}         its writer
 POST   /api/clp/documents/{id}/notes|tasks       + {group}: a write in that client tab (planners / admins); tasks + {from_note}</pre>
-<p>The demo carries one group, <em>Highways client (fictional)</em>, with no logins.</p>
+<p>The demo carries one group, <em>Highways client</em>, with no logins.</p>
 <h2 id="t1-abnormal">Abnormal loads (S16 / B5, 22 Oct 2026)</h2>
 <p>Each abnormal load is its own row in <code>abnormal_loads</code> (one tenant's, carried in its package), never a forecast line: nothing of it reaches the tonnes, trips, vehicles, CLP caps, gate capacity or carbon figures (D70, D71). The rules engine is <code>backend/abnormal_rules.py</code>, every threshold a named constant with its source, and <code>test_abnormal.py</code> asserts each on both sides.</p>
 <ul><li><strong>When a load is abnormal.</strong> Over 44 t gross, over 2.9 m wide, over 18.65 m rigid, over 10 t on an axle (11.5 t driving): the Road Vehicles (Authorised Weight) Regulations 1998 and the Construction and Use Regulations 1986 as the National Highways aide memoire reads them. Construction and Use covers up to 4.3 m wide and 27.4 m long; STGO 2003 Schedule 1 gives Category 1 (up to 50 t on 5 or 6 axles), 2 (80 t, 6 or more) and 3 (150 t), with 12.5 / 12 / 16.5 t axle limits, 1.35 m minimum spacing and the tonnes-a-metre rule; over 150 t, 6.1 m wide or 30 m long is a Special Order (BE16). Width over 5.0 m (to 6.1 m) is a VR1.</li>

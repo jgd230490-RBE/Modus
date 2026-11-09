@@ -396,8 +396,8 @@ ok("3. ⭐ the demo's 20 sites by point-in-polygon: Harborough 12, Melton 3, Cha
    and sp["Leicestershire"]["sites_count"] == 19 and len(_pkg["tables"]["locations"]) == 20,
    str({n: a["sites_count"] for n, a in sp.items()}))
 ok("3. ...Kilby Ridge in Blaby, Northfield and the crane depot in Charnwood, Brook Pit in Rutland, the precast works in Hinckley and Bosworth",
-   sp["Blaby"]["sites"] == ["Kilby Ridge Quarry"] and sorted(sp["Charnwood"]["sites"]) == ["Northfield Quarry", "Soar Valley Crane Hire (fictional)"]
-   and sp["Rutland"]["sites"] == ["Brook Pit"] and sp["Hinckley and Bosworth"]["sites"] == ["Earl Shilton Precast Works (fictional)"])
+   sp["Blaby"]["sites"] == ["Kilby Ridge Quarry"] and sorted(sp["Charnwood"]["sites"]) == ["Northfield Quarry", "Soar Valley Crane Hire"]
+   and sp["Rutland"]["sites"] == ["Brook Pit"] and sp["Hinckley and Bosworth"]["sites"] == ["Earl Shilton Precast Works"])
 ok("3. ...and the totals say 19 sites, so the card reads Harborough '11 of 19' (NARROWED 14 Oct: the batching plant; RE-PINNED 17 Oct: the two plants; 22 Oct: the two abnormal-load sites; 28 Oct: the viaduct site)",
    areas.area_load(10)["totals"]["sites"] == 20)   # RE-PINNED 29 Oct 2026 (task 3c): + the holding area
 _seed_areas = {a["name"]: a for a in areas.area_load(10)["areas"]}
