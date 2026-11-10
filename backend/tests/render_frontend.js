@@ -979,15 +979,21 @@ if (loaded) {
         gS.length > 0 && GW.gates.slice(0, 6).every((g, i) => i === 0 || gS.indexOf(`data-gw-gate="${GW.gates[i - 1].gate_id}"`) < gS.indexOf(`data-gw-gate="${g.gate_id}"`))
         && gS.includes('aria-label="About: Gates this week"'));
       const nRed = GW.gates.filter(g => g.flag === "red").length;
+      // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 33, mockup card 3): the gates are one list; a row opens its day chart, so the
+      // flagged days and the capacity sentence are read from the list with every row open (initialOpen); closed by default
+      const gOpen = (() => { const o = render("the gates list with every row open", h(sandbox.GatesWeek, { gw: GW, initialOpen: true }));
+        const i = o.indexOf('data-gates-week="1"'); return i < 0 ? "" : o.slice(i, o.indexOf("</section>", i)); })();
       ok("W17: the headline counts the gates over capacity; every flagged day is a word with its icon and its %, never colour alone",
         gS.includes(`data-gw-head="1">${nRed} gate${nRed === 1 ? "" : "s"} over capacity on a day this week<`)
-        && GW.gates.slice(0, 6).every(g => g.days.filter(d => d.flag).every(d => gS.includes(`data-gw-day="${d.date}"`)))
-        && (gS.match(/data-row-status="bad"/g) || []).length === GW.gates.slice(0, 6).reduce((n, g) => n + g.days.filter(d => d.flag === "red").length, 0)
-        && gS.includes(`${GW.gates[0].days[0].day}: Over gate capacity (${GW.gates[0].days[0].pct} %)`));
+        && !gS.includes("data-gw-detail=") && !gS.includes("data-gw-day=")
+        && GW.gates.every(g => g.days.filter(d => d.flag).every(d => gOpen.includes(`data-gw-day="${d.date}"`)))
+        && (gOpen.match(/data-row-status="bad"/g) || []).length === nRed + GW.gates.reduce((n, g) => n + g.days.filter(d => d.flag === "red").length, 0)
+        && (gS.match(/data-row-status="bad"/g) || []).length === nRed
+        && gOpen.includes(`${GW.gates[0].days[0].day}: Over gate capacity (${GW.gates[0].days[0].pct} %)`));
       ok("W17: a gate with no check-in says nothing is compared; each gate says what it can check in and how",
         // NARROWED 17 Oct 2026: the hours the capacity rests on are named (the default gate hours here), never "the shift"
-        gS.includes("No check-in time typed: nothing is compared.") && gS.includes("Can check in 200 a day (open 07:00–17:00 by default ÷ 3 min a lorry).")
-        && gS.includes("Can check in 300 a day (open 07:00–17:00 by default ÷ 2 min a lorry).") && !gS.includes("the shift ÷"));
+        gOpen.includes("No check-in time typed: nothing is compared.") && gOpen.includes("Can check in 200 a day (open 07:00–17:00 by default ÷ 3 min a lorry).")
+        && gOpen.includes("Can check in 300 a day (open 07:00–17:00 by default ÷ 2 min a lorry).") && !gOpen.includes("the shift ÷"));
       ok("🔴 W17: the honest limit and the week-split sentence are printed under the gates",
         // NARROWED 17 Oct 2026: the limit names the shut times and the bands
         gS.includes("Planned arrivals spread evenly over the gate&#x27;s open hours, less its shut times and the no-delivery bands; no hourly peak is known.")
@@ -995,7 +1001,8 @@ if (loaded) {
       // 17 Oct 2026 (the review): the week card with a gate's shut times and one left no open time
       const GWS = { ...GW, gates: GW.gates.map((g, i) => i === 0 ? { ...g, shut_minutes: 45, shut_words: "08:30–09:15" }
                                                    : i === 1 ? { ...g, no_open_time: true, capacity_per_day: 0 } : g) };
-      const gwO = render("the Commit view renders the week with shut times", h(LookAhead, { meta: laMeta, who: "t", initialPage: { ...fixture, gates_week: GWS }, initialView: "commit" }));
+      // NARROWED 10 Nov 2026 (wave 3, item 33): read with every row open (the sentence is in an opened row's chart title)
+      const gwO = render("the Commit view renders the week with shut times", h(sandbox.GatesWeek, { gw: GWS, initialOpen: true }));
       const gwS = (() => { const i = gwO.indexOf('data-gates-week="1"'); return i < 0 ? "" : gwO.slice(i, gwO.indexOf("</section>", i)); })();
       ok("⭐ the review: the week card says 'less 45 min shut' for a gate with shut times and 'No open time' for one with none left",
         gwS.includes("less 45 min shut ÷") && gwS.includes("No open time: the no-delivery bands and this gate&#x27;s shut times cover all its hours.")

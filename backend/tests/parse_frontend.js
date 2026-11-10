@@ -1710,7 +1710,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("AL2 row: no line yet is said in words, with the reason stored when HERE refused; a not-planner is told a planner draws it",
      al.includes('<span style={{ color: "var(--bad-text)" }}>{m.bake_error}</span>') && !al.includes("The line could not be drawn: {m.bake_error}")
      && al.includes("No line drawn yet.") && al.includes("A planner draws it."));
-  const wk0 = src.indexOf("function AbnormalWeek({ ab }){"), wk1 = src.indexOf("function GatesWeek({ gw }){");
+  const wk0 = src.indexOf("function AbnormalWeek({ ab }){"), wk1 = src.indexOf("function GatesWeek({ gw, initialOpen }){");
   const wk = src.slice(wk0, wk1);
   ok("⭐ AL2 Look-ahead: an 'Abnormal loads this week' block under the gates' week (only when the server's block has movements), one row a brief — the load and its ends, " +
      "the window, band, movements and escort, the class chip and summary, the route's length and 'N to survey' or 'not drawn', the status word and the flag chips, the notify-by — and the counted-apart words",
@@ -3560,10 +3560,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      clpc.includes('ctx.fillText(`${clpN1(r[valKey])} ${word}`, A.right + 12, el.y - 7);')
      && clpc.includes('ctx.fillText(`${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over the cap" : ""), A.right + 12, el.y + 8);'));
   // W17: the Look-ahead's gates this week, and the rail's two codes
+  // NARROWED 10 Nov 2026 (wave 3, item 33): the component takes initialOpen (the render harness opens every row)
   ok("⭐ W17: GatesWeek draws the page's gates_week (no read of its own), after the grid and before the map",
-     src.includes("function GatesWeek({ gw }){") && src.includes("{lines.length > 0 && <GatesWeek gw={page && page.gates_week} />}")
+     src.includes("function GatesWeek({ gw, initialOpen }){") && src.includes("{lines.length > 0 && <GatesWeek gw={page && page.gates_week} />}")
      && src.indexOf("<GatesWeek gw=") < src.indexOf("<CommitMap meta={meta} bucket={bucket} tick={tick} lines={lines} />")
-     && !src.slice(src.indexOf("function GatesWeek({ gw }){"), src.indexOf("// the status pill column between the line and the days")).includes("fetch("));
+     && !src.slice(src.indexOf("function GatesWeek({ gw, initialOpen }){"), src.indexOf("// the status pill column between the line and the days")).includes("fetch("));
   ok("W17: each day is the server's: red past capacity, gold from 85 %, a capacity step line and a dashed 85 % line; words via RowStatus",
      src.includes('backgroundColor: g.days.map(d => d.flag === "red" ? RED : d.flag === "amber" ? GOLD : (g.capacity_per_day == null ? NONE : C1)) }];')
      && src.includes('stepped: "middle", order: 1 });') && src.includes("data: g.days.map(d => d.open ? g.near_per_day : 0), borderColor: GOLD, borderWidth: 1.5, borderDash: [4, 3]")

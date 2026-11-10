@@ -960,6 +960,20 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   @media (min-width:1024px){.gw-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
   @media (min-width:1600px){.gw-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}
   .gw-gate{border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0;}
+  /* 10 Nov 2026 (16 Oct item 33, mockup card 3): the gates as one list, a row opening its day chart */
+  .gw-table{margin-top:8px;}
+  .gw-table td{vertical-align:middle;}
+  .gw-open{display:flex;align-items:flex-start;gap:6px;background:none;border:0;padding:4px 0;text-align:left;color:var(--ink);cursor:pointer;min-height:32px;}
+  .gw-open:hover .gw-name{text-decoration:underline;}
+  .gw-caret{flex:none;width:12px;color:var(--muted);font-size:12px;line-height:20px;}
+  .gw-name{font-weight:600;font-size:14px;line-height:20px;}
+  .gw-name small,.gw-busy small{display:block;font-size:13px;font-weight:400;color:var(--muted);}
+  .gw-busy b{font-weight:600;}
+  .gw-cap{min-width:160px;max-width:240px;}
+  .gw-cap span{display:block;margin-top:4px;font-size:13px;color:var(--muted);}
+  .gw-cap.ga-li-warn span{color:var(--warn-text);}
+  .gw-cap.ga-li-bad span{color:var(--bad-text);}
+  .gw-detail > td{padding-top:0;}
   /* 10 Nov 2026 (UI critique finding 5, card 5): a gate chart's Copy / Download sit in its title row, not over its sentence */
   .gw-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
   .gw-head .chart-tools{flex:none;}
@@ -11373,7 +11387,6 @@ function LaKpi({ value, caption, tone }){
 // ÷ the check-in minutes a lorry; 0 on a day it is closed). The SERVER decides each day's status (gate_hours.py): gold
 // "Queue likely" at 85 % or more, red "Over gate capacity" past it — always a word and an icon too, never colour alone.
 // The browser draws; it divides nothing. The same days raise GATE_OVER / GATE_NEAR on the clash rail. Flags, never blocks.
-const GW_SHOW = 6;
 function gwCfg(g, labels){
   const C1 = tok("--chart-1", "#E8590C"), RED = tok("--red", "#DC2626"), GOLD = tok("--gold", "#D97706"), NONE = tok("--chart-none", "#A8A29E"), INK = tok("--ink", "#1E293B");
   const ds = [{ type: "bar", label: "Planned arrivals", data: g.days.map(d => d.arrivals), order: 2, borderWidth: 0, borderRadius: 3,
@@ -11689,11 +11702,30 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
   );
 }
 
-function GatesWeek({ gw }){
+// 10 Nov 2026 (UI critique, 16 Oct item 33, mockup card 3): every gate in ONE list, worst first (the server's order: over,
+// near, then the busiest) — its busiest day, a thin bar against what it can check in, one status chip. A gate's row opens
+// its day-by-day chart, with the capacity sentence and Copy / Download in the chart's title row; no six charts at once.
+// `initialOpen` (true) opens every row: for the render harness only.
+function gwBusiest(g){
+  let b = null;
+  (g.days || []).forEach(d => { if(d.open !== false && (b == null || (+d.arrivals || 0) > (+b.arrivals || 0))) b = d; });
+  return b;
+}
+function gwStatus(g){
+  if(g.flag === "red") return { word: "Over capacity", tone: "bad" };
+  if(g.flag === "amber") return { word: "Queue likely", tone: "warn" };
+  if(g.no_open_time) return { word: "No open time", tone: "none" };
+  if(g.capacity_per_day == null) return { word: "Not compared", tone: "none" };
+  return { word: "Within", tone: "ok" };
+}
+function GatesWeek({ gw, initialOpen }){
+  const [open, setOpen] = useState(() => (initialOpen === true && gw && gw.gates ? Object.fromEntries(gw.gates.map(g => [g.gate_id, true])) : {}));
   if(!gw || !(gw.gates || []).length) return null;
   const gs = gw.gates;
   const nRed = gs.filter(g => g.flag === "red").length, nAmber = gs.filter(g => g.flag === "amber").length;
-  const shown = gs.slice(0, GW_SHOW), rest = gs.slice(GW_SHOW);
+  const capWords = (g) => g.no_open_time ? "No open time: the no-delivery bands and this gate's shut times cover all its hours."
+    : g.capacity_per_day == null ? "No check-in time typed: nothing is compared."
+    : `Can check in ${grp(g.capacity_per_day)} a day (open ${g.open_hours}${g.open_basis === "default" ? " by default" : ""}${g.peak_minutes ? `, less ${g.peak_minutes} min of peak bands` : ""}${g.shut_minutes ? `, less ${g.shut_minutes} min shut` : ""} ÷ ${+g.check_in_minutes} min a lorry)${g.closed_days ? `, ${g.closed_days}` : ""}.`;
   return (
     <section className="card p-4 mb-3" data-gates-week="1" data-guide="lookahead-gates" aria-label="Gates this week">
       <div className="ct-row">
@@ -11702,32 +11734,69 @@ function GatesWeek({ gw }){
           {nRed ? `${nRed} gate${nRed === 1 ? "" : "s"} over capacity on a day this week` : nAmber ? `${nAmber} gate${nAmber === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity this week"}
         </span>
       </div>
-      <div className="gw-grid">
-        {shown.map(g => (
-          <div key={g.gate_id} className="gw-gate" data-gw-gate={g.gate_id} data-gw-flag={g.flag || "none"}>
-            <ChartCanvas config={gwCfg(g, gw.days)} title={`Gates this week: ${[g.location_name, g.gate_name].filter(Boolean).join(", ")}`} head={<>
-            <div className="text-sm font-semibold text-slate-700">{g.location_name}<span className="text-slate-400 font-normal"> · {g.gate_name}</span></div>
-            {g.closed_words && <div className="clp-note" data-gw-closed={g.gate_id}>{g.closed_words[0].toUpperCase() + g.closed_words.slice(1)}: its lorries use the site's other gate meanwhile.</div>}
-            <div className="clp-note">{g.no_open_time ? "No open time: the no-delivery bands and this gate's shut times cover all its hours."
-              : g.capacity_per_day == null ? "No check-in time typed: nothing is compared."
-              : `Can check in ${grp(g.capacity_per_day)} a day (open ${g.open_hours}${g.open_basis === "default" ? " by default" : ""}${g.peak_minutes ? `, less ${g.peak_minutes} min of peak bands` : ""}${g.shut_minutes ? `, less ${g.shut_minutes} min shut` : ""} ÷ ${+g.check_in_minutes} min a lorry)${g.closed_days ? `, ${g.closed_days}` : ""}.`}</div>
-            </>} />
-            <div className="gw-days">
-              {g.days.filter(d => d.flag).map(d => (
-                <span key={d.date} className="gw-day" data-gw-day={d.date}><RowStatus word={`${d.day}: ${d.status_word}${d.pct != null ? ` (${d.pct} %)` : d.open ? "" : " (closed)"}`} tone={d.flag === "red" ? "bad" : "warn"} /></span>
-              ))}
-            </div>
-          </div>
-        ))}
-        {/* 29 Oct 2026 (task 3c): the holding areas — lorries a day through each this week (spaces are not a rate: no capacity line) */}
-        {(gw.holding || []).map(h => (
-          <div key={"h" + h.id} className="gw-gate" data-gw-holding={h.id}>
-            <div className="text-sm font-semibold text-slate-700"><span className="hbadge" aria-hidden="true">H</span>{h.name}<span className="text-slate-400 font-normal"> · holding area{h.spaces ? ` · ${h.spaces} spaces` : ""}</span></div>
-            <div className="clp-note">Calls off to {h.served_names}.</div>
-            <div className="gw-days">{(h.days || []).map(d => <span key={d.date} className="gw-day" data-gw-hday={d.date}><RowStatus word={`${d.day}: ${d.arrivals}`} tone="none" /></span>)}</div>
-          </div>))}
+      <div className="overflow-auto">
+        <table className="tbl gw-table" data-gw-table="1">
+          <thead><tr><th scope="col">Gate</th><th scope="col">Busiest day</th><th scope="col">Of what it can check in</th><th scope="col">Status</th></tr></thead>
+          <tbody>
+            {gs.map(g => {
+              const b = gwBusiest(g), st = gwStatus(g), isOpen = !!open[g.gate_id];
+              const name = [g.location_name, g.gate_name].filter(Boolean).join(", ");
+              return (
+                <React.Fragment key={g.gate_id}>
+                  <tr data-gw-gate={g.gate_id} data-gw-flag={g.flag || "none"} className={isOpen ? "gw-row is-open" : "gw-row"}>
+                    <td>
+                      <button type="button" className="gw-open" aria-expanded={isOpen ? "true" : "false"} aria-controls={`gw-d-${g.gate_id}`}
+                        onClick={() => setOpen(o => ({ ...o, [g.gate_id]: !o[g.gate_id] }))}>
+                        <span className="gw-caret" aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
+                        <span className="gw-name">{g.location_name}<small>{g.gate_name}</small></span>
+                      </button>
+                    </td>
+                    <td className="gw-busy">{b ? <><b>{grp(b.arrivals)}</b> lorr{+b.arrivals === 1 ? "y" : "ies"}<small>{b.day}</small></> : "—"}</td>
+                    <td>
+                      {g.peak_pct != null && g.capacity_per_day != null ? (
+                        <div className={"gw-cap" + (g.flag === "red" ? " ga-li-bad" : g.flag === "amber" ? " ga-li-warn" : "")} data-gw-pct={g.peak_pct}>
+                          <div className="ga-pbar" aria-hidden="true"><i style={{ width: Math.max(2, Math.min(100, g.peak_pct)) + "%" }}></i></div>
+                          <span>{g.peak_pct} % of {grp(g.capacity_per_day)}</span>
+                        </div>
+                      ) : <span className="text-slate-500">—</span>}
+                    </td>
+                    <td><RowStatus word={st.word} tone={st.tone} /></td>
+                  </tr>
+                  {isOpen && (
+                    <tr className="gw-detail" id={`gw-d-${g.gate_id}`} data-gw-detail={g.gate_id}>
+                      <td colSpan={4}>
+                        <div className="gw-gate">
+                          <ChartCanvas config={gwCfg(g, gw.days)} title={`Gates this week: ${name}`} head={<>
+                            <div className="text-sm font-semibold text-slate-700">{g.location_name}<span className="text-slate-400 font-normal"> · {g.gate_name}</span></div>
+                            {g.closed_words && <div className="clp-note" data-gw-closed={g.gate_id}>{g.closed_words[0].toUpperCase() + g.closed_words.slice(1)}: its lorries use the site's other gate meanwhile.</div>}
+                            <div className="clp-note">{capWords(g)}</div>
+                          </>} />
+                          <div className="gw-days">
+                            {g.days.filter(d => d.flag).map(d => (
+                              <span key={d.date} className="gw-day" data-gw-day={d.date}><RowStatus word={`${d.day}: ${d.status_word}${d.pct != null ? ` (${d.pct} %)` : d.open ? "" : " (closed)"}`} tone={d.flag === "red" ? "bad" : "warn"} /></span>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
-      {rest.length > 0 && <div className="clp-note" data-gw-rest="1">{rest.length} more gate{rest.length === 1 ? "" : "s"}: {rest.map(g => `${g.location_name}, ${g.gate_name}${g.status_word ? ` (${g.status_word})` : ""}`).join("; ")}.</div>}
+      {/* 29 Oct 2026 (task 3c): the holding areas — lorries a day through each this week (spaces are not a rate: no capacity line) */}
+      {(gw.holding || []).length > 0 && (
+        <div className="gw-grid">
+          {(gw.holding || []).map(h => (
+            <div key={"h" + h.id} className="gw-gate" data-gw-holding={h.id}>
+              <div className="text-sm font-semibold text-slate-700"><span className="hbadge" aria-hidden="true">H</span>{h.name}<span className="text-slate-400 font-normal"> · holding area{h.spaces ? ` · ${h.spaces} spaces` : ""}</span></div>
+              <div className="clp-note">Calls off to {h.served_names}.</div>
+              <div className="gw-days">{(h.days || []).map(d => <span key={d.date} className="gw-day" data-gw-hday={d.date}><RowStatus word={`${d.day}: ${d.arrivals}`} tone="none" /></span>)}</div>
+            </div>))}
+        </div>
+      )}
       <div className="ct-note">{gw.limit} The days are this page's own: the month spread over its calendar weeks, rounded up a day, so a day can be busier than the Dashboard's month average.</div>
     </section>
   );

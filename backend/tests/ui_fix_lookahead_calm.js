@@ -30,7 +30,7 @@ const between = (a, b) => { const i = code.indexOf(a), j = code.indexOf(b, i + 1
 const la = between("function LookAhead({ meta, who, access, initialPage, initialView }){", "\nfunction CommitMap(");
 const laGrid = la.slice(la.indexOf('data-rd-table="lookahead"'), la.indexOf("{/* 14 Oct 2026 (bundle G, W17): the committed week at each gate"));
 const acct = la.slice(la.indexOf('view === "account" ?'), la.indexOf("{/* 10 Sep: what came OUT of each stockpile"));
-const gw = between("function GatesWeek({ gw }){", "\n// the status pill column");
+const gw = between("function GatesWeek({ gw, initialOpen }){", "\n// the status pill column");
 
 // run a few of the page's own small functions for real (JSX → React.createElement, which we stub to plain objects)
 const grab = (start) => { const i = code.indexOf(start); if (i < 0) return ""; let j = code.indexOf("\n}\n", i); return code.slice(i, j + 2); };
@@ -99,8 +99,8 @@ ok("⭐ 5: a gate chart's Copy / Download sit in its title row: ChartCanvas take
    && code.includes('return head ? <><div className="gw-head" data-chart-head="1"><div className="min-w-0">{head}</div>{tools}</div>{chart}</> : chart;')
    && /\.gw-head\{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;\}/.test(css));
 ok("...the gate's name, closed note and capacity sentence are that head (no sentence left above the chart for the buttons to cover)",
-   gw.includes("head={<>") && gw.indexOf("Can check in ${grp(g.capacity_per_day)} a day") > gw.indexOf("head={<>")
-   && gw.indexOf("Can check in ${grp(g.capacity_per_day)} a day") < gw.indexOf("</>} />"));
+   gw.includes("head={<>") && gw.indexOf('<div className="clp-note">{capWords(g)}</div>') > gw.indexOf("head={<>")
+   && gw.indexOf('<div className="clp-note">{capWords(g)}</div>') < gw.indexOf("</>} />") && gw.includes("`Can check in ${grp(g.capacity_per_day)} a day"));
 ok("...every other chart keeps its buttons in its box as before", code.includes("{!head && tools}</div>;"));
 
 // Config
@@ -212,6 +212,34 @@ ok("⭐ 24: on the Horizon a week not set yet reads grey, explained once in the 
    la.includes('<div className="text-xs font-normal text-slate-500" data-hz-grey="1">Grey: the month spread evenly over its weeks</div>')
    && hz.includes('const grey = status == null;') && hz.includes('className={"tabular-nums " + (grey ? "text-slate-500" : "font-semibold text-slate-800")} data-hz-cell={grey ? "derived" : "set"}')
    && !/derived ÷/.test(la));
+
+// ---------------------------------------------------------------- 16 Oct item 33 / mockup card 3: the gates as one list
+const gwAll = between("function gwBusiest(g){", "\n// the status pill column");
+ok("⭐ 33: every gate is one row of one list (no six-chart grid, no \"N more gates\" sentence), in the server's order (worst first)",
+   gw.includes('<table className="tbl gw-table" data-gw-table="1">')
+   && gw.includes('<thead><tr><th scope="col">Gate</th><th scope="col">Busiest day</th><th scope="col">Of what it can check in</th><th scope="col">Status</th></tr></thead>')
+   && gw.includes("{gs.map(g => {") && !code.includes("GW_SHOW") && !gw.includes("data-gw-rest") && !gw.includes("more gate"));
+ok("...a row: the gate's two names, its busiest day with its lorries, a thin bar against what it can check in, one status chip",
+   gw.includes('<span className="gw-name">{g.location_name}<small>{g.gate_name}</small></span>')
+   && gw.includes("<b>{grp(b.arrivals)}</b> lorr{+b.arrivals === 1 ? \"y\" : \"ies\"}<small>{b.day}</small>")
+   && gw.includes('<div className="ga-pbar" aria-hidden="true"><i style={{ width: Math.max(2, Math.min(100, g.peak_pct)) + "%" }}></i></div>')
+   && gw.includes("<span>{g.peak_pct} % of {grp(g.capacity_per_day)}</span>") && gw.includes("<td><RowStatus word={st.word} tone={st.tone} /></td>"));
+ok("⭐ 33: the day chart is behind a real button on the row (aria-expanded), closed by default; the holding areas stay below the list",
+   gw.includes('<button type="button" className="gw-open" aria-expanded={isOpen ? "true" : "false"} aria-controls={`gw-d-${g.gate_id}`}')
+   && gw.includes("{isOpen && (") && gw.includes("useState(() => (initialOpen === true && gw && gw.gates ?")
+   && gw.indexOf("data-gw-holding={h.id}") > gw.indexOf("</table>"));
+try {
+  const js = ts.transpileModule(gwAll.slice(0, gwAll.indexOf("function GatesWeek(")) + "\nmodule.exports = { gwBusiest, gwStatus };",
+    { compilerOptions: { target: ts.ScriptTarget.ES2019, module: ts.ModuleKind.CommonJS } }).outputText;
+  const m = { exports: {} }; new Function("module", "exports", js)(m, m.exports); const G = m.exports;
+  const days = [{ day: "Mon 9 Nov", arrivals: 37, open: true }, { day: "Tue 10 Nov", arrivals: 41, open: true }, { day: "Sat 14 Nov", arrivals: 90, open: false }];
+  ok("...gwBusiest: the busiest OPEN day (a closed day's figure is not the gate's busiest)", G.gwBusiest({ days }).day === "Tue 10 Nov" && G.gwBusiest({ days: [] }) === null);
+  ok("...gwStatus: Over capacity (bad), Queue likely (warn), No open time, Not compared, Within (ok)",
+     G.gwStatus({ flag: "red" }).word === "Over capacity" && G.gwStatus({ flag: "red" }).tone === "bad"
+     && G.gwStatus({ flag: "amber" }).word === "Queue likely" && G.gwStatus({ flag: "amber" }).tone === "warn"
+     && G.gwStatus({ no_open_time: true, capacity_per_day: 0 }).word === "No open time"
+     && G.gwStatus({ capacity_per_day: null }).word === "Not compared" && G.gwStatus({ capacity_per_day: 170 }).tone === "ok");
+} catch (err) { fail.push("gwBusiest / gwStatus transpile and run  " + err.message); }
 
 console.log(`ui_fix_lookahead_calm.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  ✗ " + f)); process.exit(1); }
