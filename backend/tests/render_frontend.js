@@ -1041,12 +1041,14 @@ if (loaded) {
     // headings, and a short line's 'spread on this week' is the standard small button. The fixture has no short line, so
     // its first account row is made one here (action spread, 12.5 short).
     const spreadFix = JSON.parse(JSON.stringify(fixture));
-    spreadFix.account.rows[0] = { ...spreadFix.account.rows[0], action: "spread", remaining_short: 12.5, variance: 12.5, held: false };
+    // NARROWED 10 Nov 2026 (wave 3, finding 5): the wash is amber and only on a line short past the organisation's share
+    // (short_flag); an unflagged spread line keeps its button but no wash (checked below)
+    spreadFix.account.rows[0] = { ...spreadFix.account.rows[0], action: "spread", remaining_short: 12.5, variance: 12.5, held: false, short_flag: true };
     const spOut = render("UI FIX 6: the Account view renders a short line (action spread)",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: spreadFix, initialView: "account" }));
-    const spRow = spOut.slice(spOut.indexOf('<tr class="border-t border-slate-100 align-middle" style="background:rgba(191,46,85,.05)">'));
+    const spRow = spOut.slice(spOut.indexOf('<tr class="border-t border-slate-100 align-middle" style="background:rgba(217,119,6,.06)">'));
     ok("⭐ UI FIX 6 card 2: the short line's 'spread on this week' is the standard small button (btn-pri btn-sm), same words and title; the 11 px white one-off is gone",
-      spOut.includes('style="background:rgba(191,46,85,.05)"') && spRow.includes('<button class="btn-pri btn-sm disabled:opacity-40" title="Carry +12.5 into the commit week, divided over its remaining weekdays. Refused if that week is confirmed.">spread on this week</button>')
+      spOut.includes('style="background:rgba(217,119,6,.06)"') && spRow.includes('<button class="btn-pri btn-sm disabled:opacity-40" title="Carry +12.5 into the commit week, divided over its remaining weekdays. Refused if that week is confirmed.">spread on this week</button>')
       && !spOut.includes("rounded-lg text-white") && (spOut.match(/>spread on this week</g) || []).length === 1);
     ok("⭐ UI FIX 6 cards 1 and 2: the table keeps 1,220 px in its padded scroller under 13 px headings (la-acct-head); the Action heading and every Action cell are pinned (la-pin), the short line's cell painting the row's rose (la-pin-short)",
       spOut.includes('<div class="overflow-auto la-acct-scroll"><table class="text-sm w-full" style="min-width:1220px"><thead class="la-acct-head">')
@@ -1054,6 +1056,13 @@ if (loaded) {
       && (spOut.match(/<td class="px-2 py-2 text-right whitespace-nowrap la-pin( la-pin-short)?">/g) || []).length === spreadFix.account.rows.length
       && (spOut.match(/la-pin la-pin-short/g) || []).length === 1 && spRow.includes('<td class="px-2 py-2 text-right whitespace-nowrap la-pin la-pin-short">')
       && !acctOut.includes("la-pin-short") && !/<thead class="[^"]*text-\[10px\] uppercase[^"]*"><tr><th class="px-3 py-2 text-left font-semibold">Line</.test(spOut));
+    // 10 Nov 2026 (wave 3, finding 5): a spread line under the share keeps its button, with no wash and no pinned tint
+    const quietFix = JSON.parse(JSON.stringify(spreadFix));
+    quietFix.account.rows[0].short_flag = false;
+    const qOut = render("wave 3: the Account view renders a short line under the share", h(LookAhead, { meta: laMeta, who: "t", initialPage: quietFix, initialView: "account" }));
+    ok("⭐ wave 3 (finding 5): a line short by less than the share keeps 'spread on this week' but has no wash and no la-pin-short",
+      (qOut.match(/>spread on this week</g) || []).length === 1 && !qOut.includes("la-pin-short") && !qOut.includes("background:rgba(217,119,6,.06)")
+      && !qOut.includes('<tr class="border-t border-slate-100 align-middle" style="background:'));
 
     const hzOut = render("the Horizon view renders with a populated page",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "horizon" }));
