@@ -348,7 +348,7 @@ if (loaded) {
     const dOut = render("the Dashboard renders POPULATED from the cost lines (initialData)", h(Dashboard, { meta: dMeta, initialData: cl }));
     ok("...with the three KPI groups — Volume, Cost, Carbon — and the coverage line",
       // 13 Oct 2026 (W3, narrowed): the coverage line in plain words
-      dOut.includes(">Volume<") && dOut.includes(">Cost<") && dOut.includes(">Carbon<") && dOut.includes("forecast months have a route")
+      dOut.includes(">Volume<") && dOut.includes(">Cost<") && dOut.includes(">Carbon<") && dOut.includes("plan lines have a route")
       && dOut.includes("leave out the " + (cl.totals.lines - cl.totals.baked_lines) + " not routed yet"));
     // the default view is Approved only, so the KPIs are sums over the Approved rows of the fixture
     const appr = cl.lines.filter(l => l.status === "Approved");
@@ -369,7 +369,7 @@ if (loaded) {
     ok("...the Delivered-to-date group prints the server's actual tonnes and % of plan (a reported line is in the fixture)",
       dOut.includes(">Delivered to date<") && cl.totals.actual_tonnes != null
       && dOut.includes(">" + cl.totals.actual_tonnes.toLocaleString("en-US").replace(/,/g, " ") + "<")
-      && dOut.includes("tonnes moved") && dOut.includes("forecast months reported"));     // 13 Oct 2026 (W3, narrowed): was "line-months" 
+      && dOut.includes("tonnes moved") && dOut.includes("plan lines"));     // 13 Oct 2026 (W3, narrowed): was "line-months" 
     ok("...every KPI value sits in a nowrap clamp()-sized div, none truncated",
       // 14 Oct 2026 (narrowed): the clamp() size is CSS now (.fig-val, pinned in parse_frontend), not an inline style
       (dOut.match(/kpi-num font-bold whitespace-nowrap fig-val/g) || []).length >= 16 && !/kpi-num[^"]*truncate/.test(dOut));
