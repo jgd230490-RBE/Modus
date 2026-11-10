@@ -1526,5 +1526,18 @@ ok("ROAD CARD (2.1-4): technical T1 #t1-road-area has the two reads, the piece, 
    all(w in _tg_rs for w in ('id="t1-road-area"', "<code>backend/section_select.py</code>", "<code>GET /api/public/road-at",
                              "<code>GET /api/public/area-sum", "<code>PIECE_M</code> = 150 m", "<code>BOX_ENTER_KM</code> (1 m)",
                              "<code>warm()</code>", "<code>&amp;area=w,s,e,n</code>", "Not built:")))
+# 10 Nov 2026 (road card polish, John's Q1-Q6 as recommended): the rule that makes the rows add up, in both guides
+ok("ROAD CARD POLISH: user guide 8 says the table adds up in one decimal, the bold figure is whole, '1 of 12 routes', the near click, the slide and the picker's search",
+   all(w in src for w in ('id="ug-map-road-adds"', "a row&#39;s A day is its In plus its Out, and the Total is the rows added",
+                          "the same figure the figures bar and a traffic limit give", 'id="ug-map-road-of"', "<em>1 of 12 routes</em>",
+                          "a click just beside a line counts as a click on it", 'id="ug-map-area-slide"',
+                          "the search empties when the list closes, the ticks stay")))
+_ug_road = src[src.index('id="ug-map-road"'):src.index('id="8-2-filters-basemaps-and-overlays"')]
+ok("ROAD CARD POLISH: the user guide's road card keeps the back end out (no tenths, no function names)",
+   not any(w in _ug_road for w in ("share_tenths", "tenth", "fitBounds", "secsel", "px")))
+ok("ROAD CARD POLISH: technical T1 has the rounding rule, the idle routes, the moved click, the 6 px reach and the slide",
+   all(w in _tg_rs for w in ('id="t1-road-rounding"', "<code>section_select.share_tenths</code>", "<code>idle</code>", "<code>through(pas=)</code>",
+                             "<code>secselSnap</code>", "<code>CLICK_SLOP</code> = 6 px", "<code>clearBoxOfCard</code>",
+                             "the 12 Oct whole-movements rule holds everywhere else")))
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

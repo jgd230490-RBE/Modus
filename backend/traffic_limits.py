@@ -296,7 +296,7 @@ def _shares(rid, profile, days, rows, cache):
     return out
 
 
-def through(geometry, month, lines=None, wd=None, days=None, ctx=None, enter_km=None):
+def through(geometry, month, lines=None, wd=None, days=None, ctx=None, enter_km=None, pas=None):
     """
     What passes `geometry` in `month`, a day on average: {"in_per_day", "out_per_day", "movements_per_day",
     "visits_per_day", "routes": [{route_id, in_per_day, out_per_day, visits_per_day}]} — the approved plan, the
@@ -315,7 +315,8 @@ def through(geometry, month, lines=None, wd=None, days=None, ctx=None, enter_km=
     zero = {"in_per_day": 0.0, "out_per_day": 0.0, "movements_per_day": 0.0, "visits_per_day": 0.0, "routes": []}
     if not wd or not days:
         return zero
-    pas = passing(geometry, drawn=ctx["drawn"], legs=ctx["legs"], enter_km=enter_km)
+    if pas is None:     # 10 Nov 2026 (road card polish): a caller that already walked the legs hands its answer in
+        pas = passing(geometry, drawn=ctx["drawn"], legs=ctx["legs"], enter_km=enter_km)
     loads = {}
     for l in lines or []:
         rid = l["route_id"]
