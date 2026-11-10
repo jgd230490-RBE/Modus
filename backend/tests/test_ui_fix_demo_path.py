@@ -306,6 +306,11 @@ ok("F8: the stored field is unchanged (safety_minutes is still read and written)
    "safety_minutes: e.target.value" in app and "p.safety_minutes" in mp)
 ok("F8: the guide pictures' drawing script says check-in", "induction" not in read("backend", "tools", "make_guide_images.js").lower())
 
+tech = read("frontend", "help", "technical", "index.html")
+ok("F7: the technical guide places the break before the trip that would pass 4½ h of driving or 6 h of work",
+   "the break placed before the trip that would pass 4½ h of driving or 6 h of work (after it when one round trip alone passes them)" in tech
+   and "the break placed after the trip that passes" not in tech)
+
 print(f"test_ui_fix_demo_path.py: {PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
     print("  ✗ " + f)
