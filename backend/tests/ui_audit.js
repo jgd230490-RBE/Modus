@@ -971,10 +971,14 @@ async function walkPortal(browser, base, look, accent, first, widths) {
       if (id === "users" && !OPT.email) continue;
       const ts = Date.now();
       await gotoPage(page, id);
-      if (PAGE_TITLE[id]) await page.waitForFunction((t) => { const h = document.querySelector('[data-guide="page-header"] h2'); return h && h.textContent.trim() === t; }, PAGE_TITLE[id], { timeout: 20000 }).catch(() => {});
+      // FR1, A3: from the same hash set, polled alongside the header wait. The app's Route map is the public map in a frame:
+      // timed on its own stop, map-page
+      const readyP = id === "map" ? Promise.resolve(undefined) : timeReady(page, ts, { title: PAGE_TITLE[id] });
+      // the header, or (FR1, 10 Nov 2026) a phone's desk-only card, which has no header: until then each desk-only phone stop
+      // waited out the full 20 s here (about 8 minutes of a quick run)
+      if (PAGE_TITLE[id]) await page.waitForFunction((t) => { const h = document.querySelector('[data-guide="page-header"] h2'); return (h && h.textContent.trim() === t) || !!document.querySelector("[data-desk-only]"); }, PAGE_TITLE[id], { timeout: 20000 }).catch(() => {});
       const switched = Date.now() - ts;
-      // FR1, A3: from the same hash set. The app's Route map is the public map in a frame: timed on its own stop, map-page
-      const readyMs = id === "map" ? undefined : await timeReady(page, ts, { title: PAGE_TITLE[id] });
+      const readyMs = await readyP;
       await audit(page, store, meta(id, w, { portal: true, page: id, readyMs }));
       if (first && w === DESK_W) switches.push({ page: id, headerMs: switched });
       // the deep stops: once, at the desk width, in the first look + accent; one that fails is noted, not fatal
@@ -1207,8 +1211,9 @@ async function walkTeam(browser, base) {
   for (const id of TEAM_PAGES) {
     const ts = Date.now();
     await gotoPage(page, id);
+    const readyP = id === "map" ? Promise.resolve(undefined) : timeReady(page, ts, { title: PAGE_TITLE[id] });   // FR1, A3, alongside the header wait
     if (PAGE_TITLE[id]) await page.waitForFunction((t) => { const h = document.querySelector('[data-guide="page-header"] h2'); return h && h.textContent.trim() === t; }, PAGE_TITLE[id], { timeout: 20000 }).catch(() => {});
-    const readyMs = id === "map" ? undefined : await timeReady(page, ts, { title: PAGE_TITLE[id] });   // FR1, A3
+    const readyMs = await readyP;
     await audit(page, store, meta("team-" + id, { portal: true, page: id, readyMs }));
     if (OPT.deep && (id === "submit" || id === "forecasts")) await keyboardPass(page, meta("team-" + id));
   }
@@ -1731,8 +1736,8 @@ async function selfTestRules(browser) {
     }
     await walkUnsigned(browser, server.base);
     // FR1: a pinned long block no stop showed is gone from the app — named, so the pin comes out (the list may only shrink)
-    for (const p of RULES.LONG_PROSE_PINNED) if (!PINS_SEEN.has(p.starts) && (!p.page || PORTAL_PAGES.includes(p.page)))
-      note(`long-prose pin not seen in this run: "${p.starts}" (${p.where || p.page || "?"}) — take it out of LONG_PROSE_PINNED in backend/tests/lib/ui_rules.js and lower the pinned count in ui_audit_rules.js`);
+    if (!OPT.pages && OPT.deep) for (const p of RULES.LONG_PROSE_PINNED) if (!PINS_SEEN.has(p.starts))
+      note(`long-prose pin not seen in this run: "${p.starts}" (${p.where}) — take it out of LONG_PROSE_PINNED in backend/tests/lib/ui_rules.js and lower the pinned count in ui_audit_rules.js`);
     if (OPT.compare) await compareRuns(browser, OPT.compare);
   } catch (e) {
     FAIL.push("the run stopped: " + (e && e.stack || e));

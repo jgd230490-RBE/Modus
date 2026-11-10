@@ -75,6 +75,11 @@ for (const k of ["bad", "good"]) {
   const g = load(R.FIXTURES.good.html);
   ok("A1a: React's \"line\" + \"s\" (two text nodes of one element) read as one word, as drawn",
      /other forecast lines\b/.test(g.document.getElementById("split").textContent) && run(g, R.ruleMeasures, {}).words === 18);
+  // run 1 (10 Nov 2026) read "planner).Different" as one word: text either side of a <br> in ONE element was joined with nothing
+  const br = load(`<!doctype html><html><body><p id="b">Ask the planner.<br>Different words for each team, one after another, until the block runs well past the twenty five word limit set by the programme for this check.</p></body></html>`);
+  const mb = run(br, R.ruleMeasures, {});
+  ok("A1a / A1b: text either side of a <br> reads as two words, never merged (\"planner.\" and \"Different\")",
+     mb.blocks.length === 1 && /planner\. Different/.test(mb.blocks[0].text) && mb.blocks[0].words === 29, mb.blocks);
   // a page without the accent (a guide, the landing page): a control filled with a strong colour and light text
   const plain = load(`<!doctype html><html><body><p>Two</p><button style="background:rgb(15,118,110);color:rgb(255,255,255);width:120px;height:32px">Request a demo</button>
     <button style="background:rgb(255,255,255);color:rgb(30,41,59);width:120px;height:32px">Plain</button>
@@ -168,7 +173,7 @@ const M = (blocks, primaries) => ({ words: 50, blocks, primaries: primaries || [
 // ---------------------------------------------------------------- D. the pins, the limits, the wiring ------------------
 // The pinned long blocks: exactly those the first runs found on staff screens (10 Nov 2026). May only SHRINK: lower this
 // number when claude/ui-fix-long-sentences (or any fix) takes a block away; never raise it.
-const PINNED_MAX = 0;
+const PINNED_MAX = 26;
 ok(`A1b: the pinned long blocks may only shrink (${R.LONG_PROSE_PINNED.length} pinned, at most ${PINNED_MAX})`,
    R.LONG_PROSE_PINNED.length <= PINNED_MAX && R.LONG_PROSE_PINNED.every(p => p.starts && p.starts.split(" ").length >= 4 && p.where));
 ok("the limits are John's (decision U5, 10 Nov 2026): 25 words, 10 % or 25 words, 1 filled primary, 25 % and 1 s",
@@ -180,7 +185,15 @@ ok("wiring: every stop measures the rules BEFORE the shot grows the viewport (fi
    au.includes("RULES.ruleMeasures") && au.indexOf("RULES.ruleMeasures") < au.indexOf("await shoot(") && au.includes("RULES.gradeRules(") && au.includes("stop.words = rm.words"));
 ok("wiring: page ready is timed from the hash set on every portal page (not the framed Route map) and the team's, and from the goto on the map page",
    /const ts = Date\.now\(\);\n\s+await gotoPage\(page, id\);[\s\S]{0,700}timeReady\(page, ts, \{ title: PAGE_TITLE\[id\] \}\)/.test(fnSrc("walkPortal"))
-   && fnSrc("walkPortal").includes('id === "map" ? undefined') && fnSrc("walkPortal").includes("timeReady(page, tMap, { map: true })") && fnSrc("walkTeam").includes("timeReady(page, ts,"));
+   && fnSrc("walkPortal").includes('id === "map" ? Promise.resolve(undefined)') && fnSrc("walkPortal").includes("timeReady(page, tMap, { map: true })") && fnSrc("walkTeam").includes("timeReady(page, ts,"));
+// 10 Nov 2026, run 1: a phone's desk-only page has no header, so the header wait ran its full 20 s and the clock read ~20,200 ms;
+// the clock now polls ALONGSIDE the header wait (started before it, awaited after), and the header wait ends on the desk-only card
+for (const fn of ["walkPortal", "walkTeam"]) {
+  const s = fnSrc(fn), p = s.indexOf("const readyP = "), h = s.indexOf('[data-guide="page-header"] h2'), a = s.indexOf("await readyP");
+  ok(`wiring: ${fn} starts the page-ready clock BEFORE the header wait and reads it after (never inside the 20 s wait)`, p > 0 && h > p && a > h);
+}
+ok("wiring: the portal's header wait also ends on a phone's desk-only card",
+   /page-header"\] h2'\); return \(h && h\.textContent\.trim\(\) === t\) \|\| !!document\.querySelector\("\[data-desk-only\]"\)/.test(fnSrc("walkPortal")));
 ok("wiring: every run starts with the rules' self-test in its own browser, and --self-test runs only that",
    audit.includes("await selfTestRules(browser);   // FR1") && audit.includes('else if (a === "--self-test") o.selfTest = true;') && fnSrc("selfTestRules").includes("RULES.FIXTURES"));
 ok("wiring: the measures are NOT part of the run's shape (a run before them pairs); the report carries ruleVersion",

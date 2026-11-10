@@ -44,7 +44,35 @@ const COMPARE_IDS = ["words-grew", "ready-slower"];
 // its length); a pin no run sees any more is named in the run's notes for removal. `starts` is the block's opening, matched
 // on pinKey (lower case, figures as #, spaces collapsed). `where` is where the first run found it, for the reader.
 const LONG_PROSE_PINNED = [
-  // filled from the first run (10 Nov 2026) — see notes\session-1110-audit-measures-rules.md
+  // the first quick run, 10 Nov 2026 (ui-audit 2026-11-10_212940 on main 992c4d3): 26 blocks on staff screens. Five are the
+  // sentences of U5 / Q10 that claude/ui-fix-long-sentences removes; the rest sit in folds, tabs and pages the 10 Nov live check
+  // did not open (notes\session-1110-audit-measures-rules.md lists them, and the ones that are data, not copy)
+  { starts: "All three use Government factors. GOV.UK says", where: "carbon+open (Carbon planner, a section opened), 71 words" },
+  { starts: "Planned arrivals spread evenly over the gate's open hours", where: "lookahead (gates note), 50 words" },
+  { starts: "Lorries for Tilton Compound and Tilton Viaduct site", where: "simulation, simulation+site, team-simulation, 390 and 1366 (holding-area sentence, built from the data), 42 words" },
+  { starts: "The waste hierarchy step follows the disposal method", where: "carbon+open, 40 words" },
+  { starts: "This route already carries", where: "submit (Q10's sentence), 38 words" },
+  { starts: "Battery electric is worked out as kWh per km", where: "carbon+open, 38 words" },
+  { starts: "Injury collisions reported to the police, five years", where: "config-map-and-bulletin, 38 words" },
+  { starts: "Busiest hour: the lorries arriving in the busiest clock hour", where: "dashboard and its deep stops, 390 and 1366, login-user-dashboard (Q10's sentence), 35 words" },
+  { starts: "Each route has a laden leg out and an empty leg back", where: "routes, zones, locations and its deep stops (Q10's sentence), 35 words" },
+  { starts: "The English name is what every screen shows", where: "config, Vehicles tab (Q10's sentence), 35 words" },
+  { starts: "The shared codes still work on this site", where: "login-user-users (Q10's sentence), 35 words" },
+  { starts: "£/trip = fuel + cycle hours", where: "config-costing-fuel, 34 words" },
+  { starts: "These figures are for your team's lines only", where: "team-carbon, 33 words" },
+  { starts: "The agreed decisions: Receiving site", where: "dashboard+open, dashboard+row (a CLP note built from the data), 32 words" },
+  { starts: "One page: the approved plan beside the alternative", where: "carbon+open, 32 words" },
+  { starts: "Optional. Puts a value on the lorry-days", where: "config-costing-fuel, 32 words" },
+  { starts: "Schools, hospitals, stations, bus stops, homes", where: "config-map-and-bulletin, 31 words" },
+  { starts: "They get an email with a link to choose their password", where: "login-user-users, 31 words" },
+  { starts: "Per load has no target line", where: "dashboard+open, dashboard+row (CLP note), 30 words" },
+  { starts: "Writes the decisions it commits to into the construction logistics plan", where: "carbon+open, 30 words" },
+  { starts: "DESNZ 2026, WTT- delivery vehs & freight", where: "carbon+open (a factor's source path), 28 words" },
+  { starts: "Site plant and site energy, staff travel", where: "carbon+open, 27 words" },
+  { starts: "UK Government GHG conversion factors 2026 (DESNZ). The National Highways", where: "carbon+open, 27 words" },
+  { starts: "A lorry's working day. Its trips fit one driver's day", where: "config-planning, 27 words" },
+  { starts: "Artic Flatbed (44t) — electric: payload", where: "carbon+open (a vehicle's figures in a line), 26 words" },
+  { starts: "Artic Tipper (44t) — electric: payload", where: "carbon+open (a vehicle's figures in a line), 26 words" },
 ];
 
 // the stops A1b and A1a's growth warning skip: the two guides (where explanation belongs) and the landing pages (marketing
@@ -95,10 +123,11 @@ function ruleMeasures(arg) {
   // the block a text node belongs to: its nearest ancestor that is not inline (a flex or grid item is blockified)
   const blockOf = (el) => { for (let e = el; e && e !== root.parentElement; e = e.parentElement) { const d = getComputedStyle(e).display || "";
     if (d && !d.startsWith("inline") && d !== "contents") return e; } return root; };
-  // the text of each block, its text nodes joined as drawn: React splits "line" + "s" into two nodes of ONE element, which read
-  // as one word, so nodes of the same element join with nothing; nodes of different elements with a space (never merging words)
+  // the text of each block, its text nodes joined as drawn: React splits "line" + "s" into two ADJACENT text nodes, which read
+  // as one word, so a node that directly follows the last one joins it with nothing; anything between them (a <br>, a skipped
+  // "i" button, another element) gives a space, so words are never merged
   const allB = new Map(), proseB = new Map();
-  const add = (m, b, el, raw) => { const r = m.get(b); if (!r) m.set(b, { text: raw, last: el }); else { r.text += (r.last === el ? "" : " ") + raw; r.last = el; } };
+  const add = (m, b, node, raw) => { const r = m.get(b); if (!r) m.set(b, { text: raw, last: node }); else { r.text += (node.previousSibling === r.last ? "" : " ") + raw; r.last = node; } };
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let n;
   while ((n = walker.nextNode())) {
@@ -108,9 +137,9 @@ function ruleMeasures(arg) {
       const kind = Object.keys(SKIP).find(k => el.closest(SKIP[k])); out.skipped[kind] += raw.trim().split(" ").filter(hasLetter).length; continue; }
     if (!vis(el)) continue;
     const b = blockOf(el);
-    add(allB, b, el, raw);
+    add(allB, b, n, raw);
     // A1b: a control's label is not prose (a button, a tab); a link inside a sentence is
-    if (!el.closest('button, [role="button"], [role="tab"]')) add(proseB, b, el, raw);
+    if (!el.closest('button, [role="button"], [role="tab"]')) add(proseB, b, n, raw);
   }
   for (const r of allB.values()) { const toks = r.text.trim().split(" ").filter(Boolean); const w = toks.filter(hasLetter).length; out.words += w; out.skipped.figures += toks.length - w; }
   for (const [b, r] of proseB) {
