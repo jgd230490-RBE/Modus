@@ -837,7 +837,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
             _lp = [" ".join(x.split()) for x in pdf_text(r.content).split("\f") if x.strip()] if r.status_code == 200 else []
             ok("⭐ D43 the leaflet PDF over HTTP: one page, named for the month, not cached, the demo bar, the four figures, the brief",
                r.status_code == 200 and r.headers.get("content-type", "").startswith("application/pdf")
-               and r.headers.get("content-disposition") == 'attachment; filename="leaflet-2026-10.pdf"'
+               # NARROWED 10 Nov 2026 (UI critique 25b): the file is the bulletin's one-page version
+               and r.headers.get("content-disposition") == 'attachment; filename="bulletin-one-page-2026-10.pdf"'
                and r.headers.get("cache-control") == "no-store" and len(_lp) == 1
                and "demo fictional scheme" in " ".join(_lp[0].split()).lower() and all(f in _lp[0] for f in _figs) and "Key points" in _lp[0],     # NARROWED 14 Oct 2026; and 15 Oct (the wording)
                f"{r.status_code} {len(_lp)}")

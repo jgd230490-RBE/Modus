@@ -638,7 +638,10 @@ def _lot(mi, month_long, prev_long, R, prev, H, council, acc, demo):
 BRAND_TITLE = "Lorry movements bulletin"
 DEMO_MAP_TAG = "Demo - fictional scheme"        # D41: on each map itself as well as in the page bar (15 Oct 2026, the user:
                                                 # "DEMO - FICTIONAL SCHEME"; was "Fictional demo scheme")
-NEWSLETTER_LINE = "Every route, the councils and the carbon are in the monthly newsletter:"
+#: 10 Nov 2026 (UI critique 25b, John's yes): ONE name for the document, the bulletin ("Lorry movements bulletin"); the
+#: leaflet is its ONE-PAGE VERSION; "newsletter" is retired from every page, PDF and file name
+ONE_PAGE = "one-page version"
+NEWSLETTER_LINE = "Every route, the councils and the carbon are in the full bulletin:"
 
 
 def report_lines(page):
@@ -1155,8 +1158,9 @@ def sheet(month_index, acc=None, now=None):
         # 13 Oct 2026 (W15, D43): the newsletter's masthead and page 1, the leaflet, the D41 map tag
         "brand_title": f"{BRAND_TITLE} · {month_long}",
         "issued": f"Issued {_date_long(today)}",
-        "lede": (f"The lorries {page.get('tenant_name') or 'this scheme'} plans for {month_long}: how many, where they go, "
-                 "and their carbon."),
+        # REVERSED 10 Nov 2026 (UI critique 25a, John's yes): "The lorries <name> plans for…" did not parse with the demo's
+        # name ("…Wolds Link dualling — demo scheme plans for…"); the name is in the line above, so the sentence leaves it out
+        "lede": f"How many lorries are planned for {month_long}, where they go, and their carbon.",
         "definition": definition(),
         "map_title": f"Planned lorry routes, {month_long}",
         "brief": brief, "map_demo_tag": demo_tag,
@@ -1394,9 +1398,11 @@ def _band_html(S, kind):
     """W15 (13 Oct 2026): the ink band with the logo inlined as the SVG master (vector, the brand gradient kept) and the
     brand title, the orange rule under it."""
     import brand_pdf
+    # 10 Nov 2026 (25b): the bulletin's own band names no kind (its title says "bulletin"); the one-page version says so
     return (f'<header class="band"><div class="band-in">{brand_pdf.inline_svg("logo-header-on-dark", 30)}'
-            f'<div class="band-t">{_e(S["brand_title"])}</div><div class="band-s">{_e(S["tenant"])} · {_e(kind)} · '
-            f'{_e(S["as_at"])} · {_e(S["issued"])}</div></div></header><div class="band-rule"></div>')
+            f'<div class="band-t">{_e(S["brand_title"])}</div><div class="band-s">{_e(S["tenant"])} · '
+            + (f'{_e(kind)} · ' if kind else '')
+            + f'{_e(S["as_at"])} · {_e(S["issued"])}</div></div></header><div class="band-rule"></div>')
 
 
 def _mark_html():
@@ -1416,8 +1422,24 @@ def _map_block_html(S):
     """The map's title, the map, its legend and note, the key — the newsletter page and the leaflet page alike."""
     svg = _svg_map(S)
     S["_map_img"] = "<image " in svg
-    return (f'<h2 class="mt">{_e(S["map_title"])}</h2><div class="mapwrap" data-bulletin="map" tabindex="0" role="region" aria-label="{_e(S["map_title"])}">{svg}</div>'
+    return (f'<h2 class="mt">{_e(S["map_title"])}</h2>'
+            + _mapbox(f'<div class="mapwrap" data-bulletin="map" tabindex="0" role="region" aria-label="{_e(S["map_title"])}">{svg}</div>',
+                      S.get("map_demo_tag"))
             + _volume_legend_html(S) + _key_html(S))
+
+
+#: 10 Nov 2026 (UI critique 25d, John's yes): on a phone a map (720 px, so its 14 px letters never shrink) scrolls sideways
+#: and opened on its left edge, where there was nothing. It now opens CENTRED on the routes (every map is fitted to its
+#: routes / districts, so the middle is theirs). Without script the page works as before. Print and desk do not scroll.
+MAP_CENTRE_JS = ("<script>document.querySelectorAll('.mapwrap').forEach(function(w){"
+                 "var d=w.scrollWidth-w.clientWidth;if(d>0)w.scrollLeft=Math.round(d/2);});</script>")
+MAP_HINT = "Drag the map sideways to see all of it."
+
+
+def _mapbox(wrap, tag):
+    """A scrolling map with, on a phone only, its demo tag pinned over the visible corner and the one line under it."""
+    return ('<div class="mapframe">' + wrap + (f'<span class="maptag">{_e(tag)}</span>' if tag else "")
+            + f'<p class="maphint">{_e(MAP_HINT)}</p></div>')
 
 
 def leaflet_html(S):
@@ -1432,12 +1454,12 @@ def leaflet_html(S):
     notice = (f'<div class="notice">{e(S["demo_notice"])}</div>' if S["demo_notice"] else "")
     return ("<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-            f"<title>{e(S['brand_title'])} · leaflet · {e(S['tenant'])}</title>"
+            f"<title>{e(S['brand_title'])} · {ONE_PAGE} · {e(S['tenant'])}</title>"
             "<link rel=\"icon\" href=\"/favicon.svg\" type=\"image/svg+xml\">"
             "<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">"
             "<link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap\" rel=\"stylesheet\">"
             f"<style>{LEAFLET_CSS}</style></head><body data-bulletin=\"leaflet\">"
-            + _band_html(S, "leaflet") + "<main>" + notice
+            + _band_html(S, ONE_PAGE) + "<main>" + notice
             + f'<h1>Lorries on your roads in {e(S["month_long"])}</h1><div class="figs">{head}</div>'
             + f'<p class="def">{e(S["definition"])}</p>'
             + _map_block_html(S)
@@ -1445,9 +1467,9 @@ def leaflet_html(S):
             + _report_html(S)
             + (f'<p>{e(NEWSLETTER_LINE)} <a href="{e(S["newsletter_url"])}">{e(S["newsletter_url"])}</a></p>'
                if S.get("newsletter_url") else "")
-            + f'<p class="actions"><a class="btn" href="{e(S["leaflet_pdf_href"])}">Download the leaflet (PDF)</a></p>'
+            + f'<p class="actions"><a class="btn" href="{e(S["leaflet_pdf_href"])}">Download the PDF</a></p>'
             + f'<p class="muted">{e(_co2(S.get("carbon_stamp") or ""))}</p>'
-            + f'<footer>{notice} {_mark_html()} {e(S["foot"])} · wayscope.co.uk</footer></main></body></html>')
+            + f'<footer>{notice} {_mark_html()} {e(S["foot"])} · wayscope.co.uk</footer></main>{MAP_CENTRE_JS}</body></html>')
 
 
 def _report_html(S):
@@ -1476,6 +1498,10 @@ LEAFLET_CSS = (":root{color-scheme:light} *{box-sizing:border-box} body{margin:0
                " svg{width:100%;height:auto;display:block} svg .pin{fill:#fff;font:700 14px Inter,Arial,sans-serif}"
                " svg .tagt{fill:#B91C1C;font:700 14px Inter,Arial,sans-serif}"
                " .mapwrap{overflow-x:auto} .mapwrap svg{min-width:720px} .mapwrap:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}"
+               " .mapframe{position:relative} .maptag,.maphint{display:none}"
+               " @media (max-width:759px){.maptag{display:block;position:absolute;left:7px;top:7px;background:#fff;border:1.5px solid #B91C1C;"
+               "border-radius:3px;color:#B91C1C;font:700 14px Inter,Arial,sans-serif;padding:2px 6px;pointer-events:none}"
+               " .mapwrap svg .map-tag{display:none} .maphint{display:block;font-size:14px;color:#57534E;margin:4px 0 0}}"
                " .legend{font-size:14px;color:#57534E;margin:6px 0}"
                " .sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;"
                "border:1px solid rgba(0,0,0,.08)} .cc-legend .lg{display:inline-block;margin-right:12px;white-space:nowrap}"
@@ -1589,7 +1615,8 @@ def _council_html(C):
     notes = "".join(f"<li>{e(_co2(x))}</li>" for x in C["county_lines"] + C["notes"])
     return (f'<h2>{e(C["title"])}</h2>'
             f'<p>{e(_co2(C["lede"]))}</p>'
-            f'<div class="mapwrap" data-bulletin="council-map" tabindex="0" role="region" aria-label="{e(C["title"])} (map)">{_svg_council(C)}</div>'
+            + _mapbox(f'<div class="mapwrap" data-bulletin="council-map" tabindex="0" role="region" aria-label="{e(C["title"])} (map)">{_svg_council(C)}</div>',
+                      C.get("demo_tag")) +
             f'<p class="legend cc-legend">t CO₂e in the month: {sw}</p>'
             f'<div class="tw" tabindex="0" role="region" aria-label="{e(C["title"])} (table)"><table data-bulletin="council"><thead><tr><th>District</th><th>Highway authority</th>'
             f'<th class="n">t CO₂e</th><th class="n">Share of scheme</th><th class="n">Of the district&#39;s road CO₂e, a month (2024)</th></tr></thead><tbody>{rows}</tbody></table></div>'
@@ -1705,10 +1732,10 @@ def html(S):
         "change_text": e(_co2(S["change_text"])),
         "report_box": _report_html(S),
         "foot": e(S["foot"]), "map_block": _map_block_html(S), "routes": _routes_html(S),
-        "band": _band_html(S, "monthly newsletter"), "brief": _brief_html(S), "mark": _mark_html(),
+        "band": _band_html(S, ""), "brief": _brief_html(S), "mark": _mark_html(), "map_centre_js": MAP_CENTRE_JS,
         "leaflet_href": e(S["leaflet_href"]), "leaflet_pdf_href": e(S["leaflet_pdf_href"]),
         "glance": glance, "concerns_html": concerns_html, "council": _council_html(C), "council_mv": _council_mv_html(M),
-        "councils_kicker": '<p class="kick">03 Councils</p>' if (M or C) else "",
+        "councils_kicker": '<p class="kick">Councils</p>' if (M or C) else "",   # 10 Nov 2026 (25c): no numbers
         "lot": _lot_html(S.get("lot")), "sources": _sources_html(S), "traffic": _traffic_html(S.get("traffic")),
         "notice": notice, "nav": nav, "empty": empty, "head": head,
         "moved": moved, "checks": checks, "others": others, "change": change, "terms": terms, "caveats": caveats,
@@ -1748,6 +1775,8 @@ p,li,dd,td,th{{font-size:15px}}
 .nav{{display:flex;justify-content:space-between;margin:6px 0}} .nav a{{min-height:44px;display:inline-flex;align-items:center;color:#1D4ED8}}
 svg{{width:100%;height:auto;display:block}} svg .pin{{fill:#fff;font:700 14px Inter,Arial,sans-serif}} svg .sc{{fill:var(--ink);font:14px Inter,Arial,sans-serif}}
 .mapwrap{{overflow-x:auto;border:1px solid var(--line)}} .mapwrap svg{{min-width:720px}}   /* the map's 14 px pin letters never scale below 14 px: it scrolls instead */
+.mapframe{{position:relative}} .maptag,.maphint{{display:none}}   /* 10 Nov 2026 (UI critique 25d): on a phone the map scrolls; it opens centred (MAP_CENTRE_JS), its demo tag is pinned over the corner you see and one line says it moves */
+@media (max-width:759px){{.maptag{{display:block;position:absolute;left:7px;top:7px;background:#fff;border:1.5px solid #B91C1C;border-radius:3px;color:#B91C1C;font:700 14px Inter,Arial,sans-serif;padding:2px 6px;pointer-events:none}} .mapwrap svg .map-tag{{display:none}} .maphint{{display:block;font-size:14px;color:var(--muted);margin:4px 0 0}}}}
 .legend{{font-size:14px;color:var(--muted);margin:6px 0}} .credit{{white-space:nowrap}}
 .key{{display:grid;grid-template-columns:1fr;gap:4px 24px;margin:12px 0}} @media (min-width:720px){{.key{{grid-template-columns:2fr 1fr}}}}
 .key h3{{font-size:14px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 4px;border-bottom:1px solid var(--line);padding-bottom:2px}}
@@ -1793,8 +1822,8 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 {notice}
 <div class="nav">{nav}</div>
 <h1>{title}</h1>
-<p class="sub">{tenant} · monthly bulletin · {as_at}</p>
-<div class="actions"><a class="btn" href="{pdf_href}">Download the PDF</a><a class="lnk" href="{leaflet_href}">The one-page leaflet</a><a class="lnk" href="{leaflet_pdf_href}">Leaflet PDF</a><a class="lnk" href="/map/">Open the public map</a></div>
+<p class="sub">{tenant} · {as_at}</p>
+<div class="actions"><a class="btn" href="{pdf_href}">Download the PDF</a><a class="lnk" href="{leaflet_href}">One-page version</a><a class="lnk" href="{leaflet_pdf_href}">One-page version (PDF)</a><a class="lnk" href="/map/">Open the public map</a></div>
 <p class="lede">{lede}</p>
 {empty}
 <div class="figs" data-bulletin="headline">{head}</div>
@@ -1803,7 +1832,7 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 {brief}
 {report_box}
 
-<p class="kick">02 Routes and roads</p>
+<p class="kick">Routes and roads</p>
 <h2>Every route this month</h2>
 {routes}
 
@@ -1827,7 +1856,7 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 
 {council}
 
-<p class="kick">04 Carbon and the small print</p>
+<p class="kick">Carbon and the small print</p>
 {lot}
 {traffic}
 
@@ -1848,4 +1877,4 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 {report_box}
 
 <footer>{notice} {mark} {foot} · wayscope.co.uk</footer>
-</main></body></html>""".format(**v)
+</main>{map_centre_js}</body></html>""".format(**v)

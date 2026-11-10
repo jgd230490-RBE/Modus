@@ -10380,16 +10380,16 @@ function ConfigPage({ meta, who, access }){
 
           {tab === "mapbulletin" && (
             <div className="px-6 max-w-xl">
-              {/* 30 Oct 2026 (task 4b): the contact lines the bulletin and the resident leaflet print. The address also switches on
+              {/* 30 Oct 2026 (task 4b): the contact lines the bulletin and its one-page version print. The address also switches on
                   "Report a concern" on the public map. An empty box leaves its line out. Checked by the server on Save. */}
               <div data-cfg="contact-lines" className="mb-6 pb-5 border-b border-slate-200">
                 <h3 className="text-[15px] font-semibold text-slate-800 mb-1">Contact lines</h3>
-                <p className="text-[14px] text-slate-600 mb-3">Printed on the bulletin and the resident leaflet. Leave a box empty to leave its line out.</p>
+                <p className="text-[14px] text-slate-600 mb-3">Printed on the bulletin and its one-page version. Leave a box empty to leave its line out.</p>
                 {[["concern_email", "cfg-contact-email", "Where to report a lorry or a concern (one email address)", 254, "name@scheme.example", "Also the address behind Report a concern on the public map."],
                   ["contact_phone", "cfg-contact-phone", "Phone number (optional)", 40, "0116 000 0000", ""],
                   ["working_hours", "cfg-contact-hours", "Working hours", 160, "Monday to Friday 07:30–18:00", "As in the scheme's consent."],
                   ["other_formats", "cfg-contact-formats", "Large print and other formats", 160, "email name@scheme.example", ""],
-                  ["newsletter_url", "cfg-contact-link", "Public newsletter link (optional)", 300, "https://…", "Where residents can read the bulletin: the scheme's own web page."]].map(([k, id, l, mx, ph, help]) => (
+                  ["newsletter_url", "cfg-contact-link", "Public bulletin link (optional)", 300, "https://…", "Where residents can read the bulletin: the scheme's own web page."]].map(([k, id, l, mx, ph, help]) => (
                   <div key={k} className="field" style={{ marginBottom: 8 }}>
                     <label htmlFor={id}>{l}</label>
                     <input id={id} className="ctl w-full" maxLength={mx} placeholder={ro ? "—" : ph} data-contact={k} data-ph-example="1"

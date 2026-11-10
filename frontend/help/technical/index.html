@@ -386,7 +386,7 @@ place with no capacity recorded is named, never drawn as zero.</p>
 <li><strong>Busiest day (Q4)</strong> — checked on planned days only: the Look-ahead's day trips (<code>day_counts</code>, flags with <code>day_date</code>) and the Simulation's day (<code>sim_day</code>, the reply's <code>traffic_limits</code>; a pour's what-if with no route is not counted). The Dashboard, the bulletin, the CLP and the public map show the month's daily average.</li>
 <li><strong>Reads</strong> — <code>GET /api/traffic-limits?from=&amp;to=&amp;sites=</code> (planners and admins, <code>_staff_json</code>; Sites keeps the lorries of routes starting or ending at a pick, the limit unchanged; <code>current_month</code> for the Zones table's Used by); <code>GET /api/public/traffic-limits</code> (behind the map password, <code>read_cache.cached</code>, public-ticked limits only: value, unit, basis, each month's figure and each route's figure a day — no note, no team).</li>
 <li><strong>Flags</strong> — <code>clashes.traffic_limit</code>: TRAFFIC_LIMIT (red) and TRAFFIC_NEAR (amber), every team's lines; ranked after GATE OVER and last of the warnings on the Day sheet (<code>export.DAY_FLAG_RANK</code>) and the grid (<code>LA_FLAG_RANK</code>).</li>
-<li><strong>Bulletin</strong> — <code>bulletin_doc.traffic_month</code>: public limits, worst first, <code>TRAFFIC_ROWS</code> = 6 on the web page and the newsletter (an over row never hidden), the glance row and one clause in the key points; figures rounded half up.</li>
+<li><strong>Bulletin</strong> — <code>bulletin_doc.traffic_month</code>: public limits, worst first, <code>TRAFFIC_ROWS</code> = 6 on the web page and the bulletin PDF (an over row never hidden), the glance row and one clause in the key points; figures rounded half up.</li>
 <li><strong>CLP</strong> — <code>clp_doc_layers.traffic_rows</code>: each limit a plan route passes, at the plan's busiest month, this plan's figure beside all approved lorries; §2.3.1's table.</li>
 <li><strong>Public map</strong> — <code>TLIM</code> in <code>map/index.html</code>: sources <code>traffic-limit-source</code> / <code>traffic-limit-badges</code>, layers <code>traffic-limit-fill / -band / -edge / -badge</code> (badge from zoom 11), all before <code>labelAnchor()</code>; re-added on <code>style.load</code> (<code>styleReady()</code>), refiltered in <code>applyFilters</code>; the box <code>layer-traffic-limits</code> travels in the link; the presets other than Busiest roads and Everything untick it.</li>
 <li>Not built: a limit on the CLP's Appendix A; a limit in the organisation's demo package (live shows nothing until one is drawn).</li></ul>
@@ -585,7 +585,7 @@ notes blanked, the pin rounded to 3 decimal places; open 24 months: the contact 
 <code>within</code> (of those that asked a reply and are due: replied within <code>concern_reply_days</code>), by month, by kind, the five
 busiest routes. <code>outcome = spam</code> never counted; a site keeps the routes that start or end there and the concerns pinned there.
 <code>GET /api/concerns/figures?from=&amp;to=&amp;sites=</code> (planners and admins; read fresh, never kept). The bulletin&#39;s glance row
-(both the web page and the PDF) and the kinds table (the web page only: the PDF newsletter has no room for it at four pages):
+(both the web page and the PDF) and the kinds table (the web page only: the bulletin PDF has no room for it at four pages):
 <code>bulletin_doc.concern_month(mi)</code> (None when the form is off and none was ever recorded: the row stays Not reported);
 the CLP&#39;s §7: <code>clp_doc.concern_words(d)</code> (12 months to the snapshot, the plan&#39;s sites).</li></ul>
 <h2 id="t1-clp-notes">CLP notes and tasks</h2>
@@ -1161,7 +1161,7 @@ counted. The Routes page's three chips are schools, hospitals + health centres (
 <p id="t8-contact-lines">The bulletin's contact lines (task 4b): flat <code>tenant</code> keys <code>concern_email</code>, <code>contact_phone</code> (40),
 <code>working_hours</code> (160), <code>other_formats</code> (160), <code>newsletter_url</code> (https only, 300). <code>config.validate</code> refuses
 a &lt; or &gt;, a line break, an over-length text and a non-https or hostless link on Save; <code>tenant_settings</code> serves each cleaned or
-null. <code>bulletin_doc.report_lines</code> builds the report box for the page, both PDFs and the leaflet; an empty line is left out, the report
+null. <code>bulletin_doc.report_lines</code> builds the report box for the page, both PDFs and the one-page version; an empty line is left out, the report
 line apart. The values also reach <code>/api/meta</code>'s tenant block (they are public wording).</p>
 <p>Staff only (14 Oct 2026). <code>GET /api/community</code> serves what is stored as one GeoJSON FeatureCollection with the
 kinds, each source's date and the credit line; <code>GET /api/community/status</code> the same without the features. Both
