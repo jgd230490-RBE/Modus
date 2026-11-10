@@ -790,6 +790,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-dot-held{background:#475569;}
   .sim-cmp td:first-child{max-width:190px;}
   .sim-side{display:flex;flex-direction:column;gap:12px;min-width:0;}
+  @media (min-width:1024px){.sim-side{max-height:max(360px,min(62vh,720px));overflow:auto;}}   /* 10 Nov 2026 (finding 9): the Now card and the gates are no taller than the map, so nothing is left empty under it */
   .sim-card{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--surface);color:var(--ink);}
   .sim-card-h{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:6px;}
   .sim-clock{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;color:var(--ink);}
@@ -13164,7 +13165,7 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt }){
         <div className="sim-main">
           <SimMap meta={meta} D={D} store={store} frame={f} site={site} />
         </div>
-        <div className="sim-side">
+        <div className="sim-side kb-scroll" tabIndex={0} role="region" aria-label="Now and gates">
           <div className="sim-card" data-sim-now-card="1">
             <div className="sim-card-h">Now</div>
             <div className="sim-clock" aria-live="off" data-sim-clock="1">{simHM(t)}</div>

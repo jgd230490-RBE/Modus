@@ -256,6 +256,9 @@ ok("5. the user guide says what Stockpiles opens on", "opens on the stockpile wi
 tg = open(os.path.join(ROOT2, "frontend", "help", "technical", "index.html"), encoding="utf-8").read()
 ok("5. the technical guide holds the endpoint", 'id="t1-sim-opening"' in tg and "/api/sim/busiest-month" in tg)
 
+ok("3. the Now card and the gates are no taller than the map, a named scroll region (no empty hole under the map)",
+   ".sim-side{max-height:max(360px,min(62vh,720px));overflow:auto;}" in html and 'className="sim-side kb-scroll" tabIndex={0} role="region" aria-label="Now and gates"' in html)
+
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)

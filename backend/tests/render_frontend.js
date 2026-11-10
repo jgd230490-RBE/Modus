@@ -793,12 +793,12 @@ if (loaded) {
       ok("🔴 SIM: no undefined / NaN, no team id, none of the banned words or the word-rule words in the rendered section; lorries, never trucks",
         !/undefined|NaN|\bIPT ?[1-6]\b/.test(sP) && !/\b(bake[ds]?|cached|geometry|server|endpoint|token|real-time|live tracking|telematics|optimi[sz]\w*|predict\w*|trucks?|secure)\b/i.test(sTxt));
       // 17 Oct 2026 (one screen): the timeline sits under the map in the left column; the table and the haul roads fold away
-      const mainCol = seg(sP, '<div class="sim-main">', '<div class="sim-side">');
+      const mainCol = seg(sP, '<div class="sim-main">', '<div class="sim-side kb-scroll"');
       // RE-PINNED 29 Oct 2026 (card 2): the timeline is FULL WIDTH under the map and the Now card, the scenario a band under the timeline
       ok("⭐ SIM one screen: the map in the left column, the Now card and Gates now beside it, the timeline full width under them, the scenario band under it; the table and the haul roads folded (closed) below",
         mainCol.includes('class="sim-map"') && !mainCol.includes('data-sim-timeline="1"') && !mainCol.includes("data-sim-clock")
-        && sP.indexOf('data-sim-timeline="1"') > sP.indexOf('<div class="sim-side">') && sP.indexOf('data-sim-timeline="1"') < sP.indexOf('data-sim-scenario="1"')
-        && sP.includes("<b>When queues start</b>") && seg(sP, '<div class="sim-side">', 'data-sim-timeline="1"').includes('data-sim-clock="1"')
+        && sP.indexOf('data-sim-timeline="1"') > sP.indexOf('<div class="sim-side kb-scroll"') && sP.indexOf('data-sim-timeline="1"') < sP.indexOf('data-sim-scenario="1"')
+        && sP.includes("<b>When queues start</b>") && seg(sP, '<div class="sim-side kb-scroll"', 'data-sim-timeline="1"').includes('data-sim-clock="1"')
         && sP.includes('<details class="sim-fold" data-sim-fold="table"><summary>Busiest hour at each gate</summary>')
         && sP.includes('<details class="sim-fold" data-sim-fold="haul"><summary>Haul roads</summary>') && !/data-sim-fold="[a-z]+" open/.test(sP)
         && sP.indexOf('data-sim-fold="table"') > sP.indexOf('data-sim-scenario="1"'));

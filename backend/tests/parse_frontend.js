@@ -2782,7 +2782,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // RE-PINNED 28 Oct 2026 (v2): the site select sits above the map; the map and the timeline take the chosen site
     // RE-PINNED 29 Oct 2026 (the page, card 2): the timeline is FULL WIDTH under the grid, the scenario a band under it; the map the app's height
     fn("SimPlayer", "const SimScenario").includes('<SimMap meta={meta} D={D} store={store} frame={f} site={site} />')
-    && /<div className="sim-main">\s*<SimMap [^\n]*\n\s*<\/div>\s*<div className="sim-side">/.test(fn("SimPlayer", "const SimScenario"))
+    && /<div className="sim-main">\s*<SimMap [^\n]*\n\s*<\/div>\s*<div className="sim-side kb-scroll" tabIndex=\{0\}/.test(fn("SimPlayer", "const SimScenario"))
     && /<\/div>\s*<\/div>\s*<div className="sim-tl-top">\s*<div className="sim-tl-head"[^\n]*\n\s*<ChartTools [\s\S]*?<\/div>\s*<div data-sim-tl-wrap="1"><SimTimeline D=\{D\} t=\{t\}[^\n]*<\/div>\s*\{scenario && <div className="sim-band">\{scenario\}<\/div>\}/.test(fn("SimPlayer", "const SimScenario"))
     && /@media \(min-width:1024px\)\{\.sim-grid\{grid-template-columns:minmax\(0,1fr\) 300px;align-items:start;\}\n\s*\.sim-main \.sim-map\{height:62vh;min-height:360px;max-height:720px;\}\}/.test(html)
     && /\n  \.sim-map\{height:62vh;min-height:360px;max-height:720px;/.test(html)
@@ -3886,7 +3886,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // RE-PINNED 5 Nov 2026 (task 0d-2): + the Carbon planner's Route choices table (four)
   const _regions = [...src.matchAll(/<div className="([^"]*)"[^\n]*tabIndex=\{0\} role="region" aria-label="([^"]*)"/g)];
   ok("#15: every scroll region with tabindex 0 carries a focus-ring class (kb-scroll or sim-scroll) and a name that passes the word rule",
-     _regions.length === 4 && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
+     _regions.length === 5 /* NARROWED 10 Nov 2026: + the Simulation's Now and gates column */ && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
        && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(m[2])), String(_regions.length));
   // REVERSED 23 Oct 2026 (UI fix 9, decision 16): the rows are no longer mouse-only — the name in the first cell is a button
   // (the UI FIX 9 block at the end). What stays true, and is still checked here: the row click is kept for a mouse, and the
