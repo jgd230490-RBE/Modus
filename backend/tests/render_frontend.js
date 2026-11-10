@@ -1034,13 +1034,15 @@ if (loaded) {
     const acctOut = render("the Account view renders with a populated page",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "account" }));
     ok("...with the four KPI cards and the held / applied / waiting states of the fixture",
-      acctOut.includes("last week delivered · 98% band") && acctOut.includes("open to calibrate")
-      && acctOut.includes(">held<") && acctOut.includes("applied · ") && acctOut.includes(">waiting<"));
+      // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the cards in words, Delivered / Added n t / Waiting
+      acctOut.includes("lines delivered last week, within 2 % of plan") && acctOut.includes("can add") && !acctOut.includes("calibrate")
+      && acctOut.includes(">Delivered<") && acctOut.includes(">Added ") && acctOut.includes(">Waiting<") && !acctOut.includes(">held<") && !acctOut.includes("applied · "));
     ok("...the confirmed cost box is rendered next to the actual",
       acctOut.includes("The confirmed cost of this week"));
     // 13 Oct 2026 (W3, narrowed): the footer's rule is in the Variance header's info box (dom_frontend opens it)
     ok("...and the Variance header carries the not-reported rule's info box",
-      acctOut.includes('aria-label="About: Variance"') && !acctOut.includes("Empty actual is not zero"));
+      // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the column is "Difference"
+      acctOut.includes('aria-label="About: Difference"') && !acctOut.includes("Empty actual is not zero"));
     // 22 Oct 2026 (UI fix 6, cards 1 and 2): the Account table keeps its 1,220 px with the Action column pinned and 13 px
     // headings, and a short line's 'spread on this week' is the standard small button. The fixture has no short line, so
     // its first account row is made one here (action spread, 12.5 short).
@@ -1052,8 +1054,8 @@ if (loaded) {
       h(LookAhead, { meta: laMeta, who: "t", initialPage: spreadFix, initialView: "account" }));
     const spRow = spOut.slice(spOut.indexOf('<tr class="border-t border-slate-100 align-middle" style="background:rgba(217,119,6,.06)">'));
     ok("⭐ UI FIX 6 card 2: the short line's 'spread on this week' is the standard small button (btn-pri btn-sm), same words and title; the 11 px white one-off is gone",
-      spOut.includes('style="background:rgba(217,119,6,.06)"') && spRow.includes('<button class="btn-pri btn-sm disabled:opacity-40" title="Carry +12.5 into the commit week, divided over its remaining weekdays. Refused if that week is confirmed.">spread on this week</button>')
-      && !spOut.includes("rounded-lg text-white") && (spOut.match(/>spread on this week</g) || []).length === 1);
+      spOut.includes('style="background:rgba(217,119,6,.06)"') && spRow.includes('<button class="btn-pri btn-sm disabled:opacity-40" title="Add 12.5 t to this week, divided over its remaining weekdays. Refused if that week is confirmed.">Add to this week</button>')
+      && !spOut.includes("rounded-lg text-white") && (spOut.match(/>Add to this week</g) || []).length === 1);   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2)
     ok("⭐ UI FIX 6 cards 1 and 2: the table keeps 1,220 px in its padded scroller under 13 px headings (la-acct-head); the Action heading and every Action cell are pinned (la-pin), the short line's cell painting the row's rose (la-pin-short)",
       spOut.includes('<div class="overflow-auto la-acct-scroll"><table class="text-sm w-full" style="min-width:1220px"><thead class="la-acct-head">')
       && spOut.includes('<th class="px-2 py-2 text-right font-semibold la-pin">Action<button')
@@ -1065,7 +1067,7 @@ if (loaded) {
     quietFix.account.rows[0].short_flag = false;
     const qOut = render("wave 3: the Account view renders a short line under the share", h(LookAhead, { meta: laMeta, who: "t", initialPage: quietFix, initialView: "account" }));
     ok("⭐ wave 3 (finding 5): a line short by less than the share keeps 'spread on this week' but has no wash and no la-pin-short",
-      (qOut.match(/>spread on this week</g) || []).length === 1 && !qOut.includes("la-pin-short") && !qOut.includes("background:rgba(217,119,6,.06)")
+      (qOut.match(/>Add to this week</g) || []).length === 1 && !qOut.includes("la-pin-short") && !qOut.includes("background:rgba(217,119,6,.06)")
       && !qOut.includes('<tr class="border-t border-slate-100 align-middle" style="background:'));
 
     const hzOut = render("the Horizon view renders with a populated page",
@@ -1112,8 +1114,9 @@ if (loaded) {
         h(LookAhead, { meta: laMeta, who: "t", access: planner, initialPage: fuelFix, initialView: "account" }));
       const nTarget = fuelFix.account.rows.filter(r => r.rate_source === "target").length;
       ok("...the strip widget sits above the KPI cards with typeable yard and share boxes for a planner",
-        fAcct.includes('data-fuel-widget="strip"') && fAcct.indexOf('data-fuel-widget="strip"') < fAcct.indexOf("last week delivered · 98% band")
-        && fAcct.includes("Yard €/L") && fAcct.includes("Fuel share %") && (fAcct.match(/inputmode="decimal"/gi) || []).length >= 2);
+        // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): a titled Fuel card with two labelled boxes
+        fAcct.includes('data-fuel-widget="strip"') && fAcct.indexOf('data-fuel-widget="strip"') < fAcct.indexOf("lines delivered last week, within 2 % of plan")
+        && fAcct.includes("Yard price per litre") && fAcct.includes("Fuel share of the cost") && (fAcct.match(/inputmode="decimal"/gi) || []).length >= 2);
       ok("...every target-priced account row carries the 'target' chip and every priced row a + BAF line",
         (fAcct.match(/>target<\/span>/g) || []).length === nTarget && nTarget >= 1
         && (fAcct.match(/\+ BAF €/g) || []).length === fuelFix.account.rows.filter(r => r.planned_eur_adj != null).length);
@@ -1174,7 +1177,8 @@ if (loaded) {
         !fEe.includes("data-fair-country-offer") && !fNoC.includes("data-fair-country-offer") && fNoC.includes('value="25"'));
       const fNone = render("the widget renders with NO data at all", h(FuelWidget, { who: "t", access: planner, mode: "strip", initial: null }));
       ok("...as 'Index unavailable — type a price' for a planner, and nothing undefined",
-        fNone.includes("Index unavailable — type a price") && !/undefined|NaN/.test(fNone));
+        // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the Account's card says "No diesel price yet" and the surcharge "No diesel price to work it from"
+        fNone.includes("No diesel price yet") && fNone.includes("No diesel price to work it from") && !/undefined|NaN/.test(fNone));
       const fStale = render("the widget renders a stale index", h(FuelWidget, { who: "t", access: planner, mode: "compact",
         initial: { ...fuelFix.costing, index_eur_per_l: null } }));
       ok("...a compact card with no index says so instead of a price", fStale.includes("Index unavailable"));

@@ -89,7 +89,7 @@ ok("⭐ 5: Account's Variance in words — \"45.0 t short\" / \"40.0 t over\" / 
    && acct.includes('style={{ color: r.short_flag ? "var(--warn-text)" : "var(--muted)" }}'));
 ok("🔴 ...no green for over, no red for short, no bare \"+45.0\" left in the Variance cell",
    !acct.includes('r.variance > 0 && !r.held ? "var(--bad-text)" : "var(--ok-text)"') && !acct.includes('(r.variance > 0 ? "+" : "") + grp(r.variance, 1)'));
-ok("...Account's shortfall card is the same tonnes, amber", acct.includes('<LaKpi value={`${grp(laShortT(account))} t`} tone={laShortT(account) > 0 ? "warn" : undefined} caption="short last week, not yet carried" />'));
+ok("...Account's shortfall card is the same tonnes, amber", acct.includes('<LaKpi value={`${grp(laShortT(account))} t`} tone={laShortT(account) > 0 ? "warn" : undefined} caption="short last week, not yet added to this week" />'));
 ok("...a row is washed (amber) only when it is short past the share", acct.includes('const short = r.action === "spread" && !!r.short_flag;')
    && acct.includes('style={short ? { background: "rgba(217,119,6,.06)" } : {}}'));
 
@@ -169,6 +169,49 @@ ok("⭐ 16: \"not routed\" only once the route's read has said so (never while i
    mx.includes("const notRouted = tpvKnown && !(tripsPerVehicleDay > 0);") && mx.includes("setTpv(null); setTpvKnown(false);")
    && mx.includes("setTpvKnown(true);") && mx.includes("{!notRouted ? null : <div className=\"px-3 py-1.5 text-[13px] text-slate-500 bg-white\" data-foot=\"1\">")
    && !mx.includes("{tripsPerVehicleDay > 0 ? null : <div"));
+
+// ---------------------------------------------------------------- 16 Oct item 24 / mockup card 2: the Account in words
+const fw = between("function FuelWidget({ who, access, mode, initial, onChanged }){", "\nfunction ");
+const fwStrip = fw.slice(fw.indexOf('if(mode === "strip"){'), fw.indexOf('if(mode === "compact"){'));
+ok("⭐ 24: the Account's fuel line is a titled Fuel card — the price with its date, two labelled boxes, the surcharge in words",
+   fwStrip.includes('<h3 className="text-sm font-semibold text-[color:var(--navy-deep)]">Fuel</h3>')
+   && fwStrip.includes('{box("yard_eur_per_l", "Yard price per litre", "",') && fwStrip.includes('{box("share_pct", "Fuel share of the cost", "%",')
+   && fwStrip.includes('<span className="block text-[13px] text-slate-500 mb-1">Fuel surcharge</span>')
+   && fwStrip.includes(': sum.baf_reason === "no base" ? "Starts from the week you confirm"')
+   && fwStrip.includes('% of the quote`') && fwStrip.includes('`against ${CUR()}'));
+ok("🔴 24: no \"BAF:\", \"no base locked\", \"Yard £/L\" or \"Fuel share %\" on the Account's card (Config's own row is not this page's)",
+   !/BAF|no base locked|Yard \$\{CUR\(\)\}\/L|Fuel share %|Index unavailable/.test(fwStrip) && fwStrip.length > 500
+   && la.includes('<FuelWidget mode="strip" who={who} access={access} initial={page && page.costing} onChanged={() => setTick(t => t + 1)} />'));
+ok("⭐ 24: the Account's cards in words — \"within 2 % of plan\", \"lines reported\", \"not yet added to this week\", \"can add their shortfall\"",
+   acct.includes('caption="lines delivered last week, within 2 % of plan"') && acct.includes('caption={`moved · ${account.reported || 0} of ${account.lines || 0} lines reported`}')
+   && acct.includes('"line can add its shortfall to this week" : "lines can add their shortfall to this week"')
+   && !/98% band|open to calibrate|not auto|not yet carried/.test(acct));
+ok("⭐ 24: the column is \"Difference\" (its info box too); one verb: Delivered, Added n t, Add to this week, Waiting",
+   acct.includes('>Difference<InfoTip id="la.variance" /></th>') && code.includes('"la.variance": { title: "Difference",')
+   && code.includes('"la.spread": { title: "Add to this week",')
+   && acct.includes('{r.action === "held" && <RowStatus word="Delivered" tone="ok" />}')
+   && acct.includes('{r.action === "applied" && <RowStatus word={`Added ${grp(r.carried, 1)} ${unitLbl(r.unit)}`} tone="none" />}')
+   && acct.includes('>Add to this week</button>') && acct.includes('<span className="text-[13px] text-slate-500">Waiting</span>')
+   && !/>held<|applied · |spread on this week|>waiting</.test(acct));
+const hz = la.slice(la.indexOf("const hl = Object.values(g)"), la.indexOf('data-horizon-stock="1"'));
+ok("⭐ 24: Account and Horizon name a line by its route's two ends, the code moving to the second line",
+   la.includes("const ends = useMemo(() => laEnds(meta), [meta]);")
+   && acct.includes('<div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={r.route_id}>{ends[r.route_id] || r.route_id}</div>')
+   && acct.includes("{ends[r.route_id] && <span>{r.route_id}</span>}<IptPill ipt={r.ipt} />")
+   && hz.includes('<div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={line.route_id}>{ends[line.route_id] || line.route_id}</div>')
+   && hz.includes("{ends[line.route_id] && <span>{line.route_id}</span>}<IptPill ipt={line.ipt} />"));
+const endsSrc = grab("function laEnds(meta){");
+try {
+  const js = ts.transpileModule(endsSrc + "\nmodule.exports = laEnds;", { compilerOptions: { target: ts.ScriptTarget.ES2019, module: ts.ModuleKind.CommonJS } }).outputText;
+  const m = { exports: {} }; new Function("module", "exports", js)(m, m.exports); const laEnds = m.exports;
+  const e = laEnds({ routes: [{ route_id: "R001", origin: "Kilby Ridge Quarry", dest: "Harborough Compound" }, { route_id: "R9", origin: "A" }] });
+  ok("...laEnds: \"Kilby Ridge Quarry → Harborough Compound\"; a route missing a name keeps its code; no meta, no names",
+     e.R001 === "Kilby Ridge Quarry → Harborough Compound" && !("R9" in e) && Object.keys(laEnds(null)).length === 0, JSON.stringify(e));
+} catch (err) { fail.push("laEnds transpiles and runs  " + err.message); }
+ok("⭐ 24: on the Horizon a week not set yet reads grey, explained once in the heading (no \"derived ÷5\" in every cell)",
+   la.includes('<div className="text-xs font-normal text-slate-500" data-hz-grey="1">Grey: the month spread evenly over its weeks</div>')
+   && hz.includes('const grey = status == null;') && hz.includes('className={"tabular-nums " + (grey ? "text-slate-500" : "font-semibold text-slate-800")} data-hz-cell={grey ? "derived" : "set"}')
+   && !/derived ÷/.test(la));
 
 console.log(`ui_fix_lookahead_calm.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  ✗ " + f)); process.exit(1); }

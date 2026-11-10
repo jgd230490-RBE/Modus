@@ -1647,9 +1647,9 @@ const INFO = {
   "dash.col.peak": { title: "Peak vehicles", text: "The most vehicles any one month needs on this line.", tech: "t1-vehicles" },
   "la.commit": { title: "Planned quantity by day", text: "Each line's plan for each weekday of the commit week, in the unit chosen above. In Tonnes, click a day to type its plan while the week is not confirmed. ✎ marks a day typed by hand.",
     how: "A day follows the week ÷ 5 until it is typed. Monday to Friday only: Saturday and Sunday are held at 0 and not shown. Confirm locks the whole week as the haulier sheet. Figures are planning figures, not plated weights.", guide: "6-3-commit-view-this-week-by-day", tech: "t1-trips" },
-  "la.variance": { title: "Variance", text: "Planned − actual. Green: held (within the 98 % band) or over-delivered. Red: short. An empty actual is not zero: it is not reported.",
-    how: "Calibrate never runs when you save an actual: only the navy button writes into the commit week, and only if that week is not already confirmed.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
-  "la.spread": { title: "Spread on this week", text: "Divides the shortage not yet carried across the remaining weekdays of the commit week (all of Monday to Friday when it has not started). A second press carries only what the first did not.",
+  "la.variance": { title: "Difference", text: "Planned against actual, in words: short or over. Amber: short by more than the share set on Config → Planning. An empty actual is not zero: it is not reported.",
+    how: "Nothing is added when you save an actual: only Add to this week writes into the commit week, and only if that week is not already confirmed.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
+  "la.spread": { title: "Add to this week", text: "Divides the shortfall not yet added across the remaining weekdays of the commit week (all of Monday to Friday when it has not started). A second press adds only what the first did not.",
     how: "Saturday and Sunday stay 0 unless you type them. It is refused if the commit week is confirmed.", guide: "6-4-account-view-what-actually-happened-last-week" },
   "la.cost_quote": { title: "Planned cost", text: "The route's own rates, or the target rate from Config where the route has none (marked target). + BAF is the same quote with the fuel surcharge; the quote is never replaced.",
     how: "The cost variance compares the actual against the quote, not the surcharged figure. BAF = (diesel index ÷ base − 1) × fuel share.", guide: "9-5-money-settings", tech: "t1-cost" },
@@ -11938,6 +11938,52 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
               : (idx.source === "manual" ? "typed index" : (prov ? (FUEL_PROVIDER_WORDS[prov.key] || "weekly price") : "automatic index"))}
     {exVat ? <span className="ml-1" title="the published pump price includes VAT; this is the same figure with VAT removed">· {exVat}</span> : null}</span>;
 
+  // 10 Nov 2026 (UI critique, 16 Oct item 24, mockup card 2): the Account's fuel line is a titled card — the price with its
+  // date, two labelled boxes and the surcharge in words ("Starts from the week you confirm"), not "BAF: … · no base locked"
+  if(mode === "strip"){
+    const srcWords = !autoIdx || idx.source === "manual" ? "typed price" : prov ? (FUEL_PROVIDER_WORDS[prov.key] || "weekly price").replace(/^Weekly/, "weekly") : "weekly price";
+    const surcharge = sum.baf_pct != null ? `${sum.baf_pct >= 0 ? "+" : "−"}${Math.abs(sum.baf_pct * 100).toFixed(2)} % of the quote`
+      : sum.baf_reason === "no base" ? "Starts from the week you confirm"
+      : sum.baf_reason === "no share" ? "Type the fuel share to work it out"
+      : "No diesel price to work it from";
+    const against = fuelS.baf_base_eur_per_l != null ? `against ${CUR()}${(+fuelS.baf_base_eur_per_l).toFixed(3)} per litre, ${fuelDate(fuelS.baf_base_bulletin_date)}` : "";
+    const box = (k, label, unit, title) => (
+      <label className="block" title={title} data-fuel-box={k}>
+        <span className="block text-[13px] text-slate-500 mb-1">{label}</span>
+        {canType ? <span className="inline-flex items-center gap-1">
+          <input className="border border-slate-300 rounded-lg px-2 py-1 text-sm text-right tabular-nums w-24" inputMode="decimal" placeholder="—"
+            value={draft[k] ?? (fuelS[k] ?? "")} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))} onBlur={() => saveSetting(k)} disabled={busy} />
+          {unit && <span className="text-sm text-slate-600">{unit}</span>}</span>
+          : <span className="text-sm font-semibold tabular-nums text-slate-700">{fuelS[k] != null ? `${fuelS[k]}${unit ? " " + unit : ""}` : "—"}</span>}
+      </label>
+    );
+    return (
+      <div className="card px-4 py-3 mb-3" data-fuel-widget="strip">
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-[color:var(--navy-deep)]">Fuel</h3>
+            <div className="text-[13px] text-slate-500">Diesel · {srcWords}</div>
+            <div className="flex items-baseline gap-2 flex-wrap">
+              {hasIndex ? <span className="text-lg font-bold tabular-nums" style={{ color: "var(--navy-deep)" }}>{price}</span>
+                        : <span className="text-sm font-semibold" style={{ color: "var(--warn-text)" }}>No diesel price yet</span>}
+              {staleChip}
+              {hasIndex && <span className="text-[13px] text-slate-500">{autoIdx && idx.source !== "manual" ? "published" : "typed"} {fuelDate(idx.bulletin_date)}</span>}
+              {rf.running && <span className="text-[13px] text-slate-500">updating…</span>}
+              {!rf.running && idx.last_error && hasIndex && <span className="text-[13px]" style={{ color: "var(--bad-text)" }}>Update failed: showing the last price</span>}
+            </div>
+          </div>
+          {box("yard_eur_per_l", "Yard price per litre", "", "What the haulier pays at the yard. Optional. Never replaces the published price.")}
+          {box("share_pct", "Fuel share of the cost", "%", "Fuel's share of the haulage price, 0 to 100. Empty: no fuel surcharge.")}
+          <div className="min-w-0" data-fuel-surcharge={sum.baf_pct != null ? "set" : (sum.baf_reason || "none")}>
+            <span className="block text-[13px] text-slate-500 mb-1">Fuel surcharge</span>
+            <span className={"text-sm font-semibold " + (sum.baf_pct != null ? "" : "text-slate-700")} style={sum.baf_pct != null ? { color: "var(--navy-deep)" } : undefined}>{surcharge}</span>
+            {against && <span className="block text-[13px] text-slate-500">{against}</span>}
+          </div>
+        </div>
+        {err && <div className="mt-2 text-[13px]" style={{ color: "var(--bad-text)" }}>{err}</div>}
+      </div>
+    );
+  }
   if(mode === "compact"){
     return (
       <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 min-w-0" data-fuel-widget="compact" title={hasIndex ? String(price) : ""}>
@@ -11997,6 +12043,13 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
 // `initialPage` / `initialView` exist for the render harness only — useEffect does not run
 // under renderToStaticMarkup, so without them the populated views could never be rendered
 // in a test. The app never passes them.
+// 10 Nov 2026 (UI critique, 16 Oct item 24): Account and Horizon name a line by its route's two ends ("Kilby Ridge Quarry →
+// Harborough Compound"), the code going to the second line; a route with no names keeps its code
+function laEnds(meta){
+  const m = {};
+  ((meta && meta.routes) || []).forEach(r => { if(r && r.route_id && r.origin && r.dest) m[r.route_id] = `${r.origin} → ${r.dest}`; });
+  return m;
+}
 function LookAhead({ meta, who, access, initialPage, initialView }){
   const { months } = meta;
   const [view, setView] = useState(() => { if(initialView) return initialView; try { return localStorage.getItem("modus_la_view") || "commit"; } catch(e){ return "commit"; } });
@@ -12069,6 +12122,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   const totals = commit.totals || {};
   const account = (page && page.account) || { rows: [] };
   const carryBy = useMemo(() => { const g = {}; (account.rows || []).forEach(r => { g[laCarryKey(r)] = r; }); return g; }, [account]);
+  const ends = useMemo(() => laEnds(meta), [meta]);
   const horizon = (page && page.horizon) || { rows: [] };
   const rail = (page && page.clashes) || { flags: [], count: 0, sources: {} };
   const ttSrc = rail.sources || {};
@@ -12454,10 +12508,11 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
           {/* 10 Sep evening: the diesel index and the two fuel settings, top of the strip */}
           <FuelWidget mode="strip" who={who} access={access} initial={page && page.costing} onChanged={() => setTick(t => t + 1)} />
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3">
-            <LaKpi value={account.lines ? `${account.delivered} of ${account.lines} lines` : "—"} caption="last week delivered · 98% band" />
-            <LaKpi value={`${grp(account.actual_t)} t`} caption={`actual moved · ${account.reported || 0} of ${account.lines || 0} reported`} />
-            <LaKpi value={`${grp(laShortT(account))} t`} tone={laShortT(account) > 0 ? "warn" : undefined} caption="short last week, not yet carried" />
-            <LaKpi value={`${account.open_to_calibrate || 0} line${account.open_to_calibrate === 1 ? "" : "s"} open to calibrate`} caption="adds shortage onto this week · not auto" />
+            {/* 10 Nov 2026 (16 Oct item 24, mockup card 2): the cards in words: the band as "within 2 % of plan", one verb (add) */}
+            <LaKpi value={account.lines ? `${account.delivered} of ${account.lines}` : "—"} caption="lines delivered last week, within 2 % of plan" />
+            <LaKpi value={`${grp(account.actual_t)} t`} caption={`moved · ${account.reported || 0} of ${account.lines || 0} lines reported`} />
+            <LaKpi value={`${grp(laShortT(account))} t`} tone={laShortT(account) > 0 ? "warn" : undefined} caption="short last week, not yet added to this week" />
+            <LaKpi value={String(account.open_to_calibrate || 0)} caption={account.open_to_calibrate === 1 ? "line can add its shortfall to this week" : "lines can add their shortfall to this week"} />
           </div>
           {!account.week || account.rows.length === 0 ? (
             <EmptyState title="No approved line in last week." body="The Account view types what actually moved against last week's plan. There is nothing to account for yet." />
@@ -12473,7 +12528,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                       <th className="px-3 py-2 text-left font-semibold">Line</th>
                       <th className="px-2 py-2 text-right font-semibold">Planned</th>
                       <th className="px-2 py-2 text-right font-semibold">Actual</th>
-                      <th className="px-2 py-2 text-right font-semibold">Variance<InfoTip id="la.variance" /></th>
+                      <th className="px-2 py-2 text-right font-semibold">Difference<InfoTip id="la.variance" /></th>
                       <th className="px-2 py-2 text-right font-semibold">Planned {CUR()}<InfoTip id="la.cost_quote" value={account.eur_target_lines ? `${account.eur_target_lines} line${account.eur_target_lines === 1 ? "" : "s"} at the target rate.` : ""} /></th>
                       <th className="px-2 py-2 text-right font-semibold">Fair {CUR()} <span className="normal-case tracking-normal text-slate-400">(model)</span><InfoTip id="la.cost_fair" /></th>
                       <th className="px-2 py-2 text-right font-semibold">Actual {CUR()}<InfoTip id="la.cost_actual" /></th>
@@ -12488,10 +12543,10 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                       const short = r.action === "spread" && !!r.short_flag;   // 10 Nov 2026 (finding 5): a small miss is not tinted
                       return (
                         <tr key={k} className="border-t border-slate-100 align-middle" style={short ? { background: "rgba(217,119,6,.06)" } : {}}>
-                          <td className="px-3 py-2 min-w-[220px]">
-                            <div className="font-semibold text-[color:var(--navy-deep)] whitespace-nowrap">{r.route_id}</div>
+                          <td className="px-3 py-2 min-w-[260px]">
+                            <div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={r.route_id}>{ends[r.route_id] || r.route_id}</div>
                             <div className="text-[13px] text-slate-500 flex flex-wrap items-center gap-1">
-                              <IptPill ipt={r.ipt} /><WsPill ws={r.section_id} />
+                              {ends[r.route_id] && <span>{r.route_id}</span>}<IptPill ipt={r.ipt} /><WsPill ws={r.section_id} />
                               <span>{r.material_type || "—"} · <span title={vehLabel(r.vehicle_type)}>{vehShort(r.vehicle_type) || "—"}</span> · {r.status}</span>
                             </div>
                           </td>
@@ -12539,14 +12594,15 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                               onBlur={() => saveActual(r)} />
                           </td>
                           <td className={"px-2 py-2 text-right whitespace-nowrap la-pin" + (short ? " la-pin-short" : "")}>
-                            {r.action === "held" && <span className="text-xs font-semibold px-2 py-1 rounded-full" style={{ color: "var(--ok-text)", background: "rgba(3,158,134,.12)" }}>held</span>}
-                            {r.action === "waiting" && <span className="text-[13px] text-slate-400">waiting</span>}
-                            {r.action === "applied" && <span className="text-xs font-semibold px-2 py-1 rounded-full text-slate-600 bg-slate-100" title={`${grp(r.carried, 1)} carried into this week`}>applied · {grp(r.carried, 1)}</span>}
+                            {/* 10 Nov 2026 (16 Oct item 24): one verb — Delivered, Added n t, Add to this week (were held / applied / spread) */}
+                            {r.action === "held" && <RowStatus word="Delivered" tone="ok" />}
+                            {r.action === "waiting" && <span className="text-[13px] text-slate-500">Waiting</span>}
+                            {r.action === "applied" && <RowStatus word={`Added ${grp(r.carried, 1)} ${unitLbl(r.unit)}`} tone="none" />}
                             {r.action === "spread" && (
                               // 22 Oct 2026 (UI fix 6, card 2; finding #11): the app's standard small button (13 px on the accent), was an 11 px one-off on --navy
                               <button onClick={() => doSpread(r)} disabled={!!busy}
                                 className="btn-pri btn-sm disabled:opacity-40"
-                                title={`Carry +${grp(r.remaining_short, 1)} into the commit week, divided over its remaining weekdays. Refused if that week is confirmed.`}>spread on this week</button>
+                                title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to this week, divided over its remaining weekdays. Refused if that week is confirmed.`}>Add to this week</button>
                             )}
                           </td>
                         </tr>
@@ -12673,6 +12729,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                         <th className="px-3 py-2 text-left font-semibold border-r border-slate-200 sticky left-0 bg-slate-50 z-10" style={{ minWidth: 240 }}>
                           {/* 22 Oct 2026 (UI fix 6, card 3; finding #11): the month line, the role words and the outcomes are 12 px (were 9 and 10 px) */}
                           Line<InfoTip id="la.horizon" /><div className="text-xs font-normal text-slate-400">{monthLabelAbs(horizon.from_month, months.start_year)} · {monthLabelAbs(horizon.to_month, months.start_year)}</div>
+                          <div className="text-xs font-normal text-slate-500" data-hz-grey="1">Grey: the month spread evenly over its weeks</div>
                         </th>
                         {cols.map(({ m, w }) => {
                           const role = roleOf(m, w);
@@ -12695,8 +12752,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                       {hl.map(line => (
                         <tr key={line.key} className="border-t border-slate-100 align-top">
                           <td className="px-3 py-2 border-r border-slate-100 sticky left-0 bg-white z-10">
-                            <div className="font-semibold text-[color:var(--navy-deep)] whitespace-nowrap">{line.route_id}</div>
-                            <div className="text-[13px] text-slate-500 flex flex-wrap items-center gap-1"><IptPill ipt={line.ipt} /><WsPill ws={line.section_id} /><span>{line.material_type || "—"} · {vehShort(line.vehicle_type) || "—"}</span></div>
+                            <div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={line.route_id}>{ends[line.route_id] || line.route_id}</div>
+                            <div className="text-[13px] text-slate-500 flex flex-wrap items-center gap-1">{ends[line.route_id] && <span>{line.route_id}</span>}<IptPill ipt={line.ipt} /><WsPill ws={line.section_id} /><span>{line.material_type || "—"} · {vehShort(line.vehicle_type) || "—"}</span></div>
                             {line.reopened.length > 0 && (
                               <div className="text-xs mt-0.5" style={{ color: "var(--red)" }}
                                 title="These weeks were created while the month was approved. Reopening it does not delete them.">
@@ -12716,10 +12773,11 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                               ? <span style={{ color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)") : "var(--ok-text)" }}>actual {grp(r.actual_qty, 1)} · {short ? `+${grp(r.variance, 1)} short${r.calibrated_at ? " · carried" : ""}` : "held"}</span>
                               : r.status === "confirmed" ? <span style={{ color: "var(--ok-text)" }}>confirmed</span>
                               : r.status === "edited" ? <span className={role === "commit" ? "text-amber-800" : "text-amber-700"}>edited{role === "commit" ? " · open days" : ""}</span>
-                              : <span className="text-slate-400">derived ÷{weekNosOf(horizon, m).length}</span>;
+                              : null;
+                            const grey = status == null;   // 10 Nov 2026 (item 24): a week not set yet reads grey, once explained in the heading
                             return (
                               <td key={`${m}|${w}`} className="px-2 py-2 border-r border-slate-100 whitespace-nowrap" style={role === "commit" ? { background: "var(--navy-soft)" } : {}}>
-                                <div className="font-semibold tabular-nums text-slate-800">{grp(r.planned_qty, 1)} {unitLbl(line.unit)}</div>
+                                <div className={"tabular-nums " + (grey ? "text-slate-500" : "font-semibold text-slate-800")} data-hz-cell={grey ? "derived" : "set"}>{grp(r.planned_qty, 1)} {unitLbl(line.unit)}</div>
                                 <div className="text-xs tabular-nums">{status}{r.parent_changed && <span style={{ color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed</span>}</div>
                               </td>
                             );

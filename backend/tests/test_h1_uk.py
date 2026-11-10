@@ -770,7 +770,9 @@ ok("🔴 Config → Vehicles shows the Estonian label column to an Estonian tena
    and 'h !== "Estonian" || vehLangShown("ee")' not in fe and '{vehLangShown("ee") && <td' not in fe)
 ok("🔴 the Submit form never defaults to a hidden vehicle (first SHOWN of the category's list)",
    "const firstShown = (list) => (list || []).find(v => !HIDDEN_VEHICLES.includes(v))" in fe
-   and "useState(firstShown(vehicles))" in fe and "(firstShown(suggestedVehicles) || v)" in fe
+   # NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, finding 16): the route's own vehicle comes first, itself never a hidden one
+   and "useState(firstShown(vehicles))" in fe and "|| firstShown(suggestedVehicles) || v)" in fe
+   and 'return rv && (allowed || []).includes(rv) && !HIDDEN_VEHICLES.includes(rv) ? rv : "";' in fe
    and "useState(vehicles[0] || \"\")" not in fe and "(suggestedVehicles[0] || v)" not in fe)
 ok("🔴 the Look-ahead's UNBAKED text reads the tenant's unit (clashes._dist_word), never a fixed 'km'",
    "km omitted on that line" not in read("backend/clashes.py") and "{_dist_word()} omitted on that line" in read("backend/clashes.py"))
@@ -1180,7 +1182,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    and 'const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";' in fe
    and '["rgba(3,158,134,.12)", "var(--ok-text)"]' in fe and '["rgba(191,46,85,.12)", "var(--bad-text)"]' in fe
    and 'style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>' in fe
-   and 'style={{ color: "var(--ok-text)", background: "rgba(3,158,134,.12)" }}>held</span>' in fe and ': has ? ["routed", "var(--ok-text)"] : null;' in fe
+   # NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the Account's "held" is the one status chip, "Delivered"
+   and '{r.action === "held" && <RowStatus word="Delivered" tone="ok" />}' in fe and ': has ? ["routed", "var(--ok-text)"] : null;' in fe
    and '.sim-ok{color:var(--ok-text);font-weight:700;}' in fe and '.sim-tl-ok{font-size:14px;fill:var(--ok-text);}' in fe
    and '.sim-warn{color:var(--warn-text);}' in fe and ".sim-warn{color:var(--gold)" not in fe
    and 'style={{ color: "var(--warn-text)", background: "rgba(217,119,6,.10)" }} title="The last good published price is older than 8 days">stale</span>' in fe
@@ -1213,7 +1216,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-9b): bad-text 51 -> 53 — the Lorry plan's refused-drop line and the red edge of a lorry that cannot take the trip
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-1): bad-text +2, warn-text +2 — the traffic limits' Over / Near word on the
    # Dashboard fold's table and OVER / NEAR on the Simulation's "Traffic limits on this day" line
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 58 and  # NARROWED 10 Nov 2026 (wave 3, finding 5): 59 -> 58, the Account's red variance figure is words now (amber when flagged)
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 60 and  # NARROWED 10 Nov 2026 (wave 3, finding 5): 59 -> 58, the Account's red variance figure is words now (amber when flagged)
+    # NARROWED 10 Nov 2026 (wave 3, item 24): 58 -> 60, the Account's Fuel card: "Update failed: showing the last price" and a failed save
       # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon
      # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
    # NARROWED 9 Nov 2026 (UI fix phone 2): bad-text 53 -> 55, warn-text 21 -> 22 — the phone Gate arrivals list: the headline when a gate is over, and the figures of an amber / red row
@@ -1221,7 +1225,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 8 Nov 2026 (task 2.1-12): warn-text 19 -> 20 — the site layout phase row's amber "layout changed since"
    # NARROWED 10 Nov 2026 (wave 3, finding 5): 26 -> 29 — the Look-ahead's short-last-week KPI, the grid's "Short n t last
    # week" line (.la-carry.is-short) and the Account's Variance words on a flagged line
-   _fe_wo.count("var(--warn-text)") == 29   # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
+   # NARROWED 10 Nov 2026 (wave 3, item 24): 29 -> 30, the Account's Fuel card "No diesel price yet"
+   _fe_wo.count("var(--warn-text)") == 30   # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    # NARROWED 10 Nov 2026 (wave 3, finding 5): the Account's Variance reads words, amber on a flagged line, else --muted

@@ -515,9 +515,10 @@ ok("⭐ and saveActual's own body never touches the calibrate endpoint",
   !!_saveActualBody && !_saveActualBody.includes("forecast-weeks/calibrate"));
 // C18, decided: the per-line "spread on this week" button (the Account mock), not a
 // dialog checkbox. Still the ONLY thing that reaches calibrate.
+// NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the button says "Add to this week" (one verb)
 ok("⭐ calibrate is reached only from the per-line 'spread on this week' button",
   (code.match(/\/forecast-weeks\/calibrate/g) || []).length === 1
-  && code.includes("spread on this week") && /const doSpread = \(row\) => send\("\/forecast-weeks\/calibrate", \{ \.\.\.wkBody\(row\), spread: true/.test(_laBody));
+  && code.includes(">Add to this week</button>") && !code.includes("spread on this week</button>") && /const doSpread = \(row\) => send\("\/forecast-weeks\/calibrate", \{ \.\.\.wkBody\(row\), spread: true/.test(_laBody));
 ok("...and the button says the server refuses it when that week is confirmed",
   _laBody.includes("Refused if that week is confirmed"));
 // reversed: the calibrate DIALOG is gone with C18 — there is no typed override in the UI
@@ -1270,7 +1271,8 @@ ok("...and the Account footer says the quote is never replaced and € var is ag
   // 13 Oct 2026 (W3, narrowed): the Account footer moved to the Planned cost header's info box (la.cost_quote)
   src.includes("the quote is never replaced") && src.includes("The cost variance compares the actual against the quote") && _laBody.includes('<InfoTip id="la.cost_quote"'));
 ok("the Account strip is mounted above the KPI grid; the widget is passed the page's own costing block",
-  _laBody.indexOf('<FuelWidget mode="strip"') < _laBody.indexOf('caption="last week delivered · 98% band"')
+  // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the first card's caption is in words
+  _laBody.indexOf('<FuelWidget mode="strip"') < _laBody.indexOf('caption="lines delivered last week, within 2 % of plan"')
   && (_laBody.match(/initial=\{page && page\.costing\}/g) || []).length === 2);
 ok("Config has a 'Costing · fuel' tab whose target rate saves to PUT /admin/costing/target with the admin token — not inside the factors document",
   code.includes('["costing", "Costing · fuel"]') && _ctBody.includes("/admin/costing/target${qs}")
@@ -3978,7 +3980,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && code.includes('<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>')
      && _cat.includes('const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";')
      && code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') && code.includes('["rgba(191,46,85,.12)", "var(--bad-text)"]') && code.includes('["#f1f5f9", "#475569"]')
-     && code.includes(': has ? ["routed", "var(--ok-text)"] : null;') && code.includes('color: "var(--ok-text)" }}>set</span>') && code.includes('style={{ color: "var(--ok-text)", background: "rgba(3,158,134,.12)" }}>held</span>')
+     && code.includes(': has ? ["routed", "var(--ok-text)"] : null;') && code.includes('color: "var(--ok-text)" }}>set</span>') && code.includes('{r.action === "held" && <RowStatus word="Delivered" tone="ok" />}')
      && /\.sim-ok\{color:var\(--ok-text\);/.test(html) && /\.sim-tl-ok\{[^}]*fill:var\(--ok-text\);\}/.test(html) && html.includes(".sim-warn{color:var(--warn-text);}")
      && !/color: "var\(--green\)"/.test(code) && !/color:var\(--green\)/.test(html) && !/fill:var\(--green\)/.test(html)
      && code.includes('style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>') && _fw.includes('color: "var(--warn-text)", background: "rgba(217,119,6,.10)"'));
@@ -4164,8 +4166,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("UI FIX 6 card 2: the headings keep their '(model)' word and their five info boxes",
      _acct.includes('Fair {CUR()} <span className="normal-case tracking-normal text-slate-400">(model)</span><InfoTip id="la.cost_fair" />')
      && ["la.variance", "la.cost_quote", "la.cost_fair", "la.cost_actual", "la.spread"].every(id => _acct.includes(`<InfoTip id="${id}"`)));
+  // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the same button, its words "Add to this week" and its title in the line's unit
   ok("⭐ UI FIX 6 card 2: 'spread on this week' is the app's standard small button (btn-pri btn-sm: 13 px on the accent), same words, same click, same title, same disabled rule; the 11 px white-on-navy one-off is gone",
-     _acct.includes('<button onClick={() => doSpread(r)} disabled={!!busy}\n                                className="btn-pri btn-sm disabled:opacity-40"\n                                title={`Carry +${grp(r.remaining_short, 1)} into the commit week, divided over its remaining weekdays. Refused if that week is confirmed.`}>spread on this week</button>')
+     _acct.includes('<button onClick={() => doSpread(r)} disabled={!!busy}\n                                className="btn-pri btn-sm disabled:opacity-40"\n                                title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to this week, divided over its remaining weekdays. Refused if that week is confirmed.`}>Add to this week</button>')
      && !_laBody.includes("text-[11px] font-semibold px-2.5 py-1.5 rounded-lg text-white") && !/background: "var\(--navy\)" \}\}>spread on this week/.test(_laBody)
      && /\.btn-pri\{[^}]*background:var\(--action\);color:var\(--action-fg\);/.test(html) && /\.btn-sm\{padding:4px 10px;font-size:13px;\}/.test(html));
   // card 3 (finding #11 + the user's yes to finding #37)
@@ -4265,8 +4268,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("UI FIX 7 card 1: the Locations gate list wraps (it crushed each gate into one-word columns, Delete off the card), its small words take the row's 12 px",
      src.includes('className={"flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs rounded px-1.5 py-1 " +')
      && src.includes('{g.is_default && <span className="text-slate-500">default</span>}') && src.includes("<RowMenu name={g.name || g.id}>"));   // NARROWED 27 Oct 2026: Edit and Delete in the gate's "⋯"
+  // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): 260 px, since the line is named by its route's two ends
   ok("UI FIX 7 card 5: the Account table's Line column keeps 220 px and the planned quantity never breaks before its unit",
-     _laBody.includes('<td className="px-3 py-2 min-w-[220px]">')
+     _laBody.includes('<td className="px-3 py-2 min-w-[260px]">')
      && _laBody.includes('<td className="px-2 py-2 text-right tabular-nums font-semibold whitespace-nowrap">{grp(r.planned_qty, 1)} {unitLbl(r.unit)}</td>')
      && _laBody.includes('<div className="text-xs text-slate-400 whitespace-nowrap">{unitTriple(r.planned_units)}</div>'));
   ok("UI FIX 7 card 7: the Submit strip's 12 px labels may take two lines, so each figure sits at the foot of its cell",
