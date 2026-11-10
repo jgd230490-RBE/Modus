@@ -39,8 +39,12 @@ ok("2: the divisor is the tonnes planned up to this month",
    and "plannedToDate: T.tNow" in html)
 ok("2: the table's per-line figure follows", "a.actualT * 100 / a.tNow" in html and "if(r.month_index <= nowIdx) a.tNow += r.tonnes" in html)
 ok("2: the card, the big-screen figures and the i box say 'planned to date'",
-   "t planned to date`}" in html and html.count("t planned up to this month`") == 3 and "up to and including this month" in html)
-ok("2: nothing prints the whole-range total as the divisor", "t of ${bigNum(K.totT)} t`}" not in html)
+   "t planned to date · " in html and html.count("t planned up to this month. Whole plan") == 3 and "up to and including this month" in html)
+ok("2 (John's change): the card shows BOTH, to date as the headline, the whole plan beneath, the i box naming each",
+   '% <span className="text-[13px] font-normal">to date</span>' in html and "deliveredWholePct: pctOf(T.actualT, T.t)" in html
+   and "% of the whole plan (${bigNum(K.totT)} t)" in html and html.count("Whole plan: ÷ ${grp(K.totT)} t planned in view.") == 3
+   and "The second line gives the share of the whole plan in view" in html)
+ok("2: the headline's second line starts from the to-date figure", "t planned to date · " in html)
 ok("3: a long series name is left off, never cut", 'if(String(ds.label || "").length > 20) return;' in html
    and 'm.label.slice(0, 19)' not in html)
 ok("4: the council headline names the top bar by the bars' measure",
