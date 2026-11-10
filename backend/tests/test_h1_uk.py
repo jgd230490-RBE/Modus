@@ -1211,12 +1211,12 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-9b): bad-text 51 -> 53 — the Lorry plan's refused-drop line and the red edge of a lorry that cannot take the trip
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-1): bad-text +2, warn-text +2 — the traffic limits' Over / Near word on the
    # Dashboard fold's table and OVER / NEAR on the Simulation's "Traffic limits on this day" line
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 59 and  # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 60 and  # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon; (wave 3, routes-first-run) 59 -> 60, the Routes Vehicles cell's "n failed"
      # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
    # NARROWED 9 Nov 2026 (UI fix phone 2): bad-text 53 -> 55, warn-text 21 -> 22 — the phone Gate arrivals list: the headline when a gate is over, and the figures of an amber / red row
    # NARROWED 10 Nov 2026 (Stockpiles saving): warn-text 24 -> 25 — the planned-use line's amber "Not saved yet"
    # NARROWED 8 Nov 2026 (task 2.1-12): warn-text 19 -> 20 — the site layout phase row's amber "layout changed since"
-   _fe_wo.count("var(--warn-text)") == 26   # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
+   _fe_wo.count("var(--warn-text)") == 27   # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word; (wave 3, routes-first-run) 26 -> 27, the Vehicles cell's "n out only"
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe

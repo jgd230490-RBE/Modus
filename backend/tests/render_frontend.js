@@ -635,7 +635,7 @@ if (loaded) {
       ok("the empty state names the month and keeps the averages note; no table",
         eOut.includes('data-gate-arrivals="none"') && eP.includes("No approved lines in Nov 2026") && eP.includes('data-empty="none"')
         // NARROWED 11 Oct 2026 (review): the body had the pending rule backwards
-        && eP.includes("Pick another month. Pending lines appear as a note until they are approved, then in the figures.") && eP.includes("No hourly peak is typed") && !eP.includes("<table"));
+        && /* REVERSED 10 Nov 2026 (UI critique 17) */ eP.includes("Pick another month, or approve a line.") && eP.includes("No hourly peak is typed") && !eP.includes("<table"));
       // a gate listed for its PENDING lines only (nothing approved there this month): the chip says so and claims no spacing
       const pOnly = { ...GA.gates[1], laden_per_day: 0.0, empty_per_day: 0.0, arrivals_per_day: 0.0, gap_minutes: null, flag: null,
                       reason: "No approved arrivals this month.", pending_lines: 1, pending_per_day: 5.0, per_team: [], teams: [] };
