@@ -545,7 +545,9 @@ ok("the pills sit under PageHeader — the left rail stays (C18's unsettled poin
 // NARROWED (H1, 29 Sep): the t·km card reads TKM() — "t·km", or "t·mi" for a tenant that
 // reads miles (HU5: per tenant). The card and its position are unchanged.
 ok("the Commit KPI strip carries the mock's cards: planned, trips, vehicles peak, t·km (TKM()), last-week shortage, last-week delivered — and planned €",
-  ["planned this week", "trips", "vehicles / day peak", "caption={`${TKM()} · route basis`}", "last week shortage", "last week delivered", "planned ${CUR()}"]
+  // NARROWED 10 Nov 2026 (wave 3, finding 5, card 5): every number with its noun and unit — "loads", "vehicles a day at the
+  // peak", "t·mi on the routes", "short last week" (in tonnes), "lines delivered last week"
+  ["planned this week", 'caption="loads"', "vehicles a day at the peak", "caption={`${TKM()} on the routes`}", "short last week", "lines delivered last week", "planned ${CUR()}"]
     .every(t => _laBody.includes(t)));
 ok("H1 (HU5): distances are shown in the tenant's unit — helpers convert at the display boundary only, km stays stored",
   /const DU = \(\) => \(TENANT\.distance_unit === "mi" \? "mi" : "km"\);/.test(code)
@@ -1716,9 +1718,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 27 Oct 2026 (stockpile forecast, D7): the two amber stockpile warnings join the gold list after NOTICE_DUE
   // NARROWED 29 Oct 2026 (task 3a): the tone's last line is the pour's three warnings
   // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): the tone goes on with TRAFFIC_NEAR (amber)
+  // NARROWED 10 Nov 2026 (wave 3, finding 5): ... and SHORTAGE (amber: a shortfall past the share is a warning)
   ok("AL2 rail: the four words in the rail's tables (NOTICE DUE a gold warning, the other three red)",
      src.includes('NOTICE_DUE: "Notice due", NOTICE_LATE: "Notice late", SO_LEAD_TIME: "SO lead time", AIL_ROAD_LIMIT: "AIL road limit" };')   // NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case
-     && src.includes('code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";'));
+     && src.includes('code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR"\n                          // 10 Nov 2026 (UI critique finding 5): a line short last week is a warning, not an alarm\n                          || code === "SHORTAGE") ? "warn" : "bad";'));
   const st0 = src.indexOf("function AbnormalStrip({ onOpen, sites }){"), st1 = src.indexOf("function DashboardToday({ meta, week, err, wall, fill }){");
   const st = src.slice(st0, st1);
   ok("⭐ AL2 Dashboard: one strip under Gate arrivals (not on the big screen, not on a phone): ONE read of /abnormal/summary, the next-4-weeks count, notices due with the chip, " +
@@ -2360,7 +2363,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // and the rest in the details); ONE status column, after the route (the flags win over the week's state: decision 1)
     _laGrid.includes('"Planned quantity by day"}</b>') && _laGrid.includes('<th className="la-stick" style={{ minWidth: 280 }}>Route</th>')
     && _laGrid.includes('<th className="num">Week</th>') && _laGrid.includes("<th>Status</th>") && _laGrid.includes('<tr className="la-total rd-card">')
-    && _laGrid.includes('<td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>'));
+    // NARROWED 10 Nov 2026 (wave 3, finding 5): the status cell goes on with last week's shortfall as a second line
+    && _laGrid.includes('<td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} />')
+    && _laGrid.includes('{laCarryLine(carryBy[laCarryKey(line)], lf.some(f => f.code === "SHORTAGE"))}</td>'));
   ok("...the day cell is a figure until clicked, then an input that saves on blur, Enter or Escape",
     // 13 Oct 2026 (W6, narrowed): the weekend greying went with the weekend days (the grid shows Mon–Fri only)
     _laGrid.includes('<button type="button" className="la-cell"') && _laGrid.includes('onBlur={() => { saveDay(line, d); setEditing(null); }}')
@@ -3266,7 +3271,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      /\.chart-box\{position:relative;width:100%;min-width:0;height:clamp\(200px,28vh,420px\);\}/.test(html)
      && /\.chart-box\.is-lg\{height:clamp\(220px,32vh,480px\);\}/.test(html)
      // (14 Oct: a third size, "fill", for a chart that takes its card on the big screen)
-     && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} />}</div>'));   // NARROWED 2 Nov 2026: + the Copy / Download buttons, drawn after the canvas
+     // NARROWED 10 Nov 2026 (wave 3, finding 5): the buttons are drawn in the box unless the chart has its own title row (`head`)
+     && _cc.includes('<div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!head && tools}</div>')
+     && _cc.includes('const tools = !notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} inline={!!head} />;'));   // NARROWED 2 Nov 2026: + the Copy / Download buttons, drawn after the canvas
   // 14 Oct 2026 (narrowed): the gate chart joins the stockpile chart — its height follows its rows too (one a gate)
   // NARROWED 14 Oct 2026 (bundle G, W7): + the CLP section's three row charts (routes, sites, councils), one row each too
   // NARROWED 27 Oct 2026 (stockpile forecast, D10 a): the stockpile chart is a line chart now and takes the box's own height
@@ -3559,6 +3566,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && src.includes('stepped: "middle", order: 1 });') && src.includes("data: g.days.map(d => d.open ? g.near_per_day : 0), borderColor: GOLD, borderWidth: 1.5, borderDash: [4, 3]")
      && src.includes('<RowStatus word={`${d.day}: ${d.status_word}${d.pct != null ? ` (${d.pct} %)` : d.open ? "" : " (closed)"}`} tone={d.flag === "red" ? "bad" : "warn"} />'));
   // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): the tone goes on with TRAFFIC_NEAR (amber)
+  // NARROWED 10 Nov 2026 (wave 3, finding 5): ... and SHORTAGE (amber: a shortfall past the share is a warning)
   ok("⭐ W17: the rail names GATE OVER CAPACITY / GATE NEAR CAPACITY (as the exports do); near is a gold warning, over red",
      // NARROWED 22 Oct 2026 (abnormal loads, phase 2): the rail's table goes on with the four abnormal-load words after GATE NEAR CAPACITY
      // NARROWED 28 Oct 2026 (task 0c): both tables go on with NO_WAY_ROUND after the last entry
@@ -3568,7 +3576,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      src.includes('GATE_OVER: "Gate over capacity", GATE_NEAR: "Gate near capacity",') && src.includes('NOTICE_DUE: "Notice due", NOTICE_LATE: "Notice late", SO_LEAD_TIME: "SO lead time", AIL_ROAD_LIMIT: "AIL road limit",')
      // NARROWED 27 Oct 2026 (stockpile forecast, D7): the grid's table and the tone go on with STOCKPILE SOON / EMPTY (amber)
      && src.includes('GATE_OVER: "Gate over", GATE_NEAR: "Gate near", STOCKPILE_SOON: "Stockpile soon", STOCKPILE_EMPTY: "Stockpile empty",')
-     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";')
+     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR"\n                          // 10 Nov 2026 (UI critique finding 5): a line short last week is a warning, not an alarm\n                          || code === "SHORTAGE") ? "warn" : "bad";')
      && src.includes('<RowStatus word={flagWord(f)} tone={laTone(f.code)} />')
      && /"GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"/.test(fs.readFileSync(path.join(ROOT, "backend", "export.py"), "utf8")));
   // W8: the data fields
@@ -4139,9 +4147,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && _acct.includes('<td className={"px-2 py-2 text-right whitespace-nowrap la-pin" + (short ? " la-pin-short" : "")}>')
      && (_laBody.match(/la-pin/g) || []).length === 3);
   ok("⭐ UI FIX 6 card 1: a short row's pinned cell paints the row's 5 % rose over the surface (no white stripe), and the row's own inline wash is unchanged (the captions rule matches it by [style*=])",
-     /\n  \.la-pin\.la-pin-short\{background:linear-gradient\(rgba\(191,46,85,\.05\),rgba\(191,46,85,\.05\)\),var\(--surface\);\}\n/.test(html)
-     && _acct.includes('<tr key={k} className="border-t border-slate-100 align-middle" style={short ? { background: "rgba(191,46,85,.05)" } : {}}>')
-     && _acct.includes('const short = r.action === "spread";'));
+     // NARROWED 10 Nov 2026 (wave 3, finding 5): the wash is amber (6 %), and only on a line short past the organisation's share
+     /\n  \.la-pin\.la-pin-short\{background:linear-gradient\(rgba\(217,119,6,\.06\),rgba\(217,119,6,\.06\)\),var\(--surface\);\}\n/.test(html)
+     && _acct.includes('<tr key={k} className="border-t border-slate-100 align-middle" style={short ? { background: "rgba(217,119,6,.06)" } : {}}>')
+     && _acct.includes('const short = r.action === "spread" && !!r.short_flag;'));
   // card 2 (finding #11): the headings and the button in the app's standard styles
   ok("UI FIX 6 card 2: the Account headings take the .tbl th look — 13 px, ordinary capitals, muted on the second surface, one line, 40 px — and the 10 px capitals are gone from the Account — and, since UI fix 7 (22 Oct), from the Stockpiles table too",
      _acct.includes('<thead className="la-acct-head">') && !_acct.includes("text-[10px] uppercase tracking-wide")
@@ -4626,11 +4635,12 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && src.includes(`Stockpiles <span className="font-normal text-slate-500">% full at the week's end</span>`));
   // NARROWED 29 Oct 2026 (task 3a): the tone goes on with the pour's three warnings
   // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): the tone goes on with TRAFFIC_NEAR (amber)
+  // NARROWED 10 Nov 2026 (wave 3, finding 5): ... and SHORTAGE (amber: a shortfall past the share is a warning)
   ok("RAIL: STOCKPILE SOON / STOCKPILE EMPTY are words in both tables, amber, ranked with the warnings",
      // NARROWED 28 Oct 2026 (task 0c): the rank table goes on with NO_WAY_ROUND
      src.includes('STOCKPILE_SOON: "Stockpile soon", STOCKPILE_EMPTY: "Stockpile empty",') && src.includes('STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7,')   // NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case
     
-     && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";'));
+     && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR"\n                          // 10 Nov 2026 (UI critique finding 5): a line short last week is a warning, not an alarm\n                          || code === "SHORTAGE") ? "warn" : "bad";'));
   ok("DASHBOARD: a stockpile with no planned use never leads the message (as the rail's STOCKPILE SOON)",
      /function stockMessage\(sps\)\{[\s\S]{0,400}if\(!sp\.use_planned\) return;/.test(src));
   ok("DASHBOARD: the 'No use planned yet' line names a stockpile with a capacity and no plan",
@@ -5102,7 +5112,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("CHART BUTTONS: ONE component (ChartTools) drawn by ChartCanvas; Copy writes a PNG to the clipboard and falls back to a download that says 'Saved instead'; Download saves the same PNG",
      code.includes("function ChartTools({ title, scope, getPlot, inline }){") && code.includes('new ClipboardItem({ "image/png": make() })') && code.includes('await download("Saved instead")')
      && code.includes('chartToast(say("Copied"))') && code.includes("a.download = name;") && (code.match(/<ChartTools /g) || []).length === 2
-     && code.includes("{!notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} />}"));
+     // NARROWED 10 Nov 2026 (wave 3, finding 5): drawn once as `tools`, in the box or in the chart's own title row (`head`)
+     && code.includes("const tools = !notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} inline={!!head} />;"));
   ok("CHART BUTTONS: the picture is drawn at 2x on WHITE, redrawn light off screen, the title above and ONE scope line below (scheme, the page's parts, 'Wayscope, <date>', the demo notice)",
      code.includes("const CHART_PNG_SCALE = 2;") && code.includes('x.fillStyle = "#FFFFFF"; x.fillRect(0, 0, W, H);') && code.includes("C.defaults.color = CHART_MUTED; C.defaults.borderColor = CHART_GRID;")
      && code.includes("animation: false, devicePixelRatio: CHART_PNG_SCALE") && code.includes("out.push(`Wayscope, ${longDate(localIsoDate())}`);") && code.includes("out.push(`DEMO · ${TENANT.demo_notice}`);")
@@ -5484,7 +5495,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("RAIL: TRAFFIC LIMIT red and TRAFFIC NEAR amber, words in both tables, ranked",
      code.includes('TRAFFIC_LIMIT: "Traffic limit"') && code.includes('TRAFFIC_NEAR: "Traffic near"')   // NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case
     
-     && code.includes("TRAFFIC_LIMIT: 3.6") && code.includes("TRAFFIC_NEAR: 8.4") && code.includes('|| code === "TRAFFIC_NEAR") ? "warn" : "bad";'));
+     && code.includes("TRAFFIC_LIMIT: 3.6") && code.includes("TRAFFIC_NEAR: 8.4") && code.includes('|| code === "TRAFFIC_NEAR"') && code.includes('|| code === "SHORTAGE") ? "warn" : "bad";'));   // NARROWED 10 Nov 2026 (wave 3, finding 5): SHORTAGE after it
   ok("🔴 TRAFFIC LIMIT: no back-end words on the new screens",
      !/\b(api|endpoint|cache|server|geometry|LineString)\b/i.test(td.replace(/fetch\(`\$\{API\}[^`]*`\)/g, "")
        .replace(/[A-Za-z_.]*geometry[A-Za-z_.]*/g, "")));

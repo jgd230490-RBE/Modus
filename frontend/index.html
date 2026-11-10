@@ -960,6 +960,13 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   @media (min-width:1024px){.gw-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
   @media (min-width:1600px){.gw-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}
   .gw-gate{border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0;}
+  /* 10 Nov 2026 (UI critique finding 5, card 5): a gate chart's Copy / Download sit in its title row, not over its sentence */
+  .gw-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+  .gw-head .chart-tools{flex:none;}
+  /* finding 5: last week's shortfall under a Look-ahead row's status; finding 6: a concrete row's m³ under its tonnes */
+  .la-carry{display:block;font-size:12px;line-height:1.3;margin-top:2px;color:var(--muted);white-space:nowrap;}
+  .la-carry.is-short{color:var(--warn-text);font-weight:600;}
+  .la-sub{display:block;font-size:12px;line-height:1.25;font-weight:400;color:var(--muted);}
   .gw-days{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:6px;}
   .ga-key-none{width:16px;height:10px;border-radius:2px;background:var(--chart-none);}
   .ga-more{margin-top:8px;}
@@ -984,7 +991,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
      starting scroll, brings it out from under the pin. */
   .la-acct-scroll{scroll-padding-right:176px;}
   .la-pin{position:sticky;right:0;z-index:2;background:var(--surface);box-shadow:-1px 0 0 var(--line),-8px 0 10px -8px rgba(15,23,42,.28);}
-  .la-pin.la-pin-short{background:linear-gradient(rgba(191,46,85,.05),rgba(191,46,85,.05)),var(--surface);}
+  .la-pin.la-pin-short{background:linear-gradient(rgba(217,119,6,.06),rgba(217,119,6,.06)),var(--surface);}
   /* 22 Oct 2026 (UI fix 6, card 2; finding #11): the Account table's headings take the .tbl th look, 13 px in ordinary
      capitals, muted on the second surface (4.56:1; Dark 6.48:1), one line each, about 40 px tall (they were 10 px
      capitals, the smallest headings in the app). The pinned Action heading paints the same surface. */
@@ -2062,7 +2069,9 @@ function ChartTools({ title, scope, getPlot, inline }){
 // section) is built the first time it is opened, not at 0 × 0 while hidden. A ResizeObserver on the box resizes it
 // (and moves the legend when the screen crosses 768 / 1024 px); the two window `resize` dispatches that used to
 // nudge Chart.js are gone. `height` is kept for the stockpile chart, whose height follows its row count.
-function ChartCanvas({ config, height, size, title, scope, notools }){
+// 10 Nov 2026 (UI critique finding 5, card 5): `head` = the chart's own title row (a node); the Copy / Download buttons then
+// sit at its right in the flow (.gw-head), never absolutely over the sentence above the chart
+function ChartCanvas({ config, height, size, title, scope, notools, head }){
   const box = useRef(null);
   const [autoTitle, setAutoTitle] = useState("");
   const ref = useRef(null);
@@ -2101,7 +2110,9 @@ function ChartCanvas({ config, height, size, title, scope, notools }){
     inst.current = new window.Chart(ref.current, fitChartConfig(config, vwNow()));
     return () => { if(inst.current){ inst.current.destroy(); inst.current = null; } };
   }, [JSON.stringify(config), theme, accent, sized]);
-  return <div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} />}</div>;
+  const tools = !notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} inline={!!head} />;
+  const chart = <div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!head && tools}</div>;
+  return head ? <><div className="gw-head" data-chart-head="1"><div className="min-w-0">{head}</div>{tools}</div>{chart}</> : chart;
 }
 
 // ================================================================= Dashboard
@@ -10103,6 +10114,15 @@ function ConfigPage({ meta, who, access }){
                   <div className="hint">{help}</div>
                 </div>
               ))}
+              {/* 10 Nov 2026 (UI critique finding 5, card 5): the share a line's shortfall must pass before the Look-ahead flags
+                  it (planning.short_flag_pct; absent = 10, backend clashes.short_flag_pct) */}
+              <div className="field" data-cfg="short-flag">
+                <label htmlFor="cfg-short_flag_pct">Flag a shortfall over, %</label>
+                <input id="cfg-short_flag_pct" className="ctl w-40 tabular-nums" inputMode="decimal"
+                  value={"short_flag_pct" in (doc.planning || {}) ? ((doc.planning || {}).short_flag_pct ?? "") : 10}
+                  onChange={e => upd(d => { d.planning = d.planning || {}; d.planning.short_flag_pct = num(e.target.value); })} />
+                <div className="hint">A line that missed last week's plan by more than this share is flagged on the Look-ahead; a smaller miss reads quietly.</div>
+              </div>
               {/* 17 Oct 2026 (the user: "default time for gates should be 0800-1700 … local authority agreements due to noise"):
                   the hours every gate with none of its own is open (backend gate_hours.default_hours). Blank = 08:00–17:00. */}
               <div className="field" data-cfg="default-gate-hours">
@@ -11307,7 +11327,7 @@ function LaKpi({ value, caption, tone }){
   return (
     <div className="card px-4 py-3 min-w-0" title={String(value == null ? "" : value)}>
       <div className={"font-semibold tabular-nums truncate leading-8 " + (len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 6 ? "text-lg" : "text-2xl")}
-        style={{ color: tone === "red" ? "var(--red)" : "var(--navy-deep)" }}>{value}</div>
+        style={{ color: tone === "red" ? "var(--red)" : tone === "warn" ? "var(--warn-text)" : "var(--navy-deep)" }}>{value}</div>
       <div className="text-[13px] text-slate-500 mt-0.5 leading-tight">{caption}</div>
     </div>
   );
@@ -11650,12 +11670,13 @@ function GatesWeek({ gw }){
       <div className="gw-grid">
         {shown.map(g => (
           <div key={g.gate_id} className="gw-gate" data-gw-gate={g.gate_id} data-gw-flag={g.flag || "none"}>
+            <ChartCanvas config={gwCfg(g, gw.days)} title={`Gates this week: ${[g.location_name, g.gate_name].filter(Boolean).join(", ")}`} head={<>
             <div className="text-sm font-semibold text-slate-700">{g.location_name}<span className="text-slate-400 font-normal"> · {g.gate_name}</span></div>
             {g.closed_words && <div className="clp-note" data-gw-closed={g.gate_id}>{g.closed_words[0].toUpperCase() + g.closed_words.slice(1)}: its lorries use the site's other gate meanwhile.</div>}
             <div className="clp-note">{g.no_open_time ? "No open time: the no-delivery bands and this gate's shut times cover all its hours."
               : g.capacity_per_day == null ? "No check-in time typed: nothing is compared."
               : `Can check in ${grp(g.capacity_per_day)} a day (open ${g.open_hours}${g.open_basis === "default" ? " by default" : ""}${g.peak_minutes ? `, less ${g.peak_minutes} min of peak bands` : ""}${g.shut_minutes ? `, less ${g.shut_minutes} min shut` : ""} ÷ ${+g.check_in_minutes} min a lorry)${g.closed_days ? `, ${g.closed_days}` : ""}.`}</div>
-            <ChartCanvas config={gwCfg(g, gw.days)} title={`Gates this week: ${[g.location_name, g.gate_name].filter(Boolean).join(", ")}`} />
+            </>} />
             <div className="gw-days">
               {g.days.filter(d => d.flag).map(d => (
                 <span key={d.date} className="gw-day" data-gw-day={d.date}><RowStatus word={`${d.day}: ${d.status_word}${d.pct != null ? ` (${d.pct} %)` : d.open ? "" : " (closed)"}`} tone={d.flag === "red" ? "bad" : "warn"} /></span>
@@ -11721,7 +11742,9 @@ const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code =
                           // 29 Oct 2026 (task 3a): a pour's warnings; COLD JOINT and TRANSIT stay red
                           || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"
                           // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red
-                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";
+                          || code === "TRAFFIC_NEAR"
+                          // 10 Nov 2026 (UI critique finding 5): a line short last week is a warning, not an alarm
+                          || code === "SHORTAGE") ? "warn" : "bad";
 // the details' flag lines: one per kind of flag, most serious first, each distinct sentence once, team ids in
 // the team's words (teamText, as the rail does)
 function laFlagGroups(flags){
@@ -11735,7 +11758,9 @@ function laFlagGroups(flags){
   return out;
 }
 function laStatus(flags, w){
-  const codes = Array.from(new Set(laSorted(flags).map(f => f.code)));
+  // 10 Nov 2026 (UI critique finding 5, card 5): last week's shortfall never takes the row's status: the status says
+  // this week's state ("Confirmed"); the shortfall is the second line under it (laCarryLine)
+  const codes = Array.from(new Set(laSorted(flags).map(f => f.code))).filter(c => c !== "SHORTAGE");
   if(codes.length){
     const f = (flags || []).find(x => x.code === codes[0]);
     return { word: flagWord(f, LINE_FLAG_LABEL), tone: laTone(codes[0]), more: codes.length - 1 };
@@ -11746,6 +11771,32 @@ function laStatus(flags, w){
     : { word: s === "derived" ? "Derived" : (s || "—"), tone: "none", more: 0 };
 }
 // the week's state in words, for the details (the old status column's titles)
+// 10 Nov 2026 (finding 5, card 5): last week's shortfall still to carry on a line, as the quiet line under its status.
+// Past the organisation's share (Config → Planning, `short_flag_pct`; the server raises SHORTAGE) it is amber
+// "Short 45 t last week"; under it, grey "1 t to carry". Account rows are keyed without the month (last week can be
+// the month before).
+const laQty = (x) => grp(x, Math.abs(+x - Math.round(+x)) > 1e-9 ? 1 : 0);
+// the shortfall in tonnes (the server converts a concrete line's m³ at its density); an older page sent only `shortfall`
+const laShortT = (a) => (a && a.shortfall_t != null ? +a.shortfall_t : +((a && a.shortfall) || 0));
+const laCarryKey = (r) => `${r.route_id}|${r.discipline || ""}|${r.section_id || ""}`;
+function laCarryLine(row, flagged){
+  if(!row || !(+row.remaining_short > 1e-6)) return null;
+  const u = unitLbl(row.unit || "t");
+  return flagged
+    ? <span className="la-carry is-short" data-la-carry="short">Short {laQty(row.remaining_short)} {u} last week</span>
+    : <span className="la-carry" data-la-carry="quiet">{laQty(row.remaining_short)} {u} to carry</span>;
+}
+// 10 Nov 2026 (finding 6, card 6): what the Tonnes total includes when some lines are typed in m³ — "Tonnes incl.
+// concrete at 2.4 t/m³". The density is the server's (a day's tonnes ÷ its m³), never a figure typed here.
+function laMixNote(lines){
+  const m3 = (lines || []).filter(l => l.unit && l.unit !== "t");
+  if(!m3.length) return "";
+  const dens = new Set();
+  m3.forEach(l => (l.days || []).forEach(d => { const q = +d.planned_qty, t = d.derived && d.derived.tonnes; if(q > 0 && t != null) dens.add((t / q).toFixed(2)); }));
+  const conc = m3.every(l => /concrete/i.test(l.material_type || (l.context || {}).material_type || ""));
+  const what = conc ? "concrete" : `${m3.length} line${m3.length === 1 ? "" : "s"} in m³`;
+  return dens.size === 1 ? `Tonnes incl. ${what} at ${+[...dens][0]} t/m³` : `Tonnes incl. ${what} at each material's density`;
+}
 const laWeekWords = (s) => s === "confirmed" ? "Confirmed: reopen it to change the plan"
   : s === "edited" ? "Edited, not confirmed yet" : s === "derived" ? "Derived from the month, not confirmed yet" : (s || "—");
 
@@ -11982,6 +12033,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   const lines = commit.lines || [];
   const totals = commit.totals || {};
   const account = (page && page.account) || { rows: [] };
+  const carryBy = useMemo(() => { const g = {}; (account.rows || []).forEach(r => { g[laCarryKey(r)] = r; }); return g; }, [account]);
   const horizon = (page && page.horizon) || { rows: [] };
   const rail = (page && page.clashes) || { flags: [], count: 0, sources: {} };
   const ttSrc = rail.sources || {};
@@ -12135,16 +12187,16 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
           {/* KPI strip — six cards; only the shortage is coloured */}
           <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3">
             <LaKpi value={`${grp(totals.planned_t)} t`} caption="planned this week" />
-            <LaKpi value={grp(totals.trips)} caption="trips" />
-            <LaKpi value={grp(totals.vehicles_peak)} caption={"vehicles / day peak" + (totals.excludes_unbaked ? " · lines not routed yet left out" : "") + (lorryPlan && lorryPlan.chained && lorryPlan.chained.saved_week > 0 ? ` · ${grp(Math.max(...Object.values(lorryPlan.chained.by_day)))} with each yard's lorries chained` : "")} />
-            <LaKpi value={grp(dist(totals.tonne_km))} caption={`${TKM()} · route basis`} />
+            <LaKpi value={grp(totals.trips)} caption="loads" />
+            <LaKpi value={grp(totals.vehicles_peak)} caption={"vehicles a day at the peak" + (totals.excludes_unbaked ? " · lines not routed yet left out" : "") + (lorryPlan && lorryPlan.chained && lorryPlan.chained.saved_week > 0 ? ` · ${grp(Math.max(...Object.values(lorryPlan.chained.by_day)))} with each yard's lorries chained` : "")} />
+            <LaKpi value={grp(dist(totals.tonne_km))} caption={`${TKM()} on the routes`} />
             {/* 10 Sep evening: the diesel index, right of t·km — the same widget as Account and Config */}
             <FuelWidget mode="compact" who={who} access={access} initial={page && page.costing} onChanged={() => setTick(t => t + 1)} />
             <LaKpi value={totals.eur == null ? "—" : `${CUR()}` + grp(totals.eur)}
               caption={totals.eur == null ? `planned ${CUR()} · no rate typed, no target set`
                 : `planned ${CUR()} · ${totals.eur_lines} of ${totals.lines} lines priced${totals.eur_target_lines ? ` · ${totals.eur_target_lines} at target` : ""}${totals.eur_partial ? " · partial" : ""}${totals.eur_adj != null ? ` · + BAF ${CUR()}${grp(totals.eur_adj)}` : ""}${totals.fair_eur != null ? ` · fair ${CUR()}${grp(totals.fair_eur)} (model, ${totals.fair_lines} of ${totals.lines})` : ""}`} />
-            <LaKpi value={account.shortfall > 0 ? `+${grp(account.shortfall)}` : "0"} tone={account.shortfall > 0 ? "red" : undefined} caption="last week shortage" />
-            <LaKpi value={account.lines ? `${account.delivered} of ${account.lines} lines` : "—"} caption="last week delivered" />
+            <LaKpi value={`${grp(laShortT(account))} t`} tone={laShortT(account) > 0 ? "warn" : undefined} caption="short last week" />
+            <LaKpi value={account.lines ? `${account.delivered} of ${account.lines}` : "—"} caption="lines delivered last week" />
           </div>
 
           {/* the clash rail — ONE row, flags run together, +N more */}
@@ -12239,7 +12291,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                                   /* 5 Nov 2026 (task 0d-2): the route's lorries take another road in the busy hours */
                                   (c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null]}
                           cells={<>
-                            <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>
+                            <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} />
+                              {laCarryLine(carryBy[laCarryKey(line)], lf.some(f => f.code === "SHORTAGE"))}</td>
                             {weekdaysOf(line).map(d => {
                               const k = `${lk}|${d.day_date}|p`;
                               const t = d.day_date === today;
@@ -12263,7 +12316,12 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                                       onBlur={() => { saveDay(line, d); setEditing(null); }} />
                                   ) : !locked ? (
                                     <button type="button" className="la-cell" onClick={() => setEditing(k)}
-                                      aria-label={`${dayName(d.day_date)}'s plan, ${grp(draft[k] ?? d.planned_qty, 1)} ${unitLbl(line.unit)}: click to type`}>{grp(draft[k] ?? d.planned_qty, 1)}{own}</button>
+                                      aria-label={`${dayName(d.day_date)}'s plan, ${grp(draft[k] ?? d.planned_qty, 1)} ${unitLbl(line.unit)}: click to type`}>{own && f.tonnes != null && draft[k] == null
+                                        ? <>{grp(f.tonnes, 1)} t<span className="la-sub">{grp(d.planned_qty, 1)}{own}</span></> : <>{grp(draft[k] ?? d.planned_qty, 1)}{own}</>}</button>
+                                  ) : own && f.tonnes != null ? (
+                                    // 10 Nov 2026 (UI critique finding 6, card 6): under Tonnes a concrete row reads tonnes too (its m³ at
+                                    // the material's density, the server's figure), its own m³ under it, so the total never mixes units unseen
+                                    <span className="tabular-nums font-semibold text-slate-700" data-la-tonnes="1">{grp(f.tonnes, 1)} t<span className="la-sub">{grp(d.planned_qty, 1)}{own}</span></span>
                                   ) : (
                                     <span className="tabular-nums font-semibold text-slate-700">{grp(d.planned_qty, 1)}{own}</span>
                                   )}
@@ -12276,6 +12334,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                             <td className="num font-semibold" data-label="Week">
                               {unitSel === "loads" ? grp(wd.trips)
                                : unitSel === "lorries" ? (c.baked && wd.vehicles_peak != null ? grp(wd.vehicles_peak) : "—")
+                               : own && wd.tonnes != null ? <>{grp(wd.tonnes, 1)} <span className="text-slate-400 font-normal text-[13px]">t</span><span className="la-sub">{grp(w.planned_qty, 1)}{own}</span></>
                                : <>{grp(w.planned_qty, 1)} <span className="text-slate-400 font-normal text-[13px]">{unitLbl(line.unit)}</span></>}
                             </td>
                           </>}>
@@ -12322,7 +12381,8 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                       );
                     })}
                     <tr className="la-total rd-card">
-                      <td className="la-stick" data-label="Total">{lines.length} line{lines.length === 1 ? "" : "s"}</td>
+                      <td className="la-stick" data-label="Total">{lines.length} line{lines.length === 1 ? "" : "s"}
+                        {unitSel === "tonnes" && laMixNote(lines) && <span className="la-sub" data-la-mix="1">{laMixNote(lines)}</span>}</td>
                       <td></td>
                       {dates.map(iso => {
                         let tt = 0, tr = 0, vv = 0;
@@ -12361,7 +12421,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-3">
             <LaKpi value={account.lines ? `${account.delivered} of ${account.lines} lines` : "—"} caption="last week delivered · 98% band" />
             <LaKpi value={`${grp(account.actual_t)} t`} caption={`actual moved · ${account.reported || 0} of ${account.lines || 0} reported`} />
-            <LaKpi value={account.shortfall > 0 ? `+${grp(account.shortfall)}` : "0"} tone={account.shortfall > 0 ? "red" : undefined} caption="shortfall vs plan · not yet carried" />
+            <LaKpi value={`${grp(laShortT(account))} t`} tone={laShortT(account) > 0 ? "warn" : undefined} caption="short last week, not yet carried" />
             <LaKpi value={`${account.open_to_calibrate || 0} line${account.open_to_calibrate === 1 ? "" : "s"} open to calibrate`} caption="adds shortage onto this week · not auto" />
           </div>
           {!account.week || account.rows.length === 0 ? (
@@ -12390,9 +12450,9 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                   <tbody>
                     {account.rows.map(r => {
                       const k = wkKey(r);
-                      const short = r.action === "spread";
+                      const short = r.action === "spread" && !!r.short_flag;   // 10 Nov 2026 (finding 5): a small miss is not tinted
                       return (
-                        <tr key={k} className="border-t border-slate-100 align-middle" style={short ? { background: "rgba(191,46,85,.05)" } : {}}>
+                        <tr key={k} className="border-t border-slate-100 align-middle" style={short ? { background: "rgba(217,119,6,.06)" } : {}}>
                           <td className="px-3 py-2 min-w-[220px]">
                             <div className="font-semibold text-[color:var(--navy-deep)] whitespace-nowrap">{r.route_id}</div>
                             <div className="text-[13px] text-slate-500 flex flex-wrap items-center gap-1">
@@ -12403,14 +12463,16 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                           <td className="px-2 py-2 text-right tabular-nums font-semibold whitespace-nowrap">{grp(r.planned_qty, 1)} {unitLbl(r.unit)}</td>
                           <td className="px-2 py-2 text-right">
                             <input className={fld + " max-w-[110px] ml-auto"} inputMode="decimal" placeholder="—"
-                              style={short ? { borderColor: "var(--red)" } : {}}
+                              style={short ? { borderColor: "var(--gold)" } : {}}
                               value={draft[k + "|a"] ?? (r.actual_qty ?? "")}
                               onChange={e => setDraft(d => ({ ...d, [k + "|a"]: e.target.value }))}
                               onBlur={() => saveActual(r)} />
                           </td>
-                          <td className="px-2 py-2 text-right tabular-nums font-medium"
-                            style={{ color: r.variance == null ? "var(--muted)" : r.variance > 0 && !r.held ? "var(--bad-text)" : "var(--ok-text)" }}>
-                            {r.variance == null ? "—" : (r.variance > 0 ? "+" : "") + grp(r.variance, 1)}
+                          {/* 10 Nov 2026 (UI critique finding 5): the difference in words ("45.0 t short", "40.0 t over"); amber only
+                              past the organisation's share (short_flag), grey otherwise; over is never green */}
+                          <td className="px-2 py-2 text-right tabular-nums font-medium whitespace-nowrap" data-la-var={r.variance == null ? "none" : r.short_flag ? "short" : "quiet"}
+                            style={{ color: r.short_flag ? "var(--warn-text)" : "var(--muted)" }}>
+                            {r.variance == null ? "—" : Math.abs(r.variance) < 1e-9 ? "on plan" : `${grp(Math.abs(r.variance), 1)} ${unitLbl(r.unit)} ${r.variance > 0 ? "short" : "over"}`}
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums text-slate-600">
                             {r.planned_eur == null ? <span className="text-slate-500">rate not set</span> : <>
