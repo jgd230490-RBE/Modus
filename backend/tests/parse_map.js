@@ -7707,7 +7707,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   try {
     F = new Function("escHtml", "PV", "CW", "monthLabel", "teamText", "TENANT", "map", "styleReady", "document", "isPhoneShell", "mapboxgl",
                      "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle",
-                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, SECSEL_MAP };")(
+                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), SECSEL_MAP };")(
       esc, () => pv, () => (pv === 2 ? words2 : words1), m => (m === 23 ? 'Nov 2027' : 'M' + m), v => (v === 'IPT1' ? 'North Team' : v),
       { name: 'Wolds Link', demo_notice: 'Fictional scheme' }, {}, () => true, doc, () => false, {}, {}, () => 'https://x/map/?month=2027-11', null, null,
       x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }));
@@ -7852,6 +7852,50 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      && code.includes("anchor: (below ? 'top' : 'bottom') + (side ? '-' + side : ''), className: 'secsel-popup' })")
      && code.includes("if (w && getComputedStyle(w).display !== 'none' && window.innerWidth > 1023) return Math.round(w.getBoundingClientRect().left - m.left);")
      && code.includes("return Math.round(m.width - 56);"));
+  // ===== 10 Nov 2026 — road card top (John's yes to the card under "Seen on the way", notes/frontier-public-map-mockup-1110) =====
+  // Seen on live at 1422 x 677, Nov 2026: a road clicked at y = 300 opened its card ABOVE the click and the card's first
+  // ~74 px (the road's name and its headline figure) sat under the figures bar. The map runs under that bar (98 px there);
+  // the 9 Nov rule counted the timeline bar at the foot (94 px) and not the figures bar at the top.
+  const room = F && F.secselRoom;
+  ok("⭐ TOP: the pure rule exists (the card's room, from the click, the map's height, the timeline bar and the figures bar)", typeof room === 'function');
+  if (typeof room === 'function') {
+    const live = room(300, 677, 94, 98);          // the case seen on live: 202 px above the click under the bar, 283 below it
+    ok("⭐ TOP (the live case, 1422 x 677): the card opens BELOW the click, where the room is; the old rule (y < (H - foot) / 2) opened it above",
+       live.below === true && live.space === 583 - 300 - 34 && !(300 < (677 - 94) / 2));
+    ok("⭐ TOP: a card that opens above the click fills only the room under the figures bar, never the bar's own 98 px",
+       room(500, 677, 94, 98).below === false && room(500, 677, 94, 98).space === 500 - 98 - 34
+       && room(500, 677, 94, 0).space === 500 - 34 && room(500, 677, 94, 98).space === room(500, 677, 94, 0).space - 98);
+    ok("TOP: with no bar over the map (the phone, the big screen) the rule is the 9 Nov one: below in the upper half of the free map, above in the lower",
+       [60, 150, 290].every(y => room(y, 677, 94, 0).below === (y < (677 - 94) / 2))
+       && [292, 400, 560].every(y => room(y, 677, 94, 0).below === (y < (677 - 94) / 2))
+       && room(200, 600, 0, 0).space === 600 - 200 - 34 && room(400, 600, 0, 0).space === 400 - 34);
+    ok("TOP: the turning point moves down by half the bar: with a 98 px bar a click at 330 still opens below, at 345 above",
+       room(330, 677, 94, 98).below === true && room(345, 677, 94, 98).below === false);
+    ok("TOP: odd inputs are safe: nothing negative, a missing foot or bar counts as none, a bar taller than the free map leaves no room",
+       room(10, 100, 0, 0).space === 56 && room(50, 100, 0, 0).space === 16 && room(50, 100).space === 16
+       && room(40, 100, 0, 98).space === 0 && room(300, 677, 94, 700).space === 0 && room(-5, 677, 94, 98).space >= 0);
+  }
+  let ste = null;
+  const steFor = (mapRect, hudRect, display) => {
+    try {
+      return new Function("map", "document", "getComputedStyle", /function secselTopEdge\(\) \{[\s\S]*?\n    \}/.exec(code)[0] + "\nreturn secselTopEdge;")(
+        { getContainer: () => ({ getBoundingClientRect: () => mapRect }) },
+        { getElementById: id => (id === 'kpi-hud' && hudRect ? { getBoundingClientRect: () => hudRect } : null) },
+        () => ({ display: display || 'flex' }))();
+    } catch (e) { return 'threw: ' + e.message; }
+  };
+  const deskMap = { left: 300, top: 0, right: 1422, bottom: 677 }, deskHud = { left: 300, top: 26, right: 1422, bottom: 98 };
+  try { ste = /function secselTopEdge\(\) \{[\s\S]*?\n    \}/.exec(code)[0]; } catch (e) {}
+  ok("⭐ TOP (sandbox): the figures bar's bottom edge is read in the map's own px: 98 on live's desk layout, 72 when the map starts under the demo notice",
+     !!ste && steFor(deskMap, deskHud) === 98 && steFor({ left: 300, top: 26, right: 1422, bottom: 677 }, deskHud) === 72);
+  ok("TOP (sandbox): no bar, a hidden bar, or a bar that does not lie over the map counts as 0",
+     !!ste && steFor(deskMap, null) === 0 && steFor(deskMap, deskHud, 'none') === 0
+     && steFor({ left: 300, top: 100, right: 1422, bottom: 677 }, deskHud) === 0            // the bar sits wholly above the map
+     && steFor({ left: 300, top: 0, right: 1422, bottom: 677 }, { left: 0, top: 26, right: 300, bottom: 98 }) === 0);   // beside it
+  ok("⭐ TOP: both the choice of side and the card's own height use it; the old line that measured from the top of the map is gone",
+     code.includes("const below = secselRoom(at.point.y, H, foot, secselTopEdge()).below;")
+     && code.includes("? (H - foot - y - 34) : (y - secselTopEdge() - 34);")
+     && !code.includes("below = at.point.y < room / 2") && !code.includes(": (y - 34);"));
   let afp = null;
   try { afp = new Function(/function areaFromParam\(s\) \{[\s\S]*?\n    \}/.exec(code)[0] + "\nreturn areaFromParam;")(); } catch (e) {}
   ok("2.1-4 Q7 (sandbox): the link's box reads back, and anything that is not a box is no box",

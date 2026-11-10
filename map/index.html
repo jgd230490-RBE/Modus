@@ -10722,7 +10722,7 @@
         if (old) { try { old.remove(); } catch (e) {} }
         const H = map.getContainer().clientHeight || 600;
         const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
-        const room = H - foot, below = at.point.y < room / 2;
+        const below = secselRoom(at.point.y, H, foot, secselTopEdge()).below;
         const side = secselSide(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge());
         const pop = new mapboxgl.Popup({ offset: 10, maxWidth: '380px', anchor: (below ? 'top' : 'bottom') + (side ? '-' + side : ''), className: 'secsel-popup' })
             .setLngLat(at.lngLat).setHTML(roadCardHTML()).addTo(map);
@@ -10753,13 +10753,34 @@
             return Math.round(m.width - 56);
         } catch (e) { return 0; }
     }
+    // 10 Nov 2026 (road card top; seen on live at 1422 x 677: a card that opened ABOVE a click lost its first lines under the
+    // figures bar). The map runs under the figures bar, so the room for a card starts at the bar's bottom edge, not at the
+    // top of the map: the 9 Nov fix counted the timeline bar at the foot and not this one. Pure: y = the click in the map,
+    // H = the map's height, foot = the timeline bar's height, top = the figures bar's bottom edge. The card opens on the
+    // side with more room; space is what it may fill there.
+    function secselRoom(y, H, foot, top) {
+        const t = Math.max(0, top || 0), b = Math.max(t, H - (foot || 0));
+        y = Math.min(Math.max(y, t), b);
+        const below = (y - t) < (b - y);
+        return { below, space: Math.max(0, (below ? b - y : y - t) - 34) };
+    }
+    // the figures bar's bottom edge in the map's own px; 0 where the bar does not lie over the map (the phone, the big screen)
+    function secselTopEdge() {
+        try {
+            const m = map.getContainer().getBoundingClientRect(), k = document.getElementById('kpi-hud');
+            if (!k || getComputedStyle(k).display === 'none') return 0;
+            const r = k.getBoundingClientRect();
+            if (r.bottom <= m.top || r.top >= m.bottom || r.right <= m.left || r.left >= m.right) return 0;
+            return Math.max(0, Math.round(r.bottom - m.top));
+        } catch (e) { return 0; }
+    }
     function fitRoadPopup() {
         const p = SECSEL.roadPopup, at = SECSEL.roadAt; if (!p || !at) return;
         const el = p.getElement && p.getElement(); if (!el) return;
         const H = map.getContainer().clientHeight || 600;
         const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
         const y = map.project(at.lngLat).y;
-        const space = (p.options && String(p.options.anchor).indexOf('top') === 0) ? (H - foot - y - 34) : (y - 34);
+        const space = (p.options && String(p.options.anchor).indexOf('top') === 0) ? (H - foot - y - 34) : (y - secselTopEdge() - 34);
         const sc = el.querySelector('.secsel-scroll');
         if (sc) sc.style.maxHeight = Math.max(90, space - 170) + 'px';
     }
