@@ -280,7 +280,8 @@ ok("11 Oct 2026: Config → Vehicles' Estonian column (an Estonian tenant's) sho
 ok("11 Oct 2026 (review): ⭐ the Config Estonian column is gated on the COUNTRY alone (vehLangEditable), not on the offered languages",
   code.includes('const vehLangEditable = (k) => k === "en" || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE");')
   && !/const vehLangEditable = [^\n]*VEH\.langs/.test(code)
-  && code.includes('.filter(h => h !== "Estonian" || vehLangEditable("ee"))') && code.includes('{vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""}')
+  // NARROWED 9 Nov 2026 (UI critique card 10): + a planner's read-only page leaves the English (typing) column out
+  && code.includes('.filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English"))') && code.includes('{vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""}')
   && !code.includes('vehLangShown("ee")'));
 // 11 Oct 2026: ⭐ the four EU type-approval vehicles are gone from the app's source — no name, no code, no 'aliases'
 // note (only those entries carried aliases), and no comment that describes them as present
@@ -3046,7 +3047,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && src.includes('<InfoTip id="units" />') && ["lookahead", "dashboard", "forecasts"].every(p => src.includes(`useUnits("${p}")`))
      && !/useUnits\("gates"\)/.test(src));
   ok("W6: the status is a word and an icon whose shape says the tone (✓ circle, ! square, ! circle, – circle), never colour alone",
-     src.includes('const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–" };') && /\.row-st\.rs-warn i\{[^}]*border-radius:3px;/.test(html)
+     // NARROWED 9 Nov 2026 (UI critique card 11): + draft, a hollow ring with no glyph (a CLP draft; the – circle read "blocked")
+     src.includes('const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–", draft: "" };') && /\.row-st\.rs-warn i\{[^}]*border-radius:3px;/.test(html)
+     && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--chart-none\);/.test(html)
      && src.includes('<span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true">{RS_ICON[t]}</i>{word}'));
   ok("⭐ W6: all five tables are row-details tables (Look-ahead, gates, Today, the route table, Forecasts)",
      ["lookahead", "gates", "today", "dashboard", "forecasts"].every(n => src.includes(`data-rd-table="${n}"`))
@@ -4048,8 +4051,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // decision 12 / #13: the tick rows
   const mat = code.slice(code.indexOf('{tab === "materials" && ('), code.indexOf('{tab === "planning" && ('));
   ok("🔴 decision 12: Config → Materials' vehicles cell is a two-column grid of 24 px rows (min-h-6), the names free to wrap inside their column (no whitespace-nowrap), the cell at least 332 px (two 154 px columns: a 'Rigid 8-wheeler (32t)' sits on one line); the one-column flex-wrap of 16 px rows is gone",
-     mat.includes('<td style={{ whiteSpace: "normal", height: "auto", padding: "8px", minWidth: 332 }}>')
-     && mat.includes('<div className="grid grid-cols-2 gap-x-2">')
+     // NARROWED 9 Nov 2026 (UI critique card 10): the cell is a summary; the 24 px tick rows moved to a row of their own under
+     // the material, across the card, opened by an admin's Edit (columns of at least 190 px, so none is cut at the edge)
+     mat.includes('<td style={{ whiteSpace: "normal", height: "auto", minWidth: 180 }} data-cfg-veh-sum={k}>')
+     && mat.includes('<div className="grid gap-x-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))" }} role="group" aria-label={`Vehicles used for ${k}`}>')
      && mat.includes('<label key={v} className="flex items-center gap-1.5 min-h-6 text-[13px] leading-tight text-slate-600">')
      && mat.includes('<input type="checkbox" className="flex-none" checked={(c.vehicles || []).includes(v)}')
      && !mat.includes("flex flex-wrap gap-x-3 gap-y-1") && !mat.includes("text-slate-600 whitespace-nowrap"));
@@ -4541,7 +4546,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      src.includes('? "Approve or reject each line; approved lines feed the public map, the Look-ahead and the Dashboard."')
      && src.includes('subtitle="One vehicle per line; a split across two vehicles is two lines." />') && !src.includes("One vehicle per line: save a haul that uses two vehicle types as two lines.")
      && src.includes('? "Origin → destination pairs, routed for a lorry both ways."') && src.includes('subtitle={`Who can sign in, and as which ${TEAM().toLowerCase()} or role.`}')
-     && !src.includes("To set up per-person sign-in: add yourself below as an Admin") && src.includes('subtitle="The numbers every figure is computed from. Changes apply on save, for everyone."')
+     && !src.includes("To set up per-person sign-in: add yourself below as an Admin") && src.includes('subtitle={ro ? "The numbers every figure is computed from." : "The numbers every figure is computed from. Changes apply on save, for everyone."}')   // NARROWED 9 Nov 2026 (card 10): a reader is told nothing about saving
      && src.includes('data-al-words="1">{words.advice}</p>') && !src.includes("{words.not_modelled} {words.counted_apart}")
      && !/\(D\d{2,3}[,)]/.test(_nc27) && !_nc27.includes("Movements = loads per working day")   // comments may cite a decision; no screen text does
      && src.includes("Not routed yet for <strong>{vehLabel(vehicle)}</strong>: no vehicles figure until a planner routes it.")
@@ -4926,7 +4931,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      cpStrings.length > 60 && !cpStrings.some(x => cpBanned(x.replace(/\$\{API\}\/clp\/documents|"\/clp\/documents"|`\/clp\/documents[^`]*`/g, ""))),
      cpStrings.filter(x => cpBanned(x.replace(/\$\{API\}\/clp\/documents|"\/clp\/documents"|`\/clp\/documents[^`]*`/g, ""))).join(" | "));
   ok("CLP DOCS: the words — the status tones (Sent / Changes amber, Approved green), 'Approve as Issue N…', 'Building… about a minute', the blank-line rule, the exact-file promise",
-     cp.includes('const CLP_TONE = { draft: "none", sent: "warn", changes: "warn", approved: "ok" };') && cp.includes("Approve as Issue {c.next_issue}…")
+     // NARROWED 9 Nov 2026 (card 11): a draft is the hollow ring (the – circle read "blocked")
+     cp.includes('const CLP_TONE = { draft: "draft", sent: "warn", changes: "warn", approved: "ok" };') && cp.includes("Approve as Issue {c.next_issue}…")
      && cp.includes('const busyWords = "Building… about a minute";') && cp.includes('Anything left blank stays a yellow "To complete" line.')
      && cp.includes("Download gives back the file exactly as approved."));
   ok("CLP DOCS: the editor's CSS lives in the page (.clp-form grid, .clp-places)", html.includes(".clp-form{") && html.includes(".clp-places"));
@@ -5020,7 +5026,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("REVIEW PAGE: Accept asks once; Return needs a comment; a newer unsent issue says so",
      rp.includes("window.confirm(`Accept Issue ${n} of the ${open.name} CLP for ${open.group_name}?`)")
      // NARROWED 31 Oct 2026 (PR 3d, Q7): "Comments" is "Notes" on the reviewer's page
-     && rp.includes('setMsg({ ok: false, text: "Write what needs changing in the note box first." }); return;')
+     // NARROWED 9 Nov 2026 (card 11): Return has its own box on the decision card; its button stays off until something is written
+     && rp.includes('<button type="button" className="btn-pri" disabled={busy || !ret.trim()} data-review-return-go={n}')
+     && rp.includes('{ issue_no: n, decision: "returned", words: ret }')
      && rp.includes("The contractor has a newer issue that is not sent to {open.group_name} yet."));
   ok("REVIEW PAGE: a phone card's Open button is a 44 px tap (the UI audit's targets-44px row, 31 Oct)",
      rp.includes('className="btn-sec mt-3" style={{ minHeight: 44 }} onClick={() => show(c.id)}'));

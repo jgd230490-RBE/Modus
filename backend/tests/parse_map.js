@@ -3484,11 +3484,14 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      code.includes("if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof openRunCard === 'function') { openRunCard(run.id); return; }\n            new mapboxgl.Popup({ offset: 10, maxWidth: '360px' })")
      // NARROWED 13 Oct 2026 (lorry limits): the sheet's card dispatch gained a third kind ('limit:'); a section ('run:')
      // still opens its run card and anything else the route card
-     && /const sc = String\(SHEET\.card\);\s*box\.innerHTML = sc\.indexOf\('run:'\) === 0 \? runCardHTML\(sc\.slice\(4\)\)\s*: sc\.indexOf\('limit:'\) === 0 \? limitSheetHTML\(sc\.slice\(6\)\)\s*: routeCardHTML\(SHEET\.card\);/.test(code));
+     // NARROWED 10 Nov 2026 (2.1-4): the road ('road') and area ('area') cards come first in the dispatch
+     && /const sc = String\(SHEET\.card\);\s*box\.innerHTML = sc === 'road' \? roadCardHTML\(\)[^\n]*\n\s*: sc === 'area' \? areaCardHTML\(\)[^\n]*\n\s*: sc\.indexOf\('run:'\) === 0 \? runCardHTML\(sc\.slice\(4\)\)\s*: sc\.indexOf\('limit:'\) === 0 \? limitSheetHTML\(sc\.slice\(6\)\)\s*: routeCardHTML\(SHEET\.card\);/.test(code));
   ok("⭐ browser check 12 Oct (phone): a near-miss tap is answered — exact hits and other clickable layers keep their own click, then a section, then a route",
      code.includes("if ((runL.length || routeL.length) && map.queryRenderedFeatures(e.point, { layers: runL.concat(routeL) }).length) return;")
      && code.includes("if (typeof clickableAt === 'function' && clickableAt(e.point)) return;")
-     && /const runs = runL\.length \? map\.queryRenderedFeatures\(box, \{ layers: runL \}\) : \[\];\s*if \(runs\.length\) \{ openRunCard\(runs\[0\]\.properties\.id\); return; \}/.test(code)
+     // NARROWED 10 Nov 2026 (2.1-4, Q9): a near tap on a section or a route opens the ROAD card first; the run / route cards
+     // stay as the fall-back when the road card's block is absent
+     && /const runs = runL\.length \? map\.queryRenderedFeatures\(box, \{ layers: runL \}\) : \[\];[\s\S]{0,700}if \(\(runs\.length \|\| rid\) && typeof openRoadCard === 'function'\) \{[\s\S]{0,260}openRoadCard\(\{ lngLat: c, point: map\.project\(c\) \}, rid\); return;\s*\}\s*if \(runs\.length\) \{ openRunCard\(runs\[0\]\.properties\.id\); return; \}/.test(code)
      && code.includes("if (map && typeof map.on === 'function') map.on('click', phoneTapNear);")
      && /function phoneTapNear\(e\) \{\s*if \(!isPhoneShell\(\) \|\| !e \|\| !e\.point\) return;/.test(code));
   {
@@ -3922,7 +3925,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      code.includes("touchPitch: !isPhoneShell(), dragRotate: !isPhoneShell(), transformRequest: osTransformRequest });")   // NARROWED 28 Oct 2026 (8b)
      && code.includes("try { if (on) { map.touchPitch.disable(); map.dragRotate.disable(); } else { map.touchPitch.enable(); map.dragRotate.enable(); } } catch (e) {}"));
   ok("C3 phone (D14): a tap on a route opens the route card in the sheet INSTEAD of the popup and the drawer",
-     /selectRoute\(rid\);\s*if\(typeof isPhoneShell==='function' && isPhoneShell\(\) && typeof openRouteCard==='function'\)\{ openRouteCard\(rid\); return; \}\s*const info=ROUTEINFO/.test(code));
+     // NARROWED 10 Nov 2026 (2.1-4, Q1 / Q9): the road card answers first (in the sheet on a phone); the route card stays the fall-back
+     /selectRoute\(rid\);[\s\S]{0,300}if\(typeof openRoadCard==='function'\)\{ openRoadCard\(e, rid\); return; \}[\s\S]{0,200}if\(typeof isPhoneShell==='function' && isPhoneShell\(\) && typeof openRouteCard==='function'\)\{ openRouteCard\(rid\); return; \}\s*const info=ROUTEINFO/.test(code));
   ok("C3 phone: the guide works on the sheet — every step's phone anchor exists as an id, and guideAnchor tries it first on a phone",
      ["m-peek", "m-play", "m-handle", "m-layers-btn"].every(id => html.includes(`id="${id}"`))
      && (code.match(/phone: "(m-peek|m-play|m-handle|m-layers-btn)"/g) || []).length === 4
@@ -3956,7 +3960,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   ok("C3 hover: the card is a tooltip outside the canvas, never on a phone or a touch-only screen, and goes when the pointer leaves the map",
      html.includes('<div id="route-hover-card" role="tooltip" hidden></div>') && /#route-hover-card\{ display:none !important; \}/.test(shell)
      // NARROWED 13 Oct 2026: the same hide condition, which now also gives way over a lorry limit (pinned in the limits block)
-     && code.includes("if (!f || !e || !e.point || isPhoneShell() || !canHover()\n            || (typeof limitHitAt === 'function' && limitHitAt(e.point))) { card.hidden = true; HOVER.key = ''; return; }")
+     // NARROWED 10 Nov 2026 (2.1-4): the same hide condition, plus "no tip while a box is drawn"; the hide also forgets a pending road tip
+     && code.includes("if (!f || !e || !e.point || isPhoneShell() || !canHover() || (typeof SECSEL !== 'undefined' && SECSEL.drawing)\n            || (typeof limitHitAt === 'function' && limitHitAt(e.point))) {\n            card.hidden = true; HOVER.key = '';")
      && code.includes("if (mapEl) mapEl.addEventListener('mouseleave', () => setRouteHover(null, null));"));
   // ---- (5) the deep link, the share card and the hooks ---------------------------------------------------------------
   ok("C3 link: written on change — applyFilters ends with the write; a layer box or Show forecast schedules it; a stop of playback writes it",
@@ -4406,7 +4411,8 @@ function qrRead(mod) {
   ok("⭐ Track C review hover: the ONE mousemove handler lets a shared section answer (features = [run]) before it drives the card, and glows no route under it",
      /const run = \(typeof roadLoadFeatureAt === 'function'\) \? roadLoadFeatureAt\(e\.point\) : null;\s*if \(run\) features = \[run\];[\s\S]{0,200}setRouteHover\(features\.length \? features\[0\] : null, e\);/.test(code)
      && code.includes("let idMatch = run ? null : (p.Route_ID || p.route_id || p.name || p.ID || p.id);")
-     && /const isRun = f\.source === 'road-load-source' \|\| !!\(f\.layer && f\.layer\.id === 'road-load-line'\);\s*const v = isRun\s*\? runHoverView\(/.test(code));
+     // NARROWED 10 Nov 2026 (2.1-4): the road's one-line tip (secselTip) answers first; the run / route views are the fall-back
+     && /const isRun = f\.source === 'road-load-source' \|\| !!\(f\.layer && f\.layer\.id === 'road-load-line'\);[\s\S]{0,200}const v = \(typeof secselTip === 'function' && secselTip\(f, e\)\) \|\| \(isRun\s*\? runHoverView\(/.test(code));
   ok("⭐ Track C review cursor: a move with no route under it keeps the hand over a council area, a site, a zone or a closure (clickableAt), never a blind reset",
      code.includes("map.getCanvas().style.cursor = (typeof clickableAt === 'function' && clickableAt(e.point)) ? 'pointer' : '';")
      && /const CLICKABLE_LAYERS = \[[^\]]*'area-fill', 'area-county-fill'\];/.test(code) && /'locations'/.test((/const CLICKABLE_LAYERS = \[[^\]]*\]/.exec(code) || [""])[0])
@@ -5005,7 +5011,8 @@ function qrRead(mod) {
       ok("...and NO idle wait is armed at all (narrowed 28 Oct 2026: was one per call; the gate is styleReady())", idleArmed === 0, String(idleArmed));
       map.isStyleLoaded = savedIsLoaded; map.once = savedOnce;
       ok("limits (source): a route's hover card gives way over a lorry limit (seen in Chrome 13 Oct)",
-         code.includes("|| (typeof limitHitAt === 'function' && limitHitAt(e.point))) { card.hidden = true; HOVER.key = ''; return; }"));
+         // NARROWED 10 Nov 2026 (2.1-4): the hide's body now also forgets a pending road tip
+         /\|\| \(typeof limitHitAt === 'function' && limitHitAt\(e\.point\)\)\) \{\s*card\.hidden = true; HOVER\.key = '';[^\n]*\n[^\n]*SECSEL\.tip\.key = '';[^\n]*\n\s*return;/.test(code));
       ok("limits (source): the card scrolls inside the popup instead of running off the map",
          html.includes(".lim-card{ font-size:14px; line-height:1.4; color:var(--ink); min-width:230px; max-height:min(52vh, 380px); overflow-y:auto; }"));
       ok("limits (source): the add gates on styleReady() and nothing else (reversed 28 Oct 2026: was the try-now-retry-on-idle net)",
@@ -7599,6 +7606,143 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      code.includes("if (p.key !== 'busiest-roads' && p.key !== 'everything') on.delete('traffic-limits');"));
   ok("🔴 TRAFFIC LIMITS: no banned public words in the layer's words",
      !/\b(secure|real-time|AI|optimi[sz]e|predict|live tracking|truck)\b/i.test(tl + html.slice(html.indexOf('id="traffic-limits-group"'), html.indexOf('id="restrictions-group"'))));
+}
+
+// ===== 10 Nov 2026 — v2.1 task 2.1-4: the road card and "Select an area" (John's Q1–Q10 as recommended) =====
+// Each pin fails on main 992436c (no road card, no box tool).
+{
+  const a = src.indexOf("// ===== 10 Nov 2026 (v2.1 task 2.1-4"), b = src.indexOf("// ===== end of the road card and \"Select an area\" =====");
+  const blk = (a > 0 && b > a) ? src.slice(a, b) : "";
+  ok("⭐ 2.1-4: the road card and area block is on the page", blk.length > 5000, String(blk.length));
+  const live = blk.split("\n").filter(l => !/^\s*\/\//.test(l)).join("\n");
+  ok("2.1-4: the road card asks /api/public/road-at with the point, the click's reach in metres and the month on screen",
+     blk.includes("return '/api/public/road-at?lon=' + Number(lngLat.lng).toFixed(5) + '&lat=' + Number(lngLat.lat).toFixed(5)")
+     && blk.includes("+ '&r=' + (r || 30) + (month ? '&month=' + month : '') + (rid ? '&route=' + encodeURIComponent(rid) : '');")
+     && blk.includes("url = roadAtUrl(at.lngLat, m, at.r, at.clicked);") && blk.includes("return typeof mapModeMonth === 'function' ? mapModeMonth() : null;"));
+  ok("2.1-4: the area asks /api/public/area-sum with the box and the month on screen",
+     blk.includes("return '/api/public/area-sum?bbox=' + box.map(v => Number(v).toFixed(5)).join(',') + (month ? '&month=' + month : '');"));
+  ok("⭐ 2.1-4: the box layer gates on styleReady() and is re-added from style.load; no idle wait",
+     /function ensureAreaPickLayers\(\) \{\s*if \(!styleReady\(\)\) return;/.test(blk)
+     && blk.includes("if (SECSEL_MAP) map.on('style.load', () => { ensureAreaPickLayers(); });") && !/once\(\s*'idle'/.test(blk));
+  ok("2.1-4: 'Select an area' is a map button under the compass (top-right, added after the zoom / compass control)",
+     blk.includes('aria-label="Select an area" title="Select an area" aria-pressed="false"')
+     && blk.includes("map.addControl(new AreaPickControl(), 'top-right')")
+     && src.indexOf("map.addControl(new mapboxgl.NavigationControl(), 'top-right');") < src.indexOf("map.addControl(new AreaPickControl(), 'top-right')"));
+  ok("⭐ 2.1-4 (card 0's bug): the road card opens on the side with room above the timeline bar and scrolls inside itself",
+     blk.includes("getPropertyValue('--tl-foot')") && blk.includes("anchor: below ? 'top' : 'bottom'")
+     && blk.includes("sc.style.maxHeight = Math.max(90, space - 170) + 'px';") && html.includes(".secsel-scroll{ max-height:260px; overflow:auto;"));
+  ok("⭐ 2.1-4 Q1: every mode — a route line's click and a shared section's click both open the road card (the route tinted)",
+     code.includes("if(typeof openRoadCard==='function'){ openRoadCard(e, rid); return; }")
+     && /map\.on\('click', 'road-load-line', \(e\) => \{[\s\S]{0,900}if \(typeof openRoadCard === 'function'\) \{[\s\S]{0,400}openRoadCard\(e, rid\); return;/.test(code)
+     && blk.includes("tr' + (tint ? ' class=\"secsel-clicked\"' : '')"));
+  ok("2.1-4: a click pauses Play (the card is about one month)",
+     blk.includes("if (typeof TL !== 'undefined' && TL.playing && typeof stopTimeline === 'function') stopTimeline();"));
+  ok("2.1-4 Q9 phone: the card opens in the sheet ('road' / 'area'); the box is fixed mid-screen with 'Sum this box'; its buttons are 44 px",
+     blk.includes("if (isPhoneShell()) { SHEET.card = 'road'; renderRouteCard();") && blk.includes("if (isPhoneShell()) { SHEET.card = 'area'; renderRouteCard();")
+     && blk.includes('onclick="sumAreaFrame()">Sum this box</button>') && html.includes(".secsel-frame-bar .secsel-btn{ min-height:44px; flex:1; }")
+     && code.includes("openRoadCard({ lngLat: c, point: map.project(c) }, rid); return;"));
+  ok("2.1-4 Q7: the link carries &area=w,s,e,n and opens on it",
+     code.includes("if (v.area && v.area.length === 4) q.set('area', v.area.join(','));") && code.includes("out.area = areaFromParam(q.get('area'));")
+     && code.includes("area: (typeof SECSEL !== 'undefined' && SECSEL.area) ? SECSEL.area : null };")
+     && code.includes("if (v.area && typeof setAreaBox === 'function') setAreaBox(v.area, true);"));
+  ok("2.1-4 (seen in Chrome 10 Nov: the map runs under the figures bar): the area card starts level with the map's buttons, ends above the timeline",
+     blk.includes("const top = ctl ? Math.max(10, Math.round(ctl.getBoundingClientRect().top - m.top)) : 10;")
+     && blk.includes("c.style.maxHeight = Math.max(160, Math.round(m.height - top - foot - 16)) + 'px';"));
+  ok("2.1-4 (seen in Chrome 10 Nov): a tip that answers after the pointer has left draws nothing; no tip while a box is drawn",
+     code.includes("if (typeof SECSEL !== 'undefined') { SECSEL.tip.key = ''; SECSEL.tip.at = null; }")
+     && code.includes("|| (typeof SECSEL !== 'undefined' && SECSEL.drawing)") && blk.includes("if (SECSEL.tip.key === url && SECSEL.tip.at) setRouteHover(SECSEL.tip.at.f, SECSEL.tip.at.e);"));
+  ok("2.1-4 (seen on live 10 Nov): while the Conditions panel is open the area card sits to its left, and goes back when it closes",
+     blk.includes("c.style.right = open ? Math.max(56, Math.round(m.right - w.getBoundingClientRect().left + 10)) + 'px' : '';")
+     && blk.includes("const open = w && getComputedStyle(w).display !== 'none' && window.innerWidth > 1023;")
+     && blk.includes(".observe(w, { attributes: true, attributeFilter: ['style'] });"));
+  ok("2.1-4: the area and road cards follow the month (a pick, a scrub, Play)",
+     code.includes("if (typeof syncSecselMonth === 'function') syncSecselMonth();") && blk.includes("if (SECSEL.area && (!SECSEL.areaRes || SECSEL.areaRes.month !== m)) loadAreaSum();"));
+  ok("2.1-4: a traffic limit's popup gives way on a road; the road card carries the limit's line (2.1-1's slot)",
+     code.includes("if (typeof roadCardHitAt === 'function' && roadCardHitAt(e.point)) return;") && blk.includes("text: 'Traffic limit · '"));
+  ok("2.1-4: Esc stops drawing or clears the box; a click (under 6 px) draws no box",
+     blk.includes("if (SECSEL.drawing || SECSEL.frame) { stopAreaPick(); return; }") && blk.includes("if (Math.abs(p.x - s.x) < 6 || Math.abs(p.y - s.y) < 6) return;"));
+  ok("🔴 2.1-4: no back-end words, no 'two-way', no 'Shared road section' and no banned public words on the cards",
+     !/two-way|Shared road section|\bserver\b|endpoint|\btoken\b|\bcached\b/i.test(live.replace(/console\.warn\([^\n]*\n/g, ""))
+     && !/\b(secure|real-time|AI|optimi[sz]e|predict|live tracking|truck)\b/i.test(live));
+  ok("2.1-4: the map's 14 px floor holds in the new CSS", (() => {
+     const c0 = html.indexOf("/* 10 Nov 2026 (v2.1 2.1-4): the road card"), c1 = html.indexOf("body.wall-mode #area-card");
+     const sizes = (html.slice(c0, c1).match(/font(?:-size)?:[^;]*?(\d+)px/g) || []).map(s => Number(/(\d+)px/.exec(s)[1]));
+     return c0 > 0 && c1 > c0 && sizes.length > 3 && sizes.every(n => n >= 14); })());
+
+  // ---- the pure parts, run
+  const words2 = { label: 'Lorry movements a day', lower: 'lorry movements a day', short: 'movements a day', col: 'Movements a day' };
+  const words1 = { label: 'Lorry visits a day', lower: 'lorry visits a day', short: 'visits a day', col: 'Visits a day' };
+  let pv = 2;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const doc = { addEventListener() {}, getElementById() { return null; }, createElement() { return {}; } };
+  let F = null, err = "";
+  try {
+    F = new Function("escHtml", "PV", "CW", "monthLabel", "teamText", "TENANT", "map", "styleReady", "document", "isPhoneShell", "mapboxgl",
+                     "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle",
+                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, SECSEL_MAP };")(
+      esc, () => pv, () => (pv === 2 ? words2 : words1), m => (m === 23 ? 'Nov 2027' : 'M' + m), v => (v === 'IPT1' ? 'North Team' : v),
+      { name: 'Wolds Link', demo_notice: 'Fictional scheme' }, {}, () => true, doc, () => false, {}, {}, () => 'https://x/map/?month=2027-11', null, null,
+      x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }));
+  } catch (e) { err = String(e && e.stack || e); }
+  ok("⭐ 2.1-4 (sandbox): the block runs against a fake map, adding nothing to it", !!F && F.SECSEL_MAP === false, err);
+  if (F) {
+    const res = { kind: 'road', month: 23, a_day: 21.5, in: 16.5, out: 5,
+                  routes: [{ route_id: 'R1', in: 11.5, out: 0, a_day: 11.5 }, { route_id: 'R2', in: 5, out: 5, a_day: 10 }] };
+    const rp = { R1: { origin: 'Quarry A', dest: 'Site B', ipt: 'IPT1' }, R2: { origin: 'Plant C', dest: 'Site B', ipt: 'IPT1' } };
+    const v = F.secselView(res, { R1: true }, rp);
+    ok("2.1-4 (sandbox): the route filters split the rows — R2 outside them is named apart and left out of the total",
+       v.n === 1 && v.left.join() === 'R2' && v.aday === 11.5 && v.inn === 11.5 && v.out === 0 && v.rows[0].from === 'Quarry A' && v.rows[0].team === 'North Team');
+    const h = F.secselCardHTML(res, { passing: null, rp, clicked: 'R1', limits: [{ state: 'over', text: 'Traffic limit · 212 / 200 a day' }] });
+    ok("⭐ 2.1-4 Q2 / Q3 (sandbox): 'This road · Nov 2027', the day's figure, routes, in / out, In / Out / A day columns, a total row",
+       h.includes('>This road · Nov 2027</h4>') && h.includes('<b>22 lorry movements a day</b> · 2 routes') && h.includes('17 in, 5 out')
+       && h.includes('<th class="num">In</th><th class="num">Out</th><th class="num">A day</th>') && h.includes('class="secsel-total"')
+       && h.includes('<td class="num">12</td><td class="num">0</td><td class="num">12</td>'), h);
+    ok("2.1-4 (sandbox): the clicked route's row is tinted and has its card button; Copy; the limit line; teams on the card",
+       h.includes('<tr class="secsel-clicked"><td class="secsel-rid">R1</td>') && h.includes('R1’s card</button>') && h.includes('>Copy</button>')
+       && h.includes('secsel-limit secsel-over">Traffic limit · 212 / 200 a day') && h.includes('North Team'));
+    ok("🔴 2.1-4 (sandbox): no 'Shared road section', no 'two-way' on the card", !/Shared road section|two-way/i.test(h));
+    const one = F.secselCardHTML({ kind: 'road', month: 23, a_day: 4, routes: [{ route_id: 'R3', in: 2, out: 2, a_day: 4 }] }, { rp });
+    const none = F.secselCardHTML({ kind: 'road', month: 23, a_day: 0, routes: [] }, { rp });
+    ok("2.1-4 (sandbox): a road with nothing approved that month says so in words",
+       none.includes('Nothing approved on this road in Nov 2027.') && !none.includes('>Copy</button>'));
+    ok("⭐ 2.1-4 Q1 (sandbox): a road one route uses gets the same card, one row, no total", one.includes('· 1 route') && !one.includes('secsel-total'));
+    const nm = F.secselCardHTML({ kind: 'road', month: null, a_day: null, routes: [{ route_id: 'R1' }, { route_id: 'R2' }] }, { rp });
+    ok("⭐ 2.1-4 Q4 (sandbox): no month — 'This road', the routes by name, no figures, 'Pick a month'",
+       nm.includes('>This road</h4>') && nm.includes('2 routes use it. Pick a month for movements a day.') && !nm.includes('>In</th>')
+       && nm.includes('Pick a month</button>') && nm.includes('Quarry A → Site B') && nm.includes('>Copy</button>'));
+    const ar = F.secselCardHTML(Object.assign({}, res, { kind: 'area' }), { rp });
+    ok("⭐ 2.1-4 Q5 (sandbox): the area card — 'Selected area', each route once, Copy table, Draw again, no team names",
+       ar.includes('>Selected area · Nov 2027</h4>') && ar.includes('Each route counted once, however many roads in the box it uses.')
+       && ar.includes('>Copy table</button>') && ar.includes('>Draw again</button>') && !ar.includes('North Team'));
+    pv = 1;
+    const vis = F.secselCardHTML(res, { rp });
+    pv = 2;
+    ok("2.1-4 (sandbox): an organisation counting visits — one A day column, no in / out", !vis.includes('>In</th>') && vis.includes('lorry visits a day') && !vis.includes(' in, '));
+    ok("⭐ 2.1-4 (sandbox): the hover tip is one line — '22 movements a day · 2 routes'; no month: '2 routes'",
+       F.secselTipText(res, null) === '22 movements a day · 2 routes' && F.secselTipText({ routes: [{ route_id: 'R1' }, { route_id: 'R2' }], a_day: null }, null) === '2 routes'
+       && F.secselTipText({ routes: [], a_day: null }, null) === 'No route here');
+    const cp = F.secselCopyParts(Object.assign({}, res, { kind: 'area' }), null, rp, 'https://x/map/?month=2027-11&area=1,2,3,4', '10 Nov 2026');
+    const lines = cp.tsv.split('\n');
+    ok("⭐ 2.1-4 Q8 (sandbox): Copy — the title with '(demo)', the count, a tab table with a total, the date and the link; no team names",
+       lines[0] === 'Wolds Link (demo) · selected area · Nov 2027' && lines[1] === 'Approved plan, lorry movements a day (a visit = 2 movements, in and out).'
+       && lines[2] === 'Route\tFrom\tTo\tIn\tOut\tA day' && lines[3] === 'R1\tQuarry A\tSite B\t12\t0\t12' && lines[5] === 'Total\t\t\t17\t5\t22'
+       && lines[6] === 'From the Wayscope public map, 10 Nov 2026. https://x/map/?month=2027-11&area=1,2,3,4'
+       && !/North Team|IPT1/.test(cp.tsv + cp.html) && cp.html.includes('<table') && cp.html.includes('<a href="https://x/map/?month=2027-11&amp;area=1,2,3,4">'), cp.tsv);
+    ok("2.1-4 (sandbox): the reads' addresses", F.roadAtUrl({ lng: -0.95, lat: 52.5 }, 23, 30) === '/api/public/road-at?lon=-0.95000&lat=52.50000&r=30&month=23'
+       && F.roadAtUrl({ lng: -0.95, lat: 52.5 }, null, 12) === '/api/public/road-at?lon=-0.95000&lat=52.50000&r=12'
+       && F.roadAtUrl({ lng: -0.95, lat: 52.5 }, 23, 30, 'R 1') === '/api/public/road-at?lon=-0.95000&lat=52.50000&r=30&month=23&route=R%201'
+       && F.areaSumUrl([-1, 52, -0.9, 52.1], 23) === '/api/public/area-sum?bbox=-1.00000,52.00000,-0.90000,52.10000&month=23');
+    const near = F.secselNearest({ geometry: { type: 'LineString', coordinates: [[-1, 52.5], [-0.9, 52.5]] } }, { lng: -0.95, lat: 52.5003 });
+    ok("2.1-4 (sandbox): a near tap is moved onto the line it found", Math.abs(near.lat - 52.5) < 1e-9 && Math.abs(near.lng + 0.95) < 1e-9, JSON.stringify(near));
+    ok("2.1-4 (sandbox): the box drawn as one closed polygon; corners rounded to 5 places",
+       JSON.stringify(F.secselBoxFeature([1, 2, 3, 4]).features[0].geometry.coordinates) === '[[[1,2],[3,2],[3,4],[1,4],[1,2]]]'
+       && F.secselBoxFeature(null).features.length === 0 && F.secselBoxOf({ lng: -0.1234567, lat: 52.0000049 }, { lng: 1, lat: 53 }).join() === '-0.12346,52,1,53');
+  }
+  let afp = null;
+  try { afp = new Function(/function areaFromParam\(s\) \{[\s\S]*?\n    \}/.exec(code)[0] + "\nreturn areaFromParam;")(); } catch (e) {}
+  ok("2.1-4 Q7 (sandbox): the link's box reads back, and anything that is not a box is no box",
+     !!afp && JSON.stringify(afp('-0.96,52.49,-0.94,52.51')) === '[-0.96,52.49,-0.94,52.51]' && afp('1,2,3') === null && afp('3,2,1,4') === null
+     && afp('a,b,c,d') === null && afp('') === null && afp('-0.9,53,-0.8,52') === null);
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
