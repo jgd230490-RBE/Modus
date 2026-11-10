@@ -2066,7 +2066,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      // co2_error, after the span - the carbon ramp's fixed stops come from it
      // NARROWED 12 Oct 2026 (wording review): and, last, the feed's carbon stamp (carbonStamp), which the carbon legend prints
      // NARROWED 12 Oct 2026 (Track C review): and the largest section-month (sectionCo2Max), the section ramp's stops
-     && /TL\.matrix = \{ byRoute:byR, unit:j\.unit, working_days:j\.working_days, volMonths, span, co2Max, (sectionCo2Max, )?co2Error: j\.co2_error \|\| null, carbonStamp: j\.carbon_stamp \|\| null \};/.test(code));
+     // NARROWED 10 Nov 2026 (claude/map-first-view, Idea 3): and, last, planUpdated (the date the forecast last changed)
+     && /TL\.matrix = \{ byRoute:byR, unit:j\.unit, working_days:j\.working_days, volMonths, span, co2Max, (sectionCo2Max, )?co2Error: j\.co2_error \|\| null, carbonStamp: j\.carbon_stamp \|\| null(, planUpdated)? \};/.test(code));
   ok("D22: the bar opens on the current calendar month if it carries volume, else the first month that does — never an empty January",
      /function tlStartMonth\(\)\{\s*const cur = currentMonthIndex\(\);\s*if\(monthHasVolume\(cur\)\) return cur;/.test(code)
      && /return span \? span\[0\] : 1;/.test(code)
@@ -7884,6 +7885,103 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("CARBON WORDS: the distance cards are unchanged (the lorry does drive the round trip) and the new words name no setting, share or method",
      code.includes("'Round trip','Loaded out, empty back'") && code.includes("'Total trips','one-way loaded runs'")
      && !/scheme’s share[^']*(43|per cent|%|return_mode|RICS)/.test(code));
+}
+
+// ---- 10 Nov 2026 (claude/map-first-view, frontier check Ideas 1 and 3, John's F1 / F2): the map opens on this month, a
+// cleared month travels in the link as month=none, and the title block says when the forecast last changed. Every pin
+// below fails on main 992c4d3 (no firstViewMonth, no month=none, "Approved plan · forecast" hard-coded).
+{
+  const fvBody = cut0(code, "function firstViewMonth(){", "function announceTimeline(");
+  ok("⭐ FIRST VIEW: firstViewMonth is today's month clamped to the plan's first and last month with volume, null with no plan",
+     /const span = TL\.matrix && TL\.matrix\.span;\s*if\(!span\) return null;\s*return Math\.min\(span\[1\], Math\.max\(span\[0\], currentMonthIndex\(\)\)\);/.test(fvBody));
+  {
+    let F = null, err = "";
+    const TL = { matrix: null };
+    let now = 11;
+    try { F = new Function("TL", "currentMonthIndex", fvBody + "\nreturn firstViewMonth;")(TL, () => now); } catch (e) { err = String(e); }
+    ok("FIRST VIEW (sandbox): firstViewMonth runs", !!F, err);
+    if (F) {
+      ok("⭐ FIRST VIEW (sandbox): no plan with volume = no month (the map stays on 'No month on screen')", F() === null);
+      TL.matrix = { span: [3, 40] };
+      ok("⭐ FIRST VIEW (sandbox): inside the plan = this month", (now = 11, F()) === 11);
+      ok("⭐ FIRST VIEW (sandbox): before the plan's first month = its first month", (now = 1, F()) === 3);
+      ok("⭐ FIRST VIEW (sandbox): after its last month = its last month", (now = 55, F()) === 40);
+    }
+  }
+  const avBody = cut0(code, "function applyViewFromUrl() {", "function applyPendingRestr()");
+  ok("⭐ FIRST VIEW: with no month in the link the map opens on firstViewMonth once the months are in; a link's month still wins",
+     /const firstView = !v\.month && !v\.noMonth && !\(v\.layers && v\.layers\.indexOf\('forecast'\) >= 0\);/.test(avBody)
+     && /if \(v\.month\) ensureTimelineMatrix\(\)\.then\(\(\) => pickMonth\(v\.month\)\)\.catch\(\(\) => \{\}\)\.then\(done\);\s*else if \(firstView\) ensureTimelineMatrix\(\)\.then\(/.test(avBody)
+     && /if \(m && !TL\.on && !TL\.cleared && !TL\.playing && !\(fc && fc\.checked\)\) pickMonth\(m\);/.test(avBody));
+  ok("⭐ FIRST VIEW: a cleared month (closeTimeline) is remembered and a month on screen (openTimeline) forgets it",
+     /function closeTimeline\(\)\{[\s\S]{0,200}TL\.cleared = true;/.test(code) && /function openTimeline\(\)\{[\s\S]{0,120}TL\.cleared=false;/.test(code)
+     && /if \(v\.noMonth && !v\.month\) TL\.cleared = true;/.test(avBody));
+  ok("⭐ FIRST VIEW: the link of a cleared view says month=none, and the share link and the QR's short form carry it",
+     /else if \(v\.noMonth\) q\.set\('month', 'none'\);/.test(code) && /out\.noMonth = q\.get\('month'\) === 'none';/.test(code)
+     && /month: TL\.on \? TL\.month : null, noMonth: !TL\.on && !!TL\.cleared,/.test(code)
+     && code.includes("encodeView({ month: v.month, noMonth: v.noMonth, layers: VIEW.defaults, filters: {} }, VIEW.defaults)"));
+  {
+    const ev = cut0(code, "function encodeView(v, defaults) {", "function selectedText(id)");
+    let E = null, err = "";
+    try {
+      E = new Function("BASEMAP_LINK", "LIGHT_PRESETS", "VIEW_FILTER_KEYS", "monthParam", "monthFromParam", "basemapFromKey", "areaFromParam",
+        ev + "\nreturn { encodeView, decodeView };")({}, [], ['origin'], m => '2026-' + String(m).padStart(2, '0'),
+        s => (/^2026-(\d\d)$/.exec(s) ? Number(/^2026-(\d\d)$/.exec(s)[1]) : null), () => null, () => null);
+    } catch (e) { err = String(e); }
+    ok("FIRST VIEW (sandbox): encodeView / decodeView run", !!E, err);
+    if (E) {
+      ok("⭐ FIRST VIEW (sandbox): a cleared view encodes month=none; a month encodes the month; the plain view encodes nothing",
+         E.encodeView({ month: null, noMonth: true, layers: [], filters: {} }, []) === 'month=none'
+         && E.encodeView({ month: 11, noMonth: false, layers: [], filters: {} }, []) === 'month=2026-11'
+         && E.encodeView({ month: null, layers: [], filters: {} }, []) === '');
+      const d = E.decodeView('?month=none'), d2 = E.decodeView('?month=2026-11'), d3 = E.decodeView('');
+      ok("⭐ FIRST VIEW (sandbox): month=none decodes as the cleared view (no month), a month as that month, nothing as neither",
+         d.noMonth === true && d.month === null && d2.noMonth === false && d2.month === 11 && d3.noMonth === false && d3.month === null);
+    }
+  }
+  // Idea 3: the title block
+  ok("⭐ UPDATED: the title's second line comes from planSubHTML, no longer the fixed 'Approved plan · forecast'",
+     code.includes("setHTML('kpi-title', `${esc(label)}<span class=\"kpi-sub\">${planSubHTML()}</span>`);")
+     && !code.includes("<span class=\"kpi-sub\">Approved plan \\u00b7 forecast</span>`);"));
+  ok("⭐ UPDATED: the matrix keeps the server's plan_updated only when it is a YYYY-MM-DD date",
+     code.includes("const planUpdated = /^\\d{4}-\\d{2}-\\d{2}$/.test(j.plan_updated || '') ? j.plan_updated : null;"));
+  ok("⭐ UPDATED: the 'i' box sits in the figures bar, hidden, and its button names what it is about",
+     html.includes('<div class="info-pop kpi-plan-pop" id="info-plan" role="note" hidden></div>')
+     && code.includes('aria-controls="info-plan" onclick="toggleInfo(this)" title="About the plan" aria-label="About the plan"'));
+  {
+    const a = code.indexOf("const PLAN_MONTHS = "), b = code.indexOf("function calculateKPIs(oFilter");
+    let U = null, err = "";
+    const TL = { matrix: null };
+    const pop = { hidden: true, innerHTML: '' };
+    const RME = { staff: false };
+    try {
+      U = new Function("TL", "document", "RME", code.slice(a, b) + "\nreturn { planDate, planSubHTML, planInfoHTML, renderPlanInfo };")(
+        TL, { getElementById: id => id === 'info-plan' ? pop : null }, RME);
+    } catch (e) { err = String(e); }
+    ok("UPDATED (sandbox): the plan helpers run", !!U, err);
+    if (U) {
+      ok("⭐ UPDATED (sandbox): no date from the server = the old words and no 'i' (a date is never made up)",
+         U.planSubHTML() === 'Approved plan · forecast' && U.planDate(false) === '');
+      TL.matrix = { planUpdated: '2026-10-31' };
+      ok("⭐ UPDATED (sandbox): with a date the line reads 'Approved plan · updated 31 Oct' and carries the 'i'",
+         U.planSubHTML().indexOf('Approved plan · updated 31 Oct<button type="button" class="info-i" aria-expanded="false" aria-controls="info-plan"') === 0);
+      const words = U.planInfoHTML(false).replace(/<[^>]+>/g, ' ').trim().split(/\s+/);
+      ok("⭐ UPDATED (sandbox): the 'i' box is the approved sentence, 20 words, at most 30",
+         U.planInfoHTML(false) === '<p>A forecast from the approved plan, last changed on 31 Oct 2026. Months further ahead are more likely to change.</p>'
+         && words.length === 20, words.length);
+      ok("⭐ UPDATED (sandbox): the guide link is for staff only (/help/ is behind the staff sign-in); a resident gets the sentence alone",
+         !/href=/.test(U.planInfoHTML(false)) && U.planInfoHTML(true).includes('<a href="/help/#ug-map-updated" target="_blank" rel="noopener">Guide ›</a>'));
+      U.renderPlanInfo();
+      ok("UPDATED (sandbox): renderPlanInfo writes the box", pop.innerHTML.includes('last changed on 31 Oct 2026'));
+      pop.hidden = false;
+      ok("UPDATED (sandbox): the rebuilt title keeps the open box's button pressed (the bar is rebuilt on every Play tick)",
+         U.planSubHTML().includes('aria-expanded="true"'));
+      TL.matrix = { planUpdated: '2026-13-01' };
+      ok("UPDATED (sandbox): a malformed date shows no date", U.planSubHTML() === 'Approved plan · forecast');
+    }
+  }
+  ok("UPDATED: the staff answer re-renders the box (the guide link)",
+     /RME\.staff = !!\(j && j\.level === 'staff'\);[^\n]*\n\s*if \(typeof renderPlanInfo === 'function'\) renderPlanInfo\(\);/.test(code));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

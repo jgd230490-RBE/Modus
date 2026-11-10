@@ -50,6 +50,7 @@ import stockpiles    # Week 1 — stockpile capacity and typed consumption (Task
 import access        # 2026-09-02 — IPT access codes (Task F)
 import gate          # 2026-09-14 — the /map/ password and the /help/ staff gate
 import config        # 2.5b — the editable copy of factors.json; G2 — the tenant settings block
+import plan_stamp    # 10 Nov 2026 (claude/map-first-view): when the forecast last changed, for the map
 import tenant_package  # G2, 16 Sep — a tenant as one JSON document; the map overlay
 import costing       # 10 Sep evening — target rates + fuel settings (config key 'costing'), BAF
 import fuel          # 10 Sep evening — the EU Weekly Oil Bulletin diesel index, fetched server-side
@@ -3398,6 +3399,9 @@ def _forecast_matrix(from_, to, unit, sections):
            "routes": out, "carbon_stamp": carbon.SUMMARY_STAMP}
     if co2_error:
         res["co2_error"] = co2_error
+    # 10 Nov 2026 (claude/map-first-view, Idea 3): the UK date the forecast last changed, from the audit trail
+    # (plan_stamp); None when the trail has no such write. The map prints "Approved plan · updated 31 Oct".
+    res["plan_updated"] = plan_stamp.last_change()
     # 12 Oct 2026 (Track C review): sections=1 (the timeline asks) adds the programme's largest
     # SECTION-month of CO2e over the window, so the carbon ramp on the shared sections has stops
     # from what a section carries, not from a whole route's month. None when there is no figure.

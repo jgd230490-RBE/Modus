@@ -570,6 +570,12 @@ with TestClient(main.app, base_url="https://testserver") as c:
         ok("B2: ...an UNBAKED route's months read None, never a zero (the rest of the demo is not baked here)",
            any(all(v is None for v in x["co2_t"].values()) for x in fm.get("routes") or [] if x["route_id"] != "R001"))
         ok("B2: ...and co2_error is absent on the happy path", "co2_error" not in fm and "working_days" in fm)
+        # 10 Nov 2026 (claude/map-first-view, Idea 3): the matrix says when the forecast last changed, from the audit trail;
+        # the demo package was imported over HTTP above (an audited write), so it is today's UK date
+        import datetime, zoneinfo as _zi
+        _today_uk = datetime.datetime.now(_zi.ZoneInfo("Europe/London")).date().isoformat()
+        ok("⭐ UPDATED: /api/public/forecast-matrix carries plan_updated, the UK date of the newest plan write (here: the import over HTTP)",
+           fm.get("plan_updated") == _today_uk, f"{fm.get('plan_updated')} vs {_today_uk}")
         # 12 Oct 2026 (Track C review): sections=1 adds the largest section-month (the map's section ramp); absent without it
         r = c.get("/api/public/forecast-matrix", params={"from": 1, "to": 60, "unit": "t", "sections": 1})
         ok("Track C review: forecast-matrix with sections=1 answers 200 and carries section_co2_max (None or a positive figure); without it the key is absent",
