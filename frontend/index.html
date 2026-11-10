@@ -387,6 +387,22 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .cfg-nav-item:hover{color:var(--ink);}
   .cfg-nav-item.is-on{color:var(--ink);font-weight:600;border-left-color:var(--rail-on);background:var(--surface);}
   .cfg-main{padding:0;overflow:hidden;}
+  /* 9 Nov 2026 (UI critique finding 10, card 10): Configuration read-only for a reader. CfgFields is a fieldset (no frame);
+     disabled for a reader, its controls are drawn as text: no box, no arrow, no placeholder, a tick a ✓ or –, no buttons */
+  .cfg-fs{border:0;margin:0;padding:0;min-width:0;}
+  .cfg-ro-note{border:1px solid var(--line);background:var(--navy-soft);color:var(--ink);border-radius:8px;padding:10px 14px;font-size:14px;margin:0 0 16px;}
+  .cfg-ro input:not([type=checkbox]):not([type=radio]),.cfg-ro select,.cfg-ro textarea{border-color:transparent;background:transparent;box-shadow:none;color:var(--ink);-webkit-text-fill-color:var(--ink);opacity:1;cursor:default;-webkit-appearance:none;appearance:none;resize:none;}
+  .cfg-ro input::placeholder,.cfg-ro textarea::placeholder{color:var(--muted);-webkit-text-fill-color:var(--muted);}
+  .cfg-ro input::-webkit-calendar-picker-indicator{display:none;}
+  .cfg-ro input[type=checkbox]:not(.hidden){-webkit-appearance:none;appearance:none;display:inline-block;width:auto;height:auto;min-width:1em;margin:0;border:0;background:none;font:inherit;font-weight:700;color:var(--muted);text-align:center;vertical-align:baseline;}
+  .cfg-ro input[type=checkbox]:not(.hidden)::before{content:"–";}
+  .cfg-ro input[type=checkbox]:not(.hidden):checked{color:var(--ok-text);}
+  .cfg-ro input[type=checkbox]:not(.hidden):checked::before{content:"✓";}
+  .cfg-ro input[type=radio],.cfg-ro label:has(> input[type=radio]:not(:checked)),.cfg-ro [data-ro-only-on] label:has(> input:not(:checked)){display:none;}
+  .cfg-ro button,.cfg-ro [data-ro-hide]{display:none;}
+  .cfg-ro label{cursor:default;}
+  .cfg-ro-box{overflow-x:auto;}  .cfg-ro .overflow-auto{overflow:visible;}   /* 10 Nov 2026: a reader's one scroll box, outside the fieldset */
+  .cfg-ro .tbl input:not([type=checkbox]):not([type=radio]),.cfg-ro .tbl select{field-sizing:content;width:auto;min-width:2ch;}   /* 10 Nov 2026: a reader's table value is as wide as its words ("not typed", "derived: kWh × UK grid" were cut to fit a typing box) */
   .field{margin-bottom:18px;}
   /* 11 Oct 2026 — the sign-in box in the finalised theme: the page's surface, warm line, labels above,
      an orange focus ring and the orange action button; the access code has a show / hide eye. */
@@ -999,6 +1015,11 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .row-st.rs-ok i{background:var(--green);}
   .row-st.rs-warn i{background:var(--gold);color:#1F2024;border-radius:3px;}
   .row-st.rs-bad i{background:var(--red);}
+  .row-st.rs-draft i{background:transparent;border:2px solid var(--chart-none);width:14px;height:14px;}
+  /* 9 Nov 2026 (UI critique card 11): CLP documents grouped by place, the team CLPs folded under the site's */
+  .clp-fold{display:inline-flex;align-items:center;gap:4px;margin-top:4px;min-height:24px;padding:0 2px;background:none;border:0;font:inherit;font-size:13px;color:var(--ink);text-decoration:underline;cursor:pointer;}
+  .clp-kid td:first-child{padding-left:36px;}
+  .clp-nowrap{white-space:nowrap;}
   .row-st .rs-more{font-weight:500;color:var(--muted);}
   .unit-sw{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--muted);}
   .unit-sw-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
@@ -1712,9 +1733,9 @@ function UnitSwitch({ value, onChange, note }){
 }
 // the one status: a word, an icon whose SHAPE says the tone (✓ circle, ! square, ! circle, – circle), and
 // how many more things are flagged (the details spell each one out)
-const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–" };
+const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–", draft: "" };   // 9 Nov 2026: draft (CLP documents) a hollow ring
 function RowStatus({ word, tone, more }){
-  const t = RS_ICON[tone] ? tone : "none";
+  const t = Object.prototype.hasOwnProperty.call(RS_ICON, tone || "") ? tone : "none";
   return <span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true">{RS_ICON[t]}</i>{word}{more > 0 && <span className="rs-more">+{more}</span>}</span>;
 }
 // one fact in the details: a label and its value; nothing at all when there is no value
@@ -5578,7 +5599,7 @@ function PoursPage({ meta, access, who }){
 // stockpile and one for each team with lorries there (the server lists them; opening the page writes nothing), plus any made with
 // + New CLP. A team login sees its own team's only. One filled button a row (Approve as Issue N… when sent, else Download draft) and
 // the "⋯" menu. The server builds every file (one at a time across the app); this page never works a figure out.
-const CLP_TONE = { draft: "none", sent: "warn", changes: "warn", approved: "ok" };
+const CLP_TONE = { draft: "draft", sent: "warn", changes: "warn", approved: "ok" };   // 9 Nov 2026 (card 11): draft a hollow ring (the grey – circle read "blocked")
 const CLP_GROUPS = [["Sites and compounds", ["Site", "Compound"]], ["Stockpiles and holding areas", ["Stockpile", "Holding area"]]];
 const clpDay = (iso) => iso ? longDate(String(iso).slice(0, 10)) : "";
 function clpGroupOf(type){ const g = CLP_GROUPS.find(([, ts]) => ts.includes(type)); return g ? g[0] : "Quarries, plants and others"; }
@@ -5758,6 +5779,7 @@ function ClpPage({ access }){
   const [pv, setPv] = useState(null);             // the approve card's preview, or the history
   const [building, setBuilding] = useState("");   // the id whose file is being made
   const [note, setNote] = useState(null);
+  const [folds, setFolds] = useState({});        // 9 Nov 2026 (card 11): a place's team CLPs opened or folded by hand
   const headRef = useRef(null);
   useEffect(() => {
     let live = true;
@@ -6015,19 +6037,90 @@ function ClpPage({ access }){
       <button type="button" className="btn-sec mt-2" onClick={close}>Close</button>
     </div>
   );
-  const sub = (c) => [c.types.join(", "), appr ? (c.impact === "medium" ? "Medium impact" : "Higher impact") : null,
+  // 9 Nov 2026 (card 11): the Covers column is gone — the CLP's own line says whose lorries it counts
+  const sub = (c) => [c.types.join(", "), appr ? teamWord(c).replace(/^All/, "all") : null, appr ? (c.impact === "medium" ? "Medium impact" : "Higher impact") : null,
                       c.busiest_label ? `busiest ${c.busiest_label}` : "no approved lorries"].filter(Boolean).join(" · ");
+  const subKid = (c) => ["Team CLP", c.busiest_label ? `busiest ${c.busiest_label}` : "no approved lorries"].join(" · ");
   const statusLine = (c) => c.status === "sent" ? `by ${c.sent_by || "the team"} · ${clpDay(c.sent_at)}`
     : c.status === "changes" ? (c.changes_note ? `“${c.changes_note}”` : "") : "";
   // PR 3c: where the last issue sent to each client group stands (Returned in red)
   const reviewLine = (r) => r.state === "accepted" ? [`✓ Accepted by ${r.group_name} · ${clpShort(r.at)}`, "var(--ok-text)"]
     : r.state === "returned" ? [`Returned by ${r.group_name} · ${clpShort(r.at)}`, "var(--bad-text)"]
     : [`With ${r.group_name} · since ${clpShort(r.sent_at)}`, "var(--muted)"];
-  const primary = (c) => {
-    if(building === c.id) return <button type="button" className="btn-sec" disabled>{busyWords}</button>;
-    if(appr && c.status === "sent") return <button type="button" className="btn-pri" onClick={() => openApprove(c)} data-clp-primary="approve">Approve as Issue {c.next_issue}…</button>;
-    return <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 12px" }} onClick={() => draft(c)} disabled={!!building} data-clp-primary="draft">Download draft</button>;
+  // 9 Nov 2026 (UI critique finding 11, card 11): each row's main button is its NEXT STEP, never Download (that moved into ⋯).
+  // A team CLP folded under its site ("child") offers only an approval step: its cover is the team's to fill.
+  const nextStep = (c, child) => {
+    const open = c.status === "draft" || c.status === "changes";
+    const coverLeft = (c.cover_typed || 0) < (c.cover_total || 0);
+    if(appr && c.status === "sent") return ["approve", `Approve as Issue ${c.next_issue}…`, () => openApprove(c)];
+    if(child) return null;
+    if(open && canEdit && coverLeft) return ["cover", `Fill in the cover (${c.cover_typed || 0} of ${c.cover_total})`, () => openEdit(c)];
+    if(open && !appr && data.team) return ["send", "Send for approval…", () => openSend(c)];
+    if(open && appr) return ["approve", `Approve as Issue ${c.next_issue}…`, () => openApprove(c)];
+    if(appr && c.status === "approved" && data.review_groups && c.issues > 0 && !(c.reviews || []).length)
+      return ["review", `Send Issue ${c.last_issue ? c.last_issue.no : c.issues} to reviewers…`, () => openReview(c)];
+    return null;
   };
+  const primary = (c, child) => {
+    if(building === c.id) return <button type="button" className="btn-sec" disabled>{busyWords}</button>;
+    const ns = nextStep(c, child);
+    if(ns) return <button type="button" className={ns[0] === "approve" ? "btn-pri" : "btn-sec"} style={ns[0] === "approve" ? undefined : { width: "auto", height: "auto", padding: "5px 12px" }}
+      onClick={ns[2]} disabled={!!building} data-clp-primary={ns[0]}>{ns[1]}</button>;
+    // no step of this login's: the cover count as words, so a folded team CLP still says how far it is
+    return (c.status === "draft" || c.status === "changes") ? <span className="text-[13px] text-slate-500 clp-nowrap" data-clp-cover-left="1">Cover {c.cover_typed || 0} of {c.cover_total}</span> : null;
+  };
+  // 9 Nov 2026 (card 11): grouped by place — the CLP for all teams first, the team CLPs at the same places folded under it.
+  // With a filter set the matching rows are listed flat. A group opens by itself when a team CLP waits on an approver.
+  const filtered = !!(fTeam || fStatus || fTasks || fRev);
+  const groups = [];
+  if(filtered) list.forEach(c => groups.push({ key: c.id, head: c, kids: [] }));
+  else {
+    const byPlace = {};
+    list.forEach(c => { const k = [...(c.location_ids || [])].sort().join(",") || c.id;
+      if(!byPlace[k]){ byPlace[k] = { key: k, items: [] }; groups.push(byPlace[k]); }
+      byPlace[k].items.push(c); });
+    groups.forEach(g => { const h = g.items.find(c => !c.team) || g.items[0]; g.head = h; g.kids = g.items.filter(c => c !== h); });
+  }
+  const isOpen = (g) => folds[g.key] !== undefined ? folds[g.key] : g.kids.some(c => c.status === "sent" || c.status === "changes");
+  const kidWords = (g) => { const n = g.kids.length, sent = g.kids.filter(c => c.status === "sent").length;
+    return `${n} team CLP${n === 1 ? "" : "s"}` + (sent ? ` · ${sent} sent for approval` : ""); };
+  const row = (c, g, child) => {
+    const ns = nextStep(c, child);
+    return (
+    <tr key={c.id} data-clp-row={c.id} data-clp-child={child ? "1" : undefined} hidden={child && !isOpen(g) ? true : undefined} className={child ? "clp-kid" : undefined}>
+      <td style={{ whiteSpace: "normal", minWidth: 220 }}>
+        {child ? (canEdit ? <button type="button" className="row-open" aria-label={`Edit ${c.name} · ${teamWord(c)}`} onClick={() => openEdit(c)}>{teamWord(c)}</button>
+                          : <span className="font-medium text-slate-800">{teamWord(c)}</span>)
+          : canEdit ? <button type="button" className="row-open" aria-label={`Edit ${c.name}`} onClick={() => openEdit(c)}>{c.name}</button>
+                    : <span className="font-medium text-slate-800">{c.name}</span>}
+        <span className="block text-[12px] text-slate-500">{child ? subKid(c) : sub(c)}</span>
+        {!child && g.kids.length > 0 && (
+          <button type="button" className="clp-fold" aria-expanded={isOpen(g) ? "true" : "false"} data-clp-fold={g.key}
+            onClick={() => setFolds(f => ({ ...f, [g.key]: !isOpen(g) }))}><span aria-hidden="true">{isOpen(g) ? "▾" : "▸"}</span> {kidWords(g)}</button>)}
+      </td>
+      <td className="rd-status" style={{ whiteSpace: "normal" }}><RowStatus word={c.status_word} tone={CLP_TONE[c.status]} more={0} />
+        {statusLine(c) && <span className="block text-[12px] text-slate-500">{statusLine(c)}</span>}
+        {(c.reviews || []).map(r => { const [w, col] = reviewLine(r);
+          return <span key={r.group_id} className="block text-[12px]" style={{ color: col }} data-clp-review-line={r.state}>{w}</span>; })}</td>
+      <td>{c.last_issue ? <>Issue {c.last_issue.no} · {clpDay(c.last_issue.date)}{appr && c.last_issue.by ? <span className="block text-[12px] text-slate-500">{c.last_issue.by}</span> : null}</> : "—"}</td>
+      <td data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open
+          {tk(c).overdue > 0 ? <span className="block text-[12px] font-semibold" style={{ color: "var(--bad-text)" }}>{tk(c).overdue} overdue</span>
+            : tk(c).next_due ? <span className="block text-[12px] text-slate-500">due {clpShort(tk(c).next_due)}</span> : null}</>
+        : tk(c).notes > 0 ? <span className="text-slate-600">{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}</span> : tk(c).client_open > 0 ? null : "—"}
+        {tk(c).client_open > 0 && <span className="block text-[12px] text-slate-600" data-clp-tasks-client="1">+ {tk(c).client_open} with the client</span>}</td>
+      <td><div className="flex items-center gap-2 justify-end">{primary(c, child)}
+        <RowMenu name={c.name + " · " + teamWord(c)}>
+          <button type="button" onClick={() => draft(c)} disabled={!!building}>Download draft</button>
+          {appr && c.status !== "sent" && !(ns && ns[0] === "approve") && <button type="button" onClick={() => openApprove(c)} disabled={!!building}>Approve as Issue {c.next_issue}…</button>}
+          {appr && c.status === "sent" && <button type="button" onClick={() => openChanges(c)}>Ask for changes…</button>}
+          {canEdit && <button type="button" onClick={() => openEdit(c)}>{appr ? "Edit" : "Edit cover details"}</button>}
+          {!appr && data.team && !(ns && ns[0] === "send") && <button type="button" onClick={() => openSend(c)}>{c.status === "sent" ? "Send for approval (sent)" : "Send for approval…"}</button>}
+          <button type="button" onClick={() => openNotes(c)}>Notes and tasks{tk(c).open > 0 ? ` (${tk(c).open} open)` : ""}</button>
+          {appr && data.review_groups && c.issues > 0 && !(ns && ns[0] === "review") && <button type="button" onClick={() => openReview(c)}>Send Issue {c.last_issue ? c.last_issue.no : c.issues} to reviewers…</button>}
+          {c.issues > 0 && <button type="button" onClick={() => openHistory(c)}>Document history</button>}
+          {appr && c.issues === 0 && (!c.auto || c.saved) && <button type="button" style={{ color: "var(--red)" }} onClick={() => remove(c)}>{c.auto ? "Clear typed details…" : "Delete…"}</button>}
+        </RowMenu></div></td>
+    </tr>); };
   return (
     <div className="max-w-7xl mx-auto p-6 pb-2" data-page="clp">
       <PageHeader title="CLP documents" kicker="Plan"
@@ -6062,42 +6155,13 @@ function ClpPage({ access }){
       ) : (
         <div className="card overflow-x-auto">
           <table className="tbl" data-clp-table="1">
-            <thead><tr><th scope="col">CLP</th>{appr && <th scope="col">Covers</th>}<th scope="col">Status</th><th scope="col">Last issue</th><th scope="col">Tasks</th>{appr && <th scope="col" className="num">Cover</th>}<th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
-            <tbody>
-              {list.map(c => (
-                <tr key={c.id} data-clp-row={c.id}>
-                  <td style={{ whiteSpace: "normal", minWidth: 220 }}>
-                    {canEdit ? <button type="button" className="row-open" aria-label={`Edit ${c.name}`} onClick={() => openEdit(c)}>{c.name}</button>
-                             : <span className="font-medium text-slate-800">{c.name}</span>}
-                    <span className="block text-[12px] text-slate-500">{sub(c)}</span>
-                  </td>
-                  {appr && <td>{teamWord(c)}</td>}
-                  <td className="rd-status" style={{ whiteSpace: "normal" }}><RowStatus word={c.status_word} tone={CLP_TONE[c.status]} more={0} />
-                    {statusLine(c) && <span className="block text-[12px] text-slate-500">{statusLine(c)}</span>}
-                    {(c.reviews || []).map(r => { const [w, col] = reviewLine(r);
-                      return <span key={r.group_id} className="block text-[12px]" style={{ color: col }} data-clp-review-line={r.state}>{w}</span>; })}</td>
-                  <td>{c.last_issue ? <>Issue {c.last_issue.no} · {clpDay(c.last_issue.date)}{appr && c.last_issue.by ? <span className="block text-[12px] text-slate-500">{c.last_issue.by}</span> : null}</> : "—"}</td>
-                  <td data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open
-                      {tk(c).overdue > 0 ? <span className="block text-[12px] font-semibold" style={{ color: "var(--bad-text)" }}>{tk(c).overdue} overdue</span>
-                        : tk(c).next_due ? <span className="block text-[12px] text-slate-500">due {clpShort(tk(c).next_due)}</span> : null}</>
-                    : tk(c).notes > 0 ? <span className="text-slate-600">{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}</span> : tk(c).client_open > 0 ? null : "—"}
-                    {tk(c).client_open > 0 && <span className="block text-[12px] text-slate-600" data-clp-tasks-client="1">+ {tk(c).client_open} with the client</span>}</td>
-                  {appr && <td className="num tabular-nums">{c.cover_typed} of {c.cover_total}</td>}
-                  <td><div className="flex items-center gap-2 justify-end">{primary(c)}
-                    <RowMenu name={c.name + " · " + teamWord(c)}>
-                      {appr && c.status === "sent" && <button type="button" onClick={() => draft(c)} disabled={!!building}>Download draft</button>}
-                      {appr && c.status !== "sent" && <button type="button" onClick={() => openApprove(c)} disabled={!!building}>Approve as Issue {c.next_issue}…</button>}
-                      {appr && c.status === "sent" && <button type="button" onClick={() => openChanges(c)}>Ask for changes…</button>}
-                      {canEdit && <button type="button" onClick={() => openEdit(c)}>{appr ? "Edit" : "Edit cover details"}</button>}
-                      {!appr && data.team && <button type="button" onClick={() => openSend(c)}>{c.status === "sent" ? "Send for approval (sent)" : "Send for approval…"}</button>}
-                      <button type="button" onClick={() => openNotes(c)}>Notes and tasks{tk(c).open > 0 ? ` (${tk(c).open} open)` : ""}</button>
-                      {appr && data.review_groups && c.issues > 0 && <button type="button" onClick={() => openReview(c)}>Send Issue {c.last_issue ? c.last_issue.no : c.issues} to reviewers…</button>}
-                      {c.issues > 0 && <button type="button" onClick={() => openHistory(c)}>Document history</button>}
-                      {appr && c.issues === 0 && (!c.auto || c.saved) && <button type="button" style={{ color: "var(--red)" }} onClick={() => remove(c)}>{c.auto ? "Clear typed details…" : "Delete…"}</button>}
-                    </RowMenu></div></td>
-                </tr>
-              ))}
-            </tbody>
+            <thead><tr><th scope="col">CLP</th><th scope="col">Status</th><th scope="col">Last issue</th><th scope="col">Tasks</th><th scope="col"><span className="sr-only">Next step</span></th></tr></thead>
+            {groups.map(g => (
+              <tbody key={g.key} data-clp-group={g.key}>
+                {row(g.head, g, false)}
+                {g.kids.map(c => row(c, g, true))}
+              </tbody>
+            ))}
           </table>
         </div>
       )}
@@ -7080,8 +7144,12 @@ function rvDecision(st, by, at){
   if(st === "returned") return `Returned by ${by || "your group"}${at ? " · " + clpShort(at) : ""}`;
   return "Waiting for your group";
 }
+// 9 Nov 2026 (UI critique card 11): the scheme's name has to sit inside a sentence — a demo name ending "— demo scheme" read
+// as two sentences run together; the trailing "— demo scheme" becomes "(demo)"
+const rvScheme = (name) => String(name || "").replace(/\s*[—–-]\s*(fictional\s+)?demo scheme\s*$/i, " (demo)").trim();
 function ReviewPage({ role }){
   const [list, setList] = useState(null);
+  const [ret, setRet] = useState(null);          // 9 Nov 2026 (card 11): the decision card's Return box, null | words
   const [err, setErr] = useState("");
   const [tick, setTick] = useState(0);
   const [open, setOpen] = useState(null);
@@ -7107,11 +7175,11 @@ function ReviewPage({ role }){
   }, [tick]);
   useEffect(() => { if((open || openErr) && headRef.current) headRef.current.focus(); }, [open && open.id, openErr]);
   const show = (id) => {
-    setOpenErr(""); setMsg(null); setWords(""); setRtf(null);
+    setOpenErr(""); setMsg(null); setWords(""); setRtf(null); setRet(null);
     fetch(`${API}/review/clps/${encodeURIComponent(id)}`).then(okJSON).then(setOpen)
       .catch(e => setOpenErr(errSay("The CLP did not open.", e)));
   };
-  const back = () => { setOpen(null); setOpenErr(""); setMsg(null); setWords(""); setRtf(null); };
+  const back = () => { setOpen(null); setOpenErr(""); setMsg(null); setWords(""); setRtf(null); setRet(null); };
   // PR 3d: tasks (add, tick, delete) and a note's delete go the same way; only a note or a decision empties the box
   const send = (method, path, body, what, done, clear) => {
     setBusy(true); setMsg(null);
@@ -7136,8 +7204,9 @@ function ReviewPage({ role }){
     } catch(e){ setMsg({ ok: false, text: errSay("The issue did not download.", e) }); }
   };
   const group = (list && list.group_name) || role.group_name || role.label || "";
-  const scheme = (list && list.scheme) || TENANT.name || "the contractor";
-  const header = <PageHeader title="CLPs for review" kicker="For review" subtitle={`Construction Logistics Plans ${scheme} has sent to ${group}.`} />;
+  const scheme = rvScheme((list && list.scheme) || TENANT.name) || "the contractor";
+  // 9 Nov 2026 (card 11): one sentence that reads (was "Construction Logistics Plans <scheme> has sent to <group>.")
+  const header = <PageHeader title="CLPs for review" kicker="For review" subtitle={`Plans that ${scheme} has sent to you.`} />;
   if(open || openErr){
     if(openErr) return (
       <div className="max-w-5xl mx-auto p-6" data-page="review" data-review-clp="error">
@@ -7155,11 +7224,37 @@ function ReviewPage({ role }){
       <div className="max-w-5xl mx-auto p-6 pb-2" data-page="review" data-review-clp={open.id}>
         <button type="button" className="link-btn text-sm mb-2" onClick={back}>← CLPs for review</button>
         <h2 className="text-[22px] font-bold text-[color:var(--navy-deep)] mb-1" tabIndex={-1} ref={headRef}>{open.name} · {open.team_name} · Issue {n}</h2>
+        {/* 9 Nov 2026 (UI critique card 11): Download a plain button under the title (it was a second orange primary), then the
+            group's DECISION as a card of its own (Accept / Return were at the foot of the notes) */}
         <div className="flex flex-wrap items-center gap-3 mb-3">
-          <button type="button" className="btn-pri" onClick={() => download(n)} data-review-download={n}>Download Issue {n} (Word)</button>
+          <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "6px 12px" }} onClick={() => download(n)} data-review-download={n}>⤓ Download Issue {n} (Word)</button>
           <span className="text-[13px] text-slate-500">Sent {clpDay(L.sent_at)}{L.sent_by ? ` by ${L.sent_by}` : ""}{L.note ? <> · “{L.note}”</> : null}</span>
         </div>
-        <p className="mb-3"><RowStatus word={rvDecision(L.state, L.by, L.at)} tone={RV_STATE[L.state] ? RV_STATE[L.state][1] : "none"} more={0} /></p>
+        <div className="card p-4 mb-4 rv-decide" data-review-decision="1">
+          <h3 className="clp-h3" style={{ marginTop: 0 }}>Your decision on Issue {n}</h3>
+          <p className="mb-3"><RowStatus word={rvDecision(L.state, L.by, L.at)} tone={RV_STATE[L.state] ? RV_STATE[L.state][1] : "none"} more={0} /></p>
+          {!open.can_decide ? <p className="text-[13px] text-slate-500">The contractor has a newer issue that is not sent to {open.group_name} yet.</p>
+            : ret !== null ? (
+              <div data-review-return-form="1">
+                <label htmlFor="rv-ret" className="block text-[13px] text-slate-500 mb-1">What needs changing</label>
+                <textarea id="rv-ret" className="ctl w-full" rows={3} maxLength={2000} value={ret} onChange={e => setRet(e.target.value)} />
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <button type="button" className="btn-pri" disabled={busy || !ret.trim()} data-review-return-go={n}
+                    onClick={() => send("POST", "decision", { issue_no: n, decision: "returned", words: ret }, "Not returned.", `Issue ${n} returned with your comments.`)
+                      .then(okd => { if(okd) setRet(null); })}>Return Issue {n}</button>
+                  <button type="button" className="btn-sec" onClick={() => setRet(null)}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" className="btn-pri" disabled={busy} data-review-accept={n}
+                  onClick={() => { if(window.confirm(`Accept Issue ${n} of the ${open.name} CLP for ${open.group_name}?`))
+                    send("POST", "decision", { issue_no: n, decision: "accepted", words: null }, "Not accepted.", `Issue ${n} accepted.`); }}>Accept Issue {n}</button>
+                <button type="button" className="btn-sec" disabled={busy} data-review-return={n} style={{ color: "var(--bad-text)" }}
+                  onClick={() => { setMsg(null); setRet(""); }}>Return with comments…</button>
+              </div>
+            )}
+        </div>
         {msg && <p className="text-sm mb-2" style={{ color: msg.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{msg.text}</p>}
         <div className="card p-4 mb-4">
           <h3 className="clp-h3" style={{ marginTop: 0 }}>History</h3>
@@ -7243,14 +7338,6 @@ function ReviewPage({ role }){
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <button type="button" className="btn-sec" disabled={busy || !words.trim()} data-review-comment="1"
               onClick={() => post("comments", { words }, "The note was not saved.", "Note added.")}>Add note</button>
-            {open.can_decide ? <>
-              <button type="button" className="btn-pri" disabled={busy} data-review-accept={n}
-                onClick={() => { if(window.confirm(`Accept Issue ${n} of the ${open.name} CLP for ${open.group_name}?`))
-                  post("decision", { issue_no: n, decision: "accepted", words: words.trim() || null }, "Not accepted.", `Issue ${n} accepted.`); }}>Accept Issue {n}…</button>
-              <button type="button" className="btn-sec" disabled={busy} data-review-return={n} style={{ color: "var(--bad-text)" }}
-                onClick={() => { if(!words.trim()){ setMsg({ ok: false, text: "Write what needs changing in the note box first." }); return; }
-                  post("decision", { issue_no: n, decision: "returned", words }, "Not returned.", `Issue ${n} returned with your note.`); }}>Return with comments…</button>
-            </> : <span className="text-[13px] text-slate-500">The contractor has a newer issue that is not sent to {open.group_name} yet.</span>}
           </div>
         </div>
       </div>
@@ -9422,7 +9509,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
 // once here, never seeded, saved with the admin token because one number moves every
 // unpriced line. Saved on their own endpoint, not inside the factors document, so the
 // Save button above (which sends the whole factors doc) does not carry them.
-function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
+function CostingTab({ who, access, token, setToken, doc, upd, fileDoc, ro }){
   const [data, setData] = useState(null);
   const [draft, setDraft] = useState({});
   const [msg, setMsg] = useState(null);
@@ -9456,7 +9543,7 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
   return (
     <div className="px-6 pb-6 space-y-6">
       {msg && <div className="rounded-lg border p-2.5 text-sm" style={{ borderColor: msg.ok ? "var(--green)" : "var(--red)", color: msg.ok ? "var(--ok-text)" : "var(--red)" }}>{msg.text}</div>}
-      <div>
+      <CfgFields ro={ro}><div>
         <div className="text-[15px] font-semibold text-slate-800">Target rate — the planned price where a route has no rate</div>
         <p className="text-[13px] text-slate-500 mt-0.5 mb-3 max-w-3xl">Per load + per tonne + per {DU()}, added together. Used only for routes with no rate of their own, marked "target".</p>
         {!data ? <div className="text-slate-400 text-sm">Loading…</div> : (
@@ -9471,19 +9558,23 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
             <button onClick={save} disabled={busy || !dirty} className="btn-pri" title="Saved on its own: the page's Save button does not save the target rate">{busy ? "Saving…" : "Save target rate"}</button>
           </div>
         )}
-      </div>
+      </div></CfgFields>
+      {/* 9 Nov 2026 (card 10): the fuel settings are a planner's too (the server's approver check), so outside the read-only fields */}
       <div>
         <div className="text-[15px] font-semibold text-slate-800 mb-1">Diesel index and fuel surcharge (BAF)</div>
         <FuelWidget mode="config" who={who} access={access} initial={data && data.summary} onChanged={load} />
       </div>
-      <FairPriceSection doc={doc} upd={upd} fileDoc={fileDoc} summary={data && data.summary && data.summary.fair} />
-      <DayHireSection doc={doc} upd={upd} />
+      <CfgFields ro={ro}>
+        <FairPriceSection doc={doc} upd={upd} fileDoc={fileDoc} summary={data && data.summary && data.summary.fair} />
+        <div className="mt-6"><DayHireSection doc={doc} upd={upd} /></div>
+      </CfgFields>
     </div>
   );
 }
 
 // ---- 8 Nov 2026 (v2.1 task 2.1-9): a day-hire rate per lorry type — typed, never seeded; the Lorry plan's saving in money ----
 function DayHireSection({ doc, upd }){
+  const ro = React.useContext(CfgRO);
   const vehicles = Object.keys((doc && doc.vehicles) || {}).filter(k => !k.startsWith("_"));
   const dh = (doc && doc.day_hire) || {};
   const inp = "ctl ctl-sm w-full tabular-nums";
@@ -9497,7 +9588,7 @@ function DayHireSection({ doc, upd }){
         {vehicles.map(k => (
           <label key={k} className="block">
             <span className="block text-sm font-medium text-slate-700 mb-1">{vehLabel(k)}</span>
-            <input className={inp + " mt-1"} inputMode="decimal" placeholder={`${CUR()} a day`} value={dh[k] ?? ""} onChange={e => set(k, e.target.value)} />
+            <input className={inp + " mt-1"} inputMode="decimal" data-ph-example="1" placeholder={ro ? "—" : `${CUR()} a day`} value={dh[k] ?? ""} onChange={e => set(k, e.target.value)} />
           </label>
         ))}
       </div>
@@ -9623,6 +9714,20 @@ function pickMaterials(all, meta, keep) {
 // 22 Oct 2026 (words sweep): "17 Oct 2026, 12:03 UTC" for the Configuration header (was the raw ISO stamp)
 const cfgWhen = (s) => { const d = new Date(String(s).replace(" ", "T").replace(/Z?$/, "Z")); return isNaN(d) ? String(s) : d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC"; };
 const isTonnesOnly = (c) => !!(c && Array.isArray(c.units) && c.units.length === 1 && c.units[0] === "t");
+// 9 Nov 2026 (UI critique finding 10, card 10): every value on the Configuration page sits inside CfgFields. For a reader
+// (anyone but an admin login) it is a DISABLED fieldset: the browser disables every input, select, textarea and button in it,
+// and .cfg-ro draws them as plain text (no boxes, a ✓ or – for a tick, no + Add / × / Remove). A field added later inside a
+// CfgFields is read-only for a reader with no work of its own. What a planner may still do on the page (the fuel settings,
+// Fetch now) is rendered outside it.
+// 9 Nov 2026 (card 10): a field with a made-up example placeholder ("name@scheme.example") reads "—" when empty for a reader
+const CfgRO = React.createContext(false);
+// 10 Nov 2026 (card 10, UI audit): a reader's wide table has no control to Tab to (the fields are disabled), and axe counts
+// anything inside a disabled fieldset as disabled, a tabindex box too. So for a reader the scroll box sits OUTSIDE the
+// fieldset: one named box round the tab's fields (.cfg-ro-box), and the tables' own wrappers stop scrolling inside it.
+const cfgScroll = (ro, name) => ro ? { className: "cfg-ro-box kb-scroll", tabIndex: 0, role: "region", "aria-label": name } : {};
+function CfgFields({ ro, children }){
+  return <fieldset className={"cfg-fs" + (ro ? " cfg-ro" : "")} disabled={!!ro} data-cfg-fields={ro ? "read" : "edit"}><CfgRO.Provider value={!!ro}>{children}</CfgRO.Provider></fieldset>;
+}
 
 function ConfigPage({ meta, who, access }){
   const [doc, setDoc] = useState(null);
@@ -9635,6 +9740,7 @@ function ConfigPage({ meta, who, access }){
   const [raw, setRaw] = useState("");
   const [rawErr, setRawErr] = useState("");
   const [fileDoc, setFileDoc] = useState(null);
+  const [vehOpen, setVehOpen] = useState({});   // 9 Nov 2026 (card 10): the materials whose vehicle ticks an admin has opened
 
   const load = () => fetch(`${API}/config/factors`).then(okJSON)
     .then(j => { setDoc(j.doc); setOrig(JSON.stringify(j.doc)); setStatus(j.status); setRaw(JSON.stringify(j.doc, null, 2)); setRawErr(""); setFileDoc(j.file || null); })
@@ -9686,7 +9792,8 @@ function ConfigPage({ meta, who, access }){
   // 27 Oct 2026 (F3 c / P5): only an admin LOGIN saves; a planner reads every section. The organisation file (download
   // everything, or replace it from a file) replaces the admin token's export / import scripts, admins only.
   const canSave = isAdminLogin(access);
-  const TABS = [["vehicles", "Vehicles"], ["materials", "Materials"], ["planning", "Planning"], ["costing", "Costing · fuel"], ["seasonal", "Seasonal restrictions"], ["mapbulletin", "Map and bulletin"], ["raw", "Everything (JSON)"]]
+  const ro = !canSave;   // 9 Nov 2026 (card 10): a reader sees the page read-only, told so once at the top
+  const TABS =[["vehicles", "Vehicles"], ["materials", "Materials"], ["planning", "Planning"], ["costing", "Costing · fuel"], ["seasonal", "Seasonal restrictions"], ["mapbulletin", "Map and bulletin"], ["raw", "Everything (JSON)"]]
     .concat(canSave ? [["orgfile", "Organisation file"]] : []);
   // 13 Oct 2026 (W12): the scheme's council colour bands, three rising whole numbers per measure, in the tenant block.
   // A measure left blank reads COUNCIL_BREAKS_DEFAULT (backend config.COUNCIL_BREAKS_DEFAULT, held equal by parse_frontend).
@@ -9721,7 +9828,7 @@ function ConfigPage({ meta, who, access }){
   return (
     <div className="max-w-7xl mx-auto p-6 pb-2">
       <PageHeader title="Configuration" kicker="Data"
-        subtitle="The numbers every figure is computed from. Changes apply on save, for everyone."
+        subtitle={ro ? "The numbers every figure is computed from." : "The numbers every figure is computed from. Changes apply on save, for everyone."}
         actions={canSave &&
           <details className="row-menu" data-cfg-more="1">
             <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }} title="Reset to defaults">More ▾</summary>
@@ -9740,6 +9847,8 @@ function ConfigPage({ meta, who, access }){
         )}
       </PageHeader>
 
+      {ro && <div className="cfg-ro-note" role="note" data-cfg-readonly="1">You can read the configuration. An admin changes it.</div>}
+
       {msg && <div className="rounded-lg border p-3 text-sm mb-4 whitespace-pre-wrap" style={{ borderColor: msg.ok ? "var(--green)" : "var(--red)", color: msg.ok ? "var(--ok-text)" : "var(--bad-text)", background: msg.ok ? "rgba(3,158,134,.06)" : "rgba(191,46,85,.06)" }}>{msg.text}</div>}
 
       {!doc ? <SkeletonTable cols={["Vehicle", "Payload t", "GVW t", "kg CO₂e / km"]} rows={5} caption="Configuration · loading" /> : (
@@ -9752,12 +9861,14 @@ function ConfigPage({ meta, who, access }){
           <div className="card cfg-main">
             <h3 className="text-[17px] font-semibold text-slate-800 px-6 pt-5 pb-3">{tabLabel}</h3>
 
+          <div {...cfgScroll(ro, tabLabel)}>
+          <CfgFields ro={ro}>
           {tab === "vehicles" && (
             <div className="overflow-auto">
               <table className="tbl">
                 <thead>
                   <tr>
-                    {["Vehicle", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Euro class", "Planning"].filter(h => h !== "Estonian" || vehLangEditable("ee")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
+                    {["Vehicle", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Euro class", "Planning"].filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -9768,7 +9879,8 @@ function ConfigPage({ meta, who, access }){
                     return (
                     <tr key={k}>
                       <td><div className="font-medium text-slate-800 leading-tight" data-cfg-vehname>{nm}</div>{v.code && <div className="text-[13px] text-slate-500 leading-tight">{v.code}</div>}</td>
-                      <td className="min-w-[190px]"><input className={inp} value={(lab.en && lab.en !== k) ? lab.en : ""} placeholder={vehWord(k)} aria-label={`${nm} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>
+                      {/* 9 Nov 2026 (card 10): a reader reads the name once, in the first column */}
+                      {!ro && <td className="min-w-[190px]"><input className={inp} value={(lab.en && lab.en !== k) ? lab.en : ""} placeholder={vehWord(k)} aria-label={`${nm} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>}
                       {vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder={vehWord(k)} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
                       <td className="num w-24"><input className={inp + " text-right"} value={v.payload_t ?? ""} aria-label={`${nm} payload t`} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
                       <td className="num w-24"><input className={inp + " text-right"} value={v.gvw_t ?? ""} aria-label={`${nm} GVW t`} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
@@ -9804,12 +9916,18 @@ function ConfigPage({ meta, who, access }){
                     style={h === "Volume ↔ weight" ? { whiteSpace: "normal", minWidth: 92 } : ["Density t/m³", "Tonnes only"].includes(h) ? { whiteSpace: "normal", width: 1 } : undefined}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
-                  {materials.map(k => { const c = doc.material_categories[k]; return (
-                    <tr key={k} className="align-top">
-                      <td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}{c.retired === true && <span className="block mt-1"><span className="chip-st"><i style={{ background: "var(--gold)" }} aria-hidden="true"></i>Older: pick one of the three</span></span>}</td>   {/* 18 Oct 2026 (decision 12): a long name wraps; 29 Oct 2026 (3b): a retired category says so */}
+                  {materials.map(k => { const c = doc.material_categories[k];
+                    // 9 Nov 2026 (card 10): the vehicles as a short summary; an admin opens the ticks with Edit, in a row of their
+                    // own under the material across the whole card (the grid in the cell was ~150 px a row, its second column cut)
+                    const vSum = vehicles.filter(v => (c.vehicles || []).includes(v)).map(v => vehLabel(v)).join(", ");
+                    const vid = "cfg-veh-" + k.replace(/[^a-z0-9]+/gi, "-");
+                    return (
+                    <React.Fragment key={k}>
+                    <tr className="align-top">
+                      <td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}{c.retired === true && <span className="block mt-1"><span className="chip-st"><i style={{ background: "var(--gold)" }} aria-hidden="true"></i>Older: pick one of the three</span></span>}{/* 18 Oct 2026 (decision 12): a long name wraps; 29 Oct 2026 (3b): a retired category says so. 9 Nov 2026: the comment inside the cell (the spaces before it were a text node in the row) */}</td>
                       <td className="num w-28"><input className={inp + " text-right"} value={c.density_t_per_m3 ?? ""} aria-label={`${k} density`} onChange={e => upd(d => { d.material_categories[k].density_t_per_m3 = num(e.target.value); })} /></td>
-                      <td className="w-32">
-                        <select className={inp} value={c.default_unit || "t"} aria-label={`${k} default unit`} disabled={isTonnesOnly(c)} onChange={e => upd(d => { d.material_categories[k].default_unit = e.target.value; })}>
+                      <td style={{ minWidth: 118 }}>   {/* 9 Nov 2026 (card 10): wide enough for "tonnes" and "vehicles" (was cut to "tonne", "vehic") */}
+                        <select className={inp} style={{ minWidth: 104 }} value={c.default_unit || "t"} aria-label={`${k} default unit`} disabled={isTonnesOnly(c)} onChange={e => upd(d => { d.material_categories[k].default_unit = e.target.value; })}>
                           <option value="m3">m³</option><option value="t">tonnes</option><option value="vehicles">vehicles</option>
                         </select>
                       </td>
@@ -9818,24 +9936,33 @@ function ConfigPage({ meta, who, access }){
                       <td className="text-center"><input type="checkbox" checked={isTonnesOnly(c)} aria-label={`${k} is planned in tonnes only`} data-cfg-tonnes-only={k}
                         onChange={e => upd(d => { const m = d.material_categories[k]; if(e.target.checked){ m.units = ["t"]; m.default_unit = "t"; } else delete m.units; })} /></td>
                       <td className="text-center"><input type="checkbox" checked={c.volume_convertible !== false} aria-label={`${k} converts volume to weight`} onChange={e => upd(d => { d.material_categories[k].volume_convertible = e.target.checked; })} /></td>
-                      {/* 18 Oct 2026 (UI audit decision 12, finding #13): two columns of 24 px rows, a long name wrapping inside its
-                          column — it was one column of 16 px rows at a 20 px pitch (a tablet ticks the wrong vehicle, and it goes live on
-                          Save), each name on one line and cut at the card's edge ("Concrete mixer 8 m³ (3…"). The cell is at least 332 px
-                          (two 154 px columns: a "Rigid 8-wheeler (32t)" on one line; the mixers and the electric names wrap) and, with the
-                          headings above and the material name wrapping, the table fits the card at 1366 px instead of scrolling inside it */}
-                      <td style={{ whiteSpace: "normal", height: "auto", padding: "8px", minWidth: 332 }}>
-                        <div className="grid grid-cols-2 gap-x-2">
-                          {vehicles.map(v => (
-                            <label key={v} className="flex items-center gap-1.5 min-h-6 text-[13px] leading-tight text-slate-600">
-                              <input type="checkbox" className="flex-none" checked={(c.vehicles || []).includes(v)} onChange={e => upd(d => {
-                                const cur = d.material_categories[k].vehicles || [];
-                                d.material_categories[k].vehicles = e.target.checked ? [...cur, v] : cur.filter(x => x !== v);
-                              })} /> {vehLabel(v)}
-                            </label>
-                          ))}
-                        </div>
+                      {/* 18 Oct 2026 (UI audit decision 12, finding #13): 24 px tick rows, a long name wrapping. 9 Nov 2026 (UI critique
+                          card 10): the ticks moved out of this cell (two 154 px columns, the second cut at the card's edge, every material
+                          ~150 px tall) into a row of their own an admin opens with Edit; the cell is the summary */}
+                      <td style={{ whiteSpace: "normal", height: "auto", minWidth: 180 }} data-cfg-veh-sum={k}>
+                        <span className="text-[13px] text-slate-700">{vSum || "None"}</span>
+                        {!ro && <button type="button" className="link-btn text-[13px] ml-2" aria-expanded={vehOpen[k] ? "true" : "false"} aria-controls={vid}
+                          aria-label={`${vehOpen[k] ? "Done with" : "Edit"} the vehicles for ${k}`} data-cfg-veh-edit={k}
+                          onClick={() => setVehOpen(o => ({ ...o, [k]: !o[k] }))}>{vehOpen[k] ? "Done" : "Edit"}</button>}
                       </td>
                     </tr>
+                    {!ro && vehOpen[k] && (
+                      <tr id={vid} data-cfg-veh-grid={k}>
+                        <td colSpan={6} style={{ whiteSpace: "normal", height: "auto", padding: "8px 16px 12px" }}>
+                          <div className="grid gap-x-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))" }} role="group" aria-label={`Vehicles used for ${k}`}>
+                            {vehicles.map(v => (
+                              <label key={v} className="flex items-center gap-1.5 min-h-6 text-[13px] leading-tight text-slate-600">
+                                <input type="checkbox" className="flex-none" checked={(c.vehicles || []).includes(v)} onChange={e => upd(d => {
+                                  const cur = d.material_categories[k].vehicles || [];
+                                  d.material_categories[k].vehicles = e.target.checked ? [...cur, v] : cur.filter(x => x !== v);
+                                })} /> {vehLabel(v)}
+                              </label>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   ); })}
                 </tbody>
               </table>
@@ -10022,7 +10149,7 @@ function ConfigPage({ meta, who, access }){
                                   <button type="button" className="row-x" aria-label={`Take ${dLabel(dd)} out of stage ${i + 1}`} title="Remove"
                                     onClick={() => change(c => { c.stages[i].disciplines = c.stages[i].disciplines.filter(x => x !== dd); })}></button></span>))}
                               {discs.some(x => !used.has(x.id)) && (
-                                <select className="ctl" value="" aria-label={`Add a kind of work to stage ${i + 1}`}
+                                <select className="ctl" value="" data-ro-hide="1" aria-label={`Add a kind of work to stage ${i + 1}`}
                                   onChange={e => { const v = e.target.value; if(v) change(c => { c.stages[i].disciplines = [...(c.stages[i].disciplines || []), v]; }); }}>
                                   <option value="">+ Add</option>
                                   {discs.filter(x => !used.has(x.id)).map(x => <option key={x.id} value={x.id}>{x.label}</option>)}
@@ -10044,7 +10171,7 @@ function ConfigPage({ meta, who, access }){
           )}
 
           {tab === "mapbulletin" && (
-            <div className="px-6 pb-6 max-w-xl">
+            <div className="px-6 max-w-xl">
               {/* 30 Oct 2026 (task 4b): the contact lines the bulletin and the resident leaflet print. The address also switches on
                   "Report a concern" on the public map. An empty box leaves its line out. Checked by the server on Save. */}
               <div data-cfg="contact-lines" className="mb-6 pb-5 border-b border-slate-200">
@@ -10057,7 +10184,7 @@ function ConfigPage({ meta, who, access }){
                   ["newsletter_url", "cfg-contact-link", "Public newsletter link (optional)", 300, "https://…", "Where residents can read the bulletin: the scheme's own web page."]].map(([k, id, l, mx, ph, help]) => (
                   <div key={k} className="field" style={{ marginBottom: 8 }}>
                     <label htmlFor={id}>{l}</label>
-                    <input id={id} className="ctl w-full" maxLength={mx} placeholder={ph} data-contact={k}
+                    <input id={id} className="ctl w-full" maxLength={mx} placeholder={ro ? "—" : ph} data-contact={k} data-ph-example="1"
                       value={(doc.tenant || {})[k] || ""} onChange={e => upd(d => { setTenantText(d, k, e.target.value); })} />
                     {help && <div className="hint">{help}</div>}
                   </div>
@@ -10072,7 +10199,7 @@ function ConfigPage({ meta, who, access }){
                   {[["concern_privacy_url", "cfg-concern-privacy", "Privacy notice link", 300, "https://…", (doc.tenant || {}).demo_notice ? "Blank on the demo: Wayscope's own notice." : "Needed before the form shows: the page that says how concerns are kept."]].map(([k, id, l, mx, ph, help]) => (
                     <div key={k} className="field" style={{ marginBottom: 8 }}>
                       <label htmlFor={id}>{l}</label>
-                      <input id={id} className="ctl w-full" maxLength={mx} placeholder={ph} data-contact={k}
+                      <input id={id} className="ctl w-full" maxLength={mx} placeholder={ro ? "—" : ph} data-contact={k} data-ph-example="1"
                         value={(doc.tenant || {})[k] || ""} onChange={e => upd(d => { setTenantText(d, k, e.target.value); })} />
                       <div className="hint">{help}</div>
                     </div>
@@ -10119,18 +10246,18 @@ function ConfigPage({ meta, who, access }){
                 <div className="hint">Shown in the Basemap list on the public map. Leave the address empty to hide it.</div>
                 <div className="field" style={{ marginBottom: 8 }}>
                   <label htmlFor="cfg-imagery-name">Name in the list</label>
-                  <input id="cfg-imagery-name" className="ctl w-full" maxLength={40} placeholder="Client imagery"
+                  <input id="cfg-imagery-name" data-ph-example="1" className="ctl w-full" maxLength={40} placeholder={ro ? "—" : "Client imagery"}
                     value={(doc.tenant || {}).imagery_name || ""} onChange={e => upd(d => { setTenantText(d, "imagery_name", e.target.value); })} />
                 </div>
                 <div className="field" style={{ marginBottom: 8 }}>
                   <label htmlFor="cfg-imagery-url">Address</label>
-                  <input id="cfg-imagery-url" className="ctl w-full" maxLength={600} placeholder="https://…/{z}/{x}/{y}.jpg"
+                  <input id="cfg-imagery-url" data-ph-example="1" className="ctl w-full" maxLength={600} placeholder={ro ? "—" : "https://…/{z}/{x}/{y}.jpg"}
                     value={(doc.tenant || {}).imagery_url || ""} onChange={e => upd(d => { setTenantText(d, "imagery_url", e.target.value); })} />
                   <div className="hint">An address with {"{z}/{x}/{y}"}, or a WMS address. Web Mercator only.</div>
                 </div>
                 <div className="field" style={{ marginBottom: 8 }}>
                   <label htmlFor="cfg-imagery-credit">Credit shown on the map</label>
-                  <input id="cfg-imagery-credit" className="ctl w-full" maxLength={160} placeholder="© Example Council 2025"
+                  <input id="cfg-imagery-credit" data-ph-example="1" className="ctl w-full" maxLength={160} placeholder={ro ? "—" : "© Example Council 2025"}
                     value={(doc.tenant || {}).imagery_credit || ""} onChange={e => upd(d => { setTenantText(d, "imagery_credit", e.target.value); })} />
                   <div className="hint">Most aerial licences ask for it.</div>
                 </div>
@@ -10144,13 +10271,21 @@ function ConfigPage({ meta, who, access }){
                   <option value="outdoors">Outdoors</option><option value="aerial">Aerial (with names)</option></select>
                 <div className="hint">The map in the route sheet, collision evidence and Look-ahead PDFs. The bulletin stays Light.</div>
               </div>
+            </div>
+          )}
+          </CfgFields>
+          </div>
+          {/* 9 Nov 2026 (card 10): the two fetches are a planner's to press, so they sit outside the read-only fields */}
+          {tab === "mapbulletin" && (
+            <div className="px-6 pb-6 max-w-xl">
               <CommunityPanel access={access} />
               <CollisionPanel access={access} />
             </div>
           )}
 
-          {tab === "costing" && <CostingTab who={who} access={access} token={token} setToken={setToken} doc={doc} upd={upd} fileDoc={fileDoc} />}
+          {tab === "costing" && <CostingTab who={who} access={access} token={token} setToken={setToken} doc={doc} upd={upd} fileDoc={fileDoc} ro={ro} />}
 
+          <CfgFields ro={ro}>
           {tab === "seasonal" && (
             <div className="px-6 pb-6 space-y-3">
               {(doc.seasonal_restrictions || []).map((w, i) => (
@@ -10171,7 +10306,7 @@ function ConfigPage({ meta, who, access }){
                   </div>
                   <div className="space-y-2">
                     <div className="field" style={{ marginBottom: 8 }}><label>Message shown at submission and on the map timeline</label><textarea className="ctl w-full h-20" value={w.message || ""} onChange={e => upd(d => { d.seasonal_restrictions[i].message = e.target.value; })} /></div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1" data-ro-only-on="1">
                       <span className="text-[13px] text-slate-500 w-full">Restricted vehicles (none = applies to every vehicle)</span>
                       {vehicles.map(v => (
                         <label key={v} className="flex items-center gap-1 min-h-6 text-[13px] text-slate-600 whitespace-nowrap">   {/* 18 Oct 2026 (UI audit #13): 24 px rows */}
@@ -10189,11 +10324,12 @@ function ConfigPage({ meta, who, access }){
                 className="btn-sec">+ Add a window</button>
             </div>
           )}
+          </CfgFields>
 
           {tab === "raw" && (
             <div className="px-6 pb-6">
-              <p className="text-sm text-slate-500 mb-2">Everything else, such as lorry sizes for routing. Saving here sends exactly this text.</p>
-              <textarea className="w-full h-[60vh] font-mono text-[13px] border border-slate-300 rounded-lg p-3" value={raw} aria-label="Everything (JSON)"
+              <p className="text-sm text-slate-500 mb-2">{ro ? "Everything else, such as lorry sizes for routing." : "Everything else, such as lorry sizes for routing. Saving here sends exactly this text."}</p>
+              <textarea className="w-full h-[60vh] font-mono text-[13px] border border-slate-300 rounded-lg p-3" value={raw} aria-label="Everything (JSON)" readOnly={ro}
                 onChange={e => { setRaw(e.target.value); setRawErr(""); try { setDoc(JSON.parse(e.target.value)); } catch(err){} }} />
               {rawErr && <div className="text-sm mt-1" style={{ color: "var(--red)" }}>{rawErr}</div>}
             </div>
@@ -10203,7 +10339,8 @@ function ConfigPage({ meta, who, access }){
         </div>
       )}
 
-      {tab !== "orgfile" && (canSave ? (
+      {/* 9 Nov 2026 (card 10): the Save bar for an admin only; a reader was told at the top (it was a footer line ~3,700 px down) */}
+      {tab !== "orgfile" && canSave && (
       <div className="savebar" data-cfg-savebar="1">
         <span className="text-slate-500">{!doc ? "" : dirty ? "Unsaved changes on this page" : tab === "raw" ? "Saving from the JSON section sends the text as typed" : "No unsaved changes"}</span>
         <span className="flex items-center gap-2">
@@ -10211,11 +10348,7 @@ function ConfigPage({ meta, who, access }){
           <button onClick={save} disabled={busy || !doc || (!dirty && tab !== "raw")} className="btn-pri">{busy ? "Saving…" : "Save"}</button>
         </span>
       </div>
-      ) : (
-      <div className="savebar" data-cfg-savebar="1">
-        <span className="text-slate-500" role="note">Only an admin can save the configuration.</span>
-      </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -15668,7 +15801,10 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
 function CatChips({ list, dir }){
   const arr = asArray(list);
   if(!arr.length) return <span className="text-slate-500">—</span>;
-  const bg = dir === "in" ? "rgba(3,158,134,.10)" : "rgba(37,99,235,.08)";
+  // 9 Nov 2026 (UI critique #46): the tint is laid over the page's surface, so a chip reads the same on a selected or hovered
+  // row (the blue words on the selected row's wash were 4.43:1); the out chip's tint follows the accent like its words
+  const tint = dir === "in" ? "rgba(3,158,134,.10)" : "var(--navy-soft)";
+  const bg = `linear-gradient(${tint}, ${tint}), var(--surface)`;
   const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";
   return (
     <span className="flex flex-wrap gap-1">
