@@ -915,6 +915,11 @@ ok("8. no Python tuple or list is rendered into a message a person reads: the le
 ok("8. no US spelling in the module's sentences", not re.search(r"\b(color|center|meter|kilometer|neighbor|analyze|optimize)\b", src, re.I))
 ok("8. the module says what it does not do", "WHAT THIS DOES NOT DO" in src)
 
+# 9 Nov 2026 (v2.1 task 2.1-1): a traffic limit is a zone, never a haul road; it counts each pass as road sections do
+_tl = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "traffic_limits.py"), encoding="utf-8").read()
+ok("9. traffic limits count through counting (one rule with the road sections) and never re-route",
+   "import counting" in _tl and "counting.MOVEMENTS" in _tl and "affects_routing" not in _tl.split("def clean_fields")[0]
+   and "bake" not in _tl.lower().replace("baked", ""))
 print()
 for f in FAIL:
     print("  FAIL:", f)
