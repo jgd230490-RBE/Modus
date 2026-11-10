@@ -1549,6 +1549,10 @@ ok("ROAD CARD POLISH: technical T1 has the rounding rule, the idle routes, the m
                              "the 12 Oct whole-movements rule holds everywhere else")))
 ok("ROAD CARD EDGE: technical T1 says which side the road card opens on near the map's edges",
    all(w in _tg_rs for w in ('id="t1-road-edge"', "<code>secselSide</code>", "<code>SECSEL_HALF</code> = 200 px", "<code>secselRightEdge</code>")))
+# 10 Nov 2026 (road card top: a card opened above a click lost its first lines under the figures bar)
+ok("ROAD CARD TOP: technical T1 says the card's room starts under the figures bar and when it opens beside the click",
+   all(w in _tg_rs for w in ('id="t1-road-top"', "<code>secselTopEdge</code>", "<code>secselRoom</code>", "<code>SECSEL_NEED</code> = 290 px",
+                             "<code>SECSEL_WIDE</code> = 404 px", "<code>secselBeside</code>", "beside the click")))
 # 10 Nov 2026 (map drawer polish; live test findings 4, 7, 8)
 ok("MAP DRAWER POLISH: technical T1 says how the drawer, the Conditions panel, the timeline bar and the demo notice keep clear of each other",
    all(w in _tg_rs for w in ('id="t1-drawer-clear"', "<code>--tl-foot</code>", "<code>drawer-open</code>", "<code>positionWarnStack</code>", "<code>--notice-h</code>")))
