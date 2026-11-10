@@ -5589,6 +5589,16 @@ def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None
         raise HTTPException(400, str(e))
 
 
+@app.get("/api/sim/busiest-month")
+def sim_busiest_month():
+    """
+    9 Nov 2026 (UI critique finding 9, decision 7): the month the Simulation page opens on, the programme's busiest by
+    approved lorry loads (sim.busiest_month). One read, kept until the next write. Any signed-in code.
+    """
+    acc = _require_access()
+    return _staff_json("sim/busiest-month", {}, lambda: {"busiest": sim.busiest_month(conversions.load_factors())}, acc)
+
+
 @app.get("/api/clp/monitoring")
 def clp_monitoring(month: Optional[int] = None):
     """
