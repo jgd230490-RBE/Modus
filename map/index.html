@@ -31,7 +31,37 @@
             /* 11 Oct 2026 — the map takes the staff app's shell: warm neutrals, orange primary buttons. --navy
                stays blue: it is the route colour and the link colour (the user: routes stay blue). */
             --action:#C2410C; --action-fg:#FFFFFF; --surface-2:#FAFAF9; --note:#78716C;
+            /* 10 Nov 2026 (wave 2, card 14): the panel's surfaces and fixed text as tokens, so the staff app's Dark look can
+               reach the map it embeds (html[data-look="dark"] below). The values here are the ones the page always had. */
+            --surface:#FFFFFF; --ctl-line:#D6D3D1; --ink-2:#57534E;
         }
+        /* 10 Nov 2026 (wave 2, UI critique finding 14, card 14): inside the staff app (EMBED) the map follows the app's look.
+           In Dark the panel, the figures bar, the timeline, the drawers and the conditions panel go dark and the basemap opens
+           on Dark (dark-v11), as the Simulation's map already does; a basemap picked by hand is kept. The public map (not
+           embedded) has no Dark look and never sets data-look. --navy stays the route blue. */
+        html[data-look="dark"]{
+            --ink:#E6E7EA; --muted:#9AA1AB; --line:#33363D; --bg:#141518; --navy-deep:#F3F4F6; --note:#9AA1AB;
+            --surface:#1F2024; --surface-2:#1B1D21; --ctl-line:#45484F; --ink-2:#C9CCD1;
+            --action:#FF8C14; --action-fg:#1F2024;
+            color-scheme:dark;
+        }
+        html[data-look="dark"] a{ color:#8FB3F5; }
+        html[data-look="dark"] select, html[data-look="dark"] input{ background:var(--surface); color:var(--ink); }
+        html[data-look="dark"] .mapboxgl-popup-content{ background:var(--surface); color:var(--ink); }
+        html[data-look="dark"] .mapboxgl-popup-tip{ border-top-color:var(--surface); border-bottom-color:var(--surface); }
+        /* the few fixed light boxes the token swap does not reach (found in Chrome, 10 Nov): the tour strip, the timeline's
+           rail, the phone's full-screen strip, a road table's hover and clicked row */
+        html[data-look="dark"] .guide-strip{ background:rgba(31,32,36,.92); border-color:rgba(255,255,255,.14); }
+        html[data-look="dark"] .guide-strip .guide-strip-go{ color:#8FB3F5; }
+        html[data-look="dark"] .guide-strip .guide-x{ color:var(--muted); }
+        html[data-look="dark"] .tl-rail{ background:var(--surface-2); }
+        html[data-look="dark"] #m-full-strip:not([hidden]){ background:rgba(31,32,36,.96); }
+        html[data-look="dark"] .secsel-btn:hover{ background:var(--surface-2); }
+        html[data-look="dark"] .secsel-x:hover{ background:var(--surface-2); }
+        html[data-look="dark"] table.secsel-table tr.secsel-clicked td{ background:rgba(37,99,235,.22); }
+        html[data-look="dark"] .drawer-tab.active{ background:rgba(37,99,235,.22); color:#8FB3F5; }
+        html[data-look="dark"] .mapboxgl-ctrl.mapboxgl-ctrl-attrib{ background:rgba(31,32,36,.72); }
+        html[data-look="dark"] .mapboxgl-ctrl-attrib a{ color:#C9CCD1; }
         *{ box-sizing:border-box; }
         body { margin:0; padding:0; font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--ink); overflow:hidden; -webkit-font-smoothing:antialiased; }
         /* 9 Nov 2026 (UI critique finding 2, card 2): the page never scrolls. body's overflow:hidden only stopped the wheel:
@@ -44,17 +74,17 @@
         #map { position:absolute; top:0; bottom:0; right:0; left:300px; transition:left .25s ease; }
         body.sidebar-closed #map, .sidebar.closed ~ #map { left:0; }
 
-        #menu-toggle { position:absolute; top:14px; left:14px; z-index:1000; background:#fff; color:var(--navy-deep); border:1px solid var(--line); padding:8px 13px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; box-shadow:0 1px 3px rgba(16,24,40,.08); }
+        #menu-toggle { position:absolute; top:14px; left:14px; z-index:1000; background:var(--surface); color:var(--navy-deep); border:1px solid var(--line); padding:8px 13px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; box-shadow:0 1px 3px rgba(16,24,40,.08); }
         #menu-toggle:hover{ border-color:#d0d3d8; }
         /* 12 Oct 2026 (review 2.8): a tap on the chrome is a tap, never a double-tap zoom — the panel, the figures bar,
            the conditions panel, the timeline bar and the route drawer */
         .sidebar, #menu-toggle, #kpi-hud, #tl-warnings, #timeline-bar, #route-drawer{ touch-action:manipulation; }
         /* 12 Oct 2026 — the panel's own close control, a 44 px target; shown below 1024 only (the phone block) */
-        .sidebar-close{ display:none; position:absolute; top:10px; left:10px; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--navy-deep); font-size:22px; line-height:1; cursor:pointer; padding:0; }
+        .sidebar-close{ display:none; position:absolute; top:10px; left:10px; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--navy-deep); font-size:22px; line-height:1; cursor:pointer; padding:0; }
 
-        .sidebar { position:absolute; top:0; bottom:0; left:0; width:300px; background:#fff; border-right:1px solid var(--line); padding:20px 18px 24px; z-index:10; display:flex; flex-direction:column; gap:22px; overflow-y:auto; transition:transform .25s ease; }
+        .sidebar { position:absolute; top:0; bottom:0; left:0; width:300px; background:var(--surface); border-right:1px solid var(--line); padding:20px 18px 24px; z-index:10; display:flex; flex-direction:column; gap:22px; overflow-y:auto; transition:transform .25s ease; }
         .sidebar.closed { transform:translateX(-100%); }
-        .sidebar .panel-top{ flex:none; position:sticky; top:-20px; z-index:2; height:64px; margin:-20px -18px 0; background:#fff; }   /* top:-20px: sticky counts from the panel's padding edge */
+        .sidebar .panel-top{ flex:none; position:sticky; top:-20px; z-index:2; height:64px; margin:-20px -18px 0; background:var(--surface); }   /* top:-20px: sticky counts from the panel's padding edge */
         .sidebar-close{ z-index:3; }
         .sidebar h2 { margin:0; font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--navy-deep); padding-top:42px; display:flex; align-items:center; gap:9px; }
         .sidebar h2::before{ content:""; width:8px; height:22px; background:var(--navy); border-radius:2px; }
@@ -62,10 +92,10 @@
         .sidebar h3 { margin:0 0 8px; font-size:13px; font-weight:600; letter-spacing:0; color:var(--navy-deep); text-transform:none; }
 
         select, button, input { font-family:inherit; }
-        select { width:100%; background:#fff; border:1px solid #D6D3D1; border-radius:6px; padding:8px 10px; color:var(--ink); font-size:14px; outline:none; margin-bottom:6px; transition:border-color .15s; }
+        select { width:100%; background:var(--surface); border:1px solid var(--ctl-line); border-radius:6px; padding:8px 10px; color:var(--ink); font-size:14px; outline:none; margin-bottom:6px; transition:border-color .15s; }
         select:focus { border-color:var(--navy); }
         .btn { width:100%; border:none; border-radius:6px; padding:8px; font-size:14px; font-weight:600; cursor:pointer; background:var(--action); color:var(--action-fg); }
-        .btn-ghost { background:#fff; color:var(--ink); border:1px solid #D6D3D1; font-weight:500; }
+        .btn-ghost { background:var(--surface); color:var(--ink); border:1px solid var(--ctl-line); font-weight:500; }
         .btn-ghost:hover{ background:var(--surface-2); }
 
         .control-group { display:flex; flex-direction:column; }
@@ -126,7 +156,7 @@
         #limits-group [hidden]{ display:none; }
         #limit-boxes .control-item.dim label{ opacity:.45; }
         .lim-n{ margin-left:auto; padding-left:8px; padding-right:8px; color:var(--muted); font-weight:400; font-variant-numeric:tabular-nums; }   /* 28 Oct 2026: 8 px clear of the swatch */
-        .lim-sw{ flex:none; width:13px; height:13px; margin-left:8px; border-radius:50%; background:#fff; border:2.5px solid #C8102E; box-sizing:border-box; }
+        .lim-sw{ flex:none; width:13px; height:13px; margin-left:8px; border-radius:50%; background:var(--surface); border:2.5px solid #C8102E; box-sizing:border-box; }
         .lim-card{ font-size:14px; line-height:1.4; color:var(--ink); min-width:230px; max-height:min(52vh, 380px); overflow-y:auto; }   /* 13 Oct, seen in Chrome: a card with three routes ran off the map */
         .lim-head{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
         .lim-head svg{ flex:none; }
@@ -145,7 +175,7 @@
            pulls it to the edge and pads past #menu-toggle. Mapbox's zoom stack is pushed
            below it (.mapboxgl-ctrl-top-right). */
         #kpi-hud{ position:absolute; top:0; left:300px; right:0; z-index:15; height:72px;
-                  background:#fff; border-bottom:1px solid var(--line); padding:0 24px;
+                  background:var(--surface); border-bottom:1px solid var(--line); padding:0 24px;
                   display:flex; align-items:center; gap:28px; pointer-events:auto;
                   transition:left .25s ease; }
         body.sidebar-closed #kpi-hud{ left:0; padding-left:176px; }
@@ -207,7 +237,7 @@
         .kpi-note{ display:none; }
         /* the conditions pill: dots and counts; opens #tl-warnings */
         #kpi-conditions{ margin-left:auto; display:none; align-items:center; gap:8px; border:1px solid var(--line);
-                         background:#fff; border-radius:999px; padding:8px 14px 8px 12px; font:inherit; font-size:13px;
+                         background:var(--surface); border-radius:999px; padding:8px 14px 8px 12px; font:inherit; font-size:13px;
                          color:var(--navy-deep); cursor:pointer; white-space:nowrap; }
         #kpi-conditions:hover{ border-color:#cbd5e1; }
         #kpi-conditions.on{ display:flex; }
@@ -237,7 +267,7 @@
         .kpi-switch button{ flex:1; border:none; background:none; cursor:pointer; padding:5px 3px;
                      font-size:12px; font-weight:600; white-space:nowrap;
                      color:var(--muted); border-radius:5px; font-family:inherit; }
-        .kpi-switch button.on{ background:#fff; color:var(--navy-deep); box-shadow:0 1px 2px rgba(16,24,40,.10); }
+        .kpi-switch button.on{ background:var(--surface); color:var(--navy-deep); box-shadow:0 1px 2px rgba(16,24,40,.10); }
         /* 2026-09-08 (§C): the 07 Sep name plates are gone. The ends of live routes
            are marked by the location ICON growing 2 px with a 1 px halo — a data-driven
            icon-image on the one locations layer, drawn inside the canvas, with no DOM at
@@ -249,7 +279,7 @@
            a coloured dot, a plain noun, one sentence, "Show on map". No uppercase level
            labels, no coloured left stripes — the dot and the noun carry the level. */
         #tl-warnings{ display:none; position:absolute; top:84px; right:12px; z-index:24; width:min(360px, calc(100vw - 24px));
-                      max-height:min(60vh, 520px); overflow:auto; background:#fff; border:1px solid var(--line);
+                      max-height:min(60vh, 520px); overflow:auto; background:var(--surface); border:1px solid var(--line);
                       border-radius:12px; padding:14px 18px 6px; flex-direction:column; pointer-events:auto; }
         /* 9 Nov 2026 (card 2): at a desk the open conditions panel covered the zoom buttons (top 98 / 110, right 10 / 12) —
            hidden while the page was lifted 80 px. It sits left of the zoom stack now (10 px margin + 29 px + a gap). */
@@ -382,11 +412,11 @@
         .ctl-head{ display:flex; align-items:center; gap:8px; margin:0 0 8px; }
         .ctl-head h3, .ctl-head .heat-label, .ctl-head .area-legend-title{ margin:0; }
         .info-i{ position:relative; flex:none; display:inline-grid; place-items:center; width:18px; height:18px; padding:0; border-radius:50%;
-                 border:1.5px solid #94A3B8; background:#fff; color:#475569; font:700 11px/1 Inter,system-ui,sans-serif; cursor:pointer; }
+                 border:1.5px solid #94A3B8; background:var(--surface); color:var(--ink-2); font:700 11px/1 Inter,system-ui,sans-serif; cursor:pointer; }
         .info-i::after{ content:""; position:absolute; inset:-13px; }
         .info-i[aria-expanded="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; }
         .info-i:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
-        .info-pop{ margin:0 0 10px; padding:10px 12px; background:#fff; border:1px solid #CBD5E1; border-radius:8px;
+        .info-pop{ margin:0 0 10px; padding:10px 12px; background:var(--surface); border:1px solid #CBD5E1; border-radius:8px;
                    box-shadow:0 6px 18px rgba(16,24,40,.10); font-size:13px; line-height:1.5; color:var(--ink); }
         .info-pop[hidden]{ display:none; }
         .info-pop p{ margin:0 0 6px; }
@@ -395,7 +425,7 @@
         /* the month picker: a year row and that year's twelve months (was one chip per month: 60 on the four-year demo) */
         .month-picker .mp-years{ display:flex; gap:4px; margin:0 0 6px; }
         .month-picker .mp-months{ display:grid; grid-template-columns:repeat(6, 1fr); gap:4px; }
-        .month-picker button{ height:32px; padding:0; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink);
+        .month-picker button{ height:32px; padding:0; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--ink);
                               font:500 13px Inter,system-ui,sans-serif; cursor:pointer; }
         .month-picker .mp-years button{ flex:1; font-weight:600; }
         .month-picker button.none{ color:var(--muted); background:var(--surface-2); }
@@ -405,9 +435,9 @@
         .fc-box .fc-toggle{ margin-top:8px; }
         #forecast-status:empty{ display:none; }
         /* the heat map as one segmented control (the three radio buttons keep their ids, names and handlers) */
-        .heat-seg{ display:flex; border:1px solid #D6D3D1; border-radius:8px; overflow:hidden; }
-        .heat-seg .fc-toggle.fc-mode{ flex:1; justify-content:center; margin:0; padding:8px 4px; border:0; border-right:1px solid #D6D3D1;
-                                      border-radius:0; background:#fff; }
+        .heat-seg{ display:flex; border:1px solid var(--ctl-line); border-radius:8px; overflow:hidden; }
+        .heat-seg .fc-toggle.fc-mode{ flex:1; justify-content:center; margin:0; padding:8px 4px; border:0; border-right:1px solid var(--ctl-line);
+                                      border-radius:0; background:var(--surface); }
         .heat-seg .fc-toggle.fc-mode:last-child{ border-right:0; }
         .heat-seg input{ position:absolute; opacity:0; width:1px; height:1px; margin:0; }
         .heat-seg .fc-toggle.fc-mode:has(input:checked){ background:var(--navy); color:#fff; font-weight:600; }   /* beats the white above (19 Oct, seen in Chrome: white on white) */
@@ -418,12 +448,12 @@
         /* 8 Nov 2026 (v2.1 item 2.1-3, mockup notes/map-export-default-mockup-1108 card 3): the Routes picker, the grid's
            full width under the four selects; its list opens in place (the sidebar is the Layers sheet on a phone) */
         .filter-grid .route-pick-btn{ grid-column:1 / -1; margin-top:6px; min-height:36px; display:flex; justify-content:space-between; align-items:center;
-                        gap:6px; padding:8px 8px; border:1px solid #A8A29E; border-radius:6px; background:#fff; color:var(--ink);
+                        gap:6px; padding:8px 8px; border:1px solid #A8A29E; border-radius:6px; background:var(--surface); color:var(--ink);
                         font:600 13px Inter,system-ui,sans-serif; text-align:left; cursor:pointer; }
         .route-pick-btn span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
         .route-pick-btn::after{ content:"\25BE"; color:var(--muted); font-weight:400; flex:none; }
         .route-pick-btn:focus-visible{ outline:2px solid var(--navy); outline-offset:1px; }
-        .route-pick{ margin-top:6px; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(16,24,40,.14); padding:8px; background:#fff; }
+        .route-pick{ margin-top:6px; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(16,24,40,.14); padding:8px; background:var(--surface); }
         .route-pick[hidden]{ display:none; }
         .route-pick input[type=search]{ width:100%; box-sizing:border-box; min-height:40px; border:1px solid #A8A29E; border-radius:6px; padding:6px 10px;
                         font:14px Inter,system-ui,sans-serif; color:var(--ink); margin-bottom:4px; }
@@ -444,7 +474,7 @@
         .share-group .share-row .btn{ font-size:13px; padding:8px 10px; }      /* two to a row at 300 px (were one each at 14 px) */
         .layers-box > summary small{ margin-left:6px; font-size:13px; font-weight:500; color:var(--muted); }
         /* the number badges' key (the badges on the map are drawn by pillBadgeImage) */
-        .mv-pill, .co-pill{ flex:none; display:inline-flex; align-items:center; gap:3px; height:20px; padding:0 7px; border-radius:10px; background:#fff;
+        .mv-pill, .co-pill{ flex:none; display:inline-flex; align-items:center; gap:3px; height:20px; padding:0 7px; border-radius:10px; background:var(--surface);
                             font:700 13px/20px Inter,system-ui,sans-serif; white-space:nowrap; }
         .mv-pill{ color:#1D4ED8; box-shadow:inset 0 0 0 1.5px #2563EB; }
         .co-pill{ color:#065F46; box-shadow:inset 0 0 0 1.5px #059669; }
@@ -456,7 +486,7 @@
         .rb-popup-btn{ margin-top:10px; width:100%; background:var(--navy); color:#fff; border:none; padding:8px; border-radius:6px; font-weight:600; font-size:12px; cursor:pointer; }
 
         /* Bottom drawer: route analysis + forecast detail */
-        #route-drawer{ position:absolute; left:300px; right:0; bottom:0; z-index:20; background:#fff; border-top:1px solid var(--line); box-shadow:0 -8px 28px rgba(16,24,40,.10); transform:translateY(100%); transition:transform .28s ease, visibility 0s linear .28s; visibility:hidden; height:46vh; max-height:46vh; display:flex; flex-direction:column; }
+        #route-drawer{ position:absolute; left:300px; right:0; bottom:0; z-index:20; background:var(--surface); border-top:1px solid var(--line); box-shadow:0 -8px 28px rgba(16,24,40,.10); transform:translateY(100%); transition:transform .28s ease, visibility 0s linear .28s; visibility:hidden; height:46vh; max-height:46vh; display:flex; flex-direction:column; }
         #route-drawer.open{ transform:translateY(0); visibility:visible; transition:transform .28s ease; }
         /* 9 Nov 2026 (card 2): the drawer opens at one height over the bottom of the map and its tab scrolls inside it
            (a flex child keeps its content's height unless min-height is 0: the tables ran out of the drawer). Parked, it
@@ -476,12 +506,12 @@
         .an-route{ font-size:12px; color:var(--muted); margin:2px 0 14px; }
         table.fc-matrix{ border-collapse:collapse; font-size:11.5px; width:100%; }
         table.fc-matrix th, table.fc-matrix td{ padding:6px 8px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); }
-        table.fc-matrix th:first-child, table.fc-matrix td:first-child{ text-align:left; position:sticky; left:0; background:#fff; }
-        table.fc-matrix thead th{ position:sticky; top:0; background:#fff; font-weight:600; color:var(--muted); }
+        table.fc-matrix th:first-child, table.fc-matrix td:first-child{ text-align:left; position:sticky; left:0; background:var(--surface); }
+        table.fc-matrix thead th{ position:sticky; top:0; background:var(--surface); font-weight:600; color:var(--muted); }
         .mat-chip{ display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px; vertical-align:middle; }
 
         /* Playable forecast timeline bar */
-        #timeline-bar{ display:none; position:absolute; left:calc(50% + 150px); transform:translateX(-50%); bottom:18px; z-index:25; background:#fff; border:1px solid var(--line); border-radius:11px; box-shadow:0 8px 28px rgba(16,24,40,.16); padding:8px 12px; align-items:center; gap:11px; }
+        #timeline-bar{ display:none; position:absolute; left:calc(50% + 150px); transform:translateX(-50%); bottom:18px; z-index:25; background:var(--surface); border:1px solid var(--line); border-radius:11px; box-shadow:0 8px 28px rgba(16,24,40,.16); padding:8px 12px; align-items:center; gap:11px; }
         body.sidebar-closed #timeline-bar{ left:50%; }
         /* 12 Oct 2026 (browser check, 1280 px): with a council layer on, Mapbox's attribution wraps to two lines and the
            first, the ONS / OS licence line, sat behind the timeline bar. While the bar is open the map's foot controls
@@ -505,7 +535,7 @@
            change length. */
         #tl-label{ font-size:12px; font-weight:600; color:var(--navy-deep); min-width:190px; white-space:nowrap; flex:0 0 auto; }
         /* and the select was far bigger than five two-character options need */
-        #tl-speed{ border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--navy-deep); font:600 11px Inter,system-ui,sans-serif; padding:3px 2px 3px 5px; cursor:pointer; flex:0 0 auto; width:50px; text-align:center; text-align-last:center; }
+        #tl-speed{ border:1px solid var(--line); border-radius:7px; background:var(--surface); color:var(--navy-deep); font:600 11px Inter,system-ui,sans-serif; padding:3px 2px 3px 5px; cursor:pointer; flex:0 0 auto; width:50px; text-align:center; text-align-last:center; }
         /* 12 Oct 2026 (D22): the announcer is visually hidden but read by a screen reader. (The "full horizon" checkbox
            that sat here is the M3 bar's "Plan months / Full horizon" pair now, styled with the M3 rules below.) */
         #timeline-bar:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
@@ -545,7 +575,7 @@
             body.timeline-on #tl-warnings > *{ flex:0 0 auto; }   /* shortened, the panel scrolls; its rows never squash */
         }
         .tl-row1{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-        #timeline-bar .tl-btn{ width:40px; height:40px; border:1px solid #D6D3D1; background:#fff; color:var(--ink); font-size:14px; display:inline-flex; align-items:center; justify-content:center; }
+        #timeline-bar .tl-btn{ width:40px; height:40px; border:1px solid var(--ctl-line); background:var(--surface); color:var(--ink); font-size:14px; display:inline-flex; align-items:center; justify-content:center; }
         #timeline-bar #tl-play{ width:48px; background:#C2410C; border-color:#C2410C; color:#fff; font-size:17px; font-weight:700; }
         #timeline-bar .tl-btn:focus-visible, .tl-seg button:focus-visible, .tl-ghost:focus-visible, #tl-toast button:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
         .tl-lbl{ line-height:1.2; min-width:0; flex:0 1 auto; }
@@ -566,23 +596,23 @@
         .tl-sw{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; position:relative; }
         .tl-sw input{ position:absolute; opacity:0; width:1px; height:1px; margin:0; }
         .tl-sw i{ width:34px; height:20px; border-radius:999px; background:#A8A29E; position:relative; display:inline-block; flex:none; }
-        .tl-sw i:after{ content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .15s; }
+        .tl-sw i:after{ content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background:var(--surface); transition:left .15s; }
         .tl-sw input:checked + i{ background:#1F2024; }
         .tl-sw input:checked + i:after{ left:16px; }
         .tl-sw input:focus-visible + i{ outline:2px solid var(--navy); outline-offset:2px; }
-        .tl-seg{ display:inline-flex; border:1px solid #D6D3D1; border-radius:7px; overflow:hidden; }
-        .tl-seg button{ border:0; background:#fff; color:var(--ink); font:500 14px Inter,system-ui,sans-serif; padding:6px 10px; cursor:pointer; }
-        .tl-seg button + button{ border-left:1px solid #D6D3D1; }
+        .tl-seg{ display:inline-flex; border:1px solid var(--ctl-line); border-radius:7px; overflow:hidden; }
+        .tl-seg button{ border:0; background:var(--surface); color:var(--ink); font:500 14px Inter,system-ui,sans-serif; padding:6px 10px; cursor:pointer; }
+        .tl-seg button + button{ border-left:1px solid var(--ctl-line); }
         .tl-seg button[aria-checked="true"]{ background:#1F2024; color:#fff; }
         #timeline-bar #tl-speed{ width:auto; font:500 14px Inter,system-ui,sans-serif; padding:6px 6px; color:var(--ink); border-color:#D6D3D1; text-align:left; text-align-last:auto; }
-        .tl-ghost{ border:1px solid #D6D3D1; border-radius:7px; padding:6px 10px; background:#fff; color:var(--ink); font:500 14px Inter,system-ui,sans-serif; cursor:pointer; }
+        .tl-ghost{ border:1px solid var(--ctl-line); border-radius:7px; padding:6px 10px; background:var(--surface); color:var(--ink); font:500 14px Inter,system-ui,sans-serif; cursor:pointer; }
         #timeline-bar .tl-close{ font-size:22px; padding:0 4px; line-height:1; }
         /* the loop label sits over the bracket of the months Play loops over; JS sets its indent and the bracket */
         .tl-looplbl{ margin-top:10px; font-size:14px; color:var(--ink); line-height:1.3; min-height:18px; }
         .tl-looplbl b{ font-weight:600; }
         .tl-railwrap{ position:relative; margin-top:18px; }
         .tl-loop{ position:absolute; top:-14px; height:11px; border:1.5px solid #1F2024; border-bottom:0; border-radius:3px 3px 0 0; pointer-events:none; }
-        .tl-rail{ display:flex; height:30px; border:1px solid #D6D3D1; border-radius:4px; overflow:hidden; background:#FAFAF9; cursor:pointer; touch-action:none; user-select:none; }
+        .tl-rail{ display:flex; height:30px; border:1px solid var(--ctl-line); border-radius:4px; overflow:hidden; background:#FAFAF9; cursor:pointer; touch-action:none; user-select:none; }
         .tl-rail i{ flex:1; position:relative; border-left:1px solid #EFEDEA; display:block; }
         .tl-rail i:first-child{ border-left:0; }
         .tl-rail i.yr{ border-left:1px solid #A8A29E; }
@@ -599,12 +629,12 @@
         #timeline-bar .tl-railwrap:focus-within .tl-rail{ outline:2px solid var(--navy); outline-offset:2px; }
         .tl-years{ display:flex; font-size:14px; color:#78716C; margin-top:3px; }
         .tl-years span{ flex:1; padding-left:4px; }
-        .tl-hints{ display:flex; align-items:center; gap:6px 12px; margin-top:8px; font-size:14px; color:#57534E; flex-wrap:wrap; }
-        .tl-hints kbd{ font-family:inherit; font-size:14px; border:1px solid #D6D3D1; border-bottom-width:2px; border-radius:4px; padding:0 6px; background:#fff; color:var(--ink); margin-right:2px; }
+        .tl-hints{ display:flex; align-items:center; gap:6px 12px; margin-top:8px; font-size:14px; color:var(--ink-2); flex-wrap:wrap; }
+        .tl-hints kbd{ font-family:inherit; font-size:14px; border:1px solid var(--ctl-line); border-bottom-width:2px; border-radius:4px; padding:0 6px; background:var(--surface); color:var(--ink); margin-right:2px; }
         .tl-hints .sep{ color:#D6D3D1; }
         .tl-leg{ margin-left:auto; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
         .tl-leg i{ display:inline-block; vertical-align:middle; margin-right:5px; }
-        .tl-leg .sq{ width:12px; height:12px; background:rgba(37,99,235,.28); border:1px solid #D6D3D1; }
+        .tl-leg .sq{ width:12px; height:12px; background:rgba(37,99,235,.28); border:1px solid var(--ctl-line); }
         .tl-leg .tri{ width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:8px solid #D97706; }
         .tl-leg .dot{ width:8px; height:8px; border-radius:50%; background:#DC2626; }
         /* a short screen keeps the map: the keys go first, then the reduced-motion note; the rail's legend stays */
@@ -619,7 +649,7 @@
             .tl-hints .tl-keys{ display:none; }
         }
         /* paused on a clash: above the bar, at its left (the conditions panel holds the right) */
-        #tl-toast{ position:absolute; z-index:26; left:324px; bottom:var(--tl-foot, 200px); width:min(450px, calc(100vw - 48px)); background:#fff;
+        #tl-toast{ position:absolute; z-index:26; left:324px; bottom:var(--tl-foot, 200px); width:min(450px, calc(100vw - 48px)); background:var(--surface);
                    border:1px solid #E7E5E4; border-left:4px solid #DC2626; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.18);
                    padding:12px 14px; font-size:14px; line-height:1.4; color:var(--ink); }
         #tl-toast[hidden]{ display:none; }
@@ -630,7 +660,7 @@
         #tl-toast p{ margin:4px 0 10px; }
         #tl-toast .acts{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
         #tl-toast .tl-act{ border:0; background:#C2410C; color:#fff; border-radius:7px; padding:7px 12px; font:600 14px Inter,system-ui,sans-serif; cursor:pointer; }
-        #tl-toast .tl-lnk{ margin-left:auto; border:0; background:none; color:#57534E; text-decoration:underline; font:14px Inter,system-ui,sans-serif; cursor:pointer; padding:4px 0; }
+        #tl-toast .tl-lnk{ margin-left:auto; border:0; background:none; color:var(--ink-2); text-decoration:underline; font:14px Inter,system-ui,sans-serif; cursor:pointer; padding:4px 0; }
         /* WALL MODE: chrome off — the fictional strip, the map, the month and its figures, the rail */
         #wall-hud, #wall-hint{ display:none; }
         body.wall-mode #main-sidebar, body.wall-mode #menu-toggle, body.wall-mode #kpi-hud, body.wall-mode #tl-warnings, body.wall-mode #tl-toast,
@@ -650,27 +680,27 @@
         body.wall-mode .tl-years span{ text-shadow:0 0 4px #fff; }
         body.wall-mode .tl-rail i.cl:before{ border-left-width:8px; border-right-width:8px; border-bottom-width:13px; margin-left:-8px; }
         body.wall-mode .tl-rail i.oc:after{ width:12px; height:12px; margin-left:-6px; }
-        body.wall-mode #wall-hud{ display:block; position:absolute; z-index:26; left:28px; bottom:calc(var(--tl-foot, 160px) + 12px); color:#1F2024;
+        body.wall-mode #wall-hud{ display:block; position:absolute; z-index:26; left:28px; bottom:calc(var(--tl-foot, 160px) + 12px); color:var(--navy-deep);
                                   background:rgba(255,255,255,.9); padding:10px 14px 12px; border-radius:12px; }
         body.wall-mode #wall-hud .m{ font-size:64px; font-weight:700; letter-spacing:-.01em; line-height:1; }
         body.wall-mode #wall-hud .f{ font-size:26px; font-weight:500; margin-top:10px; font-variant-numeric:tabular-nums; }
-        body.wall-mode #wall-hint{ display:block; position:absolute; z-index:26; right:28px; top:calc(var(--notice-h, 26px) + 24px); font-size:20px; color:#57534E;
+        body.wall-mode #wall-hint{ display:block; position:absolute; z-index:26; right:28px; top:calc(var(--notice-h, 26px) + 24px); font-size:20px; color:var(--ink-2);
                                    text-align:right; line-height:1.3; background:rgba(255,255,255,.9); padding:10px 14px; border-radius:12px; }
-        body.wall-mode #wall-hint button{ margin-top:8px; border:1px solid #D6D3D1; border-radius:7px; background:#fff; color:#1F2024; font:500 16px Inter,system-ui,sans-serif; padding:6px 12px; cursor:pointer; }
+        body.wall-mode #wall-hint button{ margin-top:8px; border:1px solid var(--ctl-line); border-radius:7px; background:var(--surface); color:var(--navy-deep); font:500 16px Inter,system-ui,sans-serif; padding:6px 12px; cursor:pointer; }
         body.wall-mode.has-demo-notice #demo-notice{ font-size:22px; height:auto; padding:8px 22px; }
         /* ===== 12 Oct 2026 — the interactivity pass (review 2.3, D14, D29) and the phone shell (review 2.8 row 2,
            mockup 7, D30). Every font size in this section is 14 px or more (the staff bar's floor).
            Desktop first: the month chips (they replace the From/To selects), the hover card on a route, the text view
            of the month beside the map, the share card (link + QR). */
         .month-chips{ display:flex; flex-wrap:wrap; gap:6px; }
-        .month-chip{ border:1px solid #D6D3D1; background:#fff; color:var(--ink); border-radius:999px; padding:6px 12px; min-height:36px;
+        .month-chip{ border:1px solid var(--ctl-line); background:var(--surface); color:var(--ink); border-radius:999px; padding:6px 12px; min-height:36px;
                      font:500 14px/1.2 Inter,system-ui,sans-serif; cursor:pointer; white-space:nowrap; }
         .month-chip:hover{ border-color:var(--navy); }
         .month-chip[aria-pressed="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; }
         .month-chips .chips-none{ font-size:14px; color:var(--note); }
         /* 13 Oct 2026: the preset views, chips like the month chips; pressed = the map matches that view */
         .preset-views{ display:flex; flex-wrap:wrap; gap:6px; }
-        .preset-chip{ border:1px solid #D6D3D1; background:#fff; color:var(--ink); border-radius:999px; padding:6px 12px; min-height:36px;
+        .preset-chip{ border:1px solid var(--ctl-line); background:var(--surface); color:var(--ink); border-radius:999px; padding:6px 12px; min-height:36px;
                       font:500 14px/1.2 Inter,system-ui,sans-serif; cursor:pointer; }
         .preset-chip:hover{ border-color:var(--navy); }
         .preset-chip[aria-pressed="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; }
@@ -682,7 +712,7 @@
            phone block below hides it) */
         .concern-panel-slot .concern-btn{ width:100%; margin-top:6px; font-size:14px; padding:8px 10px; }
         .concern-unset{ display:block; margin-top:8px; font-size:14px; color:var(--note); line-height:1.45; }
-        #route-hover-card{ position:fixed; z-index:35; pointer-events:none; max-width:300px; background:#fff; border:1px solid var(--line);
+        #route-hover-card{ position:fixed; z-index:35; pointer-events:none; max-width:300px; background:var(--surface); border:1px solid var(--line);
                            border-radius:10px; box-shadow:0 8px 28px rgba(16,24,40,.14); padding:10px 12px; font:14px/1.4 Inter,system-ui,sans-serif; color:var(--ink); }
         #route-hover-card[hidden]{ display:none; }
         #route-hover-card .hc-title{ display:block; font-weight:600; color:var(--navy-deep); }
@@ -700,23 +730,23 @@
         .secsel-limit.secsel-near{ border-color:#B45309; color:#B45309; }
         .secsel-scroll{ max-height:260px; overflow:auto; margin-top:6px; }
         table.secsel-table{ border-collapse:collapse; width:100%; font-size:14px; }
-        table.secsel-table th{ font-weight:500; color:var(--muted); text-align:left; padding:2px 6px 2px 0; position:sticky; top:0; background:#fff; }
+        table.secsel-table th{ font-weight:500; color:var(--muted); text-align:left; padding:2px 6px 2px 0; position:sticky; top:0; background:var(--surface); }
         table.secsel-table td{ padding:2px 6px 2px 0; vertical-align:top; }
         table.secsel-table .num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
         table.secsel-table .secsel-rid{ font-weight:600; white-space:nowrap; }
         table.secsel-table tr.secsel-clicked td{ background:#EFF6FF; }
         table.secsel-table tr.secsel-total td{ border-top:1px solid var(--line); font-weight:600; }
         .secsel-btns{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-        .secsel-btn{ min-height:32px; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--navy-deep); font:600 14px Inter,system-ui,sans-serif; cursor:pointer; }
+        .secsel-btn{ min-height:32px; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--navy-deep); font:600 14px Inter,system-ui,sans-serif; cursor:pointer; }
         .secsel-btn:hover{ background:#F8FAFC; }
         .secsel-btn.secsel-copy, .secsel-btn.secsel-sum-btn{ background:var(--navy); border-color:var(--navy); color:#fff; }
         .secsel-ctrl-btn::before{ content:""; display:block; width:14px; height:12px; margin:auto; border:2px dashed #1F2024; border-radius:1px; }
         .secsel-ctrl-btn[aria-pressed="true"]{ background:#DBEAFE !important; }
         .secsel-rect{ position:absolute; border:2px dashed #1D4ED8; background:rgba(29,78,216,.06); pointer-events:none; z-index:5; }
-        .secsel-hint{ position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:6; background:#fff; border:1px solid var(--line);
+        .secsel-hint{ position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:6; background:var(--surface); border:1px solid var(--line);
                       border-radius:8px; padding:6px 10px; font:14px Inter,system-ui,sans-serif; box-shadow:0 4px 14px rgba(16,24,40,.12); }
         .secsel-hint[hidden], .secsel-panel[hidden], .secsel-frame[hidden]{ display:none; }
-        .secsel-panel{ position:absolute; top:10px; right:56px; z-index:6; background:#fff; border:1px solid var(--line); border-radius:10px;
+        .secsel-panel{ position:absolute; top:10px; right:56px; z-index:6; background:var(--surface); border:1px solid var(--line); border-radius:10px;
                        box-shadow:0 8px 28px rgba(16,24,40,.14); padding:12px 14px; max-width:380px;
                        max-height:calc(100% - var(--tl-foot, 0px) - 30px); overflow:auto; }
         .secsel-panel .secsel-scroll{ max-height:none; }
@@ -726,17 +756,17 @@
         .secsel-frame{ position:absolute; inset:0; z-index:6; pointer-events:none; }
         .secsel-frame-box{ position:absolute; left:15%; right:15%; top:22%; height:36%; border:2px dashed #1D4ED8; background:rgba(29,78,216,.06); }
         .secsel-frame-bar{ position:absolute; left:8px; right:8px; top:8px; pointer-events:auto; display:flex; flex-wrap:wrap; gap:6px; align-items:center;
-                           background:#fff; border:1px solid var(--line); border-radius:10px; padding:8px 10px; font:14px Inter,system-ui,sans-serif; }
+                           background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:8px 10px; font:14px Inter,system-ui,sans-serif; }
         .secsel-frame-bar span{ flex:1 1 100%; }
         .secsel-frame-bar .secsel-btn{ min-height:44px; flex:1; }
         body.wall-mode #area-card, body.wall-mode #area-pick-hint{ display:none; }
         /* the month as text, BESIDE the map (desktop: the map gives up the panel's width; a tablet: over the map's right) */
-        #month-text{ position:absolute; top:0; right:0; bottom:0; width:min(420px, 100vw); z-index:27; background:#fff; border-left:1px solid var(--line);
+        #month-text{ position:absolute; top:0; right:0; bottom:0; width:min(420px, 100vw); z-index:27; background:var(--surface); border-left:1px solid var(--line);
                      display:flex; flex-direction:column; font-size:14px; line-height:1.45; color:var(--ink); }
         #month-text[hidden]{ display:none; }
         .mt-head{ display:flex; align-items:center; gap:8px; padding:12px 12px 10px 18px; border-bottom:1px solid var(--line); }
         .mt-head h2{ margin:0; font-size:16px; font-weight:600; color:var(--navy-deep); flex:1; }
-        .mt-close, .share-close{ width:44px; height:44px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--navy-deep); font-size:22px; line-height:1; cursor:pointer; padding:0; flex:0 0 auto; }
+        .mt-close, .share-close{ width:44px; height:44px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--navy-deep); font-size:22px; line-height:1; cursor:pointer; padding:0; flex:0 0 auto; }
         .mt-body{ overflow:auto; padding:12px 18px 18px; }
         .mt-body p{ margin:0 0 10px; font-size:14px; }
         .mt-figs{ display:grid; grid-template-columns:1fr auto; gap:6px 12px; margin:0 0 14px; }
@@ -757,12 +787,12 @@
         }
         @media (max-width:1023px){ body.has-demo-notice #month-text{ top:var(--notice-h, 26px); } }
         #share-panel{ position:fixed; z-index:40; left:50%; top:50%; transform:translate(-50%, -50%); width:min(340px, calc(100vw - 24px));
-                      max-height:calc(100vh - 24px); overflow:auto; background:#fff; border:1px solid var(--line); border-radius:12px;
+                      max-height:calc(100vh - 24px); overflow:auto; background:var(--surface); border:1px solid var(--line); border-radius:12px;
                       box-shadow:0 12px 40px rgba(16,24,40,.22); padding:14px 16px 16px; font-size:14px; line-height:1.45; color:var(--ink); }
         #share-panel[hidden]{ display:none; }
         /* 14 Oct 2026 (backlog item 2): the route map export card, the share card's twin */
         #rme-panel{ position:fixed; z-index:40; left:50%; top:50%; transform:translate(-50%, -50%); width:min(360px, calc(100vw - 24px));
-                    max-height:calc(100vh - 24px); overflow:auto; background:#fff; border:1px solid var(--line); border-radius:12px;
+                    max-height:calc(100vh - 24px); overflow:auto; background:var(--surface); border:1px solid var(--line); border-radius:12px;
                     box-shadow:0 12px 40px rgba(16,24,40,.22); padding:14px 16px 16px; font-size:14px; line-height:1.45; color:var(--ink); }
         #rme-panel[hidden]{ display:none; }
         #rme-panel .share-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
@@ -780,7 +810,7 @@
         #share-panel .share-head b{ flex:1; font-size:16px; color:var(--navy-deep); }
         #share-qr{ display:flex; justify-content:center; margin:6px 0 10px; }
         #share-qr svg{ width:220px; height:220px; }
-        #share-url{ width:100%; font:14px Inter,system-ui,sans-serif; padding:8px 10px; border:1px solid #D6D3D1; border-radius:6px; color:var(--ink); }
+        #share-url{ width:100%; font:14px Inter,system-ui,sans-serif; padding:8px 10px; border:1px solid var(--ctl-line); border-radius:6px; color:var(--ink); }
         #share-status{ min-height:20px; font-size:14px; color:var(--green); margin-top:6px; }
         /* 5 Nov 2026 (group 6, mockup notes/report-concern-mockup-1105 cards 1-3): Report a concern. A button where the email
            link was; the form a card on the right of the map (the whole screen on a phone); a click on the map drops the pin
@@ -788,7 +818,7 @@
         .concern-btn{ margin-top:8px; }
         .concern-or{ margin:6px 0 0; font-size:14px; color:var(--note); }
         .concern-or a{ color:var(--navy); }
-        #concern-panel{ position:fixed; z-index:42; top:0; right:0; bottom:0; width:min(400px, 100vw); background:#fff; border-left:1px solid var(--line);
+        #concern-panel{ position:fixed; z-index:42; top:0; right:0; bottom:0; width:min(400px, 100vw); background:var(--surface); border-left:1px solid var(--line);
                         box-shadow:-8px 0 28px rgba(16,24,40,.12); display:flex; flex-direction:column; font-size:14px; line-height:1.45; color:var(--ink); }
         #concern-panel[hidden]{ display:none; }
         body.has-demo-notice #concern-panel{ top:var(--notice-h, 26px); }
@@ -797,7 +827,7 @@
         #concern-panel .cn-lbl{ display:block; font-weight:600; margin-bottom:4px; color:var(--navy-deep); }
         #concern-panel select, #concern-panel input[type=text], #concern-panel input[type=date], #concern-panel input[type=time],
         #concern-panel input[type=email], #concern-panel textarea{ width:100%; box-sizing:border-box; min-height:44px; font:14px Inter,system-ui,sans-serif;
-                        padding:8px 10px; border:1px solid #A8A29E; border-radius:6px; color:var(--ink); background:#fff; }
+                        padding:8px 10px; border:1px solid #A8A29E; border-radius:6px; color:var(--ink); background:var(--surface); }
         #concern-panel textarea{ min-height:110px; resize:vertical; }
         #concern-panel .cn-row{ display:flex; gap:10px; } #concern-panel .cn-row > .cn-field{ flex:1 1 0; min-width:0; }
         #concern-panel .cn-hint{ margin:4px 0 0; font-size:14px; color:var(--note); }
@@ -813,7 +843,7 @@
         #concern-panel .cn-trap{ position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden; }
         #concern-panel .cn-ref{ font-size:20px; font-weight:700; color:var(--navy-deep); }
         #cn-pick{ position:fixed; z-index:43; left:50%; bottom:calc(16px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); width:min(360px, calc(100vw - 24px));
-                  background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 28px rgba(16,24,40,.22); padding:10px 12px; font-size:14px; }
+                  background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 28px rgba(16,24,40,.22); padding:10px 12px; font-size:14px; }
         #cn-pick[hidden], #cn-cross[hidden]{ display:none; }
         #cn-pick p{ margin:0 0 8px; color:var(--navy-deep); }
         #cn-pick .cn-actions{ display:flex; gap:8px; } #cn-pick .btn{ flex:1 1 auto; width:auto; }
@@ -851,7 +881,7 @@
             #guide-btn{ display:none !important; }
             #btn-guide-sheet:not([hidden]){ display:block; }
             #m-full-btn{ display:grid; place-items:center; position:absolute; right:8px; top:10px; z-index:27; width:44px; height:44px; padding:0;
-                      border:1px solid var(--line); border-radius:22px; background:#fff; color:var(--navy-deep); font-size:20px; line-height:1;
+                      border:1px solid var(--line); border-radius:22px; background:var(--surface); color:var(--navy-deep); font-size:20px; line-height:1;
                       box-shadow:0 2px 10px rgba(16,24,40,.12); cursor:pointer; }
             #m-full-strip:not([hidden]){ display:flex; align-items:center; gap:10px; position:absolute; left:8px; right:8px; z-index:27;
                       bottom:calc(8px + env(safe-area-inset-bottom, 0px)); height:56px; padding:0 6px; border-radius:28px;
@@ -859,7 +889,7 @@
             #m-full-strip .mf-month{ flex:1 1 auto; min-width:0; color:var(--navy-deep); }
             #m-full-strip .mf-month b{ display:block; font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
             #m-full-strip .mf-month span{ display:block; font-size:14px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-            #m-full-exit{ flex:0 0 44px; width:44px; height:44px; border-radius:22px; border:1px solid var(--line); background:#fff;
+            #m-full-exit{ flex:0 0 44px; width:44px; height:44px; border-radius:22px; border:1px solid var(--line); background:var(--surface);
                       color:var(--navy-deep); font-size:20px; line-height:1; padding:0; cursor:pointer; }
             /* full screen: the map alone — the sheet, Layers, ⤢ and the guide's strip go; the demo pill moves to the top
                centre; a route's card still opens in the sheet (map-full-card) until the sheet folds again */
@@ -869,7 +899,7 @@
             body.map-full.has-demo-notice #demo-notice{ left:50%; right:auto; top:8px; transform:translateX(-50%); max-width:calc(100vw - 80px); white-space:nowrap; }
             body.map-full .mapboxgl-ctrl-top-right{ top:44px !important; }
             #m-layers-btn{ display:flex; align-items:center; gap:8px; position:absolute; left:12px; top:12px; z-index:27; height:48px; padding:0 18px;
-                           border:1px solid var(--line); border-radius:24px; background:#fff; color:var(--navy-deep); font:600 15px Inter,system-ui,sans-serif;
+                           border:1px solid var(--line); border-radius:24px; background:var(--surface); color:var(--navy-deep); font:600 15px Inter,system-ui,sans-serif;
                            box-shadow:0 2px 10px rgba(16,24,40,.12); cursor:pointer; }
             body.has-demo-notice #m-layers-btn{ top:calc(var(--notice-h, 26px) + 10px); }
             /* the panel IS the full-screen layers sheet: it rises from the bottom, under the demo strip */
@@ -881,11 +911,11 @@
             .sidebar .busy-row, .sidebar .kpi-chip{ min-height:48px; align-items:center; }
             .month-chip{ min-height:48px; min-width:56px; padding:0 14px; }
             .preset-chip{ min-height:48px; padding:0 14px; }
-            .m-done{ display:flex; order:99; position:sticky; bottom:-24px; margin:auto -18px -24px; padding:10px 18px 14px; background:#fff; border-top:1px solid var(--line); }
+            .m-done{ display:flex; order:99; position:sticky; bottom:-24px; margin:auto -18px -24px; padding:10px 18px 14px; background:var(--surface); border-top:1px solid var(--line); }
             .m-done .btn{ min-height:48px; }
             .month-picker button{ min-height:44px; }
             .layers-box > summary{ min-height:44px; display:flex; align-items:center; flex-wrap:wrap; padding:2px 0; }   /* the folds: 44 px rows (UI audit, 19 Oct) */
-            #m-sheet{ display:flex; flex-direction:column; position:absolute; left:0; right:0; bottom:0; z-index:26; background:#fff;
+            #m-sheet{ display:flex; flex-direction:column; position:absolute; left:0; right:0; bottom:0; z-index:26; background:var(--surface);
                       border-top:1px solid var(--line); border-radius:16px 16px 0 0; box-shadow:0 -8px 28px rgba(16,24,40,.14);
                       max-height:calc(100% - var(--notice-h, 0px) - 72px); font-size:14px; color:var(--ink); padding-bottom:env(safe-area-inset-bottom, 0px); }
             .m-handle{ display:flex; align-items:center; justify-content:center; flex:0 0 48px; height:48px; width:100%; border:0; background:none; cursor:pointer; padding:0; }
@@ -895,7 +925,7 @@
             .m-fig{ flex:1 1 0; min-width:0; }   /* the two lead figures side by side at any phone width; a label wraps */
             .m-fig b{ display:block; font-size:24px; font-weight:600; color:var(--navy-deep); font-variant-numeric:tabular-nums; line-height:1.1; }
             .m-fig span{ font-size:14px; color:var(--muted); }
-            .m-cond{ margin-left:auto; min-height:44px; border:1px solid var(--line); border-radius:22px; background:#fff; padding:0 14px; font:500 14px Inter,system-ui,sans-serif; color:var(--navy-deep); cursor:pointer; display:flex; align-items:center; gap:6px; }
+            .m-cond{ margin-left:auto; min-height:44px; border:1px solid var(--line); border-radius:22px; background:var(--surface); padding:0 14px; font:500 14px Inter,system-ui,sans-serif; color:var(--navy-deep); cursor:pointer; display:flex; align-items:center; gap:6px; }
             .m-cond[hidden]{ display:none; }
             .m-body{ overflow:auto; padding:0 16px 8px; flex:1 1 auto; min-height:0; }
             #m-sheet[data-state="half"]{ height:min(62vh, calc(100% - var(--notice-h, 0px) - 72px)); }   /* half: about half the screen; the body scrolls */
@@ -955,7 +985,7 @@
         }
             /* H10 (8 Oct 2026): the map's guide — demo tenant only, in-page, no library. */
             /* 22 Oct 2026 (UI fix 6, card 8): 14 px in a 21 px box like the app bar's Guide, an inset ring for the border (was 11.5 px, 4 px 12 px padding) */
-            #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:#fff;color:#1F2024;border:0;border-radius:999px;height:21px;padding:0 10px;font:600 14px/21px system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 0 0 1px var(--line),0 2px 8px rgba(16,24,40,.12);}
+            #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:var(--surface);color:var(--navy-deep);border:0;border-radius:999px;height:21px;padding:0 10px;font:600 14px/21px system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 0 0 1px var(--line),0 2px 8px rgba(16,24,40,.12);}
             #guide-btn:hover{background:#eff6ff;}
             /* 22 Oct 2026 (UI fix 6, card 8, review): on a touch screen the 21 px Guide keeps a 44 px tap area through an
                invisible ::after, like the app bar's Guide (decision 9); the visible pill is unchanged */
@@ -975,8 +1005,8 @@
   #guide-card .guide-foot button.guide-next{color:#8AB4F8}
   #guide-card .guide-off{display:block;margin-top:2px;font:inherit;font-size:12px;color:rgba(255,255,255,.5);background:none;border:none;padding:0;cursor:pointer}
   #guide-card .guide-off:hover{color:rgba(255,255,255,.8);text-decoration:underline}
-  .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#44403C;border:1px solid rgba(31,32,36,.12);border-radius:8px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 Inter,system-ui,sans-serif}
-  .guide-strip b{color:#1F2024;font-weight:600}
+  .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--ink-2);border:1px solid rgba(31,32,36,.12);border-radius:8px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 Inter,system-ui,sans-serif}
+  .guide-strip b{color:var(--navy-deep);font-weight:600}
   .guide-strip .guide-strip-go{position:relative;font:inherit;font-weight:500;color:#1A73E8;background:none;border:0;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap}
   .guide-strip .guide-strip-go:hover{background:rgba(26,115,232,.08)}
   .guide-strip .guide-x{position:relative;font:inherit;font-size:16px;line-height:1;color:#78716C;background:none;border:0;padding:2px 6px;border-radius:4px;cursor:pointer}
@@ -1099,7 +1129,7 @@
         <!-- 16 Oct 2026: Standard (3D) was removed: GL JS 2.14.1 rejected it (695 validation errors) and the map stayed on
              the basemap it had. 28 Oct 2026 (8d): the page loads GL JS 3.33.0, which draws it, so Standard and Standard
              satellite are back after Dark; their light presets are the row of buttons under this list. -->
-        <select id="basemap-select" onchange="changeBasemap(this.value)" aria-label="Basemap">
+        <select id="basemap-select" onchange="pickBasemap(this.value)" aria-label="Basemap">
             <option value="mapbox://styles/mapbox/light-v11" selected>Light</option>
             <option value="mapbox://styles/mapbox/dark-v11">Dark</option>
             <option value="mapbox://styles/mapbox/standard">Standard</option>
@@ -1190,7 +1220,7 @@
         <div class="control-item"><label><input type="checkbox" id="layer-inbound" checked onchange="applyFilters()"> Laden (out)</label><span class="color-dot" style="background:#059669;"></span></div>
         <div class="control-item"><label><input type="checkbox" id="layer-outbound" checked onchange="applyFilters()"> Empty (return)</label><span class="color-dot" style="background:#f59e0b;"></span></div>
         <!-- 29 Oct 2026 (task 3c): shown once the scheme has a holding area (updateHoldingChevrons) -->
-        <div class="control-item" id="holding-legend" hidden><span class="hbadge" aria-hidden="true">H</span><span style="font-size:12.5px;color:#57534E;font-weight:500;">Holding area · <b>›››</b> called forward to the gate</span></div>
+        <div class="control-item" id="holding-legend" hidden><span class="hbadge" aria-hidden="true">H</span><span style="font-size:12.5px;color:var(--ink-2);font-weight:500;">Holding area · <b>›››</b> called forward to the gate</span></div>
         <!-- Temporary haul removed: the network stores only a scalar origin_temp_km per
              route, no geometry, so there is nothing real to draw. Returns in Phase 4 as
              drawn polylines edited on the route itself. -->
@@ -1585,6 +1615,10 @@
     // barAbove() (by applyTenantVocabulary): the app draws its bar only once its /api/meta has answered, so if that
     // fails this map keeps its own strip and Guide, and the fictional scheme is never on screen without the notice.
     const EMBED = (() => { try { return new URLSearchParams(location.search).get('embed') === '1' && window.self !== window.top; } catch (e) { return false; } })();
+    // 10 Nov 2026 (wave 2, card 14): the staff app's look ("modus_theme", the app's own key), embedded only
+    const appDark = () => { try { return EMBED && localStorage.getItem('modus_theme') === 'dark'; } catch (e) { return false; } };
+    const setLook = () => { try { if (appDark()) document.documentElement.setAttribute('data-look', 'dark'); else document.documentElement.removeAttribute('data-look'); } catch (e) {} };
+    setLook();
     // H1 (29 Sep 2026, HU5): the distance unit the tenant reads — km stored, converted here
     const KM_PER_MI = 1.609344;
     const DU = () => (TENANT.distance_unit === 'mi' ? 'mi' : 'km');
@@ -2001,8 +2035,8 @@
             const under = r.ipt === underlayKey();
             const colour = under ? (window.IPT_UNDERLAY || {}).colour || r.colour : r.colour;
             const label = under
-                ? `<b style="color:#5b6270;">${r.ipt}</b> · ${(window.IPT_UNDERLAY || {}).label || 'corridor underlay'}`
-                : `<b style="color:#5b6270;">${r.ipt}</b>${r.ws.length ? ' · ' + r.ws.join(', ') : ''}`;
+                ? `<b style="color:var(--ink-2);">${r.ipt}</b> · ${(window.IPT_UNDERLAY || {}).label || 'corridor underlay'}`
+                : `<b style="color:var(--ink-2);">${r.ipt}</b>${r.ws.length ? ' · ' + r.ws.join(', ') : ''}`;
             const handler = under ? 'toggleUnderlay(this.checked)' : 'applyIptFilter()';
             // 18 Oct 2026 (UI audit #26): each row is the box's <label> — the whole 24 px row ticks it, and a screen reader
             // names the box by the team, not by its id (it was a bare 13 px box beside a span)
@@ -2162,8 +2196,10 @@
     }
     function basemapFromKey(k) { return Object.prototype.hasOwnProperty.call(BASEMAP_LINK, k) ? BASEMAP_LINK[k] : null; }
     function basemapKey(url) { return Object.keys(BASEMAP_LINK).find(k => BASEMAP_LINK[k] === url) || null; }
-    const INITIAL_BASEMAP = (() => { try { const u = basemapFromKey(new URLSearchParams(location.search).get('basemap')); return BASEMAP_LATE.has(u) ? null : u; } catch (e) { return null; } })()
-        || 'mapbox://styles/mapbox/light-v11';
+    const LINK_BASEMAP = (() => { try { const u = basemapFromKey(new URLSearchParams(location.search).get('basemap')); return BASEMAP_LATE.has(u) ? null : u; } catch (e) { return null; } })();
+    // 10 Nov 2026 (card 14): with no basemap in the link, the look's own: Dark in the app's Dark look, Light otherwise
+    const lookBasemap = () => appDark() ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11';
+    const INITIAL_BASEMAP = LINK_BASEMAP || lookBasemap();
     const map = new mapboxgl.Map({ container: 'map', style: INITIAL_BASEMAP, center: [10, 54], zoom: 4,
                                    touchPitch: !isPhoneShell(), dragRotate: !isPhoneShell(), transformRequest: osTransformRequest });
     // every addLayer of the page goes through here (8d): the slot and the emissive strength, and a `before` that names a layer
@@ -2900,7 +2936,7 @@
         const note = { Quarry: 'fill = material' };
         box.innerHTML = LOC_KINDS.map(k =>
             `<div class="control-item" style="padding:3px 2px;border:0;">` +
-            `<label style="font-size:12.5px;color:#57534E;font-weight:500;">` +
+            `<label style="font-size:12.5px;color:var(--ink-2);font-weight:500;">` +
             `<input type="checkbox" id="loc-kind-${k.toLowerCase()}" checked onchange="toggleLocKind()"> ` +
             `${LOC_LABEL[k] || k}${note[k] ? ` <span style="color:#a2a8b0">· ${note[k]}</span>` : ''}</label>` +
             `<img alt="" data-loc-kind="${k}" src="${swatch(k)}" style="width:15px;height:15px;margin-left:auto;">` +
@@ -2930,7 +2966,7 @@
                  `<span style="color:${over ? '#B91C1C' : 'inherit'};font-weight:${over ? '700' : '400'}">` +
                  `${Math.round(bal).toLocaleString()} ${u}</span> / ${Math.round(cap).toLocaleString()} ${u}` +
                  `${over ? ` — ${Math.round(bal - cap).toLocaleString()} ${u} over capacity` : ''}`) + `</p>`;
-            if (props.stock_month) h += `<p style='margin:2px 0 4px;font-size:12.5px;color:#475569;'>` +
+            if (props.stock_month) h += `<p style='margin:2px 0 4px;font-size:12.5px;color:var(--ink-2);'>` +
                  `${props.stock_basis === 'forecast' ? 'forecast' : 'recorded'}, end of ${monthLabel(Number(props.stock_month))}</p>`;
         }
         // Phase 2.5a — a slot the Street View thumbnail drops into once the free metadata
@@ -4524,7 +4560,7 @@
     // 27 Oct 2026 (8a): Outdoors, Satellite without names and the two Navigation styles join the page's own set (classic -v9 /
     // -v11 / -v12 styles, checked on 2.14.1 with every overlay: 0 errors), so they rebuild too. The map may open on one of
     // them (the share link's &basemap=), so the held basemap starts on INITIAL_BASEMAP.
-    const BASEMAP = { shown: INITIAL_BASEMAP, pending: null, prev: INITIAL_BASEMAP,
+    const BASEMAP = { shown: INITIAL_BASEMAP, pending: null, prev: INITIAL_BASEMAP, byHand: !!LINK_BASEMAP,   // byHand: a person (or the link) chose it
         rebuild: new Set(['mapbox://styles/mapbox/light-v11', 'mapbox://styles/mapbox/dark-v11',
             'mapbox://styles/mapbox/satellite-streets-v12', 'mapbox://styles/mapbox/streets-v12',
             'mapbox://styles/mapbox/outdoors-v12', 'mapbox://styles/mapbox/satellite-v9',
@@ -4609,6 +4645,15 @@
             b.classList.toggle('active', b.dataset.basemap === styleUrl));
     }
     syncBasemapControls(INITIAL_BASEMAP);     // a link may open the map on another basemap than the select's first option
+    // 10 Nov 2026 (card 14): a basemap picked by hand is kept when the look changes; otherwise the map follows the app's look.
+    // The app writes "modus_theme" when its look changes, which fires 'storage' here (another document of the same origin).
+    function pickBasemap(styleUrl) { BASEMAP.byHand = true; changeBasemap(styleUrl); }
+    window.pickBasemap = pickBasemap;
+    window.addEventListener('storage', e => {
+        if (!EMBED || (e && e.key && e.key !== 'modus_theme')) return;
+        setLook();
+        if (!BASEMAP.byHand) changeBasemap(lookBasemap());
+    });
     syncLightRow();
     function maaametOrthoStyle() {
         // Estonian Land Board (Maa-amet) orthophoto, all-zoom TMS tile pyramid (EPSG:3857).
@@ -6210,7 +6255,7 @@
     <style>
         /* Theme refinements — base minimalist theme lives in the <head> block */
         body { font-family:'Inter',system-ui,sans-serif !important; }
-        .sidebar { box-shadow:none !important; border-right:1px solid var(--line) !important; padding:20px 18px 24px !important; background:#fff !important; }
+        .sidebar { box-shadow:none !important; border-right:1px solid var(--line) !important; padding:20px 18px 24px !important; background:var(--surface) !important; }
         .rb-title { border:none !important; text-transform:none !important; }
         .control-group, .fc-box { background:transparent !important; border:none !important; box-shadow:none !important; padding:0 !important; margin:0 !important; }
         .mapboxgl-popup-content { min-width:210px !important; max-width:360px !important; padding:13px 14px !important; border-radius:10px !important; box-shadow:0 8px 28px rgba(16,24,40,.14) !important; }
@@ -6390,7 +6435,7 @@
 
         // one path for both basemap controls: changeBasemap holds what is showing, skips a press of the
         // basemap already there (16 Oct 2026: that blanked every overlay) and keeps the select in step
-        window.changeTheme = function(btn, styleUrl) { changeBasemap(styleUrl); };
+        window.changeTheme = function(btn, styleUrl) { pickBasemap(styleUrl); };
 
         // --------------------------------------------------------------------
         // FORECAST ENGINE
@@ -11748,7 +11793,7 @@
             const want = basemapFromKey(new URLSearchParams(location.search).get('basemap'));
             if (BASEMAP_LATE.has(want) && typeof OVERLAY_READY !== 'undefined') OVERLAY_READY.then(() => {
                 const opt = Array.from(document.querySelectorAll('#basemap-select option')).find(o => o.value === want && !o.hidden);
-                if (opt) changeBasemap(want);
+                if (opt) pickBasemap(want);
             });
         } catch (e) { /* no link, or no basemap in it */ }
         renderConcernLinks();

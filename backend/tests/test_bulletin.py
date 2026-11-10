@@ -1241,7 +1241,8 @@ ok("council: the county's figure is a line of text (its roads, its highway autho
 # authority greenhouse gas statistics"; the basis now sets each district beside a month of its DESNZ road transport, for scale
 ok("⭐ council: the basis sentence, the for-scale DESNZ wording, the Carbon page's stamp, the boundary source and the ONS / OS licence lines",
    # NARROWED 14 Oct 2026 (the publishing check): the basis in two sentences; the sources and licences once, in Sources
-   "Each route's carbon is split by the km driven in each district, so the districts add up to the scheme's figure." in CA["basis"]
+   # NARROWED 10 Nov 2026 (wave 2, finding 20): "the distance driven" (the organisation's unit is miles or km)
+   "Each route's carbon is split by the distance driven in each district, so the districts add up to the scheme's figure." in CA["basis"]
    and "not comparable" not in CA["basis"] and "for scale only" in CA["basis"]
    and "a month (one twelfth of the year) of its road transport CO2e in the government's local statistics (DESNZ, 2024" in CA["basis"]
    and CA["stamp"] == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures"

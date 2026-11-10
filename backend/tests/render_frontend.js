@@ -24,6 +24,9 @@
  * What it proves is exactly one thing, and it is the thing greps cannot: every page the
  * rail can reach mounts without throwing.
  */
+// NARROWED 10 Nov 2026 (wave 2, UI critique finding 20, decision 5): every pin below on a figure's format now reads the one
+// format: a comma for thousands ("19,950", toLocaleString("en-US") as is), money against the symbol ("€0.85"), a fuel price
+// "per litre" where there is room and "/L" in the compact card, a month picker's "Sep 2026". The figures are unchanged.
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
@@ -225,7 +228,7 @@ if (loaded) {
       cOut.includes("Wayscope: per vehicle-km, each leg at its own factor") && cOut.includes("National Highways Carbon Tool method (for comparison)")   // RE-PINNED 8 Nov 2026
       && cOut.includes("46.2"));
     ok("...the diesel-or-electric table: 300 diesel trips, 342 electric, 19 950 kWh",
-      cOut.includes(">Battery electric<") && cOut.includes(">300<") && cOut.includes(">342<") && cOut.includes("19 950")
+      cOut.includes(">Battery electric<") && cOut.includes(">300<") && cOut.includes(">342<") && cOut.includes("19,950")
       && cOut.includes("no charge needed inside a shift") && !cOut.includes("up to 0 charge"));
     ok("...the controls: a disabled recycled slider for soil with the reason, the EPD fields, the electric switch",
       cOut.includes("Not available: no primary-production factor is published for Soils.") && cOut.includes("EPD reference (required)")
@@ -241,8 +244,8 @@ if (loaded) {
       cOut.includes("Transport well-to-wheel: 13.7 tCO2e") && cOut.includes("Transport well-to-wheel: 2.0 tCO2e")
       && cOut.includes("Wayscope, well-to-wheel (adds producing the fuel or electricity)"));
     ok("...item 9 each decision's lorry effect: the soil hub 4 800 fewer lorry-km; electric 47 more loads and 1 960 more lorry-km; the alternative 3 512 fewer",
-      cOut.includes("4 800 fewer lorry-km") && cOut.includes("47 more lorry loads · 1 960 more lorry-km")
-      && cOut.includes("no change in lorry loads or lorry-km") && cOut.includes("3 512 fewer lorry-km"));
+      cOut.includes("4,800 fewer lorry-km") && cOut.includes("47 more lorry loads · 1,960 more lorry-km")
+      && cOut.includes("no change in lorry loads or lorry-km") && cOut.includes("3,512 fewer lorry-km"));
     ok("...item 13 the waste hierarchy on the muck-away route (landfill: disposal) and on each method offered",
       cOut.includes("Waste hierarchy: disposal") && cOut.includes("Recycled (closed-loop) · waste hierarchy: recycling")
       && cOut.includes("Wayscope does not replace these or the duty of care"));
@@ -326,7 +329,7 @@ if (loaded) {
       const pCap2 = step6(cp(with6({ approved_t: 7361.1, with_decisions_t: 7002.8, target_t: 7000.8, gap_with_decisions_t: 2.0, on_target_with_decisions: false }, { mode: "cap", cap_t: 7000.8 })));
       const pFollow = step6(cp(with6({ gap_with_decisions_t: 2.0, on_target_with_decisions: true })));
       ok("⭐ R2 ...a cap 2.0 tCO2e over reads '2.0 tCO2e over the target'; the verdict is the server's on_target, never a margin worked out here",
-        pCap2.includes(">With the agreed decisions: 7 002.8 tCO2e, 2.0 tCO2e over the target<") && pFollow.includes(">With the agreed decisions: 41.4 tCO2e, on target<"));
+        pCap2.includes(">With the agreed decisions: 7,002.8 tCO2e, 2.0 tCO2e over the target<") && pFollow.includes(">With the agreed decisions: 41.4 tCO2e, on target<"));
       const pWhen = step6(cp(with6({}, { updated_at: "2026-10-11T23:30:00Z" })));
       const _d = new Date("2026-10-11T23:30:00Z"), _M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
       const _day = `${_d.getDate()} ${_M[_d.getMonth()]} ${_d.getFullYear()}`;
@@ -356,10 +359,10 @@ if (loaded) {
     const fairT = appr.filter(l => l.fair.eur != null);
     const fairPerT = fairT.reduce((a, l) => a + l.fair.eur, 0) / fairT.reduce((a, l) => a + l.tonnes, 0);
     ok("...the trips KPI is the SUM of the server's rounded-up trips (no arithmetic of its own) and fair €/t the weighted figure",
-      dOut.includes(">" + sumTrips.toLocaleString("en-US").replace(/,/g, " ") + "<") && dOut.includes("planned €") && dOut.includes("fair € (model)")
-      && dOut.includes("€ " + fairPerT.toFixed(2)));
+      dOut.includes(">" + sumTrips.toLocaleString("en-US") + "<") && dOut.includes("planned €") && dOut.includes("fair € (model)")
+      && dOut.includes("€" + fairPerT.toFixed(2)));
     ok("...the diesel index is in the header, and IPT / discipline filters exist",
-      dOut.includes("€" + (+cl.costing.index_eur_per_l).toFixed(3) + "/L") && dOut.includes("All Teams") && dOut.includes("All disciplines"));
+      dOut.includes("€" + (+cl.costing.index_eur_per_l).toFixed(3) + " per litre") && dOut.includes("All Teams") && dOut.includes("All disciplines"));
     // 13 Oct 2026 (W3, narrowed): "not baked" reads "not routed"
     ok("...the route table prints planned € with a 'target' chip, fair € and fair €/t, and 'not routed' on the unbaked route",
       // 13 Oct 2026 (W6, narrowed): "not routed" is the unrouted line's status word, "Not routed"
@@ -368,7 +371,7 @@ if (loaded) {
     // 11 Sep pm: the four groups, the Delivered figures from the fixture's reported line, every Fig with a title
     ok("...the Delivered-to-date group prints the server's actual tonnes and % of plan (a reported line is in the fixture)",
       dOut.includes(">Delivered to date<") && cl.totals.actual_tonnes != null
-      && dOut.includes(">" + cl.totals.actual_tonnes.toLocaleString("en-US").replace(/,/g, " ") + "<")
+      && dOut.includes(">" + cl.totals.actual_tonnes.toLocaleString("en-US") + "<")
       && dOut.includes("tonnes moved") && dOut.includes("forecast months reported"));     // 13 Oct 2026 (W3, narrowed): was "line-months" 
     ok("...every KPI value sits in a nowrap clamp()-sized div, none truncated",
       // 14 Oct 2026 (narrowed): the clamp() size is CSS now (.fig-val, pinned in parse_frontend), not an inline style
@@ -400,8 +403,8 @@ if (loaded) {
       const tT = todayRows.reduce((a, x) => a + ((x.d.derived || {}).tonnes || 0), 0);
       const tTrips = todayRows.reduce((a, x) => a + ((x.d.derived || {}).trips || 0), 0);
       ok(`...today (${wk.today}) lists ${todayRows.length} lines with the SERVER's day tonnes and trips summed (${tT} t, ${tTrips} trips)`,
-        todayRows.length > 0 && wOut.includes(">tonnes<") && wOut.includes("day actuals typed today") && wOut.includes(">" + tT.toLocaleString("en-US").replace(/,/g, " ") + "<")
-        && wOut.includes(">" + tTrips.toLocaleString("en-US").replace(/,/g, " ") + "<")
+        todayRows.length > 0 && wOut.includes(">tonnes<") && wOut.includes("day actuals typed today") && wOut.includes(">" + tT.toLocaleString("en-US") + "<")
+        && wOut.includes(">" + tTrips.toLocaleString("en-US") + "<")
         // 13 Oct 2026 (W6, narrowed): the route id is a details line under each Today row
         && todayRows.every(x => wOut.includes("<dt>Route</dt><dd>" + x.l.route_id + "</dd>")));
       ok("...this week to date and last week's account are printed with their bars",
@@ -456,10 +459,10 @@ if (loaded) {
     // 13 Oct 2026 (W6, narrowed): the cost cell is two columns, Planned and Fair; the fair figure's reason for "—" and its
     // per-unit split are in the row's details
     ok("...one Cost cell per line, each with a planned figure (or 'rate not set') and a fair figure (or 'fair —')",
-      (fOut.match(/data-cost-cell="1"/g) || []).length === nLines && (fOut.match(/<dt>Fair € \(model\)<\/dt><dd>€ /g) || []).length >= 1
+      (fOut.match(/data-cost-cell="1"/g) || []).length === nLines && (fOut.match(/<dt>Fair € \(model\)<\/dt><dd>€/g) || []).length >= 1
       && /<dt>Fair € \(model\)<\/dt><dd>(Not routed yet for this vehicle, so no distance and no fair price|No diesel index)<\/dd>/.test(fOut)
       && (fOut.match(/>target<\/span>/g) || []).length >= 1);
-    ok("...and the fair figure carries €/t beside it", /<dt>Fair, per unit<\/dt><dd>€ [\d.]+\/t, /.test(fOut));
+    ok("...and the fair figure carries €/t beside it", /<dt>Fair, per unit<\/dt><dd>€[\d.]+\/t, /.test(fOut));
     ok("...nothing renders as undefined or NaN", !/undefined|NaN/.test(fOut));
   }
 
@@ -475,9 +478,9 @@ if (loaded) {
       h(Matrix, { meta: mMeta, who: "t", editTarget: null, vehLang: "en", access: planner, initialCost: pv }));
     const fairT = pv.totals.fair;
     ok("...the strip prints the preview's fair € total, €/t, €/trip, €/km and the planned € with 'target rate'",
-      mOut.includes('data-cost-strip="1"') && mOut.includes("€ " + Math.round(fairT.eur).toLocaleString("en-US").replace(/,/g, " "))
-      && mOut.includes("€ " + (+fairT.per_t).toFixed(2)) && mOut.includes("€ " + (+fairT.per_km).toFixed(2)) && mOut.includes("target rate"));
-    ok("...and the diesel index the model priced at, with the winter note", mOut.includes("€" + (+pv.index_eur_per_l).toFixed(3) + "/L") && mOut.includes("winter months"));
+      mOut.includes('data-cost-strip="1"') && mOut.includes("€" + Math.round(fairT.eur).toLocaleString("en-US"))
+      && mOut.includes("€" + (+fairT.per_t).toFixed(2)) && mOut.includes("€" + (+fairT.per_km).toFixed(2)) && mOut.includes("target rate"));
+    ok("...and the diesel index the model priced at, with the winter note", mOut.includes("€" + (+pv.index_eur_per_l).toFixed(3) + " per litre") && mOut.includes("winter months"));
     ok("...nothing renders as undefined or NaN", !/undefined|NaN/.test(mOut));
     const mNone = render("the matrix renders with NO preview (nothing typed)", h(Matrix, { meta: mMeta, who: "t", editTarget: null, vehLang: "en", access: planner, initialCost: null }));
     ok("...and says 'type a quantity to see the price' with fair — and 'rate not set'", mNone.includes("type a quantity to see the price") && mNone.includes("rate not set"));
@@ -669,8 +672,8 @@ if (loaded) {
         && !/undefined|NaN|IPT ?\d/.test(sgP), sgP.slice(0, 200));
       const selP = seg(gP, '<select class="ga-sel"', "</select>");
       ok("the month select shows the fixture's month in the Dashboard's words (Sep 26), 24 months of the horizon",
-        /<option value="9" selected="">Sep 26<\/option>/.test(selP) && (selP.match(/<option/g) || []).length === ctMeta.months.count && (selP.match(/selected/g) || []).length === 1
-        && /<select class="ga-sel"[^>]*aria-label="Month"/.test(eP) && /<option value="11" selected="">Nov 26<\/option>/.test(eP));
+        /<option value="9" selected="">Sep 2026<\/option>/.test(selP) && (selP.match(/<option/g) || []).length === ctMeta.months.count && (selP.match(/selected/g) || []).length === 1
+        && /<select class="ga-sel"[^>]*aria-label="Month"/.test(eP) && /<option value="11" selected="">Nov 2026<\/option>/.test(eP));
       ok("🔴 none of the banned words in the rendered panel",
         !/\b(real-time|live tracking|telematics|optimi[sz]\w*|predict\w*|trucks?|secure|booking|peak hour)\b/i.test(gP + tP + eP) && !/\bAI\b/.test(gP + tP + eP));
       // REVERSED 11 Oct 2026 (review): the page once rendered an `unbaked_note` the server never sends. A field the
@@ -834,7 +837,7 @@ if (loaded) {
     // Carbon page (the Dashboard used to call any gap within 0.05% of the plan "on target", whatever the mode)
     const dCap2 = dash(CAP2);
     ok("⭐ R2 ...a cap 2.0 tCO2e over reads '2.0 tCO2e over the target' on the Dashboard (it read 'on target' there and 'over' on the Carbon page)",
-      dCap2.includes(">With the agreed decisions: 7 002.8 tCO2e, 2.0 tCO2e over the target<") && !dCap2.includes("7 002.8 tCO2e, on target"));
+      dCap2.includes(">With the agreed decisions: 7,002.8 tCO2e, 2.0 tCO2e over the target<") && !dCap2.includes("7,002.8 tCO2e, on target"));
 
     const rowsCt = cl.lines.map(l => ({ route_id: l.route_id, discipline: l.discipline, section_id: l.section_id, month_index: l.month_index,
       quantity: l.quantity, unit: l.unit, status: l.status, ipt: l.ipt, material_type: l.material_type, material_description: null,
@@ -864,8 +867,8 @@ if (loaded) {
     const fSegs = [fTp, fTc, fBad].map(o => seg(o, "data-carbon-target", 'data-guide="forecast-status"'));
     const fCap2 = fc(CAP2);
     ok("⭐ R2 ...Forecasts says the same verdicts as the Dashboard: a cap 2.0 tCO2e over reads over",
-      fCap2.includes(">As forecast: 7 361.1 tCO2e, 360.3 tCO2e over the target · With the agreed decisions: 7 002.8 tCO2e, 2.0 tCO2e over the target<")
-      && fCap2.includes("Target: a fixed cap of 7 000.8 tCO2e (74.0% below the approved plan when it was set)<"));
+      fCap2.includes(">As forecast: 7,361.1 tCO2e, 360.3 tCO2e over the target · With the agreed decisions: 7,002.8 tCO2e, 2.0 tCO2e over the target<")
+      && fCap2.includes("Target: a fixed cap of 7,000.8 tCO2e (74.0% below the approved plan when it was set)<"));
     // REVERSED 11 Oct 2026 (no team share of the scheme's target): it asserted "target 43.4 (the scheme's 74.0% cut)" for a team code
     // REVERSED 13 Oct 2026 (each team its share): it asserted "for the whole scheme, not split by team" and no verdict
     ok("...a team code: its own share of the target, % or cap, with its verdicts; decisions that no longer apply say so",
@@ -913,7 +916,7 @@ if (loaded) {
     const mBad = mx(PC, BAD), mCap2 = mx(PC, CAP2);
     ok("...decisions that no longer apply: 'With the agreed decisions: —' on the line and the server's sentence under it; a cap 2.0 over reads over",
       mBad.includes(" · With the agreed decisions: —<") && mBad.includes('<div class="w-full ct-note">The agreed decisions no longer fit the plan (route &#x27;R4&#x27; does not exist), so the plan with them cannot be worked out. A planner needs to set the target again on the Carbon planner.</div>')
-      && mCap2.includes("With the agreed decisions: 7 002.8 tCO2e, 2.0 tCO2e over the target<") && !/undefined|NaN/.test(mBad + mCap2));
+      && mCap2.includes("With the agreed decisions: 7,002.8 tCO2e, 2.0 tCO2e over the target<") && !/undefined|NaN/.test(mBad + mCap2));
 
     // the big screen's target figure (ctFig, called directly: the Dashboard is NOT rendered in wall mode here)
     const fg = (ct, err) => sandbox.ctFig(ct, err);
@@ -1071,7 +1074,7 @@ if (loaded) {
       acctOut.includes("Stockpiles · ") && acctOut.includes('aria-label="About: Stockpiles"')   // 13 Oct 2026 (W3, narrowed): the how-to is in the info box
       && (acctOut.match(/placeholder="out —"/g) || []).length === fixture.account.stock.length && fixture.account.stock.length >= 1);
     ok("...and says the fixture's stockpile is OVER, with the same figure the server sent",
-      acctOut.includes("OVER by " + Math.round(-fixture.account.stock[0].remaining).toLocaleString("en-US").replace(/,/g, " ")));
+      acctOut.includes("OVER by " + Math.round(-fixture.account.stock[0].remaining).toLocaleString("en-US")));
 
     // ---- 10 Sep evening: the fuel widget and Quote + BAF, from test_costing.py's fixture --
     const fuelFixPath = path.join(__dirname, "fixtures", "lookahead_page_fuel.json");
@@ -1085,12 +1088,12 @@ if (loaded) {
       // NARROWED (G2): the date is labelled by where the price came from — "bulletin" when
       // fetched, "typed" when an admin typed it (this fixture's index is typed: source manual)
       ok("...the compact widget is in the KPI strip with the index, its dated source and the BAF %",
-        fOut.includes('data-fuel-widget="compact"') && fOut.includes("€" + fuelFix.costing.index_eur_per_l.toFixed(3) + " / L")
+        fOut.includes('data-fuel-widget="compact"') && fOut.includes("€" + fuelFix.costing.index_eur_per_l.toFixed(3) + "/L")
         && fOut.includes("diesel EE · " + (fuelFix.costing.index_source === "manual" ? "typed" : "bulletin"))
         && fOut.includes(bafLbl));
       ok("...the planned € card counts the target-priced lines and prints the + BAF total beside the quote",
-        fOut.includes(`· ${fuelFix.commit.totals.eur_target_lines} at target`) && fOut.includes("+ BAF € ")
-        && fOut.includes("€ " + Math.round(fuelFix.commit.totals.eur).toLocaleString("en-US").replace(/,/g, " ")));
+        fOut.includes(`· ${fuelFix.commit.totals.eur_target_lines} at target`) && fOut.includes("+ BAF €")
+        && fOut.includes("€" + Math.round(fuelFix.commit.totals.eur).toLocaleString("en-US")));
       ok("...nothing renders as 'undefined' or 'NaN'", !/undefined|NaN/.test(fOut));
       const fAcct = render("the Account view renders with the fuel fixture",
         h(LookAhead, { meta: laMeta, who: "t", access: planner, initialPage: fuelFix, initialView: "account" }));
@@ -1100,7 +1103,7 @@ if (loaded) {
         && fAcct.includes("Yard €/L") && fAcct.includes("Fuel share %") && (fAcct.match(/inputmode="decimal"/gi) || []).length >= 2);
       ok("...every target-priced account row carries the 'target' chip and every priced row a + BAF line",
         (fAcct.match(/>target<\/span>/g) || []).length === nTarget && nTarget >= 1
-        && (fAcct.match(/\+ BAF € /g) || []).length === fuelFix.account.rows.filter(r => r.planned_eur_adj != null).length);
+        && (fAcct.match(/\+ BAF €/g) || []).length === fuelFix.account.rows.filter(r => r.planned_eur_adj != null).length);
       const fSub = render("the Account view renders for a SUBMITTER with the fuel fixture",
         h(LookAhead, { meta: laMeta, who: "t", access: submitter, initialPage: fuelFix, initialView: "account" }));
       ok("...whose widget shows the yard and share as text, not inputs",

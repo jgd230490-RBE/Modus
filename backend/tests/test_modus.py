@@ -726,8 +726,10 @@ ok("frontend: signed-in role text shows the team's name",
 # NARROWED (10 Oct, the UI pass): the rail is a card of words with dots; the word and the team text are
 # still flagWord(f) and teamText(f.text), now separated by a non-breaking space inside the chip
 ok("frontend: the clash rail shows the code's name (the provider's for a restriction) and the teams' names",
-   "{flagWord(f)}</span>&nbsp;{teamText(f.text)}" in fe_src and 'IPT_SHARE: "SHARE"' in fe_src
-   and 'const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);' in fe_src
+   # NARROWED 10 Nov 2026 (wave 2, card 12): the word is the one status chip (RowStatus), in sentence case; a provider's own
+   # word in capitals ("ROADWORKS") reads in sentence case through capsWord
+   "<RowStatus word={flagWord(f)} tone={laTone(f.code)} />&nbsp;{teamText(f.text)}" in fe_src and 'IPT_SHARE: "Share"' in fe_src
+   and 'const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? capsWord(f.label) : ((table || RAIL_LABEL)[f.code] || f.code);' in fe_src
    and "{f.code}</span> {f.text}" not in fe_src and 'TARK_TEE: "TARK TEE"' not in fe_src)
 ok("frontend: the map entry is not called public — the map is behind the gate",
    '{ id: "map", label: "Route map"' in fe_src and "Back to public map" not in fe_src and 'label: "Public route map"' not in fe_src)

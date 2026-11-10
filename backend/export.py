@@ -1700,7 +1700,8 @@ def _scale_bar(c, v, w_pt, h_pt):
     24 mm (basemap.scale), clear of the basemap's own credit."""
     import basemap
     k = w_pt / v["w"]
-    km, px = basemap.scale(v, 24 * mm / k)
+    du = _du()                       # 10 Nov 2026 (finding 20): the organisation's unit
+    km, px = basemap.scale(v, 24 * mm / k, unit=du)
     bar = px * k
     x1, y1 = w_pt - 6, 17
     x0 = x1 - bar
@@ -1711,7 +1712,7 @@ def _scale_bar(c, v, w_pt, h_pt):
     c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(1)
     c.line(x0, y1, x1, y1); c.line(x0, y1 - 1.5, x0, y1 + 2.5); c.line(x1, y1 - 1.5, x1, y1 + 2.5)
     c.setFillColorRGB(*NAVY_RGB); c.setFont(_BF("regular"), 7)
-    c.drawCentredString((x0 + x1) / 2, y1 + 2.2, f"{km:g} km")
+    c.drawCentredString((x0 + x1) / 2, y1 + 2.2, f"{km:g} " + ((("mile" if km == 1 else "miles") if du == "mi" else "km")))
 
 
 class _BulletinMap(Flowable):

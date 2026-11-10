@@ -749,7 +749,7 @@ ok("🔴 no 'km' in the Dashboard's hover hint or model notes, no '$' before the
    # 13 Oct 2026 (W6, narrowed): the route table's "on hover" hint left with the hover titles; the per-unit prices it
    # named are details lines, and their distance word is still DU()
    "{CUR()}/{DU()} on hover" not in fe and "{CUR()}/km on hover" not in fe
-   and "parts.push(`${CUR()} ${(+distRate(u.per_km)).toFixed(2)}/${DU()}`)" in fe and "unitList(r.fairU)" in fe
+   and "parts.push(`${CUR()}${(+distRate(u.per_km)).toFixed(2)}/${DU()}`)" in fe and "unitList(r.fairU)" in fe   # NARROWED 10 Nov 2026 (wave 2, finding 20): money against the symbol
    # 13 Oct 2026 (W3, narrowed): the Dashboard's model note left the screen for the technical guide; its info
    # boxes name both units ("per mile or km") and the tenant's own word stays in every figure's label
    and "{DU()}, cycle and vehicles from the baked HERE route" not in fe and "Fair {CUR()} = the cost model on Config" not in fe
@@ -801,7 +801,10 @@ ok("the app's helpers convert at the display boundary (dist, distRate, distInRat
                           "const distInRate = (perUnit) =>", "const speed = (kph) =>", "const fmtDist = (km, dp) =>"))
    and all(x in mp for x in ("const KM_PER_MI = 1.609344;", "const distU = (km) =>", "const fmtDist = (km, dp) =>")))
 ok("the app types per-distance rates in the tenant's unit and stores per km (route form, target rate, running coefficient)",
-   fe.count("distInRate(") >= 3 and "rate_eur_per_km: route.rate_eur_per_km == null" in fe)
+   # NARROWED 10 Nov 2026 (wave 2, finding 20): the running coefficient (and every other per-distance Config figure) is typed
+   # through UnitNum, which shows distRate and sends distInRate; the route form and the target rate call distInRate themselves
+   fe.count("distInRate(") >= 2 and "rate_eur_per_km: route.rate_eur_per_km == null" in fe
+   and ": distInRate;" in fe and '? <UnitNum className={inp + " mt-1"} inputMode="decimal" value={fp[k]} onValue={n => set(f => { f[k] = n; })} />' in fe)
 
 # =========================================================================== #
 #  5. The GB vehicle set and the 2026 CO₂ factors                               #
@@ -1050,11 +1053,16 @@ ok("...only :root and the dark block define the pair (no accent touches it), and
 # of the DARK-REMAP block matches the inline form; here every text-white in the markup is classified by the fill it sits on.
 _TW = re.compile(r"text-white(?!/)")
 # 22 Oct 2026 (UI fix 6, card 6): one more known fill, the haul-road buttons' var(--haul-text) (decision 13)
-_FILLS = [("navy", 'var(--navy)'), ("blue", 'var(--blue)'), ("slate-800", "bg-slate-800"), ("team palette", "IPT_PALETTE_C"),
+# 10 Nov 2026 (wave 2, card 13, decision 4): every primary action takes the accent, an inline var(--action) fill whose
+# text-white reads --action-fg (.text-white[style*="var(--action)"]); the navy fills left are selections
+_FILLS = [("action", 'var(--action)'), ("navy", 'var(--navy)'), ("blue", 'var(--blue)'), ("slate-800", "bg-slate-800"), ("team palette", "IPT_PALETTE_C"),
           ("zone colour", "ZONE_HAUL"), ("zone colour", "ZONE_ROUTING"), ("red", 'var(--red)'), ("green", 'var(--green)'), ("ok-btn", 'var(--ok-btn)'),
           ("haul text", 'var(--haul-text)')]
 _sites = {}
-for _m in _TW.finditer(_fe_wo):
+# NARROWED 10 Nov 2026 (wave 2, card 13): the sites are in the markup, after the page's <style>; the stylesheet's own
+# .text-white[style*="var(--action)"] rule (the accent's --action-fg) is a rule, not a filled control
+_TW_FROM = _fe_wo.index("</style>")
+for _m in _TW.finditer(_fe_wo, _TW_FROM):
     _start = _fe_wo.rfind("<", 0, _m.start())
     _win = _fe_wo[_start:_start + 600]
     _found = sorted((_win.find(mark), kind) for kind, mark in _FILLS if mark in _win)
@@ -1074,7 +1082,11 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    # NARROWED 31 Oct 2026 (task 4a PR 3d): 24 — the CLP Notes and tasks panel's picked tab (Contractor / a client group, navy)
    # NARROWED 31 Oct 2026 (task 4c PR 5): 26 (after PR 3 and 4a PR 3d) — the Print panel's picked page (A3 / A4) and its PDF button (navy)
    # NARROWED 8 Nov 2026 (task 2.1-12): 27 — the works-area panel's "Save the works area" (navy)
-   len(_sites.get("navy", [])) == 27 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
+   # NARROWED 10 Nov 2026 (wave 2, card 13, decision 4): navy 27 -> 2 and a new kind, action (25): every primary action
+   # moved to the accent; the two navy fills left are the Submit strip (a card, not a button) and the drawing palette's
+   # picked tool (a selection); the tabs and the picked stockpile / year / page are .ws-tab tints with no text-white
+   len(_sites.get("action", [])) == 23 and ".text-white[style*=\"var(--action)\"]{color:var(--action-fg);}" in fe
+   and len(_sites.get("navy", [])) == 2 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
    and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
 ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",
@@ -1082,7 +1094,10 @@ ok("...the one text-white on var(--red) is the Locations form's Delete button (w
 ok("...every inline navy / blue fill is written `background: \"var(--navy)\"` / `\"var(--blue)\"` (the form React writes as `background: var(--navy);`, which the rule's [style*=] matches), and the rule reads --control-fg",
    'html[data-theme="dark"] .text-white[style*="var(--navy)"],html[data-theme="dark"] .text-white[style*="var(--blue)"]{color:var(--control-fg)}' in _dark
    and ".bg-\\[color\\:var\\(--navy\\)\\]" not in fe
-   and _fe_wo.count('background: "var(--navy)"') + _fe_wo.count('background:"var(--navy)"') >= 14 and _fe_wo.count('background: "var(--blue)"') >= 1
+   # NARROWED 10 Nov 2026 (wave 2, card 13): 14+ -> 2 navy fills (the Submit strip and the palette's picked tool); the primary
+   # actions are written the same way on the accent, `background: "var(--action)"`, 23 of them
+   and _fe_wo.count('background: "var(--navy)"') + _fe_wo.count('background:"var(--navy)"') == 2 and _fe_wo.count('background: "var(--blue)"') >= 1
+   and _fe_wo.count('background: "var(--action)"') >= 23
    and "backgroundColor: \"var(--navy)\"" not in _fe_wo and "backgroundColor: \"var(--blue)\"" not in _fe_wo)
 _bad1 = []
 for _a in _ACC:
@@ -1097,7 +1112,7 @@ ok("...the Submit strip's labels sit at full opacity in the strip's own text col
    # NARROWED 22 Oct 2026 (UI fix 7): the labels are 12 px now (text-xs)
    '<div className="text-xs uppercase tracking-wide">{label}</div>' in fe and "text-white/60" not in fe
    and '(tone === "peak" ? "text-[color:var(--gold)]" : "")' not in fe
-   and '.unit-sw-seg button[aria-pressed="true"]{background:var(--navy);color:var(--control-fg);}' in fe)
+   and '.unit-sw-seg button[aria-pressed="true"]{background:var(--navy-soft);color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);}' in fe)   # NARROWED 10 Nov 2026 (card 13): the selected segment is the tint
 
 # --- 17 Oct 2026: UI fix 4 (claude/ui-fix-captions) — the captions (finding 3, decision 1), the status WORDS (finding 6's words,
 # finding 19, decision 2), the Submit strip's peak values (decision 3) and the small chips / captions (findings 19, 20). Ratios by the
@@ -1147,12 +1162,16 @@ def _text_uses(tok):
 ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the markup — the 10 uses left are the progress bar's fill, a card's border (×4: the abnormal loads' note card since 22 Oct), the status dots (×3), the carbon-tone dot and the row-status icon",
    # NARROWED 27 Oct 2026: 11 — + the organisation file's message border (Config, F3 c), a border like the four above
    # NARROWED 27 Oct 2026 (stockpile forecast): 12 — + the Stockpiles page's saved-message border, a border like the others
-   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 12 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
+   # NARROWED 10 Nov 2026 (wave 2, card 12): 12 -> 8 — the one status chip: the old StatusWord dots (STATUS_DOT, ×3) and the
+   # row-status icon's fill (now the --ok-btn pair on the chip's tint) left
+   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 8 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
    and "text-[color:var(--green)]" not in fe and "text-emerald-600" not in fe, str(_text_uses("var(--green)"))[:300])
 # NARROWED 29 Oct 2026 (3b, the steel split): 8 — + the dot of Config's "Older: pick one of the three" chip (a status dot, not text)
 # NARROWED 9 Nov 2026 (UI fix phone 2): 9 — + the phone Gate arrivals list's amber bar (a fill, not text)
 ok("...nor var(--gold): the 8 uses left are the gate-arrivals key, the warning triangle, a note's border, the status dots (×2), the carbon-tone dot, the flag chip's triangle and the Older chip's dot; the Submit strip's text-[color:var(--gold)] is gone (decision 3)",
-   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 9 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
+   # NARROWED 10 Nov 2026 (wave 2, card 12): 9 -> 5 — the StatusWord dots (×2), the flag rail's triangle and the Older chip's
+   # dot are the one status chip now (its warning icon keeps var(--gold), a fill)
+   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 5 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
 ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's variance figures and the stockpile table's over-capacity figures on a rose-washed row (bad-text: --red is 4.83:1 on white but 4.4–4.5:1 on the wash); since 22 Oct the abnormal loads' .al-bad chip, route-error line and the limits a load is over (bad-text ×3), its .al-notes list, .al-warn chip, route notes and candidate notes (warn-text ×4)",
    '<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>' in fe
    and '<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>' in fe
@@ -1192,11 +1211,12 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-9b): bad-text 51 -> 53 — the Lorry plan's refused-drop line and the red edge of a lorry that cannot take the trip
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-1): bad-text +2, warn-text +2 — the traffic limits' Over / Near word on the
    # Dashboard fold's table and OVER / NEAR on the Simulation's "Traffic limits on this day" line
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 57 and  # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 59 and  # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon
+     # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
    # NARROWED 9 Nov 2026 (UI fix phone 2): bad-text 53 -> 55, warn-text 21 -> 22 — the phone Gate arrivals list: the headline when a gate is over, and the figures of an amber / red row
    # NARROWED 10 Nov 2026 (Stockpiles saving): warn-text 24 -> 25 — the planned-use line's amber "Not saved yet"
    # NARROWED 8 Nov 2026 (task 2.1-12): warn-text 19 -> 20 — the site layout phase row's amber "layout changed since"
-   _fe_wo.count("var(--warn-text)") == 25
+   _fe_wo.count("var(--warn-text)") == 26   # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe

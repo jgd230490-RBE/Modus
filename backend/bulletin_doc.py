@@ -403,7 +403,7 @@ def _council_carbon(mi, wd, month_long, A=None):
         # REVERSED 13 Oct 2026 (D40, the user: the council share "for scale"): it said the figures are "not comparable with
         # the DESNZ local authority greenhouse gas statistics"; the share column now sets them beside those figures, for scale
         # NARROWED 14 Oct 2026 (the publishing check): the method in two sentences; the detail is in the sources
-        "basis": ("Each route's carbon is split by the km driven in each district, so the districts add up to the "
+        "basis": ("Each route's carbon is split by the distance driven in each district, so the districts add up to the "
                   "scheme's figure. The last column sets each district beside a month (one twelfth of the year) of its "
                   "road transport CO2e in the government's local statistics (DESNZ, 2024: every vehicle), for scale only, "
                   "on all roads where the district has a motorway."),
@@ -718,7 +718,7 @@ def _sources(lot, council, council_mv, page, carbon, wd=None):
         if las and src and "local authority and regional greenhouse gas" in src:
             src = las                       # the same DESNZ table the council section cites: ONE entry
         r["ref"] = add(src) if src and src != "—" else None
-    add("Carbon: " + (carbon.get("rule") or "routed km × the vehicle's kg CO2e per km, approved plan only").replace("CO₂e", "CO2e")
+    add("Carbon: " + (carbon.get("rule") or "routed distance × the vehicle's kg CO2e per distance, approved plan only").replace("CO₂e", "CO2e")
         + " " + (carbon.get("stamp") or "") + ".")
     if council and not council.get("error"):
         add(council.get("la_source"))
@@ -1297,11 +1297,14 @@ def _svg_scale(v, w, h):
     if not v:
         return ""
     import basemap
-    km, px = basemap.scale(v, 110)
+    import config
+    du = (config.tenant_settings().get("distance_unit") or "km")      # 10 Nov 2026 (finding 20): the organisation's unit
+    km, px = basemap.scale(v, 110, unit=du)
+    word = ("mile" if km == 1 else "miles") if du == "mi" else "km"
     x1, y = w - 10, h - 24
     return (f'<g class="scale"><rect x="{x1 - px - 6:.1f}" y="{y - 16}" width="{px + 12:.1f}" height="24" fill="#fff" '
             f'fill-opacity="0.85"/><path d="M{x1 - px:.1f},{y - 4} v4 H{x1} v-4" fill="none" stroke="{INK}" stroke-width="1.5"/>'
-            f'<text x="{x1 - px / 2:.1f}" y="{y - 6}" text-anchor="middle" class="sc">{km:g} km</text></g>')
+            f'<text x="{x1 - px / 2:.1f}" y="{y - 6}" text-anchor="middle" class="sc">{km:g} {word}</text></g>')
 
 
 def _svg_map(S, w=720, h=420):

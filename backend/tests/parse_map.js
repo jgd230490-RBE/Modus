@@ -5309,7 +5309,7 @@ function qrRead(mod) {
   ok("card 8: the base Guide rule is 14 px in the same 21 px box, an inset ring instead of the border (colours unchanged)",
      /border:0;/.test(guideBase) && /height:21px;padding:0 10px;font:600 14px\/21px system-ui,sans-serif;/.test(guideBase)
      && /box-shadow:inset 0 0 0 1px var\(--line\),0 2px 8px rgba\(16,24,40,\.12\);/.test(guideBase)
-     && /background:#fff;color:#1F2024;/.test(guideBase), guideBase);
+     && /background:var\(--surface\);color:var\(--navy-deep\);/.test(guideBase) && /--surface:#FFFFFF;/.test(html) && /--navy-deep:#1F2024;/.test(html), guideBase);   /* NARROWED 10 Nov 2026 (wave 2, card 14): the white surface and dark text are tokens (--surface #FFFFFF, --navy-deep #1F2024 in :root, the same colours), so the staff app's Dark look can reach the embedded map */
   ok("card 8: no 11 / 11.5 px left on any Guide button rule",
      !/#guide-btn\{[^}]*font-size:11px/.test(html) && !/#guide-btn\{[^}]*11\.5px/.test(html));
   // 22 Oct 2026 (UI fix 6, card 8, review): the 21 px pill is under the 24 px floor on a phone, so a touch screen gets a 44 px
@@ -5329,7 +5329,7 @@ function qrRead(mod) {
   const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
   const muted = (html.match(/--muted:(#[0-9A-Fa-f]{6});/) || ["", "#000000"])[1];
   ok("card 9: the name reads at 4.76:1 or better (--muted #64748B on the panel's white; was 3.22:1)",
-     muted.toUpperCase() === "#64748B" && /\.sidebar \{ position:absolute;[^}]*background:#fff;/.test(html)
+     muted.toUpperCase() === "#64748B" && /\.sidebar \{ position:absolute;[^}]*background:var\(--surface\);/.test(html) && /--surface:#FFFFFF;/.test(html)   /* NARROWED 10 Nov 2026 (wave 2, card 14): the white surface and dark text are tokens (--surface #FFFFFF, --navy-deep #1F2024 in :root, the same colours), so the staff app's Dark look can reach the embedded map */
      && ratio(muted, "#FFFFFF") >= 4.5 && Math.round(ratio(muted, "#FFFFFF") * 100) / 100 === 4.76 && ratio("#8A9099", "#FFFFFF") < 4.5,
      ratio(muted, "#FFFFFF").toFixed(2));
   ok("card 9: the group's heading is 14 px like its sibling groups in the fold (community, collisions, council, limits)",
@@ -5578,7 +5578,7 @@ function qrRead(mod) {
      bm.includes("const style = styleUrl === 'maaamet-ortho' ? maaametOrthoStyle() : styleUrl;"));
   const ct = (src.match(/window\.changeTheme = function\(btn, styleUrl\) \{([^}]*)\};/) || [])[1] || "";
   ok("🔴 basemap: the widget's changeTheme calls changeBasemap and nothing else (no second setStyle path)",
-     ct.trim() === "changeBasemap(styleUrl);");
+     ct.trim() === "pickBasemap(styleUrl);");   // NARROWED 10 Nov 2026 (card 14): through pickBasemap, which marks the pick as by hand and calls changeBasemap
   ok("🔴 basemap: exactly three setStyle calls in the page, all in the basemap block (NARROWED 28 Oct 2026, 8b: two in changeBasemap, and loadLateBasemap's, which runs only after the OS / imagery style is good and still the pick)",
      (src.match(/\.setStyle\(/g) || []).length === 3 && (bm.match(/map\.setStyle\(/g) || []).length === 3
      && /if \(BASEMAP\.pending !== id\) return;\s*if \(!style\) \{ basemapFallback\(false\); return; \}\s*map\.setStyle\(style, \{ diff: false \}\);/.test(bm));
@@ -5606,9 +5606,9 @@ function qrRead(mod) {
     // NARROWED 27 Oct 2026 (8a): the block reads INITIAL_BASEMAP (Light here, as with no ?basemap= in the address)
     // NARROWED 28 Oct 2026 (8b): the block also holds loadLateBasemap (the OS map / the tenant's imagery), which reads the
     // late-basemap helpers beside BASEMAP_LINK, TENANT, fetch and toast: all given here, none used by the 16 Oct checks
-    api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast", "applyLightPreset", "syncLightRow", "restyleHaulEraser",
+    api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast", "applyLightPreset", "syncLightRow", "restyleHaulEraser", "window",
       cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(
-      fakeMap, fakeDoc, () => ({ version: 8, sources: {}, layers: [] }), "mapbox://styles/mapbox/light-v11", {}, () => Promise.reject(new Error("no network")), () => {}, () => {}, () => {}, () => {});   // NARROWED 28 Oct 2026 (8d, GL JS v3)
+      fakeMap, fakeDoc, () => ({ version: 8, sources: {}, layers: [] }), "mapbox://styles/mapbox/light-v11", {}, () => Promise.reject(new Error("no network")), () => {}, () => {}, () => {}, () => {}, { addEventListener(){} });   /* NARROWED 10 Nov 2026 (card 14): the block listens for the app's look on window; a stand-in here */   // NARROWED 28 Oct 2026 (8d, GL JS v3)
   } catch (e) { ok("basemap sandbox: the block runs", false, String(e)); }
   if (api) {
     const L = "mapbox://styles/mapbox/light-v11", D = "mapbox://styles/mapbox/dark-v11", S = "mapbox://styles/mapbox/streets-v12";
@@ -5699,7 +5699,7 @@ function qrRead(mod) {
      && nameOf("filter-discipline") === "Discipline" && nameOf("filter-ipt") === "Team",
      JSON.stringify(["filter-origin", "filter-dest", "filter-discipline", "filter-ipt"].map(nameOf)));
   ok("🔴 names #4: the basemap select is named Basemap, its handler as it was",
-     nameOf("basemap-select") === "Basemap" && tagOf("basemap-select").includes('onchange="changeBasemap(this.value)"'));
+     nameOf("basemap-select") === "Basemap" && tagOf("basemap-select").includes('onchange="pickBasemap(this.value)"'));   // NARROWED 10 Nov 2026 (card 14): a pick by hand is kept when the look changes
   ok("names #4: the filters' handlers are as they were (a name was added, nothing else changed)",
      ["filter-origin", "filter-dest", "filter-discipline", "filter-ipt"].every(id => tagOf(id).includes('onchange="applyFilters()"')));
   // every select in the static markup has a name: an aria-label, or a <label for> (the export card's four)
@@ -6666,8 +6666,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     const fakeSel = { value: M + "light-v11", selectedIndex: 0, options: [] };
     const fakeDoc = { getElementById: () => fakeSel, querySelectorAll: () => [] };
     let api = null, e0 = "";
-    try { api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast", "applyLightPreset", "syncLightRow", "restyleHaulEraser",
-      cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, fakeDoc, () => ({}), M + "light-v11", {}, () => Promise.reject(new Error("no network")), () => {}, () => {}, () => {}, () => {}); }   // NARROWED 28 Oct 2026 (8b, 8d)
+    try { api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast", "applyLightPreset", "syncLightRow", "restyleHaulEraser", "window",
+      cut0(src, "const BASEMAP_LINK = {", "const INITIAL_BASEMAP") + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, fakeDoc, () => ({}), M + "light-v11", {}, () => Promise.reject(new Error("no network")), () => {}, () => {}, () => {}, () => {}, { addEventListener(){} }); }   /* NARROWED 10 Nov 2026 (card 14): the block listens for the app's look on window; a stand-in here */   // NARROWED 28 Oct 2026 (8b, 8d)
     catch (e) { e0 = String(e); }
     ok("8a (sandbox): the basemap block runs with the new styles", !!api, e0.slice(0, 300));
     if (api) {
@@ -6789,13 +6789,15 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && l4["basemap-os"].hidden && l4["basemap-imagery"].hidden);
 
   // ---- the link
-  const initial = (search) => new Function("location", helpers + "\n" + src.slice(src.indexOf("const INITIAL_BASEMAP = "), src.indexOf("const map = new mapboxgl.Map(")) + "\nreturn INITIAL_BASEMAP;")({ search });
+  // NARROWED 10 Nov 2026 (wave 2, card 14): with no basemap in the link, INITIAL_BASEMAP is the look's own; off the staff app
+  // appDark() is false, so Light, as before
+  const initial = (search) => new Function("location", helpers + "\nconst appDark = () => false;\n" + src.slice(src.indexOf("const INITIAL_BASEMAP = "), src.indexOf("const map = new mapboxgl.Map(")) + "\nreturn INITIAL_BASEMAP;")({ search });
   ok("⭐ 8b: the map opens on the basemap a link names, except the OS map and the tenant's imagery (they need the tenant's words): a link naming one opens on Light and switches once the words are in",
      initial("?basemap=nav-night") === M + "navigation-night-v1" && initial("?basemap=os") === M + "light-v11" && initial("?basemap=imagery") === M + "light-v11"
      && initial("") === M + "light-v11" && initial("?basemap=nope") === M + "light-v11");
   const nr = src.slice(src.indexOf("function onNetworkReady() {"), src.indexOf("renderMonthChips(); renderSheet(); sheetAria();"));
   ok("8b: once the network is in, a link naming a late basemap switches to it when the tenant's words are here and the line is shown (never to a hidden line)",
-     nr.length > 100 && /const want = basemapFromKey\(new URLSearchParams\(location\.search\)\.get\('basemap'\)\);\s*if \(BASEMAP_LATE\.has\(want\) && typeof OVERLAY_READY !== 'undefined'\) OVERLAY_READY\.then\(\(\) => \{[\s\S]*?o\.value === want && !o\.hidden\);\s*if \(opt\) changeBasemap\(want\);/.test(nr));
+     nr.length > 100 && /const want = basemapFromKey\(new URLSearchParams\(location\.search\)\.get\('basemap'\)\);\s*if \(BASEMAP_LATE\.has\(want\) && typeof OVERLAY_READY !== 'undefined'\) OVERLAY_READY\.then\(\(\) => \{[\s\S]*?o\.value === want && !o\.hidden\);\s*if \(opt\) pickBasemap\(want\);/.test(nr));   // NARROWED 10 Nov 2026 (card 14): a basemap the link names counts as picked by hand
   ok("8b: the link names the OS map os and the imagery imagery, and both are late basemaps (os-zoomstack, client-imagery)",
      pure.BASEMAP_LINK.os === "os-zoomstack" && pure.BASEMAP_LINK.imagery === "client-imagery" && pure.BASEMAP_LATE.has("os-zoomstack") && pure.BASEMAP_LATE.has("client-imagery")
      && pure.BASEMAP_LATE.size === 2 && pure.basemapKey("os-zoomstack") === "os" && pure.basemapFromKey("imagery") === "client-imagery");
@@ -6813,8 +6815,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     const doc = { getElementById: () => sel, querySelectorAll: () => [] };
     let api = null, e0 = "";
     try {
-      api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast", "applyLightPreset", "syncLightRow", "restyleHaulEraser",
-        helpers + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, doc, () => ({}), M + "light-v11", tenant, fetchImpl, t => toasts.push(t), () => {}, () => {}, () => {});   // NARROWED 28 Oct 2026 (8d, GL JS v3)
+      api = new Function("map", "document", "maaametOrthoStyle", "INITIAL_BASEMAP", "TENANT", "fetch", "toast", "applyLightPreset", "syncLightRow", "restyleHaulEraser", "window",
+        helpers + "\n" + bm + "\nreturn { changeBasemap, BASEMAP };")(fakeMap, doc, () => ({}), M + "light-v11", tenant, fetchImpl, t => toasts.push(t), () => {}, () => {}, () => {}, { addEventListener(){} });   // NARROWED 28 Oct 2026 (8d, GL JS v3); NARROWED 10 Nov 2026 (card 14): a stand-in window (the block listens for the app's look)
     } catch (e) { e0 = String(e); }
     return { api, e0, calls, load: () => loads.forEach(f => f()), err: e => errs.forEach(f => f(e)), toasts, sel };
   };
@@ -7107,7 +7109,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   ok("0a card 3: the lorry limits' panel note is one caveat, no supplier names (their credit is the sources' attribution)",
      code.includes("if (note) note.textContent = 'Not every limit is mapped: check the sign on site.';") && /withAttr\(\{ type: 'geojson', data: pts/.test(code));
   ok("0a card 6: a white strip at the top of the panel stays put, so a scrolled row passes under it, not under the floating button",
-     /\.sidebar \.panel-top\{ flex:none; position:sticky; top:-20px; z-index:2; height:64px; margin:-20px -18px 0; background:#fff; \}/.test(html)
+     /\.sidebar \.panel-top\{ flex:none; position:sticky; top:-20px; z-index:2; height:64px; margin:-20px -18px 0; background:var\(--surface\); \}/.test(html)   /* NARROWED 10 Nov 2026 (wave 2, card 14): the white surface and dark text are tokens (--surface #FFFFFF, --navy-deep #1F2024 in :root, the same colours), so the staff app's Dark look can reach the embedded map */
      && html.includes('<div class="panel-top" aria-hidden="true"></div>'));
 
   // ---- the Labels switch

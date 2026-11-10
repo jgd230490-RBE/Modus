@@ -328,7 +328,7 @@ and, per gate, <code>rush_n</code> (its lorries placed in the window) and <code>
 the gate (each line's loads a day ÷ the trips one lorry makes a day, rounded up, through <code>derived.cycle_for</code>) over
 its arrivals, <code>null</code> where a line at the gate has no cycle; the card prints it as a note. Every gate, every scale; the
 pour on top; the site chain (<code>sim_site</code>) follows the gate's check-in times. On screen only (D86): nothing is saved,
-and the Dashboard's Gate arrivals, the Look-ahead's GATE OVER / NEAR flags, the public map and the big screen keep the even
+and the Dashboard's Gate arrivals, the Look-ahead's Gate over / near flags, the public map and the big screen keep the even
 spread. The figures are a what-if on a planning day, never a prediction.</p>
 <p id="t1-sim-page">29 Oct 2026 (the user: "the simulation needs its own page now and full comprehensive UI/UX review"): Plan → Simulation,
 <code>#simulation</code> (NAV id <code>simulation</code>, after Pours; <code>NAV_ICON.simulation</code>). <code>SimulationPage</code> is the
@@ -433,6 +433,7 @@ IN A BAND   a mixer at the gate (check-in before its discharge) inside planning.
             or at the plant's gate (loading + drive + the plant's check-in before that) inside the bands or the plant
             gate's own shut windows (31 Oct 2026; figures() in_band_plant)   amber
 OVER PLAN   the line's live pours in the month &gt; the line's quantity   amber</pre>
+<p>The screens say these in words (<code>pours.WORDS</code>, 10 Nov 2026): Cold joint likely, Too long in transit, Too few mixers, Mixers in a no-delivery time, Over the month's plan. The day sheet and the XLSX keep the short capitals above (their flag column is 15 characters).</p>
 <p><strong>Drive times.</strong> <code>derived.cycle_for(route, mixer, month)</code> (a dated diversion counts), then the
 busy-hour times (<code>hour_times.times_for</code>, task 0f) at the HOURS nearest each laden departure — the worst
 (there + back) of those hours (Q11). The mixer's own rows where it was worked out, else the Artic Tipper's scaled by the
@@ -992,7 +993,7 @@ landing form off (tried with its trap field only, which stores nothing), the map
 <tr><td class="k">cached geometry, geometry</td><td>stored route, route line</td></tr>
 <tr><td class="k">line-month</td><td>forecast month (one month of one forecast line)</td></tr>
 <tr><td class="k">the server</td><td>Wayscope</td></tr>
-<tr><td class="k">UNBAKED, NOT BAKED (clash rail and line flags)</td><td>NOT ROUTED</td></tr>
+<tr><td class="k">UNBAKED, NOT BAKED (clash rail and line flags)</td><td>Not routed</td></tr>
 <tr><td class="k">stored road route, no stored route (public map, bulletin)</td><td>not routed yet</td></tr>
 <tr><td class="k">HERE calls, routed by HERE, Which HERE option</td><td>(not said: routed, route option)</td></tr>
 <tr><td class="k">Reset to file; differs from the file in the repo</td><td>Reset to defaults; changed from the defaults</td></tr>

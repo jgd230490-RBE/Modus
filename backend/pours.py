@@ -57,8 +57,9 @@ MAX_RATE = 500.0
 MAX_MIXERS = 200
 MAX_WASHOUT = 120.0
 #: the screens' words for the codes (the Look-ahead's LINE_FLAG_LABEL carries the same)
-WORDS = {"POUR_COLD_JOINT": "COLD JOINT", "POUR_TRANSIT": "TRANSIT", "POUR_SHORT": "MIXERS SHORT",
-         "POUR_BAND": "IN A BAND", "POUR_OVER_PLAN": "OVER PLAN"}
+# 10 Nov 2026 (wave 2, card 12): in sentence case, in words a site manager reads ("IN A BAND" said nothing)
+WORDS = {"POUR_COLD_JOINT": "Cold joint likely", "POUR_TRANSIT": "Too long in transit", "POUR_SHORT": "Too few mixers",
+         "POUR_BAND": "Mixers in a no-delivery time", "POUR_OVER_PLAN": "Over the month's plan"}
 RED = ("POUR_COLD_JOINT", "POUR_TRANSIT")
 CODES = ("POUR_COLD_JOINT", "POUR_TRANSIT", "POUR_SHORT", "POUR_BAND", "POUR_OVER_PLAN")
 EPS = 1e-9

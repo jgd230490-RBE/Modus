@@ -371,7 +371,7 @@ ok("the Look-ahead: this week by default, the next week switch, the remembered v
 # 13 Oct 2026 (W6, narrowed): the Flags column became the one Status column, ▶ the row's arrow (›) and its details,
 # and the grid's unit is the Show switch; the same facts, told as the screen now shows them
 ok("...the grid's Flags, Week and Status columns, ▶ to expand, ✎ for a typed day; the exports' Fuel sheet and the DRAFT stamp",
-   "<strong>Status</strong> shows the one thing to look at first: a flag in short form (§12.1), ROAD LIMIT before any other" in src
+   "<strong>Status</strong> shows the one thing to look at first: a flag in short form (§12.1), Road limit before any other" in src   # NARROWED 10 Nov 2026 (wave 2, card 12): sentence case
    and "<strong>Week</strong> is the line's total in the same unit" in src
    and "Press the arrow (<strong>›</strong>) at the left of a row, or move to it with Tab and press Enter or Space, to open its details" in src
    and "The day shows ✎" in src and "<strong>Show</strong> above the grid switches every day cell between <strong>Tonnes</strong>" in src
@@ -380,8 +380,8 @@ ok("...the grid's Flags, Week and Status columns, ▶ to expand, ✎ for a typed
 # 13 Oct 2026 (W6): the other three tables and the marks, as the screens now show them
 ok("W6: the guide tells the route table, Forecasts and the marks as they are: the switch, the arrow and its details, one status, no hover",
    "<strong>Sort by</strong>, to sort" in src and "Click Route or the total to sort, or pick Total, Months or Route from <strong>Sort by</strong>" in src
-   and "The status column shows what needs a person first: <strong>Rejected</strong>, then <strong>ROAD LIMIT</strong>" in src
-   and "<tr><td>ROAD LIMIT</td>" in src and "<strong>Status as a word with an icon</strong>" in src and "<strong>Grey chips</strong>" in src
+   and "The status column shows what needs a person first: <strong>Rejected</strong>, then <strong>Road limit</strong>" in src   # NARROWED 10 Nov 2026 (wave 2, card 12): the guide says the screens' words, in sentence case
+   and "<tr><td>Road limit</td>" in src and "<strong>Status as a word with an icon</strong>" in src and "<strong>Grey chips</strong>" in src
    and "Point at a figure for the price per tonne" not in src and "shown in red under the status" not in src
    and "Click a column to sort.</li>" not in src and "The grid's Flags column" not in src)
 ok("...Account's columns and the diesel strip: Planned £, Fair £ (model), Actual £, £ var, Yard £/L, Fuel share %",
@@ -471,7 +471,7 @@ ok("⭐ the picker covers the carbon symptoms people will hit (all-in vs transpo
 # raises no RESTRICTION flag then (sources.restrictions is "unavailable" and the line under the rail says NOT checked)
 ok("🔴 the restriction flags are raised by a hit only; an unchecked route raises none and the rail line says NOT checked",
    "or the check is unavailable or has never run" not in text and text.count("A route never checked raises no flag") == 2
-   and "<td>ROADWORKS</td>" in src and "<td>TARK TEE</td>" in src)
+   and "<td>Roadworks</td>" in src and "<td>Tark tee</td>" in src)   # NARROWED 10 Nov 2026 (wave 2, card 12): the guide says the screens' words, in sentence case
 
 # the /help/ sign-in page names the rail's link as it reads
 ok("the guide's own sign-in page names the rail link as it reads (User guide), not 'Help link'",
@@ -723,7 +723,8 @@ ok("⭐ the technical guide: drivers_hours.lorry_day, the thresholds, the split,
    and "The gate figures keep the full shift" in tg and "floor(shift hours ÷ cycle)" not in tg.replace("the old floor(shift ÷ cycle)", ""))
 ok("...it maps the old screen words to the new ones, and says the exports keep the old words (decision A)",
    "baked / not baked / unbaked</td><td>routed / not routed yet" in tg and "line-month</td><td>forecast month" in tg
-   and "UNBAKED, NOT BAKED (clash rail and line flags)</td><td>NOT ROUTED" in tg and "The XLSX and PDF exports and the clash text made on the server still say" in tg)
+   and "UNBAKED, NOT BAKED (clash rail and line flags)</td><td>Not routed" in tg   # NARROWED 10 Nov 2026 (wave 2, card 12): the guide says the screens' words, in sentence case
+   and "The XLSX and PDF exports and the clash text made on the server still say" in tg)
 ok("...and the user guide's Appendix D points at it (the first client's Word document is no longer mentioned)",
    "Word document" not in src and "fifty pages" not in src   # REVERSED 22 Oct 2026 (words sweep): Appendix D moved to the technical guide's T7; the technical guide holds Appendix D's text, so it links back to nothing
    and "appendix-d-technical-reference" not in tg and "Appendix D" not in src)
@@ -832,8 +833,8 @@ ok("⭐ the guide names the W8 fields where they are typed: the CLP cap (Locatio
 ok("⭐ the guide's Commit view explains Gates this week, the 85 % step and the honest limit; §12.1 lists GATE OVER / NEAR CAPACITY",
    "<p><strong>Gates this week</strong>, under the grid," in src and "the dashed gold line 85 % of that" in src
    and "These are planned arrivals spread evenly over the gate's open hours; no hourly peak is known." in src
-   and "<tr><td>GATE OVER CAPACITY</td>" in src and "<tr><td>GATE NEAR CAPACITY</td>" in src
-   and src.index("<tr><td>ROUTE CAP</td>") < src.index("<tr><td>GATE OVER CAPACITY</td>") < src.index("<tr><td>SHARE</td>"))
+   and "<tr><td>Gate over capacity</td>" in src and "<tr><td>Gate near capacity</td>" in src   # NARROWED 10 Nov 2026 (wave 2, card 12): the guide says the screens' words, in sentence case
+   and src.index("<tr><td>Route cap</td>") < src.index("<tr><td>Gate over capacity</td>") < src.index("<tr><td>Share</td>"))
 
 ok("⭐ W10: the guide offers the CLP pack beside the month and says what it holds; the technical guide names its two reads",
    "<strong>CLP pack (PDF)</strong> and <strong>CLP pack (XLSX)</strong>, beside the month" in src
@@ -953,7 +954,8 @@ ok("⭐ STOCKPILES: chapter 15 — the page, planned use, stock counts and how t
    and "Same each month from … to …" in _ug_sf and "The planned use never takes more than is there" in _ug_sf
    and "No use planned yet" in _ug_sf)
 ok("STOCKPILES: the flags table names STOCKPILE SOON and STOCKPILE EMPTY (amber), and the Account's Next 8 weeks and grey plan",
-   "<tr><td>STOCKPILE SOON</td><td>Amber." in _ug_sf and "<tr><td>STOCKPILE EMPTY</td><td>Amber." in _ug_sf
+   "<tr><td>Stockpile soon</td><td>Amber." in _ug_sf and "<tr><td>Stockpile empty</td><td>Amber." in _ug_sf   # NARROWED 10 Nov 2026 (wave 2, card 12): the guide says the screens' words, in sentence case
+  
    and "<strong>Next 8 weeks</strong>" in _ug_sf and "with the plan under it in grey" in _ug_sf)
 ok("STOCKPILES: 🔴 the old rule's words are gone from the guide (a week nobody reported no longer counts as nothing)",
    "a week nobody reported counts as nothing" not in _ug_sf and "a route nobody reported counts as nothing" not in _ug_sf)
@@ -1432,7 +1434,9 @@ ok3("8 Nov: Users has five tabs, Client reviewers among them",
 ok3("8 Nov: a week with nothing recorded uses the plan (test_stockpile_forecast D2), not nothing",
     "A week nobody reported counts as nothing in" not in _ug8 and "the plan stands in (§15.3)" in _ug8)
 ok3("8 Nov: the clash rail table has NO WAY ROUND and names the pour flags",
-    "<tr><td>NO WAY ROUND</td>" in _ug8 and "ROAD LIMIT ranks first, then NO WAY ROUND" in _ug8 and "COLD JOINT, TRANSIT, MIXERS SHORT, IN A BAND, OVER PLAN" in _ug8)
+    "<tr><td>No way round</td>" in _ug8 and "Road limit ranks first, then No way round" in _ug8   # NARROWED 10 Nov 2026 (wave 2, card 12): sentence case
+    and "Cold joint likely, Too long in transit, Too few mixers, Mixers in a no-delivery time, Over the month's plan" in _ug8
+    and "COLD JOINT, TRANSIT, MIXERS SHORT, IN A BAND, OVER PLAN" in _ug8)   # the day sheet's own short capitals, named
 ok3("8 Nov: the CLP's regional plan is every route, grey when idle, every supplier and site named (PR #216)",
     "Its regional plan draws every route to and from the places whatever the month" in _ug8)
 ok3("8 Nov: technical guide: busy hours are applied now (0d-2), peak statuses in_use / paused / stopped",
@@ -1509,7 +1513,8 @@ ok("TRAFFIC LIMIT: user guide 9.3 says how to draw one, what counts, that it nev
                           "within 25 m for at least half its length", "Wayscope flags it; it never moves a route.",
                           "<strong>Traffic limits on local roads</strong>")))
 ok("TRAFFIC LIMIT: the rail table, the Dashboard fold, the public map layer and the Simulation line",
-   "<tr><td>TRAFFIC LIMIT</td>" in src and "<tr><td>TRAFFIC NEAR</td>" in src and "a seventh, <strong>Traffic limits</strong>" in src
+   "<tr><td>Traffic limit</td>" in src and "<tr><td>Traffic near</td>" in src   # NARROWED 10 Nov 2026 (wave 2, card 12): the guide says the screens' words, in sentence case
+   and "a seventh, <strong>Traffic limits</strong>" in src
    and "<li><strong>Traffic limits</strong> — under More layers" in src and 'id="ug-sim-traffic"' in src)
 _tg_tl = open(TECH, encoding="utf-8").read()
 ok("TRAFFIC LIMIT: technical T1 #t1-traffic-limits has the rule, the thresholds, the reads and what is not built",
