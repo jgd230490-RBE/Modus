@@ -264,12 +264,12 @@ def render(D, d, A):
         head("J", f"The councils the routes cross are in 2.3.1. These figures are this plan's lorries only, in "
                   f"{_month(j['month'])}, the busiest month.")
         kmw = "Lorry miles" if unit == "mi" else "Lorry km"
-        D.table(["Council", "Highway authority", "Routes", "Movements a day", f"{kmw} in the month"],
+        D.table(["Council", "Highway authority", "Routes", "Lorry visits a day", f"{kmw} in the month"],
                 [[f"{r['name']} ({r['tier']})" if r["tier"] else r["name"], r["authority"] or "—", ", ".join(r["routes"]) or "—",
                   f"{r['movements_per_day']:g}", _n(round(r["lorry_km"]))] for r in j["rows"]],
                 widths=[4.4, 4.2, 3.4, 2.4, 2.6], numeric=(3, 4))
-        D.src("A movement is one loaded lorry entering the council's area. Distance counts the loaded and empty legs "
-              "inside the area. A route that only clips the edge adds distance, not a movement.")
+        D.src("One lorry visit (in and out) counts once in each council area its loaded leg enters. Distance counts the "
+              "loaded and empty legs inside the area. A route that only clips the edge adds distance, not a visit.")
 
     # ---- K
     if "K" in A:
@@ -298,7 +298,8 @@ def render(D, d, A):
                     [[_month(r["month"]), f"{r['arrivals']:g}", (_n(round(r["capacity"])) if r["capacity"] else "—"),
                       (f"{r['pct']} %" if r["pct"] is not None else "—"), r["word"] or ""] for r in rows],
                     widths=[3.0, 3.0, 3.4, 3.0, 4.6], numeric=(1, 2, 3))
-        D.src("\"Queue likely\" from 85 % of capacity, \"Over gate capacity\" over 100 %. The plan's even spread over the open hours.")
+        D.src("\"Queue likely\" from 85 % of capacity (Wayscope's planning level, not a published standard), "
+              "\"Over gate capacity\" over 100 %. The plan's even spread over the open hours.")
 
     # ---- M
     if "M" in A:

@@ -439,8 +439,12 @@ ok("⭐ approved: Issue 1 kept, by the planner", r.get("status") == "approved" a
 _f1 = clp_records.issue_file(Y1, 1, PLANNER, factors)
 ok("...the file is kept", bool(_f1) and _f1[0].endswith("Issue 1.docx") and _f1[1][:2] == b"PK", str(_f1 and _f1[0]))
 _t1, _h1, _ft1 = text_of(_f1[1])
-ok("⭐ the file says Issue 1 · approved on every page, not DRAFT", "Issue 1 · approved" in _h1 and "DRAFT" not in _h1
-   and "Issue 1" in _ft1, _h1)
+# NARROWED 10 Nov 2026 (F5): the file says "issued", never "approved": an issue is the contractor's, not an approval
+ok("⭐ the file says Issue 1 · issued on every page, not DRAFT", "Issue 1 · issued" in _h1 and "DRAFT" not in _h1
+   and "Issue 1" in _ft1 and "approved" not in _h1, _h1)
+ok("🔴 F5 the cover: 'issued by Pat Planner', 'Issued by the contractor. Not a planning or client approval.' once, "
+   "the history column 'Issued by'", "Issue 1 · issued by Pat Planner on " in _t1 and "approved by" not in _t1.lower()
+   and _t1.count("Issued by the contractor. Not a planning or client approval.") == 1 and "Issued by" in _t1, _t1[:600])
 ok("...the typed cover details fill the cover (no 'To complete' for them)", "1 Yard Lane" in _t1 and "LE7 9XX" in _t1
    and "A. Example · 07700 900123" in _t1 and "Cover, site address" not in _t1 and "Cover, landowner" in _t1)
 # NARROWED 31 Oct 2026 (John: the issued file goes to the client's reviewers, so the team's note to the approver

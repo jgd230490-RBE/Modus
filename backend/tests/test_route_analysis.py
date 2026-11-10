@@ -385,7 +385,7 @@ if TX:
     ok("4 B: the named places, the counts, when fetched", "Test Primary" in TX and "Brook Surgery" in TX
        and "As fetched 1 Nov 2026" in TX)
     ok("4 C: the evidence's own pages, its assessor page left to the analysis", "This route and its alternatives" in TX
-       and TX.count("For the CLOCS route risk assessment") <= 1)
+       and TX.count("For the route risk assessment (CLOCS Standard v5, 5.1a)") <= 1 and "For the CLOCS route risk assessment" not in TX)
     ok("4 E: the busy-hour table", "Round trip by the hour it sets off" in TX and "08:00" in TX)
     ok("4: the assessor's page points at the sections, F 'not in this file' when unticked does not arise here",
        "Evidence: C · Collisions" in TX and "Evidence: A · Restrictions and lorry limits" in TX)
@@ -446,7 +446,7 @@ _cv.save()
 ok("6: into a canvas: the next page number back, nothing saved by it", isinstance(_n, int) and _n > 5)
 if TX:
     _t6 = text(_buf.getvalue())
-    ok("6: ...its assessor page and cycle block left out when told", "For the route risk assessment" not in _t6
+    ok("6: ...its assessor page and cycle block left out when told", re.search(r"For the route risk assessment(?! \(CLOCS)", _t6) is None   # NARROWED 10 Nov 2026 (F12): section C's box says "(CLOCS Standard v5, 5.1a)"
        and "Cycle routes and left turns" not in _t6 and "Page 5" in _t6, _t6[-400:])
 
 # --------------------------------------------------------------------------- #
