@@ -34,6 +34,8 @@
             /* 10 Nov 2026 (wave 2, card 14): the panel's surfaces and fixed text as tokens, so the staff app's Dark look can
                reach the map it embeds (html[data-look="dark"] below). The values here are the ones the page always had. */
             --surface:#FFFFFF; --ctl-line:#D6D3D1; --ink-2:#57534E;
+            /* 10 Nov 2026 (wave 3, map card): a status sentence in green reads at 4.5:1 or better (#059669 was 3.76:1) */
+            --ok-text:#047857;
         }
         /* 10 Nov 2026 (wave 2, UI critique finding 14, card 14): inside the staff app (EMBED) the map follows the app's look.
            In Dark the panel, the figures bar, the timeline, the drawers and the conditions panel go dark and the basemap opens
@@ -41,7 +43,7 @@
            embedded) has no Dark look and never sets data-look. --navy stays the route blue. */
         html[data-look="dark"]{
             --ink:#E6E7EA; --muted:#9AA1AB; --line:#33363D; --bg:#141518; --navy-deep:#F3F4F6; --note:#9AA1AB;
-            --surface:#1F2024; --surface-2:#1B1D21; --ctl-line:#45484F; --ink-2:#C9CCD1;
+            --surface:#1F2024; --surface-2:#1B1D21; --ctl-line:#45484F; --ink-2:#C9CCD1; --ok-text:#34D399;
             --action:#FF8C14; --action-fg:#1F2024;
             color-scheme:dark;
         }
@@ -55,6 +57,7 @@
         html[data-look="dark"] .guide-strip .guide-strip-go{ color:#8FB3F5; }
         html[data-look="dark"] .guide-strip .guide-x{ color:var(--muted); }
         html[data-look="dark"] .tl-rail{ background:var(--surface-2); }
+        html[data-look="dark"] .kpi-switch{ background:var(--surface-2); border-color:var(--ctl-line); }
         html[data-look="dark"] #m-full-strip:not([hidden]){ background:rgba(31,32,36,.96); }
         html[data-look="dark"] .secsel-btn:hover{ background:var(--surface-2); }
         html[data-look="dark"] .secsel-x:hover{ background:var(--surface-2); }
@@ -266,7 +269,7 @@
         .kpi-switch:empty{ display:none; }
         .kpi-switch button{ flex:1; border:none; background:none; cursor:pointer; padding:5px 3px;
                      font-size:12px; font-weight:600; white-space:nowrap;
-                     color:var(--muted); border-radius:5px; font-family:inherit; }
+                     color:var(--ink-2); border-radius:5px; font-family:inherit; }   /* 10 Nov 2026: was --muted, 4.23:1 on the grey */
         .kpi-switch button.on{ background:var(--surface); color:var(--navy-deep); box-shadow:0 1px 2px rgba(16,24,40,.10); }
         /* 2026-09-08 (§C): the 07 Sep name plates are gone. The ends of live routes
            are marked by the location ICON growing 2 px with a 1 px halo — a data-driven
@@ -411,11 +414,14 @@
            closes it); the 18 px circle has a 44 px hit area (::after), the phone rule. */
         .ctl-head{ display:flex; align-items:center; gap:8px; margin:0 0 8px; }
         .ctl-head h3, .ctl-head .heat-label, .ctl-head .area-legend-title{ margin:0; }
-        .info-i{ position:relative; flex:none; display:inline-grid; place-items:center; width:18px; height:18px; padding:0; border-radius:50%;
-                 border:1.5px solid #94A3B8; background:var(--surface); color:var(--ink-2); font:700 11px/1 Inter,system-ui,sans-serif; cursor:pointer; }
-        .info-i::after{ content:""; position:absolute; inset:-13px; }
-        .info-i[aria-expanded="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; }
-        .info-i:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
+        /* 10 Nov 2026 (wave 3, map card): the button is 24 px (the target-size rule) and still draws the same 18 px circle:
+           a transparent 3 px border, the fill clipped inside it, the ring an inset shadow */
+        .info-i{ position:relative; flex:none; display:inline-grid; place-items:center; width:24px; height:24px; padding:0; border-radius:50%;
+                 border:3px solid transparent; background:var(--surface); background-clip:padding-box; box-shadow:inset 0 0 0 1.5px #94A3B8;
+                 color:var(--ink-2); font:700 11px/1 Inter,system-ui,sans-serif; cursor:pointer; margin:-3px; }
+        .info-i::after{ content:""; position:absolute; inset:-10px; }   /* 44 px, as before */
+        .info-i[aria-expanded="true"]{ background-color:var(--navy); box-shadow:inset 0 0 0 1.5px var(--navy); color:#fff; }
+        .info-i:focus-visible{ outline:2px solid var(--navy); outline-offset:-1px; }
         .info-pop{ margin:0 0 10px; padding:10px 12px; background:var(--surface); border:1px solid #CBD5E1; border-radius:8px;
                    box-shadow:0 6px 18px rgba(16,24,40,.10); font-size:13px; line-height:1.5; color:var(--ink); }
         .info-pop[hidden]{ display:none; }
@@ -1487,8 +1493,8 @@
   <button type="button" class="m-handle" id="m-handle" onclick="toggleSheet()" aria-controls="m-body" aria-expanded="false" aria-label="Show the busiest routes and conditions"><span class="m-grip"></span></button>
   <div class="m-peek" id="m-peek">
     <div class="m-month" id="m-month">No month on screen</div>
-    <div class="m-fig"><b id="m-trips">&mdash;</b><span>a day</span></div>
-    <div class="m-fig"><b id="m-vehicles">&mdash;</b><span>vehicles</span></div>
+    <div class="m-fig" hidden><b id="m-trips">&mdash;</b><span id="m-trips-word">movements a day</span></div>
+    <div class="m-fig" hidden><b id="m-vehicles">&mdash;</b><span>vehicles</span></div>
     <button type="button" class="m-cond" id="m-cond" onclick="sheetTo('half')" hidden></button>
   </div>
   <div class="m-body" id="m-body">
@@ -6544,7 +6550,7 @@
                 const bd = document.getElementById('btn-detail');
                 if (matchCount > 0) {
                     status.innerHTML = `Showing ${matchCount} route(s) with approved forecasts.`;
-                    status.style.color = CONFIG.COLORS.green;
+                    status.style.color = 'var(--ok-text)';   // 10 Nov 2026: the text-grade green (was #059669, 3.76:1)
                     if (bd) bd.style.display = 'block';
                 } else {
                     status.innerHTML = `<span style="color:${CONFIG.COLORS.peak};">No approved forecasts in this window.</span>`;
@@ -6974,10 +6980,11 @@
     //: stretch under 1 a day gets no badge (ROAD_LOAD_BADGE_MIN), still clickable.
     const ROAD_LOAD_LABEL = ['get', 'rl_mv_text'];
     const ROAD_LOAD_BADGE_MIN = 1;
-    //: the route badge in carbon mode: "CO₂ 24", the route's t CO2e in the month from the server (one decimal under 10);
+    //: the route badge in carbon mode: "24 t CO₂e", the route's t CO2e in the month from the server (one decimal under 10);
     //: a route with no figure gets no badge (its grey line and the key say "no figure")
+    //: REVERSED 10 Nov 2026 (UI critique 18): was "CO₂ 24" with no unit; the figure now carries its unit, as every figure does
     const CARBON_ROUTE_LABEL = ['case', ['==', ['typeof', ['get', 'f_co2']], 'number'],
-                                ['concat', 'CO₂ ', ['case', ['>=', ['get', 'f_co2'], 10], ['to-string', ['round', ['get', 'f_co2']]], ['to-string', ['get', 'f_co2']]]], ''];
+                                ['concat', ['case', ['>=', ['get', 'f_co2'], 10], ['to-string', ['round', ['get', 'f_co2']]], ['to-string', ['get', 'f_co2']]], ' t CO₂e'], ''];
     //: the badges' ink and edge (the key in the panel uses the same pair: .mv-pill / .co-pill)
     const BADGE_STYLE = { mv: { edge: '#2563EB', ink: '#1D4ED8' }, co2: { edge: '#059669', ink: '#065F46' } };
     //: a white pill with a coloured edge, drawn at twice the size (pixelRatio 2); `arrow` adds the two-way arrow on its left.
@@ -7349,9 +7356,10 @@
                     coBox.innerHTML = '<b>Carbon · t CO₂e in ' + rlEsc(monthLabel(m)) + ', ' + per + '</b>' +
                         '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
                         ranges.map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
-                        '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_NONE + '"></span>Not routed yet · no figure</div>' +
-                        // 19 Oct 2026: the badges' key
-                        '<div class="ml-row ml-key"><span class="co-pill">CO₂ 24</span>t CO₂e from that route in the month</div>' +
+                        // 10 Nov 2026 (UI critique 18): grey is also a route with nothing in the month, so the key says both
+                        '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_NONE + '"></span>Nothing this month, or not routed yet</div>' +
+                        // 19 Oct 2026: the badges' key; 10 Nov 2026: the badge carries its unit, the key says what it is
+                        '<div class="ml-row ml-key"><span class="co-pill">24 t CO₂e</span>from that route in the month</div>' +
                         (miss ? '<div class="ml-foot">Leaves out ' + miss + ' line' + (miss === 1 ? '' : 's') + ' not routed yet.</div>' : '');
                     more = 'Approved plan only, both legs. A colour means the same tonnes every month.' +
                         (mtx.carbonStamp ? ' ' + rlEsc(mtx.carbonStamp) + '.' : '');
@@ -11154,8 +11162,7 @@
                 + (addr ? '<p class="concern-or">or email <a href="' + escHtml(concernMailto(addr, TENANT.name, TL.on ? monthLabel(TL.month) : null, VIEW.ready ? shareUrl() : null)) + '">' + escHtml(addr) + '</a></p>' : '');
             else html = addr
                 ? '<a class="concern-link" href="' + escHtml(concernMailto(addr, TENANT.name, TL.on ? monthLabel(TL.month) : null, VIEW.ready ? shareUrl() : null)) + '">Report a concern by email</a>'
-                : '<span class="concern-unset">Report a concern: no contact address yet'
-                  + (TENANT.demo_notice ? ' (fictional demo)' : '') + '.</span>';
+                : ((typeof EMBED !== 'undefined' && EMBED) ? '<span class="concern-unset">Report a concern: no contact address yet.</span>' : '');   // 10 Nov 2026 (critique 18): a resident sees no unset line
             if (slot.innerHTML !== html) slot.innerHTML = html;
         });
     }
@@ -11589,6 +11596,10 @@
         set('m-month', TL.on ? (SHEET.state === 'peek' ? monthLabel(TL.month) : (barHead() || monthLabel(TL.month))) : 'No month on screen: pick a month or press Play');
         set('m-trips', TL.on ? (txt('kpi-trips') || '—') : '—');
         set('m-vehicles', TL.on ? (txt('kpi-vehicles') || '—') : '—');
+        // 10 Nov 2026 (UI critique 18): every figure has its noun ("125 movements a day", was "125 a day"); with no month
+        // on screen the two figures are hidden, not "— a day" (the line above says to pick a month)
+        set('m-trips-word', CW().short);
+        document.querySelectorAll('#m-peek .m-fig').forEach(el => { if (el.hidden !== !TL.on) el.hidden = !TL.on; });
         const cond = document.getElementById('m-cond'), s = TL.on ? condSummary(WARN.counts) : '';
         const hd = document.getElementById('m-handle'); if (hd && hd.classList) hd.classList.toggle('has-cond', !!s);   // 28 Oct 2026: folded, a red dot
         if (typeof MAPFULL !== 'undefined' && MAPFULL.on) renderFullStrip();
@@ -11693,8 +11704,9 @@
         const conds = (month && WARN.liveMonth === month ? (WARN.live || []) : []).filter(i => i.who === rid);
         html += conds.length ? '<h3>Conditions on this route</h3>' + condRowsHTML(conds) : '';
         html += routeWordsHTML(rid);
-        html += '<p class="mt-note">Hours, responsible organisation, consent reference: not given yet'
-              + (TENANT.demo_notice ? ' (fictional demo)' : '') + '.</p>'
+        // 10 Nov 2026 (UI critique 18, decision 6): a line nobody has filled in is left out for a resident; staff (the map
+        // inside the app) still see the gap. No bracketed demo note: the DEMO bar says it once for the whole page.
+        html += ((typeof EMBED !== 'undefined' && EMBED) ? '<p class="mt-note" data-unset-route-words="1">Hours, responsible organisation, consent reference: not given yet.</p>' : '')
               + (concernFormOn(TENANT) ? '<button type="button" class="btn btn-ghost" data-concern-route="' + escHtml(rid) + '" onclick="openConcernForm(this.dataset.concernRoute)">Report a concern about this route</button>' : '')
               + '<button type="button" class="btn btn-ghost" onclick="closeRouteCard()">Close the route card</button>';
         return html;

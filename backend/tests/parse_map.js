@@ -3452,8 +3452,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
   // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the carbon badge reads "CO₂ 24" (one decimal under 10), the unit in the
   // key; a route with no figure gets NO badge (the filter), its grey line and the key say "no figure"
-  ok("⭐ C1: the route label switches to the 'CO₂' badge in carbon mode (its own layer, on the loaded leg: one label per route)",
-     blkCode.includes("['concat', 'CO₂ ', ['case', ['>=', ['get', 'f_co2'], 10], ['to-string', ['round', ['get', 'f_co2']]], ['to-string', ['get', 'f_co2']]]], ''];")
+  ok("⭐ C1: the route label switches to the '… t CO₂e' badge in carbon mode (its own layer, on the loaded leg: one label per route)",
+     // NARROWED 10 Nov 2026 (UI critique 18, wave 3 map card): the badge carries its unit, "6.8 t CO₂e" (was "CO₂ 6.8")
+     blkCode.includes("['concat', ['case', ['>=', ['get', 'f_co2'], 10], ['to-string', ['round', ['get', 'f_co2']]], ['to-string', ['get', 'f_co2']]], ' t CO₂e'], ''];")
      && blkCode.includes("return ['all', forecastLayerFilter(), ['==', ['get', 'type'], 'Inbound Highway'], ['==', ['typeof', ['get', 'f_co2']], 'number']];")
      // NARROWED 12 Oct 2026 (evening): the sections are drawn in Volume only, so their label is always the volume one
      && blkCode.includes("map.setLayoutProperty('road-load-labels', 'text-field', ROAD_LOAD_LABEL);") && !code.includes("ROAD_LOAD_CARBON_LABEL"));
@@ -3732,7 +3733,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
            // one line and the CO2 badge's key
            && el("heat-info-more").innerHTML.includes("Approved plan only, both legs. A colour means the same tonnes every month.")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter, "not routed yet"
            && !el("heat-info-more").innerHTML.includes("(55.5 t)") && el("carbon-legend").innerHTML.includes("Leaves out 3 lines not routed yet.")
-           && el("carbon-legend").innerHTML.includes('<span class="co-pill">CO₂ 24</span>t CO₂e from that route in the month'), el("carbon-legend").innerHTML.slice(0, 400));
+           // NARROWED 10 Nov 2026 (UI critique 18): the key's pill carries the unit as the badges do; grey is also a route with nothing in the month
+           && el("carbon-legend").innerHTML.includes('<span class="co-pill">24 t CO₂e</span>from that route in the month')
+           && el("carbon-legend").innerHTML.includes('Nothing this month, or not routed yet'), el("carbon-legend").innerHTML.slice(0, 400));
         // REVERSED 12 Oct 2026 (evening): carbon paints the routes only, so a section-month figure from the server never
         // sets the stops; the route-month maximum always does
         TL.matrix.sectionCo2Max = 9.1; B.refreshMapModes(); await flush();
@@ -3917,7 +3920,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      sheetHtml.indexOf('id="m-month"') > 0 && sheetHtml.indexOf('id="m-trips"') > sheetHtml.indexOf('id="m-month"')
      && sheetHtml.indexOf('id="m-vehicles"') > sheetHtml.indexOf('id="m-trips"') && sheetHtml.indexOf('id="m-cond"') > sheetHtml.indexOf('id="m-vehicles"')
      && sheetHtml.indexOf('id="m-busiest"') > sheetHtml.indexOf('id="m-body"') && sheetHtml.indexOf('id="m-conditions"') > sheetHtml.indexOf('id="m-busiest"')
-     && sheetHtml.includes('<b id="m-trips">&mdash;</b><span>a day</span>') && sheetHtml.includes('<b id="m-vehicles">&mdash;</b><span>vehicles</span>'));   // NARROWED 28 Oct 2026 (phone full screen, card 2): one line folded, short words
+     // NARROWED 10 Nov 2026 (UI critique 18): the first figure says what it counts ("movements a day", from CW().short) and
+     // both figures are hidden while no month is on screen
+     && sheetHtml.includes('<div class="m-fig" hidden><b id="m-trips">&mdash;</b><span id="m-trips-word">movements a day</span></div>')
+     && sheetHtml.includes('<div class="m-fig" hidden><b id="m-vehicles">&mdash;</b><span>vehicles</span></div>'));   // NARROWED 28 Oct 2026 (phone full screen, card 2): one line folded, short words
   ok("C3 phone: the full detent is the filters and layers (sheetTo('full') opens the panel as the layers sheet)",
      sheetHtml.includes(`onclick="sheetTo('full')">Filters and layers</button>`) && /if \(state === 'full'\) \{ openLayersSheet\(\); return; \}/.test(code));
   ok("C3 phone: the month chips and Play sit at the BOTTOM of the sheet (the last row), Play named and pressed-state",
@@ -4199,8 +4205,10 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
        mt.startsWith('mailto:contact@scheme.example?subject=Report%20a%20concern%3A%20Wolds%20Link%20(fictional)&body=What%20happened%3A')
        && /Date%3A%0ATime%3A%0APlace/.test(mt) && /Lorry%20registration/.test(mt) && /Month%20on%20the%20map%3A%20Oct%202026/.test(mt) && /month%3D2026-10/.test(mt));
     api.renderConcernLinks();
-    ok("⭐ C3 concern: the demo (no typed address) says so in every slot, as a placeholder — no link, no invented address",
-       concernSlots.every(s => s.innerHTML === '<span class="concern-unset">Report a concern: no contact address yet (fictional demo).</span>'));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
+    // NARROWED 10 Nov 2026 (UI critique 18, decision 6): a resident sees no unset line (the public map: empty slots); the map
+    // inside the app (staff) still says so, without "(fictional demo)" — checked in ui_fix_map_card.js. Still no link, no invented address.
+    ok("⭐ C3 concern: the demo (no typed address) shows a resident no link, no invented address and no placeholder",
+       concernSlots.every(s => s.innerHTML === ''));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
     TENANT.concern_email = 'contact@scheme.example'; api.renderConcernLinks();
     ok("C3 concern: a typed address becomes a 'Report a concern by email' link", concernSlots.every(s => /^<a class="concern-link" href="mailto:contact@scheme\.example\?subject=/.test(s.innerHTML) && />Report a concern by email<\/a>$/.test(s.innerHTML)));
     TENANT.concern_email = null;
@@ -6163,9 +6171,11 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && html.includes('<div id="forecast-status"></div>') && !code.includes('status.innerHTML = "Approved forecasts only.";'));
   ok("19 Oct wording: a failed or partial council read stays IN SIGHT (#area-notes is outside the info box)",
      sb.indexOf('id="area-notes"') > 0 && sb.indexOf('id="area-notes"') < sb.indexOf('id="info-council"'));
-  ok("19 Oct: the 'i' is a named button (aria-expanded, aria-controls), 18 px with a 44 px hit area (::after inset -13 px)",
-     /\.info-i\{ position:relative; flex:none; display:inline-grid; place-items:center; width:18px; height:18px;/.test(html)
-     && html.includes(".info-i::after{ content:\"\"; position:absolute; inset:-13px; }")
+  // NARROWED 10 Nov 2026 (wave 3 map card, axe target-size): the button is 24 px drawing the same 18 px circle (a 3 px
+  // transparent border), the hit area still 44 px (::after inset -10 px)
+  ok("19 Oct: the 'i' is a named button (aria-expanded, aria-controls), 24 px (an 18 px circle) with a 44 px hit area (::after inset -10 px)",
+     /\.info-i\{ position:relative; flex:none; display:inline-grid; place-items:center; width:24px; height:24px; padding:0; border-radius:50%;\s*border:3px solid transparent;/.test(html)
+     && html.includes(".info-i::after{ content:\"\"; position:absolute; inset:-10px; }")
      // named by aria-label (the UI audit, 19 Oct: a hidden .sr-only span counted as 1 px clipped text on every map stop)
      && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z-]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 16   // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): + the traffic limits. NARROWED 31 Oct 2026 (task 4c PR 3): + the pinned pictures. NARROWED 31 Oct 2026 (task 4c PR 4): + the public site layouts. NARROWED 31 Oct 2026 (task 4c PR 1): + site layouts. NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): + Labels, zones, community, collisions, abnormal (staff and public), closures, limits
      && !/class="info-i"[^>]*>[^]*?<span class="sr-only">About/.test(html.slice(0, html.indexOf('id="month-text"'))));
