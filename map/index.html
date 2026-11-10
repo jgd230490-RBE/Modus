@@ -5765,7 +5765,7 @@
                 `<p style='margin:4px 0;'><b>Direction:</b> ${dir}</p>`;
         if (!active) h += `<p style='margin:4px 0;color:#DC2626;'><b>Not in use</b>: a route through this ` +
                           `gate cannot be worked out.</p>`;
-        if (p.safety_minutes) h += `<p style='margin:4px 0;'><b>Induction:</b> ${p.safety_minutes} min</p>`;
+        if (p.safety_minutes) h += `<p style='margin:4px 0;'><b>Check-in:</b> ${p.safety_minutes} min</p>`;
         if (p.internal_travel_minutes) h += `<p style='margin:4px 0;'><b>Gate to face:</b> ` +
                                             `${p.internal_travel_minutes} min</p>`;
         h += `<p style='margin:6px 0 0 0;font-size:12px;color:var(--note);'>Access point, not the site itself</p></div>`;
@@ -6021,23 +6021,39 @@
     }
     // the Conditions rows (buildConditions): one per limit a planned route IN USE this month is over (`routeIds` are the
     // routes on screen, the closures row's own list). A standing limit has no dates: it applies every month.
+    // 10 Nov 2026 (F10, C3): ONE row per road (kind, value, exception and road name; an unnamed stretch is its own row),
+    // listing the routes over it; the row says the sign's exception, or "no exception recorded: check the sign". No
+    // supplier on the row (the sign's card keeps its Source row). `id` is every stretch's id, comma-joined: showLimit
+    // frames them all.
     function limitConditionRows(features, routeIds, month) {
         const inUse = new Set(routeIds || []);
-        const rows = [];
+        const groups = {}, order = [];
         (features || []).forEach(f => {
             const p = limitPropsOf(f && f.properties);
             if (!(p.breach_count > 0)) return;
             const lines = limitBreachLines(p.breaches.filter(b => b && inUse.has(b.route_id)));
             if (!lines.length) return;
-            const b = lines[0], where = p.name || p.ref, kw = limitKindWord(p.kind);
-            rows.push({ key: 'l|' + p.id + '|' + month, lvl: 'warn', src: 'limit', who: b.route_id, kind: 'l', id: p.id,
-                noun: 'Over ' + (p.kind === 'axle' ? 'an ' : 'a ') + kw + ' limit',
-                what: b.route_id + (b.vehicle ? ' · ' + b.vehicle : '') + ' is over the ' + limitValueText(p.kind, p.value, p.unit) + ' ' + kw + ' limit'
-                    + (where ? ' on ' + where : '') + ' (' + (p.source_label || p.source || 'source not named') + ')'
-                    + (lines.length > 1 ? ' (+' + (lines.length - 1) + ' more)' : ''),
-                sort: 1.2 });
+            const where = p.name || p.ref || '';
+            const gk = [p.kind, Number(p.value), (p.exceptions || '').toLowerCase(), where || ('#' + p.id)].join('|');
+            if (!groups[gk]) { groups[gk] = { p: p, where: where, ids: [], routes: [], vehicles: [] }; order.push(gk); }
+            const g = groups[gk];
+            g.ids.push(p.id);
+            lines.forEach(x => {
+                if (!g.routes.includes(x.route_id)) g.routes.push(x.route_id);
+                if (x.vehicle && !g.vehicles.includes(x.vehicle)) g.vehicles.push(x.vehicle);
+            });
         });
-        return rows;
+        return order.map(gk => {
+            const g = groups[gk], p = g.p, kw = limitKindWord(p.kind);
+            const rs = g.routes.slice().sort();
+            const who = rs.slice(0, 3).join(', ') + (rs.length > 3 ? ' +' + (rs.length - 3) : '')
+                + (rs.length === 1 && g.vehicles.length === 1 ? ' · ' + g.vehicles[0] : '');
+            const exc = p.exceptions ? ', ' + String(p.exceptions).toLowerCase() : ' · no exception recorded: check the sign';
+            return { key: 'l|' + gk + '|' + month, lvl: 'warn', src: 'limit', who: rs[0], kind: 'l', id: g.ids.join(','),
+                noun: 'Over ' + (p.kind === 'axle' ? 'an ' : 'a ') + kw + ' limit',
+                what: who + ' · ' + limitValueText(p.kind, p.value, p.unit) + exc + (g.where ? ' · ' + g.where : ''),
+                sort: 1.2 };
+        });
     }
     // the boxes, read from the checkboxes every time (a basemap switch re-adds the layers; a variable could drift)
     function limitBoxesOn() {
@@ -6246,7 +6262,29 @@
     // "Show on map" from a Conditions row: the limit's box is ticked (so its sign is drawn), the map flies to the sign and
     // its card opens; on a phone the card opens in the sheet once the row's own sheetTo('peek') has run
     function showLimit(id) {
-        const f = limitById(id);
+        // 10 Nov 2026 (C3): a road's row carries every stretch's id; the map frames them all and opens the first's card
+        const ids = String(id || '').split(',').filter(Boolean);
+        if (ids.length > 1) {
+            const fs = ids.map(limitById).filter(Boolean);
+            if (!fs.length) return;
+            const pts = [];
+            fs.forEach(x => { const q = limitPropsOf(x.properties); if (Array.isArray(q.anchor)) pts.push(q.anchor);
+                if (x.geometry && x.geometry.type === 'LineString') x.geometry.coordinates.forEach(c => pts.push(c)); });
+            const p0 = limitPropsOf(fs[0].properties);
+            const box0 = document.getElementById('layer-limit-' + LIMIT_BOX_OF[p0.kind]);
+            if (box0 && !box0.checked) { box0.checked = true; box0.dispatchEvent(new Event('change', { bubbles: true })); }
+            if (pts.length) {
+                const b = pts.reduce((a, c) => [Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.max(a[2], c[0]), Math.max(a[3], c[1])],
+                                     [Infinity, Infinity, -Infinity, -Infinity]);
+                const opt = { padding: 80, maxZoom: LIMIT_LABEL_ZOOM + 1 };
+                if (typeof reducedMotion === 'function' && reducedMotion()) map.fitBounds([[b[0], b[1]], [b[2], b[3]]], Object.assign({ animate: false }, opt));
+                else map.fitBounds([[b[0], b[1]], [b[2], b[3]]], Object.assign({ duration: 700 }, opt));
+            }
+            const c0 = Array.isArray(p0.anchor) ? p0.anchor : null;
+            if (c0) setTimeout(() => openLimitCardAt(p0, c0), 0);
+            return;
+        }
+        const f = limitById(ids[0] || id);
         if (!f) return;
         const p = limitPropsOf(f.properties);
         const box = document.getElementById('layer-limit-' + LIMIT_BOX_OF[p.kind]);
@@ -10567,7 +10605,10 @@
         if (res && res.loading) return h + '<p class="secsel-note">Loading…</p></div>';
         if (res && res.failed) return h + '<p class="secsel-note">The figures could not be loaded. Try again.</p></div>';
         if (!v.n && !v.left.length) {
-            return h + '<p class="secsel-note">' + (!v.fig ? (res && res.kind === 'area' ? 'No route enters this box.' : 'No route on this road.')
+            // 10 Nov 2026 (C1): nothing found under the click at all reads as that, not as "no route"
+            const none = res && res.kind !== 'area' && res.piece === null && !(res.routes || []).length;   // null = nothing under the click
+            return h + '<p class="secsel-note">' + (none ? 'No road found here. Zoom in and click the line.'
+                 : !v.fig ? (res && res.kind === 'area' ? 'No route enters this box.' : 'No route on this road.')
                  : 'Nothing approved ' + (res && res.kind === 'area' ? 'enters this box' : 'on this road') + ' in ' + escHtml(monthLabel(m)) + '.')
                  + '</p>' + secselButtons(res, opts, v) + '</div>';
         }
@@ -10660,12 +10701,35 @@
         const H = map.getContainer().clientHeight || 600;
         const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
         const room = H - foot, below = at.point.y < room / 2;
-        const pop = new mapboxgl.Popup({ offset: 10, maxWidth: '380px', anchor: below ? 'top' : 'bottom', className: 'secsel-popup' })
+        const side = secselSide(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge());
+        const pop = new mapboxgl.Popup({ offset: 10, maxWidth: '380px', anchor: (below ? 'top' : 'bottom') + (side ? '-' + side : ''), className: 'secsel-popup' })
             .setLngLat(at.lngLat).setHTML(roadCardHTML()).addTo(map);
         SECSEL.roadPopup = pop;
         // a close clears only its own card (a new click's card replaces it first)
         pop.on('close', () => { if (SECSEL.roadPopup === pop) { SECSEL.roadPopup = null; SECSEL.roadAt = null; SECSEL.roadKey = ''; } });
         fitRoadPopup();
+    }
+    // 10 Nov 2026 (road card edge; seen on live: a card opened near the map's left edge ran under the Control Panel, "…ar 2027").
+    // The card was always centred on the click and is up to 380 px wide. A click too close to the left edge opens the card to
+    // its RIGHT (the card's left corner at the click), one too close to the right edge - the Conditions panel while that is
+    // open - to its LEFT; anywhere else it stays centred. Pure: x = the click in the map, W = the map's width, right = where
+    // the free map ends, half = half a card and a margin.
+    const SECSEL_HALF = 200;
+    function secselSide(x, W, right, half) {
+        half = half || SECSEL_HALF;
+        right = Math.min(W, right > 0 ? right : W);
+        const nearL = x < half, nearR = x > right - half;
+        if (nearL && nearR) return x < right / 2 ? 'left' : 'right';      // a narrow map: the side with more room
+        return nearL ? 'left' : nearR ? 'right' : '';
+    }
+    // where the free map ends on the right, in the map's own px: the Conditions panel's left edge while it is open on a wide
+    // screen, else the column of map buttons
+    function secselRightEdge() {
+        try {
+            const m = map.getContainer().getBoundingClientRect(), w = document.getElementById('tl-warnings');
+            if (w && getComputedStyle(w).display !== 'none' && window.innerWidth > 1023) return Math.round(w.getBoundingClientRect().left - m.left);
+            return Math.round(m.width - 56);
+        } catch (e) { return 0; }
     }
     function fitRoadPopup() {
         const p = SECSEL.roadPopup, at = SECSEL.roadAt; if (!p || !at) return;
@@ -10673,7 +10737,7 @@
         const H = map.getContainer().clientHeight || 600;
         const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
         const y = map.project(at.lngLat).y;
-        const space = (p.options && p.options.anchor === 'top') ? (H - foot - y - 34) : (y - 34);
+        const space = (p.options && String(p.options.anchor).indexOf('top') === 0) ? (H - foot - y - 34) : (y - 34);
         const sc = el.querySelector('.secsel-scroll');
         if (sc) sc.style.maxHeight = Math.max(90, space - 170) + 'px';
     }

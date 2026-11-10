@@ -38,6 +38,9 @@ import traffic_limits
 PIECE_M = 150.0
 #: the click's reach, metres (the map sends ~10 px at its zoom, clamped to this)
 PICK_M_MIN, PICK_M_MAX, PICK_M_DEFAULT = 5.0, 120.0, 30.0
+#: 10 Nov 2026 (C1): a click that NAMES a route line with no stretch of it within reach takes that route's nearest
+#: stretch up to this far (a line drawn at the scheme's zoom sits further from its stored geometry than the reach)
+ROUTE_FALLBACK_M = 1000.0
 #: a box: a leg counts if this much of it is inside (1 m = "enters at all")
 BOX_ENTER_KM = 0.001
 #: the largest box, km across its diagonal (the whole of a big scheme; refuses only a slip that drew the country)
@@ -240,6 +243,9 @@ def road_at(lon, lat, month=None, r_m=PICK_M_DEFAULT, route=None):
         hit = _nearest([b for b in c["boxes"] if str(b[0]) == str(route)], float(lon), float(lat), r_m)
     if hit is None:
         hit = _nearest(c["boxes"], float(lon), float(lat), r_m)
+    if hit is None and route:
+        # C1: nothing at all within reach, but the person clicked THIS route's line: its nearest stretch (<= 1 km)
+        hit = _nearest([b for b in c["boxes"] if str(b[0]) == str(route)], float(lon), float(lat), ROUTE_FALLBACK_M)
     if hit is None:
         return {"kind": "road", "month": int(month) if month else None, "piece": None, "routes": [],
                 "in": None, "out": None, "a_day": None, "counting": counting.words()}

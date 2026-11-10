@@ -1547,5 +1547,7 @@ ok("ROAD CARD POLISH: technical T1 has the rounding rule, the idle routes, the m
    all(w in _tg_rs for w in ('id="t1-road-rounding"', "<code>section_select.share_tenths</code>", "<code>idle</code>", "<code>through(pas=)</code>",
                              "<code>secselSnap</code>", "<code>CLICK_SLOP</code> = 6 px", "<code>clearBoxOfCard</code>",
                              "the 12 Oct whole-movements rule holds everywhere else")))
+ok("ROAD CARD EDGE: technical T1 says which side the road card opens on near the map's edges",
+   all(w in _tg_rs for w in ('id="t1-road-edge"', "<code>secselSide</code>", "<code>SECSEL_HALF</code> = 200 px", "<code>secselRightEdge</code>")))
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
