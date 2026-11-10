@@ -387,12 +387,11 @@ def councils(mi, wd, unit):
         return _chart("councils", "empty", f"No approved lorry movements in any council area in {label}.")
     rows.sort(key=lambda x: (-(x["distance"] or 0), x["council"]))
     word = "lorry-miles" if unit == "mi" else "lorry-km"
-    top = max(rows, key=lambda x: x["movements_per_day"] or 0)
+    top = rows[0]          # 10 Nov 2026 (finding 19): the headline names the top bar, by the measure the bars are drawn in
     return _chart("councils", "set", rows=rows, tier=tier, unit=unit, distance_word=word,
                   scheme_movements_per_day=_r1((al.get("totals") or {}).get("movements_per_day")),
                   # 9 Nov 2026 (2.1-11b): the council figure is in the organisation's count (areas.py)
-                  headline=f"{top['council']} takes the most: {top['movements_per_day']:g} "
-                           f"{counting.words()['short']}",
+                  headline=f"{top['council']} has the most {word}: {top['distance']:g}",
                   subtitle=f"{word} in {label}, laden and empty, and {counting.words()['lower']}",
                   basis=(al.get("basis") or "") + " " + ("Distance: every lorry-mile driven inside the area, laden and "
                                                          "empty." if unit == "mi" else
