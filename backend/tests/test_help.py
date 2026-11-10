@@ -1515,5 +1515,16 @@ _tg_tl = open(TECH, encoding="utf-8").read()
 ok("TRAFFIC LIMIT: technical T1 #t1-traffic-limits has the rule, the thresholds, the reads and what is not built",
    all(w in _tg_tl for w in ('id="t1-traffic-limits"', "<code>backend/traffic_limits.py</code>", "<code>LINE_NEAR_M</code> = 25 m",
                              "<code>NEAR_SHARE</code> = 90 %", "<code>GET /api/public/traffic-limits</code>", "Not built:")))
+# 10 Nov 2026 (v2.1 task 2.1-4): a road or an area on the public map, in both guides
+ok("ROAD CARD (2.1-4): user guide 8 says the click in every mode, In / Out / A day, Pick a month, the tip, the box, Copy and the phone",
+   all(w in src for w in ('id="ug-map-road-card"', "<strong>This road · <em>month</em></strong>", "<strong>In</strong> (laden, towards the work)",
+                          "<strong>Pick a month</strong>", "<em>34 movements a day · 10 routes</em>", "<strong>⬚ Select an area</strong>",
+                          "is counted once, however often it crosses", "the box goes into the share link", "it names no team",
+                          'id="ug-map-road-phone"', "<strong>Sum this box</strong>")))
+_tg_rs = open(TECH, encoding="utf-8").read()
+ok("ROAD CARD (2.1-4): technical T1 #t1-road-area has the two reads, the piece, the box rule against the limit's, warm() and what is not built",
+   all(w in _tg_rs for w in ('id="t1-road-area"', "<code>backend/section_select.py</code>", "<code>GET /api/public/road-at",
+                             "<code>GET /api/public/area-sum", "<code>PIECE_M</code> = 150 m", "<code>BOX_ENTER_KM</code> (1 m)",
+                             "<code>warm()</code>", "<code>&amp;area=w,s,e,n</code>", "Not built:")))
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

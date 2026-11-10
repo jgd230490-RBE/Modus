@@ -178,7 +178,7 @@ def _samples(line_m):
 class _Shape:
     """A limit's geometry prepared once: a line's sample points, or an area for clipping."""
 
-    def __init__(self, geometry):
+    def __init__(self, geometry, enter_km=None):
         g = json.loads(geometry) if isinstance(geometry, str) else (geometry or {})
         self.kind = None
         line = zones.as_line(g) if g.get("type") in ("LineString", "MultiLineString") else None
@@ -198,7 +198,7 @@ class _Shape:
             b = self.area.bbox
             diag = math.hypot((b[2] - b[0]) * 111.32 * math.cos(math.radians((b[1] + b[3]) / 2)),
                               (b[3] - b[1]) * 110.54)
-            self.enter_km = min(ENTER_KM, AREA_ENTER_SHARE * diag)
+            self.enter_km = min(ENTER_KM, AREA_ENTER_SHARE * diag) if enter_km is None else float(enter_km)
             self.bbox = b
 
     def passes(self, coords):
@@ -249,16 +249,17 @@ def _legs(drawn):
     return out
 
 
-def passing(geometry, drawn=None, legs=None):
+def passing(geometry, drawn=None, legs=None, enter_km=None):
     """{route_id: {"loaded": {alt, ...}, "return": {alt, ...}}} — the stored options that pass `geometry`.
-    Kept until the next write per tenant and shape."""
+    Kept until the next write per tenant and shape. `enter_km` (an area only) replaces the entry rule: 2.1-4's box on
+    the public map counts a leg that enters it at all (section_select.BOX_ENTER_KM)."""
     gkey = json.dumps(geometry, sort_keys=True) if not isinstance(geometry, str) else geometry
-    ck = (db.current_tenant(), db.data_version(), gkey)
+    ck = (db.current_tenant(), db.data_version(), gkey, enter_km)
     if legs is None and ck in _PASS_CACHE:
         return _PASS_CACHE[ck]
     drawn = _drawn() if drawn is None else drawn
     legs = _legs(drawn) if legs is None else legs
-    shp = _Shape(geometry)
+    shp = _Shape(geometry, enter_km=enter_km)
     out = {}
     for rid, leg, alt, pts in legs:
         if shp.passes(pts):
@@ -295,7 +296,7 @@ def _shares(rid, profile, days, rows, cache):
     return out
 
 
-def through(geometry, month, lines=None, wd=None, days=None, ctx=None):
+def through(geometry, month, lines=None, wd=None, days=None, ctx=None, enter_km=None):
     """
     What passes `geometry` in `month`, a day on average: {"in_per_day", "out_per_day", "movements_per_day",
     "visits_per_day", "routes": [{route_id, in_per_day, out_per_day, visits_per_day}]} — the approved plan, the
@@ -314,7 +315,7 @@ def through(geometry, month, lines=None, wd=None, days=None, ctx=None):
     zero = {"in_per_day": 0.0, "out_per_day": 0.0, "movements_per_day": 0.0, "visits_per_day": 0.0, "routes": []}
     if not wd or not days:
         return zero
-    pas = passing(geometry, drawn=ctx["drawn"], legs=ctx["legs"])
+    pas = passing(geometry, drawn=ctx["drawn"], legs=ctx["legs"], enter_km=enter_km)
     loads = {}
     for l in lines or []:
         rid = l["route_id"]
