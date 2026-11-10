@@ -1251,7 +1251,7 @@ ok3("CLP REVIEWERS: the technical guide #t1-clp-reviewers holds the detail (the 
     'id="t1-clp-reviewers"' in _tgv2 and '<a href="#t1-clp-reviewers">CLP client reviewers</a>' in _tgv2 and "<code>backend/clp_reviews.py</code>" in _tgv2
     and "clp_review_groups  (tenant_id, id)" in _tgv2 and "<code>access.reviewer()</code>" in _tgv2 and "<code>backend/tests/smoke_reviewer_wall.py</code>" in _tgv2
     and "<code>review-download</code>" in _tgv2 and "POST   /api/review/clps/{id}/decision" in _tgv2 and "GET    /api/clp/documents/{id}/review-send" in _tgv2
-    and "<em>Highways client (fictional)</em>" in _tgv2 and "The client's reviewers (PR 3c);" not in _tgv2)
+    and "<em>Highways client</em>" in _tgv2 and "The client's reviewers (PR 3c);" not in _tgv2)
 ok3("CLP DOCS: the technical guide #t1-clp-records holds the detail (the two tables, the listed rows' ids, who may do what, the team cut, the approve build, the endpoints, the stages)",
     'id="t1-clp-records"' in _tgv2 and '<a href="#t1-clp-records">CLP documents</a>' in _tgv2 and "<code>backend/clp_records.py</code>" in _tgv2
     and "clp_documents" in _tgv2 and "clp_issues" in _tgv2 and "<code>auto-&lt;loc&gt;-all</code>" in _tgv2 and "<code>heavy_reads.solo</code>" in _tgv2

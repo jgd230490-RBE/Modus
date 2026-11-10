@@ -400,7 +400,7 @@ FEED_DESC = "Crushed rock for the asphalt plant (coarse and fine aggregate)"
 # The approval step (§1.9): one Pending and one Rejected line, each on its own line key (approval acts on every month
 # of a line). (route, discipline, section, t, material description, reason)
 #: 31 Oct 2026 (task 4a PR 3c, Q11): the demo's one client reviewer group (id, name, when made); no reviewer logins
-DEMO_REVIEW_GROUP = ("rg-demo", "Highways client (fictional)", "2026-10-31T00:00:00Z")
+DEMO_REVIEW_GROUP = ("rg-demo", "Highways client", "2026-10-31T00:00:00Z")
 
 #: 5 Nov 2026 (group 6, PR 2; John's Q14 "as recommended"): 26 FICTIONAL concerns from the public, dated back from the as-of
 #: date so they follow --as-of. No real person: the few that asked for a reply carry an example.org address and a name
@@ -600,7 +600,7 @@ def stock_plan_rows(loc):
             used += extra
             held = max(0.0, held - extra)           # a surge takes what the pile holds; the rest of it is the shortfall
             if used >= 0.5 or not done:
-                res = stockpiles.set_plan(lid, m, m, planned_qty=round(used), by="tools/make_demo_tenant.py")
+                res = stockpiles.set_plan(lid, m, m, planned_qty=round(used), by="the demo planner")
                 assert "error" not in res, res
 
 
@@ -683,7 +683,7 @@ def build(with_areas=False, out=None):
     # §1.8: the school-run no-delivery bands (a fictional CLP condition; real CLPs restrict deliveries near schools in
     # term). Scheme-wide: the product takes them off every gate with hours typed.
     doc["planning"]["peak_bands"] = [{"from": "08:00", "to": "09:00"}, {"from": "15:00", "to": "16:00"}]
-    res = config.save(doc, by="tools/make_demo_tenant.py", network=network)
+    res = config.save(doc, by="the demo planner", network=network)
     assert res["ok"], res
     config.invalidate()
 
@@ -718,6 +718,9 @@ def build(with_areas=False, out=None):
     loc = {}
 
     def add(key, name, role, loc_type, lon, lat, supplies=None, receives=None, vendor=None, detail=None):
+        # 9 Nov 2026 (decision 6): no "(fictional)" on a place or organisation name; the DEMO bar says so
+        name = name.replace(" (fictional)", "")
+        vendor = vendor.replace(" (fictional)", "") if vendor else vendor
         r = network.create_location(name, role, materials=supplies or [], lat=lat, lon=lon, loc_type=loc_type,
                                     supplies=supplies or [], receives=receives or [], vendor=vendor, detail=detail)
         loc[key] = r["id"]
@@ -1350,7 +1353,7 @@ def build(with_areas=False, out=None):
         "view": {"center": [-0.905, 52.62], "zoom": 9.6},
         "_note": "Fictional road scheme drawn across countryside. Not a real road or a proposal for one.",
     }
-    res = tenant_package.set_overlay(overlay, by="tools/make_demo_tenant.py")
+    res = tenant_package.set_overlay(overlay, by="the demo planner")
     assert res["ok"], res
 
     # 22 Oct 2026 (D75, abnormal loads phase 3): the two sites the abnormal loads start from, a gate each — south of the
@@ -1389,20 +1392,20 @@ def build(with_areas=False, out=None):
         ("Stockpile South", "Stockpile gate"): ([-0.908941, 52.52207], "Bowden Road"),
         ("Stockpile Tilton", "Stockpile gate"): ([-0.891951, 52.636202], "Loddington Road"),
         ("Stockpile North", "Stockpile gate"): ([-0.877212, 52.705444], "Burrough Road"),
-        ("Wolds Link Inert Landfill (fictional)", "Weighbridge"): ([-0.800099, 52.519765], "Medbourne Road"),
-        ("Wolds Link Soil Recycling Hub (fictional)", "Site gate"): ([-0.865023, 52.566747], "Goadby Road"),
-        ("Wolds Link Batching Plant (fictional)", "Plant gate"): ([-0.861343, 52.744406], "New Road"),
-        ("Wolds Link Asphalt Plant (fictional)", "Weighbridge"): ([-0.870439, 52.650658], "Hyde Lodge Road"),
-        ("Welland Ready-Mix (fictional)", "Plant gate"): ([-0.892004, 52.525043], "Welham Road"),
-        ("Earl Shilton Precast Works (fictional)", "Works gate"): ([-1.322679, 52.566067], "Clickers Way (A47)"),
-        ("Soar Valley Crane Hire (fictional)", "Depot gate"): ([-1.08357, 52.703875], "Fosse Way"),
+        ("Wolds Link Inert Landfill", "Weighbridge"): ([-0.800099, 52.519765], "Medbourne Road"),
+        ("Wolds Link Soil Recycling Hub", "Site gate"): ([-0.865023, 52.566747], "Goadby Road"),
+        ("Wolds Link Batching Plant", "Plant gate"): ([-0.861343, 52.744406], "New Road"),
+        ("Wolds Link Asphalt Plant", "Weighbridge"): ([-0.870439, 52.650658], "Hyde Lodge Road"),
+        ("Welland Ready-Mix", "Plant gate"): ([-0.892004, 52.525043], "Welham Road"),
+        ("Earl Shilton Precast Works", "Works gate"): ([-1.322679, 52.566067], "Clickers Way (A47)"),
+        ("Soar Valley Crane Hire", "Depot gate"): ([-1.08357, 52.703875], "Fosse Way"),
         # 28 Oct 2026 (simulation v2): two points on the lane south of Tilton Compound, read from the demo's own routed
         # line into the compound on a local copy (R007's last kilometre; Overpass was at capacity that evening)
-        ("Tilton Viaduct site (fictional)", "South lane gate (in)"): ([-0.879952, 52.64273], "the lane south of Tilton Compound"),
-        ("Tilton Viaduct site (fictional)", "South lane gate (out)"): ([-0.883957, 52.642399], "the lane south of Tilton Compound"),
+        ("Tilton Viaduct site", "South lane gate (in)"): ([-0.879952, 52.64273], "the lane south of Tilton Compound"),
+        ("Tilton Viaduct site", "South lane gate (out)"): ([-0.883957, 52.642399], "the lane south of Tilton Compound"),
         # 29 Oct 2026 (task 3c): the holding area's entrance — a vertex of the stored lane line north from the A47 at
         # Billesdon (read on live 29 Oct 2026), so every route along the lane passes it within the 50 m the mark allows
-        ("Billesdon Lane holding area (fictional)", "Lane entrance"): ([-0.92094, 52.6226], "the lane north from the A47 at Billesdon"),
+        ("Billesdon Lane holding area", "Lane entrance"): ([-0.92094, 52.6226], "the lane north from the A47 at Billesdon"),
     }
     names = {r["id"]: r["name"] for r in db.query("SELECT id, name FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
 
@@ -1471,9 +1474,9 @@ def build(with_areas=False, out=None):
     # demo shows. Built from the repo's own file, not from a live export.
     import site_layouts
     with open(LAYOUT_SAMPLE, "rb") as f:
-        held = site_layouts.read_file(vs, f.read(), os.path.basename(LAYOUT_SAMPLE), by="tools/make_demo_tenant.py")
+        held = site_layouts.read_file(vs, f.read(), os.path.basename(LAYOUT_SAMPLE), by="the demo planner")
     placed = site_layouts.place(vs, {"import_id": held["import_id"], "where": "new",
-                                     "phase": {"name": "Site logistics"}}, by="tools/make_demo_tenant.py")
+                                     "phase": {"name": "Site logistics"}}, by="the demo planner")
     assert placed["placed"] == LAYOUT_THINGS, placed
 
     # --- §1.8: the ADVISORY zones of the programme (Z033 on), created after the access roads and the site's inside ---------
@@ -1551,10 +1554,10 @@ def build(with_areas=False, out=None):
                              "for ten weeks ahead; the A606 night closures are booked for the lift (fictional)."}),
     ]
     for status, body in ABNORMAL_LOADS:
-        r = abnormal.create(body, PLANNER_ACC, by="tools/make_demo_tenant.py")
+        r = abnormal.create(body, PLANNER_ACC, by="the demo planner")
         assert r.get("ok"), r
         if status != "pending":
-            st = abnormal.set_status(r["movement"]["id"], status, PLANNER_ACC, by="tools/make_demo_tenant.py")
+            st = abnormal.set_status(r["movement"]["id"], status, PLANNER_ACC, by="the demo planner")
             assert st.get("ok"), st
     assert [m["id"] for m in abnormal.rows(PLANNER_ACC)] == ["AL001", "AL002", "AL003"]
 
@@ -1569,7 +1572,7 @@ def build(with_areas=False, out=None):
     ui = {"recycled": {BALLAST: 30}, "epd": {}, "reused": {}, "vehicle": {}, "electric": False, "distance": {},
           "supplier": {}, "alt": {}, "disposal": {ROUTE_ID[("C2", "TIP", EARTH)]: {"to_route": ROUTE_ID[("C2", "HUB", EARTH)]}}}
     ct = carbon_target.set_from_levers({"role": "planner", "ipt": None}, "pct", levers, ui_state=ui,
-                                       by="tools/make_demo_tenant.py")
+                                       by="the demo planner")
     assert ct and ct["mode"] == "pct" and ct["pct_below"] > 0, ct
 
     # --- council areas (--with-areas; §2.2b; the shipped package since D102) -------------------

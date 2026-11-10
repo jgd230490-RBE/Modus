@@ -343,14 +343,14 @@ _bp = [l for l in T["locations"] if l["loc_type"] == "Batching plant"]
 # RE-PINNED 17 Oct 2026 (demo redesign R2, §3a, D100): TWO batching plants — the Melton plant and Welland Ready-Mix for the
 # south. The on-site asphalt plant has its own type ("Asphalt plant"), so it is not counted here.
 ok("6: the demo has TWO batching plants (Melton and Welland Ready-Mix), each fictional, supplying only ready-mixed concrete",
-   sorted(l["name"] for l in _bp) == ["Welland Ready-Mix (fictional)", "Wolds Link Batching Plant (fictional)"]
+   sorted(l["name"] for l in _bp) == ["Welland Ready-Mix", "Wolds Link Batching Plant"]
    and all(json.loads(l["supplies"]) == ["Ready-mixed concrete"] for l in _bp)
    and [l["loc_type"] for l in T["locations"] if "Asphalt Plant" in l["name"]] == ["Asphalt plant"])
 _bp_id = {l["name"]: l["id"] for l in _bp}
 _pr = {n: sorted(r["id"] for r in T["routes"] if r["origin_id"] == i) for n, i in _bp_id.items()}
 # RE-PINNED 28 Oct 2026 (simulation v2): + R049, the Melton plant to the Tilton Viaduct site
 ok("6: the mixer routes leave each plant by id (Melton R021, R022, R033, R034, R049; Welland R035, R036), each with both gates named",
-   _pr == {"Wolds Link Batching Plant (fictional)": ["R021", "R022", "R033", "R034", "R049"], "Welland Ready-Mix (fictional)": ["R035", "R036"]}
+   _pr == {"Wolds Link Batching Plant": ["R021", "R022", "R033", "R034", "R049"], "Welland Ready-Mix": ["R035", "R036"]}
    and all(r["material_category"] == "Ready-mixed concrete" and r["origin_gate_id"] and r["dest_gate_id"]
            for r in T["routes"] if r["origin_id"] in _bp_id.values()))
 _pl = [f for f in T["forecasts"] if f["material_type"] == "Ready-mixed concrete"]

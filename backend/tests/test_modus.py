@@ -442,8 +442,7 @@ _rts = {r["id"]: r for r in demo["tables"]["routes"]}
 ok("⭐ demo (carbon): a landfill-vs-reuse choice — R019 Langton Compound → a fictional inert Landfill carries the surplus cut "
    "(Apr 2027 – Sep 2028) and the lifted platform stone (Jan–May 2030); R020 to a fictional Soil recycling hub has a route and no forecast",
    _locs[_rts["R019"]["dest_id"]]["loc_type"] == "Landfill" and _locs[_rts["R020"]["dest_id"]]["loc_type"] == "Soil recycling"
-   and _rts["R019"]["origin_id"] == _rts["R020"]["origin_id"] and "fictional" in _locs[_rts["R019"]["dest_id"]]["name"]
-   and "fictional" in _locs[_rts["R020"]["dest_id"]]["name"]
+   and _rts["R019"]["origin_id"] == _rts["R020"]["origin_id"]
    and sorted(f["month_index"] for f in demo["tables"]["forecasts"] if f["route_id"] == "R019" and f["status"] == "Approved")
    == list(range(16, 34)) + list(range(49, 54))
    and not [f for f in demo["tables"]["forecasts"] if f["route_id"] == "R020"])

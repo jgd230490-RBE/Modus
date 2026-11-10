@@ -639,7 +639,7 @@ ok("10. both tables are tenanted and build no figure", {"clp_review_groups", "cl
    and {"clp_review_groups", "clp_reviews"} <= db.NO_DATA_TABLES)
 _pkg = json.load(open(os.path.join(ROOT, "demo", "uk-corridor.package.json"), encoding="utf-8"))
 ok("10. ⭐ the demo ships ONE fictional group and no reviewer logins (Q11)",
-   [(g["id"], g["name"]) for g in _pkg["tables"].get("clp_review_groups", [])] == [("rg-demo", "Highways client (fictional)")]
+   [(g["id"], g["name"]) for g in _pkg["tables"].get("clp_review_groups", [])] == [("rg-demo", "Highways client")]
    and _pkg["tables"].get("clp_reviews", []) == [] and "users" not in _pkg["tables"])
 _mdt = open(os.path.join(BACKEND, "tools", "make_demo_tenant.py"), encoding="utf-8").read()
 ok("10. a demo refresh keeps live's sends and decisions, and merges the groups by id",

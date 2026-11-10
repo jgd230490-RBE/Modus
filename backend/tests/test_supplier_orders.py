@@ -185,7 +185,7 @@ ok("1 (Q2): ...and their places named for the screen",
    set(LO["not_confirmed_places"]) == {"Kilby Ridge Quarry", "Harborough Rail Freight Terminal"}, str(LO))
 ok("1 (Q2): Kilby Ridge Quarry (typed, not confirmed) gets no order", "L001" not in S)
 ok("1 (Q5): the scheme's own site sending spoil to the landfill is left out and counted",
-   LO["own"] == 1 and LO["own_places"] == ["Tilton Viaduct site (fictional)"], str(LO))
+   LO["own"] == 1 and LO["own_places"] == ["Tilton Viaduct site"], str(LO))
 ok("1 (Q5): the scheme's own place types", so.OWN_TYPES == ("Compound", "Site", "Stockpile", "Holding area"))
 try:
     so.find(D, "L001")
@@ -202,17 +202,17 @@ ok("1 (Q2): ...and says how many lines wait", D0["left_out"]["not_confirmed"] >=
 
 # --------------------------------------------------------------------------- 2. Northfield Quarry's order
 N = S["L002"]
-ok("2: the supplier's company name typed on Locations", N["vendor"] == "Northfield Stone Co. (fictional)", str(N["vendor"]))
+ok("2: the supplier's company name typed on Locations", N["vendor"] == "Northfield Stone Co.", str(N["vendor"]))
 ok("2: three deliveries", N["deliveries"] == 3 and len(N["rows"]) == 3)
 R = {r["dest_name"]: r for r in N["rows"]}
 ok("2: to Melton Compound, Stockpile North and Tilton Viaduct site",
-   set(R) == {"Melton Compound", "Stockpile North", "Tilton Viaduct site (fictional)"}, str(sorted(R)))
+   set(R) == {"Melton Compound", "Stockpile North", "Tilton Viaduct site"}, str(sorted(R)))
 M = R["Melton Compound"]
 ok("2: Melton Compound 395 t on each weekday", [M["qty"].get(d) for d in N["days"]] == [395.0] * 5, str(M["qty"]))
 ok("2: ...14 loads a day", [M["loads"].get(d) for d in N["days"]] == [14] * 5, str(M["loads"]))
 ok("2: ...1,975 t and 70 loads in the week", M["week_qty"] == 1975 and M["week_loads"] == 70)
 ok("2: Stockpile North 200 t a day, Tilton Viaduct 60 t a day",
-   R["Stockpile North"]["qty"]["2026-11-23"] == 200 and R["Tilton Viaduct site (fictional)"]["qty"]["2026-11-27"] == 60)
+   R["Stockpile North"]["qty"]["2026-11-23"] == 200 and R["Tilton Viaduct site"]["qty"]["2026-11-27"] == 60)
 ok("2: the week is 3,275 t of tonnes, 655 t each day",
    N["units"]["t"]["week"] == 3275 and all(v == 655 for v in N["units"]["t"]["day"].values()), str(N["units"]))
 ok("2: 24 loads a day, 120 in the week", N["loads_day_max"] == 24 and N["week_loads"] == 120)
@@ -223,10 +223,10 @@ ok("2: the delivery gate and its hours", M["gate"] == "Compound gate" and M["ope
 ok("2: no deliveries in the scheme's peak bands", M["no_deliveries"].startswith("08:00–09:00"), M["no_deliveries"])
 ok("2: closed days in plain words", M["closed"] == "Saturdays and Sundays", M["closed"])
 ok("2: the site rules of the delivery site", (M["site_rules"] or "").startswith("Site speed 10 mph"), str(M["site_rules"]))
-T = R["Tilton Viaduct site (fictional)"]
+T = R["Tilton Viaduct site"]
 ok("2: a site with a gate in and a gate out names both",
    T["gate"] == "South lane gate (in)" and T["exit_gate"] == "South lane gate (out)", f"{T['gate']} / {T['exit_gate']}")
-ok("2 (Q9): a delivery that calls off through a holding area names it", T["holding"] == "Billesdon Lane holding area (fictional)",
+ok("2 (Q9): a delivery that calls off through a holding area names it", T["holding"] == "Billesdon Lane holding area",
    str(T["holding"]))
 ok("2 (Q9): ...and one that does not, does not", M["holding"] is None)
 ok("2: lorries leave the quarry by its own gate, with its hours", N["leave_by"] == "A6 exit, 06:00–18:00, closed on Sundays",
@@ -303,7 +303,7 @@ ok("6: the PDF is a PDF", PDF[:5] == b"%PDF-", PDF[:8])
 TXT = pdf_text(PDF) or ""
 if TXT:
     ok("6: titled as a supplier order of the organisation", "Supplier order" in TXT and "Wolds Link dualling" in TXT, TXT[:200])
-    ok("6: the supplier and the company", "Northfield Quarry" in TXT and "Northfield Stone Co. (fictional)" in TXT)
+    ok("6: the supplier and the company", "Northfield Quarry" in TXT and "Northfield Stone Co." in TXT)
     ok("6: CONFIRMED, not a purchase order, no prices", "CONFIRMED" in TXT and "Not a purchase order" in TXT and "no prices" in TXT)
     ok("6: the demo notice", "Fictional scheme" in TXT)
     ok("6: the week", "Week of Mon 23 Nov 2026" in TXT)
@@ -354,7 +354,7 @@ z = zipfile.ZipFile(io.BytesIO(ZB))
 names = sorted(z.namelist())
 ok("8: a PDF and an XLSX for each of the four suppliers", len(names) == 8
    and "supplier-order-2026-11-23-northfield-quarry.pdf" in names
-   and "supplier-order-2026-11-23-wolds-link-batching-plant-fictional.xlsx" in names, str(names))
+   and "supplier-order-2026-11-23-wolds-link-batching-plant.xlsx" in names, str(names))
 ok("8: the zip's name", so.zip_name(D) == "supplier-orders-2026-11-23.zip")
 ok("8 (Q10): no route sheet inside", not any("route-sheet" in n for n in names))
 

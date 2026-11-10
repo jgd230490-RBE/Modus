@@ -501,7 +501,7 @@ ok("...the old zones keep their ids (Z001-Z005: the two haul roads and three geo
    # NARROWED 28 Oct 2026 (the demo narrative's F4): the one exception is Christmas trading 2027, a dated diversion
    and all(z["kind"] != "haul_road" and (not z["affects_routing"]) == (z["name"] != "Market Harborough town centre: Christmas trading 2027")
            for z in T["zones"] if 32 < int(z["id"][1:]) < 40)
-   and ZB["Z040"]["name"] == "Billesdon Lane holding area (fictional): Lane entrance access road" and ZB["Z040"]["kind"] == "haul_road")
+   and ZB["Z040"]["name"] == "Billesdon Lane holding area: Lane entrance access road" and ZB["Z040"]["kind"] == "haul_road")
 ok("...named for the site and gate, the road named in the note, 10 km/h, no end date",
    all(re.match(r"^.+: .+ access road$", ZB[g["access_zone_id"]]["name"]) for g in T["location_gates"])
    and all(ZB[g["access_zone_id"]]["note"].startswith("Bellmouth off ") for g in T["location_gates"])

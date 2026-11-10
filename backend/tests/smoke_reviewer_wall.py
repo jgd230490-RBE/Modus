@@ -98,7 +98,7 @@ with TestClient(main.app, base_url=BASE) as admin:
     ok("0. a planner approves it as Issue 1", r.status_code == 200 and r.json()["last_issue"]["no"] == 1, r.text[:200])
     r = admin.get("/api/admin/reviewers", params=TOKEN)
     ok("0. the demo's one fictional group is there, with no reviewer",
-       r.status_code == 200 and [g["name"] for g in r.json()["groups"]] == ["Highways client (fictional)"]
+       r.status_code == 200 and [g["name"] for g in r.json()["groups"]] == ["Highways client"]
        and r.json()["reviewers"] == [], r.text[:200])
     GID = r.json()["groups"][0]["id"]
     r = admin.post("/api/admin/reviewer-groups", params=TOKEN, json={"name": "Other client"})
@@ -126,7 +126,7 @@ with TestClient(main.app, base_url=BASE) as admin:
                  headers=W)
     sc = r.headers.get("set-cookie", "")
     ok("1. ⭐ two-step set up: the reviewer is signed in, the answer is the review page's",
-       r.status_code == 200 and r.json().get("via") == "reviewer" and r.json().get("group_name") == "Highways client (fictional)"
+       r.status_code == 200 and r.json().get("via") == "reviewer" and r.json().get("group_name") == "Highways client"
        and r.json().get("role") is None and len(r.json().get("recovery_codes") or []) == 10 and "wayscope_session=" in sc,
        r.text[:300])
     ok("1. 🔴 the sign-in set NO gate cookie (no staff or map level)", gate.COOKIE + "=" not in sc, sc[:300])
@@ -281,7 +281,7 @@ with TestClient(main.app, base_url=BASE) as admin:
     rows = r.json().get("rows") or r.json().get("audit") or r.json().get("events") or []
     txt = json.dumps(rows, ensure_ascii=False)
     ok("3. ⭐ the audit trail names the reviewer and the group for the download and the decision",
-       "review-download" in txt and "Rita Reviewer <rita.reviewer@example.org> · Highways client (fictional)" in txt
+       "review-download" in txt and "Rita Reviewer <rita.reviewer@example.org> · Highways client" in txt
        and f"/api/review/clps/{CLP}/decision" in txt, txt[:300])
     r = admin.patch(f"/api/admin/reviewer-groups/{GID}", params=TOKEN, json={"stopped": True})
     ok("3. 🔴 stopping the group signs the reviewer out at once",
