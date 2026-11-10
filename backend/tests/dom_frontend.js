@@ -1248,7 +1248,7 @@ async function configEstonianColumn(){
     const root = w.ReactDOM.createRoot(box);
     await act(async () => { root.render(w.React.createElement(w.ConfigPage, { meta: {}, who: "tester", access: acc || adminLogin })); });
     await tick(); await tick();
-    const th = [...box.querySelectorAll("table.tbl thead th")].map(x => x.textContent.trim());
+    const th = [...box.querySelectorAll("table.tbl thead th")].map(x => x.textContent.trim().replace(/(English|min|class)i$/, "$1"));  // NARROWED 10 Nov 2026 (U5): a header's "i" button adds an i
     const inputs = box.querySelectorAll("table.tbl tbody tr")[0] ? box.querySelectorAll("table.tbl tbody tr")[0].querySelectorAll('input[placeholder="Rigid 8-wheeler (32t)"]').length : -1;
     await act(async () => { root.unmount(); }); box.remove();
     return { th, inputs };
@@ -2390,7 +2390,7 @@ async function g3LoginsDom(){
   const usersText = a.box.querySelector("main main") ? a.box.querySelector("main main").textContent : a.box.textContent;
   ok("⭐ G3 USERS: the list shows each person, a team by its NAME, and NEVER a team id",
      /Bob North/.test(usersText) && /North Team/.test(usersText) && !/IPT1|IPT2/.test(usersText));
-  ok("G3 USERS: the shared codes are still on, and the page says so", /The shared codes still work on this site/.test(usersText));
+  ok("G3 USERS: the shared codes are still on, and the page says so", /Shared codes are still on/.test(usersText) && !/still work on this site/.test(usersText));  // NARROWED 10 Nov 2026 (U5)
   ok("G3 USERS: an admin LOGIN is not asked for the admin token", !a.box.querySelector('input[aria-label="Admin token"]'));
   ok("G3 USERS: the add form offers each team by NAME, Planner and Admin",
      [...a.box.querySelectorAll('select[aria-label="Team or role"] option')].map(x => x.textContent).join("|") === "Choose…|North Team|Central Team|Planner|Admin");

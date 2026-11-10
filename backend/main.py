@@ -5563,6 +5563,8 @@ def _gate_arrivals_build(month, acc):
     for g in out.get("gates") or []:
         g["busiest_hour"] = (b.get("gates") or {}).get(g["gate_id"])
     out["busiest_note"] = b.get("note")
+    out["busiest_detail"] = b.get("detail")   # 10 Nov 2026 (U5): the specifics the "i" box prints
+    out["busiest_loads"] = b.get("loads")
     out["holding"] = b.get("holding") or []        # 29 Oct 2026 (task 3c): a row a holding area under the gates
     return out
 
