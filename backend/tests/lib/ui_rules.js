@@ -225,14 +225,20 @@ function gradeRules(stop, m, pins) {
 
 // ---------------------------------------------------------------- in Node: comparing two runs ----------------------
 const stopKey = (s) => `${s.name}|${s.width}|${s.look}|${s.accent}`;
-// prev, now: the two reports. Returns { words: [...], ready: [...], earlierMeasured } — a row per stop both runs measured;
-// `warn` set on the rows that cross the limits. A stop the earlier run did not measure (an older run: no `words`) gets no row.
+// prev, now: the two reports. Returns { words: [...], ready: [...], unsettled: [...], earlierMeasured } — a row per stop both
+// runs measured; `warn` set on the rows that cross the limits. A stop the earlier run did not measure (an older run: no
+// `words`) gets no row. A stop that had not finished loading in EITHER run (a not-settled or ready-none warning) gets no row
+// either, only its key in `unsettled`: on 10 Nov 2026 the Look-ahead at 390 read 238 words settled and 12 unsettled, and the
+// team's Look-ahead 23 → 222 the other way round — the machine's load, not the page
+const UNSETTLED = ["not-settled", "ready-none"];
+const unsettledStop = (s) => (s.warnings || []).some(w => UNSETTLED.includes(w.id));
 function compareRules(prev, now) {
   const earlierMeasured = (prev.ruleVersion || 0) >= 1;
   const byKey = new Map((prev.stops || []).map(s => [stopKey(s), s]));
-  const words = [], ready = [];
+  const words = [], ready = [], unsettled = [];
   for (const s of now.stops || []) {
     const p = byKey.get(stopKey(s)); if (!p) continue;
+    if (unsettledStop(s) || unsettledStop(p)) { if (s.words != null || s.readyMs != null) unsettled.push(stopKey(s)); continue; }
     if (s.words != null && p.words != null && s.words !== p.words) {
       const delta = s.words - p.words, pct = p.words ? Math.round(delta * 1000 / p.words) / 10 : (delta > 0 ? Infinity : 0);
       const warn = !PROSE_SKIPPED.test(s.name) && (delta > LIMITS.wordsGrowAbs || pct > LIMITS.wordsGrowPct);
@@ -243,7 +249,7 @@ function compareRules(prev, now) {
       ready.push({ key: stopKey(s), name: s.name, was: p.readyMs, now: s.readyMs, warn });
     }
   }
-  return { words, ready, earlierMeasured };
+  return { words, ready, unsettled, earlierMeasured };
 }
 // a compare's new finding keys (name|width|look|accent|id|…) split: those of a rule check the earlier run did not have are
 // FIRST MEASURED, not new; the compare-time ids are never findings
@@ -274,6 +280,7 @@ function prLines(report) {
   } else L.push("- **New failing checks / screen words +/−:** no compare in this run (pass --compare latest)");
   const timed = (report.stops || []).filter(s => s.readyMs != null).sort((a, b) => b.readyMs - a.readyMs);
   if (timed.length) { const s = timed[0]; L.push(`- **Slowest page ready:** ${s.readyMs} ms, ${s.name} at ${s.width} px (${s.look}) — the laptop's local copy, not live's speed`); }
+  if (c && c.rules && c.rules.earlierMeasured && (c.rules.unsettled || []).length) L.push(`  (${c.rules.unsettled.length} stop(s) not compared: the page had not finished loading in one of the two runs — ${c.rules.unsettled.slice(0, 6).map(k => k.replace(/\|/g, " ")).join("; ")})`);
   const slower = c && c.rules ? c.rules.ready.filter(r => r.warn) : [];
   if (slower.length) L.push(`  ${slower.length} stop(s) 25 % slower and over 1 s: ${slower.slice(0, 8).map(r => r.key.replace(/\|/g, " ") + " " + r.was + " → " + r.now + " ms").join("; ")}`);
   return L;

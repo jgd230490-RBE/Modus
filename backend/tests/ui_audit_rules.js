@@ -168,6 +168,15 @@ const M = (blocks, primaries) => ({ words: 50, blocks, primaries: primaries || [
   const L0 = R.prLines({ stops: now.stops.map(s => ({ ...s, checks: [] })), compare: { newFindings: [], firstMeasured: ["x"], rules: c0 } }).join("\n");
   ok("D: ...and against an older run they say it has no word counts, and how many findings are first measured",
      /has no word counts/.test(L0) && /1 finding\(s\) of the rule checks are FIRST MEASURED/.test(L0), L0);
+  // run 2 (10 Nov 2026): a stop that had not finished loading in one run is the machine's load, not the page
+  const NS = { warnings: [{ id: "not-settled", detail: "x" }] }, RN = { warnings: [{ id: "ready-none", detail: "x" }] };
+  const pU = { ruleVersion: 1, stops: [S("lookahead", 238, 2090), S("team-lookahead", 23, null, RN), S("dashboard", 375, 483)] };
+  const nU = { ruleVersion: 1, stops: [S("lookahead", 12, null, { warnings: [NS.warnings[0], RN.warnings[0]] }), S("team-lookahead", 222, 2354), S("dashboard", 317, 231)] };
+  const cU = R.compareRules(pU, nU);
+  ok("C: a stop that had not settled (not-settled / ready-none) in EITHER run gets no word or speed row, only its key in unsettled",
+     cU.unsettled.length === 2 && !cU.words.some(r => /lookahead/.test(r.name)) && !cU.ready.some(r => /lookahead/.test(r.name)) && cU.words.length === 1 && cU.words[0].name === "dashboard", cU);
+  const LU = R.prLines({ stops: nU.stops.map(s => ({ ...s, checks: [] })), compare: { newFindings: [], firstMeasured: [], rules: cU } }).join("\n");
+  ok("D: ...and the PR lines say how many stops were not compared and why", /2 stop\(s\) not compared: the page had not finished loading/.test(LU), LU);
 }
 
 // ---------------------------------------------------------------- D. the pins, the limits, the wiring ------------------
@@ -182,7 +191,12 @@ const fnSrc = (name) => { const i = audit.indexOf("function " + name + "("); con
   return i < 0 ? "" : audit.slice(i, Math.min(...[j, k].filter(x => x > 0), audit.length)); };
 const au = fnSrc("audit");
 ok("wiring: every stop measures the rules BEFORE the shot grows the viewport (first view is the real fold), and grades them",
-   au.includes("RULES.ruleMeasures") && au.indexOf("RULES.ruleMeasures") < au.indexOf("await shoot(") && au.includes("RULES.gradeRules(") && au.includes("stop.words = rm.words"));
+   au.includes("RULES.ruleMeasures") && au.indexOf("RULES.ruleMeasures") < au.indexOf("await shoot(") && au.includes("RULES.gradeRules("));
+// run 2 (10 Nov 2026): the Dashboard at 1366 read 375 words on one stop and 317 on the next — a section drew after the settle
+ok("wiring: the words and long blocks are counted AGAIN after the shot (late sections in), the filled primaries kept from the first view, and a moved count is on the record",
+   au.indexOf("const rmLate = ") > au.indexOf("await shoot(") && au.includes("{ ...rmLate, primaries: rm.primaries }")
+   && au.includes("RULES.gradeRules({ name: meta.name, page: meta.page, signedIn: dom.signedIn }, rmUse)") && au.includes("stop.words = rmUse.words")
+   && au.includes("stop.wordsLate = { atFold: rm.words, afterShot: rmLate.words }"));
 ok("wiring: page ready is timed from the hash set on every portal page (not the framed Route map) and the team's, and from the goto on the map page",
    /const ts = Date\.now\(\);\n\s+await gotoPage\(page, id\);[\s\S]{0,700}timeReady\(page, ts, \{ title: PAGE_TITLE\[id\] \}\)/.test(fnSrc("walkPortal"))
    && fnSrc("walkPortal").includes('id === "map" ? Promise.resolve(undefined)') && fnSrc("walkPortal").includes("timeReady(page, tMap, { map: true })") && fnSrc("walkTeam").includes("timeReady(page, ts,"));

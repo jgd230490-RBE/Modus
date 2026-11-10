@@ -629,6 +629,12 @@ async function audit(page, store, meta) {
   const drained = drain(store);
   const file = `${meta.name}__${meta.width}__${meta.look}__${meta.accent}.png`.replace(/[^A-Za-z0-9_.+-]/g, "-");
   const shot = await shoot(page, path.join(SHOTS, file), meta.width, meta.height, dom.contentH, fixed);
+  // FR1, A1a / A1b counted AGAIN after axe and the shot (the viewport is back at the fold): a section that draws after the
+  // settle (run 2, 10 Nov 2026: the Dashboard at 1366 read 375 words on one stop and 317 on the next, the same page) is in by
+  // then. The words and the long blocks are the later count; the filled primaries stay the first view's. A stop whose count
+  // moved says so (`wordsLate`), so a compare row on it can be read for what it is
+  const rmLate = rm ? await page.evaluate(RULES.ruleMeasures, { blockWords: RULES.LIMITS.blockWords, proseShare: RULES.LIMITS.proseShare }).catch(() => null) : null;
+  const rmUse = rm && rmLate ? { ...rmLate, primaries: rm.primaries } : rm;
   // a 401 / 403 is the gate working on the signed-out screens, and on the Users page opened with a CODE (it asks for
   // the admin token first: the list answers 403 until it is typed — by design, G3)
   const signedOut = SIGNED_OUT.test(meta.name) || (meta.page === "users" && !OPT.email && !/login-user/.test(meta.name));
@@ -698,7 +704,7 @@ async function audit(page, store, meta) {
   if (store.settleWhy) warnings.push({ id: "not-settled", detail: store.settleWhy });
   if (shot.truncated) warnings.push({ id: "shot-truncated", detail: { contentH: dom.contentH, maxShot: OPT.maxShot } });
   // FR1: the rules — long prose (a failure on a staff screen), the pinned blocks, filled primaries; a page that never showed a figure
-  const graded = RULES.gradeRules({ name: meta.name, page: meta.page, signedIn: dom.signedIn }, rm);
+  const graded = RULES.gradeRules({ name: meta.name, page: meta.page, signedIn: dom.signedIn }, rmUse);
   checks.push(...graded.checks); warnings.push(...graded.warnings);
   for (const p of graded.pinsSeen) PINS_SEEN.add(p);
   if (meta.readyMs === null) warnings.push({ id: "ready-none", detail: `no figure on the page within ${RULES.LIMITS.readyCapMs} ms of the navigation` });
@@ -706,7 +712,8 @@ async function audit(page, store, meta) {
   const stop = { ...meta, shot: "shots/" + file, shotGrown: shot.grown || undefined, shotRegrown: shot.regrown || undefined, shotPinned: shot.pinned || undefined, settleMs: t, settleWhy: store.settleWhy || undefined, checks, warnings,
                  theme: dom.theme, accentApplied: dom.accent, title: dom.title, pageTitle: dom.pageTitle, contentH: dom.contentH, nav: dom.nav, masks: dom.masks,
                  signedIn: dom.signedIn };
-  if (rm) { stop.words = rm.words; stop.wordsScope = rm.scope; stop.wordsSkipped = rm.skipped; stop.blocks = rm.blocks; stop.primaries = rm.primaries; }
+  if (rmUse) { stop.words = rmUse.words; stop.wordsScope = rmUse.scope; stop.wordsSkipped = rmUse.skipped; stop.blocks = rmUse.blocks; stop.primaries = rmUse.primaries;
+    if (rmLate && rmLate.words !== rm.words) stop.wordsLate = { atFold: rm.words, afterShot: rmLate.words }; }
   delete stop.base;
   if (meta.guide) { stop.guideDots = dom.guide.dots; stop.guideStrip = dom.guide.strip; stop.guidePill = dom.guide.pill ? "button.demo-bar-guide" : null; }
   if (cut) stop.cut = cut.source;   // on the record as text (a RegExp would serialise as {})
