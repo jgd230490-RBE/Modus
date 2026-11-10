@@ -4671,7 +4671,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      /function ZoneDiversions\(/.test(src) && src.includes(">Keep the main route</button>;")
      && src.includes("Find a way round (") && src.includes("routing call"));
   ok("0c: the Used by column says what a dated zone diverts, and when a route has no way round",
-     src.includes("Diverts {zoneDiv[z.id].routes.length} route") && src.includes(" route(s): no way round")
+     src.includes("Diverts {zoneDiv[z.id].routes.length} route") && src.includes("`${n} route${n === 1 ? \"\" : \"s\"}`; })()}: no way round")   // NARROWED 10 Nov 2026 (UI critique 23): "route(s)" is a plural
      // the link is named by its visible words: an aria-label that said something else failed axe (label-content-name-mismatch)
      && src.includes("data-zone-div={z.id}>") && !src.includes("Show the routes ${z.name} diverts"));
   ok("⭐ 0c: a diverted route carries a chip with its months; a route a zone crosses with no way round reads Not diverted",

@@ -17841,6 +17841,33 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             {!form && readLoc && (
               <div className="space-y-3" data-read-loc={readLoc.id}>
                 <div className="text-sm font-medium text-slate-700">{readLoc.name}</div>
+                {/* 10 Nov 2026 (UI critique 23): what the place is and which routes use it, for a reader (a planner's click was a dead end) */}
+                {(() => {
+                  const L = locs.find(x => x.id === readLoc.id);
+                  if(!L) return null;
+                  const rs = (status || []).filter(r => r.origin_id === L.id || r.dest_id === L.id);
+                  const kind = [L.loc_type, ROLE_LABEL[L.role] || L.role].filter(Boolean).join(" · ");
+                  return (
+                    <div className="space-y-2 text-sm" data-read-loc-facts={L.id}>
+                      {kind && <div className="text-slate-500">{kind}</div>}
+                      <dl className="grid gap-x-3 gap-y-1.5" style={{ gridTemplateColumns: "auto 1fr" }}>
+                        <dt className="text-[13px] text-slate-500">Supplies</dt><dd className="m-0"><CatChips list={L.supplies} /></dd>
+                        <dt className="text-[13px] text-slate-500">Receives</dt><dd className="m-0"><CatChips list={L.receives} dir="in" /></dd>
+                        <dt className="text-[13px] text-slate-500">Gate</dt>
+                        <dd className="m-0 text-slate-700">{(L.gate_lat != null && L.gate_lon != null) ? "Routes go to its gate" : "Routes go to the marker itself"}</dd>
+                      </dl>
+                      <div className="text-[13px] text-slate-500" data-read-loc-routes={rs.length}>{rs.length === 0 ? "No route uses it yet." : `${rs.length} route${rs.length === 1 ? "" : "s"} use${rs.length === 1 ? "s" : ""} it`}</div>
+                      {rs.length > 0 && <ul className="list-none p-0 m-0">
+                        {rs.slice(0, 5).map(r => (
+                          <li key={r.id} className="flex justify-between gap-2 border-t border-slate-100 py-1 text-[13px]">
+                            <span><button type="button" className="link-btn text-[13px]" data-read-loc-route={r.id}
+                              onClick={() => { selectRoute(r.id); setSubTab("routes"); }}>{r.id}</button> {r.origin} → {r.dest}</span>
+                            <span className="text-slate-500 shrink-0">{teamText(r.ipt) || ""}</span>
+                          </li>))}
+                      </ul>}
+                      {rs.length > 5 && <div className="text-[13px] text-slate-500">+ {rs.length - 5} more · <button type="button" className="link-btn text-[13px]" data-read-loc-more="1" onClick={() => setSubTab("routes")}>Open Routes</button></div>}
+                    </div>);
+                })()}
                 <SiteLayoutCard locId={readLoc.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef}
                   drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: readLoc.id, phaseId: pid }) : null}
                   onZones={() => reloadZones().catch(e => console.warn("Wayscope:", e))} />
@@ -18757,6 +18784,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           </div>
           )}
 
+          {/* 10 Nov 2026 (UI critique 17): nothing is drawn on a new deployment, so no key for it */}
+          {(locs.length > 0 || (status || []).length > 0 || zoneList.length > 0) && (
           <div className="card p-4">
             <div className="text-sm font-semibold text-slate-700 mb-2">Legend</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
@@ -18789,6 +18818,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             </p>
             <p className="text-[13px] text-slate-400 mt-1">Tip: switch the basemap to {String(TENANT.country || "").toUpperCase() === "GB" ? "Aerial" : String(TENANT.country || "").toUpperCase() === "EE" ? "Satellite or Estonia aerial photo" : "Satellite"} to see routes sit exactly on the roads.</p>
           </div>
+          )}
         </div>
         {drawing && styles_ok(SL_STYLES) && <SiteLayoutDraw key={drawing.locId} mapRef={mapObj} styles={SL_STYLES} locId={drawing.locId} phaseId={drawing.phaseId} wide={isWide}
           roads={(zoneList || []).filter(z => z.location_id === drawing.locId)} reinstallRef={drawReinstallRef} onDone={() => { setDrawing(null); leaveFull(); }}
@@ -19154,11 +19184,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                               Diverts {zoneDiv[z.id].routes.length} route{zoneDiv[z.id].routes.length === 1 ? "" : "s"}</span>}
                             {((zoneDiv[z.id].needs_route || []).length + (zoneDiv[z.id].no_way_round || []).length) > 0 &&
                               <span className="block" style={{ color: "var(--bad-text)" }}>
-                                {(zoneDiv[z.id].needs_route || []).length + (zoneDiv[z.id].no_way_round || []).length} route(s): no way round</span>}
+                                {(() => { const n = (zoneDiv[z.id].needs_route || []).length + (zoneDiv[z.id].no_way_round || []).length; return `${n} route${n === 1 ? "" : "s"}`; })()}: no way round</span>}
                           </button>
                         : z.kind !== HAUL_KIND ? <span className="text-slate-500">—</span>
                         : haulUse[z.id]
-                        ? <span className="text-slate-600">{haulUse[z.id]} route(s)</span>
+                        ? <span className="text-slate-600" style={{ whiteSpace: "nowrap" }}>{haulUse[z.id]} route{haulUse[z.id] === 1 ? "" : "s"}</span>
                         : <span style={{ color: "var(--haul-text)" }}
                             title="Drawn, but on no route — so it changes nothing. Attach it by expanding a route on the Routes tab.">
                             no routes
