@@ -15772,7 +15772,7 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                       // with the backend by 125% on an Artic Flatbed.
                       const tp = r.turnaround_parts || {};
                       const bits = [`${r.load_minutes} min load + ${r.unload_minutes} min unload`];
-                      if(tp.safety_minutes) bits.push(`${tp.safety_minutes} min induction at the gates`);
+                      if(tp.safety_minutes) bits.push(`${tp.safety_minutes} min check-in at the gates`);
                       if(tp.internal_travel_minutes) bits.push(`${tp.internal_travel_minutes} min gate to face`);
                       if(tp.internal_travel_source === "drawn_road")
                         bits.push(`internal travel comes from the drawn haul road, not a flat allowance` +
@@ -18050,8 +18050,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           {g.is_default && <span className="text-slate-500">default</span>}
                           {!g.active && <span style={{ color: "var(--red)" }}>deactivated</span>}
                           {g.safety_minutes ? <span className="text-slate-500"
-                            title="Induction time, applied to whatever arrives at this gate">
-                            {g.safety_minutes}m induction</span> : null}
+                            title="Minutes each lorry spends at the gate on arrival.">
+                            {g.safety_minutes} min check-in</span> : null}
                           {g.internal_travel_minutes ? <span className="text-slate-500"
                             title="Flat gate-to-face travel. Ignored on a route that has a drawn haul road — that road already carries these minutes.">
                             {g.internal_travel_minutes}m internal</span> : null}
@@ -18111,7 +18111,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <label className="block">
-                          <span className="text-sm font-medium text-slate-700" title="Safety / briefing at this gate. Once per arrival.">Induction (min)</span>
+                          <span className="text-sm font-medium text-slate-700" title="Minutes each lorry spends at the gate on arrival.">Check-in (min)</span>
                           <input value={gateForm.safety_minutes}
                             onChange={e => setGateForm(g => ({ ...g, safety_minutes: e.target.value }))}
                             inputMode="decimal" placeholder="0"
@@ -18140,7 +18140,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         </span>
                       </label>
                       {/* 14 Oct 2026 (bundle G, W17): when the gate is open, for its capacity (open minutes ÷ the
-                          induction minutes a lorry). Blank = the default gate hours (17 Oct 2026), every day. */}
+                          check-in minutes a lorry). Blank = the default gate hours (17 Oct 2026), every day. */}
                       <div className="rounded-lg border border-slate-200 p-2" data-gate-hours-form="1">
                         <div className="text-sm font-medium text-slate-700">Open hours (optional)</div>
                         <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -18223,7 +18223,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       <p className="text-[13px] text-slate-400">
                         {/* 22 Oct 2026 (the user: fewer words): shortened from the 2026-09-02 feedback copy; the model is unchanged — both
                             per-gate planning assumptions, NULL on every migrated gate, an empty box means 0. */}
-                        <strong>Induction</strong>: minutes at the gate, each lorry.{" "}<strong>Gate → face</strong>: drive to the face (not counted
+                        <strong>Check-in</strong>: minutes at the gate, each lorry.{" "}<strong>Gate → face</strong>: drive to the face (not counted
                         when a haul road is drawn). Empty = 0. A route using a deactivated gate will not route.
                       </p>
                       <div className="flex items-center gap-2">

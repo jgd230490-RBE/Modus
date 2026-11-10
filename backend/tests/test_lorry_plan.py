@@ -184,9 +184,10 @@ ok("1: the 9 h driving cap: two 280-min drives (560) do not share a lorry even t
 ok("1: nothing to pack = no lorry", lp.pack([], SHIFT) == [])
 rows = lp._lorry_rows(L, SHIFT, 7 * 60)
 r0 = rows[0]
-ok("1: a row: 6 trips, times from 07:00 in 91-min steps, the 45-min break placed after the trip that passes 6 h of work (the 4th: 364 min) and before the 5th",
+# REVERSED 10 Nov 2026 (F7, John "Yes, Q1–Q9"): the break goes BEFORE the trip that would pass 6 h of work, not after it
+ok("1: a row: 6 trips, times from 07:00 in 91-min steps, the 45-min break placed before the trip that would pass 6 h of work (the 4th: 364 min), after the 3rd (273)",
    r0["trips"] == 6 and r0["start"] == "07:00" and r0["blocks"][0]["start"] == "07:00" and r0["blocks"][1]["start"] == "08:31"
-   and [b["kind"] for b in r0["blocks"]] == ["trip"] * 4 + ["break"] + ["trip"] * 2 and r0["blocks"][4]["minutes"] == 45.0 and r0["blocks"][4]["start"] == "13:04",
+   and [b["kind"] for b in r0["blocks"]] == ["trip"] * 3 + ["break"] + ["trip"] * 3 and r0["blocks"][3]["minutes"] == 45.0 and r0["blocks"][3]["start"] == "11:33",
    str([(b["kind"], b["start"]) for b in r0["blocks"]]))
 ok("1: the row's figures: driving 384, work 546, break 45, 9 min free -> 'Full day', room 0, 98 %",
    r0["driving_minutes"] == 384.0 and r0["work_minutes"] == 546.0 and r0["break_minutes"] == 45.0 and r0["free_minutes"] == 9

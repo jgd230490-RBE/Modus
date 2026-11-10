@@ -81,7 +81,7 @@ function figNumbers() {
      <div class="card warn" style="margin-top:26px">
        <h3>What this means when you read a figure</h3>
        <p>Payloads are planning figures, not weighbridge values. Distances and drive times come from HGV routing for that
-       vehicle, both legs; the cycle includes load, unload and gate induction minutes. A route not routed for the vehicle
+       vehicle, both legs; the cycle includes load, unload and gate check-in minutes. A route not routed for the vehicle
        shows “not routed” or “—”, never an estimate. Carbon uses the emission factor per vehicle type in Config; treat it as a
        planning figure. Money is in your organisation's currency — no exchange rate is ever applied.</p>
      </div>`,
@@ -126,12 +126,12 @@ function figHaulCycle() {
          <p class="muted" style="text-align:center;font-style:italic;margin:14px 0">both legs stored per vehicle profile (alternative 0 = primary)</p>
          <div class="leg"><div class="bar empty"></div><span class="lab">RETURN leg — routed separately at empty weight → may use roads the laden lorry cannot</span></div>
        </div>
-       <div class="card accent" style="width:380px;text-align:center"><h3>Destination</h3><p>site / stockpile / compound<br>entry gate<br>induction minutes here</p></div>
+       <div class="card accent" style="width:380px;text-align:center"><h3>Destination</h3><p>site / stockpile / compound<br>entry gate<br>check-in minutes here</p></div>
      </div>
      <div class="row" style="margin-top:24px">
        <div class="card" style="flex:1"><h3>Turnaround (per vehicle, from Config)</h3>
          <p>load minutes + unload minutes (e.g. artic tipper 15 + 9, artic flatbed 25 + 20)<br>
-         + gate induction at each arrival gate, once per cycle<br>
+         + gate check-in at each arrival gate, once per cycle<br>
          + gate-to-face travel — a flat figure, or the drawn haul road's own time (never both)</p></div>
        <div class="card" style="flex:1"><h3>Substitutions that stay auditable</h3>
          <p>Temporary haul road: its stretch timed at length ÷ assigned speed; the routing service's own figure is kept beside it.<br>
