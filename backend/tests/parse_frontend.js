@@ -2072,13 +2072,13 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
       && gf.includes("const [stripBottom, setStripBottom] = useState(16);") && gf.includes("document.querySelector('[data-sticky-foot]')")
       && gf.includes("Math.round(window.innerHeight - fr.top) + 8 : 16;") && gf.indexOf("useState(16)") < gf.indexOf("if(!step) return hintsEl;")
       && gf.includes("if(seen.has(s.anchor) || !s.body) return; seen.add(s.anchor);") && gf.includes("const id = setInterval(place, 1000);")
-      // NARROWED 18 Oct 2026 (decision 17): ...and none on a phone
-      && gf.includes("if(!hints || steps.length || phone){ setDots([]); return; }"));
+      // NARROWED 18 Oct 2026 (decision 17): ...and none on a phone; NARROWED 9 Nov 2026: the phone bail moved to `own` (the strip is placed there too)
+      && gf.includes("if(!hints || steps.length){ setDots([]); return; }"));
     // 18 Oct 2026 (UI audit decision 17, the user): the app's own dots are retired on the phone like the map's (decision 8) —
     // the effect draws none there, the strip stays (its "Take the tour" carries the tips), the ≤ 767 px rule hides a dot left
     // by a wider window until the next pass; a desk keeps its dots, named "Tip: <the step's title>"
     ok("🔴 decision 17: the app draws no guide dot on a phone (the dots effect bails on `phone`, which is in its deps), keeps the strip there, and the phone rule hides .guide-dot; a desk keeps its dots",
-      gf.includes("if(!hints || steps.length || phone){ setDots([]); return; }") && gf.includes("}, [hints, key, steps.length, phone]);")
+      gf.includes("if(!hints || steps.length){ setDots([]); return; }") && gf.includes("const own = phone ? [] : stepsOf();") && gf.includes("}, [hints, key, steps.length, phone]);")
       && gf.includes("{strip && (") && gf.includes('className="guide-dot" style={{ top: d.top, left: d.left }} aria-label={`Tip: ${d.title}`}')
       && /@media \(max-width:767px\)\{\.guide-dot\{display:none\}\}/.test(html) && (html.match(/\.guide-dot\{display:none\}/g) || []).length === 1
       && !/\.guide-dot\{display:none\}/.test(html.split("@media (max-width:767px){.guide-dot{display:none}}")[0]));
@@ -2518,9 +2518,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const _dbW = _dbc.slice(_dbc.indexOf("{!wall ? ("), _dbc.indexOf("      ) : (\n        <>\n"));
   const _dbWl = _dbc.slice(_dbc.indexOf("      ) : (\n        <>\n"));
   const ctSrc = src.slice(g1, src.indexOf("function Dashboard("));
-  const gaIdsStripped = gac.replace(/key=\{g\.gate_id\}|data-ga-gate=\{g\.gate_id\}/g, "");
+  const gaIdsStripped = gac.replace(/key=\{g\.gate_id\}|data-ga-gate=\{g\.gate_id\}|key=\{r\.g\.gate_id\}|data-ga-li=\{r\.g\.gate_id\}/g, "");
   ok("⭐ GATE ARRIVALS: one block before the carbon target's, holding the panel and its word helpers",
-    gaSrc.length > 1500 && gac.includes("function GateArrivalsPanel({ ga, err, month, months, onMonth, sited })")
+    gaSrc.length > 1500 && gac.includes("function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone })")
     && gac.includes("const gaMonthToday = (months) => {") && gac.includes("const gaFlagWord = (g) =>")
     && ctSrc.startsWith("// ---- 11 Oct 2026: the carbon target") && !ctSrc.includes("GateArrivalsPanel"));
   // NARROWED 11 Oct 2026 (review): the read is also skipped on the big screen, where the panel is not rendered
@@ -2533,7 +2533,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 14 Oct 2026 (the user took the recommendation): the panel moved from under the carbon strip to under the
   // four charts, so the charts are on the first screen at 1920 x 1080; still before the first collapsed section
   ok("⭐ the panel sits under the four key charts and before the first collapsed section; the six cards, five sections, eight charts are untouched",
-    _dbW.includes("<GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : \"\"} />")
+    _dbW.includes("<GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<ChartCanvas config={costCfg} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf('<div className="dash-charts" data-dash-charts="1">')
