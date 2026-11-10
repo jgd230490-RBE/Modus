@@ -1037,6 +1037,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .phone-more p{margin:0;padding:0 20px 8px;font-size:14px;color:var(--muted);}
   .phone-more-item{display:flex;align-items:center;gap:14px;width:100%;min-height:48px;padding:0 20px;border:0;background:transparent;color:var(--ink);font:500 15px Inter,system-ui,sans-serif;text-align:left;text-decoration:none;cursor:pointer;}
   .phone-more-item .nav-ic{width:20px;height:20px;color:var(--muted);}
+  .phone-more-item.pm-desk{font-weight:400;color:var(--muted);}   /* 10 Nov 2026 (UI fix phone 2): the pages a phone does not open in the plainer weight, the Simulation in the ink weight */
   .phone-more-item.is-on{color:var(--action);font-weight:600;}
   .phone-more-item:focus-visible{outline:2px solid var(--action);outline-offset:-2px;}
   .phone-more-item .pm-note{margin-left:auto;font-size:13px;font-weight:500;color:var(--muted);}
@@ -7796,7 +7797,7 @@ function NavIcon({ id }){
 const PHONE_PAGES = ["dashboard", "lookahead", "map"];
 // 29 Oct 2026: pages under More that READ on a phone (their own phone layout), never the desk-only card
 const PHONE_READ_PAGES = ["simulation"];
-function PhoneTabs({ groups, page, onPick, moreOpen, onMore, pending }){
+function PhoneTabs({ groups, page, onPick, moreOpen, onMore }){
   const items = (groups || []).flatMap(g => g.items).filter(it => PHONE_PAGES.includes(it.id));
   const deskOn = !PHONE_PAGES.includes(page);
   return (
@@ -7811,12 +7812,11 @@ function PhoneTabs({ groups, page, onPick, moreOpen, onMore, pending }){
         aria-expanded={moreOpen ? "true" : "false"} aria-controls="phone-more" onClick={onMore}>
         <svg className="nav-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
         <span>More</span>
-        {pending > 0 && <span className="rail-count" title={`${pending} line(s) waiting for approval`}>{pending}</span>}
       </button>
     </nav>
   );
 }
-function PhoneMore({ groups, page, onPick, onClose, role, who, pending, concernNew }){
+function PhoneMore({ groups, page, onPick, onClose, role, who }){
   const all = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));
   const reads = all.filter(it => PHONE_READ_PAGES.includes(it.id)), desk = all.filter(it => !PHONE_READ_PAGES.includes(it.id));
   const first = useRef(null);
@@ -7825,21 +7825,18 @@ function PhoneMore({ groups, page, onPick, onClose, role, who, pending, concernN
     <>
       <button type="button" className="phone-more-back" aria-label="Close More" tabIndex={-1} onClick={onClose}></button>
       <div id="phone-more" className="phone-more" role="dialog" aria-modal="true" aria-label="More pages">
-        {reads.length > 0 && <><h3>Read here, plan on a desktop</h3>
+        {reads.length > 0 && <><h3>Read here</h3>
         {reads.map((it, n) => (
           <button key={it.id} ref={n === 0 ? first : undefined} type="button" className={"phone-more-item" + (page === it.id ? " is-on" : "")}
             aria-current={page === it.id ? "page" : undefined} onClick={() => onPick(it.id)}>
             <NavIcon id={it.id} /><span>{it.label}</span>
           </button>
         ))}</>}
-        <h3>Made for a desktop</h3>
-        <p>On a phone these pages say so. Open them on a computer or a tablet to edit.</p>
+        <h3>Open on a computer or tablet</h3>
         {desk.map((it, n) => (
-          <button key={it.id} ref={n === 0 && !reads.length ? first : undefined} type="button" className={"phone-more-item" + (page === it.id ? " is-on" : "")}
+          <button key={it.id} ref={n === 0 && !reads.length ? first : undefined} type="button" className={"phone-more-item pm-desk" + (page === it.id ? " is-on" : "")}
             aria-current={page === it.id ? "page" : undefined} onClick={() => onPick(it.id)}>
             <NavIcon id={it.id} /><span>{it.label}</span>
-            {it.id === "forecasts" && pending > 0 && <span className="pm-note">{pending} waiting</span>}
-            {it.id === "concerns" && concernNew > 0 && <span className="pm-note">{concernNew} new</span>}
           </button>
         ))}
         <a className="phone-more-item" href={"/help/?role=" + encodeURIComponent((role && role.role) || "")} target="_blank" rel="noopener noreferrer">
@@ -7851,12 +7848,29 @@ function PhoneMore({ groups, page, onPick, onClose, role, who, pending, concernN
     </>
   );
 }
-function DeskOnly({ label, onHome }){
+// 10 Nov 2026 (UI fix phone 2, the 9 Nov critique): each desk page says in one line what it is for, so the cards differ,
+// then one sentence on where to open it and what a phone reads (the Simulation reads too)
+const DESK_LINE = {
+  submit: "Type each team's forecast loads.",
+  forecasts: "Approve, change and withdraw forecast lines.",
+  carbon: "Set the carbon target and try cuts.",
+  abnormal: "Plan wide, heavy and long loads and their notices.",
+  stockpiles: "Each stockpile's planned use and stock counts.",
+  pours: "Plan each concrete pour and its mixers.",
+  clp: "Write, send and approve each site's logistics plan.",
+  concerns: "Answer concerns sent in from the public map.",
+  locations: "Sites and gates.",
+  routes: "Draw and check each route.",
+  zones: "Closures and areas routes keep out of.",
+  config: "Units, targets and settings.",
+  users: "Logins and teams.",
+};
+function DeskOnly({ id, label, onHome }){
   return (
     <div className="card desk-only" data-desk-only="1">
       <h2>{label}</h2>
-      <p className="do-lead">Open on a desktop to edit this.</p>
-      <p>On a phone, Wayscope shows the Dashboard, the Look-ahead and the Route map, to read. Typing, approving and setting up are done on a computer or a tablet.</p>
+      <p className="do-lead">{DESK_LINE[id] || "A page for a computer or a tablet."}</p>
+      <p>Open it on a computer or a tablet. A phone reads the Dashboard, the Look-ahead, the Route map and the Simulation.</p>
       <button type="button" className="btn-pri tap48" onClick={onHome}>Go to the Dashboard</button>
     </div>
   );
@@ -8213,7 +8227,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
       <main className="flex-1 min-h-0 overflow-auto">
         {/* 14 Oct 2026 (D9): on a phone a desk page is this card, never the page itself (its write controls are
             not rendered at all, not disabled) */}
-        {phoneDesk && <DeskOnly label={current.label} onHome={() => pickPage("dashboard")} />}
+        {phoneDesk && <DeskOnly id={page} label={current.label} onHome={() => pickPage("dashboard")} />}
         {page === "dashboard" && <Dashboard meta={meta} phone={narrow} canApprove={canApprove} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />}
         {page === "submit" && !narrow && <Matrix meta={meta} who={who} editTarget={editTarget} vehLang={vehLang} access={role} />}
         {page === "forecasts" && !narrow && <Forecasts meta={meta} who={who} access={role} onEdit={editInMatrix} onChanged={refreshPending} />}
@@ -8239,9 +8253,9 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
         )}
       </main>
       {narrow && <PhoneTabs groups={visible} page={page} onPick={pickPage} moreOpen={moreOpen}
-                            onMore={() => setMoreOpen(o => !o)} pending={canApprove ? pending : 0} />}
+                            onMore={() => setMoreOpen(o => !o)} />}
       {narrow && moreOpen && <PhoneMore groups={visible} page={page} onPick={pickPage} onClose={() => setMoreOpen(false)}
-                                        role={role} who={who} pending={canApprove ? pending : 0} concernNew={canApprove ? concernNew : 0} />}
+                                        role={role} who={who} />}
       {/* H10: the coach-mark guide for this page; renders nothing unless TENANT.demo_notice is set.
           11 Oct 2026 (the demo bar): not on the Route map, whose embedded map runs its own guide (its strip under
           its bar, its dots, its tour). That was two "New here?" strips on one screen, and the app's guide there

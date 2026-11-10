@@ -3653,7 +3653,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("PHONE TABS: the tab bar is the guide's 'rail' anchor and the foot the guide's strip stays above",
      _pt.includes('data-guide="rail" data-sticky-foot="1"'));
   ok("⭐ PHONE: the Portal draws the rail only at 768 px and up, and the tab bar and More only below",
-     _po.includes('{!narrow && <aside data-guide="rail"') && _po.includes("{narrow && <PhoneTabs groups={visible} page={page} onPick={pickPage} moreOpen={moreOpen}")
+     _po.includes('{!narrow && <aside data-guide="rail"') && _po.includes("{narrow && <PhoneTabs groups={visible} page={page} onPick={pickPage} moreOpen={moreOpen}")   // 10 Nov 2026: no pending count on More any more
      && _po.includes("{narrow && moreOpen && <PhoneMore groups={visible} page={page} onPick={pickPage}"));
   ok("⭐ PHONE WATCHER (hide, do not disable): every desk page is not RENDERED on a phone — Submit, Forecasts, Carbon, the desk Look-ahead, Data, Config",
      _po.includes('{page === "submit" && !narrow && <Matrix ') && _po.includes('{page === "forecasts" && !narrow && <Forecasts ')
@@ -3661,7 +3661,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && _po.includes("{DATA_PAGES.includes(page) && canApprove && !narrow && (") && _po.includes('{page === "config" && canApprove && !narrow && <ConfigPage ')
      // NARROWED 29 Oct 2026 (the Simulation's own page): a page in PHONE_READ_PAGES reads on a phone (its own phone layout), never the desk-only card
      && _po.includes("const phoneDesk = narrow && !PHONE_PAGES.includes(page) && !PHONE_READ_PAGES.includes(page);") && src.includes('const PHONE_READ_PAGES = ["simulation"];')
-     && _po.includes("{phoneDesk && <DeskOnly label={current.label} onHome={() => pickPage(\"dashboard\")} />}")
+     // NARROWED 10 Nov 2026 (UI fix phone 2): the card is given the page id (its own one-line purpose)
+     && _po.includes("{phoneDesk && <DeskOnly id={page} label={current.label} onHome={() => pickPage(\"dashboard\")} />}")
      && !/disabled=\{[^}]*\b(narrow|phone)\b/.test(src));
   // the same rule for ANY page added later (G3's Users page, say): every page the Portal mounts, other than the Dashboard
   // and the Route map, carries `!narrow`, or is a Phone… page mounted only when narrow
@@ -3672,14 +3673,16 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     ok("⭐ PHONE WATCHER, for every page: each page the Portal mounts (but the Dashboard and the Route map) is desk-only on a phone or a Phone… page",
        mounts.length >= 9 && loose.length === 0, loose.map(m => m.id).join(", ") || String(mounts.length));
   }
-  ok("PHONE: the desk-only card says 'Open on a desktop to edit this.' under the page's own name, and offers the Dashboard",
-     _do.includes("<h2>{label}</h2>") && _do.includes('<p className="do-lead">Open on a desktop to edit this.</p>')
-     && _do.includes("On a phone, Wayscope shows the Dashboard, the Look-ahead and the Route map, to read.") && _do.includes("Go to the Dashboard"));
+  // NARROWED 10 Nov 2026 (UI fix phone 2, the 9 Nov critique): the lead is the page's own one line (DESK_LINE), the sentence names the four phone pages
+  ok("PHONE: the desk-only card says what the page is for under the page's own name, then where to open it, and offers the Dashboard",
+     _do.includes("<h2>{label}</h2>") && _do.includes('<p className="do-lead">{DESK_LINE[id] || "A page for a computer or a tablet."}</p>')
+     && _do.includes("Open it on a computer or a tablet. A phone reads the Dashboard, the Look-ahead, the Route map and the Simulation.") && _do.includes("Go to the Dashboard")
+     && !_do.includes("Open on a desktop to edit this"));
   ok("PHONE: More lists the role's desk pages (from the visible groups, so a team code never sees Data or Config) and the user guide in a new tab",
      // NARROWED 29 Oct 2026 (card 12): the pages that read on a phone are listed first under "Read here, plan on a desktop"
-     _pm.includes("const all = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));")
+     _pm.includes("const all = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));")   // NARROWED 10 Nov 2026: headings "Read here" / "Open on a computer or tablet", no counts
      && _pm.includes("const reads = all.filter(it => PHONE_READ_PAGES.includes(it.id)), desk = all.filter(it => !PHONE_READ_PAGES.includes(it.id));")
-     && _pm.includes("{reads.length > 0 && <><h3>Read here, plan on a desktop</h3>") && _pm.includes("<h3>Made for a desktop</h3>")
+     && _pm.includes("{reads.length > 0 && <><h3>Read here</h3>") && _pm.includes("<h3>Open on a computer or tablet</h3>") && !_pm.includes("pm-note\">{pending}") && !_pm.includes("waiting</span>") && !_pm.includes(" new</span>")
      && _pm.includes('role="dialog" aria-modal="true" aria-label="More pages"') && _pm.includes('target="_blank" rel="noopener noreferrer"')
      && _pm.includes("{teamText(who) || \"—\"} · {role.ipt ? teamName(role.ipt) : role.label}"));
   ok("PHONE: Escape and the shade shut More; Ctrl K opens it on a phone (the rail's search is not drawn there)",

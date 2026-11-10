@@ -1772,7 +1772,7 @@ async function phoneShellDom(){
      // NARROWED 29 Oct 2026 (the Simulation's own page): Simulation first, under "Read here, plan on a desktop"; the desk pages under "Made for a desktop"
      // NARROWED 31 Oct 2026 (task 4a, PR 3a): + CLP documents, a Plan-group desk page every login has (a team: its own CLPs)
      && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Simulation|Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours|CLP documents"
-     && [...sheet().querySelectorAll("h3")].map(h => h.textContent).join("|") === "Read here, plan on a desktop|Made for a desktop"
+     && [...sheet().querySelectorAll("h3")].map(h => h.textContent).join("|") === "Read here|Open on a computer or tablet"   // NARROWED 10 Nov 2026 (UI fix phone 2)
      && !!sheet().querySelector('a[href^="/help/?role="][target="_blank"]'));
   ok("PHONE: ...a team code's sheet holds no Data or Config page (the role's own pages only)", !/Locations|Routes|Zones|Config/.test(sheet().textContent));
   await act(async () => { w.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
@@ -1781,7 +1781,7 @@ async function phoneShellDom(){
   click([...sheet().querySelectorAll("button.phone-more-item")].find(b => /Forecasts/.test(b.textContent)));
   const desk = () => t.el.querySelector("[data-desk-only]");
   ok("⭐ PHONE: a desk page on a phone is the card \"Open on a desktop to edit this.\" with its own name, never the page",
-     !!desk() && desk().querySelector("h2").textContent === "Forecasts" && /Open on a desktop to edit this\./.test(desk().textContent)
+     !!desk() && desk().querySelector("h2").textContent === "Forecasts" && desk().querySelector(".do-lead").textContent === "Approve, change and withdraw forecast lines." && /Open it on a computer or a tablet\./.test(desk().textContent)   // NARROWED 10 Nov 2026 (UI fix phone 2)
      && !t.el.querySelector('[data-rd-table="forecasts"], table') && !sheet() && w.location.hash === "#forecasts" && tabs(t.el)[3].classList.contains("is-on"));
   ok("🔴 PHONE WATCHER: the desk card has no input and no write button (hidden, not disabled)",
      !t.el.querySelector("main input, main select, main textarea") && writeBtns(t.el.querySelector("main")).length === 0
