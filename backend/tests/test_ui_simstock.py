@@ -259,6 +259,20 @@ ok("5. the technical guide holds the endpoint", 'id="t1-sim-opening"' in tg and 
 ok("3. the Now card and the gates are no taller than the map, a named scroll region (no empty hole under the map)",
    ".sim-side{max-height:max(360px,min(62vh,720px));overflow:auto;}" in html and 'className="sim-side kb-scroll" tabIndex={0} role="region" aria-label="Now and gates"' in html)
 
+# ---- 10 Nov 2026: how saving is shown on Stockpiles (the mockup John approved, "Yes to all three")
+ok("6. planned use says where it stands: not saved yet / saved, beside the boxes",
+   'data-stock-plan-state={dirty ? "dirty" : savedPlan ? "saved" : "none"}' in stock and "Not saved yet: leave the box to save" in stock
+   and "setSavedPlan(`Saved: " in stock and "`✓ ${savedPlan}`" in stock)
+ok("6. a changed box carries an amber ring until it is saved", 'draft[k] !== undefined ? { borderColor: "#D97706"' in stock)
+ok("6. the false footer 'Saves as you type.' is gone, and the success toast is gone (failures still speak at the top)",
+   "Saves as you type" not in stock and 'then(() => { setNote(null); setTick(t => t + 1); return true; })' in stock and 'say(false, errSay(what, e))' in stock)
+ok("6. the stock count is its own box that says it saves only on the button; the button is grey until a figure is typed; a line names what was saved",
+   'data-stock-count-box="1"' in stock and "Saved only when you press Save count" in stock
+   and 'disabled={String(count.qty).trim() === "" || isNaN(stockNum(count.qty))}' in stock and 'data-stock-count-saved="1"' in stock
+   and "setSavedCount(`Saved: " in stock)
+ok("6. the saved lines clear when another stockpile is picked", 'setPick(x.location_id); setSavedPlan(""); setSavedCount("");' in stock)
+ok("6. the user guide says how saving is shown", "<em>Not saved yet</em>" in ug and "press <strong>Save count</strong>" in ug)
+
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)

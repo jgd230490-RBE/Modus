@@ -6208,6 +6208,9 @@ function StockpilesPage({ meta, access, who }){
   const [fill, setFill] = useState({ from: "", to: "", qty: "" });
   const [count, setCount] = useState({ qty: "", week: "" });
   const [tick, setTick] = useState(0);
+  // 10 Nov 2026 (the approved mockup, Q1-Q3): what the page last saved is said beside the boxes, not in a note that goes
+  const [savedPlan, setSavedPlan] = useState("");
+  const [savedCount, setSavedCount] = useState("");
   useEffect(() => {
     let live = true;
     Promise.all([fetch(`${API}/stockpiles?from_month=1&to_month=${months.count}`).then(okJSON),
@@ -6227,7 +6230,7 @@ function StockpilesPage({ meta, access, who }){
   const yr = planYear || (cw ? sy + Math.floor((cw.month_index - 1) / 12) : sy);
   const say = (ok, text) => { setNote({ ok, text }); if(ok) setTimeout(() => setNote(null), 2500); };
   const put = (path, body, what) => fetch(`${API}${path}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-    .then(okJSON).then(() => { say(true, "Saved."); setTick(t => t + 1); return true; })
+    .then(okJSON).then(() => { setNote(null); setTick(t => t + 1); return true; })
     .catch(e => { say(false, errSay(what, e)); return false; });
   if(err) return <div className="max-w-7xl mx-auto p-6"><EmptyState kind="error" title="Couldn't open the stockpiles" body={err} action={<button type="button" className="btn-sec" onClick={() => setTick(t => t + 1)}>Try again</button>} /></div>;
   if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;
@@ -6239,13 +6242,14 @@ function StockpilesPage({ meta, access, who }){
     const q = String(v).trim() === "" ? null : stockNum(v);
     if(q !== null && !(q >= 0)){ say(false, "Planned use must be a number, 0 or more."); return; }
     put("/stockpiles/plan", { location_id: sp.location_id, from_month: m, planned_qty: q, updated_by: who || null }, "The planned use was not saved.")
-      .then(ok => { if(ok) setDraft(d => { const n = { ...d }; delete n[k]; return n; }); });
+      .then(ok => { if(ok){ setDraft(d => { const n = { ...d }; delete n[k]; return n; }); setSavedPlan(`Saved: ${MONTHS[(m - 1) % 12]} ${sy + Math.floor((m - 1) / 12)} ${q == null ? "cleared" : `${stockTxt(q)} ${u}`}`); } });
   };
   const doFill = () => {
     const a = +fill.from, b = +fill.to, q = stockNum(fill.qty);
     if(!a || !b || !(q >= 0)){ say(false, "Pick both months and type a figure, 0 or more."); return; }
     put("/stockpiles/plan", { location_id: sp.location_id, from_month: Math.min(a, b), to_month: Math.max(a, b), planned_qty: q, updated_by: who || null },
-        "The planned use was not saved.").then(ok => { if(ok) setFill({ from: "", to: "", qty: "" }); });
+        "The planned use was not saved.").then(ok => { if(ok){ const lo = Math.min(a, b), hi = Math.max(a, b);
+          setSavedPlan(`Saved: ${monthLabelAbs(lo, sy)} to ${monthLabelAbs(hi, sy)}, ${stockTxt(q)} ${u} a month`); setFill({ from: "", to: "", qty: "" }); } });
   };
   const pastWeeks = sp ? sp.weeks.filter(w => cw && (w.month_index < cw.month_index || (w.month_index === cw.month_index && w.week_index < cw.week_index))).slice(-12).reverse() : [];
   const saveCount = () => {
@@ -6253,7 +6257,7 @@ function StockpilesPage({ meta, access, who }){
     const q = stockNum(count.qty);
     if(!w || !(q >= 0)){ say(false, "Type the measured stock, 0 or more."); return; }
     put("/stockpiles/count", { location_id: sp.location_id, month_index: w.month_index, week_index: w.week_index, measured_qty: q, updated_by: who || null },
-        "The stock count was not saved.").then(ok => { if(ok) setCount({ qty: "", week: "" }); });
+        "The stock count was not saved.").then(ok => { if(ok){ setSavedCount(`Saved: ${stockTxt(q)} ${u} at the end of the week of ${stockWeekWord(w.from)} ${(w.from || "").slice(0, 4)}`); setCount({ qty: "", week: "" }); } });
   };
   const saveCap = (field, v) => {
     const q = String(v).trim() === "" ? null : stockNum(v);
@@ -6300,7 +6304,7 @@ function StockpilesPage({ meta, access, who }){
         <div className="flex flex-wrap gap-1.5 mb-3" role="tablist" aria-label="Stockpile">
           {stockList.map(x => <button key={x.location_id} type="button" role="tab" aria-selected={x === sp}
             className={"rounded-full px-3 py-1 text-[13px] font-semibold " + (x === sp ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}
-            style={x === sp ? { background: "var(--navy)" } : undefined} onClick={() => setPick(x.location_id)}>{x.name}{(() => { const pr = stockProblem(x); if(!pr) return null;
+            style={x === sp ? { background: "var(--navy)" } : undefined} onClick={() => { setPick(x.location_id); setSavedPlan(""); setSavedCount(""); }}>{x.name}{(() => { const pr = stockProblem(x); if(!pr) return null;
               const bad = pr.kind === "over", word = `${bad ? "over" : "runs out"} ${stockWeekWord(pr.from)} ${pr.from.slice(0, 4)}`;
               return <span className="sp-tab-flag" data-stock-tab-flag={pr.kind}><i aria-hidden="true" className={"sp-dot " + (bad ? "sp-dot-bad" : "sp-dot-warn")} />{word}</span>; })()}</button>)}
         </div>
@@ -6326,7 +6330,12 @@ function StockpilesPage({ meta, access, who }){
             </div>
           </div>
 
-          <h3 className="text-sm font-semibold text-slate-700 mt-4 mb-1">Planned use <span className="font-normal text-slate-500">{u} a month, laid on the works</span></h3>
+          {(() => { const dirty = canPlan && Object.keys(draft).some(k => k.startsWith(sp.location_id + "|"));
+            return <div className="flex flex-wrap items-baseline justify-between gap-2 mt-4 mb-1">
+              <h3 className="text-sm font-semibold text-slate-700">Planned use <span className="font-normal text-slate-500">{u} a month, laid on the works</span></h3>
+              {canPlan && <span className="text-[13px] font-semibold" role="status" data-stock-plan-state={dirty ? "dirty" : savedPlan ? "saved" : "none"}
+                style={{ color: dirty ? "var(--warn-text)" : "var(--ok-text)" }}>{dirty ? "Not saved yet: leave the box to save" : savedPlan ? `✓ ${savedPlan}` : ""}</span>}
+            </div>; })()}
           <div className="flex flex-wrap gap-1 mb-2">
             {years.map(y => <button key={y} type="button" onClick={() => setPlanYear(y)} aria-pressed={y === yr}
               className={"rounded-full px-2.5 py-0.5 text-[13px] font-semibold " + (y === yr ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}
@@ -6339,6 +6348,7 @@ function StockpilesPage({ meta, access, who }){
               return (
                 <label key={i} className="block text-[13px] text-slate-500">{MONTHS[i]}
                   {canPlan ? <input className="ctl ctl-sm w-full text-right mt-0.5" inputMode="decimal" disabled={!inProg} aria-label={`Planned use ${MONTHS[i]} ${yr}`}
+                      style={draft[k] !== undefined ? { borderColor: "#D97706", boxShadow: "0 0 0 2px #FDE68A" } : undefined}
                       placeholder={u} value={draft[k] ?? stockTxt(v)}
                       onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))} onBlur={() => savePlan(m)} />
                     : <span className="block mt-0.5 text-sm text-slate-800 tabular-nums text-right">{v == null ? "—" : grp(v)}</span>}
@@ -6358,7 +6368,11 @@ function StockpilesPage({ meta, access, who }){
             </div>
           )}
 
-          <h3 className="text-sm font-semibold text-slate-700 mt-4 mb-1">Stock count</h3>
+          <div className="mt-4 rounded-lg border p-3" style={{ borderColor: "var(--line)" }} data-stock-count-box="1">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+            <h3 className="text-sm font-semibold text-slate-700">Stock count</h3>
+            {canPlan && <span className="text-[13px] text-slate-500">Saved only when you press Save count</span>}
+          </div>
           {canPlan && pastWeeks.length > 0 && (
             <div className="flex flex-wrap items-end gap-2 text-sm" data-stock-count="1">
               <label className="block text-[13px] text-slate-500">Measured stock
@@ -6366,17 +6380,19 @@ function StockpilesPage({ meta, access, who }){
               <label className="block text-[13px] text-slate-500">At the end of the week of
                 <select className="ctl ctl-sm mt-0.5 block" value={count.week} onChange={e => setCount(c => ({ ...c, week: e.target.value }))}>
                   {pastWeeks.map(w => <option key={`${w.month_index}|${w.week_index}`} value={`${w.month_index}|${w.week_index}`}>{stockWeekWord(w.from)} {(w.from || "").slice(0, 4)}</option>)}</select></label>
-              <button type="button" className="btn-pri" onClick={saveCount}>Save count</button>
+              <button type="button" className="btn-pri" onClick={saveCount} disabled={String(count.qty).trim() === "" || isNaN(stockNum(count.qty))}>Save count</button>
             </div>
           )}
+          {canPlan && savedCount && <p className="text-[13px] font-semibold mt-2" role="status" data-stock-count-saved="1" style={{ color: "var(--ok-text)" }}>✓ {savedCount}</p>}
           <p className="text-[13px] text-slate-500 mt-1" data-stock-lastcount="1">
             {lastCount ? `Last count: ${grp(lastCount.count)} ${u}, week of ${stockWeekWord(lastCount.from)} ${(lastCount.from || "").slice(0, 4)}` +
               (lastCount.count_adjust ? ` · ${grp(Math.abs(lastCount.count_adjust))} ${u} ${lastCount.count_adjust > 0 ? "more" : "less"} than worked out` : "")
               : "No stock count yet."}</p>
+          </div>
 
           <h3 className="text-sm font-semibold text-slate-700 mt-4 mb-1">Forecast <span className="font-normal text-slate-500">% full, solid recorded, dashed planned</span></h3>
           {chartCfg ? <ChartCanvas config={chartCfg} title={`Stockpile forecast, % full: ${sp.name}`} /> : <p className="text-sm text-slate-500">Give it a capacity to see how full it gets.</p>}
-          <p className="text-[13px] text-slate-500 mt-2">{canPlan ? "Saves as you type." : "Planners set the plan. Type what came out each week on Look-ahead → Account."}</p>
+          {!canPlan && <p className="text-[13px] text-slate-500 mt-2">Planners set the plan. Type what came out each week on Look-ahead → Account.</p>}
         </div>
       </>)}
     </div>
