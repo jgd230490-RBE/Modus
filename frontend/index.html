@@ -2263,7 +2263,7 @@ const gaBusyWords = (b) => {
   return `${b.lorries} lorr${b.lorries === 1 ? "y" : "ies"} arriving in the busiest clock hour (${when}) of an average working day. `
     + (b.per_hour == null ? "No check-in time typed, so nothing is compared." : `The gate can check in ${gaN1(b.per_hour)} an hour.`);
 };
-function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone }){
+function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOpen }){
   const [gaOpen, gaToggle] = useRowOpen("gates");
   if(!ga) return err
     ? <div className="ct-strip ga-strip" data-gate-arrivals="error" data-guide="dash-gates"><span className="ct-line">The gate arrivals did not load.</span></div>
@@ -2330,7 +2330,8 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone }){
         </select></label>
       </div>
       <div className="ct-line">{ga.label}: lorries a day at each gate, all {TEAMS().toLowerCase()} together, {GA_SPREAD} across each gate's open hours{anyDefault ? ` (${ga.default_hours}, the default, where none are typed)` : ""}.</div>
-      {state === "none" && <EmptyState kind="none" title={sited ? `No gates at these sites in ${ga.label}` : `No approved lines in ${ga.label}`} body={sited ? "Pick another month or more sites." : "Pick another month. Pending lines appear as a note until they are approved, then in the figures."} />}
+      {state === "none" && <EmptyState kind="none" title={sited ? `No gates at these sites in ${ga.label}` : `No approved lines in ${ga.label}`} body={sited ? "Pick another month or more sites." : "Pick another month, or approve a line."}
+        action={!sited && onOpen ? <button type="button" className="btn-sec" data-ga-empty-go="forecasts" onClick={() => onOpen("forecasts")}>Open Forecasts</button> : null} />}
       {state === "set" && rowsC.length > 0 && phone && (
         <div className="ga-chart" data-ga-list="1">
           <div className="ga-head">
@@ -2992,6 +2993,9 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const clearOne = (k) => ({ sites: () => setSites([]), status: () => setStatus("Approved"), ipt: () => setIpt("All"), discipline: () => setDiscipline("All"), unit: () => setUnit("t"),
                              material: () => setMaterial("All"), vehicle: () => setVehicle("All"), line: () => setLineKey(null) })[k]();
   const clearAll = () => { setSites([]); setStatus("Approved"); setIpt("All"); setDiscipline("All"); setUnit("t"); setMaterial("All"); setVehicle("All"); setLineKey(null); };
+  // 10 Nov 2026 (UI critique 17): a deployment with no forecast line at all is new, not broken: the page opens on its first steps
+  const firstRun = !wall && !!data && rows.length === 0;
+  const pendingOnly = !firstRun && rows.length > 0 && !rows.some(r => r.status === "Approved");
 
   return (
     // 13 Oct 2026 (W5): the working view is up to 1680 px wide (it was 1280, max-w-7xl), so a 1920 px screen uses its
@@ -3001,8 +3005,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           chips under the header (the old subtitle repeated both) */}
       {/* 14 Oct 2026: on a filled big screen the page header folds into the big-screen bar (range, updated, clock,
           Exit), so a 1366 × 768 TV keeps its height for the figures */}
-      {!fill && <PageHeader title="Dashboard" kicker={`${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}${sites.length ? ` · ${sites.length} site${sites.length === 1 ? "" : "s"}` : ""}`}
-        actions={<div className="flex flex-wrap gap-2 items-center">
+      {!fill && <PageHeader title="Dashboard" kicker={firstRun ? undefined : `${rangeLabel} · ${status === "All" ? "all forecasts" : status.toLowerCase()}${sites.length ? ` · ${sites.length} site${sites.length === 1 ? "" : "s"}` : ""}`}
+        actions={firstRun ? null : <div className="flex flex-wrap gap-2 items-center">
           {!wall && <>
             <select className={sel + " dash-sel"} value={fromM} onChange={e => setFromM(+e.target.value)} aria-label="From month">{Array.from({ length: months.count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, months.start_year)}</option>)}</select>
             <span className="self-center text-slate-400 text-sm">→</span>
@@ -3034,14 +3038,14 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                   title={wall ? "Back to the working view (Esc)" : "Fullscreen, larger type, filters and the table hidden, refreshed every 5 minutes"}>{wall ? "Exit big screen" : "Big screen"}</button>}
         </div>}>
         {/* coverage: what the totals include and exclude — the old amber box, moved to where the numbers are read */}
-        <div className="text-xs text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+        {!firstRun && <div className="text-xs text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1">
           <span><strong className="tabular-nums">{D.baked}</strong> of <strong className="tabular-nums">{D.lines}</strong> plan lines have a route{D.lines > D.baked ? <span className="text-amber-700"> · {DU()}, CO₂e and fair {CUR()} leave out the {D.lines - D.baked} not routed yet ({D.unbakedRoutes} route{D.unbakedRoutes === 1 ? "" : "s"}): route them on Data → Routes</span> : null}<InfoTip id="dash.coverage" /></span>
           <span>· diesel<InfoTip id="dash.diesel" /> {cost.index_eur_per_l != null ? <strong>{CUR()}{(+cost.index_eur_per_l).toFixed(3)} per litre</strong> : <span className="text-amber-700">index unavailable — no fair price</span>}{cost.index_bulletin_date ? ` (${cost.index_source === "manual" ? "typed" : "published"} ${longDate(String(cost.index_bulletin_date).slice(0, 10))})` : ""}</span>
           {stamp && <span>· updated {hhmm(stamp)}{wall ? " · refreshes every 5 min" : ""}</span>}
           {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: "var(--navy-soft)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
-        </div>
+        </div>}
       </PageHeader>}
-      {!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll} count={`${D.lines} plan line${D.lines === 1 ? "" : "s"} in view`} />}
+      {!wall && <AppliedChips chips={applied} onClear={clearOne} onClearAll={clearAll} count={firstRun ? null : `${D.lines} plan line${D.lines === 1 ? "" : "s"} in view`} />}
 
       {wall && <div className="dash-wallbar">
         <span className="dash-wallbar-lbl">Big screen</span>
@@ -3084,6 +3088,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
 
       {!wall ? (
         <>
+          {firstRun && <DashFirstSteps locCount={locList ? locList.length : null} routeCount={(meta.routes || []).length} onOpen={onOpen} />}
+          {!firstRun && <>
           <div className="dash-cards" data-guide="dash-figures">
             <Card label="Material in view" value={`${bigNum(K.totT)} t`} sub={`${D.lines} plan line${D.lines === 1 ? "" : "s"} · ${D.routeRows.length} route line${D.routeRows.length === 1 ? "" : "s"}`}
                   info={{ id: "dash.material", value: `Exactly ${grp(K.totT)} t` }} />
@@ -3102,8 +3108,12 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                   info={{ id: "dash.carbon", value: `Exactly ${grp(K.totCo2, 1)} t CO₂e` }} />
           </div>
           <CarbonTargetStrip ct={ct} err={ctErr} onOpen={onOpen} scheme={sites.length > 0} />
-      {D.empty && <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Widen the month range or clear a filter to see the plan." />}
-          <div className="dash-charts" data-dash-charts="1">
+      {D.empty && (pendingOnly
+        ? <EmptyState kind="none" title="No approved lines yet" body="The plan is drawn from approved forecast lines."
+            action={canApprove ? <button type="button" className="btn-sec" data-dash-empty-go="forecasts" onClick={() => onOpen && onOpen("forecasts")}>Open Forecasts</button> : null} />
+        : <EmptyState kind="nomatch" title="No forecast lines match these filters" body="Clear the filters to see the plan."
+            action={<button type="button" className="btn-sec" data-dash-empty-go="clear" onClick={() => { clearAll(); setFromM(1); setToM(months.count); }}>Clear the filters</button>} />)}
+          {!D.empty && <div className="dash-charts" data-dash-charts="1">
             <div className="card p-4 chart-card c-demand">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Material demand over time <span className="text-slate-400 font-normal">({unitLabel})</span><InfoTip id="dash.chart.demand" /></div>
           <ChartCanvas config={demandCfg} size="lg" title={`Material demand over time (${unitLabel})`} scope={dashScope} />
@@ -3121,10 +3131,10 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span><InfoTip id="dash.chart.cost" /></div>
           <ChartCanvas config={costCfg} title={`Cost over time (${CUR()}, planned vs fair)`} scope={dashScope} />
         </div>
-          </div>
+          </div>}
           {/* 14 Oct 2026 (the user took the recommendation): Gate arrivals moved from above the charts to
               below them, so the four key charts are on the first screen at 1920 x 1080 */}
-          <GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : ""} phone={!!phone} />
+          <GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : ""} phone={!!phone} onOpen={canApprove ? onOpen : null} />
           {!wall && !phone && <AbnormalStrip onOpen={onOpen} sites={sites} />}
           {/* 29 Oct 2026: the Simulation has its own page (Plan → Simulation); the Dashboard keeps one line under Gate arrivals,
               the busiest gate from the Gate arrivals reply (no second simulation run here) */}
@@ -3282,6 +3292,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       </div>
             </div>
           </details>
+        </>}
         </>
       ) : (
         <>
@@ -8195,6 +8206,37 @@ function PageHeader({ title, subtitle, actions, children, kicker }){
       </div>
       {actions && <div className="flex items-center gap-2 shrink-0 ph-actions-box">{actions}</div>}
     </div>
+  );
+}
+
+// 10 Nov 2026 (UI critique 17): what a new deployment shows instead of empty figures and charts: the steps, each a control that
+// opens the page, the first one still to do drawn as the primary. Locations and routes are an admin login's to add.
+function DashFirstSteps({ locCount, routeCount, onOpen }){
+  const admin = isAdminLogin(ACCESS.info);
+  const steps = [
+    { n: 1, done: true, text: "Your organisation is set up" },
+    { n: 2, done: locCount != null && locCount > 0, text: "Add the places lorries go between", page: "locations", go: "Locations", who: !admin },
+    { n: 3, done: routeCount > 0, text: "Add the routes between them", page: "routes", go: "Routes", who: !admin },
+    { n: 4, done: false, text: `Ask each ${TEAM().toLowerCase()} to submit its forecast`, page: "submit", go: "Submit forecast" },
+  ];
+  const next = steps.find(s => !s.done);
+  return (
+    <section className="card p-5" data-first-steps="1" aria-label="Getting started">
+      <h3 className="text-base font-semibold text-slate-700 mb-3">Getting started</h3>
+      <ol className="space-y-2.5 list-none p-0 m-0">
+        {steps.map(s => (
+          <li key={s.n} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm" data-first-step={s.n} data-done={s.done ? "1" : "0"}>
+            <span aria-hidden="true" className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold"
+              style={s.done ? { background: "rgba(3,158,134,.12)", color: "var(--ok-text)" } : { background: "var(--surface-3)", color: "var(--ink-2, var(--ink))" }}>{s.done ? "✓" : s.n}</span>
+            <span className={s.done ? "text-slate-500" : "text-slate-700"}>{s.text}{s.done ? <span className="sr-only"> (done)</span> : null}</span>
+            {!s.done && s.page && (s.who
+              ? <span className="text-[13px] text-slate-500" data-first-step-who="1">An admin adds these</span>
+              : <button type="button" data-first-step-go={s.page} onClick={() => onOpen && onOpen(s.page)}
+                  className={s === next ? "btn-pri btn-sm" : "btn-sec btn-sm"}>{s.go}</button>)}
+          </li>))}
+      </ol>
+      <p className="text-[13px] text-slate-500 mt-4">The charts appear once a forecast is approved.</p>
+    </section>
   );
 }
 
@@ -14992,6 +15034,19 @@ function ZoneDiversions({ zoneId, periods, routes, prof, wayRound, canEdit, busy
       {ps.length > 0 && <DivRows rows={ps} prof={prof} canEdit={canEdit} busy={busy} onKeep={onKeep} showRoute routes={routes} />}
     </div>);
 }
+// 10 Nov 2026 (UI critique 23): the Routes table's Vehicles cell is a count; the chips (each vehicle, worked out both ways or not) are in the row's details
+function VehCount({ profiles }){
+  const keys = Object.keys(profiles || {});
+  if(!keys.length) return <span className="text-xs text-slate-500">not routed</span>;
+  const half = keys.filter(k => (profiles[k] || {}).baked && !(profiles[k] || {}).return_baked).length;
+  const bad = keys.filter(k => (profiles[k] || {}).error).length;
+  const tip = keys.map(vehLabel).join(", ");
+  return <span data-route-veh-count="1" title={tip}>
+    <span className="text-slate-700">{keys.length} vehicle{keys.length === 1 ? "" : "s"}</span>
+    {half > 0 && <span className="block text-xs" style={{ color: "var(--warn-text)" }}>{half} out only</span>}
+    {bad > 0 && <span className="block text-xs" style={{ color: "var(--bad-text)" }}>{bad} failed</span>}
+  </span>;
+}
 function VehChips({ profiles }){
   const keys = Object.keys(profiles || {}).sort();
   if(!keys.length) return <span className="text-xs text-slate-500">not routed</span>;
@@ -17793,7 +17848,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             )}
             {form && (
               <div className="space-y-3">
-                <div ref={locHeadRef} tabIndex={-1} className="ed-head text-sm font-medium text-slate-700">{form.id ? `Editing ${form.id}` : "New location"}</div>
+                <div ref={locHeadRef} tabIndex={-1} className="ed-head text-sm font-medium text-slate-700">{form.id ? `Editing ${(locs.find(l => l.id === form.id) || {}).name || "location"}` : "New location"}</div>
                 <label className="block">
                   <span className="block text-sm font-medium text-slate-700 mb-1">Name</span>
                   <input value={form.name} onChange={e => setField("name", e.target.value)} placeholder="e.g. Väo quarry"
@@ -18341,7 +18396,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           {onZones && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
-              <div ref={zoneHeadRef} tabIndex={zoneForm ? -1 : undefined} className="ed-head text-sm font-semibold text-slate-700">{zoneForm ? (zoneForm.id ? `Editing ${zoneForm.id}` : "New zone") : "Zones"}</div>
+              <div ref={zoneHeadRef} tabIndex={zoneForm ? -1 : undefined} className="ed-head text-sm font-semibold text-slate-700">{zoneForm ? (zoneForm.id ? `Editing ${(zoneList.find(z => z.id === zoneForm.id) || {}).name || "zone"}` : "New zone") : "Zones"}</div>
               {!zoneForm && canEdit && (
                 <span className="flex items-center gap-2">
                   <button onClick={startNewZone} disabled={zoneBusy}
@@ -18588,7 +18643,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 <span className="block text-sm font-medium text-slate-700 mb-1">Origin (supplier)</span>
                 <select value={rOrigin} onChange={e => setROrigin(e.target.value)} className={"mt-1 w-full " + sel}>
                   <option value="">— pick origin —</option>
-                  {originOpts.map(l => <option key={l.id} value={l.id}>{l.name} ({l.id})</option>)}
+                  {originOpts.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
               </label>
               <label className="block">
@@ -18598,7 +18653,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   {destOpts.map(l => {
                     const ok = destValid(l.id);
                     return <option key={l.id} value={l.id} disabled={!ok} style={{ color: ok ? undefined : "#cbd5e1" }}>
-                      {l.name} ({l.id}){ok ? "" : " · no shared material"}
+                      {l.name}{ok ? "" : " · no shared material"}
                     </option>;
                   })}
                 </select>
@@ -18771,7 +18826,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <button type="button" className="row-open" data-loc-open={l.id} aria-label={canEdit ? `Edit ${l.name}` : `Show ${l.name} on the map`}
                       aria-current={(form && form.id === l.id) ? "true" : undefined}
                       onClick={(e) => { e.stopPropagation(); openLocFromKeys(l.id); }}>{l.name}</button>
-                    <span className="text-slate-400 font-normal">{l.id}</span>
                   </td>
                   <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{l.loc_type || "—"}</td>
                   <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{ROLE_LABEL[l.role] || l.role || "—"}</td>
@@ -18794,7 +18848,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </td>
                 </tr>
               ))}
-              {!locs.length && <tr><td colSpan="8" className="px-3 py-6 text-center text-slate-400">No locations yet — add one with “+ Add location”.</td></tr>}
+              {!locs.length && <tr data-locs-empty="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">{canEdit ? "No locations yet. Add the first with “+ Add location”." : "No locations yet. An admin adds them."}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -18880,13 +18934,17 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           transform: open ? "rotate(90deg)" : "none", fontSize: 10 }}>▶</span>
                       </button>
                     </td>
-                    <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
+                    <td className="px-3 py-2 font-medium text-slate-800" style={{ width: "1%", whiteSpace: "nowrap" }}>
                       <button type="button" className="row-open" data-route-open={r.id} aria-label={`Show ${r.id} on the map`}
                         aria-current={selected === r.id ? "true" : undefined}
                         onClick={(e) => { e.stopPropagation(); selectRoute(r.id); }}>{r.id}</button>
+                    </td>
+                    <td className="px-3 py-2" style={{ minWidth: 220 }}>
+                      <span className="text-slate-700">{r.origin} → {r.dest}</span>
+                      <span className="flex flex-wrap items-center gap-1 mt-1" data-route-notes={r.id}>
                       {!!(r.gate_blockers || []).length && (
                         <span title={(r.gate_blockers || []).join("; ")}
-                          className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                           style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>
                           gate blocked
                         </span>
@@ -18900,13 +18958,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         const words = hr.state === "calls" ? `Calls at ${H.name || "the holding area"}` : hr.state === "route_again" ? "Route again: does not pass the holding area"
                           : hr.state === "skip" ? "Does not call off" : hr.state === "exempt" ? "Straight to the gate" : "Not routed yet";
                         return <span data-route-holding={hr.state} title={hr.state === "route_again" ? "Its line does not pass the holding area: Route again through the holding area in the row's menu (one option)" : undefined}
-                          className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                           style={hr.state === "route_again" ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" } : { background: "rgba(29,78,216,.10)", color: "var(--navy)" }}>{words}</span>;
                       })()}
                       {(busyUses || []).filter(u => u.route_id === r.id && u.status !== "stopped").map(u => (
                         // 5 Nov 2026 (task 0d-2): "Busy hours: Alt 2", hover for the hours; amber while paused
                         <span key={"bh" + u.from} data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}${u.status === "paused" ? " · paused: the road changed" : ""}`}
-                          className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                           style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }}>
                           Busy hours: Alt {u.alt}</span>))}
                       {(() => {
@@ -18917,7 +18975,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         // tint read 4.09:1 in the audit
                         return <span data-route-return={mode} data-route-return-typed={typed ? "1" : "0"}
                           title={typed ? "Chosen in the row's planning figures" : "Guessed from the route's start; choose in the row's planning figures"}
-                          className={"ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}
+                          className={"text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}
                           style={typed ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : undefined}>{words}</span>;
                       })()}
                       {(() => {
@@ -18929,7 +18987,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         const more = (used.length ? used : bad).length - 1;
                         return (
                           <span data-route-diverted={r.id}
-                            className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                            className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                             style={used.length ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }
                                                : { background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>
                             {used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}{more > 0 ? ` +${more}` : ""}
@@ -18938,15 +18996,15 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       {!!(r.haul_roads || []).length && (
                         // 22 Oct 2026 (UI fix 6, card 6): the chip sits on a SOLID var(--haul-soft) (4.64:1 on any row; the tint fell to 4.24:1 on a selected row)
                         <span title={`Routed through ${(r.haul_roads || []).length} temporary haul road(s): ${(r.haul_roads || []).join(", ")}. Expand the row to edit.`}
-                          className="ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                           style={{ background: "var(--haul-soft)", color: "var(--haul-text)" }}>
                           haul ×{(r.haul_roads || []).length}
                         </span>
                       )}
-                    </td>
-                    <td className="px-3 py-2 text-slate-500">{r.origin} → {r.dest}</td>   {/* 30 Oct 2026 (4b): may wrap, so the Near the route column does not push the row's buttons off a 1280 px screen */}
-                    <td className="px-3 py-2 text-slate-500">{teamText(r.ipt) || "—"}</td>
-                    <td className="px-3 py-2" data-route-near-cell={r.id}><NearCell data={nearData} id={r.id} /></td>
+                      </span>
+                    </td>   {/* 30 Oct 2026 (4b): may wrap, so the Near the route column does not push the row's buttons off a 1280 px screen */}
+                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }}>{teamText(r.ipt) || "—"}</td>
+                    <td className="px-3 py-2" style={{ whiteSpace: "nowrap" }} data-route-near-cell={r.id}><NearCell data={nearData} id={r.id} /></td>
                     {(() => { const o = legFig(pinfo, "loaded", showAlt), b = legFig(pinfo, "return", showAlt);
                       return <>
                         <td className="px-3 py-2 text-right tabular-nums" data-leg-out={r.id}>{o ? fmtDist(o.km, 1) : "—"}</td>
@@ -18954,7 +19012,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         <td className="px-3 py-2 text-right tabular-nums" data-leg-back={r.id}>{b ? fmtDist(b.km, 1) : "—"}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{b && b.min != null ? b.min : "—"}</td>
                       </>; })()}
-                    <td className="px-3 py-2"><VehChips profiles={r.profiles} /></td>
+                    <td className="px-3 py-2" style={{ whiteSpace: "nowrap" }}><VehCount profiles={r.profiles} /></td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       {canEdit && <>
                       <button onClick={(e) => { e.stopPropagation(); rebakeRoute(r.id, Object.keys(r.profiles || {})); }}
@@ -18974,6 +19032,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       </>}
                     </td>
                   </tr>
+                  {open && <tr data-route-vehicles={r.id}><td colSpan={11} className="px-3 pt-1 pb-2">
+                    <div className="text-xs font-semibold text-slate-700 mb-1">Vehicles</div>
+                    <VehChips profiles={r.profiles} />
+                  </td></tr>}
                   {open && <NearDetails data={nearData} id={r.id} colSpan={11} />}
                   {open && <RouteAnalysis routeId={r.id} colSpan={11}
                     originId={r.origin_id} destId={r.dest_id}
@@ -18996,7 +19058,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </React.Fragment>
                 );
               })}
-              {status && status.length === 0 && <tr><td colSpan="11" className="px-3 py-6 text-center text-slate-400">No routes yet — author one with “Create route”.</td></tr>}
+              {status && status.length === 0 && <tr data-routes-empty="1"><td colSpan="11" className="px-3 py-6 text-center text-slate-500">
+                {!canEdit ? "No routes yet. An admin adds the first one."
+                  : locs.length < 2 ? <>Add two locations first. <button type="button" className="link-btn" data-routes-empty-go="locations" onClick={() => setSubTab("locations")}>Open Locations</button></>
+                  : "No routes yet. Pick an origin and a destination in Create route."}
+              </td></tr>}
               {!status && <tr><td colSpan="11" className="px-3 py-6 text-center text-slate-400">Loading…</td></tr>}
             </tbody>
           </table>
@@ -19022,7 +19088,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-500 text-xs sticky top-0">
               <tr>
-                <th className={th}>ID</th><th className={th}>Name</th><th className={th}>Kind</th>
+                <th className={th}>Name</th><th className={th}>Kind</th>
                 <th className={th}>Routing</th><th className={th}>From</th><th className={th}>To</th>
                 <th className={th}>State</th><th className={th}>Used by</th><th className={th}></th>
               </tr>
@@ -19033,7 +19099,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 return (
                   <tr key={z.id} onClick={() => editZone(z)}
                       className={"cursor-pointer hover:bg-slate-50 " + (zoneSel === z.id ? "bg-slate-50" : "")}>
-                    <td className="px-3 py-2 font-mono text-xs text-slate-500">{z.id}</td>
                     <td className="px-3 py-2 font-medium">
                       <button type="button" className="row-open" data-zone-open={z.id} aria-label={canEdit ? `Edit ${z.name}` : `Show ${z.name} on the map`}
                         aria-current={zoneSel === z.id ? "true" : undefined}
@@ -19066,8 +19131,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         ? <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>
                         : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>}
                     </td>
-                    <td className="px-3 py-2 text-slate-500">{z.starts_on || "—"}</td>
-                    <td className="px-3 py-2 text-slate-500">{z.ends_on || "—"}</td>
+                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }}>{z.starts_on || "—"}</td>
+                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }}>{z.ends_on || "—"}</td>
                     <td className="px-3 py-2 text-xs">
                       {!z.active ? <span className="text-slate-400">Inactive</span>
                         : force ? <span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>
@@ -19109,8 +19174,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </tr>
                 );
               })}
-              {!zoneList.length && <tr><td colSpan="9" className="px-3 py-6 text-center text-slate-400">
-                No zones yet. Draw a closure for routes to avoid, a works area, or a temporary haul road.
+              {!zoneList.length && <tr data-zones-empty="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">
+                {canEdit ? "No zones yet. Draw a closure for routes to avoid, a works area, or a temporary haul road." : "No zones yet. An admin draws them."}
               </td></tr>}
             </tbody>
           </table>

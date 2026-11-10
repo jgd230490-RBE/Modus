@@ -2524,7 +2524,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const ctSrc = src.slice(g1, src.indexOf("function Dashboard("));
   const gaIdsStripped = gac.replace(/key=\{g\.gate_id\}|data-ga-gate=\{g\.gate_id\}|key=\{r\.g\.gate_id\}|data-ga-li=\{r\.g\.gate_id\}/g, "");
   ok("⭐ GATE ARRIVALS: one block before the carbon target's, holding the panel and its word helpers",
-    gaSrc.length > 1500 && gac.includes("function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone })")
+    gaSrc.length > 1500 && gac.includes("function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOpen })")
     && gac.includes("const gaMonthToday = (months) => {") && gac.includes("const gaFlagWord = (g) =>")
     && ctSrc.startsWith("// ---- 11 Oct 2026: the carbon target") && !ctSrc.includes("GateArrivalsPanel"));
   // NARROWED 11 Oct 2026 (review): the read is also skipped on the big screen, where the panel is not rendered
@@ -2537,7 +2537,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 14 Oct 2026 (the user took the recommendation): the panel moved from under the carbon strip to under the
   // four charts, so the charts are on the first screen at 1920 x 1080; still before the first collapsed section
   ok("⭐ the panel sits under the four key charts and before the first collapsed section; the six cards, five sections, eight charts are untouched",
-    _dbW.includes("<GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} />")
+    _dbW.includes("<GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} onOpen={canApprove ? onOpen : null} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<ChartCanvas config={costCfg} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf('<div className="dash-charts" data-dash-charts="1">')
@@ -2556,7 +2556,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // 13 Oct 2026 (W6, narrowed): the cell reads "2.6 min"; the full sentence is in the details
     && gac.includes('{g.gap_minutes == null ? "No approved arrivals." : `One every ${gaMin(g.gap_minutes)} ${GA_SPREAD}.`}') && gac.includes('{g.gap_minutes == null ? "none" : gaMin(g.gap_minutes)}')
     && gac.includes("all {TEAMS().toLowerCase()} together") && !/every \{TEAMS\(\)/.test(code)
-    && gac.includes("Pending lines appear as a note until they are approved, then in the figures.")
+    // REVERSED 10 Nov 2026 (UI critique 17): the empty panel says "Pick another month, or approve a line." with an Open Forecasts button
+    && gac.includes("Pick another month, or approve a line.") && !gac.includes("Pending lines appear as a note until they are approved")
     && gac.includes("lorries a day at each gate") && gac.includes("The gate arrivals did not load.")
     && !/\b(secure|trusted by|testimonials?|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|compliant|NH-approved|trucks?|booking|peak hour)\b/i.test(gac)
     && !/\bAI\b/.test(gac) && !/text-xs|text-\[(9|10|11|12)(\.\d)?px\]|uppercase/.test(gac) && !/style=\{\{ ?color/.test(gac));
@@ -3239,7 +3240,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && ["const Card = ({ label, value, sub, info, tone })", "const Fig = ({ value, label, sub, info, tone })", "const Big = ({ value, label, sub, info, tone })"].every(x => src.includes(x))
      && !/<Card [^>]*\btitle=/.test(src) && !/<Fig [^>]*\btitle=/.test(src) && !/<Big [^>]*\btitle=/.test(src));
   ok("🔴 ...the Dashboard shows the date range once (the kicker): the subtitle that repeated it and the scope is gone",
-     !_dbBody.includes("Strategic planning view") && !_dbBody.includes("subtitle={`") && _dbBody.includes('<PageHeader title="Dashboard" kicker={`${rangeLabel} ·'));
+     !_dbBody.includes("Strategic planning view") && !_dbBody.includes("subtitle={`") && _dbBody.includes('<PageHeader title="Dashboard" kicker={firstRun ? undefined : `${rangeLabel} ·'));
   ok("🔴 ...the dot-separated hints are gone from the screens: the stockpile chart's formula line, the commit caption's, the Account and Horizon footers",
      !src.includes("balance at the week's end = opening + typed week actuals") && !src.includes("· loads and vehicles in grey · Monday to Friday")
      && !src.includes("Calibrate never fires on save") && !src.includes("No day columns here.") && !src.includes("Type what came out of each stockpile this week. Opening ="));
@@ -3993,8 +3994,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      // RE-PINNED 5 Nov 2026 (task 0d-2): + the Routes row's "Busy hours: Alt N" chip, the same house chip (five)
      // 8 Nov 2026 (the return journey): the Routes row's return chip is the same house chip, its className a template (the guessed
      // state adds bg-slate-100 text-slate-600), so the literal count stays five and the chip is asserted by its own line
-     && (code.match(/className="ml-1\.5 text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 5
-     && code.includes('className={"ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}')
+     // NARROWED 10 Nov 2026 (UI critique 23): the five chips moved under "From → to" (a flex row with a gap, data-route-notes), so they lose ml-1.5
+     && (() => { const _rn = code.slice(code.indexOf("data-route-notes={r.id}"), code.indexOf("data-route-near-cell={r.id}"));
+        return (_rn.match(/className="text-xs font-semibold px-1\.5 py-0\.5 rounded-full whitespace-nowrap"/g) || []).length === 5 && !/ml-1\.5/.test(_rn); })()
+     && code.includes('className={"text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}')
      && !code.includes("text-[10px] font-semibold px-1.5 py-0.5 rounded-full") && !code.includes("text-[9px] font-semibold")
      && (code.match(/text-\[9px\]/g) || []).length === 0
      && code.includes('<div className={"text-xs uppercase tracking-wide " + (role === "commit" ? "text-slate-600" : "text-slate-400")}>{roleLbl[role] || "\u00a0"}</div>'));
