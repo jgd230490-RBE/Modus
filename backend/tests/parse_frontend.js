@@ -3217,6 +3217,32 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      [...used].every(k => INFOS[k]) && ids.every(k => used.has(k)), [...used].filter(k => !INFOS[k]).concat(ids.filter(k => !used.has(k))).join(", "));
   ok("...each entry's plain text is at most 40 words (the brief's limit; the rest goes in 'how')",
      ids.every(k => words(INFOS[k].text) <= 40), ids.filter(k => words(INFOS[k].text) > 40).join(", "));
+  // ---- 10 Nov 2026 (FR1, A2: notes\ux-programme-1109.md §3; John, decision U5 / mockup Q9): an "i" box shows AT MOST 30
+  // words. Counted on what the box shows when it opens, its `text` (whitespace-separated, as the 40-word check above); `how`
+  // sits behind the box's own fold ("How it is worked out") and is not counted. The 21 boxes over 30 on main 992c4d3 are
+  // pinned with their count: a pinned box may not grow, and the list may ONLY SHRINK — a pinned box brought within 30 words
+  // (or removed) must leave the list, and INFO_PINNED_MAX comes down with it; never raise either. A box not on the list fails
+  // at 31 words. The guide link (a new or changed box links to its user-guide section) is not checked yet: FR7.
+  const INFO_PINNED_30 = { "dash.carbon": 40, "dash.today_veh": 40, "fc.cost": 39, "dash.delivered": 38, "dash.sim": 38, "clp.holding_areas": 38,
+    "la.lorryplan": 37, "la.commit": 37, "dash.deliveries": 36, "routes.return": 35, "units": 35, "la.gates": 34, "la.spread": 34, "dash.gates": 33,
+    "map.commit.today": 33, "map.commit.week": 33, "dash.stock": 33, "dash.vehicles": 32, "la.cost_quote": 32, "clp.euro_class": 31, "clp.carbon_rate": 31 };
+  const INFO_PINNED_MAX = 21;
+  const over30 = (dict) => Object.keys(dict).filter(k => words(dict[k].text) > 30);
+  const unpinnedOver = (dict) => over30(dict).filter(k => !(k in INFO_PINNED_30));
+  ok(`⭐ FR1 A2: every "i" box shows at most 30 words, but the pinned (${over30(INFOS).length} over 30 today, ${Object.keys(INFO_PINNED_30).length} pinned)`,
+     unpinnedOver(INFOS).length === 0, unpinnedOver(INFOS).map(k => `${k} (${words(INFOS[k].text)})`).join(", "));
+  ok("...a pinned box does not grow past its pinned count",
+     Object.keys(INFO_PINNED_30).every(k => !INFOS[k] || words(INFOS[k].text) <= INFO_PINNED_30[k]),
+     Object.keys(INFO_PINNED_30).filter(k => INFOS[k] && words(INFOS[k].text) > INFO_PINNED_30[k]).join(", "));
+  ok(`...and the pinned list may only shrink: every pin is still a box over 30 words (one brought within 30, or gone, leaves the list), at most ${INFO_PINNED_MAX}`,
+     Object.keys(INFO_PINNED_30).length <= INFO_PINNED_MAX && Object.keys(INFO_PINNED_30).every(k => INFOS[k] && words(INFOS[k].text) > 30),
+     Object.keys(INFO_PINNED_30).filter(k => !INFOS[k] || words(INFOS[k].text) <= 30).map(k => k + (INFOS[k] ? ` (now ${words(INFOS[k].text)} words: take it out)` : " (gone: take it out)")).join(", "));
+  {
+    const w31 = Array.from({ length: 31 }, (_, i) => "word" + i).join(" "), w30 = w31.split(" ").slice(0, 30).join(" ");
+    ok("...and it bites: a made-up 31-word box fails it, a 30-word box does not, a pinned box one word longer than its pin fails",
+       unpinnedOver({ "made.up": { text: w31 } }).length === 1 && unpinnedOver({ "made.up": { text: w30 } }).length === 0
+       && words(Array.from({ length: INFO_PINNED_30["dash.carbon"] + 1 }, () => "w").join(" ")) > INFO_PINNED_30["dash.carbon"]);
+  }
   ok("...and no entry breaks the word rule",
      ids.every(k => ["title", "text", "how", "source"].every(f => !banOf(INFOS[k][f] || ""))), ids.filter(k => ["title", "text", "how", "source"].some(f => banOf(INFOS[k][f] || ""))).join(", "));
   ok("...every 'Read more' anchor exists in the user guide, every 'Technical detail' anchor in the technical guide",

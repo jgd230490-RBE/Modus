@@ -80,6 +80,22 @@
  *     - the landing page, the privacy notice, the thanks and error pages
  *   once per run: the time to the public view's first paint, to the portal's first data, each page switch (the
  *   header's title changing), and the largest contentful paint of the first load.
+ *   the UX programme's rules (FR1, 10 Nov 2026, notes\ux-programme-1109.md §3; John's limits, decision U5), measured by
+ *   lib/ui_rules.js at every stop:
+ *     - A1a screen words: visible words per stop, leaving out table cells, figures, chart labels and keys, form fields,
+ *       menus and the "i" boxes (on the record: words); --compare: a stop grown by more than 10 % or 25 words      (warn, words-grew)
+ *     - A1b long prose: a visible block of more than 25 words outside an "i" box — on a staff screen                (fail, long-prose)
+ *       elsewhere (the public view, the map, the bulletin, the reviewer)                                            (warn, long-prose)
+ *       the guides and the landing pages are skipped; a block on the pinned list (LONG_PROSE_PINNED, which may only
+ *       shrink) is a warning until its fix merges                                                                 (warn, long-prose-pinned)
+ *     - A1c filled primaries: filled primary buttons on first view (the accent, var(--action)); more than one      (warn, filled-primaries)
+ *     - A3 page ready: navigation → the page's first figure, per portal page and the map page (readyMs); --compare: 25 %
+ *       slower and over 1 s (warn, ready-slower); no figure in 20 s (warn, ready-none). The LAPTOP'S local copy: it shows
+ *       a page getting slower in the browser, never live's speed
+ *     - every run starts with the rules' self-test: the measures run on a made-up bad page and a good one in this browser,
+ *       and must fire on the first and stay quiet on the second (--self-test runs only that, no server)
+ *     The measures are not part of the run's shape: a run before them pairs in --compare, its stops have no measures, so
+ *     their findings read as FIRST MEASURED (never new) and no word or speed change is computed for them (REPORT.ruleVersion).
  *   --compare <report.json | latest>: findings new since that run / gone since; screenshots that changed by more than
  *   0.5 % of pixels outside the masked areas (the map canvas, the clock, "updated HH:MM"); a diff image per change.
  *
@@ -101,6 +117,7 @@ const path = require("path");
 const { spawn, execFileSync } = require("child_process");
 const { chromium } = require("playwright");
 const AXE_PATH = require.resolve("axe-core/axe.min.js");
+const RULES = require("./lib/ui_rules");   // FR1 (10 Nov 2026): A1a screen words, A1b long prose, A1c filled primaries, A3 page ready
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const BACKEND = path.join(ROOT, "backend");
@@ -119,6 +136,7 @@ function parseArgs(argv) {
     else if (a === "--keep-server") o.keepServer = true;
     else if (a === "--no-deep") o.deep = false;
     else if (a === "--guide") o.guide = true;
+    else if (a === "--self-test") o.selfTest = true;   // FR1: only the rules' self-test (a bad page and a good one in this browser); no server, no report
     else if (a === "--strict-44") o.strict44 = true;   // decision 14: the 44 px rule on a phone fails; ON by default since the phone branch (18 Oct 2026)
     else if (a === "--no-strict-44") o.strict44 = false;   // ...the old grading: every 44 px row a warning
     else if (a === "--out") o.out = path.resolve(v());
@@ -244,13 +262,17 @@ async function startServer(opts) {
 const STAMP = (() => { const d = new Date(), p = n => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; })();
 const RUN_DIR = path.join(OPT.out, STAMP);
-if (fs.existsSync(RUN_DIR)) { console.error("ui_audit.js: " + RUN_DIR + " exists already; wait a second"); process.exit(2); }
+if (!OPT.selfTest && fs.existsSync(RUN_DIR)) { console.error("ui_audit.js: " + RUN_DIR + " exists already; wait a second"); process.exit(2); }
 const SHOTS = path.join(RUN_DIR, "shots");
-fs.mkdirSync(SHOTS, { recursive: true });
+if (!OPT.selfTest) fs.mkdirSync(SHOTS, { recursive: true });
 
 function gitHead() { try { return execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT }).toString().trim(); } catch (e) { return null; } }
 const REPORT = { stamp: STAMP, head: gitHead(), options: { full: OPT.full, widths: WIDTHS, looks: LOOKS, extraAccents: EXTRA_ACCENTS, extraPasses: EXTRA_PASSES, pages: PORTAL_PAGES, blockMapbox: OPT.blockMapbox, deep: OPT.deep, guide: OPT.guide, browser: OPT.browser, strict44: OPT.strict44 },
-                 stops: [], timings: {}, notes: [], totals: { passed: 0, failed: 0 } };
+                 stops: [], timings: {}, notes: [], totals: { passed: 0, failed: 0 },
+                 // FR1 (10 Nov 2026): the rule measures' version and limits. NOT in options: not part of the run's shape (sameShape),
+                 // so a run before them still pairs; compareRuns reads this to tell a first measure from a new finding
+                 ruleVersion: RULES.RULES_VERSION, ruleLimits: RULES.LIMITS };
+const PINS_SEEN = new Set();   // A1b: the pinned long blocks this run saw (a pin nothing matches is named for removal)
 
 let PASS = 0;
 const FAIL = [];
@@ -600,6 +622,9 @@ async function audit(page, store, meta) {
   const t = await settle(page, store);
   const dom = await page.evaluate(domChecks, { narrow: meta.width < 768, fixed });
   dom.contentH = await page.evaluate(contentHeight).catch(() => 0);
+  // FR1: A1a / A1b / A1c, measured at the fold size before the shot grows the viewport (first view is the real fold)
+  const rm = await page.evaluate(RULES.ruleMeasures, { blockWords: RULES.LIMITS.blockWords, proseShare: RULES.LIMITS.proseShare })
+    .catch(e => { note(`rule measures on ${meta.name} @${meta.width}: ${String(e.message || e).split("\n")[0].slice(0, 120)}`); return null; });
   const axe = await runAxe(page);
   const drained = drain(store);
   const file = `${meta.name}__${meta.width}__${meta.look}__${meta.accent}.png`.replace(/[^A-Za-z0-9_.+-]/g, "-");
@@ -672,9 +697,16 @@ async function audit(page, store, meta) {
   else if (dom.h1 > 1 && !/^help/.test(meta.name)) warnings.push({ id: "h1-many", detail: dom.h1 });
   if (store.settleWhy) warnings.push({ id: "not-settled", detail: store.settleWhy });
   if (shot.truncated) warnings.push({ id: "shot-truncated", detail: { contentH: dom.contentH, maxShot: OPT.maxShot } });
+  // FR1: the rules — long prose (a failure on a staff screen), the pinned blocks, filled primaries; a page that never showed a figure
+  const graded = RULES.gradeRules({ name: meta.name, page: meta.page, signedIn: dom.signedIn }, rm);
+  checks.push(...graded.checks); warnings.push(...graded.warnings);
+  for (const p of graded.pinsSeen) PINS_SEEN.add(p);
+  if (meta.readyMs === null) warnings.push({ id: "ready-none", detail: `no figure on the page within ${RULES.LIMITS.readyCapMs} ms of the navigation` });
   for (const c of checks) ok(`${label}: ${c.id}`, c.ok, c.ok ? "" : JSON.stringify(c.detail).slice(0, 300));
   const stop = { ...meta, shot: "shots/" + file, shotGrown: shot.grown || undefined, shotRegrown: shot.regrown || undefined, shotPinned: shot.pinned || undefined, settleMs: t, settleWhy: store.settleWhy || undefined, checks, warnings,
-                 theme: dom.theme, accentApplied: dom.accent, title: dom.title, pageTitle: dom.pageTitle, contentH: dom.contentH, nav: dom.nav, masks: dom.masks };
+                 theme: dom.theme, accentApplied: dom.accent, title: dom.title, pageTitle: dom.pageTitle, contentH: dom.contentH, nav: dom.nav, masks: dom.masks,
+                 signedIn: dom.signedIn };
+  if (rm) { stop.words = rm.words; stop.wordsScope = rm.scope; stop.wordsSkipped = rm.skipped; stop.blocks = rm.blocks; stop.primaries = rm.primaries; }
   delete stop.base;
   if (meta.guide) { stop.guideDots = dom.guide.dots; stop.guideStrip = dom.guide.strip; stop.guidePill = dom.guide.pill ? "button.demo-bar-guide" : null; }
   if (cut) stop.cut = cut.source;   // on the record as text (a RegExp would serialise as {})
@@ -884,6 +916,13 @@ async function guideContext(browser, ctx, base, look, accent, w) {
 // a dot or the strip (8 s at most; the map draws no dot on a phone since decision 8, so its strip is the sign there; a page
 // that draws neither is measured as it is, and guide-shown says so)
 const waitGuide = (page) => page.waitForSelector(".guide-dot, .guide-strip", { timeout: 8000 }).catch(() => {});
+// FR1, A3 (10 Nov 2026): ms from `t0` (just before the navigation) to the page's first figure (lib/ui_rules.js pageReadyNow:
+// the header is the page asked for, then a visible figure outside it, the page's empty / error state or the phone's desk-only
+// card; the map page: the map loaded and a figure). null when none came within the cap (the stop warns ready-none).
+async function timeReady(page, t0, arg) {
+  return page.waitForFunction(RULES.pageReadyNow, arg, { polling: 50, timeout: RULES.LIMITS.readyCapMs })
+    .then(() => Date.now() - t0).catch(() => null);
+}
 async function evalCall(page, code) { return page.evaluate(code).then(() => true).catch(e => { note(`${code}: ${String(e.message || e).slice(0, 120)}`); return false; }); }
 
 async function walkPortal(browser, base, look, accent, first, widths) {
@@ -934,7 +973,9 @@ async function walkPortal(browser, base, look, accent, first, widths) {
       await gotoPage(page, id);
       if (PAGE_TITLE[id]) await page.waitForFunction((t) => { const h = document.querySelector('[data-guide="page-header"] h2'); return h && h.textContent.trim() === t; }, PAGE_TITLE[id], { timeout: 20000 }).catch(() => {});
       const switched = Date.now() - ts;
-      await audit(page, store, meta(id, w, { portal: true, page: id }));
+      // FR1, A3: from the same hash set. The app's Route map is the public map in a frame: timed on its own stop, map-page
+      const readyMs = id === "map" ? undefined : await timeReady(page, ts, { title: PAGE_TITLE[id] });
+      await audit(page, store, meta(id, w, { portal: true, page: id, readyMs }));
       if (first && w === DESK_W) switches.push({ page: id, headerMs: switched });
       // the deep stops: once, at the desk width, in the first look + accent; one that fails is noted, not fatal
       if (OPT.deep && w === DESK_W && first) { try { await deepStops(page, store, meta, id, w); } catch (e) { note(`deep stops on ${id}: ${String(e.message || e).split("\n")[0].slice(0, 160)}`); await leaveFullscreen(page); drain(store); } }
@@ -962,8 +1003,10 @@ async function walkPortal(browser, base, look, accent, first, widths) {
     }
     // 4. the public map on its own (the staff cookie opens it) and the documents: they take no look, so the first look only
     if (first) {
+      const tMap = Date.now();
       await page.goto(base + "/map/", { waitUntil: "domcontentloaded" });
-      await mapStop(page, store, meta("map-page", w));
+      const mapReadyMs = await timeReady(page, tMap, { map: true });   // FR1, A3: the map loaded and its first figure
+      await mapStop(page, store, meta("map-page", w, { readyMs: mapReadyMs }));
       try {
         if (OPT.deep && w === DESK_W) { await keyboardPass(page, meta("map-page", w)); await mapStates(page, store, meta, w, false); }
         if (OPT.deep && w === PHONE_W && w < 768) {
@@ -1162,9 +1205,11 @@ async function walkTeam(browser, base) {
   catch (e) { note("team walk skipped: " + e.message); await ctx.close(); return; }
   drain(store);
   for (const id of TEAM_PAGES) {
+    const ts = Date.now();
     await gotoPage(page, id);
     if (PAGE_TITLE[id]) await page.waitForFunction((t) => { const h = document.querySelector('[data-guide="page-header"] h2'); return h && h.textContent.trim() === t; }, PAGE_TITLE[id], { timeout: 20000 }).catch(() => {});
-    await audit(page, store, meta("team-" + id, { portal: true, page: id }));
+    const readyMs = id === "map" ? undefined : await timeReady(page, ts, { title: PAGE_TITLE[id] });   // FR1, A3
+    await audit(page, store, meta("team-" + id, { portal: true, page: id, readyMs }));
     if (OPT.deep && (id === "submit" || id === "forecasts")) await keyboardPass(page, meta("team-" + id));
   }
   await ctx.close();
@@ -1394,6 +1439,7 @@ function findingKeys(stop) {
     if (Array.isArray(c.detail)) for (const x of c.detail) keys.push(one(c.id, x)); else keys.push(one(c.id, null));
   }
   for (const w of (stop.warnings || [])) {
+    if (RULES.COMPARE_IDS.includes(w.id)) continue;   // FR1: words-grew / ready-slower are made BY a compare, never findings of a run
     if (Array.isArray(w.detail)) for (const x of w.detail) keys.push(one(w.id, x)); else keys.push(one(w.id, null));
   }
   return keys;
@@ -1422,6 +1468,15 @@ async function compareRuns(browser, prevPath) {
   const prevDir = path.dirname(prevPath);
   const now = new Set(REPORT.stops.flatMap(findingKeys)), was = new Set(prev.stops.flatMap(findingKeys));
   const diff = { against: prevPath, prevStamp: prev.stamp, prevHead: prev.head, newFindings: [...now].filter(k => !was.has(k)), goneFindings: [...was].filter(k => !now.has(k)), shots: [] };
+  // FR1 (10 Nov 2026): an earlier run made before the rule measures (no ruleVersion) has none of their findings and no word
+  // counts or page-ready times: this run's rule findings are FIRST MEASURED, not new, and no change is computed for a stop the
+  // earlier run did not measure. Then the words and the page-ready time per stop, and the two warnings they can raise.
+  diff.rules = RULES.compareRules(prev, REPORT);
+  const split = RULES.splitFindings(diff.newFindings, diff.rules.earlierMeasured);
+  diff.newFindings = split.fresh; diff.firstMeasured = split.first;
+  const byKey = new Map(REPORT.stops.map(s => [RULES.stopKey(s), s]));
+  for (const r of diff.rules.words) if (r.warn) { const s = byKey.get(r.key); if (s) s.warnings.push({ id: "words-grew", detail: { was: r.was, now: r.now, delta: r.delta, pct: r.pct } }); }
+  for (const r of diff.rules.ready) if (r.warn) { const s = byKey.get(r.key); if (s) s.warnings.push({ id: "ready-slower", detail: { was: r.was, now: r.now } }); }
   // pixels, compared in the browser (Chromium decodes the PNGs; no image package needed); the masks of both runs are skipped
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
@@ -1463,6 +1518,12 @@ async function compareRuns(browser, prevPath) {
   console.log(`\ncompare with ${prev.stamp} (${prev.head}): ${diff.newFindings.length} new finding(s), ${diff.goneFindings.length} gone, ${changed.length} of ${diff.shots.length} screenshot(s) changed > 0.5 %`);
   for (const k of diff.newFindings.slice(0, 20)) console.log("  new  " + k);
   for (const k of diff.goneFindings.slice(0, 20)) console.log("  gone " + k);
+  if (diff.firstMeasured.length) console.log(`  ${diff.firstMeasured.length} rule finding(s) FIRST MEASURED (the earlier run had no rule measures)`);
+  const grew = diff.rules.words.filter(r => r.warn), slower = diff.rules.ready.filter(r => r.warn);
+  console.log(diff.rules.earlierMeasured ? `  screen words: ${diff.rules.words.length} stop(s) changed, ${grew.length} grew past the limit; page ready: ${slower.length} stop(s) 25 % slower and over 1 s`
+                                         : "  screen words / page ready: the earlier run has no rule measures (made before FR1)");
+  for (const r of grew.slice(0, 20)) console.log(`  words-grew ${r.key}: ${r.was} → ${r.now}`);
+  for (const r of slower.slice(0, 20)) console.log(`  ready-slower ${r.key}: ${r.was} → ${r.now} ms`);
   for (const c of changed.slice(0, 30)) console.log(`  changed ${c.pct} %  ${c.shot}`);
   return diff;
 }
@@ -1496,6 +1557,8 @@ function writeSummaryMd(t) {
   const lines = [`# UI audit ${REPORT.stamp} — ${REPORT.head || "?"}`, "",
     `${REPORT.stops.length} stops · widths ${WIDTHS.join(", ")} · looks ${LOOKS.join(", ")}${EXTRA_ACCENTS.length ? " · accents " + EXTRA_ACCENTS.join(", ") + " at " + DESK_W : ""}${EXTRA_PASSES.map(p => " · + " + p.look + " / " + p.accent + " at " + p.widths.join(", ")).join("")}${OPT.strict44 ? " · strict 44 px" : ""} · ${REPORT.browser ? REPORT.browser.ran + " " + REPORT.browser.version : ""} · ${REPORT.secs} s`,
     `**${PASS} passed, ${FAIL.length} failed.** First paint of the public view ${REPORT.timings.publicFirstPaintMs} ms; the portal's first data after sign-in ${REPORT.timings.portalFirstDataMs} ms.`, "",
+    // FR1 (10 Nov 2026): the three lines a UI PR carries (notes\ux-programme-1109.md §2, L1 step 3)
+    "## For the PR", "", ...RULES.prLines(REPORT), "",
     "## Checks (one per stop)", "", "| Check | Pass | Fail | Failing widths |", "|---|---:|---:|---|"];
   for (const [k, v] of Object.entries(t.byCheck)) lines.push(`| ${k} | ${v.pass} | ${v.fail} | ${Object.entries(v.widths).map(([w, n]) => w + " (" + n + ")").join(", ")} |`);
   lines.push("", "## Warnings (not counted as failures)", "", "| Warning | Items across all stops |", "|---|---:|");
@@ -1506,6 +1569,19 @@ function writeSummaryMd(t) {
   if (t.colourPairs.length) { lines.push("", "## Colour pairs failing contrast (one token value fixes every node that shares it), worst first", "", "| Ratio | Foreground on background | Size | Nodes | Looks | Screens | Sample |", "|---:|---|---|---:|---|---|---|");
     for (const p of t.colourPairs.slice(0, 40)) lines.push(`| ${p.ratio} | ${p.fg} on ${p.bg} | ${p.px} px ${p.weight} | ${p.nodes} | ${p.looks.join(", ")} | ${p.screens.slice(0, 5).join(", ")}${p.screens.length > 5 ? " …" : ""} | \`${p.sample.replace(/\|/g, "¦")}\` |`); }
   if (REPORT.timings.pageSwitches) { lines.push("", `## Page switches at ${DESK_W} px (first look): hash set → the page header shows the new title`, "", "| Page | ms |", "|---|---:|"); for (const p of REPORT.timings.pageSwitches) lines.push(`| ${p.page} | ${p.headerMs} |`); }
+  // FR1: the rule measures, per stop (A1a words, A1c filled primaries on first view, A3 page ready) and the long blocks (A1b)
+  const measured = REPORT.stops.filter(s => s.words != null);
+  if (measured.length) {
+    lines.push("", "## Rule measures (FR1: A1a screen words, A1c filled primaries, A3 page ready)", "",
+      `Limits: a block over ${RULES.LIMITS.blockWords} words fails on a staff screen; words grew > ${RULES.LIMITS.wordsGrowPct} % or > ${RULES.LIMITS.wordsGrowAbs} words warns; more than ${RULES.LIMITS.primaries} filled primary warns; page ready ${RULES.LIMITS.readySlowerPct} % slower and over ${RULES.LIMITS.readyFloorMs} ms warns. Page ready is the laptop's local copy, not live's speed.`, "",
+      "| Stop | Width | Look / accent | Words | Filled primaries | Ready ms | Long blocks |", "|---|---:|---|---:|---:|---:|---:|");
+    for (const s of measured.slice().sort((a, b) => a.name.localeCompare(b.name) || a.width - b.width || a.look.localeCompare(b.look)))
+      lines.push(`| ${s.name} | ${s.width} | ${s.look} / ${s.accent} | ${s.words} | ${(s.primaries || []).length}${(s.primaries || []).length > RULES.LIMITS.primaries ? " ⚠ " + s.primaries.map(p => p.text).join(" · ").replace(/\|/g, "¦") : ""} | ${s.readyMs == null ? "" : s.readyMs} | ${(s.blocks || []).length || ""} |`);
+    const longs = new Map();   // one row per block text, with every stop it was seen on
+    for (const s of measured) if (!RULES.PROSE_SKIPPED.test(s.name)) for (const b of s.blocks || []) { const k = RULES.pinKey(b.text); const r = longs.get(k) || { b, stops: new Set(), staff: false, pin: RULES.pinOf(b.text) }; r.stops.add(s.name + "@" + s.width); r.staff = r.staff || RULES.isStaffStop(s); longs.set(k, r); }
+    if (longs.size) { lines.push("", `## Long blocks (A1b: more than ${RULES.LIMITS.blockWords} words outside an "i" box)`, "", "| Words | Graded | Seen on | Text |", "|---:|---|---|---|");
+      for (const r of [...longs.values()].sort((a, b) => b.b.words - a.b.words)) lines.push(`| ${r.b.words} | ${r.pin ? "pinned (warning)" : r.staff ? "FAIL (staff)" : "warning"} | ${[...r.stops].slice(0, 6).join(", ")}${r.stops.size > 6 ? " …" : ""} | ${r.b.text.replace(/\|/g, "¦")} |`); }
+  }
   if (REPORT.notes.length) { lines.push("", "## Notes", ""); for (const n of REPORT.notes) lines.push("- " + n); }
   if (FAIL.length) { lines.push("", "## Failures", ""); for (const f of FAIL) lines.push("- " + f); }
   if (REPORT.compare) { const c = REPORT.compare; lines.push("", `## Compared with ${c.prevStamp} (${c.prevHead})`, "", `${c.newFindings.length} new, ${c.goneFindings.length} gone, ${c.shots.filter(s => s.status === "changed").length} screenshots changed`);
@@ -1582,10 +1658,49 @@ draw();
   fs.writeFileSync(path.join(RUN_DIR, "report.html"), html);
 }
 
+// ---------------------------------------------------------------- the rules' self-test (FR1) --------------------------
+// Every run starts here, and --self-test runs only this: the rule measures on lib/ui_rules.js's made-up pages, in THIS browser.
+// They must fire on the bad page (a 33-word block, two filled primaries on first view, a page whose figure comes late) and stay
+// quiet on the good one; what they leave out (a table, chart text and a key, an open "i" box, a field, a closed fold, hidden and
+// screen-reader-only text, a selected segment, a button below the fold) must not be counted.
+async function selfTestRules(browser) {
+  const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });
+  const page = await ctx.newPage();
+  const F = RULES.FIXTURES;
+  const L = (s) => "rules self-test: " + s;
+  for (const k of ["bad", "good"]) {
+    await page.setContent(F[k].html);
+    const m = await page.evaluate(RULES.ruleMeasures, { blockWords: RULES.LIMITS.blockWords, proseShare: RULES.LIMITS.proseShare });
+    const e = F[k].expect;
+    ok(L(`the ${k} page counts ${e.words} screen words (no table, chart, key, "i" box, field, fold or hidden text)`), m.words === e.words, JSON.stringify({ words: m.words, skipped: m.skipped }));
+    ok(L(`the ${k} page has ${e.blocks} long block(s)`), m.blocks.length === e.blocks && (!e.blockWords || m.blocks[0].words === e.blockWords), JSON.stringify(m.blocks));
+    ok(L(`the ${k} page has ${e.primaries} filled primar${e.primaries === 1 ? "y" : "ies"} on first view`), m.primaries.length === e.primaries, JSON.stringify(m.primaries));
+    const staff = RULES.gradeRules({ name: "fixture", signedIn: true }, m, []);
+    const lp = staff.checks.find(c => c.id === "long-prose");
+    ok(L(`graded as a staff screen, the ${k} page ${k === "bad" ? "FAILS long-prose and warns filled-primaries" : "passes long-prose and raises no warning"}`),
+       k === "bad" ? lp && !lp.ok && staff.warnings.some(w => w.id === "filled-primaries") : lp && lp.ok && !staff.warnings.length);
+  }
+  await page.setContent(F.slow.html);
+  const t0 = Date.now();
+  const readyMs = await page.waitForFunction(RULES.pageReadyNow, { title: "Slow page" }, { polling: 50, timeout: 5000 }).then(() => Date.now() - t0).catch(() => null);
+  ok(L(`page ready waits for the late figure, past "Loading…" (≥ ${F.slow.expect.readyAfterMs} ms)`), readyMs != null && readyMs >= F.slow.expect.readyAfterMs, String(readyMs));
+  await ctx.close();
+}
+
 // ---------------------------------------------------------------- main ------------------------------------------------
 (async () => {
   let server = null, browser = null;
   const started = Date.now();
+  if (OPT.selfTest) {
+    // --self-test: the browser and the made-up pages only; no server, no report folder
+    try { browser = await chromium.launch({ headless: true, ...(OPT.browser === "chrome" ? { channel: "chrome" } : {}) }); console.log(`ui_audit --self-test: ${OPT.browser} ${browser.version()}`); await selfTestRules(browser); }
+    catch (e) { FAIL.push("the self-test stopped: " + (e && e.stack || e)); }
+    finally { if (browser) await browser.close().catch(() => {}); }
+    for (const f of FAIL) console.log("  ✗ " + f);
+    console.log(`\n${PASS} passed, ${FAIL.length} failed`);
+    process.exitCode = FAIL.length ? 1 : 0;
+    return;
+  }
   try {
     server = await startServer({});
     console.log(`ui_audit: server ${server.base}${server.tenant ? " · tenant " + server.tenant : ""} · widths ${WIDTHS.join(",")} · looks ${LOOKS.join(",")} · accents orange${EXTRA_ACCENTS.length ? "," + EXTRA_ACCENTS.join(",") : ""}${EXTRA_PASSES.map(p => " · + " + p.look + "/" + p.accent + " at " + p.widths.join(",")).join("")}${OPT.strict44 ? " · strict 44 px" : ""} · out ${RUN_DIR}`);
@@ -1599,6 +1714,7 @@ draw();
     REPORT.browser = { asked: OPT.browser, ran: ranChrome ? "chrome" : "chromium", version: browser.version() };
     REPORT.options.browser = REPORT.browser.ran;   // what ran is the run's shape, not what was asked
     console.log(`ui_audit: browser ${REPORT.browser.ran} ${REPORT.browser.version}`);
+    await selfTestRules(browser);   // FR1: the rule measures fire on a bad page and stay quiet on a good one, in this browser
     // the app confirms with the browser's own confirm() boxes — outside every look, axe and the screenshots; their number is on the record
     try { const src = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8"); const n = (src.match(/\bconfirm\(/g) || []).length;
       REPORT.nativeConfirms = n; note(`frontend/index.html confirms with the browser's own confirm() box in ${n} places (unstyled, in no look, not pictured)`); } catch (e) {}
@@ -1614,6 +1730,9 @@ draw();
       else note("login-user and empty-tenant walks need the harness's own server (not --base)");
     }
     await walkUnsigned(browser, server.base);
+    // FR1: a pinned long block no stop showed is gone from the app — named, so the pin comes out (the list may only shrink)
+    for (const p of RULES.LONG_PROSE_PINNED) if (!PINS_SEEN.has(p.starts) && (!p.page || PORTAL_PAGES.includes(p.page)))
+      note(`long-prose pin not seen in this run: "${p.starts}" (${p.where || p.page || "?"}) — take it out of LONG_PROSE_PINNED in backend/tests/lib/ui_rules.js and lower the pinned count in ui_audit_rules.js`);
     if (OPT.compare) await compareRuns(browser, OPT.compare);
   } catch (e) {
     FAIL.push("the run stopped: " + (e && e.stack || e));
@@ -1633,6 +1752,8 @@ draw();
   for (const [k, v] of Object.entries(t.byCheck)) console.log(`${k.padEnd(22)} ${String(v.pass).padStart(5)} pass ${String(v.fail).padStart(5)} fail`);
   console.log(`warnings: ${Object.entries(t.warnBy).map(([k, v]) => k + " " + v).join(" · ") || "none"}`);
   if (t.strict44Would) console.log(`targets-44px: ${t.strict44Would} row(s) would FAIL without --no-strict-44 (not inline, not set apart)`);
+  { const timed = REPORT.stops.filter(s => s.readyMs != null).sort((a, b) => b.readyMs - a.readyMs);   // FR1
+    console.log(`rules: ${REPORT.stops.filter(s => s.words != null).length} stops measured · long-prose ${(t.byCheck["long-prose"] || { fail: 0 }).fail} failing · pinned ${t.warnBy["long-prose-pinned"] || 0} · filled-primaries on ${REPORT.stops.filter(s => (s.primaries || []).length > RULES.LIMITS.primaries).length} stop(s)${timed.length ? " · slowest page ready " + timed[0].readyMs + " ms (" + timed[0].name + " @" + timed[0].width + ", the laptop's copy)" : ""}`); }
   console.log(`report: ${path.join(RUN_DIR, "report.html")}  (${REPORT.secs} s; a full run is ~70 MB of screenshots — delete the runs you no longer compare against)`);
   if (FAIL.length) { console.log("\nFailures:"); for (const f of FAIL) console.log("  ✗ " + f); }
   console.log(`\n${PASS} passed, ${FAIL.length} failed`);
