@@ -1940,8 +1940,11 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   const trucks = strings.filter(s => /\btrucks?\b/i.test(s) && !/Truck mixer/.test(s));
   ok("🔴 no 'truck' in any string the public map prints (lorry / HGV)", trucks.length === 0, trucks.slice(0, 3).join(" | "));
   ok("the drawer's figures say lorry", /'Trips \/ day \/ lorry'/.test(code) && /'Lorries for peak'/.test(code));
-  ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025, and says what the figure is (average laden, both legs, tailpipe only, set on Config)",
-     /Carbon: DESNZ 2026 factors, both legs, tailpipe only\. The same figure as the bar above\./.test(code) && !/DEFRA/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; average laden and Config are in T10
+  // REVERSED 10 Nov 2026 (live test finding 7; John's yes to notes/map-drawer-polish-mockup-1110 Q3): since the return
+  // journey rule (8 Nov) the figure is the loaded journey + the share of the way back the route charges, not "both legs"
+  ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025, and says what the figure is (tailpipe only; each loaded journey and the scheme's share of the empty return)",
+     /Carbon: DESNZ 2026 factors, tailpipe only\. Each loaded journey and the scheme’s share of the empty return\. The same figure as the bar above\./.test(code)
+     && !/factors, both legs/.test(code) && !/DEFRA/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; average laden and Config are in T10
 }
 
 
@@ -2649,7 +2652,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && /\.kpi-label\{[^}]*white-space:nowrap; \}/.test(html));
   // 1d. the conditions panel is capped by the viewport
   ok("mobile: the conditions panel's max-height is measured from the bar's bottom to the timeline bar's top (or the viewport's bottom edge), and cleared on the desktop",
-     code.includes("const floor = (tb && tb.style.display !== 'none') ? Math.round(tb.getBoundingClientRect().top) - 8 : window.innerHeight - 12;")
+     // NARROWED 10 Nov 2026 (map drawer polish, finding 4): `let`, because the open route drawer can lower the floor (pinned in the DRAWER block)
+     code.includes("let floor = (tb && tb.style.display !== 'none') ? Math.round(tb.getBoundingClientRect().top) - 8 : window.innerHeight - 12;")
      && code.includes("box.style.maxHeight = Math.max(120, floor - (Math.round(kpi.getBoundingClientRect().bottom) + 8)) + 'px';")
      && code.includes("{ box.style.top = ''; box.style.maxHeight = ''; return; }"));
   // 1e. landscape
@@ -3463,7 +3467,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      // NARROWED 12 Oct 2026 (browser check): the excluded-line clause is written only when a line is excluded; the demo
      // read "excludes 0 lines with no stored road route"
      // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the note moved behind the heat map's "i" (#heat-info-more), word for word
-     && blkCode.includes("more = 'Approved plan only, both legs. A colour means the same tonnes every month.' +")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; the stops rule is in T10
+     // REVERSED 10 Nov 2026 (live test finding 7): no "both legs" (the return journey rule, 8 Nov)
+     && blkCode.includes("more = 'Approved plan only: loaded journeys and the scheme’s share of the empty return. A colour means the same tonnes every month.' +")
+     && !blkCode.includes("Approved plan only, both legs")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; the stops rule is in T10
      && blkCode.includes("if (moreEl && moreEl.innerHTML !== more) moreEl.innerHTML = more;")
      && blkCode.includes("(miss ? '<div class=\"ml-foot\">Leaves out ' + miss + ' line' + (miss === 1 ? '' : 's') + ' not routed yet.</div>' : '')")
      && !blkCode.includes("on both legs, excludes ' + miss")
@@ -3731,7 +3737,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
            && el("carbon-legend").innerHTML.includes("under 11 t") && el("carbon-legend").innerHTML.includes("44 t and over")
            // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the note is behind the heat map's "i"; the legend keeps the exclusion in
            // one line and the CO2 badge's key
-           && el("heat-info-more").innerHTML.includes("Approved plan only, both legs. A colour means the same tonnes every month.")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter, "not routed yet"
+           // REVERSED 10 Nov 2026 (live test finding 7): no "both legs"
+           && el("heat-info-more").innerHTML.includes("Approved plan only: loaded journeys and the scheme’s share of the empty return. A colour means the same tonnes every month.")
+           && !el("heat-info-more").innerHTML.includes("both legs")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter, "not routed yet"
            && !el("heat-info-more").innerHTML.includes("(55.5 t)") && el("carbon-legend").innerHTML.includes("Leaves out 3 lines not routed yet.")
            // NARROWED 10 Nov 2026 (UI critique 18): the key's pill carries the unit as the badges do; grey is also a route with nothing in the month
            && el("carbon-legend").innerHTML.includes('<span class="co-pill">24 t CO₂e</span>from that route in the month')
@@ -7849,6 +7857,33 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("2.1-4 Q7 (sandbox): the link's box reads back, and anything that is not a box is no box",
      !!afp && JSON.stringify(afp('-0.96,52.49,-0.94,52.51')) === '[-0.96,52.49,-0.94,52.51]' && afp('1,2,3') === null && afp('3,2,1,4') === null
      && afp('a,b,c,d') === null && afp('') === null && afp('-0.9,53,-0.8,52') === null);
+}
+
+// ===== 10 Nov 2026 — map drawer polish (live test findings 4, 7, 8; John's yes to notes/map-drawer-polish-mockup-1110) =====
+{
+  ok("⭐ DRAWER (finding 4, seen on live: the timeline bar over the drawer's lower rows): while the bar is open the drawer keeps its foot clear by the bar's measured height",
+     html.includes("body.timeline-on #route-drawer{ padding-bottom:var(--tl-foot, 0px); }"));
+  ok("⭐ DRAWER (finding 4: the Conditions panel over 'Trips / day / lorry'): opening the drawer marks the body, closing it unmarks it, and both re-place the Conditions panel",
+     /function showDrawerTab\(tab\)\{[\s\S]*?classList\.add\('open'\);\s*document\.body\.classList\.add\('drawer-open'\);\s*if \(typeof positionWarnStack === 'function'\) positionWarnStack\(\);\s*\}/.test(code)
+     && /function closeDrawer\(\)\{\s*document\.getElementById\('route-drawer'\)\.classList\.remove\('open'\);\s*document\.body\.classList\.remove\('drawer-open'\);\s*if \(typeof positionWarnStack === 'function'\) positionWarnStack\(\);\s*\}/.test(code));
+  ok("⭐ DRAWER: at a desk the Conditions panel ends 12 px above the drawer (its top is at 54vh; the panel starts at 84 px, 110 on a demo) and scrolls, with or without the timeline",
+     html.includes("body.drawer-open #tl-warnings, body.drawer-open.timeline-on #tl-warnings{ max-height:max(120px, calc(54vh - 96px)); }")
+     && html.includes("body.drawer-open.has-demo-notice #tl-warnings, body.drawer-open.timeline-on.has-demo-notice #tl-warnings{ max-height:max(120px, calc(54vh - 122px)); }")
+     && html.includes("body.drawer-open #tl-warnings > *{ flex:0 0 auto; }"));
+  ok("DRAWER: the desk rule comes after the timeline's own max-height (same weight or more, later wins)",
+     html.indexOf("body.drawer-open #tl-warnings, body.drawer-open.timeline-on #tl-warnings{") > html.indexOf("body.timeline-on #tl-warnings{ max-height:min(60vh, 520px,"));
+  ok("⭐ DRAWER: on a tablet (the panel spans the screen) its floor is the drawer's top while the drawer is open",
+     code.includes("if (document.body.classList.contains('drawer-open')) floor = Math.min(floor, Math.round(window.innerHeight * 0.54) - 12);")
+     && html.includes("height:46vh; max-height:46vh;"));
+  ok("⭐ DEMO BAR (finding 8, seen on live: the export card's top edge at 12 px, over the bar): the export card and the share card are centred under the notice and no taller than the room under it",
+     html.includes("body.has-demo-notice #share-panel, body.has-demo-notice #rme-panel{ top:calc(50% + var(--notice-h, 26px) / 2); max-height:calc(100vh - 24px - var(--notice-h, 26px)); }")
+     && html.indexOf("body.has-demo-notice #share-panel, body.has-demo-notice #rme-panel{") > html.indexOf("#rme-panel{ position:fixed;"));
+  ok("⭐ CARBON WORDS (finding 7: R045 charges 43 % of the way back, the card said 'both legs'): the CO₂e card says what is counted, true for all three return journeys",
+     code.includes("card(co2t.toFixed(1)+' t','CO₂e (est.)','loaded, plus the scheme’s share of the return'+(unbakedM?")
+     && !code.includes("'both legs'") && !/CO₂e \(est\.\)','both legs/.test(code));
+  ok("CARBON WORDS: the distance cards are unchanged (the lorry does drive the round trip) and the new words name no setting, share or method",
+     code.includes("'Round trip','Loaded out, empty back'") && code.includes("'Total trips','one-way loaded runs'")
+     && !/scheme’s share[^']*(43|per cent|%|return_mode|RICS)/.test(code));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

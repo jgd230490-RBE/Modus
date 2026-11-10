@@ -973,8 +973,8 @@ def road_load(month, factors=None, working_days=None, leg="loaded", profile=None
         "basis": counting.road_basis(pv) + " Over the routes the map draws. `trips` is the Dashboard's "
                  "rounded-up count, shown beside it.",
         "counting": counting.words_for(pv),
-        "co2_basis": "CO2e on a section = Σ each route's month CO2e (routed km × the vehicle's "
-                     "kg CO2e/km, both legs) × section length / the route's two-way length "
+        "co2_basis": "CO2e on a section = Σ each route's month CO2e (the loaded leg + the share of the return "
+                     "the route charges, each at the vehicle's kg CO2e/km) × section length / the route's two-way length "
                      "(loaded + stored return): the carbon emitted on the section.",
         "runs": runs_out,
         "totals": totals,
