@@ -10722,9 +10722,11 @@
         if (old) { try { old.remove(); } catch (e) {} }
         const H = map.getContainer().clientHeight || 600;
         const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
-        const below = secselRoom(at.point.y, H, foot, secselTopEdge()).below;
+        const rm = secselRoom(at.point.y, H, foot, secselTopEdge()), below = rm.below;
         const side = secselSide(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge());
-        const pop = new mapboxgl.Popup({ offset: 10, maxWidth: '380px', anchor: (below ? 'top' : 'bottom') + (side ? '-' + side : ''), className: 'secsel-popup' })
+        // a short window, the click in its middle: neither above nor below takes a whole card, so it opens BESIDE the click
+        const beside = rm.beside ? secselBeside(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge()) : '';
+        const pop = new mapboxgl.Popup({ offset: 10, maxWidth: '380px', anchor: beside || ((below ? 'top' : 'bottom') + (side ? '-' + side : '')), className: 'secsel-popup' })
             .setLngLat(at.lngLat).setHTML(roadCardHTML()).addTo(map);
         SECSEL.roadPopup = pop;
         // a close clears only its own card (a new click's card replaces it first)
@@ -10757,12 +10759,25 @@
     // figures bar). The map runs under the figures bar, so the room for a card starts at the bar's bottom edge, not at the
     // top of the map: the 9 Nov fix counted the timeline bar at the foot and not this one. Pure: y = the click in the map,
     // H = the map's height, foot = the timeline bar's height, top = the figures bar's bottom edge. The card opens on the
-    // side with more room; space is what it may fill there.
-    function secselRoom(y, H, foot, top) {
+    // side with more room; space is what it may fill there. In a short window (a laptop's, the timeline open) a click in
+    // the middle leaves less than a whole card (SECSEL_NEED) both above and below: there the card opens beside the click,
+    // centred on it, where it has twice the smaller room. Without that the fix only moved the fault to the timeline bar.
+    const SECSEL_NEED = 290, SECSEL_WIDE = 404;
+    function secselRoom(y, H, foot, top, need) {
         const t = Math.max(0, top || 0), b = Math.max(t, H - (foot || 0));
         y = Math.min(Math.max(y, t), b);
-        const below = (y - t) < (b - y);
-        return { below, space: Math.max(0, (below ? b - y : y - t) - 34) };
+        const above = y - t, under = b - y, below = above < under;
+        const big = Math.max(above, under), mid = 2 * Math.min(above, under);
+        const beside = big < (need || SECSEL_NEED) && mid > big;
+        return { below, beside, space: Math.max(0, (beside ? mid : big) - 34) };
+    }
+    // which side a card beside the click goes: 'right' = its right edge at the click (the card to the LEFT of it), 'left' =
+    // the card to its right, '' = neither side has a card's width (then it opens above or below as before). The left is
+    // taken first: the pointer's own hover tip sits to the right of the pointer and would lie over the card. Pure, as secselSide.
+    function secselBeside(x, W, right, wide) {
+        right = Math.min(W, right > 0 ? right : W);
+        wide = wide || SECSEL_WIDE;
+        return x >= wide ? 'right' : (right - x) >= wide ? 'left' : '';
     }
     // the figures bar's bottom edge in the map's own px; 0 where the bar does not lie over the map (the phone, the big screen)
     function secselTopEdge() {
@@ -10780,7 +10795,9 @@
         const H = map.getContainer().clientHeight || 600;
         const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
         const y = map.project(at.lngLat).y;
-        const space = (p.options && String(p.options.anchor).indexOf('top') === 0) ? (H - foot - y - 34) : (y - secselTopEdge() - 34);
+        const t = secselTopEdge(), a = String((p.options && p.options.anchor) || '');
+        const space = (a === 'left' || a === 'right') ? (2 * Math.min(y - t, H - foot - y) - 34)
+                    : (p.options && String(p.options.anchor).indexOf('top') === 0) ? (H - foot - y - 34) : (y - t - 34);
         const sc = el.querySelector('.secsel-scroll');
         if (sc) sc.style.maxHeight = Math.max(90, space - 170) + 'px';
     }

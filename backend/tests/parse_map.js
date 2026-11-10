@@ -7657,7 +7657,8 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("⭐ 2.1-4 (card 0's bug): the road card opens on the side with room above the timeline bar and scrolls inside itself",
      blk.includes("getPropertyValue('--tl-foot')")
      // NARROWED 10 Nov 2026 (road card edge): above / below as before, now with a side where the click is near an edge
-     && blk.includes("anchor: (below ? 'top' : 'bottom') + (side ? '-' + side : '')") && blk.includes("String(p.options.anchor).indexOf('top') === 0")
+     // NARROWED again 10 Nov 2026 (road card top): above / below with that side, unless a short window puts it beside the click
+     && blk.includes("anchor: beside || ((below ? 'top' : 'bottom') + (side ? '-' + side : ''))") && blk.includes("String(p.options.anchor).indexOf('top') === 0")
      && blk.includes("sc.style.maxHeight = Math.max(90, space - 170) + 'px';") && html.includes(".secsel-scroll{ max-height:260px; overflow:auto;"));
   ok("⭐ 2.1-4 Q1: every mode — a route line's click and a shared section's click both open the road card (the route tinted)",
      code.includes("if(typeof openRoadCard==='function'){ openRoadCard(e, rid); return; }")
@@ -7707,7 +7708,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   try {
     F = new Function("escHtml", "PV", "CW", "monthLabel", "teamText", "TENANT", "map", "styleReady", "document", "isPhoneShell", "mapboxgl",
                      "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle",
-                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), SECSEL_MAP };")(
+                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), secselBeside: (typeof secselBeside === 'function' ? secselBeside : null), SECSEL_MAP };")(
       esc, () => pv, () => (pv === 2 ? words2 : words1), m => (m === 23 ? 'Nov 2027' : 'M' + m), v => (v === 'IPT1' ? 'North Team' : v),
       { name: 'Wolds Link', demo_notice: 'Fictional scheme' }, {}, () => true, doc, () => false, {}, {}, () => 'https://x/map/?month=2027-11', null, null,
       x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }));
@@ -7849,7 +7850,8 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   }
   ok("⭐ EDGE: the popup's anchor is above / below plus that side, from the click's own point; the right edge is the Conditions panel while it shows on a wide screen, else the map buttons",
      code.includes("const side = secselSide(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge());")
-     && code.includes("anchor: (below ? 'top' : 'bottom') + (side ? '-' + side : ''), className: 'secsel-popup' })")
+     // NARROWED 10 Nov 2026 (road card top): the same anchor, after "beside ||" for a short window's middle band
+     && code.includes("anchor: beside || ((below ? 'top' : 'bottom') + (side ? '-' + side : '')), className: 'secsel-popup' })")
      && code.includes("if (w && getComputedStyle(w).display !== 'none' && window.innerWidth > 1023) return Math.round(w.getBoundingClientRect().left - m.left);")
      && code.includes("return Math.round(m.width - 56);"));
   // ===== 10 Nov 2026 — road card top (John's yes to the card under "Seen on the way", notes/frontier-public-map-mockup-1110) =====
@@ -7860,8 +7862,17 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("⭐ TOP: the pure rule exists (the card's room, from the click, the map's height, the timeline bar and the figures bar)", typeof room === 'function');
   if (typeof room === 'function') {
     const live = room(300, 677, 94, 98);          // the case seen on live: 202 px above the click under the bar, 283 below it
-    ok("⭐ TOP (the live case, 1422 x 677): the card opens BELOW the click, where the room is; the old rule (y < (H - foot) / 2) opened it above",
-       live.below === true && live.space === 583 - 300 - 34 && !(300 < (677 - 94) / 2));
+    ok("⭐ TOP (the live case, 1422 x 677): the room is counted from the bar, so below has more of it (283 against 202); the old rule (y < (H - foot) / 2) opened the card above",
+       live.below === true && !(300 < (677 - 94) / 2));
+    ok("⭐ TOP (the live case): neither side takes a whole card (290), so it opens BESIDE the click, centred, with twice the smaller room (404 - 34); opening below ran 13 px under the timeline bar in Chrome",
+       live.beside === true && live.space === 2 * 202 - 34);
+    ok("⭐ TOP: beside is only for a short window's middle band: the same click in a tall window, or one near the top or the foot of the short one, opens below or above as before",
+       room(300, 900, 94, 98).beside === false && room(300, 900, 94, 98).below === true && room(300, 900, 94, 98).space === 806 - 300 - 34
+       && room(150, 677, 94, 98).beside === false && room(150, 677, 94, 98).below === true
+       && room(540, 677, 94, 98).beside === false && room(540, 677, 94, 98).below === false
+       && [296, 320, 341, 372].every(y => room(y, 677, 94, 98).beside === true) && [290, 390].every(y => room(y, 677, 94, 98).beside === false));
+    ok("TOP: a card beside the click is centred on it, so it never passes either bar: its room is twice the distance to the nearer one",
+       [296, 320, 341, 372].every(y => room(y, 677, 94, 98).space === 2 * Math.min(y - 98, 583 - y) - 34));
     ok("⭐ TOP: a card that opens above the click fills only the room under the figures bar, never the bar's own 98 px",
        room(500, 677, 94, 98).below === false && room(500, 677, 94, 98).space === 500 - 98 - 34
        && room(500, 677, 94, 0).space === 500 - 34 && room(500, 677, 94, 98).space === room(500, 677, 94, 0).space - 98);
@@ -7872,9 +7883,15 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
     ok("TOP: the turning point moves down by half the bar: with a 98 px bar a click at 330 still opens below, at 345 above",
        room(330, 677, 94, 98).below === true && room(345, 677, 94, 98).below === false);
     ok("TOP: odd inputs are safe: nothing negative, a missing foot or bar counts as none, a bar taller than the free map leaves no room",
-       room(10, 100, 0, 0).space === 56 && room(50, 100, 0, 0).space === 16 && room(50, 100).space === 16
+       room(10, 100, 0, 0).space === 56 && room(50, 100, 0, 0).space === 66 && room(50, 100).space === 66
        && room(40, 100, 0, 98).space === 0 && room(300, 677, 94, 700).space === 0 && room(-5, 677, 94, 98).space >= 0);
   }
+  const besideOf = F && F.secselBeside;
+  ok("⭐ TOP: beside the click means to its LEFT when a whole card (404 px) fits there (the pointer's hover tip sits to its right), else to its right, else '' and the card opens above or below",
+     typeof besideOf === 'function'
+     && besideOf(400, 1122, 1066) === 'left' && besideOf(900, 1122, 1066) === 'right' && besideOf(533, 1122, 1066) === 'right' && besideOf(404, 1122, 1066) === 'right'
+     && besideOf(300, 700, 640) === '' && besideOf(300, 1122, 710) === 'left' && besideOf(350, 1122, 710) === ''
+     && besideOf(500, 1000, 0) === 'right' && besideOf(100, 1000, 0) === 'left' && besideOf(700, 1000, 0) === 'right');
   let ste = null;
   const steFor = (mapRect, hudRect, display) => {
     try {
@@ -7893,8 +7910,10 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      && steFor({ left: 300, top: 100, right: 1422, bottom: 677 }, deskHud) === 0            // the bar sits wholly above the map
      && steFor({ left: 300, top: 0, right: 1422, bottom: 677 }, { left: 0, top: 26, right: 300, bottom: 98 }) === 0);   // beside it
   ok("⭐ TOP: both the choice of side and the card's own height use it; the old line that measured from the top of the map is gone",
-     code.includes("const below = secselRoom(at.point.y, H, foot, secselTopEdge()).below;")
-     && code.includes("? (H - foot - y - 34) : (y - secselTopEdge() - 34);")
+     code.includes("const rm = secselRoom(at.point.y, H, foot, secselTopEdge()), below = rm.below;")
+     && code.includes("const beside = rm.beside ? secselBeside(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge()) : '';")
+     && code.includes("const space = (a === 'left' || a === 'right') ? (2 * Math.min(y - t, H - foot - y) - 34)")
+     && code.includes("? (H - foot - y - 34) : (y - t - 34);") && code.includes("const t = secselTopEdge(), a = String((p.options && p.options.anchor) || '');")
      && !code.includes("below = at.point.y < room / 2") && !code.includes(": (y - 34);"));
   let afp = null;
   try { afp = new Function(/function areaFromParam\(s\) \{[\s\S]*?\n    \}/.exec(code)[0] + "\nreturn areaFromParam;")(); } catch (e) {}
