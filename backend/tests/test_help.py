@@ -410,7 +410,9 @@ ok("19 Oct: the guide describes the month picker, the info buttons, the badges a
    "press a year, then a month, to show that month on the map" in text
    and "A small <strong>i</strong> beside a heading opens a short explanation" in src
    and "a small white badge with a double arrow sits on each stretch of road" in text and "(none is shown under 1 a day)" in text   # 9 Nov 2026 (2.1-11b)
-   and "a green <strong>CO₂</strong> badge on each route" in src and 'the labels say "reading…"' in text
+   # NARROWED 10 Nov 2026 (UI critique 18, claude/ui-fix-map-card): the badge carries its unit ("6.8 t CO₂e"), grey explained
+   and "a green badge on each route gives its tonnes of CO₂e in the month (<strong>6.8 t CO₂e</strong>)" in src
+   and "a grey route has nothing in that month, or is not routed yet" in text and 'the labels say "reading…"' in text
    and "Reset filters</strong> appears once a filter is set" in src)
 ok("🔴 ...and it is honest that a planned closure is listed in every month its route carries volume, whatever its dates",
    "whatever the closure's own dates" in text and "the Look-ahead counts it only in the weeks it overlaps" in text)
