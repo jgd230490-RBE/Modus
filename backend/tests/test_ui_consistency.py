@@ -82,5 +82,25 @@ ok("⭐ 12: the pour words are in sentence case, in words a site manager reads",
                    "POUR_BAND": "Mixers in a no-delivery time", "POUR_OVER_PLAN": "Over the month's plan"})
 ok("...no pour word is in capitals", all(not w.isupper() for w in pours.WORDS.values()))
 
+# --- fuel use (John, 10 Nov 2026: "mpg") ----------------------------------------------------------------------------
+import export  # noqa: E402
+
+_et = export._tenant
+try:
+    export._tenant = lambda: {"distance_unit": "mi"}
+    mi = (export._fuel_word(), export._fuel_use(23.6), export._fuel_use(31), export._fuel_use(None), export._fuel_use(0))
+    export._tenant = lambda: {"distance_unit": "km"}
+    km = (export._fuel_word(), export._fuel_use(23.6))
+finally:
+    export._tenant = _et
+ok("⭐ 20 (mpg): the XLSX reads fuel use in mpg (UK gallons) for a miles organisation: 23.6 L/100 km = 12.0 mpg, 31 = 9.1",
+   mi[0] == "mpg" and mi[1] == 12.0 and mi[2] == 9.1, mi)
+ok("...nothing and zero stay as they are (no division by nothing)", mi[3] is None and mi[4] == 0.0, mi)
+ok("...a km organisation keeps L/100 km, the figure unchanged", km == ("L/100 km", 23.6), km)
+ok("...the gallon is the UK one, 4.54609 L", abs(export.L100_MPG - 454.609 / 1.609344) < 1e-12 and abs(export.L100_MPG - 282.481) < 0.001)
+_ex = open(os.path.join(HERE, "..", "export.py"), encoding="utf-8").read()
+ok("...the Fuel sheet's coefficients row says the unit it is in", "rigid / artic empty, {_fuel_word()}" in _ex
+   and "_fuel_use((cost.get(\"fair\") or {}).get(\"artic_l_per_100km_empty\"))" in _ex)
+
 print(f"test_ui_consistency.py: {passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

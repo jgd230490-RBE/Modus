@@ -138,6 +138,28 @@ def _dist_rate(per_km):
     return v * KM_PER_MI if _du() == "mi" else v
 
 
+# 10 Nov 2026 (John: "mpg"): fuel use reads mpg (UK gallons, 4.54609 L) for a miles tenant and
+# L/100 km for a km one; stored and summed as L/100 km. mpg = L100_MPG / (L/100 km), and back.
+L100_MPG = 454.609 / KM_PER_MI
+
+
+def _fuel_use(l_per_100km):
+    """A litres-per-100-km figure as the tenant reads fuel use (mpg for miles), rounded."""
+    if l_per_100km is None:
+        return None
+    try:
+        v = float(l_per_100km)
+    except (TypeError, ValueError):
+        return l_per_100km
+    if v <= 0 or _du() != "mi":
+        return v
+    return round(L100_MPG / v, 1)
+
+
+def _fuel_word():
+    return "mpg" if _du() == "mi" else "L/100 km"
+
+
 def _tkm():
     return "t·mi" if _du() == "mi" else "t·km"
 
@@ -360,8 +382,11 @@ def build_xlsx(page):
             (f"Fair price: vehicle standing {_cur()}/h", (cost.get("fair") or {}).get("vehicle_standing_eur_per_h")),
             (f"Fair price: running {_cur()}/{_du()}", _dist_rate((cost.get("fair") or {}).get("running_eur_per_km"))),
             ("Fair price: margin %", (cost.get("fair") or {}).get("margin_pct")),
-            ("Fair price: L/100 km per tonne · rigid empty · artic empty",
-             " · ".join(str((cost.get("fair") or {}).get(k)) for k in ("l_per_100km_per_tonne", "rigid_l_per_100km_empty", "artic_l_per_100km_empty"))),
+            (f"Fair price: L/100 {'miles' if _du() == 'mi' else 'km'} per tonne · rigid / artic empty, {_fuel_word()}",
+             " · ".join(str(x) for x in (
+                 (lambda r: round(r, 3) if isinstance(r, float) else r)(_dist_rate((cost.get("fair") or {}).get("l_per_100km_per_tonne"))),
+                 _fuel_use((cost.get("fair") or {}).get("rigid_l_per_100km_empty")),
+                 _fuel_use((cost.get("fair") or {}).get("artic_l_per_100km_empty"))))),
             ("Fair price: winter months / uplift % / thaw months",
              f"{(cost.get('fair') or {}).get('winter_months')} / {(cost.get('fair') or {}).get('winter_consumption_uplift_pct')} / {(cost.get('fair') or {}).get('thaw_months')}")), 1):
         ws_f.cell(row=i, column=1, value=k).font = Font(bold=True)

@@ -147,9 +147,10 @@ try {
     'const TENANT = { distance_unit: "mi", symbol: "£" }; const CUR = () => TENANT.symbol;',
     'const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];',
     pick(/const KM_PER_MI = [^\n]*/), pick(/const DU = [^\n]*/), pick(/const dist = [^\n]*/), pick(/const distRate = [^\n]*/), pick(/const distInRate = [^\n]*/),
+    pick(/const L100_MPG = [^\n]*/), pick(/const fuelUse = [^\n]*/), pick(/const FUEL_WORD = [^\n]*/),
     pick(/const grp = \(n, d\)[^\n]*\n[^\n]*/), pick(/const eurFmt = [^\n]*/), pick(/const monthLabelAbs = [^\n]*/), pick(/const monthAxis = [^\n]*/),
     pick(/const cfgWhen = [^\n]*/),
-    "module.exports = { TENANT, grp, eurFmt, monthLabelAbs, monthAxis, cfgWhen, distRate, distInRate };"].join("\n");
+    "module.exports = { TENANT, grp, eurFmt, monthLabelAbs, monthAxis, cfgWhen, distRate, distInRate, fuelUse, FUEL_WORD };"].join("\n");
   const m = { exports: {} }; new Function("module", ts.transpile(snippet))(m); F = m.exports;
 } catch (e) { fail.push("formatters did not load: " + e.message); }
 if (F) {
@@ -160,7 +161,21 @@ if (F) {
      F.cfgWhen("2026-11-10 14:05:00") === "10 Nov 2026, 14:05" && F.cfgWhen("2026-06-09 14:30:00") === "9 Jun 2026, 15:30", F.cfgWhen("2026-11-10 14:05:00") + " | " + F.cfgWhen("2026-06-09 14:30:00"));
   ok("...a rate per km shows per mile and a typed per-mile rate goes back to per km: 1 kg a km = 1.609344 kg a mile, and back",
      Math.abs(F.distRate(1) - 1.609344) < 1e-9 && Math.abs(F.distInRate(1.609344) - 1) < 1e-9 && Math.abs(F.distInRate(F.distRate(0.99773)) - 0.99773) < 1e-12);
+  // 10 Nov 2026 (John: "mpg"): fuel use reads mpg in UK gallons for a miles organisation, L/100 km for a km one
+  ok("⭐ 20 (mpg): a miles organisation reads fuel use in mpg, UK gallons: 23.6 L/100 km = 12.0 mpg, 31 = 9.1, 34 laden = 8.3; and a typed mpg goes back to the same L/100 km",
+     F.FUEL_WORD() === "mpg" && F.fuelUse(23.6).toFixed(1) === "12.0" && F.fuelUse(31).toFixed(1) === "9.1" && F.fuelUse(34).toFixed(1) === "8.3"
+     && Math.abs(F.fuelUse(F.fuelUse(23.6)) - 23.6) < 1e-9 && Math.abs(F.fuelUse(10) - 454.609 / 1.609344 / 10) < 1e-12, F.fuelUse(23.6));
+  ok("...no division by nothing: empty, zero and text stay as they are",
+     F.fuelUse(null) === null && F.fuelUse("") === "" && F.fuelUse(0) === 0 && F.fuelUse("x") === "x");
+  F.TENANT.distance_unit = "km";
+  ok("...a km organisation keeps L/100 km, the figure unchanged", F.FUEL_WORD() === "L/100 km" && F.fuelUse(23.6) === 23.6);
+  F.TENANT.distance_unit = "mi";
 }
+ok("...Config's rigid and artic empty fields are typed as fuel use (mpg for miles, stored L/100 km); the summary line and the artic hint follow",
+   (code.match(/<UnitNum kind="fuel" /g) || []).length === 2 && code.includes("Rigid, empty, {FUEL_WORD()}") && code.includes("Artic, empty, {FUEL_WORD()}")
+   && code.includes('kind === "fuel" ? fuelUse : distRate') && code.includes('kind === "fuel" ? fuelUse : distInRate')
+   && code.includes("{FUEL_WORD()} empty ·") && !code.includes("L/100 km empty ·") && code.includes("mpg laden with 26 t")
+   && code.includes("an artic with 26 t: ${"));
 ok("...chart axes use the short month, pickers and headings the full one",
    code.includes("labels.push(monthAxis(i, months.start_year));") && code.includes("data.by_month.map(r => monthAxis(cnIdx(r.month, sy), sy))")
    && code.includes("const rangeLabel = D.lo === D.hi ? monthLabelAbs(D.lo, months.start_year)"));

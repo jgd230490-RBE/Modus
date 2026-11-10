@@ -1667,7 +1667,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      && cfg[0].includes('<th scope="col">Data</th>') && !cfg[0].includes("st.credit") && !cfg[0].includes("title={st.error}") && !cfg[0].includes("title={s.error}")
      && cfg[0].includes("Injury collisions reported to the police, five years,")
      && cfg[1].includes("Typically {+(+distRate(0.4)).toFixed(2)}–{+(+distRate(0.95)).toFixed(2)}; the low end is the default") && cfg[1].includes("From the government's 2026 factor")
-     && cfg[1].includes("{+(+distRate(34)).toFixed(1)} laden − {+(+distRate(0.4)).toFixed(2)} × 26 t")   // NARROWED 10 Nov 2026 (wave 2, finding 20): the hints' figures follow the unit (0.4–0.95 / 34 / 0.4 a km)
+     && cfg[1].includes('{DU() === "mi" ? `From ${+(+fuelUse(34)).toFixed(1)} mpg laden with 26 t` : "34 laden − 0.4 × 26 t"}')   // NARROWED 10 Nov 2026 (wave 2, finding 20 + John's "mpg"): the artic hint in the unit (mpg for miles, 34 / 0.4 a km)
  && cfg[1].includes("Cars use about 15 % more at −7 °C; lorries less")
      && cfg[2].includes('const provTitle = prov ? `${FUEL_PROVIDER_WORDS[prov.key] || "weekly price"} — '));
   ok("...and the ban would catch the old words", ["DfT NaPTAN", "Injury collisions from DfT road safety data", "DESNZ weekly road fuel prices (gov.uk)",

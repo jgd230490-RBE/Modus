@@ -1257,6 +1257,11 @@ const SPD = () => (DU() === "mi" ? "mph" : "km/h");
 const dist = (km) => (km == null || km === "" ? km : (DU() === "mi" ? +km / KM_PER_MI : +km));
 const distRate = (perKm) => (perKm == null || perKm === "" ? perKm : (DU() === "mi" ? +perKm * KM_PER_MI : +perKm));
 const distInRate = (perUnit) => (perUnit == null || perUnit === "" ? perUnit : (DU() === "mi" ? +perUnit / KM_PER_MI : +perUnit));
+/* Fuel use (John, 10 Nov 2026: "mpg"): a miles organisation reads miles per UK gallon (4.54609 L), a km one L/100 km.
+   Stored and summed as L/100 km. mpg = L100_MPG / (L/100 km) and back the same way (the sum is its own inverse). */
+const L100_MPG = 454.609 / KM_PER_MI;
+const fuelUse = (l100) => (l100 == null || l100 === "" || isNaN(+l100) || +l100 <= 0 ? l100 : (DU() === "mi" ? L100_MPG / +l100 : +l100));
+const FUEL_WORD = () => (DU() === "mi" ? "mpg" : "L/100 km");
 const speed = (kph) => (kph == null || kph === "" ? kph : (DU() === "mi" ? +kph / KM_PER_MI : +kph));
 const fmtDist = (km, dp) => (km == null ? "—" : (+dist(km)).toFixed(dp == null ? 1 : dp));
 // 10 Nov 2026 (wave 2, finding 20, decision 5): the organisation's unit, set on Config → Planning (tenant.distance_unit);
@@ -1270,7 +1275,8 @@ const { useState, useEffect, useRef, useMemo } = React;
 // 100 km) or in km/h, SHOWN and TYPED in the organisation's unit. It keeps what is typed ("0." stays "0.") and hands back
 // the stored figure; a value changed from outside (Discard, a reload, the unit) is shown again.
 function UnitNum({ value, onValue, kind, dp, ...rest }){
-  const show = kind === "speed" ? speed : distRate, back = kind === "speed" ? ((v) => DU() === "mi" ? +v * KM_PER_MI : +v) : distInRate;
+  const show = kind === "speed" ? speed : kind === "fuel" ? fuelUse : distRate,
+    back = kind === "speed" ? ((v) => DU() === "mi" ? +v * KM_PER_MI : +v) : kind === "fuel" ? fuelUse : distInRate;
   const fmtv = (v) => (v == null || v === "" || isNaN(+v)) ? (v == null ? "" : String(v)) : String(+(+show(v)).toFixed(dp == null ? 4 : dp));
   const [txt, setTxt] = useState(() => fmtv(value));
   const last = useRef(value), unit = useRef(DU());
@@ -9731,17 +9737,17 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
         <label className="block">
           <span className="block text-sm font-medium text-slate-700 mb-1">L/100 {DIST_WORD() === "miles" ? "miles" : "km"} per tonne carried</span>
           <UnitNum className={inp + " mt-1"} inputMode="decimal" dp={3} value={cons.l_per_100km_per_tonne} onValue={n => set(f => { f.consumption = f.consumption || {}; f.consumption.l_per_100km_per_tonne = n; })} />
-          <span className="block text-[13px] text-slate-500 mt-1">Typically {+(+distRate(0.4)).toFixed(2)}–{+(+distRate(0.95)).toFixed(2)}; the low end is the default</span>
+          <span className="block text-[13px] text-slate-500 mt-1">Typically {+(+distRate(0.4)).toFixed(2)}–{+(+distRate(0.95)).toFixed(2)}; the low end is the default{DU() === "mi" && cons.l_per_100km_per_tonne != null && (cons.artic || {}).l_per_100km_empty != null ? ` · an artic with 26 t: ${+(+fuelUse(+cons.artic.l_per_100km_empty + 26 * +cons.l_per_100km_per_tonne)).toFixed(1)} mpg` : ""}</span>
         </label>
         <label className="block">
-          <span className="block text-sm font-medium text-slate-700 mb-1">Rigid, empty L/100 {DIST_WORD() === "miles" ? "miles" : "km"}</span>
-          <UnitNum className={inp + " mt-1"} inputMode="decimal" dp={2} value={(cons.rigid || {}).l_per_100km_empty} onValue={n => set(f => { f.consumption = f.consumption || {}; f.consumption.rigid = f.consumption.rigid || {}; f.consumption.rigid.l_per_100km_empty = n; })} />
+          <span className="block text-sm font-medium text-slate-700 mb-1">Rigid, empty, {FUEL_WORD()}</span>
+          <UnitNum kind="fuel" className={inp + " mt-1"} inputMode="decimal" dp={2} value={(cons.rigid || {}).l_per_100km_empty} onValue={n => set(f => { f.consumption = f.consumption || {}; f.consumption.rigid = f.consumption.rigid || {}; f.consumption.rigid.l_per_100km_empty = n; })} />
           <span className="block text-[13px] text-slate-500 mt-1">From the government's 2026 factor</span>
         </label>
         <label className="block">
-          <span className="block text-sm font-medium text-slate-700 mb-1">Artic, empty L/100 {DIST_WORD() === "miles" ? "miles" : "km"}</span>
-          <UnitNum className={inp + " mt-1"} inputMode="decimal" dp={2} value={(cons.artic || {}).l_per_100km_empty} onValue={n => set(f => { f.consumption = f.consumption || {}; f.consumption.artic = f.consumption.artic || {}; f.consumption.artic.l_per_100km_empty = n; })} />
-          <span className="block text-[13px] text-slate-500 mt-1">{+(+distRate(34)).toFixed(1)} laden − {+(+distRate(0.4)).toFixed(2)} × 26 t</span>
+          <span className="block text-sm font-medium text-slate-700 mb-1">Artic, empty, {FUEL_WORD()}</span>
+          <UnitNum kind="fuel" className={inp + " mt-1"} inputMode="decimal" dp={2} value={(cons.artic || {}).l_per_100km_empty} onValue={n => set(f => { f.consumption = f.consumption || {}; f.consumption.artic = f.consumption.artic || {}; f.consumption.artic.l_per_100km_empty = n; })} />
+          <span className="block text-[13px] text-slate-500 mt-1">{DU() === "mi" ? `From ${+(+fuelUse(34)).toFixed(1)} mpg laden with 26 t` : "34 laden − 0.4 × 26 t"}</span>
         </label>
         <label className="block">
           <span className="block text-sm font-medium text-slate-700 mb-1">Winter consumption uplift %</span>
@@ -9751,7 +9757,7 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
         {monthsBox("winter_months", "Winter months (uplift applies)")}
         {monthsBox("thaw_months", "Thaw months (flag: 8 t road limits may apply)")}
       </div>
-      {summary && <p className="text-[13px] text-slate-400 mt-2">In use now (saved): driver {CUR()}{summary.driver_eur_per_h}/h · standing {CUR()}{summary.vehicle_standing_eur_per_h}/h · running {CUR()}{summary.running_eur_per_km == null ? "—" : (+distRate(summary.running_eur_per_km)).toFixed(3)}/{DU()} · margin {summary.margin_pct} % · {summary.l_per_100km_per_tonne} L/100 km per t · rigid {summary.rigid_l_per_100km_empty} / artic {summary.artic_l_per_100km_empty} L/100 km empty · index {summary.index_eur_per_l == null ? "no diesel price yet, so no fair price" : `${CUR()}${summary.index_eur_per_l}/L`}.</p>}
+      {summary && <p className="text-[13px] text-slate-400 mt-2">In use now (saved): driver {CUR()}{summary.driver_eur_per_h}/h · standing {CUR()}{summary.vehicle_standing_eur_per_h}/h · running {CUR()}{summary.running_eur_per_km == null ? "—" : (+distRate(summary.running_eur_per_km)).toFixed(3)}/{DU()} · margin {summary.margin_pct} % · {summary.l_per_100km_per_tonne == null ? "—" : +(+distRate(summary.l_per_100km_per_tonne)).toFixed(3)} L/100 {DIST_WORD() === "miles" ? "miles" : "km"} per t · rigid {summary.rigid_l_per_100km_empty == null ? "—" : +(+fuelUse(summary.rigid_l_per_100km_empty)).toFixed(DU() === "mi" ? 1 : 2)} / artic {summary.artic_l_per_100km_empty == null ? "—" : +(+fuelUse(summary.artic_l_per_100km_empty)).toFixed(DU() === "mi" ? 1 : 2)} {FUEL_WORD()} empty · index {summary.index_eur_per_l == null ? "no diesel price yet, so no fair price" : `${CUR()}${summary.index_eur_per_l}/L`}.</p>}
     </div>
   );
 }
@@ -13112,7 +13118,7 @@ const simMapStyle = () => (typeof document !== "undefined" && document.documentE
 // 10 Nov 2026 (wave 2, UI critique finding 14, card 14): every staff map opens on the look's basemap (the Simulation's rule);
 // the data pages' map also follows a change of look unless someone picked its basemap by hand. The Route map (the embedded
 // public map page) reads the look itself.
-const lookMapStyle = () => { try { return simMapStyle(); } catch (e) { return "mapbox://styles/mapbox/light-v11"; } };   // a page with no look yet (a server render) opens on Light
+const lookMapStyle = () => { try { return simMapStyle(); } catch (e) { return "mapbox://styles/mapbox/light-v11"; } };   // a page with no look yet (drawn before the app starts) opens on Light
 // the map: its own Mapbox instance (CommitMap's pattern), drawn from the reply and redrawn at each clock minute; `wall` = the
 // big screen (the key stays a box over the map there; on the page it is a row under it)
 function SimMap({ meta, D, store, frame, site, wall }){
