@@ -3430,6 +3430,9 @@ def _route_sheet_diversion_page(c, S, dv, m, cw, W, H, R, B, size):
 
 
 # --------------------------------------------------------------------------- #
+# 10 Nov 2026 (F4): the evidence sheet says once whose distances these are
+SEARCH_WORDS_EVIDENCE = "250 m and 100 m are Wayscope's search distances, not a CLOCS figure."
+
 #  16 Oct 2026 (CLOCS v5 C1) — the ROUTE COLLISION EVIDENCE (collisions.evidence)
 # --------------------------------------------------------------------------- #
 # A4 portrait, as many pages as the places need. Top to bottom: the heading; the route with the collisions within
@@ -3673,7 +3676,7 @@ def collision_headline_rows(S):
         [f"Beside a cycle route ({du})"] + cells(lambda h: h["beside"] if h.get("beside") is not None else "—"),
         ["Places where a cycle route meets it"] + cells(lambda h: str(h["meets"]) if h.get("meets") is not None else "—"),
         ["Left turns · near a cycle route"] + cells(lambda h: f"{h['turns']} · {h['turns_cycle']}" if h.get("turns_cycle") is not None else str(h["turns"])),
-        ["Lorry movements a day planned" + (f" ({S['plan']['month_words']})" if S.get("plan") else "")]
+        ["Lorry visits a day planned" + (f" ({S['plan']['month_words']})" if S.get("plan") else "")]
         + cells(lambda h: (str(int(h["lorries"] + 0.5)) if h["lorries"] >= 1 else f"{h['lorries']:.1f}") if h.get("lorries") is not None
                 else ("—" if h is H[0] else "not planned")),
     ]
@@ -3688,7 +3691,7 @@ CLOCS_MAP = [
     ("Roads, junctions, places with more than one", "5.1a roads, junctions and routes from crash data"),
     ("Vulnerable road users; cycle routes; left turns", "5.6a conflict with vulnerable road users · §2.7"),
     ("Goods vehicles over 3.5 t involved", "§2.4 scope · 4.1a, 5.1a type of vehicle movements"),
-    ("The plan's lorry movements beside the counts", "4.1a, 5.1a volume, frequency and type of movements"),
+    ("The plan's lorry visits beside the counts", "4.1a, 5.1a volume, frequency and type of movements"),
     ("Schools, health, community considerations", "§2.7 · CLP template §2.2, §2.4"),
     ("The last page, for the assessor", "5.6a preliminary route assessment · 5.2c review"),
 ]
@@ -3697,7 +3700,7 @@ CLOCS_NOTE = ("Police-reported collisions only: the project's own incidents (5.1
 # 22 Oct 2026 (v3): the last page — questions drawn from the clauses (no CLOCS document gives a question list or a
 # form); each points at the evidence; the boxes are the assessor's
 ASSESSOR_QUESTIONS = [
-    ("Which vehicles use this route, how many movements a day at the peak, and at what hours?", "page 1; the stretch table · 4.1a, 5.1a, 5.5a iii", "Finding", "Measures / action"),
+    ("Which vehicles use this route, how many lorry visits a day at the peak, and at what hours?", "page 1; the stretch table · 4.1a, 5.1a, 5.5a iii", "Finding", "Measures / action"),
     ("What does the police-reported collision record along the route show: where, how severe, who was hurt?", "the map, the strip, the counts · 4.1a, 5.1a", "Finding", "Measures / action"),
     ("Which roads, junctions or lengths carry a recorded collision history, and what is your finding for each?", "the stretches; the appendix · 5.1a", "Finding", "Measures / action"),
     ("Where could the lorries meet vulnerable road users: cycle routes, crossings, left turns, busy footways?", "cycle routes and left turns; the vulnerable road user rows · 5.6a, §2.7", "Finding", "Measures / action"),
@@ -4071,7 +4074,7 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
             lines.append((_wrap(part, B, 6.4, bw - 10), _wrap(clause, R, 6.2, bw - 10)))
         bh = 18 + sum(len(a) * 7.2 + len(b_) * 7.0 + 3 for a, b_ in lines) + len(_wrap(CLOCS_NOTE, R, 6.0, bw - 10)) * 7 + 4
         c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.9); c.setFillColorRGB(1, 1, 1); c.rect(bx, yy - bh, bw, bh, stroke=1, fill=1)
-        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 8); c.drawString(bx + 5, yy - 11, "For the CLOCS route risk assessment")
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 8); c.drawString(bx + 5, yy - 11, "For the route risk assessment (CLOCS Standard v5, 5.1a)")
         yy -= 17
         for a, b_ in lines:
             for ln in a:
@@ -4310,7 +4313,7 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
         pd = plan["per_day"]
         pdw = str(int(pd + 0.5)) if pd >= 1 else f"{pd:.1f}"
         veh = ", ".join(plan.get("vehicles") or [])
-        lead += (f" {S['route_id']} plans {pdw} lorry movements a day in its busiest month ({plan['month_words']}"
+        lead += (f" {S['route_id']} plans {pdw} lorry visits a day in its busiest month ({plan['month_words']}"
                  + (f", {veh}" if veh else "") + ").")
     elif S.get("plan_error"):
         lead += f" No lorry figures: {S['plan_error']}."
@@ -4321,7 +4324,7 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
              "Killed or seriously injured (KSI)", "A vulnerable road user KSI", "A cyclist hurt (KSI)",
              "A goods vehicle over 3.5 t involved", "Places with more than one (appendix)",
              f"Beside a cycle route ({du}) · places one meets it",
-             "Scheme lorry movements a day here" + (f", all routes, {plan['month_words']}" if plan else ""),
+             "Scheme lorry visits a day here" + (f", all routes, {plan['month_words']}" if plan else ""),
              "Schools · health within 250 m"]
     widths = [5, 24, 22, 13, 16, 13, 13, 13, 18, 17, 17, 0]
     widths[-1] = cw / mm - sum(widths)
@@ -4369,10 +4372,10 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
     y = para("The collision counts and the lorry figures sit side by side; neither is divided by the other. A stretch starts "
              "where the road DfT records for the collisions on it changes, and one road longer than "
              f"{split_words} is split where its recorded speed limits change between 20–40 and 50–70 mph: the boundaries "
-             f"come from the collisions, to the nearest 0.1 {du}, not from a road map. Lorry movements: the Approved lines "
-             "of every route on that stretch in the month named, one movement being one load there and back; two figures "
+             f"come from the collisions, to the nearest 0.1 {du}, not from a road map. Lorry visits: the Approved lines "
+             "of every route on that stretch in the month named, one visit being one load there and back; two figures "
              "are the lowest and the highest along the stretch. A cycle route is beside the route within "
-             f"{cl.CYCLE_BESIDE_M} m and meets it within {cl.CYCLE_MEETS_M} m.", y - 2, 6.8) - 8
+             f"{cl.CYCLE_BESIDE_M} m and meets it within {cl.CYCLE_MEETS_M} m. " + SEARCH_WORDS_EVIDENCE, y - 2, 6.8) - 8
 
     # by time of day — 28 Oct 2026 (0d, John's yes to notes\collision-time-mockup-1028): weekday collisions on each road
     # route by the hour they happened, the same scale side by side; the hours its gates are open shaded, the scheme's
@@ -4693,7 +4696,7 @@ def build_collision_evidence_xlsx(S):
     plan = S.get("plan")
     wt = wb.create_sheet("Stretches")
     if plan:
-        wt.cell(row=1, column=1, value=(f"{S['route_id']} plans {plan['per_day']:.1f} lorry movements a day in its busiest "
+        wt.cell(row=1, column=1, value=(f"{S['route_id']} plans {plan['per_day']:.1f} lorry visits a day in its busiest "
                                         f"month, {plan['month_words']}" + (f" ({', '.join(plan['vehicles'])})" if plan.get("vehicles") else "")
                                         + ". The lorry figures sit beside the collision counts; neither is divided by the other."))
     else:
@@ -4702,8 +4705,8 @@ def build_collision_evidence_xlsx(S):
     sh = ["No", "Stretch", "Road", "Speed limits", f"From ({du} from A)", f"To ({du} from A)", f"Length ({du})",
           f"Collisions on the route ({S['on_route_m']} m)", "Fatal", "Killed or seriously injured (KSI)",
           "A vulnerable road user KSI", "A goods vehicle over 3.5 t involved", "Places with more than one", "Place numbers",
-          "Scheme lorry movements a day, lowest" + (f" ({plan['month_words']})" if plan else ""),
-          "Scheme lorry movements a day, highest" + (f" ({plan['month_words']})" if plan else ""),
+          "Scheme lorry visits a day, lowest" + (f" ({plan['month_words']})" if plan else ""),
+          "Scheme lorry visits a day, highest" + (f" ({plan['month_words']})" if plan else ""),
           "Schools within 250 m", "Health within 250 m"]
     header(wt, sh, row=3)
     wt.column_dimensions["B"].width = 26

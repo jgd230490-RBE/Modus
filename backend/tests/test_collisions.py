@@ -695,7 +695,7 @@ ok("7b: the map draws the collisions ON the route only (C1, C2, C8; not C3, 200 
 ok("7b: the PDF: the strip, the stretch table with the plan beside it, the ring and square explained",
    not _t or ("Along the route, A to B" in _t and "Along the route, stretch by stretch" in _t
               and "ring: a vulnerable road user hurt" in _t and "square: a goods vehicle over 3.5 t involved" in _t
-              and f"R1 plans {int(_loads(5800) / _wd + 0.5)} lorry movements a day in its busiest month (Nov 2026" in _t
+              and f"R1 plans {int(_loads(5800) / _wd + 0.5)} lorry visits a day in its busiest month (Nov 2026" in _t
               and f"{_lo}–{_hi}" in _t and "neither is divided by the other" in _t and "The whole route" in _t), _t[:2400])
 ok("7b: the PDF says what is drawn and what is only counted",
    not _t or ("Drawn: the 3 collisions on this route's road route (within 25 m)" in _t
@@ -810,7 +810,8 @@ ok("7c: the community credit is on the sheet (schools, health, bus stops and cyc
 _pdf3 = export.build_collision_evidence_pdf(E3)
 _t3 = " ".join(pdf_text(_pdf3, "").split()) if shutil.which("pdftotext") else ""
 ok("7c: the PDF: page 1 opens with the routes compared and the CLOCS box",
-   not _t3 or ("This route and its alternatives" in _t3 and "For the CLOCS route risk assessment" in _t3
+   not _t3 or ("This route and its alternatives" in _t3 and "For the route risk assessment (CLOCS Standard v5, 5.1a)" in _t3
+               and "For the CLOCS route risk assessment" not in _t3   # NARROWED 10 Nov 2026 (F12): the clause it serves
                and "5.6a assess and select routes" in _t3 and "the project's own incidents (5.1a) are not in this data" in _t3), _t3[:1500])
 ok("7c: ...the cycle routes and the route's left turns, said as facts with how they are measured",
    not _t3 or ("Cycle routes and the route's left turns" in _t3 and "run beside a cycle route (within 20 m)" in _t3

@@ -33,6 +33,8 @@ USUAL_GREY = "#71717A"
 LIMIT_RED = "#C81E1E"
 CLAUSES = {"limits": "4.3a iv, 5.6a, 5.6d", "community": "4.3a ii · CLP template §2.4", "collisions": "4.1a, 5.1a, 5.6a",
            "cycle": "5.6a · §2.7", "hours": "5.5a iii", "diversions": "5.6d, 5.6f", "assessor": "5.6a, 5.2c"}
+# 10 Nov 2026 (F4): the summary says once whose distance the 250 m is
+SEARCH_WORDS = "250 m is Wayscope's search distance, not a CLOCS figure."
 SUMMARY_ROWS = [
     ("out_back", "Out · back ({du})"),
     ("limits_below", "Weight, height or width limits below this lorry"),
@@ -592,7 +594,11 @@ def page_community(doc, R):
         y = doc.para("The community places have not been fetched yet (Config → Map and bulletin).", px, y, pw, 7.4)
         doc.end_page()
         return
-    y = doc.para(f"As fetched {C['fetched']}. Both directions, every lorry.", px, y, pw, 6.8, GREY) - 3
+    dists = sorted({v for v in near.values() if isinstance(v, (int, float))}, reverse=True)
+    dist_words = " and ".join(f"{v:g} m" for v in dists) or "250 m"
+    y = doc.para(f"As fetched {C['fetched']}. Both directions, every lorry. {dist_words} "
+                 f"{'are' if len(dists) > 1 else 'is'} Wayscope's search distance{'s' if len(dists) > 1 else ''}, "
+                 "not a CLOCS figure.", px, y, pw, 6.8, GREY) - 3
     # the counts, two columns
     kinds = list(C["counts"])
     half = (len(kinds) + 1) // 2
@@ -1077,7 +1083,8 @@ def page_first(doc, pages):
         if y2 < doc.bottom() + 60 and start + per < len(routes):
             doc.end_page(); doc.landscape_page([]); y2 = doc.header(None, "Route analysis", None, cont=True); rx, rw = m, doc.cw
     doc.para("Counts side by side; nothing is divided by anything else and no route is ranked. \"—\": not in this file "
-             "or none.", rx, y2, rw, 6.6, GREY)
+             "or none." + (" " + SEARCH_WORDS if any(R["summary"].get("schools_health") is not None for R in routes) else ""),
+             rx, y2, rw, 6.6, GREY)
     doc.end_page()
 
 
