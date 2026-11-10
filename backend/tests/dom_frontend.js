@@ -2713,15 +2713,16 @@ async function rowsDom(){
        names.length === 3 && names.every(b => b.tagName === "BUTTON" && b.type === "button" && b.closest("tr") && b.closest("td") === b.closest("tr").firstElementChild));
     ok("UI FIX 9 LOCATIONS: each button is named 'Edit <the location>' and shows the name itself (the label holds the visible words, 2.5.3)",
        names.map(b => b.getAttribute("aria-label") + "|" + b.textContent).join(";") === "Edit Kilby Ridge Quarry|Kilby Ridge Quarry;Edit Northfield Quarry|Northfield Quarry;Edit Brook Pit|Brook Pit");
-    ok("UI FIX 9 LOCATIONS: the grey code stays outside the button, and no <tr> is a tab stop (the button is the path, not the row)",
-       names.every(b => !/L00/.test(b.textContent) && /L00/.test(b.parentElement.textContent)) && !L.el.querySelector("tr[tabindex]"));
+    // 10 Nov 2026 (UI critique 23): the grey code beside the name is gone (a person never reads an id)
+    ok("UI FIX 9 LOCATIONS: no place's code is printed beside its name, and no <tr> is a tab stop (the button is the path, not the row)",
+       names.every(b => !/L00/.test(b.textContent) && !/L00/.test(b.parentElement.textContent)) && !L.el.querySelector("tr[tabindex]"));
     ok("UI FIX 9 LOCATIONS: nothing is open before a press (no editor heading, no aria-current)",
        !L.el.querySelector(".ed-head") && !L.el.querySelector('[aria-current="true"]'));
     await press(names[1]);
     const head = L.el.querySelector(".ed-head");
-    ok("⭐ UI FIX 9 LOCATIONS: pressing Northfield Quarry's button opens ITS editor ('Editing L002', the Name box reads Northfield Quarry)",
-       !!head && head.textContent === "Editing L002" && [...L.el.querySelectorAll("input")].some(i => i.value === "Northfield Quarry"));
-    ok("⭐ UI FIX 9 LOCATIONS: …and the keyboard focus moves to that heading (tabindex -1), so a screen reader says 'Editing L002' and Tab goes on to Name",
+    ok("⭐ UI FIX 9 LOCATIONS: pressing Northfield Quarry's button opens ITS editor ('Editing Northfield Quarry', the Name box reads Northfield Quarry)",
+       !!head && head.textContent === "Editing Northfield Quarry" && [...L.el.querySelectorAll("input")].some(i => i.value === "Northfield Quarry"));
+    ok("⭐ UI FIX 9 LOCATIONS: …and the keyboard focus moves to that heading (tabindex -1), so a screen reader says 'Editing Northfield Quarry' and Tab goes on to Name",
        active() === head && head.tabIndex === -1);
     ok("UI FIX 9 LOCATIONS: the open location's button carries aria-current=true, the others none",
        names[1].getAttribute("aria-current") === "true" && !names[0].hasAttribute("aria-current") && !names[2].hasAttribute("aria-current"));
@@ -2734,8 +2735,8 @@ async function rowsDom(){
     await act(async () => { names[2].closest("tr").querySelector("td:nth-child(2)").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
     for (let i = 0; i < 4; i++) await tick();
     const head3 = L.el.querySelector(".ed-head");
-    ok("UI FIX 9 LOCATIONS: a mouse click elsewhere in a row still opens it (Editing L003), as before",
-       !!head3 && head3.textContent === "Editing L003");
+    ok("UI FIX 9 LOCATIONS: a mouse click elsewhere in a row still opens it (Editing <its name>), as before",
+       !!head3 && head3.textContent === "Editing " + names[2].textContent);
     ok("UI FIX 9 LOCATIONS: …and leaves the focus where it was (only a name button moves it)", active() === outside);
     outside.remove();
     const gate = [...L.el.querySelectorAll("button")].find(b => b.textContent.trim() === "+ Add gate");
@@ -2750,8 +2751,8 @@ async function rowsDom(){
        zb.length === 2 && zb.every(b => b.type === "button") && zb.map(b => b.getAttribute("aria-label") + "|" + b.textContent).join(";") === "Edit Langton haul road|Langton haul road;Edit Burrough village 7.5 t limit|Burrough village 7.5 t limit");
     await press(zb[1]);
     const zh = Z.el.querySelector(".ed-head");
-    ok("⭐ UI FIX 9 ZONES: pressing it opens that zone's editor and the focus lands on its heading ('Editing Z004')",
-       !!zh && zh.textContent === "Editing Z004" && active() === zh && zh.tabIndex === -1 && zb[1].getAttribute("aria-current") === "true");
+    ok("⭐ UI FIX 9 ZONES: pressing it opens that zone's editor and the focus lands on its heading ('Editing Burrough village 7.5 t limit')",
+       !!zh && zh.textContent === "Editing Burrough village 7.5 t limit" && active() === zh && zh.tabIndex === -1 && zb[1].getAttribute("aria-current") === "true");
     const zc = [...Z.el.querySelectorAll("button")].find(b => b.textContent.trim() === "Cancel");
     await press(zc);
     ok("⭐ UI FIX 9 ZONES: Cancel puts the focus back on that zone's name", active() === Z.el.querySelector('button[data-zone-open="Z004"]'));
