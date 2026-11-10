@@ -10,7 +10,8 @@ What is asserted, each against the text before (every check fails on it):
       "i" titles and the user guide), the collision evidence sheet and its XLSX; the quoted clause "5.1a type of vehicle
       movements" stays;
   F9  the technical guide's T9 heading has no clause label, its anchor stays;
-  F12 the evidence box is titled "For the route risk assessment (CLOCS Standard v5, 5.1a)".
+  F12 the evidence box is titled "For the route risk assessment (CLOCS Standard v5, 5.1a)";
+  F8  the user and technical guides say "check-in" for the gate minutes (the stored field safety_minutes stays).
 F3, F5, F11 and the CLP Word file's F4 lines are asserted on the built file in test_clp_doc / test_clp_records.
 
 WHAT THIS DOES NOT PROVE
@@ -108,6 +109,14 @@ ok("🔴 F9 the technical guide's T9 heading carries no clause label; the anchor
    '<h1 id="t9-collisions">T9 The collision history</h1>' in TG and "(CLOCS v5 C1)</h1>" not in TG)
 ok("🔴 F12 the evidence box: 'For the route risk assessment (CLOCS Standard v5, 5.1a)'",
    '"For the route risk assessment (CLOCS Standard v5, 5.1a)"' in EXP and '"For the CLOCS route risk assessment"' not in EXP)
+
+print("F8 · the guides say check-in (demo-path renames the gate field on the app and map; John's yes, 10 Nov)")
+ok("🔴 F8 neither guide says 'induction' any more", "induction" not in UG.lower() and "induction" not in TG.lower())
+ok("⭐ F8 the gate field is 'Check-in (min)', minutes each lorry spends at the gate on arrival",
+   "<strong>Check-in (min)</strong> (minutes each lorry spends at the gate on arrival)" in UG
+   and UG.count("÷ the check-in minutes a lorry") == 2 and "gate check-in figure" in UG
+   and "Check-in and gate-to-face minutes per gate" in UG and "carries check-in and gate-to-face minutes" in UG
+   and "+ gate check-in + (gate-to-face" in TG and "plus gate check-in, plus either" in TG)
 
 print()
 for f in FAIL:
