@@ -24,7 +24,8 @@
  *     - no JavaScript error, no console error, no same-origin 404 / 5xx; a 401 / 403 only on the signed-out screens  (fail)
  *     - no sideways scroll: the document and the portal's own scroller (<main.overflow-auto>)                      (fail)
  *       inner boxes that scroll sideways without a table in them                                                    (warn)
- *     - a page that says it is fixed (the public map, the big screen) does not scroll at all                       (fail)
+ *     - a page that says it is fixed (the public map, the big screen) does not scroll at all: measured, and also     (fail)
+ *       scrolled (scrollTo / scrollTop) and read back, so a hidden overflow that a script or focus can move fails too
  *     - axe-core: every violation of a rule tagged WCAG 2.0 / 2.1 / 2.2 A or AA, whatever axe's impact             (fail)
  *       best-practice rules (landmarks, heading order, region)                                                      (warn)
  *       what axe could not decide (text over the map or an image: "incomplete")                                     (warn, axe-needs-review)
@@ -287,6 +288,18 @@ function domChecks(arg) {
     mainHScroll: main && main.scrollWidth > main.clientWidth + 1 ? main.scrollWidth - main.clientWidth : 0,
     docVScroll: docScrolls ? doc.scrollHeight - doc.clientHeight : 0,
     h1: document.querySelectorAll("h1").length, offRight: [], innerScroll: [], tinyTargets: [], smallTargets: [], smallText: [], clipped: [], masks: [] };
+  // 9 Nov 2026 (UI critique finding 2): overflow:hidden on body stops a reader's wheel, NOT the page itself — focus, a
+  // scrollIntoView or a script still lifted the public map 80 px (the DEMO bar off screen) while the measure above said 0.
+  // So a fixed page is SCROLLED and read back: already scrolled (pageY), or moved by scrollTo / scrollTop, is a failure.
+  if (arg.fixed) {
+    const se = document.scrollingElement || doc, body = document.body;
+    const y0 = se.scrollTop, x0 = se.scrollLeft, b0 = body.scrollTop;
+    out.pageY = Math.round(Math.max(y0, b0, window.scrollY));
+    window.scrollTo(0, 100000); se.scrollTop = 100000; body.scrollTop = 100000;
+    out.scrolledTo = Math.round(Math.max(window.scrollY, se.scrollTop, body.scrollTop));
+    se.scrollTop = y0; se.scrollLeft = x0; body.scrollTop = b0; window.scrollTo(x0, y0);
+    out.docVScroll = Math.max(out.docVScroll, out.pageY, out.scrolledTo);
+  }
   // what pokes out to the right (the cause of a sideways scroll, when there is one), and what extends a fixed page downwards
   if (out.docHScroll || out.mainHScroll) {
     for (const el of document.querySelectorAll("body *")) { const r = el.getBoundingClientRect();
@@ -627,7 +640,7 @@ async function audit(page, store, meta) {
     if (want) checks.push({ id: "page-is", ok: dom.signedIn && (dom.pageTitle === want || deskCard), detail: { header: dom.pageTitle, deskOnly: dom.deskOnly, signedIn: dom.signedIn } });
     else checks.push({ id: "page-is", ok: dom.signedIn, detail: { signedIn: dom.signedIn } });
   }
-  if (fixed) checks.push({ id: "no-page-scroll", ok: !dom.docVScroll, detail: dom.docVScroll ? { by: dom.docVScroll, offBottom: dom.offBottom } : null });
+  if (fixed) checks.push({ id: "no-page-scroll", ok: !dom.docVScroll, detail: dom.docVScroll ? { by: dom.docVScroll, pageY: dom.pageY, scrolledTo: dom.scrolledTo, offBottom: dom.offBottom } : null });
   if (meta.mapState) checks.push({ id: "map-loaded", ok: meta.mapState === "loaded", detail: meta.mapState });
   // the guide stops (meta.guide, 17 Oct 2026 — findings #32 and #33): what the stop is FOR must be on the page, else it fails —
   // the map's tour strip ("map": map-page+guide) with its dots at a desk and NONE below 768 px (decision 8, 18 Oct 2026: the
