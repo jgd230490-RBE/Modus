@@ -483,7 +483,11 @@ if (loaded) {
     ok("...and the diesel index the model priced at, with the winter note", mOut.includes("€" + (+pv.index_eur_per_l).toFixed(3) + " per litre") && mOut.includes("winter months"));
     ok("...nothing renders as undefined or NaN", !/undefined|NaN/.test(mOut));
     const mNone = render("the matrix renders with NO preview (nothing typed)", h(Matrix, { meta: mMeta, who: "t", editTarget: null, vehLang: "en", access: planner, initialCost: null }));
-    ok("...and says 'type a quantity to see the price' with fair — and 'rate not set'", mNone.includes("type a quantity to see the price") && mNone.includes("rate not set"));
+    // NARROWED 10 Nov 2026 (wave 3, finding 16): with nothing typed the strip is ONE line, not six zeros and two dashes; the
+    // "type a quantity to see the price" words stay for a typed form whose price has not come back yet
+    ok("...and says 'type a quantity to see the price' with fair — and 'rate not set'",
+      mNone.includes('data-strip-empty="1"') && /Type a month(&#x27;|')s quantity: the loads, lorries and price show here\./.test(mNone)
+      && !mNone.includes("rate not set") && !mNone.includes('data-cost-strip="1"'));
     const mUnb = render("the matrix renders an UNBAKED preview", h(Matrix, { meta: mMeta, who: "t", editTarget: null, vehLang: "en", access: planner,
       initialCost: { ...pv, baked: false, fair_reason: "not baked", cells: [], totals: { ...pv.totals, fair: { eur: null, per_t: null, per_trip: null, per_km: null } } } }));
     // 13 Oct 2026 (W3, narrowed): plain words

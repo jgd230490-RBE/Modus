@@ -425,8 +425,9 @@ ok("⭐ trips-per-vehicle-per-day comes from the route's baked cycle, the same s
 ok("⭐ vehicles needed = movements ÷ trips-per-vehicle, rounded UP",
   /Math\.ceil\(movesPerDay \/ tripsPerVehicleDay\)/.test(code));
 // 13 Oct 2026 (W3, narrowed): "not baked" reads "not routed"
+// NARROWED 10 Nov 2026 (wave 3, finding 16): "not routed" only once the route's read has said so; "—" while it is unknown
 ok("⭐ an unbaked route reads 'not routed', never a fleet size",
-  code.includes('"not routed" : String(fleetOf(') && code.includes("not routed yet for") && !code.includes('"not baked" : String(fleetOf('));
+  code.includes('(notRouted ? "not routed" : "—") : String(fleetOf(') && code.includes("not routed yet for") && !code.includes('"not baked" : String(fleetOf('));
 ok("the dashboard's fleet column is the server's model (costlines.vehicles), read not recomputed", _dbBody.includes("r.vehicles") && !code.includes("Math.ceil(peakPerDay / a.capacityPerDay)"));
 // NARROWED 29 Oct 2026 (3b-2): m³ of concrete (Reinforcement) also reads "m³"
 ok("...and avg / peak material in the CHOSEN unit",
@@ -3959,7 +3960,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const _cat = code.slice(code.indexOf("function CatChips("), code.indexOf("\n}\n", code.indexOf("function CatChips(")));
   ok("🔴 captions #3 (decision 1): ONE rule maps text-slate-400 to --muted outside the dark look, weighed with :where() so hover:text-slate-700 still wins; the dark remap keeps its line; a second rule steps the greys on a selected row (.bg-blue-50) to slate-600",
      html.includes('html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}')
-     && html.includes('html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-500{color:#475569}')
+     // NARROWED 10 Nov 2026 (wave 3, finding 5): + the Account's amber short-row wash (rgba(217,119,6,.06))
+     && html.includes('html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-500{color:#475569}')
      && (html.match(/\.text-slate-400\{/g) || []).length === 2 && html.includes('html[data-theme="dark"] .text-slate-400{color:#9AA1AB}')
      // NARROWED 22 Oct 2026 (UI fix 7): fewer captions on the Data pages (the Diagnostics card and long hints went)
      && code.includes("text-slate-400 hover:text-slate-700") && (code.match(/\btext-slate-400\b/g) || []).length >= 100);

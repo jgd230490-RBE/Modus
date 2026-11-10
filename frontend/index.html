@@ -8499,6 +8499,12 @@ function vehOption(v, suggested, current){
 }
 
 // ================================================================= Matrix
+// 10 Nov 2026 (UI critique finding 16): the vehicle a route is worked out for (route.distance_profile), when the list
+// allows it and the tenant shows it; else "" (the caller then takes the material's first vehicle)
+function routeVehicle(route, allowed){
+  const rv = route && route.distance_profile;
+  return rv && (allowed || []).includes(rv) && !HIDDEN_VEHICLES.includes(rv) ? rv : "";
+}
 function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTarget }){
   const { routes, materials, vehicles, units, months, factors,
           material_categories = {}, seasonal_restrictions = [],
@@ -8578,6 +8584,9 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   const iptLocked = !!(access && access.ipt_locked);
   const iptRequired = !!(access && access.ipt_required && !access.demo);
   const [ipt, setIpt] = useState((access && access.ipt) || "");
+  // 10 Nov 2026 (UI critique finding 16): a planner's Team opens on the ROUTE's team ("The route's team" under it) and
+  // follows the route until a team is picked by hand; still required, still changeable, never silently the first
+  const [iptByHand, setIptByHand] = useState(false);
   const [siblings, setSiblings] = useState([]);   // other lines already on this route
   const [caution, setCaution] = useState(null);   // returned by the save
 
@@ -8659,11 +8668,26 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
     if(c && materials.includes(c)) setMaterial(c);
   }, [routeId]);
 
-  // category change -> sensible default unit + primary vehicle
+  // category change -> sensible default unit + primary vehicle (10 Nov 2026, finding 16: the route's routed vehicle
+  // first, when this material may go in it)
   useEffect(() => {
     setUnit(u => (u === "m3c" && fromConc) ? u : ((u === "m3" && !volumeOk) || u === "m3c" || (catUnits && !catUnits.includes(u))) ? (cat.default_unit || (catUnits || ["t"])[0]) : u);
-    setVehicle(v => suggestedVehicles.includes(v) ? v : (firstShown(suggestedVehicles) || v));
+    setVehicle(v => suggestedVehicles.includes(v) ? v : (routeVehicle(route, suggestedVehicles) || firstShown(suggestedVehicles) || v));
   }, [material]);
+
+  // 10 Nov 2026 (UI critique finding 16): a route opens on the vehicle it is worked out for (route.distance_profile) when
+  // the route's material may go in it, so the strip does not say "not routed" for a vehicle nobody chose; otherwise the
+  // material's first vehicle as before. A saved line still opens on its own vehicle (the load below runs after this).
+  // The team follows the route's too, until picked by hand.
+  useEffect(() => {
+    if(!route) return;
+    const raw = (route.material_guess || "").trim();
+    const m = materials.includes(raw) ? raw : (GUESS_TO_CAT[raw.toLowerCase()] && materials.includes(GUESS_TO_CAT[raw.toLowerCase()]) ? GUESS_TO_CAT[raw.toLowerCase()] : material);
+    const c2 = material_categories[m] || {};
+    const rv = routeVehicle(route, (c2.vehicles && c2.vehicles.length) ? c2.vehicles : vehicles);
+    if(rv) setVehicle(rv);
+    if(!iptLocked && !iptByHand && route.ipt && ((access && access.ipts) || Object.keys(TEAM_LABELS)).includes(route.ipt)) setIpt(route.ipt);
+  }, [routeId]);
 
   // Material categories the chosen discipline actually moves. Advisory, not enforced --
   // the discipline-to-category join is many-to-many and deliberately permissive, and a
@@ -8827,9 +8851,11 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
   // three surfaces cannot disagree. null = not baked for this vehicle, and the strip
   // then says "not baked" rather than a fleet size.
   const [tripsPerVehicleDay, setTpv] = useState(null);
+  // 10 Nov 2026 (finding 16): "not routed" only once the read has said so — never while it is on its way, nor when it failed
+  const [tpvKnown, setTpvKnown] = useState(false);
   useEffect(() => {
     let live = true;
-    setTpv(null);
+    setTpv(null); setTpvKnown(false);
     if(!routeId || !vehicle) return;
     fetch(`${API}/routes/${encodeURIComponent(routeId)}/analysis?profile=${encodeURIComponent(vehicle)}`)
       .then(r => r.ok ? r.json() : null)
@@ -8837,11 +8863,15 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
         if(!live || !j) return;
         const row = (j.rows || []).find(x => x.alt_index === 0 && x.profile === vehicle);
         setTpv(row && row.trips_per_day > 0 ? row.trips_per_day : null);
+        setTpvKnown(true);
       }).catch(() => {});
     return () => { live = false; };
   }, [routeId, vehicle]);
   // vehicles needed = movements/day ÷ movements one vehicle can make, rounded UP
   const fleetOf = (movesPerDay) => (tripsPerVehicleDay > 0 ? Math.ceil(movesPerDay / tripsPerVehicleDay) : null);
+  const notRouted = tpvKnown && !(tripsPerVehicleDay > 0);
+  // 10 Nov 2026 (finding 16): until a month is typed the figures strip is one line, not six zeros
+  const typedAny = inRange.some(([, q]) => +q > 0) || !!initialCost;
 
   const save = () => {
     if(!routeId){ setMsg({ ok: false, text: "Pick an origin and destination that map to a route first." }); return; }
@@ -8936,12 +8966,15 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
                 {teamName(access.ipt)} <span className="text-slate-400 font-normal">· your {TEAM().toLowerCase()}</span>
               </div>
             ) : (
-              <select value={ipt} onChange={e => setIpt(e.target.value)} className={selCls}>
+              <>
+              <select value={ipt} onChange={e => { setIpt(e.target.value); setIptByHand(true); }} className={selCls}>
                 <option value="">— pick a {TEAM().toLowerCase()} —</option>
                 {((access && access.ipts) || Object.keys(TEAM_LABELS)).map(i => (
                   <option key={i} value={i}>{teamName(i)}</option>
                 ))}
               </select>
+              {route && route.ipt && ipt === route.ipt && <span className="block mt-1 text-[13px] text-slate-500" data-team-hint="1">The route's {TEAM().toLowerCase()}</span>}
+              </>
             )}
           </Field>
           <Field label="Discipline">
@@ -9016,6 +9049,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
                 </optgroup>
               ) : vehicles.filter(v => vehShown(v, vehicle)).map(v => vehOption(v, suggestedVehicles, vehicle))}
             </select>
+            {route && route.distance_profile === vehicle && <span className="block mt-1 text-[13px] text-slate-500" data-veh-hint="1">The vehicle the route is worked out for</span>}
           </Field>
           <Field label="Input unit">
             <select value={unit} onChange={e => setUnit(e.target.value)} className={selCls}>
@@ -9085,7 +9119,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
                       <label key={mn} className="block">
                         <span className="block text-sm font-medium text-slate-700 mb-1">{mn}</span>
                         <input type="number" min="0" inputMode="decimal"
-                          value={vals[mi] ?? ""} onChange={e => setMonth(mi, e.target.value)} placeholder="0"
+                          value={vals[mi] ?? ""} onChange={e => setMonth(mi, e.target.value)}
                           className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
                         {/* the model's fair € for this cell, from the preview read — never computed here */}
                         {costCell[mi] && costCell[mi].fair && costCell[mi].fair.eur != null && (
@@ -9115,6 +9149,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
             range with three months filled in must not report a twelfth of the traffic.
             Peak = the single busiest month ÷ working days; that is what sizes a fleet
             and a site gate, and a range total hides it. */}
+        {!typedAny ? <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600" data-strip-empty="1">Type a month's quantity: the loads, lorries and price show here.</div> :
         <div className="rounded-lg border border-slate-200 overflow-hidden text-sm">
           <div className="bg-slate-50 p-4 flex flex-wrap gap-x-8 gap-y-2 border-b border-slate-200">
             <Stat label={`${fromYear === toYear ? "Year" : "Range"} total · ${rangeLabel} (${conc ? "m³ of concrete" : unit === "m3" ? "m³" : unit})`}
@@ -9135,8 +9170,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
             {[
               ["Avg movements / day",  fmt(perDay.avgTrips, "vehicles")],
               ["Peak movements / day", fmt(perDay.peakTrips, "vehicles")],
-              ["Vehicles needed (avg)",  fleetOf(perDay.avgTrips) == null ? "not routed" : String(fleetOf(perDay.avgTrips))],
-              ["Vehicles needed (peak)", fleetOf(perDay.peakTrips) == null ? "not routed" : String(fleetOf(perDay.peakTrips))],
+              ["Vehicles needed (avg)",  fleetOf(perDay.avgTrips) == null ? (notRouted ? "not routed" : "—") : String(fleetOf(perDay.avgTrips))],
+              ["Vehicles needed (peak)", fleetOf(perDay.peakTrips) == null ? (notRouted ? "not routed" : "—") : String(fleetOf(perDay.peakTrips))],
               [`Avg ${unit === "m3" || conc ? "m³" : unit === "t" ? "t" : "loads"} / day`,  fmt(perDay.avgQty, conc ? "m3" : unit)],
               [`Peak ${unit === "m3" || conc ? "m³" : unit === "t" ? "t" : "loads"} / day`, fmt(perDay.peakQty, conc ? "m3" : unit)],
             ].map(([label, value]) => (
@@ -9185,10 +9220,10 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
             {ct && ctOk(ct) && ct.status.invalid && <div className="w-full ct-note">{ct.status.invalid}</div>}
           </div>
           {/* 27 Oct 2026 (the final UI pass, card 4): the formula is in the user guide §4.1; the screen keeps only the status that stops a figure */}
-          {tripsPerVehicleDay > 0 ? null : <div className="px-3 py-1.5 text-[13px] text-slate-500 bg-white" data-foot="1">
+          {!notRouted ? null : <div className="px-3 py-1.5 text-[13px] text-slate-500 bg-white" data-foot="1">
             Not routed yet for <strong>{vehLabel(vehicle)}</strong>: no vehicles figure until a planner routes it.
           </div>}
-        </div>
+        </div>}
 
         <div className="flex items-center gap-3">
           <button onClick={save} disabled={busy || !routeId}

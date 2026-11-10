@@ -132,5 +132,43 @@ if (F.laMixNote) {
 ok("🔴 6: the old Tonnes cell that printed a concrete row in m³ beside tonne rows is gone (a locked row reads tonnes when it has them)",
    laGrid.includes(") : own && f.tonnes != null ? ("));
 
+// ---------------------------------------------------------------- finding 16 / mockup card 1: Submit opens on the route
+const mx = (() => { const i = code.indexOf("function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTarget }){");
+  const j = code.indexOf("\nfunction ", i + 10); return i >= 0 && j > i ? code.slice(i, j) : ""; })();
+const rvSrc = grab("function routeVehicle(route, allowed){");
+let routeVehicle = null;
+try {
+  const js = ts.transpileModule(rvSrc + "\nmodule.exports = routeVehicle;", { compilerOptions: { target: ts.ScriptTarget.ES2019, module: ts.ModuleKind.CommonJS } }).outputText;
+  const m = { exports: {} }; new Function("module", "exports", "HIDDEN_VEHICLES", js)(m, m.exports, ["Hidden 3-axle"]); routeVehicle = m.exports;
+} catch (e) { fail.push("routeVehicle transpiles and runs  " + e.message); }
+if (routeVehicle) {
+  const r = { route_id: "R013", distance_profile: "Artic Tipper (44t)" };
+  ok("⭐ 16: a route opens on the vehicle it is worked out for when the material may go in it",
+     routeVehicle(r, ["Rigid 8-wheeler (32t)", "Artic Tipper (44t)"]) === "Artic Tipper (44t)");
+  ok("...not when the material may not (the material's first vehicle then, as before), nor a hidden one, nor an unrouted route",
+     routeVehicle(r, ["Truck mixer 8 m³ (32t)"]) === "" && routeVehicle({ distance_profile: "Hidden 3-axle" }, ["Hidden 3-axle"]) === ""
+     && routeVehicle({ route_id: "R1" }, ["Artic Tipper (44t)"]) === "" && routeVehicle(null, []) === "");
+}
+ok("...the Matrix asks for it on a route change and after a material change; a saved line still wins (its load sets the vehicle after)",
+   mx.includes("setVehicle(v => suggestedVehicles.includes(v) ? v : (routeVehicle(route, suggestedVehicles) || firstShown(suggestedVehicles) || v));")
+   && mx.includes("if(rv) setVehicle(rv);") && mx.includes("if(first.vehicle_type) setVehicle(first.vehicle_type);")
+   && mx.indexOf("if(rv) setVehicle(rv);") < mx.indexOf("if(first.vehicle_type) setVehicle(first.vehicle_type);"));
+ok("...and says so under the box: \"The vehicle the route is worked out for\"",
+   mx.includes('{route && route.distance_profile === vehicle && <span className="block mt-1 text-[13px] text-slate-500" data-veh-hint="1">The vehicle the route is worked out for</span>}'));
+ok("⭐ 16: a planner's Team opens on the route's team, follows the route until picked by hand, and says \"The route's team\"; a team login stays locked",
+   mx.includes("if(!iptLocked && !iptByHand && route.ipt && ((access && access.ipts) || Object.keys(TEAM_LABELS)).includes(route.ipt)) setIpt(route.ipt);")
+   && mx.includes("onChange={e => { setIpt(e.target.value); setIptByHand(true); }}")
+   && mx.includes('{route && route.ipt && ipt === route.ipt && <span className="block mt-1 text-[13px] text-slate-500" data-team-hint="1">The route\'s {TEAM().toLowerCase()}</span>}')
+   && mx.includes("<option value=\"\">— pick a {TEAM().toLowerCase()} —</option>") && mx.includes("{teamName(access.ipt)} <span className=\"text-slate-400 font-normal\">· your {TEAM().toLowerCase()}</span>"));
+ok("🔴 16: the month boxes carry no grey \"0\" (it read as typed)",
+   mx.includes('value={vals[mi] ?? ""} onChange={e => setMonth(mi, e.target.value)}\n') && !mx.includes('onChange={e => setMonth(mi, e.target.value)} placeholder="0"'));
+ok("⭐ 16: until a month is typed the strip is one line, not six zeros",
+   mx.includes('{!typedAny ? <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600" data-strip-empty="1">Type a month\'s quantity: the loads, lorries and price show here.</div> :')
+   && mx.includes("const typedAny = inRange.some(([, q]) => +q > 0) || !!initialCost;"));
+ok("⭐ 16: \"not routed\" only once the route's read has said so (never while it is on its way or after it failed)",
+   mx.includes("const notRouted = tpvKnown && !(tripsPerVehicleDay > 0);") && mx.includes("setTpv(null); setTpvKnown(false);")
+   && mx.includes("setTpvKnown(true);") && mx.includes("{!notRouted ? null : <div className=\"px-3 py-1.5 text-[13px] text-slate-500 bg-white\" data-foot=\"1\">")
+   && !mx.includes("{tripsPerVehicleDay > 0 ? null : <div"));
+
 console.log(`ui_fix_lookahead_calm.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  ✗ " + f)); process.exit(1); }
