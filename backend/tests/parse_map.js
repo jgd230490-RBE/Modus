@@ -6157,7 +6157,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      /\.info-i\{ position:relative; flex:none; display:inline-grid; place-items:center; width:18px; height:18px;/.test(html)
      && html.includes(".info-i::after{ content:\"\"; position:absolute; inset:-13px; }")
      // named by aria-label (the UI audit, 19 Oct: a hidden .sr-only span counted as 1 px clipped text on every map stop)
-     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z-]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 15   // NARROWED 31 Oct 2026 (task 4c PR 3): + the pinned pictures. NARROWED 31 Oct 2026 (task 4c PR 4): + the public site layouts. NARROWED 31 Oct 2026 (task 4c PR 1): + site layouts. NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): + Labels, zones, community, collisions, abnormal (staff and public), closures, limits
+     && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z-]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 16   // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): + the traffic limits. NARROWED 31 Oct 2026 (task 4c PR 3): + the pinned pictures. NARROWED 31 Oct 2026 (task 4c PR 4): + the public site layouts. NARROWED 31 Oct 2026 (task 4c PR 1): + site layouts. NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): + Labels, zones, community, collisions, abnormal (staff and public), closures, limits
      && !/class="info-i"[^>]*>[^]*?<span class="sr-only">About/.test(html.slice(0, html.indexOf('id="month-text"'))));
   ok("19 Oct (UI audit): on a phone the folds' summary rows are 44 px tall (By council, What's moving, More layers)",
      /@media \(max-width:767px\)[\s\S]*?\.layers-box > summary\{ min-height:44px; display:flex; align-items:center; flex-wrap:wrap; padding:2px 0; \}/.test(html));
@@ -7566,6 +7566,39 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      html.includes(".filter-grid .route-pick-btn, .route-pick input[type=search], .route-pick-row, .route-pick-foot button{ min-height:44px; }"));
   ok("🔴 ROUTES FILTER: no banned public words in the new control",
      !/\b(secure|real-time|AI|optimi[sz]e|predict|live tracking|truck)\b/i.test(html.slice(html.indexOf('id="filter-routes"') - 200, html.indexOf('id="filter-reset"'))));
+}
+
+// ---- 9 Nov 2026 (v2.1 task 2.1-1, card 4): the public map's traffic limits ----
+{
+  const tl = code.slice(code.indexOf("const TLIM = "), code.indexOf("function toggleTrafficLimits("));
+  ok("TRAFFIC LIMITS: a More layers group with a layer- box (on, in the link) and an i box, hidden until a public limit exists",
+     html.includes('<div class="control-group" id="traffic-limits-group" hidden>')
+     && html.includes('<input type="checkbox" id="layer-traffic-limits" onchange="toggleTrafficLimits(this.checked)" checked> Traffic limits</label>')
+     && html.indexOf('id="traffic-limits-group"') > html.indexOf('id="layers-box"') && tl.includes("if (g) g.hidden = !lims.length;"));
+  ok("TRAFFIC LIMITS: read once from the public read, re-added on style.load through styleReady(), never on idle",
+     code.includes("fetch('/api/public/traffic-limits', { credentials: 'same-origin' })") && code.includes("loadTrafficLimits();")
+     && tl.includes("if (!styleReady()) return;") && code.includes("if (typeof TLIM !== 'undefined' && TLIM.data) ensureTrafficLimitLayers();")
+     && !/once\('idle'/.test(tl));
+  ok("TRAFFIC LIMITS: a dashed edge red / amber / grey, a soft band, a badge from zoom 11 — all under the road names",
+     tl.includes("const TLIM_COL = { over: '#B91C1C', near: '#B45309', ok: '#64748B', none: '#64748B' };")
+     && tl.includes("'line-dasharray': [3, 2]") && tl.includes("'line-opacity': 0.14") && tl.includes("minzoom: 11")
+     && tl.includes("tlimV(r.value, L.limit.value) + ' / ' + tlimN(L.limit.value) + ' a day'") && (tl.match(/\}, labelAnchor\(\)\);/g) || []).length === 4);
+  ok("TRAFFIC LIMITS: follows the month and Play (applyFilters), a limit not in force that month is not drawn, no month = Pick a month",
+     /function applyFilters\(\) \{[\s\S]{0,1200}applyTrafficMonth\(\)/.test(code) && tl.includes("if (m && !r) return;")
+     && tl.includes("when.textContent = 'Pick a month'"));
+  ok("TRAFFIC LIMITS: the popup — name, the month's figure and limit, in and out counted separately, the routes, the scheme's lorries only",
+     tl.includes("<b>Traffic limit · ${escHtml(L.name)}</b>") && tl.includes("in and out counted separately · daily average")
+     && tl.includes("<th style=\"text-align:left\">From → to</th>") && tl.includes("This scheme's lorries only. Approved plan."));
+  {
+    // seen in Chrome 9 Nov: 5.33 against 5 read "5 / 5 a day" on a red edge; a tie in whole numbers keeps one decimal
+    const fn = new Function(code.slice(code.indexOf("const tlimN = "), code.indexOf("function tlimUnit(")) + "; return [tlimV(5.33, 5), tlimV(4.6, 5), tlimV(5, 5), tlimV(212, 200)];");
+    let r = null; try { r = fn(); } catch (e) {}
+    ok("⭐ TRAFFIC LIMITS: a figure that rounds to its limit keeps one decimal (5.3 / 5), else whole", !!r && r[0] === "5.3" && r[1] === "4.6" && r[2] === "5" && r[3] === "212");
+  }
+  ok("TRAFFIC LIMITS: on in Busiest roads and Everything only among the views",
+     code.includes("if (p.key !== 'busiest-roads' && p.key !== 'everything') on.delete('traffic-limits');"));
+  ok("🔴 TRAFFIC LIMITS: no banned public words in the layer's words",
+     !/\b(secure|real-time|AI|optimi[sz]e|predict|live tracking|truck)\b/i.test(tl + html.slice(html.indexOf('id="traffic-limits-group"'), html.indexOf('id="restrictions-group"'))));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

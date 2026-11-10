@@ -1503,5 +1503,17 @@ ok("COUNT (2.1-11b Q2): 'two-way movement' is gone from the user guide", "two-wa
 ok("COUNT (2.1-11b): technical T1 has the rule, counting.convert for 2.1-1 and what keeps vehicles / visits",
    all(w in _tg_cnt for w in ('id="t1-counting"', "<code>planning.count_visit_as</code>", "counting.convert(n, from_unit, to_unit)",
                               "<code>tenant.council_breaks.movements_unit</code>", "Gate arrivals, the Look-ahead and the")))
+# 9 Nov 2026 (v2.1 task 2.1-1): traffic limits in both guides
+ok("TRAFFIC LIMIT: user guide 9.3 says how to draw one, what counts, that it never moves a route, and where it shows",
+   all(w in src for w in ('id="ug-traffic-limit"', "<strong>Line along the road</strong>", "<strong>Busiest day</strong>",
+                          "within 25 m for at least half its length", "Wayscope flags it; it never moves a route.",
+                          "<strong>Traffic limits on local roads</strong>")))
+ok("TRAFFIC LIMIT: the rail table, the Dashboard fold, the public map layer and the Simulation line",
+   "<tr><td>TRAFFIC LIMIT</td>" in src and "<tr><td>TRAFFIC NEAR</td>" in src and "a seventh, <strong>Traffic limits</strong>" in src
+   and "<li><strong>Traffic limits</strong> — under More layers" in src and 'id="ug-sim-traffic"' in src)
+_tg_tl = open(TECH, encoding="utf-8").read()
+ok("TRAFFIC LIMIT: technical T1 #t1-traffic-limits has the rule, the thresholds, the reads and what is not built",
+   all(w in _tg_tl for w in ('id="t1-traffic-limits"', "<code>backend/traffic_limits.py</code>", "<code>LINE_NEAR_M</code> = 25 m",
+                             "<code>NEAR_SHARE</code> = 90 %", "<code>GET /api/public/traffic-limits</code>", "Not built:")))
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

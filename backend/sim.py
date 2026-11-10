@@ -1912,8 +1912,20 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         word = (taxonomy._team_word() or "Team").lower()
         notes.append(f"Lines of another {word} are shown by route only: their own figures are theirs.")
     mx, mx_name = mixer_m3(factors)
+    # 9 Nov 2026 (v2.1 task 2.1-1, card 7): the day's whole loads per route against every traffic limit in force on the
+    # days it stands for. On screen only; a limit never moves a lorry. An old database without the columns: none.
+    traffic = []
+    try:
+        import traffic_limits
+        by_route = {}
+        for li, l in enumerate(lines):
+            by_route[l["route_id"]] = by_route.get(l["route_id"], 0) + (res["per_line"][li] or 0)
+        traffic = traffic_limits.sim_day(by_route, [d for d in (span_days or []) if d.weekday() < 5] or (span_days or []))
+    except Exception as e:                       # noqa: BLE001
+        print("⚠️  sim traffic limits:", str(e)[:120])
     return {
         "month": int(month_index), "label": label,
+        "traffic_limits": traffic,
         # 28 Oct 2026 (v2): the scale and what it reads
         "scale": scale, "week": week_block, "date": (chosen.isoformat() if chosen else None),
         "day_choices": day_choices,

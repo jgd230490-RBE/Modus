@@ -833,7 +833,10 @@ def init_zones_db():
         # 28 Oct 2026 (simulation v2): location_id = a road inside a site (also in init_lookahead_db)
         # 8 Nov 2026 (task 2.1-12): a works area made from a site layout's phase remembers the phase and its version
         for col, typ in (("speed_kph", "REAL"), ("haul_mode", "TEXT"), ("location_id", "TEXT"),
-                         ("from_phase_id", "TEXT"), ("from_phase_version", "INTEGER")):
+                         ("from_phase_id", "TEXT"), ("from_phase_version", "INTEGER"),
+                         # 9 Nov 2026 (v2.1 task 2.1-1): a traffic limit (traffic_limits.py)
+                         ("limit_value", "REAL"), ("limit_counts", "TEXT"), ("limit_basis", "TEXT"),
+                         ("limit_public", "INTEGER")):
             try:
                 if IS_PG:
                     cur.execute(f"ALTER TABLE zones ADD COLUMN IF NOT EXISTS {col} {typ}")
@@ -1074,6 +1077,11 @@ def init_lookahead_db():
                                 # 8 Nov 2026 (task 2.1-12): a works area's site layout phase and its version
                                 ("zones", "from_phase_id", "TEXT"),
                                 ("zones", "from_phase_version", "INTEGER"),
+                                # 9 Nov 2026 (v2.1 task 2.1-1): a traffic limit's value, unit, basis and public tick
+                                ("zones", "limit_value", "REAL"),
+                                ("zones", "limit_counts", "TEXT"),
+                                ("zones", "limit_basis", "TEXT"),
+                                ("zones", "limit_public", "INTEGER"),
                                 # 29 Oct 2026 (task 3c, holding areas): the holding area's fields, a site's choice,
                                 # a route's tick, and the mark on every stored line
                                 ("locations", "holding_spaces", "INTEGER"),

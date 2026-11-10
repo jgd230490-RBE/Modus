@@ -36,6 +36,10 @@ be reached — Tark Tee. Nothing here is stored, nothing here refuses a confirm.
     PARENT_CHANGED  the month moved under a set week (Task C's flag, surfaced)
     POUR_*          29 Oct 2026 (task 3a, pours.py): a concrete pour in the week — COLD JOINT and TRANSIT red,
                     MIXERS SHORT, IN A BAND and OVER PLAN amber — on the pour's day only (`day_date`)
+    TRAFFIC_LIMIT   9 Nov 2026 (v2.1 task 2.1-1, traffic_limits.py): a road or an area's limit on lorries a day is
+                    passed by this scheme's lorries — a daily-average limit on the week's month (every line on a
+                    route that passes, no day), a busiest-day limit on each planned day (`day_date`). Red.
+    TRAFFIC_NEAR    the same at 90 % of the limit or more. Amber. Never a block; a limit never re-routes (Q11).
 
 Rules that are the module, not details:
 
@@ -68,7 +72,9 @@ import weeks
 CODES = ("SHORTAGE", "DAYS_NE_WEEK", "STOCKPILE_OVER", "ROUTE_CAP", "GATE_OVER", "IPT_SHARE", "RESTRICTION",
          "LIMIT", "NO_WAY_ROUND", "UNBAKED", "GATE_NEAR", "STOCKPILE_EMPTY", "STOCKPILE_SOON", "PARENT_CHANGED",
          # 29 Oct 2026 (task 3a): the concrete pours' flags (pours.CODES), after the rest
-         "POUR_COLD_JOINT", "POUR_TRANSIT", "POUR_SHORT", "POUR_BAND", "POUR_OVER_PLAN")
+         "POUR_COLD_JOINT", "POUR_TRANSIT", "POUR_SHORT", "POUR_BAND", "POUR_OVER_PLAN",
+         # 9 Nov 2026 (v2.1 task 2.1-1): a traffic limit on a road or an area (traffic_limits.CODES)
+         "TRAFFIC_LIMIT", "TRAFFIC_NEAR")
 
 #: The 98 % band (brief L5): a line "holds" when actual ≥ 98 % of planned.
 HOLD_BAND = 0.98
@@ -547,6 +553,73 @@ def no_way_round(lines):
     return out
 
 
+def traffic_limit(lines, month_index, week_index):
+    """
+    9 Nov 2026 (v2.1 task 2.1-1): TRAFFIC_LIMIT (over, red) / TRAFFIC_NEAR (90 % or more, amber) from every
+    traffic-limit zone in force in the week. Every team's lines (the count is the road's, not a team's).
+      * a daily-average limit: the month's figure (traffic_limits.check on the in-force working days); a line on a
+        route that passes and carries quantity this week is flagged, no day;
+      * a busiest-day limit: each planned day of the week (the lines' day trips, traffic_limits.day_counts); a line
+        with trips that day on a route that passes is flagged on that day (`day_date`).
+    """
+    import traffic_limits as TL
+    zs = TL.limit_zones()
+    if not zs:
+        return []
+    import days as _days
+    ds = [d.isoformat() for d in _days.bucket_dates(month_index, week_index)]
+    ctx = TL.context()
+    out = []
+    by_day = {}
+    for l in lines:
+        for d in l.get("days", []) or []:
+            t = (d.get("derived") or {}).get("trips")
+            if t and d.get("day_date"):
+                e = by_day.setdefault(d["day_date"], {})
+                e[l["route_id"]] = e.get(l["route_id"], 0) + float(t)
+    for z in zs:
+        lim = z["limit"]
+        s_, e_ = z.get("starts_on"), z.get("ends_on")
+        week_in = [d for d in ds if (not s_ or d >= s_) and (not e_ or d <= e_)]
+        if not week_in:
+            continue
+        pas = TL.passing(z["geometry"], drawn=ctx["drawn"], legs=ctx["legs"])
+        if not pas:
+            continue
+        if lim["basis"] == "busiest_day":
+            dc = TL.day_counts(z, {d: by_day.get(d, {}) for d in week_in}, ctx=ctx)
+            for day, v in dc.items():
+                if v["state"] not in ("over", "near"):
+                    continue
+                when = datetime.date.fromisoformat(day).strftime("%a %d %b").replace(" 0", " ")
+                text = TL.flag_text(z, v["state"], v["value"], when)
+                for l in lines:
+                    if l["route_id"] not in v["routes"]:
+                        continue
+                    if not any(d.get("day_date") == day and (d.get("derived") or {}).get("trips")
+                               for d in l.get("days", []) or []):
+                        continue
+                    out.append(_flag(TL.CODES[v["state"]], l, text, label=TL.FLAG_WORDS[v["state"]], zone=z["id"],
+                                     day_date=day, value=v["value"], limit=lim["value"], counts=lim["counts"]))
+            continue
+        m = int(month_index)
+        res = TL.check(z, [m], ctx=ctx).get(m)
+        if not res or res["state"] not in ("over", "near"):
+            continue
+        import bulletin as _bulletin
+        when = _bulletin.month_label(m)
+        text = TL.flag_text(z, res["state"], res["value"], when) + " (a day on average)"
+        rids = {r["route_id"] for r in res.get("routes") or []}
+        for l in lines:
+            if l["route_id"] not in rids:
+                continue
+            if not any((d.get("derived") or {}).get("trips") for d in l.get("days", []) or []):
+                continue
+            out.append(_flag(TL.CODES[res["state"]], l, text, label=TL.FLAG_WORDS[res["state"]], zone=z["id"],
+                             value=res["value"], limit=lim["value"], counts=lim["counts"]))
+    return out
+
+
 # --------------------------------------------------------------------------- #
 #  The rail                                                                    #
 # --------------------------------------------------------------------------- #
@@ -571,6 +644,11 @@ def compute(all_lines, visible_keys, account_rows, month_index, week_index,
     flags += stockpile_over(all_lines, stock)
     flags += stockpile_soon(all_lines, stock)
     flags += no_way_round(all_lines)              # 28 Oct 2026 (task 0c)
+    # 9 Nov 2026 (v2.1 task 2.1-1): traffic limits. An old database without the columns must not take the rail down.
+    try:
+        flags += traffic_limit(all_lines, month_index, week_index)
+    except Exception as e:                       # noqa: BLE001
+        print("⚠️  traffic limit flags:", str(e)[:120])
     # 29 Oct 2026 (task 3a): the week's concrete pours. An old database without the table must not take the rail down.
     try:
         import days as _days

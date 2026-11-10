@@ -3035,6 +3035,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
               the busiest gate from the Gate arrivals reply (no second simulation run here) */}
           <SimDashLine ga={gaShown} month={gaMonth} months={months} onOpen={onOpen} />
           {/* 5 Nov 2026 (group 6, PR 2): the concerns from the public, planners and admins only */}
+          {/* 9 Nov 2026 (v2.1 task 2.1-1, Q9): traffic limits, planners and admins only */}
+          {canApprove && !wall && !phone && <TrafficDash months={months} lo={D.lo} hi={D.hi} sites={sites} sitesLabel={sites.length ? sitesWords(sites, locList) : ""} onOpen={onOpen} />}
           {canApprove && !wall && !phone && <ConcernsDash months={months} lo={D.lo} hi={D.hi} sites={sites} sitesLabel={sites.length ? sitesWords(sites, locList) : ""} tripsM={D.tripsM} pv={countPV(meta)} onOpen={onOpen} />}
           <details className="dash-more">
             <summary>This week and today, with the Look-ahead's map</summary>
@@ -3619,6 +3621,75 @@ function ConcernsDash({ months, lo, hi, sites, sitesLabel, tripsM, pv, onOpen })
   );
 }
 const cnIdx = (ym, startYear) => (parseInt(ym.slice(0, 4), 10) - startYear) * 12 + parseInt(ym.slice(5, 7), 10);
+
+// 9 Nov 2026 (v2.1 task 2.1-1, Q9): "Traffic limits" under Gate arrivals — planners and admins, folded, read on first
+// open; follows the month range and the Sites filter (the limit is unchanged, only the lorries counted)
+const TL_STATE = { over: "Over", near: "Near", ok: "Within" };
+const tlNum = (v) => v == null ? "—" : (Math.round(v * 10) / 10).toLocaleString("en-GB", { maximumFractionDigits: 1 });
+function TrafficDash({ months, lo, hi, sites, sitesLabel, onOpen }){
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(false);
+  const sy = (months && months.start_year) || 2026;
+  const q = `from=${lo}&to=${hi}` + ((sites && sites.length) ? "&sites=" + sites.map(encodeURIComponent).join(",") : "");
+  useEffect(() => {
+    if(!open) return;
+    if(data && data._q === q) return;
+    let live = true;
+    setErr(false);
+    fetch(`${API}/traffic-limits?${q}`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => { if(live) setData({ ...j, _q: q }); })
+      .catch(() => { if(live) setErr(true); });
+    return () => { live = false; };
+  }, [open, q]);
+  const range = lo === hi ? monthLabelAbs(lo, sy) : `${monthLabelAbs(lo, sy)} – ${monthLabelAbs(hi, sy)}`;
+  const scope = [range, sitesLabel || null];
+  const cm = data ? Math.min(hi, Math.max(lo, data.current_month || lo)) : lo;
+  const unitOf = (L) => L.limit.counts === "movements" ? "movements" : "visits";
+  const bar = (L) => {
+    const ms = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+    const v = ms.map(m => { const r = (L.months || {})[String(m)]; return r ? r.value : null; });
+    const col = ms.map(m => { const r = (L.months || {})[String(m)]; const st = r && r.state;
+      return st === "over" ? tok("--red", "#DC2626") : st === "near" ? tok("--gold", "#D97706") : tok("--chart-1", "#E8590C"); });
+    return { type: "bar", data: { labels: ms.map(m => monthLabelAbs(m, sy)),
+      datasets: [{ label: `${unitOf(L)} a day`, data: v, backgroundColor: col, borderWidth: 0 },
+                 { type: "line", label: "limit", data: ms.map(() => L.limit.value), borderColor: tok("--ink", "#1F2024"), borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                 scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } } };
+  };
+  const lims = (data && data.limits) || [];
+  return (
+    <details className="dash-more" data-traffic-dash="1" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>
+      <summary>Traffic limits</summary>
+      <div className="pt-3">
+        <div className="ct-row mb-2"><span className="ct-line">Traffic limits · {range}{sitesLabel ? " · " + sitesLabel : ""}</span>
+          <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "6px 12px" }} onClick={() => onOpen && onOpen("zones")}>Open Zones</button></div>
+        {err && <div className="ct-line" data-traffic-dash-error="1">The traffic limits did not load.</div>}
+        {!data && !err && <div className="ct-line">Loading the traffic limits…</div>}
+        {data && !lims.length && <div className="ct-line" data-traffic-dash-none="1">No traffic limit drawn. Add one on Data → Zones.</div>}
+        {data && lims.length > 0 && <>
+          <div className="overflow-auto mb-3"><table className="ga-table" data-traffic-table="1">
+            <thead><tr><th scope="col">Road</th><th scope="col" className="num">{monthLabelAbs(cm, sy)}, a day</th><th scope="col" className="num">Limit</th><th scope="col">Months over</th></tr></thead>
+            <tbody>{lims.map(L => { const r = (L.months || {})[String(cm)];
+              const st = r ? r.state : null;
+              return <tr key={L.id} data-traffic-row={L.id}>
+                <td>{L.name}</td>
+                <td className="num">{r ? tlNum(r.value) : "—"}{r && st !== "ok" ? <span className="ml-1 font-semibold" style={{ color: st === "over" ? "var(--bad-text)" : "var(--warn-text)" }}>{TL_STATE[st]}</span> : null}</td>
+                <td className="num">{tlNum(L.limit.value)} {unitOf(L)}{L.limit.basis === "busiest_day" ? " (busiest day)" : ""}</td>
+                <td>{(L.months_over || []).length ? (L.months_over || []).map(m => monthLabelAbs(m, sy)).join(", ") : "None"}</td>
+              </tr>; })}</tbody>
+          </table></div>
+          <div className="grid md:grid-cols-2 gap-3">
+            {lims.map(L => <div key={L.id} className="card p-4 chart-card" data-traffic-chart={L.id}>
+              <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">{L.name} <span className="text-slate-500 font-normal">({unitOf(L)} a day · limit {tlNum(L.limit.value)})</span></div>
+              <ChartCanvas config={bar(L)} title={`${L.name} (${unitOf(L)} a day, limit ${tlNum(L.limit.value)})`} scope={scope} />
+            </div>)}
+          </div>
+          <div className="text-xs text-slate-500 mt-2">{data.note} A busiest-day limit shows the daily average here.</div>
+        </>}
+      </div>
+    </details>
+  );
+}
 
 function DashboardStockChart({ meta, weekNow, wall, fill, tick, from, to }){
   const { months } = meta;
@@ -11354,7 +11425,9 @@ const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKP
                      // 22 Oct 2026 (abnormal loads, phase 2): the words of the Abnormal loads block's flags (a load, not a line)
                      NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT",
                      // 28 Oct 2026 (task 0c): a dated zone in force crosses the route this week and it is not diverted
-                     NO_WAY_ROUND: "NO WAY ROUND" };
+                     NO_WAY_ROUND: "NO WAY ROUND",
+                     // 9 Nov 2026 (v2.1 task 2.1-1): a road or an area's limit on lorries a day (Zones, kind Traffic limit)
+                     TRAFFIC_LIMIT: "TRAFFIC LIMIT", TRAFFIC_NEAR: "TRAFFIC NEAR" };
 // H1 (29 Sep 2026): a RESTRICTION flag carries the provider's own word — "TARK TEE" for an
 // Estonian tenant, "ROADWORKS" (National Highways planned closures) for a British one.
 const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);
@@ -11364,21 +11437,25 @@ const LINE_FLAG_LABEL = { UNBAKED: "NOT ROUTED", IPT_SHARE: "SHARE", ROUTE_CAP: 
                   GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",
                   NO_WAY_ROUND: "NO WAY ROUND",
                   // 29 Oct 2026 (task 3a): the concrete pours, on the pour's day (backend pours.WORDS)
-                  POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT", POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN" };
+                  POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT", POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN",
+                  TRAFFIC_LIMIT: "TRAFFIC LIMIT", TRAFFIC_NEAR: "TRAFFIC NEAR" };   // 9 Nov 2026 (2.1-1)
 // 13 Oct 2026 (W6): the Look-ahead row's ONE status. The flags, most serious first (a lorry over a road limit
 // before anything else: decision 1), win over the week's state; with no flag, the week's state. `more` counts the
 // other kinds of flag; every flag's sentence is in the details. (Replaces LineFlags' column of words and the
 // StatusChip column: one status a row.)
 const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1, SHORTAGE: 2, ROUTE_CAP: 3, STOCKPILE_OVER: 4, IPT_SHARE: 5, DAYS_NE_WEEK: 6, PARENT_CHANGED: 7, UNBAKED: 8,
                        GATE_OVER: 3.5, GATE_NEAR: 7.5, STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7,
-                       NO_WAY_ROUND: 0.5, POUR_COLD_JOINT: 0.6, POUR_TRANSIT: 0.7, POUR_SHORT: 8.1, POUR_BAND: 8.2, POUR_OVER_PLAN: 8.3 };   // 28 Oct 2026 (task 0c): through a closed road, after a road limit   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
+                       NO_WAY_ROUND: 0.5, POUR_COLD_JOINT: 0.6, POUR_TRANSIT: 0.7, POUR_SHORT: 8.1, POUR_BAND: 8.2, POUR_OVER_PLAN: 8.3,
+                       TRAFFIC_LIMIT: 3.6, TRAFFIC_NEAR: 8.4 };   // 28 Oct 2026 (task 0c): through a closed road, after a road limit   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
 const laRank = (code) => (code in LA_FLAG_RANK ? LA_FLAG_RANK[code] : 99);
 const laSorted = (flags) => [...(flags || [])].sort((a, b) => laRank(a.code) - laRank(b.code));
 // the rail's colours: NOT ROUTED, a road restriction and a gate near capacity in amber, every other flag red
 const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"
                           || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"
                           // 29 Oct 2026 (task 3a): a pour's warnings; COLD JOINT and TRANSIT stay red
-                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";
+                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"
+                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red
+                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";
 // the details' flag lines: one per kind of flag, most serious first, each distinct sentence once, team ids in
 // the team's words (teamText, as the rail does)
 function laFlagGroups(flags){
@@ -13284,6 +13361,14 @@ const SimScenario = React.memo(function SimScenario({ D, sc, onChange, onReset, 
             {(() => { const g = (D.gates || []).filter(x => x.first_trip_pct != null && x.arrivals > 0).sort((a, b) => b.arrivals - a.arrivals)[0];
               return g ? <div className="ct-note" data-sim-first-trips={g.gate_id}>The plan's first trips: about {g.first_trip_pct} % at {simGateName(g)}, {g.gate_name}.</div> : null; })()}
           </div>
+          {/* 9 Nov 2026 (v2.1 task 2.1-1, card 7): this day's lorries against each traffic limit they pass */}
+          {(D.traffic_limits || []).length > 0 && <div className="sim-traffic" data-sim-traffic={(D.traffic_limits || []).length}>
+            <div className="sim-scn-h">Traffic limits on this day</div>
+            {(D.traffic_limits || []).map(t => <div key={t.id} className="ct-note" data-sim-traffic-row={t.id}>
+              {t.name}: {tlNum(t.value)} {t.counts === "movements" ? "movements" : "visits"}, limit {tlNum(t.limit)}
+              {t.state !== "ok" && <span className="ml-1 font-semibold" style={{ color: t.state === "over" ? "var(--bad-text)" : "var(--warn-text)" }}>{t.state === "over" ? "OVER" : "NEAR"}</span>}
+            </div>)}
+          </div>}
           {/* 29 Oct 2026 (task 3a, card 5): on a Day, the day's planned pours (Plan → Pours), ticked; the what-if below */}
           {D.scale === "day" && <div className="sim-planned" data-sim-planned={(D.planned_pours || []).length}>
             <label className="sim-check"><input type="checkbox" checked={sc.planned !== false} onChange={e => onChange({ ...sc, planned: e.target.checked })} />
@@ -14376,8 +14461,15 @@ const ZONE_KINDS = [
   ["weight_limit", "Weight / height limit"],
   ["works", "Works area"],
   ["haul_road", "Temporary haul road"],
+  // 9 Nov 2026 (v2.1 task 2.1-1): a road or an area's limit on lorries a day. A flag, never a block: it never routes
+  ["traffic_limit", "Traffic limit"],
   ["other", "Other"],
 ];
+const LIMIT_KIND = "traffic_limit";
+// the limit's unit, as the condition was written (traffic_limits.unit_words; Q2: in and out counted separately)
+const LIMIT_UNITS = [["movements", "lorry movements a day, in and out counted separately"], ["visits", "lorry visits a day"]];
+const limitNum = (x) => (Math.round(Number(x) * 10) / 10).toLocaleString("en-GB");
+const limitChip = (lim) => (lim && lim.value != null) ? `Limit ${limitNum(lim.value)} / day` : null;
 // Which of the two ways of making a route use a haul road applies. This is a fact about
 // HERE's map data, not a preference — see the backend's haul.py. Splice is the default
 // because its failure mode (geometry only as good as the drawing) is visible, and via's
@@ -15606,6 +15698,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // 28 Oct 2026 (task 0c): the dated zones' diversions — per zone (the Used by column), per route and dates (the
   // Routes page and the panel after a zone save), and what "Find a way round" would cost now
   const [zoneDiv, setZoneDiv] = useState({});
+  const [limitUse, setLimitUse] = useState({});        // 9 Nov 2026 (2.1-1): {zone id: [route ids passing this month]}
   const [zoneFrom, setZoneFrom] = useState({});    // 8 Nov 2026 (task 2.1-12): {zone id: {location_id, site}}
   const [divPeriods, setDivPeriods] = useState([]);
   const [busyUses, setBusyUses] = useState([]);          // 5 Nov 2026 (task 0d-2): the busy-hours uses (row chip)
@@ -15728,12 +15821,23 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       if(dv){ setDivPeriods(dv.periods || []); setWayRound(dv.way_round || { legs: 0, here_calls: 0, routes: [] }); setBusyUses(dv.busy || []); }
     }).catch(() => {});
   };
+  // 9 Nov 2026 (v2.1 task 2.1-1): each traffic limit's routes this month (the Zones table's Used by), read beside the diversions
+  const loadLimitUse = () => {
+    fetch(`${API}/traffic-limits`).then(r => r.ok ? r.json() : null).then(tl => {
+      if(!tl) return;
+      const cm = String(tl.current_month || "");
+      const u = {};
+      (tl.limits || []).forEach(L => { const m = (L.months || {})[cm]; u[L.id] = m ? (m.routes || []).map(r => r.route_id) : []; });
+      setLimitUse(u);
+    }).catch(() => {});
+  };
 
   const loadNear = () =>
     fetch(`${API}/routes/community-counts`).then(okJSON).then(j => setNearData(j)).catch(e => { console.warn("Wayscope:", e); setNearData(false); });
 
   const fetchStatus = () => {
     loadDiversions();
+    loadLimitUse();
     loadNear();
     return Promise.all([
       fetch(`${API}/routes/status`).then(r => r.json()),
@@ -16108,6 +16212,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const reloadNetwork = async () => {
     const m = mapObj.current;
     try {
+      loadLimitUse();         // 9 Nov 2026 (2.1-1)
       loadDiversions();       // 28 Oct 2026 (task 0c): beside the network, never holding it up
       const [loc, st, sm] = await Promise.all([
         fetch(`${API}/locations/geojson`).then(r => r.json()),
@@ -16905,12 +17010,16 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // The difference is one condition rather than a second drawing tool, which is why the
   // hand-rolled vertex collector was worth keeping: the same clicks mean both things.
   const isHaul = (f) => !!f && f.kind === HAUL_KIND;
-  const minPts = (f) => isHaul(f) ? 2 : 3;
+  // 9 Nov 2026 (2.1-1): a traffic limit is drawn as a line along the road or as an area (its own choice)
+  const isLimit = (f) => !!f && f.kind === LIMIT_KIND;
+  const isLineZone = (f) => isHaul(f) || (isLimit(f) && f.limit_shape === "line");
+  const minPts = (f) => isLineZone(f) ? 2 : 3;
 
   const blankZone = () => ({
     id: null, name: "", kind: "closure", affects_routing: true,
     starts_on: "", ends_on: "", note: "", active: true,
     speed_kph: "", haul_mode: "", location_id: "",
+    limit_value: "", limit_counts: "movements", limit_basis: "average", limit_public: true, limit_shape: "line",
   });
 
   const startNewZone = () => {
@@ -16930,7 +17039,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   affects_routing: !!z.affects_routing, starts_on: z.starts_on || "",
                   ends_on: z.ends_on || "", note: z.note || "", active: !!z.active,
                   speed_kph: (z.speed_kph == null ? "" : String(z.speed_kph)),
-                  haul_mode: z.haul_mode || "", location_id: z.location_id || "" });
+                  haul_mode: z.haul_mode || "", location_id: z.location_id || "",
+                  limit_value: (z.limit && z.limit.value != null) ? String(z.limit.value) : "",
+                  limit_counts: (z.limit && z.limit.counts) || "movements", limit_basis: (z.limit && z.limit.basis) || "average",
+                  limit_public: !(z.limit && z.limit.public === false),
+                  limit_shape: (z.geometry && z.geometry.type === "LineString") ? "line" : "area" });
     setZoneSel(z.id);
     // load the existing shape as editable vertices. A polygon's repeated closing point is
     // dropped; a haul road has none to drop, and popping its last point would shorten the
@@ -17037,16 +17150,20 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const saveZone = async () => {
     if(!zoneForm) return;
     const haulNow = isHaul(zoneForm);
+    const lineNow = isLineZone(zoneForm);
+    const limitNow = isLimit(zoneForm);
     if(!zoneForm.name.trim()){ setZoneMsg("Give the zone a name."); return; }
+    if(limitNow && !(Number(zoneForm.limit_value) > 0)){ setZoneMsg("Type the limit: a number of lorries a day."); return; }
     if(drawPts.length < minPts(zoneForm)){
-      setZoneMsg(haulNow ? "A haul road needs at least two points — it is travelled along."
+      setZoneMsg(lineNow ? (haulNow ? "A haul road needs at least two points — it is travelled along."
+                                    : "A line along the road needs at least two points.")
                          : "A zone needs at least three corners."); return; }
     const body = {
       name: zoneForm.name.trim(),
-      geometry: haulNow
+      geometry: lineNow
         ? { type: "LineString", coordinates: drawPts.map(p => [p[0], p[1]]) }
         : { type: "Polygon", coordinates: [ringOf(drawPts)] },
-      kind: zoneForm.kind, affects_routing: !!zoneForm.affects_routing,
+      kind: zoneForm.kind, affects_routing: limitNow ? false : !!zoneForm.affects_routing,
       starts_on: zoneForm.starts_on || null, ends_on: zoneForm.ends_on || null,
       note: zoneForm.note || null, active: !!zoneForm.active,
       // sent for every kind, ignored by the backend for the others. Blank stays null:
@@ -17058,6 +17175,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       // 28 Oct 2026 (simulation v2): a haul road inside a site (never spliced into a public route); blank = a public haul road
       location_id: (haulNow && zoneForm.location_id) ? zoneForm.location_id : null,
     };
+    if(limitNow) Object.assign(body, { limit_value: Number(zoneForm.limit_value), limit_counts: zoneForm.limit_counts,
+                                       limit_basis: zoneForm.limit_basis, limit_public: !!zoneForm.limit_public });
     setZoneBusy(true); setZoneMsg("Saving…");
     try {
       const qs = tokenRef.current ? `?token=${encodeURIComponent(tokenRef.current)}` : "";
@@ -17150,7 +17269,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       // the shape that will be saved rather than an open chain that jumps shut on Save.
       // A haul road is never closed — it is a road, and showing it shut would be showing
       // a shape that Save is not going to produce.
-      const haulNow = isHaul(zoneForm);
+      const haulNow = isLineZone(zoneForm);
       const line = (!haulNow && drawPts.length >= 3) ? ringOf(drawPts) : drawPts;
       feats.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: line } });
     }
@@ -17971,7 +18090,48 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </div>
                 )}
 
-                <label className="flex items-start gap-2 text-sm">
+                {isLimit(zoneForm) && (
+                  <div className="rounded-lg border border-slate-200 p-2.5 space-y-2.5" data-zone-limit="1">
+                    <div className="grid grid-cols-[6rem_1fr] gap-2 items-end">
+                      <label className="block">
+                        <span className="block text-sm font-medium text-slate-700 mb-1">Limit</span>
+                        <input type="number" min="1" step="1" value={zoneForm.limit_value}
+                          onChange={e => setZField("limit_value", e.target.value)} placeholder="200"
+                          className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
+                      </label>
+                      <select value={zoneForm.limit_counts} onChange={e => setZField("limit_counts", e.target.value)}
+                        className={"w-full " + sel} aria-label="What the limit counts">
+                        {LIMIT_UNITS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
+                    </div>
+                    <fieldset>
+                      <legend className="block text-sm font-medium text-slate-700 mb-1">Checked against</legend>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                        {[["average", "Daily average in the month"], ["busiest_day", "Busiest day"]].map(([v, l]) =>
+                          <label key={v} className="inline-flex items-center gap-1.5">
+                            <input type="radio" name="limit_basis" checked={zoneForm.limit_basis === v}
+                              onChange={() => setZField("limit_basis", v)} />{l}</label>)}
+                      </div>
+                    </fieldset>
+                    <fieldset>
+                      <legend className="block text-sm font-medium text-slate-700 mb-1">Draw</legend>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                        {[["line", "Line along the road"], ["area", "Area"]].map(([v, l]) =>
+                          <label key={v} className="inline-flex items-center gap-1.5">
+                            <input type="radio" name="limit_shape" checked={zoneForm.limit_shape === v}
+                              onChange={() => { setZField("limit_shape", v); setDrawPts([]); }} />{l}</label>)}
+                      </div>
+                    </fieldset>
+                    <label className="flex items-start gap-2 text-sm">
+                      <input type="checkbox" checked={!!zoneForm.limit_public}
+                        onChange={e => setZField("limit_public", e.target.checked)} className="mt-1" />
+                      <span className="font-medium">Show on the public map</span>
+                    </label>
+                    <p className="text-[13px] text-slate-500">Wayscope flags it; it never moves a route.</p>
+                  </div>
+                )}
+
+                {!isLimit(zoneForm) && <label className="flex items-start gap-2 text-sm">
                   <input type="checkbox" checked={zoneForm.affects_routing}
                     onChange={e => setZField("affects_routing", e.target.checked)} className="mt-1" />
                   <span>
@@ -17982,7 +18142,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         : "Routes avoid this area; routes that cross it are worked out again."}
                     </span>
                   </span>
-                </label>
+                </label>}
                 <label className="flex items-start gap-2 text-sm">
                   <input type="checkbox" checked={zoneForm.active}
                     onChange={e => setZField("active", e.target.checked)} className="mt-1" />
@@ -18001,7 +18161,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 <div className="rounded-lg border border-slate-200 p-2.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="block text-sm font-medium text-slate-700 mb-1">
-                      {isHaul(zoneForm) ? `Line · ${drawPts.length} point(s)` : `Shape · ${drawPts.length} corner(s)`}
+                      {isLineZone(zoneForm) ? `Line · ${drawPts.length} point(s)` : `Shape · ${drawPts.length} corner(s)`}
                     </span>
                     <span className="flex items-center gap-2">
                       {/* 22 Oct 2026 (UI fix 6, card 6): "Stop placing" on a haul road reads var(--haul-text); a routing zone keeps ZONE_ROUTING */}
@@ -18009,8 +18169,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         className={"text-xs font-semibold px-2 py-0.5 rounded-md " + (zoneDraw ? "text-white" : "border border-slate-200 text-slate-600")}
                         style={zoneDraw ? { background: isHaul(zoneForm) ? "var(--haul-text)" : ZONE_ROUTING } : undefined}>
                         {zoneDraw ? "Stop placing"
-                                  : (drawPts.length ? (isHaul(zoneForm) ? "Add points" : "Add corners")
-                                                    : (isHaul(zoneForm) ? "Place points" : "Place corners"))}
+                                  : (drawPts.length ? (isLineZone(zoneForm) ? "Add points" : "Add corners")
+                                                    : (isLineZone(zoneForm) ? "Place points" : "Place corners"))}
                       </button>
                       <button onClick={undoVertex} disabled={!drawPts.length}
                         className="text-xs px-2 py-0.5 rounded-md border border-slate-200 text-slate-600 disabled:opacity-40">Undo</button>
@@ -18020,7 +18180,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </div>
                   <p className="text-[13px] text-slate-400">
                     {zoneDraw
-                      ? (isHaul(zoneForm)
+                      ? (isLineZone(zoneForm)
                          ? "Click along the road: two or more points."
                          : "Click the map to drop a corner: three or more.")
                       : "To change a shape, redraw it."}
@@ -18054,7 +18214,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <button onClick={cancelZone} disabled={zoneBusy}
                     className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 disabled:opacity-40">Cancel</button>
                 </div>
-                {zoneForm.affects_routing && !isHaul(zoneForm) && (
+                {zoneForm.affects_routing && !isHaul(zoneForm) && !isLimit(zoneForm) && (
                   <p className="text-[13px] text-amber-700">
                     {/* 28 Oct 2026 (task 0c): a dated zone diverts in its dates; only an undated one moves the routes for good */}
                     {(zoneForm.starts_on || zoneForm.ends_on)
@@ -18560,6 +18720,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                                Routed through{z.speed_kph ? ` @ ${z.speed_kph}` : ""}
                              </span>
                            : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600" title="Drawn but not open to traffic">Not open</span>)
+                        : z.kind === LIMIT_KIND
+                        /* 9 Nov 2026 (2.1-1): a traffic limit never routes; its cell is the limit */
+                        ? <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 whitespace-nowrap" data-zone-limit-chip={z.id}>{limitChip(z.limit) || "Limit"}</span>
                         : z.affects_routing
                         ? <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>
                         : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>}
@@ -18574,7 +18737,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <td className="px-3 py-2 text-xs">
                       {/* 22 Oct 2026 (UI fix 6, card 6): "no routes" reads var(--haul-text) */}
                       {/* 28 Oct 2026 (task 0c): a dated routing zone says what it diverts, and what it cannot */}
-                      {z.kind !== HAUL_KIND && zoneDiv[z.id] && ((zoneDiv[z.id].routes || []).length
+                      {z.kind === LIMIT_KIND
+                        /* 9 Nov 2026 (2.1-1): the routes that pass through it this month, from the traffic limits read */
+                        ? (limitUse[z.id] && limitUse[z.id].length
+                           ? <span className="text-slate-600" data-zone-limit-use={z.id} title={limitUse[z.id].join(", ")}>{limitUse[z.id].length} route{limitUse[z.id].length === 1 ? "" : "s"} this month</span>
+                           : <span className="text-slate-500">—</span>)
+                        : z.kind !== HAUL_KIND && zoneDiv[z.id] && ((zoneDiv[z.id].routes || []).length
                         || (zoneDiv[z.id].needs_route || []).length || (zoneDiv[z.id].no_way_round || []).length)
                         ? <button type="button" className="row-open text-left" onClick={(e) => { e.stopPropagation(); setDivZone(z.id); }}
                             data-zone-div={z.id}>   {/* named by its own words (axe label-content-name-mismatch, 28 Oct audit) */}

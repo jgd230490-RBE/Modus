@@ -661,7 +661,7 @@ def report_lines(page):
             "formats": f"Large print and other formats: {fmts.rstrip('.')}." if fmts else None}
 
 
-def _brief(month_long, prev_long, H, prev, routes_view, works, controls, never_all, council_mv, lot):
+def _brief(month_long, prev_long, H, prev, routes_view, works, controls, never_all, council_mv, lot, traffic=None):
     """
     "This month in brief": up to five plain sentences a resident can read alone (the newsletter's page 1, the
     leaflet). Each is built from a figure the bulletin prints elsewhere; nothing new is worked out here.
@@ -688,6 +688,9 @@ def _brief(month_long, prev_long, H, prev, routes_view, works, controls, never_a
     n = len(works) + len(controls)
     out.append(f"{n} road work{'s' if n != 1 else ''}, closure{'s' if n != 1 else ''} or local limit{'s' if n != 1 else ''} "
                f"on or near the routes." if n else "No road works, closures or local limits are listed.")
+    if traffic:
+        # 9 Nov 2026 (v2.1 task 2.1-1, Q10): the leaflet's one line on traffic limits, on the works point
+        out[-1] += f" Traffic limits on local roads: {traffic['glance']}."
     ds = [d for d in ((council_mv or {}).get("districts") or []) if (d.get("a_day") or 0) > 0]
     if ds:
         out.append(f"{ds[0]['name']} district sees the most: {ds[0]['text']} {lw}.")
@@ -761,7 +764,68 @@ def concern_reply_line(cm):
     return f"First reply: median {v:g} working day{'' if v == 1 else 's'}."
 
 
-def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, month_long, concerns_m=None):
+#: 9 Nov 2026 (v2.1 task 2.1-1, Q10): at most this many traffic-limit rows on the web page and the newsletter
+TRAFFIC_ROWS = 6
+TRAFFIC_STATE = {"over": "Over", "near": "Near", "ok": "Within"}
+TRAFFIC_NOTE = ("Movements count each lorry passing, in and out separately. This scheme's lorries only, from the "
+                "approved plan: a planning check, not a count on the road.")
+
+
+def _whole(x):
+    return f"{int(float(x or 0) + 0.5):,}"
+
+
+def _tl_value(v, limit):
+    """The figure against a limit: whole, half up — but one decimal when the whole number would read the same as the
+    limit and the figure is not (5.3 against 5 reads "5.3", never "5": the row says Over)."""
+    v, limit = float(v or 0), float(limit or 0)
+    if _whole(v) == _whole(limit) and abs(v - limit) > 1e-9:
+        return f"{v:,.1f}"
+    return _whole(v)
+
+
+def traffic_month(mi):
+    """
+    9 Nov 2026 (v2.1 task 2.1-1, Q10): "Traffic limits on local roads" — the limits ticked public, this month's figure
+    against each, worst first, at most TRAFFIC_ROWS (the counts of over / near are of every one). An over row is printed
+    as it is, never hidden. A busiest-day limit shows the month's average and "Average only" unless the average is
+    already over (the bulletin has no day plan, Q4). None when no public limit is in force this month.
+    """
+    try:
+        import traffic_limits
+        sm = traffic_limits.summary([int(mi)], public_only=True, with_routes=False)
+    except Exception as e:                       # noqa: BLE001 — an old database must not take the bulletin down
+        print("⚠️  bulletin traffic limits:", str(e)[:120])
+        return None
+    rows = []
+    for L in sm["limits"]:
+        m = L["months"].get(str(int(mi)))
+        if not m:
+            continue
+        lim = L["limit"]
+        mv = lim["counts"] == "movements"
+        state = m["state"]
+        if lim["basis"] == "busiest_day" and state != "over":
+            state = "average"
+        unit = "movements" if mv else "visits"
+        rows.append({"name": L["name"], "state_key": state,
+                     # whole movements, half up (round() is half-even: x.5 goes to the even whole, and the in / out split misread)
+                     "figure": _tl_value(m["value"], lim["value"]) + (f" ({_whole(m['in_per_day'])} in, {_whole(m['out_per_day'])} out)"
+                                                     if mv else f" {unit}"),
+                     "limit": f"{n0(lim['value'])} {unit} a day" + (" (busiest day)" if lim["basis"] == "busiest_day" else ""),
+                     "state": TRAFFIC_STATE.get(state, "Average only"),
+                     "ratio": (m["value"] / lim["value"]) if lim["value"] else 0})
+    if not rows:
+        return None
+    order = {"over": 0, "near": 1, "average": 2, "ok": 3}
+    rows.sort(key=lambda r: (order.get(r["state_key"], 4), -r["ratio"], r["name"]))
+    over = sum(1 for r in rows if r["state_key"] == "over")
+    near = sum(1 for r in rows if r["state_key"] == "near")
+    return {"title": "Traffic limits on local roads", "rows": rows[:TRAFFIC_ROWS], "total": len(rows),
+            "over": over, "near": near, "glance": f"{over} over, {near} near", "note": TRAFFIC_NOTE}
+
+
+def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, month_long, concerns_m=None, traffic=None):
     """
     "This month at a glance" in the Sizewell C tracker's shape: the item, this month's figure and the kind of
     data. What a monitoring report fills from observed records is listed, and marked Not reported.
@@ -802,6 +866,9 @@ def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, mo
           "Map and email records") if concerns_m is not None
          else ("Enquiries and complaints", NOT_REPORTED, "Not in this bulletin")),
     ]
+    if traffic:
+        # 9 Nov 2026 (v2.1 task 2.1-1, Q10): only when a public limit is in force; one line in the PDF's columns
+        rows.insert(4, ("Traffic limits on local roads", traffic["glance"], "Forecast against the limits"))
     return [{"item": a, "figure": b, "data": d, "not_reported": b == NOT_REPORTED} for a, b, d in rows]
 
 
@@ -1009,8 +1076,9 @@ def sheet(month_index, acc=None, now=None):
         change_text = f"Since {prev_long}: " + "; ".join(parts) + "."
 
     concerns_m = concern_month(mi)
+    traffic = traffic_month(mi)                  # 9 Nov 2026 (v2.1 task 2.1-1)
     glance = _glance(H, R, routes_view, works, controls, rs.get("status"), never, rs.get("checked_at"), month_long,
-                     concerns_m)
+                     concerns_m, traffic)
     # 13 Oct 2026 (W13): the month's areas read ONCE for both council sections (and last month's, figures only)
     import areas
     import config
@@ -1030,7 +1098,7 @@ def sheet(month_index, acc=None, now=None):
     du = (config.tenant_settings().get("distance_unit") or "km")
     council_mv = _council_movements(mi, wd, month_long, A=A, prev=A_prev, prev_long=prev_long, distance_unit=du)
     brief = _brief(month_long, prev_long, H, prev, routes_view, works, controls,
-                   rs.get("status") == bulletin.NEVER_CHECKED, council_mv, lot)
+                   rs.get("status") == bulletin.NEVER_CHECKED, council_mv, lot, traffic)
     demo_tag = DEMO_MAP_TAG if page.get("demo_notice") else None
     if council and demo_tag:
         council["demo_tag"] = demo_tag
@@ -1083,7 +1151,7 @@ def sheet(month_index, acc=None, now=None):
                         "t_day": n0((H.get("tonnes") / wd) if H.get("tonnes") is not None and wd else None)},
         "works": works, "checks": checks, "others": others,
         "glance": glance, "council": council, "council_mv": council_mv, "lot": lot,
-        "concerns": concerns_m,
+        "concerns": concerns_m, "traffic": traffic,
         # 13 Oct 2026 (W15, D43): the newsletter's masthead and page 1, the leaflet, the D41 map tag
         "brand_title": f"{BRAND_TITLE} · {month_long}",
         "issued": f"Issued {_date_long(today)}",
@@ -1529,6 +1597,22 @@ def _council_html(C):
             + f'<p class="muted">{e(_co2(C["basis"]))}</p>')
 
 
+def _traffic_html(T):
+    """9 Nov 2026 (v2.1 task 2.1-1, Q10): the "Traffic limits on local roads" table, after "Is it a lot?"."""
+    if not T:
+        return ""
+    e = _e
+    rows = "".join(f'<tr><td>{e(r["name"])}</td><td class="n">{e(r["figure"])}</td><td class="n">{e(r["limit"])}</td>'
+                   f'<td class="{"flag" if r["state_key"] == "over" else ("near" if r["state_key"] == "near" else "")}">'
+                   f'{e(r["state"])}</td></tr>' for r in T["rows"])
+    more = (f'<p class="muted">{T["total"] - len(T["rows"])} more within their limits.</p>'
+            if T["total"] > len(T["rows"]) else "")
+    return (f'<h2>{e(T["title"])}</h2><div class="tw" tabindex="0" role="region" aria-label="{e(T["title"])}">'
+            '<table data-bulletin="traffic-limits"><thead><tr><th>Road</th><th class="n">This month, a day</th>'
+            f'<th class="n">Limit</th><th>Plan</th></tr></thead><tbody>{rows}</tbody></table></div>{more}'
+            f'<p class="muted">{e(T["note"])}</p>')
+
+
 def _routes_html(S):
     """14 Oct 2026 (the publishing check): every route in ONE table with its bar in its map colour, the planning flag a
     dashed red mark — it replaces "The busiest routes" table and the chart below it, which printed the same figures."""
@@ -1622,7 +1706,7 @@ def html(S):
         "leaflet_href": e(S["leaflet_href"]), "leaflet_pdf_href": e(S["leaflet_pdf_href"]),
         "glance": glance, "concerns_html": concerns_html, "council": _council_html(C), "council_mv": _council_mv_html(M),
         "councils_kicker": '<p class="kick">03 Councils</p>' if (M or C) else "",
-        "lot": _lot_html(S.get("lot")), "sources": _sources_html(S),
+        "lot": _lot_html(S.get("lot")), "sources": _sources_html(S), "traffic": _traffic_html(S.get("traffic")),
         "notice": notice, "nav": nav, "empty": empty, "head": head,
         "moved": moved, "checks": checks, "others": others, "change": change, "terms": terms, "caveats": caveats,
         "INK": INK, "MUTED": MUTED, "PLAN_BLUE": PLAN_BLUE, "PLAN_TINT": PLAN_TINT, "FLAG_RED": FLAG_RED,
@@ -1668,7 +1752,7 @@ svg{{width:100%;height:auto;display:block}} svg .pin{{fill:#fff;font:700 14px In
 .tw{{overflow-x:auto}} table{{border-collapse:collapse;width:100%}} th,td{{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid var(--line)}}
 .mapwrap:focus-visible,.tw:focus-visible{{outline:2px solid #1D4ED8;outline-offset:2px}}   /* the wrappers that scroll on a phone are tab stops (tabindex 0, a named region): a ring says where the focus is */
 th{{font-size:14px;font-weight:700;background:var(--head);border-bottom:2px solid var(--ink)}} td.n,th.n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
-td.flag{{color:var(--flag);font-weight:700}} tr.this td{{font-weight:700}} td.lt{{color:var(--muted);white-space:nowrap}}
+td.flag{{color:var(--flag);font-weight:700}} td.near{{color:#B45309;font-weight:700}} tr.this td{{font-weight:700}} td.lt{{color:var(--muted);white-space:nowrap}}
 td.bar{{min-width:200px;white-space:nowrap}} .bn{{display:inline-block;width:2.2em;text-align:right;font-weight:700;margin-right:8px;font-variant-numeric:tabular-nums}}
 .bt{{position:relative;display:inline-block;width:calc(100% - 3em);height:12px;vertical-align:-1px}} .bf{{position:absolute;left:0;top:0;bottom:0;border-radius:2px}}
 .bc{{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed var(--flag)}}
@@ -1742,6 +1826,7 @@ svg .cl{{fill:var(--ink);font:14px Inter,Arial,sans-serif;paint-order:stroke;str
 
 <p class="kick">04 Carbon and the small print</p>
 {lot}
+{traffic}
 
 <h2>This month at a glance</h2>
 <div class="tw"><table data-bulletin="glance"><thead><tr><th>Item</th><th class="n">This month</th><th>Data</th></tr></thead>
