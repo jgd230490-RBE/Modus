@@ -10808,8 +10808,19 @@
             const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
             c.style.top = top + 'px';
             c.style.maxHeight = Math.max(160, Math.round(m.height - top - foot - 16)) + 'px';
+            // 10 Nov 2026 (seen on live): the Conditions panel opens on the same side, above the card; while it is open the
+            // card sits to its left, and goes back when it closes
+            const w = document.getElementById('tl-warnings');
+            const open = w && getComputedStyle(w).display !== 'none' && window.innerWidth > 1023;
+            c.style.right = open ? Math.max(56, Math.round(m.right - w.getBoundingClientRect().left + 10)) + 'px' : '';
         } catch (e) {}
     }
+    (function () {
+        const w = document.getElementById('tl-warnings');
+        if (!w || typeof MutationObserver === 'undefined') return;
+        new MutationObserver(() => { const c = document.getElementById('area-card'); if (c && !c.hidden) placeAreaCard(c); })
+            .observe(w, { attributes: true, attributeFilter: ['style'] });
+    })();
     // the month moved (a pick, a scrub, Play): the area's card follows it; an open road card does too
     function syncSecselMonth() {
         const m = secselMonth();

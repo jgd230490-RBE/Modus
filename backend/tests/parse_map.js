@@ -7651,6 +7651,10 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("2.1-4 (seen in Chrome 10 Nov): a tip that answers after the pointer has left draws nothing; no tip while a box is drawn",
      code.includes("if (typeof SECSEL !== 'undefined') { SECSEL.tip.key = ''; SECSEL.tip.at = null; }")
      && code.includes("|| (typeof SECSEL !== 'undefined' && SECSEL.drawing)") && blk.includes("if (SECSEL.tip.key === url && SECSEL.tip.at) setRouteHover(SECSEL.tip.at.f, SECSEL.tip.at.e);"));
+  ok("2.1-4 (seen on live 10 Nov): while the Conditions panel is open the area card sits to its left, and goes back when it closes",
+     blk.includes("c.style.right = open ? Math.max(56, Math.round(m.right - w.getBoundingClientRect().left + 10)) + 'px' : '';")
+     && blk.includes("const open = w && getComputedStyle(w).display !== 'none' && window.innerWidth > 1023;")
+     && blk.includes(".observe(w, { attributes: true, attributeFilter: ['style'] });"));
   ok("2.1-4: the area and road cards follow the month (a pick, a scrub, Play)",
      code.includes("if (typeof syncSecselMonth === 'function') syncSecselMonth();") && blk.includes("if (SECSEL.area && (!SECSEL.areaRes || SECSEL.areaRes.month !== m)) loadAreaSum();"));
   ok("2.1-4: a traffic limit's popup gives way on a road; the road card carries the limit's line (2.1-1's slot)",
