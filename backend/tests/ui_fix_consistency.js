@@ -187,5 +187,12 @@ ok("...the bulletin's and the PDF maps' scale bars are in the organisation's uni
    bd.includes("km, px = basemap.scale(v, 110, unit=du)") && bd.includes('class="sc">{km:g} {word}</text>') && ex.includes("km, px = basemap.scale(v, 24 * mm / k, unit=du)")
    && bm.includes('def scale(v, target_px, unit="km"):') && bd.includes("split by the distance driven in each district") && !bd.includes("routed km × the vehicle"));
 
+// 10 Nov 2026 (the UI audit after the comma change): "£57,833" lost its space to wrap at and ran 6 px past the Look-ahead tile
+{
+  const m = code.match(/\(len > 12 \? "text-sm" : len > 9 \? "text-base" : len > (\d+) \? "text-lg" : "text-2xl"\)/);
+  const step = m ? +m[1] : null;
+  ok("⭐ 20: a Look-ahead figure of 7 characters (\"£57,833\", \"162,438\") steps down from the largest size; 6 (\"12,345\") keeps it",
+     step === 6 && "£57,833".length > step && "162,438".length > step && !("12,345".length > step), String(step));
+}
 console.log(`ui_fix_consistency.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  ✗ " + f)); process.exit(1); }

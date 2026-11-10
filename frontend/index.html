@@ -11301,11 +11301,12 @@ function WsPill({ ws }){
     style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>{ws}</span>;
 }
 function LaKpi({ value, caption, tone }){
-  // a long value steps its size down before it would be cut off ("£1.43…" read as a price)
+  // a long value steps its size down before it would be cut off ("£1.43…" read as a price); 10 Nov 2026 (finding 20):
+  // from 7 characters, since "£57,833" and "162,438" (comma thousands, no space to wrap at) ran 6–7 px past the tile
   const len = String(value == null ? "" : value).length;
   return (
     <div className="card px-4 py-3 min-w-0" title={String(value == null ? "" : value)}>
-      <div className={"font-semibold tabular-nums truncate leading-8 " + (len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 7 ? "text-lg" : "text-2xl")}
+      <div className={"font-semibold tabular-nums truncate leading-8 " + (len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 6 ? "text-lg" : "text-2xl")}
         style={{ color: tone === "red" ? "var(--red)" : "var(--navy-deep)" }}>{value}</div>
       <div className="text-[13px] text-slate-500 mt-0.5 leading-tight">{caption}</div>
     </div>
