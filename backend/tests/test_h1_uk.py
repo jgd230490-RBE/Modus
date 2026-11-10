@@ -1216,10 +1216,11 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-9b): bad-text 51 -> 53 — the Lorry plan's refused-drop line and the red edge of a lorry that cannot take the trip
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-1): bad-text +2, warn-text +2 — the traffic limits' Over / Near word on the
    # Dashboard fold's table and OVER / NEAR on the Simulation's "Traffic limits on this day" line
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 61 and  # NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 62 and  # NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
      # NARROWED 10 Nov 2026 (wave 3, finding 5): 59 -> 58, the Account's red variance figure is words now (amber when flagged)
     # NARROWED 10 Nov 2026 (wave 3, item 24): 58 -> 60, the Account's Fuel card: "Update failed: showing the last price" and a failed save
       # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon
+      # NARROWED 10 Nov 2026 (wave 3, routes-first-run, merged): +1 = 62, the Routes Vehicles cell's "n failed"
      # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
    # NARROWED 9 Nov 2026 (UI fix phone 2): bad-text 53 -> 55, warn-text 21 -> 22 — the phone Gate arrivals list: the headline when a gate is over, and the figures of an amber / red row
    # NARROWED 10 Nov 2026 (Stockpiles saving): warn-text 24 -> 25 — the planned-use line's amber "Not saved yet"
@@ -1228,7 +1229,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # week" line (.la-carry.is-short) and the Account's Variance words on a flagged line
    # NARROWED 10 Nov 2026 (wave 3, item 24): 29 -> 30, the Account's Fuel card "No diesel price yet"
    # NARROWED 10 Nov 2026 (wave 3, item 33): 30 -> 31, the gates list's "n % of N" on a gate near capacity
-   _fe_wo.count("var(--warn-text)") == 31   # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
+   # NARROWED 10 Nov 2026 (wave 3, routes-first-run, merged): +1 = 32, the Vehicles cell's "n out only"
+   _fe_wo.count("var(--warn-text)") == 32   # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    # NARROWED 10 Nov 2026 (wave 3, finding 5): the Account's Variance reads words, amber on a flagged line, else --muted
