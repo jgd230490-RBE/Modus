@@ -447,7 +447,7 @@ async function infoTipDom(){
      && w.document.getElementById(pop.getAttribute("aria-labelledby")).textContent === "Material in view"
      && bA.getAttribute("aria-expanded") === "true" && bA.getAttribute("aria-controls") === pop.id);
   ok("INFO BOX: ...it carries the plain text, the exact figure (the old tooltip's), and both guide links",
-     pop.textContent.includes("The planned quantity of every forecast month in view") && pop.querySelector(".info-val").textContent === "Exactly 796 000 t"
+     pop.textContent.includes("The planned quantity of every plan line in view") && pop.querySelector(".info-val").textContent === "Exactly 796 000 t"
      && pop.querySelector('a[href="/help/#3-1-filters-and-the-six-cards"]') && pop.querySelector('a[href="/help/technical/#t1-volume"]'));
   ok("INFO BOX: ...focus moves into it, and the click did not sort the column under it", w.document.activeElement === pop && sorted === 0, `sorted ${sorted}`);
   act(() => { w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
@@ -1458,7 +1458,7 @@ async function rowDetailsDom(){
     click(boxFor("Alpha")); click(boxFor("Zed"));
     await settle(10);
     ok("SITES · a site no line starts or ends at leaves no lines (the CLP's rule), narrows Gate arrivals to its gates, and the carbon target says scheme-wide",
-       /^0 forecast months in view|0 forecast month/.test(dS.el.querySelector(".applied-row").textContent) && dS.el.querySelector("[data-gate-arrivals]").getAttribute("data-gate-arrivals") === "none"
+       /^0 plan lines in view|0 plan line/.test(dS.el.querySelector(".applied-row").textContent) && dS.el.querySelector("[data-gate-arrivals]").getAttribute("data-gate-arrivals") === "none"
        && /No gates at these sites/.test(dS.el.querySelector("[data-gate-arrivals]").textContent)
        && /scheme-wide/.test(dS.el.querySelector("[data-carbon-target]").textContent));
     click([...dS.el.querySelectorAll(".fchip button")][0]);
@@ -1525,7 +1525,7 @@ async function rowDetailsDom(){
       ["vehicle (full name)", l.vehicle_type], ["discipline", l.discipline], ["section (old title)", l.section_id], ["team", l.ipt ? F.teamText(l.ipt) : null],
       ["distance a trip", l.km_trip == null ? "Not routed yet for this lorry" : (+F.dist(l.km_trip)).toFixed(1)],
       ["cycle", l.cycle_min == null ? "Needs this line's route worked out" : (l.cycle_min / 60).toFixed(2)], ["tonnes", F.grp(a.t)], ["trips", F.grp(a.trips)],
-      ["delivered %", a.actualT != null && a.t > 0 ? `${(a.actualT * 100 / a.t).toFixed(0)} %` : null],
+      ["delivered %", a.actualT != null && a.tNow > 0 ? `${(a.actualT * 100 / a.tNow).toFixed(0)} %` : null],   // NARROWED 10 Nov 2026 (finding 19): planned up to this month
       ["delivered (old title)", a.actualT == null ? "No week actual reported on this line in the months in view" : `${F.grp(a.actualT)} t reported of ${F.grp(a.t)} t planned`],
       ["lorry-distance", l.baked ? F.grp(F.dist(a.km)) : null], ["tCO₂e", l.baked ? a.co2.toFixed(1) : null], ["peak vehicles", a.peak == null ? null : String(a.peak)],
       ["trips a day per vehicle (old title)", l.cycles_per_vehicle_day ? String(l.cycles_per_vehicle_day) : null],

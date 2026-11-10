@@ -113,7 +113,7 @@ ok("distance falls back to null, not 0",
 // 13 Oct 2026 (W3, narrowed): the same count in plain words ("forecast months have a route", "leave out … not routed yet");
 // the routing detail is in the coverage info box and the technical guide (T2)
 ok("the dashboard says how many forecast months the km / CO₂e / fair totals exclude, in the header",
-  _dbBody.includes("forecast months have a route") && _dbBody.includes("leave out the {D.lines - D.baked} not routed yet") && _dbBody.includes("Not routed yet for this lorry")
+  _dbBody.includes("plan lines have a route") && _dbBody.includes("leave out the {D.lines - D.baked} not routed yet") && _dbBody.includes("Not routed yet for this lorry")
   && _dbBody.includes('<InfoTip id="dash.coverage" />'));
 ok("🔴 fleet size is the SERVER's `vehicles` (a monthly peak of it), never demand ÷ capacity here",
   _dbBody.includes("a.peakVeh = Math.max(a.peakVeh || 0, r.vehicles)") && !_dbBody.includes("peakPerDay / a.capacityPerDay")
@@ -3457,7 +3457,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && ["demandCfg", "progressCfg", "costCfg", "topCfg", "tripsCfg", "fleetCfg", "co2Cfg", "splitCfg"].every(k => new RegExp("<ChartHead [^\\n]*\\n\\s*<ChartCanvas config=\\{" + k + "\\}").test(_wall))
      && !_db.slice(0, _db.indexOf('<div className="wall-charts">')).includes("<ChartHead "));
   ok("DESIGN: the headlines say what the number is measured against (delivered of plan, planned vs the model, share of tonnes, per tonne)",
-     _wall.includes('label="of the plan delivered"') && _wall.includes('`${bigNum(K.actualT)} t reported of ${bigNum(K.totT)} t planned`')
+     _wall.includes('label="of the plan delivered"') && _wall.includes('`${bigNum(K.actualT)} t reported of ${bigNum(K.plannedToDate)} t planned to date`')
      && _wall.includes('"the fair-price model"') && _wall.includes("% of the tonnes in view`") && _wall.includes("kg for each tonne moved`"));
   // REVERSED 27 Oct 2026 (stockpile forecast, D10 a): the stockpile screen opens with the first one to go over in the next 8
   // weeks (red) or run out (amber), else "None over in the next 8 weeks", and how many more; the places with no capacity by name
@@ -3472,7 +3472,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      /\.chart-head \.ch-val\{font-weight:700;color:var\(--navy-deep\);font-size:clamp\(1\.6rem,min\(5\.2vh,2\.7vw\),6\.5rem\);/.test(html)
      && /\.chart-head \.ch-lbl\{[^}]*margin-left:\.45em;\}/.test(html));
   ok("DESIGN: series names at a chart's end keep 20 characters (were cut at 15: 'Large aggregat…'), with room for them",
-     src.includes('const t = m.label.length > 20 ? m.label.slice(0, 19) + "…" : m.label;') && /const SERIES_LABEL_PAD = 136;/.test(src));
+     src.includes('if(String(ds.label || "").length > 20) return;') && src.includes("const t = m.label;") && /const SERIES_LABEL_PAD = 136;/.test(src));
 }
 
 // ---- 14 Oct 2026 (the user: "gate arrivals should be a chart, measuring arrivals against capacity"): a bullet chart,
