@@ -180,14 +180,18 @@ def pack(trips, shift_min):
 
 def _lorry_rows(lorries, shift_min, start_min):
     """Each packed lorry as the panel's row: trips in the driver's order (same destination together), the break
-    placed after the trip that passes 4½ h driving or 6 h work, times from `start_min`, free minutes and the room."""
+    placed BEFORE the trip that would pass 4½ h of driving or 6 h of work (drivers_hours' own limits; 10 Nov 2026, F7:
+    it used to fall after the trip that had passed them), times from `start_min`, free minutes and the room. One round
+    trip that alone passes a limit cannot have the break before it: it falls after that trip, "about here" (Q1). Only
+    the order and the times move: the lorries, their trips, start, end, free time and room are the same."""
     rows = []
     for i, L in enumerate(lorries, 1):
         trips = sorted(L["trips"], key=lambda t: (str(t.get("dest_name")), str(t.get("route_id"))))
         br = dh.break_minutes(L["drive"], L["work"])
         t0, dr, wk, placed, blocks = start_min, 0.0, 0.0, False, []
         for t in trips:
-            if not placed and br and (dr > dh.DRIVING_BEFORE_BREAK_MIN + EPS or wk > dh.WORK_SHORT_BREAK_AFTER_MIN + EPS):
+            n_dr, n_wk = dr + _f(t["drive"]), wk + _f(t["drive"]) + _f(t["other"])
+            if not placed and br and blocks and (n_dr > dh.DRIVING_BEFORE_BREAK_MIN + EPS or n_wk > dh.WORK_SHORT_BREAK_AFTER_MIN + EPS):
                 blocks.append({"kind": "break", "start": _hm(t0), "minutes": br})
                 t0 += br
                 placed = True
@@ -779,6 +783,12 @@ def _day_words(day):
     return d.strftime("%A %d %B %Y").replace(" 0", " ")
 
 
+def _veh(key):
+    """10 Nov 2026 (C2): the lorry's NAME on the sheets, as the panel's vehLabel prints it, never the stored key."""
+    import conversions
+    return conversions.vehicle_label(conversions.load_factors(), key) or key
+
+
 def build_pdf(data, view, day):
     """Driver sheets: one A4 page a lorry for the day, in the driver's order (export.page_frame)."""
     import export
@@ -824,7 +834,7 @@ def build_pdf(data, view, day):
             if not first:
                 story.append(PageBreak())
             first = False
-            story.append(P(E(f"{short_name(blk['name'])} · {blk['vehicle']} · lorry {r['n']} of {len(blk['lorries'])}"), st_big))
+            story.append(P(E(f"{short_name(blk['name'])} · {_veh(blk['vehicle'])} · lorry {r['n']} of {len(blk['lorries'])}"), st_big))
             story.append(P(f"<b>{E(_day_words(day))}</b> · {r['trips']} round trip{'' if r['trips'] == 1 else 's'} · "
                            f"leave the yard about {r['start']} · back about {r['end']} · {E(r['free_words'].lower())}", st_f))
             if data.get("team_only"):
@@ -836,8 +846,8 @@ def build_pdf(data, view, day):
             routes_named = []
             for b in r["blocks"]:
                 if b["kind"] == "break":
-                    rows.append([P(b["start"]), P(f"<i>Break, {int(b['minutes'])} min, about here: the rules require it after "
-                                                 f"4½ h of driving or 6 h of work; it may be taken as 15 + 30.</i>", st_g), P(""), P("")])
+                    rows.append([P(b["start"]), P(f"<i>Break, {int(b['minutes'])} min, about here: the rules require it before "
+                                                 f"4½ h of driving or 6 h of work pass; it may be taken as 15 + 30.</i>", st_g), P(""), P("")])
                 else:
                     rows.append([P(b["start"]),
                                  P(f"<b>{E(b['route_id'])}</b> {E(short_name(blk['name']))} → {E(short_name(b.get('dest_name')))}"
@@ -895,10 +905,10 @@ def build_xlsx(data, view, day):
             for b in r["blocks"]:
                 i += 1
                 if b["kind"] == "break":
-                    vals = [short_name(blk["name"]), blk["vehicle"], r["n"], None, b["start"], "Break", None, None, None, int(b["minutes"]), None]
+                    vals = [short_name(blk["name"]), _veh(blk["vehicle"]), r["n"], None, b["start"], "Break", None, None, None, int(b["minutes"]), None]
                 else:
                     k += 1
-                    vals = [short_name(blk["name"]), blk["vehicle"], r["n"], k, b["start"], b["route_id"], short_name(b.get("dest_name")),
+                    vals = [short_name(blk["name"]), _veh(blk["vehicle"]), r["n"], k, b["start"], b["route_id"], short_name(b.get("dest_name")),
                             b.get("qty"), supplier_orders_unit(b.get("unit")), round(b["minutes"], 1), r["free_minutes"] if k == 1 else None]
                 for j, v in enumerate(vals, 1):
                     ws.cell(row=i, column=j, value=v)

@@ -4945,14 +4945,16 @@ function qrRead(mod) {
                                       breaches: [{ route_id: 'R004', vehicle: 'Artic Tipper (44t)', leg: 'loaded' }, { route_id: 'R004', vehicle: 'Artic Tipper (44t)', leg: 'return' },
                                                  { route_id: 'R001', vehicle: 'Rigid 8-wheel (32t)', leg: 'loaded' }], breach_count: 3 });
     const rows = L.limitConditionRows([F(W), F(H), F(R9), F(AX)], ['R004', 'R001'], 10);
-    ok("⭐ limits conditions (sandbox): one WARNING row per limit a route in use is over; a route not in use this month gives none",
-       rows.length === 2 && rows[0].key === 'l|osm:w1:weight|10' && rows[0].lvl === 'warn' && rows[0].kind === 'l' && rows[0].id === 'osm:w1:weight'
+    // REVERSED 10 Nov 2026 (F10, C3): one row per ROAD, keyed by kind, value, exception and road; the row says the sign's
+    // exception and names no supplier ("(OpenStreetMap)" left the row; the sign's card keeps its Source row)
+    ok("⭐ limits conditions (sandbox): one WARNING row per road a route in use is over; a route not in use this month gives none",
+       rows.length === 2 && rows[0].key === 'l|weight|7.5|except for access|Back Lane|10' && rows[0].lvl === 'warn' && rows[0].kind === 'l' && rows[0].id === 'osm:w1:weight'
        && rows[0].who === 'R004' && rows[0].noun === 'Over a weight limit'
-       && rows[0].what === 'R004 · Artic Tipper (44t) is over the 7.5 t weight limit on Back Lane (OpenStreetMap)', JSON.stringify(rows));
-    ok("limits conditions (sandbox): an axle limit is 'an axle weight limit', on its ref when unnamed; two legs of one route count once, another route is '+1 more'",
-       rows[1].noun === 'Over an axle weight limit' && rows[1].what === 'R004 · Artic Tipper (44t) is over the 10 t axle weight limit on B6047 (OpenStreetMap) (+1 more)');
+       && rows[0].what === 'R004 · Artic Tipper (44t) · 7.5 t, except for access · Back Lane', JSON.stringify(rows));
+    ok("limits conditions (sandbox): an axle limit is 'an axle weight limit', on its ref when unnamed; two legs of one route count once, both routes listed",
+       rows[1].noun === 'Over an axle weight limit' && rows[1].what === 'R001, R004 · 10 t, except for access · B6047', rows[1].what);
     ok("limits conditions (sandbox): no route in use, no rows; a standing limit has no dates, so every month gets its row",
-       L.limitConditionRows([F(W)], [], 10).length === 0 && L.limitConditionRows([F(W)], ['R004'], 37)[0].key === 'l|osm:w1:weight|37');
+       L.limitConditionRows([F(W)], [], 10).length === 0 && L.limitConditionRows([F(W)], ['R004'], 37)[0].key === 'l|weight|7.5|except for access|Back Lane|37');
     // -- the map sources --
     const LN = Object.assign({}, W, { id: 'osm:w2:height', kind: 'height', value: 4, icon_text: '4.0m', imperial: "13'1\"", breaches: [], breach_count: 0 });
     const FC = { type: 'FeatureCollection', features: [
@@ -7635,7 +7637,9 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      && blk.includes("map.addControl(new AreaPickControl(), 'top-right')")
      && src.indexOf("map.addControl(new mapboxgl.NavigationControl(), 'top-right');") < src.indexOf("map.addControl(new AreaPickControl(), 'top-right')"));
   ok("⭐ 2.1-4 (card 0's bug): the road card opens on the side with room above the timeline bar and scrolls inside itself",
-     blk.includes("getPropertyValue('--tl-foot')") && blk.includes("anchor: below ? 'top' : 'bottom'")
+     blk.includes("getPropertyValue('--tl-foot')")
+     // NARROWED 10 Nov 2026 (road card edge): above / below as before, now with a side where the click is near an edge
+     && blk.includes("anchor: (below ? 'top' : 'bottom') + (side ? '-' + side : '')") && blk.includes("String(p.options.anchor).indexOf('top') === 0")
      && blk.includes("sc.style.maxHeight = Math.max(90, space - 170) + 'px';") && html.includes(".secsel-scroll{ max-height:260px; overflow:auto;"));
   ok("⭐ 2.1-4 Q1: every mode — a route line's click and a shared section's click both open the road card (the route tinted)",
      code.includes("if(typeof openRoadCard==='function'){ openRoadCard(e, rid); return; }")
@@ -7685,7 +7689,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   try {
     F = new Function("escHtml", "PV", "CW", "monthLabel", "teamText", "TENANT", "map", "styleReady", "document", "isPhoneShell", "mapboxgl",
                      "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle",
-                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, SECSEL_MAP };")(
+                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, SECSEL_MAP };")(
       esc, () => pv, () => (pv === 2 ? words2 : words1), m => (m === 23 ? 'Nov 2027' : 'M' + m), v => (v === 'IPT1' ? 'North Team' : v),
       { name: 'Wolds Link', demo_notice: 'Fictional scheme' }, {}, () => true, doc, () => false, {}, {}, () => 'https://x/map/?month=2027-11', null, null,
       x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }));
@@ -7815,6 +7819,21 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        && near.includes("|| (typeof limitHitAt === 'function' && limitHitAt(e.point)))) return;")
        && near.includes("if (!phone && typeof TLIM_LAYERS !== 'undefined' && map.queryRenderedFeatures(e.point, { layers: TLIM_LAYERS.filter(has) }).length) return;"));
   }
+  // ===== 10 Nov 2026 — road card edge (John's yes to notes/road-card-edge-mockup-1110) =====
+  if (F) {
+    ok("⭐ EDGE (seen on live 10 Nov: a card opened 60 px from the map's left edge read '…ar 2027'): a click near the left edge opens the card to its right, near the right edge to its left, else centred",
+       F.secselSide(60, 1122, 1066) === 'left' && F.secselSide(199, 1122, 1066) === 'left' && F.secselSide(200, 1122, 1066) === ''
+       && F.secselSide(560, 1122, 1066) === '' && F.secselSide(866, 1122, 1066) === '' && F.secselSide(867, 1122, 1066) === 'right' && F.secselSide(1100, 1122, 1066) === 'right');
+    ok("⭐ EDGE: with the Conditions panel open the free map ends at its left edge (710 px here): a click at 600 opens to the left, at 400 stays centred",
+       F.secselSide(600, 1122, 710) === 'right' && F.secselSide(400, 1122, 710) === '' && F.secselSide(100, 1122, 710) === 'left');
+    ok("EDGE: a map narrower than a card each side picks the side with more room; no right edge given means the map's width",
+       F.secselSide(100, 360, 304) === 'left' && F.secselSide(250, 360, 304) === 'right' && F.secselSide(300, 1000, 0) === '' && F.secselSide(900, 1000, 0) === 'right');
+  }
+  ok("⭐ EDGE: the popup's anchor is above / below plus that side, from the click's own point; the right edge is the Conditions panel while it shows on a wide screen, else the map buttons",
+     code.includes("const side = secselSide(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge());")
+     && code.includes("anchor: (below ? 'top' : 'bottom') + (side ? '-' + side : ''), className: 'secsel-popup' })")
+     && code.includes("if (w && getComputedStyle(w).display !== 'none' && window.innerWidth > 1023) return Math.round(w.getBoundingClientRect().left - m.left);")
+     && code.includes("return Math.round(m.width - 56);"));
   let afp = null;
   try { afp = new Function(/function areaFromParam\(s\) \{[\s\S]*?\n    \}/.exec(code)[0] + "\nreturn areaFromParam;")(); } catch (e) {}
   ok("2.1-4 Q7 (sandbox): the link's box reads back, and anything that is not a box is no box",

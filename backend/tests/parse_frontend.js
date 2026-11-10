@@ -1014,8 +1014,11 @@ ok("the flat gate-to-face allowance is editable per gate (B5)",
 // NARROWED 22 Oct 2026 (UI fix 7, the user: "i dont want to much wording. and no info about api or backend stuff"): the 2026-09-02 copy shortened, B5(c) kept
 ok("the UI says the flat allowance is IGNORED where a haul road is drawn — B5(c)",
   src.includes("<strong>Gate → face</strong>: drive to the face (not counted") && src.includes("when a haul road is drawn). Empty = 0."));
-ok("the two gate fields carry the 2026-09-02 label copy",
-  src.includes("Safety / briefing at this gate. Once per arrival.")
+// REVERSED 10 Nov 2026 (F8, John "Yes, Q1–Q9"): the first field is "Check-in (min)", its hover "Minutes each lorry spends at
+// the gate on arrival." (was "Induction (min)" / "Safety / briefing at this gate. Once per arrival.")
+ok("the two gate fields carry their label copy (check-in since 10 Nov; gate to face unchanged)",
+  src.includes('title="Minutes each lorry spends at the gate on arrival.">Check-in (min)</span>')
+  && !src.includes("Safety / briefing at this gate. Once per arrival.")
   && src.includes("Drive from this gate to the face. Ignored if the route uses a drawn haul road."));
 // §2 — old spelling accepted on read, never written
 ok("the old 'Rail head' spelling is read as 'Railhead'",
