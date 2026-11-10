@@ -241,5 +241,12 @@ try {
      && G.gwStatus({ capacity_per_day: null }).word === "Not compared" && G.gwStatus({ capacity_per_day: 170 }).tone === "ok");
 } catch (err) { fail.push("gwBusiest / gwStatus transpile and run  " + err.message); }
 
+// ---------------------------------------------------------------- UI audit (10 Nov 2026): contrast on the washes this branch added
+ok("⭐ audit: a chip on the Account's amber-washed row has a plain surface tint (navy on the tint over amber was 4.35:1)",
+   html.includes('html:where(:not([data-theme="dark"])) :where([style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) :where([style*="--navy-soft"],[style*="rgba(37, 99, 235, 0.08)"],[style*="rgba(37,99,235,.08)"]){background:var(--surface) !important}'));
+ok("⭐ audit: a quantity's m3 line (.la-sub) steps to slate-600 on every wash (muted on the today column's blue was 4.27:1)",
+   html.includes('[style*="rgba(217,119,6,.06)"]) .la-sub{color:#475569}')
+   && html.includes('html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],'));
+
 console.log(`ui_fix_lookahead_calm.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  ✗ " + f)); process.exit(1); }

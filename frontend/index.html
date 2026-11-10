@@ -162,6 +162,11 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   /* 27 Oct 2026 (UI fix 10): a chip (blue text on the 8 % blue tint) on a row that already has a wash (a selected row, the Account's
      short row) fell to 4.26-4.31:1, so there the chip's tint is plain surface (5.17:1 or better in every accent). !important: the tint is inline. */
   html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) :where([style*="--navy-soft"],[style*="rgba(37, 99, 235, 0.08)"],[style*="rgba(37,99,235,.08)"]){background:var(--surface) !important}
+  /* 10 Nov 2026 (wave 3, lookahead-calm; UI audit): the same two steps for what that branch added. A chip on the Account's
+     amber-washed row (a line short past the share) fell to 4.35:1, so its tint is plain surface there too; and a quantity's
+     m3 line under its tonnes (.la-sub, muted) fell to 4.27:1 on the today column's blue wash, so on any wash it is slate-600. */
+  html:where(:not([data-theme="dark"])) :where([style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) :where([style*="--navy-soft"],[style*="rgba(37, 99, 235, 0.08)"],[style*="rgba(37,99,235,.08)"]){background:var(--surface) !important}
+  html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .la-sub{color:#475569}
   /* CAPTIONS-END */
   /* DARK-REMAP-START — generated 5 Oct 2026 from the colour utilities in this file; test_h1_uk asserts coverage both ways
      (17 Oct 2026: every utility has a remap, and every remap has a utility — four stale lines went that day) */
