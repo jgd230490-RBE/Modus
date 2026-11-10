@@ -101,11 +101,14 @@ async function configReadOnly(){
     const ta = m.el.querySelector(".cfg-main textarea");
     ok(`CONFIG RO: ${who} — Everything (JSON) is read only`, !!ta && ta.readOnly === true);
     ok(`CONFIG RO: ${who} — no Organisation file tab (admins only)`, !btnT(m.el, /^Organisation file$/));
-    for (const [t, nm] of [["Vehicles", "Vehicles"], ["Materials", "Materials"]]) {
+    ok(`CONFIG RO (CSS): a reader's table values size to their words (field-sizing: content), not to a typing box`,
+       /\.cfg-ro \.tbl input:not\(\[type=checkbox\]\):not\(\[type=radio\]\),\.cfg-ro \.tbl select\{field-sizing:content;width:auto;/.test(html));
+    for (const t of ["Vehicles", "Materials"]) {
       await tab(m, t);
-      const box = m.el.querySelector(".cfg-main .overflow-auto");
-      ok(`CONFIG RO: ${who} — the ${t} table's scroll box can be reached by Tab and is named (no control inside it can)`,
-         !!box && box.getAttribute("tabindex") === "0" && box.getAttribute("role") === "region" && box.getAttribute("aria-label") === nm);
+      const box = m.el.querySelector(".cfg-main .cfg-ro-box");
+      ok(`CONFIG RO: ${who} — the ${t} tab's scroll box can be reached by Tab, is named, and sits OUTSIDE the disabled fieldset (axe counts a box inside one as disabled)`,
+         !!box && box.getAttribute("tabindex") === "0" && box.getAttribute("role") === "region" && box.getAttribute("aria-label") === t
+         && !box.closest("fieldset") && !!box.querySelector("fieldset[disabled] table"));
     }
     await tab(m, "Map and bulletin");
     const ex = [...m.el.querySelectorAll(".cfg-main [data-ph-example]")];
@@ -144,8 +147,8 @@ async function configReadOnly(){
        && !!m.el.querySelector("[data-cfg-more]") && /Changes apply on save/.test(m.el.textContent));
     const th = [...m.el.querySelectorAll(".cfg-main table.tbl thead th")].map(x => x.textContent.trim());
     ok("CONFIG EDIT: Vehicles keep the English column for an admin", th.includes("English"));
-    ok("CONFIG EDIT: an admin's Vehicles scroll box is not an extra Tab stop (its fields are)",
-       !m.el.querySelector(".cfg-main .overflow-auto").hasAttribute("tabindex"));
+    ok("CONFIG EDIT: an admin has no reader's scroll box (no extra Tab stop: its fields are the stops)",
+       !m.el.querySelector(".cfg-main .cfg-ro-box") && !m.el.querySelector(".cfg-main [tabindex='0'][role=region]"));
     await tab(m, "Materials");
     const k = Object.keys(DOC.material_categories).find(x => !x.startsWith("_") && (DOC.material_categories[x].vehicles || []).length >= 2);
     const ed = m.el.querySelector(`[data-cfg-veh-edit="${k}"]`);

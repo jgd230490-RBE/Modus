@@ -401,6 +401,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .cfg-ro input[type=radio],.cfg-ro label:has(> input[type=radio]:not(:checked)),.cfg-ro [data-ro-only-on] label:has(> input:not(:checked)){display:none;}
   .cfg-ro button,.cfg-ro [data-ro-hide]{display:none;}
   .cfg-ro label{cursor:default;}
+  .cfg-ro-box{overflow-x:auto;}  .cfg-ro .overflow-auto{overflow:visible;}   /* 10 Nov 2026: a reader's one scroll box, outside the fieldset */
+  .cfg-ro .tbl input:not([type=checkbox]):not([type=radio]),.cfg-ro .tbl select{field-sizing:content;width:auto;min-width:2ch;}   /* 10 Nov 2026: a reader's table value is as wide as its words ("not typed", "derived: kWh × UK grid" were cut to fit a typing box) */
   .field{margin-bottom:18px;}
   /* 11 Oct 2026 — the sign-in box in the finalised theme: the page's surface, warm line, labels above,
      an orange focus ring and the orange action button; the access code has a show / hide eye. */
@@ -9563,9 +9565,10 @@ const isTonnesOnly = (c) => !!(c && Array.isArray(c.units) && c.units.length ===
 // Fetch now) is rendered outside it.
 // 9 Nov 2026 (card 10): a field with a made-up example placeholder ("name@scheme.example") reads "—" when empty for a reader
 const CfgRO = React.createContext(false);
-// 10 Nov 2026 (card 10, UI audit): a reader's table has no control to Tab to (the fields are disabled), so the scroll box
-// itself takes the focus, named, like the other scrolling tables (axe scrollable-region-focusable)
-const cfgScroll = (ro, name) => ro ? { tabIndex: 0, role: "region", "aria-label": name } : {};
+// 10 Nov 2026 (card 10, UI audit): a reader's wide table has no control to Tab to (the fields are disabled), and axe counts
+// anything inside a disabled fieldset as disabled, a tabindex box too. So for a reader the scroll box sits OUTSIDE the
+// fieldset: one named box round the tab's fields (.cfg-ro-box), and the tables' own wrappers stop scrolling inside it.
+const cfgScroll = (ro, name) => ro ? { className: "cfg-ro-box kb-scroll", tabIndex: 0, role: "region", "aria-label": name } : {};
 function CfgFields({ ro, children }){
   return <fieldset className={"cfg-fs" + (ro ? " cfg-ro" : "")} disabled={!!ro} data-cfg-fields={ro ? "read" : "edit"}><CfgRO.Provider value={!!ro}>{children}</CfgRO.Provider></fieldset>;
 }
@@ -9702,9 +9705,10 @@ function ConfigPage({ meta, who, access }){
           <div className="card cfg-main">
             <h3 className="text-[17px] font-semibold text-slate-800 px-6 pt-5 pb-3">{tabLabel}</h3>
 
+          <div {...cfgScroll(ro, tabLabel)}>
           <CfgFields ro={ro}>
           {tab === "vehicles" && (
-            <div className="overflow-auto kb-scroll" {...cfgScroll(ro, "Vehicles")}>
+            <div className="overflow-auto">
               <table className="tbl">
                 <thead>
                   <tr>
@@ -9747,7 +9751,7 @@ function ConfigPage({ meta, who, access }){
           )}
 
           {tab === "materials" && (
-            <div className="overflow-auto kb-scroll" {...cfgScroll(ro, "Materials")}>
+            <div className="overflow-auto">
               <table className="tbl">
                 <thead>
                   {/* 18 Oct 2026 (decision 12): three short headings wrap to two lines and take their own width (width 1 = the
@@ -10114,6 +10118,7 @@ function ConfigPage({ meta, who, access }){
             </div>
           )}
           </CfgFields>
+          </div>
           {/* 9 Nov 2026 (card 10): the two fetches are a planner's to press, so they sit outside the read-only fields */}
           {tab === "mapbulletin" && (
             <div className="px-6 pb-6 max-w-xl">
