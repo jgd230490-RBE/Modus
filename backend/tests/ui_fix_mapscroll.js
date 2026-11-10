@@ -78,7 +78,12 @@ ok("B4 its tab scrolls inside it: overflow auto, flex 1 1 auto, min-height 0",
 ok("B5 the drawer is still a column (head, then the scrolling tab)", drawer && decl(drawer.body, "flex-direction").includes("column") && decl(drawer.body, "display").includes("flex"));
 ok("B6 the drawer markup is unchanged: two tabs, a close, two bodies",
    /<div id="route-drawer">\s*<div class="drawer-head">[\s\S]*?id="tab-analysis"[\s\S]*?id="tab-detail"[\s\S]*?class="drawer-close"[\s\S]*?<\/div>\s*<div class="drawer-body" id="drawer-analysis"><\/div>\s*<div class="drawer-body" id="drawer-detail" style="display:none;"><\/div>\s*<\/div>/.test(html));
-ok("B7 the drawer still opens and closes by the class only", /classList\.add\('open'\);\s*\n\s*\}\s*\n\s*function closeDrawer\(\)\{ document\.getElementById\('route-drawer'\)\.classList\.remove\('open'\); \}/.test(html));
+// NARROWED 10 Nov 2026 (map drawer polish, live test finding 4): the drawer itself still opens and closes by its class only;
+// beside it the body is marked `drawer-open` and the Conditions panel re-placed (pinned in parse_map's DRAWER block)
+ok("B7 the drawer still opens and closes by the class only",
+   /getElementById\('route-drawer'\)\.classList\.add\('open'\);\s*\n\s*document\.body\.classList\.add\('drawer-open'\);/.test(html)
+   && /function closeDrawer\(\)\{\s*\n\s*document\.getElementById\('route-drawer'\)\.classList\.remove\('open'\);\s*\n\s*document\.body\.classList\.remove\('drawer-open'\);/.test(html)
+   && (html.match(/getElementById\('route-drawer'\)\.(style|classList)\b/g) || []).length === 2);
 
 ok("B8 at a desk the conditions panel sits left of the zoom buttons (right 52 px), the month text's 432 px kept",
    /@media \(min-width:1024px\)\{ body #tl-warnings\{ right:52px; \} \}/.test(css) && /body\.month-text-open #tl-warnings\{ right:432px; \}/.test(css)

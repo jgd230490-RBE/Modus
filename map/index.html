@@ -492,6 +492,11 @@
            (a flex child keeps its content's height unless min-height is 0: the tables ran out of the drawer). Parked, it
            is hidden, so Tab never lands on a control below the window. */
         body.sidebar-closed #route-drawer{ left:0; }
+        /* 10 Nov 2026 (live test finding 4): the timeline bar (z 25) floats over the drawer's foot and the Conditions panel
+           (z 24) hung over its top. While the bar is open the drawer keeps its foot clear, so its tab ends above the bar
+           and scrolls to its last row; while the drawer is open (body.drawer-open) the Conditions panel ends 12 px above
+           it and scrolls inside (the desk rule is below, after the timeline's own; a tablet's is positionWarnStack). */
+        body.timeline-on #route-drawer{ padding-bottom:var(--tl-foot, 0px); }
         .drawer-head{ display:flex; align-items:center; gap:4px; padding:10px 16px; border-bottom:1px solid var(--line); }
         .drawer-tab{ border:none; background:none; font-size:12.5px; font-weight:600; color:var(--muted); padding:6px 10px; cursor:pointer; border-radius:6px; }
         .drawer-tab.active{ color:var(--navy); background:#eef3fb; }
@@ -573,6 +578,10 @@
             /* the conditions panel stops above the bar, which is taller now */
             body.timeline-on #tl-warnings{ max-height:min(60vh, 520px, calc(100vh - 130px - var(--tl-foot, 0px))); }
             body.timeline-on #tl-warnings > *{ flex:0 0 auto; }   /* shortened, the panel scrolls; its rows never squash */
+            /* 10 Nov 2026 (finding 4): the drawer is 46vh, so its top is at 54vh; the panel starts at 84 px (110 on a demo) */
+            body.drawer-open #tl-warnings, body.drawer-open.timeline-on #tl-warnings{ max-height:max(120px, calc(54vh - 96px)); }
+            body.drawer-open.has-demo-notice #tl-warnings, body.drawer-open.timeline-on.has-demo-notice #tl-warnings{ max-height:max(120px, calc(54vh - 122px)); }
+            body.drawer-open #tl-warnings > *{ flex:0 0 auto; }
         }
         .tl-row1{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
         #timeline-bar .tl-btn{ width:40px; height:40px; border:1px solid var(--ctl-line); background:var(--surface); color:var(--ink); font-size:14px; display:inline-flex; align-items:center; justify-content:center; }
@@ -795,6 +804,10 @@
                     max-height:calc(100vh - 24px); overflow:auto; background:var(--surface); border:1px solid var(--line); border-radius:12px;
                     box-shadow:0 12px 40px rgba(16,24,40,.22); padding:14px 16px 16px; font-size:14px; line-height:1.45; color:var(--ink); }
         #rme-panel[hidden]{ display:none; }
+        /* 10 Nov 2026 (live test finding 8): on a window under about 766 px the export card's top edge covered the DEMO
+           bar. Both cards are centred in the room UNDER the bar (26 px at a desk; measured below 1024; 0 on a phone,
+           where the notice is a pill over the map) and are never taller than that room. */
+        body.has-demo-notice #share-panel, body.has-demo-notice #rme-panel{ top:calc(50% + var(--notice-h, 26px) / 2); max-height:calc(100vh - 24px - var(--notice-h, 26px)); }
         #rme-panel .share-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
         #rme-panel .share-head b{ flex:1; font-size:16px; color:var(--navy-deep); }
         #rme-panel .rme-what{ margin:0 0 10px; color:var(--muted); }
@@ -6732,8 +6745,14 @@
         document.getElementById('tab-analysis').classList.toggle('active',tab==='analysis');
         document.getElementById('tab-detail').classList.toggle('active',tab==='detail');
         document.getElementById('route-drawer').classList.add('open');
+        document.body.classList.add('drawer-open');     // 10 Nov 2026 (finding 4): the Conditions panel ends above the drawer
+        if (typeof positionWarnStack === 'function') positionWarnStack();
     }
-    function closeDrawer(){ document.getElementById('route-drawer').classList.remove('open'); }
+    function closeDrawer(){
+        document.getElementById('route-drawer').classList.remove('open');
+        document.body.classList.remove('drawer-open');
+        if (typeof positionWarnStack === 'function') positionWarnStack();
+    }
     function card(val,lbl,sub){ return '<div class="an-card"><div class="an-val">'+val+'</div><div class="an-lbl">'+lbl+'</div>'+(sub?'<div class="an-sub">'+sub+'</div>':'')+'</div>'; }
 
     // 17 Oct 2026 (the user: UK drivers' hours): the trips one lorry makes in a day — the server's rule
@@ -6799,7 +6818,7 @@
                 const payload=pick(F.vehicle_payload_t,veh)||20;
                 // 12 Oct 2026 (B2): carbon is the SERVER's figure. forecast-matrix carries co2_t per month,
                 // keyed like monthly, from the same costlines read as the KPI bar and the Dashboard (km × the
-                // vehicle's kg CO2e/km, both legs). Nothing is worked out here any more — the drawer used to
+                // vehicle's kg CO2e/km; since 8 Nov 2026 the loaded leg + the share of the way back the route charges). Nothing is worked out here any more — the drawer used to
                 // multiply its own trips × round trip × a factor with a 0.9 fallback, so two carbon numbers
                 // could sit on one screen. A line-month with no road route stored for its vehicle is null: it is
                 // counted and named, never estimated.
@@ -6827,7 +6846,7 @@
                 const co2Card=mtx.co2_error
                     ? card('—','CO₂e (est.)','carbon could not be read')
                     : anyBaked
-                    ? card(co2t.toFixed(1)+' t','CO₂e (est.)','both legs'+(unbakedM?' · excl. '+unbakedM+' month'+(unbakedM>1?'s':'')+' not routed yet':''))
+                    ? card(co2t.toFixed(1)+' t','CO₂e (est.)','loaded, plus the scheme’s share of the return'+(unbakedM?' · excl. '+unbakedM+' month'+(unbakedM>1?'s':'')+' not routed yet':''))
                     : card('—','CO₂e (est.)','not routed for this lorry yet');
                 const intCard=mtx.co2_error
                     ? card('—','Carbon intensity','carbon could not be read')
@@ -6851,7 +6870,7 @@
                         card(Math.round(peakT).toLocaleString()+' t','Peak month','busiest month in window')+
                         card(trucksPeak,'Lorries for peak','to clear peak month')+
                     '</div>'+
-                    '<div class="an-sub" style="margin-top:10px;">Carbon: DESNZ 2026 factors, both legs, tailpipe only. The same figure as the bar above.'+
+                    '<div class="an-sub" style="margin-top:10px;">Carbon: DESNZ 2026 factors, tailpipe only. Each loaded journey and the scheme’s share of the empty return. The same figure as the bar above.'+
                     (mtx.carbon_stamp?' '+mtx.carbon_stamp+'.':'')+'</div>';
             } else {
                 extra='<div class="an-sub" style="margin-top:12px;">No approved forecast for this route, so no tonnes or carbon.</div>';
@@ -7391,7 +7410,7 @@
                         // 19 Oct 2026: the badges' key
                         '<div class="ml-row ml-key"><span class="co-pill">CO₂ 24</span>t CO₂e from that route in the month</div>' +
                         (miss ? '<div class="ml-foot">Leaves out ' + miss + ' line' + (miss === 1 ? '' : 's') + ' not routed yet.</div>' : '');
-                    more = 'Approved plan only, both legs. A colour means the same tonnes every month.' +
+                    more = 'Approved plan only: loaded journeys and the scheme’s share of the empty return. A colour means the same tonnes every month.' +
                         (mtx.carbonStamp ? ' ' + rlEsc(mtx.carbonStamp) + '.' : '');
                 }
             }
@@ -8548,7 +8567,10 @@
         // 12 Oct 2026: and never taller than the room left under the bar — the panel's bottom fell off a 375x667 screen; it
         // scrolls. The floor is the timeline bar's top while that is shown (it sits over the panel), else the viewport's edge.
         const tb = document.getElementById('timeline-bar');
-        const floor = (tb && tb.style.display !== 'none') ? Math.round(tb.getBoundingClientRect().top) - 8 : window.innerHeight - 12;
+        let floor = (tb && tb.style.display !== 'none') ? Math.round(tb.getBoundingClientRect().top) - 8 : window.innerHeight - 12;
+        // 10 Nov 2026 (finding 4): and above the route drawer while it is open (46vh tall, so its top is at 54vh; it
+        // slides in, so its own box is not read)
+        if (document.body.classList.contains('drawer-open')) floor = Math.min(floor, Math.round(window.innerHeight * 0.54) - 12);
         box.style.maxHeight = Math.max(120, floor - (Math.round(kpi.getBoundingClientRect().bottom) + 8)) + 'px';
     }
     window.addEventListener('resize', positionWarnStack);
