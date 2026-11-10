@@ -814,7 +814,8 @@ ok("⭐ the guide's §3.5 CLP monitoring: in the contents, says planned not obse
    '<a href="#3-5-clp-monitoring">3.5 CLP monitoring</a>' in src and '<h2 id="3-5-clp-monitoring">3.5 CLP monitoring</h2>' in src
    and "the figures are planned, not observed, because Wayscope holds no gate log, booking slots or arrival times" in src
    and all(t in src for t in ("<strong>Routes against their planning cap</strong>", "<strong>Sites against their CLP cap</strong>",
-                              "<strong>Movements by vehicle type</strong>", "<strong>by Euro class</strong>",
+                              "<strong>Lorry visits by vehicle type</strong>", "<strong>by Euro class</strong>",   # 10 Nov 2026 (F6)
+
                               "<strong>Movements and lorry distance by council</strong>",
                               "<strong>Carbon per delivery and per tonne against the target</strong>", "<strong>Lorry trips avoided</strong>"))
    and "it never shows a zero in place of a missing figure" in src and "Per load has no target line" in src)
@@ -1544,5 +1545,7 @@ ok("ROAD CARD POLISH: technical T1 has the rounding rule, the idle routes, the m
    all(w in _tg_rs for w in ('id="t1-road-rounding"', "<code>section_select.share_tenths</code>", "<code>idle</code>", "<code>through(pas=)</code>",
                              "<code>secselSnap</code>", "<code>CLICK_SLOP</code> = 6 px", "<code>clearBoxOfCard</code>",
                              "the 12 Oct whole-movements rule holds everywhere else")))
+ok("ROAD CARD EDGE: technical T1 says which side the road card opens on near the map's edges",
+   all(w in _tg_rs for w in ('id="t1-road-edge"', "<code>secselSide</code>", "<code>SECSEL_HALF</code> = 200 px", "<code>secselRightEdge</code>")))
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

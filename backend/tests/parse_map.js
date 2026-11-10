@@ -7637,7 +7637,9 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      && blk.includes("map.addControl(new AreaPickControl(), 'top-right')")
      && src.indexOf("map.addControl(new mapboxgl.NavigationControl(), 'top-right');") < src.indexOf("map.addControl(new AreaPickControl(), 'top-right')"));
   ok("⭐ 2.1-4 (card 0's bug): the road card opens on the side with room above the timeline bar and scrolls inside itself",
-     blk.includes("getPropertyValue('--tl-foot')") && blk.includes("anchor: below ? 'top' : 'bottom'")
+     blk.includes("getPropertyValue('--tl-foot')")
+     // NARROWED 10 Nov 2026 (road card edge): above / below as before, now with a side where the click is near an edge
+     && blk.includes("anchor: (below ? 'top' : 'bottom') + (side ? '-' + side : '')") && blk.includes("String(p.options.anchor).indexOf('top') === 0")
      && blk.includes("sc.style.maxHeight = Math.max(90, space - 170) + 'px';") && html.includes(".secsel-scroll{ max-height:260px; overflow:auto;"));
   ok("⭐ 2.1-4 Q1: every mode — a route line's click and a shared section's click both open the road card (the route tinted)",
      code.includes("if(typeof openRoadCard==='function'){ openRoadCard(e, rid); return; }")
@@ -7687,7 +7689,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   try {
     F = new Function("escHtml", "PV", "CW", "monthLabel", "teamText", "TENANT", "map", "styleReady", "document", "isPhoneShell", "mapboxgl",
                      "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle",
-                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, SECSEL_MAP };")(
+                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, SECSEL_MAP };")(
       esc, () => pv, () => (pv === 2 ? words2 : words1), m => (m === 23 ? 'Nov 2027' : 'M' + m), v => (v === 'IPT1' ? 'North Team' : v),
       { name: 'Wolds Link', demo_notice: 'Fictional scheme' }, {}, () => true, doc, () => false, {}, {}, () => 'https://x/map/?month=2027-11', null, null,
       x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }));
@@ -7817,6 +7819,21 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        && near.includes("|| (typeof limitHitAt === 'function' && limitHitAt(e.point)))) return;")
        && near.includes("if (!phone && typeof TLIM_LAYERS !== 'undefined' && map.queryRenderedFeatures(e.point, { layers: TLIM_LAYERS.filter(has) }).length) return;"));
   }
+  // ===== 10 Nov 2026 — road card edge (John's yes to notes/road-card-edge-mockup-1110) =====
+  if (F) {
+    ok("⭐ EDGE (seen on live 10 Nov: a card opened 60 px from the map's left edge read '…ar 2027'): a click near the left edge opens the card to its right, near the right edge to its left, else centred",
+       F.secselSide(60, 1122, 1066) === 'left' && F.secselSide(199, 1122, 1066) === 'left' && F.secselSide(200, 1122, 1066) === ''
+       && F.secselSide(560, 1122, 1066) === '' && F.secselSide(866, 1122, 1066) === '' && F.secselSide(867, 1122, 1066) === 'right' && F.secselSide(1100, 1122, 1066) === 'right');
+    ok("⭐ EDGE: with the Conditions panel open the free map ends at its left edge (710 px here): a click at 600 opens to the left, at 400 stays centred",
+       F.secselSide(600, 1122, 710) === 'right' && F.secselSide(400, 1122, 710) === '' && F.secselSide(100, 1122, 710) === 'left');
+    ok("EDGE: a map narrower than a card each side picks the side with more room; no right edge given means the map's width",
+       F.secselSide(100, 360, 304) === 'left' && F.secselSide(250, 360, 304) === 'right' && F.secselSide(300, 1000, 0) === '' && F.secselSide(900, 1000, 0) === 'right');
+  }
+  ok("⭐ EDGE: the popup's anchor is above / below plus that side, from the click's own point; the right edge is the Conditions panel while it shows on a wide screen, else the map buttons",
+     code.includes("const side = secselSide(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge());")
+     && code.includes("anchor: (below ? 'top' : 'bottom') + (side ? '-' + side : ''), className: 'secsel-popup' })")
+     && code.includes("if (w && getComputedStyle(w).display !== 'none' && window.innerWidth > 1023) return Math.round(w.getBoundingClientRect().left - m.left);")
+     && code.includes("return Math.round(m.width - 56);"));
   let afp = null;
   try { afp = new Function(/function areaFromParam\(s\) \{[\s\S]*?\n    \}/.exec(code)[0] + "\nreturn areaFromParam;")(); } catch (e) {}
   ok("2.1-4 Q7 (sandbox): the link's box reads back, and anything that is not a box is no box",

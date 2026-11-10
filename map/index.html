@@ -10682,12 +10682,35 @@
         const H = map.getContainer().clientHeight || 600;
         const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
         const room = H - foot, below = at.point.y < room / 2;
-        const pop = new mapboxgl.Popup({ offset: 10, maxWidth: '380px', anchor: below ? 'top' : 'bottom', className: 'secsel-popup' })
+        const side = secselSide(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge());
+        const pop = new mapboxgl.Popup({ offset: 10, maxWidth: '380px', anchor: (below ? 'top' : 'bottom') + (side ? '-' + side : ''), className: 'secsel-popup' })
             .setLngLat(at.lngLat).setHTML(roadCardHTML()).addTo(map);
         SECSEL.roadPopup = pop;
         // a close clears only its own card (a new click's card replaces it first)
         pop.on('close', () => { if (SECSEL.roadPopup === pop) { SECSEL.roadPopup = null; SECSEL.roadAt = null; SECSEL.roadKey = ''; } });
         fitRoadPopup();
+    }
+    // 10 Nov 2026 (road card edge; seen on live: a card opened near the map's left edge ran under the Control Panel, "…ar 2027").
+    // The card was always centred on the click and is up to 380 px wide. A click too close to the left edge opens the card to
+    // its RIGHT (the card's left corner at the click), one too close to the right edge - the Conditions panel while that is
+    // open - to its LEFT; anywhere else it stays centred. Pure: x = the click in the map, W = the map's width, right = where
+    // the free map ends, half = half a card and a margin.
+    const SECSEL_HALF = 200;
+    function secselSide(x, W, right, half) {
+        half = half || SECSEL_HALF;
+        right = Math.min(W, right > 0 ? right : W);
+        const nearL = x < half, nearR = x > right - half;
+        if (nearL && nearR) return x < right / 2 ? 'left' : 'right';      // a narrow map: the side with more room
+        return nearL ? 'left' : nearR ? 'right' : '';
+    }
+    // where the free map ends on the right, in the map's own px: the Conditions panel's left edge while it is open on a wide
+    // screen, else the column of map buttons
+    function secselRightEdge() {
+        try {
+            const m = map.getContainer().getBoundingClientRect(), w = document.getElementById('tl-warnings');
+            if (w && getComputedStyle(w).display !== 'none' && window.innerWidth > 1023) return Math.round(w.getBoundingClientRect().left - m.left);
+            return Math.round(m.width - 56);
+        } catch (e) { return 0; }
     }
     function fitRoadPopup() {
         const p = SECSEL.roadPopup, at = SECSEL.roadAt; if (!p || !at) return;
@@ -10695,7 +10718,7 @@
         const H = map.getContainer().clientHeight || 600;
         const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
         const y = map.project(at.lngLat).y;
-        const space = (p.options && p.options.anchor === 'top') ? (H - foot - y - 34) : (y - 34);
+        const space = (p.options && String(p.options.anchor).indexOf('top') === 0) ? (H - foot - y - 34) : (y - 34);
         const sc = el.querySelector('.secsel-scroll');
         if (sc) sc.style.maxHeight = Math.max(90, space - 170) + 'px';
     }
