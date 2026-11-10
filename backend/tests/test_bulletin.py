@@ -1101,9 +1101,10 @@ ok("🔴 the 14 px floor on a phone: the schematic map never draws narrower than
    str((_mv and _mv.group(1), _mm and _mm.group(1))))
 ok("…and on paper both figures take the page width (the phone's minimum is reset for print)",
    ".mapwrap svg{min-width:0}" in HTML10.split("@media print")[1])      # NARROWED 14 Oct 2026: no chart
+# NARROWED 10 Nov 2026 (UI critique 25d, claude/ui-fix-map-card): the page's own centring script is the one script allowed
 ok("…every place a person reads text is escaped (a zone typed with markup prints as text)",
    "<script" not in bulletin_doc.html(dict(S10, title="<script>x</script>")).split("<style>")[1].split("</style>")[1]
-   .replace("&lt;script&gt;", ""))
+   .replace("&lt;script&gt;", "").replace(bulletin_doc.MAP_CENTRE_JS, ""))
 
 # --------------------------------------------------------------------------- #
 #  8b. 13 Oct 2026 (the user): THIS MONTH AT A GLANCE and CARBON BY COUNCIL     #
@@ -1988,14 +1989,17 @@ ok("🔴 the endpoint is admin-only, costs one HERE call and stores nothing; not
 import brand_pdf  # noqa: E402
 _pages = lambda pdf: [" ".join(x.split()) for x in pdf_text(pdf).split("\f") if x.strip()]
 _PB = _pages(PDF10B)
-ok("⭐ D43 the newsletter is FOUR pages — with council areas (S10B) and without (S10) — each page one numbered section, in order",
+# NARROWED 10 Nov 2026 (UI critique 25c, John's yes): the sections are no longer numbered (the web page had no 01)
+ok("⭐ D43 the bulletin PDF is FOUR pages — with council areas (S10B) and without (S10) — each page one section, in order, unnumbered",
    len(PAGES) == 4 and len(_PB) == 4
-   and all(k in _PB[i] for i, k in enumerate(("01 THE MONTH IN BRIEF", "02 ROUTES AND ROADS", "03 COUNCILS", "04 CARBON AND THE SMALL PRINT")))
-   and "03 CARBON" in PAGES[2] and "Is " in PAGES[2] and "a lot?" in PAGES[2], str([len(PAGES), len(_PB)]))
+   and all(k in _PB[i] for i, k in enumerate(("THE MONTH IN BRIEF", "ROUTES AND ROADS", "COUNCILS", "CARBON AND THE SMALL PRINT")))
+   and not any(re.search(r"\b0[1-4] (THE|ROUTES|COUNCILS|CARBON)", pg) for pg in _PB + PAGES)
+   and "CARBON" in PAGES[2] and "Is " in PAGES[2] and "a lot?" in PAGES[2], str([len(PAGES), len(_PB)]))
 # NARROWED 14 Oct 2026 (the publishing check): page 1 is the front page — the lede, the four figures, the definition, the
 # map with its title, legend and key, the key points, how to report a lorry; the glance moved to page 4
 ok("⭐ page 1 reads on its own: the lede, the four figures, the definition, the map and its legend and key, Key points, how to report a lorry",
-   all(t in _PB[0] for t in ("The lorries Wolds Link (fictional) plans for October 2026: how many, where they go, and their carbon.",
+   # NARROWED 10 Nov 2026 (UI critique 25a): the lede parses with any name ("The lorries <name> plans for…" did not)
+   all(t in _PB[0] for t in ("How many lorries are planned for October 2026, where they go, and their carbon.",
                              bulletin_doc.DEFINITION, "Planned lorry routes, October 2026", "Lorry movements a day:",
                              "SITES", "ROAD WORKS AND LIMITS", "Key points", "Report a lorry off route"))
    and "This month at a glance" not in _PB[0] and all(f["value"] in _PB[0] for f in S10B["headline"]))
@@ -2013,7 +2017,8 @@ ok("⭐ W15 the brand band on page 1 (title, scheme, 'monthly newsletter', as-at
    "on every later page; the demo bar on every page; the foot with wayscope.co.uk and 'n of 4'",
    all("Issued" in pg[0] and "Approved plan as at" in pg[0] for pg in (_PB, PAGES))
    and all("Issued" not in pg for pg in _PB[1:] + PAGES[1:])
-   and all("Lorry movements bulletin · October 2026" in pg and "monthly newsletter" in pg
+   # NARROWED 10 Nov 2026 (UI critique 25b): one name, the bulletin — "monthly newsletter" is gone from the band and the head
+   and all("Lorry movements bulletin · October 2026" in pg and "newsletter" not in pg
            and "Fictional demo scheme · nothing here is real" in pg and "wayscope.co.uk" in pg for pg in _PB + PAGES)
    and all(f"{i} of 4" in pg for i, pg in enumerate(_PB, 1)))
 def _shown_fonts(pdf):
@@ -2070,11 +2075,13 @@ ok("⭐ D43 the leaflet is ONE page, with or without council areas",
 # reads "[link not set yet]"
 ok("⭐ the leaflet: the band (leaflet), the demo bar, the heading, the four figures, the definition, the map and legend, Key points, "
    "how to report a lorry with the hours and other formats, and where to read the newsletter (a placeholder until typed)",
-   all(t in _LPB[0] for t in ("Lorry movements bulletin · October 2026", "· leaflet ·", "Fictional demo scheme · nothing here is real",
+   # NARROWED 10 Nov 2026 (UI critique 25b): the leaflet is the bulletin's one-page version; it points to the full bulletin
+   all(t in _LPB[0] for t in ("Lorry movements bulletin · October 2026", "· one-page version ·", "Fictional demo scheme · nothing here is real",
                               "Lorries on your roads in October 2026", bulletin_doc.DEFINITION, "Lorry movements a day:",
                               "Key points", "Report a lorry off route", "Working hours:", "Large print and other formats:",
                               "Working hours: Monday to Friday 07:30-18:00.",
-                              "Every route, the councils and the carbon are in the monthly newsletter: https://www.example.org/lorries"))
+                              "Every route, the councils and the carbon are in the full bulletin: https://www.example.org/lorries"))
+   and "leaflet" not in _LPB[0].lower() and "newsletter" not in _LPB[0].lower()
    and "(page 2)" not in _LPB[0] and "page 1" in _LPB[0]
    and all(f["value"] in _LPB[0] for f in S10B["headline"]) and b"Inter-Bold" in LF10B and all(b"+" in f for f in _shown_fonts(LF10B)))
 # --------------------------------------------------------------------------- #
@@ -2178,7 +2185,9 @@ ok("⭐ W15 the page: the ink band with the logo inlined as SVG (vector, gradien
    '<header class="band">' in HTML10B and 'class="brand-logo"' in HTML10B and "ws-orange" in HTML10B and "<img" not in HTML10B
    and '<div class="band-rule"></div>' in HTML10B and "fonts.googleapis.com/css2?family=Inter" in HTML10B
    and '<ul class="brief" data-bulletin="brief">' in HTML10B and HTML10B.index('data-bulletin="map"') < HTML10B.index('data-bulletin="brief"')
-   and 'href="/bulletin/leaflet/?month=10">The one-page leaflet</a>' in HTML10B and 'href="/api/bulletin/leaflet.pdf?month=10"' in HTML10B)
+   # NARROWED 10 Nov 2026 (UI critique 25b): the links read "One-page version" and "One-page version (PDF)"
+   and 'href="/bulletin/leaflet/?month=10">One-page version</a>' in HTML10B
+   and 'href="/api/bulletin/leaflet.pdf?month=10">One-page version (PDF)</a>' in HTML10B)
 _pxL = [int(x) for x in re.findall(r"(?:font-size:|font:(?:\d{3} )?)(\d+)px", LH10B)]
 ok("🔴 the leaflet page: the 14 px floor, a viewport, the demo notice, the map scrolls rather than shrinks on a phone",
    _pxL and min(_pxL) >= 14 and '<meta name="viewport" content="width=device-width,initial-scale=1">' in LH10B

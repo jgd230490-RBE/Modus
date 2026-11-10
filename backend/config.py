@@ -591,6 +591,11 @@ def validate(doc, network=None):
         if dg:
             # worded for the field a person sees (Config → Planning → Default gate hours), not the setting's path
             p.append(dg)
+        # 10 Nov 2026 (UI critique finding 5): the share of a line's plan a shortfall must pass before the Look-ahead
+        # flags it (absent = clashes.SHORT_FLAG_PCT, 10). Worded for the field a person sees (Config → Planning).
+        sf = plan.get("short_flag_pct")
+        if sf is not None and (not num(sf) or sf < 0 or sf > 100):
+            p.append("Flag a shortfall over: a percentage from 0 to 100")
         # 8 Nov 2026 (v2.1): the return journeys' defaults and the part share (absent = return_journey.DEFAULTS)
         import return_journey as _rj
         rjp = _rj.settings_problem(plan.get("return_journeys"))

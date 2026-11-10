@@ -2198,10 +2198,11 @@ def _band(S, kind):
     import brand_pdf
     return {"height": 26 * mm, "fonts": brand_pdf.fonts(),
             "title": _pdf_safe(S["brand_title"]),
-            "sub": _pdf_safe(f"{S['tenant']} · {kind} · counts are " + __import__("counting").words()["many"]),
+            # 10 Nov 2026 (UI critique 25b): the bulletin's band names no kind (its title says "bulletin"); the one-page version says so
+            "sub": _pdf_safe(f"{S['tenant']} · " + (f"{kind} · " if kind else "") + "counts are " + __import__("counting").words()["many"]),
             "right": _pdf_safe(f"{S['as_at']} · {S['issued']}"),
             # 14 Oct 2026 (the publishing check): pages 2 on carry a slim running head, not the full band again
-            "running": 10.5 * mm, "right_later": _pdf_safe(f"{S['tenant']} · {kind}")}
+            "running": 10.5 * mm, "right_later": _pdf_safe(f"{S['tenant']} · {kind or 'bulletin'}")}
 
 
 def _bulletin_doc(S, kind, buf, pages=None):
@@ -2216,7 +2217,7 @@ def _bulletin_doc(S, kind, buf, pages=None):
                          notice=((_pdf_safe(notice), _BF("bold"), 8.5, DEMO_FG_RGB, H - band["height"] - 8.5 * mm)
                                  if notice else None),
                          foot=(_pdf_safe(S["foot"] + " · wayscope.co.uk"), _BF("regular"), 7, GREY), band=band)
-    doc = frame_doc(buf, W, H, lm, rm, top, 14 * mm, _pdf_safe(f"{S['title']} · {S['tenant']} · {kind}"), on_page,
+    doc = frame_doc(buf, W, H, lm, rm, top, 14 * mm, _pdf_safe(f"{S['title']} · {S['tenant']} · {kind or 'bulletin'}"), on_page,
                     top_later=top_later)
     return doc, W - lm - rm
 
@@ -2273,13 +2274,15 @@ def _newsletter(S, map_h, pages=None):
     terms, caveats and one numbered Sources list (sources were printed beside every row and on every page)."""
     from reportlab.platypus import PageBreak, CondPageBreak
     buf = io.BytesIO()
-    doc, usable = _bulletin_doc(S, "monthly newsletter", buf, pages)
+    doc, usable = _bulletin_doc(S, "", buf, pages)   # 10 Nov 2026 (25b): was "monthly newsletter" — one name, the bulletin
     K = _Kit(usable)
     E, P, grid = K.E, K.P, K.grid
     st, st_r, st_h, st_hr, st_sec, st_grey = K.st, K.st_r, K.st_h, K.st_hr, K.st_sec, K.st_grey
 
+    # REVERSED 10 Nov 2026 (UI critique 25c, John's yes): the sections are not numbered (the web page had no 01; a scheme
+    # with no council areas read 01, 02, 03 Carbon, 04); `n` is kept so the four calls still say which page they open
     def kicker(n, words):
-        return P(f"{n}  {E(words.upper())}", K.st_kick)
+        return P(E(words.upper()), K.st_kick)
 
     story = []
     # ---- 01 the month in brief (page 1 reads on its own)
@@ -2505,7 +2508,7 @@ LEAFLET_MAP_HEIGHTS = (100 * mm, 90 * mm, 80 * mm, 70 * mm, 60 * mm, 50 * mm)
 def _leaflet(S, map_h):
     """One build of the leaflet with the map at `map_h`: (bytes, pages)."""
     buf = io.BytesIO()
-    doc, usable = _bulletin_doc(S, "leaflet", buf)
+    doc, usable = _bulletin_doc(S, "one-page version", buf)   # 10 Nov 2026 (25b): was "leaflet"
     K = _Kit(usable)
     E, P = K.E, K.P
     # 14 Oct 2026 (the publishing check): a heading a resident reads first (it says what the lede said), the four
@@ -2520,7 +2523,7 @@ def _leaflet(S, map_h):
     story.append(K.report_box(S))
     story.append(Spacer(1, 1.5 * mm))
     if S.get("newsletter_url"):          # 30 Oct 2026 (task 4b): no typed link, no line
-        story.append(P(E(f"Every route, the councils and the carbon are in the monthly newsletter: {S['newsletter_url']}"), K.st))
+        story.append(P(E(f"Every route, the councils and the carbon are in the full bulletin: {S['newsletter_url']}"), K.st))
     story.append(P(E(S.get("carbon_stamp") or ""), K.st_grey))
     doc.build(story)
     return buf.getvalue(), doc.page
