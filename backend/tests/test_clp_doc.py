@@ -404,10 +404,15 @@ ok("two sites: profiles only where a site has a gate (the pile has none)", {h["s
 #  4. §5's evidence                                                             #
 # =========================================================================== #
 M = D1["measures"]
-ok("⭐ ticks only where the plan already does it: scheduling (a confirmed week), out of peak (bands), vehicle choice",
-   M["Delivery scheduling"]["tick"] and M["Re-timing for out of peak deliveries"]["tick"] and M["Vehicle choice"]["tick"]
+# REVERSED 10 Nov 2026 (F3): a person ticks what the plan commits to; Wayscope ticks only the no-delivery hours it sets,
+# and prints the evidence under scheduling, vehicle choice and designated routes with no tick
+ok("⭐ only out of peak (bands) is ticked; scheduling (a confirmed week) and vehicle choice show evidence, no tick",
+   M["Delivery scheduling"]["tick"] is False and M["Delivery scheduling"]["evidence"].startswith("Weeks are confirmed")
+   and M["Re-timing for out of peak deliveries"]["tick"] and M["Vehicle choice"]["tick"] is False
+   and M["Vehicle choice"]["evidence"].endswith("loads).")
    and M["Re-timing for out of peak deliveries"]["evidence"] == f"No deliveries {gate_hours.peak_words(D1['peak_bands'])} at any gate.")
-ok("...every route drawn: designated routes ticked", M["Adherence to designated routes"]["tick"]
+ok("...every route drawn: designated routes NOT ticked (REVERSED 10 Nov 2026, F3), the evidence kept",
+   M["Adherence to designated routes"]["tick"] is False
    and M["Adherence to designated routes"]["evidence"].startswith("4 approved routes"), str(M["Adherence to designated routes"]))
 ok("...rail and precast: the evidence, never a tick; Euro VI said, not ticked",
    M["Freight by rail*"]["tick"] is False and "Rail Head" in M["Freight by rail*"]["evidence"]
@@ -668,6 +673,24 @@ _cd = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "clp_d
 ok("TRAFFIC: the layers read gives each limit a plan route passes; §2.3.1 prints this plan beside all lorries",
    'out["traffic_limits"] = traffic_rows(' in _cl and '["Road", "Limit", "Busiest month", "This plan", "All lorries"]' in _cd
    and "A planning check, not a count on the road." in _cd)
+# 10 Nov 2026 (F3, F4, F5, F11): the words a CLOCS reader checks (each fails on the text before)
+ok("🔴 F3 §5's lead: a person ticks; never 'Wayscope ticked a row only where'",
+   "Wayscope ticked a row only where" not in JOINED and "a person ticks the measures this plan commits to" in JOINED
+   and "Only the no-delivery hours are ticked, because they are set in Wayscope." in JOINED)
+ok("🔴 F3 the ticks in the file: only Re-timing for out of peak deliveries", {k for k, v in ticks.items() if v == "✔"}
+   <= {"Re-timing for out of peak deliveries"}, str({k for k, v in ticks.items() if v == "✔"}))
+ok("🔴 F4 85 % named as Wayscope's planning level (§7 once; §1.1 beside each gate)",
+   JOINED.count(clp_doc.GATE_LEVEL_WORDS) == 1 and clp_doc.GATE_LEVEL_WORDS == "85 % is Wayscope's planning level for a gate, not a published standard."
+   and all(", Wayscope's planning level for a gate; in its busiest month" in x for x in JOINED.split(chr(10)) if "kept under 85 %" in x)
+   and "kept under 85 % of its capacity, Wayscope's planning level for a gate;" in _cd)
+ok("🔴 F4 the search distances are Wayscope's: one line, the plan's own distances",
+   clp_doc.search_words(250, 500) == "250 m and 500 m are Wayscope's search distances, not a CLOCS figure."
+   and _cd.count("D.src(search_words(") == 1)
+ok("🔴 F11 §7: the delivered figures are on Look-ahead → Account, not in this document",
+   "recorded as delivered" not in JOINED and
+   "Each confirmed week's planned quantities. What was delivered is recorded on Look-ahead → Account; this document does not print it." in JOINED)
+ok("🔴 F5 a draft carries no 'approved' in its header and no issued line", "· approved" not in JOINED
+   and clp_doc.ISSUED_WORDS not in JOINED and '"Approved by", "What changed"' not in _cd and '"Issued by", "What changed"' in _cd)
 print()
 for f in FAIL:
     print("  FAIL:", f)
