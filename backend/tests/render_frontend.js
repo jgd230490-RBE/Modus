@@ -483,7 +483,11 @@ if (loaded) {
     ok("...and the diesel index the model priced at, with the winter note", mOut.includes("€" + (+pv.index_eur_per_l).toFixed(3) + " per litre") && mOut.includes("winter months"));
     ok("...nothing renders as undefined or NaN", !/undefined|NaN/.test(mOut));
     const mNone = render("the matrix renders with NO preview (nothing typed)", h(Matrix, { meta: mMeta, who: "t", editTarget: null, vehLang: "en", access: planner, initialCost: null }));
-    ok("...and says 'type a quantity to see the price' with fair — and 'rate not set'", mNone.includes("type a quantity to see the price") && mNone.includes("rate not set"));
+    // NARROWED 10 Nov 2026 (wave 3, finding 16): with nothing typed the strip is ONE line, not six zeros and two dashes; the
+    // "type a quantity to see the price" words stay for a typed form whose price has not come back yet
+    ok("...and says 'type a quantity to see the price' with fair — and 'rate not set'",
+      mNone.includes('data-strip-empty="1"') && /Type a month(&#x27;|')s quantity: the loads, lorries and price show here\./.test(mNone)
+      && !mNone.includes("rate not set") && !mNone.includes('data-cost-strip="1"'));
     const mUnb = render("the matrix renders an UNBAKED preview", h(Matrix, { meta: mMeta, who: "t", editTarget: null, vehLang: "en", access: planner,
       initialCost: { ...pv, baked: false, fair_reason: "not baked", cells: [], totals: { ...pv.totals, fair: { eur: null, per_t: null, per_trip: null, per_km: null } } } }));
     // 13 Oct 2026 (W3, narrowed): plain words
@@ -976,15 +980,21 @@ if (loaded) {
         gS.length > 0 && GW.gates.slice(0, 6).every((g, i) => i === 0 || gS.indexOf(`data-gw-gate="${GW.gates[i - 1].gate_id}"`) < gS.indexOf(`data-gw-gate="${g.gate_id}"`))
         && gS.includes('aria-label="About: Gates this week"'));
       const nRed = GW.gates.filter(g => g.flag === "red").length;
+      // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 33, mockup card 3): the gates are one list; a row opens its day chart, so the
+      // flagged days and the capacity sentence are read from the list with every row open (initialOpen); closed by default
+      const gOpen = (() => { const o = render("the gates list with every row open", h(sandbox.GatesWeek, { gw: GW, initialOpen: true }));
+        const i = o.indexOf('data-gates-week="1"'); return i < 0 ? "" : o.slice(i, o.indexOf("</section>", i)); })();
       ok("W17: the headline counts the gates over capacity; every flagged day is a word with its icon and its %, never colour alone",
         gS.includes(`data-gw-head="1">${nRed} gate${nRed === 1 ? "" : "s"} over capacity on a day this week<`)
-        && GW.gates.slice(0, 6).every(g => g.days.filter(d => d.flag).every(d => gS.includes(`data-gw-day="${d.date}"`)))
-        && (gS.match(/data-row-status="bad"/g) || []).length === GW.gates.slice(0, 6).reduce((n, g) => n + g.days.filter(d => d.flag === "red").length, 0)
-        && gS.includes(`${GW.gates[0].days[0].day}: Over gate capacity (${GW.gates[0].days[0].pct} %)`));
+        && !gS.includes("data-gw-detail=") && !gS.includes("data-gw-day=")
+        && GW.gates.every(g => g.days.filter(d => d.flag).every(d => gOpen.includes(`data-gw-day="${d.date}"`)))
+        && (gOpen.match(/data-row-status="bad"/g) || []).length === nRed + GW.gates.reduce((n, g) => n + g.days.filter(d => d.flag === "red").length, 0)
+        && (gS.match(/data-row-status="bad"/g) || []).length === nRed
+        && gOpen.includes(`${GW.gates[0].days[0].day}: Over gate capacity (${GW.gates[0].days[0].pct} %)`));
       ok("W17: a gate with no check-in says nothing is compared; each gate says what it can check in and how",
         // NARROWED 17 Oct 2026: the hours the capacity rests on are named (the default gate hours here), never "the shift"
-        gS.includes("No check-in time typed: nothing is compared.") && gS.includes("Can check in 200 a day (open 07:00–17:00 by default ÷ 3 min a lorry).")
-        && gS.includes("Can check in 300 a day (open 07:00–17:00 by default ÷ 2 min a lorry).") && !gS.includes("the shift ÷"));
+        gOpen.includes("No check-in time typed: nothing is compared.") && gOpen.includes("Can check in 200 a day (open 07:00–17:00 by default ÷ 3 min a lorry).")
+        && gOpen.includes("Can check in 300 a day (open 07:00–17:00 by default ÷ 2 min a lorry).") && !gOpen.includes("the shift ÷"));
       ok("🔴 W17: the honest limit and the week-split sentence are printed under the gates",
         // NARROWED 17 Oct 2026: the limit names the shut times and the bands
         gS.includes("Planned arrivals spread evenly over the gate&#x27;s open hours, less its shut times and the no-delivery bands; no hourly peak is known.")
@@ -992,7 +1002,8 @@ if (loaded) {
       // 17 Oct 2026 (the review): the week card with a gate's shut times and one left no open time
       const GWS = { ...GW, gates: GW.gates.map((g, i) => i === 0 ? { ...g, shut_minutes: 45, shut_words: "08:30–09:15" }
                                                    : i === 1 ? { ...g, no_open_time: true, capacity_per_day: 0 } : g) };
-      const gwO = render("the Commit view renders the week with shut times", h(LookAhead, { meta: laMeta, who: "t", initialPage: { ...fixture, gates_week: GWS }, initialView: "commit" }));
+      // NARROWED 10 Nov 2026 (wave 3, item 33): read with every row open (the sentence is in an opened row's chart title)
+      const gwO = render("the Commit view renders the week with shut times", h(sandbox.GatesWeek, { gw: GWS, initialOpen: true }));
       const gwS = (() => { const i = gwO.indexOf('data-gates-week="1"'); return i < 0 ? "" : gwO.slice(i, gwO.indexOf("</section>", i)); })();
       ok("⭐ the review: the week card says 'less 45 min shut' for a gate with shut times and 'No open time' for one with none left",
         gwS.includes("less 45 min shut ÷") && gwS.includes("No open time: the no-delivery bands and this gate&#x27;s shut times cover all its hours.")
@@ -1031,30 +1042,41 @@ if (loaded) {
     const acctOut = render("the Account view renders with a populated page",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "account" }));
     ok("...with the four KPI cards and the held / applied / waiting states of the fixture",
-      acctOut.includes("last week delivered · 98% band") && acctOut.includes("open to calibrate")
-      && acctOut.includes(">held<") && acctOut.includes("applied · ") && acctOut.includes(">waiting<"));
+      // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the cards in words, Delivered / Added n t / Waiting
+      acctOut.includes("lines delivered last week, within 2 % of plan") && acctOut.includes("can add") && !acctOut.includes("calibrate")
+      && acctOut.includes(">Delivered<") && acctOut.includes(">Added ") && acctOut.includes(">Waiting<") && !acctOut.includes(">held<") && !acctOut.includes("applied · "));
     ok("...the confirmed cost box is rendered next to the actual",
       acctOut.includes("The confirmed cost of this week"));
     // 13 Oct 2026 (W3, narrowed): the footer's rule is in the Variance header's info box (dom_frontend opens it)
     ok("...and the Variance header carries the not-reported rule's info box",
-      acctOut.includes('aria-label="About: Variance"') && !acctOut.includes("Empty actual is not zero"));
+      // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the column is "Difference"
+      acctOut.includes('aria-label="About: Difference"') && !acctOut.includes("Empty actual is not zero"));
     // 22 Oct 2026 (UI fix 6, cards 1 and 2): the Account table keeps its 1,220 px with the Action column pinned and 13 px
     // headings, and a short line's 'spread on this week' is the standard small button. The fixture has no short line, so
     // its first account row is made one here (action spread, 12.5 short).
     const spreadFix = JSON.parse(JSON.stringify(fixture));
-    spreadFix.account.rows[0] = { ...spreadFix.account.rows[0], action: "spread", remaining_short: 12.5, variance: 12.5, held: false };
+    // NARROWED 10 Nov 2026 (wave 3, finding 5): the wash is amber and only on a line short past the organisation's share
+    // (short_flag); an unflagged spread line keeps its button but no wash (checked below)
+    spreadFix.account.rows[0] = { ...spreadFix.account.rows[0], action: "spread", remaining_short: 12.5, variance: 12.5, held: false, short_flag: true };
     const spOut = render("UI FIX 6: the Account view renders a short line (action spread)",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: spreadFix, initialView: "account" }));
-    const spRow = spOut.slice(spOut.indexOf('<tr class="border-t border-slate-100 align-middle" style="background:rgba(191,46,85,.05)">'));
+    const spRow = spOut.slice(spOut.indexOf('<tr class="border-t border-slate-100 align-middle" style="background:rgba(217,119,6,.06)">'));
     ok("⭐ UI FIX 6 card 2: the short line's 'spread on this week' is the standard small button (btn-pri btn-sm), same words and title; the 11 px white one-off is gone",
-      spOut.includes('style="background:rgba(191,46,85,.05)"') && spRow.includes('<button class="btn-pri btn-sm disabled:opacity-40" title="Carry +12.5 into the commit week, divided over its remaining weekdays. Refused if that week is confirmed.">spread on this week</button>')
-      && !spOut.includes("rounded-lg text-white") && (spOut.match(/>spread on this week</g) || []).length === 1);
+      spOut.includes('style="background:rgba(217,119,6,.06)"') && spRow.includes('<button class="btn-pri btn-sm disabled:opacity-40" title="Add 12.5 t to this week, divided over its remaining weekdays. Refused if that week is confirmed.">Add to this week</button>')
+      && !spOut.includes("rounded-lg text-white") && (spOut.match(/>Add to this week</g) || []).length === 1);   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2)
     ok("⭐ UI FIX 6 cards 1 and 2: the table keeps 1,220 px in its padded scroller under 13 px headings (la-acct-head); the Action heading and every Action cell are pinned (la-pin), the short line's cell painting the row's rose (la-pin-short)",
       spOut.includes('<div class="overflow-auto la-acct-scroll"><table class="text-sm w-full" style="min-width:1220px"><thead class="la-acct-head">')
       && spOut.includes('<th class="px-2 py-2 text-right font-semibold la-pin">Action<button')
       && (spOut.match(/<td class="px-2 py-2 text-right whitespace-nowrap la-pin( la-pin-short)?">/g) || []).length === spreadFix.account.rows.length
       && (spOut.match(/la-pin la-pin-short/g) || []).length === 1 && spRow.includes('<td class="px-2 py-2 text-right whitespace-nowrap la-pin la-pin-short">')
       && !acctOut.includes("la-pin-short") && !/<thead class="[^"]*text-\[10px\] uppercase[^"]*"><tr><th class="px-3 py-2 text-left font-semibold">Line</.test(spOut));
+    // 10 Nov 2026 (wave 3, finding 5): a spread line under the share keeps its button, with no wash and no pinned tint
+    const quietFix = JSON.parse(JSON.stringify(spreadFix));
+    quietFix.account.rows[0].short_flag = false;
+    const qOut = render("wave 3: the Account view renders a short line under the share", h(LookAhead, { meta: laMeta, who: "t", initialPage: quietFix, initialView: "account" }));
+    ok("⭐ wave 3 (finding 5): a line short by less than the share keeps 'spread on this week' but has no wash and no la-pin-short",
+      (qOut.match(/>Add to this week</g) || []).length === 1 && !qOut.includes("la-pin-short") && !qOut.includes("background:rgba(217,119,6,.06)")
+      && !qOut.includes('<tr class="border-t border-slate-100 align-middle" style="background:'));
 
     const hzOut = render("the Horizon view renders with a populated page",
       h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "horizon" }));
@@ -1100,8 +1122,9 @@ if (loaded) {
         h(LookAhead, { meta: laMeta, who: "t", access: planner, initialPage: fuelFix, initialView: "account" }));
       const nTarget = fuelFix.account.rows.filter(r => r.rate_source === "target").length;
       ok("...the strip widget sits above the KPI cards with typeable yard and share boxes for a planner",
-        fAcct.includes('data-fuel-widget="strip"') && fAcct.indexOf('data-fuel-widget="strip"') < fAcct.indexOf("last week delivered · 98% band")
-        && fAcct.includes("Yard €/L") && fAcct.includes("Fuel share %") && (fAcct.match(/inputmode="decimal"/gi) || []).length >= 2);
+        // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): a titled Fuel card with two labelled boxes
+        fAcct.includes('data-fuel-widget="strip"') && fAcct.indexOf('data-fuel-widget="strip"') < fAcct.indexOf("lines delivered last week, within 2 % of plan")
+        && fAcct.includes("Yard price per litre") && fAcct.includes("Fuel share of the cost") && (fAcct.match(/inputmode="decimal"/gi) || []).length >= 2);
       ok("...every target-priced account row carries the 'target' chip and every priced row a + BAF line",
         (fAcct.match(/>target<\/span>/g) || []).length === nTarget && nTarget >= 1
         && (fAcct.match(/\+ BAF €/g) || []).length === fuelFix.account.rows.filter(r => r.planned_eur_adj != null).length);
@@ -1162,7 +1185,8 @@ if (loaded) {
         !fEe.includes("data-fair-country-offer") && !fNoC.includes("data-fair-country-offer") && fNoC.includes('value="25"'));
       const fNone = render("the widget renders with NO data at all", h(FuelWidget, { who: "t", access: planner, mode: "strip", initial: null }));
       ok("...as 'Index unavailable — type a price' for a planner, and nothing undefined",
-        fNone.includes("Index unavailable — type a price") && !/undefined|NaN/.test(fNone));
+        // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the Account's card says "No diesel price yet" and the surcharge "No diesel price to work it from"
+        fNone.includes("No diesel price yet") && fNone.includes("No diesel price to work it from") && !/undefined|NaN/.test(fNone));
       const fStale = render("the widget renders a stale index", h(FuelWidget, { who: "t", access: planner, mode: "compact",
         initial: { ...fuelFix.costing, index_eur_per_l: null } }));
       ok("...a compact card with no index says so instead of a price", fStale.includes("Index unavailable"));
