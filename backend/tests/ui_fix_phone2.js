@@ -33,7 +33,7 @@ w.HTMLCanvasElement.prototype.getContext = () => null;
 const act = w.React.act || require(G + "react-dom/test-utils").act;
 w.IS_REACT_ACT_ENVIRONMENT = true; global.IS_REACT_ACT_ENVIRONMENT = true;
 w.eval(CLOCK.shiftSource());
-w.eval(js);
+w.eval(js + "\nwindow.__N = { NAV, DESK_LINE, PHONE_READ_PAGES, PHONE_PAGES };");
 
 const mount = (C, props) => { const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
   act(() => { r.render(w.React.createElement(C, props)); }); return { el, done: () => { act(() => { r.unmount(); }); el.remove(); } }; };
@@ -99,6 +99,44 @@ const mount = (C, props) => { const el = w.document.createElement("div"); w.docu
        && gEff.includes("setStripBottom(b => (b === lift ? b : lift))") && !gEff.includes("phone){ setDots"));
     ok("GUIDE STRIP PHONE: the desk keeps its rail-wide start (240 px default) and the strip's own CSS is unchanged (13 px, max-width 100vw − 72)",
        html.includes("const [railRight, setRailRight] = useState(240);") && /\.guide-strip\{[^}]*max-width:calc\(100vw - 72px\)/.test(html));
+
+    // ---- the desktop cards and the More sheet (10 Nov 2026, the part John approved from the mockup) -------------
+    const NAVITEMS = w.__N.NAV.flatMap(g => g.items), DL = w.__N.DESK_LINE, READ = w.__N.PHONE_READ_PAGES, PP = w.__N.PHONE_PAGES;
+    const deskIds = NAVITEMS.map(i => i.id).filter(id => !PP.includes(id) && !READ.includes(id));
+    ok("DESK CARDS: every desk page has its own one-line purpose, all different, none with a back-end word or a decision code",
+       deskIds.length >= 13 && deskIds.every(id => typeof DL[id] === "string" && DL[id].length > 8 && DL[id].length < 60) && new Set(deskIds.map(id => DL[id])).size === deskIds.length
+       && !deskIds.some(id => /\b(API|endpoint|server|JSON|token|D\d\d)\b/.test(DL[id])), deskIds.join(","));
+    let homed = 0;
+    const leads = [];
+    for (const id of deskIds) {
+      const label = NAVITEMS.find(i => i.id === id).label;
+      const d = mount(w.DeskOnly, { id, label, onHome(){ homed++; } });
+      leads.push(d.el.querySelector(".do-lead").textContent);
+      const txt = d.el.textContent;
+      ok(`DESK CARD ${id}: its name, its own line, then one sentence naming the four phone pages and where to open it; no 'Open on a desktop to edit this'`,
+         d.el.querySelector("h2").textContent === label && d.el.querySelector(".do-lead").textContent === DL[id]
+         && txt.includes("Open it on a computer or a tablet. A phone reads the Dashboard, the Look-ahead, the Route map and the Simulation.") && !txt.includes("Open on a desktop to edit this"));
+      if (id === deskIds[0]) { d.el.querySelector("button").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); }
+      d.done();
+    }
+    ok("DESK CARDS: the nine-plus cards are not identical (every lead differs) and the button still goes to the Dashboard", new Set(leads).size === leads.length && homed === 1);
+
+    const groups = w.__N.NAV;
+    const pm = mount(w.PhoneMore, { groups, page: "dashboard", onPick(){}, onClose(){}, role: { role: "planner", label: "Planner", ipt: null }, who: "Sam", pending: 7, concernNew: 3 });
+    const heads = [...pm.el.querySelectorAll("h3")].map(h => h.textContent);
+    ok("MORE: two headings, 'Read here' (the Simulation) then 'Open on a computer or tablet'; no paragraph under them",
+       heads.join("|") === "Read here|Open on a computer or tablet" && !pm.el.querySelector("#phone-more > p") && !/Made for a desktop|plan on a desktop|say so/.test(pm.el.textContent));
+    ok("MORE: no count — 'waiting' and 'new' are gone even when the page is handed numbers; only the guide's 'new tab' note stays",
+       !/\d+ waiting|\d+ new\b/.test(pm.el.textContent) && [...pm.el.querySelectorAll(".pm-note")].map(n => n.textContent).join("|") === "new tab");
+    const items = [...pm.el.querySelectorAll("button.phone-more-item")];
+    ok("MORE: the Simulation is in the ink weight, every desk page carries the plainer pm-desk class",
+       !items.find(b => /Simulation/.test(b.textContent)).classList.contains("pm-desk") && items.filter(b => b.classList.contains("pm-desk")).length === items.length - 1 && items.length >= 14);
+    pm.done();
+    const tb = mount(w.PhoneTabs, { groups, page: "dashboard", onPick(){}, moreOpen: false, onMore(){}, pending: 5 });
+    ok("MORE TAB: no red count on the More tab", !tb.el.querySelector(".rail-count") && tb.el.querySelectorAll(".phone-tab").length === 4);
+    tb.done();
+    ok("MORE: the pm-desk rule sits before the is-on rule (the open page still reads in the action colour) and uses the muted caption colour",
+       html.indexOf(".phone-more-item.pm-desk{") > 0 && html.indexOf(".phone-more-item.pm-desk{") < html.indexOf(".phone-more-item.is-on{") && /var\(--muted\)/.test(css(".phone-more-item.pm-desk")));
   } catch (e) { ok("PHONE 2: the harness ran to the end", false, String(e && e.stack || e).slice(0, 600)); }
   console.log(`\n${pass} passed, ${fail.length} failed`);
   fail.forEach(f => console.log("  FAIL: " + f));

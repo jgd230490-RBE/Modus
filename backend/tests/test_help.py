@@ -1184,12 +1184,12 @@ _ch17 = _ug[_ug.index('<h1 id="17-the-simulation">'):_ug.index('<h1 id="18-clp-d
 ok3("⭐ SIM PAGE: the user guide has chapter 17 'The Simulation' with 17.1–17.3 in the nav and the text, holding the Month / Week / Day paragraph (chapter 3 keeps one pointer line)",
     all(t in _ug for t in ('<a href="#17-the-simulation">17. The Simulation</a>', '<a href="#17-1-the-day-and-the-controls">17.1', '<a href="#17-2-the-scenario">17.2', '<a href="#17-3-the-tables-the-checks-and-the-phone">17.3'))
     and all(t in _ch17 for t in ('<h2 id="17-1-the-day-and-the-controls">', '<h2 id="17-2-the-scenario">', '<h2 id="17-3-the-tables-the-checks-and-the-phone">', "<strong>Month</strong>", "<strong>Hours and check-in</strong>", "<strong>Every gate</strong>",
-        "<strong>Arrivals</strong>", "<strong>morning rush</strong>", "<strong>Busiest hour at each gate</strong>", "<strong>Checks</strong>", "<strong>more gates</strong>", "Read here, plan on a desktop"))
+        "<strong>Arrivals</strong>", "<strong>morning rush</strong>", "<strong>Busiest hour at each gate</strong>", "<strong>Checks</strong>", "<strong>more gates</strong>", "Read here"))   # NARROWED 10 Nov 2026 (UI fix phone 2): the heading is "Read here"
     and _ug.count("<p><strong>Simulation</strong> plays a working day lorry by lorry on its own map") == 1 and _ug.index('<h1 id="17-the-simulation">') < _ug.index("<p><strong>Simulation</strong> plays a working day")
     and "has its own page under Plan (chapter 17)" in _ug and "<strong>Open the Simulation</strong>" in _ug, _ch17[:200])
-ok3("SIM PAGE: chapter 17 names no supplier, rule code, parameter or back-end word; the phone section (2.4) lists the Simulation first under 'Read here, plan on a desktop'",
+ok3("SIM PAGE: chapter 17 names no supplier, rule code, parameter or back-end word; the phone section (2.4) lists the Simulation first under 'Read here'",
     not re.search(r"\b(API|endpoint|server|JSON|D59|D85|D86|HERE|Mapbox|predict\w*|real-time|trucks?)\b", _ch17)
-    and "lists the <strong>Simulation</strong> first, under <em>Read here, plan on a desktop</em>" in _ug)
+    and "lists the <strong>Simulation</strong> first, under <em>Read here</em>" in _ug)
 ok3("SIM PAGE: the technical guide #t1-sim-page holds the detail (the NAV id, PHONE_READ_PAGES, SimDashLine, the look's style, the audit stops)",
     'id="t1-sim-page"' in _tgv2 and "<code>PHONE_READ_PAGES</code>" in _tgv2 and "<code>SimDashLine</code>" in _tgv2 and "<code>simMapStyle()</code>" in _tgv2
     and "<code>simulation+site</code>" in _tgv2 and "<code>#simulation</code>" in _tgv2)
