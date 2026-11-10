@@ -229,6 +229,8 @@ def gather(data, area_month=None):
     except Exception:                              # noqa: BLE001  a database without the route choice table
         divs = []
     out["diversions"] = divs
+    out["traffic_limits"] = traffic_rows(data, route_ids)
+
 
     # ---- the strip: community considerations and collisions ----------------------------------------------------- #
     lines = _lines(route_ids)
@@ -295,6 +297,56 @@ def gather(data, area_month=None):
             coll["sites"].append({"name": s["name"], "all": len(ns), "ksi": sum(1 for c in ns if c["ksi"])})
     out["collisions"] = coll
     return out
+
+
+def traffic_rows(data, route_ids):
+    """
+    9 Nov 2026 (v2.1 task 2.1-1, card 6): §2.3.1's traffic limits on roads this plan's lorries use — for each limit a
+    route of this plan passes, the plan's busiest month on it: this plan's lorries (a team's CLP: its own) beside every
+    approved lorry of the scheme, and whether the scheme is over. Stored routes only; a limit never moves a route.
+    """
+    try:
+        import traffic_limits as TL
+        zs = TL.limit_zones()
+        if not zs:
+            return []
+        ctx = TL.context()
+        by_month = {}
+        for l in data.get("lines") or []:
+            if l.get("trips"):
+                by_month.setdefault(int(l["month"]), {}).setdefault(l["route_id"], 0.0)
+                by_month[int(l["month"])][l["route_id"]] += float(l["trips"])
+        rows = []
+        for z in zs:
+            pas = TL.passing(z["geometry"], drawn=ctx["drawn"], legs=ctx["legs"])
+            mine = set(pas) & set(route_ids)
+            if not mine:
+                continue
+            lim = z["limit"]
+            best = None
+            for m, per in sorted(by_month.items()):
+                days = TL.in_force_days(z, m)
+                if not days:
+                    continue
+                own = [{"route_id": r, "vehicle_loads": t} for r, t in per.items() if r in mine]
+                if not own:
+                    continue
+                v = TL.figure_for(lim, TL.through(z["geometry"], m, lines=own, days=days, ctx=ctx))
+                if best is None or v > best[1]:
+                    best = (m, v, days)
+            if best is None:
+                continue
+            m, v, days = best
+            allv = TL.check(z, [m], ctx=ctx).get(m) or {}
+            rows.append({"id": z["id"], "name": z["name"], "value": lim["value"], "counts": lim["counts"],
+                         "basis": lim["basis"], "month": m, "plan": round(v, 1),
+                         "all": allv.get("value"), "state": allv.get("state") or "none",
+                         "routes": sorted(mine)})
+        rows.sort(key=lambda r: ({"over": 0, "near": 1}.get(r["state"], 2), r["name"]))
+        return rows
+    except Exception as e:                         # noqa: BLE001  an old database without the limit columns
+        print("⚠️  CLP traffic limits:", str(e)[:120])
+        return []
 
 
 def summary_json(L):

@@ -1016,6 +1016,20 @@ def build(data, impact="higher", pictures=True, acc=None, appendices=True):
         D.table(["Route", "Round", "From", "To"],
                 [[g["route_id"], ", ".join(g["zones"]) or "a closed area", _date_words(g["from"]), _date_words(g["to"])]
                  for g in L["diversions"]], widths=[2, 8, 3.5, 3.5])
+    tl = L.get("traffic_limits") or []
+    if tl:
+        # 9 Nov 2026 (v2.1 task 2.1-1, card 6): "HGV" here, a council-facing document
+        sw = {"over": "over", "near": "near", "ok": "within", "none": "—"}
+        D.p("Traffic limits on roads this plan's lorries use (the busiest month for each):")
+        D.table(["Road", "Limit", "Busiest month", "This plan", "All lorries"],
+                [[r["name"],
+                  f"{n(r['value'])} HGV {'movements' if r['counts'] == 'movements' else 'visits'} a day "
+                  f"({'busiest day' if r['basis'] == 'busiest_day' else 'daily average'})",
+                  month_label(r["month"]), f"{r['plan']:g}",
+                  (f"{r['all']:g} — {sw.get(r['state'], '—')}" if r.get("all") is not None else "—")] for r in tl],
+                widths=[5, 4.5, 2.5, 2, 3])
+        D.src("Wayscope's approved plan, a day on average in the busiest month; movements count each lorry passing, in "
+              "and out separately. A planning check, not a count on the road.")
     D.todo("Traffic Regulation Orders needed, suspensions, and roads or footways that need extra care.", "2.3.1")
     D.h("2.3.2 Railway / underground", 3)
     if C.get("stations"):

@@ -662,6 +662,12 @@ ok("🔴 no team slot id in the module", re.search(r"\bIPT ?[1-6]\b", SRC) is No
 REQ = open(os.path.join(BACKEND, "requirements.txt"), encoding="utf-8").read()
 ok("python-docx pinned (with lxml) in requirements.txt", "python-docx==1.2.0" in REQ and "lxml==6.1.3" in REQ)
 
+# 9 Nov 2026 (v2.1 task 2.1-1): §2.3.1's traffic limits table (functional checks in test_traffic_limits)
+_cl = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "clp_doc_layers.py"), encoding="utf-8").read()
+_cd = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "clp_doc.py"), encoding="utf-8").read()
+ok("TRAFFIC: the layers read gives each limit a plan route passes; §2.3.1 prints this plan beside all lorries",
+   'out["traffic_limits"] = traffic_rows(' in _cl and '["Road", "Limit", "Busiest month", "This plan", "All lorries"]' in _cd
+   and "A planning check, not a count on the road." in _cd)
 print()
 for f in FAIL:
     print("  FAIL:", f)
