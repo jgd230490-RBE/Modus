@@ -1357,7 +1357,9 @@ ok("B2: the response shape is otherwise identical — the keys the detail table 
    set(_pmb["WS1"]) == {"route_id", "discipline", "section_id", "material_type", "material_description", "vehicle_type",
                         "vehicle_name", "monthly", "total", "co2_t"}
    # NARROWED 12 Oct 2026 (the review and fix pass): plus the Carbon page's stamp, which the route drawer prints
-   and set(_pm) == {"unit", "from", "to", "working_days", "routes", "carbon_stamp"}
+   # NARROWED 10 Nov 2026 (claude/map-first-view, Idea 3): plus plan_updated, the date the forecast last changed (None here:
+   # this harness writes no audit row)
+   and set(_pm) == {"unit", "from", "to", "working_days", "routes", "carbon_stamp", "plan_updated"} and _pm["plan_updated"] is None
    and _pm["carbon_stamp"] == "Wayscope planning estimate, DESNZ 2026 basis, not Carbon Tool figures", str(sorted(_pmb["WS1"])))
 ok("B2: month-kpis carries no co2_error on the happy path", "co2_error" not in _kp)
 # the failure path: the costlines read raises → both feeds answer, every co2_t None, and SAY why.
