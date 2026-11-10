@@ -578,6 +578,9 @@ async function simDom(){
   w.fetch = (url, opt) => {
     calls.push({ url: String(url), method: (opt && opt.method) || "GET" });
     if (String(url).startsWith("/api/sim/day")) return srv.day(String(url));
+    // 9 Nov 2026 (claude/ui-fix-sim-stock): the page asks which month is the busiest before its first day; none approved here,
+    // so it opens on this month as before (the busiest-month opening itself is asserted in ui_fix_simstock / test_ui_simstock)
+    if (String(url).startsWith("/api/sim/busiest-month")) return reply(200, { busiest: null });
     return new Promise(() => {});
   };
   const simCalls = () => calls.filter(c => c.url.startsWith("/api/sim/day"));
@@ -589,6 +592,7 @@ async function simDom(){
   const g7 = SIM.gates.find(g => g.gate_id === "G007"), g1 = SIM.gates.find(g => g.gate_id === "G001");
 
   const m = mount({ meta: metaMin, months: metaMin.months });
+  for (let i = 0; i < 40 && !calls.some(c => c.url.startsWith("/api/sim/day")); i++) await settle(50);   // 9 Nov 2026: one extra read first (the busiest month), then the day
   await settle(60);
   ok("⭐ SIM DOM: the page reads this month's day ONCE on mount, as a GET, with the routes' lines (legs=1); it is a page, not a fold",
      simCalls().length === 1 && simCalls()[0].url === `/api/sim/day?month=${thisMonth}&legs=1` && simCalls()[0].method === "GET"
@@ -620,26 +624,27 @@ async function simDom(){
   w.requestAnimationFrame = (cb) => { queued.set(++rafId, cb); return rafId; };
   w.cancelAnimationFrame = (id) => { queued.delete(id); };
   const frames = (n) => act(() => { for (let i = 0; i < n; i++){ const due = [...queued.values()]; queued.clear(); pageMs += 100; due.forEach(cb => cb(pageMs)); } });
-  ok("SIM DOM: the clock starts at the first lorry setting off (05:30) and the button says Play", clock() === "05:30" && play().textContent === "Play");
+  // RE-PINNED 9 Nov 2026 (finding 9): the clock opens at the day's busiest point (12:38 on this day: Harborough's 12 waiting), not at the first lorry
+  ok("SIM DOM: the clock opens at the day's busiest point (12:38) and the button says Play", clock() === "12:38" && play().textContent === "Play", clock());
   await act(async () => { play().click(); });
   frames(11);
   const ran = clock();
-  ok("⭐ SIM DOM: Play moves the clock — one second of frames is 12 minutes of the day (05:30 → 05:42) — and the button says Pause",
-     ran === "05:42" && play().textContent === "Pause", ran);
+  ok("⭐ SIM DOM: Play moves the clock — one second of frames is 12 minutes of the day (12:38 → 12:50) — and the button says Pause",
+     ran === "12:50" && play().textContent === "Pause", ran);
   await act(async () => { play().click(); });
   const held = clock();
   frames(10);
-  ok("SIM DOM: Pause holds the clock (no frame is asked for while paused)", clock() === held && held === "05:42" && play().textContent === "Play" && queued.size === 0, held + " " + clock());
+  ok("SIM DOM: Pause holds the clock (no frame is asked for while paused)", clock() === held && held === "12:50" && play().textContent === "Play" && queued.size === 0, held + " " + clock());
   const twoX = m.el.querySelector('select[aria-label="Playback speed"]');
   await act(async () => { Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(twoX, "2"); twoX.dispatchEvent(new w.Event("change", { bubbles: true })); });
   await act(async () => { play().click(); });
   frames(11);
-  ok("SIM DOM: at 2× one second of frames is 24 minutes (05:42 → 06:06)", clock() === "06:06", clock());
+  ok("SIM DOM: at 2× one second of frames is 24 minutes (12:50 → 13:14)", clock() === "13:14", clock());
   // RE-PINNED 29 Oct 2026 (the page): there is no fold to close; while it plays one frame is always queued, and Pause empties the queue
   ok("SIM DOM: while it plays a frame is always queued (the loop is alive)", play().textContent === "Pause" && queued.size === 1, String(queued.size));
   await act(async () => { play().click(); });
   frames(10);
-  ok("SIM DOM: Pause holds the clock at 06:06 and asks for no frame", play().textContent === "Play" && clock() === "06:06" && queued.size === 0, clock());
+  ok("SIM DOM: Pause holds the clock at 13:14 and asks for no frame", play().textContent === "Play" && clock() === "13:14" && queued.size === 0, clock());
   w.requestAnimationFrame = realRaf; w.cancelAnimationFrame = realCaf;
   const restart = byText(m.el, "button", "Restart");
   await act(async () => { restart.click(); await sleep(20); });
@@ -719,6 +724,7 @@ async function simDom(){
   // the small gates folded under "more gates", the scale and month controls on the page)
   calls.length = 0;
   const p = mount({ meta: metaMin, months: metaMin.months, phone: true });
+  for (let i = 0; i < 40 && !calls.some(c => c.url.startsWith("/api/sim/day")); i++) await settle(50);   // after the busiest-month read
   await settle(60);
   ok("⭐ SIM DOM: on a phone the day is read without the lines; one card a gate, read-only, with the one-line note",
      simCalls().length === 1 && simCalls()[0].url === `/api/sim/day?month=${thisMonth}` && !!p.el.querySelector('[data-sim-phone="1"]')
@@ -1233,11 +1239,14 @@ async function configEstonianColumn(){
   const DOC = { vehicles: { _default: { payload_t: 20 }, "Rigid 8-wheeler (32t)": { payload_t: 20, gvw_t: 32, labels: { en: "Rigid 8-wheeler (32t)" } } },
                 material_categories: {}, planning: { load_minutes: 12, unload_minutes: 8, working_days_per_month: 22 } };
   w.fetch = (url) => /\/api\/config\/factors$/.test(String(url)) ? respond({ doc: DOC, status: { source: "file" }, file: DOC }) : new Promise(() => {});
-  const mount = async (country) => {
+  // NARROWED 9 Nov 2026 (UI critique card 10): a planner reads Config (no inputs, no English column), so the column
+  // checks mount an ADMIN LOGIN, who types the names; the planner's read is asserted after them
+  const adminLogin = { ...plannerAcc, role: "admin", label: "Admin", via: "login" };
+  const mount = async (country, acc) => {
     w.__TENANT.country = country; w.__VEH.langs = ["en"];
     const box = w.document.createElement("div"); w.document.body.appendChild(box);
     const root = w.ReactDOM.createRoot(box);
-    await act(async () => { root.render(w.React.createElement(w.ConfigPage, { meta: {}, who: "tester", access: plannerAcc })); });
+    await act(async () => { root.render(w.React.createElement(w.ConfigPage, { meta: {}, who: "tester", access: acc || adminLogin })); });
     await tick(); await tick();
     const th = [...box.querySelectorAll("table.tbl thead th")].map(x => x.textContent.trim());
     const inputs = box.querySelectorAll("table.tbl tbody tr")[0] ? box.querySelectorAll("table.tbl tbody tr")[0].querySelectorAll('input[placeholder="Rigid 8-wheeler (32t)"]').length : -1;
@@ -1251,6 +1260,9 @@ async function configEstonianColumn(){
   const gb = await mount("GB");
   ok("CONFIG (11 Oct 2026 review): ...a GB tenant does not (the country rule stands), English column only",
      gb.th.includes("English") && !gb.th.includes("Estonian") && gb.inputs === 1, JSON.stringify(gb));
+  const gbRead = await mount("GB", plannerAcc);
+  ok("CONFIG (9 Nov 2026, card 10): ...a planner reads the table — the English column (a typing column) is left out",
+     gbRead.th.includes("Vehicle") && !gbRead.th.includes("English") && gbRead.inputs === 0, JSON.stringify(gbRead));
   const hdr = headerWith(["en"], "EE");
   ok("CONFIG (11 Oct 2026 review): ...while the header still draws no buttons for that Estonian tenant until a vehicle carries an Estonian name",
      hdr.names.length === 0 && !hdr.seg, JSON.stringify(hdr));
@@ -1772,7 +1784,7 @@ async function phoneShellDom(){
      // NARROWED 29 Oct 2026 (the Simulation's own page): Simulation first, under "Read here, plan on a desktop"; the desk pages under "Made for a desktop"
      // NARROWED 31 Oct 2026 (task 4a, PR 3a): + CLP documents, a Plan-group desk page every login has (a team: its own CLPs)
      && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Simulation|Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours|CLP documents"
-     && [...sheet().querySelectorAll("h3")].map(h => h.textContent).join("|") === "Read here, plan on a desktop|Made for a desktop"
+     && [...sheet().querySelectorAll("h3")].map(h => h.textContent).join("|") === "Read here|Open on a computer or tablet"   // NARROWED 10 Nov 2026 (UI fix phone 2)
      && !!sheet().querySelector('a[href^="/help/?role="][target="_blank"]'));
   ok("PHONE: ...a team code's sheet holds no Data or Config page (the role's own pages only)", !/Locations|Routes|Zones|Config/.test(sheet().textContent));
   await act(async () => { w.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
@@ -1781,7 +1793,7 @@ async function phoneShellDom(){
   click([...sheet().querySelectorAll("button.phone-more-item")].find(b => /Forecasts/.test(b.textContent)));
   const desk = () => t.el.querySelector("[data-desk-only]");
   ok("⭐ PHONE: a desk page on a phone is the card \"Open on a desktop to edit this.\" with its own name, never the page",
-     !!desk() && desk().querySelector("h2").textContent === "Forecasts" && /Open on a desktop to edit this\./.test(desk().textContent)
+     !!desk() && desk().querySelector("h2").textContent === "Forecasts" && desk().querySelector(".do-lead").textContent === "Approve, change and withdraw forecast lines." && /Open it on a computer or a tablet\./.test(desk().textContent)   // NARROWED 10 Nov 2026 (UI fix phone 2)
      && !t.el.querySelector('[data-rd-table="forecasts"], table') && !sheet() && w.location.hash === "#forecasts" && tabs(t.el)[3].classList.contains("is-on"));
   ok("🔴 PHONE WATCHER: the desk card has no input and no write button (hidden, not disabled)",
      !t.el.querySelector("main input, main select, main textarea") && writeBtns(t.el.querySelector("main")).length === 0
@@ -3502,18 +3514,33 @@ async function clpDocsDom(){
   ok("⭐ CLP DOCS DOM: a planner — ONE read of /api/clp/documents, the header, + New CLP, the Team and Status filters, every team's row (3)",
      calls.filter(c => c.url === "/api/clp/documents").length === 1 && p.el.querySelector("h2").textContent === "CLP documents"
      && !!p.el.querySelector("[data-clp-add]") && !!p.el.querySelector("[data-clp-filters]") && rows(p.el).length === 3);
+  // NARROWED 9 Nov 2026 (UI critique finding 11, card 11): the CLPs are grouped by place — the site's CLP for all teams first,
+  // its team CLPs folded under it (open by itself while one waits on an approver); each row's main button is its NEXT STEP
+  // (Download draft moved into ⋯); the Covers and Cover columns are gone (the row's own line says whose lorries, the
+  // button the cover count). Was: the sent row first with Approve, the others Download draft, a Covers and a Cover column.
+  const prim = (id) => p.el.querySelector(`[data-clp-row="${id}"] [data-clp-primary]`);
+  const fold = p.el.querySelector("[data-clp-fold]");
   ok("⭐ CLP DOCS DOM: the sent row's next step is 'Approve as Issue 2…'; the others' is Download draft; the Covers column names the team or All teams, never an id; the Cover column counts typed details",
-     rows(p.el)[0].querySelector("[data-clp-primary]").textContent === "Approve as Issue 2…"
-     && rows(p.el)[1].querySelector("[data-clp-primary]").textContent === "Download draft"
-     && rows(p.el).map(r => r.querySelectorAll("td")[1].textContent).join("|") === "North Team|All teams|Central Team"
-     // NARROWED 31 Oct 2026 (PR 3b): the Cover column is the sixth now, after the new Tasks column
-     && rows(p.el)[0].querySelectorAll("td")[5].textContent === "2 of 11" && !/IPT\d/.test(p.el.textContent),
-     rows(p.el).map(r => r.querySelectorAll("td")[1].textContent).join("|"));
+     rows(p.el).map(r => r.getAttribute("data-clp-row")).join("|") === "auto-L019-all|auto-L019-IPT1|auto-L019-IPT2"
+     && p.el.querySelectorAll("[data-clp-group]").length === 1 && !!fold && fold.getAttribute("aria-expanded") === "true"
+     && fold.textContent.trim() === "▾ 2 team CLPs · 1 sent for approval" && !rows(p.el).some(r => r.hidden)
+     && prim("auto-L019-all").textContent === "Fill in the cover (0 of 11)" && prim("auto-L019-IPT1").textContent === "Approve as Issue 2…"
+     && !prim("auto-L019-IPT2") && /all teams/.test(rows(p.el)[0].textContent)
+     && rows(p.el).slice(1).map(r => r.querySelector("td button.row-open").textContent).join("|") === "North Team|Central Team"
+     && ![...p.el.querySelectorAll("[data-clp-table] thead th")].some(h => /^Covers?$/.test(h.textContent.trim()))
+     && rows(p.el).every(r => { const m = r.querySelector("details.row-menu"); return m && m.querySelector("button") && m.querySelector("button").textContent === "Download draft"; })
+     && !/IPT\d/.test(p.el.textContent),
+     rows(p.el).map(r => r.textContent.slice(0, 80)).join(" | "));
+  await press(fold);
+  ok("CLP DOCS DOM (9 Nov 2026): the fold closes the site's team CLPs and says so",
+     fold.getAttribute("aria-expanded") === "false" && rows(p.el).filter(r => r.hidden).map(r => r.getAttribute("data-clp-row")).join("|") === "auto-L019-IPT1|auto-L019-IPT2");
+  await press(fold);
   const teamSel = p.el.querySelector("[data-clp-filters] select");
   await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set; set.call(teamSel, "IPT2"); teamSel.dispatchEvent(new w.Event("change", { bubbles: true })); });
   ok("CLP DOCS DOM: the Team filter narrows the list to that team's CLP", rows(p.el).length === 1 && rows(p.el)[0].getAttribute("data-clp-row") === "auto-L019-IPT2");
   await act(async () => { const set = Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set; set.call(teamSel, ""); teamSel.dispatchEvent(new w.Event("change", { bubbles: true })); });
-  await press(rows(p.el)[0].querySelector("[data-clp-primary]"));
+  // NARROWED 9 Nov 2026 (card 11): the sent CLP is the North Team's row under the site, no longer the first row
+  await press(prim("auto-L019-IPT1"));
   const card = () => p.el.querySelector("[data-clp-approve]");
   ok("⭐ CLP DOCS DOM: Approve opens the card: who sent it and their note, what changed since Issue 1 (the server's words), Approve and issue",
      !!card() && calls.some(c => c.url === "/api/clp/documents/auto-L019-IPT1/approve-preview" && c.method === "GET")
@@ -3593,7 +3620,8 @@ async function clpDocsDom(){
      && pn().textContent.includes("Task added. They have an email about it.") && !fm());
   await press(byText(pn(), /^Close$/));
   ok("CLP NOTES DOM: Close shuts the panel", !pn());
-  await press(rows(n.el)[0].querySelector("[data-clp-primary]"));
+  // NARROWED 9 Nov 2026 (card 11): the sent CLP's row by its id (grouped, it is no longer the first)
+  await press(n.el.querySelector('[data-clp-row="auto-L019-IPT1"] [data-clp-primary]'));
   const ap = () => n.el.querySelector("[data-clp-approve]");
   const apt = () => n.el.querySelector("[data-clp-approve-tasks]");
   ok("⭐ CLP NOTES DOM: the approve card names the open tasks and the first overdue one, and Approve stays pressable (never blocking)",
@@ -3681,8 +3709,10 @@ async function clpDocsDom(){
      && t.el.querySelectorAll("[data-clp-table] thead th").length === 5 && !/IPT\d/.test(t.el.textContent));
   ok("🔴 CLP REVIEWERS DOM: with no client group the list has no review line, no Reviewers filter and no 'Send … to reviewers' (a team, and the planner before)",
      !t.el.querySelector("[data-clp-review-line]") && !t.el.querySelector("[data-clp-reviewers-filter]") && !byText(t.el, /to reviewers…$/));
+  // NARROWED 9 Nov 2026 (card 11): a SENT CLP waits on the approver, so the team's row has no main button; Download draft
+  // is the first line of its ⋯ (it was the row's main button)
   ok("CLP DOCS DOM: a team's next step is Download draft (never Approve), its menu holds Edit cover details and Send for approval (sent), no Delete",
-     rows(t.el)[0].querySelector("[data-clp-primary]").textContent === "Download draft"
+     !rows(t.el)[0].querySelector("[data-clp-primary]") && rows(t.el)[0].querySelector("details.row-menu button").textContent === "Download draft"
      && !!byText(t.el, /^Edit cover details$/) && !!byText(t.el, /^Send for approval \(sent\)$/) && !byText(t.el, /^(Delete…|Clear typed details…|Approve as Issue)/));
   await press(rows(t.el)[0].querySelector("button.row-open"));
   const ed = () => t.el.querySelector("[data-clp-editor]");
@@ -3716,7 +3746,8 @@ async function clpDocsDom(){
   ok("CLP REVIEWERS DOM: a CLP with an issue has '⋯ → Send Issue 1 to reviewers…'; the one with none does not",
      !!rv.el.querySelector('[data-clp-row="auto-L019-IPT1"]') && [...rv.el.querySelectorAll('[data-clp-row="auto-L019-IPT1"] button')].some(b => b.textContent === "Send Issue 1 to reviewers…")
      && ![...rv.el.querySelectorAll('[data-clp-row="auto-L019-all"] button')].some(b => /to reviewers…$/.test(b.textContent)));
-  await press(rows(rv.el)[0].querySelector("[data-clp-primary]"));
+  // NARROWED 9 Nov 2026 (card 11): the sent CLP's row by its id (grouped under its site, it is no longer the first)
+  await press(rv.el.querySelector('[data-clp-row="auto-L019-IPT1"] [data-clp-primary]'));
   const st2 = () => rv.el.querySelector("[data-clp-send-to]");
   const ticks = () => [...st2().querySelectorAll('input[type="checkbox"]')].map(x => x.checked);
   ok("⭐ CLP REVIEWERS DOM: the approve card lists the client groups; the one that had Issue 1 is ticked for Issue 2, the other not",
@@ -3809,7 +3840,9 @@ async function reviewerDom(){
      calls.map(c => c.u).filter(u => !/\/api\/(review\/|auth\/|meta$|activity$)/.test(u)).join(", "));
   ok("⭐ REVIEWER DOM: the header names the person in the account menu; the subtitle names the scheme and the group",
      !!box.querySelector(".acct-btn") && /Hana Highways/.test(box.querySelector(".acct-btn").textContent)
-     && /Construction Logistics Plans Wolds Link has sent to Highways client \(fictional\)\./.test(page().textContent));
+     // NARROWED 9 Nov 2026 (UI critique card 11): one sentence that reads — "Plans that <scheme> has sent to you." (was
+     // "Construction Logistics Plans <scheme> has sent to <group>.", which did not parse with a long scheme name)
+     && /Plans that Wolds Link has sent to you\./.test(page().textContent) && !/Construction Logistics Plans Wolds Link/.test(page().textContent));
   const trs = () => [...page().querySelectorAll("[data-review-row]")];
   ok("⭐ REVIEWER DOM: the list — each CLP with its team NAME, issue, who sent it, and the group's decision",
      !!page().querySelector("[data-review-table]") && trs().length === 2 && /North Team/.test(trs()[0].textContent) && /Issue 2/.test(trs()[0].textContent)
@@ -3820,7 +3853,8 @@ async function reviewerDom(){
   const clp = () => box.querySelector('[data-review-clp="auto-L019-IPT1"]');
   ok("⭐ REVIEWER DOM: opening a CLP — its name, team and issue; Download Issue 2 (Word); the history with Issue 1's return; the comments with the grey sent line",
      !!clp() && /Tilton Viaduct site · North Team · Issue 2/.test(clp().querySelector("h2").textContent)
-     && clp().querySelector("[data-review-download]").textContent === "Download Issue 2 (Word)"
+     // NARROWED 9 Nov 2026 (card 11): Download is a plain (secondary) button with ⤓, no longer a second orange primary
+     && clp().querySelector("[data-review-download]").textContent === "⤓ Download Issue 2 (Word)" && clp().querySelector("[data-review-download]").className === "btn-sec"
      && clp().querySelectorAll("[data-review-history] tbody tr").length === 2 && /Returned by Hana Highways: “Add the Saturday hours”/.test(clp().querySelector("[data-review-history]").textContent)
      && /^↗ Issue 2 sent to Highways client \(fictional\) by Pat Planner/.test(clp().querySelector('[data-review-step="review-sent"]').textContent)
      && /Saturday hours are now in 4\.1\./.test(clp().querySelector("[data-review-thread]").textContent));
@@ -3848,10 +3882,19 @@ async function reviewerDom(){
   await press(clp().querySelector("[data-review-download]"));
   ok("⭐ REVIEWER DOM: Download reads the review copy of Issue 2 (never the staff download)",
      calls.some(c => /\/api\/review\/clps\/auto-L019-IPT1\/issues\/2\.docx$/.test(c.u)) && !calls.some(c => /\/api\/clp\//.test(c.u)));
+  // NARROWED 9 Nov 2026 (card 11): Accept and Return are a DECISION card under the title, ahead of the notes; Return opens its
+  // own box (it used the note box) and its Return button stays off until something is written
+  const dec = () => clp().querySelector("[data-review-decision]");
+  ok("⭐ REVIEWER DOM (9 Nov 2026): the decision card sits before the notes — 'Your decision on Issue 2', Accept and Return with comments…",
+     !!dec() && !!dec().querySelector("[data-review-accept]") && !!dec().querySelector("[data-review-return]") && /^Your decision on Issue 2/.test(dec().textContent)
+     && !!(dec().compareDocumentPosition(clp().querySelector("[data-review-thread]")) & w.Node.DOCUMENT_POSITION_FOLLOWING));
   await press(clp().querySelector("[data-review-return]"));
   // NARROWED 31 Oct 2026 (PR 3d, Q7): "comment box" is "note box"
   ok("🔴 REVIEWER DOM: Return with comments with an empty box sends nothing and asks for the comment first",
-     !calls.some(c => /\/decision$/.test(c.u)) && /Write what needs changing in the note box first\./.test(clp().textContent));
+     !calls.some(c => /\/decision$/.test(c.u)) && !!dec().querySelector("#rv-ret") && dec().querySelector("[data-review-return-go]").disabled
+     && /What needs changing/.test(dec().textContent));
+  await press(btnT(dec(), "Cancel"));
+  ok("REVIEWER DOM (9 Nov 2026): Cancel puts Accept and Return back", !dec().querySelector("#rv-ret") && !!dec().querySelector("[data-review-accept]"));
   await setText(clp().querySelector("#rv-words"), "Thanks");
   await press(clp().querySelector("[data-review-comment]"));
   const cc = calls.find(c => /\/comments$/.test(c.u) && c.method === "POST");

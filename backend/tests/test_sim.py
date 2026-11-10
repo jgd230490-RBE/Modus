@@ -325,8 +325,9 @@ ok("⭐ sim.py imports neither main nor network, and names no team slot id",
    not re.search(r"^\s*(import|from)\s+(network|main)\b", src, re.M) and re.search(r"\bIPT ?[1-6]\b", src) is None)
 _stmts = re.findall(r'db\.query\(\s*(f?(?:"[^"]*"\s*)+)', code_only)
 ok("🔴 tenant isolation: every SQL literal in sim.py constrains tenant_id",
-   # RE-PINNED 5 Nov 2026 (task 0d-2): a fifth, _busy_legs' read of a busy-hours road's stored line
-   len(_stmts) == 5 and all("tenant_id = ?" in s for s in _stmts) and code_only.count("db.current_tenant()") >= 5,
+   # RE-PINNED 5 Nov 2026 (task 0d-2): a fifth, _busy_legs' read of a busy-hours road's stored line;
+   # 9 Nov 2026 (claude/ui-fix-sim-stock): a sixth, busiest_month's one read of the approved lines
+   len(_stmts) == 6 and all("tenant_id = ?" in s for s in _stmts) and code_only.count("db.current_tenant()") >= 6,
    str(_stmts))
 ok("the engine reuses the Dashboard's rules: trips_for, entry_gate, judge, gate_hours' capacity words and NEAR_PCT",
    "gate_arrivals.trips_for(" in code_only and "gate_arrivals.entry_gate(" in code_only

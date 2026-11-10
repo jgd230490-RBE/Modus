@@ -280,7 +280,8 @@ ok("11 Oct 2026: Config → Vehicles' Estonian column (an Estonian tenant's) sho
 ok("11 Oct 2026 (review): ⭐ the Config Estonian column is gated on the COUNTRY alone (vehLangEditable), not on the offered languages",
   code.includes('const vehLangEditable = (k) => k === "en" || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE");')
   && !/const vehLangEditable = [^\n]*VEH\.langs/.test(code)
-  && code.includes('.filter(h => h !== "Estonian" || vehLangEditable("ee"))') && code.includes('{vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""}')
+  // NARROWED 9 Nov 2026 (UI critique card 10): + a planner's read-only page leaves the English (typing) column out
+  && code.includes('.filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English"))') && code.includes('{vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""}')
   && !code.includes('vehLangShown("ee")'));
 // 11 Oct 2026: ⭐ the four EU type-approval vehicles are gone from the app's source — no name, no code, no 'aliases'
 // note (only those entries carried aliases), and no comment that describes them as present
@@ -863,8 +864,10 @@ ok("the drawn ring is explicitly closed before it is sent", code.includes("const
 // than being deleted.
 ok("a minimum vertex count is enforced before save",
   code.includes("drawPts.length < minPts(zoneForm)"));
+// NARROWED 9 Nov 2026 (v2.1 task 2.1-1): a traffic limit drawn as a line takes two points like a haul road (isLineZone)
 ok("a zone still needs three corners and a haul road two",
-  /minPts\s*=\s*\(f\)\s*=>\s*isHaul\(f\)\s*\?\s*2\s*:\s*3/.test(code));
+  /minPts\s*=\s*\(f\)\s*=>\s*isLineZone\(f\)\s*\?\s*2\s*:\s*3/.test(code)
+  && code.includes('const isLineZone = (f) => isHaul(f) || (isLimit(f) && f.limit_shape === "line");'));
 
 ok("saving re-bakes what it invalidated", code.includes("rebakeAfterZone"));
 ok("the re-bake drives the existing batch endpoint rather than a new one",
@@ -1710,9 +1713,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && code.includes("{page && page.abnormal && page.abnormal.count > 0 && <AbnormalWeek ab={page.abnormal} />}"));
   // NARROWED 27 Oct 2026 (stockpile forecast, D7): the two amber stockpile warnings join the gold list after NOTICE_DUE
   // NARROWED 29 Oct 2026 (task 3a): the tone's last line is the pour's three warnings
+  // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): the tone goes on with TRAFFIC_NEAR (amber)
   ok("AL2 rail: the four words in the rail's tables (NOTICE DUE a gold warning, the other three red)",
      src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
-     && src.includes('code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";'));
+     && src.includes('code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";'));
   const st0 = src.indexOf("function AbnormalStrip({ onOpen, sites }){"), st1 = src.indexOf("function DashboardToday({ meta, week, err, wall, fill }){");
   const st = src.slice(st0, st1);
   ok("⭐ AL2 Dashboard: one strip under Gate arrivals (not on the big screen, not on a phone): ONE read of /abnormal/summary, the next-4-weeks count, notices due with the chip, " +
@@ -2654,7 +2658,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("⭐ S7: one block before CommitMap holding the panel, its player, map, timeline, scenario, table and phone list",
     // RE-PINNED 29 Oct 2026 (its own page): SimulationPage (+ PhoneSimulation, SimDashLine); the player takes the page's controls and site; the map `wall`
     simSrc.length > 20000 && ["function SimulationPage({ meta, months, phone, initial })", "function PhoneSimulation({ meta, months })", "function SimDashLine({ ga, month, months, onOpen })",
-      "function SimPlayer({ meta, D, store, scenario, controls, site, open })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
+      "function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
       // RE-PINNED 28 Oct 2026 (simulation v2): the map and the timeline take the chosen site
       "function SimMap({ meta, D, store, frame, site, wall })", "function SimTimeline({ D, t, onSeek, site })", "const SimScenario = React.memo(function SimScenario(",
       "const SimTable = React.memo(function SimTable(", "function SimPhoneList({ D })", "function simFrame(D, legs, t)", "function simQS(month, sc, legs)"].every(f => simSrc.includes(f))
@@ -2672,10 +2676,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // RE-PINNED 29 Oct 2026 (its own page): read on MOUNT (the page is the fold), keyed on the month and the scenario
   ok("⭐ S7: its own page, read on mount with one GET of /api/sim/day (the lines once a month), keyed on the month and the scenario",
     panelSrc.includes('<div className="max-w-7xl mx-auto p-6 pb-2" data-page="simulation" data-sim="1">') && !panelSrc.includes("<details className=\"dash-more\"")
-    && panelSrc.includes("fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`)") && panelSrc.includes("}, [month, scKey]);")
-    && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (panelSrc.match(/fetch\(/g) || []).length === 1
+    && panelSrc.includes("fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`)") && panelSrc.includes("}, [month, scKey, ready]);")   // NARROWED 9 Nov 2026: and once the busiest month is known
+    && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (panelSrc.match(/fetch\(/g) || []).length === 2 && panelSrc.includes("fetch(`${API}/sim/busiest-month`)")   // NARROWED 9 Nov 2026: the busiest-month read first, then the one day read
     // NARROWED 17 Oct 2026: the block holds the big screen's SimWall too, with its own one read (the plain month, with the lines)
-    && (simc.match(/fetch\(/g) || []).length === 2 && fn("SimWall", "function CommitMap(").includes("fetch(`${API}/sim/day?month=${month}&legs=1`)"));
+    && (simc.match(/fetch\(/g) || []).length === 3 /* NARROWED 9 Nov 2026: and the busiest-month read */ && fn("SimWall", "function CommitMap(").includes("fetch(`${API}/sim/day?month=${month}&legs=1`)"));
   ok("🔴 S7 (D86): nothing written, nothing kept, nothing in the address — no method, no storage, no history, no location in the block",
     !/method:|localStorage|sessionStorage|history\.|location\.|postJSON|navigator\.clipboard/.test(simc));
   ok("⭐ S7: the scenario reaches the server only as the query its parser reads (hours, check_in, bands, pour_*, legs=1)",
@@ -2782,7 +2786,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // RE-PINNED 28 Oct 2026 (v2): the site select sits above the map; the map and the timeline take the chosen site
     // RE-PINNED 29 Oct 2026 (the page, card 2): the timeline is FULL WIDTH under the grid, the scenario a band under it; the map the app's height
     fn("SimPlayer", "const SimScenario").includes('<SimMap meta={meta} D={D} store={store} frame={f} site={site} />')
-    && /<div className="sim-main">\s*<SimMap [^\n]*\n\s*<\/div>\s*<div className="sim-side">/.test(fn("SimPlayer", "const SimScenario"))
+    && /<div className="sim-main">\s*<SimMap [^\n]*\n\s*<\/div>\s*<div className="sim-side kb-scroll" tabIndex=\{0\}/.test(fn("SimPlayer", "const SimScenario"))
     && /<\/div>\s*<\/div>\s*<div className="sim-tl-top">\s*<div className="sim-tl-head"[^\n]*\n\s*<ChartTools [\s\S]*?<\/div>\s*<div data-sim-tl-wrap="1"><SimTimeline D=\{D\} t=\{t\}[^\n]*<\/div>\s*\{scenario && <div className="sim-band">\{scenario\}<\/div>\}/.test(fn("SimPlayer", "const SimScenario"))
     && /@media \(min-width:1024px\)\{\.sim-grid\{grid-template-columns:minmax\(0,1fr\) 300px;align-items:start;\}\n\s*\.sim-main \.sim-map\{height:62vh;min-height:360px;max-height:720px;\}\}/.test(html)
     && /\n  \.sim-map\{height:62vh;min-height:360px;max-height:720px;/.test(html)
@@ -2816,12 +2820,12 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
         "`bays=${encodeURIComponent(a + \"=\" + sc.bays[a])}`", '`wash=${sc.wash ? "on" : "off"}`'].every(t => simSrc.includes(t)));
   ok("⭐ SIM V2: the scale switch is a named group of three pressed buttons; the Month select shows for the month, a Week select (this / next) for the week, a Day select of the server's day choices for the day",
     panelSrc.includes('<div className="sim-seg" role="group" aria-label="Simulation scale" data-sim-scale={sc.scale}>')
-    && panelSrc.includes('aria-pressed={sc.scale === v}') && panelSrc.includes('{sc.scale === "month" && <label className="ct-line">Month <select className="ga-sel" value={month}')
+    && panelSrc.includes('aria-pressed={sc.scale === v}') && panelSrc.includes('{sc.scale === "month" && <label className="ct-line">Which month <select className="ga-sel" value={month}')
     && panelSrc.includes('aria-label="Simulation week">') && panelSrc.includes('<option value="commit">This week</option><option value="next">Next week</option>')
     && panelSrc.includes('aria-label="Simulation day">') && panelSrc.includes('{((D && D.day_choices) || []).map(c => <option key={c.date} value={c.date}>{c.words}'));
   ok("🔴 SIM V2: a week or a day is the server's month — the panel takes j.month and reads the lines once for it; still ONE fetch call",
     panelSrc.includes('if(sc.scale !== "month" && j.month !== month){ shown.current = (store && store.month === j.month) ? `${j.month}|${scKey}` : null; setMonth(j.month); }')
-    && (panelSrc.match(/fetch\(/g) || []).length === 1);
+    && (panelSrc.match(/fetch\(/g) || []).length === 2);   // NARROWED 9 Nov 2026: the busiest-month read, then the day: still ONE day read
   ok("⭐ SIM V2: the site view — a named Site select (Whole scheme first), the map and the timeline take the site, Stations now replaces Gates now for it, 'on site' in the now line",
     // RE-PINNED 29 Oct 2026 (the page, card 4): the Site select is in the page's controls row (scale → period → site), the player takes the site
     panelSrc.includes('aria-label="Simulation site" data-sim-site="1">') && panelSrc.includes('<option value="">Whole scheme</option>') && panelSrc.includes("site={site} controls={controls}")
@@ -3043,7 +3047,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && src.includes('<InfoTip id="units" />') && ["lookahead", "dashboard", "forecasts"].every(p => src.includes(`useUnits("${p}")`))
      && !/useUnits\("gates"\)/.test(src));
   ok("W6: the status is a word and an icon whose shape says the tone (✓ circle, ! square, ! circle, – circle), never colour alone",
-     src.includes('const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–" };') && /\.row-st\.rs-warn i\{[^}]*border-radius:3px;/.test(html)
+     // NARROWED 9 Nov 2026 (UI critique card 11): + draft, a hollow ring with no glyph (a CLP draft; the – circle read "blocked")
+     src.includes('const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–", draft: "" };') && /\.row-st\.rs-warn i\{[^}]*border-radius:3px;/.test(html)
+     && /\.row-st\.rs-draft i\{background:transparent;border:2px solid var\(--chart-none\);/.test(html)
      && src.includes('<span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true">{RS_ICON[t]}</i>{word}'));
   ok("⭐ W6: all five tables are row-details tables (Look-ahead, gates, Today, the route table, Forecasts)",
      ["lookahead", "gates", "today", "dashboard", "forecasts"].every(n => src.includes(`data-rd-table="${n}"`))
@@ -3547,6 +3553,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      src.includes('backgroundColor: g.days.map(d => d.flag === "red" ? RED : d.flag === "amber" ? GOLD : (g.capacity_per_day == null ? NONE : C1)) }];')
      && src.includes('stepped: "middle", order: 1 });') && src.includes("data: g.days.map(d => d.open ? g.near_per_day : 0), borderColor: GOLD, borderWidth: 1.5, borderDash: [4, 3]")
      && src.includes('<RowStatus word={`${d.day}: ${d.status_word}${d.pct != null ? ` (${d.pct} %)` : d.open ? "" : " (closed)"}`} tone={d.flag === "red" ? "bad" : "warn"} />'));
+  // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): the tone goes on with TRAFFIC_NEAR (amber)
   ok("⭐ W17: the rail names GATE OVER CAPACITY / GATE NEAR CAPACITY (as the exports do); near is a gold warning, over red",
      // NARROWED 22 Oct 2026 (abnormal loads, phase 2): the rail's table goes on with the four abnormal-load words after GATE NEAR CAPACITY
      // NARROWED 28 Oct 2026 (task 0c): both tables go on with NO_WAY_ROUND after the last entry
@@ -3554,7 +3561,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      src.includes('GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",') && src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT",')
      // NARROWED 27 Oct 2026 (stockpile forecast, D7): the grid's table and the tone go on with STOCKPILE SOON / EMPTY (amber)
      && src.includes('GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",')
-     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";')
+     && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";')
      && src.includes('<i style={{ background: laTone(f.code) === "warn" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i>')
      && /"GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"/.test(fs.readFileSync(path.join(ROOT, "backend", "export.py"), "utf8")));
   // W8: the data fields
@@ -3649,7 +3656,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("PHONE TABS: the tab bar is the guide's 'rail' anchor and the foot the guide's strip stays above",
      _pt.includes('data-guide="rail" data-sticky-foot="1"'));
   ok("⭐ PHONE: the Portal draws the rail only at 768 px and up, and the tab bar and More only below",
-     _po.includes('{!narrow && <aside data-guide="rail"') && _po.includes("{narrow && <PhoneTabs groups={visible} page={page} onPick={pickPage} moreOpen={moreOpen}")
+     _po.includes('{!narrow && <aside data-guide="rail"') && _po.includes("{narrow && <PhoneTabs groups={visible} page={page} onPick={pickPage} moreOpen={moreOpen}")   // 10 Nov 2026: no pending count on More any more
      && _po.includes("{narrow && moreOpen && <PhoneMore groups={visible} page={page} onPick={pickPage}"));
   ok("⭐ PHONE WATCHER (hide, do not disable): every desk page is not RENDERED on a phone — Submit, Forecasts, Carbon, the desk Look-ahead, Data, Config",
      _po.includes('{page === "submit" && !narrow && <Matrix ') && _po.includes('{page === "forecasts" && !narrow && <Forecasts ')
@@ -3657,7 +3664,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && _po.includes("{DATA_PAGES.includes(page) && canApprove && !narrow && (") && _po.includes('{page === "config" && canApprove && !narrow && <ConfigPage ')
      // NARROWED 29 Oct 2026 (the Simulation's own page): a page in PHONE_READ_PAGES reads on a phone (its own phone layout), never the desk-only card
      && _po.includes("const phoneDesk = narrow && !PHONE_PAGES.includes(page) && !PHONE_READ_PAGES.includes(page);") && src.includes('const PHONE_READ_PAGES = ["simulation"];')
-     && _po.includes("{phoneDesk && <DeskOnly label={current.label} onHome={() => pickPage(\"dashboard\")} />}")
+     // NARROWED 10 Nov 2026 (UI fix phone 2): the card is given the page id (its own one-line purpose)
+     && _po.includes("{phoneDesk && <DeskOnly id={page} label={current.label} onHome={() => pickPage(\"dashboard\")} />}")
      && !/disabled=\{[^}]*\b(narrow|phone)\b/.test(src));
   // the same rule for ANY page added later (G3's Users page, say): every page the Portal mounts, other than the Dashboard
   // and the Route map, carries `!narrow`, or is a Phone… page mounted only when narrow
@@ -3668,14 +3676,16 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     ok("⭐ PHONE WATCHER, for every page: each page the Portal mounts (but the Dashboard and the Route map) is desk-only on a phone or a Phone… page",
        mounts.length >= 9 && loose.length === 0, loose.map(m => m.id).join(", ") || String(mounts.length));
   }
-  ok("PHONE: the desk-only card says 'Open on a desktop to edit this.' under the page's own name, and offers the Dashboard",
-     _do.includes("<h2>{label}</h2>") && _do.includes('<p className="do-lead">Open on a desktop to edit this.</p>')
-     && _do.includes("On a phone, Wayscope shows the Dashboard, the Look-ahead and the Route map, to read.") && _do.includes("Go to the Dashboard"));
+  // NARROWED 10 Nov 2026 (UI fix phone 2, the 9 Nov critique): the lead is the page's own one line (DESK_LINE), the sentence names the four phone pages
+  ok("PHONE: the desk-only card says what the page is for under the page's own name, then where to open it, and offers the Dashboard",
+     _do.includes("<h2>{label}</h2>") && _do.includes('<p className="do-lead">{DESK_LINE[id] || "A page for a computer or a tablet."}</p>')
+     && _do.includes("Open it on a computer or a tablet. A phone reads the Dashboard, the Look-ahead, the Route map and the Simulation.") && _do.includes("Go to the Dashboard")
+     && !_do.includes("Open on a desktop to edit this"));
   ok("PHONE: More lists the role's desk pages (from the visible groups, so a team code never sees Data or Config) and the user guide in a new tab",
      // NARROWED 29 Oct 2026 (card 12): the pages that read on a phone are listed first under "Read here, plan on a desktop"
-     _pm.includes("const all = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));")
+     _pm.includes("const all = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));")   // NARROWED 10 Nov 2026: headings "Read here" / "Open on a computer or tablet", no counts
      && _pm.includes("const reads = all.filter(it => PHONE_READ_PAGES.includes(it.id)), desk = all.filter(it => !PHONE_READ_PAGES.includes(it.id));")
-     && _pm.includes("{reads.length > 0 && <><h3>Read here, plan on a desktop</h3>") && _pm.includes("<h3>Made for a desktop</h3>")
+     && _pm.includes("{reads.length > 0 && <><h3>Read here</h3>") && _pm.includes("<h3>Open on a computer or tablet</h3>") && !_pm.includes("pm-note\">{pending}") && !_pm.includes("waiting</span>") && !_pm.includes(" new</span>")
      && _pm.includes('role="dialog" aria-modal="true" aria-label="More pages"') && _pm.includes('target="_blank" rel="noopener noreferrer"')
      && _pm.includes("{teamText(who) || \"—\"} · {role.ipt ? teamName(role.ipt) : role.label}"));
   ok("PHONE: Escape and the shade shut More; Ctrl K opens it on a phone (the rail's search is not drawn there)",
@@ -3886,7 +3896,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // RE-PINNED 5 Nov 2026 (task 0d-2): + the Carbon planner's Route choices table (four)
   const _regions = [...src.matchAll(/<div className="([^"]*)"[^\n]*tabIndex=\{0\} role="region" aria-label="([^"]*)"/g)];
   ok("#15: every scroll region with tabindex 0 carries a focus-ring class (kb-scroll or sim-scroll) and a name that passes the word rule",
-     _regions.length === 4 && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
+     _regions.length === 5 /* NARROWED 10 Nov 2026: + the Simulation's Now and gates column */ && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
        && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(m[2])), String(_regions.length));
   // REVERSED 23 Oct 2026 (UI fix 9, decision 16): the rows are no longer mouse-only — the name in the first cell is a button
   // (the UI FIX 9 block at the end). What stays true, and is still checked here: the row click is kept for a mouse, and the
@@ -4041,8 +4051,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // decision 12 / #13: the tick rows
   const mat = code.slice(code.indexOf('{tab === "materials" && ('), code.indexOf('{tab === "planning" && ('));
   ok("🔴 decision 12: Config → Materials' vehicles cell is a two-column grid of 24 px rows (min-h-6), the names free to wrap inside their column (no whitespace-nowrap), the cell at least 332 px (two 154 px columns: a 'Rigid 8-wheeler (32t)' sits on one line); the one-column flex-wrap of 16 px rows is gone",
-     mat.includes('<td style={{ whiteSpace: "normal", height: "auto", padding: "8px", minWidth: 332 }}>')
-     && mat.includes('<div className="grid grid-cols-2 gap-x-2">')
+     // NARROWED 9 Nov 2026 (UI critique card 10): the cell is a summary; the 24 px tick rows moved to a row of their own under
+     // the material, across the card, opened by an admin's Edit (columns of at least 190 px, so none is cut at the edge)
+     mat.includes('<td style={{ whiteSpace: "normal", height: "auto", minWidth: 180 }} data-cfg-veh-sum={k}>')
+     && mat.includes('<div className="grid gap-x-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))" }} role="group" aria-label={`Vehicles used for ${k}`}>')
      && mat.includes('<label key={v} className="flex items-center gap-1.5 min-h-6 text-[13px] leading-tight text-slate-600">')
      && mat.includes('<input type="checkbox" className="flex-none" checked={(c.vehicles || []).includes(v)}')
      && !mat.includes("flex flex-wrap gap-x-3 gap-y-1") && !mat.includes("text-slate-600 whitespace-nowrap"));
@@ -4534,7 +4546,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      src.includes('? "Approve or reject each line; approved lines feed the public map, the Look-ahead and the Dashboard."')
      && src.includes('subtitle="One vehicle per line; a split across two vehicles is two lines." />') && !src.includes("One vehicle per line: save a haul that uses two vehicle types as two lines.")
      && src.includes('? "Origin → destination pairs, routed for a lorry both ways."') && src.includes('subtitle={`Who can sign in, and as which ${TEAM().toLowerCase()} or role.`}')
-     && !src.includes("To set up per-person sign-in: add yourself below as an Admin") && src.includes('subtitle="The numbers every figure is computed from. Changes apply on save, for everyone."')
+     && !src.includes("To set up per-person sign-in: add yourself below as an Admin") && src.includes('subtitle={ro ? "The numbers every figure is computed from." : "The numbers every figure is computed from. Changes apply on save, for everyone."}')   // NARROWED 9 Nov 2026 (card 10): a reader is told nothing about saving
      && src.includes('data-al-words="1">{words.advice}</p>') && !src.includes("{words.not_modelled} {words.counted_apart}")
      && !/\(D\d{2,3}[,)]/.test(_nc27) && !_nc27.includes("Movements = loads per working day")   // comments may cite a decision; no screen text does
      && src.includes("Not routed yet for <strong>{vehLabel(vehicle)}</strong>: no vehicles figure until a planner routes it.")
@@ -4582,11 +4594,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      _sp.includes('Planned use <span className="font-normal text-slate-500">{u} a month, laid on the works</span>')
      && _sp.includes("Same each month from") && _sp.includes("from_month: Math.min(a, b), to_month: Math.max(a, b), planned_qty: q"));
   ok("STOCKPILES: an emptied month clears it (null, not 0); a negative figure is refused in words",
-     _sp.includes('const q = v === "" ? null : numOr(v, NaN);') && _sp.includes('say(false, "Planned use must be a number, 0 or more.")'));
+     _sp.includes('const q = String(v).trim() === "" ? null : stockNum(v);')   /* NARROWED 9 Nov 2026: typed with spaces ("11 000") is read */ && _sp.includes('say(false, "Planned use must be a number, 0 or more.")'));
   ok("STOCKPILES: the stock count names the week, and the last count says how far it was from the worked-out figure",
      _sp.includes("At the end of the week of") && _sp.includes('than worked out` : "")') && _sp.includes('"No stock count yet."'));
   ok("STOCKPILES: the status line — goes over (red) / runs out (amber) / nearly full (amber) / never over (green) — and its own forecast line",
-     _sp.includes("`Goes over in the week of ${stockWeekWord(sp.first_over.from)}") && _sp.includes("`Runs out in the week of ${stockWeekWord(sp.first_empty.from)}")
+     _sp.includes("`Goes over capacity in the week of ${stockWeekWord(sp.first_over.from)}")   /* NARROWED 9 Nov 2026: "capacity" and how long it stays over */ && _sp.includes("`Runs out in the week of ${stockWeekWord(sp.first_empty.from)}")
      && _sp.includes("`Nearly full: ${Math.round(sp.peak_pct)} %") && _sp.includes("`Never over: ${Math.round(sp.peak_pct)} % at most`")
      && _sp.includes("segment: { borderDash: (c) => (c.p0DataIndex >= cut ? [6, 4] : undefined) }"));
   ok("STOCKPILES: failures in words (errSay), never a status number", _sp.includes('errSay("The stockpiles did not load.", e)')
@@ -4606,10 +4618,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      src.includes('<tbody data-horizon-stock="1">') && src.includes('const tone = c.over ? "over" : c.pct >= 90 ? "near" : "ok";')
      && src.includes(`Stockpiles <span className="font-normal text-slate-500">% full at the week's end</span>`));
   // NARROWED 29 Oct 2026 (task 3a): the tone goes on with the pour's three warnings
+  // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): the tone goes on with TRAFFIC_NEAR (amber)
   ok("RAIL: STOCKPILE SOON / STOCKPILE EMPTY are words in both tables, amber, ranked with the warnings",
      // NARROWED 28 Oct 2026 (task 0c): the rank table goes on with NO_WAY_ROUND
      src.includes('STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",') && src.includes('STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7,')
-     && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";'));
+     && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";'));
   ok("DASHBOARD: a stockpile with no planned use never leads the message (as the rail's STOCKPILE SOON)",
      /function stockMessage\(sps\)\{[\s\S]{0,400}if\(!sp\.use_planned\) return;/.test(src));
   ok("DASHBOARD: the 'No use planned yet' line names a stockpile with a capacity and no plan",
@@ -4918,7 +4931,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      cpStrings.length > 60 && !cpStrings.some(x => cpBanned(x.replace(/\$\{API\}\/clp\/documents|"\/clp\/documents"|`\/clp\/documents[^`]*`/g, ""))),
      cpStrings.filter(x => cpBanned(x.replace(/\$\{API\}\/clp\/documents|"\/clp\/documents"|`\/clp\/documents[^`]*`/g, ""))).join(" | "));
   ok("CLP DOCS: the words — the status tones (Sent / Changes amber, Approved green), 'Approve as Issue N…', 'Building… about a minute', the blank-line rule, the exact-file promise",
-     cp.includes('const CLP_TONE = { draft: "none", sent: "warn", changes: "warn", approved: "ok" };') && cp.includes("Approve as Issue {c.next_issue}…")
+     // NARROWED 9 Nov 2026 (card 11): a draft is the hollow ring (the – circle read "blocked")
+     cp.includes('const CLP_TONE = { draft: "draft", sent: "warn", changes: "warn", approved: "ok" };') && cp.includes("Approve as Issue {c.next_issue}…")
      && cp.includes('const busyWords = "Building… about a minute";') && cp.includes('Anything left blank stays a yellow "To complete" line.')
      && cp.includes("Download gives back the file exactly as approved."));
   ok("CLP DOCS: the editor's CSS lives in the page (.clp-form grid, .clp-places)", html.includes(".clp-form{") && html.includes(".clp-places"));
@@ -5012,7 +5026,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("REVIEW PAGE: Accept asks once; Return needs a comment; a newer unsent issue says so",
      rp.includes("window.confirm(`Accept Issue ${n} of the ${open.name} CLP for ${open.group_name}?`)")
      // NARROWED 31 Oct 2026 (PR 3d, Q7): "Comments" is "Notes" on the reviewer's page
-     && rp.includes('setMsg({ ok: false, text: "Write what needs changing in the note box first." }); return;')
+     // NARROWED 9 Nov 2026 (card 11): Return has its own box on the decision card; its button stays off until something is written
+     && rp.includes('<button type="button" className="btn-pri" disabled={busy || !ret.trim()} data-review-return-go={n}')
+     && rp.includes('{ issue_no: n, decision: "returned", words: ret }')
      && rp.includes("The contractor has a newer issue that is not sent to {open.group_name} yet."));
   ok("REVIEW PAGE: a phone card's Open button is a 44 px tap (the UI audit's targets-44px row, 31 Oct)",
      rp.includes('className="btn-sec mt-3" style={{ minHeight: 44 }} onClick={() => show(c.id)}'));
@@ -5135,7 +5151,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
 // 5 Nov 2026 (group 6, PR 2; card 6): the Dashboard's Concerns section — planners and admins only, folded and read on first
 // open, the Dashboard's months and Sites, counts only, Copy / Download on its chart
 {
-  const cd = code.slice(code.indexOf("function ConcernsDash("), code.indexOf("function DashboardStockChart("));
+  // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): TrafficDash follows ConcernsDash; the slice ends where it starts
+  const cd = code.slice(code.indexOf("function ConcernsDash("), code.indexOf("const TL_STATE = "));
   ok("CONCERNS DASH: the section exists, reads /api/concerns/figures with the range and the Sites, only once opened",
      cd.length > 1500 && cd.includes("fetch(`${API}/concerns/figures?${q}`)") && cd.includes("if(!open) return;")
      && cd.includes('"&sites=" + sites.map(encodeURIComponent).join(",")') && cd.includes("<summary>Concerns from the public</summary>"));
@@ -5423,6 +5440,44 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && ram.includes('window.addEventListener("scroll", onScroll, true); window.addEventListener("resize", place);')
      && ram.includes('window.removeEventListener("scroll", onScroll, true); window.removeEventListener("resize", place);')
      && !/d\.open = false/.test(ram));
+}
+// ---- 9 Nov 2026 (v2.1 task 2.1-1): traffic limits on a road or an area ----
+{
+  ok("TRAFFIC LIMIT: Zones offers the kind, a limit with its unit, the basis, line or area, the public tick and the one sentence",
+     code.includes('["traffic_limit", "Traffic limit"]') && code.includes('const LIMIT_KIND = "traffic_limit";')
+     && code.includes('["movements", "lorry movements a day, in and out counted separately"], ["visits", "lorry visits a day"]')
+     && code.includes('[["average", "Daily average in the month"], ["busiest_day", "Busiest day"]]')
+     && code.includes('[["line", "Line along the road"], ["area", "Area"]]') && code.includes("Show on the public map")
+     && code.includes("Wayscope flags it; it never moves a route."));
+  ok("🔴 TRAFFIC LIMIT: a limit never routes — saved with affects_routing false, its Affects routing tick not drawn",
+     code.includes("affects_routing: limitNow ? false : !!zoneForm.affects_routing")
+     && code.includes("{!isLimit(zoneForm) && <label") && code.includes("zoneForm.affects_routing && !isHaul(zoneForm) && !isLimit(zoneForm)"));
+  ok("TRAFFIC LIMIT: a line is a LineString, the limit fields go in the body, a missing number is refused in words",
+     code.includes("geometry: lineNow") && code.includes("limit_value: Number(zoneForm.limit_value), limit_counts: zoneForm.limit_counts,")
+     && code.includes('setZoneMsg("Type the limit: a number of lorries a day.")'));
+  ok("TRAFFIC LIMIT: the Zones table's Routing cell is the limit and Used by the routes this month (read beside the diversions)",
+     code.includes("data-zone-limit-chip={z.id}") && code.includes("`Limit ${limitNum(lim.value)} / day`")
+     && code.includes("data-zone-limit-use={z.id}") && code.includes("const loadLimitUse = () => {")
+     && (code.match(/loadLimitUse\(\)/g) || []).length >= 2);
+  const td = code.slice(code.indexOf("function TrafficDash("), code.indexOf("function DashboardStockChart("));
+  ok("TRAFFIC DASH: a fold for planners and admins under Gate arrivals, read on first open, following the months and Sites",
+     td.includes("<summary>Traffic limits</summary>") && td.includes("if(!open) return;")
+     && td.includes("fetch(`${API}/traffic-limits?${q}`)") && td.includes('"&sites=" + sites.map(encodeURIComponent).join(",")')
+     && code.includes("{canApprove && !wall && !phone && <TrafficDash months={months} lo={D.lo} hi={D.hi} sites={sites}")
+     && code.indexOf("<TrafficDash ") > code.indexOf("<GateArrivalsPanel ") && code.indexOf("<TrafficDash ") < code.indexOf("<ConcernsDash "));
+  ok("TRAFFIC DASH: a table (road, this month, limit, months over) and a chart a limit with Copy / Download (title and scope)",
+     td.includes('data-traffic-table="1"') && td.includes(">Months over</th>") && td.includes("data-traffic-chart={L.id}")
+     && td.includes("<ChartCanvas config={bar(L)} title={") && td.includes("scope={scope} />")
+     && td.includes('label: "limit", data: ms.map(() => L.limit.value)'));
+  ok("SIM: 'Traffic limits on this day' lists the reply's limits with OVER / NEAR in words",
+     code.includes("Traffic limits on this day") && code.includes("(D.traffic_limits || []).map(t =>")
+     && code.includes('t.state === "over" ? "OVER" : "NEAR"'));
+  ok("RAIL: TRAFFIC LIMIT red and TRAFFIC NEAR amber, words in both tables, ranked",
+     code.includes('TRAFFIC_LIMIT: "TRAFFIC LIMIT"') && code.includes('TRAFFIC_NEAR: "TRAFFIC NEAR"')
+     && code.includes("TRAFFIC_LIMIT: 3.6") && code.includes("TRAFFIC_NEAR: 8.4") && code.includes('|| code === "TRAFFIC_NEAR") ? "warn" : "bad";'));
+  ok("🔴 TRAFFIC LIMIT: no back-end words on the new screens",
+     !/\b(api|endpoint|cache|server|geometry|LineString)\b/i.test(td.replace(/fetch\(`\$\{API\}[^`]*`\)/g, "")
+       .replace(/[A-Za-z_.]*geometry[A-Za-z_.]*/g, "")));
 }
 console.log();
 for (const f of fail) console.log("  FAIL:", f);

@@ -1184,12 +1184,12 @@ _ch17 = _ug[_ug.index('<h1 id="17-the-simulation">'):_ug.index('<h1 id="18-clp-d
 ok3("⭐ SIM PAGE: the user guide has chapter 17 'The Simulation' with 17.1–17.3 in the nav and the text, holding the Month / Week / Day paragraph (chapter 3 keeps one pointer line)",
     all(t in _ug for t in ('<a href="#17-the-simulation">17. The Simulation</a>', '<a href="#17-1-the-day-and-the-controls">17.1', '<a href="#17-2-the-scenario">17.2', '<a href="#17-3-the-tables-the-checks-and-the-phone">17.3'))
     and all(t in _ch17 for t in ('<h2 id="17-1-the-day-and-the-controls">', '<h2 id="17-2-the-scenario">', '<h2 id="17-3-the-tables-the-checks-and-the-phone">', "<strong>Month</strong>", "<strong>Hours and check-in</strong>", "<strong>Every gate</strong>",
-        "<strong>Arrivals</strong>", "<strong>morning rush</strong>", "<strong>Busiest hour at each gate</strong>", "<strong>Checks</strong>", "<strong>more gates</strong>", "Read here, plan on a desktop"))
+        "<strong>Arrivals</strong>", "<strong>morning rush</strong>", "<strong>Busiest hour at each gate</strong>", "<strong>Checks</strong>", "<strong>more gates</strong>", "Read here"))   # NARROWED 10 Nov 2026 (UI fix phone 2): the heading is "Read here"
     and _ug.count("<p><strong>Simulation</strong> plays a working day lorry by lorry on its own map") == 1 and _ug.index('<h1 id="17-the-simulation">') < _ug.index("<p><strong>Simulation</strong> plays a working day")
     and "has its own page under Plan (chapter 17)" in _ug and "<strong>Open the Simulation</strong>" in _ug, _ch17[:200])
-ok3("SIM PAGE: chapter 17 names no supplier, rule code, parameter or back-end word; the phone section (2.4) lists the Simulation first under 'Read here, plan on a desktop'",
+ok3("SIM PAGE: chapter 17 names no supplier, rule code, parameter or back-end word; the phone section (2.4) lists the Simulation first under 'Read here'",
     not re.search(r"\b(API|endpoint|server|JSON|D59|D85|D86|HERE|Mapbox|predict\w*|real-time|trucks?)\b", _ch17)
-    and "lists the <strong>Simulation</strong> first, under <em>Read here, plan on a desktop</em>" in _ug)
+    and "lists the <strong>Simulation</strong> first, under <em>Read here</em>" in _ug)
 ok3("SIM PAGE: the technical guide #t1-sim-page holds the detail (the NAV id, PHONE_READ_PAGES, SimDashLine, the look's style, the audit stops)",
     'id="t1-sim-page"' in _tgv2 and "<code>PHONE_READ_PAGES</code>" in _tgv2 and "<code>SimDashLine</code>" in _tgv2 and "<code>simMapStyle()</code>" in _tgv2
     and "<code>simulation+site</code>" in _tgv2 and "<code>#simulation</code>" in _tgv2)
@@ -1503,5 +1503,28 @@ ok("COUNT (2.1-11b Q2): 'two-way movement' is gone from the user guide", "two-wa
 ok("COUNT (2.1-11b): technical T1 has the rule, counting.convert for 2.1-1 and what keeps vehicles / visits",
    all(w in _tg_cnt for w in ('id="t1-counting"', "<code>planning.count_visit_as</code>", "counting.convert(n, from_unit, to_unit)",
                               "<code>tenant.council_breaks.movements_unit</code>", "Gate arrivals, the Look-ahead and the")))
+# 9 Nov 2026 (v2.1 task 2.1-1): traffic limits in both guides
+ok("TRAFFIC LIMIT: user guide 9.3 says how to draw one, what counts, that it never moves a route, and where it shows",
+   all(w in src for w in ('id="ug-traffic-limit"', "<strong>Line along the road</strong>", "<strong>Busiest day</strong>",
+                          "within 25 m for at least half its length", "Wayscope flags it; it never moves a route.",
+                          "<strong>Traffic limits on local roads</strong>")))
+ok("TRAFFIC LIMIT: the rail table, the Dashboard fold, the public map layer and the Simulation line",
+   "<tr><td>TRAFFIC LIMIT</td>" in src and "<tr><td>TRAFFIC NEAR</td>" in src and "a seventh, <strong>Traffic limits</strong>" in src
+   and "<li><strong>Traffic limits</strong> — under More layers" in src and 'id="ug-sim-traffic"' in src)
+_tg_tl = open(TECH, encoding="utf-8").read()
+ok("TRAFFIC LIMIT: technical T1 #t1-traffic-limits has the rule, the thresholds, the reads and what is not built",
+   all(w in _tg_tl for w in ('id="t1-traffic-limits"', "<code>backend/traffic_limits.py</code>", "<code>LINE_NEAR_M</code> = 25 m",
+                             "<code>NEAR_SHARE</code> = 90 %", "<code>GET /api/public/traffic-limits</code>", "Not built:")))
+# 10 Nov 2026 (v2.1 task 2.1-4): a road or an area on the public map, in both guides
+ok("ROAD CARD (2.1-4): user guide 8 says the click in every mode, In / Out / A day, Pick a month, the tip, the box, Copy and the phone",
+   all(w in src for w in ('id="ug-map-road-card"', "<strong>This road · <em>month</em></strong>", "<strong>In</strong> (laden, towards the work)",
+                          "<strong>Pick a month</strong>", "<em>34 movements a day · 10 routes</em>", "<strong>⬚ Select an area</strong>",
+                          "is counted once, however often it crosses", "the box goes into the share link", "it names no team",
+                          'id="ug-map-road-phone"', "<strong>Sum this box</strong>")))
+_tg_rs = open(TECH, encoding="utf-8").read()
+ok("ROAD CARD (2.1-4): technical T1 #t1-road-area has the two reads, the piece, the box rule against the limit's, warm() and what is not built",
+   all(w in _tg_rs for w in ('id="t1-road-area"', "<code>backend/section_select.py</code>", "<code>GET /api/public/road-at",
+                             "<code>GET /api/public/area-sum", "<code>PIECE_M</code> = 150 m", "<code>BOX_ENTER_KM</code> (1 m)",
+                             "<code>warm()</code>", "<code>&amp;area=w,s,e,n</code>", "Not built:")))
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

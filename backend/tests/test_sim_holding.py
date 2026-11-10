@@ -350,8 +350,8 @@ ok("3. ⭐ the day with and without it: the site's most waiting falls, the held 
    str((Hf["with"], Hf["without"])))
 ok("3. over its spaces: 12 spaces against the most held", Hf["over_spaces"] == max(0, Hf["most"] - 12))
 notes = " ".join(D["notes"])
-ok("3. the words: the rule in one sentence, the mixers straight to the gate, the straight lines said",
-   "call off at Lane holding area: 2 called forward at a time" in notes and "go straight to the gate" in notes
+ok("3. the words: the rule in plain English, the mixers straight to the gate, the straight lines said",
+   "wait at Lane holding area and are called forward 2 at a time for each bay" in notes and "never into a shut gate" not in notes and "go straight to the gate" in notes
    and "drawn straight from the holding area to the gate" in notes and Hf["straight"] == loads["R3"], notes[:400])
 ok("3. ⭐ the bay with more work than its gate's open day is named (Q13): the spoil bay's loading minutes against the gate's open minutes",
    spoil.get("over_day") is True and spoil["work_minutes"] >= spoil["open_minutes"] and "Spoil loading needs" in notes and "whatever happens before the gate" in notes,

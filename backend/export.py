@@ -262,7 +262,9 @@ FLAG_LABEL = {"SHORTAGE": "SHORTAGE", "DAYS_NE_WEEK": "DAYS ≠ WEEK", "STOCKPIL
               "NO_WAY_ROUND": "NO WAY ROUND",
               # 29 Oct 2026 (task 3a): the concrete pours (pours.WORDS)
               "POUR_COLD_JOINT": "COLD JOINT", "POUR_TRANSIT": "TRANSIT", "POUR_SHORT": "MIXERS SHORT",
-              "POUR_BAND": "IN A BAND", "POUR_OVER_PLAN": "OVER PLAN"}
+              "POUR_BAND": "IN A BAND", "POUR_OVER_PLAN": "OVER PLAN",
+              # 9 Nov 2026 (v2.1 task 2.1-1): a road or an area's traffic limit (traffic_limits.FLAG_WORDS)
+              "TRAFFIC_LIMIT": "TRAFFIC LIMIT", "TRAFFIC_NEAR": "TRAFFIC NEAR"}
 
 #: 14 Oct 2026 (W17): printed wherever a gate flag is — the figures are planned, not observed
 #: 17 Oct 2026: built from gate_hours.LIMIT_WORDS (it now names the shut times and bands), so the two cannot drift
@@ -906,8 +908,10 @@ def build_pdf(page):
 #: 29 Oct 2026 (task 3a): a pour's COLD JOINT and TRANSIT after NO WAY ROUND (the red group); MIXERS SHORT, IN A BAND and
 #: OVER PLAN, the pour's warnings, last
 DAY_FLAG_RANK = ("LIMIT", "NO_WAY_ROUND", "POUR_COLD_JOINT", "POUR_TRANSIT", "RESTRICTION", "SHORTAGE", "ROUTE_CAP",
-                 "GATE_OVER", "STOCKPILE_OVER", "IPT_SHARE", "DAYS_NE_WEEK", "PARENT_CHANGED", "GATE_NEAR", "STOCKPILE_EMPTY",
-                 "STOCKPILE_SOON", "UNBAKED", "POUR_SHORT", "POUR_BAND", "POUR_OVER_PLAN")
+                 "GATE_OVER", "TRAFFIC_LIMIT", "STOCKPILE_OVER", "IPT_SHARE", "DAYS_NE_WEEK", "PARENT_CHANGED", "GATE_NEAR", "STOCKPILE_EMPTY",
+                 "STOCKPILE_SOON", "UNBAKED", "POUR_SHORT", "POUR_BAND", "POUR_OVER_PLAN",
+                 # 9 Nov 2026 (v2.1 task 2.1-1): TRAFFIC LIMIT after GATE OVER (above), TRAFFIC NEAR the last warning
+                 "TRAFFIC_NEAR")
 #: the words a person reads on the sheet (the grid's LINE_FLAG_LABEL, with the restriction's own word from the flag).
 #: 17 Oct 2026: + GATE OVER / GATE NEAR, the grid's and the phone day card's words (the sheet printed "GATE_OVER"); the
 #: rail's longer GATE OVER CAPACITY (FLAG_LABEL) would wrap the FLAG column, and the sentence under it names the capacity
@@ -920,7 +924,8 @@ DAY_FLAG_WORD = {"LIMIT": "ROAD LIMIT", "RESTRICTION": "RESTRICTION", "SHORTAGE"
                  "NO_WAY_ROUND": "NO WAY ROUND",    # 28 Oct 2026 (task 0c)
                  # 29 Oct 2026 (task 3a): the concrete pours (pours.WORDS), 15 characters at most
                  "POUR_COLD_JOINT": "COLD JOINT", "POUR_TRANSIT": "TRANSIT", "POUR_SHORT": "MIXERS SHORT",
-                 "POUR_BAND": "IN A BAND", "POUR_OVER_PLAN": "OVER PLAN"}
+                 "POUR_BAND": "IN A BAND", "POUR_OVER_PLAN": "OVER PLAN",
+                 "TRAFFIC_LIMIT": "TRAFFIC LIMIT", "TRAFFIC_NEAR": "TRAFFIC NEAR"}   # 9 Nov 2026 (2.1-1)
 
 
 #: flag sentences printed in full under the counts; the rest are counted (every one is in the Look-ahead)
@@ -2344,12 +2349,14 @@ def _newsletter(S, map_h, pages=None):
                 story.append(P(E(line), st_grey))
     if not (M or C):
         story += _lot_flow(K, L)
+        story += _traffic_flow(K, S.get("traffic"))      # 9 Nov 2026 (v2.1 task 2.1-1)
 
     # ---- 04 carbon and the small print
     story.append(PageBreak())
     story.append(kicker("04", "Carbon and the small print"))
     if M or C:
         story += _lot_flow(K, L)
+        story += _traffic_flow(K, S.get("traffic"))      # 9 Nov 2026 (v2.1 task 2.1-1)
     story += _glance_flow(K, S)
     story.append(P("Terms", st_sec))
     tt = LongTable([[P(f"<b>{E(k)}</b>", ParagraphStyle("tk", parent=st, fontSize=8, leading=10)),
@@ -2395,6 +2402,31 @@ def _glance_flow(K, S):
     # holding this table has no room: a table of kinds, then even one grey line of them, took the newsletter to five pages
     # (D43 keeps it at four). The kinds and the median first reply are on the web bulletin, under the same table.
     return out
+
+
+def _traffic_flow(K, T):
+    """9 Nov 2026 (v2.1 task 2.1-1, Q10): "Traffic limits on local roads" — the web page's table, at most six rows, the
+    over word red and the near word amber; nothing when no public limit is in force this month."""
+    if not T:
+        return []
+    E, P = K.E, K.P
+    sm = ParagraphStyle("tls", parent=K.st, fontSize=8, leading=9.8)
+    smr = ParagraphStyle("tlr", parent=sm, alignment=2)
+    hd = ParagraphStyle("tlh", parent=K.st_h, fontSize=7.5, leading=9)
+    hdr = ParagraphStyle("tlhr", parent=hd, alignment=2)
+    col = {"over": "#B91C1C", "near": "#B45309"}       # text-grade red and amber (5:1 or more on white)
+    tb = [[P("Road", hd), P("This month, a day", hdr), P("Limit", hdr), P("Plan", hd)]]
+    for r in T["rows"]:
+        w = E(r["state"])
+        if r["state_key"] in col:
+            w = f"<font color='{col[r['state_key']]}'><b>{w}</b></font>"
+        tb.append([P(E(r["name"]), sm), P(E(r["figure"]), smr), P(E(r["limit"]), smr), P(w, sm)])
+    t = LongTable(tb, colWidths=[K.usable * 0.40, K.usable * 0.21, K.usable * 0.26, K.usable * 0.13], repeatRows=1)
+    t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [
+                           ("TOPPADDING", (0, 0), (-1, -1), 1.3), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.3),
+                           ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]))
+    more = (f" {T['total'] - len(T['rows'])} more within their limits." if T["total"] > len(T["rows"]) else "")
+    return [KeepTogether([P(E(T["title"]), K.st_sec), t]), P(E(T["note"] + more), K.st_grey)]
 
 
 def _lot_flow(K, L):

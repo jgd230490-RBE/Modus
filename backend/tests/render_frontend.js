@@ -158,8 +158,11 @@ if (loaded) {
       h(Portal, { role: planner, who: "tester", meta, metaErr: false, vehLang: "en" }));
     if (page === "map") ok("...the map page is an iframe", out.includes("<iframe"));
     // REVERSED 27 Oct 2026 (F3 c / P5): no admin token box anywhere; a planner reads Config and cannot save it
+    // NARROWED 9 Nov 2026 (UI critique card 10): the planner's page is read-only from the top — one line says so, the fields
+    // sit in a disabled fieldset (asserted mounted, in ui_fix_configclp.js: this static render is the loading state), and the foot no longer carries a Save bar or "Only an admin can save the configuration."
     if (page === "config") ok("...the config page asks for no admin token; a planner reads it, 'Only an admin can save the configuration.'",
-      !out.includes("Admin token") && out.includes("Only an admin can save the configuration.") && !out.includes(">Save</button>"));
+      !out.includes("Admin token") && out.includes("You can read the configuration. An admin changes it.")
+      && !out.includes("Only an admin can save the configuration.") && !out.includes(">Save</button>"));
     if (page === "carbon") ok("...the carbon page waits for its one read (no figures before the server answers)", out.includes("Loading the carbon planner"));
   }
 
@@ -753,7 +756,9 @@ if (loaded) {
         && dOut.indexOf("data-sim-dash=") > dOut.indexOf("data-gate-arrivals") && dOut.indexOf("data-sim-dash=") < dOut.indexOf("<summary>This week and today"));
       ok("⭐ SIM: the figures line, the controls row (scale, month, Play, Restart, speed, the clock), the Now card's jump slider, the scenario band and the map's key as a row",
         sTxt.includes("Sep 2026 · an average working day · 312 loads · 646 arrivals, 22 of them mixers · spread evenly")
-        && sP.includes('data-sim-controls="1"') && sP.includes('aria-label="Simulation month"') && sP.includes(`data-sim-clock="1">${SIMF.window.from}<`)
+        && sP.includes('data-sim-controls="1"') && sP.includes('aria-label="Simulation month"') && sP.includes('data-sim-clock="1">12:38<')
+        /* RE-PINNED 9 Nov 2026 (finding 9): the clock opens at the busiest point, and the headline names it */
+        && sTxt.includes("12 lorries waiting at Harborough Compound at 12:38 — the busiest point of this day.")
         && sP.includes('data-sim-play="1">Play<') && sP.includes(">Restart<")
         && sP.includes('aria-label="Playback speed"') && sP.includes('aria-label="Jump to a time of day"') && sP.includes('data-sim-scenario="1"')
         && sP.includes('<ul class="sim-key" aria-label="Key" data-sim-key="1">') && !sP.includes('class="sim-legend"')
@@ -774,7 +779,7 @@ if (loaded) {
         && sTxt.includes("the table counts 646 lorry arrivals and the map plays 646 between 05:30 and 17:30")
         && sTxt.includes(`every gate is within ${(+SIMF.checks.largest_panel_difference).toFixed(1)} of a lorry of the Dashboard's Sep 2026 average`));
       ok("SIM: the quarries and the railhead say they serve other customers; the flatbed lines say they are drawn on the tipper's route",
-        (sP.match(/Serves other customers too: only this scheme&#x27;s lorries are counted/g) || []).length === 4
+        /* NARROWED 9 Nov 2026 (finding 9): said once, not on each of the four quarry and railhead rows */ (sP.match(/Quarries and plants serve other customers too: only this scheme&#x27;s lorries are counted/g) || []).length === 1 && !sP.includes("Serves other customers too")
         && sP.includes("Drawn on another vehicle&#x27;s route (none worked out for their own): R003 (Artic Flatbed (44t), drawn as Artic Tipper (44t)); R006 ")
         && (sP.match(/drawn as Artic Tipper \(44t\)/g) || []).length === 4);
       ok("SIM: the haul roads table: Langton haul road 148 lorries, Stockpile North haul road 78, both ways",
@@ -791,12 +796,12 @@ if (loaded) {
       ok("🔴 SIM: no undefined / NaN, no team id, none of the banned words or the word-rule words in the rendered section; lorries, never trucks",
         !/undefined|NaN|\bIPT ?[1-6]\b/.test(sP) && !/\b(bake[ds]?|cached|geometry|server|endpoint|token|real-time|live tracking|telematics|optimi[sz]\w*|predict\w*|trucks?|secure)\b/i.test(sTxt));
       // 17 Oct 2026 (one screen): the timeline sits under the map in the left column; the table and the haul roads fold away
-      const mainCol = seg(sP, '<div class="sim-main">', '<div class="sim-side">');
+      const mainCol = seg(sP, '<div class="sim-main">', '<div class="sim-side kb-scroll"');
       // RE-PINNED 29 Oct 2026 (card 2): the timeline is FULL WIDTH under the map and the Now card, the scenario a band under the timeline
       ok("⭐ SIM one screen: the map in the left column, the Now card and Gates now beside it, the timeline full width under them, the scenario band under it; the table and the haul roads folded (closed) below",
         mainCol.includes('class="sim-map"') && !mainCol.includes('data-sim-timeline="1"') && !mainCol.includes("data-sim-clock")
-        && sP.indexOf('data-sim-timeline="1"') > sP.indexOf('<div class="sim-side">') && sP.indexOf('data-sim-timeline="1"') < sP.indexOf('data-sim-scenario="1"')
-        && sP.includes("<b>When queues start</b>") && seg(sP, '<div class="sim-side">', 'data-sim-timeline="1"').includes('data-sim-clock="1"')
+        && sP.indexOf('data-sim-timeline="1"') > sP.indexOf('<div class="sim-side kb-scroll"') && sP.indexOf('data-sim-timeline="1"') < sP.indexOf('data-sim-scenario="1"')
+        && sP.includes("<b>When queues start</b>") && seg(sP, '<div class="sim-side kb-scroll"', 'data-sim-timeline="1"').includes('data-sim-clock="1"')
         && sP.includes('<details class="sim-fold" data-sim-fold="table"><summary>Busiest hour at each gate</summary>')
         && sP.includes('<details class="sim-fold" data-sim-fold="haul"><summary>Haul roads</summary>') && !/data-sim-fold="[a-z]+" open/.test(sP)
         && sP.indexOf('data-sim-fold="table"') > sP.indexOf('data-sim-scenario="1"'));

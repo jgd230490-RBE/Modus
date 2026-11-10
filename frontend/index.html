@@ -387,6 +387,22 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .cfg-nav-item:hover{color:var(--ink);}
   .cfg-nav-item.is-on{color:var(--ink);font-weight:600;border-left-color:var(--rail-on);background:var(--surface);}
   .cfg-main{padding:0;overflow:hidden;}
+  /* 9 Nov 2026 (UI critique finding 10, card 10): Configuration read-only for a reader. CfgFields is a fieldset (no frame);
+     disabled for a reader, its controls are drawn as text: no box, no arrow, no placeholder, a tick a ✓ or –, no buttons */
+  .cfg-fs{border:0;margin:0;padding:0;min-width:0;}
+  .cfg-ro-note{border:1px solid var(--line);background:var(--navy-soft);color:var(--ink);border-radius:8px;padding:10px 14px;font-size:14px;margin:0 0 16px;}
+  .cfg-ro input:not([type=checkbox]):not([type=radio]),.cfg-ro select,.cfg-ro textarea{border-color:transparent;background:transparent;box-shadow:none;color:var(--ink);-webkit-text-fill-color:var(--ink);opacity:1;cursor:default;-webkit-appearance:none;appearance:none;resize:none;}
+  .cfg-ro input::placeholder,.cfg-ro textarea::placeholder{color:var(--muted);-webkit-text-fill-color:var(--muted);}
+  .cfg-ro input::-webkit-calendar-picker-indicator{display:none;}
+  .cfg-ro input[type=checkbox]:not(.hidden){-webkit-appearance:none;appearance:none;display:inline-block;width:auto;height:auto;min-width:1em;margin:0;border:0;background:none;font:inherit;font-weight:700;color:var(--muted);text-align:center;vertical-align:baseline;}
+  .cfg-ro input[type=checkbox]:not(.hidden)::before{content:"–";}
+  .cfg-ro input[type=checkbox]:not(.hidden):checked{color:var(--ok-text);}
+  .cfg-ro input[type=checkbox]:not(.hidden):checked::before{content:"✓";}
+  .cfg-ro input[type=radio],.cfg-ro label:has(> input[type=radio]:not(:checked)),.cfg-ro [data-ro-only-on] label:has(> input:not(:checked)){display:none;}
+  .cfg-ro button,.cfg-ro [data-ro-hide]{display:none;}
+  .cfg-ro label{cursor:default;}
+  .cfg-ro-box{overflow-x:auto;}  .cfg-ro .overflow-auto{overflow:visible;}   /* 10 Nov 2026: a reader's one scroll box, outside the fieldset */
+  .cfg-ro .tbl input:not([type=checkbox]):not([type=radio]),.cfg-ro .tbl select{field-sizing:content;width:auto;min-width:2ch;}   /* 10 Nov 2026: a reader's table value is as wide as its words ("not typed", "derived: kWh × UK grid" were cut to fit a typing box) */
   .field{margin-bottom:18px;}
   /* 11 Oct 2026 — the sign-in box in the finalised theme: the page's surface, warm line, labels above,
      an orange focus ring and the orange action button; the access code has a show / hide eye. */
@@ -804,6 +820,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-dot-held{background:#475569;}
   .sim-cmp td:first-child{max-width:190px;}
   .sim-side{display:flex;flex-direction:column;gap:12px;min-width:0;}
+  @media (min-width:1024px){.sim-side{max-height:max(360px,min(62vh,720px));overflow:auto;}}   /* 10 Nov 2026 (finding 9): the Now card and the gates are no taller than the map, so nothing is left empty under it */
   .sim-card{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--surface);color:var(--ink);}
   .sim-card-h{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:6px;}
   .sim-clock{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;color:var(--ink);}
@@ -834,6 +851,16 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-ctl input:not([type=checkbox]),.sim-table input{font:inherit;font-size:14px;border:1px solid var(--grey);border-radius:6px;padding:2px 6px;color:var(--ink);background:var(--surface);min-height:28px;}
   .sim-ctl input[type=time],.sim-table input[type=time]{width:108px;}
   .sim-num{width:76px;}
+  .sp-tab-flag{margin-left:8px;font-weight:600;font-size:12px;display:inline-flex;align-items:center;gap:5px;}
+  .sp-dot{display:inline-block;width:8px;height:8px;border-radius:50%;}
+  .sp-dot-bad{background:var(--red,#DC2626);box-shadow:0 0 0 1.5px #fff;}.sp-dot-warn{background:#F59E0B;box-shadow:0 0 0 1.5px #fff;}
+  .sim-head{font-size:16px;color:var(--ink);line-height:1.4;margin:2px 0 4px;}   /* 9 Nov 2026 (finding 9): the headline first */
+  .sim-head-none{font-size:14px;color:var(--muted);}
+  .sim-link{background:none;border:0;padding:0;color:var(--navy);font:inherit;font-weight:600;text-decoration:underline;cursor:pointer;}
+  .sim-lbl-txt{font-size:14px;color:var(--muted);}
+  .sim-hold-fold>summary{font-size:13px;cursor:pointer;color:var(--ink);margin:4px 0;}
+  .sim-hc .sim-lbl{display:flex;width:100%;}
+  .sim-hc .sim-lbl .ga-sel{flex:1 1 0;min-width:0;max-width:100%;}
   .sim-hold-row{flex-wrap:wrap;row-gap:2px;}   /* 30 Oct 2026 (task 3c): the holding row wraps; its note is a line under it, never a flex item beside it */
   .sim-msg{color:var(--red);font-size:14px;font-weight:600;}
   .sim-h4{font-size:15px;font-weight:600;color:var(--ink);margin:16px 0 2px;}
@@ -988,6 +1015,11 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .row-st.rs-ok i{background:var(--green);}
   .row-st.rs-warn i{background:var(--gold);color:#1F2024;border-radius:3px;}
   .row-st.rs-bad i{background:var(--red);}
+  .row-st.rs-draft i{background:transparent;border:2px solid var(--chart-none);width:14px;height:14px;}
+  /* 9 Nov 2026 (UI critique card 11): CLP documents grouped by place, the team CLPs folded under the site's */
+  .clp-fold{display:inline-flex;align-items:center;gap:4px;margin-top:4px;min-height:24px;padding:0 2px;background:none;border:0;font:inherit;font-size:13px;color:var(--ink);text-decoration:underline;cursor:pointer;}
+  .clp-kid td:first-child{padding-left:36px;}
+  .clp-nowrap{white-space:nowrap;}
   .row-st .rs-more{font-weight:500;color:var(--muted);}
   .unit-sw{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--muted);}
   .unit-sw-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
@@ -1037,6 +1069,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .phone-more p{margin:0;padding:0 20px 8px;font-size:14px;color:var(--muted);}
   .phone-more-item{display:flex;align-items:center;gap:14px;width:100%;min-height:48px;padding:0 20px;border:0;background:transparent;color:var(--ink);font:500 15px Inter,system-ui,sans-serif;text-align:left;text-decoration:none;cursor:pointer;}
   .phone-more-item .nav-ic{width:20px;height:20px;color:var(--muted);}
+  .phone-more-item.pm-desk{font-weight:400;color:var(--muted);}   /* 10 Nov 2026 (UI fix phone 2): the pages a phone does not open in the plainer weight, the Simulation in the ink weight */
   .phone-more-item.is-on{color:var(--action);font-weight:600;}
   .phone-more-item:focus-visible{outline:2px solid var(--action);outline-offset:-2px;}
   .phone-more-item .pm-note{margin-left:auto;font-size:13px;font-weight:500;color:var(--muted);}
@@ -1700,9 +1733,9 @@ function UnitSwitch({ value, onChange, note }){
 }
 // the one status: a word, an icon whose SHAPE says the tone (✓ circle, ! square, ! circle, – circle), and
 // how many more things are flagged (the details spell each one out)
-const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–" };
+const RS_ICON = { ok: "✓", warn: "!", bad: "!", none: "–", draft: "" };   // 9 Nov 2026: draft (CLP documents) a hollow ring
 function RowStatus({ word, tone, more }){
-  const t = RS_ICON[tone] ? tone : "none";
+  const t = Object.prototype.hasOwnProperty.call(RS_ICON, tone || "") ? tone : "none";
   return <span className={"row-st rs-" + t} data-row-status={t}><i aria-hidden="true">{RS_ICON[t]}</i>{word}{more > 0 && <span className="rs-more">+{more}</span>}</span>;
 }
 // one fact in the details: a label and its value; nothing at all when there is no value
@@ -3049,6 +3082,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
               the busiest gate from the Gate arrivals reply (no second simulation run here) */}
           <SimDashLine ga={gaShown} month={gaMonth} months={months} onOpen={onOpen} />
           {/* 5 Nov 2026 (group 6, PR 2): the concerns from the public, planners and admins only */}
+          {/* 9 Nov 2026 (v2.1 task 2.1-1, Q9): traffic limits, planners and admins only */}
+          {canApprove && !wall && !phone && <TrafficDash months={months} lo={D.lo} hi={D.hi} sites={sites} sitesLabel={sites.length ? sitesWords(sites, locList) : ""} onOpen={onOpen} />}
           {canApprove && !wall && !phone && <ConcernsDash months={months} lo={D.lo} hi={D.hi} sites={sites} sitesLabel={sites.length ? sitesWords(sites, locList) : ""} tripsM={D.tripsM} pv={countPV(meta)} onOpen={onOpen} />}
           <details className="dash-more">
             <summary>This week and today, with the Look-ahead's map</summary>
@@ -3634,6 +3669,75 @@ function ConcernsDash({ months, lo, hi, sites, sitesLabel, tripsM, pv, onOpen })
   );
 }
 const cnIdx = (ym, startYear) => (parseInt(ym.slice(0, 4), 10) - startYear) * 12 + parseInt(ym.slice(5, 7), 10);
+
+// 9 Nov 2026 (v2.1 task 2.1-1, Q9): "Traffic limits" under Gate arrivals — planners and admins, folded, read on first
+// open; follows the month range and the Sites filter (the limit is unchanged, only the lorries counted)
+const TL_STATE = { over: "Over", near: "Near", ok: "Within" };
+const tlNum = (v) => v == null ? "—" : (Math.round(v * 10) / 10).toLocaleString("en-GB", { maximumFractionDigits: 1 });
+function TrafficDash({ months, lo, hi, sites, sitesLabel, onOpen }){
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(false);
+  const sy = (months && months.start_year) || 2026;
+  const q = `from=${lo}&to=${hi}` + ((sites && sites.length) ? "&sites=" + sites.map(encodeURIComponent).join(",") : "");
+  useEffect(() => {
+    if(!open) return;
+    if(data && data._q === q) return;
+    let live = true;
+    setErr(false);
+    fetch(`${API}/traffic-limits?${q}`).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => { if(live) setData({ ...j, _q: q }); })
+      .catch(() => { if(live) setErr(true); });
+    return () => { live = false; };
+  }, [open, q]);
+  const range = lo === hi ? monthLabelAbs(lo, sy) : `${monthLabelAbs(lo, sy)} – ${monthLabelAbs(hi, sy)}`;
+  const scope = [range, sitesLabel || null];
+  const cm = data ? Math.min(hi, Math.max(lo, data.current_month || lo)) : lo;
+  const unitOf = (L) => L.limit.counts === "movements" ? "movements" : "visits";
+  const bar = (L) => {
+    const ms = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+    const v = ms.map(m => { const r = (L.months || {})[String(m)]; return r ? r.value : null; });
+    const col = ms.map(m => { const r = (L.months || {})[String(m)]; const st = r && r.state;
+      return st === "over" ? tok("--red", "#DC2626") : st === "near" ? tok("--gold", "#D97706") : tok("--chart-1", "#E8590C"); });
+    return { type: "bar", data: { labels: ms.map(m => monthLabelAbs(m, sy)),
+      datasets: [{ label: `${unitOf(L)} a day`, data: v, backgroundColor: col, borderWidth: 0 },
+                 { type: "line", label: "limit", data: ms.map(() => L.limit.value), borderColor: tok("--ink", "#1F2024"), borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                 scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } } };
+  };
+  const lims = (data && data.limits) || [];
+  return (
+    <details className="dash-more" data-traffic-dash="1" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>
+      <summary>Traffic limits</summary>
+      <div className="pt-3">
+        <div className="ct-row mb-2"><span className="ct-line">Traffic limits · {range}{sitesLabel ? " · " + sitesLabel : ""}</span>
+          <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "6px 12px" }} onClick={() => onOpen && onOpen("zones")}>Open Zones</button></div>
+        {err && <div className="ct-line" data-traffic-dash-error="1">The traffic limits did not load.</div>}
+        {!data && !err && <div className="ct-line">Loading the traffic limits…</div>}
+        {data && !lims.length && <div className="ct-line" data-traffic-dash-none="1">No traffic limit drawn. Add one on Data → Zones.</div>}
+        {data && lims.length > 0 && <>
+          <div className="overflow-auto mb-3"><table className="ga-table" data-traffic-table="1">
+            <thead><tr><th scope="col">Road</th><th scope="col" className="num">{monthLabelAbs(cm, sy)}, a day</th><th scope="col" className="num">Limit</th><th scope="col">Months over</th></tr></thead>
+            <tbody>{lims.map(L => { const r = (L.months || {})[String(cm)];
+              const st = r ? r.state : null;
+              return <tr key={L.id} data-traffic-row={L.id}>
+                <td>{L.name}</td>
+                <td className="num">{r ? tlNum(r.value) : "—"}{r && st !== "ok" ? <span className="ml-1 font-semibold" style={{ color: st === "over" ? "var(--bad-text)" : "var(--warn-text)" }}>{TL_STATE[st]}</span> : null}</td>
+                <td className="num">{tlNum(L.limit.value)} {unitOf(L)}{L.limit.basis === "busiest_day" ? " (busiest day)" : ""}</td>
+                <td>{(L.months_over || []).length ? (L.months_over || []).map(m => monthLabelAbs(m, sy)).join(", ") : "None"}</td>
+              </tr>; })}</tbody>
+          </table></div>
+          <div className="grid md:grid-cols-2 gap-3">
+            {lims.map(L => <div key={L.id} className="card p-4 chart-card" data-traffic-chart={L.id}>
+              <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">{L.name} <span className="text-slate-500 font-normal">({unitOf(L)} a day · limit {tlNum(L.limit.value)})</span></div>
+              <ChartCanvas config={bar(L)} title={`${L.name} (${unitOf(L)} a day, limit ${tlNum(L.limit.value)})`} scope={scope} />
+            </div>)}
+          </div>
+          <div className="text-xs text-slate-500 mt-2">{data.note} A busiest-day limit shows the daily average here.</div>
+        </>}
+      </div>
+    </details>
+  );
+}
 
 function DashboardStockChart({ meta, weekNow, wall, fill, tick, from, to }){
   const { months } = meta;
@@ -5510,7 +5614,7 @@ function PoursPage({ meta, access, who }){
 // stockpile and one for each team with lorries there (the server lists them; opening the page writes nothing), plus any made with
 // + New CLP. A team login sees its own team's only. One filled button a row (Approve as Issue N… when sent, else Download draft) and
 // the "⋯" menu. The server builds every file (one at a time across the app); this page never works a figure out.
-const CLP_TONE = { draft: "none", sent: "warn", changes: "warn", approved: "ok" };
+const CLP_TONE = { draft: "draft", sent: "warn", changes: "warn", approved: "ok" };   // 9 Nov 2026 (card 11): draft a hollow ring (the grey – circle read "blocked")
 const CLP_GROUPS = [["Sites and compounds", ["Site", "Compound"]], ["Stockpiles and holding areas", ["Stockpile", "Holding area"]]];
 const clpDay = (iso) => iso ? longDate(String(iso).slice(0, 10)) : "";
 function clpGroupOf(type){ const g = CLP_GROUPS.find(([, ts]) => ts.includes(type)); return g ? g[0] : "Quarries, plants and others"; }
@@ -5690,6 +5794,7 @@ function ClpPage({ access }){
   const [pv, setPv] = useState(null);             // the approve card's preview, or the history
   const [building, setBuilding] = useState("");   // the id whose file is being made
   const [note, setNote] = useState(null);
+  const [folds, setFolds] = useState({});        // 9 Nov 2026 (card 11): a place's team CLPs opened or folded by hand
   const headRef = useRef(null);
   useEffect(() => {
     let live = true;
@@ -5947,19 +6052,90 @@ function ClpPage({ access }){
       <button type="button" className="btn-sec mt-2" onClick={close}>Close</button>
     </div>
   );
-  const sub = (c) => [c.types.join(", "), appr ? (c.impact === "medium" ? "Medium impact" : "Higher impact") : null,
+  // 9 Nov 2026 (card 11): the Covers column is gone — the CLP's own line says whose lorries it counts
+  const sub = (c) => [c.types.join(", "), appr ? teamWord(c).replace(/^All/, "all") : null, appr ? (c.impact === "medium" ? "Medium impact" : "Higher impact") : null,
                       c.busiest_label ? `busiest ${c.busiest_label}` : "no approved lorries"].filter(Boolean).join(" · ");
+  const subKid = (c) => ["Team CLP", c.busiest_label ? `busiest ${c.busiest_label}` : "no approved lorries"].join(" · ");
   const statusLine = (c) => c.status === "sent" ? `by ${c.sent_by || "the team"} · ${clpDay(c.sent_at)}`
     : c.status === "changes" ? (c.changes_note ? `“${c.changes_note}”` : "") : "";
   // PR 3c: where the last issue sent to each client group stands (Returned in red)
   const reviewLine = (r) => r.state === "accepted" ? [`✓ Accepted by ${r.group_name} · ${clpShort(r.at)}`, "var(--ok-text)"]
     : r.state === "returned" ? [`Returned by ${r.group_name} · ${clpShort(r.at)}`, "var(--bad-text)"]
     : [`With ${r.group_name} · since ${clpShort(r.sent_at)}`, "var(--muted)"];
-  const primary = (c) => {
-    if(building === c.id) return <button type="button" className="btn-sec" disabled>{busyWords}</button>;
-    if(appr && c.status === "sent") return <button type="button" className="btn-pri" onClick={() => openApprove(c)} data-clp-primary="approve">Approve as Issue {c.next_issue}…</button>;
-    return <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 12px" }} onClick={() => draft(c)} disabled={!!building} data-clp-primary="draft">Download draft</button>;
+  // 9 Nov 2026 (UI critique finding 11, card 11): each row's main button is its NEXT STEP, never Download (that moved into ⋯).
+  // A team CLP folded under its site ("child") offers only an approval step: its cover is the team's to fill.
+  const nextStep = (c, child) => {
+    const open = c.status === "draft" || c.status === "changes";
+    const coverLeft = (c.cover_typed || 0) < (c.cover_total || 0);
+    if(appr && c.status === "sent") return ["approve", `Approve as Issue ${c.next_issue}…`, () => openApprove(c)];
+    if(child) return null;
+    if(open && canEdit && coverLeft) return ["cover", `Fill in the cover (${c.cover_typed || 0} of ${c.cover_total})`, () => openEdit(c)];
+    if(open && !appr && data.team) return ["send", "Send for approval…", () => openSend(c)];
+    if(open && appr) return ["approve", `Approve as Issue ${c.next_issue}…`, () => openApprove(c)];
+    if(appr && c.status === "approved" && data.review_groups && c.issues > 0 && !(c.reviews || []).length)
+      return ["review", `Send Issue ${c.last_issue ? c.last_issue.no : c.issues} to reviewers…`, () => openReview(c)];
+    return null;
   };
+  const primary = (c, child) => {
+    if(building === c.id) return <button type="button" className="btn-sec" disabled>{busyWords}</button>;
+    const ns = nextStep(c, child);
+    if(ns) return <button type="button" className={ns[0] === "approve" ? "btn-pri" : "btn-sec"} style={ns[0] === "approve" ? undefined : { width: "auto", height: "auto", padding: "5px 12px" }}
+      onClick={ns[2]} disabled={!!building} data-clp-primary={ns[0]}>{ns[1]}</button>;
+    // no step of this login's: the cover count as words, so a folded team CLP still says how far it is
+    return (c.status === "draft" || c.status === "changes") ? <span className="text-[13px] text-slate-500 clp-nowrap" data-clp-cover-left="1">Cover {c.cover_typed || 0} of {c.cover_total}</span> : null;
+  };
+  // 9 Nov 2026 (card 11): grouped by place — the CLP for all teams first, the team CLPs at the same places folded under it.
+  // With a filter set the matching rows are listed flat. A group opens by itself when a team CLP waits on an approver.
+  const filtered = !!(fTeam || fStatus || fTasks || fRev);
+  const groups = [];
+  if(filtered) list.forEach(c => groups.push({ key: c.id, head: c, kids: [] }));
+  else {
+    const byPlace = {};
+    list.forEach(c => { const k = [...(c.location_ids || [])].sort().join(",") || c.id;
+      if(!byPlace[k]){ byPlace[k] = { key: k, items: [] }; groups.push(byPlace[k]); }
+      byPlace[k].items.push(c); });
+    groups.forEach(g => { const h = g.items.find(c => !c.team) || g.items[0]; g.head = h; g.kids = g.items.filter(c => c !== h); });
+  }
+  const isOpen = (g) => folds[g.key] !== undefined ? folds[g.key] : g.kids.some(c => c.status === "sent" || c.status === "changes");
+  const kidWords = (g) => { const n = g.kids.length, sent = g.kids.filter(c => c.status === "sent").length;
+    return `${n} team CLP${n === 1 ? "" : "s"}` + (sent ? ` · ${sent} sent for approval` : ""); };
+  const row = (c, g, child) => {
+    const ns = nextStep(c, child);
+    return (
+    <tr key={c.id} data-clp-row={c.id} data-clp-child={child ? "1" : undefined} hidden={child && !isOpen(g) ? true : undefined} className={child ? "clp-kid" : undefined}>
+      <td style={{ whiteSpace: "normal", minWidth: 220 }}>
+        {child ? (canEdit ? <button type="button" className="row-open" aria-label={`Edit ${c.name} · ${teamWord(c)}`} onClick={() => openEdit(c)}>{teamWord(c)}</button>
+                          : <span className="font-medium text-slate-800">{teamWord(c)}</span>)
+          : canEdit ? <button type="button" className="row-open" aria-label={`Edit ${c.name}`} onClick={() => openEdit(c)}>{c.name}</button>
+                    : <span className="font-medium text-slate-800">{c.name}</span>}
+        <span className="block text-[12px] text-slate-500">{child ? subKid(c) : sub(c)}</span>
+        {!child && g.kids.length > 0 && (
+          <button type="button" className="clp-fold" aria-expanded={isOpen(g) ? "true" : "false"} data-clp-fold={g.key}
+            onClick={() => setFolds(f => ({ ...f, [g.key]: !isOpen(g) }))}><span aria-hidden="true">{isOpen(g) ? "▾" : "▸"}</span> {kidWords(g)}</button>)}
+      </td>
+      <td className="rd-status" style={{ whiteSpace: "normal" }}><RowStatus word={c.status_word} tone={CLP_TONE[c.status]} more={0} />
+        {statusLine(c) && <span className="block text-[12px] text-slate-500">{statusLine(c)}</span>}
+        {(c.reviews || []).map(r => { const [w, col] = reviewLine(r);
+          return <span key={r.group_id} className="block text-[12px]" style={{ color: col }} data-clp-review-line={r.state}>{w}</span>; })}</td>
+      <td>{c.last_issue ? <>Issue {c.last_issue.no} · {clpDay(c.last_issue.date)}{appr && c.last_issue.by ? <span className="block text-[12px] text-slate-500">{c.last_issue.by}</span> : null}</> : "—"}</td>
+      <td data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open
+          {tk(c).overdue > 0 ? <span className="block text-[12px] font-semibold" style={{ color: "var(--bad-text)" }}>{tk(c).overdue} overdue</span>
+            : tk(c).next_due ? <span className="block text-[12px] text-slate-500">due {clpShort(tk(c).next_due)}</span> : null}</>
+        : tk(c).notes > 0 ? <span className="text-slate-600">{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}</span> : tk(c).client_open > 0 ? null : "—"}
+        {tk(c).client_open > 0 && <span className="block text-[12px] text-slate-600" data-clp-tasks-client="1">+ {tk(c).client_open} with the client</span>}</td>
+      <td><div className="flex items-center gap-2 justify-end">{primary(c, child)}
+        <RowMenu name={c.name + " · " + teamWord(c)}>
+          <button type="button" onClick={() => draft(c)} disabled={!!building}>Download draft</button>
+          {appr && c.status !== "sent" && !(ns && ns[0] === "approve") && <button type="button" onClick={() => openApprove(c)} disabled={!!building}>Approve as Issue {c.next_issue}…</button>}
+          {appr && c.status === "sent" && <button type="button" onClick={() => openChanges(c)}>Ask for changes…</button>}
+          {canEdit && <button type="button" onClick={() => openEdit(c)}>{appr ? "Edit" : "Edit cover details"}</button>}
+          {!appr && data.team && !(ns && ns[0] === "send") && <button type="button" onClick={() => openSend(c)}>{c.status === "sent" ? "Send for approval (sent)" : "Send for approval…"}</button>}
+          <button type="button" onClick={() => openNotes(c)}>Notes and tasks{tk(c).open > 0 ? ` (${tk(c).open} open)` : ""}</button>
+          {appr && data.review_groups && c.issues > 0 && !(ns && ns[0] === "review") && <button type="button" onClick={() => openReview(c)}>Send Issue {c.last_issue ? c.last_issue.no : c.issues} to reviewers…</button>}
+          {c.issues > 0 && <button type="button" onClick={() => openHistory(c)}>Document history</button>}
+          {appr && c.issues === 0 && (!c.auto || c.saved) && <button type="button" style={{ color: "var(--red)" }} onClick={() => remove(c)}>{c.auto ? "Clear typed details…" : "Delete…"}</button>}
+        </RowMenu></div></td>
+    </tr>); };
   return (
     <div className="max-w-7xl mx-auto p-6 pb-2" data-page="clp">
       <PageHeader title="CLP documents" kicker="Plan"
@@ -5994,42 +6170,13 @@ function ClpPage({ access }){
       ) : (
         <div className="card overflow-x-auto">
           <table className="tbl" data-clp-table="1">
-            <thead><tr><th scope="col">CLP</th>{appr && <th scope="col">Covers</th>}<th scope="col">Status</th><th scope="col">Last issue</th><th scope="col">Tasks</th>{appr && <th scope="col" className="num">Cover</th>}<th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
-            <tbody>
-              {list.map(c => (
-                <tr key={c.id} data-clp-row={c.id}>
-                  <td style={{ whiteSpace: "normal", minWidth: 220 }}>
-                    {canEdit ? <button type="button" className="row-open" aria-label={`Edit ${c.name}`} onClick={() => openEdit(c)}>{c.name}</button>
-                             : <span className="font-medium text-slate-800">{c.name}</span>}
-                    <span className="block text-[12px] text-slate-500">{sub(c)}</span>
-                  </td>
-                  {appr && <td>{teamWord(c)}</td>}
-                  <td className="rd-status" style={{ whiteSpace: "normal" }}><RowStatus word={c.status_word} tone={CLP_TONE[c.status]} more={0} />
-                    {statusLine(c) && <span className="block text-[12px] text-slate-500">{statusLine(c)}</span>}
-                    {(c.reviews || []).map(r => { const [w, col] = reviewLine(r);
-                      return <span key={r.group_id} className="block text-[12px]" style={{ color: col }} data-clp-review-line={r.state}>{w}</span>; })}</td>
-                  <td>{c.last_issue ? <>Issue {c.last_issue.no} · {clpDay(c.last_issue.date)}{appr && c.last_issue.by ? <span className="block text-[12px] text-slate-500">{c.last_issue.by}</span> : null}</> : "—"}</td>
-                  <td data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open
-                      {tk(c).overdue > 0 ? <span className="block text-[12px] font-semibold" style={{ color: "var(--bad-text)" }}>{tk(c).overdue} overdue</span>
-                        : tk(c).next_due ? <span className="block text-[12px] text-slate-500">due {clpShort(tk(c).next_due)}</span> : null}</>
-                    : tk(c).notes > 0 ? <span className="text-slate-600">{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}</span> : tk(c).client_open > 0 ? null : "—"}
-                    {tk(c).client_open > 0 && <span className="block text-[12px] text-slate-600" data-clp-tasks-client="1">+ {tk(c).client_open} with the client</span>}</td>
-                  {appr && <td className="num tabular-nums">{c.cover_typed} of {c.cover_total}</td>}
-                  <td><div className="flex items-center gap-2 justify-end">{primary(c)}
-                    <RowMenu name={c.name + " · " + teamWord(c)}>
-                      {appr && c.status === "sent" && <button type="button" onClick={() => draft(c)} disabled={!!building}>Download draft</button>}
-                      {appr && c.status !== "sent" && <button type="button" onClick={() => openApprove(c)} disabled={!!building}>Approve as Issue {c.next_issue}…</button>}
-                      {appr && c.status === "sent" && <button type="button" onClick={() => openChanges(c)}>Ask for changes…</button>}
-                      {canEdit && <button type="button" onClick={() => openEdit(c)}>{appr ? "Edit" : "Edit cover details"}</button>}
-                      {!appr && data.team && <button type="button" onClick={() => openSend(c)}>{c.status === "sent" ? "Send for approval (sent)" : "Send for approval…"}</button>}
-                      <button type="button" onClick={() => openNotes(c)}>Notes and tasks{tk(c).open > 0 ? ` (${tk(c).open} open)` : ""}</button>
-                      {appr && data.review_groups && c.issues > 0 && <button type="button" onClick={() => openReview(c)}>Send Issue {c.last_issue ? c.last_issue.no : c.issues} to reviewers…</button>}
-                      {c.issues > 0 && <button type="button" onClick={() => openHistory(c)}>Document history</button>}
-                      {appr && c.issues === 0 && (!c.auto || c.saved) && <button type="button" style={{ color: "var(--red)" }} onClick={() => remove(c)}>{c.auto ? "Clear typed details…" : "Delete…"}</button>}
-                    </RowMenu></div></td>
-                </tr>
-              ))}
-            </tbody>
+            <thead><tr><th scope="col">CLP</th><th scope="col">Status</th><th scope="col">Last issue</th><th scope="col">Tasks</th><th scope="col"><span className="sr-only">Next step</span></th></tr></thead>
+            {groups.map(g => (
+              <tbody key={g.key} data-clp-group={g.key}>
+                {row(g.head, g, false)}
+                {g.kids.map(c => row(c, g, true))}
+              </tbody>
+            ))}
           </table>
         </div>
       )}
@@ -6044,6 +6191,24 @@ function ClpPage({ access }){
 // boxes. Capacity and opening are master data: admins type them here or on Locations (the same call). Nothing is stored
 // that the balance works out: GET /stockpiles reads it, PUT /stockpiles/plan and /stockpiles/count write what people type.
 function stockUnit(u){ return u === "m3" ? "m³" : (u || "t"); }
+// 9 Nov 2026 (UI critique finding 24): one number format on the page — thousands with a space, "11 000", in the boxes too;
+// what is typed is read with the spaces taken out
+const stockTxt = (v) => { if(v == null || v === "") return ""; const r = Math.round(+v * 10) / 10; return grp(r, Number.isInteger(r) ? 0 : 1); };
+const stockNum = (v) => numOr(String(v == null ? "" : v).replace(/\s+/g, ""), NaN);
+// the first problem a stockpile has: over its capacity, else (with a use planned) running out; { kind, from } or null
+function stockProblem(sp){
+  if(sp.first_over) return { kind: "over", from: sp.first_over.from };
+  if(sp.first_empty && sp.use_planned) return { kind: "empty", from: sp.first_empty.from };
+  return null;
+}
+// the weeks a stockpile stays over from its first week over, to the end of the plan
+function stockOverWeeks(sp){
+  const i = sp.first_over ? sp.weeks.findIndex(w => w.from === sp.first_over.from) : -1;
+  if(i < 0) return 0;
+  let n = 0;
+  for(let k = i; k < sp.weeks.length && sp.weeks[k].over; k++) n++;
+  return n;
+}
 function StockpilesPage({ meta, access, who }){
   const { months } = meta;
   const canPlan = !!(access && access.can_approve);
@@ -6058,6 +6223,9 @@ function StockpilesPage({ meta, access, who }){
   const [fill, setFill] = useState({ from: "", to: "", qty: "" });
   const [count, setCount] = useState({ qty: "", week: "" });
   const [tick, setTick] = useState(0);
+  // 10 Nov 2026 (the approved mockup, Q1-Q3): what the page last saved is said beside the boxes, not in a note that goes
+  const [savedPlan, setSavedPlan] = useState("");
+  const [savedCount, setSavedCount] = useState("");
   useEffect(() => {
     let live = true;
     Promise.all([fetch(`${API}/stockpiles?from_month=1&to_month=${months.count}`).then(okJSON),
@@ -6068,14 +6236,16 @@ function StockpilesPage({ meta, access, who }){
   }, [tick]);
   // the stockpiles this page plans: a capacity, a plan, or the type Stockpile
   const stockList = ((data && data.stockpiles) || []).filter(sp => sp.forecast || sp.loc_type === "Stockpile");
-  const sp = stockList.find(x => x.location_id === pick) || stockList[0];
+  // opens on the stockpile with the earliest problem (finding 24), else the first
+  const firstProblem = stockList.filter(x => stockProblem(x)).sort((a, b) => (stockProblem(a).from < stockProblem(b).from ? -1 : stockProblem(a).from > stockProblem(b).from ? 1 : 0))[0];
+  const sp = stockList.find(x => x.location_id === pick) || firstProblem || stockList[0];
   const cw = data && data.current_week;
   const sy = months.start_year;
   const years = Array.from(new Set(Array.from({ length: months.count }, (_, i) => sy + Math.floor(i / 12))));
   const yr = planYear || (cw ? sy + Math.floor((cw.month_index - 1) / 12) : sy);
   const say = (ok, text) => { setNote({ ok, text }); if(ok) setTimeout(() => setNote(null), 2500); };
   const put = (path, body, what) => fetch(`${API}${path}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-    .then(okJSON).then(() => { say(true, "Saved."); setTick(t => t + 1); return true; })
+    .then(okJSON).then(() => { setNote(null); setTick(t => t + 1); return true; })
     .catch(e => { say(false, errSay(what, e)); return false; });
   if(err) return <div className="max-w-7xl mx-auto p-6"><EmptyState kind="error" title="Couldn't open the stockpiles" body={err} action={<button type="button" className="btn-sec" onClick={() => setTick(t => t + 1)}>Try again</button>} /></div>;
   if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;
@@ -6084,27 +6254,28 @@ function StockpilesPage({ meta, access, who }){
   const savePlan = (m) => {
     const k = `${sp.location_id}|${m}`, v = draft[k];
     if(v === undefined) return;
-    const q = v === "" ? null : numOr(v, NaN);
+    const q = String(v).trim() === "" ? null : stockNum(v);
     if(q !== null && !(q >= 0)){ say(false, "Planned use must be a number, 0 or more."); return; }
     put("/stockpiles/plan", { location_id: sp.location_id, from_month: m, planned_qty: q, updated_by: who || null }, "The planned use was not saved.")
-      .then(ok => { if(ok) setDraft(d => { const n = { ...d }; delete n[k]; return n; }); });
+      .then(ok => { if(ok){ setDraft(d => { const n = { ...d }; delete n[k]; return n; }); setSavedPlan(`Saved: ${MONTHS[(m - 1) % 12]} ${sy + Math.floor((m - 1) / 12)} ${q == null ? "cleared" : `${stockTxt(q)} ${u}`}`); } });
   };
   const doFill = () => {
-    const a = +fill.from, b = +fill.to, q = numOr(fill.qty, NaN);
+    const a = +fill.from, b = +fill.to, q = stockNum(fill.qty);
     if(!a || !b || !(q >= 0)){ say(false, "Pick both months and type a figure, 0 or more."); return; }
     put("/stockpiles/plan", { location_id: sp.location_id, from_month: Math.min(a, b), to_month: Math.max(a, b), planned_qty: q, updated_by: who || null },
-        "The planned use was not saved.").then(ok => { if(ok) setFill({ from: "", to: "", qty: "" }); });
+        "The planned use was not saved.").then(ok => { if(ok){ const lo = Math.min(a, b), hi = Math.max(a, b);
+          setSavedPlan(`Saved: ${monthLabelAbs(lo, sy)} to ${monthLabelAbs(hi, sy)}, ${stockTxt(q)} ${u} a month`); setFill({ from: "", to: "", qty: "" }); } });
   };
   const pastWeeks = sp ? sp.weeks.filter(w => cw && (w.month_index < cw.month_index || (w.month_index === cw.month_index && w.week_index < cw.week_index))).slice(-12).reverse() : [];
   const saveCount = () => {
     const w = pastWeeks.find(x => `${x.month_index}|${x.week_index}` === (count.week || (pastWeeks[0] && `${pastWeeks[0].month_index}|${pastWeeks[0].week_index}`)));
-    const q = numOr(count.qty, NaN);
+    const q = stockNum(count.qty);
     if(!w || !(q >= 0)){ say(false, "Type the measured stock, 0 or more."); return; }
     put("/stockpiles/count", { location_id: sp.location_id, month_index: w.month_index, week_index: w.week_index, measured_qty: q, updated_by: who || null },
-        "The stock count was not saved.").then(ok => { if(ok) setCount({ qty: "", week: "" }); });
+        "The stock count was not saved.").then(ok => { if(ok){ setSavedCount(`Saved: ${stockTxt(q)} ${u} at the end of the week of ${stockWeekWord(w.from)} ${(w.from || "").slice(0, 4)}`); setCount({ qty: "", week: "" }); } });
   };
   const saveCap = (field, v) => {
-    const q = v === "" ? null : numOr(v, NaN);
+    const q = String(v).trim() === "" ? null : stockNum(v);
     if(q !== null && !(q >= 0)){ say(false, "Type a number, 0 or more."); return; }
     const body = { capacity_qty: sp.capacity_qty, capacity_unit: sp.capacity_unit, opening_qty: sp.opening_qty, [field]: q };
     put(`/locations/${encodeURIComponent(sp.location_id)}/capacity`, body, "The capacity was not saved.");
@@ -6112,7 +6283,7 @@ function StockpilesPage({ meta, access, who }){
   const lastCount = sp ? [...sp.weeks].reverse().find(w => w.count != null) : null;
   // the status line: the forward balance's own summary of this stockpile
   const status = !sp ? null : !sp.capacity_qty ? { tone: null, text: "No capacity recorded" }
-    : sp.first_over ? { tone: "bad", text: `Goes over in the week of ${stockWeekWord(sp.first_over.from)} ${sp.first_over.from.slice(0, 4)}` }
+    : sp.first_over ? { tone: "bad", text: `Goes over capacity in the week of ${stockWeekWord(sp.first_over.from)} ${sp.first_over.from.slice(0, 4)}${stockOverWeeks(sp) > 0 ? ` and stays over for ${stockOverWeeks(sp)} ${stockOverWeeks(sp) === 1 ? "week" : "weeks"}` : ""}` }
     : sp.first_empty && sp.use_planned ? { tone: "warn", text: `Runs out in the week of ${stockWeekWord(sp.first_empty.from)} ${sp.first_empty.from.slice(0, 4)}` }
     : sp.peak_pct != null && sp.peak_pct >= 90 ? { tone: "warn", text: `Nearly full: ${Math.round(sp.peak_pct)} % in the week of ${stockWeekWord(sp.peak.from)} ${sp.peak.from.slice(0, 4)}` }
     : sp.peak_pct != null ? { tone: "ok", text: `Never over: ${Math.round(sp.peak_pct)} % at most` } : null;
@@ -6148,7 +6319,9 @@ function StockpilesPage({ meta, access, who }){
         <div className="flex flex-wrap gap-1.5 mb-3" role="tablist" aria-label="Stockpile">
           {stockList.map(x => <button key={x.location_id} type="button" role="tab" aria-selected={x === sp}
             className={"rounded-full px-3 py-1 text-[13px] font-semibold " + (x === sp ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}
-            style={x === sp ? { background: "var(--navy)" } : undefined} onClick={() => setPick(x.location_id)}>{x.name}</button>)}
+            style={x === sp ? { background: "var(--navy)" } : undefined} onClick={() => { setPick(x.location_id); setSavedPlan(""); setSavedCount(""); }}>{x.name}{(() => { const pr = stockProblem(x); if(!pr) return null;
+              const bad = pr.kind === "over", word = `${bad ? "over" : "runs out"} ${stockWeekWord(pr.from)} ${pr.from.slice(0, 4)}`;
+              return <span className="sp-tab-flag" data-stock-tab-flag={pr.kind}><i aria-hidden="true" className={"sp-dot " + (bad ? "sp-dot-bad" : "sp-dot-warn")} />{word}</span>; })()}</button>)}
         </div>
         <div className="card p-4" data-stockpile-card="1">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -6157,18 +6330,27 @@ function StockpilesPage({ meta, access, who }){
               {status && <div className="text-sm font-semibold" data-stock-status={status.tone || "none"}
                 style={{ color: status.tone === "bad" ? "var(--bad-text)" : status.tone === "warn" ? "var(--warn-text)" : status.tone === "ok" ? "var(--ok-text)" : "var(--muted)" }}>{status.text}</div>}
               {sp.forecast && !sp.use_planned && <div className="text-[13px] text-slate-500">No use planned yet.</div>}
+              {(() => { const pr = stockProblem(sp), w = pr && sp.weeks.find(x => x.from === pr.from);
+                if(!w || !sp.capacity_qty) return null;
+                const pu = planOf(w.month_index), mw = `${MONTHS[(w.month_index - 1) % 12]} ${sy + Math.floor((w.month_index - 1) / 12)}`;
+                return <div className="text-[13px] text-slate-500" data-stock-sub="1">{pu > 0 ? `Planned use, ${mw}: ${stockTxt(pu)} ${u} · ` : ""}Capacity {stockTxt(sp.capacity_qty)} {u}</div>; })()}
             </div>
             <div className="flex flex-wrap gap-4">
               {[["capacity_qty", "Capacity", sp.capacity_qty], ["opening_qty", "Opening, " + monthLabelAbs(1, sy), sp.opening_qty]].map(([f, lab, v]) => (
                 <label key={f} className="block text-[13px] text-slate-500">{lab}
                   {canCap ? <span className="flex items-center gap-1 mt-0.5"><input className="ctl ctl-sm w-28 text-right" inputMode="decimal" aria-label={lab}
-                      defaultValue={v == null ? "" : v} key={`${sp.location_id}|${f}|${v}`} onBlur={e => { if(String(e.target.value) !== String(v == null ? "" : v)) saveCap(f, e.target.value); }} /> {u}</span>
+                      defaultValue={stockTxt(v)} key={`${sp.location_id}|${f}|${v}`} onBlur={e => { if(e.target.value.trim() !== stockTxt(v)) saveCap(f, e.target.value); }} /> {u}</span>
                     : <span className="block mt-0.5 text-sm text-slate-800 tabular-nums">{v == null ? "—" : `${grp(v)} ${u}`}</span>}
                 </label>))}
             </div>
           </div>
 
-          <h3 className="text-sm font-semibold text-slate-700 mt-4 mb-1">Planned use <span className="font-normal text-slate-500">{u} a month, laid on the works</span></h3>
+          {(() => { const dirty = canPlan && Object.keys(draft).some(k => k.startsWith(sp.location_id + "|"));
+            return <div className="flex flex-wrap items-baseline justify-between gap-2 mt-4 mb-1">
+              <h3 className="text-sm font-semibold text-slate-700">Planned use <span className="font-normal text-slate-500">{u} a month, laid on the works</span></h3>
+              {canPlan && <span className="text-[13px] font-semibold" role="status" data-stock-plan-state={dirty ? "dirty" : savedPlan ? "saved" : "none"}
+                style={{ color: dirty ? "var(--warn-text)" : "var(--ok-text)" }}>{dirty ? "Not saved yet: leave the box to save" : savedPlan ? `✓ ${savedPlan}` : ""}</span>}
+            </div>; })()}
           <div className="flex flex-wrap gap-1 mb-2">
             {years.map(y => <button key={y} type="button" onClick={() => setPlanYear(y)} aria-pressed={y === yr}
               className={"rounded-full px-2.5 py-0.5 text-[13px] font-semibold " + (y === yr ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}
@@ -6181,7 +6363,8 @@ function StockpilesPage({ meta, access, who }){
               return (
                 <label key={i} className="block text-[13px] text-slate-500">{MONTHS[i]}
                   {canPlan ? <input className="ctl ctl-sm w-full text-right mt-0.5" inputMode="decimal" disabled={!inProg} aria-label={`Planned use ${MONTHS[i]} ${yr}`}
-                      placeholder={u} value={draft[k] ?? (v == null ? "" : String(Math.round(v * 10) / 10))}
+                      style={draft[k] !== undefined ? { borderColor: "#D97706", boxShadow: "0 0 0 2px #FDE68A" } : undefined}
+                      placeholder={u} value={draft[k] ?? stockTxt(v)}
                       onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))} onBlur={() => savePlan(m)} />
                     : <span className="block mt-0.5 text-sm text-slate-800 tabular-nums text-right">{v == null ? "—" : grp(v)}</span>}
                 </label>);
@@ -6200,7 +6383,11 @@ function StockpilesPage({ meta, access, who }){
             </div>
           )}
 
-          <h3 className="text-sm font-semibold text-slate-700 mt-4 mb-1">Stock count</h3>
+          <div className="mt-4 rounded-lg border p-3" style={{ borderColor: "var(--line)" }} data-stock-count-box="1">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+            <h3 className="text-sm font-semibold text-slate-700">Stock count</h3>
+            {canPlan && <span className="text-[13px] text-slate-500">Saved only when you press Save count</span>}
+          </div>
           {canPlan && pastWeeks.length > 0 && (
             <div className="flex flex-wrap items-end gap-2 text-sm" data-stock-count="1">
               <label className="block text-[13px] text-slate-500">Measured stock
@@ -6208,17 +6395,19 @@ function StockpilesPage({ meta, access, who }){
               <label className="block text-[13px] text-slate-500">At the end of the week of
                 <select className="ctl ctl-sm mt-0.5 block" value={count.week} onChange={e => setCount(c => ({ ...c, week: e.target.value }))}>
                   {pastWeeks.map(w => <option key={`${w.month_index}|${w.week_index}`} value={`${w.month_index}|${w.week_index}`}>{stockWeekWord(w.from)} {(w.from || "").slice(0, 4)}</option>)}</select></label>
-              <button type="button" className="btn-pri" onClick={saveCount}>Save count</button>
+              <button type="button" className="btn-pri" onClick={saveCount} disabled={String(count.qty).trim() === "" || isNaN(stockNum(count.qty))}>Save count</button>
             </div>
           )}
+          {canPlan && savedCount && <p className="text-[13px] font-semibold mt-2" role="status" data-stock-count-saved="1" style={{ color: "var(--ok-text)" }}>✓ {savedCount}</p>}
           <p className="text-[13px] text-slate-500 mt-1" data-stock-lastcount="1">
             {lastCount ? `Last count: ${grp(lastCount.count)} ${u}, week of ${stockWeekWord(lastCount.from)} ${(lastCount.from || "").slice(0, 4)}` +
               (lastCount.count_adjust ? ` · ${grp(Math.abs(lastCount.count_adjust))} ${u} ${lastCount.count_adjust > 0 ? "more" : "less"} than worked out` : "")
               : "No stock count yet."}</p>
+          </div>
 
           <h3 className="text-sm font-semibold text-slate-700 mt-4 mb-1">Forecast <span className="font-normal text-slate-500">% full, solid recorded, dashed planned</span></h3>
           {chartCfg ? <ChartCanvas config={chartCfg} title={`Stockpile forecast, % full: ${sp.name}`} /> : <p className="text-sm text-slate-500">Give it a capacity to see how full it gets.</p>}
-          <p className="text-[13px] text-slate-500 mt-2">{canPlan ? "Saves as you type." : "Planners set the plan. Type what came out each week on Look-ahead → Account."}</p>
+          {!canPlan && <p className="text-[13px] text-slate-500 mt-2">Planners set the plan. Type what came out each week on Look-ahead → Account.</p>}
         </div>
       </>)}
     </div>
@@ -6986,8 +7175,12 @@ function rvDecision(st, by, at){
   if(st === "returned") return `Returned by ${by || "your group"}${at ? " · " + clpShort(at) : ""}`;
   return "Waiting for your group";
 }
+// 9 Nov 2026 (UI critique card 11): the scheme's name has to sit inside a sentence — a demo name ending "— demo scheme" read
+// as two sentences run together; the trailing "— demo scheme" becomes "(demo)"
+const rvScheme = (name) => String(name || "").replace(/\s*[—–-]\s*(fictional\s+)?demo scheme\s*$/i, " (demo)").trim();
 function ReviewPage({ role }){
   const [list, setList] = useState(null);
+  const [ret, setRet] = useState(null);          // 9 Nov 2026 (card 11): the decision card's Return box, null | words
   const [err, setErr] = useState("");
   const [tick, setTick] = useState(0);
   const [open, setOpen] = useState(null);
@@ -7013,11 +7206,11 @@ function ReviewPage({ role }){
   }, [tick]);
   useEffect(() => { if((open || openErr) && headRef.current) headRef.current.focus(); }, [open && open.id, openErr]);
   const show = (id) => {
-    setOpenErr(""); setMsg(null); setWords(""); setRtf(null);
+    setOpenErr(""); setMsg(null); setWords(""); setRtf(null); setRet(null);
     fetch(`${API}/review/clps/${encodeURIComponent(id)}`).then(okJSON).then(setOpen)
       .catch(e => setOpenErr(errSay("The CLP did not open.", e)));
   };
-  const back = () => { setOpen(null); setOpenErr(""); setMsg(null); setWords(""); setRtf(null); };
+  const back = () => { setOpen(null); setOpenErr(""); setMsg(null); setWords(""); setRtf(null); setRet(null); };
   // PR 3d: tasks (add, tick, delete) and a note's delete go the same way; only a note or a decision empties the box
   const send = (method, path, body, what, done, clear) => {
     setBusy(true); setMsg(null);
@@ -7042,8 +7235,9 @@ function ReviewPage({ role }){
     } catch(e){ setMsg({ ok: false, text: errSay("The issue did not download.", e) }); }
   };
   const group = (list && list.group_name) || role.group_name || role.label || "";
-  const scheme = (list && list.scheme) || TENANT.name || "the contractor";
-  const header = <PageHeader title="CLPs for review" kicker="For review" subtitle={`Construction Logistics Plans ${scheme} has sent to ${group}.`} />;
+  const scheme = rvScheme((list && list.scheme) || TENANT.name) || "the contractor";
+  // 9 Nov 2026 (card 11): one sentence that reads (was "Construction Logistics Plans <scheme> has sent to <group>.")
+  const header = <PageHeader title="CLPs for review" kicker="For review" subtitle={`Plans that ${scheme} has sent to you.`} />;
   if(open || openErr){
     if(openErr) return (
       <div className="max-w-5xl mx-auto p-6" data-page="review" data-review-clp="error">
@@ -7061,11 +7255,37 @@ function ReviewPage({ role }){
       <div className="max-w-5xl mx-auto p-6 pb-2" data-page="review" data-review-clp={open.id}>
         <button type="button" className="link-btn text-sm mb-2" onClick={back}>← CLPs for review</button>
         <h2 className="text-[22px] font-bold text-[color:var(--navy-deep)] mb-1" tabIndex={-1} ref={headRef}>{open.name} · {open.team_name} · Issue {n}</h2>
+        {/* 9 Nov 2026 (UI critique card 11): Download a plain button under the title (it was a second orange primary), then the
+            group's DECISION as a card of its own (Accept / Return were at the foot of the notes) */}
         <div className="flex flex-wrap items-center gap-3 mb-3">
-          <button type="button" className="btn-pri" onClick={() => download(n)} data-review-download={n}>Download Issue {n} (Word)</button>
+          <button type="button" className="btn-sec" style={{ width: "auto", height: "auto", padding: "6px 12px" }} onClick={() => download(n)} data-review-download={n}>⤓ Download Issue {n} (Word)</button>
           <span className="text-[13px] text-slate-500">Sent {clpDay(L.sent_at)}{L.sent_by ? ` by ${L.sent_by}` : ""}{L.note ? <> · “{L.note}”</> : null}</span>
         </div>
-        <p className="mb-3"><RowStatus word={rvDecision(L.state, L.by, L.at)} tone={RV_STATE[L.state] ? RV_STATE[L.state][1] : "none"} more={0} /></p>
+        <div className="card p-4 mb-4 rv-decide" data-review-decision="1">
+          <h3 className="clp-h3" style={{ marginTop: 0 }}>Your decision on Issue {n}</h3>
+          <p className="mb-3"><RowStatus word={rvDecision(L.state, L.by, L.at)} tone={RV_STATE[L.state] ? RV_STATE[L.state][1] : "none"} more={0} /></p>
+          {!open.can_decide ? <p className="text-[13px] text-slate-500">The contractor has a newer issue that is not sent to {open.group_name} yet.</p>
+            : ret !== null ? (
+              <div data-review-return-form="1">
+                <label htmlFor="rv-ret" className="block text-[13px] text-slate-500 mb-1">What needs changing</label>
+                <textarea id="rv-ret" className="ctl w-full" rows={3} maxLength={2000} value={ret} onChange={e => setRet(e.target.value)} />
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <button type="button" className="btn-pri" disabled={busy || !ret.trim()} data-review-return-go={n}
+                    onClick={() => send("POST", "decision", { issue_no: n, decision: "returned", words: ret }, "Not returned.", `Issue ${n} returned with your comments.`)
+                      .then(okd => { if(okd) setRet(null); })}>Return Issue {n}</button>
+                  <button type="button" className="btn-sec" onClick={() => setRet(null)}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" className="btn-pri" disabled={busy} data-review-accept={n}
+                  onClick={() => { if(window.confirm(`Accept Issue ${n} of the ${open.name} CLP for ${open.group_name}?`))
+                    send("POST", "decision", { issue_no: n, decision: "accepted", words: null }, "Not accepted.", `Issue ${n} accepted.`); }}>Accept Issue {n}</button>
+                <button type="button" className="btn-sec" disabled={busy} data-review-return={n} style={{ color: "var(--bad-text)" }}
+                  onClick={() => { setMsg(null); setRet(""); }}>Return with comments…</button>
+              </div>
+            )}
+        </div>
         {msg && <p className="text-sm mb-2" style={{ color: msg.ok ? "var(--ok-text)" : "var(--bad-text)" }} role="status">{msg.text}</p>}
         <div className="card p-4 mb-4">
           <h3 className="clp-h3" style={{ marginTop: 0 }}>History</h3>
@@ -7149,14 +7369,6 @@ function ReviewPage({ role }){
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <button type="button" className="btn-sec" disabled={busy || !words.trim()} data-review-comment="1"
               onClick={() => post("comments", { words }, "The note was not saved.", "Note added.")}>Add note</button>
-            {open.can_decide ? <>
-              <button type="button" className="btn-pri" disabled={busy} data-review-accept={n}
-                onClick={() => { if(window.confirm(`Accept Issue ${n} of the ${open.name} CLP for ${open.group_name}?`))
-                  post("decision", { issue_no: n, decision: "accepted", words: words.trim() || null }, "Not accepted.", `Issue ${n} accepted.`); }}>Accept Issue {n}…</button>
-              <button type="button" className="btn-sec" disabled={busy} data-review-return={n} style={{ color: "var(--bad-text)" }}
-                onClick={() => { if(!words.trim()){ setMsg({ ok: false, text: "Write what needs changing in the note box first." }); return; }
-                  post("decision", { issue_no: n, decision: "returned", words }, "Not returned.", `Issue ${n} returned with your note.`); }}>Return with comments…</button>
-            </> : <span className="text-[13px] text-slate-500">The contractor has a newer issue that is not sent to {open.group_name} yet.</span>}
           </div>
         </div>
       </div>
@@ -7740,7 +7952,7 @@ function NavIcon({ id }){
 const PHONE_PAGES = ["dashboard", "lookahead", "map"];
 // 29 Oct 2026: pages under More that READ on a phone (their own phone layout), never the desk-only card
 const PHONE_READ_PAGES = ["simulation"];
-function PhoneTabs({ groups, page, onPick, moreOpen, onMore, pending }){
+function PhoneTabs({ groups, page, onPick, moreOpen, onMore }){
   const items = (groups || []).flatMap(g => g.items).filter(it => PHONE_PAGES.includes(it.id));
   const deskOn = !PHONE_PAGES.includes(page);
   return (
@@ -7755,12 +7967,11 @@ function PhoneTabs({ groups, page, onPick, moreOpen, onMore, pending }){
         aria-expanded={moreOpen ? "true" : "false"} aria-controls="phone-more" onClick={onMore}>
         <svg className="nav-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
         <span>More</span>
-        {pending > 0 && <span className="rail-count" title={`${pending} line(s) waiting for approval`}>{pending}</span>}
       </button>
     </nav>
   );
 }
-function PhoneMore({ groups, page, onPick, onClose, role, who, pending, concernNew }){
+function PhoneMore({ groups, page, onPick, onClose, role, who }){
   const all = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));
   const reads = all.filter(it => PHONE_READ_PAGES.includes(it.id)), desk = all.filter(it => !PHONE_READ_PAGES.includes(it.id));
   const first = useRef(null);
@@ -7769,21 +7980,18 @@ function PhoneMore({ groups, page, onPick, onClose, role, who, pending, concernN
     <>
       <button type="button" className="phone-more-back" aria-label="Close More" tabIndex={-1} onClick={onClose}></button>
       <div id="phone-more" className="phone-more" role="dialog" aria-modal="true" aria-label="More pages">
-        {reads.length > 0 && <><h3>Read here, plan on a desktop</h3>
+        {reads.length > 0 && <><h3>Read here</h3>
         {reads.map((it, n) => (
           <button key={it.id} ref={n === 0 ? first : undefined} type="button" className={"phone-more-item" + (page === it.id ? " is-on" : "")}
             aria-current={page === it.id ? "page" : undefined} onClick={() => onPick(it.id)}>
             <NavIcon id={it.id} /><span>{it.label}</span>
           </button>
         ))}</>}
-        <h3>Made for a desktop</h3>
-        <p>On a phone these pages say so. Open them on a computer or a tablet to edit.</p>
+        <h3>Open on a computer or tablet</h3>
         {desk.map((it, n) => (
-          <button key={it.id} ref={n === 0 && !reads.length ? first : undefined} type="button" className={"phone-more-item" + (page === it.id ? " is-on" : "")}
+          <button key={it.id} ref={n === 0 && !reads.length ? first : undefined} type="button" className={"phone-more-item pm-desk" + (page === it.id ? " is-on" : "")}
             aria-current={page === it.id ? "page" : undefined} onClick={() => onPick(it.id)}>
             <NavIcon id={it.id} /><span>{it.label}</span>
-            {it.id === "forecasts" && pending > 0 && <span className="pm-note">{pending} waiting</span>}
-            {it.id === "concerns" && concernNew > 0 && <span className="pm-note">{concernNew} new</span>}
           </button>
         ))}
         <a className="phone-more-item" href={"/help/?role=" + encodeURIComponent((role && role.role) || "")} target="_blank" rel="noopener noreferrer">
@@ -7795,12 +8003,29 @@ function PhoneMore({ groups, page, onPick, onClose, role, who, pending, concernN
     </>
   );
 }
-function DeskOnly({ label, onHome }){
+// 10 Nov 2026 (UI fix phone 2, the 9 Nov critique): each desk page says in one line what it is for, so the cards differ,
+// then one sentence on where to open it and what a phone reads (the Simulation reads too)
+const DESK_LINE = {
+  submit: "Type each team's forecast loads.",
+  forecasts: "Approve, change and withdraw forecast lines.",
+  carbon: "Set the carbon target and try cuts.",
+  abnormal: "Plan wide, heavy and long loads and their notices.",
+  stockpiles: "Each stockpile's planned use and stock counts.",
+  pours: "Plan each concrete pour and its mixers.",
+  clp: "Write, send and approve each site's logistics plan.",
+  concerns: "Answer concerns sent in from the public map.",
+  locations: "Sites and gates.",
+  routes: "Draw and check each route.",
+  zones: "Closures and areas routes keep out of.",
+  config: "Units, targets and settings.",
+  users: "Logins and teams.",
+};
+function DeskOnly({ id, label, onHome }){
   return (
     <div className="card desk-only" data-desk-only="1">
       <h2>{label}</h2>
-      <p className="do-lead">Open on a desktop to edit this.</p>
-      <p>On a phone, Wayscope shows the Dashboard, the Look-ahead and the Route map, to read. Typing, approving and setting up are done on a computer or a tablet.</p>
+      <p className="do-lead">{DESK_LINE[id] || "A page for a computer or a tablet."}</p>
+      <p>Open it on a computer or a tablet. A phone reads the Dashboard, the Look-ahead, the Route map and the Simulation.</p>
       <button type="button" className="btn-pri tap48" onClick={onHome}>Go to the Dashboard</button>
     </div>
   );
@@ -8157,7 +8382,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
       <main className="flex-1 min-h-0 overflow-auto">
         {/* 14 Oct 2026 (D9): on a phone a desk page is this card, never the page itself (its write controls are
             not rendered at all, not disabled) */}
-        {phoneDesk && <DeskOnly label={current.label} onHome={() => pickPage("dashboard")} />}
+        {phoneDesk && <DeskOnly id={page} label={current.label} onHome={() => pickPage("dashboard")} />}
         {page === "dashboard" && <Dashboard meta={meta} phone={narrow} canApprove={canApprove} onWall={(on) => { setRailOpen(!on); setWallOn(!!on); }} onOpen={setPage} />}
         {page === "submit" && !narrow && <Matrix meta={meta} who={who} editTarget={editTarget} vehLang={vehLang} access={role} />}
         {page === "forecasts" && !narrow && <Forecasts meta={meta} who={who} access={role} onEdit={editInMatrix} onChanged={refreshPending} />}
@@ -8183,9 +8408,9 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
         )}
       </main>
       {narrow && <PhoneTabs groups={visible} page={page} onPick={pickPage} moreOpen={moreOpen}
-                            onMore={() => setMoreOpen(o => !o)} pending={canApprove ? pending : 0} />}
+                            onMore={() => setMoreOpen(o => !o)} />}
       {narrow && moreOpen && <PhoneMore groups={visible} page={page} onPick={pickPage} onClose={() => setMoreOpen(false)}
-                                        role={role} who={who} pending={canApprove ? pending : 0} concernNew={canApprove ? concernNew : 0} />}
+                                        role={role} who={who} />}
       {/* H10: the coach-mark guide for this page; renders nothing unless TENANT.demo_notice is set.
           11 Oct 2026 (the demo bar): not on the Route map, whose embedded map runs its own guide (its strip under
           its bar, its dots, its tour). That was two "New here?" strips on one screen, and the app's guide there
@@ -9315,7 +9540,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
 // once here, never seeded, saved with the admin token because one number moves every
 // unpriced line. Saved on their own endpoint, not inside the factors document, so the
 // Save button above (which sends the whole factors doc) does not carry them.
-function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
+function CostingTab({ who, access, token, setToken, doc, upd, fileDoc, ro }){
   const [data, setData] = useState(null);
   const [draft, setDraft] = useState({});
   const [msg, setMsg] = useState(null);
@@ -9349,7 +9574,7 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
   return (
     <div className="px-6 pb-6 space-y-6">
       {msg && <div className="rounded-lg border p-2.5 text-sm" style={{ borderColor: msg.ok ? "var(--green)" : "var(--red)", color: msg.ok ? "var(--ok-text)" : "var(--red)" }}>{msg.text}</div>}
-      <div>
+      <CfgFields ro={ro}><div>
         <div className="text-[15px] font-semibold text-slate-800">Target rate — the planned price where a route has no rate</div>
         <p className="text-[13px] text-slate-500 mt-0.5 mb-3 max-w-3xl">Per load + per tonne + per {DU()}, added together. Used only for routes with no rate of their own, marked "target".</p>
         {!data ? <div className="text-slate-400 text-sm">Loading…</div> : (
@@ -9364,19 +9589,23 @@ function CostingTab({ who, access, token, setToken, doc, upd, fileDoc }){
             <button onClick={save} disabled={busy || !dirty} className="btn-pri" title="Saved on its own: the page's Save button does not save the target rate">{busy ? "Saving…" : "Save target rate"}</button>
           </div>
         )}
-      </div>
+      </div></CfgFields>
+      {/* 9 Nov 2026 (card 10): the fuel settings are a planner's too (the server's approver check), so outside the read-only fields */}
       <div>
         <div className="text-[15px] font-semibold text-slate-800 mb-1">Diesel index and fuel surcharge (BAF)</div>
         <FuelWidget mode="config" who={who} access={access} initial={data && data.summary} onChanged={load} />
       </div>
-      <FairPriceSection doc={doc} upd={upd} fileDoc={fileDoc} summary={data && data.summary && data.summary.fair} />
-      <DayHireSection doc={doc} upd={upd} />
+      <CfgFields ro={ro}>
+        <FairPriceSection doc={doc} upd={upd} fileDoc={fileDoc} summary={data && data.summary && data.summary.fair} />
+        <div className="mt-6"><DayHireSection doc={doc} upd={upd} /></div>
+      </CfgFields>
     </div>
   );
 }
 
 // ---- 8 Nov 2026 (v2.1 task 2.1-9): a day-hire rate per lorry type — typed, never seeded; the Lorry plan's saving in money ----
 function DayHireSection({ doc, upd }){
+  const ro = React.useContext(CfgRO);
   const vehicles = Object.keys((doc && doc.vehicles) || {}).filter(k => !k.startsWith("_"));
   const dh = (doc && doc.day_hire) || {};
   const inp = "ctl ctl-sm w-full tabular-nums";
@@ -9390,7 +9619,7 @@ function DayHireSection({ doc, upd }){
         {vehicles.map(k => (
           <label key={k} className="block">
             <span className="block text-sm font-medium text-slate-700 mb-1">{vehLabel(k)}</span>
-            <input className={inp + " mt-1"} inputMode="decimal" placeholder={`${CUR()} a day`} value={dh[k] ?? ""} onChange={e => set(k, e.target.value)} />
+            <input className={inp + " mt-1"} inputMode="decimal" data-ph-example="1" placeholder={ro ? "—" : `${CUR()} a day`} value={dh[k] ?? ""} onChange={e => set(k, e.target.value)} />
           </label>
         ))}
       </div>
@@ -9516,6 +9745,20 @@ function pickMaterials(all, meta, keep) {
 // 22 Oct 2026 (words sweep): "17 Oct 2026, 12:03 UTC" for the Configuration header (was the raw ISO stamp)
 const cfgWhen = (s) => { const d = new Date(String(s).replace(" ", "T").replace(/Z?$/, "Z")); return isNaN(d) ? String(s) : d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC"; };
 const isTonnesOnly = (c) => !!(c && Array.isArray(c.units) && c.units.length === 1 && c.units[0] === "t");
+// 9 Nov 2026 (UI critique finding 10, card 10): every value on the Configuration page sits inside CfgFields. For a reader
+// (anyone but an admin login) it is a DISABLED fieldset: the browser disables every input, select, textarea and button in it,
+// and .cfg-ro draws them as plain text (no boxes, a ✓ or – for a tick, no + Add / × / Remove). A field added later inside a
+// CfgFields is read-only for a reader with no work of its own. What a planner may still do on the page (the fuel settings,
+// Fetch now) is rendered outside it.
+// 9 Nov 2026 (card 10): a field with a made-up example placeholder ("name@scheme.example") reads "—" when empty for a reader
+const CfgRO = React.createContext(false);
+// 10 Nov 2026 (card 10, UI audit): a reader's wide table has no control to Tab to (the fields are disabled), and axe counts
+// anything inside a disabled fieldset as disabled, a tabindex box too. So for a reader the scroll box sits OUTSIDE the
+// fieldset: one named box round the tab's fields (.cfg-ro-box), and the tables' own wrappers stop scrolling inside it.
+const cfgScroll = (ro, name) => ro ? { className: "cfg-ro-box kb-scroll", tabIndex: 0, role: "region", "aria-label": name } : {};
+function CfgFields({ ro, children }){
+  return <fieldset className={"cfg-fs" + (ro ? " cfg-ro" : "")} disabled={!!ro} data-cfg-fields={ro ? "read" : "edit"}><CfgRO.Provider value={!!ro}>{children}</CfgRO.Provider></fieldset>;
+}
 
 function ConfigPage({ meta, who, access }){
   const [doc, setDoc] = useState(null);
@@ -9528,6 +9771,7 @@ function ConfigPage({ meta, who, access }){
   const [raw, setRaw] = useState("");
   const [rawErr, setRawErr] = useState("");
   const [fileDoc, setFileDoc] = useState(null);
+  const [vehOpen, setVehOpen] = useState({});   // 9 Nov 2026 (card 10): the materials whose vehicle ticks an admin has opened
 
   const load = () => fetch(`${API}/config/factors`).then(okJSON)
     .then(j => { setDoc(j.doc); setOrig(JSON.stringify(j.doc)); setStatus(j.status); setRaw(JSON.stringify(j.doc, null, 2)); setRawErr(""); setFileDoc(j.file || null); })
@@ -9579,7 +9823,8 @@ function ConfigPage({ meta, who, access }){
   // 27 Oct 2026 (F3 c / P5): only an admin LOGIN saves; a planner reads every section. The organisation file (download
   // everything, or replace it from a file) replaces the admin token's export / import scripts, admins only.
   const canSave = isAdminLogin(access);
-  const TABS = [["vehicles", "Vehicles"], ["materials", "Materials"], ["planning", "Planning"], ["costing", "Costing · fuel"], ["seasonal", "Seasonal restrictions"], ["mapbulletin", "Map and bulletin"], ["raw", "Everything (JSON)"]]
+  const ro = !canSave;   // 9 Nov 2026 (card 10): a reader sees the page read-only, told so once at the top
+  const TABS =[["vehicles", "Vehicles"], ["materials", "Materials"], ["planning", "Planning"], ["costing", "Costing · fuel"], ["seasonal", "Seasonal restrictions"], ["mapbulletin", "Map and bulletin"], ["raw", "Everything (JSON)"]]
     .concat(canSave ? [["orgfile", "Organisation file"]] : []);
   // 13 Oct 2026 (W12): the scheme's council colour bands, three rising whole numbers per measure, in the tenant block.
   // A measure left blank reads COUNCIL_BREAKS_DEFAULT (backend config.COUNCIL_BREAKS_DEFAULT, held equal by parse_frontend).
@@ -9614,7 +9859,7 @@ function ConfigPage({ meta, who, access }){
   return (
     <div className="max-w-7xl mx-auto p-6 pb-2">
       <PageHeader title="Configuration" kicker="Data"
-        subtitle="The numbers every figure is computed from. Changes apply on save, for everyone."
+        subtitle={ro ? "The numbers every figure is computed from." : "The numbers every figure is computed from. Changes apply on save, for everyone."}
         actions={canSave &&
           <details className="row-menu" data-cfg-more="1">
             <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }} title="Reset to defaults">More ▾</summary>
@@ -9633,6 +9878,8 @@ function ConfigPage({ meta, who, access }){
         )}
       </PageHeader>
 
+      {ro && <div className="cfg-ro-note" role="note" data-cfg-readonly="1">You can read the configuration. An admin changes it.</div>}
+
       {msg && <div className="rounded-lg border p-3 text-sm mb-4 whitespace-pre-wrap" style={{ borderColor: msg.ok ? "var(--green)" : "var(--red)", color: msg.ok ? "var(--ok-text)" : "var(--bad-text)", background: msg.ok ? "rgba(3,158,134,.06)" : "rgba(191,46,85,.06)" }}>{msg.text}</div>}
 
       {!doc ? <SkeletonTable cols={["Vehicle", "Payload t", "GVW t", "kg CO₂e / km"]} rows={5} caption="Configuration · loading" /> : (
@@ -9645,12 +9892,14 @@ function ConfigPage({ meta, who, access }){
           <div className="card cfg-main">
             <h3 className="text-[17px] font-semibold text-slate-800 px-6 pt-5 pb-3">{tabLabel}</h3>
 
+          <div {...cfgScroll(ro, tabLabel)}>
+          <CfgFields ro={ro}>
           {tab === "vehicles" && (
             <div className="overflow-auto">
               <table className="tbl">
                 <thead>
                   <tr>
-                    {["Vehicle", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Euro class", "Planning"].filter(h => h !== "Estonian" || vehLangEditable("ee")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
+                    {["Vehicle", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Euro class", "Planning"].filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -9661,7 +9910,8 @@ function ConfigPage({ meta, who, access }){
                     return (
                     <tr key={k}>
                       <td><div className="font-medium text-slate-800 leading-tight" data-cfg-vehname>{nm}</div>{v.code && <div className="text-[13px] text-slate-500 leading-tight">{v.code}</div>}</td>
-                      <td className="min-w-[190px]"><input className={inp} value={(lab.en && lab.en !== k) ? lab.en : ""} placeholder={vehWord(k)} aria-label={`${nm} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>
+                      {/* 9 Nov 2026 (card 10): a reader reads the name once, in the first column */}
+                      {!ro && <td className="min-w-[190px]"><input className={inp} value={(lab.en && lab.en !== k) ? lab.en : ""} placeholder={vehWord(k)} aria-label={`${nm} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>}
                       {vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder={vehWord(k)} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
                       <td className="num w-24"><input className={inp + " text-right"} value={v.payload_t ?? ""} aria-label={`${nm} payload t`} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
                       <td className="num w-24"><input className={inp + " text-right"} value={v.gvw_t ?? ""} aria-label={`${nm} GVW t`} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
@@ -9697,12 +9947,18 @@ function ConfigPage({ meta, who, access }){
                     style={h === "Volume ↔ weight" ? { whiteSpace: "normal", minWidth: 92 } : ["Density t/m³", "Tonnes only"].includes(h) ? { whiteSpace: "normal", width: 1 } : undefined}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
-                  {materials.map(k => { const c = doc.material_categories[k]; return (
-                    <tr key={k} className="align-top">
-                      <td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}{c.retired === true && <span className="block mt-1"><span className="chip-st"><i style={{ background: "var(--gold)" }} aria-hidden="true"></i>Older: pick one of the three</span></span>}</td>   {/* 18 Oct 2026 (decision 12): a long name wraps; 29 Oct 2026 (3b): a retired category says so */}
+                  {materials.map(k => { const c = doc.material_categories[k];
+                    // 9 Nov 2026 (card 10): the vehicles as a short summary; an admin opens the ticks with Edit, in a row of their
+                    // own under the material across the whole card (the grid in the cell was ~150 px a row, its second column cut)
+                    const vSum = vehicles.filter(v => (c.vehicles || []).includes(v)).map(v => vehLabel(v)).join(", ");
+                    const vid = "cfg-veh-" + k.replace(/[^a-z0-9]+/gi, "-");
+                    return (
+                    <React.Fragment key={k}>
+                    <tr className="align-top">
+                      <td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}{c.retired === true && <span className="block mt-1"><span className="chip-st"><i style={{ background: "var(--gold)" }} aria-hidden="true"></i>Older: pick one of the three</span></span>}{/* 18 Oct 2026 (decision 12): a long name wraps; 29 Oct 2026 (3b): a retired category says so. 9 Nov 2026: the comment inside the cell (the spaces before it were a text node in the row) */}</td>
                       <td className="num w-28"><input className={inp + " text-right"} value={c.density_t_per_m3 ?? ""} aria-label={`${k} density`} onChange={e => upd(d => { d.material_categories[k].density_t_per_m3 = num(e.target.value); })} /></td>
-                      <td className="w-32">
-                        <select className={inp} value={c.default_unit || "t"} aria-label={`${k} default unit`} disabled={isTonnesOnly(c)} onChange={e => upd(d => { d.material_categories[k].default_unit = e.target.value; })}>
+                      <td style={{ minWidth: 118 }}>   {/* 9 Nov 2026 (card 10): wide enough for "tonnes" and "vehicles" (was cut to "tonne", "vehic") */}
+                        <select className={inp} style={{ minWidth: 104 }} value={c.default_unit || "t"} aria-label={`${k} default unit`} disabled={isTonnesOnly(c)} onChange={e => upd(d => { d.material_categories[k].default_unit = e.target.value; })}>
                           <option value="m3">m³</option><option value="t">tonnes</option><option value="vehicles">vehicles</option>
                         </select>
                       </td>
@@ -9711,24 +9967,33 @@ function ConfigPage({ meta, who, access }){
                       <td className="text-center"><input type="checkbox" checked={isTonnesOnly(c)} aria-label={`${k} is planned in tonnes only`} data-cfg-tonnes-only={k}
                         onChange={e => upd(d => { const m = d.material_categories[k]; if(e.target.checked){ m.units = ["t"]; m.default_unit = "t"; } else delete m.units; })} /></td>
                       <td className="text-center"><input type="checkbox" checked={c.volume_convertible !== false} aria-label={`${k} converts volume to weight`} onChange={e => upd(d => { d.material_categories[k].volume_convertible = e.target.checked; })} /></td>
-                      {/* 18 Oct 2026 (UI audit decision 12, finding #13): two columns of 24 px rows, a long name wrapping inside its
-                          column — it was one column of 16 px rows at a 20 px pitch (a tablet ticks the wrong vehicle, and it goes live on
-                          Save), each name on one line and cut at the card's edge ("Concrete mixer 8 m³ (3…"). The cell is at least 332 px
-                          (two 154 px columns: a "Rigid 8-wheeler (32t)" on one line; the mixers and the electric names wrap) and, with the
-                          headings above and the material name wrapping, the table fits the card at 1366 px instead of scrolling inside it */}
-                      <td style={{ whiteSpace: "normal", height: "auto", padding: "8px", minWidth: 332 }}>
-                        <div className="grid grid-cols-2 gap-x-2">
-                          {vehicles.map(v => (
-                            <label key={v} className="flex items-center gap-1.5 min-h-6 text-[13px] leading-tight text-slate-600">
-                              <input type="checkbox" className="flex-none" checked={(c.vehicles || []).includes(v)} onChange={e => upd(d => {
-                                const cur = d.material_categories[k].vehicles || [];
-                                d.material_categories[k].vehicles = e.target.checked ? [...cur, v] : cur.filter(x => x !== v);
-                              })} /> {vehLabel(v)}
-                            </label>
-                          ))}
-                        </div>
+                      {/* 18 Oct 2026 (UI audit decision 12, finding #13): 24 px tick rows, a long name wrapping. 9 Nov 2026 (UI critique
+                          card 10): the ticks moved out of this cell (two 154 px columns, the second cut at the card's edge, every material
+                          ~150 px tall) into a row of their own an admin opens with Edit; the cell is the summary */}
+                      <td style={{ whiteSpace: "normal", height: "auto", minWidth: 180 }} data-cfg-veh-sum={k}>
+                        <span className="text-[13px] text-slate-700">{vSum || "None"}</span>
+                        {!ro && <button type="button" className="link-btn text-[13px] ml-2" aria-expanded={vehOpen[k] ? "true" : "false"} aria-controls={vid}
+                          aria-label={`${vehOpen[k] ? "Done with" : "Edit"} the vehicles for ${k}`} data-cfg-veh-edit={k}
+                          onClick={() => setVehOpen(o => ({ ...o, [k]: !o[k] }))}>{vehOpen[k] ? "Done" : "Edit"}</button>}
                       </td>
                     </tr>
+                    {!ro && vehOpen[k] && (
+                      <tr id={vid} data-cfg-veh-grid={k}>
+                        <td colSpan={6} style={{ whiteSpace: "normal", height: "auto", padding: "8px 16px 12px" }}>
+                          <div className="grid gap-x-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))" }} role="group" aria-label={`Vehicles used for ${k}`}>
+                            {vehicles.map(v => (
+                              <label key={v} className="flex items-center gap-1.5 min-h-6 text-[13px] leading-tight text-slate-600">
+                                <input type="checkbox" className="flex-none" checked={(c.vehicles || []).includes(v)} onChange={e => upd(d => {
+                                  const cur = d.material_categories[k].vehicles || [];
+                                  d.material_categories[k].vehicles = e.target.checked ? [...cur, v] : cur.filter(x => x !== v);
+                                })} /> {vehLabel(v)}
+                              </label>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   ); })}
                 </tbody>
               </table>
@@ -9915,7 +10180,7 @@ function ConfigPage({ meta, who, access }){
                                   <button type="button" className="row-x" aria-label={`Take ${dLabel(dd)} out of stage ${i + 1}`} title="Remove"
                                     onClick={() => change(c => { c.stages[i].disciplines = c.stages[i].disciplines.filter(x => x !== dd); })}></button></span>))}
                               {discs.some(x => !used.has(x.id)) && (
-                                <select className="ctl" value="" aria-label={`Add a kind of work to stage ${i + 1}`}
+                                <select className="ctl" value="" data-ro-hide="1" aria-label={`Add a kind of work to stage ${i + 1}`}
                                   onChange={e => { const v = e.target.value; if(v) change(c => { c.stages[i].disciplines = [...(c.stages[i].disciplines || []), v]; }); }}>
                                   <option value="">+ Add</option>
                                   {discs.filter(x => !used.has(x.id)).map(x => <option key={x.id} value={x.id}>{x.label}</option>)}
@@ -9937,7 +10202,7 @@ function ConfigPage({ meta, who, access }){
           )}
 
           {tab === "mapbulletin" && (
-            <div className="px-6 pb-6 max-w-xl">
+            <div className="px-6 max-w-xl">
               {/* 30 Oct 2026 (task 4b): the contact lines the bulletin and the resident leaflet print. The address also switches on
                   "Report a concern" on the public map. An empty box leaves its line out. Checked by the server on Save. */}
               <div data-cfg="contact-lines" className="mb-6 pb-5 border-b border-slate-200">
@@ -9950,7 +10215,7 @@ function ConfigPage({ meta, who, access }){
                   ["newsletter_url", "cfg-contact-link", "Public newsletter link (optional)", 300, "https://…", "Where residents can read the bulletin: the scheme's own web page."]].map(([k, id, l, mx, ph, help]) => (
                   <div key={k} className="field" style={{ marginBottom: 8 }}>
                     <label htmlFor={id}>{l}</label>
-                    <input id={id} className="ctl w-full" maxLength={mx} placeholder={ph} data-contact={k}
+                    <input id={id} className="ctl w-full" maxLength={mx} placeholder={ro ? "—" : ph} data-contact={k} data-ph-example="1"
                       value={(doc.tenant || {})[k] || ""} onChange={e => upd(d => { setTenantText(d, k, e.target.value); })} />
                     {help && <div className="hint">{help}</div>}
                   </div>
@@ -9965,7 +10230,7 @@ function ConfigPage({ meta, who, access }){
                   {[["concern_privacy_url", "cfg-concern-privacy", "Privacy notice link", 300, "https://…", (doc.tenant || {}).demo_notice ? "Blank on the demo: Wayscope's own notice." : "Needed before the form shows: the page that says how concerns are kept."]].map(([k, id, l, mx, ph, help]) => (
                     <div key={k} className="field" style={{ marginBottom: 8 }}>
                       <label htmlFor={id}>{l}</label>
-                      <input id={id} className="ctl w-full" maxLength={mx} placeholder={ph} data-contact={k}
+                      <input id={id} className="ctl w-full" maxLength={mx} placeholder={ro ? "—" : ph} data-contact={k} data-ph-example="1"
                         value={(doc.tenant || {})[k] || ""} onChange={e => upd(d => { setTenantText(d, k, e.target.value); })} />
                       <div className="hint">{help}</div>
                     </div>
@@ -10012,18 +10277,18 @@ function ConfigPage({ meta, who, access }){
                 <div className="hint">Shown in the Basemap list on the public map. Leave the address empty to hide it.</div>
                 <div className="field" style={{ marginBottom: 8 }}>
                   <label htmlFor="cfg-imagery-name">Name in the list</label>
-                  <input id="cfg-imagery-name" className="ctl w-full" maxLength={40} placeholder="Client imagery"
+                  <input id="cfg-imagery-name" data-ph-example="1" className="ctl w-full" maxLength={40} placeholder={ro ? "—" : "Client imagery"}
                     value={(doc.tenant || {}).imagery_name || ""} onChange={e => upd(d => { setTenantText(d, "imagery_name", e.target.value); })} />
                 </div>
                 <div className="field" style={{ marginBottom: 8 }}>
                   <label htmlFor="cfg-imagery-url">Address</label>
-                  <input id="cfg-imagery-url" className="ctl w-full" maxLength={600} placeholder="https://…/{z}/{x}/{y}.jpg"
+                  <input id="cfg-imagery-url" data-ph-example="1" className="ctl w-full" maxLength={600} placeholder={ro ? "—" : "https://…/{z}/{x}/{y}.jpg"}
                     value={(doc.tenant || {}).imagery_url || ""} onChange={e => upd(d => { setTenantText(d, "imagery_url", e.target.value); })} />
                   <div className="hint">An address with {"{z}/{x}/{y}"}, or a WMS address. Web Mercator only.</div>
                 </div>
                 <div className="field" style={{ marginBottom: 8 }}>
                   <label htmlFor="cfg-imagery-credit">Credit shown on the map</label>
-                  <input id="cfg-imagery-credit" className="ctl w-full" maxLength={160} placeholder="© Example Council 2025"
+                  <input id="cfg-imagery-credit" data-ph-example="1" className="ctl w-full" maxLength={160} placeholder={ro ? "—" : "© Example Council 2025"}
                     value={(doc.tenant || {}).imagery_credit || ""} onChange={e => upd(d => { setTenantText(d, "imagery_credit", e.target.value); })} />
                   <div className="hint">Most aerial licences ask for it.</div>
                 </div>
@@ -10037,13 +10302,21 @@ function ConfigPage({ meta, who, access }){
                   <option value="outdoors">Outdoors</option><option value="aerial">Aerial (with names)</option></select>
                 <div className="hint">The map in the route sheet, collision evidence and Look-ahead PDFs. The bulletin stays Light.</div>
               </div>
+            </div>
+          )}
+          </CfgFields>
+          </div>
+          {/* 9 Nov 2026 (card 10): the two fetches are a planner's to press, so they sit outside the read-only fields */}
+          {tab === "mapbulletin" && (
+            <div className="px-6 pb-6 max-w-xl">
               <CommunityPanel access={access} />
               <CollisionPanel access={access} />
             </div>
           )}
 
-          {tab === "costing" && <CostingTab who={who} access={access} token={token} setToken={setToken} doc={doc} upd={upd} fileDoc={fileDoc} />}
+          {tab === "costing" && <CostingTab who={who} access={access} token={token} setToken={setToken} doc={doc} upd={upd} fileDoc={fileDoc} ro={ro} />}
 
+          <CfgFields ro={ro}>
           {tab === "seasonal" && (
             <div className="px-6 pb-6 space-y-3">
               {(doc.seasonal_restrictions || []).map((w, i) => (
@@ -10064,7 +10337,7 @@ function ConfigPage({ meta, who, access }){
                   </div>
                   <div className="space-y-2">
                     <div className="field" style={{ marginBottom: 8 }}><label>Message shown at submission and on the map timeline</label><textarea className="ctl w-full h-20" value={w.message || ""} onChange={e => upd(d => { d.seasonal_restrictions[i].message = e.target.value; })} /></div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1" data-ro-only-on="1">
                       <span className="text-[13px] text-slate-500 w-full">Restricted vehicles (none = applies to every vehicle)</span>
                       {vehicles.map(v => (
                         <label key={v} className="flex items-center gap-1 min-h-6 text-[13px] text-slate-600 whitespace-nowrap">   {/* 18 Oct 2026 (UI audit #13): 24 px rows */}
@@ -10082,11 +10355,12 @@ function ConfigPage({ meta, who, access }){
                 className="btn-sec">+ Add a window</button>
             </div>
           )}
+          </CfgFields>
 
           {tab === "raw" && (
             <div className="px-6 pb-6">
-              <p className="text-sm text-slate-500 mb-2">Everything else, such as lorry sizes for routing. Saving here sends exactly this text.</p>
-              <textarea className="w-full h-[60vh] font-mono text-[13px] border border-slate-300 rounded-lg p-3" value={raw} aria-label="Everything (JSON)"
+              <p className="text-sm text-slate-500 mb-2">{ro ? "Everything else, such as lorry sizes for routing." : "Everything else, such as lorry sizes for routing. Saving here sends exactly this text."}</p>
+              <textarea className="w-full h-[60vh] font-mono text-[13px] border border-slate-300 rounded-lg p-3" value={raw} aria-label="Everything (JSON)" readOnly={ro}
                 onChange={e => { setRaw(e.target.value); setRawErr(""); try { setDoc(JSON.parse(e.target.value)); } catch(err){} }} />
               {rawErr && <div className="text-sm mt-1" style={{ color: "var(--red)" }}>{rawErr}</div>}
             </div>
@@ -10096,7 +10370,8 @@ function ConfigPage({ meta, who, access }){
         </div>
       )}
 
-      {tab !== "orgfile" && (canSave ? (
+      {/* 9 Nov 2026 (card 10): the Save bar for an admin only; a reader was told at the top (it was a footer line ~3,700 px down) */}
+      {tab !== "orgfile" && canSave && (
       <div className="savebar" data-cfg-savebar="1">
         <span className="text-slate-500">{!doc ? "" : dirty ? "Unsaved changes on this page" : tab === "raw" ? "Saving from the JSON section sends the text as typed" : "No unsaved changes"}</span>
         <span className="flex items-center gap-2">
@@ -10104,11 +10379,7 @@ function ConfigPage({ meta, who, access }){
           <button onClick={save} disabled={busy || !doc || (!dirty && tab !== "raw")} className="btn-pri">{busy ? "Saving…" : "Save"}</button>
         </span>
       </div>
-      ) : (
-      <div className="savebar" data-cfg-savebar="1">
-        <span className="text-slate-500" role="note">Only an admin can save the configuration.</span>
-      </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -11355,7 +11626,9 @@ const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKP
                      // 22 Oct 2026 (abnormal loads, phase 2): the words of the Abnormal loads block's flags (a load, not a line)
                      NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT",
                      // 28 Oct 2026 (task 0c): a dated zone in force crosses the route this week and it is not diverted
-                     NO_WAY_ROUND: "NO WAY ROUND" };
+                     NO_WAY_ROUND: "NO WAY ROUND",
+                     // 9 Nov 2026 (v2.1 task 2.1-1): a road or an area's limit on lorries a day (Zones, kind Traffic limit)
+                     TRAFFIC_LIMIT: "TRAFFIC LIMIT", TRAFFIC_NEAR: "TRAFFIC NEAR" };
 // H1 (29 Sep 2026): a RESTRICTION flag carries the provider's own word — "TARK TEE" for an
 // Estonian tenant, "ROADWORKS" (National Highways planned closures) for a British one.
 const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);
@@ -11365,21 +11638,25 @@ const LINE_FLAG_LABEL = { UNBAKED: "NOT ROUTED", IPT_SHARE: "SHARE", ROUTE_CAP: 
                   GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",
                   NO_WAY_ROUND: "NO WAY ROUND",
                   // 29 Oct 2026 (task 3a): the concrete pours, on the pour's day (backend pours.WORDS)
-                  POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT", POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN" };
+                  POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT", POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN",
+                  TRAFFIC_LIMIT: "TRAFFIC LIMIT", TRAFFIC_NEAR: "TRAFFIC NEAR" };   // 9 Nov 2026 (2.1-1)
 // 13 Oct 2026 (W6): the Look-ahead row's ONE status. The flags, most serious first (a lorry over a road limit
 // before anything else: decision 1), win over the week's state; with no flag, the week's state. `more` counts the
 // other kinds of flag; every flag's sentence is in the details. (Replaces LineFlags' column of words and the
 // StatusChip column: one status a row.)
 const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1, SHORTAGE: 2, ROUTE_CAP: 3, STOCKPILE_OVER: 4, IPT_SHARE: 5, DAYS_NE_WEEK: 6, PARENT_CHANGED: 7, UNBAKED: 8,
                        GATE_OVER: 3.5, GATE_NEAR: 7.5, STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7,
-                       NO_WAY_ROUND: 0.5, POUR_COLD_JOINT: 0.6, POUR_TRANSIT: 0.7, POUR_SHORT: 8.1, POUR_BAND: 8.2, POUR_OVER_PLAN: 8.3 };   // 28 Oct 2026 (task 0c): through a closed road, after a road limit   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
+                       NO_WAY_ROUND: 0.5, POUR_COLD_JOINT: 0.6, POUR_TRANSIT: 0.7, POUR_SHORT: 8.1, POUR_BAND: 8.2, POUR_OVER_PLAN: 8.3,
+                       TRAFFIC_LIMIT: 3.6, TRAFFIC_NEAR: 8.4 };   // 28 Oct 2026 (task 0c): through a closed road, after a road limit   // 14 Oct 2026 (W17): over beside the route cap, near with the warnings
 const laRank = (code) => (code in LA_FLAG_RANK ? LA_FLAG_RANK[code] : 99);
 const laSorted = (flags) => [...(flags || [])].sort((a, b) => laRank(a.code) - laRank(b.code));
 // the rail's colours: NOT ROUTED, a road restriction and a gate near capacity in amber, every other flag red
 const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"
                           || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"
                           // 29 Oct 2026 (task 3a): a pour's warnings; COLD JOINT and TRANSIT stay red
-                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN") ? "warn" : "bad";
+                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"
+                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red
+                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";
 // the details' flag lines: one per kind of flag, most serious first, each distinct sentence once, team ids in
 // the team's words (teamText, as the rail does)
 function laFlagGroups(flags){
@@ -13119,8 +13396,18 @@ function SimTimeline({ D, t, onSeek, site }){
 
 // the player: the controls row (the page's scale / period / site, then Play / Restart / Speed and the clock), the map with
 // its key, the Now card and Gates / Stations now beside it, the timeline full width, then the scenario band (card 2)
-function SimPlayer({ meta, D, store, scenario, controls, site, open }){
-  const [t, setT] = useState(D.window.start);
+function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt }){
+  // 9 Nov 2026 (finding 9): the clock opens at the day's busiest point, and again when the month, week or day changes
+  // (not on a scenario change: the clock stays where you put it)
+  const [t, setT] = useState(() => (startAt != null && startAt >= D.window.start && startAt <= D.window.end) ? startAt : D.window.start);
+  const dayKey = `${D.scale}|${D.label}`, keyRef = useRef(dayKey), startRef = useRef(startAt);
+  startRef.current = startAt;
+  useEffect(() => {
+    if(keyRef.current === dayKey) return;
+    keyRef.current = dayKey;
+    const a = startRef.current;
+    setPlaying(false); setT(a != null && a >= D.window.start && a <= D.window.end ? a : D.window.start);
+  }, [dayKey]);
   const [playing, setPlaying] = useState(false);
   const [sp, setSp] = useState("1");
   const raf = useRef(null), last = useRef(null), tRef = useRef(t), spRef = useRef(1);
@@ -13167,7 +13454,7 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open }){
         <div className="sim-main">
           <SimMap meta={meta} D={D} store={store} frame={f} site={site} />
         </div>
-        <div className="sim-side">
+        <div className="sim-side kb-scroll" tabIndex={0} role="region" aria-label="Now and gates">
           <div className="sim-card" data-sim-now-card="1">
             <div className="sim-card-h">Now</div>
             <div className="sim-clock" aria-live="off" data-sim-clock="1">{simHM(t)}</div>
@@ -13182,7 +13469,8 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open }){
             const kg = (s) => M.idle_g_per_min ? (mins(s) * M.idle_g_per_min / 1000) : null;
             return <div key={h.id} className="sim-card" data-sim-holding-card={h.id}>
               <div className="sim-card-h"><span className="hbadge" aria-hidden="true">H</span>{h.name}</div>
-              <div className="ct-note">{h.held} held this day · most {h.most}{h.most_at != null ? ` at ${simHM(h.most_at)}` : ""}{h.spaces ? ` of ${h.spaces} spaces` : ""}{h.over_spaces ? <b className="sim-red"> · {h.over_spaces} over</b> : null}{h.first != null ? ` · call-off from ${simHM(h.first)}` : ""}</div>
+              <div className="ct-note" data-sim-hold-words="1">{simHoldWords(h)}</div>
+              <details className="sim-hold-fold" open={!!h.most}><summary>With and without the holding area</summary>
               <table className="sim-now sim-cmp"><thead><tr><th scope="col">This day</th><th scope="col" className="num">Without</th><th scope="col" className="num">With</th></tr></thead><tbody>
                 <tr><td>Most waiting on site</td><td className="num">{wo.site_most == null ? "—" : wo.site_most}</td><td className="num"><b>{w.site_most == null ? "—" : w.site_most}</b></td></tr>
                 <tr><td>Most waiting at the gate</td><td className="num">{wo.gate_most == null ? "—" : wo.gate_most}</td><td className="num"><b>{w.gate_most == null ? "—" : w.gate_most}</b></td></tr>
@@ -13194,6 +13482,7 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open }){
                 {kg(wo) != null && <tr><td>Idling, if every waiting engine runs<div className="sim-sub">{M.idle_words}</div></td><td className="num">{kg(wo).toFixed(1)} kg CO₂</td><td className="num"><b>{kg(w).toFixed(1)} kg CO₂</b></td></tr>}
               </tbody></table>
               <div className="ct-note">A holding area moves the waiting off the site and the lane; it does not remove it.</div>
+              </details>
             </div>; })}
           {site
             ? <div className="sim-card" data-sim-stations-now="1">
@@ -13285,6 +13574,14 @@ const SimScenario = React.memo(function SimScenario({ D, sc, onChange, onReset, 
             {(() => { const g = (D.gates || []).filter(x => x.first_trip_pct != null && x.arrivals > 0).sort((a, b) => b.arrivals - a.arrivals)[0];
               return g ? <div className="ct-note" data-sim-first-trips={g.gate_id}>The plan's first trips: about {g.first_trip_pct} % at {simGateName(g)}, {g.gate_name}.</div> : null; })()}
           </div>
+          {/* 9 Nov 2026 (v2.1 task 2.1-1, card 7): this day's lorries against each traffic limit they pass */}
+          {(D.traffic_limits || []).length > 0 && <div className="sim-traffic" data-sim-traffic={(D.traffic_limits || []).length}>
+            <div className="sim-scn-h">Traffic limits on this day</div>
+            {(D.traffic_limits || []).map(t => <div key={t.id} className="ct-note" data-sim-traffic-row={t.id}>
+              {t.name}: {tlNum(t.value)} {t.counts === "movements" ? "movements" : "visits"}, limit {tlNum(t.limit)}
+              {t.state !== "ok" && <span className="ml-1 font-semibold" style={{ color: t.state === "over" ? "var(--bad-text)" : "var(--warn-text)" }}>{t.state === "over" ? "OVER" : "NEAR"}</span>}
+            </div>)}
+          </div>}
           {/* 29 Oct 2026 (task 3a, card 5): on a Day, the day's planned pours (Plan → Pours), ticked; the what-if below */}
           {D.scale === "day" && <div className="sim-planned" data-sim-planned={(D.planned_pours || []).length}>
             <label className="sim-check"><input type="checkbox" checked={sc.planned !== false} onChange={e => onChange({ ...sc, planned: e.target.checked })} />
@@ -13369,7 +13666,7 @@ const SimTable = React.memo(function SimTable({ D }){
         const bh = hs.length > 1 ? `${String(hs[0]).padStart(2, "0")}:00 +${hs.length - 1}` : (hs.length ? `${String(hs[0]).padStart(2, "0")}:00` : "");
         return (
           <tr key={g.gate_id} data-sim-gate={g.gate_id} data-sim-flag={g.flag || "none"} title={(g.teams || []).length ? `${TEAMS()}: ${(g.teams || []).map(x => teamText(x)).join(", ")}` : undefined}>
-            <td><b>{g.location_name}</b><div className="sim-sub">{g.gate_name}</div>{g.origin_share_note && <div className="sim-sub sim-warn">{g.origin_share_note}</div>}</td>
+            <td><b>{g.location_name}</b><div className="sim-sub">{g.gate_name}</div></td>
             <td className="num" title={`${g.laden} laden · ${g.empty} empty · ${g.pour} pour · Dashboard average ${simN1(g.panel_per_day)} a day${g.even_rate != null ? ` · even spread ${simN1(g.even_rate)} an hour` : ""}`}><b>{g.arrivals}</b></td>
             <td className="num" data-sim-busy={g.busiest}><b>{g.busiest}</b><div className="sim-sub">{bh}</div></td>
             <td>{simQueueCell(g)}
@@ -13401,13 +13698,12 @@ function SimPhoneList({ D }){
     if(site) seen.add(site.location_id);
     return (
       <li key={g.gate_id} className="sim-pcard" data-sim-gate={g.gate_id} data-sim-flag={g.flag || "none"}>
-        <div className="sim-pc-h"><b>{g.location_name}</b><RowStatus word={simWord(g)} tone={simTone(g)} /></div>
+        <div className="sim-pc-h"><b>{g.location_name}</b>{g.flag === "red" || g.flag === "amber" ? <RowStatus word={simWord(g)} tone={simTone(g)} /> : null}</div>
         <div className="sim-pline">{g.gate_name} · {g.arrivals} lorr{g.arrivals === 1 ? "y" : "ies"}{g.pour ? ` (${g.pour} mixers)` : ""} · busiest <span data-sim-busy={g.busiest}>{g.busiest ? `${g.busiest} at ${g.busiest_hour}` : "—"}</span> · {simPhoneQueue(g)}{g.minutes_lost > 0.5 ? ` · ${Math.round(g.minutes_lost)} min lost` : ""}</div>
         {g.late > 0 && <div className="sim-sub sim-warn">{g.late} checked in after the last open minute</div>}
-        {g.origin_share_note && <div className="sim-sub sim-warn">{g.origin_share_note}</div>}
         {site && <ul className="sim-pstations" aria-label={`${site.name}: stations`}>{(site.stations || []).filter(st => st.kind !== "gate").map(st => (
           <li key={st.key} data-sim-station={st.key} data-sim-flag={st.flag || "none"}>
-            <div className="sim-pc-h"><b>{st.name}</b><RowStatus word={st.status_word} tone={st.flag === "red" ? "bad" : st.flag === "amber" ? "warn" : "none"} /></div>
+            <div className="sim-pc-h"><b>{st.name}</b>{st.flag === "red" || st.flag === "amber" ? <RowStatus word={st.status_word} tone={st.flag === "red" ? "bad" : "warn"} /> : null}</div>
             <div className="sim-pline">{st.arrivals} lorr{st.arrivals === 1 ? "y" : "ies"} · {simPhoneQueue(st)}{st.minutes_lost > 0.5 ? ` · ${Math.round(st.minutes_lost)} min lost` : ""}</div>
           </li>))}</ul>}
       </li>);
@@ -13416,15 +13712,41 @@ function SimPhoneList({ D }){
   return (
     <ul className="sim-plist" data-sim-table="1" aria-label="Gates and stations">
       {(D.holding || []).filter(h => h.on).map(h => <li key={"h" + h.id} className="sim-pcard" data-sim-phone-holding={h.id}>
-        <div className="sim-pc-h"><b>{h.name}</b><RowStatus word={h.over_spaces ? "Over its spaces" : "Holding area"} tone={h.over_spaces ? "bad" : "none"} /></div>
-        <div className="sim-pline">{h.held} held · most {h.most}{h.most_at != null ? ` at ${simHM(h.most_at)}` : ""}{h.spaces ? ` of ${h.spaces} spaces` : ""} · {Math.round(h.minutes_held)} min held</div>
+        <div className="sim-pc-h"><b>{h.name}</b>{h.over_spaces ? <RowStatus word="Over its spaces" tone="bad" /> : null}</div>
+        <div className="sim-pline">{simHoldWords(h)}</div>
       </li>)}
       {main.map(card)}
+      {order.some(g => g.origin_share_note) && <li className="ct-note" data-sim-other-customers="1">{SIM_OTHER_CUSTOMERS}</li>}
       {small.length > 0 && <li><details className="sim-pmore"><summary>{small.length} more gate{small.length === 1 ? "" : "s"}, fewer than 5 lorries a day</summary>
         <ul className="sim-plist">{small.map(card)}</ul></details></li>}
     </ul>
   );
 }
+
+// 9 Nov 2026 (finding 9): the busiest point of the day on screen — the gate or station with the most lorries waiting at
+// once, and when (the earliest when two tie). `site` (the page's site pick) limits it to that site's stations and gates.
+// null when nobody waits. avg = that site's gate in → gate out minutes, when the point is on a site.
+function simPeak(D, site){
+  const c = [];
+  const onSite = new Set();
+  (D.sites || []).forEach(x => (x.stations || []).forEach(st => { if(st.kind === "gate" && st.gate_id) onSite.add(st.gate_id); }));
+  (D.gates || []).forEach(g => { if((site && g.location_id !== site.d.location_id) || onSite.has(g.gate_id)) return;
+    c.push({ n: g.most_waiting || 0, at: g.most_at, name: simGateName(g), avg: null }); });
+  (D.sites || []).forEach(x => { if(site && x.location_id !== site.d.location_id) return;
+    (x.stations || []).forEach(st => c.push({ n: st.most_waiting || 0, at: st.most_at, avg: x.avg_on_site,
+      name: st.kind === "gate" ? `${x.name}, ${st.name === x.name ? "gate in" : st.name.toLowerCase()}` : st.name })); });
+  const hit = c.filter(k => k.n >= 1 && k.at != null).sort((a, b) => (b.n - a.n) || (a.at - b.at))[0];
+  return hit || null;
+}
+// the holding area's day in plain words
+function simHoldWords(h){
+  const n = h.held || 0;
+  if(!n) return "No lorry called off here this day.";
+  if(!h.most) return `${n} ${n === 1 ? "lorry" : "lorries"} passed through · none waited.`;
+  return `${n} ${n === 1 ? "lorry" : "lorries"} waited here · most ${h.most} at once${h.most_at != null ? ` at ${simHM(h.most_at)}` : ""}${h.spaces ? `, of ${h.spaces} spaces` : ""}${h.over_spaces ? `, ${h.over_spaces} over` : ""}.`;
+}
+// the quarries' caveat, said once
+const SIM_OTHER_CUSTOMERS = "Quarries and plants serve other customers too: only this scheme's lorries are counted, so a queue there is the least it could be.";
 
 // ---- 29 Oct 2026: the Simulation's own PAGE (Plan → Simulation, #simulation; mockup notes/sim-page-mockup-1029) -------------
 // Read on mount (one GET of /api/sim/day, the lines once a month), keyed on the month and the scenario; nothing saved (D86).
@@ -13432,6 +13754,21 @@ function SimPhoneList({ D }){
 function SimulationPage({ meta, months, phone, initial }){
   const open = true;
   const [month, setMonth] = useState(() => (initial && initial.month) || gaMonthToday(months));
+  // 9 Nov 2026 (UI critique finding 9, decision 7): the page opens on the programme's BUSIEST month, found by one cheap read
+  // before the first day is worked out; if that read fails it opens on this month as before
+  const [busiestM, setBusiestM] = useState(null);
+  const [ready, setReady] = useState(!!initial);
+  useEffect(() => {
+    if(ready) return;
+    let live = true;
+    fetch(`${API}/sim/busiest-month`).then(okJSON).then(j => {
+      if(!live) return;
+      const b = j && j.busiest;
+      if(b && b.month_index >= 1){ setBusiestM(b); setMonth(b.month_index); }
+      setReady(true);
+    }).catch(() => { if(live) setReady(true); });
+    return () => { live = false; };
+  }, []);
   const [sc, setSc] = useState(SIM_SC0);
   const [data, setData] = useState(initial || null);
   const [store, setStore] = useState(() => initial ? { month: initial.month, legs: initial.legs, haul: initial.haul_roads } : null);
@@ -13446,6 +13783,7 @@ function SimulationPage({ meta, months, phone, initial }){
   const shown = useRef(initial ? `${initial.month}|${JSON.stringify(SIM_SC0())}` : null);
   useEffect(() => {
     const key = `${month}|${scKey}`;
+    if(!ready) return;
     if(data && shown.current === key) return;
     let live = true;
     const wantLines = !phone && !(store && store.month === month);
@@ -13471,7 +13809,7 @@ function SimulationPage({ meta, months, phone, initial }){
     };
     const h = setTimeout(go, data ? 300 : 0);
     return () => { live = false; clearTimeout(h); };
-  }, [month, scKey]);
+  }, [month, scKey, ready]);
   // the Hours and check-in card (card 9): one gate, or every gate; refused on the screen in words (D93) before anything is read
   const onGate = (gid, f, t, c) => {
     const g = (D && D.gates || []).find(x => x.gate_id === gid);
@@ -13501,16 +13839,17 @@ function SimulationPage({ meta, months, phone, initial }){
   // the controls row (card 4): scale → period → site, left to right; the playback beside them in SimPlayer
   const controls = <>
     {/* 28 Oct 2026 (v2): the scale — the forecast month's average day, the Look-ahead week's average weekday, or one planned day */}
+    <span className="sim-lbl-txt" aria-hidden="true">Scale</span>
     <div className="sim-seg" role="group" aria-label="Simulation scale" data-sim-scale={sc.scale}>
       {SIM_SCALES.map(([v, w]) => <button key={v} type="button" className={sc.scale === v ? "on" : ""} aria-pressed={sc.scale === v}
         onClick={() => { if(sc.scale === v) return; const d = D && D.day_choices && D.day_choices.length ? D.day_choices : [];
           setMsg(""); setSc(x => ({ ...x, scale: v, date: v === "day" ? (x.date || (d[0] || {}).date || "") : x.date })); }}>{w}</button>)}
     </div>
-    {sc.scale === "month" && <label className="ct-line">Month <select className="ga-sel" value={month} onChange={e => { setMonth(+e.target.value); }} aria-label="Simulation month">
+    {sc.scale === "month" && <label className="ct-line">Which month <select className="ga-sel" value={month} onChange={e => { setMonth(+e.target.value); }} aria-label="Simulation month">
       {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}</select></label>}
-    {sc.scale === "week" && <label className="ct-line">Week <select className="ga-sel" value={sc.bucket} onChange={e => setSc(x => ({ ...x, bucket: e.target.value }))} aria-label="Simulation week">
+    {sc.scale === "week" && <label className="ct-line">Which week <select className="ga-sel" value={sc.bucket} onChange={e => setSc(x => ({ ...x, bucket: e.target.value }))} aria-label="Simulation week">
       <option value="commit">This week</option><option value="next">Next week</option></select></label>}
-    {sc.scale === "day" && <label className="ct-line">Day <select className="ga-sel" value={sc.date} onChange={e => setSc(x => ({ ...x, date: e.target.value }))} aria-label="Simulation day">
+    {sc.scale === "day" && <label className="ct-line">Which day <select className="ga-sel" value={sc.date} onChange={e => setSc(x => ({ ...x, date: e.target.value }))} aria-label="Simulation day">
       {((D && D.day_choices) || []).map(c => <option key={c.date} value={c.date}>{c.words}{c.bucket === "next" ? " (next week)" : ""}</option>)}</select></label>}
     {!phone && D && (D.sites || []).length > 0 && <label className="ct-line">Site <select className="ga-sel" value={siteId} onChange={e => setSiteId(e.target.value)} aria-label="Simulation site" data-sim-site="1">
       <option value="">Whole scheme</option>{(D.sites || []).map(x => <option key={x.location_id} value={x.location_id}>{x.name}</option>)}</select></label>}
@@ -13521,6 +13860,7 @@ function SimulationPage({ meta, months, phone, initial }){
     D.checks.largest_panel_difference != null && [D.checks.largest_panel_difference < 1, `Leaving out the pour, every gate is within ${simN1(D.checks.largest_panel_difference)} of a lorry of the ${D.scale === "month" ? "Dashboard's" : "Look-ahead's"} ${D.label} average: a day has whole lorries, the average a decimal.`],
     (D.sites || []).length > 0 && [D.checks.sites_add_up, "On site, every lorry checked in left by a gate or is named as having no area."]].filter(Boolean) : [];
   const nOk = checks.filter(c => c[0]).length, allOk = nOk === checks.length;
+  const peak = D && D.loads > 0 ? simPeak(D, site) : null;
   return (
     <div className="max-w-7xl mx-auto p-6 pb-2" data-page="simulation" data-sim="1">
       <PageHeader title="Simulation" subtitle="An average working day, lorry by lorry, at every gate and on site. Staff only."
@@ -13533,16 +13873,22 @@ function SimulationPage({ meta, months, phone, initial }){
           <EmptyState kind="none" title={`No approved lines in ${D.label}`} body="Pick another month. The simulation plays the approved lines of a month's average working day." /></>}
         {D && D.loads > 0 && <>
           {phone && <div className="sim-ctl-row" data-sim-controls="1"><div className="sim-ctl-left">{controls}</div></div>}
+          {/* 9 Nov 2026 (finding 9): the headline first — the busiest point of this day — or one line saying nothing queues */}
+          {peak
+            ? <div className="sim-head" data-sim-head="queue"><b>{peak.n} {peak.n === 1 ? "lorry" : "lorries"} waiting at {peak.name} at {simHM(peak.at)}</b> — the busiest point of this day.{peak.avg != null ? ` Gate in → gate out ${Math.round(peak.avg)} min on average.` : ""}</div>
+            : <div className="sim-head sim-head-none" data-sim-head="none">Nothing queues on this day ({D.label}).{busiestM && busiestM.label !== D.label
+                ? <> <button type="button" className="sim-link" data-sim-busiest="1" onClick={() => { setMsg(""); setSc(x => ({ ...x, scale: "month" })); setMonth(busiestM.month_index); }}>Show the busiest day ({busiestM.label})</button></> : null}</div>}
           {/* the figures line (card 3): few words; the rules are in the i box */}
           <div className="sim-figs" data-sim-lead="1">{D.label} · {simDayWords(D)} · {grp(D.loads)} loads · {grp(D.gate_arrivals)} arrivals{pourN ? `, ${pourN} of them mixers` : ""} · {(D.arrival_pattern && D.arrival_pattern.kind === "rush") ? D.arrival_pattern.words : "spread evenly"}{D.bands.on ? ` · bands ${D.bands.words} off` : ""}{(D.gates || []).some(g => g.shut_words) ? " · shut times off" : ""}{busy ? " · working it out…" : ""}</div>
           {(D.notes || []).map((n, i) => <div key={i} className="ct-note" data-sim-note="1">{n}</div>)}
           {phone
             ? <><div className="ct-note" data-sim-phone="1">The plan's day, read-only here.</div><SimPhoneList D={D} /></>
             : <>
-              <SimPlayer meta={meta} D={D} store={store} open={open} site={site} controls={controls}
+              <SimPlayer meta={meta} D={D} store={store} open={open} site={site} controls={controls} startAt={peak ? peak.at : null}
                 scenario={<SimScenario key={resetN} D={D} sc={sc} onChange={onScenario} onGate={onGate} onReset={() => { setMsg(""); setSc(SIM_SC0()); setResetN(n => n + 1); setSiteId(""); }} msg={msg} />} />
               <details className="sim-fold" data-sim-fold="table"><summary>Busiest hour at each gate</summary>
               <SimTable D={D} />
+              {(D.gates || []).some(g => g.origin_share_note) && <p className="ct-note" data-sim-other-customers="1">{SIM_OTHER_CUSTOMERS}</p>}
               </details>
               {(D.haul_roads || []).length > 0 && <details className="sim-fold" data-sim-fold="haul"><summary>Haul roads</summary>
                 <p className="ct-note">Lorries on each drawn haul road, both ways. No capacity is typed for a haul road, so none is flagged here.</p>
@@ -14377,8 +14723,15 @@ const ZONE_KINDS = [
   ["weight_limit", "Weight / height limit"],
   ["works", "Works area"],
   ["haul_road", "Temporary haul road"],
+  // 9 Nov 2026 (v2.1 task 2.1-1): a road or an area's limit on lorries a day. A flag, never a block: it never routes
+  ["traffic_limit", "Traffic limit"],
   ["other", "Other"],
 ];
+const LIMIT_KIND = "traffic_limit";
+// the limit's unit, as the condition was written (traffic_limits.unit_words; Q2: in and out counted separately)
+const LIMIT_UNITS = [["movements", "lorry movements a day, in and out counted separately"], ["visits", "lorry visits a day"]];
+const limitNum = (x) => (Math.round(Number(x) * 10) / 10).toLocaleString("en-GB");
+const limitChip = (lim) => (lim && lim.value != null) ? `Limit ${limitNum(lim.value)} / day` : null;
 // Which of the two ways of making a route use a haul road applies. This is a fact about
 // HERE's map data, not a preference — see the backend's haul.py. Splice is the default
 // because its failure mode (geometry only as good as the drawing) is visible, and via's
@@ -15479,7 +15832,10 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
 function CatChips({ list, dir }){
   const arr = asArray(list);
   if(!arr.length) return <span className="text-slate-500">—</span>;
-  const bg = dir === "in" ? "rgba(3,158,134,.10)" : "rgba(37,99,235,.08)";
+  // 9 Nov 2026 (UI critique #46): the tint is laid over the page's surface, so a chip reads the same on a selected or hovered
+  // row (the blue words on the selected row's wash were 4.43:1); the out chip's tint follows the accent like its words
+  const tint = dir === "in" ? "rgba(3,158,134,.10)" : "var(--navy-soft)";
+  const bg = `linear-gradient(${tint}, ${tint}), var(--surface)`;
   const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";
   return (
     <span className="flex flex-wrap gap-1">
@@ -15607,6 +15963,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // 28 Oct 2026 (task 0c): the dated zones' diversions — per zone (the Used by column), per route and dates (the
   // Routes page and the panel after a zone save), and what "Find a way round" would cost now
   const [zoneDiv, setZoneDiv] = useState({});
+  const [limitUse, setLimitUse] = useState({});        // 9 Nov 2026 (2.1-1): {zone id: [route ids passing this month]}
   const [zoneFrom, setZoneFrom] = useState({});    // 8 Nov 2026 (task 2.1-12): {zone id: {location_id, site}}
   const [divPeriods, setDivPeriods] = useState([]);
   const [busyUses, setBusyUses] = useState([]);          // 5 Nov 2026 (task 0d-2): the busy-hours uses (row chip)
@@ -15729,12 +16086,23 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       if(dv){ setDivPeriods(dv.periods || []); setWayRound(dv.way_round || { legs: 0, here_calls: 0, routes: [] }); setBusyUses(dv.busy || []); }
     }).catch(() => {});
   };
+  // 9 Nov 2026 (v2.1 task 2.1-1): each traffic limit's routes this month (the Zones table's Used by), read beside the diversions
+  const loadLimitUse = () => {
+    fetch(`${API}/traffic-limits`).then(r => r.ok ? r.json() : null).then(tl => {
+      if(!tl) return;
+      const cm = String(tl.current_month || "");
+      const u = {};
+      (tl.limits || []).forEach(L => { const m = (L.months || {})[cm]; u[L.id] = m ? (m.routes || []).map(r => r.route_id) : []; });
+      setLimitUse(u);
+    }).catch(() => {});
+  };
 
   const loadNear = () =>
     fetch(`${API}/routes/community-counts`).then(okJSON).then(j => setNearData(j)).catch(e => { console.warn("Wayscope:", e); setNearData(false); });
 
   const fetchStatus = () => {
     loadDiversions();
+    loadLimitUse();
     loadNear();
     return Promise.all([
       fetch(`${API}/routes/status`).then(r => r.json()),
@@ -16109,6 +16477,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const reloadNetwork = async () => {
     const m = mapObj.current;
     try {
+      loadLimitUse();         // 9 Nov 2026 (2.1-1)
       loadDiversions();       // 28 Oct 2026 (task 0c): beside the network, never holding it up
       const [loc, st, sm] = await Promise.all([
         fetch(`${API}/locations/geojson`).then(r => r.json()),
@@ -16906,12 +17275,16 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // The difference is one condition rather than a second drawing tool, which is why the
   // hand-rolled vertex collector was worth keeping: the same clicks mean both things.
   const isHaul = (f) => !!f && f.kind === HAUL_KIND;
-  const minPts = (f) => isHaul(f) ? 2 : 3;
+  // 9 Nov 2026 (2.1-1): a traffic limit is drawn as a line along the road or as an area (its own choice)
+  const isLimit = (f) => !!f && f.kind === LIMIT_KIND;
+  const isLineZone = (f) => isHaul(f) || (isLimit(f) && f.limit_shape === "line");
+  const minPts = (f) => isLineZone(f) ? 2 : 3;
 
   const blankZone = () => ({
     id: null, name: "", kind: "closure", affects_routing: true,
     starts_on: "", ends_on: "", note: "", active: true,
     speed_kph: "", haul_mode: "", location_id: "",
+    limit_value: "", limit_counts: "movements", limit_basis: "average", limit_public: true, limit_shape: "line",
   });
 
   const startNewZone = () => {
@@ -16931,7 +17304,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   affects_routing: !!z.affects_routing, starts_on: z.starts_on || "",
                   ends_on: z.ends_on || "", note: z.note || "", active: !!z.active,
                   speed_kph: (z.speed_kph == null ? "" : String(z.speed_kph)),
-                  haul_mode: z.haul_mode || "", location_id: z.location_id || "" });
+                  haul_mode: z.haul_mode || "", location_id: z.location_id || "",
+                  limit_value: (z.limit && z.limit.value != null) ? String(z.limit.value) : "",
+                  limit_counts: (z.limit && z.limit.counts) || "movements", limit_basis: (z.limit && z.limit.basis) || "average",
+                  limit_public: !(z.limit && z.limit.public === false),
+                  limit_shape: (z.geometry && z.geometry.type === "LineString") ? "line" : "area" });
     setZoneSel(z.id);
     // load the existing shape as editable vertices. A polygon's repeated closing point is
     // dropped; a haul road has none to drop, and popping its last point would shorten the
@@ -17038,16 +17415,20 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const saveZone = async () => {
     if(!zoneForm) return;
     const haulNow = isHaul(zoneForm);
+    const lineNow = isLineZone(zoneForm);
+    const limitNow = isLimit(zoneForm);
     if(!zoneForm.name.trim()){ setZoneMsg("Give the zone a name."); return; }
+    if(limitNow && !(Number(zoneForm.limit_value) > 0)){ setZoneMsg("Type the limit: a number of lorries a day."); return; }
     if(drawPts.length < minPts(zoneForm)){
-      setZoneMsg(haulNow ? "A haul road needs at least two points — it is travelled along."
+      setZoneMsg(lineNow ? (haulNow ? "A haul road needs at least two points — it is travelled along."
+                                    : "A line along the road needs at least two points.")
                          : "A zone needs at least three corners."); return; }
     const body = {
       name: zoneForm.name.trim(),
-      geometry: haulNow
+      geometry: lineNow
         ? { type: "LineString", coordinates: drawPts.map(p => [p[0], p[1]]) }
         : { type: "Polygon", coordinates: [ringOf(drawPts)] },
-      kind: zoneForm.kind, affects_routing: !!zoneForm.affects_routing,
+      kind: zoneForm.kind, affects_routing: limitNow ? false : !!zoneForm.affects_routing,
       starts_on: zoneForm.starts_on || null, ends_on: zoneForm.ends_on || null,
       note: zoneForm.note || null, active: !!zoneForm.active,
       // sent for every kind, ignored by the backend for the others. Blank stays null:
@@ -17059,6 +17440,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       // 28 Oct 2026 (simulation v2): a haul road inside a site (never spliced into a public route); blank = a public haul road
       location_id: (haulNow && zoneForm.location_id) ? zoneForm.location_id : null,
     };
+    if(limitNow) Object.assign(body, { limit_value: Number(zoneForm.limit_value), limit_counts: zoneForm.limit_counts,
+                                       limit_basis: zoneForm.limit_basis, limit_public: !!zoneForm.limit_public });
     setZoneBusy(true); setZoneMsg("Saving…");
     try {
       const qs = tokenRef.current ? `?token=${encodeURIComponent(tokenRef.current)}` : "";
@@ -17151,7 +17534,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       // the shape that will be saved rather than an open chain that jumps shut on Save.
       // A haul road is never closed — it is a road, and showing it shut would be showing
       // a shape that Save is not going to produce.
-      const haulNow = isHaul(zoneForm);
+      const haulNow = isLineZone(zoneForm);
       const line = (!haulNow && drawPts.length >= 3) ? ringOf(drawPts) : drawPts;
       feats.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: line } });
     }
@@ -17972,7 +18355,48 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </div>
                 )}
 
-                <label className="flex items-start gap-2 text-sm">
+                {isLimit(zoneForm) && (
+                  <div className="rounded-lg border border-slate-200 p-2.5 space-y-2.5" data-zone-limit="1">
+                    <div className="grid grid-cols-[6rem_1fr] gap-2 items-end">
+                      <label className="block">
+                        <span className="block text-sm font-medium text-slate-700 mb-1">Limit</span>
+                        <input type="number" min="1" step="1" value={zoneForm.limit_value}
+                          onChange={e => setZField("limit_value", e.target.value)} placeholder="200"
+                          className="mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--blue)]" />
+                      </label>
+                      <select value={zoneForm.limit_counts} onChange={e => setZField("limit_counts", e.target.value)}
+                        className={"w-full " + sel} aria-label="What the limit counts">
+                        {LIMIT_UNITS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
+                    </div>
+                    <fieldset>
+                      <legend className="block text-sm font-medium text-slate-700 mb-1">Checked against</legend>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                        {[["average", "Daily average in the month"], ["busiest_day", "Busiest day"]].map(([v, l]) =>
+                          <label key={v} className="inline-flex items-center gap-1.5">
+                            <input type="radio" name="limit_basis" checked={zoneForm.limit_basis === v}
+                              onChange={() => setZField("limit_basis", v)} />{l}</label>)}
+                      </div>
+                    </fieldset>
+                    <fieldset>
+                      <legend className="block text-sm font-medium text-slate-700 mb-1">Draw</legend>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                        {[["line", "Line along the road"], ["area", "Area"]].map(([v, l]) =>
+                          <label key={v} className="inline-flex items-center gap-1.5">
+                            <input type="radio" name="limit_shape" checked={zoneForm.limit_shape === v}
+                              onChange={() => { setZField("limit_shape", v); setDrawPts([]); }} />{l}</label>)}
+                      </div>
+                    </fieldset>
+                    <label className="flex items-start gap-2 text-sm">
+                      <input type="checkbox" checked={!!zoneForm.limit_public}
+                        onChange={e => setZField("limit_public", e.target.checked)} className="mt-1" />
+                      <span className="font-medium">Show on the public map</span>
+                    </label>
+                    <p className="text-[13px] text-slate-500">Wayscope flags it; it never moves a route.</p>
+                  </div>
+                )}
+
+                {!isLimit(zoneForm) && <label className="flex items-start gap-2 text-sm">
                   <input type="checkbox" checked={zoneForm.affects_routing}
                     onChange={e => setZField("affects_routing", e.target.checked)} className="mt-1" />
                   <span>
@@ -17983,7 +18407,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         : "Routes avoid this area; routes that cross it are worked out again."}
                     </span>
                   </span>
-                </label>
+                </label>}
                 <label className="flex items-start gap-2 text-sm">
                   <input type="checkbox" checked={zoneForm.active}
                     onChange={e => setZField("active", e.target.checked)} className="mt-1" />
@@ -18002,7 +18426,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 <div className="rounded-lg border border-slate-200 p-2.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="block text-sm font-medium text-slate-700 mb-1">
-                      {isHaul(zoneForm) ? `Line · ${drawPts.length} point(s)` : `Shape · ${drawPts.length} corner(s)`}
+                      {isLineZone(zoneForm) ? `Line · ${drawPts.length} point(s)` : `Shape · ${drawPts.length} corner(s)`}
                     </span>
                     <span className="flex items-center gap-2">
                       {/* 22 Oct 2026 (UI fix 6, card 6): "Stop placing" on a haul road reads var(--haul-text); a routing zone keeps ZONE_ROUTING */}
@@ -18010,8 +18434,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         className={"text-xs font-semibold px-2 py-0.5 rounded-md " + (zoneDraw ? "text-white" : "border border-slate-200 text-slate-600")}
                         style={zoneDraw ? { background: isHaul(zoneForm) ? "var(--haul-text)" : ZONE_ROUTING } : undefined}>
                         {zoneDraw ? "Stop placing"
-                                  : (drawPts.length ? (isHaul(zoneForm) ? "Add points" : "Add corners")
-                                                    : (isHaul(zoneForm) ? "Place points" : "Place corners"))}
+                                  : (drawPts.length ? (isLineZone(zoneForm) ? "Add points" : "Add corners")
+                                                    : (isLineZone(zoneForm) ? "Place points" : "Place corners"))}
                       </button>
                       <button onClick={undoVertex} disabled={!drawPts.length}
                         className="text-xs px-2 py-0.5 rounded-md border border-slate-200 text-slate-600 disabled:opacity-40">Undo</button>
@@ -18021,7 +18445,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </div>
                   <p className="text-[13px] text-slate-400">
                     {zoneDraw
-                      ? (isHaul(zoneForm)
+                      ? (isLineZone(zoneForm)
                          ? "Click along the road: two or more points."
                          : "Click the map to drop a corner: three or more.")
                       : "To change a shape, redraw it."}
@@ -18055,7 +18479,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <button onClick={cancelZone} disabled={zoneBusy}
                     className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 disabled:opacity-40">Cancel</button>
                 </div>
-                {zoneForm.affects_routing && !isHaul(zoneForm) && (
+                {zoneForm.affects_routing && !isHaul(zoneForm) && !isLimit(zoneForm) && (
                   <p className="text-[13px] text-amber-700">
                     {/* 28 Oct 2026 (task 0c): a dated zone diverts in its dates; only an undated one moves the routes for good */}
                     {(zoneForm.starts_on || zoneForm.ends_on)
@@ -18561,6 +18985,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                                Routed through{z.speed_kph ? ` @ ${z.speed_kph}` : ""}
                              </span>
                            : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600" title="Drawn but not open to traffic">Not open</span>)
+                        : z.kind === LIMIT_KIND
+                        /* 9 Nov 2026 (2.1-1): a traffic limit never routes; its cell is the limit */
+                        ? <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 whitespace-nowrap" data-zone-limit-chip={z.id}>{limitChip(z.limit) || "Limit"}</span>
                         : z.affects_routing
                         ? <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>
                         : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>}
@@ -18575,7 +19002,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <td className="px-3 py-2 text-xs">
                       {/* 22 Oct 2026 (UI fix 6, card 6): "no routes" reads var(--haul-text) */}
                       {/* 28 Oct 2026 (task 0c): a dated routing zone says what it diverts, and what it cannot */}
-                      {z.kind !== HAUL_KIND && zoneDiv[z.id] && ((zoneDiv[z.id].routes || []).length
+                      {z.kind === LIMIT_KIND
+                        /* 9 Nov 2026 (2.1-1): the routes that pass through it this month, from the traffic limits read */
+                        ? (limitUse[z.id] && limitUse[z.id].length
+                           ? <span className="text-slate-600" data-zone-limit-use={z.id} title={limitUse[z.id].join(", ")}>{limitUse[z.id].length} route{limitUse[z.id].length === 1 ? "" : "s"} this month</span>
+                           : <span className="text-slate-500">—</span>)
+                        : z.kind !== HAUL_KIND && zoneDiv[z.id] && ((zoneDiv[z.id].routes || []).length
                         || (zoneDiv[z.id].needs_route || []).length || (zoneDiv[z.id].no_way_round || []).length)
                         ? <button type="button" className="row-open text-left" onClick={(e) => { e.stopPropagation(); setDivZone(z.id); }}
                             data-zone-div={z.id}>   {/* named by its own words (axe label-content-name-mismatch, 28 Oct audit) */}

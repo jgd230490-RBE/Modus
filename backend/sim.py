@@ -1847,8 +1847,7 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         if fig and hold_on:
             names = " and ".join(s["name"] for s in srv)
             ex = ", ".join(sorted({conversions.vehicle_label(factors, k) for k in H["exempt"]}))
-            notes.append(f"Lorries for {names} call off at {H['name']}: {H['call']} called forward at a time for each bay, "
-                         f"at most {sim_holding.GATE_LANE} waiting at the gate, never into a shut gate."
+            notes.append(f"Lorries for {names} wait at {H['name']} and are called forward {H['call']} at a time for each bay."
                          + (f" {ex} go straight to the gate." if ex else ""))
             if fig["over_spaces"]:
                 notes.append(f"{H['name']}: {fig['most']} held at once at {hhmm(fig['most_at'])}, {fig['over_spaces']} more "
@@ -1912,8 +1911,20 @@ def day(month_index, acc, factors=None, working_days=None, scenario=None, panel=
         word = (taxonomy._team_word() or "Team").lower()
         notes.append(f"Lines of another {word} are shown by route only: their own figures are theirs.")
     mx, mx_name = mixer_m3(factors)
+    # 9 Nov 2026 (v2.1 task 2.1-1, card 7): the day's whole loads per route against every traffic limit in force on the
+    # days it stands for. On screen only; a limit never moves a lorry. An old database without the columns: none.
+    traffic = []
+    try:
+        import traffic_limits
+        by_route = {}
+        for li, l in enumerate(lines):
+            by_route[l["route_id"]] = by_route.get(l["route_id"], 0) + (res["per_line"][li] or 0)
+        traffic = traffic_limits.sim_day(by_route, [d for d in (span_days or []) if d.weekday() < 5] or (span_days or []))
+    except Exception as e:                       # noqa: BLE001
+        print("⚠️  sim traffic limits:", str(e)[:120])
     return {
         "month": int(month_index), "label": label,
+        "traffic_limits": traffic,
         # 28 Oct 2026 (v2): the scale and what it reads
         "scale": scale, "week": week_block, "date": (chosen.isoformat() if chosen else None),
         "day_choices": day_choices,
@@ -2027,3 +2038,26 @@ def busiest(month_index, acc, factors, working_days, panel):
                      "over_spaces": h["over_spaces"], "check_minutes": h.get("check_minutes"),
                      "exempt_labels": h.get("exempt_labels") or [], "on": h.get("on", True)})
     return {"gates": out, "note": note, "loads": d["loads"], "holding": hold}
+
+
+def busiest_month(factors=None):
+    """
+    9 Nov 2026 (UI critique finding 9, decision 7): the month the Simulation opens on — the month of the programme with the
+    most approved lorry loads (the first one when two tie), so a person lands on the scheme's busiest day, not on an empty
+    one. One read of the approved lines; no simulation is run (the whole range took ~15 s to simulate). None when no line
+    is approved. {"month_index", "label", "loads"} with `loads` the month's whole loads.
+    """
+    factors = factors or conversions.load_factors()
+    totals = {}
+    for r in db.query("SELECT month_index, vehicle_type, unit, material_type, quantity FROM forecasts "
+                      "WHERE tenant_id = ? AND status = 'Approved'", (db.current_tenant(),)):
+        try:
+            n = gate_arrivals.trips_for(r, factors)
+        except Exception:
+            continue
+        totals[int(r["month_index"])] = totals.get(int(r["month_index"]), 0) + n
+    totals = {m: n for m, n in totals.items() if n > 0}
+    if not totals:
+        return None
+    m = min(totals, key=lambda k: (-totals[k], k))
+    return {"month_index": m, "label": gate_arrivals.month_label(m), "loads": totals[m]}
