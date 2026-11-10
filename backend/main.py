@@ -35,6 +35,7 @@ import taxonomy
 import teams
 import zones
 import traffic_limits
+import section_select
 import haul          # Phase 4 — temporary haul roads
 import restrictions  # Phase 2.5a Tark Tee; H1 (29 Sep) a provider per country (NH closures for GB)
 import streetview    # Phase 2.5a — Google Street View proxy (key stays server-side)
@@ -4330,6 +4331,34 @@ def public_road_load(month: int = Query(..., ge=1, le=MONTH_COUNT), leg: str = Q
     factors = conversions.load_factors()
     return road_sections.road_load(int(month), factors=factors,
                                    working_days=_working_days(factors), leg=leg)
+
+
+@app.get("/api/public/road-at")
+def public_road_at(lon: float = Query(..., ge=-180, le=180), lat: float = Query(..., ge=-90, le=90),
+                   r: float = Query(section_select.PICK_M_DEFAULT, ge=1, le=1000),
+                   month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT),
+                   route: Optional[str] = Query(None, max_length=40)):
+    """10 Nov 2026 (v2.1 task 2.1-4): the public map's road card — every route on the road under the click, each one's
+    In / Out / A day for the month (2.1-1's count, traffic_limits.through), no figures without a month. `r` = the click's
+    reach in metres (clamped). Behind the map gate; route references only, no team names."""
+    if section_select.warm():          # the legs and lines are in memory: a click is a short walk, no slot needed
+        return section_select.road_at(lon, lat, month, r, route=route)
+    with _heavy("road-at"):
+        return section_select.road_at(lon, lat, month, r, route=route)
+
+
+@app.get("/api/public/area-sum")
+def public_area_sum(bbox: str = Query(..., max_length=120), month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT)):
+    """10 Nov 2026 (v2.1 task 2.1-4): "Select an area" — every route with a leg that enters the box west,south,east,north,
+    counted once, In / Out / A day for the month. A box that is not one is a 400 in words. Behind the map gate."""
+    try:
+        w, s, e, n = section_select.parse_box(bbox)
+    except section_select.BadBox as err:
+        raise HTTPException(400, str(err))
+    if section_select.warm():
+        return section_select.in_box(w, s, e, n, month)
+    with _heavy("area-sum"):
+        return section_select.in_box(w, s, e, n, month)
 
 
 @app.post("/api/admin/road-sections/rebuild")
