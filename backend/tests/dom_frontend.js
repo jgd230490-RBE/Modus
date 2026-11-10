@@ -578,6 +578,9 @@ async function simDom(){
   w.fetch = (url, opt) => {
     calls.push({ url: String(url), method: (opt && opt.method) || "GET" });
     if (String(url).startsWith("/api/sim/day")) return srv.day(String(url));
+    // 9 Nov 2026 (claude/ui-fix-sim-stock): the page asks which month is the busiest before its first day; none approved here,
+    // so it opens on this month as before (the busiest-month opening itself is asserted in ui_fix_simstock / test_ui_simstock)
+    if (String(url).startsWith("/api/sim/busiest-month")) return reply(200, { busiest: null });
     return new Promise(() => {});
   };
   const simCalls = () => calls.filter(c => c.url.startsWith("/api/sim/day"));
@@ -589,6 +592,7 @@ async function simDom(){
   const g7 = SIM.gates.find(g => g.gate_id === "G007"), g1 = SIM.gates.find(g => g.gate_id === "G001");
 
   const m = mount({ meta: metaMin, months: metaMin.months });
+  for (let i = 0; i < 40 && !calls.some(c => c.url.startsWith("/api/sim/day")); i++) await settle(50);   // 9 Nov 2026: one extra read first (the busiest month), then the day
   await settle(60);
   ok("⭐ SIM DOM: the page reads this month's day ONCE on mount, as a GET, with the routes' lines (legs=1); it is a page, not a fold",
      simCalls().length === 1 && simCalls()[0].url === `/api/sim/day?month=${thisMonth}&legs=1` && simCalls()[0].method === "GET"
@@ -620,26 +624,27 @@ async function simDom(){
   w.requestAnimationFrame = (cb) => { queued.set(++rafId, cb); return rafId; };
   w.cancelAnimationFrame = (id) => { queued.delete(id); };
   const frames = (n) => act(() => { for (let i = 0; i < n; i++){ const due = [...queued.values()]; queued.clear(); pageMs += 100; due.forEach(cb => cb(pageMs)); } });
-  ok("SIM DOM: the clock starts at the first lorry setting off (05:30) and the button says Play", clock() === "05:30" && play().textContent === "Play");
+  // RE-PINNED 9 Nov 2026 (finding 9): the clock opens at the day's busiest point (12:38 on this day: Harborough's 12 waiting), not at the first lorry
+  ok("SIM DOM: the clock opens at the day's busiest point (12:38) and the button says Play", clock() === "12:38" && play().textContent === "Play", clock());
   await act(async () => { play().click(); });
   frames(11);
   const ran = clock();
-  ok("⭐ SIM DOM: Play moves the clock — one second of frames is 12 minutes of the day (05:30 → 05:42) — and the button says Pause",
-     ran === "05:42" && play().textContent === "Pause", ran);
+  ok("⭐ SIM DOM: Play moves the clock — one second of frames is 12 minutes of the day (12:38 → 12:50) — and the button says Pause",
+     ran === "12:50" && play().textContent === "Pause", ran);
   await act(async () => { play().click(); });
   const held = clock();
   frames(10);
-  ok("SIM DOM: Pause holds the clock (no frame is asked for while paused)", clock() === held && held === "05:42" && play().textContent === "Play" && queued.size === 0, held + " " + clock());
+  ok("SIM DOM: Pause holds the clock (no frame is asked for while paused)", clock() === held && held === "12:50" && play().textContent === "Play" && queued.size === 0, held + " " + clock());
   const twoX = m.el.querySelector('select[aria-label="Playback speed"]');
   await act(async () => { Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(twoX, "2"); twoX.dispatchEvent(new w.Event("change", { bubbles: true })); });
   await act(async () => { play().click(); });
   frames(11);
-  ok("SIM DOM: at 2× one second of frames is 24 minutes (05:42 → 06:06)", clock() === "06:06", clock());
+  ok("SIM DOM: at 2× one second of frames is 24 minutes (12:50 → 13:14)", clock() === "13:14", clock());
   // RE-PINNED 29 Oct 2026 (the page): there is no fold to close; while it plays one frame is always queued, and Pause empties the queue
   ok("SIM DOM: while it plays a frame is always queued (the loop is alive)", play().textContent === "Pause" && queued.size === 1, String(queued.size));
   await act(async () => { play().click(); });
   frames(10);
-  ok("SIM DOM: Pause holds the clock at 06:06 and asks for no frame", play().textContent === "Play" && clock() === "06:06" && queued.size === 0, clock());
+  ok("SIM DOM: Pause holds the clock at 13:14 and asks for no frame", play().textContent === "Play" && clock() === "13:14" && queued.size === 0, clock());
   w.requestAnimationFrame = realRaf; w.cancelAnimationFrame = realCaf;
   const restart = byText(m.el, "button", "Restart");
   await act(async () => { restart.click(); await sleep(20); });
@@ -719,6 +724,7 @@ async function simDom(){
   // the small gates folded under "more gates", the scale and month controls on the page)
   calls.length = 0;
   const p = mount({ meta: metaMin, months: metaMin.months, phone: true });
+  for (let i = 0; i < 40 && !calls.some(c => c.url.startsWith("/api/sim/day")); i++) await settle(50);   // after the busiest-month read
   await settle(60);
   ok("⭐ SIM DOM: on a phone the day is read without the lines; one card a gate, read-only, with the one-line note",
      simCalls().length === 1 && simCalls()[0].url === `/api/sim/day?month=${thisMonth}` && !!p.el.querySelector('[data-sim-phone="1"]')
@@ -1778,7 +1784,7 @@ async function phoneShellDom(){
      // NARROWED 29 Oct 2026 (the Simulation's own page): Simulation first, under "Read here, plan on a desktop"; the desk pages under "Made for a desktop"
      // NARROWED 31 Oct 2026 (task 4a, PR 3a): + CLP documents, a Plan-group desk page every login has (a team: its own CLPs)
      && [...sheet().querySelectorAll("button.phone-more-item span:not(.pm-note)")].map(s => s.textContent).join("|") === "Simulation|Submit forecast|Forecasts|Carbon planner|Abnormal loads|Stockpiles|Pours|CLP documents"
-     && [...sheet().querySelectorAll("h3")].map(h => h.textContent).join("|") === "Read here, plan on a desktop|Made for a desktop"
+     && [...sheet().querySelectorAll("h3")].map(h => h.textContent).join("|") === "Read here|Open on a computer or tablet"   // NARROWED 10 Nov 2026 (UI fix phone 2)
      && !!sheet().querySelector('a[href^="/help/?role="][target="_blank"]'));
   ok("PHONE: ...a team code's sheet holds no Data or Config page (the role's own pages only)", !/Locations|Routes|Zones|Config/.test(sheet().textContent));
   await act(async () => { w.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
@@ -1787,7 +1793,7 @@ async function phoneShellDom(){
   click([...sheet().querySelectorAll("button.phone-more-item")].find(b => /Forecasts/.test(b.textContent)));
   const desk = () => t.el.querySelector("[data-desk-only]");
   ok("⭐ PHONE: a desk page on a phone is the card \"Open on a desktop to edit this.\" with its own name, never the page",
-     !!desk() && desk().querySelector("h2").textContent === "Forecasts" && /Open on a desktop to edit this\./.test(desk().textContent)
+     !!desk() && desk().querySelector("h2").textContent === "Forecasts" && desk().querySelector(".do-lead").textContent === "Approve, change and withdraw forecast lines." && /Open it on a computer or a tablet\./.test(desk().textContent)   // NARROWED 10 Nov 2026 (UI fix phone 2)
      && !t.el.querySelector('[data-rd-table="forecasts"], table') && !sheet() && w.location.hash === "#forecasts" && tabs(t.el)[3].classList.contains("is-on"));
   ok("🔴 PHONE WATCHER: the desk card has no input and no write button (hidden, not disabled)",
      !t.el.querySelector("main input, main select, main textarea") && writeBtns(t.el.querySelector("main")).length === 0

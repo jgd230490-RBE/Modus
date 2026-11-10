@@ -2658,7 +2658,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("⭐ S7: one block before CommitMap holding the panel, its player, map, timeline, scenario, table and phone list",
     // RE-PINNED 29 Oct 2026 (its own page): SimulationPage (+ PhoneSimulation, SimDashLine); the player takes the page's controls and site; the map `wall`
     simSrc.length > 20000 && ["function SimulationPage({ meta, months, phone, initial })", "function PhoneSimulation({ meta, months })", "function SimDashLine({ ga, month, months, onOpen })",
-      "function SimPlayer({ meta, D, store, scenario, controls, site, open })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
+      "function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt })", "useEffect(() => { if(!open) setPlaying(false); }, [open]);",
       // RE-PINNED 28 Oct 2026 (simulation v2): the map and the timeline take the chosen site
       "function SimMap({ meta, D, store, frame, site, wall })", "function SimTimeline({ D, t, onSeek, site })", "const SimScenario = React.memo(function SimScenario(",
       "const SimTable = React.memo(function SimTable(", "function SimPhoneList({ D })", "function simFrame(D, legs, t)", "function simQS(month, sc, legs)"].every(f => simSrc.includes(f))
@@ -2676,10 +2676,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // RE-PINNED 29 Oct 2026 (its own page): read on MOUNT (the page is the fold), keyed on the month and the scenario
   ok("⭐ S7: its own page, read on mount with one GET of /api/sim/day (the lines once a month), keyed on the month and the scenario",
     panelSrc.includes('<div className="max-w-7xl mx-auto p-6 pb-2" data-page="simulation" data-sim="1">') && !panelSrc.includes("<details className=\"dash-more\"")
-    && panelSrc.includes("fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`)") && panelSrc.includes("}, [month, scKey]);")
-    && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (panelSrc.match(/fetch\(/g) || []).length === 1
+    && panelSrc.includes("fetch(`${API}/sim/day?${simQS(month, sc, wantLines)}`)") && panelSrc.includes("}, [month, scKey, ready]);")   // NARROWED 9 Nov 2026: and once the busiest month is known
+    && panelSrc.includes("const wantLines = !phone && !(store && store.month === month);") && (panelSrc.match(/fetch\(/g) || []).length === 2 && panelSrc.includes("fetch(`${API}/sim/busiest-month`)")   // NARROWED 9 Nov 2026: the busiest-month read first, then the one day read
     // NARROWED 17 Oct 2026: the block holds the big screen's SimWall too, with its own one read (the plain month, with the lines)
-    && (simc.match(/fetch\(/g) || []).length === 2 && fn("SimWall", "function CommitMap(").includes("fetch(`${API}/sim/day?month=${month}&legs=1`)"));
+    && (simc.match(/fetch\(/g) || []).length === 3 /* NARROWED 9 Nov 2026: and the busiest-month read */ && fn("SimWall", "function CommitMap(").includes("fetch(`${API}/sim/day?month=${month}&legs=1`)"));
   ok("🔴 S7 (D86): nothing written, nothing kept, nothing in the address — no method, no storage, no history, no location in the block",
     !/method:|localStorage|sessionStorage|history\.|location\.|postJSON|navigator\.clipboard/.test(simc));
   ok("⭐ S7: the scenario reaches the server only as the query its parser reads (hours, check_in, bands, pour_*, legs=1)",
@@ -2786,7 +2786,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // RE-PINNED 28 Oct 2026 (v2): the site select sits above the map; the map and the timeline take the chosen site
     // RE-PINNED 29 Oct 2026 (the page, card 2): the timeline is FULL WIDTH under the grid, the scenario a band under it; the map the app's height
     fn("SimPlayer", "const SimScenario").includes('<SimMap meta={meta} D={D} store={store} frame={f} site={site} />')
-    && /<div className="sim-main">\s*<SimMap [^\n]*\n\s*<\/div>\s*<div className="sim-side">/.test(fn("SimPlayer", "const SimScenario"))
+    && /<div className="sim-main">\s*<SimMap [^\n]*\n\s*<\/div>\s*<div className="sim-side kb-scroll" tabIndex=\{0\}/.test(fn("SimPlayer", "const SimScenario"))
     && /<\/div>\s*<\/div>\s*<div className="sim-tl-top">\s*<div className="sim-tl-head"[^\n]*\n\s*<ChartTools [\s\S]*?<\/div>\s*<div data-sim-tl-wrap="1"><SimTimeline D=\{D\} t=\{t\}[^\n]*<\/div>\s*\{scenario && <div className="sim-band">\{scenario\}<\/div>\}/.test(fn("SimPlayer", "const SimScenario"))
     && /@media \(min-width:1024px\)\{\.sim-grid\{grid-template-columns:minmax\(0,1fr\) 300px;align-items:start;\}\n\s*\.sim-main \.sim-map\{height:62vh;min-height:360px;max-height:720px;\}\}/.test(html)
     && /\n  \.sim-map\{height:62vh;min-height:360px;max-height:720px;/.test(html)
@@ -2820,12 +2820,12 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
         "`bays=${encodeURIComponent(a + \"=\" + sc.bays[a])}`", '`wash=${sc.wash ? "on" : "off"}`'].every(t => simSrc.includes(t)));
   ok("⭐ SIM V2: the scale switch is a named group of three pressed buttons; the Month select shows for the month, a Week select (this / next) for the week, a Day select of the server's day choices for the day",
     panelSrc.includes('<div className="sim-seg" role="group" aria-label="Simulation scale" data-sim-scale={sc.scale}>')
-    && panelSrc.includes('aria-pressed={sc.scale === v}') && panelSrc.includes('{sc.scale === "month" && <label className="ct-line">Month <select className="ga-sel" value={month}')
+    && panelSrc.includes('aria-pressed={sc.scale === v}') && panelSrc.includes('{sc.scale === "month" && <label className="ct-line">Which month <select className="ga-sel" value={month}')
     && panelSrc.includes('aria-label="Simulation week">') && panelSrc.includes('<option value="commit">This week</option><option value="next">Next week</option>')
     && panelSrc.includes('aria-label="Simulation day">') && panelSrc.includes('{((D && D.day_choices) || []).map(c => <option key={c.date} value={c.date}>{c.words}'));
   ok("🔴 SIM V2: a week or a day is the server's month — the panel takes j.month and reads the lines once for it; still ONE fetch call",
     panelSrc.includes('if(sc.scale !== "month" && j.month !== month){ shown.current = (store && store.month === j.month) ? `${j.month}|${scKey}` : null; setMonth(j.month); }')
-    && (panelSrc.match(/fetch\(/g) || []).length === 1);
+    && (panelSrc.match(/fetch\(/g) || []).length === 2);   // NARROWED 9 Nov 2026: the busiest-month read, then the day: still ONE day read
   ok("⭐ SIM V2: the site view — a named Site select (Whole scheme first), the map and the timeline take the site, Stations now replaces Gates now for it, 'on site' in the now line",
     // RE-PINNED 29 Oct 2026 (the page, card 4): the Site select is in the page's controls row (scale → period → site), the player takes the site
     panelSrc.includes('aria-label="Simulation site" data-sim-site="1">') && panelSrc.includes('<option value="">Whole scheme</option>') && panelSrc.includes("site={site} controls={controls}")
@@ -3656,7 +3656,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("PHONE TABS: the tab bar is the guide's 'rail' anchor and the foot the guide's strip stays above",
      _pt.includes('data-guide="rail" data-sticky-foot="1"'));
   ok("⭐ PHONE: the Portal draws the rail only at 768 px and up, and the tab bar and More only below",
-     _po.includes('{!narrow && <aside data-guide="rail"') && _po.includes("{narrow && <PhoneTabs groups={visible} page={page} onPick={pickPage} moreOpen={moreOpen}")
+     _po.includes('{!narrow && <aside data-guide="rail"') && _po.includes("{narrow && <PhoneTabs groups={visible} page={page} onPick={pickPage} moreOpen={moreOpen}")   // 10 Nov 2026: no pending count on More any more
      && _po.includes("{narrow && moreOpen && <PhoneMore groups={visible} page={page} onPick={pickPage}"));
   ok("⭐ PHONE WATCHER (hide, do not disable): every desk page is not RENDERED on a phone — Submit, Forecasts, Carbon, the desk Look-ahead, Data, Config",
      _po.includes('{page === "submit" && !narrow && <Matrix ') && _po.includes('{page === "forecasts" && !narrow && <Forecasts ')
@@ -3664,7 +3664,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && _po.includes("{DATA_PAGES.includes(page) && canApprove && !narrow && (") && _po.includes('{page === "config" && canApprove && !narrow && <ConfigPage ')
      // NARROWED 29 Oct 2026 (the Simulation's own page): a page in PHONE_READ_PAGES reads on a phone (its own phone layout), never the desk-only card
      && _po.includes("const phoneDesk = narrow && !PHONE_PAGES.includes(page) && !PHONE_READ_PAGES.includes(page);") && src.includes('const PHONE_READ_PAGES = ["simulation"];')
-     && _po.includes("{phoneDesk && <DeskOnly label={current.label} onHome={() => pickPage(\"dashboard\")} />}")
+     // NARROWED 10 Nov 2026 (UI fix phone 2): the card is given the page id (its own one-line purpose)
+     && _po.includes("{phoneDesk && <DeskOnly id={page} label={current.label} onHome={() => pickPage(\"dashboard\")} />}")
      && !/disabled=\{[^}]*\b(narrow|phone)\b/.test(src));
   // the same rule for ANY page added later (G3's Users page, say): every page the Portal mounts, other than the Dashboard
   // and the Route map, carries `!narrow`, or is a Phone… page mounted only when narrow
@@ -3675,14 +3676,16 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     ok("⭐ PHONE WATCHER, for every page: each page the Portal mounts (but the Dashboard and the Route map) is desk-only on a phone or a Phone… page",
        mounts.length >= 9 && loose.length === 0, loose.map(m => m.id).join(", ") || String(mounts.length));
   }
-  ok("PHONE: the desk-only card says 'Open on a desktop to edit this.' under the page's own name, and offers the Dashboard",
-     _do.includes("<h2>{label}</h2>") && _do.includes('<p className="do-lead">Open on a desktop to edit this.</p>')
-     && _do.includes("On a phone, Wayscope shows the Dashboard, the Look-ahead and the Route map, to read.") && _do.includes("Go to the Dashboard"));
+  // NARROWED 10 Nov 2026 (UI fix phone 2, the 9 Nov critique): the lead is the page's own one line (DESK_LINE), the sentence names the four phone pages
+  ok("PHONE: the desk-only card says what the page is for under the page's own name, then where to open it, and offers the Dashboard",
+     _do.includes("<h2>{label}</h2>") && _do.includes('<p className="do-lead">{DESK_LINE[id] || "A page for a computer or a tablet."}</p>')
+     && _do.includes("Open it on a computer or a tablet. A phone reads the Dashboard, the Look-ahead, the Route map and the Simulation.") && _do.includes("Go to the Dashboard")
+     && !_do.includes("Open on a desktop to edit this"));
   ok("PHONE: More lists the role's desk pages (from the visible groups, so a team code never sees Data or Config) and the user guide in a new tab",
      // NARROWED 29 Oct 2026 (card 12): the pages that read on a phone are listed first under "Read here, plan on a desktop"
-     _pm.includes("const all = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));")
+     _pm.includes("const all = (groups || []).flatMap(g => g.items).filter(it => !PHONE_PAGES.includes(it.id));")   // NARROWED 10 Nov 2026: headings "Read here" / "Open on a computer or tablet", no counts
      && _pm.includes("const reads = all.filter(it => PHONE_READ_PAGES.includes(it.id)), desk = all.filter(it => !PHONE_READ_PAGES.includes(it.id));")
-     && _pm.includes("{reads.length > 0 && <><h3>Read here, plan on a desktop</h3>") && _pm.includes("<h3>Made for a desktop</h3>")
+     && _pm.includes("{reads.length > 0 && <><h3>Read here</h3>") && _pm.includes("<h3>Open on a computer or tablet</h3>") && !_pm.includes("pm-note\">{pending}") && !_pm.includes("waiting</span>") && !_pm.includes(" new</span>")
      && _pm.includes('role="dialog" aria-modal="true" aria-label="More pages"') && _pm.includes('target="_blank" rel="noopener noreferrer"')
      && _pm.includes("{teamText(who) || \"—\"} · {role.ipt ? teamName(role.ipt) : role.label}"));
   ok("PHONE: Escape and the shade shut More; Ctrl K opens it on a phone (the rail's search is not drawn there)",
@@ -3893,7 +3896,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // RE-PINNED 5 Nov 2026 (task 0d-2): + the Carbon planner's Route choices table (four)
   const _regions = [...src.matchAll(/<div className="([^"]*)"[^\n]*tabIndex=\{0\} role="region" aria-label="([^"]*)"/g)];
   ok("#15: every scroll region with tabindex 0 carries a focus-ring class (kb-scroll or sim-scroll) and a name that passes the word rule",
-     _regions.length === 4 && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
+     _regions.length === 5 /* NARROWED 10 Nov 2026: + the Simulation's Now and gates column */ && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
        && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(m[2])), String(_regions.length));
   // REVERSED 23 Oct 2026 (UI fix 9, decision 16): the rows are no longer mouse-only — the name in the first cell is a button
   // (the UI FIX 9 block at the end). What stays true, and is still checked here: the row click is kept for a mouse, and the
@@ -4591,11 +4594,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      _sp.includes('Planned use <span className="font-normal text-slate-500">{u} a month, laid on the works</span>')
      && _sp.includes("Same each month from") && _sp.includes("from_month: Math.min(a, b), to_month: Math.max(a, b), planned_qty: q"));
   ok("STOCKPILES: an emptied month clears it (null, not 0); a negative figure is refused in words",
-     _sp.includes('const q = v === "" ? null : numOr(v, NaN);') && _sp.includes('say(false, "Planned use must be a number, 0 or more.")'));
+     _sp.includes('const q = String(v).trim() === "" ? null : stockNum(v);')   /* NARROWED 9 Nov 2026: typed with spaces ("11 000") is read */ && _sp.includes('say(false, "Planned use must be a number, 0 or more.")'));
   ok("STOCKPILES: the stock count names the week, and the last count says how far it was from the worked-out figure",
      _sp.includes("At the end of the week of") && _sp.includes('than worked out` : "")') && _sp.includes('"No stock count yet."'));
   ok("STOCKPILES: the status line — goes over (red) / runs out (amber) / nearly full (amber) / never over (green) — and its own forecast line",
-     _sp.includes("`Goes over in the week of ${stockWeekWord(sp.first_over.from)}") && _sp.includes("`Runs out in the week of ${stockWeekWord(sp.first_empty.from)}")
+     _sp.includes("`Goes over capacity in the week of ${stockWeekWord(sp.first_over.from)}")   /* NARROWED 9 Nov 2026: "capacity" and how long it stays over */ && _sp.includes("`Runs out in the week of ${stockWeekWord(sp.first_empty.from)}")
      && _sp.includes("`Nearly full: ${Math.round(sp.peak_pct)} %") && _sp.includes("`Never over: ${Math.round(sp.peak_pct)} % at most`")
      && _sp.includes("segment: { borderDash: (c) => (c.p0DataIndex >= cut ? [6, 4] : undefined) }"));
   ok("STOCKPILES: failures in words (errSay), never a status number", _sp.includes('errSay("The stockpiles did not load.", e)')

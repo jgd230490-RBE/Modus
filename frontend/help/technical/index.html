@@ -345,6 +345,7 @@ parameters the table's inputs did (<code>all=</code> for every gate; a check-in 
 keeps 24 px at the right, labels every second hour under 900 px and every fourth under 500, and flips a mark's words left of the mark
 at the edge. The big screen's section 6 (<code>SimWall</code>) is unchanged. The UI audit walks the page (<code>simulation</code>,
 deep stop <code>simulation+site</code>).</p>
+<p id="t1-sim-opening">9 Nov 2026 (UI critique finding 9, decision 7): the page opens on the programme&#39;s busiest month. <code>GET /api/sim/busiest-month</code> (<code>sim.busiest_month</code>, kept until the next write) sums the approved lines&#39; whole loads by month with the trips rule and answers the first month with the most; no day is simulated for it (all 60 took about 15 s). The page reads it once, then reads that month&#39;s day. The headline is the gate or station with the most lorries waiting at once in the reply (<code>simPeak</code>), and the clock opens at its time. A failed read opens on this month as before. Stockpiles opens on the pile with the earliest <code>first_over</code> or <code>first_empty</code> (with a planned use).</p>
 
 <h2 id="t1-stock">Stockpiles</h2>
 <p>27 Oct 2026: the balance runs FORWARD from the plan (<code>backend/stockpiles.py</code>, <code>balances()</code>; John's decisions D1–D11 of
