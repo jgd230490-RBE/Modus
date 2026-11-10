@@ -822,8 +822,11 @@
            link was; the form a card on the right of the map (the whole screen on a phone); a click on the map drops the pin
            (desk), a cross at the map's centre on a phone ("Use this place"). */
         .concern-btn{ margin-top:8px; }
-        .concern-or{ margin:6px 0 0; font-size:14px; color:var(--note); }
-        .concern-or a{ color:var(--navy); }
+        /* 10 Nov 2026 (UI critique wave 3, the audit's 44 px rule on a phone): the address is a 45 px tall tap (14 px above and
+           below its words, taken back by a negative margin so nothing moves); the line sits 14 px under the button, so the tap
+           never reaches over the button's own edge */
+        .concern-or{ margin:14px 0 0; font-size:14px; color:var(--note); }
+        .concern-or a{ color:var(--navy); display:inline-block; padding:14px 0; margin:-14px 0; }
         #concern-panel{ position:fixed; z-index:42; top:0; right:0; bottom:0; width:min(400px, 100vw); background:var(--surface); border-left:1px solid var(--line);
                         box-shadow:-8px 0 28px rgba(16,24,40,.12); display:flex; flex-direction:column; font-size:14px; line-height:1.45; color:var(--ink); }
         #concern-panel[hidden]{ display:none; }
