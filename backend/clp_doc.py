@@ -523,8 +523,19 @@ def _london():
         return datetime.timezone.utc
 
 
+# 10 Nov 2026 (F4, F5): whose level and whose distances these are; what an issue is
+GATE_LEVEL_WORDS = "85 % is Wayscope's planning level for a gate, not a published standard."
+ISSUED_WORDS = "Issued by the contractor. Not a planning or client approval."
+
+
+def search_words(route_m=250, site_m=500):
+    """The one line that says the community / collision distances are Wayscope's own (F4)."""
+    return f"{route_m:g} m and {site_m:g} m are Wayscope's search distances, not a CLOCS figure."
+
+
 def _measures(lines, route_rows, factors, bands, touching, all_locs, vlabel):
-    """{row: {tick, evidence}} — a tick only where the approved plan already does it (the user's Q8)."""
+    """{row: {tick, evidence}} — evidence Wayscope holds; a person ticks what the plan commits to. 10 Nov 2026 (F3):
+    only the no-delivery hours keep a tick, because they are set in Wayscope."""
     vs = (factors or {}).get("vehicles") or {}
     m = {}
     used = sorted({l["vehicle"] for l in lines})
@@ -538,7 +549,7 @@ def _measures(lines, route_rows, factors, bands, touching, all_locs, vlabel):
         unrouted = [r["route_id"] for r in route_rows if not r["routed"]]
         k = len(route_rows)
         if not unrouted:
-            m["Adherence to designated routes"] = {"tick": True, "evidence": (
+            m["Adherence to designated routes"] = {"tick": False, "evidence": (
                 f"{k} approved route{'s' if k != 1 else ''}, each worked out as a lorry route for its vehicle's size and "
                 f"weight, with a driver route sheet for each.")}
         else:
@@ -554,7 +565,7 @@ def _measures(lines, route_rows, factors, bands, touching, all_locs, vlabel):
         except Exception:                          # noqa: BLE001  a database without the Look-ahead tables
             conf = None
         if conf and int(conf[0]["n"] or 0) > 0:
-            m["Delivery scheduling"] = {"tick": True, "evidence": (
+            m["Delivery scheduling"] = {"tick": False, "evidence": (
                 "Weeks are confirmed in the weekly Look-ahead, with each gate's arrivals against its capacity and a Day "
                 "sheet for each day.")}
     if bands:
@@ -568,7 +579,7 @@ def _measures(lines, route_rows, factors, bands, touching, all_locs, vlabel):
             e["mat"].add(l["material"])
         parts = [f"{vlabel(v)} for {', '.join(sorted(e['mat']))} ({n(e['trips'])} loads)"
                  for v, e in sorted(by_v.items(), key=lambda kv: -kv[1]["trips"])]
-        m["Vehicle choice"] = {"tick": True, "evidence": "; ".join(parts) + "."}
+        m["Vehicle choice"] = {"tick": False, "evidence": "; ".join(parts) + "."}
     rail = [l for l in lines if "rail" in ((all_locs.get((touching.get(l["route_id"]) or {}).get("origin_id")) or {})
                                          .get("loc_type") or "").lower()]
     if rail:
@@ -845,7 +856,7 @@ def build(data, impact="higher", pictures=True, acc=None, appendices=True):
     demo = f"DEMO · {d['demo_notice']}" if d["demo_notice"] else None
     # 31 Oct 2026 (PR 3a): a draft says so on every page and keeps nothing; an approved issue carries its number and date
     iss = d.get("issue")
-    issue_words = (f"Issue {iss['no']} · approved {_date_words(iss['date'])}" if iss else "DRAFT · not issued")
+    issue_words = (f"Issue {iss['no']} · issued {_date_words(iss['date'])}" if iss else "DRAFT · not issued")
     cover = d.get("cover") or {}
     team_name = d.get("team_name")
     sites_word = "these sites" if len(d["sites"]) > 1 else "this site"
@@ -896,8 +907,9 @@ def build(data, impact="higher", pictures=True, acc=None, appendices=True):
     D.table(["CLP reviewed by", "Name", "Signature", "Date"],
             [["", "", "", ""], ["CLP accreditation date", "", "", ""]], widths=[5, 4, 4, 4])
     if iss:
-        D.p(f"Issue {iss['no']} · approved by {iss.get('by') or 'a planner'} on {_date_words(iss['date'])} · a snapshot "
+        D.p(f"Issue {iss['no']} · issued by {iss.get('by') or 'a planner'} on {_date_words(iss['date'])} · a snapshot "
             f"of the approved plan in Wayscope on {snap_words}.", bold=True)
+        D.p(ISSUED_WORDS)
     else:
         D.p(f"DRAFT · not issued · a snapshot of the approved plan in Wayscope on {snap_words}.", bold=True)
     D.p("The figures change as the plan changes; download a new copy to bring them up to date.")
@@ -915,7 +927,7 @@ def build(data, impact="higher", pictures=True, acc=None, appendices=True):
     if hist:
         # 31 Oct 2026 (PR 3a, Q8 / Q9): every issue, newest first, with what changed (worked out by Wayscope) and the notes
         D.h("Document history", 1)
-        D.table(["Issue", "Date", "Approved by", "What changed"],
+        D.table(["Issue", "Date", "Issued by", "What changed"],
                 [[str(h["no"]), _date_words(h["date"]), h.get("by") or "", h.get("words") or ""] for h in hist],
                 widths=[1.4, 3, 3, 9.6])
     D.h("Contents", 1)
@@ -930,7 +942,7 @@ def build(data, impact="higher", pictures=True, acc=None, appendices=True):
         obj.append(f"No deliveries {d['peak_band_words']} at any gate.")
     for h in d["hourly"]:
         if h["capacity_pct"] is not None:
-            obj.append(f"{h['gate']} kept under 85 % of its capacity; in its busiest month ({month_label(h['month'])}) "
+            obj.append(f"{h['gate']} kept under 85 % of its capacity, Wayscope's planning level for a gate; in its busiest month ({month_label(h['month'])}) "
                        f"the plan uses {h['capacity_pct']} %" + (", every team's lorries together." if h.get("all_teams_pct")
                                                                  else "."))
     if d["routes"]:
@@ -1096,6 +1108,8 @@ def build(data, impact="higher", pictures=True, acc=None, appendices=True):
                 f"{n(sc['ksi'])} killed or seriously injured.")
         D.src("Counts, not a rate: the traffic on each road is not the same. Each route's collision evidence sheet "
               "gives the detail. " + co["credit"])
+    if C.get("stored") or (co.get("fetched") and co["rows"]):
+        D.src(search_words(C.get("route_m", 250), C.get("site_m", 500)))
     D.todo("how lorries will be managed near these places (times, speeds, marshals, signs).", "2.4.2")
 
     # ---------------------------------------------------------------- 3
@@ -1186,8 +1200,9 @@ def build(data, impact="higher", pictures=True, acc=None, appendices=True):
 
     # ---------------------------------------------------------------- 5
     D.h("5 Strategies to reduce impacts", 1)
-    D.p(f"{'Higher' if impact == 'higher' else 'Medium'} impact site: planned measures. Wayscope ticked a row only where "
-        "the approved plan already does it, with the evidence under the row. Change any tick before signing.")
+    D.p(f"{'Higher' if impact == 'higher' else 'Medium'} impact site: planned measures. Wayscope prints what it holds as "
+        "evidence under a row; a person ticks the measures this plan commits to. Only the no-delivery hours are ticked, "
+        "because they are set in Wayscope. Change any tick before signing.")
     head = [f"{'Higher' if impact == 'higher' else 'Medium'} impact site planned measures", "Committed", "Proposed", "Considered"]
     t = D.table(head, [], widths=[9.6, 2.5, 2.5, 2.4])
     for group, rows in MEASURES:
@@ -1278,9 +1293,11 @@ def build(data, impact="higher", pictures=True, acc=None, appendices=True):
         "Lorry visits a day against each site's CLP cap.",
         "Trips by lorry type and by Euro class; carbon per tonne against the scheme's target; trips avoided by the agreed "
         "decisions.",
-        "Each confirmed week: the planned quantities, and the quantities recorded as delivered.",
+        "Each confirmed week's planned quantities. What was delivered is recorded on Look-ahead → Account; this document "
+        "does not print it.",
         "Each gate's planned arrivals against its capacity (\"Queue likely\" from 85 %, \"Over gate capacity\" over 100 %).",
     ])
+    D.p(GATE_LEVEL_WORDS)
     caps = [f"{s['name']}: {s['clp_cap']:g} lorry visits a day" for s in d["sites"] if s["clp_cap"] is not None]
     if caps:
         D.p("CLP caps typed in Wayscope: " + "; ".join(caps) + ".")

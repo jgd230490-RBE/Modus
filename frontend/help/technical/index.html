@@ -109,7 +109,7 @@ count"). The Look-ahead and the Today panel use the same rule per day, in delive
 <h2 id="t1-distance">Distance and the cycle</h2>
 <pre>lorry-km      = trips × the routed (baked) route distance, both legs, for the line's vehicle
 cycle         = drive out (laden) + drive back (empty) + turnaround
-turnaround    = the vehicle's load + unload minutes + gate induction + (gate-to-face OR a drawn haul road, never both)</pre>
+turnaround    = the vehicle's load + unload minutes + gate check-in + (gate-to-face OR a drawn haul road, never both)</pre>
 <p>The per-trip distance is on the route's basis: the round trip unless the route says loaded only. An unbaked line
 (no stored route for its vehicle) has <strong>no</strong> distance: it adds nothing to the km, CO₂e and fair totals,
 which say how many lines they exclude. It is excluded, never estimated. The load and unload minutes are the vehicle's
@@ -1019,7 +1019,7 @@ trips needed   = ceil(tonnes / payload)
 vehicles       = ceil(movements per day / trips per day)</pre>
 <p>Both drive legs are routed <strong>separately</strong> — the return at tare weight, so the way back
 is not assumed to be the way out reversed and different weight limits can apply. Turnaround is the
-vehicle's own load and unload minutes, plus gate induction, plus either gate-to-face time or a drawn
+vehicle's own load and unload minutes, plus gate check-in, plus either gate-to-face time or a drawn
 haul road — never both.</p>
 <div class="callout note"><div class="ct">Trips are not vehicles</div><p>A trip is one loaded run; a
 vehicle makes several a day. A fleet figure worked out as tonnes ÷ payload alone is a trip count, and overstates the fleet by
@@ -1186,7 +1186,7 @@ the page says so. The rows live per organisation (<code>community_features</code
 in its package. A download that arrives short is resumed with a Range request where the source allows it, and otherwise
 handed to curl (on 14 Oct 2026 Python's own reads were cut short on the build laptop, not curl's).</p>
 
-<h1 id="t9-collisions">T9 The collision history (CLOCS v5 C1)</h1>
+<h1 id="t9-collisions">T9 The collision history</h1>
 <p id="t9-config-words">Config &rarr; Map and bulletin says &ldquo;injury collisions reported to the police&rdquo; (28 Oct 2026):
 the data is DfT's road safety data (STATS19). Config no longer prints the credit line; it is on the Route map layer and on
 the Route collision evidence. A traffic-count failure reads &ldquo;could not be read just now&rdquo;; the reason goes to the

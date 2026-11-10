@@ -64,9 +64,9 @@ CHARTS = {
     # 29 Oct 2026 (task 3c): the CLP reports the size of any vehicle holding area
     "holding_areas": {"number": "1", "title": "Holding areas",
                       "serves": "TfL CLP guidance: the size of any vehicle holding areas"},
-    "vehicle_types": {"number": "4", "title": "Movements by vehicle type",
+    "vehicle_types": {"number": "4", "title": "Lorry visits by vehicle type",
                       "serves": "TfL CLP guidance: vehicle movements by type and size"},
-    "euro_class": {"number": "5", "title": "Movements by Euro class",
+    "euro_class": {"number": "5", "title": "Lorry visits by Euro class",
                    "serves": "TfL CLP guidance: vehicle age and emissions standard"},
     "councils": {"number": "6", "title": "Movements and lorry distance by council",
                  "serves": "TfL CLP guidance: routes and the roads the scheme's lorries use"},
@@ -322,7 +322,7 @@ def vehicle_types(lines, months, factors, label):
     share = round(top["total"] * 100.0 / sum(tot)) if sum(tot) else None
     return _chart("vehicle_types", "set", months=_month_rows(months), series=series, totals=tot,
                   headline=f"{top['label']} carries {share} % of the loads",
-                  subtitle="share of approved loads each month (one load = one movement)",
+                  subtitle="share of approved loads each month (one load = one lorry visit)",
                   basis="Approved loads (trips, rounded up per forecast month) by the vehicle each line plans to use.",
                   source="Wayscope: the approved plan; vehicle types from Config → Vehicles")
 
