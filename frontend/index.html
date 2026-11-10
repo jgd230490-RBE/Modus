@@ -58,6 +58,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
        tint). The green, amber and red status colours stay for fills, dots, bars, borders and the map. In the dark look
        the status colours read well as text (8.47:1 and better on the surface), so the pairs are the same values there. */
     --ok-text:#047857; --warn-text:#B45309; --bad-text:#B91C1C;
+    /* 10 Nov 2026 (wave 2, card 12): the status chip's tints, one a tone; the words above read 4.5:1 or better on them */
+    --st-ok-bg:#ECFDF5; --st-warn-bg:#FFFBEB; --st-bad-bg:#FEF2F2; --st-none-bg:#F1F5F9;
     /* 22 Oct 2026 (UI fix 6, card 6; decision 13): the haul-road colour as TEXT and as a button FILL. The map line keeps
        ZONE_HAUL #C2790B (picked so a haul road never reads as closed), but as words or a fill it failed in every look:
        white on it 3.48:1, the chips 2.82 to 3.06:1. The haul text colour is the same brown, darker, #9A5F08: white on it
@@ -97,6 +99,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
     --ok-btn:#34D399; --ok-btn-fg:#1F2024;
     --ok-text:#34D399; --warn-text:#FBBF24; --bad-text:#F87171;
     --haul-text:#F0A838; --haul-soft:#3A2E1C;
+    --st-ok-bg:#052E16; --st-warn-bg:#3A2E1C; --st-bad-bg:#3F1D1D; --st-none-bg:#26282D;
     --chart-1:#E8681E; --chart-1-soft:rgba(232,104,30,.22); --chart-2:#5B8FF0; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
     --navy-soft:rgba(255,140,20,.14);
     color-scheme:dark;
@@ -333,6 +336,16 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .btn-sec{display:inline-block;padding:7px 12px;border-radius:6px;background:var(--surface);color:var(--ink);border:1px solid var(--grey);font-size:14px;font-weight:500;line-height:1.3;cursor:pointer;white-space:nowrap;}
   .btn-sec:hover{background:var(--surface-2);}
   .btn-sm{padding:4px 10px;font-size:13px;}
+  /* 10 Nov 2026 (wave 2, card 13, decision 4): ONE primary colour and ONE tab. Every primary action takes the accent
+     (--action, as .btn-pri does); blue (--navy) is only for what is SELECTED: a tab, a segment, a pill, drawn as the
+     --navy-soft tint with --navy text and a --navy edge, never filled like a button. An inline fill on the accent keeps its
+     text-white class (the fill test classifies it) and reads --action-fg (dark text on the Dark look's orange). */
+  .text-white[style*="var(--action)"]{color:var(--action-fg);}
+  .ws-tabs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .ws-tab{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 12px;border-radius:6px;border:1px solid var(--line);
+    background:var(--surface);color:var(--muted);font:inherit;font-size:14px;font-weight:600;line-height:1.3;cursor:pointer;white-space:nowrap;}
+  .ws-tab:hover{color:var(--ink);}
+  .ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--navy-soft);color:var(--navy);border-color:var(--navy);}
   .chip-st{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);white-space:nowrap;}
   .chip-st i{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block;}
   /* 13 Oct 2026 (W16, D39): a status is a SHAPE and a word, never colour alone — the plan orange is 6.5 from the
@@ -385,7 +398,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .cfg-nav{position:sticky;top:0;display:flex;flex-direction:column;gap:2px;font-size:14px;}
   .cfg-nav-item{text-align:left;padding:8px 12px;border-radius:6px;color:var(--muted);background:none;border:0;border-left:3px solid transparent;font:inherit;font-size:14px;cursor:pointer;}
   .cfg-nav-item:hover{color:var(--ink);}
-  .cfg-nav-item.is-on{color:var(--ink);font-weight:600;border-left-color:var(--rail-on);background:var(--surface);}
+  .cfg-nav-item.is-on{color:var(--navy);font-weight:600;border-left-color:var(--navy);background:var(--navy-soft);}   /* 10 Nov 2026 (card 13): the one tab's selected look, standing */
   .cfg-main{padding:0;overflow:hidden;}
   /* 9 Nov 2026 (UI critique finding 10, card 10): Configuration read-only for a reader. CfgFields is a fieldset (no frame);
      disabled for a reader, its controls are drawn as text: no box, no arrow, no placeholder, a tick a ✓ or –, no buttons */
@@ -400,6 +413,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .cfg-ro input[type=checkbox]:not(.hidden):checked::before{content:"✓";}
   .cfg-ro input[type=radio],.cfg-ro label:has(> input[type=radio]:not(:checked)),.cfg-ro [data-ro-only-on] label:has(> input:not(:checked)){display:none;}
   .cfg-ro button,.cfg-ro [data-ro-hide]{display:none;}
+  .cfg-ro [data-ro-only-on] button[aria-pressed="true"]{display:inline-flex;cursor:default;}   /* 10 Nov 2026: a reader sees the chosen unit only */
   .cfg-ro label{cursor:default;}
   .cfg-ro-box{overflow-x:auto;}  .cfg-ro .overflow-auto{overflow:visible;}   /* 10 Nov 2026: a reader's one scroll box, outside the fieldset */
   .cfg-ro .tbl input:not([type=checkbox]):not([type=radio]),.cfg-ro .tbl select{field-sizing:content;width:auto;min-width:2ch;}   /* 10 Nov 2026: a reader's table value is as wide as its words ("not typed", "derived: kWh × UK grid" were cut to fit a typing box) */
@@ -801,7 +815,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
   .sim-seg button{border:0;background:var(--surface);padding:4px 12px;font-size:13.5px;cursor:pointer;color:var(--ink);min-height:28px;}
   .sim-seg button+button{border-left:1px solid var(--line);}
-  .sim-seg button.on{background:var(--navy);color:var(--control-fg);}   /* 29 Oct 2026: ink on the Dark look's light navy (the audit: white failed) */
+  .sim-seg button.on{background:var(--navy-soft);color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);}   /* 29 Oct 2026: ink on the Dark look's light navy (the audit: white failed) */
   .sim-site-row{margin-bottom:4px;}
   .sim-onsite{border-top:1px solid var(--line);padding-top:6px;margin-top:4px;}
   .sim-dot-gate{background:radial-gradient(circle,#1E293B 0 2.5px,#FFFFFF 3px);border:2.5px solid #1E293B;width:15px;height:15px;}
@@ -1010,11 +1024,15 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .rd-days th{font-weight:600;color:var(--muted);font-size:12px;}
   .rd-days th:first-child,.rd-days td:first-child{text-align:left;}
   .rd-mini td.rd-primary{min-width:0;} .rd-mini .row-st{white-space:normal;} .rd-mini .rd-chip{white-space:normal;} .rd-mini .rd-sum{font-size:12px;} .rd-mini .rd-dl{padding-left:12px;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}
-  .row-st{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;}
+  /* 10 Nov 2026 (wave 2, card 12): THE status chip — every status in the app is this pill (RowStatus; StatusWord draws it
+     too): a tinted pill, the word in sentence case in the tone's text colour, and the tone's own icon SHAPE (✓ circle, !
+     square, ! circle, – circle, a hollow ring), so a status is never colour alone (D39). One shape and one colour a state. */
+  .row-st{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;line-height:1.35;color:var(--ink);white-space:nowrap;
+    border-radius:999px;padding:2px 10px 2px 3px;background:var(--st-none-bg);}
   .row-st i{flex:none;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;font-weight:700;line-height:1;color:#fff;border-radius:50%;background:var(--chart-none);}
-  .row-st.rs-ok i{background:var(--green);}
-  .row-st.rs-warn i{background:var(--gold);color:#1F2024;border-radius:3px;}
-  .row-st.rs-bad i{background:var(--red);}
+  .row-st.rs-ok{background:var(--st-ok-bg);color:var(--ok-text);} .row-st.rs-ok i{background:var(--ok-btn);color:var(--ok-btn-fg);}
+  .row-st.rs-warn{background:var(--st-warn-bg);color:var(--warn-text);} .row-st.rs-warn i{background:var(--gold);color:#1F2024;border-radius:3px;}
+  .row-st.rs-bad{background:var(--st-bad-bg);color:var(--bad-text);} .row-st.rs-bad i{background:var(--bad-text);color:var(--st-bad-bg);}
   .row-st.rs-draft i{background:transparent;border:2px solid var(--chart-none);width:14px;height:14px;}
   /* 9 Nov 2026 (UI critique card 11): CLP documents grouped by place, the team CLPs folded under the site's */
   .clp-fold{display:inline-flex;align-items:center;gap:4px;margin-top:4px;min-height:24px;padding:0 2px;background:none;border:0;font:inherit;font-size:13px;color:var(--ink);text-decoration:underline;cursor:pointer;}
@@ -1025,7 +1043,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .unit-sw-seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
   .unit-sw-seg button{font:inherit;font-size:13px;font-weight:600;padding:4px 12px;min-height:30px;border:0;background:var(--surface);color:var(--muted);cursor:pointer;}
   .unit-sw-seg button+button{border-left:1px solid var(--line);}
-  .unit-sw-seg button[aria-pressed="true"]{background:var(--navy);color:var(--control-fg);}
+  .unit-sw-seg button[aria-pressed="true"]{background:var(--navy-soft);color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);}
   .unit-sw-seg button:focus-visible{outline:2px solid var(--navy);outline-offset:-2px;}
   .rd-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;padding:10px 16px;border-bottom:1px solid var(--line);}
   .rd-sort{font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px;}
@@ -1117,6 +1135,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ph-actions-box{flex-shrink:1;min-width:0;max-width:100%;flex-wrap:wrap;}
   /* the Look-ahead's flag line: a long flag wraps inside its own chip (it ran 300 px off a 768 px screen) */
   [data-guide="lookahead-flags"] .chip-st{white-space:normal;align-items:flex-start;min-width:0;}
+  .la-flag-line{display:inline-flex;align-items:flex-start;gap:6px;min-width:0;}   /* 10 Nov 2026 (wave 2, card 12): the rail's flag, the chip then its sentence */
   /* a chart not built yet (it is built once its box has a size) is the browser's 300 px canvas: keep it inside its box
      (at 1024 px the Top routes box is 257 px and the page scrolled 6 px sideways until the chart was built) */
   .chart-box>canvas{max-width:100%;}
@@ -1174,6 +1193,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .al-lines{margin:0;padding-left:16px;} .al-lines li{margin:4px 0;}
   .al-notes{margin:8px 0 0;padding-left:16px;color:var(--warn-text);} .al-notes li{margin:3px 0;}
   .al-foot{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:8px;margin:10px 0 0;}
+  .al-flag{display:inline-block;margin:2px 4px 2px 0;}
   .al-chip{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;border:1px solid transparent;white-space:nowrap;margin-right:4px;}
   .al-so{background:#F5F3FF;color:#5B21B6;border-color:#DDD6FE;} .al-vr1{background:#ECFEFF;color:#0E7490;border-color:#A5F3FC;}
   .al-stgo{background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;} .al-cu{background:var(--surface-3);color:var(--ink);border-color:var(--line);}
@@ -1237,11 +1257,33 @@ const SPD = () => (DU() === "mi" ? "mph" : "km/h");
 const dist = (km) => (km == null || km === "" ? km : (DU() === "mi" ? +km / KM_PER_MI : +km));
 const distRate = (perKm) => (perKm == null || perKm === "" ? perKm : (DU() === "mi" ? +perKm * KM_PER_MI : +perKm));
 const distInRate = (perUnit) => (perUnit == null || perUnit === "" ? perUnit : (DU() === "mi" ? +perUnit / KM_PER_MI : +perUnit));
+/* Fuel use (John, 10 Nov 2026: "mpg"): a miles organisation reads miles per UK gallon (4.54609 L), a km one L/100 km.
+   Stored and summed as L/100 km. mpg = L100_MPG / (L/100 km) and back the same way (the sum is its own inverse). */
+const L100_MPG = 454.609 / KM_PER_MI;
+const fuelUse = (l100) => (l100 == null || l100 === "" || isNaN(+l100) || +l100 <= 0 ? l100 : (DU() === "mi" ? L100_MPG / +l100 : +l100));
+const FUEL_WORD = () => (DU() === "mi" ? "mpg" : "L/100 km");
 const speed = (kph) => (kph == null || kph === "" ? kph : (DU() === "mi" ? +kph / KM_PER_MI : +kph));
 const fmtDist = (km, dp) => (km == null ? "—" : (+dist(km)).toFixed(dp == null ? 1 : dp));
+// 10 Nov 2026 (wave 2, finding 20, decision 5): the organisation's unit, set on Config → Planning (tenant.distance_unit);
+// miles when a GB organisation has not chosen. Read by every screen through DU(); the sums stay in km.
+const DIST_WORD = () => (DU() === "mi" ? "miles" : "kilometres");
+const PER_DIST = () => (DU() === "mi" ? "mile" : "km");
 const TEAMS = () => TEAM() + "s";
 
 const { useState, useEffect, useRef, useMemo } = React;
+// 10 Nov 2026 (wave 2, finding 20): an input for a figure STORED per km (a rate: per-km money, kg CO₂e per km, litres per
+// 100 km) or in km/h, SHOWN and TYPED in the organisation's unit. It keeps what is typed ("0." stays "0.") and hands back
+// the stored figure; a value changed from outside (Discard, a reload, the unit) is shown again.
+function UnitNum({ value, onValue, kind, dp, ...rest }){
+  const show = kind === "speed" ? speed : kind === "fuel" ? fuelUse : distRate,
+    back = kind === "speed" ? ((v) => DU() === "mi" ? +v * KM_PER_MI : +v) : kind === "fuel" ? fuelUse : distInRate;
+  const fmtv = (v) => (v == null || v === "" || isNaN(+v)) ? (v == null ? "" : String(v)) : String(+(+show(v)).toFixed(dp == null ? 4 : dp));
+  const [txt, setTxt] = useState(() => fmtv(value));
+  const last = useRef(value), unit = useRef(DU());
+  useEffect(() => { if(!Object.is(value, last.current) || unit.current !== DU()){ last.current = value; unit.current = DU(); setTxt(fmtv(value)); } });
+  return <input {...rest} value={txt} onChange={e => { const t = e.target.value; setTxt(t);
+    const n = t.trim() === "" ? null : (isNaN(+t) ? t : +(+back(+t)).toFixed(6)); last.current = n; onValue(n); }} />;
+}
 function useAccent(){
   const [a, setA] = useState(ACCENT.current);
   useEffect(() => { const f = (n) => setA(n); ACCENT.subs.add(f); return () => ACCENT.subs.delete(f); }, []);
@@ -1496,7 +1538,9 @@ const fmt = (n, unit) => unit==="vehicles" ? Math.round(n).toLocaleString() : (M
 // ---- dashboard helpers ----
 // (emisFactor and planningOf were the Dashboard's own CO₂ and planning constants; gone
 //  11 Sep — the server's /api/costing/lines carries CO₂e and the working-day figure.)
-const monthLabelAbs = (idx, startYear) => MONTHS[(idx-1)%12] + " " + String(startYear + Math.floor((idx-1)/12)).slice(2);
+// 10 Nov 2026 (wave 2, finding 20): "May 2026" ("May 26" read as 26 May); monthAxis "May '26" only where space is tight (chart axes)
+const monthLabelAbs = (idx, startYear) => MONTHS[(idx-1)%12] + " " + String(startYear + Math.floor((idx-1)/12));
+const monthAxis = (idx, startYear) => MONTHS[(idx-1)%12] + " '" + String(startYear + Math.floor((idx-1)/12)).slice(2);
 // 10 Oct 2026 — the data palette, read from the tokens so the look (ink / light / dark) picks the
 // step. Fixed order, never cycled: a sixth series is "not yet" grey, never a new hue.
 const CHART_SLOTS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5"];
@@ -1520,7 +1564,7 @@ const INFO = {
   "dash.delivered": { title: "Delivered against plan", text: "Tonnes reported delivered, as a share of the tonnes planned up to and including this month. The second line gives the share of the whole plan in view. A month nobody has reported counts as not yet delivered.",
     how: "Actuals are typed each week on Look-ahead → Account. A day's actual rolls into its week.", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-delivered" },
   "dash.carbon": { title: "Transport carbon", text: "The lorry carbon of the routed lines in view, in tonnes of CO₂e: the loaded leg there, and as much of the empty way back as each route charges (Data → Routes). Lines with no route yet are left out.",
-    how: "Trips × (loaded km × the vehicle's laden factor + return km × the route's return share × its empty factor). The factors are the government's per vehicle-km, 100 % and 0 % laden, on Config → Vehicles.", source: "DESNZ greenhouse gas conversion factors, 2026", guide: "3-1-filters-and-the-six-cards", tech: "t1-return" },
+    how: "Trips × (loaded distance × the vehicle's laden factor + return distance × the route's return share × its empty factor). The factors are the government's per vehicle-km, 100 % and 0 % laden, on Config → Vehicles.", source: "DESNZ greenhouse gas conversion factors, 2026", guide: "3-1-filters-and-the-six-cards", tech: "t1-return" },
   // 8 Nov 2026 (v2.1): the return journey, on a route's planning figures and on Config → Planning
   "routes.return": { title: "Return journey", text: "How much of the lorry's empty way back this route's carbon charges: all of it, a share (43 % unless Config says otherwise) for a lorry that may find another job after unloading, or none.",
     how: "Until you choose, Wayscope guesses from the route's start: a quarry, plant, works or depot → May take other work; a site, compound or stockpile → Comes back empty. A concrete mixer always comes back empty. Cycle time, trips and lorries needed do not change: the lorry still drives back.", source: "RICS Whole life carbon assessment, 2023 (the 43 % and the 100 %); the National Highways Carbon Tool charges the whole return", guide: "7-2-routes", tech: "t1-return" },
@@ -2094,9 +2138,9 @@ const unitTriple = (u, opts) => {
   if(!u || u.eur == null) return null;
   const o = opts || {};
   const parts = [];
-  if(u.per_t != null) parts.push(`${CUR()} ${(+u.per_t).toFixed(2)}/t`);
-  if(u.per_trip != null) parts.push(`${CUR()} ${grp(u.per_trip, 0)}/trip`);
-  if(u.per_km != null) parts.push(`${CUR()} ${(+distRate(u.per_km)).toFixed(2)}/${DU()}`);
+  if(u.per_t != null) parts.push(`${CUR()}${(+u.per_t).toFixed(2)}/t`);
+  if(u.per_trip != null) parts.push(`${CUR()}${grp(u.per_trip, 0)}/trip`);
+  if(u.per_km != null) parts.push(`${CUR()}${(+distRate(u.per_km)).toFixed(2)}/${DU()}`);
   return parts.length ? parts.join(o.sep || " · ") : null;
 };
 const REFRESH_MS = 5 * 60 * 1000;
@@ -2726,7 +2770,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     const n = hi - lo + 1;
     // 10 Nov 2026 (finding 19): "delivered against plan" divides by the tonnes planned up to and including this month
     const _now = new Date(), nowIdx = (_now.getFullYear() - months.start_year) * 12 + _now.getMonth() + 1;
-    const labels = []; for(let i = lo; i <= hi; i++) labels.push(monthLabelAbs(i, months.start_year));
+    const labels = []; for(let i = lo; i <= hi; i++) labels.push(monthAxis(i, months.start_year));
     // 11 Oct 2026 — orange-led: the material with the most tonnes over the WHOLE programme takes slot 1
     // (the brand orange), the next slot 2, and so on. Ranked on every row, not the filtered ones, so a
     // filter never repaints the materials that remain (colour follows the entity, not its rank in view).
@@ -2832,7 +2876,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const fill = wall && wallLayout !== "all";
   const tf = { size: wall ? Math.max(13, Math.min(30, Math.round(winH / 74))) : 11 };
   const C1 = tok("--chart-1", "#E8590C"), C1S = tok("--chart-1-soft", "rgba(232,89,12,.18)"), C2 = tok("--chart-2", "#2563EB"), C4 = tok("--chart-4", "#7C3AED");
-  const eurTip = { callbacks: { label: (c) => `${c.dataset.label}: ${CUR()} ${grp(c.parsed.y)}` } };
+  const eurTip = { callbacks: { label: (c) => `${c.dataset.label}: ${CUR()}${grp(c.parsed.y)}` } };
   const commonOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
   const barScales = { scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } };
   const stackedOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: tf } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { font: tf } }, y: { stacked: true, ticks: { font: tf } } } };
@@ -2910,7 +2954,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
       {sub && <div className="text-xs text-slate-500 fig-sub">{sub}</div>}
     </div>
   );
-  const rangeLabel = D.lo === D.hi ? D.labels[0] : (monthLabelAbs(D.lo, months.start_year) + " – " + monthLabelAbs(D.hi, months.start_year));
+  const rangeLabel = D.lo === D.hi ? monthLabelAbs(D.lo, months.start_year) : (monthLabelAbs(D.lo, months.start_year) + " – " + monthLabelAbs(D.hi, months.start_year));
   // 2 Nov 2026: what a copied chart says about itself, under the picture
   const dashScope = [rangeLabel, status === "All" ? "all forecasts" : status.toLowerCase() + " lines",
     ipt !== "All" ? (ipt === "none" ? "no " + TEAM().toLowerCase() : teamText(ipt)) : null, discipline !== "All" ? discipline : null,
@@ -2992,7 +3036,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
         {/* coverage: what the totals include and exclude — the old amber box, moved to where the numbers are read */}
         <div className="text-xs text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1">
           <span><strong className="tabular-nums">{D.baked}</strong> of <strong className="tabular-nums">{D.lines}</strong> plan lines have a route{D.lines > D.baked ? <span className="text-amber-700"> · {DU()}, CO₂e and fair {CUR()} leave out the {D.lines - D.baked} not routed yet ({D.unbakedRoutes} route{D.unbakedRoutes === 1 ? "" : "s"}): route them on Data → Routes</span> : null}<InfoTip id="dash.coverage" /></span>
-          <span>· diesel<InfoTip id="dash.diesel" /> {cost.index_eur_per_l != null ? <strong>{CUR()}{(+cost.index_eur_per_l).toFixed(3)}/L</strong> : <span className="text-amber-700">index unavailable — no fair price</span>}{cost.index_bulletin_date ? ` (${cost.index_source === "manual" ? "typed" : "published"} ${longDate(String(cost.index_bulletin_date).slice(0, 10))})` : ""}</span>
+          <span>· diesel<InfoTip id="dash.diesel" /> {cost.index_eur_per_l != null ? <strong>{CUR()}{(+cost.index_eur_per_l).toFixed(3)} per litre</strong> : <span className="text-amber-700">index unavailable — no fair price</span>}{cost.index_bulletin_date ? ` (${cost.index_source === "manual" ? "typed" : "published"} ${longDate(String(cost.index_bulletin_date).slice(0, 10))})` : ""}</span>
           {stamp && <span>· updated {hhmm(stamp)}{wall ? " · refreshes every 5 min" : ""}</span>}
           {selected && <button type="button" onClick={() => setLineKey(null)} className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: "var(--navy-soft)", color: "var(--navy)" }} title="The charts and figures are narrowed to this line — click to show every line again">{selected.route_id}{selected.discipline ? ` · ${selected.discipline}` : ""} only · ✕ show all</button>}
         </div>
@@ -3102,8 +3146,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                info={{ id: "dash.moved", value: K.actualT == null ? "No week actual typed yet against any line in view." : `${grp(K.actualT)} t reported on ${K.reportedN} plan line${K.reportedN === 1 ? "" : "s"}` }} />
           <Fig value={K.deliveredPct == null ? "—" : K.deliveredPct.toFixed(1) + " %"} label="of plan" sub={K.actualT == null ? "type actuals on Look-ahead → Account" : `${bigNum(K.plannedToDate)} t planned to date`} tone="var(--ok-text)"
                info={{ id: "dash.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `To date: ${grp(K.actualT)} t delivered ÷ ${grp(K.plannedToDate)} t planned up to this month. Whole plan: ÷ ${grp(K.totT)} t planned in view.` }} />
-          <Fig value={K.actualEur == null ? "—" : `${CUR()} ` + eurK(K.actualEur)} label={`actual ${CUR()} typed`} sub={K.actualEur == null ? "no actual cost typed" : (K.planned ? `planned ${CUR()} ${eurK(K.planned.eur)}` : `no planned ${CUR()}`)}
-               info={{ id: "dash.actual_cost", value: K.actualEur == null ? "None typed yet." : `${CUR()} ${grp(K.actualEur)} typed` }} />
+          <Fig value={K.actualEur == null ? "—" : `${CUR()}` + eurK(K.actualEur)} label={`actual ${CUR()} typed`} sub={K.actualEur == null ? "no actual cost typed" : (K.planned ? `planned ${CUR()}${eurK(K.planned.eur)}` : `no planned ${CUR()}`)}
+               info={{ id: "dash.actual_cost", value: K.actualEur == null ? "None typed yet." : `${CUR()}${grp(K.actualEur)} typed` }} />
           <Fig value={K.reportedT > 0 && K.actualT != null ? (K.actualT * 100 / K.reportedT).toFixed(0) + " %" : "—"} label="on reported months" sub="delivered ÷ planned, reported only"
                info={{ id: "dash.reported", value: K.reportedT > 0 && K.actualT != null ? `${grp(K.actualT)} t delivered ÷ ${grp(K.reportedT)} t planned on ${K.reportedN} reported plan line${K.reportedN === 1 ? "" : "s"}` : "No month reported yet." }} />
         </Group>
@@ -3114,14 +3158,14 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <Fig value={K.peakFleet ? grp(K.peakFleet) : "—"} label="peak fleet" sub={K.peakFleet ? `vehicles · ${K.peakFleetMonth}` : "needs routes worked out"} info={{ id: "dash.vehicles", label: "Peak fleet", value: K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth}` : NO_ROUTES_YET }} />
         </Group>
         <Group title="Cost" tone="var(--navy)">
-          <Fig value={K.planned ? `${CUR()} ` + eurK(K.planned.eur) : "—"} label={`planned ${CUR()}`} sub={K.planned ? `${K.plannedN} of ${D.lines} priced${K.targetN ? ` · ${K.targetN} at target` : ""}` : "no rate typed, no target set"} tone="var(--navy)"
-               info={{ id: "dash.planned", value: K.planned ? [`${CUR()} ${grp(K.planned.eur)} = ${unitTriple(K.planned)}`, K.targetN ? `${K.targetN} plan line${K.targetN === 1 ? "" : "s"} at the target rate` : ""] : "No route in view has rates typed, and no target rate is set on Config → Costing." }} />
-          <Fig value={K.fair ? `${CUR()} ` + eurK(K.fair.eur) : "—"} label={`fair ${CUR()} (model)`} sub={K.fair ? `${K.fairN} of ${D.lines} lines${plannedVsFair != null ? ` · planned ${plannedVsFair >= 0 ? "+" : ""}${plannedVsFair.toFixed(0)} % vs fair` : ""}` : (cost.index_eur_per_l == null ? "no diesel index" : "no routed lines")} tone="var(--navy)"
-               info={{ id: "dash.fair", value: K.fair ? [`${CUR()} ${grp(K.fair.eur)} = ${unitTriple(K.fair)}`, `Winter months add ${(((factors || {}).fair_price || {}).winter_consumption_uplift_pct) ?? 8} % fuel.`] : (cost.index_eur_per_l == null ? "No diesel price: set one on Config → Costing · fuel." : "No line in view has a route worked out for its vehicle.") }} />
-          <Fig value={K.fair && K.fair.per_t != null ? `${CUR()} ` + (+K.fair.per_t).toFixed(2) : "—"} label={`fair ${CUR()} / t`} sub={K.planned && K.planned.per_t != null ? `planned ${CUR()} ${(+K.planned.per_t).toFixed(2)} / t` : "weighted over priced tonnes"}
-               info={{ id: "dash.fair_per_t", value: K.fair && K.fair.per_t != null ? [`${CUR()} ${(+K.fair.per_t).toFixed(2)} per tonne = ${CUR()} ${grp(K.fair.eur)} ÷ ${grp(K.fairT || K.totT)} t`, K.planned && K.planned.per_t != null ? `Planned: ${CUR()} ${(+K.planned.per_t).toFixed(2)} per tonne, worked out the same way` : ""] : "No line the model can price yet." }} />
-          <Fig value={K.fair && K.fair.per_km != null ? `${CUR()} ` + (+distRate(K.fair.per_km)).toFixed(2) : "—"} label={`fair ${CUR()} / ${DU()}`} sub={K.fair && K.fair.per_trip != null ? `${CUR()} ${grp(K.fair.per_trip)} / trip` : `on the route basis ${DU()}`}
-               info={{ id: "dash.fair_per_dist", value: K.fair && K.fair.per_km != null ? [`${CUR()} ${(+distRate(K.fair.per_km)).toFixed(2)} per ${DU()}, ${CUR()} ${grp(K.fair.per_trip)} per loaded trip`, K.planned && K.planned.per_km != null ? `Planned: ${CUR()} ${(+distRate(K.planned.per_km)).toFixed(2)} per ${DU()}, ${CUR()} ${grp(K.planned.per_trip)} per trip` : ""] : "No line the model can price yet." }} />
+          <Fig value={K.planned ? `${CUR()}` + eurK(K.planned.eur) : "—"} label={`planned ${CUR()}`} sub={K.planned ? `${K.plannedN} of ${D.lines} priced${K.targetN ? ` · ${K.targetN} at target` : ""}` : "no rate typed, no target set"} tone="var(--navy)"
+               info={{ id: "dash.planned", value: K.planned ? [`${CUR()}${grp(K.planned.eur)} = ${unitTriple(K.planned)}`, K.targetN ? `${K.targetN} plan line${K.targetN === 1 ? "" : "s"} at the target rate` : ""] : "No route in view has rates typed, and no target rate is set on Config → Costing." }} />
+          <Fig value={K.fair ? `${CUR()}` + eurK(K.fair.eur) : "—"} label={`fair ${CUR()} (model)`} sub={K.fair ? `${K.fairN} of ${D.lines} lines${plannedVsFair != null ? ` · planned ${plannedVsFair >= 0 ? "+" : ""}${plannedVsFair.toFixed(0)} % vs fair` : ""}` : (cost.index_eur_per_l == null ? "no diesel index" : "no routed lines")} tone="var(--navy)"
+               info={{ id: "dash.fair", value: K.fair ? [`${CUR()}${grp(K.fair.eur)} = ${unitTriple(K.fair)}`, `Winter months add ${(((factors || {}).fair_price || {}).winter_consumption_uplift_pct) ?? 8} % fuel.`] : (cost.index_eur_per_l == null ? "No diesel price: set one on Config → Costing · fuel." : "No line in view has a route worked out for its vehicle.") }} />
+          <Fig value={K.fair && K.fair.per_t != null ? `${CUR()}` + (+K.fair.per_t).toFixed(2) : "—"} label={`fair ${CUR()} / t`} sub={K.planned && K.planned.per_t != null ? `planned ${CUR()}${(+K.planned.per_t).toFixed(2)} / t` : "weighted over priced tonnes"}
+               info={{ id: "dash.fair_per_t", value: K.fair && K.fair.per_t != null ? [`${CUR()}${(+K.fair.per_t).toFixed(2)} per tonne = ${CUR()}${grp(K.fair.eur)} ÷ ${grp(K.fairT || K.totT)} t`, K.planned && K.planned.per_t != null ? `Planned: ${CUR()}${(+K.planned.per_t).toFixed(2)} per tonne, worked out the same way` : ""] : "No line the model can price yet." }} />
+          <Fig value={K.fair && K.fair.per_km != null ? `${CUR()}` + (+distRate(K.fair.per_km)).toFixed(2) : "—"} label={`fair ${CUR()} / ${DU()}`} sub={K.fair && K.fair.per_trip != null ? `${CUR()}${grp(K.fair.per_trip)} / trip` : `on the route basis ${DU()}`}
+               info={{ id: "dash.fair_per_dist", value: K.fair && K.fair.per_km != null ? [`${CUR()}${(+distRate(K.fair.per_km)).toFixed(2)} per ${DU()}, ${CUR()}${grp(K.fair.per_trip)} per loaded trip`, K.planned && K.planned.per_km != null ? `Planned: ${CUR()}${(+distRate(K.planned.per_km)).toFixed(2)} per ${DU()}, ${CUR()}${grp(K.planned.per_trip)} per trip` : ""] : "No line the model can price yet." }} />
         </Group>
         <Group title="Carbon" tone="var(--ok-text)">
           <Fig value={K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} label="tCO₂e" sub="routed lines" tone="var(--ok-text)" info={{ id: "dash.carbon", label: "tCO₂e", value: `Exactly ${grp(K.totCo2, 1)} t CO₂e` }} />
@@ -3192,7 +3236,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
             </thead>
             <tbody>
               {sortedRoutes.map(r => {
-                const st = r.limit ? { word: "ROAD LIMIT", tone: "bad" } : (!r.baked ? { word: "Not routed", tone: "warn" } : { word: "Clear", tone: "ok" });
+                const st = r.limit ? { word: "Road limit", tone: "bad" } : (!r.baked ? { word: "Not routed", tone: "warn" } : { word: "Clear", tone: "ok" });
                 const veh = r.vehicle_short || vehLabel(r.vehicle);
                 return (
                 <RowDetails key={r.key} rowKey={"dash-" + r.key} isOpen={rowOpen(r.key)} onToggle={() => rowToggle(r.key)} colSpan={7}
@@ -3204,8 +3248,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                     <td className={numTd} data-label={qtyHead}>{unitSel === "loads" ? grp(r.trips) : unitSel === "lorries" ? (r.peakVeh == null ? "—" : r.peakVeh) : grp(r.t)}</td>
                     <td className={numTd} data-label="Delivered">{r.deliveredPct == null ? <span className="text-slate-500">—</span> : <span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>}</td>
                     <td className={numTd} data-label="tCO₂e">{r.baked ? r.co2.toFixed(1) : <span className="text-slate-500">—</span>}</td>
-                    <td className={numTd} data-label={`Planned ${CUR()}`}>{r.planned == null ? <span className="text-slate-500">rate not set</span> : <>{CUR()} {grp(r.planned)}{srcChip(r.source)}</>}</td>
-                    <td className={numTd} data-label={`Fair ${CUR()}`} style={{ color: "var(--navy)" }}>{r.fair == null ? <span className="text-slate-500">—</span> : <>{CUR()} {grp(r.fair)}</>}</td>
+                    <td className={numTd} data-label={`Planned ${CUR()}`}>{r.planned == null ? <span className="text-slate-500">rate not set</span> : <>{CUR()}{grp(r.planned)}{srcChip(r.source)}</>}</td>
+                    <td className={numTd} data-label={`Fair ${CUR()}`} style={{ color: "var(--navy)" }}>{r.fair == null ? <span className="text-slate-500">—</span> : <>{CUR()}{grp(r.fair)}</>}</td>
                     <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} /></td>
                   </>}>
                   <RdItem t="Route">{r.route_id}</RdItem>
@@ -3222,12 +3266,12 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                   <RdItem t="Cycle">{r.cycleH == null ? "Needs this line's route worked out for its vehicle" : `${r.cycleH.toFixed(2)} h`}</RdItem>
                   <RdItem t={`Lorry-${DU()}`}>{r.baked ? grp(dist(r.km)) : "Not routed yet"}</RdItem>
                   <RdItem t="tCO₂e">{r.baked ? r.co2.toFixed(1) : "Not routed yet"}</RdItem>
-                  <RdItem t={`Planned ${CUR()}`}>{r.planned == null ? "No rate typed on the route, no target set" : `${CUR()} ${grp(r.planned)}, ${r.source === "target" ? "the target rate from Config (no rate on the route)" : "the rates typed on the route"}`}</RdItem>
+                  <RdItem t={`Planned ${CUR()}`}>{r.planned == null ? "No rate typed on the route, no target set" : `${CUR()}${grp(r.planned)}, ${r.source === "target" ? "the target rate from Config (no rate on the route)" : "the rates typed on the route"}`}</RdItem>
                   <RdItem t="Planned, per unit">{r.plannedU ? unitList(r.plannedU) : null}</RdItem>
-                  <RdItem t={`Fair ${CUR()} (model)`}>{r.fair == null ? (r.baked ? "No diesel index" : "Not routed yet, so no distance") : `${CUR()} ${grp(r.fair)}${fairWords(r.flags) ? ", " + fairWords(r.flags) : ""}`}</RdItem>
+                  <RdItem t={`Fair ${CUR()} (model)`}>{r.fair == null ? (r.baked ? "No diesel index" : "Not routed yet, so no distance") : `${CUR()}${grp(r.fair)}${fairWords(r.flags) ? ", " + fairWords(r.flags) : ""}`}</RdItem>
                   <RdItem t="Fair, per unit">{r.fairU ? unitList(r.fairU) : null}</RdItem>
                   <RdItem t={`Fair ${CUR()}/t`}>{r.fairPerT == null ? null : (+r.fairPerT).toFixed(2)}</RdItem>
-                  <RdItem t="ROAD LIMIT" wide bad>{r.limit ? `${r.limit.text}${r.limit.checked_at ? `. Checked ${ctWhen(r.limit.checked_at)}.` : ""}` : null}</RdItem>
+                  <RdItem t="Road limit" wide bad>{r.limit ? `${r.limit.text}${r.limit.checked_at ? `. Checked ${ctWhen(r.limit.checked_at)}.` : ""}` : null}</RdItem>
                 </RowDetails>
                 );
               })}
@@ -3252,8 +3296,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
                info={{ id: "dash.moved", value: K.actualT == null ? "No week actual typed yet against any line in view." : `${grp(K.actualT)} t reported on ${K.reportedN} plan line${K.reportedN === 1 ? "" : "s"}` }} />
           <Fig value={K.deliveredPct == null ? "—" : K.deliveredPct.toFixed(1) + " %"} label="of plan" sub={K.actualT == null ? "type actuals on Look-ahead → Account" : `${bigNum(K.plannedToDate)} t planned to date`} tone="var(--ok-text)"
                info={{ id: "dash.delivered", value: K.deliveredPct == null ? "Nothing reported yet." : `To date: ${grp(K.actualT)} t delivered ÷ ${grp(K.plannedToDate)} t planned up to this month. Whole plan: ÷ ${grp(K.totT)} t planned in view.` }} />
-          <Fig value={K.actualEur == null ? "—" : `${CUR()} ` + eurK(K.actualEur)} label={`actual ${CUR()} typed`} sub={K.actualEur == null ? "no actual cost typed" : (K.planned ? `planned ${CUR()} ${eurK(K.planned.eur)}` : `no planned ${CUR()}`)}
-               info={{ id: "dash.actual_cost", value: K.actualEur == null ? "None typed yet." : `${CUR()} ${grp(K.actualEur)} typed` }} />
+          <Fig value={K.actualEur == null ? "—" : `${CUR()}` + eurK(K.actualEur)} label={`actual ${CUR()} typed`} sub={K.actualEur == null ? "no actual cost typed" : (K.planned ? `planned ${CUR()}${eurK(K.planned.eur)}` : `no planned ${CUR()}`)}
+               info={{ id: "dash.actual_cost", value: K.actualEur == null ? "None typed yet." : `${CUR()}${grp(K.actualEur)} typed` }} />
           <Fig value={K.reportedT > 0 && K.actualT != null ? (K.actualT * 100 / K.reportedT).toFixed(0) + " %" : "—"} label="on reported months" sub="delivered ÷ planned, reported only"
                info={{ id: "dash.reported", value: K.reportedT > 0 && K.actualT != null ? `${grp(K.actualT)} t delivered ÷ ${grp(K.reportedT)} t planned on ${K.reportedN} reported plan line${K.reportedN === 1 ? "" : "s"}` : "No month reported yet." }} />
         </Group>
@@ -3264,14 +3308,14 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           <Fig value={K.peakFleet ? grp(K.peakFleet) : "—"} label="peak fleet" sub={K.peakFleet ? `vehicles · ${K.peakFleetMonth}` : "needs routes worked out"} info={{ id: "dash.vehicles", label: "Peak fleet", value: K.peakFleet ? `${grp(K.peakFleet)} vehicles in ${K.peakFleetMonth}` : NO_ROUTES_YET }} />
         </Group>
         <Group title="Cost" tone="var(--navy)">
-          <Fig value={K.planned ? `${CUR()} ` + eurK(K.planned.eur) : "—"} label={`planned ${CUR()}`} sub={K.planned ? `${K.plannedN} of ${D.lines} priced${K.targetN ? ` · ${K.targetN} at target` : ""}` : "no rate typed, no target set"} tone="var(--navy)"
-               info={{ id: "dash.planned", value: K.planned ? [`${CUR()} ${grp(K.planned.eur)} = ${unitTriple(K.planned)}`, K.targetN ? `${K.targetN} plan line${K.targetN === 1 ? "" : "s"} at the target rate` : ""] : "No route in view has rates typed, and no target rate is set on Config → Costing." }} />
-          <Fig value={K.fair ? `${CUR()} ` + eurK(K.fair.eur) : "—"} label={`fair ${CUR()} (model)`} sub={K.fair ? `${K.fairN} of ${D.lines} lines${plannedVsFair != null ? ` · planned ${plannedVsFair >= 0 ? "+" : ""}${plannedVsFair.toFixed(0)} % vs fair` : ""}` : (cost.index_eur_per_l == null ? "no diesel index" : "no routed lines")} tone="var(--navy)"
-               info={{ id: "dash.fair", value: K.fair ? [`${CUR()} ${grp(K.fair.eur)} = ${unitTriple(K.fair)}`, `Winter months add ${(((factors || {}).fair_price || {}).winter_consumption_uplift_pct) ?? 8} % fuel.`] : (cost.index_eur_per_l == null ? "No diesel price: set one on Config → Costing · fuel." : "No line in view has a route worked out for its vehicle.") }} />
-          <Fig value={K.fair && K.fair.per_t != null ? `${CUR()} ` + (+K.fair.per_t).toFixed(2) : "—"} label={`fair ${CUR()} / t`} sub={K.planned && K.planned.per_t != null ? `planned ${CUR()} ${(+K.planned.per_t).toFixed(2)} / t` : "weighted over priced tonnes"}
-               info={{ id: "dash.fair_per_t", value: K.fair && K.fair.per_t != null ? [`${CUR()} ${(+K.fair.per_t).toFixed(2)} per tonne = ${CUR()} ${grp(K.fair.eur)} ÷ ${grp(K.fairT || K.totT)} t`, K.planned && K.planned.per_t != null ? `Planned: ${CUR()} ${(+K.planned.per_t).toFixed(2)} per tonne, worked out the same way` : ""] : "No line the model can price yet." }} />
-          <Fig value={K.fair && K.fair.per_km != null ? `${CUR()} ` + (+distRate(K.fair.per_km)).toFixed(2) : "—"} label={`fair ${CUR()} / ${DU()}`} sub={K.fair && K.fair.per_trip != null ? `${CUR()} ${grp(K.fair.per_trip)} / trip` : `on the route basis ${DU()}`}
-               info={{ id: "dash.fair_per_dist", value: K.fair && K.fair.per_km != null ? [`${CUR()} ${(+distRate(K.fair.per_km)).toFixed(2)} per ${DU()}, ${CUR()} ${grp(K.fair.per_trip)} per loaded trip`, K.planned && K.planned.per_km != null ? `Planned: ${CUR()} ${(+distRate(K.planned.per_km)).toFixed(2)} per ${DU()}, ${CUR()} ${grp(K.planned.per_trip)} per trip` : ""] : "No line the model can price yet." }} />
+          <Fig value={K.planned ? `${CUR()}` + eurK(K.planned.eur) : "—"} label={`planned ${CUR()}`} sub={K.planned ? `${K.plannedN} of ${D.lines} priced${K.targetN ? ` · ${K.targetN} at target` : ""}` : "no rate typed, no target set"} tone="var(--navy)"
+               info={{ id: "dash.planned", value: K.planned ? [`${CUR()}${grp(K.planned.eur)} = ${unitTriple(K.planned)}`, K.targetN ? `${K.targetN} plan line${K.targetN === 1 ? "" : "s"} at the target rate` : ""] : "No route in view has rates typed, and no target rate is set on Config → Costing." }} />
+          <Fig value={K.fair ? `${CUR()}` + eurK(K.fair.eur) : "—"} label={`fair ${CUR()} (model)`} sub={K.fair ? `${K.fairN} of ${D.lines} lines${plannedVsFair != null ? ` · planned ${plannedVsFair >= 0 ? "+" : ""}${plannedVsFair.toFixed(0)} % vs fair` : ""}` : (cost.index_eur_per_l == null ? "no diesel index" : "no routed lines")} tone="var(--navy)"
+               info={{ id: "dash.fair", value: K.fair ? [`${CUR()}${grp(K.fair.eur)} = ${unitTriple(K.fair)}`, `Winter months add ${(((factors || {}).fair_price || {}).winter_consumption_uplift_pct) ?? 8} % fuel.`] : (cost.index_eur_per_l == null ? "No diesel price: set one on Config → Costing · fuel." : "No line in view has a route worked out for its vehicle.") }} />
+          <Fig value={K.fair && K.fair.per_t != null ? `${CUR()}` + (+K.fair.per_t).toFixed(2) : "—"} label={`fair ${CUR()} / t`} sub={K.planned && K.planned.per_t != null ? `planned ${CUR()}${(+K.planned.per_t).toFixed(2)} / t` : "weighted over priced tonnes"}
+               info={{ id: "dash.fair_per_t", value: K.fair && K.fair.per_t != null ? [`${CUR()}${(+K.fair.per_t).toFixed(2)} per tonne = ${CUR()}${grp(K.fair.eur)} ÷ ${grp(K.fairT || K.totT)} t`, K.planned && K.planned.per_t != null ? `Planned: ${CUR()}${(+K.planned.per_t).toFixed(2)} per tonne, worked out the same way` : ""] : "No line the model can price yet." }} />
+          <Fig value={K.fair && K.fair.per_km != null ? `${CUR()}` + (+distRate(K.fair.per_km)).toFixed(2) : "—"} label={`fair ${CUR()} / ${DU()}`} sub={K.fair && K.fair.per_trip != null ? `${CUR()}${grp(K.fair.per_trip)} / trip` : `on the route basis ${DU()}`}
+               info={{ id: "dash.fair_per_dist", value: K.fair && K.fair.per_km != null ? [`${CUR()}${(+distRate(K.fair.per_km)).toFixed(2)} per ${DU()}, ${CUR()}${grp(K.fair.per_trip)} per loaded trip`, K.planned && K.planned.per_km != null ? `Planned: ${CUR()}${(+distRate(K.planned.per_km)).toFixed(2)} per ${DU()}, ${CUR()}${grp(K.planned.per_trip)} per trip` : ""] : "No line the model can price yet." }} />
         </Group>
         <Group title="Carbon" tone="var(--ok-text)">
           <Fig value={K.totCo2 >= 1e4 ? bigNum(K.totCo2) : K.totCo2.toFixed(1)} label="tCO₂e" sub="routed lines" tone="var(--ok-text)" info={{ id: "dash.carbon", label: "tCO₂e", value: `Exactly ${grp(K.totCo2, 1)} t CO₂e` }} />
@@ -3297,7 +3341,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
         </div>
         <div className="card p-4 chart-card">
           <div className="text-sm font-semibold text-slate-700 mb-1 chart-title">Cost over time <span className="text-slate-400 font-normal">({CUR()} · planned vs fair)</span><InfoTip id="dash.chart.cost" /></div>
-          {fill && <ChartHead value={plannedVsFair == null ? (K.planned ? `${CUR()} ${eurK(K.planned.eur)}` : "—") : `${Math.abs(plannedVsFair).toFixed(0)} % ${plannedVsFair < 0 ? "below" : "above"}`} label={plannedVsFair == null ? "planned" : "the fair-price model"} note={K.planned && K.fair ? `planned ${CUR()} ${eurK(K.planned.eur)} · the model ${CUR()} ${eurK(K.fair.eur)}` : "no planned or fair price to compare yet"} />}
+          {fill && <ChartHead value={plannedVsFair == null ? (K.planned ? `${CUR()}${eurK(K.planned.eur)}` : "—") : `${Math.abs(plannedVsFair).toFixed(0)} % ${plannedVsFair < 0 ? "below" : "above"}`} label={plannedVsFair == null ? "planned" : "the fair-price model"} note={K.planned && K.fair ? `planned ${CUR()}${eurK(K.planned.eur)} · the model ${CUR()}${eurK(K.fair.eur)}` : "no planned or fair price to compare yet"} />}
           <ChartCanvas config={costCfg} />
         </div>
         <div className="card p-4 chart-card">
@@ -3378,9 +3422,9 @@ function AbnormalStrip({ onOpen, sites }){
   return (
     <div className="al-strip" data-abnormal-strip="set" data-guide="dash-abnormal">
       <span><b>{s.ahead}</b> abnormal load{s.ahead === 1 ? "" : "s"} in the next {s.weeks_ahead} weeks</span>
-      <span><b>{s.notices_due}</b> notice{s.notices_due === 1 ? "" : "s"} due this week{s.notices_late > 0 ? <> <AlChip tone="bad">NOTICE LATE</AlChip></> : (s.notices_due > 0 ? <> <AlChip tone="warn">NOTICE DUE</AlChip></> : null)}</span>
-      <span><b>{s.to_apply}</b> Special Order{s.to_apply === 1 ? "" : "s"} or VR1{s.to_apply === 1 ? "" : "s"} to apply for{s.to_apply > 0 ? <> <AlChip tone="bad">SO LEAD TIME</AlChip></> : null}</span>
-      {s.road_limit > 0 && <span><b>{s.road_limit}</b> over a signed limit <AlChip tone="bad">AIL ROAD LIMIT</AlChip></span>}
+      <span><b>{s.notices_due}</b> notice{s.notices_due === 1 ? "" : "s"} due this week{s.notices_late > 0 ? <> <RowStatus word="Notice late" tone="bad" /></> : (s.notices_due > 0 ? <> <RowStatus word="Notice due" tone="warn" /></> : null)}</span>
+      <span><b>{s.to_apply}</b> Special Order{s.to_apply === 1 ? "" : "s"} or VR1{s.to_apply === 1 ? "" : "s"} to apply for{s.to_apply > 0 ? <> <RowStatus word="SO lead time" tone="bad" /></> : null}</span>
+      {s.road_limit > 0 && <span><b>{s.road_limit}</b> over a signed limit <RowStatus word="AIL road limit" tone="bad" /></span>}
       <button type="button" className="btn-sec al-strip-btn" onClick={open}>Open Abnormal loads</button>
       <span className="al-strip-words">{s.words}</span>
     </div>
@@ -3627,7 +3671,7 @@ function ConcernsDash({ months, lo, hi, sites, sitesLabel, tripsM, pv, onOpen })
   const Tile = ({ v, label }) => (
     <div className="min-w-0" data-concern-fig="1"><div className="kpi-num font-bold fig-val" style={{ color: "var(--navy-deep)", lineHeight: 1.15 }}>{v}</div>
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mt-0.5">{label}</div></div>);
-  const cfg = data ? { type: "bar", data: { labels: data.by_month.map(r => monthLabelAbs(cnIdx(r.month, sy), sy)),
+  const cfg = data ? { type: "bar", data: { labels: data.by_month.map(r => monthAxis(cnIdx(r.month, sy), sy)),
       datasets: [{ label: "concerns", data: data.by_month.map(r => r.received), backgroundColor: C1, borderWidth: 0 }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
                scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 } } } } } : null;
@@ -3702,7 +3746,7 @@ function TrafficDash({ months, lo, hi, sites, sitesLabel, onOpen }){
     const v = ms.map(m => { const r = (L.months || {})[String(m)]; return r ? r.value : null; });
     const col = ms.map(m => { const r = (L.months || {})[String(m)]; const st = r && r.state;
       return st === "over" ? tok("--red", "#DC2626") : st === "near" ? tok("--gold", "#D97706") : tok("--chart-1", "#E8590C"); });
-    return { type: "bar", data: { labels: ms.map(m => monthLabelAbs(m, sy)),
+    return { type: "bar", data: { labels: ms.map(m => monthAxis(m, sy)),
       datasets: [{ label: `${unitOf(L)} a day`, data: v, backgroundColor: col, borderWidth: 0 },
                  { type: "line", label: "limit", data: ms.map(() => L.limit.value), borderColor: tok("--ink", "#1F2024"), borderDash: [5, 4], borderWidth: 1.5, pointRadius: 0 }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
@@ -5229,7 +5273,7 @@ function ConcernsPage({ onCount }){
 // login plans its own team's; a planner approves, reopens, deletes any, types the police time bans and fetches the
 // bank holidays. Desk only (D9): on a phone the Portal shows the desk-only card. Counted apart (decisions D70 and D71): nothing
 // on this page is a lorry count.
-const AL_FLAG_WORD = { NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };
+const AL_FLAG_WORD = { NOTICE_DUE: "Notice due", NOTICE_LATE: "Notice late", SO_LEAD_TIME: "SO lead time", AIL_ROAD_LIMIT: "AIL road limit" };
 const AL_FLAG_TONE = { NOTICE_DUE: "warn", NOTICE_LATE: "bad", SO_LEAD_TIME: "bad", AIL_ROAD_LIMIT: "bad" };
 // phase 2: the kinds of potential pinch point the route module finds (its KIND_WORDS) and WSP's grades (its GRADE_WORDS)
 const AL_KIND_WORDS = { turn: "Turn", roundabout: "Roundabout", slip_road: "Slip road", bend: "Sharp bend", limit: "Signed limit", notice: "Routing notice",
@@ -5365,7 +5409,7 @@ function SupplierOrdersMenu({ bucket, disabled }){
       <summary className="px-4 py-2 rounded-lg text-sm font-semibold border" aria-disabled={disabled ? "true" : undefined}
         onClick={e => { if(disabled) e.preventDefault(); }}
         title={disabled ? "Confirm at least one line first" : "One order sheet per supplier, from the confirmed lines"}
-        style={{ width: "auto", height: "auto", borderColor: "var(--navy)", color: "var(--navy)", background: "var(--surface)", opacity: disabled ? 0.4 : 1 }}>Supplier orders ▾</summary>
+        style={{ width: "auto", height: "auto", borderColor: "var(--line)", color: "var(--ink)", background: "var(--surface)", opacity: disabled ? 0.4 : 1 }}>Supplier orders ▾</summary>
       <div className="row-menu-list so-list" role="group" aria-label="Supplier orders">
         <div className="so-head">Supplier orders{list && list.week && list.week.from ? ` · ${spanLabel(list.week.from, list.week.to)}` : ""}</div>
         <div className="row-menu-note" style={{ borderTop: 0, marginTop: 0 }}>From the confirmed lines only{list && list.team_only ? `, ${list.team_only}'s lines` : ""}. Wayscope sends nothing: download and send them yourself.</div>
@@ -5398,8 +5442,8 @@ const AL_DAY_PRESETS = [["1111100", "Weekdays"], ["1111110", "Mon–Sat"], ["111
 function AlChip({ tone, children, title }){
   return <span className={"al-chip al-" + (tone || "cu")} title={title}>{children}</span>;
 }
-function AlFlag({ f }){
-  return <span className={"al-chip al-" + (AL_FLAG_TONE[f.code] || "warn")} title={f.text}>{AL_FLAG_WORD[f.code] || f.code}</span>;
+function AlFlag({ f }){   // 10 Nov 2026 (wave 2, card 12): the one status chip
+  return <span className="al-flag" title={f.text}><RowStatus word={AL_FLAG_WORD[f.code] || f.code} tone={AL_FLAG_TONE[f.code] || "warn"} /></span>;
 }
 // the advice panel: the summary, the lines, the notes, the footer — the server's words, nothing worked out here
 function AlAdvice({ adv, compact }){
@@ -5421,8 +5465,8 @@ function AlAdvice({ adv, compact }){
 // The approved mockup notes\concrete-pours-mockup-1029\ cards 1–2 (John: "as recommended", no plant output). One row a
 // pour (the 27 Oct row pattern: the name opens it, one status, the "⋯" menu); the form asks the server for the figures as
 // it is typed (GET /pours/preview: nothing saved), so the arithmetic lives in one place (backend pours.py).
-const POUR_WORD = { POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT",
-                    POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN" };
+const POUR_WORD = { POUR_COLD_JOINT: "Cold joint likely", POUR_TRANSIT: "Too long in transit", POUR_SHORT: "Too few mixers",
+                    POUR_BAND: "Mixers in a no-delivery time", POUR_OVER_PLAN: "Over the month's plan" };
 const POUR_RED = ["POUR_COLD_JOINT", "POUR_TRANSIT"];
 const pourHm = (m) => { m = Math.round(+m || 0); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`; };
 const pourDay = (iso) => { const d = new Date(iso + "T00:00:00"); return `${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]} ${longDate(iso)}`; };
@@ -5687,11 +5731,10 @@ function ClpNotes({ clp, teamWord, headRef, onClose, onChanged }){
     <div className="card p-4 mb-4" data-clp-notes="1">
       {head}
       {clients.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2 mb-1" role="tablist" aria-label="Whose notes and tasks" data-clp-tabs="1">
+        <div className="ws-tabs mt-2 mb-1" role="tablist" aria-label="Whose notes and tasks" data-clp-tabs="1">
           {[{ id: "", name: "Contractor", open: t.tasks.filter(x => !x.done).length }, ...clients].map(c => (
             <button key={c.id || "contractor"} type="button" role="tab" aria-selected={tab === c.id} data-clp-tab={c.id || "contractor"}
-              className={"rounded-full px-3 py-1 text-[13px] font-semibold " + (tab === c.id ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}
-              style={tab === c.id ? { background: "var(--navy)" } : undefined} onClick={() => pick(c.id)}>
+              className="ws-tab" onClick={() => pick(c.id)}>
               {c.name}{c.open ? <span className="font-normal"> · {c.open} open</span> : null}</button>))}
         </div>
       )}
@@ -6320,10 +6363,9 @@ function StockpilesPage({ meta, access, who }){
       {stockList.length === 0 ? (
         <EmptyState title="No stockpiles yet" body="Give a place the type Stockpile, or a capacity, on Data → Locations." />
       ) : (<>
-        <div className="flex flex-wrap gap-1.5 mb-3" role="tablist" aria-label="Stockpile">
+        <div className="ws-tabs mb-3" role="tablist" aria-label="Stockpile">
           {stockList.map(x => <button key={x.location_id} type="button" role="tab" aria-selected={x === sp}
-            className={"rounded-full px-3 py-1 text-[13px] font-semibold " + (x === sp ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}
-            style={x === sp ? { background: "var(--navy)" } : undefined} onClick={() => { setPick(x.location_id); setSavedPlan(""); setSavedCount(""); }}>{x.name}{(() => { const pr = stockProblem(x); if(!pr) return null;
+            className="ws-tab" onClick={() => { setPick(x.location_id); setSavedPlan(""); setSavedCount(""); }}>{x.name}{(() => { const pr = stockProblem(x); if(!pr) return null;
               const bad = pr.kind === "over", word = `${bad ? "over" : "runs out"} ${stockWeekWord(pr.from)} ${pr.from.slice(0, 4)}`;
               return <span className="sp-tab-flag" data-stock-tab-flag={pr.kind}><i aria-hidden="true" className={"sp-dot " + (bad ? "sp-dot-bad" : "sp-dot-warn")} />{word}</span>; })()}</button>)}
         </div>
@@ -6357,8 +6399,7 @@ function StockpilesPage({ meta, access, who }){
             </div>; })()}
           <div className="flex flex-wrap gap-1 mb-2">
             {years.map(y => <button key={y} type="button" onClick={() => setPlanYear(y)} aria-pressed={y === yr}
-              className={"rounded-full px-2.5 py-0.5 text-[13px] font-semibold " + (y === yr ? "text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200")}
-              style={y === yr ? { background: "var(--navy)" } : undefined}>{y}</button>)}
+              className="ws-tab">{y}</button>)}
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2" data-stock-plan-months="1">
             {Array.from({ length: 12 }, (_, i) => {
@@ -7582,7 +7623,7 @@ function UsersPage({ access }){
       {data && (
         <>
           <nav className="flex flex-wrap gap-2 mb-4" aria-label="Users sections">
-            {tabs.map(([k, l]) => <button key={k} type="button" onClick={() => setTab(k)} className={tab === k ? "btn-pri" : "btn-sec"} aria-current={tab === k ? "page" : undefined}>{l}</button>)}
+            {tabs.map(([k, l]) => <button key={k} type="button" onClick={() => setTab(k)} className="ws-tab" aria-current={tab === k ? "page" : undefined}>{l}</button>)}
           </nav>
           {tab === "people" && (
             <>
@@ -8188,12 +8229,11 @@ function SkeletonTable({ cols, rows, caption }){
     </div>
   );
 }
-// Status as a word with a dot beside it — the same four colours everywhere, never colour
-// alone (10 Oct 2026, mockups 2 and 3; the chart palette is a different scale).
-const STATUS_DOT = { Approved: "var(--green)", confirmed: "var(--green)", held: "var(--green)",
-                     Pending: "var(--gold)", edited: "var(--gold)", Rejected: "var(--red)" };
+// Status as a word (10 Oct 2026, mockups 2 and 3). 10 Nov 2026 (wave 2, card 12): drawn by the ONE status chip (RowStatus),
+// so Pending, Approved and the rest look the same on Forecasts, Abnormal loads, Users and Config.
+const STATUS_TONE = { Approved: "ok", confirmed: "ok", held: "ok", Pending: "warn", edited: "warn", Rejected: "bad" };
 function StatusWord({ status, label }){
-  return <span className="chip-st"><i style={{ background: STATUS_DOT[status] || "var(--chart-none)" }} aria-hidden="true"></i>{label || status}</span>;
+  return <RowStatus word={label || status} tone={STATUS_TONE[status] || "none"} />;
 }
 // The applied-filter chips under a filter row: one chip per filter in force, each removable,
 // one "Clear all", and the count beside them (mockup 4, the Carbon filtering pattern).
@@ -9039,8 +9079,8 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
                         {/* the model's fair € for this cell, from the preview read — never computed here */}
                         {costCell[mi] && costCell[mi].fair && costCell[mi].fair.eur != null && (
                           <span className="block mt-0.5 text-xs tabular-nums" style={{ color: "var(--navy)" }} data-cell-fair="1"
-                                title={`fair ${CUR()} (model): ${unitTriple(costCell[mi].fair)} · ${grp(costCell[mi].trips)} trips${(costCell[mi].fair.flags || []).includes("WINTER") ? " · winter" : ""}${(costCell[mi].fair.flags || []).includes("THAW") ? " · thaw restrictions may apply" : ""}${costCell[mi].planned && costCell[mi].planned.eur != null ? ` · ${costCell[mi].planned.source === "target" ? "target" : "quote"} ${CUR()} ${grp(costCell[mi].planned.eur)}` : ""}`}>
-                            fair {CUR()} {grp(costCell[mi].fair.eur)}{(costCell[mi].fair.flags || []).includes("WINTER") ? <span className="text-slate-400"> · w</span> : null}
+                                title={`fair ${CUR()} (model): ${unitTriple(costCell[mi].fair)} · ${grp(costCell[mi].trips)} trips${(costCell[mi].fair.flags || []).includes("WINTER") ? " · winter" : ""}${(costCell[mi].fair.flags || []).includes("THAW") ? " · thaw restrictions may apply" : ""}${costCell[mi].planned && costCell[mi].planned.eur != null ? ` · ${costCell[mi].planned.source === "target" ? "target" : "quote"} ${CUR()}${grp(costCell[mi].planned.eur)}` : ""}`}>
+                            fair {CUR()}{grp(costCell[mi].fair.eur)}{(costCell[mi].fair.flags || []).includes("WINTER") ? <span className="text-slate-400"> · w</span> : null}
                           </span>)}
                       </label>
                     );
@@ -9102,13 +9142,13 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
               the same figures the Look-ahead and the Dashboard will show once this is saved. */}
           <div className="px-4 py-3 bg-white border-t border-slate-200 flex flex-wrap gap-x-8 gap-y-2 items-start" data-cost-strip="1">
             {cost && cost.totals && cost.totals.fair && cost.totals.fair.eur != null ? <>
-              <Stat label={`Fair ${CUR()} (model) · range`} value={`${CUR()} ` + grp(cost.totals.fair.eur)} tone="var(--navy)" />
-              <Stat label={`fair ${CUR()} / t`} value={`${CUR()} ` + (+cost.totals.fair.per_t).toFixed(2)} />
-              <Stat label={`fair ${CUR()} / trip`} value={cost.totals.fair.per_trip == null ? "—" : `${CUR()} ` + grp(cost.totals.fair.per_trip)} />
-              <Stat label={`fair ${CUR()} / ${DU()}`} value={cost.totals.fair.per_km == null ? "—" : `${CUR()} ` + (+distRate(cost.totals.fair.per_km)).toFixed(2)} />
+              <Stat label={`Fair ${CUR()} (model) · range`} value={`${CUR()}` + grp(cost.totals.fair.eur)} tone="var(--navy)" />
+              <Stat label={`fair ${CUR()} / t`} value={`${CUR()}` + (+cost.totals.fair.per_t).toFixed(2)} />
+              <Stat label={`fair ${CUR()} / trip`} value={cost.totals.fair.per_trip == null ? "—" : `${CUR()}` + grp(cost.totals.fair.per_trip)} />
+              <Stat label={`fair ${CUR()} / ${DU()}`} value={cost.totals.fair.per_km == null ? "—" : `${CUR()}` + (+distRate(cost.totals.fair.per_km)).toFixed(2)} />
             </> : <Stat label={`Fair ${CUR()} (model)`} value="—" />}
             {cost && cost.totals && cost.totals.planned && cost.totals.planned.eur != null
-              ? <Stat label={`Planned ${CUR()} · ${cost.totals.planned_source === "target" ? "target rate" : "route quote"}`} value={`${CUR()} ` + grp(cost.totals.planned.eur)} />
+              ? <Stat label={`Planned ${CUR()} · ${cost.totals.planned_source === "target" ? "target rate" : "route quote"}`} value={`${CUR()}` + grp(cost.totals.planned.eur)} />
               : <Stat label={`Planned ${CUR()}`} value="rate not set" />}
             <span className="text-xs text-slate-400 self-center">
               {costErr ? <span style={{ color: "var(--red)" }}>{costErr}</span>
@@ -9116,7 +9156,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
                : cost.fair_reason === "not baked" ? <span className="text-amber-700">no fair price — this route is not routed for {vehLabel(vehicle)}; route it on Data → Routes</span>
                : cost.fair_reason === "no diesel index" ? <span className="text-amber-700">no fair price — the diesel index is unavailable (Config → Costing · fuel)</span>
                : cost.fair_reason ? `no fair price — ${cost.fair_reason}`
-               : `the cost model on Config → Costing · fuel at diesel ${CUR()}${cost.index_eur_per_l != null ? (+cost.index_eur_per_l).toFixed(3) : "—"}/L${(cost.totals.fair_flags || []).includes("WINTER") ? " · winter months +fuel" : ""} · a floor for negotiation, never a quote · fair ${CUR()} under each cell`}
+               : `the cost model on Config → Costing · fuel at diesel ${CUR()}${cost.index_eur_per_l != null ? (+cost.index_eur_per_l).toFixed(3) : "—"} per litre${(cost.totals.fair_flags || []).includes("WINTER") ? " · winter months +fuel" : ""} · a floor for negotiation, never a quote · fair ${CUR()} under each cell`}
             </span>
             {/* 11 Oct 2026: the carbon of the cells (the server's, with its parts) and the scheme's target */}
             {cost && cost.carbon && (() => {
@@ -9142,7 +9182,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
         <div className="flex items-center gap-3">
           <button onClick={save} disabled={busy || !routeId}
             className="px-5 py-2.5 rounded-lg text-white font-semibold disabled:opacity-50 transition"
-            style={{background:"var(--navy)"}}>
+            style={{background: "var(--action)"}}>
             {busy ? "Saving…" : "Save & send for approval"}
           </button>
           <button onClick={clearRange} className="px-4 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 text-sm">
@@ -9381,7 +9421,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
   const fcStatus = (g, c) => {
     const lim = !!(c && c.limit);
     if(g.status === "Rejected") return { word: "Rejected", tone: "bad", more: lim ? 1 : 0 };
-    if(lim) return { word: "ROAD LIMIT", tone: "bad", more: 0 };
+    if(lim) return { word: "Road limit", tone: "bad", more: 0 };
     if(g.status === "Pending") return { word: "Pending", tone: "warn", more: 0 };
     if(g.status === "Mixed") return { word: "Mixed", tone: "warn", more: 0 };
     return { word: g.status, tone: g.status === "Approved" ? "ok" : "none", more: 0 };
@@ -9476,8 +9516,8 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                             : grp(q)}</td>
                           <td className="num" data-label={`Planned ${CUR()}`} data-cost-cell="1">{!cost ? <span className="text-slate-500">…</span> : !c ? <span className="text-slate-500">—</span>
                             : c.planned == null ? <span className="text-slate-500">rate not set</span>
-                            : <>{CUR()} {grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[12px] font-medium px-1.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</td>
-                          <td className="num" data-label={`Fair ${CUR()}`} style={{ color: "var(--chart-4)" }}>{!cost ? <span className="text-slate-500">…</span> : (!c || c.fair == null) ? <span className="text-slate-500">—</span> : <>{CUR()} {grp(c.fair)}</>}</td>
+                            : <>{CUR()}{grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[12px] font-medium px-1.5 rounded-full bg-slate-100 text-slate-600">target</span>}</>}</td>
+                          <td className="num" data-label={`Fair ${CUR()}`} style={{ color: "var(--chart-4)" }}>{!cost ? <span className="text-slate-500">…</span> : (!c || c.fair == null) ? <span className="text-slate-500">—</span> : <>{CUR()}{grp(c.fair)}</>}</td>
                           <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>
                           <td className="num whitespace-nowrap rd-actions">
                             {canApprove && g.status !== "Approved" && (
@@ -9510,14 +9550,14 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                         <RdItem t="Tonnes">{c ? grp(c.t) : null}</RdItem>
                         <RdItem t="Loads (loaded trips)">{c ? grp(c.trips) : null}</RdItem>
                         <RdItem t="Lorries, busiest month">{c ? (c.peakVeh == null ? "Needs the route worked out" : String(c.peakVeh)) : null}</RdItem>
-                        <RdItem t={`Planned ${CUR()}`}>{!c ? null : c.planned == null ? "No rate on the route, no target on Config" : `${CUR()} ${grp(c.planned)}, ${c.source === "target" ? "the target rate from Config" : "the rates typed on the route"}`}</RdItem>
+                        <RdItem t={`Planned ${CUR()}`}>{!c ? null : c.planned == null ? "No rate on the route, no target on Config" : `${CUR()}${grp(c.planned)}, ${c.source === "target" ? "the target rate from Config" : "the rates typed on the route"}`}</RdItem>
                         <RdItem t="Planned, per unit">{c && c.plannedU ? unitList(c.plannedU) : null}</RdItem>
-                        <RdItem t={`Fair ${CUR()} (model)`}>{!c ? null : c.fair == null ? (c.baked < c.n ? "Not routed yet for this vehicle, so no distance and no fair price" : "No diesel index") : `${CUR()} ${grp(c.fair)}${fairWords(c.flags) ? ", " + fairWords(c.flags) : ""}`}</RdItem>
+                        <RdItem t={`Fair ${CUR()} (model)`}>{!c ? null : c.fair == null ? (c.baked < c.n ? "Not routed yet for this vehicle, so no distance and no fair price" : "No diesel index") : `${CUR()}${grp(c.fair)}${fairWords(c.flags) ? ", " + fairWords(c.flags) : ""}`}</RdItem>
                         <RdItem t="Fair, per unit">{c && c.fairU ? unitList(c.fairU) : null}</RdItem>
                         <RdItem t="Approval">{g.status}</RdItem>
                         <RdItem t="Reason for rejecting" wide bad>{g.rejectReason || null}</RdItem>
                         <RdItem t="Submitted by">{`${teamText(g.submittedBy) || "—"}${own ? " (you)" : ""}`}</RdItem>
-                        <RdItem t="ROAD LIMIT" wide bad>{c && c.limit ? `${c.limit.text}${c.limit.checked_at ? `. Checked ${ctWhen(c.limit.checked_at)}.` : ""}` : null}</RdItem>
+                        <RdItem t="Road limit" wide bad>{c && c.limit ? `${c.limit.text}${c.limit.checked_at ? `. Checked ${ctWhen(c.limit.checked_at)}.` : ""}` : null}</RdItem>
                       </RowDetails>
                     );
                   })}
@@ -9691,27 +9731,27 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
         {FAIR_FIELDS_FOR().map(([k, l, help]) => (
           <label key={k} className="block">
             <span className="block text-sm font-medium text-slate-700 mb-1">{l}</span>
-            {/* running_eur_per_km is stored per km and shown / typed in the tenant's unit (H1) */}
-            <input className={inp + " mt-1"} inputMode="decimal"
-              value={k === "running_eur_per_km" ? (fp[k] == null ? "" : +(+distRate(fp[k])).toFixed(4)) : (fp[k] ?? "")}
-              onChange={e => set(f => { const n = num(e.target.value); f[k] = (k === "running_eur_per_km" && typeof n === "number") ? +(+distInRate(n)).toFixed(6) : n; })} />
+            {/* running_eur_per_km is stored per km and shown / typed in the tenant's unit (H1; UnitNum 10 Nov 2026) */}
+            {k === "running_eur_per_km"
+              ? <UnitNum className={inp + " mt-1"} inputMode="decimal" value={fp[k]} onValue={n => set(f => { f[k] = n; })} />
+              : <input className={inp + " mt-1"} inputMode="decimal" value={fp[k] ?? ""} onChange={e => set(f => { f[k] = num(e.target.value); })} />}
             <span className="block text-[13px] text-slate-500 mt-1">{help}</span>
           </label>
         ))}
         <label className="block">
-          <span className="block text-sm font-medium text-slate-700 mb-1">L/100 km per tonne carried</span>
-          <input className={inp + " mt-1"} inputMode="decimal" value={cons.l_per_100km_per_tonne ?? ""} onChange={e => set(f => { f.consumption = f.consumption || {}; f.consumption.l_per_100km_per_tonne = num(e.target.value); })} />
-          <span className="block text-[13px] text-slate-500 mt-1">Typically 0.4–0.95; the low end is the default</span>
+          <span className="block text-sm font-medium text-slate-700 mb-1">L/100 {DIST_WORD() === "miles" ? "miles" : "km"} per tonne carried</span>
+          <UnitNum className={inp + " mt-1"} inputMode="decimal" dp={3} value={cons.l_per_100km_per_tonne} onValue={n => set(f => { f.consumption = f.consumption || {}; f.consumption.l_per_100km_per_tonne = n; })} />
+          <span className="block text-[13px] text-slate-500 mt-1">Typically {+(+distRate(0.4)).toFixed(2)}–{+(+distRate(0.95)).toFixed(2)}; the low end is the default{DU() === "mi" && cons.l_per_100km_per_tonne != null && (cons.artic || {}).l_per_100km_empty != null ? ` · an artic with 26 t: ${+(+fuelUse(+cons.artic.l_per_100km_empty + 26 * +cons.l_per_100km_per_tonne)).toFixed(1)} mpg` : ""}</span>
         </label>
         <label className="block">
-          <span className="block text-sm font-medium text-slate-700 mb-1">Rigid, empty L/100 km</span>
-          <input className={inp + " mt-1"} inputMode="decimal" value={(cons.rigid || {}).l_per_100km_empty ?? ""} onChange={e => set(f => { f.consumption = f.consumption || {}; f.consumption.rigid = f.consumption.rigid || {}; f.consumption.rigid.l_per_100km_empty = num(e.target.value); })} />
+          <span className="block text-sm font-medium text-slate-700 mb-1">Rigid, empty, {FUEL_WORD()}</span>
+          <UnitNum kind="fuel" className={inp + " mt-1"} inputMode="decimal" dp={2} value={(cons.rigid || {}).l_per_100km_empty} onValue={n => set(f => { f.consumption = f.consumption || {}; f.consumption.rigid = f.consumption.rigid || {}; f.consumption.rigid.l_per_100km_empty = n; })} />
           <span className="block text-[13px] text-slate-500 mt-1">From the government's 2026 factor</span>
         </label>
         <label className="block">
-          <span className="block text-sm font-medium text-slate-700 mb-1">Artic, empty L/100 km</span>
-          <input className={inp + " mt-1"} inputMode="decimal" value={(cons.artic || {}).l_per_100km_empty ?? ""} onChange={e => set(f => { f.consumption = f.consumption || {}; f.consumption.artic = f.consumption.artic || {}; f.consumption.artic.l_per_100km_empty = num(e.target.value); })} />
-          <span className="block text-[13px] text-slate-500 mt-1">34 laden − 0.4 × 26 t</span>
+          <span className="block text-sm font-medium text-slate-700 mb-1">Artic, empty, {FUEL_WORD()}</span>
+          <UnitNum kind="fuel" className={inp + " mt-1"} inputMode="decimal" dp={2} value={(cons.artic || {}).l_per_100km_empty} onValue={n => set(f => { f.consumption = f.consumption || {}; f.consumption.artic = f.consumption.artic || {}; f.consumption.artic.l_per_100km_empty = n; })} />
+          <span className="block text-[13px] text-slate-500 mt-1">{DU() === "mi" ? `From ${+(+fuelUse(34)).toFixed(1)} mpg laden with 26 t` : "34 laden − 0.4 × 26 t"}</span>
         </label>
         <label className="block">
           <span className="block text-sm font-medium text-slate-700 mb-1">Winter consumption uplift %</span>
@@ -9721,7 +9761,7 @@ function FairPriceSection({ doc, upd, fileDoc, summary }){
         {monthsBox("winter_months", "Winter months (uplift applies)")}
         {monthsBox("thaw_months", "Thaw months (flag: 8 t road limits may apply)")}
       </div>
-      {summary && <p className="text-[13px] text-slate-400 mt-2">In use now (saved): driver {CUR()}{summary.driver_eur_per_h}/h · standing {CUR()}{summary.vehicle_standing_eur_per_h}/h · running {CUR()}{summary.running_eur_per_km == null ? "—" : (+distRate(summary.running_eur_per_km)).toFixed(3)}/{DU()} · margin {summary.margin_pct} % · {summary.l_per_100km_per_tonne} L/100 km per t · rigid {summary.rigid_l_per_100km_empty} / artic {summary.artic_l_per_100km_empty} L/100 km empty · index {summary.index_eur_per_l == null ? "no diesel price yet, so no fair price" : `${CUR()}${summary.index_eur_per_l}/L`}.</p>}
+      {summary && <p className="text-[13px] text-slate-400 mt-2">In use now (saved): driver {CUR()}{summary.driver_eur_per_h}/h · standing {CUR()}{summary.vehicle_standing_eur_per_h}/h · running {CUR()}{summary.running_eur_per_km == null ? "—" : (+distRate(summary.running_eur_per_km)).toFixed(3)}/{DU()} · margin {summary.margin_pct} % · {summary.l_per_100km_per_tonne == null ? "—" : +(+distRate(summary.l_per_100km_per_tonne)).toFixed(3)} L/100 {DIST_WORD() === "miles" ? "miles" : "km"} per t · rigid {summary.rigid_l_per_100km_empty == null ? "—" : +(+fuelUse(summary.rigid_l_per_100km_empty)).toFixed(DU() === "mi" ? 1 : 2)} / artic {summary.artic_l_per_100km_empty == null ? "—" : +(+fuelUse(summary.artic_l_per_100km_empty)).toFixed(DU() === "mi" ? 1 : 2)} {FUEL_WORD()} empty · index {summary.index_eur_per_l == null ? "no diesel price yet, so no fair price" : `${CUR()}${summary.index_eur_per_l}/L`}.</p>}
     </div>
   );
 }
@@ -9747,7 +9787,7 @@ function pickMaterials(all, meta, keep) {
 }
 // 15 Oct 2026: a material whose only unit is tonnes (steel, the user)
 // 22 Oct 2026 (words sweep): "17 Oct 2026, 12:03 UTC" for the Configuration header (was the raw ISO stamp)
-const cfgWhen = (s) => { const d = new Date(String(s).replace(" ", "T").replace(/Z?$/, "Z")); return isNaN(d) ? String(s) : d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC"; };
+const cfgWhen = (s) => { const d = new Date(String(s).replace(" ", "T").replace(/Z?$/, "Z")); return isNaN(d) ? String(s) : d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" }); };   // 10 Nov 2026 (finding 20): UK time, "10 Nov 2026, 14:05"
 const isTonnesOnly = (c) => !!(c && Array.isArray(c.units) && c.units.length === 1 && c.units[0] === "t");
 // 9 Nov 2026 (UI critique finding 10, card 10): every value on the Configuration page sits inside CfgFields. For a reader
 // (anyone but an admin login) it is a DISABLED fieldset: the browser disables every input, select, textarea and button in it,
@@ -9802,6 +9842,8 @@ function ConfigPage({ meta, who, access }){
         body: JSON.stringify({ doc: body, updated_by: who || null }) });
       if(!r.ok) throw await errFrom(r);
       setMsg({ ok: true, text: "Saved. Every figure now uses it." });
+      // 10 Nov 2026 (finding 20): the distance unit reaches every screen at once, not at the next sign-in
+      { const du = ((body || {}).tenant || {}).distance_unit; if(du === "mi" || du === "km") TENANT.distance_unit = du; }
       await load();
     } catch(e){ setMsg({ ok: false, text: errSay("Not saved.", e) }); }
     setBusy(false);
@@ -9874,7 +9916,7 @@ function ConfigPage({ meta, who, access }){
           </details>}>
         {status && (
           <div className="text-sm text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span>{status.updated_at ? <>Last saved {cfgWhen(status.updated_at)} by {status.updated_by || "—"}</>
+            <span>{status.updated_at ? <>Last saved {cfgWhen(status.updated_at)}{status.updated_by ? ` by ${status.updated_by}` : ""}</>
               : status.source === "database" ? "Saved" : "Starting values, not saved yet"}</span>
             {status.differs_from_file && <StatusWord status="Pending" label="changed from the defaults" />}
             {dirty && <StatusWord status="edited" label="unsaved changes" />}
@@ -9886,7 +9928,7 @@ function ConfigPage({ meta, who, access }){
 
       {msg && <div className="rounded-lg border p-3 text-sm mb-4 whitespace-pre-wrap" style={{ borderColor: msg.ok ? "var(--green)" : "var(--red)", color: msg.ok ? "var(--ok-text)" : "var(--bad-text)", background: msg.ok ? "rgba(3,158,134,.06)" : "rgba(191,46,85,.06)" }}>{msg.text}</div>}
 
-      {!doc ? <SkeletonTable cols={["Vehicle", "Payload t", "GVW t", "kg CO₂e / km"]} rows={5} caption="Configuration · loading" /> : (
+      {!doc ? <SkeletonTable cols={["Vehicle", "Payload t", "GVW t", `kg CO₂e / ${PER_DIST()}`]} rows={5} caption="Configuration · loading" /> : (
         <div className="cfg-grid">
           <nav className="cfg-nav" aria-label="Configuration sections">
             {TABS.map(([k, l]) => (
@@ -9903,7 +9945,7 @@ function ConfigPage({ meta, who, access }){
               <table className="tbl">
                 <thead>
                   <tr>
-                    {["Vehicle", "English", "Estonian", "Payload t", "GVW t", "kg CO₂e / km", "Load min", "Unload min", "Euro class", "Planning"].filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
+                    {["Vehicle", "English", "Estonian", "Payload t", "GVW t", `kg CO₂e / ${PER_DIST()}`, "Load min", "Unload min", "Euro class", "Planning"].filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -9919,7 +9961,7 @@ function ConfigPage({ meta, who, access }){
                       {vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder={vehWord(k)} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
                       <td className="num w-24"><input className={inp + " text-right"} value={v.payload_t ?? ""} aria-label={`${nm} payload t`} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
                       <td className="num w-24"><input className={inp + " text-right"} value={v.gvw_t ?? ""} aria-label={`${nm} GVW t`} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
-                      <td className="num w-28"><input className={inp + " text-right"} placeholder={v.fuel === "electric" ? "derived: kWh × UK grid" : ""} value={v.emissions_kg_co2e_per_km ?? ""} aria-label={`${nm} kg CO2e per km`} onChange={e => upd(d => { d.vehicles[k].emissions_kg_co2e_per_km = num(e.target.value); })} /></td>
+                      <td className="num w-28"><UnitNum className={inp + " text-right"} dp={5} placeholder={v.fuel === "electric" ? "derived: kWh × UK grid" : ""} value={v.emissions_kg_co2e_per_km} aria-label={`${nm} kg CO2e per ${PER_DIST()}`} onValue={n => upd(d => { d.vehicles[k].emissions_kg_co2e_per_km = n; })} /></td>
                       <td className="num w-20"><input className={inp + " text-right"} value={v.load_minutes ?? ""} placeholder={String((doc.planning || {}).load_minutes ?? "")} aria-label={`${nm} load minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].load_minutes; else d.vehicles[k].load_minutes = n; })} /></td>
                       <td className="num w-20"><input className={inp + " text-right"} value={v.unload_minutes ?? ""} placeholder={String((doc.planning || {}).unload_minutes ?? "")} aria-label={`${nm} unload minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].unload_minutes; else d.vehicles[k].unload_minutes = n; })} /></td>
                       {/* 14 Oct 2026 (bundle G, W8): the Euro class the plan assumes for this vehicle type — optional, read only by
@@ -9959,7 +10001,7 @@ function ConfigPage({ meta, who, access }){
                     return (
                     <React.Fragment key={k}>
                     <tr className="align-top">
-                      <td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}{c.retired === true && <span className="block mt-1"><span className="chip-st"><i style={{ background: "var(--gold)" }} aria-hidden="true"></i>Older: pick one of the three</span></span>}{/* 18 Oct 2026 (decision 12): a long name wraps; 29 Oct 2026 (3b): a retired category says so. 9 Nov 2026: the comment inside the cell (the spaces before it were a text node in the row) */}</td>
+                      <td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}{c.retired === true && <span className="block mt-1"><RowStatus word="Older: pick one of the three" tone="warn" /></span>}{/* 18 Oct 2026 (decision 12): a long name wraps; 29 Oct 2026 (3b): a retired category says so. 9 Nov 2026: the comment inside the cell (the spaces before it were a text node in the row) */}</td>
                       <td className="num w-28"><input className={inp + " text-right"} value={c.density_t_per_m3 ?? ""} aria-label={`${k} density`} onChange={e => upd(d => { d.material_categories[k].density_t_per_m3 = num(e.target.value); })} /></td>
                       <td style={{ minWidth: 118 }}>   {/* 9 Nov 2026 (card 10): wide enough for "tonnes" and "vehicles" (was cut to "tonne", "vehic") */}
                         <select className={inp} style={{ minWidth: 104 }} value={c.default_unit || "t"} aria-label={`${k} default unit`} disabled={isTonnesOnly(c)} onChange={e => upd(d => { d.material_categories[k].default_unit = e.target.value; })}>
@@ -10035,14 +10077,29 @@ function ConfigPage({ meta, who, access }){
 
           {tab === "planning" && (
             <div className="px-6 pb-6 max-w-xl">
+              {/* 10 Nov 2026 (wave 2, finding 20, decision 5): the organisation's ONE distance unit (tenant.distance_unit, in the
+                  organisation file). Every screen, PDF, bulletin and speed reads it; the figures are stored in km, so nothing moves.
+                  No choice saved: miles for a GB organisation, km elsewhere (backend config.tenant_settings). */}
+              <div className="field" data-cfg="distance-unit">
+                <span className="block text-[13px] font-semibold text-slate-700 mb-1" id="cfg-du-l">Distances in</span>
+                <div className="ws-tabs" role="group" aria-labelledby="cfg-du-l" data-ro-only-on="1">
+                  {[["mi", "Miles"], ["km", "Kilometres"]].map(([k, l]) => {
+                    const cur = (doc.tenant || {}).distance_unit || (String(TENANT.country || "").toUpperCase() === "GB" ? "mi" : "km");
+                    return <button key={k} type="button" className="ws-tab" aria-pressed={cur === k ? "true" : "false"} data-du={k}
+                      onClick={() => upd(d => { d.tenant = d.tenant || {}; d.tenant.distance_unit = k; })}>{l}</button>; })}
+                </div>
+                <div className="hint">Every screen, PDF, bulletin and speed. Figures are stored in km, so only the words change.</div>
+              </div>
               {[["working_days_per_month", "Working days a month", "Loads a day and vehicle counts divide by this. Every export prints it."],
                 ["shift_hours_per_day", "Shift hours a day", "A lorry's working day. Its trips fit one driver's day (at most 13 hours) less the required break, with at most 9 hours driving. A planning figure."],
-                ["avg_haul_speed_kmh", "Average haul speed, km/h", "Used only for a route that is not routed yet."],
+                ["avg_haul_speed_kmh", `Average haul speed, ${SPD()}`, "Used only for a route that is not routed yet."],
                 ["load_minutes", "Loading time, minutes (default)", "Used when a vehicle has no figure of its own."],
                 ["unload_minutes", "Unloading time, minutes (default)", "Likewise."]].map(([k, l, help]) => (
                 <div key={k} className="field">
                   <label htmlFor={"cfg-" + k}>{l}</label>
-                  <input id={"cfg-" + k} className="ctl w-40 tabular-nums" inputMode="decimal" value={(doc.planning || {})[k] ?? ""} onChange={e => upd(d => { d.planning = d.planning || {}; d.planning[k] = num(e.target.value); })} />
+                  {k === "avg_haul_speed_kmh"
+                    ? <UnitNum id={"cfg-" + k} kind="speed" dp={1} className="ctl w-40 tabular-nums" inputMode="decimal" value={(doc.planning || {})[k]} onValue={n => upd(d => { d.planning = d.planning || {}; d.planning[k] = n; })} />
+                    : <input id={"cfg-" + k} className="ctl w-40 tabular-nums" inputMode="decimal" value={(doc.planning || {})[k] ?? ""} onChange={e => upd(d => { d.planning = d.planning || {}; d.planning[k] = num(e.target.value); })} />}
                   <div className="hint">{help}</div>
                 </div>
               ))}
@@ -11197,10 +11254,12 @@ const wkBody = (r) => ({ route_id: r.route_id, month_index: r.month_index,
                          discipline: r.discipline || "", section_id: r.section_id || "",
                          week_index: r.week_index });
 const numOr = (v, d) => (v === "" || v == null || isNaN(+v)) ? d : +v;
-// thousands with a thin space, the way the mocks print them: 4 200 t · 86 400
+// thousands: 10 Nov 2026 (wave 2, UI critique finding 20) a COMMA, as GOV.UK and the public map and bulletin print them
+// (8,405 t · 86,400); the thin space of the early mocks ("8 405 t") is gone, so staff and public screens read alike
 const grp = (n, d) => (n == null || isNaN(+n)) ? "—"
-  : (+n).toLocaleString("en-US", { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }).replace(/,/g, " ");
-const eurFmt = (n) => (n == null) ? "rate not set" : `${CUR()} ` + grp(n);
+  : (+n).toLocaleString("en-GB", { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
+// money: the symbol against the figure, "£57,833" (never "£ 57 833")
+const eurFmt = (n) => (n == null) ? "rate not set" : `${CUR()}` + grp(n);
 const unitLbl = (u) => u === "m3" ? "m³" : (u || "");
 // Palette C — one colour per team slot. The demo package paints its map bands with the
 // same hexes so a team reads the same colour in the tables and on the map; a tenant's own
@@ -11242,11 +11301,12 @@ function WsPill({ ws }){
     style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>{ws}</span>;
 }
 function LaKpi({ value, caption, tone }){
-  // a long value steps its size down before it would be cut off ("£1.43…" read as a price)
+  // a long value steps its size down before it would be cut off ("£1.43…" read as a price); 10 Nov 2026 (finding 20):
+  // from 7 characters, since "£57,833" and "162,438" (comma thousands, no space to wrap at) ran 6–7 px past the tile
   const len = String(value == null ? "" : value).length;
   return (
     <div className="card px-4 py-3 min-w-0" title={String(value == null ? "" : value)}>
-      <div className={"font-semibold tabular-nums truncate leading-8 " + (len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 7 ? "text-lg" : "text-2xl")}
+      <div className={"font-semibold tabular-nums truncate leading-8 " + (len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 6 ? "text-lg" : "text-2xl")}
         style={{ color: tone === "red" ? "var(--red)" : "var(--navy-deep)" }}>{value}</div>
       <div className="text-[13px] text-slate-500 mt-0.5 leading-tight">{caption}</div>
     </div>
@@ -11535,7 +11595,7 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
             <div className={"lp-kpi" + (view !== "booked" ? " ok" : "")}><b>{grp(dayN)} lorr{dayN === 1 ? "y" : "ies"}</b><span>{view === "booked" ? `the lines book on ${lpDayWords(shown)}` : `on ${lpDayWords(shown)} with ${view === "chained" ? "each yard's trips chained" : "the week compressed"}`}</span></div>
             <div className="lp-kpi"><b>{grp(dayBooked)}</b><span>the lines book on their own</span></div>
             <div className={"lp-kpi" + (savedWeek > 0 ? " ok" : "")}><b>{view === "booked" ? "—" : `${grp(Math.max(0, savedDay))} lorry-day${savedDay === 1 ? "" : "s"} saved`}</b><span>{view === "booked" ? "no saving in this view" : `this day · ${grp(Math.max(0, savedWeek))} this week`}</span></div>
-            <div className="lp-kpi"><b>{money && money.eur != null && data.day_hire.typed ? `${CUR()} ${grp(money.eur)}` : `${CUR()} —`}</b>
+            <div className="lp-kpi"><b>{money && money.eur != null && data.day_hire.typed ? `${CUR()}${grp(money.eur)}` : `${CUR()} —`}</b>
               <span>{data.day_hire.typed ? `saved this week, an estimate${money && money.missing && money.missing.length ? ` · no rate for ${money.missing.map(x => vehLabel(x)).join(", ")}` : ""}` : "at a day-hire rate on Config → Costing · fuel (none typed)"}</span></div>
           </div>
           {view === "booked" ? (
@@ -11618,32 +11678,33 @@ function GatesWeek({ gw }){
 }
 // the status pill column between the line and the days — sparse by design
 // the clash rail's names for each code — the same words as the user guide's §10.1
-const RAIL_LABEL = { SHORTAGE: "SHORTAGE", DAYS_NE_WEEK: "DAYS ≠ WEEK", STOCKPILE_OVER: "STOCKPILE OVER",
+const RAIL_LABEL = { SHORTAGE: "Shortage", DAYS_NE_WEEK: "Days ≠ week", STOCKPILE_OVER: "Stockpile over",
                      // 27 Oct 2026 (stockpile forecast, D7): goes over or runs out within 8 weeks; runs out this week
-                     STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",
-                     ROUTE_CAP: "ROUTE CAP", IPT_SHARE: "SHARE", RESTRICTION: "RESTRICTION",
-                     LIMIT: "ROAD LIMIT", UNBAKED: "NOT ROUTED", PARENT_CHANGED: "PARENT CHANGED",
+                     STOCKPILE_SOON: "Stockpile soon", STOCKPILE_EMPTY: "Stockpile empty",
+                     ROUTE_CAP: "Route cap", IPT_SHARE: "Share", RESTRICTION: "Restriction",
+                     LIMIT: "Road limit", UNBAKED: "Not routed", PARENT_CHANGED: "Month changed",
                      // 14 Oct 2026 (bundle G, W17)
-                     GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",
+                     GATE_OVER: "Gate over capacity", GATE_NEAR: "Gate near capacity",
                      // 29 Oct 2026 (task 3a): the concrete pours
-                     POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT", POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN",
+                     POUR_COLD_JOINT: "Cold joint likely", POUR_TRANSIT: "Too long in transit", POUR_SHORT: "Too few mixers", POUR_BAND: "Mixers in a no-delivery time", POUR_OVER_PLAN: "Over the month's plan",
                      // 22 Oct 2026 (abnormal loads, phase 2): the words of the Abnormal loads block's flags (a load, not a line)
-                     NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT",
+                     NOTICE_DUE: "Notice due", NOTICE_LATE: "Notice late", SO_LEAD_TIME: "SO lead time", AIL_ROAD_LIMIT: "AIL road limit",
                      // 28 Oct 2026 (task 0c): a dated zone in force crosses the route this week and it is not diverted
-                     NO_WAY_ROUND: "NO WAY ROUND",
+                     NO_WAY_ROUND: "No way round",
                      // 9 Nov 2026 (v2.1 task 2.1-1): a road or an area's limit on lorries a day (Zones, kind Traffic limit)
-                     TRAFFIC_LIMIT: "TRAFFIC LIMIT", TRAFFIC_NEAR: "TRAFFIC NEAR" };
+                     TRAFFIC_LIMIT: "Traffic limit", TRAFFIC_NEAR: "Traffic near" };
 // H1 (29 Sep 2026): a RESTRICTION flag carries the provider's own word — "TARK TEE" for an
 // Estonian tenant, "ROADWORKS" (National Highways planned closures) for a British one.
-const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? f.label : ((table || RAIL_LABEL)[f.code] || f.code);
+const capsWord = (w) => (/^[A-ZÄÖÜÕŠŽ0-9 ≠-]{4,}$/.test(String(w || "")) ? String(w)[0] + String(w).slice(1).toLowerCase() : w);   // 10 Nov 2026 (card 12)
+const flagWord = (f, table) => (f && f.code === "RESTRICTION" && f.label) ? capsWord(f.label) : ((table || RAIL_LABEL)[f.code] || f.code);
 // the grid's short words for each flag (the rail spells some out longer: RAIL_LABEL)
-const LINE_FLAG_LABEL = { UNBAKED: "NOT ROUTED", IPT_SHARE: "SHARE", ROUTE_CAP: "CAP", DAYS_NE_WEEK: "DAYS ≠ WEEK",
-                  STOCKPILE_OVER: "STOCKPILE OVER", RESTRICTION: "RESTRICTION", LIMIT: "ROAD LIMIT", SHORTAGE: "SHORT", PARENT_CHANGED: "MONTH CHANGED",
-                  GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",
-                  NO_WAY_ROUND: "NO WAY ROUND",
+const LINE_FLAG_LABEL = { UNBAKED: "Not routed", IPT_SHARE: "Share", ROUTE_CAP: "Cap", DAYS_NE_WEEK: "Days ≠ week",
+                  STOCKPILE_OVER: "Stockpile over", RESTRICTION: "Restriction", LIMIT: "Road limit", SHORTAGE: "Short", PARENT_CHANGED: "Month changed",
+                  GATE_OVER: "Gate over", GATE_NEAR: "Gate near", STOCKPILE_SOON: "Stockpile soon", STOCKPILE_EMPTY: "Stockpile empty",
+                  NO_WAY_ROUND: "No way round",
                   // 29 Oct 2026 (task 3a): the concrete pours, on the pour's day (backend pours.WORDS)
-                  POUR_COLD_JOINT: "COLD JOINT", POUR_TRANSIT: "TRANSIT", POUR_SHORT: "MIXERS SHORT", POUR_BAND: "IN A BAND", POUR_OVER_PLAN: "OVER PLAN",
-                  TRAFFIC_LIMIT: "TRAFFIC LIMIT", TRAFFIC_NEAR: "TRAFFIC NEAR" };   // 9 Nov 2026 (2.1-1)
+                  POUR_COLD_JOINT: "Cold joint likely", POUR_TRANSIT: "Too long in transit", POUR_SHORT: "Too few mixers", POUR_BAND: "Mixers in a no-delivery time", POUR_OVER_PLAN: "Over the month's plan",
+                  TRAFFIC_LIMIT: "Traffic limit", TRAFFIC_NEAR: "Traffic near" };   // 9 Nov 2026 (2.1-1)
 // 13 Oct 2026 (W6): the Look-ahead row's ONE status. The flags, most serious first (a lorry over a road limit
 // before anything else: decision 1), win over the week's state; with no flag, the week's state. `more` counts the
 // other kinds of flag; every flag's sentence is in the details. (Replaces LineFlags' column of words and the
@@ -11751,13 +11812,14 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
     put("/fuel-index/settings", { [k]: v, updated_by: who || null });
   };
   const hasIndex = idx.eur_per_l != null;
-  const price = hasIndex ? `${CUR()}${(+idx.eur_per_l).toFixed(3)} / L` : null;
+  const price = hasIndex ? `${CUR()}${(+idx.eur_per_l).toFixed(3)} per litre` : null;
+  const priceTight = hasIndex ? `${CUR()}${(+idx.eur_per_l).toFixed(3)}/L` : null;   // 10 Nov 2026 (finding 20): the compact card is tight
   // H1 (29 Sep 2026): no fallback to Estonia. The index country is the tenant's own
   // (or the one typed on Config); "--" means the tenant has no country — typed only.
   const rawCountry = fuelS.country || (idx.country || "") || TENANT.country || "--";
   const noCountry = rawCountry === "--" || !!idx.no_country;
   const country = noCountry ? "no country" : rawCountry;
-  const exVat = hasIndex && idx.ex_vat_per_l != null ? `${CUR()}${(+idx.ex_vat_per_l).toFixed(3)} / L ex-VAT` : null;
+  const exVat = hasIndex && idx.ex_vat_per_l != null ? `${CUR()}${(+idx.ex_vat_per_l).toFixed(3)} per litre ex-VAT` : null;
   const bafTxt = sum.baf_pct != null
     ? `BAF ${sum.baf_pct >= 0 ? "+" : ""}${(sum.baf_pct * 100).toFixed(2)} % of quote`
     : sum.baf_reason === "no base" ? "BAF: set a base on Confirm week"
@@ -11794,7 +11856,7 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
     return (
       <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 min-w-0" data-fuel-widget="compact" title={hasIndex ? String(price) : ""}>
         <div className="text-lg leading-8 font-bold tabular-nums truncate" style={{ color: "var(--navy-deep)" }}>
-          {hasIndex ? price : <span className="text-base text-amber-700">Index unavailable</span>}{staleChip}
+          {hasIndex ? priceTight : <span className="text-base text-amber-700">Index unavailable</span>}{staleChip}
         </div>
         <div className="text-xs uppercase tracking-wide text-slate-500 mt-0.5">
           diesel {country} · {hasIndex ? `${autoIdx && idx.source !== "manual" ? "published" : "typed"} ${fuelDate(idx.bulletin_date)}` : "type a price on Config"}{rf.running ? " · updating…" : ""}
@@ -12017,10 +12079,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
 
   const fld = "w-24 border border-slate-300 rounded px-1.5 py-0.5 text-sm text-right tabular-nums outline-none focus:ring-2 focus:ring-[color:var(--blue)]";
   const pill = (id, label) => (
-    <button key={id} onClick={() => pick(id)}
-      className="px-4 py-2 rounded-lg text-sm font-semibold border"
-      style={view === id ? { background: "var(--navy)", color: "var(--control-fg)", borderColor: "var(--navy)" }
-                         : { background: "var(--surface)", color: "var(--muted)", borderColor: "var(--line)" }}>{label}</button>
+    <button key={id} type="button" onClick={() => pick(id)} className="ws-tab" aria-current={view === id ? "page" : undefined}>{label}</button>
   );
   const subtitle = view === "account"
     ? `Account is last week only · ${spanLabel(account.week && account.week.from, account.week && account.week.to)} · type what actually moved`
@@ -12047,8 +12106,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
         {view === "commit" && (
           <span className="ml-auto flex items-center gap-2">
             <button onClick={() => download("xlsx")} disabled={!!busy || !lines.length}
-              className="px-4 py-2 rounded-lg text-sm font-semibold border disabled:opacity-40"
-              style={{ borderColor: "var(--navy)", color: "var(--navy)", background: "var(--surface)" }}>Export XLSX</button>
+              className="btn-sec disabled:opacity-40">Export XLSX</button>
             <button onClick={() => download("pdf")} disabled={!!busy || !lines.length}
               className="px-3 py-2 rounded-lg text-sm font-semibold border disabled:opacity-40"
               title="The one-page commitment sheet, grouped by origin"
@@ -12082,9 +12140,9 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
             <LaKpi value={grp(dist(totals.tonne_km))} caption={`${TKM()} · route basis`} />
             {/* 10 Sep evening: the diesel index, right of t·km — the same widget as Account and Config */}
             <FuelWidget mode="compact" who={who} access={access} initial={page && page.costing} onChanged={() => setTick(t => t + 1)} />
-            <LaKpi value={totals.eur == null ? "—" : `${CUR()} ` + grp(totals.eur)}
+            <LaKpi value={totals.eur == null ? "—" : `${CUR()}` + grp(totals.eur)}
               caption={totals.eur == null ? `planned ${CUR()} · no rate typed, no target set`
-                : `planned ${CUR()} · ${totals.eur_lines} of ${totals.lines} lines priced${totals.eur_target_lines ? ` · ${totals.eur_target_lines} at target` : ""}${totals.eur_partial ? " · partial" : ""}${totals.eur_adj != null ? ` · + BAF ${CUR()} ${grp(totals.eur_adj)}` : ""}${totals.fair_eur != null ? ` · fair ${CUR()} ${grp(totals.fair_eur)} (model, ${totals.fair_lines} of ${totals.lines})` : ""}`} />
+                : `planned ${CUR()} · ${totals.eur_lines} of ${totals.lines} lines priced${totals.eur_target_lines ? ` · ${totals.eur_target_lines} at target` : ""}${totals.eur_partial ? " · partial" : ""}${totals.eur_adj != null ? ` · + BAF ${CUR()}${grp(totals.eur_adj)}` : ""}${totals.fair_eur != null ? ` · fair ${CUR()}${grp(totals.fair_eur)} (model, ${totals.fair_lines} of ${totals.lines})` : ""}`} />
             <LaKpi value={account.shortfall > 0 ? `+${grp(account.shortfall)}` : "0"} tone={account.shortfall > 0 ? "red" : undefined} caption="last week shortage" />
             <LaKpi value={account.lines ? `${account.delivered} of ${account.lines} lines` : "—"} caption="last week delivered" />
           </div>
@@ -12095,7 +12153,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               <span className="font-semibold shrink-0">{rail.count} flag{rail.count === 1 ? "" : "s"} this week</span>
               <span className="min-w-0 flex-1 leading-6 flex flex-wrap gap-x-4 gap-y-1">
                 {(railOpen ? rail.flags : rail.flags.slice(0, 3)).map((f, i) => (
-                  <span key={i} className="chip-st"><i style={{ background: laTone(f.code) === "warn" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i><span className="font-semibold">{flagWord(f)}</span>&nbsp;{teamText(f.text)}</span>
+                  <span key={i} className="la-flag-line"><RowStatus word={flagWord(f)} tone={laTone(f.code)} />&nbsp;{teamText(f.text)}</span>
                 ))}
               </span>
               {rail.count > 3 && (
@@ -12254,10 +12312,10 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                             <RdItem t="Cycle">{`${grp(c.cycle_min)} min${c.cycle_source === "here" ? "" : ", return estimated"}`}</RdItem>
                             <RdItem t="Cycles a vehicle a day">{c.cycles_per_vehicle_day != null ? String(c.cycles_per_vehicle_day) + (c.lorry_day && c.lorry_day.limited_by !== "shift" ? ` (${c.lorry_day.limited_by === "driving" ? "the 9 h driving limit" : c.lorry_day.limited_by === "breaks" ? "the required break" : c.lorry_day.limited_by === "driver_day" ? "one driver's 13 h day" : "one round trip does not fit a driver's day: one lorry a trip"})` : "") : null}</RdItem>
                           </> : <RdItem t={DU()} wide>{`— until the route is worked out. Trips still come from the ${grp(c.payload_t, 1)} t planning payload${c.payload_fallback ? ` (${vehLabel(c.payload_fallback)} fallback)` : ""}.`}</RdItem>}
-                          <RdItem t="Planned cost this week">{wd.eur == null ? "Rate not set" : `${CUR()} ${grp(wd.eur)}${c.rate_source === "target" ? ", target rate" : ""}${wd.eur_partial ? `, without the per-${DU()} term` : ""}`}</RdItem>
+                          <RdItem t="Planned cost this week">{wd.eur == null ? "Rate not set" : `${CUR()}${grp(wd.eur)}${c.rate_source === "target" ? ", target rate" : ""}${wd.eur_partial ? `, without the per-${DU()} term` : ""}`}</RdItem>
                           <RdItem t={c.rate_source === "target" ? "Target, per unit" : "Quote, per unit"}>{wd.eur != null && wd.eur_units && wd.eur_units.per_t != null ? unitList(wd.eur_units) : null}</RdItem>
-                          <RdItem t="Plus the fuel surcharge (BAF)">{wd.eur_adj != null ? `${CUR()} ${grp(wd.eur_adj)}` : null}</RdItem>
-                          <RdItem t="Fair cost (model)">{wd.fair_eur != null && c.fair ? `${CUR()} ${grp(wd.fair_eur)}${fairWords(c.fair.flags) ? ", " + fairWords(c.fair.flags) : ""}` : null}</RdItem>
+                          <RdItem t="Plus the fuel surcharge (BAF)">{wd.eur_adj != null ? `${CUR()}${grp(wd.eur_adj)}` : null}</RdItem>
+                          <RdItem t="Fair cost (model)">{wd.fair_eur != null && c.fair ? `${CUR()}${grp(wd.fair_eur)}${fairWords(c.fair.flags) ? ", " + fairWords(c.fair.flags) : ""}` : null}</RdItem>
                           <RdItem t="Fair, per unit">{wd.fair_eur != null && wd.fair_units && wd.fair_units.per_t != null ? unitList(wd.fair_units) : null}</RdItem>
                           <RdItem t="Fuel" wide>{wd.fair_eur != null && c.fair ? `${grp(c.fair.litres_trip, 1)} L a trip at ${CUR()}${c.fair.index_eur_per_l} a litre, fuel ${grp(c.fair.fuel_share_pct)} % of the cost` : null}</RdItem>
                         </RowDetails>
@@ -12356,14 +12414,14 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums text-slate-600">
                             {r.planned_eur == null ? <span className="text-slate-500">rate not set</span> : <>
-                              <div>{CUR()} {grp(r.planned_eur)}{r.rate_source === "target" && <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full text-slate-600 bg-slate-100" title="No rate on this route — priced at the target rate from Config">target</span>}</div>
+                              <div>{CUR()}{grp(r.planned_eur)}{r.rate_source === "target" && <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full text-slate-600 bg-slate-100" title="No rate on this route — priced at the target rate from Config">target</span>}</div>
                               {r.planned_units && r.planned_units.per_t != null && <div className="text-xs text-slate-400 whitespace-nowrap">{unitTriple(r.planned_units)}</div>}
-                              {r.planned_eur_adj != null && <div className="text-xs text-slate-500" title="Quote × (1 + BAF). The quote above is unchanged.">+ BAF {CUR()} {grp(r.planned_eur_adj)}</div>}
+                              {r.planned_eur_adj != null && <div className="text-xs text-slate-500" title="Quote × (1 + BAF). The quote above is unchanged.">+ BAF {CUR()}{grp(r.planned_eur_adj)}</div>}
                             </>}
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums" style={{ color: "var(--navy)" }}>
                             {r.planned_fair_eur == null ? <span className="text-slate-500" title="No fair price: the route is not routed yet for this vehicle, or the diesel index is missing">—</span>
-                              : <>{CUR()} {grp(r.planned_fair_eur)}{(r.fair_flags || []).includes("WINTER") && <span className="ml-1 text-xs text-slate-500" title="winter consumption uplift applied">winter</span>}{(r.fair_flags || []).includes("THAW") && <span className="ml-1 text-xs text-amber-700" title="Spring load restrictions (8 t) may apply on gravel and municipal roads — permits are free">thaw</span>}
+                              : <>{CUR()}{grp(r.planned_fair_eur)}{(r.fair_flags || []).includes("WINTER") && <span className="ml-1 text-xs text-slate-500" title="winter consumption uplift applied">winter</span>}{(r.fair_flags || []).includes("THAW") && <span className="ml-1 text-xs text-amber-700" title="Spring load restrictions (8 t) may apply on gravel and municipal roads — permits are free">thaw</span>}
                                   {r.fair_units && r.fair_units.per_t != null && <div className="text-xs text-slate-400 whitespace-nowrap">{unitTriple(r.fair_units)}</div>}</>}
                           </td>
                           <td className="px-2 py-2 text-right">
@@ -13062,6 +13120,10 @@ const simTone = (g) => g.flag === "red" ? "bad" : g.flag === "amber" ? "warn" : 
 // 29 Oct 2026 (the page, card 5): the map follows the look — the dark basemap in the Dark look, the light one otherwise —
 // and is re-styled when the look changes (the layers are added again on each style load)
 const simMapStyle = () => (typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "dark") ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/light-v11";
+// 10 Nov 2026 (wave 2, UI critique finding 14, card 14): every staff map opens on the look's basemap (the Simulation's rule);
+// the data pages' map also follows a change of look unless someone picked its basemap by hand. The Route map (the embedded
+// public map page) reads the look itself.
+const lookMapStyle = () => { try { return simMapStyle(); } catch (e) { return "mapbox://styles/mapbox/light-v11"; } };   // a page with no look yet (drawn before the app starts) opens on Light
 // the map: its own Mapbox instance (CommitMap's pattern), drawn from the reply and redrawn at each clock minute; `wall` = the
 // big screen (the key stays a box over the map there; on the page it is a row under it)
 function SimMap({ meta, D, store, frame, site, wall }){
@@ -14078,7 +14140,7 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
     window.mapboxgl.accessToken = meta.mapbox_token;
     let m;
     try {
-      m = new window.mapboxgl.Map({ container: mapDiv.current, style: "mapbox://styles/mapbox/light-v11",
+      m = new window.mapboxgl.Map({ container: mapDiv.current, style: lookMapStyle(),   // 10 Nov 2026 (card 14): opens on the look's basemap
                                     center: UK_VIEW.center, zoom: UK_VIEW.zoom, attributionControl: true });
     } catch(e) {
       // 11 Sep: the Dashboard mounts this too — a map that cannot start (no token, no
@@ -14328,8 +14390,8 @@ function RoutePlanning({ route, token, onSaved }){
         </fieldset>
       </div>
       <button onClick={save} disabled={busy}
-        className="w-full py-2 rounded-lg text-sm font-semibold border disabled:opacity-50"
-        style={{ borderColor: "var(--navy)", color: "var(--navy)", background: "var(--surface)" }}>{busy ? "Saving…" : "Save planning figures"}</button>
+        className="w-full py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+        style={{ background: "var(--action)" }}>{busy ? "Saving…" : "Save planning figures"}</button>
       {msg && <p className="text-xs text-slate-500">{msg}</p>}
     </div>
   );
@@ -14527,8 +14589,8 @@ function RouteSheetText({ route, token, onSaved }){
       {T({ k: "permitted_deviations", label: "Permitted diversions", hint: "e.g. if the A-road is closed, the signed diversion only" })}
       <div className="grid grid-cols-2 gap-2">
         <button onClick={save} disabled={busy || over("route_reason") || over("permitted_deviations")}
-          className="w-full py-2 rounded-lg text-sm font-semibold border disabled:opacity-50"
-          style={{ borderColor: "var(--navy)", color: "var(--navy)", background: "var(--surface)" }}>{busy ? "Saving…" : "Save the words"}</button>
+          className="w-full py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+          style={{ background: "var(--action)" }}>{busy ? "Saving…" : "Save the words"}</button>
         <RouteSheetButton routeId={route.id} />
       </div>
       {msg && <p className="text-xs text-slate-500">{msg}</p>}
@@ -15502,7 +15564,7 @@ function RouteMapBox({ leg, onLeg, on, counts, onTick, msg, low }){
       <div className="inline-flex rounded-lg overflow-hidden border border-slate-300 shadow-sm" role="group" aria-label="Direction drawn" style={{ background: "var(--surface)" }}>
         {LEGS.map(([v, l]) => (
           <button key={v} type="button" data-leg-pick={v} aria-pressed={leg === v ? "true" : "false"} onClick={() => onLeg(v)}
-            className="px-3 text-[13px] font-semibold" style={{ minHeight: 28, ...(leg === v ? { background: "var(--navy)", color: "var(--control-fg)" } : { color: "var(--ink)" }) }}>{l}</button>
+            className="px-3 text-[13px] font-semibold" style={{ minHeight: 28, ...(leg === v ? { background: "var(--navy-soft)", color: "var(--navy)", boxShadow: "inset 0 0 0 1px var(--navy)" } : { color: "var(--ink)" }) }}>{l}</button>
         ))}
       </div>
       <details className="rounded-lg border border-slate-300 shadow-sm text-[13px]" style={{ background: "var(--surface)" }} data-route-layers="1">
@@ -15869,7 +15931,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [mapReady, setMapReady] = useState(false);
   const [status, setStatus] = useState(null);
   const [summary, setSummary] = useState(null);
-  const [basemap, setBasemap] = useState("mapbox://styles/mapbox/light-v11");
+  const [basemap, setBasemap] = useState(() => lookMapStyle());
+  const basemapByHand = useRef(false);   // 10 Nov 2026 (card 14): a pick in the Basemap select is kept when the look changes
   const [showProfile, setShowProfile] = useState(vehicles.includes("Artic Tipper (44t)") ? "Artic Tipper (44t)" : vehicles[0]);
   // which of the baked geometries the map draws. A route now has two directions and up
   // to three HERE options each, so without a pick the map would stack six lines per route.
@@ -16305,13 +16368,20 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     };
   }, []);
 
-  const changeStyle = (val) => {
+  const changeStyle = (val, auto) => {
+    if(!auto) basemapByHand.current = true;
     setBasemap(val);
     const m = mapObj.current;
     if(!m) return;
     if(val === "maaamet-ortho") m.setStyle(maaametStyle());
     else m.setStyle(val);
   };
+  // 10 Nov 2026 (card 14): the look changes → the look's basemap, unless one was picked by hand (style.load re-adds the layers)
+  useEffect(() => {
+    const onLook = () => { if(!basemapByHand.current) changeStyle(lookMapStyle(), true); };
+    THEME.subs.add(onLook);
+    return () => { THEME.subs.delete(onLook); };
+  }, []);
 
   // load geometry for the shown profile whenever it (or the data) changes
   useEffect(() => {
@@ -17307,7 +17377,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(canEdit) setZoneForm({ id: z.id, name: z.name || "", kind: z.kind || "other",
                   affects_routing: !!z.affects_routing, starts_on: z.starts_on || "",
                   ends_on: z.ends_on || "", note: z.note || "", active: !!z.active,
-                  speed_kph: (z.speed_kph == null ? "" : String(z.speed_kph)),
+                  speed_kph: (z.speed_kph == null ? "" : String(Math.round(speed(z.speed_kph) * 10) / 10)),   // 10 Nov 2026: typed in the unit
                   haul_mode: z.haul_mode || "", location_id: z.location_id || "",
                   limit_value: (z.limit && z.limit.value != null) ? String(z.limit.value) : "",
                   limit_counts: (z.limit && z.limit.counts) || "movements", limit_basis: (z.limit && z.limit.basis) || "average",
@@ -17439,7 +17509,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       // "no assigned speed" is not "0 km/h", and a haul road with no speed keeps HERE's
       // own timing rather than contributing an infinite one.
       speed_kph: (haulNow && String(zoneForm.speed_kph).trim() !== ""
-                  ? Number(zoneForm.speed_kph) : null),
+                  ? Math.round(Number(zoneForm.speed_kph) * (DU() === "mi" ? KM_PER_MI : 1) * 10) / 10 : null),
       haul_mode: (haulNow && zoneForm.haul_mode ? zoneForm.haul_mode : null),
       // 28 Oct 2026 (simulation v2): a haul road inside a site (never spliced into a public route); blank = a public haul road
       location_id: (haulNow && zoneForm.location_id) ? zoneForm.location_id : null,
@@ -17704,7 +17774,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-semibold text-slate-700">Locations</div>
               {mode === "view" && canEdit && (
-                <button onClick={startAdd} className="text-xs font-semibold px-2.5 py-1 rounded-md text-white" style={{ background: "var(--navy)" }}>+ Add location</button>
+                <button onClick={startAdd} className="text-xs font-semibold px-2.5 py-1 rounded-md text-white" style={{ background: "var(--action)" }}>+ Add location</button>
               )}
             </div>
 
@@ -18159,7 +18229,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       <div className="flex items-center gap-2">
                         <button onClick={saveGate}
                           className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs"
-                          style={{ background: "var(--navy)" }}>
+                          style={{ background: "var(--action)" }}>
                           {gateForm.id ? "Save gate" : "Create gate"}
                         </button>
                         <button onClick={() => { setGateForm(null); setGatePlace(false); }}
@@ -18232,7 +18302,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       <p className="text-[13px] text-slate-400">Where lorries stop. An area drawn as a shape keeps its shape; placing it here moves its point.</p>
                       <label className="flex items-center gap-1.5 text-xs text-slate-600"><input type="checkbox" checked={!!areaForm.active} onChange={e => setAreaForm(a => ({ ...a, active: e.target.checked }))} />Active</label>
                       <div className="flex items-center gap-2">
-                        <button onClick={saveArea} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs" style={{ background: "var(--navy)" }}>{areaForm.id ? "Save area" : "Create area"}</button>
+                        <button onClick={saveArea} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs" style={{ background: "var(--action)" }}>{areaForm.id ? "Save area" : "Create area"}</button>
                         <button onClick={() => { setAreaForm(null); setAreaPlace(false); }} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
                         {areaForm.id && <button onClick={() => deleteArea(areaForm.id)} className="ml-auto px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ color: "var(--red)" }}>Delete</button>}
                       </div>
@@ -18253,7 +18323,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
                 <div className="flex items-center gap-2">
                   <button onClick={saveLoc} disabled={savingLoc}
-                    className="px-4 py-2 rounded-lg text-white font-semibold text-sm disabled:opacity-50" style={{ background: "var(--navy)" }}>
+                    className="px-4 py-2 rounded-lg text-white font-semibold text-sm disabled:opacity-50" style={{ background: "var(--action)" }}>
                     {savingLoc ? "Working…" : (form.id ? "Save changes" : "Create location")}
                   </button>
                   <button onClick={cancelForm} className="px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 text-sm">Cancel</button>
@@ -18275,7 +18345,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               {!zoneForm && canEdit && (
                 <span className="flex items-center gap-2">
                   <button onClick={startNewZone} disabled={zoneBusy}
-                    className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--navy)" }}>+ Draw zone</button>
+                    className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--action)" }}>+ Draw zone</button>
                   {/* 22 Oct 2026 (UI fix 6, card 6): the haul-road fill reads var(--haul-text) */}
                   <button onClick={startNewHaul} disabled={zoneBusy}
                     title="A temporary haul road: an open line with an assigned speed, attached to routes on the Routes tab"
@@ -18324,7 +18394,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     {/* 22 Oct 2026 (UI fix 6, card 6): the label reads var(--haul-text) (5.13:1 on the amber wash) */}
                     <div className="text-xs uppercase tracking-wide" style={{ color: "var(--haul-text)" }}>Haul road</div>
                     <label className="block">
-                      <span className="block text-sm font-medium text-slate-700 mb-1">Assigned speed (km/h)</span>
+                      <span className="block text-sm font-medium text-slate-700 mb-1">Assigned speed ({SPD()})</span>
                       <input type="number" min="1" step="1" value={zoneForm.speed_kph}
                         onChange={e => setZField("speed_kph", e.target.value)}
                         placeholder="e.g. 25"
@@ -18465,7 +18535,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
                       km += 2 * 6371.0088 * Math.asin(Math.min(1, Math.sqrt(a)));
                     }
-                    const sp = Number(zoneForm.speed_kph);
+                    const sp = Number(zoneForm.speed_kph) * (DU() === "mi" ? KM_PER_MI : 1);   // km/h, from the typed unit
                     return <p className="text-[13px] text-slate-500">
                       Drawn length <span className="font-mono">{fmtDist(km, 2)} {DU()}</span>
                       {sp > 0
@@ -18477,7 +18547,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
                 <div className="flex items-center gap-2 pt-1">
                   <button onClick={saveZone} disabled={zoneBusy}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-md text-white disabled:opacity-40" style={{ background: "var(--navy)" }}>
+                    className="text-xs font-semibold px-3 py-1.5 rounded-md text-white disabled:opacity-40" style={{ background: "var(--action)" }}>
                     {zoneBusy ? "Working…" : (zoneForm.id ? "Save changes" : "Create zone")}
                   </button>
                   <button onClick={cancelZone} disabled={zoneBusy}
@@ -18604,7 +18674,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               </div>
               {editingRoute ? (
                 <button onClick={saveRouteEdit} disabled={routeBusy || !rOrigin || !rDest || !destValid(rDest)}
-                  className="w-full py-2 rounded-lg text-white font-semibold text-sm disabled:opacity-50" style={{ background: "var(--navy)" }}>
+                  className="w-full py-2 rounded-lg text-white font-semibold text-sm disabled:opacity-50" style={{ background: "var(--action)" }}>
                   {routeBusy ? "Working…" : (() => {
                     // The button says what pressing it will DO to the vehicles, because
                     // the destructive half of this form is a tick-box that looks like a
@@ -18620,7 +18690,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 </button>
               ) : (
               <button onClick={createRoute} disabled={routeBusy || !rOrigin || !rDest || !destValid(rDest)}
-                className="w-full py-2 rounded-lg text-white font-semibold text-sm disabled:opacity-50" style={{ background: "var(--navy)" }}>
+                className="w-full py-2 rounded-lg text-white font-semibold text-sm disabled:opacity-50" style={{ background: "var(--action)" }}>
                 {routeBusy ? "Working…" : (rVehicles.length ? `Create & route · ${rVehicles.length} vehicle(s)` : "Create route (not routed)")}
               </button>
               )}
@@ -18675,7 +18745,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
           <span className="text-sm font-semibold text-slate-700">Locations <span className="text-slate-400 font-normal">· click a row to locate it on the map{canEdit ? " and open it for editing" : ""}</span></span>
           {canEdit && <button onClick={startAdd}
-            className="text-xs font-semibold px-2.5 py-1 rounded-md text-white" style={{ background: "var(--navy)" }}>
+            className="text-xs font-semibold px-2.5 py-1 rounded-md text-white" style={{ background: "var(--action)" }}>
             + Add location
           </button>}
         </div>
@@ -18760,7 +18830,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 ? `Route the whole network for ${rVehicles.map(vehShort).join(", ")} — ticked on the Create route panel`
                 : `No vehicles ticked on the Create route panel — will use ${vehShort(showProfile)}`}
               className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40"
-              style={{ background: "var(--navy)" }}>
+              style={{ background: "var(--action)" }}>
               {routeBusy ? "Routing…" : `Route all · ${(rVehicles.length || 1)} vehicle(s)`}
             </button>
             <button onClick={clearRoutes} disabled={routeBusy || !(status && status.length)}
@@ -18938,7 +19008,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           <span className="text-sm font-semibold text-slate-700">Zones <span className="text-slate-400 font-normal">· click a row to {canEdit ? "edit the zone and frame it" : "frame it"} on the map</span></span>
           {canEdit && <span className="flex items-center gap-2">
             <button onClick={startNewZone} disabled={zoneBusy}
-              className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--navy)" }}>
+              className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40" style={{ background: "var(--action)" }}>
               + Draw zone
             </button>
             {/* 22 Oct 2026 (UI fix 6, card 6): the haul-road fill reads var(--haul-text) */}
@@ -18980,13 +19050,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                            ? <span className="text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap" data-zone-inside={z.id}
                                style={{ background: "var(--haul-soft)", color: "var(--haul-text)" }}
                                title="A road inside a site: never routed through; the Simulation drives it between the gates, the areas and the wheel wash.">
-                               Inside a site{z.speed_kph ? ` @ ${z.speed_kph}` : ""}
+                               Inside a site{z.speed_kph ? ` @ ${Math.round(speed(z.speed_kph))} ${SPD()}` : ""}
                              </span>
                            : z.affects_routing
                            ? <span className="text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap"
                                style={{ background: "var(--haul-soft)", color: "var(--haul-text)" }}
                                title="Routes attached to this road are sent through it.">
-                               Routed through{z.speed_kph ? ` @ ${z.speed_kph}` : ""}
+                               Routed through{z.speed_kph ? ` @ ${Math.round(speed(z.speed_kph))} ${SPD()}` : ""}
                              </span>
                            : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600" title="Drawn but not open to traffic">Not open</span>)
                         : z.kind === LIMIT_KIND
@@ -19356,7 +19426,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
               <span className="text-slate-500">{slMonths(p)} · {p.things} things{slPicWords((p.pictures || 0) + ((lay && lay.pictures) || []).filter(x => x.every).length)}</span>
               {canLayout && !edit && !imp && (
                 <span className="ml-auto flex items-center gap-1.5">
-                  {onDraw && <button onClick={() => onDraw(p.id)} className="px-2.5 py-1 rounded-lg text-white font-semibold text-[13px]" style={{ background: "var(--navy)" }} aria-label={`Draw ${p.name}`}>Draw</button>}
+                  {onDraw && <button onClick={() => onDraw(p.id)} className="px-2.5 py-1 rounded-lg text-white font-semibold text-[13px]" style={{ background: "var(--action)" }} aria-label={`Draw ${p.name}`}>Draw</button>}
                   <RowMenu name={p.name}>
                     <button type="button" onClick={() => { setPrt(null); setWa(null); setEdit({ id: p.id, name: p.name, month_from: p.month_from || "", month_to: p.month_to || "", version: p.version }); }}>Name and months</button>
                     <button type="button" onClick={() => openPrint(p)}>Print…</button>
@@ -19421,7 +19491,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
             {((wa.target === "new" && wa.routing) || (keep && keep.affects_routing)) && " Routes that cross it will need routing again."}</p>
           <div className="flex items-center gap-2">
             <button onClick={saveWorks} disabled={busy !== "" || (wa.target === "new" && !wa.name.trim())} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs disabled:opacity-50"
-              style={{ background: "var(--navy)" }}>{busy === "works" ? "Saving…" : "Save the works area"}</button>
+              style={{ background: "var(--action)" }}>{busy === "works" ? "Saving…" : "Save the works area"}</button>
             <button onClick={() => setWa(null)} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
           </div>
         </div>);
@@ -19434,8 +19504,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
             <span className="inline-flex rounded-lg border border-slate-300 overflow-hidden w-max" role="group" aria-label="Page">
               {[["a3", "A3"], ["a4", "A4"]].map(([k, t]) => (
                 <button key={k} type="button" aria-pressed={prt.page === k} onClick={() => setPrt(x => ({ ...x, page: k }))}
-                  className={"px-3 py-1 font-semibold " + (prt.page === k ? "text-white" : "text-slate-700 bg-white hover:bg-slate-50")}
-                  style={prt.page === k ? { background: "var(--navy)" } : undefined}>{t}</button>))}
+                  className={"px-3 py-1 font-semibold " + (prt.page === k ? "ws-on" : "text-slate-700 bg-white hover:bg-slate-50")}>{t}</button>))}
             </span>
             <span className="text-slate-500">Scale</span>
             <select value={prt.scale} onChange={e => setPrt(x => ({ ...x, scale: e.target.value }))} aria-label="Scale"
@@ -19451,7 +19520,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => printSheet("pdf")} disabled={busy !== ""} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs disabled:opacity-50" style={{ background: "var(--navy)" }}>{busy === "print" ? "Making…" : "PDF"}</button>
+            <button onClick={() => printSheet("pdf")} disabled={busy !== ""} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs disabled:opacity-50" style={{ background: "var(--action)" }}>{busy === "print" ? "Making…" : "PDF"}</button>
             <button onClick={() => printSheet("png")} disabled={busy !== ""} className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 disabled:opacity-50">PNG</button>
             <button onClick={() => setPrt(null)} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
           </div>
@@ -19470,7 +19539,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
                 className="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm" /></label>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={savePhase} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs" style={{ background: "var(--navy)" }}>{edit.id ? "Save phase" : "Add phase"}</button>
+            <button onClick={savePhase} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs" style={{ background: "var(--action)" }}>{edit.id ? "Save phase" : "Add phase"}</button>
             <button onClick={() => setEdit(null)} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
           </div>
         </div>
@@ -19479,7 +19548,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
         <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2" data-site-layout-ask="1">
           <p className="text-[13px] text-slate-700">{imp.ask}</p>
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={() => readFile(imp.file, "bng")} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs" style={{ background: "var(--navy)" }}>On National Grid</button>
+            <button onClick={() => readFile(imp.file, "bng")} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs" style={{ background: "var(--action)" }}>On National Grid</button>
             <button onClick={() => readFile(imp.file, "site")} className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50">On the site's own grid</button>
             <button onClick={() => setImp(null)} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
           </div>
@@ -19548,7 +19617,7 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
           </div>
           <label className="flex items-center gap-1.5 text-xs text-slate-700"><input type="checkbox" checked={keep} onChange={e => setKeep(e.target.checked)} />Keep the file's colours</label>
           <div className="flex items-center gap-2">
-            <button onClick={place} disabled={!canPlace} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs disabled:opacity-50" style={{ background: "var(--navy)" }}>{busy === "place" ? "Placing…" : "Place it"}</button>
+            <button onClick={place} disabled={!canPlace} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs disabled:opacity-50" style={{ background: "var(--action)" }}>{busy === "place" ? "Placing…" : "Place it"}</button>
             <button onClick={() => { setImp(null); setFit(null); setPts({}); setPicking(""); }} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
           </div>
         </div>
@@ -20076,7 +20145,7 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
         {full && TENANT.demo_notice && <span className="sl-demo-pill" role="note"><b>DEMO</b>{TENANT.demo_notice}</span>}
         <button onClick={undo} disabled={!hist.undo || busy !== ""} className={tb} title="Undo (Ctrl+Z)">Undo</button>
         <button onClick={redo} disabled={!hist.redo || busy !== ""} className={tb} title="Redo (Ctrl+Y)">Redo</button>
-        <button onClick={save} disabled={!(dirty || pdirty) || busy !== ""} className="px-3 py-1 rounded-lg text-white font-semibold text-[13px] disabled:opacity-50" style={{ background: "var(--navy)" }} title="Save (Ctrl+S)">{busy === "save" ? "Saving…" : "Save"}</button>
+        <button onClick={save} disabled={!(dirty || pdirty) || busy !== ""} className="px-3 py-1 rounded-lg text-white font-semibold text-[13px] disabled:opacity-50" style={{ background: "var(--action)" }} title="Save (Ctrl+S)">{busy === "save" ? "Saving…" : "Save"}</button>
         <button onClick={done} className={tb}>Done</button>
       </span>
       {(msg.t || stale || ask) && (
@@ -20089,7 +20158,7 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
       {corner && (
         <p className="basis-full text-[13px] flex flex-wrap items-center gap-2 text-slate-700" role="status" data-picture-corners={corner}>
           <span>{cWords}</span>
-          <button onClick={cornersDone} className="px-3 py-1 rounded-lg text-white font-semibold text-[13px]" style={{ background: "var(--navy)" }}>Done</button>
+          <button onClick={cornersDone} className="px-3 py-1 rounded-lg text-white font-semibold text-[13px]" style={{ background: "var(--action)" }}>Done</button>
           <button onClick={cornersCancel} className={tb}>Cancel</button>
         </p>
       )}
@@ -20221,7 +20290,7 @@ function SiteLayoutDraw({ mapRef, styles, locId, phaseId, roads, wide, reinstall
               <label className="flex items-center gap-1.5"><input type="radio" name="slp-every" checked={padd.every} onChange={() => setPadd(x => ({ ...x, every: true }))} />Every phase</label>
             </fieldset>
             <div className="flex items-center gap-2">
-              <button onClick={addPic} disabled={!padd.file || busy !== ""} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs disabled:opacity-50" style={{ background: "var(--navy)" }}>{busy === "pic" ? "Adding…" : "Add"}</button>
+              <button onClick={addPic} disabled={!padd.file || busy !== ""} className="px-3 py-1.5 rounded-lg text-white font-semibold text-xs disabled:opacity-50" style={{ background: "var(--action)" }}>{busy === "pic" ? "Adding…" : "Add"}</button>
               <button onClick={() => setPadd(null)} className="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 text-xs">Cancel</button>
             </div>
           </div>

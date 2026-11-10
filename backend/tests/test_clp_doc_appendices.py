@@ -395,7 +395,7 @@ ok("⭐ D: pours on the CLP's routes only: the yard's CLP has the pours on its t
    [r["id"] for r in AD["D"]["rows"]] == ["P901", "P902"] and [r["id"] for r in AD2["D"]["rows"]] == ["P901", "P902", "P903"],
    str([r["id"] for r in AD["D"]["rows"]]))
 ok("...a team's CLP holds that team's pours only; the flags are the screens' words",
-   [r["id"] for r in AD1["D"]["rows"]] == ["P901"] and AD["D"]["rows"][0]["flags"] == ["IN A BAND"], str(AD1.get("D")))
+   [r["id"] for r in AD1["D"]["rows"]] == ["P901"] and AD["D"]["rows"][0]["flags"] == ["Mixers in a no-delivery time"], str(AD1.get("D")))   # NARROWED 10 Nov 2026 (wave 2, card 12): the screens' words, in sentence case
 
 # ---- L, M, G, J, K: figures equal the modules that own them ------------------------------------------------------- #
 AL = APP.gather(BA, factors=factors)

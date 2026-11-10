@@ -409,7 +409,7 @@ csrc = read("backend/clashes.py")
 ok("5. compute() adds the LIMIT flags and reports the limits source",
    "lim, lim_source = limit(all_lines)" in csrc and '"limits": lim_source.get("status")' in csrc)
 fe = read("frontend/index.html")
-ok("5. the staff rail names it ROAD LIMIT in both label tables", fe.count('LIMIT: "ROAD LIMIT"') == 2)
+ok("5. the staff rail names it Road limit in both label tables", fe.count('LIMIT: "Road limit"') == 2)   # NARROWED 10 Nov 2026 (wave 2, card 12): sentence case
 
 # =========================================================================== #
 #  6. The map's collection                                                     #

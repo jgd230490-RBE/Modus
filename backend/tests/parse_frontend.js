@@ -619,7 +619,8 @@ ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not 
   && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "re-check" : "check now"}'));
 // 17 Oct 2026 (UI fix 2, findings 1 and 6): the pressed view pill and the two Confirm week buttons read tokens
 ok("UI fix 2 (#1): the pressed view pill (Commit / Account / Horizon) reads var(--control-fg), not an inline white",
-  _laBody.includes('style={view === id ? { background: "var(--navy)", color: "var(--control-fg)", borderColor: "var(--navy)" }') && !/color: "white"/.test(_laBody));
+  _laBody.includes('<button key={id} type="button" onClick={() => pick(id)} className="ws-tab" aria-current={view === id ? "page" : undefined}>{label}</button>') && !/color: "white"/.test(_laBody)
+  && html.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--navy-soft);color:var(--navy);border-color:var(--navy);}'));   // NARROWED 10 Nov 2026 (wave 2, card 13): ONE tab (.ws-tab); what is selected is the --navy-soft tint with --navy text, never a filled button
 ok("UI fix 2 (#6): both Confirm week buttons read the --ok-btn pair (5.48:1 ink, 8.47:1 dark) and carry no text-white; nothing else in the app uses the pair; no text-white sits on var(--green) anywhere",
   (_laBody.match(/style=\{\{ background: "var\(--ok-btn\)", color: "var\(--ok-btn-fg\)" \}\}/g) || []).length === 2
   && (code.match(/var\(--ok-btn\)/g) || []).length === 2 && (code.match(/var\(--ok-btn-fg\)/g) || []).length === 2
@@ -921,7 +922,7 @@ ok("the in-progress preview does not close a haul road",
 ok("editing a haul road does not pop its last point as if it closed a ring",
   code.includes('if(z.geometry && z.geometry.type === "Polygon"'));
 
-ok("a blank speed is sent as null, not zero", code.includes("? Number(zoneForm.speed_kph) : null"));
+ok("a blank speed is sent as null, not zero", code.includes('? Math.round(Number(zoneForm.speed_kph) * (DU() === "mi" ? KM_PER_MI : 1) * 10) / 10 : null'));   // NARROWED 10 Nov 2026 (wave 2, finding 20): typed in the organisation's unit, sent in km/h
 // NARROWED 22 Oct 2026 (UI fix 7, the user: "i dont want to much wording. and no info about api or backend stuff"): one line each on the screen, the HERE reasoning in the technical guide
 ok("the speed field explains that HERE will not take a custom speed",
   src.includes("Time on this road = its length ÷ this speed. Blank = not set.") && !src.includes("will not accept a custom speed") && _tg.includes("HERE's own timing stands"));
@@ -1257,10 +1258,10 @@ ok("🔴 nothing is seeded in the page: no 25 % share and no €1.9x price as a 
 ok("the Commit KPI strip is eight cards with the widget right of t·km, and the planned € caption counts target lines and shows + BAF",
   _laBody.includes("xl:grid-cols-8") && _laBody.indexOf('caption={`${TKM()} · route basis`}') < _laBody.indexOf('<FuelWidget mode="compact"')
   && _laBody.indexOf('<FuelWidget mode="compact"') < _laBody.indexOf("planned ${CUR()} · no rate typed")
-  && _laBody.includes("at target") && _laBody.includes("+ BAF ${CUR()} ${grp(totals.eur_adj)}"));
+  && _laBody.includes("at target") && _laBody.includes("+ BAF ${CUR()}${grp(totals.eur_adj)}"));   // NARROWED 10 Nov 2026 (wave 2, finding 20): money against the symbol ("£57,833")
 ok("...the expanded Commit row and the Account cell print '+ BAF' as a SECOND figure and mark a target-priced line",
   // 13 Oct 2026 (W6, narrowed): the Commit row's BAF is its own line in the details
-  _laBody.includes('<RdItem t="Plus the fuel surcharge (BAF)">{wd.eur_adj != null ? `${CUR()} ${grp(wd.eur_adj)}` : null}</RdItem>') && _laBody.includes("+ BAF {CUR()} {grp(r.planned_eur_adj)}")
+  _laBody.includes('<RdItem t="Plus the fuel surcharge (BAF)">{wd.eur_adj != null ? `${CUR()}${grp(wd.eur_adj)}` : null}</RdItem>') && _laBody.includes("+ BAF {CUR()}{grp(r.planned_eur_adj)}")   // NARROWED 10 Nov 2026 (wave 2, finding 20): money against the symbol ("£57,833")
   && _laBody.includes('r.rate_source === "target"') && _laBody.includes('c.rate_source === "target"'));
 ok("...and the Account footer says the quote is never replaced and € var is against the quote",
   // 13 Oct 2026 (W3, narrowed): the Account footer moved to the Planned cost header's info box (la.cost_quote)
@@ -1298,8 +1299,8 @@ ok("...a live document without the block shows the file's values and says so",
   _fpBody.includes("const fp = (doc && doc.fair_price) || fileFp") && _fpBody.includes("These are the starting values. Save once to keep them."));   // NARROWED 22 Oct 2026 (words sweep; the user: few words, no back-end words on screens): plain words
 ok("the Look-ahead prints the fair figure as a THIRD figure, marked 'model': KPI caption, expanded row, Account column",
   // 13 Oct 2026 (W6, narrowed): the Commit row's fair figure is the details' "Fair cost (model)" line
-  _laBody.includes("fair ${CUR()} ${grp(totals.fair_eur)} (model") && _laBody.includes('<RdItem t="Fair cost (model)">{wd.fair_eur != null && c.fair ? `${CUR()} ${grp(wd.fair_eur)}') && _laBody.includes("Fair {CUR()} <span")
-  && _laBody.includes("{CUR()} {grp(r.planned_fair_eur)}"));
+  _laBody.includes("fair ${CUR()}${grp(totals.fair_eur)} (model") && _laBody.includes('<RdItem t="Fair cost (model)">{wd.fair_eur != null && c.fair ? `${CUR()}${grp(wd.fair_eur)}') && _laBody.includes("Fair {CUR()} <span")
+  && _laBody.includes("{CUR()}{grp(r.planned_fair_eur)}"));   // NARROWED 10 Nov 2026 (wave 2, finding 20): money against the symbol ("£57,833")
 ok("...with the winter and thaw flags on the Account cell and the expanded row",
   _laBody.includes('(r.fair_flags || []).includes("WINTER")') && _laBody.includes('(r.fair_flags || []).includes("THAW")')
   // 13 Oct 2026 (W6, narrowed): the expanded row's flags are words through fairWords (winter, thaw)
@@ -1572,7 +1573,7 @@ ok("...and it collapses with the rail like every other item (label behind railSh
   ok("AL: the page's words — check with the haulier, counted apart, the flags' words and tones (NOTICE DUE amber, NOTICE LATE and SO LEAD TIME red), the status words",
      al.includes('subtitle="Each load planned on its own and counted apart from the lorries."')   // NARROWED 27 Oct 2026 (the final UI pass): one line; the rest in the guide's chapter 14
      && _ug27.includes("the haulier, ESDAL, the police and the road and bridge authorities decide") && _ug27.includes("Counted apart: an abnormal load is never in the lorry counts")
-     && al.includes('const AL_FLAG_WORD = { NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
+     && al.includes('const AL_FLAG_WORD = { NOTICE_DUE: "Notice due", NOTICE_LATE: "Notice late", SO_LEAD_TIME: "SO lead time", AIL_ROAD_LIMIT: "AIL road limit" };')   // NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case
      && al.includes('const AL_FLAG_TONE = { NOTICE_DUE: "warn", NOTICE_LATE: "bad", SO_LEAD_TIME: "bad", AIL_ROAD_LIMIT: "bad" };')
      && al.includes('const AL_NEXT_WORD = { approved: "Approve", pending: "Reopen", notified: "Mark notified", moved: "Mark moved", withdrawn: "Withdraw" };'));
   ok("AL: the guide has three steps for the page (the header, the Plan button, the list), each anchored to a mark the page carries",
@@ -1665,8 +1666,9 @@ ok("...and it collapses with the rail like every other item (label behind railSh
      code.includes('const COMM_SOURCE_WORDS = { osm: "Places and homes", osm_structures: "Bridges, crossings and limits", gias: "Schools", naptan: "Bus stops and stations" };')
      && cfg[0].includes('<th scope="col">Data</th>') && !cfg[0].includes("st.credit") && !cfg[0].includes("title={st.error}") && !cfg[0].includes("title={s.error}")
      && cfg[0].includes("Injury collisions reported to the police, five years,")
-     && cfg[1].includes("Typically 0.4–0.95; the low end is the default") && cfg[1].includes("From the government's 2026 factor")
-     && cfg[1].includes("34 laden − 0.4 × 26 t") && cfg[1].includes("Cars use about 15 % more at −7 °C; lorries less")
+     && cfg[1].includes("Typically {+(+distRate(0.4)).toFixed(2)}–{+(+distRate(0.95)).toFixed(2)}; the low end is the default") && cfg[1].includes("From the government's 2026 factor")
+     && cfg[1].includes('{DU() === "mi" ? `From ${+(+fuelUse(34)).toFixed(1)} mpg laden with 26 t` : "34 laden − 0.4 × 26 t"}')   // NARROWED 10 Nov 2026 (wave 2, finding 20 + John's "mpg"): the artic hint in the unit (mpg for miles, 34 / 0.4 a km)
+ && cfg[1].includes("Cars use about 15 % more at −7 °C; lorries less")
      && cfg[2].includes('const provTitle = prov ? `${FUEL_PROVIDER_WORDS[prov.key] || "weekly price"} — '));
   ok("...and the ban would catch the old words", ["DfT NaPTAN", "Injury collisions from DfT road safety data", "DESNZ weekly road fuel prices (gov.uk)",
      "ICCT 34 laden", "US DOE: cars", "OpenStreetMap structures and limits along the roads"].every(x => CFG_BAN.test(x)) && !CFG_BAN.test("Here is the plan"));
@@ -1715,15 +1717,16 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 29 Oct 2026 (task 3a): the tone's last line is the pour's three warnings
   // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): the tone goes on with TRAFFIC_NEAR (amber)
   ok("AL2 rail: the four words in the rail's tables (NOTICE DUE a gold warning, the other three red)",
-     src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT" };')
+     src.includes('NOTICE_DUE: "Notice due", NOTICE_LATE: "Notice late", SO_LEAD_TIME: "SO lead time", AIL_ROAD_LIMIT: "AIL road limit" };')   // NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case
      && src.includes('code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";'));
   const st0 = src.indexOf("function AbnormalStrip({ onOpen, sites }){"), st1 = src.indexOf("function DashboardToday({ meta, week, err, wall, fill }){");
   const st = src.slice(st0, st1);
   ok("⭐ AL2 Dashboard: one strip under Gate arrivals (not on the big screen, not on a phone): ONE read of /abnormal/summary, the next-4-weeks count, notices due with the chip, " +
      "permissions to apply for with the chip, limits over, the button to the page through the Portal's switch, the counted-apart words; a failed read is one line",
      st0 > 0 && st1 > st0 && (st.match(/fetch\(/g) || []).length === 1 && st.includes("fetch(`${API}/abnormal/summary${siteQ}`)")
-     && st.includes('data-abnormal-strip="set"') && st.includes("in the next {s.weeks_ahead} weeks") && st.includes('<AlChip tone="warn">NOTICE DUE</AlChip>')
-     && st.includes('<AlChip tone="bad">SO LEAD TIME</AlChip>') && st.includes('onOpen("abnormal")') && st.includes("{s.words}")
+     && st.includes('data-abnormal-strip="set"') && st.includes("in the next {s.weeks_ahead} weeks") && st.includes('<RowStatus word="Notice due" tone="warn" />')
+     && st.includes('<RowStatus word="SO lead time" tone="bad" />')   // NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case
+     && st.includes('onOpen("abnormal")') && st.includes("{s.words}")
      && st.includes("The abnormal loads did not load.") && code.includes("{!wall && !phone && <AbnormalStrip onOpen={onOpen} sites={sites} />}"));
   const gac = src.slice(src.indexOf("function GateArrivalsPanel("), src.indexOf("function CarbonTargetStrip("));
   ok("⭐ AL2 Gate arrivals: a marker on the gate's row for its abnormal loads (count and windows; the hover names each and says counted apart); the figures untouched",
@@ -3041,7 +3044,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && src.includes('const UNIT_CHOICES = [["loads", "Loads"], ["tonnes", "Tonnes"], ["lorries", "Lorries"]];'));
   // 17 Oct 2026 (UI fix 2, finding 1): the pressed word reads the control's text colour (white on the dark look's orange was 2.33:1)
   ok("UI fix 2 (#1): the pressed Loads / Tonnes / Lorries word is var(--control-fg) on var(--navy), no #fff literal",
-     html.includes('.unit-sw-seg button[aria-pressed="true"]{background:var(--navy);color:var(--control-fg);}') && !/\.unit-sw-seg[^\n]*#fff/.test(html));
+     html.includes('.unit-sw-seg button[aria-pressed="true"]{background:var(--navy-soft);color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);}') && !/\.unit-sw-seg[^\n]*#fff/.test(html));   // NARROWED 10 Nov 2026 (wave 2, card 13): ONE tab (.ws-tab); what is selected is the --navy-soft tint with --navy text, never a filled button
   ok("W6: the switch is a labelled group of three aria-pressed buttons with its info box, on the Look-ahead, the Dashboard and Forecasts (not Gate arrivals: all lorries)",
      src.includes('<span className="unit-sw-seg" role="group" aria-label="Show the figures as">') && src.includes('aria-pressed={value === k ? "true" : "false"}')
      && src.includes('<InfoTip id="units" />') && ["lookahead", "dashboard", "forecasts"].every(p => src.includes(`useUnits("${p}")`))
@@ -3058,8 +3061,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      /@media \(max-width:767px\)\{[\s\S]*?\.rd-table tr\.rd-row>td\.rd-primary\{order:0;[\s\S]*?\.rd-table tr\.rd-row>td\.rd-status\{order:1;[\s\S]*?content:attr\(data-label\);/.test(html)
      && /\.rd-table\{min-width:0 !important;/.test(html));
   ok("W6: ROAD LIMIT ranks first among the Look-ahead flags, and the Dashboard and Forecasts read it from the cost lines (`limit`)",
-     src.includes("const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1,") && src.includes('const st = r.limit ? { word: "ROAD LIMIT", tone: "bad" }')
-     && src.includes('if(lim) return { word: "ROAD LIMIT", tone: "bad", more: 0 };') && src.includes("if(r.limit && !a.limit) a.limit = r.limit;") && src.includes("if(r.limit && !e.limit) e.limit = r.limit;"));
+     src.includes("const LA_FLAG_RANK = { LIMIT: 0, RESTRICTION: 1,") && src.includes('const st = r.limit ? { word: "Road limit", tone: "bad" }')
+     && src.includes('if(lim) return { word: "Road limit", tone: "bad", more: 0 };')   // NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case
+     && src.includes("if(r.limit && !a.limit) a.limit = r.limit;") && src.includes("if(r.limit && !e.limit) e.limit = r.limit;"));
   // removed UI: asserted gone at source level
   ok("🔴 W6 removed: the Look-ahead's ▶/▼ toggle, its open-state object, the Flags column (LineFlags) and the week StatusChip",
      !src.includes('{isOpen ? "▼" : "▶"}') && !src.includes("const [open, setOpen] = useState({});") && !/function LineFlags\(/.test(src)
@@ -3155,7 +3159,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && !pieces.some(p => p.comp === "Diagnostics")
      && EXEMPT_TEXT.every(x => pieces.some(p => p.t === x)));
   ok("...the internal codes and field names stay (only the words a person reads changed)",
-     src.includes('UNBAKED: "NOT ROUTED"') && src.includes("r.baked") && src.includes("excludes_unbaked") && src.includes("D.baked"));
+     src.includes('UNBAKED: "Not routed"') && src.includes("r.baked")   // NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case
+     && src.includes("excludes_unbaked") && src.includes("D.baked"));
   // 22 Oct 2026 (the words sweep; the user: "no info about api or backend stuff"): the same walk, for the words the sweep
   // took off the screens — the routing provider by name, its calls and parameters, the file, the repository, stored routes
   const WS_BAN = /(factors\.json|\bbbox\b|bounding box|\bparameters?\b|\bprobe\b|\bdatabase\b|stored (?:road )?route|\bthe repo\b|in the repository|\binvalidated\b|\bfeed:|feed is down|hosting service|Type-check|key space|steering the router)/i;   // "approved lines feed the map" is plain English: only the diesel box's "feed:" / "feed is down"
@@ -3558,11 +3563,13 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      // NARROWED 22 Oct 2026 (abnormal loads, phase 2): the rail's table goes on with the four abnormal-load words after GATE NEAR CAPACITY
      // NARROWED 28 Oct 2026 (task 0c): both tables go on with NO_WAY_ROUND after the last entry
      // NARROWED 29 Oct 2026 (task 3a): the tone goes on with the pour's three warnings
-     src.includes('GATE_OVER: "GATE OVER CAPACITY", GATE_NEAR: "GATE NEAR CAPACITY",') && src.includes('NOTICE_DUE: "NOTICE DUE", NOTICE_LATE: "NOTICE LATE", SO_LEAD_TIME: "SO LEAD TIME", AIL_ROAD_LIMIT: "AIL ROAD LIMIT",')
+     // NARROWED 10 Nov 2026 (wave 2, card 12): the words in sentence case (the XLSX keeps its capitals); the rail's flag is the one
+     // status chip, RowStatus with laTone's tone (its own icon shape: a gold square for a warning, a red circle otherwise)
+     src.includes('GATE_OVER: "Gate over capacity", GATE_NEAR: "Gate near capacity",') && src.includes('NOTICE_DUE: "Notice due", NOTICE_LATE: "Notice late", SO_LEAD_TIME: "SO lead time", AIL_ROAD_LIMIT: "AIL road limit",')
      // NARROWED 27 Oct 2026 (stockpile forecast, D7): the grid's table and the tone go on with STOCKPILE SOON / EMPTY (amber)
-     && src.includes('GATE_OVER: "GATE OVER", GATE_NEAR: "GATE NEAR", STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",')
+     && src.includes('GATE_OVER: "Gate over", GATE_NEAR: "Gate near", STOCKPILE_SOON: "Stockpile soon", STOCKPILE_EMPTY: "Stockpile empty",')
      && src.includes('const laTone = (code) => (code === "UNBAKED" || code === "RESTRICTION" || code === "GATE_NEAR" || code === "NOTICE_DUE"\n                          || code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";')
-     && src.includes('<i style={{ background: laTone(f.code) === "warn" ? "var(--gold)" : "var(--red)" }} aria-hidden="true"></i>')
+     && src.includes('<RowStatus word={flagWord(f)} tone={laTone(f.code)} />')
      && /"GATE_OVER": "GATE OVER CAPACITY", "GATE_NEAR": "GATE NEAR CAPACITY"/.test(fs.readFileSync(path.join(ROOT, "backend", "export.py"), "utf8")));
   // W8: the data fields
   ok("⭐ W8: the location form carries the CLP cap (lorry visits a day), sends null for blank, never 0",
@@ -4062,7 +4069,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      mat.includes('style={h === "Volume ↔ weight" ? { whiteSpace: "normal", minWidth: 92 } : ["Density t/m³", "Tonnes only"].includes(h) ? { whiteSpace: "normal", width: 1 } : undefined}>{h}</th>')
      && mat.includes('["Material", "Density t/m³", "Default unit", "Tonnes only", "Volume ↔ weight", "Vehicles used"].map(h =>')
      // NARROWED 29 Oct 2026 (3b, the steel split): the name cell also carries the retired category's "Older" chip
-     && mat.includes('<td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}{c.retired === true && <span className="block mt-1"><span className="chip-st">'));
+     && mat.includes('<td className="font-medium text-slate-800" style={{ whiteSpace: "normal", minWidth: 136 }}>{k}{c.retired === true && <span className="block mt-1"><RowStatus word="Older: pick one of the three" tone="warn" />'));   // NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case
   ok("🔴 #13: the Seasonal restrictions' vehicle rows, the Locations form's two material lists and the Routes form's vehicle list are 24 px rows (min-h-6) — four lists, no 16 px tick row left among them",
      code.includes('<label key={v} className="flex items-center gap-1 min-h-6 text-[13px] text-slate-600 whitespace-nowrap">')
      // NARROWED 28 Oct 2026 (simulation v2): a third list — the materials a site area takes (the same 24 px rows)
@@ -4621,7 +4628,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): the tone goes on with TRAFFIC_NEAR (amber)
   ok("RAIL: STOCKPILE SOON / STOCKPILE EMPTY are words in both tables, amber, ranked with the warnings",
      // NARROWED 28 Oct 2026 (task 0c): the rank table goes on with NO_WAY_ROUND
-     src.includes('STOCKPILE_SOON: "STOCKPILE SOON", STOCKPILE_EMPTY: "STOCKPILE EMPTY",') && src.includes('STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7,')
+     src.includes('STOCKPILE_SOON: "Stockpile soon", STOCKPILE_EMPTY: "Stockpile empty",') && src.includes('STOCKPILE_EMPTY: 7.6, STOCKPILE_SOON: 7.7,')   // NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case
+    
      && src.includes('|| code === "STOCKPILE_SOON" || code === "STOCKPILE_EMPTY"\n                          // 29 Oct 2026 (task 3a): a pour\'s warnings; COLD JOINT and TRANSIT stay red\n                          || code === "POUR_SHORT" || code === "POUR_BAND" || code === "POUR_OVER_PLAN"\n                          // 9 Nov 2026 (2.1-1): a traffic limit near (90 %) is amber; over stays red\n                          || code === "TRAFFIC_NEAR") ? "warn" : "bad";'));
   ok("DASHBOARD: a stockpile with no planned use never leads the message (as the rail's STOCKPILE SOON)",
      /function stockMessage\(sps\)\{[\s\S]{0,400}if\(!sp\.use_planned\) return;/.test(src));
@@ -4677,7 +4685,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && /const loadDiversions = \(\) => \{\n    fetch\(`\$\{API\}\/holding`\)[^\n]*\n    fetch\(`\$\{API\}\/routes\/diversions`\)[\s\S]{0,400}?\n  \};/.test(src)
      && !src.includes("const loadDiversions = () =>\n    fetch("));
   ok("⭐ 0c: the Look-ahead line says Diverted (chip + details) and the rail knows NO WAY ROUND, ranked after a road limit",
-     src.includes('(c.diversion && c.diversion.share > 0) ? "Diverted" : null') && src.includes('NO_WAY_ROUND: "NO WAY ROUND"')
+     src.includes('(c.diversion && c.diversion.share > 0) ? "Diverted" : null') && src.includes('NO_WAY_ROUND: "No way round"')   /* NARROWED 10 Nov 2026 (card 12): sentence case */
      && /NO_WAY_ROUND: 0\.5/.test(src));
   ok("0c: the zone form's note says a dated zone diverts in its dates", src.includes('"In its dates, the routes that cross it take a way round."'));
   ok("0c: divWhen / divMonths words", (() => {
@@ -5419,7 +5427,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // the Chrome check (8 Nov): in full screen the DEMO pill sat over Out · Back · Both, and the detail table pushed the column sideways
   ok("ROUTES PAGE (2.1-8): in full screen on a demo the map's box sits under the DEMO pill; the detail table scrolls inside the right column",
      dmr.includes("<RouteMapBox low={full && !!TENANT.demo_notice}") && box.includes("top: low ? 44 : 8")
-     && box.includes('background: "var(--navy)", color: "var(--control-fg)"') && !box.includes('color: "#fff"')   // the audit: white on the Dark look's orange was 2.32:1
+     && box.includes('background: "var(--navy-soft)", color: "var(--navy)", boxShadow: "inset 0 0 0 1px var(--navy)"') && !box.includes('color: "#fff"')   // NARROWED 10 Nov 2026 (wave 2, card 13): ONE tab (.ws-tab); what is selected is the --navy-soft tint with --navy text, never a filled button
+       // the audit: white on the Dark look's orange was 2.32:1
      && det.includes('<div className="overflow-x-auto" data-route-full-analysis="1"><table className="text-sm" style={{ tableLayout: "fixed", width: "100%" }}>'));
 }
 
@@ -5473,7 +5482,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      code.includes("Traffic limits on this day") && code.includes("(D.traffic_limits || []).map(t =>")
      && code.includes('t.state === "over" ? "OVER" : "NEAR"'));
   ok("RAIL: TRAFFIC LIMIT red and TRAFFIC NEAR amber, words in both tables, ranked",
-     code.includes('TRAFFIC_LIMIT: "TRAFFIC LIMIT"') && code.includes('TRAFFIC_NEAR: "TRAFFIC NEAR"')
+     code.includes('TRAFFIC_LIMIT: "Traffic limit"') && code.includes('TRAFFIC_NEAR: "Traffic near"')   // NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case
+    
      && code.includes("TRAFFIC_LIMIT: 3.6") && code.includes("TRAFFIC_NEAR: 8.4") && code.includes('|| code === "TRAFFIC_NEAR") ? "warn" : "bad";'));
   ok("🔴 TRAFFIC LIMIT: no back-end words on the new screens",
      !/\b(api|endpoint|cache|server|geometry|LineString)\b/i.test(td.replace(/fetch\(`\$\{API\}[^`]*`\)/g, "")

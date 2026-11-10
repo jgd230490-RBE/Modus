@@ -153,7 +153,9 @@ def tenant_settings(conversions=None, doc=None):
     # H1: the distance unit the tenant reads (km stored; mi shown). Defaults to km; the
     # tenant block may say "mi" (validated in validate()).
     du = str((block or {}).get("distance_unit") or "").strip().lower() if isinstance(block, dict) else ""
-    t["distance_unit"] = du if du in DISTANCE_UNITS else "km"
+    # 10 Nov 2026 (wave 2, UI critique finding 20, decision 5): one unit per organisation, set on Config → Planning. With no
+    # choice saved, a GB organisation reads miles (the UK's road unit) and any other km.
+    t["distance_unit"] = du if du in DISTANCE_UNITS else ("mi" if t["country"] == "GB" else "km")
     dn = (block or {}).get("demo_notice") if isinstance(block, dict) else None
     t["demo_notice"] = dn.strip() if isinstance(dn, str) and dn.strip() else None
     ce = (block or {}).get("concern_email") if isinstance(block, dict) else None

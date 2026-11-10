@@ -859,12 +859,16 @@ _lfr = [c for c, v in sorted(re.findall(r"(\w+): ([\d.]+)", re.search(r"const LA
                              key=lambda cv: float(cv[1]))]
 ok("⭐ DAY SHEET: the gate flags read GATE OVER / GATE NEAR, the grid's and the phone day card's words (LINE_FLAG_LABEL); "
    "every clash code has a word, so no code prints raw",
-   _export.DAY_FLAG_WORD.get("GATE_OVER") == "GATE OVER" == _lfl.get("GATE_OVER")
-   and _export.DAY_FLAG_WORD.get("GATE_NEAR") == "GATE NEAR" == _lfl.get("GATE_NEAR")
+   # NARROWED 10 Nov 2026 (wave 2, card 12): the screens' words went to sentence case and the pours to words a site manager
+   # reads; the printed day sheet keeps its capitals and its short pour words (its FLAG column holds 15 characters), so the
+   # sheet's word is the grid's in capitals for every code but the pours'
+   _export.DAY_FLAG_WORD.get("GATE_OVER") == "GATE OVER" == _lfl.get("GATE_OVER").upper()
+   and _export.DAY_FLAG_WORD.get("GATE_NEAR") == "GATE NEAR" == _lfl.get("GATE_NEAR").upper()
    and set(_export.DAY_FLAG_WORD) == set(_lfl) == set(_clashes.CODES)
    # the one word that differs: Helvetica on the PDF has no ≠
-   and all(_export.DAY_FLAG_WORD[c] == _lfl[c] for c in _lfl if c != "DAYS_NE_WEEK")
-   and _export.DAY_FLAG_WORD["DAYS_NE_WEEK"] == "DAYS NOT = WEEK" and _lfl["DAYS_NE_WEEK"] == "DAYS ≠ WEEK",
+   and all(_export.DAY_FLAG_WORD[c] == _lfl[c].upper() for c in _lfl if c != "DAYS_NE_WEEK" and not c.startswith("POUR_"))
+   and all(len(_export.DAY_FLAG_WORD[c]) <= 15 for c in _lfl)
+   and _export.DAY_FLAG_WORD["DAYS_NE_WEEK"] == "DAYS NOT = WEEK" and _lfl["DAYS_NE_WEEK"] == "Days ≠ week",
    str((_export.DAY_FLAG_WORD, _lfl)))
 ok("⭐ DAY SHEET: the flags rank as the grid's LA_FLAG_RANK — GATE OVER after CAP, before STOCKPILE OVER; GATE NEAR after "
    "MONTH CHANGED, before NOT ROUTED",

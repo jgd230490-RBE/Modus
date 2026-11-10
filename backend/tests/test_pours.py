@@ -413,7 +413,7 @@ def as_(acc, fn, *a, **k):
 lst = as_(PLANNER, main.list_pours_ep)
 ok("GET /api/pours (planner): every pour, decorated, the limits and the words",
    {p["id"] for p in lst["pours"]} == {"P001", "P002"} and lst["limits"]["cold_joint_min"] == 30.0
-   and lst["words"]["POUR_SHORT"] == "MIXERS SHORT")
+   and lst["words"]["POUR_SHORT"] == "Too few mixers")   # NARROWED 10 Nov 2026 (wave 2, card 12): words a site manager reads
 t2 = as_(TEAM2, main.list_pours_ep)
 ok("...a team sees only its own lines' pours (team 2: none)", t2["pours"] == [])
 try:

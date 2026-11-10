@@ -1339,8 +1339,9 @@ async function rowDetailsDom(){
     return Object.keys(byField).length;
   };
   const cur = F.CUR();
-  const triple = (u) => !u || u.eur == null ? [] : [u.per_t != null ? `${cur} ${(+u.per_t).toFixed(2)}/t` : null,
-    u.per_trip != null ? `${cur} ${F.grp(u.per_trip, 0)}/trip` : null, u.per_km != null ? `${cur} ${(+F.distRate(u.per_km)).toFixed(2)}/${F.DU()}` : null].filter(Boolean);
+  // NARROWED 10 Nov 2026 (wave 2, finding 20): money is written against the symbol ("£7,000", not "£ 7,000")
+  const triple = (u) => !u || u.eur == null ? [] : [u.per_t != null ? `${cur}${(+u.per_t).toFixed(2)}/t` : null,
+    u.per_trip != null ? `${cur}${F.grp(u.per_trip, 0)}/trip` : null, u.per_km != null ? `${cur}${(+F.distRate(u.per_km)).toFixed(2)}/${F.DU()}` : null].filter(Boolean);
 
   // ============================== 1. Look-ahead → Commit ==============================
   const la = mount(w.LookAhead, { meta: laMeta, who: "t", initialPage: LA, initialView: "commit" });
@@ -1388,11 +1389,11 @@ async function rowDetailsDom(){
         // NARROWED 22 Oct 2026 (words sweep): the provider is not named; only an estimated return is said
         ["cycle source", c.cycle_source === "here" ? null : "return estimated"], ["cycles a vehicle a day", String(c.cycles_per_vehicle_day)]);
     } else facts.push(["unrouted: payload", `${F.grp(c.payload_t, 1)} t planning payload`]);
-    facts.push(["planned cost", wd.eur == null ? "Rate not set" : `${cur} ${F.grp(wd.eur)}`], ["target rate", c.rate_source === "target" && wd.eur != null ? "target rate" : null],
-      ["+ BAF", wd.eur_adj != null ? `${cur} ${F.grp(wd.eur_adj)}` : null]);
+    facts.push(["planned cost", wd.eur == null ? "Rate not set" : `${cur}${F.grp(wd.eur)}`], ["target rate", c.rate_source === "target" && wd.eur != null ? "target rate" : null],
+      ["+ BAF", wd.eur_adj != null ? `${cur}${F.grp(wd.eur_adj)}` : null]);
     if (wd.eur != null && wd.eur_units && wd.eur_units.per_t != null) triple(wd.eur_units).forEach(x => facts.push(["quote per unit", x]));
     if (wd.fair_eur != null && c.fair) {
-      facts.push(["fair cost", `${cur} ${F.grp(wd.fair_eur)}`], ["litres a trip", `${F.grp(c.fair.litres_trip, 1)} L`],
+      facts.push(["fair cost", `${cur}${F.grp(wd.fair_eur)}`], ["litres a trip", `${F.grp(c.fair.litres_trip, 1)} L`],
         ["diesel price", `${cur}${c.fair.index_eur_per_l}`], ["fuel share", `${F.grp(c.fair.fuel_share_pct)} %`],
         ["winter", (c.fair.flags || []).includes("WINTER") ? "winter" : null], ["thaw", (c.fair.flags || []).includes("THAW") ? "thaw restrictions may apply" : null]);
       if (wd.fair_units && wd.fair_units.per_t != null) triple(wd.fair_units).forEach(x => facts.push(["fair per unit", x]));
@@ -1430,10 +1431,10 @@ async function rowDetailsDom(){
   const kinds0 = new Set(LA.clashes.flags.filter(f => `${f.route_id}|${f.discipline || ""}|${f.section_id || ""}|${f.month_index}` === lk0).map(f => f.code)).size;
   const st0 = r0.querySelector("td.rd-status .row-st");
   ok("⭐ ROW DETAILS · Look-ahead: a lorry over a road limit is the row's ONE status, ahead of the line's other flags, with their count (decision 1)",
-     norm(st0.textContent) === `!ROAD LIMIT+${kinds0}` && st0.getAttribute("data-row-status") === "bad" && r0.querySelectorAll(".row-st").length === 1, norm(st0.textContent));
+     norm(st0.textContent) === `!Road limit+${kinds0}` /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && st0.getAttribute("data-row-status") === "bad" && r0.querySelectorAll(".row-st").length === 1, norm(st0.textContent));
   const d0 = la3.el.querySelector(`[data-rd-details="la-${lk0}"]`);
   ok("ROW DETAILS · ...and the details spell it out first, the limit sentence in full, then each other flag",
-     d0.querySelector(".rd-i.rd-wide dt").textContent === "ROAD LIMIT" && d0.textContent.includes(limText) && d0.querySelectorAll(".rd-i.rd-wide.rd-bad").length >= kinds0 + 1);
+     d0.querySelector(".rd-i.rd-wide dt").textContent === "Road limit" && d0.textContent.includes(limText) && d0.querySelectorAll(".rd-i.rd-wide.rd-bad").length >= kinds0 + 1);
   la3.done();
 
   // ============================== 2a. the Dashboard's Sites filter and the chart buttons (2 Nov 2026) ==============================
@@ -1528,8 +1529,8 @@ async function rowDetailsDom(){
       ["delivered (old title)", a.actualT == null ? "No week actual reported on this line in the months in view" : `${F.grp(a.actualT)} t reported of ${F.grp(a.t)} t planned`],
       ["lorry-distance", l.baked ? F.grp(F.dist(a.km)) : null], ["tCO₂e", l.baked ? a.co2.toFixed(1) : null], ["peak vehicles", a.peak == null ? null : String(a.peak)],
       ["trips a day per vehicle (old title)", l.cycles_per_vehicle_day ? String(l.cycles_per_vehicle_day) : null],
-      ["planned", a.planned == null ? "rate not set" : `${cur} ${F.grp(a.planned)}`], ["quote / target tag", a.source === "target" ? "target" : a.source === "route" ? "quote" : null],
-      ["fair", a.fair == null ? (l.baked ? "No diesel index" : "Not routed yet, so no distance") : `${cur} ${F.grp(a.fair)}`],
+      ["planned", a.planned == null ? "rate not set" : `${cur}${F.grp(a.planned)}`], ["quote / target tag", a.source === "target" ? "target" : a.source === "route" ? "quote" : null],
+      ["fair", a.fair == null ? (l.baked ? "No diesel index" : "Not routed yet, so no distance") : `${cur}${F.grp(a.fair)}`],
       ["fair per tonne", a.fair != null && a.t > 0 ? (a.fair / a.t).toFixed(2) : null], ["winter", a.flags.has("WINTER") ? "winter" : null], ["thaw", a.flags.has("THAW") ? "thaw" : null]];
     triple(per(a.planned, a)).forEach(x => facts.push(["planned per unit (old title)", x]));
     triple(per(a.fair, a)).forEach(x => facts.push(["fair per unit (old title)", x]));
@@ -1569,7 +1570,7 @@ async function rowDetailsDom(){
   const limKey = `${limLine.route_id}|${limLine.discipline || ""}|${limLine.section_id || ""}`;
   const limRow = d3.el.querySelector(`tr[data-rd="dash-${limKey}"]`);
   ok("⭐ ROW DETAILS · Dashboard: a line whose lorry is over a road limit reads ROAD LIMIT in its status, the sentence in its details (decision 3)",
-     limRow.querySelector(".row-st").getAttribute("data-row-status") === "bad" && norm(limRow.querySelector(".row-st").textContent) === "!ROAD LIMIT"
+     limRow.querySelector(".row-st").getAttribute("data-row-status") === "bad" && norm(limRow.querySelector(".row-st").textContent) === "!Road limit" /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */
      && rowText(limRow).includes(limText) && rowText(limRow).includes("Checked 13 Oct 2026"));
   const others = [...d3.el.querySelectorAll('table[data-rd-table="dashboard"] tr.rd-row')].filter(tr => tr !== limRow).map(tr => norm(tr.querySelector(".row-st").textContent));
   ok("ROW DETAILS · ...the other lines read Clear or Not routed, nothing else", others.length > 0 && others.every(x => x === "✓Clear" || x === "!Not routed"), others.join("|"));
@@ -1599,8 +1600,8 @@ async function rowDetailsDom(){
       ["team", r.ipt ? F.teamText(r.ipt) : "No team"], ["material", r.material_type], ["description (old title)", r.material_description],
       ["vehicle", F.vehLabel(r.vehicle_type)], ["vehicle (full name, old title)", r.vehicle_type], ["months", `${g.n}, ${years}`],
       ["total as typed", `${F.fmt(g.q, r.unit)} ${r.unit === "m3" ? "m³" : r.unit}`],
-      ["planned", c.planned == null ? "rate not set" : `${cur} ${F.grp(c.planned)}`], ["target tag", c.source === "target" ? "target" : null],
-      ["fair", c.fair == null ? (c.baked < c.n ? "Not routed yet for this vehicle, so no distance and no fair price" : "No diesel index") : `${cur} ${F.grp(c.fair)}`],
+      ["planned", c.planned == null ? "rate not set" : `${cur}${F.grp(c.planned)}`], ["target tag", c.source === "target" ? "target" : null],
+      ["fair", c.fair == null ? (c.baked < c.n ? "Not routed yet for this vehicle, so no distance and no fair price" : "No diesel index") : `${cur}${F.grp(c.fair)}`],
       ["status", status], ["reject reason (old title, full)", r.reject_reason], ["submitted by (old row title)", "tester (you)"]];
     triple(pu).forEach(x => facts.push(["planned per unit (old title)", x]));
     triple(fu).forEach(x => facts.push(["fair per unit (old title)", x]));
@@ -1616,7 +1617,7 @@ async function rowDetailsDom(){
   const limFk = [limLine.route_id, limLine.discipline || "", limLine.section_id || ""].join("|");
   const limFr = fT2.querySelector(`tr[data-fc-line="${limFk}"]`);
   ok("⭐ ROW DETAILS · Forecasts: the same line reads ROAD LIMIT before Pending or Approved, so an approver sees it first; the sentence in the details",
-     norm(limFr.querySelector(".row-st").textContent) === "!ROAD LIMIT" && rowText(limFr).includes(limText) && rowText(limFr).includes("Approval"));
+     norm(limFr.querySelector(".row-st").textContent) === "!Road limit" /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && rowText(limFr).includes(limText) && rowText(limFr).includes("Approval"));
   f2.done();
   ok("ROW DETAILS · the nothing-lost checks covered every table: Look-ahead, gates, Today, the route table and Forecasts each with ten fields or more",
      [nLa, nGa, nTd, nDash, nFc].every(n => n >= 10), [nLa, nGa, nTd, nDash, nFc].join(" / "));
@@ -1915,9 +1916,9 @@ async function abnormalDom(){
      && !p.el.querySelector(".al-holidays"), [...p.el.querySelectorAll(".al-stat b")].map(b => b.textContent).join("|"));   // NARROWED 27 Oct 2026 (the final UI pass): the holidays' words live in the Settings card now (asserted there)
   ok("⭐ AL DOM: a row a movement with the team's NAME, the class chip from the server's advice, the notify-by date and the flag with its tone, the apply-by line",
      !!rowOf(p.el, "AL001") && rowOf(p.el, "AL001").textContent.includes("Central Team") && rowOf(p.el, "AL001").querySelector(".al-chip.al-stgo").textContent === "STGO Cat 1"
-     && rowOf(p.el, "AL001").textContent.includes("3 Mar 2027") && rowOf(p.el, "AL001").querySelector(".al-chip.al-bad").textContent === "NOTICE LATE"
+     && rowOf(p.el, "AL001").textContent.includes("3 Mar 2027") && rowOf(p.el, "AL001").querySelector(".al-flag .row-st.rs-bad").textContent === "!Notice late" /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */
      && rowOf(p.el, "AL002").querySelector(".al-chip.al-so").textContent === "Special Order" && rowOf(p.el, "AL002").textContent.includes("apply by 1 Feb 2027")
-     && rowOf(p.el, "AL002").querySelector(".al-chip.al-bad").textContent === "SO LEAD TIME" && !/IPT[12]/.test(p.el.textContent));
+     && rowOf(p.el, "AL002").querySelector(".al-flag .row-st.rs-bad").textContent === "!SO lead time" && !/IPT[12]/.test(p.el.textContent));
   ok("AL DOM: the window reads as one span (8–12 Mar 2027, day, 3 movements) and the size line as the figures typed",
      rowOf(p.el, "AL001").textContent.includes("8–12 Mar 2027") && rowOf(p.el, "AL001").textContent.includes("day · 3 movements")
      && rowOf(p.el, "AL001").textContent.includes("Low-loader · 4.6 × 3.9 × 16.5 m · 40 t · 6 axles · 9 t axle"));
@@ -2047,8 +2048,8 @@ async function abnormalScreensDom(){
   const strip = s1.el.querySelector("[data-abnormal-strip]");
   ok("⭐ AL2 DOM strip: ONE read, the three figures with the chips, the button opens the page through the switch, the words",
      calls.filter(c => c.url === "/api/abnormal/summary").length === 1 && strip && strip.getAttribute("data-abnormal-strip") === "set"
-     && strip.textContent.includes("3 abnormal loads in the next 4 weeks") && strip.textContent.includes("1 notice due this week") && strip.textContent.includes("NOTICE DUE")
-     && strip.textContent.includes("1 Special Order or VR1 to apply for") && strip.textContent.includes("SO LEAD TIME") && strip.textContent.includes("Counted apart"));
+     && strip.textContent.includes("3 abnormal loads in the next 4 weeks") && strip.textContent.includes("1 notice due this week") && strip.textContent.includes("Notice due") /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */
+     && strip.textContent.includes("1 Special Order or VR1 to apply for") && strip.textContent.includes("SO lead time") && strip.textContent.includes("Counted apart"));
   await act(async () => { byText(s1.el, "button", "Open Abnormal loads").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
   ok("AL2 DOM strip: the button hands 'abnormal' to the Portal", opened.join("|") === "abnormal");
   await s1.done();
@@ -2070,7 +2071,7 @@ async function abnormalScreensDom(){
   ok("⭐ AL2 DOM week: the block with its count, a row a movement — the class chip, the window with band / movements / escort, the route or 'not drawn', the status and the flag, the notify-by, the words",
      wk.el.querySelector("[data-abnormal-week]") && wk.el.textContent.includes("Abnormal loads this week · 2 · counted apart from the lorries") && rows.length === 2
      && rows[0].querySelector(".al-chip.al-so").textContent === "Special Order" && rows[0].textContent.includes("12–14 Apr 2027") && rows[0].textContent.includes("night · 9 movements · private escort")
-     && rows[0].textContent.includes("21 to survey") && rows[0].textContent.includes("NOTICE DUE") && rows[0].textContent.includes("notify by 6 Apr 2027")
+     && rows[0].textContent.includes("21 to survey") && rows[0].textContent.includes("Notice due") /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && rows[0].textContent.includes("notify by 6 Apr 2027")
      && rows[1].querySelector(".al-chip.al-stgo").textContent === "STGO Cat 2" && rows[1].textContent.includes("not drawn") && rows[1].textContent.includes("Notified")
      && wk.el.textContent.includes("never in the week's tonnes"), rows.map(r => r.textContent.slice(0, 120)).join(" || "));
   await wk.done();
@@ -2124,23 +2125,23 @@ async function phoneDayFlagsDom(){
 
   ok("PHONE DAY FLAGS: the card opens on today with all three lines", card().getAttribute("data-ph-day") === today && !!line(A) && !!line(B) && !!line(C));
   ok("⭐ PHONE DAY FLAGS (today): a gate over capacity dated another day is NOT on the card — not in the line's status, not in its details",
-     word(A) !== "GATE OVER" && !/GATE OVER/.test(facts(A)) && !facts(A).includes(`Gate A on ${next}`), `${word(A)} | ${facts(A).slice(0, 200)}`);
+     word(A) !== "Gate over" && !/Gate over/.test(facts(A)) /* NARROWED 10 Nov 2026 (wave 2, card 12): the one status chip, its words in sentence case */ && !facts(A).includes(`Gate A on ${next}`), `${word(A)} | ${facts(A).slice(0, 200)}`);
   ok("⭐ PHONE DAY FLAGS (today): a flag dated today IS on the card; the same line's route cap dated another day is not",
-     word(B) === "GATE NEAR" && more(B) === "" && facts(B).includes(`Gate B on ${today}`) && !/\bCAP\b/.test(facts(B)), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
-  ok("⭐ PHONE DAY FLAGS (today): a flag with no date (a road restriction) is on the card", word(C) === "RESTRICTION" && facts(C).includes("Road closed all week"), word(C));
+     word(B) === "Gate near" && more(B) === "" && facts(B).includes(`Gate B on ${today}`) && !/\bCap\b/.test(facts(B)), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
+  ok("⭐ PHONE DAY FLAGS (today): a flag with no date (a road restriction) is on the card", word(C) === "Restriction" && facts(C).includes("Road closed all week"), word(C));
   ok("PHONE DAY FLAGS (today): the count names the two lines flagged today, not three", /· 2 lines flagged/.test(note()), note());
 
   await pick(next);
   ok("⭐ PHONE DAY FLAGS (next weekday): its own gate over capacity shows on that day's card, status and details",
-     card().getAttribute("data-ph-day") === next && word(A) === "GATE OVER" && facts(A).includes(`Gate A on ${next}`), `${word(A)} | ${facts(A).slice(0, 200)}`);
+     card().getAttribute("data-ph-day") === next && word(A) === "Gate over" && facts(A).includes(`Gate A on ${next}`), `${word(A)} | ${facts(A).slice(0, 200)}`);
   ok("PHONE DAY FLAGS (next weekday): line B carries its route cap, and today's gate near capacity has left the card",
-     word(B) === "CAP" && more(B) === "" && !/GATE NEAR/.test(facts(B)) && !facts(B).includes(`Gate B on ${today}`), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
-  ok("⭐ PHONE DAY FLAGS (next weekday): the undated restriction is still on the card (every day)", word(C) === "RESTRICTION");
+     word(B) === "Cap" && more(B) === "" && !/Gate near/.test(facts(B)) && !facts(B).includes(`Gate B on ${today}`), `${word(B)} ${more(B)} | ${facts(B).slice(0, 200)}`);
+  ok("⭐ PHONE DAY FLAGS (next weekday): the undated restriction is still on the card (every day)", word(C) === "Restriction");
   ok("PHONE DAY FLAGS (next weekday): three lines flagged", /· 3 lines flagged/.test(note()), note());
 
   await pick(third);
   ok("⭐ PHONE DAY FLAGS (a day no dated flag names): only the undated restriction — one line flagged, A and B in the week's own state",
-     card().getAttribute("data-ph-day") === third && word(C) === "RESTRICTION" && !/GATE|CAP/.test(word(A) + word(B))
+     card().getAttribute("data-ph-day") === third && word(C) === "Restriction" && !/Gate|Cap/.test(word(A) + word(B))
      && !/GATE|\bCAP\b/.test(facts(A) + facts(B)) && /· 1 line flagged/.test(note()), `${word(A)} | ${word(B)} | ${note()}`);
   await act(async () => { r.unmount(); }); el.remove();
 
@@ -2151,7 +2152,7 @@ async function phoneDayFlagsDom(){
   const deskWord = (l) => { const s = del.querySelector(`tr[data-la-line="${lk(l)}"] .row-st`); return s ? [...s.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join("").trim() : "(no row)"; };
   const deskMore = (l) => (del.querySelector(`tr[data-la-line="${lk(l)}"] .row-st .rs-more`) || {}).textContent || "";
   ok("⭐ DESK GRID (unchanged): the week's row keeps every flag of the week — A's gate over capacity, B's route cap ahead of its gate near capacity (+1), C's restriction",
-     deskWord(A) === "GATE OVER" && deskWord(B) === "CAP" && deskMore(B) === "+1" && deskWord(C) === "RESTRICTION",
+     deskWord(A) === "Gate over" && deskWord(B) === "Cap" && deskMore(B) === "+1" && deskWord(C) === "Restriction",
      `${deskWord(A)} | ${deskWord(B)} ${deskMore(B)} | ${deskWord(C)}`);
   await act(async () => { dr.unmount(); }); del.remove();
 }
@@ -3350,11 +3351,11 @@ async function todayFitDom(){
     ok("⭐ UI FIX 6 card 5: the section shown (155 px): three whole rows, busiest first; the other three are not drawn (today-cut), none cut in half",
        cut().join() === "today-R4|D3|,today-R5|D4|,today-R6|D5|" && rows().slice(0, 3).every(r => !r.classList.contains("today-cut")), cut().join());
     ok("⭐ UI FIX 6 card 5: under the list, inside the card, '+ 3 more lines today · 1 471 t' (the hidden rows' tonnes, rounded and grouped like the card's figures), 12 px, flex:none (.today-more)",
-       !!more() && norm(more().textContent) === "+ 3 more lines today · 1 471 t" && more().getAttribute("data-today-more") === "3"
+       !!more() && norm(more().textContent) === "+ 3 more lines today · 1,471 t" && more().getAttribute("data-today-more") === "3"
        && more().className === "text-xs today-more" && list().nextElementSibling === more() && !!more().closest(".card") && !list().contains(more()),
        more() ? norm(more().textContent) : "no count line");
     ok("UI FIX 6 card 5: the rows shown plus the count add up to the card's tonnes figure (5 400 + 1 470.6 = 6 870.6, printed 6 871)",
-       norm(tv.el.textContent).includes("6 871") && TONNES.slice(0, 3).reduce((a, b) => a + b, 0) + 1470.6 === TONNES.reduce((a, b) => a + b, 0));
+       norm(tv.el.textContent).includes("6,871") /* NARROWED 10 Nov 2026 (wave 2, finding 20): a comma for thousands */ && TONNES.slice(0, 3).reduce((a, b) => a + b, 0) + 1470.6 === TONNES.reduce((a, b) => a + b, 0));
     ok("⭐ UI FIX 6 card 5: every row is drawn CLOSED on the big screen although the desk opened the busiest one in this tab — and the desk's choice is kept for the desk",
        [...tv.el.querySelectorAll("tr.rd-details")].every(d => d.hidden) && tv.el.querySelector('tr[data-rd="today-R1|D0|"] .rd-chev').getAttribute("aria-expanded") === "false"
        && w.sessionStorage.getItem("modus_rows_today") === JSON.stringify(OPEN));
@@ -3367,7 +3368,7 @@ async function todayFitDom(){
       Object.defineProperty(lbx, "scrollTop", { configurable: true, get(){ return st; }, set(v){ st = v; } });
       fire();
       ok("⭐ UI FIX 6 card 5 (review): a list box left scrolled (40 px) by All sections is put back to the top before measuring — the same three whole rows and '+ 3 more lines today · 1 471 t'",
-         st === 0 && cut().join() === "today-R4|D3|,today-R5|D4|,today-R6|D5|" && !!more() && norm(more().textContent) === "+ 3 more lines today · 1 471 t",
+         st === 0 && cut().join() === "today-R4|D3|,today-R5|D4|,today-R6|D5|" && !!more() && norm(more().textContent) === "+ 3 more lines today · 1,471 t",
          `scrollTop ${st}; cut ${cut().join()}`);
       delete lbx.scrollTop; }
     // 3. a bigger screen: everything fits — no cut, no count line
@@ -3393,7 +3394,7 @@ async function todayFitDom(){
       const mm = m.el.querySelector("[data-today-more]");
       ok("⭐ UI FIX 6 card 4: All sections fits too — the 260 px box is marked to fit, three whole rows shown, three not drawn, '+ 3 more lines today · 1 471 t' under it",
          !!lb && lb.getAttribute("data-today-fit") === "1" && lb.style.maxHeight === "260px"
-         && m.el.querySelectorAll("tr.today-cut").length === 3 && !!mm && norm(mm.textContent) === "+ 3 more lines today · 1 471 t",
+         && m.el.querySelectorAll("tr.today-cut").length === 3 && !!mm && norm(mm.textContent) === "+ 3 more lines today · 1,471 t",
          mm ? norm(mm.textContent) : "no count line");
       ok("UI FIX 6 card 4: in All sections every row is drawn closed (the desk opened the busiest), and both progress bars stay above the list",
          [...m.el.querySelectorAll("tr.rd-details")].every(d => d.hidden)

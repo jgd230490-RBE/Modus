@@ -244,15 +244,18 @@ def offset_lonlat(v, coords, d_px):
     return [unproject(v, x, y) for x, y in pts]
 
 
-def scale(v, target_px):
-    """(km, px): a round scale-bar length (0.5, 1, 2, 5 ... km) near target_px image pixels at the view's centre."""
+def scale(v, target_px, unit="km"):
+    """(length, px): a round scale-bar length (0.5, 1, 2, 5 ... km) near target_px image pixels at the view's centre.
+    10 Nov 2026 (wave 2, UI critique finding 20): unit "mi" gives a round length in MILES (the organisation's unit), the
+    pixels worked out from 1 mile = 1609.344 m; "km" is unchanged."""
     m_per_px = 40075016.686 * math.cos(math.radians(v["lat"])) / (TILE * 2 ** v["zoom"])
-    want = target_px * m_per_px / 1000
-    km = 0.5
+    per = 1609.344 if unit == "mi" else 1000.0
+    want = target_px * m_per_px / per
+    n = 0.5
     for x in (0.5, 1, 2, 5, 10, 20, 50, 100, 200):
         if x <= want * 1.6:
-            km = x
-    return km, km * 1000 / m_per_px
+            n = x
+    return n, n * per / m_per_px
 
 
 # ---------------------------------------------------------------------------------------------------------------------
