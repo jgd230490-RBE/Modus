@@ -9563,6 +9563,9 @@ const isTonnesOnly = (c) => !!(c && Array.isArray(c.units) && c.units.length ===
 // Fetch now) is rendered outside it.
 // 9 Nov 2026 (card 10): a field with a made-up example placeholder ("name@scheme.example") reads "—" when empty for a reader
 const CfgRO = React.createContext(false);
+// 10 Nov 2026 (card 10, UI audit): a reader's table has no control to Tab to (the fields are disabled), so the scroll box
+// itself takes the focus, named, like the other scrolling tables (axe scrollable-region-focusable)
+const cfgScroll = (ro, name) => ro ? { tabIndex: 0, role: "region", "aria-label": name } : {};
 function CfgFields({ ro, children }){
   return <fieldset className={"cfg-fs" + (ro ? " cfg-ro" : "")} disabled={!!ro} data-cfg-fields={ro ? "read" : "edit"}><CfgRO.Provider value={!!ro}>{children}</CfgRO.Provider></fieldset>;
 }
@@ -9701,7 +9704,7 @@ function ConfigPage({ meta, who, access }){
 
           <CfgFields ro={ro}>
           {tab === "vehicles" && (
-            <div className="overflow-auto">
+            <div className="overflow-auto kb-scroll" {...cfgScroll(ro, "Vehicles")}>
               <table className="tbl">
                 <thead>
                   <tr>
@@ -9744,7 +9747,7 @@ function ConfigPage({ meta, who, access }){
           )}
 
           {tab === "materials" && (
-            <div className="overflow-auto">
+            <div className="overflow-auto kb-scroll" {...cfgScroll(ro, "Materials")}>
               <table className="tbl">
                 <thead>
                   {/* 18 Oct 2026 (decision 12): three short headings wrap to two lines and take their own width (width 1 = the

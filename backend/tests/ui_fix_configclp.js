@@ -101,6 +101,12 @@ async function configReadOnly(){
     const ta = m.el.querySelector(".cfg-main textarea");
     ok(`CONFIG RO: ${who} — Everything (JSON) is read only`, !!ta && ta.readOnly === true);
     ok(`CONFIG RO: ${who} — no Organisation file tab (admins only)`, !btnT(m.el, /^Organisation file$/));
+    for (const [t, nm] of [["Vehicles", "Vehicles"], ["Materials", "Materials"]]) {
+      await tab(m, t);
+      const box = m.el.querySelector(".cfg-main .overflow-auto");
+      ok(`CONFIG RO: ${who} — the ${t} table's scroll box can be reached by Tab and is named (no control inside it can)`,
+         !!box && box.getAttribute("tabindex") === "0" && box.getAttribute("role") === "region" && box.getAttribute("aria-label") === nm);
+    }
     await tab(m, "Map and bulletin");
     const ex = [...m.el.querySelectorAll(".cfg-main [data-ph-example]")];
     ok(`CONFIG RO: ${who} — Map and bulletin's empty example fields read '—' (no made-up example shown as a value)`,
@@ -138,6 +144,8 @@ async function configReadOnly(){
        && !!m.el.querySelector("[data-cfg-more]") && /Changes apply on save/.test(m.el.textContent));
     const th = [...m.el.querySelectorAll(".cfg-main table.tbl thead th")].map(x => x.textContent.trim());
     ok("CONFIG EDIT: Vehicles keep the English column for an admin", th.includes("English"));
+    ok("CONFIG EDIT: an admin's Vehicles scroll box is not an extra Tab stop (its fields are)",
+       !m.el.querySelector(".cfg-main .overflow-auto").hasAttribute("tabindex"));
     await tab(m, "Materials");
     const k = Object.keys(DOC.material_categories).find(x => !x.startsWith("_") && (DOC.material_categories[x].vehicles || []).length >= 2);
     const ed = m.el.querySelector(`[data-cfg-veh-edit="${k}"]`);
