@@ -105,6 +105,57 @@ ok("C6 the 'i' button is 24 px (axe target-size), drawing the same 18 px circle 
    && /box-shadow:inset 0 0 0 1\.5px #94A3B8;/.test(infoRule) && /margin:-3px;/.test(infoRule), infoRule);
 ok("C7 its hit area is still 44 px (::after inset -10 px on 24 px)", html.includes('.info-i::after{ content:""; position:absolute; inset:-10px; }'));
 
+console.log("D. the bulletin (finding 25, John's yes to the mockup)");
+const bdoc = fs.readFileSync(path.join(ROOT, "backend", "bulletin_doc.py"), "utf8").replace(/\r\n?/g, "\n");
+const exp = fs.readFileSync(path.join(ROOT, "backend", "export.py"), "utf8").replace(/\r\n?/g, "\n");
+const mainPy = fs.readFileSync(path.join(ROOT, "backend", "main.py"), "utf8").replace(/\r\n?/g, "\n");
+const app = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8").replace(/\r\n?/g, "\n");
+const tech = fs.readFileSync(path.join(ROOT, "frontend", "help", "technical", "index.html"), "utf8").replace(/\r\n?/g, "\n");
+const noPyComments = src => src.split("\n").filter(l => !/^\s*#/.test(l)).map(l => l.replace(/\s+#\s.*$/, "")).join("\n");
+const bcode = noPyComments(bdoc), ecode = noPyComments(exp);
+ok("D1 25a: the lede parses with any name: 'How many lorries are planned for <month>, where they go, and their carbon.'",
+   bdoc.includes('"lede": f"How many lorries are planned for {month_long}, where they go, and their carbon.",') && !bcode.includes("The lorries {"));
+ok("D2 25b: one name — the bulletin's band and PDF say no 'monthly newsletter', the one-page version no 'leaflet'",
+   !bdoc.includes('_band_html(S, "monthly newsletter")') && !exp.includes('_bulletin_doc(S, "monthly newsletter"')
+   && !exp.includes('_bulletin_doc(S, "leaflet"') && !bdoc.includes('_band_html(S, "leaflet")')
+   && !/NEWSLETTER_LINE = "[^"]*newsletter/.test(bdoc) && !/in the monthly newsletter/.test(bdoc + exp));
+ok("D3 25b: the leaflet is the bulletin's 'one-page version': the band, the tab title, the links, the PDF band, the file name",
+   bdoc.includes('ONE_PAGE = "one-page version"') && bdoc.includes("+ _band_html(S, ONE_PAGE) +")
+   && bdoc.includes("f\"<title>{e(S['brand_title'])} · {ONE_PAGE} · {e(S['tenant'])}</title>\"")
+   && bdoc.includes('<a class="lnk" href="{leaflet_href}">One-page version</a><a class="lnk" href="{leaflet_pdf_href}">One-page version (PDF)</a>')
+   && !bdoc.includes("The one-page leaflet") && !bdoc.includes(">Leaflet PDF<")
+   && exp.includes('doc, usable = _bulletin_doc(S, "one-page version", buf)')
+   && mainPy.includes("filename=\"bulletin-one-page-{y}-{m:02d}.pdf\"") && !mainPy.includes("filename=\"leaflet-"));
+ok("D4 25b: the line under the title and the band name no kind ('monthly bulletin' / 'monthly newsletter' are gone)",
+   bdoc.includes('<p class="sub">{tenant} · {as_at}</p>') && bdoc.includes('"band": _band_html(S, ""),')
+   && exp.includes('doc, usable = _bulletin_doc(S, "", buf, pages)') && !bdoc.includes("· monthly bulletin ·"));
+ok("D5 25b: the one-page version points to 'the full bulletin'; Config and both guides use the one name",
+   bdoc.includes('NEWSLETTER_LINE = "Every route, the councils and the carbon are in the full bulletin:"')
+   && exp.includes("are in the full bulletin: {S['newsletter_url']}")
+   && app.includes("Printed on the bulletin and its one-page version.") && app.includes('"Public bulletin link (optional)"')
+   && !/resident leaflet|Public newsletter link/.test(app)
+   && !/newsletter|leaflet/i.test(guide.replace(/newsletter_url/g, "")) && !/newsletter|\bleaflet\b/i.test(tech.replace(/newsletter_url/g, "")));
+ok("D6 25c: no numbered sections on the page ('02 Routes and roads' was its first) or in the PDF",
+   bdoc.includes('<p class="kick">Routes and roads</p>') && bdoc.includes('<p class="kick">Carbon and the small print</p>')
+   && bdoc.includes(`'<p class="kick">Councils</p>' if (M or C) else ""`) && !/class="kick">0\d/.test(bdoc)
+   && exp.includes("        return P(E(words.upper()), K.st_kick)") && !exp.includes('P(f"{n}  {E(words.upper())}"'));
+ok("D7 25d: one small script opens every scrolling map centred; the page and the one-page version both load it",
+   bdoc.includes(`MAP_CENTRE_JS = ("<script>document.querySelectorAll('.mapwrap').forEach(function(w){"`)
+   && bdoc.includes("var d=w.scrollWidth-w.clientWidth;if(d>0)w.scrollLeft=Math.round(d/2);});</script>\")")
+   && bdoc.includes("</main>{map_centre_js}</body></html>") && bdoc.includes("wayscope.co.uk</footer></main>{MAP_CENTRE_JS}</body></html>')"));
+ok("D8 25d: both maps sit in a frame with the pinned demo tag and the phone's one line",
+   (bdoc.match(/\+ _mapbox\(f'<div class="mapwrap" data-bulletin="(map|council-map)"/g) || []).length === 2
+   && bdoc.includes('MAP_HINT = "Drag the map sideways to see all of it."')
+   && bdoc.includes(`return ('<div class="mapframe">' + wrap + (f'<span class="maptag">{_e(tag)}</span>' if tag else "")`));
+ok("D9 25d: under 760 px the SVG's own tag is hidden and the pinned one shown (the demo tag stays in view); elsewhere hint and pin are hidden",
+   (bdoc.match(/@media \(max-width:759px\)\{\{?\.maptag\{\{?display:block;position:absolute;left:7px;top:7px;/g) || []).length === 2
+   && (bdoc.match(/\.mapwrap svg \.map-tag\{\{?display:none\}\}?/g) || []).length === 2
+   && (bdoc.match(/\.maptag,\.maphint\{\{?display:none\}\}?/g) || []).length === 2);
+ok("D10 18c: the lanes' key draws its samples at twice the map's size (the same widths, scaled), the closure sample too",
+   html.includes("const FLOW_KEY_SCALE = 2;") && html.includes(`'<g transform="scale(' + FLOW_KEY_SCALE + ')">' + inner + '</g></svg>'`)
+   && fnSrc("flowSample").includes("return flowKeySvg(") && fnSrc("divEdgeSample").includes("return flowKeySvg(")
+   && !html.includes('<svg class="fl-sw" width="64" height="12" viewBox="0 0 64 12"'));
+
 for (const f of fail) console.log("  FAIL: " + f);
 console.log(`${pass} passed, ${fail.length} failed`);
 process.exit(fail.length ? 1 : 0);

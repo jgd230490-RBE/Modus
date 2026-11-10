@@ -7762,11 +7762,19 @@
         } catch (e) {}
     }
     // the legend, under the heat map: the five spacings as the map draws them (one lane on the blue), and what they mean
+    // 10 Nov 2026 (UI critique 18, John's yes to the map-card mockup 18c): at the map's own size the five samples looked
+    // alike (a 1.6 to 3.8 px lane), so the key draws them at FLOW_KEY_SCALE times the map's size: the same widths, the
+    // same proportions, a step you can see. The map itself does not change.
+    const FLOW_KEY_SCALE = 2;
+    function flowKeySvg(inner){
+        return '<svg class="fl-sw" width="64" height="' + (12 * FLOW_KEY_SCALE) + '" viewBox="0 0 64 ' + (12 * FLOW_KEY_SCALE) + '" aria-hidden="true">'
+            + '<g transform="scale(' + FLOW_KEY_SCALE + ')">' + inner + '</g></svg>';
+    }
     function flowSample(w){
-        return '<svg class="fl-sw" width="64" height="12" viewBox="0 0 64 12" aria-hidden="true">' +
-            '<line x1="5" y1="6" x2="59" y2="6" stroke="' + CONFIG.COLORS.forecastCasing + '" stroke-width="' + FORECAST_CASING_WIDTH + '" stroke-linecap="round"/>' +
-            '<line x1="5" y1="6" x2="59" y2="6" stroke="' + CONFIG.COLORS.forecast + '" stroke-width="' + FORECAST_LINE_WIDTH + '" stroke-linecap="round"/>' +
-            '<line x1="7" y1="6" x2="57" y2="6" stroke="#ffffff" stroke-width="' + w + '" stroke-linecap="round" stroke-opacity="0.9"/></svg>';
+        return flowKeySvg(
+            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + CONFIG.COLORS.forecastCasing + '" stroke-width="' + FORECAST_CASING_WIDTH + '" stroke-linecap="round"/>' +
+            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + CONFIG.COLORS.forecast + '" stroke-width="' + FORECAST_LINE_WIDTH + '" stroke-linecap="round"/>' +
+            '<line x1="6" y1="6" x2="26" y2="6" stroke="#ffffff" stroke-width="' + w + '" stroke-linecap="round" stroke-opacity="0.9"/>');
     }
     function renderFlowLegend(){
         const box = document.getElementById('flow-legend');
@@ -7789,10 +7797,10 @@
             ((typeof DIV_EDGE !== 'undefined' && DIV_EDGE.fc.features.length)
                 ? '<div class="ml-row" id="div-legend">' + divEdgeSample() + 'Where a route goes round a closure</div>' : '');
     }
-    function divEdgeSample(){
-        return '<svg class="fl-sw" width="64" height="12" viewBox="0 0 64 12" aria-hidden="true">' +
-            '<line x1="5" y1="6" x2="59" y2="6" stroke="' + DIV_EDGE.colour + '" stroke-width="' + FORECAST_CASING_WIDTH + '" stroke-linecap="round"/>' +
-            '<line x1="5" y1="6" x2="59" y2="6" stroke="' + CONFIG.COLORS.forecast + '" stroke-width="' + FORECAST_LINE_WIDTH + '" stroke-linecap="round"/></svg>';
+    function divEdgeSample(){   // 10 Nov 2026: the same scale as the five samples above it
+        return flowKeySvg(
+            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + DIV_EDGE.colour + '" stroke-width="' + FORECAST_CASING_WIDTH + '" stroke-linecap="round"/>' +
+            '<line x1="5" y1="6" x2="27" y2="6" stroke="' + CONFIG.COLORS.forecast + '" stroke-width="' + FORECAST_LINE_WIDTH + '" stroke-linecap="round"/>');
     }
     // ===== end of the flow =====
 
