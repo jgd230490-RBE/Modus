@@ -39,7 +39,14 @@ passes within 0 m of the restricted way in plan, and a naive "within 30 m" test 
 a 4.0 m artic hits a 3.2 m headroom it never goes under. So a LINE limit counts only when
 the route runs ALONG it: the length of the limit's own segments lying within MATCH_M of the
 route must reach min(ALONG_MIN_M, ALONG_SHARE × the limit's length). A crossing shares a
-few metres; travelling it shares the stretch. A POINT limit (a node: a barrier, a bridge
+few metres; travelling it shares the stretch.
+THE SIDE-ROAD MOUTH (10 Nov 2026): the map data often puts a weight limit on a short stub at a
+side road's mouth (7–52 m). All of it lies within MATCH_M of the main road, so the share rule
+counted it on every route that only PASSES the junction (16 of the 30 limits live flagged). So
+a piece counts as "along" only where it runs within ALONG_ANGLE_DEG of the route's own
+direction there, OR the route carries on CARRY_ON_M past the limit's far end in the limit's own
+direction (a route that turns into the side road and uses it). Both read the same index.
+A POINT limit (a node: a barrier, a bridge
 point) cannot be told apart from a crossing by geometry alone, so it is reported as a
 "point" hit with the verdict and a note to check, never silently.
 
@@ -103,6 +110,10 @@ MATCH_M = 20.0          # a limit's vertex within this of the route counts as "o
 ALONG_MIN_M = 30.0      # a line limit counts when this much of it runs along the route…
 ALONG_SHARE = 0.6       # …or this share of a shorter one does
 POINT_M = 12.0          # a node limit within this of the route is a "point" hit
+ALONG_ANGLE_DEG = 20.0  # 10 Nov 2026: a piece runs "along" only within this of the route's direction…
+CARRY_ON_M = 40.0       # …unless the route carries on this far past the limit's far end (it uses the road)
+# Set against the 30 weight limits live flagged on 10 Nov 2026 (real lines, measured read only): this pair keeps the 14
+# roads the routes run along and drops the 16 side-road mouths; 30° let an unnamed 41 m mouth (29°) back in.
 
 TIMEOUT_S = 90
 
@@ -331,11 +342,84 @@ class _LineIndex:
 
     def near(self, p, within_m):
         """True when some segment of the line is within `within_m` (<= reach) of p."""
+        return self.first_within(p, within_m) is not None
+
+    def first_within(self, p, within_m):
+        """The distance to the FIRST segment found within `within_m` (<= reach) of p, or None: near()'s answer with
+        its distance, at the same cost (10 Nov 2026: runs_along reads it to tell a limit's far end)."""
         line = self.line
         for i in self.candidates(p):
-            if _pt_seg_m(p, line[i], line[i + 1]) <= within_m:
-                return True
-        return False
+            d = _pt_seg_m(p, line[i], line[i + 1])
+            if d <= within_m:
+                return d
+        return None
+
+
+def _bearing(a, b):
+    """The direction a -> b in radians on the local plane (_pt_seg_m's scaling)."""
+    kx = 111320.0 * math.cos(math.radians((a[1] + b[1]) / 2.0))
+    return math.atan2((b[1] - a[1]) * 110540.0, (b[0] - a[0]) * kx)
+
+
+def _angle_deg(t1, t2):
+    """The angle between two undirected lines, 0–90 degrees."""
+    d = abs(math.degrees(t1 - t2)) % 180.0
+    return 180.0 - d if d > 90.0 else d
+
+
+def _past(a, b, metres):
+    """The point `metres` beyond b on the line a -> b (local plane)."""
+    kx = 111320.0 * math.cos(math.radians(b[1]))
+    dx, dy = (b[0] - a[0]) * kx, (b[1] - a[1]) * 110540.0
+    n = math.hypot(dx, dy)
+    if n == 0:
+        return None
+    return [b[0] + dx / n * metres / kx, b[1] + dy / n * metres / 110540.0]
+
+
+def runs_along(coords, idx, length_m=None):
+    """
+    The one matching rule for a LINE limit (check_route and _matches): metres the route runs along it, or None when
+    it does not count. The old rule first (min(ALONG_MIN_M, ALONG_SHARE × length) of the limit's pieces with both ends
+    within MATCH_M); then (10 Nov 2026, the side-road mouth) enough of those pieces must run within ALONG_ANGLE_DEG
+    of the route's direction, or the route must carry on CARRY_ON_M past the limit's far end. Only ever drops a hit.
+    """
+    if not coords or len(coords) < 2:
+        return None
+    need = min(ALONG_MIN_M, ALONG_SHARE * (length_m or _line_len_m(coords)))
+    dist = [idx.first_within(c, MATCH_M) for c in coords]          # the old rule's own look-ups, distances kept
+    near = [d is not None for d in dist]
+    pieces = [(coords[i], coords[i + 1]) for i in range(len(coords) - 1) if near[i] and near[i + 1]]
+    along = sum(_hav_m(a, b) for a, b in pieces)
+    if along <= 0 or along < need:
+        return None
+    # the direction, piece by piece: a piece runs along when a stretch of the route within MATCH_M of its middle runs the
+    # same way (within ALONG_ANGLE_DEG). The angle is read before any distance is measured, so only the route's stretches
+    # that run the piece's way are measured, and the loop stops once enough does (Route all's measuring budget)
+    line, par = idx.line, 0.0
+    for a, b in pieces:
+        s = _hav_m(a, b)
+        if s <= 0:
+            continue
+        mid, tb = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0], _bearing(a, b)
+        py = MATCH_M / 110540.0
+        px = MATCH_M / (111320.0 * max(0.01, math.cos(math.radians(mid[1]))))
+        if any(min(line[i][0], line[i + 1][0]) - px <= mid[0] <= max(line[i][0], line[i + 1][0]) + px
+               and min(line[i][1], line[i + 1][1]) - py <= mid[1] <= max(line[i][1], line[i + 1][1]) + py
+               and _angle_deg(tb, _bearing(line[i], line[i + 1])) <= ALONG_ANGLE_DEG
+               and _pt_seg_m(mid, line[i], line[i + 1]) <= MATCH_M for i in idx.candidates(mid)):
+            par += s
+            if par >= need:
+                return along
+    # else the route carries on CARRY_ON_M past the limit's far end, in the limit's own direction: it uses the road (it
+    # bends with it, or turned into the side road). The far end is the one further from the route, read from the look-ups
+    # above (an end off the route is the far one); nothing more is measured
+    first, last = coords[0], coords[-1]
+    d0 = dist[0] if dist[0] is not None else float("inf")
+    d1 = dist[-1] if dist[-1] is not None else float("inf")
+    q, e = (first, last) if d1 >= d0 else (last, first)
+    p = _past(q, e, CARRY_ON_M)
+    return along if p is not None and idx.near(p, MATCH_M) else None
 
 
 def _along(limit_coords, is_near):
@@ -961,9 +1045,8 @@ def check_route(route_id, _limits=None):
                 if not fb or not _bbox_near(fb, lb, pad):
                     continue
                 idx = idx or _LineIndex(line, max(MATCH_M, POINT_M))
-                along = _along(coords, lambda c: idx.near(c, MATCH_M))
-                need = min(ALONG_MIN_M, ALONG_SHARE * (L.get("length_m") or _line_len_m(coords)))
-                if along <= 0 or along < need:
+                along = runs_along(coords, idx, L.get("length_m"))
+                if along is None:
                     continue
                 point = False
             alt = int(g.get("alt_index") or 0)
@@ -1039,9 +1122,8 @@ def _matches(line, lims):
             if not fb or not _bbox_near(fb, lb, pad):
                 continue
             idx = idx or _LineIndex(line, max(MATCH_M, POINT_M))
-            along = _along(coords, lambda c: idx.near(c, MATCH_M))
-            need = min(ALONG_MIN_M, ALONG_SHARE * (L.get("length_m") or _line_len_m(coords)))
-            if along <= 0 or along < need:
+            along = runs_along(coords, idx, L.get("length_m"))
+            if along is None:
                 continue
             out.append((L, False, along))
     return out

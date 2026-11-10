@@ -4945,14 +4945,16 @@ function qrRead(mod) {
                                       breaches: [{ route_id: 'R004', vehicle: 'Artic Tipper (44t)', leg: 'loaded' }, { route_id: 'R004', vehicle: 'Artic Tipper (44t)', leg: 'return' },
                                                  { route_id: 'R001', vehicle: 'Rigid 8-wheel (32t)', leg: 'loaded' }], breach_count: 3 });
     const rows = L.limitConditionRows([F(W), F(H), F(R9), F(AX)], ['R004', 'R001'], 10);
-    ok("⭐ limits conditions (sandbox): one WARNING row per limit a route in use is over; a route not in use this month gives none",
-       rows.length === 2 && rows[0].key === 'l|osm:w1:weight|10' && rows[0].lvl === 'warn' && rows[0].kind === 'l' && rows[0].id === 'osm:w1:weight'
+    // REVERSED 10 Nov 2026 (F10, C3): one row per ROAD, keyed by kind, value, exception and road; the row says the sign's
+    // exception and names no supplier ("(OpenStreetMap)" left the row; the sign's card keeps its Source row)
+    ok("⭐ limits conditions (sandbox): one WARNING row per road a route in use is over; a route not in use this month gives none",
+       rows.length === 2 && rows[0].key === 'l|weight|7.5|except for access|Back Lane|10' && rows[0].lvl === 'warn' && rows[0].kind === 'l' && rows[0].id === 'osm:w1:weight'
        && rows[0].who === 'R004' && rows[0].noun === 'Over a weight limit'
-       && rows[0].what === 'R004 · Artic Tipper (44t) is over the 7.5 t weight limit on Back Lane (OpenStreetMap)', JSON.stringify(rows));
-    ok("limits conditions (sandbox): an axle limit is 'an axle weight limit', on its ref when unnamed; two legs of one route count once, another route is '+1 more'",
-       rows[1].noun === 'Over an axle weight limit' && rows[1].what === 'R004 · Artic Tipper (44t) is over the 10 t axle weight limit on B6047 (OpenStreetMap) (+1 more)');
+       && rows[0].what === 'R004 · Artic Tipper (44t) · 7.5 t, except for access · Back Lane', JSON.stringify(rows));
+    ok("limits conditions (sandbox): an axle limit is 'an axle weight limit', on its ref when unnamed; two legs of one route count once, both routes listed",
+       rows[1].noun === 'Over an axle weight limit' && rows[1].what === 'R001, R004 · 10 t, except for access · B6047', rows[1].what);
     ok("limits conditions (sandbox): no route in use, no rows; a standing limit has no dates, so every month gets its row",
-       L.limitConditionRows([F(W)], [], 10).length === 0 && L.limitConditionRows([F(W)], ['R004'], 37)[0].key === 'l|osm:w1:weight|37');
+       L.limitConditionRows([F(W)], [], 10).length === 0 && L.limitConditionRows([F(W)], ['R004'], 37)[0].key === 'l|weight|7.5|except for access|Back Lane|37');
     // -- the map sources --
     const LN = Object.assign({}, W, { id: 'osm:w2:height', kind: 'height', value: 4, icon_text: '4.0m', imperial: "13'1\"", breaches: [], breach_count: 0 });
     const FC = { type: 'FeatureCollection', features: [
