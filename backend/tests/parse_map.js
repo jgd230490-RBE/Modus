@@ -7582,13 +7582,19 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("TRAFFIC LIMITS: a dashed edge red / amber / grey, a soft band, a badge from zoom 11 — all under the road names",
      tl.includes("const TLIM_COL = { over: '#B91C1C', near: '#B45309', ok: '#64748B', none: '#64748B' };")
      && tl.includes("'line-dasharray': [3, 2]") && tl.includes("'line-opacity': 0.14") && tl.includes("minzoom: 11")
-     && tl.includes("tlimN(r.value) + ' / ' + tlimN(L.limit.value) + ' a day'") && (tl.match(/\}, labelAnchor\(\)\);/g) || []).length === 4);
+     && tl.includes("tlimV(r.value, L.limit.value) + ' / ' + tlimN(L.limit.value) + ' a day'") && (tl.match(/\}, labelAnchor\(\)\);/g) || []).length === 4);
   ok("TRAFFIC LIMITS: follows the month and Play (applyFilters), a limit not in force that month is not drawn, no month = Pick a month",
      /function applyFilters\(\) \{[\s\S]{0,1200}applyTrafficMonth\(\)/.test(code) && tl.includes("if (m && !r) return;")
      && tl.includes("when.textContent = 'Pick a month'"));
   ok("TRAFFIC LIMITS: the popup — name, the month's figure and limit, in and out counted separately, the routes, the scheme's lorries only",
      tl.includes("<b>Traffic limit · ${escHtml(L.name)}</b>") && tl.includes("in and out counted separately · daily average")
      && tl.includes("<th style=\"text-align:left\">From → to</th>") && tl.includes("This scheme's lorries only. Approved plan."));
+  {
+    // seen in Chrome 9 Nov: 5.33 against 5 read "5 / 5 a day" on a red edge; a tie in whole numbers keeps one decimal
+    const fn = new Function(code.slice(code.indexOf("const tlimN = "), code.indexOf("function tlimUnit(")) + "; return [tlimV(5.33, 5), tlimV(4.6, 5), tlimV(5, 5), tlimV(212, 200)];");
+    let r = null; try { r = fn(); } catch (e) {}
+    ok("⭐ TRAFFIC LIMITS: a figure that rounds to its limit keeps one decimal (5.3 / 5), else whole", !!r && r[0] === "5.3" && r[1] === "4.6" && r[2] === "5" && r[3] === "212");
+  }
   ok("TRAFFIC LIMITS: on in Busiest roads and Everything only among the views",
      code.includes("if (p.key !== 'busiest-roads' && p.key !== 'everything') on.delete('traffic-limits');"));
   ok("🔴 TRAFFIC LIMITS: no banned public words in the layer's words",

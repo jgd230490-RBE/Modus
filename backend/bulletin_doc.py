@@ -775,6 +775,15 @@ def _whole(x):
     return f"{int(float(x or 0) + 0.5):,}"
 
 
+def _tl_value(v, limit):
+    """The figure against a limit: whole, half up — but one decimal when the whole number would read the same as the
+    limit and the figure is not (5.3 against 5 reads "5.3", never "5": the row says Over)."""
+    v, limit = float(v or 0), float(limit or 0)
+    if _whole(v) == _whole(limit) and abs(v - limit) > 1e-9:
+        return f"{v:,.1f}"
+    return _whole(v)
+
+
 def traffic_month(mi):
     """
     9 Nov 2026 (v2.1 task 2.1-1, Q10): "Traffic limits on local roads" — the limits ticked public, this month's figure
@@ -801,7 +810,7 @@ def traffic_month(mi):
         unit = "movements" if mv else "visits"
         rows.append({"name": L["name"], "state_key": state,
                      # whole movements, half up (round() is half-even: x.5 goes to the even whole, and the in / out split misread)
-                     "figure": _whole(m["value"]) + (f" ({_whole(m['in_per_day'])} in, {_whole(m['out_per_day'])} out)"
+                     "figure": _tl_value(m["value"], lim["value"]) + (f" ({_whole(m['in_per_day'])} in, {_whole(m['out_per_day'])} out)"
                                                      if mv else f" {unit}"),
                      "limit": f"{n0(lim['value'])} {unit} a day" + (" (busiest day)" if lim["basis"] == "busiest_day" else ""),
                      "state": TRAFFIC_STATE.get(state, "Average only"),

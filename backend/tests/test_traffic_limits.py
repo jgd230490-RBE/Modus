@@ -477,6 +477,11 @@ ok("the public read is kept in memory, public limits only",
    '@app.get("/api/public/traffic-limits")' in M and "summary(public_only=True" in M)
 ok("db: the four zone columns", all(c_ in read("backend/db.py") for c_ in ("limit_value", "limit_counts", "limit_basis", "limit_public")))
 
+# seen in Chrome 9 Nov 2026: a figure that rounds to its limit keeps one decimal, so an Over row never reads "5 / 5"
+import bulletin_doc as _BDt
+ok("6d. bulletin: 5.33 against 5 reads 5.3; 4.6 against 5 reads 4.6; 22.4 against 21 reads 22; 5 against 5 reads 5",
+   _BDt._tl_value(5.33, 5) == "5.3" and _BDt._tl_value(4.6, 5) == "4.6" and _BDt._tl_value(22.4, 21) == "22" and _BDt._tl_value(5, 5) == "5")
+
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)

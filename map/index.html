@@ -10186,6 +10186,10 @@
     const TLIM_COL = { over: '#B91C1C', near: '#B45309', ok: '#64748B', none: '#64748B' };
     const TLIM_LAYERS = ['traffic-limit-band', 'traffic-limit-fill', 'traffic-limit-edge', 'traffic-limit-badge'];
     const tlimN = (v) => v == null ? '—' : Math.round(Number(v)).toLocaleString('en-GB');
+    // the figure against its limit: whole, but one decimal when the whole number would read the same as the limit and the
+    // figure is not (5.3 against 5 reads "5.3 / 5", never "5 / 5" on a red edge)
+    const tlimV = (v, lim) => (v != null && Math.round(Number(v)) === Math.round(Number(lim)) && Math.abs(Number(v) - Number(lim)) > 1e-9)
+        ? (Math.round(Number(v) * 10) / 10).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : tlimN(v);
     function tlimUnit(L) { return L.limit.counts === 'movements' ? 'movements' : 'visits'; }
     function tlimPoint(g) {
         // the badge's place: the middle point of a line, the middle of an area's box
@@ -10204,7 +10208,7 @@
             if (m && !r) return;                      // a dated limit not in force this month: not drawn
             const state = r ? r.state : 'none';
             const props = { id: L.id, name: L.name, state, colour: TLIM_COL[state] || TLIM_COL.none,
-                            badge: r ? tlimN(r.value) + ' / ' + tlimN(L.limit.value) + ' a day' : L.name };
+                            badge: r ? tlimV(r.value, L.limit.value) + ' / ' + tlimN(L.limit.value) + ' a day' : L.name };
             shapes.push({ type: 'Feature', properties: props, geometry: L.geometry });
             const pt = tlimPoint(L.geometry);
             if (pt) badges.push({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: pt } });
@@ -10276,7 +10280,7 @@
                 const p = rp[x.route_id] || {};
                 return `<tr><td style="padding:1px 6px 1px 0">${escHtml(x.route_id)}</td><td style="padding:1px 6px 1px 0">${escHtml((p.origin || '') + ' → ' + (p.dest || ''))}</td><td style="text-align:right">${tlimN(x.a_day)}</td></tr>`;
             }).join('');
-            body = `<span style="color:${col};font-weight:700">${tlimN(r.value)} lorry ${u} a day</span> in ${monthLabel(m)} · limit ${tlimN(L.limit.value)}<br>` +
+            body = `<span style="color:${col};font-weight:700">${tlimV(r.value, L.limit.value)} lorry ${u} a day</span> in ${monthLabel(m)} · limit ${tlimN(L.limit.value)}<br>` +
                 (u === 'movements' ? `<span style="color:#475569">${tlimN(r.in_per_day)} in, ${tlimN(r.out_per_day)} out · in and out counted separately · daily average</span><br>`
                                    : `<span style="color:#475569">daily average</span><br>`) +
                 (L.limit.basis === 'busiest_day' ? '<span style="color:#475569">The limit is for the busiest day; this is the month\'s daily average.</span><br>' : '') +
