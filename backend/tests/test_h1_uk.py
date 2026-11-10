@@ -1171,7 +1171,9 @@ ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the marku
 ok("...nor var(--gold): the 8 uses left are the gate-arrivals key, the warning triangle, a note's border, the status dots (×2), the carbon-tone dot, the flag chip's triangle and the Older chip's dot; the Submit strip's text-[color:var(--gold)] is gone (decision 3)",
    # NARROWED 10 Nov 2026 (wave 2, card 12): 9 -> 5 — the StatusWord dots (×2), the flag rail's triangle and the Older chip's
    # dot are the one status chip now (its warning icon keeps var(--gold), a fill)
-   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 5 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
+   # NARROWED 10 Nov 2026 (wave 3, finding 5): 5 -> 6 — the Account's Actual box on a line short past the share takes an amber
+   # border (a border, not text)
+   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 6 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
 ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's variance figures and the stockpile table's over-capacity figures on a rose-washed row (bad-text: --red is 4.83:1 on white but 4.4–4.5:1 on the wash); since 22 Oct the abnormal loads' .al-bad chip, route-error line and the limits a load is over (bad-text ×3), its .al-notes list, .al-warn chip, route notes and candidate notes (warn-text ×4)",
    '<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>' in fe
    and '<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>' in fe
@@ -1211,15 +1213,19 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-9b): bad-text 51 -> 53 — the Lorry plan's refused-drop line and the red edge of a lorry that cannot take the trip
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-1): bad-text +2, warn-text +2 — the traffic limits' Over / Near word on the
    # Dashboard fold's table and OVER / NEAR on the Simulation's "Traffic limits on this day" line
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 59 and  # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 58 and  # NARROWED 10 Nov 2026 (wave 3, finding 5): 59 -> 58, the Account's red variance figure is words now (amber when flagged)
+      # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon
      # NARROWED 31 Oct 2026 (task 4a, PR 3a): + 3 on Plan → CLP documents (a failed action, the approve card's and the history's problem line)
    # NARROWED 9 Nov 2026 (UI fix phone 2): bad-text 53 -> 55, warn-text 21 -> 22 — the phone Gate arrivals list: the headline when a gate is over, and the figures of an amber / red row
    # NARROWED 10 Nov 2026 (Stockpiles saving): warn-text 24 -> 25 — the planned-use line's amber "Not saved yet"
    # NARROWED 8 Nov 2026 (task 2.1-12): warn-text 19 -> 20 — the site layout phase row's amber "layout changed since"
-   _fe_wo.count("var(--warn-text)") == 26   # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
+   # NARROWED 10 Nov 2026 (wave 3, finding 5): 26 -> 29 — the Look-ahead's short-last-week KPI, the grid's "Short n t last
+   # week" line (.la-carry.is-short) and the Account's Variance words on a flagged line
+   _fe_wo.count("var(--warn-text)") == 29   # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
-   and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe
+   # NARROWED 10 Nov 2026 (wave 3, finding 5): the Account's Variance reads words, amber on a flagged line, else --muted
+   and 'style={{ color: r.short_flag ? "var(--warn-text)" : "var(--muted)" }}>' in fe and "r.variance > 0 && !r.held ? \"var(--bad-text)\"" not in fe and "r.eur_variance < 0 ? \"var(--bad-text)\"" in fe
    and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--ok-text)\" }}>" in fe and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--navy-deep)\" }}>" in fe)
 ok("UI fix 4 (decision 1): 🔴 one rule maps text-slate-400 to --muted in the Ink and Light looks, written html:where(:not([data-theme=\"dark\"])) so it weighs as little as the utility and hover:text-slate-700 still wins; the dark look keeps its remap, whose value IS the dark --muted",
    'html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}' in fe
@@ -1241,8 +1247,13 @@ ok("...on a washed surface --muted falls short — 4.37 on a selected row (blue-
    and round(_cr("#64748B", _over(_ROOT["navy-soft"], "#FFFFFF")), 2) == 4.28 and round(_cr("#64748B", _over("rgba(191,46,85,.05)", "#FFFFFF")), 2) == 4.43
    and round(_cr("#475569", "#EFF6FF"), 2) == 6.96 and round(_cr("#475569", "#FFF4E6"), 2) == 6.98
    and round(_cr("#475569", _over(_ROOT["navy-soft"], "#FFFFFF")), 2) == 6.81 and round(_cr("#475569", _over("rgba(191,46,85,.05)", "#FFFFFF")), 2) == 7.05
-   and 'html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) .text-slate-500{color:#475569}' in fe
-   and _fe_wo.count('background: "var(--navy-soft)"') >= 7 and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 2
+   # NARROWED 10 Nov 2026 (wave 3, finding 5): the Account's short-row wash is 6 % amber now (#FDF7F0: --muted 4.47, short of
+   # 4.5), so the rule lists it too (slate-600 7.12); the rose wash is left on the stockpile table's over row only (1)
+   and 'html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-500{color:#475569}' in fe
+   and round(_cr("#64748B", _over("rgba(217,119,6,.06)", "#FFFFFF")), 2) == 4.47 and round(_cr("#475569", _over("rgba(217,119,6,.06)", "#FFFFFF")), 2) == 7.12
+   and _cr(_DARK["muted"], _over("rgba(217,119,6,.06)", _eff("orange", "dark")["surface"])) >= 4.5
+   and _fe_wo.count('background: "var(--navy-soft)"') >= 7 and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 1
+   and _fe_wo.count('background: "rgba(217,119,6,.06)"') == 1
    and ':root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}' in fe)
 ok("...the rail's group headings lose their opacity:.85 (3.45 → 4.56), the big screen's two hard-coded greys (#9aa1ac, 2.60) and the Dashboard group title's default (#94a3b8) read --muted, and every slate-300 placeholder (rate not set ×3, not recorded, the dashes) reads slate-500 — the dark remaps for slate-300 and emerald-600 went with their last use",
    # NARROWED 22 Oct 2026 (UI fix 7, card 9, the user's choice): 12 px
@@ -1383,10 +1394,12 @@ ok("UI fix 6 card 5: the big screen's '+ N more lines today' line is --muted on 
    all(_cr(_eff(a, l)["muted"], _eff(a, l)["surface"]) >= 4.5 for a in _ACC for l in ("ink", "light", "dark"))
    and round(_cr("#64748B", "#FFFFFF"), 2) == 4.76 and round(_cr("#9AA1AB", "#1F2024"), 2) == 6.25
    and ".today-more{flex:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-weight:600;color:var(--muted);}" in fe)
-ok("UI fix 6 card 1: a short row's pinned Action cell paints the row's own colour — the 5 % rose over the surface, #FCF5F6 (Dark #272126) — so no stripe runs down the table",
-   _over("rgba(191,46,85,.05)", _eff("orange", "ink")["surface"]) == "#FCF5F6" and _over("rgba(191,46,85,.05)", _eff("orange", "dark")["surface"]) == "#272126"
-   and ".la-pin.la-pin-short{background:linear-gradient(rgba(191,46,85,.05),rgba(191,46,85,.05)),var(--surface);}" in fe
-   and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 2)
+# NARROWED 10 Nov 2026 (wave 3, finding 5): the row's colour is 6 % amber (a shortfall is a warning, not an alarm), so the
+# pinned cell paints that — #FDF7F0 (Dark #2A2522)
+ok("UI fix 6 card 1: a short row's pinned Action cell paints the row's own colour — the 6 % amber over the surface, #FDF7F0 (Dark #2A2522) — so no stripe runs down the table",
+   _over("rgba(217,119,6,.06)", _eff("orange", "ink")["surface"]) == "#FDF7F0" and _over("rgba(217,119,6,.06)", _eff("orange", "dark")["surface"]) == "#2A2522"
+   and ".la-pin.la-pin-short{background:linear-gradient(rgba(217,119,6,.06),rgba(217,119,6,.06)),var(--surface);}" in fe
+   and _fe_wo.count('background: "rgba(217,119,6,.06)"') == 1)
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
