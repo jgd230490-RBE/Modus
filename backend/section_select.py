@@ -143,27 +143,89 @@ def _piece(pts, i, t, length_m=PIECE_M):
 # --------------------------------------------------------------------------- #
 #  The answer                                                                  #
 # --------------------------------------------------------------------------- #
+def _whole(x):
+    """The whole number a screen shows for x (half up, as the map's Math.round and a traffic limit's figure)."""
+    return int(math.floor(float(x) + 0.5))
+
+
+def share_tenths(cells, total):
+    """
+    10 Nov 2026 (road card polish, John's Q1 = A: "one decimal in the table, whole headline"). `cells` (movements a
+    day, any precision) as whole TENTHS that ADD UP: their sum is `total` to one decimal, and that sum to the nearest
+    whole number is `total` to the nearest whole number — the figure the card's headline, the figures bar and a
+    traffic limit on the same ground show.
+
+    Each cell is rounded to its nearest tenth (so a route that is 59.56 each way reads 59.6 and 59.6, and its day
+    119.2). Only when the cells then add to a different WHOLE number than `total` does one cell at a time move a
+    tenth the other way — the one whose rounding moved it furthest — until they agree (171.46 as cells adding to
+    171.5 would read 172 under a headline of 171). No cell ends more than a tenth from its value.
+
+    Why the card cannot round three figures apart: 59.56 + 59.56 = 119.12 read "60 · 60 · 119" (seen on live,
+    10 Nov), and fourteen rows rounded apart read 86 in, 85 out under a total of 172.
+    """
+    cells = [max(0.0, float(v or 0.0)) for v in cells]
+    want = _whole(max(0.0, float(total or 0.0)))
+    t = [int(math.floor(v * 10 + 0.5 + 1e-9)) for v in cells]
+    for _ in range(10 * len(cells) + 10):
+        got = _whole(sum(t) / 10.0)
+        if got == want or not cells:
+            break
+        if got > want:      # too high: the cell rounded UP the most comes down a tenth
+            cand = [i for i in range(len(t)) if t[i] > 0]
+            if not cand:
+                break
+            i = max(cand, key=lambda j: (t[j] - cells[j] * 10, cells[j], -j))
+            t[i] -= 1
+        else:               # too low: the cell rounded DOWN the most goes up a tenth
+            i = max(range(len(t)), key=lambda j: (cells[j] * 10 - t[j], cells[j], -j))
+            t[i] += 1
+    return t
+
+
 def _rows(fig, pv):
-    """Each route's In / Out / A day in the organisation's count, busiest first."""
+    """Each route's In / Out / A day in the organisation's count, to ONE decimal and adding up (share_tenths): a
+    row's A day is its In + Out, the totals are the rows added. Busiest first. `small` names a figure that is more
+    than nothing but under a tenth (the card says "under 0.1", never a bare 0 for a route that runs).
+    -> (rows, in, out, a_day)"""
+    rs = fig["routes"]
+    if pv == 2:
+        cells = [v for r in rs for v in (r["in_per_day"], r["out_per_day"])]
+        t = share_tenths(cells, fig["movements_per_day"])
+        trip = [(t[2 * i], t[2 * i + 1], t[2 * i] + t[2 * i + 1]) for i in range(len(rs))]
+    else:
+        a = share_tenths([r["visits_per_day"] for r in rs], fig["visits_per_day"])
+        trip = [(int(math.floor(r["in_per_day"] * 10 + 0.5)), int(math.floor(r["out_per_day"] * 10 + 0.5)), a[i])
+                for i, r in enumerate(rs)]
     rows = []
-    for r in fig["routes"]:
-        a_day = r["in_per_day"] + r["out_per_day"] if pv == 2 else r["visits_per_day"]
-        rows.append({"route_id": r["route_id"], "in": r["in_per_day"], "out": r["out_per_day"], "a_day": round(a_day, 2)})
-    rows.sort(key=lambda x: (-x["a_day"], str(x["route_id"])))
-    return rows
+    for r, (ti, to, ta) in zip(rs, trip):
+        true = {"in": r["in_per_day"], "out": r["out_per_day"],
+                "a_day": r["in_per_day"] + r["out_per_day"] if pv == 2 else r["visits_per_day"]}
+        shown = {"in": ti, "out": to, "a_day": ta}
+        row = {"route_id": r["route_id"], "in": ti / 10.0, "out": to / 10.0, "a_day": ta / 10.0}
+        small = [k for k in ("in", "out", "a_day") if not shown[k] and true[k] > 0]
+        if small:
+            row["small"] = small
+        rows.append((ta, true["a_day"], row))
+    rows.sort(key=lambda x: (-x[0], -x[1], str(x[2]["route_id"])))
+    rows = [x[2] for x in rows]
+    tin, tout, tday = (sum(int(round(r[k] * 10)) for r in rows) for k in ("in", "out", "a_day"))
+    return rows, tin / 10.0, tout / 10.0, tday / 10.0
 
 
 def _answer(kind, geometry, month, c, enter_km=None):
     pv = counting.per_visit()
     out = {"kind": kind, "month": int(month) if month else None, "counting": counting.words_for(pv)}
+    pas = traffic_limits.passing(geometry, drawn=c["drawn"], legs=c["legs"], enter_km=enter_km)
     if not month:
-        pas = traffic_limits.passing(geometry, drawn=c["drawn"], legs=c["legs"], enter_km=enter_km)
         out.update({"routes": [{"route_id": rid} for rid in sorted(pas)], "in": None, "out": None, "a_day": None})
         return out
-    fig = traffic_limits.through(geometry, int(month), ctx=c, enter_km=enter_km)
-    rows = _rows(fig, pv)
-    out.update({"routes": rows, "in": fig["in_per_day"], "out": fig["out_per_day"],
-                "a_day": fig["movements_per_day"] if pv == 2 else fig["visits_per_day"]})
+    fig = traffic_limits.through(geometry, int(month), ctx=c, enter_km=enter_km, pas=pas)
+    rows, t_in, t_out, t_day = _rows(fig, pv)
+    # 10 Nov 2026 (road card polish, Q2 / Q3): the routes on this ground with nothing approved that month, by
+    # reference — the card reads "1 of 12 routes" and can say the clicked route has no loads
+    busy = {r["route_id"] for r in rows}
+    out.update({"routes": rows, "in": t_in, "out": t_out, "a_day": t_day,
+                "idle": sorted(str(rid) for rid in pas if rid not in busy)})
     return out
 
 

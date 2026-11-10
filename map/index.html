@@ -3058,6 +3058,9 @@
     function closeRoutePick() {
         const p = document.getElementById('route-pick'), b = document.getElementById('filter-routes'); if (!p) return;
         ROUTE_PICK.open = false; p.hidden = true; if (b) { b.setAttribute('aria-expanded', 'false'); b.focus(); }
+        // 10 Nov 2026 (road card polish, Q5; seen on live: "R01" then "R013" read "R01R013", "No route matches."): the
+        // search is emptied each time the picker closes; the ticks stay
+        const q = document.getElementById('route-pick-q'); if (q && q.value) { q.value = ''; renderRoutePick(); }
     }
     function clearRoutePick() {
         ROUTE_PICK.sel.clear();
@@ -10492,15 +10495,26 @@
         res = res || {}; rp = rp || {};
         const all = res.routes || [], fig = res.a_day != null;
         const inF = all.filter(r => !passing || passing[r.route_id]), outF = all.filter(r => passing && !passing[r.route_id]);
-        const sum = k => inF.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+        // 10 Nov 2026 (road card polish, Q1 = A): the server's figures are whole TENTHS that add up; they are summed as
+        // tenths here too, so the Total is the shown rows added, never 0.30000000000000004
+        const sum = k => inF.reduce((s, r) => s + Math.round((Number(r[k]) || 0) * 10), 0) / 10;
         const rows = inF.map(r => { const p = rp[r.route_id] || {};
             return { id: r.route_id, from: p.origin || '—', to: p.dest || '—', team: p.ipt && p.ipt !== 'Unknown_IPT' ? teamText(p.ipt) : '',
+                     small: r.small || [],
                      inn: fig ? Number(r.in) || 0 : null, out: fig ? Number(r.out) || 0 : null, aday: fig ? Number(r.a_day) || 0 : null }; });
-        return { rows, left: outF.map(r => r.route_id), n: rows.length, fig,
+        // Q2 / Q3: the routes on this ground with nothing approved that month (inside the filters)
+        const idle = (res.idle || []).filter(id => !passing || passing[id]);
+        return { rows, left: outF.map(r => r.route_id), n: rows.length, fig, idle, here: rows.length + idle.length,
                  inn: fig ? sum('in') : null, out: fig ? sum('out') : null, aday: fig ? sum('a_day') : null };
     }
+    // the headline and the hover tip: whole movements (the figure the bar and a traffic limit show)
     const secN = x => (x > 0 && x < 1 ? 'under 1' : Math.round(x || 0).toLocaleString('en-GB'));
+    // the table, the in / out line and Copy: one decimal, so a row's In + Out is its A day and the rows add to the Total
+    const sec1 = x => (x ? (Math.round(x * 10) / 10).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '0');
+    const secCell = (r, k, key) => ((r.small || []).indexOf(key) >= 0 ? 'under 0.1' : sec1(r[k]));
     const secRoutes = n => n + (n === 1 ? ' route' : ' routes');
+    // "1 of 12 routes": some routes on this ground carry nothing that month
+    const secRoutesOf = v => (v.fig && v.here > v.n ? v.n + ' of ' + secRoutes(v.here) : secRoutes(v.n));
     // the hover tip: one line (pure)
     function secselTipText(res, passing) {
         const v = secselView(res, passing, {});
@@ -10539,8 +10553,8 @@
                  + '</p>' + secselButtons(res, opts, v) + '</div>';
         }
         if (v.fig) {
-            h += '<div class="secsel-sum"><b>' + secN(v.aday) + ' ' + escHtml(CW().lower) + '</b> · ' + secRoutes(v.n) + '</div>'
-               + (two ? '<div class="secsel-sub">' + secN(v.inn) + ' in, ' + secN(v.out) + ' out</div>' : '');
+            h += '<div class="secsel-sum"><b>' + secN(v.aday) + ' ' + escHtml(CW().lower) + '</b> · ' + secRoutesOf(v) + '</div>'
+               + (two ? '<div class="secsel-sub">' + sec1(v.inn) + ' in, ' + sec1(v.out) + ' out</div>' : '');
         } else {
             h += '<div class="secsel-sum">' + secRoutes(v.n) + (res && res.kind === 'area' ? ' enter it.' : ' use it.')
                + ' Pick a month for ' + escHtml(CW().short) + '.</div>';
@@ -10553,12 +10567,15 @@
             const tint = opts.clicked && String(opts.clicked) === String(r.id);
             h += '<tr' + (tint ? ' class="secsel-clicked"' : '') + '><td class="secsel-rid">' + escHtml(r.id) + '</td><td>' + escHtml(r.from) + ' → ' + escHtml(r.to)
                + (r.team && !(res && res.kind === 'area') ? '<div class="secsel-team">' + escHtml(r.team) + '</div>' : '') + '</td>'
-               + (!v.fig ? '' : two ? '<td class="num">' + secN(r.inn) + '</td><td class="num">' + secN(r.out) + '</td><td class="num">' + secN(r.aday) + '</td>'
-                                    : '<td class="num">' + secN(r.aday) + '</td>') + '</tr>';
+               + (!v.fig ? '' : two ? '<td class="num">' + secCell(r, 'inn', 'in') + '</td><td class="num">' + secCell(r, 'out', 'out') + '</td><td class="num">' + secCell(r, 'aday', 'a_day') + '</td>'
+                                    : '<td class="num">' + secCell(r, 'aday', 'a_day') + '</td>') + '</tr>';
         });
-        if (v.fig && v.n > 1) h += '<tr class="secsel-total"><td colspan="2">Total</td>' + (two ? '<td class="num">' + secN(v.inn) + '</td><td class="num">' + secN(v.out) + '</td>' : '')
-                                 + '<td class="num">' + secN(v.aday) + '</td></tr>';
+        if (v.fig && v.n > 1) h += '<tr class="secsel-total"><td colspan="2">Total</td>' + (two ? '<td class="num">' + sec1(v.inn) + '</td><td class="num">' + sec1(v.out) + '</td>' : '')
+                                 + '<td class="num">' + sec1(v.aday) + '</td></tr>';
         h += '</tbody></table></div>';
+        // Q2: the line clicked belongs to a route with nothing approved that month — said in one line, its button kept
+        if (v.fig && opts.clicked && v.idle.indexOf(String(opts.clicked)) >= 0)
+            h += '<p class="secsel-note">' + escHtml(opts.clicked) + ': no loads in ' + escHtml(monthLabel(m)) + '.</p>';
         if (v.left.length) h += '<p class="secsel-note">Also here, outside the filters: ' + v.left.map(escHtml).join(', ') + '.</p>';
         h += '<p class="secsel-note">' + (res && res.kind === 'area' ? 'Each route counted once, however many roads in the box it uses. ' : '')
            + escHtml(two ? 'A lorry coming and going is 2 movements (in and out).' : 'Each lorry counted once.') + ' Approved plan.</p>';
@@ -10566,7 +10583,8 @@
     }
     function secselButtons(res, opts, v) {
         const area = res && res.kind === 'area', b = [];
-        if (!v.fig) b.push('<button type="button" class="secsel-btn" onclick="secselPickMonth()">Pick a month</button>');
+        // (seen on live 10 Nov: "Pick a month" under Mar 2027) only when no month is on screen
+        if (!v.fig && !(res && res.month)) b.push('<button type="button" class="secsel-btn" onclick="secselPickMonth()">Pick a month</button>');
         if (!area && opts.clicked) b.push('<button type="button" class="secsel-btn" data-rid="' + escHtml(opts.clicked) + '" onclick="secselRouteCard(this.dataset.rid)">'
                                            + escHtml(opts.clicked) + '’s card</button>');
         if (v.n) b.push('<button type="button" class="secsel-btn secsel-copy" onclick="secselCopy(\'' + (area ? 'area' : 'road') + '\', this)">' + (area ? 'Copy table' : 'Copy') + '</button>');
@@ -10594,7 +10612,7 @@
         SECSEL.lastEv = e.originalEvent || null;
         if (typeof TL !== 'undefined' && TL.playing && typeof stopTimeline === 'function') stopTimeline();
         const m = secselMonth();
-        SECSEL.roadAt = { lngLat: e.lngLat, point: e.point, r: secselReachM(e.point), clicked: clickedRid || null,
+        SECSEL.roadAt = { lngLat: e.lngLat, ask: secselSnap(e, clickedRid), point: e.point, r: secselReachM(e.point), clicked: clickedRid || null,
                           limits: secselLimitLines(e.point) };
         SECSEL.road = { kind: 'road', month: m, loading: true };
         if (isPhoneShell()) { SHEET.card = 'road'; renderRouteCard(); if (SHEET.state !== 'half') sheetTo('half'); }
@@ -10603,7 +10621,7 @@
     }
     function loadRoadCard() {
         const at = SECSEL.roadAt; if (!at) return;
-        const m = secselMonth(), url = roadAtUrl(at.lngLat, m, at.r, at.clicked);
+        const m = secselMonth(), url = roadAtUrl(at.ask || at.lngLat, m, at.r, at.clicked);
         SECSEL.roadKey = url;
         secselFetch(url).then(j => { if (SECSEL.roadKey !== url) return; SECSEL.road = j; redrawRoadCard(); })
             .catch(() => { if (SECSEL.roadKey !== url) return; SECSEL.road = { kind: 'road', month: m, failed: true }; redrawRoadCard(); });
@@ -10659,6 +10677,18 @@
         } });
         return best || ll;
     }
+    // 10 Nov 2026 (road card polish; seen on live): the lines are drawn to the LEFT of the road, and on a zoomed-out map
+    // that is further than the read's reach (2.6 px = 160 m at zoom 9.6, reach 120 m), so a click ON R045's line answered
+    // "No route on this road". The point ASKED ABOUT is moved onto the line that was hit (its own geometry, never the
+    // drawn offset); the card still opens where the click was.
+    function secselSnap(e, rid) {
+        try {
+            const ls = ['forecast-layer', 'inbound-lines', 'outbound-lines', 'road-load-line'].filter(l => map.getLayer(l));
+            const fs = ls.length ? map.queryRenderedFeatures(e.point, { layers: ls }) : [];
+            const f = fs.find(x => rid && x.properties && String(x.properties.route_id) === String(rid)) || fs[0];
+            return f ? secselNearest(f, e.lngLat) : e.lngLat;
+        } catch (err) { return e.lngLat; }
+    }
     // is a road (a route line or a shared section) under this point? the traffic limit's own popup gives way to the card
     function roadCardHitAt(point) {
         const ls = ['forecast-layer', 'inbound-lines', 'outbound-lines', 'road-load-line'].filter(l => map.getLayer(l));
@@ -10670,7 +10700,7 @@
     function secselTip(f, e) {
         if (!f || !e || !e.lngLat) return null;
         const p = f.properties || {}, rid = (p.route_id && !(f.layer && f.layer.id === 'road-load-line')) ? p.route_id : null;
-        const m = secselMonth(), url = roadAtUrl(e.lngLat, m, secselReachM(e.point), rid);
+        const m = secselMonth(), url = roadAtUrl(secselNearest(f, e.lngLat), m, secselReachM(e.point), rid);
         const passing = typeof modeRoutesPassing === 'function' ? modeRoutesPassing() : null;
         const done = SECSEL.cache[url] && SECSEL.cache[url]._res;
         if (SECSEL.tip.timer) clearTimeout(SECSEL.tip.timer);
@@ -10844,6 +10874,28 @@
         const c = document.getElementById('area-card'); if (!c || c.hidden) return;
         c.innerHTML = '<button type="button" class="secsel-x" aria-label="Clear the area" onclick="clearArea()"></button>' + areaCardHTML();
         placeAreaCard(c);
+        clearBoxOfCard(c);
+    }
+    // 10 Nov 2026 (road card polish, Q4 = A; seen on live: with Conditions open the card sat on the box just drawn). When
+    // the card covers any of the box, the map slides so the box sits in the free part of the map, left of the card and
+    // above the timeline bar; it zooms out only when the box cannot fit there. Once per box and card place: a person who
+    // then moves the map is left alone. The box, the figures and the link's area do not change.
+    function secselCovers(a, b) { return a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]; }
+    function clearBoxOfCard(c) {
+        if (!SECSEL.area || !c || c.hidden || isPhoneShell() || (SECSEL.areaRes && SECSEL.areaRes.loading)) return;
+        try {
+            const key = SECSEL.area.join() + '|' + c.style.right;
+            if (SECSEL.areaFit === key) return;
+            SECSEL.areaFit = key;
+            const m = map.getContainer().getBoundingClientRect(), cr = c.getBoundingClientRect(), b = SECSEL.area;
+            const sw = map.project([b[0], b[1]]), ne = map.project([b[2], b[3]]);
+            const card = [cr.left - m.left, cr.top - m.top, cr.right - m.left, cr.bottom - m.top];
+            if (!secselCovers([sw.x, ne.y, ne.x, sw.y], card)) return;
+            const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
+            const pad = { left: 24, top: Math.max(24, Math.round(card[1])), right: Math.round(m.width - card[0] + 24), bottom: foot + 24 };
+            if (m.width - pad.left - pad.right < 120 || m.height - pad.top - pad.bottom < 120) return;      // no free map to slide it to
+            map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: pad, maxZoom: map.getZoom(), duration: 400 });
+        } catch (e) {}
     }
     // the map runs under the figures bar: the card starts level with the map's buttons and ends above the timeline bar
     function placeAreaCard(c) {
@@ -10863,7 +10915,7 @@
     (function () {
         const w = document.getElementById('tl-warnings');
         if (!w || typeof MutationObserver === 'undefined') return;
-        new MutationObserver(() => { const c = document.getElementById('area-card'); if (c && !c.hidden) placeAreaCard(c); })
+        new MutationObserver(() => { const c = document.getElementById('area-card'); if (c && !c.hidden) { placeAreaCard(c); clearBoxOfCard(c); } })
             .observe(w, { attributes: true, attributeFilter: ['style'] });
     })();
     // the month moved (a pick, a scrub, Play): the area's card follows it; an open road card does too
@@ -10880,8 +10932,8 @@
                     + (res && res.month ? ' · ' + monthLabel(res.month) : '');
         const basis = v.fig ? 'Approved plan, ' + CW().lower + (two ? ' (a visit = 2 movements, in and out).' : ' (each lorry once).') : 'Approved plan. No month picked: routes only.';
         const head = ['Route', 'From', 'To'].concat(v.fig ? (two ? ['In', 'Out', 'A day'] : ['A day']) : []);
-        const body = v.rows.map(r => [r.id, r.from, r.to].concat(v.fig ? (two ? [secN(r.inn), secN(r.out), secN(r.aday)] : [secN(r.aday)]) : []));
-        if (v.fig && v.n > 1) body.push(['Total', '', ''].concat(two ? [secN(v.inn), secN(v.out), secN(v.aday)] : [secN(v.aday)]));
+        const body = v.rows.map(r => [r.id, r.from, r.to].concat(v.fig ? (two ? [secCell(r, 'inn', 'in'), secCell(r, 'out', 'out'), secCell(r, 'aday', 'a_day')] : [secCell(r, 'aday', 'a_day')]) : []));
+        if (v.fig && v.n > 1) body.push(['Total', '', ''].concat(two ? [sec1(v.inn), sec1(v.out), sec1(v.aday)] : [sec1(v.aday)]));
         const foot = 'From the Wayscope public map, ' + when + '. ' + link;
         const tsv = [title, basis, head.join('\t')].concat(body.map(r => r.join('\t'))).concat([foot]).join('\n');
         const td = (x, n) => '<td style="padding:2px 8px;border:1px solid #ccc;' + (n ? 'text-align:right;' : '') + '">' + escHtml(x) + '</td>';
@@ -11705,15 +11757,22 @@
     // 12 Oct 2026 (browser check, phone): a finger lands a few px off a 4 to 8 px line and a layer's own click needs the
     // exact pixel, so a tap 6 px off a shared section opened nothing. On the phone shell a tap that hits no line and
     // nothing else clickable looks TAP_SLOP px round it: a shared section first, then a route.
-    const TAP_SLOP = 10;
+    // 10 Nov 2026 (road card polish, Q6; seen on live: a click 5 px beside a 6 px line opened nothing): a computer gets
+    // CLICK_SLOP px of reach for the road card too. A phone keeps its 10 px and its sheet cards.
+    const TAP_SLOP = 10, CLICK_SLOP = 6;
     function phoneTapNear(e) {
-        if (!isPhoneShell() || !e || !e.point) return;
+        if (!e || !e.point) return;
+        const phone = isPhoneShell(), slop = phone ? TAP_SLOP : CLICK_SLOP;
+        if (!phone && (typeof openRoadCard !== 'function' || (typeof SECSEL !== 'undefined' && SECSEL.drawing)
+                       || (typeof limitHitAt === 'function' && limitHitAt(e.point)))) return;
         const has = l => !!map.getLayer(l);
         const runL = ['road-load-line'].filter(has), routeL = ['forecast-layer', 'inbound-lines', 'outbound-lines'].filter(has);
         try {
             if ((runL.length || routeL.length) && map.queryRenderedFeatures(e.point, { layers: runL.concat(routeL) }).length) return;   // the layer's own click answers
             if (typeof clickableAt === 'function' && clickableAt(e.point)) return;
-            const box = [[e.point.x - TAP_SLOP, e.point.y - TAP_SLOP], [e.point.x + TAP_SLOP, e.point.y + TAP_SLOP]];
+            // a computer: a traffic limit under the click opens its own card, as it did
+            if (!phone && typeof TLIM_LAYERS !== 'undefined' && map.queryRenderedFeatures(e.point, { layers: TLIM_LAYERS.filter(has) }).length) return;
+            const box = [[e.point.x - slop, e.point.y - slop], [e.point.x + slop, e.point.y + slop]];
             const runs = runL.length ? map.queryRenderedFeatures(box, { layers: runL }) : [];
             const routes = routeL.length ? map.queryRenderedFeatures(box, { layers: routeL }) : [];
             const rid = routes.length && routes[0].properties ? routes[0].properties.route_id : null;
@@ -11722,6 +11781,7 @@
                 const hit = (runs.length ? runs : routes)[0], c = secselNearest(hit, e.lngLat);
                 openRoadCard({ lngLat: c, point: map.project(c) }, rid); return;
             }
+            if (!phone) return;
             if (runs.length) { openRunCard(runs[0].properties.id); return; }
             if (rid) openRouteCard(rid);
         } catch (err) {}

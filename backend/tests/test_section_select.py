@@ -328,6 +328,88 @@ SSRC = read("backend/section_select.py")
 ok("3. one count: section_select calls traffic_limits.through, and counts nothing itself",
    "traffic_limits.through(" in SSRC and "vehicle_loads" not in SSRC)
 
+# =========================================================================== #
+#  4. The rows add up (10 Nov 2026, road card polish, John's Q1 = A, Q2, Q3)   #
+# =========================================================================== #
+# what live answered for the box -0.9966,52.4931,-0.8154,52.68026 in Mar 2027 (in, out) — the card read
+# "60 · 60 · 119", "1 · 1 · 3", "under 1 · under 1 · 2" and 86 + 85 against 172
+LIVE = [(59.56, 59.56), (9.82, 9.82), (4.08, 4.08), (3.64, 3.64), (2.98, 2.98), (2.04, 2.04), (1.45, 1.45),
+        (0.81, 0.81), (0.32, 0.32), (0.32, 0.32), (0.32, 0.32), (0.49, 0.0), (0.16, 0.16), (0.32, 0.0)]
+cells = [v for pair in LIVE for v in pair]
+t = SS.share_tenths(cells, 171.83)
+ok("⭐ 4. live's fourteen routes as tenths: they add to 171.8, which reads 172 — the limit's and the bar's figure",
+   sum(t) == 1718 and SS._whole(sum(t) / 10.0) == SS._whole(171.83) == 172, str(sum(t)))
+ok("⭐ 4. a route that is the same each way reads the same each way (59.6 and 59.6, never 60 and 59)",
+   t[0] == t[1] == 596 and all(t[2 * i] == t[2 * i + 1] for i, (a_, b_) in enumerate(LIVE) if a_ == b_), str(t))
+ok("4. no figure is more than a tenth from its value", all(abs(x / 10.0 - v) <= 0.1 + 1e-9 for x, v in zip(t, cells)))
+ok("4. In 86.3 and Out 85.5 (live's 86.32 and 85.51)", sum(t[0::2]) == 863 and sum(t[1::2]) == 855,
+   str((sum(t[0::2]), sum(t[1::2]))))
+ok("🔴 4. the rule that was rejected: whole numbers rounded apart add to 170, not the limit's 172",
+   sum(SS._whole(v) for v in cells) == 170)
+# rounding apart would put the sum on the other side of a half: the cells give way, the headline does not
+edge = SS.share_tenths([85.73, 85.73], 171.46)
+ok("⭐ 4. 85.73 + 85.73 = 171.46 reads 171: the cells add to 171.4, never 171.5 under a headline of 171",
+   sum(edge) == 1714 and SS._whole(sum(edge) / 10.0) == SS._whole(171.46) == 171 and max(edge) - min(edge) <= 1, str(edge))
+up = SS.share_tenths([0.24, 0.24, 0.04], 0.52)
+ok("4. ...and the other way: 0.24 + 0.24 + 0.04 = 0.52 reads 1, so the cells add to at least 0.5",
+   SS._whole(sum(up) / 10.0) == 1 and all(abs(x / 10.0 - v) <= 0.1 + 1e-9 for x, v in zip(up, [0.24, 0.24, 0.04])), str(up))
+ok("4. nothing in, nothing out", SS.share_tenths([], 0.0) == [] and SS.share_tenths([0.0, 0.0], 0.0) == [0, 0])
+import random
+_rng = random.Random(1110)
+_bad = []
+for _ in range(400):
+    n = _rng.randint(1, 20)
+    cs = [round(_rng.choice([0.0, _rng.uniform(0, 3), _rng.uniform(0, 120)]), 2) for _i in range(2 * n)]
+    tot = round(sum(cs), 2)
+    tt = SS.share_tenths(cs, tot)
+    if SS._whole(sum(tt) / 10.0) != SS._whole(tot) or any(abs(x / 10.0 - v) > 0.1 + 1e-9 for x, v in zip(tt, cs)) or min(tt) < 0:
+        _bad.append((cs, tot, tt))
+ok("⭐ 4. 400 random cards: the rows' sum reads the total's whole number, every figure within a tenth, none negative",
+   not _bad, str(_bad[:1]))
+
+# awkward loads on the fixture's roads: R1 251 loads, R2 109, R3 31 over 20 days = 12.55, 5.45, 1.55 a day
+LINES[M] = [{"route_id": "R1", "vehicle_loads": 251.0, "co2_t": 1.0, "ipt": "IPT1"},
+            {"route_id": "R2", "vehicle_loads": 109.0, "co2_t": 1.0, "ipt": "IPT1"},
+            {"route_id": "R3", "vehicle_loads": 31.0, "co2_t": 1.0, "ipt": "IPT1"}]
+SS.forget()
+big2 = SS.in_box(-1.01, LAT - 0.03, -0.89, LAT + 0.02, M)
+T10 = lambda x: int(round(x * 10))
+ok("⭐ 4. the card's rows: each A day is its In + Out, in whole tenths",
+   all(T10(r["in"]) + T10(r["out"]) == T10(r["a_day"]) and abs(r["a_day"] * 10 - T10(r["a_day"])) < 1e-6 for r in big2["routes"]),
+   str(big2["routes"]))
+ok("⭐ 4. the totals are the rows added, and In + Out is A day",
+   T10(big2["in"]) == sum(T10(r["in"]) for r in big2["routes"]) and T10(big2["out"]) == sum(T10(r["out"]) for r in big2["routes"])
+   and T10(big2["a_day"]) == sum(T10(r["a_day"]) for r in big2["routes"]) == T10(big2["in"]) + T10(big2["out"]),
+   str((big2["in"], big2["out"], big2["a_day"])))
+_true = TL.through({"type": "Polygon", "coordinates": [[[-1.01, LAT - 0.03], [-0.89, LAT - 0.03], [-0.89, LAT + 0.02],
+                                                        [-1.01, LAT + 0.02], [-1.01, LAT - 0.03]]]}, M, ctx=SS._ctx(),
+                   enter_km=SS.BOX_ENTER_KM)["movements_per_day"]
+ok("⭐ 4. the card's total reads the same whole number as 2.1-1's through() for that ground (39.1 -> 39)",
+   SS._whole(big2["a_day"]) == SS._whole(_true) == 39, str((big2["a_day"], _true)))
+_pv = counting.per_visit
+counting.per_visit = lambda *x, **k: 1
+v2 = SS.in_box(-1.01, LAT - 0.03, -0.89, LAT + 0.02, M)
+counting.per_visit = _pv
+ok("4. an organisation that counts visits: the A day column adds to its total, in tenths",
+   T10(v2["a_day"]) == sum(T10(r["a_day"]) for r in v2["routes"]) and v2["counting"]["unit"] == "visits", str(v2["a_day"]))
+# Q2 / Q3: the routes on the ground with nothing approved that month
+LINES[M] = [{"route_id": "R2", "vehicle_loads": 1.0, "co2_t": 1.0, "ipt": "IPT1"}]
+SS.forget()
+idle = SS.road_at(-0.95, LAT, M)
+ok("⭐ 4. Q2 / Q3: a road two routes use, one with loads: the other is named as idle (the card's '1 of 2 routes')",
+   [r["route_id"] for r in idle["routes"]] == ["R2"] and idle["idle"] == ["R1"], str(idle))
+_tiny, _ti, _to, _td = SS._rows({"routes": [{"route_id": "R9", "in_per_day": 0.04, "out_per_day": 0.04, "visits_per_day": 0.04},
+                                           {"route_id": "R8", "in_per_day": 2.0, "out_per_day": 0.0, "visits_per_day": 2.0}],
+                                "movements_per_day": 2.08, "visits_per_day": 2.04}, 2)
+ok("⭐ 4. a route that runs under a tenth a day is marked small (the card says 'under 0.1'), a true nought is not",
+   _tiny[1]["route_id"] == "R9" and set(_tiny[1]["small"]) == {"in", "out", "a_day"} and "small" not in _tiny[0]
+   and (_ti, _to, _td) == (2.0, 0.0, 2.0), str(_tiny))
+ok("4. no month: no idle list (every route is named already)", "idle" not in SS.road_at(-0.95, LAT, None))
+ok("🔴 4. still no team in the answer", "IPT1" not in json.dumps(idle) and "team" not in json.dumps(idle).lower())
+ok("4. one read of the legs per answer: through() is handed the routes already found",
+   "traffic_limits.through(geometry, int(month), ctx=c, enter_km=enter_km, pas=pas)" in SSRC
+   and "if pas is None:" in read("backend/traffic_limits.py"))
+
 remove_scratch_db(db, TMP)
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
