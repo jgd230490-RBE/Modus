@@ -68,7 +68,7 @@ browser's routePropsById). Per area:
   laden_lorry_km     Σ loads × the laden leg's km inside.
   lorry_km           Σ loads × (laden km inside + return km inside): every lorry-km driven
                      in the area, empties included.
-  co2_t              Σ route month CO2e (costlines' figure, both legs) × (laden km inside +
+  co2_t              Σ route month CO2e (costlines' figure: the loaded leg + the charged share of the return) × (laden km inside +
                      return km inside) ÷ the route's two-way length (laden + stored return):
                      the carbon emitted inside the area, the DESNZ split. Over the areas of
                      one tier that cover a route it adds up to the route's figure exactly.
@@ -849,7 +849,7 @@ def _area_month(month, lines, co2_error, wd, ctx, geometry=True):
                  "inside (the boundaries are generalised to 200 m); a route inside by less adds its km and carbon "
                  "there, not its movements.",
         "counting": counting.words_for(pv),
-        "co2_basis": "CO2e in an area = each route's month CO2e (routed km × the vehicle's kg CO2e/km, both legs) × "
+        "co2_basis": "CO2e in an area = each route's month CO2e (the loaded leg + the share of the return the route charges, each at the vehicle's kg CO2e/km) × "
                      "its km inside the area (laden and return) ÷ its two-way length: the carbon emitted inside "
                      "the area, the DESNZ split by boundary. Over the areas of one tier that cover a route it adds "
                      "up to the route's figure. Never kg per tonne per council.",

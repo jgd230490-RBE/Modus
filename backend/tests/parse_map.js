@@ -1940,8 +1940,11 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   const trucks = strings.filter(s => /\btrucks?\b/i.test(s) && !/Truck mixer/.test(s));
   ok("🔴 no 'truck' in any string the public map prints (lorry / HGV)", trucks.length === 0, trucks.slice(0, 3).join(" | "));
   ok("the drawer's figures say lorry", /'Trips \/ day \/ lorry'/.test(code) && /'Lorries for peak'/.test(code));
-  ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025, and says what the figure is (average laden, both legs, tailpipe only, set on Config)",
-     /Carbon: DESNZ 2026 factors, both legs, tailpipe only\. The same figure as the bar above\./.test(code) && !/DEFRA/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; average laden and Config are in T10
+  // REVERSED 10 Nov 2026 (live test finding 7; John's yes to notes/map-drawer-polish-mockup-1110 Q3): since the return
+  // journey rule (8 Nov) the figure is the loaded journey + the share of the way back the route charges, not "both legs"
+  ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025, and says what the figure is (tailpipe only; each loaded journey and the scheme's share of the empty return)",
+     /Carbon: DESNZ 2026 factors, tailpipe only\. Each loaded journey and the scheme’s share of the empty return\. The same figure as the bar above\./.test(code)
+     && !/factors, both legs/.test(code) && !/DEFRA/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; average laden and Config are in T10
 }
 
 
@@ -2649,7 +2652,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && /\.kpi-label\{[^}]*white-space:nowrap; \}/.test(html));
   // 1d. the conditions panel is capped by the viewport
   ok("mobile: the conditions panel's max-height is measured from the bar's bottom to the timeline bar's top (or the viewport's bottom edge), and cleared on the desktop",
-     code.includes("const floor = (tb && tb.style.display !== 'none') ? Math.round(tb.getBoundingClientRect().top) - 8 : window.innerHeight - 12;")
+     // NARROWED 10 Nov 2026 (map drawer polish, finding 4): `let`, because the open route drawer can lower the floor (pinned in the DRAWER block)
+     code.includes("let floor = (tb && tb.style.display !== 'none') ? Math.round(tb.getBoundingClientRect().top) - 8 : window.innerHeight - 12;")
      && code.includes("box.style.maxHeight = Math.max(120, floor - (Math.round(kpi.getBoundingClientRect().bottom) + 8)) + 'px';")
      && code.includes("{ box.style.top = ''; box.style.maxHeight = ''; return; }"));
   // 1e. landscape
@@ -3452,8 +3456,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
   // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the carbon badge reads "CO₂ 24" (one decimal under 10), the unit in the
   // key; a route with no figure gets NO badge (the filter), its grey line and the key say "no figure"
-  ok("⭐ C1: the route label switches to the 'CO₂' badge in carbon mode (its own layer, on the loaded leg: one label per route)",
-     blkCode.includes("['concat', 'CO₂ ', ['case', ['>=', ['get', 'f_co2'], 10], ['to-string', ['round', ['get', 'f_co2']]], ['to-string', ['get', 'f_co2']]]], ''];")
+  ok("⭐ C1: the route label switches to the '… t CO₂e' badge in carbon mode (its own layer, on the loaded leg: one label per route)",
+     // NARROWED 10 Nov 2026 (UI critique 18, wave 3 map card): the badge carries its unit, "6.8 t CO₂e" (was "CO₂ 6.8")
+     blkCode.includes("['concat', ['case', ['>=', ['get', 'f_co2'], 10], ['to-string', ['round', ['get', 'f_co2']]], ['to-string', ['get', 'f_co2']]], ' t CO₂e'], ''];")
      && blkCode.includes("return ['all', forecastLayerFilter(), ['==', ['get', 'type'], 'Inbound Highway'], ['==', ['typeof', ['get', 'f_co2']], 'number']];")
      // NARROWED 12 Oct 2026 (evening): the sections are drawn in Volume only, so their label is always the volume one
      && blkCode.includes("map.setLayoutProperty('road-load-labels', 'text-field', ROAD_LOAD_LABEL);") && !code.includes("ROAD_LOAD_CARBON_LABEL"));
@@ -3462,7 +3467,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      // NARROWED 12 Oct 2026 (browser check): the excluded-line clause is written only when a line is excluded; the demo
      // read "excludes 0 lines with no stored road route"
      // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the note moved behind the heat map's "i" (#heat-info-more), word for word
-     && blkCode.includes("more = 'Approved plan only, both legs. A colour means the same tonnes every month.' +")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; the stops rule is in T10
+     // REVERSED 10 Nov 2026 (live test finding 7): no "both legs" (the return journey rule, 8 Nov)
+     && blkCode.includes("more = 'Approved plan only: loaded journeys and the scheme’s share of the empty return. A colour means the same tonnes every month.' +")
+     && !blkCode.includes("Approved plan only, both legs")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; the stops rule is in T10
      && blkCode.includes("if (moreEl && moreEl.innerHTML !== more) moreEl.innerHTML = more;")
      && blkCode.includes("(miss ? '<div class=\"ml-foot\">Leaves out ' + miss + ' line' + (miss === 1 ? '' : 's') + ' not routed yet.</div>' : '')")
      && !blkCode.includes("on both legs, excludes ' + miss")
@@ -3730,9 +3737,13 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
            && el("carbon-legend").innerHTML.includes("under 11 t") && el("carbon-legend").innerHTML.includes("44 t and over")
            // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the note is behind the heat map's "i"; the legend keeps the exclusion in
            // one line and the CO2 badge's key
-           && el("heat-info-more").innerHTML.includes("Approved plan only, both legs. A colour means the same tonnes every month.")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter, "not routed yet"
+           // REVERSED 10 Nov 2026 (live test finding 7): no "both legs"
+           && el("heat-info-more").innerHTML.includes("Approved plan only: loaded journeys and the scheme’s share of the empty return. A colour means the same tonnes every month.")
+           && !el("heat-info-more").innerHTML.includes("both legs")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter, "not routed yet"
            && !el("heat-info-more").innerHTML.includes("(55.5 t)") && el("carbon-legend").innerHTML.includes("Leaves out 3 lines not routed yet.")
-           && el("carbon-legend").innerHTML.includes('<span class="co-pill">CO₂ 24</span>t CO₂e from that route in the month'), el("carbon-legend").innerHTML.slice(0, 400));
+           // NARROWED 10 Nov 2026 (UI critique 18): the key's pill carries the unit as the badges do; grey is also a route with nothing in the month
+           && el("carbon-legend").innerHTML.includes('<span class="co-pill">24 t CO₂e</span>from that route in the month')
+           && el("carbon-legend").innerHTML.includes('Nothing this month, or not routed yet'), el("carbon-legend").innerHTML.slice(0, 400));
         // REVERSED 12 Oct 2026 (evening): carbon paints the routes only, so a section-month figure from the server never
         // sets the stops; the route-month maximum always does
         TL.matrix.sectionCo2Max = 9.1; B.refreshMapModes(); await flush();
@@ -3917,7 +3928,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      sheetHtml.indexOf('id="m-month"') > 0 && sheetHtml.indexOf('id="m-trips"') > sheetHtml.indexOf('id="m-month"')
      && sheetHtml.indexOf('id="m-vehicles"') > sheetHtml.indexOf('id="m-trips"') && sheetHtml.indexOf('id="m-cond"') > sheetHtml.indexOf('id="m-vehicles"')
      && sheetHtml.indexOf('id="m-busiest"') > sheetHtml.indexOf('id="m-body"') && sheetHtml.indexOf('id="m-conditions"') > sheetHtml.indexOf('id="m-busiest"')
-     && sheetHtml.includes('<b id="m-trips">&mdash;</b><span>a day</span>') && sheetHtml.includes('<b id="m-vehicles">&mdash;</b><span>vehicles</span>'));   // NARROWED 28 Oct 2026 (phone full screen, card 2): one line folded, short words
+     // NARROWED 10 Nov 2026 (UI critique 18): the first figure says what it counts ("movements a day", from CW().short) and
+     // both figures are hidden while no month is on screen
+     && sheetHtml.includes('<div class="m-fig" hidden><b id="m-trips">&mdash;</b><span id="m-trips-word">movements a day</span></div>')
+     && sheetHtml.includes('<div class="m-fig" hidden><b id="m-vehicles">&mdash;</b><span>vehicles</span></div>'));   // NARROWED 28 Oct 2026 (phone full screen, card 2): one line folded, short words
   ok("C3 phone: the full detent is the filters and layers (sheetTo('full') opens the panel as the layers sheet)",
      sheetHtml.includes(`onclick="sheetTo('full')">Filters and layers</button>`) && /if \(state === 'full'\) \{ openLayersSheet\(\); return; \}/.test(code));
   ok("C3 phone: the month chips and Play sit at the BOTTOM of the sheet (the last row), Play named and pressed-state",
@@ -4199,8 +4213,10 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
        mt.startsWith('mailto:contact@scheme.example?subject=Report%20a%20concern%3A%20Wolds%20Link%20(fictional)&body=What%20happened%3A')
        && /Date%3A%0ATime%3A%0APlace/.test(mt) && /Lorry%20registration/.test(mt) && /Month%20on%20the%20map%3A%20Oct%202026/.test(mt) && /month%3D2026-10/.test(mt));
     api.renderConcernLinks();
-    ok("⭐ C3 concern: the demo (no typed address) says so in every slot, as a placeholder — no link, no invented address",
-       concernSlots.every(s => s.innerHTML === '<span class="concern-unset">Report a concern: no contact address yet (fictional demo).</span>'));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
+    // NARROWED 10 Nov 2026 (UI critique 18, decision 6): a resident sees no unset line (the public map: empty slots); the map
+    // inside the app (staff) still says so, without "(fictional demo)" — checked in ui_fix_map_card.js. Still no link, no invented address.
+    ok("⭐ C3 concern: the demo (no typed address) shows a resident no link, no invented address and no placeholder",
+       concernSlots.every(s => s.innerHTML === ''));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
     TENANT.concern_email = 'contact@scheme.example'; api.renderConcernLinks();
     ok("C3 concern: a typed address becomes a 'Report a concern by email' link", concernSlots.every(s => /^<a class="concern-link" href="mailto:contact@scheme\.example\?subject=/.test(s.innerHTML) && />Report a concern by email<\/a>$/.test(s.innerHTML)));
     TENANT.concern_email = null;
@@ -6165,9 +6181,11 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && html.includes('<div id="forecast-status"></div>') && !code.includes('status.innerHTML = "Approved forecasts only.";'));
   ok("19 Oct wording: a failed or partial council read stays IN SIGHT (#area-notes is outside the info box)",
      sb.indexOf('id="area-notes"') > 0 && sb.indexOf('id="area-notes"') < sb.indexOf('id="info-council"'));
-  ok("19 Oct: the 'i' is a named button (aria-expanded, aria-controls), 18 px with a 44 px hit area (::after inset -13 px)",
-     /\.info-i\{ position:relative; flex:none; display:inline-grid; place-items:center; width:18px; height:18px;/.test(html)
-     && html.includes(".info-i::after{ content:\"\"; position:absolute; inset:-13px; }")
+  // NARROWED 10 Nov 2026 (wave 3 map card, axe target-size): the button is 24 px drawing the same 18 px circle (a 3 px
+  // transparent border), the hit area still 44 px (::after inset -10 px)
+  ok("19 Oct: the 'i' is a named button (aria-expanded, aria-controls), 24 px (an 18 px circle) with a 44 px hit area (::after inset -10 px)",
+     /\.info-i\{ position:relative; flex:none; display:inline-grid; place-items:center; width:24px; height:24px; padding:0; border-radius:50%;\s*border:3px solid transparent;/.test(html)
+     && html.includes(".info-i::after{ content:\"\"; position:absolute; inset:-10px; }")
      // named by aria-label (the UI audit, 19 Oct: a hidden .sr-only span counted as 1 px clipped text on every map stop)
      && (html.match(/class="info-i" aria-expanded="false" aria-controls="info-[a-z-]+" onclick="toggleInfo\(this\)" title="([^"]+)" aria-label="\1"><span aria-hidden="true">i<\/span><\/button>/g) || []).length === 16   // NARROWED 9 Nov 2026 (v2.1 task 2.1-1): + the traffic limits. NARROWED 31 Oct 2026 (task 4c PR 3): + the pinned pictures. NARROWED 31 Oct 2026 (task 4c PR 4): + the public site layouts. NARROWED 31 Oct 2026 (task 4c PR 1): + site layouts. NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8): + Labels, zones, community, collisions, abnormal (staff and public), closures, limits
      && !/class="info-i"[^>]*>[^]*?<span class="sr-only">About/.test(html.slice(0, html.indexOf('id="month-text"'))));
@@ -7839,6 +7857,33 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("2.1-4 Q7 (sandbox): the link's box reads back, and anything that is not a box is no box",
      !!afp && JSON.stringify(afp('-0.96,52.49,-0.94,52.51')) === '[-0.96,52.49,-0.94,52.51]' && afp('1,2,3') === null && afp('3,2,1,4') === null
      && afp('a,b,c,d') === null && afp('') === null && afp('-0.9,53,-0.8,52') === null);
+}
+
+// ===== 10 Nov 2026 — map drawer polish (live test findings 4, 7, 8; John's yes to notes/map-drawer-polish-mockup-1110) =====
+{
+  ok("⭐ DRAWER (finding 4, seen on live: the timeline bar over the drawer's lower rows): while the bar is open the drawer keeps its foot clear by the bar's measured height",
+     html.includes("body.timeline-on #route-drawer{ padding-bottom:var(--tl-foot, 0px); }"));
+  ok("⭐ DRAWER (finding 4: the Conditions panel over 'Trips / day / lorry'): opening the drawer marks the body, closing it unmarks it, and both re-place the Conditions panel",
+     /function showDrawerTab\(tab\)\{[\s\S]*?classList\.add\('open'\);\s*document\.body\.classList\.add\('drawer-open'\);\s*if \(typeof positionWarnStack === 'function'\) positionWarnStack\(\);\s*\}/.test(code)
+     && /function closeDrawer\(\)\{\s*document\.getElementById\('route-drawer'\)\.classList\.remove\('open'\);\s*document\.body\.classList\.remove\('drawer-open'\);\s*if \(typeof positionWarnStack === 'function'\) positionWarnStack\(\);\s*\}/.test(code));
+  ok("⭐ DRAWER: at a desk the Conditions panel ends 12 px above the drawer (its top is at 54vh; the panel starts at 84 px, 110 on a demo) and scrolls, with or without the timeline",
+     html.includes("body.drawer-open #tl-warnings, body.drawer-open.timeline-on #tl-warnings{ max-height:max(120px, calc(54vh - 96px)); }")
+     && html.includes("body.drawer-open.has-demo-notice #tl-warnings, body.drawer-open.timeline-on.has-demo-notice #tl-warnings{ max-height:max(120px, calc(54vh - 122px)); }")
+     && html.includes("body.drawer-open #tl-warnings > *{ flex:0 0 auto; }"));
+  ok("DRAWER: the desk rule comes after the timeline's own max-height (same weight or more, later wins)",
+     html.indexOf("body.drawer-open #tl-warnings, body.drawer-open.timeline-on #tl-warnings{") > html.indexOf("body.timeline-on #tl-warnings{ max-height:min(60vh, 520px,"));
+  ok("⭐ DRAWER: on a tablet (the panel spans the screen) its floor is the drawer's top while the drawer is open",
+     code.includes("if (document.body.classList.contains('drawer-open')) floor = Math.min(floor, Math.round(window.innerHeight * 0.54) - 12);")
+     && html.includes("height:46vh; max-height:46vh;"));
+  ok("⭐ DEMO BAR (finding 8, seen on live: the export card's top edge at 12 px, over the bar): the export card and the share card are centred under the notice and no taller than the room under it",
+     html.includes("body.has-demo-notice #share-panel, body.has-demo-notice #rme-panel{ top:calc(50% + var(--notice-h, 26px) / 2); max-height:calc(100vh - 24px - var(--notice-h, 26px)); }")
+     && html.indexOf("body.has-demo-notice #share-panel, body.has-demo-notice #rme-panel{") > html.indexOf("#rme-panel{ position:fixed;"));
+  ok("⭐ CARBON WORDS (finding 7: R045 charges 43 % of the way back, the card said 'both legs'): the CO₂e card says what is counted, true for all three return journeys",
+     code.includes("card(co2t.toFixed(1)+' t','CO₂e (est.)','loaded, plus the scheme’s share of the return'+(unbakedM?")
+     && !code.includes("'both legs'") && !/CO₂e \(est\.\)','both legs/.test(code));
+  ok("CARBON WORDS: the distance cards are unchanged (the lorry does drive the round trip) and the new words name no setting, share or method",
+     code.includes("'Round trip','Loaded out, empty back'") && code.includes("'Total trips','one-way loaded runs'")
+     && !/scheme’s share[^']*(43|per cent|%|return_mode|RICS)/.test(code));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {

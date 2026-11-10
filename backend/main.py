@@ -2899,7 +2899,7 @@ def bulletin_leaflet_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), request:
         raise HTTPException(503, str(e))
     y, m = weeks._month_of(month)
     return Response(content=data, media_type="application/pdf",
-                    headers={"Content-Disposition": f'attachment; filename="leaflet-{y}-{m:02d}.pdf"',
+                    headers={"Content-Disposition": f'attachment; filename="bulletin-one-page-{y}-{m:02d}.pdf"',   # 10 Nov 2026 (25b)
                              "Cache-Control": "no-store"})
 
 

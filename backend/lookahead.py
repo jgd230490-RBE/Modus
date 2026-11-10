@@ -384,13 +384,22 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     import conversions
     factors = conversions.load_factors()
     t = 0.0
+    short_t = 0.0
+    pct = clashes.short_flag_pct(factors)
     # routes, cache and cost: the page's own, read once above (13 Oct 2026, speed)
     for r in acct["rows"]:
+        ctx_t = {"unit": r.get("unit"), "material_type": r.get("material_type"),
+                 "vehicle_type": r.get("vehicle_type"),
+                 "payload_t": derived.payload_for(r.get("vehicle_type"), factors)[0]}
         if r.get("actual_qty") is not None:
-            ctx = {"unit": r.get("unit"), "material_type": r.get("material_type"),
-                   "vehicle_type": r.get("vehicle_type"),
-                   "payload_t": derived.payload_for(r.get("vehicle_type"), factors)[0]}
-            t += derived.tonnes_of(r["actual_qty"], ctx, factors)
+            t += derived.tonnes_of(r["actual_qty"], ctx_t, factors)
+        # 10 Nov 2026 (UI critique finding 5): what is still to carry, in tonnes too (a concrete line's m³ at its
+        # material's density, as the Tonnes grid does), and whether it passes the organisation's share (the amber
+        # "Short" and the rail's SHORTAGE: clashes.short_is_flagged, the same rule)
+        rem = float(r.get("remaining_short") or 0)
+        r["remaining_short_t"] = round(derived.tonnes_of(rem, ctx_t, factors), 3) if rem > 1e-6 else 0.0
+        r["short_flag"] = clashes.short_is_flagged(rem, float(r.get("planned_qty") or 0), pct)
+        short_t += r["remaining_short_t"]
         # planned € for the account week, from the route's rates — or, since 10 Sep
         # evening, the tenant's target rates where the route has none — so € variance
         # exists. `rate_source` says which; the row prints "target" when it is.
@@ -425,6 +434,11 @@ def page(bucket="commit", route_id=None, acc=None, with_restrictions=True, today
     acct["lines"] = len(acct["rows"])
     acct["reported"] = sum(1 for r in acct["rows"] if r.get("actual_qty") is not None)
     acct["shortfall"] = round(sum(r.get("remaining_short") or 0 for r in acct["rows"]), 3)
+    # 10 Nov 2026 (finding 5): `shortfall` adds each line in its OWN unit (t and m³ together, as it always has); the
+    # page reads `shortfall_t`, every line in tonnes. `short_flag_pct` is the share the amber "Short" starts at.
+    acct["shortfall_t"] = round(short_t, 3)
+    acct["short_flagged"] = sum(1 for r in acct["rows"] if r.get("short_flag"))
+    acct["short_flag_pct"] = pct
     acct["open_to_calibrate"] = sum(1 for r in acct["rows"] if r.get("action") == "spread")
     aw = acct.get("week") or {}
     acct["stock"] = account_stock(aw.get("month_index"), aw.get("week_index")) if aw else []

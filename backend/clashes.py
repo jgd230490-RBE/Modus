@@ -5,7 +5,8 @@ Every code in the brief's §6, computed on read from the decorated day lines
 (derived.decorate() output) plus the week layer, the stock read model and — when it can
 be reached — Tark Tee. Nothing here is stored, nothing here refuses a confirm.
 
-    SHORTAGE        last week's actual < planned and calibrate has not carried it
+    SHORTAGE        last week's actual < planned and calibrate has not carried it, by more than the
+                    organisation's share of the plan (planning.short_flag_pct, 10 % unset: 10 Nov 2026)
     DAYS_NE_WEEK    sum(day planned) ≠ week planned      (slice 1's flag, surfaced)
     STOCKPILE_OVER       the destination stockpile's forecast balance at week end > capacity
                     (27 Oct 2026: read from the forward balance, stockpiles.balances, so an Out
@@ -79,6 +80,29 @@ CODES = ("SHORTAGE", "DAYS_NE_WEEK", "STOCKPILE_OVER", "ROUTE_CAP", "GATE_OVER",
 #: The 98 % band (brief L5): a line "holds" when actual ≥ 98 % of planned.
 HOLD_BAND = 0.98
 
+#: 10 Nov 2026 (UI critique finding 5, wave 3): a line short last week is FLAGGED (SHORTAGE: the rail, the amber line
+#: under the row's status, the exports) only when what is still to carry is more than this share of its plan. A smaller
+#: miss is not an alarm: the Look-ahead names it quietly ("1 t to carry") and the Account tab still offers to add it.
+#: Config → Planning sets it as a percentage (`planning.short_flag_pct`); 0 flags every miss outside the 98 % band.
+SHORT_FLAG_PCT = 10.0
+
+
+def short_flag_pct(factors=None):
+    """The organisation's share (a percentage, 0–100) a shortfall must pass to raise SHORTAGE; 10 when unset."""
+    try:
+        f = factors if factors is not None else conversions.load_factors()
+        v = ((f or {}).get("planning") or {}).get("short_flag_pct")
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 100:
+            return float(v)
+    except Exception:                            # noqa: BLE001  (a cold database or a test without factors)
+        pass
+    return SHORT_FLAG_PCT
+
+
+def short_is_flagged(remaining, planned, pct):
+    """True when `remaining` (still to carry, the line's own unit) is more than `pct` % of `planned`."""
+    return remaining > 1e-6 and planned > 0 and remaining > planned * pct / 100.0 + 1e-9
+
 
 def line_key(l):
     return (l["route_id"], int(l["month_index"]), l.get("discipline") or "",
@@ -120,6 +144,7 @@ def per_line(lines, account_rows):
     """
     out = []
     short = {}
+    pct = short_flag_pct()
     for a in account_rows or []:
         if a.get("actual_qty") is None:
             continue
@@ -130,7 +155,7 @@ def per_line(lines, account_rows):
         # remains only for the part not yet carried
         variance = planned - actual
         carried = float(a.get("calibrated_qty") or 0)
-        if variance - carried > 1e-6:
+        if variance - carried > 1e-6 and short_is_flagged(variance - carried, planned, pct):
             short[(a["route_id"], a.get("discipline") or "", a.get("section_id") or "")] = {
                 "short": round(variance - carried, 3), "unit": a.get("unit")}
     for l in lines:
@@ -679,7 +704,7 @@ def compute(all_lines, visible_keys, account_rows, month_index, week_index,
     for f in vis:
         by_code[f["code"]] = by_code.get(f["code"], 0) + 1
     return {"flags": vis, "count": len(vis), "by_code": by_code,
-            "codes": list(CODES), "hold_band": HOLD_BAND,
+            "codes": list(CODES), "hold_band": HOLD_BAND, "short_flag_pct": short_flag_pct(),
             "gates_week": gate_arrivals.strip_lines(gw),
             "sources": {"restrictions": tt_source["status"], "restrictions_checked_at": tt_source["checked_at"],
                         "restrictions_unchecked": tt_source["unchecked"],

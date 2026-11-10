@@ -410,7 +410,9 @@ ok("19 Oct: the guide describes the month picker, the info buttons, the badges a
    "press a year, then a month, to show that month on the map" in text
    and "A small <strong>i</strong> beside a heading opens a short explanation" in src
    and "a small white badge with a double arrow sits on each stretch of road" in text and "(none is shown under 1 a day)" in text   # 9 Nov 2026 (2.1-11b)
-   and "a green <strong>CO₂</strong> badge on each route" in src and 'the labels say "reading…"' in text
+   # NARROWED 10 Nov 2026 (UI critique 18, claude/ui-fix-map-card): the badge carries its unit ("6.8 t CO₂e"), grey explained
+   and "a green badge on each route gives its tonnes of CO₂e in the month (<strong>6.8 t CO₂e</strong>)" in src
+   and "a grey route has nothing in that month, or is not routed yet" in text and 'the labels say "reading…"' in text
    and "Reset filters</strong> appears once a filter is set" in src)
 ok("🔴 ...and it is honest that a planned closure is listed in every month its route carries volume, whatever its dates",
    "whatever the closure's own dates" in text and "the Look-ahead counts it only in the weeks it overlaps" in text)
@@ -1547,5 +1549,13 @@ ok("ROAD CARD POLISH: technical T1 has the rounding rule, the idle routes, the m
                              "the 12 Oct whole-movements rule holds everywhere else")))
 ok("ROAD CARD EDGE: technical T1 says which side the road card opens on near the map's edges",
    all(w in _tg_rs for w in ('id="t1-road-edge"', "<code>secselSide</code>", "<code>SECSEL_HALF</code> = 200 px", "<code>secselRightEdge</code>")))
+# 10 Nov 2026 (map drawer polish; live test findings 4, 7, 8)
+ok("MAP DRAWER POLISH: technical T1 says how the drawer, the Conditions panel, the timeline bar and the demo notice keep clear of each other",
+   all(w in _tg_rs for w in ('id="t1-drawer-clear"', "<code>--tl-foot</code>", "<code>drawer-open</code>", "<code>positionWarnStack</code>", "<code>--notice-h</code>")))
+ok("MAP DRAWER POLISH: the map's carbon is no longer described as both legs (the return journey rule, 8 Nov): technical T10 and the user guide's glossary",
+   'id="t10-map-carbon"' in _tg_rs and "vehicle-km, both legs, tailpipe only, set per vehicle on Config" not in _tg_rs
+   and "use one average-laden factor on both legs, tailpipe only" not in _tg_rs
+   and "The CO₂e of moving the material, both legs" not in open(HELP, encoding="utf-8").read()
+   and "the share of the empty way back the route charges, exhaust only" in open(HELP, encoding="utf-8").read())
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)
