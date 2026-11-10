@@ -2424,6 +2424,15 @@ ok("...the newsletter's 'Lorries needed' term says the same in its own words (an
 ok("🔴 no compliance claim in the bulletin's drivers' hours words: never 'compliant', 'compliance' or 'legal'",
    not re.search(r"drivers' hours[^\"]{0,200}\b(compliant|compliance|legal)\b", _bsrc + _bdsrc, re.I))
 
+# 9 Nov 2026 (v2.1 task 2.1-1, Q10): traffic limits on local roads (functional checks in test_traffic_limits)
+_bd = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bulletin_doc.py"), encoding="utf-8").read()
+_ex = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "export.py"), encoding="utf-8").read()
+ok("TRAFFIC: the bulletin table after 'Is it a lot?' — public limits only, at most 6 rows, worst first, the glance row",
+   "TRAFFIC_ROWS = 6" in _bd and "summary([int(mi)], public_only=True, with_routes=False)" in _bd
+   and "{lot}\n{traffic}\n" in _bd and '"Traffic limits on local roads"' in _bd and "rows.insert(4, (\"Traffic limits on local roads\"" in _bd)
+ok("TRAFFIC: the newsletter draws the same table after the panel; the leaflet one clause on the works point",
+   _ex.count('story += _traffic_flow(K, S.get("traffic"))') == 2 and "Traffic limits on local roads: {traffic['glance']}." in _bd)
+ok("TRAFFIC: figures rounded half up (round() is half-even)", "def _whole(" in _bd)
 # =========================================================================== #
 print()
 for f_ in FAIL:
