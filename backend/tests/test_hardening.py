@@ -205,6 +205,19 @@ ok("⭐ the weekly audit: Mondays, on demand, and on a PR that changes requireme
    and "pip-audit==2.10.1" in WF and "pip-audit -r backend/requirements.txt" in WF and "contents: read" in WF)
 ok("...the suite itself stays offline (its harness step runs in a network namespace)",
    "network namespace" in read(".github/workflows/suite.yml"))
+# 11 Nov 2026: the poppler install retries and falls back to a second mirror (three CI runs failed at it).
+_SY = read(".github/workflows/suite.yml")
+_pop = _SY.split("- name: pdftotext (poppler) for the PDF text checks", 1)[-1].split("- name:", 1)[0]
+ok("🔴 the suite's poppler install retries (apt's own retries) and falls back to archive.ubuntu.com, both mirror files",
+   "Acquire::Retries=3" in _pop and "for ROUND in 1 2 3" in _pop and "https://archive.ubuntu.com/ubuntu/" in _pop
+   and "/etc/apt/apt-mirrors.txt" in _pop and "/etc/apt/sources.list.d/ubuntu.sources" in _pop
+   and 'if [ -f "$F" ]' in _pop and "if [ -f /etc/apt/apt-mirrors.txt ]" in _pop, _pop[:200])
+ok("...and the step still ends by finding pdftotext (it fails loudly if no mirror served it)",
+   _pop.rstrip().endswith("command -v pdftotext") and "installed from:" in _pop)
+ok("...the rest of the workflow is unchanged: read-only, no secret, the harness step offline in a namespace",
+   "permissions:\n  contents: read" in _SY and "secrets." not in _SY
+   and "sudo -E unshare --net -- sh -c '" in _SY and "--require-offline'" in _SY
+   and _SY.count("- name:") == 5 and _SY.count("- uses:") == 3)
 
 # =========================================================================== #
 #  5. the guide                                                                 #

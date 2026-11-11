@@ -49,8 +49,36 @@ jobs:
         with:
           node-version: "24"
 
+      # The install retries and falls back to a second mirror (11 Nov 2026: three runs failed here when the
+      # runner could not resolve its first mirror). The runner image (actions/runner-images,
+      # configure-apt-sources.sh) lists its mirrors in /etc/apt/apt-mirrors.txt, read through
+      # "mirror+file:" in /etc/apt/sources.list.d/ubuntu.sources (/etc/apt/sources.list on 22.04).
+      # The fallback lists archive.ubuntu.com first in place of the Azure mirror and rewrites any direct
+      # Azure line; files that are not there are skipped. The step still fails if pdftotext is missing.
       - name: pdftotext (poppler) for the PDF text checks
-        run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils
+        run: |
+          install_poppler() {
+            sudo apt-get update -q -o Acquire::Retries=3 && sudo apt-get install -y -q -o Acquire::Retries=3 poppler-utils
+          }
+          FROM=""
+          if install_poppler; then FROM="the image's own mirrors"; fi
+          for ROUND in 1 2 3; do
+            if [ -n "$FROM" ]; then break; fi
+            echo "poppler install failed: round $ROUND on archive.ubuntu.com in place of the Azure mirror"
+            if [ -f /etc/apt/apt-mirrors.txt ]; then
+              printf 'https://archive.ubuntu.com/ubuntu/\tpriority:1\nhttps://security.ubuntu.com/ubuntu/\tpriority:2\n' \
+                | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
+            fi
+            for F in /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list; do
+              if [ -f "$F" ]; then
+                sudo sed -i 's|https\?://azure\.archive\.ubuntu\.com/ubuntu/\?|http://archive.ubuntu.com/ubuntu/|g' "$F"
+              fi
+            done
+            sleep $((ROUND * 10))
+            if install_poppler; then FROM="archive.ubuntu.com (fallback round $ROUND)"; fi
+          done
+          echo "poppler-utils installed from: ${FROM:-nowhere}"
+          command -v pdftotext
 
       - name: Python for the stubbed harnesses (no FastAPI)
         run: |
