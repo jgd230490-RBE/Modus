@@ -4468,6 +4468,9 @@
         map.on('click', 'zone-fill', (e) => {
             if (!e.features || !e.features.length) return;
             if (typeof markerHitAt === 'function' && markerHitAt(e.point)) return;      // 11 Nov: a place's or a gate's marker answers
+            // 12 Nov (A1-L2): an advisory ("For information only: routes not changed", kind 'other') laid along a road gives way to the road's
+            // card, which says more: it lay over the card's left part on the B6047. A works area, a closure or a limit keeps its popup.
+            if (e.features[0].properties && e.features[0].properties.kind === 'other' && typeof roadCardHitAt === 'function' && roadCardHitAt(e.point)) return;
             new mapboxgl.Popup({ offset: 8 }).setLngLat(e.lngLat)
                 .setHTML(zonePopupHTML(e.features[0].properties)).addTo(map);
         });
@@ -4484,6 +4487,7 @@
         map.on('mouseleave', 'site-gates', () => { map.getCanvas().style.cursor = ''; });
         map.on('click', 'site-gates', (e) => {
             if (!e.features || !e.features.length) return;
+            { const top = typeof topMarkerLayerAt === 'function' ? topMarkerLayerAt(e.point) : ''; if (top && top !== 'site-gates') return; }   // 12 Nov (A1-F1): the marker on top answers alone
             new mapboxgl.Popup({ offset: 8 }).setLngLat(e.lngLat)
                 .setHTML(gatePopupHTML(e.features[0].properties)).addTo(map);
         });
@@ -4494,6 +4498,7 @@
         map.on('mouseleave', 'locations', () => { map.getCanvas().style.cursor = ''; });
         map.on('click', 'locations', (e) => {
             if (!e.features || !e.features.length) return;
+            { const top = typeof topMarkerLayerAt === 'function' ? topMarkerLayerAt(e.point) : ''; if (top && top !== 'locations') return; }   // 12 Nov (A1-F1): the marker on top answers alone
             const p = e.features[0].properties;
             const c = e.features[0].geometry.coordinates;
             const svId = 'sv-' + Math.random().toString(36).slice(2, 9);
@@ -6255,6 +6260,16 @@
         if (!ls.length || !point) return false;
         try { return map.queryRenderedFeatures(point, { layers: ls }).length > 0; } catch (e) { return false; }
     }
+    // 12 Nov 2026 (A1-F1; seen on live: the Lane entrance gate sits on its site's marker, and one click opened the gate's popup AND
+    // the holding area's). Of a place's marker, a gate's marker and a traffic limit's sign under one click, the one drawn on top
+    // answers alone: each handler asks which is on top (the map lists what lies under a point top-most first) and gives way
+    // if it is not itself. '' = none of the three (or the map could not say): the handler answers as before.
+    const TOP_MARKER_LAYERS = ['locations', 'site-gates', 'limit-signs'];
+    function topMarkerLayerAt(point) {
+        const ls = TOP_MARKER_LAYERS.filter(l => map.getLayer(l));
+        if (!ls.length || !point) return '';
+        try { const fs = map.queryRenderedFeatures(point, { layers: ls }); return fs.length && fs[0].layer ? fs[0].layer.id : ''; } catch (e) { return ''; }
+    }
     // the card: on the phone shell in the sheet (as a route's or a section's), on the desktop a popup at the sign
     function openLimitCardAt(p, lngLat) {
         if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof openLimitCard === 'function') { openLimitCard(p.id); return; }
@@ -6282,6 +6297,7 @@
         // a sign, a ring or a stretch: ONE card per click (a sign over its own stretch answers once)
         ['limit-signs', 'limit-dots', 'limit-lines'].forEach(l => map.on('click', l, (e) => {
             if (!e.features || !e.features.length) return;
+            if (l === 'limit-signs') { const top = topMarkerLayerAt(e.point); if (top && top !== 'limit-signs') return; }   // 12 Nov (A1-F1): the marker on top answers alone
             if (e.originalEvent && LIM.lastClick === e.originalEvent) return;
             LIM.lastClick = e.originalEvent || null;
             const full = limitById(e.features[0].properties.id);
