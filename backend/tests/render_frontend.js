@@ -711,12 +711,34 @@ if (loaded) {
         CLPF.order.filter(k => !cP.includes(`data-clp-chart="${k}" data-clp-state="set"`)).join(", "));
       ok("CLP: each card names its title, its source, an info box and how it is worked out; the scope, the limit and the peak bands are said once",
         // RE-PINNED 29 Oct 2026 (task 3c): eight cards — the holding areas' table after the site caps
-        ["Routes against their planning cap", "Sites against their CLP cap", "Holding areas", "Lorry visits by vehicle type", "Lorry visits by Euro class",   // NARROWED 10 Nov 2026 (F6): the figure counts lorry visits
+        // NARROWED 11 Nov 2026 (card 4, John's yes): nine — the planned and recorded tonnes first
+        ["Planned and recorded tonnes", "Routes against their planning cap", "Sites against their CLP cap", "Holding areas", "Lorry visits by vehicle type", "Lorry visits by Euro class",   // NARROWED 10 Nov 2026 (F6): the figure counts lorry visits
         
          "Movements and lorry distance by council", "Carbon per delivery and per tonne", "Lorry trips avoided"].every(t => cP.includes(`aria-label="About: ${t}"`))
-        && (cP.match(/<summary>How it is worked out<\/summary>/g) || []).length === 8 && (cP.match(/class="clp-src">Source: Wayscope/g) || []).length === 8
+        && (cP.match(/<summary>How it is worked out<\/summary>/g) || []).length === 9 && (cP.match(/class="clp-src">Source: Wayscope/g) || []).length === 9
         && cP.includes(escH(CLPF.scope_line)) && cP.includes(escH(CLPF.limit)) && cP.includes('data-clp-peak="1">' + escH(CLPF.peak_words) + "<")
         && cP.includes('aria-label="About: CLP monitoring"'));
+      // 11 Nov 2026 (card 4, John's yes "First"): the planned and recorded tonnes card leads, its line follows the limit
+      ok("⭐ CLP card 4: the planned and recorded tonnes card is the FIRST card, with its own info box and the server's headline",
+        CLPF.order[0] === "recorded_tonnes" && CLPF.charts.recorded_tonnes.state === "set"
+        && cP.indexOf('data-clp-chart="recorded_tonnes"') > 0 && cP.indexOf('data-clp-chart="recorded_tonnes"') === cP.indexOf("data-clp-chart=")
+        && cP.includes('aria-label="About: Planned and recorded tonnes"')
+        && cP.includes(`data-clp-head="recorded_tonnes">${escH(CLPF.charts.recorded_tonnes.headline)}<`));
+      ok("⭐ CLP card 4: the recorded line is said once, right after the limit (which is unchanged)",
+        !!CLPF.recorded_line && CLPF.limit === "Planned figures, not observed: Wayscope holds no gate log or arrival times."
+        && cP.split(escH(CLPF.recorded_line)).length === 2
+        && cP.indexOf(escH(CLPF.recorded_line)) > cP.indexOf(escH(CLPF.limit))
+        && cP.indexOf(escH(CLPF.recorded_line)) < cP.indexOf('data-clp-chart="recorded_tonnes"'));
+      {
+        const N = JSON.parse(JSON.stringify(CLPF)); N.recorded_line = null;
+        N.charts.recorded_tonnes = { ...N.charts.recorded_tonnes, state: "empty", missing: "No tonnes typed on Account up to Oct 2026." };
+        const nP = seg(render("the Dashboard renders CLP monitoring with nothing typed on Account", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialClp: N, onOpen(){} })),
+                       '<details class="dash-more" data-clp="1"', '<summary>Stockpile capacity');
+        const nCard = seg(nP, 'data-clp-chart="recorded_tonnes"', 'data-clp-chart="route_caps"');
+        ok("CLP card 4: with nothing typed on Account, no recorded line and the card is an empty state with the sentence, no figure",
+          !nP.includes("Recorded tonnes as typed on Account") && nCard.includes('data-clp-state="empty"')
+          && nCard.includes(">No tonnes typed on Account up to Oct 2026.<") && !nCard.includes("<canvas") && !/>0</.test(nCard));
+      }
       ok("CLP: the routes and sites with no cap are one line each, never a bar; the councils' double-count sentence and licence lines print",
         // NARROWED 14 Oct 2026 (seen in the browser at 1366 px: 17 uncapped routes were a wall of text): folded behind one line
         cP.includes('data-clp-uncapped="route"><summary>2 routes with no cap typed, not compared</summary><p>') && cP.includes('data-clp-uncapped="site">')

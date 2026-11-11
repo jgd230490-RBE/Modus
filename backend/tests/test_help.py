@@ -1573,5 +1573,11 @@ ok("MAP DRAWER POLISH: the map's carbon is no longer described as both legs (the
    and "use one average-laden factor on both legs, tailpipe only" not in _tg_rs
    and "The CO₂e of moving the material, both legs" not in open(HELP, encoding="utf-8").read()
    and "the share of the empty way back the route charges, exhaust only" in open(HELP, encoding="utf-8").read())
+# 11 Nov 2026 (card 4 of the CLP-before-Friday mockup, John: yes): the guide's 3.5 names the new first chart
+_h35 = open(HELP, encoding="utf-8").read()
+_h35 = _h35[_h35.index('<h2 id="3-5-clp-monitoring">'):_h35.index('<h1 id="4-submitting-a-forecast">')]
+ok("CLP RECORDED TONNES: guide 3.5 lists 'Planned and recorded tonnes' first, as typed on Account, never zero, never a lorry count",
+   _h35.index("<strong>Planned and recorded tonnes</strong>") < _h35.index("<strong>Routes against their planning cap</strong>")
+   and "tonnes typed on Account" in _h35 and "not recorded, never zero" in _h35 and "never a lorry count" in _h35)
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

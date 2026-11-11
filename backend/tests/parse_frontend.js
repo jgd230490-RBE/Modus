@@ -3576,9 +3576,34 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("CLP: an empty chart is an EmptyState carrying the server's missing sentence; a set one its headline, how it is worked out and its source",
      clpc.includes('{c.state !== "set" ? <EmptyState kind="none" title="Not enough to draw this yet" body={c.missing} /> : <>')
      && clpc.includes('<details className="clp-how"><summary>How it is worked out</summary><p>{c.basis}</p></details>') && clpc.includes("Source: {c.source}"));
-  ok("CLP: each card carries its own literal info box (seven) and the section one",
-     ["clp.route_caps", "clp.site_caps", "clp.vehicle_types", "clp.euro_class", "clp.councils", "clp.carbon_rate", "clp.trips_avoided", "dash.clp"]
+  // NARROWED 11 Nov 2026 (card 4, John's yes): eight — the planned and recorded tonnes' own box joins them
+  ok("CLP: each card carries its own literal info box (eight) and the section one",
+     ["clp.recorded_tonnes", "clp.route_caps", "clp.site_caps", "clp.vehicle_types", "clp.euro_class", "clp.councils", "clp.carbon_rate", "clp.trips_avoided", "dash.clp"]
        .every(id => clpc.includes(`<InfoTip id="${id}" />`)));
+  // ---- 11 Nov 2026 (card 4 of the CLP-before-Friday mockup, John's yes "First"): planned and recorded tonnes
+  {
+    const grid = clpc.slice(clpc.indexOf('<div className="clp-grid">'));
+    const infoAt = src.indexOf('"clp.recorded_tonnes": {');
+    const infoTxt = infoAt > 0 ? (src.slice(infoAt, src.indexOf("\n", src.indexOf("text:", infoAt))).match(/text: "([^"]*)"/) || [])[1] || "" : "";
+    ok("⭐ CLP card 4: the planned and recorded tonnes card is the FIRST card in the grid, with its own info box",
+       grid.indexOf("<ClpCard c={C.recorded_tonnes}") > 0 && grid.indexOf("<ClpCard c={C.recorded_tonnes}") === grid.indexOf("<ClpCard ")
+       && grid.includes('<ClpCard c={C.recorded_tonnes} info={<InfoTip id="clp.recorded_tonnes" />} wide>')
+       && grid.includes("<ChartCanvas config={clpRecordedCfg(C.recorded_tonnes)} title={C.recorded_tonnes.title} />"));
+    // 11 Nov 2026 (7a): the part month's axis label ("Nov 2026 (to 8 Nov)", 19 characters) was cut by CHART_LABEL_MAX (18)
+    const recCfg = src.slice(src.indexOf("function clpRecordedCfg("), src.indexOf("function ClpUncapped("));
+    ok("🔴 CLP card 4 (7a): a part month's axis label is drawn on two lines (month, then '(to <date>)'), never cut",
+       recCfg.length > 200 && recCfg.includes('const i = r.part_to ? r.label.indexOf(" (to ") : -1;')
+       && recCfg.includes("[cutLabel(r.label.slice(0, i)), cutLabel(r.label.slice(i + 1))]"));
+    ok("⭐ CLP card 4: its info box says what planned and recorded mean in at most 30 words (FR1), and a month not typed is not zero",
+       infoTxt.split(/\s+/).filter(Boolean).length <= 30 && infoTxt.includes("Recorded: tonnes typed on Account")
+       && infoTxt.includes("not recorded, not zero"), `${infoTxt.split(/\s+/).filter(Boolean).length} words: ${infoTxt}`);
+    ok("🔴 CLP card 4: a month nobody typed draws NO recorded bar (null), never a 0; planned light, recorded the accent",
+       clpc.includes('{ label: "Recorded", data: m.map(r => r.recorded_t == null ? null : r.recorded_t), backgroundColor: C1, borderWidth: 0 }')
+       && clpc.includes('{ label: "Planned", data: m.map(r => r.planned_t), backgroundColor: C1S, borderColor: C1, borderWidth: 1 }')
+       && !/recorded_t\s*\|\|\s*0/.test(clpc) && clpc.includes('it.raw == null ? "not recorded"'));
+    ok("CLP card 4: the recorded line is said after the limit, only when the reply carries one; the limit stays as it was",
+       clpc.includes('<div className="ct-note">{data.scope_line} {data.limit}{data.recorded_line ? " " + data.recorded_line : ""}</div>'));
+  }
   ok("🔴 CLP colours are tokens only: the chart slots, the status red, the none grey, ink for a cap or target; Not typed is grey",
      !/#[0-9A-Fa-f]{6}\b(?!")/.test(clpc.replace(/tok\("[^"]+", "#[0-9A-Fa-f]{6}"\)/g, "")) && clpc.includes('s.group === CLP_NOT_TYPED ? tok("--chart-none", "#A8A29E") : colorOf(slot++)')
      && clpc.includes('const CLP_NOT_TYPED = "Not typed";'));
