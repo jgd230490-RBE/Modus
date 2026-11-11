@@ -209,6 +209,15 @@ def _week_title(page):
     return f"week of {d.day} {d.strftime('%b %Y')}"
 
 
+def _vehicle_name(c):
+    """11 Nov 2026 (CLOCS card C-F2, the mother session's word): the lorry's NAME on every sheet and file this module
+    prints ("Artic Tipper (44t)", conversions.vehicle_label), as the Day sheet, the Driver sheet and the Lorry plan do;
+    the chips' short form ("Tipper (44t)") dropped the Artic. A line with no key keeps its short form."""
+    if c.get("vehicle_type"):
+        return conversions.vehicle_label(conversions.load_factors(), c.get("vehicle_type"))
+    return c.get("vehicle_short") or ""
+
+
 def _is_weekday(iso):
     return datetime.date.fromisoformat(iso).weekday() <= 4
 
@@ -228,7 +237,7 @@ def _line_rows(page, weekdays_only=True):
                 "date": d["day_date"], "origin": c.get("origin_name") or c.get("origin_id"),
                 "dest": c.get("dest_name") or c.get("dest_id"), "ipt": _team(c.get("ipt")) or "",
                 "ws": c.get("section_id") or "", "discipline": c.get("discipline") or "",
-                "material": c.get("material_type") or "", "vehicle": c.get("vehicle_short") or conversions.vehicle_word_rule(c.get("vehicle_type")) or "",
+                "material": c.get("material_type") or "", "vehicle": _vehicle_name(c),
                 "qty": d.get("planned_qty"), "unit": c.get("unit"),
                 "tonnes": f.get("tonnes"), "trips": f.get("trips"), "veh": f.get("vehicles"),
                 "km_trip": _dist(c.get("km_trip")), "km_day": _dist(f.get("km_day")), "tonne_km": _dist(f.get("tonne_km")),
@@ -823,7 +832,7 @@ def build_pdf(page):
                P(f"<b>{E(r['dest'])}</b><br/><font size=6.5 color='#64748B'>{_coord(d.get('lat'), d.get('lon'))}</font>", st),
                P(f"{E(_nm_rows(c.get('ipt')) or '—')}<br/>{E(c.get('section_id') or '')}", st),
                P(E(c.get("material_type") or "—"), st),
-               P(f"{E(c.get('vehicle_short') or conversions.vehicle_word_rule(c.get('vehicle_type')) or '—')}"
+               P(f"{E(_vehicle_name(c) or '—')}"
                  + ("" if c.get("baked") else "<br/><font size=6 color='#B45309'>not baked</font>"), st)]
         for iso in dates:
             x = by_date.get(iso)
@@ -1004,8 +1013,7 @@ def day_sheet_rows(page, day):
             "material": c.get("material_type") or "—",
             # 11 Nov 2026 (CLOCS card C-F2): the vehicle's NAME, as the Driver sheet, the Lorry plan and the Look-ahead's
             # flags print it ("Artic Tipper (44t)"); the chips' short form ("Tipper (44t)") dropped the Artic
-            "vehicle": (conversions.vehicle_label(conversions.load_factors(), c.get("vehicle_type")) if c.get("vehicle_type")
-                        else c.get("vehicle_short")) or "—",
+            "vehicle": _vehicle_name(c) or "—",
             "qty": d.get("planned_qty"), "unit": l.get("unit") or c.get("unit") or "",
             "typed": d.get("status") == "edited",
             "tonnes": f.get("tonnes"), "loads": f.get("trips") or 0,

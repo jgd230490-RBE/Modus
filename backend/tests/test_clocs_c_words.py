@@ -178,5 +178,26 @@ tx0 = " ".join(pdf_text(export.build_day_sheet_pdf(page(["draft"] * 2), DAY)).sp
 ok("DAY SHEET PDF: no limit flag on the day → no limits credit; an all-draft day keeps 'DRAFT - not confirmed'",
    "Road limits" not in tx0 and "DRAFT - not confirmed" in tx0, tx0[:300])
 
+print("C-F2 — the week's PDF, its XLSX and the supplier orders name the lorry the same way (the mother session, 11 Nov)")
+ok("⭐ export._vehicle_name: the lorry's NAME for a key ('Artic Tipper (44t)'); a line with no key keeps its short form",
+   export._vehicle_name({"vehicle_type": ART, "vehicle_short": "Tipper (44t)"}) == ART
+   and export._vehicle_name({"vehicle_short": "Mixer"}) == "Mixer" and export._vehicle_name({}) == "")
+try:
+    _xr = export._line_rows(page(["confirmed"]))
+    _xv = _xr[0]["vehicle"] if _xr else None
+except Exception as _e:   # the rows read the tenant's distance unit; a stub that cannot is reported, not hidden
+    _xv = repr(_e)
+ok("⭐ XLSX (the week's rows): the vehicle column reads 'Artic Tipper (44t)', not 'Tipper (44t)'", _xv == ART, str(_xv))
+_ex = open(os.path.join(BACKEND, "export.py"), encoding="utf-8").read()
+_so = open(os.path.join(BACKEND, "supplier_orders.py"), encoding="utf-8").read()
+_old = re.compile(r"""c\.get\(["']vehicle_short["']\) or conversions\.vehicle_word_rule""")
+ok("⭐ source: no sheet in export.py or supplier_orders.py prints the chips' short name first any more",
+   not _old.search(_ex) and not _old.search(_so), str(_old.findall(_ex + _so)))
+_wk = _ex[_ex.index("def build_pdf(page):"):_ex.index("def _line_key(")]
+ok("the week's PDF: its vehicle cell goes through _vehicle_name (the not-baked note kept)",
+   "P(f\"{E(_vehicle_name(c) or '—')}\"" in _wk and "not baked" in _wk)
+ok("supplier orders: the vehicle is conversions.vehicle_label of the line's key",
+   'conversions.vehicle_label(factors, c.get("vehicle_type")) if c.get("vehicle_type") else c.get("vehicle_short")' in _so)
+
 print(f"\ntest_clocs_c_words.py: {PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)

@@ -216,7 +216,7 @@ ok("2: Stockpile North 200 t a day, Tilton Viaduct 60 t a day",
 ok("2: the week is 3,275 t of tonnes, 655 t each day",
    N["units"]["t"]["week"] == 3275 and all(v == 655 for v in N["units"]["t"]["day"].values()), str(N["units"]))
 ok("2: 24 loads a day, 120 in the week", N["loads_day_max"] == 24 and N["week_loads"] == 120)
-ok("2: the material and the vehicle a person reads", M["material"] == "Small aggregate" and M["vehicle"] == "Tipper (44t)",
+ok("2: the material and the vehicle a person reads", M["material"] == "Small aggregate" and M["vehicle"] == "Artic Tipper (44t)",   # 11 Nov (CLOCS C-F2): the lorry's name, was the short "Tipper (44t)"
    f"{M['material']} {M['vehicle']}")
 ok("2: the route sheet named", M["route_ids"] == ["R011"], str(M["route_ids"]))
 ok("2: the delivery gate and its hours", M["gate"] == "Compound gate" and M["open"] == "07:30–18:00", f"{M['gate']} {M['open']}")
