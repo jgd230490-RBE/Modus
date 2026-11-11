@@ -19,7 +19,7 @@ ok("⭐ C-X2: the note no longer prints the limit sentence or the week-split sen
    !gw.includes("{gw.limit}") && !gw.includes("The days are this page's own"));
 const tip = html.slice(html.indexOf('"la.gates": {'), html.indexOf("\n", html.indexOf("how:", html.indexOf('"la.gates": {'))));
 ok("⭐ C-X2: both sentences are in the la.gates 'i' box's how (the limit with its shut times and bands; the week split)",
-   tip.includes("less shut times and the no-delivery bands; no hourly peak is known.")
+   tip.includes("less its shut times and the no-delivery peak bands)") && tip.includes("Planned arrivals spread evenly; no hourly peak is known.")
    && tip.includes("The days are this page's own: the month spread over its calendar weeks, rounded up a day, so a day can be busier than the Dashboard's month average."), tip.slice(0, 300));
 const text = (tip.match(/text: "([^"]*)"/) || [])[1] || "";
 ok("C-X2: the 'i' box's text (what the CI counts) is unchanged at 34 words, within its pin", words(text) === 34, String(words(text)));
