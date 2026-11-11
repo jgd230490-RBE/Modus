@@ -1087,7 +1087,8 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    # NARROWED 10 Nov 2026 (wave 2, card 13, decision 4): navy 27 -> 2 and a new kind, action (25): every primary action
    # moved to the accent; the two navy fills left are the Submit strip (a card, not a button) and the drawing palette's
    # picked tool (a selection); the tabs and the picked stockpile / year / page are .ws-tab tints with no text-white
-   len(_sites.get("action", [])) == 23 and ".text-white[style*=\"var(--action)\"]{color:var(--action-fg);}" in fe
+   # NARROWED 11 Nov 2026 (CLOCS card C-F6): action 23 -> 24, the site layout's "Show it" (the public tick asks first)
+   len(_sites.get("action", [])) == 24 and ".text-white[style*=\"var(--action)\"]{color:var(--action-fg);}" in fe
    and len(_sites.get("navy", [])) == 2 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
    and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
