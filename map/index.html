@@ -51,6 +51,10 @@
         html[data-look="dark"] select, html[data-look="dark"] input{ background:var(--surface); color:var(--ink); }
         html[data-look="dark"] .mapboxgl-popup-content{ background:var(--surface); color:var(--ink); }
         html[data-look="dark"] .mapboxgl-popup-tip{ border-top-color:var(--surface); border-bottom-color:var(--surface); }
+        /* a popup beside its point (the road card since 10 Nov, any popup since 11 Nov): its tip points sideways, and the
+           rule above would colour the two edges that must stay clear */
+        html[data-look="dark"] .mapboxgl-popup-anchor-left .mapboxgl-popup-tip{ border-top-color:transparent; border-bottom-color:transparent; border-right-color:var(--surface); }
+        html[data-look="dark"] .mapboxgl-popup-anchor-right .mapboxgl-popup-tip{ border-top-color:transparent; border-bottom-color:transparent; border-left-color:var(--surface); }
         /* the few fixed light boxes the token swap does not reach (found in Chrome, 10 Nov): the tour strip, the timeline's
            rail, the phone's full-screen strip, a road table's hover and clicked row */
         html[data-look="dark"] .guide-strip{ background:rgba(31,32,36,.92); border-color:rgba(255,255,255,.14); }
@@ -9195,6 +9199,7 @@
         if (y + h > window.innerHeight - 8) y = r.top + e.point.y - h - 16;
         card.style.left = Math.max(8, Math.round(x)) + 'px';
         card.style.top = Math.max(8, Math.round(y)) + 'px';
+        if (typeof hoverGiveWay === 'function') hoverGiveWay();
     }
 
     // ---------------------------------------------------------------- the deep link (review 2.3, D29)
@@ -10788,6 +10793,78 @@
             if (r.bottom <= m.top || r.top >= m.bottom || r.right <= m.left || r.left >= m.right) return 0;
             return Math.max(0, Math.round(r.bottom - m.top));
         } catch (e) { return 0; }
+    }
+    // 11 Nov 2026 (map popup top; seen on live at 1422 x 677: a holding area's popup lost its title, 23 px under the figures
+    // bar). Every popup but the road card is placed by the map itself, above its point, and the map does not know the
+    // figures bar lies over its top. Pure: x, y = the popup's point in the map; w, h = its size, the tip in; W, H = the map;
+    // foot = the timeline bar's height; top = the figures bar's bottom edge; right = where the free map ends; off = the
+    // popup's own offset. '' = leave it to the map (no bar over the map, or the place above the point is clear of it).
+    // Else below the point where a whole popup fits above the timeline bar; else beside the point, centred on it, as the
+    // road card; else the side with more room, and cap = the height the popup may take there (its box scrolls inside).
+    const POPUP_GAP = 6;
+    function popupPlace(x, y, w, h, W, H, foot, top, right, off) {
+        const t = Math.max(0, top || 0), none = { anchor: '', cap: 0 };
+        if (!t || !(h > 0)) return none;
+        const b = Math.max(t, H - (foot || 0)), o = Math.max(0, off || 0), need = h + o + POPUP_GAP;
+        const above = y - t, under = b - y;
+        if (above >= need || y < t || y > b) return none;
+        const side = x < w / 2 ? '-left' : x > W - w / 2 ? '-right' : '';
+        if (under >= need) return { anchor: 'top' + side, cap: 0 };
+        if (2 * Math.min(above, under) >= h + 2 * POPUP_GAP) {
+            const bs = secselBeside(x, W, right, w + o + POPUP_GAP);
+            if (bs) return { anchor: bs, cap: 0 };
+        }
+        const up = above >= under;
+        return { anchor: (up ? 'bottom' : 'top') + side, cap: Math.max(80, Math.round((up ? above : under) - o - POPUP_GAP)) };
+    }
+    // a popup with its own anchor (the road card) places itself; one this rule has placed is placed again when its words change
+    function popupFit(pop) {
+        try {
+            if (!pop || !pop.options || !pop.isOpen || !pop.isOpen() || !pop.getLngLat()) return;
+            if (pop.options.anchor && !pop.wsPlaced) return;
+            const el = pop.getElement && pop.getElement(), box = el && el.querySelector('.mapboxgl-popup-content'); if (!box) return;
+            // a picture or a line that arrives after the popup opened (a place's street picture) changes its height: placed again
+            if (pop.wsBox !== box && typeof ResizeObserver === 'function') {
+                if (pop.wsWatch) pop.wsWatch.disconnect();
+                pop.wsBox = box; pop.wsN = 0;
+                pop.wsWatch = new ResizeObserver(() => { if (++pop.wsN > 12) { pop.wsWatch.disconnect(); return; } popupFit(pop); });
+                pop.wsWatch.observe(box);
+            }
+            if (pop.wsPlaced) { box.style.maxHeight = ''; box.style.overflowY = ''; }
+            const c = map.getContainer(), pt = map.project(pop.getLngLat());
+            const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
+            const off = typeof pop.options.offset === 'number' ? pop.options.offset : 0;
+            const a = popupPlace(pt.x, pt.y, el.offsetWidth, el.offsetHeight, c.clientWidth || 800, c.clientHeight || 600, foot,
+                                 secselTopEdge(), secselRightEdge(), off);
+            if (!a.anchor && !pop.wsPlaced) return;
+            const tip = Math.max(0, el.offsetHeight - box.offsetHeight);
+            pop.wsPlaced = true;
+            pop.options.anchor = a.anchor || undefined;
+            pop.setLngLat(pop.getLngLat());
+            if (a.cap) { box.style.boxSizing = 'border-box'; box.style.maxHeight = Math.max(60, a.cap - tip) + 'px'; box.style.overflowY = 'auto'; }
+        } catch (e) {}
+    }
+    // the pointer's hover tip is drawn below and right of the pointer, which is where a popup that opens below or beside its
+    // point now sits (and where the road card has sat since 9 Nov): the tip gives way to any open popup it would lie over
+    function hoverGiveWay() {
+        try {
+            const card = document.getElementById('route-hover-card'); if (!card || card.hidden) return;
+            const c = card.getBoundingClientRect();
+            const over = Array.from(document.querySelectorAll('.mapboxgl-popup-content')).some(p => {
+                const r = p.getBoundingClientRect();
+                return c.left < r.right && c.right > r.left && c.top < r.bottom && c.bottom > r.top;
+            });
+            if (over) card.hidden = true;
+        } catch (e) {}
+    }
+    // one hook for every popup on the page, so a NEW popup needs nothing extra: placed when it opens and when its words change
+    if (typeof mapboxgl !== 'undefined' && mapboxgl.Popup && mapboxgl.Popup.prototype && !mapboxgl.Popup.prototype.wsFitted) {
+        ['addTo', 'setDOMContent'].forEach(k => {
+            const was = mapboxgl.Popup.prototype[k];
+            if (typeof was !== 'function') return;
+            mapboxgl.Popup.prototype[k] = function () { const r = was.apply(this, arguments); popupFit(this); hoverGiveWay(); return r; };
+        });
+        mapboxgl.Popup.prototype.wsFitted = true;
     }
     function fitRoadPopup() {
         const p = SECSEL.roadPopup, at = SECSEL.roadAt; if (!p || !at) return;
