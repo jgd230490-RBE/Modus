@@ -7981,26 +7981,26 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   // limit line, clicked at map (350, 351) with the Conditions panel open, opened ABOVE the click with its title 28 px under the
   // figures bar: 350 px of map on its left, 360 to the panel on its right, and a card beside the click wants 404). =====
   const narrow = F && F.secselNarrow;
-  ok("⭐ BESIDE (pure): where neither side has a whole 404 px, the card goes beside the click on the side with more room, at its own width narrowed to the room: the live case (click 350, free map ends 710, card 360) = to the RIGHT of the click, 348 px",
-     typeof narrow === 'function' && JSON.stringify(narrow(350, 1122, 710, 360)) === '{"anchor":"left","w":348}');
+  ok("⭐ BESIDE (pure): where neither side has a whole 404 px, the card goes beside the click on the side with more room, at its own width narrowed to the room: the live case (click 350, free map ends 710, card 360) = to the RIGHT of the click, 342 px",
+     typeof narrow === 'function' && JSON.stringify(narrow(350, 1122, 710, 360)) === '{"anchor":"left","w":342}');
   ok("BESIDE (pure): a side with at least the card's own width keeps it whole; the left of the click wins a tie (the hover tip is on the right); a side under 300 px is no side; neither = the old placing",
      typeof narrow === 'function' && JSON.stringify(narrow(200, 1122, 1066, 360)) === '{"anchor":"left","w":360}'
      && JSON.stringify(narrow(400, 1122, 800, 360)) === '{"anchor":"right","w":360}'
      && JSON.stringify(narrow(100, 1122, 380, 360)) === '{"anchor":"","w":0}' && JSON.stringify(narrow(311, 1122, 600, 360)) === '{"anchor":"","w":0}'
-     && narrow(250, 1122, 580, 360).anchor === 'left' && narrow(250, 1122, 580, 360).w === 318);
+     && narrow(250, 1122, 580, 360).anchor === 'left' && narrow(250, 1122, 580, 360).w === 312);
   ok("BESIDE (pure): a card with no width measured (0, NaN) is taken as the old 404 and narrowed to the room",
-     typeof narrow === 'function' && narrow(350, 1122, 710, 0).w === 348 && narrow(350, 1122, 710, NaN).w === 348);
+     typeof narrow === 'function' && narrow(350, 1122, 710, 0).w === 342 && narrow(350, 1122, 710, NaN).w === 342);
   if (typeof narrow === 'function' && fitRoad) {
     // the live case in the stand-in: the map 1122 x 701, the timeline bar 103, the figures bar 98, the panel's edge 710, the click (350, 351), fixed part 213, table 605 px tall
     const live = { W: 1122, H: 701, foot: 103, right: 710 };
     const b = roadFit(213, 605, 351, 'bottom', 350, false, live);
-    ok("⭐ BESIDE (the live case): the card opened above the click, squeezed (253 - 34 - 213 + 14 = 20 px of table, under the 48 floor), is placed to the RIGHT of the click, narrowed to 348 px; its table then has twice the smaller room (2 x 247 - 34 - 213 + 14 = 261 px); the old code left it above with 48 px",
-       b.anchor === 'left' && b.moved === 1 && b.widths.join() === '348px' && b.narrowed === 1 && b.max === '261px');
+    ok("⭐ BESIDE (the live case): the card opened above the click, squeezed (253 - 34 - 213 + 14 = 20 px of table, under the 48 floor), is placed to the RIGHT of the click, narrowed to 342 px; its table then has twice the smaller room (2 x 247 - 34 - 213 + 14 = 261 px); the old code left it above with 48 px",
+       b.anchor === 'left' && b.moved === 1 && b.widths.join() === '342px' && b.narrowed === 1 && b.max === '261px');
     ok("⭐ BESIDE (the live case, geometry): the card's top = 351 - (213 + 261 + 20) / 2 is not under the figures bar (98) and its foot not over the timeline bar (701 - 103 = 598)",
        Math.round(351 - (213 + 261 + 20) / 2) >= 98 && Math.round(351 + (213 + 261 + 20) / 2) <= 598);
     const lowerB = roadFit(213, 605, 342, 'top', 350, false, live);
     ok("BESIDE: the lower spot (click 342, the card opened BELOW and 17 px over the timeline bar) is placed beside the click too",
-       lowerB.anchor === 'left' && lowerB.widths.join() === '348px');
+       lowerB.anchor === 'left' && lowerB.widths.join() === '342px');
     const fits = roadFit(213, 605, 400, 'bottom', 350, false, live);
     ok("BESIDE: a click that keeps the table's 48 px floor above it (y 400: 400 - 98 - 34 - 213 + 14 = 69 px) is NOT moved and not narrowed: the old placing stands",
        fits.anchor === 'bottom' && fits.moved === 0 && fits.widths.length === 0 && fits.max === '69px');
@@ -8009,7 +8009,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        none.anchor === 'bottom' && none.widths.length === 0 && none.narrowed === 0);
     const noRoom = roadFit(213, 605, 351, 'bottom', 350, false, { W: 1122, H: 701, foot: 103, right: 710, fixed2: 520 });
     ok("BESIDE: if narrowing makes the card so tall that even beside the click the table would be under 48 px, it is put back to its own width and keeps the old placing",
-       noRoom.anchor === 'bottom' && noRoom.widths.join() === '348px,380px' && noRoom.narrowed === 0);
+       noRoom.anchor === 'bottom' && noRoom.widths.join() === '342px,380px' && noRoom.narrowed === 0);
     const again = roadFit(213, 605, 400, 'bottom', 350, false, Object.assign({ narrowed: 1 }, live));
     ok("BESIDE: a card narrowed the last time is measured at its own width again (setMaxWidth back to 380 px) before it is placed",
        again.widths[0] === '380px' && again.narrowed === 0 && again.anchor === 'bottom');
@@ -8017,7 +8017,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        roadFit(213, 605, 351, 'bottom', 350, false, { W: 1122, H: 701, foot: 103, right: 1066 }).widths.length === 0);
   } else ok("⭐ BESIDE (sandbox): fitRoadPopup or secselNarrow could not be read", false);
   ok("⭐ BESIDE (source): the narrowing is used only where the table would fall under its 48 px floor, and the card is measured at its own width each time",
-     code.includes("const SECSEL_GAP = 12, SECSEL_MINW = 300;") && code.includes("function secselNarrow(x, W, right, natW) {")
+     code.includes("const SECSEL_GAP = 12, SECSEL_MINW = 300, SECSEL_EDGE = 6;") && code.includes("function secselNarrow(x, W, right, natW) {")
      && code.includes("if (room0 - fixed + SECSEL_MARGIN < 48) {") && code.includes("p.setMaxWidth(nar.w + 'px'); SECSEL.narrowed = 1;")
      && code.includes("if (SECSEL.narrowed) { try { p.setMaxWidth('380px'); } catch (e) {} SECSEL.narrowed = 0; }"));
 

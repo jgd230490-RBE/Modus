@@ -10899,11 +10899,11 @@
     // own width, narrowed to the room (never under SECSEL_MINW). Pure: x = the click, W = the map, right = where the free map
     // ends, natW = the card's own width. anchor 'left' = the card to the RIGHT of the click, 'right' = to its left, '' = neither
     // side has SECSEL_MINW (the old placing stands). A tie goes to the left of the click (the hover tip is on the right).
-    const SECSEL_GAP = 12, SECSEL_MINW = 300;
+    const SECSEL_GAP = 12, SECSEL_MINW = 300, SECSEL_EDGE = 6;
     function secselNarrow(x, W, right, natW) {
         right = Math.min(W, right > 0 ? right : W);
         const nat = natW > 0 ? natW : SECSEL_WIDE;
-        const wl = Math.min(nat, x - SECSEL_GAP), wr = Math.min(nat, right - x - SECSEL_GAP);
+        const wl = Math.min(nat, x - SECSEL_GAP - SECSEL_EDGE), wr = Math.min(nat, right - x - SECSEL_GAP - SECSEL_EDGE);
         const okL = wl >= SECSEL_MINW, okR = wr >= SECSEL_MINW;
         if (!okL && !okR) return { anchor: '', w: 0 };
         return (okL && (!okR || wl >= wr)) ? { anchor: 'right', w: Math.floor(wl) } : { anchor: 'left', w: Math.floor(wr) };
