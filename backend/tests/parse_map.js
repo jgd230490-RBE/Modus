@@ -7709,7 +7709,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   try {
     F = new Function("escHtml", "PV", "CW", "monthLabel", "teamText", "TENANT", "map", "styleReady", "document", "isPhoneShell", "mapboxgl",
                      "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle",
-                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), secselNeed: (typeof secselNeed === 'function' ? secselNeed : null), secselBeside: (typeof secselBeside === 'function' ? secselBeside : null), popupPlace: (typeof popupPlace === 'function' ? popupPlace : null), SECSEL_MAP };")(
+                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), secselNeed: (typeof secselNeed === 'function' ? secselNeed : null), secselBeside: (typeof secselBeside === 'function' ? secselBeside : null), secselNarrow: (typeof secselNarrow === 'function' ? secselNarrow : null), popupPlace: (typeof popupPlace === 'function' ? popupPlace : null), SECSEL_MAP };")(
       esc, () => pv, () => (pv === 2 ? words2 : words1), m => (m === 23 ? 'Nov 2027' : 'M' + m), v => (v === 'IPT1' ? 'North Team' : v),
       { name: 'Wolds Link', demo_notice: 'Fictional scheme' }, {}, () => true, doc, () => false, {}, {}, () => 'https://x/map/?month=2027-11', null, null,
       x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }));
@@ -7932,19 +7932,24 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   let fitRoad = null;
   try { fitRoad = /function fitRoadPopup\(\) \{[\s\S]*?\n    \}/.exec(code)[0]; } catch (e) {}
   // fitRoadPopup against a stand-in popup: the map 1122 x 677 (a desk window), the timeline bar 94, the figures bar 98, the free map ends at 1066
-  const roadFit = (fixed, nat, y, anchor, x, noTable) => {
-    const sc = noTable ? null : { offsetHeight: 86, scrollHeight: nat, style: {} }, box = { offsetHeight: fixed + 86 };
+  // o (12 Nov, road card beside the Conditions panel): { W, H, foot, right, fixed2 (the card's fixed part once narrowed), narrowed (it was narrowed before) }
+  const roadFit = (fixed, nat, y, anchor, x, noTable, o) => {
+    o = o || {};
+    const sc = noTable ? null : { offsetHeight: 86, scrollHeight: nat, style: {} }, box = { offsetHeight: fixed + 86, offsetWidth: 360 };
+    const widths = [];
     const pop = { options: { anchor }, moved: 0, setLngLat() { this.moved++; }, getLngLat: () => ({ lng: 0, lat: 0 }),
+                  setMaxWidth(w) { widths.push(w); if (o.fixed2 != null && w !== '380px') box.offsetHeight = o.fixed2 + 86; else box.offsetHeight = fixed + 86; },
                   getElement: () => ({ querySelector: q => (q === '.secsel-scroll' ? sc : q === '.mapboxgl-popup-content' ? box : null) }) };
     let hushed = 0;
+    const SEC = { roadPopup: pop, roadAt: { lngLat: {}, point: { x: x || 550, y } }, narrowed: o.narrowed ? 1 : 0 };
     try {
       new Function("SECSEL", "map", "document", "getComputedStyle", "secselTopEdge", "secselRightEdge", "secselRoom", "secselNeed", "secselSide", "secselBeside",
-                   "SECSEL_MARGIN", "hoverGiveWay", fitRoad + "\nreturn fitRoadPopup;")(
-        { roadPopup: pop, roadAt: { lngLat: {}, point: { x: x || 550, y } } },
-        { getContainer: () => ({ clientWidth: 1122, clientHeight: 677 }), project: () => ({ x: x || 550, y }) },
-        { documentElement: {} }, () => ({ getPropertyValue: () => '94px' }), () => 98, () => 1066, F.secselRoom, F.secselNeed, F.secselSide, F.secselBeside, 14, () => { hushed++; })();
+                   "SECSEL_MARGIN", "hoverGiveWay", "secselNarrow", fitRoad + "\nreturn fitRoadPopup;")(
+        SEC,
+        { getContainer: () => ({ clientWidth: o.W || 1122, clientHeight: o.H || 677 }), project: () => ({ x: x || 550, y }) },
+        { documentElement: {} }, () => ({ getPropertyValue: () => (o.foot || 94) + 'px' }), () => 98, () => (o.right || 1066), F.secselRoom, F.secselNeed, F.secselSide, F.secselBeside, 14, () => { hushed++; }, F.secselNarrow)();
     } catch (e) { return { err: e.message }; }
-    return { anchor: pop.options.anchor, moved: pop.moved, max: sc ? sc.style.maxHeight : null, hushed };
+    return { anchor: pop.options.anchor, moved: pop.moved, max: sc ? sc.style.maxHeight : null, hushed, widths, narrowed: SEC.narrowed };
   };
   if (typeof need === 'function' && fitRoad) {
     // the live case: y = 437, a card with the "no loads" line (fixed 210, three rows, 135 px of table) opened ABOVE the click
@@ -7967,10 +7972,54 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        roadFit(210, 190, 437, 'bottom').hushed === 1);
   } else ok("⭐ TALL (sandbox): fitRoadPopup could not be read", false);
   ok("⭐ TALL (source): the fixed part is measured from the card, the old fixed 170 is gone, and the card is placed again with the real need",
-     code.includes("const fixed = (sc && box) ? Math.max(0, box.offsetHeight - sc.offsetHeight) : 0;") && !code.includes("space - 170")
+     code.includes("let fixed = (sc && box) ? Math.max(0, box.offsetHeight - sc.offsetHeight) : 0;") && !code.includes("space - 170")
      && code.includes("const rm = secselRoom(at.point.y, H, foot, secselTopEdge(), secselNeed(fixed, sc.scrollHeight));")
      && code.includes("if (want !== p.options.anchor) { p.options.anchor = want; p.setLngLat(p.getLngLat()); }")
      && code.includes("const SECSEL_MINROW = 90, SECSEL_MARGIN = 14;"));
+
+  // ===== 12 Nov 2026 — road card beside the Conditions panel (A1-L1; seen on live, Apr 2027, 1422 x 701: the B6047 card with its
+  // limit line, clicked at map (350, 351) with the Conditions panel open, opened ABOVE the click with its title 28 px under the
+  // figures bar: 350 px of map on its left, 360 to the panel on its right, and a card beside the click wants 404). =====
+  const narrow = F && F.secselNarrow;
+  ok("⭐ BESIDE (pure): where neither side has a whole 404 px, the card goes beside the click on the side with more room, at its own width narrowed to the room: the live case (click 350, free map ends 710, card 360) = to the RIGHT of the click, 348 px",
+     typeof narrow === 'function' && JSON.stringify(narrow(350, 1122, 710, 360)) === '{"anchor":"left","w":348}');
+  ok("BESIDE (pure): a side with at least the card's own width keeps it whole; the left of the click wins a tie (the hover tip is on the right); a side under 300 px is no side; neither = the old placing",
+     typeof narrow === 'function' && JSON.stringify(narrow(200, 1122, 1066, 360)) === '{"anchor":"left","w":360}'
+     && JSON.stringify(narrow(400, 1122, 800, 360)) === '{"anchor":"right","w":360}'
+     && JSON.stringify(narrow(100, 1122, 380, 360)) === '{"anchor":"","w":0}' && JSON.stringify(narrow(311, 1122, 600, 360)) === '{"anchor":"","w":0}'
+     && narrow(250, 1122, 580, 360).anchor === 'left' && narrow(250, 1122, 580, 360).w === 318);
+  ok("BESIDE (pure): a card with no width measured (0, NaN) is taken as the old 404 and narrowed to the room",
+     typeof narrow === 'function' && narrow(350, 1122, 710, 0).w === 348 && narrow(350, 1122, 710, NaN).w === 348);
+  if (typeof narrow === 'function' && fitRoad) {
+    // the live case in the stand-in: the map 1122 x 701, the timeline bar 103, the figures bar 98, the panel's edge 710, the click (350, 351), fixed part 213, table 605 px tall
+    const live = { W: 1122, H: 701, foot: 103, right: 710 };
+    const b = roadFit(213, 605, 351, 'bottom', 350, false, live);
+    ok("⭐ BESIDE (the live case): the card opened above the click, squeezed (253 - 34 - 213 + 14 = 20 px of table, under the 48 floor), is placed to the RIGHT of the click, narrowed to 348 px; its table then has twice the smaller room (2 x 247 - 34 - 213 + 14 = 261 px); the old code left it above with 48 px",
+       b.anchor === 'left' && b.moved === 1 && b.widths.join() === '348px' && b.narrowed === 1 && b.max === '261px');
+    ok("⭐ BESIDE (the live case, geometry): the card's top = 351 - (213 + 261 + 20) / 2 is not under the figures bar (98) and its foot not over the timeline bar (701 - 103 = 598)",
+       Math.round(351 - (213 + 261 + 20) / 2) >= 98 && Math.round(351 + (213 + 261 + 20) / 2) <= 598);
+    const lowerB = roadFit(213, 605, 342, 'top', 350, false, live);
+    ok("BESIDE: the lower spot (click 342, the card opened BELOW and 17 px over the timeline bar) is placed beside the click too",
+       lowerB.anchor === 'left' && lowerB.widths.join() === '348px');
+    const fits = roadFit(213, 605, 400, 'bottom', 350, false, live);
+    ok("BESIDE: a click that keeps the table's 48 px floor above it (y 400: 400 - 98 - 34 - 213 + 14 = 69 px) is NOT moved and not narrowed: the old placing stands",
+       fits.anchor === 'bottom' && fits.moved === 0 && fits.widths.length === 0 && fits.max === '69px');
+    const none = roadFit(213, 605, 351, 'bottom', 260, false, { W: 1122, H: 701, foot: 103, right: 520 });
+    ok("BESIDE: where neither side has 300 px (click 260, free map ends 520: 248 each side) the card keeps the old placing, its width untouched",
+       none.anchor === 'bottom' && none.widths.length === 0 && none.narrowed === 0);
+    const noRoom = roadFit(213, 605, 351, 'bottom', 350, false, { W: 1122, H: 701, foot: 103, right: 710, fixed2: 520 });
+    ok("BESIDE: if narrowing makes the card so tall that even beside the click the table would be under 48 px, it is put back to its own width and keeps the old placing",
+       noRoom.anchor === 'bottom' && noRoom.widths.join() === '348px,380px' && noRoom.narrowed === 0);
+    const again = roadFit(213, 605, 400, 'bottom', 350, false, Object.assign({ narrowed: 1 }, live));
+    ok("BESIDE: a card narrowed the last time is measured at its own width again (setMaxWidth back to 380 px) before it is placed",
+       again.widths[0] === '380px' && again.narrowed === 0 && again.anchor === 'bottom');
+    ok("BESIDE: the Conditions panel closed (the free map ends at the map's right edge less the buttons, 1066): the same click is placed by the old middle-band rule, not narrowed",
+       roadFit(213, 605, 351, 'bottom', 350, false, { W: 1122, H: 701, foot: 103, right: 1066 }).widths.length === 0);
+  } else ok("⭐ BESIDE (sandbox): fitRoadPopup or secselNarrow could not be read", false);
+  ok("⭐ BESIDE (source): the narrowing is used only where the table would fall under its 48 px floor, and the card is measured at its own width each time",
+     code.includes("const SECSEL_GAP = 12, SECSEL_MINW = 300;") && code.includes("function secselNarrow(x, W, right, natW) {")
+     && code.includes("if (room0 - fixed + SECSEL_MARGIN < 48) {") && code.includes("p.setMaxWidth(nar.w + 'px'); SECSEL.narrowed = 1;")
+     && code.includes("if (SECSEL.narrowed) { try { p.setMaxWidth('380px'); } catch (e) {} SECSEL.narrowed = 0; }"));
 
   // ===== 11 Nov 2026 — map popup top (seen on live at 1422 x 677, the road card's live check: a holding area's popup,
   // placed by the map above its point, ran 75 -> 308 with the figures bar's edge at 98: its title 23 px under the bar) =====

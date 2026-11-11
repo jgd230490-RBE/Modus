@@ -10892,20 +10892,51 @@
     // offset. An ordinary card (184, one row of 86) still needs the 290 px it always did.
     const SECSEL_MINROW = 90, SECSEL_MARGIN = 14;
     function secselNeed(fixed, nat) { return Math.max(SECSEL_NEED, Math.round((fixed || 0) + Math.min(nat || 0, SECSEL_MINROW) + 20)); }
+    // 12 Nov 2026 (road card beside the Conditions panel; seen on live, Apr 2027: a click on the B6047 with the panel open has
+    // 350 px of map to its left and 360 to the panel on its right, and a card beside the click wants SECSEL_WIDE = 404, so the
+    // card fell back above the click and its title lay 28 px under the figures bar). Used ONLY where the card above or below
+    // the click would be squeezed under its table's floor: the card goes beside the click on the side with more room, at its
+    // own width, narrowed to the room (never under SECSEL_MINW). Pure: x = the click, W = the map, right = where the free map
+    // ends, natW = the card's own width. anchor 'left' = the card to the RIGHT of the click, 'right' = to its left, '' = neither
+    // side has SECSEL_MINW (the old placing stands). A tie goes to the left of the click (the hover tip is on the right).
+    const SECSEL_GAP = 12, SECSEL_MINW = 300;
+    function secselNarrow(x, W, right, natW) {
+        right = Math.min(W, right > 0 ? right : W);
+        const nat = natW > 0 ? natW : SECSEL_WIDE;
+        const wl = Math.min(nat, x - SECSEL_GAP), wr = Math.min(nat, right - x - SECSEL_GAP);
+        const okL = wl >= SECSEL_MINW, okR = wr >= SECSEL_MINW;
+        if (!okL && !okR) return { anchor: '', w: 0 };
+        return (okL && (!okR || wl >= wr)) ? { anchor: 'right', w: Math.floor(wl) } : { anchor: 'left', w: Math.floor(wr) };
+    }
     function fitRoadPopup() {
         const p = SECSEL.roadPopup, at = SECSEL.roadAt; if (!p || !at) return;
         const el = p.getElement && p.getElement(); if (!el) return;
+        if (SECSEL.narrowed) { try { p.setMaxWidth('380px'); } catch (e) {} SECSEL.narrowed = 0; }      // measure the card at its own width
         const H = map.getContainer().clientHeight || 600;
         const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
         const y = map.project(at.lngLat).y;
         const sc = el.querySelector('.secsel-scroll'), box = el.querySelector('.mapboxgl-popup-content');
-        const fixed = (sc && box) ? Math.max(0, box.offsetHeight - sc.offsetHeight) : 0;
+        let fixed = (sc && box) ? Math.max(0, box.offsetHeight - sc.offsetHeight) : 0;
         if (sc && fixed && p.options) {
             const W = map.getContainer().clientWidth || 800;
             const rm = secselRoom(at.point.y, H, foot, secselTopEdge(), secselNeed(fixed, sc.scrollHeight));
             const side = secselSide(at.point.x, W, secselRightEdge());
             const beside = rm.beside ? secselBeside(at.point.x, W, secselRightEdge()) : '';
-            const want = beside || ((rm.below ? 'top' : 'bottom') + (side ? '-' + side : ''));
+            let want = beside || ((rm.below ? 'top' : 'bottom') + (side ? '-' + side : ''));
+            if (want !== 'left' && want !== 'right') {
+                // above or below the click: does the card keep the table's 48 px floor in the room on that side? if not, beside it, narrowed
+                const t0 = secselTopEdge(), yc = at.point.y;
+                const room0 = (want.indexOf('top') === 0) ? (H - foot - yc - 34) : (yc - t0 - 34);
+                if (room0 - fixed + SECSEL_MARGIN < 48) {
+                    const nar = secselNarrow(at.point.x, W, secselRightEdge(), box.offsetWidth);
+                    if (nar.anchor) {
+                        p.setMaxWidth(nar.w + 'px'); SECSEL.narrowed = 1;
+                        const fixed2 = Math.max(0, box.offsetHeight - sc.offsetHeight);
+                        if (2 * Math.min(yc - t0, H - foot - yc) - 34 - fixed2 + SECSEL_MARGIN >= 48) { want = nar.anchor; fixed = fixed2; }
+                        else { p.setMaxWidth('380px'); SECSEL.narrowed = 0; }
+                    }
+                }
+            }
             if (want !== p.options.anchor) { p.options.anchor = want; p.setLngLat(p.getLngLat()); }
         }
         const t = secselTopEdge(), a = String((p.options && p.options.anchor) || '');
