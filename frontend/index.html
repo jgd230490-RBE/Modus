@@ -1636,6 +1636,9 @@ const INFO = {
     how: "A lorry calls off where it arrives at a site that names the holding area, unless its type is exempt or its route is ticked. The most held comes from the Simulation's day, not from a count.", guide: "17-2-the-scenario", tech: "t1-holding" },
   "clp.trips_avoided": { title: "Lorry trips avoided", text: "Loads each month as planned and with the decisions agreed with the carbon target, and the difference.",
     how: "Only a decision that changes the lorry, the supplier or the route changes trips; one that changes only the material does not.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  // 11 Nov 2026 (card 4, John's yes): the planned and recorded tonnes, first in CLP monitoring
+  "clp.recorded_tonnes": { title: "Planned and recorded tonnes", text: "Planned: the approved plan. Recorded: tonnes typed on Account (a week's actual), the Dashboard's Delivered against plan. A month with nothing typed is not recorded, not zero.",
+    guide: "3-5-clp-monitoring", tech: "t1-clp" },
   // 14 Oct 2026 (bundle G, W17)
   "la.lorryplan": { title: "Lorry plan", text: "Each lorry's day used to the full: one day's loads leaving one yard in one kind of lorry, chained into as few lorry-days as the UK drivers' hours rule allows, each lorry's trips in the driver's order.",
     how: "As booked is each line's own whole lorries, as the grid counts them. Chained by yard keeps the same loads on the same days with fewer lorries. Week compressed pools the week's loads so a part-used last lorry becomes one full lorry on fewer days: a suggestion until Apply. Planners and admins can drag a trip to another lorry of its yard (or, compressed, to another day); a drop that would pass the driver's day is refused, and the arrangement is kept for the week until its loads change. A planning figure, never a check of anyone's hours.", guide: "ug-lorry-plan", tech: "t1-lorry-plan" },
@@ -4052,6 +4055,18 @@ function clpTripsCfg(c){
       tooltip: { callbacks: { footer: (items) => items.length ? `${grp(m[items[0].dataIndex].avoided)} trips avoided` : "" } } },
       scales: { x: { grid: { display: false } } } } };
 }
+// 11 Nov 2026 (card 4): planned and recorded tonnes, a pair a month as the Dashboard's Delivered against plan; a month nobody
+// typed has no recorded bar (null), never a 0
+function clpRecordedCfg(c){
+  const C1 = tok("--chart-1", "#E8590C"), C1S = tok("--chart-1-soft", "rgba(232,89,12,.18)");
+  const m = c.months || [];
+  return { type: "bar", data: { labels: m.map(r => r.label), datasets: [
+      { label: "Planned", data: m.map(r => r.planned_t), backgroundColor: C1S, borderColor: C1, borderWidth: 1 },
+      { label: "Recorded", data: m.map(r => r.recorded_t == null ? null : r.recorded_t), backgroundColor: C1, borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } },
+      tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${it.raw == null ? "not recorded" : grp(it.raw) + " t"}` } } },
+      scales: { x: { grid: { display: false } }, y: { title: { display: true, text: "t" } } } } };
+}
 function ClpUncapped({ rows, nameKey, valKey, word, what }){
   const left = (rows || []).filter(r => r.cap == null);
   if(!left.length) return null;
@@ -4119,9 +4134,13 @@ function ClpMonitoring({ months, initial }){
         {err && <div className="ct-line" data-clp-error="1">The CLP figures did not load.</div>}
         {!data && !err && <div className="ct-line">Loading the CLP figures…</div>}
         {data && <>
-          <div className="ct-note">{data.scope_line} {data.limit}</div>
+          <div className="ct-note">{data.scope_line} {data.limit}{data.recorded_line ? " " + data.recorded_line : ""}</div>
           {data.peak_words && <div className="ct-note" data-clp-peak="1">{data.peak_words}</div>}
           <div className="clp-grid">
+            {/* 11 Nov 2026 (card 4, John's yes "First"): planned and recorded tonnes lead the section */}
+            {C.recorded_tonnes && <ClpCard c={C.recorded_tonnes} info={<InfoTip id="clp.recorded_tonnes" />} wide>
+              <ChartCanvas config={clpRecordedCfg(C.recorded_tonnes)} title={C.recorded_tonnes.title} />
+            </ClpCard>}
             <ClpCard c={C.route_caps} info={<InfoTip id="clp.route_caps" />} wide>
               {capped(C.route_caps.rows).length > 0 && <ChartCanvas config={clpBulletCfg(capped(C.route_caps.rows), "movements_per_day", "route", "movements a day")} height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />}
               <ClpUncapped rows={C.route_caps.rows} nameKey="route" valKey="movements_per_day" word="a day" what="route" />

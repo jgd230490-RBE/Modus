@@ -508,9 +508,11 @@ async function clpDom(){
   const det = el.querySelector("details[data-clp]");
   await act(async () => { det.open = true; det.dispatchEvent(new w.Event("toggle")); await sleep(30); });
   // RE-PINNED 29 Oct 2026 (task 3c): eight cards — the holding areas' table (the fixture carries the chart)
-  ok("⭐ CLP DOM: opening it reads this month once, as a GET, and draws the eight cards",
+  // NARROWED 11 Nov 2026 (card 4, John's yes): nine — the planned and recorded tonnes first
+  ok("⭐ CLP DOM: opening it reads this month once, as a GET, and draws the nine cards, the planned and recorded tonnes first",
      calls.length === 1 && calls[0].url === `/api/clp/monitoring?month=${thisMonth}` && calls[0].method === "GET"
-     && el.querySelectorAll('[data-clp-state="set"]').length === 8, JSON.stringify(calls));
+     && el.querySelectorAll('[data-clp-state="set"]').length === 9
+     && (el.querySelector("[data-clp-chart]") || { getAttribute: () => "" }).getAttribute("data-clp-chart") === "recorded_tonnes", JSON.stringify(calls));
   ok("CLP DOM: the headlines are the server's words",
      CLPF.order.every(k => (el.querySelector(`[data-clp-head="${k}"]`) || {}).textContent === CLPF.charts[k].headline));
   await act(async () => { det.open = false; det.dispatchEvent(new w.Event("toggle")); await sleep(10); });

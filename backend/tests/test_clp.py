@@ -271,16 +271,30 @@ ok("⭐ clp.py is read-only: no db.execute, no INSERT / UPDATE / DELETE",
 ok("⭐ clp.py imports neither main nor network and names no team slot id",
    not re.search(r"^\s*(import|from)\s+(network|main)\b", src, re.M) and re.search(r"\bIPT ?[1-6]\b", src) is None)
 _stmts = re.findall(r'db\.query\(\s*((?:"[^"]*"\s*)+)', code_only)
-ok("🔴 tenant isolation: all three SQL literals in clp.py constrain tenant_id (29 Oct 2026: the holding areas' lines)",
-   len(_stmts) == 3 and all("tenant_id = ?" in s for s in _stmts), str(_stmts))
+# NARROWED 11 Nov 2026 (card 4, John's yes): a fourth literal, the weeks with a tonnage typed (the "recorded to" date)
+ok("🔴 tenant isolation: all four SQL literals in clp.py constrain tenant_id (29 Oct 2026: the holding areas' lines; "
+   "11 Nov 2026: the recorded weeks)",
+   len(_stmts) == 4 and all("tenant_id = ?" in s for s in _stmts), str(_stmts))
+# NARROWED 11 Nov 2026 (card 4, John's yes "First"): the planned and recorded tonnes lead the order; the reply gains recorded_line
 ok("the reply's keys and the chart order are the contract's",
    set(M) == {"month", "label", "working_days", "distance_unit", "months", "order", "charts", "with_data", "peak_bands",
-              "peak_words", "scope", "scope_line", "limit", "demo_notice"}
-   and M["order"] == ["route_caps", "site_caps", "holding_areas", "vehicle_types", "euro_class", "councils", "carbon_rate", "trips_avoided"]
+              "peak_words", "scope", "scope_line", "limit", "recorded_line", "demo_notice"}
+   and M["order"] == ["recorded_tonnes", "route_caps", "site_caps", "holding_areas", "vehicle_types", "euro_class", "councils",
+                      "carbon_rate", "trips_avoided"]
    and list(C) == M["order"] and M["label"] == "Oct 2026" and M["working_days"] == 22.0)
 ok("every chart carries key, number, title, the CLP item it serves, state and missing",
    all({"key", "number", "title", "serves", "state", "missing"} <= set(c) and c["key"] == k for k, c in C.items())
-   and [C[k]["number"] for k in M["order"]] == ["1", "1", "1", "4", "5", "6", "10", "16"])
+   # NARROWED 11 Nov 2026 (card 4): the tonnes chart is not in the outside brief's table: "R" (recorded)
+   and [C[k]["number"] for k in M["order"]] == ["R", "1", "1", "1", "4", "5", "6", "10", "16"])
+ok("⭐ 11 Nov 2026 (card 4): the planned and recorded tonnes chart is FIRST in clp.ORDER, in CHARTS and in the reply",
+   clp.ORDER[0] == "recorded_tonnes" and list(clp.CHARTS)[0] == "recorded_tonnes" and M["order"][0] == "recorded_tonnes"
+   and list(C)[0] == "recorded_tonnes" and C["recorded_tonnes"]["title"] == "Planned and recorded tonnes"
+   and "compl" not in C["recorded_tonnes"]["serves"].lower())
+ok("🔴 card 4: the limit stays word for word (John says it on Friday)",
+   M["limit"] == clp.SPREAD == "Planned figures, not observed: Wayscope holds no gate log or arrival times.")
+ok("⭐ card 4, nothing typed on Account yet: the tonnes chart is empty with a plain sentence, no recorded line, no figure 0",
+   C["recorded_tonnes"]["state"] == "empty" and C["recorded_tonnes"]["missing"] == "No tonnes typed on Account up to Oct 2026."
+   and "months" not in C["recorded_tonnes"] and M["recorded_line"] is None, str(C["recorded_tonnes"]))
 ok("29 Oct 2026 (task 3c): with no holding area the Holding areas table is empty and says what to type",
    C["holding_areas"]["state"] == "empty" and "Holding area" in (C["holding_areas"]["missing"] or ""), str(C["holding_areas"]))
 
@@ -438,8 +452,46 @@ if _had_tok is None:
     os.environ.pop("ADMIN_TOKEN", None)
 else:
     os.environ["ADMIN_TOKEN"] = _had_tok
+# 11 Nov 2026 (card 4): tonnes typed on Account (a week's actual) — R001 Oct weeks 1 and 2, R002 Oct week 1; nothing in Nov
+weeks.materialise_window(10, 11)
+_ra = [weeks.set_actual(R1, 10, "earthworks", "WS1", 1, actual_qty=700.0, by="clerk"),
+       weeks.set_actual(R1, 10, "earthworks", "WS1", 2, actual_qty=800.0, by="clerk"),
+       weeks.set_actual(R2, 10, "earthworks", "WS2", 1, actual_qty=500.0, by="clerk")]
+ok("card 4 set-up: three week actuals typed (Oct 2026)", all("error" not in (x or {}) for x in _ra), str(_ra)[:300])
 M2 = clp.monitoring(10, acc_planner, factors=factors, working_days=WD)
 C2 = M2["charts"]
+RT = C2["recorded_tonnes"]
+_dl = costlines.lines(acc_planner, status="Approved", factors=factors)["lines"]
+_pl, _rd, _nl = {}, {}, {}
+for _l in _dl:
+    _pl[_l["month_index"]] = _pl.get(_l["month_index"], 0.0) + _l["tonnes"]
+    if _l["actual_tonnes"] is not None:
+        _rd[_l["month_index"]] = _rd.get(_l["month_index"], 0.0) + _l["actual_tonnes"]
+        _nl[_l["month_index"]] = _nl.get(_l["month_index"], 0) + 1
+_sun = weeks.week_span(10, 2)[1]
+ok("⭐ card 4: planned_t is the Dashboard's source exactly (the sum of costlines tonnes of the Approved lines that month: 5 480)",
+   RT["state"] == "set" and [m["planned_t"] for m in RT["months"]] == [round(_pl[10], 3)] and RT["months"][0]["planned_t"] == 5480.0,
+   str(RT)[:400])
+ok("⭐ card 4: recorded_t is the sum of costlines actual_tonnes (700 + 800 + 500 = 2 000), lines_reported 2, 36 % of the plan",
+   RT["months"][0]["recorded_t"] == round(_rd[10], 3) == 2000.0 and RT["months"][0]["lines_reported"] == _nl[10] == 2
+   and RT["months"][0]["recorded_pct"] == 36, str(RT["months"]))
+ok("⭐ card 4: no month after the chosen one (the window runs Oct–Nov; Oct is picked, so Oct only)",
+   [m["month_index"] for m in M2["months"]] == [10, 11] and [m["month_index"] for m in RT["months"]] == [10])
+ok("⭐ card 4: recorded to the Sunday of the latest week typed (Oct week 2 ends 11 Oct 2026), said in the headline and the line",
+   RT["recorded_to"] == _sun.isoformat() == "2026-10-11"
+   and RT["headline"] == "Oct 2026: 2 000 t recorded, 36 % of the 5 480 t planned · recorded to 11 Oct"
+   and M2["recorded_line"] == "Recorded tonnes as typed on Account, to 11 Oct 2026."
+   and M2["limit"] == clp.SPREAD, RT["headline"] + " | " + str(M2["recorded_line"]))
+ok("card 4: the basis says what planned and recorded mean, and that a month with nothing typed is not recorded, not zero",
+   "Recorded: tonnes typed on Account (a week's actual)" in RT["basis"] and "Delivered against plan" in RT["basis"]
+   and "not recorded, not zero" in RT["basis"] and RT["source"].startswith("Wayscope"))
+M11 = clp.monitoring(11, acc_planner, factors=factors, working_days=WD)
+RT11 = M11["charts"]["recorded_tonnes"]
+ok("⭐ card 4: a month nobody typed is None ('not recorded'), never 0; the headline names the latest month with a record",
+   [m["month_index"] for m in RT11["months"]] == [10, 11] and RT11["months"][1]["recorded_t"] is None
+   and RT11["months"][1]["recorded_pct"] is None and RT11["months"][1]["lines_reported"] == 0
+   and RT11["months"][1]["planned_t"] == round(_pl[11], 3) == 1450.0
+   and RT11["headline"].startswith("Oct 2026: 2 000 t recorded") and RT11["recorded_to"] == "2026-10-11", str(RT11["months"]))
 _HA = C2["holding_areas"]
 ok("⭐ 29 Oct 2026 (task 3c): the Holding areas table is set: one row, 10 spaces, its hours, the site it serves, the mixers straight to the gate",
    _HA["state"] == "set" and len(_HA["rows"]) == 1 and _HA["rows"][0]["holding_area"] == "Lane holding area" and _HA["rows"][0]["spaces"] == 10
@@ -566,6 +618,12 @@ ok("⭐ a team code: scope team; the vehicle chart holds only its lines (100 rig
    and MT["charts"]["route_caps"]["rows"] == C2["route_caps"]["rows"] and MT["charts"]["councils"]["rows"] == C2["councils"]["rows"]
    and "the whole scheme for the caps and councils" in MT["scope_line"], str(MT["charts"]["vehicle_types"])[:200])
 ok("...and its target is its own share (target_scope team)", MT["charts"]["carbon_rate"]["target_scope"] == "team")
+ok("⭐ card 4, team scope: the team code's tonnes are its own lines only (R002: 2 000 t planned, 500 t recorded, one line)",
+   MT["charts"]["recorded_tonnes"]["state"] == "set"
+   and [(m["planned_t"], m["recorded_t"], m["lines_reported"]) for m in MT["charts"]["recorded_tonnes"]["months"]] == [(2000.0, 500.0, 1)]
+   and MT["charts"]["recorded_tonnes"]["recorded_to"] == weeks.week_span(10, 1)[1].isoformat()
+   and MT["recorded_line"] == f"Recorded tonnes as typed on Account, to {weeks.week_span(10, 1)[1].day} Oct 2026.",
+   str(MT["charts"]["recorded_tonnes"])[:300])
 ok("the endpoint: main.clp_monitoring(10) returns the same dict as clp.monitoring(10, acc, …)",
    main.clp_monitoring(10) == clp.monitoring(10, access.current(), factors=conversions.load_factors(), working_days=main._working_days(conversions.load_factors())))
 _e = [_raises(lambda: main.clp_monitoring(0)), _raises(lambda: main.clp_monitoring(main.MONTH_COUNT + 1))]
@@ -603,6 +661,30 @@ ok("⭐ W10 PDF: every chart with data, in the section's order, each with its he
    all(MP["charts"][k]["title"] in _pt and MP["charts"][k]["headline"] in _pt for k in MP["with_data"])
    and [_pt.index(MP["charts"][k]["title"]) for k in MP["with_data"]] == sorted(_pt.index(MP["charts"][k]["title"]) for k in MP["with_data"])
    and _pt.count("How it is worked out: ") == len(MP["with_data"]) and _pt.count("Source: Wayscope") == len(MP["with_data"]), _pt[:300])
+ok("⭐ card 4 PDF: the planned and recorded tonnes come first, with their table (Oct 2026 5 480 2 000 36 % 2), and the "
+   "recorded line follows the limit in the first paragraph; the page stamp is unchanged",
+   MP["with_data"][0] == "recorded_tonnes" and "Planned and recorded tonnes" in _pt
+   and _pt.index("Planned and recorded tonnes") < _pt.index(MP["charts"]["route_caps"]["title"])
+   and "Oct 2026 5 480 2 000 36 % 2" in _pt
+   and "Planned figures, not observed: Wayscope holds no gate log or arrival times. Recorded tonnes as typed on Account, to 11 Oct 2026." in _pt
+   and _pt.count("Recorded tonnes as typed on Account") == 1
+   and "Planned figures from the approved plan, not observed: Wayscope holds no gate log or arrival times." in _pt
+   and "avoided" not in _pt[_pt.index("Planned and recorded tonnes"):_pt.index(MP["charts"]["route_caps"]["title"])], _pt[:600])
+_M11P = clp.monitoring(11, acc_planner, factors=conversions.load_factors(), working_days=WD)
+_h11, _r11 = clp_pack.table_of(_M11P["charts"]["recorded_tonnes"], _M11P)
+_p11 = re.sub(r"\s+", " ", _pdf_text(clp_pack.build_pdf(_M11P, generated="11 Nov 2026")) or "")
+ok("⭐ card 4 pack: a month nobody typed prints 'not recorded', never 0 (table, PDF)",
+   _h11 == ["Month", "Planned t", "Recorded t", "Recorded share", "Lines reported"]
+   and _r11 == [["Oct 2026", "5 480", "2 000", "36 %", "2"], ["Nov 2026", "1 450", "not recorded", "—", "—"]]
+   and "Nov 2026 1 450 not recorded — —" in _p11, str(_r11) + " | " + _p11[:300])
+_ME0 = copy.deepcopy(MP)
+_ME0["recorded_line"] = None
+_ME0["charts"]["recorded_tonnes"] = {**{x: MP["charts"]["recorded_tonnes"][x] for x in ("key", "number", "title", "serves")},
+                                     "state": "empty", "missing": "No tonnes typed on Account up to Oct 2026."}
+_ME0["with_data"] = [k for k in _ME0["order"] if _ME0["charts"][k]["state"] == "set"]
+_p0 = re.sub(r"\s+", " ", _pdf_text(clp_pack.build_pdf(_ME0, generated="11 Nov 2026")) or "")
+ok("card 4 pack: with nothing recorded there is no recorded line, and the tonnes are listed as not drawn with their sentence",
+   "Recorded tonnes as typed on Account" not in _p0 and "Planned and recorded tonnes: No tonnes typed on Account up to Oct 2026." in _p0)
 ok("W10 PDF: the figures are printed as a table too (Pit West → Yard East 4.5 against 4, 114 %; 31 trips avoided)",
    "Pit West → Yard East 4.5 4 114 % Over the cap" in _pt and "Oct 2026 220 189 31" in _pt, _pt[:200])
 ok("🔴 W10 PDF: no team id, none of the banned words",
@@ -626,6 +708,15 @@ ok("W10 XLSX: the demo notice heads every sheet in the demo bar's colours; About
    all(_wb[n]["A1"].value == "Fictional demo scheme · nothing here is real" and (_wb[n]["A1"].font.color.rgb or "").endswith(_export.DEMO_FG_HEX)
        for n in _wb.sheetnames)
    and ["Month", "Oct 2026"] == [x for x in _ab if x[0] == "Month"][0][:2] and any(x[0] == "Scope" and x[1] == MP["scope_line"] for x in _ab))
+_rt_x = [[c.value for c in r] for r in _wb[clp_pack.SHEET["recorded_tonnes"]].iter_rows()]
+ok("⭐ card 4 XLSX: the 'Planned and recorded' sheet comes right after About, with its table; About says the recorded line",
+   _wb.sheetnames[1] == clp_pack.SHEET["recorded_tonnes"] == "Planned and recorded" and len(clp_pack.SHEET["recorded_tonnes"]) <= 31
+   and ["Month", "Planned t", "Recorded t", "Recorded share", "Lines reported"] in [r[:5] for r in _rt_x]
+   and ["Oct 2026", "5 480", "2 000", "36 %", "2"] in [r[:5] for r in _rt_x]
+   and any(x[0] == "Recorded" and x[1] == "Recorded tonnes as typed on Account, to 11 Oct 2026." for x in _ab)
+   and any(x[0] == "Basis" and x[1] == clp.SPREAD for x in _ab), str(_wb.sheetnames))
+_x11 = [[c.value for c in r] for r in _openpyxl.load_workbook(_io.BytesIO(clp_pack.build_xlsx(_M11P)))[clp_pack.SHEET["recorded_tonnes"]].iter_rows()]
+ok("card 4 XLSX: the month nobody typed reads 'not recorded'", ["Nov 2026", "1 450", "not recorded", "—", "—"] in [r[:5] for r in _x11])
 _rc = [[c.value for c in r] for r in _wb[clp_pack.SHEET["route_caps"]].iter_rows()]
 ok("W10 XLSX: a chart's sheet holds its table and says how it is worked out and its source",
    ["Pit West → Yard East", "4.5", "4", "114 %", "Over the cap"] in [r[:5] for r in _rc]

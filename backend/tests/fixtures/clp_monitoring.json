@@ -14,6 +14,7 @@
   }
  ],
  "order": [
+  "recorded_tonnes",
   "route_caps",
   "site_caps",
   "holding_areas",
@@ -24,6 +25,29 @@
   "trips_avoided"
  ],
  "charts": {
+  "recorded_tonnes": {
+   "number": "R",
+   "title": "Planned and recorded tonnes",
+   "serves": "CLOCS quarterly report: delivery activity against the plan",
+   "key": "recorded_tonnes",
+   "state": "set",
+   "missing": null,
+   "months": [
+    {
+     "month_index": 10,
+     "label": "Oct 2026",
+     "planned_t": 5480.0,
+     "recorded_t": 2000.0,
+     "recorded_pct": 36,
+     "lines_reported": 2
+    }
+   ],
+   "recorded_to": "2026-10-11",
+   "headline": "Oct 2026: 2 000 t recorded, 36 % of the 5 480 t planned · recorded to 11 Oct",
+   "subtitle": "tonnes a month",
+   "basis": "Planned: the approved plan's tonnes. Recorded: tonnes typed on Account (a week's actual), as the Dashboard's Delivered against plan. A month with nothing typed is not recorded, not zero. The months up to the one picked.",
+   "source": "Wayscope: the approved plan; the tonnes typed on Account"
+  },
   "route_caps": {
    "number": "1",
    "title": "Routes against their planning cap",
@@ -155,7 +179,7 @@
   },
   "vehicle_types": {
    "number": "4",
-   "title": "Movements by vehicle type",
+   "title": "Lorry visits by vehicle type",
    "serves": "TfL CLP guidance: vehicle movements by type and size",
    "key": "vehicle_types",
    "state": "set",
@@ -203,13 +227,13 @@
     50
    ],
    "headline": "Artic Tipper (44t) carries 63 % of the loads",
-   "subtitle": "share of approved loads each month (one load = one movement)",
+   "subtitle": "share of approved loads each month (one load = one lorry visit)",
    "basis": "Approved loads (trips, rounded up per forecast month) by the vehicle each line plans to use.",
    "source": "Wayscope: the approved plan; vehicle types from Config → Vehicles"
   },
   "euro_class": {
    "number": "5",
-   "title": "Movements by Euro class",
+   "title": "Lorry visits by Euro class",
    "serves": "TfL CLP guidance: vehicle age and emissions standard",
    "key": "euro_class",
    "state": "set",
@@ -304,7 +328,7 @@
    "unit": "km",
    "distance_word": "lorry-km",
    "scheme_movements_per_day": 18.2,
-   "headline": "Westshire takes the most: 18.2 movements a day",
+   "headline": "Westshire has the most lorry-km: 2860.7",
    "subtitle": "lorry-km in Oct 2026, laden and empty, and lorry movements a day",
    "basis": "Lorry movements a day: each leg of a route that enters an area is one movement a load (the loaded leg in, the empty way back out), the month's approved loads divided by the working days. A route counts in every area its legs enter, so the areas' figures add up to more than the scheme's. A leg enters an area when at least 200 m of it is inside (the boundaries are generalised to 200 m); a route inside by less adds its km and carbon there, not its movements. Distance: every lorry-km driven inside the area, laden and empty.",
    "double_count": "A route counts in every area its legs enter, so the areas' figures add up to more than the scheme's.",
@@ -394,6 +418,7 @@
   }
  },
  "with_data": [
+  "recorded_tonnes",
   "route_caps",
   "site_caps",
   "holding_areas",
@@ -417,5 +442,6 @@
  "scope": "scheme",
  "scope_line": "Every team's approved lines.",
  "limit": "Planned figures, not observed: Wayscope holds no gate log or arrival times.",
+ "recorded_line": "Recorded tonnes as typed on Account, to 11 Oct 2026.",
  "demo_notice": null
 }

@@ -28,12 +28,17 @@ THE CHARTS (numbers as in the outside brief's item 5 table)
                      tonnes) — carbon.scenario + carbon_target.status (the user, 14 Oct: all-in)
   16  trips_avoided  loads per month as planned and with the agreed decisions; the difference, and the
                      lorry-miles it saves — the same scenario
+  R   recorded_tonnes  11 Nov 2026 (card 4 of the CLP-before-Friday mockup, John's yes; drawn FIRST): each
+                     month's planned tonnes beside the tonnes typed on Account (a week's actual), the months of the
+                     window up to and including the chosen one — costlines.lines, the Dashboard's "Delivered against
+                     plan" read, so the two cannot disagree. A month with nothing typed is None ("not recorded"),
+                     never 0. The only recorded figure in the pack: tonnes typed by a person, never a lorry count.
 
 RULES
 -----
 * Every chart carries `state` "set" or "empty"; an empty one names what is missing in `missing`, in
   words. A missing figure is None, never 0 (a zero is only printed when it is a computed zero).
-* Scope: 4, 5, 10, 16 are the lines the caller may see (the Carbon planner's and the Dashboard's rule);
+* Scope: R, 4, 5, 10, 16 are the lines the caller may see (the Carbon planner's and the Dashboard's rule);
   1, 1b, 6 are the scheme's (the bulletin's and the public map's figures). `scope_line` says so.
 * Team NAMES only; no team id in this file (test_modus scans shipped .py files).
 * No database write; every SQL literal carries the tenant predicate.
@@ -45,7 +50,9 @@ import carbon
 import carbon_target
 import config
 import conversions
+import costlines
 import counting
+import days
 import db
 import gate_arrivals
 import gate_hours
@@ -53,10 +60,13 @@ import gate_hours
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 MAX_MONTHS = 24          # the over-time charts show at most two years around the chosen month
 NOT_TYPED = "Not typed"
-ORDER = ("route_caps", "site_caps", "holding_areas", "vehicle_types", "euro_class", "councils", "carbon_rate", "trips_avoided")
+# 11 Nov 2026 (card 4, John's yes "First"): the planned and recorded tonnes lead the section and the pack
+ORDER = ("recorded_tonnes", "route_caps", "site_caps", "holding_areas", "vehicle_types", "euro_class", "councils", "carbon_rate", "trips_avoided")
 
 #: Each chart's number in the outside brief's table, its title and the CLP item it serves.
 CHARTS = {
+    "recorded_tonnes": {"number": "R", "title": "Planned and recorded tonnes",
+                        "serves": "CLOCS quarterly report: delivery activity against the plan"},
     "route_caps": {"number": "1", "title": "Routes against their planning cap",
                    "serves": "TfL CLP guidance: estimated vehicle movements, kept within what was agreed"},
     "site_caps": {"number": "1", "title": "Sites against their CLP cap",
@@ -79,6 +89,7 @@ CHARTS = {
 CAP_DIFF = ("The Look-ahead's ROUTE CAP flag compares the same cap with the lorries needed on a day; this chart, "
             "like the bulletin, compares it with lorry visits a day.")
 SPREAD = "Planned figures, not observed: Wayscope holds no gate log or arrival times."
+RECORDED_LINE = "Recorded tonnes as typed on Account, to {date}."
 
 
 def month_label(mi):
@@ -527,6 +538,74 @@ def trips_avoided(sc, t, invalid, months, label, unit):
 
 
 # --------------------------------------------------------------------------- #
+#  Chart R — planned and recorded tonnes (11 Nov 2026, card 4)                 #
+# --------------------------------------------------------------------------- #
+def _day_words(d, year=False):
+    return f"{d.day} {MONTHS[d.month - 1]}" + (f" {d.year}" if year else "")
+
+
+def _recorded_to(cl_lines, months):
+    """The Sunday of the latest week, in the months shown, with an actual typed on one of the caller's visible lines."""
+    keys = {(l["route_id"], int(l["month_index"]), l.get("discipline") or "", l.get("section_id") or "")
+            for l in cl_lines if l.get("actual_tonnes") is not None}
+    if not keys or not months:
+        return None
+    last = None
+    for w in db.query("SELECT route_id, month_index, discipline, section_id, week_index FROM forecast_weeks "
+                      "WHERE tenant_id = ? AND actual_qty IS NOT NULL AND month_index >= ? AND month_index <= ?",
+                      (db.current_tenant(), int(months[0]), int(months[-1]))):
+        if (w["route_id"], int(w["month_index"]), w.get("discipline") or "", w.get("section_id") or "") not in keys:
+            continue
+        try:
+            end = days.bucket_dates(int(w["month_index"]), int(w["week_index"]))[-1]
+        except (TypeError, ValueError):
+            continue
+        last = end if (last is None or end > last) else last
+    return last
+
+
+def _t_words(x):
+    return f"{int(round(float(x))):,}".replace(",", " ")
+
+
+def recorded_tonnes(acc, months, mi, factors, label):
+    """(chart, recorded_to date or None): planned and recorded tonnes a month, from costlines.lines (the Dashboard's
+    Delivered against plan), for the months of the window up to and including the chosen one."""
+    shown = [m for m in months if m <= mi]
+    if not shown:
+        return _chart("recorded_tonnes", "empty", f"No approved lines up to {label}."), None
+    cl = costlines.lines(acc, from_month=shown[0], to_month=shown[-1], status="Approved", factors=factors)["lines"]
+    idx = {m: i for i, m in enumerate(shown)}
+    planned, recorded, reported = [0.0] * len(shown), [None] * len(shown), [0] * len(shown)
+    for l in cl:
+        i = idx.get(int(l["month_index"]))
+        if i is None:
+            continue
+        planned[i] += float(l.get("tonnes") or 0.0)
+        if l.get("actual_tonnes") is not None:
+            recorded[i] = (recorded[i] or 0.0) + float(l["actual_tonnes"])
+            reported[i] += 1
+    if all(r is None for r in recorded):
+        return _chart("recorded_tonnes", "empty", f"No tonnes typed on Account up to {label}."), None
+    rows = [{"month_index": m, "label": month_label(m), "planned_t": _r3(planned[i]), "recorded_t": _r3(recorded[i]),
+             "recorded_pct": (round(recorded[i] * 100.0 / planned[i]) if (recorded[i] is not None and planned[i] > 0) else None),
+             "lines_reported": reported[i]} for i, m in enumerate(shown)]
+    to = _recorded_to(cl, shown)
+    last = [r for r in rows if r["recorded_t"] is not None][-1]
+    headline = (f"{last['label']}: {_t_words(last['recorded_t'])} t recorded, {last['recorded_pct']} % of the "
+                f"{_t_words(last['planned_t'])} t planned" if last["recorded_pct"] is not None else
+                f"{last['label']}: {_t_words(last['recorded_t'])} t recorded, none planned")
+    if to is not None:
+        headline += f" · recorded to {_day_words(to)}"
+    return _chart("recorded_tonnes", "set", months=rows, recorded_to=(to.isoformat() if to else None),
+                  headline=headline, subtitle="tonnes a month",
+                  basis=("Planned: the approved plan's tonnes. Recorded: tonnes typed on Account (a week's actual), as the "
+                         "Dashboard's Delivered against plan. A month with nothing typed is not recorded, not zero. "
+                         "The months up to the one picked."),
+                  source="Wayscope: the approved plan; the tonnes typed on Account"), to
+
+
+# --------------------------------------------------------------------------- #
 #  The read                                                                    #
 # --------------------------------------------------------------------------- #
 def monitoring(month_index, acc=None, factors=None, working_days=None):
@@ -542,7 +621,9 @@ def monitoring(month_index, acc=None, factors=None, working_days=None):
     sc, t, st, invalid = _scenario(acc, factors)
     lines = sc.get("lines") or []
     months = _window(mi, sorted({int(l["month_index"]) for l in lines}))
+    rec, rec_to = recorded_tonnes(acc, months, mi, factors, label)
     charts = {
+        "recorded_tonnes": rec,
         "route_caps": route_caps(mi, wd, payload, locs, routes),
         "site_caps": site_caps(mi, wd, factors, locs),
         "holding_areas": holding_areas(mi, wd, factors, acc, locs),
@@ -565,9 +646,12 @@ def monitoring(month_index, acc=None, factors=None, working_days=None):
         "peak_words": (f"No deliveries {gate_hours.peak_words(bands)} (the CLP's peak bands, taken off each gate's "
                        f"open hours: {gate_hours.default_words(factors)} where none are typed)." if bands else None),
         "scope": "team" if team else "scheme",
-        "scope_line": (("Your team's lines for the vehicle, carbon and trip charts; the whole scheme for the caps and "
+        # NARROWED 11 Nov 2026 (card 4): the tonnes chart is the caller's lines too
+        "scope_line": (("Your team's lines for the tonnes, vehicle, carbon and trip charts; the whole scheme for the caps and "
                         "councils, as the public map shows them.") if team else
                        "Every team's approved lines."),
         "limit": SPREAD,
+        # 11 Nov 2026 (card 4): said after the limit (which stays word for word), only when something is recorded
+        "recorded_line": (RECORDED_LINE.format(date=_day_words(rec_to, year=True)) if rec_to is not None else None),
         "demo_notice": (config.tenant_settings(conversions).get("demo_notice") or None),
     }
