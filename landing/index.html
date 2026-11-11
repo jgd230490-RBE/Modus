@@ -19,7 +19,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   /* Wayscope landing v3 — 13 Oct 2026, rebuilt from the landing pack (notes/session-1013-landing-v3.md):
-     nav + hero, problem, how it works (three films), four readers, planning layer, standards, demo, footer.
+     nav + hero, problem, how it works (three films and four screens), four readers, planning layer, standards, demo, footer.
      Self-contained: this folder deploys as a Render static site on its own, or mounts under the app at
      /landing/ for preview. No script, no tracking, no cookies. The demo-request form is a plain HTML POST
      to the app (H9); it needs no JavaScript. The films are muted autoplay loops; their controls carry the
@@ -112,8 +112,8 @@
   .pains li{position:relative;padding-left:20px;font-size:16px;line-height:1.55;color:var(--ink-2)}
   .pains li::before{content:"";position:absolute;left:0;top:.62em;width:8px;height:8px;border-radius:2px;background:var(--orange)}
 
-  /* how it works: the step bar and the three films */
-  .steps{list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:32px;counter-reset:s}
+  /* how it works: the step bar and the walkthroughs (six steps since 10 Nov: three across, then two on a phone) */
+  .steps{list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:32px;counter-reset:s}
   @media (max-width:760px){.steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
   .steps li{counter-increment:s;border-top:3px solid var(--orange);padding-top:12px;font-family:var(--display);font-weight:600;font-size:16px}
   .steps li a{text-decoration:none}
@@ -255,13 +255,15 @@
 
   <section id="overview" class="sec stone" aria-label="How it works">
     <div class="wrap">
-      <h2>Three walkthroughs. One plan.</h2>
-      <p class="intro">Locate and route, forecast and flag, confirm the week, share. Each walkthrough plays muted on a loop; use the speaker button to hear the narration.</p>
+      <h2>Four walkthroughs. One plan.</h2>
+      <p class="intro">Locate and route, forecast and flag, confirm the week, share, test a site day, write the CLP. The first three walkthroughs play muted on a loop; use the speaker button to hear the narration. The fourth is four screens as they are today.</p>
       <ol class="steps">
         <li><a href="#film-1">Locate &amp; route</a></li>
         <li><a href="#film-2">Forecast &amp; flag</a></li>
         <li><a href="#film-2">Confirm week</a></li>
         <li><a href="#film-3">Share</a></li>
+        <li><a href="#film-4">Test a site day</a></li>
+        <li><a href="#film-4">Write the CLP</a></li>
       </ol>
 
       <div class="film" id="film-1">
@@ -308,7 +310,7 @@
 
       <div class="film" id="film-3">
         <figure class="player">
-          <div class="frame"><video src="./films/film3.mp4" poster="./media/still-routes.jpg" autoplay muted loop playsinline controls preload="metadata" aria-label="Walkthrough 3, recorded on the fictional demo scheme: the approved plan on the shared public map, by road and by council, month by month"></video></div>
+          <div class="frame"><video src="./films/film3.mp4" poster="./media/still-map.jpg" autoplay muted loop playsinline controls preload="metadata" aria-label="Walkthrough 3, recorded on the fictional demo scheme: the approved plan on the shared public map, by road and by council, month by month"></video></div>
           <figcaption>Walkthrough 3. The public map opens with one password you hand out.</figcaption>
         </figure>
         <div class="text">
@@ -321,7 +323,32 @@
           </details>
         </div>
       </div>
-      <p class="films-note">All three walkthroughs are recorded on the fictional demo scheme. Nothing in them is a real project.</p>
+      <div class="film" id="film-4">
+        <div class="text">
+          <p class="eyebrow">Walkthrough 4</p>
+          <h3>Play the site day before it happens. Write the CLP from the plan.</h3>
+          <p class="body">The Simulation plays a working day lorry by lorry, at every gate and on site, so you can see where lorries queue before they do. Each concrete pour is planned with its date, its first mixer and its pour rate, and flagged when it runs over its limit. A site layout draws your roads, areas, fences and signs by phase on the map. CLP documents then writes a Construction Logistics Plan as a Word file laid out like the CLOCS outline CLP template: a draft to agree with the client and the council, not an approved CLP.</p>
+        </div>
+      </div>
+      <div class="shots">
+        <figure class="shot">
+          <a href="./media/still-sim.jpg" title="Open the full-size screen"><img src="./media/still-sim.jpg" alt="The Simulation on the fictional demo scheme: a working day played lorry by lorry, with the lorries waiting at a gate and the day's figures above the map" width="1240" height="609" loading="lazy"></a>
+          <figcaption>1. The Simulation: a working day played lorry by lorry. Fictional demo scheme.</figcaption>
+        </figure>
+        <figure class="shot">
+          <a href="./media/still-pours.jpg" title="Open the full-size screen"><img src="./media/still-pours.jpg" alt="The Pours page on the fictional demo scheme: each concrete pour with its volume, pour rate and flag" width="1240" height="609" loading="lazy"></a>
+          <figcaption>2. Pours: each pour's volume and rate, with its flag. Fictional demo scheme.</figcaption>
+        </figure>
+        <figure class="shot">
+          <a href="./media/still-layout.jpg" title="Open the full-size screen"><img src="./media/still-layout.jpg" alt="A site layout on the fictional demo scheme: roads, areas, fences and signs drawn on the map for one phase" width="1240" height="609" loading="lazy"></a>
+          <figcaption>3. A site layout drawn on the map, phase by phase. Fictional demo scheme.</figcaption>
+        </figure>
+        <figure class="shot">
+          <a href="./media/still-clp.jpg" title="Open the full-size screen"><img src="./media/still-clp.jpg" alt="CLP documents on the fictional demo scheme: each plan in the list with its stage" width="1240" height="609" loading="lazy"></a>
+          <figcaption>4. CLP documents: each plan and where it has got to. Fictional demo scheme.</figcaption>
+        </figure>
+      </div>
+      <p class="films-note">All four walkthroughs are on the fictional demo scheme. Nothing in them is a real project.</p>
     </div>
   </section>
 
@@ -405,7 +432,7 @@
       <div class="copy">
         <p class="eyebrow">Organisation before movement.</p>
         <h2>See it on a fictional demo scheme.</h2>
-        <p>Demos are by request. Tell us who you are and we'll email you your own sign-in link for the fictional demo scheme straight away. Tell us the type of scheme and the plans you have to write, and we'll take you through the three walkthroughs on it.</p>
+        <p>Demos are by request. Tell us who you are and we'll email you your own sign-in link for the fictional demo scheme straight away. Tell us the type of scheme and the plans you have to write, and we'll take you through the four walkthroughs on it.</p>
         <p>Or write to <a href="mailto:JDavis@wayscope.co.uk">JDavis@wayscope.co.uk</a>.</p>
       </div>
       <!-- 8 Oct (H5c): a plain HTML POST to the app on app.wayscope.co.uk (H9 builds the endpoint;
