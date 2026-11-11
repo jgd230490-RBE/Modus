@@ -4063,11 +4063,15 @@ function clpRecordedCfg(c){
   return { type: "bar", data: { labels: m.map(r => r.label), datasets: [
       { label: "Planned", data: m.map(r => r.planned_t), backgroundColor: C1S, borderColor: C1, borderWidth: 1 },
       { label: "Recorded", data: m.map(r => r.recorded_t == null ? null : r.recorded_t), backgroundColor: C1, borderWidth: 0 }] },
-    // 11 Nov 2026 (7a): the last month can read "Nov 2026 (to 8 Nov)"; room on the right so the axis does not cut it
-    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { right: 40 } },
+    options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } },
       tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${it.raw == null ? "not recorded" : grp(it.raw) + " t"}` } } },
-      scales: { x: { grid: { display: false } }, y: { title: { display: true, text: "t" } } } } };
+      // 11 Nov 2026 (7a): a part month ("Nov 2026 (to 8 Nov)") is over the axis's 18 characters: two lines, as the Gate
+      // arrivals and route charts split theirs
+      scales: { x: { grid: { display: false }, ticks: { callback: function(v){ const r = m[v]; if(!r) return "";
+        const i = r.part_to ? r.label.indexOf(" (to ") : -1;
+        return i > 0 ? [cutLabel(r.label.slice(0, i)), cutLabel(r.label.slice(i + 1))] : cutLabel(r.label); } } },
+        y: { title: { display: true, text: "t" } } } } };
 }
 function ClpUncapped({ rows, nameKey, valKey, word, what }){
   const left = (rows || []).filter(r => r.cap == null);
