@@ -1668,6 +1668,9 @@ def copy_abnormal_drawings(live_rows, new_rows):
     return copied
 
 
+GATE_SAME_DEG = 1e-5     # about 1.1 m: wider than float4's rounding at UK latitudes, far under a moved gate
+
+
 def copy_live_tables(pkg, path):
     """Copy LIVE_TABLES and the live carbon_target row from a live export into `pkg`. Refuses (SystemExit) when the
     live routes, gates or zones are not the ones written here: their baked geometry would then describe other roads."""
@@ -1679,11 +1682,21 @@ def copy_live_tables(pkg, path):
         return sorted(tuple(_same(r.get(c)) for c in cols) for r in rows or [])
     problems = []
     for t, cols in (("routes", ("id", "origin_id", "dest_id", "material_category")),
-                    ("location_gates", ("id", "location_id", "lat", "lon", "access_zone_id")),
+                    ("location_gates", ("id", "location_id", "access_zone_id")),
                     ("zones", ("id", "kind", "affects_routing", "geometry", "starts_on", "ends_on")),
                     ("route_haul_roads", ("route_id", "zone_id"))):
         if sig(lt.get(t), cols) != sig(nt.get(t), cols):
             problems.append(f"{t} differ between the live export and this build")
+    # 10 Nov 2026: a gate's position is compared within GATE_SAME_DEG, not to 6 places. Live's Postgres stores lat / lon as
+    # REAL (float4, about 7 significant figures), so the first refresh from a real live export was refused over 17 gates
+    # whose latitudes sat up to 3e-6 deg (0.3 m) off the generator's. A gate that really moved is metres away.
+    if "location_gates differ between the live export and this build" not in problems:
+        ng = {r.get("id"): r for r in nt.get("location_gates") or []}
+        for r in lt.get("location_gates") or []:
+            g = ng.get(r.get("id"))
+            if g is None or any(abs(float(r.get(c) or 0) - float(g.get(c) or 0)) > GATE_SAME_DEG for c in ("lat", "lon")):
+                problems.append("location_gates differ between the live export and this build")
+                break
     if problems:
         raise SystemExit("--live-export refused: " + "; ".join(problems) + ". Re-bake on live instead (§4.2).")
     for t in LIVE_TABLES:
