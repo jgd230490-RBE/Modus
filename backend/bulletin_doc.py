@@ -755,7 +755,11 @@ def concern_month(mi):
         return None
     if not F["taking"]["form"] and not ever:
         return None
-    return {"received": F["received"], "closed": F["closed"], "first_reply_median": F["first_reply_median"],
+    # 11 Nov 2026 (card A-F1): "closed" is how many of the MONTH'S concerns are closed now, the same count as the kinds
+    # table under it (the glance row read "3 · 3" beside a table of 3 received, 1 closed: it counted every closing in the
+    # month, older concerns too). "form" says whether the map's form is on, so the row names its source honestly.
+    return {"received": F["received"], "closed": F["closed_of_received"], "first_reply_median": F["first_reply_median"],
+            "form": bool(F["taking"]["form"]),
             "kinds": [{"kind": k["kind_text"], "received": k["received"], "closed": k["closed"]} for k in F["by_kind"]]}
 
 
@@ -866,7 +870,8 @@ def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, mo
         # NARROWED 5 Nov 2026 (group 6, PR 2): the scheme's own record when it takes concerns (counts only). Short enough that
         # each cell stays on ONE line in the PDF's narrow figure / data columns: a two-line row took the newsletter to five pages
         (("Concerns from the public, received · closed", f"{concerns_m['received']} · {concerns_m['closed']}",
-          "Map and email records") if concerns_m is not None
+          # 11 Nov 2026 (card A-F1): the map's form named only while it is on
+          "Map and email records" if concerns_m.get("form", True) else "Email records") if concerns_m is not None
          else ("Enquiries and complaints", NOT_REPORTED, "Not in this bulletin")),
     ]
     if traffic:
