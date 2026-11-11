@@ -94,7 +94,9 @@ def table_of(c, M):
                      _n(m["lines_reported"], 0)] if m.get("recorded_t") is not None else [NOT_RECORDED, "—", "—"])
                  for m in c.get("months") or []])
     if k == "route_caps":
-        return (["Route", "Movements a day", "Cap", "Share of cap", "Status"],
+        # 11 Nov 2026 (D-F5, John's yes): the figure is lorry VISITS a day (one load = one visit, the cap typed in visits),
+        # as the subtitle says; it was headed "Movements a day". The data key keeps its name.
+        return (["Route", "Visits a day", "Cap", "Share of cap", "Status"],
                 [[r["route"], _n(r["movements_per_day"]), (_n(r["cap"], 0) if r["cap"] is not None else "no cap typed"),
                   (f"{r['pct']} %" if r["pct"] is not None else "—"),
                   ("Over the cap" if r["over"] else ("Within the cap" if r["cap"] is not None else "Not compared"))]
@@ -431,7 +433,7 @@ def _chart_flowable(c, width, F):
 
     rows_b = []
     if k in ("route_caps", "site_caps"):
-        vk, nk, word = (("movements_per_day", "route", "movements a day") if k == "route_caps"
+        vk, nk, word = (("movements_per_day", "route", "visits a day") if k == "route_caps"   # D-F5: visits, not movements
                         else ("visits_per_day", "site", "visits a day"))
         for r in c.get("rows") or []:
             if r.get("cap") is None:
@@ -519,7 +521,10 @@ def build_pdf(M, generated=None):
 
     # 11 Nov 2026 (card 4): the recorded line follows the limit here, not in the page stamp: the stamp is page_frame's one
     # sub-line, and the two sentences together run past the page's width at 8 pt
-    story = [P_(E(" ".join(x for x in (M.get("scope_line"), M.get("limit"), M.get("recorded_line")) if x)), st_g)]
+    # 11 Nov 2026 (D-F8, John: "do it now"): the recorded line is its own paragraph under the first, as on the screen
+    story = [P_(E(" ".join(x for x in (M.get("scope_line"), M.get("limit")) if x)), st_g)]
+    if M.get("recorded_line"):
+        story.append(P_(E(M["recorded_line"]), st_g))
     if M.get("peak_words"):
         story.append(P_(E(M["peak_words"]), st_g))
     story.append(Spacer(1, 3 * mm))

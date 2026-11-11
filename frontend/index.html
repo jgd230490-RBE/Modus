@@ -4143,7 +4143,9 @@ function ClpMonitoring({ months, initial }){
         {err && <div className="ct-line" data-clp-error="1">The CLP figures did not load.</div>}
         {!data && !err && <div className="ct-line">Loading the CLP figures…</div>}
         {data && <>
-          <div className="ct-note">{data.scope_line} {data.limit}{data.recorded_line ? " " + data.recorded_line : ""}</div>
+          {/* 11 Nov 2026 (D-F8, John: "do it now"): the recorded words on their own line; one line ran to 26 words */}
+          <div className="ct-note">{data.scope_line} {data.limit}</div>
+          {data.recorded_line && <div className="ct-note" data-clp-recorded="1">{data.recorded_line}</div>}
           {data.peak_words && <div className="ct-note" data-clp-peak="1">{data.peak_words}</div>}
           <div className="clp-grid">
             {/* 11 Nov 2026 (card 4, John's yes "First"): planned and recorded tonnes lead the section */}
@@ -4151,7 +4153,7 @@ function ClpMonitoring({ months, initial }){
               <ChartCanvas config={clpRecordedCfg(C.recorded_tonnes)} title={C.recorded_tonnes.title} />
             </ClpCard>}
             <ClpCard c={C.route_caps} info={<InfoTip id="clp.route_caps" />} wide>
-              {capped(C.route_caps.rows).length > 0 && <ChartCanvas config={clpBulletCfg(capped(C.route_caps.rows), "movements_per_day", "route", "movements a day")} height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />}
+              {capped(C.route_caps.rows).length > 0 && <ChartCanvas config={clpBulletCfg(capped(C.route_caps.rows), "movements_per_day", "route", "visits a day")} height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />}
               <ClpUncapped rows={C.route_caps.rows} nameKey="route" valKey="movements_per_day" word="a day" what="route" />
             </ClpCard>
             <ClpCard c={C.site_caps} info={<InfoTip id="clp.site_caps" />} wide>
