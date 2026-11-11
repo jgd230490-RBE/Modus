@@ -2890,14 +2890,22 @@ def bulletin_month_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), request: R
 def bulletin_leaflet_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), request: Request = None):
     """
     13 Oct 2026 (D43) — the one-page LEAFLET (residents, the working group) as an A4 PDF, from the SAME view model as
-    the newsletter and the page (bulletin_doc.sheet). Staff only, the bulletin's rule (D10). Stores nothing.
+    the newsletter and the page (bulletin_doc.sheet). Staff only, the bulletin's rule (D10).
+    11 Nov 2026 (card A-F4): kept like the newsletter's PDF (45 s on every press on live): built once per month, role and
+    day, until the next write; one whose map fell back to the schematic is served, never kept.
     """
     from fastapi.responses import Response       # not in every test stub; imported here
     if not _staff_request(request):
         raise HTTPException(401, "sign in — a valid access code is required")
-    sheet = bulletin_doc.sheet(month, access.current())
+    acc = access.current()
+    misses = basemap.MISSES[0]
+
+    def build():
+        sheet = bulletin_doc.sheet(month, acc)
+        return export.build_bulletin_leaflet_pdf(sheet)
     try:
-        data = export.build_bulletin_leaflet_pdf(sheet)
+        data = _staff_bytes("bulletin/leaflet.pdf", {"month": int(month), "staff": bool(acc)}, build, acc,
+                            keep=lambda: basemap.MISSES[0] == misses)
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     y, m = weeks._month_of(month)
@@ -2913,8 +2921,12 @@ def bulletin_leaflet_page(month: Optional[int] = Query(None, ge=1, le=MONTH_COUN
     if not _staff_request(request):
         return Response(content=_BULLETIN_SIGNIN_PAGE, status_code=401, media_type="text/html; charset=utf-8")
     mi = month if month is not None else _bulletin_month_default()
-    return Response(content=bulletin_doc.leaflet_html(bulletin_doc.sheet(mi, access.current())),
-                    media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
+    acc, misses = access.current(), basemap.MISSES[0]
+    # 11 Nov 2026 (card A-F4): kept as the bulletin page is (below)
+    data = _staff_bytes("bulletin/leaflet-page", {"month": int(mi), "staff": bool(acc)},
+                        lambda: bulletin_doc.leaflet_html(bulletin_doc.sheet(mi, acc)).encode("utf-8"), acc,
+                        keep=lambda: basemap.MISSES[0] == misses)
+    return Response(content=data.decode("utf-8"), media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/bulletin/")
@@ -2931,8 +2943,14 @@ def bulletin_page(month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT), requ
     if not _staff_request(request):
         return Response(content=_BULLETIN_SIGNIN_PAGE, status_code=401, media_type="text/html; charset=utf-8")
     mi = month if month is not None else _bulletin_month_default()
-    return Response(content=bulletin_doc.html(bulletin_doc.sheet(mi, access.current())),
-                    media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
+    acc, misses = access.current(), basemap.MISSES[0]
+    # 11 Nov 2026 (card A-F4): the page was built afresh on every open (16-21 s on live, 11 Nov). It is kept like the PDF:
+    # one build per month, role and day, served again until the next write to the plan (read_cache: never stale), and
+    # one whose map fell back to the schematic is served, never kept. Kept as bytes, so the store's byte cap counts it.
+    data = _staff_bytes("bulletin/page", {"month": int(mi), "staff": bool(acc)},
+                        lambda: bulletin_doc.html(bulletin_doc.sheet(mi, acc)).encode("utf-8"), acc,
+                        keep=lambda: basemap.MISSES[0] == misses)
+    return Response(content=data.decode("utf-8"), media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
 
 
 # ------------------------------------------------------------------ public feed (map)

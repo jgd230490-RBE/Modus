@@ -948,7 +948,7 @@ CSV keeps the path. The carbon target's write carries the decisions, never a fig
 every committed write except the tables in <code>db.NO_DATA_TABLES</code> (accounts, audit, leads, CLP notes, concerns and the
 like), and the middleware bumps it after every audited <code>/api/</code> write as a second net. Staff reads go through
 <code>main._staff_json</code> / <code>_staff_bytes</code>, keyed by the read, its parameters, the role, the team and the date, so a
-team never gets another team's answer. <code>read_cache.WARMERS</code> rebuild the map's every-month council read, the admin's staff reads and the road-restrictions
+team never gets another team's answer. The monthly bulletin's page, its leaflet page and both its PDFs are kept this way (since 11 Nov 2026; one whose map fell back to the schematic is served, never kept). Concerns are in <code>NO_DATA_TABLES</code>, so a concern logged or closed alone shows in a kept bulletin at the next plan write or the next day. <code>read_cache.WARMERS</code> rebuild the map's every-month council read, the admin's staff reads and the road-restrictions
 check after start-up and after writes go quiet (<code>WAYSCOPE_WARM_CACHE=0</code> off). A second worker or instance would need the version in the
 database: <code>render.yaml</code> runs one.</li>
 <li><strong>Heavy jobs.</strong> <code>backend/heavy_reads.py</code>: at most <code>SLOTS</code> = 2 heavy public reads at once; a
