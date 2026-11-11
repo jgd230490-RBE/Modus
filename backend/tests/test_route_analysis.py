@@ -492,10 +492,99 @@ _go.set()
 _th.join(5)
 ok("7: one at a time: a second press while one is being made is busy, 503 in words",
    getattr(_e, "status_code", None) == 503 and "Another route analysis is being made" in str(getattr(_e, "detail", "")))
+
+# --------------------------------------------------------------------------- #
+#  7b. Kept until the next write (11 Nov 2026, CLOCS card B-F1)                #
+# --------------------------------------------------------------------------- #
+import read_cache  # noqa: E402
+import basemap  # noqa: E402
+heavy_reads.SOLO_WAIT_S = 5
+read_cache.clear()
+_real_fetch = basemap.fetch
+basemap.fetch = lambda *a, **k: None     # as with no Mapbox key: no picture, and no miss counted
+access.current = lambda: {"role": "planner", "label": "Planner"}
+
+
+def _ra(sections="limits,diversions", routes="R1", lorry=PROF):
+    b0 = read_cache.STATS["builds"]
+    r = main.route_analysis_pdf(routes=routes, lorry=lorry, sections=sections, request=_Request())
+    return r, read_cache.STATS["builds"] - b0
+
+
+_a, _na = _ra()
+_b, _nb = _ra()
+ok("7b: the same file twice: made once, the second press served the kept file (the same bytes)",
+   _na == 1 and _nb == 0 and _a.body == _b.body and _b.headers["Cache-Control"] == "no-store"
+   and 'filename="route-analysis-R1.pdf"' in _b.headers["Content-Disposition"], (_na, _nb))
+_c, _nc = _ra(routes=" R1 , R1")
+ok("7b: the same routes written another way (spaces, twice): the same kept file", _nc == 0 and _c.body == _a.body, _nc)
+_d, _nd = _ra(sections="limits")
+ok("7b: other ticks: a file of its own", _nd == 1, _nd)
+_e7, _ne = _ra(lorry=None)
+ok("7b: another lorry choice: a file of its own", _ne == 1, _ne)
+_xa = main.route_analysis_xlsx(routes="R1", sections="limits,diversions", request=_Request())
+_b0 = read_cache.STATS["builds"]
+_xb = main.route_analysis_xlsx(routes="R1", sections="limits,diversions", request=_Request())
+ok("7b: the XLSX kept too, apart from the PDF", _xb.body == _xa.body and read_cache.STATS["builds"] == _b0
+   and _xb.body[:2] == b"PK")
+db.bump_data_version()
+_f7, _nf = _ra()
+ok("7b: after a write: made again", _nf == 1, _nf)
+access.current = lambda: _team1
+_g, _ng = _ra()
+ok("7b: a team login never gets the planner's kept file: made for the team", _ng == 1, _ng)
+access.current = lambda: {"role": "planner", "label": "Planner"}
+_old_stamp = RA.held_stamp
+RA.held_stamp = lambda: "nh_closures:another-fetch"
+_h, _nh = _ra()
+ok("7b: the closures feed taken in again (no data version moves): made again", _nh == 1, _nh)
+_h2, _nh2 = _ra(sections="diversions")
+_h3, _nh3 = _ra(sections="diversions")
+RA.held_stamp = _old_stamp
+ok("7b: ...the stamp is only read when section A (limits) is ticked", _nh3 == 0, (_nh2, _nh3))
+import route_analysis_render as _rar  # noqa: E402
+_real_build = _rar.build_pdf
+
+
+def _missing_map(D):
+    basemap.MISSES[0] += 1
+    return _real_build(D)
+
+
+_rar.build_pdf = _missing_map
+_i1, _ni1 = _ra(sections="limits,community")
+_rar.build_pdf = _real_build
+_i2, _ni2 = _ra(sections="limits,community")
+ok("7b: a file whose map picture was missed is served, never kept (the next press makes it again)",
+   _ni1 == 1 and _ni2 == 1, (_ni1, _ni2))
+_cap = main.ANALYSIS_KEEP_MAX
+main.ANALYSIS_KEEP_MAX = 100
+_j1, _nj1 = _ra(sections="limits,hours")
+_j2, _nj2 = _ra(sections="limits,hours")
+main.ANALYSIS_KEEP_MAX = _cap
+ok("7b: a file over ANALYSIS_KEEP_MAX is served, not kept", _nj1 == 1 and _nj2 == 1 and _cap == 6 * 1024 * 1024,
+   (_nj1, _nj2, _cap))
+_e = raises(lambda: main.route_analysis_pdf(routes="NOPE", request=_Request()))
+_e2 = raises(lambda: main.route_analysis_pdf(routes="NOPE", request=_Request()))
+ok("7b: a refusal is never kept (404 both times)", getattr(_e, "status_code", None) == 404
+   and getattr(_e2, "status_code", None) == 404)
+_e = raises(lambda: main.route_analysis_pdf(routes="", request=_Request()))
+ok("7b: no route: 422 before anything is made", getattr(_e, "status_code", None) == 422 and "route" in str(_e.detail))
+ok("7b: the file name from the parsed ids, as before", RA.file_name_for(["R1"], "xlsx") == "route-analysis-R1.xlsx"
+   and RA.file_name_for(["R1", "R2"]) == "route-analysis-2-routes.pdf"
+   and RA.file_name({"routes": [{"id": "R1"}, {"id": "R2"}]}, "xlsx") == "route-analysis-2-routes.xlsx")
+_st = RA.held_stamp()
+ok("7b: held_stamp: a string that repeats while the feed does not change", isinstance(_st, str) and _st == RA.held_stamp(), _st)
+basemap.fetch = _real_fetch
+
 _src_main = read("backend/main.py")
 _f = _src_main.split("def _route_analysis(")[1].split("\n@app.")[0]
 ok("7: staff checked first; built inside heavy_reads.solo('route-analysis')",
    _f.index("if not _staff_request(request):") < _f.index('heavy_reads.solo("route-analysis"'))
+ok("7b: kept through _staff_bytes (per role and team, per day, until the next write), only when no map was missed",
+   '_staff_bytes("routes/analysis", params, build, acc,' in _f and "basemap.MISSES[0] == misses" in _f
+   and _f.index("def build():") < _f.index('heavy_reads.solo("route-analysis"') < _f.index("_staff_bytes(")
+   and '"held": route_analysis_doc.held_stamp() if "limits" in secs else None' in _f)
 ok("7: the old evidence addresses still answer (Q13)", '@app.get("/api/routes/{route_id}/collision-evidence.pdf")' in _src_main
    and '@app.get("/api/routes/{route_id}/collision-evidence.xlsx")' in _src_main
    and '@app.get("/api/routes/analysis.pdf")' in _src_main and '@app.get("/api/routes/analysis.xlsx")' in _src_main)
@@ -516,6 +605,8 @@ ok("8: app: the Route analysis menu in the Routes header and the full-screen col
    and "CollisionEvidenceButton" not in APP and "Collision evidence (PDF)" not in APP)
 _secs = re.findall(r'\["(\w+)", "[A-F]?", "', APP.split("const RA_SECTIONS = ")[1].split(";")[0])
 ok("8: app: the sections are the server's, in its order", _secs == RA.SECTION_KEYS, str(_secs))
+ok("8: app: one route's PDF says how long it takes while it is made (CLOCS card B-F1); several say how many",
+   '"Making the file… about 30 s"' in _m and "`Making the file (${chosen.length} routes)…`" in _m)
 ok("8: app: the ticks remembered in this browser in try / catch; up to 12 routes; PDF and XLSX; errors in words",
    "localStorage.setItem(RA_KEY" in _m and "try { localStorage.setItem" in _m and "const RA_MAX = 12;" in APP
    and 'download("pdf")' in _m and 'download("xlsx")' in _m and 'errSay("The route analysis could not be made.", e)' in _m)

@@ -14854,7 +14854,7 @@ function RouteAnalysisMenu({ routes, picked, vehicles }){
         ))}
         <div className="ra-foot" data-ra-foot="1">
           <button type="button" onClick={() => download("pdf")} disabled={!!busy || !chosen.length || noSection}>
-            {busy === "pdf" ? `Making the file${chosen.length > 1 ? ` (${chosen.length} routes)` : ""}…` : "Download PDF"}</button>
+            {busy === "pdf" ? (chosen.length > 1 ? `Making the file (${chosen.length} routes)…` : "Making the file… about 30 s") : "Download PDF"}</button>
           <button type="button" onClick={() => download("xlsx")} disabled={!!busy || !chosen.length || noSection}>
             {busy === "xlsx" ? "Making the file…" : "Download XLSX"}</button>
           <div className="row-menu-note">{!chosen.length ? "Tick a route." : noSection ? "Tick a section." : "Made from what Wayscope holds. Evidence for the assessment, not the assessment."}</div>
