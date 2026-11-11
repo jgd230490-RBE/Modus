@@ -46,6 +46,7 @@ RULES
 import access
 import areas
 import bulletin
+import calendar
 import carbon
 import carbon_target
 import config
@@ -571,6 +572,11 @@ def _today_date():
     return datetime.date.today()
 
 
+def _month_end(mi):
+    y, m = days.month_of(int(mi))
+    return datetime.date(y, m, calendar.monthrange(y, m)[1])
+
+
 def _t_words(x):
     return f"{int(round(float(x))):,}".replace(",", " ")
 
@@ -598,10 +604,20 @@ def recorded_tonnes(acc, months, mi, factors, label):
              "recorded_pct": (round(recorded[i] * 100.0 / planned[i]) if (recorded[i] is not None and planned[i] > 0) else None),
              "lines_reported": reported[i]} for i, m in enumerate(shown)]
     to = _recorded_to(cl, shown)
-    last = [r for r in rows if r["recorded_t"] is not None][-1]
-    headline = (f"{last['label']}: {_t_words(last['recorded_t'])} t recorded, {last['recorded_pct']} % of the "
+    # 11 Nov 2026 (John: yes, 7a as recommended): a month whose recorded weeks stop before its end is labelled
+    # "<month> (to <date>)" (its bar and its row stay); the headline names the last COMPLETE month, as drawn on the
+    # approved mockup, so a part month never reads as a shortfall. Only when no month is complete does it name the part one
+    for r in rows:
+        r["part_to"] = (to.isoformat() if (r["recorded_t"] is not None and to is not None and to < _month_end(r["month_index"]))
+                        else None)
+        if r["part_to"]:
+            r["label"] = f"{r['label']} (to {_day_words(to)})"
+    typed = [r for r in rows if r["recorded_t"] is not None]
+    last = ([r for r in typed if not r["part_to"]] or typed)[-1]
+    lab = month_label(last["month_index"])
+    headline = (f"{lab}: {_t_words(last['recorded_t'])} t recorded, {last['recorded_pct']} % of the "
                 f"{_t_words(last['planned_t'])} t planned" if last["recorded_pct"] is not None else
-                f"{last['label']}: {_t_words(last['recorded_t'])} t recorded, none planned")
+                f"{lab}: {_t_words(last['recorded_t'])} t recorded, none planned")
     if to is not None:
         headline += f" · recorded to {_day_words(to)}"
     return _chart("recorded_tonnes", "set", months=rows, recorded_to=(to.isoformat() if to else None),

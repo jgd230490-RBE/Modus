@@ -499,10 +499,12 @@ def build_pdf(M, generated=None):
     title = _title(M)
     stamp = "Planned figures from the approved plan, not observed: Wayscope holds no gate log or arrival times."
     on_page = export.page_frame(W, H, lm, rm, _txt(title, fb), rule_y=H - 9 * mm, title_font=(F["bold"], 13),
-                                title_y=H - 15 * mm, right=(f"Generated {when}", F["regular"], 8, export.GREY),
+                                title_y=H - 15 * mm,
                                 sub=(stamp, F["regular"], 8, export.GREY, H - 20.5 * mm),
                                 notice=((_txt(notice, fb), F["bold"], 8.5, export.DEMO_FG_RGB, H - 25 * mm) if notice else None),
-                                foot=(f"{export._tenant_name()} · {TITLE}", F["regular"], 7, export.GREY))
+                                # 11 Nov 2026 (John: yes, 7c): "Generated <date>" ran into the title on page 1 (the title
+                                # with the scheme's name and the month fills the line); it goes to the foot, on every page
+                                foot=(_txt(f"{export._tenant_name()} · {TITLE} · Generated {when}", fb), F["regular"], 7, export.GREY))
     doc = export.frame_doc(buf, W, H, lm, rm, top, bottom, title, on_page)
     st = PS("b", fontName=F["regular"], fontSize=8.5, leading=11)
     st_g = PS("g", parent=st, fontSize=7.5, leading=9.5, textColor=colors.Color(*export.GREY))

@@ -674,7 +674,7 @@ ok("⭐ card 4 PDF: the planned and recorded tonnes come first, with their table
    "recorded line follows the limit in the first paragraph; the page stamp is unchanged",
    MP["with_data"][0] == "recorded_tonnes" and "Planned and recorded tonnes" in _pt
    and _pt.index("Planned and recorded tonnes") < _pt.index(MP["charts"]["route_caps"]["title"])
-   and "Oct 2026 5 480 2 000 36 % 2" in _pt
+   and "Oct 2026 (to 11 Oct) 5 480 2 000 36 % 2" in _pt   # NARROWED 11 Nov 2026 (7a): Oct is typed to 11 Oct only, so labelled a part month
    and "Planned figures, not observed: Wayscope holds no gate log or arrival times. Recorded tonnes as typed on Account, to 11 Oct 2026." in _pt
    and _pt.count("Recorded tonnes as typed on Account") == 1
    and "Planned figures from the approved plan, not observed: Wayscope holds no gate log or arrival times." in _pt
@@ -684,7 +684,7 @@ _h11, _r11 = clp_pack.table_of(_M11P["charts"]["recorded_tonnes"], _M11P)
 _p11 = re.sub(r"\s+", " ", _pdf_text(clp_pack.build_pdf(_M11P, generated="11 Nov 2026")) or "")
 ok("⭐ card 4 pack: a month nobody typed prints 'not recorded', never 0 (table, PDF)",
    _h11 == ["Month", "Planned t", "Recorded t", "Recorded share", "Lines reported"]
-   and _r11 == [["Oct 2026", "5 480", "2 000", "36 %", "2"], ["Nov 2026", "1 450", "not recorded", "—", "—"]]
+   and _r11 == [["Oct 2026 (to 11 Oct)", "5 480", "2 000", "36 %", "2"], ["Nov 2026", "1 450", "not recorded", "—", "—"]]   # NARROWED 11 Nov 2026 (7a)
    and "Nov 2026 1 450 not recorded — —" in _p11, str(_r11) + " | " + _p11[:300])
 _ME0 = copy.deepcopy(MP)
 _ME0["recorded_line"] = None
@@ -721,7 +721,7 @@ _rt_x = [[c.value for c in r] for r in _wb[clp_pack.SHEET["recorded_tonnes"]].it
 ok("⭐ card 4 XLSX: the 'Planned and recorded' sheet comes right after About, with its table; About says the recorded line",
    _wb.sheetnames[1] == clp_pack.SHEET["recorded_tonnes"] == "Planned and recorded" and len(clp_pack.SHEET["recorded_tonnes"]) <= 31
    and ["Month", "Planned t", "Recorded t", "Recorded share", "Lines reported"] in [r[:5] for r in _rt_x]
-   and ["Oct 2026", "5 480", "2 000", "36 %", "2"] in [r[:5] for r in _rt_x]
+   and ["Oct 2026 (to 11 Oct)", "5 480", "2 000", "36 %", "2"] in [r[:5] for r in _rt_x]   # NARROWED 11 Nov 2026 (7a)
    and any(x[0] == "Recorded" and x[1] == "Recorded tonnes as typed on Account, to 11 Oct 2026." for x in _ab)
    and any(x[0] == "Basis" and x[1] == clp.SPREAD for x in _ab), str(_wb.sheetnames))
 _x11 = [[c.value for c in r] for r in _openpyxl.load_workbook(_io.BytesIO(clp_pack.build_xlsx(_M11P)))[clp_pack.SHEET["recorded_tonnes"]].iter_rows()]
@@ -864,6 +864,37 @@ if not FAIL:
         fh.write(json.dumps(M2, indent=1, ensure_ascii=False))
 ok("the fixture backend/tests/fixtures/clp_monitoring.json is written from a clean run, LF on disk",
    os.path.exists(_fix) and b"\r\n" not in open(_fix, "rb").read())
+
+# ---- 11 Nov 2026 (John: yes, 7c as recommended): "Generated <date>" off the pack's title line, to the foot
+_lay = (_pdf_text(_pdf) or "").splitlines()
+ok("🔴 7c: no line of the pack carries both the title and 'Generated' (they ran into each other on page 1)",
+   not [l for l in _lay if "CLP monitoring pack · Oct 2026" in l and "Generated" in l], str([l for l in _lay if "Generated" in l][:3]))
+ok("⭐ 7c: 'Generated 14 Oct 2026' is in the foot of every page, after the pack's name; the frame's right-hand stamp is not used",
+   _pt.count("Generated 14 Oct 2026") >= _pages and "CLP monitoring pack · Generated 14 Oct 2026" in _pt
+   and 'right=(f"Generated' not in open(os.path.join(BACKEND, "clp_pack.py"), encoding="utf-8").read(), f"{_pt.count('Generated 14 Oct 2026')} of {_pages}")
+
+# ---- 11 Nov 2026 (John: yes, 7a as recommended): a part month is labelled "(to <date>)"; the headline names the last
+# COMPLETE month (Oct, typed in weeks 1-2 above), never the part one, so Nov's first week does not read as a shortfall
+_nw = weeks.set_actual(R1, 11, "earthworks", "WS1", 1, actual_qty=300.0, by="clerk")
+_n1_end = weeks.week_span(11, 1)[1]
+_keep_today = clp._today_date
+clp._today_date = lambda: _dt.date(2026, 11, 12)
+_M7a = clp.monitoring(11, acc_planner, factors=factors, working_days=WD)
+clp._today_date = _keep_today
+_R7a = _M7a["charts"]["recorded_tonnes"]
+_byi = {m["month_index"]: m for m in _R7a.get("months") or []}
+_nd = f"{_n1_end.day} Nov"
+ok("7a set-up: Nov week 1 typed (300 t on R001), its week ends before the month does", "error" not in (_nw or {})
+   and _n1_end < _dt.date(2026, 11, 30), str(_nw)[:200])
+ok("⭐ 7a: the part month keeps its bar and row, labelled 'Nov 2026 (to <date>)'; a complete month keeps its plain label",
+   _byi[11]["recorded_t"] == 300.0 and _byi[11]["label"] == f"Nov 2026 (to {_nd})" and _byi[11]["part_to"] == _n1_end.isoformat()
+   and _byi[10]["part_to"] is None and _byi[10]["label"] == "Oct 2026", str(_R7a.get("months")))
+ok("🔴 7a: the headline names the last COMPLETE month (Oct), not the part month picked; 'recorded to' is the part month's date",
+   _R7a["headline"].startswith("Oct 2026: 2 000 t recorded, 36 % of the 5 480 t planned") and _R7a["headline"].endswith(f"· recorded to {_nd}")
+   and not _R7a["headline"].startswith("Nov") and _M7a["recorded_line"] == f"Recorded tonnes as typed on Account, to {_nd} 2026.", _R7a["headline"])
+_p7a = re.sub(r"\s+", " ", _pdf_text(clp_pack.build_pdf(_M7a, generated="12 Nov 2026")) or "")
+ok("7a: the pack's table prints the part month as 'Nov 2026 (to <date>)' with its own figures", f"Nov 2026 (to {_nd}) 1 450 300" in _p7a,
+   _p7a[_p7a.find("Month Planned"):_p7a.find("Month Planned") + 200])
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

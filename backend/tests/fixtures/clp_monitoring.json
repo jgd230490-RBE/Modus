@@ -35,11 +35,12 @@
    "months": [
     {
      "month_index": 10,
-     "label": "Oct 2026",
+     "label": "Oct 2026 (to 11 Oct)",
      "planned_t": 5480.0,
      "recorded_t": 2000.0,
      "recorded_pct": 36,
-     "lines_reported": 2
+     "lines_reported": 2,
+     "part_to": "2026-10-11"
     }
    ],
    "recorded_to": "2026-10-11",
