@@ -117,9 +117,13 @@ console.log("A-X1 the road card");
     ok("A-X1 a clicked route WITH loads keeps its card button", hb.includes("R011’s card</button>") && !hb.includes("has no loads this month"));
     const hn = c.secselCardHTML(Object.assign({}, RES, { a_day: null, routes: [{ route_id: "R011" }] }), { rp: RP, clicked: "R045" });
     ok("A-X1 no month on screen: the button stays (nothing says the route is idle)", hn.includes("R045’s card</button>"));
-    ok("⭐ A-X1 the team is on the route's name (a tip and the screen reader's words), not a second line in the row",
-       h.includes('<td class="secsel-rid" title="North Team">R011<span class="sr-only"> · North Team</span></td><td>Northfield Quarry → Melton Compound</td>')
-       && !h.includes("secsel-team") && h.includes("<th>From → to</th>") && !h.includes("· team</th>"), h);
+    // NARROWED 11 Nov 2026 (merged with PR #270, the route number a button "Show R011 on the map"): the team is that button's
+    // DESCRIPTION (aria-describedby to a hidden span) and the mouse's tip; never in its name, never a second line in the row
+    ok("⭐ A-X1 the team is on the route's button as its description and tip, not in its name, not a second line in the row",
+       h.includes('aria-label="Show R011 on the map"') && h.includes('aria-describedby="secsel-team-road-R011" title="North Team"')
+       && h.includes('>R011</button><span id="secsel-team-road-R011" hidden>North Team</span></td><td>Northfield Quarry → Melton Compound</td>')
+       && !h.includes('class="secsel-team"') && !/aria-label="[^"]*North Team/.test(h)
+       && h.includes("<th>From → to</th>") && !h.includes("· team</th>"), h);
     const ha = c.secselCardHTML(Object.assign({}, RES, { kind: "area" }), { rp: RP });
     ok("A-X1 the area card names no team, in a tip or otherwise", !ha.includes("North Team") && !ha.includes(' title="'));
     ok("A-X1 'under 1' in the card's headline is singular: 'under 1 lorry movement a day'",

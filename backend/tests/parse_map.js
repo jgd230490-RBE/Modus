@@ -7744,8 +7744,29 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        && h.includes('<td class="num">16.5</td><td class="num">5.0</td><td class="num">21.5</td></tr>'), h);
     // NARROWED 11 Nov 2026 (card A-X1): the team is on the route's name (a tip and the screen reader's words), not a line in the row
     ok("2.1-4 (sandbox): the clicked route's row is tinted and has its card button; Copy; the limit line; teams on the card",
-       /<tr class="secsel-clicked"><td class="secsel-rid"( title="[^"]*")?>R1(<span class="sr-only">[^<]*<\/span>)?<\/td>/.test(h) && h.includes('R1’s card</button>') && h.includes('>Copy</button>')
+       // NARROWED 11 Nov 2026 (merge of A-X1 with R1, PR #270): the route number is R1's button, its name unchanged; the team is
+       // its description (aria-describedby to a hidden span) and the mouse's tip
+       h.includes('<tr class="secsel-clicked"><td class="secsel-rid"><button type="button" class="secsel-rid-btn" data-rid="R1" aria-label="Show R1 on the map" aria-pressed="true" data-kind="road"')
+       && /<td class="secsel-rid"><button [^>]*data-rid="R1"[^>]* onclick="secselPickRow\(this\.dataset\.rid, this\.dataset\.kind\)">R1<\/button><span id="secsel-team-road-R1" hidden>North Team<\/span><\/td>/.test(h)
+       && h.includes('aria-describedby="secsel-team-road-R1" title="North Team"')
+       && h.includes('R1’s card</button>') && h.includes('>Copy</button>')
        && h.includes('secsel-limit secsel-over">Traffic limit · 212 / 200 a day') && h.includes('North Team'));
+    // 12 Nov 2026 (map-pick-route, option R1): every route number on the ROAD card is a button; the picked route's row is tinted and the one button follows it
+    {
+      const h2 = F.secselCardHTML(res, { passing: null, rp, clicked: 'R2', limits: [] });
+      ok("⭐ R1 (sandbox): each route number on the road card is a real button with a name ('Show R1 on the map'); the picked row says so (aria-pressed) and is the tinted one",
+         (h2.match(/<button type="button" class="secsel-rid-btn"/g) || []).length === 2
+         && h2.includes('data-rid="R1" aria-label="Show R1 on the map" aria-pressed="false"') && h2.includes('data-rid="R2" aria-label="Show R2 on the map" aria-pressed="true"')
+         && h2.includes('<tr class="secsel-clicked"><td class="secsel-rid"><button type="button" class="secsel-rid-btn" data-rid="R2"'));
+      ok("⭐ R1 (sandbox): the ONE card button follows the picked row: picking R2 gives 'R2’s card' and not 'R1’s card'; nothing picked gives no card button",
+         h2.includes('R2’s card</button>') && !h2.includes('R1’s card</button>') && !F.secselCardHTML(res, { passing: null, rp }).includes('’s card</button>'));
+      const ar = F.secselCardHTML({ kind: 'area', month: 23, a_day: 21.5, in: 16.5, out: 5, routes: res.routes }, { passing: null, rp, clicked: 'R1' });
+      ok("⭐ R1 / frame 8 (sandbox): the AREA card's rows are buttons too (data-kind area), the picked row is tinted, and the picked route gets a 'R1’s card' button that opens its panel (Copy table and Draw again stay)",
+         (ar.match(/<button type="button" class="secsel-rid-btn"/g) || []).length === 2 && ar.includes('data-rid="R1" aria-label="Show R1 on the map" aria-pressed="true" data-kind="area"')
+         && ar.includes('<tr class="secsel-clicked">') && ar.includes('R1’s card</button>') && ar.includes('data-kind="area" onclick="secselRouteCard(this.dataset.rid, this.dataset.kind)"')
+         && ar.includes('>Copy table</button>') && ar.includes('>Draw again</button>')
+         && !F.secselCardHTML({ kind: 'area', month: 23, a_day: 21.5, in: 16.5, out: 5, routes: res.routes }, { passing: null, rp }).includes('’s card</button>'));
+    }
     ok("🔴 2.1-4 (sandbox): no 'Shared road section', no 'two-way' on the card", !/Shared road section|two-way/i.test(h));
     const one = F.secselCardHTML({ kind: 'road', month: 23, a_day: 4, routes: [{ route_id: 'R3', in: 2, out: 2, a_day: 4 }] }, { rp });
     const none = F.secselCardHTML({ kind: 'road', month: 23, a_day: 0, routes: [] }, { rp });
