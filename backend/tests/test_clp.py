@@ -727,6 +727,9 @@ ok("⭐ card 4 XLSX: the 'Planned and recorded' sheet comes right after About, w
 _x11 = [[c.value for c in r] for r in _openpyxl.load_workbook(_io.BytesIO(clp_pack.build_xlsx(_M11P)))[clp_pack.SHEET["recorded_tonnes"]].iter_rows()]
 ok("card 4 XLSX: the month nobody typed reads 'not recorded'", ["Nov 2026", "1 450", "not recorded", "—", "—"] in [r[:5] for r in _x11])
 _rc = [[c.value for c in r] for r in _wb[clp_pack.SHEET["route_caps"]].iter_rows()]
+ok("🔴 D-F5: the XLSX route-cap sheet's header row reads Visits a day, never Movements a day",
+   ["Route", "Visits a day", "Cap", "Share of cap", "Status"] in [r[:5] for r in _rc]
+   and not any("Movements a day" in [str(x) for x in r] for r in _rc))
 ok("W10 XLSX: a chart's sheet holds its table and says how it is worked out and its source",
    ["Pit West → Yard East", "4.5", "4", "114 %", "Over the cap"] in [r[:5] for r in _rc]
    and any(r[0] == "How it is worked out" and r[1] == MP["charts"]["route_caps"]["basis"] for r in _rc)
@@ -852,6 +855,19 @@ ok("24-month window: the XLSX sheet's header row is table_of's 49 columns", _h i
 _rt = clp_pack.pdf_tables(MP["charts"]["route_caps"], MP, _usable, _F)
 ok("a table that already fits A4 keeps its layout: one table, the XLSX's header, reportlab sharing the width out",
    len(_rt) == 1 and _rt[0]["widths"] is None and _rt[0]["header"] == [clp_pack.table_of(MP["charts"]["route_caps"], MP)[0]])
+# ---- 11 Nov 2026 (D-F5, John's yes): the route figure is lorry VISITS a day (one load = one visit, the cap typed in visits),
+# as the subtitle says; the bar words and the table header said "movements a day". Councils really are movements: unchanged.
+ok("🔴 D-F5: the pack's route-cap table is headed 'Visits a day', never 'Movements a day'",
+   clp_pack.table_of(MP["charts"]["route_caps"], MP)[0] == ["Route", "Visits a day", "Cap", "Share of cap", "Status"]
+   and "Route Visits a day Cap Share of cap Status" in _pt and "Route Movements a day" not in _pt,
+   str(clp_pack.table_of(MP["charts"]["route_caps"], MP)[0]))
+ok("🔴 D-F5: the pack's route-cap bars read '4.5 visits a day · 114 % of 4'; no bar says 'movements a day · N % of'",
+   "4.5 visits a day · 114 % of 4" in _pt and not re.search(r"movements a day · \d+ % of", _pt),
+   _pt[_pt.find(MP["charts"]["route_caps"]["title"]):_pt.find(MP["charts"]["route_caps"]["title"]) + 300])
+ok("D-F5: the subtitle still says lorry visits a day, and the councils keep 'Movements a day' (they count movements)",
+   MP["charts"]["route_caps"]["subtitle"].startswith("lorry visits a day")
+   and clp_pack.table_of(MP["charts"]["councils"], MP)[0][1] == "Movements a day" if MP["charts"].get("councils", {}).get("rows")
+   else MP["charts"]["route_caps"]["subtitle"].startswith("lorry visits a day"))
 _doc["tenant"]["demo_notice"] = None
 config.save(_doc, by="tester"); config.invalidate()
 
