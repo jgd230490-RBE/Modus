@@ -7659,7 +7659,8 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      // NARROWED 10 Nov 2026 (road card edge): above / below as before, now with a side where the click is near an edge
      // NARROWED again 10 Nov 2026 (road card top): above / below with that side, unless a short window puts it beside the click
      && blk.includes("anchor: beside || ((below ? 'top' : 'bottom') + (side ? '-' + side : ''))") && blk.includes("String(p.options.anchor).indexOf('top') === 0")
-     && blk.includes("sc.style.maxHeight = Math.max(90, space - 170) + 'px';") && html.includes(".secsel-scroll{ max-height:260px; overflow:auto;"));
+     // NARROWED 11 Nov 2026 (road card tall): the table's room is the card's room less its MEASURED fixed part (it was a fixed 170)
+     && blk.includes("sc.style.maxHeight = Math.max(48, space - fixed + SECSEL_MARGIN) + 'px';") && html.includes(".secsel-scroll{ max-height:260px; overflow:auto;"));
   ok("⭐ 2.1-4 Q1: every mode — a route line's click and a shared section's click both open the road card (the route tinted)",
      code.includes("if(typeof openRoadCard==='function'){ openRoadCard(e, rid); return; }")
      && /map\.on\('click', 'road-load-line', \(e\) => \{[\s\S]{0,900}if \(typeof openRoadCard === 'function'\) \{[\s\S]{0,400}openRoadCard\(e, rid\); return;/.test(code)
@@ -7708,7 +7709,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   try {
     F = new Function("escHtml", "PV", "CW", "monthLabel", "teamText", "TENANT", "map", "styleReady", "document", "isPhoneShell", "mapboxgl",
                      "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle",
-                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), secselBeside: (typeof secselBeside === 'function' ? secselBeside : null), popupPlace: (typeof popupPlace === 'function' ? popupPlace : null), SECSEL_MAP };")(
+                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), secselNeed: (typeof secselNeed === 'function' ? secselNeed : null), secselBeside: (typeof secselBeside === 'function' ? secselBeside : null), popupPlace: (typeof popupPlace === 'function' ? popupPlace : null), SECSEL_MAP };")(
       esc, () => pv, () => (pv === 2 ? words2 : words1), m => (m === 23 ? 'Nov 2027' : 'M' + m), v => (v === 'IPT1' ? 'North Team' : v),
       { name: 'Wolds Link', demo_notice: 'Fictional scheme' }, {}, () => true, doc, () => false, {}, {}, () => 'https://x/map/?month=2027-11', null, null,
       x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }));
@@ -7920,6 +7921,56 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("2.1-4 Q7 (sandbox): the link's box reads back, and anything that is not a box is no box",
      !!afp && JSON.stringify(afp('-0.96,52.49,-0.94,52.51')) === '[-0.96,52.49,-0.94,52.51]' && afp('1,2,3') === null && afp('3,2,1,4') === null
      && afp('a,b,c,d') === null && afp('') === null && afp('-0.9,53,-0.8,52') === null);
+
+  // ===== 11 Nov 2026 — road card tall (seen on live at 1422 x 677, Jan 2028, whole-scheme zoom: a road card with the extra line
+  // "R0xx: no loads in <month>" opened above a low click with its title 26 px under the figures bar). The card's fixed part (all
+  // but its table) was ASSUMED 170 px; it measures 184 for an ordinary card and 210 with that line. It is now measured. =====
+  const need = F && F.secselNeed;
+  ok("⭐ TALL: the card's need is its measured fixed part + the table's first 90 px (or all of it, if shorter) + 20 for the tip and offset, never under the 290 an ordinary card always needed",
+     typeof need === 'function' && need(184, 86) === 290 && need(184, 300) === 294 && need(210, 86) === 316 && need(210, 135) === 320 && need(243, 86) === 349
+     && need(210, 5) === 290 && need(0, 0) === 290 && need() === 290 && need(NaN, NaN) === 290);
+  let fitRoad = null;
+  try { fitRoad = /function fitRoadPopup\(\) \{[\s\S]*?\n    \}/.exec(code)[0]; } catch (e) {}
+  // fitRoadPopup against a stand-in popup: the map 1122 x 677 (a desk window), the timeline bar 94, the figures bar 98, the free map ends at 1066
+  const roadFit = (fixed, nat, y, anchor, x, noTable) => {
+    const sc = noTable ? null : { offsetHeight: 86, scrollHeight: nat, style: {} }, box = { offsetHeight: fixed + 86 };
+    const pop = { options: { anchor }, moved: 0, setLngLat() { this.moved++; }, getLngLat: () => ({ lng: 0, lat: 0 }),
+                  getElement: () => ({ querySelector: q => (q === '.secsel-scroll' ? sc : q === '.mapboxgl-popup-content' ? box : null) }) };
+    let hushed = 0;
+    try {
+      new Function("SECSEL", "map", "document", "getComputedStyle", "secselTopEdge", "secselRightEdge", "secselRoom", "secselNeed", "secselSide", "secselBeside",
+                   "SECSEL_MARGIN", "hoverGiveWay", fitRoad + "\nreturn fitRoadPopup;")(
+        { roadPopup: pop, roadAt: { lngLat: {}, point: { x: x || 550, y } } },
+        { getContainer: () => ({ clientWidth: 1122, clientHeight: 677 }), project: () => ({ x: x || 550, y }) },
+        { documentElement: {} }, () => ({ getPropertyValue: () => '94px' }), () => 98, () => 1066, F.secselRoom, F.secselNeed, F.secselSide, F.secselBeside, 14, () => { hushed++; })();
+    } catch (e) { return { err: e.message }; }
+    return { anchor: pop.options.anchor, moved: pop.moved, max: sc ? sc.style.maxHeight : null, hushed };
+  };
+  if (typeof need === 'function' && fitRoad) {
+    // the live case: y = 437, a card with the "no loads" line (fixed 210, three rows, 135 px of table) opened ABOVE the click
+    const a = roadFit(210, 190, 437, 'bottom');
+    ok("⭐ TALL (the live case, 1422 x 677): above a click at y = 437 a card with the 'no loads' line is given 437 - 98 - 34 - 210 + 14 = 109 px of table, so its top is AT the bar (437 - 20 - 210 - 109 = 98), not 26 px under it; the old fixed 170 gave 135 px",
+       a.anchor === 'bottom' && a.max === '109px' && a.moved === 0 && 437 - 20 - 210 - 109 === 98 && 437 - 20 - 210 - (437 - 98 - 34 - 170) === 72);
+    ok("TALL: an ordinary card (fixed 184) gets exactly what the fixed 170 gave it: the table's room is unchanged",
+       roadFit(184, 190, 437, 'bottom').max === (437 - 98 - 34 - 170) + 'px' && roadFit(184, 190, 200, 'top').max === (583 - 200 - 34 - 170) + 'px');
+    ok("⭐ TALL: a card too tall for the room it opened in is placed AGAIN, beside the click: at y = 290 an ordinary card (needs 290, has 293 below) stays below, one with the 'no loads' line (needs 316) goes to the left of the click",
+       roadFit(184, 86, 290, 'top').anchor === 'top' && roadFit(184, 86, 290, 'top').moved === 0
+       && roadFit(210, 86, 290, 'top').anchor === 'right' && roadFit(210, 86, 290, 'top').moved === 1);
+    ok("TALL: beside the click its table has twice the smaller room (2 x 192 - 34 = 350, less the fixed part 210, plus the margin 14)",
+       roadFit(210, 86, 290, 'top').max === (2 * 192 - 34 - 210 + 14) + 'px');
+    ok("TALL: a tall card opened beside the click in the middle band stays there; one that opened above a low click and has room stays above; none is moved twice",
+       roadFit(210, 86, 330, 'right').anchor === 'right' && roadFit(210, 86, 330, 'right').moved === 0 && roadFit(236, 190, 520, 'bottom').anchor === 'bottom');
+    ok("TALL: the table is never squeezed under 48 px, and a card with no table (loading, nothing approved) is left alone",
+       roadFit(340, 190, 300, 'right').max === '48px' && roadFit(210, 86, 300, 'top', 550, true).moved === 0 && roadFit(210, 86, 300, 'top', 550, true).anchor === 'top'
+       && roadFit(210, 86, 300, 'top', 550, true).max === null);
+    ok("TALL: the hover tip gives way to the card once it is placed again (the card may now lie where the tip is drawn)",
+       roadFit(210, 190, 437, 'bottom').hushed === 1);
+  } else ok("⭐ TALL (sandbox): fitRoadPopup could not be read", false);
+  ok("⭐ TALL (source): the fixed part is measured from the card, the old fixed 170 is gone, and the card is placed again with the real need",
+     code.includes("const fixed = (sc && box) ? Math.max(0, box.offsetHeight - sc.offsetHeight) : 0;") && !code.includes("space - 170")
+     && code.includes("const rm = secselRoom(at.point.y, H, foot, secselTopEdge(), secselNeed(fixed, sc.scrollHeight));")
+     && code.includes("if (want !== p.options.anchor) { p.options.anchor = want; p.setLngLat(p.getLngLat()); }")
+     && code.includes("const SECSEL_MINROW = 90, SECSEL_MARGIN = 14;"));
 
   // ===== 11 Nov 2026 — map popup top (seen on live at 1422 x 677, the road card's live check: a holding area's popup,
   // placed by the map above its point, ran 75 -> 308 with the figures bar's edge at 98: its title 23 px under the bar) =====
