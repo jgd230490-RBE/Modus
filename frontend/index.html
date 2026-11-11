@@ -4151,7 +4151,7 @@ function ClpMonitoring({ months, initial }){
               <ChartCanvas config={clpRecordedCfg(C.recorded_tonnes)} title={C.recorded_tonnes.title} />
             </ClpCard>}
             <ClpCard c={C.route_caps} info={<InfoTip id="clp.route_caps" />} wide>
-              {capped(C.route_caps.rows).length > 0 && <ChartCanvas config={clpBulletCfg(capped(C.route_caps.rows), "movements_per_day", "route", "movements a day")} height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />}
+              {capped(C.route_caps.rows).length > 0 && <ChartCanvas config={clpBulletCfg(capped(C.route_caps.rows), "movements_per_day", "route", "visits a day")} height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />}
               <ClpUncapped rows={C.route_caps.rows} nameKey="route" valKey="movements_per_day" word="a day" what="route" />
             </ClpCard>
             <ClpCard c={C.site_caps} info={<InfoTip id="clp.site_caps" />} wide>
