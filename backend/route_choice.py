@@ -8,7 +8,8 @@ month. Now:
 
   * the MAIN line (alt_index 0) avoids only routing zones with no dates at all (network.active_avoid);
   * a DATED routing zone gives each route whose main line crosses it, for the zone's own dates only, the stored
-    option that misses it (HERE's 1, 2, or a way round baked for it, alt_index >= WAY_ROUND_BASE). These are
+    option that misses it (HERE's 1, 2, or a way round baked for it, alt_index >= WAY_ROUND_BASE). Which one: see
+    pick_key() (11 Nov 2026: no lorry limit below the lorry first, then the quickest; it was the shortest). These are
     the 'zone' rows of the route_choice table, worked out by refresh_zones() from the zones and the stored lines
     (geometry only: never a HERE call) and rewritten whole each time;
   * readers ask alt_on() (one day) or mix() (a set of days: a month, a week) and nothing else.
@@ -146,12 +147,57 @@ def _keep_main_rules():
     return {(r["route_id"], r["reason_ref"]): r.get("vehicle_profile") for r in rows}
 
 
-def work_out(zs=None, lines=None, keep=None):
+def limits_below(line, profile, leg, lims):
+    """How many stored lorry limits this line runs along (or passes, for a point limit) that are BELOW this lorry
+    (limits.assess verdict "exceeds", the Route sheet's "is over"), each limit once. A limit "except for access" counts:
+    whether this site is one is for a person to check, as the sheet says. Geometry only, no outside call."""
+    if not lims or not line:
+        return 0
+    import limits
+    seen = set()
+    for L, _point, _along in limits._matches(line, lims):
+        k = (L.get("source"), L.get("ext_id"), L.get("kind"))
+        if k in seen:
+            continue
+        if limits.assess(L, profile, leg)["verdict"] == "exceeds":
+            seen.add(k)
+    return len(seen)
+
+
+def pick_key(opt, below):
     """
-    The zone rows refresh_zones() would write, as dicts, without writing them. Pure: the stored lines and the
-    zones in, rows out. For each (route, lorry type, leg) whose MAIN line crosses a dated zone in a run of days:
-    the shortest stored option that misses every routing zone in force then (the user's Q3 answer: shortest,
-    fewer road miles), else needs_route / no_way_round; 'keep_main' rules turn a run to declined.
+    The order a dated zone's diversion is picked in, among the stored options that miss every routing zone in force.
+    John, 11 Nov 2026 (CLOCS card B-F3, "No limit, then quickest"): REVERSES the user's Q3 answer of 28 Oct ("shortest,
+    fewer road miles"). Picked on distance alone, a diversion could come out SHORTER than the main route and run on
+    weight-limited roads (on live R002's diversion was 4.8 mi shorter each way). Now:
+      1. an option with no lorry limit below this lorry (limits_below == 0) before one with any;
+      2. then the quickest: the stored duration_hr of that leg, which HERE gave for a lorry of that size setting off at
+         the pinned bake time (here_routing.bake_departure_time: a weekday at 10:00 in the tenant's time zone); an option
+         with no stored time (0) goes after every timed one;
+      3. on a tie, the shorter (distance_km), then the lower alt_index (HERE's own order, then the ways round).
+    Where every option has a limit below the lorry, the quickest of them is used and its limits are shown (periods()).
+    """
+    hr = float(opt.get("hr") or 0)
+    return (below > 0, hr <= 0, hr, float(opt.get("km") or 0))
+
+
+def _load_limits():
+    """The stored lorry limits for the picker; [] where none are held (every option then counts 0 below)."""
+    try:
+        import limits
+        return limits.stored() or []
+    except Exception as e:
+        print("route_choice: lorry limits not read:", str(e)[:120])
+        return []
+
+
+def work_out(zs=None, lines=None, keep=None, lims=None):
+    """
+    The zone rows refresh_zones() would write, as dicts, without writing them. Pure: the stored lines, the zones and
+    the stored lorry limits in, rows out. For each (route, lorry type, leg) whose MAIN line crosses a dated zone in a
+    run of days: the stored option that misses every routing zone in force then, picked by pick_key() (11 Nov 2026: no
+    lorry limit below the lorry first, then the quickest; it was the shortest, the user's Q3 answer of 28 Oct), else
+    needs_route / no_way_round; 'keep_main' rules turn a run to declined.
     """
     zs = dated_zones() if zs is None else zs
     lines = _stored_lines() if lines is None else lines
@@ -159,13 +205,20 @@ def work_out(zs=None, lines=None, keep=None):
     runs = _intervals(zs)
     if not runs:
         return []
-    hit_cache = {}
+    lims = _load_limits() if lims is None else lims
+    hit_cache, below_cache = {}, {}
 
     def hits(key, alt, z):
         k = (key, alt, z["id"])
         if k not in hit_cache:
             hit_cache[k] = zones.line_hits_geometry(lines[key][alt]["line"], z["geometry"])
         return hit_cache[k]
+
+    def below(key, alt):
+        k = (key, alt)
+        if k not in below_cache:
+            below_cache[k] = limits_below(lines[key][alt]["line"], key[1], key[2], lims)
+        return below_cache[k]
 
     out = []
     for key in sorted(lines):
@@ -184,7 +237,7 @@ def work_out(zs=None, lines=None, keep=None):
             else:
                 cands = [alt for alt in opts if alt != 0 and not any(hits(key, alt, z) for z in active)]
                 if cands:
-                    alt = min(cands, key=lambda x: (opts[x]["km"], opts[x]["hr"], x))
+                    alt = min(cands, key=lambda x: pick_key(opts[x], below(key, x)) + (x,))
                     status = "in_use"
                 else:
                     tried = [x for x in opts if x >= WAY_ROUND_BASE and set(ids) <= set(opts[x]["avoids"])]
@@ -258,6 +311,42 @@ def refresh_zones():
     except Exception as e:
         print("route_choice: busy-hours uses not checked:", str(e)[:120])
     return summary(rows)
+
+
+def preview():
+    """
+    11 Nov 2026 (CLOCS card B-F3): what refresh_zones() would change now, WITHOUT writing: per (route, lorry, leg, from)
+    the option stored in use and the one the rule picks, with each one's distance and time against the main line and its
+    lorry limits below the lorry. The admin read GET /api/admin/route-diversions/preview; POST …/refresh applies it.
+    """
+    new = {r["id"]: r for r in work_out()}
+    try:
+        old = {r["id"]: r for r in db.query("SELECT * FROM route_choice WHERE tenant_id = ? AND reason_kind = 'zone' "
+                                            "AND source = 'auto'", (db.current_tenant(),))}
+    except Exception:
+        old = {}
+    lines, lims = _stored_lines(), _load_limits()
+
+    def figs(r):
+        if not r:
+            return None
+        key = (r["route_id"], r["vehicle_profile"], r["leg"])
+        opts, alt = lines.get(key) or {}, int(r.get("alt_index") or 0)
+        o, m = opts.get(alt), opts.get(0)
+        if not o or not m:
+            return {"alt_index": alt, "status": r.get("status")}
+        return {"alt_index": alt, "status": r.get("status"), "km_delta": round(o["km"] - m["km"], 3),
+                "hr_delta": round(o["hr"] - m["hr"], 4), "limits_below": limits_below(o["line"], key[1], key[2], lims)}
+
+    out = []
+    for i in sorted(set(old) | set(new)):
+        a, b = old.get(i), new.get(i)
+        if a and b and int(a.get("alt_index") or 0) == int(b.get("alt_index") or 0) and a.get("status") == b.get("status"):
+            continue
+        r = b or a
+        out.append({"id": i, "route_id": r["route_id"], "vehicle_profile": r["vehicle_profile"], "leg": r["leg"],
+                    "starts_on": r.get("starts_on"), "ends_on": r.get("ends_on"), "now": figs(a), "rule": figs(b)})
+    return {"changes": out, "rows_now": len(old), "rows_rule": len(new), "limits_held": len(lims)}
 
 
 def refresh_quietly(why):
@@ -501,6 +590,7 @@ def periods(route_id=None):
                                   "status": r.get("status"), "legs": []})
         g["legs"].append({"vehicle_profile": r.get("vehicle_profile"), "leg": r.get("leg"),
                           "alt_index": r.get("alt_index"), "km_delta": r.get("km_delta")})
+    _leg_figures(groups.values())
     out = []
     for g in groups.values():
         g["zone_names"] = [names.get(z) or z for z in g["zones"]]
@@ -508,6 +598,47 @@ def periods(route_id=None):
         out.append(g)
     out.sort(key=lambda g: (g["route_id"], g["starts_on"] or "", g["status"]))
     return out
+
+
+def _leg_figures(groups):
+    """
+    11 Nov 2026 (CLOCS cards B-F3 / B-I2): each in-use leg of a diversion also carries hr_delta (the option's stored
+    time less the main line's, hours) and limits_below (the stored lorry limits below that lorry on the option, as the
+    picker counts them; None where no limits are held at all, so nothing claims a check that was not made). Read only:
+    nothing here writes, so the Zones list shows what live has in use, whichever rule picked it.
+    """
+    want = {(g["route_id"], l.get("vehicle_profile"), l.get("leg"), int(l.get("alt_index") or 0))
+            for g in groups for l in g["legs"] if g.get("status") == "in_use" and l.get("alt_index")}
+    if not want:
+        return
+    rids = sorted({w[0] for w in want})
+    lims = _load_limits()
+    try:                                 # times for every option (no line text); a line only where limits are held
+        rows = db.query("SELECT route_id, vehicle_profile, leg, alt_index, duration_hr FROM route_geometry "
+                        f"WHERE tenant_id = ? AND route_id IN ({','.join('?' * len(rids))})",
+                        (db.current_tenant(), *rids))
+        fig = {(r["route_id"], r["vehicle_profile"], r["leg"], int(r["alt_index"] or 0)): dict(r) for r in rows}
+        if lims:
+            for r in db.query("SELECT route_id, vehicle_profile, leg, alt_index, geometry FROM route_geometry "
+                              f"WHERE tenant_id = ? AND alt_index <> 0 AND route_id IN ({','.join('?' * len(rids))})",
+                              (db.current_tenant(), *rids)):
+                k = (r["route_id"], r["vehicle_profile"], r["leg"], int(r["alt_index"] or 0))
+                if k in want and k in fig:
+                    fig[k]["geometry"] = r["geometry"]
+    except Exception:
+        return
+    for g in groups:
+        if g.get("status") != "in_use":
+            continue
+        for l in g["legs"]:
+            k = (g["route_id"], l.get("vehicle_profile"), l.get("leg"), int(l.get("alt_index") or 0))
+            if k not in want:
+                continue
+            a, m = fig.get(k), fig.get(k[:3] + (0,))
+            if a and m and a.get("duration_hr") and m.get("duration_hr"):
+                l["hr_delta"] = round(float(a["duration_hr"]) - float(m["duration_hr"]), 4)
+            l["limits_below"] = (limits_below(_line_of(a.get("geometry")) if a else None, k[1], k[2], lims)
+                                 if lims else None)
 
 
 def keep_main(route_id, zone_id, keep=True, who=None):
