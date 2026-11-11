@@ -2876,7 +2876,7 @@ def bulletin_month_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), request: R
         return export.build_bulletin_pdf(bulletin_doc.sheet(month, acc))
     try:
         # kept only when every map in it is Mapbox's picture: one drawn as the schematic stand-in is served, not kept
-        data = _staff_bytes("bulletin/month.pdf", {"month": int(month), "staff": bool(acc)}, build, acc,
+        data = _staff_bytes("bulletin/month.pdf", {"month": int(month), "staff": bool(acc), "concerns": concerns.stamp()}, build, acc,
                             keep=lambda: basemap.MISSES[0] == misses)
     except RuntimeError as e:
         raise HTTPException(503, str(e))
@@ -2904,7 +2904,7 @@ def bulletin_leaflet_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), request:
         sheet = bulletin_doc.sheet(month, acc)
         return export.build_bulletin_leaflet_pdf(sheet)
     try:
-        data = _staff_bytes("bulletin/leaflet.pdf", {"month": int(month), "staff": bool(acc)}, build, acc,
+        data = _staff_bytes("bulletin/leaflet.pdf", {"month": int(month), "staff": bool(acc), "concerns": concerns.stamp()}, build, acc,
                             keep=lambda: basemap.MISSES[0] == misses)
     except RuntimeError as e:
         raise HTTPException(503, str(e))
@@ -2923,7 +2923,7 @@ def bulletin_leaflet_page(month: Optional[int] = Query(None, ge=1, le=MONTH_COUN
     mi = month if month is not None else _bulletin_month_default()
     acc, misses = access.current(), basemap.MISSES[0]
     # 11 Nov 2026 (card A-F4): kept as the bulletin page is (below)
-    data = _staff_bytes("bulletin/leaflet-page", {"month": int(mi), "staff": bool(acc)},
+    data = _staff_bytes("bulletin/leaflet-page", {"month": int(mi), "staff": bool(acc), "concerns": concerns.stamp()},
                         lambda: bulletin_doc.leaflet_html(bulletin_doc.sheet(mi, acc)).encode("utf-8"), acc,
                         keep=lambda: basemap.MISSES[0] == misses)
     return Response(content=data.decode("utf-8"), media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
@@ -2944,10 +2944,12 @@ def bulletin_page(month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT), requ
         return Response(content=_BULLETIN_SIGNIN_PAGE, status_code=401, media_type="text/html; charset=utf-8")
     mi = month if month is not None else _bulletin_month_default()
     acc, misses = access.current(), basemap.MISSES[0]
+    # 11 Nov 2026 (card A-F4): the concerns' stamp is in the key of all four kept bulletin reads (concerns are a
+    # NO_DATA_TABLES table, so a concern alone never moves the data version; the stamp does).
     # 11 Nov 2026 (card A-F4): the page was built afresh on every open (16-21 s on live, 11 Nov). It is kept like the PDF:
     # one build per month, role and day, served again until the next write to the plan (read_cache: never stale), and
     # one whose map fell back to the schematic is served, never kept. Kept as bytes, so the store's byte cap counts it.
-    data = _staff_bytes("bulletin/page", {"month": int(mi), "staff": bool(acc)},
+    data = _staff_bytes("bulletin/page", {"month": int(mi), "staff": bool(acc), "concerns": concerns.stamp()},
                         lambda: bulletin_doc.html(bulletin_doc.sheet(mi, acc)).encode("utf-8"), acc,
                         keep=lambda: basemap.MISSES[0] == misses)
     return Response(content=data.decode("utf-8"), media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})

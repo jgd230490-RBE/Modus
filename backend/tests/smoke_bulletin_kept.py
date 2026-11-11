@@ -13,7 +13,10 @@ on a scratch SQLite database, signs in with a planner code and counts the builds
   * a write to the plan (the data version moves) builds afresh: a reader never gets an older plan than the one approved;
   * another month is its own build; the leaflet page and the leaflet PDF are kept the same way;
   * a build whose map fell back to the schematic (basemap.MISSES moved) is served but never kept, as the PDF's rule;
-  * still staff only: no sign-in answers 401 and builds nothing.
+  * still staff only: no sign-in answers 401 and builds nothing;
+  * the concerns' stamp (11 Nov, the mother session for John): a concern logged, edited (its updated_at moves), closed or
+    deleted rebuilds the next open of all four kept reads (page, one-page page, one-page PDF, full PDF), though concerns
+    are a NO_DATA_TABLES table and never move the data version; with no change the kept copies are served.
 
 NOT covered: PostgreSQL, Mapbox (no token: every map is the schematic, so the "kept" checks count builds with MISSES held
 still), live timings (after the merge, read only).
@@ -123,6 +126,55 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("the leaflet PDF keeps its file name and no-store",
        "bulletin-one-page-" in r9.headers.get("content-disposition", "") and r9.headers.get("cache-control") == "no-store")
 
+    # ---- the concerns stamp (11 Nov 2026, the mother session for John): concerns are a NO_DATA_TABLES table, so a
+    # concern alone never moves the data version; the four kept bulletin reads carry concerns.stamp() in their key.
+    import datetime as _dt
+    import concerns
+    T0 = concerns._now().replace(hour=9, minute=0, second=0)
+    DAY = T0.date().isoformat()
+
+    def all_four():
+        """open the four kept reads once each; how many of them were built"""
+        return sum(opens(c, p)[1] for p in ("/bulletin/?month=10", "/bulletin/leaflet/?month=10",
+                                             "/api/bulletin/leaflet.pdf?month=10", "/api/bulletin/month.pdf?month=10"))
+
+    all_four()
+    ok("the four kept reads, opened again with no change: none is built (still the kept copies)", all_four() == 0)
+    s0 = concerns.stamp()
+    cid = concerns._insert({"kind": "mud", "words": "Mud on the road by the gate", "happened_on": DAY, "happened_time": None,
+                            "registration": None, "lat": None, "lon": None, "route_id": None, "wants_reply": 0,
+                            "name": None, "email": None, "phone": None, "source": "email"}, T0, "Planner")
+    v0 = db.data_version()
+    ok("a concern logged does NOT move the data version (concerns stay a NO_DATA_TABLES table)", db.data_version() == v0
+       and "concerns" in db.NO_DATA_TABLES)
+    ok("...but it moves the concerns' stamp", concerns.stamp() != s0, f"{s0} {concerns.stamp()}")
+    ok("⭐ a concern logged: the next open of each of the four is built afresh", all_four() == 4)
+    ok("...and the one after that is kept again", all_four() == 0)
+
+    def upd(i):
+        r = db.query("SELECT updated_at FROM concerns WHERE tenant_id = ? AND id = ?", (db.current_tenant(), i))
+        return r[0]["updated_at"] if r else None
+    u0 = upd(cid)
+    concerns.reply(cid, "Our road sweeper went out at once.", None, "Planner", now=T0 + _dt.timedelta(minutes=5))
+    u1 = upd(cid)
+    ok("⭐ a concern's edit (a reply recorded) moves its updated_at", u0 and u1 and u1 > u0, f"{u0} {u1}")
+    ok("...and so the next open of the four is built afresh", all_four() == 4)
+    concerns.set_route(cid, None, "Planner", now=T0 + _dt.timedelta(minutes=5))      # the same second as the reply
+    ok("two edits in the same second still move the stamp (the histories' length is in it)", all_four() == 4)
+
+    concerns.close(cid, "spam", "Planner", now=T0 - _dt.timedelta(days=40))
+    ok("⭐ a concern closed: the next open of the four is built afresh", all_four() == 4)
+    # a second concern that stays, so the deletion below leaves a state no earlier open was kept under (deleting the only
+    # concern returns to the first state, whose kept copies are still right: no concerns, as then)
+    concerns._insert({"kind": "noise", "words": "Reversing alarms before seven", "happened_on": DAY, "happened_time": None,
+                      "registration": None, "lat": None, "lon": None, "route_id": None, "wants_reply": 0,
+                      "name": None, "email": None, "phone": None, "source": "phone"}, T0 + _dt.timedelta(minutes=20), "Planner")
+    ok("a second concern logged: built afresh", all_four() == 4)
+    concerns.sweep()
+    ok("the clean-up deleted it (spam closed over 30 days ago)", not db.query("SELECT id FROM concerns WHERE id = ?", (cid,)))
+    ok("⭐ a concern deleted: the next open of the four is built afresh", all_four() == 4)
+    ok("...and with no change after, all four are the kept copies again", all_four() == 0)
+
     BUILDS["miss"] = True
     db.bump_data_version()
     ra, ba = opens(c, "/bulletin/?month=10")
@@ -138,6 +190,10 @@ _MS = open(os.path.join(BACKEND, "main.py"), encoding="utf-8").read()
 ok("source: the page, the leaflet page and the leaflet PDF go through _staff_bytes with the map rule",
    all(f'_staff_bytes("{n}"' in _MS for n in ("bulletin/page", "bulletin/leaflet-page", "bulletin/leaflet.pdf"))
    and _MS.count("keep=lambda: basemap.MISSES[0] == misses") >= 4)
+ok("source: all four kept bulletin reads carry the concerns' stamp in their key",
+   all(f'_staff_bytes("{n}", {{"month": int({m}), "staff": bool(acc), "concerns": concerns.stamp()}}' in _MS
+       for n, m in (("bulletin/page", "mi"), ("bulletin/leaflet-page", "mi"), ("bulletin/leaflet.pdf", "month"),
+                    ("bulletin/month.pdf", "month"))))
 
 print()
 for f_ in FAIL:
