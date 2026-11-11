@@ -702,7 +702,7 @@ if (loaded) {
       const cOut = render("the Dashboard renders with the CLP section open (initialClp)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialClp: CLPF, onOpen(){} }));
       const cP = seg(cOut, '<details class="dash-more" data-clp="1"', '<summary>Stockpile capacity');
       ok("⭐ CLP: the section is a folded <details> after More charts, open when its figures are handed in, with its summary",
-        cP.startsWith('<details class="dash-more" data-clp="1" data-guide="dash-clp" open=""') && cP.includes("<summary>CLP monitoring: caps, vehicles, councils, carbon and trips avoided</summary>")
+        cP.startsWith('<details class="dash-more" data-clp="1" data-guide="dash-clp" open=""') && cP.includes("<summary>CLP monitoring: tonnes, caps, vehicles, councils, carbon and trips avoided</summary>")   /* REVERSED 11 Nov 2026 (D-F2, John's yes): the title names tonnes */
         && cOut.indexOf('data-clp="1"') > cOut.indexOf("<summary>More charts") && cOut.indexOf('data-clp="1"') < cOut.indexOf("<summary>Stockpile capacity"));
       ok("⭐ CLP: seven cards in the server's order, each in state set, each headline the server's words",
         CLPF.order.every(k => cP.includes(`data-clp-chart="${k}" data-clp-state="set"`))
