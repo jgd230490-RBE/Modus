@@ -196,6 +196,19 @@ ok("⭐ source: no sheet in export.py or supplier_orders.py prints the chips' sh
 _wk = _ex[_ex.index("def build_pdf(page):"):_ex.index("def _line_key(")]
 ok("the week's PDF: its vehicle cell goes through _vehicle_name (the not-baked note kept)",
    "P(f\"{E(_vehicle_name(c) or '—')}\"" in _wk and "not baked" in _wk)
+import lookahead  # noqa: E402
+_wg, _rg, _dm = lookahead.week_geometry, export.route_geometries, export.draw_route_map
+lookahead.week_geometry = lambda *a, **k: []          # the stub page has no database: no route ends, no map
+export.route_geometries = lambda *a, **k: []
+export.draw_route_map = lambda *a, **k: None
+try:
+    _wp = export.build_pdf(dict(page(["confirmed"]), commit_week={"from": "2026-11-09", "to": "2026-11-15"}))
+    _wt = " ".join(pdf_text(_wp, raw=True).split())
+except Exception as _e:
+    _wt = "BUILD FAILED " + repr(_e)
+lookahead.week_geometry, export.route_geometries, export.draw_route_map = _wg, _rg, _dm
+ok("⭐ the week's PDF, built: the vehicle cell reads 'Artic Tipper (44t)' (the short 'Tipper (44t)' never on its own)",
+   ART in _wt and not re.search(r"(?<!Artic )Tipper \(44t\)", _wt), _wt[:600])
 ok("supplier orders: the vehicle is conversions.vehicle_label of the line's key",
    'conversions.vehicle_label(factors, c.get("vehicle_type")) if c.get("vehicle_type") else c.get("vehicle_short")' in _so)
 
