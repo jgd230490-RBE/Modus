@@ -206,8 +206,10 @@ for (const fn of ["walkPortal", "walkTeam"]) {
   const s = fnSrc(fn), p = s.indexOf("const readyP = "), h = s.indexOf('[data-guide="page-header"] h2'), a = s.indexOf("await readyP");
   ok(`wiring: ${fn} starts the page-ready clock BEFORE the header wait and reads it after (never inside the 20 s wait)`, p > 0 && h > p && a > h);
 }
-ok("wiring: the portal's header wait also ends on a phone's desk-only card",
-   /page-header"\] h2'\); return \(h && h\.textContent\.trim\(\) === t\) \|\| !!document\.querySelector\("\[data-desk-only\]"\)/.test(fnSrc("walkPortal")));
+// reversed the same evening: ending the header wait on the desk-only card sped the phone walk up enough that the Look-ahead
+// and the Simulation at 390 no longer loaded behind the Dashboard's reads (runs 2 and 3); the walk keeps its old pacing
+ok("wiring: the portal's header wait does NOT end on a phone's desk-only card (the walk's pacing is unchanged by FR1)",
+   fnSrc("walkPortal").includes("return h && h.textContent.trim() === t; }, PAGE_TITLE[id], { timeout: 20000 })") && !/querySelector\("\[data-desk-only\]"\)/.test(fnSrc("walkPortal")));
 ok("wiring: every run starts with the rules' self-test in its own browser, and --self-test runs only that",
    audit.includes("await selfTestRules(browser);   // FR1") && audit.includes('else if (a === "--self-test") o.selfTest = true;') && fnSrc("selfTestRules").includes("RULES.FIXTURES"));
 ok("wiring: the measures are NOT part of the run's shape (a run before them pairs); the report carries ruleVersion",

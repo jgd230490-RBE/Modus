@@ -981,9 +981,11 @@ async function walkPortal(browser, base, look, accent, first, widths) {
       // FR1, A3: from the same hash set, polled alongside the header wait. The app's Route map is the public map in a frame:
       // timed on its own stop, map-page
       const readyP = id === "map" ? Promise.resolve(undefined) : timeReady(page, ts, { title: PAGE_TITLE[id] });
-      // the header, or (FR1, 10 Nov 2026) a phone's desk-only card, which has no header: until then each desk-only phone stop
-      // waited out the full 20 s here (about 8 minutes of a quick run)
-      if (PAGE_TITLE[id]) await page.waitForFunction((t) => { const h = document.querySelector('[data-guide="page-header"] h2'); return (h && h.textContent.trim() === t) || !!document.querySelector("[data-desk-only]"); }, PAGE_TITLE[id], { timeout: 20000 }).catch(() => {});
+      // the header (a phone's desk-only card has none, so that stop waits the full 20 s here, as it always has). FR1 tried ending
+      // the wait on the desk-only card (10 Nov 2026): the walk then reached the phone's Simulation and Look-ahead while the
+      // local server was still busy with the Dashboard's reads — the Look-ahead sat on "Loading the week…" for 35 s and the
+      // Simulation never showed a figure in 20 s, in both runs. The pacing is the walk's, not FR1's: kept as it was
+      if (PAGE_TITLE[id]) await page.waitForFunction((t) => { const h = document.querySelector('[data-guide="page-header"] h2'); return h && h.textContent.trim() === t; }, PAGE_TITLE[id], { timeout: 20000 }).catch(() => {});
       const switched = Date.now() - ts;
       const readyMs = await readyP;
       await audit(page, store, meta(id, w, { portal: true, page: id, readyMs }));
