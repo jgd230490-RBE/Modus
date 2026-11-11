@@ -13444,6 +13444,11 @@ const simMapStyle = () => (typeof document !== "undefined" && document.documentE
 // the data pages' map also follows a change of look unless someone picked its basemap by hand. The Route map (the embedded
 // public map page) reads the look itself.
 const lookMapStyle = () => { try { return simMapStyle(); } catch (e) { return "mapbox://styles/mapbox/light-v11"; } };   // a page with no look yet (drawn before the app starts) opens on Light
+// 11 Nov 2026 (card B-X1): a dark ground under the data pages' map (the public map's labelsDark test), and the zone
+// names' paint on it: the public map's name rule (labelPaint), near-white on a near-black halo, else ink on white
+const mapGroundDark = (style) => /dark|night|satellite|maaamet/.test(String(style || ""));
+const zoneLabelPaint = (dark) => ({ "text-color": dark ? "#F5F5F4" : "#1F2024",
+  "text-halo-color": dark ? "rgba(18,19,22,0.92)" : "#FFFFFF", "text-halo-width": 1.75, "text-halo-blur": 0.5 });
 // the map: its own Mapbox instance (CommitMap's pattern), drawn from the reply and redrawn at each clock minute; `wall` = the
 // big screen (the key stays a box over the map there; on the page it is a row under it)
 function SimMap({ meta, D, store, frame, site, wall }){
@@ -16266,6 +16271,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [summary, setSummary] = useState(null);
   const [basemap, setBasemap] = useState(() => lookMapStyle());
   const basemapByHand = useRef(false);   // 10 Nov 2026 (card 14): a pick in the Basemap select is kept when the look changes
+  const basemapShown = useRef(null);     // 11 Nov 2026 (card B-X1): the style last set, for the zone names' ground
   const [showProfile, setShowProfile] = useState(vehicles.includes("Artic Tipper (44t)") ? "Artic Tipper (44t)" : vehicles[0]);
   // which of the baked geometries the map draws. A route now has two directions and up
   // to three HERE options each, so without a pick the map would stack six lines per route.
@@ -16592,9 +16598,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                // a zone that is out of its date window is dashed, not hidden — it still
                // explains a bake that happened while it applied
                "line-dasharray": ["case", ["get", "in_force"], ["literal", [1, 0]], ["literal", [2, 2]]] } });
+    // 11 Nov 2026 (card B-X1): the zone names follow the public map's name rule — ink on a soft white halo, near-white on a
+    // near-black halo on a dark ground (Dark, Navigation night, the aerial styles). Before, slate on a thick white halo read
+    // as a row of white blocks on Dark. 12 px, the app's floor (was 11). Set again after the add: a kept layer keeps old paint.
+    const zonePaint = zoneLabelPaint(mapGroundDark(basemapShown.current || basemap));
     if(!m.getLayer("zone-label")) m.addLayer({ id: "zone-label", type: "symbol", source: "zones",
-      layout: { "text-field": ["get", "name"], "text-size": 11, "symbol-placement": "point" },
-      paint: { "text-color": "#334155", "text-halo-color": "#ffffff", "text-halo-width": 2 } });
+      layout: { "text-field": ["get", "name"], "text-size": 12, "symbol-placement": "point" },
+      paint: zonePaint });
+    Object.keys(zonePaint).forEach(k => { try { m.setPaintProperty("zone-label", k, zonePaint[k]); } catch(e){} });
     if(!m.getLayer("draw-line")) m.addLayer({ id: "draw-line", type: "line", source: "draw",
       paint: { "line-color": "#DC2626", "line-width": 2.5, "line-dasharray": [2, 1.5] } });
     if(!m.getLayer("draw-vertex")) m.addLayer({ id: "draw-vertex", type: "circle", source: "draw",
@@ -16703,6 +16714,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
   const changeStyle = (val, auto) => {
     if(!auto) basemapByHand.current = true;
+    basemapShown.current = val;
     setBasemap(val);
     const m = mapObj.current;
     if(!m) return;
