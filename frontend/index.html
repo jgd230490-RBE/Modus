@@ -392,6 +392,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .so-name{flex:1;min-width:0;font-size:14px;} .so-name small{display:block;font-size:12px;color:var(--popover-muted);}
   .row-menu-list .so-row button{display:inline-block;width:auto;padding:7px 10px;text-decoration:underline;font-weight:600;}
   .row-menu-list button.so-all{margin-top:6px;text-align:center;background:var(--navy);color:var(--control-fg);font-weight:600;}
+  .row-menu-list hr.row-menu-sep{border:0;border-top:1px solid var(--popover-line);margin:4px 2px;}
   .row-menu-note{font-size:12px;color:var(--popover-muted);padding:6px 10px 4px;border-top:1px solid var(--popover-line);margin-top:4px;white-space:normal;}
   /* 27 Oct 2026 (the final UI pass, card 1): the one row-action pattern — a filled next step + the "⋯" menu (RowMenu) on every
      table; a list row that only ever loses a line gets a named "×" instead of a red Remove link */
@@ -1581,6 +1582,8 @@ const colorOf = (i) => tok(CHART_SLOTS[i] || "--chart-none", "#A8A29E");
 // `text` over 40 words, or a banned word anywhere in here. `value` (a prop, not an entry) carries
 // the exact, unrounded figure the old hover tooltip showed, so moving a figure here loses nothing.
 const INFO = {
+  // 11 Nov 2026 (card 3, John: yes): the "i" beside "Plan changed since Issue N" (its value: the first two changes)
+  "clp.changed": { title: "Since the last issue", text: "What changed in the plan since this CLP's last issue, as the approve card shows it." },
   "dash.material": { title: "Material in view", text: "The planned quantity of every plan line in view, in tonnes. Cubic metres and lorry loads become tonnes through each line's own conversion.", guide: "3-1-filters-and-the-six-cards", tech: "t1-volume" },
   "dash.deliveries": { title: "Lorry movements a day", text: "Deliveries in the months in view, divided by the working days in those months. A lorry coming and going is 2 movements, as councils count them (or 1 visit, if set so on Config → Planning).",
     how: "Trips are worked out for each month of each line: tonnes ÷ the vehicle's payload, rounded up. The working days in a month are set on Config → Planning.", guide: "3-1-filters-and-the-six-cards", tech: "t1-trips" },
@@ -1636,6 +1639,9 @@ const INFO = {
     how: "A lorry calls off where it arrives at a site that names the holding area, unless its type is exempt or its route is ticked. The most held comes from the Simulation's day, not from a count.", guide: "17-2-the-scenario", tech: "t1-holding" },
   "clp.trips_avoided": { title: "Lorry trips avoided", text: "Loads each month as planned and with the decisions agreed with the carbon target, and the difference.",
     how: "Only a decision that changes the lorry, the supplier or the route changes trips; one that changes only the material does not.", guide: "3-5-clp-monitoring", tech: "t1-clp" },
+  // 11 Nov 2026 (card 4, John's yes): the planned and recorded tonnes, first in CLP monitoring
+  "clp.recorded_tonnes": { title: "Planned and recorded tonnes", text: "Planned: the approved plan. Recorded: tonnes typed on Account (a week's actual), the Dashboard's Delivered against plan. A month with nothing typed is not recorded, not zero.",
+    guide: "3-5-clp-monitoring", tech: "t1-clp" },
   // 14 Oct 2026 (bundle G, W17)
   "la.lorryplan": { title: "Lorry plan", text: "Each lorry's day used to the full: one day's loads leaving one yard in one kind of lorry, chained into as few lorry-days as the UK drivers' hours rule allows, each lorry's trips in the driver's order.",
     how: "As booked is each line's own whole lorries, as the grid counts them. Chained by yard keeps the same loads on the same days with fewer lorries. Week compressed pools the week's loads so a part-used last lorry becomes one full lorry on fewer days: a suggestion until Apply. Planners and admins can drag a trip to another lorry of its yard (or, compressed, to another day); a drop that would pass the driver's day is refused, and the arrangement is kept for the week until its loads change. A planning figure, never a check of anyone's hours.", guide: "ug-lorry-plan", tech: "t1-lorry-plan" },
@@ -4052,6 +4058,24 @@ function clpTripsCfg(c){
       tooltip: { callbacks: { footer: (items) => items.length ? `${grp(m[items[0].dataIndex].avoided)} trips avoided` : "" } } },
       scales: { x: { grid: { display: false } } } } };
 }
+// 11 Nov 2026 (card 4): planned and recorded tonnes, a pair a month as the Dashboard's Delivered against plan; a month nobody
+// typed has no recorded bar (null), never a 0
+function clpRecordedCfg(c){
+  const C1 = tok("--chart-1", "#E8590C"), C1S = tok("--chart-1-soft", "rgba(232,89,12,.18)");
+  const m = c.months || [];
+  return { type: "bar", data: { labels: m.map(r => r.label), datasets: [
+      { label: "Planned", data: m.map(r => r.planned_t), backgroundColor: C1S, borderColor: C1, borderWidth: 1 },
+      { label: "Recorded", data: m.map(r => r.recorded_t == null ? null : r.recorded_t), backgroundColor: C1, borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } },
+      tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${it.raw == null ? "not recorded" : grp(it.raw) + " t"}` } } },
+      // 11 Nov 2026 (7a): a part month ("Nov 2026 (to 8 Nov)") is over the axis's 18 characters: two lines, as the Gate
+      // arrivals and route charts split theirs
+      scales: { x: { grid: { display: false }, ticks: { callback: function(v){ const r = m[v]; if(!r) return "";
+        const i = r.part_to ? r.label.indexOf(" (to ") : -1;
+        return i > 0 ? [cutLabel(r.label.slice(0, i)), cutLabel(r.label.slice(i + 1))] : cutLabel(r.label); } } },
+        y: { title: { display: true, text: "t" } } } } };
+}
 function ClpUncapped({ rows, nameKey, valKey, word, what }){
   const left = (rows || []).filter(r => r.cap == null);
   if(!left.length) return null;
@@ -4119,11 +4143,15 @@ function ClpMonitoring({ months, initial }){
         {err && <div className="ct-line" data-clp-error="1">The CLP figures did not load.</div>}
         {!data && !err && <div className="ct-line">Loading the CLP figures…</div>}
         {data && <>
-          <div className="ct-note">{data.scope_line} {data.limit}</div>
+          <div className="ct-note">{data.scope_line} {data.limit}{data.recorded_line ? " " + data.recorded_line : ""}</div>
           {data.peak_words && <div className="ct-note" data-clp-peak="1">{data.peak_words}</div>}
           <div className="clp-grid">
+            {/* 11 Nov 2026 (card 4, John's yes "First"): planned and recorded tonnes lead the section */}
+            {C.recorded_tonnes && <ClpCard c={C.recorded_tonnes} info={<InfoTip id="clp.recorded_tonnes" />} wide>
+              <ChartCanvas config={clpRecordedCfg(C.recorded_tonnes)} title={C.recorded_tonnes.title} />
+            </ClpCard>}
             <ClpCard c={C.route_caps} info={<InfoTip id="clp.route_caps" />} wide>
-              {capped(C.route_caps.rows).length > 0 && <ChartCanvas config={clpBulletCfg(capped(C.route_caps.rows), "movements_per_day", "route", "movements a day")} height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />}
+              {capped(C.route_caps.rows).length > 0 && <ChartCanvas config={clpBulletCfg(capped(C.route_caps.rows), "movements_per_day", "route", "visits a day")} height={Math.max(150, 46 * capped(C.route_caps.rows).length + 50)} />}
               <ClpUncapped rows={C.route_caps.rows} nameKey="route" valKey="movements_per_day" word="a day" what="route" />
             </ClpCard>
             <ClpCard c={C.site_caps} info={<InfoTip id="clp.site_caps" />} wide>
@@ -5891,6 +5919,13 @@ function ClpPage({ access }){
     return () => { live = false; };
   }, [tick]);
   useEffect(() => { if(panel && headRef.current) headRef.current.focus(); }, [panel]);
+  // 11 Nov 2026 (card 3, John: yes): which issued CLPs' plans moved since their last issue (read after the list is drawn)
+  const [changed, setChanged] = useState({});
+  useEffect(() => { let live = true;
+    if(!data || !(data.clps || []).some(c => c.status === "approved" && c.issues > 0)) return;
+    fetch(`${API}/clp/plan-changed`).then(r => okJSON(r)).then(j => { if(live) setChanged((j && j.changed) || {}); })
+      .catch(e => console.warn("Wayscope:", e));
+    return () => { live = false; }; }, [data]);
   const say = (ok, text) => { setNote({ ok, text }); if(ok) setTimeout(() => setNote(null), 3000); };
   if(err) return <div className="max-w-7xl mx-auto p-6"><EmptyState kind="error" title="Couldn't open the CLPs" body={err} action={<button type="button" className="btn-sec" onClick={() => setTick(t => t + 1)}>Try again</button>} /></div>;
   if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;
@@ -6147,6 +6182,14 @@ function ClpPage({ access }){
   const statusLine = (c) => c.status === "sent" ? `by ${c.sent_by || "the team"} · ${clpDay(c.sent_at)}`
     : c.status === "changes" ? (c.changes_note ? `“${c.changes_note}”` : "") : "";
   // PR 3c: where the last issue sent to each client group stands (Returned in red)
+  // 11 Nov 2026 (card 3 of notes\clp-before-friday-mockup-1111, John: yes): "Plan changed since Issue N" under an issued
+  // CLP whose plan moved since its last issue; the "i" gives the first two changes in the approve card's words. Read after
+  // the list is drawn; a failed read shows nothing (the line is a hint, never a status)
+  const changedLine = (c) => { const ch = c.status === "approved" ? changed[c.id] : null;
+    if(!ch || !(ch.changes || []).length) return null;
+    const first = ch.changes.slice(0, 2).map(w => w + ".").concat(ch.changes.length > 2 ? [`The rest: Approve as Issue ${ch.issue + 1}…`] : []);
+    return <span className="block text-[12px] text-slate-500" data-clp-changed={c.id}>Plan changed since Issue {ch.issue}
+      <InfoTip id="clp.changed" label={`Since Issue ${ch.issue}`} value={first} /></span>; };
   const reviewLine = (r) => r.state === "accepted" ? [`✓ Accepted by ${r.group_name} · ${clpShort(r.at)}`, "var(--ok-text)"]
     : r.state === "returned" ? [`Returned by ${r.group_name} · ${clpShort(r.at)}`, "var(--bad-text)"]
     : [`With ${r.group_name} · since ${clpShort(r.sent_at)}`, "var(--muted)"];
@@ -6160,8 +6203,8 @@ function ClpPage({ access }){
     if(open && canEdit && coverLeft) return ["cover", `Fill in the cover (${c.cover_typed || 0} of ${c.cover_total})`, () => openEdit(c)];
     if(open && !appr && data.team) return ["send", "Send for approval…", () => openSend(c)];
     if(open && appr) return ["approve", `Approve as Issue ${c.next_issue}…`, () => openApprove(c)];
-    if(appr && c.status === "approved" && data.review_groups && c.issues > 0 && !(c.reviews || []).length)
-      return ["review", `Send Issue ${c.last_issue ? c.last_issue.no : c.issues} to reviewers…`, () => openReview(c)];
+    // REVERSED 11 Nov 2026 (the CLOCS live check, card 1 of notes\clp-before-friday-mockup-1111, John: yes): sending an
+    // issue to the client's reviewers is never the row's button (it sat 8 px from the "⋯"); it is in the "⋯" only
     return null;
   };
   const primary = (c, child) => {
@@ -6203,6 +6246,7 @@ function ClpPage({ access }){
       </td>
       <td className="rd-status" style={{ whiteSpace: "normal" }}><RowStatus word={c.status_word} tone={CLP_TONE[c.status]} more={0} />
         {statusLine(c) && <span className="block text-[12px] text-slate-500">{statusLine(c)}</span>}
+        {changedLine(c)}
         {(c.reviews || []).map(r => { const [w, col] = reviewLine(r);
           return <span key={r.group_id} className="block text-[12px]" style={{ color: col }} data-clp-review-line={r.state}>{w}</span>; })}</td>
       <td>{c.last_issue ? <>Issue {c.last_issue.no} · {clpDay(c.last_issue.date)}{appr && c.last_issue.by ? <span className="block text-[12px] text-slate-500">{c.last_issue.by}</span> : null}</> : "—"}</td>
@@ -6212,15 +6256,18 @@ function ClpPage({ access }){
         : tk(c).notes > 0 ? <span className="text-slate-600">{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}</span> : tk(c).client_open > 0 ? null : "—"}
         {tk(c).client_open > 0 && <span className="block text-[12px] text-slate-600" data-clp-tasks-client="1">+ {tk(c).client_open} with the client</span>}</td>
       <td><div className="flex items-center gap-2 justify-end">{primary(c, child)}
+        {/* 11 Nov 2026 (card 1, John: yes): the items that only read first; under a line the ones that write or send, so
+            nothing that writes sits next to Download draft */}
         <RowMenu name={c.name + " · " + teamWord(c)}>
           <button type="button" onClick={() => draft(c)} disabled={!!building}>Download draft</button>
+          <button type="button" onClick={() => openNotes(c)}>Notes and tasks{tk(c).open > 0 ? ` (${tk(c).open} open)` : ""}</button>
+          {c.issues > 0 && <button type="button" onClick={() => openHistory(c)}>Document history</button>}
+          {(appr || canEdit || data.team) && <hr className="row-menu-sep" data-clp-menu-sep="1" />}
+          {appr && data.review_groups && c.issues > 0 && <button type="button" onClick={() => openReview(c)}>Send Issue {c.last_issue ? c.last_issue.no : c.issues} to reviewers…</button>}
           {appr && c.status !== "sent" && !(ns && ns[0] === "approve") && <button type="button" onClick={() => openApprove(c)} disabled={!!building}>Approve as Issue {c.next_issue}…</button>}
           {appr && c.status === "sent" && <button type="button" onClick={() => openChanges(c)}>Ask for changes…</button>}
           {canEdit && <button type="button" onClick={() => openEdit(c)}>{appr ? "Edit" : "Edit cover details"}</button>}
           {!appr && data.team && !(ns && ns[0] === "send") && <button type="button" onClick={() => openSend(c)}>{c.status === "sent" ? "Send for approval (sent)" : "Send for approval…"}</button>}
-          <button type="button" onClick={() => openNotes(c)}>Notes and tasks{tk(c).open > 0 ? ` (${tk(c).open} open)` : ""}</button>
-          {appr && data.review_groups && c.issues > 0 && !(ns && ns[0] === "review") && <button type="button" onClick={() => openReview(c)}>Send Issue {c.last_issue ? c.last_issue.no : c.issues} to reviewers…</button>}
-          {c.issues > 0 && <button type="button" onClick={() => openHistory(c)}>Document history</button>}
           {appr && c.issues === 0 && (!c.auto || c.saved) && <button type="button" style={{ color: "var(--red)" }} onClick={() => remove(c)}>{c.auto ? "Clear typed details…" : "Delete…"}</button>}
         </RowMenu></div></td>
     </tr>); };

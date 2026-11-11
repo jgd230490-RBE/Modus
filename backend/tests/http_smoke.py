@@ -1208,10 +1208,20 @@ with TestClient(main.app, base_url="https://testserver") as c:
     cm = r.json() if r.status_code == 200 else {}
     ch = cm.get("charts") or {}
     # RE-PINNED 29 Oct 2026 (task 3c): eight charts — the holding areas' table after the site caps
-    ok("⭐ the planner reads CLP monitoring for Oct 2026 of the demo: eight charts in order, each set or empty with a sentence",
-       r.status_code == 200 and cm.get("label") == "Oct 2026" and cm.get("order") == ["route_caps", "site_caps", "holding_areas", "vehicle_types", "euro_class",
-                                                                                   "councils", "carbon_rate", "trips_avoided"]
+    # NARROWED 11 Nov 2026 (card 4, John's yes "First"): nine — the planned and recorded tonnes lead the order
+    ok("⭐ the planner reads CLP monitoring for Oct 2026 of the demo: nine charts in order, each set or empty with a sentence",
+       r.status_code == 200 and cm.get("label") == "Oct 2026" and cm.get("order") == ["recorded_tonnes", "route_caps", "site_caps", "holding_areas",
+                                                                                   "vehicle_types", "euro_class", "councils", "carbon_rate", "trips_avoided"]
        and all((c_.get("state") == "set") or (c_.get("state") == "empty" and c_.get("missing")) for c_ in ch.values()), r.text[:300])
+    _rt = ch.get("recorded_tonnes") or {}
+    ok("card 4 over HTTP: the tonnes chart holds no month after Oct 2026, never a 0 for a month not typed, and the limit is unchanged; "
+       "the recorded line rides only with a record",
+       cm.get("limit") == "Planned figures, not observed: Wayscope holds no gate log or arrival times."
+       and all(m["month_index"] <= 10 for m in _rt.get("months") or [])
+       and all(m["recorded_t"] is None or m["lines_reported"] > 0 for m in _rt.get("months") or [])
+       and ((_rt.get("state") == "set") == bool(cm.get("recorded_line")))
+       and (not cm.get("recorded_line") or cm["recorded_line"].startswith("Recorded tonnes as typed on Account, to ")),
+       str(_rt)[:300] + " | " + str(cm.get("recorded_line")))
     ok("the demo's vehicle chart is drawn (approved loads exist), its shares from the server",
        (ch.get("vehicle_types") or {}).get("state") == "set" and (ch.get("vehicle_types") or {}).get("series"), str(ch.get("vehicle_types"))[:200])
     ok("🔴 no team id and no team slot in the reply; the demo notice rides on it",

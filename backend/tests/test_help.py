@@ -862,8 +862,9 @@ def _png_size(path):
 _itags = re.findall(r"<img [^>]*>", src)
 _iattrs = [dict(re.findall(r'([a-z-]+)="([^"]*)"', t)) for t in _itags]
 _isizes = {a["src"]: _png_size(os.path.join(ROOT, "frontend", "help", a["src"])) for a in _iattrs}
+# NARROWED 10 Nov 2026 (wave 5, finding 22): 27 figures became 45 (the 22 grey frames are real screens, 18 figures added in chapters 2 and 14-20)
 ok3("\U0001f534 #17 every figure image (%d) carries width and height equal to its file's own pixels, and keeps loading=\"lazy\"" % len(_itags),
-   len(_itags) == 27 and all(a.get("loading") == "lazy" and _isizes[a["src"]]
+   len(_itags) == 45 and all(a.get("loading") == "lazy" and _isizes[a["src"]]
                              and (int(a.get("width", 0)), int(a.get("height", 0))) == _isizes[a["src"]] for a in _iattrs),
    str([(a["src"], a.get("width"), a.get("height"), _isizes[a["src"]]) for a in _iattrs
         if (int(a.get("width", 0)), int(a.get("height", 0))) != _isizes[a["src"]]]))
@@ -1549,6 +1550,21 @@ ok("ROAD CARD POLISH: technical T1 has the rounding rule, the idle routes, the m
                              "the 12 Oct whole-movements rule holds everywhere else")))
 ok("ROAD CARD EDGE: technical T1 says which side the road card opens on near the map's edges",
    all(w in _tg_rs for w in ('id="t1-road-edge"', "<code>secselSide</code>", "<code>SECSEL_HALF</code> = 200 px", "<code>secselRightEdge</code>")))
+# 10 Nov 2026 (road card top: a card opened above a click lost its first lines under the figures bar)
+ok("ROAD CARD TOP: technical T1 says the card's room starts under the figures bar and when it opens beside the click",
+   all(w in _tg_rs for w in ('id="t1-road-top"', "<code>secselTopEdge</code>", "<code>secselRoom</code>", "<code>SECSEL_NEED</code> = 290 px",
+                             "<code>SECSEL_WIDE</code> = 404 px", "<code>secselBeside</code>", "beside the click")))
+# 11 Nov 2026 (road card tall: a card with the "no loads" line lost its title under the figures bar)
+ok("ROAD CARD TALL: technical T1 says the card's fixed part is measured, what it is placed again by, and the numbers",
+   all(w in _tg_rs for w in ('id="t1-road-tall"', "<code>fitRoadPopup</code>", "<code>secselNeed</code>", "<code>SECSEL_MARGIN</code> = 14 px",
+                             "<code>SECSEL_MINROW</code> = 90 px", "no loads")))
+# 11 Nov 2026 (map popup top: a holding area's popup lost its title under the figures bar)
+ok("MAP POPUP TOP: technical T1 says every other map popup is placed clear of the figures bar by one hook, and when nothing is changed",
+   all(w in _tg_rs for w in ('id="t1-popup-top"', "<code>popupFit</code>", "<code>popupPlace</code>", "<code>addTo</code>", "<code>setDOMContent</code>",
+                             "<code>POPUP_GAP</code> = 6 px", "a new popup needs nothing extra", "is left alone")))
+ok("ONE POPUP: technical T1 says a place's or a gate's marker answers its click alone, and what gives way to it",
+   all(w in _tg_rs for w in ('id="t1-one-popup"', "<code>markerHitAt</code>", "<code>MARKER_CLICK_LAYERS</code>", "<code>limitHitAt</code>",
+                             "a shared section, a zone and a haul road give way")))
 # 10 Nov 2026 (map drawer polish; live test findings 4, 7, 8)
 ok("MAP DRAWER POLISH: technical T1 says how the drawer, the Conditions panel, the timeline bar and the demo notice keep clear of each other",
    all(w in _tg_rs for w in ('id="t1-drawer-clear"', "<code>--tl-foot</code>", "<code>drawer-open</code>", "<code>positionWarnStack</code>", "<code>--notice-h</code>")))
@@ -1557,5 +1573,11 @@ ok("MAP DRAWER POLISH: the map's carbon is no longer described as both legs (the
    and "use one average-laden factor on both legs, tailpipe only" not in _tg_rs
    and "The CO₂e of moving the material, both legs" not in open(HELP, encoding="utf-8").read()
    and "the share of the empty way back the route charges, exhaust only" in open(HELP, encoding="utf-8").read())
+# 11 Nov 2026 (card 4 of the CLP-before-Friday mockup, John: yes): the guide's 3.5 names the new first chart
+_h35 = open(HELP, encoding="utf-8").read()
+_h35 = _h35[_h35.index('<h2 id="3-5-clp-monitoring">'):_h35.index('<h1 id="4-submitting-a-forecast">')]
+ok("CLP RECORDED TONNES: guide 3.5 lists 'Planned and recorded tonnes' first, as typed on Account, never zero, never a lorry count",
+   _h35.index("<strong>Planned and recorded tonnes</strong>") < _h35.index("<strong>Routes against their planning cap</strong>")
+   and "tonnes typed on Account" in _h35 and "not recorded, never zero" in _h35 and "never a lorry count" in _h35)
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

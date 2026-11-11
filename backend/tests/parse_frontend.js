@@ -3217,6 +3217,32 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      [...used].every(k => INFOS[k]) && ids.every(k => used.has(k)), [...used].filter(k => !INFOS[k]).concat(ids.filter(k => !used.has(k))).join(", "));
   ok("...each entry's plain text is at most 40 words (the brief's limit; the rest goes in 'how')",
      ids.every(k => words(INFOS[k].text) <= 40), ids.filter(k => words(INFOS[k].text) > 40).join(", "));
+  // ---- 10 Nov 2026 (FR1, A2: notes\ux-programme-1109.md §3; John, decision U5 / mockup Q9): an "i" box shows AT MOST 30
+  // words. Counted on what the box shows when it opens, its `text` (whitespace-separated, as the 40-word check above); `how`
+  // sits behind the box's own fold ("How it is worked out") and is not counted. The 21 boxes over 30 on main 992c4d3 are
+  // pinned with their count: a pinned box may not grow, and the list may ONLY SHRINK — a pinned box brought within 30 words
+  // (or removed) must leave the list, and INFO_PINNED_MAX comes down with it; never raise either. A box not on the list fails
+  // at 31 words. The guide link (a new or changed box links to its user-guide section) is not checked yet: FR7.
+  const INFO_PINNED_30 = { "dash.carbon": 40, "dash.today_veh": 40, "fc.cost": 39, "dash.delivered": 38, "dash.sim": 38, "clp.holding_areas": 38,
+    "la.lorryplan": 37, "la.commit": 37, "dash.deliveries": 36, "routes.return": 35, "units": 35, "la.gates": 34, "la.spread": 34, "dash.gates": 33,
+    "map.commit.today": 33, "map.commit.week": 33, "dash.stock": 33, "dash.vehicles": 32, "la.cost_quote": 32, "clp.euro_class": 31, "clp.carbon_rate": 31 };
+  const INFO_PINNED_MAX = 21;
+  const over30 = (dict) => Object.keys(dict).filter(k => words(dict[k].text) > 30);
+  const unpinnedOver = (dict) => over30(dict).filter(k => !(k in INFO_PINNED_30));
+  ok(`⭐ FR1 A2: every "i" box shows at most 30 words, but the pinned (${over30(INFOS).length} over 30 today, ${Object.keys(INFO_PINNED_30).length} pinned)`,
+     unpinnedOver(INFOS).length === 0, unpinnedOver(INFOS).map(k => `${k} (${words(INFOS[k].text)})`).join(", "));
+  ok("...a pinned box does not grow past its pinned count",
+     Object.keys(INFO_PINNED_30).every(k => !INFOS[k] || words(INFOS[k].text) <= INFO_PINNED_30[k]),
+     Object.keys(INFO_PINNED_30).filter(k => INFOS[k] && words(INFOS[k].text) > INFO_PINNED_30[k]).join(", "));
+  ok(`...and the pinned list may only shrink: every pin is still a box over 30 words (one brought within 30, or gone, leaves the list), at most ${INFO_PINNED_MAX}`,
+     Object.keys(INFO_PINNED_30).length <= INFO_PINNED_MAX && Object.keys(INFO_PINNED_30).every(k => INFOS[k] && words(INFOS[k].text) > 30),
+     Object.keys(INFO_PINNED_30).filter(k => !INFOS[k] || words(INFOS[k].text) <= 30).map(k => k + (INFOS[k] ? ` (now ${words(INFOS[k].text)} words: take it out)` : " (gone: take it out)")).join(", "));
+  {
+    const w31 = Array.from({ length: 31 }, (_, i) => "word" + i).join(" "), w30 = w31.split(" ").slice(0, 30).join(" ");
+    ok("...and it bites: a made-up 31-word box fails it, a 30-word box does not, a pinned box one word longer than its pin fails",
+       unpinnedOver({ "made.up": { text: w31 } }).length === 1 && unpinnedOver({ "made.up": { text: w30 } }).length === 0
+       && words(Array.from({ length: INFO_PINNED_30["dash.carbon"] + 1 }, () => "w").join(" ")) > INFO_PINNED_30["dash.carbon"]);
+  }
   ok("...and no entry breaks the word rule",
      ids.every(k => ["title", "text", "how", "source"].every(f => !banOf(INFOS[k][f] || ""))), ids.filter(k => ["title", "text", "how", "source"].some(f => banOf(INFOS[k][f] || ""))).join(", "));
   ok("...every 'Read more' anchor exists in the user guide, every 'Technical detail' anchor in the technical guide",
@@ -3550,9 +3576,34 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("CLP: an empty chart is an EmptyState carrying the server's missing sentence; a set one its headline, how it is worked out and its source",
      clpc.includes('{c.state !== "set" ? <EmptyState kind="none" title="Not enough to draw this yet" body={c.missing} /> : <>')
      && clpc.includes('<details className="clp-how"><summary>How it is worked out</summary><p>{c.basis}</p></details>') && clpc.includes("Source: {c.source}"));
-  ok("CLP: each card carries its own literal info box (seven) and the section one",
-     ["clp.route_caps", "clp.site_caps", "clp.vehicle_types", "clp.euro_class", "clp.councils", "clp.carbon_rate", "clp.trips_avoided", "dash.clp"]
+  // NARROWED 11 Nov 2026 (card 4, John's yes): eight — the planned and recorded tonnes' own box joins them
+  ok("CLP: each card carries its own literal info box (eight) and the section one",
+     ["clp.recorded_tonnes", "clp.route_caps", "clp.site_caps", "clp.vehicle_types", "clp.euro_class", "clp.councils", "clp.carbon_rate", "clp.trips_avoided", "dash.clp"]
        .every(id => clpc.includes(`<InfoTip id="${id}" />`)));
+  // ---- 11 Nov 2026 (card 4 of the CLP-before-Friday mockup, John's yes "First"): planned and recorded tonnes
+  {
+    const grid = clpc.slice(clpc.indexOf('<div className="clp-grid">'));
+    const infoAt = src.indexOf('"clp.recorded_tonnes": {');
+    const infoTxt = infoAt > 0 ? (src.slice(infoAt, src.indexOf("\n", src.indexOf("text:", infoAt))).match(/text: "([^"]*)"/) || [])[1] || "" : "";
+    ok("⭐ CLP card 4: the planned and recorded tonnes card is the FIRST card in the grid, with its own info box",
+       grid.indexOf("<ClpCard c={C.recorded_tonnes}") > 0 && grid.indexOf("<ClpCard c={C.recorded_tonnes}") === grid.indexOf("<ClpCard ")
+       && grid.includes('<ClpCard c={C.recorded_tonnes} info={<InfoTip id="clp.recorded_tonnes" />} wide>')
+       && grid.includes("<ChartCanvas config={clpRecordedCfg(C.recorded_tonnes)} title={C.recorded_tonnes.title} />"));
+    // 11 Nov 2026 (7a): the part month's axis label ("Nov 2026 (to 8 Nov)", 19 characters) was cut by CHART_LABEL_MAX (18)
+    const recCfg = src.slice(src.indexOf("function clpRecordedCfg("), src.indexOf("function ClpUncapped("));
+    ok("🔴 CLP card 4 (7a): a part month's axis label is drawn on two lines (month, then '(to <date>)'), never cut",
+       recCfg.length > 200 && recCfg.includes('const i = r.part_to ? r.label.indexOf(" (to ") : -1;')
+       && recCfg.includes("[cutLabel(r.label.slice(0, i)), cutLabel(r.label.slice(i + 1))]"));
+    ok("⭐ CLP card 4: its info box says what planned and recorded mean in at most 30 words (FR1), and a month not typed is not zero",
+       infoTxt.split(/\s+/).filter(Boolean).length <= 30 && infoTxt.includes("Recorded: tonnes typed on Account")
+       && infoTxt.includes("not recorded, not zero"), `${infoTxt.split(/\s+/).filter(Boolean).length} words: ${infoTxt}`);
+    ok("🔴 CLP card 4: a month nobody typed draws NO recorded bar (null), never a 0; planned light, recorded the accent",
+       clpc.includes('{ label: "Recorded", data: m.map(r => r.recorded_t == null ? null : r.recorded_t), backgroundColor: C1, borderWidth: 0 }')
+       && clpc.includes('{ label: "Planned", data: m.map(r => r.planned_t), backgroundColor: C1S, borderColor: C1, borderWidth: 1 }')
+       && !/recorded_t\s*\|\|\s*0/.test(clpc) && clpc.includes('it.raw == null ? "not recorded"'));
+    ok("CLP card 4: the recorded line is said after the limit, only when the reply carries one; the limit stays as it was",
+       clpc.includes('<div className="ct-note">{data.scope_line} {data.limit}{data.recorded_line ? " " + data.recorded_line : ""}</div>'));
+  }
   ok("🔴 CLP colours are tokens only: the chart slots, the status red, the none grey, ink for a cap or target; Not typed is grey",
      !/#[0-9A-Fa-f]{6}\b(?!")/.test(clpc.replace(/tok\("[^"]+", "#[0-9A-Fa-f]{6}"\)/g, "")) && clpc.includes('s.group === CLP_NOT_TYPED ? tok("--chart-none", "#A8A29E") : colorOf(slot++)')
      && clpc.includes('const CLP_NOT_TYPED = "Not typed";'));
@@ -4967,6 +5018,22 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && cp.includes('const busyWords = "Building… about a minute";') && cp.includes('Anything left blank stays a yellow "To complete" line.')
      && cp.includes("Download gives back the file exactly as approved."));
   ok("CLP DOCS: the editor's CSS lives in the page (.clp-form grid, .clp-places)", html.includes(".clp-form{") && html.includes(".clp-places"));
+  // 11 Nov 2026 (card 3, John: yes): the plan-changed read sits with the page's other hooks, before its early returns
+  ok("🔴 CLP DOCS (card 3): the plan-changed hooks come before the page's early returns (React's order of hooks)",
+     cp.indexOf("const [changed, setChanged] = useState({});") > 0
+     && cp.indexOf("const [changed, setChanged] = useState({});") < cp.indexOf('if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;')
+     && cp.includes("fetch(`${API}/clp/plan-changed`).then(r => okJSON(r))") && code.includes('"clp.changed": { title: "Since the last issue"'));
+  // 11 Nov 2026 (cards 1-2 of notes\clp-before-friday-mockup-1111, John: yes)
+  const _ns = cp.slice(cp.indexOf("const nextStep = (c, child) => {"), cp.indexOf("const primary = (c, child) => {"));
+  ok("🔴 CLP DOCS (card 1): the next step is never the reviewers' send (no \"review\" step; it is in the \"⋯\" only)",
+     _ns.length > 300 && !_ns.includes('"review"') && !_ns.includes("to reviewers") && cp.includes("to reviewers…</button>"));
+  const _rm = cp.slice(cp.indexOf('<RowMenu name={c.name + " · " + teamWord(c)}>'), cp.indexOf("</RowMenu></div></td>"));
+  const _at = (s) => _rm.indexOf(s);
+  ok("⭐ CLP DOCS (card 1): the \"⋯\" lists what only reads first, then the line, then what writes or sends; Delete stays last",
+     _at(">Download draft<") > 0 && _at(">Download draft<") < _at("Notes and tasks") && _at("Notes and tasks") < _at(">Document history<")
+     && _at(">Document history<") < _at('className="row-menu-sep"') && _at('className="row-menu-sep"') < _at("to reviewers…")
+     && _at("to reviewers…") < _at("Approve as Issue {c.next_issue}…") && _at("Approve as Issue {c.next_issue}…") < _at("Ask for changes…")
+     && _at("Ask for changes…") < _at('"Edit cover details"') && _at('"Delete…"') > _at("Send for approval…") && html.includes(".row-menu-list hr.row-menu-sep{"));
   // 31 Oct 2026 (task 4a, PR 3b; the approved mockup notes\clp-notes-mockup-1031, Q1–Q12): notes and tasks on each CLP
   const cn = cp.slice(cp.indexOf("function ClpNotes("), cp.indexOf("function ClpPage("));
   ok("⭐ CLP NOTES: one read of the thread (GET …/notes) and its own writes (POST notes, POST tasks, PATCH and DELETE a task, DELETE a note); the reply's thread is drawn",

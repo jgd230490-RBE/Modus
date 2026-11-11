@@ -208,15 +208,17 @@ _body = " ".join(p.text)
 ok("no media placeholder text left on the page", "[SCREEN RECORDING" not in _body and "[EXPLAINER" not in src
    and "placeholder]" not in _body.lower())
 # NARROWED 13 Oct (second pass, the user): a reader sees "walkthrough", never "film" (files keep their names).
-ok("the walkthroughs note says all three are the fictional demo scheme",
-   "All three walkthroughs are recorded on the fictional demo scheme. Nothing in them is a real project." in _body)
+# NARROWED 10 Nov (UI critique 21): a fourth walkthrough, four screens; the note now says all four.
+ok("the walkthroughs note says all four are the fictional demo scheme",
+   "All four walkthroughs are on the fictional demo scheme. Nothing in them is a real project." in _body)
 _visible = re.sub(r"<style\b.*?</style>|<!--.*?-->|<[^>]+>", " ", src, flags=re.S)
 ok("🔴 no 'film' in anything a reader sees (text, alt, aria-label, captions)",
    not re.search(r"\bfilms?\b", _visible, re.I)
    and not re.search(r'\b(?:alt|aria-label|title|content)="[^"]*\bfilms?\b', src, re.I))
-ok("How it works says 'Three walkthroughs. One plan.' and labels each one",
-   "<h2>Three walkthroughs. One plan.</h2>" in src
-   and all(f'<p class="eyebrow">Walkthrough {n}</p>' in src for n in (1, 2, 3)))
+# NARROWED 10 Nov (UI critique 21): "Four walkthroughs. One plan."; the fourth is four screens, no video.
+ok("How it works says 'Four walkthroughs. One plan.' and labels each one",
+   "<h2>Four walkthroughs. One plan.</h2>" in src
+   and all(f'<p class="eyebrow">Walkthrough {n}</p>' in src for n in (1, 2, 3, 4)))
 
 # --- the hero (13 Oct, second pass, the user): the 6 Oct explainer back, its wording corrected, over the
 # fictional scheme's route network as the band's background ---------------------------------------------------
@@ -253,18 +255,22 @@ ok("the landing page says 'public map', never 'corridor map' (copy and the label
 import pathlib
 _still_path = lambda n: pathlib.Path(ROOT, "landing", "media", n + ".jpg")
 # NARROWED 13 Oct (second pass): the hero still gave way to the explainer; still-routes stays as two posters.
-_STILLS = ("still-fairprice", "still-lookahead")
+# NARROWED 10 Nov (UI critique 21): the Forecasts and Look-ahead screens are retaken from today's app, and Walkthrough 4 adds four.
+_STILLS = ("still-fairprice", "still-lookahead", "still-sim", "still-pours", "still-layout", "still-clp")
 _still_tags = re.findall(r'<figure class="shot"[^>]*>\s*<a href="\./media/([\w-]+)\.jpg"[^>]*><img ([^>]*)></a>', src)
-ok("two stills (the Film 2 screens), each linking to its own full-size image, in page order",
+ok("six stills (Walkthrough 2's two, Walkthrough 4's four), each linking to its own full-size image, in page order",
    [h for h, _ in _still_tags] == list(_STILLS)
    and all('src="./media/%s.jpg"' % h in t for h, t in _still_tags))
 _still_tags = [t for _, t in _still_tags]
 ok("⭐ every still's alt text says it is the fictional demo scheme",
-   len(_still_tags) == 2 and all(re.search(r'alt="[^"]*fictional demo scheme[^"]*"', t) for t in _still_tags))
+   len(_still_tags) == 6 and all(re.search(r'alt="[^"]*fictional demo scheme[^"]*"', t) for t in _still_tags))
 # NARROWED 13 Oct (second pass): the public-map still left the hero; still no alt text says "route map".
-ok("...and no alt text calls the map the route map; still-routes survives as a poster",
+# NARROWED 10 Nov 2026 (wave 5, finding 21): film 1's poster is the Routes screen (still-routes), film 3's the public map (still-map); both new
+ok("...and no alt text calls the map the route map; still-routes survives as film 1's poster, still-map as film 3's",
    not re.search(r'alt="[^"]*route map', src, re.I) and 'poster="./media/still-routes.jpg"' in src
-   and _still_path("still-routes").is_file())
+   and 'poster="./media/still-map.jpg"' in src
+   and all(_still_path(n).is_file() and _still_path(n).read_bytes()[:3] == b"\xff\xd8\xff" and _still_path(n).stat().st_size < 200 * 1024
+           for n in ("still-routes", "still-map")))
 ok("every still has width and height (no layout jump) and loads lazily",
    all('width="' in t and 'height="' in t and 'loading="lazy"' in t for t in _still_tags))
 ok("each still exists as a JPEG under 200 KB",

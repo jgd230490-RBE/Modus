@@ -2799,7 +2799,10 @@ def get_carbon_target():
     decisions or the page state (only the words of decisions that name no route).
     """
     acc = _require_access()
-    return carbon_target.payload(acc)
+    # 11 Nov 2026 (the one Dashboard read that was worked out afresh on every open):
+    # kept like the Dashboard's other reads, per role and team, until the next write (a PUT or DELETE writes the
+    # config row, so the next GET is built afresh).
+    return _staff_json("carbon/target", {}, lambda: carbon_target.payload(acc), acc)
 
 
 @app.put("/api/carbon/target")
@@ -4524,6 +4527,7 @@ def _warm_staff():
         lookahead_page(bucket="commit", route_id=None, restrictions_on=1, tark_tee=None)   # the Look-ahead page
         gate_arrivals_month(month=None)
         clp_monitoring(month=None)
+        get_carbon_target()                                                      # the Dashboard's carbon tile
         routes_status()
         routes_summary()
         routes_diversions(route_id=None)
@@ -5784,6 +5788,17 @@ def _clp_out(out):
 def clp_documents_list():
     """Every CLP the caller may see (a team its own; a planner or an admin all, the ones sent for approval first)."""
     return clp_records.list_for(_require_access())
+
+
+@app.get("/api/clp/plan-changed")
+def clp_plan_changed():
+    """
+    11 Nov 2026 (card 3, John: yes): each issued CLP whose plan changed since its last issue, with the approve card's
+    words. Read by the CLP list after it is drawn (the list stays quick); kept per role and team until the next write.
+    """
+    acc = _require_access()
+    factors = conversions.load_factors()
+    return _staff_json("clp/plan-changed", {}, lambda: clp_records.changed_since(acc, factors, _working_days(factors)), acc)
 
 
 @app.post("/api/clp/documents")

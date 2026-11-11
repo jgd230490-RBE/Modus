@@ -30,6 +30,7 @@ import weeks
 SLOTS = ("#E8590C", "#2563EB", "#0D9488", "#7C3AED", "#A07D34")
 NONE, RED, GOLD, INK, TRACK, GRID = "#A8A29E", "#DC2626", "#D97706", "#1E293B", "#F3F2EF", "#E2E8F0"
 NOT_TYPED = "Not typed"
+NOT_RECORDED = "not recorded"
 TITLE = "CLP monitoring pack"
 
 
@@ -86,8 +87,16 @@ def table_of(c, M):
     """(header, rows) for a chart in state 'set' — the figures the drawing shows, in words a reader can check."""
     k = c["key"]
     dw = c.get("distance_word") or ("lorry-miles" if M.get("distance_unit") == "mi" else "lorry-km")
+    if k == "recorded_tonnes":   # 11 Nov 2026 (card 4): a month nobody typed is "not recorded", never 0
+        return (["Month", "Planned t", "Recorded t", "Recorded share", "Lines reported"],
+                [[m["label"], _n(m["planned_t"], 0)]
+                 + ([_n(m["recorded_t"], 0), (f"{m['recorded_pct']} %" if m.get("recorded_pct") is not None else "—"),
+                     _n(m["lines_reported"], 0)] if m.get("recorded_t") is not None else [NOT_RECORDED, "—", "—"])
+                 for m in c.get("months") or []])
     if k == "route_caps":
-        return (["Route", "Movements a day", "Cap", "Share of cap", "Status"],
+        # 11 Nov 2026 (D-F5, John's yes): the figure is lorry VISITS a day (one load = one visit, the cap typed in visits),
+        # as the subtitle says; it was headed "Movements a day". The data key keeps its name.
+        return (["Route", "Visits a day", "Cap", "Share of cap", "Status"],
                 [[r["route"], _n(r["movements_per_day"]), (_n(r["cap"], 0) if r["cap"] is not None else "no cap typed"),
                   (f"{r['pct']} %" if r["pct"] is not None else "—"),
                   ("Over the cap" if r["over"] else ("Within the cap" if r["cap"] is not None else "Not compared"))]
@@ -378,12 +387,14 @@ def _chart_flowable(c, width, F):
                 self._fill(cv, INK); self._font(cv, size=7); cv.drawString(lx + 4 * mm, 1.4 * mm, name)
                 lx += 4 * mm + cv.stringWidth(name, F["regular"], 7) + 5 * mm
 
-        # --- loads as planned and with the decisions, a pair a month, the trips avoided over them
+        # --- loads as planned and with the decisions, a pair a month, the trips avoided over them; or (11 Nov 2026, card 4)
+        # tonnes planned and recorded, a pair a month, no figure over them and no recorded bar where nothing was typed
         def _pairs(self, cv):
             ms = c.get("months") or []
+            a_key, b_key, legend, over = pair
             left, bottom, legend_h = 14 * mm, 10 * mm, 6 * mm
             ph, pw = self.height - bottom - legend_h - 4 * mm, self.width - left - 4 * mm
-            top, step = nice_top(max([m["loads_planned"] for m in ms] + [1]) * 1.05)
+            top, step = nice_top(max([m[a_key] or 0 for m in ms] + [m[b_key] or 0 for m in ms] + [1]) * 1.05)
             n = max(1, len(ms))
             bw = min(10 * mm, pw / n * 0.3)
             self._stroke(cv, GRID, 0.4)
@@ -399,28 +410,30 @@ def _chart_flowable(c, width, F):
             fit = lambda fmt: all(cv.stringWidth(fmt(m), F["bold"], 7) + 1 * mm <= gap for m in ms if m["avoided"])
             words = (lambda m: f"{_n(m['avoided'], 0)} avoided")
             figure = (lambda m: _n(m["avoided"], 0))
-            say = words if fit(words) else (figure if fit(figure) else None)
+            say = (words if fit(words) else (figure if fit(figure) else None)) if over else None
             for i, m in enumerate(ms):
                 cx = xs[i]
-                h1, h2 = ph * m["loads_planned"] / top, ph * m["loads_with_decisions"] / top
+                h1 = ph * (m[a_key] or 0) / top
+                h2 = None if m[b_key] is None else ph * m[b_key] / top
                 self._fill(cv, "#F8C9AE"); self._stroke(cv, SLOTS[0], 0.6); cv.rect(cx - bw - 0.5 * mm, bottom, bw, h1, fill=1, stroke=1)
-                self._fill(cv, SLOTS[0]); cv.rect(cx + 0.5 * mm, bottom, bw, h2, fill=1, stroke=0)
-                if m["avoided"] and say:
+                if h2 is not None:
+                    self._fill(cv, SLOTS[0]); cv.rect(cx + 0.5 * mm, bottom, bw, h2, fill=1, stroke=0)
+                if over and m["avoided"] and say:
                     self._fill(cv, INK); self._font(cv, bold=True, size=7)
                     cv.drawCentredString(cx, bottom + max(h1, h2) + 1.5 * mm, say(m))
             self._months(cv, xs, [m["label"] for m in ms], bottom - 4 * mm)
             lx = left
-            for name, col in (("Loads as planned", "#F8C9AE"), ("With the agreed decisions", SLOTS[0])):
+            for name, col in zip(legend, ("#F8C9AE", SLOTS[0])):
                 self._fill(cv, col); cv.rect(lx, 1 * mm, 3 * mm, 3 * mm, fill=1, stroke=0)
                 self._fill(cv, INK); self._font(cv, size=7); cv.drawString(lx + 4 * mm, 1.4 * mm, name)
                 lx += 4 * mm + cv.stringWidth(name, F["regular"], 7) + 5 * mm
-            if any(m["avoided"] for m in ms) and say is not words:
+            if over and any(m["avoided"] for m in ms) and say is not words:
                 self._fill(cv, INK); self._font(cv, bold=True, size=7)
                 cv.drawString(lx, 1.4 * mm, "Figure over a pair: trips avoided" if say else "Trips avoided each month: the table below")
 
     rows_b = []
     if k in ("route_caps", "site_caps"):
-        vk, nk, word = (("movements_per_day", "route", "movements a day") if k == "route_caps"
+        vk, nk, word = (("movements_per_day", "route", "visits a day") if k == "route_caps"   # D-F5: visits, not movements
                         else ("visits_per_day", "site", "visits a day"))
         for r in c.get("rows") or []:
             if r.get("cap") is None:
@@ -460,6 +473,11 @@ def _chart_flowable(c, width, F):
         return Chart(58 * mm)
     if k == "trips_avoided":
         kind = "pairs"
+        pair = ("loads_planned", "loads_with_decisions", ("Loads as planned", "With the agreed decisions"), True)
+        return Chart(58 * mm)
+    if k == "recorded_tonnes":     # 11 Nov 2026 (card 4)
+        kind = "pairs"
+        pair = ("planned_t", "recorded_t", ("Planned", "Recorded"), False)
         return Chart(58 * mm)
     return None
 
@@ -483,10 +501,12 @@ def build_pdf(M, generated=None):
     title = _title(M)
     stamp = "Planned figures from the approved plan, not observed: Wayscope holds no gate log or arrival times."
     on_page = export.page_frame(W, H, lm, rm, _txt(title, fb), rule_y=H - 9 * mm, title_font=(F["bold"], 13),
-                                title_y=H - 15 * mm, right=(f"Generated {when}", F["regular"], 8, export.GREY),
+                                title_y=H - 15 * mm,
                                 sub=(stamp, F["regular"], 8, export.GREY, H - 20.5 * mm),
                                 notice=((_txt(notice, fb), F["bold"], 8.5, export.DEMO_FG_RGB, H - 25 * mm) if notice else None),
-                                foot=(f"{export._tenant_name()} · {TITLE}", F["regular"], 7, export.GREY))
+                                # 11 Nov 2026 (John: yes, 7c): "Generated <date>" ran into the title on page 1 (the title
+                                # with the scheme's name and the month fills the line); it goes to the foot, on every page
+                                foot=(_txt(f"{export._tenant_name()} · {TITLE} · Generated {when}", fb), F["regular"], 7, export.GREY))
     doc = export.frame_doc(buf, W, H, lm, rm, top, bottom, title, on_page)
     st = PS("b", fontName=F["regular"], fontSize=8.5, leading=11)
     st_g = PS("g", parent=st, fontSize=7.5, leading=9.5, textColor=colors.Color(*export.GREY))
@@ -499,7 +519,9 @@ def build_pdf(M, generated=None):
     def E(v):
         return _txt(v, fb).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-    story = [P_(E(f"{M.get('scope_line') or ''} {M.get('limit') or ''}"), st_g)]
+    # 11 Nov 2026 (card 4): the recorded line follows the limit here, not in the page stamp: the stamp is page_frame's one
+    # sub-line, and the two sentences together run past the page's width at 8 pt
+    story = [P_(E(" ".join(x for x in (M.get("scope_line"), M.get("limit"), M.get("recorded_line")) if x)), st_g)]
     if M.get("peak_words"):
         story.append(P_(E(M["peak_words"]), st_g))
     story.append(Spacer(1, 3 * mm))
@@ -554,7 +576,7 @@ def build_pdf(M, generated=None):
 # --------------------------------------------------------------------------- #
 #  XLSX                                                                        #
 # --------------------------------------------------------------------------- #
-SHEET = {"route_caps": "Routes vs cap", "site_caps": "Sites vs CLP cap", "holding_areas": "Holding areas", "vehicle_types": "By vehicle type",
+SHEET = {"recorded_tonnes": "Planned and recorded", "route_caps": "Routes vs cap", "site_caps": "Sites vs CLP cap", "holding_areas": "Holding areas", "vehicle_types": "By vehicle type",
          "euro_class": "By Euro class", "councils": "By council", "carbon_rate": "Carbon a tonne", "trips_avoided": "Trips avoided"}
 
 
@@ -582,7 +604,10 @@ def build_xlsx(M, generated=None):
     r = demo_row(ws)
     about = [("Pack", _title(M)), ("Month", M.get("label")),
              ("Generated", generated or datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z"),
-             ("Scope", M.get("scope_line")), ("Basis", M.get("limit")), ("Peak bands", M.get("peak_words") or "none typed"),
+             ("Scope", M.get("scope_line")), ("Basis", M.get("limit"))]
+    if M.get("recorded_line"):       # 11 Nov 2026 (card 4)
+        about.append(("Recorded", M["recorded_line"]))
+    about += [("Peak bands", M.get("peak_words") or "none typed"),
              ("Working days a month", M.get("working_days")),
              ("Charts in this pack", ", ".join(charts[k]["title"] for k in drawn) or "none")]
     about += [("Not drawn", f"{charts[k]['title']}: {charts[k].get('missing') or 'no data'}") for k in missing]

@@ -557,6 +557,40 @@ ok("🔴 every statement in clp_records names tenant_id (test_tenant_audit check
 ok("🔴 no BOOLEAN compared with a number", not re.search(r"\bactive\s*=\s*1\b", SRC))
 ok("🔴 no team slot id in the module's words", re.search(r"\bIPT ?[1-6]\b", SRC) is None)
 
+# 11 Nov 2026 (card 3 of notes\clp-before-friday-mockup-1111, John: yes; frontier D1): "Plan changed since Issue N"
+as_(PLANNER)
+PA = f"auto-{PILE}-all"
+_c0 = clp_records.changed_since(PLANNER, factors, WD)["changed"]
+ok("⭐ card 3: an issued CLP whose plan has not moved since its issue is left out; a draft with issues is never in it",
+   PA not in _c0 and Y1 not in _c0, str(_c0))
+_line(R_BTW, "substructure", "WS9", [(14, 1160.0)], ART, "IPT2", BAL)        # 40 more loads yard -> pile, Feb 2027
+config.invalidate()
+factors = conversions.load_factors()
+_c1 = clp_records.changed_since(PLANNER, factors, WD)["changed"]
+_pv = clp_records.preview(PA, PLANNER, factors, WD)
+ok("⭐ ...once its plan moves it is listed with its last issue's number and the approve card's very words",
+   PA in _c1 and _c1[PA]["issue"] == 1 and _c1[PA]["changes"] == _pv["changes"] and _pv["changes"] != [clp_records.NO_CHANGE],
+   str(_c1.get(PA)))
+ok("🔴 ...a team login is never told about a CLP it cannot see (the every-team CLP)",
+   PA not in clp_records.changed_since(NORTH, factors, WD)["changed"]
+   and PA not in clp_records.changed_since(CENTRAL, factors, WD)["changed"])
+_n0 = count_rows()
+clp_records.changed_since(PLANNER, factors, WD)
+ok("🔴 ...and reading it writes nothing", count_rows() == _n0)
+ok("at source: GET /api/clp/plan-changed is kept per role and team through _staff_json; changes() says 'no change' in ONE place",
+   '@app.get("/api/clp/plan-changed")' in MAIN and '_staff_json("clp/plan-changed", {}, lambda: clp_records.changed_since(acc, factors, _working_days(factors)), acc)' in MAIN
+   and SRC.count("No change in the plan's figures.") == 1 and "return out or [NO_CHANGE]" in SRC)
+
+# 11 Nov 2026 (card 2 of notes\clp-before-friday-mockup-1111, John: yes): an issued CLP reads "Issued" on the list and in
+# the Status filter; the key stays "approved"; the other three words are unchanged
+ok("⭐ card 2: the status words are Draft / Sent for approval / Changes asked / Issued (the key stays 'approved')",
+   clp_records.STATUS_WORDS == {"draft": "Draft", "sent": "Sent for approval", "changes": "Changes asked", "approved": "Issued"})
+_LI = clp_records.list_for(PLANNER, factors)
+_issued = [c for c in _LI["clps"] if c["status"] == "approved"]
+ok("...an issued CLP on the list says 'Issued', and the filter offers 'Issued'",
+   bool(_issued) and all(c["status_word"] == "Issued" for c in _issued)
+   and {"key": "approved", "word": "Issued"} in _LI["statuses"], str([c["status_word"] for c in _issued]))
+
 print()
 for f in FAIL:
     print("  FAIL:", f)
