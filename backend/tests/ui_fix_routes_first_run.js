@@ -87,8 +87,9 @@ const zoneTable = slice("<th className={th}>Name</th><th className={th}>Kind</th
 ok("⭐ 23: Zones open on the Name column: no ID header, no `{z.id}` cell, the first cell is the name button",
    !code.includes("<th className={th}>ID</th>") && !/<td className="px-3 py-2 font-mono text-xs text-slate-500">\{z\.id\}<\/td>/.test(zoneTable)
    && /<tr key=\{z\.id\} onClick=\{\(\) => editZone\(z\)\}[\s\S]{0,260}<td className="px-3 py-2 font-medium">\s*<button type="button" className="row-open" data-zone-open=\{z\.id\}/.test(zoneTable));
+// NARROWED 11 Nov 2026 (CLOCS B-F4): the dates read through dayWords ("5 Oct 2026") and the cells carry data-zone-from / -to
 ok("...Zones' dates and 'Used by' stay on one line, and 'route(s)' is a plural",
-   (zoneTable.match(/style=\{\{ whiteSpace: "nowrap" \}\}>\{z\.(starts|ends)_on/g) || []).length === 2 && !/route\(s\)/.test(zoneTable)
+   (zoneTable.match(/style=\{\{ whiteSpace: "nowrap" \}\}(?: data-zone-(?:from|to)=\{z\.id\})?>\{(?:dayWords\()?z\.(starts|ends)_on/g) || []).length === 2 && !/route\(s\)/.test(zoneTable)
    && zoneTable.includes('route{haulUse[z.id] === 1 ? "" : "s"}'));
 ok("⭐ 23: an editor's heading and the route pickers name the place or zone, never its code ('Editing Northfield Quarry'; no '(L001)' in an option)",
    code.includes('`Editing ${(locs.find(l => l.id === form.id) || {}).name || "location"}`') && code.includes('`Editing ${(zoneList.find(z => z.id === zoneForm.id) || {}).name || "zone"}`')

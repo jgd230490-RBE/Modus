@@ -4146,8 +4146,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && (code.match(/<label key=\{cat\} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">/g) || []).length === 3
      && code.includes('<label key={v} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">')
      && !code.includes('className="flex items-center gap-2 text-xs text-slate-700">') && !code.includes('className="flex items-center gap-1 text-[13px] text-slate-600 whitespace-nowrap">'));
-  ok("#29: the Routes table's Route button (the one that spends HERE calls) is the row's one visible small button; Edit and Delete are in its \"⋯\" (NARROWED 27 Oct 2026, the final UI pass)",
-     code.includes('className="btn-sec btn-sm mr-1">') && code.includes("<span onClick={e => e.stopPropagation()}><RowMenu name={r.id}>")
+  ok("#29: the Routes table's Route (the one that spends HERE calls) is in the row's \"⋯\" with Edit and Delete, and asks first (REVERSED 11 Nov 2026, CLOCS card B-F6; it was the row's one visible small button, 27 Oct)",
+     !code.includes('className="btn-sec btn-sm mr-1">') && code.includes("<span onClick={e => e.stopPropagation()}><RowMenu name={r.id}>")
+     && code.includes("onClick={() => routeAgainAsk(r)}>{Object.keys(r.profiles || {}).length ? \"Route again\" : \"Route\"}</button>")
+     && code.includes("if(!confirm(had ? `Route ${r.id} again? Its lines are replaced.` : `Route ${r.id}?`)) return;")
      && !code.includes('hover:underline text-xs font-semibold mr-3">Edit</button>'));
   ok("no visible word changed in the app for this branch: the pill still says Guide, the eye Show / Hide password, the links their two sentences",
      code.includes('<button type="button" className="demo-bar-guide" onClick={onGuide} title="Replay the guide for this page">Guide</button>')

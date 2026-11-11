@@ -427,8 +427,13 @@ def gather(route_ids, lorry=None, sections=None, acc=None, now=None):
              "loaded_words": base["loaded_words"], "return_words": base["return_words"], "vehicle": base["vehicle"],
              "vehicle_text": base["vehicle_text"], "drawn": base["drawn"], "team": base.get("team"),
              "drawn_for_other": bool(used and base["vehicle"] and base["vehicle"] != used)}
-        R["out_m"] = collisions.line_length_m(index, base["loaded"]) if len(base["loaded"]) >= 2 else None
-        R["back_m"] = collisions.line_length_m(index, base["return"]) if len(base["return"]) >= 2 else None
+        # 11 Nov 2026 (CLOCS card B-F7): the header gives the route's stored (routed) length, as the Routes screen and
+        # the Route sheet do (R001: 19.1 mi, where the drawn line measured 18.9); the drawn line's own length only where
+        # no distance is stored. The line's length still places things along it (a limit "5.2 mi from A").
+        R["out_m"] = (base["loaded_km"] * 1000.0 if base.get("loaded_km") is not None
+                      else (collisions.line_length_m(index, base["loaded"]) if len(base["loaded"]) >= 2 else None))
+        R["back_m"] = (base["return_km"] * 1000.0 if base.get("return_km") is not None
+                       else (collisions.line_length_m(index, base["return"]) if len(base["return"]) >= 2 else None))
         if "limits" in sections:
             R["limits"] = _limits(rid, base["vehicle"], base["loaded"], base["return"], index)
             R["closures"] = _held_closures(rid, base["vehicle"]) if base["drawn"] else {"held": False, "hits": [],

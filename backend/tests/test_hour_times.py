@@ -387,9 +387,10 @@ ok("⭐ 6. the button: admins only, its call count on it and in the question, cl
    and "routing calls. ` +" in _dm and "The plan's figures do not change." in _dm
    and "admin/hour-times/clear" in _dm and 'postRouteBatch(new URLSearchParams({ limit: "30" }), setRouteMsg, "hour-times/bake")' in _dm
    and "if(left >= last) throw" in _dm)
+# NARROWED 11 Nov 2026 (CLOCS B-F6): Busy-hour times moved into the Routing menu, one job a line there
 ok("6. the header's buttons wrap as whole buttons; the new one keeps its words on one line (card 2)",
    '<span className="flex items-center gap-2" style={{ flexWrap: "wrap", justifyContent: "flex-end" }}>' in _fe
-   and 'data-hour-bake style={{ whiteSpace: "nowrap" }}' in _fe)
+   and 'data-hour-bake style={{ whiteSpace: "nowrap" }}' in _fe and "<RoutingMenu busy={routeBusy}>" in _fe)
 _shown = (re.findall(r"setRouteMsg\(`([^`]*)`\)", _dm) + re.findall(r"confirm\(`([^`]*)`", _dm)
           + re.findall(r"` It takes [^`]*`", _ra)
           + [_ra.split("data-hour-note>")[1].split("</p>")[0], "Busy-hour times · calls"])
@@ -405,7 +406,8 @@ ok("6. the evidence PDF draws the block after By time of day, and the XLSX puts 
    and 'cell.fill = PatternFill("solid", fgColor="DCFCE7")' in _x and '"cycle_by_hour": _cycle_by_hour(route_id)' in read("backend/collisions.py"))
 _ug, _tg = read("frontend/help/index.html"), read("frontend/help/technical/index.html")
 ok("6. the user guide says it in plain words; the technical guide has the detail",
-   "<strong>Busy-hour times</strong> (admins, beside Route all)" in _ug and "The plan's own figures do not change." in _ug
+   # NARROWED 11 Nov 2026 (CLOCS B-F6): beside Route all, both now in the Routing menu
+   "<strong>Busy-hour times</strong> (admins, in <strong>Routing &#9662;</strong>)" in _ug and "The plan's own figures do not change." in _ug
    and 'id="t2-hour-times"' in _tg and "route_hour_times" in _tg)
 
 # 29 Oct 2026 (John: "please ensure full outline of this is in user and tech guide. try and include how here exactly ranks")
