@@ -3475,6 +3475,7 @@ async function clpDocsDom(){
     statuses: ["draft", "sent", "changes", "approved"].map(k => ({ key: k, word: { draft: "Draft", sent: "Sent", changes: "Changes asked", approved: "Approved" }[k] })) };
   // 31 Oct 2026 (PR 3c): with rvOn the list carries the client groups' lines (Returned in red)
   let rvOn = false;
+  let CHANGED = {};      // 11 Nov 2026 (card 3): GET /api/clp/plan-changed's answer
   const RV_LINES = { "auto-L019-IPT1": [{ group_id: "G1", group_name: "Highways client (fictional)", issue_no: 1, state: "waiting", sent_at: "2026-10-21T10:00:00Z" },
                                         { group_id: "G2", group_name: "Rail client (fictional)", issue_no: 1, state: "returned", at: "2026-10-29T10:00:00Z" }],
                      "auto-L019-IPT2": [{ group_id: "G1", group_name: "Highways client (fictional)", issue_no: 1, state: "accepted", at: "2026-10-27T10:00:00Z" }] };
@@ -3501,6 +3502,7 @@ async function clpDocsDom(){
       ...(rvOn ? { review_send: { sent: [{ group_id: "G1", group_name: "Highways client (fictional)", email: { sent: 2 } }], skipped: [] } } : {}) });
     if (/\/send$/.test(url) && method === "POST") return reply(200, { ok: true });
     if (/^\/api\/clp\/documents\/[^/]+$/.test(url) && method === "PATCH") return reply(200, { ok: true });
+    if (url === "/api/clp/plan-changed" && method === "GET") return reply(200, { changed: CHANGED });   // 11 Nov 2026 (card 3)
     return reply(404, { detail: "no" });
   };
   const mount = async (role) => { acc = role; calls.length = 0; const el = w.document.createElement("div"); w.document.body.appendChild(el); const r = w.ReactDOM.createRoot(el);
@@ -3774,7 +3776,52 @@ async function clpDocsDom(){
      rsc && JSON.stringify(rsc.body) === JSON.stringify({ groups: ["G2"], issue_no: 1 }) && rv.el.textContent.includes("Issue 1: Sent to Rail client (fictional).") && !sp());
   ok("🔴 CLP REVIEWERS DOM: no team id anywhere", !/IPT\d/.test(rv.el.textContent));
   await rv.done();
+  // 11 Nov 2026 (card 1 of notes\clp-before-friday-mockup-1111, John: yes; the CLOCS live check found Harborough
+  // Compound's one button reading "Send Issue 1 to reviewers…", 8 px from the "⋯"): an issued CLP with a reviewers' group
+  // and no review yet has NO button on its row; the send is in the "⋯", under the line, after the items that only read
+  const _rvKeep = RV_LINES["auto-L019-IPT2"];
+  delete RV_LINES["auto-L019-IPT2"];
+  const r1 = await mount(plannerAcc);
+  const r1row = () => r1.el.querySelector('[data-clp-row="auto-L019-IPT2"]');
+  const r1menu = () => [...r1row().querySelector("details.row-menu .row-menu-list").children];
+  const r1words = () => r1menu().map(x => x.tagName === "HR" ? "|" : x.textContent).join(" · ");
+  ok("⭐ CLP ROW (card 1): an issued CLP with a reviewers' group and no review has no button on its row (only the \"⋯\")",
+     !!r1row() && !r1row().querySelector("[data-clp-primary]") && ![...r1row().querySelectorAll("td:last-child > div > button")].length,
+     r1row() ? r1row().textContent : "no row");
+  ok("⭐ CLP ROW (card 1): its \"⋯\" reads first (Download draft, Notes and tasks, Document history), then a line, then Send Issue 1 to reviewers… and Approve as Issue 2…",
+     r1words() === "Download draft · Notes and tasks (1 open) · Document history · | · Send Issue 1 to reviewers… · Approve as Issue 2… · Edit", r1words());
+  ok("🔴 CLP ROW (card 1): nothing that writes is next to Download draft (the item after it only reads)",
+     r1menu()[0].textContent === "Download draft" && r1menu()[1].textContent.startsWith("Notes and tasks"));
+  await press([...r1row().querySelectorAll("button")].find(b => b.textContent === "Send Issue 1 to reviewers…"));
+  ok("CLP ROW (card 1): \"⋯ → Send Issue 1 to reviewers…\" still opens the send card (it reads; nothing is sent)",
+     !!r1.el.querySelector("[data-clp-review-send]") && !calls.some(c => /review-send$/.test(c.url) && c.method === "POST" && c.body && c.body.issue_no === 1 && c.url.includes("IPT2")));
+  await r1.done();
+  RV_LINES["auto-L019-IPT2"] = _rvKeep;
   rvOn = false;
+  // 11 Nov 2026 (card 3 of notes\clp-before-friday-mockup-1111, John: yes; frontier D1): "Plan changed since Issue N"
+  CHANGED = { "auto-L019-IPT2": { issue: 1, changes: ["Earthworks: 1 240 → 1 310 loads", "Busiest month now Apr 2029 (was Mar 2029)", "Route R009 added"] },
+              "auto-L019-IPT1": { issue: 1, changes: ["Route R001 no longer used"] } };
+  const c3 = await mount(plannerAcc);
+  const c3line = (id) => c3.el.querySelector(`[data-clp-row="${id}"] [data-clp-changed]`);
+  ok("⭐ CLP CHANGED (card 3): the list reads GET /api/clp/plan-changed once after it is drawn, and an issued CLP whose plan moved says 'Plan changed since Issue 1' under its status",
+     calls.filter(c => c.url === "/api/clp/plan-changed").length === 1 && !!c3line("auto-L019-IPT2")
+     && c3line("auto-L019-IPT2").textContent.startsWith("Plan changed since Issue 1") && !!c3line("auto-L019-IPT2").closest("td.rd-status"),
+     c3line("auto-L019-IPT2") ? c3line("auto-L019-IPT2").textContent : "no line");
+  ok("🔴 CLP CHANGED (card 3): only an ISSUED CLP shows it (the one sent for approval has its own step), and a draft never",
+     !c3line("auto-L019-IPT1") && !c3line("auto-L019-all"));
+  await press(c3line("auto-L019-IPT2").querySelector("button"));
+  const c3pop = c3.el.ownerDocument.querySelector('[id^="info-clp-changed"]');
+  const c3vals = c3pop ? [...c3pop.querySelectorAll(".info-val")].map(p => p.textContent) : [];
+  ok("⭐ CLP CHANGED (card 3): its 'i' gives the first two changes in the approve card's words, then 'The rest: Approve as Issue 2…'",
+     !!c3pop && c3vals.join(" | ") === "Earthworks: 1 240 → 1 310 loads. | Busiest month now Apr 2029 (was Mar 2029). | The rest: Approve as Issue 2…"
+     && /Since Issue 1/.test(c3pop.textContent), c3vals.join(" | "));
+  await c3.done();
+  CHANGED = { "auto-L019-IPT2": { issue: 1, changes: ["Route R009 added"] } };
+  const c4 = await mount(TEAM_N);
+  ok("CLP CHANGED (card 3): a list with no issued CLP in it does not read it at all",
+     !calls.some(c => c.url === "/api/clp/plan-changed") && !c4.el.querySelector("[data-clp-changed]"));
+  await c4.done();
+  CHANGED = {};
 }
 
 // ---- 31 Oct 2026 (task 4a, PR 3c): a client reviewer's Wayscope — ONE page, CLPs for review
