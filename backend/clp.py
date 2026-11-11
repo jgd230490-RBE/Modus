@@ -549,14 +549,15 @@ def _day_words(d, year=False):
     return f"{d.day} {MONTHS[d.month - 1]}" + (f" {d.year}" if year else "")
 
 
-def _recorded_to(cl_lines, months, week_start=False):
+def _recorded_to(cl_lines, months, week_start=False, as_week=False):
     """The Sunday of the latest week, in the months shown, with an actual typed on one of the caller's visible lines
-    (capped at today). With week_start=True: that week's Monday (D-F3, the words), also never after today."""
+    (capped at today). With week_start=True: that week's Monday (D-F3, the words), also never after today.
+    With as_week=True: that week's (month_index, week_index), or None (D-I4: the plan to the same week)."""
     keys = {(l["route_id"], int(l["month_index"]), l.get("discipline") or "", l.get("section_id") or "")
             for l in cl_lines if l.get("actual_tonnes") is not None}
     if not keys or not months:
         return None
-    last = None
+    last, last_key = None, None
     for w in db.query("SELECT route_id, month_index, discipline, section_id, week_index FROM forecast_weeks "
                       "WHERE tenant_id = ? AND actual_qty IS NOT NULL AND month_index >= ? AND month_index <= ?",
                       (db.current_tenant(), int(months[0]), int(months[-1]))):
@@ -567,10 +568,37 @@ def _recorded_to(cl_lines, months, week_start=False):
         except (TypeError, ValueError):
             continue
         end = span[0] if week_start else span[-1]
-        last = end if (last is None or end > last) else last
+        if last is None or end > last:
+            last, last_key = end, (int(w["month_index"]), int(w["week_index"]))
+    if as_week:
+        return last_key
     # 11 Nov 2026: a week typed part-way through (Mon-Wed of this week) ends on a Sunday still to come; never say a
     # date after today
     return min(last, _today_date()) if last is not None else None
+
+
+def _planned_to_week(cl_lines, mi, last_week):
+    """11 Nov 2026 (D-I4, John's yes, option a): the planned tonnes of month mi's weeks 1..last_week, so a part month is
+    compared with the plan of the same weeks, not the whole month's. Each Approved line's tonnes are shared out as its
+    weeks on the Look-ahead share its planned quantity (what Account compares each week's actual with); a line with no
+    weeks yet is shared out evenly over the month's weeks."""
+    import weeks as _weeks
+    by = {}
+    for w in db.query("SELECT route_id, discipline, section_id, week_index, planned_qty FROM forecast_weeks "
+                      "WHERE tenant_id = ? AND month_index = ?", (db.current_tenant(), int(mi))):
+        k = (w["route_id"], w.get("discipline") or "", w.get("section_id") or "")
+        q = float(w.get("planned_qty") or 0.0)
+        tot, upto = by.get(k, (0.0, 0.0))
+        by[k] = (tot + q, upto + (q if int(w["week_index"]) <= int(last_week) else 0.0))
+    n = max(1, int(_weeks.weeks_in_month(int(mi))))
+    even = min(1.0, int(last_week) / float(n))
+    out = 0.0
+    for l in cl_lines:
+        if int(l["month_index"]) != int(mi):
+            continue
+        tot, upto = by.get((l["route_id"], l.get("discipline") or "", l.get("section_id") or ""), (0.0, 0.0))
+        out += float(l.get("tonnes") or 0.0) * ((upto / tot) if tot > 0 else even)
+    return out
 
 
 def _today_date():
@@ -613,11 +641,19 @@ def recorded_tonnes(acc, months, mi, factors, label):
     # 11 Nov 2026 (John: yes, 7a as recommended): a month whose recorded weeks stop before its end is labelled
     # "<month> (to <date>)" (its bar and its row stay); the headline names the last COMPLETE month, as drawn on the
     # approved mockup, so a part month never reads as a shortfall. Only when no month is complete does it name the part one
+    lw = _recorded_to(cl, shown, as_week=True)        # D-I4: the latest typed week, (month_index, week_index)
     for r in rows:
         r["part_to"] = (to.isoformat() if (r["recorded_t"] is not None and to is not None and to < _month_end(r["month_index"]))
                         else None)
+        r["planned_month_t"] = r["planned_t"]
+        r["planned_to_week"] = None
         if r["part_to"]:
             r["label"] = f"{r['label']} {PART_MONTH}"     # D-F3: "Nov 2026 (part)", never a day
+            # D-I4: the planned bar and the share are the plan of the same weeks (the month's weeks up to the latest typed one)
+            if lw is not None and lw[0] == r["month_index"] and wk is not None:
+                r["planned_t"] = _r3(_planned_to_week(cl, r["month_index"], lw[1]))
+                r["planned_to_week"] = wk.isoformat()
+                r["recorded_pct"] = (round(r["recorded_t"] * 100.0 / r["planned_t"]) if r["planned_t"] > 0 else None)
     typed = [r for r in rows if r["recorded_t"] is not None]
     last = ([r for r in typed if not r["part_to"]] or typed)[-1]
     lab = month_label(last["month_index"])
@@ -631,6 +667,7 @@ def recorded_tonnes(acc, months, mi, factors, label):
                   headline=headline, subtitle="tonnes a month",
                   basis=("Planned: the approved plan's tonnes. Recorded: tonnes typed on Account (a week's actual), as the "
                          "Dashboard's Delivered against plan. A month with nothing typed is not recorded, not zero. "
+                         "A part month is set against the plan of the same weeks. "
                          "The months up to the one picked."),
                   source="Wayscope: the approved plan; the tonnes typed on Account"), wk   # D-F3: the line names the week
 

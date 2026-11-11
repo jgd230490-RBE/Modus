@@ -272,9 +272,10 @@ ok("⭐ clp.py imports neither main nor network and names no team slot id",
    not re.search(r"^\s*(import|from)\s+(network|main)\b", src, re.M) and re.search(r"\bIPT ?[1-6]\b", src) is None)
 _stmts = re.findall(r'db\.query\(\s*((?:"[^"]*"\s*)+)', code_only)
 # NARROWED 11 Nov 2026 (card 4, John's yes): a fourth literal, the weeks with a tonnage typed (the "recorded to" date)
-ok("🔴 tenant isolation: all four SQL literals in clp.py constrain tenant_id (29 Oct 2026: the holding areas' lines; "
-   "11 Nov 2026: the recorded weeks)",
-   len(_stmts) == 4 and all("tenant_id = ?" in s for s in _stmts), str(_stmts))
+# NARROWED 11 Nov 2026 (D-I4, John's yes): a fifth, each week's planned quantity (the plan to the same week)
+ok("🔴 tenant isolation: all five SQL literals in clp.py constrain tenant_id (29 Oct 2026: the holding areas' lines; "
+   "11 Nov 2026: the recorded weeks; D-I4: the weeks' planned quantity)",
+   len(_stmts) == 5 and all("tenant_id = ?" in s for s in _stmts), str(_stmts))
 # NARROWED 11 Nov 2026 (card 4, John's yes "First"): the planned and recorded tonnes lead the order; the reply gains recorded_line
 ok("the reply's keys and the chart order are the contract's",
    set(M) == {"month", "label", "working_days", "distance_unit", "months", "order", "charts", "with_data", "peak_bands",
@@ -469,17 +470,29 @@ for _l in _dl:
         _rd[_l["month_index"]] = _rd.get(_l["month_index"], 0.0) + _l["actual_tonnes"]
         _nl[_l["month_index"]] = _nl.get(_l["month_index"], 0) + 1
 _sun = weeks.week_span(10, 2)[1]
-ok("⭐ card 4: planned_t is the Dashboard's source exactly (the sum of costlines tonnes of the Approved lines that month: 5 480)",
-   RT["state"] == "set" and [m["planned_t"] for m in RT["months"]] == [round(_pl[10], 3)] and RT["months"][0]["planned_t"] == 5480.0,
-   str(RT)[:400])
-ok("⭐ card 4: recorded_t is the sum of costlines actual_tonnes (700 + 800 + 500 = 2 000), lines_reported 2, 36 % of the plan",
+# D-I4: the plan of Oct's weeks 1-2 (the latest typed), restated here from the weeks' own planned quantities
+_wq = {}
+for _w in db.query("SELECT route_id, discipline, section_id, week_index, planned_qty FROM forecast_weeks WHERE tenant_id = ? AND month_index = 10",
+                   (db.current_tenant(),)):
+    _k = (_w["route_id"], _w["discipline"] or "", _w["section_id"] or "")
+    _a, _b = _wq.get(_k, (0.0, 0.0))
+    _wq[_k] = (_a + float(_w["planned_qty"] or 0), _b + (float(_w["planned_qty"] or 0) if int(_w["week_index"]) <= 2 else 0.0))
+_pw10 = sum(_l["tonnes"] * (_wq[(_l["route_id"], _l["discipline"] or "", _l["section_id"] or "")][1]
+                            / _wq[(_l["route_id"], _l["discipline"] or "", _l["section_id"] or "")][0])
+            for _l in _dl if _l["month_index"] == 10)
+ok("⭐ card 4: planned_month_t is the Dashboard's source exactly (the sum of costlines tonnes of the Approved lines that month: 5 480)",
+   RT["state"] == "set" and [m.get("planned_month_t") for m in RT["months"]] == [round(_pl[10], 3)] and RT["months"][0].get("planned_month_t") == 5480.0,
+   str(RT)[:400])   # NARROWED 11 Nov 2026 (D-I4, John's yes): a part month is set against the plan of the same weeks
+ok("🔴 D-I4: Oct is typed to week 2 only (a part month), so its planned_t is the plan of weeks 1-2: 2 192 of 5 480 (2 of 5 weeks)",
+   RT["months"][0]["planned_t"] == round(_pw10, 3) == 2192.0 and RT["months"][0].get("planned_to_week") == "2026-10-05", str(RT["months"]))
+ok("⭐ card 4: recorded_t is the sum of costlines actual_tonnes (700 + 800 + 500 = 2 000), lines_reported 2, 91 % of the plan to that week",
    RT["months"][0]["recorded_t"] == round(_rd[10], 3) == 2000.0 and RT["months"][0]["lines_reported"] == _nl[10] == 2
-   and RT["months"][0]["recorded_pct"] == 36, str(RT["months"]))
+   and RT["months"][0]["recorded_pct"] == round(2000 * 100 / _pw10) == 91, str(RT["months"]))   # NARROWED 11 Nov 2026 (D-I4, John's yes): a part month is set against the plan of the same weeks
 ok("⭐ card 4: no month after the chosen one (the window runs Oct–Nov; Oct is picked, so Oct only)",
    [m["month_index"] for m in M2["months"]] == [10, 11] and [m["month_index"] for m in RT["months"]] == [10])
 ok("⭐ card 4: recorded to the latest week typed (Oct week 2, Mon 5 to Sun 11 Oct 2026), the WEEK named in the headline and the line",
    RT["recorded_to"] == _sun.isoformat() == "2026-10-11" and RT.get("recorded_week") == "2026-10-05"
-   and RT["headline"] == "Oct 2026: 2,000 t recorded, 36 % of the 5,480 t planned · recorded to the week of 5 Oct"   # REVERSED 11 Nov 2026 (D-F1/D-F3, John's yes): commas for thousands; the week, not a day
+   and RT["headline"] == "Oct 2026: 2,000 t recorded, 91 % of the 2,192 t planned · recorded to the week of 5 Oct"   # D-I4: the plan to that week   # REVERSED 11 Nov 2026 (D-F1/D-F3, John's yes): commas for thousands; the week, not a day
    and M2["recorded_line"] == "Recorded tonnes as typed on Account, weeks to 5 Oct 2026."
    and M2["limit"] == clp.SPREAD, RT["headline"] + " | " + str(M2["recorded_line"]))
 ok("card 4: the basis says what planned and recorded mean, and that a month with nothing typed is not recorded, not zero",
@@ -630,7 +643,8 @@ ok("⭐ a team code: scope team; the vehicle chart holds only its lines (100 rig
 ok("...and its target is its own share (target_scope team)", MT["charts"]["carbon_rate"]["target_scope"] == "team")
 ok("⭐ card 4, team scope: the team code's tonnes are its own lines only (R002: 2 000 t planned, 500 t recorded, one line)",
    MT["charts"]["recorded_tonnes"]["state"] == "set"
-   and [(m["planned_t"], m["recorded_t"], m["lines_reported"]) for m in MT["charts"]["recorded_tonnes"]["months"]] == [(2000.0, 500.0, 1)]
+   and [(m.get("planned_month_t"), m["recorded_t"], m["lines_reported"]) for m in MT["charts"]["recorded_tonnes"]["months"]] == [(2000.0, 500.0, 1)]   # NARROWED 11 Nov 2026 (D-I4, John's yes): a part month is set against the plan of the same weeks
+   and MT["charts"]["recorded_tonnes"]["months"][0]["planned_t"] == 400.0   # D-I4: R002 is typed to week 1 only: 1 of Oct's 5 weeks
    and MT["charts"]["recorded_tonnes"]["recorded_to"] == weeks.week_span(10, 1)[1].isoformat()
    and MT["recorded_line"] == f"Recorded tonnes as typed on Account, weeks to {clp._day_words(weeks.week_span(10, 1)[0], year=True)}.",   # REVERSED 11 Nov 2026 (D-F3): the week's Monday (Oct week 1 starts Mon 28 Sep)
    str(MT["charts"]["recorded_tonnes"])[:300])
@@ -675,7 +689,7 @@ ok("⭐ card 4 PDF: the planned and recorded tonnes come first, with their table
    "recorded line follows the limit in the first paragraph; the page stamp is unchanged",
    MP["with_data"][0] == "recorded_tonnes" and "Planned and recorded tonnes" in _pt
    and _pt.index("Planned and recorded tonnes") < _pt.index(MP["charts"]["route_caps"]["title"])
-   and "Oct 2026 (part) 5,480 2,000 36 % 2" in _pt   # NARROWED 11 Nov 2026 (7a): Oct is typed to 11 Oct only, so labelled a part month; REVERSED (D-F1/D-F3): "(part)", commas
+   and "Oct 2026 (part) 2,192 to the week of 5 Oct 2,000 91 % 2" in _pt   # NARROWED 11 Nov 2026 (D-I4, John's yes): a part month is set against the plan of the same weeks   # NARROWED 11 Nov 2026 (7a): Oct is typed to 11 Oct only, so labelled a part month; REVERSED (D-F1/D-F3): "(part)", commas
    and "Planned figures, not observed: Wayscope holds no gate log or arrival times. Recorded tonnes as typed on Account, weeks to 5 Oct 2026." in _pt
    and _pt.count("Recorded tonnes as typed on Account") == 1
    and "Planned figures from the approved plan, not observed: Wayscope holds no gate log or arrival times." in _pt
@@ -685,7 +699,7 @@ _h11, _r11 = clp_pack.table_of(_M11P["charts"]["recorded_tonnes"], _M11P)
 _p11 = re.sub(r"\s+", " ", _pdf_text(clp_pack.build_pdf(_M11P, generated="11 Nov 2026")) or "")
 ok("⭐ card 4 pack: a month nobody typed prints 'not recorded', never 0 (table, PDF)",
    _h11 == ["Month", "Planned t", "Recorded t", "Recorded share", "Lines reported"]
-   and _r11 == [["Oct 2026 (part)", "5,480", "2,000", "36 %", "2"], ["Nov 2026", "1,450", "not recorded", "—", "—"]]   # NARROWED 11 Nov 2026 (7a); REVERSED (D-F1/D-F3)
+   and _r11 == [["Oct 2026 (part)", "2,192 to the week of 5 Oct", "2,000", "91 %", "2"], ["Nov 2026", "1,450", "not recorded", "—", "—"]]   # NARROWED 11 Nov 2026 (D-I4, John's yes): a part month is set against the plan of the same weeks   # NARROWED 11 Nov 2026 (7a); REVERSED (D-F1/D-F3)
    and "Nov 2026 1,450 not recorded — —" in _p11, str(_r11) + " | " + _p11[:300])
 _ME0 = copy.deepcopy(MP)
 _ME0["recorded_line"] = None
@@ -722,7 +736,7 @@ _rt_x = [[c.value for c in r] for r in _wb[clp_pack.SHEET["recorded_tonnes"]].it
 ok("⭐ card 4 XLSX: the 'Planned and recorded' sheet comes right after About, with its table; About says the recorded line",
    _wb.sheetnames[1] == clp_pack.SHEET["recorded_tonnes"] == "Planned and recorded" and len(clp_pack.SHEET["recorded_tonnes"]) <= 31
    and ["Month", "Planned t", "Recorded t", "Recorded share", "Lines reported"] in [r[:5] for r in _rt_x]
-   and ["Oct 2026 (part)", "5,480", "2,000", "36 %", "2"] in [r[:5] for r in _rt_x]   # NARROWED 11 Nov 2026 (7a); REVERSED (D-F1/D-F3)
+   and ["Oct 2026 (part)", "2,192 to the week of 5 Oct", "2,000", "91 %", "2"] in [r[:5] for r in _rt_x]   # NARROWED 11 Nov 2026 (D-I4, John's yes): a part month is set against the plan of the same weeks   # NARROWED 11 Nov 2026 (7a); REVERSED (D-F1/D-F3)
    and any(x[0] == "Recorded" and x[1] == "Recorded tonnes as typed on Account, weeks to 5 Oct 2026." for x in _ab)   # REVERSED 11 Nov 2026 (D-F3)
    and any(x[0] == "Basis" and x[1] == clp.SPREAD for x in _ab), str(_wb.sheetnames))
 _x11 = [[c.value for c in r] for r in _openpyxl.load_workbook(_io.BytesIO(clp_pack.build_xlsx(_M11P)))[clp_pack.SHEET["recorded_tonnes"]].iter_rows()]
@@ -895,16 +909,27 @@ ok("🔴 7a: the headline names the last COMPLETE month (Oct), not the part mont
    _R7a["headline"].startswith("Oct 2026: 2,000 t recorded, 36 % of the 5,480 t planned") and _R7a["headline"].endswith(f"· recorded to the week of {_nm}")
    and not _R7a["headline"].startswith("Nov") and _M7a["recorded_line"] == f"Recorded tonnes as typed on Account, weeks to {_nm} 2026.", _R7a["headline"])   # REVERSED 11 Nov 2026 (D-F1/D-F3)
 _p7a = re.sub(r"\s+", " ", _pdf_text(clp_pack.build_pdf(_M7a, generated="12 Nov 2026")) or "")
-ok("7a: the pack's table prints the part month as 'Nov 2026 (part)' with its own figures", "Nov 2026 (part) 1,450 300" in _p7a,   # REVERSED 11 Nov 2026 (D-F1/D-F3)
+ok("7a: the pack's table prints the part month as 'Nov 2026 (part)' with its own figures", "Nov 2026 (part) 362 to the week of 2 Nov 300 83 % 1" in _p7a,   # NARROWED 11 Nov 2026 (D-I4, John's yes): a part month is set against the plan of the same weeks   # REVERSED 11 Nov 2026 (D-F1/D-F3)
    _p7a[_p7a.find("Month Planned"):_p7a.find("Month Planned") + 200])
 
 # ---- 11 Nov 2026 (D-F1 / 7b, John's yes): thousands with a comma in CLP monitoring and the pack; percentages keep the space
 ok("🔴 D-F1: the pack's number helper and the headline helper write a comma for thousands; a percentage keeps its space",
    clp_pack._n(28719, 0) == "28,719" and clp_pack._n(1234.56) == "1,234.6" and clp_pack._n(999, 0) == "999" and clp._t_words(32174.4) == "32,174"
-   and "36 % 2" in _pt and "36 %" in RT["headline"])
+   and "91 % 2" in _pt and "91 %" in RT["headline"])   # NARROWED 11 Nov 2026 (D-I4): Oct's share is of the plan to its typed week
 ok("🔴 D-F1: no pack page prints a thousands figure with a space (5 480 / 2 000 / 1 450), and the trips-avoided headline has no space",
    all(x not in (_pt + _p11 + _p7a) for x in ("5 480", "2 000", "1 450", "9 000")) and "5,480" in _pt
    and not re.search(r"\d \d{3} (more )?lorry trips", str(MP["charts"].get("trips_avoided", {}).get("headline") or "")))
+# ---- 11 Nov 2026 (D-I4, John's yes, option a): a part month is set against the plan of the same weeks
+ok("🔴 D-I4: with Nov typed to week 1, Nov's planned bar is its week 1 (1 450 of 4 weeks = 362.5), its share 300 of that (83 %); "
+   "Oct, now complete, keeps the whole month's plan and its 36 %",
+   _byi[11]["planned_t"] == 362.5 and _byi[11].get("planned_month_t") == 1450.0 and _byi[11]["recorded_pct"] == 83
+   and _byi[11].get("planned_to_week") == weeks.week_span(11, 1)[0].isoformat()
+   and _byi[10]["planned_t"] == _byi[10].get("planned_month_t") == 5480.0 and _byi[10]["recorded_pct"] == 36 and _byi[10].get("planned_to_week", "missing") is None,
+   str(_R7a.get("months")))
+ok("D-I4: a line with no weeks on the Look-ahead yet is shared out evenly over the month's weeks (500 t, 2 of Oct's 5 weeks = 200)",
+   getattr(clp, "_planned_to_week", lambda *a: None)([{"route_id": "RX9", "month_index": 10, "discipline": "", "section_id": "", "tonnes": 500.0}], 10, 2) == 200.0
+   and weeks.weeks_in_month(10) == 5)
+ok("D-I4: the basis says a part month is set against the plan of the same weeks", "A part month is set against the plan of the same weeks." in _R7a["basis"])
 # ---- 11 Nov 2026 (D-F3, John's yes): the words name the latest typed WEEK, never a day (Account takes a week's tonnes)
 ok("🔴 D-F3: a part month reads '(part)', never '(to <date>)'; nothing says 'recorded to <day>' without 'the week of'",
    all("(to " not in m["label"] for m in (_R7a.get("months") or []) + (RT.get("months") or []))
