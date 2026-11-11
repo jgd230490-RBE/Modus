@@ -3601,8 +3601,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
        clpc.includes('{ label: "Recorded", data: m.map(r => r.recorded_t == null ? null : r.recorded_t), backgroundColor: C1, borderWidth: 0 }')
        && clpc.includes('{ label: "Planned", data: m.map(r => r.planned_t), backgroundColor: C1S, borderColor: C1, borderWidth: 1 }')
        && !/recorded_t\s*\|\|\s*0/.test(clpc) && clpc.includes('it.raw == null ? "not recorded"'));
+    // NARROWED 11 Nov 2026 (D-F8, John: "do it now"): the recorded line is its own note line under the scope + limit line
     ok("CLP card 4: the recorded line is said after the limit, only when the reply carries one; the limit stays as it was",
-       clpc.includes('<div className="ct-note">{data.scope_line} {data.limit}{data.recorded_line ? " " + data.recorded_line : ""}</div>'));
+       clpc.includes('<div className="ct-note">{data.scope_line} {data.limit}</div>')
+       && clpc.includes('{data.recorded_line && <div className="ct-note" data-clp-recorded="1">{data.recorded_line}</div>}')
+       && clpc.indexOf('{data.scope_line} {data.limit}</div>') < clpc.indexOf('data-clp-recorded="1"'));
   }
   ok("🔴 CLP colours are tokens only: the chart slots, the status red, the none grey, ink for a cap or target; Not typed is grey",
      !/#[0-9A-Fa-f]{6}\b(?!")/.test(clpc.replace(/tok\("[^"]+", "#[0-9A-Fa-f]{6}"\)/g, "")) && clpc.includes('s.group === CLP_NOT_TYPED ? tok("--chart-none", "#A8A29E") : colorOf(slot++)')
