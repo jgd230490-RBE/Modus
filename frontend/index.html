@@ -12762,9 +12762,11 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                             {r.action === "waiting" && <span className="text-[13px] text-slate-500">Waiting</span>}
                             {r.action === "applied" && <RowStatus word={`Added ${grp(r.carried, 1)} ${unitLbl(r.unit)}`} tone="none" />}
                             {r.action === "spread" && (
-                              // 22 Oct 2026 (UI fix 6, card 2; finding #11): the app's standard small button (13 px on the accent), was an 11 px one-off on --navy
+                              // 22 Oct 2026 (UI fix 6, card 2; finding #11): the app's standard small button, was an 11 px one-off on --navy.
+                              // 11 Nov 2026 (D-F4, John's yes): an OUTLINE button (btn-sec), not filled: one per short line made three filled
+                              // primaries on one page (rule R2); the amber row and the "short last week" card carry the attention
                               <button onClick={() => doSpread(r)} disabled={!!busy}
-                                className="btn-pri btn-sm disabled:opacity-40"
+                                className="btn-sec btn-sm disabled:opacity-40"
                                 title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to this week, divided over its remaining weekdays. Refused if that week is confirmed.`}>Add to this week</button>
                             )}
                           </td>
