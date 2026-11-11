@@ -8053,6 +8053,42 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("⭐ POPUP TOP: the page opens " + sites + " kinds of popup and only the road card names its own anchor; the others go through the hook, so a new popup needs nothing extra",
      sites >= 19 && anchored === 1 && code.includes("if (pop.options.anchor && !pop.wsPlaced) return;")
      && code.includes("secselTopEdge(), secselRightEdge(), off);") && code.includes("['addTo', 'setDOMContent'].forEach(k => {"));
+  // ===== 11 Nov 2026 — one popup from one click (John's yes to P2; seen on live: Brook Pit answered a click with its own
+  // popup AND the road card under it, Langton Compound with its popup AND the haul road's) =====
+  let mhSrc = null;
+  try { mhSrc = /const MARKER_CLICK_LAYERS = \[[^\]]*\];\s*function markerHitAt\(point\) \{[\s\S]*?\n    \}/.exec(code)[0]; } catch (e) {}
+  const mhRun = (have, hits, point) => {
+    try {
+      const asked = [];
+      const fn = new Function("map", mhSrc + "\nreturn markerHitAt;")(
+        { getLayer: l => have.includes(l), queryRenderedFeatures: (pt, o) => { asked.push(o.layers.join(',')); if (hits === 'throw') throw new Error('x'); return hits; } });
+      return { hit: fn(point === undefined ? { x: 5, y: 5 } : point), asked };
+    } catch (e) { return { hit: 'threw: ' + e.message, asked: [] }; }
+  };
+  ok("⭐ ONE POPUP (sandbox): a place's or a gate's marker under the click is found on the two marker layers, and only on those that exist",
+     !!mhSrc && mhRun(['locations', 'site-gates'], [{}]).hit === true && mhRun(['locations', 'site-gates'], [{}]).asked[0] === 'locations,site-gates'
+     && mhRun(['locations'], [{}]).asked[0] === 'locations' && mhRun(['locations', 'site-gates'], []).hit === false);
+  ok("ONE POPUP (sandbox): no marker layer on the map, no point, or a map that will not answer counts as no marker (the road answers as before)",
+     !!mhSrc && mhRun([], [{}]).hit === false && mhRun([], [{}]).asked.length === 0 && mhRun(['locations'], [{}], null).hit === false
+     && mhRun(['locations'], 'throw').hit === false);
+  const gives = "if (typeof markerHitAt === 'function' && markerHitAt(e.point)) return;";
+  ok("⭐ ONE POPUP: a route line's click gives way to a marker, as it has to a traffic limit's sign since 13 Oct (the limit's line still stands)",
+     code.includes("if(typeof limitHitAt === 'function' && limitHitAt(e.point)) return;")
+     && /if\(typeof limitHitAt === 'function' && limitHitAt\(e\.point\)\) return;[^\n]*\n\s*if\(typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) return;/.test(code));
+  ok("⭐ ONE POPUP: a shared section, a zone and a haul road give way to a marker too, each before it opens anything",
+     new RegExp("map\\.on\\('click', 'road-load-line', \\(e\\) => \\{\\s*if \\(!e\\.features \\|\\| !e\\.features\\.length \\|\\| !RL\\.month\\) return;\\s*" + gives.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(code)
+     && new RegExp("map\\.on\\('click', 'zone-fill', \\(e\\) => \\{\\s*if \\(!e\\.features \\|\\| !e\\.features\\.length\\) return;\\s*" + gives.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(code)
+     && new RegExp("map\\.on\\('click', 'temp-haul-lines', \\(e\\) => \\{\\s*if \\(!e\\.features \\|\\| !e\\.features\\.length\\) return;\\s*" + gives.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(code));
+  ok("⭐ ONE POPUP (seen in Chrome: a site on the alignment opened its popup AND the work section's): the alignment's line and its boundary ticks give way to a marker too",
+     /map\.on\('click', lId, \(e\) => \{\s*if \(typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) return;[^\n]*\n\s*const p = \(e\.features && e\.features\[0\] && e\.features\[0\]\.properties\) \|\| \{\};[\s\S]{0,220}?const ch = \(v\) =>/.test(code)
+     && /map\.on\('click', lId, \(e\) => \{\s*if \(typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) return;[^\n]*\n\s*const p = \(e\.features && e\.features\[0\] && e\.features\[0\]\.properties\) \|\| \{\};\s*const gone = /.test(code)
+     && (code.match(/markerHitAt\(e\.point\)\) return;/g) || []).length === 6);
+  ok("⭐ ONE POPUP: over a marker the road's hover tip gives way (it promised the road's card), through the tip's own hidden path",
+     /if \(!card\) return;\s*if \(f && e && e\.point && typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) e = null;\s*if \(!f \|\| !e \|\| !e\.point \|\| isPhoneShell\(\)/.test(code));
+  ok("ONE POPUP: the marker's own clicks are untouched, and a near miss on a road already stood aside for a marker (the clickable list names both layers)",
+     /map\.on\('click', 'locations', \(e\) => \{\s*if \(!e\.features \|\| !e\.features\.length\) return;\s*const p = e\.features\[0\]\.properties;/.test(code)
+     && /map\.on\('click', 'site-gates', \(e\) => \{\s*if \(!e\.features \|\| !e\.features\.length\) return;\s*new mapboxgl\.Popup/.test(code)
+     && /const CLICKABLE_LAYERS = \[[^\]]*'site-gates',\s*'locations'/.test(code) && code.includes("if (typeof clickableAt === 'function' && clickableAt(e.point)) return;"));
   ok("POPUP TOP: in the Dark look a popup beside its point has a tip that points sideways (the plain Dark rule coloured the two edges that must stay clear)",
      html.includes('html[data-look="dark"] .mapboxgl-popup-anchor-left .mapboxgl-popup-tip{ border-top-color:transparent; border-bottom-color:transparent; border-right-color:var(--surface); }')
      && html.includes('html[data-look="dark"] .mapboxgl-popup-anchor-right .mapboxgl-popup-tip{ border-top-color:transparent; border-bottom-color:transparent; border-left-color:var(--surface); }'));

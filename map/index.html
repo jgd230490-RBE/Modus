@@ -4339,6 +4339,7 @@
             map.on('mouseenter', lId, () => { map.getCanvas().style.cursor = 'pointer'; });
             map.on('mouseleave', lId, () => { map.getCanvas().style.cursor = ''; });
             map.on('click', lId, (e) => {
+                if (typeof markerHitAt === 'function' && markerHitAt(e.point)) return;      // 11 Nov: a place's or a gate's marker answers
                 const p = (e.features && e.features[0] && e.features[0].properties) || {};
                 // 42900 -> "42+900", which is how the chainage is written on every
                 // drawing this will be read next to
@@ -4420,6 +4421,7 @@
             map.on('mouseenter', lId, () => { map.getCanvas().style.cursor = 'pointer'; });
             map.on('mouseleave', lId, () => { map.getCanvas().style.cursor = ''; });
             map.on('click', lId, (e) => {
+                if (typeof markerHitAt === 'function' && markerHitAt(e.point)) return;      // 11 Nov: a place's or a gate's marker answers
                 const p = (e.features && e.features[0] && e.features[0].properties) || {};
                 const gone = p.no_surveyed_track === true || p.no_surveyed_track === 'true';
                 const nameOf = (c) => (window.WS_NAMES && window.WS_NAMES[c])
@@ -4465,11 +4467,13 @@
         // bound once, on the layer id — Mapbox tolerates a layer that does not exist yet
         map.on('click', 'zone-fill', (e) => {
             if (!e.features || !e.features.length) return;
+            if (typeof markerHitAt === 'function' && markerHitAt(e.point)) return;      // 11 Nov: a place's or a gate's marker answers
             new mapboxgl.Popup({ offset: 8 }).setLngLat(e.lngLat)
                 .setHTML(zonePopupHTML(e.features[0].properties)).addTo(map);
         });
         map.on('click', 'temp-haul-lines', (e) => {
             if (!e.features || !e.features.length) return;
+            if (typeof markerHitAt === 'function' && markerHitAt(e.point)) return;      // 11 Nov: a place's or a gate's marker answers
             new mapboxgl.Popup({ offset: 8 }).setLngLat(e.lngLat)
                 .setHTML(tempHaulPopupHTML(e.features[0].properties)).addTo(map);
         });
@@ -6241,6 +6245,16 @@
         if (!ls.length) return false;
         try { return map.queryRenderedFeatures(point, { layers: ls }).length > 0; } catch (e) { return false; }
     }
+    // 11 Nov 2026 (seen on live: Brook Pit answered one click with its own popup AND the road card under it, Langton
+    // Compound with its popup AND the haul road's). A place's or a gate's marker answers its click alone, as a traffic
+    // limit's sign has since 13 Oct: the road card, a shared section, a haul road, a zone and the alignment give way to it, and so does
+    // the road's hover tip (it promised the road's card).
+    const MARKER_CLICK_LAYERS = ['locations', 'site-gates'];
+    function markerHitAt(point) {
+        const ls = MARKER_CLICK_LAYERS.filter(l => map.getLayer(l));
+        if (!ls.length || !point) return false;
+        try { return map.queryRenderedFeatures(point, { layers: ls }).length > 0; } catch (e) { return false; }
+    }
     // the card: on the phone shell in the sheet (as a route's or a section's), on the desktop a popup at the sign
     function openLimitCardAt(p, lngLat) {
         if (typeof isPhoneShell === 'function' && isPhoneShell() && typeof openLimitCard === 'function') { openLimitCard(p.id); return; }
@@ -7552,6 +7566,7 @@
         map.on('mouseleave', 'road-load-line', () => { map.getCanvas().style.cursor = ''; });
         map.on('click', 'road-load-line', (e) => {
             if (!e.features || !e.features.length || !RL.month) return;
+            if (typeof markerHitAt === 'function' && markerHitAt(e.point)) return;      // 11 Nov: a place's or a gate's marker answers
             const id = e.features[0].properties.id;
             const run = ((RL.cache[RL.month] || {}).runs || []).find(r => String(r.id) === String(id));
             if (!run) return;
@@ -8995,6 +9010,7 @@
                 if(!e.features||!e.features.length) return;
                 if(typeof roadLoadHitAt === 'function' && roadLoadHitAt(e.point)) return;   // 12 Oct: the section card answers
                 if(typeof limitHitAt === 'function' && limitHitAt(e.point)) return;         // 13 Oct: a lorry limit's sign answers
+                if(typeof markerHitAt === 'function' && markerHitAt(e.point)) return;       // 11 Nov: a place's or a gate's marker answers
                 const p=e.features[0].properties, rid=p.route_id||'Route';
                 selectRoute(rid);
                 // 10 Nov 2026 (v2.1 2.1-4, Q1): a click on a route opens THE ROAD's card — every route on that road — in every
@@ -9169,6 +9185,8 @@
         }
         const card = document.getElementById('route-hover-card');
         if (!card) return;
+        // 11 Nov 2026: over a place's or a gate's marker the tip gives way too (a click there opens the marker's popup, not the road's card)
+        if (f && e && e.point && typeof markerHitAt === 'function' && markerHitAt(e.point)) e = null;
         // 13 Oct 2026, seen in Chrome: a route's hover card sat on top of a lorry limit's card; over a limit it gives way
         if (!f || !e || !e.point || isPhoneShell() || !canHover() || (typeof SECSEL !== 'undefined' && SECSEL.drawing)
             || (typeof limitHitAt === 'function' && limitHitAt(e.point))) {

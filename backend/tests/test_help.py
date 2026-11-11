@@ -1558,6 +1558,9 @@ ok("ROAD CARD TOP: technical T1 says the card's room starts under the figures ba
 ok("MAP POPUP TOP: technical T1 says every other map popup is placed clear of the figures bar by one hook, and when nothing is changed",
    all(w in _tg_rs for w in ('id="t1-popup-top"', "<code>popupFit</code>", "<code>popupPlace</code>", "<code>addTo</code>", "<code>setDOMContent</code>",
                              "<code>POPUP_GAP</code> = 6 px", "a new popup needs nothing extra", "is left alone")))
+ok("ONE POPUP: technical T1 says a place's or a gate's marker answers its click alone, and what gives way to it",
+   all(w in _tg_rs for w in ('id="t1-one-popup"', "<code>markerHitAt</code>", "<code>MARKER_CLICK_LAYERS</code>", "<code>limitHitAt</code>",
+                             "a shared section, a zone and a haul road give way")))
 # 10 Nov 2026 (map drawer polish; live test findings 4, 7, 8)
 ok("MAP DRAWER POLISH: technical T1 says how the drawer, the Conditions panel, the timeline bar and the demo notice keep clear of each other",
    all(w in _tg_rs for w in ('id="t1-drawer-clear"', "<code>--tl-foot</code>", "<code>drawer-open</code>", "<code>positionWarnStack</code>", "<code>--notice-h</code>")))
