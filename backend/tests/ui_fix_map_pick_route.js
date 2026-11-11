@@ -114,7 +114,8 @@ const mat = (names) => { const m = {}; let i = 0; names.forEach(k => { m[k] = "#
      && html.includes("SECSEL.area = box; SECSEL.areaPick = null;"));
   ok("⭐ R1: the row button is 44 px tall at least, fills its cell, and has a visible keyboard focus",
      /\.secsel-rid-btn\{[^}]*min-width:44px; min-height:44px;/.test(html) && /table\.secsel-table td\.secsel-rid\{ padding:0; \}/.test(html)
-     && /\.secsel-rid-btn:focus-visible\{ outline:2px solid #1D4ED8;/.test(html));
+     && /\.secsel-rid-btn:focus-visible\{ outline:2px solid #1D4ED8;/.test(html)
+     && html.includes('html[data-look="dark"] .secsel-rid-btn:focus-visible{ outline-color:#8FB3F5; }'));
   ok("R1: the phone's sheet draws the same card (roadCardHTML) and the same button (its onclick is in the HTML, so the sheet needs nothing extra); Dark: the tint is the existing one",
      html.includes("box.innerHTML = sc === 'road' ? roadCardHTML() +") && html.includes('html[data-look="dark"] table.secsel-table tr.secsel-clicked td{ background:rgba(37,99,235,.22); }'));
   ok("⭐ A + R1: technical T1 says what the tab and the row buttons do, and that the card stays open",
