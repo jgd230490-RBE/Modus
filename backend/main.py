@@ -5571,6 +5571,21 @@ def _gate_arrivals_build(month, acc):
     return out
 
 
+@app.get("/api/gates/queue-months")
+def gate_queue_months():
+    """
+    11 Nov 2026 (CLOCS idea C-I1): the months with a gate at the 85 % step or over (gate_arrivals.queue_months), so the
+    Dashboard's Gate arrivals can point at the next queue. Reads only; kept until the next write. Any signed-in code,
+    like the panel (no team figure in the reply).
+    """
+    acc = _require_access()
+
+    def build():
+        factors = conversions.load_factors()
+        return gate_arrivals.queue_months(acc, factors, _working_days(factors), MONTH_COUNT)
+    return _staff_json("gates/queue-months", {}, build, acc)
+
+
 @app.get("/api/sim/day")
 def sim_day(month: Optional[int] = None, hours: Optional[List[str]] = Query(None),
             check_in: Optional[List[str]] = Query(None), bands: Optional[str] = None,

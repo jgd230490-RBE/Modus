@@ -836,6 +836,7 @@ identical distances, cycle times or CO2e.</li>
 <tr><td class="k">Dashboard figures, charts, route table</td><td><code>GET /api/costing/lines</code></td><td>The Look-ahead's functions; one row per forecast month with totals and the costing block.</td></tr>
 <tr><td class="k">Dashboard: Today, this week, last week</td><td><code>GET /api/lookahead</code> (the commit bucket)</td><td>The Look-ahead's own read; nothing is derived in the browser.</td></tr>
 <tr><td class="k">Dashboard: Gate arrivals</td><td><code>GET /api/gates/arrivals?month=N</code></td><td>Its own read, per month; the busiest hour from <code>backend/sim.py</code>.</td></tr>
+<tr><td class="k">Dashboard: Gate arrivals, "Next queue likely"</td><td><code>GET /api/gates/queue-months</code></td><td>The months with a gate at 85 % of capacity or over, each month's own arrivals read (<code>gate_arrivals.queue_months</code>, the repeated reads answered once by <code>db.select_memo</code>); kept until the next write. The panel names the next such month after the one on screen, or, past the last, the fullest.</td></tr>
 <tr><td class="k">Dashboard and Forecasts: carbon target</td><td><code>GET /api/carbon/target</code></td><td>The all-in figure.</td></tr>
 <tr><td class="k">Config → Costing: target rate</td><td>its own endpoint, saved separately from the configuration document</td><td>The page's Save button does not save it; it has its own button.</td></tr>
 <tr><td class="k">Configuration</td><td>the configuration table (seeded from <code>backend/factors.json</code>)</td><td>See T4.</td></tr>
