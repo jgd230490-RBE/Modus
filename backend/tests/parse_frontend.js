@@ -4993,6 +4993,22 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && cp.includes('const busyWords = "Building… about a minute";') && cp.includes('Anything left blank stays a yellow "To complete" line.')
      && cp.includes("Download gives back the file exactly as approved."));
   ok("CLP DOCS: the editor's CSS lives in the page (.clp-form grid, .clp-places)", html.includes(".clp-form{") && html.includes(".clp-places"));
+  // 11 Nov 2026 (card 3, John: yes): the plan-changed read sits with the page's other hooks, before its early returns
+  ok("🔴 CLP DOCS (card 3): the plan-changed hooks come before the page's early returns (React's order of hooks)",
+     cp.indexOf("const [changed, setChanged] = useState({});") > 0
+     && cp.indexOf("const [changed, setChanged] = useState({});") < cp.indexOf('if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;')
+     && cp.includes("fetch(`${API}/clp/plan-changed`).then(r => okJSON(r))") && code.includes('"clp.changed": { title: "Since the last issue"'));
+  // 11 Nov 2026 (cards 1-2 of notes\clp-before-friday-mockup-1111, John: yes)
+  const _ns = cp.slice(cp.indexOf("const nextStep = (c, child) => {"), cp.indexOf("const primary = (c, child) => {"));
+  ok("🔴 CLP DOCS (card 1): the next step is never the reviewers' send (no \"review\" step; it is in the \"⋯\" only)",
+     _ns.length > 300 && !_ns.includes('"review"') && !_ns.includes("to reviewers") && cp.includes("to reviewers…</button>"));
+  const _rm = cp.slice(cp.indexOf('<RowMenu name={c.name + " · " + teamWord(c)}>'), cp.indexOf("</RowMenu></div></td>"));
+  const _at = (s) => _rm.indexOf(s);
+  ok("⭐ CLP DOCS (card 1): the \"⋯\" lists what only reads first, then the line, then what writes or sends; Delete stays last",
+     _at(">Download draft<") > 0 && _at(">Download draft<") < _at("Notes and tasks") && _at("Notes and tasks") < _at(">Document history<")
+     && _at(">Document history<") < _at('className="row-menu-sep"') && _at('className="row-menu-sep"') < _at("to reviewers…")
+     && _at("to reviewers…") < _at("Approve as Issue {c.next_issue}…") && _at("Approve as Issue {c.next_issue}…") < _at("Ask for changes…")
+     && _at("Ask for changes…") < _at('"Edit cover details"') && _at('"Delete…"') > _at("Send for approval…") && html.includes(".row-menu-list hr.row-menu-sep{"));
   // 31 Oct 2026 (task 4a, PR 3b; the approved mockup notes\clp-notes-mockup-1031, Q1–Q12): notes and tasks on each CLP
   const cn = cp.slice(cp.indexOf("function ClpNotes("), cp.indexOf("function ClpPage("));
   ok("⭐ CLP NOTES: one read of the thread (GET …/notes) and its own writes (POST notes, POST tasks, PATCH and DELETE a task, DELETE a note); the reply's thread is drawn",
