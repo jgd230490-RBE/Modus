@@ -767,6 +767,39 @@ ok("...and its material and disposal factors are carbon.py's own functions, no f
    and "_carbon.disposal_route_of(cp, loc)" in _pvc and not re.search(r"\b7\.8\d|\b19\.5\d|\b1\.01\d", _pvc))
 ok("🔴 the tenant import clears the target's cache with the config cache", "_carbon_target.invalidate()" in read("backend/tenant_package.py"))
 
+# =========================================================================== #
+#  11 Nov 2026: GET is kept until the next write (the CLOCS live check: 6.2 s  #
+#  on every Dashboard open)                                                    #
+# =========================================================================== #
+import read_cache  # noqa: E402
+access.set_current("planner123")
+_g0 = read_cache.STATS["builds"]
+_k1 = GET()
+_k2 = GET()
+ok("⭐ a second GET is served from memory: the same answer, nothing built", _k2 is _k1 and read_cache.STATS["builds"] == _g0 + 1,
+   str(read_cache.STATS))
+_mode0 = (_k1.get("target") or {}).get("mode")
+_other = "cap" if _mode0 == "pct" else "pct"
+if _k1.get("target") is None:
+    PUT(mode="pct", levers=DECISIONS, ui_state=UI, updated_by="Sam (planner)")
+    _other = "cap"
+    _k1 = GET()
+PUT(mode=_other, updated_by="Sam (planner)")
+_k3 = GET()
+ok("🔴 never stale: after a PUT the next GET is built afresh and carries the change",
+   _k3 is not _k1 and (_k3.get("target") or {}).get("mode") == _other, str((_k3.get("target") or {}).get("mode")))
+carbon_target.clear()
+_k4 = GET()
+ok("🔴 ...and after the target is cleared, GET says there is none (not the kept answer)", _k4 == {"target": None, "status": None})
+as_team(1)
+_kt = GET()
+access.set_current("planner123")
+ok("🔴 a team code's GET is its own entry (no stored decisions from the scheme's kept answer)",
+   _kt is not _k4 and _kt == {"target": None, "status": None})
+ok("...at source: GET goes through _staff_json under the name carbon/target; PUT and DELETE return a fresh payload",
+   '_staff_json("carbon/target", {}, lambda: carbon_target.payload(acc), acc)' in _fn("get_carbon_target")
+   and "return carbon_target.payload(acc)" in _fn("put_carbon_target") and "return carbon_target.payload(acc)" in _fn("delete_carbon_target"))
+
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)

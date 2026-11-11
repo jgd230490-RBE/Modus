@@ -2798,7 +2798,10 @@ def get_carbon_target():
     decisions or the page state (only the words of decisions that name no route).
     """
     acc = _require_access()
-    return carbon_target.payload(acc)
+    # 11 Nov 2026 (the CLOCS-meeting live check: 6.2 s on every Dashboard open, the one uncached Dashboard read):
+    # kept like the Dashboard's other reads, per role and team, until the next write (a PUT or DELETE writes the
+    # config row, so the next GET is built afresh).
+    return _staff_json("carbon/target", {}, lambda: carbon_target.payload(acc), acc)
 
 
 @app.put("/api/carbon/target")
@@ -4520,6 +4523,7 @@ def _warm_staff():
         lookahead_page(bucket="commit", route_id=None, restrictions_on=1, tark_tee=None)   # the Look-ahead page
         gate_arrivals_month(month=None)
         clp_monitoring(month=None)
+        get_carbon_target()                                                      # the Dashboard's carbon tile
         routes_status()
         routes_summary()
         routes_diversions(route_id=None)
