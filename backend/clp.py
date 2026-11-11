@@ -52,6 +52,7 @@ import config
 import conversions
 import costlines
 import counting
+import datetime
 import days
 import db
 import gate_arrivals
@@ -561,7 +562,13 @@ def _recorded_to(cl_lines, months):
         except (TypeError, ValueError):
             continue
         last = end if (last is None or end > last) else last
-    return last
+    # 11 Nov 2026: a week typed part-way through (Mon-Wed of this week) ends on a Sunday still to come; never say a
+    # date after today
+    return min(last, _today_date()) if last is not None else None
+
+
+def _today_date():
+    return datetime.date.today()
 
 
 def _t_words(x):

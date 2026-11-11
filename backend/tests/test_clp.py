@@ -492,6 +492,15 @@ ok("⭐ card 4: a month nobody typed is None ('not recorded'), never 0; the head
    and RT11["months"][1]["recorded_pct"] is None and RT11["months"][1]["lines_reported"] == 0
    and RT11["months"][1]["planned_t"] == round(_pl[11], 3) == 1450.0
    and RT11["headline"].startswith("Oct 2026: 2 000 t recorded") and RT11["recorded_to"] == "2026-10-11", str(RT11["months"]))
+import datetime as _dt  # noqa: E402
+_keep_today = clp._today_date
+clp._today_date = lambda: _dt.date(2026, 10, 8)        # Thu of Oct week 2: that week is typed but ends on Sun 11 Oct
+_RT8 = clp.monitoring(10, acc_planner, factors=factors, working_days=WD)
+clp._today_date = _keep_today
+ok("🔴 11 Nov 2026: a week typed part-way through never says a date after today (Thu 8 Oct, not Sun 11 Oct)",
+   _RT8["charts"]["recorded_tonnes"]["recorded_to"] == "2026-10-08"
+   and _RT8["charts"]["recorded_tonnes"]["headline"].endswith("· recorded to 8 Oct")
+   and _RT8["recorded_line"] == "Recorded tonnes as typed on Account, to 8 Oct 2026.", str(_RT8.get("recorded_line")))
 _HA = C2["holding_areas"]
 ok("⭐ 29 Oct 2026 (task 3c): the Holding areas table is set: one row, 10 spaces, its hours, the site it serves, the mixers straight to the gate",
    _HA["state"] == "set" and len(_HA["rows"]) == 1 and _HA["rows"][0]["holding_area"] == "Lane holding area" and _HA["rows"][0]["spaces"] == 10
