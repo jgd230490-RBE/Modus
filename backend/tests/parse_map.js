@@ -2766,7 +2766,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   }
   // the matrix fetch in flight is shared
   ok("ensureTimelineMatrix shares the fetch in flight (TL.matrixPending), cleared when it settles",
-     /if\(TL\.matrixPending\) return TL\.matrixPending;\s*TL\.matrixPending = loadTimelineMatrix\(\)\.finally\(\(\)=>\{ TL\.matrixPending = null; \}\);/.test(code));
+     // NARROWED 11 Nov 2026 (card A-F7): Play is greyed while the fetch is in flight (playWait) and handed back when it settles
+     /if\(TL\.matrixPending\) return TL\.matrixPending;\s*playWait\(true\);\s*TL\.matrixPending = loadTimelineMatrix\(\)\.finally\(\(\)=>\{ TL\.matrixPending = null; playWait\(false\); \}\);/.test(code));
   ok("F3: openTimeline records the month Play started on once it has moved off an empty month",
      /setTimelineMonth\(TL\.month\);\s*if\(TL\.playing && TL\.ticked === null\) TL\.startedOn = TL\.month;/.test(code));
 

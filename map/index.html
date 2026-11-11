@@ -8032,7 +8032,7 @@
     // tries again). No new words: "Loading the months…" under Month already says why.
     const PLAY_IDS = ['tl-open', 'tl-play', 'm-play', 'm-full-play'];
     function playWait(on) {
-        PLAY_IDS.forEach(id => { const b = document.getElementById(id); if (b) { b.disabled = !!on; b.classList.toggle('play-wait', !!on); } });
+        PLAY_IDS.forEach(id => { const b = document.getElementById(id); if (b) { b.disabled = !!on; if (b.classList) b.classList.toggle('play-wait', !!on); } });
     }
     async function loadTimelineMatrix(){
         const unit = CONFIG.FORECAST_UNIT || 'vehicles';
@@ -10688,7 +10688,7 @@
         (opts.limits || []).forEach(L => { h += '<div class="secsel-limit secsel-' + escHtml(L.state) + '">' + escHtml(L.text) + '</div>'; });
         const cols = !v.fig ? '' : two ? '<th class="num">In</th><th class="num">Out</th><th class="num">A day</th>' : '<th class="num">A day</th>';
         // 11 Nov 2026 (card A-X1, John's yes): the team left the row (it wrapped every row to three lines, so the table scrolled
-        // after one); it is the route's own detail, on its name (a tip and the screen reader's name). Copy keeps it.
+        // after one); it is the route's own detail, on its name (a tip and the screen reader's words). Copy never carried it.
         h += '<div class="secsel-scroll"><table class="secsel-table"><thead><tr><th>Route</th><th>From → to'
            + '</th>' + cols + '</tr></thead><tbody>';
         v.rows.forEach(r => {
