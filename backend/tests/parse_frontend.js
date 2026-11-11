@@ -2473,9 +2473,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && ctc.includes("return `Target for ${ctYour()}: ${ctT(s.target_t)} tCO2e, ${(+s.share_pct).toFixed(1)}% of ${of}`;")
     && ctc.includes("const of = t.mode === \"cap\" ? `the scheme's fixed cap of ${ctT(t.cap_t)} tCO2e` : `the scheme's target (${pct} below the approved plan)`;")
     && ctc.includes("have no share of it while the agreed decisions do not fit the plan`;") && !ctc.includes("ctSplit")
-    && ctc.includes("`As forecast${on}: ${ctT(s.approved_t)} tCO2e${g1 ? \", \" + g1 : \"\"}`")
-    && ctc.includes("`With the agreed decisions${on}: ${ctT(s.with_decisions_t)} tCO2e${g2 ? \", \" + g2 : \"\"}`")
-    && ctc.includes("s.invalid ? (dash ? `With the agreed decisions${on}: —` : s.invalid)")
+    && ctc.includes("`As forecast: ${ctT(s.approved_t)} tCO2e${g1 ? \", \" + g1 : \"\"}`")
+    && ctc.includes("`With the agreed decisions: ${ctT(s.with_decisions_t)} tCO2e${g2 ? \", \" + g2 : \"\"}`")
+    && ctc.includes("s.invalid ? (dash ? `With the agreed decisions: —` : s.invalid)")
     && ctc.includes('${gap > 0 ? "over" : "under"} the target') && ctc.includes("pct = `${(+t.pct_below).toFixed(1)}%`"));
   ok("⭐ the same three things on the Dashboard, Forecasts, Submit forecast and the big screen: the target line and both figures, from one pair of helpers",
     (ctc.match(/ctTargetLine\(ct\)/g) || []).length >= 4 && (ctc.match(/ctProgress\(ct(, true)?\)/g) || []).length >= 4
