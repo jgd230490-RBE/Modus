@@ -539,7 +539,7 @@ NO_CHANGE = "No change in the plan's figures."
 
 def changed_since(acc, factors=None, working_days=None):
     """
-    11 Nov 2026 (card 3 of notes\clp-before-friday-mockup-1111, John: yes; frontier idea D1): for each ISSUED CLP the
+    11 Nov 2026 (card 3 of the CLP-before-Friday mockup, John: yes; frontier idea D1): for each ISSUED CLP the
     caller may see, what changed in the plan since its last issue, in the approve card's own words (changes() on the
     issue's kept summary against the plan today), so the list and the approve card can never disagree. A CLP whose plan
     has not moved is left out (the list shows nothing for it). One gather per issued CLP: main keeps the answer until the
