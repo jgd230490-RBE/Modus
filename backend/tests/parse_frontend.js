@@ -4993,6 +4993,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && cp.includes('const busyWords = "Building… about a minute";') && cp.includes('Anything left blank stays a yellow "To complete" line.')
      && cp.includes("Download gives back the file exactly as approved."));
   ok("CLP DOCS: the editor's CSS lives in the page (.clp-form grid, .clp-places)", html.includes(".clp-form{") && html.includes(".clp-places"));
+  // 11 Nov 2026 (card 3, John: yes): the plan-changed read sits with the page's other hooks, before its early returns
+  ok("🔴 CLP DOCS (card 3): the plan-changed hooks come before the page's early returns (React's order of hooks)",
+     cp.indexOf("const [changed, setChanged] = useState({});") > 0
+     && cp.indexOf("const [changed, setChanged] = useState({});") < cp.indexOf('if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;')
+     && cp.includes("fetch(`${API}/clp/plan-changed`).then(r => okJSON(r))") && code.includes('"clp.changed": { title: "Since the last issue"'));
   // 11 Nov 2026 (cards 1-2 of notes\clp-before-friday-mockup-1111, John: yes)
   const _ns = cp.slice(cp.indexOf("const nextStep = (c, child) => {"), cp.indexOf("const primary = (c, child) => {"));
   ok("🔴 CLP DOCS (card 1): the next step is never the reviewers' send (no \"review\" step; it is in the \"⋯\" only)",

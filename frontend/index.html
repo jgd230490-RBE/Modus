@@ -1582,6 +1582,8 @@ const colorOf = (i) => tok(CHART_SLOTS[i] || "--chart-none", "#A8A29E");
 // `text` over 40 words, or a banned word anywhere in here. `value` (a prop, not an entry) carries
 // the exact, unrounded figure the old hover tooltip showed, so moving a figure here loses nothing.
 const INFO = {
+  // 11 Nov 2026 (card 3, John: yes): the "i" beside "Plan changed since Issue N" (its value: the first two changes)
+  "clp.changed": { title: "Since the last issue", text: "What changed in the plan since this CLP's last issue, as the approve card shows it." },
   "dash.material": { title: "Material in view", text: "The planned quantity of every plan line in view, in tonnes. Cubic metres and lorry loads become tonnes through each line's own conversion.", guide: "3-1-filters-and-the-six-cards", tech: "t1-volume" },
   "dash.deliveries": { title: "Lorry movements a day", text: "Deliveries in the months in view, divided by the working days in those months. A lorry coming and going is 2 movements, as councils count them (or 1 visit, if set so on Config → Planning).",
     how: "Trips are worked out for each month of each line: tonnes ÷ the vehicle's payload, rounded up. The working days in a month are set on Config → Planning.", guide: "3-1-filters-and-the-six-cards", tech: "t1-trips" },
@@ -5892,6 +5894,13 @@ function ClpPage({ access }){
     return () => { live = false; };
   }, [tick]);
   useEffect(() => { if(panel && headRef.current) headRef.current.focus(); }, [panel]);
+  // 11 Nov 2026 (card 3, John: yes): which issued CLPs' plans moved since their last issue (read after the list is drawn)
+  const [changed, setChanged] = useState({});
+  useEffect(() => { let live = true;
+    if(!data || !(data.clps || []).some(c => c.status === "approved" && c.issues > 0)) return;
+    fetch(`${API}/clp/plan-changed`).then(r => okJSON(r)).then(j => { if(live) setChanged((j && j.changed) || {}); })
+      .catch(e => console.warn("Wayscope:", e));
+    return () => { live = false; }; }, [data]);
   const say = (ok, text) => { setNote({ ok, text }); if(ok) setTimeout(() => setNote(null), 3000); };
   if(err) return <div className="max-w-7xl mx-auto p-6"><EmptyState kind="error" title="Couldn't open the CLPs" body={err} action={<button type="button" className="btn-sec" onClick={() => setTick(t => t + 1)}>Try again</button>} /></div>;
   if(!data) return <div className="max-w-7xl mx-auto p-6 text-slate-400 text-sm">Loading…</div>;
@@ -6148,6 +6157,14 @@ function ClpPage({ access }){
   const statusLine = (c) => c.status === "sent" ? `by ${c.sent_by || "the team"} · ${clpDay(c.sent_at)}`
     : c.status === "changes" ? (c.changes_note ? `“${c.changes_note}”` : "") : "";
   // PR 3c: where the last issue sent to each client group stands (Returned in red)
+  // 11 Nov 2026 (card 3 of notes\clp-before-friday-mockup-1111, John: yes): "Plan changed since Issue N" under an issued
+  // CLP whose plan moved since its last issue; the "i" gives the first two changes in the approve card's words. Read after
+  // the list is drawn; a failed read shows nothing (the line is a hint, never a status)
+  const changedLine = (c) => { const ch = c.status === "approved" ? changed[c.id] : null;
+    if(!ch || !(ch.changes || []).length) return null;
+    const first = ch.changes.slice(0, 2).map(w => w + ".").concat(ch.changes.length > 2 ? [`The rest: Approve as Issue ${ch.issue + 1}…`] : []);
+    return <span className="block text-[12px] text-slate-500" data-clp-changed={c.id}>Plan changed since Issue {ch.issue}
+      <InfoTip id="clp.changed" label={`Since Issue ${ch.issue}`} value={first} /></span>; };
   const reviewLine = (r) => r.state === "accepted" ? [`✓ Accepted by ${r.group_name} · ${clpShort(r.at)}`, "var(--ok-text)"]
     : r.state === "returned" ? [`Returned by ${r.group_name} · ${clpShort(r.at)}`, "var(--bad-text)"]
     : [`With ${r.group_name} · since ${clpShort(r.sent_at)}`, "var(--muted)"];
@@ -6204,6 +6221,7 @@ function ClpPage({ access }){
       </td>
       <td className="rd-status" style={{ whiteSpace: "normal" }}><RowStatus word={c.status_word} tone={CLP_TONE[c.status]} more={0} />
         {statusLine(c) && <span className="block text-[12px] text-slate-500">{statusLine(c)}</span>}
+        {changedLine(c)}
         {(c.reviews || []).map(r => { const [w, col] = reviewLine(r);
           return <span key={r.group_id} className="block text-[12px]" style={{ color: col }} data-clp-review-line={r.state}>{w}</span>; })}</td>
       <td>{c.last_issue ? <>Issue {c.last_issue.no} · {clpDay(c.last_issue.date)}{appr && c.last_issue.by ? <span className="block text-[12px] text-slate-500">{c.last_issue.by}</span> : null}</> : "—"}</td>

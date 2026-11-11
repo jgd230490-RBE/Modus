@@ -5782,6 +5782,17 @@ def clp_documents_list():
     return clp_records.list_for(_require_access())
 
 
+@app.get("/api/clp/plan-changed")
+def clp_plan_changed():
+    """
+    11 Nov 2026 (card 3, John: yes): each issued CLP whose plan changed since its last issue, with the approve card's
+    words. Read by the CLP list after it is drawn (the list stays quick); kept per role and team until the next write.
+    """
+    acc = _require_access()
+    factors = conversions.load_factors()
+    return _staff_json("clp/plan-changed", {}, lambda: clp_records.changed_since(acc, factors, _working_days(factors)), acc)
+
+
 @app.post("/api/clp/documents")
 def clp_documents_create(body: ClpIn):
     acc = _require_access()
