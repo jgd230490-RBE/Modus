@@ -459,6 +459,59 @@ try:
 except SystemExit as e:
     _refused = "zones differ" in str(e)
 ok("...and a live export whose zones DO differ (a routing tick not in the package) is still refused", _refused)
+
+
+# 10 Nov 2026: the first refresh from a REAL live export was refused ("location_gates differ"): Postgres stores a gate's
+# lat / lon as REAL (float4), so 17 latitudes came back up to 3e-6 deg (0.3 m) off the generator's 6-place figures.
+import struct as _struct  # noqa: E402
+
+
+def _float4(v):
+    return round(_struct.unpack("f", _struct.pack("f", float(v)))[0], 6)
+
+
+def _gates_as_float4(lt):
+    for g in lt["location_gates"]:
+        g["lat"], g["lon"] = _float4(g["lat"]), _float4(g["lon"])
+
+
+_g4 = _live_export(_gates_as_float4)
+_moved4 = sum(1 for a, b in zip(_g4["tables"]["location_gates"], PKG["tables"]["location_gates"])
+              if (a["lat"], a["lon"]) != (b["lat"], b["lon"]))
+ok("F6b: the stand-in export's gates read as float4 (Postgres REAL) really differ from the package in the 6th place",
+   _moved4 > 0, f"{_moved4} gates")
+try:
+    _refresh(_g4)
+    _err4 = None
+except SystemExit as e:
+    _err4 = str(e)
+ok("...and such an export is NOT refused (a gate within GATE_SAME_DEG is the same gate)", _err4 is None, _err4 or "")
+ok("...GATE_SAME_DEG is about a metre (wider than float4 at UK latitudes, far under a moved gate)",
+   2e-6 < getattr(GEN, "GATE_SAME_DEG", 0) <= 2e-5, str(getattr(GEN, "GATE_SAME_DEG", None)))
+
+
+def _move_a_gate(lt):
+    lt["location_gates"][0]["lat"] = round(float(lt["location_gates"][0]["lat"]) + 0.0002, 6)     # about 22 m north
+
+
+try:
+    _refresh(_live_export(_move_a_gate))
+    _refused_g = False
+except SystemExit as e:
+    _refused_g = "location_gates differ" in str(e)
+ok("...but a gate moved about 22 m on live is still refused (its baked lines would start elsewhere)", _refused_g)
+
+
+def _drop_a_gate(lt):
+    lt["location_gates"] = lt["location_gates"][1:]
+
+
+try:
+    _refresh(_live_export(_drop_a_gate))
+    _refused_d = False
+except SystemExit as e:
+    _refused_d = "location_gates differ" in str(e)
+ok("...and so is a live export missing a gate", _refused_d)
 shutil_tmp = getattr(GEN, "TMP", None)
 
 print()
