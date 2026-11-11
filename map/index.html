@@ -6750,7 +6750,7 @@
         ['busy-casing', 'busy-core', 'sel-glow', 'sel-casing', 'sel-core', 'busy-hours-at'].forEach(l => { if(map.getLayer(l)) { try { map.moveLayer(l, labelAnchor()); } catch(e){} } });
         setRouteDim(routeId);
         // 12 Nov 2026 (option A): the Forecast detail tab is on screen while a route is picked: its table follows the pick
-        try { if (drawerTab === 'detail' && document.getElementById('route-drawer').classList.contains('open') && typeof openForecastDetail === 'function') openForecastDetail(); } catch (e) {}
+        try { const dr = document.getElementById('route-drawer'); if (drawerTab === 'detail' && dr && dr.classList.contains('open') && typeof openForecastDetail === 'function') openForecastDetail(); } catch (e) {}
     }
     function clearSelection(){
         selectedRouteId=null;

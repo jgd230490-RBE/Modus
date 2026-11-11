@@ -55,7 +55,7 @@ const mat = (names) => { const m = {}; let i = 0; names.forEach(k => { m[k] = "#
        && a.html.includes("<td><b>800</b></td>"));
   }
   ok("⭐ A: a route picked while the Forecast detail tab is open re-reads the table (the pick follows), only with the drawer open on that tab",
-     html.includes("if (drawerTab === 'detail' && document.getElementById('route-drawer').classList.contains('open') && typeof openForecastDetail === 'function') openForecastDetail();"));
+     html.includes("const dr = document.getElementById('route-drawer'); if (drawerTab === 'detail' && dr && dr.classList.contains('open') && typeof openForecastDetail === 'function') openForecastDetail();"));
   ok("A: the tint has a light and a Dark look (the first column is sticky and has its own background, so it is named)",
      html.includes("table.fc-matrix tr.fc-picked td, table.fc-matrix tr.fc-picked td:first-child{ background:#EFF6FF; }")
      && html.includes('html[data-look="dark"] table.fc-matrix tr.fc-picked td, html[data-look="dark"] table.fc-matrix tr.fc-picked td:first-child{ background:rgba(37,99,235,.22); }'));
