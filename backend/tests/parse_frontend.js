@@ -3589,6 +3589,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
        grid.indexOf("<ClpCard c={C.recorded_tonnes}") > 0 && grid.indexOf("<ClpCard c={C.recorded_tonnes}") === grid.indexOf("<ClpCard ")
        && grid.includes('<ClpCard c={C.recorded_tonnes} info={<InfoTip id="clp.recorded_tonnes" />} wide>')
        && grid.includes("<ChartCanvas config={clpRecordedCfg(C.recorded_tonnes)} title={C.recorded_tonnes.title} />"));
+    // 11 Nov 2026 (7a): the part month's axis label ("Nov 2026 (to 8 Nov)") was cut at the chart's right edge
+    const recCfg = src.slice(src.indexOf("function clpRecordedCfg("), src.indexOf("function ClpUncapped("));
+    ok("CLP card 4 (7a): the tonnes chart keeps room on its right for a part month's longer axis label",
+       recCfg.length > 200 && recCfg.includes("layout: { padding: { right: 40 } }"));
     ok("⭐ CLP card 4: its info box says what planned and recorded mean in at most 30 words (FR1), and a month not typed is not zero",
        infoTxt.split(/\s+/).filter(Boolean).length <= 30 && infoTxt.includes("Recorded: tonnes typed on Account")
        && infoTxt.includes("not recorded, not zero"), `${infoTxt.split(/\s+/).filter(Boolean).length} words: ${infoTxt}`);
