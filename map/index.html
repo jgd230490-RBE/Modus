@@ -66,6 +66,7 @@
         html[data-look="dark"] .secsel-btn:hover{ background:var(--surface-2); }
         html[data-look="dark"] .secsel-x:hover{ background:var(--surface-2); }
         html[data-look="dark"] table.secsel-table tr.secsel-clicked td{ background:rgba(37,99,235,.22); }
+        html[data-look="dark"] table.fc-matrix tr.fc-picked td, html[data-look="dark"] table.fc-matrix tr.fc-picked td:first-child{ background:rgba(37,99,235,.22); }
         html[data-look="dark"] .drawer-tab.active{ background:rgba(37,99,235,.22); color:#8FB3F5; }
         html[data-look="dark"] .mapboxgl-ctrl.mapboxgl-ctrl-attrib{ background:rgba(31,32,36,.72); }
         html[data-look="dark"] .mapboxgl-ctrl-attrib a{ color:#C9CCD1; }
@@ -523,6 +524,7 @@
         table.fc-matrix th, table.fc-matrix td{ padding:6px 8px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); }
         table.fc-matrix th:first-child, table.fc-matrix td:first-child{ text-align:left; position:sticky; left:0; background:var(--surface); }
         table.fc-matrix thead th{ position:sticky; top:0; background:var(--surface); font-weight:600; color:var(--muted); }
+        table.fc-matrix tr.fc-picked td, table.fc-matrix tr.fc-picked td:first-child{ background:#EFF6FF; }
         .mat-chip{ display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px; vertical-align:middle; }
 
         /* Playable forecast timeline bar */
@@ -753,6 +755,11 @@
         table.secsel-table td{ padding:2px 6px 2px 0; vertical-align:top; }
         table.secsel-table .num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
         table.secsel-table .secsel-rid{ font-weight:600; white-space:nowrap; }
+        /* 12 Nov 2026 (map-pick-route, option R1): each route number on the road card is a button, 44 px tall, filling its cell */
+        table.secsel-table td.secsel-rid{ padding:0; }
+        .secsel-rid-btn{ display:block; width:100%; min-width:44px; min-height:44px; margin:0; padding:2px 8px 2px 0; border:0; border-radius:4px; background:transparent; font:inherit; font-weight:600; color:var(--navy-deep); text-align:left; cursor:pointer; }
+        .secsel-rid-btn:hover{ text-decoration:underline; }
+        .secsel-rid-btn:focus-visible{ outline:2px solid #1D4ED8; outline-offset:-2px; }
         table.secsel-table tr.secsel-clicked td{ background:#EFF6FF; }
         table.secsel-table tr.secsel-total td{ border-top:1px solid var(--line); font-weight:600; }
         .secsel-btns{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
@@ -1497,7 +1504,7 @@
 <div id="route-drawer">
   <div class="drawer-head">
     <button class="drawer-tab active" id="tab-analysis" onclick="showDrawerTab('analysis')">Route analysis</button>
-    <button class="drawer-tab" id="tab-detail" onclick="showDrawerTab('detail')">Forecast detail</button>
+    <button class="drawer-tab" id="tab-detail" onclick="openForecastDetail()">Forecast detail</button>
     <button type="button" class="drawer-close" onclick="closeDrawer()" title="Close" aria-label="Close the route panel">&times;</button>
   </div>
   <div class="drawer-body" id="drawer-analysis"></div>
@@ -6741,6 +6748,8 @@
         showBusyRoad(rl);
         ['busy-casing', 'busy-core', 'sel-glow', 'sel-casing', 'sel-core', 'busy-hours-at'].forEach(l => { if(map.getLayer(l)) { try { map.moveLayer(l, labelAnchor()); } catch(e){} } });
         setRouteDim(routeId);
+        // 12 Nov 2026 (option A): the Forecast detail tab is on screen while a route is picked: its table follows the pick
+        try { if (drawerTab === 'detail' && document.getElementById('route-drawer').classList.contains('open') && typeof openForecastDetail === 'function') openForecastDetail(); } catch (e) {}
     }
     function clearSelection(){
         selectedRouteId=null;
@@ -6923,13 +6932,18 @@
             const routes=mtx.routes||[];
             if(!routes.length){ box.innerHTML='<div class="an-sub">No approved forecasts in the selected window.</div>'; return; }
             const lo=mtx.from, hi=mtx.to, cmap=materialColorMap(routes);
+            // 12 Nov 2026 (map-pick-route, option A): the route picked on the map, if any, comes first (every line of it, one per
+            // material) and its rows are tinted; the rest keep their order (sorted by total). Nothing else about the table changes.
+            const pickedL=(typeof selectedRouteId==='string'||typeof selectedRouteId==='number') ? String(selectedRouteId).trim().toLowerCase() : '';
+            const isPicked=r=>!!pickedL && String(r.route_id||'').trim().toLowerCase()===pickedL;
+            if(pickedL) routes.splice(0,routes.length,...routes.filter(isPicked),...routes.filter(r=>!isPicked(r)));
             let head='<th>Route</th>'; for(let i=lo;i<=hi;i++) head+='<th>'+monthLabel(i)+'</th>'; head+='<th>Total</th>';
             let body='';
             routes.forEach(r=>{
                 let row='<td><span class="mat-chip" style="background:'+cmap[r.material_type||'—']+'"></span>'+r.route_id+'</td>';
                 for(let i=lo;i<=hi;i++){ const v=(r.monthly||{})[i]; row+='<td>'+(v?Math.round(v).toLocaleString():'·')+'</td>'; }
                 row+='<td><b>'+Math.round(r.total||0).toLocaleString()+'</b></td>';
-                body+='<tr>'+row+'</tr>';
+                body+='<tr'+(isPicked(r)?' class="fc-picked"':'')+'>'+row+'</tr>';
             });
             const leg=Object.keys(cmap).map(k=>'<span style="margin-right:14px;white-space:nowrap;"><span class="mat-chip" style="background:'+cmap[k]+'"></span>'+k+'</span>').join('');
             box.innerHTML =
@@ -10561,7 +10575,7 @@
     // the screen and "Sum this box" sums what is under it (Q9). Everyone who opens the map sees it (Q10).
     // The figures are the server's; this block only asks and draws. The route filters split the rows: a route outside them
     // is named under "Also here, outside the filters" and left out of the total, as the old section card did.
-    const SECSEL = { road: null, roadAt: null, roadPopup: null, roadKey: '', area: null, areaRes: null, areaKey: '',
+    const SECSEL = { road: null, roadAt: null, roadPopup: null, roadKey: '', area: null, areaRes: null, areaKey: '', areaPick: null,
                      drawing: false, start: null, rect: null, frame: false, tip: { key: '', timer: null, at: null },
                      cache: {}, cacheKeys: [] };
     // a click's reach on screen; the read is sent it in metres at the map's zoom
@@ -10670,7 +10684,11 @@
            + '</th>' + cols + '</tr></thead><tbody>';
         v.rows.forEach(r => {
             const tint = opts.clicked && String(opts.clicked) === String(r.id);
-            h += '<tr' + (tint ? ' class="secsel-clicked"' : '') + '><td class="secsel-rid">' + escHtml(r.id) + '</td><td>' + escHtml(r.from) + ' → ' + escHtml(r.to)
+            // 12 Nov 2026 (option R1, frame 8): on the road card AND the area card the route number is a button: it picks the route
+            // (row tinted, route lit on the map, the "…'s card" button follows it)
+            const rid = '<button type="button" class="secsel-rid-btn" data-rid="' + escHtml(r.id) + '" aria-label="Show ' + escHtml(r.id) + ' on the map" aria-pressed="' + (tint ? 'true' : 'false')
+                  + '" data-kind="' + (res && res.kind === 'area' ? 'area' : 'road') + '" onclick="secselPickRow(this.dataset.rid, this.dataset.kind)">' + escHtml(r.id) + '</button>';
+            h += '<tr' + (tint ? ' class="secsel-clicked"' : '') + '><td class="secsel-rid">' + rid + '</td><td>' + escHtml(r.from) + ' → ' + escHtml(r.to)
                + (r.team && !(res && res.kind === 'area') ? '<div class="secsel-team">' + escHtml(r.team) + '</div>' : '') + '</td>'
                + (!v.fig ? '' : two ? '<td class="num">' + secCell(r, 'inn', 'in') + '</td><td class="num">' + secCell(r, 'out', 'out') + '</td><td class="num">' + secCell(r, 'aday', 'a_day') + '</td>'
                                     : '<td class="num">' + secCell(r, 'aday', 'a_day') + '</td>') + '</tr>';
@@ -10690,7 +10708,7 @@
         const area = res && res.kind === 'area', b = [];
         // (seen on live 10 Nov: "Pick a month" under Mar 2027) only when no month is on screen
         if (!v.fig && !(res && res.month)) b.push('<button type="button" class="secsel-btn" onclick="secselPickMonth()">Pick a month</button>');
-        if (!area && opts.clicked) b.push('<button type="button" class="secsel-btn" data-rid="' + escHtml(opts.clicked) + '" onclick="secselRouteCard(this.dataset.rid)">'
+        if (opts.clicked) b.push('<button type="button" class="secsel-btn" data-rid="' + escHtml(opts.clicked) + '" data-kind="' + (area ? 'area' : 'road') + '" onclick="secselRouteCard(this.dataset.rid, this.dataset.kind)">'
                                            + escHtml(opts.clicked) + '’s card</button>');
         if (v.n) b.push('<button type="button" class="secsel-btn secsel-copy" onclick="secselCopy(\'' + (area ? 'area' : 'road') + '\', this)">' + (area ? 'Copy table' : 'Copy') + '</button>');
         if (area) b.push('<button type="button" class="secsel-btn" onclick="secselDrawAgain()">Draw again</button>');
@@ -10700,10 +10718,47 @@
         if (typeof TL !== 'undefined' && !TL.on && typeof openTimeline === 'function') openTimeline();
         if (isPhoneShell() && typeof sheetTo === 'function') sheetTo('half');
     }
-    function secselRouteCard(rid) {
+    // 12 Nov 2026 (option R1): a click on a row's route number, on the road card or the area card (kind). The route becomes the
+    // card's picked route (its row tinted, the one button reads "<route>'s card") and is lit on the map exactly as a picked route
+    // is: the halo, the others dimmed (the WHOLE route, so an area's route needs no line under the box). The card STAYS open; the
+    // table keeps its scroll and the keyboard stays on the button pressed. Closing the card drops the pick and the light (frame 6)
+    // unless a route's panel is open; a month change keeps the pick while the route is still listed, else drops it (frame 7).
+    function secselPickRow(rid, kind) {
+        if (!rid) return;
+        const area = kind === 'area';
+        if (area ? !SECSEL.area : !SECSEL.roadAt) return;
+        const host = () => (SHEET && SHEET.card === (area ? 'area' : 'road')) ? document.getElementById('m-card')
+            : area ? document.getElementById('area-card') : (SECSEL.roadPopup && SECSEL.roadPopup.getElement && SECSEL.roadPopup.getElement());
+        const sc0 = host() && host().querySelector('.secsel-scroll'), top = sc0 ? sc0.scrollTop : 0;
+        if (area) SECSEL.areaPick = String(rid); else SECSEL.roadAt.clicked = String(rid);
+        if (typeof selectRoute === 'function') selectRoute(rid);
+        if (area) redrawAreaCard(); else redrawRoadCard();
+        const h = host(); if (!h) return;
+        const sc1 = h.querySelector('.secsel-scroll'); if (sc1) sc1.scrollTop = top;
+        const again = Array.from(h.querySelectorAll('.secsel-rid-btn')).find(b => b.dataset.rid === String(rid));
+        if (again) { try { again.focus({ preventScroll: true }); } catch (e) {} }
+    }
+    // frame 6: a card closed by the person takes its pick and the light with it, unless a route's panel is open (its route stays lit)
+    function secselDropPick() {
+        try {
+            const d = document.getElementById('route-drawer');
+            if (d && d.classList.contains('open')) return;
+            if (typeof clearSelection === 'function') clearSelection();
+        } catch (e) {}
+    }
+    // frame 7: the month moved under an open card: a picked route that is no longer listed loses its tint and its light
+    function secselKeepPick(was, now, area) {
+        if (!was || !now || was.month === now.month || was.loading || was.failed) return;
+        const pick = area ? SECSEL.areaPick : (SECSEL.roadAt && SECSEL.roadAt.clicked);
+        if (!pick || (now.routes || []).some(r => String(r.route_id) === String(pick))) return;
+        if (area) SECSEL.areaPick = null; else if (SECSEL.roadAt) SECSEL.roadAt.clicked = null;
+        secselDropPick();
+    }
+    function secselRouteCard(rid, kind) {
         if (!rid) return;
         if (isPhoneShell() && typeof openRouteCard === 'function') { openRouteCard(rid); return; }
-        if (SECSEL.roadPopup) { try { SECSEL.roadPopup.remove(); } catch (e) {} }
+        // the road card closes as the route's panel opens (as today), without the frame-6 drop: the panel keeps the route lit; the area card stays
+        if (kind !== 'area' && SECSEL.roadPopup) { const pp = SECSEL.roadPopup; SECSEL.roadPopup = null; SECSEL.roadAt = null; SECSEL.roadKey = ''; try { pp.remove(); } catch (e) {} }
         if (typeof openRouteAnalysis === 'function') openRouteAnalysis(rid);
     }
 
@@ -10728,7 +10783,7 @@
         const at = SECSEL.roadAt; if (!at) return;
         const m = secselMonth(), url = roadAtUrl(at.ask || at.lngLat, m, at.r, at.clicked);
         SECSEL.roadKey = url;
-        secselFetch(url).then(j => { if (SECSEL.roadKey !== url) return; SECSEL.road = j; redrawRoadCard(); })
+        secselFetch(url).then(j => { if (SECSEL.roadKey !== url) return; const was = SECSEL.road; SECSEL.road = j; secselKeepPick(was, j, false); redrawRoadCard(); })
             .catch(() => { if (SECSEL.roadKey !== url) return; SECSEL.road = { kind: 'road', month: m, failed: true }; redrawRoadCard(); });
     }
     function roadCardHTML() {
@@ -10753,7 +10808,7 @@
             .setLngLat(at.lngLat).setHTML(roadCardHTML()).addTo(map);
         SECSEL.roadPopup = pop;
         // a close clears only its own card (a new click's card replaces it first)
-        pop.on('close', () => { if (SECSEL.roadPopup === pop) { SECSEL.roadPopup = null; SECSEL.roadAt = null; SECSEL.roadKey = ''; } });
+        pop.on('close', () => { if (SECSEL.roadPopup === pop) { SECSEL.roadPopup = null; SECSEL.roadAt = null; SECSEL.roadKey = ''; secselDropPick(); } });
         fitRoadPopup();
     }
     // 10 Nov 2026 (road card edge; seen on live: a card opened near the map's left edge ran under the Control Panel, "…ar 2027").
@@ -11088,7 +11143,7 @@
     function secselDrawAgain() { clearArea(); toggleAreaPick(); }
     function setAreaBox(box, quiet) {
         if (!box || box.length !== 4 || !(box[0] < box[2] && box[1] < box[3])) return;
-        SECSEL.area = box;
+        SECSEL.area = box; SECSEL.areaPick = null;
         ensureAreaPickLayers();
         loadAreaSum();
         if (isPhoneShell()) { SHEET.card = 'area'; renderRouteCard(); if (SHEET.state !== 'half') sheetTo('half'); }
@@ -11096,7 +11151,9 @@
         if (!quiet && typeof scheduleViewWrite === 'function') scheduleViewWrite();
     }
     function clearArea() {
-        SECSEL.area = null; SECSEL.areaRes = null; SECSEL.areaKey = '';
+        const picked = !!SECSEL.areaPick;
+        SECSEL.area = null; SECSEL.areaRes = null; SECSEL.areaKey = ''; SECSEL.areaPick = null;
+        if (picked) secselDropPick();      // frame 6: the area closed, its pick and its light go (unless a route's panel is open)
         ensureAreaPickLayers();
         const c = document.getElementById('area-card'); if (c) { c.hidden = true; c.innerHTML = ''; }
         if (SHEET.card === 'area' && typeof closeRouteCard === 'function') closeRouteCard();
@@ -11108,13 +11165,13 @@
         if (SECSEL.areaKey === url && SECSEL.areaRes && !SECSEL.areaRes.failed) return;
         SECSEL.areaKey = url;
         if (!SECSEL.areaRes || SECSEL.areaRes.month !== m) SECSEL.areaRes = { kind: 'area', month: m, loading: true };
-        secselFetch(url).then(j => { if (SECSEL.areaKey !== url) return; SECSEL.areaRes = j; redrawAreaCard(); })
+        secselFetch(url).then(j => { if (SECSEL.areaKey !== url) return; const was = SECSEL.areaRes; SECSEL.areaRes = j; secselKeepPick(was, j, true); redrawAreaCard(); })
             .catch(() => { if (SECSEL.areaKey !== url) return; SECSEL.areaRes = { kind: 'area', month: m, failed: true }; redrawAreaCard(); });
         redrawAreaCard();
     }
     function areaCardHTML() {
         return secselCardHTML(SECSEL.areaRes || { kind: 'area', loading: true },
-            { passing: typeof modeRoutesPassing === 'function' ? modeRoutesPassing() : null, rp: typeof routePropsById === 'function' ? routePropsById() : {} });
+            { passing: typeof modeRoutesPassing === 'function' ? modeRoutesPassing() : null, rp: typeof routePropsById === 'function' ? routePropsById() : {}, clicked: SECSEL.areaPick });
     }
     function showAreaCard() {
         let c = document.getElementById('area-card');
