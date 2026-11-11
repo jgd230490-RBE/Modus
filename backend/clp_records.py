@@ -51,7 +51,9 @@ import taxonomy
 import clp_doc
 
 STATUSES = ("draft", "sent", "changes", "approved")
-STATUS_WORDS = {"draft": "Draft", "sent": "Sent for approval", "changes": "Changes asked", "approved": "Approved"}
+# 11 Nov 2026 (card 2 of notes\clp-before-friday-mockup-1111, John: yes): an issued CLP reads "Issued", as its documents
+# do ("Issue 1"); the status key stays "approved" and the contractor's step keeps its name, "Approve as Issue N…"
+STATUS_WORDS = {"draft": "Draft", "sent": "Sent for approval", "changes": "Changes asked", "approved": "Issued"}
 AUTO_TYPES = ("compound", "site", "stockpile")
 COVER_KEYS = tuple(k for k, _l in clp_doc.COVER_FIELDS)
 COVER_MAX = {"summary": 1200}
@@ -529,7 +531,39 @@ def changes(prev, cur):
         out.append("Places now: " + ", ".join(cur["places"]))
     if cur["peak_month"] and prev.get("peak_month") and cur["peak_month"] != prev["peak_month"]:
         out.append(f"Busiest month now {ml(cur['peak_month'])} (was {ml(prev['peak_month'])})")
-    return out or ["No change in the plan's figures."]
+    return out or [NO_CHANGE]
+
+
+NO_CHANGE = "No change in the plan's figures."
+
+
+def changed_since(acc, factors=None, working_days=None):
+    """
+    11 Nov 2026 (card 3 of the CLP-before-Friday mockup, John: yes; frontier idea D1): for each ISSUED CLP the
+    caller may see, what changed in the plan since its last issue, in the approve card's own words (changes() on the
+    issue's kept summary against the plan today), so the list and the approve card can never disagree. A CLP whose plan
+    has not moved is left out (the list shows nothing for it). One gather per issued CLP: main keeps the answer until the
+    next write. {"changed": {clp_id: {"issue": N, "changes": [words, ...]}}}
+    """
+    factors = factors or conversions.load_factors()
+    rows, _locs, _m = _all(factors)
+    out = {}
+    for rec in rows.values():
+        if rec.get("status") != "approved" or not visible(rec, acc):
+            continue
+        iss = _issue_rows(rec["id"])
+        last = iss[-1] if iss else None
+        prev = json.loads(last["summary"]) if last and last.get("summary") else None
+        if not prev:
+            continue
+        try:
+            data = gather_for(rec, factors, working_days)
+        except ValueError:
+            continue
+        words = changes(prev, summary(data))
+        if words and words != [NO_CHANGE]:
+            out[rec["id"]] = {"issue": last["issue_no"], "changes": words}
+    return {"changed": out}
 
 
 def _issue_rows(clp_id):
