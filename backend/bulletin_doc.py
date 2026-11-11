@@ -133,6 +133,29 @@ def n0(v):
     return "—" if v is None else f"{float(v):,.0f}"
 
 
+def a_day_words(v):
+    """11 Nov 2026 (card A-F2): a route that carries loads but fewer than half a movement a day reads "under 1" (the
+    public map's words), never "0" beside a month figure above nought."""
+    return "under 1" if v is not None and 0 < float(v) < 0.5 else n0(v)
+
+
+def name_twins(views, vehicle_types, vehicle_label):
+    """11 Nov 2026 (card A-F2): two rows with the same name ("M–B Harborough Rail Freight Terminal to Melton Compound"
+    twice) each get what differs: the lorry type when every twin has exactly one and they differ, else the route's
+    name. `views` is changed in place (its "label"); `vehicle_types` maps a route to its lorry keys."""
+    seen = {}
+    for v in views:
+        seen.setdefault(v["label"], []).append(v)
+    for label, vs in seen.items():
+        if len(vs) < 2:
+            continue
+        keys = [tuple(vehicle_types.get(v["route_id"]) or ()) for v in vs]
+        by_lorry = all(len(k) == 1 for k in keys) and len(set(keys)) == len(keys)
+        for v, k in zip(vs, keys):
+            v["label"] = f"{label} · {vehicle_label(k[0]) if by_lorry else v['route_id']}"
+    return views
+
+
 def n1(v):
     return "—" if v is None else f"{float(v):,.1f}"
 
@@ -942,10 +965,10 @@ def sheet(month_index, acc=None, now=None):
     def route_view(r):
         pr = prev_rows.get(r["route_id"])
         last = ("no earlier month in the programme" if mi <= 1 else
-                (f"{n0(pr['count_a_day'])} a day" if pr else "none planned"))
+                (f"{a_day_words(pr['count_a_day'])} a day" if pr else "none planned"))
         return {"route_id": r["route_id"], "label": r.get("label") or r["route_id"], "letters": letters_of(r),
                 # 9 Nov 2026 (2.1-11b): the figure in the organisation's unit; `visits` for the cap and the colour
-                "a_day": r.get("count_a_day"), "a_day_text": n0(r.get("count_a_day")), "visits": r.get("two_way_a_day"),
+                "a_day": r.get("count_a_day"), "a_day_text": a_day_words(r.get("count_a_day")), "visits": r.get("two_way_a_day"),
                 # the cap is typed in visits; on the bar (drawn in the organisation's count) it sits at cap × per visit
                 "cap_at": (r["cap"] * per_visit() if r.get("cap") is not None else None),
                 # 12 Oct 2026 (the user, evening): a page people read prints WHOLE movements ("6,874", never
@@ -959,6 +982,10 @@ def sheet(month_index, acc=None, now=None):
                 "over_flag": bool(r.get("cap") is not None and (r.get("two_way_a_day") or 0) > r["cap"])}
 
     routes_view = [route_view(r) for r in rows]
+    import conversions
+    _fac = conversions.load_factors()
+    name_twins(routes_view, {r["route_id"]: r.get("vehicle_types") for r in rows},
+               lambda k: conversions.vehicle_label(_fac, k))
     # REVERSED 13 Oct 2026 (W11): no width by volume (it was 1.5-6.5 px by the month's busiest route, so the same width
     # meant different volumes in different months); each route takes the public map's Volume colour for its two-way
     # movements a day, at one width. Drawn quietest first, so the busiest sit on top.
@@ -1210,21 +1237,27 @@ def projector(points, w, h, pad):
 
 
 MARKER_CLEAR = 11.0                      # PDF pt between marker centres before a control steps off a pin
+# 11 Nov 2026 (card A-X3): what the PDF map passes. A works square (8.8 pt, half-diagonal 6.2) and a letter pin (radius
+# 4.6, white edge) touch at about 11 pt; 14 leaves a gap of about 3 pt, and the step must be longer than the clearance
+PDF_MARKER_CLEAR, PDF_MARKER_STEP = 14.0, 16.0
 
 
-def control_spot(x, y, taken, clear=MARKER_CLEAR, step=13.0):
+def control_spot(x, y, taken, clear=MARKER_CLEAR, step=13.0, rings=1):
     """
     14 Oct 2026 (the publishing check): a control's square covered a site's letter. Where it goes: at (x, y) if nothing
     taken is within `clear`, else the first clear spot `step` away (up, up-right, right ... round the clock; "up" is +y,
     so a y-down caller passes a negative step), else one step up. The caller draws a leader back to (x, y).
+    11 Nov 2026 (card A-X3): `rings=2` tries a second ring, two steps out, before giving up (the PDF map: three pins
+    round one control left no clear spot one step away).
     """
     if all(math.hypot(x - a, y - b) >= clear for a, b in taken):
         return x, y
-    for k in range(8):
-        ang = math.pi / 2 - k * math.pi / 4
-        cx, cy = round(x + abs(step) * math.cos(ang), 2), round(y + step * math.sin(ang), 2)
-        if all(math.hypot(cx - a, cy - b) >= clear for a, b in taken):
-            return cx, cy
+    for ring in range(1, max(1, rings) + 1):
+        for k in range(8):
+            ang = math.pi / 2 - k * math.pi / 4
+            cx, cy = round(x + ring * abs(step) * math.cos(ang), 2), round(y + ring * step * math.sin(ang), 2)
+            if all(math.hypot(cx - a, cy - b) >= clear for a, b in taken):
+                return cx, cy
     return x, y + step
 
 

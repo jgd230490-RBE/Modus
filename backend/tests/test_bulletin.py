@@ -2349,7 +2349,8 @@ _cs = [bulletin_doc.control_spot(0, 0, [(0, 0)] + [(13 * math.cos(math.pi / 2 - 
 ok("control_spot: boxed in on every side it goes one step up (never on the pin itself)", _cs == [(0, 13)])
 _dbs2 = _EXP[_EXP.index("def _draw_bulletin_schematic("):_EXP.index("def _scale_bar(")]
 ok("🔴 the PDF and the page both step controls off the pins and draw a leader back (one rule, bulletin_doc.control_spot)",
-   "bulletin_doc.control_spot(ax, ay, pins)" in _dbs2 and "c.line(ax, ay, px, py)" in _dbs2
+   # NARROWED 11 Nov 2026 (card A-X3): the PDF passes its own clearance and step (the function's defaults are unchanged)
+   "bulletin_doc.control_spot(ax, ay, pins, clear=bulletin_doc.PDF_MARKER_CLEAR," in _dbs2 and "c.line(ax, ay, px, py)" in _dbs2
    and "control_spot(ax, ay, pins, clear=24, step=-26)" in read("backend/bulletin_doc.py"))
 # labels apart
 _ent = [(100, 100, 60), (104, 102, 60), (98, 96, 80), (300, 300, 40)]

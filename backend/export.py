@@ -1708,7 +1708,10 @@ def _draw_bulletin_schematic(c, S, x, y, w, h, P=None):
     for z in S["controls"]:
         if z.get("at"):
             ax, ay = P(*z["at"])
-            px, py = bulletin_doc.control_spot(ax, ay, pins)
+            # 11 Nov 2026 (card A-X3): a square 8.8 pt wide beside a 4.6 pt pin touched it at 11 pt apart (E on 2,
+            # J on 4); the printed map keeps PDF_MARKER_CLEAR between centres, a clear gap
+            px, py = bulletin_doc.control_spot(ax, ay, pins, clear=bulletin_doc.PDF_MARKER_CLEAR,
+                                               step=bulletin_doc.PDF_MARKER_STEP, rings=2)
             if (px, py) != (ax, ay):
                 c.setStrokeColorRGB(*AMBER_RGB); c.setLineWidth(0.8)
                 c.line(ax, ay, px, py)
@@ -2007,12 +2010,21 @@ def _council_legend(C, width, title="t CO2e in the month:"):
     return d
 
 
+def _last_month_cell(text):
+    """11 Nov 2026 (card A-F2): the route table's narrow last-month column. "none planned" broke mid-word over two lines
+    ("none p / lanned"); the column reads "none", and "no earlier month in the programme" a dash. The web page keeps
+    the whole words."""
+    t = (text or "").replace(" a day", "")
+    return {"none planned": "none", "no earlier month in the programme": "—"}.get(t, t)
+
+
 def _route_bar(r, width, vmax):
     """14 Oct 2026 (the publishing check): the route table's cell — the figure, then a bar in the route's map colour,
     the planning flag a dashed red tick. It replaces the separate chart that repeated the table."""
     from reportlab.graphics.shapes import Drawing, Line, Rect, String
     d = Drawing(width, 10)
-    num_w = 26
+    # 11 Nov 2026 (card A-F2): "under 1" is wider than a figure: the number's room grows to fit it
+    num_w = max(26, rl_pdfmetrics_width(r["a_day_text"], _BF("bold"), 8) + 4)
     d.add(String(num_w - 2, 2.2, r["a_day_text"], fontName=_BF("bold"), fontSize=8, textAnchor="end",
                  fillColor=colors.Color(*NAVY_RGB)))
     bw = width - num_w - 4
@@ -2112,10 +2124,11 @@ class _Kit:
         k = (len(sites) + 1) // 2
         cols = [[P("SITES", skh)] + sites[:k], [P("", skh)] + sites[k:],
                 [P("ROAD WORKS AND LIMITS", skh)] + (lims or [P("none this month", sk)])]
-        n = max(len(x) for x in cols)
-        rows = [[x[i] if i < len(x) else P("", sk) for x in cols] for i in range(n)]     # an empty cell at the key's leading
+        # 11 Nov 2026 (card A-X3): each column flows on its own. As one grid, a works line that wrapped made its whole row
+        # two lines tall and left an empty line in the sites' columns ("A Wolds Link Batching Plant", a gap, "B ...").
+        # Each column is now one cell holding its own lines: the header row keeps the rule under it.
         u = self.usable
-        t = LongTable(rows, colWidths=[u * 0.31, u * 0.31, u * 0.38])
+        t = LongTable([[x[0] for x in cols], [x[1:] or P("", sk) for x in cols]], colWidths=[u * 0.31, u * 0.31, u * 0.38])
         t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("VALIGN", (0, 0), (-1, -1), "TOP"),
                                ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
                                ("TOPPADDING", (0, 0), (-1, -1), 0.6), ("BOTTOMPADDING", (0, 0), (-1, -1), 0.6),
@@ -2139,7 +2152,7 @@ class _Kit:
         for r in S["routes"]:
             rows.append([P(E(r["letters"].replace(" to ", "–").replace(" → ", "–")), smg), P(E(r["label"]), sm),
                          _route_bar(r, bar_w - 8, vmax), P(E(r["in_month_text"]), smr),
-                         P(E(r["last_month_text"].replace(" a day", "")), smr),
+                         P(E(_last_month_cell(r["last_month_text"])), smr),
                          P(E(r["flag_short"]), ParagraphStyle("rtf", parent=smr, textColor=colors.Color(*RED_RGB), fontName=_BF("bold"))
                            if r["over_flag"] else smr)])
         if not S["routes"]:
@@ -2806,10 +2819,18 @@ def _draw_community(c, PL, P, layer):
 
 
 def _plan_scale_bar(c, v, fw):
-    """The scale bar, bottom right: 1, 2 or 5 × 10^k metres near 50 mm, in four segments, 0 / half / whole labelled."""
+    """The scale bar, bottom right: 1, 2 or 5 × 10^k metres near 50 mm, in four segments, 0 / half / whole labelled.
+    11 Nov 2026 (card A-F3): in the organisation's unit, as the bulletin's maps are: a miles organisation reads a road-scale
+    plan in miles ("0 2.5 5 miles"); a bar under 1 km (a site plan) stays in metres, as site drawings are. Returns the
+    bar's length in metres."""
     import basemap
     k = fw / v["w"]
     metres, px = basemap.bar_metres(v, 50 * mm / k)
+    half, whole = basemap.length_words(metres / 2).replace(" km", "").replace(" m", ""), basemap.length_words(metres)
+    if _du() == "mi" and metres >= 1000:
+        mi, px = basemap.bar_miles(v, 50 * mm / k)
+        metres = mi * 1609.344
+        half, whole = f"{mi / 2:g}", f"{mi:g} " + ("mile" if mi == 1 else "miles")
     bar = px * k
     x1, y = fw - 16, 24
     x0 = x1 - bar
@@ -2823,8 +2844,8 @@ def _plan_scale_bar(c, v, fw):
         c.rect(x0 + i * bar / 4, y - 1.5, bar / 4, 3.5, stroke=1, fill=1)
     c.setFillColorRGB(*NAVY_RGB); c.setFont(_BF("regular"), 6.8)
     c.drawCentredString(x0, y + 4.5, "0")
-    c.drawCentredString(x0 + bar / 2, y + 4.5, basemap.length_words(metres / 2).replace(" km", "").replace(" m", ""))
-    c.drawCentredString(x1, y + 4.5, basemap.length_words(metres))
+    c.drawCentredString(x0 + bar / 2, y + 4.5, half)
+    c.drawCentredString(x1, y + 4.5, whole)
     return metres
 
 
