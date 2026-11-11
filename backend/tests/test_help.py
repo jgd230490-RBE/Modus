@@ -862,8 +862,9 @@ def _png_size(path):
 _itags = re.findall(r"<img [^>]*>", src)
 _iattrs = [dict(re.findall(r'([a-z-]+)="([^"]*)"', t)) for t in _itags]
 _isizes = {a["src"]: _png_size(os.path.join(ROOT, "frontend", "help", a["src"])) for a in _iattrs}
+# NARROWED 10 Nov 2026 (wave 5, finding 22): 27 figures became 45 (the 22 grey frames are real screens, 18 figures added in chapters 2 and 14-20)
 ok3("\U0001f534 #17 every figure image (%d) carries width and height equal to its file's own pixels, and keeps loading=\"lazy\"" % len(_itags),
-   len(_itags) == 27 and all(a.get("loading") == "lazy" and _isizes[a["src"]]
+   len(_itags) == 45 and all(a.get("loading") == "lazy" and _isizes[a["src"]]
                              and (int(a.get("width", 0)), int(a.get("height", 0))) == _isizes[a["src"]] for a in _iattrs),
    str([(a["src"], a.get("width"), a.get("height"), _isizes[a["src"]]) for a in _iattrs
         if (int(a.get("width", 0)), int(a.get("height", 0))) != _isizes[a["src"]]]))

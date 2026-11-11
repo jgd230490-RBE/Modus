@@ -265,9 +265,12 @@ _still_tags = [t for _, t in _still_tags]
 ok("⭐ every still's alt text says it is the fictional demo scheme",
    len(_still_tags) == 6 and all(re.search(r'alt="[^"]*fictional demo scheme[^"]*"', t) for t in _still_tags))
 # NARROWED 13 Oct (second pass): the public-map still left the hero; still no alt text says "route map".
-ok("...and no alt text calls the map the route map; still-routes survives as a poster",
+# NARROWED 10 Nov 2026 (wave 5, finding 21): film 1's poster is the Routes screen (still-routes), film 3's the public map (still-map); both new
+ok("...and no alt text calls the map the route map; still-routes survives as film 1's poster, still-map as film 3's",
    not re.search(r'alt="[^"]*route map', src, re.I) and 'poster="./media/still-routes.jpg"' in src
-   and _still_path("still-routes").is_file())
+   and 'poster="./media/still-map.jpg"' in src
+   and all(_still_path(n).is_file() and _still_path(n).read_bytes()[:3] == b"\xff\xd8\xff" and _still_path(n).stat().st_size < 200 * 1024
+           for n in ("still-routes", "still-map")))
 ok("every still has width and height (no layout jump) and loads lazily",
    all('width="' in t and 'height="' in t and 'loading="lazy"' in t for t in _still_tags))
 ok("each still exists as a JPEG under 200 KB",

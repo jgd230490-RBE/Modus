@@ -12,7 +12,7 @@
  * data from anyone's project. They are drawn from the HTML below, so an edit to a figure
  * is an edit to this file, not to a picture.
  *
- * PLACEHOLDERS (S01–S15, M01–M08 except M04) stand where the guide's screenshots go.
+ * PLACEHOLDERS (S01–S15, M01–M08 except M04) stand where a guide screenshot is missing (10 Nov 2026: none is missing; a real file is never overwritten).
  * Each says, on the image itself, that it is NOT a capture. A placeholder that looked like a
  * screenshot would be a false caption — the previous guide had exactly that bug inside its PNGs.
  * The real screens come from backend/tools/capture_guide.js (import the demo package on a
@@ -219,22 +219,22 @@ const HOLDERS = {
   S04: ["Submit forecast — one line across a year, with the totals strip", "Submit forecast, a demo route picked", "app"],
   S05: ["Forecasts — the list with its filters, cost and status (planner view)", "Forecasts, as the planner", "app"],
   S06: ["Commit view — KPI strip, clash rail and the Monday–Friday grid", "Look-ahead › Commit", "app"],
-  S07: ["A row expanded, and the map of this week's lines under the grid", "Look-ahead › Commit, first row expanded", "app"],
-  S08: ["Account view — planned, actual, variance, cost, and the Stockpiles block", "Look-ahead › Account", "app"],
+  S07: ["A row opened: its details, its flags and the plan day by day", "Look-ahead › Commit, first row expanded", "app"],
+  S08: ["Account view — planned, actual, the difference and the cost for each line", "Look-ahead › Account", "app"],
   S09: ["Horizon — week totals for this month and next", "Look-ahead › Horizon", "app"],
   S10: ["The Confirm week dialog", "Look-ahead › Commit next week › Confirm week", "app"],
-  S11: ["Locations — the map and the edit form with gates and stock held", "Locations, a stockpile selected", "app"],
-  S12: ["Routes — a route expanded: route status, analysis, alternatives, planning block", "Routes, a routed route expanded", "app"],
-  S13: ["Zones — a disruption zone and a haul road with speed and mode", "Zones, the demo haul road selected", "app"],
+  S11: ["Locations — a site selected on the map, with its edit form", "Locations, a stockpile selected", "app"],
+  S12: ["Routes — a route opened: its vehicles and what lies near it", "Routes, a routed route expanded", "app"],
+  S13: ["Zones — a haul road selected, with its dates and its assigned speed", "Zones, the demo haul road selected", "app"],
   S14: ["Configuration — the Vehicles section", "Configuration › Vehicles", "app"],
-  S15: ["The supplier PDF — one row per line, Monday to Friday, coordinates, route map", "Look-ahead › PDF, first page", "pdf"],
+  S15: ["The commitment sheet (PDF) — a map of the week's routes, then one row per line, Monday to Friday", "Look-ahead › PDF, first page", "pdf"],
   M01: ["The public map with the Control Panel open", "/map/, corridor zoom", "map"],
   M02: ["The alignment popup — team, work section and chainage", "/map/, a band clicked", "map"],
-  M03: ["Sites and assets — the stockpile gauge and its popup", "/map/, a stockpile clicked", "map"],
+  M03: ["Sites and assets — a stockpile's popup, with the stock held against its capacity", "/map/, a stockpile clicked", "map"],
   M05: ["A road closure or restriction and its popup", "/map/ with a road-restriction provider connected, a closure clicked", "map"],
   M06: ["Playing the months — the figures bar, What's moving and Conditions", "/map/, timeline on October", "map"],
   M07: ["The satellite basemap under routes and alignment", "/map/, Basemap › Satellite", "map"],
-  M08: ["A site popup with its Street View picture", "/map/, a quarry clicked", "map"],
+  M08: ["A site popup — its type, vendor and detail", "/map/, a quarry clicked", "map"],
 };
 
 function holder(code, [caption, , kind]) {
@@ -297,6 +297,8 @@ function holder(code, [caption, , kind]) {
   if (which === "all" || which === "holders") {
     await pg.setViewportSize({ width: 1440, height: 760 });
     for (const [code, spec] of Object.entries(HOLDERS)) {
+      // 10 Nov 2026 (wave 5, finding 22): every one of these now has a real capture; never write a placeholder over one
+      if (fs.existsSync(path.join(MEDIA, code + ".png"))) { out.push(code + ".png (kept: a real capture)"); continue; }
       await pg.setContent(holder(code, spec), { waitUntil: "load" });
       await pg.screenshot({ path: path.join(MEDIA, code + ".png"), clip: { x: 0, y: 0, width: 1440, height: 760 } });
       out.push(code + ".png");
