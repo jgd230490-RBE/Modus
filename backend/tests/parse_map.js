@@ -7708,7 +7708,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   try {
     F = new Function("escHtml", "PV", "CW", "monthLabel", "teamText", "TENANT", "map", "styleReady", "document", "isPhoneShell", "mapboxgl",
                      "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle",
-                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), secselBeside: (typeof secselBeside === 'function' ? secselBeside : null), SECSEL_MAP };")(
+                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), secselBeside: (typeof secselBeside === 'function' ? secselBeside : null), popupPlace: (typeof popupPlace === 'function' ? popupPlace : null), SECSEL_MAP };")(
       esc, () => pv, () => (pv === 2 ? words2 : words1), m => (m === 23 ? 'Nov 2027' : 'M' + m), v => (v === 'IPT1' ? 'North Team' : v),
       { name: 'Wolds Link', demo_notice: 'Fictional scheme' }, {}, () => true, doc, () => false, {}, {}, () => 'https://x/map/?month=2027-11', null, null,
       x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }));
@@ -7920,6 +7920,178 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("2.1-4 Q7 (sandbox): the link's box reads back, and anything that is not a box is no box",
      !!afp && JSON.stringify(afp('-0.96,52.49,-0.94,52.51')) === '[-0.96,52.49,-0.94,52.51]' && afp('1,2,3') === null && afp('3,2,1,4') === null
      && afp('a,b,c,d') === null && afp('') === null && afp('-0.9,53,-0.8,52') === null);
+
+  // ===== 11 Nov 2026 — map popup top (seen on live at 1422 x 677, the road card's live check: a holding area's popup,
+  // placed by the map above its point, ran 75 -> 308 with the figures bar's edge at 98: its title 23 px under the bar) =====
+  const place = F && F.popupPlace;
+  ok("⭐ POPUP TOP: the pure rule exists (where a popup the map would place itself must go to clear both bars)", typeof place === 'function');
+  if (typeof place === 'function') {
+    // live's desk layout: the map 1122 x 677, the timeline bar 94, the figures bar's edge at 98, the free map ends at 1066
+    const P = (x, y, w, h, off, top) => place(x, y, w, h, 1122, 677, 94, top === undefined ? 98 : top, 1066, off || 0);
+    ok("⭐ POPUP TOP (the live case): a 243 px popup at y = 324 has 226 px above it under the bar and 259 below: it opens BELOW its point; the map alone put it above, 23 px under the bar",
+       P(550, 324, 240, 243).anchor === 'top' && P(550, 324, 240, 243).cap === 0 && (324 - 243) < 98);
+    ok("⭐ POPUP TOP: where the place above the point is clear of the bar the map keeps its own place ('' = nothing is changed)",
+       P(550, 400, 240, 243).anchor === '' && P(550, 347, 240, 243).anchor === '' && P(550, 346, 240, 243).anchor !== '');
+    ok("⭐ POPUP TOP: with no bar over the map (the phone, the big screen) nothing is changed at all, whatever the point",
+       [10, 100, 324, 340, 560].every(y => P(550, y, 240, 243, 0, 0).anchor === '' && P(550, y, 240, 600, 0, 0).cap === 0));
+    ok("⭐ POPUP TOP: a popup that fits neither above nor below (a short window, the point mid-map) opens BESIDE its point, centred, as the road card: to the left where its width fits, else to the right",
+       P(550, 340, 240, 243).anchor === 'right' && P(550, 340, 240, 243).cap === 0 && P(200, 340, 240, 243).anchor === 'left');
+    ok("⭐ POPUP TOP: a popup too tall for any of the three opens on the side with more room and is capped to that room, never under a bar",
+       P(550, 340, 240, 500).anchor === 'top' && P(550, 340, 240, 500).cap === 583 - 340 - 6
+       && P(550, 345, 240, 500).anchor === 'bottom' && P(550, 345, 240, 500).cap === 345 - 98 - 6);
+    ok("POPUP TOP: near the map's left or right edge the corner is kept as the map would choose it",
+       P(50, 324, 240, 243).anchor === 'top-left' && P(1100, 324, 240, 243).anchor === 'top-right' && P(550, 324, 240, 243).anchor === 'top');
+    ok("POPUP TOP: the popup's own offset counts (a traffic limit's is 18 px): 259 px below is enough for 243 + 6, not for 243 + 18 + 6",
+       P(550, 324, 240, 243, 0).anchor === 'top' && P(550, 324, 240, 243, 18).anchor !== 'top' && P(550, 324, 240, 243, 18).anchor !== '');
+    ok("POPUP TOP: odd inputs are safe: no size, a point under the bar or under the timeline bar, a missing foot",
+       P(550, 324, 240, 0).anchor === '' && P(550, 50, 240, 243).anchor === '' && P(550, 640, 240, 243).anchor === ''
+       && place(550, 200, 240, 243, 1122, 677, undefined, 98, 1066).anchor === 'top');
+    // every point between the bars, four popup sizes, three offsets: the box the rule gives never crosses either bar
+    let crossed = 0, seen = 0;
+    for (const h of [120, 243, 320, 520]) for (const off of [0, 8, 18]) for (let y = 99; y <= 582; y += 3) {
+      const r = P(550, y, 240, h, off); seen++;
+      const hh = r.cap ? Math.min(h, r.cap) : h;
+      let a, b;
+      if (r.anchor === '' || r.anchor.indexOf('bottom') === 0) { a = y - off - hh; b = y - off; }
+      else if (r.anchor.indexOf('top') === 0) { a = y + off; b = y + off + hh; }
+      else { a = y - hh / 2; b = y + hh / 2; }
+      if (a < 98 || b > 583) crossed++;
+    }
+    ok("⭐ POPUP TOP: at every height between the bars, for four popup sizes and three offsets, the popup's box stays between the figures bar and the timeline bar (" + seen + " cases)",
+       seen > 1500 && crossed === 0);
+  }
+  // popupFit, run against a stand-in popup
+  let fitSrc = null;
+  try { fitSrc = /function popupFit\(pop\) \{[\s\S]*?\n    \}/.exec(code)[0]; } catch (e) {}
+  const watched = [];
+  function FakeRO(cb) { this.cb = cb; this.seen = []; this.off = 0; watched.push(this); }
+  FakeRO.prototype.observe = function (n) { this.seen.push(n); };
+  FakeRO.prototype.disconnect = function () { this.off++; };
+  const fitRun = (pop, y, hud, RO) => {
+    try {
+      new Function("map", "document", "getComputedStyle", "popupPlace", "secselTopEdge", "secselRightEdge", "ResizeObserver", fitSrc + "\nreturn popupFit;")(
+        { getContainer: () => ({ clientWidth: 1122, clientHeight: 677 }), project: () => ({ x: 550, y }) },
+        { documentElement: {} }, () => ({ getPropertyValue: () => '94px' }), place, () => (hud === undefined ? 98 : hud), () => 1066, RO)(pop);
+      return true;
+    } catch (e) { return 'threw: ' + e.message; }
+  };
+  const fakePop = (h, opts, open) => {
+    const box = { offsetHeight: h - 10, style: {} }, pop = { options: opts || {}, moved: 0, box,
+      isOpen: () => open !== false, getLngLat: () => ({ lng: 0, lat: 0 }), setLngLat() { this.moved++; return this; },
+      getElement: () => ({ offsetWidth: 240, offsetHeight: h, querySelector: q => (q === '.mapboxgl-popup-content' ? box : null) }) };
+    return pop;
+  };
+  const p1 = fakePop(243), p2 = fakePop(243, { anchor: 'bottom-left' }), p3 = fakePop(243, {}, false), p4 = fakePop(243), p5 = fakePop(500), p6 = fakePop(243);
+  ok("⭐ POPUP TOP (sandbox): the live case is given the anchor 'top' and drawn again once",
+     !!fitSrc && typeof place === 'function' && fitRun(p1, 324) === true && p1.options.anchor === 'top' && p1.moved === 1 && p1.wsPlaced === true);
+  ok("⭐ POPUP TOP (sandbox): a popup with its own anchor (the road card) and a popup that is not open are left alone",
+     !!fitSrc && fitRun(p2, 324) === true && p2.options.anchor === 'bottom-left' && p2.moved === 0 && fitRun(p3, 324) === true && p3.moved === 0 && !p3.options.anchor);
+  ok("POPUP TOP (sandbox): a popup the map already places clear of the bar is not touched, nor is any popup where no bar lies over the map",
+     !!fitSrc && fitRun(p4, 400) === true && p4.moved === 0 && !p4.options.anchor && !p4.wsPlaced && fitRun(p6, 324, 0) === true && p6.moved === 0 && !p6.options.anchor);
+  ok("⭐ POPUP TOP (sandbox): a popup too tall for the room is capped (its box scrolls inside): 583 - 340 - 6 less its 10 px tip",
+     !!fitSrc && fitRun(p5, 340) === true && p5.options.anchor === 'top' && p5.box.style.maxHeight === (583 - 340 - 6 - 10) + 'px' && p5.box.style.overflowY === 'auto');
+  ok("POPUP TOP (sandbox): placed again when its words change: a popup placed below that now sits clear goes back to the map's own place, and its cap is cleared",
+     !!fitSrc && (() => { const was = p5.options.anchor; p5.getElement = () => ({ offsetWidth: 240, offsetHeight: 120, querySelector: () => p5.box });
+                          fitRun(p5, 400); return was === 'top' && p5.options.anchor === undefined && p5.box.style.maxHeight === ''; })());
+  // a picture that arrives after the popup opened (a place's street picture): the popup's box is watched and placed again
+  const p7 = fakePop(243);
+  const grew = (() => {
+    if (!fitSrc || typeof place !== 'function') return {};
+    fitRun(p7, 400, 98, FakeRO);                                   // clear of the bar: the map's own place, but watched
+    const ro = watched[watched.length - 1], n0 = watched.length, untouched = !p7.options.anchor && p7.moved === 0;
+    fitRun(p7, 400, 98, FakeRO);                                   // a second fit watches nothing new
+    const once = watched.length === n0 && ro.seen.length === 1 && ro.seen[0] === p7.box;
+    p7.getElement = () => ({ offsetWidth: 240, offsetHeight: 420, querySelector: () => p7.box });   // the picture came: 420 px, no room above
+    p7.box.offsetHeight = 410;
+    fitRun(p7, 400, 98, FakeRO);
+    return { untouched, once, after: p7.options.anchor, cap: p7.box.style.maxHeight, isFn: typeof ro.cb === 'function' };
+  })();
+  ok("⭐ POPUP TOP (sandbox): every popup the map places is watched once, even one that needed no change, and one that grows after it opened (a street picture) is placed again: 420 px at y = 400 goes above, capped under the bar",
+     grew.untouched === true && grew.once === true && grew.isFn === true && grew.after === 'bottom' && grew.cap === (400 - 98 - 6 - 10) + 'px'
+     && code.includes("pop.wsWatch = new ResizeObserver(() => { if (++pop.wsN > 12) { pop.wsWatch.disconnect(); return; } popupFit(pop); });"));
+  // the one hook
+  let hookSrc = null;
+  try { hookSrc = /if \(typeof mapboxgl !== 'undefined' && mapboxgl\.Popup && mapboxgl\.Popup\.prototype && !mapboxgl\.Popup\.prototype\.wsFitted\) \{[\s\S]*?\n    \}/.exec(code)[0]; } catch (e) {}
+  const hooked = (() => {
+    try {
+      const calls = [], fits = []; let gave = 0;
+      function Popup() {}
+      Popup.prototype.addTo = function (m) { calls.push(['addTo', m]); return this; };
+      Popup.prototype.setDOMContent = function (n) { calls.push(['setDOMContent', n]); return this; };
+      const gl = { Popup };
+      const run = new Function("mapboxgl", "popupFit", "hoverGiveWay", hookSrc);
+      run(gl, p => fits.push(p), () => { gave++; }); run(gl, p => fits.push(p), () => { gave++; });          // twice: the second must not wrap again
+      const pop = new Popup(), r1 = pop.addTo('MAP'), r2 = pop.setDOMContent('NODE');
+      return { ok: r1 === pop && r2 === pop && calls.length === 2 && calls[0][1] === 'MAP' && calls[1][1] === 'NODE' && fits.length === 2 && fits[0] === pop && gave === 2,
+               flag: Popup.prototype.wsFitted === true };
+    } catch (e) { return { ok: false, err: e.message }; }
+  })();
+  ok("⭐ POPUP TOP (sandbox): ONE hook places every popup when it opens and when its words change; it hands back the popup as before and is never applied twice",
+     !!hookSrc && hooked.ok === true && hooked.flag === true);
+  // the pointer's hover tip (drawn 16 px below and right of the pointer) gives way to an open popup it would lie over
+  let giveSrc = null;
+  try { giveSrc = /function hoverGiveWay\(\) \{[\s\S]*?\n    \}/.exec(code)[0]; } catch (e) {}
+  const giveRun = (tip, boxes, hidden) => {
+    const card = { hidden: !!hidden, getBoundingClientRect: () => tip };
+    try {
+      new Function("document", giveSrc + "\nreturn hoverGiveWay;")(
+        { getElementById: id => (id === 'route-hover-card' ? card : null), querySelectorAll: q => (q === '.mapboxgl-popup-content' ? boxes.map(b => ({ getBoundingClientRect: () => b })) : []) })();
+    } catch (e) { return 'threw: ' + e.message; }
+    return card.hidden;
+  };
+  const tipAt = { left: 876, top: 298, right: 1100, bottom: 330 };          // the pointer at (860, 282), a road under a place's marker
+  ok("⭐ POPUP TOP (sandbox, seen in Chrome: the road's hover tip lay over the title of a popup that opened below its point): the tip is hidden when it would lie over an open popup",
+     !!giveSrc && giveRun(tipAt, [{ left: 741, top: 306, right: 981, bottom: 560 }]) === true);
+  ok("POPUP TOP (sandbox): the tip stays where no popup is open, where the open popup is clear of it (a popup above the point), and a hidden tip stays hidden",
+     !!giveSrc && giveRun(tipAt, []) === false && giveRun(tipAt, [{ left: 741, top: 40, right: 981, bottom: 272 }]) === false
+     && giveRun(tipAt, [{ left: 400, top: 200, right: 640, bottom: 450 }, { left: 1100, top: 330, right: 1300, bottom: 500 }]) === false
+     && giveRun(tipAt, [{ left: 741, top: 306, right: 981, bottom: 560 }], true) === true);
+  ok("⭐ POPUP TOP: the tip gives way both when a popup opens (the hook) and when the pointer moves on (the end of setRouteHover)",
+     code.includes("const r = was.apply(this, arguments); popupFit(this); hoverGiveWay(); return r; };")
+     && /card\.style\.top = Math\.max\(8, Math\.round\(y\)\) \+ 'px';\s*if \(typeof hoverGiveWay === 'function'\) hoverGiveWay\(\);\s*\}/.test(code));
+  const sites = (code.match(/new mapboxgl\.Popup\(/g) || []).length, anchored = (code.match(/new mapboxgl\.Popup\(\{[^}]*\banchor:/g) || []).length;
+  ok("⭐ POPUP TOP: the page opens " + sites + " kinds of popup and only the road card names its own anchor; the others go through the hook, so a new popup needs nothing extra",
+     sites >= 19 && anchored === 1 && code.includes("if (pop.options.anchor && !pop.wsPlaced) return;")
+     && code.includes("secselTopEdge(), secselRightEdge(), off);") && code.includes("['addTo', 'setDOMContent'].forEach(k => {"));
+  // ===== 11 Nov 2026 — one popup from one click (John's yes to P2; seen on live: Brook Pit answered a click with its own
+  // popup AND the road card under it, Langton Compound with its popup AND the haul road's) =====
+  let mhSrc = null;
+  try { mhSrc = /const MARKER_CLICK_LAYERS = \[[^\]]*\];\s*function markerHitAt\(point\) \{[\s\S]*?\n    \}/.exec(code)[0]; } catch (e) {}
+  const mhRun = (have, hits, point) => {
+    try {
+      const asked = [];
+      const fn = new Function("map", mhSrc + "\nreturn markerHitAt;")(
+        { getLayer: l => have.includes(l), queryRenderedFeatures: (pt, o) => { asked.push(o.layers.join(',')); if (hits === 'throw') throw new Error('x'); return hits; } });
+      return { hit: fn(point === undefined ? { x: 5, y: 5 } : point), asked };
+    } catch (e) { return { hit: 'threw: ' + e.message, asked: [] }; }
+  };
+  ok("⭐ ONE POPUP (sandbox): a place's or a gate's marker under the click is found on the two marker layers, and only on those that exist",
+     !!mhSrc && mhRun(['locations', 'site-gates'], [{}]).hit === true && mhRun(['locations', 'site-gates'], [{}]).asked[0] === 'locations,site-gates'
+     && mhRun(['locations'], [{}]).asked[0] === 'locations' && mhRun(['locations', 'site-gates'], []).hit === false);
+  ok("ONE POPUP (sandbox): no marker layer on the map, no point, or a map that will not answer counts as no marker (the road answers as before)",
+     !!mhSrc && mhRun([], [{}]).hit === false && mhRun([], [{}]).asked.length === 0 && mhRun(['locations'], [{}], null).hit === false
+     && mhRun(['locations'], 'throw').hit === false);
+  const gives = "if (typeof markerHitAt === 'function' && markerHitAt(e.point)) return;";
+  ok("⭐ ONE POPUP: a route line's click gives way to a marker, as it has to a traffic limit's sign since 13 Oct (the limit's line still stands)",
+     code.includes("if(typeof limitHitAt === 'function' && limitHitAt(e.point)) return;")
+     && /if\(typeof limitHitAt === 'function' && limitHitAt\(e\.point\)\) return;[^\n]*\n\s*if\(typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) return;/.test(code));
+  ok("⭐ ONE POPUP: a shared section, a zone and a haul road give way to a marker too, each before it opens anything",
+     new RegExp("map\\.on\\('click', 'road-load-line', \\(e\\) => \\{\\s*if \\(!e\\.features \\|\\| !e\\.features\\.length \\|\\| !RL\\.month\\) return;\\s*" + gives.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(code)
+     && new RegExp("map\\.on\\('click', 'zone-fill', \\(e\\) => \\{\\s*if \\(!e\\.features \\|\\| !e\\.features\\.length\\) return;\\s*" + gives.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(code)
+     && new RegExp("map\\.on\\('click', 'temp-haul-lines', \\(e\\) => \\{\\s*if \\(!e\\.features \\|\\| !e\\.features\\.length\\) return;\\s*" + gives.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(code));
+  ok("⭐ ONE POPUP (seen in Chrome: a site on the alignment opened its popup AND the work section's): the alignment's line and its boundary ticks give way to a marker too",
+     /map\.on\('click', lId, \(e\) => \{\s*if \(typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) return;[^\n]*\n\s*const p = \(e\.features && e\.features\[0\] && e\.features\[0\]\.properties\) \|\| \{\};[\s\S]{0,220}?const ch = \(v\) =>/.test(code)
+     && /map\.on\('click', lId, \(e\) => \{\s*if \(typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) return;[^\n]*\n\s*const p = \(e\.features && e\.features\[0\] && e\.features\[0\]\.properties\) \|\| \{\};\s*const gone = /.test(code)
+     && (code.match(/markerHitAt\(e\.point\)\) return;/g) || []).length === 6);
+  ok("⭐ ONE POPUP: over a marker the road's hover tip gives way (it promised the road's card), through the tip's own hidden path",
+     /if \(!card\) return;\s*if \(f && e && e\.point && typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) e = null;\s*if \(!f \|\| !e \|\| !e\.point \|\| isPhoneShell\(\)/.test(code));
+  ok("ONE POPUP: the marker's own clicks are untouched, and a near miss on a road already stood aside for a marker (the clickable list names both layers)",
+     /map\.on\('click', 'locations', \(e\) => \{\s*if \(!e\.features \|\| !e\.features\.length\) return;\s*const p = e\.features\[0\]\.properties;/.test(code)
+     && /map\.on\('click', 'site-gates', \(e\) => \{\s*if \(!e\.features \|\| !e\.features\.length\) return;\s*new mapboxgl\.Popup/.test(code)
+     && /const CLICKABLE_LAYERS = \[[^\]]*'site-gates',\s*'locations'/.test(code) && code.includes("if (typeof clickableAt === 'function' && clickableAt(e.point)) return;"));
+  ok("POPUP TOP: in the Dark look a popup beside its point has a tip that points sideways (the plain Dark rule coloured the two edges that must stay clear)",
+     html.includes('html[data-look="dark"] .mapboxgl-popup-anchor-left .mapboxgl-popup-tip{ border-top-color:transparent; border-bottom-color:transparent; border-right-color:var(--surface); }')
+     && html.includes('html[data-look="dark"] .mapboxgl-popup-anchor-right .mapboxgl-popup-tip{ border-top-color:transparent; border-bottom-color:transparent; border-left-color:var(--surface); }'));
 }
 
 // ===== 10 Nov 2026 — map drawer polish (live test findings 4, 7, 8; John's yes to notes/map-drawer-polish-mockup-1110) =====
