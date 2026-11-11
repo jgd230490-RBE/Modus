@@ -372,10 +372,13 @@ def with_step(steps, h):
 
 
 # --------------------------------------------------------------------------- the cycle
-def cycle_minutes(route, origin, dest, profile, gates_by_loc=None, factors=None):
+def cycle_minutes(route, origin, dest, profile, gates_by_loc=None, factors=None, locs=None):
     """The holding area's check minutes this lorry pays once a cycle at each end where it calls off: 0.0, and no
     read at all, unless an end's row names a holding area (`holding_id` travels on the location rows every caller
-    already holds). Called for every row of route_analysis, so it stays this cheap."""
+    already holds). Called for every row of route_analysis, so it stays this cheap.
+    `locs` (11 Nov 2026, X-F1 part 2): {id: location row} the caller already read (route_analysis); the holding
+    area's row is taken from it, the same row, instead of one read per call. Without it, or for an id not in it,
+    the row is read as before."""
     if not route or _skip(route):
         return 0.0
     hids = {"loaded": (dest or {}).get("holding_id"), "return": (origin or {}).get("holding_id")}
@@ -386,7 +389,8 @@ def cycle_minutes(route, origin, dest, profile, gates_by_loc=None, factors=None)
         if not hid:
             continue
         if hid not in seen:
-            rows = db.query("SELECT * FROM locations WHERE tenant_id = ? AND id = ?", (db.current_tenant(), hid))
+            rows = ([locs[hid]] if (locs and hid in locs) else
+                    db.query("SELECT * FROM locations WHERE tenant_id = ? AND id = ?", (db.current_tenant(), hid)))
             h = rows[0] if (rows and is_holding(rows[0])) else None
             if h is not None:
                 try:

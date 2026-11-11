@@ -119,18 +119,20 @@ def _busy_line(r, ctx, f, cost, factors, cache):
         return None
 
 
-def lines(acc=None, from_month=None, to_month=None, status=None, factors=None):
+def lines(acc=None, from_month=None, to_month=None, status=None, factors=None, pre=None):
     """
     {lines: [...], totals: {...}, costing: {...}} for the caller's visible forecast rows.
     One derived.costing_context() (two statements), one route map, one cycle per
     (route, vehicle) pair — the same budget shape as the Look-ahead's read.
+    `pre` (11 Nov 2026, X-F1 part 2): a caller's route_analysis dict for this request (carbon.scenario's), so the
+    route figures are read once for the caller and these lines together. Without it, one of its own.
     """
     acc = acc if acc is not None else access.current()
     factors = factors or conversions.load_factors()
     rows = _rows(acc, from_month, to_month, status)
     routes = derived._routes_and_names()
     cost = derived.costing_context()
-    cache = {}
+    cache = {} if pre is None else {"__route_analysis_pre__": pre}
     actuals = _actuals()
     plan = factors.get("planning", {}) or {}
     work_days = float(plan.get("working_days_per_month") or 22)
