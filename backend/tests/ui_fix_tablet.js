@@ -206,10 +206,10 @@ ok("...its chips are the page's own (renderMonthChips fills every .month-chips, 
    /document\.querySelectorAll\('\.month-chips'\)\.forEach/.test(map) && ts.includes("#t-strip .month-chip{ flex:0 0 auto; min-height:44px; min-width:52px; }")
    && ts.includes("#t-strip .t-play{ flex:0 0 48px; width:48px; height:48px;"));
 ok("⭐ 8: the map opens on this month there (openTabletMonth → openTimeline: D22's start month), never over a linked month or in wall mode, once",
-   /function openTabletMonth\(\) \{\n\s*if \(TSTRIP\.opened \|\| !isTabletStrip\(\) \|\| sidebarIsOpen\(\) \|\| TL\.on \|\| TL\.wall/.test(map)
+   /function openTabletMonth\(\) \{\n[^\n]*\n\s*if \(TSTRIP\.opened \|\| !isTabletStrip\(\) \|\| sidebarIsOpen\(\) \|\| TL\.on \|\| TL\.cleared \|\| TL\.wall/.test(map)
    && map.includes("applyViewFromUrl();\n        openTabletMonth();")
    // and only after the one read of every month's figures: no single-month heavy read beside it on every tablet load
-   && map.includes("ensureTimelineMatrix().then(() => kpiFetchAll().catch(() => {}))\n            .then(() => { if (!TL.on && isTabletStrip() && !sidebarIsOpen()) openTimeline(); syncTimelineFoot(); }, () => {});") && map.includes("const TABLET_STRIP_MQ = '(min-width:768px) and (max-width:1024px)';"));
+   && map.includes("ensureTimelineMatrix().then(() => kpiFetchAll().catch(() => {}))\n            .then(() => { if (!TL.on && !TL.cleared && isTabletStrip() && !sidebarIsOpen()) openTimeline(); syncTimelineFoot(); }, () => {});") && map.includes("const TABLET_STRIP_MQ = '(min-width:768px) and (max-width:1024px)';"));
 ok("...the strip's Play follows the timeline (syncPlayButtons), and the map's credits ride above the strip as above the bar (--tl-foot)",
    map.includes("const tp = document.getElementById('t-play');") && map.includes("const foot = sOn ? Math.round(strip.offsetHeight + 18 + 8) : h;")
    && map.includes("observeEl('main-sidebar', { attributes: true, attributeFilter: ['class'] }, () => setTimeout(syncTimelineFoot, 0));"));

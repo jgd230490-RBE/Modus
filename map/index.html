@@ -11999,13 +11999,14 @@
     }
     const TSTRIP = { opened: false };
     function openTabletMonth() {
-        if (TSTRIP.opened || !isTabletStrip() || sidebarIsOpen() || TL.on || TL.wall || document.body.classList.contains('wall-mode')) return;
+        // TL.cleared: a link from the cleared view (month=none, claude/map-first-view) stays cleared here too
+        if (TSTRIP.opened || !isTabletStrip() || sidebarIsOpen() || TL.on || TL.cleared || TL.wall || document.body.classList.contains('wall-mode')) return;
         TSTRIP.opened = true;
         // after the page's one read of every month's figures (kpiFetchAll, shared with prefetchSpanKpis): opened before it, the
         // month read its figures on its own beside it, a second heavy read on every tablet load (the UI audit's next page
         // then waited past 30 s on the busy server)
         ensureTimelineMatrix().then(() => kpiFetchAll().catch(() => {}))
-            .then(() => { if (!TL.on && isTabletStrip() && !sidebarIsOpen()) openTimeline(); syncTimelineFoot(); }, () => {});
+            .then(() => { if (!TL.on && !TL.cleared && isTabletStrip() && !sidebarIsOpen()) openTimeline(); syncTimelineFoot(); }, () => {});
     }
     // the phone breakpoint: the map's tilt and drag-rotate are off on a phone and back on above it
     function wirePhoneShell() {
