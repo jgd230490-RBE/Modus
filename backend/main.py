@@ -2798,7 +2798,7 @@ def get_carbon_target():
     decisions or the page state (only the words of decisions that name no route).
     """
     acc = _require_access()
-    # 11 Nov 2026 (the CLOCS-meeting live check: 6.2 s on every Dashboard open, the one uncached Dashboard read):
+    # 11 Nov 2026 (the one Dashboard read that was worked out afresh on every open):
     # kept like the Dashboard's other reads, per role and team, until the next write (a PUT or DELETE writes the
     # config row, so the next GET is built afresh).
     return _staff_json("carbon/target", {}, lambda: carbon_target.payload(acc), acc)

@@ -373,7 +373,7 @@ as_(ADMIN, lambda: main.routes_summary())
 as_(ADMIN, lambda: main.routes_diversions(route_id=None))
 ok("...after it, the admin's Dashboard, Look-ahead and Routes reads build nothing (all nine served from memory)",
    stats()["builds"] == s8["builds"] and stats()["hits"] == s8["hits"] + 9, f"{s8} {stats()}")
-# 11 Nov 2026 (CLOCS live check: the Dashboard's carbon tile took 6.2 s on every open, the one read not kept)
+# 11 Nov 2026 (the Dashboard's carbon tile: the one Dashboard read that was not kept)
 s8b = stats()
 _ct1 = as_(ADMIN, lambda: main.get_carbon_target())
 _ct2 = as_(ADMIN, lambda: main.get_carbon_target())

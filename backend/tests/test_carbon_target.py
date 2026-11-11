@@ -768,8 +768,8 @@ ok("...and its material and disposal factors are carbon.py's own functions, no f
 ok("🔴 the tenant import clears the target's cache with the config cache", "_carbon_target.invalidate()" in read("backend/tenant_package.py"))
 
 # =========================================================================== #
-#  11 Nov 2026: GET is kept until the next write (the CLOCS live check: 6.2 s  #
-#  on every Dashboard open)                                                    #
+#  11 Nov 2026: GET is kept until the next write (the one Dashboard read that  #
+#  was worked out afresh on every open)                                        #
 # =========================================================================== #
 import read_cache  # noqa: E402
 access.set_current("planner123")
