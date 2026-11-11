@@ -2022,6 +2022,7 @@ def _route_bar(r, width, vmax):
     """14 Oct 2026 (the publishing check): the route table's cell — the figure, then a bar in the route's map colour,
     the planning flag a dashed red tick. It replaces the separate chart that repeated the table."""
     from reportlab.graphics.shapes import Drawing, Line, Rect, String
+    import bulletin_doc     # 11 Nov 2026 (card A-F2b): a bar with no colour takes the second band's, from the one list
     d = Drawing(width, 10)
     # 11 Nov 2026 (card A-F2): "under 1" is wider than a figure: the number's room grows to fit it
     num_w = max(26, rl_pdfmetrics_width(r["a_day_text"], _BF("bold"), 8) + 4)
@@ -2029,7 +2030,7 @@ def _route_bar(r, width, vmax):
                  fillColor=colors.Color(*NAVY_RGB)))
     bw = width - num_w - 4
     lw = bw * (r["a_day"] or 0) / (vmax or 1)
-    d.add(Rect(num_w + 2, 1.5, max(lw, 0.5), 6.5, fillColor=colors.Color(*_hex_rgb(r.get("color") or "#5A96F6")),
+    d.add(Rect(num_w + 2, 1.5, max(lw, 0.5), 6.5, fillColor=colors.Color(*_hex_rgb(r.get("color") or bulletin_doc.VOLUME_RAMP[1])),
                strokeColor=None))
     if r.get("cap") is not None:
         cx = num_w + 2 + bw * (r.get("cap_at") or r["cap"]) / (vmax or 1)     # cap_at: the cap in the bar's count

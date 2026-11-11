@@ -1432,15 +1432,18 @@ _vc = bulletin_doc.volume_class
 ok("W11: the step is the map's Mapbox step (at or over a stop takes the next colour); None and 0 the lightest",
    [_vc(x) for x in (None, 0, 9.99, 10, 24.9, 25, 49.9, 50, 99.9, 100, 4000)] == [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4])
 _MR = {r["route_id"]: r for r in S10["map_routes"]}
-ok("⭐ W11 (hand): R1 (~65 a day) is #0B55CB, R2 (~23 a day) #5A96F6; no width or weight is carried any more",
+   # REVERSED 11 Nov 2026 (card A-F2b, John: "Yes, both together"): the five blues re-stepped; same band, new hex
+ok("⭐ W11 (hand): R1 (~65 a day) is #00388E, R2 (~23 a day) #006AFD; no width or weight is carried any more",
    # REVERSED 9 Nov 2026 (2.1-11b): the figure is movements (2 × _r1), the colour unchanged (stops doubled too)
-   _MR["R1"]["color"] == "#0B55CB" and _MR["R2"]["color"] == "#5A96F6" and near(_MR["R1"]["a_day"], 2 * _r1, 1e-2)
+   # REVERSED 11 Nov 2026 (card A-F2b, John: "Yes, both together"): the five blues re-stepped; same band, new hex
+   _MR["R1"]["color"] == "#00388E" and _MR["R2"]["color"] == "#006AFD" and near(_MR["R1"]["a_day"], 2 * _r1, 1e-2)
    and all("weight" not in r for r in S10["map_routes"]), str(S10["map_routes"]))
 ok("W11: drawn quietest first, so the busiest route is on top", [r["route_id"] for r in S10["map_routes"]] == ["R2", "R1"])
 _svgm = HTML10.split('data-bulletin="map"')[1].split("</svg>")[0]   # 17 Oct 2026: the wrapper carries tabindex / role / aria-label after the marker
 ok("⭐ W11 page: every route at ONE width (5) in its Volume colour over a 7.5 casing in the map's ink; never the plan blue",
    _svgm.count('stroke-width="5"') == 2 and _svgm.count('stroke="#1F2024" stroke-width="7.5"') == 2
-   and 'stroke="#0B55CB" stroke-width="5"' in _svgm and 'stroke="#5A96F6" stroke-width="5"' in _svgm
+   # REVERSED 11 Nov 2026 (card A-F2b, John: "Yes, both together"): the five blues re-stepped; same band, new hex
+   and 'stroke="#00388E" stroke-width="5"' in _svgm and 'stroke="#006AFD" stroke-width="5"' in _svgm
    and "#4A72C9" not in _svgm and _svgm.index('stroke-width="7.5"') < _svgm.index('stroke-width="5"'))
 # NARROWED 14 Oct 2026 (the publishing check: legends too wordy): the legend title is "Two-way movements a day" (the map's own title names the month); the
 # long "one width" sentences went (one width is a drawing rule, held at source below, not a thing a reader needs told)
@@ -1494,13 +1497,16 @@ ok("⭐ W11 (hand): ONE shared section (R1 and R2's common road) at BOTH routes'
    "colour, while R2 alone is the 10-25 colour; the figure is road_load's (the map's /api/public/road-load)",
    # REVERSED 9 Nov 2026 (2.1-11b question A): both routes' loaded AND return legs pass here: 2 × the deliveries, the same colour
    len(S10S["map_sections"]) == 1 and near(S10S["map_sections"][0]["a_day"], 2 * LOADS / WD, 0.02)
-   and S10S["map_sections"][0]["color"] == "#0B55CB" and S10S["map_sections"][0]["routes"] == 2
+   # REVERSED 11 Nov 2026 (card A-F2b, John: "Yes, both together"): the five blues re-stepped; same band, new hex
+   and S10S["map_sections"][0]["color"] == "#00388E" and S10S["map_sections"][0]["routes"] == 2
    and near(S10S["map_sections"][0]["a_day"], _RL10["runs"][0]["movements_per_day"], 1e-9)
-   and {r["route_id"]: r["color"] for r in S10S["map_routes"]}["R2"] == "#5A96F6", str((_rb, S10S["map_sections"][:1] and S10S["map_sections"][0]["a_day"])))
+   # REVERSED 11 Nov 2026 (card A-F2b, John: "Yes, both together"): the five blues re-stepped; same band, new hex
+   and {r["route_id"]: r["color"] for r in S10S["map_routes"]}["R2"] == "#006AFD", str((_rb, S10S["map_sections"][:1] and S10S["map_sections"][0]["a_day"])))
 _svgs = HTML10S.split('data-bulletin="map"')[1].split("</svg>")[0]
 ok("⭐ W11 page: the shared section is drawn ON TOP of the routes (after them), with its own casing, in its summed colour",
-   _svgs.count('class="sec"') == 2 and _svgs.rindex('stroke="#5A96F6"') < _svgs.index('class="sec"')
-   and 'stroke="#0B55CB" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" class="sec"><title>shared by 2 routes: 196 lorry movements a day</title>' in _svgs
+   # REVERSED 11 Nov 2026 (card A-F2b, John: "Yes, both together"): the five blues re-stepped; same band, new hex
+   _svgs.count('class="sec"') == 2 and _svgs.rindex('stroke="#006AFD"') < _svgs.index('class="sec"')
+   and 'stroke="#00388E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" class="sec"><title>shared by 2 routes: 196 lorry movements a day</title>' in _svgs
    and "Where routes share a road, its colour shows their total." in _hm.unescape(HTML10S))
 # NARROWED 14 Oct 2026 (the publishing check: legends too wordy): the one-sentence note
 ok("W11 PDF: the note under the legend says shared roads show the routes' total",

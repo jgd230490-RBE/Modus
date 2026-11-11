@@ -3621,7 +3621,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
       const cc = B.carbonColor("f_co2", [11, 22, 33, 44]);
       ok("C1: the colour expression: a number steps through the five blues at the fixed stops, anything else is the grey 'no figure'",
          cc[0] === "case" && JSON.stringify(cc[1]) === JSON.stringify(["==", ["typeof", ["get", "f_co2"]], "number"])
-         && JSON.stringify(cc[2]) === JSON.stringify(["step", ["to-number", ["get", "f_co2"], 0], "#94BBF9", 11, "#5A96F6", 22, "#2071F3", 33, "#0B55CB", 44, "#073888"])
+         // REVERSED 11 Nov 2026 (card A-F2b): the five blues re-stepped; same band, new hex
+         && JSON.stringify(cc[2]) === JSON.stringify(["step", ["to-number", ["get", "f_co2"], 0], "#72A7FF", 11, "#006AFD", 22, "#0051C4", 33, "#00388E", 44, "#00215B"])
          && cc[3] === B.CARBON_NONE);
       // the features: two overlapping routes, summed once
       const all = B.roadLoadFeatures(RUNS[10], null);
@@ -3697,7 +3698,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
         {
           const fl0 = fmap.layers["forecast-layer"].paint, rl0 = fmap.layers["road-load-line"].paint;
           ok("⭐ heat map (Volume): the routes are painted by f_avg and the sections by rl_mv on the SAME five blues and stops [10, 25, 50, 100], one width",
-             JSON.stringify(fl0["line-color"]) === JSON.stringify(["step", ["to-number", ["get", "f_avg"], 0], "#94BBF9", 10, "#5A96F6", 25, "#2071F3", 50, "#0B55CB", 100, "#073888"])
+         // REVERSED 11 Nov 2026 (card A-F2b): the five blues re-stepped; same band, new hex
+             JSON.stringify(fl0["line-color"]) === JSON.stringify(["step", ["to-number", ["get", "f_avg"], 0], "#72A7FF", 10, "#006AFD", 25, "#0051C4", 50, "#00388E", 100, "#00215B"])
              // REVERSED 9 Nov 2026 (2.1-11b question B): the sections are in movements, on the stops × 2 (the same blues for the same lorries)
              && JSON.stringify(rl0["line-color"]) === JSON.stringify(B.volumeColor("rl_mv", [20, 50, 100, 200]))
              // NARROWED 16 Oct 2026 (D115): one width, 6 / 8.5 px (were 5 / 7.5), so the flow's lanes fit

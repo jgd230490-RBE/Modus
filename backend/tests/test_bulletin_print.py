@@ -11,6 +11,9 @@ WHAT IS ASSERTED
     "km" for a km one, metres at a site scale whichever the unit;
   * A-X3: a works square on the printed map keeps a clear gap from every letter pin; the map key's columns flow on their
     own, so a wrapped works line leaves no empty line in the sites' columns.
+  * A-F2b (John: "Yes, both together"): the five band blues are #72A7FF #006AFD #0051C4 #00388E #00215B in the bulletin
+    AND the public map's heat maps; the lightest clears 2:1 on white; light to dark in even steps; the first two bands
+    part in a black-and-white print; the route table's bar takes its default from the one list; one line width stays.
 
 WHAT THIS DOES NOT PROVE
 ------------------------
@@ -181,6 +184,56 @@ lines = [l.strip() for l in portable.pdf_text(pdf_of([key]), raw=True).splitline
 _a = next((i for i, l in enumerate(lines) if "Wolds Link Batching Plant" in l), None)
 ok("⭐ no empty line after 'A Wolds Link Batching Plant': B follows at once in its column (pdftotext order)",
    _a is not None and any("Melton Compound" in l for l in lines[_a:_a + 3]), str(lines[:12]))
+
+# --------------------------------------------------------------------------- #
+#  A-F2b (John, 11 Nov 2026: "Yes, both together"): the five band blues re-stepped, screens and paper together
+# --------------------------------------------------------------------------- #
+import re  # noqa: E402
+NEW = ["#72A7FF", "#006AFD", "#0051C4", "#00388E", "#00215B"]
+MAP_HTML = open(os.path.join(os.path.dirname(BACKEND), "map", "index.html"), encoding="utf-8").read()
+_m = re.search(r"const CARBON_RAMP = \[([^\]]+)\];", MAP_HTML)
+MAP_RAMP = [x.strip().strip("'") for x in _m.group(1).split(",")] if _m else []
+ok("⭐ A-F2b: the bulletin's five blues are the card's (was #94BBF9 #5A96F6 #2071F3 #0B55CB #073888)",
+   list(bulletin_doc.VOLUME_RAMP) == NEW, str(bulletin_doc.VOLUME_RAMP))
+ok("⭐ A-F2b: the public map's heat-map blues are the same five (screens and paper together)", MAP_RAMP == NEW, str(MAP_RAMP))
+
+
+def _lin(h):
+    c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    return [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+
+
+def _Y(h):
+    r, g, b = _lin(h)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _okl(h):
+    r, g, b = _lin(h)
+    l_ = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) ** (1 / 3)
+    m_ = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) ** (1 / 3)
+    s_ = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b) ** (1 / 3)
+    return 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_
+
+
+_c0 = 1.05 / (_Y(bulletin_doc.VOLUME_RAMP[0]) + 0.05)
+ok("⭐ A-F2b: the lightest band clears the colour system's 2:1 floor on white (rule 5; the old one was 1.96:1)",
+   _c0 >= 2.0, f"{_c0:.2f}:1")
+_L = [_okl(h) for h in bulletin_doc.VOLUME_RAMP]
+ok("A-F2b: light to dark, each step at least 0.06 darker (OK lightness; the palette checker's ordinal rule)",
+   all(a - b >= 0.06 for a, b in zip(_L, _L[1:])), str([round(x, 3) for x in _L]))
+_g = [116 * _Y(h) ** (1 / 3) - 16 for h in bulletin_doc.VOLUME_RAMP]
+ok("⭐ A-F2b: 'under 20' and '20 to 50' part in a black-and-white print (grey step at least 15 L*; it was 13.0)",
+   _g[0] - _g[1] >= 15, str([round(x, 1) for x in _g]))
+ok("A-F2b: a route-table bar with no colour takes the second band's from the one list, no hex of its own",
+   'r.get("color") or bulletin_doc.VOLUME_RAMP[1]' in open(os.path.join(BACKEND, "export.py"), encoding="utf-8").read())
+_bar = export._route_bar({"a_day": 3, "a_day_text": "3"}, 120, 10)
+ok("A-F2b: the bar itself is drawn in that blue",
+   any(getattr(c, "fillColor", None) is not None and abs(c.fillColor.blue - 0xFD / 255) < 1e-3
+       and abs(c.fillColor.green - 0x6A / 255) < 1e-3 for c in _bar.contents), "no #006AFD bar")
+ok("A-F2b: the one-width rule stays (one line width on the printed map, no width by band)",
+   "ONE line width" in open(os.path.join(BACKEND, "bulletin_doc.py"), encoding="utf-8").read()
+   and "weight" not in str(bulletin_doc.volume_legend(2) if hasattr(bulletin_doc, "volume_legend") else ""))
 
 print()
 for f_ in FAIL:

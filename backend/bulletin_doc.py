@@ -119,8 +119,12 @@ COUNCIL_RAMP_MOVEMENTS = ("#89A3DC", "#6A8BD2", "#4A72C9", "#2D4E95")
 # movements a day, fixed in every month and every scheme) and its five-step blue (map/index.html CARBON_RAMP, which
 # volumeColor() paints with), and ONE line width, so a width never carries a figure (the map's rule since PR #39).
 # The map's casing colour (CONFIG.COLORS.forecastCasing) sits under each line so the light end reads on white paper.
+# 11 Nov 2026 (card A-F2b, John: "Yes, both together"): the five blues re-stepped in the same hue (OK-L 0.73, 0.57, 0.47,
+# 0.37, 0.27; were #94BBF9 #5A96F6 #2071F3 #0B55CB #073888): the lightest clears the colour system's 2:1 floor on white
+# (2.42:1, was 1.96:1) and "under 20" / "20 to 50" part on paper, in black and white and for red-green colour blindness.
+# Screens and print together: the map's CARBON_RAMP is the same list (test_bulletin holds them equal).
 VOLUME_STOPS = (10, 25, 50, 100)
-VOLUME_RAMP = ("#94BBF9", "#5A96F6", "#2071F3", "#0B55CB", "#073888")
+VOLUME_RAMP = ("#72A7FF", "#006AFD", "#0051C4", "#00388E", "#00215B")
 ROUTE_CASING = "#1F2024"
 HATCH_INK, HATCH_PAPER = "#B8B2A8", "#F3F1EC"
 NOT_REPORTED = "Not reported"
