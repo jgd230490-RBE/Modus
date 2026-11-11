@@ -10884,17 +10884,35 @@
         });
         mapboxgl.Popup.prototype.wsFitted = true;
     }
+    // 11 Nov 2026 (road card tall; seen on live at 1422 x 677: a card with the "no loads" line opened above a low click with its
+    // title 26 px under the figures bar). The card's own fixed part (everything but its table) was ASSUMED 170 px; it is 184 px
+    // for an ordinary card, 210 with the "no loads" line, more with a traffic limit's line. It is now MEASURED once the card
+    // has filled, and a card that cannot keep SECSEL_MINROW of its table in the room on its side is placed again, as the
+    // click's middle band is. Pure: fixed = the card less its table, nat = the table's own height; 20 = the pointer's tip and
+    // offset. An ordinary card (184, one row of 86) still needs the 290 px it always did.
+    const SECSEL_MINROW = 90, SECSEL_MARGIN = 14;
+    function secselNeed(fixed, nat) { return Math.max(SECSEL_NEED, Math.round((fixed || 0) + Math.min(nat || 0, SECSEL_MINROW) + 20)); }
     function fitRoadPopup() {
         const p = SECSEL.roadPopup, at = SECSEL.roadAt; if (!p || !at) return;
         const el = p.getElement && p.getElement(); if (!el) return;
         const H = map.getContainer().clientHeight || 600;
         const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
         const y = map.project(at.lngLat).y;
+        const sc = el.querySelector('.secsel-scroll'), box = el.querySelector('.mapboxgl-popup-content');
+        const fixed = (sc && box) ? Math.max(0, box.offsetHeight - sc.offsetHeight) : 0;
+        if (sc && fixed && p.options) {
+            const W = map.getContainer().clientWidth || 800;
+            const rm = secselRoom(at.point.y, H, foot, secselTopEdge(), secselNeed(fixed, sc.scrollHeight));
+            const side = secselSide(at.point.x, W, secselRightEdge());
+            const beside = rm.beside ? secselBeside(at.point.x, W, secselRightEdge()) : '';
+            const want = beside || ((rm.below ? 'top' : 'bottom') + (side ? '-' + side : ''));
+            if (want !== p.options.anchor) { p.options.anchor = want; p.setLngLat(p.getLngLat()); }
+        }
         const t = secselTopEdge(), a = String((p.options && p.options.anchor) || '');
         const space = (a === 'left' || a === 'right') ? (2 * Math.min(y - t, H - foot - y) - 34)
                     : (p.options && String(p.options.anchor).indexOf('top') === 0) ? (H - foot - y - 34) : (y - t - 34);
-        const sc = el.querySelector('.secsel-scroll');
-        if (sc) sc.style.maxHeight = Math.max(90, space - 170) + 'px';
+        if (sc) sc.style.maxHeight = Math.max(48, space - fixed + SECSEL_MARGIN) + 'px';
+        hoverGiveWay();
     }
     function redrawRoadCard() {
         if (SHEET.card === 'road') { renderRouteCard(); return; }

@@ -1554,6 +1554,10 @@ ok("ROAD CARD EDGE: technical T1 says which side the road card opens on near the
 ok("ROAD CARD TOP: technical T1 says the card's room starts under the figures bar and when it opens beside the click",
    all(w in _tg_rs for w in ('id="t1-road-top"', "<code>secselTopEdge</code>", "<code>secselRoom</code>", "<code>SECSEL_NEED</code> = 290 px",
                              "<code>SECSEL_WIDE</code> = 404 px", "<code>secselBeside</code>", "beside the click")))
+# 11 Nov 2026 (road card tall: a card with the "no loads" line lost its title under the figures bar)
+ok("ROAD CARD TALL: technical T1 says the card's fixed part is measured, what it is placed again by, and the numbers",
+   all(w in _tg_rs for w in ('id="t1-road-tall"', "<code>fitRoadPopup</code>", "<code>secselNeed</code>", "<code>SECSEL_MARGIN</code> = 14 px",
+                             "<code>SECSEL_MINROW</code> = 90 px", "no loads")))
 # 11 Nov 2026 (map popup top: a holding area's popup lost its title under the figures bar)
 ok("MAP POPUP TOP: technical T1 says every other map popup is placed clear of the figures bar by one hook, and when nothing is changed",
    all(w in _tg_rs for w in ('id="t1-popup-top"', "<code>popupFit</code>", "<code>popupPlace</code>", "<code>addTo</code>", "<code>setDOMContent</code>",
