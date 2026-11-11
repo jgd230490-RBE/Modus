@@ -27,6 +27,10 @@ ok("D-F6: every change of open or month is written back", body.includes("useEffe
 ok("D-F6: it scrolls back once, after its figures are in, only when it was open when the Dashboard was left",
    body.includes("const backTo = useRef(!initial && CLP_FOLD.open);") && body.includes("if(!backTo.current || !data) return;")
    && body.includes("backTo.current = false;") && body.includes('el.scrollIntoView({ block: "start" })') && body.includes("<details ref={foldEl}"));
+ok("🔴 D-F6: the trip back follows the page as the cards above fill in (again while it grows, for 6 s), and the person's own scroll, click or key, from mount on, cancels it",
+   body.includes('const evs = ["wheel", "touchstart", "keydown", "mousedown"];') && body.includes("const quit = () => { backTo.current = false; };")
+   && body.includes("if(h !== last){ last = h; el.scrollIntoView") && body.includes("if(Date.now() - t0 < 6000) timer = setTimeout(step, 150); else backTo.current = false;")
+   && body.includes("return () => clearTimeout(timer);"));
 ok("D-F6: no stored figures: coming back reads the month again (the read is not skipped for a remembered month)",
    !/CLP_FOLD\.data/.test(html) && body.includes("if(data && data.month === month) return;"));
 ok("🔴 D-F6: sign-out clears it, so the next person starts with the fold closed",

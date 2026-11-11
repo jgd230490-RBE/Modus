@@ -4108,12 +4108,30 @@ function ClpMonitoring({ months, initial }){
     }).catch(() => { if(live) setErr(true); });
     return () => { live = false; };
   }, [open, month]);
-  // D-F6: once its figures are in (the cards above it have their height by then), bring the fold back into view
+  // D-F6: once its figures are in (about 6 s after coming back on a local copy, Chrome 11 Nov), bring the fold back
+  // into view. The cards above it may still be filling in and push it down again, so it is brought back each time the
+  // page grows, for 6 s. A scroll, click or key from the person, before or during that, cancels the trip back.
+  useEffect(() => {
+    if(!backTo.current) return;
+    const quit = () => { backTo.current = false; };
+    const evs = ["wheel", "touchstart", "keydown", "mousedown"];
+    evs.forEach(n => window.addEventListener(n, quit, { passive: true }));
+    return () => evs.forEach(n => window.removeEventListener(n, quit));
+  }, []);
   useEffect(() => {
     if(!backTo.current || !data) return;
-    backTo.current = false;
     const el = foldEl.current;
-    if(el && el.scrollIntoView) requestAnimationFrame(() => el.scrollIntoView({ block: "start" }));
+    if(!el || !el.scrollIntoView) return;
+    let last = -1, timer = 0;
+    const t0 = Date.now();
+    const step = () => {
+      if(!backTo.current || !el.isConnected) return;
+      const h = (el.closest("main") || document.documentElement).scrollHeight;
+      if(h !== last){ last = h; el.scrollIntoView({ block: "start" }); }
+      if(Date.now() - t0 < 6000) timer = setTimeout(step, 150); else backTo.current = false;
+    };
+    requestAnimationFrame(step);
+    return () => clearTimeout(timer);
   }, [data]);
   // 14 Oct 2026 (bundle G, W10): the CLP pack for the month — the same reply, printed (only the charts with data)
   const [packBusy, setPackBusy] = useState("");
