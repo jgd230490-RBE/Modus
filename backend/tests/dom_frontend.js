@@ -3774,6 +3774,27 @@ async function clpDocsDom(){
      rsc && JSON.stringify(rsc.body) === JSON.stringify({ groups: ["G2"], issue_no: 1 }) && rv.el.textContent.includes("Issue 1: Sent to Rail client (fictional).") && !sp());
   ok("🔴 CLP REVIEWERS DOM: no team id anywhere", !/IPT\d/.test(rv.el.textContent));
   await rv.done();
+  // 11 Nov 2026 (card 1 of notes\clp-before-friday-mockup-1111, John: yes; the CLOCS live check found Harborough
+  // Compound's one button reading "Send Issue 1 to reviewers…", 8 px from the "⋯"): an issued CLP with a reviewers' group
+  // and no review yet has NO button on its row; the send is in the "⋯", under the line, after the items that only read
+  const _rvKeep = RV_LINES["auto-L019-IPT2"];
+  delete RV_LINES["auto-L019-IPT2"];
+  const r1 = await mount(plannerAcc);
+  const r1row = () => r1.el.querySelector('[data-clp-row="auto-L019-IPT2"]');
+  const r1menu = () => [...r1row().querySelector("details.row-menu .row-menu-list").children];
+  const r1words = () => r1menu().map(x => x.tagName === "HR" ? "|" : x.textContent).join(" · ");
+  ok("⭐ CLP ROW (card 1): an issued CLP with a reviewers' group and no review has no button on its row (only the \"⋯\")",
+     !!r1row() && !r1row().querySelector("[data-clp-primary]") && ![...r1row().querySelectorAll("td:last-child > div > button")].length,
+     r1row() ? r1row().textContent : "no row");
+  ok("⭐ CLP ROW (card 1): its \"⋯\" reads first (Download draft, Notes and tasks, Document history), then a line, then Send Issue 1 to reviewers… and Approve as Issue 2…",
+     r1words() === "Download draft · Notes and tasks (1 open) · Document history · | · Send Issue 1 to reviewers… · Approve as Issue 2… · Edit", r1words());
+  ok("🔴 CLP ROW (card 1): nothing that writes is next to Download draft (the item after it only reads)",
+     r1menu()[0].textContent === "Download draft" && r1menu()[1].textContent.startsWith("Notes and tasks"));
+  await press([...r1row().querySelectorAll("button")].find(b => b.textContent === "Send Issue 1 to reviewers…"));
+  ok("CLP ROW (card 1): \"⋯ → Send Issue 1 to reviewers…\" still opens the send card (it reads; nothing is sent)",
+     !!r1.el.querySelector("[data-clp-review-send]") && !calls.some(c => /review-send$/.test(c.url) && c.method === "POST" && c.body && c.body.issue_no === 1 && c.url.includes("IPT2")));
+  await r1.done();
+  RV_LINES["auto-L019-IPT2"] = _rvKeep;
   rvOn = false;
 }
 

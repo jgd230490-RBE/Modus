@@ -392,6 +392,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .so-name{flex:1;min-width:0;font-size:14px;} .so-name small{display:block;font-size:12px;color:var(--popover-muted);}
   .row-menu-list .so-row button{display:inline-block;width:auto;padding:7px 10px;text-decoration:underline;font-weight:600;}
   .row-menu-list button.so-all{margin-top:6px;text-align:center;background:var(--navy);color:var(--control-fg);font-weight:600;}
+  .row-menu-list hr.row-menu-sep{border:0;border-top:1px solid var(--popover-line);margin:4px 2px;}
   .row-menu-note{font-size:12px;color:var(--popover-muted);padding:6px 10px 4px;border-top:1px solid var(--popover-line);margin-top:4px;white-space:normal;}
   /* 27 Oct 2026 (the final UI pass, card 1): the one row-action pattern — a filled next step + the "⋯" menu (RowMenu) on every
      table; a list row that only ever loses a line gets a named "×" instead of a red Remove link */
@@ -6160,8 +6161,8 @@ function ClpPage({ access }){
     if(open && canEdit && coverLeft) return ["cover", `Fill in the cover (${c.cover_typed || 0} of ${c.cover_total})`, () => openEdit(c)];
     if(open && !appr && data.team) return ["send", "Send for approval…", () => openSend(c)];
     if(open && appr) return ["approve", `Approve as Issue ${c.next_issue}…`, () => openApprove(c)];
-    if(appr && c.status === "approved" && data.review_groups && c.issues > 0 && !(c.reviews || []).length)
-      return ["review", `Send Issue ${c.last_issue ? c.last_issue.no : c.issues} to reviewers…`, () => openReview(c)];
+    // REVERSED 11 Nov 2026 (the CLOCS live check, card 1 of notes\clp-before-friday-mockup-1111, John: yes): sending an
+    // issue to the client's reviewers is never the row's button (it sat 8 px from the "⋯"); it is in the "⋯" only
     return null;
   };
   const primary = (c, child) => {
@@ -6212,15 +6213,18 @@ function ClpPage({ access }){
         : tk(c).notes > 0 ? <span className="text-slate-600">{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}</span> : tk(c).client_open > 0 ? null : "—"}
         {tk(c).client_open > 0 && <span className="block text-[12px] text-slate-600" data-clp-tasks-client="1">+ {tk(c).client_open} with the client</span>}</td>
       <td><div className="flex items-center gap-2 justify-end">{primary(c, child)}
+        {/* 11 Nov 2026 (card 1, John: yes): the items that only read first; under a line the ones that write or send, so
+            nothing that writes sits next to Download draft */}
         <RowMenu name={c.name + " · " + teamWord(c)}>
           <button type="button" onClick={() => draft(c)} disabled={!!building}>Download draft</button>
+          <button type="button" onClick={() => openNotes(c)}>Notes and tasks{tk(c).open > 0 ? ` (${tk(c).open} open)` : ""}</button>
+          {c.issues > 0 && <button type="button" onClick={() => openHistory(c)}>Document history</button>}
+          {(appr || canEdit || data.team) && <hr className="row-menu-sep" data-clp-menu-sep="1" />}
+          {appr && data.review_groups && c.issues > 0 && <button type="button" onClick={() => openReview(c)}>Send Issue {c.last_issue ? c.last_issue.no : c.issues} to reviewers…</button>}
           {appr && c.status !== "sent" && !(ns && ns[0] === "approve") && <button type="button" onClick={() => openApprove(c)} disabled={!!building}>Approve as Issue {c.next_issue}…</button>}
           {appr && c.status === "sent" && <button type="button" onClick={() => openChanges(c)}>Ask for changes…</button>}
           {canEdit && <button type="button" onClick={() => openEdit(c)}>{appr ? "Edit" : "Edit cover details"}</button>}
           {!appr && data.team && !(ns && ns[0] === "send") && <button type="button" onClick={() => openSend(c)}>{c.status === "sent" ? "Send for approval (sent)" : "Send for approval…"}</button>}
-          <button type="button" onClick={() => openNotes(c)}>Notes and tasks{tk(c).open > 0 ? ` (${tk(c).open} open)` : ""}</button>
-          {appr && data.review_groups && c.issues > 0 && !(ns && ns[0] === "review") && <button type="button" onClick={() => openReview(c)}>Send Issue {c.last_issue ? c.last_issue.no : c.issues} to reviewers…</button>}
-          {c.issues > 0 && <button type="button" onClick={() => openHistory(c)}>Document history</button>}
           {appr && c.issues === 0 && (!c.auto || c.saved) && <button type="button" style={{ color: "var(--red)" }} onClick={() => remove(c)}>{c.auto ? "Clear typed details…" : "Delete…"}</button>}
         </RowMenu></div></td>
     </tr>); };

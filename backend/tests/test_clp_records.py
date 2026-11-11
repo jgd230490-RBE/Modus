@@ -557,6 +557,16 @@ ok("🔴 every statement in clp_records names tenant_id (test_tenant_audit check
 ok("🔴 no BOOLEAN compared with a number", not re.search(r"\bactive\s*=\s*1\b", SRC))
 ok("🔴 no team slot id in the module's words", re.search(r"\bIPT ?[1-6]\b", SRC) is None)
 
+# 11 Nov 2026 (card 2 of notes\clp-before-friday-mockup-1111, John: yes): an issued CLP reads "Issued" on the list and in
+# the Status filter; the key stays "approved"; the other three words are unchanged
+ok("⭐ card 2: the status words are Draft / Sent for approval / Changes asked / Issued (the key stays 'approved')",
+   clp_records.STATUS_WORDS == {"draft": "Draft", "sent": "Sent for approval", "changes": "Changes asked", "approved": "Issued"})
+_LI = clp_records.list_for(PLANNER, factors)
+_issued = [c for c in _LI["clps"] if c["status"] == "approved"]
+ok("...an issued CLP on the list says 'Issued', and the filter offers 'Issued'",
+   bool(_issued) and all(c["status_word"] == "Issued" for c in _issued)
+   and {"key": "approved", "word": "Issued"} in _LI["statuses"], str([c["status_word"] for c in _issued]))
+
 print()
 for f in FAIL:
     print("  FAIL:", f)

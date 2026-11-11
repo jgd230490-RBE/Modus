@@ -51,7 +51,9 @@ import taxonomy
 import clp_doc
 
 STATUSES = ("draft", "sent", "changes", "approved")
-STATUS_WORDS = {"draft": "Draft", "sent": "Sent for approval", "changes": "Changes asked", "approved": "Approved"}
+# 11 Nov 2026 (card 2 of notes\clp-before-friday-mockup-1111, John: yes): an issued CLP reads "Issued", as its documents
+# do ("Issue 1"); the status key stays "approved" and the contractor's step keeps its name, "Approve as Issue N…"
+STATUS_WORDS = {"draft": "Draft", "sent": "Sent for approval", "changes": "Changes asked", "approved": "Issued"}
 AUTO_TYPES = ("compound", "site", "stockpile")
 COVER_KEYS = tuple(k for k, _l in clp_doc.COVER_FIELDS)
 COVER_MAX = {"summary": 1200}
