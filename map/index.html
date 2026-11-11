@@ -778,6 +778,8 @@
                            background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:8px 10px; font:14px Inter,system-ui,sans-serif; }
         .secsel-frame-bar span{ flex:1 1 100%; }
         .secsel-frame-bar .secsel-btn{ min-height:44px; flex:1; }
+        .play-wait, .play-wait:hover{ opacity:.45; cursor:progress; filter:grayscale(1); }   /* 11 Nov 2026 (A-F7): Play while the months load */
+        a.secsel-btn{ display:inline-flex; align-items:center; text-decoration:none; }   /* 11 Nov 2026 (A-I3): "Report a lorry here" */
         body.wall-mode #area-card, body.wall-mode #area-pick-hint{ display:none; }
         /* the month as text, BESIDE the map (desktop: the map gives up the panel's width; a tablet: over the map's right) */
         #month-text{ position:absolute; top:0; right:0; bottom:0; width:min(420px, 100vw); z-index:27; background:var(--surface); border-left:1px solid var(--line);
@@ -1393,7 +1395,7 @@
         <div class="kpi-row">
             <div class="kpi-card lead">
                 <div class="kpi-value" id="kpi-trips">—</div>
-                <div class="kpi-label" id="kpi-trips-label" title="A lorry coming and going is 2 movements, as councils count them.">Lorry movements a day</div>
+                <div class="kpi-label" id="kpi-trips-label" title="A lorry coming and going is 2 movements, as councils count them.">Movements a day</div>
             </div>
             <div class="kpi-card lead">
                 <div class="kpi-value" id="kpi-vehicles">—</div>
@@ -1660,6 +1662,9 @@
             line: 'movements / day', note: 'A lorry coming and going is 2 movements, as councils count them.' }
         : { label: 'Lorry visits a day', lower: 'lorry visits a day', short: 'visits a day', col: 'Visits a day',
             line: 'visits / day', note: 'A lorry coming and going is 1 visit (2 movements as councils count them).' });
+    // 11 Nov 2026 (card A-X2): a count and its words, "under 1 lorry movement a day" / "1 lorry movement a day" in the singular
+    const cwN = t => String(t) + ' ' + (String(t) === 'under 1' || String(t) === '1'
+        ? CW().lower.replace('movements a day', 'movement a day').replace('visits a day', 'visit a day') : CW().lower);
     // The tenant's names for its team slots ("IPT3" -> "North Team"), from the overlay
     // response. Ids never reach the screen: every team value shown goes through teamText().
     const TEAM_LABELS = {};
@@ -1737,7 +1742,7 @@
         if (v) v.textContent = window.OVERLAY_VERSION ? ('overlay ' + window.OVERLAY_VERSION) : 'no alignment in this tenant';
         if (typeof KPI_BY !== 'undefined') KPI_BY[1][1] = TEAM;
         const tl = document.getElementById('kpi-trips-label');      // 9 Nov 2026 (2.1-11b): the organisation's count
-        if (tl) { tl.textContent = CW().label; tl.title = CW().note; }
+        if (tl) { tl.textContent = CW().col; tl.title = CW().note; }   // 11 Nov 2026 (card A-X2): "Movements a day", two lines
         const hc = document.getElementById('heat-count-words'); if (hc) hc.textContent = CW().lower;
     }
     // 11 Oct 2026 (review): is the app's demo bar drawn above this iframe? Embedded only (EMBED), and asked of the
@@ -2298,10 +2303,14 @@
     // REVERSED 9 Nov 2026 (2.1-11b Q2): "Two-way" is retired; the line reads the organisation's count
     // (forecastLabelField(): f_avg × PV() in a vehicles unit, the unit's own figure otherwise)
     const FORECAST_LABEL_UNIT = 'movements / day';
+    // 11 Nov 2026 (card A-F5, John's yes): the label names its ROUTE ("R050 · 132 a day"). It read "132 movements a day"
+    // beside a road card saying 172 for the same road: the line is one route, the card adds every route on the road.
+    // A route under 1 a day that month (a lane with nothing that way: "0 movements a day") has no label.
     function forecastLabelField() {
         const u = CONFIG.FORECAST_UNIT || 'vehicles';
-        if (u !== 'vehicles') return ['concat', ['get', 'f_avg'], ' ', (u === 'm3' ? 'm³' : u) + ' / day'];
-        return ['concat', ['to-string', ['round', ['*', ['to-number', ['get', 'f_avg'], 0], PV()]]], ' ', CW().line];
+        if (u !== 'vehicles') return ['concat', ['get', 'route_id'], ' · ', ['get', 'f_avg'], ' ', (u === 'm3' ? 'm³' : u) + ' / day'];
+        const n = ['round', ['*', ['to-number', ['get', 'f_avg'], 0], PV()]];
+        return ['case', ['<', n, 1], '', ['concat', ['get', 'route_id'], ' · ', ['to-string', n], ' a day']];
     }
     // 12 Oct 2026 (the user, evening): "line width by volume leave out and change to heat map like the carbon
     // (toggle between carbon and volume)". The fix pass's width by volume (f_avg on fixed stops) is gone: the
@@ -6070,9 +6079,13 @@
             const who = rs.slice(0, 3).join(', ') + (rs.length > 3 ? ' +' + (rs.length - 3) : '')
                 + (rs.length === 1 && g.vehicles.length === 1 ? ' · ' + g.vehicles[0] : '');
             const exc = p.exceptions ? ', ' + String(p.exceptions).toLowerCase() : ' · no exception recorded: check the sign';
+            // 11 Nov 2026 (card A-X2): a stretch with no name or number reads "Road near R008 · 7.5 t · …" (a list of routes
+            // read as the road's name); its routes go in the row's tip
+            const what = g.where ? who + ' · ' + limitValueText(p.kind, p.value, p.unit) + exc + ' · ' + g.where
+                                 : 'Road near ' + rs[0] + ' · ' + limitValueText(p.kind, p.value, p.unit) + exc;
             return { key: 'l|' + gk + '|' + month, lvl: 'warn', src: 'limit', who: rs[0], kind: 'l', id: g.ids.join(','),
                 noun: 'Over ' + (p.kind === 'axle' ? 'an ' : 'a ') + kw + ' limit',
-                what: who + ' · ' + limitValueText(p.kind, p.value, p.unit) + exc + (g.where ? ' · ' + g.where : ''),
+                what: what, tip: g.where ? '' : 'Routes over it: ' + rs.join(', '),
                 sort: 1.2 };
         });
     }
@@ -7528,7 +7541,7 @@
         }).join('');
         return '<div style="min-width:240px;max-width:340px;font-size:14px;">' +
             '<h4 style="margin:0 0 4px;color:' + CONFIG.COLORS.brandDark + ';font-size:14px;">Shared road section · ' + rlEsc(monthLabel(m)) + '</h4>' +
-            '<div style="margin-bottom:6px;">' + (f ? f.properties.rl_mv_text : '0') + ' ' + CW().lower +
+            '<div style="margin-bottom:6px;">' + cwN(f ? f.properties.rl_mv_text : '0') +
             (f && PV() === 2 && f.properties.rl_in_text != null ? ' (' + f.properties.rl_in_text + ' in, ' + f.properties.rl_out_text + ' out)' : '') +
             ' · ' + (f ? f.properties.rl_routes_text : '') +
             (co2On && f ? ' · ' + rlEsc(f.properties.rl_co2_text) : '') + '</div>' +
@@ -8010,8 +8023,16 @@
     async function ensureTimelineMatrix(){
         if(TL.matrix) return TL.matrix;
         if(TL.matrixPending) return TL.matrixPending;     // a double press waits on the same fetch
-        TL.matrixPending = loadTimelineMatrix().finally(()=>{ TL.matrixPending = null; });
+        playWait(true);
+        TL.matrixPending = loadTimelineMatrix().finally(()=>{ TL.matrixPending = null; playWait(false); });
         return TL.matrixPending;
+    }
+    // 11 Nov 2026 (card A-F7, John's yes): every Play is grey and cannot be pressed while the months load (on live
+    // 15-19 s on a cold open, an orange Play looked ready with nothing to play); a failed load hands Play back (a press
+    // tries again). No new words: "Loading the months…" under Month already says why.
+    const PLAY_IDS = ['tl-open', 'tl-play', 'm-play', 'm-full-play'];
+    function playWait(on) {
+        PLAY_IDS.forEach(id => { const b = document.getElementById(id); if (b) { b.disabled = !!on; b.classList.toggle('play-wait', !!on); } });
     }
     async function loadTimelineMatrix(){
         const unit = CONFIG.FORECAST_UNIT || 'vehicles';
@@ -8814,7 +8835,7 @@
             `<button type="button" class="x" title="Close" aria-label="Close the conditions panel" onclick="toggleConditions()">&times;</button></div>` +
             live.map(i =>
             `<div class="tl-warn ${i.lvl}"><span class="cond-dot"></span><span class="body">` +
-            `<b>${esc(i.noun)}</b><span class="what">${esc(i.what)}</span><br>` +
+            `<b>${esc(i.noun)}</b><span class="what"${i.tip ? ` title="${esc(i.tip)}"` : ''}>${esc(i.what)}</span><br>` +
             `<button class="show" onclick="showCondition('${i.kind}','${esc(i.id).replace(/'/g, '')}')">Show on map</button></span>` +
             `<button type="button" class="x" title="Dismiss for this month" aria-label="Dismiss for this month" onclick="dismissWarning('${esc(i.key).replace(/'/g, '')}')">&times;</button></div>`).join('');
         box.style.display = 'flex';
@@ -8887,7 +8908,7 @@
         else if (TL.full) html = '<b>Play loops over all ' + N + ' months</b> — ' + monthRangeText(1, N) + ', including the ' + (N - vol.size) + ' with nothing approved.';
         else html = '<b>Play loops over ' + (n === 1 ? 'this month' : 'these ' + countWord(n) + ' months') + '</b> — ' + monthRangeText(lo, hi)
                   + (n === vol.size ? (n === 1 ? ', the only one with approved volume.' : ', the ones with approved volume.') : ', the span with approved volume.')
-                  + ' The other ' + (N - n) + ' are shown, not played.';
+                  + (N - n > 0 ? ' The other ' + (N - n) + ' are shown, not played.' : '');   // 11 Nov 2026 (card A-X2): never "The other 0"
         if (lbl) {
             lbl.innerHTML = html;
             // the sentence starts over the bracket while it fits; past the middle it ends at the bracket's right edge
@@ -8935,7 +8956,7 @@
         else if (txt('kpi-title').indexOf(monthLabel(m)) === 0 && txt('kpi-title').indexOf('nothing approved') >= 0) line = 'nothing approved in this view';
         else if (TL.matrix && line === 'nothing approved this month') line = 'loading figures';   // the month has volume: never "nothing" while it loads
         else if (trips && trips !== '—' && txt('kpi-title').indexOf(monthLabel(m)) === 0) {
-            const parts = [trips + ' ' + CW().lower, routes + (routes === '1' ? ' route' : ' routes')];
+            const parts = [cwN(trips), routes + (routes === '1' ? ' route' : ' routes')];
             if (co2 && co2 !== '—') parts.push(co2 + ' CO₂e a day');
             line = parts.join(' · ');
         }
@@ -9172,7 +9193,7 @@
         p = p || {};
         return { title: 'Shared road section',
                  sub: [p.rl_routes_text, when].filter(Boolean).join(' · '),
-                 fig: (p.rl_mv_text != null ? p.rl_mv_text : '0') + ' ' + CW().lower + (co2On && p.rl_co2_text ? ' · ' + p.rl_co2_text : ''),
+                 fig: cwN(p.rl_mv_text != null ? p.rl_mv_text : '0') + (co2On && p.rl_co2_text ? ' · ' + p.rl_co2_text : ''),
                  hint: 'Click for the routes on this section' };
     }
     function setRouteHover(f, e) {
@@ -10658,7 +10679,7 @@
                  + '</p>' + secselButtons(res, opts, v) + '</div>';
         }
         if (v.fig) {
-            h += '<div class="secsel-sum"><b>' + secN(v.aday) + ' ' + escHtml(CW().lower) + '</b> · ' + secRoutesOf(v) + '</div>'
+            h += '<div class="secsel-sum"><b>' + escHtml(cwN(secN(v.aday))) + '</b> · ' + secRoutesOf(v) + '</div>'
                + (two ? '<div class="secsel-sub">' + sec1(v.inn) + ' in, ' + sec1(v.out) + ' out</div>' : '');
         } else {
             h += '<div class="secsel-sum">' + secRoutes(v.n) + (res && res.kind === 'area' ? ' enter it.' : ' use it.')
@@ -10666,21 +10687,26 @@
         }
         (opts.limits || []).forEach(L => { h += '<div class="secsel-limit secsel-' + escHtml(L.state) + '">' + escHtml(L.text) + '</div>'; });
         const cols = !v.fig ? '' : two ? '<th class="num">In</th><th class="num">Out</th><th class="num">A day</th>' : '<th class="num">A day</th>';
-        h += '<div class="secsel-scroll"><table class="secsel-table"><thead><tr><th>Route</th><th>From → to' + (res && res.kind === 'area' ? '' : ' · team')
+        // 11 Nov 2026 (card A-X1, John's yes): the team left the row (it wrapped every row to three lines, so the table scrolled
+        // after one); it is the route's own detail, on its name (a tip and the screen reader's name). Copy keeps it.
+        h += '<div class="secsel-scroll"><table class="secsel-table"><thead><tr><th>Route</th><th>From → to'
            + '</th>' + cols + '</tr></thead><tbody>';
         v.rows.forEach(r => {
             const tint = opts.clicked && String(opts.clicked) === String(r.id);
-            h += '<tr' + (tint ? ' class="secsel-clicked"' : '') + '><td class="secsel-rid">' + escHtml(r.id) + '</td><td>' + escHtml(r.from) + ' → ' + escHtml(r.to)
-               + (r.team && !(res && res.kind === 'area') ? '<div class="secsel-team">' + escHtml(r.team) + '</div>' : '') + '</td>'
+            const team = r.team && !(res && res.kind === 'area') ? escHtml(r.team) : '';
+            h += '<tr' + (tint ? ' class="secsel-clicked"' : '') + '><td class="secsel-rid"' + (team ? ' title="' + team + '"' : '') + '>'
+               + (team ? escHtml(r.id) + '<span class="sr-only"> · ' + team + '</span>' : escHtml(r.id)) + '</td><td>' + escHtml(r.from) + ' → ' + escHtml(r.to) + '</td>'
                + (!v.fig ? '' : two ? '<td class="num">' + secCell(r, 'inn', 'in') + '</td><td class="num">' + secCell(r, 'out', 'out') + '</td><td class="num">' + secCell(r, 'aday', 'a_day') + '</td>'
                                     : '<td class="num">' + secCell(r, 'aday', 'a_day') + '</td>') + '</tr>';
         });
         if (v.fig && v.n > 1) h += '<tr class="secsel-total"><td colspan="2">Total</td>' + (two ? '<td class="num">' + sec1(v.inn) + '</td><td class="num">' + sec1(v.out) + '</td>' : '')
                                  + '<td class="num">' + sec1(v.aday) + '</td></tr>';
         h += '</tbody></table></div>';
-        // Q2: the line clicked belongs to a route with nothing approved that month — said in one line, its button kept
+        // Q2: the line clicked belongs to a route with nothing approved that month — said in one line
+        // REVERSED 11 Nov 2026 (card A-X1, John's yes): it says it is the clicked line ("R045: no loads in Apr 2027." under a
+        // table of R011 read like a mistake), and its card button goes (secselButtons): that card has no loads to show
         if (v.fig && opts.clicked && v.idle.indexOf(String(opts.clicked)) >= 0)
-            h += '<p class="secsel-note">' + escHtml(opts.clicked) + ': no loads in ' + escHtml(monthLabel(m)) + '.</p>';
+            h += '<p class="secsel-note">The line you clicked, ' + escHtml(opts.clicked) + ', has no loads this month.</p>';
         if (v.left.length) h += '<p class="secsel-note">Also here, outside the filters: ' + v.left.map(escHtml).join(', ') + '.</p>';
         h += '<p class="secsel-note">' + (res && res.kind === 'area' ? 'Each route counted once, however many roads in the box it uses. ' : '')
            + escHtml(two ? 'A lorry coming and going is 2 movements (in and out).' : 'Each lorry counted once.') + ' Approved plan.</p>';
@@ -10690,10 +10716,14 @@
         const area = res && res.kind === 'area', b = [];
         // (seen on live 10 Nov: "Pick a month" under Mar 2027) only when no month is on screen
         if (!v.fig && !(res && res.month)) b.push('<button type="button" class="secsel-btn" onclick="secselPickMonth()">Pick a month</button>');
-        if (!area && opts.clicked) b.push('<button type="button" class="secsel-btn" data-rid="' + escHtml(opts.clicked) + '" onclick="secselRouteCard(this.dataset.rid)">'
+        const idle = v.fig && opts.clicked && (v.idle || []).indexOf(String(opts.clicked)) >= 0;   // A-X1: no button for a route with no loads
+        if (!area && opts.clicked && !idle) b.push('<button type="button" class="secsel-btn" data-rid="' + escHtml(opts.clicked) + '" onclick="secselRouteCard(this.dataset.rid)">'
                                            + escHtml(opts.clicked) + '’s card</button>');
         if (v.n) b.push('<button type="button" class="secsel-btn secsel-copy" onclick="secselCopy(\'' + (area ? 'area' : 'road') + '\', this)">' + (area ? 'Copy table' : 'Copy') + '</button>');
         if (area) b.push('<button type="button" class="secsel-btn" onclick="secselDrawAgain()">Draw again</button>');
+        // 11 Nov 2026 (card A-I3): the scheme's concern address, with this road and month filled in (none typed: no link)
+        const addr = !area && res && !res.loading && typeof concernAddress === 'function' ? concernAddress(TENANT) : null;
+        if (addr) b.push('<a class="secsel-btn secsel-report" href="' + escHtml(lorryMailto(addr, opts.road || '', res.month ? monthLabel(res.month) : null, opts.link || null)) + '">Report a lorry here</a>');
         return '<div class="secsel-btns">' + b.join('') + '</div>';
     }
     function secselPickMonth() {
@@ -10718,7 +10748,7 @@
         if (typeof TL !== 'undefined' && TL.playing && typeof stopTimeline === 'function') stopTimeline();
         const m = secselMonth();
         SECSEL.roadAt = { lngLat: e.lngLat, ask: secselSnap(e, clickedRid), point: e.point, r: secselReachM(e.point), clicked: clickedRid || null,
-                          limits: secselLimitLines(e.point) };
+                          limits: secselLimitLines(e.point), road: secselRoadName(e.point) };
         SECSEL.road = { kind: 'road', month: m, loading: true };
         if (isPhoneShell()) { SHEET.card = 'road'; renderRouteCard(); if (SHEET.state !== 'half') sheetTo('half'); }
         else showRoadPopup();
@@ -10734,7 +10764,16 @@
     function roadCardHTML() {
         const at = SECSEL.roadAt || {};
         return secselCardHTML(SECSEL.road, { passing: typeof modeRoutesPassing === 'function' ? modeRoutesPassing() : null,
-            rp: typeof routePropsById === 'function' ? routePropsById() : {}, clicked: at.clicked, limits: at.limits });
+            rp: typeof routePropsById === 'function' ? routePropsById() : {}, clicked: at.clicked, limits: at.limits,
+            road: at.road, link: typeof VIEW !== 'undefined' && VIEW.ready && typeof shareUrl === 'function' ? shareUrl() : null });
+    }
+    // 11 Nov 2026 (card A-I3): the road's own number or name from the basemap under the click ("B6047"), for the email's
+    // subject; '' where the basemap gives none (a style whose roads cannot be asked, as Standard's)
+    function secselRoadName(point) {
+        try {
+            const f = map.queryRenderedFeatures(point).find(x => x.sourceLayer === 'road' && x.properties && (x.properties.ref || x.properties.name));
+            return f ? String(f.properties.ref || f.properties.name).slice(0, 60) : '';
+        } catch (e) { return ''; }
     }
     // 9 Nov 2026 (seen on live, the mockup's card 0): a card opened low on the map ran UNDER the timeline bar. The card opens
     // on the side of the click with more room above the bar, and scrolls inside itself in the room it has.
@@ -11383,11 +11422,21 @@
         // the server's own test (config.is_concern_email): one plain address, nothing a mailto: could be bent with
         return /^[^\s@<>"',;:?&]+@[^\s@<>"',;:?&]+\.[^\s@<>"',;:?&]+$/.test(a) && a.length <= 254 ? a : null;
     }
-    function concernMailto(addr, schemeName, monthLbl, link) {
-        const subject = 'Report a concern: ' + (schemeName || 'construction lorries');
-        const body = 'What happened:\n\nDate:\nTime:\nPlace (road and nearest landmark):\nLorry registration, if seen:\n\n'
+    // 11 Nov 2026 (card A-I3, John's yes; CLOCS 5.13): the email asks for the four things a lorry is found by, and says a
+    // lorry on another road may not be the scheme's. The road card's "Report a lorry here" fills in the road and month.
+    function lorryBody(where, monthLbl, link) {
+        return 'When (date and time):\nWhere: ' + (where || '') + '\nWhich way it was going:\nRegistration or company name, if seen:\n\n'
+            + 'A lorry on another road may be a local delivery, not this scheme’s.\n\n'
             + (monthLbl ? 'Month on the map: ' + monthLbl + '\n' : '') + (link ? 'The map view: ' + link + '\n' : '');
+    }
+    function mailtoOf(addr, subject, body) {
         return 'mailto:' + encodeURIComponent(addr).replace(/%40/g, '@') + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    }
+    function concernMailto(addr, schemeName, monthLbl, link) {
+        return mailtoOf(addr, 'Report a concern: ' + (schemeName || 'construction lorries'), 'What happened:\n\n' + lorryBody('', monthLbl, link));
+    }
+    function lorryMailto(addr, road, monthLbl, link) {
+        return mailtoOf(addr, 'A lorry on ' + (road || 'a road on the map') + (monthLbl ? ', ' + monthLbl : ''), lorryBody(road ? road + ', ' : '', monthLbl, link));
     }
     // 5 Nov 2026 (group 6, mockup notes/report-concern-mockup-1105 cards 1-3; John: "Yes, as recommended"): when the
     // scheme has ticked Report a concern on (Config → Map and bulletin) AND has a privacy notice (the demo uses Wayscope's),
@@ -11826,7 +11875,7 @@
     // the condition rows, in the panel's markup; on a phone "Show on map" also lowers the sheet so the map shows
     function condRowsHTML(live) {
         return live.map(i =>
-            '<div class="tl-warn ' + i.lvl + '"><span class="cond-dot"></span><span class="body"><b>' + escHtml(i.noun) + '</b><span class="what">' + escHtml(i.what) + '</span><br>'
+            '<div class="tl-warn ' + i.lvl + '"><span class="cond-dot"></span><span class="body"><b>' + escHtml(i.noun) + '</b><span class="what"' + (i.tip ? ' title="' + escHtml(i.tip) + '"' : '') + '>' + escHtml(i.what) + '</span><br>'
             + '<button type="button" class="show" onclick="showCondition(\'' + i.kind + '\',\'' + escHtml(i.id).replace(/'/g, '') + '\'); sheetTo(\'peek\')">Show on map</button></span>'
             + '<button type="button" class="x" title="Dismiss for this month" aria-label="Dismiss for this month" onclick="dismissWarning(\'' + escHtml(i.key).replace(/'/g, '') + '\')">&times;</button></div>').join('');
     }

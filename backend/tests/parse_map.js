@@ -56,6 +56,11 @@ globalThis.COUNT_TENANT = {};
     globalThis.PV = () => f(globalThis.COUNT_TENANT).PV();
     globalThis.CW = () => f(globalThis.COUNT_TENANT).CW();
   }
+  // 11 Nov 2026 (card A-X2): cwN, a count and its words ("under 1 lorry movement a day"), the same way
+  // (mkCwN(cw): the same helper over a sandbox's own CW)
+  const c = src.indexOf("    const cwN = "), d = src.indexOf("\n", src.indexOf("CW().lower);", c));
+  globalThis.mkCwN = cw => new Function("CW", src.slice(c, d) + "\nreturn cwN;")(cw);
+  if (c > 0 && d > c) globalThis.cwN = globalThis.mkCwN(() => globalThis.CW());
 })();
 // comment-stripped, so an assertion cannot pass by matching the prose that explains
 // why something was removed
@@ -332,8 +337,9 @@ ok("§9: vehicles/day = vehicle-loads over months with volume, per working day",
 // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): the figure is loads per working day × the
 // organisation's count (PV(): 2 by default), never a literal 2; the label is the organisation's ("Lorry movements a day")
 ok("§9: lorry movements/day is the loads-per-working-day figure × the organisation's count, never a literal × 2", /set\('kpi-trips', fmtN\(vehDay \* PV\(\), 0\)\)/.test(code)
-  && />Lorry movements a day</.test(html) && !/MOVES_PER_LOAD/.test(code) && !/vehDay \* 2/.test(code)
-  && code.includes("if (tl) { tl.textContent = CW().label; tl.title = CW().note; }"));
+  // NARROWED 11 Nov 2026 (card A-X2): the bar's label is "Movements a day" (CW().col), two lines at 1422 px, not three
+  && />Movements a day</.test(html) && !/MOVES_PER_LOAD/.test(code) && !/vehDay \* 2/.test(code)
+  && code.includes("if (tl) { tl.textContent = CW().col; tl.title = CW().note; }"));
 ok("§9: ⭐ vehicles needed is ceil(movements ÷ trips-per-vehicle-day) per line, from the route's cycle",
   /fleet \+= Math\.ceil\(\(l\.vehicle_loads \/ wd\) \/ l\.trips_per_vehicle_day\)/.test(code));
 // NARROWED 12 Oct 2026 (the base merge): the words a person reads are "no stored route" / "with no stored road route"
@@ -1409,7 +1415,8 @@ ok("§8: the seasonal check honours restricted_vehicles", /rv\.length === 0 \|\|
 // 2026-10-06 — REVERSED: a row is a dot, a plain NOUN and one sentence; the month is in
 // the panel's title, once, not on every row
 ok("§8: each row reads noun + sentence, with the month in the panel title",
-  /<b>\$\{esc\(i\.noun\)\}<\/b><span class="what">\$\{esc\(i\.what\)\}<\/span>/.test(code)
+  // NARROWED 11 Nov 2026 (card A-X2): an unnamed limit's row carries its routes in a tip on the sentence
+  /<b>\$\{esc\(i\.noun\)\}<\/b><span class="what"\$\{i\.tip \? ` title="\$\{esc\(i\.tip\)\}"` : ''\}>\$\{esc\(i\.what\)\}<\/span>/.test(code)
   && /<b>Conditions in \$\{esc\(monthLabel\(month\)\)\}<\/b>/.test(code));
 ok("§8: fetch failures degrade to no warnings, not a broken map",
   /\.catch\(\(\) => \{ WARN\.restr = \{\}; return WARN\.restr; \}\)/.test(code));
@@ -4143,7 +4150,8 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
        // REVERSED 9 Nov 2026 (2.1-11b): the section's figure is already in the count (the server's movements_per_day)
        rv.title === 'Shared road section' && rv.sub === '2 routes · Oct 2026' && rv.fig === '46 lorry movements a day · 3.2 t CO₂e'
        && rv.hint === 'Click for the routes on this section' && rv.hint !== 'Click for the route analysis', JSON.stringify(rv));
-    ok("Track C review: ...without carbon on, no tonnes", api.runHoverView({ rl_mv_text: 'under 1', rl_routes_text: '3 routes' }, 'Oct 2026', false).fig === 'under 1 lorry movements a day');   // 9 Nov 2026 (2.1-11b)
+    // REVERSED 11 Nov 2026 (card A-X2): "under 1" takes the singular
+    ok("Track C review: ...without carbon on, no tonnes", api.runHoverView({ rl_mv_text: 'under 1', rl_routes_text: '3 routes' }, 'Oct 2026', false).fig === 'under 1 lorry movement a day');   // 9 Nov 2026 (2.1-11b)
     // ---- the deep link ----
     // Track C review: "Show forecast routes" travels as layers=forecast (a link from the forecast view opened bare)
     {
@@ -4209,9 +4217,12 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
        && api.concernAddress({ concern_email: 'a@b.example, c@d.example' }) === null && api.concernAddress({ concern_email: 'a@b.example?cc=x@y.example' }) === null
        && api.concernAddress({ concern_email: ' contact@scheme.example ' }) === 'contact@scheme.example');
     const mt = api.concernMailto('contact@scheme.example', 'Wolds Link (fictional)', 'Oct 2026', 'https://x.example/map/?month=2026-10');
-    ok("C3 concern: the mailto keeps the address, and its subject and body (date, time, place, registration, the month and the link) are encoded",
+    // REVERSED 11 Nov 2026 (card A-I3, John's yes): the body asks for when, where, which way and the registration or
+    // company, as the road card's "Report a lorry here" does (one body, lorryBody), and says another road may not be the scheme's
+    ok("C3 concern: the mailto keeps the address, and its subject and body (when, where, which way, registration, the month and the link) are encoded",
        mt.startsWith('mailto:contact@scheme.example?subject=Report%20a%20concern%3A%20Wolds%20Link%20(fictional)&body=What%20happened%3A')
-       && /Date%3A%0ATime%3A%0APlace/.test(mt) && /Lorry%20registration/.test(mt) && /Month%20on%20the%20map%3A%20Oct%202026/.test(mt) && /month%3D2026-10/.test(mt));
+       && /When%20\(date%20and%20time\)%3A%0AWhere%3A%20%0AWhich%20way%20it%20was%20going%3A%0ARegistration%20or%20company%20name%2C%20if%20seen%3A/.test(mt)
+       && /local%20delivery/.test(mt) && /Month%20on%20the%20map%3A%20Oct%202026/.test(mt) && /month%3D2026-10/.test(mt), mt);
     api.renderConcernLinks();
     // NARROWED 10 Nov 2026 (UI critique 18, decision 6): a resident sees no unset line (the public map: empty slots); the map
     // inside the app (staff) still says so, without "(fictional demo)" — checked in ui_fix_map_card.js. Still no link, no invented address.
@@ -7708,11 +7719,11 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   let F = null, err = "";
   try {
     F = new Function("escHtml", "PV", "CW", "monthLabel", "teamText", "TENANT", "map", "styleReady", "document", "isPhoneShell", "mapboxgl",
-                     "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle",
+                     "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle", "cwN",
                      blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), secselNeed: (typeof secselNeed === 'function' ? secselNeed : null), secselBeside: (typeof secselBeside === 'function' ? secselBeside : null), popupPlace: (typeof popupPlace === 'function' ? popupPlace : null), SECSEL_MAP };")(
       esc, () => pv, () => (pv === 2 ? words2 : words1), m => (m === 23 ? 'Nov 2027' : 'M' + m), v => (v === 'IPT1' ? 'North Team' : v),
       { name: 'Wolds Link', demo_notice: 'Fictional scheme' }, {}, () => true, doc, () => false, {}, {}, () => 'https://x/map/?month=2027-11', null, null,
-      x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }));
+      x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }), mkCwN(() => (pv === 2 ? words2 : words1)));
   } catch (e) { err = String(e && e.stack || e); }
   ok("⭐ 2.1-4 (sandbox): the block runs against a fake map, adding nothing to it", !!F && F.SECSEL_MAP === false, err);
   if (F) {
@@ -7730,8 +7741,9 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        && h.includes('<th class="num">In</th><th class="num">Out</th><th class="num">A day</th>') && h.includes('class="secsel-total"')
        && h.includes('<td class="num">11.5</td><td class="num">0</td><td class="num">11.5</td>') && !h.includes('<td class="num">12</td>')
        && h.includes('<td class="num">16.5</td><td class="num">5.0</td><td class="num">21.5</td></tr>'), h);
+    // NARROWED 11 Nov 2026 (card A-X1): the team is on the route's name (a tip and the screen reader's words), not a line in the row
     ok("2.1-4 (sandbox): the clicked route's row is tinted and has its card button; Copy; the limit line; teams on the card",
-       h.includes('<tr class="secsel-clicked"><td class="secsel-rid">R1</td>') && h.includes('R1’s card</button>') && h.includes('>Copy</button>')
+       /<tr class="secsel-clicked"><td class="secsel-rid"( title="[^"]*")?>R1(<span class="sr-only">[^<]*<\/span>)?<\/td>/.test(h) && h.includes('R1’s card</button>') && h.includes('>Copy</button>')
        && h.includes('secsel-limit secsel-over">Traffic limit · 212 / 200 a day') && h.includes('North Team'));
     ok("🔴 2.1-4 (sandbox): no 'Shared road section', no 'two-way' on the card", !/Shared road section|two-way/i.test(h));
     const one = F.secselCardHTML({ kind: 'road', month: 23, a_day: 4, routes: [{ route_id: 'R3', in: 2, out: 2, a_day: 4 }] }, { rp });
@@ -7804,9 +7816,10 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        F.secselCardHTML(live, { rp, passing: { R050: true, R047: true } }).includes('</b> · 1 of 2 routes</div>'));
     const road = { kind: 'road', month: 23, in: 4.1, out: 4.1, a_day: 8.2, idle: ['R001', 'R045'], routes: [{ route_id: 'R004', in: 4.1, out: 4.1, a_day: 8.2 }] };
     const hc = F.secselCardHTML(road, { rp, clicked: 'R045' });
-    ok("⭐ POLISH Q2 (sandbox; live 10 Nov: a table with R004 only and a button 'R045’s card'): the clicked route with no loads is said in one line, its button kept",
-       hc.includes('<p class="secsel-note">R045: no loads in Nov 2027.</p>') && hc.includes('R045’s card</button>') && hc.includes('· 1 of 3 routes')
-       && !F.secselCardHTML(road, { rp, clicked: 'R004' }).includes('no loads in') && !F.secselCardHTML(road, { rp }).includes('no loads in'), hc);
+    // REVERSED 11 Nov 2026 (card A-X1, John's yes): the line says it is the clicked one, and its card button goes (it was kept)
+    ok("⭐ POLISH Q2 (sandbox; live 10 Nov: a table with R004 only and a button 'R045’s card'): the clicked route with no loads is said in one line; no button for it",
+       hc.includes('<p class="secsel-note">The line you clicked, R045, has no loads this month.</p>') && !hc.includes('R045’s card</button>') && hc.includes('· 1 of 3 routes')
+       && !F.secselCardHTML(road, { rp, clicked: 'R004' }).includes('no loads this month') && !F.secselCardHTML(road, { rp }).includes('no loads this month'), hc);
     const lost = F.secselCardHTML({ kind: 'road', month: 15, piece: null, routes: [], in: null, out: null, a_day: null }, { rp, clicked: 'R045' });
     ok("⭐ POLISH (sandbox; live 10 Nov: 'Pick a month' under Mar 2027): no 'Pick a month' button while a month is on screen; it stays when none is",
        !lost.includes('Pick a month</button>') && lost.includes('R045’s card</button>')
