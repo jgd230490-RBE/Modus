@@ -373,6 +373,12 @@ as_(ADMIN, lambda: main.routes_summary())
 as_(ADMIN, lambda: main.routes_diversions(route_id=None))
 ok("...after it, the admin's Dashboard, Look-ahead and Routes reads build nothing (all nine served from memory)",
    stats()["builds"] == s8["builds"] and stats()["hits"] == s8["hits"] + 9, f"{s8} {stats()}")
+# 11 Nov 2026 (the Dashboard's carbon tile: the one Dashboard read that was not kept)
+s8b = stats()
+_ct1 = as_(ADMIN, lambda: main.get_carbon_target())
+_ct2 = as_(ADMIN, lambda: main.get_carbon_target())
+ok("⭐ the Dashboard's carbon-target read is warmed too: after the warmer, two reads build nothing",
+   stats()["builds"] == s8b["builds"] and stats()["hits"] == s8b["hits"] + 2 and _ct2 is _ct1, f"{s8b} {stats()}")
 s9 = stats()
 as_(TEAM1, lambda: main.costing_lines(from_=None, to=None, status="All"))
 ok("...a team login's first read is still built for that team (the warmer builds the admin's scope only)",
@@ -391,7 +397,8 @@ def _body(fn):
 
 
 _JSON_READS = ("forecasts_summary", "lookahead_page", "lookahead_geometry", "costing_lines", "carbon_scenario",
-               "routes_status", "routes_summary", "routes_diversions", "gate_arrivals_month", "clp_monitoring")
+               "routes_status", "routes_summary", "routes_diversions", "gate_arrivals_month", "clp_monitoring",
+               "get_carbon_target")
 ok("⭐ every cached staff read goes through _staff_json (the key with role and team)",
    all("_staff_json(" in _body(f) for f in _JSON_READS), str([f for f in _JSON_READS if "_staff_json(" not in _body(f)]))
 ok("...the two PDFs through _staff_bytes, the bulletin with its keep on basemap.MISSES",
