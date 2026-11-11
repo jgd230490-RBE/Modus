@@ -5,13 +5,15 @@ test_diversion_choice.py — 11 Nov 2026, CLOCS cards B-F3 + B-I2 (branch claude
 John, 11 Nov 2026, "No limit, then quickest" (reverses the 28 Oct Q3 answer "shortest"): a dated zone's diversion is the
 stored option that misses the zone with NO lorry limit below the lorry first, then the QUICKEST (stored duration_hr, the
 HERE time at the pinned bake departure), a tie to the shorter, then the lower alt; where every option has a limit below
-the lorry, the quickest of them. The Zones list says "+x mi · +y min each way" and a chip ("No limit below this lorry" /
-"N lorry limits · check"); an admin can preview the change and apply it; nothing changes at the merge itself.
+the lorry, the quickest of them. The Zones list says "+x mi · +y min each way" and a chip counting only the limits the
+diversion ADDS over its own main route (John, 11 Nov: "Yes, only new limits"): "No new limit below this lorry" /
+"1 new lorry limit · check"; an admin can preview the change and apply it; nothing changes at the merge itself.
 
   1. pick_key: the order (no limit first, quickest, shorter, alt; no stored time last)
-  2. limits_below: below the lorry only, each limit once, a point limit counts, per leg (an empty lorry is lighter)
+  2. limits_below: below the lorry only, each limit once, a point limit counts, per leg (an empty lorry is lighter);
+     limits_added: only those the main line of the same leg does not meet
   3. work_out: the old rule's shortest loses to a limit-free quicker option; no limits held = the quickest
-  4. periods(): hr_delta and limits_below on each in-use leg (None when no limits are held)
+  4. periods(): hr_delta, limits_below and limits_new on each in-use leg (None when no limits are held)
   5. preview() lists the change without writing; refresh_zones() applies it; then preview() is empty
   6. source pins: the dated reversal in route_choice.py, the two admin endpoints, the Zones list's words
 
@@ -179,6 +181,7 @@ MID = round(((DIMS_L.get("mass_t") or 44) + (DIMS_R.get("mass_t") or 15)) / 2, 1
 WMID = lim("wmid", "weight", MID, along(SHORT, 0.4, 0.5))                       # below the laden lorry only
 H3 = lim("h3", "height", 3.0, along(SLOW, 0.45, 0.45, 1)[0], "Point")           # a low bridge on alt 2
 H9 = lim("h9", "height", 6.9, along(QUICK, 0.4, 0.5))                           # a high one on alt 3: within
+SHARED = lim("sh", "height", 3.0, [-1.0, LAT], "Point")                          # at the start: every line passes it
 
 # =========================================================================== #
 #  1. pick_key                                                                 #
@@ -207,6 +210,17 @@ ok("2. a point limit (a low bridge) counts", lb(SLOW, ART, "loaded", [H3]) == 1)
 ok("2. a limit above the lorry (6.9 m) does not", lb(QUICK, ART, "loaded", [H9]) == 0)
 ok("2. a limit on another road does not", lb(MAIN, ART, "loaded", [W75, H3]) == 0)
 ok("2. no limits held / no line = 0", lb(SHORT, ART, "loaded", []) == 0 and lb(None, ART, "loaded", [W75]) == 0)
+la = route_choice.limits_added
+ok("⭐ 2. limits_added: the 7.5 t limit on the diversion and not on the main line is new", la(SHORT, MAIN, ART, "loaded", [W75]) == 1)
+ok("⭐ 2. ...a limit the main line passes too is not new (below 1, added 0)",
+   lb(SHORT, ART, "loaded", [SHARED]) == 1 and lb(MAIN, ART, "loaded", [SHARED]) == 1
+   and la(SHORT, MAIN, ART, "loaded", [SHARED]) == 0)
+ok("2. ...shared and new together: 1 new of 2 below", lb(SHORT, ART, "loaded", [W75, SHARED]) == 2
+   and la(SHORT, MAIN, ART, "loaded", [W75, SHARED]) == 1)
+ok("2. ...judged for the leg's weight: the mid limit adds one laden, none empty",
+   la(SHORT, MAIN, ART, "loaded", [WMID]) == 1 and la(list(reversed(SHORT)), list(reversed(MAIN)), ART, "return", [WMID]) == 0)
+ok("2. ...a limit only the main line passes adds nothing (the diversion leaves it)", la(SHORT, MAIN, ART, "loaded",
+   [lim("m1", "weight", 7.5, along(MAIN, 0.4, 0.5))]) == 0)
 
 # =========================================================================== #
 #  3. work_out                                                                 #
@@ -253,6 +267,8 @@ ok("3. a tie on time (0.24 h): the shorter (alt 2, 9 km)", pick([], lines=TIE)[0
 FULL = {("R1", ART, "loaded"): {0: opts()[0], 2: dict(opts()[3]), 3: opts()[3]}}
 ok("3. a full tie: the lower alt", pick([], lines=FULL)[0] == 2)
 ok("3. km_delta is still the option's distance less the main line's", pick([W75, H3])[2] == 3.0)
+ok("3. a limit every option passes (at the quarry gate) leaves no option limit-free: the quickest (alt 1), as the demo's "
+   "return legs do", pick([W75, H3, SHARED])[0] == 1, str(pick([W75, H3, SHARED])))
 
 # =========================================================================== #
 #  4–5. The stored rows: periods(), preview(), refresh                         #
@@ -268,7 +284,7 @@ z = zones.create_zone("Mill bridge closure", BOX, kind="closure", starts_on="202
 ZID = (z or {}).get("id") or ((z or {}).get("zone") or {}).get("id")
 ok("4. the dated zone is stored and dated", any(d["id"] == ZID for d in route_choice.dated_zones()), str(z)[:200])
 
-HELD = [W75, H3]
+HELD = [W75, H3, SHARED]
 _real_load = route_choice._load_limits
 route_choice._load_limits = lambda: list(HELD)
 # the rows as the OLD rule wrote them (shortest: alt 1 both legs), as live holds them until applied
@@ -291,13 +307,17 @@ P = route_choice.periods("R1")
 legs = {l["leg"]: l for g in P for l in g["legs"]}
 ok("⭐ 4. periods(): each in-use leg carries hr_delta (stored time less the main line's)",
    abs((legs.get("loaded") or {}).get("hr_delta", 9) - 0.01) < 1e-6, str(legs.get("loaded")))
-ok("⭐ 4. ...and limits_below: alt 1 has the 7.5 t limit", (legs.get("loaded") or {}).get("limits_below") == 1,
+ok("⭐ 4. ...and limits_below: alt 1 has the 7.5 t limit and the shared low bridge", (legs.get("loaded") or {}).get("limits_below") == 2,
    str(legs.get("loaded")))
+ok("⭐ 4. ...and limits_new: only the 7.5 t limit is new (the main route passes the bridge too)",
+   (legs.get("loaded") or {}).get("limits_new") == 1, str(legs.get("loaded")))
 ok("4. periods() shows what is STORED (alt 1), whichever rule picked it", (legs.get("loaded") or {}).get("alt_index") == 1)
 route_choice._load_limits = lambda: []
 l0 = ([l for g in route_choice.periods("R1") for l in g["legs"] if l["leg"] == "loaded"] or [{}])[0]
-ok("⭐ 4. no limits held: limits_below is None (no chip claims a check)", l0.get("limits_below", "x") is None
+ok("⭐ 4. no limits held: limits_below and limits_new are None (no chip claims a check)", l0.get("limits_below", "x") is None
+   and l0.get("limits_new", "x") is None
    and l0.get("hr_delta") is not None, str(l0))
+HELD = [W75, H3]                          # the preview: alt 3 limit-free, so the rule moves off alt 1
 route_choice._load_limits = lambda: list(HELD)
 
 v0 = db.data_version()
@@ -309,7 +329,8 @@ ok("⭐ 5. preview(): both legs move from alt 1 to alt 3", (cl.get("now") or {})
    and ((ch.get("return") or {}).get("rule") or {}).get("alt_index") == 3, str(PV)[:400])
 ok("5. ...with distance, time and limits for each", (cl.get("now") or {}).get("km_delta") == 0.2
    and abs((cl.get("rule") or {}).get("hr_delta", 9) - 0.04) < 1e-6 and (cl.get("now") or {}).get("limits_below") == 1
-   and (cl.get("rule") or {}).get("limits_below") == 0, str(cl))
+   and (cl.get("rule") or {}).get("limits_below") == 0 and (cl.get("now") or {}).get("limits_new") == 1
+   and (cl.get("rule") or {}).get("limits_new") == 0, str(cl))
 ok("⭐ 5. preview() writes nothing", db.data_version() == v0 and stored_alts() == [("loaded", 1), ("return", 1)])
 ok("5. preview() says how many limits it read and the rows on each side",
    PV["limits_held"] == 2 and PV["rows_now"] == 2 and PV["rows_rule"] == 2, str({k: PV[k] for k in PV if k != "changes"}))
@@ -340,8 +361,12 @@ for path, fn in (('@app.get("/api/admin/route-diversions/preview")', "route_choi
 FE = read("frontend/index.html")
 ok("🔴 6. the Zones list says the time as well (divEach in both layouts)", FE.count("{divEach(p, prof)}") == 2
    and "· ${divMins(hr)}" in FE)
-ok("🔴 6. the chip's words (B-I2)", '"No limit below this lorry"' in FE and 'lorry limit${n === 1 ? "" : "s"} · check' in FE
+ok("🔴 6. the chip's words (B-I2, only new limits): 'No new limit below this lorry' / '1 new lorry limit · check', tip 'Compared with the main route'",
+   '"No new limit below this lorry"' in FE and 'new lorry limit${n === 1 ? "" : "s"} · check' in FE
+   and 'title="Compared with the main route"' in FE and '"No limit below this lorry"' not in FE
    and FE.count("<DivLimits p={p} prof={prof} />") == 2)
+ok("🔴 6. the chip reads limits_new, not limits_below", "x.limits_new != null" in FE and "map(x => x.limits_new)" in FE
+   and "x.limits_below" not in FE)
 _dl = FE[FE.find("function DivLimits"):FE.find("function DivLimits") + 500]
 ok("6. the chip is the one status chip (RowStatus), amber / green", "<RowStatus" in _dl and 'tone="warn"' in _dl
    and 'tone="ok"' in _dl)

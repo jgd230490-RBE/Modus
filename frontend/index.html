@@ -1355,17 +1355,18 @@ const divDelta = (p, prof) => {
   const l = divLeg(p, prof);
   return l && l.km_delta != null ? l.km_delta : null;
 };
-// 11 Nov 2026 (CLOCS B-F3 / B-I2): the same leg's change in time ("+4 min"), and the lorry limits below that lorry on
-// the diversion (every leg of the lorry type on screen; null where no limits are held, so the list claims no check)
+// 11 Nov 2026 (CLOCS B-F3 / B-I2): the same leg's change in time ("+4 min"), and the lorry limits below that lorry the
+// diversion adds over its own main route (limits_new; John: "Yes, only new limits"; every leg of the lorry type on
+// screen; null where no limits are held, so the list claims no check)
 const divHr = (p, prof) => {
   const l = divLeg(p, prof);
   return l && l.hr_delta != null ? l.hr_delta : null;
 };
 const divLimits = (p, prof) => {
-  const legs = ((p && p.legs) || []).filter(x => x.limits_below != null);
+  const legs = ((p && p.legs) || []).filter(x => x.limits_new != null);
   if(!legs.length) return null;
   const mine = legs.filter(x => x.vehicle_profile === prof);
-  return Math.max(...(mine.length ? mine : legs).map(x => x.limits_below));
+  return Math.max(...(mine.length ? mine : legs).map(x => x.limits_new));
 };
 const DIV_PROBLEM = { needs_route: "No way round yet", no_way_round: "No road round it", declined: "Kept on the main route" };
 
@@ -15257,12 +15258,14 @@ const divEach = (p, prof) => {
   const hr = divHr(p, prof);
   return hr == null ? divSigned(divDelta(p, prof)) : `${divSigned(divDelta(p, prof))} · ${divMins(hr)}`;
 };
-// B-I2: the diversion checked for the lorry: green "No limit below this lorry", amber "2 lorry limits · check"
+// B-I2: the diversion checked for the lorry, against its main route: green "No new limit below this lorry", amber
+// "1 new lorry limit · check"; the tip says what "new" is compared with
 function DivLimits({ p, prof }){
   const n = p && p.status === "in_use" ? divLimits(p, prof) : null;
   if(n == null) return null;
-  return <span data-div-limits={n}>{n ? <RowStatus word={`${n} lorry limit${n === 1 ? "" : "s"} · check`} tone="warn" />
-                                       : <RowStatus word="No limit below this lorry" tone="ok" />}</span>;
+  return <span data-div-limits={n} title="Compared with the main route">
+    {n ? <RowStatus word={`${n} new lorry limit${n === 1 ? "" : "s"} · check`} tone="warn" />
+       : <RowStatus word="No new limit below this lorry" tone="ok" />}</span>;
 }
 function DivButton({ p, canEdit, busy, onKeep }){
   if(!canEdit) return null;

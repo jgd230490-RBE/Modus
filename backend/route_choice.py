@@ -147,21 +147,35 @@ def _keep_main_rules():
     return {(r["route_id"], r["reason_ref"]): r.get("vehicle_profile") for r in rows}
 
 
-def limits_below(line, profile, leg, lims):
-    """How many stored lorry limits this line runs along (or passes, for a point limit) that are BELOW this lorry
-    (limits.assess verdict "exceeds", the Route sheet's "is over"), each limit once. A limit "except for access" counts:
-    whether this site is one is for a person to check, as the sheet says. Geometry only, no outside call."""
+def _below_keys(line, profile, leg, lims):
+    """The stored lorry limits this line runs along (or passes, for a point limit) that are BELOW this lorry on this leg
+    (limits.assess verdict "exceeds", the Route sheet's "is over"), as a set of (source, ext_id, kind): each limit once.
+    A limit "except for access" counts: whether this site is one is for a person to check, as the sheet says."""
     if not lims or not line:
-        return 0
+        return set()
     import limits
     seen = set()
     for L, _point, _along in limits._matches(line, lims):
         k = (L.get("source"), L.get("ext_id"), L.get("kind"))
-        if k in seen:
-            continue
-        if limits.assess(L, profile, leg)["verdict"] == "exceeds":
+        if k not in seen and limits.assess(L, profile, leg)["verdict"] == "exceeds":
             seen.add(k)
-    return len(seen)
+    return seen
+
+
+def limits_below(line, profile, leg, lims):
+    """How many stored lorry limits below this lorry the line meets (_below_keys). Geometry only, no outside call."""
+    return len(_below_keys(line, profile, leg, lims))
+
+
+def limits_added(line, main_line, profile, leg, lims):
+    """
+    11 Nov 2026 (CLOCS B-F3 chip, John: "Yes, only new limits"): how many limits below this lorry a diversion meets that
+    the route's own MAIN line (alt 0) of the same lorry type and leg does not. The same stored limit (source, ext_id,
+    kind) is matched against each line separately by the one matching rule (limits._matches) and judged for that leg's
+    weight (an empty lorry coming back is lighter); "adds" = on the diversion, not on the main line. A limit both pass is
+    not new: the main route meets it anyway. The picker still uses limits_below (any limit, not only new ones).
+    """
+    return len(_below_keys(line, profile, leg, lims) - _below_keys(main_line, profile, leg, lims))
 
 
 def pick_key(opt, below):
@@ -169,10 +183,11 @@ def pick_key(opt, below):
     The order a dated zone's diversion is picked in, among the stored options that miss every routing zone in force.
     John, 11 Nov 2026 (CLOCS card B-F3, "No limit, then quickest"): REVERSES the user's Q3 answer of 28 Oct ("shortest,
     fewer road miles"). Picked on distance alone, a diversion could come out SHORTER than the main route and run on
-    weight-limited roads (on live R002's diversion was 4.8 mi shorter each way). Now:
+    weight-limited roads (on live R002's diversion, its return leg, was 4.8 mi shorter). Now:
       1. an option with no lorry limit below this lorry (limits_below == 0) before one with any;
       2. then the quickest: the stored duration_hr of that leg, which HERE gave for a lorry of that size setting off at
-         the pinned bake time (here_routing.bake_departure_time: a weekday at 10:00 in the tenant's time zone); an option
+         the pinned bake time (here_routing.bake_departure_time: the next Tuesday at least two days ahead, 10:00 in the
+         tenant's time zone); an option
          with no stored time (0) goes after every timed one;
       3. on a tie, the shorter (distance_km), then the lower alt_index (HERE's own order, then the ways round).
     Where every option has a limit below the lorry, the quickest of them is used and its limits are shown (periods()).
@@ -336,7 +351,8 @@ def preview():
         if not o or not m:
             return {"alt_index": alt, "status": r.get("status")}
         return {"alt_index": alt, "status": r.get("status"), "km_delta": round(o["km"] - m["km"], 3),
-                "hr_delta": round(o["hr"] - m["hr"], 4), "limits_below": limits_below(o["line"], key[1], key[2], lims)}
+                "hr_delta": round(o["hr"] - m["hr"], 4), "limits_below": limits_below(o["line"], key[1], key[2], lims),
+                "limits_new": limits_added(o["line"], m["line"], key[1], key[2], lims)}
 
     out = []
     for i in sorted(set(old) | set(new)):
@@ -603,8 +619,9 @@ def periods(route_id=None):
 def _leg_figures(groups):
     """
     11 Nov 2026 (CLOCS cards B-F3 / B-I2): each in-use leg of a diversion also carries hr_delta (the option's stored
-    time less the main line's, hours) and limits_below (the stored lorry limits below that lorry on the option, as the
-    picker counts them; None where no limits are held at all, so nothing claims a check that was not made). Read only:
+    time less the main line's, hours), limits_below (the stored lorry limits below that lorry on the option, as the
+    picker counts them) and limits_new (those its main line does not meet, limits_added: the Zones list's chip); both
+    None where no limits are held at all, so nothing claims a check that was not made. Read only:
     nothing here writes, so the Zones list shows what live has in use, whichever rule picked it.
     """
     want = {(g["route_id"], l.get("vehicle_profile"), l.get("leg"), int(l.get("alt_index") or 0))
@@ -620,10 +637,10 @@ def _leg_figures(groups):
         fig = {(r["route_id"], r["vehicle_profile"], r["leg"], int(r["alt_index"] or 0)): dict(r) for r in rows}
         if lims:
             for r in db.query("SELECT route_id, vehicle_profile, leg, alt_index, geometry FROM route_geometry "
-                              f"WHERE tenant_id = ? AND alt_index <> 0 AND route_id IN ({','.join('?' * len(rids))})",
+                              f"WHERE tenant_id = ? AND route_id IN ({','.join('?' * len(rids))})",
                               (db.current_tenant(), *rids)):
                 k = (r["route_id"], r["vehicle_profile"], r["leg"], int(r["alt_index"] or 0))
-                if k in want and k in fig:
+                if (k in want or (k[3] == 0 and any(w[:3] == k[:3] for w in want))) and k in fig:
                     fig[k]["geometry"] = r["geometry"]
     except Exception:
         return
@@ -637,8 +654,10 @@ def _leg_figures(groups):
             a, m = fig.get(k), fig.get(k[:3] + (0,))
             if a and m and a.get("duration_hr") and m.get("duration_hr"):
                 l["hr_delta"] = round(float(a["duration_hr"]) - float(m["duration_hr"]), 4)
-            l["limits_below"] = (limits_below(_line_of(a.get("geometry")) if a else None, k[1], k[2], lims)
-                                 if lims else None)
+            al = _line_of(a.get("geometry")) if a else None
+            ml = _line_of(m.get("geometry")) if m else None
+            l["limits_below"] = limits_below(al, k[1], k[2], lims) if lims else None
+            l["limits_new"] = limits_added(al, ml, k[1], k[2], lims) if lims and al and ml else None
 
 
 def keep_main(route_id, zone_id, keep=True, who=None):
