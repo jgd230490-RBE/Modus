@@ -27,7 +27,8 @@ shipped history whichever session runs it. Any other date is accepted ONLY with 
 OPTION --live-export (the same note, §1.9): with --as-of, copies the live demo's baked and fetched tables
 (route_geometry, route_sections, route_area_km, areas, community_*, collision_*) and its carbon_target row from a
 live export file (GET /api/admin/tenant/export) into the output, so a refresh needs no re-bake and no Fetch now.
-It refuses when the live routes, gates or zones differ from the ones written here. Outside the checkout only: the
+It refuses when the live routes, gates or zones differ from the ones written here (a traffic limit keeps live's line,
+M-F1). Outside the checkout only: the
 file holds HERE routes and OpenStreetMap-derived data.
 
 WHAT IT MAKES
@@ -135,6 +136,17 @@ DEMO_NOTICE = "Fictional scheme"   # 15 Oct 2026 (the user): the bar reads DEMO 
 DEMO_CONTACT = {"concern_email": "hello@wayscope.co.uk",
                 "working_hours": "Monday to Friday 07:30-18:00 (fictional scheme)",
                 "other_formats": "email hello@wayscope.co.uk"}
+#: 11 Nov 2026 (card M-F1): the traffic limit drawn on live as Z041 (made last in build(); the line's source is there)
+TRAFFIC_LIMIT_B6047 = {
+    "name": "B6047 Melton Road, Cold Newton turn to Tilton on the Hill",
+    "geometry": {"type": "LineString", "coordinates": [
+        [-0.92079, 52.622928], [-0.919984, 52.625588], [-0.919639, 52.626905], [-0.918539, 52.62966],
+        [-0.918245, 52.630274], [-0.917775, 52.630957], [-0.916563, 52.63305], [-0.916295, 52.63379],
+        [-0.915658, 52.635177], [-0.914677, 52.638279], [-0.914053, 52.639836], [-0.913865, 52.640151],
+        [-0.912784, 52.641113], [-0.912509, 52.641457], [-0.912244, 52.642009], [-0.912056, 52.642187],
+        [-0.911343, 52.642709], [-0.910848, 52.642973], [-0.910043, 52.643244], [-0.90966, 52.643324],
+        [-0.906979, 52.64365], [-0.905694, 52.643839], [-0.90519, 52.643951], [-0.904592, 52.644152]]},
+}
 START_YEAR = 2026
 N_MONTHS = 60                     # Jan 2026 – Dec 2030: month_index = (year − 2026) × 12 + month
 #: 31 Oct 2026 (task 4c PR 6): the drawing the demo's Tilton Viaduct layout is placed from, and what it must place
@@ -1525,6 +1537,19 @@ def build(with_areas=False, out=None):
     # 29 Oct 2026 (task 3c): the holding area's access road, the last zone (see access_road above)
     z = access_road(next(g for g in gates.list_gates() if g["location_id"] == loc["HA"]))
     assert z["id"] == "Z040", z
+    # 11 Nov 2026 (the CLOCS meeting's T1, then card M-F1, John's yes): the traffic limit drawn on live that day, made
+    # LAST so no zone id moves (Z041, as on live). A council's 150 lorry movements a day (in and out counted separately,
+    # the average of working days, public, in force every month) on the B6047 through Tilton on the Hill, which the
+    # approved plan passes in Mar 2027 (147, near) and Apr 2027 (162, over). A traffic limit never moves a route.
+    # The line: the B6047's OpenStreetMap ways from the Cold Newton turn to Tilton on the Hill (one Overpass query, 11 Nov
+    # 2026; OSM data © OpenStreetMap contributors, ODbL), cut where live's line ends, 2 m Douglas-Peucker, 6 places. Live's
+    # own line was taken from a baked route, so it stays off this public repository; the two lie within 4 m of each other
+    # along the whole stretch (a limit counts a route within 25 m), and a --live-export refresh keeps live's line
+    # (copy_live_tables).
+    z = zones.create_zone(TRAFFIC_LIMIT_B6047["name"], TRAFFIC_LIMIT_B6047["geometry"], kind="traffic_limit",
+                          affects_routing=False, limit_value=150, limit_counts="movements", limit_basis="average",
+                          limit_public=True)
+    assert z.get("id") == "Z041", z
 
     # --- D75 (22 Oct 2026, abnormal loads phase 3): three fictional abnormal loads ------------------------------------
     # Each is its own planned movement (D66a), counted apart from the lorries (D70, D71), unrouted in the package: a
@@ -1668,6 +1693,23 @@ def copy_abnormal_drawings(live_rows, new_rows):
     return copied
 
 
+TRAFFIC_LIMIT_KIND = "traffic_limit"
+
+
+def keep_live_traffic_limits(live_rows, new_rows):
+    """11 Nov 2026 (card M-F1): each traffic limit in the new rows takes live's row of the same id whole (live's line,
+    its limit as last saved there, its name and note), so a refresh never redraws a limit drawn or edited on live.
+    Returns the ids kept. copy_live_tables has already refused when the ids, kinds, routing or dates differ."""
+    live_by_id = {r.get("id"): r for r in live_rows or [] if r.get("kind") == TRAFFIC_LIMIT_KIND}
+    kept = []
+    for i, r in enumerate(new_rows or []):
+        lr = live_by_id.get(r.get("id"))
+        if r.get("kind") == TRAFFIC_LIMIT_KIND and lr is not None:
+            new_rows[i] = dict(lr)
+            kept.append(r.get("id"))
+    return kept
+
+
 GATE_SAME_DEG = 1e-5     # about 1.1 m: wider than float4's rounding at UK latitudes, far under a moved gate
 
 
@@ -1679,7 +1721,10 @@ def copy_live_tables(pkg, path):
     lt, nt = live.get("tables") or {}, pkg["tables"]
 
     def sig(rows, cols):
-        return sorted(tuple(_same(r.get(c)) for c in cols) for r in rows or [])
+        # 11 Nov 2026 (card M-F1): a traffic limit's line is not compared (it never moves a route, so no baked table
+        # depends on it); live's row is kept below. Its id, kind, routing and dates still are.
+        return sorted(tuple(None if c == "geometry" and r.get("kind") == TRAFFIC_LIMIT_KIND else _same(r.get(c))
+                            for c in cols) for r in rows or [])
     problems = []
     for t, cols in (("routes", ("id", "origin_id", "dest_id", "material_category")),
                     ("location_gates", ("id", "location_id", "access_zone_id")),
@@ -1706,6 +1751,7 @@ def copy_live_tables(pkg, path):
     nt["clp_review_groups"] = list(lt.get("clp_review_groups") or []) + [
         r for r in nt.get("clp_review_groups") or [] if r.get("id") not in have]
     copy_abnormal_drawings(lt.get("abnormal_loads"), nt.get("abnormal_loads"))
+    keep_live_traffic_limits(lt.get("zones"), nt.get("zones"))
     row = [r for r in lt.get("config") or [] if r.get("key") == "carbon_target"]
     nt["config"] = [r for r in nt["config"] if r.get("key") != "carbon_target"] + row
 
