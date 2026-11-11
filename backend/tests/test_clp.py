@@ -679,6 +679,16 @@ ok("⭐ card 4 PDF: the planned and recorded tonnes come first, with their table
    and _pt.count("Recorded tonnes as typed on Account") == 1
    and "Planned figures from the approved plan, not observed: Wayscope holds no gate log or arrival times." in _pt
    and "avoided" not in _pt[_pt.index("Planned and recorded tonnes"):_pt.index(MP["charts"]["route_caps"]["title"])], _pt[:600])
+# 11 Nov 2026 (D-F8, John: "do it now"): the recorded words are their own line under the scope + limit, in the pack as on
+# the screen (one line ran to 26 words and failed the audit's long-prose rule); the words themselves do not change
+_ptl = [ln.strip() for ln in (_pdf_text(_pdf) or "").splitlines()]
+ok("🔴 D-F8 PDF: the recorded line starts a line of its own; no line runs the limit and the recorded words together",
+   any(ln.startswith("Recorded tonnes as typed on Account, to 11 Oct 2026.") for ln in _ptl)
+   and not any("arrival times." in ln and "Recorded tonnes" in ln for ln in _ptl),
+   str([ln for ln in _ptl if "Recorded tonnes" in ln or "arrival times." in ln][:4]))
+ok("D-F8: each of the two note lines stays within the long-prose rule (25 words): the scope + limit, and the recorded line",
+   len(f"{MP['scope_line']} {MP['limit']}".split()) <= 25 and 0 < len((MP["recorded_line"] or "").split()) <= 25,
+   str((MP["scope_line"], MP["limit"], MP["recorded_line"])))
 _M11P = clp.monitoring(11, acc_planner, factors=conversions.load_factors(), working_days=WD)
 _h11, _r11 = clp_pack.table_of(_M11P["charts"]["recorded_tonnes"], _M11P)
 _p11 = re.sub(r"\s+", " ", _pdf_text(clp_pack.build_pdf(_M11P, generated="11 Nov 2026")) or "")

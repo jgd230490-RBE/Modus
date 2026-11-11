@@ -521,7 +521,10 @@ def build_pdf(M, generated=None):
 
     # 11 Nov 2026 (card 4): the recorded line follows the limit here, not in the page stamp: the stamp is page_frame's one
     # sub-line, and the two sentences together run past the page's width at 8 pt
-    story = [P_(E(" ".join(x for x in (M.get("scope_line"), M.get("limit"), M.get("recorded_line")) if x)), st_g)]
+    # 11 Nov 2026 (D-F8, John: "do it now"): the recorded line is its own paragraph under the first, as on the screen
+    story = [P_(E(" ".join(x for x in (M.get("scope_line"), M.get("limit")) if x)), st_g)]
+    if M.get("recorded_line"):
+        story.append(P_(E(M["recorded_line"]), st_g))
     if M.get("peak_words"):
         story.append(P_(E(M["peak_words"]), st_g))
     story.append(Spacer(1, 3 * mm))
