@@ -1067,8 +1067,15 @@ if (loaded) {
       // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the cards in words, Delivered / Added n t / Waiting
       acctOut.includes("lines delivered last week, within 2 % of plan") && acctOut.includes("can add") && !acctOut.includes("calibrate")
       && acctOut.includes(">Delivered<") && acctOut.includes(">Added ") && acctOut.includes(">Waiting<") && !acctOut.includes(">held<") && !acctOut.includes("applied · "));
-    ok("...the confirmed cost box is rendered next to the actual",
-      acctOut.includes("The confirmed cost of this week"));
+    // NARROWED 11 Nov 2026 (CLOCS card C-F10): the Account opens on Tonnes (no money column); the cost box is the Cost view's
+    const acctCostOut = render("the Account view renders its Cost columns (Show Cost)",
+      h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "account", initialAcctShow: "cost" }));
+    ok("...the confirmed cost box is rendered in the Cost view",
+      acctCostOut.includes("The confirmed cost of this week") && acctCostOut.includes('data-acct-cols="cost"'));
+    ok("C-F10: the Account opens on Tonnes: Show Tonnes · Cost, Tonnes pressed; no money column, no cost box; Actual and Difference shown",
+      acctOut.includes('data-acct-show="tonnes"') && acctOut.includes('data-acct-cols="tonnes"') && acctOut.includes('style="min-width:860px"')
+      && !acctOut.includes("The confirmed cost of this week") && !acctOut.includes(">Planned €<") && !acctOut.includes("Fair € <span")
+      && acctOut.includes('aria-label="Show the account as"') && /aria-pressed="true"[^>]*>Tonnes</.test(acctOut));
     // 13 Oct 2026 (W3, narrowed): the footer's rule is in the Variance header's info box (dom_frontend opens it)
     ok("...and the Variance header carries the not-reported rule's info box",
       // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the column is "Difference"
@@ -1081,13 +1088,13 @@ if (loaded) {
     // (short_flag); an unflagged spread line keeps its button but no wash (checked below)
     spreadFix.account.rows[0] = { ...spreadFix.account.rows[0], action: "spread", remaining_short: 12.5, variance: 12.5, held: false, short_flag: true };
     const spOut = render("UI FIX 6: the Account view renders a short line (action spread)",
-      h(LookAhead, { meta: laMeta, who: "t", initialPage: spreadFix, initialView: "account" }));
+      h(LookAhead, { meta: laMeta, who: "t", initialPage: spreadFix, initialView: "account", initialAcctShow: "cost" }));   // NARROWED 11 Nov 2026 (C-F10)
     const spRow = spOut.slice(spOut.indexOf('<tr class="border-t border-slate-100 align-middle" style="background:rgba(217,119,6,.06)">'));
     ok("⭐ UI FIX 6 card 2: the short line's 'spread on this week' is the standard small button (btn-pri btn-sm), same words and title; the 11 px white one-off is gone",
       spOut.includes('style="background:rgba(217,119,6,.06)"') && spRow.includes('<button class="btn-pri btn-sm disabled:opacity-40" title="Add 12.5 t to this week, divided over its remaining weekdays. Refused if that week is confirmed.">Add to this week</button>')
       && !spOut.includes("rounded-lg text-white") && (spOut.match(/>Add to this week</g) || []).length === 1);   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2)
     ok("⭐ UI FIX 6 cards 1 and 2: the table keeps 1,220 px in its padded scroller under 13 px headings (la-acct-head); the Action heading and every Action cell are pinned (la-pin), the short line's cell painting the row's rose (la-pin-short)",
-      spOut.includes('<div class="overflow-auto la-acct-scroll"><table class="text-sm w-full" style="min-width:1220px"><thead class="la-acct-head">')
+      spOut.includes('<div class="overflow-auto la-acct-scroll"><table class="text-sm w-full" style="min-width:1220px" data-acct-cols="cost"><thead class="la-acct-head">')   // NARROWED 11 Nov 2026 (C-F10)
       && spOut.includes('<th class="px-2 py-2 text-right font-semibold la-pin">Action<button')
       && (spOut.match(/<td class="px-2 py-2 text-right whitespace-nowrap la-pin( la-pin-short)?">/g) || []).length === spreadFix.account.rows.length
       && (spOut.match(/la-pin la-pin-short/g) || []).length === 1 && spRow.includes('<td class="px-2 py-2 text-right whitespace-nowrap la-pin la-pin-short">')
@@ -1141,7 +1148,7 @@ if (loaded) {
         && fOut.includes("€" + Math.round(fuelFix.commit.totals.eur).toLocaleString("en-US")));
       ok("...nothing renders as 'undefined' or 'NaN'", !/undefined|NaN/.test(fOut));
       const fAcct = render("the Account view renders with the fuel fixture",
-        h(LookAhead, { meta: laMeta, who: "t", access: planner, initialPage: fuelFix, initialView: "account" }));
+        h(LookAhead, { meta: laMeta, who: "t", access: planner, initialPage: fuelFix, initialView: "account", initialAcctShow: "cost" }));   // NARROWED 11 Nov 2026 (C-F10)
       const nTarget = fuelFix.account.rows.filter(r => r.rate_source === "target").length;
       ok("...the strip widget sits above the KPI cards with typeable yard and share boxes for a planner",
         // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): a titled Fuel card with two labelled boxes

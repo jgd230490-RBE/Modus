@@ -27,7 +27,7 @@ const html = read("frontend", "index.html");
 const code = html.match(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/)[1];
 const css = html.slice(0, html.indexOf("</style>"));
 const between = (a, b) => { const i = code.indexOf(a), j = code.indexOf(b, i + 1); return i >= 0 && j > i ? code.slice(i, j) : ""; };
-const la = between("function LookAhead({ meta, who, access, initialPage, initialView }){", "\nfunction CommitMap(");
+const la = between("function LookAhead({ meta, who, access, initialPage, initialView", "\nfunction CommitMap(");   // NARROWED 11 Nov 2026 (CLOCS C-F10 added a prop)
 const laGrid = la.slice(la.indexOf('data-rd-table="lookahead"'), la.indexOf("{/* 14 Oct 2026 (bundle G, W17): the committed week at each gate"));
 const acct = la.slice(la.indexOf('view === "account" ?'), la.indexOf("{/* 10 Sep: what came OUT of each stockpile"));
 const gw = between("function GatesWeek({ gw, initialOpen }){", "\n// the status pill column");

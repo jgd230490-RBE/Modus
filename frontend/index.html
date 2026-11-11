@@ -668,6 +668,14 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   /* 9 Nov 2026 (2.1-9b, card 9): a trip a planner can drag or move from its menu — a details whose summary is the block face */
   .lp-trip{position:absolute;top:2px;bottom:2px;min-width:24px;overflow:visible}
   .lp-trip summary.lp-blk{position:static;height:24px;display:block;list-style:none;cursor:grab;border:0;margin:0}
+  /* 11 Nov 2026 (CLOCS card C-F4): .row-menu summary set every trip 32 px wide, centred, in --muted grey: the code read
+     "R02" in dark grey on a dark fill. The block is its trip's full width, its code white; a block too narrow for the
+     whole code shows none (container query on the block), the code stays in its title and its menu. */
+  .lp-trip summary.lp-blk{width:100%;justify-content:flex-start;color:#fff;font-weight:600;padding:0 4px}
+  .lp-blk:not(.is-break){container-type:inline-size}
+  @container (max-width:37px){ .lp-code{visibility:hidden} }
+  /* C-F6: a trip moves by dragging only after "Move trips"; until then a click opens its menu */
+  .lp-trip:not([draggable="true"]) summary.lp-blk{cursor:pointer}
   .lp-trip summary::-webkit-details-marker{display:none}
   .lp-trip[open] summary.lp-blk{box-shadow:inset 0 0 0 2px #fff}
   .lp-trip summary.lp-blk:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
@@ -5496,6 +5504,38 @@ function SupplierOrdersMenu({ bucket, disabled }){
           left.not_confirmed ? `${left.not_confirmed} line${left.not_confirmed === 1 ? "" : "s"} not confirmed yet: ${(left.not_confirmed_places || []).join(", ")}` : null,
           left.own ? `${left.own} line${left.own === 1 ? "" : "s"} from your own site${left.own === 1 ? "" : "s"}: ${(left.own_places || []).join(", ")}` : null].filter(Boolean).join(" · ")}</div>}
         {sups.length > 1 && <button type="button" className="so-all" onClick={() => dl("zip")} disabled={!!busy} data-so-zip="1">{busy === "zip" ? "Making the zip…" : `All ${sups.length} suppliers (zip)`}</button>}
+      </div>
+    </details>
+  );
+}
+// 11 Nov 2026 (CLOCS card C-F4, John's yes): "Day sheet ▾" on the desk Look-ahead — the week's weekdays, today first; each
+// downloads that day's one-page sheet for the gate (the phone's button reads the same address). Nothing is written.
+function DaySheetMenu({ bucket, dates, today, disabled }){
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+  const days = (dates || []).filter(d => d === today).concat((dates || []).filter(d => d !== today));
+  const dl = async (iso) => {
+    setBusy(iso); setErr("");
+    try {
+      const r = await fetch(`${API}/forecast-weeks/day-sheet?bucket=${bucket}&day=${iso}`);
+      if(!r.ok) throw await errFrom(r);
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = `day-sheet-${iso}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ setErr(errSay("The day sheet did not download.", e)); }
+    setBusy("");
+  };
+  return (
+    <details className="row-menu" data-day-sheet-menu="1">
+      <summary className="px-4 py-2 rounded-lg text-sm font-semibold border" aria-disabled={disabled ? "true" : undefined}
+        onClick={e => { if(disabled) e.preventDefault(); }} title="One page of a day for the gate"
+        style={{ width: "auto", height: "auto", borderColor: "var(--line)", color: "var(--ink)", background: "var(--surface)", opacity: disabled ? 0.4 : 1 }}>Day sheet ▾</summary>
+      <div className="row-menu-list" role="group" aria-label="Day sheet">
+        {days.map(d => <button key={d} type="button" onClick={() => dl(d)} disabled={!!busy} data-day-sheet={d}
+          style={d === today ? { fontWeight: 600 } : undefined}>{busy === d ? "…" : `${dayName(d)} ${dayNum(d)}${d === today ? ", today" : ""}`}</button>)}
+        {err && <div className="row-menu-note" role="alert">{err}</div>}
       </div>
     </details>
   );
@@ -11527,7 +11567,20 @@ const LP_DAY_FROM = 6 * 60, LP_DAY_TO = 19 * 60;    // the track: 06:00 to 19:00
 const lpMin = (hm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
 const lpShort = (n) => String(n || "").replace(" (fictional)", "").replace("Rail Freight Terminal", "RFT");
 // destination colours: the chart tokens first (every look and accent), then five more data colours
-const lpPalette = () => [1, 2, 3, 4, 5].map(i => tok(`--chart-${i}`, "#1E3A8A")).concat(["#9D174D", "#0F766E", "#B45309", "#4338CA", "#C2410C"]);
+const lpPalette = () => [1, 2, 3, 4, 5].map(i => tok(`--chart-${i}`, "#1E3A8A")).concat(["#9D174D", "#0F766E", "#B45309", "#4338CA", "#C2410C"]).map(lpDeep);
+// 11 Nov 2026 (CLOCS card C-F4): a fill darkened, hue kept, until white text on it passes 4.5 : 1 (WCAG AA); the chart
+// tokens #E8590C and #0D9488 gave 3.4 and 3.7. Anything but #rrggbb is left as it is.
+function lpLum(h){ const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+function lpDeep(hex){
+  const h = String(hex || "").trim();
+  if(!/^#[0-9a-f]{6}$/i.test(h)) return hex;
+  let rgb = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), out = h;
+  for(let k = 0; k < 40 && 1.05 / (lpLum(out) + 0.05) < 4.5; k++){
+    rgb = rgb.map(v => Math.floor(v * 0.94));
+    out = "#" + rgb.map(v => v.toString(16).padStart(2, "0")).join("");
+  }
+  return out;
+}
 function lpDayWords(iso){ return iso ? `${dayName(iso)} ${dayNum(iso)}` : ""; }
 // 9 Nov 2026 (2.1-9b, card 9): the page's own look at a drop before the server's answer — the same rule as
 // backend/drivers_hours.py (test_lorry_plan pins these six figures to its constants); the server's check is the one that counts.
@@ -11549,8 +11602,8 @@ function LpTrip({ b, r, yard, style, colour, label, dnd }){
   const items = dnd.targets(trip);
   return (
     <details className={"row-menu lp-trip" + (dnd.drag && dnd.drag.lk === trip.lk && dnd.drag.lorry === trip.lorry && dnd.drag.day === trip.day ? " is-dragging" : "")} ref={ref} style={style}
-      draggable="true" onDragStart={e => dnd.start(e, trip)} onDragEnd={dnd.end} data-lp-trip={b.line_key}>
-      <summary className="lp-blk" aria-label={`${label}: move…`} title={`${label} — drag to another lorry, or open for the choices`} style={{ background: colour(b.dest_name) }}>{b.route_id}</summary>
+      draggable={dnd.dragOn ? "true" : "false"} onDragStart={e => { if(!dnd.dragOn){ e.preventDefault(); return; } dnd.start(e, trip); }} onDragEnd={dnd.end} data-lp-trip={b.line_key}>
+      <summary className="lp-blk" aria-label={`${label}: move…`} title={dnd.dragOn ? `${label} — drag to another lorry, or open for the choices` : `${label} — open for the choices`} style={{ background: colour(b.dest_name) }}><span className="lp-code">{b.route_id}</span></summary>
       <div className="row-menu-list" onClick={pick} role="group" aria-label={`Move ${label}`}>
         <div className="lp-menu-h">{label}</div>
         {items.map((it, i) => <button key={i} type="button" className={it.ok ? "" : "is-no"} disabled={!it.ok && it.hard} onClick={() => dnd.go(trip, it.to)} title={it.ok ? "" : it.words}>{it.label}{it.ok ? "" : ` · ${it.words}`}</button>)}
@@ -11577,7 +11630,7 @@ function LorryPlanRow({ r, yard, colour, dnd }){
           const style = { left: `${left}%`, width: `${Math.min(width, 100 - left)}%` };
           if(can && b.kind === "trip") return <LpTrip key={i} b={b} r={r} yard={yard} style={style} colour={colour} dnd={dnd} label={`${b.start} ${b.route_id} → ${lpShort(b.dest_name)}, lorry ${r.n}`} />;
           return <div key={i} className={"lp-blk" + (b.kind === "break" ? " is-break" : "")} aria-hidden="true"
-            style={{ ...style, background: b.kind === "break" ? undefined : colour(b.dest_name) }}>{b.kind === "break" ? "break" : b.route_id}</div>;
+            style={{ ...style, background: b.kind === "break" ? undefined : colour(b.dest_name) }}>{b.kind === "break" ? "break" : <span className="lp-code">{b.route_id}</span>}</div>;
         })}
       </div>
       <div className="lp-free" data-lp-free={r.free_minutes}>{r.free_words}</div>
@@ -11585,7 +11638,7 @@ function LorryPlanRow({ r, yard, colour, dnd }){
     </div>
   );
 }
-function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
+function LorryPlan({ bucket, tick, access, onData, weekConfirmed, today }){
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [open, setOpen] = useState(false);
@@ -11599,6 +11652,9 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
   const [drag, setDrag] = useState(null);
   const [over, setOver] = useState(null);
   const [refused, setRefused] = useState(null);
+  // 11 Nov 2026 (CLOCS card C-F6, John's yes): trips are dragged only after "Move trips" (a stray drag on a shared screen
+  // wrote); each trip's menu still moves it from the keyboard
+  const [moving, setMoving] = useState(false);
   const canApply = !!(access && (access.role === "planner" || access.role === "admin"));
   const canMove = canApply;
   useEffect(() => {
@@ -11611,7 +11667,10 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
   useEffect(() => { if(!refused) return; const t = setTimeout(() => setRefused(null), 5000); return () => clearTimeout(t); }, [refused]);
   if(!data && !err) return null;
   const days = (data && data.days) || [];
-  const shown = (day && days.includes(day)) ? day : (days.includes(data && data.today) ? data.today : days[0]);
+  // 11 Nov 2026 (CLOCS card C-F7): open on TODAY when it is in the week shown — the read carries no today, so it always
+  // opened on the Monday; the Look-ahead's own today is passed in (next week still opens on its Monday)
+  const todayIso = today || (data && data.today) || null;
+  const shown = (day && days.includes(day)) ? day : (days.includes(todayIso) ? todayIso : days[0]);
   const v = data ? data[view] : null;
   const blocks = (view !== "booked" && v && v.days && v.days[shown]) || [];
   const shiftMin = (data && data.shift_minutes) || ((data && data.shift_hours) || 10) * 60;
@@ -11634,7 +11693,7 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
     setBusy("");
   };
   const dnd = {
-    can: canMove && !busy, drag, over, refused,
+    can: canMove && !busy, dragOn: canMove && moving && !busy, drag, over, refused,
     start: (e, trip) => { try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", trip.route); } catch(_){} setDrag(trip); },
     end: () => { setDrag(null); setOver(null); },
     hover: (e, row, target) => {
@@ -11741,11 +11800,12 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
               {days.map(d => (
                 <button key={d} type="button" aria-pressed={d === shown ? "true" : "false"} onClick={() => setDay(d)} className={"px-2.5 py-1.5 font-semibold" + (over && over.dayChip === d ? " lp-day-over" : "")}
                   onDragOver={canMove ? (e => dnd.hoverDay(e, d)) : undefined} onDragLeave={canMove ? dnd.leave : undefined} onDrop={canMove ? (e => dnd.dropDay(e, d)) : undefined}
-                  style={d === shown ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}>{lpDayWords(d)}</button>
+                  style={d === shown ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }} data-lp-today={d === todayIso ? "1" : undefined}>{lpDayWords(d)}{d === todayIso ? ", today" : ""}</button>
               ))}
             </span>
             {view !== "booked" && <span className="ml-auto flex items-center gap-2">
               {canMove && arrangedHere && <button type="button" className="btn-sec" onClick={resetPlan} disabled={!!busy} data-lp-reset="1" title="Forget your moves in this view and show Wayscope's plan">{busy === "reset" ? "Resetting…" : "Reset to Wayscope's plan"}</button>}
+              {canMove && blocks.length > 0 && <button type="button" className="btn-sec" aria-pressed={moving ? "true" : "false"} onClick={() => setMoving(m => !m)} data-lp-move-toggle="1">{moving ? "Done" : "Move trips"}</button>}
               <button type="button" className="btn-sec" onClick={() => download("pdf")} disabled={!!busy || !blocks.length} data-lp-sheets="1">{busy === "pdf" ? "Preparing…" : "Driver sheets (PDF)"}</button>
               <button type="button" className="btn-sec" onClick={() => download("xlsx")} disabled={!!busy || !blocks.length}>XLSX</button>
               {view === "compressed" && canApply && <button type="button" className="btn-pri" onClick={apply} data-lp-apply="1"
@@ -11771,7 +11831,7 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
                   {y.lorries.map(r => <LorryPlanRow key={r.n} r={r} yard={y} colour={colour} dnd={dnd} />)}
                 </div>
               ))}
-              {canMove && blocks.length > 0 && <div className="clp-note" data-lp-drag-hint="1">Drag a trip to another lorry of its yard{view === "compressed" ? ", or to a day above" : ""}; a drop that would pass the driver's day is refused. Each trip's menu does the same from the keyboard.</div>}
+              {canMove && moving && blocks.length > 0 && <div className="clp-note" data-lp-drag-hint="1">Drag a trip to another lorry of its yard{view === "compressed" ? ", or to a day above" : ""}; a drop that would pass the driver's day is refused. Each trip's menu does the same from the keyboard.</div>}
               <div className="lp-axis" aria-hidden="true"><span></span><div className="lp-ticks">{Array.from({ length: (LP_DAY_TO - LP_DAY_FROM) / 60 + 1 }, (_, i) => <span key={i} style={{ left: `${i * 60 / (LP_DAY_TO - LP_DAY_FROM) * 100}%` }}>{String(LP_DAY_FROM / 60 + i).padStart(2, "0")}:00</span>)}</div><span></span></div>
               <div className="lp-key" data-lp-key="1">{Object.entries(dests).map(([d, c]) => <span key={d}><i style={{ background: c }}></i>{lpShort(d)}</span>)}<span><i style={{ background: "repeating-linear-gradient(135deg,#CBD5E1 0 4px,#E2E8F0 4px 8px)" }}></i>required break</span><span><i style={{ background: "var(--soft,#F1F5F9)", border: "1px solid #CBD5E1" }}></i>free</span></div>
               {view === "compressed" && (
@@ -12213,7 +12273,7 @@ function laEnds(meta){
   ((meta && meta.routes) || []).forEach(r => { if(r && r.route_id && r.origin && r.dest) m[r.route_id] = `${r.origin} → ${r.dest}`; });
   return m;
 }
-function LookAhead({ meta, who, access, initialPage, initialView }){
+function LookAhead({ meta, who, access, initialPage, initialView, initialAcctShow }){
   const { months } = meta;
   const [view, setView] = useState(() => { if(initialView) return initialView; try { return localStorage.getItem("modus_la_view") || "commit"; } catch(e){ return "commit"; } });
   const [bucket, setBucket] = useState("commit");        // 'commit' = the week containing today · 'next' = the Thursday process
@@ -12225,6 +12285,10 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   const [draft, setDraft] = useState({});                // key -> unsaved input
   const [laOpen, laToggle] = useRowOpen("lookahead");    // 13 Oct 2026 (W6): line key -> details open, for the session
   const [unitSel, setUnitSel] = useUnits("lookahead");     // the grid's Loads | Tonnes | Lorries
+  // 11 Nov 2026 (CLOCS card C-F10, John's yes): the Account opens on tonnes; its four money columns behind "Show Tonnes · Cost"
+  const [acctShow, setAcctShowRaw] = useState(() => { if(initialAcctShow) return initialAcctShow; try { return localStorage.getItem("modus_la_acct_show") === "cost" ? "cost" : "tonnes"; } catch(e){ return "tonnes"; } });
+  const setAcctShow = (v) => { setAcctShowRaw(v); try { localStorage.setItem("modus_la_acct_show", v); } catch(e){} };
+  const acctCost = acctShow === "cost";
   const [railOpen, setRailOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);   // the whole-week flag dialog
   const [flags, setFlags] = useState({ weather: "", wetness: "", traffic: "", other: "" });
@@ -12415,6 +12479,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               className="px-3 py-2 rounded-lg text-sm font-semibold border disabled:opacity-40"
               title="The one-page commitment sheet, grouped by origin"
               style={{ borderColor: "var(--line)", color: "var(--muted)", background: "var(--surface)" }}>PDF</button>
+            <DaySheetMenu bucket={bucket} dates={dates} today={today} disabled={!!busy || !lines.length} />
             <SupplierOrdersMenu bucket={bucket} disabled={!anyConfirmed} />
             {allConfirmed ? (
               <button onClick={doReopen} disabled={!!busy}
@@ -12659,7 +12724,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
           {/* 14 Oct 2026 (bundle G, W17): the committed week at each gate, against what it can check in */}
           {lines.length > 0 && <GatesWeek gw={page && page.gates_week} />}
           {/* 8 Nov 2026 (v2.1 task 2.1-9): each lorry's day used to the full */}
-          {lines.length > 0 && !initialPage && <LorryPlan bucket={bucket} tick={tick} access={access} onData={setLorryPlan} weekConfirmed={allConfirmed} />}
+          {lines.length > 0 && !initialPage && <LorryPlan bucket={bucket} tick={tick} access={access} onData={setLorryPlan} weekConfirmed={allConfirmed} today={today} />}
           {page && page.abnormal && page.abnormal.count > 0 && <AbnormalWeek ab={page.abnormal} />}
           {/* 10 Sep: this week's movements on a map, in place of the stock card (now on
               the Dashboard). Drawn from the baked geometry of the lines on this page;
@@ -12680,22 +12745,29 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
           {!account.week || account.rows.length === 0 ? (
             <EmptyState title="No approved line in last week." body="The Account view types what actually moved against last week's plan. There is nothing to account for yet." />
           ) : (
+            <>
+            <div className="unit-sw mb-2" data-acct-show={acctShow}>
+              <span>Show</span>
+              <span className="unit-sw-seg" role="group" aria-label="Show the account as">
+                {[["tonnes", "Tonnes"], ["cost", "Cost"]].map(([k, l]) => <button key={k} type="button" aria-pressed={acctShow === k ? "true" : "false"} onClick={() => setAcctShow(k)}>{l}</button>)}
+              </span>
+            </div>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               {/* 22 Oct 2026 (UI fix 6, cards 1 and 2): the table keeps its 1,220 px; the Action column is pinned right (.la-pin),
                   the scroller pads its right edge so Tab brings the Note box out from under the pin (.la-acct-scroll), and the
                   headings take the .tbl th look (.la-acct-head). */}
               <div className="overflow-auto la-acct-scroll">
-                <table className="text-sm w-full" style={{ minWidth: 1220 }}>
+                <table className="text-sm w-full" style={{ minWidth: acctCost ? 1220 : 860 }} data-acct-cols={acctShow}>
                   <thead className="la-acct-head">
                     <tr>
                       <th className="px-3 py-2 text-left font-semibold">Line</th>
                       <th className="px-2 py-2 text-right font-semibold">Planned</th>
-                      <th className="px-2 py-2 text-right font-semibold">Actual</th>
-                      <th className="px-2 py-2 text-right font-semibold">Difference<InfoTip id="la.variance" /></th>
-                      <th className="px-2 py-2 text-right font-semibold">Planned {CUR()}<InfoTip id="la.cost_quote" value={account.eur_target_lines ? `${account.eur_target_lines} line${account.eur_target_lines === 1 ? "" : "s"} at the target rate.` : ""} /></th>
+                      {!acctCost && <th className="px-2 py-2 text-right font-semibold">Actual</th>}
+                      {!acctCost && <th className="px-2 py-2 text-right font-semibold">Difference<InfoTip id="la.variance" /></th>}
+                      {acctCost && <><th className="px-2 py-2 text-right font-semibold">Planned {CUR()}<InfoTip id="la.cost_quote" value={account.eur_target_lines ? `${account.eur_target_lines} line${account.eur_target_lines === 1 ? "" : "s"} at the target rate.` : ""} /></th>
                       <th className="px-2 py-2 text-right font-semibold">Fair {CUR()} <span className="normal-case tracking-normal text-slate-400">(model)</span><InfoTip id="la.cost_fair" /></th>
                       <th className="px-2 py-2 text-right font-semibold">Actual {CUR()}<InfoTip id="la.cost_actual" /></th>
-                      <th className="px-2 py-2 text-right font-semibold">{CUR()} var</th>
+                      <th className="px-2 py-2 text-right font-semibold">{CUR()} var</th></>}
                       <th className="px-2 py-2 text-left font-semibold">Note</th>
                       <th className="px-2 py-2 text-right font-semibold la-pin">Action<InfoTip id="la.spread" /></th>
                     </tr>
@@ -12710,24 +12782,24 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                             <div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={r.route_id}>{ends[r.route_id] || r.route_id}</div>
                             <div className="text-[13px] text-slate-500 flex flex-wrap items-center gap-1">
                               {ends[r.route_id] && <span>{r.route_id}</span>}<IptPill ipt={r.ipt} /><WsPill ws={r.section_id} />
-                              <span>{r.material_type || "—"} · <span title={vehLabel(r.vehicle_type)}>{vehShort(r.vehicle_type) || "—"}</span> · {r.status}</span>
+                              <span>{r.material_type || "—"} · {vehLabel(r.vehicle_type) || "—"} · {r.status}</span>
                             </div>
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums font-semibold whitespace-nowrap">{grp(r.planned_qty, 1)} {unitLbl(r.unit)}</td>
-                          <td className="px-2 py-2 text-right">
+                          {!acctCost && <td className="px-2 py-2 text-right">
                             <input className={fld + " max-w-[110px] ml-auto"} inputMode="decimal" placeholder="—"
                               style={short ? { borderColor: "var(--gold)" } : {}}
                               value={draft[k + "|a"] ?? (r.actual_qty ?? "")}
                               onChange={e => setDraft(d => ({ ...d, [k + "|a"]: e.target.value }))}
                               onBlur={() => saveActual(r)} />
-                          </td>
+                          </td>}
                           {/* 10 Nov 2026 (UI critique finding 5): the difference in words ("45.0 t short", "40.0 t over"); amber only
                               past the organisation's share (short_flag), grey otherwise; over is never green */}
-                          <td className="px-2 py-2 text-right tabular-nums font-medium whitespace-nowrap" data-la-var={r.variance == null ? "none" : r.short_flag ? "short" : "quiet"}
+                          {!acctCost && <td className="px-2 py-2 text-right tabular-nums font-medium whitespace-nowrap" data-la-var={r.variance == null ? "none" : r.short_flag ? "short" : "quiet"}
                             style={{ color: r.short_flag ? "var(--warn-text)" : "var(--muted)" }}>
                             {r.variance == null ? "—" : Math.abs(r.variance) < 1e-9 ? "on plan" : `${grp(Math.abs(r.variance), 1)} ${unitLbl(r.unit)} ${r.variance > 0 ? "short" : "over"}`}
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums text-slate-600">
+                          </td>}
+                          {acctCost && <><td className="px-2 py-2 text-right tabular-nums text-slate-600">
                             {r.planned_eur == null ? <span className="text-slate-500">rate not set</span> : <>
                               <div>{CUR()}{grp(r.planned_eur)}{r.rate_source === "target" && <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full text-slate-600 bg-slate-100" title="No rate on this route — priced at the target rate from Config">target</span>}</div>
                               {r.planned_units && r.planned_units.per_t != null && <div className="text-xs text-slate-400 whitespace-nowrap">{unitTriple(r.planned_units)}</div>}
@@ -12749,7 +12821,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                           <td className="px-2 py-2 text-right tabular-nums font-medium"
                             style={{ color: r.eur_variance == null ? "var(--muted)" : r.eur_variance < 0 ? "var(--bad-text)" : "var(--ok-text)" }}>
                             {r.eur_variance == null ? "—" : (r.eur_variance > 0 ? "+" : "") + grp(r.eur_variance)}
-                          </td>
+                          </td></>}
                           <td className="px-2 py-2">
                             <input className={fld + " text-left"} placeholder="not typed"
                               value={draft[k + "|n"] ?? (r.actual_note ?? "")}
@@ -12779,6 +12851,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                 {busy && <span className="text-slate-500">saving…</span>}
               </div>
             </div>
+            </>
           )}
           {/* 10 Sep: what came OUT of each stockpile in the account week — one box per stockpile. Over capacity is a
               flag, never a block. 27 Oct 2026 (stockpile forecast): a stockpile with a capacity or a planned use shows what was
