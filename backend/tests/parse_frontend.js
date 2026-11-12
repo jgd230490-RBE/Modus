@@ -2437,7 +2437,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // NARROWED 16 Oct 2026 (S7: the render harness's prop initialSim joins the signature)
     // RE-PINNED 29 Oct 2026 (the Simulation's own page): initialSim leaves the Dashboard; SimulationPage takes `initial`
     // NARROWED 5 Nov 2026 (group 6, PR 2): + canApprove
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone, canApprove })")
+    // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + initialQueue
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, onWall, onOpen, phone, canApprove })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
@@ -2538,7 +2539,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const ctSrc = src.slice(g1, src.indexOf("function Dashboard("));
   const gaIdsStripped = gac.replace(/key=\{g\.gate_id\}|data-ga-gate=\{g\.gate_id\}|key=\{r\.g\.gate_id\}|data-ga-li=\{r\.g\.gate_id\}/g, "");
   ok("⭐ GATE ARRIVALS: one block before the carbon target's, holding the panel and its word helpers",
-    gaSrc.length > 1500 && gac.includes("function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOpen })")
+    gaSrc.length > 1500 && gac.includes("function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOpen, queue, sites })")   /* NARROWED 11 Nov 2026 (CLOCS idea C-I1) */
     && gac.includes("const gaMonthToday = (months) => {") && gac.includes("const gaFlagWord = (g) =>")
     && ctSrc.startsWith("// ---- 11 Oct 2026: the carbon target") && !ctSrc.includes("GateArrivalsPanel"));
   // NARROWED 11 Oct 2026 (review): the read is also skipped on the big screen, where the panel is not rendered
@@ -2551,7 +2552,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 14 Oct 2026 (the user took the recommendation): the panel moved from under the carbon strip to under the
   // four charts, so the charts are on the first screen at 1920 x 1080; still before the first collapsed section
   ok("⭐ the panel sits under the four key charts and before the first collapsed section; the six cards, five sections, eight charts are untouched",
-    _dbW.includes("<GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} onOpen={canApprove ? onOpen : null} />")
+    // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + the months with a queue and the sites picked
+    _dbW.includes("<GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<ChartCanvas config={costCfg} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf('<div className="dash-charts" data-dash-charts="1">')
@@ -2560,7 +2562,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && (_dbW.match(/<ChartCanvas config=/g) || []).length === 8 && (_dbW.match(/onToggle=\{onMore\}/g) || []).length === 0);
   ok("the hooks sit before the early returns (React #310)",
     _dbc.indexOf("const [ga, setGa]") > 0 && _dbc.indexOf("const [ga, setGa]") < _dbc.indexOf("if(err) return")
-    && _dbc.indexOf("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));") < _dbc.indexOf("if(err) return")
+    && _dbc.indexOf("const [gaMonth, setGaMonthRaw] = useState(() => (initialGates && initialGates.month) || keptMonth(\"ga\") || gaMonthToday(months));") < _dbc.indexOf("if(err) return")
     && _dbc.indexOf("fetch(`${API}/gates/arrivals") < _dbc.indexOf("if(err) return"));
   ok("🔴 the words: 'if arrivals are spread evenly', 'Queue likely', 'Spacing holds', 'No check-in time typed', 'coming to load', lorries not trucks; none of the banned words; no small, uppercase or colour-only text",
     gac.includes('const GA_SPREAD = "if arrivals are spread evenly";') && gac.includes('"Queue likely"') && gac.includes('"Spacing holds"')
@@ -3557,7 +3559,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const clpc = _cs > 0 && _ce > _cs ? src.slice(_cs, _ce) : "";
   ok("CLP: one block before BulletinMenu holds the section, its cards and its five chart builders",
      clpc.length > 4000 && ["function ClpCard(", "function clpBulletCfg(", "function clpShareCfg(", "function clpCouncilCfg(", "function clpCarbonCfg(",
-       "function clpTripsCfg(", "function ClpUncapped(", "function ClpMonitoring({ months, initial })"].every(f => clpc.includes(f)));
+       "function clpTripsCfg(", "function ClpUncapped(", "function ClpMonitoring({ months, initial })"].every(f => clpc.includes(f)));   // the D-F6 CLP_FOLD memory sits just above ClpMonitoring
   ok("⭐ CLP: read on FIRST OPEN only: the effect waits for open, GETs /api/clp/monitoring?month=N, keyed on open and the month",
      clpc.includes("if(!open) return;") && clpc.includes("fetch(`${API}/clp/monitoring?month=${month}`)") && clpc.includes("}, [open, month]);")
      // NARROWED 14 Oct 2026 (W10, the same session): a second fetch, the CLP pack, on a button press only
@@ -4004,8 +4006,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      src.includes(">Whole programme</button>") && src.includes(">This month ± 6</button>")
      && src.indexOf(">Whole programme</button>") > src.indexOf('aria-label="To month"')
      && src.lastIndexOf("{!wall && <>", src.indexOf(">Whole programme</button>")) > src.lastIndexOf("</>}", src.indexOf(">Whole programme</button>")));
+  // NARROWED 11 Nov 2026 (CLOCS card C-F3): today's month unless a month picked today is kept (keptMonth); the range is untouched
   ok("🔴 D114: only the Dashboard's range changed — the Gate arrivals and Simulation months still start at today's month",
-     src.includes("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));"));
+     src.includes("const [gaMonth, setGaMonthRaw] = useState(() => (initialGates && initialGates.month) || keptMonth(\"ga\") || gaMonthToday(months));"));
   // 17 Oct 2026 (D114 fix): seen on live — the Dashboard opened on Jan 26 – Dec 30 because its first read of the lines
   // widened From / To to every month with lines, after the ± 6 default had been set
   ok("🔴 D114 fix: the Dashboard's first read no longer widens From / To to every month with lines; it keeps this month ± 6 "
@@ -4152,8 +4155,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && (code.match(/<label key=\{cat\} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">/g) || []).length === 3
      && code.includes('<label key={v} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">')
      && !code.includes('className="flex items-center gap-2 text-xs text-slate-700">') && !code.includes('className="flex items-center gap-1 text-[13px] text-slate-600 whitespace-nowrap">'));
-  ok("#29: the Routes table's Route button (the one that spends HERE calls) is the row's one visible small button; Edit and Delete are in its \"⋯\" (NARROWED 27 Oct 2026, the final UI pass)",
-     code.includes('className="btn-sec btn-sm mr-1">') && code.includes("<span onClick={e => e.stopPropagation()}><RowMenu name={r.id}>")
+  ok("#29: the Routes table's Route (the one that spends HERE calls) is in the row's \"⋯\" with Edit and Delete, and asks first (REVERSED 11 Nov 2026, CLOCS card B-F6; it was the row's one visible small button, 27 Oct)",
+     !code.includes('className="btn-sec btn-sm mr-1">') && code.includes("<span onClick={e => e.stopPropagation()}><RowMenu name={r.id}>")
+     && code.includes("onClick={() => routeAgainAsk(r)}>{Object.keys(r.profiles || {}).length ? \"Route again\" : \"Route\"}</button>")
+     && code.includes("if(!confirm(had ? `Route ${r.id} again? Its lines are replaced.` : `Route ${r.id}?`)) return;")
      && !code.includes('hover:underline text-xs font-semibold mr-3">Edit</button>'));
   ok("no visible word changed in the app for this branch: the pill still says Guide, the eye Show / Hide password, the links their two sentences",
      code.includes('<button type="button" className="demo-bar-guide" onClick={onGuide} title="Replay the guide for this page">Guide</button>')
@@ -4206,8 +4211,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const _hz = _laBody.slice(_laBody.indexOf("const roleLbl"), _laBody.indexOf("{confirming &&"));
   // card 1 (decision 11): the Action column pinned right; the table keeps its 1,220 px
   ok("UI FIX 6 card 1: the Account table keeps its 1,220 px inside a scroller that pads its right edge 176 px (Tab brings the Note box out from under the pin)",
-     _acct.includes('<div className="overflow-auto la-acct-scroll">\n                <table className="text-sm w-full" style={{ minWidth: 1220 }}>')
-     && /\n  \.la-acct-scroll\{scroll-padding-right:176px;\}\n/.test(html) && (_laBody.match(/minWidth: 1220/g) || []).length === 1);
+     // NARROWED 11 Nov 2026 (CLOCS card C-F10): 1,220 px with the Cost columns shown; the Tonnes view (the default) is 860
+     _acct.includes('<div className="overflow-auto la-acct-scroll">\n                <table className="text-sm w-full" style={{ minWidth: acctCost ? 1220 : 860 }} data-acct-cols={acctShow}>')
+     && /\n  \.la-acct-scroll\{scroll-padding-right:176px;\}\n/.test(html) && (_laBody.match(/minWidth: (acctCost \? )?1220/g) || []).length === 1);
   ok("⭐ UI FIX 6 card 1: the Action heading and cell are pinned to the right (sticky, opaque, above the cells), with the app's hairline and a soft shadow",
      /\n  \.la-pin\{position:sticky;right:0;z-index:2;background:var\(--surface\);box-shadow:-1px 0 0 var\(--line\),-8px 0 10px -8px rgba\(15,23,42,\.28\);\}\n/.test(html)
      && /\n  \.la-acct-head th\.la-pin\{background:var\(--surface-2\);z-index:3;\}\n/.test(html)
@@ -4232,9 +4238,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && ["la.variance", "la.cost_quote", "la.cost_fair", "la.cost_actual", "la.spread"].every(id => _acct.includes(`<InfoTip id="${id}"`)));
   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the same button, its words "Add to this week" and its title in the line's unit
   ok("⭐ UI FIX 6 card 2: 'spread on this week' is the app's standard small button (btn-pri btn-sm: 13 px on the accent), same words, same click, same title, same disabled rule; the 11 px white-on-navy one-off is gone",
-     _acct.includes('<button onClick={() => doSpread(r)} disabled={!!busy}\n                                className="btn-pri btn-sm disabled:opacity-40"\n                                title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to this week, divided over its remaining weekdays. Refused if that week is confirmed.`}>Add to this week</button>')
+     _acct.includes('<button onClick={() => doSpread(r)} disabled={!!busy}\n                                className="btn-sec btn-sm disabled:opacity-40"\n                                title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to this week, divided over its remaining weekdays. Refused if that week is confirmed.`}>Add to this week</button>')
      && !_laBody.includes("text-[11px] font-semibold px-2.5 py-1.5 rounded-lg text-white") && !/background: "var\(--navy\)" \}\}>spread on this week/.test(_laBody)
-     && /\.btn-pri\{[^}]*background:var\(--action\);color:var\(--action-fg\);/.test(html) && /\.btn-sm\{padding:4px 10px;font-size:13px;\}/.test(html));
+     && /\.btn-pri\{[^}]*background:var\(--action\);color:var\(--action-fg\);/.test(html) && /\.btn-sm\{padding:4px 10px;font-size:13px;\}/.test(html));   // REVERSED 11 Nov 2026 (D-F4, John's yes): btn-sec btn-sm, an outline button, not on the accent
   // card 3 (finding #11 + the user's yes to finding #37)
   ok("⭐ UI FIX 6 card 3: the Horizon's month line, role words, 'month is now …' note and outcome lines are 12 px (text-xs); no 9 or 10 px text is left in the Horizon",
      _hz.includes('Line<InfoTip id="la.horizon" /><div className="text-xs font-normal text-slate-400">{monthLabelAbs(horizon.from_month, months.start_year)}')
@@ -4793,7 +4799,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const card = a < 0 ? "" : code.slice(a, b);
   ok("⭐ SITE LAYOUT: a card under Site areas for a saved location, with the page's ONE map and the three refs",
      // NARROWED 31 Oct 2026 (PR 2): the card also gets `drawing` and `onDraw` (planners and admins only)
-     card.length > 3000 && src.includes('{form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef}\n')
+     // NARROWED 12 Nov 2026 (CLOCS card C-X1): + frameRef (a site's row click frames its layout)
+     card.length > 3000 && src.includes('{form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef} frameRef={layoutFrameRef}\n')
      // NARROWED 8 Nov 2026 (task 2.1-12): + onZones (the Zones list read again after a works area is saved)
      && src.includes('drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: form.id, phaseId: pid }) : null}\n                  onZones={() => reloadZones().catch(e => console.warn("Wayscope:", e))} />}')
      && src.lastIndexOf("<SiteLayoutCard ") > src.indexOf('data-site-areas="1"') && card.includes('data-site-layout="1"'));
@@ -4842,7 +4849,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // 31 Oct 2026 (task 4c PR 4, the approved mockup notes\site-layout-public-mockup-1031\): "Show on the public map"
   ok("⭐ SITE LAYOUT: one 'Show on the public map' tick (planners / admins; with the layout's version), shown when the layout has a phase",
      card.includes('data-site-layout-public="1"') && card.includes("Show on the public map")
-     && card.includes("disabled={!canLayout || busy !== \"\"} onChange={e => setPublic(e.target.checked)}")
+     // NARROWED 11 Nov 2026 (CLOCS card C-F6): ticking asks first (askPub); unticking writes at once
+     && card.includes("disabled={!canLayout || busy !== \"\"} onChange={e => { if(e.target.checked) setAskPub(true); else if(askPub) setAskPub(false); else setPublic(false); }}")
      && card.includes("/site-layout`,") && card.includes("JSON.stringify({ public: !!on, version: lay.version })")
      && card.includes("{lay && phases.length > 0 && !imp && !edit && ("));
   ok("SITE LAYOUT: the tick's one line says what the public sees (from close in, no security / CCTV) and names no back end",
@@ -5265,7 +5273,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("CONCERNS DASH: shown only to planners and admins, never on the big screen or a phone; the App passes canApprove",
      code.includes("{canApprove && !wall && !phone && <ConcernsDash months={months} lo={D.lo} hi={D.hi} sites={sites}")
      && code.includes('<Dashboard meta={meta} phone={narrow} canApprove={canApprove}')
-     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone, canApprove }){"));
+     // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + initialQueue (the render harness's months with a queue)
+     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, onWall, onOpen, phone, canApprove }){"));
   ok("CONCERNS DASH: the five figures, the monthly chart with a title and scope (Copy / Download), by kind, busiest routes",
      ['label="received"', 'label="open now"', 'label="working days to first reply (median)"', 'label="working days to close (median)"',
       "replied within ${data.reply_days} working days"].every(w => cd.includes(w))
@@ -5408,7 +5417,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && lpc.includes("if(onData) onData(j);") && code.includes("onData={setLorryPlan} weekConfirmed={allConfirmed}"));
   ok("⭐ 2.1-9 (Q1, Q11): three views, Chained by yard the default; the weekday chips are the week's own days from the server",
      lpc.includes('const [view, setView] = useState("chained");') && lpc.includes('["booked", "chained", "compressed"].map(k =>')
-     && lpc.includes("const shown = (day && days.includes(day)) ? day : (days.includes(data && data.today) ? data.today : days[0]);"));
+     // NARROWED 11 Nov 2026 (CLOCS card C-F7): today is the Look-ahead's own (the read carries none), then the read's, then Monday
+     && lpc.includes("const todayIso = today || (data && data.today) || null;")
+     && lpc.includes("const shown = (day && days.includes(day)) ? day : (days.includes(todayIso) ? todayIso : days[0]);"));
   // NARROWED 9 Nov 2026 (2.1-9b): the track is role=img with the words for a reader of the plan; for a planner, whose trips are
   // controls (card 9), it is a named group — the same words either way
   ok("⭐ 2.1-9 (card 1): one row a lorry, trips as blocks across 06:00–19:00 by their start and minutes, the break hatched, a role=img (a group for a planner) with the words",
@@ -5443,7 +5454,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // ---- 9 Nov 2026 (v2.1 task 2.1-9b, mockup card 9 + Q14; John: "Yes, build it"): drag and drop between lorries ----
   const trip = code.slice(code.indexOf("function LpTrip({"), code.indexOf("function LorryPlanRow({"));
   ok("⭐ 2.1-9b (card 9): for a planner a trip is a draggable details whose summary is the block, named for a screen reader, with a menu of the other lorries (and, compressed, the days)",
-     trip.includes('draggable="true" onDragStart={e => dnd.start(e, trip)} onDragEnd={dnd.end} data-lp-trip={b.line_key}')
+     // NARROWED 11 Nov 2026 (CLOCS card C-F6): draggable only after "Move trips" (dnd.dragOn); the menu is there either way
+     trip.includes('draggable={dnd.dragOn ? "true" : "false"} onDragStart={e => { if(!dnd.dragOn){ e.preventDefault(); return; } dnd.start(e, trip); }} onDragEnd={dnd.end} data-lp-trip={b.line_key}')
      && trip.includes('<summary className="lp-blk" aria-label={`${label}: move…`}') && trip.includes("const items = dnd.targets(trip);")
      && lpc.includes("out.push({ label: `Move to lorry ${row.n}`, to: { day: trip.day, lorry: row.n }, ok: f.ok, hard: true, words: f.words });")
      && lpc.includes('if(view === "compressed") days.filter(d => d !== trip.day).forEach(d => out.push({ label: `Move to ${lpDayWords(d)}`, to: { day: d, lorry: 0 }, ok: true, words: "" }));'));

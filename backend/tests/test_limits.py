@@ -387,9 +387,12 @@ def line(rid, veh, baked=True):
 fl, src = clashes.limit([line(r1, PROFILE)])
 ok("5. ⭐ the artic line on R001 gets ONE LIMIT flag", len(fl) == 1 and fl[0]["code"] == "LIMIT" and fl[0]["label"] == "ROAD LIMIT", str(fl))
 t = fl[0]["text"]
-ok("5. the text names the vehicle, its weight, the limit, the road and the source",
-   "Artic Tipper (44t) (44 t, loaded)" in t and "over the Weight limit 5 t · Back Lane" in t and "(OpenStreetMap)" in t, t)
-ok("5. ...says 'except for access' and how many more", "except for access" in t and "(+" in t, t)
+# NARROWED 11 Nov 2026 (CLOCS card C-F1, John's yes): one wording for a limit, the public map's — the supplier left the
+# sentence (it was "(OpenStreetMap)"; the sheets carry limits.credit_for at their foot), the exception after a comma
+ok("5. the text names the vehicle, its weight, the limit and the road, and no source (C-F1)",
+   "Artic Tipper (44t), 44 t loaded, is over the Weight limit 5 t · Back Lane" in t and "(OpenStreetMap)" not in t
+   and "OpenStreetMap" not in t, t)
+ok("5. ...says 'except for access' after a comma, and how many more", ", except for access" in t and "(+" in t, t)
 ok("5. no team id in the text", not TEAM_ID.search(t))
 _pt = dict(limits.stored_checks([r1])[r1])
 _only_point = [h for h in _pt["hits"] if h["point"] and h["verdict"] == "exceeds"]

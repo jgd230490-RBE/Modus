@@ -182,7 +182,7 @@ const M = (blocks, primaries) => ({ words: 50, blocks, primaries: primaries || [
 // ---------------------------------------------------------------- D. the pins, the limits, the wiring ------------------
 // The pinned long blocks: exactly those the first runs found on staff screens (10 Nov 2026). May only SHRINK: lower this
 // number when claude/ui-fix-long-sentences (or any fix) takes a block away; never raise it.
-const PINNED_MAX = 22;   // 12 Nov 2026 (batch 5): PR #257 cut four Q10 sentences (Busiest hour, route legs, Vehicles, shared codes)
+const PINNED_MAX = 21;   // 12 Nov 2026 (batch 5, main merged in): PR #257 cut four Q10 sentences (Busiest hour, route legs, Vehicles, shared codes) and C-X2 the Look-ahead gates note (11 Nov): 26 -> 21
 ok(`A1b: the pinned long blocks may only shrink (${R.LONG_PROSE_PINNED.length} pinned, at most ${PINNED_MAX})`,
    R.LONG_PROSE_PINNED.length <= PINNED_MAX && R.LONG_PROSE_PINNED.every(p => p.starts && p.starts.split(" ").length >= 4 && p.where));
 ok("the limits are John's (decision U5, 10 Nov 2026): 25 words, 10 % or 25 words, 1 filled primary, 25 % and 1 s",

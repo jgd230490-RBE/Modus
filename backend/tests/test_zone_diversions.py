@@ -7,7 +7,8 @@ WHAT IS ASSERTED
   * the table route_choice (shared with 0d) and route_geometry.avoids, tenanted, in the package;
   * the main line avoids only UNDATED routing zones (network.active_avoid);
   * route_choice.refresh_zones: per (route, lorry type, leg) whose main line crosses a dated zone in force, the
-    SHORTEST stored option that misses every zone in force then, for the zone's dates only; needs_route when none
+    stored option that misses every zone in force then (11 Nov 2026: no lorry limit below the lorry first, then the
+    QUICKEST; it was the shortest; test_diversion_choice.py holds that rule), for the zone's dates only; needs_route when none
     does; a second refresh rewrites, never doubles;
   * alt_on per day, mix per month / week by WORKING days (Q2); derived.cycle_for / line_context follow the line's
     month and week (distance weighted, trips a day the fewest); the Look-ahead flag NO_WAY_ROUND;
@@ -189,7 +190,7 @@ def put(rid, leg, alt, line, km, hr, avoids=None, prof=ART):
 
 for leg in ("loaded", "return"):
     put("R1", leg, 0, MAIN, 7.0, 0.20)
-    put("R1", leg, 1, FAR, 9.0, 0.24)       # stored first, so "shortest" — not HERE's order — has to pick option 2
+    put("R1", leg, 1, FAR, 9.0, 0.24)       # stored first, so the rule — not HERE's order — has to pick option 2 (quicker)
     put("R1", leg, 2, NORTH, 8.0, 0.22)
     put("R2", leg, 0, MAIN, 7.0, 0.20)      # R2 has NO stored option that misses the box
 
@@ -233,7 +234,9 @@ summ = route_choice.refresh_zones()
 rows = db.query("SELECT * FROM route_choice WHERE tenant_id = ? ORDER BY route_id, leg", (db.current_tenant(),))
 r1 = [r for r in rows if r["route_id"] == "R1"]
 r2 = [r for r in rows if r["route_id"] == "R2"]
-ok("⭐ R1: one in-use row a leg, the zone's own dates, the SHORTEST stored option that misses it (2 at 8 km, not 1)",
+# NARROWED 11 Nov 2026 (CLOCS B-F3, John: "No limit, then quickest"): option 2 is the quicker AND the shorter here, so the
+# check holds under both rules; the rule itself is test_diversion_choice.py's
+ok("⭐ R1: one in-use row a leg, the zone's own dates, the QUICKEST stored option that misses it (2 at 0.22 h, not 1)",
    len(r1) == 2 and all(r["status"] == "in_use" and int(r["alt_index"]) == 2 and r["starts_on"] == "2027-12-01"
                         and r["ends_on"] == "2027-12-17" and r["reason_ref"] == ZD for r in r1), str(r1))
 ok("...with its change in length against the main line (+1.0 km)", all(abs(float(r["km_delta"]) - 1.0) < 1e-9 for r in r1))

@@ -156,7 +156,8 @@ ok("⭐ 5: the map keeps the full width at 768–1024: map | panel side by side 
    && dm.includes('const panelStyle = isWide && !tabletW ? { height: MAP_H, overflowY: "auto" } : undefined;'));
 
 // ---------------------------------------------------------------- card 6: the Look-ahead
-const la = between(code, "function LookAhead({ meta, who, access, initialPage, initialView }){", "\nfunction CommitMap(");
+// NARROWED 12 Nov 2026 (batch 5): batch 3 (C-I2) added a prop after initialView, so the slice starts at the name
+const la = between(code, "function LookAhead({ meta, who, access, initialPage, initialView", "\nfunction CommitMap(");
 ok("⭐ 6: at 768–1024 the Status column goes and its chip (and last week's carry line) sits under the route's name",
    la.includes("const laTab = useMQ(TABLET_MQ);") && la.includes("{!laTab && <th>Status</th>}")
    && la.includes('{laTab && <span className="la-st-under" data-la-st-under="1"><RowStatus word={st.word} tone={st.tone} more={st.more} />')

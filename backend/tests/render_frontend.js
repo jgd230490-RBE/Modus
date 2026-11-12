@@ -52,6 +52,40 @@ function ok(label, cond, extra) {
   else fail.push(label + (extra ? "  " + extra : ""));
 }
 
+// ---- 12 Nov 2026 (claude/suite-fixture-order): a STALE fixture fails here, loudly, whatever order the harnesses ran in.
+// Until then run_suite ran this file BEFORE the Python harnesses that write its fixtures, so CI rendered the copies
+// committed on 27 Oct, which lack fields the backend sends now, and every check below passed against the old shape.
+// Each entry names fields the backend's page sends today; a fixture without one was written by older code. The fix is to
+// run the harness named (run_suite runs it first) and, when the page's shape moved on purpose, commit the rewritten file.
+const FIXTURE_SHAPE = [
+  ["lookahead_page.json", "test_lookahead.py", [
+    ["account.short_flag_pct", (f) => typeof (f.account || {}).short_flag_pct === "number"],
+    ["account.short_flagged", (f) => "short_flagged" in (f.account || {})],
+    ["account.shortfall_t", (f) => "shortfall_t" in (f.account || {})],
+    ["account.rows[].short_flag", (f) => ((f.account || {}).rows || []).length > 0 && f.account.rows.every(r => "short_flag" in r)],
+    ["clashes.short_flag_pct", (f) => typeof (f.clashes || {}).short_flag_pct === "number"],
+    ["a forecast stockpile (account.stock[].forecast with plan_out)", (f) => ((f.account || {}).stock || []).some(s => s.forecast === true && "plan_out" in s)],
+    ["horizon.stock", (f) => Array.isArray((f.horizon || {}).stock)],
+    ["commit.lines[].context.return_mode", (f) => ((f.commit || {}).lines || []).some(l => "return_mode" in (l.context || {}))],
+  ]],
+  ["lookahead_page_fuel.json", "test_costing.py", [
+    ["account.short_flag_pct", (f) => typeof (f.account || {}).short_flag_pct === "number"],
+    ["clashes.short_flag_pct", (f) => typeof (f.clashes || {}).short_flag_pct === "number"],
+  ]],
+  ["sim_day.json", "test_sim.py", [
+    ["busy_hours", (f) => "busy_hours" in f],
+    ["traffic_limits", (f) => "traffic_limits" in f],
+  ]],
+];
+function fixtureMissing(f, shape) { return shape.filter(([, has]) => { try { return !has(f); } catch (e) { return true; } }).map(([name]) => name); }
+for (const [file, writer, shape] of FIXTURE_SHAPE) {
+  const p = path.join(__dirname, "fixtures", file);
+  const f = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : null;
+  const missing = f ? fixtureMissing(f, shape) : ["the file"];
+  ok(`⭐ FIXTURE SHAPE: ${file} carries what the backend sends now (else it is stale: run ${writer} first, as run_suite does)`,
+    missing.length === 0, "missing: " + missing.join(", "));
+}
+
 const m = html.match(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/);
 if (!m) { console.log("no babel block"); process.exit(1); }
 // the mount call is the one line that needs a real DOM; drop it and export instead
@@ -702,7 +736,7 @@ if (loaded) {
       const cOut = render("the Dashboard renders with the CLP section open (initialClp)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialClp: CLPF, onOpen(){} }));
       const cP = seg(cOut, '<details class="dash-more" data-clp="1"', '<summary>Stockpile capacity');
       ok("⭐ CLP: the section is a folded <details> after More charts, open when its figures are handed in, with its summary",
-        cP.startsWith('<details class="dash-more" data-clp="1" data-guide="dash-clp" open=""') && cP.includes("<summary>CLP monitoring: caps, vehicles, councils, carbon and trips avoided</summary>")
+        cP.startsWith('<details class="dash-more" data-clp="1" data-guide="dash-clp" open=""') && cP.includes("<summary>CLP monitoring: tonnes, caps, vehicles, councils, carbon and trips avoided</summary>")   /* REVERSED 11 Nov 2026 (D-F2, John's yes): the title names tonnes */
         && cOut.indexOf('data-clp="1"') > cOut.indexOf("<summary>More charts") && cOut.indexOf('data-clp="1"') < cOut.indexOf("<summary>Stockpile capacity"));
       ok("⭐ CLP: seven cards in the server's order, each in state set, each headline the server's words",
         CLPF.order.every(k => cP.includes(`data-clp-chart="${k}" data-clp-state="set"`))
@@ -1017,10 +1051,12 @@ if (loaded) {
         // NARROWED 17 Oct 2026: the hours the capacity rests on are named (the default gate hours here), never "the shift"
         gOpen.includes("No check-in time typed: nothing is compared.") && gOpen.includes("Can check in 200 a day (open 07:00–17:00 by default ÷ 3 min a lorry).")
         && gOpen.includes("Can check in 300 a day (open 07:00–17:00 by default ÷ 2 min a lorry).") && !gOpen.includes("the shift ÷"));
-      ok("🔴 W17: the honest limit and the week-split sentence are printed under the gates",
+      ok("🔴 W17: the honest limit is printed under the gates, in few words",
         // NARROWED 17 Oct 2026: the limit names the shut times and the bands
-        gS.includes("Planned arrivals spread evenly over the gate&#x27;s open hours, less its shut times and the no-delivery bands; no hourly peak is known.")
-        && gS.includes("so a day can be busier than the Dashboard&#x27;s month average"));
+        // NARROWED 11 Nov 2026 (CLOCS card C-X2, rule R1): "Averages only: no hourly peak." under the gates; the limit's and
+        // the week split's sentences are in the la.gates "i" box's how (ui_fix_clocs_c_gates_words.js reads them there)
+        gS.includes("Averages only: no hourly peak.") && gS.includes('data-gw-note="1"')
+        && !gS.includes("Planned arrivals spread evenly over the gate&#x27;s open hours") && !gS.includes("so a day can be busier"));
       // 17 Oct 2026 (the review): the week card with a gate's shut times and one left no open time
       const GWS = { ...GW, gates: GW.gates.map((g, i) => i === 0 ? { ...g, shut_minutes: 45, shut_words: "08:30–09:15" }
                                                    : i === 1 ? { ...g, no_open_time: true, capacity_per_day: 0 } : g) };
@@ -1067,8 +1103,15 @@ if (loaded) {
       // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the cards in words, Delivered / Added n t / Waiting
       acctOut.includes("lines delivered last week, within 2 % of plan") && acctOut.includes("can add") && !acctOut.includes("calibrate")
       && acctOut.includes(">Delivered<") && acctOut.includes(">Added ") && acctOut.includes(">Waiting<") && !acctOut.includes(">held<") && !acctOut.includes("applied · "));
-    ok("...the confirmed cost box is rendered next to the actual",
-      acctOut.includes("The confirmed cost of this week"));
+    // NARROWED 11 Nov 2026 (CLOCS card C-F10): the Account opens on Tonnes (no money column); the cost box is the Cost view's
+    const acctCostOut = render("the Account view renders its Cost columns (Show Cost)",
+      h(LookAhead, { meta: laMeta, who: "t", initialPage: fixture, initialView: "account", initialAcctShow: "cost" }));
+    ok("...the confirmed cost box is rendered in the Cost view",
+      acctCostOut.includes("The confirmed cost of this week") && acctCostOut.includes('data-acct-cols="cost"'));
+    ok("C-F10: the Account opens on Tonnes: Show Tonnes · Cost, Tonnes pressed; no money column, no cost box; Actual and Difference shown",
+      acctOut.includes('data-acct-show="tonnes"') && acctOut.includes('data-acct-cols="tonnes"') && acctOut.includes('style="min-width:860px"')
+      && !acctOut.includes("The confirmed cost of this week") && !acctOut.includes(">Planned €<") && !acctOut.includes("Fair € <span")
+      && acctOut.includes('aria-label="Show the account as"') && /aria-pressed="true"[^>]*>Tonnes</.test(acctOut));
     // 13 Oct 2026 (W3, narrowed): the footer's rule is in the Variance header's info box (dom_frontend opens it)
     ok("...and the Variance header carries the not-reported rule's info box",
       // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the column is "Difference"
@@ -1081,13 +1124,13 @@ if (loaded) {
     // (short_flag); an unflagged spread line keeps its button but no wash (checked below)
     spreadFix.account.rows[0] = { ...spreadFix.account.rows[0], action: "spread", remaining_short: 12.5, variance: 12.5, held: false, short_flag: true };
     const spOut = render("UI FIX 6: the Account view renders a short line (action spread)",
-      h(LookAhead, { meta: laMeta, who: "t", initialPage: spreadFix, initialView: "account" }));
+      h(LookAhead, { meta: laMeta, who: "t", initialPage: spreadFix, initialView: "account", initialAcctShow: "cost" }));   // NARROWED 11 Nov 2026 (C-F10)
     const spRow = spOut.slice(spOut.indexOf('<tr class="border-t border-slate-100 align-middle" style="background:rgba(217,119,6,.06)">'));
     ok("⭐ UI FIX 6 card 2: the short line's 'spread on this week' is the standard small button (btn-pri btn-sm), same words and title; the 11 px white one-off is gone",
-      spOut.includes('style="background:rgba(217,119,6,.06)"') && spRow.includes('<button class="btn-pri btn-sm disabled:opacity-40" title="Add 12.5 t to this week, divided over its remaining weekdays. Refused if that week is confirmed.">Add to this week</button>')
-      && !spOut.includes("rounded-lg text-white") && (spOut.match(/>Add to this week</g) || []).length === 1);   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2)
+      spOut.includes('style="background:rgba(217,119,6,.06)"') && spRow.includes('<button class="btn-sec btn-sm disabled:opacity-40" title="Add 12.5 t to this week, divided over its remaining weekdays. Refused if that week is confirmed.">Add to this week</button>')
+      && !spOut.includes("rounded-lg text-white") && (spOut.match(/>Add to this week</g) || []).length === 1);   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2); REVERSED 11 Nov 2026 (D-F4): btn-sec, an outline button
     ok("⭐ UI FIX 6 cards 1 and 2: the table keeps 1,220 px in its padded scroller under 13 px headings (la-acct-head); the Action heading and every Action cell are pinned (la-pin), the short line's cell painting the row's rose (la-pin-short)",
-      spOut.includes('<div class="overflow-auto la-acct-scroll"><table class="text-sm w-full" style="min-width:1220px"><thead class="la-acct-head">')
+      spOut.includes('<div class="overflow-auto la-acct-scroll"><table class="text-sm w-full" style="min-width:1220px" data-acct-cols="cost"><thead class="la-acct-head">')   // NARROWED 11 Nov 2026 (C-F10)
       && spOut.includes('<th class="px-2 py-2 text-right font-semibold la-pin">Action<button')
       && (spOut.match(/<td class="px-2 py-2 text-right whitespace-nowrap la-pin( la-pin-short)?">/g) || []).length === spreadFix.account.rows.length
       && (spOut.match(/la-pin la-pin-short/g) || []).length === 1 && spRow.includes('<td class="px-2 py-2 text-right whitespace-nowrap la-pin la-pin-short">')
@@ -1117,7 +1160,16 @@ if (loaded) {
       && !hzT.includes('style="color:var(--navy)"'));
     ok("...the Account view carries the account week's stockpiles with one 'out' box each",
       acctOut.includes("Stockpiles · ") && acctOut.includes('aria-label="About: Stockpiles"')   // 13 Oct 2026 (W3, narrowed): the how-to is in the info box
-      && (acctOut.match(/placeholder="out —"/g) || []).length === fixture.account.stock.length && fixture.account.stock.length >= 1);
+      // NARROWED 11 Nov 2026: one 'out' box per stockpile, found by its name; its placeholder follows the row, "plan <n>" for
+      // a forecast row and "out —" for a records row (the fixture test_lookahead.py writes today has a forecast row: the
+      // check counted only "out —" boxes and failed on correct output whenever that fixture was fresh)
+      && fixture.account.stock.length >= 1
+      && (acctOut.match(/aria-label="Out of [^"]* this week"/g) || []).length === fixture.account.stock.length
+      && fixture.account.stock.every(s => {
+        const tag = (acctOut.match(new RegExp('<input[^>]*aria-label="Out of ' + String(s.name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ' this week"[^>]*>')) || [""])[0];
+        const want = s.forecast ? "plan " + (+s.plan_out).toLocaleString("en-GB", { maximumFractionDigits: 0 }) : "out —";
+        return tag.includes('placeholder="' + want + '"');
+      }));
     ok("...and says the fixture's stockpile is OVER, with the same figure the server sent",
       acctOut.includes("OVER by " + Math.round(-fixture.account.stock[0].remaining).toLocaleString("en-US")));
 
@@ -1141,7 +1193,7 @@ if (loaded) {
         && fOut.includes("€" + Math.round(fuelFix.commit.totals.eur).toLocaleString("en-US")));
       ok("...nothing renders as 'undefined' or 'NaN'", !/undefined|NaN/.test(fOut));
       const fAcct = render("the Account view renders with the fuel fixture",
-        h(LookAhead, { meta: laMeta, who: "t", access: planner, initialPage: fuelFix, initialView: "account" }));
+        h(LookAhead, { meta: laMeta, who: "t", access: planner, initialPage: fuelFix, initialView: "account", initialAcctShow: "cost" }));   // NARROWED 11 Nov 2026 (C-F10)
       const nTarget = fuelFix.account.rows.filter(r => r.rate_source === "target").length;
       ok("...the strip widget sits above the KPI cards with typeable yard and share boxes for a planner",
         // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): a titled Fuel card with two labelled boxes
