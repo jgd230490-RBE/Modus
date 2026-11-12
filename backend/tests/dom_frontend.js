@@ -2129,8 +2129,11 @@ async function phoneDayFlagsDom(){
   const meta = { ...metaMin, months: { start_year: 2026, count: 60 } };
   const lk = (r) => `${r.route_id}|${r.discipline || ""}|${r.section_id || ""}|${r.month_index}`;
   const planned = (l, iso) => { const d = (l.days || []).find(x => x.day_date === iso); return !!d && ((+d.planned_qty || 0) > 0 || ((d.derived || {}).trips || 0) > 0); };
-  const today = LA.today;
+  // 12 Nov 2026 (claude/suite-fixture-order): run_suite now runs test_lookahead.py BEFORE this harness, so the fixture's
+  // today is the real date (a weekday of its week, portable.fixture_today). On a Thursday or Friday it has fewer than two
+  // later weekdays; the page is then handed the last weekday that has two (the screen opens on page.today).
   const weekdays = LA.commit.lines[0].days.map(d => d.day_date).filter(iso => !w.__F.isWeekend(iso));
+  const today = weekdays.filter(iso => iso > LA.today).length >= 2 ? LA.today : weekdays[Math.max(0, weekdays.length - 3)];
   const [next, third] = weekdays.filter(iso => iso > today);
   const lines = LA.commit.lines.filter(l => weekdays.every(iso => planned(l, iso))).slice(0, 3);
   ok("PHONE DAY FLAGS: the test page — three fixture lines planned on every weekday, today and two later weekdays",
@@ -2138,7 +2141,7 @@ async function phoneDayFlagsDom(){
   const [A, B, C] = lines;
   const fl = (l, code, text, day) => ({ code, route_id: l.route_id, month_index: l.month_index, discipline: l.discipline || "",
     section_id: l.section_id || "", ipt: l.ipt, text, ...(day ? { day_date: day } : {}) });
-  const page = { ...LA, commit: { ...LA.commit, lines }, clashes: { ...LA.clashes, flags: [
+  const page = { ...LA, today, commit: { ...LA.commit, lines }, clashes: { ...LA.clashes, flags: [
     fl(A, "GATE_OVER", `Gate A on ${next}: 9 lorries against the 6 it can check in (150 %)`, next),
     fl(B, "GATE_NEAR", `Gate B on ${today}: 5 lorries against the 6 it can check in (83 %), near capacity`, today),
     fl(B, "ROUTE_CAP", `${B.route_id} ${next}: 12 veh against a cap of 10`, next),

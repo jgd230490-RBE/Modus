@@ -49,7 +49,11 @@ jobs:
         with:
           node-version: "24"
 
+      # 11 Nov 2026 (X-F2): when the runner cannot reach Ubuntu's package servers this step used to retry until
+      # the job's 40-minute limit; it now fails in 5 minutes, saying so, and the run can be re-run later. No second
+      # source: the failure seen was the runner's own name lookup, which a second Ubuntu server did not get round.
       - name: pdftotext (poppler) for the PDF text checks
+        timeout-minutes: 5
         run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils
 
       - name: Python for the stubbed harnesses (no FastAPI)

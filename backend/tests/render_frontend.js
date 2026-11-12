@@ -52,6 +52,40 @@ function ok(label, cond, extra) {
   else fail.push(label + (extra ? "  " + extra : ""));
 }
 
+// ---- 12 Nov 2026 (claude/suite-fixture-order): a STALE fixture fails here, loudly, whatever order the harnesses ran in.
+// Until then run_suite ran this file BEFORE the Python harnesses that write its fixtures, so CI rendered the copies
+// committed on 27 Oct, which lack fields the backend sends now, and every check below passed against the old shape.
+// Each entry names fields the backend's page sends today; a fixture without one was written by older code. The fix is to
+// run the harness named (run_suite runs it first) and, when the page's shape moved on purpose, commit the rewritten file.
+const FIXTURE_SHAPE = [
+  ["lookahead_page.json", "test_lookahead.py", [
+    ["account.short_flag_pct", (f) => typeof (f.account || {}).short_flag_pct === "number"],
+    ["account.short_flagged", (f) => "short_flagged" in (f.account || {})],
+    ["account.shortfall_t", (f) => "shortfall_t" in (f.account || {})],
+    ["account.rows[].short_flag", (f) => ((f.account || {}).rows || []).length > 0 && f.account.rows.every(r => "short_flag" in r)],
+    ["clashes.short_flag_pct", (f) => typeof (f.clashes || {}).short_flag_pct === "number"],
+    ["a forecast stockpile (account.stock[].forecast with plan_out)", (f) => ((f.account || {}).stock || []).some(s => s.forecast === true && "plan_out" in s)],
+    ["horizon.stock", (f) => Array.isArray((f.horizon || {}).stock)],
+    ["commit.lines[].context.return_mode", (f) => ((f.commit || {}).lines || []).some(l => "return_mode" in (l.context || {}))],
+  ]],
+  ["lookahead_page_fuel.json", "test_costing.py", [
+    ["account.short_flag_pct", (f) => typeof (f.account || {}).short_flag_pct === "number"],
+    ["clashes.short_flag_pct", (f) => typeof (f.clashes || {}).short_flag_pct === "number"],
+  ]],
+  ["sim_day.json", "test_sim.py", [
+    ["busy_hours", (f) => "busy_hours" in f],
+    ["traffic_limits", (f) => "traffic_limits" in f],
+  ]],
+];
+function fixtureMissing(f, shape) { return shape.filter(([, has]) => { try { return !has(f); } catch (e) { return true; } }).map(([name]) => name); }
+for (const [file, writer, shape] of FIXTURE_SHAPE) {
+  const p = path.join(__dirname, "fixtures", file);
+  const f = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : null;
+  const missing = f ? fixtureMissing(f, shape) : ["the file"];
+  ok(`⭐ FIXTURE SHAPE: ${file} carries what the backend sends now (else it is stale: run ${writer} first, as run_suite does)`,
+    missing.length === 0, "missing: " + missing.join(", "));
+}
+
 const m = html.match(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/);
 if (!m) { console.log("no babel block"); process.exit(1); }
 // the mount call is the one line that needs a real DOM; drop it and export instead
@@ -1117,7 +1151,16 @@ if (loaded) {
       && !hzT.includes('style="color:var(--navy)"'));
     ok("...the Account view carries the account week's stockpiles with one 'out' box each",
       acctOut.includes("Stockpiles · ") && acctOut.includes('aria-label="About: Stockpiles"')   // 13 Oct 2026 (W3, narrowed): the how-to is in the info box
-      && (acctOut.match(/placeholder="out —"/g) || []).length === fixture.account.stock.length && fixture.account.stock.length >= 1);
+      // NARROWED 11 Nov 2026: one 'out' box per stockpile, found by its name; its placeholder follows the row, "plan <n>" for
+      // a forecast row and "out —" for a records row (the fixture test_lookahead.py writes today has a forecast row: the
+      // check counted only "out —" boxes and failed on correct output whenever that fixture was fresh)
+      && fixture.account.stock.length >= 1
+      && (acctOut.match(/aria-label="Out of [^"]* this week"/g) || []).length === fixture.account.stock.length
+      && fixture.account.stock.every(s => {
+        const tag = (acctOut.match(new RegExp('<input[^>]*aria-label="Out of ' + String(s.name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ' this week"[^>]*>')) || [""])[0];
+        const want = s.forecast ? "plan " + (+s.plan_out).toLocaleString("en-GB", { maximumFractionDigits: 0 }) : "out —";
+        return tag.includes('placeholder="' + want + '"');
+      }));
     ok("...and says the fixture's stockpile is OVER, with the same figure the server sent",
       acctOut.includes("OVER by " + Math.round(-fixture.account.stock[0].remaining).toLocaleString("en-US")));
 
