@@ -968,7 +968,10 @@
             .m-grip{ width:40px; height:5px; border-radius:3px; background:#A8A29E; }
             .m-peek{ display:flex; flex-wrap:wrap; align-items:flex-start; gap:4px 16px; padding:0 16px 8px; }
             .m-month{ flex:1 0 100%; font-size:15px; font-weight:600; color:var(--navy-deep); }
-            .m-fig{ flex:1 1 0; min-width:0; }   /* the two lead figures side by side at any phone width; a label wraps */
+            /* the two lead figures side by side at any phone width; a label wraps between words, never inside one: with min-width:0
+               the conditions pill beside them squeezed "movements" (77 px) into the next label at 360 and 390 px, so a figure keeps
+               its longest word and the pill drops to its own row when the three do not fit */
+            .m-fig{ flex:1 1 0; min-width:min-content; }
             .m-fig b{ display:block; font-size:24px; font-weight:600; color:var(--navy-deep); font-variant-numeric:tabular-nums; line-height:1.1; }
             .m-fig span{ font-size:14px; color:var(--muted); }
             .m-cond{ margin-left:auto; min-height:44px; border:1px solid var(--line); border-radius:22px; background:var(--surface); padding:0 14px; font:500 14px Inter,system-ui,sans-serif; color:var(--navy-deep); cursor:pointer; display:flex; align-items:center; gap:6px; }
