@@ -314,6 +314,14 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .kicker{font:600 12px ui-monospace,'SF Mono',Consolas,'Liberation Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--action);margin-bottom:4px;}
   .kicker::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--action);margin-right:8px;vertical-align:1px;}
   .rail-count{font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;}
+  /* TABLET-RAIL — 10 Nov 2026 (UI critique finding 3, John's decision 2; wave 4 card 1): a folded rail keeps its counts as
+     a badge on the icon; at 768–1024 px "›" / Ctrl K opens the full rail OVER the page (.rail-over, a scrim behind it), and
+     a folded icon says its name beside itself when pointed at or focused (.rail-tip). */
+  .rail-ico{position:relative;display:inline-flex;flex:none;}
+  .rail-dot{position:absolute;top:-9px;left:9px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--action);color:var(--action-fg);font-size:12px;font-weight:700;line-height:18px;text-align:center;font-variant-numeric:tabular-nums;box-shadow:0 0 0 2px var(--rail-bg);}
+  .rail.rail-over{position:absolute;left:0;top:0;bottom:0;z-index:60;box-shadow:0 10px 30px rgba(15,23,42,.22);}
+  .rail-scrim{position:absolute;inset:0;z-index:59;background:rgba(15,23,42,.18);}
+  .rail-tip{position:fixed;left:60px;transform:translateY(-50%);z-index:70;pointer-events:none;padding:4px 10px;border-radius:6px;background:var(--ink);color:var(--surface);font-size:13px;font-weight:600;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.18);}
   /* 10 Oct 2026 — the UI pass (ui-review-1009, mockups 2, 4 and 5): tables at 14 px in 40 px
      rows with a caption, a sticky header and the sort shown once; the filter row and its
      applied-filter chips; buttons; status as a word with a dot; the empty-state family;
@@ -856,7 +864,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-tag{display:inline-block;font-size:12px;font-weight:600;border-radius:4px;padding:0 6px;background:var(--surface-3);color:var(--ink);margin-left:4px;}
   .sim-ctl{display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--ink);}
   .sim-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;}
-  .sim-check{display:flex;align-items:flex-start;gap:8px;cursor:pointer;}
+  .sim-check{display:flex;align-items:flex-start;gap:8px;cursor:pointer;min-height:24px;}   /* 10 Nov 2026 (wave 4): a one-line tick is 24 px tall (with the rail folded at 1024 "Wheel wash on the way out" fit one line at 21 px; the audit's targets-24px) */
   .sim-check input[type=checkbox]{width:18px;height:18px;flex:0 0 auto;margin-top:2px;}
   .sim-table td:first-child{min-width:150px;}
   .sim-pour{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-left:26px;}
@@ -1094,6 +1102,78 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
     .rd-table tr.rd-details>td{display:block;}
     .rd-dl{padding:8px 12px 10px;grid-template-columns:1fr 1fr;gap:6px 14px;position:static;max-width:none;}
   }
+  /* TABLET-CARDS-START — 10 Nov 2026 (UI critique finding 3, John's decision 2; wave 4, notes\ui-fix-tablet-mockup-1110\
+     cards 2–5): at 768–1024 px a busy table (class .tab-cards) is one card a row, the phone's card laid out wider. The
+     row's lead cell (.rd-primary) on the left of the top line, its status (.rd-status) on the right; the figures (each
+     <td data-label>) in one row of --tc-n columns, the label over the value; the foot (.tc-foot: team, route…) and the
+     one next-step button with its "⋯" (.rd-actions) on the last line. A cell marked .tc-hide (and any .tc-hide inside a
+     cell) is left to the row's details. A chevron cell (.tc-tri) sits at the card's top left. Tokens only. Nothing here
+     applies below 768 px (the phone's own cards) or above 1024 px (the tables as they are). */
+  @media (min-width:768px) and (max-width:1024px){
+    .tab-cards{min-width:0 !important;width:100%;}
+    .tab-cards>thead{display:none;}
+    .tab-cards,.tab-cards>tbody{display:block;}
+    .tab-cards>caption{display:block;}
+    .tab-cards>tbody>tr:not(.rd-details):not(.al-det-row):not(:has(>td[colspan])){position:relative;display:grid;grid-template-columns:repeat(var(--tc-n,4),minmax(0,1fr));gap:8px 16px;align-items:start;margin:10px 12px 0;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);}
+    .tab-cards>tbody>tr[hidden]{display:none !important;}
+    .tab-cards>tbody>tr.tc-has-tri{padding-left:46px !important;}   /* !important: the row rule's :not() chain outweighs a class */
+    .tab-cards>tbody>tr>td.tc-tri>button{width:28px;height:28px;}
+    .tab-cards>tbody>tr.rd-row.is-open,.tab-cards>tbody>tr.al-open{border-bottom-left-radius:0;border-bottom-right-radius:0;}
+    .tab-cards>tbody>tr>td{display:block;order:3;width:auto !important;min-width:0 !important;height:auto;padding:0;border:0;white-space:normal;text-align:left;position:static;box-shadow:none;background:none !important;vertical-align:top;}
+    .tab-cards>tbody>tr>td[data-label]::before{content:attr(data-label);display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:1px;}
+    .tab-cards>tbody>tr>td.rd-primary{order:0;grid-column:1 / -2;}
+    .tab-cards>tbody>tr>td.rd-status{order:1;grid-column:-2 / -1;justify-self:end;text-align:right;}
+    .tab-cards>tbody>tr>td.rd-status::before,.tab-cards>tbody>tr>td.rd-primary::before{content:none !important;}
+    .tab-cards>tbody>tr>td.tc-foot{order:8;align-self:stretch;display:flex;flex-wrap:wrap;align-items:center;column-gap:6px;padding-top:8px;border-top:1px solid var(--line);margin-right:-16px;padding-right:16px;}
+    .tab-cards>tbody>tr>td.tc-foot::before{content:none !important;}
+    .tab-cards>tbody>tr>td.rd-actions{order:9;grid-column:-2 / -1;justify-self:stretch;align-self:stretch;display:flex;justify-content:flex-end;align-items:center;gap:4px;padding-top:8px;border-top:1px solid var(--line);}
+    .tab-cards>tbody>tr>td.rd-actions.tc-wide{grid-column:1 / -1;}
+    .tab-cards>tbody>tr>td.tc-tri{position:absolute;left:8px;top:8px;}
+    .tab-cards>tbody>tr>td:empty,.tab-cards>tbody>tr>td.tc-hide,.tab-cards .tc-hide{display:none !important;}
+    .tab-cards>tbody>tr.rd-details,.tab-cards>tbody>tr.al-det-row,.tab-cards>tbody>tr:has(>td[colspan]){display:block;margin:0 12px;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;overflow:hidden;}
+    .tab-cards>tbody>tr.rd-details>td,.tab-cards>tbody>tr.al-det-row>td,.tab-cards>tbody>tr>td[colspan]{display:block;}
+    .tab-cards>tbody>tr:first-child:has(>td[colspan]){border-top:1px solid var(--line);border-radius:10px;margin-top:10px;}
+    .tab-cards>tbody>tr>td.tc-lead{order:0;}
+    .tab-cards>tbody>tr>td.tc-span2{grid-column:span 2;}
+    .tab-cards>tbody>tr>td.tc-span3{grid-column:span 3;}
+    .tab-cards>tbody>tr>td.tc-late{order:4;}
+    .tab-cards>tbody>tr>td.rd-primary.tc-span-all{grid-column:1 / -1;}
+    .tab-cards>tbody>tr.clp-kid{margin-left:40px;}
+    .tab-cards>tbody>tr.clp-kid td:first-child{padding-left:0;}
+    .tab-cards .row-st{white-space:normal;text-align:left;}
+    .tab-cards>tbody>tr>td>span{display:inline-block;max-width:100%;white-space:normal;}   /* a chip in a card cell wraps inside its column (Zones' "Routed through @ 12 mph" ran into From) */
+    .tab-cards .tc-only{display:inline-block !important;margin-left:10px;}
+  }
+  .tc-only{display:none !important;}
+  .al-det-btn{background:none;border:0;padding:0 2px;min-height:24px;font:inherit;font-size:14px;color:var(--ink);text-decoration:underline;cursor:pointer;}
+  /* the Data page's map | panel: side by side above 1024 px, no gap at a zoomed width such as 1024.2 (was Tailwind's lg, 1024); at 768–1024 the panel sits under the map */
+  @media not all and (max-width:1024px){ .dm-grid{grid-template-columns:repeat(3,minmax(0,1fr));} .dm-grid>.dm-map{grid-column:span 2 / span 2;} }
+  /* the Look-ahead day table at 768–1024 (wave 4, card 6): the status under the route's name, the day columns narrower */
+  .la-st-under{display:block;margin-top:4px;font-weight:400;}
+  .la-st-under .la-carry{display:block;margin-top:2px;}
+  [data-la-tab="1"] .tbl th.num,[data-la-tab="1"] .tbl td.num{padding-left:6px;padding-right:6px;}
+  [data-la-tab="1"] .tbl .la-stick{min-width:200px !important;}
+  /* Configuration → Vehicles (wave 4, card 7): on a desk the name column is held and a fade says there is more; at 768–1024
+     each vehicle is a card, two a row, each field with its label over the box */
+  .fade-scroll{position:relative;}
+  .fade-scroll::after{content:"";position:absolute;top:0;right:var(--fade-x,0px);bottom:0;width:32px;pointer-events:none;opacity:0;transition:opacity .15s;background:linear-gradient(to right, transparent, var(--surface));}
+  .fade-scroll[data-more="1"]::after{opacity:1;}
+  .tbl.cfg-veh th:first-child,.tbl.cfg-veh td.cfg-veh-name{position:sticky;left:0;z-index:2;background:var(--surface);box-shadow:1px 0 0 var(--line);}
+  .tbl.cfg-veh th:first-child{z-index:3;background:var(--surface-2);}
+  .tbl.cfg-veh tbody tr:hover td.cfg-veh-name{background:var(--surface-2);}
+  @media (min-width:768px) and (max-width:1024px){
+    .fade-scroll.cfg-veh-fade::after{display:none;}
+    .tbl.cfg-veh{display:block;min-width:0;}
+    .tbl.cfg-veh>thead{display:none;}
+    .tbl.cfg-veh>tbody{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:4px 16px 16px;}
+    .tbl.cfg-veh>tbody>tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;align-content:start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);}
+    .tbl.cfg-veh>tbody>tr>td{display:block;width:auto;min-width:0 !important;height:auto;padding:0;border:0;white-space:normal;text-align:left;position:static;box-shadow:none;background:none !important;}
+    .tbl.cfg-veh>tbody>tr>td.cfg-veh-name,.tbl.cfg-veh>tbody>tr>td.cfg-veh-wide,.tbl.cfg-veh>tbody>tr>td.cfg-veh-span{grid-column:1 / -1;}
+    .tbl.cfg-veh>tbody>tr>td.cfg-veh-name{position:static;box-shadow:none;}
+    .tbl.cfg-veh>tbody>tr>td[data-label]::before{content:attr(data-label);display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:2px;}
+    .tbl.cfg-veh>tbody>tr>td.cfg-veh-tick{display:flex;flex-direction:column;align-items:flex-start;}
+  }
+  /* TABLET-CARDS-END */
   /* PHONE-SHELL-START — 14 Oct 2026 (D9, the mobile shell): below 768 px the rail gives way to a bottom tab bar of
      four (Dashboard, Look-ahead, Route map, More), every control a 48 px box or more (WCAG 2.5.5, Material 48 dp,
      Apple 44 pt; backlog §6 item 8). The pages made for a desk say "open on a desktop to edit this"; nothing on a
@@ -1813,6 +1893,39 @@ function UnitSwitch({ value, onChange, note }){
       {note && <span>{note}</span>}
     </div>
   );
+}
+// 10 Nov 2026 (wave 4, card 7): a sideways scroller that says there is more: a fade at its right edge while the content runs
+// past it (data-more="1" on the outer box, from the scroller's own widths, on scroll and on resize)
+function FadeScroll({ className, children, ...rest }){
+  const ref = useRef(null);
+  const [more, setMore] = useState(false);
+  // the box that really scrolls: this one, or for a Config reader the one scroll box outside the fieldset (.cfg-ro-box,
+  // cfgScroll; inside it this one is overflow:visible). There the fade rides the content, so --fade-x holds it at the edge.
+  const scroller = (el) => (window.getComputedStyle(el).overflowX === "visible" && el.closest(".cfg-ro-box")) || el;
+  const check = () => { const el = ref.current; if(!el) return; const sc = scroller(el);
+    const t = el.firstElementChild;   // more to the right while the table's right edge is past the box's (the moved fade would count in a scroll width)
+    setMore(!!t && t.getBoundingClientRect().right > sc.getBoundingClientRect().left + sc.clientWidth + 2);
+    if(el.parentElement) el.parentElement.style.setProperty("--fade-x", sc === el ? "0px" : `${-sc.scrollLeft}px`); };
+  // after every render: the box can turn read-only after the first one (the sign-in answers late)
+  useEffect(() => { check(); const el = ref.current; const sc = el && scroller(el);
+    if(!sc || sc === el) return; sc.addEventListener("scroll", check, { passive: true }); return () => sc.removeEventListener("scroll", check); });
+  useEffect(() => { window.addEventListener("resize", check); return () => window.removeEventListener("resize", check); }, []);
+  return <div className={"fade-scroll " + (className || "")} data-more={more ? "1" : "0"} {...rest}>
+    <div ref={ref} className="overflow-auto" onScroll={check}>{children}</div>
+  </div>;
+}
+// 10 Nov 2026 (wave 4, UI critique finding 3): 768–1024 px, a tablet; the rail folds and the busy tables become cards there
+const TABLET_MQ = "(min-width: 768px) and (max-width: 1024px)";
+function useMQ(q){
+  const [on, setOn] = useState(() => { try { return !!(window.matchMedia && window.matchMedia(q).matches); } catch(e){ return false; } });
+  useEffect(() => {
+    let mq; try { mq = window.matchMedia && window.matchMedia(q); } catch(e){ return; }
+    if(!mq) return;
+    const f = () => setOn(!!mq.matches);
+    if(mq.addEventListener) mq.addEventListener("change", f); else if(mq.addListener) mq.addListener(f);
+    return () => { if(mq.removeEventListener) mq.removeEventListener("change", f); else if(mq.removeListener) mq.removeListener(f); };
+  }, [q]);
+  return on;
 }
 // the one status: a word, an icon whose SHAPE says the tone (✓ circle, ! square, ! circle, – circle), and
 // how many more things are flagged (the details spell each one out)
@@ -5702,22 +5815,22 @@ function PoursPage({ meta, access, who }){
         <EmptyState title="No pours yet" body={lines.length ? "Add one with + Add pour." : "A pour goes on a ready-mixed concrete line planned in m³ with a concrete mixer."} />
       ) : (
         <div className="card overflow-x-auto">
-          <table className="tbl" data-pours-table="1">
+          <table className="tbl tab-cards" data-pours-table="1" style={{ "--tc-n": 3 }}>
             <thead><tr><th>Pour</th><th className="num">m³</th><th className="num">Mixers</th><th className="num">Gap</th><th>Status</th><th className="w-10"><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
               {list.map(p => {
                 const st = pourStatus(p), f = p.figures;
                 return (
                   <tr key={p.id} data-pour-row={p.id}>
-                    <td style={{ whiteSpace: "normal" }}>
+                    <td className="rd-primary" style={{ whiteSpace: "normal" }}>
                       <button type="button" className="row-open" aria-label={`Edit ${p.place || p.id}`} onClick={() => open(p)}>{p.place || p.id}</button>
                       <span className="block text-[12px] text-slate-500">{pourDay(p.pour_date)} · {p.start} · {p.dest_name || "—"}</span>
                     </td>
-                    <td className="num tabular-nums">{grp(p.m3)}</td>
-                    <td className="num tabular-nums">{f ? (f.booked && f.booked < f.needed ? `${f.booked} of ${f.needed}` : grp(f.needed)) : "—"}</td>
-                    <td className="num tabular-nums">{f ? pourHm(f.real_gap) : "—"}</td>
+                    <td className="num tabular-nums" data-label="m³">{grp(p.m3)}</td>
+                    <td className="num tabular-nums" data-label="Mixers">{f ? (f.booked && f.booked < f.needed ? `${f.booked} of ${f.needed}` : grp(f.needed)) : "—"}</td>
+                    <td className="num tabular-nums" data-label="Gap">{f ? pourHm(f.real_gap) : "—"}</td>
                     <td className="rd-status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>
-                    <td><RowMenu name={p.place || p.id}>
+                    <td className="rd-actions"><RowMenu name={p.place || p.id}>
                       <button type="button" onClick={() => open(p)}>Edit</button>
                       {p.status === "cancelled" ? <button type="button" onClick={() => setStatus(p, "planned")}>Plan again</button>
                                                 : <button type="button" onClick={() => setStatus(p, "cancelled")}>Cancel the pour</button>}
@@ -6243,7 +6356,7 @@ function ClpPage({ access }){
     const ns = nextStep(c, child);
     return (
     <tr key={c.id} data-clp-row={c.id} data-clp-child={child ? "1" : undefined} hidden={child && !isOpen(g) ? true : undefined} className={child ? "clp-kid" : undefined}>
-      <td style={{ whiteSpace: "normal", minWidth: 220 }}>
+      <td className="rd-primary" style={{ whiteSpace: "normal", minWidth: 220 }}>
         {child ? (canEdit ? <button type="button" className="row-open" aria-label={`Edit ${c.name} · ${teamWord(c)}`} onClick={() => openEdit(c)}>{teamWord(c)}</button>
                           : <span className="font-medium text-slate-800">{teamWord(c)}</span>)
           : canEdit ? <button type="button" className="row-open" aria-label={`Edit ${c.name}`} onClick={() => openEdit(c)}>{c.name}</button>
@@ -6258,13 +6371,13 @@ function ClpPage({ access }){
         {changedLine(c)}
         {(c.reviews || []).map(r => { const [w, col] = reviewLine(r);
           return <span key={r.group_id} className="block text-[12px]" style={{ color: col }} data-clp-review-line={r.state}>{w}</span>; })}</td>
-      <td>{c.last_issue ? <>Issue {c.last_issue.no} · {clpDay(c.last_issue.date)}{appr && c.last_issue.by ? <span className="block text-[12px] text-slate-500">{c.last_issue.by}</span> : null}</> : "—"}</td>
-      <td data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open
+      <td data-label="Last issue">{c.last_issue ? <>Issue {c.last_issue.no} · {clpDay(c.last_issue.date)}{appr && c.last_issue.by ? <span className="block text-[12px] text-slate-500">{c.last_issue.by}</span> : null}</> : "—"}</td>
+      <td data-label="Tasks" data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open
           {tk(c).overdue > 0 ? <span className="block text-[12px] font-semibold" style={{ color: "var(--bad-text)" }}>{tk(c).overdue} overdue</span>
             : tk(c).next_due ? <span className="block text-[12px] text-slate-500">due {clpShort(tk(c).next_due)}</span> : null}</>
         : tk(c).notes > 0 ? <span className="text-slate-600">{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}</span> : tk(c).client_open > 0 ? null : "—"}
         {tk(c).client_open > 0 && <span className="block text-[12px] text-slate-600" data-clp-tasks-client="1">+ {tk(c).client_open} with the client</span>}</td>
-      <td><div className="flex items-center gap-2 justify-end">{primary(c, child)}
+      <td className="rd-actions tc-wide"><div className="flex items-center gap-2 justify-end">{primary(c, child)}
         {/* 11 Nov 2026 (card 1, John: yes): the items that only read first; under a line the ones that write or send, so
             nothing that writes sits next to Download draft */}
         <RowMenu name={c.name + " · " + teamWord(c)}>
@@ -6313,7 +6426,7 @@ function ClpPage({ access }){
           body={(data.clps || []).length ? "Change the filters." : (appr ? "Add a compound, site or stockpile on Data → Locations, or make one with + New CLP." : "Your team has no lorries at a compound, site or stockpile yet.")} />
       ) : (
         <div className="card overflow-x-auto">
-          <table className="tbl" data-clp-table="1">
+          <table className="tbl tab-cards" data-clp-table="1" style={{ "--tc-n": 2 }}>
             <thead><tr><th scope="col">CLP</th><th scope="col">Status</th><th scope="col">Last issue</th><th scope="col">Tasks</th><th scope="col"><span className="sr-only">Next step</span></th></tr></thead>
             {groups.map(g => (
               <tbody key={g.key} data-clp-group={g.key}>
@@ -6842,7 +6955,7 @@ function AbnormalPage({ meta, access, who }){
       )}
       {data && movements.length > 0 && (
         <div className="card overflow-auto" data-guide="al-list">
-          <table className="tbl al-tbl">
+          <table className="tbl al-tbl tab-cards" data-tab-cards="abnormal">
             <caption><b>Abnormal loads</b> · {movements.length} · oldest window first</caption>
             <thead><tr>{["", "Load", TEAM(), "From → to", "Window", "What it needs", "Notify by", "Route", "Status", ""].map((h, i) => <th key={i} scope="col" className={i === 9 ? "text-right" : ""}>{h}</th>)}</tr></thead>
             <tbody>
@@ -6851,22 +6964,23 @@ function AbnormalPage({ meta, access, who }){
                 const isOpen = open === m.id;
                 return (<React.Fragment key={m.id}>
                   <tr data-al-row={m.id} className={isOpen ? "al-open" : ""}>
-                    <td><button type="button" className={"al-tri" + (isOpen ? " is-open" : "")} aria-expanded={isOpen} aria-label={`${isOpen ? "Close" : "Open"} ${m.name}`} onClick={() => setOpen(isOpen ? null : m.id)}>›</button></td>
-                    <td><div className="font-medium text-slate-800">{m.name}</div><div className="text-[13px] text-slate-500">{[m.vehicle_word, alSize(m)].filter(Boolean).join(" · ")}</div></td>
-                    <td>{m.team_name || "—"}</td>
-                    <td><div>{m.origin_name} → {m.dest_name}</div>{(m.dest_gate_name || m.origin_gate_name) && <div className="text-[13px] text-slate-500">{[m.origin_gate_name, m.dest_gate_name].filter(Boolean).join(" → ")}</div>}</td>
-                    <td><div>{alWindow(m.date_from, m.date_to)}</div><div className="text-[13px] text-slate-500">{m.time_band} · {m.movements} movement{m.movements === 1 ? "" : "s"}{m.return_abnormal ? " (in and out)" : ""}</div></td>
-                    <td><AlChip tone={ct}>{cw}</AlChip><div className="text-[13px] text-slate-500">{(m.advice && m.advice.summary || "").replace(/^(Special Order|VR1|STGO Cat [123]|C&U)( · )?/, "")}</div></td>
-                    <td><div>{m.advice && m.advice.notify_by ? alDay(m.advice.notify_by) : "—"}{" "}{(m.flags || []).map(f => <AlFlag key={f.code} f={f} />)}</div>
-                      {m.advice && m.advice.apply_by && <div className="text-[13px] text-slate-500">apply by {alDay(m.advice.apply_by)}</div>}</td>
-                    <td data-al-route-cell={m.routed ? "drawn" : "none"}>{m.routed
+                    <td className="tc-hide"><button type="button" className={"al-tri" + (isOpen ? " is-open" : "")} aria-expanded={isOpen} aria-label={`${isOpen ? "Close" : "Open"} ${m.name}`} onClick={() => setOpen(isOpen ? null : m.id)}>›</button></td>
+                    <td className="rd-primary"><div className="font-medium text-slate-800">{m.name}</div><div className="text-[13px] text-slate-500">{[m.vehicle_word, alSize(m)].filter(Boolean).join(" · ")}</div></td>
+                    <td className="tc-foot">{m.team_name || "—"}</td>
+                    <td data-label="From → to"><div>{m.origin_name} → {m.dest_name}</div>{(m.dest_gate_name || m.origin_gate_name) && <div className="text-[13px] text-slate-500 tc-hide">{[m.origin_gate_name, m.dest_gate_name].filter(Boolean).join(" → ")}</div>}</td>
+                    <td data-label="Window"><div>{alWindow(m.date_from, m.date_to)}</div><div className="text-[13px] text-slate-500">{m.time_band} · {m.movements} movement{m.movements === 1 ? "" : "s"}{m.return_abnormal ? " (in and out)" : ""}</div></td>
+                    <td data-label="What it needs"><AlChip tone={ct}>{cw}</AlChip><div className="text-[13px] text-slate-500">{(m.advice && m.advice.summary || "").replace(/^(Special Order|VR1|STGO Cat [123]|C&U)( · )?/, "")}</div></td>
+                    <td data-label="Notify by"><div>{m.advice && m.advice.notify_by ? alDay(m.advice.notify_by) : "—"}{" "}{(m.flags || []).map(f => <AlFlag key={f.code} f={f} />)}</div>
+                      {m.advice && m.advice.apply_by && <div className="text-[13px] text-slate-500 tc-hide">apply by {alDay(m.advice.apply_by)}</div>}</td>
+                    <td className="tc-foot tc-span2" data-al-route-cell={m.routed ? "drawn" : "none"}>{m.routed
                       ? <><div className="whitespace-nowrap">{fmtDist(m.distance_km)} {DU()} · {Math.round((m.duration_hr || 0) * 60)} min</div>
                           <div className="text-[13px] text-slate-500">{(m.candidates || []).length} to survey{(m.route_notes || []).some(n => /at most/.test(n)) ? " · drawn at 30 m" : ""}{(m.limit_exceeds || []).length ? ` · ${m.limit_exceeds.length} limit${m.limit_exceeds.length === 1 ? "" : "s"} over` : ""}</div></>
-                      : <span className="text-[13px] text-slate-500">{m.bake_error ? "not drawn (see the row)" : "not drawn"}</span>}</td>
-                    <td><StatusWord status={{ pending: "Pending", approved: "Approved", notified: "Approved", moved: "confirmed", withdrawn: "Rejected" }[m.status]} label={m.status_word} /></td>
+                      : <span className="text-[13px] text-slate-500">{m.bake_error ? "not drawn (see the row)" : "not drawn"}</span>}
+                      <button type="button" className="tc-only al-det-btn" aria-expanded={isOpen} data-al-det-btn={m.id} onClick={() => setOpen(isOpen ? null : m.id)}>{isOpen ? "Hide details" : "Details"}</button></td>
+                    <td className="rd-status"><StatusWord status={{ pending: "Pending", approved: "Approved", notified: "Approved", moved: "confirmed", withdrawn: "Rejected" }[m.status]} label={m.status_word} /></td>
                     {/* 27 Oct 2026 (the final UI pass, card 1): one filled button for the next step, the rest in the "⋯" — Withdraw and
                         Delete red at the bottom, each asking first; the ESDAL details sheet is gone (card 2) */}
-                    <td className="text-right whitespace-nowrap" data-al-actions={m.id}>
+                    <td className="text-right whitespace-nowrap rd-actions" data-al-actions={m.id}>
                       {forwardOf(m) && <button type="button" className="btn-pri btn-sm mr-1" disabled={busy} onClick={() => setStatus(m, forwardOf(m))}>{AL_NEXT_WORD[forwardOf(m)]}</button>}
                       <RowMenu name={m.name} note={m.created_by ? `Planned by ${m.created_by}${m.created_at ? ", " + alDay(m.created_at.slice(0, 10)) : ""}` : null}>
                         <button type="button" disabled={busy} onClick={() => startEdit(m)}>Edit</button>
@@ -8411,7 +8525,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   }, [page]);
   // and put the hash on the URL for the page we actually opened with
   useEffect(() => { try { if(pageFromHash() !== page) history.replaceState(null, "", "#" + page); } catch(e){} }, []);
-  const [railOpen, setRailOpen] = useState(() => { try { return localStorage.getItem("modus_rail") !== "closed"; } catch(e){ return true; } });
+  const [railDesk, setRailOpen] = useState(() => { try { return localStorage.getItem("modus_rail") !== "closed"; } catch(e){ return true; } });
   // 13 Oct 2026 (W5, bundle E; the user's "3 yes"): below 768 px the rail was icons only, opening OVER the page.
   // 14 Oct 2026 (D9, the mobile shell): below 768 px there is NO rail. A bottom tab bar of four takes its place
   // (PhoneTabs: Dashboard, Look-ahead, Route map, More); "More" opens a sheet with the pages made for a desk, each of
@@ -8432,10 +8546,35 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
     const k = (e) => { if(e.key === "Escape") setMoreOpen(false); };
     window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
   }, [moreOpen]);
+  // 10 Nov 2026 (UI critique finding 3, John's decision 2; wave 4, notes\ui-fix-tablet-mockup-1110\ card 1): at 768–1024 px
+  // (TABLET_Q) the rail always opens FOLDED to its icons, whatever the desk's own Collapse choice says (that stays the
+  // desk's). "›" or Ctrl K opens the full rail OVER the page (railOver: the page does not move); picking a page, Escape or
+  // a tap outside folds it again. The waiting counts ride on the icons (.rail-dot), and each icon says its name when
+  // pointed at or focused (railTip) and to a screen reader (aria-label).
+  const TABLET_Q = TABLET_MQ;
+  const [tablet, setTablet] = useState(() => { try { return !!(window.matchMedia && window.matchMedia(TABLET_Q).matches); } catch(e){ return false; } });
+  const [railOver, setRailOver] = useState(false);
+  const [railTip, setRailTip] = useState(null);     // { label, top } of the folded icon pointed at or focused
+  useEffect(() => {
+    if(!window.matchMedia) return;
+    const mq = window.matchMedia(TABLET_Q);
+    const f = (e) => { setTablet(!!e.matches); setRailOver(false); setRailTip(null); };
+    if(mq.addEventListener) mq.addEventListener("change", f); else if(mq.addListener) mq.addListener(f);
+    return () => { if(mq.removeEventListener) mq.removeEventListener("change", f); else if(mq.removeListener) mq.removeListener(f); };
+  }, []);
+  useEffect(() => {
+    if(!railOver) return;
+    const k = (e) => { if(e.key === "Escape") setRailOver(false); };
+    window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k);
+  }, [railOver]);
+  const railOpen = tablet ? railOver : railDesk;
   const railShown = railOpen;
   const toggleRail = () => {
-    const v = !railOpen; setRailOpen(v); try { localStorage.setItem("modus_rail", v ? "open" : "closed"); } catch(e){}
+    if(tablet){ const v = !railOver; setRailOver(v); setRailTip(null); if(v) setTimeout(() => navRef.current && navRef.current.focus(), 0); return; }
+    const v = !railDesk; setRailOpen(v); try { localStorage.setItem("modus_rail", v ? "open" : "closed"); } catch(e){}
   };
+  // a page picked (from the rail, Find a page or anywhere else) folds the tablet's over-the-page rail again
+  useEffect(() => { setRailOver(false); setRailTip(null); }, [page]);
   // {routeId, year, toYear, discipline, sectionId} handed to the Matrix. `year` is the
   // FIRST year of the line and `toYear` the last — a line can span several since the
   // multi-year save, and reopening it on one year would hide the rest.
@@ -8460,7 +8599,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
   const [navQ, setNavQ] = useState("");
   const navRef = useRef(null);
   useEffect(() => {
-    const onKey = (e) => { if((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")){ e.preventDefault(); if(window.matchMedia && window.matchMedia(NARROW_Q).matches){ setMoreOpen(true); return; } setRailOpen(true); setTimeout(() => navRef.current && navRef.current.focus(), 0); } };
+    const onKey = (e) => { if((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")){ e.preventDefault(); if(window.matchMedia && window.matchMedia(NARROW_Q).matches){ setMoreOpen(true); return; } if(window.matchMedia && window.matchMedia(TABLET_Q).matches) setRailOver(true); else setRailOpen(true); setTimeout(() => navRef.current && navRef.current.focus(), 0); } };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   }, []);
   // G3: an item marked adminOnly (Users) shows to an admin. 27 Oct 2026 (F3 c): to an admin LOGIN only — the admin
@@ -8496,8 +8635,11 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
 
   return (
     <div className={"flex-1 min-h-0 flex relative" + (narrow ? " phone-shell" : "")}>
-      {!narrow && <aside data-guide="rail" className={"rail shrink-0 flex flex-col transition-[width] duration-150 " + (railShown ? "w-56" : "w-14") + (wallOn && page === "dashboard" ? " hidden" : "")}>
-        <div className="flex-1 overflow-y-auto py-3">
+      {!narrow && tablet && railOver && <div className="w-14 shrink-0" aria-hidden="true" data-rail-spacer="1" />}
+      {!narrow && tablet && railOver && <div className="rail-scrim" aria-hidden="true" data-rail-scrim="1" onClick={() => setRailOver(false)} />}
+      {!narrow && <aside data-guide="rail" className={"rail shrink-0 flex flex-col transition-[width] duration-150 " + (railShown ? "w-56" : "w-14") + (tablet && railOver ? " rail-over" : "") + (wallOn && page === "dashboard" ? " hidden" : "")}
+        data-rail-fold={tablet ? (railOver ? "over" : "folded") : undefined}>
+        <div className="flex-1 overflow-y-auto py-3" onScroll={() => railTip && setRailTip(null)}>
           {railShown && (
             <label className="rail-search" title="Find a page (Ctrl K)">
               <input ref={navRef} value={navQ} onChange={e => setNavQ(e.target.value)} placeholder="Find a page…" aria-label="Find a page"
@@ -8514,10 +8656,14 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
                 const active = page === it.id;
                 const badge = it.id === "forecasts" && canApprove && pending > 0 ? pending
                             : it.id === "concerns" && canApprove && concernNew > 0 ? concernNew : null;
+                const badgeWords = badge == null ? "" : it.id === "concerns" ? `${badge} new` : `${badge} waiting`;
+                const tipOn = (e) => { if(!tablet || railShown) return; const b = e.currentTarget.getBoundingClientRect(); setRailTip({ label: it.label + (badgeWords ? ", " + badgeWords : ""), top: b.top + b.height / 2 }); };
                 return (
-                  <button key={it.id} onClick={() => setPage(it.id)} title={railShown ? undefined : it.label}
+                  <button key={it.id} onClick={() => setPage(it.id)} title={railShown || tablet ? undefined : it.label}
+                    aria-label={railShown ? undefined : it.label + (badgeWords ? ", " + badgeWords : "")} aria-current={active ? "page" : undefined}
+                    onMouseEnter={tipOn} onFocus={tipOn} onMouseLeave={() => setRailTip(null)} onBlur={() => setRailTip(null)}
                     className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}>
-                    <NavIcon id={it.id} />
+                    <span className="rail-ico"><NavIcon id={it.id} />{badge != null && !railShown && <span className="rail-dot" aria-hidden="true" data-rail-dot={it.id}>{badge}</span>}</span>
                     {railShown && <span className="truncate flex-1">{it.label}</span>}
                     {badge != null && railShown && (
                       <span className="rail-count" title={it.id === "concerns" ? `${badge} new concern(s)` : `${badge} line(s) waiting for approval`}>{badge}</span>
@@ -8532,14 +8678,16 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
           {/* 2026-09-14: the user guide had no way in. It has been served at /help/ since
               10 Sep and nothing in the app linked to it, so the only way to reach it was
               to type the URL. An ANCHOR, not a NAV entry: /help/ is a separate document,
-              not a React view, and a new tab keeps the app's state. */}
-          <a href={"/help/?role=" + encodeURIComponent((role && role.role) || "")} target="_blank" rel="noopener noreferrer"
+              not a React view, and a new tab keeps the app's state. 10 Nov 2026 (wave 4): on a tablet it is in the
+              opened rail only. */}
+          {(!tablet || railShown) && <a href={"/help/?role=" + encodeURIComponent((role && role.role) || "")} target="_blank" rel="noopener noreferrer"
              title={railShown ? "Opens in a new tab" : "User guide"}
              className="w-full flex items-center gap-3 px-2 py-1.5 mb-1 text-xs rounded text-slate-500 hover:bg-slate-50 hover:text-[color:var(--navy)] transition">
             <span className="w-4 text-center text-sm leading-none opacity-80">?</span>
             {railShown && <span className="truncate">User guide</span>}
-          </a>
-          <button onClick={toggleRail} className="w-full text-xs text-slate-400 hover:text-slate-700 py-1" title={railShown ? "Collapse" : "Expand"}>
+          </a>}
+          <button onClick={toggleRail} className="w-full text-xs text-slate-400 hover:text-slate-700 py-1" title={railShown ? "Collapse" : "Expand"}
+            aria-expanded={tablet ? (railOver ? "true" : "false") : undefined} data-rail-toggle="1">
             {railShown ? "‹ Collapse" : "›"}
           </button>
           {railShown && role && (
@@ -8549,6 +8697,7 @@ function Portal({ role, who, meta, metaErr, vehLang, onPage }){
           )}
         </div>
       </aside>}
+      {!narrow && tablet && railTip && <div className="rail-tip" role="presentation" aria-hidden="true" style={{ top: railTip.top }} data-rail-tip="1">{railTip.label}</div>}
 
       <main className="flex-1 min-h-0 overflow-auto">
         {/* 14 Oct 2026 (D9): on a phone a desk page is this card, never the page itself (its write controls are
@@ -9647,7 +9796,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
               </select></label>
             </div>
             <div className="max-h-[72vh] overflow-auto rd-scroll">
-              <table className="tbl rd-table" data-rd-table="forecasts">
+              <table className="tbl rd-table tab-cards" data-rd-table="forecasts" style={{ "--tc-n": 3 }}>
                 <caption><b>Forecast lines</b> · {sortCaption}{counts.Pending ? `, ${counts.Pending} pending approval` : ""}</caption>
                 <thead>
                   <tr>
@@ -10103,8 +10252,11 @@ function ConfigPage({ meta, who, access }){
           <div {...cfgScroll(ro, tabLabel)}>
           <CfgFields ro={ro}>
           {tab === "vehicles" && (
-            <div className="overflow-auto">
-              <table className="tbl">
+            <div>
+              {/* 10 Nov 2026 (wave 4, card 7): on a desk the vehicle's name is held while the rest scrolls, a fade at the right
+                  edge while there is more; at 768–1024 px each vehicle is a card, two a row, each field with its label */}
+              <FadeScroll className="cfg-veh-fade" data-cfg-veh-scroll="1">
+              <table className="tbl cfg-veh" data-cfg-veh-table="1">
                 <thead>
                   <tr>
                     {["Vehicle", "English", "Estonian", "Payload t", "GVW t", `kg CO₂e / ${PER_DIST()}`, "Load min", "Unload min", "Euro class", "Planning"].filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}{h === "English" && <InfoTip id="cfg.veh.english" />}{(h === "Load min" || h === "Unload min") && <InfoTip id="cfg.veh.minutes" />}{h === "Euro class" && <InfoTip id="cfg.veh.euro" />}</th>)}
@@ -10117,28 +10269,29 @@ function ConfigPage({ meta, who, access }){
                     const nm = ((lab.en || "").trim() && lab.en.trim() !== k) ? lab.en.trim() : vehWord(k);
                     return (
                     <tr key={k}>
-                      <td><div className="font-medium text-slate-800 leading-tight" data-cfg-vehname>{nm}</div>{v.code && <div className="text-[13px] text-slate-500 leading-tight">{v.code}</div>}</td>
+                      <td className="cfg-veh-name"><div className="font-medium text-slate-800 leading-tight" data-cfg-vehname>{nm}</div>{v.code && <div className="text-[13px] text-slate-500 leading-tight">{v.code}</div>}</td>
                       {/* 9 Nov 2026 (card 10): a reader reads the name once, in the first column */}
-                      {!ro && <td className="min-w-[190px]"><input className={inp} value={(lab.en && lab.en !== k) ? lab.en : ""} placeholder={vehWord(k)} aria-label={`${nm} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>}
-                      {vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""} placeholder={vehWord(k)} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
-                      <td className="num w-24"><input className={inp + " text-right"} value={v.payload_t ?? ""} aria-label={`${nm} payload t`} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
-                      <td className="num w-24"><input className={inp + " text-right"} value={v.gvw_t ?? ""} aria-label={`${nm} GVW t`} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
-                      <td className="num w-28"><UnitNum className={inp + " text-right"} dp={5} placeholder={v.fuel === "electric" ? "derived: kWh × UK grid" : ""} value={v.emissions_kg_co2e_per_km} aria-label={`${nm} kg CO2e per ${PER_DIST()}`} onValue={n => upd(d => { d.vehicles[k].emissions_kg_co2e_per_km = n; })} /></td>
-                      <td className="num w-20"><input className={inp + " text-right"} value={v.load_minutes ?? ""} placeholder={String((doc.planning || {}).load_minutes ?? "")} aria-label={`${nm} load minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].load_minutes; else d.vehicles[k].load_minutes = n; })} /></td>
-                      <td className="num w-20"><input className={inp + " text-right"} value={v.unload_minutes ?? ""} placeholder={String((doc.planning || {}).unload_minutes ?? "")} aria-label={`${nm} unload minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].unload_minutes; else d.vehicles[k].unload_minutes = n; })} /></td>
+                      {!ro && <td className="min-w-[190px] cfg-veh-wide" data-label="English name"><input className={inp} value={(lab.en && lab.en !== k) ? lab.en : ""} placeholder={vehWord(k)} aria-label={`${nm} English name`} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), en: e.target.value }; })} /></td>}
+                      {vehLangEditable("ee") && <td className="min-w-[190px] cfg-veh-wide" data-label="Estonian name"><input className={inp} value={lab.ee || ""} placeholder={vehWord(k)} onChange={e => upd(d => { d.vehicles[k].labels = { ...(d.vehicles[k].labels || {}), ee: e.target.value }; })} /></td>}
+                      <td className="num w-24" data-label="Payload t"><input className={inp + " text-right"} value={v.payload_t ?? ""} aria-label={`${nm} payload t`} onChange={e => upd(d => { d.vehicles[k].payload_t = num(e.target.value); })} /></td>
+                      <td className="num w-24" data-label="GVW t"><input className={inp + " text-right"} value={v.gvw_t ?? ""} aria-label={`${nm} GVW t`} onChange={e => upd(d => { d.vehicles[k].gvw_t = num(e.target.value); })} /></td>
+                      <td className={"num w-28" + (v.fuel === "electric" ? " cfg-veh-span" : "")} data-label={`kg CO₂e / ${PER_DIST()}`}><UnitNum className={inp + " text-right"} dp={5} placeholder={v.fuel === "electric" ? "derived: kWh × UK grid" : ""} value={v.emissions_kg_co2e_per_km} aria-label={`${nm} kg CO2e per ${PER_DIST()}`} onValue={n => upd(d => { d.vehicles[k].emissions_kg_co2e_per_km = n; })} /></td>
+                      <td className="num w-20" data-label="Load min"><input className={inp + " text-right"} value={v.load_minutes ?? ""} placeholder={String((doc.planning || {}).load_minutes ?? "")} aria-label={`${nm} load minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].load_minutes; else d.vehicles[k].load_minutes = n; })} /></td>
+                      <td className="num w-20" data-label="Unload min"><input className={inp + " text-right"} value={v.unload_minutes ?? ""} placeholder={String((doc.planning || {}).unload_minutes ?? "")} aria-label={`${nm} unload minutes`} onChange={e => upd(d => { const n = num(e.target.value); if(n == null) delete d.vehicles[k].unload_minutes; else d.vehicles[k].unload_minutes = n; })} /></td>
                       {/* 14 Oct 2026 (bundle G, W8): the Euro class the plan assumes for this vehicle type — optional, read only by
                           the CLP section's chart 5; "not typed" deletes the key (never a guess) */}
-                      <td className="w-36"><select className={inp} value={v.euro_class || ""} aria-label={`${nm} Euro class`} data-cfg-euro={k}
+                      <td className="w-36" data-label="Euro class"><select className={inp} value={v.euro_class || ""} aria-label={`${nm} Euro class`} data-cfg-euro={k}
                         onChange={e => upd(d => { if(e.target.value) d.vehicles[k].euro_class = e.target.value; else delete d.vehicles[k].euro_class; })}>
                         <option value="">not typed</option>{EURO_CLASSES.map(x => <option key={x} value={x}>{x}</option>)}
                       </select></td>
                       {/* 11 Oct 2026: a tick keeps the planning list's ORDER (the first is the payload fallback) and adds a
                           newly ticked vehicle at the end; until then every tick rebuilt the list in file order */}
-                      <td className="text-center"><input type="checkbox" checked={!!v.planning_vehicle} aria-label={`${nm} is a planning vehicle`} onChange={e => upd(d => { d.vehicles[k].planning_vehicle = e.target.checked; const kept = (d.planning_vehicles || []).filter(x => d.vehicles[x] && d.vehicles[x].planning_vehicle); d.planning_vehicles = [...kept, ...Object.keys(d.vehicles).filter(x => !x.startsWith("_") && d.vehicles[x].planning_vehicle && !kept.includes(x))]; })} /></td>
+                      <td className="text-center cfg-veh-tick" data-label="Planning"><input type="checkbox" checked={!!v.planning_vehicle} aria-label={`${nm} is a planning vehicle`} onChange={e => upd(d => { d.vehicles[k].planning_vehicle = e.target.checked; const kept = (d.planning_vehicles || []).filter(x => d.vehicles[x] && d.vehicles[x].planning_vehicle); d.planning_vehicles = [...kept, ...Object.keys(d.vehicles).filter(x => !x.startsWith("_") && d.vehicles[x].planning_vehicle && !kept.includes(x))]; })} /></td>
                     </tr>
                   ); })}
                 </tbody>
               </table>
+              </FadeScroll>
             </div>
           )}
 
@@ -12219,6 +12372,9 @@ function laEnds(meta){
   return m;
 }
 function LookAhead({ meta, who, access, initialPage, initialView }){
+  // 10 Nov 2026 (wave 4, card 6): at 768–1024 px the Status column goes and its chip sits under the route's name, and the
+  // day columns narrow, so Monday to Friday and the week fit at 768 with the rail folded; more days scroll, the route held
+  const laTab = useMQ(TABLET_MQ);
   const { months } = meta;
   const [view, setView] = useState(() => { if(initialView) return initialView; try { return localStorage.getItem("modus_la_view") || "commit"; } catch(e){ return "commit"; } });
   const [bucket, setBucket] = useState("commit");        // 'commit' = the week containing today · 'next' = the Thursday process
@@ -12506,13 +12662,13 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               <div className="rd-bar">
                 <UnitSwitch value={unitSel} onChange={setUnitSel} note={unitSel !== "tonnes" ? "Switch to Tonnes to type a day's plan." : null} />
               </div>
-              <div className="overflow-auto rd-scroll">
-                <table className="tbl compact rd-table" data-rd-table="lookahead" style={{ minWidth: `${440 + dates.length * 96}px` }}>
+              <div className="overflow-auto rd-scroll" data-la-tab={laTab ? "1" : undefined}>
+                <table className="tbl compact rd-table" data-rd-table="lookahead" style={{ minWidth: laTab ? `${200 + (dates.length + 1) * 70}px` : `${440 + dates.length * 96}px` }}>
                   <caption><b>{unitSel === "loads" ? "Loads by day" : unitSel === "lorries" ? "Lorries needed by day" : "Planned quantity by day"}</b><InfoTip id="la.commit" /></caption>
                   <thead>
                     <tr>
                       <th className="la-stick" style={{ minWidth: 280 }}>Route</th>
-                      <th>Status</th>
+                      {!laTab && <th>Status</th>}
                       {dates.map(iso => {
                         const t = iso === today;
                         return (
@@ -12537,19 +12693,21 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                       const veh = c.vehicle_short || vehLabel(c.vehicle_type) || "—";
                       const own = line.unit && line.unit !== "t" ? ` ${unitLbl(line.unit)}` : "";
                       return (
-                        <RowDetails key={lk} rowKey={"la-" + lk} isOpen={laOpen(lk)} onToggle={() => laToggle(lk)} colSpan={3 + dates.length}
+                        <RowDetails key={lk} rowKey={"la-" + lk} isOpen={laOpen(lk)} onToggle={() => laToggle(lk)} colSpan={(laTab ? 2 : 3) + dates.length}
                           label={`Details for ${line.route_id}${line.discipline ? ", " + line.discipline : ""}`}
                           firstClass="la-stick" firstStyle={{ minWidth: 280 }}
                           rowProps={{ "data-la-line": lk }}
-                          summary={<>{c.origin_name || line.route_id} <span className="text-slate-400 font-normal">→</span> {c.dest_name || "—"}</>}
+                          summary={<>{c.origin_name || line.route_id} <span className="text-slate-400 font-normal">→</span> {c.dest_name || "—"}
+                            {laTab && <span className="la-st-under" data-la-st-under="1"><RowStatus word={st.word} tone={st.tone} more={st.more} />
+                              {laCarryLine(carryBy[laCarryKey(line)], lf.some(f => f.code === "SHORTAGE"))}</span>}</>}
                           chips={[teamWord, c.material_type || null,
                                   /* 28 Oct 2026 (task 0c): a dated zone diverts the route on some of this week's days */
                                   (c.diversion && c.diversion.share > 0) ? "Diverted" : null,
                                   /* 5 Nov 2026 (task 0d-2): the route's lorries take another road in the busy hours */
                                   (c.busy_hours && (c.busy_hours.options || []).length) ? `Busy hours: Alt ${c.busy_hours.options[0].alt}` : null]}
                           cells={<>
-                            <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} />
-                              {laCarryLine(carryBy[laCarryKey(line)], lf.some(f => f.code === "SHORTAGE"))}</td>
+                            {!laTab && <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} />
+                              {laCarryLine(carryBy[laCarryKey(line)], lf.some(f => f.code === "SHORTAGE"))}</td>}
                             {weekdaysOf(line).map(d => {
                               const k = `${lk}|${d.day_date}|p`;
                               const t = d.day_date === today;
@@ -12640,7 +12798,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                     <tr className="la-total rd-card">
                       <td className="la-stick" data-label="Total">{lines.length} line{lines.length === 1 ? "" : "s"}
                         {unitSel === "tonnes" && laMixNote(lines) && <span className="la-sub" data-la-mix="1">{laMixNote(lines)}</span>}</td>
-                      <td></td>
+                      {!laTab && <td></td>}
                       {dates.map(iso => {
                         let tt = 0, tr = 0, vv = 0;
                         lines.forEach(l => (l.days || []).forEach(d => { if(d.day_date === iso){ const f = d.derived || {}; tt += f.tonnes || 0; tr += f.trips || 0; vv += f.vehicles || 0; } }));
@@ -16327,6 +16485,18 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     return () => { mq.removeEventListener ? mq.removeEventListener("change", on) : mq.removeListener(on); };
   }, []);
 
+  // 10 Nov 2026 (wave 4, card 5): at 768–1024 px the map keeps the full width and the side panel (the key, the page's note,
+  // the editor) sits UNDER it, as below 768: the 1024 px side-by-side squeezed the map to ~300 px. Drawing and full screen
+  // keep isWide as they were.
+  const [tabletW, setTabletW] = useState(() => { try { return window.matchMedia("(min-width: 768px) and (max-width: 1024px)").matches; } catch(e){ return false; } });
+  useEffect(() => {
+    let mq;
+    try { mq = window.matchMedia("(min-width: 768px) and (max-width: 1024px)"); } catch(e){ return; }
+    const on = () => setTabletW(mq.matches);
+    mq.addEventListener ? mq.addEventListener("change", on) : mq.addListener(on);
+    return () => { mq.removeEventListener ? mq.removeEventListener("change", on) : mq.removeListener(on); };
+  }, []);
+
   // ---- reactive locations (for the route-authoring pickers) ----
   const [locs, setLocs] = useState([]);
   const featProps = (gj) => (gj.features || []).map(f => ({ ...f.properties }));
@@ -18013,7 +18183,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const onRoutes = subTab === "routes";
   // side by side, the panel column matches the map and scrolls inside itself, so the
   // map never slides out from under whatever you're editing
-  const panelStyle = isWide ? { height: MAP_H, overflowY: "auto" } : undefined;
+  const panelStyle = isWide && !tabletW ? { height: MAP_H, overflowY: "auto" } : undefined;
   const th = "px-3 py-2 text-left font-semibold";
 
   return (
@@ -18075,13 +18245,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           the middle (the SAME div, placed by grid column, so the map is never unmounted), its settings right; the panel is hidden */}
       {/* 5 Nov 2026: in full screen (sl-full) the same grid lies over the whole window: the Drawing bar, then palette | map |
           settings filling the height (either side folds to a strip); before Draw, the map | the site's panel */}
-      <div ref={fullGrid} className={(drawing ? "grid gap-3" : "grid lg:grid-cols-3 gap-4") + (full ? " sl-full" : "")} data-drawing={drawing ? "1" : undefined} data-full={full ? "1" : undefined}
+      <div ref={fullGrid} className={(drawing ? "grid gap-3" : "grid dm-grid gap-4") + (full ? " sl-full" : "")} data-drawing={drawing ? "1" : undefined} data-full={full ? "1" : undefined}
         style={full ? (drawing ? { gridTemplateColumns: `${fold.l ? 44 : 232}px minmax(0, 1fr) ${fold.r ? 44 : 300}px`, gridTemplateRows: "auto minmax(0, 1fr)" }
           : onRoutes ? { gridTemplateColumns: `${fold.l ? 44 : 300}px minmax(0, 1fr) ${fold.r ? 44 : 380}px`, gridTemplateRows: "minmax(0, 1fr)" }
           : { gridTemplateColumns: "minmax(0, 1fr) 380px", gridTemplateRows: "minmax(0, 1fr)" })
           : drawing && isWide ? { gridTemplateColumns: "232px minmax(0, 1fr) 300px" } : undefined}>
         {/* ONE map instance, shared by both sub-tabs — this div is never unmounted */}
-        <div className={drawing ? "card overflow-hidden" : "lg:col-span-2 card overflow-hidden"}
+        <div className={drawing ? "card overflow-hidden" : "dm-map card overflow-hidden"}
           style={full ? { gridColumn: (drawing || onRoutes) ? 2 : 1, gridRow: drawing ? 2 : 1, minHeight: 0, position: "relative" } : drawing && isWide ? { gridColumn: 2, gridRow: 2, position: "relative" } : { position: "relative" }}>
           <div ref={mapDiv} style={{ height: full ? "100%" : drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />
           {onRoutes && !drawing && <RouteMapBox low={full && !!TENANT.demo_notice} leg={showLeg} onLeg={setShowLeg} on={rLayers} counts={rLayerCounts} onTick={toggleRLayer} msg={rlMsg} />}
@@ -19115,7 +19285,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           </button>}
         </div>
         <div className="overflow-auto kb-scroll" style={{ maxHeight: "40vh" }} tabIndex={0} role="region" aria-label="Locations table">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm tab-cards" data-tab-cards="locations">
             <thead className="bg-slate-50 text-slate-500 text-xs sticky top-0">
               <tr>
                 <th className={th}>Location</th>
@@ -19132,26 +19302,26 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               {locs.map(l => (
                 <tr key={l.id} onClick={() => locateNode(l.id)}
                   className={"border-t border-slate-100 cursor-pointer " + ((form && form.id === l.id) ? "bg-blue-50" : "hover:bg-slate-50")}>
-                  <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap">
+                  <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap rd-primary tc-span-all">
                     <button type="button" className="row-open" data-loc-open={l.id} aria-label={canEdit ? `Edit ${l.name}` : `Show ${l.name} on the map`}
                       aria-current={(form && form.id === l.id) ? "true" : undefined}
                       onClick={(e) => { e.stopPropagation(); openLocFromKeys(l.id); }}>{l.name}</button>
                   </td>
-                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{l.loc_type || "—"}</td>
-                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{ROLE_LABEL[l.role] || l.role || "—"}</td>
-                  <td className="px-3 py-2"><CatChips list={l.supplies} /></td>
-                  <td className="px-3 py-2"><CatChips list={l.receives} dir="in" /></td>
-                  <td className="px-3 py-2 text-right tabular-nums text-xs text-slate-500 whitespace-nowrap">
+                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap" data-label="Type">{l.loc_type || "—"}</td>
+                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap" data-label="Role">{ROLE_LABEL[l.role] || l.role || "—"}</td>
+                  <td className="px-3 py-2 tc-span2 tc-late" data-label="Supplies"><CatChips list={l.supplies} /></td>
+                  <td className="px-3 py-2 tc-span2 tc-late" data-label="Receives"><CatChips list={l.receives} dir="in" /></td>
+                  <td className="px-3 py-2 text-right tabular-nums text-xs text-slate-500 whitespace-nowrap tc-late" data-label="Coordinates">
                     {Number(l.lat).toFixed(5)}, {Number(l.lon).toFixed(5)}
                   </td>
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-3 py-2 text-center" data-label="Gate">
                     {(l.gate_lat != null && l.gate_lon != null)
                       ? <span title={`Routes via ${Number(l.gate_lat).toFixed(5)}, ${Number(l.gate_lon).toFixed(5)}`}
                           className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                           style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>
                       : <span className="text-slate-500" title="Routes to the marker itself">—</span>}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
+                  <td className="px-3 py-2 text-right tabular-nums" data-label="Routes">
                     {routeCounts[l.id]
                       ? routeCounts[l.id]
                       : <span className="text-slate-500">0</span>}
@@ -19208,7 +19378,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           <div className="px-4 py-2 border-b border-slate-100 text-xs text-slate-600 bg-slate-50">{routeMsg}</div>
         )}
         <div className="overflow-auto" style={{ maxHeight: "40vh" }}>
-          <table className="w-full text-sm">
+          <table className="w-full text-sm tab-cards" data-tab-cards="routes">
             <thead className="bg-slate-50 text-slate-500 text-xs sticky top-0">
               <tr>
                 <th className="px-2 py-2 w-6"></th>
@@ -19232,8 +19402,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 return (
                   <React.Fragment key={r.id}>
                   <tr onClick={() => selectRoute(r.id)}
-                    className={"border-t border-slate-100 cursor-pointer " + (selected === r.id ? "bg-blue-50" : "hover:bg-slate-50")}>
-                    <td className="px-2 py-2">
+                    className={"border-t border-slate-100 cursor-pointer tc-has-tri " + (selected === r.id ? "bg-blue-50" : "hover:bg-slate-50")}>
+                    <td className="px-2 py-2 tc-tri">
                       <button
                         onClick={(e) => { e.stopPropagation(); setOpenRow(open ? null : r.id); }}
                         title={open ? "Hide analysis" : "Show haul-cycle analysis"}
@@ -19244,12 +19414,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                           transform: open ? "rotate(90deg)" : "none", fontSize: 10 }}>▶</span>
                       </button>
                     </td>
-                    <td className="px-3 py-2 font-medium text-slate-800" style={{ width: "1%", whiteSpace: "nowrap" }}>
+                    <td className="px-3 py-2 font-medium text-slate-800 tc-lead" style={{ width: "1%", whiteSpace: "nowrap" }}>
                       <button type="button" className="row-open" data-route-open={r.id} aria-label={`Show ${r.id} on the map`}
                         aria-current={selected === r.id ? "true" : undefined}
                         onClick={(e) => { e.stopPropagation(); selectRoute(r.id); }}>{r.id}</button>
                     </td>
-                    <td className="px-3 py-2" style={{ minWidth: 220 }}>
+                    <td className="px-3 py-2 tc-lead tc-span3" style={{ minWidth: 220 }}>
                       <span className="text-slate-700">{r.origin} → {r.dest}</span>
                       <span className="flex flex-wrap items-center gap-1 mt-1" data-route-notes={r.id}>
                       {!!(r.gate_blockers || []).length && (
@@ -19313,17 +19483,17 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       )}
                       </span>
                     </td>   {/* 30 Oct 2026 (4b): may wrap, so the Near the route column does not push the row's buttons off a 1280 px screen */}
-                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }}>{teamText(r.ipt) || "—"}</td>
-                    <td className="px-3 py-2" style={{ whiteSpace: "nowrap" }} data-route-near-cell={r.id}><NearCell data={nearData} id={r.id} /></td>
+                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }} data-label={TEAM()}>{teamText(r.ipt) || "—"}</td>
+                    <td className="px-3 py-2 tc-span3" style={{ whiteSpace: "nowrap" }} data-label="Near the route" data-route-near-cell={r.id}><NearCell data={nearData} id={r.id} /></td>
                     {(() => { const o = legFig(pinfo, "loaded", showAlt), b = legFig(pinfo, "return", showAlt);
                       return <>
-                        <td className="px-3 py-2 text-right tabular-nums" data-leg-out={r.id}>{o ? fmtDist(o.km, 1) : "—"}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{o && o.min != null ? o.min : "—"}</td>
-                        <td className="px-3 py-2 text-right tabular-nums" data-leg-back={r.id}>{b ? fmtDist(b.km, 1) : "—"}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{b && b.min != null ? b.min : "—"}</td>
+                        <td className="px-3 py-2 text-right tabular-nums" data-label={`Out ${DU()}`} data-leg-out={r.id}>{o ? fmtDist(o.km, 1) : "—"}</td>
+                        <td className="px-3 py-2 text-right tabular-nums" data-label="Out min">{o && o.min != null ? o.min : "—"}</td>
+                        <td className="px-3 py-2 text-right tabular-nums" data-label={`Back ${DU()}`} data-leg-back={r.id}>{b ? fmtDist(b.km, 1) : "—"}</td>
+                        <td className="px-3 py-2 text-right tabular-nums" data-label="Back min">{b && b.min != null ? b.min : "—"}</td>
                       </>; })()}
-                    <td className="px-3 py-2" style={{ whiteSpace: "nowrap" }}><VehCount profiles={r.profiles} /></td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <td className="px-3 py-2 tc-late" style={{ whiteSpace: "nowrap" }} data-label="Vehicles"><VehCount profiles={r.profiles} /></td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap rd-actions tc-late">
                       {canEdit && <>
                       <button onClick={(e) => { e.stopPropagation(); rebakeRoute(r.id, Object.keys(r.profiles || {})); }}
                         disabled={bakeBusy === r.id}
@@ -19395,7 +19565,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           </span>}
         </div>
         <div className="overflow-auto" style={{ maxHeight: "40vh" }}>
-          <table className="w-full text-sm">
+          <table className="w-full text-sm tab-cards" data-tab-cards="zones">
             <thead className="bg-slate-50 text-slate-500 text-xs sticky top-0">
               <tr>
                 <th className={th}>Name</th><th className={th}>Kind</th>
@@ -19409,14 +19579,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 return (
                   <tr key={z.id} onClick={() => editZone(z)}
                       className={"cursor-pointer hover:bg-slate-50 " + (zoneSel === z.id ? "bg-slate-50" : "")}>
-                    <td className="px-3 py-2 font-medium">
+                    <td className="px-3 py-2 font-medium rd-primary">
                       <button type="button" className="row-open" data-zone-open={z.id} aria-label={canEdit ? `Edit ${z.name}` : `Show ${z.name} on the map`}
                         aria-current={zoneSel === z.id ? "true" : undefined}
                         onClick={(e) => { e.stopPropagation(); openZoneFromKeys(z); }}>{z.name}</button>
                       {zoneFrom[z.id] && <span className="block text-xs font-normal text-slate-500" data-zone-from-layout={z.id}>From the {zoneFrom[z.id].site} site layout</span>}
                     </td>
-                    <td className="px-3 py-2 text-slate-500">{(ZONE_KINDS.find(k => k[0] === z.kind) || [null, z.kind])[1]}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2 text-slate-500" data-label="Kind">{(ZONE_KINDS.find(k => k[0] === z.kind) || [null, z.kind])[1]}</td>
+                    <td className="px-3 py-2" data-label="Routing">
                       {/* 22 Oct 2026 (UI fix 6, card 6): "Routed through" on a solid var(--haul-soft) in var(--haul-text); the user's extra: "Avoided" is
                           #B91C1C on its pink (5.53:1, was #DC2626 at 4.13:1), a fixed pair in every look */}
                       {z.kind === HAUL_KIND
@@ -19441,14 +19611,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         ? <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>
                         : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>}
                     </td>
-                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }}>{z.starts_on || "—"}</td>
-                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }}>{z.ends_on || "—"}</td>
-                    <td className="px-3 py-2 text-xs">
+                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }} data-label="From">{z.starts_on || "—"}</td>
+                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }} data-label="To">{z.ends_on || "—"}</td>
+                    <td className="px-3 py-2 text-xs rd-status">
                       {!z.active ? <span className="text-slate-400">Inactive</span>
                         : force ? <span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>
                         : <span className="text-slate-400">Out of window</span>}
                     </td>
-                    <td className="px-3 py-2 text-xs">
+                    <td className="px-3 py-2 text-xs" data-label="Used by">
                       {/* 22 Oct 2026 (UI fix 6, card 6): "no routes" reads var(--haul-text) */}
                       {/* 28 Oct 2026 (task 0c): a dated routing zone says what it diverts, and what it cannot */}
                       {z.kind === LIMIT_KIND
@@ -19474,7 +19644,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                             no routes
                           </span>}
                     </td>
-                    <td className="px-3 py-2 text-right" onClick={e => e.stopPropagation()}>
+                    <td className="px-3 py-2 text-right rd-actions" onClick={e => e.stopPropagation()}>
                       {/* 27 Oct 2026 (the final UI pass, card 1) */}
                       {canEdit && <RowMenu name={z.name || z.id}>
                         <button type="button" onClick={() => editZone(z)}>Edit</button>
