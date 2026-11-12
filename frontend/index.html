@@ -194,7 +194,6 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   html[data-theme="dark"] .disabled\:text-slate-500:disabled{color:#A9AFB8}
   html[data-theme="dark"] .divide-slate-100{--tw-divide-opacity:1;border-color:#2A2D33}
   html[data-theme="dark"] .divide-slate-200{--tw-divide-opacity:1;border-color:#33363D}
-  html[data-theme="dark"] .hover\:bg-red-50:hover{background-color:rgba(239,68,68,.14)}
   html[data-theme="dark"] .hover\:bg-slate-100:hover{background-color:var(--surface-3)}
   html[data-theme="dark"] .hover\:bg-slate-200:hover{background-color:#2F3238}
   html[data-theme="dark"] .hover\:bg-slate-50:hover{background-color:var(--surface-2)}
@@ -1339,6 +1338,8 @@ const divWhen = (from, to) => {
   if(a.y === b.y) return `${a.d} ${MONTHS[a.m - 1]} – ${b.d} ${MONTHS[b.m - 1]} ${b.y}`;
   return `${a.d} ${MONTHS[a.m - 1]} ${a.y} – ${b.d} ${MONTHS[b.m - 1]} ${b.y}`;
 };
+// 11 Nov 2026 (CLOCS card B-F4): one day in words, "5 Oct 2026" (the Zones table's From and To, as divWhen says them)
+const dayWords = (iso) => { const a = _dvD(iso); return a ? `${a.d} ${MONTHS[a.m - 1]} ${a.y}` : null; };
 const divMonths = (from, to) => {
   const a = _dvD(from), b = _dvD(to);
   if(!a || !b) return a ? `from ${MONTHS[a.m - 1]} ${a.y}` : (b ? `until ${MONTHS[b.m - 1]} ${b.y}` : "");
@@ -14753,6 +14754,39 @@ function RouteSheetButton({ routeId }){
     </span>
   );
 }
+// 11 Nov 2026 (CLOCS card B-F2, John's yes): the route sheet leaves an untyped part out, so the Routes bar says which of
+// the route's own words are missing, beside the Route sheet button; "Add" (an admin) opens the route's form at that field.
+function sheetWordsMissing(r){
+  if(!r || !r.id) return null;
+  const why = !String(r.route_reason || "").trim(), div = !String(r.permitted_deviations || "").trim();
+  return why && div ? "No reason or diversions typed" : why ? "No reason typed" : div ? "No diversions typed" : null;
+}
+function SheetWordsNote({ route, canEdit, onAdd }){
+  const words = sheetWordsMissing(route);
+  if(!words) return null;
+  return (
+    <span className="text-xs" data-sheet-words-missing={route.id} style={{ color: "var(--warn-text)", whiteSpace: "nowrap" }}>
+      {words}{canEdit && <> · <button type="button" className="underline" data-sheet-words-add={route.id}
+        style={{ color: "inherit", background: "none", border: 0, padding: 0, font: "inherit", cursor: "pointer" }}
+        aria-label={`Add the route sheet words for ${route.id}`} onClick={() => onAdd(route)}>Add</button></>}
+    </span>
+  );
+}
+// 11 Nov 2026 (CLOCS card B-F6, John's yes): the Routes bar's network jobs (both legs, busy-hour times, Route all, Clear all
+// routes) in one "Routing ▾" menu set apart from the reader's buttons; each job still asks first, as before. While one runs
+// the button says so.
+function RoutingMenu({ busy, children }){
+  const ref = useRef(null);
+  useRowMenuPlace(ref);
+  const pick = e => { const b = e.target.closest ? e.target.closest("button") : null; if (b && !b.disabled && ref.current) ref.current.open = false; };
+  return (
+    <details className="row-menu bulletin-menu" data-routing-menu="1" ref={ref}>
+      <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 10px", fontWeight: 500 }}
+               title="Route the network again, busy-hour times, clear the routes">{busy ? "Routing…" : "Routing ▾"}</summary>
+      <div className="row-menu-list dash-filters" onClick={pick}>{children}</div>
+    </details>
+  );
+}
 // ---- 9 Nov 2026 (v2.1 task 2.1-6): the ROUTE ANALYSIS, replacing the two collision evidence buttons --------------------
 // One file (PDF or XLSX) for the routes ticked here (the one picked in the list first; up to 12), for one lorry, with the
 // sections ticked (remembered in this browser). Drawn on the server from what Wayscope holds; nothing is fetched for it.
@@ -14762,8 +14796,11 @@ const RA_SECTIONS = [["limits", "A", "Restrictions and lorry limits"], ["communi
   ["collisions", "C", "Collisions"], ["cycle", "D", "Cycle routes and left turns"], ["hours", "E", "Busy-hour times"],
   ["diversions", "F", "Diversions"], ["assessor", "", "The page for the assessor"]];
 const RA_KEY = "wayscope.routeAnalysis.sections";
+// 11 Nov 2026 (CLOCS card B-F5, John's yes): sections A-F are remembered as ticked; the page for the assessor is ticked
+// again every time the menu opens (raWithAssessor), so a file is never made without it unless it is unticked for that file.
+const raWithAssessor = (v) => v.includes("assessor") ? v : [...v, "assessor"];
 function raSaved(){
-  try { const v = JSON.parse(localStorage.getItem(RA_KEY) || "null"); if(Array.isArray(v) && v.length) return v; } catch(e){}
+  try { const v = JSON.parse(localStorage.getItem(RA_KEY) || "null"); if(Array.isArray(v) && v.length) return raWithAssessor(v); } catch(e){}
   return RA_SECTIONS.map(x => x[0]);
 }
 // Pins the open Route analysis menu inside the window: below its button, or above when there is more room there, as tall
@@ -14835,7 +14872,8 @@ function RouteAnalysisMenu({ routes, picked, vehicles }){
   };
   const first = chosen[0];
   return (
-    <details className="row-menu bulletin-menu" data-route-analysis="1" ref={ref} onToggle={e => setOpen(e.currentTarget.open)}>
+    <details className="row-menu bulletin-menu" data-route-analysis="1" ref={ref}
+      onToggle={e => { const o = e.currentTarget.open; setOpen(o); if(o) setSecs(raWithAssessor); }}>
       <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 10px", fontWeight: 500 }}
                title="Evidence for the route risk assessment, as a PDF or a spreadsheet">Route analysis ▾</summary>
       {open && <div className="row-menu-list dash-filters ra-menu">
@@ -17425,6 +17463,18 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     setEVehicles(Object.keys(r.profiles || {}).sort());
     setSubTab("routes"); setRouteMsg("");
   };
+  // 11 Nov 2026 (CLOCS card B-F6): the row's Route asks first
+  const routeAgainAsk = (r) => {
+    const had = Object.keys(r.profiles || {}).length;
+    if(!confirm(had ? `Route ${r.id} again? Its lines are replaced.` : `Route ${r.id}?`)) return;
+    rebakeRoute(r.id, Object.keys(r.profiles || {}));
+  };
+  // 11 Nov 2026 (CLOCS card B-F2): "Add" beside the missing route sheet words opens the route's form at the first missing field
+  const addSheetWords = (r) => {
+    startEditRoute(r);
+    const k = String(r.route_reason || "").trim() ? "Permitted diversions" : "Why this route";
+    setTimeout(() => { const t = document.querySelector(`[data-route-sheet-text] textarea[aria-label="${k}"]`); if(t){ t.scrollIntoView({ block: "center" }); t.focus(); } }, 120);
+  };
   const cancelEditRoute = () => {
     setEditingRoute(null); setRDest(""); setRIpt(""); setRMaterial(""); setRIdTouched(false);
     setEVehicles([]); setRouteMsg("");
@@ -19171,35 +19221,34 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             <RouteMapExportMenu months={meta.months} ipts={meta.ipts} picked={selected} />
             {/* 16 Oct 2026 (CLOCS v5 C3): the route sheet for drivers, for the route picked in the list */}
             <RouteSheetButton routeId={selected} />
+            <SheetWordsNote route={(status || []).find(x => x.id === selected)} canEdit={canEdit} onAdd={addSheetWords} />
             {/* 9 Nov 2026 (v2.1 task 2.1-6): the route analysis (the collision evidence is its section C) */}
             <RouteAnalysisMenu routes={status || []} picked={selected} vehicles={vehicles} />
             {/* Bulk bake. Vehicles come from the tick-boxes on the Create route panel so
-                there is one vehicle list on the tab rather than two that can disagree. */}
-            {canEdit && <>
-            <select value={bakeLegs} onChange={e => setBakeLegs(e.target.value)} className={sel}
-              title="Both legs gives a cycle time. Laden only is quicker but leaves the return not routed.">
+                there is one vehicle list on the tab rather than two that can disagree.
+                11 Nov 2026 (CLOCS card B-F6): in the Routing menu, set apart; each still asks first. */}
+            {canEdit && <RoutingMenu busy={routeBusy}>
+            <label><span>Legs to route</span><select value={bakeLegs} onChange={e => setBakeLegs(e.target.value)}
+              aria-label="Legs to route" title="Both legs gives a cycle time. Laden only is quicker but leaves the return not routed.">
               <option value="both">Both legs</option>
               <option value="loaded">Laden leg only</option>
-            </select>
+            </select></label>
+            <button type="button" onClick={bulkBake} disabled={routeBusy || !(status && status.length)} data-route-all="1"
+              title={rVehicles.length
+                ? `Route the whole network for ${rVehicles.map(vehShort).join(", ")} — ticked on the Create route panel`
+                : `No vehicles ticked on the Create route panel — will use ${vehShort(showProfile)}`}>
+              {`Route all · ${(rVehicles.length || 1)} vehicle(s)`}
+            </button>
             {hourPlan && hourPlan.legs > 0 && (
-              <button onClick={hourBake} disabled={routeBusy} data-hour-bake style={{ whiteSpace: "nowrap" }}
-                className="text-xs font-semibold px-2.5 py-1 rounded-md border border-slate-300 disabled:opacity-40">
+              <button type="button" onClick={hourBake} disabled={routeBusy} data-hour-bake style={{ whiteSpace: "nowrap" }}>
                 {`Busy-hour times · ${hourPlan.here_calls} calls`}
               </button>
             )}
-            <button onClick={bulkBake} disabled={routeBusy || !(status && status.length)}
-              title={rVehicles.length
-                ? `Route the whole network for ${rVehicles.map(vehShort).join(", ")} — ticked on the Create route panel`
-                : `No vehicles ticked on the Create route panel — will use ${vehShort(showProfile)}`}
-              className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40"
-              style={{ background: "var(--action)" }}>
-              {routeBusy ? "Routing…" : `Route all · ${(rVehicles.length || 1)} vehicle(s)`}
-            </button>
-            <button onClick={clearRoutes} disabled={routeBusy || !(status && status.length)}
-              className="text-xs font-semibold px-2.5 py-1 rounded-md border border-slate-200 text-[color:var(--red)] hover:bg-red-50 disabled:opacity-40">
+            <button type="button" onClick={clearRoutes} disabled={routeBusy || !(status && status.length)} data-clear-routes="1"
+              style={{ color: "var(--red)" }}>
               Clear all routes
             </button>
-            </>}
+            </RoutingMenu>}
           </span>
         </div>
         {routeMsg && (
@@ -19323,16 +19372,16 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <td className="px-3 py-2" style={{ whiteSpace: "nowrap" }}><VehCount profiles={r.profiles} /></td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       {canEdit && <>
-                      <button onClick={(e) => { e.stopPropagation(); rebakeRoute(r.id, Object.keys(r.profiles || {})); }}
-                        disabled={bakeBusy === r.id}
-                        title={Object.keys(r.profiles || {}).length
-                          ? `Route again for ${Object.keys(r.profiles).map(vehShort).join(", ")}`
-                          : `Not routed yet — will route for ${vehShort(showProfile)}`}
-                        className="btn-sec btn-sm mr-1">   {/* 18 Oct 2026 (UI audit #29): the one button that spends HERE calls was 16 px tall */}
-                        {bakeBusy === r.id ? "Routing…" : "Route"}
-                      </button>
-                      {/* 27 Oct 2026 (the final UI pass, card 1): Edit and Delete in the "⋯"; Route stays as the row's one visible button */}
+                      {bakeBusy === r.id && <span className="text-xs text-slate-500 mr-1" data-route-busy={r.id}>Routing…</span>}
+                      {/* 27 Oct 2026 (the final UI pass, card 1): Edit and Delete in the "⋯". REVERSED 11 Nov 2026 (CLOCS card
+                          B-F6, John's yes): Route is no longer the row's visible button; it is in the "⋯" and asks first (one
+                          click routed the route again at once, replacing its lines and spending routing calls) */}
                       <span onClick={e => e.stopPropagation()}><RowMenu name={r.id}>
+                        <button type="button" data-route-again={r.id} disabled={bakeBusy === r.id}
+                          title={Object.keys(r.profiles || {}).length
+                            ? `Route again for ${Object.keys(r.profiles).map(vehShort).join(", ")}`
+                            : `Not routed yet — will route for ${vehShort(showProfile)}`}
+                          onClick={() => routeAgainAsk(r)}>{Object.keys(r.profiles || {}).length ? "Route again" : "Route"}</button>
                         {(((holdSum || {}).routes || []).find(x => x.route_id === r.id) || {}).state === "route_again" && <button type="button" data-route-via-holding={r.id} onClick={() => rebakeRoute(r.id, Object.keys(r.profiles || {}), true)}>Route again through the holding area</button>}
                         <button type="button" onClick={() => startEditRoute(r)}>Edit</button>
                         <button type="button" style={{ color: "var(--red)" }} onClick={() => deleteRoute(r.id)}>Delete…</button>
@@ -19439,8 +19488,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         ? <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>
                         : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>}
                     </td>
-                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }}>{z.starts_on || "—"}</td>
-                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }}>{z.ends_on || "—"}</td>
+                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }} data-zone-from={z.id}>{dayWords(z.starts_on) || "—"}</td>
+                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }} data-zone-to={z.id}>{dayWords(z.ends_on) || "—"}</td>
                     <td className="px-3 py-2 text-xs">
                       {!z.active ? <span className="text-slate-400">Inactive</span>
                         : force ? <span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>

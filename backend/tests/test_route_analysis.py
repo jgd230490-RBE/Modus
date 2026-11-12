@@ -338,6 +338,8 @@ E = R["hours"]
 ok("2 E: the stored busy-hour times per option, at 08:00 and 12:00 (Q11)",
    E["worked_out"] and [r_["alt"] for r_ in E["rows"]] == [0, 1] and E["rows"][0]["at"]["08:00"] is not None
    and E["rows"][0]["at"]["08:00"] > E["rows"][0]["at"]["12:00"], str(E["rows"]))
+ok("2 (B-F7): out_m / back_m are the stored leg distances (3.4 km each), as the screens show; the line's own length only "
+   "where none is stored", R["out_m"] == 3400.0 and R["back_m"] == 3400.0, (R["out_m"], R["back_m"]))
 ok("2 F: no diversion planned: an empty list, nothing invented", R["diversions"]["items"] == [] and R["diversions"]["no_way"] == [])
 _base = {"loaded": ROUTE, "return": list(reversed(ROUTE)),
          "diversions": [{"kind": "busy", "when": "Weekdays 16:00–19:00", "loaded": ALT, "return": ALT},
@@ -387,6 +389,11 @@ if TX:
     ok("4 C: the evidence's own pages, its assessor page left to the analysis", "This route and its alternatives" in TX
        and TX.count("For the route risk assessment (CLOCS Standard v5, 5.1a)") <= 1 and "For the CLOCS route risk assessment" not in TX)
     ok("4 E: the busy-hour table", "Round trip by the hour it sets off" in TX and "08:00" in TX)
+    # 11 Nov 2026 (CLOCS card B-F7): the header's length is the stored (routed) distance, as on the Routes screen and the
+    # Route sheet (3.4 km stored for R1's legs = 2.1 mi); section C's page head says "Made", as every other page does
+    ok("4 (B-F7): the route's length in the header is the stored distance: 2.1 mi out and back (3.4 km), not the drawn line's",
+       "2.1 mi out, 2.1 mi back" in TX or "2.1 km out" not in TX and "3.4 km out, 3.4 km back" in TX, TX[:900])
+    ok("4 (B-F7): section C's page head says 'Made', no page says 'Issued'", "Issued" not in TX and "Made 9 Nov 2026" in TX)
     ok("4: the assessor's page points at the sections, F 'not in this file' when unticked does not arise here",
        "Evidence: C · Collisions" in TX and "Evidence: A · Restrictions and lorry limits" in TX)
     ok("4: no collision's hour on any page (the hours' chart counts only)", not re.search(r"\b(08:15|17:40|23:05)\b", TX))

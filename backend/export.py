@@ -3194,9 +3194,9 @@ def _holding_steps(H, gate_word):
 
 
 def route_sheet_blocks(S):
-    """The typed words in the order printed: (heading, text, not_typed). Site rules at A always shown, so an
-    empty field reads "Not typed" rather than vanishing."""
-    import route_sheet as rs
+    """The typed words in the order printed: (heading, text, not_typed). REVERSED 11 Nov 2026 (CLOCS card B-F2, John's
+    yes): a part with nothing typed is left out (it printed "Not typed", which tells a driver nothing); the Routes
+    screen tells the planner which words are missing instead. not_typed stays in the tuple (always False now)."""
     out = []
     heads = [("Why this route", S.get("route_reason")),
              ("Permitted diversions", S.get("permitted_deviations")),
@@ -3206,7 +3206,8 @@ def route_sheet_blocks(S):
     if H:          # 29 Oct 2026 (task 3c): the holding area's own rules, as typed on it
         heads.insert(2, (f"Site rules at H, {H['name']}", H.get("site_rules")))
     for head, v in heads:
-        out.append((head, v if v else rs.NOT_TYPED, not v))
+        if v and str(v).strip():
+            out.append((head, v, False))
     return out
 
 
@@ -4025,7 +4026,8 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
     y = H - m
     c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 18); c.drawString(m, y - 18, S["title"])
     c.setFont(B, 9); c.drawRightString(W - m, y - 9, _pdf_safe(S["tenant"]))
-    c.setFillColorRGB(*GREY); c.setFont(R, 8); c.drawRightString(W - m, y - 20, f"Issued {S['issued']}")
+    c.setFillColorRGB(*GREY); c.setFont(R, 8)
+    c.drawRightString(W - m, y - 20, f"{S.get('head_word') or 'Issued'} {S['issued']}")   # "Made" inside the route analysis
     if S.get("demo_notice"):
         c.setFillColorRGB(*DEMO_FG_RGB); c.setFont(B, 8)
         c.drawRightString(W - m, y - 31, _pdf_safe("DEMO · " + S["demo_notice"]))
