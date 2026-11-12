@@ -134,7 +134,7 @@ ok("⭐ 4: CLP documents are cards: the CLP leads, its status top right, Last is
    && clp.includes('<td className="rd-actions tc-wide"><div className="flex items-center gap-2 justify-end">{primary(c, child)}'));
 ok("...checked in Chrome at 768: the foot's lines join (the foot cells stretch to one height), a chip wraps in its column, a route's ▶ has its own room and a 28 px tap",
    tc.includes(".tab-cards>tbody>tr>td.tc-foot{order:8;align-self:stretch;display:flex;") && /td\.rd-actions\{[^}]*align-self:stretch;/.test(tc)
-   && tc.includes(".tab-cards>tbody>tr>td>span{display:inline-block;max-width:100%;white-space:normal;}")
+   && tc.includes(".tab-cards>tbody>tr>td>span:not(.block){display:inline-block;max-width:100%;white-space:normal;}")   // NARROWED 12 Nov 2026 (batch 5): a `block` second line keeps its own line (ui_fix_tab_cards_lines.js)
    && tc.includes(".tab-cards>tbody>tr.tc-has-tri{padding-left:46px !important;}") && tc.includes(".tab-cards>tbody>tr>td.tc-tri>button{width:28px;height:28px;}"));
 ok("...a Simulation tick is 24 px tall on one line (a wider page at 768–1024 put \"Wheel wash on the way out\" on one 21 px line: the audit's targets-24px)",
    css.includes(".sim-check{display:flex;align-items:flex-start;gap:8px;cursor:pointer;min-height:24px;}"));
