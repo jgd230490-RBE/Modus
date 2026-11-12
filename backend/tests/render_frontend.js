@@ -1017,10 +1017,12 @@ if (loaded) {
         // NARROWED 17 Oct 2026: the hours the capacity rests on are named (the default gate hours here), never "the shift"
         gOpen.includes("No check-in time typed: nothing is compared.") && gOpen.includes("Can check in 200 a day (open 07:00–17:00 by default ÷ 3 min a lorry).")
         && gOpen.includes("Can check in 300 a day (open 07:00–17:00 by default ÷ 2 min a lorry).") && !gOpen.includes("the shift ÷"));
-      ok("🔴 W17: the honest limit and the week-split sentence are printed under the gates",
+      ok("🔴 W17: the honest limit is printed under the gates, in few words",
         // NARROWED 17 Oct 2026: the limit names the shut times and the bands
-        gS.includes("Planned arrivals spread evenly over the gate&#x27;s open hours, less its shut times and the no-delivery bands; no hourly peak is known.")
-        && gS.includes("so a day can be busier than the Dashboard&#x27;s month average"));
+        // NARROWED 11 Nov 2026 (CLOCS card C-X2, rule R1): "Averages only: no hourly peak." under the gates; the limit's and
+        // the week split's sentences are in the la.gates "i" box's how (ui_fix_clocs_c_gates_words.js reads them there)
+        gS.includes("Averages only: no hourly peak.") && gS.includes('data-gw-note="1"')
+        && !gS.includes("Planned arrivals spread evenly over the gate&#x27;s open hours") && !gS.includes("so a day can be busier"));
       // 17 Oct 2026 (the review): the week card with a gate's shut times and one left no open time
       const GWS = { ...GW, gates: GW.gates.map((g, i) => i === 0 ? { ...g, shut_minutes: 45, shut_words: "08:30–09:15" }
                                                    : i === 1 ? { ...g, no_open_time: true, capacity_per_day: 0 } : g) };
