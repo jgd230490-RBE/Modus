@@ -2947,6 +2947,32 @@ def _heavy(name):
     return heavy_reads.slot(name, busy=_heavy_busy)
 
 
+# 12 Nov 2026 (card A-F7 (a), BUILD.md rule 13): the public map's cold open made ~430 database connections, ~315 of them in
+# three reads every visitor rebuilt (map-data 48, forecast-matrix 126, month-kpis/months 141). On live, with the Postgres
+# pool empty, each connection is a fresh one (PR #263), so a cold open took 15-19 s. The three are the same for every
+# viewer until a write, so each is kept through read_cache.cached() (never stale: keyed by the data version), built inside
+# its heavy slot as before, and served as bytes after the first. Only the shapes the map asks for are kept (the whole
+# horizon, no profile), so odd query strings cannot crowd the store; any other shape is built as before.
+PUBLIC_MAP_CACHE = "public/map-data"
+PUBLIC_MATRIX_CACHE = "public/forecast-matrix|"          # + unit and sections
+PUBLIC_MONTHS_CACHE = "public/month-kpis-months|"        # + unit
+
+
+def _public_kept(name, build):
+    """The read's JSON, built by build() inside its heavy slot, kept until the next write; the same bytes FastAPI sends."""
+    body = read_cache.cached(name, (MONTH_COUNT,), lambda: _json_body(build()))
+    return Response(content=body, media_type="application/json")
+
+
+def _json_body(value):
+    """The bytes FastAPI would send for value: plain JSON as is (the three reads are), anything else through its encoder."""
+    try:
+        return read_cache.json_bytes(value)
+    except TypeError:
+        from fastapi.encoders import jsonable_encoder
+        return read_cache.json_bytes(jsonable_encoder(value))
+
+
 def _working_days(factors):
     """
     Working days in a planning month, from factors.json.
@@ -3065,9 +3091,12 @@ def public_month_kpis_months(unit: str = Query("vehicles")):
     """
     if unit not in conversions.UNITS:
         raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
-    with _heavy("month-kpis/months"):
-        pages = _month_kpis_payloads(range(1, MONTH_COUNT + 1), unit)
-        return {"unit": unit, "months": {str(m): pages[m] for m in sorted(pages)}}
+
+    def build():
+        with _heavy("month-kpis/months"):
+            pages = _month_kpis_payloads(range(1, MONTH_COUNT + 1), unit)
+            return {"unit": unit, "months": {str(m): pages[m] for m in sorted(pages)}}
+    return _public_kept(PUBLIC_MONTHS_CACHE + unit, build)          # 12 Nov 2026 (A-F7): kept until the next write
 
 
 def _month_kpis_payloads(months, unit):
@@ -3349,8 +3378,14 @@ def public_forecast_matrix(
     """
     if unit not in conversions.UNITS:
         raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
-    with _heavy("forecast-matrix"):
-        return _forecast_matrix(from_, to, unit, sections)
+
+    def build():
+        with _heavy("forecast-matrix"):
+            return _forecast_matrix(from_, to, unit, sections)
+    # 12 Nov 2026 (A-F7): the whole horizon (the map's timeline and its detail table) is kept until the next write
+    if min(from_, to) == 1 and max(from_, to) == MONTH_COUNT:
+        return _public_kept(f"{PUBLIC_MATRIX_CACHE}{unit}|{1 if sections else 0}", build)
+    return build()
 
 
 def _forecast_matrix(from_, to, unit, sections):
@@ -4316,8 +4351,12 @@ def public_map_data(profile: Optional[str] = None):
     dashed straight line usefully says 'HERE could not route this'; on a public map it
     would just look like a road that isn't there.
     """
-    with _heavy("map-data"):
-        return network.public_map_data(profile=profile)
+    def build():
+        with _heavy("map-data"):
+            return network.public_map_data(profile=profile)
+    if profile is None:                       # 12 Nov 2026 (A-F7): the map's own read, kept until the next write
+        return _public_kept(PUBLIC_MAP_CACHE, build)
+    return build()
 
 
 @app.get("/api/public/road-load")
@@ -4540,6 +4579,17 @@ read_cache.WARMERS[AREAS_MONTHS_CACHE] = lambda: read_cache.cached(AREAS_MONTHS_
                                                                    _areas_months_build)
 # 27 Oct 2026 (group 2a): the public map's route check against the closures, built after start-up and after writes
 read_cache.WARMERS["restrictions_check"] = lambda: restrictions.check_all(current_only=False)
+
+
+def _warm_public_map():
+    """12 Nov 2026 (A-F7): the public map's three kept reads, as the map asks for them (map/config.js FORECAST_UNIT
+    "vehicles"), so the first visitor after a deploy or an edit does not build them either."""
+    public_map_data(profile=None)
+    public_forecast_matrix(from_=1, to=MONTH_COUNT, unit="vehicles", sections=1)
+    public_month_kpis_months(unit="vehicles")
+
+
+read_cache.WARMERS["public_map"] = _warm_public_map
 
 
 @app.post("/api/admin/areas/import")
