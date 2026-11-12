@@ -264,8 +264,9 @@ ok("⭐ it imports neither network nor main, and names no team slot id",
 _stmts = re.findall(r'db\.query\(\s*((?:"[^"]*"\s*)+)', code_only)
 # NARROWED 14 Oct 2026 (bundle G): seven statements — location_visits() (the CLP section's chart 1b) adds two and
 # week_by_day() (W17, the Look-ahead's gates) two more, each tenanted
+# NARROWED 11 Nov 2026 (CLOCS idea C-I1): eight — queue_months() reads the months with an approved line, tenanted
 ok("🔴 tenant isolation: the SQL literals in gate_arrivals.py constrain tenant_id",
-   len(_stmts) == 7 and all("tenant_id = ?" in s for s in _stmts)
+   len(_stmts) == 8 and all("tenant_id = ?" in s for s in _stmts)
    and all(re.search(r"FROM (\w+)", s) for s in _stmts)
    and code_only.count("db.current_tenant()") >= 3, str(_stmts))
 

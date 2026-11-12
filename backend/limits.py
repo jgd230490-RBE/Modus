@@ -1257,20 +1257,46 @@ def exceeding(stored_entry, vehicle_type):
             if isinstance(h, dict) and h.get("verdict") == "exceeds" and h.get("vehicle_profile") == vehicle_type]
 
 
+#: 11 Nov 2026 (CLOCS card C-F1): the words when a limit's sign carries no exception, as the public map's rows say it
+NO_EXCEPTION = "no exception recorded: check the sign"
+
+
 def breach_text(hits, vehicle_type=None):
-    """The words for the first breach and how many more: "<vehicle> (<value> <unit>, <leg>) is over
-    the <headline> (<source>) ...". The clash rail puts the line's name in front of it."""
+    """The words for the first breach and how many more: "<vehicle>, <value> <unit> <leg>, is over
+    the <headline>, <exception>" (+N more). The clash rail puts the line's name in front of it.
+
+    11 Nov 2026 (CLOCS card C-F1, John's yes): ONE wording wherever a limit is printed (the Look-ahead's
+    flag, the Day sheet, the Route sheet, the Dashboard / Forecasts rows), in the public map's words (PR #253):
+    no supplier in brackets (the sheets carry `credit_for` at their foot instead), the sign's exception after a
+    comma, or NO_EXCEPTION when the sign has none recorded."""
     h = hits[0]
     leg = "going back empty" if h.get("leg") != "loaded" else "loaded"
-    text = (f"{vehicle_label(h.get('vehicle_profile') or vehicle_type)} ({h.get('vehicle_value'):g} {h.get('unit')}, {leg}) "
-            f"is over the {h.get('headline')} ({SOURCES.get(h.get('source'), {}).get('short', h.get('source'))})")
+    text = (f"{vehicle_label(h.get('vehicle_profile') or vehicle_type)}, {h.get('vehicle_value'):g} {h.get('unit')} {leg}, "
+            f"is over the {h.get('headline')}")
     if h.get("exceptions"):
-        text += f" — {h['exceptions'].lower()}"
+        text += f", {h['exceptions'].lower()}"
+    else:
+        text += f" · {NO_EXCEPTION}"
     if h.get("point"):
-        text += " — a point limit: check whether the route passes it or crosses over or under it"
+        text += " · a point limit: check whether the route passes it or crosses over or under it"
     if len(hits) > 1:
         text += f" (+{len(hits) - 1} more)"
     return text
+
+
+def credit_for(route_ids):
+    """11 Nov 2026 (CLOCS card C-F1): the credit line a sheet prints at its foot for the limits it names, now that
+    the sentence names no supplier: "Road limits © OpenStreetMap contributors (ODbL)." (each source of a stored
+    hit on these routes, once), or None when the routes carry no stored limit."""
+    srcs = set()
+    ids = [r for r in (route_ids or []) if r]
+    for st in (stored_checks(ids) if ids else {}).values():     # stored_checks([]) would read every route
+        for h in (st or {}).get("hits") or []:
+            if isinstance(h, dict) and h.get("source") in SOURCES:
+                srcs.add(h["source"])
+    if not srcs:
+        return None
+    return "Road limits " + "; ".join(SOURCES[s]["attribution"] for s in sorted(srcs)) + "."
 
 # --------------------------------------------------------------------------- #
 #  The map's collection                                                        #

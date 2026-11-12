@@ -668,6 +668,14 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   /* 9 Nov 2026 (2.1-9b, card 9): a trip a planner can drag or move from its menu — a details whose summary is the block face */
   .lp-trip{position:absolute;top:2px;bottom:2px;min-width:24px;overflow:visible}
   .lp-trip summary.lp-blk{position:static;height:24px;display:block;list-style:none;cursor:grab;border:0;margin:0}
+  /* 11 Nov 2026 (CLOCS card C-F4): .row-menu summary set every trip 32 px wide, centred, in --muted grey: the code read
+     "R02" in dark grey on a dark fill. The block is its trip's full width, its code white; a block too narrow for the
+     whole code shows none (container query on the block), the code stays in its title and its menu. */
+  .lp-trip summary.lp-blk{width:100%;justify-content:flex-start;color:#fff;font-weight:600;padding:0 4px}
+  .lp-blk:not(.is-break){container-type:inline-size}
+  @container (max-width:37px){ .lp-code{visibility:hidden} }
+  /* C-F6: a trip moves by dragging only after "Move trips"; until then a click opens its menu */
+  .lp-trip:not([draggable="true"]) summary.lp-blk{cursor:pointer}
   .lp-trip summary::-webkit-details-marker{display:none}
   .lp-trip[open] summary.lp-blk{box-shadow:inset 0 0 0 2px #fff}
   .lp-trip summary.lp-blk:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
@@ -705,6 +713,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ga-chart{margin-top:10px;}
   .ga-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin-bottom:4px;}
   .ga-head-v{font-size:18px;font-weight:700;color:var(--ink);}
+  .ga-next{font-size:13px;color:var(--ink);} .ga-next .link-btn{display:inline-block;min-height:24px;line-height:24px;padding:0 4px;font-size:13px;}
   .ga-key{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px;color:var(--muted);}
   .ga-key i{display:inline-block;vertical-align:middle;margin-left:8px;}
   .ga-key i:first-child{margin-left:0;}
@@ -1646,7 +1655,7 @@ const INFO = {
   "la.lorryplan": { title: "Lorry plan", text: "Each lorry's day used to the full: one day's loads leaving one yard in one kind of lorry, chained into as few lorry-days as the UK drivers' hours rule allows, each lorry's trips in the driver's order.",
     how: "As booked is each line's own whole lorries, as the grid counts them. Chained by yard keeps the same loads on the same days with fewer lorries. Week compressed pools the week's loads so a part-used last lorry becomes one full lorry on fewer days: a suggestion until Apply. Planners and admins can drag a trip to another lorry of its yard (or, compressed, to another day); a drop that would pass the driver's day is refused, and the arrangement is kept for the week until its loads change. A planning figure, never a check of anyone's hours.", guide: "ug-lorry-plan", tech: "t1-lorry-plan" },
   "la.gates": { title: "Gates this week", text: "Each gate's planned lorries a day this week, every team together, against what it can check in. Gold, Queue likely, from 85 %; red, Over gate capacity, past it or on a closed day.",
-    how: "What a gate can check in = its open minutes (its hours, or the default gate hours where none are typed, less its shut times and the no-delivery peak bands) ÷ its check-in minutes a lorry. Planned arrivals spread evenly; no hourly peak is known.", guide: "6-3-commit-view-this-week-by-day", tech: "t1-gates" },
+    how: "What a gate can check in = its open minutes (its hours, or the default gate hours where none are typed, less its shut times and the no-delivery peak bands) ÷ its check-in minutes a lorry. Planned arrivals spread evenly; no hourly peak is known. The days are this page's own: the month spread over its calendar weeks, rounded up a day, so a day can be busier than the Dashboard's month average.", guide: "6-3-commit-view-this-week-by-day", tech: "t1-gates" },
   // 8 Nov 2026 (2.1-13): the week maps' "i" boxes (the hover hint left the key row)
   "map.commit.today": { title: "Today on the map", text: "Bold: today's lines, green out and amber back. Faded grey: later this week. A line's tag is today's load. Zoom in for the gates; point at a line for its figures and team.", guide: "3-3-charts-and-the-folded-sections" },
   "map.commit.week": { title: "This week's movements", text: "Each line of the week, out (loaded) in green. The tag on a line is its load this week. Zoom in for the gates; point at a line for its figures and team.", guide: "6-3-commit-view-this-week-by-day" },
@@ -2246,6 +2255,22 @@ const gaMonthToday = (months) => {
   const sy = (months && months.start_year) || 2026, n = (months && months.count) || 60, d = new Date();
   return Math.max(1, Math.min(n, (d.getFullYear() - sy) * 12 + d.getMonth() + 1));
 };
+// 11 Nov 2026 (CLOCS card C-F3): a month picked on the Dashboard's Gate arrivals ("ga") or on the Simulation ("sim") is kept
+// while this page is open: until sign-out, a reload or a new day. Never stored, never in the address (D86 stands).
+const KEPT_MONTH = {};
+const keptMonth = (k) => { const v = KEPT_MONTH[k]; return v && v.day === new Date().toDateString() ? v.month : null; };
+const keepMonth = (k, m) => { if(m >= 1) KEPT_MONTH[k] = { month: +m, day: new Date().toDateString() }; };
+const forgetKeptMonths = () => { Object.keys(KEPT_MONTH).forEach(k => { delete KEPT_MONTH[k]; }); };
+// 11 Nov 2026 (CLOCS idea C-I1, John's (a)): with no gate at the 85 % step in the month on screen, the next month that has
+// one (GET /api/gates/queue-months, the flags of every month's own Gate arrivals read), at the sites picked; past the
+// plan's last queue, the fullest month with one. null when the plan has none.
+const gaNextQueue = (q, month, sites) => {
+  const ms = ((q && q.months) || []).map(m => ({ ...m, gates: (m.gates || []).filter(g => !(sites && sites.length) || sites.includes(g.location_id)) }))
+    .filter(m => m.gates.length && m.month !== month);
+  if(!ms.length) return null;
+  const full = (m) => Math.max(...m.gates.map(g => g.capacity_pct == null ? 999 : g.capacity_pct));
+  return ms.find(m => m.month > month) || ms.slice().sort((a, b) => full(b) - full(a) || a.month - b.month)[0];
+};
 // 17 Oct 2026 (D114): the Dashboard opens on THIS month and six either side (13 months), not every month of the horizon:
 // on a 60-month programme the whole span made "Deliveries a day" a programme average and the charts 60 thin bars.
 // Clamped to the horizon. Only the default: From / To and "Whole programme" still pick any span.
@@ -2299,7 +2324,7 @@ const gaBusyWords = (b) => {
   return `${b.lorries} lorr${b.lorries === 1 ? "y" : "ies"} arriving in the busiest clock hour (${when}) of an average working day. `
     + (b.per_hour == null ? "No check-in time typed, so nothing is compared." : `The gate can check in ${gaN1(b.per_hour)} an hour.`);
 };
-function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOpen }){
+function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOpen, queue, sites }){
   const [gaOpen, gaToggle] = useRowOpen("gates");
   if(!ga) return err
     ? <div className="ct-strip ga-strip" data-gate-arrivals="error" data-guide="dash-gates"><span className="ct-line">The gate arrivals did not load.</span></div>
@@ -2312,6 +2337,9 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOp
     .map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === "red", near: g.flag === "amber" }))
     .sort((a, b) => ((b.pct == null ? -1 : b.pct) - (a.pct == null ? -1 : a.pct)) || (b.g.arrivals_per_day - a.g.arrivals_per_day));
   const nOverG = rowsC.filter(r => r.over).length, nNearG = rowsC.filter(r => r.near).length;
+  // 11 Nov 2026 (CLOCS idea C-I1): no gate at the 85 % step this month: where the next queue is, and "Show" goes there
+  const nextQ = (nOverG || nNearG) ? null : gaNextQueue(queue, month, sites);
+  const nextLine = nextQ && <span className="ga-next" data-ga-next={nextQ.month}>Next queue likely: {nextQ.label}, {simGateName(nextQ.gates[0])} · <button type="button" className="link-btn" onClick={() => onMonth(nextQ.month)}>Show</button></span>;
   // 17 Oct 2026: every gate has clock hours (typed, or the default gate hours); the words say where the default stands
   const anyDefault = gates.some(g => g.open_basis === "default");
   const gaFs = 11;
@@ -2368,10 +2396,12 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOp
       <div className="ct-line">{ga.label}: lorries a day at each gate, all {TEAMS().toLowerCase()} together, {GA_SPREAD} across each gate's open hours{anyDefault ? ` (${ga.default_hours}, the default, where none are typed)` : ""}.</div>
       {state === "none" && <EmptyState kind="none" title={sited ? `No gates at these sites in ${ga.label}` : `No approved lines in ${ga.label}`} body={sited ? "Pick another month or more sites." : "Pick another month, or approve a line."}
         action={!sited && onOpen ? <button type="button" className="btn-sec" data-ga-empty-go="forecasts" onClick={() => onOpen("forecasts")}>Open Forecasts</button> : null} />}
+      {state === "none" && nextLine && <div className="ga-head">{nextLine}</div>}
       {state === "set" && rowsC.length > 0 && phone && (
         <div className="ga-chart" data-ga-list="1">
           <div className="ga-head">
             <span className="ga-head-v" style={nOverG ? { color: "var(--bad-text)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}</span>
+            {nextLine}
           </div>
           <ul className="ga-list" aria-label="Gates, fullest first">
             {rowsC.map(r => (
@@ -2390,6 +2420,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOp
         <div className="ga-chart" data-ga-chart="1">
           <div className="ga-head">
             <span className="ga-head-v" style={nOverG ? { color: "var(--red)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}</span>
+            {nextLine}
             <span className="ga-key" aria-hidden="true"><i className="ga-key-bar"></i>planned arrivals a day <i className="ga-key-track"></i><i className="ga-key-cap"></i>capacity: the open hours ÷ the check-in time a lorry <i className="ga-key-gold"></i>{GA_NEAR} % or more: queue likely <i className="ga-key-red"></i>more than it can check in <i className="ga-key-none"></i>no check-in time typed</span>
           </div>
           <ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} title="Gate arrivals: lorries a day at each gate" scope={[ga.label, sited || null]} />
@@ -2601,7 +2632,7 @@ function CarbonTargetLine({ ct, err, pendingN }){
   );
 }
 
-function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone, canApprove }){
+function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, onWall, onOpen, phone, canApprove }){
   const { materials, vehicles, units, months, factors } = meta;
   const [data, setData] = useState(initialData || null);
   const [week, setWeek] = useState(initialWeek || null);
@@ -2611,7 +2642,10 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const [ctErr, setCtErr] = useState(false);
   const [ga, setGa] = useState(initialGates || null);    // 11 Oct 2026: gate arrivals (GET /api/gates/arrivals?month=)
   const [gaErr, setGaErr] = useState(false);
-  const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));
+  // 11 Nov 2026 (CLOCS card C-F3): the month picked here is kept for the next visit (keptMonth), until sign-out or a reload
+  const [gaMonth, setGaMonthRaw] = useState(() => (initialGates && initialGates.month) || keptMonth("ga") || gaMonthToday(months));
+  const setGaMonth = (m) => { keepMonth("ga", m); setGaMonthRaw(m); };
+  const [gaQueue, setGaQueue] = useState(initialQueue || null);   // 11 Nov 2026 (CLOCS idea C-I1): the months with a queue
   const [status, setStatus] = useState("Approved");
   const [unit, setUnit] = useState("t");
   const [material, setMaterial] = useState("All");
@@ -2759,6 +2793,14 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     }).catch(() => { if(live) setGaErr(true); });
     return () => { live = false; };
   }, [tick, gaMonth, wall]);
+  // 11 Nov 2026 (CLOCS idea C-I1): one read of the months with a queue (kept on the server until the next write); a
+  // failed read only leaves the "Next queue likely" line out
+  useEffect(() => {
+    if(initialGates || wall) return;
+    let live = true;
+    fetch(`${API}/gates/queue-months`).then(okJSON).then(j => { if(live) setGaQueue(j); }).catch(() => {});
+    return () => { live = false; };
+  }, [tick, wall]);
   useEffect(() => {
     if(!wall) return;
     const id = setInterval(() => setTick(t => t + 1), REFRESH_MS);
@@ -3170,7 +3212,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           </div>}
           {/* 14 Oct 2026 (the user took the recommendation): Gate arrivals moved from above the charts to
               below them, so the four key charts are on the first screen at 1920 x 1080 */}
-          <GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : ""} phone={!!phone} onOpen={canApprove ? onOpen : null} />
+          <GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : ""} phone={!!phone} onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />
           {!wall && !phone && <AbnormalStrip onOpen={onOpen} sites={sites} />}
           {/* 29 Oct 2026: the Simulation has its own page (Plan → Simulation); the Dashboard keeps one line under Gate arrivals,
               the busiest gate from the Gate arrivals reply (no second simulation run here) */}
@@ -4656,6 +4698,7 @@ function App(){
   }, []);
   const signOut = () => {
     ACCESS.code = ""; ACCESS.info = null;
+    forgetKeptMonths();          // 11 Nov 2026 (CLOCS card C-F3): the next person starts on this month
     try { sessionStorage.removeItem("modus_access_code"); } catch(e){}
     authHint(false);
     // 12 Oct 2026 (the review and fix pass): the server swaps the 12-hour STAFF cookie for a map-only one, so the next
@@ -5531,6 +5574,38 @@ function SupplierOrdersMenu({ bucket, disabled }){
           left.not_confirmed ? `${left.not_confirmed} line${left.not_confirmed === 1 ? "" : "s"} not confirmed yet: ${(left.not_confirmed_places || []).join(", ")}` : null,
           left.own ? `${left.own} line${left.own === 1 ? "" : "s"} from your own site${left.own === 1 ? "" : "s"}: ${(left.own_places || []).join(", ")}` : null].filter(Boolean).join(" · ")}</div>}
         {sups.length > 1 && <button type="button" className="so-all" onClick={() => dl("zip")} disabled={!!busy} data-so-zip="1">{busy === "zip" ? "Making the zip…" : `All ${sups.length} suppliers (zip)`}</button>}
+      </div>
+    </details>
+  );
+}
+// 11 Nov 2026 (CLOCS card C-F4, John's yes): "Day sheet ▾" on the desk Look-ahead — the week's weekdays, today first; each
+// downloads that day's one-page sheet for the gate (the phone's button reads the same address). Nothing is written.
+function DaySheetMenu({ bucket, dates, today, disabled }){
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+  const days = (dates || []).filter(d => d === today).concat((dates || []).filter(d => d !== today));
+  const dl = async (iso) => {
+    setBusy(iso); setErr("");
+    try {
+      const r = await fetch(`${API}/forecast-weeks/day-sheet?bucket=${bucket}&day=${iso}`);
+      if(!r.ok) throw await errFrom(r);
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = `day-sheet-${iso}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch(e){ setErr(errSay("The day sheet did not download.", e)); }
+    setBusy("");
+  };
+  return (
+    <details className="row-menu" data-day-sheet-menu="1">
+      <summary className="px-4 py-2 rounded-lg text-sm font-semibold border" aria-disabled={disabled ? "true" : undefined}
+        onClick={e => { if(disabled) e.preventDefault(); }} title="One page of a day for the gate"
+        style={{ width: "auto", height: "auto", borderColor: "var(--line)", color: "var(--ink)", background: "var(--surface)", opacity: disabled ? 0.4 : 1 }}>Day sheet ▾</summary>
+      <div className="row-menu-list" role="group" aria-label="Day sheet">
+        {days.map(d => <button key={d} type="button" onClick={() => dl(d)} disabled={!!busy} data-day-sheet={d}
+          style={d === today ? { fontWeight: 600 } : undefined}>{busy === d ? "…" : `${dayName(d)} ${dayNum(d)}${d === today ? ", today" : ""}`}</button>)}
+        {err && <div className="row-menu-note" role="alert">{err}</div>}
       </div>
     </details>
   );
@@ -8290,7 +8365,9 @@ function SitesMenu({ locList, sites, onChange }){
       <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }}>{n ? `${n} site${n === 1 ? "" : "s"}` : "All sites"} ▾</summary>
       <div className="row-menu-list sites-list" role="group" aria-label="Lorries to or from">
         <div className="sites-head">Lorries to or from</div>
-        {(locList || []).length === 0 && <div className="sites-empty">No locations yet.</div>}
+        {/* 11 Nov 2026 (CLOCS card C-F8): "Loading…" until the locations arrive; the empty words only when there are none */}
+        {!locList && <div className="sites-empty" data-sites-loading="1">Loading…</div>}
+        {locList && locList.length === 0 && <div className="sites-empty">No locations yet.</div>}
         {groups.map(([t, ls]) => (
           <div key={t} className="sites-grp">
             <div className="sites-type">{t}</div>
@@ -11562,7 +11639,20 @@ const LP_DAY_FROM = 6 * 60, LP_DAY_TO = 19 * 60;    // the track: 06:00 to 19:00
 const lpMin = (hm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hm || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
 const lpShort = (n) => String(n || "").replace(" (fictional)", "").replace("Rail Freight Terminal", "RFT");
 // destination colours: the chart tokens first (every look and accent), then five more data colours
-const lpPalette = () => [1, 2, 3, 4, 5].map(i => tok(`--chart-${i}`, "#1E3A8A")).concat(["#9D174D", "#0F766E", "#B45309", "#4338CA", "#C2410C"]);
+const lpPalette = () => [1, 2, 3, 4, 5].map(i => tok(`--chart-${i}`, "#1E3A8A")).concat(["#9D174D", "#0F766E", "#B45309", "#4338CA", "#C2410C"]).map(lpDeep);
+// 11 Nov 2026 (CLOCS card C-F4): a fill darkened, hue kept, until white text on it passes 4.5 : 1 (WCAG AA); the chart
+// tokens #E8590C and #0D9488 gave 3.4 and 3.7. Anything but #rrggbb is left as it is.
+function lpLum(h){ const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+function lpDeep(hex){
+  const h = String(hex || "").trim();
+  if(!/^#[0-9a-f]{6}$/i.test(h)) return hex;
+  let rgb = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), out = h;
+  for(let k = 0; k < 40 && 1.05 / (lpLum(out) + 0.05) < 4.5; k++){
+    rgb = rgb.map(v => Math.floor(v * 0.94));
+    out = "#" + rgb.map(v => v.toString(16).padStart(2, "0")).join("");
+  }
+  return out;
+}
 function lpDayWords(iso){ return iso ? `${dayName(iso)} ${dayNum(iso)}` : ""; }
 // 9 Nov 2026 (2.1-9b, card 9): the page's own look at a drop before the server's answer — the same rule as
 // backend/drivers_hours.py (test_lorry_plan pins these six figures to its constants); the server's check is the one that counts.
@@ -11584,8 +11674,8 @@ function LpTrip({ b, r, yard, style, colour, label, dnd }){
   const items = dnd.targets(trip);
   return (
     <details className={"row-menu lp-trip" + (dnd.drag && dnd.drag.lk === trip.lk && dnd.drag.lorry === trip.lorry && dnd.drag.day === trip.day ? " is-dragging" : "")} ref={ref} style={style}
-      draggable="true" onDragStart={e => dnd.start(e, trip)} onDragEnd={dnd.end} data-lp-trip={b.line_key}>
-      <summary className="lp-blk" aria-label={`${label}: move…`} title={`${label} — drag to another lorry, or open for the choices`} style={{ background: colour(b.dest_name) }}>{b.route_id}</summary>
+      draggable={dnd.dragOn ? "true" : "false"} onDragStart={e => { if(!dnd.dragOn){ e.preventDefault(); return; } dnd.start(e, trip); }} onDragEnd={dnd.end} data-lp-trip={b.line_key}>
+      <summary className="lp-blk" aria-label={`${label}: move…`} title={dnd.dragOn ? `${label} — drag to another lorry, or open for the choices` : `${label} — open for the choices`} style={{ background: colour(b.dest_name) }}><span className="lp-code">{b.route_id}</span></summary>
       <div className="row-menu-list" onClick={pick} role="group" aria-label={`Move ${label}`}>
         <div className="lp-menu-h">{label}</div>
         {items.map((it, i) => <button key={i} type="button" className={it.ok ? "" : "is-no"} disabled={!it.ok && it.hard} onClick={() => dnd.go(trip, it.to)} title={it.ok ? "" : it.words}>{it.label}{it.ok ? "" : ` · ${it.words}`}</button>)}
@@ -11612,7 +11702,7 @@ function LorryPlanRow({ r, yard, colour, dnd }){
           const style = { left: `${left}%`, width: `${Math.min(width, 100 - left)}%` };
           if(can && b.kind === "trip") return <LpTrip key={i} b={b} r={r} yard={yard} style={style} colour={colour} dnd={dnd} label={`${b.start} ${b.route_id} → ${lpShort(b.dest_name)}, lorry ${r.n}`} />;
           return <div key={i} className={"lp-blk" + (b.kind === "break" ? " is-break" : "")} aria-hidden="true"
-            style={{ ...style, background: b.kind === "break" ? undefined : colour(b.dest_name) }}>{b.kind === "break" ? "break" : b.route_id}</div>;
+            style={{ ...style, background: b.kind === "break" ? undefined : colour(b.dest_name) }}>{b.kind === "break" ? "break" : <span className="lp-code">{b.route_id}</span>}</div>;
         })}
       </div>
       <div className="lp-free" data-lp-free={r.free_minutes}>{r.free_words}</div>
@@ -11620,7 +11710,7 @@ function LorryPlanRow({ r, yard, colour, dnd }){
     </div>
   );
 }
-function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
+function LorryPlan({ bucket, tick, access, onData, weekConfirmed, today }){
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [open, setOpen] = useState(false);
@@ -11634,6 +11724,9 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
   const [drag, setDrag] = useState(null);
   const [over, setOver] = useState(null);
   const [refused, setRefused] = useState(null);
+  // 11 Nov 2026 (CLOCS card C-F6, John's yes): trips are dragged only after "Move trips" (a stray drag on a shared screen
+  // wrote); each trip's menu still moves it from the keyboard
+  const [moving, setMoving] = useState(false);
   const canApply = !!(access && (access.role === "planner" || access.role === "admin"));
   const canMove = canApply;
   useEffect(() => {
@@ -11646,7 +11739,10 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
   useEffect(() => { if(!refused) return; const t = setTimeout(() => setRefused(null), 5000); return () => clearTimeout(t); }, [refused]);
   if(!data && !err) return null;
   const days = (data && data.days) || [];
-  const shown = (day && days.includes(day)) ? day : (days.includes(data && data.today) ? data.today : days[0]);
+  // 11 Nov 2026 (CLOCS card C-F7): open on TODAY when it is in the week shown — the read carries no today, so it always
+  // opened on the Monday; the Look-ahead's own today is passed in (next week still opens on its Monday)
+  const todayIso = today || (data && data.today) || null;
+  const shown = (day && days.includes(day)) ? day : (days.includes(todayIso) ? todayIso : days[0]);
   const v = data ? data[view] : null;
   const blocks = (view !== "booked" && v && v.days && v.days[shown]) || [];
   const shiftMin = (data && data.shift_minutes) || ((data && data.shift_hours) || 10) * 60;
@@ -11669,7 +11765,7 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
     setBusy("");
   };
   const dnd = {
-    can: canMove && !busy, drag, over, refused,
+    can: canMove && !busy, dragOn: canMove && moving && !busy, drag, over, refused,
     start: (e, trip) => { try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", trip.route); } catch(_){} setDrag(trip); },
     end: () => { setDrag(null); setOver(null); },
     hover: (e, row, target) => {
@@ -11776,11 +11872,12 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
               {days.map(d => (
                 <button key={d} type="button" aria-pressed={d === shown ? "true" : "false"} onClick={() => setDay(d)} className={"px-2.5 py-1.5 font-semibold" + (over && over.dayChip === d ? " lp-day-over" : "")}
                   onDragOver={canMove ? (e => dnd.hoverDay(e, d)) : undefined} onDragLeave={canMove ? dnd.leave : undefined} onDrop={canMove ? (e => dnd.dropDay(e, d)) : undefined}
-                  style={d === shown ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}>{lpDayWords(d)}</button>
+                  style={d === shown ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }} data-lp-today={d === todayIso ? "1" : undefined}>{lpDayWords(d)}{d === todayIso ? ", today" : ""}</button>
               ))}
             </span>
             {view !== "booked" && <span className="ml-auto flex items-center gap-2">
               {canMove && arrangedHere && <button type="button" className="btn-sec" onClick={resetPlan} disabled={!!busy} data-lp-reset="1" title="Forget your moves in this view and show Wayscope's plan">{busy === "reset" ? "Resetting…" : "Reset to Wayscope's plan"}</button>}
+              {canMove && blocks.length > 0 && <button type="button" className="btn-sec" aria-pressed={moving ? "true" : "false"} onClick={() => setMoving(m => !m)} data-lp-move-toggle="1">{moving ? "Done" : "Move trips"}</button>}
               <button type="button" className="btn-sec" onClick={() => download("pdf")} disabled={!!busy || !blocks.length} data-lp-sheets="1">{busy === "pdf" ? "Preparing…" : "Driver sheets (PDF)"}</button>
               <button type="button" className="btn-sec" onClick={() => download("xlsx")} disabled={!!busy || !blocks.length}>XLSX</button>
               {view === "compressed" && canApply && <button type="button" className="btn-pri" onClick={apply} data-lp-apply="1"
@@ -11806,7 +11903,7 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed }){
                   {y.lorries.map(r => <LorryPlanRow key={r.n} r={r} yard={y} colour={colour} dnd={dnd} />)}
                 </div>
               ))}
-              {canMove && blocks.length > 0 && <div className="clp-note" data-lp-drag-hint="1">Drag a trip to another lorry of its yard{view === "compressed" ? ", or to a day above" : ""}; a drop that would pass the driver's day is refused. Each trip's menu does the same from the keyboard.</div>}
+              {canMove && moving && blocks.length > 0 && <div className="clp-note" data-lp-drag-hint="1">Drag a trip to another lorry of its yard{view === "compressed" ? ", or to a day above" : ""}; a drop that would pass the driver's day is refused. Each trip's menu does the same from the keyboard.</div>}
               <div className="lp-axis" aria-hidden="true"><span></span><div className="lp-ticks">{Array.from({ length: (LP_DAY_TO - LP_DAY_FROM) / 60 + 1 }, (_, i) => <span key={i} style={{ left: `${i * 60 / (LP_DAY_TO - LP_DAY_FROM) * 100}%` }}>{String(LP_DAY_FROM / 60 + i).padStart(2, "0")}:00</span>)}</div><span></span></div>
               <div className="lp-key" data-lp-key="1">{Object.entries(dests).map(([d, c]) => <span key={d}><i style={{ background: c }}></i>{lpShort(d)}</span>)}<span><i style={{ background: "repeating-linear-gradient(135deg,#CBD5E1 0 4px,#E2E8F0 4px 8px)" }}></i>required break</span><span><i style={{ background: "var(--soft,#F1F5F9)", border: "1px solid #CBD5E1" }}></i>free</span></div>
               {view === "compressed" && (
@@ -11926,7 +12023,8 @@ function GatesWeek({ gw, initialOpen }){
             </div>))}
         </div>
       )}
-      <div className="ct-note">{gw.limit} The days are this page's own: the month spread over its calendar weeks, rounded up a day, so a day can be busier than the Dashboard's month average.</div>
+      {/* 11 Nov 2026 (CLOCS card C-X2, rule R1): five words; the 50-word sentence moved into the "i" box's how */}
+      <div className="ct-note" data-gw-note="1">Averages only: no hourly peak.</div>
     </section>
   );
 }
@@ -12248,7 +12346,7 @@ function laEnds(meta){
   ((meta && meta.routes) || []).forEach(r => { if(r && r.route_id && r.origin && r.dest) m[r.route_id] = `${r.origin} → ${r.dest}`; });
   return m;
 }
-function LookAhead({ meta, who, access, initialPage, initialView }){
+function LookAhead({ meta, who, access, initialPage, initialView, initialAcctShow }){
   const { months } = meta;
   const [view, setView] = useState(() => { if(initialView) return initialView; try { return localStorage.getItem("modus_la_view") || "commit"; } catch(e){ return "commit"; } });
   const [bucket, setBucket] = useState("commit");        // 'commit' = the week containing today · 'next' = the Thursday process
@@ -12260,6 +12358,10 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
   const [draft, setDraft] = useState({});                // key -> unsaved input
   const [laOpen, laToggle] = useRowOpen("lookahead");    // 13 Oct 2026 (W6): line key -> details open, for the session
   const [unitSel, setUnitSel] = useUnits("lookahead");     // the grid's Loads | Tonnes | Lorries
+  // 11 Nov 2026 (CLOCS card C-F10, John's yes): the Account opens on tonnes; its four money columns behind "Show Tonnes · Cost"
+  const [acctShow, setAcctShowRaw] = useState(() => { if(initialAcctShow) return initialAcctShow; try { return localStorage.getItem("modus_la_acct_show") === "cost" ? "cost" : "tonnes"; } catch(e){ return "tonnes"; } });
+  const setAcctShow = (v) => { setAcctShowRaw(v); try { localStorage.setItem("modus_la_acct_show", v); } catch(e){} };
+  const acctCost = acctShow === "cost";
   const [railOpen, setRailOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);   // the whole-week flag dialog
   const [flags, setFlags] = useState({ weather: "", wetness: "", traffic: "", other: "" });
@@ -12450,6 +12552,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
               className="px-3 py-2 rounded-lg text-sm font-semibold border disabled:opacity-40"
               title="The one-page commitment sheet, grouped by origin"
               style={{ borderColor: "var(--line)", color: "var(--muted)", background: "var(--surface)" }}>PDF</button>
+            <DaySheetMenu bucket={bucket} dates={dates} today={today} disabled={!!busy || !lines.length} />
             <SupplierOrdersMenu bucket={bucket} disabled={!anyConfirmed} />
             {allConfirmed ? (
               <button onClick={doReopen} disabled={!!busy}
@@ -12694,7 +12797,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
           {/* 14 Oct 2026 (bundle G, W17): the committed week at each gate, against what it can check in */}
           {lines.length > 0 && <GatesWeek gw={page && page.gates_week} />}
           {/* 8 Nov 2026 (v2.1 task 2.1-9): each lorry's day used to the full */}
-          {lines.length > 0 && !initialPage && <LorryPlan bucket={bucket} tick={tick} access={access} onData={setLorryPlan} weekConfirmed={allConfirmed} />}
+          {lines.length > 0 && !initialPage && <LorryPlan bucket={bucket} tick={tick} access={access} onData={setLorryPlan} weekConfirmed={allConfirmed} today={today} />}
           {page && page.abnormal && page.abnormal.count > 0 && <AbnormalWeek ab={page.abnormal} />}
           {/* 10 Sep: this week's movements on a map, in place of the stock card (now on
               the Dashboard). Drawn from the baked geometry of the lines on this page;
@@ -12715,22 +12818,29 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
           {!account.week || account.rows.length === 0 ? (
             <EmptyState title="No approved line in last week." body="The Account view types what actually moved against last week's plan. There is nothing to account for yet." />
           ) : (
+            <>
+            <div className="unit-sw mb-2" data-acct-show={acctShow}>
+              <span>Show</span>
+              <span className="unit-sw-seg" role="group" aria-label="Show the account as">
+                {[["tonnes", "Tonnes"], ["cost", "Cost"]].map(([k, l]) => <button key={k} type="button" aria-pressed={acctShow === k ? "true" : "false"} onClick={() => setAcctShow(k)}>{l}</button>)}
+              </span>
+            </div>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               {/* 22 Oct 2026 (UI fix 6, cards 1 and 2): the table keeps its 1,220 px; the Action column is pinned right (.la-pin),
                   the scroller pads its right edge so Tab brings the Note box out from under the pin (.la-acct-scroll), and the
                   headings take the .tbl th look (.la-acct-head). */}
               <div className="overflow-auto la-acct-scroll">
-                <table className="text-sm w-full" style={{ minWidth: 1220 }}>
+                <table className="text-sm w-full" style={{ minWidth: acctCost ? 1220 : 860 }} data-acct-cols={acctShow}>
                   <thead className="la-acct-head">
                     <tr>
                       <th className="px-3 py-2 text-left font-semibold">Line</th>
                       <th className="px-2 py-2 text-right font-semibold">Planned</th>
-                      <th className="px-2 py-2 text-right font-semibold">Actual</th>
-                      <th className="px-2 py-2 text-right font-semibold">Difference<InfoTip id="la.variance" /></th>
-                      <th className="px-2 py-2 text-right font-semibold">Planned {CUR()}<InfoTip id="la.cost_quote" value={account.eur_target_lines ? `${account.eur_target_lines} line${account.eur_target_lines === 1 ? "" : "s"} at the target rate.` : ""} /></th>
+                      {!acctCost && <th className="px-2 py-2 text-right font-semibold">Actual</th>}
+                      {!acctCost && <th className="px-2 py-2 text-right font-semibold">Difference<InfoTip id="la.variance" /></th>}
+                      {acctCost && <><th className="px-2 py-2 text-right font-semibold">Planned {CUR()}<InfoTip id="la.cost_quote" value={account.eur_target_lines ? `${account.eur_target_lines} line${account.eur_target_lines === 1 ? "" : "s"} at the target rate.` : ""} /></th>
                       <th className="px-2 py-2 text-right font-semibold">Fair {CUR()} <span className="normal-case tracking-normal text-slate-400">(model)</span><InfoTip id="la.cost_fair" /></th>
                       <th className="px-2 py-2 text-right font-semibold">Actual {CUR()}<InfoTip id="la.cost_actual" /></th>
-                      <th className="px-2 py-2 text-right font-semibold">{CUR()} var</th>
+                      <th className="px-2 py-2 text-right font-semibold">{CUR()} var</th></>}
                       <th className="px-2 py-2 text-left font-semibold">Note</th>
                       <th className="px-2 py-2 text-right font-semibold la-pin">Action<InfoTip id="la.spread" /></th>
                     </tr>
@@ -12745,24 +12855,24 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                             <div className="font-semibold text-[color:var(--navy-deep)]" data-la-ends={r.route_id}>{ends[r.route_id] || r.route_id}</div>
                             <div className="text-[13px] text-slate-500 flex flex-wrap items-center gap-1">
                               {ends[r.route_id] && <span>{r.route_id}</span>}<IptPill ipt={r.ipt} /><WsPill ws={r.section_id} />
-                              <span>{r.material_type || "—"} · <span title={vehLabel(r.vehicle_type)}>{vehShort(r.vehicle_type) || "—"}</span> · {r.status}</span>
+                              <span>{r.material_type || "—"} · {vehLabel(r.vehicle_type) || "—"} · {r.status}</span>
                             </div>
                           </td>
                           <td className="px-2 py-2 text-right tabular-nums font-semibold whitespace-nowrap">{grp(r.planned_qty, 1)} {unitLbl(r.unit)}</td>
-                          <td className="px-2 py-2 text-right">
+                          {!acctCost && <td className="px-2 py-2 text-right">
                             <input className={fld + " max-w-[110px] ml-auto"} inputMode="decimal" placeholder="—"
                               style={short ? { borderColor: "var(--gold)" } : {}}
                               value={draft[k + "|a"] ?? (r.actual_qty ?? "")}
                               onChange={e => setDraft(d => ({ ...d, [k + "|a"]: e.target.value }))}
                               onBlur={() => saveActual(r)} />
-                          </td>
+                          </td>}
                           {/* 10 Nov 2026 (UI critique finding 5): the difference in words ("45.0 t short", "40.0 t over"); amber only
                               past the organisation's share (short_flag), grey otherwise; over is never green */}
-                          <td className="px-2 py-2 text-right tabular-nums font-medium whitespace-nowrap" data-la-var={r.variance == null ? "none" : r.short_flag ? "short" : "quiet"}
+                          {!acctCost && <td className="px-2 py-2 text-right tabular-nums font-medium whitespace-nowrap" data-la-var={r.variance == null ? "none" : r.short_flag ? "short" : "quiet"}
                             style={{ color: r.short_flag ? "var(--warn-text)" : "var(--muted)" }}>
                             {r.variance == null ? "—" : Math.abs(r.variance) < 1e-9 ? "on plan" : `${grp(Math.abs(r.variance), 1)} ${unitLbl(r.unit)} ${r.variance > 0 ? "short" : "over"}`}
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums text-slate-600">
+                          </td>}
+                          {acctCost && <><td className="px-2 py-2 text-right tabular-nums text-slate-600">
                             {r.planned_eur == null ? <span className="text-slate-500">rate not set</span> : <>
                               <div>{CUR()}{grp(r.planned_eur)}{r.rate_source === "target" && <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded-full text-slate-600 bg-slate-100" title="No rate on this route — priced at the target rate from Config">target</span>}</div>
                               {r.planned_units && r.planned_units.per_t != null && <div className="text-xs text-slate-400 whitespace-nowrap">{unitTriple(r.planned_units)}</div>}
@@ -12784,7 +12894,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                           <td className="px-2 py-2 text-right tabular-nums font-medium"
                             style={{ color: r.eur_variance == null ? "var(--muted)" : r.eur_variance < 0 ? "var(--bad-text)" : "var(--ok-text)" }}>
                             {r.eur_variance == null ? "—" : (r.eur_variance > 0 ? "+" : "") + grp(r.eur_variance)}
-                          </td>
+                          </td></>}
                           <td className="px-2 py-2">
                             <input className={fld + " text-left"} placeholder="not typed"
                               value={draft[k + "|n"] ?? (r.actual_note ?? "")}
@@ -12816,6 +12926,7 @@ function LookAhead({ meta, who, access, initialPage, initialView }){
                 {busy && <span className="text-slate-500">saving…</span>}
               </div>
             </div>
+            </>
           )}
           {/* 10 Sep: what came OUT of each stockpile in the account week — one box per stockpile. Over capacity is a
               flag, never a block. 27 Oct 2026 (stockpile forecast): a stockpile with a capacity or a planned use shows what was
@@ -13888,10 +13999,13 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt }){
             const mins = (s) => (s.site_minutes_lost || 0) + (s.gate_minutes_lost || 0) + (s.minutes_held || 0);
             const gbp = (s) => M.lorry_hour_gbp ? Math.round(mins(s) / 60 * M.lorry_hour_gbp) : null;
             const kg = (s) => M.idle_g_per_min ? (mins(s) * M.idle_g_per_min / 1000) : null;
+            // 11 Nov 2026 (CLOCS card C-F5): whose lorries it holds, and no with / without fold when nothing was held or waited
+            const still = !h.held && !(w.site_most || wo.site_most || w.gate_most || wo.gate_most) && !mins(w) && !mins(wo);
             return <div key={h.id} className="sim-card" data-sim-holding-card={h.id}>
               <div className="sim-card-h"><span className="hbadge" aria-hidden="true">H</span>{h.name}</div>
-              <div className="ct-note" data-sim-hold-words="1">{simHoldWords(h)}</div>
-              <details className="sim-hold-fold" open={!!h.most}><summary>With and without the holding area</summary>
+              {(h.served || []).length > 0 && <div className="ct-note" data-sim-hold-for="1">For {h.served.map(s => s.name).join(", ")} · {h.call} at a time</div>}
+              <div className="ct-note" data-sim-hold-words="1">{simHoldWords(h, D)}</div>
+              {!still && <details className="sim-hold-fold" open={!!h.most}><summary>With and without the holding area</summary>
               <table className="sim-now sim-cmp"><thead><tr><th scope="col">This day</th><th scope="col" className="num">Without</th><th scope="col" className="num">With</th></tr></thead><tbody>
                 <tr><td>Most waiting on site</td><td className="num">{wo.site_most == null ? "—" : wo.site_most}</td><td className="num"><b>{w.site_most == null ? "—" : w.site_most}</b></td></tr>
                 <tr><td>Most waiting at the gate</td><td className="num">{wo.gate_most == null ? "—" : wo.gate_most}</td><td className="num"><b>{w.gate_most == null ? "—" : w.gate_most}</b></td></tr>
@@ -13903,7 +14017,7 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt }){
                 {kg(wo) != null && <tr><td>Idling, if every waiting engine runs<div className="sim-sub">{M.idle_words}</div></td><td className="num">{kg(wo).toFixed(1)} kg CO₂</td><td className="num"><b>{kg(w).toFixed(1)} kg CO₂</b></td></tr>}
               </tbody></table>
               <div className="ct-note">A holding area moves the waiting off the site and the lane; it does not remove it.</div>
-              </details>
+              </details>}
             </div>; })}
           {site
             ? <div className="sim-card" data-sim-stations-now="1">
@@ -14134,7 +14248,7 @@ function SimPhoneList({ D }){
     <ul className="sim-plist" data-sim-table="1" aria-label="Gates and stations">
       {(D.holding || []).filter(h => h.on).map(h => <li key={"h" + h.id} className="sim-pcard" data-sim-phone-holding={h.id}>
         <div className="sim-pc-h"><b>{h.name}</b>{h.over_spaces ? <RowStatus word="Over its spaces" tone="bad" /> : null}</div>
-        <div className="sim-pline">{simHoldWords(h)}</div>
+        <div className="sim-pline">{simHoldWords(h, D)}</div>
       </li>)}
       {main.map(card)}
       {order.some(g => g.origin_share_note) && <li className="ct-note" data-sim-other-customers="1">{SIM_OTHER_CUSTOMERS}</li>}
@@ -14160,9 +14274,13 @@ function simPeak(D, site){
   return hit || null;
 }
 // the holding area's day in plain words
-function simHoldWords(h){
+// 11 Nov 2026 (CLOCS card C-F5): a quiet holding area says why: no lorry for the sites it serves this day, or theirs came
+// straight to the gate (exempt, a pour) and none waited. The sites' lorries are the day's own gate arrivals there.
+const simHoldServedIn = (h, D) => { const ids = (h.served || []).map(s => s.id);
+  return ((D && D.gates) || []).filter(g => ids.includes(g.location_id)).reduce((s, g) => s + (g.arrivals || 0), 0); };
+function simHoldWords(h, D){
   const n = h.held || 0;
-  if(!n) return "No lorry called off here this day.";
+  if(!n) return simHoldServedIn(h, D) ? "None waited this day." : "No lorry for these sites this day.";
   if(!h.most) return `${n} ${n === 1 ? "lorry" : "lorries"} passed through · none waited.`;
   return `${n} ${n === 1 ? "lorry" : "lorries"} waited here · most ${h.most} at once${h.most_at != null ? ` at ${simHM(h.most_at)}` : ""}${h.spaces ? `, of ${h.spaces} spaces` : ""}${h.over_spaces ? `, ${h.over_spaces} over` : ""}.`;
 }
@@ -14174,11 +14292,13 @@ const SIM_OTHER_CUSTOMERS = "Quarries and plants serve other customers too: only
 // On a phone (PhoneSimulation) the day is read without the lines: the controls, the figures line and one card a gate.
 function SimulationPage({ meta, months, phone, initial }){
   const open = true;
-  const [month, setMonth] = useState(() => (initial && initial.month) || gaMonthToday(months));
+  // 11 Nov 2026 (CLOCS card C-F3): a month kept from this page or carried from the Dashboard opens without the busiest read
+  const kept0 = initial ? null : keptMonth("sim");
+  const [month, setMonth] = useState(() => (initial && initial.month) || kept0 || gaMonthToday(months));
   // 9 Nov 2026 (UI critique finding 9, decision 7): the page opens on the programme's BUSIEST month, found by one cheap read
   // before the first day is worked out; if that read fails it opens on this month as before
   const [busiestM, setBusiestM] = useState(null);
-  const [ready, setReady] = useState(!!initial);
+  const [ready, setReady] = useState(!!initial || !!kept0);
   useEffect(() => {
     if(ready) return;
     let live = true;
@@ -14191,6 +14311,8 @@ function SimulationPage({ meta, months, phone, initial }){
     return () => { live = false; };
   }, []);
   const [sc, setSc] = useState(SIM_SC0);
+  // 11 Nov 2026 (CLOCS card C-F3): the month on the Month scale is kept; Week and Day show the server's month and leave it be
+  useEffect(() => { if(ready && sc.scale === "month") keepMonth("sim", month); }, [month, sc.scale, ready]);
   const [data, setData] = useState(initial || null);
   const [store, setStore] = useState(() => initial ? { month: initial.month, legs: initial.legs, haul: initial.haul_roads } : null);
   const [loadErr, setLoadErr] = useState(false);
@@ -14264,7 +14386,8 @@ function SimulationPage({ meta, months, phone, initial }){
     <div className="sim-seg" role="group" aria-label="Simulation scale" data-sim-scale={sc.scale}>
       {SIM_SCALES.map(([v, w]) => <button key={v} type="button" className={sc.scale === v ? "on" : ""} aria-pressed={sc.scale === v}
         onClick={() => { if(sc.scale === v) return; const d = D && D.day_choices && D.day_choices.length ? D.day_choices : [];
-          setMsg(""); setSc(x => ({ ...x, scale: v, date: v === "day" ? (x.date || (d[0] || {}).date || "") : x.date })); }}>{w}</button>)}
+          setMsg(""); if(v === "month" && keptMonth("sim")) setMonth(keptMonth("sim"));   // 11 Nov 2026 (C-F3): back to the month you were on
+          setSc(x => ({ ...x, scale: v, date: v === "day" ? (x.date || (d[0] || {}).date || "") : x.date })); }}>{w}</button>)}
     </div>
     {sc.scale === "month" && <label className="ct-line">Which month <select className="ga-sel" value={month} onChange={e => { setMonth(+e.target.value); }} aria-label="Simulation month">
       {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}</select></label>}
@@ -14364,7 +14487,8 @@ function SimDashLine({ ga, month, months, onOpen }){
   return (
     <div className="ct-strip sim-dash-line" data-sim-dash={top ? "set" : "none"}>
       <span className="ct-line"><b>Simulation</b> · {monthLabelAbs(month, startYear)}{top ? `: the busiest gate ${simGateName(top)}, ${top.gate_name}, ${gaN1(top.arrivals_per_day)} lorries a day` : ""}</span>
-      <button type="button" className="btn-sec" onClick={() => { if(onOpen) onOpen("simulation"); }}>Open the Simulation</button>
+      {/* 11 Nov 2026 (CLOCS card C-F3 / idea C-I1): a month picked on Gate arrivals goes with it; untouched, the page opens on its busiest month */}
+      <button type="button" className="btn-sec" onClick={() => { if(keptMonth("ga") === month) keepMonth("sim", month); if(onOpen) onOpen("simulation"); }}>Open the Simulation</button>
     </div>
   );
 }
@@ -16360,7 +16484,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   }, []);
 
   // ---- reactive locations (for the route-authoring pickers) ----
-  const [locs, setLocs] = useState([]);
+  // 11 Nov 2026 (CLOCS card C-F8): the Locations table says "Loading…" until the first answer (locsIn), not "No locations yet"
+  const [locs, setLocsRaw] = useState([]);
+  const [locsIn, setLocsIn] = useState(false);
+  const setLocs = (v) => { setLocsIn(true); setLocsRaw(v); };
   const featProps = (gj) => (gj.features || []).map(f => ({ ...f.properties }));
 
   // ---- route authoring (Phase 1b) ----
@@ -16394,6 +16521,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
   // ---- zones (Phase 3): geofencing and disruptions in one table ----
   const [zoneList, setZoneList] = useState([]);
+  const [zonesIn, setZonesIn] = useState(false);   // 11 Nov 2026 (CLOCS card C-F8, the sweep): "Loading…" until the first answer
   const [haulUse, setHaulUse] = useState({});      // Phase 4: zone_id -> routes attached
   // 28 Oct 2026 (task 0c): the dated zones' diversions — per zone (the Used by column), per route and dates (the
   // Routes page and the panel after a zone save), and what "Find a way round" would cost now
@@ -16430,6 +16558,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const areaPlaceRef = useRef(false);     // 28 Oct 2026 (simulation v2): the next map click places an area
   // 31 Oct 2026 (task 4c): the site layout card's drawing on this map, its survey-point click, its re-add after a basemap switch
   const layoutHandle = useRef(null), layoutPickRef = useRef(null), layoutReinstallRef = useRef(null);
+  // 12 Nov 2026 (CLOCS card C-X1, option (a)): a site's row click asks its layout card to frame the layout once it has read it
+  const layoutFrameRef = useRef(null);
   // 31 Oct 2026 (4c PR 2): the drawing tools open on this page's map: { locId, phaseId } while open. drawRef keeps the map's
   // own clicks (select a site, drag a marker, pick a route) away from them; drawReinstallRef puts them back after a basemap switch.
   const [drawing, setDrawing] = useState(null);
@@ -16782,7 +16912,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           .filter(c => Array.isArray(c) && isFinite(c[0]) && isFinite(c[1]));
         if(pts.length){ framedRef.current = true; try { m.fitBounds(boundsOf(pts), { padding: 60, maxZoom: 12, duration: 0 }); } catch(e){} }
       }
-    }).catch(() => {});
+    }).catch(() => { setLocsIn(true); });
   }, [mapReady, showProfile, showLeg, showAlt, status]);
 
   const boundsOf = (coords) => {
@@ -17027,6 +17157,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     openEditForNode(id);
     if(!canEdit && feat) setReadLoc({ id, name: feat.properties.name || id });
     const m = mapObj.current;
+    layoutFrameRef.current = id;   // C-X1 (a): a site with a layout is framed on it by SiteLayoutCard; one without stays as here
     if(feat && m) m.easeTo({ center: feat.geometry.coordinates, zoom: Math.max(m.getZoom(), 11), duration: 700 });
   };
   const openLocFromKeys = (id) => {
@@ -17690,7 +17821,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       return j;
     });
 
-  useEffect(() => { reloadZones().catch(() => setZoneList([])); }, []);
+  useEffect(() => { reloadZones().catch(() => setZoneList([])).finally(() => setZonesIn(true)); }, []);
 
   const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -18181,7 +18312,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       {rs.length > 5 && <div className="text-[13px] text-slate-500">+ {rs.length - 5} more · <button type="button" className="link-btn text-[13px]" data-read-loc-more="1" onClick={() => setSubTab("routes")}>Open Routes</button></div>}
                     </div>);
                 })()}
-                <SiteLayoutCard locId={readLoc.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef}
+                <SiteLayoutCard locId={readLoc.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef} frameRef={layoutFrameRef}
                   drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: readLoc.id, phaseId: pid }) : null}
                   onZones={() => reloadZones().catch(e => console.warn("Wayscope:", e))} />
               </div>
@@ -18707,7 +18838,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 </div>
                 )}
                 {/* 31 Oct 2026 (task 4c PR 1): the site's logistics layout, its phases and drawings brought in */}
-                {form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef}
+                {form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef} frameRef={layoutFrameRef}
                   drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: form.id, phaseId: pid }) : null}
                   onZones={() => reloadZones().catch(e => console.warn("Wayscope:", e))} />}
                 {!form.id && (
@@ -19191,7 +19322,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </td>
                 </tr>
               ))}
-              {!locs.length && <tr data-locs-empty="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">{canEdit ? "No locations yet. Add the first with “+ Add location”." : "No locations yet. An admin adds them."}</td></tr>}
+              {!locs.length && !locsIn && <tr data-locs-loading="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>}
+              {!locs.length && locsIn && <tr data-locs-empty="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">{canEdit ? "No locations yet. Add the first with “+ Add location”." : "No locations yet. An admin adds them."}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -19517,7 +19649,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </tr>
                 );
               })}
-              {!zoneList.length && <tr data-zones-empty="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">
+              {!zoneList.length && !zonesIn && <tr data-zones-loading="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>}
+              {!zoneList.length && zonesIn && <tr data-zones-empty="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">
                 {canEdit ? "No zones yet. Draw a closure for routes to avoid, a works area, or a temporary haul road." : "No zones yet. An admin draws them."}
               </td></tr>}
             </tbody>
@@ -19557,11 +19690,13 @@ function slMonths(p){
 }
 // 31 Oct 2026 (task 4c PR 3): " · 1 picture" in a phase's row (its own pictures and those shown in every phase)
 const slPicWords = (n) => n ? ` · ${n} picture${n === 1 ? "" : "s"}` : "";
-function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstallRef, drawing, onDraw, onZones }){
+function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstallRef, frameRef, drawing, onDraw, onZones }){
   const canLayout = !!(ACCESS.info && ACCESS.info.can_approve);
   const canWorks = isAdminLogin(ACCESS.info);     // 8 Nov 2026 (task 2.1-12, Q7): a works area is a zone: admins only
   const [styles, setStyles] = useState(SL_STYLES);
   const [lay, setLay] = useState(null);
+  const [layIn, setLayIn] = useState(false);
+  const [askPub, setAskPub] = useState(false);   // 11 Nov 2026 (CLOCS card C-F6): ticking "Show on the public map" asks first     // 11 Nov 2026 (CLOCS card C-F8): "Loading…" until the first answer
   const [shown, setShown] = useState("");
   const [msg, setMsg] = useState("");
   const [edit, setEdit] = useState(null);
@@ -19586,9 +19721,10 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       const ids = ((j.layout && j.layout.phases) || []).map(p => p.id);
       setShown(s => (keepShown && ids.includes(keepShown)) ? keepShown : (ids.includes(s) ? s : (ids[0] || "")));
     } catch(e){ setLay(null); setMsg(errSay("Couldn't load the layout.", e)); }
+    setLayIn(true);
   };
   useEffect(() => {
-    setImp(null); setEdit(null); setMsg(""); setPts({}); setFit(null); setPicking(""); setShown(""); setWa(null);
+    setImp(null); setEdit(null); setMsg(""); setPts({}); setFit(null); setPicking(""); setShown(""); setWa(null); setLayIn(false); setAskPub(false);
     load();
     if(!SL_STYLES) fetch(`${API}/site-layouts/styles`).then(okJSON).then(j => { SL_STYLES = j; setStyles(j); }).catch(e => console.warn("Wayscope:", e));
   }, [locId]);
@@ -19604,7 +19740,21 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       const h = handleRef.current;
       reinstallRef.current = () => { try { h.reinstall(); } catch(e){ console.warn("Wayscope:", e); } };
       const p = ((lay && lay.phases) || []).find(x => x.id === shown);
-      h.ready.then(() => { if(!gone){ h.setData(p ? p.features : []); h.setVisible(!drawing); } });
+      h.ready.then(() => {
+        if(gone) return;
+        h.setData(p ? p.features : []); h.setVisible(!drawing);
+        // 12 Nov 2026 (CLOCS card C-X1, option (a)): opened from its row, a site WITH a layout is framed on the shown phase's
+        // drawing (zoom up to 17), its routes still drawn round it; a site without one keeps the row click's own centring.
+        // Once per row click, and only on this site's own layout (lay is the previous site's for one render after a switch).
+        if(frameRef && frameRef.current === locId && lay && lay.location_id === locId && !drawing){
+          frameRef.current = null;
+          const b = new mapboxgl.LngLatBounds();
+          const walk = (c) => { if(typeof c[0] === "number") b.extend(c); else c.forEach(walk); };
+          const fc = (p && p.features) || [];   // a phase's drawing is a FeatureCollection (a list is taken too)
+          (Array.isArray(fc) ? fc : (fc.features || [])).forEach(f => { if(f && f.geometry) walk(f.geometry.coordinates); });
+          try { if(!b.isEmpty()) m.fitBounds(b, { padding: 60, maxZoom: 17, duration: 700 }); } catch(e){}
+        }
+      });
     });
     return () => { gone = true; };
   }, [lay, shown, styles, mapReady, drawing]);
@@ -19815,13 +19965,23 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       </div>
       <input ref={fileRef} type="file" accept=".dxf,.dwg,.kml,.kmz,.geojson,.json,.zip" style={{ display: "none" }} aria-label="Drawing to bring in" tabIndex={-1}
         onChange={e => readFile(e.target.files && e.target.files[0])} />
-      {!phases.length && !imp && !edit && <p className="text-[13px] text-slate-500 mt-1">No layout yet.</p>}
+      {!phases.length && !imp && !edit && <p className="text-[13px] text-slate-500 mt-1" data-layout-loading={layIn ? null : "1"}>{layIn ? "No layout yet." : "Loading…"}</p>}
       {lay && phases.length > 0 && !imp && !edit && (
         <div className="mt-1.5" data-site-layout-public="1">
           <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <input type="checkbox" checked={!!lay.public} disabled={!canLayout || busy !== ""} onChange={e => setPublic(e.target.checked)} />
+            {/* 11 Nov 2026 (CLOCS card C-F6): putting a layout on the public map asks first (one click published it); taking it off writes at once */}
+            <input type="checkbox" checked={!!lay.public || askPub} disabled={!canLayout || busy !== ""} onChange={e => { if(e.target.checked) setAskPub(true); else if(askPub) setAskPub(false); else setPublic(false); }} />
             Show on the public map
           </label>
+          {askPub && <div className="rounded-lg border border-slate-200 p-2 mt-1" role="group" aria-labelledby="sl-ask-pub" data-site-layout-ask="1">
+            <p id="sl-ask-pub" className="text-sm font-medium text-slate-700">Show this layout on the public map?</p>
+            <p className="text-[13px] text-slate-500">Anyone with the map's link will see it.</p>
+            <div className="flex gap-2 mt-1.5">
+              <button type="button" className="btn-sec" onClick={() => setAskPub(false)} data-site-layout-ask-no="1">Cancel</button>
+              <button type="button" className="px-3 py-1.5 rounded-lg text-white font-semibold text-[13px]" style={{ background: "var(--action)" }}
+                onClick={() => { setAskPub(false); setPublic(true); }} data-site-layout-ask-yes="1">Show it</button>
+            </div>
+          </div>}
           {lay.public && <p className="text-[13px] text-slate-500 mt-0.5">From close in. Security and CCTV stay off it.</p>}
         </div>
       )}
