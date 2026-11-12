@@ -699,7 +699,8 @@ ok("🔴 every fitBounds in the app is inside a try (30 Sep: a NaN bounds on the
    # NARROWED 31 Oct 2026 (task 4c PR 1): eight, the Site layout card frames a drawing brought in and its fitted place
    # NARROWED 31 Oct 2026 (task 4c PR 2): 8 -> 9 — the drawing tools go to the phase's drawing once, on open
    # NARROWED 31 Oct 2026 (task 4c PR 3): 9 -> 10 — a pinned picture's "Fit to screen" (fitPic)
-   len(_fits) == 10 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
+   # NARROWED 12 Nov 2026 (CLOCS card C-X1): 10 -> 11 — a Locations row click frames a site's layout (SiteLayoutCard)
+   len(_fits) == 11 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
    and "try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); store.framed = true; } catch(e){}" in fe, str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
 # --- 5 Oct 2026: Appearance (Ink / Light / Dark) ------------------------------------------
 _PAL = re.compile(r'(?:(?:hover|focus|disabled|group-hover|sm|md|lg):)?(?:bg|text|border|divide|ring|placeholder)-(?:white|black|transparent|current|\[color:[^\]]+\]|\[#[0-9a-fA-F]{3,8}\]|\[rgba?\([^\]]+\)\]|(?:slate|gray|red|amber|blue|emerald|green)-\d{2,3})(?:/\d{1,3})?')

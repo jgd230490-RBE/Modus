@@ -16523,6 +16523,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const areaPlaceRef = useRef(false);     // 28 Oct 2026 (simulation v2): the next map click places an area
   // 31 Oct 2026 (task 4c): the site layout card's drawing on this map, its survey-point click, its re-add after a basemap switch
   const layoutHandle = useRef(null), layoutPickRef = useRef(null), layoutReinstallRef = useRef(null);
+  // 12 Nov 2026 (CLOCS card C-X1, option (a)): a site's row click asks its layout card to frame the layout once it has read it
+  const layoutFrameRef = useRef(null);
   // 31 Oct 2026 (4c PR 2): the drawing tools open on this page's map: { locId, phaseId } while open. drawRef keeps the map's
   // own clicks (select a site, drag a marker, pick a route) away from them; drawReinstallRef puts them back after a basemap switch.
   const [drawing, setDrawing] = useState(null);
@@ -17120,6 +17122,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     openEditForNode(id);
     if(!canEdit && feat) setReadLoc({ id, name: feat.properties.name || id });
     const m = mapObj.current;
+    layoutFrameRef.current = id;   // C-X1 (a): a site with a layout is framed on it by SiteLayoutCard; one without stays as here
     if(feat && m) m.easeTo({ center: feat.geometry.coordinates, zoom: Math.max(m.getZoom(), 11), duration: 700 });
   };
   const openLocFromKeys = (id) => {
@@ -18274,7 +18277,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       {rs.length > 5 && <div className="text-[13px] text-slate-500">+ {rs.length - 5} more · <button type="button" className="link-btn text-[13px]" data-read-loc-more="1" onClick={() => setSubTab("routes")}>Open Routes</button></div>}
                     </div>);
                 })()}
-                <SiteLayoutCard locId={readLoc.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef}
+                <SiteLayoutCard locId={readLoc.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef} frameRef={layoutFrameRef}
                   drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: readLoc.id, phaseId: pid }) : null}
                   onZones={() => reloadZones().catch(e => console.warn("Wayscope:", e))} />
               </div>
@@ -18800,7 +18803,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 </div>
                 )}
                 {/* 31 Oct 2026 (task 4c PR 1): the site's logistics layout, its phases and drawings brought in */}
-                {form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef}
+                {form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef} frameRef={layoutFrameRef}
                   drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: form.id, phaseId: pid }) : null}
                   onZones={() => reloadZones().catch(e => console.warn("Wayscope:", e))} />}
                 {!form.id && (
@@ -19652,7 +19655,7 @@ function slMonths(p){
 }
 // 31 Oct 2026 (task 4c PR 3): " · 1 picture" in a phase's row (its own pictures and those shown in every phase)
 const slPicWords = (n) => n ? ` · ${n} picture${n === 1 ? "" : "s"}` : "";
-function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstallRef, drawing, onDraw, onZones }){
+function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstallRef, frameRef, drawing, onDraw, onZones }){
   const canLayout = !!(ACCESS.info && ACCESS.info.can_approve);
   const canWorks = isAdminLogin(ACCESS.info);     // 8 Nov 2026 (task 2.1-12, Q7): a works area is a zone: admins only
   const [styles, setStyles] = useState(SL_STYLES);
@@ -19702,7 +19705,21 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       const h = handleRef.current;
       reinstallRef.current = () => { try { h.reinstall(); } catch(e){ console.warn("Wayscope:", e); } };
       const p = ((lay && lay.phases) || []).find(x => x.id === shown);
-      h.ready.then(() => { if(!gone){ h.setData(p ? p.features : []); h.setVisible(!drawing); } });
+      h.ready.then(() => {
+        if(gone) return;
+        h.setData(p ? p.features : []); h.setVisible(!drawing);
+        // 12 Nov 2026 (CLOCS card C-X1, option (a)): opened from its row, a site WITH a layout is framed on the shown phase's
+        // drawing (zoom up to 17), its routes still drawn round it; a site without one keeps the row click's own centring.
+        // Once per row click, and only on this site's own layout (lay is the previous site's for one render after a switch).
+        if(frameRef && frameRef.current === locId && lay && lay.location_id === locId && !drawing){
+          frameRef.current = null;
+          const b = new mapboxgl.LngLatBounds();
+          const walk = (c) => { if(typeof c[0] === "number") b.extend(c); else c.forEach(walk); };
+          const fc = (p && p.features) || [];   // a phase's drawing is a FeatureCollection (a list is taken too)
+          (Array.isArray(fc) ? fc : (fc.features || [])).forEach(f => { if(f && f.geometry) walk(f.geometry.coordinates); });
+          try { if(!b.isEmpty()) m.fitBounds(b, { padding: 60, maxZoom: 17, duration: 700 }); } catch(e){}
+        }
+      });
     });
     return () => { gone = true; };
   }, [lay, shown, styles, mapReady, drawing]);
