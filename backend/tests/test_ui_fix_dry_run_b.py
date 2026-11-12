@@ -86,10 +86,11 @@ ok("B-X2: the lines are kept on the page's data for the tests", 'S["clocs_box_ti
 
 # ---- B-X3: the data pages' counts --------------------------------------------------------------------------------- #
 j = HTML.find('data-counts-loading="1"')
+# NARROWED 12 Nov 2026 (B-X4): the line waits for the zones' answer too (status null OR zones not in)
 ok("🔴 B-X3: the counts line says Loading… until the routes' answer",
-   '{status === null && <div className="text-xs text-slate-500 mt-1.5" data-counts-loading="1">Loading…</div>}' in HTML)
+   '{(status === null || !zonesIn) && <div className="text-xs text-slate-500 mt-1.5" data-counts-loading="1">Loading…</div>}' in HTML)
 ok("🔴 B-X3: the counts themselves only once it is in",
-   '{status !== null && <div className="text-xs text-slate-500 mt-1.5 flex flex-wrap gap-x-3 gap-y-1">' in HTML)
+   '{status !== null && zonesIn && <div className="text-xs text-slate-500 mt-1.5 flex flex-wrap gap-x-3 gap-y-1">' in HTML)
 ok("🔴 B-X3: the locations count from the answer until the map's list is in",
    "<span>{locs.length || (summary && summary.locations) || 0} locations</span>" in HTML
    and "<span>{locs.length} locations</span>" not in HTML)
@@ -98,6 +99,11 @@ ok("B-X3: a failed status read still ends the wait (status becomes [], not null)
    "fetchStatus().catch(() => setStatus([]))" in HTML)
 ok("B-X3: the summary the count reads carries the locations", re.search(r'return \{"locations": db\.count_locations\(\), "routes": total',
                                                                          read("backend", "network.py")) is not None)
+# ---- B-X4 (12 Nov 2026, batch 4's live check): "0 zones" for a few seconds after the routes arrived ----------------- #
+ok("🔴 B-X4: no counts while the zones are still loading (zonesIn, C-F8's flag)",
+   "{status !== null && zonesIn && <div" in HTML and "{status !== null && <div className=\"text-xs text-slate-500 mt-1.5 flex" not in HTML)
+ok("🔴 B-X4: Loading… while either answer is out", "{(status === null || !zonesIn) && <div" in HTML)
+ok("B-X4: zonesIn still ends on a failed zones read too", ".catch(() => setZoneList([])).finally(() => setZonesIn(true))" in HTML)
 ok("B-X3: C-F8's word, nothing longer", HTML[j:j + 40].count("Loading…") == 1 if j > 0 else False)
 
 print(f"\ntest_ui_fix_dry_run_b: {PASS} passed, {len(FAIL)} failed")
