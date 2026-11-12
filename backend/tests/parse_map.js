@@ -8276,7 +8276,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("⭐ ONE POPUP (seen in Chrome: a site on the alignment opened its popup AND the work section's): the alignment's line and its boundary ticks give way to a marker too",
      /map\.on\('click', lId, \(e\) => \{\s*if \(typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) return;[^\n]*\n\s*const p = \(e\.features && e\.features\[0\] && e\.features\[0\]\.properties\) \|\| \{\};[\s\S]{0,220}?const ch = \(v\) =>/.test(code)
      && /map\.on\('click', lId, \(e\) => \{\s*if \(typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) return;[^\n]*\n\s*const p = \(e\.features && e\.features\[0\] && e\.features\[0\]\.properties\) \|\| \{\};\s*const gone = /.test(code)
-     && (code.match(/markerHitAt\(e\.point\)\) return;/g) || []).length === 6);
+     && (code.match(/markerHitAt\(e\.point\)\) return;/g) || []).length === 7);   // NARROWED 12 Nov 2026 (A1-L4): 6 -> 7, the traffic limit's zone popup asks too (map_limit_popup.js)
   ok("⭐ ONE POPUP: over a marker the road's hover tip gives way (it promised the road's card), through the tip's own hidden path",
      /if \(!card\) return;\s*if \(f && e && e\.point && typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) e = null;\s*if \(!f \|\| !e \|\| !e\.point \|\| isPhoneShell\(\)/.test(code));
   ok("ONE POPUP: the marker's own clicks are untouched, and a near miss on a road already stood aside for a marker (the clickable list names both layers)",

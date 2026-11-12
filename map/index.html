@@ -11210,6 +11210,9 @@
     }
     function trafficLimitPopup(e) {
         const f = e.features && e.features[0]; if (!f) return;
+        // 12 Nov 2026 (card A1-L4; live at the Billesdon Lane holding area's marker, Jan 2028): a place's or a gate's marker answers its click alone;
+        // the limit's own zone popup gave way to nothing and opened over the place's
+        if (typeof markerHitAt === 'function' && markerHitAt(e.point)) return;
         if (typeof roadCardHitAt === 'function' && roadCardHitAt(e.point)) return;   // 10 Nov 2026 (2.1-4): the road card carries its line
         const L = ((TLIM.data && TLIM.data.limits) || []).find(x => String(x.id) === String((f.properties || {}).id)); if (!L) return;
         const m = TLIM.month, r = m ? (L.months || {})[String(m)] : null, u = tlimUnit(L);
