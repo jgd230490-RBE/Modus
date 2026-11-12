@@ -1117,7 +1117,16 @@ if (loaded) {
       && !hzT.includes('style="color:var(--navy)"'));
     ok("...the Account view carries the account week's stockpiles with one 'out' box each",
       acctOut.includes("Stockpiles · ") && acctOut.includes('aria-label="About: Stockpiles"')   // 13 Oct 2026 (W3, narrowed): the how-to is in the info box
-      && (acctOut.match(/placeholder="out —"/g) || []).length === fixture.account.stock.length && fixture.account.stock.length >= 1);
+      // NARROWED 11 Nov 2026: one 'out' box per stockpile, found by its name; its placeholder follows the row, "plan <n>" for
+      // a forecast row and "out —" for a records row (the fixture test_lookahead.py writes today has a forecast row: the
+      // check counted only "out —" boxes and failed on correct output whenever that fixture was fresh)
+      && fixture.account.stock.length >= 1
+      && (acctOut.match(/aria-label="Out of [^"]* this week"/g) || []).length === fixture.account.stock.length
+      && fixture.account.stock.every(s => {
+        const tag = (acctOut.match(new RegExp('<input[^>]*aria-label="Out of ' + String(s.name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ' this week"[^>]*>')) || [""])[0];
+        const want = s.forecast ? "plan " + (+s.plan_out).toLocaleString("en-GB", { maximumFractionDigits: 0 }) : "out —";
+        return tag.includes('placeholder="' + want + '"');
+      }));
     ok("...and says the fixture's stockpile is OVER, with the same figure the server sent",
       acctOut.includes("OVER by " + Math.round(-fixture.account.stock[0].remaining).toLocaleString("en-US")));
 
