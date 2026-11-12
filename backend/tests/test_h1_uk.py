@@ -699,7 +699,8 @@ ok("🔴 every fitBounds in the app is inside a try (30 Sep: a NaN bounds on the
    # NARROWED 31 Oct 2026 (task 4c PR 1): eight, the Site layout card frames a drawing brought in and its fitted place
    # NARROWED 31 Oct 2026 (task 4c PR 2): 8 -> 9 — the drawing tools go to the phase's drawing once, on open
    # NARROWED 31 Oct 2026 (task 4c PR 3): 9 -> 10 — a pinned picture's "Fit to screen" (fitPic)
-   len(_fits) == 10 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
+   # NARROWED 12 Nov 2026 (CLOCS card C-X1): 10 -> 11 — a Locations row click frames a site's layout (SiteLayoutCard)
+   len(_fits) == 11 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
    and "try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); store.framed = true; } catch(e){}" in fe, str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
 # --- 5 Oct 2026: Appearance (Ink / Light / Dark) ------------------------------------------
 _PAL = re.compile(r'(?:(?:hover|focus|disabled|group-hover|sm|md|lg):)?(?:bg|text|border|divide|ring|placeholder)-(?:white|black|transparent|current|\[color:[^\]]+\]|\[#[0-9a-fA-F]{3,8}\]|\[rgba?\([^\]]+\)\]|(?:slate|gray|red|amber|blue|emerald|green)-\d{2,3})(?:/\d{1,3})?')
@@ -1087,6 +1088,9 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    # NARROWED 10 Nov 2026 (wave 2, card 13, decision 4): navy 27 -> 2 and a new kind, action (25): every primary action
    # moved to the accent; the two navy fills left are the Submit strip (a card, not a button) and the drawing palette's
    # picked tool (a selection); the tabs and the picked stockpile / year / page are .ws-tab tints with no text-white
+   # NARROWED 11 Nov 2026 (CLOCS B-F6): 23 -> 22, Route all is a line in the Routing menu, no longer a filled button
+   # NARROWED 11 Nov 2026 (CLOCS card C-F6): action +1, the site layout's "Show it" (the public tick asks first)
+   # 12 Nov 2026 (batch 4 merge, both kept): 23 - 1 (B-F6) + 1 (C-F6) = 23
    len(_sites.get("action", [])) == 23 and ".text-white[style*=\"var(--action)\"]{color:var(--action-fg);}" in fe
    and len(_sites.get("navy", [])) == 2 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
    and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
@@ -1099,7 +1103,7 @@ ok("...every inline navy / blue fill is written `background: \"var(--navy)\"` / 
    # NARROWED 10 Nov 2026 (wave 2, card 13): 14+ -> 2 navy fills (the Submit strip and the palette's picked tool); the primary
    # actions are written the same way on the accent, `background: "var(--action)"`, 23 of them
    and _fe_wo.count('background: "var(--navy)"') + _fe_wo.count('background:"var(--navy)"') == 2 and _fe_wo.count('background: "var(--blue)"') >= 1
-   and _fe_wo.count('background: "var(--action)"') >= 23
+   and _fe_wo.count('background: "var(--action)"') >= 22   # NARROWED 11 Nov 2026 (CLOCS B-F6): Route all in the menu
    and "backgroundColor: \"var(--navy)\"" not in _fe_wo and "backgroundColor: \"var(--blue)\"" not in _fe_wo)
 _bad1 = []
 for _a in _ACC:
@@ -1230,7 +1234,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 10 Nov 2026 (wave 3, item 24): 29 -> 30, the Account's Fuel card "No diesel price yet"
    # NARROWED 10 Nov 2026 (wave 3, item 33): 30 -> 31, the gates list's "n % of N" on a gate near capacity
    # NARROWED 10 Nov 2026 (wave 3, routes-first-run, merged): +1 = 32, the Vehicles cell's "n out only"
-   _fe_wo.count("var(--warn-text)") == 32   # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
+   _fe_wo.count("var(--warn-text)") == 33   # NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
+     # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    # NARROWED 10 Nov 2026 (wave 3, finding 5): the Account's Variance reads words, amber on a flagged line, else --muted
@@ -1398,7 +1403,8 @@ ok("UI fix 6 card 2: the Account headings are --muted on --surface-2 — 4.56:1 
    all(_cr(_eff(a, l)["muted"], _eff(a, l)["surface-2"]) >= 4.5 for a in _ACC for l in ("ink", "light", "dark"))
    and round(_cr("#64748B", "#FAFAF9"), 2) == 4.56 and round(_cr("#9AA1AB", "#1B1D21"), 2) == 6.48
    and round(_cr("#FFFFFF", "#C2410C"), 2) == 5.18 and round(_cr("#FFFFFF", "#2563EB"), 2) == 5.17
-   and ".la-acct-head th{background:var(--surface-2);color:var(--muted);font-size:13px;" in fe and 'className="btn-pri btn-sm disabled:opacity-40"' in fe)
+   # NARROWED 11 Nov 2026 (D-F4, John's yes): "Add to this week" is an outline button now (btn-sec), not the accent fill
+   and ".la-acct-head th{background:var(--surface-2);color:var(--muted);font-size:13px;" in fe and 'className="btn-sec btn-sm disabled:opacity-40"' in fe)
 ok("UI fix 6 card 5: the big screen's '+ N more lines today' line is --muted on the card — 4.76:1 (Ink and Light), 6.25:1 (Dark), 4.5 or better in all 12",
    all(_cr(_eff(a, l)["muted"], _eff(a, l)["surface"]) >= 4.5 for a in _ACC for l in ("ink", "light", "dark"))
    and round(_cr("#64748B", "#FFFFFF"), 2) == 4.76 and round(_cr("#9AA1AB", "#1F2024"), 2) == 6.25

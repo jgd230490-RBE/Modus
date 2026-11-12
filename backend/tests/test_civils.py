@@ -525,7 +525,8 @@ for label, gone, now in (
     ("Routes create message", "routing ${prof} (", "routing ${vehLabel(prof)} ("),
     ("Routes chip tooltip", "`${k} · not routed`", "`${vehLabel(k)} · not routed`"),
     ("Look-ahead map popup", "drawn for ${r.vehicle_profile}", "drawn for ${vehLabel(r.vehicle_profile)}"),
-    ("Look-ahead last-week tooltip", "title={r.vehicle_type}", "title={vehLabel(r.vehicle_type)}"),
+    # NARROWED 11 Nov 2026 (CLOCS card C-F2, screen half): the Account line prints the name itself, no tooltip needed
+    ("Look-ahead last-week tooltip", "title={r.vehicle_type}", '{vehLabel(r.vehicle_type) || "—"} · {r.status}'),
     ("Look-ahead payload fallback", "(${c.payload_fallback} fallback)", "(${vehLabel(c.payload_fallback)} fallback)"),
     ("Forecasts CSV", 'g.material_description || "", g.vehicle || "",', 'g.material_description || "", vehLabel(g.vehicle),'),
     ("Dashboard full name", "r.vehicle !== veh ? r.vehicle : null", "vehLabel(r.vehicle) !== veh ? vehLabel(r.vehicle) : null"),

@@ -3519,6 +3519,24 @@ def route_keep_main(body: dict, token: Optional[str] = None):
             "periods": route_choice.periods(rid), "by_zone": (summ or {}).get("by_zone", {})}
 
 
+@app.get("/api/admin/route-diversions/preview")
+def route_diversions_preview(token: Optional[str] = None):
+    """11 Nov 2026 (CLOCS card B-F3): which dated zones' diversions the picking rule (no lorry limit below the lorry
+    first, then the quickest) would change now, each with its distance, time and limits against the main line. Reads
+    only; POST …/refresh applies it. Geometry only, never a HERE call."""
+    _check_admin(token)
+    return route_choice.preview()
+
+
+@app.post("/api/admin/route-diversions/refresh")
+def route_diversions_refresh(token: Optional[str] = None):
+    """11 Nov 2026 (CLOCS card B-F3): apply the picking rule to every dated zone's diversions now (the same rewrite a
+    zone save, a route's routing and Route all already do). Geometry only, never a HERE call."""
+    _check_admin(token)
+    summ = route_choice.refresh_zones() or {}
+    return {"rows": summ.get("rows", 0), "by_zone": summ.get("by_zone", {})}
+
+
 @app.post("/api/admin/route-diversions/way-round")
 def route_way_round(route_id: Optional[str] = None, limit: int = Query(30, ge=1, le=60),
                     token: Optional[str] = None):
@@ -4227,22 +4245,48 @@ def _route_analysis(request, routes, lorry, sections, ext):
         known = (conversions.load_factors() or {}).get("vehicles") or {}
         if lorry not in known:
             raise HTTPException(422, "Pick a lorry from the list.")
-    with heavy_reads.solo("route-analysis", busy=lambda: HTTPException(
-            503, "Another route analysis is being made. Try again in a minute.", headers={"Retry-After": "60"})):
-        try:
-            D = route_analysis_doc.gather(routes, lorry=lorry or None, sections=sections, acc=access.current())
-            data = route_analysis_render.build_pdf(D) if ext == "pdf" else route_analysis_render.build_xlsx(D)
-        except route_analysis_doc.AnalysisError as e:
-            raise HTTPException(404, str(e))
-        except route_analysis_doc.AskError as e:
-            raise HTTPException(422, str(e))
-        except RuntimeError as e:
-            raise HTTPException(503, str(e))
+    try:
+        ids = route_analysis_doc.parse_routes(routes)
+        secs = route_analysis_doc.parse_sections(sections)
+    except route_analysis_doc.AskError as e:
+        raise HTTPException(422, str(e))
+    acc = access.current()
+    misses = basemap.MISSES[0]
+    made = {"size": 0}
+
+    def build():
+        with heavy_reads.solo("route-analysis", busy=lambda: HTTPException(
+                503, "Another route analysis is being made. Try again in a minute.", headers={"Retry-After": "60"})):
+            try:
+                D = route_analysis_doc.gather(ids, lorry=lorry or None, sections=secs, acc=acc)
+                data = route_analysis_render.build_pdf(D) if ext == "pdf" else route_analysis_render.build_xlsx(D)
+            except route_analysis_doc.AnalysisError as e:
+                raise HTTPException(404, str(e))
+            except route_analysis_doc.AskError as e:
+                raise HTTPException(422, str(e))
+            except RuntimeError as e:
+                raise HTTPException(503, str(e))
+        made["size"] = len(data)
+        return data
+
+    # 11 Nov 2026 (CLOCS card B-F1): kept like the other heavy staff files (_staff_bytes: per role and team, per day,
+    # until the next write), so a second press of the same file opens at once instead of ~25 s on live. The key holds
+    # what the file reads from outside the database: the closures feed held in memory (route_analysis_doc.held_stamp;
+    # a feed refresh moves no data version). Kept only when every map in it is Mapbox's picture, and only up to
+    # ANALYSIS_KEEP_MAX (12 routes' maps would push the rest of the store out).
+    params = {"routes": ids, "lorry": lorry or None, "sections": secs, "ext": ext,
+              "held": route_analysis_doc.held_stamp() if "limits" in secs else None}
+    data = _staff_bytes("routes/analysis", params, build, acc,
+                        keep=lambda: basemap.MISSES[0] == misses and made["size"] <= ANALYSIS_KEEP_MAX)
     media = ("application/pdf" if ext == "pdf"
              else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     return Response(content=data, media_type=media,
-                    headers={"Content-Disposition": f'attachment; filename="{route_analysis_doc.file_name(D, ext)}"',
+                    headers={"Content-Disposition": f'attachment; filename="{route_analysis_doc.file_name_for(ids, ext)}"',
                              "Cache-Control": "no-store"})
+
+
+#: the largest route analysis kept in memory (bytes); a bigger one is served, not kept (CLOCS card B-F1)
+ANALYSIS_KEEP_MAX = 6 * 1024 * 1024
 
 
 @app.get("/api/routes/analysis.pdf")
@@ -5664,8 +5708,25 @@ def _gate_arrivals_build(month, acc):
     for g in out.get("gates") or []:
         g["busiest_hour"] = (b.get("gates") or {}).get(g["gate_id"])
     out["busiest_note"] = b.get("note")
+    out["busiest_detail"] = b.get("detail")   # 10 Nov 2026 (U5): the specifics the "i" box prints
+    out["busiest_loads"] = b.get("loads")
     out["holding"] = b.get("holding") or []        # 29 Oct 2026 (task 3c): a row a holding area under the gates
     return out
+
+
+@app.get("/api/gates/queue-months")
+def gate_queue_months():
+    """
+    11 Nov 2026 (CLOCS idea C-I1): the months with a gate at the 85 % step or over (gate_arrivals.queue_months), so the
+    Dashboard's Gate arrivals can point at the next queue. Reads only; kept until the next write. Any signed-in code,
+    like the panel (no team figure in the reply).
+    """
+    acc = _require_access()
+
+    def build():
+        factors = conversions.load_factors()
+        return gate_arrivals.queue_months(acc, factors, _working_days(factors), MONTH_COUNT)
+    return _staff_json("gates/queue-months", {}, build, acc)
 
 
 @app.get("/api/sim/day")

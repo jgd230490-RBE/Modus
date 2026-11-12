@@ -264,8 +264,9 @@ ok("⭐ it imports neither network nor main, and names no team slot id",
 _stmts = re.findall(r'db\.query\(\s*((?:"[^"]*"\s*)+)', code_only)
 # NARROWED 14 Oct 2026 (bundle G): seven statements — location_visits() (the CLP section's chart 1b) adds two and
 # week_by_day() (W17, the Look-ahead's gates) two more, each tenanted
+# NARROWED 11 Nov 2026 (CLOCS idea C-I1): eight — queue_months() reads the months with an approved line, tenanted
 ok("🔴 tenant isolation: the SQL literals in gate_arrivals.py constrain tenant_id",
-   len(_stmts) == 7 and all("tenant_id = ?" in s for s in _stmts)
+   len(_stmts) == 8 and all("tenant_id = ?" in s for s in _stmts)
    and all(re.search(r"FROM (\w+)", s) for s in _stmts)
    and code_only.count("db.current_tenant()") >= 3, str(_stmts))
 
@@ -509,7 +510,7 @@ ep = main.gate_arrivals_month(9)
 # NARROWED 16 Oct 2026 (S3): the endpoint adds the simulation's busiest hour to each gate (busiest_hour) and one note
 # (busiest_note); everything arrivals() sends is unchanged
 # NARROWED 29 Oct 2026 (task 3c): the endpoint also adds the holding areas' rows (holding), from the same simulation day
-_ep_core = {k: v for k, v in ep.items() if k not in ("busiest_note", "holding")}
+_ep_core = {k: v for k, v in ep.items() if k not in ("busiest_note", "busiest_detail", "busiest_loads", "holding")}
 _ep_core["gates"] = [{k: v for k, v in g.items() if k != "busiest_hour"} for g in ep["gates"]]
 ok("the endpoint: main.gate_arrivals_month(9) returns gate_arrivals.arrivals(9, acc, …) plus each gate's busiest hour and its note",
    _ep_core == res and all("busiest_hour" in g for g in ep["gates"]) and "busiest_note" in ep

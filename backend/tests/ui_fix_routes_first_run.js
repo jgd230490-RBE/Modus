@@ -49,7 +49,8 @@ ok("⭐ 23: the Routes header keeps its columns: Route, From → to, team, Near 
    && head.includes('<th className={th}>Vehicles</th>') && head.includes('data-leg-col="out-dist"') && head.includes('data-leg-col="back-min"'));
 const codeCell = routesTable.slice(routesTable.indexOf("data-route-open={r.id}") - 260, routesTable.indexOf("data-route-notes={r.id}"));
 ok("⭐ 23: the code cell is only as wide as the code (width 1%, never wrapping, set inline: the Tailwind class is not defined here) and holds the code button alone",
-   /<td className="px-3 py-2 font-medium text-slate-800" style=\{\{ width: "1%", whiteSpace: "nowrap" \}\}>/.test(codeCell)
+   // NARROWED 10 Nov 2026 (wave 4, card 5): + tc-lead, the tablet card's top line
+   /<td className="px-3 py-2 font-medium text-slate-800 tc-lead" style=\{\{ width: "1%", whiteSpace: "nowrap" \}\}>/.test(codeCell)
    && !/gate blocked|Part return|Busy hours|Diverted|haul ×/.test(codeCell.slice(codeCell.indexOf("data-route-open"))));
 const fromTo = routesTable.slice(routesTable.indexOf("data-route-notes={r.id}") - 330, routesTable.indexOf("data-route-near-cell={r.id}"));
 ok("⭐ 23: From → to takes the room on one line, and the five status chips (gate blocked, holding area, busy hours, return, diverted, haul) sit UNDER it",
@@ -57,8 +58,9 @@ ok("⭐ 23: From → to takes the room on one line, and the five status chips (g
    && fromTo.indexOf("{r.origin} → {r.dest}") < fromTo.indexOf("data-route-notes={r.id}")
    && ["gate blocked", "data-route-holding", "data-route-busy", "data-route-return", "data-route-diverted", "haul ×"].every(k => fromTo.includes(k)));
 ok("...the team and Near-the-route cells do not wrap (inline white-space), so the width goes to From → to",
-   /<td className="px-3 py-2 text-slate-500" style=\{\{ whiteSpace: "nowrap" \}\}>\{teamText\(r\.ipt\)/.test(routesTable)
-   && /style=\{\{ whiteSpace: "nowrap" \}\} data-route-near-cell=\{r\.id\}/.test(routesTable));
+   // NARROWED 10 Nov 2026 (wave 4, card 5): + the tablet card's label (data-label) and Near the route's width there
+   /<td className="px-3 py-2 text-slate-500" style=\{\{ whiteSpace: "nowrap" \}\} data-label=\{TEAM\(\)\}>\{teamText\(r\.ipt\)/.test(routesTable)
+   && /style=\{\{ whiteSpace: "nowrap" \}\} data-label="Near the route" data-route-near-cell=\{r\.id\}/.test(routesTable));
 ok("⭐ 23: the Vehicles cell is a count (VehCount); each vehicle's chip moves to the row's details (data-route-vehicles) beside the analysis",
    routesTable.includes("<VehCount profiles={r.profiles} />") && !routesTable.includes("<td className=\"px-3 py-2\"><VehChips")
    && /\{open && <tr data-route-vehicles=\{r\.id\}><td colSpan=\{11\}[^>]*>[\s\S]{0,200}<VehChips profiles=\{r\.profiles\} \/>/.test(routesTable)
@@ -81,14 +83,18 @@ ok("⭐ 17: an empty Routes table says who adds the first route: a reader 'An ad
    && /\{!canEdit \? "No routes yet\. An admin adds the first one\."\s*: locs\.length < 2/.test(code));
 
 // ---------------------------------------------------------------- Locations and Zones: no id as the lead, nor anywhere
-const locTable = slice('<th className={th}>Location</th>', "{!locs.length && <tr");
+// NARROWED 11 Nov 2026 (CLOCS card C-F8): the table ends at its "Loading…" row now
+const locTable = slice('<th className={th}>Location</th>', "{!locs.length && !locsIn && <tr");
 ok("⭐ 23: Locations print no place code beside the name (no `{l.id}` in the row's cells)", !/\{l\.id\}<\/span>/.test(locTable) && locTable.includes("{l.name}</button>"));
-const zoneTable = slice("<th className={th}>Name</th><th className={th}>Kind</th>", "{!zoneList.length && <tr");
+const zoneTable = slice("<th className={th}>Name</th><th className={th}>Kind</th>", "{!zoneList.length && !zonesIn && <tr");   // NARROWED 11 Nov 2026 (C-F8)
 ok("⭐ 23: Zones open on the Name column: no ID header, no `{z.id}` cell, the first cell is the name button",
    !code.includes("<th className={th}>ID</th>") && !/<td className="px-3 py-2 font-mono text-xs text-slate-500">\{z\.id\}<\/td>/.test(zoneTable)
-   && /<tr key=\{z\.id\} onClick=\{\(\) => editZone\(z\)\}[\s\S]{0,260}<td className="px-3 py-2 font-medium">\s*<button type="button" className="row-open" data-zone-open=\{z\.id\}/.test(zoneTable));
+   // NARROWED 10 Nov 2026 (wave 4, card 5): + rd-primary, the tablet card's lead
+   && /<tr key=\{z\.id\} onClick=\{\(\) => editZone\(z\)\}[\s\S]{0,260}<td className="px-3 py-2 font-medium rd-primary">\s*<button type="button" className="row-open" data-zone-open=\{z\.id\}/.test(zoneTable));
+// NARROWED 11 Nov 2026 (CLOCS B-F4): the dates read through dayWords ("5 Oct 2026") and the cells carry data-zone-from / -to;
+// NARROWED 10 Nov 2026 (wave 4, card 5): + the tablet card's label (data-label="From" / "To"); both kept 12 Nov (batch 5)
 ok("...Zones' dates and 'Used by' stay on one line, and 'route(s)' is a plural",
-   (zoneTable.match(/style=\{\{ whiteSpace: "nowrap" \}\}>\{z\.(starts|ends)_on/g) || []).length === 2 && !/route\(s\)/.test(zoneTable)
+   (zoneTable.match(/style=\{\{ whiteSpace: "nowrap" \}\} data-label="(?:From|To)"(?: data-zone-(?:from|to)=\{z\.id\})?>\{(?:dayWords\()?z\.(starts|ends)_on/g) || []).length === 2 && !/route\(s\)/.test(zoneTable)
    && zoneTable.includes('route{haulUse[z.id] === 1 ? "" : "s"}'));
 ok("⭐ 23: an editor's heading and the route pickers name the place or zone, never its code ('Editing Northfield Quarry'; no '(L001)' in an option)",
    code.includes('`Editing ${(locs.find(l => l.id === form.id) || {}).name || "location"}`') && code.includes('`Editing ${(zoneList.find(z => z.id === zoneForm.id) || {}).name || "zone"}`')
@@ -145,7 +151,8 @@ ok("⭐ 17: with lines but a filter that shows none, the Dashboard draws NO empt
    && !code.includes("Widen the month range or clear a filter"));
 ok("⭐ 17: the Gate arrivals panel names the way on: 'Pick another month, or approve a line.' with an Open Forecasts button (a planner), not 'Pick another month. Pending lines appear as a note…'",
    code.includes('"Pick another month, or approve a line."') && code.includes('data-ga-empty-go="forecasts" onClick={() => onOpen("forecasts")}>Open Forecasts')
-   && code.includes("onOpen={canApprove ? onOpen : null} />") && !code.includes("Pending lines appear as a note until they are approved"));
+   // NARROWED 11 Nov 2026 (CLOCS idea C-I1): the panel also takes the months with a queue and the sites
+   && code.includes("onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />") && !code.includes("Pending lines appear as a note until they are approved"));
 ok("...the Dashboard's first steps are not placed among the carbon-target strip or the Gate arrivals blocks (their word checks read those slices)",
    code.indexOf("function DashFirstSteps(") > code.indexOf("function AppliedChips") - 5000 && code.indexOf("function DashFirstSteps(") > code.indexOf("function GateArrivalsPanel(")
    && !slice("function CarbonTargetStrip(", "function Dashboard(").includes("DashFirstSteps"));
