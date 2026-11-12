@@ -194,7 +194,6 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   html[data-theme="dark"] .disabled\:text-slate-500:disabled{color:#A9AFB8}
   html[data-theme="dark"] .divide-slate-100{--tw-divide-opacity:1;border-color:#2A2D33}
   html[data-theme="dark"] .divide-slate-200{--tw-divide-opacity:1;border-color:#33363D}
-  html[data-theme="dark"] .hover\:bg-red-50:hover{background-color:rgba(239,68,68,.14)}
   html[data-theme="dark"] .hover\:bg-slate-100:hover{background-color:var(--surface-3)}
   html[data-theme="dark"] .hover\:bg-slate-200:hover{background-color:#2F3238}
   html[data-theme="dark"] .hover\:bg-slate-50:hover{background-color:var(--surface-2)}
@@ -1348,6 +1347,8 @@ const divWhen = (from, to) => {
   if(a.y === b.y) return `${a.d} ${MONTHS[a.m - 1]} – ${b.d} ${MONTHS[b.m - 1]} ${b.y}`;
   return `${a.d} ${MONTHS[a.m - 1]} ${a.y} – ${b.d} ${MONTHS[b.m - 1]} ${b.y}`;
 };
+// 11 Nov 2026 (CLOCS card B-F4): one day in words, "5 Oct 2026" (the Zones table's From and To, as divWhen says them)
+const dayWords = (iso) => { const a = _dvD(iso); return a ? `${a.d} ${MONTHS[a.m - 1]} ${a.y}` : null; };
 const divMonths = (from, to) => {
   const a = _dvD(from), b = _dvD(to);
   if(!a || !b) return a ? `from ${MONTHS[a.m - 1]} ${a.y}` : (b ? `until ${MONTHS[b.m - 1]} ${b.y}` : "");
@@ -1356,10 +1357,26 @@ const divMonths = (from, to) => {
   return `${MONTHS[a.m - 1]} ${a.y} – ${MONTHS[b.m - 1]} ${b.y}`;
 };
 // the change in length each way: the laden leg of the lorry type on screen where it is listed, else any laden leg
-const divDelta = (p, prof) => {
+const divLeg = (p, prof) => {
   const legs = (p && p.legs) || [];
-  const l = legs.find(x => x.leg === "loaded" && x.vehicle_profile === prof) || legs.find(x => x.leg === "loaded") || legs[0];
+  return legs.find(x => x.leg === "loaded" && x.vehicle_profile === prof) || legs.find(x => x.leg === "loaded") || legs[0];
+};
+const divDelta = (p, prof) => {
+  const l = divLeg(p, prof);
   return l && l.km_delta != null ? l.km_delta : null;
+};
+// 11 Nov 2026 (CLOCS B-F3 / B-I2): the same leg's change in time ("+4 min"), and the lorry limits below that lorry the
+// diversion adds over its own main route (limits_new; John: "Yes, only new limits"; every leg of the lorry type on
+// screen; null where no limits are held, so the list claims no check)
+const divHr = (p, prof) => {
+  const l = divLeg(p, prof);
+  return l && l.hr_delta != null ? l.hr_delta : null;
+};
+const divLimits = (p, prof) => {
+  const legs = ((p && p.legs) || []).filter(x => x.limits_new != null);
+  if(!legs.length) return null;
+  const mine = legs.filter(x => x.vehicle_profile === prof);
+  return Math.max(...(mine.length ? mine : legs).map(x => x.limits_new));
 };
 const DIV_PROBLEM = { needs_route: "No way round yet", no_way_round: "No road round it", declined: "Kept on the main route" };
 
@@ -13590,6 +13607,11 @@ const simMapStyle = () => (typeof document !== "undefined" && document.documentE
 // the data pages' map also follows a change of look unless someone picked its basemap by hand. The Route map (the embedded
 // public map page) reads the look itself.
 const lookMapStyle = () => { try { return simMapStyle(); } catch (e) { return "mapbox://styles/mapbox/light-v11"; } };   // a page with no look yet (drawn before the app starts) opens on Light
+// 11 Nov 2026 (card B-X1): a dark ground under the data pages' map (the public map's labelsDark test), and the zone
+// names' paint on it: the public map's name rule (labelPaint), near-white on a near-black halo, else ink on white
+const mapGroundDark = (style) => /dark|night|satellite|maaamet/.test(String(style || ""));
+const zoneLabelPaint = (dark) => ({ "text-color": dark ? "#F5F5F4" : "#1F2024",
+  "text-halo-color": dark ? "rgba(18,19,22,0.92)" : "#FFFFFF", "text-halo-width": 1.75, "text-halo-blur": 0.5 });
 // the map: its own Mapbox instance (CommitMap's pattern), drawn from the reply and redrawn at each clock minute; `wall` = the
 // big screen (the key stays a box over the map there; on the page it is a row under it)
 function SimMap({ meta, D, store, frame, site, wall }){
@@ -14912,6 +14934,39 @@ function RouteSheetButton({ routeId }){
     </span>
   );
 }
+// 11 Nov 2026 (CLOCS card B-F2, John's yes): the route sheet leaves an untyped part out, so the Routes bar says which of
+// the route's own words are missing, beside the Route sheet button; "Add" (an admin) opens the route's form at that field.
+function sheetWordsMissing(r){
+  if(!r || !r.id) return null;
+  const why = !String(r.route_reason || "").trim(), div = !String(r.permitted_deviations || "").trim();
+  return why && div ? "No reason or diversions typed" : why ? "No reason typed" : div ? "No diversions typed" : null;
+}
+function SheetWordsNote({ route, canEdit, onAdd }){
+  const words = sheetWordsMissing(route);
+  if(!words) return null;
+  return (
+    <span className="text-xs" data-sheet-words-missing={route.id} style={{ color: "var(--warn-text)", whiteSpace: "nowrap" }}>
+      {words}{canEdit && <> · <button type="button" className="underline" data-sheet-words-add={route.id}
+        style={{ color: "inherit", background: "none", border: 0, padding: 0, font: "inherit", cursor: "pointer" }}
+        aria-label={`Add the route sheet words for ${route.id}`} onClick={() => onAdd(route)}>Add</button></>}
+    </span>
+  );
+}
+// 11 Nov 2026 (CLOCS card B-F6, John's yes): the Routes bar's network jobs (both legs, busy-hour times, Route all, Clear all
+// routes) in one "Routing ▾" menu set apart from the reader's buttons; each job still asks first, as before. While one runs
+// the button says so.
+function RoutingMenu({ busy, children }){
+  const ref = useRef(null);
+  useRowMenuPlace(ref);
+  const pick = e => { const b = e.target.closest ? e.target.closest("button") : null; if (b && !b.disabled && ref.current) ref.current.open = false; };
+  return (
+    <details className="row-menu bulletin-menu" data-routing-menu="1" ref={ref}>
+      <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 10px", fontWeight: 500 }}
+               title="Route the network again, busy-hour times, clear the routes">{busy ? "Routing…" : "Routing ▾"}</summary>
+      <div className="row-menu-list dash-filters" onClick={pick}>{children}</div>
+    </details>
+  );
+}
 // ---- 9 Nov 2026 (v2.1 task 2.1-6): the ROUTE ANALYSIS, replacing the two collision evidence buttons --------------------
 // One file (PDF or XLSX) for the routes ticked here (the one picked in the list first; up to 12), for one lorry, with the
 // sections ticked (remembered in this browser). Drawn on the server from what Wayscope holds; nothing is fetched for it.
@@ -14921,8 +14976,11 @@ const RA_SECTIONS = [["limits", "A", "Restrictions and lorry limits"], ["communi
   ["collisions", "C", "Collisions"], ["cycle", "D", "Cycle routes and left turns"], ["hours", "E", "Busy-hour times"],
   ["diversions", "F", "Diversions"], ["assessor", "", "The page for the assessor"]];
 const RA_KEY = "wayscope.routeAnalysis.sections";
+// 11 Nov 2026 (CLOCS card B-F5, John's yes): sections A-F are remembered as ticked; the page for the assessor is ticked
+// again every time the menu opens (raWithAssessor), so a file is never made without it unless it is unticked for that file.
+const raWithAssessor = (v) => v.includes("assessor") ? v : [...v, "assessor"];
 function raSaved(){
-  try { const v = JSON.parse(localStorage.getItem(RA_KEY) || "null"); if(Array.isArray(v) && v.length) return v; } catch(e){}
+  try { const v = JSON.parse(localStorage.getItem(RA_KEY) || "null"); if(Array.isArray(v) && v.length) return raWithAssessor(v); } catch(e){}
   return RA_SECTIONS.map(x => x[0]);
 }
 // Pins the open Route analysis menu inside the window: below its button, or above when there is more room there, as tall
@@ -14994,7 +15052,8 @@ function RouteAnalysisMenu({ routes, picked, vehicles }){
   };
   const first = chosen[0];
   return (
-    <details className="row-menu bulletin-menu" data-route-analysis="1" ref={ref} onToggle={e => setOpen(e.currentTarget.open)}>
+    <details className="row-menu bulletin-menu" data-route-analysis="1" ref={ref}
+      onToggle={e => { const o = e.currentTarget.open; setOpen(o); if(o) setSecs(raWithAssessor); }}>
       <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "5px 10px", fontWeight: 500 }}
                title="Evidence for the route risk assessment, as a PDF or a spreadsheet">Route analysis ▾</summary>
       {open && <div className="row-menu-list dash-filters ra-menu">
@@ -15015,7 +15074,7 @@ function RouteAnalysisMenu({ routes, picked, vehicles }){
         ))}
         <div className="ra-foot" data-ra-foot="1">
           <button type="button" onClick={() => download("pdf")} disabled={!!busy || !chosen.length || noSection}>
-            {busy === "pdf" ? `Making the file${chosen.length > 1 ? ` (${chosen.length} routes)` : ""}…` : "Download PDF"}</button>
+            {busy === "pdf" ? (chosen.length > 1 ? `Making the file (${chosen.length} routes)…` : "Making the file… about 30 s") : "Download PDF"}</button>
           <button type="button" onClick={() => download("xlsx")} disabled={!!busy || !chosen.length || noSection}>
             {busy === "xlsx" ? "Making the file…" : "Download XLSX"}</button>
           <div className="row-menu-note">{!chosen.length ? "Tick a route." : noSection ? "Tick a section." : "Made from what Wayscope holds. Evidence for the assessment, not the assessment."}</div>
@@ -15397,6 +15456,21 @@ const vehShort = (v) => vehLabel(v).replace(/^(Artic|Rigid)\s+/, "");
 // divSigned: "−0.7 mi" / "+1.2 mi" each way. DivRows: one row a (route, dates), the button that keeps the main route or
 // gives the diversion back (admins). ZoneDiversions: the panel under the Zones form after a save (or the Used by link).
 const divSigned = (km) => (km == null ? "—" : `${km < 0 ? "−" : "+"}${fmtDist(Math.abs(km), 1)} ${DU()}`);
+// 11 Nov 2026 (CLOCS B-F3): "+1.2 mi · +4 min" (the time only where both lines carry one)
+const divMins = (hr) => `${hr < -1 / 120 ? "−" : "+"}${Math.round(Math.abs(hr) * 60)} min`;
+const divEach = (p, prof) => {
+  const hr = divHr(p, prof);
+  return hr == null ? divSigned(divDelta(p, prof)) : `${divSigned(divDelta(p, prof))} · ${divMins(hr)}`;
+};
+// B-I2: the diversion checked for the lorry, against its main route: green "No new limit below this lorry", amber
+// "1 new lorry limit · check"; the tip says what "new" is compared with
+function DivLimits({ p, prof }){
+  const n = p && p.status === "in_use" ? divLimits(p, prof) : null;
+  if(n == null) return null;
+  return <span data-div-limits={n} title="Compared with the main route">
+    {n ? <RowStatus word={`${n} new lorry limit${n === 1 ? "" : "s"} · check`} tone="warn" />
+       : <RowStatus word="No new limit below this lorry" tone="ok" />}</span>;
+}
 function DivButton({ p, canEdit, busy, onKeep }){
   if(!canEdit) return null;
   const zid = (p.zones || [])[0];
@@ -15415,10 +15489,11 @@ function DivRows({ rows, prof, canEdit, busy, onKeep, showRoute, routes }){
           <div><b>{p.route_id}</b> <span className="text-slate-500">{r.origin ? `${r.origin} → ${r.dest}` : ""}</span></div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
             <span>{divWhen(p.starts_on, p.ends_on)}</span>
-            {p.status === "in_use" ? <span className="tabular-nums">{divSigned(divDelta(p, prof))} each way</span>
+            {p.status === "in_use" ? <span className="tabular-nums">{divEach(p, prof)} each way</span>
               : <span style={{ color: "var(--bad-text)" }}>{DIV_PROBLEM[p.status] || "—"}</span>}
             <DivButton p={p} canEdit={canEdit} busy={busy} onKeep={onKeep} />
           </div>
+          <div className="mt-1"><DivLimits p={p} prof={prof} /></div>
         </li>);
     })}</ul>);
   return (
@@ -15435,7 +15510,7 @@ function DivRows({ rows, prof, canEdit, busy, onKeep, showRoute, routes }){
             <td className="px-2 py-1 whitespace-nowrap">{divWhen(p.starts_on, p.ends_on)}</td>
             <td className="px-2 py-1">{(p.zone_names || []).join(", ")}</td>
             <td className="px-2 py-1 text-right tabular-nums">
-              {p.status === "in_use" ? divSigned(divDelta(p, prof))
+              {p.status === "in_use" ? <>{divEach(p, prof)}<div className="mt-0.5"><DivLimits p={p} prof={prof} /></div></>
                 : <span style={{ color: "var(--bad-text)" }}>{DIV_PROBLEM[p.status] || "—"}</span>}
             </td>
             {canEdit && <td className="px-2 py-1 text-right"><DivButton p={p} canEdit={canEdit} busy={busy} onKeep={onKeep} /></td>}
@@ -16425,6 +16500,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [summary, setSummary] = useState(null);
   const [basemap, setBasemap] = useState(() => lookMapStyle());
   const basemapByHand = useRef(false);   // 10 Nov 2026 (card 14): a pick in the Basemap select is kept when the look changes
+  const basemapShown = useRef(null);     // 11 Nov 2026 (card B-X1): the style last set, for the zone names' ground
   const [showProfile, setShowProfile] = useState(vehicles.includes("Artic Tipper (44t)") ? "Artic Tipper (44t)" : vehicles[0]);
   // which of the baked geometries the map draws. A route now has two directions and up
   // to three HERE options each, so without a pick the map would stack six lines per route.
@@ -16757,9 +16833,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                // a zone that is out of its date window is dashed, not hidden — it still
                // explains a bake that happened while it applied
                "line-dasharray": ["case", ["get", "in_force"], ["literal", [1, 0]], ["literal", [2, 2]]] } });
+    // 11 Nov 2026 (card B-X1): the zone names follow the public map's name rule — ink on a soft white halo, near-white on a
+    // near-black halo on a dark ground (Dark, Navigation night, the aerial styles). Before, slate on a thick white halo read
+    // as a row of white blocks on Dark. 12 px, the app's floor (was 11). Set again after the add: a kept layer keeps old paint.
+    const zonePaint = zoneLabelPaint(mapGroundDark(basemapShown.current || basemap));
     if(!m.getLayer("zone-label")) m.addLayer({ id: "zone-label", type: "symbol", source: "zones",
-      layout: { "text-field": ["get", "name"], "text-size": 11, "symbol-placement": "point" },
-      paint: { "text-color": "#334155", "text-halo-color": "#ffffff", "text-halo-width": 2 } });
+      layout: { "text-field": ["get", "name"], "text-size": 12, "symbol-placement": "point" },
+      paint: zonePaint });
+    Object.keys(zonePaint).forEach(k => { try { m.setPaintProperty("zone-label", k, zonePaint[k]); } catch(e){} });
     if(!m.getLayer("draw-line")) m.addLayer({ id: "draw-line", type: "line", source: "draw",
       paint: { "line-color": "#DC2626", "line-width": 2.5, "line-dasharray": [2, 1.5] } });
     if(!m.getLayer("draw-vertex")) m.addLayer({ id: "draw-vertex", type: "circle", source: "draw",
@@ -16868,6 +16949,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
   const changeStyle = (val, auto) => {
     if(!auto) basemapByHand.current = true;
+    basemapShown.current = val;
     setBasemap(val);
     const m = mapObj.current;
     if(!m) return;
@@ -17591,6 +17673,18 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     setEVehicles(Object.keys(r.profiles || {}).sort());
     setSubTab("routes"); setRouteMsg("");
   };
+  // 11 Nov 2026 (CLOCS card B-F6): the row's Route asks first
+  const routeAgainAsk = (r) => {
+    const had = Object.keys(r.profiles || {}).length;
+    if(!confirm(had ? `Route ${r.id} again? Its lines are replaced.` : `Route ${r.id}?`)) return;
+    rebakeRoute(r.id, Object.keys(r.profiles || {}));
+  };
+  // 11 Nov 2026 (CLOCS card B-F2): "Add" beside the missing route sheet words opens the route's form at the first missing field
+  const addSheetWords = (r) => {
+    startEditRoute(r);
+    const k = String(r.route_reason || "").trim() ? "Permitted diversions" : "Why this route";
+    setTimeout(() => { const t = document.querySelector(`[data-route-sheet-text] textarea[aria-label="${k}"]`); if(t){ t.scrollIntoView({ block: "center" }); t.focus(); } }, 120);
+  };
   const cancelEditRoute = () => {
     setEditingRoute(null); setRDest(""); setRIpt(""); setRMaterial(""); setRIdTouched(false);
     setEVehicles([]); setRouteMsg("");
@@ -18207,12 +18301,15 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             <option value={2}>Alt 2</option>
           </select>
         </>}>
-        <div className="text-xs text-slate-500 mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-          <span>{locs.length} locations</span><span className="text-slate-500">·</span>
+        {/* 12 Nov 2026 (card B-X3, the dry run): "Loading…" until the routes' answer arrives (C-F8's words), never
+            "0 locations · 0 routes"; the locations count comes from that answer until the map's own list is in */}
+        {status === null && <div className="text-xs text-slate-500 mt-1.5" data-counts-loading="1">Loading…</div>}
+        {status !== null && <div className="text-xs text-slate-500 mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+          <span>{locs.length || (summary && summary.locations) || 0} locations</span><span className="text-slate-500">·</span>
           <span>{(status || []).length} routes</span><span className="text-slate-500">·</span>
           <span>{zoneList.length} zones</span><span className="text-slate-500">·</span>
           <span>{bakedCount}/{totalRoutes || 0} routed for {vehLabel(showProfile)}</span>
-        </div>
+        </div>}
       </PageHeader>
 
       {summary && !summary.here_configured && (
@@ -19338,35 +19435,34 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             <RouteMapExportMenu months={meta.months} ipts={meta.ipts} picked={selected} />
             {/* 16 Oct 2026 (CLOCS v5 C3): the route sheet for drivers, for the route picked in the list */}
             <RouteSheetButton routeId={selected} />
+            <SheetWordsNote route={(status || []).find(x => x.id === selected)} canEdit={canEdit} onAdd={addSheetWords} />
             {/* 9 Nov 2026 (v2.1 task 2.1-6): the route analysis (the collision evidence is its section C) */}
             <RouteAnalysisMenu routes={status || []} picked={selected} vehicles={vehicles} />
             {/* Bulk bake. Vehicles come from the tick-boxes on the Create route panel so
-                there is one vehicle list on the tab rather than two that can disagree. */}
-            {canEdit && <>
-            <select value={bakeLegs} onChange={e => setBakeLegs(e.target.value)} className={sel}
-              title="Both legs gives a cycle time. Laden only is quicker but leaves the return not routed.">
+                there is one vehicle list on the tab rather than two that can disagree.
+                11 Nov 2026 (CLOCS card B-F6): in the Routing menu, set apart; each still asks first. */}
+            {canEdit && <RoutingMenu busy={routeBusy}>
+            <label><span>Legs to route</span><select value={bakeLegs} onChange={e => setBakeLegs(e.target.value)}
+              aria-label="Legs to route" title="Both legs gives a cycle time. Laden only is quicker but leaves the return not routed.">
               <option value="both">Both legs</option>
               <option value="loaded">Laden leg only</option>
-            </select>
+            </select></label>
+            <button type="button" onClick={bulkBake} disabled={routeBusy || !(status && status.length)} data-route-all="1"
+              title={rVehicles.length
+                ? `Route the whole network for ${rVehicles.map(vehShort).join(", ")} — ticked on the Create route panel`
+                : `No vehicles ticked on the Create route panel — will use ${vehShort(showProfile)}`}>
+              {`Route all · ${(rVehicles.length || 1)} vehicle(s)`}
+            </button>
             {hourPlan && hourPlan.legs > 0 && (
-              <button onClick={hourBake} disabled={routeBusy} data-hour-bake style={{ whiteSpace: "nowrap" }}
-                className="text-xs font-semibold px-2.5 py-1 rounded-md border border-slate-300 disabled:opacity-40">
+              <button type="button" onClick={hourBake} disabled={routeBusy} data-hour-bake style={{ whiteSpace: "nowrap" }}>
                 {`Busy-hour times · ${hourPlan.here_calls} calls`}
               </button>
             )}
-            <button onClick={bulkBake} disabled={routeBusy || !(status && status.length)}
-              title={rVehicles.length
-                ? `Route the whole network for ${rVehicles.map(vehShort).join(", ")} — ticked on the Create route panel`
-                : `No vehicles ticked on the Create route panel — will use ${vehShort(showProfile)}`}
-              className="text-xs font-semibold px-2.5 py-1 rounded-md text-white disabled:opacity-40"
-              style={{ background: "var(--action)" }}>
-              {routeBusy ? "Routing…" : `Route all · ${(rVehicles.length || 1)} vehicle(s)`}
-            </button>
-            <button onClick={clearRoutes} disabled={routeBusy || !(status && status.length)}
-              className="text-xs font-semibold px-2.5 py-1 rounded-md border border-slate-200 text-[color:var(--red)] hover:bg-red-50 disabled:opacity-40">
+            <button type="button" onClick={clearRoutes} disabled={routeBusy || !(status && status.length)} data-clear-routes="1"
+              style={{ color: "var(--red)" }}>
               Clear all routes
             </button>
-            </>}
+            </RoutingMenu>}
           </span>
         </div>
         {routeMsg && (
@@ -19490,16 +19586,16 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <td className="px-3 py-2" style={{ whiteSpace: "nowrap" }}><VehCount profiles={r.profiles} /></td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       {canEdit && <>
-                      <button onClick={(e) => { e.stopPropagation(); rebakeRoute(r.id, Object.keys(r.profiles || {})); }}
-                        disabled={bakeBusy === r.id}
-                        title={Object.keys(r.profiles || {}).length
-                          ? `Route again for ${Object.keys(r.profiles).map(vehShort).join(", ")}`
-                          : `Not routed yet — will route for ${vehShort(showProfile)}`}
-                        className="btn-sec btn-sm mr-1">   {/* 18 Oct 2026 (UI audit #29): the one button that spends HERE calls was 16 px tall */}
-                        {bakeBusy === r.id ? "Routing…" : "Route"}
-                      </button>
-                      {/* 27 Oct 2026 (the final UI pass, card 1): Edit and Delete in the "⋯"; Route stays as the row's one visible button */}
+                      {bakeBusy === r.id && <span className="text-xs text-slate-500 mr-1" data-route-busy={r.id}>Routing…</span>}
+                      {/* 27 Oct 2026 (the final UI pass, card 1): Edit and Delete in the "⋯". REVERSED 11 Nov 2026 (CLOCS card
+                          B-F6, John's yes): Route is no longer the row's visible button; it is in the "⋯" and asks first (one
+                          click routed the route again at once, replacing its lines and spending routing calls) */}
                       <span onClick={e => e.stopPropagation()}><RowMenu name={r.id}>
+                        <button type="button" data-route-again={r.id} disabled={bakeBusy === r.id}
+                          title={Object.keys(r.profiles || {}).length
+                            ? `Route again for ${Object.keys(r.profiles).map(vehShort).join(", ")}`
+                            : `Not routed yet — will route for ${vehShort(showProfile)}`}
+                          onClick={() => routeAgainAsk(r)}>{Object.keys(r.profiles || {}).length ? "Route again" : "Route"}</button>
                         {(((holdSum || {}).routes || []).find(x => x.route_id === r.id) || {}).state === "route_again" && <button type="button" data-route-via-holding={r.id} onClick={() => rebakeRoute(r.id, Object.keys(r.profiles || {}), true)}>Route again through the holding area</button>}
                         <button type="button" onClick={() => startEditRoute(r)}>Edit</button>
                         <button type="button" style={{ color: "var(--red)" }} onClick={() => deleteRoute(r.id)}>Delete…</button>
@@ -19606,8 +19702,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         ? <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>
                         : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>}
                     </td>
-                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }}>{z.starts_on || "—"}</td>
-                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }}>{z.ends_on || "—"}</td>
+                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }} data-zone-from={z.id}>{dayWords(z.starts_on) || "—"}</td>
+                    <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }} data-zone-to={z.id}>{dayWords(z.ends_on) || "—"}</td>
                     <td className="px-3 py-2 text-xs">
                       {!z.active ? <span className="text-slate-400">Inactive</span>
                         : force ? <span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>

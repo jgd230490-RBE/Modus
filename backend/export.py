@@ -3237,9 +3237,9 @@ def _holding_steps(H, gate_word):
 
 
 def route_sheet_blocks(S):
-    """The typed words in the order printed: (heading, text, not_typed). Site rules at A always shown, so an
-    empty field reads "Not typed" rather than vanishing."""
-    import route_sheet as rs
+    """The typed words in the order printed: (heading, text, not_typed). REVERSED 11 Nov 2026 (CLOCS card B-F2, John's
+    yes): a part with nothing typed is left out (it printed "Not typed", which tells a driver nothing); the Routes
+    screen tells the planner which words are missing instead. not_typed stays in the tuple (always False now)."""
     out = []
     heads = [("Why this route", S.get("route_reason")),
              ("Permitted diversions", S.get("permitted_deviations")),
@@ -3249,7 +3249,8 @@ def route_sheet_blocks(S):
     if H:          # 29 Oct 2026 (task 3c): the holding area's own rules, as typed on it
         heads.insert(2, (f"Site rules at H, {H['name']}", H.get("site_rules")))
     for head, v in heads:
-        out.append((head, v if v else rs.NOT_TYPED, not v))
+        if v and str(v).strip():
+            out.append((head, v, False))
     return out
 
 
@@ -3748,6 +3749,22 @@ CLOCS_MAP = [
     ("The last page, for the assessor", "5.6a preliminary route assessment · 5.2c review"),
 ]
 CLOCS_NOTE = ("Police-reported collisions only: the project's own incidents (5.1a) are not in this data.")
+CLOCS_BOX_TITLE = "For the route risk assessment (CLOCS Standard v5, 5.1a)"
+
+
+def _box_title_lines(text, font, size, room):
+    """12 Nov 2026 (card B-X2): a box title that fits stays one line; one that does not breaks before its bracket
+    ("For the route risk assessment" / "(CLOCS Standard v5, 5.1a)"), and any line still too wide wraps by words."""
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    text = _pdf_safe(text)
+    if stringWidth(text, font, size) <= room:
+        return [text]
+    head, sep, tail = text.partition(" (")
+    parts = [head, "(" + tail] if sep else [text]
+    out = []
+    for p in parts:
+        out.extend(_wrap(p, font, size, room) if stringWidth(p, font, size) > room else [p])
+    return out
 
 # 22 Oct 2026 (v3): the last page — questions drawn from the clauses (no CLOCS document gives a question list or a
 # form); each points at the evidence; the boxes are the assessor's
@@ -4074,7 +4091,8 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
     y = H - m
     c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 18); c.drawString(m, y - 18, S["title"])
     c.setFont(B, 9); c.drawRightString(W - m, y - 9, _pdf_safe(S["tenant"]))
-    c.setFillColorRGB(*GREY); c.setFont(R, 8); c.drawRightString(W - m, y - 20, f"Issued {S['issued']}")
+    c.setFillColorRGB(*GREY); c.setFont(R, 8)
+    c.drawRightString(W - m, y - 20, f"{S.get('head_word') or 'Issued'} {S['issued']}")   # "Made" inside the route analysis
     if S.get("demo_notice"):
         c.setFillColorRGB(*DEMO_FG_RGB); c.setFont(B, 8)
         c.drawRightString(W - m, y - 31, _pdf_safe("DEMO · " + S["demo_notice"]))
@@ -4124,10 +4142,17 @@ def build_collision_evidence_pdf(S, canvas=None, page_start=1, skip=()):
         lines = []
         for part, clause in CLOCS_MAP:
             lines.append((_wrap(part, B, 6.4, bw - 10), _wrap(clause, R, 6.2, bw - 10)))
-        bh = 18 + sum(len(a) * 7.2 + len(b_) * 7.0 + 3 for a, b_ in lines) + len(_wrap(CLOCS_NOTE, R, 6.0, bw - 10)) * 7 + 4
+        # 12 Nov 2026 (card B-X2, the dry run): the title ran 221 pt into a 201 pt room and its "5.1a)" touched the box's edge;
+        # it now breaks before the Standard's reference when it does not fit, and the box grows by the extra line
+        title_lines = _box_title_lines(CLOCS_BOX_TITLE, B, 8, bw - 10)
+        S["clocs_box_title"] = title_lines
+        extra = (len(title_lines) - 1) * 9.6
+        bh = 18 + extra + sum(len(a) * 7.2 + len(b_) * 7.0 + 3 for a, b_ in lines) + len(_wrap(CLOCS_NOTE, R, 6.0, bw - 10)) * 7 + 4
         c.setStrokeColorRGB(*NAVY_RGB); c.setLineWidth(0.9); c.setFillColorRGB(1, 1, 1); c.rect(bx, yy - bh, bw, bh, stroke=1, fill=1)
-        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 8); c.drawString(bx + 5, yy - 11, "For the route risk assessment (CLOCS Standard v5, 5.1a)")
-        yy -= 17
+        c.setFillColorRGB(*NAVY_RGB); c.setFont(B, 8)
+        for i, ln in enumerate(title_lines):
+            c.drawString(bx + 5, yy - 11 - i * 9.6, ln)
+        yy -= 17 + extra
         for a, b_ in lines:
             for ln in a:
                 c.setFont(B, 6.4); c.setFillColorRGB(*NAVY_RGB); c.drawString(bx + 5, yy - 6.4, ln); yy -= 7.2

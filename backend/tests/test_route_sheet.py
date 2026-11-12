@@ -434,9 +434,18 @@ ok("⭐ the typed words under their headings, two to a row; 'Not typed' nowhere 
 network.set_site_rules("L1", None)
 network.set_route_sheet_text("R1", {"permitted_deviations"}, permitted_deviations=None)
 T2 = flat(export.build_route_sheet_pdf(rs.sheet("R1", acc=PLANNER)))
-ok("🔴 an empty field reads 'Not typed' under its heading, never vanishes",
-   "Why this route Permitted diversions Agreed in the CLP: avoids the village centre. Not typed" in T2
-   and "Site rules at B, Mill Compound Site rules at A, Kelsey Quarry 15 mph on site. Not typed" in T2, T2[-500:])
+# REVERSED 11 Nov 2026 (CLOCS card B-F2, John's yes): it read "an empty field reads 'Not typed' under its heading, never
+# vanishes"; an empty part is now left off the sheet and the Routes screen says which words are missing
+ok("🔴 an empty field is left out, heading and all: no 'Not typed' on the sheet; the typed parts close up two to a row",
+   "Not typed" not in T2 and "Permitted diversions" not in T2 and "Site rules at A" not in T2
+   and "Why this route Site rules at B, Mill Compound Agreed in the CLP: avoids the village centre. 15 mph on site." in T2,
+   T2[-500:])
+network.set_route_sheet_text("R1", {"route_reason"}, route_reason=None)
+_blk = export.route_sheet_blocks(rs.sheet("R1", acc=PLANNER))
+ok("...route_sheet_blocks lists only what is typed, never a 'Not typed' body",
+   all(b[1] and b[1] != rs.NOT_TYPED and b[2] is False for b in _blk)
+   and not any(b[0] in ("Why this route", "Permitted diversions") for b in _blk), str(_blk))
+network.set_route_sheet_text("R1", {"route_reason"}, route_reason="Agreed in the CLP: avoids the village centre.")
 ok("⭐ the footer: a planning document, the site team and the signs first; no Mapbox credit for a map it did not draw (offline)",
    "A planning document: the site team's instructions and the road signs come first." in T and "Mapbox" not in T
    and S.get("basemap") is False)

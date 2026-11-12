@@ -809,10 +809,19 @@ ok("7c: the community credit is on the sheet (schools, health, bus stops and cyc
    "OpenStreetMap contributors (ODbL)" in (E3["community_credit"] or ""))
 _pdf3 = export.build_collision_evidence_pdf(E3)
 _t3 = " ".join(pdf_text(_pdf3, "").split()) if shutil.which("pdftotext") else ""
+# NARROWED 12 Nov 2026 (B-X2): the box's own lines are read in drawing order (raw): the box grew by its title's second
+# line, and -layout now runs its last line together with a table row level with it
+_t3r = " ".join(pdf_text(_pdf3, "", raw=True).split()) if shutil.which("pdftotext") else ""
 ok("7c: the PDF: page 1 opens with the routes compared and the CLOCS box",
-   not _t3 or ("This route and its alternatives" in _t3 and "For the route risk assessment (CLOCS Standard v5, 5.1a)" in _t3
+   not _t3 or ("This route and its alternatives" in _t3 and re.search(r"For the route risk assessment\s+\(CLOCS Standard v5, 5\.1a\)", _t3r)
                and "For the CLOCS route risk assessment" not in _t3   # NARROWED 10 Nov 2026 (F12): the clause it serves
-               and "5.6a assess and select routes" in _t3 and "the project's own incidents (5.1a) are not in this data" in _t3), _t3[:1500])
+               and "5.6a assess and select routes" in _t3r and "the project's own incidents (5.1a) are not in this data" in _t3r), _t3r[:1500])
+# 12 Nov 2026 (card B-X2, the dry run): the box's title lines, measured in the PDF's own font against the box's room
+from reportlab.pdfbase.pdfmetrics import stringWidth as _sw  # noqa: E402
+_room = (export.A4[0] - 24 * export.mm) * 0.42 - 20
+ok("🔴 7c B-X2: the CLOCS box title is two lines here, each inside the box (5 pt in from each side)",
+   E3.get("clocs_box_title") == ["For the route risk assessment", "(CLOCS Standard v5, 5.1a)"]
+   and all(_sw(x, export._BF("bold"), 8) <= _room for x in E3.get("clocs_box_title") or ["x" * 99]), E3.get("clocs_box_title"))
 ok("7c: ...the cycle routes and the route's left turns, said as facts with how they are measured",
    not _t3 or ("Cycle routes and the route's left turns" in _t3 and "run beside a cycle route (within 20 m)" in _t3
                and "The route makes 0 left turns" in _t3 and "mapped by volunteers" in _t3), _t3[:3000])
