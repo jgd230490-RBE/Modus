@@ -2646,7 +2646,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && gbW.includes("`The gate can check in ${gaN1(b.per_hour)} an hour.`") && gbW.includes("No check-in time typed, so nothing is compared.")
     && gbW.length > 200 && !/Math\.(ceil|floor|round|max)\(|\/ *60|\* *60/.test(gbW));
   ok("S3: the server's note on where the busiest hour comes from is printed under the notes",
-    gb.includes('{ga.busiest_note && <div className="ct-note" data-ga-busy-note="1">{ga.busiest_note}</div>}')
+    gb.includes('{ga.busiest_note && <div className="ct-note" data-ga-busy-note="1">Busiest hour{ga.busiest_loads != null ?')  // NARROWED 10 Nov 2026 (U5): a few words and an "i" box, no 30-word note on the screen
     && gb.indexOf("data-ga-busy-note") > gb.indexOf("(ga.notes || []).map("));
   ok("S3: no banned word and no 'peak hour' in the new words",
     !/\b(secure|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|trucks?|peak hour)\b/i.test(gbW));
