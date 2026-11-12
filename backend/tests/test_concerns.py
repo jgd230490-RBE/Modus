@@ -620,17 +620,28 @@ ok("FIGURES: read fresh, never kept (no read_cache / _staff_json on it)",
 # the bulletin's glance row and short table (card 7)
 import bulletin_doc  # noqa: E402
 _cm = bulletin_doc.concern_month(10)            # October 2026
-ok("⭐ BULLETIN: October's concerns — received, closed, by kind, the median first reply",
-   _cm is not None and _cm["received"] == 4 and _cm["closed"] == 3 and _cm["kinds"][0] == {"kind": "Mud or debris on the road", "received": 2, "closed": 2},
+# REVERSED 11 Nov 2026 (card A-F1): "closed" counts October's concerns that are closed now (2: C-0101, C-0102), the same
+# count as the kinds table; C-0104 (received in September, closed in October) is no longer in it. It read 3.
+ok("⭐ BULLETIN: October's concerns — received, closed (of those received), by kind, the median first reply",
+   _cm is not None and _cm["received"] == 4 and _cm["closed"] == 2 and _cm["kinds"][0] == {"kind": "Mud or debris on the road", "received": 2, "closed": 2},
    str(_cm))
 _g = bulletin_doc._glance({}, {}, [], [], [], None, [], None, "October 2026", _cm)
 # NARROWED 5 Nov 2026 (the newsletter stays at four pages, D43): the item carries "received · closed", the figure only the two
 # counts, the data cell a short "Map and email records", so no cell wraps in the PDF's narrow columns
-ok("BULLETIN: the glance row reads 'Concerns from the public, received · closed: 4 · 3', marked as a record",
-   any(r["item"] == "Concerns from the public, received · closed" and r["figure"] == "4 · 3" and not r["not_reported"]
+# REVERSED 11 Nov 2026 (card A-F1): "4 · 2", the kinds table's own sums (it read "4 · 3", one more closed than the table)
+ok("BULLETIN: the glance row reads 'Concerns from the public, received · closed: 4 · 2', marked as a record",
+   any(r["item"] == "Concerns from the public, received · closed" and r["figure"] == "4 · 2" and not r["not_reported"]
        and r["data"] == "Map and email records" for r in _g), str(_g[-1]))
 ok("BULLETIN: ...each cell short enough for one line in the PDF (figure ≤ 12 characters like 'Not reported', data ≤ 22)",
    all(len(r["figure"]) <= 12 and len(r["data"]) <= 22 for r in _g if r["item"].startswith("Concerns")))
+ok("⭐ BULLETIN (A-F1): the glance row's closed figure equals the kinds table's closed, summed",
+   _cm["closed"] == sum(k["closed"] for k in _cm["kinds"]) and _cm["received"] == sum(k["received"] for k in _cm["kinds"]),
+   str(_cm))
+ok("BULLETIN (A-F1): the form is on here, and the row says so", _cm["form"] is True)
+_gx = bulletin_doc._glance({}, {}, [], [], [], None, [], None, "October 2026", dict(_cm, form=False))
+ok("⭐ BULLETIN (A-F1): with the map's form off the row's source is 'Email records', never the map",
+   any(r["item"].startswith("Concerns") and r["data"] == "Email records" for r in _gx)
+   and not any("Map and email" in r["data"] for r in _gx), str(_gx[-1]))
 _g0 = bulletin_doc._glance({}, {}, [], [], [], None, [], None, "October 2026", None)
 ok("BULLETIN: ...and without concerns it is still 'Enquiries and complaints: Not reported'",
    _g0[-1] == {"item": "Enquiries and complaints", "figure": "Not reported", "data": "Not in this bulletin", "not_reported": True})

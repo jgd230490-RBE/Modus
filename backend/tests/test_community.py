@@ -198,7 +198,9 @@ ok("1: the user's words (and the cycle label the user chose, 14 Oct)",
                                "Cycle routes (National Cycle Network and cycle paths)", "Bus stops"])
 ok("1: one colour each, all different", len({k["colour"].upper() for k in K}) == 9)
 ok("1: one symbol each, all different", len({k["symbol"] for k in K}) == 9)
-RESERVED = {"#94BBF9", "#5A96F6", "#2071F3", "#0B55CB", "#073888",          # the Volume blues (map CARBON_RAMP)
+# NARROWED 11 Nov 2026 (card A-F2b): the new Volume blues joined the set; the old five stay reserved too
+RESERVED = {"#94BBF9", "#5A96F6", "#2071F3", "#0B55CB", "#073888",          # the Volume blues (map CARBON_RAMP), before A-F2b
+            "#72A7FF", "#006AFD", "#0051C4", "#00388E", "#00215B",          # the Volume blues since A-F2b
             "#DC2626", "#C8102E",                                           # breach / clash red, the limit-sign red
             "#FF8C14", "#E8590C", "#E8681E", "#FF8312",                     # orange (barred on the map) and the accent
             "#D97706", "#F59E0B", "#C2790B",                                # amber status
