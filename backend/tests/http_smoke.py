@@ -1214,7 +1214,8 @@ with TestClient(main.app, base_url="https://testserver") as c:
        and all(m["month_index"] <= 10 for m in _rt.get("months") or [])
        and all(m["recorded_t"] is None or m["lines_reported"] > 0 for m in _rt.get("months") or [])
        and ((_rt.get("state") == "set") == bool(cm.get("recorded_line")))
-       and (not cm.get("recorded_line") or cm["recorded_line"].startswith("Recorded tonnes as typed on Account, to ")),
+       # NARROWED 11 Nov 2026 (D-F3): the recorded line now says "weeks to <the Monday of the last week typed>"
+       and (not cm.get("recorded_line") or cm["recorded_line"].startswith("Recorded tonnes as typed on Account, weeks to ")),
        str(_rt)[:300] + " | " + str(cm.get("recorded_line")))
     ok("the demo's vehicle chart is drawn (approved loads exist), its shares from the server",
        (ch.get("vehicle_types") or {}).get("state") == "set" and (ch.get("vehicle_types") or {}).get("series"), str(ch.get("vehicle_types"))[:200])

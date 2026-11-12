@@ -562,6 +562,37 @@ async function clpDom(){
      !!el.querySelector('[data-clp-pack-error="1"]') && el.querySelector('[data-clp-pack-error="1"]').textContent === "The CLP pack could not be made. Openpyxl is not installed.");
   w.HTMLAnchorElement.prototype.click = realClick; w.URL.createObjectURL = realCreate;
   act(() => { r.unmount(); }); el.remove();
+  // ---- 11 Nov 2026 (D-F6, John's yes): leaving the Dashboard and coming back keeps the fold open, on its month, scrolled to
+  {
+    const FOLD = w.CLP_FOLD || {}, left = { open: FOLD.open, month: FOLD.month };
+    ok("🔴 D-F6: the fold remembers it was open, and the month picked, when it is unmounted (leaving the Dashboard)",
+       left.open === true && left.month === thisMonth, JSON.stringify(left));
+    const scrolled = []; const realSIV = w.Element.prototype.scrollIntoView;
+    w.Element.prototype.scrollIntoView = function(o){ scrolled.push([this.getAttribute("data-clp"), o && o.block]); };
+    const realRAF = w.requestAnimationFrame; w.requestAnimationFrame = (f) => { f(); return 0; };
+    calls.length = 0;
+    w.fetch = (url, opt) => { calls.push({ url: String(url), method: (opt && opt.method) || "GET" });
+      return String(url).startsWith("/api/clp/monitoring") ? reply(200, { ...CLPF, month: +String(url).split("month=")[1] }) : new Promise(() => {}); };
+    const el2 = w.document.createElement("div"); w.document.body.appendChild(el2);
+    const r2 = w.ReactDOM.createRoot(el2);
+    act(() => { r2.render(w.React.createElement(w.ClpMonitoring, { months: metaMin.months })); });
+    await settle(30);
+    ok("🔴 D-F6: coming back, it opens on the same month and reads it again (a week typed in between shows)",
+       el2.querySelector("details[data-clp]").open && el2.querySelector('select[aria-label="CLP month"]').value === String(thisMonth)
+       && calls.length === 1 && calls[0].url === `/api/clp/monitoring?month=${thisMonth}`, JSON.stringify(calls));
+    ok("🔴 D-F6: ...and scrolls back to the fold once, top first, after its figures are in",
+       JSON.stringify(scrolled) === JSON.stringify([["1", "start"]]), JSON.stringify(scrolled));
+    act(() => { r2.unmount(); }); el2.remove();
+    FOLD.open = false; FOLD.month = null;
+    const el3 = w.document.createElement("div"); w.document.body.appendChild(el3);
+    const r3 = w.ReactDOM.createRoot(el3); calls.length = 0; scrolled.length = 0;
+    act(() => { r3.render(w.React.createElement(w.ClpMonitoring, { months: metaMin.months })); });
+    await settle(30);
+    ok("D-F6: cleared (as sign-out does), it starts closed, reads nothing and does not scroll",
+       !el3.querySelector("details[data-clp]").open && calls.length === 0 && scrolled.length === 0);
+    act(() => { r3.unmount(); }); el3.remove();
+    w.Element.prototype.scrollIntoView = realSIV; w.requestAnimationFrame = realRAF;
+  }
 }
 
 // ---- 16 Oct 2026 (S7): the Simulation section in a real DOM ----------------------------------------------------------

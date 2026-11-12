@@ -736,7 +736,7 @@ if (loaded) {
       const cOut = render("the Dashboard renders with the CLP section open (initialClp)", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialClp: CLPF, onOpen(){} }));
       const cP = seg(cOut, '<details class="dash-more" data-clp="1"', '<summary>Stockpile capacity');
       ok("⭐ CLP: the section is a folded <details> after More charts, open when its figures are handed in, with its summary",
-        cP.startsWith('<details class="dash-more" data-clp="1" data-guide="dash-clp" open=""') && cP.includes("<summary>CLP monitoring: caps, vehicles, councils, carbon and trips avoided</summary>")
+        cP.startsWith('<details class="dash-more" data-clp="1" data-guide="dash-clp" open=""') && cP.includes("<summary>CLP monitoring: tonnes, caps, vehicles, councils, carbon and trips avoided</summary>")   /* REVERSED 11 Nov 2026 (D-F2, John's yes): the title names tonnes */
         && cOut.indexOf('data-clp="1"') > cOut.indexOf("<summary>More charts") && cOut.indexOf('data-clp="1"') < cOut.indexOf("<summary>Stockpile capacity"));
       ok("⭐ CLP: seven cards in the server's order, each in state set, each headline the server's words",
         CLPF.order.every(k => cP.includes(`data-clp-chart="${k}" data-clp-state="set"`))
@@ -1118,8 +1118,8 @@ if (loaded) {
       h(LookAhead, { meta: laMeta, who: "t", initialPage: spreadFix, initialView: "account" }));
     const spRow = spOut.slice(spOut.indexOf('<tr class="border-t border-slate-100 align-middle" style="background:rgba(217,119,6,.06)">'));
     ok("⭐ UI FIX 6 card 2: the short line's 'spread on this week' is the standard small button (btn-pri btn-sm), same words and title; the 11 px white one-off is gone",
-      spOut.includes('style="background:rgba(217,119,6,.06)"') && spRow.includes('<button class="btn-pri btn-sm disabled:opacity-40" title="Add 12.5 t to this week, divided over its remaining weekdays. Refused if that week is confirmed.">Add to this week</button>')
-      && !spOut.includes("rounded-lg text-white") && (spOut.match(/>Add to this week</g) || []).length === 1);   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2)
+      spOut.includes('style="background:rgba(217,119,6,.06)"') && spRow.includes('<button class="btn-sec btn-sm disabled:opacity-40" title="Add 12.5 t to this week, divided over its remaining weekdays. Refused if that week is confirmed.">Add to this week</button>')
+      && !spOut.includes("rounded-lg text-white") && (spOut.match(/>Add to this week</g) || []).length === 1);   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2); REVERSED 11 Nov 2026 (D-F4): btn-sec, an outline button
     ok("⭐ UI FIX 6 cards 1 and 2: the table keeps 1,220 px in its padded scroller under 13 px headings (la-acct-head); the Action heading and every Action cell are pinned (la-pin), the short line's cell painting the row's rose (la-pin-short)",
       spOut.includes('<div class="overflow-auto la-acct-scroll"><table class="text-sm w-full" style="min-width:1220px"><thead class="la-acct-head">')
       && spOut.includes('<th class="px-2 py-2 text-right font-semibold la-pin">Action<button')
