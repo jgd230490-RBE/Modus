@@ -3554,7 +3554,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const clpc = _cs > 0 && _ce > _cs ? src.slice(_cs, _ce) : "";
   ok("CLP: one block before BulletinMenu holds the section, its cards and its five chart builders",
      clpc.length > 4000 && ["function ClpCard(", "function clpBulletCfg(", "function clpShareCfg(", "function clpCouncilCfg(", "function clpCarbonCfg(",
-       "function clpTripsCfg(", "function ClpUncapped(", "function ClpMonitoring({ months, initial })"].every(f => clpc.includes(f)));
+       "function clpTripsCfg(", "function ClpUncapped(", "function ClpMonitoring({ months, initial })"].every(f => clpc.includes(f)));   // the D-F6 CLP_FOLD memory sits just above ClpMonitoring
   ok("⭐ CLP: read on FIRST OPEN only: the effect waits for open, GETs /api/clp/monitoring?month=N, keyed on open and the month",
      clpc.includes("if(!open) return;") && clpc.includes("fetch(`${API}/clp/monitoring?month=${month}`)") && clpc.includes("}, [open, month]);")
      // NARROWED 14 Oct 2026 (W10, the same session): a second fetch, the CLP pack, on a button press only
@@ -4231,9 +4231,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && ["la.variance", "la.cost_quote", "la.cost_fair", "la.cost_actual", "la.spread"].every(id => _acct.includes(`<InfoTip id="${id}"`)));
   // NARROWED 10 Nov 2026 (wave 3, 16 Oct item 24, mockup card 2): the same button, its words "Add to this week" and its title in the line's unit
   ok("⭐ UI FIX 6 card 2: 'spread on this week' is the app's standard small button (btn-pri btn-sm: 13 px on the accent), same words, same click, same title, same disabled rule; the 11 px white-on-navy one-off is gone",
-     _acct.includes('<button onClick={() => doSpread(r)} disabled={!!busy}\n                                className="btn-pri btn-sm disabled:opacity-40"\n                                title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to this week, divided over its remaining weekdays. Refused if that week is confirmed.`}>Add to this week</button>')
+     _acct.includes('<button onClick={() => doSpread(r)} disabled={!!busy}\n                                className="btn-sec btn-sm disabled:opacity-40"\n                                title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to this week, divided over its remaining weekdays. Refused if that week is confirmed.`}>Add to this week</button>')
      && !_laBody.includes("text-[11px] font-semibold px-2.5 py-1.5 rounded-lg text-white") && !/background: "var\(--navy\)" \}\}>spread on this week/.test(_laBody)
-     && /\.btn-pri\{[^}]*background:var\(--action\);color:var\(--action-fg\);/.test(html) && /\.btn-sm\{padding:4px 10px;font-size:13px;\}/.test(html));
+     && /\.btn-pri\{[^}]*background:var\(--action\);color:var\(--action-fg\);/.test(html) && /\.btn-sm\{padding:4px 10px;font-size:13px;\}/.test(html));   // REVERSED 11 Nov 2026 (D-F4, John's yes): btn-sec btn-sm, an outline button, not on the accent
   // card 3 (finding #11 + the user's yes to finding #37)
   ok("⭐ UI FIX 6 card 3: the Horizon's month line, role words, 'month is now …' note and outcome lines are 12 px (text-xs); no 9 or 10 px text is left in the Horizon",
      _hz.includes('Line<InfoTip id="la.horizon" /><div className="text-xs font-normal text-slate-400">{monthLabelAbs(horizon.from_month, months.start_year)}')
