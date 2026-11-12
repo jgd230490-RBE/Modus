@@ -281,7 +281,9 @@ ok("11 Oct 2026 (review): ⭐ the Config Estonian column is gated on the COUNTRY
   code.includes('const vehLangEditable = (k) => k === "en" || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE");')
   && !/const vehLangEditable = [^\n]*VEH\.langs/.test(code)
   // NARROWED 9 Nov 2026 (UI critique card 10): + a planner's read-only page leaves the English (typing) column out
-  && code.includes('.filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English"))') && code.includes('{vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""}')
+  && code.includes('.filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English"))')
+  // NARROWED 10 Nov 2026 (wave 4, card 7): + the tablet card's class and label on the Estonian box's cell
+  && code.includes('{vehLangEditable("ee") && <td className="min-w-[190px] cfg-veh-wide" data-label="Estonian name"><input className={inp} value={lab.ee || ""}')
   && !code.includes('vehLangShown("ee")'));
 // 11 Oct 2026: ⭐ the four EU type-approval vehicles are gone from the app's source — no name, no code, no 'aliases'
 // note (only those entries carried aliases), and no comment that describes them as present
@@ -2252,7 +2254,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("Forecasts: one .tbl with a caption, the unit in the header, numbers in .num cells, the one visible sort",
     // 13 Oct 2026 (W6, narrowed): one unit for every line through the switch (the header names it); what was typed,
     // in its own unit, is in the details
-    _fcBody.includes('<table className="tbl rd-table" data-rd-table="forecasts">') && _fcBody.includes("<caption><b>Forecast lines</b> · {sortCaption}")
+    // NARROWED 10 Nov 2026 (wave 4, card 2): + tab-cards, the table's cards at 768–1024 (three figures a row)
+    _fcBody.includes('<table className="tbl rd-table tab-cards" data-rd-table="forecasts" style={{ "--tc-n": 3 }}>') && _fcBody.includes("<caption><b>Forecast lines</b> · {sortCaption}")
     && _fcBody.includes('{th(qtyHead, "quantity", true)}') && _fcBody.includes('<td className="num" data-label={qtyHead}>')
     // NARROWED 29 Oct 2026 (3b-2): a line typed as m³ of concrete shows that basis in Typed; every other line as before
     && _fcBody.includes('<RdItem t="Typed">{g.kg != null && g.concrete > 0') && _fcBody.includes(': `${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>') && _fcBody.includes('const [sort, setSort] = useState({ key: "quantity", dir: "desc" });'));
@@ -2474,9 +2477,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && ctc.includes("return `Target for ${ctYour()}: ${ctT(s.target_t)} tCO2e, ${(+s.share_pct).toFixed(1)}% of ${of}`;")
     && ctc.includes("const of = t.mode === \"cap\" ? `the scheme's fixed cap of ${ctT(t.cap_t)} tCO2e` : `the scheme's target (${pct} below the approved plan)`;")
     && ctc.includes("have no share of it while the agreed decisions do not fit the plan`;") && !ctc.includes("ctSplit")
-    && ctc.includes("`As forecast${on}: ${ctT(s.approved_t)} tCO2e${g1 ? \", \" + g1 : \"\"}`")
-    && ctc.includes("`With the agreed decisions${on}: ${ctT(s.with_decisions_t)} tCO2e${g2 ? \", \" + g2 : \"\"}`")
-    && ctc.includes("s.invalid ? (dash ? `With the agreed decisions${on}: —` : s.invalid)")
+    && ctc.includes("`As forecast: ${ctT(s.approved_t)} tCO2e${g1 ? \", \" + g1 : \"\"}`")
+    && ctc.includes("`With the agreed decisions: ${ctT(s.with_decisions_t)} tCO2e${g2 ? \", \" + g2 : \"\"}`")
+    && ctc.includes("s.invalid ? (dash ? `With the agreed decisions: —` : s.invalid)")
     && ctc.includes('${gap > 0 ? "over" : "under"} the target') && ctc.includes("pct = `${(+t.pct_below).toFixed(1)}%`"));
   ok("⭐ the same three things on the Dashboard, Forecasts, Submit forecast and the big screen: the target line and both figures, from one pair of helpers",
     (ctc.match(/ctTargetLine\(ct\)/g) || []).length >= 4 && (ctc.match(/ctProgress\(ct(, true)?\)/g) || []).length >= 4
@@ -2648,7 +2651,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && gbW.includes("`The gate can check in ${gaN1(b.per_hour)} an hour.`") && gbW.includes("No check-in time typed, so nothing is compared.")
     && gbW.length > 200 && !/Math\.(ceil|floor|round|max)\(|\/ *60|\* *60/.test(gbW));
   ok("S3: the server's note on where the busiest hour comes from is printed under the notes",
-    gb.includes('{ga.busiest_note && <div className="ct-note" data-ga-busy-note="1">{ga.busiest_note}</div>}')
+    gb.includes('{ga.busiest_note && <div className="ct-note" data-ga-busy-note="1">Busiest hour{ga.busiest_loads != null ?')  // NARROWED 10 Nov 2026 (U5): a few words and an "i" box, no 30-word note on the screen
     && gb.indexOf("data-ga-busy-note") > gb.indexOf("(ga.notes || []).map("));
   ok("S3: no banned word and no 'peak hour' in the new words",
     !/\b(secure|real-time|optimi[sz]\w*|predict\w*|telematics|live tracking|trucks?|peak hour)\b/i.test(gbW));
@@ -5076,7 +5079,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("CLP NOTES: the one email's result in words ('They have an email about it.' / 'The email to them did not go.'), never a code",
      cn.includes('d.email === "sent" ? `${first} They have an email about it.`') && cn.includes('`${first} The email to them did not go.`'));
   ok("⭐ CLP NOTES: the list — a Tasks column (open, then overdue in red or the next due date, else the notes count), the Tasks filter (Any · Open · Given to me · Overdue) and 'Notes and tasks (N open)' in every row's ⋯",
-     cp.includes('<th scope="col">Last issue</th><th scope="col">Tasks</th>') && cp.includes('<td data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open')
+     // NARROWED 10 Nov 2026 (wave 4, card 4): + the tablet card's label on the Tasks cell
+     cp.includes('<th scope="col">Last issue</th><th scope="col">Tasks</th>') && cp.includes('<td data-label="Tasks" data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open')
      && cp.includes("{tk(c).overdue} overdue</span>") && cp.includes("due {clpShort(tk(c).next_due)}") && cp.includes('{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}')
      && cp.includes('+ {tk(c).client_open} with the client</span>}')   // NARROWED 31 Oct 2026 (PR 3d, Q8): the second line
     

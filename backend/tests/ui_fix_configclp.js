@@ -120,7 +120,7 @@ async function configReadOnly(){
   // the vehicles: a planner reads a summary, no English column, no Edit
   {
     const m = await mount(w.ConfigPage, { meta: {}, who: "tester", access: PLANNER });
-    const th = [...m.el.querySelectorAll(".cfg-main table.tbl thead th")].map(x => x.textContent.trim());
+    const th = [...m.el.querySelectorAll(".cfg-main table.tbl thead th")].map(x => x.textContent.trim().replace(/(English|min|class)i$/, "$1"));  // NARROWED 10 Nov 2026 (U5): a header i button adds an i
     ok("CONFIG RO: Vehicles — the English column (a typing column) is left out for a reader", th.includes("Vehicle") && !th.includes("English"), th.join("|"));
     await tab(m, "Materials");
     const k = Object.keys(DOC.material_categories).find(x => !x.startsWith("_") && (DOC.material_categories[x].vehicles || []).length >= 2);
@@ -145,7 +145,7 @@ async function configReadOnly(){
     ok("⭐ CONFIG EDIT: an admin login — no read-only line, the fields enabled (data-cfg-fields=\"edit\"), the Save bar and More",
        !m.el.querySelector("[data-cfg-readonly]") && fs_(m).every(x => !x.disabled && x.dataset.cfgFields === "edit") && !!m.el.querySelector("[data-cfg-savebar]")
        && !!m.el.querySelector("[data-cfg-more]") && /Changes apply on save/.test(m.el.textContent));
-    const th = [...m.el.querySelectorAll(".cfg-main table.tbl thead th")].map(x => x.textContent.trim());
+    const th = [...m.el.querySelectorAll(".cfg-main table.tbl thead th")].map(x => x.textContent.trim().replace(/(English|min|class)i$/, "$1"));  // NARROWED 10 Nov 2026 (U5): a header i button adds an i
     ok("CONFIG EDIT: Vehicles keep the English column for an admin", th.includes("English"));
     ok("CONFIG EDIT: an admin has no reader's scroll box (no extra Tab stop: its fields are the stops)",
        !m.el.querySelector(".cfg-main .cfg-ro-box") && !m.el.querySelector(".cfg-main [tabindex='0'][role=region]"));

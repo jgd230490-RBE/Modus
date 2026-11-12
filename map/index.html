@@ -138,6 +138,7 @@
         #area-district-rows{ padding-left:23px; margin:0 0 4px; }
         #area-district-rows .control-item{ padding:4px 2px; font-size:14px; }
         #area-district-rows .control-item label{ width:auto; flex:1 1 auto; min-width:0; }   /* the name gives way to the figure (Chrome, 12 Oct) */
+        #area-district-rows .control-item label{ min-height:24px; }   /* 10 Nov 2026 (wave 4): a council's tick row is 24 px (it was 20 px; the UI audit's targets-24px once a month is on screen) */
         #area-district-rows .control-item + .control-item{ border-top:none; }
         #area-district-rows .area-row.dim label, #area-district-rows .area-row.dim .area-fig{ opacity:.45; }
         .area-fig{ flex:0 1 auto; margin-left:auto; padding-left:8px; color:var(--muted); font-size:14px; font-variant-numeric:tabular-nums; text-align:right; }   /* wraps: the panel is narrow (Chrome, 12 Oct) */
@@ -714,6 +715,22 @@
            Desktop first: the month chips (they replace the From/To selects), the hover card on a route, the text view
            of the month beside the map, the share card (link + QR). */
         .month-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+        /* TABLET-STRIP — 10 Nov 2026 (UI critique finding 3, John's decision 2; wave 4, notes\ui-fix-tablet-mockup-1110\ card 8):
+           at 768–1024 px, while the Control Panel is shut, Play and the month chips sit in one strip at the map's foot (the
+           phone's chips row, laid out for a tablet) in place of the timeline bar, and the map opens on this month
+           (tlStartMonth, D22) instead of "No month on screen". Opening the panel hides the strip and gives the bar back. */
+        #t-strip{ display:none; }
+        @media (min-width:768px) and (max-width:1024px){
+            body.sidebar-closed:not(.wall-mode) #t-strip{ display:flex; position:absolute; left:50%; transform:translateX(-50%); bottom:18px; z-index:25;
+                max-width:min(620px, calc(100% - 24px)); align-items:center; gap:10px; padding:8px 10px; background:var(--surface);
+                border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 28px rgba(16,24,40,.16); }
+            body.sidebar-closed:not(.wall-mode) #timeline-bar{ display:none !important; }
+            #t-strip .t-play{ flex:0 0 48px; width:48px; height:48px; border-radius:24px; border:0; background:#C2410C; color:#fff; font-size:18px; font-weight:700; cursor:pointer; }
+            #t-strip .t-play:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
+            #t-strip .t-chips{ min-width:0; overflow-x:auto; scrollbar-width:thin; }
+            #t-strip .month-chips{ flex-wrap:nowrap; }
+            #t-strip .month-chip{ flex:0 0 auto; min-height:44px; min-width:52px; }
+        }
         .month-chip{ border:1px solid var(--ctl-line); background:var(--surface); color:var(--ink); border-radius:999px; padding:6px 12px; min-height:36px;
                      font:500 14px/1.2 Inter,system-ui,sans-serif; cursor:pointer; white-space:nowrap; }
         .month-chip:hover{ border-color:var(--navy); }
@@ -1543,6 +1560,12 @@
     <div class="month-chips" id="m-chips" role="group" aria-label="Month"></div>
   </div>
 </section>
+
+<!-- 10 Nov 2026 (wave 4, card 8): at 768–1024 px, while the Control Panel is shut, Play and the month chips at the map's foot -->
+<div id="t-strip" role="group" aria-label="Months on the map">
+  <button type="button" class="t-play" id="t-play" onclick="toggleTimeline()" aria-label="Play" aria-pressed="false">&#9654;</button>
+  <div class="t-chips m-chips-row"><div class="month-chips" id="t-chips" role="group" aria-label="Month"></div></div>
+</div>
 
 <!-- 12 Oct 2026 (review 2.1 third row, 2.3): the month AS TEXT, beside the map — the bar's figures (copied from the
      bar, so the two cannot disagree) and a table: route, lorry movements (or visits) a day, vehicles, conditions. -->
@@ -8632,10 +8655,14 @@
     // the bar's height plus its 18 px offset and an 8 px gap. Read by CSS from 768 px up only.
     function syncTimelineFoot(){
         const bar = document.getElementById('timeline-bar');
-        const open = !!(bar && bar.style.display === 'flex');
+        // 10 Nov 2026 (wave 4, card 8): at 768–1024 with the panel shut the tablet strip stands in for the bar
+        const strip = document.getElementById('t-strip');
+        const sOn = !!(strip && strip.offsetHeight > 0);
+        const open = sOn || !!(bar && bar.style.display === 'flex');
         document.body.classList.toggle('timeline-on', open);
         const h = open ? Math.round((bar.offsetHeight || 0) + 18 + 8) : 0;
-        try { document.documentElement.style.setProperty('--tl-foot', h + 'px'); } catch (e) {}
+        const foot = sOn ? Math.round(strip.offsetHeight + 18 + 8) : h;
+        try { document.documentElement.style.setProperty('--tl-foot', foot + 'px'); } catch (e) {}
     }
     window.addEventListener('resize', syncTimelineFoot);
     // 11 Oct: and whenever the bar itself changes height (cards filling in, labels wrapping, the window narrowing)
@@ -11931,6 +11958,8 @@
     }
     function syncPlayButtons() {
         const t = TL.playing ? '⏸' : '▶';
+        const tp = document.getElementById('t-play');     // 10 Nov 2026 (wave 4, card 8): the tablet strip's Play
+        if (tp) { tp.setAttribute('aria-pressed', String(!!TL.playing)); tp.setAttribute('aria-label', TL.playing ? 'Pause' : 'Play'); if (tp.textContent !== t) tp.textContent = t; }
         ['m-play', 'm-full-play'].forEach(id => {     // 28 Oct 2026: the full-screen strip's Play too
             const b = document.getElementById(id);
             if (!b) return;
@@ -12130,7 +12159,26 @@
     observeEl('timeline-bar', { attributes: true, attributeFilter: ['style'] }, refreshShell);
     observeEl('tl-play', { attributes: true, attributeFilter: ['aria-pressed'] }, () => { syncPlayButtons(); if (!TL.playing) scheduleViewWrite(); });
     observeEl('main-sidebar', { attributes: true, attributeFilter: ['class'] }, syncSheetWithPanel);
+    observeEl('main-sidebar', { attributes: true, attributeFilter: ['class'] }, () => setTimeout(syncTimelineFoot, 0));   // 10 Nov 2026: the tablet strip shows / hides with the panel
     observeEl('restriction-toggles', { childList: true }, applyPendingRestr);
+    // 10 Nov 2026 (wave 4, card 8): at 768–1024 px with the Control Panel shut the map opens on this month (D22's start month:
+    // the current month if it carries volume, else the first that does), so the strip's chip is pressed and the bar has figures.
+    // Never over a month a link asked for, never in wall mode, once a page load.
+    const TABLET_STRIP_MQ = '(min-width:768px) and (max-width:1024px)';
+    function isTabletStrip() {
+        try { return !!(window.matchMedia && window.matchMedia(TABLET_STRIP_MQ).matches); } catch (e) { return false; }
+    }
+    const TSTRIP = { opened: false };
+    function openTabletMonth() {
+        // TL.cleared: a link from the cleared view (month=none, claude/map-first-view) stays cleared here too
+        if (TSTRIP.opened || !isTabletStrip() || sidebarIsOpen() || TL.on || TL.cleared || TL.wall || document.body.classList.contains('wall-mode')) return;
+        TSTRIP.opened = true;
+        // after the page's one read of every month's figures (kpiFetchAll, shared with prefetchSpanKpis): opened before it, the
+        // month read its figures on its own beside it, a second heavy read on every tablet load (the UI audit's next page
+        // then waited past 30 s on the busy server)
+        ensureTimelineMatrix().then(() => kpiFetchAll().catch(() => {}))
+            .then(() => { if (!TL.on && !TL.cleared && isTabletStrip() && !sidebarIsOpen()) openTimeline(); syncTimelineFoot(); }, () => {});
+    }
     // the phone breakpoint: the map's tilt and drag-rotate are off on a phone and back on above it
     function wirePhoneShell() {
         const apply = () => {
@@ -12166,6 +12214,7 @@
         renderMonthChips();
         ensureTimelineMatrix().then(() => { CHIPS.failed = false; renderMonthChips(); }, () => { CHIPS.failed = true; renderMonthChips(); });
         applyViewFromUrl();
+        openTabletMonth();
         // 28 Oct 2026 (8b): a link naming the OS map or the tenant's imagery switches once the tenant's words are in
         try {
             const want = basemapFromKey(new URLSearchParams(location.search).get('basemap'));
