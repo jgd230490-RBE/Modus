@@ -91,7 +91,10 @@ CHARTS = {
 CAP_DIFF = ("The Look-ahead's ROUTE CAP flag compares the same cap with the lorries needed on a day; this chart, "
             "like the bulletin, compares it with lorry visits a day.")
 SPREAD = "Planned figures, not observed: Wayscope holds no gate log or arrival times."
-RECORDED_LINE = "Recorded tonnes as typed on Account, to {date}."
+# 11 Nov 2026 (D-F3, John's yes): Account takes a week's tonnes with no day, so the words name the latest typed week
+# (its Monday), never a day ("to 11 Nov" read as counted up to that day)
+RECORDED_LINE = "Recorded tonnes as typed on Account, weeks to {date}."
+PART_MONTH = "(part)"
 
 
 def month_label(mi):
@@ -524,9 +527,9 @@ def trips_avoided(sc, t, invalid, months, label, unit):
     dist_saved = _dist(-(alt.get("delta_vkm_km") or 0.0), unit)
     word = "lorry-miles" if unit == "mi" else "lorry-km"
     if avoided > 0:
-        headline = f"{avoided:,} lorry trips avoided".replace(",", " ")
+        headline = f"{avoided:,} lorry trips avoided"   # D-F1 (11 Nov 2026): a comma for thousands
     elif avoided < 0:
-        headline = f"{-avoided:,} more lorry trips with the decisions".replace(",", " ")
+        headline = f"{-avoided:,} more lorry trips with the decisions"
     else:
         headline = "The agreed decisions change no lorry trips"
     return _chart("trips_avoided", "set", months=rows, avoided=avoided, distance_saved=_r1(dist_saved),
@@ -546,8 +549,9 @@ def _day_words(d, year=False):
     return f"{d.day} {MONTHS[d.month - 1]}" + (f" {d.year}" if year else "")
 
 
-def _recorded_to(cl_lines, months):
-    """The Sunday of the latest week, in the months shown, with an actual typed on one of the caller's visible lines."""
+def _recorded_to(cl_lines, months, week_start=False):
+    """The Sunday of the latest week, in the months shown, with an actual typed on one of the caller's visible lines
+    (capped at today). With week_start=True: that week's Monday (D-F3, the words), also never after today."""
     keys = {(l["route_id"], int(l["month_index"]), l.get("discipline") or "", l.get("section_id") or "")
             for l in cl_lines if l.get("actual_tonnes") is not None}
     if not keys or not months:
@@ -559,9 +563,10 @@ def _recorded_to(cl_lines, months):
         if (w["route_id"], int(w["month_index"]), w.get("discipline") or "", w.get("section_id") or "") not in keys:
             continue
         try:
-            end = days.bucket_dates(int(w["month_index"]), int(w["week_index"]))[-1]
+            span = days.bucket_dates(int(w["month_index"]), int(w["week_index"]))
         except (TypeError, ValueError):
             continue
+        end = span[0] if week_start else span[-1]
         last = end if (last is None or end > last) else last
     # 11 Nov 2026: a week typed part-way through (Mon-Wed of this week) ends on a Sunday still to come; never say a
     # date after today
@@ -578,7 +583,7 @@ def _month_end(mi):
 
 
 def _t_words(x):
-    return f"{int(round(float(x))):,}".replace(",", " ")
+    return f"{int(round(float(x))):,}"   # D-F1 (11 Nov 2026, John's yes): "32,174 t", the app's rule since PR #246
 
 
 def recorded_tonnes(acc, months, mi, factors, label):
@@ -604,6 +609,7 @@ def recorded_tonnes(acc, months, mi, factors, label):
              "recorded_pct": (round(recorded[i] * 100.0 / planned[i]) if (recorded[i] is not None and planned[i] > 0) else None),
              "lines_reported": reported[i]} for i, m in enumerate(shown)]
     to = _recorded_to(cl, shown)
+    wk = _recorded_to(cl, shown, week_start=True)     # D-F3: the latest typed week's Monday, for the words
     # 11 Nov 2026 (John: yes, 7a as recommended): a month whose recorded weeks stop before its end is labelled
     # "<month> (to <date>)" (its bar and its row stay); the headline names the last COMPLETE month, as drawn on the
     # approved mockup, so a part month never reads as a shortfall. Only when no month is complete does it name the part one
@@ -611,21 +617,22 @@ def recorded_tonnes(acc, months, mi, factors, label):
         r["part_to"] = (to.isoformat() if (r["recorded_t"] is not None and to is not None and to < _month_end(r["month_index"]))
                         else None)
         if r["part_to"]:
-            r["label"] = f"{r['label']} (to {_day_words(to)})"
+            r["label"] = f"{r['label']} {PART_MONTH}"     # D-F3: "Nov 2026 (part)", never a day
     typed = [r for r in rows if r["recorded_t"] is not None]
     last = ([r for r in typed if not r["part_to"]] or typed)[-1]
     lab = month_label(last["month_index"])
     headline = (f"{lab}: {_t_words(last['recorded_t'])} t recorded, {last['recorded_pct']} % of the "
                 f"{_t_words(last['planned_t'])} t planned" if last["recorded_pct"] is not None else
                 f"{lab}: {_t_words(last['recorded_t'])} t recorded, none planned")
-    if to is not None:
-        headline += f" · recorded to {_day_words(to)}"
+    if wk is not None:
+        headline += f" · recorded to the week of {_day_words(wk)}"
     return _chart("recorded_tonnes", "set", months=rows, recorded_to=(to.isoformat() if to else None),
+                  recorded_week=(wk.isoformat() if wk else None),
                   headline=headline, subtitle="tonnes a month",
                   basis=("Planned: the approved plan's tonnes. Recorded: tonnes typed on Account (a week's actual), as the "
                          "Dashboard's Delivered against plan. A month with nothing typed is not recorded, not zero. "
                          "The months up to the one picked."),
-                  source="Wayscope: the approved plan; the tonnes typed on Account"), to
+                  source="Wayscope: the approved plan; the tonnes typed on Account"), wk   # D-F3: the line names the week
 
 
 # --------------------------------------------------------------------------- #
@@ -644,7 +651,7 @@ def monitoring(month_index, acc=None, factors=None, working_days=None):
     sc, t, st, invalid = _scenario(acc, factors)
     lines = sc.get("lines") or []
     months = _window(mi, sorted({int(l["month_index"]) for l in lines}))
-    rec, rec_to = recorded_tonnes(acc, months, mi, factors, label)
+    rec, rec_to = recorded_tonnes(acc, months, mi, factors, label)   # rec_to: the latest typed week's Monday (D-F3)
     charts = {
         "recorded_tonnes": rec,
         "route_caps": route_caps(mi, wd, payload, locs, routes),

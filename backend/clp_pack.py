@@ -50,8 +50,8 @@ def _n(x, dp=1):
     if x is None:
         return "—"
     v = round(float(x), dp)
-    s = f"{v:,.{dp}f}" if dp else f"{int(round(v)):,}"
-    return s.replace(",", " ")
+    # 11 Nov 2026 (D-F1 / 7b, John's yes): thousands with a comma, as every other screen and export since PR #246
+    return f"{v:,.{dp}f}" if dp else f"{int(round(v)):,}"
 
 
 def nice_top(v, steps=4):

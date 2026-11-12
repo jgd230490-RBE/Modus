@@ -4127,7 +4127,7 @@ function ClpMonitoring({ months, initial }){
   const capped = (rows) => (rows || []).filter(r => r.cap != null);
   return (
     <details className="dash-more" data-clp="1" data-guide="dash-clp" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>
-      <summary>CLP monitoring: caps, vehicles, councils, carbon and trips avoided</summary>
+      <summary>CLP monitoring: tonnes, caps, vehicles, councils, carbon and trips avoided</summary>
       <div className="pt-3" data-clp-body="1">
         <div className="ct-row mb-2">
           <span className="ct-line">The Construction Logistics Plan's figures from the approved plan<InfoTip id="dash.clp" /></span>
