@@ -18303,8 +18303,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         </>}>
         {/* 12 Nov 2026 (card B-X3, the dry run): "Loading…" until the routes' answer arrives (C-F8's words), never
             "0 locations · 0 routes"; the locations count comes from that answer until the map's own list is in */}
-        {status === null && <div className="text-xs text-slate-500 mt-1.5" data-counts-loading="1">Loading…</div>}
-        {status !== null && <div className="text-xs text-slate-500 mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+        {/* 12 Nov 2026 (card B-X4, batch 4's live check): the zones answer comes after the routes' one, so the line waits
+            for both (C-F8's zonesIn); it read "0 zones" for a few seconds */}
+        {(status === null || !zonesIn) && <div className="text-xs text-slate-500 mt-1.5" data-counts-loading="1">Loading…</div>}
+        {status !== null && zonesIn && <div className="text-xs text-slate-500 mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
           <span>{locs.length || (summary && summary.locations) || 0} locations</span><span className="text-slate-500">·</span>
           <span>{(status || []).length} routes</span><span className="text-slate-500">·</span>
           <span>{zoneList.length} zones</span><span className="text-slate-500">·</span>
