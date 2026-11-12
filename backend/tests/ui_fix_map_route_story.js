@@ -51,11 +51,15 @@ for (let m = 1; m <= 60; m++) {
      && !/class="drawer-tab[^"]*"[^>]*>(Route analysis|Forecast detail)</.test(html));
   ok("⭐ the view's switches sit in the tab row, between the tabs and the close button, hidden until a story is drawn",
      /id="tab-detail"[^\n]*\n[^\n]*\n\s*<span class="rs-ctl" id="rs-ctl" hidden><\/span>\s*\n\s*<button type="button" class="drawer-close"/.test(html));
-  ok("⭐ showDrawerTab hides the switches on the other tab and closes an open 'i'",
-     html.includes("{ const rc = document.getElementById('rs-ctl'); if (rc) rc.hidden = tab !== 'analysis' || !rc.innerHTML; if (typeof closeInfos === 'function') closeInfos(); }"));
+  ok("⭐ showDrawerTab clears the tab row's switches when the tab changes (each tab draws its own), closes an open 'i', and draws 'This route' again when its tab is pressed",
+     html.includes("{ const rc = document.getElementById('rs-ctl'); if (rc && rc._tab !== tab) { rc._tab = tab; rc._src = null; rc.innerHTML = ''; rc.hidden = true; } if (typeof closeInfos === 'function') closeInfos(); }")
+     && html.includes("if (tab === 'analysis' && typeof RS !== 'undefined' && RS.rid && typeof renderRouteStory === 'function') renderRouteStory();")
+     && html.includes("if (ctl && drawerTab === 'analysis') {"));
+  ok("with no route picked there is no 'This route' tab to press (the panel opened from the Control Panel shows All routes)",
+     html.includes("{ const ta = document.getElementById('tab-analysis'); if (ta && typeof RS !== 'undefined') ta.hidden = !RS.rid; }"));
 
   // ---------- no read of its own ----------
-  const a = html.indexOf("async function openRouteAnalysis(routeId){"), b = html.indexOf("const MAT_PALETTE=");
+  const a = html.indexOf("async function openRouteAnalysis(routeId){"), b = html.indexOf("async function openForecastDetail(){");
   const block = a > 0 && b > a ? html.slice(a, b) : "";
   ok("⭐ NO READ: the route panel asks the server for nothing of its own (no fetch, no fetchMatrix between openRouteAnalysis and the table's code); it waits on the two reads the page makes when it opens",
      !!block && !/fetchMatrix\(/.test(block) && !/\bfetch\(/.test(block) && block.includes("await ensureTimelineMatrix();") && block.includes("await kpiFetchAll();"));
@@ -161,7 +165,7 @@ for (let m = 1; m <= 60; m++) {
     ok("⭐ moving the month goes through the page's own pickMonth; the open panel follows a month move and the timeline closing",
        /function rsGoMonth\(m\) \{\s*m = parseInt\(m, 10\);\s*if \(m >= 1 && m <= \(CONFIG\.MONTH_COUNT \|\| 60\) && typeof pickMonth === 'function'\) pickMonth\(m\);/.test(html)
        && (html.match(/if \(typeof rsOnMonth === 'function'\) rsOnMonth\(\);/g) || []).length === 2
-       && /function rsOnMonth\(\) \{\s*if \(!RS\.rid \|\| drawerTab !== 'analysis' \|\| !document\.body\.classList\.contains\('drawer-open'\)\) return;\s*renderRouteStory\(\);/.test(html));
+       && /function rsOnMonth\(\) \{\s*if \(!document\.body\.classList\.contains\('drawer-open'\)\) return;\s*if \(drawerTab === 'detail'\) \{ if \(typeof renderAllRoutes === 'function'\) renderAllRoutes\(\); return; \}\s*if \(RS\.rid\) renderRouteStory\(\);/.test(html));
 
     // the table
     const tm = M.rsTableHTML(st, 16, "count"), tt = M.rsTableHTML(st, 9, "t");

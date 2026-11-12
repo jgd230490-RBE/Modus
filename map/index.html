@@ -66,7 +66,6 @@
         html[data-look="dark"] .secsel-btn:hover{ background:var(--surface-2); }
         html[data-look="dark"] .secsel-x:hover{ background:var(--surface-2); }
         html[data-look="dark"] table.secsel-table tr.secsel-clicked td{ background:rgba(37,99,235,.22); }
-        html[data-look="dark"] table.fc-matrix tr.fc-picked td, html[data-look="dark"] table.fc-matrix tr.fc-picked td:first-child{ background:rgba(37,99,235,.22); }
         html[data-look="dark"] .drawer-tab.active{ background:rgba(37,99,235,.22); color:#8FB3F5; }
         html[data-look="dark"] .mapboxgl-ctrl.mapboxgl-ctrl-attrib{ background:rgba(31,32,36,.72); }
         html[data-look="dark"] .mapboxgl-ctrl-attrib a{ color:#C9CCD1; }
@@ -490,7 +489,7 @@
         .mv-pill{ color:#1D4ED8; box-shadow:inset 0 0 0 1.5px #2563EB; }
         .co-pill{ color:#065F46; box-shadow:inset 0 0 0 1.5px #059669; }
         .mode-legend .ml-key{ margin-top:6px; }
-        #btn-detail{ margin-top:8px; display:none; }
+        #btn-detail{ margin-top:8px; }
 
         .mapboxgl-popup-content { border-radius:10px !important; border:1px solid var(--line) !important; padding:13px 14px !important; box-shadow:0 8px 28px rgba(16,24,40,.14) !important; font-family:'Inter',sans-serif !important; }
         .mapboxgl-popup-content h3, .mapboxgl-popup-content h4{ font-family:'Inter',sans-serif; }
@@ -520,12 +519,6 @@
         .an-sub{ font-size:12.5px; color:var(--muted); margin-top:1px; }
         .an-title{ font-size:14px; font-weight:700; color:var(--navy-deep); }
         .an-route{ font-size:12px; color:var(--muted); margin:2px 0 14px; }
-        table.fc-matrix{ border-collapse:collapse; font-size:11.5px; width:100%; }
-        table.fc-matrix th, table.fc-matrix td{ padding:6px 8px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); }
-        table.fc-matrix th:first-child, table.fc-matrix td:first-child{ text-align:left; position:sticky; left:0; background:var(--surface); }
-        table.fc-matrix thead th{ position:sticky; top:0; background:var(--surface); font-weight:600; color:var(--muted); }
-        table.fc-matrix tr.fc-picked td, table.fc-matrix tr.fc-picked td:first-child{ background:#EFF6FF; }
-        .mat-chip{ display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px; vertical-align:middle; }
         /* 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1): "This route". The panel is a wide, short strip
            (169 px of content in a 1422 x 700 window with the timeline open), so the story sits on the left, the months on
            the right, and the switches in the tab row. The chart is ONE control, as the timeline's rail is: a slider kept
@@ -603,6 +596,47 @@
         html[data-look="dark"] .rs-cell.rs-now{ border-color:#8FB3F5; }
         html[data-look="dark"] .rs-seg button:focus-visible, html[data-look="dark"] .rs-bt:focus-visible, html[data-look="dark"] .rs-go:focus-visible, html[data-look="dark"] .rs-cell:focus-visible{ outline-color:#8FB3F5; }
         html[data-look="dark"] .rs-chart:focus-within .rs-plot{ outline-color:#8FB3F5; }
+        /* 12 Nov 2026 (option A2): "All routes". One scroller (the tab's own), so the headings and the totals stay put;
+           the cells that stay put are solid, or the rows would show through them. */
+        #route-drawer .drawer-head{ flex-wrap:wrap; row-gap:6px; }
+        #drawer-detail{ padding:0 16px; }
+        #drawer-detail > .an-sub{ padding:12px 0; }
+        table.ar-table{ border-collapse:separate; border-spacing:0; width:100%; min-width:780px; font-size:12.5px; }
+        table.ar-table th, table.ar-table td{ padding:4px 6px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); font-weight:400; color:var(--ink); background:var(--surface); }
+        table.ar-table thead th{ position:sticky; top:0; z-index:2; padding:2px 2px; }
+        table.ar-table tfoot th, table.ar-table tfoot td{ position:sticky; bottom:0; z-index:2; font-weight:700; border-top:1.5px solid #94A3B8; border-bottom:0; background:var(--surface-2); }
+        table.ar-table tbody th, table.ar-table tfoot th{ text-align:left; position:sticky; left:0; z-index:1; padding:0 8px 0 0; }
+        .ar-name{ display:inline-block; max-width:300px; overflow:hidden; text-overflow:ellipsis; vertical-align:middle; }
+        table.ar-table tfoot th{ padding:4px 8px 4px 4px; z-index:3; }
+        table.ar-table thead th:first-child{ text-align:left; left:0; z-index:3; }
+        table.ar-table .ar-l{ text-align:left; max-width:150px; overflow:hidden; text-overflow:ellipsis; }
+        /* tonnes are wider figures: the route's name gives them room, so the year still fits the panel at 1422 px */
+        table.ar-table.ar-t .ar-name{ max-width:180px; }
+        table.ar-table.ar-t td{ padding:4px 4px; }
+        table.ar-table td.ar-sum{ font-weight:700; }
+        table.ar-table .ar-now, table.ar-table tr.ar-picked th, table.ar-table tr.ar-picked td{ background:#EFF6FF; }
+        table.ar-table tfoot .ar-now{ background:#E3EDFB; }
+        table.ar-table td.ar-none{ text-align:left; color:var(--muted); padding:12px 0; }
+        .ar-h{ border:0; background:none; font:inherit; font-size:12px; font-weight:600; color:var(--muted); padding:4px 6px; min-height:24px; min-width:24px; cursor:pointer; border-radius:4px; white-space:nowrap; }
+        th.ar-now .ar-h{ color:#1E3A8A; }
+        th[aria-sort="descending"] .ar-h::after{ content:" \25BE"; }
+        th[aria-sort="ascending"] .ar-h::after{ content:" \25B4"; }
+        .ar-rid{ border:0; background:none; font:inherit; font-weight:600; color:#1D4ED8; padding:3px 4px; min-height:24px; min-width:40px; cursor:pointer; border-radius:4px; text-align:left; }
+        .ar-h:focus-visible, .ar-rid:focus-visible, .ar-mat:focus-visible, a.ar-dl:focus-visible{ outline:2px solid #1D4ED8; outline-offset:-2px; }
+        .ar-year button{ min-width:28px; }
+        .ar-year button[disabled]{ color:var(--muted); cursor:default; opacity:.55; }
+        .ar-prev::before{ content:"\25C0"; } .ar-next::before{ content:"\25B6"; }
+        .ar-yr{ padding:5px 9px; font-size:12px; font-weight:700; border-left:1px solid var(--ctl-line); border-right:1px solid var(--ctl-line); background:#EEF3FB; color:#1E3A8A; }
+        .ar-mat{ border:1px solid var(--ctl-line); border-radius:7px; background:var(--surface); color:var(--ink); font:inherit; font-size:12px; font-weight:600; padding:4px 6px; min-height:28px; max-width:150px; }
+        a.ar-dl{ text-decoration:none; display:inline-flex; align-items:center; }
+        .rs-bt[aria-pressed="true"]{ background:#EEF3FB; color:#1E3A8A; }
+        body.drawer-open.drawer-tall #route-drawer{ height:80vh; max-height:80vh; }
+        body.drawer-open.drawer-tall #tl-warnings{ display:none; }     /* the taller table takes the Conditions panel's room; "Taller" again brings it back */
+        html[data-look="dark"] table.ar-table .ar-now, html[data-look="dark"] table.ar-table tr.ar-picked th, html[data-look="dark"] table.ar-table tr.ar-picked td{ background:#202F50; }
+        html[data-look="dark"] table.ar-table tfoot .ar-now{ background:#243560; }
+        html[data-look="dark"] th.ar-now .ar-h, html[data-look="dark"] .ar-rid{ color:#8FB3F5; }
+        html[data-look="dark"] .ar-yr, html[data-look="dark"] .rs-bt[aria-pressed="true"]{ background:#202F50; color:#8FB3F5; }
+        html[data-look="dark"] .ar-h:focus-visible, html[data-look="dark"] .ar-rid:focus-visible, html[data-look="dark"] .ar-mat:focus-visible, html[data-look="dark"] a.ar-dl:focus-visible{ outline-color:#8FB3F5; }
         /* a laptop-height window (650 px: 125 px of content): the same story a little tighter, still without scrolling */
         @media (max-height:680px){ .rs-plot{ height:80px; } .rs-what{ margin:3px 0 2px; } .rs-desc{ margin-bottom:4px; } .rs-inm{ margin:2px 0 1px; } }
         /* the phone's route card: the same line, the months as a picture, one button to the busiest month */
@@ -1464,7 +1498,7 @@
         <div class="share-row">
             <button type="button" class="btn btn-ghost" id="btn-month-text" onclick="openMonthText()">Month as text</button>
             <button type="button" class="btn btn-ghost" id="btn-share" onclick="openSharePanel()">Link and QR code</button>
-            <button type="button" class="btn btn-ghost" id="btn-detail" onclick="openForecastDetail()">Forecast detail table</button>
+            <button type="button" class="btn btn-ghost" id="btn-detail" onclick="openForecastDetail()">All routes by month</button>
             <!-- 14 Oct 2026 (backlog item 2): the route map export, STAFF ONLY (the user, 14 Oct). Hidden until
                  /api/public/whoami says staff; the endpoint refuses anyone else (401) whatever the page shows. -->
             <button type="button" class="btn btn-ghost" id="rme-open" hidden onclick="openRouteExport()">Export route map (plan)</button>
@@ -1599,6 +1633,7 @@
     <button type="button" class="drawer-close" onclick="closeDrawer()" title="Close" aria-label="Close the route panel">&times;</button>
   </div>
   <div class="info-pop rs-info" id="info-route-story" hidden><p id="info-route-story-words"></p><p><a id="info-route-story-guide" href="/help/#ug-map-route-panel" target="_blank" rel="noopener" hidden>User guide</a></p></div>
+  <div class="info-pop rs-info" id="info-all-routes" hidden><p id="info-all-routes-words"></p><p><a id="info-all-routes-guide" href="/help/#ug-map-route-panel" target="_blank" rel="noopener" hidden>User guide</a></p></div>
   <div class="drawer-body" id="drawer-analysis"></div>
   <div class="drawer-body" id="drawer-detail" style="display:none;"></div>
 </div>
@@ -6631,8 +6666,6 @@
                 applyFilters();            // §9: and the cards drop back to the network count
                 status.innerHTML = "";
                 status.style.color = "#6b7280";
-                const bd = document.getElementById('btn-detail'); if(bd) bd.style.display = 'none';
-                if (typeof closeDrawer === 'function' && drawerTab === 'detail') closeDrawer();
                 if (typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon follow
                 return;
             }
@@ -6718,14 +6751,11 @@
                 // 12 Oct 2026 (review §2.2d / §2.2a): Road load and Carbon need ONE month: a month chip or Play gives one
                 if (typeof refreshMapModes === 'function') refreshMapModes();
 
-                const bd = document.getElementById('btn-detail');
                 if (matchCount > 0) {
                     status.innerHTML = `Showing ${matchCount} route(s) with approved forecasts.`;
                     status.style.color = 'var(--ok-text)';   // 10 Nov 2026: the text-grade green (was #059669, 3.76:1)
-                    if (bd) bd.style.display = 'block';
                 } else {
                     status.innerHTML = `<span style="color:${CONFIG.COLORS.peak};">No approved forecasts in this window.</span>`;
-                    if (bd) bd.style.display = 'none';
                 }
             } catch (e) {
                 status.innerHTML = "Could not load the forecasts.";
@@ -6740,7 +6770,6 @@
     let ROUTEINFO = {};                 // route_id(lower) -> {origin,dest,distance_km}
     let selectedRouteId = null;
     let drawerTab = 'analysis';
-    const FCACHE = {};                  // `${lo}-${hi}-${unit}` -> matrix json
 
     const FALLBACK_FACTORS = {
         vehicle_payload_t: { "_default": 20 },
@@ -6797,17 +6826,6 @@
         }
         catch(e){ META.factors=FALLBACK_FACTORS; META.seasonal=[]; }
         META.ready=true;
-    }
-    async function fetchMatrix(unit){
-        // 12 Oct 2026 (D14): the route analysis and the detail table cover the months with volume (no From / To any more)
-        try { await ensureTimelineMatrix(); } catch (e) {}
-        const [f, t] = forecastWindow() || [];
-        if (!f) throw new Error('The months could not be loaded');   // Track C review: no window, no 60-month read
-        const lo=Math.min(f,t), hi=Math.max(f,t), key=lo+'-'+hi+'-'+unit;
-        if(FCACHE[key]) return FCACHE[key];
-        const r=await fetch(CONFIG.API_BASE+'/public/forecast-matrix?from='+lo+'&to='+hi+'&unit='+unit);
-        if(!r.ok) throw new Error('API '+r.status);
-        const j=await r.json(); FCACHE[key]=j; return j;
     }
 
     // 23 Oct 2026 (the user: "more subtle" than the breach red): a clicked route keeps its own green / amber over a soft
@@ -6872,7 +6890,11 @@
         document.getElementById('drawer-detail').style.display   = tab==='detail'?'block':'none';
         document.getElementById('tab-analysis').classList.toggle('active',tab==='analysis');
         document.getElementById('tab-detail').classList.toggle('active',tab==='detail');
-        { const rc = document.getElementById('rs-ctl'); if (rc) rc.hidden = tab !== 'analysis' || !rc.innerHTML; if (typeof closeInfos === 'function') closeInfos(); }   // 12 Nov 2026 (A1)
+        // 12 Nov 2026 (A1, A2): the tab row's switches are the tab's own (each tab draws its own into #rs-ctl)
+        { const rc = document.getElementById('rs-ctl'); if (rc && rc._tab !== tab) { rc._tab = tab; rc._src = null; rc.innerHTML = ''; rc.hidden = true; } if (typeof closeInfos === 'function') closeInfos(); }
+        { const ta = document.getElementById('tab-analysis'); if (ta && typeof RS !== 'undefined') ta.hidden = !RS.rid; }      // no route picked: no "This route"
+        document.body.classList.toggle('drawer-tall', tab === 'detail' && typeof AR !== 'undefined' && AR.tall);
+        if (tab === 'analysis' && typeof RS !== 'undefined' && RS.rid && typeof renderRouteStory === 'function') renderRouteStory();
         document.getElementById('route-drawer').classList.add('open');
         document.body.classList.add('drawer-open');     // 10 Nov 2026 (finding 4): the Conditions panel ends above the drawer
         if (typeof positionWarnStack === 'function') positionWarnStack();
@@ -7092,7 +7114,7 @@
             + '<button type="button" class="rs-bt" data-k="copy" onclick="rsCopy(this)">Copy</button>'
             + '<button type="button" class="info-i" data-k="info" aria-expanded="false" aria-controls="info-route-story" onclick="toggleInfo(this)" title="About these figures" aria-label="About these figures"><span aria-hidden="true">i</span></button>';
     }
-    function rsSetUnit(u) { RS.unit = u === 't' ? 't' : 'count'; renderRouteStory(); }
+    function rsSetUnit(u) { RS.unit = u === 't' ? 't' : 'count'; if (drawerTab === 'detail') renderAllRoutes(); else renderRouteStory(); }
     function rsSetView(v) { RS.view = v === 'table' || v === 'facts' ? v : 'chart'; renderRouteStory(); }
     // the figures the story needs, with no read of its own: the timeline matrix and every month's figures are loaded
     // when the page opens. Only if that one read failed are the route's own months read, one at a time (the page's
@@ -7123,11 +7145,12 @@
         if (!box || !RS.rid) return;
         const rid = RS.rid, names = rsNames(rid), story = RS.story, month = TL.on ? TL.month : null;
         const act = document.activeElement, held = act && (box.contains(act) || (ctl && ctl.contains(act))) ? (act.id || (act.getAttribute && act.getAttribute('data-k'))) : null;
-        if (ctl) {
+        if (ctl && drawerTab === 'analysis') {
             const h = story ? rsCtlHTML(RS.unit, RS.view) : '';
             if (ctl._src !== h) { if (typeof closeInfos === 'function') closeInfos(); ctl._src = h; ctl.innerHTML = h; }
-            ctl.hidden = !story || drawerTab !== 'analysis';
+            ctl.hidden = !story;
         }
+        { const ta = document.getElementById('tab-analysis'); if (ta) ta.hidden = false; }
         const words = document.getElementById('info-route-story-words');
         if (words) words.textContent = 'Approved plan. A month’s loads over its working days. ' + CW().note + ' Click a month to move the map.';
         const guide = document.getElementById('info-route-story-guide');
@@ -7154,8 +7177,9 @@
     }
     // the month moved (or the timeline closed): the open panel's figures and its marked month follow
     function rsOnMonth() {
-        if (!RS.rid || drawerTab !== 'analysis' || !document.body.classList.contains('drawer-open')) return;
-        renderRouteStory();
+        if (!document.body.classList.contains('drawer-open')) return;
+        if (drawerTab === 'detail') { if (typeof renderAllRoutes === 'function') renderAllRoutes(); return; }
+        if (RS.rid) renderRouteStory();
     }
     function rsCopyParts(story, names, link, when) {
         const title = (TENANT.name || 'Wayscope') + (TENANT.demo_notice ? ' (demo)' : '') + ' · ' + names.rid + ' · ' + names.from + ' → ' + names.to;
@@ -7175,7 +7199,9 @@
     function rsCopy(btn) {
         if (!RS.story) return;
         const when = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-        const parts = rsCopyParts(RS.story, rsNames(RS.rid), shareUrl(false), when);
+        rsClip(rsCopyParts(RS.story, rsNames(RS.rid), shareUrl(false), when), btn);
+    }
+    function rsClip(parts, btn) {
         const done = okd => { if (!btn) return; const was = 'Copy'; btn.textContent = okd ? 'Copied' : 'Copy failed'; setTimeout(() => { btn.textContent = was; }, 2000); };
         try {
             if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
@@ -7188,42 +7214,217 @@
     }
     // ===== end of "This route" =====
 
-    const MAT_PALETTE=['#2563EB','#059669','#DC2626','#C6841D','#6D28D9','#0E7490','#9AA7B4'];
-    function materialColorMap(routes){
-        const m={}; let i=0;
-        routes.forEach(r=>{ const k=r.material_type||'—'; if(!(k in m)){ m[k]=MAT_PALETTE[i%MAT_PALETTE.length]; i++; } });
-        return m;
+    // ===== 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2): "All routes" =============================
+    // Every route for ONE year: a row a route (a route's work lines added together), the route and its material in
+    // words, the map's month tinted, a row of totals that stays in view. Drawn from the month figures the page already
+    // holds (KPI.cache), so this tab reads nothing of its own either: the 60-column tonnes table asked the server for
+    // the whole plan again. A count a day is in the organisation's unit (PV(), CW()), as on "This route".
+    const AR = { year: null, month: undefined, mat: '', sort: 'month', tall: false, picked: '' };
+    function arYearRows(months, y, wdDefault) {
+        const by = {};
+        for (let k = 0; k < 12; k++) {
+            const kp = months && months[y * 12 + k + 1];
+            if (!kp) continue;
+            const wd = kp.working_days > 0 ? kp.working_days : wdDefault;
+            (kp.lines || []).forEach(l => {
+                if (!l.route_id) return;
+                const r = by[l.route_id] || (by[l.route_id] = { rid: l.route_id, t: new Array(12).fill(0), aday: new Array(12).fill(0), mats: {} });
+                const q = Number(l.qty_t) || 0, mk = l.material_type || '—';
+                r.t[k] += q;
+                r.aday[k] += wd > 0 ? (Number(l.vehicle_loads) || 0) / wd : 0;
+                r.mats[mk] = (r.mats[mk] || 0) + q;
+            });
+        }
+        return Object.keys(by).map(rid => {
+            const r = by[rid];
+            r.yearT = r.t.reduce((a, b) => a + b, 0);
+            r.peak = Math.max.apply(null, r.aday);
+            r.materials = Object.keys(r.mats).sort((a, b) => (r.mats[b] - r.mats[a]) || a.localeCompare(b));
+            return r;
+        }).filter(r => r.yearT > 0 || r.peak > 0);
+    }
+    // the rows as shown: one material or all, sorted, with their totals. opt: { mat, sort, k (the map's month in the year, 0-11, or null), unit }
+    function arView(rows, opt) {
+        const mats = Array.from(new Set([].concat.apply([], rows.map(r => r.materials)))).sort((a, b) => a.localeCompare(b));
+        const list = rows.filter(r => !opt.mat || r.materials.indexOf(opt.mat) >= 0);
+        const last = r => (opt.unit === 't' ? r.yearT : r.peak);
+        const at = r => (opt.k == null ? last(r) : (opt.unit === 't' ? r.t[opt.k] : r.aday[opt.k]));
+        const byId = (a, b) => String(a.rid).localeCompare(String(b.rid), undefined, { numeric: true });
+        list.sort(opt.sort === 'route' ? byId
+            : opt.sort === 'material' ? ((a, b) => (a.materials[0] || '').localeCompare(b.materials[0] || '') || byId(a, b))
+            : opt.sort === 'last' ? ((a, b) => (last(b) - last(a)) || byId(a, b))
+            : ((a, b) => (at(b) - at(a)) || (last(b) - last(a)) || byId(a, b)));
+        const tot = { t: new Array(12).fill(0), aday: new Array(12).fill(0) };
+        list.forEach(r => { for (let k = 0; k < 12; k++) { tot.t[k] += r.t[k]; tot.aday[k] += r.aday[k]; } });
+        tot.yearT = tot.t.reduce((a, b) => a + b, 0);
+        tot.peak = Math.max.apply(null, tot.aday);
+        return { rows: list, tot, mats };
+    }
+    function arTableHTML(view, y, k, unit, sort, picked, namesOf) {
+        const yr = CONFIG.START_YEAR + y;
+        const few = v => (v > 0 && v < 1 ? '&lt;1' : rsN(v));      // "under 1", short enough for a month's column
+        const cell = (r, i) => { const v = unit === 't' ? r.t[i] : r.aday[i] * PV(); return v > 0 ? (unit === 't' ? fmtN(v, 0) : few(v)) : '–'; };
+        const lastOf = r => (unit === 't' ? fmtN(r.yearT, 0) : few(r.peak * PV()));
+        const srt = key => (sort === key ? ' aria-sort="' + (key === 'route' || key === 'material' ? 'ascending' : 'descending') + '"' : '');
+        const hb = (key, text) => '<button type="button" class="ar-h" data-k="h-' + key + '" onclick="arSort(\'' + key + '\')">' + text + '</button>';
+        let head = '<th scope="col"' + srt('route') + '>' + hb('route', 'Route') + '</th><th scope="col" class="ar-l"' + srt('material') + '>' + hb('material', 'Material') + '</th>';
+        for (let i = 0; i < 12; i++) {
+            const m = y * 12 + i + 1;
+            head += '<th scope="col"' + (i === k ? ' class="ar-now"' + (sort === 'month' ? ' aria-sort="descending"' : '') : '') + '>'
+                + '<button type="button" class="ar-h" data-k="h-m' + m + '" onclick="arMonth(' + m + ')" aria-label="' + RS_MONTHS[i] + ' ' + yr + ': move the map to this month">' + RS_MONTHS[i] + '</button></th>';
+        }
+        head += '<th scope="col"' + srt('last') + '>' + hb('last', unit === 't' ? 'Year' : 'Busiest') + '</th>';
+        let body = '';
+        view.rows.forEach(r => {
+            const nm = namesOf(r.rid), on = !!picked && String(r.rid).trim().toLowerCase() === picked, id = escHtml(r.rid);
+            const where = escHtml(nm.from) + ' → ' + escHtml(nm.to);
+            let tds = '';
+            for (let i = 0; i < 12; i++) tds += '<td' + (i === k ? ' class="ar-now"' : '') + '>' + cell(r, i) + '</td>';
+            body += '<tr' + (on ? ' class="ar-picked"' : '') + '><th scope="row"><button type="button" class="ar-rid" data-k="r-' + id + '" data-rid="' + id + '" onclick="arPick(this.dataset.rid)" aria-pressed="' + on + '"'
+                + ' aria-label="' + (on ? 'Open ' + id + ', this route' : 'Show ' + id + ' on the map') + '">' + id + '</button><span class="ar-name" title="' + where + '"> · ' + where + '</span></th>'
+                + '<td class="ar-l">' + escHtml(r.materials.length > 2 ? r.materials.length + ' materials' : r.materials.join(', ')) + '</td>' + tds + '<td class="ar-sum">' + lastOf(r) + '</td></tr>';
+        });
+        if (!view.rows.length) body = '<tr><td class="ar-none" colspan="15">Nothing approved in ' + yr + '.</td></tr>';
+        let foot = '';
+        if (view.rows.length) {
+            const n = view.rows.length;
+            for (let i = 0; i < 12; i++) foot += '<td' + (i === k ? ' class="ar-now"' : '') + '>' + cell(view.tot, i) + '</td>';
+            foot = '<tfoot><tr><th scope="row">All ' + n + ' route' + (n === 1 ? '' : 's') + '</th><td class="ar-l"></td>' + foot + '<td class="ar-sum">' + lastOf(view.tot) + '</td></tr></tfoot>';
+        }
+        return '<table class="ar-table' + (unit === 't' ? ' ar-t' : '') + '"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody>' + foot + '</table>';
+    }
+    function arCtlHTML(y, y0, y1, mats, mat, unit, tall, staff) {
+        const opts = '<option value="">All materials</option>' + mats.map(m => '<option value="' + escHtml(m) + '"' + (m === mat ? ' selected' : '') + '>' + escHtml(m) + '</option>').join('');
+        const u = (k, on, arg, text) => '<button type="button" data-k="' + k + '" aria-pressed="' + on + '" onclick="rsSetUnit(\'' + arg + '\')">' + text + '</button>';
+        return '<span class="rs-seg ar-year" role="group" aria-label="Year">'
+            + '<button type="button" class="ar-prev" data-k="y-prev" onclick="arYear(-1)" aria-label="Previous year"' + (y <= y0 ? ' disabled' : '') + '></button>'
+            + '<span class="ar-yr" aria-live="polite">' + (CONFIG.START_YEAR + y) + '</span>'
+            + '<button type="button" class="ar-next" data-k="y-next" onclick="arYear(1)" aria-label="Next year"' + (y >= y1 ? ' disabled' : '') + '></button></span>'
+            + '<select id="ar-mat" class="ar-mat" aria-label="Material" onchange="arSetMat(this.value)">' + opts + '</select>'
+            + '<span class="rs-seg" role="group" aria-label="Unit">' + u('u-count', unit !== 't', 'count', CW().col) + u('u-t', unit === 't', 't', 'Tonnes') + '</span>'
+            + '<button type="button" class="rs-bt" data-k="copy" onclick="arCopy(this)">Copy</button>'
+            // the file is for staff (John's call 7): the link is drawn for a staff viewer only, and the server refuses anyone else
+            + (staff ? '<a class="rs-bt ar-dl" data-k="dl" href="/api/routes/forecast-plan.csv?unit=' + (unit === 't' ? 't' : 'count') + '" download>Download</a>' : '')
+            + '<button type="button" class="rs-bt" data-k="tall" aria-pressed="' + !!tall + '" onclick="arTall()">Taller</button>'
+            + '<button type="button" class="info-i" data-k="info" aria-expanded="false" aria-controls="info-all-routes" onclick="toggleInfo(this)" title="About this table" aria-label="About this table"><span aria-hidden="true">i</span></button>';
+    }
+    function arState() {
+        const span = forecastWindow();
+        if (!span) return null;
+        const y0 = Math.floor((span[0] - 1) / 12), y1 = Math.floor((span[1] - 1) / 12), month = TL.on ? TL.month : null;
+        // the year follows the map's month when the month MOVES; the year buttons hold until it does
+        if (month !== AR.month) { AR.month = month; if (month) AR.year = Math.floor((month - 1) / 12); }
+        if (AR.year == null) AR.year = y0;
+        AR.year = Math.min(y1, Math.max(y0, AR.year));
+        const y = AR.year, k = month && Math.floor((month - 1) / 12) === y ? (month - 1) % 12 : null;
+        const rows = arYearRows(KPI.cache, y, FORECAST_WORKING_DAYS);
+        if (AR.mat && !rows.some(r => r.materials.indexOf(AR.mat) >= 0)) AR.mat = '';
+        return { y, y0, y1, k, view: arView(rows, { mat: AR.mat, sort: AR.sort, k, unit: RS.unit }) };
+    }
+    function renderAllRoutes() {
+        const box = document.getElementById('drawer-detail'), ctl = document.getElementById('rs-ctl');
+        if (!box || drawerTab !== 'detail') return;
+        const st = arState();
+        if (!st) {
+            box.innerHTML = '<div class="an-sub">Nothing approved yet.</div>';
+            if (ctl) { ctl._src = ''; ctl.innerHTML = ''; ctl.hidden = true; }
+            return;
+        }
+        const act = document.activeElement, held = act && (box.contains(act) || (ctl && ctl.contains(act))) ? (act.id || (act.getAttribute && act.getAttribute('data-k'))) : null;
+        const top = box.scrollTop, left = box.scrollLeft;
+        if (ctl) {
+            const h = arCtlHTML(st.y, st.y0, st.y1, st.view.mats, AR.mat, RS.unit, AR.tall, RME.staff);
+            if (ctl._src !== h) { if (typeof closeInfos === 'function') closeInfos(); ctl._src = h; ctl.innerHTML = h; }
+            ctl.hidden = false;
+        }
+        const words = document.getElementById('info-all-routes-words');
+        if (words) words.textContent = 'Approved plan, a year at a time. ' + CW().note + ' A route’s number shows it on the map.';
+        const guide = document.getElementById('info-all-routes-guide');
+        if (guide) guide.hidden = !RME.staff;
+        const picked = (typeof selectedRouteId === 'string' || typeof selectedRouteId === 'number') ? String(selectedRouteId).trim().toLowerCase() : '';
+        box.innerHTML = arTableHTML(st.view, st.y, st.k, RS.unit, AR.sort, picked, rsNames);
+        box.scrollTop = top; box.scrollLeft = left;
+        if (picked !== AR.picked) {      // a newly picked route's row is brought into view; the order stays the sort's
+            AR.picked = picked;
+            const row = box.querySelector('tr.ar-picked');
+            if (row && row.scrollIntoView) { try { row.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
+        }
+        if (held) {
+            let again = document.getElementById(held) || box.querySelector('[data-k="' + held + '"]') || (ctl && ctl.querySelector('[data-k="' + held + '"]'));
+            if (again && again.disabled && ctl) again = ctl.querySelector('[data-k="' + (held === 'y-prev' ? 'y-next' : 'y-prev') + '"]');
+            if (again && again.focus) { try { again.focus({ preventScroll: true }); } catch (e) {} }
+        }
+    }
+    function arSort(key) { AR.sort = key === 'route' || key === 'material' || key === 'last' ? key : 'month'; renderAllRoutes(); }
+    // a month's heading moves the map to that month, and the rows follow it (busiest in that month first)
+    function arMonth(m) { AR.sort = 'month'; rsGoMonth(m); renderAllRoutes(); }
+    function arSetMat(v) { AR.mat = v || ''; renderAllRoutes(); }
+    function arYear(d) {
+        AR.year = (AR.year == null ? 0 : AR.year) + (d < 0 ? -1 : 1);
+        if (KPI.allDone) { renderAllRoutes(); return; }
+        arFetchYear().then(renderAllRoutes, renderAllRoutes);
+    }
+    // a route's number: the first click lights the route on the map (the row is tinted), a click on the lit route opens "This route"
+    function arPick(rid) {
+        if (!rid) return;
+        if (String(selectedRouteId == null ? '' : selectedRouteId).trim().toLowerCase() === String(rid).trim().toLowerCase()) { openRouteAnalysis(rid); return; }
+        selectRoute(rid);
+        renderAllRoutes();
+    }
+    function arTall() {
+        AR.tall = !AR.tall;
+        document.body.classList.toggle('drawer-tall', AR.tall && drawerTab === 'detail');
+        if (typeof positionWarnStack === 'function') positionWarnStack();
+        renderAllRoutes();
+    }
+    // only when the one read of every month failed: the months of the year on screen, one at a time (the page's fallback)
+    async function arFetchYear() {
+        const span = forecastWindow();
+        if (!span) return;
+        const y = AR.year == null ? Math.floor(((TL.on ? TL.month : span[0]) - 1) / 12) : AR.year;
+        for (let k = 0; k < 12; k++) {
+            const m = y * 12 + k + 1;
+            if (m < span[0] || m > span[1] || KPI.cache[m]) continue;
+            try { await kpiFetchMonth(m); } catch (e) {}
+        }
+    }
+    function arCopyParts(st, unit, mat, namesOf, link, when) {
+        const yr = CONFIG.START_YEAR + st.y, v = st.view;
+        const title = (TENANT.name || 'Wayscope') + (TENANT.demo_notice ? ' (demo)' : '') + ' · All routes · ' + yr + (mat ? ' · ' + mat : '');
+        const basis = 'Approved plan, ' + (unit === 't' ? 'tonnes a month.' : CW().lower + '.');
+        const cell = (r, i) => { const x = unit === 't' ? r.t[i] : r.aday[i] * PV(); return x > 0 ? (unit === 't' ? fmtN(x, 0) : rsN(x)) : ''; };
+        const lastOf = r => (unit === 't' ? fmtN(r.yearT, 0) : rsN(r.peak * PV()));
+        const head = ['Route', 'From', 'To', 'Material'].concat(RS_MONTHS.map(s => s + ' ' + yr)).concat([unit === 't' ? 'Year' : 'Busiest']);
+        const body = v.rows.map(r => { const nm = namesOf(r.rid); return [r.rid, nm.from, nm.to, r.materials.join(', ')].concat(RS_MONTHS.map((s, i) => cell(r, i))).concat([lastOf(r)]); });
+        if (v.rows.length) body.push(['All ' + v.rows.length + ' route' + (v.rows.length === 1 ? '' : 's'), '', '', ''].concat(RS_MONTHS.map((s, i) => cell(v.tot, i))).concat([lastOf(v.tot)]));
+        const tsv = [title, basis, head.join('\t')].concat(body.map(r => r.join('\t'))).concat(['From the Wayscope public map, ' + when + '. ' + link]).join('\n');
+        const td = (x, n) => '<td style="padding:2px 8px;border:1px solid #ccc;' + (n ? 'text-align:right;' : '') + '">' + escHtml(x) + '</td>';
+        const html = '<p><b>' + escHtml(title) + '</b><br>' + escHtml(basis) + '</p><table style="border-collapse:collapse">'
+            + '<tr>' + head.map((x, i) => '<th style="padding:2px 8px;border:1px solid #ccc;text-align:' + (i > 3 ? 'right' : 'left') + '">' + escHtml(x) + '</th>').join('') + '</tr>'
+            + body.map(r => '<tr>' + r.map((x, i) => td(x, i > 3)).join('') + '</tr>').join('') + '</table>'
+            + '<p>From the Wayscope public map, ' + escHtml(when) + '. <a href="' + escHtml(link) + '">' + escHtml(link) + '</a></p>';
+        return { tsv, html };
+    }
+    function arCopy(btn) {
+        const st = arState();
+        if (!st) return;
+        const when = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        rsClip(arCopyParts(st, RS.unit, AR.mat, rsNames, shareUrl(false), when), btn);
     }
     async function openForecastDetail(){
         showDrawerTab('detail');
         const box=document.getElementById('drawer-detail');
-        box.innerHTML='<div class="an-sub">Loading forecast detail…</div>';
+        // 12 Nov 2026 (option A2): no read of its own. The table is drawn from every month's figures, which the page
+        // loads once when it opens; they are waited for, never asked for again.
+        if (TL.matrix && KPI.allDone) { renderAllRoutes(); return; }
+        box.innerHTML='<div class="an-sub">Loading the routes…</div>';
         try{
-            const mtx=await fetchMatrix('t');
-            const routes=mtx.routes||[];
-            if(!routes.length){ box.innerHTML='<div class="an-sub">No approved forecasts in the selected window.</div>'; return; }
-            const lo=mtx.from, hi=mtx.to, cmap=materialColorMap(routes);
-            // 12 Nov 2026 (map-pick-route, option A): the route picked on the map, if any, comes first (every line of it, one per
-            // material) and its rows are tinted; the rest keep their order (sorted by total). Nothing else about the table changes.
-            const pickedL=(typeof selectedRouteId==='string'||typeof selectedRouteId==='number') ? String(selectedRouteId).trim().toLowerCase() : '';
-            const isPicked=r=>!!pickedL && String(r.route_id||'').trim().toLowerCase()===pickedL;
-            if(pickedL) routes.splice(0,routes.length,...routes.filter(isPicked),...routes.filter(r=>!isPicked(r)));
-            let head='<th>Route</th>'; for(let i=lo;i<=hi;i++) head+='<th>'+monthLabel(i)+'</th>'; head+='<th>Total</th>';
-            let body='';
-            routes.forEach(r=>{
-                let row='<td><span class="mat-chip" style="background:'+cmap[r.material_type||'—']+'"></span>'+r.route_id+'</td>';
-                for(let i=lo;i<=hi;i++){ const v=(r.monthly||{})[i]; row+='<td>'+(v?Math.round(v).toLocaleString():'·')+'</td>'; }
-                row+='<td><b>'+Math.round(r.total||0).toLocaleString()+'</b></td>';
-                body+='<tr'+(isPicked(r)?' class="fc-picked"':'')+'>'+row+'</tr>';
-            });
-            const leg=Object.keys(cmap).map(k=>'<span style="margin-right:14px;white-space:nowrap;"><span class="mat-chip" style="background:'+cmap[k]+'"></span>'+k+'</span>').join('');
-            box.innerHTML =
-                '<div class="an-title">Approved forecast — tonnes of material by month</div>'+
-                '<div class="an-route">Window '+monthLabel(lo)+' – '+monthLabel(hi)+' · '+routes.length+' route(s) · sorted by total</div>'+
-                '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">'+leg+'</div>'+
-                '<div style="overflow:auto;"><table class="fc-matrix"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>';
-        }catch(e){ box.innerHTML='<div class="an-sub">Couldn\'t load the forecast detail.</div>'; }
+            await ensureTimelineMatrix();
+            try { await kpiFetchAll(); } catch (e) { await arFetchYear(); }
+            renderAllRoutes();
+        }catch(e){ box.innerHTML='<div class="an-sub">Couldn\'t load the routes.</div>'; }
     }
+    // ===== end of "All routes" =====
 
     // ===== Directional flow animation + playable forecast timeline =====
     // 12 Oct 2026 (review §3 row 3): the overlay's filter is is_forecast AND the leg toggles

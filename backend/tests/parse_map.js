@@ -1963,7 +1963,7 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   ok("the drawer's carbon words name NO source on the screen, and still say what the figure is (exhaust emissions; each loaded journey and the scheme's share of the empty return)",
      /A planning estimate: exhaust emissions of each loaded journey and the scheme’s share of the empty return\. The same figure as the bar\./.test(code)
      && !/Carbon: DESNZ 2026 factors/.test(code)
-     && (() => { const a = code.indexOf("async function openRouteAnalysis(routeId){"), b = code.indexOf("const MAT_PALETTE="); return a > 0 && b > a && !/DESNZ|DEFRA/.test(code.slice(a, b)); })()
+     && (() => { const a = code.indexOf("async function openRouteAnalysis(routeId){"), b = code.indexOf("async function openForecastDetail(){"); return a > 0 && b > a && !/DESNZ|DEFRA/.test(code.slice(a, b)); })()   // the slice ends at the table's opener since A2 (the colour key it ended at is gone)
      && /DESNZ 2026 conversion factors, exhaust \(tailpipe\) emissions only/.test(fs.readFileSync(path.join(ROOT, "frontend", "help", "technical", "index.html"), "utf8"))
      && !/factors, both legs/.test(code) && !/DEFRA/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; average laden and Config are in T10
 }
@@ -3550,7 +3550,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && !/f\.properties\.type === 'Inbound Highway'/.test(blkCode.slice(blkCode.indexOf("function stampCarbon"), blkCode.indexOf("function carbonMissingLines"))));
   // ---- the drawer: one carbon number, the server's ----
   ok("⭐ C1: the drawer reads the server's co2_t for the sidebar window and works out no carbon of its own (no factor read)",
-     (() => { const a = code.indexOf("async function openRouteAnalysis(routeId){"), b = code.indexOf("const MAT_PALETTE=");
+     (() => { const a = code.indexOf("async function openRouteAnalysis(routeId){"), b = code.indexOf("async function openForecastDetail(){");   // since A2 (the colour key the slice ended at is gone)
               const d = a > 0 && b > a ? code.slice(a, b) : "";
               // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): no matrix read
               // at all; the server's co2_t per line and month comes with the month figures the page already holds
@@ -3991,7 +3991,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      // NARROWED 12 Oct 2026 (Track C review): `|| []` (the window may be null); REVERSED: no matrix is NO window, never
      // the whole horizon (which made the bar ask for up to 60 months)
      /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*let \[fromM, toM\] = forecastWindow\(\)( \|\| \[\])?;/.test(code)
-     && /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*const \[f, t\] = forecastWindow\(\)( \|\| \[\])?;/.test(code)
+     // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"): the panel's own read of
+     // the plan (fetchMatrix) is gone; its two tabs still take the span with volume from forecastWindow, after the matrix
+     && /await ensureTimelineMatrix\(\);\s*\n\s*const span = forecastWindow\(\);/.test(code)
+     && /function arState\(\) \{\s*const span = forecastWindow\(\);\s*if \(!span\) return null;/.test(code) && !/fetchMatrix/.test(code)
      && code.includes("return span ? [span[0], span[1]] : null;") && !code.includes("return span ? [span[0], span[1]] : [1, CONFIG.MONTH_COUNT || 60];"));
   // ---- (4) the hover card's plumbing --------------------------------------------------------------------------------
   ok("C3 hover: routes-source carries generated feature ids (generateId), so a hover can set a feature-state",
@@ -4496,7 +4499,11 @@ function qrRead(mod) {
     ok("⭐ Track C review: with no timeline matrix (its read failed) there is no window and Show forecast asks for NO month (was all 60)",
        !!FW && FW() === null && JSON.stringify(KM()) === "[]" && (TLx.matrix = { span: [9, 11] }, JSON.stringify(KM()) === "[9,10,11]"));
     ok("Track C review: ...and Show forecast routes says the months could not be loaded instead of reading the whole horizon",
-       code.includes('"The months could not be loaded, so no forecast is shown."') && code.includes("if (!f) throw new Error('The months could not be loaded');"));
+       // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"): the panel no longer
+       // reads the plan at all, so with no window there is nothing to ask for: "This route" has no story and "All routes"
+       // says "Nothing approved yet."
+       code.includes('"The months could not be loaded, so no forecast is shown."') && code.includes("if (!span) return null;")
+       && code.includes("box.innerHTML = '<div class=\"an-sub\">Nothing approved yet.</div>';") && !code.includes("to='+hi+'&unit='+unit)"));
   }
   // the section ramp's maximum comes from the server
   ok("⭐ Track C review: the timeline asks forecast-matrix for sections=1 and keeps section_co2_max as sectionCo2Max",
@@ -6194,7 +6201,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && !/<details[^>]*id="(council|moving)-fold"[^>]*\sopen/.test(sb)
      && /function toggleAreaTier\(tier, on\) \{\s*(\/\/[^\n]*\n\s*)?if \(on\) \{ const fold = document\.getElementById\('council-fold'\); if \(fold && !fold\.open\) fold\.open = true; \}/.test(code));
   ok("19 Oct: the share row carries Month as text, Link and QR code, the detail table and (staff) the plan export; 'Report a concern' is in the share card",
-     /<div class="control-group share-group" id="share-group">\s*<div class="share-row">\s*<button[^>]*id="btn-month-text"[^>]*>Month as text<\/button>\s*<button[^>]*id="btn-share"[^>]*>Link and QR code<\/button>\s*<button[^>]*id="btn-detail"[^>]*>Forecast detail table<\/button>/.test(sb)
+     /<div class="control-group share-group" id="share-group">\s*<div class="share-row">\s*<button[^>]*id="btn-month-text"[^>]*>Month as text<\/button>\s*<button[^>]*id="btn-share"[^>]*>Link and QR code<\/button>\s*<button[^>]*id="btn-detail"[^>]*>All routes by month<\/button>/.test(sb)   // REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"), his call 10: the button names what it opens and is always shown
      // NARROWED 5 Nov 2026 (group 6): the share card's slot is now followed by the Report a concern form, then the export card
      && /<div class="concern-slot"><\/div>\s*<\/div>\s*\n\s*<!-- 5 Nov 2026 \(group 6, mockup notes\/report-concern-mockup-1105 cards 2-3\): the Report a concern form\./.test(html)
      // NARROWED 5 Nov 2026 (group 6, UI audit): the panel is a <div role="dialog"> like the share and export panels; an <aside> may not
