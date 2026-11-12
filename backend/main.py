@@ -3528,42 +3528,6 @@ def _export_style(style):
     return k
 
 
-def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community=1, collisions=0):
-    """
-    14 Oct 2026 (backlog item 2; the evening rework, the user: "just the map … add certain scales as in the CLP
-    template") — the route map export's one read: the map as it is filtered, as one of the CLOCS outline CLP template's
-    three plans (route_map_export.PLANS: regional, local, site) at a stated scale. STAFF ONLY (the user, 14 Oct): a
-    valid code or the staff cookie (the map's iframe in the app sends the cookie); the map password's cookie gets 401.
-    The filters are the public map's Route filtering (origin, dest, discipline, team: the slot id or the team's name)
-    and `routes` (comma-separated ids, the Routes page's list). `plan` = regional | local | site; `scale` = the N of 1:N
-    (one the plan offers; regional is fitted to the routes without one); `at` = the place a local or site plan is
-    centred on (by name; the busiest route's site end without one). A team code gets its own team's routes whatever it
-    asks for. Approved lines only (D11). Stores nothing. 8 Nov 2026 (v2.1 item 2.1-2): no `month` = "Approved routes,
-    no month" (route_map_export.sheet_no_month: every approved route, the legs as the map draws them, no figures).
-    """
-    if not _staff_request(request):
-        raise HTTPException(401, "sign in — the route map export is for staff")
-    ids = [x.strip() for x in (routes or "").split(",") if x.strip()] or None
-    S = route_map_export.sheet(month, route_ids=ids, team=team, acc=access.current(), origin=origin, dest=dest,
-                               discipline=discipline)
-    try:
-        # 14 Oct 2026: community=0 is the card's "Leave out the community considerations"
-        # 16 Oct 2026 (CLOCS v5 C1): collisions=1 is the card's "Add the collision history" (off unless ticked)
-        route_map_export.plan(S, plan, scale, at, community=bool(community), collisions=bool(collisions))
-    except route_map_export.PlanError as e:
-        raise HTTPException(422, str(e))
-    return S
-
-
-def _route_map_file(S, month, ext):
-    PL = S["plan"]
-    tail = f"-1-{PL['denom']}" if PL.get("denom") else ""
-    if month is None:          # 8 Nov 2026 (v2.1 item 2.1-2): "Approved routes, no month"
-        return f"route-map-approved-{PL['kind']}{tail}.{ext}"
-    y, m = weeks._month_of(month)
-    return f"route-map-{y}-{m:02d}-{PL['kind']}{tail}.{ext}"
-
-
 def _forecast_plan_csv(unit):
     """The approved plan by route and month as CSV bytes (forecast_plan.table / csv_text), from every APPROVED line as
     /api/public/month-kpis carries it (_month_kpi_line: tonnes, and loads on the line's own payload), so the file's
@@ -3604,6 +3568,42 @@ def routes_forecast_plan_csv(unit: str = Query("count"), request: Request = None
     name = forecast_plan.file_name(unit, counting.per_visit(conversions.load_factors()))
     return Response(content=data, media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+
+
+def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community=1, collisions=0):
+    """
+    14 Oct 2026 (backlog item 2; the evening rework, the user: "just the map … add certain scales as in the CLP
+    template") — the route map export's one read: the map as it is filtered, as one of the CLOCS outline CLP template's
+    three plans (route_map_export.PLANS: regional, local, site) at a stated scale. STAFF ONLY (the user, 14 Oct): a
+    valid code or the staff cookie (the map's iframe in the app sends the cookie); the map password's cookie gets 401.
+    The filters are the public map's Route filtering (origin, dest, discipline, team: the slot id or the team's name)
+    and `routes` (comma-separated ids, the Routes page's list). `plan` = regional | local | site; `scale` = the N of 1:N
+    (one the plan offers; regional is fitted to the routes without one); `at` = the place a local or site plan is
+    centred on (by name; the busiest route's site end without one). A team code gets its own team's routes whatever it
+    asks for. Approved lines only (D11). Stores nothing. 8 Nov 2026 (v2.1 item 2.1-2): no `month` = "Approved routes,
+    no month" (route_map_export.sheet_no_month: every approved route, the legs as the map draws them, no figures).
+    """
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the route map export is for staff")
+    ids = [x.strip() for x in (routes or "").split(",") if x.strip()] or None
+    S = route_map_export.sheet(month, route_ids=ids, team=team, acc=access.current(), origin=origin, dest=dest,
+                               discipline=discipline)
+    try:
+        # 14 Oct 2026: community=0 is the card's "Leave out the community considerations"
+        # 16 Oct 2026 (CLOCS v5 C1): collisions=1 is the card's "Add the collision history" (off unless ticked)
+        route_map_export.plan(S, plan, scale, at, community=bool(community), collisions=bool(collisions))
+    except route_map_export.PlanError as e:
+        raise HTTPException(422, str(e))
+    return S
+
+
+def _route_map_file(S, month, ext):
+    PL = S["plan"]
+    tail = f"-1-{PL['denom']}" if PL.get("denom") else ""
+    if month is None:          # 8 Nov 2026 (v2.1 item 2.1-2): "Approved routes, no month"
+        return f"route-map-approved-{PL['kind']}{tail}.{ext}"
+    y, m = weeks._month_of(month)
+    return f"route-map-{y}-{m:02d}-{PL['kind']}{tail}.{ext}"
 
 
 @app.get("/api/routes/map-export.pdf")

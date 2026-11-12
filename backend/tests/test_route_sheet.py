@@ -564,7 +564,9 @@ ok("⭐ the location form's 'Site rules for drivers' box, sent as null when blan
    and 'site_rules: p.site_rules || ""' in _fe)       # 29 Oct 2026 (task 3c): the form's state gained fields after it
 _mp = read("map/index.html")
 ok("⭐ the public map: the route card and the route analysis both show the typed words, escaped, and only when typed",
-   "function routeWordsHTML(rid)" in _mp and "html += routeWordsHTML(rid);" in _mp and "routeWordsHTML(routeId)+" in _mp
+   # NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A "This route"; John's "Yes, option A"): on a desk the
+   # typed words are on the route panel's Route facts (rsFactsHTML), no longer straight under the old cards
+   "function routeWordsHTML(rid)" in _mp and "html += routeWordsHTML(rid);" in _mp and "rsLorryWords(story) + routeWordsHTML(rid) + dirs" in _mp
    and "escHtml(String(r[1]).trim())" in _mp and ".filter(r => r[1] && String(r[1]).trim())" in _mp)
 # 16 Oct 2026 (browser check): the rules first landed INSIDE the phone-only @media block, so the desktop's route analysis
 # showed the words unstyled at 16 px. Brace depth from the start of the stylesheet to the rule must be 0 (top level).

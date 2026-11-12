@@ -583,6 +583,9 @@
         .rs-card .info-i{ vertical-align:middle; margin-left:4px; }
         .rs-more{ font-size:12px; color:var(--muted); margin-top:8px; }
         .rs-more .route-words{ margin:0 0 4px; }
+        .rs-more .route-words h4{ display:inline; font-size:12px; margin:0 6px 0 0; color:var(--ink); }
+        .rs-more .route-words p{ display:inline; font-size:12px; margin:0 12px 0 0; }
+        .rs-lorry{ display:inline-block; margin:0 12px 4px 0; color:var(--ink); }
         .rs-more a{ color:#1D4ED8; font-weight:600; text-decoration:none; }
         .info-pop.rs-info{ position:absolute; z-index:3; right:16px; top:46px; width:min(320px, calc(100% - 32px)); margin:0; box-shadow:0 8px 24px rgba(16,24,40,.14); }
         .rs-info a{ color:#1D4ED8; font-weight:600; }
@@ -6940,7 +6943,7 @@
     const RS_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const rsN = x => (x > 0 && x < 1 ? 'under 1' : fmtN(x || 0, 0));
     function rsStory(rid, months, wdDefault, lo, hi) {
-        const by = {}, mats = {};
+        const by = {}, mats = {}, lorries = {};
         let first = 0, last = 0, co2Error = false;
         for (let m = lo; m <= hi; m++) {
             const kp = months && months[m];
@@ -6954,6 +6957,10 @@
                 const q = Number(l.qty_t) || 0, k = l.material_type || '—';
                 t += q;
                 mats[k] = (mats[k] || 0) + q;
+                // the lorry by its NAME (14 Oct 2026: vehicle_name is what the map prints, never the stored key), with its load
+                const vn = vehName(l.vehicle_type, l.vehicle_name) || '—';
+                if (!lorries[vn]) lorries[vn] = { name: vn, payload: Number(l.payload_t) || 0, t: 0 };
+                lorries[vn].t += q;
                 // carbon is the server's figure for the line and month; none (no road worked out for its lorry, or the
                 // carbon read failed) is counted, never a zero
                 if (l.co2_t == null || kp.co2_error) { if (q > 0) miss++; } else { co2 += Number(l.co2_t); baked += q; }
@@ -6975,7 +6982,8 @@
             if (!busiest || x.aday > busiest.aday) busiest = x;
         }
         const materials = Object.keys(mats).sort((a, b) => (mats[b] - mats[a]) || a.localeCompare(b));
-        return { rid, months: list, first, last, totalT, totalLoads, co2T, co2BakedT, co2MissingMonths, co2Error, busiest: { m: busiest.m, aday: busiest.aday }, materials };
+        const lorryList = Object.keys(lorries).map(k => lorries[k]).sort((a, b) => (b.t - a.t) || a.name.localeCompare(b.name));
+        return { rid, months: list, first, last, totalT, totalLoads, co2T, co2BakedT, co2MissingMonths, co2Error, busiest: { m: busiest.m, aday: busiest.aday }, materials, lorries: lorryList };
     }
     // "Earthworks / soil · 133,500 t · May 2026 to Aug 2027": what, how much, between which months
     function rsWhat(story) {
@@ -7083,7 +7091,7 @@
         const cycleH = P.avg_haul_speed_kmh > 0 ? (round / P.avg_haul_speed_kmh + (P.load_minutes + P.unload_minutes) / 60) : 0;
         // whole round trips in a driver's day: the server's figure on the routed cycle when the route carries it, else
         // the rough estimate at the average speed (lorryDayTrips, 17 Oct 2026)
-        const fromServer = typeof info.trips_per_day === 'number';
+        const fromServer = typeof info.trips_per_day==='number';
         const trips = fromServer ? info.trips_per_day
             : (cycleH > 0 ? lorryDayTrips(P.shift_hours_per_day, (round/P.avg_haul_speed_kmh)*60, P.load_minutes+P.unload_minutes) : 0);
         const c = (v, l) => '<div class="rs-card"><b>' + v + '</b><span>' + l + '</span></div>';
@@ -7102,9 +7110,14 @@
             + c(story ? fmtN(story.totalLoads, 0) : '—', 'Loads in all')
             + c(any ? story.co2T.toFixed(1) + ' t' : '—', 'CO₂e (est.)' + co2Words + tip)
             + c(any ? (story.co2T * 1000 / story.co2BakedT).toFixed(1) + ' kg' : '—', 'CO₂e a tonne moved')
-            + '</div><div class="rs-more">' + routeWordsHTML(rid) + dirs + '</div>'
+            + '</div><div class="rs-more">' + rsLorryWords(story) + routeWordsHTML(rid) + dirs + '</div>'
             + '<div class="info-pop rs-info" id="info-route-co2" hidden><p>A planning estimate: exhaust emissions of each loaded journey and the scheme’s share of the empty return. The same figure as the bar.</p>'
             + '<p><a href="/help/#ug-map-route-panel" target="_blank" rel="noopener"' + (RME.staff ? '' : ' hidden') + '>User guide</a></p></div></div>';
+    }
+    // "Artic Tipper (44t), 29 t a load": the route's lorry by name with its load (the old caption carried both)
+    function rsLorryWords(story) {
+        if (!story || !story.lorries || !story.lorries.length) return '';
+        return '<span class="rs-lorry">' + escHtml(story.lorries.map(v => v.name + (v.payload > 0 ? ', ' + fmtN(v.payload, 1) + ' t a load' : '')).join('; ')) + '</span>';
     }
     function rsCtlHTML(unit, view) {
         const b = (k, on, fn, arg, text) => '<button type="button" data-k="' + k + '" aria-pressed="' + on + '" onclick="' + fn + '(\'' + arg + '\')">' + text + '</button>';
@@ -7170,7 +7183,8 @@
                 + (RS.view === 'facts' ? rsFactsHTML(rid, story) : rsChartHTML(story, month, RS.unit, false, names)) + '</div>';
         }
         box.innerHTML = html;
-        if (box.scrollHeight > box.clientHeight + 1) { const d = box.querySelector('.rs-desc'); if (d) d.hidden = true; }      // the strip is full: the description gives way
+        // the story does not fit the strip (a long name in a low window): its description line gives way, never a name or a figure
+        { const sEl = box.querySelector('.rs-story'), d = box.querySelector('.rs-desc'); if (sEl && d && sEl.offsetHeight > box.clientHeight - 19) d.hidden = true; }
         if (held) {
             const again = document.getElementById(held) || box.querySelector('[data-k="' + held + '"]') || (ctl && ctl.querySelector('[data-k="' + held + '"]'))
                 || (held === 'go' ? document.getElementById('rs-range') : null);

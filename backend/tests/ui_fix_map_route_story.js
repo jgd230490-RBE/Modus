@@ -74,7 +74,8 @@ for (let m = 1; m <= 60; m++) {
   const routeFigures = new Function(fnSrc("function routeFigures(lines, rid, wd) {") + "\nreturn routeFigures;")();
   const storySrc = fnSrc("function rsStory(rid, months, wdDefault, lo, hi) {");
   ok("⭐ rsStory is in the page and takes its month figures from routeFigures (the phone card's rule)", !!storySrc && storySrc.includes("routeFigures(kp.lines, rid, wd)"));
-  const rsStory = storySrc ? new Function("routeFigures", storySrc + "\nreturn rsStory;")(routeFigures) : () => null;
+  const vehName = (key, name) => name || key;
+  const rsStory = storySrc ? new Function("routeFigures", "vehName", storySrc + "\nreturn rsStory;")(routeFigures, vehName) : () => null;
   const st = rsStory("R050", months, 22, 1, 60) || { months: [], busiest: {}, materials: [] };
   ok("⭐ rsStory (run): R050 works May 2026 to Aug 2027 (months 5 to 20), 16 months listed, 133,500 t, 4,603 loads",
      st.first === 5 && st.last === 20 && st.months.length === 16 && st.totalT === 133500 && Math.round(st.totalLoads) === 4603, [st.first, st.last, st.months.length, st.totalT, st.totalLoads]);
@@ -204,7 +205,14 @@ for (let m = 1; m <= 60; m++) {
   const facts = fnSrc("function rsFactsHTML(rid, story) {");
   ok("⭐ Route facts: six cards with the words put right (One way, by road · Round trip with loading · Round trips a lorry a day · Loads in all · CO₂e (est.) · CO₂e a tonne moved)",
      !!facts && ["'One way, by road'", "'Round trip with loading'", "'Round trips a lorry a day'", "'Loads in all'", "'CO₂e (est.)'", "'CO₂e a tonne moved'"].every(w => facts.includes(w))
-     && (facts.match(/\+ c\(/g) || []).length === 6 && facts.includes("routeWordsHTML(rid)") && facts.includes("Driving directions ↗"));
+     && (facts.match(/\+ c\(/g) || []).length === 6 && facts.includes("routeWordsHTML(rid)") && facts.includes("Driving directions ↗")
+     && html.includes(".rs-more .route-words h4{ display:inline;"));
+  ok("⭐ the lorry is still named, by its NAME and never the stored key, with its load: 'Artic Tipper (44t), 29 t a load' on Route facts' line (the old caption carried both)",
+     TRY(() => { const s2 = rsStory("R050", Object.assign({}, months, { 16: { working_days: 22, lines: [{ route_id: "R050", material_type: "Earthworks / soil", vehicle_type: "artic_44", vehicle_name: "Artic Tipper (44t)", payload_t: 29, qty_t: 42000, vehicle_loads: 1448.276 }] } }), 22, 16, 16);
+                 const f = new Function("escHtml", "fmtN", fnSrc("function rsLorryWords(story) {") + "\nreturn rsLorryWords;")(escHtml, fmtN);
+                 return s2.lorries.length === 1 && s2.lorries[0].name === "Artic Tipper (44t)" && f(s2) === '<span class="rs-lorry">Artic Tipper (44t), 29 t a load</span>' && f(null) === ""
+                        && !f(s2).includes("artic_44"); })
+     && html.includes("const vn = vehName(l.vehicle_type, l.vehicle_name) || '—';") && html.includes("rsLorryWords(story) + routeWordsHTML(rid) + dirs"));
   ok("a failed carbon read says so and a month with no figure is 'not routed yet' (two different states); a lorry that cannot make one round trip in a day says why",
      !!facts && facts.includes("story.co2Error ? ', carbon could not be read'") && facts.includes("' not routed yet'") && facts.includes("'one round trip does not fit a driver\\'s day'")
      && rsStory("R050", Object.assign({}, months, { 16: Object.assign({}, months[16], { co2_error: "x" }) }), 22, 1, 60).co2Error === true && st.co2Error === false);
@@ -229,7 +237,7 @@ for (let m = 1; m <= 60; m++) {
      && html.includes("@media (max-height:680px){ .rs-plot{ height:80px; }"));
   ok("⭐ a place name is NEVER cut on 'This route': the number and team drop to the line below when the two do not fit, then the name wraps; if the strip is then full the description line gives way",
      css(".rs-title").includes("flex-wrap:wrap;") && !/ellipsis|nowrap|overflow:hidden/.test(css(".rs-title span")) && css(".rs-title small").includes("white-space:nowrap;")
-     && html.includes("if (box.scrollHeight > box.clientHeight + 1) { const d = box.querySelector('.rs-desc'); if (d) d.hidden = true; }"));
+     && html.includes("{ const sEl = box.querySelector('.rs-story'), d = box.querySelector('.rs-desc'); if (sEl && d && sEl.offsetHeight > box.clientHeight - 19) d.hidden = true; }"));
   ok("⭐ the four figures stay on one line, and the pale bars are 3:1 against the panel (#6690E3 on white)",
      css(".rs-figs").includes("display:flex;") && !css(".rs-figs").includes("wrap") && css(".rs-col i").includes("background:#6690E3;"));
   ok("⭐ after the busiest-month button has done its job (it is no longer a button on that month) the keyboard is on the months, not lost",
