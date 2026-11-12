@@ -684,7 +684,7 @@ ok("⭐ card 4 PDF: the planned and recorded tonnes come first, with their table
 # the screen (one line ran to 26 words and failed the audit's long-prose rule); the words themselves do not change
 _ptl = [ln.strip() for ln in (_pdf_text(_pdf) or "").splitlines()]
 ok("🔴 D-F8 PDF: the recorded line starts a line of its own; no line runs the limit and the recorded words together",
-   any(ln.startswith("Recorded tonnes as typed on Account, to 11 Oct 2026.") for ln in _ptl)
+   any(ln.startswith("Recorded tonnes as typed on Account, weeks to 5 Oct 2026.") for ln in _ptl)   # REVERSED 12 Nov 2026 (batch 2, D-F3 on D-F8): the week's Monday, "weeks to"
    and not any("arrival times." in ln and "Recorded tonnes" in ln for ln in _ptl),
    str([ln for ln in _ptl if "Recorded tonnes" in ln or "arrival times." in ln][:4]))
 ok("D-F8: each of the two note lines stays within the long-prose rule (25 words): the scope + limit, and the recorded line",
