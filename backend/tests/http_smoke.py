@@ -842,8 +842,17 @@ with TestClient(main.app, base_url="https://testserver") as c:
                and r.headers.get("cache-control") == "no-store" and len(_lp) == 1
                and "demo fictional scheme" in " ".join(_lp[0].split()).lower() and all(f in _lp[0] for f in _figs) and "Key points" in _lp[0],     # NARROWED 14 Oct 2026; and 15 Oct (the wording)
                f"{r.status_code} {len(_lp)}")
-            ok("⭐ D43 the newsletter PDF over HTTP is four pages, the brand band on each",
-               len(_bp) == 4 and all("Lorry movements bulletin · October 2026" in x for x in _bp), f"{len(_bp)} " + " || ".join(x[:160] for x in _bp))
+            # NARROWED 11 Nov 2026 (card M-F1): the demo package carries a public traffic limit (Z041, as on live since 11 Nov), so
+            # page 4's ledger gains its row ("Forecast against the limits") and the sources start a fifth page
+            # REVERSED 12 Nov 2026 (batch 6: claude/bulletin-print-fixes with the newsletter's fit ladder and A-F8): four pages
+            # again with the public traffic limit, the limit printed once (page 2's works table), page 4 keeping its glance row
+            # and every source
+            ok("⭐ D43 the newsletter PDF over HTTP is four pages with a public traffic limit, the brand band on each",
+               len(_bp) == 4 and all("Lorry movements bulletin · October 2026" in x for x in _bp)
+               and "B6047" in _bp[1] and "This month, a day:" in _bp[1]
+               and "Forecast against the limits" in _bp[3] and "Boundaries: ONS Local Authority Districts" in _bp[3]
+               and "4 of 4" in _bp[3] and "ROUTES AND ROADS (CONTINUED)" not in " ".join(_bp),
+               f"{len(_bp)} " + " || ".join(x[:160] for x in _bp))
             r = c.get("/bulletin/leaflet/?month=10", headers=PLAN)
             ok("⭐ the leaflet page over HTTP with a code: HTML, not cached, the band, the figures, a link to its PDF",
                r.status_code == 200 and r.headers.get("content-type", "").startswith("text/html")

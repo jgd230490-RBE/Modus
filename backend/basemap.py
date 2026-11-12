@@ -329,6 +329,17 @@ def bar_metres(v, target_px):
     return best, best / mpp
 
 
+def bar_miles(v, target_px):
+    """11 Nov 2026 (card A-F3): (miles, px): a scale-bar length of 0.5, 1, 2, 5, 10 ... miles, the longest not over
+    target_px image pixels (bar_metres's rule, in miles), for an organisation that reads miles."""
+    mpp = m_per_px(v["lat"], v["zoom"])
+    want, best = target_px * mpp / 1609.344, 0.5
+    for x in (0.5, 1, 2, 5, 10, 20, 50, 100, 200):
+        if x <= want:
+            best = x
+    return best, best * 1609.344 / mpp
+
+
 def length_words(metres):
     return f"{metres / 1000:g} km" if metres >= 1000 else f"{metres:g} m"
 
