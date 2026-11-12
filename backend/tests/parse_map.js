@@ -285,26 +285,38 @@ ok("⭐ B2: the map's only emissions fallback literal is the published 0.89743 �
   && !/pick\(F\.vehicle_emissions_kg_co2e_per_km,\s*veh\)\s*\|\|\s*0\.9/.test(code));
 // NARROWED 12 Oct 2026 (the review and fix pass): the drawer sums EVERY forecast-matrix row of the route (one row per
 // discipline and section) — it read the first row only, under a caption that called it the bar's figure
-ok("⭐ B2: the drawer reads co2_t per month from forecast-matrix for EVERY line of the route and sums the baked line-months",
-  /const rows=\(mtx\.routes\|\|\[\]\)\.filter\(r=>\(r\.route_id\|\|''\)\.toString\(\)\.trim\(\)\.toLowerCase\(\)===rl\);/.test(code)
-  && /rows\.forEach\(rw=>\{[\s\S]{0,400}const co2m=rw\.co2_t\|\|\{\};[\s\S]{0,400}if\(c==null\)\{ unbakedMonths\[k\]=true; \} else \{ co2t\+=c; bakedT\+=mt; co2LineMonths\+\+; \}/.test(code)
+// NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the panel no longer reads
+// forecast-matrix at all; the same server co2_t, per line and month, comes from the month figures the page holds
+// (month-kpis), summed over EVERY line of the route; a line with no figure is counted, never a zero
+ok("⭐ B2: the drawer reads the server's co2_t per month for EVERY line of the route and sums the routed line-months",
+  /\(kp\.lines \|\| \[\]\)\.forEach\(l => \{\s*if \(l\.route_id !== rid\) return;[\s\S]{0,700}if \(l\.co2_t == null \|\| kp\.co2_error\) \{ if \(q > 0\) miss\+\+; \} else \{ co2 \+= Number\(l\.co2_t\); baked \+= q; \}/.test(code)
   && !/const row=\(mtx\.routes\|\|\[\]\)\.find\(/.test(code)
   && !/trips\*round\*emis\/1000/.test(code) && !/const emis=/.test(code));
 // NARROWED 12 Oct 2026 (the review and fix pass): "(est.)" is back on the label, the server's planning-estimate stamp is
 // printed under the cards, a failed carbon read says so (it used to blame a missing route), and the wording says
 // "no stored road route" instead of the team's word "baked"
+// NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the card is one of six short
+// cards; the dash and "not routed yet" stay, the months left out are counted on the card's own label, and "The same
+// figure as the bar." is in the card's "i"
 ok("B2: no stored route shows a dash and says so, never an estimate; a partly stored window names the months it excludes",
-  /card\('—','CO₂e \(est\.\)','not routed for this lorry yet'\)/.test(code)   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"; the route card no longer says "read from the server"
-  && /' · excl\. '\+unbakedM\+' month'\+\(unbakedM>1\?'s':''\)\+' not routed yet'/.test(code)
-  && /The same figure as the bar above\.'/.test(code) && !/Read from the server/.test(code)
+  /c\(any \? story\.co2T\.toFixed\(1\) \+ ' t' : '—', 'CO₂e \(est\.\)' \+ co2Words \+ tip\)/.test(code)   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"; the route card no longer says "read from the server"
+  && /any && mm \? ', ' \+ mm \+ ' month' \+ \(mm > 1 \? 's' : ''\) \+ ' not routed yet' : \(story && !any \? ', not routed yet' : ''\)/.test(code)
+  && /The same figure as the bar\.</.test(code) && !/Read from the server/.test(code)
   && !/The same figure as the bar above and the Dashboard, read from the server\./.test(code)
   && !/route not baked for this vehicle/.test(code));
-ok("⭐ the drawer's CO2e card is labelled an estimate and carries the server's planning-estimate stamp (forecast-matrix carbon_stamp)",
-  /card\(co2t\.toFixed\(1\)\+' t','CO₂e \(est\.\)'/.test(code)
-  && /\(mtx\.carbon_stamp\?' '\+mtx\.carbon_stamp\+'\.':''\)/.test(code));
-ok("⭐ a failed carbon read (forecast-matrix co2_error) reads 'carbon could not be read', never 'not stored'",
-  /const co2Card=mtx\.co2_error\s*\n\s*\? card\('—','CO₂e \(est\.\)','carbon could not be read'\)/.test(code)
-  && /const anyBaked=co2LineMonths>0 && !mtx\.co2_error;/.test(code));
+// REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"), his call 5: the stamp names
+// its source, so it left the panel with the 34-word note; the card is still labelled an estimate, its "i" opens with
+// "A planning estimate", and the stamp's words are in the technical guide (#t1-route-story). The carbon legend keeps its own.
+ok("⭐ the drawer's CO2e card is labelled an estimate; the server's planning-estimate stamp is no longer printed in the panel (the 'i' says 'A planning estimate', the guide has the stamp's words)",
+  /'CO₂e \(est\.\)' \+ co2Words \+ tip/.test(code) && !/mtx\.carbon_stamp/.test(code)
+  && /id="info-route-co2" hidden><p>A planning estimate: /.test(code)
+  && /not Carbon Tool figures/.test(fs.readFileSync(path.join(ROOT, "frontend", "help", "technical", "index.html"), "utf8")));
+// NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the flag is the month
+// read's own co2_error now (the panel reads no matrix); the words and the rule are the same
+ok("⭐ a failed carbon read (the month figures' co2_error) reads 'carbon could not be read', never 'not routed'",
+  /if \(kp\.co2_error\) co2Error = true;/.test(code)
+  && /const co2Words = story && story\.co2Error \? ', carbon could not be read'/.test(code)
+  && /const any = !!story && story\.co2BakedT > 0 && !story\.co2Error,/.test(code));
 ok("no label in the bar is uppercase microtext", !/\.kpi-label\{[^}]*text-transform:uppercase/.test(html)
   && !/\.kpi-label\{[^}]*font-size:9/.test(html));
 ok("the KPI block is outside the sidebar element",
@@ -1949,11 +1961,20 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   const strings = (code.match(/'[^'\r\n]*'|"[^"\r\n]*"|`[^`]*`/g) || []).filter(s => !/^['"`]\s*$/.test(s));
   const trucks = strings.filter(s => /\btrucks?\b/i.test(s) && !/Truck mixer/.test(s));
   ok("🔴 no 'truck' in any string the public map prints (lorry / HGV)", trucks.length === 0, trucks.slice(0, 3).join(" | "));
-  ok("the drawer's figures say lorry", /'Trips \/ day \/ lorry'/.test(code) && /'Lorries for peak'/.test(code));
+  // REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"), his call 4: six cards
+  // for ten; "Trips / day / lorry" reads "Round trips a lorry a day" and "Lorries for peak" is gone (the story names the
+  // busiest month and its vehicles)
+  ok("the drawer's figures say lorry", /'Round trips a lorry a day'/.test(code) && !/'Trips \/ day \/ lorry'/.test(code) && !/'Lorries for peak'/.test(code));
   // REVERSED 10 Nov 2026 (live test finding 7; John's yes to notes/map-drawer-polish-mockup-1110 Q3): since the return
   // journey rule (8 Nov) the figure is the loaded journey + the share of the way back the route charges, not "both legs"
-  ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025, and says what the figure is (tailpipe only; each loaded journey and the scheme's share of the empty return)",
-     /Carbon: DESNZ 2026 factors, tailpipe only\. Each loaded journey and the scheme’s share of the empty return\. The same figure as the bar above\./.test(code)
+  // REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"), his call 5: the note
+  // (34 words, its source named twice) left the screen. What the figure is stays, in the card's "i"; DESNZ 2026 is named in
+  // the guides (user guide A.1, technical #t1-route-story), never on the panel
+  ok("the drawer's carbon words name NO source on the screen, and still say what the figure is (exhaust emissions; each loaded journey and the scheme's share of the empty return)",
+     /A planning estimate: exhaust emissions of each loaded journey and the scheme’s share of the empty return\. The same figure as the bar\./.test(code)
+     && !/Carbon: DESNZ 2026 factors/.test(code)
+     && (() => { const a = code.indexOf("async function openRouteAnalysis(routeId){"), b = code.indexOf("async function openForecastDetail(){"); return a > 0 && b > a && !/DESNZ|DEFRA/.test(code.slice(a, b)); })()   // the slice ends at the table's opener since A2 (the colour key it ended at is gone)
+     && /DESNZ 2026 conversion factors, exhaust \(tailpipe\) emissions only/.test(fs.readFileSync(path.join(ROOT, "frontend", "help", "technical", "index.html"), "utf8"))
      && !/factors, both legs/.test(code) && !/DEFRA/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; average laden and Config are in T10
 }
 
@@ -2747,14 +2768,19 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && !/'line-color':\s?CONFIG\.COLORS\.forecast,\s?'line-width':\s?3\.5/.test(code));
   ok("...and the routes stay blue: the forecast colour is untouched", (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
   // the drawer's half of review bug (d)
-  ok("⭐ row 3 (d), the drawer: a route's analysis counts EVERY approved line of the route, not the first one find() met",
-     code.includes("const rows=(mtx.routes||[]).filter(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);")
-     && code.includes("const totalT=rows.reduce((a,r)=>a+(r.total||0),0);")
+  // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the route's story is
+  // built from the month figures, every line of the route in every month (routeFigures adds the lines' loads and vehicles,
+  // rsStory their tonnes and the server's co2_t); loads are the server's vehicle_loads on each line's own payload, no longer
+  // rounded up per line in the page; the "N approved lines: ..." caption gave way to the one line that names the materials
+  ok("⭐ row 3 (d), the drawer: a route's story counts EVERY approved line of the route, not the first one find() met",
+     code.includes("const f = routeFigures(kp.lines, rid, wd);")
+     && /\(kp\.lines \|\| \[\]\)\.forEach\(l => \{\s*if \(l\.route_id !== rid\) return;/.test(code)
+     && code.includes("totalT += x.t; totalLoads += x.loads; co2T += x.co2; co2BakedT += x.baked;")
      // NARROWED 12 Oct 2026 (the base merge of Track A and Track B): the per-line carbon is no longer worked out in the
      // page (trips × round trip × factor); every line's trips use its own payload and its CO2e is the server's co2_t
-     && code.includes("trips+=pl>0?Math.ceil((rw.total||0)/pl):0;") && code.includes("const co2m=rw.co2_t||{};")
+     && code.includes("co2 += Number(l.co2_t); baked += q;")
      && !code.includes("co2t+=t*round*em/1000")
-     && code.includes("rows.length+' approved lines: '")
+     && code.includes("const mat = names.length > 2 ? names.length + ' materials' : names.join(', ');")
      && !code.includes("const row=(mtx.routes||[]).find(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);"));
   // the zone popup speaks the legend's words, and its routing line is not red
   {
@@ -3537,9 +3563,11 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && !/f\.properties\.type === 'Inbound Highway'/.test(blkCode.slice(blkCode.indexOf("function stampCarbon"), blkCode.indexOf("function carbonMissingLines"))));
   // ---- the drawer: one carbon number, the server's ----
   ok("⭐ C1: the drawer reads the server's co2_t for the sidebar window and works out no carbon of its own (no factor read)",
-     (() => { const a = code.indexOf("async function openRouteAnalysis(routeId){"), b = code.indexOf("const MAT_PALETTE=");
+     (() => { const a = code.indexOf("async function openRouteAnalysis(routeId){"), b = code.indexOf("async function openForecastDetail(){");   // since A2 (the colour key the slice ended at is gone)
               const d = a > 0 && b > a ? code.slice(a, b) : "";
-              return d.includes("const mtx=await fetchMatrix('t');") && d.includes("const co2m=rw.co2_t||{};")
+              // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): no matrix read
+              // at all; the server's co2_t per line and month comes with the month figures the page already holds
+              return !/fetchMatrix\(/.test(d) && d.includes("await kpiFetchAll();") && d.includes("co2 += Number(l.co2_t); baked += q;")
                      && !/vehicle_emissions_kg_co2e_per_km/.test(d) && !/round\s*\*\s*em/.test(d) && !/\*\s*emis/.test(d); })());
   // ---- the product rules ----
   ok("C1: no literal working-day divisor in the block (the server's movements_per_day; never 22)", !/\b22\b/.test(blkCode));
@@ -3976,7 +4004,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      // NARROWED 12 Oct 2026 (Track C review): `|| []` (the window may be null); REVERSED: no matrix is NO window, never
      // the whole horizon (which made the bar ask for up to 60 months)
      /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*let \[fromM, toM\] = forecastWindow\(\)( \|\| \[\])?;/.test(code)
-     && /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*const \[f, t\] = forecastWindow\(\)( \|\| \[\])?;/.test(code)
+     // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"): the panel's own read of
+     // the plan (fetchMatrix) is gone; its two tabs still take the span with volume from forecastWindow, after the matrix
+     && /await ensureTimelineMatrix\(\);\s*\n\s*const span = forecastWindow\(\);/.test(code)
+     && /function arState\(\) \{\s*const span = forecastWindow\(\);\s*if \(!span\) return null;/.test(code) && !/fetchMatrix/.test(code)
      && code.includes("return span ? [span[0], span[1]] : null;") && !code.includes("return span ? [span[0], span[1]] : [1, CONFIG.MONTH_COUNT || 60];"));
   // ---- (4) the hover card's plumbing --------------------------------------------------------------------------------
   ok("C3 hover: routes-source carries generated feature ids (generateId), so a hover can set a feature-state",
@@ -4485,7 +4516,11 @@ function qrRead(mod) {
     ok("⭐ Track C review: with no timeline matrix (its read failed) there is no window and Show forecast asks for NO month (was all 60)",
        !!FW && FW() === null && JSON.stringify(KM()) === "[]" && (TLx.matrix = { span: [9, 11] }, JSON.stringify(KM()) === "[9,10,11]"));
     ok("Track C review: ...and Show forecast routes says the months could not be loaded instead of reading the whole horizon",
-       code.includes('"The months could not be loaded, so no forecast is shown."') && code.includes("if (!f) throw new Error('The months could not be loaded');"));
+       // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"): the panel no longer
+       // reads the plan at all, so with no window there is nothing to ask for: "This route" has no story and "All routes"
+       // says "Nothing approved yet."
+       code.includes('"The months could not be loaded, so no forecast is shown."') && code.includes("if (!span) return null;")
+       && code.includes("box.innerHTML = '<div class=\"an-sub\">Nothing approved yet.</div>';") && !code.includes("to='+hi+'&unit='+unit)"));
   }
   // the section ramp's maximum comes from the server
   ok("⭐ Track C review: the timeline asks forecast-matrix for sections=1 and keeps section_co2_max as sectionCo2Max",
@@ -6135,17 +6170,24 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   }
   // NARROWED 17 Oct 2026 (the review): the card reads the server's figure on the routed cycle when the route carries it
   // (the rough estimate only without), and a 0 says why in words
-  ok("the drawer's card names the day: the shift less breaks, at most 9 h driving; whole trips, the literal kept",
-     code.includes("card(String(tripsPerDay),'Trips / day / lorry', tripsPerDay>0")
-     && code.includes("'@ '+Math.min(13, P.shift_hours_per_day)+' h shift less breaks, at most 9 h driving, '")
-     && code.includes("Math.min(13, P.shift_hours_per_day)+' h shift less the break, max 9 h driving'")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
-     && code.includes(": 'one round trip does not fit a driver\\'s day')"));
+  // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"), his call 4: the card is
+  // "Round trips a lorry a day", a figure and a label; the shift and the 9 h are in the guides (user guide A.2). A 0 still
+  // says why in words, the literal kept
+  ok("the drawer's card is whole round trips a lorry a day; a 0 says why in words, the literal kept (the shift and the 9 h driving are in the guide)",
+     code.includes("c(String(trips), trips > 0 ? 'Round trips a lorry a day' : 'one round trip does not fit a driver\\'s day')")
+     && !code.includes("h shift less the break, max 9 h driving'") && !code.includes("h shift less breaks, at most 9 h driving, '")
+     && /Shift hours per/.test(fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8")));
   ok("⭐ the review: the drawer prefers the server's trips a day and cycle (feature properties), and 0 trips counts one lorry a trip",
-     code.includes("const tripsPerDay = fromServer ? info.trips_per_day")
+     // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the same preference
+     // (the server's trips a day and cycle from the feature properties); the cycle card reads "Round trip with loading"
+     // ("(est.)" on the rough figure); the panel no longer works out "lorries for peak" of its own: a month's vehicles are
+     // routeFigures', on the server's trips a lorry a day, and a line without them is counted, never divided by zero
+     code.includes("const trips = fromServer ? info.trips_per_day")
      && code.includes("if(cur.trips_per_day==null && typeof f.properties.trips_per_day==='number')")
-     && code.includes("card(info.cycle_hr.toFixed(2)+' h','Haul cycle','driving both ways, plus gate and handling')")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): plain words
-     && code.includes("Math.ceil(peakLoads/(Math.max(1, tripsPerDay)*P.working_days_per_month))")
-     && !code.includes("(tripsPerDay>0)?Math.ceil(peakLoads/"));
+     && code.includes("const cyc = fromServer && typeof info.cycle_hr === 'number' ? info.cycle_hr : cycleH;")
+     && code.includes("c(cyc.toFixed(2) + ' h', 'Round trip with loading' + (fromServer ? '' : ' (est.)'))")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): plain words
+     && code.includes("if (l.trips_per_vehicle_day > 0) vehicles += Math.ceil((vl / wd) / l.trips_per_vehicle_day); else unbaked++;")
+     && !code.includes("Math.ceil(peakLoads/") && !code.includes("(tripsPerDay>0)?Math.ceil(peakLoads/"));
   if (grabLD) {
     const lorryDayTrips = new Function(grabLD[0] + "; return lorryDayTrips;")();
     // REVERSED 18 Oct 2026 (the user: the law allows the 45 as 15 + 30): was "the twin knows the second break past 12 h"
@@ -6184,7 +6226,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && !/<details[^>]*id="(council|moving)-fold"[^>]*\sopen/.test(sb)
      && /function toggleAreaTier\(tier, on\) \{\s*(\/\/[^\n]*\n\s*)?if \(on\) \{ const fold = document\.getElementById\('council-fold'\); if \(fold && !fold\.open\) fold\.open = true; \}/.test(code));
   ok("19 Oct: the share row carries Month as text, Link and QR code, the detail table and (staff) the plan export; 'Report a concern' is in the share card",
-     /<div class="control-group share-group" id="share-group">\s*<div class="share-row">\s*<button[^>]*id="btn-month-text"[^>]*>Month as text<\/button>\s*<button[^>]*id="btn-share"[^>]*>Link and QR code<\/button>\s*<button[^>]*id="btn-detail"[^>]*>Forecast detail table<\/button>/.test(sb)
+     /<div class="control-group share-group" id="share-group">\s*<div class="share-row">\s*<button[^>]*id="btn-month-text"[^>]*>Month as text<\/button>\s*<button[^>]*id="btn-share"[^>]*>Link and QR code<\/button>\s*<button[^>]*id="btn-detail"[^>]*>All routes by month<\/button>/.test(sb)   // REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"), his call 10: the button names what it opens and is always shown
      // NARROWED 5 Nov 2026 (group 6): the share card's slot is now followed by the Report a concern form, then the export card
      && /<div class="concern-slot"><\/div>\s*<\/div>\s*\n\s*<!-- 5 Nov 2026 \(group 6, mockup notes\/report-concern-mockup-1105 cards 2-3\): the Report a concern form\./.test(html)
      // NARROWED 5 Nov 2026 (group 6, UI audit): the panel is a <div role="dialog"> like the share and export panels; an <aside> may not
@@ -6358,7 +6400,9 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   ok("...the rule is real: it catches the old sentences, and the new words are on the page",
      OLD.every(x => MAP_BAN.some(r => r.test(x)))
      && noComments.includes("not routed yet") && noComments.includes("No routes are worked out yet.")
-     && noComments.includes("For information only: routes do not avoid these.") && noComments.includes("The same figure as the bar above."));
+     // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the sentence is
+     // in the carbon "i" now, without "above" (the bar is not above an "i")
+     && noComments.includes("For information only: routes do not avoid these.") && noComments.includes("The same figure as the bar."));
   const visibleHere = (noComments.match(/['"`>][^'"`<\n]*\bHERE\b[^'"`<\n]*/g) || []).filter(s => !/src\.has\('here'\)/.test(s));
   ok("...HERE is named only in the lorry limits' credit (OpenStreetMap contributors and HERE)",
      visibleHere.every(s => /OpenStreetMap contributors and HERE/.test(s) || s === "'HERE"), visibleHere.join(" | "));
@@ -8262,10 +8306,17 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      html.includes("body.has-demo-notice #share-panel, body.has-demo-notice #rme-panel{ top:calc(50% + var(--notice-h, 26px) / 2); max-height:calc(100vh - 24px - var(--notice-h, 26px)); }")
      && html.indexOf("body.has-demo-notice #share-panel, body.has-demo-notice #rme-panel{") > html.indexOf("#rme-panel{ position:fixed;"));
   ok("⭐ CARBON WORDS (finding 7: R045 charges 43 % of the way back, the card said 'both legs'): the CO₂e card says what is counted, true for all three return journeys",
-     code.includes("card(co2t.toFixed(1)+' t','CO₂e (est.)','loaded, plus the scheme’s share of the return'+(unbakedM?")
-     && !code.includes("'both legs'") && !/CO₂e \(est\.\)','both legs/.test(code));
-  ok("CARBON WORDS: the distance cards are unchanged (the lorry does drive the round trip) and the new words name no setting, share or method",
-     code.includes("'Round trip','Loaded out, empty back'") && code.includes("'Total trips','one-way loaded runs'")
+     // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): what is counted is
+     // said in the card's "i" (the card is a figure and a label now), in words still true for all three return journeys
+     code.includes("exhaust emissions of each loaded journey and the scheme’s share of the empty return")
+     && code.includes("'CO₂e (est.)' + co2Words + tip")
+     && !code.includes("'both legs'") && !/CO₂e \(est\.\)','both legs/.test(code) && !/both legs/.test(code.slice(code.indexOf("function rsFactsHTML"), code.indexOf("function rsCtlHTML"))));
+  // REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"), his call 4: the
+  // round-trip distance card and "Total trips · one-way loaded runs" are gone (six cards for ten): the one-way distance and
+  // "Loads in all" stay. The carbon words still name no setting, share or method
+  ok("CARBON WORDS: the distance card is the one-way distance and the loads card reads 'Loads in all' (were four cards); the carbon words name no setting, share or method",
+     code.includes("'One way, by road'") && code.includes("'Loads in all'")
+     && !code.includes("'Round trip','Loaded out, empty back'") && !code.includes("'Total trips','one-way loaded runs'")
      && !/scheme’s share[^']*(43|per cent|%|return_mode|RICS)/.test(code));
 }
 

@@ -67,6 +67,7 @@ import limits        # 13 Oct 2026 — lorry limits (weight / height / width) fr
 import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the map bar's month roll-up + the conditions of the month
 import route_sheet  # 16 Oct 2026 — the route sheet for drivers (CLOCS v5 C3)
 import route_map_export  # 14 Oct 2026 — the route map export (backlog item 2): the map as filtered, as a PDF
+import forecast_plan  # 12 Nov 2026 — the approved plan by route and month as a CSV (the public map's "All routes", staff Download)
 import community     # 14 Oct 2026 — the community considerations layer (staff map and the CLP plans)
 import collisions    # 16 Oct 2026 — the collision history along the routes (CLOCS v5 C1; staff only)
 import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
@@ -3564,6 +3565,48 @@ def _export_style(style):
     if not k:
         raise HTTPException(422, "style must be light, streets, outdoors or aerial")
     return k
+
+
+def _forecast_plan_csv(unit):
+    """The approved plan by route and month as CSV bytes (forecast_plan.table / csv_text), from every APPROVED line as
+    /api/public/month-kpis carries it (_month_kpi_line: tonnes, and loads on the line's own payload), so the file's
+    figures are the public map's own. One forecast read, the routes' names, no carbon table."""
+    factors = conversions.load_factors()
+    vs = factors.get("vehicles", {}) or {}
+    fb_payload, fb_name = derived.payload_for(None, factors)
+    rows = db.query(
+        "SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
+        "ORDER BY month_index, route_id, discipline, section_id",
+        (db.current_tenant(),))
+    by_month = {}
+    for r in rows:
+        by_month.setdefault(int(r["month_index"]), []).append(
+            _month_kpi_line(r, "vehicles", factors, vs, fb_payload, fb_name))
+    names = {r["route_id"]: {"origin": r.get("origin"), "dest": r.get("dest")} for r in network.meta_routes()}
+    tab = forecast_plan.table(by_month, MONTH_COUNT, _working_days(factors), counting.per_visit(factors), names)
+    return forecast_plan.csv_text(tab, unit, START_YEAR).encode("utf-8")
+
+
+@app.get("/api/routes/forecast-plan.csv")
+def routes_forecast_plan_csv(unit: str = Query("count"), request: Request = None):
+    """
+    12 Nov 2026 (the public map's "All routes"; John's call 7: Copy for everyone, Download for staff only at first).
+    The approved plan as one CSV: a row a route, a column a month, in lorry movements (or visits) a day
+    (`unit=count`, the organisation's setting) or tonnes (`unit=t`), with a row of totals.
+
+    STAFF ONLY: a valid code or the staff cookie, as the route map export; the map password's visitor is refused here
+    whatever the page shows (the button is hidden for them too). The whole scheme for any staff caller: the public map
+    shows every route to anyone it lets in. Kept until the next write (_staff_bytes). Stores nothing.
+    """
+    from fastapi.responses import Response       # not in every test stub; imported here
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the plan as a file is for staff")
+    if unit not in forecast_plan.UNITS:
+        raise HTTPException(400, f"unit must be one of {forecast_plan.UNITS}")
+    data = _staff_bytes("routes/forecast-plan", {"unit": unit}, lambda: _forecast_plan_csv(unit), acc={})
+    name = forecast_plan.file_name(unit, counting.per_visit(conversions.load_factors()))
+    return Response(content=data, media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
 
 def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community=1, collisions=0):
