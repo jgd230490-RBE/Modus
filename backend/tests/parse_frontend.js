@@ -281,7 +281,9 @@ ok("11 Oct 2026 (review): ⭐ the Config Estonian column is gated on the COUNTRY
   code.includes('const vehLangEditable = (k) => k === "en" || (k === "ee" && String(TENANT.country || "").toUpperCase() === "EE");')
   && !/const vehLangEditable = [^\n]*VEH\.langs/.test(code)
   // NARROWED 9 Nov 2026 (UI critique card 10): + a planner's read-only page leaves the English (typing) column out
-  && code.includes('.filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English"))') && code.includes('{vehLangEditable("ee") && <td className="min-w-[190px]"><input className={inp} value={lab.ee || ""}')
+  && code.includes('.filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English"))')
+  // NARROWED 10 Nov 2026 (wave 4, card 7): + the tablet card's class and label on the Estonian box's cell
+  && code.includes('{vehLangEditable("ee") && <td className="min-w-[190px] cfg-veh-wide" data-label="Estonian name"><input className={inp} value={lab.ee || ""}')
   && !code.includes('vehLangShown("ee")'));
 // 11 Oct 2026: ⭐ the four EU type-approval vehicles are gone from the app's source — no name, no code, no 'aliases'
 // note (only those entries carried aliases), and no comment that describes them as present
@@ -2252,7 +2254,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("Forecasts: one .tbl with a caption, the unit in the header, numbers in .num cells, the one visible sort",
     // 13 Oct 2026 (W6, narrowed): one unit for every line through the switch (the header names it); what was typed,
     // in its own unit, is in the details
-    _fcBody.includes('<table className="tbl rd-table" data-rd-table="forecasts">') && _fcBody.includes("<caption><b>Forecast lines</b> · {sortCaption}")
+    // NARROWED 10 Nov 2026 (wave 4, card 2): + tab-cards, the table's cards at 768–1024 (three figures a row)
+    _fcBody.includes('<table className="tbl rd-table tab-cards" data-rd-table="forecasts" style={{ "--tc-n": 3 }}>') && _fcBody.includes("<caption><b>Forecast lines</b> · {sortCaption}")
     && _fcBody.includes('{th(qtyHead, "quantity", true)}') && _fcBody.includes('<td className="num" data-label={qtyHead}>')
     // NARROWED 29 Oct 2026 (3b-2): a line typed as m³ of concrete shows that basis in Typed; every other line as before
     && _fcBody.includes('<RdItem t="Typed">{g.kg != null && g.concrete > 0') && _fcBody.includes(': `${fmt(g.quantity, g.unit)} ${unitLabel(g.unit)}`}</RdItem>') && _fcBody.includes('const [sort, setSort] = useState({ key: "quantity", dir: "desc" });'));
@@ -5068,7 +5071,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("CLP NOTES: the one email's result in words ('They have an email about it.' / 'The email to them did not go.'), never a code",
      cn.includes('d.email === "sent" ? `${first} They have an email about it.`') && cn.includes('`${first} The email to them did not go.`'));
   ok("⭐ CLP NOTES: the list — a Tasks column (open, then overdue in red or the next due date, else the notes count), the Tasks filter (Any · Open · Given to me · Overdue) and 'Notes and tasks (N open)' in every row's ⋯",
-     cp.includes('<th scope="col">Last issue</th><th scope="col">Tasks</th>') && cp.includes('<td data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open')
+     // NARROWED 10 Nov 2026 (wave 4, card 4): + the tablet card's label on the Tasks cell
+     cp.includes('<th scope="col">Last issue</th><th scope="col">Tasks</th>') && cp.includes('<td data-label="Tasks" data-clp-tasks-cell="1">{tk(c).open > 0 ? <>{tk(c).open} open')
      && cp.includes("{tk(c).overdue} overdue</span>") && cp.includes("due {clpShort(tk(c).next_due)}") && cp.includes('{tk(c).notes} note{tk(c).notes === 1 ? "" : "s"}')
      && cp.includes('+ {tk(c).client_open} with the client</span>}')   // NARROWED 31 Oct 2026 (PR 3d, Q8): the second line
     
