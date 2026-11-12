@@ -606,15 +606,22 @@ def _routes():
 
 
 class _Geo:
-    """route_analysis() rows per (route, profile, alt), one call per route per request."""
+    """route_analysis() rows per (route, profile, alt), one call per route per request.
 
-    def __init__(self):
-        self.cache = {}
+    11 Nov 2026 (X-F1 part 2): `pre` is route_analysis's per-request dict, shared by every scenario of one request
+    (carbon_target.status passes one). The routes, locations, gates and every route's geometry rows are read ONCE
+    into it (network.prefetch_analysis_geometry), and each route's rows are kept in it, instead of four statements per
+    route per scenario (about 300 per carbon target read). Same rows, same figures (test_carbon_fewer_reads.py)."""
+
+    def __init__(self, pre=None):
+        self.pre = pre if pre is not None else {}
+        self.cache = self.pre.setdefault("carbon_rows", {})
 
     def rows(self, route_id):
         if route_id not in self.cache:
             try:
-                res = network.route_analysis(route_id)
+                network.prefetch_analysis_geometry(self.pre)
+                res = network.route_analysis(route_id, pre=self.pre)
                 self.cache[route_id] = [r for r in (res.get("rows", []) or [])]
             except Exception:
                 self.cache[route_id] = []
@@ -1103,7 +1110,7 @@ def _check_allocation(allocation):
 
 
 def scenario(acc=None, alternatives=None, baseline_levers=None, from_month=None, to_month=None,
-             status="Approved", spend_m=None, allocation=None, factors=None):
+             status="Approved", spend_m=None, allocation=None, factors=None, pre=None):
     """
     The baseline (the caller's visible forecast lines, as approved, with Government primary
     material factors and the forecast vehicles — adjusted by `baseline_levers`) and each
@@ -1111,6 +1118,9 @@ def scenario(acc=None, alternatives=None, baseline_levers=None, from_month=None,
     per-driver deltas RANKED by tCO2e moved — each driver's levers applied alone to the
     baseline — plus the interaction (combined minus the sum of the singles), every delta taken
     on unrounded sums. Raises CarbonError.
+
+    `pre` (11 Nov 2026): a dict that lives for ONE request, shared by the scenarios a caller runs together, so the
+    route figures are read once (see _Geo). Without it each scenario reads them once for itself.
     """
     acc = acc if acc is not None else access.current()
     factors = factors if factors is not None else conversions.load_factors()
@@ -1127,7 +1137,7 @@ def scenario(acc=None, alternatives=None, baseline_levers=None, from_month=None,
             cm_cache[cat] = carbon_material_of(cat, factors)
         return cm_cache[cat]
 
-    ctx = {"cp": cp, "doc": doc, "vs": vs, "geo": _Geo(), "locs": locs, "routes": routes, "cm": cm_of,
+    ctx = {"cp": cp, "doc": doc, "vs": vs, "geo": _Geo(pre), "locs": locs, "routes": routes, "cm": cm_of,
            # 17 Oct 2026: the shift as the drivers' hours rule reads it (at most 13 h)
            "plan": {"shift_h": drivers_hours.shift_hours({"planning": plan})[0],
                     "shift_typed_h": drivers_hours.typed_shift_hours({"planning": plan}),
@@ -1138,7 +1148,8 @@ def scenario(acc=None, alternatives=None, baseline_levers=None, from_month=None,
     for a in alts:
         _check_levers(a.get("levers"), vs, routes)
 
-    cl = costlines.lines(acc, from_month=from_month, to_month=to_month, status=status, factors=factors)
+    cl = costlines.lines(acc, from_month=from_month, to_month=to_month, status=status, factors=factors,
+                         pre=ctx["geo"].pre)
     lines = cl["lines"]
     notes = set()
     states0 = [_apply(_state0(l), l, baseline_levers, ctx, notes) for l in lines]
