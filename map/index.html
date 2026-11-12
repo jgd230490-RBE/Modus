@@ -264,6 +264,16 @@
            each dot stays with its words. */
         @media (min-width:1024px){ #kpi-conditions{ flex-wrap:wrap; max-width:300px; flex-shrink:0; column-gap:12px; row-gap:2px;
                                                    white-space:normal; border-radius:14px; padding:6px 12px; } }
+        /* 12 Nov 2026 (card A1-X2, seen on live at 1150 px): beside the figures the chip lay over them (two entries hid
+           "375 t CO2e to date", three the "CO2e a day" too; at 1024 px one entry did). fitCondChip() puts body.cond-chip-below
+           on when the figures do not fit beside it: the chip then hangs on its own line under the bar, right-aligned, and
+           everything that measured from the bar's bottom edge measures from the chip's (--cond-chip-h, secselTopEdge). */
+        @media (min-width:1024px){
+            body.cond-chip-below #kpi-conditions{ position:absolute; top:calc(100% + 7px); right:64px; margin:0; z-index:16; box-shadow:0 2px 8px rgba(16,24,40,.14); }
+            body.cond-chip-below #tl-warnings{ top:calc(84px + var(--cond-chip-h, 0px)); }
+            body.has-demo-notice.cond-chip-below #tl-warnings{ top:calc(110px + var(--cond-chip-h, 0px)); }
+            body.timeline-on.cond-chip-below #tl-warnings{ max-height:min(60vh, 520px, calc(100vh - 130px - var(--cond-chip-h, 0px) - var(--tl-foot, 0px))); }
+        }
         .cond-dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
         .cond-dot.clash{ background:#C2321C; } .cond-dot.warn{ background:#D98A17; } .cond-dot.caution{ background:#8A94A3; }
         /* 2026-10-06 — the breakdown ("what is moving") lives in the SIDEBAR now, as plain
@@ -9312,6 +9322,27 @@
     // 11 Oct: and whenever the bar itself changes height (cards filling in, labels wrapping, the window narrowing)
     try { new ResizeObserver(() => positionWarnStack()).observe(document.getElementById('kpi-hud')); } catch (e) {}
     setTimeout(positionWarnStack, 1200);   // and once after first paint, for a browser that has not laid out yet
+    // 12 Nov 2026 (card A1-X2): the chip stays in the bar while the figures fit beside it; when they do not (at 1024 to
+    // about 1280 px with the Control Panel open) it hangs on its own line under the bar and --cond-chip-h carries the room it
+    // takes. Measured with the chip in the bar every time, so a window that grows puts it back; it changes nothing on the
+    // phone and the tablet (under 1024 px the bar stacks and the chip has its own row already).
+    function fitCondChip() {
+      try {
+        const chip = document.getElementById('kpi-conditions'), cards = document.getElementById('kpi-cards'), hud = document.getElementById('kpi-hud');
+        if (!chip || !cards || !hud || !document.body) return;
+        const b = document.body;
+        let below = false;
+        b.classList.remove('cond-chip-below');
+        if (window.innerWidth >= 1024 && chip.classList.contains('on') && getComputedStyle(hud).display !== 'none') {
+            below = cards.scrollWidth > cards.clientWidth + 1;
+            if (below) b.classList.add('cond-chip-below');
+        }
+        const h = below ? Math.round(chip.getBoundingClientRect().height) + 15 : 0;
+        if (b.style.getPropertyValue('--cond-chip-h') !== h + 'px') b.style.setProperty('--cond-chip-h', h + 'px');
+      } catch (e) {}
+    }
+    window.addEventListener('resize', fitCondChip);
+    try { new ResizeObserver(() => fitCondChip()).observe(document.getElementById('kpi-hud')); } catch (e) {}
     function renderConditionsPill(live) {
         const pill = document.getElementById('kpi-conditions');
         if (!pill) return;
@@ -9328,6 +9359,7 @@
             + part('caution', c.caution, 'seasonal window')
             + `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5B6470" stroke-width="2" aria-hidden="true"><path d="${WARN.open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}"></path></svg>`;
         pill.classList.add('on');
+        fitCondChip();
     }
     function renderTimelineWarnings(m) {
         const box = document.getElementById('tl-warnings');
@@ -11576,7 +11608,10 @@
             if (!k || getComputedStyle(k).display === 'none') return 0;
             const r = k.getBoundingClientRect();
             if (r.bottom <= m.top || r.top >= m.bottom || r.right <= m.left || r.left >= m.right) return 0;
-            return Math.max(0, Math.round(r.bottom - m.top));
+            // 12 Nov 2026 (card A1-X2): the conditions chip hanging under the bar is part of the bar's foot
+            let bottom = r.bottom;
+            if (document.body && document.body.classList && document.body.classList.contains('cond-chip-below')) { const c = document.getElementById('kpi-conditions'); if (c) bottom = Math.max(bottom, c.getBoundingClientRect().bottom + 6); }
+            return Math.max(0, Math.round(bottom - m.top));
         } catch (e) { return 0; }
     }
     // 11 Nov 2026 (map popup top; seen on live at 1422 x 677: a holding area's popup lost its title, 23 px under the figures
