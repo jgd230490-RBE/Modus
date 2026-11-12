@@ -18,8 +18,9 @@ route (§5.6f) and "route information upon egress from site" (§5.6g), and to de
                            row's mark): "go to H first", its hours and spaces, "wait there to be called forward", then the
                            gate; an H badge and chevrons from H to the gate on the map. Nothing for an exempt lorry.
 
-It prints what the scheme typed and what Wayscope stored, and says so where a field is empty ("Not typed"). It never
-writes an instruction of its own: no invented speed, phone number or rule. Reads only; stores nothing.
+It prints what the scheme typed and what Wayscope stored. A typed part left empty is left off the page (11 Nov 2026,
+CLOCS card B-F2: it printed "Not typed"; the Routes screen now says which words are missing). It never writes an
+instruction of its own: no invented speed, phone number or rule. Reads only; stores nothing.
 
     S = sheet(route_id, vehicle=None, now=None)        export.build_route_sheet_pdf(S)
 """
@@ -245,6 +246,11 @@ def sheet(route_id, vehicle=None, now=None, acc=None):
         "vehicle": used, "vehicle_text": vehicle_text, "baked_vehicles": baked,
         "loaded": loaded, "return": ret,
         "loaded_words": leg_words(legs.get("loaded")), "return_words": leg_words(legs.get("return")),
+        # 11 Nov 2026 (CLOCS card B-F7): the stored leg lengths, for the route analysis's header (as the screens show)
+        "loaded_km": (float(legs["loaded"]["distance_km"]) if (legs.get("loaded") or {}).get("distance_km") is not None
+                      else None),
+        "return_km": (float(legs["return"]["distance_km"]) if (legs.get("return") or {}).get("distance_km") is not None
+                      else None),
         "last_mile_in": last_in,
         "last_mile_out": last_out,
         # 29 Oct 2026 (task 3c): the holding area this lorry calls off at on the way in, or None

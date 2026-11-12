@@ -2028,6 +2028,13 @@ def busiest(month_index, acc, factors, working_days, panel):
             + (", its shut times" if shut and d["bands"]["on"] else (", its shut times taken off" if shut else ""))
             + (f"{' and' if shut else ','} the no-delivery bands {d['bands']['words']} taken off" if d["bands"]["on"] else "")
             + ". No pour.")
+    # 10 Nov 2026 (UX decision U5): the screen prints a few words and keeps the specifics in an "i" box (at most 30 words with the
+    # box's own line): the same facts as the note, without its lead-in
+    detail = ("Whole loads, spread evenly over open hours"
+              + (f" ({d['default_hours']['from']}–{d['default_hours']['to']} where none are typed)" if dflt else "")
+              + (", less shut times" if shut else "")
+              + ((" and" if shut else ", less") + f" the no-delivery bands {d['bands']['words']}" if d["bands"]["on"] else "")
+              + ".")
     # 29 Oct 2026 (task 3c): the holding areas for the panel's rows — lorries a day through each (the day's held loads),
     # the most held at once and when, against its spaces
     hold = []
@@ -2037,7 +2044,7 @@ def busiest(month_index, acc, factors, working_days, panel):
                      "per_day": h["held"], "most": h["most"], "most_at": hhmm(h["most_at"]) if h.get("most_at") is not None else None,
                      "over_spaces": h["over_spaces"], "check_minutes": h.get("check_minutes"),
                      "exempt_labels": h.get("exempt_labels") or [], "on": h.get("on", True)})
-    return {"gates": out, "note": note, "loads": d["loads"], "holding": hold}
+    return {"gates": out, "note": note, "detail": detail, "loads": d["loads"], "holding": hold}
 
 
 def busiest_month(factors=None):

@@ -39,10 +39,11 @@ tech = read("frontend/help/technical/index.html")
 pkg_raw = read("demo/uk-corridor.package.json")
 
 # ---- 1 the banner
-i = html.index("The shared codes still work on this site.")
-banner = html[i:i + 600]
+# NARROWED 10 Nov 2026 (U5, claude/ui-fix-long-sentences): the banner is "Shared codes are still on." and a link to the guide
+i = html.index("Shared codes are still on.")
+banner = html[i:i + 400]
 ok("1: the banner names no date", not re.search(r"\d{1,2} (Oct|Nov) 20\d\d|Sat 31", banner))
-ok("1: the banner says what to do", "They can be turned off once everyone has a login." in banner)
+ok("1: the banner says what to do (a link to how)", "How to switch them off" in banner and 'GUIDE_URL("ug-shared-codes")' in banner)
 ok("1: the old sentence is gone", "They end on" not in html)
 
 # ---- 7 set-by lines
