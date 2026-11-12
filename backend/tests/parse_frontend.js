@@ -4203,8 +4203,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const _hz = _laBody.slice(_laBody.indexOf("const roleLbl"), _laBody.indexOf("{confirming &&"));
   // card 1 (decision 11): the Action column pinned right; the table keeps its 1,220 px
   ok("UI FIX 6 card 1: the Account table keeps its 1,220 px inside a scroller that pads its right edge 176 px (Tab brings the Note box out from under the pin)",
-     _acct.includes('<div className="overflow-auto la-acct-scroll">\n                <table className="text-sm w-full" style={{ minWidth: 1220 }}>')
-     && /\n  \.la-acct-scroll\{scroll-padding-right:176px;\}\n/.test(html) && (_laBody.match(/minWidth: 1220/g) || []).length === 1);
+     // NARROWED 11 Nov 2026 (CLOCS card C-F10): 1,220 px with the Cost columns shown; the Tonnes view (the default) is 860
+     _acct.includes('<div className="overflow-auto la-acct-scroll">\n                <table className="text-sm w-full" style={{ minWidth: acctCost ? 1220 : 860 }} data-acct-cols={acctShow}>')
+     && /\n  \.la-acct-scroll\{scroll-padding-right:176px;\}\n/.test(html) && (_laBody.match(/minWidth: (acctCost \? )?1220/g) || []).length === 1);
   ok("⭐ UI FIX 6 card 1: the Action heading and cell are pinned to the right (sticky, opaque, above the cells), with the app's hairline and a soft shadow",
      /\n  \.la-pin\{position:sticky;right:0;z-index:2;background:var\(--surface\);box-shadow:-1px 0 0 var\(--line\),-8px 0 10px -8px rgba\(15,23,42,\.28\);\}\n/.test(html)
      && /\n  \.la-acct-head th\.la-pin\{background:var\(--surface-2\);z-index:3;\}\n/.test(html)
@@ -5404,7 +5405,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && lpc.includes("if(onData) onData(j);") && code.includes("onData={setLorryPlan} weekConfirmed={allConfirmed}"));
   ok("⭐ 2.1-9 (Q1, Q11): three views, Chained by yard the default; the weekday chips are the week's own days from the server",
      lpc.includes('const [view, setView] = useState("chained");') && lpc.includes('["booked", "chained", "compressed"].map(k =>')
-     && lpc.includes("const shown = (day && days.includes(day)) ? day : (days.includes(data && data.today) ? data.today : days[0]);"));
+     // NARROWED 11 Nov 2026 (CLOCS card C-F7): today is the Look-ahead's own (the read carries none), then the read's, then Monday
+     && lpc.includes("const todayIso = today || (data && data.today) || null;")
+     && lpc.includes("const shown = (day && days.includes(day)) ? day : (days.includes(todayIso) ? todayIso : days[0]);"));
   // NARROWED 9 Nov 2026 (2.1-9b): the track is role=img with the words for a reader of the plan; for a planner, whose trips are
   // controls (card 9), it is a named group — the same words either way
   ok("⭐ 2.1-9 (card 1): one row a lorry, trips as blocks across 06:00–19:00 by their start and minutes, the break hatched, a role=img (a group for a planner) with the words",
@@ -5439,7 +5442,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // ---- 9 Nov 2026 (v2.1 task 2.1-9b, mockup card 9 + Q14; John: "Yes, build it"): drag and drop between lorries ----
   const trip = code.slice(code.indexOf("function LpTrip({"), code.indexOf("function LorryPlanRow({"));
   ok("⭐ 2.1-9b (card 9): for a planner a trip is a draggable details whose summary is the block, named for a screen reader, with a menu of the other lorries (and, compressed, the days)",
-     trip.includes('draggable="true" onDragStart={e => dnd.start(e, trip)} onDragEnd={dnd.end} data-lp-trip={b.line_key}')
+     // NARROWED 11 Nov 2026 (CLOCS card C-F6): draggable only after "Move trips" (dnd.dragOn); the menu is there either way
+     trip.includes('draggable={dnd.dragOn ? "true" : "false"} onDragStart={e => { if(!dnd.dragOn){ e.preventDefault(); return; } dnd.start(e, trip); }} onDragEnd={dnd.end} data-lp-trip={b.line_key}')
      && trip.includes('<summary className="lp-blk" aria-label={`${label}: move…`}') && trip.includes("const items = dnd.targets(trip);")
      && lpc.includes("out.push({ label: `Move to lorry ${row.n}`, to: { day: trip.day, lorry: row.n }, ok: f.ok, hard: true, words: f.words });")
      && lpc.includes('if(view === "compressed") days.filter(d => d !== trip.day).forEach(d => out.push({ label: `Move to ${lpDayWords(d)}`, to: { day: d, lorry: 0 }, ok: true, words: "" }));'));
