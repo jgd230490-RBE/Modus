@@ -362,9 +362,11 @@ ok("16 Oct 2026: and one access road per gate (24 since 29 Oct, task 3c), all sp
 # start date, ends with the junction build 17 Dec 2027; the Burrough limit runs the whole programme; the Melton works area
 # Mar 2026 – Sep 2027), then the seven ADVISORY zones created after the access roads (Z025–Z031; Z027–Z033 since 22 Oct 2026,
 # the two abnormal-load sites' access roads before them): nothing new steers routing
-ok("H2: three geofences — a closure that re-routes (Tilton), an advisory 7.5 t village limit, an advisory works area — then seven dated zones, six advisory and Christmas trading 2027 re-routing (28 Oct)",
+# REVERSED 12 Nov 2026 (John, 15:34 UTC: "Meant, keep it gone"): Z004, the Burrough village 7.5 t limit, was deleted on live and
+# is no longer made; its id stays burnt (the works area is made AS Z005), so no other zone id moves
+ok("H2: two geofences — a closure that re-routes (Tilton) and an advisory works area (Z004, the Burrough 7.5 t limit, retired: its id burnt) — then seven dated zones, six advisory and Christmas trading 2027 re-routing (28 Oct)",
    [(z["id"], z["kind"], z["affects_routing"], z["starts_on"], z["ends_on"]) for z in _T["zones"] if z["kind"] != "haul_road"]
-   == [("Z003", "closure", 1, "2026-10-05", "2027-12-17"), ("Z004", "weight_limit", 0, "2026-01-01", "2030-12-31"),
+   == [("Z003", "closure", 1, "2026-10-05", "2027-12-17"),
        ("Z005", "works", 0, "2026-03-01", "2027-09-30"),
        # RE-PINNED 28 Oct 2026 (simulation v2): Z033–Z039, after the viaduct site's two access roads and four internal roads
        ("Z033", "works", 0, "2026-05-01", "2028-05-31"), ("Z034", "works", 0, "2027-04-01", "2028-09-30"),
@@ -378,7 +380,8 @@ ok("H2: three geofences — a closure that re-routes (Tilton), an advisory 7.5 t
    # NARROWED 11 Nov 2026 (card M-F1): the traffic limit carries no note, as saved on live (a refresh keeps live's row)
    and all("(fictional)" in (z["note"] or "") for z in _T["zones"] if z["kind"] not in ("haul_road", "traffic_limit"))
    and [z["note"] for z in _T["zones"] if z["kind"] == "traffic_limit"] == [None]
-   and "8 vehicles a day" in [z for z in _T["zones"] if z["id"] == "Z004"][0]["note"]
+   # REVERSED 12 Nov 2026: no Z004 and no weight-limit zone at all; the Burrough words stay on the routes (R016, R018)
+   and not [z for z in _T["zones"] if z["id"] == "Z004" or z["kind"] == "weight_limit" or "Burrough" in (z["name"] or "")]
    and [z for z in _T["zones"] if z["id"] == "Z003"][0]["name"] == "A47 at the new Tilton junction: HGV diversion while the junction is built")
 def _bbox(g):
     xs = [c[0] for c in g["coordinates"][0]]; ys = [c[1] for c in g["coordinates"][0]]
@@ -390,8 +393,11 @@ ok("H2: the Tilton closure box straddles the A47 as HERE baked it (52.620–52.6
    "because a zone only steers routing while it applies today (zones.applies_on) — the 5 Oct live bake moved nothing with a 12 Oct start",
    _Z["Z003"][1] < 52.6208 < _Z["Z003"][3] and _Z["Z003"][0] < -0.949 < _Z["Z003"][2] and _Z["Z003"][3] < 52.6225
    and [z for z in _T["zones"] if z["id"] == "Z003"][0]["starts_on"] <= "2026-10-05")
-ok("H2: the Burrough 7.5 t box straddles the lane the Stockpile North routes were baked along (-0.8879, 52.6993)",
-   _Z["Z004"][0] < -0.8879 < _Z["Z004"][2] and _Z["Z004"][1] < 52.6993 < _Z["Z004"][3])
+# REVERSED 12 Nov 2026 (John: "Meant, keep it gone"): was "the Burrough 7.5 t box straddles the lane the Stockpile North routes
+# were baked along (-0.8879, 52.6993)"; now no zone box covers that point, and the works area beside it keeps its own box
+ok("H2: no zone box covers the Burrough lane (-0.8879, 52.6993) since Z004 was retired; Z005 is still the Melton works area",
+   not [k for k, b in _Z.items() if b[0] < -0.8879 < b[2] and b[1] < 52.6993 < b[3]]
+   and [z["name"] for z in _T["zones"] if z["id"] == "Z005"] == ["Melton junction works area"], str(sorted(_Z)))
 ok("H2: daily vehicle caps on the two village routes, so ROUTE_CAP has something to fire on",
    # RE-PINNED 17 Oct 2026 (R2, §3a, §1.8): the Burrough lane community agreement, 8 a day on each route (was 20 and 30)
    {r["id"]: r["max_vehicles_per_day"] for r in _T["routes"] if r["max_vehicles_per_day"]} == {"R016": 8, "R018": 8})
