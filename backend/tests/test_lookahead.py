@@ -1659,7 +1659,7 @@ finally:
     db.get_conn, db.IS_PG = _orig_get, _orig_pg
 db_src = open(os.path.join(BACKEND, "db.py"), encoding="utf-8").read()
 ok("get_conn() on Postgres borrows from the pool, and DB_POOL=0 turns it off",
-   "ThreadedConnectionPool" in db_src and 'os.getenv("DB_POOL", "1")' in db_src and "return _PooledConn(pool, conn)" in db_src)
+   "ThreadedConnectionPool" in db_src and 'os.getenv("DB_POOL", "1")' in db_src and "return _PooledConn(pool, conn" in db_src)   # 11 Nov: + the wait slot (test_db_pool_wait.py)
 ok("query() and execute() both go through the retrying _run()",
    db_src.count("return _run(sql, params, fetch=True)") == 1 and db_src.count("_run(sql, params, fetch=False)") == 1)
 

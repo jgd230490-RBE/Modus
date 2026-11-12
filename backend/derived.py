@@ -264,6 +264,7 @@ def cycle_for(route_id, vehicle, cache=None, month_index=None, week_index=None):
         # 13 Oct 2026 (speed): the request's shared preloads ride in the same cache (one key that is
         # not a (route, vehicle) pair); see network.route_analysis(pre=)
         pre = cache.setdefault("__route_analysis_pre__", {}) if cache is not None else None
+        network.prefetch_analysis_geometry(pre)   # 11 Nov 2026 (X-F1 part 2): every route's rows in one read
         res = network.route_analysis(route_id, profiles=[vehicle] if vehicle else None, pre=pre)
         for r in res.get("rows", []) or []:
             if r.get("alt_index") == 0 and (not vehicle or r.get("profile") == vehicle):
@@ -280,6 +281,7 @@ def _blended_row(route_id, vehicle, m, cache):
     """One cycle row for a mix of options (route_choice.mix): see cycle_for."""
     pre = cache.setdefault("__route_analysis_pre__", {}) if cache is not None else None
     try:
+        network.prefetch_analysis_geometry(pre)
         res = network.route_analysis(route_id, profiles=[vehicle] if vehicle else None, pre=pre,
                                      pairs=[p for p, _w in m["pairs"]])
     except Exception:
