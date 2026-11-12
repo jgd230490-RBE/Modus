@@ -431,10 +431,11 @@ dc = tenant_package.counts(demo)
 # RE-PINNED 28 Oct 2026 (simulation v2, the Tilton Viaduct site L019: two gates G020 / G021 with access roads Z027 / Z028, four internal roads Z029–Z032, seven routes R044–R050, 942 approved line-months)
 # RE-PINNED 29 Oct 2026 (task 3c): + the Billesdon Lane holding area, its entrance gate and the gate's access road (Z040)
 # RE-PINNED 11 Nov 2026 (card M-F1): + the B6047 traffic limit drawn on live, the last zone (Z041), so 41 zones
-ok("demo: 20 locations, 50 routes, 3 teams, 8 sections, 944 forecasts (942 approved + 1 pending + 1 rejected), 24 gates, 41 zones "
-   "(5 + 24 gate access roads + 4 roads inside the viaduct site + 7 advisory + 1 traffic limit), 11 haul links, 3 abnormal loads, 4 site areas",
+# RE-PINNED 12 Nov 2026 (John, 15:34 UTC: "Meant, keep it gone"): Z004, the Burrough village 7.5 t limit, retired, so 40 zones
+ok("demo: 20 locations, 50 routes, 3 teams, 8 sections, 944 forecasts (942 approved + 1 pending + 1 rejected), 24 gates, 40 zones "
+   "(4 + 24 gate access roads + 4 roads inside the viaduct site + 7 advisory + 1 traffic limit), 11 haul links, 3 abnormal loads, 4 site areas",
    dc["locations"] == 20 and dc["routes"] == 50 and dc["ipts"] == 3 and dc["work_sections"] == 8 and dc["forecasts"] == 944
-   and dc["location_gates"] == 24 and dc["zones"] == 41 and dc["route_haul_roads"] == 11 and dc["abnormal_loads"] == 3
+   and dc["location_gates"] == 24 and dc["zones"] == 40 and dc["route_haul_roads"] == 11 and dc["abnormal_loads"] == 3
    and dc["site_areas"] == 4, str(dc))
 _locs = {l["id"]: l for l in demo["tables"]["locations"]}
 _rts = {r["id"]: r for r in demo["tables"]["routes"]}
