@@ -48,7 +48,8 @@ const LONG_PROSE_PINNED = [
   // sentences of U5 / Q10 that claude/ui-fix-long-sentences removes; the rest sit in folds, tabs and pages the 10 Nov live check
   // did not open (notes\session-1110-audit-measures-rules.md lists them, and the ones that are data, not copy)
   { starts: "All three use Government factors. GOV.UK says", where: "carbon+open (Carbon planner, a section opened), 71 words" },
-  { starts: "Planned arrivals spread evenly over the gate's open hours", where: "lookahead (gates note), 50 words" },
+  // REMOVED 11 Nov 2026 (claude/clocs-c-gates-week-words, CLOCS card C-X2): "Planned arrivals spread evenly over the gate's
+  // open hours" (lookahead, gates note, 50 words) is five words now; its sentence is in the la.gates "i" box. PINNED_MAX 26 -> 25
   { starts: "Lorries for Tilton Compound and Tilton Viaduct site", where: "simulation, simulation+site, team-simulation, 390 and 1366 (holding-area sentence, built from the data), 42 words" },
   { starts: "The waste hierarchy step follows the disposal method", where: "carbon+open, 40 words" },
   { starts: "This route already carries", where: "submit (Q10's sentence), 38 words" },

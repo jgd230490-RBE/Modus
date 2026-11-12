@@ -3218,7 +3218,8 @@ async function lorryPlanDom(){
      && gets === 1 && !m.el.querySelector(".lp-row"));
   act(() => { m.el.querySelector("[data-lp-toggle]").click(); });
   ok("⭐ 2.1-9 DOM: opened: Chained by yard, today's chip (Wed 4) pressed, the day's yard block with two lorry rows, no Apply in this view",
-     sec().getAttribute("data-lp-view") === "chained" && [...m.el.querySelectorAll('[aria-label="Day"] button')].find(b => b.getAttribute("aria-pressed") === "true").textContent === "Wed 4"
+     // NARROWED 11 Nov 2026 (CLOCS card C-F7): today's chip says so ("Wed 4, today")
+     sec().getAttribute("data-lp-view") === "chained" && [...m.el.querySelectorAll('[aria-label="Day"] button')].find(b => b.getAttribute("aria-pressed") === "true").textContent === "Wed 4, today"
      && m.el.querySelectorAll(".lp-row").length === 2 && !m.el.querySelector("[data-lp-apply]"));
   const kp = [...m.el.querySelectorAll(".lp-kpi")].map(e => norm(e.textContent));
   ok("⭐ 2.1-9 DOM: the four figures: 16 lorries chained on Wed 4, 27 booked, 11 lorry-days saved this day · 55 this week, £ — with where to type a rate",
@@ -3271,8 +3272,18 @@ async function lorryPlanDom(){
   const d = mount({});
   await settle();
   act(() => { d.el.querySelector("[data-lp-toggle]").click(); });
+  // 11 Nov 2026 (CLOCS card C-F6): until "Move trips" no trip can be dragged (each keeps its menu) and the drag hint is hidden
+  const trips0 = [...d.el.querySelectorAll(".lp-trip")];
+  ok("⭐ C-F6 DOM: before 'Move trips' no trip is draggable, each keeps its menu; the toggle reads 'Move trips', not pressed; no drag hint",
+     trips0.length === 7 && trips0.every(t => t.getAttribute("draggable") === "false" && !!t.querySelector(".row-menu-list"))
+     && d.el.querySelector("[data-lp-move-toggle]").textContent === "Move trips" && d.el.querySelector("[data-lp-move-toggle]").getAttribute("aria-pressed") === "false"
+     && !d.el.querySelector("[data-lp-drag-hint]"));
+  act(() => { d.el.querySelector("[data-lp-move-toggle]").click(); });
+  ok("C-F6 DOM: pressed, the toggle reads 'Done' (aria-pressed)", d.el.querySelector("[data-lp-move-toggle]").textContent === "Done"
+     && d.el.querySelector("[data-lp-move-toggle]").getAttribute("aria-pressed") === "true");
   const trips = [...d.el.querySelectorAll(".lp-trip")];
   const L1 = d.el.querySelector('[data-lp-lorry="1"]'), L2 = d.el.querySelector('[data-lp-lorry="2"]');
+  // NARROWED 11 Nov 2026 (CLOCS card C-F6): after "Move trips"
   ok("⭐ 2.1-9b DOM (card 9): for a planner every trip is a draggable block with a name for a screen reader, the break is not; the track is a named group, not a picture",
      trips.length === 7 && trips.every(t => t.getAttribute("draggable") === "true" && /R011 → Melton Compound, lorry \d: move…$/.test(t.querySelector("summary").getAttribute("aria-label")))
      && L1.querySelectorAll(".lp-blk.is-break").length === 1 && !L1.querySelector(".lp-blk.is-break[draggable]") && L1.querySelector(".lp-track").getAttribute("role") === "group"

@@ -231,7 +231,8 @@ ok("2. a site's gate in is named once (the site's station, not the gate row besi
 tbl = html[html.index("const SimTable"):html.index("function SimulationPage(")]
 ok("3. the quarries' caveat is said once, in the table fold and on the phone",
    html.count("{SIM_OTHER_CUSTOMERS}") == 2 and "origin_share_note && <div" not in tbl)
-ok("3. the holding area reads in plain words: passed through, none waited", "passed through · none waited." in html and "{simHoldWords(h)}" in html and "held this day" not in html)
+# NARROWED 11 Nov 2026 (CLOCS card C-F5): the words also read the day's gates (whose lorries came), on the card and the phone
+ok("3. the holding area reads in plain words: passed through, none waited", "passed through · none waited." in html and html.count("{simHoldWords(h, D)}") == 2 and "{simHoldWords(h)}" not in html and "held this day" not in html)
 ok("3. the with-and-without table is folded unless someone waited", 'className="sim-hold-fold" open={!!h.most}' in html)
 ok("3. the phone shows a tag only for a flagged gate or station",
    'g.flag === "red" || g.flag === "amber" ? <RowStatus word={simWord(g)}' in html and 'st.flag === "red" || st.flag === "amber" ? <RowStatus word={st.status_word}' in html)

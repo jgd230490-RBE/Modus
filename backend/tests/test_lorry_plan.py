@@ -506,7 +506,8 @@ ok("7: the panel: folded, the three views, the weekday chips, the sheets, Apply 
 ok("7: one row a lorry, its trips as blocks across the day, the break hatched, the free words at the end",
    'role={can ? "group" : "img"}' in APP and 'className={"lp-blk" + (b.kind === "break" ? " is-break" : "")}' in APP and 'data-lp-free={r.free_minutes}' in APP)
 ok("7: the panel sits under Gates this week; the KPI caption gains the chained figure; the phone reads it",
-   "<LorryPlan bucket={bucket} tick={tick} access={access} onData={setLorryPlan} weekConfirmed={allConfirmed} />" in APP
+   # NARROWED 11 Nov 2026 (CLOCS card C-F7): the Look-ahead passes its today
+   "<LorryPlan bucket={bucket} tick={tick} access={access} onData={setLorryPlan} weekConfirmed={allConfirmed} today={today} />" in APP
    and "with each yard's lorries chained` : \"\")} />" in APP and 'data-ph-lorry-plan={shown}' in APP and 'data-ph-lorry-list="1"' in APP)
 ok("7: the Config rows: a day-hire rate per lorry type, optional, never seeded", 'function DayHireSection({ doc, upd })' in APP
    and 'data-day-hire-section="1"' in APP and "Blank = the saving in lorry-days only" in APP and "<DayHireSection doc={doc} upd={upd} />" in APP)
