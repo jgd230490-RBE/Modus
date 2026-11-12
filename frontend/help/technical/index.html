@@ -937,7 +937,7 @@ CSV keeps the path. The carbon target's write carries the decisions, never a fig
 <tr><td class="k"><code>SMTP_USER</code>, <code>SMTP_PASSWORD</code>, <code>DEMO_FROM</code>, <code>DEMO_NOTIFY</code>, <code>DEMO_REPLY_TO</code></td><td>The sender for every email (invites, resets, tasks, demo leads); who is told of a lead; the reply-to (default <code>DEMO_NOTIFY</code>).</td></tr>
 <tr><td class="k"><code>DEMO_LEADS</code>, <code>DEMO_TEAM_CODE_VAR</code></td><td><code>1</code> on the demo only: the landing form makes a login. The team slot a lead's login belongs to (default <code>IPT1_CODE</code>; its value is never sent).</td></tr>
 <tr><td class="k"><code>PLANNER_CODE</code>, <code>ADMIN_CODE</code>, <code>IPT1_CODE</code>&hellip;<code>IPT6_CODE</code>, <code>ADMIN_TOKEN</code></td><td>The old shared codes and token: work only while set; a new deployment sets none of them.</td></tr>
-<tr><td class="k"><code>WAYSCOPE_WARM_CACHE</code></td><td><code>0</code> turns the kept-read warm-up off (tests only).</td></tr>
+<tr><td class="k"><code>WAYSCOPE_WARM_CACHE</code></td><td><code>0</code> turns the kept-read warm-up off (tests only). The warm-up runs after start-up, after writes go quiet for 30 s, and (11 Nov 2026) when the day turns over (<code>read_cache.due</code>).</td></tr>
 <tr><td class="k"><code>ALLOW_DEMO_CODES</code>, <code>MAP_GATE</code></td><td>Test harnesses only. Never set on Render.</td></tr>
 </tbody></table></div>
 
@@ -1205,7 +1205,7 @@ vehicle key; blank = the lorry the first route's Approved lines use most, where 
 <code>limits,community,collisions,cycle,hours,diversions,assessor</code>; blank = all). Staff only (401 otherwise); a team login
 gets its own team's routes only (404 names a route it cannot see). 422 for an unknown lorry, more than 12 routes, an unknown
 section or none but the assessor's page; 503 &ldquo;Another route analysis is being made&rdquo; while one is building
-(<code>heavy_reads.solo</code> under the name <code>route-analysis</code>, one at a time, memory trimmed after). <code>route_analysis_doc.gather()</code>
+(<code>heavy_reads.solo</code> under the name <code>route-analysis</code>, one at a time, memory trimmed after). Since 11 Nov 2026 a made file is kept (<code>main._staff_bytes</code>, name <code>routes/analysis</code>): per role and team, per day, per routes + lorry + sections + PDF or XLSX, until the next write; the closures feed's fetch stamp (<code>route_analysis_doc.held_stamp()</code>) is in the key when section A is ticked, since a feed refresh moves no data version. A file in which a map picture was missed (<code>basemap.MISSES</code>), or one over <code>main.ANALYSIS_KEEP_MAX</code> (6 MB), is served and not kept. <code>route_analysis_doc.gather()</code>
 reads only what is stored: the lorry-limit hits on the route's stored rows for that profile (and the other profiles' hits to say
 what differs), road closures as held (with their fetch date) within 100 m, routing zones the line crosses, community features within each kind's
 <code>route_compare.NEAR_M</code> (250 m; bus stops and homes 100 m; <code>NAMED_KINDS</code> named, the rest counted), the route's collision evidence (<code>collisions.evidence()</code>, the

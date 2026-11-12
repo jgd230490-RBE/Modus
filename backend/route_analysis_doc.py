@@ -75,6 +75,27 @@ def parse_routes(raw):
     return ids
 
 
+def held_stamp():
+    """11 Nov 2026 (CLOCS card B-F1): when the closures feed the file reads (_held_closures) was last taken in, per
+    layer, so a kept file is made again after the feed changes (a feed refresh moves no data version)."""
+    import restrictions
+    try:
+        if not restrictions.enabled():
+            return "off"
+        prov = restrictions.current() or {}
+        keys = ["nh_closures"] if prov.get("key") == "nh_closures" else list(getattr(restrictions, "LAYERS", {}) or [])
+        out = []
+        for k in keys:
+            hit = restrictions._cache.get(f"lyr:{k}")
+            if not hit and k == "nh_closures" and getattr(restrictions, "_NH_GOOD", None):
+                hit = restrictions._NH_GOOD
+            fc = (hit[1] or {}) if hit else {}
+            out.append(f"{k}:{hit[0] if hit else '-'}:{id(fc)}:{len(fc.get('features') or [])}")
+        return "|".join(out)
+    except Exception:  # noqa: BLE001 — never stop the file; a key that never repeats keeps nothing stale
+        return f"err:{__import__('time').monotonic()}"
+
+
 def default_lorry(route_id):
     """Q3: the lorry the route's Approved lines use most (by number of lines), where the route is drawn for it; else the
     app's default lorry where drawn; else the first drawn."""
@@ -498,7 +519,11 @@ def _summary(R, ev):
 
 
 def file_name(D, ext="pdf"):
-    ids = [R["id"] for R in D["routes"]]
+    return file_name_for([R["id"] for R in D["routes"]], ext)
+
+
+def file_name_for(ids, ext="pdf"):
+    """The download's name from the parsed route ids (main serves a kept file without gathering it again)."""
     if len(ids) == 1:
         safe = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in str(ids[0]))
         return f"route-analysis-{safe}.{ext}"

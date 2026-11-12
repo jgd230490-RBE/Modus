@@ -4145,22 +4145,48 @@ def _route_analysis(request, routes, lorry, sections, ext):
         known = (conversions.load_factors() or {}).get("vehicles") or {}
         if lorry not in known:
             raise HTTPException(422, "Pick a lorry from the list.")
-    with heavy_reads.solo("route-analysis", busy=lambda: HTTPException(
-            503, "Another route analysis is being made. Try again in a minute.", headers={"Retry-After": "60"})):
-        try:
-            D = route_analysis_doc.gather(routes, lorry=lorry or None, sections=sections, acc=access.current())
-            data = route_analysis_render.build_pdf(D) if ext == "pdf" else route_analysis_render.build_xlsx(D)
-        except route_analysis_doc.AnalysisError as e:
-            raise HTTPException(404, str(e))
-        except route_analysis_doc.AskError as e:
-            raise HTTPException(422, str(e))
-        except RuntimeError as e:
-            raise HTTPException(503, str(e))
+    try:
+        ids = route_analysis_doc.parse_routes(routes)
+        secs = route_analysis_doc.parse_sections(sections)
+    except route_analysis_doc.AskError as e:
+        raise HTTPException(422, str(e))
+    acc = access.current()
+    misses = basemap.MISSES[0]
+    made = {"size": 0}
+
+    def build():
+        with heavy_reads.solo("route-analysis", busy=lambda: HTTPException(
+                503, "Another route analysis is being made. Try again in a minute.", headers={"Retry-After": "60"})):
+            try:
+                D = route_analysis_doc.gather(ids, lorry=lorry or None, sections=secs, acc=acc)
+                data = route_analysis_render.build_pdf(D) if ext == "pdf" else route_analysis_render.build_xlsx(D)
+            except route_analysis_doc.AnalysisError as e:
+                raise HTTPException(404, str(e))
+            except route_analysis_doc.AskError as e:
+                raise HTTPException(422, str(e))
+            except RuntimeError as e:
+                raise HTTPException(503, str(e))
+        made["size"] = len(data)
+        return data
+
+    # 11 Nov 2026 (CLOCS card B-F1): kept like the other heavy staff files (_staff_bytes: per role and team, per day,
+    # until the next write), so a second press of the same file opens at once instead of ~25 s on live. The key holds
+    # what the file reads from outside the database: the closures feed held in memory (route_analysis_doc.held_stamp;
+    # a feed refresh moves no data version). Kept only when every map in it is Mapbox's picture, and only up to
+    # ANALYSIS_KEEP_MAX (12 routes' maps would push the rest of the store out).
+    params = {"routes": ids, "lorry": lorry or None, "sections": secs, "ext": ext,
+              "held": route_analysis_doc.held_stamp() if "limits" in secs else None}
+    data = _staff_bytes("routes/analysis", params, build, acc,
+                        keep=lambda: basemap.MISSES[0] == misses and made["size"] <= ANALYSIS_KEEP_MAX)
     media = ("application/pdf" if ext == "pdf"
              else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     return Response(content=data, media_type=media,
-                    headers={"Content-Disposition": f'attachment; filename="{route_analysis_doc.file_name(D, ext)}"',
+                    headers={"Content-Disposition": f'attachment; filename="{route_analysis_doc.file_name_for(ids, ext)}"',
                              "Cache-Control": "no-store"})
+
+
+#: the largest route analysis kept in memory (bytes); a bigger one is served, not kept (CLOCS card B-F1)
+ANALYSIS_KEEP_MAX = 6 * 1024 * 1024
 
 
 @app.get("/api/routes/analysis.pdf")

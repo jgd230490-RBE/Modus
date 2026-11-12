@@ -17,8 +17,8 @@ that lands mid-build can never leave the older figures behind.
 Single-flight: two first viewers at once do not build it twice; the second waits for the first's
 answer (the build runs inside one of heavy_reads' slots, so a cold read still cannot pile up).
 
-warm() / start_warmer(): after start-up, and again once writes have stopped for WARM_QUIET_S, the
-background warmer builds what is missing, so the first viewer after a deploy or an edit does not
+warm() / start_warmer(): after start-up, again once writes have stopped for WARM_QUIET_S, and again when the day
+turns over (11 Nov 2026: the staff reads are keyed by the day), the background warmer builds what is missing, so the first viewer after a deploy or an edit does not
 wait either. It only ever calls the same builder a viewer would.
 
 WHAT THIS DOES NOT DO: share entries between processes (Render runs one; see db.py), hold more than
@@ -164,23 +164,39 @@ def warm(tenant):
     return out
 
 
+def due(warmed_at, warmed_day, version, day, quiet_for):
+    """Whether the warmer runs now. After start-up (nothing warmed yet); after the data version moved and writes have
+    been quiet for WARM_QUIET_S; and (11 Nov 2026, CLOCS card B-F8) when the day turns over: the staff reads are keyed
+    by the day (a week or "this month" turns at midnight), so without this the first page opened each morning built
+    its reads cold (Zones 4-6 s on live on 11 Nov, the diversions read last warmed the night before)."""
+    if warmed_at is None:
+        return True
+    if warmed_at != version:
+        return quiet_for >= WARM_QUIET_S
+    return warmed_day != day
+
+
 def start_warmer(tenant):
     """One daemon thread: warm after start-up, then again whenever writes have been quiet for WARM_QUIET_S
-    and an entry has gone out of date. Called from main.lifespan only, never by an import."""
+    and an entry has gone out of date, and again when the day turns over (`due`). Called from main.lifespan only,
+    never by an import."""
+    import datetime
+
     def run():
         time.sleep(WARM_FIRST_S)
-        warmed_at = None
+        warmed_at, warmed_day = None, None
         seen, quiet_since = db.data_version(), time.monotonic()
         while True:
             v = db.data_version()
             if v != seen:
                 seen, quiet_since = v, time.monotonic()
-            if warmed_at != v and (warmed_at is None or time.monotonic() - quiet_since >= WARM_QUIET_S):
+            day = datetime.date.today().isoformat()
+            if due(warmed_at, warmed_day, v, day, time.monotonic() - quiet_since):
                 t0 = time.monotonic()
                 res = warm(tenant)
                 print(f"🧮 read cache: warmed {', '.join(f'{k} {r}' for k, r in res.items())} "
-                      f"in {time.monotonic() - t0:.1f} s (data version {v})")
-                warmed_at = v
+                      f"in {time.monotonic() - t0:.1f} s (data version {v}, {day})")
+                warmed_at, warmed_day = v, day
             time.sleep(WARM_TICK_S)
 
     threading.Thread(target=run, name="read-cache-warmer", daemon=True).start()
