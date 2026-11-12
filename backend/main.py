@@ -50,6 +50,7 @@ import stockpiles    # Week 1 — stockpile capacity and typed consumption (Task
 import access        # 2026-09-02 — IPT access codes (Task F)
 import gate          # 2026-09-14 — the /map/ password and the /help/ staff gate
 import config        # 2.5b — the editable copy of factors.json; G2 — the tenant settings block
+import plan_stamp    # 10 Nov 2026 (claude/map-first-view): when the forecast last changed, for the map
 import tenant_package  # G2, 16 Sep — a tenant as one JSON document; the map overlay
 import costing       # 10 Sep evening — target rates + fuel settings (config key 'costing'), BAF
 import fuel          # 10 Sep evening — the EU Weekly Oil Bulletin diesel index, fetched server-side
@@ -66,6 +67,7 @@ import limits        # 13 Oct 2026 — lorry limits (weight / height / width) fr
 import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the map bar's month roll-up + the conditions of the month
 import route_sheet  # 16 Oct 2026 — the route sheet for drivers (CLOCS v5 C3)
 import route_map_export  # 14 Oct 2026 — the route map export (backlog item 2): the map as filtered, as a PDF
+import forecast_plan  # 12 Nov 2026 — the approved plan by route and month as a CSV (the public map's "All routes", staff Download)
 import community     # 14 Oct 2026 — the community considerations layer (staff map and the CLP plans)
 import collisions    # 16 Oct 2026 — the collision history along the routes (CLOCS v5 C1; staff only)
 import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
@@ -2966,6 +2968,32 @@ def _heavy(name):
     return heavy_reads.slot(name, busy=_heavy_busy)
 
 
+# 12 Nov 2026 (card A-F7 (a), BUILD.md rule 13): the public map's cold open made ~430 database connections, ~315 of them in
+# three reads every visitor rebuilt (map-data 48, forecast-matrix 126, month-kpis/months 141). On live, with the Postgres
+# pool empty, each connection is a fresh one (PR #263), so a cold open took 15-19 s. The three are the same for every
+# viewer until a write, so each is kept through read_cache.cached() (never stale: keyed by the data version), built inside
+# its heavy slot as before, and served as bytes after the first. Only the shapes the map asks for are kept (the whole
+# horizon, no profile), so odd query strings cannot crowd the store; any other shape is built as before.
+PUBLIC_MAP_CACHE = "public/map-data"
+PUBLIC_MATRIX_CACHE = "public/forecast-matrix|"          # + unit and sections
+PUBLIC_MONTHS_CACHE = "public/month-kpis-months|"        # + unit
+
+
+def _public_kept(name, build):
+    """The read's JSON, built by build() inside its heavy slot, kept until the next write; the same bytes FastAPI sends."""
+    body = read_cache.cached(name, (MONTH_COUNT,), lambda: _json_body(build()))
+    return Response(content=body, media_type="application/json")
+
+
+def _json_body(value):
+    """The bytes FastAPI would send for value: plain JSON as is (the three reads are), anything else through its encoder."""
+    try:
+        return read_cache.json_bytes(value)
+    except TypeError:
+        from fastapi.encoders import jsonable_encoder
+        return read_cache.json_bytes(jsonable_encoder(value))
+
+
 def _working_days(factors):
     """
     Working days in a planning month, from factors.json.
@@ -3084,9 +3112,12 @@ def public_month_kpis_months(unit: str = Query("vehicles")):
     """
     if unit not in conversions.UNITS:
         raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
-    with _heavy("month-kpis/months"):
-        pages = _month_kpis_payloads(range(1, MONTH_COUNT + 1), unit)
-        return {"unit": unit, "months": {str(m): pages[m] for m in sorted(pages)}}
+
+    def build():
+        with _heavy("month-kpis/months"):
+            pages = _month_kpis_payloads(range(1, MONTH_COUNT + 1), unit)
+            return {"unit": unit, "months": {str(m): pages[m] for m in sorted(pages)}}
+    return _public_kept(PUBLIC_MONTHS_CACHE + unit, build)          # 12 Nov 2026 (A-F7): kept until the next write
 
 
 def _month_kpis_payloads(months, unit):
@@ -3368,8 +3399,14 @@ def public_forecast_matrix(
     """
     if unit not in conversions.UNITS:
         raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
-    with _heavy("forecast-matrix"):
-        return _forecast_matrix(from_, to, unit, sections)
+
+    def build():
+        with _heavy("forecast-matrix"):
+            return _forecast_matrix(from_, to, unit, sections)
+    # 12 Nov 2026 (A-F7): the whole horizon (the map's timeline and its detail table) is kept until the next write
+    if min(from_, to) == 1 and max(from_, to) == MONTH_COUNT:
+        return _public_kept(f"{PUBLIC_MATRIX_CACHE}{unit}|{1 if sections else 0}", build)
+    return build()
 
 
 def _forecast_matrix(from_, to, unit, sections):
@@ -3421,6 +3458,9 @@ def _forecast_matrix(from_, to, unit, sections):
            "routes": out, "carbon_stamp": carbon.SUMMARY_STAMP}
     if co2_error:
         res["co2_error"] = co2_error
+    # 10 Nov 2026 (claude/map-first-view, Idea 3): the UK date the forecast last changed, from the audit trail
+    # (plan_stamp); None when the trail has no such write. The map prints "Approved plan · updated 31 Oct".
+    res["plan_updated"] = plan_stamp.last_change()
     # 12 Oct 2026 (Track C review): sections=1 (the timeline asks) adds the programme's largest
     # SECTION-month of CO2e over the window, so the carbon ramp on the shared sections has stops
     # from what a section carries, not from a whole route's month. None when there is no figure.
@@ -3563,6 +3603,48 @@ def _export_style(style):
     if not k:
         raise HTTPException(422, "style must be light, streets, outdoors or aerial")
     return k
+
+
+def _forecast_plan_csv(unit):
+    """The approved plan by route and month as CSV bytes (forecast_plan.table / csv_text), from every APPROVED line as
+    /api/public/month-kpis carries it (_month_kpi_line: tonnes, and loads on the line's own payload), so the file's
+    figures are the public map's own. One forecast read, the routes' names, no carbon table."""
+    factors = conversions.load_factors()
+    vs = factors.get("vehicles", {}) or {}
+    fb_payload, fb_name = derived.payload_for(None, factors)
+    rows = db.query(
+        "SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
+        "ORDER BY month_index, route_id, discipline, section_id",
+        (db.current_tenant(),))
+    by_month = {}
+    for r in rows:
+        by_month.setdefault(int(r["month_index"]), []).append(
+            _month_kpi_line(r, "vehicles", factors, vs, fb_payload, fb_name))
+    names = {r["route_id"]: {"origin": r.get("origin"), "dest": r.get("dest")} for r in network.meta_routes()}
+    tab = forecast_plan.table(by_month, MONTH_COUNT, _working_days(factors), counting.per_visit(factors), names)
+    return forecast_plan.csv_text(tab, unit, START_YEAR).encode("utf-8")
+
+
+@app.get("/api/routes/forecast-plan.csv")
+def routes_forecast_plan_csv(unit: str = Query("count"), request: Request = None):
+    """
+    12 Nov 2026 (the public map's "All routes"; John's call 7: Copy for everyone, Download for staff only at first).
+    The approved plan as one CSV: a row a route, a column a month, in lorry movements (or visits) a day
+    (`unit=count`, the organisation's setting) or tonnes (`unit=t`), with a row of totals.
+
+    STAFF ONLY: a valid code or the staff cookie, as the route map export; the map password's visitor is refused here
+    whatever the page shows (the button is hidden for them too). The whole scheme for any staff caller: the public map
+    shows every route to anyone it lets in. Kept until the next write (_staff_bytes). Stores nothing.
+    """
+    from fastapi.responses import Response       # not in every test stub; imported here
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the plan as a file is for staff")
+    if unit not in forecast_plan.UNITS:
+        raise HTTPException(400, f"unit must be one of {forecast_plan.UNITS}")
+    data = _staff_bytes("routes/forecast-plan", {"unit": unit}, lambda: _forecast_plan_csv(unit), acc={})
+    name = forecast_plan.file_name(unit, counting.per_visit(conversions.load_factors()))
+    return Response(content=data, media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
 
 def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community=1, collisions=0):
@@ -4376,8 +4458,12 @@ def public_map_data(profile: Optional[str] = None):
     dashed straight line usefully says 'HERE could not route this'; on a public map it
     would just look like a road that isn't there.
     """
-    with _heavy("map-data"):
-        return network.public_map_data(profile=profile)
+    def build():
+        with _heavy("map-data"):
+            return network.public_map_data(profile=profile)
+    if profile is None:                       # 12 Nov 2026 (A-F7): the map's own read, kept until the next write
+        return _public_kept(PUBLIC_MAP_CACHE, build)
+    return build()
 
 
 @app.get("/api/public/road-load")
@@ -4600,6 +4686,17 @@ read_cache.WARMERS[AREAS_MONTHS_CACHE] = lambda: read_cache.cached(AREAS_MONTHS_
                                                                    _areas_months_build)
 # 27 Oct 2026 (group 2a): the public map's route check against the closures, built after start-up and after writes
 read_cache.WARMERS["restrictions_check"] = lambda: restrictions.check_all(current_only=False)
+
+
+def _warm_public_map():
+    """12 Nov 2026 (A-F7): the public map's three kept reads, as the map asks for them (map/config.js FORECAST_UNIT
+    "vehicles"), so the first visitor after a deploy or an edit does not build them either."""
+    public_map_data(profile=None)
+    public_forecast_matrix(from_=1, to=MONTH_COUNT, unit="vehicles", sections=1)
+    public_month_kpis_months(unit="vehicles")
+
+
+read_cache.WARMERS["public_map"] = _warm_public_map
 
 
 @app.post("/api/admin/areas/import")

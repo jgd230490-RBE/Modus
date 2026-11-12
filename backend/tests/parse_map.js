@@ -56,6 +56,11 @@ globalThis.COUNT_TENANT = {};
     globalThis.PV = () => f(globalThis.COUNT_TENANT).PV();
     globalThis.CW = () => f(globalThis.COUNT_TENANT).CW();
   }
+  // 11 Nov 2026 (card A-X2): cwN, a count and its words ("under 1 lorry movement a day"), the same way
+  // (mkCwN(cw): the same helper over a sandbox's own CW)
+  const c = src.indexOf("    const cwN = "), d = src.indexOf("\n", src.indexOf("CW().lower);", c));
+  globalThis.mkCwN = cw => new Function("CW", src.slice(c, d) + "\nreturn cwN;")(cw);
+  if (c > 0 && d > c) globalThis.cwN = globalThis.mkCwN(() => globalThis.CW());
 })();
 // comment-stripped, so an assertion cannot pass by matching the prose that explains
 // why something was removed
@@ -280,26 +285,38 @@ ok("⭐ B2: the map's only emissions fallback literal is the published 0.89743 �
   && !/pick\(F\.vehicle_emissions_kg_co2e_per_km,\s*veh\)\s*\|\|\s*0\.9/.test(code));
 // NARROWED 12 Oct 2026 (the review and fix pass): the drawer sums EVERY forecast-matrix row of the route (one row per
 // discipline and section) — it read the first row only, under a caption that called it the bar's figure
-ok("⭐ B2: the drawer reads co2_t per month from forecast-matrix for EVERY line of the route and sums the baked line-months",
-  /const rows=\(mtx\.routes\|\|\[\]\)\.filter\(r=>\(r\.route_id\|\|''\)\.toString\(\)\.trim\(\)\.toLowerCase\(\)===rl\);/.test(code)
-  && /rows\.forEach\(rw=>\{[\s\S]{0,400}const co2m=rw\.co2_t\|\|\{\};[\s\S]{0,400}if\(c==null\)\{ unbakedMonths\[k\]=true; \} else \{ co2t\+=c; bakedT\+=mt; co2LineMonths\+\+; \}/.test(code)
+// NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the panel no longer reads
+// forecast-matrix at all; the same server co2_t, per line and month, comes from the month figures the page holds
+// (month-kpis), summed over EVERY line of the route; a line with no figure is counted, never a zero
+ok("⭐ B2: the drawer reads the server's co2_t per month for EVERY line of the route and sums the routed line-months",
+  /\(kp\.lines \|\| \[\]\)\.forEach\(l => \{\s*if \(l\.route_id !== rid\) return;[\s\S]{0,700}if \(l\.co2_t == null \|\| kp\.co2_error\) \{ if \(q > 0\) miss\+\+; \} else \{ co2 \+= Number\(l\.co2_t\); baked \+= q; \}/.test(code)
   && !/const row=\(mtx\.routes\|\|\[\]\)\.find\(/.test(code)
   && !/trips\*round\*emis\/1000/.test(code) && !/const emis=/.test(code));
 // NARROWED 12 Oct 2026 (the review and fix pass): "(est.)" is back on the label, the server's planning-estimate stamp is
 // printed under the cards, a failed carbon read says so (it used to blame a missing route), and the wording says
 // "no stored road route" instead of the team's word "baked"
+// NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the card is one of six short
+// cards; the dash and "not routed yet" stay, the months left out are counted on the card's own label, and "The same
+// figure as the bar." is in the card's "i"
 ok("B2: no stored route shows a dash and says so, never an estimate; a partly stored window names the months it excludes",
-  /card\('—','CO₂e \(est\.\)','not routed for this lorry yet'\)/.test(code)   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"; the route card no longer says "read from the server"
-  && /' · excl\. '\+unbakedM\+' month'\+\(unbakedM>1\?'s':''\)\+' not routed yet'/.test(code)
-  && /The same figure as the bar above\.'/.test(code) && !/Read from the server/.test(code)
+  /c\(any \? story\.co2T\.toFixed\(1\) \+ ' t' : '—', 'CO₂e \(est\.\)' \+ co2Words \+ tip\)/.test(code)   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): "not routed yet"; the route card no longer says "read from the server"
+  && /any && mm \? ', ' \+ mm \+ ' month' \+ \(mm > 1 \? 's' : ''\) \+ ' not routed yet' : \(story && !any \? ', not routed yet' : ''\)/.test(code)
+  && /The same figure as the bar\.</.test(code) && !/Read from the server/.test(code)
   && !/The same figure as the bar above and the Dashboard, read from the server\./.test(code)
   && !/route not baked for this vehicle/.test(code));
-ok("⭐ the drawer's CO2e card is labelled an estimate and carries the server's planning-estimate stamp (forecast-matrix carbon_stamp)",
-  /card\(co2t\.toFixed\(1\)\+' t','CO₂e \(est\.\)'/.test(code)
-  && /\(mtx\.carbon_stamp\?' '\+mtx\.carbon_stamp\+'\.':''\)/.test(code));
-ok("⭐ a failed carbon read (forecast-matrix co2_error) reads 'carbon could not be read', never 'not stored'",
-  /const co2Card=mtx\.co2_error\s*\n\s*\? card\('—','CO₂e \(est\.\)','carbon could not be read'\)/.test(code)
-  && /const anyBaked=co2LineMonths>0 && !mtx\.co2_error;/.test(code));
+// REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"), his call 5: the stamp names
+// its source, so it left the panel with the 34-word note; the card is still labelled an estimate, its "i" opens with
+// "A planning estimate", and the stamp's words are in the technical guide (#t1-route-story). The carbon legend keeps its own.
+ok("⭐ the drawer's CO2e card is labelled an estimate; the server's planning-estimate stamp is no longer printed in the panel (the 'i' says 'A planning estimate', the guide has the stamp's words)",
+  /'CO₂e \(est\.\)' \+ co2Words \+ tip/.test(code) && !/mtx\.carbon_stamp/.test(code)
+  && /id="info-route-co2" hidden><p>A planning estimate: /.test(code)
+  && /not Carbon Tool figures/.test(fs.readFileSync(path.join(ROOT, "frontend", "help", "technical", "index.html"), "utf8")));
+// NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the flag is the month
+// read's own co2_error now (the panel reads no matrix); the words and the rule are the same
+ok("⭐ a failed carbon read (the month figures' co2_error) reads 'carbon could not be read', never 'not routed'",
+  /if \(kp\.co2_error\) co2Error = true;/.test(code)
+  && /const co2Words = story && story\.co2Error \? ', carbon could not be read'/.test(code)
+  && /const any = !!story && story\.co2BakedT > 0 && !story\.co2Error,/.test(code));
 ok("no label in the bar is uppercase microtext", !/\.kpi-label\{[^}]*text-transform:uppercase/.test(html)
   && !/\.kpi-label\{[^}]*font-size:9/.test(html));
 ok("the KPI block is outside the sidebar element",
@@ -332,8 +349,9 @@ ok("§9: vehicles/day = vehicle-loads over months with volume, per working day",
 // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): the figure is loads per working day × the
 // organisation's count (PV(): 2 by default), never a literal 2; the label is the organisation's ("Lorry movements a day")
 ok("§9: lorry movements/day is the loads-per-working-day figure × the organisation's count, never a literal × 2", /set\('kpi-trips', fmtN\(vehDay \* PV\(\), 0\)\)/.test(code)
-  && />Lorry movements a day</.test(html) && !/MOVES_PER_LOAD/.test(code) && !/vehDay \* 2/.test(code)
-  && code.includes("if (tl) { tl.textContent = CW().label; tl.title = CW().note; }"));
+  // NARROWED 11 Nov 2026 (card A-X2): the bar's label is "Movements a day" (CW().col), two lines at 1422 px, not three
+  && />Movements a day</.test(html) && !/MOVES_PER_LOAD/.test(code) && !/vehDay \* 2/.test(code)
+  && code.includes("if (tl) { tl.textContent = CW().col; tl.title = CW().note; }"));
 ok("§9: ⭐ vehicles needed is ceil(movements ÷ trips-per-vehicle-day) per line, from the route's cycle",
   /fleet \+= Math\.ceil\(\(l\.vehicle_loads \/ wd\) \/ l\.trips_per_vehicle_day\)/.test(code));
 // NARROWED 12 Oct 2026 (the base merge): the words a person reads are "no stored route" / "with no stored road route"
@@ -1379,6 +1397,9 @@ ok("§8 (2026-10-06): the panel is opened from a pill in the bar that counts the
   && /function renderConditionsPill\(live\)/.test(code) && /over capacity/.test(code) && /route limit/.test(code));
 ok("§8 (2026-10-06): a month with a red condition opens the panel once by itself",
   /live\.some\(i => i\.lvl === 'clash'\) && !WARN\.autoOpened/.test(code));
+// 12 Nov 2026 (card A1-X1, John: "Yes, both"): ...but only at 1400 px and wider, and not after a close by hand (ui_fix_map_conditions.js)
+ok("§8 (12 Nov 2026): the by-itself open is limited by width and by a remembered close",
+  /live\.some\(i => i\.lvl === 'clash'\) && !WARN\.autoOpened && condMayOpenItself\(\)/.test(code));
 ok("§8 (2026-10-06): an over-capacity pile is ringed on the map so map and number agree",
   /id: 'cond-ring', type: 'circle'/.test(code) && /setCondRing\(live\.filter\(i => i\.kind === 's'\)\.map\(i => i\.id\)\)/.test(code));
 // 🔴 a Node's id property is `id` (network.py), not `location_id`; the first cut filtered
@@ -1409,7 +1430,8 @@ ok("§8: the seasonal check honours restricted_vehicles", /rv\.length === 0 \|\|
 // 2026-10-06 — REVERSED: a row is a dot, a plain NOUN and one sentence; the month is in
 // the panel's title, once, not on every row
 ok("§8: each row reads noun + sentence, with the month in the panel title",
-  /<b>\$\{esc\(i\.noun\)\}<\/b><span class="what">\$\{esc\(i\.what\)\}<\/span>/.test(code)
+  // NARROWED 11 Nov 2026 (card A-X2): an unnamed limit's row carries its routes in a tip on the sentence
+  /<b>\$\{esc\(i\.noun\)\}<\/b><span class="what"\$\{i\.tip \? ` title="\$\{esc\(i\.tip\)\}"` : ''\}>\$\{esc\(i\.what\)\}<\/span>/.test(code)
   && /<b>Conditions in \$\{esc\(monthLabel\(month\)\)\}<\/b>/.test(code));
 ok("§8: fetch failures degrade to no warnings, not a broken map",
   /\.catch\(\(\) => \{ WARN\.restr = \{\}; return WARN\.restr; \}\)/.test(code));
@@ -1939,11 +1961,20 @@ ok("the speed is remembered per browser and shown when the bar opens; a bad valu
   const strings = (code.match(/'[^'\r\n]*'|"[^"\r\n]*"|`[^`]*`/g) || []).filter(s => !/^['"`]\s*$/.test(s));
   const trucks = strings.filter(s => /\btrucks?\b/i.test(s) && !/Truck mixer/.test(s));
   ok("🔴 no 'truck' in any string the public map prints (lorry / HGV)", trucks.length === 0, trucks.slice(0, 3).join(" | "));
-  ok("the drawer's figures say lorry", /'Trips \/ day \/ lorry'/.test(code) && /'Lorries for peak'/.test(code));
+  // REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"), his call 4: six cards
+  // for ten; "Trips / day / lorry" reads "Round trips a lorry a day" and "Lorries for peak" is gone (the story names the
+  // busiest month and its vehicles)
+  ok("the drawer's figures say lorry", /'Round trips a lorry a day'/.test(code) && !/'Trips \/ day \/ lorry'/.test(code) && !/'Lorries for peak'/.test(code));
   // REVERSED 10 Nov 2026 (live test finding 7; John's yes to notes/map-drawer-polish-mockup-1110 Q3): since the return
   // journey rule (8 Nov) the figure is the loaded journey + the share of the way back the route charges, not "both legs"
-  ok("the drawer's carbon note names DESNZ 2026, not DEFRA 2025, and says what the figure is (tailpipe only; each loaded journey and the scheme's share of the empty return)",
-     /Carbon: DESNZ 2026 factors, tailpipe only\. Each loaded journey and the scheme’s share of the empty return\. The same figure as the bar above\./.test(code)
+  // REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"), his call 5: the note
+  // (34 words, its source named twice) left the screen. What the figure is stays, in the card's "i"; DESNZ 2026 is named in
+  // the guides (user guide A.1, technical #t1-route-story), never on the panel
+  ok("the drawer's carbon words name NO source on the screen, and still say what the figure is (exhaust emissions; each loaded journey and the scheme's share of the empty return)",
+     /A planning estimate: exhaust emissions of each loaded journey and the scheme’s share of the empty return\. The same figure as the bar\./.test(code)
+     && !/Carbon: DESNZ 2026 factors/.test(code)
+     && (() => { const a = code.indexOf("async function openRouteAnalysis(routeId){"), b = code.indexOf("async function openForecastDetail(){"); return a > 0 && b > a && !/DESNZ|DEFRA/.test(code.slice(a, b)); })()   // the slice ends at the table's opener since A2 (the colour key it ended at is gone)
+     && /DESNZ 2026 conversion factors, exhaust \(tailpipe\) emissions only/.test(fs.readFileSync(path.join(ROOT, "frontend", "help", "technical", "index.html"), "utf8"))
      && !/factors, both legs/.test(code) && !/DEFRA/.test(code));   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter; average laden and Config are in T10
 }
 
@@ -2066,7 +2097,8 @@ ok("no place search was added (the user's decision 11 Oct: no geocoder)", !/geoc
      // co2_error, after the span - the carbon ramp's fixed stops come from it
      // NARROWED 12 Oct 2026 (wording review): and, last, the feed's carbon stamp (carbonStamp), which the carbon legend prints
      // NARROWED 12 Oct 2026 (Track C review): and the largest section-month (sectionCo2Max), the section ramp's stops
-     && /TL\.matrix = \{ byRoute:byR, unit:j\.unit, working_days:j\.working_days, volMonths, span, co2Max, (sectionCo2Max, )?co2Error: j\.co2_error \|\| null, carbonStamp: j\.carbon_stamp \|\| null \};/.test(code));
+     // NARROWED 10 Nov 2026 (claude/map-first-view, Idea 3): and, last, planUpdated (the date the forecast last changed)
+     && /TL\.matrix = \{ byRoute:byR, unit:j\.unit, working_days:j\.working_days, volMonths, span, co2Max, (sectionCo2Max, )?co2Error: j\.co2_error \|\| null, carbonStamp: j\.carbon_stamp \|\| null(, planUpdated)? \};/.test(code));
   ok("D22: the bar opens on the current calendar month if it carries volume, else the first month that does — never an empty January",
      /function tlStartMonth\(\)\{\s*const cur = currentMonthIndex\(\);\s*if\(monthHasVolume\(cur\)\) return cur;/.test(code)
      && /return span \? span\[0\] : 1;/.test(code)
@@ -2736,14 +2768,19 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && !/'line-color':\s?CONFIG\.COLORS\.forecast,\s?'line-width':\s?3\.5/.test(code));
   ok("...and the routes stay blue: the forecast colour is untouched", (code.match(/'line-color':\s?CONFIG\.COLORS\.forecast,/g) || []).length === 2);
   // the drawer's half of review bug (d)
-  ok("⭐ row 3 (d), the drawer: a route's analysis counts EVERY approved line of the route, not the first one find() met",
-     code.includes("const rows=(mtx.routes||[]).filter(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);")
-     && code.includes("const totalT=rows.reduce((a,r)=>a+(r.total||0),0);")
+  // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the route's story is
+  // built from the month figures, every line of the route in every month (routeFigures adds the lines' loads and vehicles,
+  // rsStory their tonnes and the server's co2_t); loads are the server's vehicle_loads on each line's own payload, no longer
+  // rounded up per line in the page; the "N approved lines: ..." caption gave way to the one line that names the materials
+  ok("⭐ row 3 (d), the drawer: a route's story counts EVERY approved line of the route, not the first one find() met",
+     code.includes("const f = routeFigures(kp.lines, rid, wd);")
+     && /\(kp\.lines \|\| \[\]\)\.forEach\(l => \{\s*if \(l\.route_id !== rid\) return;/.test(code)
+     && code.includes("totalT += x.t; totalLoads += x.loads; co2T += x.co2; co2BakedT += x.baked;")
      // NARROWED 12 Oct 2026 (the base merge of Track A and Track B): the per-line carbon is no longer worked out in the
      // page (trips × round trip × factor); every line's trips use its own payload and its CO2e is the server's co2_t
-     && code.includes("trips+=pl>0?Math.ceil((rw.total||0)/pl):0;") && code.includes("const co2m=rw.co2_t||{};")
+     && code.includes("co2 += Number(l.co2_t); baked += q;")
      && !code.includes("co2t+=t*round*em/1000")
-     && code.includes("rows.length+' approved lines: '")
+     && code.includes("const mat = names.length > 2 ? names.length + ' materials' : names.join(', ');")
      && !code.includes("const row=(mtx.routes||[]).find(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);"));
   // the zone popup speaks the legend's words, and its routing line is not red
   {
@@ -2759,7 +2796,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   }
   // the matrix fetch in flight is shared
   ok("ensureTimelineMatrix shares the fetch in flight (TL.matrixPending), cleared when it settles",
-     /if\(TL\.matrixPending\) return TL\.matrixPending;\s*TL\.matrixPending = loadTimelineMatrix\(\)\.finally\(\(\)=>\{ TL\.matrixPending = null; \}\);/.test(code));
+     // NARROWED 11 Nov 2026 (card A-F7): Play is greyed while the fetch is in flight (playWait) and handed back when it settles
+     /if\(TL\.matrixPending\) return TL\.matrixPending;\s*playWait\(true\);\s*TL\.matrixPending = loadTimelineMatrix\(\)\.finally\(\(\)=>\{ TL\.matrixPending = null; playWait\(false\); \}\);/.test(code));
   ok("F3: openTimeline records the month Play started on once it has moved off an empty month",
      /setTimelineMonth\(TL\.month\);\s*if\(TL\.playing && TL\.ticked === null\) TL\.startedOn = TL\.month;/.test(code));
 
@@ -2886,7 +2924,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
           "coordsBounds", "selectRoute", "reducedMotion", "monthSpan", "dnum", "stopTimeline", "announceTimeline", "monthLabel", "kpiFetchMonth",
           "FORECAST_WORKING_DAYS", "META", "setRestrictionHits", "setCapBadges", "KPI",
           src.slice(a, b) + "\nreturn { WARN, renderTimelineWarnings, dismissWarning, showRestrictionHit, renderConditionsPill, capSentence, pileSentence, splitHitRowId };")(
-          document, { innerWidth: 1280, innerHeight: 800, addEventListener() {} }, function () { this.observe = () => {}; }, () => {},
+          // 12 Nov 2026 (card A1-X1): a window under 1400 px no longer opens the panel by itself, so this one is 1440 wide; the rows' words are the check here
+          document, { innerWidth: 1440, innerHeight: 800, addEventListener() {} }, function () { this.observe = () => {}; }, () => {},
           { API_BASE: "", MONTH_COUNT: 60, START_YEAR: 2026 }, () => { throw new Error("fetch must not be called"); }, a1_data, () => true, TL, map, RESTR,
           () => [0, 0, 1, 1], rid => rec.select.push(rid), () => false, monthSpan, dnum,
           reason => { rec.stops.push(reason); TL.playing = false; }, t => rec.announced.push(t), monthLabel, m => { kpiCalls++; return kpiFetch(m); },
@@ -3524,9 +3563,11 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && !/f\.properties\.type === 'Inbound Highway'/.test(blkCode.slice(blkCode.indexOf("function stampCarbon"), blkCode.indexOf("function carbonMissingLines"))));
   // ---- the drawer: one carbon number, the server's ----
   ok("⭐ C1: the drawer reads the server's co2_t for the sidebar window and works out no carbon of its own (no factor read)",
-     (() => { const a = code.indexOf("async function openRouteAnalysis(routeId){"), b = code.indexOf("const MAT_PALETTE=");
+     (() => { const a = code.indexOf("async function openRouteAnalysis(routeId){"), b = code.indexOf("async function openForecastDetail(){");   // since A2 (the colour key the slice ended at is gone)
               const d = a > 0 && b > a ? code.slice(a, b) : "";
-              return d.includes("const mtx=await fetchMatrix('t');") && d.includes("const co2m=rw.co2_t||{};")
+              // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): no matrix read
+              // at all; the server's co2_t per line and month comes with the month figures the page already holds
+              return !/fetchMatrix\(/.test(d) && d.includes("await kpiFetchAll();") && d.includes("co2 += Number(l.co2_t); baked += q;")
                      && !/vehicle_emissions_kg_co2e_per_km/.test(d) && !/round\s*\*\s*em/.test(d) && !/\*\s*emis/.test(d); })());
   // ---- the product rules ----
   ok("C1: no literal working-day divisor in the block (the server's movements_per_day; never 22)", !/\b22\b/.test(blkCode));
@@ -3965,7 +4006,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      // NARROWED 12 Oct 2026 (Track C review): `|| []` (the window may be null); REVERSED: no matrix is NO window, never
      // the whole horizon (which made the bar ask for up to 60 months)
      /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*let \[fromM, toM\] = forecastWindow\(\)( \|\| \[\])?;/.test(code)
-     && /try \{ await ensureTimelineMatrix\(\); \} catch \(e\) \{\}\s*\n\s*const \[f, t\] = forecastWindow\(\)( \|\| \[\])?;/.test(code)
+     // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"): the panel's own read of
+     // the plan (fetchMatrix) is gone; its two tabs still take the span with volume from forecastWindow, after the matrix
+     && /await ensureTimelineMatrix\(\);\s*\n\s*const span = forecastWindow\(\);/.test(code)
+     && /function arState\(\) \{\s*const span = forecastWindow\(\);\s*if \(!span\) return null;/.test(code) && !/fetchMatrix/.test(code)
      && code.includes("return span ? [span[0], span[1]] : null;") && !code.includes("return span ? [span[0], span[1]] : [1, CONFIG.MONTH_COUNT || 60];"));
   // ---- (4) the hover card's plumbing --------------------------------------------------------------------------------
   ok("C3 hover: routes-source carries generated feature ids (generateId), so a hover can set a feature-state",
@@ -4145,7 +4189,8 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
        // REVERSED 9 Nov 2026 (2.1-11b): the section's figure is already in the count (the server's movements_per_day)
        rv.title === 'Shared road section' && rv.sub === '2 routes · Oct 2026' && rv.fig === '46 lorry movements a day · 3.2 t CO₂e'
        && rv.hint === 'Click for the routes on this section' && rv.hint !== 'Click for the route analysis', JSON.stringify(rv));
-    ok("Track C review: ...without carbon on, no tonnes", api.runHoverView({ rl_mv_text: 'under 1', rl_routes_text: '3 routes' }, 'Oct 2026', false).fig === 'under 1 lorry movements a day');   // 9 Nov 2026 (2.1-11b)
+    // REVERSED 11 Nov 2026 (card A-X2): "under 1" takes the singular
+    ok("Track C review: ...without carbon on, no tonnes", api.runHoverView({ rl_mv_text: 'under 1', rl_routes_text: '3 routes' }, 'Oct 2026', false).fig === 'under 1 lorry movement a day');   // 9 Nov 2026 (2.1-11b)
     // ---- the deep link ----
     // Track C review: "Show forecast routes" travels as layers=forecast (a link from the forecast view opened bare)
     {
@@ -4211,9 +4256,12 @@ function newBlockCode() { return newBlockSrc().split("\n").map(l => l.replace(/\
        && api.concernAddress({ concern_email: 'a@b.example, c@d.example' }) === null && api.concernAddress({ concern_email: 'a@b.example?cc=x@y.example' }) === null
        && api.concernAddress({ concern_email: ' contact@scheme.example ' }) === 'contact@scheme.example');
     const mt = api.concernMailto('contact@scheme.example', 'Wolds Link (fictional)', 'Oct 2026', 'https://x.example/map/?month=2026-10');
-    ok("C3 concern: the mailto keeps the address, and its subject and body (date, time, place, registration, the month and the link) are encoded",
+    // REVERSED 11 Nov 2026 (card A-I3, John's yes): the body asks for when, where, which way and the registration or
+    // company, as the road card's "Report a lorry here" does (one body, lorryBody), and says another road may not be the scheme's
+    ok("C3 concern: the mailto keeps the address, and its subject and body (when, where, which way, registration, the month and the link) are encoded",
        mt.startsWith('mailto:contact@scheme.example?subject=Report%20a%20concern%3A%20Wolds%20Link%20(fictional)&body=What%20happened%3A')
-       && /Date%3A%0ATime%3A%0APlace/.test(mt) && /Lorry%20registration/.test(mt) && /Month%20on%20the%20map%3A%20Oct%202026/.test(mt) && /month%3D2026-10/.test(mt));
+       && /When%20\(date%20and%20time\)%3A%0AWhere%3A%20%0AWhich%20way%20it%20was%20going%3A%0ARegistration%20or%20company%20name%2C%20if%20seen%3A/.test(mt)
+       && /local%20delivery/.test(mt) && /Month%20on%20the%20map%3A%20Oct%202026/.test(mt) && /month%3D2026-10/.test(mt), mt);
     api.renderConcernLinks();
     // NARROWED 10 Nov 2026 (UI critique 18, decision 6): a resident sees no unset line (the public map: empty slots); the map
     // inside the app (staff) still says so, without "(fictional demo)" — checked in ui_fix_map_card.js. Still no link, no invented address.
@@ -4470,7 +4518,11 @@ function qrRead(mod) {
     ok("⭐ Track C review: with no timeline matrix (its read failed) there is no window and Show forecast asks for NO month (was all 60)",
        !!FW && FW() === null && JSON.stringify(KM()) === "[]" && (TLx.matrix = { span: [9, 11] }, JSON.stringify(KM()) === "[9,10,11]"));
     ok("Track C review: ...and Show forecast routes says the months could not be loaded instead of reading the whole horizon",
-       code.includes('"The months could not be loaded, so no forecast is shown."') && code.includes("if (!f) throw new Error('The months could not be loaded');"));
+       // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"): the panel no longer
+       // reads the plan at all, so with no window there is nothing to ask for: "This route" has no story and "All routes"
+       // says "Nothing approved yet."
+       code.includes('"The months could not be loaded, so no forecast is shown."') && code.includes("if (!span) return null;")
+       && code.includes("box.innerHTML = '<div class=\"an-sub\">Nothing approved yet.</div>';") && !code.includes("to='+hi+'&unit='+unit)"));
   }
   // the section ramp's maximum comes from the server
   ok("⭐ Track C review: the timeline asks forecast-matrix for sections=1 and keeps section_co2_max as sectionCo2Max",
@@ -4569,16 +4621,22 @@ function qrRead(mod) {
   ok("M3: the rail's legend names its three marks; the keys are Space, the two arrows and Esc",
      barHtml.includes('<i class="sq"></i>Approved volume') && barHtml.includes('<i class="tri"></i>Closure affecting a route') && barHtml.includes('<i class="dot"></i>Over capacity')
      && barHtml.includes('<kbd>Space</kbd> play / pause') && barHtml.includes('<kbd>←</kbd><kbd>→</kbd> one month') && barHtml.includes('<kbd>Esc</kbd> close'));
-  ok("M3: Pause on clash is a named switch (role=switch, on by default) wired to setPauseOnClash; the speed options say the seconds a month",
-     /<input type="checkbox" id="tl-pause-clash" role="switch" checked onchange="setPauseOnClash\(this\.checked\)">/.test(barHtml) && barHtml.includes(">Pause on clash</label>")
+  // REVERSED 11 Nov 2026 (card A-F6, John's yes): OFF by default (Play stopped every new visitor at Mar 2027); a tick by hand
+  // is remembered (the second argument)
+  ok("M3: Pause on clash is a named switch (role=switch, off by default) wired to setPauseOnClash; the speed options say the seconds a month",
+     /<input type="checkbox" id="tl-pause-clash" role="switch" onchange="setPauseOnClash\(this\.checked, true\)">/.test(barHtml) && barHtml.includes(">Pause on clash</label>")
      && barHtml.includes('<option value="0.25">¼× · 3 s a month</option>') && barHtml.includes('<option value="4">4× · 0.2 s a month</option>'));
   ok("M3: the rail and its marks are hidden from a screen reader; the month slider stays as the keyboard's and the reader's control",
      /<div class="tl-rail" id="tl-rail" aria-hidden="true"/.test(barHtml) && /<div class="tl-years" id="tl-years" aria-hidden="true">/.test(barHtml)
      && /#timeline-bar \.tl-railwrap input\[type=range\]\{ position:absolute; width:1px; height:1px;[^}]*clip:rect\(0,0,0,0\);/.test(html));
   // the switch, stored per browser, and read by the pause
-  ok("⭐ M3: the switch is remembered in this browser (modus_tl_pause) and the clash pause happens only while it is on; wall mode dwells instead",
-     code.includes("try { if(localStorage.getItem('modus_tl_pause') === '0') TL.pauseOnClash = false; } catch(e){}")
-     && code.includes("try { localStorage.setItem('modus_tl_pause', TL.pauseOnClash ? '1' : '0'); } catch(e){}")
+  // REVERSED 11 Nov 2026 (card A-F6): off unless ticked BY HAND in this browser (modus_tl_pause_hand); the old key was written on
+  // every opening of the bar, so it is no longer read
+  ok("⭐ M3: the switch is remembered in this browser (modus_tl_pause_hand, by hand only) and the clash pause happens only while it is on; wall mode dwells instead",
+     code.includes("TL.pauseOnClash = false; TL.wall = false;")
+     && code.includes("try { if(localStorage.getItem('modus_tl_pause_hand') === '1') TL.pauseOnClash = true; } catch(e){}")
+     && code.includes("if (byHand) { try { localStorage.setItem('modus_tl_pause_hand', TL.pauseOnClash ? '1' : '0'); } catch(e){} }")
+     && !code.includes("localStorage.getItem('modus_tl_pause')")
      && /if \(TL\.playing && TL\.wall && TL\.ticked === month && live\.some\(i => i\.lvl === 'clash'\)\) \{ if \(typeof wallDwell === 'function'\) wallDwell\(month\); \}\s*else if \(TL\.playing && TL\.pauseOnClash !== false/.test(code));
   ok("⭐ M3: the pause says why — the message is shown by the pause and hidden by Play, by closing the bar and by any other month",
      /if \(typeof showClashToast === 'function'\) showClashToast\(month, live\.filter\(i => i\.lvl === 'clash'\)\);/.test(code)
@@ -4587,14 +4645,16 @@ function qrRead(mod) {
      && code.includes("if(typeof TOAST !== 'undefined' && TOAST.month !== m) hideClashToast();")
      && /<div id="tl-toast" role="status" hidden>/.test(html) && html.includes('<button type="button" class="tl-act" onclick="startTimeline()">▶ Resume</button>')
      && html.includes('onclick="stopPausingOnClash()">Stop pausing on clashes</button>')
-     && /function stopPausingOnClash\(\)\{ setPauseOnClash\(false\); startTimeline\(\); \}/.test(code));
+     // NARROWED 11 Nov 2026 (card A-F6): "Stop pausing on clashes" is a choice by hand, so it is remembered
+     && /function stopPausingOnClash\(\)\{ setPauseOnClash\(false, true\); startTimeline\(\); \}/.test(code));
   ok("⭐ M3: moving the month by hand (the slider, the step buttons, a month chip, the rail) re-arms the once-per-loop pause",
      /function onTimelineScrub\(v\)\{ stopTimeline\(\); TL\.clashPaused = false; setTimelineMonth/.test(code) && /function stepTimeline\(delta\)\{\s*stopTimeline\(\); TL\.clashPaused = false;/.test(code)
      // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): and marks the month as asked for (TL.chosen)
      && /TL\.month = m; TL\.chosen = true; TL\.clashPaused = false;\s*(\/\/[^\n]*\n\s*)?if \(!TL\.on\) openTimeline\(\); else setTimelineMonth\(m\);/.test(code)
      && code.includes("RAIL.drag = true; stopTimeline(); TL.clashPaused = false;"));
+  // NARROWED 11 Nov 2026 (card A-F6): Esc closes the BAR and keeps the month (hideTimelineBar), as the × does
   ok("M3: Esc on the bar closes it (the keys row says so); wall mode has its own Esc",
-     code.includes("else if(e.key === 'Escape' && inBar && !TL.wall){ e.preventDefault(); closeTimeline(); }")
+     code.includes("else if(e.key === 'Escape' && inBar && !TL.wall){ e.preventDefault(); hideTimelineBar(); }")
      && code.includes("if (TL.wall && e.key === 'Escape') { e.preventDefault(); exitWallMode(); }"));
   // wall mode
   ok("⭐ M3 wall mode: the bar's button and ?wall=1 open it; the address keeps wall=1 while it is on; leaving drops it",
@@ -6112,17 +6172,24 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   }
   // NARROWED 17 Oct 2026 (the review): the card reads the server's figure on the routed cycle when the route carries it
   // (the rough estimate only without), and a 0 says why in words
-  ok("the drawer's card names the day: the shift less breaks, at most 9 h driving; whole trips, the literal kept",
-     code.includes("card(String(tripsPerDay),'Trips / day / lorry', tripsPerDay>0")
-     && code.includes("'@ '+Math.min(13, P.shift_hours_per_day)+' h shift less breaks, at most 9 h driving, '")
-     && code.includes("Math.min(13, P.shift_hours_per_day)+' h shift less the break, max 9 h driving'")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter
-     && code.includes(": 'one round trip does not fit a driver\\'s day')"));
+  // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"), his call 4: the card is
+  // "Round trips a lorry a day", a figure and a label; the shift and the 9 h are in the guides (user guide A.2). A 0 still
+  // says why in words, the literal kept
+  ok("the drawer's card is whole round trips a lorry a day; a 0 says why in words, the literal kept (the shift and the 9 h driving are in the guide)",
+     code.includes("c(String(trips), trips > 0 ? 'Round trips a lorry a day' : 'one round trip does not fit a driver\\'s day')")
+     && !code.includes("h shift less the break, max 9 h driving'") && !code.includes("h shift less breaks, at most 9 h driving, '")
+     && /Shift hours per/.test(fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8")));
   ok("⭐ the review: the drawer prefers the server's trips a day and cycle (feature properties), and 0 trips counts one lorry a trip",
-     code.includes("const tripsPerDay = fromServer ? info.trips_per_day")
+     // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the same preference
+     // (the server's trips a day and cycle from the feature properties); the cycle card reads "Round trip with loading"
+     // ("(est.)" on the rough figure); the panel no longer works out "lorries for peak" of its own: a month's vehicles are
+     // routeFigures', on the server's trips a lorry a day, and a line without them is counted, never divided by zero
+     code.includes("const trips = fromServer ? info.trips_per_day")
      && code.includes("if(cur.trips_per_day==null && typeof f.properties.trips_per_day==='number')")
-     && code.includes("card(info.cycle_hr.toFixed(2)+' h','Haul cycle','driving both ways, plus gate and handling')")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): plain words
-     && code.includes("Math.ceil(peakLoads/(Math.max(1, tripsPerDay)*P.working_days_per_month))")
-     && !code.includes("(tripsPerDay>0)?Math.ceil(peakLoads/"));
+     && code.includes("const cyc = fromServer && typeof info.cycle_hr === 'number' ? info.cycle_hr : cycleH;")
+     && code.includes("c(cyc.toFixed(2) + ' h', 'Round trip with loading' + (fromServer ? '' : ' (est.)'))")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): plain words
+     && code.includes("if (l.trips_per_vehicle_day > 0) vehicles += Math.ceil((vl / wd) / l.trips_per_vehicle_day); else unbaked++;")
+     && !code.includes("Math.ceil(peakLoads/") && !code.includes("(tripsPerDay>0)?Math.ceil(peakLoads/"));
   if (grabLD) {
     const lorryDayTrips = new Function(grabLD[0] + "; return lorryDayTrips;")();
     // REVERSED 18 Oct 2026 (the user: the law allows the 45 as 15 + 30): was "the twin knows the second break past 12 h"
@@ -6161,7 +6228,7 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
      && !/<details[^>]*id="(council|moving)-fold"[^>]*\sopen/.test(sb)
      && /function toggleAreaTier\(tier, on\) \{\s*(\/\/[^\n]*\n\s*)?if \(on\) \{ const fold = document\.getElementById\('council-fold'\); if \(fold && !fold\.open\) fold\.open = true; \}/.test(code));
   ok("19 Oct: the share row carries Month as text, Link and QR code, the detail table and (staff) the plan export; 'Report a concern' is in the share card",
-     /<div class="control-group share-group" id="share-group">\s*<div class="share-row">\s*<button[^>]*id="btn-month-text"[^>]*>Month as text<\/button>\s*<button[^>]*id="btn-share"[^>]*>Link and QR code<\/button>\s*<button[^>]*id="btn-detail"[^>]*>Forecast detail table<\/button>/.test(sb)
+     /<div class="control-group share-group" id="share-group">\s*<div class="share-row">\s*<button[^>]*id="btn-month-text"[^>]*>Month as text<\/button>\s*<button[^>]*id="btn-share"[^>]*>Link and QR code<\/button>\s*<button[^>]*id="btn-detail"[^>]*>All routes by month<\/button>/.test(sb)   // REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"), his call 10: the button names what it opens and is always shown
      // NARROWED 5 Nov 2026 (group 6): the share card's slot is now followed by the Report a concern form, then the export card
      && /<div class="concern-slot"><\/div>\s*<\/div>\s*\n\s*<!-- 5 Nov 2026 \(group 6, mockup notes\/report-concern-mockup-1105 cards 2-3\): the Report a concern form\./.test(html)
      // NARROWED 5 Nov 2026 (group 6, UI audit): the panel is a <div role="dialog"> like the share and export panels; an <aside> may not
@@ -6335,7 +6402,9 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   ok("...the rule is real: it catches the old sentences, and the new words are on the page",
      OLD.every(x => MAP_BAN.some(r => r.test(x)))
      && noComments.includes("not routed yet") && noComments.includes("No routes are worked out yet.")
-     && noComments.includes("For information only: routes do not avoid these.") && noComments.includes("The same figure as the bar above."));
+     // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): the sentence is
+     // in the carbon "i" now, without "above" (the bar is not above an "i")
+     && noComments.includes("For information only: routes do not avoid these.") && noComments.includes("The same figure as the bar."));
   const visibleHere = (noComments.match(/['"`>][^'"`<\n]*\bHERE\b[^'"`<\n]*/g) || []).filter(s => !/src\.has\('here'\)/.test(s));
   ok("...HERE is named only in the lorry limits' credit (OpenStreetMap contributors and HERE)",
      visibleHere.every(s => /OpenStreetMap contributors and HERE/.test(s) || s === "'HERE"), visibleHere.join(" | "));
@@ -7710,11 +7779,11 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   let F = null, err = "";
   try {
     F = new Function("escHtml", "PV", "CW", "monthLabel", "teamText", "TENANT", "map", "styleReady", "document", "isPhoneShell", "mapboxgl",
-                     "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle",
-                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), secselNeed: (typeof secselNeed === 'function' ? secselNeed : null), secselBeside: (typeof secselBeside === 'function' ? secselBeside : null), popupPlace: (typeof popupPlace === 'function' ? popupPlace : null), SECSEL_MAP };")(
+                     "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle", "cwN",
+                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), secselNeed: (typeof secselNeed === 'function' ? secselNeed : null), secselBeside: (typeof secselBeside === 'function' ? secselBeside : null), secselNarrow: (typeof secselNarrow === 'function' ? secselNarrow : null), popupPlace: (typeof popupPlace === 'function' ? popupPlace : null), SECSEL_MAP };")(
       esc, () => pv, () => (pv === 2 ? words2 : words1), m => (m === 23 ? 'Nov 2027' : 'M' + m), v => (v === 'IPT1' ? 'North Team' : v),
       { name: 'Wolds Link', demo_notice: 'Fictional scheme' }, {}, () => true, doc, () => false, {}, {}, () => 'https://x/map/?month=2027-11', null, null,
-      x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }));
+      x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }), mkCwN(() => (pv === 2 ? words2 : words1)));
   } catch (e) { err = String(e && e.stack || e); }
   ok("⭐ 2.1-4 (sandbox): the block runs against a fake map, adding nothing to it", !!F && F.SECSEL_MAP === false, err);
   if (F) {
@@ -7732,8 +7801,14 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        && h.includes('<th class="num">In</th><th class="num">Out</th><th class="num">A day</th>') && h.includes('class="secsel-total"')
        && h.includes('<td class="num">11.5</td><td class="num">0</td><td class="num">11.5</td>') && !h.includes('<td class="num">12</td>')
        && h.includes('<td class="num">16.5</td><td class="num">5.0</td><td class="num">21.5</td></tr>'), h);
+    // NARROWED 11 Nov 2026 (card A-X1): the team is on the route's name (a tip and the screen reader's words), not a line in the row
     ok("2.1-4 (sandbox): the clicked route's row is tinted and has its card button; Copy; the limit line; teams on the card",
-       h.includes('<tr class="secsel-clicked"><td class="secsel-rid"><button type="button" class="secsel-rid-btn" data-rid="R1" aria-label="Show R1 on the map" aria-pressed="true" data-kind="road" onclick="secselPickRow(this.dataset.rid, this.dataset.kind)">R1</button></td>') && h.includes('R1’s card</button>') && h.includes('>Copy</button>')
+       // NARROWED 11 Nov 2026 (merge of A-X1 with R1, PR #270): the route number is R1's button, its name unchanged; the team is
+       // its description (aria-describedby to a hidden span) and the mouse's tip
+       h.includes('<tr class="secsel-clicked"><td class="secsel-rid"><button type="button" class="secsel-rid-btn" data-rid="R1" aria-label="Show R1 on the map" aria-pressed="true" data-kind="road"')
+       && /<td class="secsel-rid"><button [^>]*data-rid="R1"[^>]* onclick="secselPickRow\(this\.dataset\.rid, this\.dataset\.kind\)">R1<\/button><span id="secsel-team-road-R1" hidden>North Team<\/span><\/td>/.test(h)
+       && h.includes('aria-describedby="secsel-team-road-R1" title="North Team"')
+       && h.includes('R1’s card</button>') && h.includes('>Copy</button>')
        && h.includes('secsel-limit secsel-over">Traffic limit · 212 / 200 a day') && h.includes('North Team'));
     // 12 Nov 2026 (map-pick-route, option R1): every route number on the ROAD card is a button; the picked route's row is tinted and the one button follows it
     {
@@ -7822,9 +7897,10 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        F.secselCardHTML(live, { rp, passing: { R050: true, R047: true } }).includes('</b> · 1 of 2 routes</div>'));
     const road = { kind: 'road', month: 23, in: 4.1, out: 4.1, a_day: 8.2, idle: ['R001', 'R045'], routes: [{ route_id: 'R004', in: 4.1, out: 4.1, a_day: 8.2 }] };
     const hc = F.secselCardHTML(road, { rp, clicked: 'R045' });
-    ok("⭐ POLISH Q2 (sandbox; live 10 Nov: a table with R004 only and a button 'R045’s card'): the clicked route with no loads is said in one line, its button kept",
-       hc.includes('<p class="secsel-note">R045: no loads in Nov 2027.</p>') && hc.includes('R045’s card</button>') && hc.includes('· 1 of 3 routes')
-       && !F.secselCardHTML(road, { rp, clicked: 'R004' }).includes('no loads in') && !F.secselCardHTML(road, { rp }).includes('no loads in'), hc);
+    // REVERSED 11 Nov 2026 (card A-X1, John's yes): the line says it is the clicked one, and its card button goes (it was kept)
+    ok("⭐ POLISH Q2 (sandbox; live 10 Nov: a table with R004 only and a button 'R045’s card'): the clicked route with no loads is said in one line; no button for it",
+       hc.includes('<p class="secsel-note">The line you clicked, R045, has no loads this month.</p>') && !hc.includes('R045’s card</button>') && hc.includes('· 1 of 3 routes')
+       && !F.secselCardHTML(road, { rp, clicked: 'R004' }).includes('no loads this month') && !F.secselCardHTML(road, { rp }).includes('no loads this month'), hc);
     const lost = F.secselCardHTML({ kind: 'road', month: 15, piece: null, routes: [], in: null, out: null, a_day: null }, { rp, clicked: 'R045' });
     ok("⭐ POLISH (sandbox; live 10 Nov: 'Pick a month' under Mar 2027): no 'Pick a month' button while a month is on screen; it stays when none is",
        !lost.includes('Pick a month</button>') && lost.includes('R045’s card</button>')
@@ -7950,19 +8026,24 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   let fitRoad = null;
   try { fitRoad = /function fitRoadPopup\(\) \{[\s\S]*?\n    \}/.exec(code)[0]; } catch (e) {}
   // fitRoadPopup against a stand-in popup: the map 1122 x 677 (a desk window), the timeline bar 94, the figures bar 98, the free map ends at 1066
-  const roadFit = (fixed, nat, y, anchor, x, noTable) => {
-    const sc = noTable ? null : { offsetHeight: 86, scrollHeight: nat, style: {} }, box = { offsetHeight: fixed + 86 };
+  // o (12 Nov, road card beside the Conditions panel): { W, H, foot, right, fixed2 (the card's fixed part once narrowed), narrowed (it was narrowed before) }
+  const roadFit = (fixed, nat, y, anchor, x, noTable, o) => {
+    o = o || {};
+    const sc = noTable ? null : { offsetHeight: 86, scrollHeight: nat, style: {} }, box = { offsetHeight: fixed + 86, offsetWidth: 360 };
+    const widths = [];
     const pop = { options: { anchor }, moved: 0, setLngLat() { this.moved++; }, getLngLat: () => ({ lng: 0, lat: 0 }),
+                  setMaxWidth(w) { widths.push(w); if (o.fixed2 != null && w !== '380px') box.offsetHeight = o.fixed2 + 86; else box.offsetHeight = fixed + 86; },
                   getElement: () => ({ querySelector: q => (q === '.secsel-scroll' ? sc : q === '.mapboxgl-popup-content' ? box : null) }) };
     let hushed = 0;
+    const SEC = { roadPopup: pop, roadAt: { lngLat: {}, point: { x: x || 550, y } }, narrowed: o.narrowed ? 1 : 0 };
     try {
       new Function("SECSEL", "map", "document", "getComputedStyle", "secselTopEdge", "secselRightEdge", "secselRoom", "secselNeed", "secselSide", "secselBeside",
-                   "SECSEL_MARGIN", "hoverGiveWay", fitRoad + "\nreturn fitRoadPopup;")(
-        { roadPopup: pop, roadAt: { lngLat: {}, point: { x: x || 550, y } } },
-        { getContainer: () => ({ clientWidth: 1122, clientHeight: 677 }), project: () => ({ x: x || 550, y }) },
-        { documentElement: {} }, () => ({ getPropertyValue: () => '94px' }), () => 98, () => 1066, F.secselRoom, F.secselNeed, F.secselSide, F.secselBeside, 14, () => { hushed++; })();
+                   "SECSEL_MARGIN", "hoverGiveWay", "secselNarrow", fitRoad + "\nreturn fitRoadPopup;")(
+        SEC,
+        { getContainer: () => ({ clientWidth: o.W || 1122, clientHeight: o.H || 677 }), project: () => ({ x: x || 550, y }) },
+        { documentElement: {} }, () => ({ getPropertyValue: () => (o.foot || 94) + 'px' }), () => 98, () => (o.right || 1066), F.secselRoom, F.secselNeed, F.secselSide, F.secselBeside, 14, () => { hushed++; }, F.secselNarrow)();
     } catch (e) { return { err: e.message }; }
-    return { anchor: pop.options.anchor, moved: pop.moved, max: sc ? sc.style.maxHeight : null, hushed };
+    return { anchor: pop.options.anchor, moved: pop.moved, max: sc ? sc.style.maxHeight : null, hushed, widths, narrowed: SEC.narrowed };
   };
   if (typeof need === 'function' && fitRoad) {
     // the live case: y = 437, a card with the "no loads" line (fixed 210, three rows, 135 px of table) opened ABOVE the click
@@ -7985,10 +8066,54 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        roadFit(210, 190, 437, 'bottom').hushed === 1);
   } else ok("⭐ TALL (sandbox): fitRoadPopup could not be read", false);
   ok("⭐ TALL (source): the fixed part is measured from the card, the old fixed 170 is gone, and the card is placed again with the real need",
-     code.includes("const fixed = (sc && box) ? Math.max(0, box.offsetHeight - sc.offsetHeight) : 0;") && !code.includes("space - 170")
+     code.includes("let fixed = (sc && box) ? Math.max(0, box.offsetHeight - sc.offsetHeight) : 0;") && !code.includes("space - 170")
      && code.includes("const rm = secselRoom(at.point.y, H, foot, secselTopEdge(), secselNeed(fixed, sc.scrollHeight));")
      && code.includes("if (want !== p.options.anchor) { p.options.anchor = want; p.setLngLat(p.getLngLat()); }")
      && code.includes("const SECSEL_MINROW = 90, SECSEL_MARGIN = 14;"));
+
+  // ===== 12 Nov 2026 — road card beside the Conditions panel (A1-L1; seen on live, Apr 2027, 1422 x 701: the B6047 card with its
+  // limit line, clicked at map (350, 351) with the Conditions panel open, opened ABOVE the click with its title 28 px under the
+  // figures bar: 350 px of map on its left, 360 to the panel on its right, and a card beside the click wants 404). =====
+  const narrow = F && F.secselNarrow;
+  ok("⭐ BESIDE (pure): where neither side has a whole 404 px, the card goes beside the click on the side with more room, at its own width narrowed to the room: the live case (click 350, free map ends 710, card 360) = to the RIGHT of the click, 342 px",
+     typeof narrow === 'function' && JSON.stringify(narrow(350, 1122, 710, 360)) === '{"anchor":"left","w":342}');
+  ok("BESIDE (pure): a side with at least the card's own width keeps it whole; the left of the click wins a tie (the hover tip is on the right); a side under 300 px is no side; neither = the old placing",
+     typeof narrow === 'function' && JSON.stringify(narrow(200, 1122, 1066, 360)) === '{"anchor":"left","w":360}'
+     && JSON.stringify(narrow(400, 1122, 800, 360)) === '{"anchor":"right","w":360}'
+     && JSON.stringify(narrow(100, 1122, 380, 360)) === '{"anchor":"","w":0}' && JSON.stringify(narrow(311, 1122, 600, 360)) === '{"anchor":"","w":0}'
+     && narrow(250, 1122, 580, 360).anchor === 'left' && narrow(250, 1122, 580, 360).w === 312);
+  ok("BESIDE (pure): a card with no width measured (0, NaN) is taken as the old 404 and narrowed to the room",
+     typeof narrow === 'function' && narrow(350, 1122, 710, 0).w === 342 && narrow(350, 1122, 710, NaN).w === 342);
+  if (typeof narrow === 'function' && fitRoad) {
+    // the live case in the stand-in: the map 1122 x 701, the timeline bar 103, the figures bar 98, the panel's edge 710, the click (350, 351), fixed part 213, table 605 px tall
+    const live = { W: 1122, H: 701, foot: 103, right: 710 };
+    const b = roadFit(213, 605, 351, 'bottom', 350, false, live);
+    ok("⭐ BESIDE (the live case): the card opened above the click, squeezed (253 - 34 - 213 + 14 = 20 px of table, under the 48 floor), is placed to the RIGHT of the click, narrowed to 342 px; its table then has twice the smaller room (2 x 247 - 34 - 213 + 14 = 261 px); the old code left it above with 48 px",
+       b.anchor === 'left' && b.moved === 1 && b.widths.join() === '342px' && b.narrowed === 1 && b.max === '261px');
+    ok("⭐ BESIDE (the live case, geometry): the card's top = 351 - (213 + 261 + 20) / 2 is not under the figures bar (98) and its foot not over the timeline bar (701 - 103 = 598)",
+       Math.round(351 - (213 + 261 + 20) / 2) >= 98 && Math.round(351 + (213 + 261 + 20) / 2) <= 598);
+    const lowerB = roadFit(213, 605, 342, 'top', 350, false, live);
+    ok("BESIDE: the lower spot (click 342, the card opened BELOW and 17 px over the timeline bar) is placed beside the click too",
+       lowerB.anchor === 'left' && lowerB.widths.join() === '342px');
+    const fits = roadFit(213, 605, 400, 'bottom', 350, false, live);
+    ok("BESIDE: a click that keeps the table's 48 px floor above it (y 400: 400 - 98 - 34 - 213 + 14 = 69 px) is NOT moved and not narrowed: the old placing stands",
+       fits.anchor === 'bottom' && fits.moved === 0 && fits.widths.length === 0 && fits.max === '69px');
+    const none = roadFit(213, 605, 351, 'bottom', 260, false, { W: 1122, H: 701, foot: 103, right: 520 });
+    ok("BESIDE: where neither side has 300 px (click 260, free map ends 520: 248 each side) the card keeps the old placing, its width untouched",
+       none.anchor === 'bottom' && none.widths.length === 0 && none.narrowed === 0);
+    const noRoom = roadFit(213, 605, 351, 'bottom', 350, false, { W: 1122, H: 701, foot: 103, right: 710, fixed2: 520 });
+    ok("BESIDE: if narrowing makes the card so tall that even beside the click the table would be under 48 px, it is put back to its own width and keeps the old placing",
+       noRoom.anchor === 'bottom' && noRoom.widths.join() === '342px,380px' && noRoom.narrowed === 0);
+    const again = roadFit(213, 605, 400, 'bottom', 350, false, Object.assign({ narrowed: 1 }, live));
+    ok("BESIDE: a card narrowed the last time is measured at its own width again (setMaxWidth back to 380 px) before it is placed",
+       again.widths[0] === '380px' && again.narrowed === 0 && again.anchor === 'bottom');
+    ok("BESIDE: the Conditions panel closed (the free map ends at the map's right edge less the buttons, 1066): the same click is placed by the old middle-band rule, not narrowed",
+       roadFit(213, 605, 351, 'bottom', 350, false, { W: 1122, H: 701, foot: 103, right: 1066 }).widths.length === 0);
+  } else ok("⭐ BESIDE (sandbox): fitRoadPopup or secselNarrow could not be read", false);
+  ok("⭐ BESIDE (source): the narrowing is used only where the table would fall under its 48 px floor, and the card is measured at its own width each time",
+     code.includes("const SECSEL_GAP = 12, SECSEL_MINW = 300, SECSEL_EDGE = 6;") && code.includes("function secselNarrow(x, W, right, natW) {")
+     && code.includes("if (room0 - fixed + SECSEL_MARGIN < 48) {") && code.includes("p.setMaxWidth(nar.w + 'px'); SECSEL.narrowed = 1;")
+     && code.includes("if (SECSEL.narrowed) { try { p.setMaxWidth('380px'); } catch (e) {} SECSEL.narrowed = 0; }"));
 
   // ===== 11 Nov 2026 — map popup top (seen on live at 1422 x 677, the road card's live check: a holding area's popup,
   // placed by the map above its point, ran 75 -> 308 with the figures bar's edge at 98: its title 23 px under the bar) =====
@@ -8155,8 +8280,8 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("⭐ ONE POPUP: over a marker the road's hover tip gives way (it promised the road's card), through the tip's own hidden path",
      /if \(!card\) return;\s*if \(f && e && e\.point && typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) e = null;\s*if \(!f \|\| !e \|\| !e\.point \|\| isPhoneShell\(\)/.test(code));
   ok("ONE POPUP: the marker's own clicks are untouched, and a near miss on a road already stood aside for a marker (the clickable list names both layers)",
-     /map\.on\('click', 'locations', \(e\) => \{\s*if \(!e\.features \|\| !e\.features\.length\) return;\s*const p = e\.features\[0\]\.properties;/.test(code)
-     && /map\.on\('click', 'site-gates', \(e\) => \{\s*if \(!e\.features \|\| !e\.features\.length\) return;\s*new mapboxgl\.Popup/.test(code)
+     /map\.on\('click', 'locations', \(e\) => \{\s*if \(!e\.features \|\| !e\.features\.length\) return;\s*(?:\{ const top = [^\n]*\n\s*)?const p = e\.features\[0\]\.properties;/.test(code)
+     && /map\.on\('click', 'site-gates', \(e\) => \{\s*if \(!e\.features \|\| !e\.features\.length\) return;\s*(?:\{ const top = [^\n]*\n\s*)?new mapboxgl\.Popup/.test(code)
      && /const CLICKABLE_LAYERS = \[[^\]]*'site-gates',\s*'locations'/.test(code) && code.includes("if (typeof clickableAt === 'function' && clickableAt(e.point)) return;"));
   ok("POPUP TOP: in the Dark look a popup beside its point has a tip that points sideways (the plain Dark rule coloured the two edges that must stay clear)",
      html.includes('html[data-look="dark"] .mapboxgl-popup-anchor-left .mapboxgl-popup-tip{ border-top-color:transparent; border-bottom-color:transparent; border-right-color:var(--surface); }')
@@ -8183,11 +8308,115 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      html.includes("body.has-demo-notice #share-panel, body.has-demo-notice #rme-panel{ top:calc(50% + var(--notice-h, 26px) / 2); max-height:calc(100vh - 24px - var(--notice-h, 26px)); }")
      && html.indexOf("body.has-demo-notice #share-panel, body.has-demo-notice #rme-panel{") > html.indexOf("#rme-panel{ position:fixed;"));
   ok("⭐ CARBON WORDS (finding 7: R045 charges 43 % of the way back, the card said 'both legs'): the CO₂e card says what is counted, true for all three return journeys",
-     code.includes("card(co2t.toFixed(1)+' t','CO₂e (est.)','loaded, plus the scheme’s share of the return'+(unbakedM?")
-     && !code.includes("'both legs'") && !/CO₂e \(est\.\)','both legs/.test(code));
-  ok("CARBON WORDS: the distance cards are unchanged (the lorry does drive the round trip) and the new words name no setting, share or method",
-     code.includes("'Round trip','Loaded out, empty back'") && code.includes("'Total trips','one-way loaded runs'")
+     // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"): what is counted is
+     // said in the card's "i" (the card is a figure and a label now), in words still true for all three return journeys
+     code.includes("exhaust emissions of each loaded journey and the scheme’s share of the empty return")
+     && code.includes("'CO₂e (est.)' + co2Words + tip")
+     && !code.includes("'both legs'") && !/CO₂e \(est\.\)','both legs/.test(code) && !/both legs/.test(code.slice(code.indexOf("function rsFactsHTML"), code.indexOf("function rsCtlHTML"))));
+  // REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1 "This route"; John's "Yes, option A"), his call 4: the
+  // round-trip distance card and "Total trips · one-way loaded runs" are gone (six cards for ten): the one-way distance and
+  // "Loads in all" stay. The carbon words still name no setting, share or method
+  ok("CARBON WORDS: the distance card is the one-way distance and the loads card reads 'Loads in all' (were four cards); the carbon words name no setting, share or method",
+     code.includes("'One way, by road'") && code.includes("'Loads in all'")
+     && !code.includes("'Round trip','Loaded out, empty back'") && !code.includes("'Total trips','one-way loaded runs'")
      && !/scheme’s share[^']*(43|per cent|%|return_mode|RICS)/.test(code));
+}
+
+// ---- 10 Nov 2026 (claude/map-first-view, frontier check Ideas 1 and 3, John's F1 / F2): the map opens on this month, a
+// cleared month travels in the link as month=none, and the title block says when the forecast last changed. Every pin
+// below fails on main 992c4d3 (no firstViewMonth, no month=none, "Approved plan · forecast" hard-coded).
+{
+  const fvBody = cut0(code, "function firstViewMonth(){", "function announceTimeline(");
+  ok("⭐ FIRST VIEW: firstViewMonth is today's month clamped to the plan's first and last month with volume, null with no plan",
+     /const span = TL\.matrix && TL\.matrix\.span;\s*if\(!span\) return null;\s*return Math\.min\(span\[1\], Math\.max\(span\[0\], currentMonthIndex\(\)\)\);/.test(fvBody));
+  {
+    let F = null, err = "";
+    const TL = { matrix: null };
+    let now = 11;
+    try { F = new Function("TL", "currentMonthIndex", fvBody + "\nreturn firstViewMonth;")(TL, () => now); } catch (e) { err = String(e); }
+    ok("FIRST VIEW (sandbox): firstViewMonth runs", !!F, err);
+    if (F) {
+      ok("⭐ FIRST VIEW (sandbox): no plan with volume = no month (the map stays on 'No month on screen')", F() === null);
+      TL.matrix = { span: [3, 40] };
+      ok("⭐ FIRST VIEW (sandbox): inside the plan = this month", (now = 11, F()) === 11);
+      ok("⭐ FIRST VIEW (sandbox): before the plan's first month = its first month", (now = 1, F()) === 3);
+      ok("⭐ FIRST VIEW (sandbox): after its last month = its last month", (now = 55, F()) === 40);
+    }
+  }
+  const avBody = cut0(code, "function applyViewFromUrl() {", "function applyPendingRestr()");
+  ok("⭐ FIRST VIEW: with no month in the link the map opens on firstViewMonth once the months are in; a link's month still wins",
+     /const firstView = !v\.month && !v\.noMonth && !\(v\.layers && v\.layers\.indexOf\('forecast'\) >= 0\);/.test(avBody)
+     && /if \(v\.month\) ensureTimelineMatrix\(\)\.then\(\(\) => pickMonth\(v\.month\)\)\.catch\(\(\) => \{\}\)\.then\(done\);\s*else if \(firstView\) ensureTimelineMatrix\(\)\.then\(/.test(avBody)
+     && /if \(m && !TL\.on && !TL\.cleared && !TL\.playing && !\(fc && fc\.checked\)\) pickMonth\(m\);/.test(avBody));
+  ok("⭐ FIRST VIEW: a cleared month (closeTimeline) is remembered and a month on screen (openTimeline) forgets it",
+     /function closeTimeline\(\)\{[\s\S]{0,200}TL\.cleared = true;/.test(code) && /function openTimeline\(\)\{[\s\S]{0,120}TL\.cleared=false;/.test(code)
+     && /if \(v\.noMonth && !v\.month\) TL\.cleared = true;/.test(avBody));
+  ok("⭐ FIRST VIEW: the link of a cleared view says month=none, and the share link and the QR's short form carry it",
+     /else if \(v\.noMonth\) q\.set\('month', 'none'\);/.test(code) && /out\.noMonth = q\.get\('month'\) === 'none';/.test(code)
+     && /month: TL\.on \? TL\.month : null, noMonth: !TL\.on && !!TL\.cleared,/.test(code)
+     && code.includes("encodeView({ month: v.month, noMonth: v.noMonth, layers: VIEW.defaults, filters: {} }, VIEW.defaults)"));
+  {
+    const ev = cut0(code, "function encodeView(v, defaults) {", "function selectedText(id)");
+    let E = null, err = "";
+    try {
+      E = new Function("BASEMAP_LINK", "LIGHT_PRESETS", "VIEW_FILTER_KEYS", "monthParam", "monthFromParam", "basemapFromKey", "areaFromParam",
+        ev + "\nreturn { encodeView, decodeView };")({}, [], ['origin'], m => '2026-' + String(m).padStart(2, '0'),
+        s => (/^2026-(\d\d)$/.exec(s) ? Number(/^2026-(\d\d)$/.exec(s)[1]) : null), () => null, () => null);
+    } catch (e) { err = String(e); }
+    ok("FIRST VIEW (sandbox): encodeView / decodeView run", !!E, err);
+    if (E) {
+      ok("⭐ FIRST VIEW (sandbox): a cleared view encodes month=none; a month encodes the month; the plain view encodes nothing",
+         E.encodeView({ month: null, noMonth: true, layers: [], filters: {} }, []) === 'month=none'
+         && E.encodeView({ month: 11, noMonth: false, layers: [], filters: {} }, []) === 'month=2026-11'
+         && E.encodeView({ month: null, layers: [], filters: {} }, []) === '');
+      const d = E.decodeView('?month=none'), d2 = E.decodeView('?month=2026-11'), d3 = E.decodeView('');
+      ok("⭐ FIRST VIEW (sandbox): month=none decodes as the cleared view (no month), a month as that month, nothing as neither",
+         d.noMonth === true && d.month === null && d2.noMonth === false && d2.month === 11 && d3.noMonth === false && d3.month === null);
+    }
+  }
+  // Idea 3: the title block
+  ok("⭐ UPDATED: the title's second line comes from planSubHTML, no longer the fixed 'Approved plan · forecast'",
+     code.includes("setHTML('kpi-title', `${esc(label)}<span class=\"kpi-sub\">${planSubHTML()}</span>`);")
+     && !code.includes("<span class=\"kpi-sub\">Approved plan \\u00b7 forecast</span>`);"));
+  ok("⭐ UPDATED: the matrix keeps the server's plan_updated only when it is a YYYY-MM-DD date",
+     code.includes("const planUpdated = /^\\d{4}-\\d{2}-\\d{2}$/.test(j.plan_updated || '') ? j.plan_updated : null;"));
+  ok("⭐ UPDATED: the 'i' box sits in the figures bar, hidden, and its button names what it is about",
+     html.includes('<div class="info-pop kpi-plan-pop" id="info-plan" role="note" hidden></div>')
+     && code.includes('aria-controls="info-plan" onclick="toggleInfo(this)" title="About the plan" aria-label="About the plan"'));
+  {
+    const a = code.indexOf("const PLAN_MONTHS = "), b = code.indexOf("function calculateKPIs(oFilter");
+    let U = null, err = "";
+    const TL = { matrix: null };
+    const pop = { hidden: true, innerHTML: '' };
+    const RME = { staff: false };
+    try {
+      U = new Function("TL", "document", "RME", code.slice(a, b) + "\nreturn { planDate, planSubHTML, planInfoHTML, renderPlanInfo };")(
+        TL, { getElementById: id => id === 'info-plan' ? pop : null }, RME);
+    } catch (e) { err = String(e); }
+    ok("UPDATED (sandbox): the plan helpers run", !!U, err);
+    if (U) {
+      ok("⭐ UPDATED (sandbox): no date from the server = the old words and no 'i' (a date is never made up)",
+         U.planSubHTML() === 'Approved plan · forecast' && U.planDate(false) === '');
+      TL.matrix = { planUpdated: '2026-10-31' };
+      ok("⭐ UPDATED (sandbox): with a date the line reads 'Approved plan · updated 31 Oct' and carries the 'i'",
+         U.planSubHTML().indexOf('Approved plan · updated 31 Oct<button type="button" class="info-i" aria-expanded="false" aria-controls="info-plan"') === 0);
+      const words = U.planInfoHTML(false).replace(/<[^>]+>/g, ' ').trim().split(/\s+/);
+      ok("⭐ UPDATED (sandbox): the 'i' box is the approved sentence, 20 words, at most 30",
+         U.planInfoHTML(false) === '<p>A forecast from the approved plan, last changed on 31 Oct 2026. Months further ahead are more likely to change.</p>'
+         && words.length === 20, words.length);
+      ok("⭐ UPDATED (sandbox): the guide link is for staff only (/help/ is behind the staff sign-in); a resident gets the sentence alone",
+         !/href=/.test(U.planInfoHTML(false)) && U.planInfoHTML(true).includes('<a href="/help/#ug-map-updated" target="_blank" rel="noopener">Guide ›</a>'));
+      U.renderPlanInfo();
+      ok("UPDATED (sandbox): renderPlanInfo writes the box", pop.innerHTML.includes('last changed on 31 Oct 2026'));
+      pop.hidden = false;
+      ok("UPDATED (sandbox): the rebuilt title keeps the open box's button pressed (the bar is rebuilt on every Play tick)",
+         U.planSubHTML().includes('aria-expanded="true"'));
+      TL.matrix = { planUpdated: '2026-13-01' };
+      ok("UPDATED (sandbox): a malformed date shows no date", U.planSubHTML() === 'Approved plan · forecast');
+    }
+  }
+  ok("UPDATED: the staff answer re-renders the box (the guide link)",
+     /RME\.staff = !!\(j && j\.level === 'staff'\);[^\n]*\n\s*if \(typeof renderPlanInfo === 'function'\) renderPlanInfo\(\);/.test(code));
 }
 
 Promise.all(ASYNC_PINS).catch(e => { fail.push("an async pin block threw  " + (e && e.stack || e)); }).then(() => {
