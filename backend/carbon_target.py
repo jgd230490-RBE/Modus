@@ -295,15 +295,16 @@ def status(acc, target, factors=None):
     scope = "team" if (acc or {}).get("ipt") else "scheme"
     invalid = None
     alt = None
+    pre = {}   # 11 Nov 2026 (X-F1 part 2): the route figures read once for all of this read's scenarios (carbon._Geo)
     try:
         sc = carbon.scenario(acc, alternatives=[{"name": "Target", "levers": target.get("levers") or []}],
-                             status="Approved", factors=factors)
+                             status="Approved", factors=factors, pre=pre)
         alt = sc["alternatives"][0]
     except carbon.CarbonError as e:
         invalid = (f"The agreed decisions no longer fit the plan ({e}), so the plan with them cannot be "
                    f"worked out. A planner needs to set the target again on the Carbon planner.")
-        sc = carbon.scenario(acc, status="Approved", factors=factors)
-    pend = carbon.scenario(acc, status="Pending", factors=factors)
+        sc = carbon.scenario(acc, status="Approved", factors=factors, pre=pre)
+    pend = carbon.scenario(acc, status="Pending", factors=factors, pre=pre)
     approved = _r3(sc["baseline"]["totals"]["total_t"])
     with_dec = _r3(alt["totals"]["total_t"]) if alt is not None else None
     share_pct = None
@@ -316,7 +317,7 @@ def status(acc, target, factors=None):
             whole = dict(acc or {}, ipt=None)
             try:
                 sw = carbon.scenario(whole, alternatives=[{"name": "Target", "levers": target.get("levers") or []}],
-                                     status="Approved", factors=factors)
+                                     status="Approved", factors=factors, pre=pre)
                 s_approved = sw["baseline"]["totals"]["total_t"]
                 s_with = sw["alternatives"][0]["totals"]["total_t"]
                 s_target = (s_approved * (1.0 - float(target["pct_below"]) / 100.0) if target["mode"] == "pct"
