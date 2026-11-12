@@ -1141,7 +1141,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
     .tab-cards>tbody>tr.clp-kid{margin-left:40px;}
     .tab-cards>tbody>tr.clp-kid td:first-child{padding-left:0;}
     .tab-cards .row-st{white-space:normal;text-align:left;}
-    .tab-cards>tbody>tr>td>span{display:inline-block;max-width:100%;white-space:normal;}   /* a chip in a card cell wraps inside its column (Zones' "Routed through @ 12 mph" ran into From) */
+    .tab-cards>tbody>tr>td>span:not(.block){display:inline-block;max-width:100%;white-space:normal;}   /* a chip in a card cell wraps inside its column (Zones' "Routed through @ 12 mph" ran into From) */
+    .tab-cards>tbody>tr>td>span.block{display:block;max-width:100%;white-space:normal;}   /* 12 Nov 2026 (batch 5): a second line keeps its own line in a card, as at a desk ("2 Nov 2026Approver Name" ran together under Last issue) */
     .tab-cards .tc-only{display:inline-block !important;margin-left:10px;}
   }
   .tc-only{display:none !important;}
