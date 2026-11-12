@@ -4790,7 +4790,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   const card = a < 0 ? "" : code.slice(a, b);
   ok("⭐ SITE LAYOUT: a card under Site areas for a saved location, with the page's ONE map and the three refs",
      // NARROWED 31 Oct 2026 (PR 2): the card also gets `drawing` and `onDraw` (planners and admins only)
-     card.length > 3000 && src.includes('{form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef}\n')
+     // NARROWED 12 Nov 2026 (CLOCS card C-X1): + frameRef (a site's row click frames its layout)
+     card.length > 3000 && src.includes('{form.id && <SiteLayoutCard locId={form.id} mapRef={mapObj} mapReady={mapReady} handleRef={layoutHandle} pickRef={layoutPickRef} reinstallRef={layoutReinstallRef} frameRef={layoutFrameRef}\n')
      // NARROWED 8 Nov 2026 (task 2.1-12): + onZones (the Zones list read again after a works area is saved)
      && src.includes('drawing={!!drawing} onDraw={ACCESS.info && ACCESS.info.can_approve ? (pid) => setDrawing({ locId: form.id, phaseId: pid }) : null}\n                  onZones={() => reloadZones().catch(e => console.warn("Wayscope:", e))} />}')
      && src.lastIndexOf("<SiteLayoutCard ") > src.indexOf('data-site-areas="1"') && card.includes('data-site-layout="1"'));
