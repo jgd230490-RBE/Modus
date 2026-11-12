@@ -260,8 +260,11 @@ def _stand_in(pages_at):
     return nl
 
 
+# NARROWED 12 Nov 2026 (A-F8, the ladder's fifth step): each stand-in gives a page count for all five steps; (6, 6, 6, 5)
+# was served at step 3 (the last then) and is now tried once more at step 4; where no step fits, the LAST step is served
 try:
-    for pages_at, want in (((4, 4, 4, 4), 0), ((5, 4, 4, 4), 1), ((5, 5, 5, 4), 3), ((6, 6, 6, 5), 3)):
+    for pages_at, want in (((4, 4, 4, 4, 4), 0), ((5, 4, 4, 4, 4), 1), ((5, 5, 5, 4, 4), 3), ((6, 6, 6, 5, 4), 4),
+                           ((6, 6, 6, 6, 5), 4)):
         del _calls[:]
         export._newsletter = _stand_in(pages_at)
         out = export.build_bulletin_pdf({"x": 1})
@@ -271,11 +274,49 @@ try:
 finally:
     export._newsletter = _real_nl
 
+# 12 Nov 2026 (A-F8, decided under John's one-hour rule): the ladder's LAST step takes half a point off page 2's tables
+# and gives the route names the room of shorter bars; no 7 pt step; months that fit earlier keep their look
+_FL = export.NEWSLETTER_FIT[-1]
+ok("FIT5 five steps; only the last sets page 2's tables (half a point smaller) and the bar (0.20 of the width)",
+   len(export.NEWSLETTER_FIT) == 5 and _FL.get("table") == -0.5 and _FL.get("bar") == 0.20
+   and all("table" not in f and "bar" not in f for f in export.NEWSLETTER_FIT[:-1]), str(_FL))
+ok("FIT6 no step below half a point (a 7 pt step was measured and left out): route rows 7.5 pt at the most",
+   min(f.get("table", 0) for f in export.NEWSLETTER_FIT) == -0.5)
+_K3, _K4 = export._Kit(180 * mm, export.NEWSLETTER_FIT[3]), export._Kit(180 * mm, _FL)
+ok("FIT7 page 2's row style is the body (8.5 pt) up to step 3, 8 pt at the last step, its leading in step",
+   _K3.st_t.fontSize == 8.5 and _K3.st_t.leading == 10.8 and _K4.st_t.fontSize == 8.0 and _K4.st_tr.alignment == 2
+   and abs(_K4.st_t.leading - 10.8 * 8 / 8.5) < 0.01, f"{_K3.st_t.fontSize} {_K4.st_t.fontSize} {_K4.st_t.leading}")
+_SR = {"routes": [row("R001", "Northfield Quarry to Stockpile North", 11)], "prev_long": "March 2027",
+       "map_legend_title": "Lorry movements a day"}
+
+
+def _route_table(kit):
+    t = kit.routes_table(_SR)
+    return t, t._colWidths, t._cellvalues[1][1].style.fontSize
+
+
+_t3, _w3, _f3 = _route_table(_K3)
+_t4, _w4, _f4 = _route_table(_K4)
+ok("FIT8 at the last step the route rows are 7.5 pt (8 pt before) and the bar 0.20 of the width (0.25 before)",
+   _f3 == 8 and _f4 == 7.5 and abs(_w3[2] - 180 * mm * 0.25) < 0.01 and abs(_w4[2] - 180 * mm * 0.20) < 0.01, f"{_f3} {_f4}")
+ok("FIT9 the bar's room goes to the route name: the table still makes the whole width at both steps",
+   abs(_w4[1] - _w3[1] - 180 * mm * 0.05) < 0.01 and abs(sum(_w3) - 180 * mm) < 0.01 and abs(sum(_w4) - 180 * mm) < 0.01,
+   f"{[round(w) for w in _w3]} {[round(w) for w in _w4]}")
+ok("CONT1 the run-on head is 'Routes and roads (continued)'", export.CONTINUED == "Routes and roads (continued)")
+_src = open(os.path.join(BACKEND, "export.py"), encoding="utf-8").read()
+_p2 = _src[_src.index('story.append(kicker("02", "Routes and roads"))'):_src.index('# ---- 03 councils')]
+ok("CONT2 page 2 sets the continued head right after its own and clears it before the councils' page (SetTopFlowables)",
+   _p2.index('SetTopFlowables([kicker("02", CONTINUED)])') < _p2.index('P("Every route this month"')
+   and _p2.rstrip().endswith("P, st_r = K.P, K.st_r") and "story.append(SetTopFlowables([]))" in _p2
+   and _p2.count("story.append(SetTopFlowables(") == 2)
+ok("CONT3 page 2's own rows take the table style; P and st_r are the body's again for the councils",
+   "P = lambda t, style=None: K.P(t, style or K.st_t)" in _p2 and "st_r = K.st_tr" in _p2)
+
 # 12 Nov 2026 (A-F8 (a), John's yes): the route column takes the room the Map and "In the month" columns do not use
 from reportlab.pdfbase.pdfmetrics import stringWidth  # noqa: E402
 _u = 180 * mm
 ok("ROUTE1 the route table still makes the whole width (map, route, bar 0.25, in the month, last month 0.07, flag 0.10)",
-   abs(sum(export.ROUTE_COLS) + 0.25 + 0.07 + 0.10 - 1.0) < 1e-9, str(export.ROUTE_COLS))
+   abs(sum(export.ROUTE_COLS) + export.ROUTE_BAR + 0.07 + 0.10 - 1.0) < 1e-9 and export.ROUTE_BAR == 0.25, str(export.ROUTE_COLS))
 ok("ROUTE2 the route column is wider than before (0.42) and the Map column still holds two letters and a dash",
    export.ROUTE_COLS[1] > 0.42 and _u * export.ROUTE_COLS[0] - 8 >= stringWidth("M–G", export._BF("regular"), 8))
 ok("ROUTE3 'month' in the In the month header fits its column whole (it broke as mont / h at 0.06)",

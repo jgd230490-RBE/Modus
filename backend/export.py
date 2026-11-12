@@ -2053,11 +2053,18 @@ TABLE_LOOK = [ ("BACKGROUND", (0, 0), (-1, 0), HEAD_TINT),
 #: one step at a time, until each section fits again (D43: four pages). Nothing is left out and nothing moves: the gaps
 #: between rows and sections close, the council carbon map gives some height, and at the last steps the small print
 #: (grey notes, sources, terms) steps down to 7 pt. Step 0 is the look of 14 Oct; the leaflet always uses step 0.
+#: 12 Nov 2026 (A-F8, decided under John's one-hour rule, not by his explicit yes): a LAST step for page 2 only, its tables
+#: half a point smaller (route rows 8 to 7.5 pt, the "what is moved" and works rows 8.5 to 8 pt) and the route bars 0.20 of
+#: the width (0.25), the room going to the route names. No step below it (a 7 pt step was measured and left out). A month
+#: that fits at an earlier step keeps that step's look. Where page 2 still cannot fit, it runs on to a page headed "Routes
+#: and roads (continued)" (`_newsletter`): five pages, which bends D43 in that case only.
 NEWSLETTER_FIT = (
     {"pad": 2.2, "small_pad": 1.3, "lot_pad": 2.5, "sec_before": 7, "council_map": 70, "small": 7.5, "terms": 8},
     {"pad": 1.6, "small_pad": 1.0, "lot_pad": 1.8, "sec_before": 5.5, "council_map": 60, "small": 7.5, "terms": 8},
     {"pad": 1.2, "small_pad": 0.8, "lot_pad": 1.4, "sec_before": 4.5, "council_map": 52, "small": 7.2, "terms": 7.5},
     {"pad": 1.0, "small_pad": 0.6, "lot_pad": 1.0, "sec_before": 4, "council_map": 46, "small": 7.0, "terms": 7.2},
+    {"pad": 1.0, "small_pad": 0.6, "lot_pad": 1.0, "sec_before": 4, "council_map": 46, "small": 7.0, "terms": 7.2,
+     "table": -0.5, "bar": 0.20},
 )
 
 
@@ -2071,6 +2078,10 @@ class _Kit:
         st = ParagraphStyle("b", fontName=r, fontSize=8.5, leading=10.8)
         self.st = st
         self.st_r = ParagraphStyle("r", parent=st, alignment=2)
+        # 12 Nov 2026 (A-F8): page 2's table rows; the body size until the ladder's last step takes half a point off
+        t = fit.get("table", 0)
+        self.st_t = ParagraphStyle("t", parent=st, fontSize=8.5 + t, leading=round(10.8 * (8.5 + t) / 8.5, 2))
+        self.st_tr = ParagraphStyle("tr", parent=self.st_t, alignment=2)
         # 14 Oct 2026 (the publishing check): light table heads (ink on a pale band), not white on ink
         self.st_h = ParagraphStyle("h", parent=st, fontName=b, fontSize=7.5, leading=9.5, textColor=colors.Color(*NAVY_RGB))
         self.st_hr = ParagraphStyle("hr", parent=self.st_h, alignment=2)
@@ -2157,9 +2168,10 @@ class _Kit:
         table and the chart below it, which printed the same figures twice."""
         E, P, st_h, st_r = self.E, self.P, self.st_h, self.st_r
         st_hr = self.st_hr
-        bar_w = self.usable * 0.25
+        bar_w = self.usable * self.fit.get("bar", ROUTE_BAR)
         vmax = max([r["a_day"] or 0 for r in S["routes"]] + [r.get("cap_at") or r["cap"] or 0 for r in S["routes"]] + [1])
-        sm = ParagraphStyle("rt", parent=self.st, fontSize=8, leading=9.8)
+        t = self.fit.get("table", 0)
+        sm = ParagraphStyle("rt", parent=self.st, fontSize=8 + t, leading=round(9.8 * (8 + t) / 8, 2))
         smr = ParagraphStyle("rtr", parent=sm, alignment=2)
         prev = (S["prev_long"] or "Last month")[:3] if S.get("prev_long") else "Last month"
         smg = ParagraphStyle("rtg", parent=sm, textColor=colors.Color(*GREY))
@@ -2178,7 +2190,9 @@ class _Kit:
         # 12 Nov 2026 (A-F8 (a), John's yes): the route column takes what the Map and "In the month" columns do not use
         # (two letters and a dash, a four-figure count, "month" whole in the header), so most names fit on one line: 14 of 23 wrapped in Apr
         # 2027 on a local copy and page 2 ran over (it was 0.06 / 0.42 / 0.10)
-        return self.grid(rows, [u * ROUTE_COLS[0], u * ROUTE_COLS[1], bar_w, u * ROUTE_COLS[2], u * 0.07, u * 0.10])
+        # 12 Nov 2026 (A-F8): a shorter bar gives its room to the route name
+        return self.grid(rows, [u * ROUTE_COLS[0], u * (ROUTE_COLS[1] + ROUTE_BAR) - bar_w, bar_w, u * ROUTE_COLS[2],
+                                u * 0.07, u * 0.10])
 
     def brief(self, S, title="Key points"):
         E, P = self.E, self.P
@@ -2299,6 +2313,8 @@ NEWSLETTER_MAP_HEIGHTS = (100 * mm, 92 * mm, 84 * mm, 76 * mm, 68 * mm, 60 * mm,
 #: 12 Nov 2026 (A-F8 (a)): page 2's route table, the Map, Route and "In the month" columns (with the bar 0.25, the last
 #: month 0.07 and the planning flag 0.10 they make the whole width)
 ROUTE_COLS = (0.05, 0.465, 0.065)
+ROUTE_BAR = 0.25                   # the route bar's share of the width (the ladder's last step: NEWSLETTER_FIT "bar")
+CONTINUED = "Routes and roads (continued)"   # the head of page 2's run-on page (A-F8, 12 Nov 2026)
 
 
 class _PageMark(Flowable):
@@ -2321,6 +2337,7 @@ def _newsletter(S, map_h, pages=None, fit=None):
     the works; page 3 the councils; page 4 the carbon panel with numbered references, the glance, what changed, the four
     terms, caveats and one numbered Sources list (sources were printed beside every row and on every page)."""
     from reportlab.platypus import PageBreak, CondPageBreak
+    from reportlab.platypus.flowables import SetTopFlowables
     buf = io.BytesIO()
     doc, usable = _bulletin_doc(S, "", buf, pages)   # 10 Nov 2026 (25b): was "monthly newsletter" — one name, the bulletin
     K = _Kit(usable, fit)
@@ -2354,6 +2371,12 @@ def _newsletter(S, map_h, pages=None, fit=None):
     mark = _PageMark()
     story.append(mark)
     story.append(kicker("02", "Routes and roads"))
+    # 12 Nov 2026 (A-F8): where page 2 cannot fit even at the ladder's last step, the page it runs on to is headed
+    # CONTINUED (SetTopFlowables heads every new page until it is cleared before the councils' page); page 2's rows take
+    # the table style (`K.st_t`, the body size until that step)
+    story.append(SetTopFlowables([kicker("02", CONTINUED)]))
+    P = lambda t, style=None: K.P(t, style or K.st_t)   # noqa: E731
+    st_r = K.st_tr
     story.append(P("Every route this month", st_sec))
     story.append(K.routes_table(S))
     story.append(P(E(f"Bars in each route's map colour. Planning flag: the scheme's own daily limit, the dashed red mark "
@@ -2392,6 +2415,8 @@ def _newsletter(S, map_h, pages=None, fit=None):
         story.append(P(f"<b>{E(o['kind'])}.</b> " + E(o["text"]), st_grey))
     story.append(KeepTogether([P("What changed since last month", st_sec),
                                P(E(S["change_text"]) + " <font color='#64748B'>Each month's approved plan as it stands today.</font>")]))
+    story.append(SetTopFlowables([]))   # the councils' page and after: no continued head
+    P, st_r = K.P, K.st_r
 
     # ---- 03 councils (no council areas: the carbon panel takes the page)
     story.append(PageBreak())

@@ -19,6 +19,12 @@ THREE public traffic limits and builds the October 2026 newsletter (/api/bulleti
   * one limit (live's case): four pages, "4 of 4", the limit in the works table, in the traffic limits table and in the
     glance row, every numbered source present;
   * two and three limits: the page count is PRINTED, and asserted only as far as this branch holds it (see WHAT IS NOT).
+  * 12 Nov 2026 (A-F8, decided under John's one-hour rule): live's case, ONE limit, is four pages in EVERY month of the
+    demo (all 60; with no limit a month prints less, so it fits at the same step or an earlier one; a run over all 60 with
+    no limit as well took about 3 minutes more, so it is not repeated here); and where page 2 cannot fit even at the
+    ladder's last step (stand-in rows added to page 2's "What is being moved" table only, since a limit also adds to page
+    1's map key), the page it runs on to is headed "Routes and roads (continued)", the councils' page is not, and each
+    foot counts the pages.
 
 WHAT IS NOT PROVED: the demo package carries no road routes, so its council pages are shorter than live's (HERE lines cross
 more districts). A local copy with stand-in lines ran to five pages in Apr and May 2027 with NO limit (23 routes, page 2):
@@ -92,6 +98,18 @@ def recording_newsletter(S, map_h, pages=None, fit=None):
 
 export._newsletter = recording_newsletter
 PLAN = {"X-Access-Code": "plan-code-xyz"}
+PAD = {"rows": 0}   # A-F8: stand-in rows added to page 2's "What is being moved" table (page 2 only)
+_build = export.build_bulletin_pdf
+
+
+def padded_build(S, *a, **k):
+    if PAD["rows"]:
+        S = dict(S, moved=list(S["moved"]) + [{"name": f"Stand-in discipline {i}", "a_day": "1", "vehicles": "1",
+                                                "t_day": "10"} for i in range(PAD["rows"])])
+    return _build(S, *a, **k)
+
+
+export.build_bulletin_pdf = padded_build
 
 # live's limit (zone Z041, drawn 11 Nov) and two more on nearby roads, the longest names a limit is likely to carry
 B6047 = [[-0.92079, 52.622928], [-0.919984, 52.625588], [-0.919639, 52.626905], [-0.918539, 52.62966], [-0.918245, 52.630274],
@@ -102,6 +120,16 @@ B6047 = [[-0.92079, 52.622928], [-0.919984, 52.625588], [-0.919639, 52.626905], 
 LIMITS = [("B6047 Melton Road, Cold Newton turn to Tilton on the Hill", B6047, 150),
           ("Main Street, Tilton on the Hill, from the church to the Oakham road", [[p[0] + 0.01, p[1] + 0.004] for p in B6047], 60),
           ("Leicester Road and High Street through the village centre, both ways", [[p[0] - 0.02, p[1] - 0.006] for p in B6047], 100)]
+
+
+def every_month(c):
+    """the page count of every month of the demo, keyed by month"""
+    out = {}
+    for m in range(1, main.MONTH_COUNT + 1):
+        read_cache.clear()
+        r = c.get(f"/api/bulletin/month.pdf?month={m}", headers=PLAN)
+        out[m] = len([x for x in pdf_text(r.content).split("\f") if x.strip()]) if r.status_code == 200 else -r.status_code
+    return out
 
 
 def ladder_ok():
@@ -155,6 +183,9 @@ with TestClient(main.app, base_url="https://testserver") as c:
                r.status_code == 200 and len(pg) == 4 and all(f"{i} of 4" in p for i, p in enumerate(pg, 1)),
                f"{len(pg)} pages, step {step}")
             ok("...built tighter only as far as needed: the first step that fits", ladder_ok(), str(BUILT))
+            allm = every_month(c)
+            ok("⭐ A-F8: EVERY month of the demo, ONE limit (live's case): four pages", len(allm) == 60
+               and set(allm.values()) == {4}, str({m: n for m, n in allm.items() if n != 4}))
             # REVERSED 12 Nov 2026 (A-F8 (a), John's yes): printed ONCE, in page 2's works table with its figure; page 4
             # keeps the glance row only (it printed a second table there)
             ok("...nothing left out, printed once: the limit is page 2's works row with this month's figure, its limit and the plan word",
@@ -177,6 +208,22 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("...the three limits each once, all on page 2",
        len(pg) == 4 and all(sum(p.count(nm[:16]) for p in pg[1:]) == 1 and nm[:16] in pg[1] for nm, _, _ in LIMITS),
        str([(nm[:16], [p.count(nm[:16]) for p in pg]) for nm, _, _ in LIMITS]))
+
+    # 12 Nov 2026 (A-F8): page 2 that cannot fit even at the last step runs on to a page headed "Routes and roads
+    # (continued)"; the councils' page and the last page keep their own heads
+    PAD["rows"] = 45
+    r, pg, j, step = newsletter(c)
+    PAD["rows"] = 0
+    n = len(pg)
+    print(f"        three limits and 45 stand-in rows on page 2: {n} pages, fit step {step}")
+    ok("⭐ A-F8: page 2 that cannot fit at the last step runs on to a page headed \"Routes and roads (continued)\"",
+       n == 5 and step == len(export.NEWSLETTER_FIT) - 1 and pg[2].split("Fictional scheme", 1)[-1].lstrip().startswith(
+           "ROUTES AND ROADS (CONTINUED)"), f"{n} pages, step {step}: {pg[2][:300] if n > 2 else ''}")
+    ok("...the head is on that page only: the councils' and the carbon pages keep their own, each foot \"n of N\"",
+       n >= 5 and sum(p.count("ROUTES AND ROADS (CONTINUED)") for p in pg) == n - 4
+       and pg[-2].split("Fictional scheme", 1)[-1].lstrip().startswith("COUNCILS")
+       and pg[-1].split("Fictional scheme", 1)[-1].lstrip().startswith("CARBON AND THE SMALL PRINT")
+       and all(f"{i} of {n}" in p for i, p in enumerate(pg, 1)), f"{n} pages")
 
 print(f"{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
