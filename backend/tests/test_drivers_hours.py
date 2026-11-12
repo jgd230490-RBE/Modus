@@ -233,14 +233,24 @@ ok("carbon.ev_day: a battery that holds the trip but a day that holds none is NO
 #  8. The public map's JavaScript twin: the same cases, the same answers       #
 # =========================================================================== #
 _map = read("map/index.html")
-ok("⭐ the map's drawer applies the same rule (lorryDayTrips) instead of shift ÷ cycle, and says so on the card",
+# NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A "This route"; John's "Yes, option A"): the card is "Round
+# trips a lorry a day", a figure and a label (six short cards); the shift and the 9 h are in the user guide's A.2, and a 0
+# still says why in words
+ok("⭐ the map's drawer applies the same rule (lorryDayTrips) instead of shift ÷ cycle; a 0 says why on the card (the shift and the 9 h are in the guide)",
    "function lorryDayTrips(shiftH, driveMin, otherMin)" in _map and "P.shift_hours_per_day/cycleH" not in _map
-   and "' h shift less breaks, at most 9 h driving, '" in _map)
+   and "lorryDayTrips(P.shift_hours_per_day, (round/P.avg_haul_speed_kmh)*60, P.load_minutes+P.unload_minutes)" in _map
+   and "c(String(trips), trips > 0 ? 'Round trips a lorry a day' : 'one round trip does not fit a driver\\'s day')" in _map
+   and "Shift hours per" in read("frontend/help/index.html"))
 ok("the review: the drawer reads the SERVER's trips a day for the route when it has them (the routed cycle), and the "
    "rough estimate only without; 0 counts one lorry a trip",
    "const fromServer = typeof info.trips_per_day==='number';" in _map
    and "cur.trips_per_day=f.properties.trips_per_day; cur.cycle_hr=f.properties.cycle_hr;" in _map
-   and "Math.ceil(peakLoads/(Math.max(1, tripsPerDay)*P.working_days_per_month))" in _map)
+   # NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A "This route"; John's "Yes, option A"): the panel no
+   # longer works out "lorries for peak" of its own; a month's vehicles are routeFigures' (the server's trips a lorry a day
+   # per line, rounded up per line; a line without them is counted, never divided by zero)
+   and "const trips = fromServer ? info.trips_per_day" in _map
+   and "if (l.trips_per_vehicle_day > 0) vehicles += Math.ceil((vl / wd) / l.trips_per_vehicle_day); else unbaked++;" in _map
+   and "Math.ceil(peakLoads/" not in _map)
 _js = read("backend/tests/parse_map.js")
 ok("parse_map.js runs lorryDayTrips on THIS table (the two languages are held to one answer)",
    all(f"[{sh}, {d}, {o}, {n}]" in _js for sh, d, o, n, *_ in CASES), "")

@@ -144,6 +144,20 @@ import road_sections  # noqa: E402
 import gate  # noqa: E402
 import main  # noqa: E402
 
+# NARROWED 12 Nov 2026 (A-F7, claude/map-cold-open): the public map's three reads (map-data, forecast-matrix over the whole
+# horizon, month-kpis/months) answer kept JSON bytes now. A direct call clears the kept copy first (so it still builds, counts
+# and takes its slot as before) and reads the body back into the same dict the assertions always read.
+import read_cache  # noqa: E402
+
+
+def fresh_read(r):
+    return json.loads(r.body.decode("utf-8")) if hasattr(r, "body") else r
+
+
+def built(call):
+    read_cache.clear()
+    return fresh_read(call())
+
 PASS = 0
 FAIL = []
 
@@ -630,8 +644,8 @@ ok("5. 🔴 ...and NOT the largest route-month (a run carries a fraction of each
 ok("5. ...a month of another route's figure adds to a run only by that route's share; no figure at all gives None",
    road_sections.section_co2_max({}) is None and road_sections.section_co2_max({"R001": {M: None}}) is None
    and abs(road_sections.section_co2_max({"R001": {M: per_route["R001"]["co2_t"]}}) - max(shareA_ab["co2_t"], shareA_abc["co2_t"])) < 2e-3)
-_fm = main.public_forecast_matrix(from_=1, to=main.MONTH_COUNT, unit="vehicles", sections=1)
-_fm0 = main.public_forecast_matrix(from_=1, to=main.MONTH_COUNT, unit="vehicles", sections=0)
+_fm = built(lambda: main.public_forecast_matrix(from_=1, to=main.MONTH_COUNT, unit="vehicles", sections=1))
+_fm0 = built(lambda: main.public_forecast_matrix(from_=1, to=main.MONTH_COUNT, unit="vehicles", sections=0))
 ok("5. ⭐ forecast-matrix with sections=1 carries section_co2_max (the map's section stops); without it the key is absent",
    _fm.get("section_co2_max") is not None and _fm["section_co2_max"] >= max(ab["co2_t"], abc["co2_t"]) - 2e-3
    and "section_co2_max" not in _fm0, str(_fm.get("section_co2_max")))

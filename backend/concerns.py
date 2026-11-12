@@ -578,6 +578,24 @@ def _load(cid):
     return r
 
 
+def stamp():
+    """
+    11 Nov 2026 (card A-F4): the concerns table's state in one short string, for the key of a kept staff read that prints
+    concern figures (the bulletin). `concerns` is in db.NO_DATA_TABLES (a public send must not throw the kept staff reads
+    away), so a new, edited, closed or deleted concern does not move the data version; this stamp moves instead:
+    how many there are, the newest updated_at (seconds), and the total length of their histories (every edit through
+    _save appends an event, so two edits in the same second still differ). One small query.
+    """
+    tenant = db.current_tenant()
+    try:
+        rows = db.query("SELECT COUNT(*) AS n, MAX(updated_at) AS u, SUM(LENGTH(history_json)) AS h FROM concerns "
+                        "WHERE tenant_id = ?", (tenant,))
+    except Exception:      # no table yet: nothing to stamp
+        return "-"
+    r = rows[0] if rows else {}
+    return f"{int(r.get('n') or 0)}|{r.get('u') or ''}|{int(r.get('h') or 0)}"
+
+
 def _save(cid, sets, history, now):
     cols = ", ".join(f"{k} = ?" for k in sets)
     db.execute("UPDATE concerns SET {}, history_json = ?, updated_at = ? WHERE tenant_id = ? AND id = ?".format(cols),

@@ -439,6 +439,17 @@ try:
     ok("the web table: after the panel, the over word red, '2 more within their limits', the note",
        'data-bulletin="traffic-limits"' in h and '<td class="flag">Over</td>' in h and "2 more within their limits." in h
        and "a planning check, not a count on the road" in h)
+    # 12 Nov 2026 (A-F8 (a), John's yes): the printed newsletter prints EVERY public limit once, in its works table
+    ok("⭐ by_zone holds every public limit's row by its zone (eight), not only the six the web table shows",
+       len(Tm["by_zone"]) == 8 and set(Tm["by_zone"]) == {m_["id"] for m_ in many} | {z["id"]}
+       and all(r["zone_id"] == k for k, r in Tm["by_zone"].items()), str(sorted(Tm["by_zone"]))[:200])
+    import export
+    _ll = export._limit_line(lambda s: str(s), T["rows"][0])
+    ok("⭐ the works row's limit line: this month's figure, the limit and the plan word in the web table's words; Over red",
+       "This month, a day:" in _ll and T["rows"][0]["figure"] in _ll and "Limit:</font> 21 movements a day" in _ll
+       and "Plan:" in _ll and "<font color='#B91C1C'><b>Over</b></font>" in _ll, _ll)
+    ok("...a limit within reads Within, not coloured", "<b>" not in export._limit_line(
+       lambda s: str(s), dict(T["rows"][0], state="Within", state_key="ok")))
     for m_ in many:
         zones.update_zone(m_["id"], active=False)
     gl = bulletin_doc._glance({}, {}, [], [], [], None, [], None, "Nov 2027", None, T)
@@ -452,7 +463,13 @@ try:
     BD = read("backend/bulletin_doc.py")
     ok("source: the web page prints {traffic} after {lot}", "{lot}\n{traffic}\n" in BD)
     EX = read("backend/export.py")
-    ok("source: the newsletter prints the table after the panel, both places", EX.count('story += _traffic_flow(K, S.get("traffic"))') == 2)
+    # REVERSED 12 Nov 2026 (A-F8 (a), John's yes): the table after the panel is gone from the newsletter; the works row
+    # carries the figure, and the note goes under the works table
+    ok("source: the newsletter prints no table after the panel; the works row carries the limit, the note under it",
+       EX.count('story += _traffic_flow(K, S.get("traffic"))') == 0 and "_limit_line(E, lim) if lim" in EX
+       and 'story.append(P(E(S["traffic"]["note"]), st_grey))' in EX)
+    ok("the works word for a traffic limit is 'traffic limit' (it read 'local control')",
+       bulletin_doc.ZONE_WORDS.get("traffic_limit") == "traffic limit")
 
     data = {"lines": [{"route_id": "R2", "month": NOV27, "trips": 100.0}, {"route_id": "R2", "month": DEC27, "trips": 60.0}]}
     tr = clp_doc_layers.traffic_rows(data, ["R2"])
