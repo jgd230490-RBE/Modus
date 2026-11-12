@@ -3554,7 +3554,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const clpc = _cs > 0 && _ce > _cs ? src.slice(_cs, _ce) : "";
   ok("CLP: one block before BulletinMenu holds the section, its cards and its five chart builders",
      clpc.length > 4000 && ["function ClpCard(", "function clpBulletCfg(", "function clpShareCfg(", "function clpCouncilCfg(", "function clpCarbonCfg(",
-       "function clpTripsCfg(", "function ClpUncapped(", "function ClpMonitoring({ months, initial })"].every(f => clpc.includes(f)));
+       "function clpTripsCfg(", "function ClpUncapped(", "function ClpMonitoring({ months, initial })"].every(f => clpc.includes(f)));   // the D-F6 CLP_FOLD memory sits just above ClpMonitoring
   ok("⭐ CLP: read on FIRST OPEN only: the effect waits for open, GETs /api/clp/monitoring?month=N, keyed on open and the month",
      clpc.includes("if(!open) return;") && clpc.includes("fetch(`${API}/clp/monitoring?month=${month}`)") && clpc.includes("}, [open, month]);")
      // NARROWED 14 Oct 2026 (W10, the same session): a second fetch, the CLP pack, on a button press only
