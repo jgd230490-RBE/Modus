@@ -928,7 +928,7 @@ CSV keeps the path. The carbon target's write carries the decisions, never a fig
 <h2 id="t4-env">Settings the app reads (8 Nov 2026)</h2>
 <p>Set by hand on Render (the Blueprint marks them <code>sync: false</code>). Any other name is ignored.</p>
 <div class="tbl" tabindex="0" role="region" aria-label="Settings the app reads"><table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody>
-<tr><td class="k"><code>DATABASE_URL</code></td><td>Postgres; unset = a local SQLite file. <code>DB_POOL=0</code> turns the connection pool off, <code>DB_POOL_MAX</code> sets its size (default 6).</td></tr>
+<tr><td class="k"><code>DATABASE_URL</code></td><td>Postgres; unset = a local SQLite file. <code>DB_POOL=0</code> turns the connection pool off, <code>DB_POOL_MAX</code> sets its size (default 6). <code>DB_POOL_WAIT_S</code> is how long a request waits for a free pooled connection before opening its own (default 3 s; 0 = no wait; at most 30).</td></tr>
 <tr><td class="k"><code>TENANT_ID</code></td><td>The organisation this deployment serves (default <code>default</code>).</td></tr>
 <tr><td class="k"><code>HERE_API_KEY</code>, <code>MAPBOX_TOKEN</code>, <code>OS_MAPS_KEY</code>, <code>GOOGLE_MAPS_API_KEY</code>, <code>GOOGLE_MAPS_URL_SIGNING_SECRET</code></td><td>Routing, the maps and PDFs' base maps, the OS map (unset = no OS line in the Basemap list), Street View.</td></tr>
 <tr><td class="k"><code>GATE_SECRET</code>, <code>MAP_PASSWORD</code></td><td>Signs the map's cookie; the public map's shared password.</td></tr>
