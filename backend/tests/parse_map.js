@@ -4568,16 +4568,22 @@ function qrRead(mod) {
   ok("M3: the rail's legend names its three marks; the keys are Space, the two arrows and Esc",
      barHtml.includes('<i class="sq"></i>Approved volume') && barHtml.includes('<i class="tri"></i>Closure affecting a route') && barHtml.includes('<i class="dot"></i>Over capacity')
      && barHtml.includes('<kbd>Space</kbd> play / pause') && barHtml.includes('<kbd>←</kbd><kbd>→</kbd> one month') && barHtml.includes('<kbd>Esc</kbd> close'));
-  ok("M3: Pause on clash is a named switch (role=switch, on by default) wired to setPauseOnClash; the speed options say the seconds a month",
-     /<input type="checkbox" id="tl-pause-clash" role="switch" checked onchange="setPauseOnClash\(this\.checked\)">/.test(barHtml) && barHtml.includes(">Pause on clash</label>")
+  // REVERSED 11 Nov 2026 (card A-F6, John's yes): OFF by default (Play stopped every new visitor at Mar 2027); a tick by hand
+  // is remembered (the second argument)
+  ok("M3: Pause on clash is a named switch (role=switch, off by default) wired to setPauseOnClash; the speed options say the seconds a month",
+     /<input type="checkbox" id="tl-pause-clash" role="switch" onchange="setPauseOnClash\(this\.checked, true\)">/.test(barHtml) && barHtml.includes(">Pause on clash</label>")
      && barHtml.includes('<option value="0.25">¼× · 3 s a month</option>') && barHtml.includes('<option value="4">4× · 0.2 s a month</option>'));
   ok("M3: the rail and its marks are hidden from a screen reader; the month slider stays as the keyboard's and the reader's control",
      /<div class="tl-rail" id="tl-rail" aria-hidden="true"/.test(barHtml) && /<div class="tl-years" id="tl-years" aria-hidden="true">/.test(barHtml)
      && /#timeline-bar \.tl-railwrap input\[type=range\]\{ position:absolute; width:1px; height:1px;[^}]*clip:rect\(0,0,0,0\);/.test(html));
   // the switch, stored per browser, and read by the pause
-  ok("⭐ M3: the switch is remembered in this browser (modus_tl_pause) and the clash pause happens only while it is on; wall mode dwells instead",
-     code.includes("try { if(localStorage.getItem('modus_tl_pause') === '0') TL.pauseOnClash = false; } catch(e){}")
-     && code.includes("try { localStorage.setItem('modus_tl_pause', TL.pauseOnClash ? '1' : '0'); } catch(e){}")
+  // REVERSED 11 Nov 2026 (card A-F6): off unless ticked BY HAND in this browser (modus_tl_pause_hand); the old key was written on
+  // every opening of the bar, so it is no longer read
+  ok("⭐ M3: the switch is remembered in this browser (modus_tl_pause_hand, by hand only) and the clash pause happens only while it is on; wall mode dwells instead",
+     code.includes("TL.pauseOnClash = false; TL.wall = false;")
+     && code.includes("try { if(localStorage.getItem('modus_tl_pause_hand') === '1') TL.pauseOnClash = true; } catch(e){}")
+     && code.includes("if (byHand) { try { localStorage.setItem('modus_tl_pause_hand', TL.pauseOnClash ? '1' : '0'); } catch(e){} }")
+     && !code.includes("localStorage.getItem('modus_tl_pause')")
      && /if \(TL\.playing && TL\.wall && TL\.ticked === month && live\.some\(i => i\.lvl === 'clash'\)\) \{ if \(typeof wallDwell === 'function'\) wallDwell\(month\); \}\s*else if \(TL\.playing && TL\.pauseOnClash !== false/.test(code));
   ok("⭐ M3: the pause says why — the message is shown by the pause and hidden by Play, by closing the bar and by any other month",
      /if \(typeof showClashToast === 'function'\) showClashToast\(month, live\.filter\(i => i\.lvl === 'clash'\)\);/.test(code)
@@ -4586,14 +4592,16 @@ function qrRead(mod) {
      && code.includes("if(typeof TOAST !== 'undefined' && TOAST.month !== m) hideClashToast();")
      && /<div id="tl-toast" role="status" hidden>/.test(html) && html.includes('<button type="button" class="tl-act" onclick="startTimeline()">▶ Resume</button>')
      && html.includes('onclick="stopPausingOnClash()">Stop pausing on clashes</button>')
-     && /function stopPausingOnClash\(\)\{ setPauseOnClash\(false\); startTimeline\(\); \}/.test(code));
+     // NARROWED 11 Nov 2026 (card A-F6): "Stop pausing on clashes" is a choice by hand, so it is remembered
+     && /function stopPausingOnClash\(\)\{ setPauseOnClash\(false, true\); startTimeline\(\); \}/.test(code));
   ok("⭐ M3: moving the month by hand (the slider, the step buttons, a month chip, the rail) re-arms the once-per-loop pause",
      /function onTimelineScrub\(v\)\{ stopTimeline\(\); TL\.clashPaused = false; setTimelineMonth/.test(code) && /function stepTimeline\(delta\)\{\s*stopTimeline\(\); TL\.clashPaused = false;/.test(code)
      // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): and marks the month as asked for (TL.chosen)
      && /TL\.month = m; TL\.chosen = true; TL\.clashPaused = false;\s*(\/\/[^\n]*\n\s*)?if \(!TL\.on\) openTimeline\(\); else setTimelineMonth\(m\);/.test(code)
      && code.includes("RAIL.drag = true; stopTimeline(); TL.clashPaused = false;"));
+  // NARROWED 11 Nov 2026 (card A-F6): Esc closes the BAR and keeps the month (hideTimelineBar), as the × does
   ok("M3: Esc on the bar closes it (the keys row says so); wall mode has its own Esc",
-     code.includes("else if(e.key === 'Escape' && inBar && !TL.wall){ e.preventDefault(); closeTimeline(); }")
+     code.includes("else if(e.key === 'Escape' && inBar && !TL.wall){ e.preventDefault(); hideTimelineBar(); }")
      && code.includes("if (TL.wall && e.key === 'Escape') { e.preventDefault(); exitWallMode(); }"));
   // wall mode
   ok("⭐ M3 wall mode: the bar's button and ?wall=1 open it; the address keeps wall=1 while it is on; leaving drops it",

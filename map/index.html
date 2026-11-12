@@ -1475,7 +1475,7 @@
   <button type="button" class="tl-btn" id="tl-next" onclick="stepTimeline(1)" title="Next month" aria-label="Next month">▶▶</button>
   <div class="tl-lbl"><span id="tl-label">Jan 2026</span></div>
   <div class="tl-ctl">
-  <label class="tl-sw" title="Stop once per loop on the first month with a red condition (over capacity)"><input type="checkbox" id="tl-pause-clash" role="switch" checked onchange="setPauseOnClash(this.checked)"><i aria-hidden="true"></i>Pause on clash</label>
+  <label class="tl-sw" title="Stop once per loop on the first month with a red condition (over capacity)"><input type="checkbox" id="tl-pause-clash" role="switch" onchange="setPauseOnClash(this.checked, true)"><i aria-hidden="true"></i>Pause on clash</label>
   <div class="tl-seg" role="radiogroup" aria-label="Months Play loops over">
     <button type="button" id="tl-seg-plan" role="radio" aria-checked="true" onclick="setTimelineFull(false)" title="Loop over the months with approved volume">Plan months</button><button type="button" id="tl-seg-full" role="radio" aria-checked="false" onclick="setTimelineFull(true)" title="Play every month of the horizon, including the months with nothing approved">Full horizon</button>
   </div>
@@ -1484,7 +1484,7 @@
   </select>
   <button type="button" class="tl-ghost" id="tl-more" aria-expanded="false" onclick="setTimelineExpanded(!TL.expanded)" title="Show every month of the horizon and the play settings">Horizon ▴</button>
   <button type="button" class="tl-ghost" id="tl-wall" onclick="enterWallMode()" title="Full screen for a stand: plays by itself, no buttons or panels; Esc to leave">Wall mode</button>
-  <button type="button" class="tl-close" onclick="closeTimeline()" title="Close timeline" aria-label="Close the timeline">&times;</button>
+  <button type="button" class="tl-close" onclick="hideTimelineBar()" title="Close timeline" aria-label="Close the timeline">&times;</button>
   </div>
   </div>
   <div class="tl-looplbl" id="tl-looplbl"></div>
@@ -7999,8 +7999,11 @@
     try { const sp = parseFloat(localStorage.getItem('modus_tl_speed')); if(sp > 0){ TL.speed = sp; } } catch(e){}
     // 12 Oct 2026 (evening, M3): `pauseOnClash` = the bar's "Pause on clash" switch (on unless the visitor turned it off,
     // remembered in this browser); `wall` = wall mode is on (it dwells on a red month instead of pausing)
-    TL.pauseOnClash = true; TL.wall = false;
-    try { if(localStorage.getItem('modus_tl_pause') === '0') TL.pauseOnClash = false; } catch(e){}
+    // 11 Nov 2026 (card A-F6, John's yes): OFF unless this browser's visitor ticked it. The old key (modus_tl_pause) was
+    // written on every opening of the bar, so it cannot tell a tick from the old default: only a tick or untick by hand
+    // is kept now, under its own key (modus_tl_pause_hand), and the old key is no longer read.
+    TL.pauseOnClash = false; TL.wall = false;
+    try { if(localStorage.getItem('modus_tl_pause_hand') === '1') TL.pauseOnClash = true; } catch(e){}
     function setTimelineFull(on){
         TL.full = !!on;
         // M3: the "Plan months / Full horizon" pair is the switch now; the rail's bracket and label follow it
@@ -8009,13 +8012,13 @@
         if(sf) sf.setAttribute('aria-checked', String(TL.full));
         if(typeof renderTlLoop === 'function') renderTlLoop();
     }
-    function setPauseOnClash(on){
+    function setPauseOnClash(on, byHand){
         TL.pauseOnClash = !!on;
-        try { localStorage.setItem('modus_tl_pause', TL.pauseOnClash ? '1' : '0'); } catch(e){}
+        if (byHand) { try { localStorage.setItem('modus_tl_pause_hand', TL.pauseOnClash ? '1' : '0'); } catch(e){} }
         const cb=document.getElementById('tl-pause-clash'); if(cb && cb.checked !== TL.pauseOnClash) cb.checked = TL.pauseOnClash;
     }
     // the pause message's "Stop pausing on clashes": the switch goes off and Play carries on
-    function stopPausingOnClash(){ setPauseOnClash(false); startTimeline(); }
+    function stopPausingOnClash(){ setPauseOnClash(false, true); startTimeline(); }
     // the first and last month with any route volume, from the matrix; [1, MONTH_COUNT] when the
     // tenant has nothing approved or the planner asked for the full horizon
     function tlLoopBounds(){
@@ -8448,9 +8451,22 @@
         if(typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon say they need a month
     }
     function toggleTimeline(){ if(TL.playing) stopTimeline(); else startTimeline(); }
+    // 11 Nov 2026 (card A-F6, John's yes): the bar's × and Esc close the BAR and keep the month on screen with its figures
+    // (closeTimeline cleared it: "—" everywhere and "No month on screen" mid-demo). Picking the month on screen again in
+    // the Control Panel clears it (pickMonth); a month or Play brings the bar back.
+    function timelineBarShown(){ const bar=document.getElementById('timeline-bar'); return !!(bar && bar.style.display === 'flex'); }
+    function showTimelineBar(){ const bar=document.getElementById('timeline-bar'); if(bar && bar.style.display !== 'flex'){ bar.style.display='flex'; if(typeof syncTimelineFoot === 'function') syncTimelineFoot(); } }
+    function hideTimelineBar(){
+        if(TL.wall && typeof exitWallMode === 'function') exitWallMode();
+        stopTimeline();
+        if(typeof hideClashToast === 'function') hideClashToast();
+        const bar=document.getElementById('timeline-bar'); if(bar) bar.style.display='none';
+        if(typeof syncTimelineFoot === 'function') syncTimelineFoot();
+    }
     // 12 Oct (A4): the sidebar's "Play forecast timeline" calls THIS, so a press opens the bar AND plays.
     function startTimeline(){
         if(!TL.matrix){ ensureTimelineMatrix().then(()=>startTimeline()).catch(()=>{}); return; }
+        if(TL.on && typeof showTimelineBar === 'function') showTimelineBar();   // A-F6: the bar hidden by its ×, the month kept
         if(!TL.on) openTimeline();
         if(TL.playing) return;
         // D22: resuming on a red month counts as this loop's pause \u2014 it does not stop again until the loop wraps
@@ -8509,7 +8525,7 @@
         if(e.key === ' ' || e.key === 'Spacebar'){ if(tag === 'BUTTON' && inBar) return; e.preventDefault(); toggleTimeline(); }
         else if(e.key === 'ArrowLeft' && inBar){ e.preventDefault(); stepTimeline(-1); }
         else if(e.key === 'ArrowRight' && inBar){ e.preventDefault(); stepTimeline(1); }
-        else if(e.key === 'Escape' && inBar && !TL.wall){ e.preventDefault(); closeTimeline(); }
+        else if(e.key === 'Escape' && inBar && !TL.wall){ e.preventDefault(); hideTimelineBar(); }
     });
 
     // ===== 2026-09-02 (§8) — warnings for the month on the playhead ==================
@@ -9206,8 +9222,10 @@
         m = parseInt(m, 10);
         if (!(m >= 1 && m <= (CONFIG.MONTH_COUNT || 60))) return;
         if (TL.playing) stopTimeline();
+        if (TL.on && TL.month === m && typeof timelineBarShown === 'function' && !timelineBarShown()) { closeTimeline(); return; }   // A-F6: the month on screen again clears it
         TL.month = m; TL.chosen = true; TL.clashPaused = false;     // M3: a month picked by hand starts a new loop
         if (!TL.on) openTimeline(); else setTimelineMonth(m);
+        if (typeof showTimelineBar === 'function') showTimelineBar();   // A-F6: a month brings the bar back
     }
 
     // ---------------------------------------------------------------- the hover card (review 2.3)
