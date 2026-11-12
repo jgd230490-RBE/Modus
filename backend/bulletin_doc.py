@@ -1564,7 +1564,8 @@ LEAFLET_CSS = (":root{color-scheme:light} *{box-sizing:border-box} body{margin:0
                " .kl li{font-size:15px;margin:2px 0} .kl.two{columns:2;column-gap:24px} .amber{color:#D97706}"
                " .btn{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:6px;background:#C2410C;"
                "color:#fff;font-weight:600;text-decoration:none;font-size:15px} .muted{color:#57534E;font-size:14px}"
-               " footer{margin:28px 0 12px;font-size:14px;color:#57534E} footer .brand-logo{height:16px;width:auto;vertical-align:-3px}"
+               # 12 Nov 2026 (seen on live): `svg{display:block}` above is the map's; the footer's mark stays in the line
+               " footer{margin:28px 0 12px;font-size:14px;color:#57534E} footer .brand-logo{display:inline-block;height:16px;width:auto;vertical-align:-3px}"
                " @media print{@page{size:A4;margin:12mm} .actions,.btn{display:none} .mapwrap svg{min-width:0}"
                " .band,.band-rule{-webkit-print-color-adjust:exact;print-color-adjust:exact}}")
 
