@@ -7729,7 +7729,8 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      blk.includes("getPropertyValue('--tl-foot')")
      // NARROWED 10 Nov 2026 (road card edge): above / below as before, now with a side where the click is near an edge
      // NARROWED again 10 Nov 2026 (road card top): above / below with that side, unless a short window puts it beside the click
-     && blk.includes("anchor: beside || ((below ? 'top' : 'bottom') + (side ? '-' + side : ''))") && blk.includes("String(p.options.anchor).indexOf('top') === 0")
+     // NARROWED again 12 Nov 2026 (card A1-X2 fix): the same expression, now in secselRoadWant (the chip counts only under the card's own column)
+     && blk.includes("want: beside || ((rm.below ? 'top' : 'bottom') + (side ? '-' + side : ''))") && blk.includes("anchor: rw.want") && blk.includes("String(p.options.anchor).indexOf('top') === 0")
      // NARROWED 11 Nov 2026 (road card tall): the table's room is the card's room less its MEASURED fixed part (it was a fixed 170)
      && blk.includes("sc.style.maxHeight = Math.max(48, space - fixed + SECSEL_MARGIN) + 'px';") && html.includes(".secsel-scroll{ max-height:260px; overflow:auto;"));
   ok("⭐ 2.1-4 Q1: every mode — a route line's click and a shared section's click both open the road card (the route tinted)",
@@ -7780,7 +7781,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   try {
     F = new Function("escHtml", "PV", "CW", "monthLabel", "teamText", "TENANT", "map", "styleReady", "document", "isPhoneShell", "mapboxgl",
                      "SHEET", "shareUrl", "modeRoutesPassing", "routePropsById", "tlimV", "tlimN", "tlimUnit", "TLIM", "getComputedStyle", "cwN",
-                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), secselNeed: (typeof secselNeed === 'function' ? secselNeed : null), secselBeside: (typeof secselBeside === 'function' ? secselBeside : null), secselNarrow: (typeof secselNarrow === 'function' ? secselNarrow : null), popupPlace: (typeof popupPlace === 'function' ? popupPlace : null), SECSEL_MAP };")(
+                     blk + "\nreturn { secselView, secselTipText, secselCardHTML, secselCopyParts, roadAtUrl, areaSumUrl, secselBoxFeature, secselNearest, secselBoxOf, secselCovers, secselSide, secselRoom: (typeof secselRoom === 'function' ? secselRoom : null), secselNeed: (typeof secselNeed === 'function' ? secselNeed : null), secselBeside: (typeof secselBeside === 'function' ? secselBeside : null), secselRoadWant: (typeof secselRoadWant === 'function' ? secselRoadWant : null), secselSpan: (typeof secselSpan === 'function' ? secselSpan : null), secselNarrow: (typeof secselNarrow === 'function' ? secselNarrow : null), popupPlace: (typeof popupPlace === 'function' ? popupPlace : null), SECSEL_MAP };")(
       esc, () => pv, () => (pv === 2 ? words2 : words1), m => (m === 23 ? 'Nov 2027' : 'M' + m), v => (v === 'IPT1' ? 'North Team' : v),
       { name: 'Wolds Link', demo_notice: 'Fictional scheme' }, {}, () => true, doc, () => false, {}, {}, () => 'https://x/map/?month=2027-11', null, null,
       x => String(x), x => String(x), () => 'movements', null, () => ({ getPropertyValue: () => '' }), mkCwN(() => (pv === 2 ? words2 : words1)));
@@ -7944,9 +7945,9 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
        F.secselSide(100, 360, 304) === 'left' && F.secselSide(250, 360, 304) === 'right' && F.secselSide(300, 1000, 0) === '' && F.secselSide(900, 1000, 0) === 'right');
   }
   ok("⭐ EDGE: the popup's anchor is above / below plus that side, from the click's own point; the right edge is the Conditions panel while it shows on a wide screen, else the map buttons",
-     code.includes("const side = secselSide(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge());")
+     code.includes("const side = secselSide(x, W, right);")
      // NARROWED 10 Nov 2026 (road card top): the same anchor, after "beside ||" for a short window's middle band
-     && code.includes("anchor: beside || ((below ? 'top' : 'bottom') + (side ? '-' + side : '')), className: 'secsel-popup' })")
+     && code.includes("anchor: rw.want, className: 'secsel-popup' })") && code.includes("want: beside || ((rm.below ? 'top' : 'bottom') + (side ? '-' + side : ''))")
      && code.includes("if (w && getComputedStyle(w).display !== 'none' && window.innerWidth > 1023) return Math.round(w.getBoundingClientRect().left - m.left);")
      && code.includes("return Math.round(m.width - 56);"));
   // ===== 10 Nov 2026 — road card top (John's yes to the card under "Seen on the way", notes/frontier-public-map-mockup-1110) =====
@@ -7990,14 +7991,14 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   let ste = null;
   const steFor = (mapRect, hudRect, display) => {
     try {
-      return new Function("map", "document", "getComputedStyle", /function secselTopEdge\(\) \{[\s\S]*?\n    \}/.exec(code)[0] + "\nreturn secselTopEdge;")(
+      return new Function("map", "document", "getComputedStyle", /function secselTopEdge\(span\) \{[\s\S]*?\n    \}/.exec(code)[0] + "\nreturn secselTopEdge;")(
         { getContainer: () => ({ getBoundingClientRect: () => mapRect }) },
         { getElementById: id => (id === 'kpi-hud' && hudRect ? { getBoundingClientRect: () => hudRect } : null) },
         () => ({ display: display || 'flex' }))();
     } catch (e) { return 'threw: ' + e.message; }
   };
   const deskMap = { left: 300, top: 0, right: 1422, bottom: 677 }, deskHud = { left: 300, top: 26, right: 1422, bottom: 98 };
-  try { ste = /function secselTopEdge\(\) \{[\s\S]*?\n    \}/.exec(code)[0]; } catch (e) {}
+  try { ste = /function secselTopEdge\(span\) \{[\s\S]*?\n    \}/.exec(code)[0]; } catch (e) {}
   ok("⭐ TOP (sandbox): the figures bar's bottom edge is read in the map's own px: 98 on live's desk layout, 72 when the map starts under the demo notice",
      !!ste && steFor(deskMap, deskHud) === 98 && steFor({ left: 300, top: 26, right: 1422, bottom: 677 }, deskHud) === 72);
   ok("TOP (sandbox): no bar, a hidden bar, or a bar that does not lie over the map counts as 0",
@@ -8005,10 +8006,11 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      && steFor({ left: 300, top: 100, right: 1422, bottom: 677 }, deskHud) === 0            // the bar sits wholly above the map
      && steFor({ left: 300, top: 0, right: 1422, bottom: 677 }, { left: 0, top: 26, right: 300, bottom: 98 }) === 0);   // beside it
   ok("⭐ TOP: both the choice of side and the card's own height use it; the old line that measured from the top of the map is gone",
-     code.includes("const rm = secselRoom(at.point.y, H, foot, secselTopEdge()), below = rm.below;")
-     && code.includes("const beside = rm.beside ? secselBeside(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge()) : '';")
+     code.includes("const rw = secselRoadWant(at.point.x, at.point.y, map.getContainer().clientWidth || 800, H, foot, secselRightEdge());")
+     && code.includes("let rm = secselRoom(y, H, foot, top, need);")
+     && code.includes("let beside = rm.beside ? secselBeside(x, W, right) : '';")
      && code.includes("const space = (a === 'left' || a === 'right') ? (2 * Math.min(y - t, H - foot - y) - 34)")
-     && code.includes("? (H - foot - y - 34) : (y - t - 34);") && code.includes("const t = secselTopEdge(), a = String((p.options && p.options.anchor) || '');")
+     && code.includes("? (H - foot - y - 34) : (y - t - 34);") && code.includes("(p.options && p.options.anchor) || '', (box && box.offsetWidth) || 380)), a = String((p.options && p.options.anchor) || '');")
      && !code.includes("below = at.point.y < room / 2") && !code.includes(": (y - 34);"));
   let afp = null;
   try { afp = new Function(/function areaFromParam\(s\) \{[\s\S]*?\n    \}/.exec(code)[0] + "\nreturn areaFromParam;")(); } catch (e) {}
@@ -8024,7 +8026,8 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      typeof need === 'function' && need(184, 86) === 290 && need(184, 300) === 294 && need(210, 86) === 316 && need(210, 135) === 320 && need(243, 86) === 349
      && need(210, 5) === 290 && need(0, 0) === 290 && need() === 290 && need(NaN, NaN) === 290);
   let fitRoad = null;
-  try { fitRoad = /function fitRoadPopup\(\) \{[\s\S]*?\n    \}/.exec(code)[0]; } catch (e) {}
+  let rwSrc = "";
+  try { fitRoad = /function fitRoadPopup\(\) \{[\s\S]*?\n    \}/.exec(code)[0]; rwSrc = /function secselRoadWant\([\s\S]*?\n    \}\n/.exec(code)[0]; } catch (e) {}
   // fitRoadPopup against a stand-in popup: the map 1122 x 677 (a desk window), the timeline bar 94, the figures bar 98, the free map ends at 1066
   // o (12 Nov, road card beside the Conditions panel): { W, H, foot, right, fixed2 (the card's fixed part once narrowed), narrowed (it was narrowed before) }
   const roadFit = (fixed, nat, y, anchor, x, noTable, o) => {
@@ -8037,11 +8040,14 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
     let hushed = 0;
     const SEC = { roadPopup: pop, roadAt: { lngLat: {}, point: { x: x || 550, y } }, narrowed: o.narrowed ? 1 : 0 };
     try {
+      const chipEdge = o.chip ? (span => (span && span[0] < o.chip.right && span[1] > o.chip.left ? o.chip.bottom : 98)) : (() => 98);
+      const want = new Function("secselTopEdge", "secselSide", "secselRoom", "secselBeside", "secselSpan", "SECSEL_WIDE", rwSrc + "\nreturn secselRoadWant;")(
+        chipEdge, F.secselSide, F.secselRoom, F.secselBeside, F.secselSpan, 404);
       new Function("SECSEL", "map", "document", "getComputedStyle", "secselTopEdge", "secselRightEdge", "secselRoom", "secselNeed", "secselSide", "secselBeside",
-                   "SECSEL_MARGIN", "hoverGiveWay", "secselNarrow", fitRoad + "\nreturn fitRoadPopup;")(
+                   "SECSEL_MARGIN", "hoverGiveWay", "secselNarrow", "secselRoadWant", "secselSpan", fitRoad + "\nreturn fitRoadPopup;")(
         SEC,
         { getContainer: () => ({ clientWidth: o.W || 1122, clientHeight: o.H || 677 }), project: () => ({ x: x || 550, y }) },
-        { documentElement: {} }, () => ({ getPropertyValue: () => (o.foot || 94) + 'px' }), () => 98, () => (o.right || 1066), F.secselRoom, F.secselNeed, F.secselSide, F.secselBeside, 14, () => { hushed++; }, F.secselNarrow)();
+        { documentElement: {} }, () => ({ getPropertyValue: () => (o.foot || 94) + 'px' }), chipEdge, () => (o.right || 1066), F.secselRoom, F.secselNeed, F.secselSide, F.secselBeside, 14, () => { hushed++; }, F.secselNarrow, want, F.secselSpan)();
     } catch (e) { return { err: e.message }; }
     return { anchor: pop.options.anchor, moved: pop.moved, max: sc ? sc.style.maxHeight : null, hushed, widths, narrowed: SEC.narrowed };
   };
@@ -8067,7 +8073,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   } else ok("⭐ TALL (sandbox): fitRoadPopup could not be read", false);
   ok("⭐ TALL (source): the fixed part is measured from the card, the old fixed 170 is gone, and the card is placed again with the real need",
      code.includes("let fixed = (sc && box) ? Math.max(0, box.offsetHeight - sc.offsetHeight) : 0;") && !code.includes("space - 170")
-     && code.includes("const rm = secselRoom(at.point.y, H, foot, secselTopEdge(), secselNeed(fixed, sc.scrollHeight));")
+     && code.includes("secselRoadWant(at.point.x, at.point.y, W, H, foot, secselRightEdge(), secselNeed(fixed, sc.scrollHeight), cw);")
      && code.includes("if (want !== p.options.anchor) { p.options.anchor = want; p.setLngLat(p.getLngLat()); }")
      && code.includes("const SECSEL_MINROW = 90, SECSEL_MARGIN = 14;"));
 
@@ -8163,9 +8169,9 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   FakeRO.prototype.disconnect = function () { this.off++; };
   const fitRun = (pop, y, hud, RO) => {
     try {
-      new Function("map", "document", "getComputedStyle", "popupPlace", "secselTopEdge", "secselRightEdge", "ResizeObserver", fitSrc + "\nreturn popupFit;")(
+      new Function("map", "document", "getComputedStyle", "popupPlace", "secselTopEdge", "secselRightEdge", "ResizeObserver", "secselSpan", fitSrc + "\nreturn popupFit;")(
         { getContainer: () => ({ clientWidth: 1122, clientHeight: 677 }), project: () => ({ x: 550, y }) },
-        { documentElement: {} }, () => ({ getPropertyValue: () => '94px' }), place, () => (hud === undefined ? 98 : hud), () => 1066, RO)(pop);
+        { documentElement: {} }, () => ({ getPropertyValue: () => '94px' }), place, () => (hud === undefined ? 98 : hud), () => 1066, RO, F.secselSpan)(pop);
       return true;
     } catch (e) { return 'threw: ' + e.message; }
   };
@@ -8246,7 +8252,7 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   const sites = (code.match(/new mapboxgl\.Popup\(/g) || []).length, anchored = (code.match(/new mapboxgl\.Popup\(\{[^}]*\banchor:/g) || []).length;
   ok("⭐ POPUP TOP: the page opens " + sites + " kinds of popup and only the road card names its own anchor; the others go through the hook, so a new popup needs nothing extra",
      sites >= 19 && anchored === 1 && code.includes("if (pop.options.anchor && !pop.wsPlaced) return;")
-     && code.includes("secselTopEdge(), secselRightEdge(), off);") && code.includes("['addTo', 'setDOMContent'].forEach(k => {"));
+     && code.includes("el.offsetWidth)), secselRightEdge(), off);") && code.includes("['addTo', 'setDOMContent'].forEach(k => {"));
   // ===== 11 Nov 2026 — one popup from one click (John's yes to P2; seen on live: Brook Pit answered a click with its own
   // popup AND the road card under it, Langton Compound with its popup AND the haul road's) =====
   let mhSrc = null;
