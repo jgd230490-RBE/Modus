@@ -13,6 +13,7 @@ import contextvars
 import os
 import re
 import sqlite3
+import threading
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 IS_PG = bool(DATABASE_URL)
@@ -165,20 +166,65 @@ else:
 # statement retried once on a fresh one. DB_POOL=0 restores one-connection-per-
 # statement; DB_POOL_MAX sets the pool size (default 6 — Render's smallest Postgres
 # allows ~97, uvicorn runs one process).
+#
+# 11 Nov 2026 (X-F1): psycopg2's pool does not wait: with every pooled connection lent out,
+# getconn() raises at once and the statement opened a brand-new connection (~190 ms, above).
+# Several heavy reads at once (one carbon build is ~300 statements) then paid that on every
+# statement and stacked to minutes. A request now waits up to DB_POOL_WAIT_S (default 3 s;
+# 0 = the old no-wait behaviour) for a pooled connection to come back, and only then opens a
+# fresh one as before, so a pool held by something slow can still never hang a request.
+# The wait is a semaphore with one slot per pooled connection; every _PooledConn gives its slot
+# back exactly once on close() or discard() (every get_conn() caller closes in a finally).
 _PG_POOL = None          # None = not built yet · False = unavailable · else the pool
+_POOL_SLOTS = None       # threading.BoundedSemaphore(pool size), built with the pool
+POOL_STATS = {"waited": 0, "wait_ran_out": 0, "fresh": 0}
+_HELD = threading.local()  # how many pooled connections this thread holds (a nested borrow never waits)
 _TX_IDLE = 0             # psycopg2.extensions.TRANSACTION_STATUS_IDLE
 
 
+def _pool_wait_s():
+    try:
+        return max(0.0, min(30.0, float(os.getenv("DB_POOL_WAIT_S", "3") or 3)))
+    except ValueError:
+        return 3.0
+
+
+def _take_slot():
+    """A slot for one pooled connection: at once if one is free, else after waiting up to
+    DB_POOL_WAIT_S. False = the wait ran out (the caller opens its own connection)."""
+    slots = _POOL_SLOTS
+    if slots is None:
+        return True
+    if slots.acquire(blocking=False):
+        return True
+    if getattr(_HELD, "n", 0) > 0:
+        # This thread already holds a pooled connection and asks for another (a nested read): waiting
+        # could only wait on itself and its neighbours doing the same, so it opens its own at once.
+        POOL_STATS["wait_ran_out"] += 1
+        return False
+    wait = _pool_wait_s()
+    POOL_STATS["waited"] += 1
+    if wait > 0 and slots.acquire(timeout=wait):
+        return True
+    POOL_STATS["wait_ran_out"] += 1
+    if POOL_STATS["wait_ran_out"] in (1, 10, 100) or POOL_STATS["wait_ran_out"] % 1000 == 0:
+        print(f"⚠️  db: no pooled connection free after {wait:g} s, opening a fresh one "
+              f"({POOL_STATS['wait_ran_out']} times since start-up)")
+    return False
+
+
 def _pg_pool():
-    global _PG_POOL
+    global _PG_POOL, _POOL_SLOTS
     if _PG_POOL is None:
         if os.getenv("DB_POOL", "1").strip() == "0":
             _PG_POOL = False
         else:
             try:
                 from psycopg2 import pool as _pgpool
-                _PG_POOL = _pgpool.ThreadedConnectionPool(
-                    1, max(2, int(os.getenv("DB_POOL_MAX", "6") or 6)), DATABASE_URL)
+                size = max(2, int(os.getenv("DB_POOL_MAX", "6") or 6))
+                built = _pgpool.ThreadedConnectionPool(1, size, DATABASE_URL)
+                _POOL_SLOTS = threading.BoundedSemaphore(size)     # set before the pool is seen
+                _PG_POOL = built
                 print("db: Postgres connection pool ready")
             except Exception as e:
                 print("⚠️  db: connection pool unavailable, one connection per statement:", e)
@@ -192,10 +238,18 @@ class _PooledConn:
     commit, rollback, …); close() RETURNS it to the pool instead of closing it, so
     every existing `conn = get_conn() … conn.close()` site works unchanged.
     """
-    __slots__ = ("_pool", "_conn")
+    __slots__ = ("_pool", "_conn", "_slot")
 
-    def __init__(self, pool, conn):
-        self._pool, self._conn = pool, conn
+    def __init__(self, pool, conn, slot=None):
+        self._pool, self._conn, self._slot = pool, conn, slot   # slot: the semaphore to give back once
+        if slot is not None:
+            _HELD.n = getattr(_HELD, "n", 0) + 1
+
+    def _give_slot(self):
+        slot, self._slot = self._slot, None
+        if slot is not None:
+            _HELD.n = max(0, getattr(_HELD, "n", 0) - 1)
+            slot.release()
 
     def __getattr__(self, name):
         conn = object.__getattribute__(self, "_conn")
@@ -215,6 +269,8 @@ class _PooledConn:
                 conn.close()
             except Exception:
                 pass
+        finally:
+            self._give_slot()
 
     def close(self):
         conn, self._conn = self._conn, None
@@ -235,6 +291,8 @@ class _PooledConn:
                 conn.close()
             except Exception:
                 pass
+        finally:
+            self._give_slot()
 
 
 def _is_conn_error(e):
@@ -246,15 +304,20 @@ def _is_conn_error(e):
 def get_conn():
     if IS_PG:
         pool = _pg_pool()
-        if pool is not None:
+        if pool is not None and _take_slot():
+            slots = _POOL_SLOTS
             try:
                 conn = pool.getconn()
                 if conn.closed:               # died while idle in the pool — replace it
                     pool.putconn(conn, close=True)
                     conn = pool.getconn()
-                return _PooledConn(pool, conn)
+                return _PooledConn(pool, conn, slots)
             except Exception as e:
+                if slots is not None:
+                    slots.release()           # nothing was lent: give the slot straight back
                 print("⚠️  db: pool getconn failed, opening a fresh connection:", e)
+        if pool is not None:
+            POOL_STATS["fresh"] += 1
         return psycopg2.connect(DATABASE_URL)
     conn = sqlite3.connect(_SQLITE_PATH)
     conn.row_factory = sqlite3.Row
