@@ -2849,7 +2849,7 @@ def drawn_road_on(rows, access_ids=None):
 
 
 def _turnaround_parts(profile, factors, origin=None, dest=None, route=None,
-                      has_drawn_road=False, gates_by_loc=None):
+                      has_drawn_road=False, gates_by_loc=None, locs=None):
     """
     B4: turnaround as three named components instead of one number.
 
@@ -2896,7 +2896,10 @@ def _turnaround_parts(profile, factors, origin=None, dest=None, route=None,
     # 29 Oct 2026 (task 3c): the holding area's own check minutes, where this lorry calls off (0.0 with none)
     try:
         import holding as _holding
-        holding_m = _holding.cycle_minutes(route, origin, dest, profile, gates_by_loc=gbl, factors=factors)
+        # 11 Nov 2026 (X-F1 part 2): `locs` = the location rows route_analysis already read, so the holding area's row
+        # is not read again for every row
+        holding_m = _holding.cycle_minutes(route, origin, dest, profile, gates_by_loc=gbl, factors=factors,
+                                           locs=locs)
     except Exception:
         holding_m = 0.0
 
@@ -2933,6 +2936,31 @@ ANALYSIS_GEOMETRY_SQL = (
     # 29 Oct 2026 (task 3c): the holding-area mark (the Routes page reads it with the row)
     "holding_id, holding_at_km, holding_tail_hr "
     "FROM route_geometry WHERE tenant_id = ? AND route_id = ?")
+
+
+#: 11 Nov 2026 (X-F1 part 2): the same columns for every route of the tenant in one statement
+ANALYSIS_GEOMETRY_ALL_SQL = ANALYSIS_GEOMETRY_SQL.replace(" AND route_id = ?", "")
+
+
+def prefetch_analysis_geometry(pre):
+    """
+    Fill a route_analysis `pre` dict for EVERY route at once: the routes (the read route_analysis makes with `pre`)
+    and every route's geometry rows from ONE statement, filed by route id (a route with no rows gets an empty list, as
+    its own read would give). A route already in pre["geom"] keeps its rows. Row order within a route does not matter:
+    route_analysis files the rows by (profile, leg, alternative), which is route_geometry's key. Runs once per `pre`.
+    """
+    if pre is None or pre.get("geom_all"):
+        return
+    if "routes" not in pre:
+        pre["routes"] = {x["id"]: x for x in db.query("SELECT * FROM routes WHERE tenant_id = ?",
+                                                      (db.current_tenant(),))}
+    by_route = {}
+    for g in db.query(ANALYSIS_GEOMETRY_ALL_SQL, (db.current_tenant(),)):
+        by_route.setdefault(g["route_id"], []).append(g)
+    geo = pre.setdefault("geom", {})
+    for rid in pre["routes"]:
+        geo.setdefault(rid, by_route.get(rid, []))
+    pre["geom_all"] = True
 
 
 def route_analysis(route_id, profiles=None, pre=None, pairs=None):
@@ -3046,7 +3074,7 @@ def route_analysis(route_id, profiles=None, pre=None, pairs=None):
             has_drawn_road = drawn_road_on((lg, rg), access_ids)
             parts = _turnaround_parts(prof, factors, origin=o_loc, dest=d_loc,
                                       route=route_row, has_drawn_road=has_drawn_road,
-                                      gates_by_loc=gates_by_loc)
+                                      gates_by_loc=gates_by_loc, locs=locs)
             turnaround_hr = parts["turnaround_hr"]
             cycle_hr = l_hr + r_hr + turnaround_hr
             # driving = both legs + gate-to-face travel; other work = loading, unloading, the gate check-in
