@@ -7260,6 +7260,13 @@
         tot.peak = Math.max.apply(null, tot.aday);
         return { rows: list, tot, mats };
     }
+    // 12 Nov 2026 (map-pick-route, John's "Yes, A and R1 now", kept): the route picked on the map comes FIRST, tinted;
+    // the others keep the sort's order
+    function arPickedFirst(rows, picked) {
+        if (!picked) return rows;
+        const is = r => String(r.rid).trim().toLowerCase() === picked;
+        return rows.filter(is).concat(rows.filter(r => !is(r)));
+    }
     function arTableHTML(view, y, k, unit, sort, picked, namesOf) {
         const yr = CONFIG.START_YEAR + y;
         const few = v => (v > 0 && v < 1 ? '&lt;1' : rsN(v));      // "under 1", short enough for a month's column
@@ -7342,13 +7349,10 @@
         const guide = document.getElementById('info-all-routes-guide');
         if (guide) guide.hidden = !RME.staff;
         const picked = (typeof selectedRouteId === 'string' || typeof selectedRouteId === 'number') ? String(selectedRouteId).trim().toLowerCase() : '';
+        st.view.rows = arPickedFirst(st.view.rows, picked);
         box.innerHTML = arTableHTML(st.view, st.y, st.k, RS.unit, AR.sort, picked, rsNames);
         box.scrollTop = top; box.scrollLeft = left;
-        if (picked !== AR.picked) {      // a newly picked route's row is brought into view; the order stays the sort's
-            AR.picked = picked;
-            const row = box.querySelector('tr.ar-picked');
-            if (row && row.scrollIntoView) { try { row.scrollIntoView({ block: 'nearest' }); } catch (e) {} }
-        }
+        if (picked !== AR.picked) { AR.picked = picked; if (picked) box.scrollTop = 0; }      // a newly picked route is the first row: show it
         if (held) {
             let again = document.getElementById(held) || box.querySelector('[data-k="' + held + '"]') || (ctl && ctl.querySelector('[data-k="' + held + '"]'));
             if (again && again.disabled && ctl) again = ctl.querySelector('[data-k="' + (held === 'y-prev' ? 'y-next' : 'y-prev') + '"]');

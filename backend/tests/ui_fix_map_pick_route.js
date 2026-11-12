@@ -30,10 +30,11 @@ const fnSrc = (re) => (re.exec(html) || [""])[0];
      html.includes('<button class="drawer-tab" id="tab-detail" onclick="openForecastDetail()">All routes</button>')
      && !html.includes('id="tab-detail" onclick="showDrawerTab(\'detail\')"')
      && (html.match(/openForecastDetail\(\)/g) || []).length >= 3);
-  // REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"): the 60-column tonnes
-  // table this block ran is gone. "All routes" is a year at a time, a row a route, drawn from the month figures the page
-  // holds; a picked route's row is tinted and brought into view IN THE SORT'S ORDER (it no longer jumps to the top), and
-  // the heading, the "N route(s) · sorted by total" line and the colour key are gone. Its own checks: ui_fix_map_all_routes.js.
+  // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"): the 60-column
+  // tonnes table this block ran is gone. "All routes" is a year at a time, a row a ROUTE (a route's lines are added together),
+  // drawn from the month figures the page holds. The rule this block holds is KEPT: the route picked on the map comes FIRST,
+  // tinted, and the others keep their order. The heading, the "N route(s) · sorted by total" line and the colour key are gone.
+  // The new table's own checks: ui_fix_map_all_routes.js.
   const ofd = fnSrc(/async function openForecastDetail\(\)\{[\s\S]*?\n    \}/);
   ok("A: the function is in the page, shows the tab first and draws from the figures the page holds (no read of the plan)",
      !!ofd && ofd.indexOf("showDrawerTab('detail')") < ofd.indexOf("renderAllRoutes();") && !/fetchMatrix|\bfetch\(/.test(ofd) && !html.includes("fetchMatrix"));
@@ -45,13 +46,15 @@ const fnSrc = (re) => (re.exec(html) || [""])[0];
     const tot = { t: [1755, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], aday: [6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], yearT: 1755, peak: 6 };
     const f = new Function("CONFIG", "PV", "fmtN", "rsN", "escHtml", "RS_MONTHS", arT + "\nreturn arTableHTML;")(
       { START_YEAR: 2026 }, () => 2, n => String(Math.round(n)), n => String(Math.round(n)), x => String(x), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]);
-    return f({ rows, tot, mats: [] }, 0, 0, "t", "month", picked, () => ({ from: "A", to: "B" }));
+    const first = new Function(fnSrc(/function arPickedFirst\(rows, picked\) \{[\s\S]*?\n    \}/) + "\nreturn arPickedFirst;")();
+    return f({ rows: first(rows, picked), tot, mats: [] }, 0, 0, "t", "month", picked, () => ({ from: "A", to: "B" }));
   };
   const ids = (h) => (h.match(/data-rid="(R\d+)"/g) || []).map(x => x.replace(/data-rid="|"/g, ""));
   {
     const a = arT ? run("r050") : "";
-    ok("⭐ A (run): a picked route's row is tinted and stays where the sort puts it (one row a route: its lines are added together)",
-       ids(a).join() === "R019,R050,R032" && (a.match(/<tr class="ar-picked">/g) || []).length === 1 && /<tr class="ar-picked"><th scope="row"><button[^>]*data-rid="R050"/.test(a));
+    ok("⭐ A (run): a picked route's row comes FIRST and is tinted; the others keep their order (one row a route now: its lines are added together)",
+       ids(a).join() === "R050,R019,R032" && (a.match(/<tr class="ar-picked">/g) || []).length === 1 && /<tr class="ar-picked"><th scope="row"><button[^>]*data-rid="R050"/.test(a)
+       && html.includes("st.view.rows = arPickedFirst(st.view.rows, picked);"));
     const b = arT ? run("") : "";
     ok("A (run): nothing picked = no tint, the same order", ids(b).join() === "R019,R050,R032" && !b.includes("ar-picked"));
     ok("A (run): the pick is matched without regard to case or spaces (the map lowercases ids to compare)",

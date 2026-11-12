@@ -171,8 +171,11 @@ const namesOf = (rid) => ({ rid, from: rid === "R050" ? "Tilton Viaduct site" : 
     ok("⭐ arPick (run): the first click lights the route on the map (selectRoute, as a picked route is) and tints its row; a click on the lit route opens 'This route'; an empty id does nothing", first && second && empty);
     return true;
   }) || ok("⭐ arPick (run): the first click lights the route; a click on the lit route opens 'This route'", false);
-  ok("⭐ a newly picked route's row is brought into view; the table keeps its scroll and the keyboard its place when it is drawn again; a year button that has reached the end hands the keyboard to its neighbour",
-     html.includes("if (picked !== AR.picked) {") && html.includes("row.scrollIntoView({ block: 'nearest' })") && html.includes("box.scrollTop = top; box.scrollLeft = left;")
+  ok("⭐ the picked route comes first (11 Nov's rule, kept) and a newly picked one is shown; the table keeps its scroll and the keyboard its place when it is drawn again; a year button that has reached the end hands the keyboard to its neighbour",
+     html.includes("st.view.rows = arPickedFirst(st.view.rows, picked);") && html.includes("if (picked !== AR.picked) { AR.picked = picked; if (picked) box.scrollTop = 0; }")
+     && TRY(() => { const f = new Function(fnSrc("function arPickedFirst(rows, picked) {") + "\nreturn arPickedFirst;")(); const r = [{ rid: "R1" }, { rid: " R2" }, { rid: "R3" }];
+                    return f(r, "r2").map(x => x.rid.trim()).join() === "R2,R1,R3" && f(r, "").map(x => x.rid.trim()).join() === "R1,R2,R3" && f(r, "r9").length === 3; })
+     && html.includes("box.scrollTop = top; box.scrollLeft = left;")
      && html.includes("if (again && again.disabled && ctl) again = ctl.querySelector('[data-k=\"' + (held === 'y-prev' ? 'y-next' : 'y-prev') + '\"]');"));
   ok("⭐ Taller: the table takes most of the window (80 % of its height) while its tab is on screen, the Conditions panel steps aside, and the drawer still opens and closes by its class only",
      html.includes("body.drawer-open.drawer-tall #route-drawer{ height:80vh; max-height:80vh; }") && html.includes("body.drawer-open.drawer-tall #tl-warnings{ display:none; }")
