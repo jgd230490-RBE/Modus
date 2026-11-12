@@ -11544,11 +11544,9 @@
         if (old) { try { old.remove(); } catch (e) {} }
         const H = map.getContainer().clientHeight || 600;
         const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
-        const rm = secselRoom(at.point.y, H, foot, secselTopEdge()), below = rm.below;
-        const side = secselSide(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge());
         // a short window, the click in its middle: neither above nor below takes a whole card, so it opens BESIDE the click
-        const beside = rm.beside ? secselBeside(at.point.x, map.getContainer().clientWidth || 800, secselRightEdge()) : '';
-        const pop = new mapboxgl.Popup({ offset: 10, maxWidth: '380px', anchor: beside || ((below ? 'top' : 'bottom') + (side ? '-' + side : '')), className: 'secsel-popup' })
+        const rw = secselRoadWant(at.point.x, at.point.y, map.getContainer().clientWidth || 800, H, foot, secselRightEdge());
+        const pop = new mapboxgl.Popup({ offset: 10, maxWidth: '380px', anchor: rw.want, className: 'secsel-popup' })
             .setLngLat(at.lngLat).setHTML(roadCardHTML()).addTo(map);
         SECSEL.roadPopup = pop;
         // a close clears only its own card (a new click's card replaces it first)
@@ -11602,17 +11600,47 @@
         return x >= wide ? 'right' : (right - x) >= wide ? 'left' : '';
     }
     // the figures bar's bottom edge in the map's own px; 0 where the bar does not lie over the map (the phone, the big screen)
-    function secselTopEdge() {
+    function secselTopEdge(span) {
         try {
             const m = map.getContainer().getBoundingClientRect(), k = document.getElementById('kpi-hud');
             if (!k || getComputedStyle(k).display === 'none') return 0;
             const r = k.getBoundingClientRect();
             if (r.bottom <= m.top || r.top >= m.bottom || r.right <= m.left || r.left >= m.right) return 0;
-            // 12 Nov 2026 (card A1-X2): the conditions chip hanging under the bar is part of the bar's foot
+            // 12 Nov 2026 (card A1-X2): the conditions chip hanging under the bar is part of the bar's foot - but only for a card
+            // that lies under it. span = [left, right] of the card in the map's own px: a card whose column does not meet the chip
+            // (live, Apr 2027: the B6047 card beside its click, x 331-701, the chip at x 786-1086) measures from the bar alone;
+            // no span = the conservative old answer (the chip counts).
             let bottom = r.bottom;
-            if (document.body && document.body.classList && document.body.classList.contains('cond-chip-below')) { const c = document.getElementById('kpi-conditions'); if (c) bottom = Math.max(bottom, c.getBoundingClientRect().bottom + 6); }
+            if (document.body && document.body.classList && document.body.classList.contains('cond-chip-below')) {
+                const c = document.getElementById('kpi-conditions');
+                if (c) {
+                    const cr = c.getBoundingClientRect(), a = span ? span[0] : -Infinity, b = span ? span[1] : Infinity;
+                    if (a < cr.right - m.left && b > cr.left - m.left) bottom = Math.max(bottom, cr.bottom + 6);
+                }
+            }
             return Math.max(0, Math.round(bottom - m.top));
         } catch (e) { return 0; }
+    }
+    // the card's left and right edge in the map's px for an anchor ('left' / 'right' = beside the click, 'top-left', 'bottom-right'
+    // ... = above or below it, '' = centred), x = the click, w = the card's width
+    function secselSpan(x, anchor, w) {
+        w = w > 0 ? w : SECSEL_WIDE; anchor = String(anchor || '');
+        const toRight = anchor === 'left' || /-left$/.test(anchor), toLeft = anchor === 'right' || /-right$/.test(anchor);
+        return toRight ? [x, x + w] : toLeft ? [x - w, x] : [x - w / 2, x + w / 2];
+    }
+    // where the road card goes for a click (above / below / beside) and the top edge it measures from. The first pass measures
+    // from the edge under the card's centred or cornered column; a card that goes BESIDE the click is measured again under its
+    // own column (a chip over the other side of the map is not in its way)
+    function secselRoadWant(x, y, W, H, foot, right, need, w) {
+        const side = secselSide(x, W, right);
+        let top = secselTopEdge(secselSpan(x, side ? 'top-' + side : '', w));
+        let rm = secselRoom(y, H, foot, top, need);
+        let beside = rm.beside ? secselBeside(x, W, right) : '';
+        if (beside) {
+            const t2 = secselTopEdge(secselSpan(x, beside, w));
+            if (t2 !== top) { const rm2 = secselRoom(y, H, foot, t2, need); if (rm2.beside) { rm = rm2; top = t2; } }
+        }
+        return { rm, side, beside, top, want: beside || ((rm.below ? 'top' : 'bottom') + (side ? '-' + side : '')) };
     }
     // 11 Nov 2026 (map popup top; seen on live at 1422 x 677: a holding area's popup lost its title, 23 px under the figures
     // bar). Every popup but the road card is placed by the map itself, above its point, and the map does not know the
@@ -11655,7 +11683,7 @@
             const foot = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tl-foot'), 10) || 0;
             const off = typeof pop.options.offset === 'number' ? pop.options.offset : 0;
             const a = popupPlace(pt.x, pt.y, el.offsetWidth, el.offsetHeight, c.clientWidth || 800, c.clientHeight || 600, foot,
-                                 secselTopEdge(), secselRightEdge(), off);
+                                 secselTopEdge(secselSpan(pt.x, pt.x < el.offsetWidth / 2 ? 'top-left' : pt.x > (c.clientWidth || 800) - el.offsetWidth / 2 ? 'top-right' : '', el.offsetWidth)), secselRightEdge(), off);
             if (!a.anchor && !pop.wsPlaced) return;
             const tip = Math.max(0, el.offsetHeight - box.offsetHeight);
             pop.wsPlaced = true;
@@ -11721,27 +11749,27 @@
         let fixed = (sc && box) ? Math.max(0, box.offsetHeight - sc.offsetHeight) : 0;
         if (sc && fixed && p.options) {
             const W = map.getContainer().clientWidth || 800;
-            const rm = secselRoom(at.point.y, H, foot, secselTopEdge(), secselNeed(fixed, sc.scrollHeight));
-            const side = secselSide(at.point.x, W, secselRightEdge());
-            const beside = rm.beside ? secselBeside(at.point.x, W, secselRightEdge()) : '';
-            let want = beside || ((rm.below ? 'top' : 'bottom') + (side ? '-' + side : ''));
+            const cw = box.offsetWidth || 380;
+            const rw = secselRoadWant(at.point.x, at.point.y, W, H, foot, secselRightEdge(), secselNeed(fixed, sc.scrollHeight), cw);
+            let want = rw.want;
             if (want !== 'left' && want !== 'right') {
                 // above or below the click: does the card keep the table's 48 px floor in the room on that side? if not, beside it, narrowed
-                const t0 = secselTopEdge(), yc = at.point.y;
+                const t0 = rw.top, yc = at.point.y;
                 const room0 = (want.indexOf('top') === 0) ? (H - foot - yc - 34) : (yc - t0 - 34);
                 if (room0 - fixed + SECSEL_MARGIN < 48) {
                     const nar = secselNarrow(at.point.x, W, secselRightEdge(), box.offsetWidth);
                     if (nar.anchor) {
                         p.setMaxWidth(nar.w + 'px'); SECSEL.narrowed = 1;
                         const fixed2 = Math.max(0, box.offsetHeight - sc.offsetHeight);
-                        if (2 * Math.min(yc - t0, H - foot - yc) - 34 - fixed2 + SECSEL_MARGIN >= 48) { want = nar.anchor; fixed = fixed2; }
+                        const tn = secselTopEdge(secselSpan(at.point.x, nar.anchor, nar.w));      // measured under the narrowed card's own column
+                        if (2 * Math.min(yc - tn, H - foot - yc) - 34 - fixed2 + SECSEL_MARGIN >= 48) { want = nar.anchor; fixed = fixed2; }
                         else { p.setMaxWidth('380px'); SECSEL.narrowed = 0; }
                     }
                 }
             }
             if (want !== p.options.anchor) { p.options.anchor = want; p.setLngLat(p.getLngLat()); }
         }
-        const t = secselTopEdge(), a = String((p.options && p.options.anchor) || '');
+        const t = secselTopEdge(secselSpan(at.point.x, (p.options && p.options.anchor) || '', (box && box.offsetWidth) || 380)), a = String((p.options && p.options.anchor) || '');
         const space = (a === 'left' || a === 'right') ? (2 * Math.min(y - t, H - foot - y) - 34)
                     : (p.options && String(p.options.anchor).indexOf('top') === 0) ? (H - foot - y - 34) : (y - t - 34);
         if (sc) sc.style.maxHeight = Math.max(48, space - fixed + SECSEL_MARGIN) + 'px';
