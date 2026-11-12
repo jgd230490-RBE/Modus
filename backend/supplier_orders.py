@@ -132,7 +132,8 @@ def orders(page, acc=None, now=None):
         entry = route_sheet._gate_words(dloc, "entry", r.get("dest_gate_id"), gbl.get(did), factors)
         exit_ = route_sheet._gate_words(dloc, "exit", r.get("dest_gate_id"), gbl.get(did), factors)
         load_exit = route_sheet._gate_words(oloc, "exit", r.get("origin_gate_id"), gbl.get(oid), factors)
-        vehicle = c.get("vehicle_short") or conversions.vehicle_word_rule(c.get("vehicle_type")) or "—"
+        # 11 Nov 2026 (CLOCS C-F2): the lorry's name, as every sheet prints it (export._vehicle_name)
+        vehicle = (conversions.vehicle_label(factors, c.get("vehicle_type")) if c.get("vehicle_type") else c.get("vehicle_short")) or "—"
         hold = None
         if holding is not None and hctx and hctx.get("holding") and r:
             h = holding.stops(r, "loaded", hctx, c.get("vehicle_type"))
