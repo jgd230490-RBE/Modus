@@ -3479,6 +3479,24 @@ def route_keep_main(body: dict, token: Optional[str] = None):
             "periods": route_choice.periods(rid), "by_zone": (summ or {}).get("by_zone", {})}
 
 
+@app.get("/api/admin/route-diversions/preview")
+def route_diversions_preview(token: Optional[str] = None):
+    """11 Nov 2026 (CLOCS card B-F3): which dated zones' diversions the picking rule (no lorry limit below the lorry
+    first, then the quickest) would change now, each with its distance, time and limits against the main line. Reads
+    only; POST …/refresh applies it. Geometry only, never a HERE call."""
+    _check_admin(token)
+    return route_choice.preview()
+
+
+@app.post("/api/admin/route-diversions/refresh")
+def route_diversions_refresh(token: Optional[str] = None):
+    """11 Nov 2026 (CLOCS card B-F3): apply the picking rule to every dated zone's diversions now (the same rewrite a
+    zone save, a route's routing and Route all already do). Geometry only, never a HERE call."""
+    _check_admin(token)
+    summ = route_choice.refresh_zones() or {}
+    return {"rows": summ.get("rows", 0), "by_zone": summ.get("by_zone", {})}
+
+
 @app.post("/api/admin/route-diversions/way-round")
 def route_way_round(route_id: Optional[str] = None, limit: int = Query(30, ge=1, le=60),
                     token: Optional[str] = None):
