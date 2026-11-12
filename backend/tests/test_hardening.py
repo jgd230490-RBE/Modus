@@ -205,6 +205,15 @@ ok("⭐ the weekly audit: Mondays, on demand, and on a PR that changes requireme
    and "pip-audit==2.10.1" in WF and "pip-audit -r backend/requirements.txt" in WF and "contents: read" in WF)
 ok("...the suite itself stays offline (its harness step runs in a network namespace)",
    "network namespace" in read(".github/workflows/suite.yml"))
+# 11 Nov 2026 (X-F2): the package install fails in minutes when Ubuntu's servers cannot be reached; the job keeps
+# its 40-minute limit and the harness step has none of its own
+SUITE_WF = read(".github/workflows/suite.yml")
+_steps = re.split(r"\n      - ", SUITE_WF)
+_poppler = next((s for s in _steps if s.startswith("name: pdftotext (poppler)")), "")
+_harness = next((s for s in _steps if s.startswith("name: Run every harness")), "")
+ok("...the poppler install step has a 5-minute limit; the harness step none of its own; the job still 40",
+   "\n        timeout-minutes: 5\n" in _poppler and "timeout-minutes" not in _harness and bool(_harness)
+   and "\n    timeout-minutes: 40\n" in SUITE_WF)
 
 # =========================================================================== #
 #  5. the guide                                                                 #

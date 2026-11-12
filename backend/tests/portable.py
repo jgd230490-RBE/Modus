@@ -97,6 +97,10 @@ def fixture_today(today=None):
 
 DEMO_AS_OF = datetime.date(2026, 11, 26)   # the shipped demo's as-of date (make_demo_tenant.SHIPPED_AS_OF, D96)
 
+#: 12 Nov 2026: the real clock pin_today's now() reads; None = datetime.datetime.now. Tests of the pin set it to step a
+#: fake clock across midnight (test_pin_today.py); nothing else should.
+_REAL_NOW = None
+
 
 def pin_today(day=DEMO_AS_OF, extra=()):
     """
@@ -112,6 +116,8 @@ def pin_today(day=DEMO_AS_OF, extra=()):
     date`) likewise. isinstance() keeps accepting real dates and datetimes. utcnow() and time.time() are NOT pinned:
     stamps (created_at, an audit row) keep the real clock, and so does restrictions' "current" filter, which reads
     time.time() — a fixture closure must therefore span both the real and the pinned date. Returns the pinned date.
+    now() is SHIFTED, not frozen (12 Nov 2026): it starts on the pinned day at the real time and runs on with the real
+    clock, so a run that crosses midnight moves to the next day instead of jumping back 24 hours.
     """
     import importlib
     import sys
@@ -138,10 +144,20 @@ def pin_today(day=DEMO_AS_OF, extra=()):
         def __new__(cls, *a, **k):
             return real_dt(*a, **k)
 
+        # 12 Nov 2026: SHIFTED, not frozen (as lib/harness_clock.js). The first now() in a time zone reads the pinned day
+        # at the real time of day; later reads run forward from there by the real clock. It used to put the pinned day
+        # on every reading, so a run that crossed midnight jumped back 24 hours (26 Nov 23:59:59, then 26 Nov 00:00:00):
+        # the audit trail's newest row no longer came first and a demo login's 14 days read as 15 (http_smoke's three
+        # G3 checks, 11 Nov). date.today() stays the pinned day.
+        _shift = {}
+
         @classmethod
         def now(cls, tz=None):
-            t = real_dt.now(tz)
-            return t.replace(year=day.year, month=day.month, day=day.day)
+            t = (_REAL_NOW or real_dt.now)(tz)
+            key = repr(tz)
+            if key not in cls._shift:
+                cls._shift[key] = real_date(day.year, day.month, day.day) - t.date()
+            return t + cls._shift[key]
 
         @classmethod
         def today(cls):
