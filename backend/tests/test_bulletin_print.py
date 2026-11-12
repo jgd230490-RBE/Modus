@@ -176,7 +176,7 @@ ok("⭐ the PDF map passes the clearance (it used the 11 pt default: E touched 2
 SK = {"places": [{"letter": l, "name": n} for l, n in zip("ABCDEFG", ["Wolds Link Batching Plant", "Melton Compound",
       "Northfield Quarry", "Tilton Viaduct site", "Stockpile North", "Kilby Ridge Quarry", "Harborough Compound"])],
       "controls": [{"n": 1, "name": "A47 at the new Tilton junction: HGV diversion while the junction is built and for some "
-                                    "weeks after it opens"}, {"n": 2, "name": "Burrough village 7.5 t limit"}]}
+                                    "weeks after it opens"}, {"n": 2, "name": "Melton junction works area"}]}
 key = KIT.map_key(SK)
 ok("the key is a header row and ONE row of three columns, each holding its own lines",
    len(key._cellvalues) == 2 and all(isinstance(c, list) for c in key._cellvalues[1]), str(len(key._cellvalues)))
