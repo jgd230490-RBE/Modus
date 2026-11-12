@@ -354,9 +354,32 @@ def note_write(sql):
         bump_data_version()
 
 
+# 11 Nov 2026 (CLOCS idea C-I1): a build that repeats the same reads many times (gate_arrivals.queue_months reads every
+# month's arrivals: 842 statements, each its own connection on live when the pool is empty) runs inside select_memo():
+# within it an identical SELECT is answered from the first answer, as copies. Per context (contextvars), so another
+# request on another thread never sees it; nothing outside the `with` changes. Never wrap a write in it.
+_SELECT_MEMO = contextvars.ContextVar("select_memo", default=None)
+
+
+class select_memo:
+    def __enter__(self):
+        self._token = _SELECT_MEMO.set({})
+        return self
+
+    def __exit__(self, *exc):
+        _SELECT_MEMO.reset(self._token)
+        return False
+
+
 def query(sql, params=()):
     """Run a SELECT and return a list of plain dicts."""
-    return _run(sql, params, fetch=True)
+    memo = _SELECT_MEMO.get()
+    if memo is None:
+        return _run(sql, params, fetch=True)
+    key = (sql, tuple(params or ()))
+    if key not in memo:
+        memo[key] = _run(sql, params, fetch=True)
+    return [dict(r) for r in memo[key]]
 
 
 def execute(sql, params=()):

@@ -2434,7 +2434,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // NARROWED 16 Oct 2026 (S7: the render harness's prop initialSim joins the signature)
     // RE-PINNED 29 Oct 2026 (the Simulation's own page): initialSim leaves the Dashboard; SimulationPage takes `initial`
     // NARROWED 5 Nov 2026 (group 6, PR 2): + canApprove
-    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone, canApprove })")
+    // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + initialQueue
+    && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, onWall, onOpen, phone, canApprove })")
     && ctc.includes('{onOpen && <button type="button" className="btn-sec" onClick={() => onOpen("carbon")}>Open the Carbon planner</button>}'));
   ok("...the big screen's Carbon group gains ONE target figure in the group's own pattern (a Fig with a title); the working view's group is unchanged",
     // 13 Oct 2026 (W3, narrowed): the Fig's words ride in its info box (value) instead of a title
@@ -2535,7 +2536,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const ctSrc = src.slice(g1, src.indexOf("function Dashboard("));
   const gaIdsStripped = gac.replace(/key=\{g\.gate_id\}|data-ga-gate=\{g\.gate_id\}|key=\{r\.g\.gate_id\}|data-ga-li=\{r\.g\.gate_id\}/g, "");
   ok("⭐ GATE ARRIVALS: one block before the carbon target's, holding the panel and its word helpers",
-    gaSrc.length > 1500 && gac.includes("function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOpen })")
+    gaSrc.length > 1500 && gac.includes("function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOpen, queue, sites })")   /* NARROWED 11 Nov 2026 (CLOCS idea C-I1) */
     && gac.includes("const gaMonthToday = (months) => {") && gac.includes("const gaFlagWord = (g) =>")
     && ctSrc.startsWith("// ---- 11 Oct 2026: the carbon target") && !ctSrc.includes("GateArrivalsPanel"));
   // NARROWED 11 Oct 2026 (review): the read is also skipped on the big screen, where the panel is not rendered
@@ -2548,7 +2549,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 14 Oct 2026 (the user took the recommendation): the panel moved from under the carbon strip to under the
   // four charts, so the charts are on the first screen at 1920 x 1080; still before the first collapsed section
   ok("⭐ the panel sits under the four key charts and before the first collapsed section; the six cards, five sections, eight charts are untouched",
-    _dbW.includes("<GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} onOpen={canApprove ? onOpen : null} />")
+    // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + the months with a queue and the sites picked
+    _dbW.includes("<GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<CarbonTargetStrip") && _dbW.indexOf("<GateArrivalsPanel") < _dbW.indexOf('<details className="dash-more"')
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf("<ChartCanvas config={costCfg} />")
     && _dbW.indexOf("<GateArrivalsPanel") > _dbW.indexOf('<div className="dash-charts" data-dash-charts="1">')
@@ -2557,7 +2559,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && (_dbW.match(/<ChartCanvas config=/g) || []).length === 8 && (_dbW.match(/onToggle=\{onMore\}/g) || []).length === 0);
   ok("the hooks sit before the early returns (React #310)",
     _dbc.indexOf("const [ga, setGa]") > 0 && _dbc.indexOf("const [ga, setGa]") < _dbc.indexOf("if(err) return")
-    && _dbc.indexOf("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));") < _dbc.indexOf("if(err) return")
+    && _dbc.indexOf("const [gaMonth, setGaMonthRaw] = useState(() => (initialGates && initialGates.month) || keptMonth(\"ga\") || gaMonthToday(months));") < _dbc.indexOf("if(err) return")
     && _dbc.indexOf("fetch(`${API}/gates/arrivals") < _dbc.indexOf("if(err) return"));
   ok("🔴 the words: 'if arrivals are spread evenly', 'Queue likely', 'Spacing holds', 'No check-in time typed', 'coming to load', lorries not trucks; none of the banned words; no small, uppercase or colour-only text",
     gac.includes('const GA_SPREAD = "if arrivals are spread evenly";') && gac.includes('"Queue likely"') && gac.includes('"Spacing holds"')
@@ -4001,8 +4003,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      src.includes(">Whole programme</button>") && src.includes(">This month ± 6</button>")
      && src.indexOf(">Whole programme</button>") > src.indexOf('aria-label="To month"')
      && src.lastIndexOf("{!wall && <>", src.indexOf(">Whole programme</button>")) > src.lastIndexOf("</>}", src.indexOf(">Whole programme</button>")));
+  // NARROWED 11 Nov 2026 (CLOCS card C-F3): today's month unless a month picked today is kept (keptMonth); the range is untouched
   ok("🔴 D114: only the Dashboard's range changed — the Gate arrivals and Simulation months still start at today's month",
-     src.includes("const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));"));
+     src.includes("const [gaMonth, setGaMonthRaw] = useState(() => (initialGates && initialGates.month) || keptMonth(\"ga\") || gaMonthToday(months));"));
   // 17 Oct 2026 (D114 fix): seen on live — the Dashboard opened on Jan 26 – Dec 30 because its first read of the lines
   // widened From / To to every month with lines, after the ± 6 default had been set
   ok("🔴 D114 fix: the Dashboard's first read no longer widens From / To to every month with lines; it keeps this month ± 6 "
@@ -4840,7 +4843,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   // 31 Oct 2026 (task 4c PR 4, the approved mockup notes\site-layout-public-mockup-1031\): "Show on the public map"
   ok("⭐ SITE LAYOUT: one 'Show on the public map' tick (planners / admins; with the layout's version), shown when the layout has a phase",
      card.includes('data-site-layout-public="1"') && card.includes("Show on the public map")
-     && card.includes("disabled={!canLayout || busy !== \"\"} onChange={e => setPublic(e.target.checked)}")
+     // NARROWED 11 Nov 2026 (CLOCS card C-F6): ticking asks first (askPub); unticking writes at once
+     && card.includes("disabled={!canLayout || busy !== \"\"} onChange={e => { if(e.target.checked) setAskPub(true); else if(askPub) setAskPub(false); else setPublic(false); }}")
      && card.includes("/site-layout`,") && card.includes("JSON.stringify({ public: !!on, version: lay.version })")
      && card.includes("{lay && phases.length > 0 && !imp && !edit && ("));
   ok("SITE LAYOUT: the tick's one line says what the public sees (from close in, no security / CCTV) and names no back end",
@@ -5262,7 +5266,8 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("CONCERNS DASH: shown only to planners and admins, never on the big screen or a phone; the App passes canApprove",
      code.includes("{canApprove && !wall && !phone && <ConcernsDash months={months} lo={D.lo} hi={D.hi} sites={sites}")
      && code.includes('<Dashboard meta={meta} phone={narrow} canApprove={canApprove}')
-     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone, canApprove }){"));
+     // NARROWED 11 Nov 2026 (CLOCS idea C-I1): + initialQueue (the render harness's months with a queue)
+     && code.includes("function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, onWall, onOpen, phone, canApprove }){"));
   ok("CONCERNS DASH: the five figures, the monthly chart with a title and scope (Copy / Download), by kind, busiest routes",
      ['label="received"', 'label="open now"', 'label="working days to first reply (median)"', 'label="working days to close (median)"',
       "replied within ${data.reply_days} working days"].every(w => cd.includes(w))

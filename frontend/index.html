@@ -713,6 +713,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ga-chart{margin-top:10px;}
   .ga-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin-bottom:4px;}
   .ga-head-v{font-size:18px;font-weight:700;color:var(--ink);}
+  .ga-next{font-size:13px;color:var(--ink);} .ga-next .link-btn{display:inline-block;min-height:24px;line-height:24px;padding:0 4px;font-size:13px;}
   .ga-key{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:13px;color:var(--muted);}
   .ga-key i{display:inline-block;vertical-align:middle;margin-left:8px;}
   .ga-key i:first-child{margin-left:0;}
@@ -2254,6 +2255,22 @@ const gaMonthToday = (months) => {
   const sy = (months && months.start_year) || 2026, n = (months && months.count) || 60, d = new Date();
   return Math.max(1, Math.min(n, (d.getFullYear() - sy) * 12 + d.getMonth() + 1));
 };
+// 11 Nov 2026 (CLOCS card C-F3): a month picked on the Dashboard's Gate arrivals ("ga") or on the Simulation ("sim") is kept
+// while this page is open: until sign-out, a reload or a new day. Never stored, never in the address (D86 stands).
+const KEPT_MONTH = {};
+const keptMonth = (k) => { const v = KEPT_MONTH[k]; return v && v.day === new Date().toDateString() ? v.month : null; };
+const keepMonth = (k, m) => { if(m >= 1) KEPT_MONTH[k] = { month: +m, day: new Date().toDateString() }; };
+const forgetKeptMonths = () => { Object.keys(KEPT_MONTH).forEach(k => { delete KEPT_MONTH[k]; }); };
+// 11 Nov 2026 (CLOCS idea C-I1, John's (a)): with no gate at the 85 % step in the month on screen, the next month that has
+// one (GET /api/gates/queue-months, the flags of every month's own Gate arrivals read), at the sites picked; past the
+// plan's last queue, the fullest month with one. null when the plan has none.
+const gaNextQueue = (q, month, sites) => {
+  const ms = ((q && q.months) || []).map(m => ({ ...m, gates: (m.gates || []).filter(g => !(sites && sites.length) || sites.includes(g.location_id)) }))
+    .filter(m => m.gates.length && m.month !== month);
+  if(!ms.length) return null;
+  const full = (m) => Math.max(...m.gates.map(g => g.capacity_pct == null ? 999 : g.capacity_pct));
+  return ms.find(m => m.month > month) || ms.slice().sort((a, b) => full(b) - full(a) || a.month - b.month)[0];
+};
 // 17 Oct 2026 (D114): the Dashboard opens on THIS month and six either side (13 months), not every month of the horizon:
 // on a 60-month programme the whole span made "Deliveries a day" a programme average and the charts 60 thin bars.
 // Clamped to the horizon. Only the default: From / To and "Whole programme" still pick any span.
@@ -2307,7 +2324,7 @@ const gaBusyWords = (b) => {
   return `${b.lorries} lorr${b.lorries === 1 ? "y" : "ies"} arriving in the busiest clock hour (${when}) of an average working day. `
     + (b.per_hour == null ? "No check-in time typed, so nothing is compared." : `The gate can check in ${gaN1(b.per_hour)} an hour.`);
 };
-function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOpen }){
+function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOpen, queue, sites }){
   const [gaOpen, gaToggle] = useRowOpen("gates");
   if(!ga) return err
     ? <div className="ct-strip ga-strip" data-gate-arrivals="error" data-guide="dash-gates"><span className="ct-line">The gate arrivals did not load.</span></div>
@@ -2320,6 +2337,9 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOp
     .map(g => ({ g, cap: g.capacity_per_day, pct: g.capacity_pct, over: g.flag === "red", near: g.flag === "amber" }))
     .sort((a, b) => ((b.pct == null ? -1 : b.pct) - (a.pct == null ? -1 : a.pct)) || (b.g.arrivals_per_day - a.g.arrivals_per_day));
   const nOverG = rowsC.filter(r => r.over).length, nNearG = rowsC.filter(r => r.near).length;
+  // 11 Nov 2026 (CLOCS idea C-I1): no gate at the 85 % step this month: where the next queue is, and "Show" goes there
+  const nextQ = (nOverG || nNearG) ? null : gaNextQueue(queue, month, sites);
+  const nextLine = nextQ && <span className="ga-next" data-ga-next={nextQ.month}>Next queue likely: {nextQ.label}, {simGateName(nextQ.gates[0])} · <button type="button" className="link-btn" onClick={() => onMonth(nextQ.month)}>Show</button></span>;
   // 17 Oct 2026: every gate has clock hours (typed, or the default gate hours); the words say where the default stands
   const anyDefault = gates.some(g => g.open_basis === "default");
   const gaFs = 11;
@@ -2376,10 +2396,12 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOp
       <div className="ct-line">{ga.label}: lorries a day at each gate, all {TEAMS().toLowerCase()} together, {GA_SPREAD} across each gate's open hours{anyDefault ? ` (${ga.default_hours}, the default, where none are typed)` : ""}.</div>
       {state === "none" && <EmptyState kind="none" title={sited ? `No gates at these sites in ${ga.label}` : `No approved lines in ${ga.label}`} body={sited ? "Pick another month or more sites." : "Pick another month, or approve a line."}
         action={!sited && onOpen ? <button type="button" className="btn-sec" data-ga-empty-go="forecasts" onClick={() => onOpen("forecasts")}>Open Forecasts</button> : null} />}
+      {state === "none" && nextLine && <div className="ga-head">{nextLine}</div>}
       {state === "set" && rowsC.length > 0 && phone && (
         <div className="ga-chart" data-ga-list="1">
           <div className="ga-head">
             <span className="ga-head-v" style={nOverG ? { color: "var(--bad-text)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}</span>
+            {nextLine}
           </div>
           <ul className="ga-list" aria-label="Gates, fullest first">
             {rowsC.map(r => (
@@ -2398,6 +2420,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOp
         <div className="ga-chart" data-ga-chart="1">
           <div className="ga-head">
             <span className="ga-head-v" style={nOverG ? { color: "var(--red)" } : undefined}>{nOverG ? `${nOverG} gate${nOverG === 1 ? "" : "s"} over capacity` : nNearG ? `${nNearG} gate${nNearG === 1 ? "" : "s"} near capacity: queue likely` : "Every gate within its capacity"}</span>
+            {nextLine}
             <span className="ga-key" aria-hidden="true"><i className="ga-key-bar"></i>planned arrivals a day <i className="ga-key-track"></i><i className="ga-key-cap"></i>capacity: the open hours ÷ the check-in time a lorry <i className="ga-key-gold"></i>{GA_NEAR} % or more: queue likely <i className="ga-key-red"></i>more than it can check in <i className="ga-key-none"></i>no check-in time typed</span>
           </div>
           <ChartCanvas config={gaCfg} height={Math.max(180, 46 * rowsC.length + 60)} title="Gate arrivals: lorries a day at each gate" scope={[ga.label, sited || null]} />
@@ -2609,7 +2632,7 @@ function CarbonTargetLine({ ct, err, pendingN }){
   );
 }
 
-function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, onWall, onOpen, phone, canApprove }){
+function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates, initialClp, initialLocations, initialQueue, onWall, onOpen, phone, canApprove }){
   const { materials, vehicles, units, months, factors } = meta;
   const [data, setData] = useState(initialData || null);
   const [week, setWeek] = useState(initialWeek || null);
@@ -2619,7 +2642,10 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const [ctErr, setCtErr] = useState(false);
   const [ga, setGa] = useState(initialGates || null);    // 11 Oct 2026: gate arrivals (GET /api/gates/arrivals?month=)
   const [gaErr, setGaErr] = useState(false);
-  const [gaMonth, setGaMonth] = useState(() => (initialGates && initialGates.month) || gaMonthToday(months));
+  // 11 Nov 2026 (CLOCS card C-F3): the month picked here is kept for the next visit (keptMonth), until sign-out or a reload
+  const [gaMonth, setGaMonthRaw] = useState(() => (initialGates && initialGates.month) || keptMonth("ga") || gaMonthToday(months));
+  const setGaMonth = (m) => { keepMonth("ga", m); setGaMonthRaw(m); };
+  const [gaQueue, setGaQueue] = useState(initialQueue || null);   // 11 Nov 2026 (CLOCS idea C-I1): the months with a queue
   const [status, setStatus] = useState("Approved");
   const [unit, setUnit] = useState("t");
   const [material, setMaterial] = useState("All");
@@ -2767,6 +2793,14 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
     }).catch(() => { if(live) setGaErr(true); });
     return () => { live = false; };
   }, [tick, gaMonth, wall]);
+  // 11 Nov 2026 (CLOCS idea C-I1): one read of the months with a queue (kept on the server until the next write); a
+  // failed read only leaves the "Next queue likely" line out
+  useEffect(() => {
+    if(initialGates || wall) return;
+    let live = true;
+    fetch(`${API}/gates/queue-months`).then(okJSON).then(j => { if(live) setGaQueue(j); }).catch(() => {});
+    return () => { live = false; };
+  }, [tick, wall]);
   useEffect(() => {
     if(!wall) return;
     const id = setInterval(() => setTick(t => t + 1), REFRESH_MS);
@@ -3178,7 +3212,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           </div>}
           {/* 14 Oct 2026 (the user took the recommendation): Gate arrivals moved from above the charts to
               below them, so the four key charts are on the first screen at 1920 x 1080 */}
-          <GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : ""} phone={!!phone} onOpen={canApprove ? onOpen : null} />
+          <GateArrivalsPanel ga={gaShown} err={gaErr} month={gaMonth} months={months} onMonth={setGaMonth} sited={sites.length ? sitesWords(sites, locList) : ""} phone={!!phone} onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />
           {!wall && !phone && <AbnormalStrip onOpen={onOpen} sites={sites} />}
           {/* 29 Oct 2026: the Simulation has its own page (Plan → Simulation); the Dashboard keeps one line under Gate arrivals,
               the busiest gate from the Gate arrivals reply (no second simulation run here) */}
@@ -4632,6 +4666,7 @@ function App(){
   }, []);
   const signOut = () => {
     ACCESS.code = ""; ACCESS.info = null;
+    forgetKeptMonths();          // 11 Nov 2026 (CLOCS card C-F3): the next person starts on this month
     try { sessionStorage.removeItem("modus_access_code"); } catch(e){}
     authHint(false);
     // 12 Oct 2026 (the review and fix pass): the server swaps the 12-hour STAFF cookie for a map-only one, so the next
@@ -8297,7 +8332,9 @@ function SitesMenu({ locList, sites, onChange }){
       <summary className="btn-sec" style={{ width: "auto", height: "auto", padding: "7px 12px", fontWeight: 500 }}>{n ? `${n} site${n === 1 ? "" : "s"}` : "All sites"} ▾</summary>
       <div className="row-menu-list sites-list" role="group" aria-label="Lorries to or from">
         <div className="sites-head">Lorries to or from</div>
-        {(locList || []).length === 0 && <div className="sites-empty">No locations yet.</div>}
+        {/* 11 Nov 2026 (CLOCS card C-F8): "Loading…" until the locations arrive; the empty words only when there are none */}
+        {!locList && <div className="sites-empty" data-sites-loading="1">Loading…</div>}
+        {locList && locList.length === 0 && <div className="sites-empty">No locations yet.</div>}
         {groups.map(([t, ls]) => (
           <div key={t} className="sites-grp">
             <div className="sites-type">{t}</div>
@@ -13926,10 +13963,13 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt }){
             const mins = (s) => (s.site_minutes_lost || 0) + (s.gate_minutes_lost || 0) + (s.minutes_held || 0);
             const gbp = (s) => M.lorry_hour_gbp ? Math.round(mins(s) / 60 * M.lorry_hour_gbp) : null;
             const kg = (s) => M.idle_g_per_min ? (mins(s) * M.idle_g_per_min / 1000) : null;
+            // 11 Nov 2026 (CLOCS card C-F5): whose lorries it holds, and no with / without fold when nothing was held or waited
+            const still = !h.held && !(w.site_most || wo.site_most || w.gate_most || wo.gate_most) && !mins(w) && !mins(wo);
             return <div key={h.id} className="sim-card" data-sim-holding-card={h.id}>
               <div className="sim-card-h"><span className="hbadge" aria-hidden="true">H</span>{h.name}</div>
-              <div className="ct-note" data-sim-hold-words="1">{simHoldWords(h)}</div>
-              <details className="sim-hold-fold" open={!!h.most}><summary>With and without the holding area</summary>
+              {(h.served || []).length > 0 && <div className="ct-note" data-sim-hold-for="1">For {h.served.map(s => s.name).join(", ")} · {h.call} at a time</div>}
+              <div className="ct-note" data-sim-hold-words="1">{simHoldWords(h, D)}</div>
+              {!still && <details className="sim-hold-fold" open={!!h.most}><summary>With and without the holding area</summary>
               <table className="sim-now sim-cmp"><thead><tr><th scope="col">This day</th><th scope="col" className="num">Without</th><th scope="col" className="num">With</th></tr></thead><tbody>
                 <tr><td>Most waiting on site</td><td className="num">{wo.site_most == null ? "—" : wo.site_most}</td><td className="num"><b>{w.site_most == null ? "—" : w.site_most}</b></td></tr>
                 <tr><td>Most waiting at the gate</td><td className="num">{wo.gate_most == null ? "—" : wo.gate_most}</td><td className="num"><b>{w.gate_most == null ? "—" : w.gate_most}</b></td></tr>
@@ -13941,7 +13981,7 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt }){
                 {kg(wo) != null && <tr><td>Idling, if every waiting engine runs<div className="sim-sub">{M.idle_words}</div></td><td className="num">{kg(wo).toFixed(1)} kg CO₂</td><td className="num"><b>{kg(w).toFixed(1)} kg CO₂</b></td></tr>}
               </tbody></table>
               <div className="ct-note">A holding area moves the waiting off the site and the lane; it does not remove it.</div>
-              </details>
+              </details>}
             </div>; })}
           {site
             ? <div className="sim-card" data-sim-stations-now="1">
@@ -14172,7 +14212,7 @@ function SimPhoneList({ D }){
     <ul className="sim-plist" data-sim-table="1" aria-label="Gates and stations">
       {(D.holding || []).filter(h => h.on).map(h => <li key={"h" + h.id} className="sim-pcard" data-sim-phone-holding={h.id}>
         <div className="sim-pc-h"><b>{h.name}</b>{h.over_spaces ? <RowStatus word="Over its spaces" tone="bad" /> : null}</div>
-        <div className="sim-pline">{simHoldWords(h)}</div>
+        <div className="sim-pline">{simHoldWords(h, D)}</div>
       </li>)}
       {main.map(card)}
       {order.some(g => g.origin_share_note) && <li className="ct-note" data-sim-other-customers="1">{SIM_OTHER_CUSTOMERS}</li>}
@@ -14198,9 +14238,13 @@ function simPeak(D, site){
   return hit || null;
 }
 // the holding area's day in plain words
-function simHoldWords(h){
+// 11 Nov 2026 (CLOCS card C-F5): a quiet holding area says why: no lorry for the sites it serves this day, or theirs came
+// straight to the gate (exempt, a pour) and none waited. The sites' lorries are the day's own gate arrivals there.
+const simHoldServedIn = (h, D) => { const ids = (h.served || []).map(s => s.id);
+  return ((D && D.gates) || []).filter(g => ids.includes(g.location_id)).reduce((s, g) => s + (g.arrivals || 0), 0); };
+function simHoldWords(h, D){
   const n = h.held || 0;
-  if(!n) return "No lorry called off here this day.";
+  if(!n) return simHoldServedIn(h, D) ? "None waited this day." : "No lorry for these sites this day.";
   if(!h.most) return `${n} ${n === 1 ? "lorry" : "lorries"} passed through · none waited.`;
   return `${n} ${n === 1 ? "lorry" : "lorries"} waited here · most ${h.most} at once${h.most_at != null ? ` at ${simHM(h.most_at)}` : ""}${h.spaces ? `, of ${h.spaces} spaces` : ""}${h.over_spaces ? `, ${h.over_spaces} over` : ""}.`;
 }
@@ -14212,11 +14256,13 @@ const SIM_OTHER_CUSTOMERS = "Quarries and plants serve other customers too: only
 // On a phone (PhoneSimulation) the day is read without the lines: the controls, the figures line and one card a gate.
 function SimulationPage({ meta, months, phone, initial }){
   const open = true;
-  const [month, setMonth] = useState(() => (initial && initial.month) || gaMonthToday(months));
+  // 11 Nov 2026 (CLOCS card C-F3): a month kept from this page or carried from the Dashboard opens without the busiest read
+  const kept0 = initial ? null : keptMonth("sim");
+  const [month, setMonth] = useState(() => (initial && initial.month) || kept0 || gaMonthToday(months));
   // 9 Nov 2026 (UI critique finding 9, decision 7): the page opens on the programme's BUSIEST month, found by one cheap read
   // before the first day is worked out; if that read fails it opens on this month as before
   const [busiestM, setBusiestM] = useState(null);
-  const [ready, setReady] = useState(!!initial);
+  const [ready, setReady] = useState(!!initial || !!kept0);
   useEffect(() => {
     if(ready) return;
     let live = true;
@@ -14229,6 +14275,8 @@ function SimulationPage({ meta, months, phone, initial }){
     return () => { live = false; };
   }, []);
   const [sc, setSc] = useState(SIM_SC0);
+  // 11 Nov 2026 (CLOCS card C-F3): the month on the Month scale is kept; Week and Day show the server's month and leave it be
+  useEffect(() => { if(ready && sc.scale === "month") keepMonth("sim", month); }, [month, sc.scale, ready]);
   const [data, setData] = useState(initial || null);
   const [store, setStore] = useState(() => initial ? { month: initial.month, legs: initial.legs, haul: initial.haul_roads } : null);
   const [loadErr, setLoadErr] = useState(false);
@@ -14302,7 +14350,8 @@ function SimulationPage({ meta, months, phone, initial }){
     <div className="sim-seg" role="group" aria-label="Simulation scale" data-sim-scale={sc.scale}>
       {SIM_SCALES.map(([v, w]) => <button key={v} type="button" className={sc.scale === v ? "on" : ""} aria-pressed={sc.scale === v}
         onClick={() => { if(sc.scale === v) return; const d = D && D.day_choices && D.day_choices.length ? D.day_choices : [];
-          setMsg(""); setSc(x => ({ ...x, scale: v, date: v === "day" ? (x.date || (d[0] || {}).date || "") : x.date })); }}>{w}</button>)}
+          setMsg(""); if(v === "month" && keptMonth("sim")) setMonth(keptMonth("sim"));   // 11 Nov 2026 (C-F3): back to the month you were on
+          setSc(x => ({ ...x, scale: v, date: v === "day" ? (x.date || (d[0] || {}).date || "") : x.date })); }}>{w}</button>)}
     </div>
     {sc.scale === "month" && <label className="ct-line">Which month <select className="ga-sel" value={month} onChange={e => { setMonth(+e.target.value); }} aria-label="Simulation month">
       {Array.from({ length: count }, (_, i) => i + 1).map(i => <option key={i} value={i}>{monthLabelAbs(i, startYear)}</option>)}</select></label>}
@@ -14402,7 +14451,8 @@ function SimDashLine({ ga, month, months, onOpen }){
   return (
     <div className="ct-strip sim-dash-line" data-sim-dash={top ? "set" : "none"}>
       <span className="ct-line"><b>Simulation</b> · {monthLabelAbs(month, startYear)}{top ? `: the busiest gate ${simGateName(top)}, ${top.gate_name}, ${gaN1(top.arrivals_per_day)} lorries a day` : ""}</span>
-      <button type="button" className="btn-sec" onClick={() => { if(onOpen) onOpen("simulation"); }}>Open the Simulation</button>
+      {/* 11 Nov 2026 (CLOCS card C-F3 / idea C-I1): a month picked on Gate arrivals goes with it; untouched, the page opens on its busiest month */}
+      <button type="button" className="btn-sec" onClick={() => { if(keptMonth("ga") === month) keepMonth("sim", month); if(onOpen) onOpen("simulation"); }}>Open the Simulation</button>
     </div>
   );
 }
@@ -16398,7 +16448,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   }, []);
 
   // ---- reactive locations (for the route-authoring pickers) ----
-  const [locs, setLocs] = useState([]);
+  // 11 Nov 2026 (CLOCS card C-F8): the Locations table says "Loading…" until the first answer (locsIn), not "No locations yet"
+  const [locs, setLocsRaw] = useState([]);
+  const [locsIn, setLocsIn] = useState(false);
+  const setLocs = (v) => { setLocsIn(true); setLocsRaw(v); };
   const featProps = (gj) => (gj.features || []).map(f => ({ ...f.properties }));
 
   // ---- route authoring (Phase 1b) ----
@@ -16432,6 +16485,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
   // ---- zones (Phase 3): geofencing and disruptions in one table ----
   const [zoneList, setZoneList] = useState([]);
+  const [zonesIn, setZonesIn] = useState(false);   // 11 Nov 2026 (CLOCS card C-F8, the sweep): "Loading…" until the first answer
   const [haulUse, setHaulUse] = useState({});      // Phase 4: zone_id -> routes attached
   // 28 Oct 2026 (task 0c): the dated zones' diversions — per zone (the Used by column), per route and dates (the
   // Routes page and the panel after a zone save), and what "Find a way round" would cost now
@@ -16820,7 +16874,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           .filter(c => Array.isArray(c) && isFinite(c[0]) && isFinite(c[1]));
         if(pts.length){ framedRef.current = true; try { m.fitBounds(boundsOf(pts), { padding: 60, maxZoom: 12, duration: 0 }); } catch(e){} }
       }
-    }).catch(() => {});
+    }).catch(() => { setLocsIn(true); });
   }, [mapReady, showProfile, showLeg, showAlt, status]);
 
   const boundsOf = (coords) => {
@@ -17728,7 +17782,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       return j;
     });
 
-  useEffect(() => { reloadZones().catch(() => setZoneList([])); }, []);
+  useEffect(() => { reloadZones().catch(() => setZoneList([])).finally(() => setZonesIn(true)); }, []);
 
   const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -19229,7 +19283,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </td>
                 </tr>
               ))}
-              {!locs.length && <tr data-locs-empty="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">{canEdit ? "No locations yet. Add the first with “+ Add location”." : "No locations yet. An admin adds them."}</td></tr>}
+              {!locs.length && !locsIn && <tr data-locs-loading="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>}
+              {!locs.length && locsIn && <tr data-locs-empty="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">{canEdit ? "No locations yet. Add the first with “+ Add location”." : "No locations yet. An admin adds them."}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -19555,7 +19610,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   </tr>
                 );
               })}
-              {!zoneList.length && <tr data-zones-empty="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">
+              {!zoneList.length && !zonesIn && <tr data-zones-loading="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>}
+              {!zoneList.length && zonesIn && <tr data-zones-empty="1"><td colSpan="8" className="px-3 py-6 text-center text-slate-500">
                 {canEdit ? "No zones yet. Draw a closure for routes to avoid, a works area, or a temporary haul road." : "No zones yet. An admin draws them."}
               </td></tr>}
             </tbody>
@@ -19600,6 +19656,8 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
   const canWorks = isAdminLogin(ACCESS.info);     // 8 Nov 2026 (task 2.1-12, Q7): a works area is a zone: admins only
   const [styles, setStyles] = useState(SL_STYLES);
   const [lay, setLay] = useState(null);
+  const [layIn, setLayIn] = useState(false);
+  const [askPub, setAskPub] = useState(false);   // 11 Nov 2026 (CLOCS card C-F6): ticking "Show on the public map" asks first     // 11 Nov 2026 (CLOCS card C-F8): "Loading…" until the first answer
   const [shown, setShown] = useState("");
   const [msg, setMsg] = useState("");
   const [edit, setEdit] = useState(null);
@@ -19624,9 +19682,10 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       const ids = ((j.layout && j.layout.phases) || []).map(p => p.id);
       setShown(s => (keepShown && ids.includes(keepShown)) ? keepShown : (ids.includes(s) ? s : (ids[0] || "")));
     } catch(e){ setLay(null); setMsg(errSay("Couldn't load the layout.", e)); }
+    setLayIn(true);
   };
   useEffect(() => {
-    setImp(null); setEdit(null); setMsg(""); setPts({}); setFit(null); setPicking(""); setShown(""); setWa(null);
+    setImp(null); setEdit(null); setMsg(""); setPts({}); setFit(null); setPicking(""); setShown(""); setWa(null); setLayIn(false); setAskPub(false);
     load();
     if(!SL_STYLES) fetch(`${API}/site-layouts/styles`).then(okJSON).then(j => { SL_STYLES = j; setStyles(j); }).catch(e => console.warn("Wayscope:", e));
   }, [locId]);
@@ -19853,13 +19912,23 @@ function SiteLayoutCard({ locId, mapRef, mapReady, handleRef, pickRef, reinstall
       </div>
       <input ref={fileRef} type="file" accept=".dxf,.dwg,.kml,.kmz,.geojson,.json,.zip" style={{ display: "none" }} aria-label="Drawing to bring in" tabIndex={-1}
         onChange={e => readFile(e.target.files && e.target.files[0])} />
-      {!phases.length && !imp && !edit && <p className="text-[13px] text-slate-500 mt-1">No layout yet.</p>}
+      {!phases.length && !imp && !edit && <p className="text-[13px] text-slate-500 mt-1" data-layout-loading={layIn ? null : "1"}>{layIn ? "No layout yet." : "Loading…"}</p>}
       {lay && phases.length > 0 && !imp && !edit && (
         <div className="mt-1.5" data-site-layout-public="1">
           <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <input type="checkbox" checked={!!lay.public} disabled={!canLayout || busy !== ""} onChange={e => setPublic(e.target.checked)} />
+            {/* 11 Nov 2026 (CLOCS card C-F6): putting a layout on the public map asks first (one click published it); taking it off writes at once */}
+            <input type="checkbox" checked={!!lay.public || askPub} disabled={!canLayout || busy !== ""} onChange={e => { if(e.target.checked) setAskPub(true); else if(askPub) setAskPub(false); else setPublic(false); }} />
             Show on the public map
           </label>
+          {askPub && <div className="rounded-lg border border-slate-200 p-2 mt-1" role="group" aria-labelledby="sl-ask-pub" data-site-layout-ask="1">
+            <p id="sl-ask-pub" className="text-sm font-medium text-slate-700">Show this layout on the public map?</p>
+            <p className="text-[13px] text-slate-500">Anyone with the map's link will see it.</p>
+            <div className="flex gap-2 mt-1.5">
+              <button type="button" className="btn-sec" onClick={() => setAskPub(false)} data-site-layout-ask-no="1">Cancel</button>
+              <button type="button" className="px-3 py-1.5 rounded-lg text-white font-semibold text-[13px]" style={{ background: "var(--action)" }}
+                onClick={() => { setAskPub(false); setPublic(true); }} data-site-layout-ask-yes="1">Show it</button>
+            </div>
+          </div>}
           {lay.public && <p className="text-[13px] text-slate-500 mt-0.5">From close in. Security and CCTV stay off it.</p>}
         </div>
       )}
