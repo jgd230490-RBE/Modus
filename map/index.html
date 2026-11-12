@@ -214,6 +214,15 @@
                     letter-spacing:-.01em; min-width:120px; white-space:nowrap; }
         .kpi-title:empty{ display:none; }
         .kpi-sub{ display:block; font-size:12px; font-weight:400; color:var(--muted); margin-top:2px; }
+        /* 10 Nov 2026 (claude/map-first-view, Idea 3): "Approved plan · updated 31 Oct" carries an "i"; its box hangs under the
+           title block, over the map (the bar is 72 px tall and cannot hold it) */
+        .kpi-sub .info-i{ vertical-align:middle; margin:-6px -3px -5px 2px; }
+        #kpi-hud{ --plan-pop-left:24px; }
+        body.sidebar-closed #kpi-hud{ --plan-pop-left:176px; }
+        .kpi-plan-pop{ position:absolute; top:calc(100% + 6px); left:var(--plan-pop-left); width:300px; max-width:calc(100vw - 24px); z-index:30; }
+        .kpi-plan-pop a{ color:var(--navy); font-weight:600; }
+        /* the tour's strip (z 40) sits just under the bar: while the box is open the bar is lifted over it */
+        body:has(#info-plan:not([hidden])) #kpi-hud{ z-index:41; }
         #kpi-cards{ display:flex; gap:28px; flex:1; min-width:0; align-items:center; }
         .kpi-row{ display:flex; gap:28px; }
         .kpi-row-2{ margin-top:0; }
@@ -336,6 +345,7 @@
             body.has-demo-notice #kpi-hud, body.has-demo-notice.sidebar-closed #kpi-hud{ padding-top:calc(var(--notice-h, 26px) + 58px); }
             body.has-demo-notice #guide-btn{ top:calc(var(--notice-h, 26px) + 10px); }
             #kpi-hud .kpi-title{ font-size:15px; }
+            #kpi-hud, body.sidebar-closed #kpi-hud{ --plan-pop-left:12px; }
             #kpi-cards{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px 12px; }
             #kpi-cards .kpi-row{ display:contents; }
             .kpi-sep{ display:none; }
@@ -1397,6 +1407,8 @@
      one sentence, no zeros. The breakdown rows live in the sidebar (#kpi-moving). -->
 <div id="kpi-hud">
     <div class="kpi-title" id="kpi-title" title=""></div>
+    <!-- 10 Nov 2026 (claude/map-first-view, Idea 3): what "updated <date>" means; words from planInfoHTML() -->
+    <div class="info-pop kpi-plan-pop" id="info-plan" role="note" hidden></div>
     <div id="kpi-cards">
         <div class="kpi-row">
             <div class="kpi-card lead">
@@ -3347,6 +3359,38 @@
         return out;
     }
     const fmtN = (n, d) => (Math.round(n * Math.pow(10, d || 0)) / Math.pow(10, d || 0)).toLocaleString();
+    // 10 Nov 2026 (claude/map-first-view, Idea 3, frontier check F2): the date the forecast last changed. The server sends it
+    // with the matrix (plan_updated, backend/plan_stamp.py: the newest write in the audit trail that can change the approved
+    // plan); none = the old words, never a made-up date. Short form on the bar ("31 Oct"), long in the "i" box ("31 Oct 2026").
+    const PLAN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    function planDate(long) {
+        const d = (typeof TL !== 'undefined' && TL.matrix && TL.matrix.planUpdated) || '';
+        const r = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+        if (!r || +r[2] < 1 || +r[2] > 12) return '';
+        return Number(r[3]) + ' ' + PLAN_MONTHS[+r[2] - 1] + (long ? ' ' + r[1] : '');
+    }
+    function planSubHTML() {
+        const d = planDate(false);
+        if (!d) return 'Approved plan \u00b7 forecast';
+        renderPlanInfo();
+        const pop = document.getElementById('info-plan'), open = !!(pop && !pop.hidden);
+        return 'Approved plan \u00b7 updated ' + d
+            + '<button type="button" class="info-i" aria-expanded="' + open + '" aria-controls="info-plan" onclick="toggleInfo(this)" title="About the plan" aria-label="About the plan"><span aria-hidden="true">i</span></button>';
+    }
+    // the "i" box: at most 30 words. The guide link only for staff: /help/ is behind the staff sign-in, and a resident sent
+    // there meets a sign-in page
+    function planInfoHTML(staff) {
+        const d = planDate(true);
+        return '<p>' + (d ? 'A forecast from the approved plan, last changed on ' + d + '. ' : 'A forecast from the approved plan. ')
+            + 'Months further ahead are more likely to change.'
+            + (staff ? ' <a href="/help/#ug-map-updated" target="_blank" rel="noopener">Guide \u203a</a>' : '') + '</p>';
+    }
+    function renderPlanInfo() {
+        const pop = document.getElementById('info-plan');
+        if (!pop) return;
+        const html = planInfoHTML(typeof RME !== 'undefined' && RME.staff);
+        if (pop.innerHTML !== html) pop.innerHTML = html;
+    }
     function calculateKPIs(oFilter, dFilter, discFilter, iFilter) {
         const months = kpiMonthsOnScreen();
         // 12 Oct 2026 (fix pass, F1 seen in Chrome): a stale fetch must not overwrite a newer month, but the guard is
@@ -3518,7 +3562,9 @@
             // readable without also reading the timeline label at the bottom of the screen.
             // 2026-10-06 — month on the first line, "Approved plan · forecast" under it.
             set('kpi-title', label + ' \u00b7 what is moving');
-            setHTML('kpi-title', `${esc(label)}<span class="kpi-sub">Approved plan \u00b7 forecast</span>`);
+            // 10 Nov 2026 (claude/map-first-view, Idea 3): "Approved plan · updated 31 Oct" with an "i" when the server sent the
+            // date the forecast last changed (TL.matrix.planUpdated); "Approved plan · forecast" as before when it did not
+            setHTML('kpi-title', `${esc(label)}<span class="kpi-sub">${planSubHTML()}</span>`);
             showMoving(true); set('kpi-moving-title', 'What\u2019s moving in ' + label);
             renderKpiSwitch();
             // ⚠️ TONNES, not the map unit, for the third figure. The map unit is
@@ -7990,6 +8036,15 @@
         const span = TL.matrix && TL.matrix.span;
         return span ? span[0] : 1;
     }
+    // 10 Nov 2026 (claude/map-first-view, Idea 1, frontier check F1): the month the map OPENS on when the address names none:
+    // today's calendar month, clamped to the plan's first and last month with volume (before the plan, its first month;
+    // after it, its last). A month inside the plan with nothing approved is still this month (the bar says so). null = no
+    // month has anything approved: the map stays on "No month on screen". tlStartMonth (Play, D22) is unchanged.
+    function firstViewMonth(){
+        const span = TL.matrix && TL.matrix.span;
+        if(!span) return null;
+        return Math.min(span[1], Math.max(span[0], currentMonthIndex()));
+    }
     function announceTimeline(text){
         const el=document.getElementById('tl-live'); if(el) el.textContent = text;
     }
@@ -8068,7 +8123,9 @@
         // wording review (12 Oct): carbonStamp is the Carbon page's stamp from the feed, printed beside the carbon legend
         // Track C review: sectionCo2Max, the largest section-month from the server (null when it gave none)
         const sectionCo2Max = (Number(j.section_co2_max) > 0 && !j.co2_error) ? Number(j.section_co2_max) : null;
-        TL.matrix = { byRoute:byR, unit:j.unit, working_days:j.working_days, volMonths, span, co2Max, sectionCo2Max, co2Error: j.co2_error || null, carbonStamp: j.carbon_stamp || null };
+        // 10 Nov 2026 (claude/map-first-view, Idea 3): planUpdated = the UK date the forecast last changed (YYYY-MM-DD), or null
+        const planUpdated = /^\d{4}-\d{2}-\d{2}$/.test(j.plan_updated || '') ? j.plan_updated : null;
+        TL.matrix = { byRoute:byR, unit:j.unit, working_days:j.working_days, volMonths, span, co2Max, sectionCo2Max, co2Error: j.co2_error || null, carbonStamp: j.carbon_stamp || null, planUpdated };
         prefetchSpanKpis();     // in the background, one month at a time; never awaited
         return TL.matrix;
     }
@@ -8352,6 +8409,7 @@
     function openTimeline(){
         TL.on=true;
         setTimelineExpanded(false);
+        TL.cleared=false;          // 10 Nov 2026 (claude/map-first-view): a month is on screen
         const cb=document.getElementById('toggle-forecast'); if(cb) cb.checked=false;
         const bar=document.getElementById('timeline-bar'); if(bar) bar.style.display='flex';
         syncTimelineFoot();
@@ -8371,6 +8429,7 @@
     }
     function closeTimeline(){
         if(TL.wall && typeof exitWallMode === 'function') exitWallMode();
+        TL.cleared = true;         // 10 Nov 2026 (claude/map-first-view): no month on screen; the link carries month=none
         stopTimeline(); TL.on=false;
         renderTimelineWarnings(null);      // §8: no month on screen, no warnings
         if(typeof hideClashToast === 'function') hideClashToast();     // M3: and no pause message
@@ -9275,6 +9334,9 @@
     function encodeView(v, defaults) {
         const q = new URLSearchParams();
         if (v.month) q.set('month', monthParam(v.month));
+        // 10 Nov 2026 (claude/map-first-view): the map opens on this month, so a view with the month CLEARED says so, or its
+        // link would open on a month the sharer was not looking at
+        else if (v.noMonth) q.set('month', 'none');
         const on = new Set(v.layers || []), def = new Set(defaults || []);
         const changes = [...on].filter(k => !def.has(k)).sort().concat([...def].filter(k => !on.has(k)).sort().map(k => '-' + k));
         if (changes.length) q.set('layers', changes.join('.'));
@@ -9296,6 +9358,7 @@
                       light: LIGHT_PRESETS.includes(q.get('light')) ? q.get('light') : null,
                       labels: /^(off|few|all)$/.test(q.get('labels') || '') ? q.get('labels') : null };   // 28 Oct 2026 (task 0a): LABEL_MODES
         if (q.has('month')) out.month = monthFromParam(q.get('month'));
+        out.noMonth = q.get('month') === 'none';           // 10 Nov 2026 (claude/map-first-view): the cleared view
         out.area = areaFromParam(q.get('area'));
         if (q.has('layers')) out.layers = (q.get('layers') || '').split('.').map(x => x.trim()).filter(x => /^-?[a-z0-9_-]+$/i.test(x));
         (q.get('filters') || '').split('|').forEach(part => {
@@ -9314,7 +9377,7 @@
     }
     function currentView() {
         const val = id => { const el = document.getElementById(id); return el && el.value !== 'ALL' ? el.value : null; };
-        return { month: TL.on ? TL.month : null, layers: layersOn(),
+        return { month: TL.on ? TL.month : null, noMonth: !TL.on && !!TL.cleared, layers: layersOn(),
                  filters: { origin: val('filter-origin'), dest: val('filter-dest'), discipline: val('filter-discipline'),
                             team: selectedText('filter-ipt'),         // the team's NAME as the option shows it
                             routes: (typeof ROUTE_PICK !== 'undefined' && ROUTE_PICK.sel.size) ? routePickList().join(',') : null },   // 8 Nov 2026 (2.1-3)
@@ -9330,7 +9393,7 @@
     // monthOnly = the short form for a QR code that cannot hold the whole view
     function shareUrl(monthOnly) {
         const v = currentView();
-        const qs = monthOnly ? encodeView({ month: v.month, layers: VIEW.defaults, filters: {} }, VIEW.defaults) : encodeView(v, VIEW.defaults);
+        const qs = monthOnly ? encodeView({ month: v.month, noMonth: v.noMonth, layers: VIEW.defaults, filters: {} }, VIEW.defaults) : encodeView(v, VIEW.defaults);
         return location.origin + location.pathname + (qs ? '?' + qs : '');
     }
     function writeView() {
@@ -9368,6 +9431,7 @@
         };
         // 19 Oct 2026: the link's month BEFORE its boxes, so a box that opens the timeline (By council) opens on it (it
         // opened on the first month, then switched once the months had loaded: ~30 s on live)
+        if (v.noMonth && !v.month) TL.cleared = true;      // 10 Nov 2026 (claude/map-first-view): a link from the cleared view opens cleared
         if (v.month) { TL.month = v.month; TL.chosen = true; }
         setSel('filter-origin', v.filters.origin); setSel('filter-dest', v.filters.dest);
         setSel('filter-discipline', v.filters.discipline); setSel('filter-ipt', v.filters.team, true);
@@ -9391,7 +9455,16 @@
         applyFilters();
         const done = () => { VIEW.ready = true; if (v.area && typeof setAreaBox === 'function') setAreaBox(v.area, true);
                              scheduleViewWrite(); schedulePresetRender(); };
+        // 10 Nov 2026 (claude/map-first-view, Idea 1): no month in the link opens on this month (firstViewMonth), unless the
+        // link is the cleared view (month=none) or the "Show forecast routes" average (layers=forecast, no month: that view
+        // has no month by design), or the person has already opened or cleared a month while the months were loading
+        const firstView = !v.month && !v.noMonth && !(v.layers && v.layers.indexOf('forecast') >= 0);
         if (v.month) ensureTimelineMatrix().then(() => pickMonth(v.month)).catch(() => {}).then(done);
+        else if (firstView) ensureTimelineMatrix().then(() => {
+            const fc = document.getElementById('toggle-forecast');
+            const m = typeof firstViewMonth === 'function' ? firstViewMonth() : null;
+            if (m && !TL.on && !TL.cleared && !TL.playing && !(fc && fc.checked)) pickMonth(m);
+        }).catch(() => {}).then(done);
         else done();
     }
     function applyPendingRestr() {
@@ -9605,6 +9678,7 @@
             fetch('/api/public/whoami', { credentials: 'same-origin' })
                 .then(r => r.ok ? r.json() : null)
                 .then(j => { RME.staff = !!(j && j.level === 'staff'); const b = document.getElementById('rme-open'); if (b) b.hidden = !RME.staff;
+                             if (typeof renderPlanInfo === 'function') renderPlanInfo();     // 10 Nov 2026: staff get the guide link
                              communityStaff(RME.staff); collisionStaff(RME.staff); abnormalStaff(RME.staff); siteLayoutsStaff(RME.staff); })
                 .catch(() => {});
         } catch (e) {}
