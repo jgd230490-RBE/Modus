@@ -311,7 +311,7 @@ if (loaded) {
         pTeam.includes(">Target for your team&#x27;s lines: 32.7 tCO2e, 79.1% of the scheme&#x27;s target (74.0% below the approved plan)<") && pTeam.includes("Your planner sets the scheme&#x27;s carbon target.")
         && !pTeam.includes("Set as the scheme") && !pTeam.includes("Clear the target") && !pTeam.includes("aria-pressed")
         && pTeamCap.includes(">Target for your team&#x27;s lines: 32.7 tCO2e, 79.1% of the scheme&#x27;s fixed cap of 41.4 tCO2e<")
-        && [pTeam, pTeamCap].every(o => o.includes(">As forecast on your team&#x27;s lines: 159.1 tCO2e, 117.7 tCO2e over the target<") && o.includes(">With the agreed decisions on your team&#x27;s lines: 41.4 tCO2e, on target<")
+        && [pTeam, pTeamCap].every(o => o.includes(">As forecast: 159.1 tCO2e, 117.7 tCO2e over the target<") && o.includes(">With the agreed decisions: 41.4 tCO2e, on target<")
           && o.includes("These figures are for your team&#x27;s lines only, against their share of the scheme&#x27;s target: the target split by each team&#x27;s plan with the agreed decisions. The shares add up to the target.")
           && !o.includes("not split by") && !o.includes("not compared"))
         && !/IPT\d/.test(pTeam + pTeamCap) && !/undefined|NaN/.test(pTeam + pTeamCap));
@@ -571,7 +571,7 @@ if (loaded) {
     // REVERSED 13 Oct 2026 (each team its share): it asserted "for the whole scheme, not split by team" and no verdict
     ok("⭐ ...a team code: its own share of the target, % or cap, with its own verdicts; no decisions listed; no team id",
       [dTp, dTc].every(o => o.includes("These figures are for your team&#x27;s lines only, against their share of the scheme&#x27;s target: the target split by each team&#x27;s plan with the agreed decisions. The shares add up to the target.")
-        && o.includes("As forecast on your team&#x27;s lines: 159.1 tCO2e, 117.7 tCO2e over the target") && o.includes("With the agreed decisions on your team&#x27;s lines: 41.4 tCO2e, on target")
+        && o.includes("As forecast: 159.1 tCO2e, 117.7 tCO2e over the target") && o.includes("With the agreed decisions: 41.4 tCO2e, on target")
         && !o.includes("agreed decisions</summary>")
         && !o.includes("whole approved plan") && o.includes("All-in: making the material, transport and waste disposal, on the approved plan on your team&#x27;s lines."))
       && dTp.includes("<b>Target for your team&#x27;s lines: 32.7 tCO2e, 79.1% of the scheme&#x27;s target (74.0% below the approved plan)</b>") && !dTp.includes("scheme&#x27;s cut")
@@ -900,7 +900,7 @@ if (loaded) {
     // REVERSED 13 Oct 2026 (each team its share): it asserted "for the whole scheme, not split by team" and no verdict
     ok("...a team code: its own share of the target, % or cap, with its verdicts; decisions that no longer apply say so",
       fTp.includes("<b>Carbon (all-in):</b> Target for your team&#x27;s lines: 32.7 tCO2e, 79.1% of the scheme&#x27;s target (74.0% below the approved plan)<") && !fTp.includes("scheme&#x27;s 74.0% cut")
-      && fTp.includes(">As forecast on your team&#x27;s lines: 159.1 tCO2e, 117.7 tCO2e over the target · With the agreed decisions on your team&#x27;s lines: 41.4 tCO2e, on target<")
+      && fTp.includes(">As forecast: 159.1 tCO2e, 117.7 tCO2e over the target · With the agreed decisions: 41.4 tCO2e, on target<")
       && fTc.includes("Target for your team&#x27;s lines: 32.7 tCO2e, 79.1% of the scheme&#x27;s fixed cap of 41.4 tCO2e<") && !/not split by|not compared/.test(fSegs[0] + fSegs[1])
       && fBad.includes("With the agreed decisions: —<") && fBad.includes("A planner needs to set the target again on the Carbon planner.")
       && fSegs.every(x => x.includes("Carbon (all-in)") && !x.includes("<select"))
@@ -936,8 +936,8 @@ if (loaded) {
     // REVERSED 11 Oct 2026 (no team share of the scheme's target): it asserted "Target for your team's lines: 41.4 tCO2e"
     // REVERSED 13 Oct 2026 (each team its share): it asserted the scheme's target "not split by team" and no verdict
     ok("...a team code: its own share of the target, % or cap, beside its own lines' figures and verdicts; no carbon block and no target read yet: neither line",
-      mTp.includes(">Target for your team&#x27;s lines: 32.7 tCO2e, 79.1% of the scheme&#x27;s target (74.0% below the approved plan) · As forecast on your team&#x27;s lines: 159.1 tCO2e, 117.7 tCO2e over the target · With the agreed decisions on your team&#x27;s lines: 41.4 tCO2e, on target<")
-      && mTc.includes(">Target for your team&#x27;s lines: 32.7 tCO2e, 79.1% of the scheme&#x27;s fixed cap of 41.4 tCO2e · As forecast on your team&#x27;s lines: 159.1 tCO2e")
+      mTp.includes(">Target for your team&#x27;s lines: 32.7 tCO2e, 79.1% of the scheme&#x27;s target (74.0% below the approved plan) · As forecast: 159.1 tCO2e, 117.7 tCO2e over the target · With the agreed decisions: 41.4 tCO2e, on target<")
+      && mTc.includes(">Target for your team&#x27;s lines: 32.7 tCO2e, 79.1% of the scheme&#x27;s fixed cap of 41.4 tCO2e · As forecast: 159.1 tCO2e")
       && !mNo.includes("data-carbon-cells") && !mNo.includes("data-carbon-target")
       && !/IPT\d/.test([mTp, mTc].map(o => seg(o, 'data-cost-strip="1"', "Clear year")).join("")) && !/undefined|NaN/.test(mTp + mTc + mNo));   // NARROWED 27 Oct 2026: the strip ends before the form's buttons now
     const mBad = mx(PC, BAD), mCap2 = mx(PC, CAP2);

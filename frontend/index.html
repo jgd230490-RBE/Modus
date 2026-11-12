@@ -2624,12 +2624,14 @@ function ctTargetLine(ct){
 // as forecast, and with the agreed decisions, each with the server's verdict. When the decisions no longer
 // apply, the second is the server's sentence, or (dash: a line with no room for it) "—" and the page prints it below
 function ctProgress(ct, dash){
-  const s = ct.status, on = ctTeam(ct) ? ` on ${ctYour()}` : "";
+  // 12 Nov 2026 (A1-F2): the scope is said ONCE, by the target line above ("Target for your team's lines"), not again in each figure:
+  // with both gaps the team's line was 29 words, over the 25 the audit allows
+  const s = ct.status;
   const g1 = ctGap(s.on_target_as_forecast, s.gap_as_forecast_t), g2 = ctGap(s.on_target_with_decisions, s.gap_with_decisions_t);
   return [
-    `As forecast${on}: ${ctT(s.approved_t)} tCO2e${g1 ? ", " + g1 : ""}`,
-    s.invalid ? (dash ? `With the agreed decisions${on}: —` : s.invalid)
-      : `With the agreed decisions${on}: ${ctT(s.with_decisions_t)} tCO2e${g2 ? ", " + g2 : ""}`,
+    `As forecast: ${ctT(s.approved_t)} tCO2e${g1 ? ", " + g1 : ""}`,
+    s.invalid ? (dash ? `With the agreed decisions: —` : s.invalid)
+      : `With the agreed decisions: ${ctT(s.with_decisions_t)} tCO2e${g2 ? ", " + g2 : ""}`,
   ];
 }
 function ctScopeNote(ct){
