@@ -372,14 +372,20 @@ ok("H2: three geofences — a closure that re-routes (Tilton), an advisory 7.5 t
        ("Z037", "works", 0, "2029-06-01", "2029-10-31"),
        # NARROWED 28 Oct 2026 (the demo narrative's F4): Christmas trading 2027 now DIVERTS in its dates, as ticked on live
        ("Z038", "closure", 1, "2027-12-01", "2027-12-31"),
-       ("Z039", "closure", 0, "2028-12-01", "2028-12-31")]
-   and all("(fictional)" in (z["note"] or "") for z in _T["zones"] if z["kind"] != "haul_road")
+       ("Z039", "closure", 0, "2028-12-01", "2028-12-31"),
+       # NARROWED 11 Nov 2026 (card M-F1): + the B6047 traffic limit drawn on live, last, undated, never routing
+       ("Z041", "traffic_limit", 0, None, None)]
+   # NARROWED 11 Nov 2026 (card M-F1): the traffic limit carries no note, as saved on live (a refresh keeps live's row)
+   and all("(fictional)" in (z["note"] or "") for z in _T["zones"] if z["kind"] not in ("haul_road", "traffic_limit"))
+   and [z["note"] for z in _T["zones"] if z["kind"] == "traffic_limit"] == [None]
    and "8 vehicles a day" in [z for z in _T["zones"] if z["id"] == "Z004"][0]["note"]
    and [z for z in _T["zones"] if z["id"] == "Z003"][0]["name"] == "A47 at the new Tilton junction: HGV diversion while the junction is built")
 def _bbox(g):
     xs = [c[0] for c in g["coordinates"][0]]; ys = [c[1] for c in g["coordinates"][0]]
     return min(xs), min(ys), max(xs), max(ys)
-_Z = {z["id"]: _bbox(json.loads(z["geometry"]) if isinstance(z["geometry"], str) else z["geometry"]) for z in _T["zones"] if z["kind"] != "haul_road"}
+# NARROWED 11 Nov 2026 (card M-F1): the boxes only (the traffic limit Z041 is a line)
+_Z = {z["id"]: _bbox(json.loads(z["geometry"]) if isinstance(z["geometry"], str) else z["geometry"]) for z in _T["zones"]
+      if z["kind"] not in ("haul_road", "traffic_limit")}
 ok("H2: the Tilton closure box straddles the A47 as HERE baked it (52.620–52.622 N, west of the -0.922 turn) and is in force on the day of the bake, "
    "because a zone only steers routing while it applies today (zones.applies_on) — the 5 Oct live bake moved nothing with a 12 Oct start",
    _Z["Z003"][1] < 52.6208 < _Z["Z003"][3] and _Z["Z003"][0] < -0.949 < _Z["Z003"][2] and _Z["Z003"][3] < 52.6225

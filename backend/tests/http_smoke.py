@@ -842,8 +842,12 @@ with TestClient(main.app, base_url="https://testserver") as c:
                and r.headers.get("cache-control") == "no-store" and len(_lp) == 1
                and "demo fictional scheme" in " ".join(_lp[0].split()).lower() and all(f in _lp[0] for f in _figs) and "Key points" in _lp[0],     # NARROWED 14 Oct 2026; and 15 Oct (the wording)
                f"{r.status_code} {len(_lp)}")
-            ok("⭐ D43 the newsletter PDF over HTTP is four pages, the brand band on each",
-               len(_bp) == 4 and all("Lorry movements bulletin · October 2026" in x for x in _bp), f"{len(_bp)} " + " || ".join(x[:160] for x in _bp))
+            # NARROWED 11 Nov 2026 (card M-F1): the demo package carries a public traffic limit (Z041, as on live since 11 Nov), so
+            # page 4's ledger gains its row ("Forecast against the limits") and the sources start a fifth page
+            ok("⭐ D43 the newsletter PDF over HTTP is four pages and the sources' page (five with a public traffic limit), the brand band on each",
+               len(_bp) == 5 and all("Lorry movements bulletin · October 2026" in x for x in _bp)
+               and "Forecast against the limits" in _bp[3] and "Boundaries: ONS Local Authority Districts" in _bp[4]
+               and "5 of 5" in _bp[4], f"{len(_bp)} " + " || ".join(x[:160] for x in _bp))
             r = c.get("/bulletin/leaflet/?month=10", headers=PLAN)
             ok("⭐ the leaflet page over HTTP with a code: HTML, not cached, the band, the figures, a link to its PDF",
                r.status_code == 200 and r.headers.get("content-type", "").startswith("text/html")
