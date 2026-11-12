@@ -1398,7 +1398,8 @@ ok("UI fix 6 card 2: the Account headings are --muted on --surface-2 — 4.56:1 
    all(_cr(_eff(a, l)["muted"], _eff(a, l)["surface-2"]) >= 4.5 for a in _ACC for l in ("ink", "light", "dark"))
    and round(_cr("#64748B", "#FAFAF9"), 2) == 4.56 and round(_cr("#9AA1AB", "#1B1D21"), 2) == 6.48
    and round(_cr("#FFFFFF", "#C2410C"), 2) == 5.18 and round(_cr("#FFFFFF", "#2563EB"), 2) == 5.17
-   and ".la-acct-head th{background:var(--surface-2);color:var(--muted);font-size:13px;" in fe and 'className="btn-pri btn-sm disabled:opacity-40"' in fe)
+   # NARROWED 11 Nov 2026 (D-F4, John's yes): "Add to this week" is an outline button now (btn-sec), not the accent fill
+   and ".la-acct-head th{background:var(--surface-2);color:var(--muted);font-size:13px;" in fe and 'className="btn-sec btn-sm disabled:opacity-40"' in fe)
 ok("UI fix 6 card 5: the big screen's '+ N more lines today' line is --muted on the card — 4.76:1 (Ink and Light), 6.25:1 (Dark), 4.5 or better in all 12",
    all(_cr(_eff(a, l)["muted"], _eff(a, l)["surface"]) >= 4.5 for a in _ACC for l in ("ink", "light", "dark"))
    and round(_cr("#64748B", "#FFFFFF"), 2) == 4.76 and round(_cr("#9AA1AB", "#1F2024"), 2) == 6.25
