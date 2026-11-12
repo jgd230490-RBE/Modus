@@ -526,6 +526,94 @@
         table.fc-matrix thead th{ position:sticky; top:0; background:var(--surface); font-weight:600; color:var(--muted); }
         table.fc-matrix tr.fc-picked td, table.fc-matrix tr.fc-picked td:first-child{ background:#EFF6FF; }
         .mat-chip{ display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px; vertical-align:middle; }
+        /* 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1): "This route". The panel is a wide, short strip
+           (169 px of content in a 1422 x 700 window with the timeline open), so the story sits on the left, the months on
+           the right, and the switches in the tab row. The chart is ONE control, as the timeline's rail is: a slider kept
+           out of sight for the keyboard, the bars for the pointer. */
+        .rs-ctl{ margin-left:auto; display:flex; align-items:center; gap:6px; }
+        .rs-ctl[hidden]{ display:none; }
+        .rs-ctl + .drawer-close{ margin-left:2px; }
+        .rs-seg{ display:inline-flex; border:1px solid var(--ctl-line); border-radius:7px; overflow:hidden; }
+        .rs-seg[hidden]{ display:none; }
+        .rs-seg button, .rs-bt{ border:0; background:var(--surface); color:var(--ink); font:inherit; font-size:12px; font-weight:600; padding:5px 9px; min-height:26px; cursor:pointer; white-space:nowrap; }
+        .rs-seg button + button{ border-left:1px solid var(--ctl-line); }
+        .rs-seg button[aria-pressed="true"]{ background:#EEF3FB; color:#1E3A8A; }
+        .rs-bt{ border:1px solid var(--ctl-line); border-radius:7px; }
+        .rs-seg button:focus-visible, .rs-bt:focus-visible, .rs-go:focus-visible, .rs-cell:focus-visible{ outline:2px solid #1D4ED8; outline-offset:-2px; }
+        #drawer-analysis{ padding:10px 16px; position:relative; }
+        .rs-two{ display:grid; grid-template-columns:minmax(0, 484px) minmax(0, 1fr); gap:22px; }
+        .rs-title{ margin:0; font-size:14px; font-weight:700; color:var(--navy-deep); display:flex; align-items:baseline; gap:6px; }
+        .rs-title span{ min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .rs-title small{ flex:none; font-size:12px; font-weight:400; color:var(--muted); white-space:nowrap; }
+        .rs-what{ font-size:13px; font-weight:600; color:var(--ink); margin:5px 0 4px; }
+        .rs-desc{ font-size:12px; color:var(--muted); margin:0 0 7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .rs-inm{ font-size:12px; color:var(--muted); margin:4px 0 2px; }
+        .rs-figs{ display:flex; gap:14px; align-items:flex-start; }
+        .rs-fig span{ white-space:nowrap; }
+        .rs-fig{ display:block; text-align:left; font:inherit; color:inherit; background:none; border:0; padding:0; }
+        .rs-fig b{ display:block; font-size:19px; font-weight:700; letter-spacing:-.02em; line-height:1.15; color:var(--navy-deep); }
+        .rs-fig span{ font-size:12px; color:var(--muted); }
+        button.rs-go{ border:1px solid var(--ctl-line); border-radius:7px; padding:1px 7px 3px; margin:-2px -8px 0 -8px; cursor:pointer; min-height:24px; }
+        button.rs-go b{ color:#1D4ED8; }
+        .rs-chart{ position:relative; }
+        .rs-plot{ display:flex; align-items:flex-end; gap:4px; height:100px; margin-top:4px; border-bottom:1px solid #94A3B8; cursor:pointer; touch-action:manipulation; user-select:none; }
+        .rs-plot.rs-many{ gap:2px; }
+        .rs-col{ flex:1 1 0; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; position:relative; }
+        .rs-col i{ display:block; width:72%; min-height:3px; background:#6690E3; border-radius:2px 2px 0 0; }
+        .rs-col.rs-none i{ min-height:0; height:0; }
+        .rs-col em{ font-style:normal; font-size:12px; font-weight:700; color:var(--ink); margin-bottom:2px; white-space:nowrap; }
+        .rs-col.rs-now i{ background:#1D4ED8; }
+        .rs-col.rs-now::before{ content:""; position:absolute; left:-1px; right:-1px; top:-3px; bottom:-19px; border:1.5px solid #1D4ED8; border-radius:4px; background:rgba(29,78,216,.07); pointer-events:none; }
+        .rs-xl{ display:flex; gap:4px; margin-top:3px; }
+        .rs-plot.rs-many + .rs-xl{ gap:2px; }
+        .rs-xl span{ flex:1 1 0; min-width:0; text-align:center; font-size:12px; color:var(--muted); overflow:hidden; }
+        .rs-xl span.rs-now{ color:#1D4ED8; font-weight:700; }
+        .rs-yl{ display:flex; gap:4px; font-size:12px; color:var(--muted); }
+        .rs-yl span{ min-width:0; border-top:1px solid var(--ctl-line); margin-top:2px; padding-top:1px; text-align:center; overflow:hidden; }
+        .rs-chart input[type=range]{ position:absolute; width:1px; height:1px; min-width:0; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+        .rs-chart:focus-within .rs-plot{ outline:2px solid #1D4ED8; outline-offset:2px; }
+        .rs-sline{ font-size:12.5px; color:var(--muted); margin:0 0 6px; }
+        .rs-sline b{ font-size:14px; color:var(--navy-deep); margin-right:6px; }
+        table.rs-year{ border-collapse:collapse; width:100%; font-size:12.5px; }
+        table.rs-year th, table.rs-year td{ padding:1px 4px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); font-weight:400; color:var(--ink); }
+        table.rs-year thead th{ font-weight:600; color:var(--muted); font-size:12px; padding:4px 8px; }
+        table.rs-year th:first-child{ text-align:left; font-weight:700; padding-left:0; }
+        table.rs-year td.rs-sum{ font-weight:700; padding-right:0; }
+        table.rs-year td.rs-nil{ padding:4px 8px; color:var(--muted); }
+        .rs-cell{ border:1.5px solid transparent; border-radius:3px; background:none; font:inherit; color:inherit; padding:2px 4px; min-width:30px; min-height:24px; text-align:right; cursor:pointer; }
+        .rs-cell.rs-now{ border-color:#1D4ED8; }
+        .rs-cell.rs-peak{ font-weight:700; }
+        .rs-cards{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; }
+        .rs-card{ border:1px solid var(--line); border-radius:8px; padding:6px 9px; position:relative; }
+        .rs-card b{ display:block; font-size:15px; color:var(--navy-deep); }
+        .rs-card span{ font-size:12px; color:var(--muted); }
+        .rs-card .info-i{ vertical-align:middle; margin-left:4px; }
+        .rs-more{ font-size:12px; color:var(--muted); margin-top:8px; }
+        .rs-more .route-words{ margin:0 0 4px; }
+        .rs-more a{ color:#1D4ED8; font-weight:600; text-decoration:none; }
+        .info-pop.rs-info{ position:absolute; z-index:3; right:16px; top:46px; width:min(320px, calc(100% - 32px)); margin:0; box-shadow:0 8px 24px rgba(16,24,40,.14); }
+        .rs-info a{ color:#1D4ED8; font-weight:600; }
+        .rs-info a[hidden]{ display:none; }
+        html[data-look="dark"] .rs-seg button[aria-pressed="true"]{ background:rgba(37,99,235,.22); color:#8FB3F5; }
+        html[data-look="dark"] .rs-col i{ background:#5B7FC7; }
+        html[data-look="dark"] .rs-col.rs-now i{ background:#8FB3F5; }
+        html[data-look="dark"] .rs-col.rs-now::before{ border-color:#8FB3F5; background:rgba(143,179,245,.10); }
+        html[data-look="dark"] .rs-xl span.rs-now, html[data-look="dark"] button.rs-go b, html[data-look="dark"] .rs-more a, html[data-look="dark"] .rs-info a{ color:#8FB3F5; }
+        html[data-look="dark"] .rs-plot{ border-bottom-color:#6B7080; }
+        html[data-look="dark"] .rs-cell.rs-now{ border-color:#8FB3F5; }
+        html[data-look="dark"] .rs-seg button:focus-visible, html[data-look="dark"] .rs-bt:focus-visible, html[data-look="dark"] .rs-go:focus-visible, html[data-look="dark"] .rs-cell:focus-visible{ outline-color:#8FB3F5; }
+        html[data-look="dark"] .rs-chart:focus-within .rs-plot{ outline-color:#8FB3F5; }
+        /* a laptop-height window (650 px: 125 px of content): the same story a little tighter, still without scrolling */
+        @media (max-height:680px){ .rs-plot{ height:80px; } .rs-what{ margin:3px 0 2px; } .rs-desc{ margin-bottom:4px; } .rs-inm{ margin:2px 0 1px; } }
+        /* the phone's route card: the same line, the months as a picture, one button to the busiest month */
+        .route-card .rs-what{ margin:0 0 8px; font-size:14px; }
+        .route-card .rs-plot{ height:54px; gap:3px; cursor:default; }
+        .route-card .rs-xl{ gap:3px; }
+        .route-card .rs-col em, .route-card .rs-xl span, .route-card .rs-yl{ font-size:12px; }
+        .route-card .rs-yl{ margin-bottom:8px; }
+        .route-card .rs-busy{ color:#1D4ED8; }
+        .route-card .rs-busy[disabled]{ color:var(--muted); cursor:default; }
+        html[data-look="dark"] .route-card .rs-busy{ color:#8FB3F5; }
 
         /* Playable forecast timeline bar */
         #timeline-bar{ display:none; position:absolute; left:calc(50% + 150px); transform:translateX(-50%); bottom:18px; z-index:25; background:var(--surface); border:1px solid var(--line); border-radius:11px; box-shadow:0 8px 28px rgba(16,24,40,.16); padding:8px 12px; align-items:center; gap:11px; }
@@ -1504,10 +1592,13 @@
 
 <div id="route-drawer">
   <div class="drawer-head">
-    <button class="drawer-tab active" id="tab-analysis" onclick="showDrawerTab('analysis')">Route analysis</button>
-    <button class="drawer-tab" id="tab-detail" onclick="openForecastDetail()">Forecast detail</button>
+    <button class="drawer-tab active" id="tab-analysis" onclick="showDrawerTab('analysis')">This route</button>
+    <button class="drawer-tab" id="tab-detail" onclick="openForecastDetail()">All routes</button>
+    <!-- 12 Nov 2026 (option A1): the view's switches sit in the tab row (the strip has 169 px for its content) -->
+    <span class="rs-ctl" id="rs-ctl" hidden></span>
     <button type="button" class="drawer-close" onclick="closeDrawer()" title="Close" aria-label="Close the route panel">&times;</button>
   </div>
+  <div class="info-pop rs-info" id="info-route-story" hidden><p id="info-route-story-words"></p><p><a id="info-route-story-guide" href="/help/#ug-map-route-panel" target="_blank" rel="noopener" hidden>User guide</a></p></div>
   <div class="drawer-body" id="drawer-analysis"></div>
   <div class="drawer-body" id="drawer-detail" style="display:none;"></div>
 </div>
@@ -6781,6 +6872,7 @@
         document.getElementById('drawer-detail').style.display   = tab==='detail'?'block':'none';
         document.getElementById('tab-analysis').classList.toggle('active',tab==='analysis');
         document.getElementById('tab-detail').classList.toggle('active',tab==='detail');
+        { const rc = document.getElementById('rs-ctl'); if (rc) rc.hidden = tab !== 'analysis' || !rc.innerHTML; if (typeof closeInfos === 'function') closeInfos(); }   // 12 Nov 2026 (A1)
         document.getElementById('route-drawer').classList.add('open');
         document.body.classList.add('drawer-open');     // 10 Nov 2026 (finding 4): the Conditions panel ends above the drawer
         if (typeof positionWarnStack === 'function') positionWarnStack();
@@ -6790,8 +6882,6 @@
         document.body.classList.remove('drawer-open');
         if (typeof positionWarnStack === 'function') positionWarnStack();
     }
-    function card(val,lbl,sub){ return '<div class="an-card"><div class="an-val">'+val+'</div><div class="an-lbl">'+lbl+'</div>'+(sub?'<div class="an-sub">'+sub+'</div>':'')+'</div>'; }
-
     // 17 Oct 2026 (the user: UK drivers' hours): the trips one lorry makes in a day — the server's rule
     // (backend/drivers_hours.py lorry_day), here only for the drawer's rough estimate at the average haul speed when the
     // route carries no server figure. The largest n whose driving is at most 9 h and whose work + the required break
@@ -6810,113 +6900,293 @@
     async function openRouteAnalysis(routeId){
         selectRoute(routeId);
         showDrawerTab('analysis');
-        const box=document.getElementById('drawer-analysis');
-        const rl=(routeId||'').toString().trim().toLowerCase();
-        const info=ROUTEINFO[rl]||{distance_km:0};
-        const F=fac(); const P=F.planning||FALLBACK_FACTORS.planning;
-        const dist=info.distance_km||0, round=dist*2;
-        const cycleH = P.avg_haul_speed_kmh>0 ? (round/P.avg_haul_speed_kmh + (P.load_minutes+P.unload_minutes)/60) : 0;
-        // 17 Oct 2026: whole trips in a driver's day (the shift less the required break, at most 9 h driving) — the
-        // server's figure on the routed cycle when the route carries it, else this rough estimate at the average speed
-        const fromServer = typeof info.trips_per_day==='number';
-        const tripsPerDay = fromServer ? info.trips_per_day
-            : (cycleH>0 ? lorryDayTrips(P.shift_hours_per_day, (round/P.avg_haul_speed_kmh)*60, P.load_minutes+P.unload_minutes) : 0);
-        const dirLink = (info.start&&info.end)
-            ? ' &nbsp;·&nbsp; <a href="https://www.google.com/maps/dir/?api=1&origin='+info.start[1]+','+info.start[0]+'&destination='+info.end[1]+','+info.end[0]+'&travelmode=driving" target="_blank" rel="noopener" style="color:var(--navy);font-weight:600;text-decoration:none;">Driving directions ↗</a>'
-            : '';
-        box.innerHTML =
-            '<div class="an-title">'+routeId+'</div>'+
-            '<div class="an-route">'+(info.origin||'—')+' → '+(info.dest||'—')+dirLink+'</div>'+
-            '<div class="an-grid">'+
-                card(fmtDist(dist, 1)+' '+DU(),'One-way distance','by road')+
-                card(fmtDist(round, 1)+' '+DU(),'Round trip','Loaded out, empty back')+
-                (fromServer && typeof info.cycle_hr==='number'
-                    ? card(info.cycle_hr.toFixed(2)+' h','Haul cycle','driving both ways, plus gate and handling')
-                    : card(cycleH.toFixed(2)+' h','Est. haul cycle','Drive + '+(P.load_minutes+P.unload_minutes)+' min handling'))+
-                card(String(tripsPerDay),'Trips / day / lorry', tripsPerDay>0
-                    ? (fromServer ? Math.min(13, P.shift_hours_per_day)+' h shift less the break, max 9 h driving'
-                                  : '@ '+Math.min(13, P.shift_hours_per_day)+' h shift less breaks, at most 9 h driving, '+Math.round(distU(P.avg_haul_speed_kmh))+' '+SPD())
-                    : 'one round trip does not fit a driver\'s day')+
-            '</div>'+
-            routeWordsHTML(routeId)+
-            '<div id="an-fc-slot" class="an-sub" style="margin-top:12px;">Loading forecast…</div>';
-        try{
-            const mtx=await fetchMatrix('t');
-            // 12 Oct 2026 (both tracks' fix passes, merged on the base branch): EVERY line of the route, not the first
-            // one find() met. forecast-matrix is one row per (route, discipline, section), so a route with two approved
-            // lines is two rows; the drawer used to print one line's tonnes and carbon under a caption that called it
-            // the bar's figure. Tonnes, trips and the monthly profile are summed over every row, trips on each line's
-            // own payload.
-            const rows=(mtx.routes||[]).filter(r=>(r.route_id||'').toString().trim().toLowerCase()===rl);
-            const row=rows.length?rows[0]:null;
-            let extra;
-            if(row){
-                const veh=row.vehicle_type, vehN=vehName(row.vehicle_type,row.vehicle_name), mat=row.material_type;
-                const payload=pick(F.vehicle_payload_t,veh)||20;
-                // 12 Oct 2026 (B2): carbon is the SERVER's figure. forecast-matrix carries co2_t per month,
-                // keyed like monthly, from the same costlines read as the KPI bar and the Dashboard (km × the
-                // vehicle's kg CO2e/km; since 8 Nov 2026 the loaded leg + the share of the way back the route charges). Nothing is worked out here any more — the drawer used to
-                // multiply its own trips × round trip × a factor with a 0.9 fallback, so two carbon numbers
-                // could sit on one screen. A line-month with no road route stored for its vehicle is null: it is
-                // counted and named, never estimated.
-                const totalT=rows.reduce((a,r)=>a+(r.total||0),0);
-                let trips=0, co2t=0, bakedT=0, co2LineMonths=0;
-                const monthT={}, monthLoads={}, unbakedMonths={};
-                rows.forEach(rw=>{
-                    const pl=pick(F.vehicle_payload_t,rw.vehicle_type)||20;
-                    trips+=pl>0?Math.ceil((rw.total||0)/pl):0;
-                    const co2m=rw.co2_t||{};
-                    Object.keys(rw.monthly||{}).forEach(k=>{
-                        const mt=rw.monthly[k]||0;
-                        monthT[k]=(monthT[k]||0)+mt;
-                        monthLoads[k]=(monthLoads[k]||0)+(pl>0?mt/pl:0);
-                        const c=co2m[k];
-                        if(c==null){ unbakedMonths[k]=true; } else { co2t+=c; bakedT+=mt; co2LineMonths++; }
-                    });
-                });
-                const peakT=Object.keys(monthT).length?Math.max.apply(null,Object.values(monthT)):0;
-                const peakLoads=Object.keys(monthLoads).length?Math.max.apply(null,Object.values(monthLoads)):0;
-                const unbakedM=Object.keys(unbakedMonths).length;
-                const anyBaked=co2LineMonths>0 && !mtx.co2_error;
-                const intensity=bakedT>0?(co2t*1000/bakedT):0;
-                // the carbon read failed on the server: say so, never blame a missing road route
-                const co2Card=mtx.co2_error
-                    ? card('—','CO₂e (est.)','carbon could not be read')
-                    : anyBaked
-                    ? card(co2t.toFixed(1)+' t','CO₂e (est.)','loaded, plus the scheme’s share of the return'+(unbakedM?' · excl. '+unbakedM+' month'+(unbakedM>1?'s':'')+' not routed yet':''))
-                    : card('—','CO₂e (est.)','not routed for this lorry yet');
-                const intCard=mtx.co2_error
-                    ? card('—','Carbon intensity','carbon could not be read')
-                    : anyBaked
-                    ? card(intensity.toFixed(1)+' kg/t','Carbon intensity','per tonne, routed months only')
-                    : card('—','Carbon intensity','not routed yet');
-                // 17 Oct 2026: not one round trip in a driver's day counts one lorry a trip (the server's floor)
-                const trucksPeak=Math.ceil(peakLoads/(Math.max(1, tripsPerDay)*P.working_days_per_month));
-                // Track A's caption: a route with several approved lines names each material · vehicle pair
-                const what=rows.length>1
-                    ? rows.length+' approved lines: '+[...new Set(rows.map(r=>(r.material_type||'—')+' · '+(vehName(r.vehicle_type,r.vehicle_name)||'—')))].join('; ')
-                    : mat+' · '+vehN+' · payload '+payload+' t';
-                extra =
-                    '<div class="an-title" style="margin-top:16px;">Forecast · '+monthLabel(mtx.from)+' – '+monthLabel(mtx.to)+'</div>'+
-                    '<div class="an-route">'+what+'</div>'+
-                    '<div class="an-grid">'+
-                        card(Math.round(totalT).toLocaleString()+' t','Total material','over selected window')+
-                        card(trips.toLocaleString(),'Total trips','one-way loaded runs')+
-                        co2Card+
-                        intCard+
-                        card(Math.round(peakT).toLocaleString()+' t','Peak month','busiest month in window')+
-                        card(trucksPeak,'Lorries for peak','to clear peak month')+
-                    '</div>'+
-                    '<div class="an-sub" style="margin-top:10px;">Carbon: DESNZ 2026 factors, tailpipe only. Each loaded journey and the scheme’s share of the empty return. The same figure as the bar above.'+
-                    (mtx.carbon_stamp?' '+mtx.carbon_stamp+'.':'')+'</div>';
-            } else {
-                extra='<div class="an-sub" style="margin-top:12px;">No approved forecast for this route, so no tonnes or carbon.</div>';
+        // 12 Nov 2026 (option A1, "This route"; John's "Yes, option A" to notes ux-map-forecast-detail-1111): the panel
+        // tells ONE route's story and reads nothing of its own (rsLoad). It used to ask the server for the whole plan
+        // again, in tonnes, every time it opened.
+        renderRouteStory(routeId);
+        await rsLoad(routeId);
+        if (RS.rid === routeId) renderRouteStory();
+    }
+
+    // ===== 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1): "This route" ==============================
+    // One route's story from what the page already holds: the month figures it loads when it opens (KPI.cache, every
+    // month in one read: tonnes, loads and the SERVER's co2_t per line and month, the bar's own figures) and the timeline
+    // matrix (the load's description). The month's figures are routeFigures(), the phone card's rule, so a desk and a
+    // phone read the same numbers. A count a day is in the organisation's unit (PV(), CW(): movements, or visits).
+    const RS = { rid: null, story: null, loading: false, failed: false, unit: 'count', view: 'chart' };
+    const RS_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const rsN = x => (x > 0 && x < 1 ? 'under 1' : fmtN(x || 0, 0));
+    function rsStory(rid, months, wdDefault, lo, hi) {
+        const by = {}, mats = {};
+        let first = 0, last = 0, co2Error = false;
+        for (let m = lo; m <= hi; m++) {
+            const kp = months && months[m];
+            if (!kp) continue;
+            const wd = kp.working_days > 0 ? kp.working_days : wdDefault;
+            const f = routeFigures(kp.lines, rid, wd);
+            if (!f.lines) continue;
+            let t = 0, co2 = 0, baked = 0, miss = 0;
+            (kp.lines || []).forEach(l => {
+                if (l.route_id !== rid) return;
+                const q = Number(l.qty_t) || 0, k = l.material_type || '—';
+                t += q;
+                mats[k] = (mats[k] || 0) + q;
+                // carbon is the server's figure for the line and month; none (no road worked out for its lorry, or the
+                // carbon read failed) is counted, never a zero
+                if (l.co2_t == null || kp.co2_error) { if (q > 0) miss++; } else { co2 += Number(l.co2_t); baked += q; }
+            });
+            if (kp.co2_error) co2Error = true;
+            if (!(t > 0) && !(f.loads > 0)) continue;
+            by[m] = { m, t, loads: f.loads, aday: f.twoWay, tonnesDay: f.tonnesDay, vehicles: f.vehicles, unbaked: f.unbaked, co2, baked, miss };
+            if (!first) first = m;
+            last = m;
+        }
+        if (!first) return null;
+        const list = [];
+        let totalT = 0, totalLoads = 0, co2T = 0, co2BakedT = 0, co2MissingMonths = 0, busiest = null;
+        for (let m = first; m <= last; m++) {
+            const x = by[m] || { m, t: 0, loads: 0, aday: 0, tonnesDay: 0, vehicles: 0, unbaked: 0, co2: 0, baked: 0, miss: 0 };
+            list.push(x);
+            totalT += x.t; totalLoads += x.loads; co2T += x.co2; co2BakedT += x.baked;
+            if (x.miss) co2MissingMonths++;
+            if (!busiest || x.aday > busiest.aday) busiest = x;
+        }
+        const materials = Object.keys(mats).sort((a, b) => (mats[b] - mats[a]) || a.localeCompare(b));
+        return { rid, months: list, first, last, totalT, totalLoads, co2T, co2BakedT, co2MissingMonths, co2Error, busiest: { m: busiest.m, aday: busiest.aday }, materials };
+    }
+    // "Earthworks / soil · 133,500 t · May 2026 to Aug 2027": what, how much, between which months
+    function rsWhat(story) {
+        const names = story.materials;
+        const mat = names.length > 2 ? names.length + ' materials' : names.join(', ');
+        const when = story.first === story.last ? monthLabel(story.first) : monthLabel(story.first) + ' to ' + monthLabel(story.last);
+        return mat + ' · ' + fmtN(story.totalT, 0) + ' t · ' + when;
+    }
+    function rsNames(rid) {
+        const info = ROUTEINFO[String(rid).trim().toLowerCase()] || {}, rp = (typeof routePropsById === 'function' ? routePropsById()[rid] : null) || {};
+        return { rid, from: rp.origin || info.origin || '—', to: rp.dest || info.dest || '—',
+                 team: rp.ipt && rp.ipt !== 'Unknown_IPT' ? teamText(rp.ipt) : '' };
+    }
+    function rsTitleHTML(names) {
+        return '<h3 class="rs-title"><span title="' + escHtml(names.from + ' → ' + names.to) + '">' + escHtml(names.from) + ' → ' + escHtml(names.to) + '</span>'
+            + '<small>' + escHtml([names.rid, names.team].filter(Boolean).join(' · ')) + '</small></h3>';
+    }
+    // a month's words for a screen reader and the slider: "Apr 2027: 132 lorry movements a day"
+    function rsMonthWords(x, unit) {
+        return monthLabel(x.m) + ': ' + (unit === 't' ? fmtN(x.t, 0) + ' t' : rsN(x.aday * PV()) + ' ' + CW().lower);
+    }
+    // the left of the strip: the route, what it carries, and the figures for the month on the map (the phone card's three)
+    function rsStoryHTML(story, month, names, desc) {
+        const b = story.busiest, cur = month ? story.months.find(x => x.m === month) : null;
+        const bw = '<b>' + escHtml(monthLabel(b.m)) + '</b><span>Busiest · ' + rsN(b.aday * PV()) + ' a day</span>';
+        const busy = month === b.m ? '<div class="rs-fig">' + bw + '</div>'
+            : '<button type="button" class="rs-fig rs-go" data-k="go" onclick="rsGoMonth(' + b.m + ')" aria-label="Go to the busiest month, ' + escHtml(monthLabel(b.m)) + '">' + bw + '</button>';
+        let figs;
+        if (!month) figs = '<div class="rs-inm">Pick a month to see this route’s ' + CW().short + '.</div><div class="rs-figs">' + busy + '</div>';
+        else if (!cur || !(cur.loads > 0)) figs = '<div class="rs-inm">Nothing approved on this route in ' + escHtml(monthLabel(month)) + '.</div><div class="rs-figs">' + busy + '</div>';
+        else figs = '<div class="rs-inm">In ' + escHtml(monthLabel(month)) + '</div><div class="rs-figs">'
+            + '<div class="rs-fig"><b>' + rsN(cur.aday * PV()) + '</b><span>' + CW().label + '</span></div>'
+            + '<div class="rs-fig"><b>' + escHtml(vehiclesText(cur)) + '</b><span>Vehicles needed</span></div>'
+            + '<div class="rs-fig"><b>' + fmtN(cur.tonnesDay, 0) + ' t</b><span>Material a day</span></div>' + busy + '</div>';
+        return '<div class="rs-story">' + rsTitleHTML(names) + '<div class="rs-what">' + escHtml(rsWhat(story)) + '</div>'
+            + (desc ? '<div class="rs-desc" title="' + escHtml(desc) + '">' + escHtml(desc) + '</div>' : '') + figs + '</div>';
+    }
+    // the months as bars. On a desk the chart is one control: a click on a month, or the slider's arrow keys, moves the
+    // map. `still` (the phone's card) draws the same bars as a picture: sixteen targets would be too small for a thumb.
+    function rsChartHTML(story, month, unit, still, names) {
+        const ms = story.months, n = ms.length, val = x => (unit === 't' ? x.t : x.aday * PV());
+        const max = Math.max.apply(null, ms.map(val)) || 1, bm = story.busiest.m;
+        const txt = x => (unit === 't' ? fmtN(x.t, 0) : rsN(x.aday * PV()));
+        // a figure over the month on the map, over the busiest month, and over a tall neighbour of the month on the map
+        const lab = x => x.m === month || x.m === bm || (n <= 24 && !!month && Math.abs(x.m - month) === 1 && val(x) >= max / 2);
+        let cols = '', xl = '', yl = '', yr = null, run = 0;
+        ms.forEach(x => {
+            const v = val(x), h = v > 0 ? Math.max(3, Math.round(v / max * 84)) : 0;
+            cols += '<div class="rs-col' + (x.m === month ? ' rs-now' : '') + (v > 0 ? '' : ' rs-none') + '">'
+                + (v > 0 && lab(x) ? '<em>' + txt(x) + '</em>' : '') + '<i style="height:' + h + '%"></i></div>';
+            const name = RS_MONTHS[(x.m - 1) % 12];
+            xl += '<span' + (x.m === month ? ' class="rs-now"' : '') + '>' + (n > 36 ? '' : n > 24 || still ? name.charAt(0) : name) + '</span>';
+            const y = CONFIG.START_YEAR + Math.floor((x.m - 1) / 12);
+            if (y !== yr) { if (yr !== null) yl += '<span style="flex:' + run + ' 1 0">' + yr + '</span>'; yr = y; run = 0; }
+            run++;
+        });
+        yl += '<span style="flex:' + run + ' 1 0">' + yr + '</span>';
+        const at = ms.find(x => x.m === month) || ms.find(x => x.m === bm) || ms[0];
+        const plot = '<div class="rs-plot' + (n > 24 ? ' rs-many' : '') + '"' + (still ? '' : ' onclick="rsPlotClick(event)"') + ' aria-hidden="true">' + cols + '</div>'
+            + '<div class="rs-xl" aria-hidden="true">' + xl + '</div><div class="rs-yl" aria-hidden="true">' + yl + '</div>';
+        if (still) return '<div class="rs-chart" role="img" aria-label="' + escHtml(rsWhat(story) + '. Busiest month ' + monthLabel(bm) + ', ' + rsN(story.busiest.aday * PV()) + ' a day') + '">' + plot + '</div>';
+        return '<div class="rs-chart">' + plot
+            + '<input type="range" id="rs-range" min="' + story.first + '" max="' + story.last + '" step="1" value="' + at.m + '"'
+            + ' aria-label="' + escHtml((names ? names.rid : story.rid) + ', month') + '" aria-valuetext="' + escHtml(rsMonthWords(at, unit)) + '" oninput="rsGoMonth(this.value)"></div>';
+    }
+    function rsPlotMonth(x, left, width, first, n) {
+        if (!(width > 0) || !(n > 0)) return null;
+        return first + Math.min(n - 1, Math.max(0, Math.floor((x - left) / width * n)));
+    }
+    function rsPlotClick(e) {
+        const s = RS.story, el = e && e.currentTarget;
+        if (!s || !el || !el.getBoundingClientRect) return;
+        const r = el.getBoundingClientRect(), m = rsPlotMonth(e.clientX, r.left, r.width, s.first, s.months.length);
+        if (m) rsGoMonth(m);
+    }
+    function rsGoMonth(m) {
+        m = parseInt(m, 10);
+        if (m >= 1 && m <= (CONFIG.MONTH_COUNT || 60) && typeof pickMonth === 'function') pickMonth(m);
+    }
+    // the same months as numbers, a year to a line; a figure is a button that moves the map, as a bar does
+    function rsTableHTML(story, month, unit) {
+        const by = {};
+        story.months.forEach(x => { by[x.m] = x; });
+        const y0 = Math.floor((story.first - 1) / 12), y1 = Math.floor((story.last - 1) / 12), bm = story.busiest.m;
+        let body = '';
+        for (let y = y0; y <= y1; y++) {
+            let tds = '', sum = 0, top = 0;
+            for (let k = 0; k < 12; k++) {
+                const m = y * 12 + k + 1, x = by[m];
+                if (!x || !(x.loads > 0 || x.t > 0)) { tds += '<td class="rs-nil">–</td>'; continue; }
+                sum += x.t; top = Math.max(top, x.aday);
+                tds += '<td><button type="button" class="rs-cell' + (m === month ? ' rs-now' : '') + (m === bm ? ' rs-peak' : '') + '" data-k="c' + m + '" onclick="rsGoMonth(' + m + ')"'
+                    + (m === month ? ' aria-current="true"' : '') + ' aria-label="' + escHtml(rsMonthWords(x, unit)) + '">' + (unit === 't' ? fmtN(x.t, 0) : rsN(x.aday * PV())) + '</button></td>';
             }
-            const slot=document.getElementById('an-fc-slot'); if(slot) slot.outerHTML=extra;
-        }catch(e){
-            const slot=document.getElementById('an-fc-slot'); if(slot) slot.outerHTML='<div class="an-sub" style="margin-top:12px;">Couldn\'t load the forecast.</div>';
+            body += '<tr><th scope="row">' + (CONFIG.START_YEAR + y) + '</th>' + tds + '<td class="rs-sum">' + (unit === 't' ? fmtN(sum, 0) : rsN(top * PV())) + '</td></tr>';
+        }
+        return '<table class="rs-year"><thead><tr><th scope="col">Year</th>' + RS_MONTHS.map(s => '<th scope="col">' + s + '</th>').join('')
+            + '<th scope="col">' + (unit === 't' ? 'Year' : 'Busiest') + '</th></tr></thead><tbody>' + body + '</tbody></table>';
+    }
+    // the route's own facts: six cards (were ten). The busiest month and its vehicles are in the story beside them.
+    function rsFactsHTML(rid, story) {
+        const info = ROUTEINFO[String(rid).trim().toLowerCase()] || {};
+        const F = fac(), P = F.planning || FALLBACK_FACTORS.planning;
+        const dist = info.distance_km || 0, round = dist * 2;
+        const cycleH = P.avg_haul_speed_kmh > 0 ? (round / P.avg_haul_speed_kmh + (P.load_minutes + P.unload_minutes) / 60) : 0;
+        // whole round trips in a driver's day: the server's figure on the routed cycle when the route carries it, else
+        // the rough estimate at the average speed (lorryDayTrips, 17 Oct 2026)
+        const fromServer = typeof info.trips_per_day === 'number';
+        const trips = fromServer ? info.trips_per_day
+            : (cycleH > 0 ? lorryDayTrips(P.shift_hours_per_day, (round/P.avg_haul_speed_kmh)*60, P.load_minutes+P.unload_minutes) : 0);
+        const c = (v, l) => '<div class="rs-card"><b>' + v + '</b><span>' + l + '</span></div>';
+        const cyc = fromServer && typeof info.cycle_hr === 'number' ? info.cycle_hr : cycleH;
+        const any = !!story && story.co2BakedT > 0 && !story.co2Error, mm = story ? story.co2MissingMonths : 0;
+        const co2Words = story && story.co2Error ? ', carbon could not be read'
+            : any && mm ? ', ' + mm + ' month' + (mm > 1 ? 's' : '') + ' not routed yet' : (story && !any ? ', not routed yet' : '');
+        const tip = '<button type="button" class="info-i" aria-expanded="false" aria-controls="info-route-co2" onclick="toggleInfo(this)" title="About the carbon figure" aria-label="About the carbon figure"><span aria-hidden="true">i</span></button>';
+        const dirs = (info.start && info.end)
+            ? '<a href="https://www.google.com/maps/dir/?api=1&origin=' + info.start[1] + ',' + info.start[0] + '&destination=' + info.end[1] + ',' + info.end[0] + '&travelmode=driving" target="_blank" rel="noopener">Driving directions ↗</a>'
+            : '';
+        return '<div class="rs-facts"><div class="rs-cards">'
+            + c(fmtDist(dist, 1) + ' ' + DU(), 'One way, by road')
+            + c(cyc.toFixed(2) + ' h', 'Round trip with loading' + (fromServer ? '' : ' (est.)'))
+            + c(String(trips), trips > 0 ? 'Round trips a lorry a day' : 'one round trip does not fit a driver\'s day')
+            + c(story ? fmtN(story.totalLoads, 0) : '—', 'Loads in all')
+            + c(any ? story.co2T.toFixed(1) + ' t' : '—', 'CO₂e (est.)' + co2Words + tip)
+            + c(any ? (story.co2T * 1000 / story.co2BakedT).toFixed(1) + ' kg' : '—', 'CO₂e a tonne moved')
+            + '</div><div class="rs-more">' + routeWordsHTML(rid) + dirs + '</div>'
+            + '<div class="info-pop rs-info" id="info-route-co2" hidden><p>A planning estimate: exhaust emissions of each loaded journey and the scheme’s share of the empty return. The same figure as the bar.</p>'
+            + '<p><a href="/help/#ug-map-route-panel" target="_blank" rel="noopener"' + (RME.staff ? '' : ' hidden') + '>User guide</a></p></div></div>';
+    }
+    function rsCtlHTML(unit, view) {
+        const b = (k, on, fn, arg, text) => '<button type="button" data-k="' + k + '" aria-pressed="' + on + '" onclick="' + fn + '(\'' + arg + '\')">' + text + '</button>';
+        return '<span class="rs-seg" role="group" aria-label="Unit"' + (view === 'facts' ? ' hidden' : '') + '>'
+            + b('u-count', unit !== 't', 'rsSetUnit', 'count', CW().col) + b('u-t', unit === 't', 'rsSetUnit', 't', 'Tonnes') + '</span>'
+            + '<span class="rs-seg" role="group" aria-label="View">'
+            + b('v-chart', view === 'chart', 'rsSetView', 'chart', 'Chart') + b('v-table', view === 'table', 'rsSetView', 'table', 'Table') + b('v-facts', view === 'facts', 'rsSetView', 'facts', 'Route facts') + '</span>'
+            + '<button type="button" class="rs-bt" data-k="copy" onclick="rsCopy(this)">Copy</button>'
+            + '<button type="button" class="info-i" data-k="info" aria-expanded="false" aria-controls="info-route-story" onclick="toggleInfo(this)" title="About these figures" aria-label="About these figures"><span aria-hidden="true">i</span></button>';
+    }
+    function rsSetUnit(u) { RS.unit = u === 't' ? 't' : 'count'; renderRouteStory(); }
+    function rsSetView(v) { RS.view = v === 'table' || v === 'facts' ? v : 'chart'; renderRouteStory(); }
+    // the figures the story needs, with no read of its own: the timeline matrix and every month's figures are loaded
+    // when the page opens. Only if that one read failed are the route's own months read, one at a time (the page's
+    // existing fallback).
+    async function rsLoad(rid) {
+        RS.rid = rid; RS.story = null; RS.failed = false; RS.loading = true;
+        try {
+            await ensureTimelineMatrix();
+            const span = forecastWindow();
+            if (span) {
+                try { await kpiFetchAll(); } catch (e) {
+                    const by = (TL.matrix && TL.matrix.byRoute[String(rid).trim().toLowerCase()]) || { monthly: {} };
+                    for (let m = span[0]; m <= span[1]; m++) {
+                        if (!((Number(by.monthly[m]) || 0) > 0) || KPI.cache[m]) continue;
+                        try { await kpiFetchMonth(m); } catch (err) {}
+                    }
+                }
+                if (RS.rid !== rid) return null;
+                RS.story = rsStory(rid, KPI.cache, FORECAST_WORKING_DAYS, span[0], span[1]);
+            }
+        } catch (e) { if (RS.rid === rid) RS.failed = true; }
+        if (RS.rid === rid) RS.loading = false;
+        return RS.story;
+    }
+    function renderRouteStory(startRid) {
+        if (startRid !== undefined && startRid !== RS.rid) { RS.rid = startRid; RS.story = null; RS.failed = false; RS.loading = true; }
+        const box = document.getElementById('drawer-analysis'), ctl = document.getElementById('rs-ctl');
+        if (!box || !RS.rid) return;
+        const rid = RS.rid, names = rsNames(rid), story = RS.story, month = TL.on ? TL.month : null;
+        const act = document.activeElement, held = act && (box.contains(act) || (ctl && ctl.contains(act))) ? (act.id || (act.getAttribute && act.getAttribute('data-k'))) : null;
+        if (ctl) {
+            const h = story ? rsCtlHTML(RS.unit, RS.view) : '';
+            if (ctl._src !== h) { if (typeof closeInfos === 'function') closeInfos(); ctl._src = h; ctl.innerHTML = h; }
+            ctl.hidden = !story || drawerTab !== 'analysis';
+        }
+        const words = document.getElementById('info-route-story-words');
+        if (words) words.textContent = 'Approved plan. A month’s loads over its working days. ' + CW().note + ' Click a month to move the map.';
+        const guide = document.getElementById('info-route-story-guide');
+        if (guide) guide.hidden = !RME.staff;
+        let html;
+        if (!story) {
+            const note = RS.loading ? 'Loading the forecast…' : RS.failed ? 'Couldn’t load the forecast.' : 'No approved forecast for this route, so no tonnes or carbon.';
+            html = '<div class="rs-two"><div class="rs-story">' + rsTitleHTML(names) + '<p class="an-sub" style="margin-top:8px;">' + note + '</p></div>'
+                + (RS.loading ? '<div></div>' : rsFactsHTML(rid, null)) + '</div>';
+        } else if (RS.view === 'table') {
+            html = '<div class="rs-sline"><b>' + escHtml(names.from) + ' → ' + escHtml(names.to) + '</b>'
+                + escHtml([names.rid, names.team, rsWhat(story)].filter(Boolean).join(' · ')) + '</div>' + rsTableHTML(story, month, RS.unit);
+        } else {
+            const desc = (TL.matrix && (TL.matrix.byRoute[String(rid).trim().toLowerCase()] || {}).desc) || '';
+            html = '<div class="rs-two">' + rsStoryHTML(story, month, names, desc)
+                + (RS.view === 'facts' ? rsFactsHTML(rid, story) : rsChartHTML(story, month, RS.unit, false, names)) + '</div>';
+        }
+        box.innerHTML = html;
+        if (held) {
+            const again = document.getElementById(held) || box.querySelector('[data-k="' + held + '"]') || (ctl && ctl.querySelector('[data-k="' + held + '"]'))
+                || (held === 'go' ? document.getElementById('rs-range') : null);
+            if (again && again.focus) { try { again.focus({ preventScroll: true }); } catch (e) {} }
         }
     }
+    // the month moved (or the timeline closed): the open panel's figures and its marked month follow
+    function rsOnMonth() {
+        if (!RS.rid || drawerTab !== 'analysis' || !document.body.classList.contains('drawer-open')) return;
+        renderRouteStory();
+    }
+    function rsCopyParts(story, names, link, when) {
+        const title = (TENANT.name || 'Wayscope') + (TENANT.demo_notice ? ' (demo)' : '') + ' · ' + names.rid + ' · ' + names.from + ' → ' + names.to;
+        const basis = 'Approved plan. ' + rsWhat(story) + '.';
+        const head = ['Month', CW().label, 'Tonnes'];
+        const body = story.months.map(x => [monthLabel(x.m), rsN(x.aday * PV()), fmtN(x.t, 0)]);
+        body.push(['Total', '', fmtN(story.totalT, 0)]);
+        const foot = 'From the Wayscope public map, ' + when + '. ' + link;
+        const tsv = [title, basis, head.join('\t')].concat(body.map(r => r.join('\t'))).concat([foot]).join('\n');
+        const td = (x, n) => '<td style="padding:2px 8px;border:1px solid #ccc;' + (n ? 'text-align:right;' : '') + '">' + escHtml(x) + '</td>';
+        const html = '<p><b>' + escHtml(title) + '</b><br>' + escHtml(basis) + '</p><table style="border-collapse:collapse">'
+            + '<tr>' + head.map((x, i) => '<th style="padding:2px 8px;border:1px solid #ccc;text-align:' + (i ? 'right' : 'left') + '">' + escHtml(x) + '</th>').join('') + '</tr>'
+            + body.map(r => '<tr>' + r.map((x, i) => td(x, i > 0)).join('') + '</tr>').join('') + '</table>'
+            + '<p>From the Wayscope public map, ' + escHtml(when) + '. <a href="' + escHtml(link) + '">' + escHtml(link) + '</a></p>';
+        return { tsv, html };
+    }
+    function rsCopy(btn) {
+        if (!RS.story) return;
+        const when = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        const parts = rsCopyParts(RS.story, rsNames(RS.rid), shareUrl(false), when);
+        const done = okd => { if (!btn) return; const was = 'Copy'; btn.textContent = okd ? 'Copied' : 'Copy failed'; setTimeout(() => { btn.textContent = was; }, 2000); };
+        try {
+            if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+                navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([parts.html], { type: 'text/html' }),
+                                                               'text/plain': new Blob([parts.tsv], { type: 'text/plain' }) })])
+                    .then(() => done(true)).catch(() => navigator.clipboard.writeText(parts.tsv).then(() => done(true), () => done(false)));
+            } else if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(parts.tsv).then(() => done(true), () => done(false));
+            else done(false);
+        } catch (e) { done(false); }
+    }
+    // ===== end of "This route" =====
 
     const MAT_PALETTE=['#2563EB','#059669','#DC2626','#C6841D','#6D28D9','#0E7490','#9AA7B4'];
     function materialColorMap(routes){
@@ -8044,6 +8314,8 @@
             const acc = byR[rid] || (byR[rid] = { route_id: rt.route_id, monthly: {}, total: 0, lines: 0 });
             Object.keys(rt.monthly||{}).forEach(k=>{ acc.monthly[k] = (acc.monthly[k]||0) + (Number(rt.monthly[k])||0); });
             acc.total += Number(rt.total)||0; acc.lines++;
+            // 12 Nov 2026 (A1, John's yes to call 6): the team's own description of the load, one line on "This route"
+            if (rt.material_description && String(rt.material_description).trim() && (Number(rt.total)||0) >= (acc.descOf||0)) { acc.desc = String(rt.material_description).trim(); acc.descOf = Number(rt.total)||0; }
             // 12 Oct 2026 (review §2.2a): the route's t CO2e per month is the SUM of its lines' server co2_t (B2, the
             // costlines figure the bar reads); a line-month with volume and no figure (no stored road route for its
             // vehicle) is COUNTED in co2Missing, never a zero. A route-month with no line carrying a figure stays absent.
@@ -8376,6 +8648,7 @@
         if(typeof hideClashToast === 'function') hideClashToast();     // M3: and no pause message
         const bar=document.getElementById('timeline-bar'); if(bar) bar.style.display='none';
         syncTimelineFoot();
+        if (typeof rsOnMonth === 'function') rsOnMonth();      // 12 Nov 2026 (A1): "This route" says to pick a month
         const src=map.getSource('routes-source');
         if(src){ const d=src._data; applyDiversions(null, d);   /* 28 Oct 2026 (task 0c): no month on screen, the main lines */
                  d.features.forEach(f=>{ if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString') f.properties.is_forecast=false; }); src.setData(d); }
@@ -8425,6 +8698,7 @@
         applyFilters();
         // §8: and the warnings. Rebuilt for THIS month, every tick.
         renderTimelineWarnings(m);
+        if (typeof rsOnMonth === 'function') rsOnMonth();      // 12 Nov 2026 (A1): "This route" marks the month and shows its figures
     }
     // 12 Oct evening (M3): moving the month by hand starts a NEW loop, so the once-per-loop pause is re-armed (it used to
     // stay spent from the last loop, and Play from September then ran through a red October without stopping)
@@ -11996,6 +12270,9 @@
             html += '<p class="mt-note" data-holding-words="1">' + (straight ? 'Lorries call off at ' + escHtml(rp.holding_name || 'the holding area') + ' first.'
                 : 'Lorries wait at the holding area and are called forward to the gate' + (left != null ? ' (' + escHtml(fmtDist(left, 1) + ' ' + DU()) + (mins != null ? ', about ' + mins + ' min' : '') + ')' : '') + '.') + '</p>';
         }
+        // 12 Nov 2026 (A1): what the route carries, how much and between which months, with its months as a picture
+        const st = (typeof RS !== 'undefined' && RS.rid === rid) ? RS.story : null;
+        if (st) html += '<p class="rs-what">' + escHtml(rsWhat(st)) + '</p>' + rsChartHTML(st, month, 'count', true);
         if (!month) html += '<p class="mt-note">Pick a month to see this route’s movements a day.</p>';
         else if (!kp) html += '<p class="mt-note">Loading the figures for ' + escHtml(monthLabel(month)) + '…</p>';
         else {
@@ -12007,6 +12284,7 @@
                   + (info.distance_km ? '<dt>One way</dt><dd>' + escHtml(fmtDist(info.distance_km, 1) + ' ' + DU()) + '</dd>' : '') + '</dl>'
                 : '<p class="mt-note">Nothing approved on this route in ' + escHtml(monthLabel(month)) + '.</p>';
         }
+        if (st) html += rsPhoneBusyHTML(st, month);
         const conds = (month && WARN.liveMonth === month ? (WARN.live || []) : []).filter(i => i.who === rid);
         html += conds.length ? '<h3>Conditions on this route</h3>' + condRowsHTML(conds) : '';
         html += routeWordsHTML(rid);
@@ -12016,6 +12294,12 @@
               + (concernFormOn(TENANT) ? '<button type="button" class="btn btn-ghost" data-concern-route="' + escHtml(rid) + '" onclick="openConcernForm(this.dataset.concernRoute)">Report a concern about this route</button>' : '')
               + '<button type="button" class="btn btn-ghost" onclick="closeRouteCard()">Close the route card</button>';
         return html;
+    }
+    // 12 Nov 2026 (A1): the phone's one button to the route's busiest month (the bars above it are a picture)
+    function rsPhoneBusyHTML(st, month) {
+        const b = st.busiest, w = 'Busiest month: ' + monthLabel(b.m);
+        return month === b.m ? '<button type="button" class="btn btn-ghost rs-busy" disabled>' + escHtml(w) + ' (this month)</button>'
+            : '<button type="button" class="btn btn-ghost rs-busy" onclick="rsGoMonth(' + b.m + ')">' + escHtml(w + ' · ' + rsN(b.aday * PV()) + ' a day') + '</button>';
     }
     function renderRouteCard() {
         const box = document.getElementById('m-card'), main = document.getElementById('m-main');
@@ -12036,6 +12320,8 @@
         renderRouteCard();
         if (SHEET.state !== 'half') sheetTo('half');
         if (TL.on && !KPI.cache[TL.month]) kpiFetchMonth(TL.month).then(renderRouteCard).catch(() => {});
+        // 12 Nov 2026 (A1): the route's story from the figures the page holds, drawn into the card when it is ready
+        if (typeof rsLoad === 'function') rsLoad(String(rid)).then(() => { if (SHEET.card === String(rid)) renderRouteCard(); }).catch(() => {});
     }
     function closeRouteCard() {
         if (!SHEET.card) return;

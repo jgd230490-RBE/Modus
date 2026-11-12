@@ -27,7 +27,8 @@ const mat = (names) => { const m = {}; let i = 0; names.forEach(k => { m[k] = "#
 (async () => {
   // ---------- A: the Forecast detail tab ----------
   ok("⭐ A: the tab's button loads the table itself (openForecastDetail), no longer only shows the empty panel; the Control Panel's own button still calls it",
-     html.includes('<button class="drawer-tab" id="tab-detail" onclick="openForecastDetail()">Forecast detail</button>')
+     // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1; John's call 2): the tab reads "All routes"
+     html.includes('<button class="drawer-tab" id="tab-detail" onclick="openForecastDetail()">All routes</button>')
      && !html.includes('id="tab-detail" onclick="showDrawerTab(\'detail\')"')
      && (html.match(/openForecastDetail\(\)/g) || []).length >= 3);
   const ofd = fnSrc(/async function openForecastDetail\(\)\{[\s\S]*?\n    \}/);
