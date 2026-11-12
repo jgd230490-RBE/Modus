@@ -154,6 +154,13 @@ with TestClient(main.app, base_url="https://testserver") as c:
     pkg = json.load(open(os.path.join(ROOT, "demo", "uk-corridor.package.json"), encoding="utf-8"))
     res = tenant_package.import_tenant(pkg)
     ok("the demo package imports", bool(res.get("ok")), str(res)[:200])
+    # 12 Nov 2026 (batch 6, with claude/demo-package-b6047): the package now carries live's B6047 limit (zone Z041); it is
+    # set aside here so this harness's own 0, 1, 2 and 3 limits are what they say (the B6047 printed twice on page 2
+    # otherwise). http_smoke builds the package as shipped, its limit included (four pages).
+    shipped = [z for z in zones.list_zones() if z.get("kind") == "traffic_limit"]
+    ok("the package as shipped carries live's B6047 limit (Z041), set aside for this harness's own counts",
+       [z["id"] for z in shipped] == ["Z041"] and all(zones.delete_zone(z["id"]).get("deleted") == z["id"] for z in shipped)
+       and not [z for z in zones.list_zones() if z.get("kind") == "traffic_limit"], str([z.get("id") for z in shipped]))
 
     quiet = {}
     for m in (1, 2, 30, 50, 60):
