@@ -2454,6 +2454,17 @@ ok("TRAFFIC: the newsletter prints each limit once, in the works table, never th
    _ex.count('story += _traffic_flow(K, S.get("traffic"))') == 0 and "def _traffic_flow(" not in _ex
    and "_limit_line(E, lim) if lim" in _ex and "Traffic limits on local roads: {traffic['glance']}." in _bd)
 ok("TRAFFIC: figures rounded half up (round() is half-even)", "def _whole(" in _bd)
+# 12 Nov 2026 (seen on live after batch 6): the leaflet's `svg{display:block}` (the map's rule) put the footer's mark
+# on its own line, touching the DEMO badge above it; the footer's mark is inline, as on the bulletin page
+import re as _re_lf  # noqa: E402
+_lf_css = bulletin_doc.LEAFLET_CSS
+_lf_svg = _re_lf.search(r"(?:^|[ }])svg\{[^}]*display:block", _lf_css)
+_lf_mark = _re_lf.search(r"footer \.brand-logo\{([^}]*)\}", _lf_css)
+ok("LEAFLET FOOT: the map's svg{display:block} is still there, and the footer's mark overrides it with display:inline-block",
+   bool(_lf_svg) and bool(_lf_mark) and "display:inline-block" in _lf_mark.group(1)
+   and _lf_css.index(_lf_mark.group(0)) > _lf_svg.start(), _lf_mark.group(0) if _lf_mark else "no footer .brand-logo rule")
+ok("LEAFLET FOOT: the leaflet's footer still prints the badge, the mark and the words in that order",
+   _re_lf.search(r"<footer>\{notice\} \{_mark_html\(\)\} \{e\(S\[\"foot\"\]\)\}", _bd) is not None)
 # =========================================================================== #
 print()
 for f_ in FAIL:
