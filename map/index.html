@@ -455,6 +455,11 @@
         .month-picker button[aria-pressed="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; font-weight:700; }
         .month-picker .chips-none{ font-size:14px; color:var(--note); }
         .fc-box #tl-open{ margin-top:8px; }
+        /* 12 Nov 2026 (John: "option b now", claude/map-one-play; mockup map-one-play-mockup-1112 B): while the timeline
+           bar is on screen its Play is the one filled Play; the panel's button goes plain (it still opens the bar and
+           plays) and is filled again once the bar is closed. An inset edge, not a border, so the button keeps its height. */
+        body.tl-bar-on .fc-box #tl-open{ background:var(--surface); color:var(--ink); box-shadow:inset 0 0 0 1px var(--ctl-line); font-weight:500; }
+        body.tl-bar-on .fc-box #tl-open:hover{ background:var(--surface-2); }
         .fc-box .fc-toggle{ margin-top:8px; }
         #forecast-status:empty{ display:none; }
         /* the heat map as one segmented control (the three radio buttons keep their ids, names and handlers) */
@@ -9304,6 +9309,7 @@
         const sOn = !!(strip && strip.offsetHeight > 0);
         const open = sOn || !!(bar && bar.style.display === 'flex');
         document.body.classList.toggle('timeline-on', open);
+        document.body.classList.toggle('tl-bar-on', !!(bar && bar.style.display === 'flex'));   // 12 Nov 2026 (claude/map-one-play): one filled Play
         const h = open ? Math.round((bar.offsetHeight || 0) + 18 + 8) : 0;
         const foot = sOn ? Math.round(strip.offsetHeight + 18 + 8) : h;
         try { document.documentElement.style.setProperty('--tl-foot', foot + 'px'); } catch (e) {}
