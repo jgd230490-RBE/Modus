@@ -372,14 +372,20 @@ ok("H2: three geofences — a closure that re-routes (Tilton), an advisory 7.5 t
        ("Z037", "works", 0, "2029-06-01", "2029-10-31"),
        # NARROWED 28 Oct 2026 (the demo narrative's F4): Christmas trading 2027 now DIVERTS in its dates, as ticked on live
        ("Z038", "closure", 1, "2027-12-01", "2027-12-31"),
-       ("Z039", "closure", 0, "2028-12-01", "2028-12-31")]
-   and all("(fictional)" in (z["note"] or "") for z in _T["zones"] if z["kind"] != "haul_road")
+       ("Z039", "closure", 0, "2028-12-01", "2028-12-31"),
+       # NARROWED 11 Nov 2026 (card M-F1): + the B6047 traffic limit drawn on live, last, undated, never routing
+       ("Z041", "traffic_limit", 0, None, None)]
+   # NARROWED 11 Nov 2026 (card M-F1): the traffic limit carries no note, as saved on live (a refresh keeps live's row)
+   and all("(fictional)" in (z["note"] or "") for z in _T["zones"] if z["kind"] not in ("haul_road", "traffic_limit"))
+   and [z["note"] for z in _T["zones"] if z["kind"] == "traffic_limit"] == [None]
    and "8 vehicles a day" in [z for z in _T["zones"] if z["id"] == "Z004"][0]["note"]
    and [z for z in _T["zones"] if z["id"] == "Z003"][0]["name"] == "A47 at the new Tilton junction: HGV diversion while the junction is built")
 def _bbox(g):
     xs = [c[0] for c in g["coordinates"][0]]; ys = [c[1] for c in g["coordinates"][0]]
     return min(xs), min(ys), max(xs), max(ys)
-_Z = {z["id"]: _bbox(json.loads(z["geometry"]) if isinstance(z["geometry"], str) else z["geometry"]) for z in _T["zones"] if z["kind"] != "haul_road"}
+# NARROWED 11 Nov 2026 (card M-F1): the boxes only (the traffic limit Z041 is a line)
+_Z = {z["id"]: _bbox(json.loads(z["geometry"]) if isinstance(z["geometry"], str) else z["geometry"]) for z in _T["zones"]
+      if z["kind"] not in ("haul_road", "traffic_limit")}
 ok("H2: the Tilton closure box straddles the A47 as HERE baked it (52.620–52.622 N, west of the -0.922 turn) and is in force on the day of the bake, "
    "because a zone only steers routing while it applies today (zones.applies_on) — the 5 Oct live bake moved nothing with a 12 Oct start",
    _Z["Z003"][1] < 52.6208 < _Z["Z003"][3] and _Z["Z003"][0] < -0.949 < _Z["Z003"][2] and _Z["Z003"][3] < 52.6225
@@ -1088,8 +1094,10 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    # NARROWED 10 Nov 2026 (wave 2, card 13, decision 4): navy 27 -> 2 and a new kind, action (25): every primary action
    # moved to the accent; the two navy fills left are the Submit strip (a card, not a button) and the drawing palette's
    # picked tool (a selection); the tabs and the picked stockpile / year / page are .ws-tab tints with no text-white
-   # NARROWED 11 Nov 2026 (CLOCS card C-F6): action 23 -> 24, the site layout's "Show it" (the public tick asks first)
-   len(_sites.get("action", [])) == 24 and ".text-white[style*=\"var(--action)\"]{color:var(--action-fg);}" in fe
+   # NARROWED 11 Nov 2026 (CLOCS B-F6): 23 -> 22, Route all is a line in the Routing menu, no longer a filled button
+   # NARROWED 11 Nov 2026 (CLOCS card C-F6): action +1, the site layout's "Show it" (the public tick asks first)
+   # 12 Nov 2026 (batch 4 merge, both kept): 23 - 1 (B-F6) + 1 (C-F6) = 23
+   len(_sites.get("action", [])) == 23 and ".text-white[style*=\"var(--action)\"]{color:var(--action-fg);}" in fe
    and len(_sites.get("navy", [])) == 2 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
    and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
@@ -1101,7 +1109,7 @@ ok("...every inline navy / blue fill is written `background: \"var(--navy)\"` / 
    # NARROWED 10 Nov 2026 (wave 2, card 13): 14+ -> 2 navy fills (the Submit strip and the palette's picked tool); the primary
    # actions are written the same way on the accent, `background: "var(--action)"`, 23 of them
    and _fe_wo.count('background: "var(--navy)"') + _fe_wo.count('background:"var(--navy)"') == 2 and _fe_wo.count('background: "var(--blue)"') >= 1
-   and _fe_wo.count('background: "var(--action)"') >= 23
+   and _fe_wo.count('background: "var(--action)"') >= 22   # NARROWED 11 Nov 2026 (CLOCS B-F6): Route all in the menu
    and "backgroundColor: \"var(--navy)\"" not in _fe_wo and "backgroundColor: \"var(--blue)\"" not in _fe_wo)
 _bad1 = []
 for _a in _ACC:
@@ -1232,7 +1240,8 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 10 Nov 2026 (wave 3, item 24): 29 -> 30, the Account's Fuel card "No diesel price yet"
    # NARROWED 10 Nov 2026 (wave 3, item 33): 30 -> 31, the gates list's "n % of N" on a gate near capacity
    # NARROWED 10 Nov 2026 (wave 3, routes-first-run, merged): +1 = 32, the Vehicles cell's "n out only"
-   _fe_wo.count("var(--warn-text)") == 32   # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
+   _fe_wo.count("var(--warn-text)") == 33   # NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
+     # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
    # NARROWED 10 Nov 2026 (wave 3, finding 5): the Account's Variance reads words, amber on a flagged line, else --muted

@@ -544,9 +544,12 @@ ok("7: Config's vehicle table: no placeholder or label reads the bare key",
 # placeholder shows the name the rule gives (browser check, 14 Oct 2026: the box showed the stored id-like text)
 ok("7: Config's English-name box shows a label equal to the id as empty, the rule's name as its placeholder",
    "value={(lab.en && lab.en !== k) ? lab.en : \"\"} placeholder={vehWord(k)}" in _vt and "value={lab.en || \"\"}" not in _vt)
+# NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A "This route"; John's "Yes, option A"): the route
+# panel's caption ("material · lorry · payload", and the several-lines list) gave way to the route's story. The lorry is still
+# printed by its NAME, never the key: once, with its load, on Route facts' line (rsStory collects it through vehName)
 for label, gone, now in (
-    ("route drawer caption", "mat+' · '+veh+' · payload", "mat+' · '+vehN+' · payload"),
-    ("route drawer, several lines", "+' · '+(r.vehicle_type||'—')", "+' · '+(vehName(r.vehicle_type,r.vehicle_name)||'—')"),
+    ("route drawer caption", "mat+' · '+veh+' · payload", "const vn = vehName(l.vehicle_type, l.vehicle_name) || '—';"),
+    ("route drawer, several lines", "+' · '+(r.vehicle_type||'—')", "story.lorries.map(v => v.name + (v.payload > 0 ? ', ' + fmtN(v.payload, 1) + ' t a load' : '')).join('; ')"),
     ("KPI bar payload note", "const fbName = payloads[0].payload_fallback_vehicle;",
      "const fbName = vehName(payloads[0].payload_fallback_vehicle, payloads[0].payload_fallback_name);"),
 ):

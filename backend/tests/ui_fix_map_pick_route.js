@@ -22,43 +22,54 @@ function ok(label, cond, extra) {
   else { fail.push(label + (extra !== undefined ? "  → " + JSON.stringify(extra).slice(0, 400) : "")); console.log("  ✗ " + label); }
 }
 const fnSrc = (re) => (re.exec(html) || [""])[0];
-const mat = (names) => { const m = {}; let i = 0; names.forEach(k => { m[k] = "#c" + (i++); }); return m; };
 
 (async () => {
   // ---------- A: the Forecast detail tab ----------
   ok("⭐ A: the tab's button loads the table itself (openForecastDetail), no longer only shows the empty panel; the Control Panel's own button still calls it",
-     html.includes('<button class="drawer-tab" id="tab-detail" onclick="openForecastDetail()">Forecast detail</button>')
+     // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A1; John's call 2): the tab reads "All routes"
+     html.includes('<button class="drawer-tab" id="tab-detail" onclick="openForecastDetail()">All routes</button>')
      && !html.includes('id="tab-detail" onclick="showDrawerTab(\'detail\')"')
      && (html.match(/openForecastDetail\(\)/g) || []).length >= 3);
+  // NARROWED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"): the 60-column
+  // tonnes table this block ran is gone. "All routes" is a year at a time, a row a ROUTE (a route's lines are added together),
+  // drawn from the month figures the page holds. The rule this block holds is KEPT: the route picked on the map comes FIRST,
+  // tinted, and the others keep their order. The heading, the "N route(s) · sorted by total" line and the colour key are gone.
+  // The new table's own checks: ui_fix_map_all_routes.js.
   const ofd = fnSrc(/async function openForecastDetail\(\)\{[\s\S]*?\n    \}/);
-  ok("A: the function is in the page, shows the tab first and asks for the table", !!ofd && ofd.indexOf("showDrawerTab('detail')") < ofd.indexOf("await fetchMatrix('t')"));
-  const run = async (routes, picked) => {
-    const box = { innerHTML: "" }; let tab = null;
-    const f = new Function("showDrawerTab", "document", "fetchMatrix", "materialColorMap", "monthLabel", "selectedRouteId",
-                           ofd + "\nreturn openForecastDetail;")(t => { tab = t; }, { getElementById: () => box }, async () => ({ routes, from: 1, to: 3 }), mat2, i => "M" + i, picked);
-    await f(); return { html: box.innerHTML, tab };
+  ok("A: the function is in the page, shows the tab first and draws from the figures the page holds (no read of the plan)",
+     !!ofd && ofd.indexOf("showDrawerTab('detail')") < ofd.indexOf("renderAllRoutes();") && !/fetchMatrix|\bfetch\(/.test(ofd) && !html.includes("fetchMatrix"));
+  const arT = fnSrc(/function arTableHTML\(view, y, k, unit, sort, picked, namesOf\) \{[\s\S]*?\n    \}/);
+  const run = (picked) => {
+    const rows = [{ rid: "R019", materials: ["Soil"], t: [900, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], aday: [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], yearT: 900, peak: 3 },
+                  { rid: "R050", materials: ["Soil", "Stone"], t: [850, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], aday: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], yearT: 850, peak: 2 },
+                  { rid: "R032", materials: ["Sand"], t: [5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], aday: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], yearT: 5, peak: 1 }];
+    const tot = { t: [1755, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], aday: [6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], yearT: 1755, peak: 6 };
+    const f = new Function("CONFIG", "PV", "fmtN", "rsN", "escHtml", "RS_MONTHS", arT + "\nreturn arTableHTML;")(
+      { START_YEAR: 2026 }, () => 2, n => String(Math.round(n)), n => String(Math.round(n)), x => String(x), ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]);
+    const first = new Function(fnSrc(/function arPickedFirst\(rows, picked\) \{[\s\S]*?\n    \}/) + "\nreturn arPickedFirst;")();
+    return f({ rows: first(rows, picked), tot, mats: [] }, 0, 0, "t", "month", picked, () => ({ from: "A", to: "B" }));
   };
-  const mat2 = (routes) => mat(Array.from(new Set(routes.map(r => r.material_type || "—"))));
-  const R = [{ route_id: "R019", material_type: "Soil", monthly: { 1: 100 }, total: 900 }, { route_id: "R050", material_type: "Soil", monthly: { 1: 800 }, total: 800 },
-             { route_id: "R050", material_type: "Stone", monthly: { 2: 50 }, total: 50 }, { route_id: "R032", material_type: "Sand", monthly: { 3: 5 }, total: 5 }];
-  const ids = (h) => (h.match(/<\/span>(R\d+)<\/td>/g) || []).map(x => x.replace(/<\/span>|<\/td>/g, ""));
+  const ids = (h) => (h.match(/data-rid="(R\d+)"/g) || []).map(x => x.replace(/data-rid="|"/g, ""));
   {
-    const a = await run(R.map(r => ({ ...r })), "R050");
-    ok("⭐ A (run): a picked route's lines (one per material) come FIRST and are tinted; the others keep their order (sorted by total)",
-       ids(a.html).join() === "R050,R050,R019,R032" && (a.html.match(/<tr class="fc-picked">/g) || []).length === 2 && a.tab === "detail");
-    const b = await run(R.map(r => ({ ...r })), null);
-    ok("A (run): nothing picked = today's table exactly: same order, no tint", ids(b.html).join() === "R019,R050,R050,R032" && !b.html.includes("fc-picked"));
-    const c = await run(R.map(r => ({ ...r })), " r050 ");
-    ok("A (run): the pick is matched without regard to case or spaces (the map lowercases ids to compare)", ids(c.html).join() === "R050,R050,R019,R032");
-    ok("A (run): the heading, the window line ('4 route(s) · sorted by total'), the columns and the totals are untouched",
-       a.html.includes("Approved forecast — tonnes of material by month") && a.html.includes("4 route(s) · sorted by total") && a.html.includes("<th>Route</th><th>M1</th><th>M2</th><th>M3</th><th>Total</th>")
-       && a.html.includes("<td><b>800</b></td>"));
+    const a = arT ? run("r050") : "";
+    ok("⭐ A (run): a picked route's row comes FIRST and is tinted; the others keep their order (one row a route now: its lines are added together)",
+       ids(a).join() === "R050,R019,R032" && (a.match(/<tr class="ar-picked">/g) || []).length === 1 && /<tr class="ar-picked"><th scope="row"><button[^>]*data-rid="R050"/.test(a)
+       && html.includes("st.view.rows = arPickedFirst(st.view.rows, picked);"));
+    const b = arT ? run("") : "";
+    ok("A (run): nothing picked = no tint, the same order", ids(b).join() === "R019,R050,R032" && !b.includes("ar-picked"));
+    ok("A (run): the pick is matched without regard to case or spaces (the map lowercases ids to compare)",
+       html.includes("const picked = (typeof selectedRouteId === 'string' || typeof selectedRouteId === 'number') ? String(selectedRouteId).trim().toLowerCase() : '';"));
+    ok("A (run): the old heading, the '4 route(s) · sorted by total' line and the colour key are gone; the totals are a row of their own",
+       !html.includes("Approved forecast — tonnes of material by month") && !html.includes("route(s) · sorted by total") && !html.includes("mat-chip")
+       && a.includes('<tfoot><tr><th scope="row">All 3 routes</th>'));
   }
   ok("⭐ A: a route picked while the Forecast detail tab is open re-reads the table (the pick follows), only with the drawer open on that tab",
      html.includes("const dr = document.getElementById('route-drawer'); if (drawerTab === 'detail' && dr && dr.classList.contains('open') && typeof openForecastDetail === 'function') openForecastDetail();"));
-  ok("A: the tint has a light and a Dark look (the first column is sticky and has its own background, so it is named)",
-     html.includes("table.fc-matrix tr.fc-picked td, table.fc-matrix tr.fc-picked td:first-child{ background:#EFF6FF; }")
-     && html.includes('html[data-look="dark"] table.fc-matrix tr.fc-picked td, html[data-look="dark"] table.fc-matrix tr.fc-picked td:first-child{ background:rgba(37,99,235,.22); }'));
+  // REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"): the new table's own tint
+  // (solid colours: its first column and its headings stay put, and a see-through tint would show the rows under them)
+  ok("A: the tint has a light and a Dark look (the cells that stay put are solid, so the tint is too)",
+     html.includes("table.ar-table .ar-now, table.ar-table tr.ar-picked th, table.ar-table tr.ar-picked td{ background:#EFF6FF; }")
+     && html.includes('html[data-look="dark"] table.ar-table .ar-now, html[data-look="dark"] table.ar-table tr.ar-picked th, html[data-look="dark"] table.ar-table tr.ar-picked td{ background:#202F50; }'));
 
   // ---------- R1: the road card's row buttons ----------
   const pick = fnSrc(/function secselPickRow\(rid, kind\) \{[\s\S]*?\n    \}/);

@@ -104,7 +104,9 @@ def definition():
 DEFINITION = ("A lorry coming and going is 2 movements, as councils count them. "
               "Planned figures from the approved plan: no lorry was counted.")   # the default; a page reads definition()
 CHART_MAX_ROUTES = 24
-ZONE_WORDS = {"closure": "closure", "weight_limit": "weight limit", "works": "works area", "other": "local control"}
+# 12 Nov 2026 (A-F8, rule 13): + traffic_limit — a public traffic limit read "local control" in "Road works and limits"
+ZONE_WORDS = {"closure": "closure", "weight_limit": "weight limit", "works": "works area", "other": "local control",
+              "traffic_limit": "traffic limit"}
 # 13 Oct 2026: the council layer's carbon colouring, the public map's own (map/index.html AREA_RAMP_CARBON,
 # AREA_NONE, AREA_STOPS.carbon and the hatch of areaHatchImage) — test_bulletin.py reads the map and holds them equal
 COUNCIL_RAMP = ("#EE9150", "#E8590C", "#B8470A", "#7C2D06")
@@ -119,8 +121,12 @@ COUNCIL_RAMP_MOVEMENTS = ("#89A3DC", "#6A8BD2", "#4A72C9", "#2D4E95")
 # movements a day, fixed in every month and every scheme) and its five-step blue (map/index.html CARBON_RAMP, which
 # volumeColor() paints with), and ONE line width, so a width never carries a figure (the map's rule since PR #39).
 # The map's casing colour (CONFIG.COLORS.forecastCasing) sits under each line so the light end reads on white paper.
+# 11 Nov 2026 (card A-F2b, John: "Yes, both together"): the five blues re-stepped in the same hue (OK-L 0.73, 0.57, 0.47,
+# 0.37, 0.27; were #94BBF9 #5A96F6 #2071F3 #0B55CB #073888): the lightest clears the colour system's 2:1 floor on white
+# (2.42:1, was 1.96:1) and "under 20" / "20 to 50" part on paper, in black and white and for red-green colour blindness.
+# Screens and print together: the map's CARBON_RAMP is the same list (test_bulletin holds them equal).
 VOLUME_STOPS = (10, 25, 50, 100)
-VOLUME_RAMP = ("#94BBF9", "#5A96F6", "#2071F3", "#0B55CB", "#073888")
+VOLUME_RAMP = ("#72A7FF", "#006AFD", "#0051C4", "#00388E", "#00215B")
 ROUTE_CASING = "#1F2024"
 HATCH_INK, HATCH_PAPER = "#B8B2A8", "#F3F1EC"
 NOT_REPORTED = "Not reported"
@@ -131,6 +137,29 @@ NOT_REPORTED = "Not reported"
 # --------------------------------------------------------------------------- #
 def n0(v):
     return "—" if v is None else f"{float(v):,.0f}"
+
+
+def a_day_words(v):
+    """11 Nov 2026 (card A-F2): a route that carries loads but fewer than half a movement a day reads "under 1" (the
+    public map's words), never "0" beside a month figure above nought."""
+    return "under 1" if v is not None and 0 < float(v) < 0.5 else n0(v)
+
+
+def name_twins(views, vehicle_types, vehicle_label):
+    """11 Nov 2026 (card A-F2): two rows with the same name ("M–B Harborough Rail Freight Terminal to Melton Compound"
+    twice) each get what differs: the lorry type when every twin has exactly one and they differ, else the route's
+    name. `views` is changed in place (its "label"); `vehicle_types` maps a route to its lorry keys."""
+    seen = {}
+    for v in views:
+        seen.setdefault(v["label"], []).append(v)
+    for label, vs in seen.items():
+        if len(vs) < 2:
+            continue
+        keys = [tuple(vehicle_types.get(v["route_id"]) or ()) for v in vs]
+        by_lorry = all(len(k) == 1 for k in keys) and len(set(keys)) == len(keys)
+        for v, k in zip(vs, keys):
+            v["label"] = f"{label} · {vehicle_label(k[0]) if by_lorry else v['route_id']}"
+    return views
 
 
 def n1(v):
@@ -755,7 +784,11 @@ def concern_month(mi):
         return None
     if not F["taking"]["form"] and not ever:
         return None
-    return {"received": F["received"], "closed": F["closed"], "first_reply_median": F["first_reply_median"],
+    # 11 Nov 2026 (card A-F1): "closed" is how many of the MONTH'S concerns are closed now, the same count as the kinds
+    # table under it (the glance row read "3 · 3" beside a table of 3 received, 1 closed: it counted every closing in the
+    # month, older concerns too). "form" says whether the map's form is on, so the row names its source honestly.
+    return {"received": F["received"], "closed": F["closed_of_received"], "first_reply_median": F["first_reply_median"],
+            "form": bool(F["taking"]["form"]),
             "kinds": [{"kind": k["kind_text"], "received": k["received"], "closed": k["closed"]} for k in F["by_kind"]]}
 
 
@@ -811,7 +844,7 @@ def traffic_month(mi):
         if lim["basis"] == "busiest_day" and state != "over":
             state = "average"
         unit = "movements" if mv else "visits"
-        rows.append({"name": L["name"], "state_key": state,
+        rows.append({"name": L["name"], "state_key": state, "zone_id": L["id"],
                      # whole movements, half up (round() is half-even: x.5 goes to the even whole, and the in / out split misread)
                      "figure": _tl_value(m["value"], lim["value"]) + (f" ({_whole(m['in_per_day'])} in, {_whole(m['out_per_day'])} out)"
                                                      if mv else f" {unit}"),
@@ -824,8 +857,11 @@ def traffic_month(mi):
     rows.sort(key=lambda r: (order.get(r["state_key"], 4), -r["ratio"], r["name"]))
     over = sum(1 for r in rows if r["state_key"] == "over")
     near = sum(1 for r in rows if r["state_key"] == "near")
+    # 12 Nov 2026 (A-F8 (a), John's yes): by_zone = EVERY public limit's row by its zone, for the printed newsletter,
+    # which prints each limit once, in "Road works and limits" (the web page keeps its table of at most six)
     return {"title": "Traffic limits on local roads", "rows": rows[:TRAFFIC_ROWS], "total": len(rows),
-            "over": over, "near": near, "glance": f"{over} over, {near} near", "note": TRAFFIC_NOTE}
+            "over": over, "near": near, "glance": f"{over} over, {near} near", "note": TRAFFIC_NOTE,
+            "by_zone": {r["zone_id"]: r for r in rows}}
 
 
 def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, month_long, concerns_m=None, traffic=None):
@@ -866,7 +902,8 @@ def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, mo
         # NARROWED 5 Nov 2026 (group 6, PR 2): the scheme's own record when it takes concerns (counts only). Short enough that
         # each cell stays on ONE line in the PDF's narrow figure / data columns: a two-line row took the newsletter to five pages
         (("Concerns from the public, received · closed", f"{concerns_m['received']} · {concerns_m['closed']}",
-          "Map and email records") if concerns_m is not None
+          # 11 Nov 2026 (card A-F1): the map's form named only while it is on
+          "Map and email records" if concerns_m.get("form", True) else "Email records") if concerns_m is not None
          else ("Enquiries and complaints", NOT_REPORTED, "Not in this bulletin")),
     ]
     if traffic:
@@ -937,10 +974,10 @@ def sheet(month_index, acc=None, now=None):
     def route_view(r):
         pr = prev_rows.get(r["route_id"])
         last = ("no earlier month in the programme" if mi <= 1 else
-                (f"{n0(pr['count_a_day'])} a day" if pr else "none planned"))
+                (f"{a_day_words(pr['count_a_day'])} a day" if pr else "none planned"))
         return {"route_id": r["route_id"], "label": r.get("label") or r["route_id"], "letters": letters_of(r),
                 # 9 Nov 2026 (2.1-11b): the figure in the organisation's unit; `visits` for the cap and the colour
-                "a_day": r.get("count_a_day"), "a_day_text": n0(r.get("count_a_day")), "visits": r.get("two_way_a_day"),
+                "a_day": r.get("count_a_day"), "a_day_text": a_day_words(r.get("count_a_day")), "visits": r.get("two_way_a_day"),
                 # the cap is typed in visits; on the bar (drawn in the organisation's count) it sits at cap × per visit
                 "cap_at": (r["cap"] * per_visit() if r.get("cap") is not None else None),
                 # 12 Oct 2026 (the user, evening): a page people read prints WHOLE movements ("6,874", never
@@ -954,6 +991,10 @@ def sheet(month_index, acc=None, now=None):
                 "over_flag": bool(r.get("cap") is not None and (r.get("two_way_a_day") or 0) > r["cap"])}
 
     routes_view = [route_view(r) for r in rows]
+    import conversions
+    _fac = conversions.load_factors()
+    name_twins(routes_view, {r["route_id"]: r.get("vehicle_types") for r in rows},
+               lambda k: conversions.vehicle_label(_fac, k))
     # REVERSED 13 Oct 2026 (W11): no width by volume (it was 1.5-6.5 px by the month's busiest route, so the same width
     # meant different volumes in different months); each route takes the public map's Volume colour for its two-way
     # movements a day, at one width. Drawn quietest first, so the busiest sit on top.
@@ -1205,21 +1246,27 @@ def projector(points, w, h, pad):
 
 
 MARKER_CLEAR = 11.0                      # PDF pt between marker centres before a control steps off a pin
+# 11 Nov 2026 (card A-X3): what the PDF map passes. A works square (8.8 pt, half-diagonal 6.2) and a letter pin (radius
+# 4.6, white edge) touch at about 11 pt; 14 leaves a gap of about 3 pt, and the step must be longer than the clearance
+PDF_MARKER_CLEAR, PDF_MARKER_STEP = 14.0, 16.0
 
 
-def control_spot(x, y, taken, clear=MARKER_CLEAR, step=13.0):
+def control_spot(x, y, taken, clear=MARKER_CLEAR, step=13.0, rings=1):
     """
     14 Oct 2026 (the publishing check): a control's square covered a site's letter. Where it goes: at (x, y) if nothing
     taken is within `clear`, else the first clear spot `step` away (up, up-right, right ... round the clock; "up" is +y,
     so a y-down caller passes a negative step), else one step up. The caller draws a leader back to (x, y).
+    11 Nov 2026 (card A-X3): `rings=2` tries a second ring, two steps out, before giving up (the PDF map: three pins
+    round one control left no clear spot one step away).
     """
     if all(math.hypot(x - a, y - b) >= clear for a, b in taken):
         return x, y
-    for k in range(8):
-        ang = math.pi / 2 - k * math.pi / 4
-        cx, cy = round(x + abs(step) * math.cos(ang), 2), round(y + step * math.sin(ang), 2)
-        if all(math.hypot(cx - a, cy - b) >= clear for a, b in taken):
-            return cx, cy
+    for ring in range(1, max(1, rings) + 1):
+        for k in range(8):
+            ang = math.pi / 2 - k * math.pi / 4
+            cx, cy = round(x + ring * abs(step) * math.cos(ang), 2), round(y + ring * step * math.sin(ang), 2)
+            if all(math.hypot(cx - a, cy - b) >= clear for a, b in taken):
+                return cx, cy
     return x, y + step
 
 

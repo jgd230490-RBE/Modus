@@ -257,6 +257,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
                 g["fleet"] += line_fleet or 0
                 g["months"].add(mk)
             br = by_route.setdefault(rid, {"rp": rp, "months": {}})
+            br.setdefault("vehs", set()).add(l.get("vehicle_type"))   # 11 Nov 2026 (card A-F2): twins told apart
             bm = br["months"].setdefault(mk, {"veh": 0.0, "t": 0.0, "fleet": 0, "co2": 0.0,
                                               "co2_unbaked": 0, "unbaked": 0, "lines": 0})
             bm["veh"] += loads
@@ -331,6 +332,7 @@ def rollup_payloads(payloads, routes, wd, acc=None, unit="vehicles", labels=None
             "months_with_volume": len(ms),
             "cap": cap,
             "cap_wording": CAP_WORDING if cap is not None else NO_CAP_WORDING,
+            "vehicle_types": sorted(v for v in br.get("vehs", ()) if v),
         }))
     ranked.sort(key=lambda x: (-x[0], x[1]))
     busiest = [row for _, _, row in ranked[:BUSIEST_N]]

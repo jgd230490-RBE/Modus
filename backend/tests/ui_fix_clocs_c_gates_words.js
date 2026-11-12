@@ -25,7 +25,9 @@ const text = (tip.match(/text: "([^"]*)"/) || [])[1] || "";
 ok("C-X2: the 'i' box's text (what the CI counts) is unchanged at 34 words, within its pin", words(text) === 34, String(words(text)));
 ok("⭐ C-X2: the long-prose pin 'Planned arrivals spread evenly over the gate's open hours' has left the list",
    !rules.LONG_PROSE_PINNED.some(p => /^Planned arrivals spread evenly/.test(p.starts)));
-ok("⭐ C-X2: PINNED_MAX came down with it (25), and the list fits", /const PINNED_MAX = 25;/.test(auditRules) && rules.LONG_PROSE_PINNED.length <= 25,
+// NARROWED 12 Nov 2026 (batch 5): PR #257's four cuts brought it on to 21; 25 or under, and the list fits under it
+const pinnedMax = +((auditRules.match(/const PINNED_MAX = (\d+);/) || [])[1] || 99);
+ok("⭐ C-X2: PINNED_MAX came down with it (25 or under), and the list fits", pinnedMax <= 25 && rules.LONG_PROSE_PINNED.length <= pinnedMax,
    String(rules.LONG_PROSE_PINNED.length));
 ok("C-X2: the gates heading keeps its 'i' box", gw.includes('<h3 className="ct-h">Gates this week<InfoTip id="la.gates" /></h3>'));
 console.log(`\nui_fix_clocs_c_gates_words.js: ${pass} passed, ${fail} failed`);

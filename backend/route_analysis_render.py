@@ -1173,7 +1173,9 @@ def _render(D, sizing, pages_in):
                 if sizing:
                     X._SIZING.on = True
                 try:
-                    doc.page = X.build_collision_evidence_pdf(ev, canvas=doc.c, page_start=doc.page, skip=skip)
+                    # 11 Nov 2026 (CLOCS card B-F7): "Made", as every other page of the file says, not "Issued"
+                    doc.page = X.build_collision_evidence_pdf(dict(ev, head_word="Made"), canvas=doc.c,
+                                                              page_start=doc.page, skip=skip)
                 finally:
                     if sizing:
                         X._SIZING.on = False

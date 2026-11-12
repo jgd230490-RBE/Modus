@@ -226,7 +226,8 @@ ok("1: 'This is evidence for a route risk assessment. It is not the assessment.'
 ok("1: the table rows are counts only — no rate, no per km, no score", all("per" not in l.lower().split() and "%" not in l
                                                                            for _, l in cl.ROWS))
 ok("1: a vowel takes 'An' ('An e-scooter …')", any(l.startswith("An e-scooter") for _, l in cl.ROWS))
-RESERVED = {"#94BBF9", "#5A96F6", "#2071F3", "#0B55CB", "#073888", "#DC2626", "#C8102E", "#FF8C14", "#E8590C", "#E8681E",
+# NARROWED 11 Nov 2026 (card A-F2b): the new Volume blues joined the set; the old five stay reserved too
+RESERVED = {"#94BBF9", "#5A96F6", "#2071F3", "#0B55CB", "#073888", "#72A7FF", "#006AFD", "#0051C4", "#00388E", "#00215B", "#DC2626", "#C8102E", "#FF8C14", "#E8590C", "#E8681E",
             "#FF8312", "#D97706", "#F59E0B", "#C2790B", "#059669", "#3B82F6", "#2563EB", "#0F766E", "#0D9488",
             "#4C1D95", "#155E75", "#57534E", "#64748B", "#7C3AED", "#89A3DC", "#6A8BD2", "#4A72C9", "#2D4E95"}
 ok("1: the collision ink is one dark ink, no reserved colour, no community kind's colour (a hue would claim a meaning)",
@@ -809,10 +810,19 @@ ok("7c: the community credit is on the sheet (schools, health, bus stops and cyc
    "OpenStreetMap contributors (ODbL)" in (E3["community_credit"] or ""))
 _pdf3 = export.build_collision_evidence_pdf(E3)
 _t3 = " ".join(pdf_text(_pdf3, "").split()) if shutil.which("pdftotext") else ""
+# NARROWED 12 Nov 2026 (B-X2): the box's own lines are read in drawing order (raw): the box grew by its title's second
+# line, and -layout now runs its last line together with a table row level with it
+_t3r = " ".join(pdf_text(_pdf3, "", raw=True).split()) if shutil.which("pdftotext") else ""
 ok("7c: the PDF: page 1 opens with the routes compared and the CLOCS box",
-   not _t3 or ("This route and its alternatives" in _t3 and "For the route risk assessment (CLOCS Standard v5, 5.1a)" in _t3
+   not _t3 or ("This route and its alternatives" in _t3 and re.search(r"For the route risk assessment\s+\(CLOCS Standard v5, 5\.1a\)", _t3r)
                and "For the CLOCS route risk assessment" not in _t3   # NARROWED 10 Nov 2026 (F12): the clause it serves
-               and "5.6a assess and select routes" in _t3 and "the project's own incidents (5.1a) are not in this data" in _t3), _t3[:1500])
+               and "5.6a assess and select routes" in _t3r and "the project's own incidents (5.1a) are not in this data" in _t3r), _t3r[:1500])
+# 12 Nov 2026 (card B-X2, the dry run): the box's title lines, measured in the PDF's own font against the box's room
+from reportlab.pdfbase.pdfmetrics import stringWidth as _sw  # noqa: E402
+_room = (export.A4[0] - 24 * export.mm) * 0.42 - 20
+ok("🔴 7c B-X2: the CLOCS box title is two lines here, each inside the box (5 pt in from each side)",
+   E3.get("clocs_box_title") == ["For the route risk assessment", "(CLOCS Standard v5, 5.1a)"]
+   and all(_sw(x, export._BF("bold"), 8) <= _room for x in E3.get("clocs_box_title") or ["x" * 99]), E3.get("clocs_box_title"))
 ok("7c: ...the cycle routes and the route's left turns, said as facts with how they are measured",
    not _t3 or ("Cycle routes and the route's left turns" in _t3 and "run beside a cycle route (within 20 m)" in _t3
                and "The route makes 0 left turns" in _t3 and "mapped by volunteers" in _t3), _t3[:3000])

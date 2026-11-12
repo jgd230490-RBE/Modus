@@ -50,6 +50,7 @@ import stockpiles    # Week 1 — stockpile capacity and typed consumption (Task
 import access        # 2026-09-02 — IPT access codes (Task F)
 import gate          # 2026-09-14 — the /map/ password and the /help/ staff gate
 import config        # 2.5b — the editable copy of factors.json; G2 — the tenant settings block
+import plan_stamp    # 10 Nov 2026 (claude/map-first-view): when the forecast last changed, for the map
 import tenant_package  # G2, 16 Sep — a tenant as one JSON document; the map overlay
 import costing       # 10 Sep evening — target rates + fuel settings (config key 'costing'), BAF
 import fuel          # 10 Sep evening — the EU Weekly Oil Bulletin diesel index, fetched server-side
@@ -66,6 +67,7 @@ import limits        # 13 Oct 2026 — lorry limits (weight / height / width) fr
 import bulletin      # 12 Oct 2026 — the monthly bulletin's server half: the map bar's month roll-up + the conditions of the month
 import route_sheet  # 16 Oct 2026 — the route sheet for drivers (CLOCS v5 C3)
 import route_map_export  # 14 Oct 2026 — the route map export (backlog item 2): the map as filtered, as a PDF
+import forecast_plan  # 12 Nov 2026 — the approved plan by route and month as a CSV (the public map's "All routes", staff Download)
 import community     # 14 Oct 2026 — the community considerations layer (staff map and the CLP plans)
 import collisions    # 16 Oct 2026 — the collision history along the routes (CLOCS v5 C1; staff only)
 import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
@@ -2876,7 +2878,7 @@ def bulletin_month_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), request: R
         return export.build_bulletin_pdf(bulletin_doc.sheet(month, acc))
     try:
         # kept only when every map in it is Mapbox's picture: one drawn as the schematic stand-in is served, not kept
-        data = _staff_bytes("bulletin/month.pdf", {"month": int(month), "staff": bool(acc)}, build, acc,
+        data = _staff_bytes("bulletin/month.pdf", {"month": int(month), "staff": bool(acc), "concerns": concerns.stamp()}, build, acc,
                             keep=lambda: basemap.MISSES[0] == misses)
     except RuntimeError as e:
         raise HTTPException(503, str(e))
@@ -2890,14 +2892,22 @@ def bulletin_month_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), request: R
 def bulletin_leaflet_pdf(month: int = Query(..., ge=1, le=MONTH_COUNT), request: Request = None):
     """
     13 Oct 2026 (D43) — the one-page LEAFLET (residents, the working group) as an A4 PDF, from the SAME view model as
-    the newsletter and the page (bulletin_doc.sheet). Staff only, the bulletin's rule (D10). Stores nothing.
+    the newsletter and the page (bulletin_doc.sheet). Staff only, the bulletin's rule (D10).
+    11 Nov 2026 (card A-F4): kept like the newsletter's PDF (45 s on every press on live): built once per month, role and
+    day, until the next write; one whose map fell back to the schematic is served, never kept.
     """
     from fastapi.responses import Response       # not in every test stub; imported here
     if not _staff_request(request):
         raise HTTPException(401, "sign in — a valid access code is required")
-    sheet = bulletin_doc.sheet(month, access.current())
+    acc = access.current()
+    misses = basemap.MISSES[0]
+
+    def build():
+        sheet = bulletin_doc.sheet(month, acc)
+        return export.build_bulletin_leaflet_pdf(sheet)
     try:
-        data = export.build_bulletin_leaflet_pdf(sheet)
+        data = _staff_bytes("bulletin/leaflet.pdf", {"month": int(month), "staff": bool(acc), "concerns": concerns.stamp()}, build, acc,
+                            keep=lambda: basemap.MISSES[0] == misses)
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     y, m = weeks._month_of(month)
@@ -2913,8 +2923,12 @@ def bulletin_leaflet_page(month: Optional[int] = Query(None, ge=1, le=MONTH_COUN
     if not _staff_request(request):
         return Response(content=_BULLETIN_SIGNIN_PAGE, status_code=401, media_type="text/html; charset=utf-8")
     mi = month if month is not None else _bulletin_month_default()
-    return Response(content=bulletin_doc.leaflet_html(bulletin_doc.sheet(mi, access.current())),
-                    media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
+    acc, misses = access.current(), basemap.MISSES[0]
+    # 11 Nov 2026 (card A-F4): kept as the bulletin page is (below)
+    data = _staff_bytes("bulletin/leaflet-page", {"month": int(mi), "staff": bool(acc), "concerns": concerns.stamp()},
+                        lambda: bulletin_doc.leaflet_html(bulletin_doc.sheet(mi, acc)).encode("utf-8"), acc,
+                        keep=lambda: basemap.MISSES[0] == misses)
+    return Response(content=data.decode("utf-8"), media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/bulletin/")
@@ -2931,8 +2945,16 @@ def bulletin_page(month: Optional[int] = Query(None, ge=1, le=MONTH_COUNT), requ
     if not _staff_request(request):
         return Response(content=_BULLETIN_SIGNIN_PAGE, status_code=401, media_type="text/html; charset=utf-8")
     mi = month if month is not None else _bulletin_month_default()
-    return Response(content=bulletin_doc.html(bulletin_doc.sheet(mi, access.current())),
-                    media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
+    acc, misses = access.current(), basemap.MISSES[0]
+    # 11 Nov 2026 (card A-F4): the concerns' stamp is in the key of all four kept bulletin reads (concerns are a
+    # NO_DATA_TABLES table, so a concern alone never moves the data version; the stamp does).
+    # 11 Nov 2026 (card A-F4): the page was built afresh on every open (16-21 s on live, 11 Nov). It is kept like the PDF:
+    # one build per month, role and day, served again until the next write to the plan (read_cache: never stale), and
+    # one whose map fell back to the schematic is served, never kept. Kept as bytes, so the store's byte cap counts it.
+    data = _staff_bytes("bulletin/page", {"month": int(mi), "staff": bool(acc), "concerns": concerns.stamp()},
+                        lambda: bulletin_doc.html(bulletin_doc.sheet(mi, acc)).encode("utf-8"), acc,
+                        keep=lambda: basemap.MISSES[0] == misses)
+    return Response(content=data.decode("utf-8"), media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
 
 
 # ------------------------------------------------------------------ public feed (map)
@@ -2944,6 +2966,32 @@ def _heavy(name):
     """21 Oct 2026 (live OOM kills): one of heavy_reads.SLOTS slots for a heavy public read, one memory line in the log.
     The heavy reads: month-kpis, month-kpis/months, map-data, route-alternatives, forecast-matrix, areas/months."""
     return heavy_reads.slot(name, busy=_heavy_busy)
+
+
+# 12 Nov 2026 (card A-F7 (a), BUILD.md rule 13): the public map's cold open made ~430 database connections, ~315 of them in
+# three reads every visitor rebuilt (map-data 48, forecast-matrix 126, month-kpis/months 141). On live, with the Postgres
+# pool empty, each connection is a fresh one (PR #263), so a cold open took 15-19 s. The three are the same for every
+# viewer until a write, so each is kept through read_cache.cached() (never stale: keyed by the data version), built inside
+# its heavy slot as before, and served as bytes after the first. Only the shapes the map asks for are kept (the whole
+# horizon, no profile), so odd query strings cannot crowd the store; any other shape is built as before.
+PUBLIC_MAP_CACHE = "public/map-data"
+PUBLIC_MATRIX_CACHE = "public/forecast-matrix|"          # + unit and sections
+PUBLIC_MONTHS_CACHE = "public/month-kpis-months|"        # + unit
+
+
+def _public_kept(name, build):
+    """The read's JSON, built by build() inside its heavy slot, kept until the next write; the same bytes FastAPI sends."""
+    body = read_cache.cached(name, (MONTH_COUNT,), lambda: _json_body(build()))
+    return Response(content=body, media_type="application/json")
+
+
+def _json_body(value):
+    """The bytes FastAPI would send for value: plain JSON as is (the three reads are), anything else through its encoder."""
+    try:
+        return read_cache.json_bytes(value)
+    except TypeError:
+        from fastapi.encoders import jsonable_encoder
+        return read_cache.json_bytes(jsonable_encoder(value))
 
 
 def _working_days(factors):
@@ -3064,9 +3112,12 @@ def public_month_kpis_months(unit: str = Query("vehicles")):
     """
     if unit not in conversions.UNITS:
         raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
-    with _heavy("month-kpis/months"):
-        pages = _month_kpis_payloads(range(1, MONTH_COUNT + 1), unit)
-        return {"unit": unit, "months": {str(m): pages[m] for m in sorted(pages)}}
+
+    def build():
+        with _heavy("month-kpis/months"):
+            pages = _month_kpis_payloads(range(1, MONTH_COUNT + 1), unit)
+            return {"unit": unit, "months": {str(m): pages[m] for m in sorted(pages)}}
+    return _public_kept(PUBLIC_MONTHS_CACHE + unit, build)          # 12 Nov 2026 (A-F7): kept until the next write
 
 
 def _month_kpis_payloads(months, unit):
@@ -3348,8 +3399,14 @@ def public_forecast_matrix(
     """
     if unit not in conversions.UNITS:
         raise HTTPException(400, f"unit must be one of {conversions.UNITS}")
-    with _heavy("forecast-matrix"):
-        return _forecast_matrix(from_, to, unit, sections)
+
+    def build():
+        with _heavy("forecast-matrix"):
+            return _forecast_matrix(from_, to, unit, sections)
+    # 12 Nov 2026 (A-F7): the whole horizon (the map's timeline and its detail table) is kept until the next write
+    if min(from_, to) == 1 and max(from_, to) == MONTH_COUNT:
+        return _public_kept(f"{PUBLIC_MATRIX_CACHE}{unit}|{1 if sections else 0}", build)
+    return build()
 
 
 def _forecast_matrix(from_, to, unit, sections):
@@ -3401,6 +3458,9 @@ def _forecast_matrix(from_, to, unit, sections):
            "routes": out, "carbon_stamp": carbon.SUMMARY_STAMP}
     if co2_error:
         res["co2_error"] = co2_error
+    # 10 Nov 2026 (claude/map-first-view, Idea 3): the UK date the forecast last changed, from the audit trail
+    # (plan_stamp); None when the trail has no such write. The map prints "Approved plan · updated 31 Oct".
+    res["plan_updated"] = plan_stamp.last_change()
     # 12 Oct 2026 (Track C review): sections=1 (the timeline asks) adds the programme's largest
     # SECTION-month of CO2e over the window, so the carbon ramp on the shared sections has stops
     # from what a section carries, not from a whole route's month. None when there is no figure.
@@ -3479,6 +3539,24 @@ def route_keep_main(body: dict, token: Optional[str] = None):
             "periods": route_choice.periods(rid), "by_zone": (summ or {}).get("by_zone", {})}
 
 
+@app.get("/api/admin/route-diversions/preview")
+def route_diversions_preview(token: Optional[str] = None):
+    """11 Nov 2026 (CLOCS card B-F3): which dated zones' diversions the picking rule (no lorry limit below the lorry
+    first, then the quickest) would change now, each with its distance, time and limits against the main line. Reads
+    only; POST …/refresh applies it. Geometry only, never a HERE call."""
+    _check_admin(token)
+    return route_choice.preview()
+
+
+@app.post("/api/admin/route-diversions/refresh")
+def route_diversions_refresh(token: Optional[str] = None):
+    """11 Nov 2026 (CLOCS card B-F3): apply the picking rule to every dated zone's diversions now (the same rewrite a
+    zone save, a route's routing and Route all already do). Geometry only, never a HERE call."""
+    _check_admin(token)
+    summ = route_choice.refresh_zones() or {}
+    return {"rows": summ.get("rows", 0), "by_zone": summ.get("by_zone", {})}
+
+
 @app.post("/api/admin/route-diversions/way-round")
 def route_way_round(route_id: Optional[str] = None, limit: int = Query(30, ge=1, le=60),
                     token: Optional[str] = None):
@@ -3525,6 +3603,48 @@ def _export_style(style):
     if not k:
         raise HTTPException(422, "style must be light, streets, outdoors or aerial")
     return k
+
+
+def _forecast_plan_csv(unit):
+    """The approved plan by route and month as CSV bytes (forecast_plan.table / csv_text), from every APPROVED line as
+    /api/public/month-kpis carries it (_month_kpi_line: tonnes, and loads on the line's own payload), so the file's
+    figures are the public map's own. One forecast read, the routes' names, no carbon table."""
+    factors = conversions.load_factors()
+    vs = factors.get("vehicles", {}) or {}
+    fb_payload, fb_name = derived.payload_for(None, factors)
+    rows = db.query(
+        "SELECT * FROM forecasts WHERE tenant_id = ? AND status = 'Approved' "
+        "ORDER BY month_index, route_id, discipline, section_id",
+        (db.current_tenant(),))
+    by_month = {}
+    for r in rows:
+        by_month.setdefault(int(r["month_index"]), []).append(
+            _month_kpi_line(r, "vehicles", factors, vs, fb_payload, fb_name))
+    names = {r["route_id"]: {"origin": r.get("origin"), "dest": r.get("dest")} for r in network.meta_routes()}
+    tab = forecast_plan.table(by_month, MONTH_COUNT, _working_days(factors), counting.per_visit(factors), names)
+    return forecast_plan.csv_text(tab, unit, START_YEAR).encode("utf-8")
+
+
+@app.get("/api/routes/forecast-plan.csv")
+def routes_forecast_plan_csv(unit: str = Query("count"), request: Request = None):
+    """
+    12 Nov 2026 (the public map's "All routes"; John's call 7: Copy for everyone, Download for staff only at first).
+    The approved plan as one CSV: a row a route, a column a month, in lorry movements (or visits) a day
+    (`unit=count`, the organisation's setting) or tonnes (`unit=t`), with a row of totals.
+
+    STAFF ONLY: a valid code or the staff cookie, as the route map export; the map password's visitor is refused here
+    whatever the page shows (the button is hidden for them too). The whole scheme for any staff caller: the public map
+    shows every route to anyone it lets in. Kept until the next write (_staff_bytes). Stores nothing.
+    """
+    from fastapi.responses import Response       # not in every test stub; imported here
+    if not _staff_request(request):
+        raise HTTPException(401, "sign in — the plan as a file is for staff")
+    if unit not in forecast_plan.UNITS:
+        raise HTTPException(400, f"unit must be one of {forecast_plan.UNITS}")
+    data = _staff_bytes("routes/forecast-plan", {"unit": unit}, lambda: _forecast_plan_csv(unit), acc={})
+    name = forecast_plan.file_name(unit, counting.per_visit(conversions.load_factors()))
+    return Response(content=data, media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
 
 def _route_map_plan(request, month, origin, dest, discipline, team, routes, plan, scale, at, community=1, collisions=0):
@@ -4145,22 +4265,48 @@ def _route_analysis(request, routes, lorry, sections, ext):
         known = (conversions.load_factors() or {}).get("vehicles") or {}
         if lorry not in known:
             raise HTTPException(422, "Pick a lorry from the list.")
-    with heavy_reads.solo("route-analysis", busy=lambda: HTTPException(
-            503, "Another route analysis is being made. Try again in a minute.", headers={"Retry-After": "60"})):
-        try:
-            D = route_analysis_doc.gather(routes, lorry=lorry or None, sections=sections, acc=access.current())
-            data = route_analysis_render.build_pdf(D) if ext == "pdf" else route_analysis_render.build_xlsx(D)
-        except route_analysis_doc.AnalysisError as e:
-            raise HTTPException(404, str(e))
-        except route_analysis_doc.AskError as e:
-            raise HTTPException(422, str(e))
-        except RuntimeError as e:
-            raise HTTPException(503, str(e))
+    try:
+        ids = route_analysis_doc.parse_routes(routes)
+        secs = route_analysis_doc.parse_sections(sections)
+    except route_analysis_doc.AskError as e:
+        raise HTTPException(422, str(e))
+    acc = access.current()
+    misses = basemap.MISSES[0]
+    made = {"size": 0}
+
+    def build():
+        with heavy_reads.solo("route-analysis", busy=lambda: HTTPException(
+                503, "Another route analysis is being made. Try again in a minute.", headers={"Retry-After": "60"})):
+            try:
+                D = route_analysis_doc.gather(ids, lorry=lorry or None, sections=secs, acc=acc)
+                data = route_analysis_render.build_pdf(D) if ext == "pdf" else route_analysis_render.build_xlsx(D)
+            except route_analysis_doc.AnalysisError as e:
+                raise HTTPException(404, str(e))
+            except route_analysis_doc.AskError as e:
+                raise HTTPException(422, str(e))
+            except RuntimeError as e:
+                raise HTTPException(503, str(e))
+        made["size"] = len(data)
+        return data
+
+    # 11 Nov 2026 (CLOCS card B-F1): kept like the other heavy staff files (_staff_bytes: per role and team, per day,
+    # until the next write), so a second press of the same file opens at once instead of ~25 s on live. The key holds
+    # what the file reads from outside the database: the closures feed held in memory (route_analysis_doc.held_stamp;
+    # a feed refresh moves no data version). Kept only when every map in it is Mapbox's picture, and only up to
+    # ANALYSIS_KEEP_MAX (12 routes' maps would push the rest of the store out).
+    params = {"routes": ids, "lorry": lorry or None, "sections": secs, "ext": ext,
+              "held": route_analysis_doc.held_stamp() if "limits" in secs else None}
+    data = _staff_bytes("routes/analysis", params, build, acc,
+                        keep=lambda: basemap.MISSES[0] == misses and made["size"] <= ANALYSIS_KEEP_MAX)
     media = ("application/pdf" if ext == "pdf"
              else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     return Response(content=data, media_type=media,
-                    headers={"Content-Disposition": f'attachment; filename="{route_analysis_doc.file_name(D, ext)}"',
+                    headers={"Content-Disposition": f'attachment; filename="{route_analysis_doc.file_name_for(ids, ext)}"',
                              "Cache-Control": "no-store"})
+
+
+#: the largest route analysis kept in memory (bytes); a bigger one is served, not kept (CLOCS card B-F1)
+ANALYSIS_KEEP_MAX = 6 * 1024 * 1024
 
 
 @app.get("/api/routes/analysis.pdf")
@@ -4312,8 +4458,12 @@ def public_map_data(profile: Optional[str] = None):
     dashed straight line usefully says 'HERE could not route this'; on a public map it
     would just look like a road that isn't there.
     """
-    with _heavy("map-data"):
-        return network.public_map_data(profile=profile)
+    def build():
+        with _heavy("map-data"):
+            return network.public_map_data(profile=profile)
+    if profile is None:                       # 12 Nov 2026 (A-F7): the map's own read, kept until the next write
+        return _public_kept(PUBLIC_MAP_CACHE, build)
+    return build()
 
 
 @app.get("/api/public/road-load")
@@ -4536,6 +4686,17 @@ read_cache.WARMERS[AREAS_MONTHS_CACHE] = lambda: read_cache.cached(AREAS_MONTHS_
                                                                    _areas_months_build)
 # 27 Oct 2026 (group 2a): the public map's route check against the closures, built after start-up and after writes
 read_cache.WARMERS["restrictions_check"] = lambda: restrictions.check_all(current_only=False)
+
+
+def _warm_public_map():
+    """12 Nov 2026 (A-F7): the public map's three kept reads, as the map asks for them (map/config.js FORECAST_UNIT
+    "vehicles"), so the first visitor after a deploy or an edit does not build them either."""
+    public_map_data(profile=None)
+    public_forecast_matrix(from_=1, to=MONTH_COUNT, unit="vehicles", sections=1)
+    public_month_kpis_months(unit="vehicles")
+
+
+read_cache.WARMERS["public_map"] = _warm_public_map
 
 
 @app.post("/api/admin/areas/import")
@@ -5567,6 +5728,8 @@ def _gate_arrivals_build(month, acc):
     for g in out.get("gates") or []:
         g["busiest_hour"] = (b.get("gates") or {}).get(g["gate_id"])
     out["busiest_note"] = b.get("note")
+    out["busiest_detail"] = b.get("detail")   # 10 Nov 2026 (U5): the specifics the "i" box prints
+    out["busiest_loads"] = b.get("loads")
     out["holding"] = b.get("holding") or []        # 29 Oct 2026 (task 3c): a row a holding area under the gates
     return out
 

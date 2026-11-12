@@ -78,8 +78,11 @@ if (L) {
      !rows.some(r => r.id.includes("osm:w7")) && rows.some(r => r.what === "R003 · Artic Tipper (44t) · 18 t, except for access · Loughborough Road"));
   ok("F10: ⭐ a road with one route over it names the route and its lorry: 'R008 · Artic Tipper (44t) · 7.5 t, except for access · Rearsby Road'",
      rows.some(r => r.what === "R008 · Artic Tipper (44t) · 7.5 t, except for access · Rearsby Road"));
-  ok("F10: ⭐ no exception recorded says so: 'R008 · Artic Tipper (44t) · 7.5 t · no exception recorded: check the sign'",
-     rows.some(r => r.what === "R008 · Artic Tipper (44t) · 7.5 t · no exception recorded: check the sign"));
+  // REVERSED 11 Nov 2026 (card A-X2, John's "Yes, as recommended"): an unnamed stretch reads "Road near R008 · …" (a list of
+  // routes read as the road's name); its routes and lorry go in the row's tip. The exception words are unchanged.
+  ok("F10: ⭐ no exception recorded says so: 'Road near R008 · 7.5 t · no exception recorded: check the sign', its routes in the tip",
+     rows.some(r => r.what === "Road near R008 · 7.5 t · no exception recorded: check the sign" && r.tip === "Routes over it: R008"),
+     JSON.stringify(rows.map(r => [r.what, r.tip])));
   ok("C3: two unnamed stretches are two rows (never merged by a missing name)",
      rows.filter(r => r.what.includes("no exception recorded")).length === 2);
   ok("F10: ⭐ no row names the supplier (screens name no supplier; the sign's card keeps it)",

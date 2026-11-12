@@ -158,6 +158,20 @@ import heavy_reads  # noqa: E402
 import gate  # noqa: E402
 import main  # noqa: E402
 
+# NARROWED 12 Nov 2026 (A-F7, claude/map-cold-open): the public map's three reads (map-data, forecast-matrix over the whole
+# horizon, month-kpis/months) answer kept JSON bytes now. A direct call clears the kept copy first (so it still builds, counts
+# and takes its slot as before) and reads the body back into the same dict the assertions always read.
+import read_cache  # noqa: E402
+
+
+def fresh_read(r):
+    return json.loads(r.body.decode("utf-8")) if hasattr(r, "body") else r
+
+
+def built(call):
+    read_cache.clear()
+    return fresh_read(call())
+
 PASS = 0
 FAIL = []
 
@@ -367,7 +381,7 @@ network.route_analysis = _cra
 with quiet():
     COUNT["q"] = COUNT["ra"] = 0
     t = time.perf_counter()
-    BULK = main.public_month_kpis_months(unit="vehicles")
+    BULK = built(lambda: main.public_month_kpis_months(unit="vehicles"))
     bulk_s, bulk_q, bulk_ra = time.perf_counter() - t, COUNT["q"], COUNT["ra"]
     COUNT["q"] = COUNT["ra"] = 0
     t = time.perf_counter()
@@ -401,7 +415,7 @@ ok("1. ...a month with no lines (if the programme has one) still carries its car
    "the whole programme's", all(ONE[m]["co2_to_date"] or m < min(f["month_index"] for f in APPROVED) for m in _empty)
    and len(ONE[MC]["co2_to_date"]) >= len(ONE[1]["co2_to_date"]) and ONE[MC]["co2_to_date"], str(_empty))
 with quiet():
-    BULK_T = main.public_month_kpis_months(unit="t")
+    BULK_T = built(lambda: main.public_month_kpis_months(unit="t"))
 _diff = [m for m in (1, 12, 31, 47, 60) if dumps({k: v for k, v in BULK_T["months"][str(m)].items() if k != "abnormal_loads"}) != dumps(reference_month_kpis(m, "t"))]
 ok("1. ⭐ in tonnes too: the bulk read equals the old month read for a spread of months (NARROWED 23 Oct 2026: abnormal_loads, appended last, left out)", not _diff, str(_diff))
 
@@ -434,7 +448,7 @@ _calls = []
 _keep = main._approved_co2
 main._approved_co2 = lambda f, a, b: (_calls.append((a, b)), _keep(f, a, b))[1]
 with quiet():
-    main.public_month_kpis_months(unit="vehicles")
+    built(lambda: main.public_month_kpis_months(unit="vehicles"))
 main._approved_co2 = _keep
 ok("2. ⭐ ONE carbon read for the whole horizon, months 1..60 (was one 1..M read per month)", _calls == [(1, MC)], str(_calls))
 _mk = read("backend/main.py")
@@ -498,7 +512,7 @@ ok("3. route_analysis() reads the geometry through ANALYSIS_GEOMETRY_SQL, never 
 _keep_lines = costlines.lines
 costlines.lines = lambda **k: (_ for _ in ()).throw(RuntimeError("no carbon today"))
 with quiet():
-    _bf = main.public_month_kpis_months(unit="vehicles")
+    _bf = built(lambda: main.public_month_kpis_months(unit="vehicles"))
     _of = {m: main.public_month_kpis(month=m, unit="vehicles") for m in (9, 31, 60)}
 costlines.lines = _keep_lines
 ok("4. ⭐ a failed carbon read: every month says co2_error, every co2_t is None, nothing to date — in both reads alike",
@@ -592,7 +606,7 @@ with quiet() as _out3:
     _started.wait(2)
     _busy = None
     try:
-        main.public_map_data(profile=None)
+        built(lambda: main.public_map_data(profile=None))
     except Exception as e:      # noqa: BLE001
         _busy = e
     _go2.set()
