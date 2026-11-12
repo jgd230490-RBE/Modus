@@ -2048,11 +2048,25 @@ TABLE_LOOK = [ ("BACKGROUND", (0, 0), (-1, 0), HEAD_TINT),
               ("LINEBELOW", (0, 1), (-1, -1), 0.3, colors.Color(0.85, 0.87, 0.9))]
 
 
+#: 12 Nov 2026 (BUILD.md rule 13; the newsletter ran to five pages on live once a public traffic limit was drawn, which adds
+#: a row on page 2's works table and two to page 4): when a section cannot fit its own page, the newsletter is set tighter,
+#: one step at a time, until each section fits again (D43: four pages). Nothing is left out and nothing moves: the gaps
+#: between rows and sections close, the council carbon map gives some height, and at the last steps the small print
+#: (grey notes, sources, terms) steps down to 7 pt. Step 0 is the look of 14 Oct; the leaflet always uses step 0.
+NEWSLETTER_FIT = (
+    {"pad": 2.2, "small_pad": 1.3, "lot_pad": 2.5, "sec_before": 7, "council_map": 70, "small": 7.5, "terms": 8},
+    {"pad": 1.6, "small_pad": 1.0, "lot_pad": 1.8, "sec_before": 5.5, "council_map": 60, "small": 7.5, "terms": 8},
+    {"pad": 1.2, "small_pad": 0.8, "lot_pad": 1.4, "sec_before": 4.5, "council_map": 52, "small": 7.2, "terms": 7.5},
+    {"pad": 1.0, "small_pad": 0.6, "lot_pad": 1.0, "sec_before": 4, "council_map": 46, "small": 7.0, "terms": 7.2},
+)
+
+
 class _Kit:
     """The bulletin's styles and builders, shared by the newsletter and the leaflet (one look, one view model)."""
 
-    def __init__(self, usable):
+    def __init__(self, usable, fit=None):
         self.usable = usable
+        self.fit = fit = fit or NEWSLETTER_FIT[0]
         r, b, it = _BF("regular"), _BF("bold"), _BF("italic")
         st = ParagraphStyle("b", fontName=r, fontSize=8.5, leading=10.8)
         self.st = st
@@ -2060,11 +2074,12 @@ class _Kit:
         # 14 Oct 2026 (the publishing check): light table heads (ink on a pale band), not white on ink
         self.st_h = ParagraphStyle("h", parent=st, fontName=b, fontSize=7.5, leading=9.5, textColor=colors.Color(*NAVY_RGB))
         self.st_hr = ParagraphStyle("hr", parent=self.st_h, alignment=2)
-        self.st_sec = ParagraphStyle("sec", parent=st, fontName=b, fontSize=11, leading=13.5, spaceBefore=7,
+        self.st_sec = ParagraphStyle("sec", parent=st, fontName=b, fontSize=11, leading=13.5, spaceBefore=fit["sec_before"],
                                      spaceAfter=2.5, textColor=colors.Color(*NAVY_RGB))
         self.st_kick = ParagraphStyle("kick", parent=st, fontName=b, fontSize=7.5, leading=9, spaceBefore=0, spaceAfter=1,
                                       textColor=colors.HexColor("#C2410C"))
-        self.st_grey = ParagraphStyle("g", parent=st, fontSize=7.5, leading=9.4, textColor=colors.Color(*GREY))
+        self.st_grey = ParagraphStyle("g", parent=st, fontSize=fit["small"], leading=round(fit["small"] * 1.253, 2),
+                                      textColor=colors.Color(*GREY))
         self.st_def = ParagraphStyle("def", parent=self.st_grey, fontSize=8, leading=10, spaceBefore=2)
         self.st_big = ParagraphStyle("big", parent=st, fontName=b, fontSize=17, leading=20, textColor=colors.Color(*NAVY_RGB))
         self.st_lab = ParagraphStyle("lab", parent=st, fontSize=8, leading=9.6, textColor=colors.Color(*GREY))
@@ -2083,7 +2098,8 @@ class _Kit:
 
     def grid(self, data, widths, total_row=False):
         t = LongTable(data, colWidths=widths, repeatRows=1)
-        style = [("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [("TOPPADDING", (0, 0), (-1, -1), 2.2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.2),
+        pad = self.fit["pad"]
+        style = [("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [("TOPPADDING", (0, 0), (-1, -1), pad), ("BOTTOMPADDING", (0, 0), (-1, -1), pad),
                               ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]
         if total_row:
             style += [("BACKGROUND", (0, -1), (-1, -1), colors.Color(*BAND)),
@@ -2183,7 +2199,7 @@ class _Kit:
         numbers), at 7.5 pt."""
         E, P = self.E, self.P
         sm = ParagraphStyle("src", parent=self.st_grey, leftIndent=11, bulletIndent=0, bulletFontName=_BF("regular"),
-                            bulletFontSize=7.5, spaceAfter=1.5)
+                            bulletFontSize=self.fit["small"], spaceAfter=1.5)
         items = [(i, _co2_pdf(E(t))) for i, t in enumerate(S.get("sources") or [], 1)]   # 14 Oct 2026: was CO2e always
         if not items:
             return []
@@ -2255,15 +2271,25 @@ def build_bulletin_pdf(S):
     # report box onto a page of its own at 64 mm), then the newsletter is as long as its content needs
     # REVERSED 14 Oct 2026: the map is the biggest that keeps page 1 on its own page (it shrank until the WHOLE
     # newsletter was four pages, so a long route table made the front-page map small)
+    # 12 Nov 2026 (BUILD.md rule 13): then, while a section still runs over its page (more than four pages), the next
+    # step of NEWSLETTER_FIT; page 1's map height is found again from where the last step left it (a tighter step
+    # never needs a smaller map)
     with _sizing():
-        for map_h in NEWSLETTER_MAP_HEIGHTS:
-            data, pages, page2 = _newsletter(S, map_h)
-            if page2 == 2:
+        start = 0
+        for fit in NEWSLETTER_FIT:
+            for k in range(start, len(NEWSLETTER_MAP_HEIGHTS)):
+                map_h = NEWSLETTER_MAP_HEIGHTS[k]
+                data, pages, page2 = _newsletter(S, map_h, fit=fit)
+                if page2 == 2:
+                    start = k
+                    break
+            if pages <= NEWSLETTER_PAGES:
                 break
     # 14 Oct 2026: built once more with the page total known, so each foot says "2 of 4", and with the basemap
-    return _newsletter(S, map_h, pages)[0]
+    return _newsletter(S, map_h, pages, fit=fit)[0]
 
 
+NEWSLETTER_PAGES = 4               # D43: one section a page
 NEWSLETTER_MAP_HEIGHTS = (100 * mm, 92 * mm, 84 * mm, 76 * mm, 68 * mm, 60 * mm, 52 * mm, 44 * mm, 36 * mm)
 
 
@@ -2280,7 +2306,7 @@ class _PageMark(Flowable):
         self.page = self.canv.getPageNumber()
 
 
-def _newsletter(S, map_h, pages=None):
+def _newsletter(S, map_h, pages=None, fit=None):
     """One build of the newsletter with the page-1 map at `map_h`: (bytes, pages). REVERSED 14 Oct 2026 (the publishing
     check): page 1 is the front page (lede, figures, the definition once, the map with its key, key points, report);
     page 2 one table of every route with its bar (it was a busiest table AND a chart of the same figures), what is moved,
@@ -2289,7 +2315,7 @@ def _newsletter(S, map_h, pages=None):
     from reportlab.platypus import PageBreak, CondPageBreak
     buf = io.BytesIO()
     doc, usable = _bulletin_doc(S, "", buf, pages)   # 10 Nov 2026 (25b): was "monthly newsletter" — one name, the bulletin
-    K = _Kit(usable)
+    K = _Kit(usable, fit)
     E, P, grid = K.E, K.P, K.grid
     st, st_r, st_h, st_hr, st_sec, st_grey = K.st, K.st_r, K.st_h, K.st_hr, K.st_sec, K.st_grey
 
@@ -2382,7 +2408,7 @@ def _newsletter(S, map_h, pages=None):
                 cc.append([P(E(d["name"])), P(E(d["highway_authority"])), P(E(d["text"]), st_r), P(E(d["share"]), st_r),
                            P(E(d.get("la_share") or "—"), st_r)])
             story.append(KeepTogether([P(E(C["title"]), st_sec), P(E(C["lede"])), Spacer(1, 1.5 * mm),
-                                       _CouncilMap(C, usable, 70 * mm), Spacer(1, 1 * mm), _council_legend(C, usable)]))
+                                       _CouncilMap(C, usable, K.fit["council_map"] * mm), Spacer(1, 1 * mm), _council_legend(C, usable)]))
             story.append(Spacer(1, 1.5 * mm))
             story.append(grid(cc, [usable * 0.24, usable * 0.28, usable * 0.13, usable * 0.14, usable * 0.21]))
             story.append(P(E(" ".join([C["tally"]] + C["county_lines"]) + (" † A and minor roads only: no motorway in the "
@@ -2402,8 +2428,9 @@ def _newsletter(S, map_h, pages=None):
         story += _traffic_flow(K, S.get("traffic"))      # 9 Nov 2026 (v2.1 task 2.1-1)
     story += _glance_flow(K, S)
     story.append(P("Terms", st_sec))
-    tt = LongTable([[P(f"<b>{E(k)}</b>", ParagraphStyle("tk", parent=st, fontSize=8, leading=10)),
-                     P(E(v[0].upper() + v[1:]), ParagraphStyle("tv", parent=st, fontSize=8, leading=10))] for k, v in S["terms"]],
+    tf = K.fit["terms"]
+    tt = LongTable([[P(f"<b>{E(k)}</b>", ParagraphStyle("tk", parent=st, fontSize=tf, leading=tf * 1.25)),
+                     P(E(v[0].upper() + v[1:]), ParagraphStyle("tv", parent=st, fontSize=tf, leading=tf * 1.25))] for k, v in S["terms"]],
                    colWidths=[usable * 0.2, usable * 0.8])
     tt.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("VALIGN", (0, 0), (-1, -1), "TOP"),
                             ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
@@ -2435,7 +2462,7 @@ def _glance_flow(K, S):
     # back out of order when the PDF is read as text; the Data column may wrap (it is the last)
     t = LongTable(gl, colWidths=[K.usable * 0.57, K.usable * 0.14, K.usable * 0.29], repeatRows=1)
     t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [
-                           ("TOPPADDING", (0, 0), (-1, -1), 1.3), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.3),
+                           ("TOPPADDING", (0, 0), (-1, -1), K.fit["small_pad"]), ("BOTTOMPADDING", (0, 0), (-1, -1), K.fit["small_pad"]),
                            ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]))
     # NARROWED 14 Oct 2026 (the publishing check): one short line under the table, at 7.5 pt
     out = [P("This month at a glance", K.st_sec), t,
@@ -2466,7 +2493,7 @@ def _traffic_flow(K, T):
         tb.append([P(E(r["name"]), sm), P(E(r["figure"]), smr), P(E(r["limit"]), smr), P(w, sm)])
     t = LongTable(tb, colWidths=[K.usable * 0.40, K.usable * 0.21, K.usable * 0.26, K.usable * 0.13], repeatRows=1)
     t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [
-                           ("TOPPADDING", (0, 0), (-1, -1), 1.3), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.3),
+                           ("TOPPADDING", (0, 0), (-1, -1), K.fit["small_pad"]), ("BOTTOMPADDING", (0, 0), (-1, -1), K.fit["small_pad"]),
                            ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]))
     more = (f" {T['total'] - len(T['rows'])} more within their limits." if T["total"] > len(T["rows"]) else "")
     return [KeepTogether([P(E(T["title"]), K.st_sec), t]), P(E(T["note"] + more), K.st_grey)]
@@ -2490,7 +2517,7 @@ def _lot_flow(K, L):
     lt.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("VALIGN", (0, 0), (-1, -1), "TOP"),
                             ("LINEBELOW", (0, 0), (-1, -1), 0.3, colors.Color(0.85, 0.87, 0.9)),
                             ("LINEABOVE", (0, 0), (-1, 0), 0.9, colors.Color(*NAVY_RGB)),
-                            ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+                            ("TOPPADDING", (0, 0), (-1, -1), K.fit["lot_pad"]), ("BOTTOMPADDING", (0, 0), (-1, -1), K.fit["lot_pad"]),
                             ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5)]))
     out = [KeepTogether([P(E(L["title"]), K.st_sec), P(E(L["lede"])), Spacer(1, 1.2 * mm), lt])]
     # 14 Oct 2026: the demo note and the factor check on one line

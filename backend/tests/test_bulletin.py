@@ -2161,7 +2161,8 @@ ok("🔴 the newsletter's page 1 never spills: its map gives way first (100 → 
    and "if page2 == 2:" in _EXP and "return buf.getvalue(), doc.page, mark.page" in _EXP)
 ok("🔴 a sizing pass fetches no basemap (the box is the same size either way); only the final build asks Mapbox",
    'if getattr(_SIZING, "on", False):\n        return None, None, None' in _EXP
-   and _EXP.index("with _sizing():") < _EXP.index("return _newsletter(S, map_h, pages)[0]"))
+   # NARROWED 12 Nov 2026 (BUILD.md rule 13): the final build names the fit step the sizing passes chose
+   and _EXP.index("with _sizing():") < _EXP.index("return _newsletter(S, map_h, pages, fit=fit)[0]"))
 # the brief, by hand
 _BR = S10B["brief"]
 # NARROWED 14 Oct 2026 (the publishing check): "Key points", shorter: no "laden legs", the district named as a district,

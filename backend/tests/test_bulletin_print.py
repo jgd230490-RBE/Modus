@@ -238,5 +238,38 @@ ok("A-F2b: the one-width rule stays (one line width on the printed map, no width
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)
+# ---- 12 Nov 2026 (BUILD.md rule 13): the newsletter's fit ladder (export.NEWSLETTER_FIT), with stand-in builds
+print("Newsletter fit ladder (four pages, one section a page)")
+F0 = export.NEWSLETTER_FIT[0]
+ok("FIT1 the first step is the look of 14 Oct: rows 2.2 pt, small print 7.5 pt, section gap 7 pt, council map 70 mm, terms 8 pt",
+   F0 == {"pad": 2.2, "small_pad": 1.3, "lot_pad": 2.5, "sec_before": 7, "council_map": 70, "small": 7.5, "terms": 8})
+_k = export._Kit(100)
+ok("FIT2 the leaflet's kit (no step named) is the first step", _k.fit is F0 and _k.st_grey.fontSize == 7.5
+   and _k.st_sec.spaceBefore == 7)
+ok("FIT3 each step is tighter than the one before, never under 7 pt small print or 46 mm of council map",
+   all(b[k] <= a[k] for a, b in zip(export.NEWSLETTER_FIT, export.NEWSLETTER_FIT[1:]) for k in F0)
+   and min(f["small"] for f in export.NEWSLETTER_FIT) >= 7 and min(f["council_map"] for f in export.NEWSLETTER_FIT) >= 46)
+_real_nl, _calls = export._newsletter, []
+
+
+def _stand_in(pages_at):
+    def nl(S, map_h, pages=None, fit=None):
+        st = export.NEWSLETTER_FIT.index(fit)
+        _calls.append((st, round(map_h / mm), pages))
+        return (f"step{st}".encode(), pages_at[st], 2)
+    return nl
+
+
+try:
+    for pages_at, want in (((4, 4, 4, 4), 0), ((5, 4, 4, 4), 1), ((5, 5, 5, 4), 3), ((6, 6, 6, 5), 3)):
+        del _calls[:]
+        export._newsletter = _stand_in(pages_at)
+        out = export.build_bulletin_pdf({"x": 1})
+        ok(f"FIT4 pages by step {pages_at}: served at step {want}, the page total passed to the last build",
+           out == f"step{want}".encode() and _calls[-1][0] == want and _calls[-1][2] == pages_at[want]
+           and [c[0] for c in _calls[:-1]] == list(range(want + 1)), str(_calls))
+finally:
+    export._newsletter = _real_nl
+
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 sys.exit(1 if FAIL else 0)
