@@ -36,18 +36,20 @@
     {
      "month_index": 10,
      "label": "Oct 2026 (part)",
-     "planned_t": 5480.0,
+     "planned_t": 2192.0,
      "recorded_t": 2000.0,
-     "recorded_pct": 36,
+     "recorded_pct": 91,
      "lines_reported": 2,
-     "part_to": "2026-10-11"
+     "part_to": "2026-10-11",
+     "planned_month_t": 5480.0,
+     "planned_to_week": "2026-10-05"
     }
    ],
    "recorded_to": "2026-10-11",
    "recorded_week": "2026-10-05",
-   "headline": "Oct 2026: 2,000 t recorded, 36 % of the 5,480 t planned · recorded to the week of 5 Oct",
+   "headline": "Oct 2026: 2,000 t recorded, 91 % of the 2,192 t planned · recorded to the week of 5 Oct",
    "subtitle": "tonnes a month",
-   "basis": "Planned: the approved plan's tonnes. Recorded: tonnes typed on Account (a week's actual), as the Dashboard's Delivered against plan. A month with nothing typed is not recorded, not zero. The months up to the one picked.",
+   "basis": "Planned: the approved plan's tonnes. Recorded: tonnes typed on Account (a week's actual), as the Dashboard's Delivered against plan. A month with nothing typed is not recorded, not zero. A part month is set against the plan of the same weeks. The months up to the one picked.",
    "source": "Wayscope: the approved plan; the tonnes typed on Account"
   },
   "route_caps": {
