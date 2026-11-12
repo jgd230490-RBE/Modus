@@ -6513,6 +6513,22 @@ def diagnostics_road_class(route_id: str, profile: str = network.DEFAULT_PROFILE
     return network.road_class_diagnostics(route_id, profile=profile, leg=leg)
 
 
+@app.get("/api/admin/diagnostics/no-through/{route_id}")
+def diagnostics_no_through(route_id: str, profile: str = network.DEFAULT_PROFILE, leg: str = "loaded",
+                           via: Optional[str] = None, token: Optional[str] = None):
+    """
+    12 Nov 2026. What does the router hold about lorry restrictions along one leg, loading-only ones included?
+    One HERE request for this leg as the bake asks it (the bake's ends, vehicle, avoid areas and pinned time), with
+    `return=polyline,summary,noThroughRestrictions` and `spans=noThroughRestrictions,truckAttributes,notices,names,length`.
+    `leg` is loaded or return; `via=lat,lon` adds one pass-through point to force the line along a road. The answer is
+    reported as it came back: every notice in full, the no-through list, the spans that carry a restriction, the
+    length. If HERE refuses a name its own error is reported and nothing is retried. Nothing is written or stored and
+    nothing reads the answer. ⚠️ Costs one HERE request.
+    """
+    _check_admin(token)
+    return network.no_through_diagnostics(route_id, profile=profile, leg=leg, via=via)
+
+
 @app.get("/api/admin/diagnostics/compare/{route_id}")
 def diagnostics_compare(route_id: str, probe: bool = False, token: Optional[str] = None):
     """

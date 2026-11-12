@@ -423,6 +423,197 @@ def road_class_probe(o_lat, o_lon, d_lat, d_lon, profile, factors=None, laden=Tr
 
 
 # --------------------------------------------------------------------------- #
+#  The loading-only question (12 Nov 2026)                                     #
+# --------------------------------------------------------------------------- #
+#
+# WHY THIS EXISTS. On 12 Nov 2026 two demo roads with a 7.5 t "except for loading" limit carried baked lorry lines
+# (notes/session-1112-here-limits-why.md). HERE's guide says a loading-only ("no-through") restriction is NEVER
+# reported as a notice: the router avoids it unless the origin, the destination or a via point lies inside, and tells
+# of it only when asked with `return=noThroughRestrictions` and `spans=noThroughRestrictions`. A bake asks for
+# "polyline,summary" and nothing else, so from a bake's answer "the router holds the limit as loading-only and let
+# the journey end inside" and "the router holds no limit there" look exactly alike. Those two names (and
+# `spans=truckAttributes`) had never been sent from this codebase: this makes ONE call that sends them and reports
+# what came back, raw. Nothing reads its answer, and no bake sends these names (decide from the probe, then build).
+NO_THROUGH_RETURN = "polyline,summary,noThroughRestrictions"
+NO_THROUGH_SPANS = "noThroughRestrictions,truckAttributes,notices,names,length"
+#: the span attributes that mark a stretch as worth listing (the others, names and length, ride along with them)
+_NO_THROUGH_MARKS = ("noThroughRestrictions", "notices")
+
+
+def _without_key(text, key):
+    """A provider's words with the API key cut out, should it ever be echoed back."""
+    text = str(text)
+    return text.replace(key, "[key removed]") if key else text
+
+
+def no_through_probe(o_lat, o_lon, d_lat, d_lon, profile, factors=None, laden=True, via=None,
+                     avoid_areas=None, departure_time=None, max_spans=80):
+    """
+    One real HERE call that asks what the router holds about lorry restrictions along one leg. Never raises; the API
+    key is never in the answer.
+
+    Sent: the leg's truck parameters exactly as _truck_params builds them (a bake's), the bake's pinned
+    `departureTime` (bake_departure_time() unless one is passed), `return=polyline,summary,noThroughRestrictions`,
+    `spans=noThroughRestrictions,truckAttributes,notices,names,length`, the bake's `avoid[areas]` when given, and at
+    most ONE pass-through `via` (a (lat, lon) pair) to force the line along a named road.
+
+    Reported, as HERE sent it: the keys of the answer, the route and its sections; every notice at every level in
+    full (code, title, severity, details); each section's `noThroughRestrictions` list; the spans that carry a
+    no-through or a notice reference, or truck attributes other than the leg's commonest (with offset, length, names,
+    where the span starts and the entries its indexes point to); the truck attributes seen, with the metres on each;
+    the route's length. Only the first route is read (no alternatives are asked for).
+
+    If HERE refuses a name (HTTP 400) nothing is retried: the refusal is reported with HERE's own error body and the
+    names that were sent.
+    """
+    key = api_key()
+    params = {"origin": f"{o_lat},{o_lon}", "destination": f"{d_lat},{d_lon}",
+              "return": NO_THROUGH_RETURN, "spans": NO_THROUGH_SPANS, "apiKey": key}
+    params.update(_truck_params(profile, factors, laden=laden))
+    if avoid_areas:
+        params["avoid[areas]"] = "|".join(avoid_areas)
+    params["departureTime"] = str(departure_time or bake_departure_time())
+    via_values = _via_values([tuple(via)] if via else [], pass_through=True)
+    sent = {k: v for k, v in params.items() if k != "apiKey"}
+    if via_values:
+        sent["via"] = via_values
+    out = {"profile": profile, "laden": laden, "params_sent": sent,
+           "names_sent": {"return": NO_THROUGH_RETURN.split(","), "spans": NO_THROUGH_SPANS.split(",")},
+           "via_pass_through": (list(via) if via else None),
+           "api_key_set": bool(key), "here_calls": 0}
+    if not key:
+        out["error"] = "HERE_API_KEY is not set on the server"
+        return out
+    url = HERE_ENDPOINT + "?" + _query(params, via_values)
+    out["here_calls"] = 1
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            data = json.load(resp)
+    except urllib.error.HTTPError as e:
+        body = _without_key(e.read().decode("utf-8", "replace"), key)
+        out["error"] = f"HTTP {e.code}: {body[:1200]}"
+        out["http_status"] = e.code
+        try:
+            parsed = json.loads(body)
+            out["error_body"] = parsed if isinstance(parsed, dict) else None
+        except Exception:
+            out["error_body"] = None
+        out["refused"] = True
+        out["retried"] = False
+        out["reads_as"] = (f"The router refused the request (HTTP {e.code}) and nothing was retried. Names sent: "
+                           f"return={NO_THROUGH_RETURN}; spans={NO_THROUGH_SPANS}. Its own reason is in error_body "
+                           "(cause).")
+        return out
+    except Exception as e:
+        out["error"] = _without_key(str(e), key)[:400]
+        return out
+
+    rts = data.get("routes") or []
+    rt = rts[0] if rts else {}
+    secs = rt.get("sections") or []
+    out["routes_returned"] = len(rts)
+    out["response_keys"] = sorted(data)
+    out["route_keys"] = sorted(rt)
+    out["sections"] = len(secs)
+    out["section_keys"] = sorted({k for sec in secs for k in sec})
+
+    # every notice, at every level HERE's reference names one, exactly as it came
+    notices = [{"level": "response", "notice": n} for n in (data.get("notices") or [])]
+    notices += [{"level": "route", "notice": n} for n in (rt.get("notices") or [])]
+    for i, sec in enumerate(secs):
+        notices += [{"level": "section", "section": i, "notice": n} for n in (sec.get("notices") or [])]
+    out["notices"] = notices
+    out["notice_codes"] = sorted({str(n["notice"].get("code")) for n in notices if isinstance(n["notice"], dict)})
+
+    out["no_through_field_returned"] = any("noThroughRestrictions" in sec for sec in secs)
+    out["no_through_restrictions"] = [{"section": i, "restrictions": sec["noThroughRestrictions"]}
+                                      for i, sec in enumerate(secs) if "noThroughRestrictions" in sec]
+    n_restr = sum(len(x["restrictions"]) if isinstance(x["restrictions"], list) else 1
+                  for x in out["no_through_restrictions"])
+
+    # the spans. Truck attributes ride on every span of a lorry route, so only the stretches that differ from the
+    # leg's commonest value are listed; the table of values seen (with the metres on each) covers the rest.
+    def _attr(sp):
+        return json.dumps(sp.get("truckAttributes"), sort_keys=True) if "truckAttributes" in sp else None
+
+    spans_all, attr_m, attr_n = [], {}, {}
+    for i, sec in enumerate(secs):
+        for sp in (sec.get("spans") or []):
+            if not isinstance(sp, dict):
+                continue
+            spans_all.append((i, sp))
+            a = _attr(sp)
+            if a is not None:
+                attr_n[a] = attr_n.get(a, 0) + 1
+                attr_m[a] = attr_m.get(a, 0) + (sp["length"] if isinstance(sp.get("length"), (int, float)) else 0)
+    common = max(attr_n, key=lambda a: (attr_m[a], attr_n[a])) if attr_n else None
+    out["spans_returned"] = len(spans_all)
+    out["span_keys"] = sorted({k for _i, sp in spans_all for k in sp})
+    out["truck_attributes_seen"] = [{"truckAttributes": json.loads(a), "spans": attr_n[a], "length_m": attr_m[a],
+                                     "commonest": a == common}
+                                    for a in sorted(attr_n, key=lambda a: -attr_m[a])]
+    points = {}
+
+    def _at(i, offset):
+        """Where a span starts, [lat, lon], from the section's own line (None when it cannot be read)."""
+        if i not in points:
+            try:
+                points[i] = decode_polyline(secs[i].get("polyline") or "")
+            except Exception:
+                points[i] = []
+        pts = points[i]
+        if isinstance(offset, int) and 0 <= offset < len(pts):
+            return [pts[offset][1], pts[offset][0]]
+        return None
+
+    def _refs(i, sp):
+        """The entries a span's index lists point to, from its own section (HERE's reference: indexes)."""
+        got = {}
+        for name in _NO_THROUGH_MARKS:
+            src, idx = secs[i].get(name), sp.get(name)
+            if isinstance(src, list) and isinstance(idx, list):
+                got[name] = [src[j] for j in idx if isinstance(j, int) and 0 <= j < len(src)]
+        return got
+
+    marked = []
+    for i, sp in spans_all:
+        a = _attr(sp)
+        if any(sp.get(k) for k in _NO_THROUGH_MARKS) or (a is not None and a != common):
+            marked.append({"section": i, "span": sp, "at": _at(i, sp.get("offset")), "refers_to": _refs(i, sp)})
+    out["spans_marked"] = len(marked)
+    out["spans_marked_list"] = marked[:max_spans]
+    out["spans_marked_truncated"] = len(marked) > max_spans
+    out["spans_sample"] = [sp for _i, sp in spans_all[:8]]
+
+    length_m = sum((s.get("summary") or {}).get("length", 0) for s in secs)
+    out["length_m"] = length_m
+    out["distance_km"] = round(length_m / 1000.0, 2)
+    out["duration_hr"] = round(sum((s.get("summary") or {}).get("duration", 0) for s in secs) / 3600.0, 3)
+
+    if not rts:
+        out["reads_as"] = "The router returned no route: see response_keys and notices."
+    else:
+        said = []
+        if n_restr:
+            said.append(f"The router listed {n_restr} no-through restriction(s) on this line: see "
+                        "no_through_restrictions, and spans_marked_list for where.")
+        elif out["no_through_field_returned"]:
+            said.append("The router returned an EMPTY noThroughRestrictions list: it honoured the name and holds none "
+                        "on this line.")
+        else:
+            said.append("No section carries noThroughRestrictions. HERE's reference lists the name, and a name it did "
+                        "not know should have been refused; whether it leaves the field out when there is nothing to "
+                        "list is not stated there, so this reads as 'none on this line' and is not proof of it.")
+        said.append(f"Notices: {', '.join(out['notice_codes'])}." if notices else "No notices at any level.")
+        if not spans_all:
+            said.append("No spans came back: the spans names were ignored (see section_keys).")
+        elif "truckAttributes" not in out["span_keys"]:
+            said.append("The spans carry no truckAttributes (see span_keys).")
+        out["reads_as"] = " ".join(said)
+    return out
+
+
+# --------------------------------------------------------------------------- #
 #  The departure-time experiment                                              #
 # --------------------------------------------------------------------------- #
 #
