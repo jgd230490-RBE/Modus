@@ -454,7 +454,12 @@ _cv.save()
 ok("6: into a canvas: the next page number back, nothing saved by it", isinstance(_n, int) and _n > 5)
 if TX:
     _t6 = text(_buf.getvalue())
-    ok("6: ...its assessor page and cycle block left out when told", re.search(r"For the route risk assessment(?!\s+\(CLOCS)", _t6) is None   # NARROWED 12 Nov 2026 (B-X2): the box title may break before "(CLOCS"   # NARROWED 10 Nov 2026 (F12): section C's box says "(CLOCS Standard v5, 5.1a)"
+    _t6r = " ".join(pdf_text(_buf.getvalue(), "", raw=True).split())   # the order drawn: the box's two title lines stay together
+    # NARROWED 12 Nov 2026 (B-X2, batch 4 CI): read with -raw, and the assessor page's own sentence must be absent too.
+    # Under poppler's -layout (CI) a table row level with the two-line box title ran between its lines.
+    # NARROWED 10 Nov 2026 (F12): section C's box says "(CLOCS Standard v5, 5.1a)"
+    ok("6: ...its assessor page and cycle block left out when told", re.search(r"For the route risk assessment(?!\s+\(CLOCS)", _t6r) is None
+       and "Questions drawn from CLOCS Standard v5 clauses" not in _t6r
        and "Cycle routes and left turns" not in _t6 and "Page 5" in _t6, _t6[-400:])
 
 # --------------------------------------------------------------------------- #
