@@ -112,7 +112,7 @@ const namesOf = (rid) => ({ rid, from: rid === "R050" ? "Tilton Viaduct site" : 
        && /<tr class="ar-picked"><th scope="row"><button type="button" class="ar-rid" data-k="r-R011" data-rid="R011" onclick="arPick\(this\.dataset\.rid\)" aria-pressed="true" aria-label="Open R011, this route">/.test(h)
        && (h.match(/<tr class="ar-picked">/g) || []).length === 1);
     ok("⭐ the table (run): a typed name is escaped; a route with two materials names both; under one a day reads '<1' in a month's narrow cell",
-       h.includes("Quarry &lt;b&gt; → Compound") && !h.includes("Quarry <b>") && trs[1].includes('<td class="ar-l">Small aggregate, Asphalt</td>') && cells(trs[3]).slice(-2).join("|") === "<1|<1".replace(/</g, "&lt;"));
+       h.includes("Quarry &lt;b&gt; → Compound") && !h.includes("Quarry <b>") && trs[1].includes('<td class="ar-l" title="Small aggregate, Asphalt">Small aggregate, Asphalt</td>') && cells(trs[3]).slice(-2).join("|") === "<1|<1".replace(/</g, "&lt;"));
     const t = arTableHTML(arView(rows.slice(), { mat: "", sort: "month", k: 3, unit: "t" }), 1, 3, "t", "month", "", namesOf);
     ok("⭐ the table in tonnes (run): R050's Apr is 42,000 and its last column, 'Year', 123,400", t.includes('onclick="arSort(\'last\')">Year</button>') && cells(t.slice(t.indexOf("<tbody>")).split("</tr>")[0]).slice(-1)[0] === "123,400" && t.includes(">42,000</td>"));
     ok("⭐ the unit follows the organisation's setting (run): counting visits, R050's Apr reads 66", cells(mk(1)(v, 1, 3, "count", "month", "", namesOf).slice(h.indexOf("<tbody>") - 400).split("</tr>").find(x => x.includes('data-rid="R050"')))[4] === "66");
@@ -207,6 +207,9 @@ const namesOf = (rid) => ({ rid, from: rid === "R050" ? "Tilton Viaduct site" : 
      css("table.ar-table thead th").includes("position:sticky; top:0;") && css("table.ar-table tfoot th, table.ar-table tfoot td").includes("position:sticky; bottom:0;")
      && css("table.ar-table tbody th, table.ar-table tfoot th").includes("position:sticky; left:0;") && css("table.ar-table th, table.ar-table td").includes("background:var(--surface);")
      && css("#drawer-detail").includes("padding:0 16px;") && !html.includes('<div style="overflow:auto;"><table'));
+  ok("⭐ in movements a day (the view it opens on) the route's name has the room of the longest pair in the demo (360 px) and the material its own (200 px); in tonnes, whose figures are wider, both give way with their full words in a tip",
+     css(".ar-name").includes("max-width:360px;") && css("table.ar-table .ar-l").includes("max-width:200px;") && css("table.ar-table.ar-t .ar-name").includes("max-width:172px;")
+     && html.includes("<span class=\"ar-name\" title=\"' + where + '\">") && html.includes("'<td class=\"ar-l\" title=\"' + escHtml(r.materials.join(', ')) + '\">'"));
   ok("⭐ nothing in the table is under 12 px; every button in it shows the keyboard's focus; the arrows are drawn by CSS on named buttons",
      !(html.slice(html.indexOf("        #route-drawer .drawer-head{"), html.indexOf("        /* a laptop-height window")).match(/font-size:(\d+(\.\d+)?)px/g) || []).some(x => parseFloat(x.split(":")[1]) < 12)
      && html.includes(".ar-h:focus-visible, .ar-rid:focus-visible, .ar-mat:focus-visible, a.ar-dl:focus-visible{ outline:2px solid #1D4ED8; outline-offset:-2px; }")

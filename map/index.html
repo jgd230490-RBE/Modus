@@ -535,12 +535,12 @@
         .rs-seg button:focus-visible, .rs-bt:focus-visible, .rs-go:focus-visible, .rs-cell:focus-visible{ outline:2px solid #1D4ED8; outline-offset:-2px; }
         #drawer-analysis{ padding:10px 16px; position:relative; }
         .rs-two{ display:grid; grid-template-columns:minmax(0, 484px) minmax(0, 1fr); gap:22px; }
-        .rs-title{ margin:0; font-size:14px; font-weight:700; color:var(--navy-deep); display:flex; align-items:baseline; gap:6px; }
-        .rs-title span{ min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .rs-title{ margin:0; font-size:14px; font-weight:700; color:var(--navy-deep); display:flex; flex-wrap:wrap; align-items:baseline; column-gap:6px; }
+        .rs-title span{ min-width:0; }      /* a place name is never cut: the number and team drop to the next line first, then the name wraps */
         .rs-title small{ flex:none; font-size:12px; font-weight:400; color:var(--muted); white-space:nowrap; }
         .rs-what{ font-size:13px; font-weight:600; color:var(--ink); margin:5px 0 4px; }
         .rs-desc{ font-size:12px; color:var(--muted); margin:0 0 7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .rs-inm{ font-size:12px; color:var(--muted); margin:4px 0 2px; }
+        .rs-inm{ font-size:12px; color:var(--muted); margin:3px 0 1px; }
         .rs-figs{ display:flex; gap:14px; align-items:flex-start; }
         .rs-fig span{ white-space:nowrap; }
         .rs-fig{ display:block; text-align:left; font:inherit; color:inherit; background:none; border:0; padding:0; }
@@ -606,18 +606,19 @@
         table.ar-table thead th{ position:sticky; top:0; z-index:2; padding:2px 2px; }
         table.ar-table tfoot th, table.ar-table tfoot td{ position:sticky; bottom:0; z-index:2; font-weight:700; border-top:1.5px solid #94A3B8; border-bottom:0; background:var(--surface-2); }
         table.ar-table tbody th, table.ar-table tfoot th{ text-align:left; position:sticky; left:0; z-index:1; padding:0 8px 0 0; }
-        .ar-name{ display:inline-block; max-width:300px; overflow:hidden; text-overflow:ellipsis; vertical-align:middle; }
+        .ar-name{ display:inline-block; max-width:360px; overflow:hidden; text-overflow:ellipsis; vertical-align:middle; }
         table.ar-table tfoot th{ padding:4px 8px 4px 4px; z-index:3; }
         table.ar-table thead th:first-child{ text-align:left; left:0; z-index:3; }
-        table.ar-table .ar-l{ text-align:left; max-width:150px; overflow:hidden; text-overflow:ellipsis; }
+        table.ar-table .ar-l{ text-align:left; max-width:200px; overflow:hidden; text-overflow:ellipsis; }
+        table.ar-table tbody td:not(.ar-l), table.ar-table tfoot td:not(.ar-l){ padding:4px 4px; }      /* the months sit closer, so the material's words fit */
         /* tonnes are wider figures: the route's name gives them room, so the year still fits the panel at 1422 px */
-        table.ar-table.ar-t .ar-name{ max-width:180px; }
-        table.ar-table.ar-t td{ padding:4px 4px; }
+        table.ar-table.ar-t .ar-name{ max-width:172px; }
+        table.ar-table.ar-t .ar-l{ max-width:160px; }
         table.ar-table td.ar-sum{ font-weight:700; }
         table.ar-table .ar-now, table.ar-table tr.ar-picked th, table.ar-table tr.ar-picked td{ background:#EFF6FF; }
         table.ar-table tfoot .ar-now{ background:#E3EDFB; }
         table.ar-table td.ar-none{ text-align:left; color:var(--muted); padding:12px 0; }
-        .ar-h{ border:0; background:none; font:inherit; font-size:12px; font-weight:600; color:var(--muted); padding:4px 6px; min-height:24px; min-width:24px; cursor:pointer; border-radius:4px; white-space:nowrap; }
+        .ar-h{ border:0; background:none; font:inherit; font-size:12px; font-weight:600; color:var(--muted); padding:4px 3px; min-height:24px; min-width:24px; cursor:pointer; border-radius:4px; white-space:nowrap; }
         th.ar-now .ar-h{ color:#1E3A8A; }
         th[aria-sort="descending"] .ar-h::after{ content:" \25BE"; }
         th[aria-sort="ascending"] .ar-h::after{ content:" \25B4"; }
@@ -6989,7 +6990,7 @@
                  team: rp.ipt && rp.ipt !== 'Unknown_IPT' ? teamText(rp.ipt) : '' };
     }
     function rsTitleHTML(names) {
-        return '<h3 class="rs-title"><span title="' + escHtml(names.from + ' → ' + names.to) + '">' + escHtml(names.from) + ' → ' + escHtml(names.to) + '</span>'
+        return '<h3 class="rs-title"><span>' + escHtml(names.from) + ' → ' + escHtml(names.to) + '</span>'
             + '<small>' + escHtml([names.rid, names.team].filter(Boolean).join(' · ')) + '</small></h3>';
     }
     // a month's words for a screen reader and the slider: "Apr 2027: 132 lorry movements a day"
@@ -7072,7 +7073,7 @@
             body += '<tr><th scope="row">' + (CONFIG.START_YEAR + y) + '</th>' + tds + '<td class="rs-sum">' + (unit === 't' ? fmtN(sum, 0) : rsN(top * PV())) + '</td></tr>';
         }
         return '<table class="rs-year"><thead><tr><th scope="col">Year</th>' + RS_MONTHS.map(s => '<th scope="col">' + s + '</th>').join('')
-            + '<th scope="col">' + (unit === 't' ? 'Year' : 'Busiest') + '</th></tr></thead><tbody>' + body + '</tbody></table>';
+            + '<th scope="col">' + (unit === 't' ? 'Total' : 'Busiest') + '</th></tr></thead><tbody>' + body + '</tbody></table>';
     }
     // the route's own facts: six cards (were ten). The busiest month and its vehicles are in the story beside them.
     function rsFactsHTML(rid, story) {
@@ -7169,6 +7170,7 @@
                 + (RS.view === 'facts' ? rsFactsHTML(rid, story) : rsChartHTML(story, month, RS.unit, false, names)) + '</div>';
         }
         box.innerHTML = html;
+        if (box.scrollHeight > box.clientHeight + 1) { const d = box.querySelector('.rs-desc'); if (d) d.hidden = true; }      // the strip is full: the description gives way
         if (held) {
             const again = document.getElementById(held) || box.querySelector('[data-k="' + held + '"]') || (ctl && ctl.querySelector('[data-k="' + held + '"]'))
                 || (held === 'go' ? document.getElementById('rs-range') : null);
@@ -7289,7 +7291,7 @@
             for (let i = 0; i < 12; i++) tds += '<td' + (i === k ? ' class="ar-now"' : '') + '>' + cell(r, i) + '</td>';
             body += '<tr' + (on ? ' class="ar-picked"' : '') + '><th scope="row"><button type="button" class="ar-rid" data-k="r-' + id + '" data-rid="' + id + '" onclick="arPick(this.dataset.rid)" aria-pressed="' + on + '"'
                 + ' aria-label="' + (on ? 'Open ' + id + ', this route' : 'Show ' + id + ' on the map') + '">' + id + '</button><span class="ar-name" title="' + where + '"> · ' + where + '</span></th>'
-                + '<td class="ar-l">' + escHtml(r.materials.length > 2 ? r.materials.length + ' materials' : r.materials.join(', ')) + '</td>' + tds + '<td class="ar-sum">' + lastOf(r) + '</td></tr>';
+                + '<td class="ar-l" title="' + escHtml(r.materials.join(', ')) + '">' + escHtml(r.materials.length > 2 ? r.materials.length + ' materials' : r.materials.join(', ')) + '</td>' + tds + '<td class="ar-sum">' + lastOf(r) + '</td></tr>';
         });
         if (!view.rows.length) body = '<tr><td class="ar-none" colspan="15">Nothing approved in ' + yr + '.</td></tr>';
         let foot = '';

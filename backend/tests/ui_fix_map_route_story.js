@@ -118,7 +118,7 @@ for (let m = 1; m <= 60; m++) {
   if (M) {
     const s16 = M.rsStoryHTML(st, 16, NAMES, "Piling arisings <b>to tip</b>");
     ok("⭐ the story (run), Apr 2027 on the map: the route in words, 'R050 · North Team', the line, 'In Apr 2027', 132 / 11 / 1,909 t with the phone card's labels, and 'Busiest · 132 a day' under Apr 2027 (not a button on its own month)",
-       s16.includes('<h3 class="rs-title"><span title="Tilton Viaduct site → Wolds Link Inert Landfill">Tilton Viaduct site → Wolds Link Inert Landfill</span><small>R050 · North Team</small></h3>')
+       s16.includes('<h3 class="rs-title"><span>Tilton Viaduct site → Wolds Link Inert Landfill</span><small>R050 · North Team</small></h3>')
        && s16.includes('<div class="rs-what">Earthworks / soil · 133,500 t · May 2026 to Aug 2027</div>') && s16.includes('<div class="rs-inm">In Apr 2027</div>')
        && s16.includes('<b>132</b><span>Lorry movements a day</span>') && s16.includes('<b>11</b><span>Vehicles needed</span>') && s16.includes('<b>1,909 t</b><span>Material a day</span>')
        && s16.includes('<div class="rs-fig"><b>Apr 2027</b><span>Busiest · 132 a day</span></div>') && !s16.includes("rs-go"), s16.slice(0, 300));
@@ -176,8 +176,8 @@ for (let m = 1; m <= 60; m++) {
     ok("⭐ the table (run): a figure is a button that moves the map; the map's month is framed and named current; the busiest is bold",
        tm.includes('<button type="button" class="rs-cell rs-now rs-peak" data-k="c16" onclick="rsGoMonth(16)" aria-current="true" aria-label="Apr 2027: 132 lorry movements a day">132</button>')
        && tm.includes('<button type="button" class="rs-cell" data-k="c9" onclick="rsGoMonth(9)" aria-label="Sep 2026: 5 lorry movements a day">5</button>') && (tm.match(/<button/g) || []).length === 16);
-    ok("⭐ the table in tonnes (run): the last column is the year's total: 10,100 and 123,400 (133,500 in all)",
-       tt.includes('<th scope="col">Year</th></tr>') && cells(tt).filter((x, i) => i === 12 || i === 25).join("|") === "10,100|123,400" && tt.includes('aria-label="Apr 2027: 42,000 t">42,000</button>'));
+    ok("⭐ the table in tonnes (run): the last column is headed 'Total' (one 'Year' heading, the first): 10,100 and 123,400 (133,500 in all)",
+       tt.includes('<th scope="col">Total</th></tr>') && (tt.match(/>Year</g) || []).length === 1 && cells(tt).filter((x, i) => i === 12 || i === 25).join("|") === "10,100|123,400" && tt.includes('aria-label="Apr 2027: 42,000 t">42,000</button>'));
 
     // the phone, Copy
     ok("⭐ the phone's button (run): 'Busiest month: Apr 2027 · 132 a day' goes to month 16; on that month it rests as 'Busiest month: Apr 2027 (this month)'",
@@ -227,8 +227,11 @@ for (let m = 1; m <= 60; m++) {
   ok("⭐ the strip: the story and the months side by side; the panel's own padding is 10 px so the story fits 169 px without scrolling",
      /\.rs-two\{ display:grid; grid-template-columns:minmax\(0, 484px\) minmax\(0, 1fr\); gap:22px; \}/.test(html) && css("#drawer-analysis").includes("padding:10px 16px;")
      && html.includes("@media (max-height:680px){ .rs-plot{ height:80px; }"));
-  ok("⭐ a long route name stays on one line (cut with its full words in a tip), the four figures stay on one line, and the pale bars are 3:1 against the panel (#6690E3 on white)",
-     css(".rs-title span").includes("text-overflow:ellipsis;") && css(".rs-figs").includes("display:flex;") && !css(".rs-figs").includes("wrap") && css(".rs-col i").includes("background:#6690E3;"));
+  ok("⭐ a place name is NEVER cut on 'This route': the number and team drop to the line below when the two do not fit, then the name wraps; if the strip is then full the description line gives way",
+     css(".rs-title").includes("flex-wrap:wrap;") && !/ellipsis|nowrap|overflow:hidden/.test(css(".rs-title span")) && css(".rs-title small").includes("white-space:nowrap;")
+     && html.includes("if (box.scrollHeight > box.clientHeight + 1) { const d = box.querySelector('.rs-desc'); if (d) d.hidden = true; }"));
+  ok("⭐ the four figures stay on one line, and the pale bars are 3:1 against the panel (#6690E3 on white)",
+     css(".rs-figs").includes("display:flex;") && !css(".rs-figs").includes("wrap") && css(".rs-col i").includes("background:#6690E3;"));
   ok("⭐ after the busiest-month button has done its job (it is no longer a button on that month) the keyboard is on the months, not lost",
      html.includes("|| (held === 'go' ? document.getElementById('rs-range') : null);"));
   ok("⭐ the slider is kept out of sight for the keyboard, as the timeline's is, and the bars show the focus",
