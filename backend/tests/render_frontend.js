@@ -654,7 +654,7 @@ if (loaded) {
       // 16 Oct 2026 (S3): the busiest hour, as GET /api/gates/arrivals sends it (sim.py's average working day). Injected into
       // the fixture here: test_gate_arrivals.py writes the module's reply, and the busiest hour is added by the endpoint.
       // NARROWED 17 Oct 2026 (the review): the injected note in the server's current words (the stood-in words are gone)
-      const GAB = { ...GA, busiest_note: "Busiest hour: the lorries arriving in the busiest clock hour of an average working day, 312 whole loads spread evenly over each gate's open hours (08:00–17:00 where none are typed). No pour.",
+      const GAB = { ...GA, busiest_loads: 312, busiest_detail: "Whole loads, spread evenly over open hours (08:00–17:00 where none are typed).", busiest_note: "Busiest hour: the lorries arriving in the busiest clock hour of an average working day, 312 whole loads spread evenly over each gate's open hours (08:00–17:00 where none are typed). No pour.",
         gates: GA.gates.map((g, i) => ({ ...g, busiest_hour: i === 0 ? { lorries: 26, hour: "07:00", hours: ["07:00", "09:00", "12:00"], per_hour: 30.0 }
                                                        : i === 1 ? { lorries: 1, hour: "16:00", hours: ["16:00"], per_hour: null } : null })) };
       const bP = gaSeg(render("the Dashboard renders gate arrivals with the busiest hour", h(Dashboard, { meta: ctMeta, initialData: cl, initialTarget: CT, initialGates: GAB, onOpen(){} })));
@@ -662,7 +662,7 @@ if (loaded) {
         bP.includes('data-ga-busy="26">26 at 07:00<') && bP.includes('data-ga-busy="1">1 at 16:00<') && bP.includes('data-ga-busy="0">—<')
         && bP.includes("26 lorries arriving in the busiest clock hour (07:00 and 2 more hours) of an average working day. The gate can check in 30.0 an hour.")
         && bP.includes("1 lorry arriving in the busiest clock hour (16:00) of an average working day. No check-in time typed, so nothing is compared.")
-        && (bP.match(/<dt>Busiest hour<\/dt>/g) || []).length === 2 && bP.includes('data-ga-busy-note="1">Busiest hour: the lorries arriving in the busiest clock hour')
+        && (bP.match(/<dt>Busiest hour<\/dt>/g) || []).length === 2 && bP.includes('data-ga-busy-note="1">Busiest hour · 312 loads a day') && !bP.includes("the lorries arriving in the busiest clock hour of an average working day, 312") // NARROWED 10 Nov 2026 (U5): a few words, the specifics in the box
         && bP.includes(">Busiest hour</th>") && !/undefined|NaN|IPT ?\d/.test(bP));
       // 17 Oct 2026 (the review): a gate WITH shut times, and one left no open time — drawn, not only read in the source
       const GAS = { ...GA, gates: GA.gates.map((g, i) => i === 0 ? { ...g, shut_windows: [{ from: "12:00", to: "12:30" }], shut_minutes: 30, shut_words: "12:00–12:30" }

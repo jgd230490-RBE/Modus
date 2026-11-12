@@ -1615,6 +1615,13 @@ const INFO = {
   "dash.tkm": { title: "Tonne-distance", text: "Tonnes × the route's distance, on routed lines: the usual measure of freight work.", tech: "t1-carbon" },
   "dash.peak_month": { title: "Peak month", text: "The month with the most planned tonnes in view." },
   "dash.target": { title: "Carbon target", text: "The scheme's carbon target and where the approved plan stands against it, with and without the agreed Carbon planner decisions. This figure is all-in: materials and transport.", guide: "6-5-reading-the-carbon-target", tech: "t1-carbon" },
+  // 10 Nov 2026 (ui-fix-long-sentences): the sentences that were over 25 words, now a few words and a box of at most 30
+  "dash.busiest": { title: "Busiest hour", text: "Busiest clock hour, average working day. No pour.", guide: "ug-gate-busiest" },
+  "submit.siblings": { title: "Other lines on this route", text: "Different disciplines can share a route. Check that the same loads are not entered twice.", guide: "ug-submit-siblings" },
+  "routes.legs": { title: "Legs of a route", text: "A route is a loaded leg out and an empty leg back. Open a row for its cycle figures.", guide: "ug-routes-legs" },
+  "cfg.veh.english": { title: "English name", text: "The name every screen shows for this vehicle.", guide: "ug-config-vehicles" },
+  "cfg.veh.minutes": { title: "Load and unload minutes", text: "Left blank, a vehicle uses the Planning defaults, shown in grey.", guide: "ug-config-vehicles" },
+  "cfg.veh.euro": { title: "Euro class", text: "What hauliers are assumed to send. Used by the CLP charts only; it changes no carbon figure.", guide: "ug-config-vehicles" },
   "dash.gates": { title: "Gate arrivals", text: "Lorries a day at each gate in the month, every team together, against what the gate can check in. Amber, Queue likely, from 85 % of that; red, Over gate capacity, past it.",
     how: "Loaded lorries count at the delivery site's gate, empty ones at the loading site's. Capacity = open minutes (less shut times and peak bands) ÷ check-in minutes a lorry. Averages, no peak hour.", guide: "3-1-filters-and-the-six-cards", tech: "t1-gates" },
   // 14 Oct 2026 (bundle G, W7): the CLP monitoring section
@@ -1695,7 +1702,7 @@ const GUIDE_URL = (a) => "/help/" + (a ? "#" + a : "");
 const TECH_URL = (a) => "/help/technical/" + (a ? "#" + a : "");
 // one info box open at a time: opening one closes the last
 let INFO_OPEN = null;
-function InfoTip({ id, label, value }){
+function InfoTip({ id, label, value, guide }){
   const e = INFO[id];
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState(null);
@@ -1749,7 +1756,7 @@ function InfoTip({ id, label, value }){
       {vals.map((v, i) => <p key={i} className="info-val">{v}</p>)}
       {e.how && <details><summary>How it is worked out</summary><p style={{ marginTop: 6 }}>{e.how}</p></details>}
       {e.source && <div className="info-src">Source: {e.source}</div>}
-      {e.guide && <a href={GUIDE_URL(e.guide)} target="_blank" rel="noopener noreferrer">Read more in the user guide →</a>}
+      {(guide || e.guide) && <a href={GUIDE_URL(guide || e.guide)} target="_blank" rel="noopener noreferrer">Read more in the user guide →</a>}
       {e.tech && <a href={TECH_URL(e.tech)} target="_blank" rel="noopener noreferrer">Technical detail →</a>}
     </div>
   );
@@ -2460,7 +2467,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOp
       {(ga.notes || []).map((n, i) => <div key={i} className="ct-note">{n}</div>)}
       {/* 28 Oct 2026 (simulation v2): a gate closed for a period that no route names has its own line */}
       {(ga.closed_gates || []).filter(c => !(ga.notes || []).some(n => n.includes(c.gate_name))).map(c => <div key={c.gate_id} className="ct-note" data-ga-closed={c.gate_id}>{c.location_name}, {c.gate_name} {c.closed_words}{c.to_gate_name ? `: in and out by ${c.to_gate_name}` : ""}.</div>)}
-      {ga.busiest_note && <div className="ct-note" data-ga-busy-note="1">{ga.busiest_note}</div>}
+      {ga.busiest_note && <div className="ct-note" data-ga-busy-note="1">Busiest hour{ga.busiest_loads != null ? ` · ${grp(ga.busiest_loads)} loads a day` : ""}<InfoTip id="dash.busiest" value={ga.busiest_detail} /></div>}
     </section>
   );
 }
@@ -7699,8 +7706,7 @@ function UsersPage({ access }){
         subtitle={`Who can sign in, and as which ${TEAM().toLowerCase()} or role.`} />
       {data && data.codes && (
         <div className="card p-4 mb-4 text-sm" role="note" style={{ borderColor: "var(--gold)" }}>
-          <b>The shared codes still work on this site.</b> Anyone with a {TEAM().toLowerCase()}, planner or admin code can sign in without a login of their own.
-          They can be turned off once everyone has a login.
+          <b>Shared codes are still on.</b> <a className="link-btn" href={GUIDE_URL("ug-shared-codes")} target="_blank" rel="noopener noreferrer">How to switch them off</a>
         </div>
       )}
       {err && <EmptyState kind="error" title="Couldn't open the list of logins" body={err} />}
@@ -9123,7 +9129,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-600">
             <span className="font-semibold">This route already carries {siblings.length} other forecast line{siblings.length > 1 ? "s" : ""}:</span>{" "}
             {siblings.map(s => `${s.discipline || "unassigned"}${s.section_id ? " / " + s.section_id : ""}${s.submitted_by ? " (" + teamText(s.submitted_by) + ")" : ""}`).join(" · ")}.
-            {" "}Different disciplines on one route are expected — just make sure you aren't counting the same lorries twice.
+            <InfoTip id="submit.siblings" />
           </div>
         )}
 
@@ -10101,7 +10107,7 @@ function ConfigPage({ meta, who, access }){
               <table className="tbl">
                 <thead>
                   <tr>
-                    {["Vehicle", "English", "Estonian", "Payload t", "GVW t", `kg CO₂e / ${PER_DIST()}`, "Load min", "Unload min", "Euro class", "Planning"].filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}</th>)}
+                    {["Vehicle", "English", "Estonian", "Payload t", "GVW t", `kg CO₂e / ${PER_DIST()}`, "Load min", "Unload min", "Euro class", "Planning"].filter(h => (h !== "Estonian" || vehLangEditable("ee")) && !(ro && h === "English")).map(h => <th key={h} scope="col" className={/t$|km$|min$/.test(h) ? "num" : ""}>{h}{h === "English" && <InfoTip id="cfg.veh.english" />}{(h === "Load min" || h === "Unload min") && <InfoTip id="cfg.veh.minutes" />}{h === "Euro class" && <InfoTip id="cfg.veh.euro" />}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -10133,9 +10139,6 @@ function ConfigPage({ meta, who, access }){
                   ); })}
                 </tbody>
               </table>
-              <p className="px-6 py-3 text-[13px] text-slate-500 border-t border-slate-100">
-                The English name is what every screen shows. Blank load or unload minutes use the Planning defaults. Euro class: what the plan assumes hauliers send, for the CLP charts only; it changes no carbon figure.
-              </p>
             </div>
           )}
 
@@ -19091,8 +19094,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               </span>
             </div>
             <p className="text-[13px] text-slate-400 mt-1">
-              Each route has a laden leg out and an empty leg back. Green vehicle chip: both worked out;{" "}
-              <span className="font-semibold">amber ↦</span>: outbound only, no cycle time yet. Open a row (▶) for the cycle figures.
+              Green chip: both legs. <span className="font-semibold">Amber ↦</span>: out only.<InfoTip id="routes.legs" />
             </p>
             <p className="text-[13px] text-slate-400 mt-1">Tip: switch the basemap to {String(TENANT.country || "").toUpperCase() === "GB" ? "Aerial" : String(TENANT.country || "").toUpperCase() === "EE" ? "Satellite or Estonia aerial photo" : "Satellite"} to see routes sit exactly on the roads.</p>
           </div>

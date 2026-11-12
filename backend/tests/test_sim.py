@@ -743,6 +743,9 @@ ok("the panel's note says where the busiest hour comes from (the default gate ho
    "Busiest hour" in GA["busiest_note"] and "(08:00–17:00 where none are typed)" in GA["busiest_note"]
    and "stood in" not in GA["busiest_note"] and "No pour" in GA["busiest_note"]
    and "312 whole loads" in GA["busiest_note"], GA["busiest_note"])
+ok("the panel also sends the specifics for the screen's i box (U5, 10 Nov 2026): whole loads, the default hours, the loads count",
+   GA.get("busiest_detail", "").startswith("Whole loads, spread evenly over open hours") and "(08:00–17:00 where none are typed)" in GA["busiest_detail"]
+   and GA["busiest_loads"] == 312 and len(GA["busiest_detail"].split()) <= 24, str(GA.get("busiest_detail")))
 ok("the panel's own figures are untouched by the busiest hour",
    {g["gate_id"]: g["arrivals_per_day"] for g in GA["gates"]} == EX_PANEL)
 _ga_mod = gate_arrivals.arrivals(9, acc_planner, factors=factors, working_days=WD)
