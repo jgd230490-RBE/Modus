@@ -820,6 +820,44 @@ def _tl_value(v, limit):
     return _whole(v)
 
 
+def _tl_split(v, limit, inn, out):
+    """
+    12 Nov 2026 (found on live after batch 6: "32 (18 in, 15 out)"). The "(x in, y out)" after a limit's figure, in the
+    figure's own precision, ADDING UP to the figure as printed: the printed whole (or tenth, when `_tl_value` keeps one
+    decimal) is shared between in and out by the larger remainder (17.6 in + 14.6 out = 32.2 reads "32 (17 in, 15 out)"
+    or "(18 in, 14 out)", never 18 + 15). Only when in + out IS the figure (an average limit); a busiest-day figure is
+    not their sum, so each is rounded on its own as before.
+    """
+    v, inn, out = float(v or 0), float(inn or 0), float(out or 0)
+    if abs((inn + out) - v) > 0.05:
+        return f"({_whole(inn)} in, {_whole(out)} out)"
+    shown = _tl_value(v, limit)
+    tenth = "." in shown
+    k = 10 if tenth else 1
+    total = int(round(float(shown.replace(",", "")) * k))     # the figure exactly as printed, in whole units
+    a, b = inn * k, out * k
+    fa, fb = int(a), int(b)
+    left = total - fa - fb
+    big_a = (a - fa) >= (b - fb)       # the larger remainder takes the first unit (in first on a tie)
+    while left > 0:
+        if big_a:
+            fa += 1
+        else:
+            fb += 1
+        big_a, left = not big_a, left - 1
+    while left < 0:                    # the printed figure rounded below both floors: take from the side over it most
+        if fb > 0 and (fb - b >= fa - a or fa == 0):
+            fb -= 1
+        elif fa > 0:
+            fa -= 1
+        else:
+            break
+        left += 1
+    if tenth:
+        return f"({fa / 10:,.1f} in, {fb / 10:,.1f} out)"
+    return f"({fa:,} in, {fb:,} out)"
+
+
 def traffic_month(mi):
     """
     9 Nov 2026 (v2.1 task 2.1-1, Q10): "Traffic limits on local roads" — the limits ticked public, this month's figure
@@ -846,7 +884,8 @@ def traffic_month(mi):
         unit = "movements" if mv else "visits"
         rows.append({"name": L["name"], "state_key": state, "zone_id": L["id"],
                      # whole movements, half up (round() is half-even: x.5 goes to the even whole, and the in / out split misread)
-                     "figure": _tl_value(m["value"], lim["value"]) + (f" ({_whole(m['in_per_day'])} in, {_whole(m['out_per_day'])} out)"
+                     # 12 Nov 2026: the in / out split adds up to the figure as printed (`_tl_split`)
+                     "figure": _tl_value(m["value"], lim["value"]) + (" " + _tl_split(m["value"], lim["value"], m["in_per_day"], m["out_per_day"])
                                                      if mv else f" {unit}"),
                      "limit": f"{n0(lim['value'])} {unit} a day" + (" (busiest day)" if lim["basis"] == "busiest_day" else ""),
                      "state": TRAFFIC_STATE.get(state, "Average only"),

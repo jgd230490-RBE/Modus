@@ -499,6 +499,31 @@ import bulletin_doc as _BDt
 ok("6d. bulletin: 5.33 against 5 reads 5.3; 4.6 against 5 reads 4.6; 22.4 against 21 reads 22; 5 against 5 reads 5",
    _BDt._tl_value(5.33, 5) == "5.3" and _BDt._tl_value(4.6, 5) == "4.6" and _BDt._tl_value(22.4, 21) == "22" and _BDt._tl_value(5, 5) == "5")
 
+# seen on live 12 Nov 2026 (the B6047 row of the Nov 2026 bulletin): "32 (18 in, 15 out)" — the halves rounded apart
+ok("6e. bulletin: 17.6 in + 14.6 out = 32.2 against 150 reads (18 in, 14 out): adds up to the 32 printed, never 18 + 15",
+   _BDt._tl_value(32.2, 150) == "32" and _BDt._tl_split(32.2, 150, 17.6, 14.6) == "(18 in, 14 out)",
+   _BDt._tl_split(32.2, 150, 17.6, 14.6))
+ok("6f. bulletin: a figure kept to one decimal splits in tenths that add up (5.3 against 5: 2.66 + 2.64 = 2.7 + 2.6)",
+   _BDt._tl_split(5.3, 5, 2.66, 2.64) == "(2.7 in, 2.6 out)", _BDt._tl_split(5.3, 5, 2.66, 2.64))
+ok("6g. bulletin: a busiest-day figure (not in + out) keeps each half rounded on its own",
+   _BDt._tl_split(40.0, 50, 17.6, 14.6) == "(18 in, 15 out)", _BDt._tl_split(40.0, 50, 17.6, 14.6))
+_bad = []
+for _i in range(0, 400):
+    for _o in (0.0, 0.25, 0.5, 0.49, 3.75, 14.6, 61.95):
+        _a = _i * 0.37
+        _v = round(_a + _o, 2)
+        for _lim in (150, int(_v + 0.5), 5):
+            _f, _s = _BDt._tl_value(_v, _lim), _BDt._tl_split(_v, _lim, _a, _o)
+            _p = _s.strip("()").replace(",", "").split(" in ")
+            _x, _y = float(_p[0]), float(_p[1].replace(" out", ""))
+            if abs(_x + _y - float(_f.replace(",", ""))) > 1e-6 or _x < 0 or _y < 0 or abs(_x - _a) > 1 or abs(_y - _o) > 1:
+                _bad.append((_v, _lim, _a, _o, _f, _s))
+ok("6h. bulletin: on 8,400 figures the printed in + out IS the printed figure, neither half below 0 or more than 1 off its value",
+   not _bad, str(_bad[:3]))
+_BD_SRC = read("backend/bulletin_doc.py")
+ok("6i. bulletin: traffic_month no longer rounds in and out apart",
+   "{_whole(m['in_per_day'])} in, {_whole(m['out_per_day'])} out" not in _BD_SRC and "_tl_split(m[\"value\"]" in _BD_SRC)
+
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)
