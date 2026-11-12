@@ -705,7 +705,8 @@ ok("🔴 every fitBounds in the app is inside a try (30 Sep: a NaN bounds on the
    # NARROWED 31 Oct 2026 (task 4c PR 1): eight, the Site layout card frames a drawing brought in and its fitted place
    # NARROWED 31 Oct 2026 (task 4c PR 2): 8 -> 9 — the drawing tools go to the phase's drawing once, on open
    # NARROWED 31 Oct 2026 (task 4c PR 3): 9 -> 10 — a pinned picture's "Fit to screen" (fitPic)
-   len(_fits) == 10 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
+   # NARROWED 12 Nov 2026 (CLOCS card C-X1): 10 -> 11 — a Locations row click frames a site's layout (SiteLayoutCard)
+   len(_fits) == 11 and all("try {" in fe[max(0, i - 60):i] for i in _fits)
    and "try { m.fitBounds(b, { padding: 40, maxZoom: 12, duration: 0 }); store.framed = true; } catch(e){}" in fe, str([fe[max(0, i - 60):i] for i in _fits if "try {" not in fe[max(0, i - 60):i]])[:200])
 # --- 5 Oct 2026: Appearance (Ink / Light / Dark) ------------------------------------------
 _PAL = re.compile(r'(?:(?:hover|focus|disabled|group-hover|sm|md|lg):)?(?:bg|text|border|divide|ring|placeholder)-(?:white|black|transparent|current|\[color:[^\]]+\]|\[#[0-9a-fA-F]{3,8}\]|\[rgba?\([^\]]+\)\]|(?:slate|gray|red|amber|blue|emerald|green)-\d{2,3})(?:/\d{1,3})?')
@@ -1093,7 +1094,8 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    # NARROWED 10 Nov 2026 (wave 2, card 13, decision 4): navy 27 -> 2 and a new kind, action (25): every primary action
    # moved to the accent; the two navy fills left are the Submit strip (a card, not a button) and the drawing palette's
    # picked tool (a selection); the tabs and the picked stockpile / year / page are .ws-tab tints with no text-white
-   len(_sites.get("action", [])) == 23 and ".text-white[style*=\"var(--action)\"]{color:var(--action-fg);}" in fe
+   # NARROWED 11 Nov 2026 (CLOCS card C-F6): action 23 -> 24, the site layout's "Show it" (the public tick asks first)
+   len(_sites.get("action", [])) == 24 and ".text-white[style*=\"var(--action)\"]{color:var(--action-fg);}" in fe
    and len(_sites.get("navy", [])) == 2 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
    and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
@@ -1404,7 +1406,8 @@ ok("UI fix 6 card 2: the Account headings are --muted on --surface-2 — 4.56:1 
    all(_cr(_eff(a, l)["muted"], _eff(a, l)["surface-2"]) >= 4.5 for a in _ACC for l in ("ink", "light", "dark"))
    and round(_cr("#64748B", "#FAFAF9"), 2) == 4.56 and round(_cr("#9AA1AB", "#1B1D21"), 2) == 6.48
    and round(_cr("#FFFFFF", "#C2410C"), 2) == 5.18 and round(_cr("#FFFFFF", "#2563EB"), 2) == 5.17
-   and ".la-acct-head th{background:var(--surface-2);color:var(--muted);font-size:13px;" in fe and 'className="btn-pri btn-sm disabled:opacity-40"' in fe)
+   # NARROWED 11 Nov 2026 (D-F4, John's yes): "Add to this week" is an outline button now (btn-sec), not the accent fill
+   and ".la-acct-head th{background:var(--surface-2);color:var(--muted);font-size:13px;" in fe and 'className="btn-sec btn-sm disabled:opacity-40"' in fe)
 ok("UI fix 6 card 5: the big screen's '+ N more lines today' line is --muted on the card — 4.76:1 (Ink and Light), 6.25:1 (Dark), 4.5 or better in all 12",
    all(_cr(_eff(a, l)["muted"], _eff(a, l)["surface"]) >= 4.5 for a in _ACC for l in ("ink", "light", "dark"))
    and round(_cr("#64748B", "#FFFFFF"), 2) == 4.76 and round(_cr("#9AA1AB", "#1F2024"), 2) == 6.25

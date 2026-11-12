@@ -35,18 +35,21 @@
    "months": [
     {
      "month_index": 10,
-     "label": "Oct 2026 (to 11 Oct)",
-     "planned_t": 5480.0,
+     "label": "Oct 2026 (part)",
+     "planned_t": 2192.0,
      "recorded_t": 2000.0,
-     "recorded_pct": 36,
+     "recorded_pct": 91,
      "lines_reported": 2,
-     "part_to": "2026-10-11"
+     "part_to": "2026-10-11",
+     "planned_month_t": 5480.0,
+     "planned_to_week": "2026-10-05"
     }
    ],
    "recorded_to": "2026-10-11",
-   "headline": "Oct 2026: 2 000 t recorded, 36 % of the 5 480 t planned · recorded to 11 Oct",
+   "recorded_week": "2026-10-05",
+   "headline": "Oct 2026: 2,000 t recorded, 91 % of the 2,192 t planned · recorded to the week of 5 Oct",
    "subtitle": "tonnes a month",
-   "basis": "Planned: the approved plan's tonnes. Recorded: tonnes typed on Account (a week's actual), as the Dashboard's Delivered against plan. A month with nothing typed is not recorded, not zero. The months up to the one picked.",
+   "basis": "Planned: the approved plan's tonnes. Recorded: tonnes typed on Account (a week's actual), as the Dashboard's Delivered against plan. A month with nothing typed is not recorded, not zero. A part month is set against the plan of the same weeks. The months up to the one picked.",
    "source": "Wayscope: the approved plan; the tonnes typed on Account"
   },
   "route_caps": {
@@ -443,6 +446,6 @@
  "scope": "scheme",
  "scope_line": "Every team's approved lines.",
  "limit": "Planned figures, not observed: Wayscope holds no gate log or arrival times.",
- "recorded_line": "Recorded tonnes as typed on Account, to 11 Oct 2026.",
+ "recorded_line": "Recorded tonnes as typed on Account, weeks to 5 Oct 2026.",
  "demo_notice": null
 }

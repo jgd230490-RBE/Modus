@@ -432,6 +432,37 @@ def arrivals(month_index, acc, factors=None, working_days=None):
     }
 
 
+QUEUE_FIELDS = ("gate_id", "gate_name", "location_id", "location_name", "capacity_pct", "flag")
+
+
+def queue_months(acc, factors=None, working_days=None, month_count=None):
+    """
+    11 Nov 2026 (CLOCS idea C-I1, John's yes): the months of the programme in which a gate is at the 85 % step or over
+    (amber "Queue likely" or red "Over gate capacity"), so the Dashboard's Gate arrivals can say where the next queue is
+    when the month on screen has none. Each month is arrivals()' own reply, so the flags cannot disagree with the panel;
+    only months with an approved line are read. {"near_pct", "months": [{"month", "label", "gates": [the flagged gates,
+    red first, then fullest first, QUEUE_FIELDS only]}]}. The caller keeps it until the next write (main._staff_json).
+    """
+    factors = factors or conversions.load_factors()
+    wd = _positive(working_days, _working_days(factors))
+    tenant_id = db.current_tenant()
+    have = sorted({int(r["month_index"]) for r in db.query(
+        "SELECT DISTINCT month_index FROM forecasts WHERE tenant_id = ? AND status = 'Approved'", (tenant_id,))})
+    out = []
+    with db.select_memo():                       # the same routes / locations / gates reads, once for every month
+        reads = {m: arrivals(m, acc, factors=factors, working_days=wd) for m in have
+                 if m >= 1 and not (month_count and m > int(month_count))}
+    for m in sorted(reads):
+        a = reads[m]
+        flagged = [g for g in a.get("gates") or [] if g.get("flag") in ("red", "amber")]
+        if not flagged:
+            continue
+        flagged.sort(key=lambda g: (g.get("flag") != "red", -(g.get("capacity_pct") or 0), g.get("location_name") or ""))
+        out.append({"month": m, "label": a.get("label") or month_label(m),
+                    "gates": [{k: g.get(k) for k in QUEUE_FIELDS} for g in flagged]})
+    return {"near_pct": gate_hours.NEAR_PCT, "months": out}
+
+
 def location_visits(month_index, factors=None, working_days=None):
     """
     14 Oct 2026 (bundle G, the CLP section's chart 1b): lorry VISITS a day at each LOCATION in a month —

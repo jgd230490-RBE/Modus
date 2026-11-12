@@ -209,6 +209,15 @@ def _week_title(page):
     return f"week of {d.day} {d.strftime('%b %Y')}"
 
 
+def _vehicle_name(c):
+    """11 Nov 2026 (CLOCS card C-F2, the mother session's word): the lorry's NAME on every sheet and file this module
+    prints ("Artic Tipper (44t)", conversions.vehicle_label), as the Day sheet, the Driver sheet and the Lorry plan do;
+    the chips' short form ("Tipper (44t)") dropped the Artic. A line with no key keeps its short form."""
+    if c.get("vehicle_type"):
+        return conversions.vehicle_label(conversions.load_factors(), c.get("vehicle_type"))
+    return c.get("vehicle_short") or ""
+
+
 def _is_weekday(iso):
     return datetime.date.fromisoformat(iso).weekday() <= 4
 
@@ -228,7 +237,7 @@ def _line_rows(page, weekdays_only=True):
                 "date": d["day_date"], "origin": c.get("origin_name") or c.get("origin_id"),
                 "dest": c.get("dest_name") or c.get("dest_id"), "ipt": _team(c.get("ipt")) or "",
                 "ws": c.get("section_id") or "", "discipline": c.get("discipline") or "",
-                "material": c.get("material_type") or "", "vehicle": c.get("vehicle_short") or conversions.vehicle_word_rule(c.get("vehicle_type")) or "",
+                "material": c.get("material_type") or "", "vehicle": _vehicle_name(c),
                 "qty": d.get("planned_qty"), "unit": c.get("unit"),
                 "tonnes": f.get("tonnes"), "trips": f.get("trips"), "veh": f.get("vehicles"),
                 "km_trip": _dist(c.get("km_trip")), "km_day": _dist(f.get("km_day")), "tonne_km": _dist(f.get("tonne_km")),
@@ -823,7 +832,7 @@ def build_pdf(page):
                P(f"<b>{E(r['dest'])}</b><br/><font size=6.5 color='#64748B'>{_coord(d.get('lat'), d.get('lon'))}</font>", st),
                P(f"{E(_nm_rows(c.get('ipt')) or '—')}<br/>{E(c.get('section_id') or '')}", st),
                P(E(c.get("material_type") or "—"), st),
-               P(f"{E(c.get('vehicle_short') or conversions.vehicle_word_rule(c.get('vehicle_type')) or '—')}"
+               P(f"{E(_vehicle_name(c) or '—')}"
                  + ("" if c.get("baked") else "<br/><font size=6 color='#B45309'>not baked</font>"), st)]
         for iso in dates:
             x = by_date.get(iso)
@@ -1002,7 +1011,9 @@ def day_sheet_rows(page, day):
             "dest": c.get("dest_name") or c.get("dest_id") or "—",
             "team": name(c.get("ipt")) or "No team", "section": c.get("section_id") or "",
             "material": c.get("material_type") or "—",
-            "vehicle": c.get("vehicle_short") or conversions.vehicle_word_rule(c.get("vehicle_type")) or "—",
+            # 11 Nov 2026 (CLOCS card C-F2): the vehicle's NAME, as the Driver sheet, the Lorry plan and the Look-ahead's
+            # flags print it ("Artic Tipper (44t)"); the chips' short form ("Tipper (44t)") dropped the Artic
+            "vehicle": _vehicle_name(c) or "—",
             "qty": d.get("planned_qty"), "unit": l.get("unit") or c.get("unit") or "",
             "typed": d.get("status") == "edited",
             "tonnes": f.get("tonnes"), "loads": f.get("trips") or 0,
@@ -1046,7 +1057,36 @@ def day_sheet_totals(rows):
     return {"lines": len(rows), "tonnes": sum(r["tonnes"] or 0 for r in rows), "loads": sum(r["loads"] for r in rows),
             "lorries": sum(r["lorries"] or 0 for r in routed) if routed else None, "routed": len(routed),
             "flagged": sum(1 for r in rows if r["flag"]),
-            "confirmed": bool(rows) and all(r["week_status"] == "confirmed" for r in rows)}
+            "confirmed": bool(rows) and all(r["week_status"] == "confirmed" for r in rows),
+            # 11 Nov 2026 (CLOCS card C-F2): how many of the day's lines are confirmed, for "18 of 22 lines confirmed"
+            "n_confirmed": sum(1 for r in rows if r["week_status"] == "confirmed")}
+
+
+#: 11 Nov 2026 (CLOCS card C-F2): the Day sheet's corner for a part-confirmed day, in the screens' amber text grade
+WARN_TEXT_RGB = (0xB4 / 255, 0x53 / 255, 0x09 / 255)
+
+
+def day_sheet_stamp(tot):
+    """11 Nov 2026 (CLOCS card C-F2, John's yes): the Day sheet's top-right word and its colour. "CONFIRMED" (navy) when
+    every line of the day is, "DRAFT - not confirmed" (red) when none is, else "18 of 22 lines confirmed" (amber): the
+    sheet printed DRAFT while 18 of its 22 lines were confirmed."""
+    n, k = tot.get("lines") or 0, tot.get("n_confirmed") or 0
+    if tot.get("confirmed"):
+        return "CONFIRMED", NAVY_RGB
+    if k <= 0:
+        return "DRAFT - not confirmed", RED_RGB
+    return f"{k} of {n} lines confirmed", WARN_TEXT_RGB
+
+
+def day_sheet_not_confirmed_words(tot):
+    """The closing sentence's part about confirmation (C-F2): the whole week, none, or how many lines can still change."""
+    n, k = tot.get("lines") or 0, tot.get("n_confirmed") or 0
+    if tot.get("confirmed"):
+        return "This week is confirmed. "
+    if k <= 0:
+        return "This week is not confirmed yet: the plan can still change. "
+    left = n - k
+    return f"{left} line{' is' if left == 1 else 's are'} not confirmed yet: {'it' if left == 1 else 'they'} can still change. "
 
 
 def build_day_sheet_pdf(page, day):
@@ -1071,8 +1111,7 @@ def build_day_sheet_pdf(page, day):
     title = f"{_tenant_name()} · day sheet · {d:%a} {d.day} {d:%b %Y}"
     on_page = page_frame(W, H, lm, rm, _pdf_safe(title), rule_y=H - 9 * mm, title_font=("Helvetica-Bold", 13),
                          title_y=H - 15 * mm,
-                         right=("CONFIRMED" if tot["confirmed"] else "DRAFT - not confirmed", "Helvetica-Bold", 9,
-                                NAVY_RGB if tot["confirmed"] else RED_RGB),
+                         right=(day_sheet_stamp(tot)[0], "Helvetica-Bold", 9, day_sheet_stamp(tot)[1]),
                          sub=("Day sheet · not a delivery note · planning payloads, not plated", "Helvetica", 8, GREY,
                               H - 19.5 * mm),
                          notice=((_pdf_safe(_demo_notice()), "Helvetica-Bold", 8.5, DEMO_FG_RGB, H - 24.5 * mm)
@@ -1208,12 +1247,16 @@ def build_day_sheet_pdf(page, day):
         fl.append(P(E(GATE_LIMIT), st_grey))
     story.append(KeepTogether(fl))
     story.append(Spacer(1, 2 * mm))
+    # 11 Nov 2026 (CLOCS card C-F1): the limit sentences name no supplier now; the credit goes at the sheet's foot
+    import limits as _limits
+    _lim_credit = _limits.credit_for(sorted({r["route_id"] for r in rows if "LIMIT" in r["codes"]}))
 
     story.append(P("Loads are loaded trips: each is one delivery, there and back. Lorries are the vehicles the day "
                    "needs from each route's worked-out cycle (none where the route is not worked out yet). † = typed by hand. "
                    "Planning figures, not plated weights. Road restrictions are the stored check, not re-read for this sheet. "
-                   + ("This week is confirmed. " if tot["confirmed"] else "This week is not confirmed yet: the plan can still change. ")
-                   + "Made from the Look-ahead on " + datetime.date.today().isoformat() + ".", st_grey))
+                   + day_sheet_not_confirmed_words(tot)
+                   + "Made from the Look-ahead on " + datetime.date.today().isoformat() + "."
+                   + (" " + E(_lim_credit) if _lim_credit else ""), st_grey))
     doc.build(story)
     return buf.getvalue()
 
@@ -3459,6 +3502,12 @@ def build_route_sheet_pdf(S):
         foot.append("Map " + basemap.credit() + ".")
     if (S.get("community") or {}).get("credit"):
         foot.append(S["community"]["credit"])
+    # 11 Nov 2026 (CLOCS card C-F1): the limit lines name no supplier now; their credit goes here
+    if S.get("limits_lines"):
+        import limits as _limits
+        _lc = _limits.credit_for([S.get("route_id")])
+        if _lc:
+            foot.append(_lc)
     fy = m + footer_h - 8
     for ln in _wrap(" ".join(foot), R, 6.8, cw)[:3]:
         c.setFillColorRGB(*GREY); c.setFont(R, 6.8); c.drawString(m, fy, ln)

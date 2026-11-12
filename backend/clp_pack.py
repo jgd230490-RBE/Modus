@@ -46,12 +46,19 @@ def _txt(s, fallback):
     return s
 
 
+def _week_words(iso):
+    """D-I4 (11 Nov 2026): "9 Nov" from a week's Monday, for the part month's planned cell."""
+    import datetime as _d
+    d = _d.date.fromisoformat(iso)
+    return f"{d.day} {('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')[d.month - 1]}"
+
+
 def _n(x, dp=1):
     if x is None:
         return "—"
     v = round(float(x), dp)
-    s = f"{v:,.{dp}f}" if dp else f"{int(round(v)):,}"
-    return s.replace(",", " ")
+    # 11 Nov 2026 (D-F1 / 7b, John's yes): thousands with a comma, as every other screen and export since PR #246
+    return f"{v:,.{dp}f}" if dp else f"{int(round(v)):,}"
 
 
 def nice_top(v, steps=4):
@@ -89,7 +96,7 @@ def table_of(c, M):
     dw = c.get("distance_word") or ("lorry-miles" if M.get("distance_unit") == "mi" else "lorry-km")
     if k == "recorded_tonnes":   # 11 Nov 2026 (card 4): a month nobody typed is "not recorded", never 0
         return (["Month", "Planned t", "Recorded t", "Recorded share", "Lines reported"],
-                [[m["label"], _n(m["planned_t"], 0)]
+                [[m["label"], _n(m["planned_t"], 0) + (f" to the week of {_week_words(m['planned_to_week'])}" if m.get("planned_to_week") else "")]
                  + ([_n(m["recorded_t"], 0), (f"{m['recorded_pct']} %" if m.get("recorded_pct") is not None else "—"),
                      _n(m["lines_reported"], 0)] if m.get("recorded_t") is not None else [NOT_RECORDED, "—", "—"])
                  for m in c.get("months") or []])

@@ -89,7 +89,7 @@ const mount = (C, props) => { const el = w.document.createElement("div"); w.docu
        /overflow-wrap:anywhere/.test(css(".ga-li-name")) && /height:6px/.test(css(".ga-pbar")) && /font-size:13px/.test(css(".ga-li-fig")) && /font-size:13px/.test(css(".ga-li-name small"))
        && /var\(--warn-text\)/.test(css(".ga-li-warn .ga-li-fig")) && /var\(--bad-text\)/.test(css(".ga-li-bad .ga-li-fig"))
        && /var\(--gold\)/.test(css(".ga-li-warn .ga-pbar i")) && /var\(--red\)/.test(css(".ga-li-bad .ga-pbar i")));
-    ok("PHONE GATES: the Dashboard hands its `phone` to the panel", html.includes("sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} onOpen={canApprove ? onOpen : null} />"));
+    ok("PHONE GATES: the Dashboard hands its `phone` to the panel", html.includes("sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />")   /* NARROWED 11 Nov 2026 (CLOCS idea C-I1) */);
 
     // ---- the guide strip on a phone ------------------------------------------------------------------------
     const gi = html.indexOf("const own = phone ? [] : stepsOf();");

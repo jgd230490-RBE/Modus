@@ -81,9 +81,10 @@ ok("⭐ 17: an empty Routes table says who adds the first route: a reader 'An ad
    && /\{!canEdit \? "No routes yet\. An admin adds the first one\."\s*: locs\.length < 2/.test(code));
 
 // ---------------------------------------------------------------- Locations and Zones: no id as the lead, nor anywhere
-const locTable = slice('<th className={th}>Location</th>', "{!locs.length && <tr");
+// NARROWED 11 Nov 2026 (CLOCS card C-F8): the table ends at its "Loading…" row now
+const locTable = slice('<th className={th}>Location</th>', "{!locs.length && !locsIn && <tr");
 ok("⭐ 23: Locations print no place code beside the name (no `{l.id}` in the row's cells)", !/\{l\.id\}<\/span>/.test(locTable) && locTable.includes("{l.name}</button>"));
-const zoneTable = slice("<th className={th}>Name</th><th className={th}>Kind</th>", "{!zoneList.length && <tr");
+const zoneTable = slice("<th className={th}>Name</th><th className={th}>Kind</th>", "{!zoneList.length && !zonesIn && <tr");   // NARROWED 11 Nov 2026 (C-F8)
 ok("⭐ 23: Zones open on the Name column: no ID header, no `{z.id}` cell, the first cell is the name button",
    !code.includes("<th className={th}>ID</th>") && !/<td className="px-3 py-2 font-mono text-xs text-slate-500">\{z\.id\}<\/td>/.test(zoneTable)
    && /<tr key=\{z\.id\} onClick=\{\(\) => editZone\(z\)\}[\s\S]{0,260}<td className="px-3 py-2 font-medium">\s*<button type="button" className="row-open" data-zone-open=\{z\.id\}/.test(zoneTable));
@@ -145,7 +146,8 @@ ok("⭐ 17: with lines but a filter that shows none, the Dashboard draws NO empt
    && !code.includes("Widen the month range or clear a filter"));
 ok("⭐ 17: the Gate arrivals panel names the way on: 'Pick another month, or approve a line.' with an Open Forecasts button (a planner), not 'Pick another month. Pending lines appear as a note…'",
    code.includes('"Pick another month, or approve a line."') && code.includes('data-ga-empty-go="forecasts" onClick={() => onOpen("forecasts")}>Open Forecasts')
-   && code.includes("onOpen={canApprove ? onOpen : null} />") && !code.includes("Pending lines appear as a note until they are approved"));
+   // NARROWED 11 Nov 2026 (CLOCS idea C-I1): the panel also takes the months with a queue and the sites
+   && code.includes("onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />") && !code.includes("Pending lines appear as a note until they are approved"));
 ok("...the Dashboard's first steps are not placed among the carbon-target strip or the Gate arrivals blocks (their word checks read those slices)",
    code.indexOf("function DashFirstSteps(") > code.indexOf("function AppliedChips") - 5000 && code.indexOf("function DashFirstSteps(") > code.indexOf("function GateArrivalsPanel(")
    && !slice("function CarbonTargetStrip(", "function Dashboard(").includes("DashFirstSteps"));
