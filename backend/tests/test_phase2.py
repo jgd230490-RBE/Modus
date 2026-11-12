@@ -156,6 +156,20 @@ for _v in ("IPT1_CODE", "IPT2_CODE", "IPT3_CODE", "IPT4_CODE", "IPT5_CODE", "IPT
 os.environ["ALLOW_DEMO_CODES"] = "1"
 access.set_current("planner123")
 
+# NARROWED 12 Nov 2026 (A-F7, claude/map-cold-open): the public map's three reads (map-data, forecast-matrix over the whole
+# horizon, month-kpis/months) answer kept JSON bytes now. A direct call clears the kept copy first (so it still builds, counts
+# and takes its slot as before) and reads the body back into the same dict the assertions always read.
+import read_cache  # noqa: E402
+
+
+def fresh_read(r):
+    return json.loads(r.body.decode("utf-8")) if hasattr(r, "body") else r
+
+
+def built(call):
+    read_cache.clear()
+    return fresh_read(call())
+
 PASS = 0
 FAIL = []
 
@@ -470,7 +484,7 @@ ok("an unscoped withdrawal still clears the route", unscoped["scoped_to_line"] i
 ok("route is empty after the unscoped withdrawal",
    db.query("SELECT COUNT(*) AS n FROM forecasts WHERE route_id='R-Q04-C01'")[0]["n"] == 0)
 
-pm = main.public_forecast_matrix(from_=1, to=60, unit="t")
+pm = built(lambda: main.public_forecast_matrix(from_=1, to=60, unit="t"))
 rows = [r for r in pm["routes"] if r["route_id"] == "R-Q03-C01"]
 ok("public matrix keeps disciplines as separate rows", len(rows) == 1, str(rows))
 ok("public matrix row carries discipline", rows and "discipline" in rows[0])
