@@ -1385,6 +1385,9 @@ ok("§8 (2026-10-06): the panel is opened from a pill in the bar that counts the
   && /function renderConditionsPill\(live\)/.test(code) && /over capacity/.test(code) && /route limit/.test(code));
 ok("§8 (2026-10-06): a month with a red condition opens the panel once by itself",
   /live\.some\(i => i\.lvl === 'clash'\) && !WARN\.autoOpened/.test(code));
+// 12 Nov 2026 (card A1-X1, John: "Yes, both"): ...but only at 1400 px and wider, and not after a close by hand (ui_fix_map_conditions.js)
+ok("§8 (12 Nov 2026): the by-itself open is limited by width and by a remembered close",
+  /live\.some\(i => i\.lvl === 'clash'\) && !WARN\.autoOpened && condMayOpenItself\(\)/.test(code));
 ok("§8 (2026-10-06): an over-capacity pile is ringed on the map so map and number agree",
   /id: 'cond-ring', type: 'circle'/.test(code) && /setCondRing\(live\.filter\(i => i\.kind === 's'\)\.map\(i => i\.id\)\)/.test(code));
 // 🔴 a Node's id property is `id` (network.py), not `location_id`; the first cut filtered
@@ -2895,7 +2898,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
           "coordsBounds", "selectRoute", "reducedMotion", "monthSpan", "dnum", "stopTimeline", "announceTimeline", "monthLabel", "kpiFetchMonth",
           "FORECAST_WORKING_DAYS", "META", "setRestrictionHits", "setCapBadges", "KPI",
           src.slice(a, b) + "\nreturn { WARN, renderTimelineWarnings, dismissWarning, showRestrictionHit, renderConditionsPill, capSentence, pileSentence, splitHitRowId };")(
-          document, { innerWidth: 1280, innerHeight: 800, addEventListener() {} }, function () { this.observe = () => {}; }, () => {},
+          // 12 Nov 2026 (card A1-X1): a window under 1400 px no longer opens the panel by itself, so this one is 1440 wide; the rows' words are the check here
+          document, { innerWidth: 1440, innerHeight: 800, addEventListener() {} }, function () { this.observe = () => {}; }, () => {},
           { API_BASE: "", MONTH_COUNT: 60, START_YEAR: 2026 }, () => { throw new Error("fetch must not be called"); }, a1_data, () => true, TL, map, RESTR,
           () => [0, 0, 1, 1], rid => rec.select.push(rid), () => false, monthSpan, dnum,
           reason => { rec.stops.push(reason); TL.playing = false; }, t => rec.announced.push(t), monthLabel, m => { kpiCalls++; return kpiFetch(m); },

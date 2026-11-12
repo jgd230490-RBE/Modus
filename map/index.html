@@ -8657,7 +8657,16 @@
     // first time a month with a CLASH (red) is on screen. `open` is remembered across
     // ticks so scrubbing does not slam it shut; `autoOpened` makes the auto-open happen once.
     WARN.open = false; WARN.autoOpened = false; WARN.counts = { clash: 0, warn: 0, caution: 0 }; WARN.countsMonth = null;
-    function toggleConditions() { WARN.open = !WARN.open; renderTimelineWarnings(TL.month); }
+    // 12 Nov 2026 (card A1-X1, John: "Yes, both"): two limits on the panel opening by itself. (1) A close by hand (the panel's
+    // x, or the bar's chip while it is open) is remembered for the browser session (this tab; a new tab or window is a fresh
+    // visit), so a reload or a way back to the map does not open it again; the chip opening it forgets the close. (2) Under
+    // COND_AUTO_MIN_W px it never opens by itself (it would cover 40 % of the map beside the Control Panel): the chip shows the
+    // count and one click opens it. Play's clash pause is not limited: it opens the panel at any width, close or no close.
+    const COND_AUTO_MIN_W = 1400, COND_CLOSED_KEY = 'wayscope-conditions-closed';
+    function condHandClosed() { try { return sessionStorage.getItem(COND_CLOSED_KEY) === '1'; } catch (e) { return false; } }
+    function condRemember(closed) { try { if (closed) sessionStorage.setItem(COND_CLOSED_KEY, '1'); else sessionStorage.removeItem(COND_CLOSED_KEY); } catch (e) {} }
+    function condMayOpenItself() { return !condHandClosed() && window.innerWidth >= COND_AUTO_MIN_W; }
+    function toggleConditions() { WARN.open = !WARN.open; condRemember(!WARN.open); renderTimelineWarnings(TL.month); }
     // "Show on map": a route is selected (its own glow layer); a stockpile is flown to and
     // ringed; a National Highways closure ('h', keyed by its event_number) selects the route it
     // sits on and flies to the CLOSURE's bounds rather than the whole route.
@@ -8928,7 +8937,7 @@
         setRestrictionHits(liveHitEvents(hitEvents, WARN.hitRoute, live));
         setCapBadges(overCap.filter(rid => live.some(i => i.src === 'cap' && i.id === rid)));
         // a month with a red condition opens the panel once, by itself
-        if (live.some(i => i.lvl === 'clash') && !WARN.autoOpened) { WARN.open = true; WARN.autoOpened = true; renderConditionsPill(live); }
+        if (live.some(i => i.lvl === 'clash') && !WARN.autoOpened && condMayOpenItself()) { WARN.open = true; WARN.autoOpened = true; renderConditionsPill(live); }
         // 12 Oct 2026 (D22): playback stops ONCE PER LOOP on the first red month it ticks into, with the
         // panel open; the next press of Play carries on and does not stop again until the loop wraps.
         // Only a month reached by a tick can stop it — never the month Play was pressed on.
