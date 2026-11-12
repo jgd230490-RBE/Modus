@@ -2520,6 +2520,88 @@ def road_class_diagnostics(route_id, profile=DEFAULT_PROFILE, leg="loaded"):
     return out
 
 
+def _via_point(via):
+    """`via` as typed on the address ("lat,lon") -> (lat, lon), or None when it is not one point on the globe."""
+    try:
+        lat, lon = [float(x) for x in str(via).split(",")]
+    except Exception:
+        return None
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return None
+    return (lat, lon)
+
+
+def no_through_diagnostics(route_id, profile=DEFAULT_PROFILE, leg="loaded", via=None):
+    """
+    12 Nov 2026 (notes/session-1112-here-limits-why.md): what does the router hold about lorry restrictions along this
+    leg, loading-only ("no-through") ones included? A bake's answer cannot say: it asks for the line and its summary
+    only, and HERE reports a loading-only restriction as no notice at all.
+
+    The leg resolves exactly as the bake's (leg_request: the gate each end is left by / arrived at, the laden flag
+    flipped for the return leg, the return leg d_exit -> o_entry). Where a gate has an access road the bake's router
+    call runs between the access roads' ROAD ends, not the gates (haul._route_access_alternatives), and so does this
+    one. It sends the bake's permanent avoid areas (active_avoid) and the bake's pinned departure time. `via`
+    ("lat,lon") adds ONE pass-through point, to force the line along a road the router no longer picks.
+
+    ⚠️ A leg with a haul road part way along it is baked as several router calls; this makes one, road end to road
+    end, and says so (`mid_leg_roads`). One HERE request; writes nothing; nothing reads the answer.
+    """
+    if leg not in LEGS:
+        return {"error": f"leg must be one of {LEGS}", "leg": leg}
+    via_pt = None
+    if via not in (None, ""):
+        via_pt = _via_point(via)
+        if via_pt is None:
+            return {"error": "via must be one point as lat,lon (for example 52.7240,-0.8436)", "via": str(via)[:80]}
+    r = db.query("SELECT * FROM routes WHERE tenant_id = ? AND id = ?", (db.current_tenant(), route_id))
+    if not r:
+        return {"error": "route not found", "route_id": route_id}
+    r = r[0]
+    locs = {l["id"]: l for l in db.query("SELECT * FROM locations WHERE tenant_id = ?", (db.current_tenant(),))}
+    o, d = locs.get(r["origin_id"]), locs.get(r["dest_id"])
+    if not o or not d:
+        return {"error": "missing origin/destination", "route_id": route_id}
+    req = leg_request(r, o, d, leg)
+    a, b, steps = req["a"], req["b"], req["steps"]
+    # the bake's router call: from the road end of the access road it leaves by to the road end of the one it arrives by
+    dep = steps[0] if steps and steps[0].get("gate_role") == "exit" else None
+    arr = steps[-1] if steps and steps[-1].get("gate_role") == "entry" else None
+    frm = tuple(dep["exit"]) if dep else (a["lat"], a["lon"])
+    to = tuple(arr["entry"]) if arr else (b["lat"], b["lon"])
+    mid = [s for s in steps if s is not dep and s is not arr]
+    avoid, zone_tag = active_avoid()
+    factors = conversions.load_factors()
+    bake_at = here_routing.bake_departure_time()
+    out = {
+        "route_id": route_id, "profile": profile, "leg": leg,
+        "profile_in_factors": profile in (factors.get("vehicles", {}) or {}),
+        "gate_points": {"from": [a["lat"], a["lon"]], "to": [b["lat"], b["lon"]]},
+        "gate_sources": {"from": a["source"], "to": b["source"]},
+        "from": list(frm), "to": list(to),
+        "steps": [{"zone_id": s["zone_id"], "gate_role": s.get("gate_role"), "mode": s.get("mode")} for s in steps],
+        "mid_leg_roads": [s["zone_id"] for s in mid],
+        "same_request_as_bake": not mid and via_pt is None,
+        "zones_in_force": [z for z in zone_tag.split(",") if z],
+        "avoid_areas": avoid,
+        "bake_time": bake_at,
+        "via": (list(via_pt) if via_pt else None),
+        "here_configured": here_routing.configured(),
+    }
+    if mid:
+        out["note"] = ("The bake splits this leg at the drawn roads in mid_leg_roads (several router calls); this is "
+                       "one call from road end to road end, so its line is not the bake's.")
+    if frm[0] is None or frm[1] is None or to[0] is None or to[1] is None:
+        out["error"] = "an end of this leg has no coordinates"
+        return out
+    if not out["here_configured"]:
+        out["error"] = "HERE_API_KEY is not set on the server"
+        return out
+    out["probe"] = here_routing.no_through_probe(frm[0], frm[1], to[0], to[1], profile, factors,
+                                                 laden=(leg == "loaded"), via=via_pt,
+                                                 avoid_areas=(avoid or None), departure_time=bake_at)
+    return out
+
+
 def departure_diagnostics(route_id, profile=DEFAULT_PROFILE, leg="loaded", times=None,
                           alternatives=ALTERNATIVES, plan=False):
     """

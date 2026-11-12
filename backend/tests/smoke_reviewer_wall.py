@@ -203,7 +203,7 @@ with TestClient(main.app, base_url=BASE) as admin:
             return client.request(method, url, params=query, json=body, headers=h)
         return client.request(method, url, params=query, headers=h)
 
-    swept, diffs, review_routes = 0, [], []
+    swept, diffs, review_routes, swept_paths = 0, [], [], set()
     for passname in ("no map cookie", "map password cookie"):
         anon = TestClient(main.app, base_url=BASE, raise_server_exceptions=False)
         if passname == "map password cookie":
@@ -224,6 +224,7 @@ with TestClient(main.app, base_url=BASE) as admin:
                 a = call(anon, method.upper(), url, query, body, {})
                 b = call(rev, method.upper(), url, query, body, {})
                 swept += 1
+                swept_paths.add(path)
                 same = a.status_code == b.status_code
                 if same and method == "get" and 200 <= a.status_code < 300:
                     same = norm(a) == norm(b)
@@ -249,6 +250,20 @@ with TestClient(main.app, base_url=BASE) as admin:
     ok("2. ⭐🔴 THE WALL: on every route a reviewer answers exactly as nobody signed in", diffs == [], "; ".join(diffs[:20]))
     r = rev.get("/api/auth/me")
     ok("2. ...and the reviewer was signed in the whole time", r.json().get("reviewer") is not None)
+    # 12 Nov 2026: the loading-only probe (GET /api/admin/diagnostics/no-through/{route_id}) is one of the routes swept, a
+    # reviewer is refused it as nobody is, and on the real app it answers an admin (no router key here: it makes no call)
+    NT = "/api/admin/diagnostics/no-through/R001"
+    ok("2. 🔴 the no-through diagnostic is swept, and refuses a reviewer",
+       "/api/admin/diagnostics/no-through/{route_id}" in swept_paths and rev.get(NT, headers=W).status_code in (401, 403)
+       and "route_id" not in rev.get(NT, headers=W).text)
+    r = admin.get(NT, params=dict(TOKEN, leg="return", via="52.7240,-0.8436"))
+    ok("2. ...an admin gets its answer: the leg, the via point, and no call without a key",
+       r.status_code == 200 and r.json()["route_id"] == "R001" and r.json()["leg"] == "return"
+       and r.json()["via"] == [52.724, -0.8436] and r.json()["here_configured"] is False
+       and r.json()["error"] == "HERE_API_KEY is not set on the server" and "probe" not in r.json(), r.text[:300])
+    r = admin.get(NT, params=dict(TOKEN, via="52.7"))
+    ok("2. ...and a via that is not lat,lon is refused in words", r.status_code == 200
+       and r.json().get("error", "").startswith("via must be one point as lat,lon"), r.text[:200])
 
     # ---- the review routes ----------------------------------------------------------------------------------------- #
     # NARROWED 31 Oct 2026 (PR 3d): + the group's tasks and the reviewer's own deletes (four routes, three paths)
