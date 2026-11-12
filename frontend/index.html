@@ -4128,9 +4128,16 @@ function ClpUncapped({ rows, nameKey, valKey, word, what }){
     </details>
   );
 }
+// 11 Nov 2026 (D-F6, John's yes): the fold keeps its place for the session. It closed whenever you left the Dashboard,
+// about four screens down; now it opens again on the month you picked, scrolled to, until sign-out (signOut clears it).
+// The figures are read again on the way back (a week typed on Account in between shows). `var`: the DOM harness reads it.
+var CLP_FOLD = { open: false, month: null };
 function ClpMonitoring({ months, initial }){
-  const [open, setOpen] = useState(!!initial);
-  const [month, setMonth] = useState(() => (initial && initial.month) || gaMonthToday(months));
+  const [open, setOpen] = useState(() => !!initial || CLP_FOLD.open);
+  const [month, setMonth] = useState(() => (initial && initial.month) || CLP_FOLD.month || gaMonthToday(months));
+  const foldEl = useRef(null);
+  const backTo = useRef(!initial && CLP_FOLD.open);   // open when the Dashboard was left: scroll back to it once
+  useEffect(() => { CLP_FOLD.open = open; CLP_FOLD.month = month; }, [open, month]);
   const [data, setData] = useState(initial || null);
   const [err, setErr] = useState(false);
   useEffect(() => {
@@ -4143,6 +4150,31 @@ function ClpMonitoring({ months, initial }){
     }).catch(() => { if(live) setErr(true); });
     return () => { live = false; };
   }, [open, month]);
+  // D-F6: once its figures are in (about 6 s after coming back on a local copy, Chrome 11 Nov), bring the fold back
+  // into view. The cards above it may still be filling in and push it down again, so it is brought back each time the
+  // page grows, for 6 s. A scroll, click or key from the person, before or during that, cancels the trip back.
+  useEffect(() => {
+    if(!backTo.current) return;
+    const quit = () => { backTo.current = false; };
+    const evs = ["wheel", "touchstart", "keydown", "mousedown"];
+    evs.forEach(n => window.addEventListener(n, quit, { passive: true }));
+    return () => evs.forEach(n => window.removeEventListener(n, quit));
+  }, []);
+  useEffect(() => {
+    if(!backTo.current || !data) return;
+    const el = foldEl.current;
+    if(!el || !el.scrollIntoView) return;
+    let last = -1, timer = 0;
+    const t0 = Date.now();
+    const step = () => {
+      if(!backTo.current || !el.isConnected) return;
+      const h = (el.closest("main") || document.documentElement).scrollHeight;
+      if(h !== last){ last = h; el.scrollIntoView({ block: "start" }); }
+      if(Date.now() - t0 < 6000) timer = setTimeout(step, 150); else backTo.current = false;
+    };
+    requestAnimationFrame(step);
+    return () => clearTimeout(timer);
+  }, [data]);
   // 14 Oct 2026 (bundle G, W10): the CLP pack for the month — the same reply, printed (only the charts with data)
   const [packBusy, setPackBusy] = useState("");
   const [packErr, setPackErr] = useState(null);
@@ -4168,8 +4200,8 @@ function ClpMonitoring({ months, initial }){
   const C = (data && data.charts) || {};
   const capped = (rows) => (rows || []).filter(r => r.cap != null);
   return (
-    <details className="dash-more" data-clp="1" data-guide="dash-clp" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>
-      <summary>CLP monitoring: caps, vehicles, councils, carbon and trips avoided</summary>
+    <details ref={foldEl} className="dash-more" data-clp="1" data-guide="dash-clp" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>
+      <summary>CLP monitoring: tonnes, caps, vehicles, councils, carbon and trips avoided</summary>
       <div className="pt-3" data-clp-body="1">
         <div className="ct-row mb-2">
           <span className="ct-line">The Construction Logistics Plan's figures from the approved plan<InfoTip id="dash.clp" /></span>
@@ -4675,6 +4707,7 @@ function App(){
     // cookie is dead wherever it was copied); it replaced the call to gate-signout?keep=map, which still answers.
     fetch(`${API}/auth/signout`, { method: "POST" }).catch(() => {});
     metaHadCode.current = false;
+    CLP_FOLD.open = false; CLP_FOLD.month = null;   // D-F6: the next person starts with the CLP fold closed
     setRole(null); setView("public");
   };
   // the bar's Guide: none on the sign-in view (it has no tour); the embedded map's tour on a map view, once the map
@@ -12874,9 +12907,11 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                             {r.action === "waiting" && <span className="text-[13px] text-slate-500">Waiting</span>}
                             {r.action === "applied" && <RowStatus word={`Added ${grp(r.carried, 1)} ${unitLbl(r.unit)}`} tone="none" />}
                             {r.action === "spread" && (
-                              // 22 Oct 2026 (UI fix 6, card 2; finding #11): the app's standard small button (13 px on the accent), was an 11 px one-off on --navy
+                              // 22 Oct 2026 (UI fix 6, card 2; finding #11): the app's standard small button, was an 11 px one-off on --navy.
+                              // 11 Nov 2026 (D-F4, John's yes): an OUTLINE button (btn-sec), not filled: one per short line made three filled
+                              // primaries on one page (rule R2); the amber row and the "short last week" card carry the attention
                               <button onClick={() => doSpread(r)} disabled={!!busy}
-                                className="btn-pri btn-sm disabled:opacity-40"
+                                className="btn-sec btn-sm disabled:opacity-40"
                                 title={`Add ${grp(r.remaining_short, 1)} ${unitLbl(r.unit)} to this week, divided over its remaining weekdays. Refused if that week is confirmed.`}>Add to this week</button>
                             )}
                           </td>

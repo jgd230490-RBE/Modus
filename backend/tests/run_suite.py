@@ -6,14 +6,17 @@ Written for CI (.github/workflows/suite.yml) and just as usable on the laptop:
     $env:PYTHONUTF8 = "1"; $env:NODE_PATH = (npm root -g)
     .venv-tests\\Scripts\\python backend/tests/run_suite.py --smoke-py .venv-smoke\\Scripts\\python.exe
 
-What it runs, in this order (the order CLAUDE.md "Tests" gives):
-  1. every backend/tests/*.js except BROWSER_ONLY (each of those says in its header that it needs a
+What it runs, in this order:
+  1. the FIXTURE_WRITERS below (test_*.py that write a file in backend/tests/fixtures/ a JS harness reads),
+     so the JS harnesses render what the backend sends NOW, not the copy committed when the fixture last moved
+     (12 Nov 2026: until then the JS ran first and CI rendered fixtures of 27 Oct) — with --py;
+  2. every backend/tests/*.js except BROWSER_ONLY (each of those says in its header that it needs a
      real browser and is not part of the default suite) — with --node;
-  2. every backend/tests/test_*.py — with --py, the interpreter WITHOUT FastAPI (the harnesses stub it);
-  3. backend/tests/http_smoke.py, then every backend/tests/smoke_*.py — with --smoke-py, the interpreter with
+  3. every other backend/tests/test_*.py — with --py, the interpreter WITHOUT FastAPI (the harnesses stub it);
+  4. backend/tests/http_smoke.py, then every backend/tests/smoke_*.py — with --smoke-py, the interpreter with
      backend/requirements.txt.
-A new harness that follows the naming is picked up without editing this file.
-
+A new harness that follows the naming is picked up without editing this file; a NEW fixture a JS harness reads
+goes in FIXTURE_WRITERS beside the harness that writes it (test_suite_order.py fails until it does).
 A harness FAILS when any of these is true — so a harness that quietly did nothing cannot pass:
   - its exit code is not 0;
   - its output has no "N passed, M failed" line (the last such line is the count);
@@ -25,9 +28,10 @@ HERE or Mapbox call or send mail. --require-offline (CI) also checks first that 
 router.hereapi.com cannot be reached at all, and stops if they can — in CI the run sits in a network
 namespace with no route out, so a harness that needs the network fails there instead of passing on luck.
 
-Fixtures: test_costlines.py, test_lookahead.py (and others) rewrite files in backend/tests/fixtures/.
+Fixtures: the FIXTURE_WRITERS rewrite files in backend/tests/fixtures/ on every run (some only on a clean run).
 The table's footer lists what changed; nothing here restores or commits them. Before a commit on the
-laptop: git checkout -- backend/tests/fixtures/
+laptop: git checkout -- backend/tests/fixtures/  (a branch that changes a page's shape on purpose commits the
+rewritten fixture instead, so a JS harness run alone sees the new shape too).
 """
 import argparse
 import glob
@@ -42,6 +46,17 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 
+# 12 Nov 2026: the Python harnesses that write a fixture a JS harness reads, and what each writes. They run FIRST.
+FIXTURE_WRITERS = {
+    "test_carbon.py": ("carbon_scenario.json",),
+    "test_carbon_target.py": ("carbon_target.json", "cost_preview_carbon.json"),
+    "test_clp.py": ("clp_monitoring.json",),
+    "test_costing.py": ("lookahead_page_fuel.json",),
+    "test_costlines.py": ("cost_lines.json", "cost_preview.json"),
+    "test_gate_arrivals.py": ("gate_arrivals.json", "lookahead_gates_week.json"),
+    "test_lookahead.py": ("lookahead_page.json",),
+    "test_sim.py": ("sim_day.json",),
+}
 BROWSER_ONLY = {"browser_check.js", "help_browser_check.js", "look_check.js", "map_browser_check.js", "ui_audit.js"}
 KEYS = ("HERE_API_KEY", "MAPBOX_TOKEN", "MAPBOX_PUBLIC_TOKEN", "GOOGLE_MAPS_API_KEY", "GOOGLE_STREETVIEW_KEY",
         "SMTP_USER", "SMTP_PASSWORD", "DATABASE_URL", "TENANT_ID", "ALLOW_DEMO_CODES", "MAP_GATE")
@@ -52,7 +67,10 @@ ACTIONS = os.environ.get("GITHUB_ACTIONS") == "true"
 def harnesses(args):
     js = sorted(f for f in glob.glob(os.path.join(HERE, "*.js")) if os.path.basename(f) not in BROWSER_ONLY)
     py = sorted(glob.glob(os.path.join(HERE, "test_*.py")))
-    out = [(f, [args.node, f]) for f in js] + [(f, [args.py, f]) for f in py]
+    first = [f for f in py if os.path.basename(f) in FIXTURE_WRITERS]   # the fixture writers, before any JS
+    rest = [f for f in py if os.path.basename(f) not in FIXTURE_WRITERS]
+    out = ([(f, [args.py, f]) for f in first] + [(f, [args.node, f]) for f in js]
+           + [(f, [args.py, f]) for f in rest])
     out.append((os.path.join(HERE, "http_smoke.py"), [args.smoke_py, os.path.join(HERE, "http_smoke.py")]))
     # 31 Oct 2026 (task 4a PR 3c): every smoke_*.py also boots the real app, with --smoke-py
     out += [(f, [args.smoke_py, f]) for f in sorted(glob.glob(os.path.join(HERE, "smoke_*.py")))]

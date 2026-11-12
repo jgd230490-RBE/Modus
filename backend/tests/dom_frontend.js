@@ -562,6 +562,37 @@ async function clpDom(){
      !!el.querySelector('[data-clp-pack-error="1"]') && el.querySelector('[data-clp-pack-error="1"]').textContent === "The CLP pack could not be made. Openpyxl is not installed.");
   w.HTMLAnchorElement.prototype.click = realClick; w.URL.createObjectURL = realCreate;
   act(() => { r.unmount(); }); el.remove();
+  // ---- 11 Nov 2026 (D-F6, John's yes): leaving the Dashboard and coming back keeps the fold open, on its month, scrolled to
+  {
+    const FOLD = w.CLP_FOLD || {}, left = { open: FOLD.open, month: FOLD.month };
+    ok("🔴 D-F6: the fold remembers it was open, and the month picked, when it is unmounted (leaving the Dashboard)",
+       left.open === true && left.month === thisMonth, JSON.stringify(left));
+    const scrolled = []; const realSIV = w.Element.prototype.scrollIntoView;
+    w.Element.prototype.scrollIntoView = function(o){ scrolled.push([this.getAttribute("data-clp"), o && o.block]); };
+    const realRAF = w.requestAnimationFrame; w.requestAnimationFrame = (f) => { f(); return 0; };
+    calls.length = 0;
+    w.fetch = (url, opt) => { calls.push({ url: String(url), method: (opt && opt.method) || "GET" });
+      return String(url).startsWith("/api/clp/monitoring") ? reply(200, { ...CLPF, month: +String(url).split("month=")[1] }) : new Promise(() => {}); };
+    const el2 = w.document.createElement("div"); w.document.body.appendChild(el2);
+    const r2 = w.ReactDOM.createRoot(el2);
+    act(() => { r2.render(w.React.createElement(w.ClpMonitoring, { months: metaMin.months })); });
+    await settle(30);
+    ok("🔴 D-F6: coming back, it opens on the same month and reads it again (a week typed in between shows)",
+       el2.querySelector("details[data-clp]").open && el2.querySelector('select[aria-label="CLP month"]').value === String(thisMonth)
+       && calls.length === 1 && calls[0].url === `/api/clp/monitoring?month=${thisMonth}`, JSON.stringify(calls));
+    ok("🔴 D-F6: ...and scrolls back to the fold once, top first, after its figures are in",
+       JSON.stringify(scrolled) === JSON.stringify([["1", "start"]]), JSON.stringify(scrolled));
+    act(() => { r2.unmount(); }); el2.remove();
+    FOLD.open = false; FOLD.month = null;
+    const el3 = w.document.createElement("div"); w.document.body.appendChild(el3);
+    const r3 = w.ReactDOM.createRoot(el3); calls.length = 0; scrolled.length = 0;
+    act(() => { r3.render(w.React.createElement(w.ClpMonitoring, { months: metaMin.months })); });
+    await settle(30);
+    ok("D-F6: cleared (as sign-out does), it starts closed, reads nothing and does not scroll",
+       !el3.querySelector("details[data-clp]").open && calls.length === 0 && scrolled.length === 0);
+    act(() => { r3.unmount(); }); el3.remove();
+    w.Element.prototype.scrollIntoView = realSIV; w.requestAnimationFrame = realRAF;
+  }
 }
 
 // ---- 16 Oct 2026 (S7): the Simulation section in a real DOM ----------------------------------------------------------
@@ -2098,8 +2129,11 @@ async function phoneDayFlagsDom(){
   const meta = { ...metaMin, months: { start_year: 2026, count: 60 } };
   const lk = (r) => `${r.route_id}|${r.discipline || ""}|${r.section_id || ""}|${r.month_index}`;
   const planned = (l, iso) => { const d = (l.days || []).find(x => x.day_date === iso); return !!d && ((+d.planned_qty || 0) > 0 || ((d.derived || {}).trips || 0) > 0); };
-  const today = LA.today;
+  // 12 Nov 2026 (claude/suite-fixture-order): run_suite now runs test_lookahead.py BEFORE this harness, so the fixture's
+  // today is the real date (a weekday of its week, portable.fixture_today). On a Thursday or Friday it has fewer than two
+  // later weekdays; the page is then handed the last weekday that has two (the screen opens on page.today).
   const weekdays = LA.commit.lines[0].days.map(d => d.day_date).filter(iso => !w.__F.isWeekend(iso));
+  const today = weekdays.filter(iso => iso > LA.today).length >= 2 ? LA.today : weekdays[Math.max(0, weekdays.length - 3)];
   const [next, third] = weekdays.filter(iso => iso > today);
   const lines = LA.commit.lines.filter(l => weekdays.every(iso => planned(l, iso))).slice(0, 3);
   ok("PHONE DAY FLAGS: the test page — three fixture lines planned on every weekday, today and two later weekdays",
@@ -2107,7 +2141,7 @@ async function phoneDayFlagsDom(){
   const [A, B, C] = lines;
   const fl = (l, code, text, day) => ({ code, route_id: l.route_id, month_index: l.month_index, discipline: l.discipline || "",
     section_id: l.section_id || "", ipt: l.ipt, text, ...(day ? { day_date: day } : {}) });
-  const page = { ...LA, commit: { ...LA.commit, lines }, clashes: { ...LA.clashes, flags: [
+  const page = { ...LA, today, commit: { ...LA.commit, lines }, clashes: { ...LA.clashes, flags: [
     fl(A, "GATE_OVER", `Gate A on ${next}: 9 lorries against the 6 it can check in (150 %)`, next),
     fl(B, "GATE_NEAR", `Gate B on ${today}: 5 lorries against the 6 it can check in (83 %), near capacity`, today),
     fl(B, "ROUTE_CAP", `${B.route_id} ${next}: 12 veh against a cap of 10`, next),
