@@ -406,6 +406,8 @@
         .mode-legend .ml-steps{ display:flex; gap:2px; margin:4px 0 2px; }
         .mode-legend .ml-steps i{ flex:1; height:14px; display:block; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
         .mode-legend .ml-sw{ display:inline-block; width:14px; height:14px; flex:0 0 14px; border-radius:2px; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
+        /* 12 Nov 2026 (card A-F2b, dark grounds): on the Dark look the near-black outline vanished round the darkest blues */
+        html[data-look="dark"] .mode-legend .ml-steps i, html[data-look="dark"] .mode-legend .ml-sw{ box-shadow:0 0 0 1px rgba(231,229,228,.7); }
         .mode-legend .ml-foot{ margin-top:6px; color:var(--muted); }
         /* 16 Oct 2026 (D115): the flow legend — a sample of each spacing as drawn, then its band */
         #flow-legend{ margin-top:12px; }
@@ -2280,6 +2282,7 @@
         applyLightPreset(); syncLightRow();
         try { if (typeof restyleHaulEraser === 'function') restyleHaulEraser(); } catch (e) {}
         try { if (typeof applyLabels === 'function') applyLabels(); } catch (e) {}     // 28 Oct 2026: a dark ground turns the names light
+        try { if (typeof restyleHeatEdge === 'function') restyleHeatEdge(); } catch (e) {}     // 12 Nov 2026 (A-F2b): and the heat map's edge pale
         try { scheduleViewWrite(); } catch (e) {}
     }
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -2807,6 +2810,7 @@
     function raiseMarks() {
         if (!map || !map.getStyle) return;
         if (typeof applyLabels === 'function') applyLabels();     // 28 Oct 2026 (task 0a): a label layer just (re)made
+        if (typeof restyleHeatEdge === 'function') restyleHeatEdge();     // 12 Nov 2026 (A-F2b): a casing just (re)made on a dark ground
         let ids;
         try { ids = map.getStyle().layers.map(l => l.id); } catch (e) { return; }
         // 13 Oct 2026: the lorry limits go over the routes first, so the marks then land on top of them
@@ -7116,7 +7120,23 @@
     //: a blue at five lightness steps (HSL hue 217, mockup 5's #2071F3 family), light to dark; the light end may recede
     //: (rule 5). Track C review: this is NOT the plan blue #4A72C9 (hue 221) that the council fill (AREA_RAMP) is built
     //: on, and the two carry different stops; the council legend says so. One ramp for both is a D26 follow-up.
-    const CARBON_RAMP = ['#94BBF9', '#5A96F6', '#2071F3', '#0B55CB', '#073888'];
+    //: 11 Nov 2026 (card A-F2b): re-stepped in the same hue so the lightest clears 2:1 on white and the first two
+    //: bands part in print and for red-green colour blindness; the bulletin's VOLUME_RAMP is the same list.
+    const CARBON_RAMP = ['#72A7FF', '#006AFD', '#0051C4', '#00388E', '#00215B'];
+    //: 12 Nov 2026 (card A-F2b, dark grounds, option b): on a dark ground (Dark, Navigation night, the aerial styles,
+    //: Standard at dusk or night: labelsDark()) the near-black edge under a heat map line vanished and the two darkest
+    //: blues sank into the ground. There the edge turns pale; the one list of blues is kept. A separate Dark list (c)
+    //: stays open to John.
+    const HEAT_EDGE_DARK = '#E7E5E4';
+    function heatEdgeColour(heat){ return heat && typeof labelsDark === 'function' && labelsDark() ? HEAT_EDGE_DARK : CONFIG.COLORS.forecastCasing; }
+    let HEAT_LINES_ON = false;      // set by applyCarbonMode: a heat map colours the route lines now
+    function restyleHeatEdge(){
+        try {
+            const heat = HEAT_LINES_ON;
+            if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-color', heatEdgeColour(heat));
+            if (map.getLayer('road-load-casing')) map.setPaintProperty('road-load-casing', 'line-color', heatEdgeColour(true));
+        } catch (e) {}
+    }
     //: no stored road route for the line's vehicle: no figure, painted grey, never a zero dressed as a figure
     const CARBON_NONE = '#A8A29E';
     //: the four stops as fractions of the programme's largest route-month, rounded to two significant figures
@@ -7392,6 +7412,7 @@
         }
         COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });
         if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', heat ? CARBON_CASING_WIDTH : FORECAST_CASING_WIDTH);
+        HEAT_LINES_ON = heat && !focus; restyleHeatEdge();
         if (co2) { ensureCarbonLabelLayer(); syncCarbonLabels(); }
         else {
             if (map.getLayer(CARBON_LABEL_LAYER)) map.removeLayer(CARBON_LABEL_LAYER);

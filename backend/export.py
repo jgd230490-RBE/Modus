@@ -1708,7 +1708,10 @@ def _draw_bulletin_schematic(c, S, x, y, w, h, P=None):
     for z in S["controls"]:
         if z.get("at"):
             ax, ay = P(*z["at"])
-            px, py = bulletin_doc.control_spot(ax, ay, pins)
+            # 11 Nov 2026 (card A-X3): a square 8.8 pt wide beside a 4.6 pt pin touched it at 11 pt apart (E on 2,
+            # J on 4); the printed map keeps PDF_MARKER_CLEAR between centres, a clear gap
+            px, py = bulletin_doc.control_spot(ax, ay, pins, clear=bulletin_doc.PDF_MARKER_CLEAR,
+                                               step=bulletin_doc.PDF_MARKER_STEP, rings=2)
             if (px, py) != (ax, ay):
                 c.setStrokeColorRGB(*AMBER_RGB); c.setLineWidth(0.8)
                 c.line(ax, ay, px, py)
@@ -2007,17 +2010,27 @@ def _council_legend(C, width, title="t CO2e in the month:"):
     return d
 
 
+def _last_month_cell(text):
+    """11 Nov 2026 (card A-F2): the route table's narrow last-month column. "none planned" broke mid-word over two lines
+    ("none p / lanned"); the column reads "none", and "no earlier month in the programme" a dash. The web page keeps
+    the whole words."""
+    t = (text or "").replace(" a day", "")
+    return {"none planned": "none", "no earlier month in the programme": "—"}.get(t, t)
+
+
 def _route_bar(r, width, vmax):
     """14 Oct 2026 (the publishing check): the route table's cell — the figure, then a bar in the route's map colour,
     the planning flag a dashed red tick. It replaces the separate chart that repeated the table."""
     from reportlab.graphics.shapes import Drawing, Line, Rect, String
+    import bulletin_doc     # 11 Nov 2026 (card A-F2b): a bar with no colour takes the second band's, from the one list
     d = Drawing(width, 10)
-    num_w = 26
+    # 11 Nov 2026 (card A-F2): "under 1" is wider than a figure: the number's room grows to fit it
+    num_w = max(26, rl_pdfmetrics_width(r["a_day_text"], _BF("bold"), 8) + 4)
     d.add(String(num_w - 2, 2.2, r["a_day_text"], fontName=_BF("bold"), fontSize=8, textAnchor="end",
                  fillColor=colors.Color(*NAVY_RGB)))
     bw = width - num_w - 4
     lw = bw * (r["a_day"] or 0) / (vmax or 1)
-    d.add(Rect(num_w + 2, 1.5, max(lw, 0.5), 6.5, fillColor=colors.Color(*_hex_rgb(r.get("color") or "#5A96F6")),
+    d.add(Rect(num_w + 2, 1.5, max(lw, 0.5), 6.5, fillColor=colors.Color(*_hex_rgb(r.get("color") or bulletin_doc.VOLUME_RAMP[1])),
                strokeColor=None))
     if r.get("cap") is not None:
         cx = num_w + 2 + bw * (r.get("cap_at") or r["cap"]) / (vmax or 1)     # cap_at: the cap in the bar's count
@@ -2035,23 +2048,49 @@ TABLE_LOOK = [ ("BACKGROUND", (0, 0), (-1, 0), HEAD_TINT),
               ("LINEBELOW", (0, 1), (-1, -1), 0.3, colors.Color(0.85, 0.87, 0.9))]
 
 
+#: 12 Nov 2026 (BUILD.md rule 13; the newsletter ran to five pages on live once a public traffic limit was drawn, which adds
+#: a row on page 2's works table and two to page 4): when a section cannot fit its own page, the newsletter is set tighter,
+#: one step at a time, until each section fits again (D43: four pages). Nothing is left out and nothing moves: the gaps
+#: between rows and sections close, the council carbon map gives some height, and at the last steps the small print
+#: (grey notes, sources, terms) steps down to 7 pt. Step 0 is the look of 14 Oct; the leaflet always uses step 0.
+#: 12 Nov 2026 (A-F8, decided under John's one-hour rule, not by his explicit yes): a LAST step for page 2 only, its tables
+#: half a point smaller (route rows 8 to 7.5 pt, the "what is moved" and works rows 8.5 to 8 pt) and the route bars 0.20 of
+#: the width (0.25), the room going to the route names. No step below it (a 7 pt step was measured and left out). A month
+#: that fits at an earlier step keeps that step's look. Where page 2 still cannot fit, it runs on to a page headed "Routes
+#: and roads (continued)" (`_newsletter`): five pages, which bends D43 in that case only.
+NEWSLETTER_FIT = (
+    {"pad": 2.2, "small_pad": 1.3, "lot_pad": 2.5, "sec_before": 7, "council_map": 70, "small": 7.5, "terms": 8},
+    {"pad": 1.6, "small_pad": 1.0, "lot_pad": 1.8, "sec_before": 5.5, "council_map": 60, "small": 7.5, "terms": 8},
+    {"pad": 1.2, "small_pad": 0.8, "lot_pad": 1.4, "sec_before": 4.5, "council_map": 52, "small": 7.2, "terms": 7.5},
+    {"pad": 1.0, "small_pad": 0.6, "lot_pad": 1.0, "sec_before": 4, "council_map": 46, "small": 7.0, "terms": 7.2},
+    {"pad": 1.0, "small_pad": 0.6, "lot_pad": 1.0, "sec_before": 4, "council_map": 46, "small": 7.0, "terms": 7.2,
+     "table": -0.5, "bar": 0.20},
+)
+
+
 class _Kit:
     """The bulletin's styles and builders, shared by the newsletter and the leaflet (one look, one view model)."""
 
-    def __init__(self, usable):
+    def __init__(self, usable, fit=None):
         self.usable = usable
+        self.fit = fit = fit or NEWSLETTER_FIT[0]
         r, b, it = _BF("regular"), _BF("bold"), _BF("italic")
         st = ParagraphStyle("b", fontName=r, fontSize=8.5, leading=10.8)
         self.st = st
         self.st_r = ParagraphStyle("r", parent=st, alignment=2)
+        # 12 Nov 2026 (A-F8): page 2's table rows; the body size until the ladder's last step takes half a point off
+        t = fit.get("table", 0)
+        self.st_t = ParagraphStyle("t", parent=st, fontSize=8.5 + t, leading=round(10.8 * (8.5 + t) / 8.5, 2))
+        self.st_tr = ParagraphStyle("tr", parent=self.st_t, alignment=2)
         # 14 Oct 2026 (the publishing check): light table heads (ink on a pale band), not white on ink
         self.st_h = ParagraphStyle("h", parent=st, fontName=b, fontSize=7.5, leading=9.5, textColor=colors.Color(*NAVY_RGB))
         self.st_hr = ParagraphStyle("hr", parent=self.st_h, alignment=2)
-        self.st_sec = ParagraphStyle("sec", parent=st, fontName=b, fontSize=11, leading=13.5, spaceBefore=7,
+        self.st_sec = ParagraphStyle("sec", parent=st, fontName=b, fontSize=11, leading=13.5, spaceBefore=fit["sec_before"],
                                      spaceAfter=2.5, textColor=colors.Color(*NAVY_RGB))
         self.st_kick = ParagraphStyle("kick", parent=st, fontName=b, fontSize=7.5, leading=9, spaceBefore=0, spaceAfter=1,
                                       textColor=colors.HexColor("#C2410C"))
-        self.st_grey = ParagraphStyle("g", parent=st, fontSize=7.5, leading=9.4, textColor=colors.Color(*GREY))
+        self.st_grey = ParagraphStyle("g", parent=st, fontSize=fit["small"], leading=round(fit["small"] * 1.253, 2),
+                                      textColor=colors.Color(*GREY))
         self.st_def = ParagraphStyle("def", parent=self.st_grey, fontSize=8, leading=10, spaceBefore=2)
         self.st_big = ParagraphStyle("big", parent=st, fontName=b, fontSize=17, leading=20, textColor=colors.Color(*NAVY_RGB))
         self.st_lab = ParagraphStyle("lab", parent=st, fontSize=8, leading=9.6, textColor=colors.Color(*GREY))
@@ -2070,7 +2109,8 @@ class _Kit:
 
     def grid(self, data, widths, total_row=False):
         t = LongTable(data, colWidths=widths, repeatRows=1)
-        style = [("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [("TOPPADDING", (0, 0), (-1, -1), 2.2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.2),
+        pad = self.fit["pad"]
+        style = [("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [("TOPPADDING", (0, 0), (-1, -1), pad), ("BOTTOMPADDING", (0, 0), (-1, -1), pad),
                               ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]
         if total_row:
             style += [("BACKGROUND", (0, -1), (-1, -1), colors.Color(*BAND)),
@@ -2112,10 +2152,11 @@ class _Kit:
         k = (len(sites) + 1) // 2
         cols = [[P("SITES", skh)] + sites[:k], [P("", skh)] + sites[k:],
                 [P("ROAD WORKS AND LIMITS", skh)] + (lims or [P("none this month", sk)])]
-        n = max(len(x) for x in cols)
-        rows = [[x[i] if i < len(x) else P("", sk) for x in cols] for i in range(n)]     # an empty cell at the key's leading
+        # 11 Nov 2026 (card A-X3): each column flows on its own. As one grid, a works line that wrapped made its whole row
+        # two lines tall and left an empty line in the sites' columns ("A Wolds Link Batching Plant", a gap, "B ...").
+        # Each column is now one cell holding its own lines: the header row keeps the rule under it.
         u = self.usable
-        t = LongTable(rows, colWidths=[u * 0.31, u * 0.31, u * 0.38])
+        t = LongTable([[x[0] for x in cols], [x[1:] or P("", sk) for x in cols]], colWidths=[u * 0.31, u * 0.31, u * 0.38])
         t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("VALIGN", (0, 0), (-1, -1), "TOP"),
                                ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
                                ("TOPPADDING", (0, 0), (-1, -1), 0.6), ("BOTTOMPADDING", (0, 0), (-1, -1), 0.6),
@@ -2127,9 +2168,10 @@ class _Kit:
         table and the chart below it, which printed the same figures twice."""
         E, P, st_h, st_r = self.E, self.P, self.st_h, self.st_r
         st_hr = self.st_hr
-        bar_w = self.usable * 0.25
+        bar_w = self.usable * self.fit.get("bar", ROUTE_BAR)
         vmax = max([r["a_day"] or 0 for r in S["routes"]] + [r.get("cap_at") or r["cap"] or 0 for r in S["routes"]] + [1])
-        sm = ParagraphStyle("rt", parent=self.st, fontSize=8, leading=9.8)
+        t = self.fit.get("table", 0)
+        sm = ParagraphStyle("rt", parent=self.st, fontSize=8 + t, leading=round(9.8 * (8 + t) / 8, 2))
         smr = ParagraphStyle("rtr", parent=sm, alignment=2)
         prev = (S["prev_long"] or "Last month")[:3] if S.get("prev_long") else "Last month"
         smg = ParagraphStyle("rtg", parent=sm, textColor=colors.Color(*GREY))
@@ -2139,13 +2181,18 @@ class _Kit:
         for r in S["routes"]:
             rows.append([P(E(r["letters"].replace(" to ", "–").replace(" → ", "–")), smg), P(E(r["label"]), sm),
                          _route_bar(r, bar_w - 8, vmax), P(E(r["in_month_text"]), smr),
-                         P(E(r["last_month_text"].replace(" a day", "")), smr),
+                         P(E(_last_month_cell(r["last_month_text"])), smr),
                          P(E(r["flag_short"]), ParagraphStyle("rtf", parent=smr, textColor=colors.Color(*RED_RGB), fontName=_BF("bold"))
                            if r["over_flag"] else smr)])
         if not S["routes"]:
             rows.append(["", P("No route with a stored road route carries approved lorries this month.", self.st_grey), "", "", "", ""])
         u = self.usable
-        return self.grid(rows, [u * 0.06, u * 0.42, bar_w, u * 0.10, u * 0.07, u * 0.10])
+        # 12 Nov 2026 (A-F8 (a), John's yes): the route column takes what the Map and "In the month" columns do not use
+        # (two letters and a dash, a four-figure count, "month" whole in the header), so most names fit on one line: 14 of 23 wrapped in Apr
+        # 2027 on a local copy and page 2 ran over (it was 0.06 / 0.42 / 0.10)
+        # 12 Nov 2026 (A-F8): a shorter bar gives its room to the route name
+        return self.grid(rows, [u * ROUTE_COLS[0], u * (ROUTE_COLS[1] + ROUTE_BAR) - bar_w, bar_w, u * ROUTE_COLS[2],
+                                u * 0.07, u * 0.10])
 
     def brief(self, S, title="Key points"):
         E, P = self.E, self.P
@@ -2169,7 +2216,7 @@ class _Kit:
         numbers), at 7.5 pt."""
         E, P = self.E, self.P
         sm = ParagraphStyle("src", parent=self.st_grey, leftIndent=11, bulletIndent=0, bulletFontName=_BF("regular"),
-                            bulletFontSize=7.5, spaceAfter=1.5)
+                            bulletFontSize=self.fit["small"], spaceAfter=1.5)
         items = [(i, _co2_pdf(E(t))) for i, t in enumerate(S.get("sources") or [], 1)]   # 14 Oct 2026: was CO2e always
         if not items:
             return []
@@ -2241,16 +2288,33 @@ def build_bulletin_pdf(S):
     # report box onto a page of its own at 64 mm), then the newsletter is as long as its content needs
     # REVERSED 14 Oct 2026: the map is the biggest that keeps page 1 on its own page (it shrank until the WHOLE
     # newsletter was four pages, so a long route table made the front-page map small)
+    # 12 Nov 2026 (BUILD.md rule 13): then, while a section still runs over its page (more than four pages), the next
+    # step of NEWSLETTER_FIT; page 1's map height is found again from where the last step left it (a tighter step
+    # never needs a smaller map)
     with _sizing():
-        for map_h in NEWSLETTER_MAP_HEIGHTS:
-            data, pages, page2 = _newsletter(S, map_h)
-            if page2 == 2:
+        start = 0
+        for fit in NEWSLETTER_FIT:
+            for k in range(start, len(NEWSLETTER_MAP_HEIGHTS)):
+                map_h = NEWSLETTER_MAP_HEIGHTS[k]
+                data, pages, page2 = _newsletter(S, map_h, fit=fit)
+                if page2 == 2:
+                    start = k
+                    break
+            if pages <= NEWSLETTER_PAGES:
                 break
     # 14 Oct 2026: built once more with the page total known, so each foot says "2 of 4", and with the basemap
-    return _newsletter(S, map_h, pages)[0]
+    return _newsletter(S, map_h, pages, fit=fit)[0]
 
 
+NEWSLETTER_PAGES = 4               # D43: one section a page
 NEWSLETTER_MAP_HEIGHTS = (100 * mm, 92 * mm, 84 * mm, 76 * mm, 68 * mm, 60 * mm, 52 * mm, 44 * mm, 36 * mm)
+
+
+#: 12 Nov 2026 (A-F8 (a)): page 2's route table, the Map, Route and "In the month" columns (with the bar 0.25, the last
+#: month 0.07 and the planning flag 0.10 they make the whole width)
+ROUTE_COLS = (0.05, 0.465, 0.065)
+ROUTE_BAR = 0.25                   # the route bar's share of the width (the ladder's last step: NEWSLETTER_FIT "bar")
+CONTINUED = "Routes and roads (continued)"   # the head of page 2's run-on page (A-F8, 12 Nov 2026)
 
 
 class _PageMark(Flowable):
@@ -2266,16 +2330,17 @@ class _PageMark(Flowable):
         self.page = self.canv.getPageNumber()
 
 
-def _newsletter(S, map_h, pages=None):
+def _newsletter(S, map_h, pages=None, fit=None):
     """One build of the newsletter with the page-1 map at `map_h`: (bytes, pages). REVERSED 14 Oct 2026 (the publishing
     check): page 1 is the front page (lede, figures, the definition once, the map with its key, key points, report);
     page 2 one table of every route with its bar (it was a busiest table AND a chart of the same figures), what is moved,
     the works; page 3 the councils; page 4 the carbon panel with numbered references, the glance, what changed, the four
     terms, caveats and one numbered Sources list (sources were printed beside every row and on every page)."""
     from reportlab.platypus import PageBreak, CondPageBreak
+    from reportlab.platypus.flowables import SetTopFlowables
     buf = io.BytesIO()
     doc, usable = _bulletin_doc(S, "", buf, pages)   # 10 Nov 2026 (25b): was "monthly newsletter" — one name, the bulletin
-    K = _Kit(usable)
+    K = _Kit(usable, fit)
     E, P, grid = K.E, K.P, K.grid
     st, st_r, st_h, st_hr, st_sec, st_grey = K.st, K.st_r, K.st_h, K.st_hr, K.st_sec, K.st_grey
 
@@ -2306,6 +2371,12 @@ def _newsletter(S, map_h, pages=None):
     mark = _PageMark()
     story.append(mark)
     story.append(kicker("02", "Routes and roads"))
+    # 12 Nov 2026 (A-F8): where page 2 cannot fit even at the ladder's last step, the page it runs on to is headed
+    # CONTINUED (SetTopFlowables heads every new page until it is cleared before the councils' page); page 2's rows take
+    # the table style (`K.st_t`, the body size until that step)
+    story.append(SetTopFlowables([kicker("02", CONTINUED)]))
+    P = lambda t, style=None: K.P(t, style or K.st_t)   # noqa: E731
+    st_r = K.st_tr
     story.append(P("Every route this month", st_sec))
     story.append(K.routes_table(S))
     story.append(P(E(f"Bars in each route's map colour. Planning flag: the scheme's own daily limit, the dashed red mark "
@@ -2324,18 +2395,28 @@ def _newsletter(S, map_h, pages=None):
     for w in S["works"]:
         wk.append([P(E(w["where"])), P(E(w["line"]) + f"<br/><font size=7.5 color='#64748B'>{E(w['routes_text'])}</font>"),
                    P(E(w["when"]) + f"<br/><font size=7.5 color='#64748B'>{E(w['who'])}</font>")])
+    # 12 Nov 2026 (A-F8 (a), John's yes): each public traffic limit is printed ONCE, here, with this month's figure, the
+    # limit and the plan word (the web table's words); page 4 keeps its glance row. It printed a table there as well and
+    # took the newsletter past four pages (D43).
+    lim_by = (S.get("traffic") or {}).get("by_zone") or {}
     for z in S["controls"]:
-        wk.append([P(f"<font color='#{AMBER_HEX}'><b>{z['n']}</b></font> " + E(z["name"])), P(E(z["kind"] + (f": {z['note']}" if z["note"] else ""))),
+        lim = lim_by.get(z.get("id"))
+        wk.append([P(f"<font color='#{AMBER_HEX}'><b>{z['n']}</b></font> " + E(z["name"])),
+                   P(E(z["kind"] + (f": {z['note']}" if z["note"] else "")) + (_limit_line(E, lim) if lim else "")),
                    P(E(z["when"]) + "<br/><font size=7.5 color='#64748B'>set by the scheme</font>")])
     if len(wk) == 1:
         wk.append([P("Nothing listed for this month.", st_grey), "", ""])
     story.append(grid(wk, [usable * 0.26, usable * 0.46, usable * 0.28]))
+    if lim_by:
+        story.append(P(E(S["traffic"]["note"]), st_grey))
     for line in S["checks"]:
         story.append(P(E(line), st_grey))
     for o in S["others"]:
         story.append(P(f"<b>{E(o['kind'])}.</b> " + E(o["text"]), st_grey))
     story.append(KeepTogether([P("What changed since last month", st_sec),
                                P(E(S["change_text"]) + " <font color='#64748B'>Each month's approved plan as it stands today.</font>")]))
+    story.append(SetTopFlowables([]))   # the councils' page and after: no continued head
+    P, st_r = K.P, K.st_r
 
     # ---- 03 councils (no council areas: the carbon panel takes the page)
     story.append(PageBreak())
@@ -2368,7 +2449,7 @@ def _newsletter(S, map_h, pages=None):
                 cc.append([P(E(d["name"])), P(E(d["highway_authority"])), P(E(d["text"]), st_r), P(E(d["share"]), st_r),
                            P(E(d.get("la_share") or "—"), st_r)])
             story.append(KeepTogether([P(E(C["title"]), st_sec), P(E(C["lede"])), Spacer(1, 1.5 * mm),
-                                       _CouncilMap(C, usable, 70 * mm), Spacer(1, 1 * mm), _council_legend(C, usable)]))
+                                       _CouncilMap(C, usable, K.fit["council_map"] * mm), Spacer(1, 1 * mm), _council_legend(C, usable)]))
             story.append(Spacer(1, 1.5 * mm))
             story.append(grid(cc, [usable * 0.24, usable * 0.28, usable * 0.13, usable * 0.14, usable * 0.21]))
             story.append(P(E(" ".join([C["tally"]] + C["county_lines"]) + (" † A and minor roads only: no motorway in the "
@@ -2378,18 +2459,17 @@ def _newsletter(S, map_h, pages=None):
                 story.append(P(E(line), st_grey))
     if not (M or C):
         story += _lot_flow(K, L)
-        story += _traffic_flow(K, S.get("traffic"))      # 9 Nov 2026 (v2.1 task 2.1-1)
 
     # ---- 04 carbon and the small print
     story.append(PageBreak())
     story.append(kicker("04", "Carbon and the small print"))
     if M or C:
         story += _lot_flow(K, L)
-        story += _traffic_flow(K, S.get("traffic"))      # 9 Nov 2026 (v2.1 task 2.1-1)
     story += _glance_flow(K, S)
     story.append(P("Terms", st_sec))
-    tt = LongTable([[P(f"<b>{E(k)}</b>", ParagraphStyle("tk", parent=st, fontSize=8, leading=10)),
-                     P(E(v[0].upper() + v[1:]), ParagraphStyle("tv", parent=st, fontSize=8, leading=10))] for k, v in S["terms"]],
+    tf = K.fit["terms"]
+    tt = LongTable([[P(f"<b>{E(k)}</b>", ParagraphStyle("tk", parent=st, fontSize=tf, leading=tf * 1.25)),
+                     P(E(v[0].upper() + v[1:]), ParagraphStyle("tv", parent=st, fontSize=tf, leading=tf * 1.25))] for k, v in S["terms"]],
                    colWidths=[usable * 0.2, usable * 0.8])
     tt.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("VALIGN", (0, 0), (-1, -1), "TOP"),
                             ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
@@ -2421,7 +2501,7 @@ def _glance_flow(K, S):
     # back out of order when the PDF is read as text; the Data column may wrap (it is the last)
     t = LongTable(gl, colWidths=[K.usable * 0.57, K.usable * 0.14, K.usable * 0.29], repeatRows=1)
     t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [
-                           ("TOPPADDING", (0, 0), (-1, -1), 1.3), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.3),
+                           ("TOPPADDING", (0, 0), (-1, -1), K.fit["small_pad"]), ("BOTTOMPADDING", (0, 0), (-1, -1), K.fit["small_pad"]),
                            ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]))
     # NARROWED 14 Oct 2026 (the publishing check): one short line under the table, at 7.5 pt
     out = [P("This month at a glance", K.st_sec), t,
@@ -2433,29 +2513,19 @@ def _glance_flow(K, S):
     return out
 
 
-def _traffic_flow(K, T):
-    """9 Nov 2026 (v2.1 task 2.1-1, Q10): "Traffic limits on local roads" — the web page's table, at most six rows, the
-    over word red and the near word amber; nothing when no public limit is in force this month."""
-    if not T:
-        return []
-    E, P = K.E, K.P
-    sm = ParagraphStyle("tls", parent=K.st, fontSize=8, leading=9.8)
-    smr = ParagraphStyle("tlr", parent=sm, alignment=2)
-    hd = ParagraphStyle("tlh", parent=K.st_h, fontSize=7.5, leading=9)
-    hdr = ParagraphStyle("tlhr", parent=hd, alignment=2)
-    col = {"over": "#B91C1C", "near": "#B45309"}       # text-grade red and amber (5:1 or more on white)
-    tb = [[P("Road", hd), P("This month, a day", hdr), P("Limit", hdr), P("Plan", hd)]]
-    for r in T["rows"]:
-        w = E(r["state"])
-        if r["state_key"] in col:
-            w = f"<font color='{col[r['state_key']]}'><b>{w}</b></font>"
-        tb.append([P(E(r["name"]), sm), P(E(r["figure"]), smr), P(E(r["limit"]), smr), P(w, sm)])
-    t = LongTable(tb, colWidths=[K.usable * 0.40, K.usable * 0.21, K.usable * 0.26, K.usable * 0.13], repeatRows=1)
-    t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [
-                           ("TOPPADDING", (0, 0), (-1, -1), 1.3), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.3),
-                           ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]))
-    more = (f" {T['total'] - len(T['rows'])} more within their limits." if T["total"] > len(T["rows"]) else "")
-    return [KeepTogether([P(E(T["title"]), K.st_sec), t]), P(E(T["note"] + more), K.st_grey)]
+TRAFFIC_WORD_COLOUR = {"over": "#B91C1C", "near": "#B45309"}       # text-grade red and amber (5:1 or more on white)
+
+
+def _limit_line(E, r):
+    """12 Nov 2026 (A-F8 (a), John's yes): a public traffic limit's second line in "Road works and limits": this month's
+    figure, the limit and the plan word, in the web table's words (This month, a day / Limit / Plan); the over word red
+    and the near word amber. REPLACES the newsletter's "Traffic limits on local roads" table (9 Nov, v2.1 task 2.1-1),
+    which printed every limit a second time on page 4."""
+    w = E(r["state"])
+    if r["state_key"] in TRAFFIC_WORD_COLOUR:
+        w = f"<font color='{TRAFFIC_WORD_COLOUR[r['state_key']]}'><b>{w}</b></font>"
+    return (f"<br/><font size=7.5><font color='#64748B'>This month, a day:</font> {E(r['figure'])}"
+            f" <font color='#64748B'>· Limit:</font> {E(r['limit'])} <font color='#64748B'>· Plan:</font> {w}</font>")
 
 
 def _lot_flow(K, L):
@@ -2476,7 +2546,7 @@ def _lot_flow(K, L):
     lt.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular")), ("VALIGN", (0, 0), (-1, -1), "TOP"),
                             ("LINEBELOW", (0, 0), (-1, -1), 0.3, colors.Color(0.85, 0.87, 0.9)),
                             ("LINEABOVE", (0, 0), (-1, 0), 0.9, colors.Color(*NAVY_RGB)),
-                            ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+                            ("TOPPADDING", (0, 0), (-1, -1), K.fit["lot_pad"]), ("BOTTOMPADDING", (0, 0), (-1, -1), K.fit["lot_pad"]),
                             ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5)]))
     out = [KeepTogether([P(E(L["title"]), K.st_sec), P(E(L["lede"])), Spacer(1, 1.2 * mm), lt])]
     # 14 Oct 2026: the demo note and the factor check on one line
@@ -2806,10 +2876,18 @@ def _draw_community(c, PL, P, layer):
 
 
 def _plan_scale_bar(c, v, fw):
-    """The scale bar, bottom right: 1, 2 or 5 × 10^k metres near 50 mm, in four segments, 0 / half / whole labelled."""
+    """The scale bar, bottom right: 1, 2 or 5 × 10^k metres near 50 mm, in four segments, 0 / half / whole labelled.
+    11 Nov 2026 (card A-F3): in the organisation's unit, as the bulletin's maps are: a miles organisation reads a road-scale
+    plan in miles ("0 2.5 5 miles"); a bar under 1 km (a site plan) stays in metres, as site drawings are. Returns the
+    bar's length in metres."""
     import basemap
     k = fw / v["w"]
     metres, px = basemap.bar_metres(v, 50 * mm / k)
+    half, whole = basemap.length_words(metres / 2).replace(" km", "").replace(" m", ""), basemap.length_words(metres)
+    if _du() == "mi" and metres >= 1000:
+        mi, px = basemap.bar_miles(v, 50 * mm / k)
+        metres = mi * 1609.344
+        half, whole = f"{mi / 2:g}", f"{mi:g} " + ("mile" if mi == 1 else "miles")
     bar = px * k
     x1, y = fw - 16, 24
     x0 = x1 - bar
@@ -2823,8 +2901,8 @@ def _plan_scale_bar(c, v, fw):
         c.rect(x0 + i * bar / 4, y - 1.5, bar / 4, 3.5, stroke=1, fill=1)
     c.setFillColorRGB(*NAVY_RGB); c.setFont(_BF("regular"), 6.8)
     c.drawCentredString(x0, y + 4.5, "0")
-    c.drawCentredString(x0 + bar / 2, y + 4.5, basemap.length_words(metres / 2).replace(" km", "").replace(" m", ""))
-    c.drawCentredString(x1, y + 4.5, basemap.length_words(metres))
+    c.drawCentredString(x0 + bar / 2, y + 4.5, half)
+    c.drawCentredString(x1, y + 4.5, whole)
     return metres
 
 
