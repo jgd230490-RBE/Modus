@@ -271,5 +271,16 @@ try:
 finally:
     export._newsletter = _real_nl
 
+# 12 Nov 2026 (A-F8 (a), John's yes): the route column takes the room the Map and "In the month" columns do not use
+from reportlab.pdfbase.pdfmetrics import stringWidth  # noqa: E402
+_u = 180 * mm
+ok("ROUTE1 the route table still makes the whole width (map, route, bar 0.25, in the month, last month 0.07, flag 0.10)",
+   abs(sum(export.ROUTE_COLS) + 0.25 + 0.07 + 0.10 - 1.0) < 1e-9, str(export.ROUTE_COLS))
+ok("ROUTE2 the route column is wider than before (0.42) and the Map column still holds two letters and a dash",
+   export.ROUTE_COLS[1] > 0.42 and _u * export.ROUTE_COLS[0] - 8 >= stringWidth("M–G", export._BF("regular"), 8))
+ok("ROUTE3 'month' in the In the month header fits its column whole (it broke as mont / h at 0.06)",
+   _u * export.ROUTE_COLS[2] - 8 >= stringWidth("month", KIT.st_h.fontName, KIT.st_h.fontSize)
+   and _u * export.ROUTE_COLS[2] - 8 >= stringWidth("9,999", export._BF("regular"), 8))
+
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 sys.exit(1 if FAIL else 0)

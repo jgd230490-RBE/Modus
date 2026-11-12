@@ -2448,8 +2448,11 @@ _ex = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "expor
 ok("TRAFFIC: the bulletin table after 'Is it a lot?' — public limits only, at most 6 rows, worst first, the glance row",
    "TRAFFIC_ROWS = 6" in _bd and "summary([int(mi)], public_only=True, with_routes=False)" in _bd
    and "{lot}\n{traffic}\n" in _bd and '"Traffic limits on local roads"' in _bd and "rows.insert(4, (\"Traffic limits on local roads\"" in _bd)
-ok("TRAFFIC: the newsletter draws the same table after the panel; the leaflet one clause on the works point",
-   _ex.count('story += _traffic_flow(K, S.get("traffic"))') == 2 and "Traffic limits on local roads: {traffic['glance']}." in _bd)
+# REVERSED 12 Nov 2026 (A-F8 (a), John's yes): the newsletter no longer prints the table after the panel; each public
+# limit is printed once, as its row in "Road works and limits" with its figure (export._limit_line)
+ok("TRAFFIC: the newsletter prints each limit once, in the works table, never the table after the panel; the leaflet one clause on the works point",
+   _ex.count('story += _traffic_flow(K, S.get("traffic"))') == 0 and "def _traffic_flow(" not in _ex
+   and "_limit_line(E, lim) if lim" in _ex and "Traffic limits on local roads: {traffic['glance']}." in _bd)
 ok("TRAFFIC: figures rounded half up (round() is half-even)", "def _whole(" in _bd)
 # =========================================================================== #
 print()

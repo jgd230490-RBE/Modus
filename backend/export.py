@@ -2175,7 +2175,10 @@ class _Kit:
         if not S["routes"]:
             rows.append(["", P("No route with a stored road route carries approved lorries this month.", self.st_grey), "", "", "", ""])
         u = self.usable
-        return self.grid(rows, [u * 0.06, u * 0.42, bar_w, u * 0.10, u * 0.07, u * 0.10])
+        # 12 Nov 2026 (A-F8 (a), John's yes): the route column takes what the Map and "In the month" columns do not use
+        # (two letters and a dash, a four-figure count, "month" whole in the header), so most names fit on one line: 14 of 23 wrapped in Apr
+        # 2027 on a local copy and page 2 ran over (it was 0.06 / 0.42 / 0.10)
+        return self.grid(rows, [u * ROUTE_COLS[0], u * ROUTE_COLS[1], bar_w, u * ROUTE_COLS[2], u * 0.07, u * 0.10])
 
     def brief(self, S, title="Key points"):
         E, P = self.E, self.P
@@ -2293,6 +2296,11 @@ NEWSLETTER_PAGES = 4               # D43: one section a page
 NEWSLETTER_MAP_HEIGHTS = (100 * mm, 92 * mm, 84 * mm, 76 * mm, 68 * mm, 60 * mm, 52 * mm, 44 * mm, 36 * mm)
 
 
+#: 12 Nov 2026 (A-F8 (a)): page 2's route table, the Map, Route and "In the month" columns (with the bar 0.25, the last
+#: month 0.07 and the planning flag 0.10 they make the whole width)
+ROUTE_COLS = (0.05, 0.465, 0.065)
+
+
 class _PageMark(Flowable):
     """Draws nothing; remembers the page it landed on (the newsletter's page-1 fit check)."""
     def __init__(self):
@@ -2364,12 +2372,20 @@ def _newsletter(S, map_h, pages=None, fit=None):
     for w in S["works"]:
         wk.append([P(E(w["where"])), P(E(w["line"]) + f"<br/><font size=7.5 color='#64748B'>{E(w['routes_text'])}</font>"),
                    P(E(w["when"]) + f"<br/><font size=7.5 color='#64748B'>{E(w['who'])}</font>")])
+    # 12 Nov 2026 (A-F8 (a), John's yes): each public traffic limit is printed ONCE, here, with this month's figure, the
+    # limit and the plan word (the web table's words); page 4 keeps its glance row. It printed a table there as well and
+    # took the newsletter past four pages (D43).
+    lim_by = (S.get("traffic") or {}).get("by_zone") or {}
     for z in S["controls"]:
-        wk.append([P(f"<font color='#{AMBER_HEX}'><b>{z['n']}</b></font> " + E(z["name"])), P(E(z["kind"] + (f": {z['note']}" if z["note"] else ""))),
+        lim = lim_by.get(z.get("id"))
+        wk.append([P(f"<font color='#{AMBER_HEX}'><b>{z['n']}</b></font> " + E(z["name"])),
+                   P(E(z["kind"] + (f": {z['note']}" if z["note"] else "")) + (_limit_line(E, lim) if lim else "")),
                    P(E(z["when"]) + "<br/><font size=7.5 color='#64748B'>set by the scheme</font>")])
     if len(wk) == 1:
         wk.append([P("Nothing listed for this month.", st_grey), "", ""])
     story.append(grid(wk, [usable * 0.26, usable * 0.46, usable * 0.28]))
+    if lim_by:
+        story.append(P(E(S["traffic"]["note"]), st_grey))
     for line in S["checks"]:
         story.append(P(E(line), st_grey))
     for o in S["others"]:
@@ -2418,14 +2434,12 @@ def _newsletter(S, map_h, pages=None, fit=None):
                 story.append(P(E(line), st_grey))
     if not (M or C):
         story += _lot_flow(K, L)
-        story += _traffic_flow(K, S.get("traffic"))      # 9 Nov 2026 (v2.1 task 2.1-1)
 
     # ---- 04 carbon and the small print
     story.append(PageBreak())
     story.append(kicker("04", "Carbon and the small print"))
     if M or C:
         story += _lot_flow(K, L)
-        story += _traffic_flow(K, S.get("traffic"))      # 9 Nov 2026 (v2.1 task 2.1-1)
     story += _glance_flow(K, S)
     story.append(P("Terms", st_sec))
     tf = K.fit["terms"]
@@ -2474,29 +2488,19 @@ def _glance_flow(K, S):
     return out
 
 
-def _traffic_flow(K, T):
-    """9 Nov 2026 (v2.1 task 2.1-1, Q10): "Traffic limits on local roads" — the web page's table, at most six rows, the
-    over word red and the near word amber; nothing when no public limit is in force this month."""
-    if not T:
-        return []
-    E, P = K.E, K.P
-    sm = ParagraphStyle("tls", parent=K.st, fontSize=8, leading=9.8)
-    smr = ParagraphStyle("tlr", parent=sm, alignment=2)
-    hd = ParagraphStyle("tlh", parent=K.st_h, fontSize=7.5, leading=9)
-    hdr = ParagraphStyle("tlhr", parent=hd, alignment=2)
-    col = {"over": "#B91C1C", "near": "#B45309"}       # text-grade red and amber (5:1 or more on white)
-    tb = [[P("Road", hd), P("This month, a day", hdr), P("Limit", hdr), P("Plan", hd)]]
-    for r in T["rows"]:
-        w = E(r["state"])
-        if r["state_key"] in col:
-            w = f"<font color='{col[r['state_key']]}'><b>{w}</b></font>"
-        tb.append([P(E(r["name"]), sm), P(E(r["figure"]), smr), P(E(r["limit"]), smr), P(w, sm)])
-    t = LongTable(tb, colWidths=[K.usable * 0.40, K.usable * 0.21, K.usable * 0.26, K.usable * 0.13], repeatRows=1)
-    t.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), _BF("regular"))] + TABLE_LOOK + [
-                           ("TOPPADDING", (0, 0), (-1, -1), K.fit["small_pad"]), ("BOTTOMPADDING", (0, 0), (-1, -1), K.fit["small_pad"]),
-                           ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4)]))
-    more = (f" {T['total'] - len(T['rows'])} more within their limits." if T["total"] > len(T["rows"]) else "")
-    return [KeepTogether([P(E(T["title"]), K.st_sec), t]), P(E(T["note"] + more), K.st_grey)]
+TRAFFIC_WORD_COLOUR = {"over": "#B91C1C", "near": "#B45309"}       # text-grade red and amber (5:1 or more on white)
+
+
+def _limit_line(E, r):
+    """12 Nov 2026 (A-F8 (a), John's yes): a public traffic limit's second line in "Road works and limits": this month's
+    figure, the limit and the plan word, in the web table's words (This month, a day / Limit / Plan); the over word red
+    and the near word amber. REPLACES the newsletter's "Traffic limits on local roads" table (9 Nov, v2.1 task 2.1-1),
+    which printed every limit a second time on page 4."""
+    w = E(r["state"])
+    if r["state_key"] in TRAFFIC_WORD_COLOUR:
+        w = f"<font color='{TRAFFIC_WORD_COLOUR[r['state_key']]}'><b>{w}</b></font>"
+    return (f"<br/><font size=7.5><font color='#64748B'>This month, a day:</font> {E(r['figure'])}"
+            f" <font color='#64748B'>· Limit:</font> {E(r['limit'])} <font color='#64748B'>· Plan:</font> {w}</font>")
 
 
 def _lot_flow(K, L):

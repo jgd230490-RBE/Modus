@@ -104,7 +104,9 @@ def definition():
 DEFINITION = ("A lorry coming and going is 2 movements, as councils count them. "
               "Planned figures from the approved plan: no lorry was counted.")   # the default; a page reads definition()
 CHART_MAX_ROUTES = 24
-ZONE_WORDS = {"closure": "closure", "weight_limit": "weight limit", "works": "works area", "other": "local control"}
+# 12 Nov 2026 (A-F8, rule 13): + traffic_limit — a public traffic limit read "local control" in "Road works and limits"
+ZONE_WORDS = {"closure": "closure", "weight_limit": "weight limit", "works": "works area", "other": "local control",
+              "traffic_limit": "traffic limit"}
 # 13 Oct 2026: the council layer's carbon colouring, the public map's own (map/index.html AREA_RAMP_CARBON,
 # AREA_NONE, AREA_STOPS.carbon and the hatch of areaHatchImage) — test_bulletin.py reads the map and holds them equal
 COUNCIL_RAMP = ("#EE9150", "#E8590C", "#B8470A", "#7C2D06")
@@ -842,7 +844,7 @@ def traffic_month(mi):
         if lim["basis"] == "busiest_day" and state != "over":
             state = "average"
         unit = "movements" if mv else "visits"
-        rows.append({"name": L["name"], "state_key": state,
+        rows.append({"name": L["name"], "state_key": state, "zone_id": L["id"],
                      # whole movements, half up (round() is half-even: x.5 goes to the even whole, and the in / out split misread)
                      "figure": _tl_value(m["value"], lim["value"]) + (f" ({_whole(m['in_per_day'])} in, {_whole(m['out_per_day'])} out)"
                                                      if mv else f" {unit}"),
@@ -855,8 +857,11 @@ def traffic_month(mi):
     rows.sort(key=lambda r: (order.get(r["state_key"], 4), -r["ratio"], r["name"]))
     over = sum(1 for r in rows if r["state_key"] == "over")
     near = sum(1 for r in rows if r["state_key"] == "near")
+    # 12 Nov 2026 (A-F8 (a), John's yes): by_zone = EVERY public limit's row by its zone, for the printed newsletter,
+    # which prints each limit once, in "Road works and limits" (the web page keeps its table of at most six)
     return {"title": "Traffic limits on local roads", "rows": rows[:TRAFFIC_ROWS], "total": len(rows),
-            "over": over, "near": near, "glance": f"{over} over, {near} near", "note": TRAFFIC_NOTE}
+            "over": over, "near": near, "glance": f"{over} over, {near} near", "note": TRAFFIC_NOTE,
+            "by_zone": {r["zone_id"]: r for r in rows}}
 
 
 def _glance(H, R, routes_view, works, controls, rs_status, never, checked_at, month_long, concerns_m=None, traffic=None):

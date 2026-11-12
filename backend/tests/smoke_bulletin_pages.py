@@ -155,9 +155,15 @@ with TestClient(main.app, base_url="https://testserver") as c:
                r.status_code == 200 and len(pg) == 4 and all(f"{i} of 4" in p for i, p in enumerate(pg, 1)),
                f"{len(pg)} pages, step {step}")
             ok("...built tighter only as far as needed: the first step that fits", ladder_ok(), str(BUILT))
-            ok("...nothing left out: the limit is in page 2's works table and page 4's traffic limits table, by name",
-               len(pg) == 4 and "B6047 Melton Road" in pg[1] and "Traffic limits on local roads" in pg[3]
-               and "B6047 Melton Road" in pg[3] and "150 movements a day" in pg[3], pg[3][:300] if len(pg) > 3 else "")
+            # REVERSED 12 Nov 2026 (A-F8 (a), John's yes): printed ONCE, in page 2's works table with its figure; page 4
+            # keeps the glance row only (it printed a second table there)
+            ok("...nothing left out, printed once: the limit is page 2's works row with this month's figure, its limit and the plan word",
+               len(pg) == 4 and "B6047 Melton Road" in pg[1] and "traffic limit" in pg[1] and "This month, a day:" in pg[1]
+               and "150 movements a day" in pg[1] and "Plan:" in pg[1] and "a planning check, not a count on the road" in pg[1],
+               pg[1][-900:] if len(pg) > 1 else "")
+            ok("...and NOT a second time on page 4 (no table there; the glance row stays)",
+               len(pg) == 4 and "B6047 Melton Road" not in pg[3] and "150 movements a day" not in pg[3]
+               and "Traffic limits on local roads" in pg[3], pg[3][:300] if len(pg) > 3 else "")
             ok("...the glance row and the brief's line are there",
                "Traffic limits on local roads 0 over, 0 near Forecast against the limits" in j
                and "Traffic limits on local roads: 0 over, 0 near." in j)
@@ -165,8 +171,12 @@ with TestClient(main.app, base_url="https://testserver") as c:
                len(pg) == 4 and all(f" {k} " in pg[3] for k in sources0) and "Terms" in pg[3] and "Caveats" in pg[3]
                and "Sources" in pg[3], str(sources0))
     print(f"        two limits: {counts.get(2)}, three limits: {counts.get(3)} (pages, fit step)")
-    ok("two and three limits: never fewer pages than one limit, the sections in order (reported, see card A-F8)",
-       counts.get(2, (0,))[0] >= 4 and counts.get(3, (0,))[0] >= counts.get(2, (0,))[0])
+    # REVERSED 12 Nov 2026 (A-F8 (a)): two and three limits are four pages too, each limit once on page 2
+    ok("⭐ two and three public limits: four pages each, \"n of 4\" (with the limits printed once, page 4 no longer spills)",
+       counts.get(2, (0,))[0] == 4 and counts.get(3, (0,))[0] == 4, str(counts))
+    ok("...the three limits each once, all on page 2",
+       len(pg) == 4 and all(sum(p.count(nm[:16]) for p in pg[1:]) == 1 and nm[:16] in pg[1] for nm, _, _ in LIMITS),
+       str([(nm[:16], [p.count(nm[:16]) for p in pg]) for nm, _, _ in LIMITS]))
 
 print(f"{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
