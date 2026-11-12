@@ -8230,8 +8230,8 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
   ok("⭐ ONE POPUP: over a marker the road's hover tip gives way (it promised the road's card), through the tip's own hidden path",
      /if \(!card\) return;\s*if \(f && e && e\.point && typeof markerHitAt === 'function' && markerHitAt\(e\.point\)\) e = null;\s*if \(!f \|\| !e \|\| !e\.point \|\| isPhoneShell\(\)/.test(code));
   ok("ONE POPUP: the marker's own clicks are untouched, and a near miss on a road already stood aside for a marker (the clickable list names both layers)",
-     /map\.on\('click', 'locations', \(e\) => \{\s*if \(!e\.features \|\| !e\.features\.length\) return;\s*const p = e\.features\[0\]\.properties;/.test(code)
-     && /map\.on\('click', 'site-gates', \(e\) => \{\s*if \(!e\.features \|\| !e\.features\.length\) return;\s*new mapboxgl\.Popup/.test(code)
+     /map\.on\('click', 'locations', \(e\) => \{\s*if \(!e\.features \|\| !e\.features\.length\) return;\s*(?:\{ const top = [^\n]*\n\s*)?const p = e\.features\[0\]\.properties;/.test(code)
+     && /map\.on\('click', 'site-gates', \(e\) => \{\s*if \(!e\.features \|\| !e\.features\.length\) return;\s*(?:\{ const top = [^\n]*\n\s*)?new mapboxgl\.Popup/.test(code)
      && /const CLICKABLE_LAYERS = \[[^\]]*'site-gates',\s*'locations'/.test(code) && code.includes("if (typeof clickableAt === 'function' && clickableAt(e.point)) return;"));
   ok("POPUP TOP: in the Dark look a popup beside its point has a tip that points sideways (the plain Dark rule coloured the two edges that must stay clear)",
      html.includes('html[data-look="dark"] .mapboxgl-popup-anchor-left .mapboxgl-popup-tip{ border-top-color:transparent; border-bottom-color:transparent; border-right-color:var(--surface); }')
