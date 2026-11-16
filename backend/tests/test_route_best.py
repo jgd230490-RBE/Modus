@@ -324,8 +324,18 @@ def keep_words(r):
 # =========================================================================== #
 #  2. Limits (N1) and the plain answer                                         #
 # =========================================================================== #
-ok("2. the gate reads False where community.status() has no all_options key (this branch's own community.py)",
-   "all_options" not in (community.status() or {}) and RB.Context(day=DAY).community_all is False)
+# NARROWED 16 Nov 2026 (the rule merged with claude/community-all-options): community.status() now carries the key. It
+# reads False until a Fetch now has covered every stored option; a status with no key at all (an older layer's) still
+# reads False. Before the merge this check asserted that the key was absent.
+ok("2. the gate reads False while the layer was not fetched along every option (the key is there, and False)",
+   (community.status() or {}).get("all_options") is False and RB.Context(day=DAY).community_all is False)
+_status_was = community.status
+community.status = lambda: {}
+try:
+    ok("2. ...and False where community.status() has no all_options key at all",
+       RB.Context(day=DAY).community_all is False)
+finally:
+    community.status = _status_was
 R1 = run("R1")
 keep_words(R1)
 o1, o2 = opt(R1, 1), opt(R1, 2)
