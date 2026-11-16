@@ -8,7 +8,7 @@ the collision evidence gets a cycle-by-hour chart and table. Never in the plan's
 WHAT IS ASSERTED: the plan (calls before the run, no call); the run (the bake's question at each hour, one call a leg
 an hour, every option named or "not stored", the stored lines untouched, a second run idle, a refused call kept as a
 row, the time budget); the read (only rows whose stored line is still the one matched; a re-route retires them); the
-cycle at an hour = both legs + the turnaround; other lorries on the same road scaled and saying so; the plan's own
+cycle at an hour = both legs + the turnaround; (16 Nov 2026) after a re-route the plan counts and the run redoes only the rows the read no longer trusts, replacing them, never an unchanged leg; Make primary keeps each option's times on its own line; other lorries on the same road scaled and saying so; the plan's own
 figures unchanged; the evidence block, its sentence and its PDF drawing; the page's columns, marking, note, busy-hours
 words and the button; the registrations; the guides.
 
@@ -344,6 +344,79 @@ try:
     T2 = hour_times.times_for("R1")
     ok("⭐ 5. re-routing a leg retires its times (the stored line is not the one they matched); the other leg keeps its",
        "loaded" not in (T2.get(TIP) or {}) and "return" in T2.get(TIP, {}), str(list((T2.get(TIP) or {}).keys())))
+
+    # ---- 5b. 16 Nov 2026 (Group A, claude/busy-hours-redo-stale): after a re-route the run works out again ONLY the  ---
+    # rows its reader no longer trusts. The fault (live, 12 Nov 18:28): the run counted a (route, leg, hour) with ANY row
+    # as done, so it answered "attempted 0" and the re-routed lines had no times until a wipe and a full run.
+    RET_BEFORE = json.dumps(db.query("SELECT * FROM route_hour_times WHERE leg = 'return' ORDER BY hour, rank"), default=str)
+    CALLS.clear()
+    P2 = hour_times.plan()
+    td = P2.get("to_do") or {}
+    ok("⭐ 5b. after a re-route the plan counts the re-routed leg's 7 hours as to do: 1 route, 1 leg, 7 calls, all stale",
+       (td.get("routes"), td.get("legs"), td.get("leg_hours"), td.get("stale"), td.get("absent"), td.get("here_calls"))
+       == (1, 1, 7, 7, 0, 7) and not CALLS, str(td))
+    ok("5b. ...and still gives the whole run's figure beside it (14 calls), unchanged", P2["here_calls"] == 14, str(P2))
+    B5 = hour_times.bake_batch(limit=30)
+    ok("⭐ 5b. the run works out only those 7 (loaded leg, every hour), 7 calls, nothing left",
+       (B5["attempted"], B5["baked"], B5["remaining"], B5["here_calls"]) == (7, 7, 0, 7)
+       and len(CALLS) == 7 and all(c["laden"] for c in CALLS), str(B5))
+    T3 = hour_times.times_for("R1")
+    ok("⭐ 5b. the re-routed leg has its times again, all three options at every hour but 17:00's road not stored",
+       sorted((T3.get(TIP) or {}).get("loaded") or {}) == [0, 1, 2] and len(T3[TIP]["loaded"][0]) == 7, str(T3.get(TIP, {}).keys()))
+    ok("⭐ 5b. a stale row is replaced, not left beside the new one (3 rows a loaded hour, none matched to the old line)",
+       db.query("SELECT COUNT(*) AS n FROM route_hour_times WHERE leg = 'loaded'")[0]["n"] == 21
+       and not db.query("SELECT 1 FROM route_hour_times h WHERE h.leg = 'loaded' AND h.alt_index IS NOT NULL AND NOT EXISTS "
+                        "(SELECT 1 FROM route_geometry g WHERE g.route_id = h.route_id AND g.vehicle_profile = h.vehicle_profile "
+                        "AND g.leg = h.leg AND g.computed_at = h.geom_computed_at)"))
+    ok("⭐ 5b. the leg whose line did not change is never asked for again: its rows are as they were",
+       json.dumps(db.query("SELECT * FROM route_hour_times WHERE leg = 'return' ORDER BY hour, rank"), default=str) == RET_BEFORE)
+    CALLS.clear()
+    P3 = hour_times.plan()
+    ok("5b. then the plan has nothing to do and a batch calls nothing",
+       (P3.get("to_do", {}).get("leg_hours"), P3.get("to_do", {}).get("here_calls")) == (0, 0) and hour_times.bake_batch()["attempted"] == 0
+       and not CALLS, str(P3.get("to_do")))
+    ok("5b. the same departure day and hours as before (only which rows are asked for changed)",
+       {r["depart_at"][:10] for r in db.query("SELECT depart_at FROM route_hour_times")} == {DAY}
+       and sorted({r["hour"] for r in db.query("SELECT hour FROM route_hour_times WHERE leg = 'loaded'")}) == list(hour_times.HOURS))
+    # A key whose options matched NO stored line (all None) has nothing for the reader to distrust: it is redone after a
+    # re-route by its age (worked out before the leg's newest stored line), never otherwise
+    db.execute("UPDATE route_hour_times SET alt_index = NULL, geom_computed_at = NULL WHERE leg = 'loaded' AND hour = '06:00'")
+    ok("5b. a key that matched no stored line and is newer than the line is not redone",
+       hour_times.plan().get("to_do", {}).get("leg_hours") == 0)
+    db.execute("UPDATE route_hour_times SET computed_at = '2026-01-01T00:00:00+00:00' WHERE leg = 'loaded' AND hour = '06:00'")
+    ok("5b. ...but one worked out before the leg was last routed is", hour_times.plan().get("to_do", {}).get("leg_hours") == 1)
+    CALLS.clear()
+    hour_times.bake_batch(limit=30)
+    ok("5b. ...and the run redoes it with one call", len(CALLS) == 1 and hour_times.plan().get("to_do", {}).get("leg_hours") == 0)
+
+    # ---- 5c. Make primary swaps an option's number with 0 and keeps its computed_at: the times follow the LINES -------
+    T4 = hour_times.times_for("R1")
+    network.promote_alternative("R1", TIP, 1, leg="loaded")
+    T5 = hour_times.times_for("R1")
+    ok("⭐ 5c. after Make primary the old alternative 1's times are read as option 0, and the old main line's as 1",
+       T5.get(TIP, {}).get("loaded", {}).get(0) == T4[TIP]["loaded"][1] and T5[TIP]["loaded"].get(1) == T4[TIP]["loaded"][0]
+       and T5[TIP]["loaded"].get(2) == T4[TIP]["loaded"][2], str(sorted(T5.get(TIP, {}).get("loaded", {}))))
+    CALLS.clear()
+    ok("⭐ 5c. ...and the lines did not change, so the plan has nothing to do and the run calls nothing",
+       hour_times.plan().get("to_do", {}).get("leg_hours") == 0 and hour_times.bake_batch()["attempted"] == 0 and not CALLS)
+    A5 = hour_times.attach(network.route_analysis("R1"))
+    a0 = next(x for x in A5["rows"] if x["profile"] == TIP and x["alt_index"] == 0)
+    ok("5c. the Routes row of the new main line carries the cycle of its own line at 08:00 (old alternative 1's)",
+       a0["hours"]["08:00"] is not None and abs(a0["hours"]["08:00"] - (T4[TIP]["loaded"][1]["08:00"]
+       + T4[TIP]["return"][a0["return_alt_used"] or 0]["08:00"] + a0["turnaround_hr"])) < 0.0006)
+    # Options stored in the same instant (one computed_at for several): the row's line is told apart by its fingerprint
+    SAME = "2026-11-16T09:00:00.000001+00:00"
+    db.execute("UPDATE route_geometry SET computed_at = ? WHERE vehicle_profile = ? AND leg = 'return'", (SAME, TIP))
+    db.execute("UPDATE route_hour_times SET geom_computed_at = ? WHERE leg = 'return' AND alt_index IS NOT NULL", (SAME,))
+    T6 = hour_times.times_for("R1")
+    network.promote_alternative("R1", TIP, 2, leg="return")
+    T7 = hour_times.times_for("R1")
+    ok("⭐ 5c. two options stored in the same instant: after Make primary each keeps its own line's times (by its line)",
+       T6[TIP]["return"] == T4[TIP]["return"] and T7[TIP]["return"].get(0) == T6[TIP]["return"][2]
+       and T7[TIP]["return"].get(2) == T6[TIP]["return"][0] and T7[TIP]["return"].get(1) == T6[TIP]["return"][1])
+    ok("5c. ...and still nothing to do", hour_times.plan().get("to_do", {}).get("leg_hours") == 0)
+    network.promote_alternative("R1", TIP, 2, leg="return")
+    network.promote_alternative("R1", TIP, 1, leg="loaded")
     hour_times.clear()
     ok("5. clear drops every time", not db.query("SELECT 1 FROM route_hour_times") and hour_times.times_for("R1") == {})
     SC["boom"] = True
@@ -423,6 +496,12 @@ ok("⭐ 7. the technical guide explains how HERE ranks a lorry route, sourced, a
    and "R049 Alt 2" in _rk and "That is not verified" in _rk)
 ok("7. the request really sends no routingMode (so HERE's default applies, as the guide says)",
    "routingMode" not in read("backend/here_routing.py").split("def routes(")[1].split(chr(10) + "def ")[0])
+ok("8. (16 Nov 2026) the technical guide says a run redoes only rows no longer trusted, and Make primary keeps the times",
+   "<code>hour_times._to_do</code>" in _tg and "<code>to_do</code> beside the whole run" in _tg
+   and "Make primary, which renumbers the options and keeps their times" in _tg)
+ok("8. ...and the run reads its list from _to_do, never from 'any row' again",
+   "todo = [k for k, _why in _to_do(profile)]" in read("backend/hour_times.py")
+   and "SELECT DISTINCT route_id, leg, hour FROM route_hour_times" not in read("backend/hour_times.py"))
 
 print()
 for f_ in FAIL:
