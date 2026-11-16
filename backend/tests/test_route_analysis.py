@@ -423,7 +423,9 @@ ok("4 F: no diversion: one line for the assessor's page, a period with no way ro
 import openpyxl  # noqa: E402
 WB = openpyxl.load_workbook(io.BytesIO(RR.build_xlsx(D)))
 _names = WB.sheetnames
-ok("5: a sheet per section, the contents first and About last", _names[0] == "Contents" and _names[-1] == "About"
+# REVERSED 16 Nov 2026 (step 1c, John: "Yes, as recommended"): the Summary sheet is first, the contents second
+ok("5: a sheet per section, the Summary first, the contents second and About last", _names[0] == "Summary"
+   and _names[1] == "Contents" and _names[-1] == "About"
    and {"Routes side by side", "A Limits", "A Closures and zones", "B Community places", "D Cycle and left turns",
         "E Busy-hour times", "F Diversions"} <= set(_names) and any(n.startswith("C ") for n in _names), str(_names))
 ok("5: C is the evidence workbook merged, its cycle sheet left to D when D is ticked",
@@ -629,6 +631,165 @@ ok("8: the user guide names the Route analysis and its sections, no back-end wor
    and not re.search(r"route-analysis|/api/|heavy_reads|endpoint", GUIDE.split("Route analysis")[1][:2500]))
 ok("8: the technical guide: the addresses, the solo build, stored data only", "/api/routes/analysis.pdf" in TECH
    and "route_analysis_doc" in TECH and "solo" in TECH)
+
+# --------------------------------------------------------------------------- #
+#  9. The summary (16 Nov 2026, step 1c; notes\route-best-summary-mockup-1116, #
+#     John: "Yes, as recommended" to S1 to S7)                                 #
+# --------------------------------------------------------------------------- #
+import route_best  # noqa: E402
+_b9 = R.get("best") or {}
+ok("9: gather: the rule's answer on every route, from route_best.evaluate", isinstance(_b9, dict)
+   and _b9.get("error") is None and _b9.get("answer") in ("Suggested", "A trade-off", "Keep the route in use")
+   and isinstance(_b9.get("cols"), list) and _b9["cols"] and _b9["cols"][0]["in_use"], str(_b9)[:400])
+ok("9: the rule's lorry (most approved loads: OTHER), not the file's (PROF picked), said as a name",
+   _b9.get("lorry") == OTHER and _b9.get("lorry_text") == conversions.vehicle_label(conversions.load_factors(), OTHER)
+   and D["lorry"] == PROF, (str(_b9.get("lorry")), D.get("lorry")))
+ok("9: the other lorries by name, never a key", conversions.vehicle_label(conversions.load_factors(), PROF)
+   in _b9.get("others_text", []) and PROF not in _b9.get("others_text", [PROF]) or
+   conversions.vehicle_label(conversions.load_factors(), PROF) == PROF, str(_b9.get("others_text")))
+_real_eval = route_best.evaluate
+route_best.evaluate = lambda rid, ctx: (_ for _ in ()).throw(RuntimeError("boom"))
+_Bx = RA.best("R1", route_best.Context(day=date(2026, 11, 9)), conversions.load_factors())
+route_best.evaluate = _real_eval
+ok("9: the rule failing on a route: one plain sentence, never the error", _Bx == {"error": RA.SUMMARY_UNAVAILABLE}
+   and "boom" not in str(_Bx), str(_Bx))
+ok("9: no context (the rule not read): the same sentence", RA.best("R1", None, {}) == {"error": RA.SUMMARY_UNAVAILABLE})
+
+
+def _col(label, counts, pct=None, in_use=False, chosen=False, traded=False, ruled_out=None, head=None):
+    return {"label": label, "in_use": in_use, "chosen": chosen, "traded": traded, "ruled_out": ruled_out or [],
+            "counts": counts, "pct": pct or {}, "head_words": head or {}}
+
+
+def _cnt(col, goods, left, meets, km, places, mins, co2, busy=None):
+    return {"collisions": col, "goods": goods, "left_turns": left, "cycle_meets": meets, "cycle_beside_km": km,
+            "places": places, "shown": {"bus_stops": 3, "care_homes": 1}, "cycle_min": mins, "trips": 4,
+            "co2_kg": co2, "km": 40.0, "busy_min": busy or {"08:00": None, "17:00": None}}
+
+
+def _best(answer, option=None, why="", history="current", counted=True, cols=None, busy=False, held_back=None):
+    return {"error": None, "answer": answer, "option": option, "why": why, "held_back": held_back,
+            "lorry": OTHER, "lorry_text": "Rule Lorry", "lorry_basis": "approved loads", "others_text": ["Other Lorry"],
+            "history": history, "counted": counted, "period": "2021–2025", "in_use_words": "the main route, both legs",
+            "cols": cols, "busy_held": busy, "cycle_held": True}
+
+
+_USE = _col("In use", _cnt(26, 3, 17, 5, 1.2, 9, 120.0, 40.0), in_use=True)
+SUGG = _best("Suggested", "Alt 1", "Alt 1 passes fewer schools, hospitals and health centres and takes no longer.",
+             cols=[_USE, _col("Alt 1", _cnt(31, 4, 12, 3, 0.8, 4, 118.0, 39.0),
+                              {"left_turns": -29, "cycle_meets": -40, "cycle_beside_km": -33, "places": -56},
+                              chosen=True, head={"time": "the same"})])
+TRADE = _best("A trade-off", None, "Alt 1 passes fewer places (6 against 9), but its round trip is 9 min longer.",
+              cols=[_USE, _col("Alt 1", _cnt(23, 2, 4, 5, 1.2, 6, 129.0, 44.0), {"places": -33}, traded=True)])
+KEEP = _best("Keep the route in use", None, "Every other option is ruled out: each adds a limit below this lorry.",
+             cols=[_USE, _col("Alt 1", _cnt(8, 0, 2, 0, 0.0, 1, 90.0, 30.0), ruled_out=["Weight limit 7.5 t, both legs"]),
+                   _col("Alt 2", _cnt(9, 0, 3, 0, 0.0, 1, 95.0, 31.0), ruled_out=["Weight limit 7.5 t, both legs"])])
+
+
+def _page(B, routes=1):
+    """The summary page alone for a typed answer: (its text, the PDF)."""
+    D9 = dict(D)
+    D9["routes"] = [dict(R, best=B, id=f"R{9 + i}") for i in range(routes)]
+    doc = RR.Doc(D9)
+    for i, R9 in enumerate(D9["routes"], 1):
+        RR.page_summary(doc, R9, i, routes, {(R9["id"], "_start"): 7})
+    doc.c.save()
+    pdf = doc.buf.getvalue()
+    return (" ".join(pdf_text(pdf, "", raw=True).split()) if TX else pdf.decode("latin-1")), pdf   # the order drawn
+
+
+_pages = (pdf_text(PDF, "") or "").split("\f")
+if TX:
+    ok("9: the summary is the FIRST page of the file, the contents page second (S2)",
+       "Route analysis · Summary" in _pages[0] and "In this file" not in _pages[0]
+       and "In this file" in _pages[1] and "Route analysis · Summary" not in _pages[1], _pages[0][:300])
+    _p0 = " ".join(_pages[0].split())
+    ok("9: page 1 says the rule's lorry, the file's lorry for A to F, the route in use, and who decides",
+       "For the " + _b9["lorry_text"] in _p0 and "Sections A to F are drawn for the" in _p0
+       and "Route in use on" in _p0 and "The planner decides; nothing here changes the plan." in _p0
+       and "Made from what Wayscope holds; nothing was fetched for this file." in _p0, _p0[:700])
+    _praw = " ".join((pdf_text(PDF, "", raw=True) or "").split("\f")[1].split())
+    ok("9: the contents page lists the summary at page 1", re.search(r"Summary · one page a route\s+1\b", _praw)
+       is not None, _praw[:500])
+    _ts, _ = _page(SUGG)
+    ok("9 answer: Suggested: the option, the rule's one sentence, the percentages beside the parts",
+       "Suggested: Alt 1" in _ts and "takes no longer" in _ts and "56 % fewer" in _ts and "29 % fewer" in _ts
+       and "33 % less" in _ts and "The suggested option" in _ts, _ts[:900])
+    _tt, _ = _page(TRADE)
+    ok("9 answer: A trade-off: no pick, no option named in the box, the rule's sentence",
+       "A trade-off" in _tt and "A trade-off:" not in _tt and "but its round trip is 9 min longer" in _tt
+       and "The suggested option" not in _tt and "(suggested)" not in _tt, _tt[:900])
+    _tk, _ = _page(KEEP)
+    ok("9 answer: Keep: both options ruled out, said once by the rule (no list repeating it), marked in the figures",
+       "Keep the route in use" in _tk and "Every other option is ruled out" in _tk and "ruled out: Weight limit" not in _tk
+       and _tk.count("ruled out") >= 2, _tk[:900])
+    _KEEP1 = dict(KEEP, why="Not suggested: Alt 1 adds a limit.", cols=KEEP["cols"][:2])
+    _tk1, _ = _page(_KEEP1)
+    ok("9 answer: Keep with one option ruled out and the rule not saying which limit: the limit listed",
+       "Alt 1 ruled out: Weight limit 7.5 t, both legs." in _tk1, _tk1[:900])
+    _te, _ = _page({"error": RA.SUMMARY_UNAVAILABLE})
+    ok("9: no answer for a route: the page says so in one sentence, no figures",
+       RA.SUMMARY_UNAVAILABLE in _te and "The figures" not in _te and "At a glance" not in _te, _te[:400])
+    # each part not counted: said in words, never drawn as a bar or a zero
+    _to, _ = _page(dict(SUGG, history="out_of_date"))
+    _tn, _ = _page(dict(SUGG, history="not_fetched"))
+    ok("9 not counted: collision history out of date / not fetched: 'Not compared', no collision figure",
+       "the collision history is out of date for this route" in _to and "the collision history has not been fetched" in _tn
+       and "not compared" in _to and "With a goods vehicle over 3.5 t" not in _to and " 26 " not in f" {_to} ".split("The figures")[1][:400],
+       _to[:900])
+    _tc, _ = _page(dict(SUGG, counted=False))
+    ok("9 not counted: cycle routes and places not fetched along every option: said, the figures starred 'shown'",
+       "Not counted yet: not fetched along every option." in _tc and "shown, not counted" in _tc and "17*" in _tc, _tc[:900])
+    ok("9 not counted: busy hours held for the route in use only / for none: said in words",
+       "No busy-hour times are worked out for this route." in _ts, _ts[:900])
+    _USEb = _col("In use", _cnt(26, 3, 17, 5, 1.2, 9, 120.0, 40.0, {"08:00": 131.0, "17:00": 135.5}), in_use=True)
+    _tb, _ = _page(dict(SUGG, cols=[_USEb, SUGG["cols"][1]]))
+    ok("9 not counted: ...held for the route in use only", "busy-hour times are held for the route in use only" in _tb)
+    _Ob = dict(SUGG["cols"][1], counts=dict(SUGG["cols"][1]["counts"], busy_min={"08:00": 128.0, "17:00": 130.0}))
+    _th, _ = _page(dict(SUGG, busy_held=True, cols=[_USEb, _Ob]))
+    ok("9: busy hours held for every option: drawn by the hour it sets off", "Setting off at 08:00" in _th
+       and "135.5" in _th and "130" in _th and "Not compared: busy-hour" not in _th, _th[-1500:])
+    _tm, _ = _page(SUGG, routes=3)
+    ok("9: a file of several routes: 'Summary i of n' and where each route's sections start",
+       "Summary 1 of 3." in _tm and "Summary 3 of 3." in _tm and "R9's sections start on page 7" in _tm, _tm[-600:])
+    # no "Better", "safer" or a percentage beside a collision count: every collision line on every typed page
+    for _lab, _t in (("Suggested", _ts), ("trade-off", _tt), ("Keep", _tk), ("held", _th)):
+        _near = [m.group(0) for m in re.finditer(r"[Cc]ollisions?[^.]{0,90}", _t)]
+        ok(f"9 collisions ({_lab}): counts only: no 'better', 'safer', 'worse', rate or % beside a collision count",
+           _near and not any(re.search(r"better|safer|worse|%|per |rate\b", s, re.I)
+                             and "never a percentage or a rate" not in s for s in _near), str(_near)[:600])
+else:
+    ok("9: pdftotext missing: the file starts with more pages than before (a summary a route)", D["pages"] >= 9)
+# at source: the collision rows and panel take no percentage, and the words never say "safer" / "better"
+_sumsrc = _ren.split("#  The summary (16 Nov 2026")[1].split("def page_assessor(")[0] if "#  The summary (16 Nov 2026" in _ren else ""
+ok("9 source: the summary's code exists, collisions drawn grey with no pct_key, no 'safer' / 'better' word",
+   _sumsrc and 'dict(key="collisions", grey_all=True)' in _sumsrc and 'pct_key="collisions"' not in _sumsrc
+   and not re.search(r'"[^"\n]*\b(safer|better|safest)\b[^"\n]*"', _sumsrc, re.I)
+   and 'p.get("collisions")' not in _sumsrc, str(len(_sumsrc)))
+ok("9 source: stored data only: the summary is gathered through route_best (no fetch), inside gather",
+   "R[\"best\"] = best(rid, best_ctx, factors)" in _doc and "route_best.Context(day=day)" in _doc
+   and not re.search(r"urlopen|requests\.|httpx|\.refresh\(|fetch_all", _sumsrc))
+ok("9 source: the 'Counts only' sentences REVERSED where the summary appears, the old words gone",
+   "Counts side by side: nothing is divided by anything else and no route is ranked" not in _ren
+   and "Sections A to F are counts side by side" in _ren and "The summary compares each option by fixed rules" in _ren
+   and "THE SUMMARY REVERSES THAT" in _doc and "Counts only; made from what Wayscope holds" not in _ren)
+_S = [[c.value for c in r] for r in WB["Summary"].iter_rows()]
+ok("9 XLSX: the Summary sheet: says collisions are never a percentage; a row for the route in use and each option",
+   "Collisions are counts, never a percentage" in str(_S[0][0]) and _S[3][:3] == ["Route", "Option", "Answer"]
+   and _S[4][0] == "R1" and str(_S[4][1]).startswith("In use") and len(_S) - 4 == len(_b9["cols"]), str(_S[:6])[:600])
+ok("9 XLSX: no percentage column beside the collision columns", not any(
+   "%" in str(h) and "ollision" in str(h) for h in _S[3]) and _S[3][5] == "Collisions on the road"
+   and "%" not in str(_S[3][6]) and "%" not in str(_S[3][7]), str(_S[3]))
+_rs = RR.summary_rows(dict(R, best=dict(SUGG, history="not_fetched")))
+ok("9 XLSX: collisions not compared said in the cells; the suggested option marked", _rs[0][5] == "not compared"
+   and _rs[1][1] == "Alt 1 (suggested)" and _rs[1][2] == "Suggested: Alt 1" and _rs[1][8] == -29, str(_rs)[:500])
+ok("9 XLSX: a route with no answer: one row saying so", RR.summary_rows(dict(R, best={"error": RA.SUMMARY_UNAVAILABLE}))[0][3]
+   == RA.SUMMARY_UNAVAILABLE)
+_A = [c.value for c in WB["About"]["A"]]
+ok("9 XLSX: Contents and About say sections A to F are counts only and the Summary compares by fixed rules",
+   "Sections A to F: counts only" in str(WB["Contents"]["A5"].value) and "The Summary sheet compares by fixed rules"
+   in str(WB["Contents"]["A5"].value) and any("The Summary sheet gives one suggestion a route" in str(a) for a in _A), str(_A))
+ok("9 guide: one sentence on the summary page (S7)", "The file opens on a summary page a route" in GUIDE)
 
 remove_scratch_db(db, TMP)
 print(f"\n{PASS} passed, {len(FAIL)} failed")
