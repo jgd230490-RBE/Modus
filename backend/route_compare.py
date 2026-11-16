@@ -11,7 +11,8 @@ left out: it is not HERE's choice between options), on that lorry type:
   * distance and minutes of the round trip (the pairing route_analysis costs), carbon a trip (the plan's own per-km
     figure), the busy-hour drive minutes at 08:00 and 17:00 when the busy-hour times are worked out;
   * collisions within collisions.ON_ROUTE_M of the option (both legs, every lorry type: its route key), all, killed or
-    seriously injured, people walking, cycling or riding hurt badly, cyclists;
+    seriously injured, people walking, cycling or riding hurt badly, cyclists, and (16 Nov 2026, route_best) those with
+    a goods vehicle over 3.5 t involved (the stored record's `goods`);
   * the community considerations near the option (NEAR_M by kind; an area counts when one of its outline points is that
     close; a point when it is), from the stored community layer. ⚠️ On live that layer is fetched along the main routes
     and diversions only (a wider fetch is too heavy for the deployment), so an alternative's counts there are UNDER-counted
@@ -36,7 +37,7 @@ MAX_HERE_ALT = 9                     # alt_index 10+ is a way round (route_choic
 NEAR_M = {"schools": 250, "hospitals": 250, "health": 250, "community": 250, "sports": 250, "stations": 250,
           "bus_stops": 100, "residential": 100}
 KINDS = list(NEAR_M)
-COLLISION_KINDS = ("collisions", "ksi", "vru_ksi", "cyclist")
+COLLISION_KINDS = ("collisions", "ksi", "vru_ksi", "cyclist", "goods")
 COMPARE_KINDS = COLLISION_KINDS + tuple(KINDS) + ("left_turns", "cycle_meets", "km", "co2_kg")
 
 
@@ -93,6 +94,7 @@ def compare(profile=PROFILE):
                 col[k]["ksi"] += 1 if c["ksi"] else 0
                 col[k]["vru_ksi"] += 1 if c.get("vru_ksi") else 0
                 col[k]["cyclist"] += 1 if "cyclist" in (c.get("vru") or []) else 0
+                col[k]["goods"] += 1 if c.get("goods") else 0
     # the community considerations near each option: one pass over the stored features
     com = near_counts(index, keys)
     cl = collisions.cycle_lines()
