@@ -928,7 +928,7 @@ def build(with_areas=False, out=None):
         res = haul.attach(by_od[key], zr2["id"])
         assert "error" not in res, res
 
-    # --- three geofences (Z003–Z005) ----------------------------------------------------
+    # --- the geofences Z003 and Z005 (Z004 retired 12 Nov 2026) ----------------------------------------------------
     def box(lon, lat, w_m, h_m):
         a = offset([lon, lat], -w_m / 2, -h_m / 2); b = offset([lon, lat], w_m / 2, h_m / 2)
         return {"type": "Polygon", "coordinates": [[[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]], [a[0], a[1]]]]}
@@ -942,17 +942,14 @@ def build(with_areas=False, out=None):
                             starts_on="2026-10-05", ends_on="2027-12-17",
                             note="A47 closed to through HGVs at the new junction while it is built; signed HGV diversion (fictional).")
     assert "error" not in z_a, z_a
-    # (b) a village 7.5 t limit on the lane to Stockpile North — ADVISORY (the router is not told): the routes keep
-    #     using it and the flag says so; paired with the daily caps above. For the whole programme.
-    z_b = zones.create_zone("Burrough village 7.5 t limit", box(-0.8879, 52.6993, 420, 360), kind="weight_limit",
-                            affects_routing=False, starts_on="2026-01-01", ends_on="2030-12-31",
-                            note="Community liaison agreement: 7.5 t except for access, 8 vehicles a day on each route, no deliveries before 07:30 (fictional).")
-    assert "error" not in z_b, z_b
+    # (b) RETIRED 12 Nov 2026 (John, 15:34 UTC: "Meant, keep it gone"): Z004 "Burrough village 7.5 t limit" was deleted
+    #     on live and is no longer made. Its id stays burnt: the works area below is made AS Z005, so no later zone id
+    #     moves (Z005 ... Z041 as on live). The Burrough routes' own words and daily caps (above) are unchanged.
     # (c) an advisory works area at the Melton end — drawn grey, changes nothing (the junction, Mar 2026 – Sep 2027)
-    z_c = zones.create_zone("Melton junction works area", box(-0.8695, 52.7482, 380, 300), kind="works",
+    z_c = zones.create_zone("Melton junction works area", box(-0.8695, 52.7482, 380, 300), kind="works", zone_id="Z005",
                             affects_routing=False, starts_on="2026-03-01", ends_on="2027-09-30",
                             note="Earthworks compound and crane standing for the junction structures (fictional).")
-    assert "error" not in z_c, z_c
+    assert "error" not in z_c and z_c.get("id") == "Z005", z_c
 
     # --- gates (G001–G019): a site is entered and left where its roads are, not at its centre ------------------
     # Quarries: weighbridge in, a separate exit onto the main road. Compounds: one gate on the access road. Harborough
