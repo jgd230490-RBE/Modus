@@ -7271,6 +7271,25 @@ def demo_smtp_probe(token: Optional[str] = None):
     return demo_request.smtp_probe()
 
 
+#: the headers a proxy may carry a visitor's address in, besides X-Forwarded-For (reported only when present)
+_ADDRESS_HEADERS = ("x-real-ip", "true-client-ip", "cf-connecting-ip", "forwarded", "via")
+
+
+@app.get("/api/admin/diagnostics/address")
+def diagnostics_address(request: Request, token: Optional[str] = None):
+    """16 Nov 2026: what address THIS request arrived with, so the question "can a visitor choose the address the limits
+    count?" is answered by a read and not a guess. The forwarded-for chain as received (in order), the connection's own
+    address, and what the app reads as the visitor (`_client_ip`: the chain's FIRST entry). Nothing is stored. Send the
+    same request with a made-up X-Forwarded-For: if that value comes back first in the chain, a visitor can set it."""
+    _check_admin(token)
+    raw = request.headers.get("x-forwarded-for") or ""
+    chain = [p.strip() for p in raw.split(",") if p.strip()]
+    return {"forwarded_for": chain, "entries": len(chain),
+            "peer": request.client.host if request.client else "",
+            "read_as": _client_ip(request),
+            "other": {h: request.headers.get(h) for h in _ADDRESS_HEADERS if request.headers.get(h)}}
+
+
 @app.get("/api/admin/demo-requests.csv")
 def demo_requests_csv(token: Optional[str] = None):
     """The leads, newest first. Behind ADMIN_TOKEN like every /api/admin/* call."""
