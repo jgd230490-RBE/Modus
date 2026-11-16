@@ -3,7 +3,8 @@ Route options compared (29 Oct 2026). John: "there must be some narrative on how
 can actually show that HERE chooses the safer / more sustainable route". route_compare.compare() sets HERE's first option
 beside each alternative it gave, for every route: distance, minutes, carbon a trip, collisions on it, the community
 considerations near it, cycle routes and left turns; summary() tallies first-against-alternative as fewer / same / more.
-The community strip now covers every option HERE gave, so the alternatives' schools and homes are fetched too.
+The community strip now covers every option HERE gave, so the alternatives' schools and homes are fetched too (a Fetch now
+does so since 16 Nov 2026; community.status()["all_options"] says whether the stored layer still covers every option).
 
 WHAT IS ASSERTED: one row per HERE option (a way round left out); the plan's own distance, minutes and carbon; collisions
 within 25 m only; community counts by kind and distance (an area by an outline point); the tally; the strip; the read is
@@ -230,15 +231,20 @@ ok("2. a route without an alternative makes no pair", route_compare.summary([{"r
 # =========================================================================== #
 # 29 Oct 2026 (NARROWED, not deleted): the wide strip is too heavy for the deployment's OpenStreetMap pass, so a
 # Fetch now covers the main routes and diversions only; the wide strip is an option for a study on a bigger machine
+# 16 Nov 2026 (REVERSED for Fetch now, narrowed, not deleted; claude/community-all-options): live has 2 GB, and a Fetch now
+# asks for the wide strip (community.ALL_OPTIONS); strip_from_db() with no argument is still the narrow one. The full
+# checks of the wide fetch and of status()["all_options"] are in test_community_all_options.py.
 lines = community.strip_from_db().lines
 wide = community.strip_from_db(all_options=True).lines
-ok("⭐ 3. a Fetch now's strip is the main routes and diversions only (the wide one is too heavy for the deployment)",
+ok("⭐ 3. strip_from_db() with no argument is the main routes and diversions only",
    not any(abs(c[1] - 52.51) < 1e-6 for ln in lines for c in ln))
-ok("⭐ 3. ...the wide strip (all_options=True) covers the alternative, for a study run with more memory",
-   any(abs(c[1] - 52.51) < 1e-6 for ln in wide for c in ln))
+ok("⭐ 3. ...the wide strip (all_options=True) covers the alternative, and a Fetch now asks for it",
+   any(abs(c[1] - 52.51) < 1e-6 for ln in wide for c in ln) and community.ALL_OPTIONS is True)
 ok("3. ...and neither covers a way round a closed zone that no diversion uses",
    not any(abs(c[1] - 52.49) < 1e-6 for ln in lines + wide for c in ln))
-ok("3. refresh() uses the default (narrow) strip", "strip = strip or strip_from_db()" in read("backend/community.py"))
+ok("3. refresh() builds the strip from the stored options when none is handed in, every option unless told otherwise",
+   "strip = strip_from_db(all_options=all_options)" in read("backend/community.py")
+   and "all_options = ALL_OPTIONS if all_options is None else bool(all_options)" in read("backend/community.py"))
 
 # =========================================================================== #
 #  4. Source                                                                   #
