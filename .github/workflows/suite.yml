@@ -74,11 +74,14 @@ jobs:
       - name: Run every harness (offline)
         run: |
           export NODE_PATH="$(npm root -g)"
-          export RUN_UID="$(id -u)" RUN_GID="$(id -g)" RUN_PATH="$PATH"
           export PY="$(command -v python)" NODE_BIN="$(command -v node)"
+          RUN_UID="$(id -u)"; RUN_GID="$(id -g)"
+          # 16 Nov 2026: the runner's sudo stopped handing the environment on (the step died on
+          # "setpriv: failed to parse reuid: ''" before any harness ran). Nothing here relies on that now: the
+          # two ids go on the command line, and the environment travels in a file the inner shell reads back.
+          export -p > /tmp/suite-env.sh
+          printf '%s\n' '. /tmp/suite-env.sh' \
+            'exec "$PY" backend/tests/run_suite.py --py "$PY" --smoke-py /tmp/venv-smoke/bin/python --node "$NODE_BIN" --require-offline' \
+            > /tmp/suite-inner.sh
           # A fresh network namespace has only loopback: bring it up, drop back to the runner user, run.
-          sudo -E unshare --net -- sh -c '
-            ip link set lo up
-            exec setpriv --reuid="$RUN_UID" --regid="$RUN_GID" --init-groups env PATH="$RUN_PATH" \
-              "$PY" backend/tests/run_suite.py --py "$PY" --smoke-py /tmp/venv-smoke/bin/python \
-              --node "$NODE_BIN" --require-offline'
+          sudo unshare --net -- sh -c "ip link set lo up && exec setpriv --reuid=$RUN_UID --regid=$RUN_GID --init-groups bash /tmp/suite-inner.sh"
