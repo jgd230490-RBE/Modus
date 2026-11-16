@@ -184,7 +184,11 @@ const PAGE_TITLE = { dashboard: "Dashboard", submit: "Submit forecast", forecast
 const TEAM_PAGES = ["dashboard", "submit", "forecasts", "carbon", "abnormal", "stockpiles", "pours", "simulation", "clp", "lookahead", "map"];   // 31 Oct 2026: + clp (a team sees its own CLPs)   // 29 Oct 2026: + simulation (a team reads its own lines)   // 22 Oct 2026: + abnormal (a team plans its own); 28 Oct 2026: + stockpiles (read-only for a team)
 const PHONE_PAGES = ["dashboard", "lookahead", "map"];   // what a phone shows as itself (frontend PHONE_PAGES); the rest is the desk-only card
 // the screens a visitor meets signed out: a 401 / 403 there is the gate working, anywhere else it is a defect
-const SIGNED_OUT = /^(public|login|login-wrong|login-forgot|login-code|setpw|linkerr|map-password|map-password-wrong|map-public|landing|privacy|thanks|landing-error)$/;
+const SIGNED_OUT = /^(public|login|login-wrong|login-forgot|login-code|setpw|linkerr|map-password|map-password-wrong|map-public|landing|privacy|thanks|landing-error|tools-[a-z0-9-]+)$/;   // 16 Nov 2026: + the public tool pages
+// 16 Nov 2026 (claude/tools-shell): the public tool pages at /tools/<page> (frontend/tools/<page>.html), walked with the
+// guides and the landing pages as signed-out stops named "tools-<page>". Empty until a tool page exists: each tool branch
+// adds its page here (test_tools_pages.py fails when a page in frontend/tools/ is missing from this list).
+const TOOL_PAGES = [];
 const FIXED_PAGES = /^(map-page|map-public|dashboard-bigscreen|bigscreen-)/;   // pages that must not scroll as a document
 
 // ---------------------------------------------------------------- the server ------------------------------------------
@@ -1039,7 +1043,8 @@ async function walkPortal(browser, base, look, accent, first, widths) {
         return sy ? (d.getFullYear() - sy) * 12 + d.getMonth() + 1 : 10; }).catch(() => 10);
       REPORT.month = month;
       const docs = [["help", "/help/"], ["help-technical", "/help/technical/"], ["bulletin", "/bulletin/?month=" + month], ["bulletin-leaflet", "/bulletin/leaflet/?month=" + month],
-                    ["landing", "/landing/"], ["privacy", "/landing/privacy.html"], ["thanks", "/landing/thanks.html"], ["landing-error", "/landing/error.html"]];
+                    ["landing", "/landing/"], ["privacy", "/landing/privacy.html"], ["thanks", "/landing/thanks.html"], ["landing-error", "/landing/error.html"],
+                    ...TOOL_PAGES.map(n => ["tools-" + n, "/tools/" + n])];
       await ctx.route(/^https:\/\/(app\.)?wayscope\.co\.uk\//, r => r.abort());   // the landing page's links never leave this machine
       for (const [name, url] of docs) {
         await page.goto(base + url, { waitUntil: "domcontentloaded" });

@@ -290,6 +290,17 @@ with TestClient(main.app, base_url=BASE) as admin:
     ok("3. a reviewer's sign-out opens nothing (no map cookie set)", r.status_code == 200
        and gate.COOKIE + "=" not in (r.headers.get("set-cookie") or "").replace(f"{gate.COOKIE}=\"\"", ""), r.headers.get("set-cookie"))
 
+# ---- 16 Nov 2026 (claude/tools-shell): the public tools' open calls are open ON PURPOSE ----------------------------- #
+# Every /api/tools route answers anyone (no cookie, no sign-in), so the sweep above sees nobody and a reviewer alike. That is
+# the point of them, but only for the routes a tool session listed in tools_public.OPEN_ROUTES: any other /api/tools route
+# fails here, and so does a listed one that no longer exists. Everything else must still refuse an outsider (the sweep).
+import tools_public  # noqa: E402
+_tools_routes = sorted({rt.path for rt in main.app.routes if isinstance(rt, APIRoute) and rt.path.startswith("/api/tools/")})
+ok("4. every /api/tools route is named open on purpose in tools_public.OPEN_ROUTES, and every name is a route",
+   _tools_routes == sorted(set(tools_public.OPEN_ROUTES)), f"routes {_tools_routes} vs listed {sorted(tools_public.OPEN_ROUTES)}")
+ok("4. 🔴 nothing outside /api/tools is listed as open", all(r.startswith("/api/tools/") for r in tools_public.OPEN_ROUTES),
+   str(tools_public.OPEN_ROUTES))
+
 print(f"smoke_reviewer_wall: {PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
     print("  FAIL:", f)

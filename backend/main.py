@@ -508,7 +508,10 @@ AUDIT_SKIP = ("/api/costing/preview", "/api/carbon/scenario", "/api/carbon/summa
               # 5 Nov 2026 (group 6): a concern's body is a member of the public's words and contact; the endpoint writes
               # its own audit row (the reference and the step), so the log never keeps them past the clean-up
               "/api/public/concerns", "/api/concerns")
-AUDIT_SKIP_PREFIXES = ("/api/auth/", "/api/concerns/")
+AUDIT_SKIP_PREFIXES = ("/api/auth/", "/api/concerns/",
+                       # 16 Nov 2026 (claude/tools-shell): the public tools' open calls work something out from typed
+                       # figures; they write no audit row and must not empty the kept reads (tools_public, rule 6)
+                       "/api/tools/")
 #: 31 Oct 2026 (task 4c PR 3): adding a pinned picture (a file of up to 10 MB as the body) writes its OWN audit row, so
 #: the middleware does not keep the upload in memory a second time (as /api/site-layouts/read)
 _PICTURE_UPLOAD_PATH = re.compile(r"^/api/locations/[^/]+/site-layout/pictures$")
@@ -7291,6 +7294,25 @@ def demo_smtp_probe(token: Optional[str] = None):
     return demo_request.smtp_probe()
 
 
+#: the headers a proxy may carry a visitor's address in, besides X-Forwarded-For (reported only when present)
+_ADDRESS_HEADERS = ("x-real-ip", "true-client-ip", "cf-connecting-ip", "forwarded", "via")
+
+
+@app.get("/api/admin/diagnostics/address")
+def diagnostics_address(request: Request, token: Optional[str] = None):
+    """16 Nov 2026: what address THIS request arrived with, so the question "can a visitor choose the address the limits
+    count?" is answered by a read and not a guess. The forwarded-for chain as received (in order), the connection's own
+    address, and what the app reads as the visitor (`_client_ip`: the chain's FIRST entry). Nothing is stored. Send the
+    same request with a made-up X-Forwarded-For: if that value comes back first in the chain, a visitor can set it."""
+    _check_admin(token)
+    raw = request.headers.get("x-forwarded-for") or ""
+    chain = [p.strip() for p in raw.split(",") if p.strip()]
+    return {"forwarded_for": chain, "entries": len(chain),
+            "peer": request.client.host if request.client else "",
+            "read_as": _client_ip(request),
+            "other": {h: request.headers.get(h) for h in _ADDRESS_HEADERS if request.headers.get(h)}}
+
+
 @app.get("/api/admin/demo-requests.csv")
 def demo_requests_csv(token: Optional[str] = None):
     """The leads, newest first. Behind ADMIN_TOKEN like every /api/admin/* call."""
@@ -7556,6 +7578,28 @@ def concern_forget(cid: str):
         _concern_refused(e)
     _concern_audit("personal details deleted", cid)
     return out
+
+# 16 Nov 2026 (claude/tools-shell) — the public tool pages at /tools/<page>: frontend/tools/<page>.html, plus the shared
+# tools.css and tools.js. Open to anyone (gate.scope_for does not police /tools), no demo bar, no cookie. tools_public
+# decides what a name serves; /tools, /tools/ and any page that does not exist are a 404 (the Tools index is a page on
+# the landing site). The open-call rule for /api/tools/... is in tools_public's header.
+import tools_public  # noqa: E402
+
+
+@app.get("/tools", include_in_schema=False)
+@app.get("/tools/", include_in_schema=False)
+def tools_index():
+    raise HTTPException(status_code=404, detail="not found")
+
+
+@app.get("/tools/{name}", include_in_schema=False)
+def tools_page(name: str):
+    found = tools_public.page_file(name)
+    if not found:
+        raise HTTPException(status_code=404, detail="not found")
+    path, media = found
+    return Response(content=tools_public.page_bytes(path), media_type=media, headers={"Cache-Control": "no-cache"})
+
 
 # 6 Oct 2026 (H5) — the public landing page at /landing/ for PREVIEW on this service. The
 # page lives in landing/ at the repo root so the same folder deploys as a Render static
