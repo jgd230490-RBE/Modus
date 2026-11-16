@@ -5753,6 +5753,26 @@ def route_options_best(day: Optional[str] = None, token: Optional[str] = None):
     return _staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d))
 
 
+@app.get("/api/routes/{route_id}/best-option")
+def route_best_option(route_id: str):
+    """
+    16 Nov 2026 (step 1b, John's yes to the third draft: notes route-best-option-mockup-1116): ONE route's best-option
+    answer for today, for the card on Data -> Routes. Q8: one kept build of the rule over every route (the same build
+    and key as the admin table, per caller's scope), sliced to this route, so only the first card after a write is slow.
+    Read only, no outside call; any staff login (a reviewer session is refused by _require_access).
+    Returns {day, checks, thresholds, route} where route is route_best.evaluate()'s dict, or 404.
+    """
+    acc = _require_access()
+    import datetime as _dt
+    import route_best
+    d = _dt.date.today()
+    t = _staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d), acc)
+    r = next((x for x in (t.get("routes") or []) if x.get("route") == route_id), None)
+    if r is None:
+        raise HTTPException(404, "no such route")
+    return {"day": t.get("day"), "checks": t.get("checks"), "thresholds": t.get("thresholds"), "route": r}
+
+
 @app.get("/api/gates/queue-months")
 def gate_queue_months():
     """

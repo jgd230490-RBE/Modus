@@ -1077,6 +1077,24 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .row-st.rs-warn{background:var(--st-warn-bg);color:var(--warn-text);} .row-st.rs-warn i{background:var(--gold);color:#1F2024;border-radius:3px;}
   .row-st.rs-bad{background:var(--st-bad-bg);color:var(--bad-text);} .row-st.rs-bad i{background:var(--bad-text);color:var(--st-bad-bg);}
   .row-st.rs-draft i{background:transparent;border:2px solid var(--chart-none);width:14px;height:14px;}
+  /* 16 Nov 2026 (step 1b): the best option card on Data -> Routes. A collision row never takes a status tint (R5, 16 Oct;
+     John 16 Nov "Yes, plain words"): .bo-col rows carry .bo-dash or a grey rs-none chip only. Under 600 px of card the
+     head's name and chip share a line and the figures go below (the full-window panel, a tablet). */
+  .bo-card{container-type:inline-size;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 10px;max-width:820px;}
+  .bo-eye{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
+  .bo-ans{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:6px 0 2px;} .bo-ans b{font-size:20px;letter-spacing:-.01em;}
+  .bo-why{font-size:13px;margin:0 0 8px;}
+  .bo-state{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-size:13px;margin:6px 0;}
+  .bo-heads{border-top:1px solid var(--line);}
+  .bo-grp{font-weight:600;font-size:13px;padding:6px 0 2px;}
+  .bo-h{display:grid;grid-template-columns:116px 140px 1fr;gap:10px;align-items:start;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .bo-k{font-weight:600;} .bo-k.bo-sub{font-weight:500;padding-left:12px;}
+  .bo-v{font-variant-numeric:tabular-nums;} .bo-v small,.bo-grey{color:var(--muted);} .bo-v small{font-size:12px;}
+  .bo-dash{color:var(--muted);}
+  .bo-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;}
+  .bo-fold{margin-left:auto;font-size:13px;font-weight:600;color:var(--navy);background:none;border:0;cursor:pointer;padding:6px 4px;}
+  .bo-foot{font-size:12px;color:var(--muted);margin:8px 0 0;}
+  @container (max-width:600px){.bo-h{grid-template-columns:1fr auto;gap:2px 8px;}.bo-h .bo-v{grid-column:1 / -1;}.bo-k.bo-sub{padding-left:0;}}
   /* 9 Nov 2026 (UI critique card 11): CLP documents grouped by place, the team CLPs folded under the site's */
   .clp-fold{display:inline-flex;align-items:center;gap:4px;margin-top:4px;min-height:24px;padding:0 2px;background:none;border:0;font:inherit;font-size:13px;color:var(--ink);text-decoration:underline;cursor:pointer;}
   .clp-kid td:first-child{padding-left:36px;}
@@ -1725,6 +1743,8 @@ const INFO = {
   // 10 Nov 2026 (ui-fix-long-sentences): the sentences that were over 25 words, now a few words and a box of at most 30
   "dash.busiest": { title: "Busiest hour", text: "Busiest clock hour, average working day. No pour.", guide: "ug-gate-busiest" },
   "submit.siblings": { title: "Other lines on this route", text: "Different disciplines can share a route. Check that the same loads are not entered twice.", guide: "ug-submit-siblings" },
+  // 16 Nov 2026 (step 1b, John's yes to the third draft): the best option card on Data -> Routes
+  "routes.best": { title: "Best option", text: "Each option is compared with the route in use. One is suggested only when clearly ahead on one head and behind on none.", guide: "ug-best-option" },
   "routes.legs": { title: "Legs of a route", text: "A route is a loaded leg out and an empty leg back. Open a row for its cycle figures.", guide: "ug-routes-legs" },
   "cfg.veh.english": { title: "English name", text: "The name every screen shows for this vehicle.", guide: "ug-config-vehicles" },
   "cfg.veh.minutes": { title: "Load and unload minutes", text: "Left blank, a vehicle uses the Planning defaults, shown in grey.", guide: "ug-config-vehicles" },
@@ -16184,7 +16204,8 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
 
 // 30 Oct 2026 (task 4b): the Routes page's "Near the route" column and its opened-row list. The counts are the server's
 // (route_community.py: the stored community considerations within 250 m of the drawn line, both legs; bus stops and homes
-// 100 m): the same numbers the collision evidence prints. Counts only: nothing is scored or ranked.
+// 100 m): the same numbers the collision evidence prints. 16 Nov 2026 (step 1b; John's Q1, "Yes to Q1"): the box's
+// closing "counts only" sentence is gone: the best option card above the options table now suggests.
 const NEAR_CHIPS = [["schools", ["school", "schools"]], ["health", ["health", "health"]], ["bus_stops", ["bus stop", "bus stops"]]];
 function nearChipCounts(c){
   return NEAR_CHIPS.map(([k, w]) => {
@@ -16217,7 +16238,7 @@ function NearDetails({ data, id, colSpan }){
             <span key={k.key} className="flex justify-between border-b border-dotted border-slate-300">
               <span>{k.label}</span><b className={c[k.key] ? "" : "text-slate-500"}>{c[k.key] || 0}</b></span>))}
         </div>
-        <p className="text-[13px] text-slate-600 mt-1.5">Bus stops and homes count within {near.bus_stops || 100} m. Fetched {isNaN(when) ? "" : when.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}. Counts only: nothing is scored or ranked.</p>
+        <p className="text-[13px] text-slate-600 mt-1.5">Bus stops and homes count within {near.bus_stops || 100} m. Fetched {isNaN(when) ? "" : when.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}.</p>
       </div>
     </td></tr>
   );
@@ -16370,6 +16391,151 @@ function RouteFullDetails({ route, prof, alt, folded, onFold, near, analysis, di
     </div>
   );
 }
+// 16 Nov 2026 (step 1b; John's yes to the third draft, notes route-best-option-mockup-1116, Q1-Q9 as recommended): the
+// "Best option" card above a route's options table. The rule decides and writes (backend/route_best.py, read through
+// /api/routes/<id>/best-option); this card only lays out its answer, its sentences and its counts. Collisions are said
+// in the rule's plain words with no status tint (R5 of 16 Oct kept; Q1 A): their rows carry a dash, or a grey chip when
+// the history is not counted. Cycle routes and places: a chip, each measure's counts and its percentage. No pick on a
+// trade-off (no Make primary there, Q2); none on a route whose line in use is a dated diversion (Q4). Make primary
+// moves the card's lorry only (Q3).
+const BO_TONE = { fewer: "ok", quicker: "ok", less: "ok", same: "none", more: "warn", slower: "warn", mixed: "warn" };
+const BO_STALE = "Collision history out of date. Fetch it again on Config → Map and bulletin.";
+const BO_NO_HISTORY = "Collisions are not compared: the collision history has not been fetched.";
+function boDate(s){
+  if(!s) return "";
+  const d = new Date(String(s).length > 10 ? s : s + "T12:00:00Z");
+  return isNaN(d) ? String(s) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+function boNum(x, d){ if(x == null) return "–"; const v = Math.round(Number(x) * Math.pow(10, d || 1)) / Math.pow(10, d || 1); return String(v); }
+// a measure's percentage in words: none where the base was too small (null) or nothing changed (0)
+function boPct(p, fewer, more){ return p ? ` (${Math.abs(p)} % ${p < 0 ? fewer || "fewer" : more || "more"})` : ""; }
+function boChip(word, notYet){
+  if(!word || word === "not counted") return <RowStatus word={notYet ? "Not counted yet" : "Not counted"} tone="none" />;
+  return <RowStatus word={word.charAt(0).toUpperCase() + word.slice(1)} tone={BO_TONE[word] || "none"} />;
+}
+// the lorry names with the two concrete mixers said once ("both concrete mixers"), as drawn on the third draft's card 5
+function boOthers(list){
+  const names = (list || []).map(vehShort);
+  const mixers = names.filter(n => /^Concrete mixer/i.test(n));
+  if(mixers.length < 2) return names.join(", ");
+  const rest = names.filter(n => !/^Concrete mixer/i.test(n));
+  return rest.concat([mixers.length === 2 ? "both concrete mixers" : "the concrete mixers"]).join(", ");
+}
+function boRow(k, chip, v, opts){
+  const o = opts || {};
+  return (
+    <div className="bo-h" data-bo-row={o.key || k} key={o.key || k}>
+      <span className={"bo-k" + (o.sub ? " bo-sub" : "")}>{k}</span>
+      <span>{chip}</span>
+      <span className={"bo-v" + (o.grey ? " bo-grey" : "")}>{v}</span>
+    </div>);
+}
+// the option the card describes: the suggested one, the traded one, or (Keep held back) the one whose sentences the rule
+// gave the route
+function boShown(r){
+  const os = r.options || [];
+  return os.find(o => o.chosen) || os.find(o => o.traded)
+    || (r.held_back && os.find(o => JSON.stringify(o.sentences) === JSON.stringify(r.sentences))) || null;
+}
+function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoting, busyUses }){
+  const allBtn = (
+    <button type="button" className="bo-fold" aria-expanded={showAll ? "true" : "false"} data-bo-all="1"
+      onClick={(e) => { e.stopPropagation(); onAll(); }}>All figures {showAll ? "▴" : "▾"}</button>);
+  if(best === null) return (
+    <div className="bo-card" data-best-option="loading">
+      <p className="bo-why text-slate-500" style={{ margin: 0 }}>Working out the best option…</p>
+      <div className="bo-acts">{allBtn}</div>
+    </div>);
+  if(!best || !best.route) return <div className="bo-acts" data-best-option="none">{allBtn}</div>;
+  const r = best.route, checks = best.checks || {}, hist = (r.checks || {}).collision_history;
+  const lorry = r.lorry ? vehShort(r.lorry) : null;
+  const o = boShown(r);
+  const inUse = r.in_use || {};
+  const div = ["loaded", "return"].map(l => inUse[l]).find(x => x && x.why === "diversion" && x.status === "in_use");
+  const counted = (r.checks || {}).community_all_options;
+  const cu = r.counts_in_use || {};
+  const tone = r.answer === "Suggested" ? "ok" : r.answer === "A trade-off" ? "warn" : "none";
+  const tag = r.answer === "Suggested" ? "Suggested" : r.answer === "A trade-off" ? "Your call" : "No change";
+  // the why: a Suggested or Keep line as the rule wrote it; a trade-off only in its short form (Q7: the long one is over
+  // 25 words and stays for the table and the file); "Every other option is ruled out" with each option's reasons on rows
+  let why = null;
+  const allOut = (r.options || []).length > 0 && (r.options || []).every(x => (x.ruled_out || []).length);
+  if(r.answer === "A trade-off") why = r.trade_short || null;
+  else if(r.answer === "Keep the route in use" && r.held_back)
+    why = hist === "out_of_date" ? "Not suggested yet: the collision history is out of date." : `Not suggested yet: ${r.held_back}`;
+  else if(allOut) why = "Every other option is ruled out.";
+  else why = r.why;
+  const sent = o ? (o.sentences || []) : [];
+  const colSent = sent.find(s => s.startsWith(o.label + " had") && !s.includes("goods vehicle"));
+  const goodsSent = sent.find(s => s.startsWith(o.label + " had") && s.includes("goods vehicle"));
+  const busySent = sent.find(s => s.startsWith("Setting off"));
+  const c = o ? o.counts || {} : {};
+  const colRow = (k, s, key) => {
+    if(hist === "out_of_date") return boRow(k, boChip(null), BO_STALE, { sub: true, grey: true, key });
+    if(hist === "not_fetched") return boRow(k, boChip(null), BO_NO_HISTORY, { sub: true, grey: true, key });
+    return boRow(k, <span className="bo-dash">—</span>, s || "", { sub: true, key });
+  };
+  const pw = o ? o.part_words || {} : {}, hw = o ? o.head_words || {} : {}, p = o ? o.pct || {} : {};
+  const cyc = o ? [
+    `Left turns ${c.left_turns} against ${cu.left_turns}${boPct(p.left_turns)}`,
+    c.cycle_meets != null && cu.cycle_meets != null ? `met ${c.cycle_meets} against ${cu.cycle_meets}${boPct(p.cycle_meets)}` : null,
+    c.cycle_beside_km != null && cu.cycle_beside_km != null ? `beside ${boNum(c.cycle_beside_km, 2)} km against ${boNum(cu.cycle_beside_km, 2)}${boPct(p.cycle_beside_km, "less", "more")}` : null,
+  ].filter(Boolean).join(" · ") : "";
+  const tripsWords = o && (c.trips === cu.trips ? `${c.trips} trips a day either way` : `${c.trips} trips a day, not ${cu.trips}`);
+  const limitsRow = () => {
+    if(!(r.checks || {}).limits_held) return boRow("Limits", <RowStatus word="Not checked" tone="none" />, "No road limits are held.", { grey: true });
+    if((o.added_limits || []).length) return boRow("Limits", <RowStatus word="Added" tone="warn" />, (o.ruled_out || []).join("; "));
+    return boRow("Limits", <RowStatus word="None added" tone="none" />, "");
+  };
+  const ownWayBack = o && o.return_alt != null && Number(o.return_alt) === Number(o.alt);
+  const canPromote = r.answer === "Suggested" && o && onPromote && !div;
+  const busyUse = (busyUses || []).find(u => u.status === "in_use");
+  const inUseLimits = r.in_use_limits || [];
+  return (
+    <div className="bo-card" data-best-option={r.answer} data-bo-route={routeId}>
+      <div className="bo-eye"><span>Best option{lorry ? ` · ${lorry}` : ""}</span><InfoTip id="routes.best" /></div>
+      {div && <p className="bo-state" data-bo-in-use="diversion">In use: {div.label}, the diversion{div.until ? `, until ${boDate(div.until)}` : ""}. Compared with it.</p>}
+      {busyUse && <p className="bo-state" data-bo-in-use="busy">Busy hours: Alt {busyUse.alt} is in use on weekdays {busyUse.from}–{busyUse.to}.</p>}
+      {inUseLimits.map((L, i) => <p key={i} className="bo-state bo-grey" data-bo-in-use-limit="1">{L.words}</p>)}
+      <div className="bo-ans">
+        <b>{r.answer === "Suggested" && r.option ? r.option : r.answer}</b>
+        <RowStatus word={tag} tone={tone} />
+      </div>
+      {why && <p className="bo-why" data-bo-why="1">{why}</p>}
+      {allOut && (
+        <div className="bo-heads">
+          {(r.options || []).map(x => boRow(x.label, <RowStatus word="Ruled out" tone="none" />,
+            Array.from(new Set(x.ruled_out || [])).join("; "), { key: "out-" + x.alt }))}
+        </div>)}
+      {o && !allOut && (
+        <div className="bo-heads" data-bo-option={o.label}>
+          <div className="bo-grp">People</div>
+          {colRow("Collisions", colSent, "collisions")}
+          {colRow("Goods vehicle", goodsSent, "goods")}
+          {boRow("Cycle routes", boChip(pw.cycle, !counted), cyc, { sub: true, grey: !counted, key: "cycle" })}
+          {boRow("Places", boChip(pw.community, !counted), `${c.places} against ${cu.places}${boPct(p.places)}`, { sub: true, grey: !counted, key: "places" })}
+          {!counted && <p className="bo-state" data-bo-not-counted="community">Cycle routes and community places are shown, not counted: they have not been fetched along every option yet.</p>}
+          {boRow("Time", boChip(hw.time), <>{boNum(c.cycle_min)} min a round trip <small>· {boNum(cu.cycle_min)} now · {tripsWords}{o.n5 ? " · a shorter road that takes longer" : ""}</small></>)}
+          {boRow("Busy hours", boChip(hw.busy), busySent || (hw.busy === "not counted" ? `No busy-hour times held for ${o.label}.` : "At 08:00 and 17:00."), { grey: hw.busy === "not counted" })}
+          {boRow("Carbon", boChip(hw.carbon), <>{boNum(c.co2_kg)} kg CO₂e a trip <small>· {boNum(cu.co2_kg)} now</small></>)}
+          {limitsRow()}
+        </div>)}
+      <div className="bo-acts">
+        {o && onFocus && <button type="button" className="btn-sec" data-bo-show={o.alt}
+          onClick={(e) => { e.stopPropagation(); onFocus(r.lorry, o.alt); }}>Show {o.label} on map</button>}
+        {canPromote && <button type="button" className="btn-sec" data-bo-promote={o.alt}
+          disabled={promoting === `${r.lorry}|${o.alt}`}
+          onClick={(e) => { e.stopPropagation(); onPromote(r.lorry, o.alt, "loaded",
+            { legs: ownWayBack ? ["loaded", "return"] : ["loaded"], label: o.label, others: boOthers(r.other_lorries) }); }}>
+          {promoting === `${r.lorry}|${o.alt}` ? "…" : `Make ${o.label} primary`}</button>}
+        {((r.options || []).length > 0) && allBtn}
+      </div>
+      {lorry && <p className="bo-foot" data-bo-lorry="1">
+        {r.lorry_basis === "approved loads" ? `For the ${lorry}, the lorry most approved loads use.` : `For the ${lorry}: no approved loads yet.`}
+        {(r.other_lorries || []).length ? ` Not for: ${(r.other_lorries || []).map(vehShort).join(", ")}.` : ""}</p>}
+    </div>);
+}
+
 function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting, leg,
                         haulRoads, token, onHaulChanged, originId, destId, gateBlockers, onBusyChanged }){
   const [data, setData] = useState(null);
@@ -16377,6 +16543,29 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
   const [busy, setBusy] = useState(null);
   const [busyMsg, setBusyMsg] = useState(null);
   const [busyWorking, setBusyWorking] = useState(false);
+  // 16 Nov 2026 (step 1b): the best option card's answer (null loading, false failed) and the fold of the table (Q6:
+  // closed each time a row opens)
+  const [best, setBest] = useState(null);
+  const [showAll, setShowAll] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setBest(null); setShowAll(false);
+    fetch(`${API}/routes/${encodeURIComponent(routeId)}/best-option`)
+      .then(okJSON)
+      .then(j => { if(live) setBest(j); })
+      .catch(e => { console.warn("Wayscope:", e); if(live) setBest(false); });
+    return () => { live = false; };
+  }, [routeId]);
+  // after a Make primary ends (promoting goes back to ""), the answer is read again: a write empties the kept read
+  const wasPromoting = useRef("");
+  useEffect(() => {
+    if(wasPromoting.current && !promoting){
+      setBest(null);
+      fetch(`${API}/routes/${encodeURIComponent(routeId)}/best-option`).then(okJSON).then(j => setBest(j))
+        .catch(e => { console.warn("Wayscope:", e); setBest(false); });
+    }
+    wasPromoting.current = promoting || "";
+  }, [promoting]);
   // 5 Nov 2026 (task 0d-2): Use / Stop a busy-hours road (planners and admins); the answer is the same read as below
   const busyPost = (body, what) => {
     setBusyWorking(true); setBusyMsg(null);
@@ -16452,8 +16641,13 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
           </p>
         )}
         {data && !!data.rows.length && (
+          <BestOption best={best} routeId={routeId} showAll={showAll} onAll={() => setShowAll(v => !v)}
+            onFocus={onFocus} onPromote={onPromote} promoting={promoting} busyUses={busy && busy.uses} />
+        )}
+        {data && !!data.rows.length && (
           <div className="overflow-x-auto">
-            <table className="text-xs w-full">
+            {(showAll || (best && best.route && !(best.route.options || []).length)) && <>
+            <table className="text-xs w-full" data-bo-table="1">
               <thead className="text-slate-400">
                 <tr>
                   <th className="px-2 py-1 text-left font-semibold">Vehicle</th>
@@ -16577,6 +16771,7 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
             <p className="text-[13px] text-slate-400 mt-1">
               Click a row to show that option on the map. “Make primary” makes an alternative the route the plan uses.
             </p>
+            </>}
             {busy && busy.shown && (busy.offers || []).map(o => (
               <p key={o.alt} className="text-[13px] mt-2" data-busy-hours={o.alt}>
                 Busy hours, weekdays: <span className="font-semibold" style={{ color: "var(--navy)" }}>{o.label}</span> had
@@ -17283,23 +17478,29 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(!selected){ setSelGeoms(null); setActiveGeom(null); }
   }, [selected]);
 
-  const promoteAlt = async (profile, alt_index, leg) => {
+  // 16 Nov 2026 (step 1b, Q3): `card` = the best option card's press: {legs, label, others}; it moves the card's lorry
+  // only, on each leg in `legs` (both where the option has its own way back), and the message names the lorries not moved
+  const promoteAlt = async (profile, alt_index, leg, card) => {
     if(!selected) return;
     const key = `${profile}|${alt_index}`;
     setPromoting(key);
     try {
-      const p = new URLSearchParams({ profile, alt_index: String(alt_index), leg: oneLeg(leg || showLeg) });
-      if(tokenRef.current) p.set("token", tokenRef.current);
-      const res = await fetch(`${API}/admin/routes/${encodeURIComponent(selected)}/promote-alt?${p}`,
-        { method: "POST" });
-      if(!res.ok) throw await errFrom(res);
-      const j = await res.json();
-      if(j.error) throw new Error(j.error);
+      for(const lg of (card ? card.legs : [oneLeg(leg || showLeg)])){
+        const p = new URLSearchParams({ profile, alt_index: String(alt_index), leg: lg });
+        if(tokenRef.current) p.set("token", tokenRef.current);
+        const res = await fetch(`${API}/admin/routes/${encodeURIComponent(selected)}/promote-alt?${p}`,
+          { method: "POST" });
+        if(!res.ok) throw await errFrom(res);
+        const j = await res.json();
+        if(j.error) throw new Error(j.error);
+      }
       const gj = await fetch(`${API}/routes/${encodeURIComponent(selected)}/geometries`).then(r => r.json());
       setSelGeoms(gj);
       setActiveGeom({ profile, leg: leg || showLeg, alt_index: 0 });
       await reloadNetwork();
-      setRouteMsg(`${selected}: alternative ${alt_index} is now the main route for ${vehShort(profile)}. Routing again puts the original order back.`);
+      setRouteMsg(card
+        ? `${selected}: ${card.label} is now the main route for the ${vehShort(profile)}.${card.others ? ` Not moved: ${card.others}.` : ""} Routing again puts the original order back.`
+        : `${selected}: alternative ${alt_index} is now the main route for ${vehShort(profile)}. Routing again puts the original order back.`);
     } catch(e){ setRouteMsg(errSay("Couldn't use this alternative.", e)); }
     setPromoting("");
   };
