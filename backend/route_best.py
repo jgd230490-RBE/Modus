@@ -183,6 +183,25 @@ def _join(xs):
     return "" if not xs else xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
 
 
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def date_words(v):
+    """'2027-12-17' -> '17 Dec 2027': the app's date words (clp_doc._date_words' rule, asserted equal; that module is not
+    imported here, it brings the whole document build). No sentence of the rule carries an ISO date (pinned)."""
+    try:
+        d = datetime.date.fromisoformat(str(v)[:10])
+    except (TypeError, ValueError):
+        return str(v or "")
+    return f"{d.day} {_MONTHS[d.month - 1]} {d.year}"
+
+
+def _legs_words(legs):
+    """' (both legs)' or ' (loaded leg)': a thing an option meets on both legs is said once."""
+    legs = sorted(set(legs))
+    return " (both legs)" if len(legs) > 1 else f" ({legs[0]} leg)"
+
+
 def _n(x, d=1):
     """A figure as words: whole where it is whole."""
     if x is None:
@@ -442,18 +461,21 @@ def _ruled_out(opt_legs, use_legs, lorry, ctx):
     """[reason words] and [added limits] for one option: a routing zone in force it crosses; a lorry limit below the lorry
     it ADDS over the line in use on the same leg (N1)."""
     reasons, added = [], []
+    crossed = {}                     # each zone named once, with the legs that cross it (16 Nov: it was said a leg)
     for leg, line in opt_legs.items():
         if not line:
             continue
-        for z in ctx.zones_on:
+        for i, z in enumerate(ctx.zones_on):
             try:
                 hit = zones.line_hits_geometry(line, z["geometry"])
             except Exception:
                 hit = False
             if hit:
-                until = z.get("ends_on")
-                reasons.append(f"it crosses {z.get('name') or 'a closed area'}, closed"
-                               + (f" until {until}" if until else "") + f" ({leg} leg)")
+                crossed.setdefault(z.get("id") or i, [z, []])[1].append(leg)
+    for z, legs in crossed.values():
+        until = z.get("ends_on")
+        reasons.append(f"it crosses {z.get('name') or 'a closed area'}, closed"
+                       + (f" until {date_words(until)}" if until else "") + _legs_words(legs))
     if ctx.lims:
         by_key = {(L.get("source"), L.get("ext_id"), L.get("kind")): L for L in ctx.lims}
         for leg, line in opt_legs.items():
@@ -472,8 +494,7 @@ def _ruled_out(opt_legs, use_legs, lorry, ctx):
                 legs_of.setdefault((a["source"], a["ext_id"], a["kind"]), [a["words"], []])[1].append(a["leg"])
             n = len(legs_of)
             reasons.append(f"it meets {n} road limit{'s' if n != 1 else ''} below this lorry that the route in use does "
-                           f"not: " + "; ".join(w + (" (both legs)" if len(ls) > 1 else f" ({ls[0]} leg)")
-                                                for w, ls in legs_of.values()))
+                           f"not: " + "; ".join(w + _legs_words(ls) for w, ls in legs_of.values()))
     return reasons, added
 
 

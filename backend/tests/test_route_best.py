@@ -408,8 +408,23 @@ ok("⭐ 3. R2 is compared against its DIVERSION (Alt 1), not option 0: the in-us
    and R2["in_use"]["loaded"]["until"] == "2027-03-31", f"{R2['in_use']} {R2.get('counts_in_use', {}).get('collisions')}")
 o20, o22 = opt(R2, 0), opt(R2, 2)
 ok("⭐ 3. option 0 crosses the closure in force and is ruled out (it would send lorries back through it)",
-   o20 and o20["ruled_out"] and "Mill bridge closure" in o20["ruled_out"][0] and "until 2027-03-31" in o20["ruled_out"][0],
+   o20 and o20["ruled_out"] and "Mill bridge closure" in o20["ruled_out"][0] and "until 31 Mar 2027" in o20["ruled_out"][0],
    str(o20 and o20["ruled_out"]))
+ok("⭐ 3. (reversed 16 Nov evening) the closure's end reads as a person reads a date, never ISO (live R027: "
+   "'closed until 2027-12-17')", "2027-03-31" not in " ".join(o20["ruled_out"]) and RB.date_words("2027-12-17") == "17 Dec 2027"
+   and RB.date_words("2027-03-01") == "1 Mar 2027", str(o20["ruled_out"]))
+import clp_doc  # noqa: E402
+ok("3. the date words are the app's own (clp_doc._date_words' rule)",
+   all(RB.date_words(d) == clp_doc._date_words(d) for d in ("2027-12-17", "2027-03-01", "2026-01-09", "2028-02-29")))
+ok("⭐ 3. a closure the option crosses on BOTH legs is named once, '(both legs)' (it was a reason a leg, and the why named "
+   "the loaded leg only)", len([r for r in o20["ruled_out"] if "Mill bridge closure" in r]) == 1
+   and o20["ruled_out"][0].endswith("closed until 31 Mar 2027 (both legs)"), str(o20["ruled_out"]))
+_why_all = {"options": [o20], "answer": RB.KEEP, "option": None, "trade": None, "why": None, "held_back": None,
+            "sentences": []}
+RB._answer(_why_all, {}, RB.Context(day=DAY), "current")
+keep_words(_why_all)
+ok("3. ...and so the why says it once for both legs", _why_all["why"] == "Every other option is ruled out: The main route: it "
+   "crosses Mill bridge closure, closed until 31 Mar 2027 (both legs).", _why_all["why"])
 ok("3. ...and Alt 1 itself is not offered as a change", opt(R2, 1) is None)
 ok("⭐ 3. Alt 2 has clearly fewer collisions than the diversion (5 against 20) but is slower: A trade-off, no pick",
    R2["answer"] == RB.TRADE_OFF and R2["option"] is None and o22["heads"]["people"] == 1 and o22["heads"]["time"] == -1
@@ -707,6 +722,12 @@ ok("⭐ 11. never 'safer', 'better', a rate, a ratio, a score or a risk; no supp
 ok("⭐ 11. no '%' in any sentence about collisions", not any("%" in w for w in _words if "collision" in w.lower()),
    [w for w in _words if "collision" in w.lower() and "%" in w][:2])
 ok("11. the words were read from every scenario", len(_words) > 60, str(len(_words)))
+import re as _re  # noqa: E402
+ok("⭐ 11. no line of the rule carries an ISO date (16 Nov evening: 'closed until 2027-12-17')",
+   not [w for w in _words if _re.search(r"\b\d{4}-\d{2}-\d{2}\b", w)],
+   [w for w in _words if _re.search(r"\b\d{4}-\d{2}-\d{2}\b", w)][:2])
+ok("11. the rule writes no date but through date_words", "until {date_words(until)}" in _rb
+   and "until {until}" not in _rb)
 
 # =========================================================================== #
 #  12. The admin read                                                          #
@@ -752,6 +773,13 @@ ok("12. the technical guide has the rule's section (the user guide waits for the
 _fe = read("frontend/index.html")
 ok("12. no screen: the frontend does not read it, and 'Counts only: nothing is scored or ranked' is still on the Routes page",
    "route-options/best" not in _fe and "route_best" not in _fe and "Counts only: nothing is scored or ranked" in _fe)
+
+_tab_words = [w for r in TAB["routes"] for w in [r.get("why") or "", r.get("trade") or "", r.get("held_back") or ""]
+              + list(r.get("sentences") or []) + [s for o in r["options"] for s in o["sentences"] + o["ruled_out"]]] \
+    + [r.get("ruled_out") or "" for r in TAB["rows"]]
+ok("⭐ 12. ...nor does any line of the admin table (why, trade, held back, sentences, what ruled an option out)",
+   not [w for w in _tab_words if _re.search(r"\b\d{4}-\d{2}-\d{2}\b", w)] and any("31 Mar 2027" in w for w in _tab_words),
+   [w for w in _tab_words if _re.search(r"\b\d{4}-\d{2}-\d{2}\b", w)][:2])
 
 print()
 for f_ in FAIL:
