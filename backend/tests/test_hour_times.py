@@ -455,8 +455,10 @@ ok("6. a cell is marked quicker only where another option of the same lorry has 
 ok("⭐ 6. 0d's busy-hours line gains the time difference at 08:00 and 17:00 (the tipper's)",
    "{busyGap(o.alt)}" in _ra and "a round trip at 08:00 and at 17:00." in _ra)
 _dm = _fe.split("const hourBake = async")[1].split("const bulkBake = async")[0]
+# NARROWED 16 Nov 2026 (claude/busy-hours-redo-stale, John's yes to the mockup): the whole run's count is on the line only
+# when nothing is due ("Busy-hour times again"); otherwise the line shows what is due. The clear is kept for that whole run.
 ok("⭐ 6. the button: admins only, its call count on it and in the question, clear then batches until none are left",
-   "{`Busy-hour times · ${hourPlan.here_calls} calls`}" in _fe and "if(!canEdit) return;" in _fe
+   "`Busy-hour times again · ${hourPlan.here_calls} calls`" in _fe and "if(!canEdit) return;" in _fe
    and "routing calls. ` +" in _dm and "The plan's figures do not change." in _dm
    and "admin/hour-times/clear" in _dm and 'postRouteBatch(new URLSearchParams({ limit: "30" }), setRouteMsg, "hour-times/bake")' in _dm
    and "if(left >= last) throw" in _dm)
@@ -499,6 +501,25 @@ ok("7. the request really sends no routingMode (so HERE's default applies, as th
 ok("8. (16 Nov 2026) the technical guide says a run redoes only rows no longer trusted, and Make primary keeps the times",
    "<code>hour_times._to_do</code>" in _tg and "<code>to_do</code> beside the whole run" in _tg
    and "Make primary, which renumbers the options and keeps their times" in _tg)
+_dm2 = _fe.split("const hourBake = async")[1].split("const bulkBake = async")[0]
+ok("⭐ 9. (16 Nov, the mockup's card 1) the menu line shows the calls still due, or the whole run again when none are",
+   "var hourDue = (p) => (p && p.to_do && p.to_do.leg_hours > 0) ? p.to_do : null;" in _fe
+   and "{hourDue(hourPlan) ? `Busy-hour times · ${hourDue(hourPlan).here_calls} calls`" in _fe
+   and ": `Busy-hour times again · ${hourPlan.here_calls} calls`}" in _fe)
+ok("⭐ 9. (card 2) with routes due the run does NOT clear; the clear runs only for the whole run, and each asks first",
+   "if(!due){" in _dm2 and _dm2.index("if(!due){") < _dm2.index("admin/hour-times/clear")
+   and _dm2.index("confirm(due") < _dm2.index("if(!due){")
+   and "The other routes keep theirs." in _dm2 and "Every route's times are replaced." in _dm2
+   and "Work out the busy-hour times again for all ${all} routes?" in _dm2 and " routed again" in _dm2)
+ok("9. (card 3) the end line says how many were worked out and how many kept theirs",
+   "the other ${p.routes - due.routes} kept theirs." in _dm2 and "`Busy-hour times worked out for ${p.routes} routes.`" in _dm2)
+ok("9. (card 4) the user guide's one sentence",
+   "After a route is routed again, the button works out only the routes routed since; when none are, it offers every route again."
+   in _ug)
+_shown2 = re.findall(r"`([^`]*)`", _dm2) + ["Busy-hour times again · calls"]
+ok("9. the new words name no supplier and no back end",
+   not re.search(r"\bHERE\b|\bAPI\b|endpoint|server|token|\bbak(e|ed|ing)\b",
+                 " ".join(x for x in _shown2 if "${API}" not in x)), str(_shown2))
 ok("8. ...and the run reads its list from _to_do, never from 'any row' again",
    "todo = [k for k, _why in _to_do(profile)]" in read("backend/hour_times.py")
    and "SELECT DISTINCT route_id, leg, hour FROM route_hour_times" not in read("backend/hour_times.py"))

@@ -15119,6 +15119,9 @@ function SheetWordsNote({ route, canEdit, onAdd }){
 // 11 Nov 2026 (CLOCS card B-F6, John's yes): the Routes bar's network jobs (both legs, busy-hour times, Route all, Clear all
 // routes) in one "Routing ▾" menu set apart from the reader's buttons; each job still asks first, as before. While one runs
 // the button says so.
+// 16 Nov 2026 (claude/busy-hours-redo-stale): the busy-hour times still to work out (routes routed again since the last
+// run, or never worked out): {routes, here_calls}, or null when none are (the menu then offers the whole run again).
+var hourDue = (p) => (p && p.to_do && p.to_do.leg_hours > 0) ? p.to_do : null;
 function RoutingMenu({ busy, children }){
   const ref = useRef(null);
   useRowMenuPlace(ref);
@@ -17994,14 +17997,22 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // 'remaining' hits 0 rather than trying to do it in one request that would time out.
   // 29 Oct 2026 (task 0f-2, card 2): "Busy-hour times" — the cycle at set weekday hours, its own run (never Route all);
   // the count of routing calls is on the button and in the question first, the batches looped as Route all's
+  // 16 Nov 2026 (claude/busy-hours-redo-stale, John's yes to the mockup): only the routes routed again since the last run
+  // (hourDue), no clear; when none are, the whole run again as before (clear first). hourDue / hourAll: the menu line too.
   const hourBake = async () => {
-    const calls = hourPlan ? hourPlan.here_calls : 0;
-    if(!confirm(`Work out the busy-hour times for ${hourPlan ? hourPlan.routes : 0} routes?\n\n${calls} routing calls. ` +
-                `The plan's figures do not change.`)) return;
+    const due = hourDue(hourPlan), all = hourPlan ? hourPlan.routes : 0;
+    const calls = due ? due.here_calls : (hourPlan ? hourPlan.here_calls : 0);
+    if(!confirm(due
+        ? `Work out the busy-hour times for ${due.routes} ${due.routes === 1 ? "route" : "routes"}${due.stale ? " routed again" : ""}?\n\n` +
+          `${calls} routing calls.${due.routes < all ? " The other routes keep theirs." : ""} The plan's figures do not change.`
+        : `Work out the busy-hour times again for all ${all} routes?\n\n${calls} routing calls. ` +
+          `Every route's times are replaced. The plan's figures do not change.`)) return;
     setRouteBusy(true);
     try {
-      let res = await fetch(`${API}/admin/hour-times/clear`, { method: "POST" });
-      if(!res.ok) throw await errFrom(res);
+      if(!due){
+        const res = await fetch(`${API}/admin/hour-times/clear`, { method: "POST" });
+        if(!res.ok) throw await errFrom(res);
+      }
       let last = Infinity;
       while(true){
         const j = await postRouteBatch(new URLSearchParams({ limit: "30" }), setRouteMsg, "hour-times/bake");
@@ -18013,7 +18024,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       }
       const p = await fetch(`${API}/admin/hour-times/plan`).then(okJSON);
       setHourPlan(p);
-      setRouteMsg(`Busy-hour times worked out for ${p.routes} routes.`);
+      setRouteMsg(due && due.routes < p.routes
+        ? `Busy-hour times worked out for ${due.routes} ${due.routes === 1 ? "route" : "routes"}; the other ${p.routes - due.routes} kept theirs.`
+        : `Busy-hour times worked out for ${p.routes} routes.`);
     } catch(e){
       setRouteMsg(`Busy-hour times stopped. ${errMsg(e)} Those already worked out are kept.`);
     }
@@ -19632,7 +19645,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             </button>
             {hourPlan && hourPlan.legs > 0 && (
               <button type="button" onClick={hourBake} disabled={routeBusy} data-hour-bake style={{ whiteSpace: "nowrap" }}>
-                {`Busy-hour times · ${hourPlan.here_calls} calls`}
+                {hourDue(hourPlan) ? `Busy-hour times · ${hourDue(hourPlan).here_calls} calls`
+                                   : `Busy-hour times again · ${hourPlan.here_calls} calls`}
               </button>
             )}
             <button type="button" onClick={clearRoutes} disabled={routeBusy || !(status && status.length)} data-clear-routes="1"
