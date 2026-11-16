@@ -419,6 +419,11 @@ ok("3. the date words are the app's own (clp_doc._date_words' rule)",
 ok("⭐ 3. a closure the option crosses on BOTH legs is named once, '(both legs)' (it was a reason a leg, and the why named "
    "the loaded leg only)", len([r for r in o20["ruled_out"] if "Mill bridge closure" in r]) == 1
    and o20["ruled_out"][0].endswith("closed until 31 Mar 2027 (both legs)"), str(o20["ruled_out"]))
+ok("⭐ 3. an option ruled out for ONE reason on both legs returns ONE string in options[i].ruled_out (the card's rows read "
+   "it, never the why): the closure here, the added limit on R1's Alt 1",
+   o20["ruled_out"] == ["it crosses Mill bridge closure, closed until 31 Mar 2027 (both legs)"]
+   and len(opt(R1, 1)["ruled_out"]) == 1 and opt(R1, 1)["ruled_out"][0].endswith("(both legs)"),
+   f"{o20['ruled_out']} {opt(R1, 1)['ruled_out']}")
 _why_all = {"options": [o20], "answer": RB.KEEP, "option": None, "trade": None, "why": None, "held_back": None,
             "sentences": []}
 RB._answer(_why_all, {}, RB.Context(day=DAY), "current")
