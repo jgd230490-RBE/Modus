@@ -14,10 +14,11 @@ left out: it is not HERE's choice between options), on that lorry type:
     seriously injured, people walking, cycling or riding hurt badly, cyclists, and (16 Nov 2026, route_best) those with
     a goods vehicle over 3.5 t involved (the stored record's `goods`);
   * the community considerations near the option (NEAR_M by kind; an area counts when one of its outline points is that
-    close; a point when it is), from the stored community layer. ⚠️ On live that layer is fetched along the main routes
-    and diversions only (a wider fetch is too heavy for the deployment), so an alternative's counts there are UNDER-counted
-    where it leaves the main route by more than 250 m; a fair count needs community.strip_from_db(all_options=True) run
-    on a machine with more memory;
+    close; a point when it is), from the stored community layer. ⚠️ An alternative's counts there (and its cycle routes)
+    are fair only when community.status()["all_options"] is True: since 16 Nov 2026 a Fetch now covers every option the
+    router gave (community.strip_from_db(all_options=True)), but a layer fetched before that, a narrow fetch, or a re-route
+    or new option since the last fetch leaves an alternative UNDER-counted where it leaves the main route by more than
+    250 m;
   * the laden leg's cycle-route stretches and meeting points and its left turns (the collision evidence's own rules).
 summary(rows) — for each route with an alternative, HERE's first option against each alternative, kind by kind:
 fewer / same / more. Counts only, never rates or a verdict; the words come from whoever reads the table.

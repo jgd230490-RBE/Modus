@@ -18,7 +18,17 @@ for nurseries. community_sources.py downloads and parses; this module decides, s
 
 A refresh replaces a source's features only when that source succeeded; a failed source keeps what it had
 and its failure is said in words beside the date it was last fetched.
+
+EVERY OPTION (16 Nov 2026, step 2 of the best-option work; notes/session-1116-community-all-options.md): a Fetch now's
+strip covers every option the router gave (alt_index 0-9) as well as the ways round a diversion uses (ALL_OPTIONS), so
+an alternative's places and cycle routes are counted as fairly as the main route's. Live has had 2 GB since PR #208; the
+29 Oct widening ran out of memory on 512 MB. The OpenStreetMap passes can read the county files once per slice of
+SLICE_LINES lines (None = one pass); a slice that fails fails its source, so nothing of it is replaced. status() says
+whether the stored layer covers every option that exists NOW ("all_options"): each source records the stamp of the
+options it was fetched along (options_stamp: no line text read), and a re-route, a new option or a changed diversion
+changes the stamp.
 """
+import hashlib
 import json
 import math
 import os
@@ -80,7 +90,19 @@ SOURCE_ORDER = ("osm", "osm_structures", "gias", "naptan")
 OSM_SOURCES = ("osm", "osm_structures")      # both credited as OpenStreetMap, never under the OGL
 META_ID = "current"
 STALE_RUN = timedelta(minutes=30)       # a 'running' row older than this is a dead run, not a live one
+# 16 Nov 2026: measured from the run's last sign of life (detail "beat", written at most every BEAT_S while the
+# OpenStreetMap passes read), not from its start: the wide strip's pass can outlast 30 minutes and is still alive
+BEAT_S = 60
 _LOCK = threading.Lock()
+# 16 Nov 2026: Fetch now covers every stored option the router gave, not only the main routes and diversions
+ALL_OPTIONS = True
+MAX_ROUTER_ALT = 9                      # alt_index 10+ is a way round a closed zone (route_choice.WAY_ROUND_BASE)
+# the OpenStreetMap passes read the county files once per slice of this many strip lines; None = one pass (measured
+# 16 Nov 2026 on live's own lines: see the session note)
+SLICE_LINES = None
+# the sources the places and cycle routes come from: all three must have been fetched along every option for
+# status()["all_options"] (the structures pass feeds no count)
+COUNT_SOURCES = ("osm", "gias", "naptan")
 
 
 def _now():
@@ -113,6 +135,20 @@ class Strip:
             S = self._xy(s)
             self._index((S, S, site_m), S[0] - reach, S[0] + reach, S[1] - reach, S[1] + reach)
         self.probe = [tuple(c) for l in self.lines for c in l[::5]] + [tuple(s) for s in self.sites]
+        # 16 Nov 2026: the probe points and the bare route segments (lon / lat, no reach added) in the same cells, so an
+        # outline asks only the cells under its own box instead of every probe and every segment of the strip (the wide
+        # strip's OpenStreetMap pass took 62 min on a laptop, 2/3 of it in _crosses). Same answers: an outline's box and a
+        # segment's box that overlap share a cell.
+        self.probe_grid, self.seg_grid = {}, {}
+        for p in self.probe:
+            X, Y = self._xy(p)
+            self.probe_grid.setdefault((int(X // self.CELL), int(Y // self.CELL)), []).append(p)
+        for l in self.lines:
+            for a, b in zip(l, l[1:]):
+                A, B = self._xy(a), self._xy(b)
+                for gx in range(int(min(A[0], B[0]) // self.CELL), int(max(A[0], B[0]) // self.CELL) + 1):
+                    for gy in range(int(min(A[1], B[1]) // self.CELL), int(max(A[1], B[1]) // self.CELL) + 1):
+                        self.seg_grid.setdefault((gx, gy), []).append((tuple(a), tuple(b)))
         pad_x, pad_y = (reach + 100) / self.kx, (reach + 100) / self.ky
         self.bbox = ([min(p[0] for p in pts) - pad_x, min(p[1] for p in pts) - pad_y,
                       max(p[0] for p in pts) + pad_x, max(p[1] for p in pts) + pad_y] if pts else None)
@@ -159,7 +195,7 @@ class Strip:
             coords = [c for poly in polys for ring in poly for c in ring]
             if coords:
                 bb = bbox_of_coords(coords)
-                for x, y in self.probe:
+                for x, y in self._in_cells(self.probe_grid, bb):
                     if bb[0] <= x <= bb[2] and bb[1] <= y <= bb[3] and in_polygons(x, y, polys):
                         return 0.0
                 # a route that CROSSES the outline between its vertices (a long straight stretch through a housing
@@ -180,17 +216,30 @@ class Strip:
             return 0 if abs(v) < 1e-18 else (1 if v > 0 else -1)
         return o(p1, p2, q1) != o(p1, p2, q2) and o(q1, q2, p1) != o(q1, q2, p2)
 
+    def _in_cells(self, grid, bb):
+        """Every item of `grid` filed in a cell under the lon / lat box bb, each once (a segment can sit in many)."""
+        x0, y0 = self._xy((bb[0], bb[1]))
+        x1, y1 = self._xy((bb[2], bb[3]))
+        seen = set()
+        for gx in range(int(x0 // self.CELL), int(x1 // self.CELL) + 1):
+            for gy in range(int(y0 // self.CELL), int(y1 // self.CELL) + 1):
+                for item in grid.get((gx, gy), ()):
+                    if item not in seen:
+                        seen.add(item)
+                        yield item
+
     def _crosses(self, polys, bb):
         from community_sources import in_polygons
-        edges = [(r[i - 1], r[i]) for poly in polys for r in poly for i in range(1, len(r))]
-        for line in self.lines:
-            for a, b in zip(line, line[1:]):
-                if max(a[0], b[0]) < bb[0] or min(a[0], b[0]) > bb[2] or max(a[1], b[1]) < bb[1] or min(a[1], b[1]) > bb[3]:
-                    continue
-                if in_polygons(a[0], a[1], polys) or in_polygons(b[0], b[1], polys):
-                    return True
-                if any(self._seg_cross(a, b, e1, e2) for e1, e2 in edges):
-                    return True
+        edges = None
+        for a, b in self._in_cells(self.seg_grid, bb):
+            if max(a[0], b[0]) < bb[0] or min(a[0], b[0]) > bb[2] or max(a[1], b[1]) < bb[1] or min(a[1], b[1]) > bb[3]:
+                continue
+            if in_polygons(a[0], a[1], polys) or in_polygons(b[0], b[1], polys):
+                return True
+            if edges is None:
+                edges = [(r[i - 1], r[i]) for poly in polys for r in poly for i in range(1, len(r))]
+            if any(self._seg_cross(a, b, e1, e2) for e1, e2 in edges):
+                return True
         return False
 
     def keep(self, kind, geometry):
@@ -212,27 +261,68 @@ def _thin(coords, step_m=60.0):
     return out
 
 
+def _used_alts():
+    """{(route_id, leg, alt_index)} of the stored options a diversion or a busy-hours road uses (route_choice)."""
+    try:
+        import route_choice
+        use = route_choice.in_use()
+    except Exception:
+        use = {}
+    return {(rid, lg, a) for (rid, _p, lg), alts in use.items() for a in alts}
+
+
+def _option_wanted(row, all_options, used_alt):
+    """Whether a stored route_geometry row is in the strip: the main line always; an option the router gave
+    (alt_index 1-9) when all_options; a way round a closed zone (10+) only while a diversion uses it."""
+    a = int(row.get("alt_index") or 0)
+    if not a:
+        return True
+    if (row["route_id"], row["leg"], a) in used_alt:
+        return True
+    return bool(all_options) and a <= MAX_ROUTER_ALT
+
+
+def option_rows():
+    """Every stored option the WIDE strip covers now, one short line each: route, lorry type, leg, when the line was
+    worked out and its length, never the line text (a light read), sorted. The option NUMBER is left out, so Make
+    primary (a swap of numbers) changes nothing; a re-route (even one that gives the same line back), a new option or a
+    diversion taking up a way round adds a line no fetch has covered."""
+    used_alt = _used_alts()
+    rows = set()
+    for r in db.query("SELECT route_id, vehicle_profile, leg, alt_index, computed_at, distance_km FROM route_geometry "
+                      "WHERE tenant_id = ? AND geometry IS NOT NULL", (db.current_tenant(),)):
+        if not _option_wanted(r, True, used_alt):
+            continue
+        km = r.get("distance_km")
+        rows.add("|".join((str(r["route_id"]), str(r["vehicle_profile"]), str(r["leg"]), str(r.get("computed_at") or ""),
+                           "" if km is None else f"{float(km):.3f}")))
+    return sorted(rows)
+
+
+def options_stamp(rows=None):
+    """A short stamp of option_rows(); None when no option is stored."""
+    rows = option_rows() if rows is None else rows
+    if not rows:
+        return None
+    return hashlib.sha1("\n".join(rows).encode("utf-8")).hexdigest()[:16]
+
+
 def strip_from_db(all_options=False):
     """The tenant's strip: every PRIMARY stored road route (both legs, every vehicle, duplicates thinned out)
     and every site with a position.
     29 Oct 2026 (task 0c, PR B): + every stored option a dated zone's diversion uses (lorries drive it in those
     months), so a fetch covers the schools and homes along a diversion too.
     29 Oct 2026 (the route options compared, route_compare.py): `all_options=True` adds every option HERE gave
-    (alt_index 1-9), so the schools, homes and cycle routes along an alternative are fetched too. NOT the default: the
-    OpenStreetMap pass over that wider strip is too heavy for the deployment, so a Fetch now covers the main routes and
-    the diversions only, as before; the wide strip is for a study run on a machine with more memory. A way round a closed zone (alt_index 10+) stays in only while a diversion uses it."""
+    (alt_index 1-9), so the schools, homes and cycle routes along an alternative are fetched too. A way round a closed
+    zone (alt_index 10+) stays in only while a diversion uses it.
+    16 Nov 2026: a Fetch now asks for the wide strip (refresh(all_options=ALL_OPTIONS)); on 29 Oct it was too heavy for
+    the 512 MB deployment, live has had 2 GB since PR #208. Called with no argument this is still the narrow strip."""
     tenant = db.current_tenant()
     lines, seen = [], set()
-    try:
-        import route_choice
-        use = route_choice.in_use()
-    except Exception:
-        use = {}
-    used_alt = {(rid, lg, a) for (rid, _p, lg), alts in use.items() for a in alts}
+    used_alt = _used_alts()
     for r in db.query("SELECT route_id, vehicle_profile, leg, alt_index, geometry FROM route_geometry WHERE tenant_id = ? "
                       "AND geometry IS NOT NULL", (tenant,)):
-        a = int(r.get("alt_index") or 0)
-        if a and (a > 9 or not all_options) and (r["route_id"], r["leg"], a) not in used_alt:
+        if not _option_wanted(r, all_options, used_alt):
             continue
         try:
             coords = json.loads(r["geometry"]) if isinstance(r["geometry"], str) else r["geometry"]
@@ -371,7 +461,8 @@ def status():
     state = (row or {}).get("state") or "never"
     if state == "running" and row and row.get("started_at"):
         try:
-            if datetime.now(timezone.utc) - datetime.fromisoformat(row["started_at"].replace("Z", "+00:00")) > STALE_RUN:
+            last = max(x for x in (row["started_at"], det.get("beat")) if x)
+            if datetime.now(timezone.utc) - datetime.fromisoformat(last.replace("Z", "+00:00")) > STALE_RUN:
                 state = "failed"
                 det.setdefault("error", "the last refresh stopped without finishing (the server restarted?)")
         except ValueError:
@@ -382,12 +473,35 @@ def status():
         sources.append({"key": s, **{k: v for k, v in SOURCES[s].items() if k != "kinds"},
                         "fetched_at": d.get("fetched_at"), "data_date": d.get("data_date"), "files": d.get("files"),
                         "count": d.get("count"), "error": d.get("error")})
-    return {"state": state, "started_at": (row or {}).get("started_at"), "fetched_at": (row or {}).get("fetched_at"),
+    return {"state": state, "all_options": covers_all_options(det),
+            "started_at": (row or {}).get("started_at"), "fetched_at": (row or {}).get("fetched_at"),
             "by": (row or {}).get("by_whom"), "error": det.get("error"), "notes": det.get("notes") or [],
             "strip": {"route_m": det.get("route_m", STRIP_ROUTE_M), "site_m": det.get("site_m", STRIP_SITE_M)},
             "counts": counts, "total": sum(counts.values()), "sources": sources,
             "kinds": [dict(k, count=counts[k["key"]]) for k in KINDS],
             "credit": credit_line([s["key"] for s in sources if s["fetched_at"]])}
+
+
+def covers_all_options(det=None):
+    """True only when the stored places and cycle routes were fetched along every stored option that exists NOW: each
+    of COUNT_SOURCES last stored its features from a wide strip whose options_stamp equals today's. False after a
+    narrow fetch, before any fetch, when a source's last wide fetch failed (it keeps an older layer), and after a
+    re-route, a new or dropped option or a diversion's new way round (the stamp moves). The best-option rule reads
+    exactly (community.status() or {}).get("all_options")."""
+    det = _detail(_meta_row()) if det is None else det
+    stamps = {((det.get("sources") or {}).get(s) or {}).get("options_stamp") for s in COUNT_SOURCES}
+    if None in stamps:
+        return False
+    try:
+        now = option_rows()
+        if not now:
+            return False
+        stamp = options_stamp(now)
+        sets = det.get("option_sets") or {}
+        # each source's layer covers today's options when today's are the ones it was fetched along, or fewer
+        return all(s == stamp or set(now) <= set(sets.get(s) or ()) for s in stamps)
+    except Exception:       # noqa: BLE001 — a read that fails never claims a fair count
+        return False
 
 
 def credit_line(source_keys=None):
@@ -446,16 +560,61 @@ def _osm_files(strip, workdir, fetch):
     return paths, files, (ds[0] if ds else None)
 
 
-def _fetch_osm(strip, workdir, fetch):
+def strip_slices(strip, size=None):
+    """The strip cut into strips of at most `size` lines (every site in each), or [strip] when it is no longer than
+    that or size is None. A feature in the whole strip is in at least one slice, at the same nearest distance."""
+    size = SLICE_LINES if size is None else size
+    if not size or len(strip.lines) <= size:
+        return [strip]
+    return [Strip(strip.lines[i:i + size], strip.sites, strip.route_m, strip.site_m)
+            for i in range(0, len(strip.lines), size)]
+
+
+def _beating(keep, beat):
+    """keep() as it was, calling beat() at most every BEAT_S seconds (the run's sign of life for the stale rule)."""
+    if beat is None:
+        return keep
+    import time as _time
+    last = [_time.monotonic()]
+
+    def kept(kind, geometry):
+        now = _time.monotonic()
+        if now - last[0] >= BEAT_S:
+            last[0] = now
+            try:
+                beat()
+            except Exception:       # noqa: BLE001 — a missed beat never stops the fetch
+                pass
+        return keep(kind, geometry)
+    return kept
+
+
+def _extract_sliced(extract, paths, strip, beat=None):
+    """One OpenStreetMap pass per slice over the same files, merged: an object kept by two slices once, at its nearest
+    distance. An exception in any slice goes up, so the source fails and nothing of it is replaced."""
+    parts = strip_slices(strip)
+    if len(parts) == 1:
+        return extract(paths, _beating(strip.keep, beat))
+    best = {}
+    for part in parts:
+        for f in extract(paths, _beating(part.keep, beat)):
+            k = (f.get("kind"), f["source_ref"])
+            old = best.get(k)
+            if old is None or (f.get("dist_m") is not None and (old.get("dist_m") is None or f["dist_m"] < old["dist_m"])):
+                best[k] = f
+    return list(best.values())
+
+
+def _fetch_osm(strip, workdir, fetch, beat=None):
     paths, files, data_date = _osm_files(strip, workdir, fetch)
-    feats = fetch["osm_extract"](paths, strip.keep)
+    feats = _extract_sliced(fetch["osm_extract"], paths, strip, beat)
     return feats, files, data_date
 
 
-def _fetch_osm_structures(strip, workdir, fetch):
+def _fetch_osm_structures(strip, workdir, fetch, beat=None):
     """22 Oct 2026 (abnormal loads, phase 3): the second pass over the same files."""
     paths, files, data_date = _osm_files(strip, workdir, fetch)
-    feats = fetch["osm_structures_extract"](paths, strip.keep)
+    feats = _extract_sliced(fetch["osm_structures_extract"], paths, strip, beat)
     return feats, files, data_date
 
 
@@ -489,22 +648,40 @@ def default_fetchers():
     return {"download": cs.download, "osm_extract": cs.osm_extract, "osm_structures_extract": cs.osm_structures_extract}
 
 
-def refresh(by=None, fetchers=None, strip=None, today=None, sources=SOURCE_ORDER):
+def refresh(by=None, fetchers=None, strip=None, today=None, sources=SOURCE_ORDER, all_options=None):
     """Fetch every source along the tenant's strip and store what each gave. Synchronous; start_refresh()
     runs it on a thread. Returns status()."""
     fetch = dict(default_fetchers(), **(fetchers or {}))
+    # 16 Nov 2026: the strip is every stored option (all_options, default ALL_OPTIONS); each source that succeeds records
+    # the options_stamp it was fetched along (None for a narrow strip or a strip handed in), which status() compares
     today = today or date.today()
     started = _now()
     old = _detail(_meta_row())
     det = {"route_m": STRIP_ROUTE_M, "site_m": STRIP_SITE_M, "sources": dict(old.get("sources") or {}), "notes": []}
     _write_meta("running", det, by=by, started_at=started)
-    strip = strip or strip_from_db()
+    all_options = ALL_OPTIONS if all_options is None else bool(all_options)
+    stamp, rows = None, None
+    if strip is None:
+        # the options are read BEFORE the lines: a re-route while the fetch runs is left out of the record, never in it
+        if all_options:
+            rows = option_rows()
+            stamp = options_stamp(rows)
+        strip = strip_from_db(all_options=all_options)
+    det["all_options_asked"] = all_options
+    # the option lists the sources were fetched along, kept only while a source still points at one
+    sets = dict(old.get("option_sets") or {})
+    if stamp:
+        sets[stamp] = rows
+    det["option_sets"] = sets
     if not strip.bbox:
         det["error"] = "nothing to fetch along: no route is worked out and no site has a position yet"
         _write_meta("failed", det)
         return status()
     if not strip.lines:
         det["notes"].append("No route is routed yet, so only the sites were searched round.")
+    def beat():
+        det["beat"] = _now()
+        _write_meta("running", det)
     workdir = tempfile.mkdtemp(prefix="wayscope_community_")
     ok_any = False
     try:
@@ -512,9 +689,9 @@ def refresh(by=None, fetchers=None, strip=None, today=None, sources=SOURCE_ORDER
             entry = dict(det["sources"].get(s) or {})
             try:
                 if s == "osm":
-                    feats, files, data_date = _fetch_osm(strip, workdir, fetch)
+                    feats, files, data_date = _fetch_osm(strip, workdir, fetch, beat)
                 elif s == "osm_structures":
-                    feats, files, data_date = _fetch_osm_structures(strip, workdir, fetch)
+                    feats, files, data_date = _fetch_osm_structures(strip, workdir, fetch, beat)
                 elif s == "gias":
                     feats, files, data_date = _fetch_gias(strip, workdir, fetch, today)
                 else:
@@ -522,7 +699,7 @@ def refresh(by=None, fetchers=None, strip=None, today=None, sources=SOURCE_ORDER
                 now = _now()
                 n = replace_source(s, feats, now)
                 entry.update({"fetched_at": now, "data_date": data_date or now[:10], "files": files, "count": n,
-                              "error": None})
+                              "error": None, "options_stamp": stamp, "lines": len(strip.lines)})
                 ok_any = True
             except Exception as e:      # noqa: BLE001 — one source failing never loses another's rows
                 entry["error"] = str(e)[:240]
@@ -530,6 +707,8 @@ def refresh(by=None, fetchers=None, strip=None, today=None, sources=SOURCE_ORDER
             _write_meta("running", det)
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
+    used = {(e or {}).get("options_stamp") for e in det["sources"].values()}
+    det["option_sets"] = {k: v for k, v in det["option_sets"].items() if k in used}
     failed = [SOURCES[s]["name"] for s in sources if (det["sources"].get(s) or {}).get("error")]
     if failed:
         det["error"] = ("could not fetch " + ", ".join(failed) + "; what it had before is kept") if ok_any else \
