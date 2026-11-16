@@ -6197,8 +6197,9 @@
     // the properties as the server sent them; a Mapbox feature hands nested values back as strings, so they are parsed
     function limitPropsOf(p) {
         const q = Object.assign({}, p || {});
-        ['breaches', 'anchor'].forEach(k => { if (typeof q[k] === 'string') { try { q[k] = JSON.parse(q[k]); } catch (e) { q[k] = null; } } });
+        ['breaches', 'allowed', 'anchor'].forEach(k => { if (typeof q[k] === 'string') { try { q[k] = JSON.parse(q[k]); } catch (e) { q[k] = null; } } });
         if (!Array.isArray(q.breaches)) q.breaches = [];
+        if (!Array.isArray(q.allowed)) q.allowed = [];
         q.breach_count = Number(q.breach_count) || q.breaches.length;
         return q;
     }
@@ -6273,6 +6274,8 @@
         h += row('Planned routes over it', lines.length
             ? lines.map(x => e(x.route_id + (x.vehicle ? ' · ' + x.vehicle : '') + ' · ' + x.legs.join(' and '))).join('<br>')
             : 'None of the planned routes', lines.length ? 'over' : '');
+        const okLines = limitBreachLines(p.allowed);
+        if (okLines.length) h += row('Allowed: the site is on this road', okLines.map(x => e(x.route_id + (x.vehicle ? ' · ' + x.vehicle : '') + ' · ' + x.legs.join(' and '))).join('<br>'));
         h += row('Source', e((p.source_label || p.source || '') + (fetched ? ' · fetched ' + fetched : '')));
         h += '<div class="lim-foot">Advisory: check the signed limit on site.' + (p.attribution ? '<br>' + e(p.attribution) : '') + '</div></div>';
         return h;
