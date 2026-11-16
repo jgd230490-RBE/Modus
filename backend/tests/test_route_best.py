@@ -14,8 +14,13 @@ WHAT IS ASSERTED (each would fail on a fault the 16 Nov check found):
   5. goods-vehicle counts per option (route_best and route_compare);
   6. the gate: cycle and community parts are shown and move nothing while community.status() has no "all_options" (or
      False); with it True a rise from 0 places shows (counts alone, no percentage) and turns the answer into a trade-off;
-  7. stale keys (finding 4): after Make primary the history is "out of date" (by fingerprint, and for an older fetch by the
-     audit log), no collision part is counted and nothing is suggested; promoted back, current again; a re-route too;
+  7. the collision history (finding 4, narrowed 16 Nov evening): REVERSED: a Make primary moves no line, so it stays
+     current and the counts follow the lines to their new numbers (and the audit log is no longer read); a re-route after
+     the fetch is "out of date" (a road on it may not have been searched), no collision part counted, nothing suggested;
+ 10b. (16 Nov evening, the mother session's first live read) collisions counted on each pair's OWN two lines from each
+     record's position: an option costed with the main line's way back reads "fewer" when its own road has fewer (R5;
+     the count by option number could never); a collision near both legs counts once; and the fixed sentences: no five
+     words said twice, "but" once, the time said once, both busy hours in one phrase, a limit on both legs named once;
   8. no limits held = nothing suggested; no alternative = Keep;
   9. the lorry (N2): the type the Approved loads mostly use, among the types with a line;
  10. the three example routes of rule_demo.py (13 Nov) through the same option code, and where the decisions changed them;
@@ -245,9 +250,36 @@ _z = zones.create_zone("Mill bridge closure", BOX, kind="closure", starts_on="20
 route_choice.refresh_zones()
 
 
-# collisions: on the road (within 25 m) or beyond it, a few with a goods vehicle over 3.5 t
-def rec(cid, routes, goods=False):
-    return {"collision_id": cid, "year": 2024, "month": 5, "lon": -0.95, "lat": 52.5, "severity": 3, "road": "A6",
+# R5 (16 Nov evening): the main line's two legs are DIFFERENT roads (loaded straight, back by the north road), and
+# Alt 1 has a loaded line only, so it is costed with the main line's way back (return option 0), as on live's R003
+LAT5 = 52.9
+R5_A, R5_B, R5_C = bent(LAT5, 0), list(reversed(bent(LAT5, 0.01))), bent(LAT5, -0.01)
+db.execute("INSERT INTO locations (tenant_id, id, name, lat, lon, loc_type) VALUES (?, 'LR5a', 'Pit R5', ?, -1.0, 'Quarry')",
+           (T, LAT5))
+db.execute("INSERT INTO locations (tenant_id, id, name, lat, lon, loc_type) VALUES (?, 'LR5b', 'Yard R5', ?, -0.9, 'Compound')",
+           (T, LAT5))
+db.execute("INSERT INTO routes (tenant_id, id, origin_id, dest_id, material_category, ipt) VALUES (?, 'R5', 'LR5a', 'LR5b', "
+           "'Small aggregate', 'IPT1')", (T,))
+network._upsert_geom("R5", ART, json.dumps(R5_A), 7.0, 0.20, None, leg="loaded", alt_index=0)
+network._upsert_geom("R5", ART, json.dumps(R5_B), 7.4, 0.21, None, leg="return", alt_index=0)
+network._upsert_geom("R5", ART, json.dumps(R5_C), 7.0, 0.20, None, leg="loaded", alt_index=1)
+
+DLAT = 1 / 110574.0
+
+
+def on_line(lat, dlat, k, n, off_m=0.0):
+    """The k-th of n points along the middle of bent(lat, dlat) (x from -0.962 to -0.938, where every option is at least
+    800 m from every other), off_m metres north of it."""
+    x = -0.962 + 0.024 * (k + 0.5) / n
+    y = lat + dlat * (((x + 1) / 0.05) if x <= -0.95 else ((-0.9 - x) / 0.05))
+    return x, y + off_m * DLAT
+
+
+# collisions: on the road (within 25 m) or beyond it, a few with a goods vehicle over 3.5 t. Since 16 Nov evening the rule
+# measures each record's own position to the option's lines, so each sits on (or off) the road it is said to be on; the
+# stored per-key distances (`routes`) are kept as the fetch would write them, for route_compare and the grouping by route.
+def rec(cid, routes, goods=False, lon=-0.95, lat=52.5):
+    return {"collision_id": cid, "year": 2024, "month": 5, "lon": lon, "lat": lat, "severity": 3, "road": "A6",
             "road2": None, "junction": None, "road_type": None, "speed_limit": 40, "light": None, "authority": None,
             "n_casualties": 1, "n_vehicles": 2, "vru": [], "vru_ksi": [], "goods": goods, "dist_m": 5, "routes": routes,
             "sites": {}}
@@ -256,21 +288,25 @@ def rec(cid, routes, goods=False):
 RECS, _n = [], [0]
 
 
-def many(n, routes, goods=0):
+def many(n, routes, at, goods=0, off_m=0.0):
     for i in range(n):
         _n[0] += 1
-        RECS.append(rec(f"C{_n[0]}", routes, goods=i < goods))
+        lon, lat = on_line(at[0], at[1], i, n, off_m)
+        RECS.append(rec(f"C{_n[0]}", routes, goods=i < goods, lon=lon, lat=lat))
 
 
-many(23, {"R1": 5}, goods=3)            # the main line: 23 on it, 3 with a goods vehicle
-many(8, {"R1@2": 4}, goods=1)           # Alt 2: 8, 1 goods
-many(5, {"R1@1": 6})                    # Alt 1: 5
-many(4, {"R1": 60, "R1@2": 90})         # near both but on neither (beyond 25 m): never counted
-many(20, {"R2@1": 5})                   # R2's diversion (Alt 1): 20
-many(30, {"R2": 5})                     # R2's main line: 30 (not in use on DAY)
-many(5, {"R2@2": 5})                    # R2 Alt 2: 5
-many(23, {"R3": 5})
-many(8, {"R3@1": 5})
+many(23, {"R1": 5}, (LAT1, 0), goods=3)           # the main line: 23 on it, 3 with a goods vehicle
+many(8, {"R1@2": 4}, (LAT1, -0.01), goods=1)      # Alt 2: 8, 1 goods
+many(5, {"R1@1": 6}, (LAT1, 0.01))                # Alt 1: 5
+many(4, {"R1": 60, "R1@2": 90}, (LAT1, 0), off_m=60)   # 60 m off the main line, on no road: never counted
+many(20, {"R2@1": 5}, (LAT2, 0.01))               # R2's diversion (Alt 1): 20
+many(30, {"R2": 5}, (LAT2, 0))                    # R2's main line: 30 (not in use on DAY)
+many(5, {"R2@2": 5}, (LAT2, -0.01))               # R2 Alt 2: 5
+many(23, {"R3": 5}, (LAT3, 0))
+many(8, {"R3@1": 5}, (LAT3, 0.004))
+many(23, {"R5": 5}, (LAT5, 0))                    # R5's main LOADED road: 23
+many(5, {"R5": 5}, (LAT5, 0.01))                  # R5's main RETURN road (the north road): 5
+many(8, {"R5@1": 5}, (LAT5, -0.01))               # R5 Alt 1's loaded road: 8
 collisions.replace_all(RECS, FETCHED)
 
 
@@ -287,7 +323,6 @@ db.execute("UPDATE route_geometry SET computed_at = '2026-11-01T10:00:00+00:00' 
 write_history()
 
 # community: three schools 100 m south of R1's Alt 2, near nothing else
-DLAT = 1 / 110574.0
 community.replace_source("gias", [{"source_ref": f"URN {i}", "kind": "schools", "name": f"School {i}",
                                    "geometry": {"type": "Point", "coordinates": [-0.95 + i * 0.001, LAT1 - 0.01 - 100 * DLAT]}}
                                   for i in range(3)], "2026-11-16T09:00:00Z")
@@ -343,6 +378,9 @@ ok("⭐ 2. a limit the option ADDS over the route in use rules it out, named, wi
    o1 and len(o1["added_limits"]) >= 1 and o1["ruled_out"] and "Back Lane" in o1["ruled_out"][0]
    and "except for access" in o1["ruled_out"][0] and o1["added_limits"][0]["except_for_access"] is True,
    str(o1 and o1["ruled_out"]))
+ok("2. a limit the option meets on both legs is named once and counted once (16 Nov evening: it was said twice, as 2)",
+   o1 and o1["ruled_out"][0].startswith("it meets 1 road limit below") and "(both legs)" in o1["ruled_out"][0]
+   and o1["ruled_out"][0].count("Back Lane") == 1 and len(o1["added_limits"]) == 2, str(o1 and o1["ruled_out"]))
 ok("⭐ 2. a limit both lines meet (the quarry gate's bridge) does NOT rule an option out",
    o2 and not o2["ruled_out"] and not o2["added_limits"], str(o2 and o2["ruled_out"]))
 ok("2. ...though the line in use meets it (it is below this lorry: the old 'any limit' rule would have ruled out every option)",
@@ -388,8 +426,11 @@ keep_words(R3)
 o31 = opt(R3, 1)
 ok("⭐ 4. N5: R3's Alt 1 is shorter but slower; ahead on people and carbon, behind on nothing: still not Suggested",
    o31 and o31["n5"] and o31["heads"]["people"] == 1 and o31["heads"]["time"] == 0 and R3["answer"] == RB.TRADE_OFF
-   and "it is shorter but slower" in R3["trade"], f"{R3['answer']} {R3['trade']}")
-ok("4. its sentences say so", any("is shorter but slower" in s and "so it is never suggested" in s for s in o31["sentences"]))
+   and "but it is a shorter road that takes longer" in R3["trade"], f"{R3['answer']} {R3['trade']}")
+ok("⭐ 4. (reversed 16 Nov evening) the trade line says 'but' ONCE: never '…, but it is shorter but slower'",
+   R3["trade"].count(" but ") == 1 and "shorter but slower" not in R3["trade"], R3["trade"])
+ok("4. its sentences say so", any("is a shorter road that takes longer" in s and "so it is never suggested" in s
+                                  for s in o31["sentences"]) and not any("shorter but slower" in s for s in o31["sentences"]))
 
 # =========================================================================== #
 #  5. Goods-vehicle counts                                                     #
@@ -437,28 +478,43 @@ ok("7. the fetch keeps the fingerprints of the lines it searched (collisions.ref
 _p = collisions.route_line_prints()
 ok("7. route_line_prints: one key an option, both legs and every lorry type under it", set(_p["R1@2"]) and len(_p["R1"]) == 2
    and "R1@10" not in _p, str(sorted(_p))[:200])
+# 16 Nov evening (REVERSED): the counts are measured on the lines, so a Make primary, which swaps option numbers and
+# changes no line, no longer makes the history out of date, and the counts follow the lines to their new numbers.
 network.promote_alternative("R1", ART, 2, leg="loaded")
+network.promote_alternative("R1", ART, 2, leg="return")
 R1p = run("R1")
 keep_words(R1p)
-ok("⭐ 7. after Make primary the keys name other lines: 'out of date', no collision part counted, nothing suggested",
-   R1p["checks"]["collision_history"] == "out_of_date" and R1p["answer"] != RB.SUGGESTED
-   and all(o["parts"]["collisions"] is None and o["parts"]["goods"] is None for o in R1p["options"])
-   and any(RB.STALE_WORDS in o["sentences"] for o in R1p["options"]), f"{R1p['answer']} {R1p['held_back']}")
-ok("7. ...and the swapped counts are never put in words", not any("had fewer collisions" in s or "had more collisions" in s
-                                                                  for o in R1p["options"] for s in o["sentences"]))
+o2p = opt(R1p, 2)
+ok("⭐ 7. (reversed) after Make primary the lines are the ones searched, only their numbers moved: current",
+   R1p["checks"]["collision_history"] == "current", R1p["checks"]["collision_history"])
+ok("⭐ 7. a Make primary swap no longer changes the counts: the south road is option 0 now and keeps its 8 (1 goods); the "
+   "straight road is Alt 2 and keeps its 23 (3 goods)",
+   (R1p["counts_in_use"]["collisions"], R1p["counts_in_use"]["goods"]) == (8, 1)
+   and o2p and (o2p["counts"]["collisions"], o2p["counts"]["goods"]) == (23, 3) and o2p["parts"]["collisions"] == -1,
+   f"{R1p.get('counts_in_use', {}).get('collisions')} {o2p and o2p['counts']['collisions']}")
+ok("7. ...and they are put in words as they are", f"Alt 2 had more collisions on it: 23 against 8 on the route in use, {PERIOD}."
+   in o2p["sentences"] and R1p["answer"] != RB.SUGGESTED, str(o2p["sentences"][:2]))
 write_history(prints=False)        # an older fetch: no fingerprints kept
-ok("7. a fetch with no fingerprints and no event since: current (the promote above is not in the audit log)",
-   run("R1")["checks"]["collision_history"] == "current")
+ok("7. a fetch with no fingerprints and no event since: current", run("R1")["checks"]["collision_history"] == "current")
 db.execute("INSERT INTO audit_log (id, tenant_id, at, kind, method, path, status) VALUES ('a1', ?, '2026-11-03T13:00:00+00:00', "
            "'write', 'POST', '/api/admin/routes/R1/promote-alt', 200)", (T,))
-ok("⭐ 7. ...with a Make primary in the audit log after the fetch: out of date", run("R1")["checks"]["collision_history"] == "out_of_date")
-ok("7. ...on that route only", run("R3")["checks"]["collision_history"] == "current")
+ok("⭐ 7. (reversed) a Make primary in the audit log after an older fetch no longer makes it out of date (it moves no line)",
+   run("R1")["checks"]["collision_history"] == "current")
+ok("7. ...on any route", run("R3")["checks"]["collision_history"] == "current")
+ok("7. the audit log is no longer read for it", "promote-alt" not in _rb.split("def history_state(")[1].split("\ndef ")[0]
+   and "promoted_since" not in read("backend/route_best.py"))
 db.execute("DELETE FROM audit_log WHERE id = 'a1'")
 network.promote_alternative("R1", ART, 2, leg="loaded")       # back as it was searched
+network.promote_alternative("R1", ART, 2, leg="return")
 write_history(prints=True)
 ok("7. promoted back: the lines match the search again, current and Suggested", run("R1")["answer"] == RB.SUGGESTED)
 network._upsert_geom("R1", ART, json.dumps(bent(LAT1, -0.011)), 7.2, 0.19, None, leg="loaded", alt_index=2)
-ok("⭐ 7. a re-route of one option after the fetch: out of date (by fingerprint)", run("R1")["checks"]["collision_history"] == "out_of_date")
+R1rr = run("R1")
+keep_words(R1rr)
+ok("⭐ 7. a re-route of one option after the fetch: out of date (by fingerprint): a road on it may not have been searched",
+   R1rr["checks"]["collision_history"] == "out_of_date" and R1rr["answer"] != RB.SUGGESTED
+   and all(o["parts"]["collisions"] is None for o in R1rr["options"])
+   and "may not have been searched" in RB.STALE_WORDS and any(RB.STALE_WORDS in o["sentences"] for o in R1rr["options"]))
 write_history(prints=False)
 ok("7. ...and by its time for an older fetch", run("R1")["checks"]["collision_history"] == "out_of_date")
 network._upsert_geom("R1", ART, json.dumps(bent(LAT1, -0.01)), 7.2, 0.19, None, leg="loaded", alt_index=2)
@@ -535,7 +591,8 @@ D003 = demo(M(23, 0, 5, 3, 2.07, 6, 14.79, 20.3, 1.356, 6, 9.6),
             [(1, M(11, 0, 5, 6, 0.87, 5, 13.31, 23.3, 1.405, 6, 8.0)), (2, M(8, 0, 3, 3, 0.73, 4, 12.84, 21.4, 1.374, 6, 7.5))])
 ok("⭐ 10. R003 (demo: 'Suggested Alt 2') is now 'A trade-off': Alt 2 is shorter (12.84 against 14.79 km) but slower "
    "(21.4 against 20.3 min), N5", D003["answer"] == RB.TRADE_OFF and D003["trade"].startswith("Alt 2 has fewer collisions on it "
-   "(8 against 23)") and "it is shorter but slower" in D003["trade"], f"{D003['answer']} {D003['trade']}")
+   "(8 against 23)") and "but it is a shorter road that takes longer" in D003["trade"]
+   and D003["trade"].count(" but ") == 1, f"{D003['answer']} {D003['trade']}")
 D027 = demo(M(151, 0, 7, 20, 8.61, 9, 73.6, 88.0, 88.0 / 60 + 0.667, 4, 53.5),
             [(1, M(196, 0, 10, 21, 8.98, 8, 82.68, 104.2, 104.2 / 60 + 0.667, 3, 56.3)),
              (2, M(101, 0, 8, 17, 6.21, 8, 92.21, 106.7, 106.7 / 60 + 0.667, 3, 62.8))])
@@ -555,9 +612,94 @@ ok("10. R003 with the cycle and community parts counted: still 'A trade-off' (N5
    and "2 fewer schools, hospitals and health centres passed" in D003g["trade"], str(D003g["trade"]))
 
 # =========================================================================== #
+#  10b. Collisions counted on each pair's OWN lines (16 Nov evening)           #
+# =========================================================================== #
+R5 = run("R5")
+keep_words(R5)
+o51 = opt(R5, 1)
+ok("10b. R5's Alt 1 has a loaded line only: it is costed with the main line's way back (return option 0)",
+   o51 is not None and o51["return_alt"] == 0 and R5["in_use"]["pair"] == [0, 0], str(o51 and o51["return_alt"]))
+ok("⭐ 10b. an option whose way back is the main line, with fewer collisions on its own loaded road than the main loaded "
+   "road, reads FEWER: 13 (8 + 5 on the shared way back) against 28 (23 + 5)",
+   o51 and (o51["counts"]["collisions"], R5["counts_in_use"]["collisions"]) == (13, 28) and o51["parts"]["collisions"] == 1
+   and R5["answer"] == RB.SUGGESTED and R5["option"] == "Alt 1",
+   f"{o51 and o51['counts']['collisions']} vs {R5.get('counts_in_use', {}).get('collisions')} {R5['answer']}")
+ok("10b. ...the count by option number (the stored keys R5 and R5@1, both legs pooled) would read 36 against 28: never fewer",
+   sum(1 for c in RECS if any(k in c["routes"] and c["routes"][k] <= collisions.ON_ROUTE_M for k in ("R5", "R5@1"))) == 36)
+ok("⭐ 10b. a collision near both the loaded and the return line counts once",
+   RB.count_on_lines([rec("X1", {}, goods=True, lon=-0.9995, lat=LAT5)], [R5_A, R5_B]) == {"all": 1, "goods": 1}
+   and RB.count_on_lines([rec("X2", {}, lon=-0.95, lat=LAT5)], [R5_A, list(reversed(R5_A))]) == {"all": 1, "goods": 0})
+ok("10b. ...and R1's main pair (the same road both ways) counts its 23 once, not 46", R1["counts_in_use"]["collisions"] == 23)
+ok("10b. a collision 60 m off every line of a pair is not counted, wherever the stored distances say it is",
+   RB.count_on_lines([rec("X3", {"R5": 5}, lon=-0.95, lat=LAT5 + 60 * DLAT)], [R5_A]) == {"all": 0, "goods": 0}
+   and RB.count_on_lines([rec("X4", {}, lon=-0.95, lat=LAT5 + 20 * DLAT)], [R5_A]) == {"all": 1, "goods": 0})
+ok("10b. the rule reads no stored per-key distance for its counts", 'c.get("routes")' not in _rb.split("def count_on_lines(")[1]
+   .split("\ndef ")[0] and "_collision_counts" not in read("backend/route_best.py"))
+
+# --- the fixed sentences: no phrase said twice, one "but" (16 Nov evening, live's R050 / R036 / R003 words) -------------
+import re  # noqa: E402
+
+
+def repeats(s, n=5):
+    """The first run of n words said twice in s (figures and signs left out), or None."""
+    w = re.findall(r"[a-z]+", s.lower())
+    seen = set()
+    for i in range(len(w) - n + 1):
+        g = tuple(w[i:i + n])
+        if g in seen:
+            return " ".join(g)
+        seen.add(g)
+    return None
+
+
+ok("10b. the check finds live's three faults", repeats("4 min quicker a round trip, with 4 min quicker a round trip.")
+   and repeats("2 min quicker a round trip, with fewer collisions on it (2 against 10), 2 min quicker a round trip and "
+               "4.6 kg CO2e less a trip.") and "Alt 2 has 2.1 kg CO2e less a trip, but it is shorter but slower.".count(" but ") == 2)
+B = {h: 30.0 for h in RB.BUSY_HOURS}
+GEN = []
+for col in (4, 20, 40):
+    for dt in (-6.0, 0.0, 6.0):
+        for km in (8.0, 10.0, 12.0):
+            for dco2 in (-1.5, 0.0, 1.5):
+                for trips in (5, 6, 7):
+                    for busy in (None, (-5.0, -5.0), (5.0, -5.0), (5.0, 5.0)):
+                        for cmty in (False, True):
+                            u = M(20, 2, 5, 3, 2.0, 4, 10.0, 20.0, 0.9, 6, 9.0)
+                            u["busy_min"] = dict(B)
+                            m = M(col, col // 10, 3 if cmty else 5, 3, 2.0, 1 if cmty else 4, km, 20.0 + dt,
+                                  0.9 + dt / 60, trips, 9.0 + dco2)
+                            m["busy_min"] = ({h: None for h in RB.BUSY_HOURS} if busy is None
+                                             else {"08:00": 30.0 + busy[0], "17:00": 30.0 + busy[1]})
+                            Fake.community_all = cmty
+                            out = {"options": [RB.option_entry(2, m, dict(u, busy_at=dict(B)), Fake, "current")],
+                                   "answer": RB.KEEP, "option": None, "trade": None, "why": None, "held_back": None,
+                                   "sentences": []}
+                            RB._answer(out, dict(u, busy_at=dict(B)), Fake, "current")
+                            GEN.append(out)
+Fake.community_all = False
+_gen_words = [w for g in GEN for w in [g["why"] or "", g["trade"] or ""] + g["options"][0]["sentences"] if w]
+_answers = {g["answer"] for g in GEN}
+ok("10b. the typed combinations reach every answer (so every kind of line was written)", _answers == set(RB.ANSWERS), str(_answers))
+_rep = [(w, repeats(w)) for w in _gen_words + [w for w in ALL_WORDS if w] if repeats(w)]
+ok("⭐ 10b. no fixed sentence, why or trade line says a phrase of five words twice (live: 'min quicker a round trip')",
+   not _rep, str(_rep[:2]))
+_but = [w for w in _gen_words + ALL_WORDS if w and w.count(" but ") > 1]
+ok("⭐ 10b. 'but' at most once in any line (live: '…, but it is shorter but slower')", not _but, str(_but[:2]))
+ok("10b. 'shorter but slower' is said nowhere", not any("shorter but slower" in w for w in _gen_words + ALL_WORDS))
+_q = [g for g in GEN if g["answer"] == RB.SUGGESTED and g["options"][0]["heads"]["time"] == 1
+      and g["options"][0]["counts"]["cycle_min"] <= 0.9 * 60 - 1]
+ok("⭐ 10b. a Suggested option quicker a round trip says its time once, first (live R050: 'with 4 min quicker a round trip')",
+   _q and all(g["why"].count("quicker a round trip") == 1 and "quicker a round trip" in g["why"].split(",")[0] for g in _q),
+   str([g["why"] for g in _q][:1]))
+_bb = [g for g in GEN if "setting off at" in (g["why"] or "") + (g["trade"] or "")]
+ok("10b. both busy hours ahead are said in one phrase ('quicker setting off at 08:00 (5 min) and 17:00 (5 min)')",
+   any("quicker setting off at 08:00 (5 min) and 17:00 (5 min)" in (g["why"] or "") + (g["trade"] or "") for g in _bb),
+   str([g["why"] for g in _bb][:1]))
+
+# =========================================================================== #
 #  11. Words                                                                   #
 # =========================================================================== #
-_words = [w for w in ALL_WORDS if w]
+_words = [w for w in ALL_WORDS + _gen_words if w]
 _low = " ".join(_words).lower()
 ok("⭐ 11. never 'safer', 'better', a rate, a ratio, a score or a risk; no supplier; lorry, not truck",
    not any(b in _low for b in ("safer", "better", " rate", "ratio", "score", "risk", "here ", "truck", "exposure")),
@@ -571,10 +713,11 @@ ok("11. the words were read from every scenario", len(_words) > 60, str(len(_wor
 # =========================================================================== #
 TAB = main.route_options_best(day="2027-02-02", token="best-admin-token")
 ok("⭐ 12. the table: every route, a row a (route, option), the thresholds and the checks",
-   TAB["day"] == "2027-02-02" and [r["route"] for r in TAB["routes"]] == ["R1", "R2", "R3", "R4"]
+   TAB["day"] == "2027-02-02" and [r["route"] for r in TAB["routes"]] == ["R1", "R2", "R3", "R4", "R5"]
    and TAB["thresholds"]["set_by_john"] is False and TAB["checks"]["limits_held"] is True
    and TAB["checks"]["community_all_options"] is False and TAB["checks"]["collision_fingerprints_kept"] is True
-   and TAB["totals"] == {RB.SUGGESTED: 1, RB.TRADE_OFF: 2, RB.KEEP: 1, "no_alternative": 1}, str(TAB["totals"]))
+   # R5 (added 16 Nov evening) is the second Suggested
+   and TAB["totals"] == {RB.SUGGESTED: 2, RB.TRADE_OFF: 2, RB.KEEP: 1, "no_alternative": 1}, str(TAB["totals"]))
 _rows = {(r["route"], r["option"]): r for r in TAB["rows"]}
 ok("12. each row: route, from, to, lorry, answer, the option, each head, the counts on both sides, why, what ruled it out",
    all(k in _rows[("R1", "Alt 2")] for k in ("from", "to", "lorry", "answer", "heads", "counts", "counts_in_use", "pct",

@@ -26,14 +26,21 @@ How each decision of John's is held (section numbers of the 16 Nov note):
     the same leg (route_choice._below_keys on each, the one matching rule of limits_added). A limit both lines meet is not
     new. "Except for access" is a limit below the lorry like any other (route_choice's rule) and keeps its note. With NO
     limits held at all nothing is suggested (SUGGEST_NEEDS_LIMITS): no option could have been checked.
-  * Collisions (4c, 4e): on-the-road counts per option, all and goods-vehicle, from the stored records' distances to each
-    option key (within collisions.ON_ROUTE_M); "clearly fewer" by the app's own exact test (OFFER_MIN, OFFER_P). Never in a
-    percentage, never a rate or a ratio, said in plain words with the two counts.
-  * Stale keys (finding 4): the stored distances are keyed by option NUMBER as it was at the last collision fetch, and
-    Make primary swaps numbers. history_state() compares each key's lines now with the lines the fetch searched (their
-    fingerprints, kept by the fetch since 16 Nov); for a fetch made before that it reads the events instead (a line routed
-    after the fetch, or a Make primary on the route after it, in the audit log). Out of date: no collision part is
-    counted, the answer says "Collision history out of date", and nothing is suggested (SUGGEST_NEEDS_COLLISIONS).
+  * Collisions (4c, 4e): on-the-road counts per option, all and goods-vehicle, measured at read from each stored record's
+    position to the option's OWN two lines (its loaded line and the return line it is costed with), within
+    collisions.ON_ROUTE_M, on the fetch's own thinned lines and projection (collisions.RouteIndex); a collision near both
+    lines counts once. The route in use is counted the same way on its own pair. (16 Nov evening, the mother session's
+    first live read: the stored distances are keyed by option NUMBER with both legs pooled, so an option costed with the
+    main line's way back counted every collision of the main line too and could never read "fewer"; R003's Alt 1 and
+    Alt 2 read 29 against 23 on live. Counting on the lines retires that, and Make primary no longer moves a count.)
+    "Clearly fewer" by the app's own exact test (OFFER_MIN, OFFER_P). Never in a percentage, never a rate or a ratio,
+    said in plain words with the two counts.
+  * What the collision history still guards (finding 4, narrowed): the fetch keeps only the collisions within
+    collisions.NEAR_ROUTE_M (250 m) of the lines it searched. A line routed after the fetch can run on a road the fetch
+    never searched, so its count could be short. history_state() compares the route's set of lines now with the set the
+    fetch searched (fingerprints, kept by the fetch since 16 Nov), whatever option number each sits under (a Make primary
+    swap changes no line, so it reads current); for a fetch made before that, a line routed after the fetch. Out of
+    date: no collision part is counted, the answer says so, and nothing is suggested (SUGGEST_NEEDS_COLLISIONS).
   * Both legs (N3): left turns, cycle routes met and distance beside a cycle route are a ROUND trip's (the loaded leg plus
     the return leg route_analysis costs).
   * Community places (4d): schools, hospitals and health centres within 250 m decide; the other kinds are returned as
@@ -50,9 +57,9 @@ How each decision of John's is held (section numbers of the 16 Nov note):
 Every threshold is a named constant below: STARTING VALUES that John has not set (he sets them on the all-50 table, Q9).
 
 WHAT IS NOT VERIFIED: run on stubbed and local lines only; never on live's figures (local worktree databases hold stand-in
-lines and no limits). Collision counts are pooled over every lorry type under an option number (the stored key), which is
-right only where the lorry types' lines agree (true on live on 16 Nov: lines_differ_by_lorry says when not). A count
-beside a road is not a risk.
+lines and no limits). Collisions are counted on the chosen lorry's own lines; the RECORDS a route is measured against are
+those the fetch kept near any of the route's searched lines (every lorry type), so a lorry type whose line was never
+searched is caught by history_state only through its fingerprint. A count beside a road is not a risk.
 """
 import datetime
 import math
@@ -98,8 +105,8 @@ SUGGESTED, TRADE_OFF, KEEP = "Suggested", "A trade-off", "Keep the route in use"
 ANSWERS = (SUGGESTED, TRADE_OFF, KEEP)
 NOT_FETCHED_WORDS = ("Cycle routes and community places are shown, not counted: they have not been fetched along every "
                      "option yet.")
-STALE_WORDS = ("Collision history out of date: a line of this route changed after the last collision fetch, so "
-               "collisions are not compared until it is fetched again.")
+STALE_WORDS = ("Collision history out of date: this route was routed again after the last collision fetch, so a road "
+               "on it may not have been searched; collisions are not compared until it is fetched again.")
 NO_HISTORY_WORDS = "Collisions are not compared: the collision history has not been fetched."
 NO_LIMITS_WORDS = "No road limits are held, so no other option could be checked against them."
 
@@ -233,7 +240,6 @@ class Context:
             for c in collisions.records():
                 for rid in {route_choice.base_of(k) for k in (c.get("routes") or {})}:
                     self.records.setdefault(rid, []).append(c)
-        self.promoted_since = self._promoted_since()
         self.period = self.col_status.get("period") or ""
         # community: the gate, the features (once), the cycle routes on one projection
         self.community_all = bool((community.status() or {}).get("all_options"))
@@ -250,22 +256,12 @@ class Context:
         self.grid = collisions._SegGrid(self.proj, cl) if cl else None
         self.loads = approved_loads(self.factors)
 
-    def _promoted_since(self):
-        """{route_id} with a Make primary written after the last collision fetch (the audit log; 2xx writes only)."""
-        if not self.fetched_at:
-            return set()
-        out = set()
-        try:
-            rows = db.query("SELECT at, path FROM audit_log WHERE tenant_id = ? AND path LIKE ?",
-                            (self.tenant, "%/promote-alt"))
-        except Exception:
-            return out
-        for r in rows:
-            t = _parse_ts(r.get("at"))
-            parts = (r.get("path") or "").split("/")
-            if t and t > self.fetched_at and "routes" in parts and parts.index("routes") + 1 < len(parts):
-                out.add(parts[parts.index("routes") + 1])
-        return out
+    def searched_lines(self, rid):
+        """{fingerprint} of every line of this route the last fetch searched (any option number), or None when the fetch
+        kept no fingerprints (a fetch made before 16 Nov)."""
+        if self.searched_prints is None:
+            return None
+        return {p for k, v in self.searched_prints.items() if route_choice.base_of(k) == rid for p in v}
 
     def route_lines(self, rid):
         """{(profile, leg, alt): coords}, {route_key: {fingerprint}} and the lines' computed_at, for one route."""
@@ -329,21 +325,19 @@ def pick_lorry(rid, ctx, profiles):
 
 
 def history_state(rid, prints, computed, ctx):
-    """'current', 'out_of_date' or 'not_fetched' for this route's collision counts (finding 4). With the fetch's own
-    fingerprints: out of date when any key of the route names other lines than were searched. For a fetch made before
-    16 Nov (no fingerprints kept): out of date when a line of the route was routed after the fetch, or a Make primary was
-    written on it after the fetch."""
+    """'current', 'out_of_date' or 'not_fetched' for this route's collision counts. The counts are measured on the lines
+    themselves, so what can go stale is only WHICH collisions the fetch kept: those within 250 m of the lines it searched.
+    With the fetch's own fingerprints: out of date when the route now holds a line the fetch did not search, under any
+    option number (a Make primary swaps numbers, not lines: current). For a fetch made before 16 Nov (no fingerprints
+    kept): out of date when a line of the route was routed after the fetch. A line the fetch searched that has since
+    gone does not matter (its collisions are kept, just not read)."""
     if not ctx.fetched:
         return "not_fetched"
-    if ctx.searched_prints is not None:
-        keys = set(prints) | {k for k in ctx.searched_prints if route_choice.base_of(k) == rid}
-        for k in keys:
-            if prints.get(k, set()) != ctx.searched_prints.get(k, set()):
-                return "out_of_date"
-        return "current"
+    searched = ctx.searched_lines(rid)
+    if searched is not None:
+        now = {p for v in prints.values() for p in v}
+        return "current" if now <= searched else "out_of_date"
     if any(t is not None and t > ctx.fetched_at for t in computed):
-        return "out_of_date"
-    if rid in ctx.promoted_since:
         return "out_of_date"
     return "current"
 
@@ -375,12 +369,20 @@ def _places(legs, ctx):
     return out
 
 
-def _collision_counts(rid, keys, ctx):
-    """{"all", "goods"}: the stored collisions within ON_ROUTE_M of any of these option keys (each collision once)."""
+def count_on_lines(recs, legs):
+    """{"all", "goods"}: the collisions of `recs` within collisions.ON_ROUTE_M of any of these lines, each collision once.
+    Measured from the record's own position to the lines thinned as the fetch thins them (community._thin) on the
+    fetch's index (collisions.RouteIndex), so a distance here is the one the fetch would have stored for that line."""
     n = {"all": 0, "goods": 0}
-    for c in ctx.records.get(rid, ()):
-        rk = c.get("routes") or {}
-        if any(k in rk and rk[k] <= collisions.ON_ROUTE_M for k in keys):
+    legs = [community._thin(l) for l in legs if l and len(l) >= 2]
+    if not legs:
+        return n
+    idx = collisions.RouteIndex([(str(i), l) for i, l in enumerate(legs)], [], route_m=collisions.ON_ROUTE_M, site_m=0)
+    for c in recs:
+        lon, lat = c.get("lon"), c.get("lat")
+        if lon is None or lat is None or not idx.in_box(float(lon), float(lat)):
+            continue
+        if idx.near(float(lon), float(lat))[0]:
             n["all"] += 1
             n["goods"] += 1 if c.get("goods") else 0
     return n
@@ -404,10 +406,13 @@ def measures(rid, row, lines, lorry, ctx):
             beside_m += len(cy["beside_m"]) * 10
         beside = round(beside_m / 1000.0, 2)
     places = _places(legs, ctx)
+    # the option numbers the pair is stored under (an older fetch's "searched" list is by number) and its lines' prints
     keys = {collisions.route_key(rid, la)} | ({collisions.route_key(rid, int(ra))} if ra is not None else set())
-    col = _collision_counts(rid, keys, ctx)
+    import here_routing
+    col = count_on_lines(ctx.records.get(rid, ()), legs)
     hrs = row.get("hours") or {}
     return {"loaded_alt": la, "return_alt": (int(ra) if ra is not None else None), "keys": sorted(keys),
+            "prints": sorted({here_routing._fingerprint(l) for l in legs}),
             "km": round(float(row.get("total_km") or 0), 2),
             "drive_min": round((float(row.get("loaded_hr") or 0) + float(row.get("return_hr") or 0)) * 60, 1),
             "cycle_min": round(float(row.get("cycle_hr") or 0) * 60, 1),
@@ -461,8 +466,14 @@ def _ruled_out(opt_legs, use_legs, lorry, ctx):
                 added.append({"leg": leg, "source": k[0], "ext_id": k[1], "kind": k[2], "words": _limit_words(L),
                               "except_for_access": bool(L.get("exceptions"))})
         if added:
-            reasons.append(f"it meets {len(added)} road limit{'s' if len(added) != 1 else ''} below this lorry that the "
-                           f"route in use does not: " + "; ".join(a["words"] + f" ({a['leg']} leg)" for a in added))
+            # each limit named once, with the legs it is on (a limit on both legs was said twice, 16 Nov evening)
+            legs_of = {}
+            for a in added:
+                legs_of.setdefault((a["source"], a["ext_id"], a["kind"]), [a["words"], []])[1].append(a["leg"])
+            n = len(legs_of)
+            reasons.append(f"it meets {n} road limit{'s' if n != 1 else ''} below this lorry that the route in use does "
+                           f"not: " + "; ".join(w + (" (both legs)" if len(ls) > 1 else f" ({ls[0]} leg)")
+                                                for w, ls in legs_of.values()))
     return reasons, added
 
 
@@ -546,13 +557,18 @@ def sentences(o, use, ctx, hist):
         out.append("Setting off " + "; ".join(busy) + ".")
     out.append(f"Carbon is {_n(c['co2_kg'])} kg CO2e a trip against {_n(use['co2_kg'])} kg.")
     if o["n5"]:
-        out.append(f"{name} is shorter but slower ({_n(use['km'] - c['km'], 2)} km less, "
+        out.append(f"{name} is {N5_WORDS} ({_n(use['km'] - c['km'], 2)} km less, "
                    f"{_n(c['drive_min'] - use['drive_min'])} min more driving a round trip), so it is never suggested.")
     return out
 
 
-def _gains_losses(o, use):
-    """([what the option gains], [what it gives up]) in words, for the why and the trade line."""
+#: N5 in words, once: never "shorter but slower" (a trade line already carries its own "but")
+N5_WORDS = "a shorter road that takes longer"
+
+
+def _gains_losses(o, use, with_time=True):
+    """([what the option gains], [what it gives up]) in words, for the why and the trade line. with_time=False leaves the
+    round-trip time out (the why says it first, so it is said once)."""
     c, gains, losses = o["counts"], [], []
     pt = o["parts"]
     for key, what in (("collisions", "collisions"), ("goods", "goods-vehicle collisions")):
@@ -578,28 +594,37 @@ def _gains_losses(o, use):
         (gains if d < 0 else losses).append(f"{abs(d)} {'fewer' if d < 0 else 'more'} schools, hospitals and health "
                                             f"centres passed")
     dt = round(c["cycle_min"] - use["cycle_min"])
-    if o["heads"]["time"] in (1, MIXED) and dt < 0:
+    time_loss = with_time and o["heads"]["time"] in (-1, MIXED) and dt > 0
+    if with_time and o["heads"]["time"] in (1, MIXED) and dt < 0:
         gains.append(f"{-dt} min quicker a round trip")
-    if o["heads"]["time"] in (-1, MIXED) and dt > 0:
+    if time_loss:
         losses.append(f"{dt} min more a round trip")
     if c["trips"] > use["trips"]:
         gains.append(f"{c['trips']} trips a day, not {use['trips']}")
     elif c["trips"] < use["trips"]:
         losses.append(f"a lorry fits {c['trips']} trips a day, not {use['trips']}")
+    busy = {1: [], -1: []}
     for h, v in o["detail"]["busy_hours"].items():
         if v in (1, -1):
-            d = round(c["busy_min"][h] - use["busy_at"][h])
-            (gains if v == 1 else losses).append(f"{abs(d)} min {'quicker' if v == 1 else 'more'} setting off at {h}")
+            busy[v].append((h, abs(round(c["busy_min"][h] - use["busy_at"][h]))))
+    for v, hs in busy.items():
+        word = "quicker" if v == 1 else "more"
+        if len(hs) == 1:
+            (gains if v == 1 else losses).append(f"{hs[0][1]} min {word} setting off at {hs[0][0]}")
+        elif hs:
+            # both busy hours in ONE phrase, so "min quicker setting off at" is not said twice
+            (gains if v == 1 else losses).append(f"{word} setting off at " + _join([f"{h} ({d} min)" for h, d in hs]))
     if o["heads"]["carbon"] in (1, -1):
         d = round(c["co2_kg"] - use["co2_kg"], 1)
         (gains if d < 0 else losses).append(f"{_n(abs(d))} kg CO2e {'less' if d < 0 else 'more'} a trip")
-    if o["n5"]:
-        losses.append("it is shorter but slower")
+    if o["n5"] and not time_loss:
+        # said once: where the longer round trip is already a loss above, the N5 words would say it again
+        losses.append(f"it is {N5_WORDS}")
     return gains, losses
 
 
 def _why_suggested(o, use):
-    gains, _ = _gains_losses(o, use)
+    gains, _ = _gains_losses(o, use, with_time=False)
     dt = o["counts"]["cycle_min"] - use["cycle_min"]
     if round(abs(dt)) == 0:
         first = "About the same time a round trip"
@@ -624,7 +649,8 @@ def evaluate(rid, ctx):
            "answer": KEEP, "option": None, "alt": None, "why": None, "trade": None, "held_back": None,
            "sentences": [], "options": [], "in_use": None, "busy_roads": [],
            "checks": {"limits_held": bool(ctx.lims), "community_all_options": ctx.community_all}}
-    # finding 5: do the lorry types' lines differ on any (leg, option)? Collisions and places are pooled by option number
+    # finding 5: do the lorry types' lines differ on any (leg, option)? Every count here is on the chosen lorry's own
+    # lines (16 Nov evening); route_compare's table still pools collisions by option number, so this says where they part
     by_lo = {}
     for (p, leg, alt), l in lines.items():
         by_lo.setdefault((leg, alt), set()).add((len(l), tuple(l[0][:2]), tuple(l[-1][:2]), tuple(l[len(l) // 2][:2])))
@@ -681,7 +707,14 @@ def evaluate(rid, ctx):
                                                 "left_turns", "cycle_meets", "cycle_beside_km", "places", "shown")}
     out["counts_in_use"]["busy_min"] = use["busy_at"]
     use_legs = {"loaded": lines.get((lorry, "loaded", use_pair[0])), "return": lines.get((lorry, "return", use_pair[1]))}
-    use_searched = ctx.searched is None or set(use["keys"]) <= ctx.searched
+    searched_lines = ctx.searched_lines(rid)
+
+    def was_searched(m):
+        # were this pair's lines searched by the last fetch? By line where it kept fingerprints, else by option number
+        if searched_lines is not None:
+            return set(m["prints"]) <= searched_lines
+        return ctx.searched is None or set(m["keys"]) <= ctx.searched
+    use_searched = was_searched(use)
     for a in cands:
         if (a, a) not in rows:
             continue
@@ -690,7 +723,7 @@ def evaluate(rid, ctx):
         if m["return_alt"] is not None:
             opt_legs["return"] = lines.get((lorry, "return", m["return_alt"]))
         reasons, added = _ruled_out(opt_legs, use_legs, lorry, ctx)
-        searched = use_searched and (ctx.searched is None or set(m["keys"]) <= ctx.searched)
+        searched = use_searched and was_searched(m)
         out["options"].append(option_entry(a, m, use, ctx, hist, reasons, added, searched))
     _answer(out, use, ctx, hist)
     return out
