@@ -1007,7 +1007,8 @@ def build(data, impact="higher", pictures=True, acc=None, appendices=True):
     lim = L.get("limits") or {}
     if lim.get("checked"):
         if lim["rows"]:
-            vw = {"exceeds": "over the limit", "at_limit": "at the limit", "unknown": "to be checked"}
+            vw = {"exceeds": "over the limit", "at_limit": "at the limit", "unknown": "to be checked",
+                  "allowed": "allowed: the site is on this road"}
             D.p("Signed and mapped lorry limits on the routes that need a look:")
             D.table(["Limit", "Lorry", "Routes"],
                     [[e["what"], f"{', '.join(e['lorries']) or 'all'}: {vw[e['verdict']]}", ", ".join(e["routes"])]

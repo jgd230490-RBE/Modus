@@ -150,14 +150,18 @@ def _keep_main_rules():
 def _below_keys(line, profile, leg, lims):
     """The stored lorry limits this line runs along (or passes, for a point limit) that are BELOW this lorry on this leg
     (limits.assess verdict "exceeds", the Route sheet's "is over"), as a set of (source, ext_id, kind): each limit once.
-    A limit "except for access" counts: whether this site is one is for a person to check, as the sheet says."""
+    A limit "except for access" counts: whether this site is one is for a person to check, as the sheet says.
+    16 Nov 2026 (John: "Yes" to the mockup; bends 11 Nov's "No limit, then quickest" and "only new limits"): EXCEPT one the
+    line's own start or end is on (limits.site_allowed): "Allowed: the site is on this road" is not a limit below the lorry."""
     if not lims or not line:
         return set()
     import limits
     seen = set()
-    for L, _point, _along in limits._matches(line, lims):
+    matches = limits._matches(line, lims)
+    allowed = limits.site_allowed(line, matches)
+    for L, _point, _along in matches:
         k = (L.get("source"), L.get("ext_id"), L.get("kind"))
-        if k not in seen and limits.assess(L, profile, leg)["verdict"] == "exceeds":
+        if k not in seen and k not in allowed and limits.assess(L, profile, leg)["verdict"] == "exceeds":
             seen.add(k)
     return seen
 
