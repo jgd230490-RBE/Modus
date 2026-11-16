@@ -29,7 +29,7 @@ MAX_PLACES = 40            # 2.4.2 lists the first 40 named; the rest are counte
 UNNAMED_WORDS = {"schools": ("school", "schools"), "hospitals": ("hospital", "hospitals"),
                  "health": ("health centre", "health centres"), "community": ("community centre", "community centres"),
                  "sports": ("sports facility", "sports facilities")}
-LIMIT_SHOWN = ("exceeds", "at_limit", "unknown")
+LIMIT_SHOWN = ("exceeds", "at_limit", "unknown", "allowed")
 
 
 def _lines(route_ids):
@@ -197,7 +197,7 @@ def gather(data, area_month=None):
             e["routes"].add(rid)
             if h.get("vehicle_label"):
                 e["lorries"].add(h["vehicle_label"])
-    order = {"exceeds": 0, "at_limit": 1, "unknown": 2}
+    order = {"exceeds": 0, "at_limit": 1, "unknown": 2, "allowed": 3}
     out["limits"] = {"checked": checked, "within": within,
                      "rows": [dict(e, routes=sorted(e["routes"]), lorries=sorted(e["lorries"]))
                               for e in sorted(lim_rows.values(), key=lambda e: (order[e["verdict"]], e["what"]))]}

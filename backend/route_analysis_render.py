@@ -481,9 +481,12 @@ def page_limits(doc, R):
         blocks.append((7.0, NAVY_RGB, "On a diversion (section F): " + "; ".join(
             f"{g['headline']} · {g['road']} — {g['verdict_words'].lower()}" for g in L["diversion_items"][:6])
             + (" …" if len(L["diversion_items"]) > 6 else "")))
-    if any(g.get("exceptions") for g in items):
+    if any(g.get("exceptions") and g["verdict"] != "allowed" for g in items):
         blocks.append((6.8, GREY, "\"Except for access\": a lorry may use the road to reach premises on it — check whether "
                                   "this site is one. The signs on the road come first."))
+    if any(g["verdict"] == "allowed" for g in items):
+        blocks.append((6.8, GREY, "Allowed: the site is on this road. Check the sign names this site. "
+                                  "The signs on the road come first."))
     if Cl.get("held"):
         n = len(Cl["hits"])
         t = (f"None of the planned closures held on {Cl['when']} is on this route (within {Cl.get('near_m') or RA.CLOSURE_NEAR_M} m)."

@@ -127,6 +127,13 @@ ALONG_SIDE_M = 8.0      # 12 Nov 2026: …and only where it lies this close to t
 # Set against the 15 stretches live flagged on 12 Nov 2026 (real lines, measured read only): the 12 the routes run along
 # lie 0 to 4.5 m from the route's line; the two parallel roads 11.6 to 24 m; the roundabout arm ends 17.3 m off it.
 
+#: 16 Nov 2026 ("Allowed: the site is on this road", John's yes to the mockup): a lorry WEIGHT or AXLE limit whose sign carries an
+#: exception for access / delivery stops reading "over" on a leg that starts or ends on that road. Judgement, not measured:
+SITE_END_M = 40.0       # the leg's own first or last point lies within this of a stretch of the limit (the quarry's gate: 35 m)
+SITE_JOIN_M = 15.0      # …and the stretches of one signed road join end to end within this (the quarry road: 11 pieces, gaps 0 to 12 m)
+SITE_KINDS = ("weight", "axle")   # a bridge's height or width does not care why the lorry is there
+ALLOWED_NOTE = "the site is on this road: check the sign names this site"
+
 TIMEOUT_S = 90
 
 # --------------------------------------------------------------------------- #
@@ -1045,6 +1052,40 @@ def assess(limit, profile, leg="loaded"):
     return {"verdict": verdict, "vehicle": have, "margin": round(lim - have, 2), "note": None}
 
 
+def _ends_gap_m(a, b):
+    """The smallest distance between the end points of two limit lines."""
+    return min(_hav_m(p, q) for p in (a[0], a[-1]) for q in (b[0], b[-1]))
+
+
+def site_allowed(line, matches):
+    """
+    The stored lorry limits ({(source, ext_id, kind)}) that one leg's line MATCHES but that allow it, because the leg
+    starts or ends on that road: `matches` = [(limit, point?, along_m)] from the one matching rule. A limit qualifies
+    only when ALL hold: a weight or axle limit; its sign carries an exception (limit["exceptions"]); it is a line, not a
+    point; the line's first or last point lies within SITE_END_M of it, or of a stretch that joins it end to end
+    (SITE_JOIN_M) with the same kind, value and exception (one signed road drawn as several pieces).
+    What it cannot tell: whether the site is one of the premises the sign means (the planner checks).
+    """
+    if not line or len(line) < 2:
+        return set()
+    cands = [L for L, point, _a in matches
+             if not point and L.get("exceptions") and L.get("kind") in SITE_KINDS and L.get("geometry")]
+    if not cands:
+        return set()
+    ends = (line[0], line[-1])
+    done, todo = [], [L for L in cands if min(_pt_line_m(p, L["geometry"]) for p in ends) <= SITE_END_M]
+    while todo:
+        cur = todo.pop()
+        done.append(cur)
+        for L in list(cands):
+            if L is cur or L in done or L in todo:
+                continue
+            if (L["kind"], L["value"], L["exceptions"]) == (cur["kind"], cur["value"], cur["exceptions"]) \
+                    and _ends_gap_m(L["geometry"], cur["geometry"]) <= SITE_JOIN_M:
+                todo.append(L)
+    return {(L.get("source"), L.get("ext_id"), L.get("kind")) for L in done}
+
+
 def headline(limit):
     v = fmt_value(limit["kind"], limit["value"])
     if limit["kind"] in ("height", "width"):
@@ -1076,6 +1117,7 @@ def check_route(route_id, _limits=None):
             continue
         lb = _bbox(line)
         idx = None          # built on the first limit near the line (17 Oct 2026: see _LineIndex)
+        found = []
         for L in lims:
             coords = L["geometry"]
             if L["geom_type"] == "Point":
@@ -1094,17 +1136,25 @@ def check_route(route_id, _limits=None):
                 if along is None:
                     continue
                 point = False
+            found.append((L, point, along))
+        # 16 Nov 2026: a weight limit with an exception on a road this leg starts or ends on is allowed (site_allowed)
+        allowed = site_allowed(line, found)
+        for L, point, along in found:
             alt = int(g.get("alt_index") or 0)
             key = (g["vehicle_profile"], g["leg"], alt, L["source"], L["ext_id"], L["kind"])
             if key in seen:
                 continue
             seen.add(key)
             a = assess(L, g["vehicle_profile"], g["leg"])
+            if a["verdict"] == "exceeds" and (L.get("source"), L.get("ext_id"), L.get("kind")) in allowed:
+                a = dict(a, verdict="allowed", note=None)
             note = a["note"]
             if point:
                 note = ("a point limit on or beside the route: check whether the route passes it or "
                         "crosses over or under it") + (f"; {note}" if note else "")
-            if L.get("exceptions"):
+            if a["verdict"] == "allowed":
+                note = f"{L['exceptions']}: {ALLOWED_NOTE}"
+            elif L.get("exceptions"):
                 note = (f"{L['exceptions']}: a lorry may use it to reach premises on it — check whether "
                         "this site is one") + (f"; {note}" if note else "")
             hits.append({
@@ -1120,7 +1170,7 @@ def check_route(route_id, _limits=None):
             if alt:
                 hits[-1]["alt_index"] = alt
                 hits[-1]["diversion"] = div[(g["vehicle_profile"], g["leg"], alt)]
-    order = {"exceeds": 0, "at_limit": 1, "unknown": 2, "within": 3}
+    order = {"exceeds": 0, "at_limit": 1, "unknown": 2, "allowed": 3, "within": 4}
     # a limit the route runs ALONG outranks a point limit (which may be a crossing)
     hits.sort(key=lambda h: (order.get(h["verdict"], 3), bool(h["point"]), h["kind"], h["vehicle_profile"], h["leg"]))
     return {"route_id": route_id, "baked": True, "hits": hits,
@@ -1356,13 +1406,13 @@ def feature_collection(box=None):
     planned = {(r["route_id"], r["vehicle_type"]) for r in db.query(
         "SELECT DISTINCT route_id, vehicle_type FROM forecasts WHERE tenant_id = ? AND status = 'Approved'",
         (db.current_tenant(),))}
-    over = {}
+    over, okay = {}, {}
     for rid, st in checks.items():
         for h in st.get("hits") or []:
-            if h.get("verdict") != "exceeds" or (rid, h.get("vehicle_profile")) not in planned:
+            if h.get("verdict") not in ("exceeds", "allowed") or (rid, h.get("vehicle_profile")) not in planned:
                 continue
             k = (h["source"], h["ext_id"], h["kind"])
-            lst = over.setdefault(k, [])
+            lst = (over if h.get("verdict") == "exceeds" else okay).setdefault(k, [])
             item = {"route_id": rid, "vehicle": vehicle_label(h["vehicle_profile"]),
                     "vehicle_value": h.get("vehicle_value"), "leg": h["leg"]}
             if item not in lst:
@@ -1371,6 +1421,7 @@ def feature_collection(box=None):
     for L in lims:
         k = (L["source"], L["ext_id"], L["kind"])
         br = over.get(k, [])
+        al = okay.get(k, [])
         kind = L["kind"]
         counts[kind] = counts.get(kind, 0) + 1
         fetched[L["source"]] = max(fetched.get(L["source"]) or "", L["fetched_at"] or "")
@@ -1385,7 +1436,7 @@ def feature_collection(box=None):
             "source_label": SOURCES[L["source"]]["short"], "attribution": SOURCES[L["source"]]["attribution"],
             "fetched_at": L["fetched_at"], "length_m": L.get("length_m"),
             "geom_type": L["geom_type"], "anchor": [L["anchor_lon"], L["anchor_lat"]],
-            "breaches": br, "breach_count": len(br),
+            "breaches": br, "breach_count": len(br), "allowed": al,
         }
         geom = ({"type": "Point", "coordinates": L["geometry"]} if L["geom_type"] == "Point"
                 else {"type": "LineString", "coordinates": L["geometry"]})
