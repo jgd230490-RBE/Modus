@@ -206,6 +206,9 @@ if (hasCard) {
     m.done();
     const SHORT = "Alt 2 is ahead on cycle routes and carbon, behind on places and time.";
     const m2 = mount(B(Object.assign({}, r, { trade_short: SHORT })));
+    const m0 = mount(B(Object.assign({}, r, { trade_short: null })));
+    ok("TRADE-OFF: trade_short null (the field's agreed shape) gives no why line, never the long trade", !m0.host.querySelector("[data-bo-why]") && !m0.text().includes(LONG));
+    m0.done();
     ok("TRADE-OFF: the rule's short trade line is the why when it gives one", m2.host.querySelector("[data-bo-why]") && m2.host.querySelector("[data-bo-why]").textContent === SHORT);
     m2.done();
   }
@@ -279,10 +282,14 @@ if (hasCard) {
        m2.host.querySelector('[data-bo-in-use="busy"]').textContent === "Busy hours: Alt 2 is in use on weekdays 16:00–19:00." && m2.host.querySelectorAll('[data-bo-in-use="busy"]').length === 1);
     m2.done();
     const m3 = mount(B(route({ options: [opt(1)], answer: "Keep the route in use", why: "No other option is clearly ahead on any head.",
-                               in_use_limits: [{ words: "The diversion in use meets a 7.5 t limit below this lorry.", legs: ["loaded", "return"] }] })));
+                               in_use_limits: [{ words: "The diversion in use meets a 7.5 t limit below this lorry.", legs: "both" }] })));
     ok("Q9: a limit on the line in use, as the rule words it, is one grey line on the card",
        m3.host.querySelector("[data-bo-in-use-limit]") && m3.host.querySelector("[data-bo-in-use-limit]").textContent === "The diversion in use meets a 7.5 t limit below this lorry.");
     m3.done();
+    const m4 = mount(B(route({ options: [Object.assign(opt(1), { chosen: true })], in_use_limits: [], trade_short: null })));
+    ok("Q9: an empty in_use_limits list (the rule's 'none') draws no line; trade_short null on a Suggested answer leaves the rule's why",
+       !m4.host.querySelector("[data-bo-in-use-limit]") && m4.host.querySelector("[data-bo-why]") && m4.host.querySelector("[data-bo-why]").textContent === route().why);
+    m4.done();
   }
   // 6. Loading, and a failed read
   {
