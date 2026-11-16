@@ -1,0 +1,155 @@
+/* Wayscope tools: the frame every public tool page stands in (claude/tools-shell, 16 Nov 2026).
+   The look is John's agreed mockup, notes/tools-first-opening-mockup-1116 (cards 2, 3, 4): a slim dark bar with the
+   logo, "Tools" and "Request a demo", then the page in the landing page's colours and type. The tokens below are the
+   landing page's own (landing/index.html :root) plus the few status colours the mockup adds; the class names are the
+   mockup's, so a tool page is written from its card. No demo bar, no sign-in, no balance on these pages.
+   Loaded only by frontend/tools/*.html; the app's own screens never read it. */
+
+:root{
+  --ink:#1F2024; --ink-2:#3D4552; --muted:#5B6470; --line:#E3E6EA; --line-2:#EEF0F2;
+  --paper:#FFFFFF; --stone:#F6F6F4; --ground:#E9ECEF;
+  --dark:#1F2024; --dark-2:#2A2C31; --dark-line:#3A3D44; --on-dark:#FFFFFF; --on-dark-2:#C9CED6; --on-dark-3:#9AA2AD;
+  --orange:#FF8C14; --orange-text:#B85600; --orange-deep:#8A4A05; --orange-tint:#FFF3E3;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,"Segoe UI",sans-serif;
+  --display:Sora,var(--sans);
+  /* the mockup's status colours (answers, chips, pills) */
+  --navy:#1D4ED8; --soft:#eff6ff; --ok:#047857; --ok-bg:#ecfdf5; --warn:#B45309; --warn-bg:#fffbeb; --bad:#B91C1C;
+  --none-bg:#f1f5f9; --box-line:#cbd5e1;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+a:hover{color:var(--orange-text)}
+:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+img{max-width:100%;display:block}
+p{margin:0 0 10px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* the page column: the mockup is drawn at about 1150 px; wider windows keep that column, centred */
+.tw{max-width:1200px;margin:0 auto}
+
+/* ---------- the bar (every tool page) ---------- */
+.toolbar{background:var(--dark)}
+.toolbar .tw{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 26px}
+.toolbar .brand{display:flex;align-items:center;text-decoration:none}
+.toolbar img{display:block;height:22px;width:auto}
+.toolbar .links{display:flex;align-items:center;gap:18px;font-size:14px;font-weight:500}
+.toolbar .links a{text-decoration:none;color:var(--on-dark-2)}
+.toolbar .links a:hover{color:#fff}
+.toolbar .links a.on{color:#fff;border-bottom:2px solid var(--orange);padding-bottom:2px}
+.toolbar .links a.btn{color:var(--ink);border-bottom:0}
+.toolbar .links a.btn:hover{color:var(--ink)}
+
+/* ---------- buttons and pills ---------- */
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:8px;padding:10px 18px;
+  font:600 14px/1.5 var(--sans);border:1px solid transparent;white-space:nowrap;text-decoration:none;cursor:pointer;background:none;color:inherit}
+.btn.sm{padding:7px 12px;font-size:13px}
+/* a small button keeps the mockup's size and still offers a 44 px tap area */
+.btn.sm::after{content:"";position:absolute;left:0;right:0;top:50%;height:44px;transform:translateY(-50%)}
+.btn-orange{background:var(--orange);color:var(--ink)}
+.btn-orange:hover{background:#FF9A33;color:var(--ink)}
+.btn-ink{background:var(--ink);color:#fff}
+.btn-ink:hover{background:#000;color:#fff}
+.btn-line{border-color:var(--box-line);color:var(--ink);background:#fff}
+.btn-line:hover{border-color:var(--ink);color:var(--ink)}
+.btn[disabled],.btn[aria-disabled="true"]{opacity:.55;cursor:default}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--orange-text);margin:0 0 6px}
+.cr{display:inline-flex;align-items:center;gap:5px;font-weight:600;font-size:13px;color:var(--orange-text);background:var(--orange-tint);
+  border-radius:999px;padding:3px 10px;white-space:nowrap}
+.cr.free{background:var(--ok-bg);color:var(--ok)}
+.cr.ask{background:var(--none-bg);color:var(--ink-2)}
+.cr::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}
+.chip.same{background:var(--none-bg);color:var(--ink-2)}
+.chip.warn{background:var(--warn-bg);color:var(--warn)}
+.chip.info{background:#e0e7ff;color:var(--navy)}
+.chip.ok::before{content:"";border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:7px solid currentColor}
+.chip.same::before{content:"";width:8px;height:2px;background:currentColor}
+
+/* ---------- a tool page: the pitch on the left, the work on the right (cards 3 and 4) ---------- */
+.tp{display:grid;grid-template-columns:1fr 1.25fr;gap:0}
+.tp .pitch{padding:22px 26px;background:var(--stone);border-right:1px solid var(--line)}
+.tp .pitch h1{font:600 24px/1.15 var(--display);letter-spacing:-.02em;margin:0 0 8px}
+.tp .pitch p{color:var(--ink-2);margin:0 0 10px}
+.tp .pitch ul{margin:0 0 14px;padding-left:18px;color:var(--ink-2)}
+.tp .pitch li{margin:4px 0}
+.tp .work{padding:22px 26px}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 12px}
+.topline h2{font:600 15px/1.5 var(--sans);margin:0}
+
+/* ---------- form boxes ---------- */
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin:0 0 12px}
+.form .f{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted);font-weight:500}
+.form .f.w,.form .tick.w{grid-column:1 / -1}
+.inp,.f input:not([type=checkbox]),.f select,.f textarea{border:1px solid var(--box-line);border-radius:7px;padding:8px 10px;font:400 14px/1.4 var(--sans);
+  color:var(--ink);background:#fff;min-height:38px;width:100%}
+.inp{display:flex;align-items:center;justify-content:space-between}
+.f input::placeholder,.f textarea::placeholder{color:var(--muted)}
+.f select{appearance:none;-webkit-appearance:none;padding-right:30px;background-repeat:no-repeat;background-position:right 10px center;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235B6470' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E")}
+.f textarea,.inp.tall{min-height:64px;resize:vertical}
+.f input:focus,.f select:focus,.f textarea:focus{outline:2px solid var(--orange);outline-offset:1px;border-color:var(--orange)}
+.f [aria-invalid="true"]{border-color:var(--bad)}
+.tick{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink-2);cursor:pointer}
+.tick input{width:16px;height:16px;margin:0;flex:none;accent-color:var(--ink)}
+/* the hidden box only a machine fills in (the landing form's trap) */
+.trap{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+.runrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px}
+.runrow small{color:var(--muted);font-size:12.5px}
+
+/* ---------- answers ---------- */
+.res{border-top:1px solid var(--line);padding-top:14px}
+.big{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 4px}
+.big .v{font:600 20px/1.2 var(--display)}
+.note{font-size:12.5px;color:var(--muted)}
+.adv{list-style:none;margin:8px 0 0;padding:0;font-size:13.5px}
+.adv li{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.adv li b{font-weight:600}
+.fine2{font-size:12.5px;color:var(--muted);margin:10px 0 0}
+.fine2 a{color:inherit}
+.thanks{border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:8px;padding:10px 12px;background:var(--ok-bg);
+  display:flex;flex-direction:column;gap:2px;font-size:13.5px}
+.thanks b{font-size:14px}
+/* a sentence the shared script writes when a call fails (tools.js) */
+.say{font-size:13.5px;color:var(--bad);margin:8px 0 0}
+.say:empty{display:none}
+
+/* ---------- the calculators (card 2) ---------- */
+.calchead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:22px 26px 0}
+.calchead h1{font:600 24px/1.15 var(--display);letter-spacing:-.02em;margin:0}
+.calcs{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:22px 26px}
+.calc{border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column}
+.calc h2{font:600 16px/1.25 var(--display);margin:0 0 10px}
+.calc .row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--muted);padding:4px 0;border-bottom:1px dashed var(--line)}
+.calc .row b{color:var(--ink);font-weight:500;text-align:right}
+.calc .ans{margin-top:10px;background:var(--stone);border-radius:8px;padding:10px 12px}
+.calc .ans .v{font:600 22px/1.2 var(--display)}
+.calc .ans small{color:var(--muted);font-size:12.5px;display:block}
+.calc .pdf{align-self:flex-start;margin-top:10px}
+.pdfbox{margin:0 26px 16px auto;max-width:372px;border:1px solid var(--box-line);border-radius:10px;padding:12px 14px;box-shadow:0 4px 14px rgba(15,23,42,.08)}
+.pdfbox h2,.pdfbox b.h{display:block;font:600 14px/1.5 var(--sans);margin:0 0 8px}
+.pdfrow{display:flex;align-items:flex-end;gap:8px;margin-bottom:8px}
+.pdfrow .f{flex:1;display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted);font-weight:500}
+
+/* ---------- the "next" strip (each tool leads on) ---------- */
+.next{margin-top:12px;border:1px solid var(--line);border-left:4px solid var(--orange);border-radius:8px;padding:10px 12px;font-size:13.5px;
+  display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.next.wide{margin:0 26px 22px}
+
+/* ---------- narrow windows (the mockup's own breakpoints) ---------- */
+@media (max-width:860px){
+  .tp{grid-template-columns:1fr}
+  .tp .pitch{border-right:0;border-bottom:1px solid var(--line)}
+  .calcs{grid-template-columns:1fr}
+  .adv li{grid-template-columns:1fr}
+}
+@media (max-width:520px){
+  .form{grid-template-columns:1fr}
+  .toolbar .tw{padding:10px 16px}
+  .tp .pitch,.tp .work,.calcs{padding:16px}
+  .calchead{padding:16px 16px 0}
+  .pdfbox{margin:0 16px 16px}
+  .next.wide{margin:0 16px 16px}
+}
