@@ -240,7 +240,11 @@ def lim(ext, kind, value, geom, gtype="LineString", exceptions=None, name=None):
 
 W_ALT1 = lim("w1", "weight", 7.5, along(bent(LAT1, 0.01), 0.4, 0.5), exceptions="Except for access", name="Back Lane")
 SHARED = lim("sh", "height", 3.0, [-1.0, LAT1], "Point", name="Quarry gate bridge")   # every R1 line passes it
-HELD = [W_ALT1, SHARED]
+# R4's main line (its only option) meets a 7.5 t limit mid-way, and starts on an "except for access" 7.5 t road the site
+# is on (limits.site_allowed allows that one): in_use_limits lists the first and not the second (16 Nov evening)
+W4_MID = lim("w4", "weight", 7.5, along(bent(LAT4, 0), 0.4, 0.5), name="Mill Road")
+W4_SITE = lim("w4s", "weight", 7.5, along(bent(LAT4, 0), 0.0, 0.15), exceptions="Except for access", name="Pit Lane")
+HELD = [W_ALT1, SHARED, W4_MID, W4_SITE]
 route_choice._load_limits = lambda: list(HELD)
 
 # the closure on R2's main line, in force on DAY
@@ -717,6 +721,77 @@ ok("10b. both busy hours ahead are said in one phrase ('quicker setting off at 0
    str([g["why"] for g in _bb][:1]))
 
 # =========================================================================== #
+#  10c. trade_short and in_use_limits (John's yes to the third draft, 16 Nov)  #
+# =========================================================================== #
+def wc(s):
+    return len((s or "").split())
+
+
+ok("⭐ 10c. trade_short: R2's trade in one line naming the heads only",
+   R2["trade_short"] == "Alt 2: fewer collisions, but slower." and wc(R2["trade"]) > wc(R2["trade_short"]),
+   f"{R2.get('trade_short')!r} / {R2['trade']!r}")
+ok("⭐ 10c. ...R3's: the N5 words once, no counts", R3["trade_short"].startswith("Alt 1: fewer collisions")
+   and R3["trade_short"].endswith(", but a shorter road that takes longer.") and R3["trade_short"].count(" but ") == 1,
+   R3.get("trade_short"))
+ok("10c. trade_short is null where the answer is not a trade-off", R1["trade_short"] is None and run("R4")["trade_short"] is None
+   and R5["trade_short"] is None and RB.Context and "trade_short" in run("R4"))
+_trades = [g for g in GEN if g["answer"] == RB.TRADE_OFF] + [x for x in (R2, R3, R1g, D003, D027, D003g) if x["answer"] == RB.TRADE_OFF]
+_shorts = [g["trade_short"] for g in _trades]
+ok("10c. the typed combinations make many trade-offs to measure", len(_trades) > 200, str(len(_trades)))
+ok("⭐ 10c. every trade_short the harness makes is at most 25 words, one 'but' at most, and every trade-off has one",
+   all(s and wc(s) <= RB.SHORT_MAX and s.count(" but ") <= 1 for s in _shorts),
+   [s for s in _shorts if not s or wc(s) > RB.SHORT_MAX or s.count(" but ") > 1][:2])
+ok("10c. ...about 20 words: the middle one of every trade_short the harness makes is 20 words or under (19 on 16 Nov, "
+   "over the typed combinations, which load many heads at once)",
+   sorted(wc(s) for s in _shorts)[len(_shorts) // 2] <= 20, str(sorted(wc(s) for s in _shorts)[len(_shorts) // 2]))
+ok("⭐ 10c. heads only: no figure in trade_short but the option's own name, and the words of the rule's register",
+   not [s for s in _shorts if re.search(r"\d", s.split(":", 1)[1])]
+   and not [s for s in _shorts if any(b in s.lower() for b in ("better", "safer", "%", " rate", "ratio", "risk"))],
+   [s for s in _shorts if re.search(r"\d", s.split(":", 1)[1])][:2])
+ok("10c. no five words said twice in any trade_short", not [s for s in _shorts if repeats(s)])
+# the three live shapes: R001's long line 44 words, R003's 39, R036's 31 (16 Nov 19:20 UTC); typed here as their heads
+D001 = demo(M(165, 9, 9, 6, 3.1, 5, 41.0, 50.0, 50.0 / 60 + 0.667, 5, 30.0),
+            [(1, M(84, 2, 14, 9, 4.6, 9, 44.0, 47.0, 47.0 / 60 + 0.667, 4, 32.2))], community_all=True)
+D036 = demo(M(10, 1, 6, 2, 0.4, 2, 20.0, 30.0, 0.5 + 0.667, 6, 14.0),
+            [(1, M(2, 0, 6, 2, 0.4, 2, 21.0, 28.0, 28.0 / 60 + 0.667, 5, 9.4))])
+_shapes = {"R001": D001, "R003": D003, "R036": D036}
+ok("⭐ 10c. the live shapes: each a trade-off whose long line runs long, and whose trade_short is at most 25 words",
+   all(x["answer"] == RB.TRADE_OFF and x["trade_short"] and wc(x["trade_short"]) <= RB.SHORT_MAX for x in _shapes.values())
+   and wc(D001["trade"]) > RB.SHORT_MAX,
+   {k: (x["answer"], wc(x.get("trade")), wc(x.get("trade_short")), x.get("trade_short")) for k, x in _shapes.items()})
+ok("10c. the three live shapes read as written (R003, R036 within 15 words; R001, the busiest, within 25)",
+   D003["trade_short"] == "Alt 2: fewer collisions and less carbon, but a shorter road that takes longer."
+   and D036["trade_short"] == "Alt 1: fewer collisions, quicker and less carbon, but fewer trips a day."
+   and wc(D001["trade_short"]) <= RB.SHORT_MAX and wc(D001["trade"]) > 40,
+   f"{D003.get('trade_short')} | {D036.get('trade_short')} | {wc(D001.get('trade'))}")
+_big = dict(D001["options"][0], parts={"collisions": 1, "goods": -1, "cycle": -1, "community": -1},
+            heads={"people": RB.MIXED, "time": 1, "busy": -1, "carbon": -1}, n5=False)
+_bs = RB.trade_short(_big)
+ok("10c. every head and part at once still fits (the shorter words take over past 25)", wc(_bs) <= RB.SHORT_MAX
+   and "fewer collisions" in _bs and "more goods-vehicle" in _bs, f"{wc(_bs)} {_bs}")
+
+ok("⭐ 10c. in_use_limits: the limit the line in use itself meets, with its name, on both legs (R1: the quarry gate's bridge)",
+   [(x["legs"], "Quarry gate bridge" in x["words"]) for x in R1["in_use_limits"]] == [("both", True)],
+   str(R1["in_use_limits"]))
+ok("10c. ...reported only: R1's answer is still Suggested Alt 2", R1["answer"] == RB.SUGGESTED and R1["option"] == "Alt 2")
+R4l = run("R4")
+_w4 = [x["words"] for x in R4l["in_use_limits"]]
+ok("⭐ 10c. a 7.5 t limit on the line in use is listed in the added-limit words ('Weight limit 7.5 t', the road's name)",
+   len(_w4) == 1 and _w4[0].startswith("Weight limit 7.5 t") and "Mill Road" in _w4[0] and R4l["in_use_limits"][0]["legs"] == "both"
+   and R4l["answer"] == RB.KEEP, str(R4l["in_use_limits"]))
+ok("⭐ 10c. ...and the 'except for access' road the site is on (limits.site_allowed) is NOT listed",
+   not any("Pit Lane" in w for w in _w4), str(_w4))
+_no_exc = dict(W4_SITE, exceptions=None)
+_ctx4 = RB.Context(day=DAY)
+_ctx4.lims = [W4_MID, _no_exc]
+ok("10c. ...it is the site rule that leaves it out: the same road with no exception on its sign is listed",
+   any("Pit Lane" in x["words"] for x in RB.in_use_limits({"loaded": bent(LAT4, 0), "return": list(reversed(bent(LAT4, 0)))},
+                                                           ART, _ctx4)))
+ok("10c. a line in use with no limit below the lorry gives an empty list", R3["in_use_limits"] == [] and R2["in_use_limits"] == [])
+ok("10c. one leg only reads 'loaded' or 'return'", RB.in_use_limits({"loaded": bent(LAT4, 0), "return": None}, ART, _ctx4)[0]["legs"]
+   == "loaded")
+
+# =========================================================================== #
 #  11. Words                                                                   #
 # =========================================================================== #
 _words = [w for w in ALL_WORDS + _gen_words if w]
@@ -779,6 +854,12 @@ _fe = read("frontend/index.html")
 ok("12. no screen: the frontend does not read it, and 'Counts only: nothing is scored or ranked' is still on the Routes page",
    "route-options/best" not in _fe and "route_best" not in _fe and "Counts only: nothing is scored or ranked" in _fe)
 
+ok("⭐ 12. every row of the admin table carries trade_short and in_use_limits (the card is built to these names)",
+   all("trade_short" in r and "in_use_limits" in r for r in TAB["rows"])
+   and _rows[("R2", "Alt 2")]["trade_short"] == "Alt 2: fewer collisions, but slower."
+   and _rows[("R1", "Alt 2")]["trade_short"] is None
+   and [x["legs"] for x in _rows[("R4", None)]["in_use_limits"]] == ["both"]
+   and all(isinstance(r["in_use_limits"], list) for r in TAB["rows"]), str(_rows[("R4", None)].get("in_use_limits")))
 _tab_words = [w for r in TAB["routes"] for w in [r.get("why") or "", r.get("trade") or "", r.get("held_back") or ""]
               + list(r.get("sentences") or []) + [s for o in r["options"] for s in o["sentences"] + o["ruled_out"]]] \
     + [r.get("ruled_out") or "" for r in TAB["rows"]]
