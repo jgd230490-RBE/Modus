@@ -63,6 +63,7 @@ main:focus{outline:0}
 <li class="l2"><a href="#t4-env">Settings the app reads</a></li>
 <li class="l2"><a href="#t4-kept-reads">Kept reads and heavy jobs</a></li>
 <li class="l2"><a href="#t4-organisation">A deployment per organisation</a></li>
+<li class="l2"><a href="#t4-tools">Public tool pages</a></li>
 <li class="l1"><a href="#t5-errors">T5 Errors and what they mean</a></li>
 <li class="l1"><a href="#t6-words">T6 Old words, new words</a></li>
 <li class="l1"><a href="#t7-reference">T7 Sourced and assumed figures</a></li>
@@ -986,6 +987,20 @@ https, the headers, no-store on sign-in, admin calls refused (the refusal's word
 landing form off (tried with its trap field only, which stores nothing), the map's password, the guides' sign-in. Add
 <code>--demo</code> for the demo, where the form must be on.</li>
 </ul>
+
+<h2 id="t4-tools">Public tool pages (16 Nov 2026, claude/tools-shell)</h2>
+<p>The public tools (calculators, the abnormal load check, the route check request) are pages anyone can open, with no sign-in,
+no demo bar and no cookie. Each is <code>frontend/tools/&lt;page&gt;.html</code>, served at <code>/tools/&lt;page&gt;</code>
+(no <code>.html</code>), with the shared <code>/tools/tools.css</code> (the landing page's colours and type) and
+<code>/tools/tools.js</code>. <code>backend/tools_public.py</code> decides what a name serves: <code>/tools</code>,
+<code>/tools/</code> and any page not in the folder answer 404, because the Tools index is a page on the landing site. The gate
+does not police <code>/tools</code>, so nothing there may show any organisation's plan.</p>
+<p><strong>The open-call rule.</strong> A tool's own call lives under <code>/api/tools/</code>: JSON in and out, no cookie sent or
+read, only the typed figures and the shipped defaults, never the organisation's settings. Each call starts with
+<code>tools_public.guard(request, limit)</code>: a count per hashed address in a window, kept in memory (a restart starts it
+again); over it, a 429 with one plain sentence (<code>tools_public.refuse</code>). A form carries the hidden trap box. These
+calls write no audit row, empty no kept read and are never cached, and each is listed in <code>tools_public.OPEN_ROUTES</code>,
+which the reviewer-wall sweep checks.</p>
 
 <h1 id="t5-errors">T5 Errors and what they mean</h1>
 <div class="tbl" tabindex="0" role="region" aria-label="Errors and what they mean"><table><thead><tr><th>The screen says</th><th>What happened</th></tr></thead><tbody>

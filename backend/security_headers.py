@@ -71,7 +71,9 @@ HEADERS = {
 }
 
 #: answers that must never be kept by a browser or a proxy
-NO_STORE_PREFIXES = ("/api/auth/", "/api/admin/users")
+NO_STORE_PREFIXES = ("/api/auth/", "/api/admin/users",
+                     # 16 Nov 2026 (claude/tools-shell): a public tool's answer is the visitor's own; nothing keeps it
+                     "/api/tools/")
 
 
 def apply(path, headers, extra_connect=()):

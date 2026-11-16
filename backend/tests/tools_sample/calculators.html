@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<!-- TEST ONLY (claude/tools-shell, 16 Nov 2026): the mockup's card 2 laid out in the tools frame, so the frame can be
+     pictured beside the agreed drawing (notes/tools-first-opening-mockup-1116). Never shipped: it lives under
+     backend/tests/, not frontend/tools/. The real calculators page is claude/tools-calculators' to build. The figures are
+     the mockup's example figures, typed in, not worked out. A tool page starts from this skeleton: the head, the bar,
+     <main class="tw">, and the shared script at the end. -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Haul calculators · Wayscope tools</title>
+<meta name="description" content="Lorries needed, haul carbon and fuel surcharge, each from a handful of figures. Free.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tools/tools.css">
+</head>
+<body>
+<header class="toolbar"><div class="tw">
+  <a class="brand" href="https://wayscope.co.uk/"><img src="/brand/logo-header-on-dark.svg" alt="Wayscope" width="116" height="22"></a>
+  <nav class="links" aria-label="Site"><a class="on" href="https://wayscope.co.uk/tools">Tools</a><a class="btn btn-orange sm" href="https://wayscope.co.uk/#demo">Request a demo</a></nav>
+</div></header>
+<main class="tw">
+  <div class="calchead"><div><p class="eyebrow">Haul calculators</p><h1>Three quick answers from a few figures.</h1></div><span class="cr free">Free</span></div>
+  <div class="calcs">
+    <section class="calc"><h2>Lorries needed</h2>
+      <div class="row"><span>Material to move</span><b>2,500 t</b></div>
+      <div class="row"><span>Lorry</span><b>Artic Flatbed, 28 t a load</b></div>
+      <div class="row"><span>Working days</span><b>22</b></div>
+      <div class="row"><span>Round trips a lorry a day</span><b>6</b></div>
+      <div class="ans"><span class="v">1 lorry</span><small>90 loads · about 4 loads a day</small></div>
+      <button type="button" class="btn btn-line sm pdf">Download as PDF</button>
+    </section>
+    <section class="calc"><h2>Haul carbon</h2>
+      <div class="row"><span>Loads</span><b>90</b></div>
+      <div class="row"><span>Round trip</span><b>9.2 miles</b></div>
+      <div class="row"><span>Lorry</span><b>Artic Flatbed (44t)</b></div>
+      <div class="row"><span>Way back</span><b>Empty</b></div>
+      <div class="ans"><span class="v">1.16 t CO₂e</span><small>12.8 kg a trip · transport only · a planning estimate</small></div>
+      <button type="button" class="btn btn-line sm pdf">Download as PDF</button>
+    </section>
+    <section class="calc"><h2>Fuel surcharge</h2>
+      <div class="row"><span>Diesel when the rate was agreed</span><b>140.0p a litre</b></div>
+      <div class="row"><span>Diesel now</span><b>154.0p a litre</b></div>
+      <div class="row"><span>Fuel's share of the rate</span><b>30 %</b></div>
+      <div class="row"><span>Agreed rate</span><b>£180.00 a load</b></div>
+      <div class="ans"><span class="v">3.0 % surcharge</span><small>£185.40 a load</small></div>
+      <button type="button" class="btn btn-ink sm pdf">Download as PDF</button>
+    </section>
+  </div>
+  <form class="pdfbox" action="#" method="post">
+    <b class="h">Download the PDF</b>
+    <div class="pdfrow"><label class="f">Your email<input type="email" name="email" placeholder="name@example.co.uk" autocomplete="email"></label><button type="submit" class="btn btn-orange sm">Download</button></div>
+    <label class="tick"><input type="checkbox" name="news">Send me Wayscope news now and then</label>
+    <label class="trap" aria-hidden="true">Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+    <p class="fine2">We keep your email with this download. Read the <a href="https://wayscope.co.uk/privacy.html">privacy notice</a>.</p>
+    <p class="say" role="status"></p>
+  </form>
+  <div class="next wide"><span><b>Need the roads compared?</b> Ask for a route check.</span><a class="btn btn-line sm" href="/tools/route-check">Route check</a></div>
+</main>
+<script src="/tools/tools.js"></script>
+</body>
+</html>
