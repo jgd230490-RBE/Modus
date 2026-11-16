@@ -592,6 +592,10 @@ ok("⭐ 12. a heavy staff read: _staff_json, one Context (one pre, prefetch), pl
    and "network.prefetch_analysis_geometry(self.pre)" in _rb)
 ok("12. no outside call in the rule (no router, no fetch)", not any(x in _rb for x in ("here_routing.route", "requests.",
                                                                                        "urllib", "fetch_years", "refresh(")))
+_tg = read("frontend/help/technical/index.html")
+ok("12. the technical guide has the rule's section (the user guide waits for the card)",
+   'id="t2-best-option"' in _tg and "/api/admin/route-options/best" in _tg and "searched_prints" in _tg
+   and "route-options/best" not in read("frontend/help/index.html"))
 _fe = read("frontend/index.html")
 ok("12. no screen: the frontend does not read it, and 'Counts only: nothing is scored or ranked' is still on the Routes page",
    "route-options/best" not in _fe and "route_best" not in _fe and "Counts only: nothing is scored or ranked" in _fe)
