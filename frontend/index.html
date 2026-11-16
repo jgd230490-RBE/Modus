@@ -16401,6 +16401,13 @@ function RouteFullDetails({ route, prof, alt, folded, onFold, near, analysis, di
 const BO_TONE = { fewer: "ok", quicker: "ok", less: "ok", same: "none", more: "warn", slower: "warn", mixed: "warn" };
 const BO_STALE = "Collision history out of date. Fetch it again on Config → Map and bulletin.";
 const BO_NO_HISTORY = "Collisions are not compared: the collision history has not been fetched.";
+// Q9 (John, 16 Nov 2026): the rule names a limit below the lorry that the line IN USE meets ({words, legs}); the card says it
+// in one grey sentence of its own around the rule's words, e.g. "The diversion in use meets a limit below this lorry: Weight
+// limit 7.5 t." An allowed limit is never listed by the rule.
+function boInUseLimit(L, div){
+  const leg = L.legs === "loaded" ? " (loaded leg)" : L.legs === "return" ? " (return leg)" : "";
+  return `The ${div ? "diversion" : "route"} in use meets a limit below this lorry: ${L.words}${leg}.`;
+}
 function boDate(s){
   if(!s) return "";
   const d = new Date(String(s).length > 10 ? s : s + "T12:00:00Z");
@@ -16496,7 +16503,7 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
       <div className="bo-eye"><span>Best option{lorry ? ` · ${lorry}` : ""}</span><InfoTip id="routes.best" /></div>
       {div && <p className="bo-state" data-bo-in-use="diversion">In use: {div.label}, the diversion{div.until ? `, until ${boDate(div.until)}` : ""}. Compared with it.</p>}
       {busyUse && <p className="bo-state" data-bo-in-use="busy">Busy hours: Alt {busyUse.alt} is in use on weekdays {busyUse.from}–{busyUse.to}.</p>}
-      {inUseLimits.map((L, i) => <p key={i} className="bo-state bo-grey" data-bo-in-use-limit="1">{L.words}</p>)}
+      {inUseLimits.map((L, i) => <p key={i} className="bo-state bo-grey" data-bo-in-use-limit="1">{boInUseLimit(L, div)}</p>)}
       <div className="bo-ans">
         <b>{r.answer === "Suggested" && r.option ? r.option : r.answer}</b>
         <RowStatus word={tag} tone={tone} />

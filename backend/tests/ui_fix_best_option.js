@@ -281,11 +281,19 @@ if (hasCard) {
     ok("⭐ BUSY HOURS: 'Busy hours: Alt 2 is in use on weekdays 16:00–19:00.' (a stopped use is not said)",
        m2.host.querySelector('[data-bo-in-use="busy"]').textContent === "Busy hours: Alt 2 is in use on weekdays 16:00–19:00." && m2.host.querySelectorAll('[data-bo-in-use="busy"]').length === 1);
     m2.done();
-    const m3 = mount(B(route({ options: [opt(1)], answer: "Keep the route in use", why: "No other option is clearly ahead on any head.",
-                               in_use_limits: [{ words: "The diversion in use meets a 7.5 t limit below this lorry.", legs: "both" }] })));
-    ok("Q9: a limit on the line in use, as the rule words it, is one grey line on the card",
-       m3.host.querySelector("[data-bo-in-use-limit]") && m3.host.querySelector("[data-bo-in-use-limit]").textContent === "The diversion in use meets a 7.5 t limit below this lorry.");
+    // live's shapes, 16 Nov (PR #297): R027 [both] on its diversion, R016 [return] on its main route
+    const DIVU = { loaded: { alt: 2, label: "Alt 2", why: "diversion", status: "in_use", until: "2027-12-17" }, return: { alt: 2, label: "Alt 2", why: "diversion", status: "in_use", until: "2027-12-17" } };
+    const m3 = mount(B(route({ options: [opt(1)], answer: "Keep the route in use", why: "No other option is clearly ahead on any head.", in_use: DIVU,
+                               in_use_limits: [{ words: "Weight limit 7.5 t", legs: "both" }] })));
+    ok("⭐ Q9: a limit on the line in use is one grey sentence around the rule's words (both legs: no leg named)",
+       m3.host.querySelector("[data-bo-in-use-limit].bo-grey") && m3.host.querySelector("[data-bo-in-use-limit]").textContent === "The diversion in use meets a limit below this lorry: Weight limit 7.5 t.",
+       (m3.host.querySelector("[data-bo-in-use-limit]") || {}).textContent);
     m3.done();
+    const m3b = mount(B(route({ options: [opt(1)], answer: "Keep the route in use", why: "No other option is clearly ahead on any head.",
+                                in_use_limits: [{ words: "Weight limit 7.5 t", legs: "return" }] })));
+    ok("Q9: on the main route and one leg only, the leg is named",
+       m3b.host.querySelector("[data-bo-in-use-limit]").textContent === "The route in use meets a limit below this lorry: Weight limit 7.5 t (return leg).");
+    m3b.done();
     const m4 = mount(B(route({ options: [Object.assign(opt(1), { chosen: true })], in_use_limits: [], trade_short: null })));
     ok("Q9: an empty in_use_limits list (the rule's 'none') draws no line; trade_short null on a Suggested answer leaves the rule's why",
        !m4.host.querySelector("[data-bo-in-use-limit]") && m4.host.querySelector("[data-bo-why]") && m4.host.querySelector("[data-bo-why]").textContent === route().why);
