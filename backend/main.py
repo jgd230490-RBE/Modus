@@ -5734,6 +5734,25 @@ def _gate_arrivals_build(month, acc):
     return out
 
 
+@app.get("/api/admin/route-options/best")
+def route_options_best(day: Optional[str] = None, token: Optional[str] = None):
+    """
+    16 Nov 2026 (step 1a of the best-option idea, John's decisions of 16 Nov): the best-option rule (route_best.py) run
+    over every route for one day (default today; `day` = YYYY-MM-DD): a table of each route's answer and every option's
+    heads, counts, percentages, why and what ruled it out, with the thresholds used (starting values John sets on this
+    table). Read only, no outside call; admin, like the comparison it builds on: it feeds a study, not a screen.
+    One `pre` for every route (route_best.Context, network.prefetch_analysis_geometry); kept until the next write.
+    """
+    _check_admin(token)
+    import datetime as _dt
+    import route_best
+    try:
+        d = _dt.date.fromisoformat(day.strip()) if day else _dt.date.today()
+    except ValueError:
+        raise HTTPException(400, "day must be YYYY-MM-DD")
+    return _staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d))
+
+
 @app.get("/api/gates/queue-months")
 def gate_queue_months():
     """

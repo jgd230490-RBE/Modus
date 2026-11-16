@@ -205,6 +205,21 @@ class RouteIndex:
         return math.hypot((a[0] - b[0]) * self.kx, (a[1] - b[1]) * self.ky)
 
 
+def route_line_prints():
+    """16 Nov 2026 (route_best): {route_key: [fingerprints]} of every stored road line under each key (both legs, every
+    lorry type; here_routing._fingerprint of the stored line), sorted. The collision fetch keeps it with the keys it
+    searched, so a reader can tell a key that now names another line (a Make primary, a re-route) from one that does not."""
+    import here_routing
+    out = {}
+    for r in db.query("SELECT route_id, alt_index, geometry FROM route_geometry WHERE tenant_id = ? AND geometry IS NOT NULL",
+                      (db.current_tenant(),)):
+        coords = _coords(r["geometry"])
+        if len(coords) < 2:
+            continue
+        out.setdefault(route_key(r["route_id"], r.get("alt_index") or 0), set()).add(here_routing._fingerprint(coords))
+    return {k: sorted(v) for k, v in out.items()}
+
+
 def _coords(g):
     try:
         c = json.loads(g) if isinstance(g, str) else g
@@ -631,9 +646,12 @@ def refresh(by=None, fetchers=None, index=None, today=None):
     old = _detail(_meta_row())
     det = {"years": old.get("years") or [], "files": old.get("files") or [], "notes": [], "error": None,
            # 28 Oct 2026 (0d, found on live): what the stored rows carry stays true while a fetch runs
-           "hours": old.get("hours"), "vehicle_details": old.get("vehicle_details"), "searched": old.get("searched")}
+           "hours": old.get("hours"), "vehicle_details": old.get("vehicle_details"), "searched": old.get("searched"),
+           # 16 Nov 2026 (route_best): which stored line each searched key was, kept as the stored rows' truth meanwhile
+           "searched_prints": old.get("searched_prints")}
     _write_meta("running", det, by=by, started_at=_now())
     index = index or index_from_db()
+    prints = route_line_prints()        # 16 Nov 2026 (route_best): the lines as they are when the search starts
     if not index.bbox:
         det["error"] = "nothing to fetch along: no route is worked out and no site has a position yet"
         _write_meta("failed", det)
@@ -688,6 +706,10 @@ def refresh(by=None, fetchers=None, index=None, today=None):
     # 28 Oct 2026 (0d, found on live: a route's alternative drawn AFTER the fetch had 0 collisions on it, so it looked
     # quieter): the road routes this fetch searched along; an alternative not among them is never offered
     det["searched"] = sorted({k for k, _ in index.lines})
+    # 16 Nov 2026 (route_best, finding 4 of the best-option check): a collision's distances are kept by option NUMBER, and
+    # Make primary swaps numbers; with the lines' fingerprints kept, a reader can tell when a key no longer names the line
+    # that was searched (route_best.history_state) instead of reading the two lines' counts swapped
+    det["searched_prints"] = prints
     _write_meta("done", det, fetched_at=now)
     return status()
 

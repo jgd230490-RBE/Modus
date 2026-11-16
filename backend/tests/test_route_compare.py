@@ -176,15 +176,15 @@ community.replace_source("naptan", [{"source_ref": "stop 1", "kind": "bus_stops"
                                      "geometry": {"type": "Point", "coordinates": [-0.97, 52.5 + 50 * DLAT]}}], "2026-10-29T09:00:00Z")
 
 
-def rec(cid, routes, severity=3, vru=(), vru_ksi=()):
+def rec(cid, routes, severity=3, vru=(), vru_ksi=(), goods=False):
     return {"collision_id": cid, "year": 2024, "month": 5, "lon": -0.95, "lat": 52.5, "severity": severity, "road": "A6",
             "road2": None, "junction": None, "road_type": None, "speed_limit": 40, "light": None, "authority": None,
-            "n_casualties": 1, "n_vehicles": 2, "vru": list(vru), "vru_ksi": list(vru_ksi), "goods": False, "dist_m": 5,
+            "n_casualties": 1, "n_vehicles": 2, "vru": list(vru), "vru_ksi": list(vru_ksi), "goods": goods, "dist_m": 5,
             "routes": routes, "sites": {}}
 
 
 collisions.replace_all([rec("C1", {"R1": 10}, severity=2, vru=["pedestrian"], vru_ksi=["pedestrian"]),
-                        rec("C2", {"R1@1": 5, "R1": 400}, vru=["cyclist"]),
+                        rec("C2", {"R1@1": 5, "R1": 400}, vru=["cyclist"], goods=True),
                         rec("C3", {"R1@1": 40}),                     # beyond ON_ROUTE_M of the alternative: not on it
                         rec("C4", {"R1@10": 3}, severity=1)],        # the way round only: never counted
                        "2026-10-29T09:00:00Z")
@@ -203,6 +203,8 @@ ok("1. HERE's rank, distance, minutes and the plan's carbon a trip, from the pla
 ok("⭐ 1. collisions on each option: within 25 m only, the kinds counted",
    (r0["collisions"], r0["ksi"], r0["vru_ksi"], r0["cyclist"]) == (1, 1, 1, 0)
    and (r1["collisions"], r1["ksi"], r1["vru_ksi"], r1["cyclist"]) == (1, 0, 0, 1), f"{r0} {r1}")
+ok("⭐ 1. (16 Nov 2026, route_best) goods-vehicle collisions on each option: within 25 m only, from the stored record's flag",
+   (r0["goods"], r1["goods"]) == (0, 1) and "goods" in route_compare.COLLISION_KINDS, f"{r0.get('goods')} {r1.get('goods')}")
 ok("⭐ 1. the community near each option: a school near the alternative only; homes (an outline within 100 m) and a bus stop "
    "(within 100 m) near the first option only",
    (r0["schools"], r1["schools"]) == (0, 1) and (r0["residential"], r1["residential"]) == (1, 0)
@@ -221,6 +223,8 @@ ok("⭐ 2. one pair (R1 first against R1 Alt 1), tallied kind by kind as fewer /
    and S["kinds"]["schools"] == {"fewer": 1, "same": 0, "more": 0, "total_first": 0, "total_alt": 1}
    and S["kinds"]["ksi"]["more"] == 1 and S["kinds"]["collisions"]["same"] == 1
    and S["kinds"]["residential"]["more"] == 1 and S["kinds"]["km"]["fewer"] == 1 and S["kinds"]["co2_kg"]["fewer"] == 1, str(S["kinds"]))
+ok("2. (16 Nov 2026) goods-vehicle collisions are tallied like the other collision kinds",
+   S["kinds"]["goods"] == {"fewer": 1, "same": 0, "more": 0, "total_first": 0, "total_alt": 1}, str(S["kinds"].get("goods")))
 ok("2. a kind with no figure on either side (no cycle route stored) is not tallied",
    S["kinds"]["cycle_meets"] == {"fewer": 0, "same": 0, "more": 0, "total_first": 0, "total_alt": 0})
 ok("2. a route without an alternative makes no pair", route_compare.summary([{"route": "R9", "alt": 0, "km": 3}])["pairs"] == 0)
