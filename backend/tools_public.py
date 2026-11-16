@@ -113,11 +113,11 @@ def address_hash(ip):
 
 
 def client_ip(request):
-    """The visitor's address behind Render's proxy (the first X-Forwarded-For entry), as the demo form reads it."""
+    """The visitor's address as every other limit reads it (demo_request.visitor_ip: the edge's own header first)."""
     try:
         import demo_request
-        return demo_request.client_ip(request.headers.get("x-forwarded-for"),
-                                      request.client.host if getattr(request, "client", None) else "")
+        return demo_request.visitor_ip(request.headers,
+                                       request.client.host if getattr(request, "client", None) else "")
     except Exception:
         return ""
 
