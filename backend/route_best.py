@@ -54,7 +54,9 @@ How each decision of John's is held (section numbers of the 16 Nov note):
   * Time (round trip, trips a day), Busy hours (08:00 and 17:00 where held) and Carbon are heads beside People.
   * N5: an option shorter in km whose driving takes longer is never "Suggested"; "A trade-off" at most.
   * The card's two extra fields (John's yes to the third draft, 16 Nov evening): `trade_short`, the trade in one line
-    naming the heads only, at most SHORT_MAX (25) words, the long `trade` kept for "All figures" and the file; and
+    naming the heads only in the card's words ("Alt 2 is ahead on cycle routes and carbon, behind on places and time.";
+    collisions said first as a fact; a mixed head last), at most SHORT_MAX (25) words, the long `trade` kept for "All
+    figures" and the file; and
     `in_use_limits`, the lorry limits below the lorry that the line in use itself meets (site-allowed ones left out),
     reported only: the answer does not change for them.
 
@@ -526,81 +528,69 @@ def in_use_limits(use_legs, lorry, ctx):
     return out
 
 
-#: trade_short: the trade in one line naming the HEADS only (John's yes to the third draft, 16 Nov evening); the long
-#: `trade` (with its counts) stays for "All figures" and the file. Each part or head: (ahead words, behind words). Three
-#: levels, the first that keeps the line within SHORT_MAX words: 0 the full words; 1 shorter words, and the busy hours left
-#: out where they go the same way as the round trip; 2 as 1, the people parts grouped under one "fewer" / "more", and the
-#: "mixed" notes left out (they are in the long line).
+#: trade_short: the trade in one line naming the HEADS only, in the words John said yes to on the card's third draft
+#: (16 Nov evening, card 10): "Alt 2 is ahead on cycle routes and carbon, behind on places and time." The long `trade`
+#: (with its counts) stays for "All figures" and the file. Collisions keep his plain-words decision (R5, 16 Oct): never
+#: "ahead" or "behind", said first as a fact where the test says clearly ("Alt 1 had fewer collisions and is ahead on
+#: ..."). No counts, no "but". Levels, the first that keeps the line within SHORT_MAX words: 0 everything; 1 the busy hours
+#: left out where they go the same way as time; 2 as 1, and goods-vehicle collisions left out where all collisions are
+#: said; 3 as 2, and the mixed heads left out (they are in the long line).
 SHORT_MAX = 25
-_SHORT = {"collisions": ("fewer collisions", "more collisions"),
-          "goods": ("fewer goods-vehicle collisions", "more goods-vehicle collisions"),
-          "cycle": ("less by cycle routes", "more by cycle routes"),
-          "community": ("fewer schools, hospitals and health centres passed",
-                        "more schools, hospitals and health centres passed"),
-          "time": ("quicker", "slower"),
-          "busy": ("quicker at the busy hours", "slower at the busy hours"),
-          "carbon": ("less carbon", "more carbon")}
-_SHORTER = {"community": ("fewer schools and hospitals passed", "more schools and hospitals passed"),
-            "busy": ("quicker at busy hours", "slower at busy hours")}
-#: level 2's nouns for the people parts, after one "fewer" or "more"
-_PEOPLE_NOUNS = {"collisions": "collisions", "goods": "goods-vehicle collisions", "cycle": "cycle routes met",
-                 "community": "places passed"}
+#: the plain head names, in the order they are listed
+SHORT_HEADS = (("cycle", "cycle routes"), ("community", "places"), ("time", "time"), ("busy", "busy hours"),
+               ("carbon", "carbon"))
+#: a head with a part each way is in neither list and is said last, "; mixed on cycle routes" (the mother session's
+#: recommendation, NOT yet seen by John: change these words here, or set "" to leave mixed heads out)
+SHORT_MIXED = "mixed on"
 
 
 def _short_line(o, level):
-    words = dict(_SHORT, **(_SHORTER if level else {}))
-    gains, losses = [], []
     pt, hd = o["parts"], o["heads"]
-    grouped = {1: [], -1: []}
-    for key in ("collisions", "goods", "cycle", "community"):
-        v = pt.get(key)
-        if key == "goods" and v is not None and v == pt.get("collisions"):
-            continue            # goods go the same way as all collisions: "fewer collisions" says it
-        if v in (1, -1) and level == 2:
-            grouped[v].append(_PEOPLE_NOUNS[key])
-        elif v == 1:
-            gains.append(words[key][0])
+    v_of = {"cycle": pt.get("cycle"), "community": pt.get("community"), "time": hd.get("time"),
+            "busy": hd.get("busy"), "carbon": hd.get("carbon")}
+    ahead, behind, mixed = [], [], []
+    for key, name in SHORT_HEADS:
+        v = v_of[key]
+        if key == "busy" and level >= 1 and v is not None and v == v_of["time"]:
+            continue            # "ahead on time" already says it
+        if v == 1:
+            ahead.append(name)
         elif v == -1:
-            losses.append(words[key][1])
-        elif v == MIXED and level < 2:
-            losses.append("mixed by cycle routes")       # some cycle measures ahead, some behind
-    if grouped[1]:
-        gains.append("fewer " + _join(grouped[1]))
-    if grouped[-1]:
-        losses.append("more " + _join(grouped[-1]))
-    det = o.get("detail") or {}
-    gap = det.get("time_gap_min", 0)
-    beyond = abs(gap) >= det.get("time_tolerance_min", 0)
-    for key in ("time", "busy", "carbon"):
-        v = hd.get(key)
-        if key == "busy" and level and v in (1, -1) and v == hd.get("time"):
-            continue            # "quicker" already says it
-        if key == "time" and v in (1, -1) and not beyond:
-            # the time head moved on trips a day alone (the round trip is about the same)
-            (gains if v == 1 else losses).append("more trips a day" if v == 1 else "fewer trips a day")
-        elif v == 1:
-            gains.append(words[key][0])
-        elif v == -1:
-            losses.append(words[key][1])
-        elif v == MIXED and key == "time":
-            # quicker a round trip but a trip a day fewer, or the other way round: both sides, once each
-            if gap < 0:
-                gains.append("quicker")
-                losses.append("fewer trips a day")
-            else:
-                gains.append("more trips a day")
-                losses.append("slower")
-        elif v == MIXED and level < 2:
-            losses.append("mixed at the busy hours" if key == "busy" else "mixed on carbon")
+            behind.append(name)
+        elif v == MIXED:
+            mixed.append(name)
+    facts = []
+    c, g = pt.get("collisions"), pt.get("goods")
+    if c in (1, -1):
+        facts.append("fewer collisions" if c == 1 else "more collisions")
+    if g in (1, -1) and g != c and not (level >= 2 and c in (1, -1)):
+        facts.append("fewer goods-vehicle collisions" if g == 1 else "more goods-vehicle collisions")
+    side = ", ".join(x for x in (("ahead on " + _join(ahead)) if ahead else "",
+                                 ("behind on " + _join(behind)) if behind else "") if x)
+    name = o["label"]
+    if facts and side:
+        line = f"{name} had {_join(facts)}{',' if len(facts) > 1 else ''} and is {side}"
+    elif facts:
+        line = f"{name} had {_join(facts)}"
+    elif side:
+        line = f"{name} is {side}"
+    else:
+        line = ""
+    tail = []
+    if mixed and SHORT_MIXED and level < 3:
+        tail.append(f"{SHORT_MIXED} {_join(mixed)}")
     if o.get("n5") and hd.get("time") not in (-1, MIXED):
-        losses.append(N5_WORDS)
-    return f"{o['label']}: " + (_join(gains) or "nothing clearly ahead") + (", but " + _join(losses) if losses else "") + "."
+        tail.append(N5_WORDS)
+    if not line:
+        # nothing clearly ahead or behind (a trade-off always has both; kept so the line is never empty)
+        return f"{name} is " + ("; ".join(tail) if tail else "level on every head") + "."
+    return line + "".join("; " + x for x in tail) + "."
 
 
 def trade_short(o):
-    """'Alt 2: fewer collisions and less carbon, but slower.' Heads only, no counts, one "but", at most SHORT_MAX words:
-    the first of the three levels that fits (level 2 is returned whatever its length; the harness pins it under)."""
-    for level in (0, 1, 2):
+    """'Alt 2 is ahead on cycle routes and carbon, behind on places and time.' Heads only, no counts, no "but", at most
+    SHORT_MAX words: the first of the levels that fits (the last is returned whatever its length; the harness pins it)."""
+    for level in (0, 1, 2, 3):
         line = _short_line(o, level)
         if len(line.split()) <= SHORT_MAX:
             return line
