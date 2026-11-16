@@ -2709,7 +2709,9 @@ async function rowsDom(){
                   { id: "R002", origin: "Northfield Quarry", dest: "Brook Pit", origin_id: "L002", dest_id: "L003", ipt: "", profiles: {} }];
   const ZONES = { zones: [{ id: "Z001", name: "Langton haul road", kind: "haul_road", affects_routing: 1, active: 1,
                             geometry: { type: "LineString", coordinates: [[-1.0, 52.6], [-0.9, 52.65]] } },
-                          { id: "Z004", name: "Burrough village 7.5 t limit", kind: "weight_limit", affects_routing: 0, active: 1,
+                          // 12 Nov 2026 (John): the stand-in's second zone was a weight limit retired from the demo that day;
+                          // now the demo's Z005, an advisory works area (routing off, as that one was)
+                          { id: "Z005", name: "Melton junction works area", kind: "works", affects_routing: 0, active: 1,
                             geometry: { type: "Polygon", coordinates: [[[-1, 52], [-0.9, 52], [-0.9, 52.1], [-1, 52]]] } }], haul_links: {} };
   const FC0 = { type: "FeatureCollection", features: [] };
   const fetchWas = w.fetch;
@@ -2784,14 +2786,14 @@ async function rowsDom(){
     const Z = await mount("zones");
     const zb = [...Z.el.querySelectorAll("button[data-zone-open]")];
     ok("⭐ UI FIX 9 ZONES: every zone's name is a real <button> named 'Edit <the zone>' (the row offered only Delete to a keyboard)",
-       zb.length === 2 && zb.every(b => b.type === "button") && zb.map(b => b.getAttribute("aria-label") + "|" + b.textContent).join(";") === "Edit Langton haul road|Langton haul road;Edit Burrough village 7.5 t limit|Burrough village 7.5 t limit");
+       zb.length === 2 && zb.every(b => b.type === "button") && zb.map(b => b.getAttribute("aria-label") + "|" + b.textContent).join(";") === "Edit Langton haul road|Langton haul road;Edit Melton junction works area|Melton junction works area");
     await press(zb[1]);
     const zh = Z.el.querySelector(".ed-head");
-    ok("⭐ UI FIX 9 ZONES: pressing it opens that zone's editor and the focus lands on its heading ('Editing Burrough village 7.5 t limit')",
-       !!zh && zh.textContent === "Editing Burrough village 7.5 t limit" && active() === zh && zh.tabIndex === -1 && zb[1].getAttribute("aria-current") === "true");
+    ok("⭐ UI FIX 9 ZONES: pressing it opens that zone's editor and the focus lands on its heading ('Editing Melton junction works area')",
+       !!zh && zh.textContent === "Editing Melton junction works area" && active() === zh && zh.tabIndex === -1 && zb[1].getAttribute("aria-current") === "true");
     const zc = [...Z.el.querySelectorAll("button")].find(b => b.textContent.trim() === "Cancel");
     await press(zc);
-    ok("⭐ UI FIX 9 ZONES: Cancel puts the focus back on that zone's name", active() === Z.el.querySelector('button[data-zone-open="Z004"]'));
+    ok("⭐ UI FIX 9 ZONES: Cancel puts the focus back on that zone's name", active() === Z.el.querySelector('button[data-zone-open="Z005"]'));
     ok("UI FIX 9 ZONES: with no zone open the panel's heading is not a focus target (no tabindex)", !Z.el.querySelector(".ed-head[tabindex]"));
     await Z.done();
 
