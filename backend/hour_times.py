@@ -59,12 +59,114 @@ def _legs(profile):
         "AND geometry IS NOT NULL", (db.current_tenant(), profile))})
 
 
+def _second(s):
+    """An ISO time cut to the whole second (UTC), or None. Rows here are stamped to the second, stored lines finer."""
+    try:
+        d = datetime.datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=datetime.timezone.utc)
+    return d.astimezone(datetime.timezone.utc).replace(microsecond=0)
+
+
+class _Lines:
+    """
+    16 Nov 2026 (claude/busy-hours-redo-stale): the stored lines a row may have matched, read without their polyline text.
+
+    A row names the stored line it matched by that line's computed_at (geom_computed_at). A re-route writes a new
+    computed_at, so the row is no longer trusted. Make primary (network.promote_alternative) swaps an option's NUMBER with
+    0 and leaves computed_at alone: the line is the same, so the row stays trusted and is read under the line's number
+    NOW. Where several stored options carry the same computed_at, the row's own fingerprint picks its line (the only
+    case that reads polyline text, one line at a time).
+    """
+
+    def __init__(self, route_id=None, profile=None):
+        sql = ("SELECT route_id, vehicle_profile, leg, alt_index, computed_at FROM route_geometry "
+               "WHERE tenant_id = ? AND geometry IS NOT NULL")
+        args = [db.current_tenant()]
+        if route_id is not None:
+            sql += " AND route_id = ?"
+            args.append(route_id)
+        if profile is not None:
+            sql += " AND vehicle_profile = ?"
+            args.append(profile)
+        self.by_at, self.newest, self._fps = {}, {}, {}
+        for g in db.query(sql, tuple(args)):
+            k = (g["route_id"], g["vehicle_profile"], g["leg"])
+            self.by_at.setdefault(k, {}).setdefault(str(g["computed_at"]), []).append(int(g["alt_index"]))
+            t = _second(g["computed_at"])
+            if t is not None and (self.newest.get(k) is None or t > self.newest[k]):
+                self.newest[k] = t
+
+    def _fp(self, k, alt):
+        if (k, alt) not in self._fps:
+            g = db.query("SELECT geometry FROM route_geometry WHERE tenant_id = ? AND route_id = ? AND vehicle_profile = ? "
+                         "AND leg = ? AND alt_index = ?", (db.current_tenant(), k[0], k[1], k[2], alt))
+            try:
+                self._fps[(k, alt)] = here_routing._fingerprint(json.loads(g[0]["geometry"])) if g else None
+            except Exception:
+                self._fps[(k, alt)] = None
+        return self._fps[(k, alt)]
+
+    def alt_now(self, route_id, profile, leg, row):
+        """The number the row's line has NOW, or None when that line is no longer stored (the row is not trusted)."""
+        if row.get("alt_index") is None or row.get("geom_computed_at") is None:
+            return None
+        k = (route_id, profile, leg)
+        alts = (self.by_at.get(k) or {}).get(str(row["geom_computed_at"])) or []
+        if len(alts) <= 1:
+            return alts[0] if alts else None
+        if row.get("fingerprint"):
+            hit = [a for a in alts if self._fp(k, a) == row["fingerprint"]]
+            return hit[0] if hit else None
+        return int(row["alt_index"]) if int(row["alt_index"]) in alts else None
+
+
+def _to_do(profile):
+    """
+    The (route, leg, hour) a run works out, as [((route_id, leg, hour), why)], why = "absent" (no row) or "stale" (16 Nov
+    2026: rows the reader no longer trusts). A key is stale when a row that named a stored line no longer finds it, or
+    when it was worked out before the leg's newest stored line (a re-route; a key whose options matched no stored line
+    has nothing else to tell). A failed call's row (rank -1) is done until the leg is routed again, as before.
+    """
+    lines = _Lines(profile=profile)
+    keys = {}
+    for x in db.query("SELECT route_id, leg, hour, rank, alt_index, geom_computed_at, fingerprint, computed_at "
+                      "FROM route_hour_times WHERE tenant_id = ? AND vehicle_profile = ?", (db.current_tenant(), profile)):
+        keys.setdefault((x["route_id"], x["leg"], x["hour"]), []).append(x)
+    out = []
+    for r, l in _legs(profile):
+        newest = lines.newest.get((r, profile, l))
+        for h in HOURS:
+            rows = keys.get((r, l, h))
+            if not rows:
+                out.append(((r, l, h), "absent"))
+                continue
+            gone = any(x["rank"] >= 0 and x["alt_index"] is not None and lines.alt_now(r, profile, l, x) is None
+                       for x in rows)
+            at = [_second(x["computed_at"]) for x in rows]
+            older = newest is not None and all(t is not None for t in at) and max(at) < newest
+            if gone or older:
+                out.append(((r, l, h), "stale"))
+    return out
+
+
 def plan(profile=PROFILE):
-    """What a run would cost, before it is pressed: routes, legs, hours and HERE calls (haul._here_calls_for x hours)."""
+    """
+    What a run would cost, before it is pressed: routes, legs, hours and HERE calls (haul._here_calls_for x hours) for
+    the whole run (`here_calls`, what a clear and a run costs), and since 16 Nov 2026 `to_do`: what a run WITHOUT a clear
+    works out (the rows absent or no longer trusted, e.g. after a re-route) and the calls that costs. No HERE call.
+    """
     legs = _legs(profile)
-    per = haul._here_calls_for([(r, profile, l) for r, l in legs]) if legs else 0
+    per = {(r, l): haul._here_calls_for([(r, profile, l)]) for r, l in legs}
+    todo = _to_do(profile)
+    tl = {(r, l) for (r, l, _h), _w in todo}
     return {"profile": profile, "routes": len({r for r, _ in legs}), "legs": len(legs), "hours": list(HOURS),
-            "here_calls": per * len(HOURS), "worked_out": status(profile)}
+            "here_calls": sum(per.values()) * len(HOURS), "worked_out": status(profile),
+            "to_do": {"routes": len({r for r, _ in tl}), "legs": len(tl), "leg_hours": len(todo),
+                      "absent": sum(1 for _k, w in todo if w == "absent"), "stale": sum(1 for _k, w in todo if w == "stale"),
+                      "here_calls": sum(per.get((r, l), 1) for (r, l, _h), _w in todo)}}
 
 
 def status(profile=PROFILE):
@@ -86,14 +188,14 @@ def bake_batch(profile=PROFILE, limit=30, budget_s=None, now=None):
     Work out up to `limit` (route, leg, hour) times not yet worked out for the profile. Call until `remaining` is 0
     (the page loops, as Route all). A failed call is stored as rank -1 with the reason, so the run moves on; `errors`
     counts them. Stops starting calls after `budget_s` seconds (network.BAKE_BUDGET_S from the endpoint).
+    16 Nov 2026: "not yet worked out" includes a key whose rows the reader no longer trusts (_to_do: a re-route); its
+    rows are replaced. Before, any row counted as done and a re-routed line kept no times until a clear and a full run.
     """
     import network
     if not here_routing.configured():
         return {"error": "HERE_API_KEY not set on the server", "baked": 0, "remaining": None}
     tenant = db.current_tenant()
-    done = {(x["route_id"], x["leg"], x["hour"]) for x in db.query(
-        "SELECT DISTINCT route_id, leg, hour FROM route_hour_times WHERE tenant_id = ? AND vehicle_profile = ?", (tenant, profile))}
-    todo = [(r, l, h) for r, l in _legs(profile) for h in HOURS if (r, l, h) not in done]
+    todo = [k for k, _why in _to_do(profile)]
     routes = {x["id"]: x for x in db.query("SELECT * FROM routes WHERE tenant_id = ?", (tenant,))}
     locs = {x["id"]: x for x in db.query("SELECT * FROM locations WHERE tenant_id = ?", (tenant,))}
     try:
@@ -149,17 +251,25 @@ def bake_batch(profile=PROFILE, limit=30, budget_s=None, now=None):
 
 
 def times_for(route_id):
-    """{profile: {leg: {alt_index: {hour: duration_hr}}}} — the rows whose stored line is still the one they matched."""
+    """
+    {profile: {leg: {alt_index: {hour: duration_hr}}}} — the rows whose stored line is still the one they matched, each
+    under the number that line has NOW (16 Nov 2026: Make primary renumbers the lines and keeps their computed_at; the
+    old join on the number read a swapped option's times against the other line, or dropped both).
+    """
+    rows = db.query(
+        "SELECT vehicle_profile, leg, hour, alt_index, duration_hr, geom_computed_at, fingerprint FROM route_hour_times "
+        "WHERE tenant_id = ? AND route_id = ? AND rank >= 0 AND alt_index IS NOT NULL", (db.current_tenant(), route_id))
+    if not rows:
+        return {}
+    lines = _Lines(route_id=route_id)
     out = {}
-    for h in db.query(
-            "SELECT h.vehicle_profile, h.leg, h.hour, h.alt_index, h.duration_hr, h.geom_computed_at, g.computed_at AS gc "
-            "FROM route_hour_times h LEFT JOIN route_geometry g ON g.tenant_id = h.tenant_id AND g.route_id = h.route_id "
-            "AND g.vehicle_profile = h.vehicle_profile AND g.leg = h.leg AND g.alt_index = h.alt_index "
-            "WHERE h.tenant_id = ? AND h.route_id = ? AND h.rank >= 0 AND h.alt_index IS NOT NULL",
-            (db.current_tenant(), route_id)):
-        if h["gc"] is None or str(h["gc"]) != str(h["geom_computed_at"]) or h["duration_hr"] is None:
+    for h in rows:
+        if h["duration_hr"] is None:
             continue
-        out.setdefault(h["vehicle_profile"], {}).setdefault(h["leg"], {}).setdefault(int(h["alt_index"]), {})[h["hour"]] = \
+        alt = lines.alt_now(route_id, h["vehicle_profile"], h["leg"], h)
+        if alt is None:
+            continue
+        out.setdefault(h["vehicle_profile"], {}).setdefault(h["leg"], {}).setdefault(alt, {})[h["hour"]] = \
             float(h["duration_hr"])
     return out
 
