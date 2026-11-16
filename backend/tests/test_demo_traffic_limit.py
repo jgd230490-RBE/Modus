@@ -152,8 +152,9 @@ def geom_of(z):
 # =========================================================================== #
 #  1. The package                                                             #
 # =========================================================================== #
-ok("1. ⭐ the package's last zone is Z041, the B6047 limit, and no zone id moved (Z001-Z041 in order)",
-   [z["id"] for z in ZS] == [f"Z{n:03d}" for n in range(1, 42)]
+# NARROWED 12 Nov 2026 (John, 15:34 UTC: "Meant, keep it gone"): Z004 (the Burrough 7.5 t limit) retired, its id burnt
+ok("1. ⭐ the package's last zone is Z041, the B6047 limit, and no zone id moved (Z001-Z041 in order, without Z004)",
+   [z["id"] for z in ZS] == [f"Z{n:03d}" for n in range(1, 42) if n != 4]
    and Z.get("name") == "B6047 Melton Road, Cold Newton turn to Tilton on the Hill",
    str([z["id"] for z in ZS[-3:]]))
 ok("1. Z041 is a traffic limit as drawn on live: routing off, no dates, active, no note",
@@ -307,8 +308,17 @@ def _move_33(t):
     _z(t, "Z033")["geometry"] = json.dumps(g)
 
 
+# 12 Nov 2026: live before 14:54 UTC still held Z004 (the Burrough village 7.5 t limit); the package no longer does
+def _back_04(t):
+    z5 = _copy.deepcopy(_z(t, "Z005"))
+    z5.update({"id": "Z004", "name": "Burrough village 7.5 t limit", "kind": "weight_limit", "starts_on": "2026-01-01",
+               "ends_on": "2030-12-31"})
+    t["zones"] = sorted(t["zones"] + [z5], key=lambda z: z["id"])
+
+
 for label, fn in (("without Z041 (live before 11 Nov)", _drop_41), ("with Z041 dated", _date_41),
-                  ("with another zone's shape changed (Z033)", _move_33)):
+                  ("with another zone's shape changed (Z033)", _move_33),
+                  ("that still holds Z004 (live before 12 Nov 14:54 UTC)", _back_04)):
     _o, _e = refresh(live_export(fn))
     ok(f"3. a live export {label} is still refused (zones differ)", _o is None and "zones differ" in (_e or ""), _e or "")
 

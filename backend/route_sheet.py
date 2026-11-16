@@ -135,7 +135,11 @@ def _limits_words(route_id, profile, vehicle_text, alts=(0,)):
     n = len(mine)
     first = (f"None of the {n} stored weight, height or width limits along this route is below the {vehicle_text}"
              if n else "No stored weight, height or width limit along this route")
-    return "clear", [f"{first} (checked {when}). The signs on the road come first."]
+    lines = [f"{first} (checked {when}). The signs on the road come first."]
+    ok = [h for h in mine if h.get("verdict") == "allowed"]
+    if ok:
+        lines.insert(0, f"{len(ok)} allowed: the site is on the road. Check the sign names this site.")
+    return "clear", lines
 
 
 def sheet(route_id, vehicle=None, now=None, acc=None):

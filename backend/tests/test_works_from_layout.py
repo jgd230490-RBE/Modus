@@ -325,7 +325,10 @@ ok("5. it remembers the phase and its version", (Z033.get("from_phase_id"), Z033
 others = [z for z in PKG["tables"]["zones"] if z["id"] != "Z033"]
 ok("5. no other zone in the package came from a layout", all(not z.get("from_phase_id") for z in others))
 # RE-PINNED 11 Nov 2026 (card M-F1): the B6047 traffic limit is made after Z040, so 41 zones and Z041 the last; no id moved
-ok("5. zone ids unchanged: 41 zones, Z041 the last", (len(PKG["tables"]["zones"]), PKG["tables"]["zones"][-1]["id"]) == (41, "Z041"),
+# RE-PINNED 12 Nov 2026 (John: "Meant, keep it gone"): Z004 retired, its id burnt, so 40 zones, Z041 still the last; no id moved
+ok("5. zone ids unchanged: 40 zones, Z041 the last, Z004 gone and no other id moved",
+   (len(PKG["tables"]["zones"]), PKG["tables"]["zones"][-1]["id"]) == (40, "Z041")
+   and [z["id"] for z in PKG["tables"]["zones"]] == [f"Z{n:03d}" for n in range(1, 42) if n != 4],
    str((len(PKG["tables"]["zones"]), PKG["tables"]["zones"][-1]["id"])))
 ok("5. imported: by_phase says PH001 made Z033 and they match", WL.by_phase().get("PH001") ==
    {"zone_id": "Z033", "name": "Tilton viaduct works area", "state": "same"}, str(WL.by_phase()))

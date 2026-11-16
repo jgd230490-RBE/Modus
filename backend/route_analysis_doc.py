@@ -40,7 +40,8 @@ NAMED_KINDS = ("schools", "hospitals", "health")            # named on the page 
 COUNTED_KINDS = ("community", "sports", "stations", "bus_stops", "residential")
 CLOSURE_NEAR_M = 100                                        # restrictions.match_m()'s default; the file says the figure
 VERDICT_WORDS = {"exceeds": "Below this lorry", "at_limit": "At this lorry's limit",
-                 "unknown": "Not known for this lorry", "within": "Above this lorry"}
+                 "unknown": "Not known for this lorry", "within": "Above this lorry",
+                 "allowed": "Allowed: the site is on this road"}
 
 
 class AnalysisError(LookupError):
@@ -155,7 +156,7 @@ def _limits(rid, used, loaded, ret, index):
                                   "legs": set(), "kind": h.get("kind"), "limit": h.get("limit"), "unit": h.get("unit"),
                                   "alt": alt, "diversion": h.get("diversion")})
         g["legs"].add(h.get("leg"))
-    order = {"exceeds": 0, "at_limit": 1, "unknown": 2, "within": 3}
+    order = {"exceeds": 0, "at_limit": 1, "unknown": 2, "allowed": 3, "within": 4}
     for g in groups.values():
         a = g.get("anchor")
         g["along_m"], g["off_m"] = None, None

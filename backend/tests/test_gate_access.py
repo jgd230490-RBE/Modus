@@ -494,7 +494,8 @@ ok("⭐ THE DEMO: every one of the 24 gates has an access road — a spliced hau
 ok("...the old zones keep their ids (Z001-Z005: the two haul roads and three geofences); the access roads are Z006-Z028, "
    "the viaduct site's four internal roads Z029-Z032, the dated zones after them (all advisory but Christmas trading 2027, "
    "which re-routes in its dates since 28 Oct)",
-   [z["id"] for z in T["zones"]][:5] == ["Z001", "Z002", "Z003", "Z004", "Z005"]
+   # NARROWED 12 Nov 2026 (John: "Meant, keep it gone"): Z004 (the Burrough 7.5 t limit) retired, its id burnt; no other id moved
+   [z["id"] for z in T["zones"]][:4] == ["Z001", "Z002", "Z003", "Z005"] and "Z004" not in {z["id"] for z in T["zones"]}
    and [ZB[i]["name"] for i in ("Z001", "Z002")] == ["Langton haul road", "Stockpile North haul road"]
    and sorted(g["access_zone_id"] for g in T["location_gates"]) == [f"Z{n:03d}" for n in range(6, 29)] + ["Z040"]
    and all(z["kind"] == "haul_road" and z["haul_mode"] == "internal" and z["location_id"] == "L019" for z in T["zones"] if 29 <= int(z["id"][1:]) <= 32)

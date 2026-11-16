@@ -214,6 +214,11 @@ _harness = next((s for s in _steps if s.startswith("name: Run every harness")), 
 ok("...the poppler install step has a 5-minute limit; the harness step none of its own; the job still 40",
    "\n        timeout-minutes: 5\n" in _poppler and "timeout-minutes" not in _harness and bool(_harness)
    and "\n    timeout-minutes: 40\n" in SUITE_WF)
+# 16 Nov 2026: the runner's sudo stopped passing the environment on, and the step died before any harness ran. The
+# step no longer leans on it: the ids are on the command line, the environment is read back from a file
+ok("...the harness step does not rely on sudo keeping the environment (ids on the command line, the rest from a file)",
+   "sudo -E" not in _harness and "export -p > /tmp/suite-env.sh" in _harness and ". /tmp/suite-env.sh" in _harness
+   and "--reuid=$RUN_UID --regid=$RUN_GID" in _harness and "unshare --net" in _harness and "--require-offline" in _harness)
 
 # =========================================================================== #
 #  5. the guide                                                                 #
