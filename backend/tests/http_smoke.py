@@ -2359,6 +2359,13 @@ with TestClient(main.app, base_url="https://testserver") as c:
     _a2 = c.get(_ad, params=TOKEN, headers={"X-Real-IP": "198.51.100.7", "X-Unrelated": "x"})
     ok("ADDRESS: another address header is reported when present, and only those named",
        _a2.json().get("other") == {"x-real-ip": "198.51.100.7"}, _a2.text[:200])
+    # 16 Nov 2026 (claude/visitor-address): where the edge writes its own header, the app reads THAT as the visitor
+    _a3 = c.get(_ad, params=TOKEN, headers={"X-Forwarded-For": "203.0.113.9, 198.51.100.7, 192.0.2.1", "CF-Connecting-IP": "198.51.100.7"})
+    ok("🔴 ADDRESS: with the edge's own header present the app reads it, not the chain's first entry",
+       _a3.status_code == 200 and _a3.json()["read_as"] == "198.51.100.7" and _a3.json()["forwarded_for"][0] == "203.0.113.9",
+       _a3.text[:200])
+    _a4 = c.get(_ad, params=TOKEN, headers={"X-Forwarded-For": "203.0.113.9", "True-Client-IP": "198.51.100.8"})
+    ok("ADDRESS: ...and the edge's second header when the first is absent", _a4.json()["read_as"] == "198.51.100.8", _a4.text[:200])
     _n_aud = len(db.query("SELECT id FROM audit_log"))
     c.get(_ad, params=TOKEN, headers={"X-Forwarded-For": "203.0.113.9"})
     ok("ADDRESS: the read stores nothing (no audit row)", len(db.query("SELECT id FROM audit_log")) == _n_aud)
