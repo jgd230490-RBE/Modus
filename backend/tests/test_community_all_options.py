@@ -318,6 +318,95 @@ community.refresh(fetchers=FETCH, today=TODAY)
 ok("3. the next good fetch puts it right", community.status()["all_options"] is True and "Cycle path by the alternative" in refs())
 
 # =========================================================================== #
+#  3b. The cell look-ups give the same answers as the old scan of every probe  #
+#      and every segment (the old code, copied here as the reference)          #
+# =========================================================================== #
+import random  # noqa: E402
+from community_sources import polygons_of, in_polygons, bbox_of_coords  # noqa: E402
+
+
+def old_distance(s, geometry):
+    t = geometry["type"]
+    if t == "Point":
+        ok_, d = s.margin(*geometry["coordinates"][:2])
+        return round(d, 1) if ok_ else None
+    if t == "LineString":
+        coords = geometry["coordinates"]
+    else:
+        polys = polygons_of(geometry)
+        coords = [c for poly in polys for ring in poly for c in ring]
+        bb = bbox_of_coords(coords)
+        for x, y in s.probe:
+            if bb[0] <= x <= bb[2] and bb[1] <= y <= bb[3] and in_polygons(x, y, polys):
+                return 0.0
+        edges = [(r[i - 1], r[i]) for poly in polys for r in poly for i in range(1, len(r))]
+        for line in s.lines:
+            for a, b in zip(line, line[1:]):
+                if max(a[0], b[0]) < bb[0] or min(a[0], b[0]) > bb[2] or max(a[1], b[1]) < bb[1] or min(a[1], b[1]) > bb[3]:
+                    continue
+                if in_polygons(a[0], a[1], polys) or in_polygons(b[0], b[1], polys):
+                    return 0.0
+                if any(s._seg_cross(a, b, e1, e2) for e1, e2 in edges):
+                    return 0.0
+    best = None
+    for c in coords:
+        ok_, d = s.margin(c[0], c[1])
+        if ok_ and (best is None or d < best):
+            best = d
+    return round(best, 1) if best is not None else None
+
+
+rng = random.Random(1116)
+LONGSEG = [[-1.0, 52.45], [-0.85, 52.55]]          # one long diagonal segment over many cells
+S3 = community.Strip([LINE0, LINE1, LINE10, LONGSEG], [(-0.9, 52.5)])
+_shapes = []
+for _i in range(600):
+    cx, cy = rng.uniform(-1.02, -0.83), rng.uniform(52.44, 52.56)
+    w, h = rng.uniform(0.0002, 0.03), rng.uniform(0.0002, 0.02)
+    kind = _i % 3
+    if kind == 0:
+        g = {"type": "Polygon", "coordinates": [[[cx, cy], [cx + w, cy], [cx + w, cy + h], [cx, cy + h], [cx, cy]]]}
+    elif kind == 1:
+        g = {"type": "LineString", "coordinates": [[cx, cy], [cx + w, cy + h]]}
+    else:
+        g = P(cx, cy)
+    _shapes.append(g)
+_diff = [(g, S3.distance(g), old_distance(S3, g)) for g in _shapes if S3.distance(g) != old_distance(S3, g)]
+_zero = sum(1 for g in _shapes if g["type"] == "Polygon" and S3.distance(g) == 0.0)
+_none = sum(1 for g in _shapes if S3.distance(g) is None)
+ok("⭐ 3b. 600 random outlines, lines and points: the cell look-ups give exactly the old answers (some in at 0 m, some out)",
+   not _diff and _zero >= 10 and _none >= 10, f"{len(_diff)} differ, e.g. {_diff[:2]}; zero {_zero} none {_none}")
+_big = {"type": "Polygon", "coordinates": [[[-0.97, 52.4], [-0.96, 52.4], [-0.96, 52.6], [-0.97, 52.6], [-0.97, 52.4]]]}
+ok("3b. an outline crossed only between the vertices of a long segment is in at 0 m, as before",
+   S3.distance(_big) == old_distance(S3, _big) == 0.0)
+
+# =========================================================================== #
+#  3c. A long fetch keeps a sign of life: the stale rule reads the last beat   #
+# =========================================================================== #
+_beats = []
+community.BEAT_S = 0
+_k = community._beating(S3.keep, lambda: _beats.append(1))
+ok("3c. the keep() wrapper answers as keep() does and calls beat() when BEAT_S has passed",
+   _k("schools", P(-0.95, 52.5)) == S3.keep("schools", P(-0.95, 52.5)) and len(_beats) == 1)
+community.BEAT_S = 3600
+_k = community._beating(S3.keep, lambda: _beats.append(1))
+_k("schools", P(-0.95, 52.5))
+ok("3c. ...and not before", len(_beats) == 1 and community._beating(S3.keep, None) == S3.keep)
+community.BEAT_S = 60
+_old_t = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(minutes=45)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+community._write_meta("running", dict(community._detail(community._meta_row()), beat=community._now()), started_at=_old_t)
+ok("⭐ 3c. a fetch started 45 minutes ago that beat a moment ago still reads running (it was 'failed' at 30 minutes)",
+   community.status()["state"] == "running")
+r_ = community.start_refresh(by="x", sync=True, fetchers=FETCH, today=TODAY)
+ok("3c. ...so a second Fetch now is refused while it runs", r_["started"] is False and "already running" in r_["message"])
+community._write_meta("running", dict(community._detail(community._meta_row()), beat=_old_t), started_at=_old_t)
+ok("3c. one with no beat for 45 minutes reads failed (a restart killed it)", community.status()["state"] == "failed")
+_src_r = read("backend/community.py").split("def refresh(")[1].split("\ndef ")[0]
+ok("3c. refresh() hands the beat to both OpenStreetMap passes",
+   "_fetch_osm(strip, workdir, fetch, beat)" in _src_r and "_fetch_osm_structures(strip, workdir, fetch, beat)" in _src_r)
+community.refresh(fetchers=FETCH, today=TODAY)
+
+# =========================================================================== #
 #  4. Source                                                                   #
 # =========================================================================== #
 _c = read("backend/community.py")

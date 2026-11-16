@@ -1173,7 +1173,10 @@ diversion uses and the abnormal loads&rsquo; lines (<code>community.ALL_OPTIONS<
 an alternative&rsquo;s places and cycle routes are counted as fairly as the main line&rsquo;s. A way round a closed zone that no diversion
 uses stays out. On 29 Oct the same widening ran the 512 MB deployment out of memory; live has had 2 GB since 31 Oct (Standard). The
 OpenStreetMap passes can read the county files once per slice of <code>community.SLICE_LINES</code> lines (unset: one pass, as measured
-on 16 Nov); a slice that fails fails its source, which keeps what it had. Each source records the options it was fetched along
+on 16 Nov: memory stayed flat, the time is what grew); a slice that fails fails its source, which keeps what it had. An outline is
+tested only against the probe points and route segments filed in the 600 m cells under its own box (the same answers as the old scan of
+the whole strip, which took most of the time), and a running fetch writes a sign of life (<code>beat</code>) at most every minute, so the
+30-minute stale rule (<code>STALE_RUN</code>) counts from the last one, not from the start. Each source records the options it was fetched along
 (route, lorry type, leg, when the line was worked out and its length; never the line itself), and <code>community.status()</code>
 answers <code>all_options</code>: true only while all three sources that feed the counts (OpenStreetMap, GIAS, NaPTAN) were
 fetched along every option stored now. A re-route (even one that gives the same line back), a new option or a diversion taking up a

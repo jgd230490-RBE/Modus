@@ -90,6 +90,9 @@ SOURCE_ORDER = ("osm", "osm_structures", "gias", "naptan")
 OSM_SOURCES = ("osm", "osm_structures")      # both credited as OpenStreetMap, never under the OGL
 META_ID = "current"
 STALE_RUN = timedelta(minutes=30)       # a 'running' row older than this is a dead run, not a live one
+# 16 Nov 2026: measured from the run's last sign of life (detail "beat", written at most every BEAT_S while the
+# OpenStreetMap passes read), not from its start: the wide strip's pass can outlast 30 minutes and is still alive
+BEAT_S = 60
 _LOCK = threading.Lock()
 # 16 Nov 2026: Fetch now covers every stored option the router gave, not only the main routes and diversions
 ALL_OPTIONS = True
@@ -132,6 +135,20 @@ class Strip:
             S = self._xy(s)
             self._index((S, S, site_m), S[0] - reach, S[0] + reach, S[1] - reach, S[1] + reach)
         self.probe = [tuple(c) for l in self.lines for c in l[::5]] + [tuple(s) for s in self.sites]
+        # 16 Nov 2026: the probe points and the bare route segments (lon / lat, no reach added) in the same cells, so an
+        # outline asks only the cells under its own box instead of every probe and every segment of the strip (the wide
+        # strip's OpenStreetMap pass took 62 min on a laptop, 2/3 of it in _crosses). Same answers: an outline's box and a
+        # segment's box that overlap share a cell.
+        self.probe_grid, self.seg_grid = {}, {}
+        for p in self.probe:
+            X, Y = self._xy(p)
+            self.probe_grid.setdefault((int(X // self.CELL), int(Y // self.CELL)), []).append(p)
+        for l in self.lines:
+            for a, b in zip(l, l[1:]):
+                A, B = self._xy(a), self._xy(b)
+                for gx in range(int(min(A[0], B[0]) // self.CELL), int(max(A[0], B[0]) // self.CELL) + 1):
+                    for gy in range(int(min(A[1], B[1]) // self.CELL), int(max(A[1], B[1]) // self.CELL) + 1):
+                        self.seg_grid.setdefault((gx, gy), []).append((tuple(a), tuple(b)))
         pad_x, pad_y = (reach + 100) / self.kx, (reach + 100) / self.ky
         self.bbox = ([min(p[0] for p in pts) - pad_x, min(p[1] for p in pts) - pad_y,
                       max(p[0] for p in pts) + pad_x, max(p[1] for p in pts) + pad_y] if pts else None)
@@ -178,7 +195,7 @@ class Strip:
             coords = [c for poly in polys for ring in poly for c in ring]
             if coords:
                 bb = bbox_of_coords(coords)
-                for x, y in self.probe:
+                for x, y in self._in_cells(self.probe_grid, bb):
                     if bb[0] <= x <= bb[2] and bb[1] <= y <= bb[3] and in_polygons(x, y, polys):
                         return 0.0
                 # a route that CROSSES the outline between its vertices (a long straight stretch through a housing
@@ -199,17 +216,30 @@ class Strip:
             return 0 if abs(v) < 1e-18 else (1 if v > 0 else -1)
         return o(p1, p2, q1) != o(p1, p2, q2) and o(q1, q2, p1) != o(q1, q2, p2)
 
+    def _in_cells(self, grid, bb):
+        """Every item of `grid` filed in a cell under the lon / lat box bb, each once (a segment can sit in many)."""
+        x0, y0 = self._xy((bb[0], bb[1]))
+        x1, y1 = self._xy((bb[2], bb[3]))
+        seen = set()
+        for gx in range(int(x0 // self.CELL), int(x1 // self.CELL) + 1):
+            for gy in range(int(y0 // self.CELL), int(y1 // self.CELL) + 1):
+                for item in grid.get((gx, gy), ()):
+                    if item not in seen:
+                        seen.add(item)
+                        yield item
+
     def _crosses(self, polys, bb):
         from community_sources import in_polygons
-        edges = [(r[i - 1], r[i]) for poly in polys for r in poly for i in range(1, len(r))]
-        for line in self.lines:
-            for a, b in zip(line, line[1:]):
-                if max(a[0], b[0]) < bb[0] or min(a[0], b[0]) > bb[2] or max(a[1], b[1]) < bb[1] or min(a[1], b[1]) > bb[3]:
-                    continue
-                if in_polygons(a[0], a[1], polys) or in_polygons(b[0], b[1], polys):
-                    return True
-                if any(self._seg_cross(a, b, e1, e2) for e1, e2 in edges):
-                    return True
+        edges = None
+        for a, b in self._in_cells(self.seg_grid, bb):
+            if max(a[0], b[0]) < bb[0] or min(a[0], b[0]) > bb[2] or max(a[1], b[1]) < bb[1] or min(a[1], b[1]) > bb[3]:
+                continue
+            if in_polygons(a[0], a[1], polys) or in_polygons(b[0], b[1], polys):
+                return True
+            if edges is None:
+                edges = [(r[i - 1], r[i]) for poly in polys for r in poly for i in range(1, len(r))]
+            if any(self._seg_cross(a, b, e1, e2) for e1, e2 in edges):
+                return True
         return False
 
     def keep(self, kind, geometry):
@@ -431,7 +461,8 @@ def status():
     state = (row or {}).get("state") or "never"
     if state == "running" and row and row.get("started_at"):
         try:
-            if datetime.now(timezone.utc) - datetime.fromisoformat(row["started_at"].replace("Z", "+00:00")) > STALE_RUN:
+            last = max(x for x in (row["started_at"], det.get("beat")) if x)
+            if datetime.now(timezone.utc) - datetime.fromisoformat(last.replace("Z", "+00:00")) > STALE_RUN:
                 state = "failed"
                 det.setdefault("error", "the last refresh stopped without finishing (the server restarted?)")
         except ValueError:
@@ -539,15 +570,34 @@ def strip_slices(strip, size=None):
             for i in range(0, len(strip.lines), size)]
 
 
-def _extract_sliced(extract, paths, strip):
+def _beating(keep, beat):
+    """keep() as it was, calling beat() at most every BEAT_S seconds (the run's sign of life for the stale rule)."""
+    if beat is None:
+        return keep
+    import time as _time
+    last = [_time.monotonic()]
+
+    def kept(kind, geometry):
+        now = _time.monotonic()
+        if now - last[0] >= BEAT_S:
+            last[0] = now
+            try:
+                beat()
+            except Exception:       # noqa: BLE001 — a missed beat never stops the fetch
+                pass
+        return keep(kind, geometry)
+    return kept
+
+
+def _extract_sliced(extract, paths, strip, beat=None):
     """One OpenStreetMap pass per slice over the same files, merged: an object kept by two slices once, at its nearest
     distance. An exception in any slice goes up, so the source fails and nothing of it is replaced."""
     parts = strip_slices(strip)
     if len(parts) == 1:
-        return extract(paths, strip.keep)
+        return extract(paths, _beating(strip.keep, beat))
     best = {}
     for part in parts:
-        for f in extract(paths, part.keep):
+        for f in extract(paths, _beating(part.keep, beat)):
             k = (f.get("kind"), f["source_ref"])
             old = best.get(k)
             if old is None or (f.get("dist_m") is not None and (old.get("dist_m") is None or f["dist_m"] < old["dist_m"])):
@@ -555,16 +605,16 @@ def _extract_sliced(extract, paths, strip):
     return list(best.values())
 
 
-def _fetch_osm(strip, workdir, fetch):
+def _fetch_osm(strip, workdir, fetch, beat=None):
     paths, files, data_date = _osm_files(strip, workdir, fetch)
-    feats = _extract_sliced(fetch["osm_extract"], paths, strip)
+    feats = _extract_sliced(fetch["osm_extract"], paths, strip, beat)
     return feats, files, data_date
 
 
-def _fetch_osm_structures(strip, workdir, fetch):
+def _fetch_osm_structures(strip, workdir, fetch, beat=None):
     """22 Oct 2026 (abnormal loads, phase 3): the second pass over the same files."""
     paths, files, data_date = _osm_files(strip, workdir, fetch)
-    feats = _extract_sliced(fetch["osm_structures_extract"], paths, strip)
+    feats = _extract_sliced(fetch["osm_structures_extract"], paths, strip, beat)
     return feats, files, data_date
 
 
@@ -629,6 +679,9 @@ def refresh(by=None, fetchers=None, strip=None, today=None, sources=SOURCE_ORDER
         return status()
     if not strip.lines:
         det["notes"].append("No route is routed yet, so only the sites were searched round.")
+    def beat():
+        det["beat"] = _now()
+        _write_meta("running", det)
     workdir = tempfile.mkdtemp(prefix="wayscope_community_")
     ok_any = False
     try:
@@ -636,9 +689,9 @@ def refresh(by=None, fetchers=None, strip=None, today=None, sources=SOURCE_ORDER
             entry = dict(det["sources"].get(s) or {})
             try:
                 if s == "osm":
-                    feats, files, data_date = _fetch_osm(strip, workdir, fetch)
+                    feats, files, data_date = _fetch_osm(strip, workdir, fetch, beat)
                 elif s == "osm_structures":
-                    feats, files, data_date = _fetch_osm_structures(strip, workdir, fetch)
+                    feats, files, data_date = _fetch_osm_structures(strip, workdir, fetch, beat)
                 elif s == "gias":
                     feats, files, data_date = _fetch_gias(strip, workdir, fetch, today)
                 else:
