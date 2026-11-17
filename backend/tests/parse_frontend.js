@@ -3345,8 +3345,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // and its timeline (it redraws to its own width)
   // NARROWED 22 Oct 2026 (UI fix 6, card 5): one more, the big screen's Today list (it counts the rows that fit whole)
   ok("W5: the Today map and the Routes map watch their own container (the dispatch they relied on is gone); so do the Simulation's map and timeline, and the big screen's Today list",
-     // NARROWED 17 Nov 2026 (routes-card-room): one more, the open route's panel (useBoxWide: two columns from its own width)
-     (src.match(/new ResizeObserver\(/g) || []).length === 7
+     // NARROWED 17 Nov 2026 (routes-card-room): two more, both the open route's panel: useBoxWide (two columns from its own
+     // width) and the page kept at the panel's top while the panel's reads arrive (until the person scrolls, clicks or types)
+     (src.match(/new ResizeObserver\(/g) || []).length === 8
+     && src.includes("const ro = new ResizeObserver(() => { if(on) go(); });")
      && (src.slice(src.indexOf("function useBoxWide("), src.indexOf("// the one status:")).match(/new ResizeObserver\(/g) || []).length === 1
      && (src.slice(src.indexOf("function DashboardToday("), src.indexOf("function DashboardStockChart(")).match(/new ResizeObserver\(/g) || []).length === 1 && /const ro = typeof ResizeObserver !== "undefined" \? new ResizeObserver\(doResize\) : null;/.test(src)
      && (src.slice(src.indexOf("function SimMap("), src.indexOf("function SimPlayer(")).match(/new ResizeObserver\(/g) || []).length === 2);

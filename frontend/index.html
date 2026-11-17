@@ -16960,7 +16960,22 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(openRow && openRow !== was){
       const el = roEl.current, h = roHead.current;
       if(h){ try { h.focus({ preventScroll: true }); } catch(e){} }
-      if(el && el.scrollIntoView){ try { el.scrollIntoView({ block: "start", behavior: calmMotion() ? "auto" : "smooth" }); } catch(e){} }
+      if(el && el.scrollIntoView){
+        const go = () => { try { el.scrollIntoView({ block: "start", behavior: calmMotion() ? "auto" : "smooth" }); } catch(e){} };
+        go();
+        // the panel grows as its reads arrive (the card last, and the page under a short panel is too short to move
+        // that far): its top is kept at the top of the view until the person scrolls, clicks or types, a minute at most
+        if(typeof ResizeObserver !== "undefined"){
+          const EV = ["wheel", "touchstart", "keydown", "mousedown"];
+          let on = true, t = 0;
+          const ro = new ResizeObserver(() => { if(on) go(); });
+          const stop = () => { if(!on) return; on = false; ro.disconnect(); clearTimeout(t); EV.forEach(e => window.removeEventListener(e, stop, true)); };
+          EV.forEach(e => window.addEventListener(e, stop, { capture: true, passive: true }));
+          t = setTimeout(stop, 60000);
+          ro.observe(el);
+          return stop;
+        }
+      }
     } else if(!openRow && was){
       const b = [...document.querySelectorAll("[data-route-tri]")].find(x => x.getAttribute("data-route-tri") === was);
       if(b){ try { b.focus(); } catch(e){} }

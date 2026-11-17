@@ -222,6 +222,10 @@ w.Element.prototype.getBoundingClientRect = function(){
 };
 const moved = [];
 w.Element.prototype.scrollIntoView = function(o){ moved.push([this, o || {}]); };
+// jsdom has no ResizeObserver: a stub that remembers what each one watches, so a growing panel can be played
+const ROS = [];
+w.ResizeObserver = function(cb){ this.cb = cb; this.els = []; this.observe = (el) => { this.els.push(el); if (!ROS.includes(this)) ROS.push(this); }; this.disconnect = () => { this.els = []; }; };
+const grow = (el) => act(() => { ROS.filter(r => r.els.includes(el)).forEach(r => r.cb([])); });
 
 (async () => {
   if (!loaded || typeof w.DataManagement !== "function") { ok("the Routes page (DataManagement) is defined", false); return finish(); }
@@ -257,6 +261,17 @@ w.Element.prototype.scrollIntoView = function(o){ moved.push([this, o || {}]); }
        && seen.some(u => /\/routes\/R001\/geometries$/.test(u)));
     ok("⭐ DOM: the page moves to the panel's top (block start) and focus goes to the panel's heading",
        !!p && moved.some(([n, o]) => n === p && o.block === "start") && doc.activeElement === q("#route-panel-h"));
+    {
+      // the panel grows as its reads arrive: the page is kept at its top, until the person does something
+      const n0 = moved.filter(([n]) => n === p).length;
+      await grow(p);
+      const n1 = moved.filter(([n]) => n === p).length;
+      await act(async () => { w.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true })); });
+      await grow(p);
+      const n2 = moved.filter(([n]) => n === p).length;
+      ok("⭐ DOM: while the panel grows (its reads arriving) the page is kept at the panel's top; after a click, a key or a scroll it is left alone",
+         n1 === n0 + 1 && n2 === n1, [n0, n1, n2].join(","));
+    }
     ok("⭐ DOM: one column reads the card, then the figures, then the settings (Q2: the card first)", order() === "card>figures>settings"
        && TRY(() => p.getAttribute("data-route-panel-wide") === "0" && !q(".ro-body").classList.contains("ro-wide")), order());
     ok("⭐ DOM: the Best option card is the first thing in the panel's body, with its answer",
