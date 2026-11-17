@@ -57,7 +57,8 @@ How each decision of John's is held (section numbers of the 16 Nov note):
     naming the heads only in the card's words ("Alt 2 is ahead on cycle routes and carbon, behind on places and time.";
     collisions said first as a fact; a mixed head last), at most SHORT_MAX (25) words, the long `trade` kept for "All
     figures" and the file; and
-    `in_use_limits`, the lorry limits below the lorry that the line in use itself meets (site-allowed ones left out),
+    `in_use_limits`, the lorry limits below the lorry that the line in use itself meets (site-allowed ones left out;
+    each with `words` and `short`, "7.5 t limit", for use inside a sentence),
     reported only: the answer does not change for them.
 
 Every threshold is a named constant below: STARTING VALUES that John has not set (he sets them on the all-50 table, Q9).
@@ -463,6 +464,25 @@ def _limit_words(L):
     return w
 
 
+#: a limit as a person names it inside a sentence, no leading capital: "7.5 t limit", "4.2 m height limit" (17 Nov: the
+#: card's third draft reads "The diversion in use meets a 7.5 t limit below this lorry.")
+_SHORT_NOUN = {"weight": "", "height": "height", "width": "width", "axle": "axle"}
+
+
+def limit_short(L):
+    """'7.5 t limit', '4.2 m height limit', '2.5 m width limit', '10 t axle limit' (limits.fmt_value's figures)."""
+    kind, value = L.get("kind"), L.get("value")
+    noun = _SHORT_NOUN.get(kind, str(kind or "").lower())
+    if value is None:
+        return f"{noun or 'weight'} limit"
+    try:
+        import limits
+        fig = limits.fmt_value(kind, value)
+    except Exception:
+        fig = f"{value:g}" if isinstance(value, (int, float)) else str(value)
+    return f"{fig} {noun} limit".replace("  ", " ")
+
+
 def _ruled_out(opt_legs, use_legs, lorry, ctx):
     """[reason words] and [added limits] for one option: a routing zone in force it crosses; a lorry limit below the lorry
     it ADDS over the line in use on the same leg (N1)."""
@@ -523,7 +543,7 @@ def in_use_limits(use_legs, lorry, ctx):
     for k in sorted(legs_of, key=lambda x: tuple(str(v) for v in x)):
         L = by_key.get(k) or {"kind": k[2], "value": None}
         ls = legs_of[k]
-        out.append({"words": _limit_words(L), "legs": "both" if len(set(ls)) > 1 else ls[0],
+        out.append({"words": _limit_words(L), "short": limit_short(L), "legs": "both" if len(set(ls)) > 1 else ls[0],
                     "kind": k[2], "except_for_access": bool(L.get("exceptions"))})
     return out
 
