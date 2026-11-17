@@ -346,7 +346,70 @@ def answer(body, today=None):
                  holidays_feed=holidays_feed(), time_bans=None, today=today)
     g = R.figures(figs)
     page = words(a, g, today)
+    page["date_steps"] = date_steps(a, nation, d)      # 17 Nov 2026: "How the date was counted" (John's yes)
     return {"advice": a, "page": page}
+
+
+# --------------------------------------------------------------------------- how the "Notify by" date was counted
+
+HOW_DATE = "How the date was counted"
+_COUNT_WORDS = {1: "One", 2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7: "Seven"}
+
+
+def _dm(d):
+    """Mon 7 Dec."""
+    return f"{d:%a} {d.day} {d:%b}"
+
+
+def _holiday_names(divisions):
+    out = {}
+    for div in divisions:
+        for ev in ((holidays_feed() or {}).get(div) or {}).get("events") or []:
+            dd = R._date((ev or {}).get("date"))
+            if dd and dd not in out:
+                out[dd] = str((ev or {}).get("title") or "a bank holiday").replace("\u2019", "'")
+    return out
+
+
+def date_steps(a, nation, move):
+    """The three lines of "How the date was counted", or [] when there is no notice date. The days are walked with the
+    rules' own is_working_day on the rules' own calendar; this changes no date. Should the walk ever end on a day other
+    than the rules' notify_by, nothing is shown (a count that disagrees with the date above it would be worse than none)."""
+    nt = a.get("notices") or {}
+    n = max(int(nt.get("police_days") or 0), int(nt.get("rba_days") or 0))
+    nb = R._date(a.get("notify_by"))
+    cal = a.get("calendar")
+    if not nb or not n or not move or cal not in ("stgo", "cu", "calendar"):
+        return []
+    divs = R.calendar_divisions(cal, nation)
+    hol = R.holiday_dates(holidays_feed(), divs)
+    names = _holiday_names(divs)
+    clear, skipped, dday = [], [], move - datetime.timedelta(days=1)
+    while len(clear) < n:
+        if R.is_working_day(dday, cal, hol):
+            clear.append(dday)
+        else:
+            skipped.append(dday)
+        dday -= datetime.timedelta(days=1)
+        if (move - dday).days > 400:
+            return []
+    by = clear[-1] - datetime.timedelta(days=1)
+    if by != nb:
+        return []
+    pd, rd = int(nt.get("police_days") or 0), int(nt.get("rba_days") or 0)
+    whose = (" for the road and bridge authorities" if rd > pd and pd else " for the police" if pd > rd and rd else "")
+    kind = "clear day" if cal == "calendar" else "clear working day"
+    two = f"{_COUNT_WORDS.get(n, str(n))} {kind}{'' if n == 1 else 's'} before it{whose}: {_and([_dm(x) for x in clear])}."
+    if skipped:
+        two += " Not counted: " + ", ".join(_dm(x) + (f" ({names[x]})" if x in names else "") for x in skipped) + "."
+    three = f"The notice must arrive by the day before them: {_dm(by)}."
+    wcal = "stgo" if cal == "calendar" else cal
+    whol = R.holiday_dates(holidays_feed(), R.calendar_divisions(wcal, nation))
+    if not R.is_working_day(by, wcal, whol):
+        what = "a bank holiday" if by in whol else f"a {by:%A}"
+        before = R.working_days_before(by, 1, wcal, whol)
+        three += f" That is {what}: a notice sent by {_dm(before)} arrives in time."
+    return [f"The load moves on {_dm(move)}.", two, three]
 
 
 def words(a, g, today):
