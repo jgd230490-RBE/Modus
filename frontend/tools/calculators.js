@@ -64,6 +64,11 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
   }
 
+  function done(on) {                                 // "Your PDF has downloaded." under the box, the box left open
+    var el = document.querySelector("#pdfbox .done");
+    if (el) el.hidden = !on;
+  }
+
   function init() {
     var cards = document.querySelectorAll(".calc");
     var box = document.getElementById("pdfbox");
@@ -85,6 +90,7 @@
             if (card.nextElementSibling !== box) card.parentNode.insertBefore(box, card.nextSibling);   // under the card on one column
             box.hidden = false;
             window.WaysTools.say(box.querySelector(".say"), "");
+            done(false);                              // another card's PDF: the last download's line goes
             var email = box.querySelector('input[name="email"]');
             if (box.scrollIntoView) box.scrollIntoView({ block: "nearest", behavior: "smooth" });
             if (email) email.focus();
@@ -96,6 +102,7 @@
     if (box) box.addEventListener("submit", function (e) {
       e.preventDefault();
       var sayEl = box.querySelector(".say");
+      done(false);
       var card = document.getElementById("c-" + state.which);
       if (!card) { window.WaysTools.say(sayEl, "Pick a calculator first."); return; }
       window.WaysTools.call(PDF, {
@@ -106,7 +113,7 @@
         website: box.querySelector('input[name="website"]').value
       }, sayEl).then(function (data) {
         if (!data) return;
-        if (data.pdf) download(data.filename || "wayscope.pdf", data.pdf);
+        if (data.pdf) { download(data.filename || "wayscope.pdf", data.pdf); done(true); }
       });
     });
   }

@@ -75,6 +75,8 @@ BOUND_SAY = {
 
 #: Q8 (17 Nov): a C&U answer's head, its calendar line, and the plain words for the rules' "over the C&U ceiling" reasons
 CU_HEAD = "Moves under C&U, not STGO"
+NOT_ABNORMAL = "Not an abnormal load"
+NOT_ABNORMAL_NOTICE = "Not abnormal, but a notice is needed"
 CU_SATURDAY = "For an ordinary lorry a Saturday counts as a working day; Sundays and bank holidays do not."
 CEILING_WORDS = (("width over the C&U ceiling", f"over {R.CU_WIDTH_MAX_M:g} m wide"),
                  ("length over the C&U ceiling", f"over {R.CU_LENGTH_MAX_M:g} m long"),
@@ -367,7 +369,9 @@ def words(a, g, today):
     # within the weights and width is "not abnormal" to the rules yet a Special Order case (17 Nov)
     if not a["abnormal"] and perm == "none" and not nt["rba_days"]:
         over = []
-        head = "Not an abnormal load"
+        # 17 Nov 2026 (John's yes, the review's B3): with a police notice still due the head says so; it read
+        # "Not an abnormal load" beside a "Notify by" chip
+        head = NOT_ABNORMAL_NOTICE if nt["police_days"] else NOT_ABNORMAL
         axle_words = f"{_g(R.ABNORMAL_AXLE_T)} t an axle" + (
             f" ({_g(R.ABNORMAL_DRIVING_AXLE_T)} t a driving axle)" if g["axle_driving"] else "")
         notes.append(f"Within the normal limits on these figures: {_g(R.ABNORMAL_GROSS_T)} t gross, "

@@ -8,6 +8,7 @@
   var res = document.getElementById("adv-res");
   if (!form || !res) return;
   var sayBox = form.querySelector(".say");
+  var hint = document.getElementById("adv-hint");
   var NEEDED = ["width_m", "length_m", "height_m", "gross_t", "max_axle_t", "axle_count", "date"];
   var timer = null;
   var asked = 0;
@@ -70,6 +71,7 @@
 
   function ask() {
     var missing = NEEDED.filter(function (n) { return !val(n); });
+    if (hint) hint.hidden = !missing.length;          // the cue shows only while a box is still empty
     if (missing.length) {
       res.hidden = true;
       WaysTools.say(sayBox, "");
