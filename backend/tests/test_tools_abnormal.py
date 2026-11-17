@@ -570,6 +570,48 @@ ok("the page's script is served beside its page only", tools_public.page_file("a
    and tools_public.page_file("nothing.js") is None and tools_public.page_file("index.js") is None
    and tools_public.page_file("../main.js") is None and tools_public.page_file("Abnormal-load.js") is None)
 
+# 17 Nov 2026 (the planning session's read of the branch): an odd value sent by a script is answered with the box's own
+# sentence, never an uncaught error on the open call ("1e999" axles overflowed; a list as "where" could not be looked up)
+_BASE = {"width_m": "4.2", "length_m": "27", "height_m": "4.6", "gross_t": "76", "max_axle_t": "11", "axle_count": "7",
+         "date": "2026-12-14", "where": "england-and-wales", "indivisible": True}
+_ODD = [None, "", " ", "abc", "1e999", "inf", "-inf", "nan", "-1", "0", "999999999999", True, False, [], {}, [1, 2],
+        {"a": 1}, 1e308, float("inf"), float("nan"), -5, 0, 3.5, "3,5", "0x10", "2026-13-40", "14/12/2026", 20261214,
+        "2026-12-14T00:00", "9999-12-31", "0001-01-01", "2029-01-01"]
+_uncaught = []
+for _k in list(_BASE) + ["axle_spacings_m", "cu_vehicle", "axle_driving", "band", "website"]:
+    for _v in _ODD:
+        _b = dict(_BASE)
+        _b[_k] = _v
+        try:
+            T.answer(_b, today=datetime.date(2026, 11, 17))
+        except T.Bad:
+            pass
+        except Exception as _e:  # noqa: BLE001
+            _uncaught.append(f"{_k}={_v!r}: {type(_e).__name__}")
+for _b in (None, [], "x", 5, {}):
+    try:
+        T.answer(_b, today=datetime.date(2026, 11, 17))
+    except T.Bad:
+        pass
+    except Exception as _e:  # noqa: BLE001
+        _uncaught.append(f"body={_b!r}: {type(_e).__name__}")
+ok("🔴 every odd typed value is an answer or one sentence, never an uncaught error", not _uncaught, str(_uncaught[:6]))
+
+
+def _say(extra):
+    try:
+        T.answer(dict(_BASE, **extra), today=datetime.date(2026, 11, 17))
+    except T.Bad as e:
+        return e.say
+    return None
+
+
+ok("🔴 '1e999' or 'inf' typed as the axles is the axles sentence", _say({"axle_count": "1e999"}) == T.SAY["axle_count"]
+   and _say({"axle_count": "inf"}) == T.SAY["axle_count"] and _say({"axle_count": float("inf")}) == T.SAY["axle_count"])
+ok("🔴 a list or a dict as 'where' or the time band is that box's sentence", _say({"where": [1, 2]}) == T.SAY["where"]
+   and _say({"where": {"a": 1}}) == T.SAY["where"] and _say({"band": [1, 2]}) == T.SAY["band"]
+   and _say({"band": {"a": 1}}) == T.SAY["band"])
+
 print()
 for f in FAIL:
     print("  FAIL:", f)

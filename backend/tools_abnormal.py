@@ -178,7 +178,7 @@ def read_form(body, today=None):
     n = body.get("axle_count")
     try:
         n = int(float(str(n).strip())) if n not in (None, "") and not isinstance(n, bool) else None
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):     # OverflowError: "1e999" or "inf" typed as the axles
         n = None
     if n is None or n < AXLES_MIN or n > AXLES_MAX or float(str(body.get("axle_count")).strip()) != n:
         raise Bad(SAY["axle_count"])
@@ -199,10 +199,10 @@ def read_form(body, today=None):
     # changes an answer with no police time bans); "Where" is kept (it moves the C&U calendar); a caller may still send
     # either, read as before
     nation = body.get("where") or "england-and-wales"
-    if nation not in NATIONS:
+    if not isinstance(nation, str) or nation not in NATIONS:      # a list or a dict sent by a script is a sentence too
         raise Bad(SAY["where"])
     band = body.get("band") or "day"
-    if band not in BANDS:
+    if not isinstance(band, str) or band not in BANDS:
         raise Bad(SAY["band"])
     figures = {"width_m": width, "length_m": length, "height_m": height, "gross_t": gross, "max_axle_t": axle,
                "axle_count": n, "axle_spacings_m": spacings, "indivisible": body.get("indivisible") is True,
