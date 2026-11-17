@@ -5758,6 +5758,28 @@ def _best_table(d):
     return _staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d), BEST_SCOPE)
 
 
+#: 17 Nov 2026 (frontier check, Idea 2; John: F3 "yes"): while the table is NOT held (the minutes after any write, until
+#: the warm-up has built it again) a card works out its OWN route and shows it, instead of waiting for every route. On
+#: live one route cost 5.6 to 6.8 s against 29 to 37 s for all 50. ONE slot: the route last asked for, kept until the
+#: next write or the next route, so opening many routes cannot push the Dashboard's reads out of the store.
+BEST_ONE = STAFF_CACHE + "route-options/best-one|staff"
+
+
+def _best_table_held(d):
+    """Today's table if it is held now (read_cache.peek builds nothing), else None."""
+    import datetime as _dt
+    return read_cache.peek(_staff_name("route-options/best", {"day": d.isoformat()}, BEST_SCOPE),
+                           _dt.date.today().isoformat())
+
+
+def _best_one(route_id, d):
+    """One route's answer worked out on its own read of the rule (route_best.card_answer), in the card's shape; None
+    for a route that is not here. Never stale: kept only until the next write, like every kept read."""
+    import route_best
+    return read_cache.cached(BEST_ONE, (d.isoformat(), route_id),
+                             lambda: route_best.card_answer(route_id, route_best.Context(day=d)))
+
+
 def _warm_best():
     """Today's table, as the card's read asks for it. Registered LAST: the Dashboard's and the public map's reads first."""
     import datetime as _dt
@@ -5790,14 +5812,21 @@ def route_best_option(route_id: str):
     """
     16 Nov 2026 (step 1b, John's yes to the third draft: notes route-best-option-mockup-1116): ONE route's best-option
     answer for today, for the card on Data -> Routes. Q8: one kept build of the rule over every route (the same build
-    and key as the admin table, per caller's scope), sliced to this route, so only the first card after a write is slow.
+    and key as the admin table), sliced to this route. 17 Nov 2026 (frontier check, Idea 2): while that build is not
+    held the route is worked out on its own (_best_one), so the first card after a write waits for one route, not all.
     Read only, no outside call; any staff login (a reviewer session is refused by _require_access).
     Returns {day, checks, thresholds, route} where route is route_best.evaluate()'s dict, or 404.
     """
     acc = _require_access()        # the wall: a reviewer session or no sign-in is refused; the table is the same for all
     import datetime as _dt
     d = _dt.date.today()
-    t = _best_table(d)          # 17 Nov 2026: one copy for every staff caller, warmed (BEST_SCOPE)
+    t = _best_table_held(d)     # 17 Nov 2026: one copy for every staff caller, warmed (BEST_SCOPE); never built here
+    if t is None:
+        # 17 Nov 2026 (frontier check, Idea 2): not held, so this route is answered first; the warm-up builds the rest
+        one = _best_one(route_id, d)
+        if one is None:
+            raise HTTPException(404, "no such route")
+        return one
     r = next((x for x in (t.get("routes") or []) if x.get("route") == route_id), None)
     if r is None:
         raise HTTPException(404, "no such route")

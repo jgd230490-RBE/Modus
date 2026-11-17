@@ -77,7 +77,8 @@ ok("⭐ SRC: the 'i' box: at most 30 words and a user-guide link (R1)",
   ok("⭐ SRC: the staff read: after _gate_arrivals_build, any staff login (_require_access), one kept build of the rule over every route (Q8), 404 for an unknown route",
      ga > 0 && ep > ga && body.includes("acc = _require_access()")
      // NARROWED 17 Nov 2026 (claude/warm-best-option): the build is the shared helper's, one copy for every staff caller
-     && body.includes('t = _best_table(d)')
+     // NARROWED 17 Nov 2026 (claude/best-option-one-first): the read takes the HELD table, else works out its own route
+     && body.includes('t = _best_table_held(d)') && body.includes('one = _best_one(route_id, d)')
      && mainPy.includes('return _staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d), BEST_SCOPE)')
      && body.includes('raise HTTPException(404, "no such route")'));
 }
