@@ -256,6 +256,32 @@ ok("🔴 the sixth call from one address is refused, others are not", allowed ==
    and L.hit("198.51.100.2"))
 ok("...with a sentence that names no count", "Too many" in L.say and not re.search(r"\d", L.say.replace("an hour", "")))
 L.reset()
+# 17 Nov 2026 (the live check's F1): a refused try does not use up the five; only a kept request does
+ok("🔴 the sentence says 'requests', not 'checks'", L.say == "Too many requests from this connection. Please try again in an hour." == rc.TRIES.say)
+ok("every call is counted on a wider limit, 30 an hour", (rc.TRIES.most, rc.TRIES.window_s) == (30, 3600) and rc.TRIES is not L)
+L.reset()
+_slips = 0
+for _i in range(8):
+    try:
+        rc.handle(dict(GOOD, email="nobody"), "198.51.100.44")
+    except Exception as _e:  # noqa: BLE001
+        _slips += getattr(_e, "status_code", 0) == 400
+_kept = [rc.handle(dict(GOOD, email=f"k{_i}@example.org"), "198.51.100.44")["request_id"] for _i in range(5)]
+try:
+    rc.handle(dict(GOOD, email="k6@example.org"), "198.51.100.44")
+    _sixth = None
+except Exception as _e:  # noqa: BLE001
+    _sixth = (getattr(_e, "status_code", None), getattr(_e, "detail", {}).get("say"))
+ok("🔴 eight mistyped tries are each the box's own sentence and use up none of the five", _slips == 8 and all(_kept), f"{_slips} {_kept}")
+ok("🔴 ...the sixth KEPT request in the hour is refused with the requests sentence", _sixth == (429, L.say), str(_sixth))
+try:
+    _trap = rc.handle(dict(GOOD, website="x"), "198.51.100.45")
+except Exception as _e:  # noqa: BLE001
+    _trap = _e
+ok("a machine's request (the trap box) is told it worked and nothing is kept", _trap == {"ok": True, "request_id": None})
+for _rid in _kept:
+    tools_leads.db.execute("DELETE FROM tool_leads WHERE id = ?", (_rid,))
+L.reset()
 
 # =========================================================================== #
 #  5. the email to John                                                        #
@@ -332,8 +358,9 @@ ok("the table is made at start-up, after demo_requests and before the users", 0 
    < MAIN.find("db.init_tool_leads_db()") < MAIN.find("db.init_users_db()"))
 ok("the open call: guarded first, listed in OPEN_ROUTES, the email as a background task, no audit",
    '@app.post("/api/tools/route-check/request")' in MAIN
-   and "tools_public.guard(request, tools_route_check.LIMIT)" in MAIN
-   and MAIN.index("tools_public.guard(request, tools_route_check.LIMIT)") < MAIN.index("await request.json()", MAIN.index('"/api/tools/route-check/request"'))
+   # REVERSED 17 Nov 2026 (F1): the first line guards with TRIES (every call); LIMIT counts kept requests in handle()
+   and "tools_public.guard(request, tools_route_check.TRIES)" in MAIN and "tools_public.guard(request, tools_route_check.LIMIT)" not in MAIN
+   and MAIN.index("tools_public.guard(request, tools_route_check.TRIES)") < MAIN.index("await request.json()", MAIN.index('"/api/tools/route-check/request"'))
    and "background=_TRCTask(tools_route_check.deliver, rid)" in MAIN
    and "/api/tools/route-check/request" in tools_public.OPEN_ROUTES)
 ok("...and it never reads the visitor's session or a cookie", "access.current()" not in

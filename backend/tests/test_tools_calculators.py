@@ -89,7 +89,7 @@ ok("⭐ ...£185.40 a load", S["detail"] == "£185.40 a load" and S["rate_with"]
 keys = tc.lorry_keys()
 ok("the pickers hold the six shipped planning lorries", len(keys) == 6 and FLAT in keys, str(keys))
 n_checked = 0
-for key, tonnes, days, trips in itertools.product(keys, (1, 27.9, 28, 28.01, 500, 2500, 61234.5), (1, 5, 22, 260), (0.5, 1, 2, 6, 11.5)):
+for key, tonnes, days, trips in itertools.product(keys, (1, 27.9, 28, 28.01, 500, 2500, 61234.5), (1, 5, 22, 260), (1, 2, 6, 11.5)):     # NARROWED 17 Nov: under one trip a day is refused now
     r = tc.lorries_needed(tonnes, key, days, trips)
     payload = derived.payload_for(key, F)[0]
     loads = int(math.ceil(round(tonnes / payload, 9)))
@@ -104,8 +104,25 @@ ok("loads round UP (28.01 t on a 28 t lorry is 2 loads) and never 3.000000000000
    and tc.lorries_needed(84, FLAT, 22, 6)["loads"] == 3)
 ok("a lorry that cannot do the loads in the days needs more lorries (the fleet rule)", tc.lorries_needed(2500, FLAT, 5, 2)["lorries"] == 9,
    str(tc.lorries_needed(2500, FLAT, 5, 2)))
-ok("one load is 'load', one lorry is 'lorry'", tc.lorries_needed(10, FLAT, 20, 6)["detail"] == "1 load · about 1 load a day"
+# REVERSED 17 Nov 2026 (the live check's F9): fewer loads than days gives no "a day" figure
+ok("one load is 'load', one lorry is 'lorry', and one load over 20 days has no 'a day'", tc.lorries_needed(10, FLAT, 20, 6)["detail"] == "1 load"
    and tc.lorries_needed(10, FLAT, 20, 6)["answer"] == "1 lorry")
+ok("🔴 fewer loads than days: the loads alone; as many loads as days or more: the 'a day' figure",
+   tc.lorries_needed(280, FLAT, 22, 6)["detail"] == "10 loads" and tc.lorries_needed(28 * 22, FLAT, 22, 6)["detail"] == "22 loads · about 1 load a day")
+
+
+def _refusal17(fn, *a):
+    try:
+        fn(*a)
+    except Exception as e:  # noqa: BLE001
+        return (getattr(e, "status_code", None), getattr(e, "detail", {}).get("say"))
+    return None
+
+
+# 17 Nov 2026 (F4): 0.5 round trips a day answered 5 lorries for 90 loads in 22 days (the sum needs 9)
+ok("🔴 under one round trip a day is refused in a sentence, one or more is worked", _refusal17(tc.lorries_needed, 2500, FLAT, 22, 0.5)
+   == (400, "Type 1 or more round trips a day.") == _refusal17(tc.lorries_needed, 2500, FLAT, 22, "0.99")
+   and tc.lorries_needed(2500, FLAT, 22, 1)["lorries"] == 5)
 ok("many lorries read 'lorries'", tc.lorries_needed(25000, FLAT, 5, 1)["answer"].endswith("lorries"))
 
 n_checked = 0

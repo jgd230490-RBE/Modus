@@ -151,6 +151,8 @@ def lorries_needed(tonnes, lorry, working_days, round_trips):
     rt = _pos(round_trips, MAX_TRIPS)
     if rt is None:
         tools_public.refuse(400, "Type the round trips a lorry makes in a day.")
+    if rt < 1:          # 17 Nov 2026: carbon.lorries_for counts under one trip a day as one, so 0.5 answered too few lorries
+        tools_public.refuse(400, "Type 1 or more round trips a day.")
     payload = payload_t(key)
     loads = int(math.ceil(round(t / payload, 9)))
     lorries = carbon.lorries_for(loads, rt, days)
@@ -158,8 +160,10 @@ def lorries_needed(tonnes, lorry, working_days, round_trips):
     return {"loads": loads, "lorries": lorries, "per_day": per_day, "payload_t": payload, "tonnes": t, "lorry": key,
             "working_days": days, "round_trips": rt,
             "answer": f"{lorries} {'lorry' if lorries == 1 else 'lorries'}",
-            "detail": f"{grp(loads)} {'load' if loads == 1 else 'loads'} · about {per_day} "
-                      f"{'load' if per_day == 1 else 'loads'} a day"}
+            # 17 Nov 2026: with fewer loads than days there is no "a day" figure worth giving (1 load over 22 days)
+            "detail": (f"{grp(loads)} {'load' if loads == 1 else 'loads'}" if loads < days else
+                       f"{grp(loads)} {'load' if loads == 1 else 'loads'} · about {per_day} "
+                       f"{'load' if per_day == 1 else 'loads'} a day")}
 
 
 def haul_carbon(loads, miles, lorry, way_back=WAY_BACK_DEFAULT):
