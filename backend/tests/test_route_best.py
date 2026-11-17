@@ -1028,14 +1028,25 @@ _b1 = read_cache.STATS["builds"]
 _c2 = _as(_TEAM, lambda: main.route_best_option("R1"))
 _c3 = _as(_PLAN, lambda: main.route_best_option("R2"))
 _b2 = read_cache.STATS["builds"]
-ok("⭐ 13. the card's read: an admin's first card builds the table once; a team's and a planner's cards build nothing more",
-   _b1 - _b0 == 1 and _b2 == _b1 and _c1["route"]["route"] == "R1" and _c2["route"] == _c1["route"]
-   and _c3["route"]["route"] == "R2", f"builds {_b1 - _b0} then {_b2 - _b1}")
+# REVERSED 17 Nov 2026 (claude/best-option-one-first; the frontier check's Idea 2, John: "All as recommended"): with no
+# table held a card no longer builds the table: it works out its OWN route (one build), a second caller of the same
+# route builds nothing, another route is one more build, and the table is still not held. It read "an admin's first
+# card builds the table once; a team's and a planner's cards build nothing more".
+ok("⭐ 13. the card's read with no table held: the first card works out its own route once; a team's card for the same "
+   "route builds nothing; a planner's other route is one more build; no table is built",
+   _b1 - _b0 == 1 and _b2 - _b1 == 1 and _c1["route"]["route"] == "R1" and _c2["route"] == _c1["route"]
+   and _c3["route"]["route"] == "R2" and getattr(main, "_best_table_held", lambda d: "?")(datetime.date.today()) is None,
+   f"builds {_b1 - _b0} then {_b2 - _b1}")
 _today = datetime.date.today().isoformat()
 _t_today = main.route_options_best(day=None, token="best-admin-token")
-ok("13. the admin table for today is the same kept copy (no build); another day is its own",
-   read_cache.STATS["builds"] == _b2 and _t_today["day"] == _today
-   and [r["route"] for r in _t_today["routes"]] == ["R1", "R2", "R3", "R4", "R5"])
+# NARROWED 17 Nov 2026 (claude/best-option-one-first): the cards above built no table, so the admin read builds it (one
+# build); the card that follows is served from it and builds nothing (it read "the same kept copy (no build)")
+_b2a = read_cache.STATS["builds"]
+_c1t = _as(_ADMIN, lambda: main.route_best_option("R1"))
+ok("13. the admin table for today is one build, held for every staff caller; the card after it builds nothing",
+   _b2a == _b2 + 1 and read_cache.STATS["builds"] == _b2a and _t_today["day"] == _today
+   and [r["route"] for r in _t_today["routes"]] == ["R1", "R2", "R3", "R4", "R5"]
+   and getattr(main, "_best_table_held", lambda d: "?")(datetime.date.today()) is not None and _c1t["route"]["route"] == "R1")
 try:
     main.route_best_option("R1")
     _open = True
@@ -1069,6 +1080,61 @@ _b5 = read_cache.STATS["builds"]
 _as(_ADMIN, lambda: main.route_best_option("R1"))
 ok("13. never stale: after a write the next card builds it again", read_cache.STATS["builds"] == _b5 + 1
    and db.data_version() != _db_v)
+
+# =========================================================================== #
+#  14. The card answers its own route first (17 Nov 2026, the frontier check)  #
+# =========================================================================== #
+# John, 17 Nov 2026: "All as recommended" (F3). After any write the first card waited for all the routes (29 to 37 s on
+# live); one route on its own read cost 5.6 to 6.8 s there. While the table is not held, the card's read works out its
+# own route and keeps it in ONE slot; the warm-up builds the table, and the card reads that once it is held.
+read_cache.clear()
+_tab14 = main._best_table(datetime.date.today())
+_by14 = {r["route"]: r for r in _tab14["routes"]}
+read_cache.clear()
+_one14 = {rid: _as(_ADMIN, lambda rid=rid: main.route_best_option(rid)) for rid in ("R1", "R2", "R3", "R4", "R5")}
+_ONE14 = getattr(main, "BEST_ONE", "?")             # a plain failure, not a crash, against a main.py without the slot
+_held14 = getattr(main, "_best_table_held", lambda d: "?")
+ok("⭐ 14. a route worked out on its own is the table's own answer for it, for every route (answer, option, why, counts)",
+   all(_one14[rid]["route"] == _by14[rid] for rid in _by14)
+   and all(_one14[rid]["checks"] == _tab14["checks"] and _one14[rid]["thresholds"] == _tab14["thresholds"]
+           and _one14[rid]["day"] == _tab14["day"] for rid in _by14),
+   str([rid for rid in _by14 if _one14[rid]["route"] != _by14[rid]]))
+ok("⭐ 14. ONE slot: five routes asked for leave one kept entry, the last, and no table",
+   sum(1 for (n, _t) in read_cache._STORE if n == _ONE14) == 1
+   and read_cache.peek(_ONE14, (datetime.date.today().isoformat(), "R5")) is not None
+   and read_cache.peek(_ONE14, (datetime.date.today().isoformat(), "R1")) is None
+   and _held14(datetime.date.today()) is None)
+_b14 = read_cache.STATS["builds"]
+try:
+    _as(_ADMIN, lambda: main.route_best_option("NOPE"))
+    _nf14 = None
+except _HTTPException as e:
+    _nf14 = e.status_code
+ok("14. an unknown route with no table held is a 404", _nf14 == 404)
+_b14b = read_cache.STATS["builds"]
+try:
+    main.route_best_option("R1")
+    _open14 = True
+except _HTTPException as e:
+    _open14 = e.status_code != 401
+ok("⭐ 14. the wall first: with no sign-in the read is refused and nothing is worked out",
+   _open14 is False and read_cache.STATS["builds"] == _b14b)
+read_cache.WARMERS["best_option"]()
+_b14c = read_cache.STATS["builds"]
+_c14 = _as(_PLAN, lambda: main.route_best_option("R3"))
+ok("⭐ 14. once the warm-up has built the table the card reads the table (no build), whatever the slot holds",
+   read_cache.STATS["builds"] == _b14c and _c14["route"] == _by14["R3"]
+   and _held14(datetime.date.today()) is not None)
+db.bump_data_version()
+_b14d = read_cache.STATS["builds"]
+_c14w = _as(_ADMIN, lambda: main.route_best_option("R5"))
+ok("14. after a write neither the table nor the slot is served: the card works its route out again (one build, no table)",
+   read_cache.STATS["builds"] == _b14d + 1 and _c14w["route"]["route"] == "R5"
+   and _held14(datetime.date.today()) is None)
+_ep14 = _m.split('@app.get("/api/routes/{route_id}/best-option")')[1].split("\n@app")[0]
+ok("14. source: the card's read never builds the table itself (peek, then its own route), and the admin read still does",
+   "_best_table_held(d)" in _ep14 and "_best_one(route_id, d)" in _ep14 and "_best_table(d)" not in _ep14
+   and "return _best_table(d)" in _f and "read_cache.peek(" in _m.split("def _best_table_held(")[1].split("\ndef ")[0])
 
 print()
 for f_ in FAIL:
