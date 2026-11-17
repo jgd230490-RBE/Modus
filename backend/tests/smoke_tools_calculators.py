@@ -58,6 +58,7 @@ db._SQLITE_PATH = os.path.join(TMP, "toolcalc.db")
 import main  # noqa: E402
 import security_headers  # noqa: E402
 import tools_calculators as tc  # noqa: E402
+import tools_public  # noqa: E402
 from portable import pdf_text  # noqa: E402
 
 PASS = 0
@@ -161,12 +162,17 @@ with TestClient(main.app, base_url=BASE) as anon:
     ok("3. ...one page, the answer, 'A planning estimate', no organisation, no demo notice", txt.count("\f") == 1 and "1.16 t CO₂e" in txt
        and "A planning estimate" in txt and "DEMO" not in txt and "Fictional" not in txt and "Wolds" not in txt, txt[:300])
     ok("3. ...no-store, every header, no cookie", "no-store" in r.headers.get("cache-control", "") and clean(r))
+    kept = db.query("SELECT * FROM tool_leads")
+    ok("3. ⭐ ...and one row is kept: 'calculator-pdf', the tick 0, the address only as a hash", len(kept) == 1 and kept[0]["kind"] == "calculator-pdf"
+       and kept[0]["news"] == 0 and kept[0]["email"] == "name@example.co.uk" and "203.0.113.77" not in str(kept[0])
+       and kept[0]["ip_hash"] == tools_public.address_hash("203.0.113.77"), str(kept))
     r = post(anon, PDF, {"which": "carbon", "figures": GOOD["carbon"], "email": "nobody"})
     ok("3. 🔴 a bad email is a sentence", r.status_code == 400 and r.json() == {"detail": {"say": "That email does not look right. Check it and try again."}}, r.text[:200])
     r = post(anon, PDF, {"which": "carbon", "figures": GOOD["carbon"], "email": ""})
     ok("3. 🔴 no email is a sentence", r.status_code == 400 and r.json()["detail"]["say"] == "Type your email to download the PDF.", r.text[:200])
     r = post(anon, PDF, {"which": "carbon", "figures": GOOD["carbon"], "email": "a@b.co", "website": "http://spam.example"})
     ok("3. 🔴 the trap box filled: answered as if it worked, no file", r.status_code == 200 and r.json() == {"ok": True}, r.text[:200])
+    ok("3. 🔴 ...and nothing kept for it, nor for the refusals before it", db.query("SELECT COUNT(*) AS n FROM tool_leads")[0]["n"] == 1)
     for which in ("lorries", "surcharge"):
         r = post(anon, PDF, {"which": which, "figures": GOOD[which], "email": "name@example.co.uk"})
         ok(f"3. the {which} PDF too", r.status_code == 200 and base64.b64decode(r.json()["pdf"])[:5] == b"%PDF-")

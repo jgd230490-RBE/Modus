@@ -51,8 +51,7 @@ ROOT = Path(__file__).resolve().parent.parent
 TOOLS_DIR = ROOT / "frontend" / "tools"
 
 #: the shared files every tool page loads, by their exact names, and their types
-SHARED_FILES = {"tools.css": "text/css; charset=utf-8", "tools.js": "text/javascript; charset=utf-8",
-                "calculators.js": "text/javascript; charset=utf-8"}
+SHARED_FILES = {"tools.css": "text/css; charset=utf-8", "tools.js": "text/javascript; charset=utf-8"}
 #: a tool page's name in its address: /tools/calculators, /tools/abnormal-load, /tools/route-check
 _PAGE_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 #: never served as a page, whatever is in the folder (the index lives on the landing site)
@@ -63,7 +62,7 @@ LANDING_DEFAULT = "https://wayscope.co.uk"
 
 #: every open /api/tools route, by its path as FastAPI registers it. A tool session adds its own here, and the
 #: reviewer-wall sweep fails on any /api/tools route missing from this list.
-OPEN_ROUTES = ("/api/tools/calculators/sum", "/api/tools/calculators/pdf")
+OPEN_ROUTES = ("/api/tools/route-check/request", "/api/tools/calculators/sum", "/api/tools/calculators/pdf")
 
 #: the hidden box only a machine fills in (the landing form's trap, demo_request.HONEYPOT)
 TRAP = "website"
@@ -78,6 +77,10 @@ def page_file(name):
     if name in SHARED_FILES:
         p = TOOLS_DIR / name
         return (p, SHARED_FILES[name]) if p.is_file() else None
+    if name.endswith(".js") and _PAGE_NAME.match(name[:-3]) and name[:-3] not in NOT_PAGES:
+        # a page's own script, /tools/<page>.js, served only beside an existing page of that name (claude/tools-route-check-request)
+        p = TOOLS_DIR / name
+        return (p, "text/javascript; charset=utf-8") if p.is_file() and (TOOLS_DIR / (name[:-3] + ".html")).is_file() else None
     if not _PAGE_NAME.match(name) or name in NOT_PAGES:
         return None
     p = TOOLS_DIR / (name + ".html")

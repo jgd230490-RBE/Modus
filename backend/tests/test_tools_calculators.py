@@ -12,6 +12,7 @@ The app's side (the real routes, the gate on, the limit, no audit row) is smoke_
 """
 import io
 import itertools
+import json
 import math
 import os
 import re
@@ -27,6 +28,11 @@ ROOT = BACKEND.parent
 sys.path.insert(0, str(BACKEND))
 sys.path.insert(0, str(HERE))
 
+import tempfile  # noqa: E402
+TMP = tempfile.mkdtemp(prefix="wayscope_calc_")
+import db  # noqa: E402
+db._SQLITE_PATH = os.path.join(TMP, "scratch.db")
+from portable import remove_scratch_db  # noqa: E402
 import carbon  # noqa: E402
 import costing  # noqa: E402
 import derived  # noqa: E402
@@ -256,31 +262,36 @@ ok("🔴 an unknown calculator is refused", r == (400, "Pick one of the three ca
 r = refusal(tc.pdf_answer, dict(which="lorries", figures=dict(FIG["lorries"], tonnes=""), email="a@b.co"))
 ok("🔴 figures that do not work are refused before anything is kept", r == (400, "Type the tonnes to move."), str(r))
 
-sys.modules.pop("tools_leads", None)
-real_import = tc._leads
-ok("with no store on main the keep is skipped and says so (kept False), the file still downloads",
-   (lambda a: a["ok"] and a["kept"] is False and a["filename"] == "wayscope-lorries.pdf")(
-       tc.pdf_answer(dict(which="lorries", figures=FIG["lorries"], email="name@example.co.uk"))))
-KEPT = []
-stub = types.ModuleType("tools_leads")
-stub.email_ok = lambda e: "@" in e and "." in e.split("@")[-1]
-stub.keep = lambda kind, email, name="", company="", news=False, details=None, ip="": KEPT.append((kind, email, news, details, ip)) or 7
-sys.modules["tools_leads"] = stub
-try:
-    a = tc.pdf_answer(dict(which="carbon", figures=FIG["carbon"], email=" Name@Example.co.uk ", news=True), ip="203.0.113.9")
-    ok("⭐ with the store, the address is kept as a 'calculator-pdf' with the news tick and which calculator, and the ip passed through",
-       a["kept"] is True and KEPT == [("calculator-pdf", "Name@Example.co.uk", True, {"calculator": "carbon"}, "203.0.113.9")], str(KEPT))
-    a = tc.pdf_answer(dict(which="surcharge", figures=FIG["surcharge"], email="a@b.co"))
-    ok("the news tick unticked (or missing) is kept as False", KEPT[-1][2] is False and KEPT[-1][3] == {"calculator": "surcharge"}, str(KEPT[-1]))
-    import base64
-    ok("the answer carries the file: base64 of a PDF, named for its calculator", base64.b64decode(a["pdf"])[:5] == b"%PDF-"
-       and a["filename"] == "wayscope-surcharge.pdf")
-    ok("an email the store does not accept is refused", refusal(tc.pdf_answer, dict(which="lorries", figures=FIG["lorries"], email="a@b")) is not None)
-    n = len(KEPT)
-    refusal(tc.pdf_answer, dict(which="lorries", figures=dict(FIG["lorries"], tonnes=""), email="a@b.co"))
-    ok("🔴 nothing is kept when the figures do not work", len(KEPT) == n)
-finally:
-    sys.modules.pop("tools_leads", None)
+import base64  # noqa: E402
+import tools_leads  # noqa: E402
+remove_scratch_db(db, TMP)
+db.init_tool_leads_db()
+
+
+def rows():
+    return db.query("SELECT * FROM tool_leads ORDER BY created_at")
+
+
+a = tc.pdf_answer(dict(which="carbon", figures=FIG["carbon"], email=" Name@Example.co.uk ", news=True), ip="203.0.113.9")
+r1 = rows()
+ok("⭐ a good email: the file comes back and ONE row is kept as 'calculator-pdf'", a["ok"] and a["kept"] is True and len(r1) == 1 and r1[0]["kind"] == "calculator-pdf"
+   and base64.b64decode(a["pdf"])[:5] == b"%PDF-" and a["filename"] == "wayscope-carbon.pdf", str(r1))
+ok("...the tick is 1, the calculator is in the details, the email is the store's (trimmed, lower case)", r1[0]["news"] == 1
+   and json.loads(r1[0]["details"]) == {"calculator": "carbon"} and r1[0]["email"] == "name@example.co.uk", str(r1[0]))
+ok("🔴 ...the address is kept only as a hash", "203.0.113.9" not in json.dumps(r1[0], default=str) and r1[0]["ip_hash"] == tools_public.address_hash("203.0.113.9"))
+tc.pdf_answer(dict(which="surcharge", figures=FIG["surcharge"], email="a@b.co"))
+r2 = rows()
+ok("the tick unticked (or missing) is kept as 0, with no address hash when none was passed", len(r2) == 2 and sorted(x["news"] for x in r2) == [0, 1]
+   and [x for x in r2 if x["news"] == 0][0]["ip_hash"] == "")
+n = len(rows())
+for label, body in (("no email", dict(which="lorries", figures=FIG["lorries"], email="")),
+                    ("a bad email", dict(which="lorries", figures=FIG["lorries"], email="a@b")),
+                    ("figures that do not work", dict(which="lorries", figures=dict(FIG["lorries"], tonnes=""), email="a@b.co")),
+                    ("an unknown calculator", dict(which="nope", figures={}, email="a@b.co"))):
+    ok(f"🔴 {label}: refused, nothing kept", refusal(tc.pdf_answer, body) is not None and len(rows()) == n)
+ok("the page's email check is the store's own", tc.email_ok("a@b.co") == tools_leads.email_ok("a@b.co") and tc.email_ok("a@b") == tools_leads.email_ok("a@b") is False)
+ok("🔴 the trap box is checked in the route before anything is kept (main.py)", read("backend/main.py").index("tools_public.trapped(body)",
+   read("backend/main.py").index("async def tools_calc_pdf")) < read("backend/main.py").index("tools_calculators.pdf_answer("))
 
 # =========================================================================== #
 #  7. the page against card 2                                                  #

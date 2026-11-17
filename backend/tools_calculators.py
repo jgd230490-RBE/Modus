@@ -24,7 +24,7 @@ the PDF request and worked out again here, so the file can never disagree with w
 
 An email is asked for with the PDF; the file downloads at once, nothing is sent by email and nothing is checked by email
 (John's answers Q2 and R4). The address is kept through tools_leads.keep("calculator-pdf", …) (the route-check request
-branch owns that one store); until that module is on main the keep is skipped and `kept` says so.
+branch owns that one store) once the figures have worked and the file is built; a refused request keeps nothing.
 """
 import base64
 import datetime
@@ -32,6 +32,7 @@ import io
 import math
 import re
 
+import tools_leads
 import tools_public
 
 #: a sum is pressed often (a figure typed, a lorry picked): 300 an hour per address, about five a minute, which is far more
@@ -335,33 +336,14 @@ def build_pdf(which, figures, on=None):
 
 # --------------------------------------------------------------------------- the email kept with a PDF
 
-def _leads():
-    try:
-        import tools_leads
-        return tools_leads
-    except ImportError:
-        return None
-
-
-_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$")
-
-
 def email_ok(email):
-    e = str(email or "").strip()
-    if not e or len(e) > 254:
-        return False
-    tl = _leads()
-    if tl is not None and hasattr(tl, "email_ok"):
-        return bool(tl.email_ok(e))
-    return bool(_EMAIL.match(e))
+    """The store's own shape check (tools_leads.email_ok), so the page and the store never disagree."""
+    return tools_leads.email_ok(email)
 
 
 def keep_email(which, email, news, ip=""):
-    """Keep the address with this download in the one store. True when kept; False while that store is not on main."""
-    tl = _leads()
-    if tl is None:
-        return False
-    tl.keep("calculator-pdf", str(email).strip(), news=bool(news), details={"calculator": which}, ip=ip)
+    """Keep the address with this download in the one store (tools_leads, owned by the route check request branch)."""
+    tools_leads.keep("calculator-pdf", str(email).strip(), news=bool(news), details={"calculator": which}, ip=ip)
     return True
 
 

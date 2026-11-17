@@ -384,7 +384,7 @@ def _run(sql, params, fetch):
 # reports would otherwise make every heavy read rebuild); the concern figures are read fresh.
 NO_DATA_TABLES = frozenset({"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users",
                             "demo_requests", "clp_notes", "clp_review_groups", "clp_reviews",
-                            "site_layout_pictures", "concerns"})
+                            "site_layout_pictures", "concerns", "tool_leads"})
 _DATA_VERSION = [0]
 _WRITE_TABLE_RE = None
 
@@ -1274,6 +1274,35 @@ def init_demo_requests_db():
             )
         """)
         cur.execute("CREATE INDEX IF NOT EXISTS ix_demo_requests_created ON demo_requests (created_at)")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def init_tool_leads_db():
+    """
+    16 Nov 2026 (claude/tools-route-check-request) — the public tools' ONE store for a person's details (tools_leads.py).
+    Untenanted like demo_requests: a lead belongs to the company running the deployment, not to a tenant, and a package
+    import never touches it. The address is kept only as a salted hash. `news` is 0 / 1; `details` is JSON text.
+    """
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS tool_leads (
+                id          TEXT PRIMARY KEY,
+                kind        TEXT NOT NULL,
+                created_at  TEXT NOT NULL,
+                email       TEXT NOT NULL,
+                name        TEXT,
+                company     TEXT,
+                news        INTEGER DEFAULT 0,
+                details     TEXT,
+                ip_hash     TEXT,
+                status      TEXT
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS ix_tool_leads_created ON tool_leads (created_at)")
         conn.commit()
     finally:
         conn.close()

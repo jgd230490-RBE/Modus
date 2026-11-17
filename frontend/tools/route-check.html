@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Route check · Wayscope tools</title>
+<meta name="description" content="Which road should the lorries take? Ask for a route check by email.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tools/tools.css">
+</head>
+<body>
+<header class="toolbar"><div class="tw">
+  <a class="brand" href="https://wayscope.co.uk/"><img src="/brand/logo-header-on-dark.svg" alt="Wayscope" width="116" height="22"></a>
+  <nav class="links" aria-label="Site"><a class="on" href="https://wayscope.co.uk/tools">Tools</a><a class="btn btn-orange sm" href="https://wayscope.co.uk/#demo">Request a demo</a></nav>
+</div></header>
+<main class="tw">
+  <div class="tp">
+    <div class="pitch">
+      <p class="eyebrow">Route check</p>
+      <h1>Which road should the lorries take?</h1>
+      <p>Tell us where the load starts and ends and the lorry. We compare the roads a lorry of that size can take and send you the report.</p>
+      <ul>
+        <li>Collisions recorded on each road, 2021 to 2025</li>
+        <li>Left turns, cycle routes, schools and hospitals passed</li>
+        <li>Lorry limits</li>
+        <li>Time, busy hours and carbon for a round trip</li>
+        <li>A summary page for your route risk assessment</li>
+      </ul>
+      <span class="cr ask">By request</span>
+      <p class="fine2">England only for now. A planning estimate. The planner decides.</p>
+    </div>
+    <div class="work">
+      <div class="topline"><h2>Ask for a route check</h2></div>
+      <form id="rc-form" action="#" method="post" novalidate>
+        <div class="form">
+          <label class="f w">From<input type="text" name="from" maxlength="200" autocomplete="off" required></label>
+          <label class="f w">To<input type="text" name="to" maxlength="200" autocomplete="off" required></label>
+          <label class="f">Lorry<select name="lorry" required>
+          <option value=""></option>
+          <option>Rigid 8-wheeler (32t)</option>
+          <option>Rigid 6-wheeler (26t)</option>
+          <option>Artic Tipper (44t)</option>
+          <option>Concrete mixer 8 m³ (32t)</option>
+          <option>Concrete mixer 6 m³ (26t)</option>
+          <option>Artic Flatbed (44t)</option>
+          </select></label>
+          <label class="f">Loads, if you know them<input type="text" name="loads" inputmode="numeric" maxlength="6" autocomplete="off"></label>
+          <label class="f">Your name<input type="text" name="name" maxlength="120" autocomplete="name" required></label>
+          <label class="f">Email<input type="email" name="email" maxlength="200" autocomplete="email" required></label>
+          <label class="f w">Company, if you have one<input type="text" name="company" maxlength="160" autocomplete="organization"></label>
+          <label class="f w">Anything we should know<textarea name="note" maxlength="300" rows="3"></textarea></label>
+        </div>
+        <label class="trap" aria-hidden="true">Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+        <div class="runrow"><button type="submit" class="btn btn-orange">Ask for a route check</button><small>Nothing is charged now. We reply by email.</small></div>
+        <p class="say" role="status"></p>
+        <p class="fine2">We use your details to answer this request. Read the <a href="https://wayscope.co.uk/privacy.html">privacy notice</a>.</p>
+      </form>
+      <div class="res" id="rc-thanks" hidden>
+        <div class="thanks"><b>Thanks. We have your request.</b><span>We will write to you at the email you gave.</span></div>
+      </div>
+    </div>
+  </div>
+</main>
+<script src="/tools/route-check.js"></script>
+<script src="/tools/tools.js"></script>
+</body>
+</html>
