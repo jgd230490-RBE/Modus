@@ -407,6 +407,12 @@ lines = csv_text.strip().split("\n")
 ok("the CSV has a header and one line per request, newest first",
    lines[0] == ",".join(dr.CSV_COLUMNS + dr.LOGIN_COLUMNS) and lines[0].startswith(",".join(dr.CSV_COLUMNS) + ",")
    and len(lines) == 1 + db.query("SELECT COUNT(*) AS n FROM demo_requests")[0]["n"])
+# 17 Nov 2026 (claude/csv-cells-plain): what a visitor typed is written so a spreadsheet shows it and does not run it
+dr.store(dict(clean, name="=1+1", organisation="@SUM(A1)", wants="-2+3", email="formula@example.org"), "h-formula", "sent", T0)
+_csv_f = [l for l in dr.csv_export().strip().split("\n") if "formula@example.org" in l][0]
+ok("🔴 the leads CSV writes a name, organisation or note that starts with = + - or @ as plain text",
+   ",'=1+1,formula@example.org,'@SUM(A1)," in _csv_f and ",'-2+3," in _csv_f, _csv_f)
+db.execute("DELETE FROM demo_requests WHERE email = ?", ("formula@example.org",))
 _ada = users.find_by_email("ada@example.org")
 users.audit_event("demo-link", user=_ada)
 users.record_page(users.access_for(_ada), "dashboard")
