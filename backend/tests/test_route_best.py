@@ -883,6 +883,26 @@ ok("10c. ...it is the site rule that leaves it out: the same road with no except
 ok("10c. a line in use with no limit below the lorry gives an empty list", R3["in_use_limits"] == [] and R2["in_use_limits"] == [])
 ok("10c. one leg only reads 'loaded' or 'return'", RB.in_use_limits({"loaded": bent(LAT4, 0), "return": None}, ART, _ctx4)[0]["legs"]
    == "loaded")
+# 17 Nov: `short`, the limit as a person names it inside a sentence ("The diversion in use meets a 7.5 t limit below this
+# lorry."), beside `words` (unchanged)
+ok("⭐ 10c. in_use_limits: each entry carries `short` beside `words` (R4: '7.5 t limit'; R1's bridge too)",
+   [x.get("short") for x in R4l["in_use_limits"]] == ["7.5 t limit"] and R4l["in_use_limits"][0]["words"].startswith("Weight limit 7.5 t")
+   and all(x.get("short", "").endswith(" limit") for x in R1["in_use_limits"]),
+   str(R4l["in_use_limits"]) + " / " + str(R1["in_use_limits"]))
+_shorts_by_kind = {(k, v): RB.limit_short({"kind": k, "value": v}) for k, v in
+                   (("weight", 7.5), ("weight", 18), ("height", 4.2), ("height", 4.0), ("width", 2.5), ("width", 2.0),
+                    ("axle", 10), ("axle", 11.5))}
+ok("⭐ 10c. `short` for each kind the app holds, in the app's own figures (limits.fmt_value: heights and widths keep one decimal)",
+   _shorts_by_kind == {("weight", 7.5): "7.5 t limit", ("weight", 18): "18 t limit", ("height", 4.2): "4.2 m height limit",
+                       ("height", 4.0): "4.0 m height limit", ("width", 2.5): "2.5 m width limit",
+                       ("width", 2.0): "2.0 m width limit", ("axle", 10): "10 t axle limit", ("axle", 11.5): "11.5 t axle limit"},
+   str(_shorts_by_kind))
+_all_kind_shorts = list(_shorts_by_kind.values()) + [RB.limit_short({"kind": k, "value": None}) for k in ("weight", "height", "width", "axle")]
+ok("⭐ 10c. `short` carries no capital and no colon, no double space, no road name, and ends 'limit' (every kind, with and "
+   "without a value)",
+   all(s == s.lower() and ":" not in s and "  " not in s and s.endswith(" limit") and "·" not in s for s in _all_kind_shorts)
+   and set(RB._SHORT_NOUN) == set(__import__("limits").KINDS),
+   str(_all_kind_shorts))
 
 # =========================================================================== #
 #  11. Words                                                                   #
@@ -952,6 +972,7 @@ ok("⭐ 12. every row of the admin table carries trade_short and in_use_limits (
    and _rows[("R2", "Alt 2")]["trade_short"] == "Alt 2 had fewer collisions and is behind on time."
    and _rows[("R1", "Alt 2")]["trade_short"] is None
    and [x["legs"] for x in _rows[("R4", None)]["in_use_limits"]] == ["both"]
+   and [x["short"] for x in _rows[("R4", None)]["in_use_limits"]] == ["7.5 t limit"]
    and all(isinstance(r["in_use_limits"], list) for r in TAB["rows"]), str(_rows[("R4", None)].get("in_use_limits")))
 _tab_words = [w for r in TAB["routes"] for w in [r.get("why") or "", r.get("trade") or "", r.get("held_back") or ""]
               + list(r.get("sentences") or []) + [s for o in r["options"] for s in o["sentences"] + o["ruled_out"]]] \
