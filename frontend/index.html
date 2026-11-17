@@ -1110,6 +1110,19 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .bo-done{font-size:13px;margin:0 0 10px;max-width:820px;}
   .bo-state{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-size:13px;margin:6px 0;}
   .bo-heads{border-top:1px solid var(--line);}
+  .bo-tabs{margin:8px 0 8px;}
+  /* 17 Nov 2026 (route option labels): the labels on the Routes map. A small solid box in the app's look (not the
+     basemap's), 12 px, the picked one edged in the picked line's blue, a ruled-out one in grey words, never red */
+  .ol-layer{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:2;}
+  .ol-lab{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;box-sizing:border-box;min-height:26px;padding:3px 8px;border-radius:6px;
+    font-size:12px;line-height:1.3;font-weight:500;white-space:nowrap;cursor:pointer;background:var(--surface);color:var(--ink);
+    border:1px solid #A8A29E;box-shadow:0 1px 2px rgba(0,0,0,.2);}
+  .ol-lab b{font-weight:700;}
+  .ol-lab.ol-out{color:var(--muted);}
+  .ol-lab[aria-pressed="true"]{border-color:#1D4ED8;box-shadow:0 0 0 2px rgba(29,78,216,.38),0 1px 2px rgba(0,0,0,.2);}
+  html[data-theme="dark"] .ol-lab{border-color:#78716C;box-shadow:0 1px 2px rgba(0,0,0,.5);}
+  html[data-theme="dark"] .ol-lab[aria-pressed="true"]{border-color:#7AA2FF;box-shadow:0 0 0 2px rgba(122,162,255,.5);}
+  @media (max-width:1024px), (pointer:coarse){.ol-lab::after{content:"";position:absolute;left:-4px;right:-4px;top:-10px;bottom:-10px;}}
   .bo-grp{font-weight:600;font-size:13px;padding:6px 0 2px;}
   .bo-h{display:grid;grid-template-columns:116px 140px 1fr;gap:10px;align-items:start;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;}
   .bo-k{font-weight:600;} .bo-k.bo-sub{font-weight:500;padding-left:12px;}
@@ -15671,6 +15684,111 @@ function legFig(pinfo, leg, alt){
   const l = ((pinfo && pinfo.legs && pinfo.legs[leg]) || []).find(x => x.alt_index === (alt || 0));
   return (l && l.baked && l.distance_km != null) ? { km: l.distance_km, min: l.duration_hr != null ? Math.round(l.duration_hr * 60) : null } : null;
 }
+// ---- 17 Nov 2026 (route option labels; John's "Yes, as recommended" to notes route-option-labels-mockup-1117, Q1 to Q8) ----
+// While a route is open on Data → Routes, each stored line of the card's lorry carries one short label, "<name> · <words>",
+// both halves written by the best-option rule (route.lines); the page prints them and works nothing out. A label is a real
+// button; a click on it or on its line picks that option (the map's blue halo, the card's rows). Not the public map.
+var OL_H = 26, OL_STEP = 14, OL_NEAR = 10, OL_ENDS = 0.12;
+// a label's width before it is drawn (the placing needs it): measured where a canvas can, else by its length
+function olTextW(text){
+  try {
+    const cv = olTextW.cv || (olTextW.cv = document.createElement("canvas")), x = cv.getContext && cv.getContext("2d");
+    if(x){ x.font = "600 12px Inter, system-ui, sans-serif"; return Math.ceil(x.measureText(text).width) + 20; }
+  } catch(e){}
+  return Math.round(String(text).length * 6.6) + 20;
+}
+// points every `step` px along a drawn line, each with how far along it is (0 to 1)
+function olSamples(pts, step){
+  const out = []; let total = 0;
+  for(let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  if(!(total > 0)) return out;
+  let run = 0, next = 0;
+  for(let i = 1; i < pts.length; i++){
+    const a = pts[i - 1], b = pts[i], d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    while(d > 0 && next <= run + d){
+      const f = (next - run) / d;
+      out.push({ x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f, t: next / total });
+      next += step;
+    }
+    run += d;
+  }
+  return out;
+}
+// Where each label sits (card 4's four rules; rule 1, the fit, is the page's). items: [{k, pts: [[x, y]…] on screen, w, h}]
+// in reading order (the line in use first); W, H the map's size; keep: boxes no label may cover (the map's own buttons).
+// Returns {k: {x, y, stacked}}; a line with no point in view gets no label (rule 4).
+//   rule 2: on the part of its line no other line shares, nearest the middle of the map, clear of the line's two ends;
+//   rule 3: where it would overlap a label already placed it stacks under it.
+function olPlace(items, W, H, keep){
+  const out = {}, boxes = [];
+  const hit = (a, b) => a.x - a.w / 2 < b.x + b.w / 2 && b.x - b.w / 2 < a.x + a.w / 2 && a.y - a.h / 2 < b.y + b.h / 2 && b.y - b.h / 2 < a.y + a.h / 2;
+  const inView = (c) => c.x - c.w / 2 >= 4 && c.x + c.w / 2 <= W - 4 && c.y - c.h / 2 >= 4 && c.y + c.h / 2 <= H - 4
+    && !(keep || []).some(k => c.x - c.w / 2 < k.x1 && k.x0 < c.x + c.w / 2 && c.y - c.h / 2 < k.y1 && k.y0 < c.y + c.h / 2);
+  const fine = items.map(it => olSamples(it.pts, OL_STEP / 2));
+  items.forEach((it, i) => {
+    const others = [].concat(...fine.filter((x, j) => j !== i));
+    let cands = olSamples(it.pts, OL_STEP).map(q => ({ x: q.x, y: q.y, t: q.t, w: it.w, h: it.h })).filter(inView);
+    if(!cands.length) return;
+    const mid = cands.filter(c => c.t >= OL_ENDS && c.t <= 1 - OL_ENDS);
+    if(mid.length) cands = mid;
+    cands.forEach(c => {
+      c.shared = others.some(o => Math.abs(o.x - c.x) < OL_NEAR && Math.abs(o.y - c.y) < OL_NEAR && Math.hypot(o.x - c.x, o.y - c.y) < OL_NEAR);
+      c.d = Math.hypot(c.x - W / 2, c.y - H / 2);
+    });
+    cands.sort((a, b) => (a.shared - b.shared) || (a.d - b.d));
+    let pos = cands.find(c => !c.shared && !boxes.some(b => hit(c, b))), stacked = false;
+    if(!pos){
+      pos = { x: cands[0].x, y: cands[0].y, w: it.w, h: it.h };
+      for(let k = 0; k < 8; k++){
+        const b = boxes.find(x => hit(pos, x));
+        if(!b) break;
+        stacked = true;
+        pos = { x: b.x, y: b.y + (b.h + it.h) / 2 + 2, w: it.w, h: it.h };
+      }
+    }
+    boxes.push(pos);
+    out[it.k] = { x: Math.round(pos.x), y: Math.round(pos.y), stacked };
+  });
+  return out;
+}
+// F2 (Q7): the limits that rule the open route's options out. options: the rule's options that carry added_limits;
+// limits: the Lorry limits read (each feature's id is "<source>:<ext_id>:<kind>", the key an added limit carries).
+// marks: each such limit's own stored line, once; signs: ONE sign a road (the middle stretch's anchor), an unnamed road a
+// sign a stretch, with the sign's legend, the limit's own name and which options meet it.
+function olMarks(options, limits, r){
+  const byId = {};
+  ((limits && limits.features) || []).forEach(f => { if(f.properties) byId[f.properties.id] = f; });
+  const marks = [], seen = {}, groups = {};
+  (options || []).forEach(o => (o.added_limits || []).forEach(a => {
+    const id = `${a.source}:${a.ext_id}:${a.kind}`, f = byId[id];
+    if(!f) return;
+    if(!seen[id]){
+      seen[id] = 1;
+      if(f.geometry && f.geometry.type !== "Point") marks.push({ type: "Feature", properties: { id }, geometry: f.geometry });
+    }
+    const gk = `${a.short || a.kind}|${a.road || id}`;
+    const g = groups[gk] || (groups[gk] = { ids: [], names: [] });
+    if(!g.ids.includes(id)) g.ids.push(id);
+    const name = boLineName(r, o);
+    if(!g.names.includes(name)) g.names.push(name);
+  }));
+  const signs = Object.keys(groups).sort().map(gk => {
+    const g = groups[gk], id = g.ids.slice().sort()[Math.floor((g.ids.length - 1) / 2)], pr = byId[id].properties;
+    if(!Array.isArray(pr.anchor)) return null;
+    const who = g.names.length === 1 ? `${g.names[0]} meets it.`
+      : `${g.names.slice(0, -1).join(", ")} and ${g.names[g.names.length - 1]} meet it.`;
+    return { type: "Feature", geometry: { type: "Point", coordinates: pr.anchor },
+             properties: { id, sign: String(pr.icon_text || pr.value || ""), headline: pr.headline || pr.label || "Lorry limit", who } };
+  }).filter(Boolean);
+  return { marks, signs };
+}
+// signs that would touch at this zoom become one (the first kept); pts: each sign's place on screen
+function olThin(signs, pts, gap){
+  const kept = [];
+  signs.forEach((f, i) => { if(!kept.some(j => Math.hypot(pts[j][0] - pts[i][0], pts[j][1] - pts[i][1]) < gap)) kept.push(i); });
+  return kept.map(i => signs[i]);
+}
+const OL_MARK = "#334155", OL_MARK_DARK = "#E2E8F0";
 // the selected route's other options, drawn behind the chosen line
 const ALT_COLOR = "#94A3B8";
 const MAP_H = "62vh";     // map height — the right-hand column matches it and scrolls inside
@@ -16660,7 +16778,15 @@ function boShown(r){
   return os.find(o => o.chosen) || os.find(o => o.traded)
     || (r.held_back && os.find(o => JSON.stringify(o.sentences) === JSON.stringify(r.sentences))) || null;
 }
-function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoting, busyUses, frame }){
+// 17 Nov 2026 (route option labels; John's "Yes, as recommended" to notes route-option-labels-mockup-1117, Q5): the card
+// can show ANY of the route's options, not only the one the rule names. `pick` is the option picked on the map (a label,
+// a line) or in the card (a tab): its rows come from the same options[i] fields, the headline answer never changes, and
+// Make primary stays on the suggested option alone. The option's name on a tab and on its line is the rule's (lines[i].name).
+function boLineName(r, x){
+  const ln = (r.lines || []).find(l => l.alt != null && Number(l.alt) === Number(x.alt) && l.state !== "in_use");
+  return (ln && ln.name) || x.label;
+}
+function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoting, busyUses, frame, pick, onPick }){
   const allBtn = (
     <button type="button" className="bo-fold" aria-expanded={showAll ? "true" : "false"} data-bo-all="1"
       onClick={(e) => { e.stopPropagation(); onAll(); }}>All figures {showAll ? "▴" : "▾"}</button>);
@@ -16673,7 +16799,8 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
   if(!best || !best.route) return <div className="bo-acts" data-best-option="none">{allBtn}</div>;
   const r = best.route, checks = best.checks || {}, hist = (r.checks || {}).collision_history;
   const lorry = r.lorry ? vehShort(r.lorry) : null;
-  const o = boShown(r);
+  const picked = pick != null ? (r.options || []).find(x => Number(x.alt) === Number(pick)) : null;
+  const o = picked || boShown(r);
   const inUse = r.in_use || {};
   const div = ["loaded", "return"].map(l => inUse[l]).find(x => x && x.why === "diversion" && x.status === "in_use");
   const counted = (r.checks || {}).community_all_options;
@@ -16712,7 +16839,16 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
     return boRow("Limits", <RowStatus word="None added" tone="none" />, "");
   };
   const ownWayBack = o && o.return_alt != null && Number(o.return_alt) === Number(o.alt);
-  const canPromote = r.answer === "Suggested" && o && onPromote && !div;
+  const canPromote = r.answer === "Suggested" && o && o.chosen && onPromote && !div;
+  const tabs = !allOut && (r.options || []).length > 1 && onPick ? r.options : null;
+  const oOut = !!(o && (o.ruled_out || []).length);
+  const tabKey = (e) => {
+    if(e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    const all = [...e.currentTarget.querySelectorAll("[role=tab]")], i = all.indexOf(document.activeElement);
+    if(i < 0) return;
+    e.preventDefault();
+    all[(i + (e.key === "ArrowRight" ? 1 : all.length - 1)) % all.length].focus();
+  };
   const busyUse = (busyUses || []).find(u => u.status === "in_use");
   const inUseLimits = r.in_use_limits || [];
   const also = r.answer === "A trade-off" ? boAlso(r.trade_also) : "";
@@ -16732,7 +16868,19 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
           {(r.options || []).map(x => boRow(x.label, <RowStatus word="Ruled out" tone="none" />,
             Array.from(new Set(x.ruled_out || [])).map(boSay).join(" "), { key: "out-" + x.alt }))}
         </div>)}
-      {o && !allOut && (
+      {tabs && (
+        <div className="ws-tabs bo-tabs" role="tablist" aria-label="Option shown" data-bo-tabs="1" onKeyDown={tabKey}>
+          {tabs.map((x, i) => (
+            <button key={x.alt} type="button" role="tab" className="ws-tab" data-bo-tab={x.alt}
+              aria-selected={o && o.alt === x.alt ? "true" : "false"} tabIndex={(o ? o.alt === x.alt : i === 0) ? 0 : -1}
+              onClick={(e) => { e.stopPropagation(); onPick(r.lorry, x.alt); }}>{boLineName(r, x)}</button>))}
+        </div>)}
+      {o && !allOut && oOut && (
+        <div className="bo-heads" data-bo-option={o.label}>
+          {boRow(boLineName(r, o), <RowStatus word="Ruled out" tone="none" />,
+            Array.from(new Set(o.ruled_out || [])).map(boSay).join(" "), { key: "out-" + o.alt })}
+        </div>)}
+      {o && !allOut && !oOut && (
         <div className="bo-heads" data-bo-option={o.label}>
           <div className="bo-grp">People</div>
           {colRow("Collisions", colSent, "collisions")}
@@ -16769,7 +16917,7 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
 // in the order they are read either way. `onShow` is the card's "Show Alt N on map" where it differs from a table
 // row's click (Q4: the page moves up to the map).
 function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting, promoted, leg, wide, side, diversions,
-                        haulRoads, token, onHaulChanged, originId, destId, gateBlockers, onBusyChanged }){
+                        haulRoads, token, onHaulChanged, originId, destId, gateBlockers, onBusyChanged, onBest }){
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(null);
@@ -16814,6 +16962,12 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
     }
     wasPromoting.current = promoting || "";
   }, [promoting]);
+  // 17 Nov 2026 (route option labels): the page's map prints this answer's labels, so the page is told each answer
+  // (null while it is worked out, false when the read failed); the map's focused option is the card's picked one
+  useEffect(() => { if(onBest) onBest(routeId, best); }, [best]);
+  const bestR = best && best.route ? best.route : null;
+  const useAlt = bestR && bestR.in_use && bestR.in_use.loaded ? Number(bestR.in_use.loaded.alt) : 0;
+  const pick = active && bestR && active.profile === bestR.lorry && Number(active.alt_index) !== useAlt ? Number(active.alt_index) : null;
   // 5 Nov 2026 (task 0d-2): Use / Stop a busy-hours road (planners and admins); the answer is the same read as below
   const busyPost = (body, what) => {
     setBusyWorking(true); setBusyMsg(null);
@@ -16886,7 +17040,8 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
         )}
         {data && !!data.rows.length && (
           <BestOption best={best} routeId={routeId} showAll={showAll} onAll={() => setShowAll(v => !v)}
-            onFocus={onShow || onFocus} onPromote={onPromote} promoting={promoting} busyUses={busy && busy.uses} />
+            onFocus={onShow || onFocus} onPromote={onPromote} promoting={promoting} busyUses={busy && busy.uses}
+            pick={pick} onPick={onFocus} />
         )}
         {done && done.text && <p className="bo-done" role="status" data-bo-done={done.failed ? "failed" : "1"}>{done.text}</p>}
       </div>);
@@ -17155,6 +17310,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   useEffect(() => {
     const was = roWas.current; roWas.current = openRow;
     if(openRow && openRow !== was){
+      // 17 Nov 2026 (route option labels, Q6): opened by a click on its line, the page stays at the map
+      if(roQuiet.current){ roQuiet.current = false; return; }
       const el = roEl.current, h = roHead.current;
       if(h){ try { h.focus({ preventScroll: true }); } catch(e){} }
       if(el && el.scrollIntoView){
@@ -17181,7 +17338,17 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // every cached option for the selected route, and which one is currently in focus.
   // Selecting a route draws all of its options; the focused one is red, the rest grey.
   const [selGeoms, setSelGeoms] = useState(null);
-  const [activeGeom, setActiveGeom] = useState(null);   // {profile, leg, alt_index}
+  const [activeGeom, setActiveGeom] = useState(null);   // {profile, leg, alt_index, ret_alt}
+  // 17 Nov 2026 (route option labels): each route's best-option answer as its card last told the page ({id: answer}); the
+  // labels on the map ([{k, ln, x, y, lng, lat}]); and: the focus was moved by hand since the route was picked, a route
+  // was opened from the map (the page stays at the map), the route and lorry the map was last fitted to
+  const [cardBest, setCardBest] = useState({});
+  const [olLabels, setOlLabels] = useState([]);
+  const focusByHand = useRef(false), roQuiet = useRef(false), olFitFor = useRef(null), olLayer = useRef(null);
+  const olUseFC = useRef({ type: "FeatureCollection", features: [] }), olHide = useRef(null);
+  const olMarkFC = useRef({ type: "FeatureCollection", features: [] }), olSignFC = useRef({ type: "FeatureCollection", features: [] });
+  const olSignsAll = useRef([]);
+  const onCardBest = (id, b) => setCardBest(m => (m[id] === b ? m : { ...m, [id]: b }));
   const [promoting, setPromoting] = useState("");
   const [token, setToken] = useState("");
   const [bakeBusy, setBakeBusy] = useState("");   // route id currently being (re-)baked
@@ -17448,7 +17615,16 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       }
       m.setPaintProperty("node-dots", "circle-radius", E.node);
       m.setPaintProperty("node-dots", "circle-stroke-width", E.nodeStroke);
+      if(m.getLayer("ol-use-line")) m.setPaintProperty("ol-use-line", "line-width", E.route);
+      if(m.getLayer("ol-use-arrows")) m.setLayoutProperty("ol-use-arrows", "visibility", subTabRef.current === "routes" ? "visible" : "none");
     } catch(e){}
+  };
+  // 17 Nov 2026 (route option labels): while the open route's line IN USE is drawn by the ol-use layers, the three
+  // route layers give that one route up (they draw option 0, which a dated diversion is not)
+  const olRouteFilter = (m) => {
+    const base = ["!=", ["get", "failed"], true], hide = olHide.current;
+    const f = hide ? ["all", base, ["!=", ["get", "route_id"], hide]] : base;
+    ["route-casing", "route-line", "route-arrows"].forEach(l => { try { if(m.getLayer(l)) m.setFilter(l, f); } catch(e){} });
   };
 
   // add sources + layers; called on first load AND after every basemap change
@@ -17457,6 +17633,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(!m.getSource("nodes")) m.addSource("nodes", { type: "geojson", data: nodesFC.current });
     if(!m.getSource("sel")) m.addSource("sel", { type: "geojson", data: selFC.current });
     if(!m.getSource("alts")) m.addSource("alts", { type: "geojson", data: altFC.current });
+    if(!m.getSource("oluse")) m.addSource("oluse", { type: "geojson", data: olUseFC.current });
+    if(!m.getSource("olmarks")) m.addSource("olmarks", { type: "geojson", data: olMarkFC.current });
+    if(!m.getSource("olsigns")) m.addSource("olsigns", { type: "geojson", data: olSignFC.current });
     if(!m.getSource("selnode")) m.addSource("selnode", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
     if(!m.getSource("newnode")) m.addSource("newnode", { type: "geojson", data: newFC.current });
     // Phase 3 zones: the saved shapes, and the one currently being drawn
@@ -17479,6 +17658,18 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                 "icon-rotation-alignment": "map", "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 14, 1.1],
                 "icon-offset": ["interpolate", ["linear"], ["zoom"], 9, ["literal", [0, -5]], 14, ["literal", [0, -8]]] },
       paint: { "icon-color": "#ffffff", "icon-halo-color": LEG_COLOR_EXPR, "icon-halo-width": 2 } });
+    // 17 Nov 2026 (route option labels): the open route's line in use, in the same leg colours, casing and arrows
+    if(!m.getLayer("ol-use-casing")) m.addLayer({ id: "ol-use-casing", type: "line", source: "oluse",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#ffffff", "line-width": 5, "line-opacity": 0.85, "line-offset": LEG_OFFSET } });
+    if(!m.getLayer("ol-use-line")) m.addLayer({ id: "ol-use-line", type: "line", source: "oluse",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": LEG_COLOR_EXPR, "line-width": 3, "line-offset": LEG_OFFSET } });
+    if(!m.getLayer("ol-use-arrows")) m.addLayer({ id: "ol-use-arrows", type: "symbol", source: "oluse",
+      layout: { "symbol-placement": "line", "symbol-spacing": 110, "icon-image": "leg-arrow", "icon-allow-overlap": true,
+                "icon-rotation-alignment": "map", "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 14, 1.1],
+                "icon-offset": ["interpolate", ["linear"], ["zoom"], 9, ["literal", [0, -5]], 14, ["literal", [0, -8]]] },
+      paint: { "icon-color": "#ffffff", "icon-halo-color": LEG_COLOR_EXPR, "icon-halo-width": 2 } });
     if(!m.getLayer("route-failed")) m.addLayer({ id: "route-failed", type: "line", source: "routes",
       filter: ["==", ["get", "failed"], true],
       paint: { "line-color": FAILED_COLOR, "line-width": 2, "line-opacity": 0.9,
@@ -17486,6 +17677,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     // alternatives sit *under* the chosen line, so the primary always reads on top
     if(!m.getLayer("alt-line")) m.addLayer({ id: "alt-line", type: "line", source: "alts",
       paint: { "line-color": ALT_COLOR, "line-width": 4, "line-opacity": 0.8 } });
+    // 17 Nov 2026 (route option labels, F2 / Q7): the stretch of a limit that rules an option out, SOLID and dark on the
+    // option's line (never the red dashes of the Lorry limits layer: a route's line is never red and never dotted)
+    const olMarkInk = mapGroundDark(basemapShown.current || basemap) ? OL_MARK_DARK : OL_MARK;
+    if(!m.getLayer("ol-mark")) m.addLayer({ id: "ol-mark", type: "line", source: "olmarks",
+      layout: { "line-cap": "butt", "line-join": "round" }, paint: { "line-color": olMarkInk, "line-width": 7 } });
+    try { m.setPaintProperty("ol-mark", "line-color", olMarkInk); } catch(e){}
     // 8 Nov 2026 (task 2.1-7, Q3): the picked route is a blue halo UNDER its own coloured legs, not a red line over them
     if(!m.getLayer("sel-line")) m.addLayer({ id: "sel-line", type: "line", source: "sel",
       layout: { "line-cap": "round", "line-join": "round" },
@@ -17497,6 +17694,11 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       paint: { "circle-radius": 5, "circle-color": nodeExpr(), "circle-stroke-width": 1.5, "circle-stroke-color": "#fff" } });
     if(!m.getLayer("newnode-dot")) m.addLayer({ id: "newnode-dot", type: "circle", source: "newnode",
       paint: { "circle-radius": 8, "circle-color": "#D97706", "circle-stroke-width": 3, "circle-stroke-color": "#2563EB", "circle-opacity": 0.95 } });
+    // the limit sign the Lorry limits layer draws (rlSignImage), one a road, on the marked stretch
+    (olSignsAll.current || []).forEach(f => { const t = f.properties.sign; try { if(!m.hasImage("rl-sign-" + t)) m.addImage("rl-sign-" + t, rlSignImage(t), { pixelRatio: 2 }); } catch(e){} });
+    if(!m.getLayer("ol-sign")) m.addLayer({ id: "ol-sign", type: "symbol", source: "olsigns",
+      layout: { "icon-image": ["concat", "rl-sign-", ["get", "sign"]], "icon-allow-overlap": true,
+                "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.45, 14, 0.8] } });
     // Zone fills go on last so they sit above the routes: the whole point is seeing which
     // lines cross one. A routing zone reads red, an advisory one grey — the colour is the
     // difference between "the router avoids this" and "look at this".
@@ -17526,6 +17728,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       filter: ["==", ["geometry-type"], "Point"],
       paint: { "circle-radius": 5, "circle-color": "#fff", "circle-stroke-width": 2.5, "circle-stroke-color": "#DC2626" } });
     applyEmphasis(m);   // a basemap switch resets paint, so re-lean towards the active sub-tab
+    olRouteFilter(m);
   };
 
   // init the map once
@@ -17595,10 +17798,20 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         const box = [[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]];
         const hitNode = m.queryRenderedFeatures(box, { layers: ["node-dots"] });
         if(hitNode.length) return;    // node taps are handled by mousedown/up
+        // 17 Nov 2026 (route option labels): a ruled-out option's limit sign, then one of the open route's own lines
+        // (the option is picked), before a ticked layer's thing and before any other route's line
+        if(cbRef.current.olClick && cbRef.current.olClick(e)) return;
         if(cbRef.current.layerPopup && cbRef.current.layerPopup(e)) return;   // 2.1-5: a ticked layer's thing, not the route under it
-        const layers = ["route-line", "route-failed"].filter(l => m.getLayer(l));
+        const layers = ["route-line", "route-failed", "ol-use-line"].filter(l => m.getLayer(l));
         const hitRoute = m.queryRenderedFeatures(e.point, { layers });
-        if(hitRoute.length) (cbRef.current.selectRoute || (()=>{}))(hitRoute[0].properties.route_id);
+        // Q6: a click on a route's line opens its panel (it only picked the row)
+        if(hitRoute.length) (cbRef.current.routeClick || cbRef.current.selectRoute || (()=>{}))(hitRoute[0].properties.route_id);
+      });
+      m.on("move", () => { if(cbRef.current.olMove) cbRef.current.olMove(); });
+      m.on("moveend", () => { if(cbRef.current.olPlace) cbRef.current.olPlace(); });
+      ["alt-line", "sel-line", "ol-use-line", "ol-sign"].forEach(l => {
+        m.on("mouseenter", l, () => { if(modeRef.current === "view" && (l === "ol-sign" || cbRef.current.olOn)) m.getCanvas().style.cursor = "pointer"; });
+        m.on("mouseleave", l, () => { m.getCanvas().style.cursor = modeRef.current === "add" ? "crosshair" : ""; });
       });
       m.on("mouseenter", "node-dots", () => { if(modeRef.current !== "add") m.getCanvas().style.cursor = "move"; });
       m.on("mouseleave", "node-dots", () => { m.getCanvas().style.cursor = modeRef.current === "add" ? "crosshair" : ""; });
@@ -17685,6 +17898,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // showing, so the alternatives can be drawn alongside the chosen line.
   const selectRoute = (id) => {
     setSelected(id);
+    focusByHand.current = false;
     setActiveGeom({ profile: showProfile, leg: showLegRef.current, alt_index: 0 });
     setSelGeoms(null);
     const m = mapObj.current;
@@ -17698,8 +17912,10 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
 
   // Focus a specific option — used by the analysis rows, so clicking a vehicle line
   // shows that vehicle's actual road rather than whatever the map selector is on.
-  const focusGeom = (profile, alt_index, leg) =>
-    setActiveGeom({ profile, alt_index, leg: leg || showLeg });
+  const focusGeom = (profile, alt_index, leg, ret_alt) => {
+    focusByHand.current = true;
+    setActiveGeom({ profile, alt_index, leg: leg || showLeg, ret_alt: ret_alt == null ? null : ret_alt });
+  };
 
   const sameGeom = (f, a) => a && f.properties.vehicle_profile === a.profile
     && (a.leg === "both" || f.properties.leg === a.leg) && f.properties.alt_index === a.alt_index;
@@ -17732,7 +17948,9 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     // one focused line per leg drawn: the picked option where it exists, else that leg's primary
     const focused = [...new Set(mine.map(f => f.properties.leg))].map(l => {
       const ofLeg = mine.filter(f => f.properties.leg === l);
-      return ofLeg.find(f => f.properties.alt_index === alt) || ofLeg.find(f => f.properties.alt_index === 0);
+      // 17 Nov 2026 (route option labels): an option's way back can carry another number than its way out (ret_alt)
+      const want = (l === "return" && activeGeom && activeGeom.ret_alt != null) ? activeGeom.ret_alt : alt;
+      return ofLeg.find(f => f.properties.alt_index === want) || ofLeg.find(f => f.properties.alt_index === 0);
     }).filter(Boolean);
 
     selFC.current = { type: "FeatureCollection", features: focused };
@@ -17740,6 +17958,124 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       features: mine.filter(f => !focused.includes(f)) };
     selSrc.setData(selFC.current); altSrc.setData(altFC.current);
   }, [selected, selGeoms, activeGeom, showProfile, showLeg, mapReady, subTab]);
+
+  // ---- 17 Nov 2026 (route option labels) ----
+  // The route whose panel is open (the ordinary page: the open row, while it is also the picked one; full screen: the
+  // picked route), its answer once its card has it, and the lorry whose lines the map draws for it.
+  const olRoute = subTab === "routes" && !drawing && selected && (full || openRow === selected) ? selected : null;
+  const olAns = olRoute ? cardBest[olRoute] : null;
+  const olBest = olAns && olAns.route && (olAns.route.lines || []).length ? olAns.route : null;
+  const olProf = (activeGeom && activeGeom.profile) || showProfile;
+  const olOn = !!(olBest && selGeoms && olProf === olBest.lorry);   // labels only on the lines of the lorry the card speaks for
+  const olFeats = () => (selGeoms && selGeoms.features || []).filter(f => f.properties.route_id === olRoute && olBest && f.properties.vehicle_profile === olBest.lorry);
+  // the answer arrives (or the route's lines do): the map shows the card's lorry, its line in use under the halo,
+  // unless the person has already picked something by hand
+  useEffect(() => {
+    if(!olBest || !olBest.lorry || focusByHand.current) return;
+    const u = olBest.in_use || {};
+    setActiveGeom({ profile: olBest.lorry, leg: showLegRef.current, alt_index: u.loaded ? u.loaded.alt : 0, ret_alt: u.return ? u.return.alt : null });
+  }, [olBest, selGeoms]);
+  // the line in use, strong (the route layers draw option 0; a dated diversion in use is another number)
+  useEffect(() => {
+    const m = mapObj.current; if(!m || !mapReady) return;
+    let feats = [];
+    if(olOn){
+      const u = olBest.in_use || {};
+      feats = olFeats().filter(f => (showLeg === "both" || f.properties.leg === oneLeg(showLeg))
+        && u[f.properties.leg] && Number(u[f.properties.leg].alt) === Number(f.properties.alt_index));
+    }
+    olUseFC.current = { type: "FeatureCollection", features: feats };
+    olHide.current = feats.length ? olRoute : null;
+    try { const src = m.getSource("oluse"); if(src) src.setData(olUseFC.current); } catch(e){}
+    olRouteFilter(m);
+  }, [olOn, olBest, selGeoms, showLeg, mapReady, olRoute]);
+  // rule 1: opening a route fits the map to ALL its options (selectRoute fits the line it knows, option 0)
+  useEffect(() => {
+    if(!olRoute){ olFitFor.current = null; return; }
+    const m = mapObj.current; if(!m || !mapReady || !selGeoms) return;
+    const key = `${olRoute}|${olProf}`;
+    if(olFitFor.current === key) return;
+    const pts = [].concat(...(selGeoms.features || []).filter(f => f.properties.route_id === olRoute && f.properties.vehicle_profile === olProf)
+      .map(f => (f.geometry && f.geometry.coordinates) || []));
+    if(!pts.length) return;
+    olFitFor.current = key;
+    try { m.fitBounds(boundsOf(pts), { padding: { top: 70, bottom: 50, left: 70, right: 70 }, maxZoom: 13, duration: calmMotion() ? 0 : 500 }); } catch(e){}
+  }, [olRoute, selGeoms, olProf, mapReady]);
+  // F2: the limits that rule this route's options out (the Lorry limits read, made once, whether or not its box is ticked)
+  const olSetMarks = (marks, signs) => {
+    const m = mapObj.current;
+    olMarkFC.current = { type: "FeatureCollection", features: marks };
+    olSignsAll.current = signs;
+    if(!m) return;
+    signs.forEach(f => { const t = f.properties.sign; try { if(!m.hasImage("rl-sign-" + t)) m.addImage("rl-sign-" + t, rlSignImage(t), { pixelRatio: 2 }); } catch(e){} });
+    try { const src = m.getSource("olmarks"); if(src) src.setData(olMarkFC.current); } catch(e){}
+    olSignsNow();
+  };
+  const olSignsNow = () => {
+    const m = mapObj.current; if(!m) return;
+    let kept = olSignsAll.current || [];
+    try { kept = olThin(kept, kept.map(f => { const q = m.project(f.geometry.coordinates); return [q.x, q.y]; }), 26); } catch(e){}
+    olSignFC.current = { type: "FeatureCollection", features: kept };
+    try { const src = m.getSource("olsigns"); if(src) src.setData(olSignFC.current); } catch(e){}
+  };
+  useEffect(() => {
+    if(!mapReady) return;
+    const opts = olOn ? (olBest.options || []).filter(o => (o.added_limits || []).length) : [];
+    if(!opts.length){ olSetMarks([], []); return; }
+    let live = true;
+    rlRead("limits").then(() => { if(!live) return; const r = olMarks(opts, rLayerData.current.limits, olBest); olSetMarks(r.marks, r.signs); })
+      .catch(e => { console.warn("Wayscope:", e); });
+    return () => { live = false; };
+  }, [olOn, olBest, mapReady]);
+  // the labels: placed when the answer, the lines, the lorry, the direction drawn or the map's size changes, and again
+  // as each move of the map ends (rule 4); while the map moves they ride with their place on the road
+  const olLineOf = (ln, feats) => {
+    const legs = showLeg === "return" ? ["return"] : showLeg === "loaded" ? ["loaded"] : ["loaded", "return"];
+    for(const leg of legs){
+      const a = leg === "loaded" ? ln.alt : ln.return_alt;
+      if(a == null) continue;
+      const f = feats.find(x => x.properties.leg === leg && Number(x.properties.alt_index) === Number(a));
+      if(f && f.geometry && (f.geometry.coordinates || []).length > 1) return f.geometry.coordinates;
+    }
+    return null;
+  };
+  const olPlaceNow = () => {
+    const m = mapObj.current;
+    if(!m || !olOn){ setOlLabels(v => (v.length ? [] : v)); return; }
+    olSignsNow();
+    let next = [];
+    try {
+      const box = m.getContainer(), W = box.clientWidth, H = box.clientHeight, at = box.getBoundingClientRect();
+      // the map's own buttons (Both · Out · Back and Layers, zoom, the credits, the demo notice): no label covers them
+      const keep = [...(box.parentElement || box).querySelectorAll("[data-route-map-box], .mapboxgl-ctrl-top-right, .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right, .sl-demo-on-map")]
+        .map(el => el.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0)
+        .map(r => ({ x0: r.left - at.left - 4, y0: r.top - at.top - 4, x1: r.right - at.left + 4, y1: r.bottom - at.top + 4 }));
+      const feats = olFeats();
+      const items = (olBest.lines || []).map((ln, k) => {
+        const c = olLineOf(ln, feats);
+        if(!c) return null;
+        return { k, ln, pts: c.map(p => { const q = m.project(p); return [q.x, q.y]; }), w: olTextW(`${ln.name} · ${ln.words}`), h: OL_H };
+      }).filter(Boolean);
+      const placed = olPlace(items, W, H, keep);
+      next = items.filter(it => placed[it.k]).map(it => {
+        const q = placed[it.k], ll = m.unproject([q.x, q.y]);
+        return { k: it.k, ln: it.ln, x: q.x, y: q.y, lng: ll.lng, lat: ll.lat };
+      });
+    } catch(e){ console.warn("Wayscope:", e); }
+    setOlLabels(v => (JSON.stringify(v) === JSON.stringify(next) ? v : next));
+  };
+  const olMoveNow = () => {
+    const m = mapObj.current, box = olLayer.current;
+    if(!m || !box) return;
+    [...box.querySelectorAll("[data-ol-label]")].forEach(b => {
+      try { const q = m.project([+b.getAttribute("data-lng"), +b.getAttribute("data-lat")]); b.style.left = q.x + "px"; b.style.top = q.y + "px"; } catch(e){}
+    });
+  };
+  useEffect(() => { if(mapReady) olPlaceNow(); }, [olOn, olBest, selGeoms, showLeg, mapReady, full, olRoute]);
+  // a pick: the map's focus is the one selection (the halo, the label's edge, the card's rows and its tab)
+  const olPick = (ln) => { if(olBest) focusGeom(olBest.lorry, ln.alt != null ? ln.alt : ln.return_alt, showLegRef.current, ln.return_alt); };
+  const olPicked = (ln) => !!(activeGeom && olBest && activeGeom.profile === olBest.lorry
+    && Number(activeGeom.alt_index) === Number(ln.alt != null ? ln.alt : ln.return_alt));
 
   // 8 Nov 2026 (task 2.1-5): the five layers. A box's first tick reads what the staff Route map reads (nothing new is fetched);
   // every change, a page switch and a basemap switch (rlReinstall) draws them again. Shown on the Routes page only.
@@ -18255,6 +18591,40 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // clicking the map follows the thing you clicked to its sub-tab
   cbRef.current.selectNode = (id) => { setSubTab("locations"); openEditForNode(id); };
   cbRef.current.selectRoute = (id) => { setSubTab("routes"); selectRoute(id); };
+  // 17 Nov 2026 (route option labels, Q6): on the Routes page a click on a route's line opens its panel and the page
+  // stays at the map (in full screen the picked route IS the panel beside the map)
+  cbRef.current.routeClick = (id) => {
+    if(subTab !== "routes" || drawing){ cbRef.current.selectRoute(id); return; }
+    if(!full && openRow !== id){ roQuiet.current = true; setOpenRow(id); }
+    if(selected !== id) selectRoute(id);
+  };
+  cbRef.current.olPlace = olPlaceNow; cbRef.current.olMove = olMoveNow; cbRef.current.olOn = olOn;
+  cbRef.current.olClick = (e) => {
+    const m = mapObj.current;
+    if(!m || subTab !== "routes" || drawing) return false;
+    const box = [[e.point.x - 5, e.point.y - 5], [e.point.x + 5, e.point.y + 5]];
+    const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    if(m.getLayer("ol-sign")){
+      const sg = m.queryRenderedFeatures(box, { layers: ["ol-sign"] });
+      if(sg.length){
+        const pr = sg[0].properties || {};
+        try { if(rlPop.current) rlPop.current.remove(); } catch(err){}
+        rlPop.current = new window.mapboxgl.Popup({ closeButton: true, maxWidth: "280px" }).setLngLat(sg[0].geometry.coordinates)
+          .setHTML(`<div style="font:14px system-ui;max-width:260px" data-ol-sign-pop="1"><b>${esc(pr.headline)}</b><div style="color:#64748B">${esc(pr.who)}</div></div>`).addTo(m);
+        return true;
+      }
+    }
+    if(!olOn) return false;
+    const hit = m.queryRenderedFeatures(box, { layers: ["ol-use-line", "alt-line", "sel-line"].filter(l => m.getLayer(l)) })
+      .find(f => f.properties && f.properties.route_id === olRoute && f.properties.vehicle_profile === olBest.lorry);
+    if(!hit) return false;
+    const leg = hit.properties.leg, a = Number(hit.properties.alt_index);
+    const ln = (olBest.lines || []).find(l => l.state === "in_use" && Number(leg === "return" ? l.return_alt : l.alt) === a)
+      || (olBest.lines || []).find(l => (leg === "return" ? l.return_alt : l.alt) != null && Number(leg === "return" ? l.return_alt : l.alt) === a);
+    if(!ln) return false;
+    olPick(ln);
+    return true;
+  };
   cbRef.current.commitMove = commitMove;
   cbRef.current.placeGateAt = (lng, lat) => {
     setGateForm(g => g ? { ...g, lat: +(+lat).toFixed(6), lon: +(+lng).toFixed(6) } : g);
@@ -19078,6 +19448,18 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           style={full ? { gridColumn: (drawing || onRoutes) ? 2 : 1, gridRow: drawing ? 2 : 1, minHeight: 0, position: "relative" } : drawing && isWide ? { gridColumn: 2, gridRow: 2, position: "relative" } : { position: "relative" }}>
           <div ref={mapDiv} style={{ height: full ? "100%" : drawing ? SL_DRAW_H : MAP_H, width: "100%" }} />
           {onRoutes && !drawing && <RouteMapBox low={full && !!TENANT.demo_notice} leg={showLeg} onLeg={setShowLeg} on={rLayers} counts={rLayerCounts} onTick={toggleRLayer} msg={rlMsg} />}
+          {/* 17 Nov 2026 (route option labels): one label a stored line of the open route, each a real button named by its
+              own words, the line in use first; after the map's own buttons in the page, so Tab reaches them after those */}
+          {olOn && olLabels.length > 0 && (
+            <div className="ol-layer" ref={olLayer} data-ol-layer={olRoute}>
+              {olLabels.map(L => (
+                <button key={L.k} type="button" data-ol-label={L.ln.state} data-ol-alt={L.ln.alt != null ? L.ln.alt : `r${L.ln.return_alt}`}
+                  data-lng={L.lng} data-lat={L.lat} aria-pressed={olPicked(L.ln) ? "true" : "false"}
+                  className={"ol-lab" + (L.ln.state === "ruled_out" || L.ln.state === "not_compared" ? " ol-out" : "")}
+                  style={{ left: L.x, top: L.y }} onClick={(e) => { e.stopPropagation(); olPick(L.ln); }}>
+                  <b>{L.ln.name}</b> · {L.ln.words}
+                </button>))}
+            </div>)}
           {full && !drawing && TENANT.demo_notice && <span className="sl-demo-pill sl-demo-on-map" role="note"><b>DEMO</b>{TENANT.demo_notice}</span>}
         </div>
 
@@ -19090,7 +19472,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
             analysis={selected ? <RouteAnalysis routeId={selected}
               originId={((status || []).find(r => r.id === selected) || {}).origin_id} destId={((status || []).find(r => r.id === selected) || {}).dest_id}
               gateBlockers={((status || []).find(r => r.id === selected) || {}).gate_blockers}
-              active={activeGeom} leg={showLeg} onFocus={focusGeom} onPromote={canEdit ? promoteAlt : null}
+              active={activeGeom} leg={showLeg} onFocus={focusGeom} onPromote={canEdit ? promoteAlt : null} onBest={onCardBest}
               onBusyChanged={loadDiversions} promoting={promoting} promoted={promoted} haulRoads={haulRoadList} token={tokenRef.current}
               onHaulChanged={rebakeAfterZone} diversions={routeDiversions(selected)} /> : null} />
         </>}
@@ -20377,6 +20759,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
               onFocus={focusR}
               onShow={(p, a) => { focusR(p, a); mapIntoView(); }}
               onPromote={selected === r.id && canEdit ? promoteAlt : null}
+              onBest={onCardBest}
               onBusyChanged={loadDiversions}
               promoting={promoting}
               promoted={promoted}

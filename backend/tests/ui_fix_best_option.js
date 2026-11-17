@@ -45,7 +45,9 @@ ok("⭐ SRC: 'Counts only: nothing is scored or ranked' is GONE from the app and
 ok("⭐ SRC: the card says no 'Better', 'safer', 'risk', 'rate' or 'ratio', and no '%' next to a collision count",
    bo.length > 0 && !/\b(Better|better|safer|Safer|risk|ratio)\b/.test(bo) && !/collisions?[^"`\n]{0,40}%/.test(bo));
 ok("⭐ SRC: no Make primary on a trade-off or a diverted route (Q2, Q4): only on a Suggested answer with no diversion in use",
-   bo.includes('const canPromote = r.answer === "Suggested" && o && onPromote && !div;'));
+   // NARROWED 17 Nov 2026 (route option labels, Q5; John: "Yes, as recommended"): the card can show another option
+   // (a label on the map, a tab), so the line names the SUGGESTED one (`o.chosen`); the rule it pins is unchanged.
+   bo.includes('const canPromote = r.answer === "Suggested" && o && o.chosen && onPromote && !div;'));
 ok("⭐ SRC: the card's Make primary moves the card's lorry on both legs only where the option has its own way back, and the message names the lorries not moved (Q3)",
    // REVERSED 17 Nov 2026 (ui-best-option-1117, Q2; John: "Yes, as recommended"): the press is ONE request for the legs
    // it moves (it was `for(const lg of ...)`, a request a leg); the strip's sentence is the same words, now built from

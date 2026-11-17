@@ -87,7 +87,9 @@ ok("⭐ SRC: Q4: the card's 'Show Alt N on map' (and only it) also moves the pag
    && !between("<RouteFullDetails route=", "</>}").includes("onShow"));
 ok("SRC: the card itself still calls the handler it is given, with its lorry and option (BestOption is not this branch's)",
    bo.includes("onClick={(e) => { e.stopPropagation(); onFocus(r.lorry, o.alt); }}>Show {o.label} on map</button>")
-   && bo.includes('const canPromote = r.answer === "Suggested" && o && onPromote && !div;'));
+   // NARROWED 17 Nov 2026 (route option labels, Q5): the card can show another option, so Make primary names the
+   // suggested one (`o.chosen`); the handler's call is as it was.
+   && bo.includes('const canPromote = r.answer === "Suggested" && o && o.chosen && onPromote && !div;'));
 ok("SRC: when Make primary shows is unchanged: the route picked in the list, an admin login (the page hands the card no handler otherwise)",
    panel.includes("onPromote={selected === r.id && canEdit ? promoteAlt : null}"));
 ok("⭐ SRC: card 4: the haul road picker may shrink to its box and cuts a long name with '…'; the Attach button never shrinks",
