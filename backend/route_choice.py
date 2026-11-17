@@ -329,6 +329,11 @@ def refresh_zones():
         check_busy()                     # 5 Nov 2026 (task 0d-2, Q11): a changed Alt N pauses its busy-hours use
     except Exception as e:
         print("route_choice: busy-hours uses not checked:", str(e)[:120])
+    try:                                 # 17 Nov 2026 (best option step 3, Q8): a re-route or a pause ENDS a record row
+        import route_record
+        route_record.sync_quietly("refresh")
+    except Exception as e:
+        print("route_choice: route choices record not checked:", str(e)[:120])
     return summary(rows)
 
 
@@ -892,6 +897,11 @@ def use_busy(route_id, alt, hours_from, hours_to, who=None):
             "'planner', ?, ?, ?, ?, ?, ?)",
             (db.current_tenant(), rid, route_id, prof, leg, alt, hours_from, hours_to, BUSY_DAYS,
              f"{hours_from}-{hours_to}", km_delta, who, now, now, now, _fp(g["geometry"])))
+    try:                                 # 17 Nov 2026 (best option step 3, Q1b): the route choices record keeps it
+        import route_record
+        route_record.open_busy(route_id, alt, hours_from, hours_to, who=who, decided_at=now)
+    except Exception as e:
+        print("route_choice: busy-hours road not kept in the record:", str(e)[:120])
     return len(legs)
 
 
@@ -905,6 +915,11 @@ def stop_busy(route_id, hours_from, who=None):
     for r in rows:
         db.execute("UPDATE route_choice SET status = 'stopped', decided_by = ?, decided_at = ?, updated_at = ? "
                    "WHERE tenant_id = ? AND id = ?", (who, now, now, db.current_tenant(), r["id"]))
+    try:                                 # 17 Nov 2026 (best option step 3, Q8): "Ended: stopped"
+        import route_record
+        route_record.stop_busy(route_id, hours_from)
+    except Exception as e:
+        print("route_choice: busy-hours stop not kept in the record:", str(e)[:120])
     return len(rows)
 
 

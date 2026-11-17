@@ -79,6 +79,7 @@ ORDER = [
     "route_sections",       # 12 Oct 2026 (§2.2d): derived from route_geometry, so after it
     "route_area_km",        # 12 Oct 2026 (§2.2b): derived from route_geometry and areas, so after both
     "route_choice",         # 28 Oct 2026 (task 0c): names routes, zones and stored options, so after route_geometry
+    "route_choice_record",  # 17 Nov 2026 (best option step 3): names routes and stored options, so after route_geometry
     "route_hour_times",     # 29 Oct 2026 (task 0f-2): drive times by hour, named by the stored option, so after route_geometry
     "forecasts", "forecast_weeks", "forecast_days",
     "pours",                # 29 Oct 2026 (task 3a): names a forecast line's key, so after forecasts

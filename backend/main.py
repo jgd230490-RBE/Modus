@@ -4372,7 +4372,8 @@ def promote_alt(route_id: str, profile: str = network.DEFAULT_PROFILE,
     _check_admin(token)
     if leg not in network.LEGS:
         raise HTTPException(400, f"leg must be one of {list(network.LEGS)}")
-    return network.promote_alternative(route_id, profile, alt_index, leg=leg)
+    # 17 Nov 2026 (best option step 3): the route choices record keeps who made the choice
+    return network.promote_alternative(route_id, profile, alt_index, leg=leg, who=_by())
 
 
 @app.get("/api/routes/{route_id}/analysis")
@@ -5775,6 +5776,36 @@ def route_best_option(route_id: str):
     if r is None:
         raise HTTPException(404, "no such route")
     return {"day": t.get("day"), "checks": t.get("checks"), "thresholds": t.get("thresholds"), "route": r}
+
+
+@app.get("/api/route-choices/record")
+def route_choices_record():
+    """
+    17 Nov 2026 (best option step 3, John's yes to the third draft: notes route-choices-record-mockup-1117): the
+    Dashboard's "Route choices" fold. Every route choice kept (Make primary, a busy-hours road), a trip's figures saved
+    on the day, the planned and so-far sums, the two collision counts, and how many routes are on a dated diversion.
+    Kept until the next write (route_record.record runs its sync first: a row a re-route ended, R013's take-in). Any
+    staff login (a reviewer session is refused by _require_access); the figures are scheme-wide, like the carbon total.
+    """
+    acc = _require_access()
+    import route_record
+    return _staff_json("route-choices/record", {}, route_record.record, acc)
+
+
+@app.get("/api/route-choices/record.xlsx")
+def route_choices_record_xlsx():
+    """17 Nov 2026 (Q7): the record as a spreadsheet, a row a choice with its before and after as saved on the day."""
+    acc = _require_access()
+    import route_record
+    from fastapi.responses import Response
+    R = _staff_json("route-choices/record", {}, route_record.record, acc)
+    try:
+        data = route_record.build_xlsx(R)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{route_record.file_name(R)}"',
+                             "Cache-Control": "no-store"})
 
 
 @app.get("/api/gates/queue-months")

@@ -536,6 +536,30 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   /* 2 Nov 2026: Copy and Download on every chart - 30 px, always visible, sitting on the title row above the chart; not on the big screen or a phone */
   .chart-tools{position:absolute;top:-36px;right:0;display:flex;gap:4px;z-index:3;}
   .chart-tools.is-inline{position:static;}
+  /* 17 Nov 2026 (best option step 3): the route choices record on the Dashboard */
+  .rc-head{display:flex;align-items:center;gap:8px;margin:0 0 8px;}
+  .rc-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line, #e2e8f0);border-radius:10px;overflow:hidden;background:var(--surface);}
+  .rc-tile{padding:10px 14px;border-left:1px solid var(--line, #e2e8f0);min-width:0;}
+  .rc-tile:first-child{border-left:0;}
+  .rc-tile .rc-tk{display:block;font-size:13px;color:var(--muted);}
+  .rc-tile b{display:block;font-size:22px;font-weight:600;margin-top:2px;white-space:nowrap;}
+  .rc-tile small{display:block;font-size:12px;color:var(--muted);}
+  .rc-more{color:var(--bad-text);}
+  .rc-pass{font-size:13px;margin:8px 0 6px;}
+  .rc-table td,.rc-table th{white-space:nowrap;padding-left:6px;padding-right:6px;font-size:13px;}
+  .rc-table td.rc-ch{white-space:normal;min-width:170px;}
+  .rc-table th.rc-colh{white-space:normal;min-width:120px;}
+  .rc-table .rc-ch small{display:block;font-size:12px;color:var(--muted);}
+  .rc-table .rc-k{font-size:12px;color:var(--muted);}
+  .rc-table .rc-col{font-size:13px;}
+  .rc-table td.rc-none{text-align:left;color:var(--muted);font-size:13px;}
+  .rc-end{display:inline-block;margin-top:4px;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--surface-3);color:var(--ink-2, var(--ink));}
+  .rc-ended td{color:var(--muted);}
+  .rc-empty{text-align:center;padding:14px 8px;font-size:13px;}
+  .rc-empty b{display:block;font-size:14px;margin-bottom:4px;}
+  .rc-pcard{border:1px solid var(--line, #e2e8f0);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:13px;}
+  .rc-pcard b{display:block;}
+  @media (max-width:767px){ .rc-tiles{grid-template-columns:repeat(2,minmax(0,1fr));} .rc-tile:nth-child(3){border-left:0;} .rc-tile:nth-child(n+3){border-top:1px solid var(--line, #e2e8f0);} .rc-tile b{font-size:18px;} }
   .chart-tool{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--muted);font-size:16px;line-height:1;cursor:pointer;}
   .chart-tool:hover{color:var(--ink);border-color:var(--muted);}
   .chart-tool-copy::before{content:"\29C9";} .chart-tool-dl::before{content:"\2193";}
@@ -1794,6 +1818,9 @@ const INFO = {
   "dash.stock": { title: "Stockpile capacity", text: "Each stockpile's stock at the end of each week, as a share of its capacity. Solid = recorded; dashed = the plan. A week nobody recorded uses the plan. Red dots: over capacity.",
     how: "Balance = the opening balance + what came in − what went out. In: the week actuals delivered there, or the approved plan where nothing was recorded. Out: the figure typed on Look-ahead → Account, or the planned use (Plan → Stockpiles).", guide: "6-4-account-view-what-actually-happened-last-week", tech: "t1-stock" },
   "dash.chart.demand": { title: "Material demand over time", text: "The planned quantity in each month, stacked by material, for the lines in view." },
+  "dash.rc.planned": { title: "Planned, not measured", text: "Planned from the approved loads, so far from recorded loads. A trip's figures are those saved on the day of the choice.", guide: "route-choices-record", tech: "t1-route-choices-record" },
+  "dash.rc.places": { title: "Places", text: "Places: schools, hospitals and health centres within 250 m. Both legs of a trip.", guide: "route-choices-record" },
+  "dash.rc.collisions": { title: "Collisions", text: "Injury collisions the police recorded on each road. A record of the road, never multiplied by loads.", guide: "route-choices-record" },
   "dash.chart.top": { title: "Top routes by tonnage", text: "The ten route lines with the most planned tonnes. Click a bar to narrow the page to that line; click it again to show every line." },
   "dash.chart.progress": { title: "Delivered against plan", text: "Planned and reported tonnes, month by month. A month nobody has reported has no delivered bar: it is not counted as zero.", tech: "t1-delivered" },
   "dash.chart.cost": { title: "Cost over time", text: "The planned cost (route rates or the target rate) beside the fair cost (the model), month by month.", tech: "t1-fair" },
@@ -3377,6 +3404,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
           {/* 29 Oct 2026: the Simulation has its own page (Plan → Simulation); the Dashboard keeps one line under Gate arrivals,
               the busiest gate from the Gate arrivals reply (no second simulation run here) */}
           <SimDashLine ga={gaShown} month={gaMonth} months={months} onOpen={onOpen} />
+          {/* 17 Nov 2026 (best option step 3, Q5): the route choices record, first under the Simulation line, closed each visit */}
+          {!wall && <RouteChoicesRecord phone={!!phone} />}
           {/* 5 Nov 2026 (group 6, PR 2): the concerns from the public, planners and admins only */}
           {/* 9 Nov 2026 (v2.1 task 2.1-1, Q9): traffic limits, planners and admins only */}
           {canApprove && !wall && !phone && <TrafficDash months={months} lo={D.lo} hi={D.hi} sites={sites} sitesLabel={sites.length ? sitesWords(sites, locList) : ""} onOpen={onOpen} />}
@@ -8586,6 +8615,130 @@ function DashFirstSteps({ locCount, routeCount, onOpen }){
       </ol>
       <p className="text-[13px] text-slate-500 mt-4">The charts appear once a forecast is approved.</p>
     </section>
+  );
+}
+
+// 17 Nov 2026 (best option step 3, John's "Yes, as recommended" to notes route-choices-record-mockup-1117): the ROUTE
+// CHOICES RECORD, a fold first under the Simulation line, closed each visit, read on first open (GET
+// /api/route-choices/record). Each choice kept (another main route, a road for the busy hours) with a trip's figures saved
+// on the day, the planned and so-far sums, and each road's collision record as two counts (never x loads, never totalled,
+// never a percentage). What a choice adds is shown in red, never hidden. A phone: the four totals and a short card a choice.
+const RC_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const rcDate = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${+m[3]} ${RC_MONTHS[+m[2] - 1]} ${m[1]}` : ""; };
+// one figure as words: [text, adds] — "less" / "more" for an amount, "fewer" / "more" for a count, "the same" at nought
+function rcWord(v, kind, scale){
+  if(v == null || isNaN(+v)) return ["—", false];
+  const x = +v, a = Math.abs(x), trip = scale === "trip";
+  let t;
+  if(kind === "kg") t = a >= 1000 ? `${(a / 1000).toFixed(1)} t` : `${a < 10 ? a.toFixed(1) : grp(Math.round(a))} kg`;
+  else if(kind === "min") t = trip ? `${a.toFixed(1)} min` : `${(a / 60).toFixed(1)} h`;
+  else if(kind === "km") { const d = dist(a); t = `${trip || d < 10 ? d.toFixed(1) : grp(Math.round(d))} ${DU()}`; }
+  else if(kind === "eur") t = `${CUR()}${trip ? a.toFixed(2) : grp(Math.round(a))}`;
+  else t = grp(Math.round(a));
+  const zero = kind === "count" ? Math.round(a) === 0 : t.replace(/[^1-9]/g, "") === "";
+  if(zero) return ["the same", false];
+  return [`${t} ${x > 0 ? "more" : (kind === "count" ? "fewer" : "less")}`, x > 0];
+}
+const RC_COLS = [["kg", "kg", "Carbon"], ["min", "min", "Lorry time"], ["km", "km", "Distance"], ["eur", "eur", "Fair cost"],
+                 ["left_turns", "count", "Left turns"], ["cycle_meets", "count", "Cycle routes met"], ["places", "count", "Places"]];
+function RcCell({ v, kind, scale, missing }){
+  const [t, more] = missing ? ["—", false] : rcWord(v, kind, scale);
+  return <td className={"num" + (more ? " rc-more" : "")} data-rc-more={more ? "1" : undefined}>{t}</td>;
+}
+function rcChoice(r, short){
+  if(r.kind === "busy") return `${r.route_id} · ${r.label}, ${short ? "" : "weekdays "}${r.hours_from}–${r.hours_to}`;
+  const one = (r.legs || []).length === 1 ? ` (${r.legs[0]} leg)` : "";
+  return `${r.route_id} · ${r.label} ${short ? "the" : "made the"} main route${one}`;
+}
+function rcLorry(r){ return r.all_lorries ? "all lorry types" : (r.lorry ? vehLabel(r.lorry) : ""); }
+function rcWhen(r){
+  return r.status === "ended" ? `${rcDate(r.since)} to ${rcDate(r.ended_on)}` : `Since ${rcDate(r.since)}`;
+}
+// the fold as a picture for ChartTools: the four totals, then a line a choice (its planned figures)
+function rcPicture(d){
+  const T = d.totals.planned, font = "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif";
+  const lines = [`Carbon ${rcWord(T.kg, "kg")[0]} · Lorry time ${rcWord(T.min, "min")[0]} · Distance ${rcWord(T.km, "km")[0]} · Fair cost (model) ${T.eur_missing ? "—" : rcWord(T.eur, "eur")[0]}`, ""];
+  d.rows.forEach(r => {
+    const p = r.planned;
+    lines.push(rcChoice(r) + (r.status === "ended" ? " · Ended: " + r.ended_words : ""));
+    lines.push(`   ${grp(Math.round(p.trips))} loads planned: ${RC_COLS.map(([k, kind, l]) => `${l.toLowerCase()} ${k === "eur" && p.eur_missing ? "—" : rcWord(p[k], kind)[0]}`).join(", ")}`);
+  });
+  const W = 980, H = 22 * lines.length + 12, S = 2;
+  const c = document.createElement("canvas"); c.width = W * S; c.height = H * S;
+  const x = c.getContext("2d"); x.scale(S, S); x.fillStyle = "#FFFFFF"; x.fillRect(0, 0, W, H);
+  x.textBaseline = "top"; x.fillStyle = CHART_INK;
+  lines.forEach((t, i) => { x.font = `${i % 2 === 0 && i > 1 ? "600 " : ""}13px ${font}`; x.fillText(t, 4, 6 + i * 22); });
+  return { canvas: c, w: W, h: H };
+}
+function RouteChoicesRecord({ phone }){
+  const [open, setOpen] = useState(false);
+  const [d, setD] = useState(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    if(!open || d) return;
+    let live = true;
+    setErr(false);
+    fetch(`${API}/route-choices/record`).then(okJSON).then(j => { if(live) setD(j); })
+      .catch(e => { console.warn("Wayscope:", e); if(live) setErr(true); });
+    return () => { live = false; };
+  }, [open]);
+  const rows = (d && d.rows) || [];
+  const T = d && d.totals && d.totals.planned;
+  const tile = (key, kind, label, small) => { const missing = key === "eur" && T.eur_missing; const [t, more] = missing ? ["—", false] : rcWord(T[key], kind);
+    return <div className="rc-tile" data-rc-tile={key}><span className="rc-tk">{label}</span><b className={more ? "rc-more" : ""}>{t}</b>{small && <small>{small}</small>}</div>; };
+  const pass = (key, kind, label) => { const [t, more] = rcWord(T[key], kind);
+    return <span data-rc-pass={key}><b className={more ? "rc-more" : ""}>{t}</b> {label}</span>; };
+  const div = d ? d.diversions || 0 : 0;
+  const foot = div > 0 && <p className="ct-line mt-2" data-rc-diversions="1">{div} route{div === 1 ? " is" : "s are"} on a dated diversion: a closure, not a choice, so not counted here.</p>;
+  return (
+    <details className="dash-more" data-route-choices="1" open={open || undefined} onToggle={e => setOpen(e.currentTarget.open)}>
+      <summary>Route choices: what each saved or added</summary>
+      <div className="pt-3">
+        {err && <div className="ct-line" data-rc-error="1">The route choices did not load.</div>}
+        {!d && !err && <div className="ct-line">Loading the route choices…</div>}
+        {d && !rows.length && <div className="rc-empty" data-rc-empty="1"><b>No route choice yet.</b><span>A choice made on Routes is kept here: another main route, or a road for the busy hours.</span>{foot}</div>}
+        {d && rows.length > 0 && <>
+          {!phone && <div className="rc-head">
+            <span className="ct-line">Planned, not measured<InfoTip id="dash.rc.planned" /></span>
+            <span className="flex-1"></span>
+            <ChartTools inline title="Route choices: what each saved or added" scope={["Planned, not measured", rcDate(d.day)]} getPlot={async () => rcPicture(d)} />
+            <a className="btn-sec" href={`${API}/route-choices/record.xlsx`} download data-rc-sheet="1" style={{ width: "auto", height: "auto", padding: "5px 11px" }}>Spreadsheet</a>
+          </div>}
+          <div className="rc-tiles" data-rc-tiles="1">
+            {tile("kg", "kg", "Carbon", phone ? null : "CO₂e · planned")}
+            {tile("min", "min", "Lorry time", phone ? null : "planned")}
+            {tile("km", "km", "Distance", phone ? null : "planned")}
+            {tile("eur", "eur", phone ? "Fair cost" : "Fair cost (model)", phone ? null : "planned")}
+          </div>
+          {phone ? rows.map(r => { const p = r.planned;
+              const bits = [["kg", "kg", ""], ["min", "min", ""], ["left_turns", "count", " left turns"]].map(([k, kind, l]) => { const [t, more] = rcWord(p[k], kind); return { t: t + (t === "the same" || t === "—" ? "" : l), more }; });
+              return <div key={r.id} className="rc-pcard" data-rc-pcard={r.id}><b>{rcChoice(r, true)}</b>{r.status === "ended" && <span className="rc-end">Ended: {r.ended_words}</span>}
+                <div>{grp(Math.round(p.trips))} loads planned: {bits.map((b, i) => <React.Fragment key={i}>{i ? ", " : ""}<span className={b.more ? "rc-more" : ""}>{b.t}</span></React.Fragment>)}</div></div>; })
+          : <>
+          <p className="rc-pass" data-rc-passes="1">A lorry passes, planned: {pass("left_turns", "count", "left turns")} · {pass("cycle_meets", "count", "cycle routes met")} · {pass("places", "count", "places")}<InfoTip id="dash.rc.places" /></p>
+          <div className="overflow-x-auto kb-scroll" tabIndex={0} role="region" aria-label="Route choices">
+            <table className="tbl rc-table" data-rc-table="1">
+              <caption className="sr-only">Route choices: a trip, planned and so far, against the line before</caption>
+              <thead><tr><th scope="col">Choice</th><th scope="col" className="num">Loads</th><th scope="col"><span className="sr-only">Figures</span></th>
+                {RC_COLS.map(([k, , l]) => <th key={k} scope="col" className="num">{l}</th>)}
+                <th scope="col" className="rc-colh">Collisions{d.collision_period ? `, ${d.collision_period}` : ""}<InfoTip id="dash.rc.collisions" /></th></tr></thead>
+              {rows.map(r => { const p = r.planned, s = r.so_far, c = r.collisions || {};
+                const cells = (f, scale) => RC_COLS.map(([k, kind]) => <RcCell key={k} v={f && f[k]} kind={kind} scale={scale} missing={!f || (k === "eur" && f.eur_missing)} />);
+                return <tbody key={r.id} className={r.status === "ended" ? "rc-ended" : ""} data-rc-row={r.id}>
+                  <tr><td rowSpan={3} className="rc-ch"><b>{rcChoice(r)}</b><small>{r.from} → {r.to}</small><small>{rcWhen(r)} · {rcLorry(r)}</small>
+                      {r.status === "ended" && <span className="rc-end" data-rc-ended={r.ended_why}>Ended: {r.ended_words}</span>}</td>
+                    <td rowSpan={3} className="num">{r.kind === "busy" ? `${grp(Math.round(p.trips))} of ${grp(Math.round(p.of))}` : grp(Math.round(p.trips))}</td>
+                    <td className="rc-k">A trip</td>{cells(r.per_trip, "trip")}
+                    <td rowSpan={3} className="rc-col" data-rc-collisions="1">{c.after == null && c.before == null ? "—" : <>{c.after_label}: {c.after == null ? "—" : c.after}<br />{c.before_label}: {c.before == null ? "—" : c.before}</>}</td></tr>
+                  <tr><td className="rc-k">Planned</td>{cells(p)}</tr>
+                  <tr><td className="rc-k">So far</td>{s.trips > 0 ? cells(s) : <td colSpan={RC_COLS.length} className="rc-none" data-rc-none="1">No loads recorded yet</td>}</tr>
+                </tbody>; })}
+            </table>
+          </div></>}
+          {foot}
+        </>}
+      </div>
+    </details>
   );
 }
 

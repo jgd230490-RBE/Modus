@@ -128,6 +128,7 @@ TENANTED = {
     "concerns",
     # 9 Nov 2026 (v2.1 task 2.1-9b, lorry_plan.py PR 2): a planner's arrangement of a yard's lorries for a week. Same edit.
     "lorry_plan_moves",
+    "route_choice_record",
 }
 
 # Tables that are deliberately NOT tenanted, with the reason. Anything here is

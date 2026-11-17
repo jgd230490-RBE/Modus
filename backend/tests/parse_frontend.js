@@ -3978,7 +3978,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // RE-PINNED 5 Nov 2026 (task 0d-2): + the Carbon planner's Route choices table (four)
   const _regions = [...src.matchAll(/<div className="([^"]*)"[^\n]*tabIndex=\{0\} role="region" aria-label="([^"]*)"/g)];
   ok("#15: every scroll region with tabindex 0 carries a focus-ring class (kb-scroll or sim-scroll) and a name that passes the word rule",
-     _regions.length === 5 /* NARROWED 10 Nov 2026: + the Simulation's Now and gates column */ && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
+     _regions.length === 6 /* NARROWED 10 Nov 2026: + the Simulation's Now and gates column; NARROWED 17 Nov 2026 (best option step 3): + the Dashboard's Route choices record */ && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
        && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(m[2])), String(_regions.length));
   // REVERSED 23 Oct 2026 (UI fix 9, decision 16): the rows are no longer mouse-only — the name in the first cell is a button
   // (the UI FIX 9 block at the end). What stays true, and is still checked here: the row click is kept for a mouse, and the
@@ -5206,7 +5206,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && dash.includes("{sites.length ? ` · ${sitesWords(sites, locList)}` : \"\"}"));
   ok("CHART BUTTONS: ONE component (ChartTools) drawn by ChartCanvas; Copy writes a PNG to the clipboard and falls back to a download that says 'Saved instead'; Download saves the same PNG",
      code.includes("function ChartTools({ title, scope, getPlot, inline }){") && code.includes('new ClipboardItem({ "image/png": make() })') && code.includes('await download("Saved instead")')
-     && code.includes('chartToast(say("Copied"))') && code.includes("a.download = name;") && (code.match(/<ChartTools /g) || []).length === 2
+     && code.includes('chartToast(say("Copied"))') && code.includes("a.download = name;") && (code.match(/<ChartTools /g) || []).length === 3 /* NARROWED 17 Nov 2026 (best option step 3): + the Route choices record, in its own head */
      // NARROWED 10 Nov 2026 (wave 3, finding 5): drawn once as `tools`, in the box or in the chart's own title row (`head`)
      && code.includes("const tools = !notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} inline={!!head} />;"));
   ok("CHART BUTTONS: the picture is drawn at 2x on WHITE, redrawn light off screen, the title above and ONE scope line below (scheme, the page's parts, 'Wayscope, <date>', the demo notice)",
