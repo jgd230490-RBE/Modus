@@ -27,7 +27,10 @@
   function draw(p) {
     res.textContent = "";
     var big = el("div", "big");
-    big.appendChild(el("span", "v", p.head));
+    var head = el("span", "v", p.head);        // a heading to a screen reader, the same span to the eye
+    head.setAttribute("role", "heading");
+    head.setAttribute("aria-level", "3");
+    big.appendChild(head);
     (p.chips || []).forEach(function (c) { big.appendChild(el("span", "chip " + c[0], c[1])); });
     res.appendChild(big);
     if (p.over && p.over.length) {
@@ -92,6 +95,11 @@
     if (timer) clearTimeout(timer);
     timer = setTimeout(ask, 500);
   }
+
+  (function () {                               // the days that would be refused are greyed out: before today
+    var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; };
+    if (form.elements.date) form.elements.date.min = d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  })();
 
   form.addEventListener("input", soon);
   form.addEventListener("change", soon);

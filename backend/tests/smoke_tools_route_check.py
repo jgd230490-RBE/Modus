@@ -134,12 +134,16 @@ with TestClient(main.app, base_url=BASE) as anon:
 
     # the limit: five an hour per address
     tools_route_check.LIMIT.reset()
+    tools_route_check.TRIES.reset()
+    # 17 Nov 2026 (F1): mistyped tries do not use up the five
+    slips = [anon.post(URL, json=dict(GOOD, email="nobody"), headers=dict(HDR, **{"CF-Connecting-IP": "198.51.100.9"})).status_code for i in range(6)]
+    ok("5. 🔴 six mistyped tries are six 400s and use up none of the five", slips == [400] * 6, str(slips))
     codes = [anon.post(URL, json=dict(GOOD, email=f"p{i}@example.org"), headers=dict(HDR, **{"CF-Connecting-IP": "198.51.100.9"})).status_code
              for i in range(7)]
     ok("5. 🔴 the sixth call from one address is 429, and the seventh", codes == [200] * 5 + [429] * 2, str(codes))
     r = anon.post(URL, json=GOOD, headers=dict(HDR, **{"CF-Connecting-IP": "198.51.100.9"}))
     ok("5. ...the refusal is one sentence, no count", r.status_code == 429
-       and r.json()["detail"]["say"].startswith("Too many") and r.headers.get("cache-control") == "no-store")
+       and r.json()["detail"]["say"] == "Too many requests from this connection. Please try again in an hour." and r.headers.get("cache-control") == "no-store")
     ok("5. ...and another address is not held back", anon.post(URL, json=GOOD, headers=dict(HDR, **{"CF-Connecting-IP": "198.51.100.10"})).status_code == 200)
     ok("5. a visitor cannot choose the address the limit counts: a made-up forwarded-for entry does not reset it",
        anon.post(URL, json=GOOD, headers=dict(HDR, **{"CF-Connecting-IP": "198.51.100.9", "X-Forwarded-For": "1.2.3.4"})).status_code == 429)

@@ -541,7 +541,9 @@ ok("Where: England and Wales first, then Scotland (kept: it moves the C&U calend
    re.search(r'name="where"><option value="england-and-wales">England and Wales</option><option value="scotland">Scotland</option>', HTML))
 ok("Q1 as revised: no 'by day / by night' box (it never changes an answer); 'Moving on' is a date alone",
    'name="band"' not in HTML and "by night" not in HTML
-   and '<label class="f">Moving on<input type="date" name="date" required></label>' in HTML)
+   and '<label class="f">Moving on<input type="date" name="date" max="2028-12-31" required></label>' in HTML)
+# 17 Nov 2026 (the live check's F8, F10)
+ok("🔴 the date box's last day is the rules' own last moving day", f'max="{T.last_moving_day().isoformat()}"' in HTML, T.last_moving_day().isoformat())
 ok("🔴 no documents button, no 'Add a route', no balance, no price on the page",
    not re.search(r"document|Add a route|balance|£|credit|PDF", HTML, re.I))
 ok("the trap box and the sentence box", 'name="website" tabindex="-1"' in HTML and '<p class="say" role="status"></p>' in HTML)
@@ -611,6 +613,10 @@ ok("🔴 '1e999' or 'inf' typed as the axles is the axles sentence", _say({"axle
 ok("🔴 a list or a dict as 'where' or the time band is that box's sentence", _say({"where": [1, 2]}) == T.SAY["where"]
    and _say({"where": {"a": 1}}) == T.SAY["where"] and _say({"band": [1, 2]}) == T.SAY["band"]
    and _say({"band": {"a": 1}}) == T.SAY["band"])
+
+# 17 Nov 2026 (the live check's F8, F10)
+ok("the script greys out the days before today and marks the answer's head as a heading", "form.elements.date.min = " in JS
+   and 'head.setAttribute("role", "heading")' in JS and 'head.setAttribute("aria-level", "3")' in JS)
 
 print()
 for f in FAIL:

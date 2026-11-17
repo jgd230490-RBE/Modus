@@ -18,8 +18,13 @@ import demo_request
 import tools_leads
 import tools_public
 
-#: five an hour for one address, as the landing form's (demo_request.PER_IP_PER_HOUR)
-LIMIT = tools_public.Limit("route-check", 5, 3600)
+#: five KEPT requests an hour for one address, as the landing form's (demo_request.PER_IP_PER_HOUR). 17 Nov 2026: counted
+#: in handle() only when a request is kept, so a mistyped box does not use one up (read on live: five slips locked a
+#: person out for an hour)
+LIMIT = tools_public.Limit("route-check", 5, 3600, what="requests")
+#: every call, kept or refused: the open call's first line (tools_public.guard). Far above a person correcting a form,
+#: far below a script
+TRIES = tools_public.Limit("route-check-tries", 30, 3600, what="requests")
 MAX_LEN = {"from": 200, "to": 200, "name": 120, "email": 200, "company": 160, "note": 300}
 MAX_LOADS = 100000
 SUBJECT = "Route check request"
@@ -80,6 +85,8 @@ def handle(body, ip):
     clean, say = validate(body)
     if say:
         tools_public.refuse(400, say)
+    if not LIMIT.hit(ip):                      # only a request that would be kept counts toward the five
+        tools_public.refuse(429, LIMIT.say)
     rid = tools_leads.keep("route-check", clean["email"], name=clean["name"], company=clean["company"], news=False,
                            details={"from": clean["from"], "to": clean["to"], "lorry": clean["lorry"],
                                     "loads": clean["loads"], "note": clean["note"]}, ip=ip)
