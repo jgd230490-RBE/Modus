@@ -16612,7 +16612,9 @@ function boInUseLimit(L, div){
 // 17 Nov 2026 (the live check and UI / UX review, notes ux-best-option-1117; John: "Yes, as recommended", Q1 to Q7).
 // Q3: the card's frame shows the moment a route opens, with how long the wait can be (the first card after a change
 // waited 29 to 37 s on live behind an empty half panel).
-const BO_WAIT = "Working out the best option… about half a minute after a change.";
+// 17 Nov 2026 (John: "Yes, drop it"): it ended "about half a minute after a change"; since the card answers its own
+// route first (PR #317) the wait after a change is a few seconds on live, so the line no longer says how long
+const BO_WAIT = "Working out the best option…";
 // Q1: a reason the rule gives as a fragment ("it adds 7.5 t limits, except for access, on Syston Road…") is shown on a
 // row as a sentence. The words are the rule's; nothing here splits or rewrites them.
 function boSay(s){
