@@ -2648,8 +2648,13 @@ async function routesDriversDom(){
   const host = w.document.createElement("div"); w.document.body.appendChild(host);
   const root = w.ReactDOM.createRoot(host);
   const E = w.React.createElement;
-  act(() => { root.render(E("table", null, E("tbody", null, E(w.RouteAnalysis, { routeId: "R1", colSpan: 9, token: "t" })))); });
+  // NARROWED 17 Nov 2026 (routes-card-room, Option B; John's yes to notes routes-card-room-mockup-1117): an open route's
+  // analysis is no longer a row of the Routes list's table, so it is mounted as the page mounts it (no table round it)
+  act(() => { root.render(E(w.RouteAnalysis, { routeId: "R1", token: "t" })); });
   await settle(150);
+  ok("⭐ ROUTES DOM: the analysis is a block of its own (.ro-body), not a table row: the card's part, the figures, then the settings",
+     !!host.firstElementChild && host.firstElementChild.tagName === "DIV" && host.firstElementChild.classList.contains("ro-body")
+     && [...host.firstElementChild.children].map(c => c.getAttribute("data-ro")).join(">") === "card>figures>settings" && !host.querySelector("tr.bg-slate-50\\/70"));
   // NARROWED 16 Nov 2026 (step 1b, John's yes to the third draft, Q6): the options table is folded under "All figures"
   // each time a row opens (the best option card above it); open the fold, then read the table as before
   ok("ROUTES DOM: the options table opens folded, with an 'All figures' button (the best-option read never answers here)",

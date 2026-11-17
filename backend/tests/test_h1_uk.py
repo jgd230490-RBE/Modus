@@ -1324,7 +1324,9 @@ for _line in _dark.splitlines():
         if not _used:
             _dead.append(_sel.strip())
 ok("UI fix 2: every selector in the DARK-REMAP block has a use in the markup — the four stale remaps found this way on 17 Oct (bg-[rgba(37,99,235,.06)], bg-slate-200, hover:text-slate-800 / -900: utilities no longer in the file) are gone",
-   not _dead and _dark.count('html[data-theme="dark"]') >= 48 and "bg-slate-200{" not in _dark and "text-slate-900" not in _dark, str(_dead)[:300])
+   # NARROWED 17 Nov 2026 (routes-card-room): 48 -> 47. The open route is a panel of its own, no longer a grey table row
+   # (bg-slate-50/70), so that row's remap had no use left and went with it, as this check asks of a stale remap
+   not _dead and _dark.count('html[data-theme="dark"]') >= 47 and "bg-slate-50\\/70" not in _dark and "bg-slate-200{" not in _dark and "text-slate-900" not in _dark, str(_dead)[:300])
 
 # --- 22 Oct 2026: UI fix 6 (claude/ui-fix-layout) — the approved mockup notes/ui-fix-layout-mockup-1022/ (the user: "i agree to
 # all apart from 4"): the contrast of cards 2, 3, 5 and 6 and of the two extras the user said yes to (the Horizon's commit-week
@@ -1348,6 +1350,8 @@ for _a in _ACC:
         for name, a, b in [("a haul-road button's text on its fill (white; the control's text colour in Dark)", t["control-fg"] if _dk else "#FFFFFF", t["haul-text"]),
                            ("the words on a card", t["haul-text"], t["surface"]),
                            ("the words on the page", t["haul-text"], t["bg"]),
+                           # 17 Nov 2026 (routes-card-room): the expanded row is the open route's own panel now (a card: "the words on
+                           # a card" above); the old row's wash is kept here as the harder surface, its Dark remap left the CSS with the row
                            ("the dagger and its note on the expanded Routes row (slate-50/70)", t["haul-text"], _over("rgba(27,29,33,.7)", t["surface"]) if _dk else _over("rgba(248,250,252,.7)", "#FFFFFF")),
                            ("the 'Haul road' label on the amber wash (amber-50/60)", t["haul-text"], _over("rgba(251,191,36,.10)", t["surface"]) if _dk else _over("rgba(255,251,235,.6)", "#FFFFFF")),
                            ("the words on a slate-50 surface", t["haul-text"], t["surface-2"] if _dk else "#F8FAFC"),
