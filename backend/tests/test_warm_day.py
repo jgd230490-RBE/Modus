@@ -71,6 +71,11 @@ MAIN = read("backend/main.py")
 _ws = MAIN.split("def _warm_staff():")[1].split("\nread_cache.WARMERS")[0]
 ok("the Zones page's diversions read is on the staff warm-up list, as the page asks for it",
    "routes_diversions(route_id=None)" in _ws and 'read_cache.WARMERS["staff"] = _warm_staff' in MAIN)
+# 17 Nov 2026 (claude/warm-best-option): the best-option rule's table is warmed too, in its own entry, registered last
+ok("the best-option table has its own warm-up entry, registered after the staff and public map entries",
+   'read_cache.WARMERS["best_option"] = _warm_best' in MAIN
+   and MAIN.index('read_cache.WARMERS["public_map"]') < MAIN.index('read_cache.WARMERS["best_option"]')
+   and "_best_table(_dt.date.today())" in MAIN.split("def _warm_best():")[1].split("\nread_cache.WARMERS")[0])
 ok("the staff reads are still keyed by the day (why the turnover matters)",
    re.search(r"def _staff_json\(.*?_dt\.date\.today\(\)\.isoformat\(\)", MAIN, re.S) is not None)
 

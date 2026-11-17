@@ -953,9 +953,12 @@ except _HTTPException as e:
 ok("12. a day that is not YYYY-MM-DD is a 400", _bad == 400)
 _m = read("backend/main.py")
 _f = _m.split("def route_options_best(")[1].split("\n@app")[0]
+_bt = (_m.split("def _best_table(") + [""])[1].split("\ndef ")[0]
 ok("⭐ 12. a heavy staff read: _staff_json, one Context (one pre, prefetch), placed after _gate_arrivals_build",
-   '"/api/admin/route-options/best"' in _m and "_check_admin(token)" in _f and "_staff_json(" in _f
-   and "route_best.table(d)" in _f and _m.index("def _gate_arrivals_build(") < _m.index("def route_options_best(")
+   # NARROWED 17 Nov 2026 (claude/warm-best-option): the admin table and the card share ONE helper, _best_table, which
+   # holds the _staff_json call (it was written out in each endpoint)
+   '"/api/admin/route-options/best"' in _m and "_check_admin(token)" in _f and "return _best_table(d)" in _f
+   and "_staff_json(" in _bt and "route_best.table(d)" in _bt and _m.index("def _gate_arrivals_build(") < _m.index("def route_options_best(")
    and "network.prefetch_analysis_geometry(self.pre)" in _rb)
 ok("12. no outside call in the rule (no router, no fetch)", not any(x in _rb for x in ("here_routing.route", "requests.",
                                                                                        "urllib", "fetch_years", "refresh(")))
@@ -983,6 +986,75 @@ _tab_words = [w for r in TAB["routes"] for w in [r.get("why") or "", r.get("trad
 ok("⭐ 12. ...nor does any line of the admin table (why, trade, held back, sentences, what ruled an option out)",
    not [w for w in _tab_words if _re.search(r"\b\d{4}-\d{2}-\d{2}\b", w)] and any("31 Mar 2027" in w for w in _tab_words),
    [w for w in _tab_words if _re.search(r"\b\d{4}-\d{2}-\d{2}\b", w)][:2])
+
+# =========================================================================== #
+#  13. One kept copy for every staff caller, built by the warm-up (17 Nov 2026) #
+# =========================================================================== #
+# John, 17 Nov 2026: "Yes, add it". On live the first card after a deploy, a write or midnight waited 29 to 35 s for the
+# rule's table, and each role and team built its own copy of the same table.
+import access  # noqa: E402
+import read_cache  # noqa: E402
+
+
+def _as(acc, fn):
+    tok = access._ACCESS.set(acc)
+    try:
+        return fn()
+    finally:
+        access._ACCESS.reset(tok)
+
+
+_ADMIN = {"role": "admin", "ipt": None, "label": "Admin", "via": "login", "kind": "staff"}
+_TEAM = {"role": "ipt", "ipt": "IPT1", "label": "Team 1", "via": "login", "kind": "staff"}
+_PLAN = {"role": "planner", "ipt": None, "label": "Planner", "via": "login", "kind": "staff"}
+read_cache.clear()
+_b0 = read_cache.STATS["builds"]
+_c1 = _as(_ADMIN, lambda: main.route_best_option("R1"))
+_b1 = read_cache.STATS["builds"]
+_c2 = _as(_TEAM, lambda: main.route_best_option("R1"))
+_c3 = _as(_PLAN, lambda: main.route_best_option("R2"))
+_b2 = read_cache.STATS["builds"]
+ok("⭐ 13. the card's read: an admin's first card builds the table once; a team's and a planner's cards build nothing more",
+   _b1 - _b0 == 1 and _b2 == _b1 and _c1["route"]["route"] == "R1" and _c2["route"] == _c1["route"]
+   and _c3["route"]["route"] == "R2", f"builds {_b1 - _b0} then {_b2 - _b1}")
+_today = datetime.date.today().isoformat()
+_t_today = main.route_options_best(day=None, token="best-admin-token")
+ok("13. the admin table for today is the same kept copy (no build); another day is its own",
+   read_cache.STATS["builds"] == _b2 and _t_today["day"] == _today
+   and [r["route"] for r in _t_today["routes"]] == ["R1", "R2", "R3", "R4", "R5"])
+try:
+    main.route_best_option("R1")
+    _open = True
+except _HTTPException as e:
+    _open = e.status_code != 401
+ok("⭐ 13. the wall stays: with no sign-in the card's read is refused although a copy is held", _open is False)
+try:
+    _as(_ADMIN, lambda: main.route_best_option("NOPE"))
+    _nf = None
+except _HTTPException as e:
+    _nf = e.status_code
+ok("13. an unknown route is still a 404", _nf == 404)
+read_cache.clear()
+_b3 = read_cache.STATS["builds"]
+read_cache.WARMERS["best_option"]()
+_b4 = read_cache.STATS["builds"]
+_c4 = _as(_TEAM, lambda: main.route_best_option("R1"))
+ok("⭐ 13. the warm-up builds today's table, and the first card after it (any staff caller) builds nothing",
+   _b4 - _b3 == 1 and read_cache.STATS["builds"] == _b4 and _c4["route"]["route"] == "R1")
+ok("13. it is registered last, after the Dashboard's and the public map's reads, and warm() runs it without an error",
+   list(read_cache.WARMERS)[-1] == "best_option" and read_cache.WARMERS["best_option"] is main._warm_best
+   and all(k in read_cache.WARMERS for k in ("staff", "public_map")))
+ok("13. one _staff_json call for the table in main.py, with the shared scope (never the caller's)",
+   _m.count('_staff_json("route-options/best"') == 1 and "BEST_SCOPE)" in _bt
+   and main._staff_scope(main.BEST_SCOPE) == "staff|-"
+   and main._staff_name("route-options/best", {"day": _today}, main.BEST_SCOPE)
+   == main._staff_name("route-options/best", {"day": _today}, dict(main.BEST_SCOPE)))
+_db_v = db.data_version()
+db.bump_data_version()
+_b5 = read_cache.STATS["builds"]
+_as(_ADMIN, lambda: main.route_best_option("R1"))
+ok("13. never stale: after a write the next card builds it again", read_cache.STATS["builds"] == _b5 + 1
+   and db.data_version() != _db_v)
 
 print()
 for f_ in FAIL:
