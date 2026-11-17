@@ -7661,6 +7661,39 @@ async def tools_abnormal_load(request: Request):
     return {"ok": True, "page": out["page"]}
 
 
+# 17 Nov 2026 (claude/tools-calculators) — the three free haul calculators' open calls (tools_calculators.py): each works the
+# platform's own sum on the figures typed and the shipped lorry figures, behind its own limit; the PDF call is the only one
+# that takes an email.
+import tools_calculators  # noqa: E402
+
+
+async def _tools_json(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    return body if isinstance(body, dict) else {}
+
+
+@app.post("/api/tools/calculators/sum")
+async def tools_calc_sum(request: Request):
+    tools_public.guard(request, tools_calculators.SUM_LIMIT)
+    body = await _tools_json(request)
+    which = str(body.get("which") or "")
+    if which not in tools_calculators.WHICH:
+        tools_public.refuse(400, "Pick one of the three calculators.")
+    return tools_calculators.public(which, tools_calculators.work(which, body.get("figures")))
+
+
+@app.post("/api/tools/calculators/pdf")
+async def tools_calc_pdf(request: Request):
+    tools_public.guard(request, tools_calculators.PDF_LIMIT)
+    body = await _tools_json(request)
+    if tools_public.trapped(body):
+        return {"ok": True}
+    return tools_calculators.pdf_answer(body, tools_public.client_ip(request))
+
+
 # 6 Oct 2026 (H5) — the public landing page at /landing/ for PREVIEW on this service. The
 # page lives in landing/ at the repo root so the same folder deploys as a Render static
 # site on the root domain once the app has moved to app. (H0's open decision). Not gated:
