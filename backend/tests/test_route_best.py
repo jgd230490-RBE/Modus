@@ -960,12 +960,15 @@ ok("⭐ 12. a heavy staff read: _staff_json, one Context (one pre, prefetch), pl
 ok("12. no outside call in the rule (no router, no fetch)", not any(x in _rb for x in ("here_routing.route", "requests.",
                                                                                        "urllib", "fetch_years", "refresh(")))
 _tg = read("frontend/help/technical/index.html")
-ok("12. the technical guide has the rule's section (the user guide waits for the card)",
+# NARROWED 16 Nov 2026 (step 1b): the user guide now has the card's section; it still names no admin endpoint
+ok("12. the technical guide has the rule's section; the user guide names no endpoint of it",
    'id="t2-best-option"' in _tg and "/api/admin/route-options/best" in _tg and "searched_prints" in _tg
-   and "route-options/best" not in read("frontend/help/index.html"))
+   and "route-options/best" not in read("frontend/help/index.html") and 'id="ug-best-option"' in read("frontend/help/index.html"))
 _fe = read("frontend/index.html")
-ok("12. no screen: the frontend does not read it, and 'Counts only: nothing is scored or ranked' is still on the Routes page",
-   "route-options/best" not in _fe and "route_best" not in _fe and "Counts only: nothing is scored or ranked" in _fe)
+# REVERSED 16 Nov 2026 (step 1b, John's yes to the third draft): the card on Data -> Routes reads the rule through the
+# staff read /best-option (never the admin table), and 'Counts only: nothing is scored or ranked' is gone (Q1)
+ok("12. the card: the frontend reads /best-option, not the admin table, and 'Counts only: nothing is scored or ranked' is gone",
+   "route-options/best" not in _fe and "/best-option`" in _fe and "Counts only: nothing is scored or ranked" not in _fe)
 
 ok("⭐ 12. every row of the admin table carries trade_short and in_use_limits (the card is built to these names)",
    all("trade_short" in r and "in_use_limits" in r for r in TAB["rows"])

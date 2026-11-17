@@ -121,6 +121,8 @@ with TestClient(main.app, base_url=BASE) as anon:
     # 17 Nov 2026 (claude/tools-abnormal-adviser): narrowed from "no page on this branch" — the tool branches add theirs
     ok("1. the shipped folder serves only the first opening's tool pages",
        set(tools_public.pages()) <= {"abnormal-load", "calculators", "route-check"}, str(tools_public.pages()))
+    # NARROWED 16 Nov 2026 (claude/tools-route-check-request): the first tool pages ship
+    ok("1. the shipped folder holds only the named tool pages", set(tools_public.pages()) <= {"calculators", "abnormal-load", "route-check"})
 
     # ---- 2. a page in the frame (the sample, from a scratch copy of the folder) ------------------------------------- #
     scratch = Path(TMP) / "tools"

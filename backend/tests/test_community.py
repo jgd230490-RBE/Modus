@@ -869,9 +869,12 @@ ok("9: the Routes page: a Near the route column after the team, the cell and the
    and "<NearDetails data={nearData} id={r.id} colSpan={11} />" in _FE9 and "<RouteAnalysis routeId={r.id} colSpan={11}" in _FE9
    and 'data-route-diversions={r.id}><td colSpan={11}' in _FE9 and "colSpan={8}" not in _FE9[_FE9.find('data-route-near-cell'):_FE9.find('data-route-near-cell') + 6000] and "Not fetched" in _FE9 and "None of these" in _FE9
    and "fetch(`${API}/routes/community-counts`)" in _FE9)
-ok("9: ...three chips (schools, health, bus stops), counts only: no score, no ranking; the guides say so",
-   'const NEAR_CHIPS = [["schools"' in _FE9 and "nothing is scored or ranked" in _FE9 and "Near the route" in GUIDE
-   and "nothing is scored or ranked" in GUIDE and "t8-route-counts" in TECH and "route_compare.near_counts" in TECH)
+# REVERSED 16 Nov 2026 (step 1b, John's Q1 "Yes to Q1"): the best option card now suggests on the Routes page, so the
+# "nothing is scored or ranked" sentence is gone from the Near box and the user guide's Routes section; the chips stay
+ok("9: ...three chips (schools, health, bus stops); 'nothing is scored or ranked' is GONE from the Routes page and its guide",
+   'const NEAR_CHIPS = [["schools"' in _FE9 and "nothing is scored or ranked" not in _FE9 and "Near the route" in GUIDE
+   and "nothing is scored or ranked" not in GUIDE and "t8-route-counts" in TECH and "route_compare.near_counts" in TECH
+   and 'id="ug-best-option"' in GUIDE)
 
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
