@@ -185,3 +185,9 @@ p{margin:0 0 10px}
 .pdfbox .done{font-size:13.5px;color:var(--ok);margin:8px 0 0}
 /* B2: the adviser's cue while the form has no answer */
 #adv-hint{margin:0 0 12px}
+/* 17 Nov 2026 (claude/tools-working; John's yes): "How this was worked out", a closed fold under a calculator's answer */
+.calc .how{margin-top:8px;font-size:12.5px;color:var(--ink-2)}
+.calc .how summary{cursor:pointer;color:var(--ink);font-weight:500;padding:4px 0;min-height:24px}
+.calc .how ol{margin:6px 0 2px;padding-left:18px}
+.calc .how li{margin:3px 0}
+@media (max-width:520px){.calc .how summary{min-height:44px;display:flex;align-items:center}}

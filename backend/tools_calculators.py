@@ -221,20 +221,89 @@ def fuel_surcharge(diesel_then_p, diesel_now_p, share_pct, rate):
 
 
 def work(which, figures):
-    """The one sum named, on a dict of typed figures: the same call the page and the PDF both go through."""
+    """The one sum named, on a dict of typed figures: the same call the page and the PDF both go through.
+    17 Nov 2026: every answer carries `steps`, the three lines of "How this was worked out" (John's yes)."""
     f = figures if isinstance(figures, dict) else {}
     if which == "lorries":
-        return lorries_needed(f.get("tonnes"), f.get("lorry"), f.get("working_days"), f.get("round_trips"))
+        out = lorries_needed(f.get("tonnes"), f.get("lorry"), f.get("working_days"), f.get("round_trips"))
+    elif which == "carbon":
+        out = haul_carbon(f.get("loads"), f.get("miles"), f.get("lorry"), f.get("way_back") or WAY_BACK_DEFAULT)
+    elif which == "surcharge":
+        out = fuel_surcharge(f.get("diesel_then"), f.get("diesel_now"), f.get("share"), f.get("rate"))
+    else:
+        tools_public.refuse(400, "Pick one of the three calculators.")
+    out["steps"] = steps(which, out, f)
+    return out
+
+
+# --------------------------------------------------------------------------- how each answer was worked out
+
+#: the words that name the lorry figures' source inside the carbon fold. On the PUBLIC tool pages only (John's yes,
+#: 17 Nov, Q2: it bends "a screen names no source" for these pages); the PDF's own source line already names it
+def source_words():
+    import re as _re
+    name = str(((factors().get("carbon") or {}).get("source") or {}).get("name") or "")
+    m = _re.search(r"\b(20\d\d)\b", name)
+    return f"UK Government figures, {m.group(1)}" if m else "UK Government figures"
+
+
+def _plural(n, word):
+    return f"{_t(n) if float(n) != int(float(n)) else grp(n)} {word if float(n) == 1 else word + 's'}"
+
+
+def steps(which, out, figures, source=True):
+    """The three lines of "How this was worked out": what was typed, the figure used, the result. Each number is the
+    sum's own (never worked again a second way); `source=False` leaves the source's name out (the PDF names it below)."""
+    if which == "lorries":
+        raw = out["tonnes"] / out["payload_t"]
+        loads, cap = out["loads"], out["round_trips"] * out["working_days"]
+        up = "" if abs(raw - loads) < 1e-9 else f" ({raw:.1f}, rounded up)"
+        tonnes = grp(out["tonnes"]) if out["tonnes"] == int(out["tonnes"]) else f"{out['tonnes']:,.2f}".rstrip("0").rstrip(".")
+        return [f"{tonnes} t at {_t(out['payload_t'])} t a load is {_plural(loads, 'load')}{up}.",
+                f"One lorry makes {_plural(out['round_trips'], 'round trip')} a day for {_plural(out['working_days'], 'day')}: "
+                f"{_plural(cap, 'load')}.",
+                f"{_plural(loads, 'load')} {'needs' if loads == 1 else 'need'} {out['lorries']} "
+                f"{'lorry' if out['lorries'] == 1 else 'lorries'}."]
     if which == "carbon":
-        return haul_carbon(f.get("loads"), f.get("miles"), f.get("lorry"), f.get("way_back") or WAY_BACK_DEFAULT)
-    if which == "surcharge":
-        return fuel_surcharge(f.get("diesel_then"), f.get("diesel_now"), f.get("share"), f.get("rate"))
-    tools_public.refuse(400, "Pick one of the three calculators.")
+        import return_journey
+        mi, n, key, wb = out["miles"], out["loads"], out["lorry"], out["way_back"]
+        f = factors()
+        per_mile_loaded = return_journey.trip_kg(f, key, KM_PER_MILE, 0.0, 1.0)["kg"]
+        per_mile_empty = return_journey.trip_kg(f, key, KM_PER_MILE, KM_PER_MILE, 1.0)["kg"] - per_mile_loaded
+        src = f" ({source_words()})" if source else ""
+        kg = out["kg_per_trip"]
+        name = lorry_short(key)
+        half = _t(round(mi / 2.0, 2))
+        miles = "mile" if mi / 2.0 == 1 else "miles"
+        if wb == "Empty":
+            loaded = per_mile_loaded * mi / 2.0
+            one = f"A {_t(mi)} mile round trip: {half} {miles} loaded, {half} back empty."
+            two = (f"{name}: {per_mile_loaded:.2f} kg a mile loaded, {per_mile_empty:.2f} empty{src}. "
+                   f"That is {loaded:.2f} + {kg - loaded:.2f} = {kg:.2f} kg a trip.")
+        elif wb == "Loaded":
+            one = f"A {_t(mi)} mile round trip, counted loaded both ways."
+            two = f"{name}: {per_mile_loaded:.2f} kg a mile loaded{src}. That is {kg:.2f} kg a trip."
+        else:
+            one = f"A {_t(mi)} mile round trip: {half} {miles} loaded; the way back is not counted."
+            two = f"{name}: {per_mile_loaded:.2f} kg a mile loaded{src}. That is {kg:.2f} kg a trip."
+        return [one, two, f"{kg:.2f} kg × {_plural(n, 'load')} = {out['answer'].replace(' CO₂e', '')}."]
+    then, now, share = _num(figures.get("diesel_then")), _num(figures.get("diesel_now")), _num(figures.get("share"))
+    move = (now / then - 1.0) * 100.0
+    pct = out["pct"]
+    if abs(move) < 1e-9:
+        one = f"Diesel is unchanged at {now:.1f}p a litre."
+    else:
+        one = f"Diesel is {'up' if move > 0 else 'down'} {abs(move):.1f} %: from {then:.1f}p to {now:.1f}p a litre."
+    two = f"Fuel is {_t(share)} % of the rate: {abs(move):.1f} % × {_t(share)} % = {abs(pct):.1f} %."
+    three = f"{money(out['rate'])} {'−' if pct < 0 else '+'} {abs(pct):.1f} % = {money(out['rate_with'])} a load."
+    if pct >= 0:
+        three += " A fall in diesel lowers the rate the same way."
+    return [one, two, three]
 
 
 def public(which, out):
-    """What the page is sent: the answer's two lines and nothing else."""
-    return {"which": which, "answer": out["answer"], "detail": out["detail"]}
+    """What the page is sent: the answer's two lines and the three steps of how it was worked out; nothing else."""
+    return {"which": which, "answer": out["answer"], "detail": out["detail"], "steps": out["steps"]}
 
 
 # --------------------------------------------------------------------------- the PDF
@@ -266,6 +335,22 @@ def today():
     except Exception:
         d = datetime.date.today()
     return d
+
+
+HOW = "How this was worked out"
+
+
+def _wrap(c, text, font, size, width):
+    """The text broken at spaces to fit `width` points in this font."""
+    lines, cur = [], ""
+    for word in text.split(" "):
+        trial = (cur + " " + word).strip()
+        if cur and c.stringWidth(trial, font, size) > width:
+            lines.append(cur)
+            cur = word
+        else:
+            cur = trial
+    return lines + ([cur] if cur else [])
 
 
 def build_pdf(which, figures, on=None):
@@ -320,6 +405,17 @@ def build_pdf(which, figures, on=None):
     c.setFillColorRGB(0.45, 0.47, 0.5)
     c.drawString(lm + 12, y - 33, out["detail"])
     y -= 70
+    # 17 Nov 2026: the three steps under the answer in every calculator's file (the source is named in its own line below)
+    c.setFont(fo["bold"], 10)
+    c.setFillColorRGB(0.1, 0.12, 0.16)
+    c.drawString(lm, y, HOW)
+    c.setFont(fo["regular"], 10)
+    c.setFillColorRGB(0.24, 0.27, 0.31)
+    for i, line in enumerate(steps(which, out, figures if isinstance(figures, dict) else {}, source=False), 1):
+        for j, piece in enumerate(_wrap(c, f"{i}. {line}", fo["regular"], 10, W - 2 * lm)):
+            y -= 15
+            c.drawString(lm + (0 if j == 0 else 12), y, piece)
+    y -= 26
     if which == "carbon":
         c.setFont(fo["bold"], 10)
         c.setFillColorRGB(0.1, 0.12, 0.16)
@@ -328,8 +424,6 @@ def build_pdf(which, figures, on=None):
         c.setFillColorRGB(0.45, 0.47, 0.5)
         y -= 14
         c.drawString(lm, y, "Lorry emission figures: UK Government greenhouse gas conversion factors 2026. Transport only.")
-        y -= 12
-        c.drawString(lm, y, "The round trip is counted half out loaded and half back, the way back as picked above.")
     c.setFont(fo["regular"], 9)
     c.setFillColorRGB(0.45, 0.47, 0.5)
     c.drawString(lm, 20 * 2.8346, f"Wayscope · wayscope.co.uk/tools · {on.day} {on.strftime('%B %Y')}")
