@@ -285,7 +285,7 @@ if (hasCard) {
     const DIVU = { loaded: { alt: 2, label: "Alt 2", why: "diversion", status: "in_use", until: "2027-12-17" }, return: { alt: 2, label: "Alt 2", why: "diversion", status: "in_use", until: "2027-12-17" } };
     const m3 = mount(B(route({ options: [opt(1)], answer: "Keep the route in use", why: "No other option is clearly ahead on any head.", in_use: DIVU,
                                in_use_limits: [{ words: "Weight limit 7.5 t", legs: "both" }] })));
-    ok("⭐ Q9: a limit on the line in use is one grey sentence around the rule's words (both legs: no leg named)",
+    ok("⭐ Q9: without the rule's short form, one grey sentence around its words (both legs: no leg named)",
        m3.host.querySelector("[data-bo-in-use-limit].bo-grey") && m3.host.querySelector("[data-bo-in-use-limit]").textContent === "The diversion in use meets a limit below this lorry: Weight limit 7.5 t.",
        (m3.host.querySelector("[data-bo-in-use-limit]") || {}).textContent);
     m3.done();
@@ -294,6 +294,18 @@ if (hasCard) {
     ok("Q9: on the main route and one leg only, the leg is named",
        m3b.host.querySelector("[data-bo-in-use-limit]").textContent === "The route in use meets a limit below this lorry: Weight limit 7.5 t (return leg).");
     m3b.done();
+    // the rule's `short` (claude/route-best-limit-short): the words John saw on Q9 (his one-hour rule, 17 Nov)
+    const m3c = mount(B(route({ options: [opt(1)], answer: "Keep the route in use", why: "No other option is clearly ahead on any head.", in_use: DIVU,
+                                in_use_limits: [{ words: "Weight limit 7.5 t", short: "7.5 t limit", legs: "both" }] })));
+    ok("⭐ Q9: with the rule's short form, the sentence John saw: 'The diversion in use meets a 7.5 t limit below this lorry.'",
+       m3c.host.querySelector("[data-bo-in-use-limit]").textContent === "The diversion in use meets a 7.5 t limit below this lorry.",
+       m3c.host.querySelector("[data-bo-in-use-limit]").textContent);
+    m3c.done();
+    const m3d = mount(B(route({ options: [opt(1)], answer: "Keep the route in use", why: "No other option is clearly ahead on any head.",
+                                in_use_limits: [{ words: "Height limit 4.2 m", short: "4.2 m height limit", legs: "loaded" }] })));
+    ok("Q9: short form on the main route, one leg named",
+       m3d.host.querySelector("[data-bo-in-use-limit]").textContent === "The route in use meets a 4.2 m height limit below this lorry (loaded leg).");
+    m3d.done();
     const m4 = mount(B(route({ options: [Object.assign(opt(1), { chosen: true })], in_use_limits: [], trade_short: null })));
     ok("Q9: an empty in_use_limits list (the rule's 'none') draws no line; trade_short null on a Suggested answer leaves the rule's why",
        !m4.host.querySelector("[data-bo-in-use-limit]") && m4.host.querySelector("[data-bo-why]") && m4.host.querySelector("[data-bo-why]").textContent === route().why);
