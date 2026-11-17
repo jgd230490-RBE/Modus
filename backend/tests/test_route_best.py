@@ -883,6 +883,26 @@ ok("10c. ...it is the site rule that leaves it out: the same road with no except
 ok("10c. a line in use with no limit below the lorry gives an empty list", R3["in_use_limits"] == [] and R2["in_use_limits"] == [])
 ok("10c. one leg only reads 'loaded' or 'return'", RB.in_use_limits({"loaded": bent(LAT4, 0), "return": None}, ART, _ctx4)[0]["legs"]
    == "loaded")
+# 17 Nov: `short`, the limit as a person names it inside a sentence ("The diversion in use meets a 7.5 t limit below this
+# lorry."), beside `words` (unchanged)
+ok("⭐ 10c. in_use_limits: each entry carries `short` beside `words` (R4: '7.5 t limit'; R1's bridge too)",
+   [x.get("short") for x in R4l["in_use_limits"]] == ["7.5 t limit"] and R4l["in_use_limits"][0]["words"].startswith("Weight limit 7.5 t")
+   and all(x.get("short", "").endswith(" limit") for x in R1["in_use_limits"]),
+   str(R4l["in_use_limits"]) + " / " + str(R1["in_use_limits"]))
+_shorts_by_kind = {(k, v): RB.limit_short({"kind": k, "value": v}) for k, v in
+                   (("weight", 7.5), ("weight", 18), ("height", 4.2), ("height", 4.0), ("width", 2.5), ("width", 2.0),
+                    ("axle", 10), ("axle", 11.5))}
+ok("⭐ 10c. `short` for each kind the app holds, in the app's own figures (limits.fmt_value: heights and widths keep one decimal)",
+   _shorts_by_kind == {("weight", 7.5): "7.5 t limit", ("weight", 18): "18 t limit", ("height", 4.2): "4.2 m height limit",
+                       ("height", 4.0): "4.0 m height limit", ("width", 2.5): "2.5 m width limit",
+                       ("width", 2.0): "2.0 m width limit", ("axle", 10): "10 t axle limit", ("axle", 11.5): "11.5 t axle limit"},
+   str(_shorts_by_kind))
+_all_kind_shorts = list(_shorts_by_kind.values()) + [RB.limit_short({"kind": k, "value": None}) for k in ("weight", "height", "width", "axle")]
+ok("⭐ 10c. `short` carries no capital and no colon, no double space, no road name, and ends 'limit' (every kind, with and "
+   "without a value)",
+   all(s == s.lower() and ":" not in s and "  " not in s and s.endswith(" limit") and "·" not in s for s in _all_kind_shorts)
+   and set(RB._SHORT_NOUN) == set(__import__("limits").KINDS),
+   str(_all_kind_shorts))
 
 # =========================================================================== #
 #  11. Words                                                                   #
@@ -940,18 +960,22 @@ ok("⭐ 12. a heavy staff read: _staff_json, one Context (one pre, prefetch), pl
 ok("12. no outside call in the rule (no router, no fetch)", not any(x in _rb for x in ("here_routing.route", "requests.",
                                                                                        "urllib", "fetch_years", "refresh(")))
 _tg = read("frontend/help/technical/index.html")
-ok("12. the technical guide has the rule's section (the user guide waits for the card)",
+# NARROWED 16 Nov 2026 (step 1b): the user guide now has the card's section; it still names no admin endpoint
+ok("12. the technical guide has the rule's section; the user guide names no endpoint of it",
    'id="t2-best-option"' in _tg and "/api/admin/route-options/best" in _tg and "searched_prints" in _tg
-   and "route-options/best" not in read("frontend/help/index.html"))
+   and "route-options/best" not in read("frontend/help/index.html") and 'id="ug-best-option"' in read("frontend/help/index.html"))
 _fe = read("frontend/index.html")
-ok("12. no screen: the frontend does not read it, and 'Counts only: nothing is scored or ranked' is still on the Routes page",
-   "route-options/best" not in _fe and "route_best" not in _fe and "Counts only: nothing is scored or ranked" in _fe)
+# REVERSED 16 Nov 2026 (step 1b, John's yes to the third draft): the card on Data -> Routes reads the rule through the
+# staff read /best-option (never the admin table), and 'Counts only: nothing is scored or ranked' is gone (Q1)
+ok("12. the card: the frontend reads /best-option, not the admin table, and 'Counts only: nothing is scored or ranked' is gone",
+   "route-options/best" not in _fe and "/best-option`" in _fe and "Counts only: nothing is scored or ranked" not in _fe)
 
 ok("⭐ 12. every row of the admin table carries trade_short and in_use_limits (the card is built to these names)",
    all("trade_short" in r and "in_use_limits" in r for r in TAB["rows"])
    and _rows[("R2", "Alt 2")]["trade_short"] == "Alt 2 had fewer collisions and is behind on time."
    and _rows[("R1", "Alt 2")]["trade_short"] is None
    and [x["legs"] for x in _rows[("R4", None)]["in_use_limits"]] == ["both"]
+   and [x["short"] for x in _rows[("R4", None)]["in_use_limits"]] == ["7.5 t limit"]
    and all(isinstance(r["in_use_limits"], list) for r in TAB["rows"]), str(_rows[("R4", None)].get("in_use_limits")))
 _tab_words = [w for r in TAB["routes"] for w in [r.get("why") or "", r.get("trade") or "", r.get("held_back") or ""]
               + list(r.get("sentences") or []) + [s for o in r["options"] for s in o["sentences"] + o["ruled_out"]]] \
