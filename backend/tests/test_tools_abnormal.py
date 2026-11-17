@@ -474,6 +474,16 @@ ok("the script sends every box the module reads", all(f"{k}:" in JS for k in ("w
    "axle_count", "date", "where", "axle_spacings_m", "indivisible", "website"))
    and "band:" not in JS)
 ok("'See the platform' goes to the landing site", 'a.href = "https://wayscope.co.uk/";' in JS and '"See the platform"' in JS)
+# the UI audit's two findings on this page (17 Nov): the tick row under 44 px on a phone, and the date box read as a trap
+_css = read("frontend/tools/tools.css")
+_phone = _css[_css.find("@media (max-width:520px){"):]
+_phone = _phone[:_phone.find("\n}") + 2]
+ok("🔴 on a phone the tick row is a whole 44 px target (the audit's targets-44px)", ".tick{min-height:44px}" in _phone, _phone)
+_ua = read("backend/tests/ui_audit.js")
+ok("the audit's keyboard walk steps through a date or time box's own parts (only those), not calling it a trap",
+   'const parts = info.tag === "input" && /^(date|time|datetime-local|month|week)$/.test(info.itype || "");' in _ua
+   and "if (parts && stops.length && stops[stops.length - 1].order === info.order) continue;" in _ua
+   and 'itype: el.tagName === "INPUT" ? el.type : undefined' in _ua)
 ok("the page's script is served beside its page only", tools_public.page_file("abnormal-load.js") is not None
    and tools_public.page_file("abnormal-load.js")[1].startswith("text/javascript")
    and tools_public.page_file("nothing.js") is None and tools_public.page_file("index.js") is None
