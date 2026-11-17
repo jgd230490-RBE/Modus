@@ -27,9 +27,17 @@ from the saved distances and times (fairprice.trip_cost, as busy_savings does). 
 choice adds is shown, never hidden. Collisions are a record of the road: two counts, never x loads, never totalled.
 
 Planned or estimated, never measured: Wayscope cannot see which road a lorry took.
+
+17 Nov 2026 (the live check and UI / UX review, notes ux-best-option-1117, findings 7 and 8; John: "Yes, as
+recommended"): the sums use WHOLE loads (_whole: each line's share of the period as whole loads that add up to the
+rounded total), so the loads a row shows times a trip's difference is the sum it shows (live: 4,317.6 loads shown as
+4,318 gave 21,588 places, not 5 x 4,318); a trip's difference in minutes is also given to the nearest half
+(per_trip's "min_half", route_best.half_min: the card, the file and the record say one figure); and a Make primary of
+both legs is ONE press here (before_promote takes the legs; one row, written once).
 """
 import datetime
 import json
+import math
 
 import conversions
 import db
@@ -214,16 +222,18 @@ def end(rec_id, why, on=None):
 # --------------------------------------------------------------------------- #
 def before_promote(route_id, profile, leg, alt_index):
     """Read BEFORE the swap: a trip on the line in use (the main line, both legs) for this lorry, and its prints. The
-    state after_promote needs; never raises (the swap must not fail because of the record)."""
+    state after_promote needs; never raises (the swap must not fail because of the record). `leg`: one leg, or the
+    list of legs one press swaps (17 Nov 2026: the card's press moves both legs in one request)."""
     try:
+        legs = [leg] if isinstance(leg, str) else list(leg)
         ctx = _Ctx()
         lines, prints = _lines(route_id)
         before = _measure(route_id, profile, (0, 0), lines, ctx)
         if before is None:
-            return None
+            return {"route_id": route_id, "profile": profile, "ctx": ctx, "skip": True}
         before["prints"] = _side_prints(prints, profile, (0, 0))
-        return {"route_id": route_id, "profile": profile, "leg": leg, "alt": int(alt_index), "before": before,
-                "ctx": ctx}
+        return {"route_id": route_id, "profile": profile, "leg": legs[0], "legs": legs, "alt": int(alt_index),
+                "before": before, "ctx": ctx}
     except Exception as e:
         print("route record: before the swap:", route_id, str(e)[:160])
         return None
@@ -232,7 +242,7 @@ def before_promote(route_id, profile, leg, alt_index):
 def after_promote(state, who=None, now=None):
     """After the swap: measure the new main line and write, join or end (module docstring). Returns the row id written
     or joined, or None. Never raises."""
-    if not state:
+    if not state or state.get("skip"):
         return None
     try:
         return _after_promote(state, who, now)
@@ -242,7 +252,8 @@ def after_promote(state, who=None, now=None):
 
 
 def _after_promote(state, who, now):
-    rid, prof, leg = state["route_id"], state["profile"], state["leg"]
+    rid, prof = state["route_id"], state["profile"]
+    swapped = list(state.get("legs") or [state["leg"]])
     lines, prints = _lines(rid)
     after = _measure(rid, prof, (0, 0), lines, state["ctx"])
     if after is None:
@@ -260,8 +271,7 @@ def _after_promote(state, who, now):
         t = _ts(r.get("decided_at"))
         if t is not None and (now_ts - t) <= datetime.timedelta(minutes=JOIN_MIN):
             legs = list(r["legs"])
-            if leg not in legs:
-                legs.append(leg)
+            legs += [l for l in swapped if l not in legs]
             f = dict(f, after=after)
             figs = dict(r["figures"] or {}, **{prof: f})
             db.execute(f"UPDATE {TABLE} SET legs = ?, figures = ?, prints = ?, updated_at = ? WHERE tenant_id = ? "
@@ -271,7 +281,7 @@ def _after_promote(state, who, now):
             return r["id"]
         end(r["id"], "road_changed", now_ts.date())       # another line made the main route since
     rec = {"id": f"M:{rid}:{prof}:{stamp}:{_tag()}", "route_id": rid, "kind": "primary", "vehicle_profile": prof,
-           "alt_index": state["alt"], "legs": [leg], "since": now_ts.date().isoformat(),
+           "alt_index": state["alt"], "legs": sorted(swapped), "since": now_ts.date().isoformat(),
            "figures": {prof: {"before": state["before"], "after": after}}, "prints": {prof: after["prints"]},
            "decided_by": who, "decided_at": stamp}
     _insert(rec)
@@ -444,6 +454,19 @@ def _add(acc, n, d):
             acc[k] += n * d[k]
 
 
+def _whole(ns):
+    """Shares of loads as WHOLE loads that add up to the rounded total (17 Nov 2026, finding 8): each share's whole part,
+    then one more to the shares with the largest remainder, the earlier line first on a tie. A month partly inside a
+    choice's period, or a busy-hours road's share of a day, is a fraction of a line's loads; the sums used the fractions
+    while the row showed the total rounded, so a reader's own multiplication did not agree with the sum."""
+    ns = [max(0.0, float(n)) for n in ns]
+    base = [int(math.floor(n)) for n in ns]
+    left = int(math.floor(sum(ns) + 0.5)) - sum(base)
+    for i in sorted(range(len(ns)), key=lambda i: (-(ns[i] - base[i]), i))[:max(0, left)]:
+        base[i] += 1
+    return base
+
+
 def _round(acc):
     out = {k: (None if acc[k] is None else round(acc[k], 2 if k == "eur" else 1))
            for k in ("trips", "of", "km", "min", "kg", "eur", "left_turns", "cycle_meets", "places")}
@@ -469,7 +492,12 @@ def per_trip(side_b, side_a, profile, month_index, cost, factors):
         if side_a.get(k) is None or side_b.get(k) is None:
             return None
         return float(side_a[k]) - float(side_b[k])
+    half = None
+    if side_a.get("cycle_min") is not None and side_b.get("cycle_min") is not None:
+        import route_best                     # the one rounding of a difference in minutes (17 Nov 2026, finding 7)
+        half = route_best.half_min(side_b["cycle_min"], side_a["cycle_min"])
     return {"km": round(diff("km") or 0, 3), "min": round(diff("cycle_min") or 0, 2), "kg": round(diff("kg") or 0, 2),
+            "min_half": half,
             "eur": (round(ea - eb, 2) if ea is not None and eb is not None else None),
             "left_turns": diff("left_turns"), "cycle_meets": diff("cycle_meets"), "places": diff("places")}
 
@@ -510,6 +538,7 @@ def sums(rec, factors=None, cost=None, routes=None, cache=None, today=None):
                           "WHERE tenant_id = ? AND route_id = ? AND actual_qty IS NOT NULL", (db.current_tenant(), rid)):
             recorded.setdefault((int(w["month_index"]), w.get("discipline") or "", w.get("section_id") or ""), []).append(w)
     deltas = {}
+    plan, far, of = [], [], 0.0             # (loads as a fraction, a trip's difference, lorry): made whole below
     for r in lines:
         veh, mi = r["vehicle_type"], int(r["month_index"])
         f = rec["figures"][veh]
@@ -523,10 +552,8 @@ def sums(rec, factors=None, cost=None, routes=None, cache=None, today=None):
         trips = derived.day_figures(r.get("quantity"), ctx, factors)["trips"]
         inside, all_days = _days_in(mi, since, until)
         frac = inside / float(all_days) if all_days else 0.0
-        n = trips * frac * share
-        planned["of"] += trips * frac
-        loads_by[veh] = loads_by.get(veh, 0.0) + n
-        _add(planned, n, d)
+        of += trips * frac
+        plan.append((trips * frac * share, d, veh))
         for w in recorded.get((mi, r.get("discipline") or "", r.get("section_id") or ""), []):
             try:
                 mon, sun = weeks.week_span(mi, int(w["week_index"]))
@@ -535,7 +562,14 @@ def sums(rec, factors=None, cost=None, routes=None, cache=None, today=None):
             if sun < since or (until is not None and mon >= until):
                 continue                       # a week before the choice, or after its end
             got = derived.day_figures(w["actual_qty"], ctx, factors)["trips"]
-            _add(so_far, got * share, d)
+            far.append((got * share, d, veh))
+    # 17 Nov 2026 (finding 8): whole loads in the sums, so the loads shown times a trip's difference is the sum shown
+    for n, (_f, d, veh) in zip(_whole([x[0] for x in plan]), plan):
+        loads_by[veh] = loads_by.get(veh, 0) + n
+        _add(planned, n, d)
+    for n, (_f, d, veh) in zip(_whole([x[0] for x in far]), far):
+        _add(so_far, n, d)
+    planned["of"] = float(max(int(math.floor(of + 0.5)), int(planned["trips"])))
     lorry = (max(loads_by, key=lambda v: (loads_by[v], v)) if loads_by else (rec.get("vehicle_profile") or
                                                                             (profs[0] if profs else None)))
     pt = None
