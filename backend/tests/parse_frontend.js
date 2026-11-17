@@ -3982,7 +3982,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // RE-PINNED 5 Nov 2026 (task 0d-2): + the Carbon planner's Route choices table (four)
   const _regions = [...src.matchAll(/<div className="([^"]*)"[^\n]*tabIndex=\{0\} role="region" aria-label="([^"]*)"/g)];
   ok("#15: every scroll region with tabindex 0 carries a focus-ring class (kb-scroll or sim-scroll) and a name that passes the word rule",
-     _regions.length === 5 /* NARROWED 10 Nov 2026: + the Simulation's Now and gates column */ && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
+     _regions.length === 6 /* NARROWED 10 Nov 2026: + the Simulation's Now and gates column; NARROWED 17 Nov 2026 (routes-card-room): + an open route's All figures table */ && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
        && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(m[2])), String(_regions.length));
   // REVERSED 23 Oct 2026 (UI fix 9, decision 16): the rows are no longer mouse-only — the name in the first cell is a button
   // (the UI FIX 9 block at the end). What stays true, and is still checked here: the row click is kept for a mouse, and the

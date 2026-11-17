@@ -289,6 +289,9 @@ const grow = (el) => act(() => { ROS.filter(r => r.els.includes(el)).forEach(r =
     ok("DOM: the haul road picker is named, carries the class that lets it shrink, and lists the long-named road",
        TRY(() => { const s = q("[data-haul-pick] select"); return s.classList.contains("ro-pick") && s.getAttribute("aria-label") === "Add a haul road" && s.options.length === 2 && s.options[0].textContent === "Add a haul road…"; }));
     await press(q("button[data-bo-all]"));
+    ok("⭐ DOM: the figures table sits in a sideways-scrolling box the keyboard can reach, named 'All figures' (a narrow panel, full screen)",
+       TRY(() => { const b = q('[data-ro="figures"] [data-bo-figures]'); return b.getAttribute("tabindex") === "0" && b.getAttribute("role") === "region"
+                     && b.getAttribute("aria-label") === "All figures" && b.classList.contains("kb-scroll") && b.firstElementChild.matches("table[data-bo-table]"); }));
     ok("⭐ DOM: 'All figures' opens the options table with the figures (under both columns), not inside the card",
        TRY(() => !!q('[data-ro="figures"] table[data-bo-table]') && !q('.bo-card table') && q("button[data-bo-all]").getAttribute("aria-expanded") === "true"));
 

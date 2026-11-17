@@ -16711,6 +16711,9 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
         {data && !!data.rows.length && (
           <div className="overflow-x-auto">
             {(showAll || (best && best.route && !(best.route.options || []).length)) && <>
+            {/* 17 Nov 2026 (routes-card-room): the table scrolls sideways in a box of its own that the keyboard can reach
+                (a narrow panel, full screen); found by axe on a route whose table holds no button */}
+            <div className="overflow-x-auto kb-scroll" tabIndex={0} role="region" aria-label="All figures" data-bo-figures="1">
             <table className="text-xs w-full" data-bo-table="1">
               <thead className="text-slate-400">
                 <tr>
@@ -16813,6 +16816,7 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
                 })}
               </tbody>
             </table>
+            </div>
             <p className="text-[13px] text-slate-400 mt-2">
               Cycle = out + back + turnaround (load, unload and gate time ‡). Trips/day = round trips that fit a{" "}
               {data.planning.shift_hours_per_day} h shift with the legal break and at most 9 h driving (§ = fewer; hover for why;
