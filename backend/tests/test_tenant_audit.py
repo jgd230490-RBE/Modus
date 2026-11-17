@@ -147,6 +147,9 @@ UNTENANTED = {
     # company running the deployment, not to the tenant whose data the demo shows. The IP
     # is stored only as a salted hash; the codes the visitor was sent are never stored.
     "demo_requests": "leads for the company running the deployment, not a tenant's data",
+    # 16 Nov 2026 (claude/tools-route-check-request). The public tools' leads (a route check request, a calculator PDF's
+    # email): the same kind of row as demo_requests, kept apart from any tenant; the address is only a salted hash.
+    "tool_leads": "leads from the public tools for the company running the deployment, not a tenant's data",
     # 14 Oct 2026 (G3). Logins and everything that hangs off them. Each carries tenant_id and every
     # statement filters on it, but none is PACKAGE data: a package import deletes and rewrites every
     # TENANTED_TABLES row, and re-importing the demo must never delete the people who sign in to it.

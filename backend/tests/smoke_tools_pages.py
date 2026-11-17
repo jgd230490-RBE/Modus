@@ -118,7 +118,8 @@ with TestClient(main.app, base_url=BASE) as anon:
         r = anon.get(path, follow_redirects=False)
         ok(f"1. 🔴 {path} is a 404 (no redirect, no listing, no coming-soon page)", r.status_code == 404 and clean(r),
            f"{r.status_code} {r.headers.get('location', '')}")
-    ok("1. the shipped folder serves no page on this branch", tools_public.pages() == [])
+    # NARROWED 16 Nov 2026 (claude/tools-route-check-request): the first tool pages ship
+    ok("1. the shipped folder holds only the named tool pages", set(tools_public.pages()) <= {"calculators", "abnormal-load", "route-check"})
 
     # ---- 2. a page in the frame (the sample, from a scratch copy of the folder) ------------------------------------- #
     scratch = Path(TMP) / "tools"

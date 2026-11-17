@@ -62,7 +62,7 @@ LANDING_DEFAULT = "https://wayscope.co.uk"
 
 #: every open /api/tools route, by its path as FastAPI registers it. A tool session adds its own here, and the
 #: reviewer-wall sweep fails on any /api/tools route missing from this list.
-OPEN_ROUTES = ()
+OPEN_ROUTES = ("/api/tools/route-check/request",)
 
 #: the hidden box only a machine fills in (the landing form's trap, demo_request.HONEYPOT)
 TRAP = "website"
