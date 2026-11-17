@@ -475,6 +475,16 @@ ok("🔴 neither route reads the cookie or the session", "access.current()" not 
 ok("ui_audit.js walks the page (TOOL_PAGES holds 'calculators')", re.search(r"const TOOL_PAGES = \[[^\]]*\"calculators\"", read("backend/tests/ui_audit.js")))
 ok("the stylesheet's calculator rows are in tools.css", ".calc .row input" in read("frontend/tools/tools.css") and ".calc .row select" in read("frontend/tools/tools.css"))
 
+# 17 Nov 2026 (claude/tools-review-looks; John's yes to the review's B1): a line once the file has downloaded
+_html17 = (ROOT / "frontend" / "tools" / "calculators.html").read_text(encoding="utf-8")
+_js17 = (ROOT / "frontend" / "tools" / "calculators.js").read_text(encoding="utf-8")
+ok("🔴 B1: the box holds 'Your PDF has downloaded.', hidden until a download",
+   '<p class="done" role="status" hidden>Your PDF has downloaded.</p>' in _html17
+   and _html17.index('class="done"') > _html17.index('id="pdfbox"'))
+ok("🔴 B1: the script shows it after the file is handed over and hides it on the next press or send",
+   'download(data.filename || "wayscope.pdf", data.pdf); done(true);' in _js17 and _js17.count("done(false);") == 2
+   and "if (el) el.hidden = !on;" in _js17)
+
 print(f"test_tools_calculators.py: {PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
     print("  FAIL:", f)

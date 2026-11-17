@@ -178,7 +178,8 @@ for body in SPREAD:
     if not a["abnormal"] and a["permission"] == "none" and not nt["rba_days"]:
         # narrowed 17 Nov: a "not abnormal" load may still need what the rules give (a long combination): the page must
         # show each of those rows, and only those; before, it hid them
-        if p["head"] != "Not an abnormal load" or p["over"]:
+        # REVERSED 17 Nov (B3): the head says a notice is needed when one is
+        if p["head"] != (T.NOT_ABNORMAL_NOTICE if nt["police_days"] else T.NOT_ABNORMAL) or p["over"]:
             errs.append("not abnormal")
         if [c[1] for c in p["chips"]] != ([f"Notify by {T._day(a['notify_by'])}"
                                            + (": passed" if any(f["code"] == "NOTICE_LATE" for f in a["flags"]) else "")]
@@ -290,8 +291,8 @@ ok("⭐🔴 the spread reaches a load the rules call not abnormal that still nee
    any(not s[0] and s[3] for s in seen_shapes), str([s for s in seen_shapes if not s[0]][:6]))
 _long = T.answer(W(width_m=2.5, length_m=28, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5, date="2026-12-10"),
                  today=TODAY)["page"]
-ok("⭐🔴 2.5 m wide, 28 m long, 40 t: 'Not an abnormal load', and yet the police notice, attendant and marker plates shown",
-   _long["head"] == "Not an abnormal load" and _long["chips"] == [["warn", "Notify by Mon 7 Dec 2026"]]
+ok("⭐🔴 2.5 m wide, 28 m long, 40 t: 'Not abnormal, but a notice is needed' (REVERSED 17 Nov, B3), with the police notice, attendant and marker plates",
+   _long["head"] == "Not abnormal, but a notice is needed" and _long["chips"] == [["warn", "Notify by Mon 7 Dec 2026"]]
    and [k for k, _ in _long["rows"]] == ["Police", "Attendant", "Markers", "Height"]
    and _long["rows"][0][1] == "2 clear working days' notice to every force on the route. Receive by 7 Dec.", str(_long))
 _so31 = T.answer(W(width_m=2.5, length_m=31, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5, date="2027-03-04"),
@@ -415,7 +416,7 @@ ok("card 17 A0: the same load unticked is STGO, notify by Wed 25 Nov", _A0["chip
    and _A0["head"] == "No STGO category fits")
 _B = C17(width_m=2.5, length_m=24, gross_t=30, max_axle_t=8, axle_count=4, cu_vehicle=True)
 ok("⭐ card 17 B (C&U, long only): not abnormal, yet the police by 27 Nov, marker plates, the Saturday line",
-   _B["head"] == "Not an abnormal load" and _B["chips"] == [["warn", "Notify by Fri 27 Nov 2026"]]
+   _B["head"] == "Not abnormal, but a notice is needed" and _B["chips"] == [["warn", "Notify by Fri 27 Nov 2026"]]
    and [k for k, _ in _B["rows"]] == ["Police", "Markers", "Height"] and T.CU_SATURDAY in _B["fine"], str(_B))
 _C = C17(width_m=2.95, length_m=16.5, gross_t=40, max_axle_t=9, axle_count=5, cu_vehicle=True)
 ok("card 17 C (C&U, 2.95 m): a police notice, and no STGO speeds although the rules give Category 1 speeds",
@@ -617,6 +618,14 @@ ok("🔴 a list or a dict as 'where' or the time band is that box's sentence", _
 # 17 Nov 2026 (the live check's F8, F10)
 ok("the script greys out the days before today and marks the answer's head as a heading", "form.elements.date.min = " in JS
    and 'head.setAttribute("role", "heading")' in JS and 'head.setAttribute("aria-level", "3")' in JS)
+
+# 17 Nov 2026 (claude/tools-review-looks; John's yes to B2 and B3)
+ok("🔴 B3: an ordinary load keeps 'Not an abnormal load'; the notice head appears only with a notice", T.NOT_ABNORMAL == "Not an abnormal load"
+   and T.answer(W(width_m=2.5, length_m=16, height_m=4.0, gross_t=40, max_axle_t=8, axle_count=6, date="2026-12-10"), today=TODAY)["page"]["head"] == T.NOT_ABNORMAL
+   and "Not abnormal, but a notice is needed" in seen_heads and T.NOT_ABNORMAL in seen_heads)
+ok("🔴 B2: the empty form carries the cue, and the script shows it only while a box is empty",
+   '<p class="note" id="adv-hint">The answer appears when the boxes are filled.</p>' in HTML
+   and "if (hint) hint.hidden = !missing.length;" in JS and 'document.getElementById("adv-hint")' in JS)
 
 print()
 for f in FAIL:

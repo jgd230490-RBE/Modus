@@ -176,3 +176,12 @@ p{margin:0 0 10px}
 .calcs > .pdfbox[data-col="2"]{grid-column:2}
 .calcs > .pdfbox[data-col="3"]{grid-column:3}
 @media (max-width:860px){.calcs > .pdfbox[data-col]{grid-row:auto;grid-column:auto}}
+
+/* ---------- 17 Nov 2026 (claude/tools-review-looks; John's yes to the review's B1 to B4) ---------- */
+/* B4: one filled action a page: the header's "Request a demo" is an outline button on the dark bar */
+.toolbar .links a.btn.btn-ondark{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
+.toolbar .links a.btn.btn-ondark:hover{color:#fff;border-color:#fff}
+/* B1: the line under the PDF box once the file has downloaded */
+.pdfbox .done{font-size:13.5px;color:var(--ok);margin:8px 0 0}
+/* B2: the adviser's cue while the form has no answer */
+#adv-hint{margin:0 0 12px}

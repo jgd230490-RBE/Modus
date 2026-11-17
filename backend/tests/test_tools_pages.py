@@ -194,7 +194,9 @@ for path in PAGES:
        re.search(r'<header class="toolbar">', src)
        and '<img src="/brand/logo-header-on-dark.svg" alt="Wayscope"' in src
        and '<a class="on" href="https://wayscope.co.uk/tools">Tools</a>' in src
-       and '<a class="btn btn-orange sm" href="https://wayscope.co.uk/#demo">Request a demo</a>' in src)
+       and '<a class="btn btn-ondark sm" href="https://wayscope.co.uk/#demo">Request a demo</a>' in src
+       # REVERSED 17 Nov 2026 (the review's B4, John's yes): an outline button, so the page's own action is the one filled
+       and "btn-orange sm" not in src.split("</header>")[0])
     ok(f"{name}: the shared script loads last", src.rstrip().endswith('<script src="/tools/tools.js"></script>\n</body>\n</html>'.strip()))
     ok(f"{name}: one h1", sum(1 for t, _ in p.tags if t == "h1") == 1)
     forms = src.count("<form")
