@@ -166,6 +166,7 @@ with TestClient(main.app, base_url=BASE) as anon:
     ok("3. ⭐ ...and one row is kept: 'calculator-pdf', the tick 0, the address only as a hash", len(kept) == 1 and kept[0]["kind"] == "calculator-pdf"
        and kept[0]["news"] == 0 and kept[0]["email"] == "name@example.co.uk" and "203.0.113.77" not in str(kept[0])
        and kept[0]["ip_hash"] == tools_public.address_hash("203.0.113.77"), str(kept))
+    ok("3. 🔴 ...and the row reads 'kept', not 'queued' (nothing is sent for a download)", kept[0]["status"] == "kept", str(kept[0]["status"]))
     r = post(anon, PDF, {"which": "carbon", "figures": GOOD["carbon"], "email": "nobody"})
     ok("3. 🔴 a bad email is a sentence", r.status_code == 400 and r.json() == {"detail": {"say": "That email does not look right. Check it and try again."}}, r.text[:200])
     r = post(anon, PDF, {"which": "carbon", "figures": GOOD["carbon"], "email": ""})
