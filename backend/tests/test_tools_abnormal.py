@@ -147,10 +147,19 @@ SPREAD += [W(indivisible=False), W(axle_spacings_m="0.9, 1.36, 1.36, 1.36, 1.36,
            W(width_m=2.5, length_m=28, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5, date="2026-12-10"),
            W(width_m=2.5, length_m=26.5, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5, date="2026-11-18"),
            W(width_m=2.5, length_m=20, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5)]
+# 17 Nov, Q6 and Q7 (John's yes): the ordinary-lorry tick and the driving-axle tick, on a spread that reaches C&U (within
+# 44 t and 4.3 m) and the C&U ceilings, each date
+for w, ln, gross, axle, n, date in itertools.product(
+        (2.5, 2.95, 3.2, 4.2, 4.5), (12, 19, 24, 28), (30, 40, 44, 46, 60), (8, 10.5, 11.5), (4, 5, 6),
+        ("2026-11-18", "2026-12-01", "2027-03-30")):
+    for cu, dr in ((True, False), (False, True), (True, True)):
+        SPREAD.append(W(width_m=w, length_m=ln, height_m=4.0, gross_t=gross, max_axle_t=axle, axle_count=n, date=date,
+                        cu_vehicle=cu, axle_driving=dr))
 
 checked = 0
 problems = []
 seen_heads, seen_shapes = set(), set()
+seen_ticked_but = 0
 for body in SPREAD:
     try:
         r = T.answer(body, today=TODAY)
@@ -162,6 +171,7 @@ for body in SPREAD:
     rows = dict(p["rows"])
     nt = a["notices"]
     seen_heads.add(p["head"])
+    seen_ticked_but += any(n.startswith("Ticked as an ordinary lorry, but ") for n in p["notes"])
     seen_shapes.add((a["abnormal"], a["category"], a["permission"], bool(nt["police_days"]), nt["rba_days"],
                      a["attendant"], a["escort_expected"], len(a["height"])))
     errs = []
@@ -185,7 +195,7 @@ for body in SPREAD:
         if bool(a["height"]) != ("Height" in rows):
             errs.append("height on a normal load")
     else:
-        want = T.CLASS_WORDS.get(a["category"]) or "No STGO category fits"
+        want = T.CU_HEAD if a["regime"] == "cu" else (T.CLASS_WORDS.get(a["category"]) or "No STGO category fits")
         if p["head"] != want:
             errs.append("head")
         if len(p["over"]) != len(a["reasons"]):
@@ -227,7 +237,10 @@ for body in SPREAD:
                                                                  < len(a["attendant_reasons"])):
             errs.append("attendant")
         sp = a["speeds_mph"]
-        if sp and rows.get("Speeds") != f"{sp[0]} mph motorway, {sp[1]} dual carriageway, {sp[2]} other roads.":
+        if a["regime"] == "cu":
+            if "Speeds" in rows:
+                errs.append("speeds on a C&U move")
+        elif sp and rows.get("Speeds") != f"{sp[0]} mph motorway, {sp[1]} dual carriageway, {sp[2]} other roads.":
             errs.append("speeds")
         if not sp and "mph" in rows.get("Speeds", ""):
             errs.append("speeds none")
@@ -254,6 +267,13 @@ for body in SPREAD:
             errs.append("spacing line")
         if any(n.startswith("not declared indivisible") for n in a["notes"]) != any(n.startswith("Not ticked") for n in p["notes"]):
             errs.append("indivisible")
+    # Q8, every load: the C&U calendar line exactly when the rules give a C&U date; the "ticked, but" sentence exactly when
+    # the rules say the tick is set but STGO applies, and first
+    if (a["regime"] == "cu" and bool(a["notify_by"])) != (T.CU_SATURDAY in p["fine"]):
+        errs.append("saturday line")
+    _rn = any(n.startswith("The C&U tick is set") for n in a["notes"])
+    if _rn != bool(p["notes"] and p["notes"][0].startswith("Ticked as an ordinary lorry, but ")):
+        errs.append("ticked-but sentence")
     if errs:
         problems.append(("differs", body, errs))
 ok(f"⭐ the spread: {checked} loads answered, each page equal in class, dates and facts to the rules' own",
@@ -263,8 +283,11 @@ ok("the spread's refusals are only the impossible ones (heaviest axle times axle
 ok("the spread reaches every class the rules give (normal, Categories 1 to 3, none fits, Special Order)",
    {"Not an abnormal load", "STGO Category 1", "STGO Category 2", "STGO Category 3", "No STGO category fits",
     "Special Order"} <= seen_heads, str(seen_heads))
+ok("⭐ the spread reaches C&U answers, both abnormal and not, and the 'ticked, but STGO' answer",
+   {"Moves under C&U, not STGO"} <= seen_heads and any(not s[0] and s[3] for s in seen_shapes)
+   and seen_ticked_but > 0, str(seen_heads))
 ok("⭐🔴 the spread reaches a load the rules call not abnormal that still needs a police notice (and the page shows it)",
-   any(not s[0] and s[3] for s in seen_shapes), str(sorted(s for s in seen_shapes if not s[0])))
+   any(not s[0] and s[3] for s in seen_shapes), str([s for s in seen_shapes if not s[0]][:6]))
 _long = T.answer(W(width_m=2.5, length_m=28, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5, date="2026-12-10"),
                  today=TODAY)["page"]
 ok("⭐🔴 2.5 m wide, 28 m long, 40 t: 'Not an abnormal load', and yet the police notice, attendant and marker plates shown",
@@ -304,6 +327,10 @@ alltext = "\n".join(sorted(texts))
 _hits = [n for pat, n in LANDING_BANNED if re.search(pat, alltext, re.I)] + [x for x in EXTRA if re.search(x, alltext, re.I)]
 ok(f"🔴 no banned word in any answer ({len(texts)} distinct pieces)", not _hits, str(_hits))
 ok("🔴 no supplier or back-end name in any answer", not SCREEN_BAN.search(alltext), str(SCREEN_BAN.findall(alltext)[:5]))
+# narrowed 17 Nov (Q8, John's yes): "C&U" may appear in the one approved head and nowhere else
+ok("Q8: 'C&U' appears only as the approved head", all("C&U" not in t or t == T.CU_HEAD for t in texts)
+   and T.CU_HEAD == "Moves under C&U, not STGO" and T.CU_HEAD in texts)
+alltext = "\n".join(sorted(t for t in texts if t != T.CU_HEAD))
 ok("🔴 no statute reference, code-of-practice name, raw date or staff note in any answer", not STATUTE.search(alltext),
    str(STATUTE.findall(alltext)[:6]))
 ok("🔴 'lorry' never 'truck'; and the answer never says permitted or meets the rules",
@@ -336,11 +363,16 @@ ok("the shipped holidays run to 26 Dec 2028, so the last moving day taken is 31 
    max(R.holiday_dates(T.holidays_feed(), ("england-and-wales", "scotland"))) == datetime.date(2028, 12, 26)
    and T.last_moving_day() == datetime.date(2028, 12, 31))
 _f = T.read_form(W(), today=TODAY)[0]
-ok("the form's figures reach the rules as the drawing reads them: overall length, no overhang, a non-driving axle, no C&U",
+ok("the form's figures reach the rules as the drawing reads them: overall length, no overhang; unticked: a non-driving axle, no C&U",
    _f["length_m"] == 27.0 and "rigid_length_m" not in _f and _f["axle_driving"] is False and _f["cu_vehicle"] is False
    and _f["indivisible"] is True and _f["axle_spacings_m"] == [])
 ok("the tick reaches the rules only when it is really true (a string 'false' is not a tick)",
    T.read_form(W(indivisible="false"), today=TODAY)[0]["indivisible"] is False)
+ok("Q6, Q7: the two new ticks reach the rules only when really true",
+   T.read_form(W(cu_vehicle=True, axle_driving=True), today=TODAY)[0]["cu_vehicle"] is True
+   and T.read_form(W(cu_vehicle=True, axle_driving=True), today=TODAY)[0]["axle_driving"] is True
+   and T.read_form(W(cu_vehicle="true", axle_driving=1), today=TODAY)[0]["cu_vehicle"] is False
+   and T.read_form(W(cu_vehicle="true", axle_driving=1), today=TODAY)[0]["axle_driving"] is False)
 
 # England and Wales against Scotland: 30 Nov 2026 is St Andrew's Day (Scotland only)
 _ew = T.answer(W(date="2026-12-02", where="england-and-wales"), today=TODAY)
@@ -353,11 +385,57 @@ ok("⭐ under STGO the answer is the SAME for both nations (the rules count a ho
 _cu = dict(width_m=3.2, length_m=16, height_m=4, gross_t=40, max_axle_t=9, axle_count=5, indivisible=True, cu_vehicle=True)
 _cu_ew = R.advice(_cu, date_from="2026-12-02", nation="england-and-wales", holidays_feed=T.holidays_feed(), today=TODAY)
 _cu_sc = R.advice(_cu, date_from="2026-12-02", nation="scotland", holidays_feed=T.holidays_feed(), today=TODAY)
-ok("...while the rules' C&U calendar does differ on that date (29 Nov against 27 Nov): only a C&U load would show it,"
-   " and this form never sends one", _cu_ew["notify_by"] == "2026-11-29" and _cu_sc["notify_by"] == "2026-11-27"
-   and _ew["advice"]["regime"] == "stgo")
+ok("...while the rules' C&U calendar does differ on that date (29 Nov against 27 Nov)",
+   _cu_ew["notify_by"] == "2026-11-29" and _cu_sc["notify_by"] == "2026-11-27" and _ew["advice"]["regime"] == "stgo")
+# narrowed 17 Nov (Q6): the form now sends a C&U load, so "Where" moves the page's date for one
+_cuw = dict(width_m=3.2, length_m=12, height_m=4.0, gross_t=30, max_axle_t=8, axle_count=4, cu_vehicle=True, date="2026-12-01")
+_pew = T.answer(W(**_cuw, where="england-and-wales"), today=TODAY)["page"]
+_psc = T.answer(W(**_cuw, where="scotland"), today=TODAY)["page"]
+ok("⭐ Q6: on the page, a C&U load moving Tue 1 Dec 2026: England and Wales notify by Fri 27 Nov, Scotland by Thu 26 Nov",
+   _pew["chips"] == [["warn", "Notify by Fri 27 Nov 2026"]] and _psc["chips"] == [["warn", "Notify by Thu 26 Nov 2026"]],
+   str((_pew["chips"], _psc["chips"])))
 ok("by night gives the same answer as by day (no time bans on a public check)",
    T.answer(W(band="night"), today=TODAY)["page"] == P)
+
+# card 17 of notes/tools-abnormal-adviser-mockup-1116 (John's yes, 17 Nov), word for word
+def C17(**kw):
+    return T.answer(W(height_m=4.0, date="2026-12-01", **kw), today=TODAY)["page"]
+
+
+_A = C17(width_m=3.2, length_m=12, gross_t=30, max_axle_t=8, axle_count=4, cu_vehicle=True)
+ok("⭐ card 17 A (C&U, wide only): the head, the chip, the police row, no road authority notice, no Speeds row, the Saturday line",
+   _A["head"] == "Moves under C&U, not STGO" and _A["chips"] == [["warn", "Notify by Fri 27 Nov 2026"]]
+   and _A["over"] == ["3.2 m wide (2.9 m)"] and _A["notes"] == []
+   and dict(_A["rows"])["Police"] == "2 clear working days' notice to every force on the route. Receive by 27 Nov."
+   and dict(_A["rows"])["Road and bridge authorities"] == "No notice from these figures."
+   and "Speeds" not in dict(_A["rows"])
+   and _A["fine"] == ["For an ordinary lorry a Saturday counts as a working day; Sundays and bank holidays do not."], str(_A))
+_A0 = C17(width_m=3.2, length_m=12, gross_t=30, max_axle_t=8, axle_count=4)
+ok("card 17 A0: the same load unticked is STGO, notify by Wed 25 Nov", _A0["chips"] == [["warn", "Notify by Wed 25 Nov 2026"]]
+   and _A0["head"] == "No STGO category fits")
+_B = C17(width_m=2.5, length_m=24, gross_t=30, max_axle_t=8, axle_count=4, cu_vehicle=True)
+ok("⭐ card 17 B (C&U, long only): not abnormal, yet the police by 27 Nov, marker plates, the Saturday line",
+   _B["head"] == "Not an abnormal load" and _B["chips"] == [["warn", "Notify by Fri 27 Nov 2026"]]
+   and [k for k, _ in _B["rows"]] == ["Police", "Markers", "Height"] and T.CU_SATURDAY in _B["fine"], str(_B))
+_C = C17(width_m=2.95, length_m=16.5, gross_t=40, max_axle_t=9, axle_count=5, cu_vehicle=True)
+ok("card 17 C (C&U, 2.95 m): a police notice, and no STGO speeds although the rules give Category 1 speeds",
+   _C["head"] == "Moves under C&U, not STGO" and "Police" in dict(_C["rows"]) and "Speeds" not in dict(_C["rows"])
+   and T.answer(W(height_m=4.0, date="2026-12-01", width_m=2.95, length_m=16.5, gross_t=40, max_axle_t=9, axle_count=5,
+                  cu_vehicle=True), today=TODAY)["advice"]["speeds_mph"] == [60, 50, 40], str(_C))
+for _k, _f, _why in (("D", dict(width_m=4.5, length_m=16, gross_t=40, max_axle_t=9, axle_count=5), "over 4.3 m wide"),
+                     ("E", dict(width_m=3.2, length_m=16, gross_t=60, max_axle_t=10, axle_count=6), "over the normal weights"),
+                     ("F", dict(width_m=2.5, length_m=28, gross_t=40, max_axle_t=9, axle_count=5), "over 27.4 m long")):
+    _p = C17(cu_vehicle=True, **_f)
+    ok(f"⭐ card 17 {_k} (ticked, but {_why}): STGO, with the sentence first",
+       _p["notes"][:1] == [f"Ticked as an ordinary lorry, but {_why}: it moves under STGO. Check with the haulier."]
+       and _p["head"] != "Moves under C&U, not STGO" and T.CU_SATURDAY not in _p["fine"], str(_p))
+_G = C17(width_m=2.5, length_m=16.5, gross_t=44, max_axle_t=11, axle_count=5, axle_driving=True)
+_G0 = C17(width_m=2.5, length_m=16.5, gross_t=44, max_axle_t=11, axle_count=5)
+ok("⭐ card 17 G (an 11 t DRIVING axle, ticked): not abnormal, the limits line naming 11.5 t a driving axle",
+   _G["head"] == "Not an abnormal load" and _G["chips"] == [] and _G["notes"][0].startswith(
+       "Within the normal limits on these figures: 44 t gross, 10 t an axle (11.5 t a driving axle), 2.9 m wide."), str(_G))
+ok("card 17 G0 (the same, unticked): abnormal, no category, a road and bridge notice",
+   _G0["head"] == "No STGO category fits" and dict(_G0["rows"])["Road and bridge authorities"].startswith("2 clear days"))
 
 # =========================================================================== #
 #  4. the refusals                                                             #
@@ -454,6 +532,9 @@ _labels = re.findall(r'<(?:label|div) class="(?:f(?: w)?|tick w)">([^<]+)<', HTM
 ok("⭐ the boxes in card 3's order, with card 3's labels",
    _labels == ["Width", "Length", "Height", "Gross weight", "Heaviest axle", "Axles", "Moving on", "Where",
                "Axle spacings, if you have them"], str(_labels))
+ok("Q6, Q7: the two new ticks, after card 3's, unticked at the start, in the words John said yes to",
+   '<label class="tick w"><input type="checkbox" name="cu_vehicle">The lorry itself is within the normal size and weight limits</label>\n'
+   '        <label class="tick w"><input type="checkbox" name="axle_driving">The heaviest axle is a driving axle</label>' in HTML)
 ok("the tick, ticked at the start as card 3 draws it", '<label class="tick w"><input type="checkbox" name="indivisible" checked>'
    "The load cannot be divided</label>" in HTML)
 ok("Where: England and Wales first, then Scotland (kept: it moves the C&U calendar)",
@@ -471,7 +552,7 @@ ok("🔴 the script writes the answer as text only (no innerHTML, no eval)", not
 ok("🔴 the script keeps nothing (no storage, no cookie)", not re.search(r"localStorage|sessionStorage|document\.cookie|indexedDB", JS))
 ok("the script asks the one open call through the shared caller", 'WaysTools.call("/api/tools/abnormal-load", body, sayBox)' in JS)
 ok("the script sends every box the module reads", all(f"{k}:" in JS for k in ("width_m", "length_m", "height_m", "gross_t", "max_axle_t",
-   "axle_count", "date", "where", "axle_spacings_m", "indivisible", "website"))
+   "axle_count", "date", "where", "axle_spacings_m", "indivisible", "cu_vehicle", "axle_driving", "website"))
    and "band:" not in JS)
 ok("'See the platform' goes to the landing site", 'a.href = "https://wayscope.co.uk/";' in JS and '"See the platform"' in JS)
 # the UI audit's two findings on this page (17 Nov): the tick row under 44 px on a phone, and the date box read as a trap

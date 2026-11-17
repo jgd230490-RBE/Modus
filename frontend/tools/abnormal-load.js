@@ -76,7 +76,9 @@
       width_m: val("width_m"), length_m: val("length_m"), height_m: val("height_m"), gross_t: val("gross_t"),
       max_axle_t: val("max_axle_t"), axle_count: val("axle_count"), date: val("date"),
       where: val("where") || "england-and-wales", axle_spacings_m: val("axle_spacings_m"),
-      indivisible: !!(form.elements.indivisible && form.elements.indivisible.checked), website: val("website")
+      indivisible: !!(form.elements.indivisible && form.elements.indivisible.checked),
+      cu_vehicle: !!(form.elements.cu_vehicle && form.elements.cu_vehicle.checked),
+      axle_driving: !!(form.elements.axle_driving && form.elements.axle_driving.checked), website: val("website")
     };
     var mine = ++asked;
     WaysTools.call("/api/tools/abnormal-load", body, sayBox).then(function (data) {

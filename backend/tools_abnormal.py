@@ -15,9 +15,12 @@ statute paragraphs and a code of practice; the public page leaves those referenc
 place a public sentence is shorter than the rules' line is listed side by side in notes/session-1116-tools-abnormal-
 adviser.md. The staff-only note "No escort is planned for this movement…" is never shown (a public check plans nothing).
 
-The form has no rigid-length box, no overhang boxes and no driving-axle tick: "Length" is the overall length
-(`length_m`), overhangs are 0 and the heaviest axle is read against the 10 t non-driving limit, as the drawing's worked
-example reads it.
+The form has no rigid-length box and no overhang boxes: "Length" is the overall length (`length_m`) and overhangs are 0.
+Two ticks (John's yes, 17 Nov, Q6 and Q7 of notes/tools-abnormal-adviser-mockup-1116): "The lorry itself is within the
+normal size and weight limits" sends `cu_vehicle` (the rules then answer C&U where the figures allow it), and "The heaviest
+axle is a driving axle" sends `axle_driving` (11.5 t, not 10 t). How a C&U answer reads is Q8: the head "Moves under C&U,
+not STGO", no Speeds row and no STGO category note, a line that a Saturday counts; ticked but over the C&U ceilings, the
+rules answer STGO and the page says why first.
 
 Pure: no database, no network, no clock of its own beyond `today` (passed in, or London's date).
 """
@@ -69,6 +72,13 @@ BOUND_SAY = {
     "gross_t": "A gross weight of {lo:g} to {hi:g} t, please.",
     "max_axle_t": "A heaviest axle of {lo:g} to {hi:g} t, please.",
 }
+
+#: Q8 (17 Nov): a C&U answer's head, its calendar line, and the plain words for the rules' "over the C&U ceiling" reasons
+CU_HEAD = "Moves under C&U, not STGO"
+CU_SATURDAY = "For an ordinary lorry a Saturday counts as a working day; Sundays and bank holidays do not."
+CEILING_WORDS = (("width over the C&U ceiling", f"over {R.CU_WIDTH_MAX_M:g} m wide"),
+                 ("length over the C&U ceiling", f"over {R.CU_LENGTH_MAX_M:g} m long"),
+                 ("weights over the normal limits", "over the normal weights"))
 
 #: the fixed lines of the answer
 LAST_LINE = ("Advice from the typed figures, not permission. The haulier, ESDAL, the police and the road and bridge "
@@ -196,7 +206,7 @@ def read_form(body, today=None):
         raise Bad(SAY["band"])
     figures = {"width_m": width, "length_m": length, "height_m": height, "gross_t": gross, "max_axle_t": axle,
                "axle_count": n, "axle_spacings_m": spacings, "indivisible": body.get("indivisible") is True,
-               "axle_driving": False, "cu_vehicle": False}
+               "axle_driving": body.get("axle_driving") is True, "cu_vehicle": body.get("cu_vehicle") is True}
     return figures, d, band, nation
 
 
@@ -344,14 +354,24 @@ def words(a, g, today):
     chips, notes, fine, rows = [], [], [], []
     late = any(f["code"] == "NOTICE_LATE" for f in a["flags"])
     so_late = any(f["code"] == "SO_LEAD_TIME" for f in a["flags"])
+    cu = a["regime"] == "cu"
+    # Q8: ticked as an ordinary lorry but over what C&U allows: the rules answer STGO and say why; the page says it first
+    reg_note = next((n for n in a["notes"] if n.startswith("The C&U tick is set")), None)
+    if reg_note:
+        notes.append("Ticked as an ordinary lorry, but " + " and ".join(w for k, w in CEILING_WORDS if k in reg_note)
+                     + ": it moves under STGO. Check with the haulier.")
+    if cu and a["notify_by"]:
+        fine.append(CU_SATURDAY)
 
     # the short answer only when the rules give no permission and no road-authority notice either: a 31 m long load
     # within the weights and width is "not abnormal" to the rules yet a Special Order case (17 Nov)
     if not a["abnormal"] and perm == "none" and not nt["rba_days"]:
         over = []
         head = "Not an abnormal load"
+        axle_words = f"{_g(R.ABNORMAL_AXLE_T)} t an axle" + (
+            f" ({_g(R.ABNORMAL_DRIVING_AXLE_T)} t a driving axle)" if g["axle_driving"] else "")
         notes.append(f"Within the normal limits on these figures: {_g(R.ABNORMAL_GROSS_T)} t gross, "
-                     f"{_g(R.ABNORMAL_AXLE_T)} t an axle, {_g(R.ABNORMAL_WIDTH_M)} m wide. A rigid vehicle over "
+                     f"{axle_words}, {_g(R.ABNORMAL_WIDTH_M)} m wide. A rigid vehicle over "
                      f"{_g(R.ABNORMAL_RIGID_LENGTH_M)} m long is abnormal too. Check with the haulier.")
         # 17 Nov: the rules' "abnormal" reads gross, axle, width and RIGID length only, so a long combination within them
         # (2.5 m, 28 m, 40 t) is "not abnormal" yet needs a police notice, an attendant and marker plates: the page shows
@@ -383,7 +403,7 @@ def words(a, g, today):
 
     # ---- the class
     cat = a["category"]
-    head = CLASS_WORDS.get(cat) or "No STGO category fits"
+    head = CU_HEAD if cu else (CLASS_WORDS.get(cat) or "No STGO category fits")
     over = _over_normal(g)
 
     # ---- the chips: apply by (a Special Order or VR1), notify by
@@ -406,7 +426,7 @@ def words(a, g, today):
     if late:
         notes.append(f"The last day to notify for this moving day was {_day(a['notify_by'])}. Notices given now are "
                      "too late for it.")
-    if cat is None:
+    if cat is None and not cu:          # an STGO category note means nothing for a C&U move (Q8)
         why = []
         n = g["axle_count"]
         sp = g["axle_spacings_m"]
@@ -454,7 +474,9 @@ def words(a, g, today):
     mk = _markers(g)
     rows.append(["Markers", " ".join(mk) if mk else "None from these figures."])
     sp = a["speeds_mph"]
-    if sp:
+    if cu:
+        pass                            # Q8: no Speeds row for a C&U move (the rules give STGO Category 1 speeds even so)
+    elif sp:
         rows.append(["Speeds", f"{sp[0]} mph motorway, {sp[1]} dual carriageway, {sp[2]} other roads."])
     elif cat == "special_order":
         rows.append(["Speeds", "Set by the Special Order."])
@@ -473,7 +495,7 @@ def words(a, g, today):
 
     # ---- the fine lines under the rows
     sp_typed = bool(g["axle_spacings_m"])
-    if sp_typed and min(g["axle_spacings_m"]) < R.AXLE_SPACING_MIN_M:
+    if sp_typed and min(g["axle_spacings_m"]) < R.AXLE_SPACING_MIN_M and not cu:
         fine.append(f"An axle spacing under {_g(R.AXLE_SPACING_MIN_M)} m: Categories 2 and 3 need axles at least "
                     f"{_g(R.AXLE_SPACING_MIN_M)} m apart.")
     if cat in ("cat2", "cat3") and not sp_typed:
