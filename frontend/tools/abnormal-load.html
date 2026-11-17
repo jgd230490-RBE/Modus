@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<!-- The abnormal load adviser's free check (claude/tools-abnormal-adviser, 17 Nov 2026). The look is the agreed mockup's
+     card 3 (notes/tools-first-opening-mockup-1116). The answer is the platform's own rules (backend/abnormal_rules.py)
+     through POST /api/tools/abnormal-load (backend/tools_abnormal.py); this page only lays out the words it returns. -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abnormal load adviser · Wayscope tools</title>
+<meta name="description" content="Is it an abnormal load, and who must be told by when? Type the size and weight and the day it moves. Free.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tools/tools.css">
+</head>
+<body>
+<header class="toolbar"><div class="tw">
+  <a class="brand" href="https://wayscope.co.uk/"><img src="/brand/logo-header-on-dark.svg" alt="Wayscope" width="116" height="22"></a>
+  <nav class="links" aria-label="Site"><a class="on" href="https://wayscope.co.uk/tools">Tools</a><a class="btn btn-orange sm" href="https://wayscope.co.uk/#demo">Request a demo</a></nav>
+</div></header>
+<main class="tw">
+<div class="tp">
+  <div class="pitch">
+    <p class="eyebrow">Abnormal load adviser</p>
+    <h1>Is it an abnormal load, and who must be told by when?</h1>
+    <p>Type the size and weight and the day it moves.</p>
+    <ul>
+      <li>The class it moves under</li>
+      <li>Who to notify, and the last day, on the right calendar</li>
+      <li>Attendant, markers, speeds and the escort to expect</li>
+    </ul>
+    <span class="cr free">Free</span>
+    <p class="fine2">Great Britain. Rules as read on 16 October 2026.</p>
+  </div>
+  <div class="work">
+    <form id="adv-form" action="#" method="post" novalidate>
+      <div class="topline"><h2>Check a load</h2></div>
+      <div class="form">
+        <label class="f">Width<span style="position:relative;display:block"><input type="number" name="width_m" aria-label="Width in metres" inputmode="decimal" step="any" min="0" required style="padding-right:30px"><i aria-hidden="true" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-style:normal;color:var(--muted);pointer-events:none">m</i></span></label>
+        <label class="f">Length<span style="position:relative;display:block"><input type="number" name="length_m" aria-label="Length in metres" inputmode="decimal" step="any" min="0" required style="padding-right:30px"><i aria-hidden="true" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-style:normal;color:var(--muted);pointer-events:none">m</i></span></label>
+        <label class="f">Height<span style="position:relative;display:block"><input type="number" name="height_m" aria-label="Height in metres" inputmode="decimal" step="any" min="0" required style="padding-right:30px"><i aria-hidden="true" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-style:normal;color:var(--muted);pointer-events:none">m</i></span></label>
+        <label class="f">Gross weight<span style="position:relative;display:block"><input type="number" name="gross_t" aria-label="Gross weight in tonnes" inputmode="decimal" step="any" min="0" required style="padding-right:30px"><i aria-hidden="true" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-style:normal;color:var(--muted);pointer-events:none">t</i></span></label>
+        <label class="f">Heaviest axle<span style="position:relative;display:block"><input type="number" name="max_axle_t" aria-label="Heaviest axle in tonnes" inputmode="decimal" step="any" min="0" required style="padding-right:30px"><i aria-hidden="true" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-style:normal;color:var(--muted);pointer-events:none">t</i></span></label>
+        <label class="f">Axles<input type="number" name="axle_count" inputmode="numeric" step="1" min="2" required></label>
+        <div class="f w">Moving on<div style="display:grid;grid-template-columns:1.6fr 1fr;gap:8px"><input type="date" name="date" aria-label="Moving on" required><select name="band" aria-label="By day or by night"><option value="day">by day</option><option value="night">by night</option></select></div></div>
+        <label class="f">Where<select name="where"><option value="england-and-wales">England and Wales</option><option value="scotland">Scotland</option></select></label>
+        <label class="f">Axle spacings, if you have them<input type="text" name="axle_spacings_m" inputmode="decimal" placeholder="m, with commas" autocomplete="off"></label>
+        <label class="tick w"><input type="checkbox" name="indivisible" checked>The load cannot be divided</label>
+      </div>
+      <label class="trap" aria-hidden="true">Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+      <p class="say" role="status"></p>
+    </form>
+    <div class="res" id="adv-res" hidden aria-live="polite"></div>
+  </div>
+</div>
+</main>
+<script src="/tools/abnormal-load.js"></script>
+<script src="/tools/tools.js"></script>
+</body>
+</html>

@@ -188,7 +188,7 @@ const SIGNED_OUT = /^(public|login|login-wrong|login-forgot|login-code|setpw|lin
 // 16 Nov 2026 (claude/tools-shell): the public tool pages at /tools/<page> (frontend/tools/<page>.html), walked with the
 // guides and the landing pages as signed-out stops named "tools-<page>". Empty until a tool page exists: each tool branch
 // adds its page here (test_tools_pages.py fails when a page in frontend/tools/ is missing from this list).
-const TOOL_PAGES = [];
+const TOOL_PAGES = ["abnormal-load"];
 const FIXED_PAGES = /^(map-page|map-public|dashboard-bigscreen|bigscreen-)/;   // pages that must not scroll as a document
 
 // ---------------------------------------------------------------- the server ------------------------------------------

@@ -118,7 +118,9 @@ with TestClient(main.app, base_url=BASE) as anon:
         r = anon.get(path, follow_redirects=False)
         ok(f"1. 🔴 {path} is a 404 (no redirect, no listing, no coming-soon page)", r.status_code == 404 and clean(r),
            f"{r.status_code} {r.headers.get('location', '')}")
-    ok("1. the shipped folder serves no page on this branch", tools_public.pages() == [])
+    # 17 Nov 2026 (claude/tools-abnormal-adviser): narrowed from "no page on this branch" — the tool branches add theirs
+    ok("1. the shipped folder serves only the first opening's tool pages",
+       set(tools_public.pages()) <= {"abnormal-load", "calculators", "route-check"}, str(tools_public.pages()))
 
     # ---- 2. a page in the frame (the sample, from a scratch copy of the folder) ------------------------------------- #
     scratch = Path(TMP) / "tools"
