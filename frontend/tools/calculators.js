@@ -26,10 +26,20 @@
     return out;
   }
 
-  function show(card, answer, detail) {
+  function show(card, answer, detail, steps) {
     var v = card.querySelector(".ans .v"), s = card.querySelector(".ans small");
     v.textContent = answer || " ";
     s.textContent = detail || " ";
+    var how = card.querySelector(".how");             // "How this was worked out": the server's own three steps, as text
+    if (!how) return;
+    var ol = how.querySelector("ol"), i, li;
+    ol.textContent = "";
+    for (i = 0; steps && i < steps.length; i++) {
+      li = document.createElement("li");
+      li.textContent = steps[i];
+      ol.appendChild(li);
+    }
+    how.hidden = !(steps && steps.length);            // no answer, no fold; it stays open or closed as the person left it
   }
 
   function work(card) {
@@ -39,7 +49,7 @@
     window.WaysTools.call(SUM, { which: which, figures: figures(card) }, sayEl).then(function (data) {
       if (n !== state.seq[which]) return;           // a newer figure has been typed since
       if (!data) { show(card, "", ""); return; }
-      show(card, data.answer, data.detail);
+      show(card, data.answer, data.detail, data.steps);
     });
   }
 

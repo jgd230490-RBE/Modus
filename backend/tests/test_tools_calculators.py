@@ -485,6 +485,62 @@ ok("🔴 B1: the script shows it after the file is handed over and hides it on t
    'download(data.filename || "wayscope.pdf", data.pdf); done(true);' in _js17 and _js17.count("done(false);") == 2
    and "if (el) el.hidden = !on;" in _js17)
 
+# 17 Nov 2026 (claude/tools-working; John's yes to the frontier check's Ideas 1 and 3): "How this was worked out"
+_EX = {"lorries": dict(tonnes="2,500", lorry="Artic Flatbed (44t)", working_days="22", round_trips="6"),
+       "carbon": dict(loads="90", miles="9.2", lorry="Artic Flatbed (44t)", way_back="Empty"),
+       "surcharge": dict(diesel_then="140.0", diesel_now="154.0", share="30", rate="180.00")}
+_ST = {w: tc.work(w, f)["steps"] for w, f in _EX.items()}
+ok("⭐ lorries: the three steps for the card's example", _ST["lorries"] == [
+    "2,500 t at 28 t a load is 90 loads (89.3, rounded up).", "One lorry makes 6 round trips a day for 22 days: 132 loads.",
+    "90 loads need 1 lorry."], str(_ST["lorries"]))
+ok("⭐ carbon: the three steps, the source named inside the fold (John's yes, Q2)", _ST["carbon"] == [
+    "A 9.2 mile round trip: 4.6 miles loaded, 4.6 back empty.",
+    "Artic Flatbed: 1.74 kg a mile loaded, 1.05 empty (UK Government figures, 2026). That is 8.00 + 4.84 = 12.84 kg a trip.",
+    "12.84 kg × 90 loads = 1.16 t."], str(_ST["carbon"]))
+ok("⭐ surcharge: the three steps, with the line that a fall lowers the rate (Q3)", _ST["surcharge"] == [
+    "Diesel is up 10.0 %: from 140.0p to 154.0p a litre.", "Fuel is 30 % of the rate: 10.0 % × 30 % = 3.0 %.",
+    "£180.00 + 3.0 % = £185.40 a load. A fall in diesel lowers the rate the same way."], str(_ST["surcharge"]))
+ok("the page is sent the steps with the answer", tc.public("carbon", tc.work("carbon", _EX["carbon"]))["steps"] == _ST["carbon"]
+   and set(tc.public("carbon", tc.work("carbon", _EX["carbon"]))) == {"which", "answer", "detail", "steps"})
+_fall = tc.work("surcharge", dict(_EX["surcharge"], diesel_now="126"))["steps"]
+ok("a fall in diesel: 'down', a minus, and no line about a fall", _fall[0] == "Diesel is down 10.0 %: from 140.0p to 126.0p a litre."
+   and _fall[2] == "£180.00 − 3.0 % = £174.60 a load.", str(_fall))
+ok("way back Loaded and Not counted say so in step 1", tc.work("carbon", dict(_EX["carbon"], way_back="Loaded"))["steps"][0]
+   == "A 9.2 mile round trip, counted loaded both ways."
+   and tc.work("carbon", dict(_EX["carbon"], way_back="Not counted"))["steps"][0] == "A 9.2 mile round trip: 4.6 miles loaded; the way back is not counted.")
+ok("one of anything is singular", tc.work("lorries", dict(tonnes="28", lorry="Artic Flatbed (44t)", working_days="1", round_trips="1"))["steps"]
+   == ["28 t at 28 t a load is 1 load.", "One lorry makes 1 round trip a day for 1 day: 1 load.", "1 load needs 1 lorry."]
+   and tc.work("carbon", dict(loads="3", miles="2", lorry="Artic Flatbed (44t)", way_back="Empty"))["steps"][0] == "A 2 mile round trip: 1 mile loaded, 1 back empty.")
+_bad17 = []
+for _key, _n, _mi, _wb in itertools.product(tc.lorry_keys(), (1, 7, 90, 5000), (0.5, 2, 9.2, 120), tc.WAY_BACK):
+    _o = tc.work("carbon", dict(loads=_n, miles=_mi, lorry=_key, way_back=_wb))
+    _m = re.search(r"([\d.]+) kg × ", _o["steps"][2])
+    if not _m or abs(float(_m.group(1)) - _o["kg_per_trip"]) > 0.005 or abs(float(_m.group(1)) * _n - _o["total_kg"]) > 0.005 * _n + 1e-6:
+        _bad17.append((_key, _n, _mi, _wb, _o["steps"][2]))
+    if _wb == "Empty":
+        _p = re.search(r"That is ([\d.]+) \+ ([\d.]+) = ([\d.]+) kg", _o["steps"][1])
+        if not _p or abs(float(_p.group(1)) + float(_p.group(2)) - float(_p.group(3))) > 0.0101:
+            _bad17.append((_key, _n, _mi, "parts", _o["steps"][1]))
+ok("🔴 carbon over 288 inputs: the kg a trip printed in the steps is the sum's own, and its two parts add up to it", not _bad17, str(_bad17[:3]))
+ok("the source's year comes from the shipped figures, not from a typed year", tc.source_words() == "UK Government figures, 2026"
+   and "UK Government figures, 2026" not in read("backend/tools_calculators.py").replace('"""', ""))
+_h17 = read("frontend/tools/calculators.html")
+_j17 = read("frontend/tools/calculators.js")
+ok("🔴 each card carries the closed fold, hidden until there is an answer", _h17.count(
+    '<details class="how" hidden><summary>How this was worked out</summary><ol></ol></details>') == 3 and " open" not in _h17.split("<details")[1][:40])
+ok("the script fills the fold as text from the server's steps and hides it without an answer",
+   "show(card, data.answer, data.detail, data.steps);" in _j17 and "li.textContent = steps[i];" in _j17
+   and "how.hidden = !(steps && steps.length);" in _j17 and "innerHTML" not in _j17)
+for _w in ("lorries", "carbon", "surcharge"):
+    _raw17, _ = tc.build_pdf(_w, _EX[_w], on=datetime.date(2026, 11, 17))
+    _t17 = " ".join(pdf_text(_raw17, raw=True).split())
+    ok(f"🔴 the {_w} PDF prints 'How this was worked out' and its three steps, on one page",
+       "How this was worked out" in _t17 and all(st.replace(" (UK Government figures, 2026)", "").split(". ")[0][:40] in _t17 for st in _ST[_w])
+       and pdf_text(_raw17).count("\f") == 1, _t17[:400])
+_c17 = " ".join(pdf_text(tc.build_pdf("carbon", _EX["carbon"], on=datetime.date(2026, 11, 17))[0], raw=True).split())
+ok("the carbon PDF names the source once, in its own line, and the old 'half out loaded' line is gone (the steps say it)",
+   _c17.count("UK Government") == 1 and "half out loaded" not in _c17 and "A planning estimate" in _c17, _c17[:400])
+
 print(f"test_tools_calculators.py: {PASS} passed, {len(FAIL)} failed")
 for f in FAIL:
     print("  FAIL:", f)

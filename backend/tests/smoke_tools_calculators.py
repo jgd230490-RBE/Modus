@@ -123,7 +123,9 @@ with TestClient(main.app, base_url=BASE) as anon:
         r = post(anon, SUM, {"which": which, "figures": GOOD[which]})
         j = r.json() if r.status_code == 200 else {}
         ok(f"2. ⭐ {which}: the open call answers card 2's figures, '{ans}'", r.status_code == 200 and j.get("answer") == ans and j.get("detail") == det, r.text[:200])
-        ok(f"2. {which}: nothing but which, answer and detail comes back (no figure of the platform)", set(j) == {"which", "answer", "detail"}, str(set(j)))
+        # NARROWED 17 Nov 2026 (claude/tools-working): the answer also carries the three steps of how it was worked out
+        ok(f"2. {which}: nothing but which, answer, detail and the three steps comes back", set(j) == {"which", "answer", "detail", "steps"}
+           and isinstance(j["steps"], list) and len(j["steps"]) == 3 and all(isinstance(x, str) and x for x in j["steps"]), str(j))
         ok(f"2. {which}: no-store, every header, no Set-Cookie", "no-store" in r.headers.get("cache-control", "") and clean(r), str(dict(r.headers)))
     r = post(anon, SUM, {"which": "carbon", "figures": dict(GOOD["carbon"], way_back="Loaded")})
     ok("2. 'Loaded' reads 16.0 kg a trip through the open call", "16.0 kg a trip" in r.json().get("detail", ""), r.text[:200])
