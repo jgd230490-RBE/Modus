@@ -1095,6 +1095,20 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .bo-fold{margin-left:auto;font-size:13px;font-weight:600;color:var(--navy);background:none;border:0;cursor:pointer;padding:6px 4px;}
   .bo-foot{font-size:12px;color:var(--muted);margin:8px 0 0;}
   @container (max-width:600px){.bo-h{grid-template-columns:1fr auto;gap:2px 8px;}.bo-h .bo-v{grid-column:1 / -1;}.bo-k.bo-sub{padding-left:0;}}
+  /* 17 Nov 2026 (routes-card-room, Option B; John's yes to notes routes-card-room-mockup-1117, Q1 to Q4): an open route
+     has a panel of its own under the Routes list. One column: the card, then all figures and diversions, then the
+     route's settings. On a wide panel (.ro-wide, set from the panel's own width) the settings sit beside the card and
+     the figures run under both. The settings never push their column wider (the haul road picker did, in full screen). */
+  .ro-body{display:grid;grid-template-columns:minmax(0,1fr);column-gap:16px;}
+  .ro-body.ro-wide{grid-template-columns:minmax(0,820px) minmax(0,1fr);}
+  .ro-body.ro-wide>.ro-under{grid-column:1 / -1;}
+  .ro-main,.ro-side,.ro-under{min-width:0;}
+  .ro-under:empty{display:none;}
+  .ro-under{margin-bottom:10px;}
+  .ro-pick{min-width:0;flex:0 1 auto;max-width:100%;text-overflow:ellipsis;}
+  .ro-head{font-size:14px;font-weight:600;color:var(--ink);margin:0;min-width:0;border-radius:3px;}
+  .ro-head:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
+  .ro-tri:focus-visible{outline:2px solid var(--navy);outline-offset:1px;}
   /* 9 Nov 2026 (UI critique card 11): CLP documents grouped by place, the team CLPs folded under the site's */
   .clp-fold{display:inline-flex;align-items:center;gap:4px;margin-top:4px;min-height:24px;padding:0 2px;background:none;border:0;font:inherit;font-size:13px;color:var(--ink);text-decoration:underline;cursor:pointer;}
   .clp-kid td:first-child{padding-left:36px;}
@@ -1973,6 +1987,23 @@ function useMQ(q){
     return () => { if(mq.removeEventListener) mq.removeEventListener("change", f); else if(mq.removeListener) mq.removeListener(f); };
   }, [q]);
   return on;
+}
+// 17 Nov 2026 (routes-card-room): true while a box is at least `min` px wide: its OWN width, not the window's (the rail
+// folds, full screen is a 380 px column). Returns [ref for the box, wide, the box]: measured as the box is put on the
+// page (before the paint), then on every resize; a box not laid out (0 px: the jsdom harness) reads as narrow.
+function useBoxWide(min){
+  const [wide, setWide] = useState(false);
+  const box = useRef(null), watch = useRef(null);
+  const ref = React.useCallback((el) => {
+    if(watch.current){ watch.current.disconnect(); watch.current = null; }
+    box.current = el;
+    if(!el) return;
+    const f = () => { let px = 0; try { px = el.getBoundingClientRect().width || 0; } catch(e){} setWide(px >= min); };
+    f();
+    if(typeof ResizeObserver === "undefined") return;
+    watch.current = new ResizeObserver(f); watch.current.observe(el);
+  }, [min]);
+  return [ref, wide, box];
 }
 // the one status: a word, an icon whose SHAPE says the tone (✓ circle, ! square, ! circle, – circle), and
 // how many more things are flagged (the details spell each one out)
@@ -15874,7 +15905,9 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
       )}
 
       {!!attached.length && (
-        <table className="text-[13px] w-full mb-2">
+        // 17 Nov 2026 (routes-card-room): the table scrolls inside its own box where the column is narrow
+        <div className="overflow-x-auto mb-2" data-haul-table="1">
+        <table className="text-[13px] w-full">
           <thead className="text-slate-400">
             <tr>
               <th className="px-1 py-0.5 text-left font-semibold">Order</th>
@@ -15935,11 +15968,15 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
             })}
           </tbody>
         </table>
+        </div>
       )}
 
-      {canEdit && <div className="flex items-center gap-2">
+      {/* 17 Nov 2026 (routes-card-room, card 4): the picker keeps to its box's width (.ro-pick: it may shrink, a long name
+          is cut with "…"); in full screen it stood 176 px past the 380 px route panel and gave it a sideways scroll bar */}
+      {canEdit && <div className="flex items-center gap-2" style={{ minWidth: 0 }} data-haul-pick="1">
         <select value={pick} onChange={e => setPick(e.target.value)} disabled={busy || !available.length}
-          className="border border-slate-200 rounded-lg px-2 py-1 text-[13px] bg-white disabled:opacity-40">
+          aria-label="Add a haul road"
+          className="ro-pick border border-slate-200 rounded-lg px-2 py-1 text-[13px] bg-white disabled:opacity-40">
           <option value="">{available.length ? "Add a haul road…" : "No other haul roads drawn"}</option>
           {available.map(z => (
             <option key={z.id} value={z.id}>
@@ -15950,7 +15987,7 @@ function HaulRoads({ routeId, haulRoads, token, onChanged }){
         {/* 22 Oct 2026 (UI fix 6, card 6): the haul-road fill reads var(--haul-text) (white on it 5.23:1; dark text in the dark look) */}
         <button onClick={attach} disabled={busy || !pick}
           className="text-[13px] font-semibold px-2 py-1 rounded-md text-white disabled:opacity-40"
-          style={{ background: "var(--haul-text)" }}>Attach</button>
+          style={{ background: "var(--haul-text)", flex: "none" }}>Attach</button>
       </div>}
 
       {!!attached.length && (
@@ -16045,6 +16082,8 @@ function RouteRestrictions({ routeId }){
       </button>
 
       {open && (
+        // 17 Nov 2026 (routes-card-room): scrolls inside its own box where the column is narrow
+        <div className="overflow-x-auto">
         <table className="text-[13px] w-full mt-2">
           <thead className="text-slate-400">
             <tr>
@@ -16105,6 +16144,7 @@ function RouteRestrictions({ routeId }){
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       <p className="text-[13px] text-slate-400 mt-1.5">
@@ -16189,7 +16229,8 @@ function RouteGates({ routeId, originId, destId, token, blockers, onChanged }){
           This route cannot be routed: {(blockers || []).join("; ")}.
         </p>
       )}
-      <div className="grid grid-cols-2 gap-2">
+      {/* 17 Nov 2026 (routes-card-room): side by side where each has 150 px, one above the other in a narrow column */}
+      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }} data-route-gates="1">
         {pick("Origin gate", originId, "origin_gate_id")}
         {pick("Destination gate", destId, "dest_gate_id")}
       </div>
@@ -16224,13 +16265,14 @@ function NearCell({ data, id }){
   return <span className="inline-flex flex-wrap gap-1">{chips.map(x => (
     <span key={x.k} className="text-[12px] px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-700 whitespace-nowrap"><b>{x.n}</b> {x.w}</span>))}</span>;
 }
-function NearDetails({ data, id, colSpan }){
+// 17 Nov 2026 (routes-card-room): a box in the open route's panel (it was a row of the Routes list's table)
+function NearDetails({ data, id }){
   const c = data && data.fetched_at && (data.routes || {})[id];
   if(!c) return null;
   const when = new Date(data.fetched_at.length > 10 ? data.fetched_at : data.fetched_at + "T12:00:00Z");
   const near = data.near_m || {};
   return (
-    <tr data-route-near={id}><td colSpan={colSpan} className="px-3 pb-2">
+    <div data-route-near={id} className="mb-3">
       <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
         <p className="text-[13px] font-semibold text-slate-700 mb-1">Near {id}: within {near.schools || 250} m of its drawn line, both legs</p>
         <div className="grid gap-x-6 gap-y-0.5 text-[13px] text-slate-700" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
@@ -16240,7 +16282,7 @@ function NearDetails({ data, id, colSpan }){
         </div>
         <p className="text-[13px] text-slate-600 mt-1.5">Bus stops and homes count within {near.bus_stops || 100} m. Fetched {isNaN(when) ? "" : when.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}.</p>
       </div>
-    </td></tr>
+    </div>
   );
 }
 
@@ -16360,7 +16402,7 @@ function RouteFullList({ routes, prof, alt, selected, onPick, folded, onFold }){
   );
 }
 // ... and the chosen route on the right (» folds it): the two legs, near the route, the buttons, then the vehicle table
-function RouteFullDetails({ route, prof, alt, folded, onFold, near, analysis, diversions, routes, vehicles }){
+function RouteFullDetails({ route, prof, alt, folded, onFold, near, analysis, routes, vehicles }){
   const r = route;
   const leg = (key, word, colour) => {
     const f = r ? legFig(r.profiles[prof], key, alt) : null;
@@ -16385,8 +16427,9 @@ function RouteFullDetails({ route, prof, alt, folded, onFold, near, analysis, di
           <p className="text-[13px] text-slate-500">{vehLabel(prof)}{alt ? ` · Alt ${alt}` : ""}</p></div>
         <div className="text-[13px]"><span className="font-semibold text-slate-700">Near the route </span><NearCell data={near} id={r.id} /></div>
         <div className="flex flex-wrap gap-2"><RouteSheetButton routeId={r.id} /><RouteAnalysisMenu routes={routes} picked={r.id} vehicles={vehicles} /></div>
-        {analysis && <div className="overflow-x-auto" data-route-full-analysis="1"><table className="text-sm" style={{ tableLayout: "fixed", width: "100%" }}><tbody>{analysis}</tbody></table></div>}
-        {diversions && <div><p className="text-xs font-semibold text-slate-700">Diversions</p>{diversions}</div>}
+        {/* 17 Nov 2026 (routes-card-room, cards 2 to 4): one column, the Best option card first, then all figures and the
+            diversions (inside `analysis`), then Gates and Haul roads; nothing in it is wider than the panel */}
+        {analysis && <div data-route-full-analysis="1" style={{ minWidth: 0 }}>{analysis}</div>}
       </>)}
     </div>
   );
@@ -16545,7 +16588,14 @@ function BestOption({ best, routeId, showAll, onAll, onFocus, onPromote, promoti
     </div>);
 }
 
-function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting, leg,
+// 17 Nov 2026 (routes-card-room; John's yes to notes routes-card-room-mockup-1117, Option B and Q2): an open route's
+// detail is no longer a row of the Routes list's table. Three parts, the card FIRST (Q2): .ro-main the Best option
+// card; .ro-under all figures, the busy-hours lines and `diversions`; .ro-side `side` (the page's Vehicles and Near the
+// route boxes), Gates, Temporary haul roads and the closures line. One column reads in that order (full screen, a
+// tablet, a narrow page); `wide` puts .ro-side beside the card and .ro-under beneath both, and the parts are written
+// in the order they are read either way. `onShow` is the card's "Show Alt N on map" where it differs from a table
+// row's click (Q4: the page moves up to the map).
+function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting, leg, wide, side, diversions,
                         haulRoads, token, onHaulChanged, originId, destId, gateBlockers, onBusyChanged }){
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
@@ -16634,25 +16684,31 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                          : ` It takes ${say(g[0])} a round trip at 08:00 and ${say(g[1])} at 17:00.`;
   };
 
-  return (
-    <tr className="bg-slate-50/70">
-      <td colSpan={colSpan} className="px-4 py-3">
-        <RouteGates routeId={routeId} originId={originId} destId={destId} token={token}
-          blockers={gateBlockers} onChanged={onHaulChanged} />
-        <HaulRoads routeId={routeId} haulRoads={haulRoads} token={token} onChanged={onHaulChanged} />
-        <RouteRestrictions routeId={routeId} />
-        {err && <p className="text-xs" style={{ color: "var(--red)" }}>Couldn't load analysis: {err}</p>}
-        {!data && !err && <p className="text-xs text-slate-400">Loading analysis…</p>}
+  const partMain = (
+      <div className="ro-main" key="main" data-ro="card">
+        {err && <p className="text-xs mb-3" style={{ color: "var(--red)" }}>Couldn't load analysis: {err}</p>}
+        {!data && !err && <p className="text-xs text-slate-400 mb-3">Loading analysis…</p>}
         {data && !data.rows.length && (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 mb-3">
             Nothing to show yet: this route is not routed. Use the
             <span className="font-semibold"> Route</span> action on this row to route it.
           </p>
         )}
         {data && !!data.rows.length && (
           <BestOption best={best} routeId={routeId} showAll={showAll} onAll={() => setShowAll(v => !v)}
-            onFocus={onFocus} onPromote={onPromote} promoting={promoting} busyUses={busy && busy.uses} />
+            onFocus={onShow || onFocus} onPromote={onPromote} promoting={promoting} busyUses={busy && busy.uses} />
         )}
+      </div>);
+  const partSide = (
+      <div className="ro-side" key="side" data-ro="settings">
+        {side}
+        <RouteGates routeId={routeId} originId={originId} destId={destId} token={token}
+          blockers={gateBlockers} onChanged={onHaulChanged} />
+        <HaulRoads routeId={routeId} haulRoads={haulRoads} token={token} onChanged={onHaulChanged} />
+        <RouteRestrictions routeId={routeId} />
+      </div>);
+  const partUnder = (
+      <div className="ro-under" key="under" data-ro="figures">
         {data && !!data.rows.length && (
           <div className="overflow-x-auto">
             {(showAll || (best && best.route && !(best.route.options || []).length)) && <>
@@ -16684,8 +16740,8 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
                     onClick={() => onFocus && onFocus(r.profile, r.alt_index)}
                     title="Show this option on the map"
                     className={"border-t border-slate-200/70 cursor-pointer "
-                      + (isActive ? "bg-white ring-1 ring-inset ring-[color:var(--navy)]/40 "
-                                  : "hover:bg-white ")
+                      + (isActive ? "bg-slate-50 ring-1 ring-inset ring-[color:var(--navy)]/40 "
+                                  : "hover:bg-slate-50 ")
                       + (r.alt_index === 0 ? "" : "text-slate-500")}>
                     <td className="px-2 py-1 whitespace-nowrap">
                       {r.alt_index === 0 ? vehShort(r.profile) : ""}
@@ -16827,8 +16883,12 @@ function RouteAnalysis({ routeId, colSpan, active, onFocus, onPromote, promoting
             {busyMsg && <p className="text-[13px] mt-1" style={{ color: "var(--bad-text)" }} role="status">{busyMsg}</p>}
           </div>
         )}
-      </td>
-    </tr>
+        {diversions}
+      </div>);
+  return (
+    <div className={"ro-body" + (wide ? " ro-wide" : "")} data-route-analysis-body={routeId}>
+      {wide ? [partMain, partSide, partUnder] : [partMain, partUnder, partSide]}
+    </div>
   );
 }
 
@@ -16889,6 +16949,23 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   const [rLayerCounts, setRLayerCounts] = useState({});
   // which Routes row has its analysis panel open (Step C)
   const [openRow, setOpenRow] = useState(null);
+  // 17 Nov 2026 (routes-card-room, Option B): the open route's own panel under the list. Two columns from 1,100 px of
+  // panel; opening one moves the page to the panel's top and focus to its heading, closing brings focus back to the
+  // row's ▶ button. roBeside: "Beside the map" was pressed, so full screen opens with focus on the chosen route.
+  const [roBox, roWide, roEl] = useBoxWide(1100);
+  const roHead = useRef(null), roWas = useRef(null), roBeside = useRef(false);
+  const calmMotion = () => { try { return !!window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch(e){ return true; } };
+  useEffect(() => {
+    const was = roWas.current; roWas.current = openRow;
+    if(openRow && openRow !== was){
+      const el = roEl.current, h = roHead.current;
+      if(h){ try { h.focus({ preventScroll: true }); } catch(e){} }
+      if(el && el.scrollIntoView){ try { el.scrollIntoView({ block: "start", behavior: calmMotion() ? "auto" : "smooth" }); } catch(e){} }
+    } else if(!openRow && was){
+      const b = [...document.querySelectorAll("[data-route-tri]")].find(x => x.getAttribute("data-route-tri") === was);
+      if(b){ try { b.focus(); } catch(e){} }
+    }
+  }, [openRow]);
   // every cached option for the selected route, and which one is currently in focus.
   // Selecting a route draws all of its options; the focused one is red, the rest grey.
   const [selGeoms, setSelGeoms] = useState(null);
@@ -17050,6 +17127,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     fsAsked.current = false;
   };
   useEffect(() => { if(full && !fullOk) leaveFull(); }, [full, fullOk]);
+  // 17 Nov 2026 (routes-card-room, Q3): entered from the route panel's "Beside the map", focus goes to the chosen route
+  useEffect(() => {
+    if(!full || !roBeside.current) return;
+    roBeside.current = false;
+    const d = fullGrid.current && fullGrid.current.querySelector("[data-route-full-details]");
+    if(d){ try { d.focus(); } catch(e){} }
+  }, [full]);
   // the page under it is out of reach while it is covered (Tab, a screen reader), and back after
   useEffect(() => {
     if(!full || !fullGrid.current) return;
@@ -18671,6 +18755,29 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
   // map never slides out from under whatever you're editing
   const panelStyle = isWide && !tabletW ? { height: MAP_H, overflowY: "auto" } : undefined;
   const th = "px-3 py-2 text-left font-semibold";
+  // 17 Nov 2026 (routes-card-room): the open route (its own panel under the list) and what the panel needs
+  const openR = onRoutes && openRow ? ((status || []).find(r => r.id === openRow) || null) : null;
+  const routeDiversions = (id) => (divPeriods || []).some(p => p.route_id === id) ? (
+    <div data-route-diversions={id} className="mt-3">
+      <p className="text-xs font-semibold text-slate-700">Diversions</p>
+      <DivRows rows={(divPeriods || []).filter(p => p.route_id === id)} prof={showProfile} canEdit={canEdit}
+        busy={divBusy} onKeep={keepMain} routes={status} />
+    </div>) : null;
+  // Q3: full screen for this route (the list, the map, the chosen route side by side)
+  const besideMap = (id) => { if(selected !== id) selectRoute(id); roBeside.current = true; enterFull(); };
+  // Q4: the card's "Show Alt N on map" moves the page up to the map when under half of the map is in sight
+  const mapIntoView = () => {
+    const box = mapDiv.current && mapDiv.current.parentElement;
+    if(full || !box || !box.scrollIntoView) return;
+    let seen = 1;
+    try {
+      const r = box.getBoundingClientRect(), sc = box.closest("main");
+      const top = sc ? Math.max(0, sc.getBoundingClientRect().top) : 0;
+      const foot = window.innerHeight || document.documentElement.clientHeight || 0;
+      seen = r.height > 0 ? (Math.min(r.bottom, foot) - Math.max(r.top, top)) / r.height : 1;
+    } catch(e){}
+    if(seen < 0.5){ try { box.scrollIntoView({ block: "start", behavior: calmMotion() ? "auto" : "smooth" }); } catch(e){} }
+  };
 
   return (
     <div className="max-w-7xl mx-auto p-5 space-y-4">
@@ -18755,14 +18862,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           <RouteFullDetails route={(status || []).find(r => r.id === selected) || null} prof={showProfile} alt={showAlt}
             routes={status || []} vehicles={vehicles}
             folded={fold.r} onFold={() => setFold(f => ({ ...f, r: !f.r }))} near={nearData}
-            analysis={selected ? <RouteAnalysis routeId={selected} colSpan={1}
+            analysis={selected ? <RouteAnalysis routeId={selected}
               originId={((status || []).find(r => r.id === selected) || {}).origin_id} destId={((status || []).find(r => r.id === selected) || {}).dest_id}
               gateBlockers={((status || []).find(r => r.id === selected) || {}).gate_blockers}
               active={activeGeom} leg={showLeg} onFocus={focusGeom} onPromote={canEdit ? promoteAlt : null}
               onBusyChanged={loadDiversions} promoting={promoting} haulRoads={haulRoadList} token={tokenRef.current}
-              onHaulChanged={rebakeAfterZone} /> : null}
-            diversions={selected && (divPeriods || []).some(p => p.route_id === selected)
-              ? <DivRows rows={(divPeriods || []).filter(p => p.route_id === selected)} prof={showProfile} canEdit={canEdit} busy={divBusy} onKeep={keepMain} routes={status} /> : null} />
+              onHaulChanged={rebakeAfterZone} diversions={routeDiversions(selected)} /> : null} />
         </>}
         {/* 27 Oct 2026 (P5): read-only, the panel may hold no control at all, so it is a tab stop itself to scroll by keyboard */}
         <div className="space-y-4" style={drawing || (full && onRoutes) ? { display: "none" } : full ? { gridColumn: 2, gridRow: 1, minHeight: 0, overflowY: "auto" } : panelStyle} {...(canEdit ? {} : { tabIndex: 0, role: "region", "aria-label": onLoc ? "Locations panel" : onZones ? "Zones panel" : "Routes panel" })}>
@@ -19826,6 +19931,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         </div>
       </div>
       ) : onRoutes ? (
+      <>
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
           <span className="text-sm font-semibold text-slate-700">Routes <span className="text-slate-400 font-normal">· click a row to locate it on the map</span></span>
@@ -19896,12 +20002,14 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <tr onClick={() => selectRoute(r.id)}
                     className={"border-t border-slate-100 cursor-pointer tc-has-tri " + (selected === r.id ? "bg-blue-50" : "hover:bg-slate-50")}>
                     <td className="px-2 py-2 tc-tri">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setOpenRow(open ? null : r.id); }}
+                      {/* 17 Nov 2026 (routes-card-room, Option B): opens the route's own panel under the list and picks the
+                          route in the list (so a Suggested card shows Make primary at once); the row itself stays a row */}
+                      <button type="button" data-route-tri={r.id}
+                        onClick={(e) => { e.stopPropagation(); if(open) setOpenRow(null); else { setOpenRow(r.id); if(selected !== r.id) selectRoute(r.id); } }}
                         title={open ? "Hide analysis" : "Show haul-cycle analysis"}
                         aria-label={open ? "Hide analysis" : "Show analysis"}
-                        aria-expanded={open}
-                        className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition">
+                        aria-expanded={open} aria-controls={open ? "route-panel" : undefined}
+                        className="ro-tri w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition">
                         <span style={{ display: "inline-block", transition: "transform .15s",
                           transform: open ? "rotate(90deg)" : "none", fontSize: 10 }}>▶</span>
                       </button>
@@ -20004,29 +20112,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       </>}
                     </td>
                   </tr>
-                  {open && <tr data-route-vehicles={r.id}><td colSpan={11} className="px-3 pt-1 pb-2">
-                    <div className="text-xs font-semibold text-slate-700 mb-1">Vehicles</div>
-                    <VehChips profiles={r.profiles} />
-                  </td></tr>}
-                  {open && <NearDetails data={nearData} id={r.id} colSpan={11} />}
-                  {open && <RouteAnalysis routeId={r.id} colSpan={11}
-                    originId={r.origin_id} destId={r.dest_id}
-                    gateBlockers={r.gate_blockers}
-                    active={selected === r.id ? activeGeom : null}
-                    leg={showLeg}
-                    onFocus={selected === r.id ? focusGeom : (p, a) => { selectRoute(r.id); focusGeom(p, a); }}
-                    onPromote={selected === r.id && canEdit ? promoteAlt : null}
-                    onBusyChanged={loadDiversions}
-                    promoting={promoting}
-                    haulRoads={haulRoadList}
-                    token={tokenRef.current}
-                    onHaulChanged={rebakeAfterZone} />}
-                  {open && (divPeriods || []).some(p => p.route_id === r.id) && (
-                    <tr data-route-diversions={r.id}><td colSpan={11} className="px-3 pb-3">
-                      <p className="text-xs font-semibold text-slate-700 mt-1">Diversions</p>
-                      <DivRows rows={(divPeriods || []).filter(p => p.route_id === r.id)} prof={showProfile} canEdit={canEdit}
-                        busy={divBusy} onKeep={keepMain} routes={status} />
-                    </td></tr>)}
                   </React.Fragment>
                 );
               })}
@@ -20040,6 +20125,50 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           </table>
         </div>
       </div>
+      {/* 17 Nov 2026 (routes-card-room, Option B; John's yes to notes routes-card-room-mockup-1117, Q1 to Q4): the open route
+          in its own panel under the list (it was rows inside the list's 40vh box, the Best option card the fifth thing
+          down). The card first (Q2); from 1,100 px of panel the route's settings sit beside it; all figures, the
+          busy-hours lines and the diversions run under both. The card's own words, rows and rules are BestOption's. */}
+      {openR && (() => {
+        const r = openR;
+        const focusR = selected === r.id ? focusGeom : (p, a) => { selectRoute(r.id); focusGeom(p, a); };
+        return (
+        <section className="card" id="route-panel" ref={roBox} data-route-panel={r.id} data-route-panel-wide={roWide ? "1" : "0"}
+          aria-labelledby="route-panel-h" style={{ scrollMarginTop: 8 }}>
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
+            <h3 id="route-panel-h" className="ro-head" tabIndex={-1} ref={roHead}>{r.id} · {r.origin} → {r.dest}</h3>
+            <span className="flex items-center gap-2" style={{ flex: "none" }}>
+              {fullOk && <button type="button" className="btn-sec" data-route-beside={r.id} onClick={() => besideMap(r.id)}>Beside the map</button>}
+              <button type="button" className="row-x" data-route-close={r.id} aria-label={`Close ${r.id}`} title={`Close ${r.id}`}
+                onClick={() => setOpenRow(null)}></button>
+            </span>
+          </div>
+          <div className="px-4 pt-3 pb-1">
+            <RouteAnalysis routeId={r.id} wide={roWide}
+              originId={r.origin_id} destId={r.dest_id}
+              gateBlockers={r.gate_blockers}
+              active={selected === r.id ? activeGeom : null}
+              leg={showLeg}
+              onFocus={focusR}
+              onShow={(p, a) => { focusR(p, a); mapIntoView(); }}
+              onPromote={selected === r.id && canEdit ? promoteAlt : null}
+              onBusyChanged={loadDiversions}
+              promoting={promoting}
+              haulRoads={haulRoadList}
+              token={tokenRef.current}
+              onHaulChanged={rebakeAfterZone}
+              diversions={routeDiversions(r.id)}
+              side={<>
+                <div className="rounded-lg border border-slate-200 bg-white p-2.5 mb-3" data-route-vehicles={r.id}>
+                  <div className="text-xs font-semibold text-slate-700 mb-1">Vehicles</div>
+                  <VehChips profiles={r.profiles} />
+                </div>
+                <NearDetails data={nearData} id={r.id} />
+              </>} />
+          </div>
+        </section>);
+      })()}
+      </>
       ) : (
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">

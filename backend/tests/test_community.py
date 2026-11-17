@@ -864,10 +864,14 @@ ok("9: the endpoint sits before the {route_id} paths, takes a heavy-read slot an
    and 'with _heavy("routes/community-counts")' in _SRC9 and '_staff_json("routes/community-counts"' in _SRC9)
 _FE9 = read("frontend/index.html")
 # NARROWED 8 Nov 2026 (v2.1 task 2.1-7): colSpan 8 -> 11, the one distance column became Out / Back distance and minutes
-ok("9: the Routes page: a Near the route column after the team, the cell and the opened-row list, the table's colSpan 11 throughout",
+# NARROWED 17 Nov 2026 (routes-card-room, Option B; John's yes to notes routes-card-room-mockup-1117): the opened route's
+# list is a box in the route's own panel under the table, no longer rows of the table (no colSpan on it); the table's
+# own full-width rows keep colSpan 11
+ok("9: the Routes page: a Near the route column after the team, the cell and the open route's list, the table's colSpan 11 throughout",
    '<th className={th}>Near the route</th>' in _FE9 and "<NearCell data={nearData} id={r.id} />" in _FE9
-   and "<NearDetails data={nearData} id={r.id} colSpan={11} />" in _FE9 and "<RouteAnalysis routeId={r.id} colSpan={11}" in _FE9
-   and 'data-route-diversions={r.id}><td colSpan={11}' in _FE9 and "colSpan={8}" not in _FE9[_FE9.find('data-route-near-cell'):_FE9.find('data-route-near-cell') + 6000] and "Not fetched" in _FE9 and "None of these" in _FE9
+   and "<NearDetails data={nearData} id={r.id} />" in _FE9 and "<RouteAnalysis routeId={r.id} wide={roWide}" in _FE9
+   and "function NearDetails({ data, id }){" in _FE9 and '<tr data-routes-empty="1"><td colSpan="11"' in _FE9
+   and "<div data-route-diversions={id}" in _FE9 and "colSpan={8}" not in _FE9[_FE9.find('data-route-near-cell'):_FE9.find('data-route-near-cell') + 6000] and "Not fetched" in _FE9 and "None of these" in _FE9
    and "fetch(`${API}/routes/community-counts`)" in _FE9)
 # REVERSED 16 Nov 2026 (step 1b, John's Q1 "Yes to Q1"): the best option card now suggests on the Routes page, so the
 # "nothing is scored or ranked" sentence is gone from the Near box and the user guide's Routes section; the chips stay
