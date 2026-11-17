@@ -142,7 +142,11 @@ for w, ln, h, gross, n, date in itertools.product(
 SPREAD += [W(indivisible=False), W(axle_spacings_m="0.9, 1.36, 1.36, 1.36, 1.36, 1.36"),
            W(axle_spacings_m="1.2,1.2,1.2,1.2,1.2,1.2"), W(gross_t=60, max_axle_t=12, axle_count=5),
            W(width_m=2.5, length_m=16.5, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5),
-           W(width_m=2.5, length_m=16.5, height_m=2.8, gross_t=40, max_axle_t=9, axle_count=5)]
+           W(width_m=2.5, length_m=16.5, height_m=2.8, gross_t=40, max_axle_t=9, axle_count=5),
+           # 17 Nov: long combinations within the normal weights and width (the rules: not abnormal, yet a police notice)
+           W(width_m=2.5, length_m=28, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5, date="2026-12-10"),
+           W(width_m=2.5, length_m=26.5, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5, date="2026-11-18"),
+           W(width_m=2.5, length_m=20, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5)]
 
 checked = 0
 problems = []
@@ -161,9 +165,23 @@ for body in SPREAD:
     seen_shapes.add((a["abnormal"], a["category"], a["permission"], bool(nt["police_days"]), nt["rba_days"],
                      a["attendant"], a["escort_expected"], len(a["height"])))
     errs = []
-    if not a["abnormal"]:
-        if p["head"] != "Not an abnormal load" or p["chips"] or p["over"]:
+    if not a["abnormal"] and a["permission"] == "none" and not nt["rba_days"]:
+        # narrowed 17 Nov: a "not abnormal" load may still need what the rules give (a long combination): the page must
+        # show each of those rows, and only those; before, it hid them
+        if p["head"] != "Not an abnormal load" or p["over"]:
             errs.append("not abnormal")
+        if [c[1] for c in p["chips"]] != ([f"Notify by {T._day(a['notify_by'])}"
+                                           + (": passed" if any(f["code"] == "NOTICE_LATE" for f in a["flags"]) else "")]
+                                          if a["notify_by"] else []):
+            errs.append("not abnormal: notify chip")
+        if bool(nt["police_days"]) != ("Police" in rows) or nt["rba_days"]:
+            errs.append("not abnormal: police")
+        if bool(a["attendant"]) != ("Attendant" in rows):
+            errs.append("not abnormal: attendant")
+        if bool(a["markers"]) != ("Markers" in rows):
+            errs.append("not abnormal: markers")
+        if (a["escort_expected"] != "none") != ("Escort" in rows):
+            errs.append("not abnormal: escort")
         if bool(a["height"]) != ("Height" in rows):
             errs.append("height on a normal load")
     else:
@@ -245,6 +263,18 @@ ok("the spread's refusals are only the impossible ones (heaviest axle times axle
 ok("the spread reaches every class the rules give (normal, Categories 1 to 3, none fits, Special Order)",
    {"Not an abnormal load", "STGO Category 1", "STGO Category 2", "STGO Category 3", "No STGO category fits",
     "Special Order"} <= seen_heads, str(seen_heads))
+ok("⭐🔴 the spread reaches a load the rules call not abnormal that still needs a police notice (and the page shows it)",
+   any(not s[0] and s[3] for s in seen_shapes), str(sorted(s for s in seen_shapes if not s[0])))
+_long = T.answer(W(width_m=2.5, length_m=28, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5, date="2026-12-10"),
+                 today=TODAY)["page"]
+ok("⭐🔴 2.5 m wide, 28 m long, 40 t: 'Not an abnormal load', and yet the police notice, attendant and marker plates shown",
+   _long["head"] == "Not an abnormal load" and _long["chips"] == [["warn", "Notify by Mon 7 Dec 2026"]]
+   and [k for k, _ in _long["rows"]] == ["Police", "Attendant", "Markers", "Height"]
+   and _long["rows"][0][1] == "2 clear working days' notice to every force on the route. Receive by 7 Dec.", str(_long))
+_so31 = T.answer(W(width_m=2.5, length_m=31, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5, date="2027-03-04"),
+                 today=TODAY)["page"]
+ok("⭐🔴 2.5 m wide, 31 m long, 40 t (not abnormal to the rules, a Special Order case): the Special Order answer, never "
+   "'Not an abnormal load'", _so31["head"] == "Special Order" and _so31["rows"][0][0] == "Special Order", str(_so31)[:300])
 ok("the spread reaches VR1, Special Order, both escort kinds and the late notice",
    any(s[2] == "vr1" for s in seen_shapes) and any(s[2] == "special_order" for s in seen_shapes)
    and any(s[6] == "all_roads" for s in seen_shapes) and any(s[6] == "other_roads" for s in seen_shapes))
@@ -370,7 +400,7 @@ REF = [
 ]
 # Q1: the page sends no "Where" and no band; left out (or blank) they read as England and Wales, by day
 _nowb = {k: v for k, v in W().items() if k not in ("where", "band")}
-ok("⭐ Q1: no 'Where' and no band sent: the same answer as England and Wales by day",
+ok("⭐ Q1: no 'Where' and no band sent (another caller): the same answer as England and Wales by day",
    T.answer(_nowb, today=TODAY)["page"] == P and T.answer(W(where=""), today=TODAY)["page"] == P)
 for label, body, say in REF:
     got = refused(body)
@@ -421,13 +451,15 @@ for words in ('<p class="eyebrow">Abnormal load adviser</p>',
               "<h2>Check a load</h2>"):
     ok(f"card 3 words on the page: {re.sub('<[^>]+>', '', words)}", words in HTML)
 _labels = re.findall(r'<(?:label|div) class="(?:f(?: w)?|tick w)">([^<]+)<', HTML)
-ok("⭐ the boxes in card 3's order, with card 3's labels, less Q1's 'Where'",
-   _labels == ["Width", "Length", "Height", "Gross weight", "Heaviest axle", "Axles", "Moving on",
+ok("⭐ the boxes in card 3's order, with card 3's labels",
+   _labels == ["Width", "Length", "Height", "Gross weight", "Heaviest axle", "Axles", "Moving on", "Where",
                "Axle spacings, if you have them"], str(_labels))
 ok("the tick, ticked at the start as card 3 draws it", '<label class="tick w"><input type="checkbox" name="indivisible" checked>'
    "The load cannot be divided</label>" in HTML)
-ok("Q1: no 'Where' box and no 'by day / by night' box (they change nothing on this form); 'Moving on' is a date alone",
-   'name="where"' not in HTML and 'name="band"' not in HTML and "by night" not in HTML
+ok("Where: England and Wales first, then Scotland (kept: it moves the C&U calendar)",
+   re.search(r'name="where"><option value="england-and-wales">England and Wales</option><option value="scotland">Scotland</option>', HTML))
+ok("Q1 as revised: no 'by day / by night' box (it never changes an answer); 'Moving on' is a date alone",
+   'name="band"' not in HTML and "by night" not in HTML
    and '<label class="f">Moving on<input type="date" name="date" required></label>' in HTML)
 ok("🔴 no documents button, no 'Add a route', no balance, no price on the page",
    not re.search(r"document|Add a route|balance|£|credit|PDF", HTML, re.I))
@@ -439,8 +471,8 @@ ok("🔴 the script writes the answer as text only (no innerHTML, no eval)", not
 ok("🔴 the script keeps nothing (no storage, no cookie)", not re.search(r"localStorage|sessionStorage|document\.cookie|indexedDB", JS))
 ok("the script asks the one open call through the shared caller", 'WaysTools.call("/api/tools/abnormal-load", body, sayBox)' in JS)
 ok("the script sends every box the module reads", all(f"{k}:" in JS for k in ("width_m", "length_m", "height_m", "gross_t", "max_axle_t",
-   "axle_count", "date", "axle_spacings_m", "indivisible", "website"))
-   and "band:" not in JS and "where:" not in JS)
+   "axle_count", "date", "where", "axle_spacings_m", "indivisible", "website"))
+   and "band:" not in JS)
 ok("'See the platform' goes to the landing site", 'a.href = "https://wayscope.co.uk/";' in JS and '"See the platform"' in JS)
 ok("the page's script is served beside its page only", tools_public.page_file("abnormal-load.js") is not None
    and tools_public.page_file("abnormal-load.js")[1].startswith("text/javascript")

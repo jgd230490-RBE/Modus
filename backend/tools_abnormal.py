@@ -185,8 +185,9 @@ def read_form(body, today=None):
     last = last_moving_day()
     if d > last:
         raise Bad(f"Pick a moving day up to {_long(last)}: the bank holidays held here end then.")
-    # Q1 (17 Nov, the session's recommendation; John's yes OUTSTANDING): the page sends no "Where" and no time band,
-    # because on this form neither changes an answer; a caller may still send them, read as before
+    # Q1 (17 Nov, the session's recommendation as revised; John's yes OUTSTANDING): the page sends no time band (it never
+    # changes an answer with no police time bans); "Where" is kept (it moves the C&U calendar); a caller may still send
+    # either, read as before
     nation = body.get("where") or "england-and-wales"
     if nation not in NATIONS:
         raise Bad(SAY["where"])
@@ -344,12 +345,36 @@ def words(a, g, today):
     late = any(f["code"] == "NOTICE_LATE" for f in a["flags"])
     so_late = any(f["code"] == "SO_LEAD_TIME" for f in a["flags"])
 
-    if not a["abnormal"]:
+    # the short answer only when the rules give no permission and no road-authority notice either: a 31 m long load
+    # within the weights and width is "not abnormal" to the rules yet a Special Order case (17 Nov)
+    if not a["abnormal"] and perm == "none" and not nt["rba_days"]:
         over = []
         head = "Not an abnormal load"
         notes.append(f"Within the normal limits on these figures: {_g(R.ABNORMAL_GROSS_T)} t gross, "
                      f"{_g(R.ABNORMAL_AXLE_T)} t an axle, {_g(R.ABNORMAL_WIDTH_M)} m wide. A rigid vehicle over "
                      f"{_g(R.ABNORMAL_RIGID_LENGTH_M)} m long is abnormal too. Check with the haulier.")
+        # 17 Nov: the rules' "abnormal" reads gross, axle, width and RIGID length only, so a long combination within them
+        # (2.5 m, 28 m, 40 t) is "not abnormal" yet needs a police notice, an attendant and marker plates: the page shows
+        # every one of those the rules give, in the same rows as an abnormal load (it hid them before; nothing is invented)
+        if nt["police_days"]:
+            chips.append(["warn", f"Notify by {_day(a['notify_by'])}" + (": passed" if late else "")])
+            rows.append(["Police", f"{nt['police_days']} clear working days' notice to every force on the route."
+                         + (f" Receive by {_short(nt['police_by'])}." if nt["police_by"] else "")])
+            if late:
+                notes.append(f"The last day to notify for this moving day was {_day(a['notify_by'])}. Notices given now "
+                             "are too late for it.")
+        att = _attendant(g, a["regime"])
+        if att:
+            rows.append(["Attendant", "Required: " + _and(att) + "."])
+        mk = _markers(g)
+        if mk:
+            rows.append(["Markers", " ".join(mk)])
+        esc = a["escort_expected"]
+        if esc != "none":
+            where = {"all_roads": "on every road", "other_roads": "on roads other than motorways",
+                     "motorways": "on motorways"}[esc]
+            why = _escort(g, "other") or _escort(g, "motorway")
+            rows.append(["Escort", f"Expected {where} ({_and(why)}). The police decide."])
         h = _height(g, perm)
         if h:
             rows.append(["Height", h])
