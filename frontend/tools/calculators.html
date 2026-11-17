@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Haul calculators · Wayscope tools</title>
+<meta name="description" content="Lorries needed, haul carbon and fuel surcharge, each from a handful of figures. Free.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tools/tools.css">
+</head>
+<body>
+<header class="toolbar"><div class="tw">
+  <a class="brand" href="https://wayscope.co.uk/"><img src="/brand/logo-header-on-dark.svg" alt="Wayscope" width="116" height="22"></a>
+  <nav class="links" aria-label="Site"><a class="on" href="https://wayscope.co.uk/tools">Tools</a><a class="btn btn-orange sm" href="https://wayscope.co.uk/#demo">Request a demo</a></nav>
+</div></header>
+<main class="tw">
+  <div class="calchead"><div><p class="eyebrow">Haul calculators</p><h1>Three quick answers from a few figures.</h1></div><span class="cr free">Free</span></div>
+  <div class="calcs">
+    <section class="calc" id="c-lorries" data-which="lorries"><h2>Lorries needed</h2>
+      <div class="row"><label for="l-tonnes">Material to move</label><span class="bx"><input id="l-tonnes" name="tonnes" inputmode="decimal" autocomplete="off" value="2,500"><i>t</i></span></div>
+      <div class="row"><label for="l-lorry">Lorry</label><span class="bx"><select id="l-lorry" name="lorry"><option value="Rigid 8-wheeler (32t)">Rigid 8-wheeler, 20 t a load</option><option value="Rigid 6-wheeler (26t)">Rigid 6-wheeler, 16 t a load</option><option value="Artic Tipper (44t)">Artic Tipper, 29 t a load</option><option value="Concrete mixer 8 m³ (32t)">Concrete mixer 8 m³, 18 t a load</option><option value="Concrete mixer 6 m³ (26t)">Concrete mixer 6 m³, 14.4 t a load</option><option value="Artic Flatbed (44t)" selected>Artic Flatbed, 28 t a load</option></select></span></div>
+      <div class="row"><label for="l-days">Working days</label><span class="bx"><input id="l-days" name="working_days" inputmode="decimal" autocomplete="off" value="22"></span></div>
+      <div class="row"><label for="l-trips">Round trips a lorry a day</label><span class="bx"><input id="l-trips" name="round_trips" inputmode="decimal" autocomplete="off" value="6"></span></div>
+      <div class="ans" aria-live="polite"><span class="v">&nbsp;</span><small>&nbsp;</small></div>
+      <p class="say" role="status"></p>
+      <button type="button" class="btn btn-line sm pdf">Download as PDF</button>
+    </section>
+    <section class="calc" id="c-carbon" data-which="carbon"><h2>Haul carbon</h2>
+      <div class="row"><label for="c-loads">Loads</label><span class="bx"><input id="c-loads" name="loads" inputmode="decimal" autocomplete="off" value="90"></span></div>
+      <div class="row"><label for="c-miles">Round trip</label><span class="bx"><input id="c-miles" name="miles" inputmode="decimal" autocomplete="off" value="9.2"><i>miles</i></span></div>
+      <div class="row"><label for="c-lorry">Lorry</label><span class="bx"><select id="c-lorry" name="lorry"><option value="Rigid 8-wheeler (32t)">Rigid 8-wheeler (32t)</option><option value="Rigid 6-wheeler (26t)">Rigid 6-wheeler (26t)</option><option value="Artic Tipper (44t)">Artic Tipper (44t)</option><option value="Concrete mixer 8 m³ (32t)">Concrete mixer 8 m³ (32t)</option><option value="Concrete mixer 6 m³ (26t)">Concrete mixer 6 m³ (26t)</option><option value="Artic Flatbed (44t)" selected>Artic Flatbed (44t)</option></select></span></div>
+      <div class="row"><label for="c-back">Way back</label><span class="bx"><select id="c-back" name="way_back"><option selected>Empty</option><option>Loaded</option><option>Not counted</option></select></span></div>
+      <div class="ans" aria-live="polite"><span class="v">&nbsp;</span><small>&nbsp;</small></div>
+      <p class="say" role="status"></p>
+      <button type="button" class="btn btn-line sm pdf">Download as PDF</button>
+    </section>
+    <section class="calc" id="c-surcharge" data-which="surcharge"><h2>Fuel surcharge</h2>
+      <div class="row"><label for="s-then">Diesel when the rate was agreed</label><span class="bx"><input id="s-then" name="diesel_then" inputmode="decimal" autocomplete="off" value="140.0"><i>p a litre</i></span></div>
+      <div class="row"><label for="s-now">Diesel now</label><span class="bx"><input id="s-now" name="diesel_now" inputmode="decimal" autocomplete="off" value="154.0"><i>p a litre</i></span></div>
+      <div class="row"><label for="s-share">Fuel's share of the rate</label><span class="bx"><input id="s-share" name="share" inputmode="decimal" autocomplete="off" value="30"><i>%</i></span></div>
+      <div class="row"><label for="s-rate">Agreed rate</label><span class="bx"><i>£</i><input id="s-rate" name="rate" inputmode="decimal" autocomplete="off" value="180.00"><i>a load</i></span></div>
+      <div class="ans" aria-live="polite"><span class="v">&nbsp;</span><small>&nbsp;</small></div>
+      <p class="say" role="status"></p>
+      <button type="button" class="btn btn-ink sm pdf">Download as PDF</button>
+    </section>
+  </div>
+  <form class="pdfbox" id="pdfbox" action="#" method="post" hidden>
+    <b class="h">Download the PDF</b>
+    <div class="pdfrow"><label class="f">Your email<input type="email" name="email" placeholder="name@example.co.uk" autocomplete="email"></label><button type="submit" class="btn btn-orange sm">Download</button></div>
+    <label class="tick"><input type="checkbox" name="news">Send me Wayscope news now and then</label>
+    <label class="trap" aria-hidden="true">Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+    <p class="fine2">We keep your email with this download. Read the <a href="https://wayscope.co.uk/privacy.html">privacy notice</a>.</p>
+    <p class="say" role="status"></p>
+  </form>
+  <div class="next wide"><span><b>Need the roads compared?</b> Ask for a route check.</span><a class="btn btn-line sm" href="/tools/route-check">Route check</a></div>
+</main>
+<script src="/tools/calculators.js"></script>
+<script src="/tools/tools.js"></script>
+</body>
+</html>

@@ -113,12 +113,12 @@ with TestClient(main.app, base_url=BASE) as anon:
         ok(f"1. ...with its type, no-cache, every security header and no cookie set",
            r.headers.get("content-type", "").startswith("text/css" if name.endswith("css") else "text/javascript")
            and r.headers.get("cache-control") == "no-cache" and clean(r), str(dict(r.headers)))
-    for path in ("/tools", "/tools/", "/tools/calculators", "/tools/index", "/tools/index.html", "/tools/calculators.html",
+    for path in ("/tools", "/tools/", "/tools/index", "/tools/index.html", "/tools/calculators.html",
                  "/tools/README.md", "/tools/..%2Fmain.py", "/tools/%2e%2e/backend/main.py", "/tools/x/y", "/tools/Tools.css"):
         r = anon.get(path, follow_redirects=False)
         ok(f"1. 🔴 {path} is a 404 (no redirect, no listing, no coming-soon page)", r.status_code == 404 and clean(r),
            f"{r.status_code} {r.headers.get('location', '')}")
-    ok("1. the shipped folder serves no page on this branch", tools_public.pages() == [])
+    ok("1. the shipped folder serves only the pages that ship (narrowed 17 Nov: each tool branch adds its own)", all(anon.get("/tools/" + n).status_code == 200 for n in tools_public.pages()))
 
     # ---- 2. a page in the frame (the sample, from a scratch copy of the folder) ------------------------------------- #
     scratch = Path(TMP) / "tools"

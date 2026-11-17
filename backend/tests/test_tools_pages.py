@@ -273,8 +273,8 @@ try:
 finally:
     tools_public.TOOLS_DIR = _real
     shutil.rmtree(_tmp, ignore_errors=True)
-ok("on this branch no tool page is reachable yet (the folder holds the shared files only)", tools_public.pages() == []
-   and tools_public.page_file("calculators") is None)
+ok("every page in the folder is reachable by its name and nothing else is (narrowed 17 Nov: a tool branch adds its page)",
+   all(tools_public.page_file(n) is not None for n in tools_public.pages()) and tools_public.page_file("index") is None)
 
 # the limit
 L = tools_public.Limit("sample", 3, 3600)
@@ -352,9 +352,8 @@ ok("...and another visitor behind the same edge is let through, even with the sa
 ok("trapped(): the hidden box filled is a machine; empty or missing is a person",
    tools_public.trapped({"website": "x"}) and not tools_public.trapped({"website": " "}) and not tools_public.trapped({})
    and not tools_public.trapped(None) and tools_public.TRAP == "website")
-ok("OPEN_ROUTES is a tuple, every entry under /api/tools/ (empty on this branch: no tool call yet)",
-   isinstance(tools_public.OPEN_ROUTES, tuple) and all(r.startswith("/api/tools/") for r in tools_public.OPEN_ROUTES)
-   and tools_public.OPEN_ROUTES == ())
+ok("OPEN_ROUTES is a tuple, every entry under /api/tools/ (narrowed 17 Nov: each tool branch lists its own calls)",
+   isinstance(tools_public.OPEN_ROUTES, tuple) and all(r.startswith("/api/tools/") for r in tools_public.OPEN_ROUTES))
 
 # =========================================================================== #
 #  5. the pins: the gate, the app, the headers, the guide, the audit           #
