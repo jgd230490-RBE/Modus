@@ -273,6 +273,10 @@ try:
 finally:
     tools_public.TOOLS_DIR = _real
     shutil.rmtree(_tmp, ignore_errors=True)
+# 17 Nov 2026 (claude/tools-abnormal-adviser): narrowed from "no tool page yet" — the tool branches add their pages
+ok("only the first opening's tool pages are reachable (no sample page, no other name)",
+   set(tools_public.pages()) <= {"abnormal-load", "calculators", "route-check"}
+   and (tools_public.page_file("calculators") is None or "TEST ONLY" not in (TOOLS / "calculators.html").read_text(encoding="utf-8")))
 # NARROWED 16 Nov 2026 (claude/tools-route-check-request): the first tool pages ship, so the folder holds only the named tool pages
 ok("the folder holds only the named tool pages, and a page that does not exist is not served",
    set(tools_public.pages()) <= {"calculators", "abnormal-load", "route-check"} and tools_public.page_file("no-such-tool") is None)
@@ -300,6 +304,8 @@ ok("reset() empties it", L.hit("203.0.113.5", now=t0) is True)
 ok("the refusal is one plain sentence with no number", tools_public.Limit("x", 5, 3600).say
    == "Too many checks from this connection. Please try again in an hour."
    and tools_public.Limit("x", 5, 600).say.endswith("in 10 minutes.") and tools_public.Limit("x", 5, 60).say.endswith("in a minute."))
+ok("a form's limit says 'requests', a tool's 'checks' (17 Nov)", tools_public.Limit("x", 5, 3600, what="requests").say
+   == "Too many requests from this connection. Please try again in an hour." and tools_public.Limit("x", 5, 3600).what == "checks")
 for args in (("", 1, 1), ("x", 0, 1), ("x", 1, 0)):
     try:
         tools_public.Limit(*args)
@@ -353,6 +359,10 @@ ok("...and another visitor behind the same edge is let through, even with the sa
 ok("trapped(): the hidden box filled is a machine; empty or missing is a person",
    tools_public.trapped({"website": "x"}) and not tools_public.trapped({"website": " "}) and not tools_public.trapped({})
    and not tools_public.trapped(None) and tools_public.TRAP == "website")
+# 17 Nov 2026 (claude/tools-abnormal-adviser): narrowed from "empty on this branch" — each tool branch adds its own call
+ok("OPEN_ROUTES is a tuple, every entry under /api/tools/, none twice (the tool branches add theirs)",
+   isinstance(tools_public.OPEN_ROUTES, tuple) and all(r.startswith("/api/tools/") for r in tools_public.OPEN_ROUTES)
+   and len(set(tools_public.OPEN_ROUTES)) == len(tools_public.OPEN_ROUTES))
 # NARROWED 16 Nov 2026 (claude/tools-route-check-request): the route check request is the first open call
 ok("OPEN_ROUTES is a tuple, every entry under /api/tools/, and only the named tools' calls",
    isinstance(tools_public.OPEN_ROUTES, tuple) and all(r.startswith("/api/tools/") for r in tools_public.OPEN_ROUTES)

@@ -26,6 +26,8 @@ EMAIL_RX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$")
 MAX_EMAIL = 200
 STATUS_QUEUED = "queued"
 STATUS_SENT = "sent"
+#: 17 Nov 2026: a row nothing is ever sent for (an email given with a calculator's PDF) reads "kept", not "queued"
+STATUS_KEPT = "kept"
 CSV_COLUMNS = ("created_at", "kind", "name", "email", "company", "news", "details", "status", "id")
 
 
@@ -39,8 +41,9 @@ def _now():
     return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
 
 
-def keep(kind, email, name="", company="", news=False, details=None, ip=""):
-    """Store one row and return its id. The address `ip` is hashed here; `details` (a dict) is kept as JSON text."""
+def keep(kind, email, name="", company="", news=False, details=None, ip="", status=STATUS_QUEUED):
+    """Store one row and return its id. The address `ip` is hashed here; `details` (a dict) is kept as JSON text.
+    `status` is how the row starts: "queued" where an email follows (the route check request), "kept" where none does."""
     if kind not in KINDS:
         raise ValueError("unknown kind")
     if not email_ok(email):
@@ -51,7 +54,7 @@ def keep(kind, email, name="", company="", news=False, details=None, ip=""):
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (rid, kind, _now().strftime("%Y-%m-%dT%H:%M:%SZ"), email.strip().lower(), (name or "").strip(),
          (company or "").strip(), 1 if news else 0, json.dumps(details or {}, ensure_ascii=False, sort_keys=True),
-         tools_public.address_hash(ip) if ip else "", STATUS_QUEUED))
+         tools_public.address_hash(ip) if ip else "", (status or STATUS_QUEUED)[:200]))
     return rid
 
 

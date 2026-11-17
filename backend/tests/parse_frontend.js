@@ -3345,7 +3345,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // and its timeline (it redraws to its own width)
   // NARROWED 22 Oct 2026 (UI fix 6, card 5): one more, the big screen's Today list (it counts the rows that fit whole)
   ok("W5: the Today map and the Routes map watch their own container (the dispatch they relied on is gone); so do the Simulation's map and timeline, and the big screen's Today list",
-     (src.match(/new ResizeObserver\(/g) || []).length === 6
+     // NARROWED 17 Nov 2026 (routes-card-room): two more, both the open route's panel: useBoxWide (two columns from its own
+     // width) and the page kept at the panel's top while the panel's reads arrive (until the person scrolls, clicks or types)
+     (src.match(/new ResizeObserver\(/g) || []).length === 8
+     && src.includes("const ro = new ResizeObserver(() => { if(on) go(); });")
+     && (src.slice(src.indexOf("function useBoxWide("), src.indexOf("// the one status:")).match(/new ResizeObserver\(/g) || []).length === 1
      && (src.slice(src.indexOf("function DashboardToday("), src.indexOf("function DashboardStockChart(")).match(/new ResizeObserver\(/g) || []).length === 1 && /const ro = typeof ResizeObserver !== "undefined" \? new ResizeObserver\(doResize\) : null;/.test(src)
      && (src.slice(src.indexOf("function SimMap("), src.indexOf("function SimPlayer(")).match(/new ResizeObserver\(/g) || []).length === 2);
   // REVERSED 14 Oct 2026 (D9, the mobile shell): below 768 px there is NO rail (not even icons); the bottom tab bar
@@ -3978,7 +3982,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // RE-PINNED 5 Nov 2026 (task 0d-2): + the Carbon planner's Route choices table (four)
   const _regions = [...src.matchAll(/<div className="([^"]*)"[^\n]*tabIndex=\{0\} role="region" aria-label="([^"]*)"/g)];
   ok("#15: every scroll region with tabindex 0 carries a focus-ring class (kb-scroll or sim-scroll) and a name that passes the word rule",
-     _regions.length === 6 /* NARROWED 10 Nov 2026: + the Simulation's Now and gates column; NARROWED 17 Nov 2026 (best option step 3): + the Dashboard's Route choices record */ && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
+     _regions.length === 7 /* NARROWED 10 Nov 2026: + the Simulation's Now and gates column; NARROWED 17 Nov 2026 (best option step 3): + the Dashboard's Route choices record; NARROWED 17 Nov 2026 (routes-card-room): + an open route's All figures table (each branch said 6 alone: together 7) */ && _regions.every(m => /\b(kb-scroll|sim-scroll)\b/.test(m[1]) && m[2].length > 3
        && !/\b(bake|baked|server|endpoint|token|cached|geometry|trucks?)\b/i.test(m[2])), String(_regions.length));
   // REVERSED 23 Oct 2026 (UI fix 9, decision 16): the rows are no longer mouse-only — the name in the first cell is a button
   // (the UI FIX 9 block at the end). What stays true, and is still checked here: the row click is kept for a mouse, and the
@@ -4759,7 +4763,10 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && src.includes("data-zone-div={z.id}>") && !src.includes("Show the routes ${z.name} diverts"));
   ok("⭐ 0c: a diverted route carries a chip with its months; a route a zone crosses with no way round reads Not diverted",
      src.includes("data-route-diverted={r.id}") && src.includes('{used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}'));
-  ok("0c: the opened route lists its Diversions (DivRows)", src.includes("data-route-diversions={r.id}") && /function DivRows\(/.test(src));
+  // NARROWED 17 Nov 2026 (routes-card-room, Option B): the open route is a panel under the list, not rows of its table;
+  // its Diversions are one block (routeDiversions) handed to RouteAnalysis, on the page and in full screen
+  ok("0c: the opened route lists its Diversions (DivRows)", src.includes("<div data-route-diversions={id} className=\"mt-3\">")
+     && !src.includes("data-route-diversions={r.id}") && (src.match(/diversions=\{routeDiversions\(/g) || []).length === 2 && /function DivRows\(/.test(src));
   ok("0c: the first load and every network reload read the diversions, on their own (never inside the routes' Promise.all)",
      src.includes("fetch(`${API}/routes/diversions`)") && (src.match(/loadDiversions\(\)/g) || []).length >= 2
      && !/Promise\.all\(\[[^\]]*routes\/diversions/.test(src));
@@ -5539,7 +5546,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      dmr.includes("<RouteMapBox low={full && !!TENANT.demo_notice}") && box.includes("top: low ? 44 : 8")
      && box.includes('background: "var(--navy-soft)", color: "var(--navy)", boxShadow: "inset 0 0 0 1px var(--navy)"') && !box.includes('color: "#fff"')   // NARROWED 10 Nov 2026 (wave 2, card 13): ONE tab (.ws-tab); what is selected is the --navy-soft tint with --navy text, never a filled button
        // the audit: white on the Dark look's orange was 2.32:1
-     && det.includes('<div className="overflow-x-auto" data-route-full-analysis="1"><table className="text-sm" style={{ tableLayout: "fixed", width: "100%" }}>'));
+     // REVERSED 17 Nov 2026 (routes-card-room, cards 3 and 4; John's yes to notes routes-card-room-mockup-1117): the chosen
+     // route's detail is no longer a table row in a sideways-scrolling box (that box showed a scroll bar: the haul road
+     // picker stood 176 px past the panel). It is the analysis itself, one column, and only the figures table scrolls
+     && det.includes('{analysis && <div data-route-full-analysis="1" style={{ minWidth: 0 }}>{analysis}</div>}')
+     && !det.includes("<table") && !det.includes("overflow-x-auto"));
 }
 
 // ---- 9 Nov 2026 (John, on live: the Route analysis menu's Download buttons were cut off the screen) ----

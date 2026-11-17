@@ -63,8 +63,11 @@ ok("...the team and Near-the-route cells do not wrap (inline white-space), so th
    && /style=\{\{ whiteSpace: "nowrap" \}\} data-label="Near the route" data-route-near-cell=\{r\.id\}/.test(routesTable));
 ok("⭐ 23: the Vehicles cell is a count (VehCount); each vehicle's chip moves to the row's details (data-route-vehicles) beside the analysis",
    routesTable.includes("<VehCount profiles={r.profiles} />") && !routesTable.includes("<td className=\"px-3 py-2\"><VehChips")
-   && /\{open && <tr data-route-vehicles=\{r\.id\}><td colSpan=\{11\}[^>]*>[\s\S]{0,200}<VehChips profiles=\{r\.profiles\} \/>/.test(routesTable)
-   && routesTable.indexOf("data-route-vehicles") < routesTable.indexOf("<NearDetails"));
+   // REVERSED 17 Nov 2026 (routes-card-room, Option B; John's yes to notes routes-card-room-mockup-1117): the chips are no
+   // longer a row of the list's table. They are a box (data-route-vehicles) in the open route's own panel, before Near the route
+   && !routesTable.includes("data-route-vehicles") && !routesTable.includes("<VehChips")
+   && /<div className="rounded-lg border border-slate-200 bg-white p-2\.5 mb-3" data-route-vehicles=\{r\.id\}>[\s\S]{0,200}<VehChips profiles=\{r\.profiles\} \/>/.test(html)
+   && html.indexOf("data-route-vehicles={r.id}") < html.indexOf("<NearDetails data={nearData} id={r.id} />"));
 if (!fnSrc("VehCount")) ok("...VehCount exists (the Vehicles cell's count)", false);
 else {
   const mk = compile(["VehCount"], "const vehLabel = (k) => ({ tipper: 'Tipper (44t)', flat: 'Flatbed (44t)', mix: 'Mixer' }[k] || k);");

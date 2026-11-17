@@ -5739,6 +5739,29 @@ def _gate_arrivals_build(month, acc):
     return out
 
 
+#: 17 Nov 2026 (John: "Yes, add it"): the rule's table reads nothing of the caller (route_best.table takes a day only), so
+#: ONE copy is kept for every staff caller, not one a role and team as _staff_json's default scope would keep, and the
+#: warm-up builds today's (read_cache.WARMERS["best_option"]: after start-up, once writes go quiet, at the day's turn).
+#: On live the first card after a deploy, a write or midnight waited 29 to 35 s for it; a planner's or a team's first
+#: card waited again although an admin's copy was already held.
+BEST_SCOPE = {"role": "staff", "ipt": None}
+
+
+def _best_table(d):
+    """The best-option rule over every route for day `d`: one kept build for every staff caller, until the next write."""
+    import route_best
+    return _staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d), BEST_SCOPE)
+
+
+def _warm_best():
+    """Today's table, as the card's read asks for it. Registered LAST: the Dashboard's and the public map's reads first."""
+    import datetime as _dt
+    _best_table(_dt.date.today())
+
+
+read_cache.WARMERS["best_option"] = _warm_best
+
+
 @app.get("/api/admin/route-options/best")
 def route_options_best(day: Optional[str] = None, token: Optional[str] = None):
     """
@@ -5750,12 +5773,11 @@ def route_options_best(day: Optional[str] = None, token: Optional[str] = None):
     """
     _check_admin(token)
     import datetime as _dt
-    import route_best
     try:
         d = _dt.date.fromisoformat(day.strip()) if day else _dt.date.today()
     except ValueError:
         raise HTTPException(400, "day must be YYYY-MM-DD")
-    return _staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d))
+    return _best_table(d)
 
 
 @app.get("/api/routes/{route_id}/best-option")
@@ -5767,11 +5789,10 @@ def route_best_option(route_id: str):
     Read only, no outside call; any staff login (a reviewer session is refused by _require_access).
     Returns {day, checks, thresholds, route} where route is route_best.evaluate()'s dict, or 404.
     """
-    acc = _require_access()
+    acc = _require_access()        # the wall: a reviewer session or no sign-in is refused; the table is the same for all
     import datetime as _dt
-    import route_best
     d = _dt.date.today()
-    t = _staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d), acc)
+    t = _best_table(d)          # 17 Nov 2026: one copy for every staff caller, warmed (BEST_SCOPE)
     r = next((x for x in (t.get("routes") or []) if x.get("route") == route_id), None)
     if r is None:
         raise HTTPException(404, "no such route")
@@ -7646,7 +7667,7 @@ except Exception:      # the stubbed fastapi of the sandbox harnesses; the call 
 
 @app.post("/api/tools/route-check/request")
 async def tools_route_check_request(request: Request):
-    tools_public.guard(request, tools_route_check.LIMIT)
+    tools_public.guard(request, tools_route_check.TRIES)     # every call; the five an hour count kept requests (handle)
     try:
         body = await request.json()
     except Exception:
@@ -7664,6 +7685,65 @@ def tool_leads_csv(token: Optional[str] = None):
     return Response(tools_leads.csv_export(), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="tool-leads.csv"',
                              "Cache-Control": "no-store"})
+
+
+# 17 Nov 2026 (claude/tools-abnormal-adviser) — the abnormal load adviser's free check: the platform's own rules
+# (abnormal_rules.advice) on the typed figures, with the nation the person picked, the SHIPPED bank holidays and no police
+# time bans. Nothing of any organisation is read; nothing is written or kept (tools_abnormal's header).
+import tools_abnormal  # noqa: E402
+
+TOOLS_ABNORMAL_LIMIT = tools_public.Limit("abnormal-load", tools_abnormal.CHECKS_PER_HOUR, 3600)
+
+
+@app.post("/api/tools/abnormal-load")
+async def tools_abnormal_load(request: Request):
+    tools_public.guard(request, TOOLS_ABNORMAL_LIMIT)
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    if not isinstance(body, dict):
+        tools_public.refuse(400, tools_abnormal.SAY["width_m"])
+    if tools_public.trapped(body):
+        return {"ok": True}
+    try:
+        out = tools_abnormal.answer(body)
+    except tools_abnormal.Bad as e:
+        tools_public.refuse(400, e.say)
+    return {"ok": True, "page": out["page"]}
+
+
+# 17 Nov 2026 (claude/tools-calculators) — the three free haul calculators' open calls (tools_calculators.py): each works the
+# platform's own sum on the figures typed and the shipped lorry figures, behind its own limit; the PDF call is the only one
+# that takes an email.
+import tools_calculators  # noqa: E402
+
+
+async def _tools_json(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    return body if isinstance(body, dict) else {}
+
+
+@app.post("/api/tools/calculators/sum")
+async def tools_calc_sum(request: Request):
+    tools_public.guard(request, tools_calculators.SUM_LIMIT)
+    body = await _tools_json(request)
+    which = str(body.get("which") or "")
+    if which not in tools_calculators.WHICH:
+        tools_public.refuse(400, "Pick one of the three calculators.")
+    return tools_calculators.public(which, tools_calculators.work(which, body.get("figures")))
+
+
+@app.post("/api/tools/calculators/pdf")
+async def tools_calc_pdf(request: Request):
+    tools_public.guard(request, tools_calculators.PDF_LIMIT)
+    body = await _tools_json(request)
+    if tools_public.trapped(body):
+        return {"ok": True}
+    return tools_calculators.pdf_answer(body, tools_public.client_ip(request))
 
 
 # 6 Oct 2026 (H5) — the public landing page at /landing/ for PREVIEW on this service. The

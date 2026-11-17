@@ -71,7 +71,9 @@ ok("⭐ SRC: the 'i' box: at most 30 words and a user-guide link (R1)",
   const body = ep > 0 ? mainPy.slice(ep, mainPy.indexOf("\n@app.", ep + 10)) : "";
   ok("⭐ SRC: the staff read: after _gate_arrivals_build, any staff login (_require_access), one kept build of the rule over every route (Q8), 404 for an unknown route",
      ga > 0 && ep > ga && body.includes("acc = _require_access()")
-     && body.includes('_staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d), acc)')
+     // NARROWED 17 Nov 2026 (claude/warm-best-option): the build is the shared helper's, one copy for every staff caller
+     && body.includes('t = _best_table(d)')
+     && mainPy.includes('return _staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d), BEST_SCOPE)')
      && body.includes('raise HTTPException(404, "no such route")'));
 }
 ok("⭐ GUIDE: the user guide's Routes section has the Best option entry, names the three answers, no supplier and no endpoint",
