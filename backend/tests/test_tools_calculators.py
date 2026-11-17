@@ -278,6 +278,8 @@ ok("⭐ a good email: the file comes back and ONE row is kept as 'calculator-pdf
    and base64.b64decode(a["pdf"])[:5] == b"%PDF-" and a["filename"] == "wayscope-carbon.pdf", str(r1))
 ok("...the tick is 1, the calculator is in the details, the email is the store's (trimmed, lower case)", r1[0]["news"] == 1
    and json.loads(r1[0]["details"]) == {"calculator": "carbon"} and r1[0]["email"] == "name@example.co.uk", str(r1[0]))
+# 17 Nov 2026 (claude/tools-leads-status-kept): read on live after one download, the row said "queued" though nothing is ever sent for it
+ok("🔴 a PDF's row reads 'kept', never 'queued': nothing is sent for a download", r1[0]["status"] == "kept" == tools_leads.STATUS_KEPT, str(r1[0]["status"]))
 ok("🔴 ...the address is kept only as a hash", "203.0.113.9" not in json.dumps(r1[0], default=str) and r1[0]["ip_hash"] == tools_public.address_hash("203.0.113.9"))
 tc.pdf_answer(dict(which="surcharge", figures=FIG["surcharge"], email="a@b.co"))
 r2 = rows()

@@ -1048,6 +1048,7 @@ async function walkPortal(browser, base, look, accent, first, widths) {
       REPORT.month = month;
       const docs = [["help", "/help/"], ["help-technical", "/help/technical/"], ["bulletin", "/bulletin/?month=" + month], ["bulletin-leaflet", "/bulletin/leaflet/?month=" + month],
                     ["landing", "/landing/"], ["privacy", "/landing/privacy.html"], ["thanks", "/landing/thanks.html"], ["landing-error", "/landing/error.html"],
+                    ["tools-landing", "/landing/tools.html"],   // 17 Nov 2026: the Tools page on the landing site (a signed-out stop)
                     ...TOOL_PAGES.map(n => ["tools-" + n, "/tools/" + n])];
       await ctx.route(/^https:\/\/(app\.)?wayscope\.co\.uk\//, r => r.abort());   // the landing page's links never leave this machine
       for (const [name, url] of docs) {
