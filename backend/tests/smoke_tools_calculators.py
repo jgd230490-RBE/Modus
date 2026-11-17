@@ -183,6 +183,37 @@ with TestClient(main.app, base_url=BASE) as anon:
     ok("3. ⭐ the PDF's limit: 20 answer, the 21st is a 429 with the sentence", codes[:20] == [200] * 20 and codes[20] == 429, str(codes[18:]))
     tc.PDF_LIMIT.reset()
 
+    # ---- 3b. odd values: an answer or one plain sentence, never an uncaught error -------------------------------------- #
+    tc.SUM_LIMIT.reset(); tc.PDF_LIMIT.reset()
+    ODD = [[1], {}, "x", None, True, "1e999", "inf", "-inf", "nan", -1, 0, "", "  ", "1e-320", 1e308, "9" * 400, {"a": 1}, [[]], "\u0000", "é"]
+    bad = []
+    for which in ("lorries", "carbon", "surcharge", [1], {}, None, "x"):
+        for odd in ODD:
+            for body in ({"which": which, "figures": odd}, {"which": which, "figures": {k: odd for k in
+                         ("tonnes", "lorry", "working_days", "round_trips", "loads", "miles", "way_back", "diesel_then", "diesel_now", "share", "rate")}}):
+                tc.SUM_LIMIT.reset()
+                r = post(anon, SUM, body)
+                if not (r.status_code == 200 or (r.status_code == 400 and isinstance(r.json().get("detail", {}).get("say"), str))):
+                    bad.append((str(body)[:80], r.status_code, r.text[:80]))
+    ok("3b. ⭐ odd values at the sum call: an answer or one plain sentence, never an error", not bad, str(bad[:3]))
+    bad = []
+    spread = dict(GOOD["lorries"])
+    for em in (["a@b.co"], {"a": 1}, 5, True, None, "a@b.co" * 100, "a@b.co\n", "  a@b.co  "):
+        for news in ("yes", [1], {}, None, 0, True):
+            for which in ("lorries", [1], {}, None, "x"):
+                tc.PDF_LIMIT.reset()
+                r = post(anon, PDF, {"which": which, "figures": GOOD["lorries"], "email": em, "news": news})
+                if not (r.status_code in (200, 400) and (r.status_code == 200 or isinstance(r.json().get("detail", {}).get("say"), str))):
+                    bad.append((str(em)[:30], str(news), str(which), r.status_code, r.text[:80]))
+    for fig in ("x", [1], {}, None, 5, {"tonnes": [1], "lorry": {}}):
+        for web in (None, [], {}, 0, ""):
+            tc.PDF_LIMIT.reset()
+            r = post(anon, PDF, {"which": "lorries", "figures": fig, "email": "a@b.co", "website": web})
+            if r.status_code not in (200, 400):
+                bad.append(("figures", str(fig)[:30], str(web), r.status_code, r.text[:80]))
+    ok("3b. ⭐ odd values at the PDF call: an answer or one plain sentence, never an error", not bad, str(bad[:3]))
+    tc.SUM_LIMIT.reset(); tc.PDF_LIMIT.reset()
+
     # ---- 4. nothing written, nothing emptied ------------------------------------------------------------------------ #
     ok("4. 🔴 no calculator call moved db.data_version (the kept reads survive a press)", db.data_version() == ver0, f"{ver0} -> {db.data_version()}")
     conn = db.get_conn()
