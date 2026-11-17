@@ -1068,9 +1068,10 @@ ok("6b. ⭐ warm(): builds the council read for the tenant, and the next viewer'
    # result holds both names, each "ok"; the council read is still built and served the same way
    # NARROWED 28 Oct 2026 (the demo narrative's F1): + "staff", the admin's Dashboard / Look-ahead / Routes reads
    # NARROWED 12 Nov 2026 (A-F7, claude/map-cold-open): + "public_map", the public map's three kept reads, each "ok"
-   {k: _w.get(k) for k in ("areas/months", "restrictions_check", "public_map")}
-   == {"areas/months": "ok", "restrictions_check": "ok", "public_map": "ok"}
-   and set(_w) == {"areas/months", "restrictions_check", "staff", "public_map"}
+   # NARROWED 17 Nov 2026 (claude/warm-best-option): + "best_option", the best-option rule's table for today, "ok"
+   {k: _w.get(k) for k in ("areas/months", "restrictions_check", "public_map", "best_option")}
+   == {"areas/months": "ok", "restrictions_check": "ok", "public_map": "ok", "best_option": "ok"}
+   and set(_w) == {"areas/months", "restrictions_check", "staff", "public_map", "best_option"}
    and read_cache.STATS["builds"] == _bw and _wb == fresh())
 ok("6b. a warmer that fails says so and never raises",
    (lambda: (read_cache.WARMERS.__setitem__("t/boom", lambda: 1 / 0), read_cache.warm(db.current_tenant()),
