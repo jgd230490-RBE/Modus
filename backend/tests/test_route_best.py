@@ -382,8 +382,12 @@ ok("⭐ 2. a limit the option ADDS over the route in use rules it out, named, wi
    o1 and len(o1["added_limits"]) >= 1 and o1["ruled_out"] and "Back Lane" in o1["ruled_out"][0]
    and "except for access" in o1["ruled_out"][0] and o1["added_limits"][0]["except_for_access"] is True,
    str(o1 and o1["ruled_out"]))
+# 17 Nov 2026 (ui-best-option-1117, Q1; John: "Yes, as recommended"): REVERSED. The reason read "it meets 1 road limit
+# below this lorry that the route in use does not: Weight limit 7.5 t · Back Lane (except for access: ...) (both legs)";
+# an added limit is now said road by road. Still named once and counted once, still both legs said once.
 ok("2. a limit the option meets on both legs is named once and counted once (16 Nov evening: it was said twice, as 2)",
-   o1 and o1["ruled_out"][0].startswith("it meets 1 road limit below") and "(both legs)" in o1["ruled_out"][0]
+   o1 and o1["ruled_out"][0] == "it adds a 7.5 t limit, except for access, on Back Lane (both legs)"
+   and not o1["ruled_out"][0].startswith("it meets 1 road limit below")
    and o1["ruled_out"][0].count("Back Lane") == 1 and len(o1["added_limits"]) == 2, str(o1 and o1["ruled_out"]))
 ok("⭐ 2. a limit both lines meet (the quarry gate's bridge) does NOT rule an option out",
    o2 and not o2["ruled_out"] and not o2["added_limits"], str(o2 and o2["ruled_out"]))
@@ -392,8 +396,10 @@ ok("2. ...though the line in use meets it (it is below this lorry: the old 'any 
 ok("⭐ 2. R1: Suggested Alt 2 on clearly fewer collisions, the same time and carbon",
    R1["answer"] == RB.SUGGESTED and R1["option"] == "Alt 2" and R1["alt"] == 2
    and o2["heads"] == {"people": 1, "time": 0, "busy": None, "carbon": 0}, f"{R1['answer']} {R1['why']} {o2 and o2['heads']}")
-ok("2. the why is a fixed sentence with the two counts", R1["why"].startswith("About a minute quicker a round trip, with fewer "
-   "collisions on it (8 against 23)"), R1["why"])
+# 17 Nov 2026 (Q7): REVERSED. It began "About a minute quicker a round trip": a difference in minutes is said to the
+# nearest half everywhere, so the card, the file and the record say one figure.
+ok("2. the why is a fixed sentence with the two counts", R1["why"].startswith("1 min quicker a round trip, with fewer "
+   "collisions on it (8 against 23)") and "About a minute" not in R1["why"], R1["why"])
 ok("⭐ 2. collisions in plain words with the two counts and the period (4e)",
    f"Alt 2 had fewer collisions on it: 8 against 23 on the route in use, {PERIOD}." in R1["sentences"], str(R1["sentences"]))
 ok("2. the route in use is option 0 on both legs on a day no zone touches R1", R1["in_use"]["pair"] == [0, 0]
@@ -626,8 +632,9 @@ ok("⭐ 10. R027: 'A trade-off' as in the demo (Alt 2 fewer collisions, slower, 
 D031 = demo(M(24, 0, 5, 1, 0.05, 1, 47.61, 55.3, 55.3 / 60 + 0.667, 0, 28.9),
             [(1, M(50, 0, 5, 1, 0.05, 6, 75.0, 86.3, 86.3 / 60 + 0.667, 0, 43.6)),
              (2, M(32, 0, 6, 1, 0.04, 2, 61.79, 74.5, 74.5 / 60 + 0.667, 0, 46.1))])
+# 17 Nov 2026 (Q4): REVERSED. It read "No other option is clearly ahead on any head." ("head" is the rule's own word).
 ok("⭐ 10. R031: 'Keep the route in use' as in the demo", D031["answer"] == RB.KEEP and D031["why"] ==
-   "No other option is clearly ahead on any head.", str(D031["why"]))
+   "No other option is clearly better." and "head" not in D031["why"], str(D031["why"]))
 D003g = demo(M(23, 0, 5, 3, 2.07, 6, 14.79, 20.3, 1.356, 6, 9.6),
              [(1, M(11, 0, 5, 6, 0.87, 5, 13.31, 23.3, 1.405, 6, 8.0)), (2, M(8, 0, 3, 3, 0.73, 4, 12.84, 21.4, 1.374, 6, 7.5))],
              community_all=True)
@@ -802,12 +809,15 @@ L036 = demo(M(10, 1, 4, 1, 0.6, 1, 17.48, 19.9, 63.9 / 60, 8, 16.3),
 _live = {"R001": L001, "R003": L003, "R036": L036}
 ok("⭐ 10c. live's own figures give live's own long lines, word for word (so the shapes are live's)",
    L001["trade"] == "Alt 1 has fewer collisions on it (97 against 165), 13 fewer cycle routes met and 1.55 km less beside "
-   "a cycle route, but 13 more left turns, 5 more schools, hospitals and health centres passed, 24 min more a round trip, "
-   "a lorry fits 3 trips a day, not 4 and 15.6 kg CO2e more a trip."
-   and L003["trade"] == "Alt 2 has 2 fewer left turns, 1.32 km less beside a cycle route and 2.1 kg CO2e less a trip, but "
+   # 17 Nov 2026 (Q7, Q5): REVERSED in two places. "24 min more a round trip" is "23.5 min more" (halves); and the
+   # rule writes CO₂e, as the card's own rows do (it wrote "CO2e").
+   "a cycle route, but 13 more left turns, 5 more schools, hospitals and health centres passed, 23.5 min more a round trip, "
+   "a lorry fits 3 trips a day, not 4 and 15.6 kg CO₂e more a trip."
+   and L003["trade"] == "Alt 2 has 2 fewer left turns, 1.32 km less beside a cycle route and 2.1 kg CO₂e less a trip, but "
    "3 more schools, hospitals and health centres passed and it is a shorter road that takes longer."
-   and L036["trade"] == "Alt 1 has fewer collisions on it (2 against 10), 2 min quicker a round trip and 4.6 kg CO2e less "
-   "a trip, but 1.19 km more beside a cycle route.",
+   and L036["trade"] == "Alt 1 has fewer collisions on it (2 against 10), 2 min quicker a round trip and 4.6 kg CO₂e less "
+   "a trip, but 1.19 km more beside a cycle route."
+   and not any("CO2e" in str(x.get("trade")) for x in (L001, L003, L036)),
    " | ".join(str(x.get("trade")) for x in _live.values()))
 ok("⭐ 10c. ...and their short lines in the card's words (R006 typed from its heads)",
    L001["trade_short"] == "Alt 1 had fewer collisions and is behind on places, time and carbon; mixed on cycle routes."
@@ -908,9 +918,13 @@ ok("⭐ 10c. `short` carries no capital and no colon, no double space, no road n
 #  11. Words                                                                   #
 # =========================================================================== #
 _words = [w for w in ALL_WORDS + _gen_words if w]
-_low = " ".join(_words).lower()
+# 17 Nov 2026 (Q4; John: "Yes, as recommended"): NARROWED. "better" is still in no sentence about an option's counts,
+# but ONE fixed sentence may say it, word for word: "No other option is clearly better." (it read "... clearly ahead on
+# any head."). Every other sentence is checked as before.
+_low = " ".join(w for w in _words if w != RB.NONE_BETTER_WORDS).lower()
 ok("⭐ 11. never 'safer', 'better', a rate, a ratio, a score or a risk; no supplier; lorry, not truck",
-   not any(b in _low for b in ("safer", "better", " rate", "ratio", "score", "risk", "here ", "truck", "exposure")),
+   not any(b in _low for b in ("safer", "better", " rate", "ratio", "score", "risk", "here ", "truck", "exposure"))
+   and RB.NONE_BETTER_WORDS == "No other option is clearly better.",
    [b for b in ("safer", "better", " rate", "ratio", "score", "risk", "here ", "truck", "exposure") if b in _low])
 ok("⭐ 11. no '%' in any sentence about collisions", not any("%" in w for w in _words if "collision" in w.lower()),
    [w for w in _words if "collision" in w.lower() and "%" in w][:2])

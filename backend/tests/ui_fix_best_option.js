@@ -47,8 +47,13 @@ ok("⭐ SRC: the card says no 'Better', 'safer', 'risk', 'rate' or 'ratio', and 
 ok("⭐ SRC: no Make primary on a trade-off or a diverted route (Q2, Q4): only on a Suggested answer with no diversion in use",
    bo.includes('const canPromote = r.answer === "Suggested" && o && onPromote && !div;'));
 ok("⭐ SRC: the card's Make primary moves the card's lorry on both legs only where the option has its own way back, and the message names the lorries not moved (Q3)",
-   bo.includes('legs: ownWayBack ? ["loaded", "return"] : ["loaded"]') && html.includes("for(const lg of (card ? card.legs : [oneLeg(leg || showLeg)])){")
-   && html.includes("is now the main route for the ${vehShort(profile)}.${card.others ? ` Not moved: ${card.others}.` : \"\"} Routing again puts the original order back."));
+   // REVERSED 17 Nov 2026 (ui-best-option-1117, Q2; John: "Yes, as recommended"): the press is ONE request for the legs
+   // it moves (it was `for(const lg of ...)`, a request a leg); the strip's sentence is the same words, now built from
+   // the sentence the open route's panel also shows.
+   bo.includes('legs: ownWayBack ? ["loaded", "return"] : ["loaded"]') && !html.includes("for(const lg of (card ? card.legs : [oneLeg(leg || showLeg)])){")
+   && html.includes("const legs = card ? card.legs : [oneLeg(leg || showLeg)];") && html.includes('legs: legs.join(",") });')
+   && html.includes("? `${card.label} is now the main route for the ${vehShort(profile)}.${card.others ? ` Not moved: ${card.others}.` : \"\"}`")
+   && html.includes("? `${rid}: ${said} Routing again puts the original order back.`"));
 ok("⭐ SRC: the options table folds under 'All figures', closed each time a row opens (Q6); a route with no other option keeps it open",
    html.includes("const [showAll, setShowAll] = useState(false);") && html.includes("setBest(null); setShowAll(false);")
    && html.includes("{(showAll || (best && best.route && !(best.route.options || []).length)) && <>"));
@@ -216,27 +221,34 @@ if (hasCard) {
   }
   // 3. Keep: every other option ruled out (R021), no other option (R009), nothing clearly ahead
   {
-    const REASON = "it meets 1 road limit below this lorry that the route in use does not: Weight limit 7.5 t (both legs)";
+    // REVERSED 17 Nov 2026 (ui-best-option-1117, Q1; John: "Yes, as recommended"): the rule's reason for an added limit read
+    // "it meets 1 road limit below this lorry that the route in use does not: Weight limit 7.5 t (both legs)"; it is said
+    // road by road, and the row shows it as a sentence (SAID)
+    const REASON = "it adds a 7.5 t limit, except for access, on Narborough Road South (return leg)";
+    const SAID = "It adds a 7.5 t limit, except for access, on Narborough Road South (return leg).";
     const r = route({ route: "R021", answer: "Keep the route in use", option: null, alt: null,
                       why: "Every other option is ruled out: Alt 1: " + REASON + "; Alt 2: " + REASON + ".",
                       options: [opt(1, { ruled_out: [REASON] }), opt(2, { ruled_out: [REASON] })] });
     const m = mount(B(r)); const t = m.text();
     ok("⭐ KEEP · RULED OUT: 'Every other option is ruled out.' and one row an option with its own reasons, word for word",
        /Keep the route in use.?No change/.test(t) && m.host.querySelector("[data-bo-why]").textContent === "Every other option is ruled out."
-       && /^Alt 1.?Ruled out/.test(row(m.host, "out-1").textContent) && row(m.host, "out-1").textContent.endsWith(REASON) && row(m.host, "out-2").textContent.includes(REASON)
+       && /^Alt 1.?Ruled out/.test(row(m.host, "out-1").textContent) && row(m.host, "out-1").textContent.endsWith(SAID) && row(m.host, "out-2").textContent.includes(SAID)
+       && !t.includes("road limit below this lorry that the route in use does not")
        && !m.host.querySelector("[data-bo-option]") && ![...m.host.querySelectorAll("button")].some(b => /primary/.test(b.textContent)), t);
     m.done();
     const z = "it crosses A47 at the new Tilton junction: HGV diversion while the junction is built, closed until 17 Dec 2027 (loaded leg)";
     const m1 = mount(B(route({ answer: "Keep the route in use", options: [opt(1, { ruled_out: [z, z] })] })));
+    // NARROWED 17 Nov 2026 (Q1): a reason is shown as a sentence (a capital, a full stop); its words are the rule's
     ok("KEEP · RULED OUT: a reason said twice is shown once; a zone name with a colon is kept whole (built from the list, never by splitting the why)",
-       row(m1.host, "out-1").textContent.split(z).length === 2);
+       row(m1.host, "out-1").textContent.split(z.slice(1)).length === 2 && row(m1.host, "out-1").textContent.endsWith("I" + z.slice(1) + "."));
     m1.done();
     const m2 = mount(B(route({ route: "R009", answer: "Keep the route in use", option: null, why: "No other option is stored for this lorry.", options: [] })));
     ok("⭐ KEEP · NO OTHER OPTION: the rule's sentence, no heads, no buttons, no fold to open", m2.text().includes("No other option is stored for this lorry.")
        && !m2.host.querySelector(".bo-heads") && !m2.host.querySelector("button[data-bo-all]") && !m2.host.querySelector("button.btn-sec"));
     m2.done();
-    const m3 = mount(B(route({ answer: "Keep the route in use", option: null, why: "No other option is clearly ahead on any head.", options: [opt(1)] })));
-    ok("KEEP · NOTHING CLEARLY AHEAD: the rule's sentence and the fold", m3.text().includes("No other option is clearly ahead on any head.") && m3.host.querySelector("button[data-bo-all]"));
+    // REVERSED 17 Nov 2026 (Q4): the rule's sentence read "No other option is clearly ahead on any head."
+    const m3 = mount(B(route({ answer: "Keep the route in use", option: null, why: "No other option is clearly better.", options: [opt(1)] })));
+    ok("KEEP · NOTHING CLEARLY AHEAD: the rule's sentence and the fold", m3.text().includes("No other option is clearly better.") && !/\bhead\b/.test(m3.text()) && m3.host.querySelector("button[data-bo-all]"));
     m3.done();
   }
   // 4. The not-counted states

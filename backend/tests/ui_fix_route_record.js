@@ -121,8 +121,10 @@ const FULL = { rows: [R013, R014], totals: { planned: TOT, so_far: Z() }, divers
        && t.includes("Since 6 Nov 2026 · all lorry types") && t.includes("35 of 212"));
     const r13 = m.host.querySelector('[data-rc-row="B:R013"]');
     const cellsOf = (row, i) => [...row.querySelectorAll("tr")[i].querySelectorAll("td.num")].map(c => c.textContent);
-    ok("⭐ R013 a trip: 6.3 kg less, 1.7 min less, 5.7 mi less, £8.53 less, 5 more, 3 fewer, 2 fewer",
-       r13 && JSON.stringify(cellsOf(r13, 0).slice(1)) === JSON.stringify(["6.3 kg less", "1.7 min less", "5.7 mi less", "£8.53 less", "5 more", "3 fewer", "2 fewer"]),
+    // REVERSED 17 Nov 2026 (ui-best-option-1117, finding 7): a trip's minutes read to the nearest half, as the card and the
+    // file say them ("1.7 min less" was a tenth; the card said the same difference in whole minutes)
+    ok("⭐ R013 a trip: 6.3 kg less, 1.5 min less, 5.7 mi less, £8.53 less, 5 more, 3 fewer, 2 fewer",
+       r13 && JSON.stringify(cellsOf(r13, 0).slice(1)) === JSON.stringify(["6.3 kg less", "1.5 min less", "5.7 mi less", "£8.53 less", "5 more", "3 fewer", "2 fewer"]),
        r13 && cellsOf(r13, 0).join(" | "));
     ok("⭐ R013 planned: 223 kg less, 1.0 h less, 200 mi less, £301 less, 177 more, 106 fewer, 71 fewer",
        r13 && JSON.stringify(cellsOf(r13, 1)) === JSON.stringify(["223 kg less", "1.0 h less", "200 mi less", "£301 less", "177 more", "106 fewer", "71 fewer"]),
@@ -131,7 +133,8 @@ const FULL = { rows: [R013, R014], totals: { planned: TOT, so_far: Z() }, divers
     const r14 = m.host.querySelector('[data-rc-row="M:R014"]');
     ok("⭐ R014: 'Alt 1 made the main route', its lorry, a trip with 'the same' at nought",
        t.includes("R014 · Alt 1 made the main route") && t.includes("Since 17 Nov 2026 · ")
-       && r14 && JSON.stringify(cellsOf(r14, 0).slice(1)) === JSON.stringify(["8.2 kg less", "2.4 min more", "0.4 mi more", "£2.06 more", "5 fewer", "the same", "the same"]),
+       // REVERSED 17 Nov 2026 (finding 7): "2.4 min more" is "2.5 min more" (halves)
+       && r14 && JSON.stringify(cellsOf(r14, 0).slice(1)) === JSON.stringify(["8.2 kg less", "2.5 min more", "0.4 mi more", "£2.06 more", "5 fewer", "the same", "the same"]),
        r14 && cellsOf(r14, 0).join(" | "));
     ok("⭐ R014 planned: 11.4 t less, 55.6 h more, 492 mi more, £2,861 more, 6,945 fewer",
        r14 && JSON.stringify(cellsOf(r14, 1).slice(0, 5)) === JSON.stringify(["11.4 t less", "55.6 h more", "492 mi more", "£2,861 more", "6,945 fewer"]),

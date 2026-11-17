@@ -2235,7 +2235,7 @@ def route_geometries(route_id, profile=None, leg=None):
     return {"type": "FeatureCollection", "features": feats}
 
 
-def promote_alternative(route_id, profile, alt_index, leg="loaded", who=None):
+def promote_alternative(route_id, profile, alt_index, leg="loaded", who=None, legs=None):
     """
     Make one of HERE's alternatives the primary route for a (route, profile, leg).
 
@@ -2253,11 +2253,75 @@ def promote_alternative(route_id, profile, alt_index, leg="loaded", who=None):
     17 Nov 2026 (best option step 3, Q1a): the route choices record (route_record.py) reads a trip on the main line
     BEFORE the swap and on the new main line after it, and keeps both (`who` = the person, main._by()). The swap
     leaves no other trace. A record that cannot be written never stops the swap.
+
+    17 Nov 2026 (the live check, finding 2; John: "Yes, as recommended"): `legs` = the legs ONE press swaps (the Best
+    option card's press moves an option with its own way back on both). It was a request a leg, each reading the rule
+    for the record and rebuilding the road sections, and a third read of the rule for the card: on live the message came
+    35 to 69 s after the press and the card read again at 107 to 142 s. Now every leg is checked BEFORE any is swapped
+    (a leg without the option refuses the whole press; a request a leg could leave one leg moved), the record is read
+    once before and written once after, the road sections and the route choices are rebuilt once, and the reply carries
+    `best`: the route's new best-option answer, from the same read of the rule (route_best.card_answer on the record's
+    own Context, read again after the swap), so the card does not ask for the whole table.
     """
     alt_index = int(alt_index)
+    legs = [leg] if not legs else list(dict.fromkeys(legs))
     if alt_index == 0:
-        return {"route_id": route_id, "profile": profile, "leg": leg,
+        return {"route_id": route_id, "profile": profile, "leg": legs[0],
                 "promoted": 0, "note": "already the primary route"}
+    for leg in legs:
+        refused = _promote_refusal(route_id, profile, alt_index, leg)
+        if refused:
+            return refused
+
+    try:
+        import route_record as _record
+        _rec = _record.before_promote(route_id, profile, legs, alt_index)
+    except Exception as e:
+        _record, _rec = None, None
+        print(f"route record: {route_id} not read before promote: {e}")
+    TMP = -1
+    # tenant_id is a WHERE condition on all three legs of the swap and never appears in
+    # a SET clause: the rows are being re-indexed within one tenant, not moved between.
+    for leg in legs:
+        db.execute(
+            "UPDATE route_geometry SET alt_index = ? WHERE tenant_id = ? AND route_id = ? "
+            "AND vehicle_profile = ? AND leg = ? AND alt_index = 0",
+            (TMP, db.current_tenant(), route_id, profile, leg))
+        db.execute(
+            "UPDATE route_geometry SET alt_index = 0 WHERE tenant_id = ? AND route_id = ? "
+            "AND vehicle_profile = ? AND leg = ? AND alt_index = ?",
+            (db.current_tenant(), route_id, profile, leg, alt_index))
+        db.execute(
+            "UPDATE route_geometry SET alt_index = ? WHERE tenant_id = ? AND route_id = ? "
+            "AND vehicle_profile = ? AND leg = ? AND alt_index = ?",
+            (alt_index, db.current_tenant(), route_id, profile, leg, TMP))
+    if _record is not None:                                  # 17 Nov 2026: written before refresh_zones' sync reads it
+        _record.after_promote(_rec, who=who)
+    road_sections._rebuild_quietly("alternative promoted")   # 12 Oct 2026: a new primary
+    route_choice.refresh_quietly("alternative promoted")     # 28 Oct 2026 (task 0c): the main line changed
+    try:                                                     # 29 Oct 2026 (task 3c): the marks follow the rows
+        import holding as _holding
+        _holding.mark_route(route_id)
+    except Exception as e:
+        print(f"holding: {route_id} not marked after promote: {e}")
+    best = None
+    try:                                                     # 17 Nov 2026: the card's new answer, the rule read once
+        import route_best as _best
+        ctx = _rec["ctx"].get() if _rec else None
+        if ctx is None:
+            ctx = _best.Context()
+        else:
+            ctx.reread()
+        best = _best.card_answer(route_id, ctx)
+    except Exception as e:
+        print(f"best option: {route_id} not worked out after promote: {str(e)[:160]}")
+    return {"route_id": route_id, "profile": profile, "leg": legs[0], "legs": legs,
+            "promoted": alt_index, "swapped_with": 0, "best": best,
+            "note": "Re-baking this route will restore HERE's own ranking."}
+
+
+def _promote_refusal(route_id, profile, alt_index, leg):
+    """None when this leg holds the option; else the reply that says why not (nothing is swapped)."""
     rows = db.query(
         "SELECT alt_index FROM route_geometry WHERE tenant_id = ? AND route_id = ? "
         "AND vehicle_profile = ? AND leg = ?", (db.current_tenant(), route_id, profile, leg))
@@ -2284,40 +2348,7 @@ def promote_alternative(route_id, profile, alt_index, leg="loaded", who=None):
                              f"alternatives back.",
                     "haul_zones": on_haul, "alternatives_available": sorted(have)}
         return {"error": f"no alternative {alt_index} cached for {conversions.vehicle_label(conversions.load_factors(), profile)} / {leg}"}
-
-    try:
-        import route_record as _record
-        _rec = _record.before_promote(route_id, profile, leg, alt_index)
-    except Exception as e:
-        _record, _rec = None, None
-        print(f"route record: {route_id} not read before promote: {e}")
-    TMP = -1
-    # tenant_id is a WHERE condition on all three legs of the swap and never appears in
-    # a SET clause: the rows are being re-indexed within one tenant, not moved between.
-    db.execute(
-        "UPDATE route_geometry SET alt_index = ? WHERE tenant_id = ? AND route_id = ? "
-        "AND vehicle_profile = ? AND leg = ? AND alt_index = 0",
-        (TMP, db.current_tenant(), route_id, profile, leg))
-    db.execute(
-        "UPDATE route_geometry SET alt_index = 0 WHERE tenant_id = ? AND route_id = ? "
-        "AND vehicle_profile = ? AND leg = ? AND alt_index = ?",
-        (db.current_tenant(), route_id, profile, leg, alt_index))
-    db.execute(
-        "UPDATE route_geometry SET alt_index = ? WHERE tenant_id = ? AND route_id = ? "
-        "AND vehicle_profile = ? AND leg = ? AND alt_index = ?",
-        (alt_index, db.current_tenant(), route_id, profile, leg, TMP))
-    if _record is not None:                                  # 17 Nov 2026: written before refresh_zones' sync reads it
-        _record.after_promote(_rec, who=who)
-    road_sections._rebuild_quietly("alternative promoted")   # 12 Oct 2026: a new primary
-    route_choice.refresh_quietly("alternative promoted")     # 28 Oct 2026 (task 0c): the main line changed
-    try:                                                     # 29 Oct 2026 (task 3c): the marks follow the rows
-        import holding as _holding
-        _holding.mark_route(route_id)
-    except Exception as e:
-        print(f"holding: {route_id} not marked after promote: {e}")
-    return {"route_id": route_id, "profile": profile, "leg": leg,
-            "promoted": alt_index, "swapped_with": 0,
-            "note": "Re-baking this route will restore HERE's own ranking."}
+    return None
 
 
 # --------------------------------------------------------------------------- #
