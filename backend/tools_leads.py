@@ -70,6 +70,7 @@ def csv_export():
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator="\n")
     w.writerow(CSV_COLUMNS)
+    import users       # 17 Nov 2026: csv_cell, so a typed "=…" is shown by a spreadsheet and not run
     for r in rows:
-        w.writerow([("yes" if r.get(k) else "no") if k == "news" else (r.get(k) or "") for k in CSV_COLUMNS])
+        w.writerow([("yes" if r.get(k) else "no") if k == "news" else users.csv_cell(r.get(k) or "") for k in CSV_COLUMNS])
     return buf.getvalue()
