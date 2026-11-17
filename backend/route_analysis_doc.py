@@ -12,10 +12,18 @@ more routes (up to MAX_ROUTES), one lorry, the sections ticked —
     F  Diversions                      a dated zone's way taken, its dates, why, how much further
     the page for the assessor          the CLOCS questions, each pointing at its section
 
+    the summary                        (16 Nov 2026, step 1c) one page a route, FIRST in the file, and a "Summary" sheet
+                                       first in the XLSX: the best-option rule's answer (route_best.evaluate) for the
+                                       route's stored options, its figures, how it was reached
+                                       (notes\\route-best-summary-mockup-1116, John: "Yes, as recommended")
+
 STORED DATA ONLY: nothing is fetched while the file is made (the closures are the feed the app already holds, and the
-file says when it was read). Counts only: nothing is scored, ranked or divided, except the collision evidence's own
-"Compared with roads like these" range. No collision's date or hour is printed. Built in heavy_reads.solo("route-analysis")
-by main.py. gather() here; the pages in route_analysis_render.py.
+file says when it was read; the rule makes no outside call). Sections A to F: counts only, nothing is scored, ranked or
+divided, except the collision evidence's own "Compared with roads like these" range. THE SUMMARY REVERSES THAT where it
+appears (John's yes to Q6, 16 Nov 2026): it compares each option with the route in use by the rule's fixed rules and gives
+one suggestion; its collisions stay counts, never a percentage, a rate or a "better" (R5 of 16 Oct kept). No collision's
+date or hour is printed. Built in heavy_reads.solo("route-analysis") by main.py. gather() here; the pages in
+route_analysis_render.py.
 """
 import datetime
 import json
@@ -439,6 +447,7 @@ def gather(route_ids, lorry=None, sections=None, acc=None, now=None):
     as_at = now or datetime.date.today()
     index = collisions.index_from_db()
     feats = community.features(list(__import__("route_compare").KINDS)) if "community" in sections else []
+    best_ctx = _best_context(as_at)
     routes = []
     for rid in route_ids:
         try:
@@ -478,6 +487,7 @@ def gather(route_ids, lorry=None, sections=None, acc=None, now=None):
         if "diversions" in sections:
             R["diversions"] = _diversions(rid, base, index)
         R["summary"] = _summary(R, ev)
+        R["best"] = best(rid, best_ctx, factors)
         routes.append(R)
     notice = export._demo_notice() or None
     return {
@@ -522,6 +532,82 @@ def _summary(R, ev):
     if "diversions" in R:
         s["diversions"] = str(len(R["diversions"]["items"])) if R["diversions"]["items"] else "—"
     return s
+
+
+# --------------------------------------------------------------------------- #
+#  The summary (16 Nov 2026, step 1c): the best-option rule's answer           #
+# --------------------------------------------------------------------------- #
+SUMMARY_UNAVAILABLE = "The suggestion could not be worked out for this route."
+BUSY_HOURS = ("08:00", "17:00")
+
+
+def _best_context(as_at):
+    """ONE read of what the rule needs for the whole file (route_best.Context: stored rows only, no outside call), or
+    None when it cannot be read: the file is then made with each summary page saying so, never refused."""
+    try:
+        import route_best
+        day = as_at if isinstance(as_at, datetime.date) else datetime.date.today()
+        if isinstance(day, datetime.datetime):
+            day = day.date()
+        return route_best.Context(day=day)
+    except Exception as e:  # noqa: BLE001 — the summary never stops the file
+        print("route analysis: the best-option rule not read:", str(e)[:160])
+        return None
+
+
+def best(rid, ctx, factors):
+    """The summary page's data for one route: the rule's own answer, its one sentence (the why, or the trade line) as the
+    rule wrote it, the lorry it speaks for (N2) and those it does not, the route in use on the day, and a column a line:
+    the route in use first, then each stored option with its counts, percentages and what ruled it out. Nothing here
+    decides or rewords: the rule does (Q2)."""
+    import conversions
+    if ctx is None:
+        return {"error": SUMMARY_UNAVAILABLE}
+    try:
+        import route_best
+        r = route_best.evaluate(rid, ctx)
+    except Exception as e:  # noqa: BLE001
+        print("route analysis: no best option for", rid, str(e)[:160])
+        r = None
+    if not r:
+        return {"error": SUMMARY_UNAVAILABLE}
+    out = {"error": None, "answer": r["answer"], "option": r.get("option"), "why": r.get("why"),
+           "held_back": r.get("held_back"), "lorry": r.get("lorry"), "lorry_text": r.get("lorry_name") or r.get("lorry"),
+           "lorry_basis": r.get("lorry_basis"),
+           "others_text": [conversions.vehicle_label(factors, k) for k in (r.get("other_lorries") or [])],
+           "history": (r.get("checks") or {}).get("collision_history"),
+           "counted": bool((r.get("checks") or {}).get("community_all_options")),
+           "period": getattr(ctx, "period", "") or "", "in_use_words": None, "cols": []}
+    # the limits below the lorry that the line in use ITSELF meets (the rule's `in_use_limits`, reported only: the answer
+    # does not change for them); the page says them as the card does, the file keeping the limit's long words
+    out["in_use_limits"] = [{"words": L.get("words") or "", "short": L.get("short"), "legs": L.get("legs")}
+                            for L in (r.get("in_use_limits") or []) if L.get("words") or L.get("short")]
+    out["in_use_diversion"] = False
+    iu = r.get("in_use")
+    if iu:
+        out["in_use_diversion"] = list(iu.get("pair") or []) != [0, 0]
+        if list(iu.get("pair") or []) == [0, 0]:
+            out["in_use_words"] = "the main route, both legs"
+        else:
+            parts = []
+            for leg, w in (("loaded", "out"), ("return", "back")):
+                L = iu.get(leg) or {}
+                until = _words_date(L.get("until")) if L.get("alt") and L.get("until") else None
+                parts.append(f"{L.get('label') or 'The main route'} {w}" + (f" (a diversion until {until})" if until else ""))
+            out["in_use_words"] = "; ".join(parts)
+    use = r.get("counts_in_use")
+    if use:
+        out["cols"].append({"label": "In use", "in_use": True, "chosen": False, "traded": False, "ruled_out": [],
+                            "counts": dict(use), "pct": {}, "head_words": {}})
+    for o in r.get("options") or []:
+        out["cols"].append({"label": o["label"], "in_use": False, "chosen": bool(o.get("chosen")),
+                            "traded": bool(o.get("traded")), "ruled_out": list(o.get("ruled_out") or []),
+                            "counts": dict(o.get("counts") or {}), "pct": dict(o.get("pct") or {}),
+                            "head_words": dict(o.get("head_words") or {})})
+    out["busy_held"] = any((c["counts"].get("busy_min") or {}).get(h) is not None
+                           for c in out["cols"] if not c["in_use"] for h in BUSY_HOURS)
+    out["cycle_held"] = bool(use) and use.get("cycle_meets") is not None
+    return out
 
 
 def file_name(D, ext="pdf"):
