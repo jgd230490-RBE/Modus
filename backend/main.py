@@ -7635,6 +7635,32 @@ def tool_leads_csv(token: Optional[str] = None):
                              "Cache-Control": "no-store"})
 
 
+# 17 Nov 2026 (claude/tools-abnormal-adviser) — the abnormal load adviser's free check: the platform's own rules
+# (abnormal_rules.advice) on the typed figures, with the nation the person picked, the SHIPPED bank holidays and no police
+# time bans. Nothing of any organisation is read; nothing is written or kept (tools_abnormal's header).
+import tools_abnormal  # noqa: E402
+
+TOOLS_ABNORMAL_LIMIT = tools_public.Limit("abnormal-load", tools_abnormal.CHECKS_PER_HOUR, 3600)
+
+
+@app.post("/api/tools/abnormal-load")
+async def tools_abnormal_load(request: Request):
+    tools_public.guard(request, TOOLS_ABNORMAL_LIMIT)
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    if not isinstance(body, dict):
+        tools_public.refuse(400, tools_abnormal.SAY["width_m"])
+    if tools_public.trapped(body):
+        return {"ok": True}
+    try:
+        out = tools_abnormal.answer(body)
+    except tools_abnormal.Bad as e:
+        tools_public.refuse(400, e.say)
+    return {"ok": True, "page": out["page"]}
+
+
 # 17 Nov 2026 (claude/tools-calculators) — the three free haul calculators' open calls (tools_calculators.py): each works the
 # platform's own sum on the figures typed and the shipped lorry figures, behind its own limit; the PDF call is the only one
 # that takes an email.
