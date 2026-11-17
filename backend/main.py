@@ -129,6 +129,7 @@ async def lifespan(app: FastAPI):
         db.init_config_db()         # 2.5b. No ALTERs, so its position only needs to precede the seed.
         db.init_costing_db()        # 10 Sep evening. The GLOBAL fuel_index table (untenanted, by design).
         db.init_demo_requests_db()  # H9, 8 Oct. The GLOBAL demo_requests table (untenanted, by design).
+        db.init_tool_leads_db()     # 16 Nov. The GLOBAL tool_leads table (the public tools' details; untenanted, by design).
         db.init_users_db()          # G3, 14 Oct. Logins, sessions, links, audit, attempts: account data, not package data.
         limits.init_db()            # 13 Oct. The GLOBAL road_limits table (untenanted, by design: public road facts).
         # Phase 4.5. Must sit exactly here: init_tenant() migrates a pre-4.5 database by
@@ -7599,6 +7600,39 @@ def tools_page(name: str):
         raise HTTPException(status_code=404, detail="not found")
     path, media = found
     return Response(content=tools_public.page_bytes(path), media_type=media, headers={"Cache-Control": "no-cache"})
+
+
+# 16 Nov 2026 (claude/tools-route-check-request) — the route check REQUEST (an open call, tools_public's rule) and the
+# admin read of the store the tools share (tools_leads). The email to John goes after the answer, as a background task.
+import tools_leads  # noqa: E402
+import tools_route_check  # noqa: E402
+try:
+    from fastapi.responses import JSONResponse as _TRCJson
+    from starlette.background import BackgroundTask as _TRCTask
+except Exception:      # the stubbed fastapi of the sandbox harnesses; the call never runs there
+    _TRCJson = _TRCTask = None
+
+
+@app.post("/api/tools/route-check/request")
+async def tools_route_check_request(request: Request):
+    tools_public.guard(request, tools_route_check.LIMIT)
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    result = tools_route_check.handle(body, tools_public.client_ip(request))
+    rid = result.get("request_id")
+    return _TRCJson({"ok": True}, headers={"Cache-Control": "no-store"},
+                    background=_TRCTask(tools_route_check.deliver, rid) if rid else None)
+
+
+@app.get("/api/admin/tool-leads.csv")
+def tool_leads_csv(token: Optional[str] = None):
+    """The public tools' leads (route check requests, calculator PDF emails), newest first. Admin only."""
+    _check_admin(token)
+    return Response(tools_leads.csv_export(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="tool-leads.csv"',
+                             "Cache-Control": "no-store"})
 
 
 # 6 Oct 2026 (H5) — the public landing page at /landing/ for PREVIEW on this service. The
