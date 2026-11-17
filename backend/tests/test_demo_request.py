@@ -432,7 +432,25 @@ ok("main.py posts /api/public/demo-request and calls demo_request.handle()",
    '@app.post("/api/public/demo-request")' in main_src and "demo_request.handle(form, ip)" in main_src)
 ok("...parses the body with urllib (no multipart dependency)", "parse_qs(raw, keep_blank_values=True)" in main_src
    and "python-multipart" not in open(os.path.join(BACKEND, "requirements.txt"), encoding="utf-8").read())
-ok("...reads the visitor's IP through client_ip(X-Forwarded-For, peer)", 'demo_request.client_ip(request.headers.get("x-forwarded-for")' in main_src)
+# REVERSED 16 Nov 2026 (claude/visitor-address): it read client_ip(X-Forwarded-For, peer). Every reader in main.py now
+# goes through visitor_ip(headers, peer), and none reads the chain's first entry on its own.
+ok("...reads the visitor's address through visitor_ip(headers, peer), the form and every other reader in main.py",
+   main_src.count("demo_request.visitor_ip(request.headers") == 2 and "demo_request.client_ip(" not in main_src,
+   f"{main_src.count('demo_request.visitor_ip(request.headers')} {main_src.count('demo_request.client_ip(')}")
+ok("visitor_ip: the edge's own header wins over anything in the forwarded-for chain",
+   dr.visitor_ip({"cf-connecting-ip": "198.51.100.4", "x-forwarded-for": "203.0.113.9, 198.51.100.4, 10.0.0.1"}, "10.0.0.9") == "198.51.100.4"
+   and dr.visitor_ip({"true-client-ip": " 198.51.100.5 ", "x-forwarded-for": "203.0.113.9"}, "10.0.0.9") == "198.51.100.5"
+   and dr.visitor_ip({"cf-connecting-ip": "198.51.100.4", "true-client-ip": "198.51.100.5"}, "") == "198.51.100.4")
+ok("visitor_ip: with no edge header it reads as before (the chain's first entry, else the peer), and None headers are the peer",
+   dr.visitor_ip({"x-forwarded-for": "198.51.100.4, 10.0.0.1"}, "10.0.0.9") == "198.51.100.4"
+   and dr.visitor_ip({}, "10.0.0.9") == "10.0.0.9" and dr.visitor_ip(None, "10.0.0.9") == "10.0.0.9"
+   and dr.visitor_ip({"cf-connecting-ip": "  "}, "10.0.0.9") == "10.0.0.9")
+ok("visitor_ip: an address header the edge does not write is never read",
+   dr.visitor_ip({"x-real-ip": "203.0.113.9", "forwarded": "for=203.0.113.9"}, "10.0.0.9") == "10.0.0.9"
+   and dr.EDGE_ADDRESS_HEADERS == ("cf-connecting-ip", "true-client-ip"))
+_tp_src = open(os.path.join(BACKEND, "tools_public.py"), encoding="utf-8").read()
+ok("the public tools' limit reads the same address (tools_public.client_ip goes through visitor_ip)",
+   "demo_request.visitor_ip(request.headers" in _tp_src and "demo_request.client_ip(" not in _tp_src)
 ok("...answers 303 to thanks.html / error.html on the landing site", main_src.count("status_code=303") == 3
    and '"/thanks.html"' in main_src and '"/error.html"' in main_src)
 ok("...and the send is a BackgroundTask AFTER the redirect", "_DRTask(demo_request.deliver, result[\"request_id\"])" in main_src)

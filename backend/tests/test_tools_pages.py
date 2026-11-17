@@ -329,6 +329,26 @@ except Exception as e:
        getattr(e, "status_code", None) == 429 and e.detail["say"] == L4.say)
 tools_public.guard(_Req("198.51.100.1", "10.0.0.1"), L4)
 ok("...and lets another visitor through the same proxy", True)
+
+
+# 16 Nov 2026 (claude/visitor-address): where the edge writes its own header, the limit counts by it, whatever the
+# request put in the forwarded-for chain
+class _EdgeReq(_Req):
+    def __init__(self, fwd, edge, peer):
+        super().__init__(fwd, peer)
+        self.headers["cf-connecting-ip"] = edge
+
+
+L5 = tools_public.Limit("guard-edge", 1, 3600)
+tools_public.guard(_EdgeReq("203.0.113.1, 198.51.100.9, 10.0.0.1", "198.51.100.9", "10.0.0.1"), L5)
+try:
+    tools_public.guard(_EdgeReq("203.0.113.2, 198.51.100.9, 10.0.0.1", "198.51.100.9", "10.0.0.1"), L5)
+    ok("guard() counts by the edge's own header: a different first entry in the chain does not get a second call", False)
+except Exception as e:
+    ok("guard() counts by the edge's own header: a different first entry in the chain does not get a second call",
+       getattr(e, "status_code", None) == 429)
+tools_public.guard(_EdgeReq("203.0.113.1, 198.51.100.10, 10.0.0.1", "198.51.100.10", "10.0.0.1"), L5)
+ok("...and another visitor behind the same edge is let through, even with the same first entry", True)
 ok("trapped(): the hidden box filled is a machine; empty or missing is a person",
    tools_public.trapped({"website": "x"}) and not tools_public.trapped({"website": " "}) and not tools_public.trapped({})
    and not tools_public.trapped(None) and tools_public.TRAP == "website")

@@ -525,8 +525,8 @@ def _audited(path):
 
 def _client_ip(request):
     try:
-        return demo_request.client_ip(request.headers.get("x-forwarded-for"),
-                                      request.client.host if request.client else "")
+        # 16 Nov 2026: the edge's own header first (demo_request.visitor_ip), not the forwarded-for chain's first entry
+        return demo_request.visitor_ip(request.headers, request.client.host if request.client else "")
     except Exception:
         return ""
 
@@ -7272,8 +7272,7 @@ except Exception:      # the stubbed fastapi of the sandbox harnesses has neithe
 async def demo_request_submit(request: Request):
     raw = (await request.body()).decode("utf-8", "replace")
     form = {k: v[0] for k, v in _urlparse.parse_qs(raw, keep_blank_values=True).items()}
-    ip = demo_request.client_ip(request.headers.get("x-forwarded-for"),
-                                request.client.host if request.client else "")
+    ip = demo_request.visitor_ip(request.headers, request.client.host if request.client else "")
     result = demo_request.handle(form, ip)
     lu = demo_request.landing_url()
     if result["outcome"] == "screen":
@@ -7302,8 +7301,9 @@ _ADDRESS_HEADERS = ("x-real-ip", "true-client-ip", "cf-connecting-ip", "forwarde
 def diagnostics_address(request: Request, token: Optional[str] = None):
     """16 Nov 2026: what address THIS request arrived with, so the question "can a visitor choose the address the limits
     count?" is answered by a read and not a guess. The forwarded-for chain as received (in order), the connection's own
-    address, and what the app reads as the visitor (`_client_ip`: the chain's FIRST entry). Nothing is stored. Send the
-    same request with a made-up X-Forwarded-For: if that value comes back first in the chain, a visitor can set it."""
+    address, and what the app reads as the visitor (`_client_ip`, which is demo_request.visitor_ip: the edge's own
+    header where there is one, else the chain's first entry). Nothing is stored. Send the same request with a made-up
+    X-Forwarded-For: `read_as` must not follow it."""
     _check_admin(token)
     raw = request.headers.get("x-forwarded-for") or ""
     chain = [p.strip() for p in raw.split(",") if p.strip()]
