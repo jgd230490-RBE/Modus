@@ -88,7 +88,12 @@ with TestClient(main.app, base_url=BASE) as anon:
     ok("1. ...no demo bar, no 'Fictional scheme', the heading and the form", "DEMO" not in r.text and "Fictional" not in r.text
        and "Which road should the lorries take?" in r.text and 'id="rc-form"' in r.text)
     r = anon.get("/tools/route-check.js")
-    ok("1. its own script is not a page and is not served as one (404)", r.status_code == 404)
+    ok("1. ⭐ its own script is served beside the page: 200, javascript, no-cache, no cookie, the file's bytes",
+       r.status_code == 200 and r.headers.get("content-type", "").startswith("text/javascript")
+       and r.headers.get("cache-control") == "no-cache" and clean(r)
+       and r.content == (ROOT / "frontend" / "tools" / "route-check.js").read_bytes())
+    ok("1. ...a script with no page beside it is still a 404", anon.get("/tools/no-such-page.js").status_code == 404
+       and anon.get("/tools/index.js").status_code == 404)
 
     ver0 = db.data_version()
     a0 = db.query("SELECT COUNT(*) AS n FROM audit_log")[0]["n"]

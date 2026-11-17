@@ -338,6 +338,13 @@ ok("the CSV read is admin only (_check_admin first) and not stored by a browser"
 ok("/api/tools/ writes no audit row (tools_public rule 6)", '"/api/tools/"' in MAIN[MAIN.index("AUDIT_SKIP_PREFIXES"):MAIN.index("AUDIT_SKIP_PREFIXES") + 600])
 ok("the page is in the UI audit's list", re.search(r'const TOOL_PAGES = \[[^\]]*"route-check"', read("backend/tests/ui_audit.js")))
 
+# a page's own script is served beside its page, and only there
+_pf = tools_public.page_file("route-check.js")
+ok("⭐ page_file serves /tools/route-check.js as javascript beside its page; no page, no script; no path tricks",
+   _pf is not None and _pf[1].startswith("text/javascript") and tools_public.page_file("no-such-page.js") is None
+   and tools_public.page_file("index.js") is None and tools_public.page_file("..%2fmain.js") is None
+   and tools_public.page_file("a/b.js") is None and tools_public.page_file(".js") is None)
+
 print()
 for f in FAIL:
     print("  FAIL:", f)

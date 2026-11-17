@@ -77,6 +77,10 @@ def page_file(name):
     if name in SHARED_FILES:
         p = TOOLS_DIR / name
         return (p, SHARED_FILES[name]) if p.is_file() else None
+    if name.endswith(".js") and _PAGE_NAME.match(name[:-3]) and name[:-3] not in NOT_PAGES:
+        # a page's own script, /tools/<page>.js, served only beside an existing page of that name (claude/tools-route-check-request)
+        p = TOOLS_DIR / name
+        return (p, "text/javascript; charset=utf-8") if p.is_file() and (TOOLS_DIR / (name[:-3] + ".html")).is_file() else None
     if not _PAGE_NAME.match(name) or name in NOT_PAGES:
         return None
     p = TOOLS_DIR / (name + ".html")
