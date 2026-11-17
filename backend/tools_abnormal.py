@@ -12,7 +12,7 @@ Nothing of any organisation is read (no Config, no database, no access.current()
 This module changes no rule and adds none: it only turns the rules' STRUCTURED answer (category, notices, attendant
 reasons, markers, speeds, escort, height, reasons, notes) into the page's short sentences. The rules' own `lines` name
 statute paragraphs and a code of practice; the public page leaves those references out, as the agreed drawing does. Every
-place a public sentence is shorter than the rules' line is listed side by side in notes/session-1116-tools-abnormal-
+place a public sentence is shorter than the rules' line is listed side by side in notes/session-1117-tools-abnormal-
 adviser.md. The staff-only note "No escort is planned for this movement…" is never shown (a public check plans nothing).
 
 The form has no rigid-length box and no overhang boxes: "Length" is the overall length (`length_m`) and overhangs are 0.
