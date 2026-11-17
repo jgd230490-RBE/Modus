@@ -777,7 +777,10 @@ ok("...skipping only the POSTs that change nothing and the paths that log themse
                             # NARROWED 5 Nov 2026 (group 6): a concern's body is a member of the public's words and contact;
                             # its endpoints write their own audit row (the reference and the step, never the words)
                             "/api/public/concerns", "/api/concerns"}
-   and main.AUDIT_SKIP_PREFIXES == ("/api/auth/", "/api/concerns/")
+   # NARROWED 16 Nov 2026 (claude/tools-shell): + "/api/tools/": a public tool's open call works something out from typed
+   # figures, writes no audit row of the middleware's and does not empty the kept reads (tools_public, rule 6); a tool
+   # call that stores something writes its own row
+   and main.AUDIT_SKIP_PREFIXES == ("/api/auth/", "/api/concerns/", "/api/tools/")
    and not main._audited("/api/concerns/C-0001/reply") and not main._audited("/api/public/concerns")
    and main._audited("/api/locations/L1/site-layout/place")
    and main._audited("/api/forecasts/bulk") and main._audited("/api/admin/config/factors")

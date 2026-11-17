@@ -96,12 +96,33 @@ def ip_hash(ip):
 
 
 def client_ip(forwarded_for, peer):
-    """Render terminates TLS and forwards; the first X-Forwarded-For entry is the visitor."""
+    """The first X-Forwarded-For entry, else the peer. NOT the visitor on its own where a request can carry that
+    header in: use visitor_ip(), which asks the edge first."""
     if forwarded_for:
         first = forwarded_for.split(",")[0].strip()
         if first:
             return first
     return (peer or "").strip()
+
+
+#: the headers the edge in front of the app writes ITSELF with the visitor's address, in the order they are trusted.
+#: Read on live with /api/admin/diagnostics/address on 16 Nov 2026: both carry the visitor's own address whatever the
+#: request sent, while the forwarded-for chain starts with whatever the request sent.
+EDGE_ADDRESS_HEADERS = ("cf-connecting-ip", "true-client-ip")
+
+
+def visitor_ip(headers, peer):
+    """16 Nov 2026: the address every limit and every audit row counts a visitor by. The edge's own header where the
+    request arrived through it; else (a local run, a test, a deployment with no such edge) client_ip() as before.
+    `headers` is anything with .get (Starlette's headers, a dict with lower-case names) or None."""
+    get = getattr(headers, "get", None)
+    if get is None:
+        return client_ip(None, peer)
+    for name in EDGE_ADDRESS_HEADERS:
+        v = (get(name) or "").strip()
+        if v:
+            return v
+    return client_ip(get("x-forwarded-for"), peer)
 
 
 def _now():

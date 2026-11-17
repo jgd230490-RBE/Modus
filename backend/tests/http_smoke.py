@@ -2341,6 +2341,35 @@ with TestClient(main.app, base_url="https://testserver") as c:
     ok("CONCERNS: switched off again, the public send is a 404",
        _mc.post("/api/public/concerns", json=_body, headers={"X-Wayscope": "1"}).status_code == 404)
 
+    # ---- 16 Nov 2026 (claude/diagnostics-address): what address a request arrived with -------------------------------- #
+    # The limits (sign-in, reset, the landing form) count a visitor by the forwarded-for chain's FIRST entry. This read
+    # shows the chain as received, so live can show whether a visitor can set that entry. Admin only; nothing stored.
+    _ad = "/api/admin/diagnostics/address"
+    ok("🔴 ADDRESS: the read is refused without the admin token, and to a planner's code",
+       c.get(_ad).status_code == 403 and c.get(_ad, headers=PLAN).status_code == 403,
+       f"{c.get(_ad).status_code} {c.get(_ad, headers=PLAN).status_code}")
+    _a0 = c.get(_ad, params=TOKEN)
+    ok("ADDRESS: with no forwarded-for header the chain is empty and the app reads the connection's own address",
+       _a0.status_code == 200 and _a0.json()["forwarded_for"] == [] and _a0.json()["entries"] == 0
+       and _a0.json()["read_as"] == _a0.json()["peer"], _a0.text[:200])
+    _a1 = c.get(_ad, params=TOKEN, headers={"X-Forwarded-For": "203.0.113.9, 198.51.100.7 ,192.0.2.1"})
+    ok("ADDRESS: the chain comes back in the order received, trimmed, and the app reads its FIRST entry",
+       _a1.status_code == 200 and _a1.json()["forwarded_for"] == ["203.0.113.9", "198.51.100.7", "192.0.2.1"]
+       and _a1.json()["entries"] == 3 and _a1.json()["read_as"] == "203.0.113.9", _a1.text[:200])
+    _a2 = c.get(_ad, params=TOKEN, headers={"X-Real-IP": "198.51.100.7", "X-Unrelated": "x"})
+    ok("ADDRESS: another address header is reported when present, and only those named",
+       _a2.json().get("other") == {"x-real-ip": "198.51.100.7"}, _a2.text[:200])
+    # 16 Nov 2026 (claude/visitor-address): where the edge writes its own header, the app reads THAT as the visitor
+    _a3 = c.get(_ad, params=TOKEN, headers={"X-Forwarded-For": "203.0.113.9, 198.51.100.7, 192.0.2.1", "CF-Connecting-IP": "198.51.100.7"})
+    ok("🔴 ADDRESS: with the edge's own header present the app reads it, not the chain's first entry",
+       _a3.status_code == 200 and _a3.json()["read_as"] == "198.51.100.7" and _a3.json()["forwarded_for"][0] == "203.0.113.9",
+       _a3.text[:200])
+    _a4 = c.get(_ad, params=TOKEN, headers={"X-Forwarded-For": "203.0.113.9", "True-Client-IP": "198.51.100.8"})
+    ok("ADDRESS: ...and the edge's second header when the first is absent", _a4.json()["read_as"] == "198.51.100.8", _a4.text[:200])
+    _n_aud = len(db.query("SELECT id FROM audit_log"))
+    c.get(_ad, params=TOKEN, headers={"X-Forwarded-For": "203.0.113.9"})
+    ok("ADDRESS: the read stores nothing (no audit row)", len(db.query("SELECT id FROM audit_log")) == _n_aud)
+
 print()
 for f in FAIL:
     print("  FAIL:", f)
