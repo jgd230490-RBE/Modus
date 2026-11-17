@@ -1125,12 +1125,26 @@ def audit_rows(actor_id=None, kind=None, since=None, limit=500):
 AUDIT_CSV_COLUMNS = ("at", "kind", "actor_label", "actor_kind", "method", "path", "target", "status", "detail")
 
 
+#: a cell that starts with one of these is run as a formula by a spreadsheet when the file is opened
+CSV_RUN_STARTS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def csv_cell(v):
+    """17 Nov 2026: one CSV cell as plain text. A text value that starts with = + - @ (or a tab or a return) gets a leading
+    apostrophe, so a spreadsheet shows what was typed and does not run it; anything else, and anything that is not text,
+    passes through. Every CSV that can carry words typed by someone outside the team writes its cells through this
+    (the landing leads, the tools' leads, the activity log)."""
+    if isinstance(v, str) and v[:1] in CSV_RUN_STARTS:
+        return "'" + v
+    return v
+
+
 def audit_csv(actor_id=None, kind=None, since=None):
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator="\n")
     w.writerow(AUDIT_CSV_COLUMNS)
     for r in audit_rows(actor_id, kind, since, limit=5000):
-        w.writerow([r.get(k) if r.get(k) is not None else "" for k in AUDIT_CSV_COLUMNS])
+        w.writerow([csv_cell(r.get(k)) if r.get(k) is not None else "" for k in AUDIT_CSV_COLUMNS])
     return buf.getvalue()
 
 

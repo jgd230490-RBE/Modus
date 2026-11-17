@@ -309,6 +309,12 @@ ok("the CSV: a header and one line a row, newest first; no address hash column",
    lines[0] == "created_at,kind,name,email,company,news,details,status,id" and len(lines) == 3 and "ip_hash" not in lines[0]
    and row["ip_hash"] not in text and IP not in text)
 ok("...the news column reads yes / no", ",no," in text and ",yes," in text)
+# 17 Nov 2026 (claude/csv-cells-plain): what a visitor typed is written so a spreadsheet shows it and does not run it
+_kf = tools_leads.keep("route-check", "formula@example.org", name="=1+1", company="@SUM(A1)", details={"from": "a"})
+_line_f = [l for l in tools_leads.csv_export().strip().split("\n") if "formula@example.org" in l][0]
+ok("🔴 the tools' leads CSV writes a name or company that starts with = + - or @ as plain text",
+   ",'=1+1,formula@example.org,'@SUM(A1)," in _line_f, _line_f)
+db.execute("DELETE FROM tool_leads WHERE id = ?", (_kf,))
 
 # =========================================================================== #
 #  7. the table's place and main.py's wiring                                   #

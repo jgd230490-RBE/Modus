@@ -567,6 +567,7 @@ def leads():
 
 
 def csv_export():
+    import users       # 17 Nov 2026: csv_cell, so a typed "=…" is shown by a spreadsheet and not run
     rows = db.query("SELECT * FROM demo_requests ORDER BY created_at DESC")
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator="\n")
@@ -576,6 +577,7 @@ def csv_export():
         if r["email"] not in summaries:
             summaries[r["email"]] = login_summary(r["email"])
         s = summaries[r["email"]]
-        w.writerow([("yes" if r.get(k) else "no") if k == "updates_opt_in" else (r.get(k) or "") for k in CSV_COLUMNS]
-                   + [s.get(k, "") for k in LOGIN_COLUMNS])
+        w.writerow([("yes" if r.get(k) else "no") if k == "updates_opt_in" else users.csv_cell(r.get(k) or "")
+                    for k in CSV_COLUMNS]
+                   + [users.csv_cell(s.get(k, "")) for k in LOGIN_COLUMNS])
     return buf.getvalue()
