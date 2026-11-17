@@ -152,4 +152,5 @@ p{margin:0 0 10px}
   .calchead{padding:16px 16px 0}
   .pdfbox{margin:0 16px 16px}
   .next.wide{margin:0 16px 16px}
+  .tick{min-height:44px}   /* the phone's 44 px rule: a tick row is a whole 44 px target (claude/tools-abnormal-adviser) */
 }

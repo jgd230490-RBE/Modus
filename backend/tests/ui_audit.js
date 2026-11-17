@@ -188,7 +188,7 @@ const SIGNED_OUT = /^(public|login|login-wrong|login-forgot|login-code|setpw|lin
 // 16 Nov 2026 (claude/tools-shell): the public tool pages at /tools/<page> (frontend/tools/<page>.html), walked with the
 // guides and the landing pages as signed-out stops named "tools-<page>". Empty until a tool page exists: each tool branch
 // adds its page here (test_tools_pages.py fails when a page in frontend/tools/ is missing from this list).
-const TOOL_PAGES = ["route-check"];
+const TOOL_PAGES = ["abnormal-load", "route-check"];
 const FIXED_PAGES = /^(map-page|map-public|dashboard-bigscreen|bigscreen-)/;   // pages that must not scroll as a document
 
 // ---------------------------------------------------------------- the server ------------------------------------------
@@ -761,14 +761,18 @@ async function keyboardPass(page, meta) {
       const nm = (el.getAttribute("aria-label") || el.getAttribute("title") || el.textContent || el.getAttribute("placeholder") || el.value || "").trim().replace(/\s+/g, " ").slice(0, 50);
       // document order, for 2.4.3: where this stop sits among every focusable element
       const all = [...document.querySelectorAll('a[href], button, input:not([type="hidden"]), select, textarea, summary, iframe, [tabindex]:not([tabindex="-1"])')];
-      const row = { key: n, tag: el.tagName.toLowerCase(), text: nm, inView, visibleFocus: focused !== blurred, seenBefore, order: all.indexOf(el), w: Math.round(r.width), h: Math.round(r.height) };
+      const row = { key: n, tag: el.tagName.toLowerCase(), itype: el.tagName === "INPUT" ? el.type : undefined, text: nm, inView, visibleFocus: focused !== blurred, seenBefore, order: all.indexOf(el), w: Math.round(r.width), h: Math.round(r.height) };
       if (!row.visibleFocus) row.styles = { focused, blurred };   // what was compared, so a reader can see what the control does and does not change
       return row;
     }, i).catch(() => null);
     if (!info || info.body) { stops.push({ tag: "(body)", text: "", inView: true, visibleFocus: true, skipped: true, order: -1 }); break; }   // the page's stops are exhausted
     // a frame or a media player keeps the focus for several Tabs (its own controls): not a trap, and not this document
     const opaque = /^(iframe|video|audio|embed|object)$/.test(info.tag);
+    // 17 Nov 2026 (claude/tools-abnormal-adviser): a browser date or time box keeps the focus for its own parts (day, month,
+    // year, its calendar button: four Tabs in Chrome) and then moves on: not a trap either
+    const parts = info.tag === "input" && /^(date|time|datetime-local|month|week)$/.test(info.itype || "");
     if (info.seenBefore) { if (opaque) { if (info.tag === "iframe") break; continue; }
+      if (parts && stops.length && stops[stops.length - 1].order === info.order) continue;
       if (prevKey !== null && stops.length && stops[stops.length - 1].order === info.order) { stuck++; stops[stops.length - 1].stuck = true; if (stuck >= 2) break; else continue; } break; }   // wrapped round, or stuck
     prevKey = info.key;
     if (opaque) { info.skipped = true; info.visibleFocus = true; }

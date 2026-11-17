@@ -7635,6 +7635,32 @@ def tool_leads_csv(token: Optional[str] = None):
                              "Cache-Control": "no-store"})
 
 
+# 17 Nov 2026 (claude/tools-abnormal-adviser) — the abnormal load adviser's free check: the platform's own rules
+# (abnormal_rules.advice) on the typed figures, with the nation the person picked, the SHIPPED bank holidays and no police
+# time bans. Nothing of any organisation is read; nothing is written or kept (tools_abnormal's header).
+import tools_abnormal  # noqa: E402
+
+TOOLS_ABNORMAL_LIMIT = tools_public.Limit("abnormal-load", tools_abnormal.CHECKS_PER_HOUR, 3600)
+
+
+@app.post("/api/tools/abnormal-load")
+async def tools_abnormal_load(request: Request):
+    tools_public.guard(request, TOOLS_ABNORMAL_LIMIT)
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    if not isinstance(body, dict):
+        tools_public.refuse(400, tools_abnormal.SAY["width_m"])
+    if tools_public.trapped(body):
+        return {"ok": True}
+    try:
+        out = tools_abnormal.answer(body)
+    except tools_abnormal.Bad as e:
+        tools_public.refuse(400, e.say)
+    return {"ok": True, "page": out["page"]}
+
+
 # 6 Oct 2026 (H5) — the public landing page at /landing/ for PREVIEW on this service. The
 # page lives in landing/ at the repo root so the same folder deploys as a Render static
 # site on the root domain once the app has moved to app. (H0's open decision). Not gated:
