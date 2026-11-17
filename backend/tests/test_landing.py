@@ -428,6 +428,14 @@ for fn, must in (("privacy.html", ("ico.org.uk", "24 months", "JDavis@wayscope.c
         for s in [s for s in q.srcs if s.startswith("./")]:
             ok(f"{fn} asset present: {s}", os.path.exists(os.path.join(ROOT, "landing", s[2:])))
         ok(f"{fn} is not indexed", 'name="robots" content="noindex"' in open(path, encoding="utf-8").read())
+# 17 Nov 2026 (the tools' live check, F13): a sitemap of the pages that may be indexed, and a robots file that names it
+_sm = open(os.path.join(ROOT, "landing", "sitemap.xml"), encoding="utf-8").read()
+_rb = open(os.path.join(ROOT, "landing", "robots.txt"), encoding="utf-8").read()
+ok("the sitemap lists the home page and the Tools page, and no page marked noindex",
+   "<loc>https://wayscope.co.uk/</loc>" in _sm and "<loc>https://wayscope.co.uk/tools</loc>" in _sm and _sm.count("<loc>") == 2
+   and "privacy" not in _sm and "thanks" not in _sm and "error" not in _sm)
+ok("robots.txt lets every page be read and names the sitemap", "User-agent: *" in _rb and "Disallow" not in _rb
+   and "Sitemap: https://wayscope.co.uk/sitemap.xml" in _rb)
 ok("the footer links the privacy notice", src.rfind('href="./privacy.html"') > src.find("<footer"))
 
 # --- footer (7 Oct decisions) ------------------------------------------------------------

@@ -145,10 +145,11 @@ class Limit:
     #: addresses kept at most; past it the oldest-touched are dropped (a flood of addresses cannot grow memory)
     MAX_KEYS = 20000
 
-    def __init__(self, name, most, window_s):
+    def __init__(self, name, most, window_s, what="checks"):
         if not name or int(most) < 1 or int(window_s) < 1:
             raise ValueError("a limit needs a name, a count of at least 1 and a window")
         self.name = name
+        self.what = str(what or "checks")       # the noun in the refusal: "checks" on a tool, "requests" on a form
         self.most = int(most)
         self.window_s = int(window_s)
         self._hits = {}
@@ -157,7 +158,7 @@ class Limit:
     @property
     def say(self):
         """The refusal sentence: plain words, no number of calls, no status."""
-        return f"Too many checks from this connection. Please try again in {_window_words(self.window_s)}."
+        return f"Too many {self.what} from this connection. Please try again in {_window_words(self.window_s)}."
 
     def hit(self, ip, now=None):
         """Count one call from this address. True when it is allowed; False (and nothing counted) when over."""

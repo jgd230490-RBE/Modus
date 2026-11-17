@@ -5738,6 +5738,29 @@ def _gate_arrivals_build(month, acc):
     return out
 
 
+#: 17 Nov 2026 (John: "Yes, add it"): the rule's table reads nothing of the caller (route_best.table takes a day only), so
+#: ONE copy is kept for every staff caller, not one a role and team as _staff_json's default scope would keep, and the
+#: warm-up builds today's (read_cache.WARMERS["best_option"]: after start-up, once writes go quiet, at the day's turn).
+#: On live the first card after a deploy, a write or midnight waited 29 to 35 s for it; a planner's or a team's first
+#: card waited again although an admin's copy was already held.
+BEST_SCOPE = {"role": "staff", "ipt": None}
+
+
+def _best_table(d):
+    """The best-option rule over every route for day `d`: one kept build for every staff caller, until the next write."""
+    import route_best
+    return _staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d), BEST_SCOPE)
+
+
+def _warm_best():
+    """Today's table, as the card's read asks for it. Registered LAST: the Dashboard's and the public map's reads first."""
+    import datetime as _dt
+    _best_table(_dt.date.today())
+
+
+read_cache.WARMERS["best_option"] = _warm_best
+
+
 @app.get("/api/admin/route-options/best")
 def route_options_best(day: Optional[str] = None, token: Optional[str] = None):
     """
@@ -5749,12 +5772,11 @@ def route_options_best(day: Optional[str] = None, token: Optional[str] = None):
     """
     _check_admin(token)
     import datetime as _dt
-    import route_best
     try:
         d = _dt.date.fromisoformat(day.strip()) if day else _dt.date.today()
     except ValueError:
         raise HTTPException(400, "day must be YYYY-MM-DD")
-    return _staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d))
+    return _best_table(d)
 
 
 @app.get("/api/routes/{route_id}/best-option")
@@ -5766,11 +5788,10 @@ def route_best_option(route_id: str):
     Read only, no outside call; any staff login (a reviewer session is refused by _require_access).
     Returns {day, checks, thresholds, route} where route is route_best.evaluate()'s dict, or 404.
     """
-    acc = _require_access()
+    acc = _require_access()        # the wall: a reviewer session or no sign-in is refused; the table is the same for all
     import datetime as _dt
-    import route_best
     d = _dt.date.today()
-    t = _staff_json("route-options/best", {"day": d.isoformat()}, lambda: route_best.table(d), acc)
+    t = _best_table(d)          # 17 Nov 2026: one copy for every staff caller, warmed (BEST_SCOPE)
     r = next((x for x in (t.get("routes") or []) if x.get("route") == route_id), None)
     if r is None:
         raise HTTPException(404, "no such route")
@@ -7615,7 +7636,7 @@ except Exception:      # the stubbed fastapi of the sandbox harnesses; the call 
 
 @app.post("/api/tools/route-check/request")
 async def tools_route_check_request(request: Request):
-    tools_public.guard(request, tools_route_check.LIMIT)
+    tools_public.guard(request, tools_route_check.TRIES)     # every call; the five an hour count kept requests (handle)
     try:
         body = await request.json()
     except Exception:
