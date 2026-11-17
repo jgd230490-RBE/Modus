@@ -157,7 +157,7 @@ ok("⭐ 17: the Gate arrivals panel names the way on: 'Pick another month, or ap
    // NARROWED 11 Nov 2026 (CLOCS idea C-I1): the panel also takes the months with a queue and the sites
    && code.includes("onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />") && !code.includes("Pending lines appear as a note until they are approved"));
 ok("...the Dashboard's first steps are not placed among the carbon-target strip or the Gate arrivals blocks (their word checks read those slices)",
-   code.indexOf("function DashFirstSteps(") > code.indexOf("function AppliedChips") - 5000 && code.indexOf("function DashFirstSteps(") > code.indexOf("function GateArrivalsPanel(")
+   code.indexOf("function DashFirstSteps(") > code.indexOf("function AppliedChips") - 16000 /* NARROWED 17 Nov 2026 (best option step 3): 5000 -> 16000, the Route choices record sits between them, before EmptyState as the rule asks */ && code.indexOf("function DashFirstSteps(") > code.indexOf("function GateArrivalsPanel(")
    && !slice("function CarbonTargetStrip(", "function Dashboard(").includes("DashFirstSteps"));
 
 // ---------------------------------------------------------------- the old claims are gone from the guide too

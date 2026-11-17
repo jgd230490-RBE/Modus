@@ -116,6 +116,9 @@ TENANTED_TABLES = {
     # Lorry plan (which trip on which lorry, which day), kept until the week's loads change. Per tenant, in the package,
     # same rule, same edit.
     "lorry_plan_moves",
+    # 17 Nov 2026 (best option step 3, route_record.py): the record of the route choices made (another main route, a road
+    # for the busy hours) with a trip's figures saved on the day. Per tenant, in the package, same rule, same edit.
+    "route_choice_record",
     # 5 Nov 2026 (group 6, concerns.py): the concerns the public reports on the public map (and staff add from an email or
     # a call), with the scheme's triage. Per tenant, in the package, same rule, same edit.
     "concerns",
@@ -1053,6 +1056,8 @@ def init_weeks_db():
         _create_tenanted(cur, "concerns")
         # 9 Nov 2026 (v2.1 task 2.1-9b): the Lorry plan's saved arrangements
         _create_tenanted(cur, "lorry_plan_moves")
+        # 17 Nov 2026 (best option step 3): the route choices record
+        _create_tenanted(cur, "route_choice_record")
         conn.commit()
         # PR 3c: a note's reviewer group — the group a reviewer's comment came from, or the group a contractor's note is
         # shown to (NULL: only the contractor's people see it). Plain ADD COLUMN.
@@ -2463,6 +2468,34 @@ _TENANT_DDL = {
             PRIMARY KEY (tenant_id, id)
         )
     """,
+    # 17 Nov 2026 (best option step 3, route_record.py). One route choice: Make primary for one route and lorry type
+    # (kind 'primary'), or a busy-hours road for every lorry type (kind 'busy'). `figures` is JSON text: a trip's figures
+    # before and after, per lorry type, as stored on the day (km, minutes, kg CO2e, left turns, cycle routes met, places,
+    # collisions on each pair's own lines). `prints` the chosen lines' fingerprints. A row is ENDED, never deleted
+    # (`ended_on`, `ended_why`). No REAL column (Postgres REAL is float4): every figure is in the JSON text.
+    "route_choice_record": """
+        CREATE TABLE route_choice_record (
+            tenant_id      TEXT NOT NULL DEFAULT 'default',
+            id             TEXT NOT NULL,
+            route_id       TEXT NOT NULL,
+            kind           TEXT NOT NULL,
+            vehicle_profile TEXT,
+            alt_index      INTEGER NOT NULL,
+            legs           TEXT NOT NULL,
+            hours_from     TEXT,
+            hours_to       TEXT,
+            since          TEXT NOT NULL,
+            status         TEXT NOT NULL,
+            ended_on       TEXT,
+            ended_why      TEXT,
+            figures        TEXT NOT NULL,
+            prints         TEXT,
+            decided_by     TEXT,
+            decided_at     TEXT NOT NULL,
+            updated_at     TEXT NOT NULL,
+            PRIMARY KEY (tenant_id, id)
+        )
+    """,
     # 5 Nov 2026 (group 6, concerns.py). One concern from the public: what kind, where (a pin and / or a route), when, the
     # words, the contact only if a reply was asked for, the triage (status, first reply, close, outcome) and its history.
     # INTEGER flags, never BOOLEAN (SQLite hides a Postgres boolean compared with 1). The clean-up blanks the personal
@@ -2553,6 +2586,7 @@ _TENANT_PK = {
     "clp_reviews": "(tenant_id, id)",
     "concerns": "(tenant_id, id)",
     "lorry_plan_moves": "(tenant_id, id)",
+    "route_choice_record": "(tenant_id, id)",
     "config": "(tenant_id, key)",
     "forecast_days": "(tenant_id, route_id, month_index, discipline, section_id, "
                      "day_date)",

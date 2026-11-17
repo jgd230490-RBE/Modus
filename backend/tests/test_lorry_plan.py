@@ -528,7 +528,8 @@ access.set_current("planner123")
 import read_cache  # noqa: E402,F811
 ok("8: the table is tenanted, in the package order, in the audit's registry and among the tables a refresh keeps from live",
    lp.TABLE == "lorry_plan_moves" and lp.TABLE in db.TENANTED_TABLES and lp.TABLE in tenant_package.ORDER and lp.TABLE in db._TENANT_DDL
-   and lp.TABLE in db._TENANT_PK and lp.TABLE in read("backend/tests/test_tenant_audit.py") and f'"{lp.TABLE}")' in read("backend/tools/make_demo_tenant.py"))
+   and lp.TABLE in db._TENANT_PK and lp.TABLE in read("backend/tests/test_tenant_audit.py") and re.search(r'LIVE_TABLES = \([^)]*"' + lp.TABLE + '"', read("backend/tools/make_demo_tenant.py")) is not None)
+# NARROWED 17 Nov 2026 (best option step 3): the table is no longer the LAST of LIVE_TABLES (route_choice_record follows it)
 ok("8: the table is NOT among the no-data tables: a move changes what the plan shows, so the kept reads must refresh", lp.TABLE not in db.NO_DATA_TABLES)
 ok("8: the trips carry their booked day and their own driving / other minutes, for the page's own look at a drop",
    all("day" in b and "drive" in b and "other" in b for blk in C["days"][DAY] for r in blk["lorries"] for b in r["blocks"] if b["kind"] == "trip")
