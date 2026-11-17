@@ -547,6 +547,66 @@ ok("UI fix 10: the privacy footer's email link is an inline-block with 4 px abov
    "footer a{display:inline-block;padding:4px 0}" in _priv_raw
    and "@media (pointer:coarse){footer a{display:inline-flex;align-items:center;min-height:44px}}" in _priv_raw)
 
+# --- 17 Nov 2026 (claude/tools-landing-page): the Tools page, the menu's "Tools", the privacy notice's tool lines ----------
+_tools_raw = open(os.path.join(ROOT, "landing", "tools.html"), encoding="utf-8").read()
+_tools_flat = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", re.sub(r"<style.*?</style>", " ", _tools_raw, flags=re.S)))
+_tp = P()
+_tp.feed(_tools_raw)
+ok("tools.html: parses, one h1, a title of its own", "<h1>One job at a time. No contract.</h1>" in _tools_raw and _tp.title.startswith("Wayscope tools"))
+ok("tools.html: no script, no form, no cookie, no tracking", _tp.scripts == 0 and "<script" not in _tools_raw.lower()
+   and "<form" not in _tools_raw.lower() and "document.cookie" not in _tools_raw)
+ok("tools.html: the three tools, each linking to its page in the app, in card 1's order",
+   [h for h in _tp.hrefs if h.startswith("https://app.wayscope.co.uk/tools/")][-3:] ==
+   ["https://app.wayscope.co.uk/tools/calculators", "https://app.wayscope.co.uk/tools/abnormal-load",
+    "https://app.wayscope.co.uk/tools/route-check"]
+   and _tools_raw.count('class="tool"') == 3)
+ok("tools.html: card 1's words (Free, Free, By request; the evidence line; the ladder)",
+   all(w in _tools_flat for w in ("Haul calculators", "Abnormal load adviser", "Route check", "By request",
+       "The options compared, with the evidence behind each.", "A quick answer from a few figures. Free.",
+       "From one route to the whole plan", "Planning estimates from published data. The planner decides."))
+   and _tools_flat.count("Free") >= 3)
+ok("tools.html: no price, credit, VAT, sign-in, account or balance",
+   not re.search(r"credit|VAT|£|\$|price|sign in|log in|balance|account|from \d", _tools_flat, re.I))
+ok("tools.html: no 'safer', 'best', 'compliant' and none of the landing page's banned words",
+   not re.search(r"safer|best|compliant", _tools_flat, re.I)
+   and all(not re.search(pat, _tools_raw, re.I) for pat, _n in BANNED))
+ok("tools.html: its assets all exist in landing/assets",
+   all(os.path.exists(os.path.join(ASSETS, os.path.basename(s_))) for s_ in _tp.srcs if s_.startswith("./assets/")))
+ok("tools.html: the company line is the landing footer's, and the footer links the privacy notice",
+   "WAYSCOPE LTD. Registered in England and Wales, company no. 17531597. Registered office: 128 City Road, London EC1V 2NX." in _tools_flat
+   and 'href="./privacy.html"' in _tools_raw[_tools_raw.find("<footer"):])
+# the menu: every landing page that carries it keeps "Standards" and has "Tools" (privacy, thanks and error carry no menu)
+for _fn, _raw in (("index.html", _land_raw), ("tools.html", _tools_raw)):
+    _nav = _raw[_raw.find('<nav class="nav"'):_raw.find("</nav>")]
+    ok(f"{_fn}: the menu keeps Standards, gains Tools, has no Sign in",
+       ">Standards</a>" in _nav and ">Tools</a>" in _nav and 'href="./tools"' in _nav and not re.search("sign in", _nav, re.I))
+ok("the menu order is How it works, Readers, Standards, Tools, Request a demo (index.html)",
+   re.findall(r">([^<]+)</a>", _land_raw[_land_raw.find('<nav class="nav"'):_land_raw.find("</nav>")])[0:5]
+   == ["How it works", "Readers", "Standards", "Tools", "Request a demo"])
+ok("Render's static site serves /tools from landing/tools.html, as /privacy comes from privacy.html (read on live 17 Nov)",
+   os.path.exists(os.path.join(ROOT, "landing", "tools.html")) and os.path.exists(os.path.join(ROOT, "landing", "privacy.html")))
+ok("the other landing pages carry no menu to change", all('<nav class="nav"' not in open(os.path.join(ROOT, "landing", f), encoding="utf-8").read()
+   for f in ("privacy.html", "thanks.html", "error.html")))
+_priv_tools = _priv_raw[_priv_raw.find('<h2 id="tools">'):_priv_raw.find("<h2>The demo itself</h2>")]
+_pt = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", _priv_tools))
+ok("privacy notice: a tools section sits after the concerns section and before the demo itself",
+   _priv_raw.find('id="concerns"') < _priv_raw.find('<h2 id="tools">') < _priv_raw.find("<h2>The demo itself</h2>"))
+ok("privacy notice: the route check request's facts (typed places, lorry, loads, name, email, company, note, time; answer by email)",
+   all(w in _pt for w in ("where the load starts and ends", "the lorry", "the loads if you gave them", "your name, your email",
+       "your company and a note", "the date and time", "answer your request by email", "No account is made")))
+ok("privacy notice: the calculators' PDF facts (email, the unticked news box, which calculator, time; not the figures, answer or PDF)",
+   all(w in _pt for w in ("type your email address", "it starts unticked", "which calculator the PDF was for", "the date and time",
+       "We do not keep the figures, the answer or the PDF", 'replying "stop"')))
+ok("privacy notice: the adviser keeps nothing, the count is in memory only",
+   "keeps nothing about you" in _pt and "in memory only" in _pt)
+ok("privacy notice: no cookie and no tracking script on a tool; the scrambled address is not the address",
+   "none sets a cookie or runs a tracking script" in _pt and "It is not your address itself" in _pt)
+ok("privacy notice: the tools section adds no contact address, promise or period (the rights section above covers asking)", "mailto:" not in _priv_tools)
+ok("privacy notice: no retention period or legal basis is invented in the tools section",
+   not re.search(r"\d+ (months|days|years)|legitimate interest|consent of", _pt) and "no supplier" not in _pt.lower())
+ok("privacy notice: the older pinned sentences are still there (no tracking cookies; the one cookie)",
+   "This site sets no tracking cookies; the app sets one cookie that keeps you signed in." in _priv_raw)
+
 # --- the placeholders that still need the user's facts ---------------------------
 placeholders = sorted(set(re.findall(r"\[[A-Z][A-Z 0-9:,\-]+\]", body)))
 print("placeholders still on the page:", ", ".join(placeholders) or "none")

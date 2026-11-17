@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wayscope tools — one job at a time</title>
+<meta name="description" content="Free calculators and an abnormal load adviser for lorry movements, and a route check by request. Type what you know, see the answer. Planning estimates from published data.">
+<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="./assets/favicon.ico">
+<link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+<meta property="og:title" content="Wayscope tools — one job at a time">
+<meta property="og:description" content="Free calculators and an abnormal load adviser for lorry movements, and a route check by request.">
+<meta property="og:image" content="https://wayscope.co.uk/assets/og-image-1200x630.png">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Wayscope landing — the Tools page (17 Nov 2026). Same tokens and nav as index.html. A plain page: no script,
+     no tracking, no cookies. Served at /tools by Render's static site (the way /privacy serves privacy.html). */
+  :root{
+    --ink:#1F2024; --ink-2:#3D4552; --muted:#5B6470; --line:#E3E6EA; --line-2:#EEF0F2;
+    --paper:#FFFFFF; --stone:#F6F6F4;
+    --dark:#1F2024; --dark-2:#2A2C31; --dark-line:#3A3D44; --on-dark-2:#C9CED6; --on-dark-3:#9AA2AD;
+    --orange:#FF8C14; --orange-text:#B85600; --orange-tint:#FFF3E3; --ok:#047857; --ok-bg:#ecfdf5; --none-bg:#f1f5f9;
+    --sans:'IBM Plex Sans',system-ui,-apple-system,"Segoe UI",sans-serif;
+    --display:Sora,var(--sans);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--paper);line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  a:hover{color:var(--orange-text)}
+  :focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+  img{max-width:100%;display:block}
+  h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:-.02em;margin:0;line-height:1.12}
+  p{margin:0}
+  ul{margin:0;padding:0}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 32px}
+  @media (max-width:600px){.wrap{padding:0 20px}}
+  section{scroll-margin-top:12px}
+  .eyebrow{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--orange-text)}
+  .on-dark .eyebrow{color:var(--orange)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;border-radius:8px;padding:13px 22px;font-weight:600;font-size:15px;min-height:48px;border:1px solid transparent;font-family:inherit}
+  .btn-orange{background:var(--orange);color:var(--ink)}
+  .btn-orange:hover{background:#FF9A33;color:var(--ink)}
+  .btn-ghost{border-color:#FFFFFF;color:#fff;background:transparent}
+  .btn-ghost:hover{background:#fff;color:var(--ink)}
+  .on-dark{background:var(--dark);color:#fff}
+  .on-dark a:hover{color:var(--orange)}
+
+  .nav{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 24px;padding:22px 0}
+  .nav .brand{display:flex;align-items:center;text-decoration:none}
+  .nav .brand img{height:30px;width:auto}
+  .nav .links{display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px;font-size:15px}
+  .nav .links a{text-decoration:none;color:var(--on-dark-2)}
+  .nav .links a:hover{color:#fff}
+  .nav .links a[aria-current="page"]{color:#fff;border-bottom:2px solid var(--orange);padding-bottom:2px}
+  .nav .links .btn{padding:9px 16px;min-height:40px;font-size:14px;color:var(--ink)}
+  .nav .links .btn:hover{color:var(--ink)}
+  @media (max-width:720px){.nav .links .text-link{display:none}}
+
+  .hero{display:flex;flex-direction:column;gap:20px;padding-top:24px;padding-bottom:64px}
+  .hero h1{font-size:clamp(34px,5vw,52px);line-height:1.06;letter-spacing:-.03em;font-weight:700;max-width:760px}
+  .hero .lede{font-size:18px;line-height:1.6;color:var(--on-dark-2);max-width:640px}
+  .hero .ctas{display:flex;flex-wrap:wrap;gap:12px;padding-top:4px}
+  .hero .fine{font-size:13px;color:var(--on-dark-3)}
+
+  .band{padding-top:56px;padding-bottom:56px}
+  .tools{list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+  @media (max-width:860px){.tools{grid-template-columns:1fr}}
+  .tools li{display:flex}
+  .tool{flex:1;display:flex;flex-direction:column;text-decoration:none;border:1px solid var(--line);border-radius:12px;padding:22px 24px;background:var(--paper);min-width:0}
+  .tool:hover{border-color:var(--orange);color:var(--ink)}
+  .tool h2{font-size:21px;margin-bottom:8px}
+  .tool p{font-size:15.5px;line-height:1.6;color:var(--ink-2);flex:1;margin-bottom:16px}
+  .tool .ft{display:flex;align-items:center;justify-content:space-between;gap:8px;border-top:1px solid var(--line-2);padding-top:14px;font-size:14px}
+  .cr{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:var(--ok);background:var(--ok-bg);border-radius:999px;padding:3px 10px}
+  .cr::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+  .cr.ask{background:var(--none-bg);color:var(--ink-2)}
+  .go{font-weight:600;color:var(--ink)}
+
+  .ladder h2{font-size:clamp(24px,3vw,32px);margin-bottom:24px}
+  .steps{list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+  @media (max-width:760px){.steps{grid-template-columns:1fr}}
+  .steps li{border:1px solid var(--dark-line);border-radius:12px;padding:20px 22px;background:var(--dark-2)}
+  .steps b{display:block;font-family:var(--display);font-weight:600;font-size:17px;margin-bottom:6px}
+  .steps span{color:var(--on-dark-2);font-size:15px;line-height:1.55}
+
+  footer .wrap{padding:36px 32px 48px;font-size:13.5px;color:var(--on-dark-3);line-height:1.65;border-top:1px solid var(--dark-line);display:flex;flex-direction:column;gap:10px}
+  @media (max-width:600px){footer .wrap{padding:32px 20px 40px}}
+  footer .links{display:flex;flex-wrap:wrap;gap:6px 18px}
+  footer .links a{color:var(--on-dark-2);display:inline-block;padding:4px 0}
+  @media (pointer:coarse){footer .links a{display:inline-flex;align-items:center;min-height:44px}}
+</style>
+</head>
+<body>
+
+<header class="on-dark"><div class="wrap">
+  <nav class="nav" aria-label="Site">
+    <a class="brand" href="./"><img src="./assets/logo-header-on-dark.svg" alt="Wayscope" width="158" height="30"></a>
+    <div class="links">
+      <a class="text-link" href="./#overview">How it works</a>
+      <a class="text-link" href="./#readers">Readers</a>
+      <a class="text-link" href="./#standards">Standards</a>
+      <a href="./tools" aria-current="page">Tools</a>
+      <a class="btn btn-orange" href="./#demo">Request a demo</a>
+    </div>
+  </nav>
+  <div class="hero">
+    <p class="eyebrow">Wayscope tools</p>
+    <h1>One job at a time. No contract.</h1>
+    <p class="lede">The checks and documents a logistics plan asks for, taken from the Wayscope platform and opened up one by one. Type what you know, see the answer, download the evidence.</p>
+    <div class="ctas">
+      <a class="btn btn-orange" href="https://app.wayscope.co.uk/tools/abnormal-load">Check a load</a>
+      <a class="btn btn-ghost" href="#tools">See the tools</a>
+    </div>
+    <p class="fine">Planning estimates from published data. The planner decides.</p>
+  </div>
+</div></header>
+
+<main>
+  <section id="tools" class="wrap band" aria-label="The tools">
+    <ul class="tools">
+      <li><a class="tool" href="https://app.wayscope.co.uk/tools/calculators">
+        <h2>Haul calculators</h2>
+        <p>Lorries needed, haul carbon and fuel surcharge, each from a handful of figures.</p>
+        <span class="ft"><span class="cr">Free</span><span class="go">Open →</span></span>
+      </a></li>
+      <li><a class="tool" href="https://app.wayscope.co.uk/tools/abnormal-load">
+        <h2>Abnormal load adviser</h2>
+        <p>Which class a load moves under, who must be told, and the last day to tell them.</p>
+        <span class="ft"><span class="cr">Free</span><span class="go">Open →</span></span>
+      </a></li>
+      <li><a class="tool" href="https://app.wayscope.co.uk/tools/route-check">
+        <h2>Route check</h2>
+        <p>Which road should the lorries take? The options compared, with the evidence behind each.</p>
+        <span class="ft"><span class="cr ask">By request</span><span class="go">Ask →</span></span>
+      </a></li>
+    </ul>
+  </section>
+
+  <section class="on-dark ladder" aria-label="From one route to the whole plan"><div class="wrap band">
+    <h2>From one route to the whole plan</h2>
+    <ul class="steps">
+      <li><b>A calculator</b><span>A quick answer from a few figures. Free.</span></li>
+      <li><b>A tool</b><span>One route or one load, checked and written up.</span></li>
+      <li><b>The platform</b><span>Every route, every team and every week in one plan.</span></li>
+    </ul>
+  </div></section>
+</main>
+
+<footer class="on-dark">
+  <div class="wrap">
+    <div class="links"><a href="mailto:JDavis@wayscope.co.uk">JDavis@wayscope.co.uk</a><a href="./privacy.html">Privacy</a></div>
+    <p>WAYSCOPE LTD. Registered in England and Wales, company no. 17531597. Registered office: 128 City Road, London EC1V 2NX.</p>
+  </div>
+</footer>
+
+</body>
+</html>
