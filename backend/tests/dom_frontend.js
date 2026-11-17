@@ -2650,6 +2650,12 @@ async function routesDriversDom(){
   const E = w.React.createElement;
   act(() => { root.render(E("table", null, E("tbody", null, E(w.RouteAnalysis, { routeId: "R1", colSpan: 9, token: "t" })))); });
   await settle(150);
+  // NARROWED 16 Nov 2026 (step 1b, John's yes to the third draft, Q6): the options table is folded under "All figures"
+  // each time a row opens (the best option card above it); open the fold, then read the table as before
+  ok("ROUTES DOM: the options table opens folded, with an 'All figures' button (the best-option read never answers here)",
+     !host.querySelector("td[data-trips-limit]") && !!host.querySelector("button[data-bo-all]"));
+  act(() => { host.querySelector("button[data-bo-all]").dispatchEvent(new w.MouseEvent("click", { bubbles: true })); });
+  await settle(50);
   const cells = [...host.querySelectorAll("td[data-trips-limit]")];
   ok("⭐ ROUTES DOM: one Trips/day cell a row, each carrying its limit", cells.length === 3
      && cells.map(c => c.getAttribute("data-trips-limit")).join() === "breaks,shift,none", String(cells.length));
