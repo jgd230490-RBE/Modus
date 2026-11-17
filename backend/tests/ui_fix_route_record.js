@@ -142,6 +142,14 @@ const FULL = { rows: [R013, R014], totals: { planned: TOT, so_far: Z() }, divers
        JSON.stringify(cols) === JSON.stringify(["Alt 2: 25Main route: 51", "Alt 1: 53Old main route: 49"])
        && !m.host.querySelector("[data-rc-collisions] .rc-more, [data-rc-collisions] .row-st") && !cols.join("").includes("%")
        && t.includes("Collisions, 2021–2025"), cols.join(" | "));
+    // John, 17 Nov 2026 ("Yes, build both", q1q2 mockup Q1): Collisions sits right after Loads, so at a 1150 px window
+    // the sideways scroll never hides it (bends the third draft, where it was the last column)
+    const heads = [...m.host.querySelectorAll("[data-rc-table] thead th")].map(h => h.textContent.trim());
+    ok("⭐ Q1: the head reads Choice, Loads, Collisions, then the figures",
+       heads[0] === "Choice" && heads[1] === "Loads" && heads[2].startsWith("Collisions, 2021–2025"), heads.join(" | "));
+    ok("⭐ Q1: in every row the collisions cell comes straight after the loads cell",
+       [r13, r14].every(r => { const loads = r && r.querySelector("tr td.num"); return loads && loads.nextElementSibling
+         && loads.nextElementSibling.hasAttribute("data-rc-collisions"); }));
     ok("⭐ the head: 'Planned, not measured', the picture icons and the Spreadsheet button",
        t.includes("Planned, not measured") && m.host.querySelector("[data-chart-tools]") && m.host.querySelector("[data-rc-sheet]"));
     ok("⭐ the diversions line under the table", t.includes("13 routes are on a dated diversion: a closure, not a choice, so not counted here."));
@@ -184,6 +192,18 @@ const FULL = { rows: [R013, R014], totals: { planned: TOT, so_far: Z() }, divers
     ok("⭐ ...the cards in the draft's words", t.includes("R013 · Alt 2, 16:00–19:00") && t.includes("35 loads planned: 223 kg less, 1.0 h less, 177 more left turns")
        && t.includes("R014 · Alt 1 the main route") && t.includes("1,389 loads planned: 11.4 t less, 55.6 h more, 6,945 fewer left turns"), t);
     ok("...the short tile name on a phone", (m.host.querySelector('[data-rc-tile="eur"] .rc-tk') || {}).textContent === "Fair cost");
+    m.done();
+  }
+  // ---- a phone card with a figure that does not change (John, 17 Nov 2026, q1q2 mockup Q2): the card names it ----
+  {
+    const same = Object.assign({}, R014, { planned: Object.assign({}, R014.planned, { min: 0 }) });
+    const sameKg = Object.assign({}, R013, { planned: Object.assign({}, R013.planned, { kg: 0, left_turns: 0 }) });
+    const m = await mount({ rows: [sameKg, same], totals: { planned: TOT, so_far: Z() }, diversions: 0, collision_period: null, day: "2026-11-17" }, { phone: true });
+    const t = m.text();
+    ok("⭐ Q2: a phone card says WHAT is the same: 'lorry time the same', never 'the same' alone",
+       t.includes("1,389 loads planned: 11.4 t less, lorry time the same, 6,945 fewer left turns"), t);
+    ok("⭐ Q2: ...'carbon the same' and 'left turns the same' too; a changed figure reads as before",
+       t.includes("35 loads planned: carbon the same, 1.0 h less, left turns the same"), t);
     m.done();
   }
   console.log(`ui_fix_route_record.js: ${pass} passed, ${fail.length} failed`);

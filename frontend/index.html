@@ -8711,7 +8711,7 @@ function RouteChoicesRecord({ phone }){
             {tile("eur", "eur", phone ? "Fair cost" : "Fair cost (model)", phone ? null : "planned")}
           </div>
           {phone ? rows.map(r => { const p = r.planned;
-              const bits = [["kg", "kg", ""], ["min", "min", ""], ["left_turns", "count", " left turns"]].map(([k, kind, l]) => { const [t, more] = rcWord(p[k], kind); return { t: t + (t === "the same" || t === "—" ? "" : l), more }; });
+              const bits = [["kg", "kg", "", "carbon"], ["min", "min", "", "lorry time"], ["left_turns", "count", " left turns", "left turns"]].map(([k, kind, l, name]) => { const [t, more] = rcWord(p[k], kind); return { t: t === "the same" ? `${name} the same` : t + (t === "—" ? "" : l), more }; });
               return <div key={r.id} className="rc-pcard" data-rc-pcard={r.id}><b>{rcChoice(r, true)}</b>{r.status === "ended" && <span className="rc-end">Ended: {r.ended_words}</span>}
                 <div>{grp(Math.round(p.trips))} loads planned: {bits.map((b, i) => <React.Fragment key={i}>{i ? ", " : ""}<span className={b.more ? "rc-more" : ""}>{b.t}</span></React.Fragment>)}</div></div>; })
           : <>
@@ -8719,17 +8719,18 @@ function RouteChoicesRecord({ phone }){
           <div className="overflow-x-auto kb-scroll" tabIndex={0} role="region" aria-label="Route choices">
             <table className="tbl rc-table" data-rc-table="1">
               <caption className="sr-only">Route choices: a trip, planned and so far, against the line before</caption>
-              <thead><tr><th scope="col">Choice</th><th scope="col" className="num">Loads</th><th scope="col"><span className="sr-only">Figures</span></th>
+              <thead><tr><th scope="col">Choice</th><th scope="col" className="num">Loads</th><th scope="col" className="rc-colh">Collisions{d.collision_period ? `, ${d.collision_period}` : ""}<InfoTip id="dash.rc.collisions" /></th><th scope="col"><span className="sr-only">Figures</span></th>
                 {RC_COLS.map(([k, , l]) => <th key={k} scope="col" className="num">{l}</th>)}
-                <th scope="col" className="rc-colh">Collisions{d.collision_period ? `, ${d.collision_period}` : ""}<InfoTip id="dash.rc.collisions" /></th></tr></thead>
+                </tr></thead>
               {rows.map(r => { const p = r.planned, s = r.so_far, c = r.collisions || {};
                 const cells = (f, scale) => RC_COLS.map(([k, kind]) => <RcCell key={k} v={f && f[k]} kind={kind} scale={scale} missing={!f || (k === "eur" && f.eur_missing)} />);
                 return <tbody key={r.id} className={r.status === "ended" ? "rc-ended" : ""} data-rc-row={r.id}>
                   <tr><td rowSpan={3} className="rc-ch"><b>{rcChoice(r)}</b><small>{r.from} → {r.to}</small><small>{rcWhen(r)} · {rcLorry(r)}</small>
                       {r.status === "ended" && <span className="rc-end" data-rc-ended={r.ended_why}>Ended: {r.ended_words}</span>}</td>
                     <td rowSpan={3} className="num">{r.kind === "busy" ? `${grp(Math.round(p.trips))} of ${grp(Math.round(p.of))}` : grp(Math.round(p.trips))}</td>
+                    <td rowSpan={3} className="rc-col" data-rc-collisions="1">{c.after == null && c.before == null ? "—" : <>{c.after_label}: {c.after == null ? "—" : c.after}<br />{c.before_label}: {c.before == null ? "—" : c.before}</>}</td>
                     <td className="rc-k">A trip</td>{cells(r.per_trip, "trip")}
-                    <td rowSpan={3} className="rc-col" data-rc-collisions="1">{c.after == null && c.before == null ? "—" : <>{c.after_label}: {c.after == null ? "—" : c.after}<br />{c.before_label}: {c.before == null ? "—" : c.before}</>}</td></tr>
+                    </tr>
                   <tr><td className="rc-k">Planned</td>{cells(p)}</tr>
                   <tr><td className="rc-k">So far</td>{s.trips > 0 ? cells(s) : <td colSpan={RC_COLS.length} className="rc-none" data-rc-none="1">No loads recorded yet</td>}</tr>
                 </tbody>; })}
