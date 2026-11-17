@@ -74,8 +74,8 @@
     }
     var body = {
       width_m: val("width_m"), length_m: val("length_m"), height_m: val("height_m"), gross_t: val("gross_t"),
-      max_axle_t: val("max_axle_t"), axle_count: val("axle_count"), date: val("date"), band: val("band") || "day",
-      where: val("where") || "england-and-wales", axle_spacings_m: val("axle_spacings_m"),
+      max_axle_t: val("max_axle_t"), axle_count: val("axle_count"), date: val("date"),
+      axle_spacings_m: val("axle_spacings_m"),
       indivisible: !!(form.elements.indivisible && form.elements.indivisible.checked), website: val("website")
     };
     var mine = ++asked;

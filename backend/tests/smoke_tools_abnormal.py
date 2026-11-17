@@ -89,7 +89,7 @@ MOVE = (tools_abnormal.london_today() + datetime.timedelta(days=30))
 if MOVE > tools_abnormal.last_moving_day():          # after 2028 the shipped holidays end: the refusal is the answer
     MOVE = None
 BODY = dict(width_m="4.2", length_m="27", height_m="4.6", gross_t="76", max_axle_t="11", axle_count="7",
-            date=MOVE.isoformat() if MOVE else "", band="day", where="england-and-wales", axle_spacings_m="",
+            date=MOVE.isoformat() if MOVE else "", axle_spacings_m="",          # as the page sends it (Q1: no where, no band)
             indivisible=True, website="")
 HDR = {"X-Forwarded-For": "203.0.113.50", "Content-Type": "application/json"}
 

@@ -89,6 +89,9 @@ CARD3 = {
     "last": ("Advice from the typed figures, not permission. The haulier, ESDAL, the police and the road and bridge "
              "authorities decide. Bridges and structures are not checked here."),
 }
+# Q2 (17 Nov, the session's recommendation; John's yes OUTSTANDING): the built last line adds "overhangs" (the form asks
+# none); card 3's own line is kept above as drawn and the built one is card 3's with that one word added
+BUILT_LAST = CARD3["last"].replace("Bridges and structures are", "Bridges, structures and overhangs are")
 P = T.answer(WORKED, today=TODAY)["page"]
 ok("⭐ card 3: the class", P["head"] == CARD3["head"], P["head"])
 ok("⭐ card 3: the chip", P["chips"] == CARD3["chips"], str(P["chips"]))
@@ -99,7 +102,8 @@ for i, (k, v) in enumerate(CARD3["rows"]):
     ok(f"card 3 row {i + 1} {k}", i < len(P["rows"]) and P["rows"][i] == [k, v], str(P["rows"][i:i + 1]))
 ok("⭐ card 3: the spacing line", P["fine"] == CARD3["fine"], str(P["fine"]))
 ok("⭐ card 3: the next strip", P["next"] == CARD3["next"])
-ok("⭐ card 3: the last line", P["last"] == CARD3["last"] == T.LAST_LINE)
+ok("⭐ card 3: the last line, with Q2's 'overhangs' and nothing else changed",
+   P["last"] == BUILT_LAST == T.LAST_LINE and BUILT_LAST != CARD3["last"], P["last"])
 # the drawing's notes file, where this laptop has it (not in git; CI skips this one check)
 _card = Path(r"C:\Users\Laptop\Wayscope\notes\tools-first-opening-mockup-1116\index.html")
 if _card.is_file():
@@ -359,11 +363,15 @@ REF = [
     ("date 31 Feb", W(date="2026-02-31"), "Pick the day it moves."),
     ("yesterday", W(date="2026-11-16"), "Pick a moving day from today on."),
     ("2029", W(date="2029-01-04"), "Pick a moving day up to 31 December 2028: the bank holidays held here end then."),
-    ("where blank", W(where=""), "Pick England and Wales, or Scotland."),
+    ("where unknown", W(where="france"), "Pick England and Wales, or Scotland."),
     ("where wales", W(where="wales"), "Pick England and Wales, or Scotland."),
     ("band dusk", W(band="dusk"), "Pick by day or by night."),
     ("not a dict", [], "Type the width in metres."),
 ]
+# Q1: the page sends no "Where" and no band; left out (or blank) they read as England and Wales, by day
+_nowb = {k: v for k, v in W().items() if k not in ("where", "band")}
+ok("⭐ Q1: no 'Where' and no band sent: the same answer as England and Wales by day",
+   T.answer(_nowb, today=TODAY)["page"] == P and T.answer(W(where=""), today=TODAY)["page"] == P)
 for label, body, say in REF:
     got = refused(body)
     ok(f"refusal: {label} -> \"{say}\"", got == say, str(got))
@@ -413,14 +421,14 @@ for words in ('<p class="eyebrow">Abnormal load adviser</p>',
               "<h2>Check a load</h2>"):
     ok(f"card 3 words on the page: {re.sub('<[^>]+>', '', words)}", words in HTML)
 _labels = re.findall(r'<(?:label|div) class="(?:f(?: w)?|tick w)">([^<]+)<', HTML)
-ok("⭐ the boxes in card 3's order, with card 3's labels",
-   _labels == ["Width", "Length", "Height", "Gross weight", "Heaviest axle", "Axles", "Moving on", "Where",
+ok("⭐ the boxes in card 3's order, with card 3's labels, less Q1's 'Where'",
+   _labels == ["Width", "Length", "Height", "Gross weight", "Heaviest axle", "Axles", "Moving on",
                "Axle spacings, if you have them"], str(_labels))
 ok("the tick, ticked at the start as card 3 draws it", '<label class="tick w"><input type="checkbox" name="indivisible" checked>'
    "The load cannot be divided</label>" in HTML)
-ok("Where: England and Wales first, then Scotland; by day first, then by night",
-   re.search(r'name="where"><option value="england-and-wales">England and Wales</option><option value="scotland">Scotland</option>', HTML)
-   and re.search(r'<option value="day">by day</option><option value="night">by night</option>', HTML))
+ok("Q1: no 'Where' box and no 'by day / by night' box (they change nothing on this form); 'Moving on' is a date alone",
+   'name="where"' not in HTML and 'name="band"' not in HTML and "by night" not in HTML
+   and '<label class="f">Moving on<input type="date" name="date" required></label>' in HTML)
 ok("🔴 no documents button, no 'Add a route', no balance, no price on the page",
    not re.search(r"document|Add a route|balance|£|credit|PDF", HTML, re.I))
 ok("the trap box and the sentence box", 'name="website" tabindex="-1"' in HTML and '<p class="say" role="status"></p>' in HTML)
@@ -431,7 +439,8 @@ ok("🔴 the script writes the answer as text only (no innerHTML, no eval)", not
 ok("🔴 the script keeps nothing (no storage, no cookie)", not re.search(r"localStorage|sessionStorage|document\.cookie|indexedDB", JS))
 ok("the script asks the one open call through the shared caller", 'WaysTools.call("/api/tools/abnormal-load", body, sayBox)' in JS)
 ok("the script sends every box the module reads", all(f"{k}:" in JS for k in ("width_m", "length_m", "height_m", "gross_t", "max_axle_t",
-   "axle_count", "date", "band", "where", "axle_spacings_m", "indivisible", "website")))
+   "axle_count", "date", "axle_spacings_m", "indivisible", "website"))
+   and "band:" not in JS and "where:" not in JS)
 ok("'See the platform' goes to the landing site", 'a.href = "https://wayscope.co.uk/";' in JS and '"See the platform"' in JS)
 ok("the page's script is served beside its page only", tools_public.page_file("abnormal-load.js") is not None
    and tools_public.page_file("abnormal-load.js")[1].startswith("text/javascript")

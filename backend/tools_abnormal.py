@@ -72,7 +72,7 @@ BOUND_SAY = {
 
 #: the fixed lines of the answer
 LAST_LINE = ("Advice from the typed figures, not permission. The haulier, ESDAL, the police and the road and bridge "
-             "authorities decide. Bridges and structures are not checked here.")
+             "authorities decide. Bridges, structures and overhangs are not checked here.")
 SPACINGS_NOT_TYPED = "Axle spacings not typed: the limits for closely spaced axles are not tested."
 NEXT_WORDS = ("More than one load?", "Keep each load and its notices in one plan.")
 
@@ -185,7 +185,9 @@ def read_form(body, today=None):
     last = last_moving_day()
     if d > last:
         raise Bad(f"Pick a moving day up to {_long(last)}: the bank holidays held here end then.")
-    nation = body.get("where")
+    # Q1 (17 Nov, the session's recommendation; John's yes OUTSTANDING): the page sends no "Where" and no time band,
+    # because on this form neither changes an answer; a caller may still send them, read as before
+    nation = body.get("where") or "england-and-wales"
     if nation not in NATIONS:
         raise Bad(SAY["where"])
     band = body.get("band") or "day"
