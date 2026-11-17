@@ -627,6 +627,54 @@ ok("🔴 B2: the empty form carries the cue, and the script shows it only while 
    '<p class="note" id="adv-hint">The answer appears when the boxes are filled.</p>' in HTML
    and "if (hint) hint.hidden = !missing.length;" in JS and 'document.getElementById("adv-hint")' in JS)
 
+# 17 Nov 2026 (claude/tools-date-counted; John's yes to the frontier check's Idea 2): "How the date was counted"
+def _ds(**kw):
+    return T.answer(W(**kw), today=TODAY)["page"]["date_steps"]
+
+
+ok("⭐ the card's load moving Thu 10 Dec: the two clear days and the day before them", _ds(date="2026-12-10") == [
+    "The load moves on Thu 10 Dec.", "Two clear working days before it: Wed 9 Dec and Tue 8 Dec.",
+    "The notice must arrive by the day before them: Mon 7 Dec."], str(_ds(date="2026-12-10")))
+ok("⭐ moving Tue 29 Dec: Christmas, the weekend and Boxing Day's Monday are named as not counted", _ds(date="2026-12-29") == [
+    "The load moves on Tue 29 Dec.",
+    "Two clear working days before it: Thu 24 Dec and Wed 23 Dec. Not counted: Mon 28 Dec (Boxing Day), Sun 27 Dec, Sat 26 Dec, Fri 25 Dec (Christmas Day).",
+    "The notice must arrive by the day before them: Tue 22 Dec."], str(_ds(date="2026-12-29")))
+ok("⭐🔴 moving Wed 18 Nov: the last day is a Sunday and the line names the Friday before (Q2)", _ds(date="2026-11-18")[2]
+   == "The notice must arrive by the day before them: Sun 15 Nov. That is a Sunday: a notice sent by Fri 13 Nov arrives in time.",
+   str(_ds(date="2026-11-18")))
+_cu = dict(width_m=3.2, length_m=12, height_m=3.5, gross_t=30, max_axle_t=8, axle_count=4, cu_vehicle=True)
+ok("⭐ an ordinary lorry in Scotland moving Tue 5 Jan 2027: a Saturday counts, the Scottish holidays do not",
+   _ds(date="2027-01-05", where="scotland", **_cu) == [
+       "The load moves on Tue 5 Jan.",
+       "Two clear working days before it: Sat 2 Jan and Thu 31 Dec. Not counted: Mon 4 Jan (2nd January), Sun 3 Jan, Fri 1 Jan (New Year's Day).",
+       "The notice must arrive by the day before them: Wed 30 Dec."], str(_ds(date="2027-01-05", where="scotland", **_cu)))
+ok("🔴 the same load in England: the last day is New Year's Day, called a bank holiday, with the working day before it",
+   _ds(date="2027-01-05", **_cu)[2] == "The notice must arrive by the day before them: Fri 1 Jan. That is a bank holiday: "
+   "a notice sent by Thu 31 Dec arrives in time.", str(_ds(date="2027-01-05", **_cu)))
+ok("an ordinary load with no notice has no fold", _ds(width_m=2.5, length_m=16, height_m=4.0, gross_t=40, max_axle_t=8, axle_count=6, date="2026-12-10") == [])
+_heavy = _ds(width_m=3.0, length_m=20, height_m=4.0, gross_t=90, max_axle_t=14, axle_count=8, date="2026-12-10")
+ok("where one notice is longer than the other the fold counts the longer and says whose it is", len(_heavy) == 3
+   and ("for the road and bridge authorities" in _heavy[1] or "for the police" in _heavy[1]) and _heavy[1].startswith("Five clear working days"), str(_heavy))
+_missing, _wrong, _n17 = [], [], 0
+for _day in (TODAY + datetime.timedelta(days=k) for k in range(1, 420, 3)):
+    for _kw in (dict(), dict(_cu), dict(_cu, where="scotland"), dict(width_m=3.0, length_m=20, height_m=4.0, gross_t=90, max_axle_t=14, axle_count=8),
+                dict(width_m=2.5, length_m=28, height_m=4.0, gross_t=40, max_axle_t=9, axle_count=5)):
+        _r = T.answer(W(date=_day.isoformat(), **_kw), today=TODAY)
+        _nb = _r["advice"]["notify_by"]
+        _st = _r["page"]["date_steps"]
+        _n17 += 1
+        if _nb and len(_st) != 3:
+            _missing.append((_day.isoformat(), _kw))
+        elif _nb and f"day before them: {T._dm(R._date(_nb))}." not in _st[2]:
+            _wrong.append((_day.isoformat(), _st[2], _nb))
+ok(f"🔴 over {_n17} answers: wherever the rules give a notice date the fold has its three steps, ending on the rules' own date",
+   not _missing and not _wrong and _n17 > 600, f"{_missing[:2]} {_wrong[:2]}")
+ok("the module walks the days with the rules' own calendar and never changes the date", "R.is_working_day(dday, cal, hol)" in read("backend/tools_abnormal.py")
+   and "if by != nb:" in read("backend/tools_abnormal.py"))
+ok("🔴 the script draws the fold as text under the answer's first line, closed at first, and keeps it as the person left it",
+   'el("summary", null, "How the date was counted")' in JS and "how.open = howOpen;" in JS and "var howOpen = false;" in JS
+   and "p.date_steps.forEach" in JS and "innerHTML" not in JS and ".res .how summary" in read("frontend/tools/tools.css"))
+
 print()
 for f in FAIL:
     print("  FAIL:", f)

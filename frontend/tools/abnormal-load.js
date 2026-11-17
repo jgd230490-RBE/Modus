@@ -10,6 +10,7 @@
   var sayBox = form.querySelector(".say");
   var hint = document.getElementById("adv-hint");
   var NEEDED = ["width_m", "length_m", "height_m", "gross_t", "max_axle_t", "axle_count", "date"];
+  var howOpen = false;
   var timer = null;
   var asked = 0;
 
@@ -34,6 +35,16 @@
     big.appendChild(head);
     (p.chips || []).forEach(function (c) { big.appendChild(el("span", "chip " + c[0], c[1])); });
     res.appendChild(big);
+    if (p.date_steps && p.date_steps.length) {          // "How the date was counted": the server's own three steps
+      var how = el("details", "how");
+      how.open = howOpen;                              // it stays open or closed as the person left it
+      how.appendChild(el("summary", null, "How the date was counted"));
+      var ol = el("ol");
+      p.date_steps.forEach(function (s) { ol.appendChild(el("li", null, s)); });
+      how.appendChild(ol);
+      how.addEventListener("toggle", function () { howOpen = how.open; });
+      res.appendChild(how);
+    }
     if (p.over && p.over.length) {
       var o = el("p", "note", "Over the normal limits: " + p.over.join(", ") + ".");
       o.style.margin = "0";
