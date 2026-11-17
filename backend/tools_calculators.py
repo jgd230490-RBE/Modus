@@ -343,7 +343,8 @@ def email_ok(email):
 
 def keep_email(which, email, news, ip=""):
     """Keep the address with this download in the one store (tools_leads, owned by the route check request branch)."""
-    tools_leads.keep("calculator-pdf", str(email).strip(), news=bool(news), details={"calculator": which}, ip=ip)
+    tools_leads.keep("calculator-pdf", str(email).strip(), news=bool(news), details={"calculator": which}, ip=ip,
+                     status=tools_leads.STATUS_KEPT)      # nothing is sent for a download, so the row never waits
     return True
 
 
