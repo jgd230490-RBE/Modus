@@ -31,8 +31,13 @@ const fnSrc = (name) => { const a = html.indexOf("function " + name + "("); if (
 const ra = fnSrc("RouteAnalysis");
 ok("⭐ SRC Q3: the open route's panel shows the card's frame while it reads (it said 'Loading analysis…' over an empty half panel)",
    ra.includes("{!data && !err && <BestOption best={null} frame routeId={routeId} />}") && !ra.includes(">Loading analysis…</p>"));
-ok("⭐ SRC Q3: the wait says how long: 'Working out the best option… about half a minute after a change.' (25 words or fewer)",
-   html.includes('const BO_WAIT = "Working out the best option… about half a minute after a change.";'));
+// REVERSED 17 Nov 2026 (claude/best-option-wait-line; John: "Yes, drop it"): the line no longer says how long. Since the
+// card answers its own route first (PR #317) the wait after a change is a few seconds on live, so "about half a minute
+// after a change" was no longer true. It read: the wait says how long.
+ok("⭐ SRC Q3: the wait line is 'Working out the best option…' and no longer says 'half a minute' (the screen and the guide)",
+   html.includes('const BO_WAIT = "Working out the best option…";') && !/BO_WAIT = "[^"]*half a minute/.test(html)
+   && !read("frontend", "help", "index.html").includes("half a minute")
+   && read("frontend", "help", "index.html").includes("After a change the card takes a few seconds to work out again."));
 ok("⭐ SRC Q2: the press is ONE request with every leg it moves, and its reply's answer goes to the open panel",
    html.includes('legs: legs.join(",") });') && !html.includes("for(const lg of (card ? card.legs")
    && html.includes("setPromoted({ route: rid, text: said, best: j.best || null });")
@@ -119,8 +124,9 @@ function answer(o){
 {
   const m = mountCard(null, { frame: true });
   const wait = m.host.querySelector("[data-bo-wait]");
-  ok("⭐ Q3: the frame names the card and says how long ('Best option', the wait words)",
-     txt(m.host).startsWith("Best option") && txt(wait) === "Working out the best option… about half a minute after a change.", txt(m.host));
+  // REVERSED 17 Nov 2026 (claude/best-option-wait-line): the wait words alone, no time
+  ok("⭐ Q3: the frame names the card and shows the wait words ('Best option', 'Working out the best option…')",
+     txt(m.host).startsWith("Best option") && txt(wait) === "Working out the best option…", txt(m.host));
   ok("⭐ Q3: the frame has no 'All figures' button (nothing to fold yet)", !m.host.querySelector("button[data-bo-all]"));
   m.done();
   const m2 = mountCard(null);
