@@ -791,6 +791,60 @@ ok("9 XLSX: Contents and About say sections A to F are counts only and the Summa
    in str(WB["Contents"]["A5"].value) and any("The Summary sheet gives one suggestion a route" in str(a) for a in _A), str(_A))
 ok("9 guide: one sentence on the summary page (S7)", "The file opens on a summary page a route" in GUIDE)
 
+# --------------------------------------------------------------------------- #
+#  9b. Two lines added at John's yes in this branch's chat (17 Nov 2026,       #
+#      "Yes, both"): the in-use line's own limits, the card's sentence; and    #
+#      why the summary's collision count can differ from section C's           #
+# --------------------------------------------------------------------------- #
+_L75 = {"words": "Weight limit 7.5 t", "short": "7.5 t limit", "legs": "both"}
+FRONT = open(os.path.join(os.path.dirname(BACKEND), "frontend", "index.html"), encoding="utf-8").read()
+ok("9b: the in-use limit in the card's sentence word for word (frontend boInUseLimit, from `short`)",
+   RR.in_use_limit_words(_L75, True) == "The diversion in use meets a 7.5 t limit below this lorry."
+   and RR.in_use_limit_words(dict(_L75, legs="loaded"), False) == "The route in use meets a 7.5 t limit below this lorry (loaded leg)."
+   and RR.in_use_limit_words(dict(_L75, short=None, legs="return"), False)
+   == "The route in use meets a limit below this lorry: Weight limit 7.5 t (return leg).")
+ok("9b: the card says the same sentence (so the two agree)", "in use meets a`;" in FRONT
+   and "${what} ${L.short} below this lorry${leg}." in FRONT and "${what} limit below this lorry: ${L.words}${leg}." in FRONT)
+_r9b = {"answer": "Keep the route in use", "why": "x", "checks": {}, "options": [], "counts_in_use": None,
+        "in_use": {"pair": [2, 2], "loaded": {"alt": 2, "label": "Alt 2", "until": "2027-12-17"},
+                   "return": {"alt": 2, "label": "Alt 2", "until": "2027-12-17"}},
+        "in_use_limits": [dict(_L75, kind="weight", except_for_access=False)]}
+route_best.evaluate = lambda rid, ctx: _r9b
+_B9b = RA.best("R1", route_best.Context(day=date(2026, 11, 9)), conversions.load_factors())
+route_best.evaluate = _real_eval
+ok("9b: best() carries the rule's in_use_limits (words, short, legs) and whether the line in use is a diversion",
+   _B9b.get("in_use_limits") == [_L75] and _B9b.get("in_use_diversion") is True, str(_B9b)[:400])
+ok("9b: gather on the scratch DB: a list (none held here) and the main route is no diversion",
+   _b9.get("in_use_limits") == [] and _b9.get("in_use_diversion") is False, str(_b9.get("in_use_limits")))
+_doc9b = RR.Doc(D)
+_doc9b.landscape_page([])
+_ok_w = RR._w(RR.SUM_COUNT_NOTE, _doc9b.R, 6.4) <= _doc9b.cw - 74
+ok("9b: the collision-count line: one line on the page, under 30 words, the words John saw",
+   RR.SUM_COUNT_NOTE == ("Collisions here are counted on this lorry's own lines, out and back. Section C counts each "
+                         "option's lines for every lorry type, as at the last fetch.")
+   and len(RR.SUM_COUNT_NOTE.split()) <= 30 and _ok_w)
+ok("9b source: the line is TRUE of both counts: the rule counts the lorry's own lines now, section C the option "
+   "number's stored distances (change either and this pin asks for the sentence again)",
+   "col = count_on_lines(ctx.records.get(rid, ()), legs)" in open(os.path.join(BACKEND, "route_best.py"), encoding="utf-8").read()
+   and 'legs = [lines.get((lorry, "loaded", la))]' in open(os.path.join(BACKEND, "route_best.py"), encoding="utf-8").read()
+   and 'on = [c for c in near if c["routes"][key] <= ON_ROUTE_M]' in open(os.path.join(BACKEND, "collisions.py"), encoding="utf-8").read())
+if TX:
+    _tl, _ = _page(dict(KEEP, in_use_limits=[_L75], in_use_diversion=True))
+    ok("9b page: the in-use limit line prints (Keep, a diversion in use)",
+       "The diversion in use meets a 7.5 t limit below this lorry." in _tl, _tl[:700])
+    ok("9b page: no line where the rule holds none", "in use meets a" not in _tk, _tk[:500])
+    for _lab, _t in (("Suggested", _ts), ("trade-off", _tt), ("Keep", _tk), ("error", _te)):
+        if _lab == "error":
+            ok("9b page: no count line on a page with no figures", RR.SUM_COUNT_NOTE[:40] not in _t)
+        else:
+            ok(f"9b page ({_lab}): the count line prints under How to read, the summary's label still 'on the road'",
+               RR.SUM_COUNT_NOTE in _t and _t.index("How to read this page") < _t.index(RR.SUM_COUNT_NOTE)
+               and "Collisions on the road" in _t, _t[-700:])
+    _full = " ".join((pdf_text(PDF, "") or "").split())
+    ok("9b: section C's own label still reads 'on the route' in the same file", "collisions on the route" in _full.lower())
+ok("9b XLSX: the Summary sheet says it too (A3), its column still 'Collisions on the road'",
+   WB["Summary"]["A3"].value == RR.SUM_COUNT_NOTE and _S[3][5] == "Collisions on the road")
+
 remove_scratch_db(db, TMP)
 print(f"\n{PASS} passed, {len(FAIL)} failed")
 for f in FAIL:

@@ -578,8 +578,14 @@ def best(rid, ctx, factors):
            "history": (r.get("checks") or {}).get("collision_history"),
            "counted": bool((r.get("checks") or {}).get("community_all_options")),
            "period": getattr(ctx, "period", "") or "", "in_use_words": None, "cols": []}
+    # the limits below the lorry that the line in use ITSELF meets (the rule's `in_use_limits`, reported only: the answer
+    # does not change for them); the page says them as the card does, the file keeping the limit's long words
+    out["in_use_limits"] = [{"words": L.get("words") or "", "short": L.get("short"), "legs": L.get("legs")}
+                            for L in (r.get("in_use_limits") or []) if L.get("words") or L.get("short")]
+    out["in_use_diversion"] = False
     iu = r.get("in_use")
     if iu:
+        out["in_use_diversion"] = list(iu.get("pair") or []) != [0, 0]
         if list(iu.get("pair") or []) == [0, 0]:
             out["in_use_words"] = "the main route, both legs"
         else:

@@ -1124,6 +1124,12 @@ SUM_READ = [("Collisions", "Injury collisions the police recorded on the road. C
             ("Cycle, places", "What a lorry passes on a round trip, with each option's change against the route in use."),
             ("Time, carbon", "One round trip, a planning figure. A small gap reads \"same\"."),
             ("Sections A to F", "The counts behind this page, unchanged. Section C keeps its own rules.")]
+#: why the summary's collision count can differ from section C's (John, 17 Nov 2026: "Yes, add it"): the rule counts the
+#: line in use / an option on the chosen lorry's own two lines as they are now (route_best.count_on_lines); section C a
+#: column's option number over every lorry type's lines, both legs, by the distances stored at the last fetch
+#: (collisions.counts_for)
+SUM_COUNT_NOTE = ("Collisions here are counted on this lorry's own lines, out and back. Section C counts each option's "
+                  "lines for every lorry type, as at the last fetch.")
 
 
 def _n(x, d=1):
@@ -1338,6 +1344,16 @@ def _sum_table(doc, x, y, w, B):
     return y
 
 
+def in_use_limit_words(L, diversion):
+    """The card's own sentence for a limit the line in use meets (frontend boInUseLimit, word for word, so the two agree):
+    "The diversion in use meets a 7.5 t limit below this lorry." from `short`; the long words where no short is held."""
+    leg = " (loaded leg)" if L.get("legs") == "loaded" else " (return leg)" if L.get("legs") == "return" else ""
+    what = f"The {'diversion' if diversion else 'route'} in use meets a"
+    if L.get("short"):
+        return f"{what} {L['short']} below this lorry{leg}."
+    return f"{what} limit below this lorry: {L.get('words') or ''}{leg}."
+
+
 def page_summary(doc, R, i, n, pages):
     """The summary page for one route (S1): the answer and the rule's one sentence on top, the six panels, the figures,
     how the answer was reached and how to read the page. One page; all of them first in the file (S2)."""
@@ -1373,6 +1389,8 @@ def page_summary(doc, R, i, n, pages):
     if D.get("lorry") and B.get("lorry") and D["lorry"] != B["lorry"]:
         sub += f" Sections A to F are drawn for the {D.get('lorry_text') or D['lorry']}."
     y = doc.para(sub, m, y, doc.cw * 0.72, 7.2, GREY) - 5
+    for L in B.get("in_use_limits") or []:
+        y = doc.para(in_use_limit_words(L, B.get("in_use_diversion")), m, y + 3, doc.cw * 0.72, 7.2, GREY) - 5
     # the answer and the rule's own sentence (S4: one navy box for every answer)
     head = B["answer"] + (f": {B['option']}" if B.get("option") else "")
     hw_ = _w(head, doc.B, 13) + 16
@@ -1454,6 +1472,7 @@ def page_summary(doc, R, i, n, pages):
             c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.B, 6.6); c.drawString(x0, y - 6.6, lab)
             low = min(low, doc.para(t, x0 + 62, y, half - 74, 6.4, NAVY_RGB))
         y = low - 2
+    y = doc.para(SUM_COUNT_NOTE, m + 62, y, doc.cw - 74, 6.4, NAVY_RGB) - 2
     doc.end_page()
 
 
@@ -1651,6 +1670,7 @@ def build_xlsx(D):
     if D.get("demo_notice"):
         ws["A2"] = "DEMO · " + D["demo_notice"]
         ws["A2"].font = Font(bold=True, color=X.DEMO_FG_HEX)
+    ws["A3"] = SUM_COUNT_NOTE
     for j, t in enumerate(SUMMARY_SHEET_HEAD, 1):
         cell = ws.cell(row=4, column=j, value=t)
         cell.font, cell.fill = head, fill
