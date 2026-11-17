@@ -284,8 +284,11 @@ if route_record:
                (T, got[0]["id"]))
     r3 = by_route(route_record.record(), "R3")[0]
     nd = len(route_choice.month_days(NOV27))
+    # NARROWED 17 Nov 2026 (ui-best-option-1117, finding 8): the sums use WHOLE loads: 100 x 10 / 22 = 45.45 is 45 loads
+    # (it was 45.5), and the km sum is those 45 x a trip's 4 km, so the shown loads times a trip is the shown sum
     ok("⭐ an end inside a month counts that month's working days before it only (100 x 10 / %d)" % nd,
-       nd == 22 and abs(r3["planned"]["trips"] - round(100 * 10 / 22, 1)) < 0.06, str(r3["planned"]))
+       nd == 22 and r3["planned"]["trips"] == round(100 * 10 / 22) == 45
+       and abs(r3["planned"]["km"] - 45 * r3["per_trip"]["km"]) < 1e-6, str(r3["planned"]))
     ok("...so far: only the recorded weeks before the end (week 1's 20 trips)", abs(r3["so_far"]["trips"] - 20) < 1e-6,
        str(r3["so_far"]))
     ok("an end is never undone by a later read: still ended", rows_of("R3")[0]["status"] == "ended")
@@ -324,7 +327,9 @@ if route_record:
     r5 = by_route(R, "R5")[0]
     SH = route_choice.busy_share("16:00", "19:00", route_choice.busy_span("R5"))
     ok("⭐ planned: the band's share of the open window (16:00-17:00 of 08:00-17:00 = 1/9) of the 100 trips, 'of 100'",
-       abs(SH - 1 / 9) < 1e-9 and abs(r5["planned"]["trips"] - round(100 / 9, 1)) < 0.06 and abs(r5["planned"]["of"] - 100) < 1e-6
+       # NARROWED 17 Nov 2026 (finding 8): whole loads: 100 / 9 = 11.1 is 11 (it was 11.1), "of" a whole 100
+       abs(SH - 1 / 9) < 1e-9 and r5["planned"]["trips"] == 11 and r5["planned"]["of"] == 100
+       and abs(r5["planned"]["km"] - 11 * r5["per_trip"]["km"]) < 1e-6
        and r5["all_lorries"] is True and r5["collisions"]["before_label"] == "Main route", str(r5["planned"]))
     route_choice.stop_busy("R5", "16:00", who="Pat")
     got = rows_of("R5")
@@ -390,7 +395,9 @@ ok("⭐ the staff read: after _gate_arrivals_build, any staff login, one kept bu
    and '_staff_json("route-choices/record", {}, route_record.record, acc)' in body)
 ok("⭐ ...and the spreadsheet beside it", '@app.get("/api/route-choices/record.xlsx")' in MAIN_PY
    and "route_record.build_xlsx(R)" in MAIN_PY)
-ok("⭐ Make primary's endpoint passes who made the choice", "network.promote_alternative(route_id, profile, alt_index, leg=leg, who=_by())" in MAIN_PY)
+# NARROWED 17 Nov 2026 (finding 2): the endpoint passes the legs one press moves too; who made the choice as before
+ok("⭐ Make primary's endpoint passes who made the choice",
+   "network.promote_alternative(route_id, profile, alt_index, leg=want[0], who=_by(), legs=want)" in MAIN_PY)
 NET = read("backend/network.py")
 ok("⭐ the record is read BEFORE the swap and written before refresh_zones' sync",
    NET.find("_record.before_promote(route_id, profile, leg, alt_index)") < NET.find("TMP = -1")

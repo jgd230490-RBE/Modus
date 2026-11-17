@@ -1344,6 +1344,28 @@ def _sum_table(doc, x, y, w, B):
     return y
 
 
+#: 17 Nov 2026 (the live check, finding 1; John: "Yes, as recommended"): no reason may push the page's content off the
+#: sheet. On live R011's reason was 443 words and the page drew ten lines of text below its foot (lowest text 15 pt
+#: under the page's edge; 35 pt above it on the other 49). The rule now says an added limit road by road, so a reason is
+#: a line or two; as a second guard every reason on this page (the answer's why, a "held back" line, a "ruled out"
+#: line) is cut at SUM_REASON_LINES lines, its last line ending SUM_CUT. Every stretch is listed in section A.
+SUM_REASON_LINES = 4
+SUM_CUT = "… section A has the rest"
+
+
+def cut_lines(lines, font, size, width, most=SUM_REASON_LINES, tail=SUM_CUT):
+    """Wrapped lines cut at `most`: the first `most`, the last shortened word by word until `tail` fits after it."""
+    if len(lines) <= most:
+        return list(lines)
+    keep = list(lines[:most])
+    words = keep[-1].split(" ")
+    end = " " + _pdf_safe(tail)
+    while len(words) > 1 and _w(" ".join(words) + end, font, size) > width:
+        words.pop()
+    keep[-1] = " ".join(words).rstrip(" ,;:") + end
+    return keep
+
+
 def in_use_limit_words(L, diversion):
     """The card's own sentence for a limit the line in use meets (frontend boInUseLimit, word for word, so the two agree):
     "The diversion in use meets a 7.5 t limit below this lorry." from `short`; the long words where no short is held."""
@@ -1394,7 +1416,8 @@ def page_summary(doc, R, i, n, pages):
     # the answer and the rule's own sentence (S4: one navy box for every answer)
     head = B["answer"] + (f": {B['option']}" if B.get("option") else "")
     hw_ = _w(head, doc.B, 13) + 16
-    why = _wrap(_pdf_safe(B.get("why") or ""), doc.R, 8, doc.cw - hw_ - 18) or [""]
+    why = cut_lines(_wrap(_pdf_safe(B.get("why") or ""), doc.R, 8, doc.cw - hw_ - 18) or [""], doc.R, 8,
+                    doc.cw - hw_ - 18)
     bh = max(24, 10 + len(why) * 10)
     c.setStrokeColorRGB(*_rgb(SUM_LINE)); c.setLineWidth(0.6); c.roundRect(m, y - bh, doc.cw, bh, 3, stroke=1, fill=0)
     c.setFillColorRGB(*NAVY_RGB); c.rect(m, y - bh, 3.2, bh, stroke=0, fill=1)
@@ -1412,8 +1435,40 @@ def page_summary(doc, R, i, n, pages):
     outs = [k for k in B["cols"] if k["ruled_out"]]
     if not (outs and len(outs) == len(B["cols"]) - 1 and (B.get("why") or "").startswith("Every other option is ruled out")):
         notes += [f"{k['label']} ruled out: {k['ruled_out'][0]}." for k in outs]
+    # the notes take only the room the rest of the page leaves (measured first, drawn on nothing): a note that would
+    # not fit is cut shorter, and one with no line left is not drawn
+    below = _sum_lower_h(doc, B)
     for t in notes:
-        y = doc.para(t, m, y, doc.cw, 6.6, NAVY_RGB) - 1
+        fit = int((y - 1 - below - doc.bottom()) // 8.8)
+        if fit < 1:
+            break
+        for ln in cut_lines(_wrap(_pdf_safe(t), doc.R, 6.6, doc.cw), doc.R, 6.6, doc.cw, most=min(SUM_REASON_LINES, fit)):
+            c.setFillColorRGB(*NAVY_RGB); c.setFont(doc.R, 6.6); c.drawString(m, y - 6.6, ln)
+            y -= 8.8
+        y -= 1
+    _sum_lower(doc, y, B)
+    doc.end_page()
+
+
+class _NoCanvas:
+    """A canvas that draws nothing: the summary page's lower half is laid out on it once to learn its height."""
+
+    def __getattr__(self, name):
+        return lambda *a, **k: None
+
+
+def _sum_lower_h(doc, B):
+    """The height of the summary page's lower half (the panels, the figures, the steps, how to read the page)."""
+    real, doc.c = doc.c, _NoCanvas()
+    try:
+        return 10000 - _sum_lower(doc, 10000, B)
+    finally:
+        doc.c = real
+
+
+def _sum_lower(doc, y, B):
+    """The summary page from "At a glance" down; returns the lowest y drawn."""
+    c, m = doc.c, doc.m
     # two columns: the panels (left), the figures (right)
     lw = doc.cw * 0.56
     rx, rw = m + lw + 16, doc.cw - lw - 16
@@ -1473,7 +1528,7 @@ def page_summary(doc, R, i, n, pages):
             low = min(low, doc.para(t, x0 + 62, y, half - 74, 6.4, NAVY_RGB))
         y = low - 2
     y = doc.para(SUM_COUNT_NOTE, m + 62, y, doc.cw - 74, 6.4, NAVY_RGB) - 2
-    doc.end_page()
+    return y
 
 
 SUMMARY_SHEET_HEAD = ["Route", "Option", "Answer", "Why", "Ruled out by", "Collisions on the road",

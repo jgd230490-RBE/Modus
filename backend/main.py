@@ -4363,17 +4363,22 @@ def route_geometries(route_id: str, profile: Optional[str] = None,
 @app.post("/api/admin/routes/{route_id}/promote-alt")
 def promote_alt(route_id: str, profile: str = network.DEFAULT_PROFILE,
                 alt_index: int = Query(..., ge=1, le=10),
-                leg: str = "loaded", token: Optional[str] = None):
+                leg: str = "loaded", legs: Optional[str] = None, token: Optional[str] = None):
     """
     Make one of HERE's alternatives the primary route for this vehicle and direction —
     a planner overruling the router's ranking. Swaps with the current primary, which
     stays available. Re-baking the route restores HERE's own ordering.
+
+    17 Nov 2026 (the live check, finding 2): `legs` = "loaded,return" moves both legs in ONE request (the Best option
+    card's press; it was a request a leg). The reply's `best` is the route's new best-option answer in the shape of
+    GET /api/routes/<id>/best-option, worked out with the press's own read of the rule.
     """
     _check_admin(token)
-    if leg not in network.LEGS:
+    want = [l.strip() for l in legs.split(",") if l.strip()] if legs else [leg]
+    if not want or any(l not in network.LEGS for l in want):
         raise HTTPException(400, f"leg must be one of {list(network.LEGS)}")
     # 17 Nov 2026 (best option step 3): the route choices record keeps who made the choice
-    return network.promote_alternative(route_id, profile, alt_index, leg=leg, who=_by())
+    return network.promote_alternative(route_id, profile, alt_index, leg=want[0], who=_by(), legs=want)
 
 
 @app.get("/api/routes/{route_id}/analysis")

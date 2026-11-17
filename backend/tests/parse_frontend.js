@@ -5229,9 +5229,13 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && code.includes('title="Gate arrivals: lorries a day at each gate" scope={[ga.label, sited || null]}') && code.includes('title="Simulation: when queues start" scope={[D.label]}')
      && code.includes("const dashScope = [rangeLabel,"));
   // 5 Nov 2026 (task 0d-2, the user: "Yes, as recommended" to notes\busy-hours-apply-mockup-1105 Q1-Q20)
+  // REVERSED 17 Nov 2026 (ui-best-option-1117, Q6; the user: "Yes, as recommended"; it bends the 5 Nov line): the offer no
+  // longer says "{o.label} is also shorter and quicker all day: Make primary may suit better." (on R013 it advised Alt 2
+  // under a Best option card that named Alt 1); the card says when a second option trades too.
   ok("BUSY HOURS: the Routes page offers 'Use Alt N on weekdays HH–HH' to a planner / admin (can_use) and says when Make primary may suit better (Q3)",
      code.includes("Use {o.label} on weekdays {b.from}–{b.to}") && code.includes("busy.can_use && (o.bands || []).filter(b => !(o.in_use || []).includes(b.from))")
-     && code.includes("{o.label} is also shorter and quicker all day: Make primary may suit better.")
+     && !code.includes("Make primary may suit better") && !code.includes("is also shorter and quicker all day")
+     && code.includes("function boAlso(list){")
      && code.includes("postJSON(`/routes/${encodeURIComponent(routeId)}/busy-hours`, body)"));
   ok("BUSY HOURS: the in-use line — its hours, since / by, Stop, Use again when paused (Q11), 'No longer offered' (Q12), the share of trips, what it saves or ADDS in red (Q19)",
      code.includes('{u.status === "in_use" ? "In use" : "Paused"} on weekdays {u.from}–{u.to}') && code.includes('busyPost({ stop: true, from: u.from }, "It was not stopped.")')

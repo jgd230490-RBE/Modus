@@ -61,6 +61,21 @@ How each decision of John's is held (section numbers of the 16 Nov note):
     each with `words` and `short`, "7.5 t limit", for use inside a sentence),
     reported only: the answer does not change for them.
 
+  * 17 Nov 2026 (the live check and UI / UX review, notes ux-best-option-1117; John: "Yes, as recommended", Q1 to Q7).
+    The rule decides as before; only its SENTENCES changed, and one field was added:
+      - an added lorry limit is said ROAD BY ROAD, not stretch by stretch (added_words: "it adds 7.5 t limits, except for
+        access, on Syston Road, Cossington Lane, Valley Road and unnamed roads"; at most ROADS_NAMED roads named, then
+        "N more"; the legs once, where every road shares them; never over SHORT_MAX words). It bends the 16 Nov sentence
+        ("it meets 1 road limit below this lorry that the route in use does not: ..."), at John's yes. Every stretch
+        stays in `added_limits` (each now with its `road` and `short`) and in the file's section A;
+      - "head" is the rule's own word and is in no sentence a person reads ("No other option is clearly better.");
+      - a suggestion's why opens with what it GAINS when the round trip is longer ("5 fewer left turns and 8.2 kg CO₂e
+        less a trip, for 2 min longer a round trip."); when it is quicker, time stays first;
+      - a difference in minutes is said to the nearest HALF everywhere (half_min; the record of route choices says it
+        with the same function, so the card, the file and the record agree);
+      - `trade_also`: the labels of the OTHER options that are trade-offs too (the card: "Alt 2 trades too: All
+        figures."); the answer and the option named are unchanged.
+
 Every threshold is a named constant below: STARTING VALUES that John has not set (he sets them on the all-50 table, Q9).
 
 WHAT IS NOT VERIFIED: run on stubbed and local lines only; never on live's figures (local worktree databases hold stand-in
@@ -116,6 +131,8 @@ STALE_WORDS = ("Collision history out of date: this route was routed again after
                "on it may not have been searched; collisions are not compared until it is fetched again.")
 NO_HISTORY_WORDS = "Collisions are not compared: the collision history has not been fetched."
 NO_LIMITS_WORDS = "No road limits are held, so no other option could be checked against them."
+#: 17 Nov 2026 (Q4): it read "No other option is clearly ahead on any head." ("head" is this module's own word)
+NONE_BETTER_WORDS = "No other option is clearly better."
 
 #: a head's or a part's value: +1 the option is ahead, -1 behind, 0 the same, MIXED both, None not counted
 MIXED = 2
@@ -217,6 +234,20 @@ def _n(x, d=1):
     return str(int(x)) if x == int(x) else f"{x:.{d}f}"
 
 
+def half_min(use_min, opt_min):
+    """The difference option less in-use, in minutes, to the nearest HALF, signed (17 Nov 2026, Q7: one rounding for a
+    time difference wherever it is said: the why, the trade line, the file's summary page and the record of route
+    choices, which calls this). Both sides are taken to a tenth first, as the rule's own counts are held, and the
+    halves are worked in whole tenths, so 104 against 100.5 is -3.5 whatever the floats do."""
+    t = int(round((round(float(opt_min), 1) - round(float(use_min), 1)) * 10))
+    h = ((2 * abs(t) + 5) // 10) * 0.5
+    return -h if t < 0 else h
+
+
+#: carbon's unit as every sentence of the rule writes it (17 Nov 2026: the card's rows already said CO₂e)
+CO2E = "CO\u2082e"
+
+
 def _parse_ts(v):
     if not v:
         return None
@@ -281,6 +312,17 @@ class Context:
         cl = collisions.cycle_lines()
         self.grid = collisions._SegGrid(self.proj, cl) if cl else None
         self.loads = approved_loads(self.factors)
+
+    def reread(self):
+        """After a Make primary (17 Nov 2026, Q2): read again what the swap changed, the routes' analysis rows and the
+        route-choice rows, and keep everything else (the collision records, the community features, the cycle routes,
+        the limits, the loads: a swap moves none of them). The one Context the record of route choices measured the
+        press with then gives the card's new answer, so the press reads the rule once."""
+        self.pre = {}
+        network.prefetch_analysis_geometry(self.pre)
+        self.routes = self.pre["routes"]
+        self.choice_rows = route_choice._rows_by_route()
+        self.zones_on = [z for z in route_choice.dated_zones() if zones.applies_on(z, self.day.isoformat())]
 
     def searched_lines(self, rid):
         """{fingerprint} of every line of this route the last fetch searched (any option number), or None when the fetch
@@ -483,9 +525,112 @@ def limit_short(L):
     return f"{fig} {noun} limit".replace("  ", " ")
 
 
+#: 17 Nov 2026 (Q1): an added limit's sentence names at most this many roads, then "N more"
+ROADS_NAMED = 3
+
+
+def _article(fig):
+    """'a' or 'an' before a limit's figure as it is read aloud: an 8 t, an 11 t, an 18 t limit."""
+    whole = str(fig).strip().split(" ")[0].split(".")[0]
+    return "an" if whole[:1] == "8" or whole in ("11", "18") else "a"
+
+
+def _road_of(L):
+    """The road a stored limit is on as a person names it (limits.headline's rule: its name, else its number), or None."""
+    w = " ".join(str(L.get("name") or L.get("ref") or "").split())
+    return w or None
+
+
+def _roads_words(named, unnamed, k):
+    """'Syston Road, Cossington Lane, Valley Road and unnamed roads': the first k named roads (most stretches first),
+    then 'N more', then the unnamed ones; with k = 0, '6 named roads and unnamed roads'."""
+    parts = [n for n, _c in named[:k]]
+    rest = len(named) - len(parts)
+    if rest and parts:
+        parts.append(f"{rest} more")
+    elif rest:
+        parts.append(f"{rest} named road{'s' if rest != 1 else ''}")
+    if unnamed:
+        parts.append("an unnamed road" if unnamed == 1 else "unnamed roads")
+    return _join(parts)
+
+
+def added_words(added, max_words=None):
+    """The one reason for the lorry limits an option ADDS, road by road (17 Nov 2026, Q1; John: "Yes, as recommended"):
+
+      it adds 7.5 t limits, except for access, on Syston Road, Cossington Lane, Valley Road and unnamed roads
+      it adds a 7.5 t limit, except for access, on Narborough Road South (return leg)
+      it adds a 7.5 t limit, except for access, on Mill Lane and a 4.2 m height limit on Station Road
+
+    `added`: the option's added_limits ({"leg", "source", "ext_id", "kind", "short", "road", "except_for_access"}).
+    Each road once however many stored stretches of it the option runs; a road is one limit, so "limits" only where
+    there is more than one road. At most ROADS_NAMED roads named, then "N more"; unnamed roads last. The legs are said
+    once, at the end, where every road is met on the same leg or legs, and left out where they differ (each stretch's
+    leg stays in added_limits and in the file's section A). Several kinds or figures of limit: a clause each. Never over
+    max_words (SHORT_MAX): the first of these that fits: the roads named 3, 2, 1, then counted; for several kinds,
+    the kinds listed with the roads pooled; last, "it adds limits below this lorry on N named roads". A fragment
+    (no capital, no full stop), as the reason for a closed area is: the card and the file end it."""
+    max_words = SHORT_MAX if max_words is None else max_words
+    if not added:
+        return ""
+    groups, order = {}, []
+    for a in added:
+        key = (a.get("short") or limit_short({"kind": a.get("kind"), "value": None}), bool(a.get("except_for_access")))
+        if key not in groups:
+            groups[key] = {"stretches": {}, "roads": {}}
+            order.append(key)
+        g = groups[key]
+        ident = (a.get("source"), a.get("ext_id"), a.get("kind"))
+        g["stretches"].setdefault(ident, set()).add(a.get("leg"))
+        road = a.get("road")
+        r = g["roads"].setdefault((road or "").lower(), {"name": road, "ids": set(), "legs": set()})
+        r["ids"].add(ident)
+        r["legs"].add(a.get("leg"))
+    order.sort(key=lambda k: (-len(groups[k]["stretches"]), k[0], k[1]))
+    G = []
+    for key in order:
+        g = groups[key]
+        named = sorted(((r["name"], len(r["ids"])) for k, r in g["roads"].items() if k),
+                       key=lambda x: (-x[1], x[0].lower()))
+        unnamed = len(g["roads"][""]["ids"]) if "" in g["roads"] else 0
+        G.append({"short": key[0], "exc": key[1], "named": named, "unnamed": unnamed,
+                  "plural": (len(named) + unnamed) > 1})
+    # the legs, once: only where every road is met on the same leg or legs
+    leg_sets = {frozenset(r["legs"]) for g in groups.values() for r in g["roads"].values()}
+    legs = _legs_words(next(iter(leg_sets))) if len(leg_sets) == 1 and None not in next(iter(leg_sets)) else ""
+
+    def clause(g, k):
+        what = (g["short"] + "s") if g["plural"] else f"{_article(g['short'])} {g['short']}"
+        return what + (", except for access," if g["exc"] else "") + " on " + _roads_words(g["named"], g["unnamed"], k)
+
+    def fits(line):
+        return len(line.split()) <= max_words
+
+    for k in (ROADS_NAMED, 2, 1, 0):
+        cs = [clause(g, k) for g in G]
+        body = cs[0] if len(cs) == 1 else " and ".join(cs) if len(cs) == 2 else "; ".join(cs[:-1]) + "; and " + cs[-1]
+        line = "it adds " + body + legs
+        if fits(line):
+            return line
+    # several kinds that do not fit a clause each: the kinds listed, the roads pooled
+    pooled = {}
+    for g in groups.values():
+        for k, r in g["roads"].items():
+            p = pooled.setdefault(k, {"name": r["name"], "ids": set()})
+            p["ids"] |= r["ids"]
+    named = sorted(((p["name"], len(p["ids"])) for k, p in pooled.items() if k), key=lambda x: (-x[1], x[0].lower()))
+    unnamed = len(pooled[""]["ids"]) if "" in pooled else 0
+    figs = _join([g["short"][:-len(" limit")] + (" (except for access)" if g["exc"] else "") for g in G])
+    for k in (ROADS_NAMED, 2, 1, 0):
+        line = f"it adds {figs} limits on " + _roads_words(named, unnamed, k) + legs
+        if fits(line):
+            return line
+    return "it adds limits below this lorry on " + _roads_words(named, unnamed, 0) + legs
+
+
 def _ruled_out(opt_legs, use_legs, lorry, ctx):
     """[reason words] and [added limits] for one option: a routing zone in force it crosses; a lorry limit below the lorry
-    it ADDS over the line in use on the same leg (N1)."""
+    it ADDS over the line in use on the same leg (N1), said road by road (added_words)."""
     reasons, added = [], []
     crossed = {}                     # each zone named once, with the legs that cross it (16 Nov: it was said a leg)
     for leg, line in opt_legs.items():
@@ -512,15 +657,12 @@ def _ruled_out(opt_legs, use_legs, lorry, ctx):
             for k in sorted(new, key=lambda x: tuple(str(v) for v in x)):
                 L = by_key.get(k) or {"kind": k[2], "value": None}
                 added.append({"leg": leg, "source": k[0], "ext_id": k[1], "kind": k[2], "words": _limit_words(L),
-                              "except_for_access": bool(L.get("exceptions"))})
+                              "except_for_access": bool(L.get("exceptions")), "short": limit_short(L),
+                              "road": _road_of(L)})
         if added:
-            # each limit named once, with the legs it is on (a limit on both legs was said twice, 16 Nov evening)
-            legs_of = {}
-            for a in added:
-                legs_of.setdefault((a["source"], a["ext_id"], a["kind"]), [a["words"], []])[1].append(a["leg"])
-            n = len(legs_of)
-            reasons.append(f"it meets {n} road limit{'s' if n != 1 else ''} below this lorry that the route in use does "
-                           f"not: " + "; ".join(w + _legs_words(ls) for w, ls in legs_of.values()))
+            # 17 Nov 2026 (Q1): one reason, road by road. It was a clause a stored stretch, each with the 13-word
+            # "except for access" note: 361 words for the 16 stretches R011's Alt 2 adds on four roads
+            reasons.append(added_words(added))
     return reasons, added
 
 
@@ -603,7 +745,7 @@ def _short_line(o, level):
         tail.append(N5_WORDS)
     if not line:
         # nothing clearly ahead or behind (a trade-off always has both; kept so the line is never empty)
-        return f"{name} is " + ("; ".join(tail) if tail else "level on every head") + "."
+        return f"{name} is " + ("; ".join(tail) if tail else "level on every measure") + "."
     return line + "".join("; " + x for x in tail) + "."
 
 
@@ -695,10 +837,11 @@ def sentences(o, use, ctx, hist):
             if c["busy_min"].get(h) is not None and use["busy_at"].get(h) is not None]
     if busy:
         out.append("Setting off " + "; ".join(busy) + ".")
-    out.append(f"Carbon is {_n(c['co2_kg'])} kg CO2e a trip against {_n(use['co2_kg'])} kg.")
+    out.append(f"Carbon is {_n(c['co2_kg'])} kg {CO2E} a trip against {_n(use['co2_kg'])} kg.")
     if o["n5"]:
         out.append(f"{name} is {N5_WORDS} ({_n(use['km'] - c['km'], 2)} km less, "
-                   f"{_n(c['drive_min'] - use['drive_min'])} min more driving a round trip), so it is never suggested.")
+                   f"{_n(abs(half_min(use['drive_min'], c['drive_min'])))} min more driving a round trip), so it is "
+                   f"never suggested.")
     return out
 
 
@@ -733,12 +876,12 @@ def _gains_losses(o, use, with_time=True):
         d = c["places"] - use["places"]
         (gains if d < 0 else losses).append(f"{abs(d)} {'fewer' if d < 0 else 'more'} schools, hospitals and health "
                                             f"centres passed")
-    dt = round(c["cycle_min"] - use["cycle_min"])
+    dt = half_min(use["cycle_min"], c["cycle_min"])         # 17 Nov 2026 (Q7): halves, as everywhere
     time_loss = with_time and o["heads"]["time"] in (-1, MIXED) and dt > 0
     if with_time and o["heads"]["time"] in (1, MIXED) and dt < 0:
-        gains.append(f"{-dt} min quicker a round trip")
+        gains.append(f"{_n(-dt)} min quicker a round trip")
     if time_loss:
-        losses.append(f"{dt} min more a round trip")
+        losses.append(f"{_n(dt)} min more a round trip")
     if c["trips"] > use["trips"]:
         gains.append(f"{c['trips']} trips a day, not {use['trips']}")
     elif c["trips"] < use["trips"]:
@@ -746,7 +889,7 @@ def _gains_losses(o, use, with_time=True):
     busy = {1: [], -1: []}
     for h, v in o["detail"]["busy_hours"].items():
         if v in (1, -1):
-            busy[v].append((h, abs(round(c["busy_min"][h] - use["busy_at"][h]))))
+            busy[v].append((h, _n(abs(half_min(use["busy_at"][h], c["busy_min"][h])))))
     for v, hs in busy.items():
         word = "quicker" if v == 1 else "more"
         if len(hs) == 1:
@@ -756,7 +899,7 @@ def _gains_losses(o, use, with_time=True):
             (gains if v == 1 else losses).append(f"{word} setting off at " + _join([f"{h} ({d} min)" for h, d in hs]))
     if o["heads"]["carbon"] in (1, -1):
         d = round(c["co2_kg"] - use["co2_kg"], 1)
-        (gains if d < 0 else losses).append(f"{_n(abs(d))} kg CO2e {'less' if d < 0 else 'more'} a trip")
+        (gains if d < 0 else losses).append(f"{_n(abs(d))} kg {CO2E} {'less' if d < 0 else 'more'} a trip")
     if o["n5"] and not time_loss:
         # said once: where the longer round trip is already a loss above, the N5 words would say it again
         losses.append(f"it is {N5_WORDS}")
@@ -764,13 +907,19 @@ def _gains_losses(o, use, with_time=True):
 
 
 def _why_suggested(o, use):
+    """'4 min quicker a round trip, with 5 fewer left turns.' Time first when the option is quicker or the same. When
+    its round trip is LONGER (17 Nov 2026, Q5; John: "Yes, as recommended") the why opens with what it gains: '5 fewer
+    left turns and 8.2 kg CO₂e less a trip, for 2 min longer a round trip.' (a suggestion that opened on its cost read
+    as a warning). The minutes to the nearest half (Q7)."""
     gains, _ = _gains_losses(o, use, with_time=False)
-    dt = o["counts"]["cycle_min"] - use["cycle_min"]
-    if round(abs(dt)) == 0:
+    dt = half_min(use["cycle_min"], o["counts"]["cycle_min"])
+    if dt == 0:
         first = "About the same time a round trip"
     else:
-        first = ("About a minute" if round(abs(dt)) <= 1 else f"{round(abs(dt))} min") + \
-                (" longer" if dt > 0 else " quicker") + " a round trip"
+        first = f"{_n(abs(dt))} min " + ("longer" if dt > 0 else "quicker") + " a round trip"
+    if dt > 0 and gains:
+        said = _join(gains)
+        return said[:1].upper() + said[1:] + ", for " + first[:1].lower() + first[1:] + "."
     return first + (", with " + _join(gains) if gains else "") + "."
 
 
@@ -787,7 +936,7 @@ def evaluate(rid, ctx):
            "lorry": lorry, "lorry_name": (conversions.vehicle_label(ctx.factors, lorry) if lorry else None),
            "lorry_basis": basis, "other_lorries": [p for p in profiles if p != lorry],
            "answer": KEEP, "option": None, "alt": None, "why": None, "trade": None, "trade_short": None,
-           "held_back": None, "in_use_limits": [],
+           "trade_also": [], "held_back": None, "in_use_limits": [],
            "sentences": [], "options": [], "in_use": None, "busy_roads": [],
            "checks": {"limits_held": bool(ctx.lims), "community_all_options": ctx.community_all}}
     # finding 5: do the lorry types' lines differ on any (leg, option)? Every count here is on the chosen lorry's own
@@ -927,8 +1076,11 @@ def _answer(out, use, ctx, hist):
         o["traded"] = True
         gains, losses = _gains_losses(o, use)
         line = f"{o['label']} has " + (_join(gains) or "nothing clearly ahead") + (", but " + _join(losses) if losses else "")
+        # 17 Nov 2026 (Q6): the other options that are trade-offs too, by number. The card names the first and says
+        # the rest trade too (on R013 the card named Alt 1 while an older line under it advised Alt 2)
+        also = [x["label"] for x in sorted(trade, key=lambda x: x["alt"]) if x is not o]
         out.update(answer=TRADE_OFF, why=line + ".", trade=line + ".", trade_short=trade_short(o),
-                   sentences=o["sentences"], held_back=held)
+                   trade_also=also, sentences=o["sentences"], held_back=held)
         return
     if clean:
         o = sorted(clean, key=lambda x: (-ahead(x), x["alt"]))[0]
@@ -944,12 +1096,29 @@ def _answer(out, use, ctx, hist):
     elif not live:
         out["why"] = "Every other option is ruled out: " + "; ".join(f"{o['label']}: {o['ruled_out'][0]}" for o in opts) + "."
     else:
-        out["why"] = "No other option is clearly ahead on any head."
+        out["why"] = NONE_BETTER_WORDS
 
 
 # --------------------------------------------------------------------------- #
 #  The all-routes table (the admin read)                                       #
 # --------------------------------------------------------------------------- #
+def table_checks(ctx):
+    """The checks the table's head and the card's read carry, from one Context."""
+    return {"limits_held": bool(ctx.lims), "community_all_options": ctx.community_all,
+            "collisions_fetched_at": ctx.col_status.get("fetched_at"), "collisions_period": ctx.period,
+            "collision_fingerprints_kept": ctx.searched_prints is not None,
+            "community_fetched_at": (community.status() or {}).get("fetched_at")}
+
+
+def card_answer(rid, ctx):
+    """One route's answer in the shape the card's read gives ({day, checks, thresholds, route}), from a Context already
+    made: after a Make primary the press's own Context (reread) answers, so the card does not wait for the whole table."""
+    r = evaluate(rid, ctx)
+    if r is None:
+        return None
+    return {"day": ctx.day.isoformat(), "checks": table_checks(ctx), "thresholds": thresholds(), "route": r}
+
+
 def table(day=None, route_ids=None):
     """The rule over every route (or those asked): {"day", "thresholds", "checks", "totals", "rows", "routes"}. One row a
     (route, option) John can set thresholds on: the route's answer, the option, each head, the counts on both sides, the
@@ -971,7 +1140,7 @@ def table(day=None, route_ids=None):
                            if r.get("in_use") else None),
                 "answer": r["answer"], "why": r["why"], "held_back": r["held_back"],
                 "collision_history": r["checks"]["collision_history"], "trade_short": r.get("trade_short"),
-                "in_use_limits": r.get("in_use_limits") or []}
+                "trade_also": r.get("trade_also") or [], "in_use_limits": r.get("in_use_limits") or []}
         if not r["options"]:
             rows.append(dict(base, option=None, chosen=False))
         for o in r["options"]:
@@ -979,9 +1148,5 @@ def table(day=None, route_ids=None):
                              ruled_out="; ".join(o["ruled_out"]) or None, heads=o["head_words"], parts=o["part_words"],
                              counts=o["counts"], counts_in_use=r.get("counts_in_use"), pct=o["pct"],
                              shorter_but_slower=o["n5"], collisions_searched=o["searched"]))
-    return {"day": ctx.day.isoformat(), "thresholds": thresholds(),
-            "checks": {"limits_held": bool(ctx.lims), "community_all_options": ctx.community_all,
-                       "collisions_fetched_at": ctx.col_status.get("fetched_at"), "collisions_period": ctx.period,
-                       "collision_fingerprints_kept": ctx.searched_prints is not None,
-                       "community_fetched_at": (community.status() or {}).get("fetched_at")},
+    return {"day": ctx.day.isoformat(), "thresholds": thresholds(), "checks": table_checks(ctx),
             "totals": totals, "rows": rows, "routes": routes}
