@@ -76,7 +76,13 @@
         var btn = card.querySelector(".pdf");
         if (btn) btn.addEventListener("click", function () {
           state.which = card.getAttribute("data-which");
+          for (var j = 0; j < cards.length; j++) {          // the pressed card's button is the dark one, the others outline
+            var b2 = cards[j].querySelector(".pdf");
+            b2.className = "btn sm pdf " + (cards[j] === card ? "btn-ink" : "btn-line");
+          }
           if (box) {
+            box.setAttribute("data-col", String(Array.prototype.indexOf.call(cards, card) + 1));
+            if (card.nextElementSibling !== box) card.parentNode.insertBefore(box, card.nextSibling);   // under the card on one column
             box.hidden = false;
             window.WaysTools.say(box.querySelector(".say"), "");
             var email = box.querySelector('input[name="email"]');

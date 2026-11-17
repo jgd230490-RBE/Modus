@@ -348,8 +348,20 @@ for line in ("Haul calculators", "Three quick answers from a few figures.", "Fre
 ok("the pieces of card 2 that are headings, in order, are the page's headings",
    [t for t in P.text if t in ("Lorries needed", "Haul carbon", "Fuel surcharge")] == ["Lorries needed", "Haul carbon", "Fuel surcharge"])
 btn_pdf = [a for t, a in P.tags if t == "button" and "pdf" in (a.get("class") or "").split()]
-ok("three 'Download as PDF' buttons, drawn line, line, ink as card 2 draws them",
-   [a.get("class") for a in btn_pdf] == ["btn btn-line sm pdf", "btn btn-line sm pdf", "btn btn-ink sm pdf"], str([a.get("class") for a in btn_pdf]))
+raw = read("frontend/tools/calculators.html")
+ok("three 'Download as PDF' buttons, ALL outline at load: none is dark while the box is closed (the drawing's dark third button is the one pressed)",
+   [a.get("class") for a in btn_pdf] == ["btn btn-line sm pdf"] * 3 and "btn-ink" not in raw, str([a.get("class") for a in btn_pdf]))
+_calcjs = re.sub(r"/\*.*?\*/", "", read("frontend/tools/calculators.js"), flags=re.S)
+ok("⭐ the script turns the PRESSED card's button dark (btn-ink) and every other one outline (btn-line)",
+   'cards[j] === card ? "btn-ink" : "btn-line"' in _calcjs and 'className = "btn sm pdf "' in _calcjs)
+ok("⭐ the script puts the box in the pressed card's column (data-col 1, 2 or 3) and under that card on one column",
+   'setAttribute("data-col", String(Array.prototype.indexOf.call(cards, card) + 1))' in _calcjs and "insertBefore(box, card.nextSibling)" in _calcjs)
+_css = read("frontend/tools/tools.css")
+ok("the box is inside the card grid, in its second row, in the column data-col names; on one column it follows its card",
+   raw.index('id="pdfbox"') < raw.index('<div class="next wide">') and raw.index('id="pdfbox"') > raw.index('id="c-surcharge"')
+   and all(f'.calcs > .pdfbox[data-col="{n}"]{{grid-column:{n}}}' in _css for n in (1, 2, 3))
+   and '.calcs > .pdfbox[data-col]{grid-row:auto;grid-column:auto}' in _css)
+ok("no word changed: the box's heading and labels are card 2's", all(w in ptext for w in ("Download the PDF", "Your email", "Download", "Send me Wayscope news now and then")))
 ok("the pill reads Free and the 'next' strip's button goes to /tools/route-check",
    any(t == "span" and a.get("class") == "cr free" for t, a in P.tags) and any(t == "a" and a.get("href") == "/tools/route-check" for t, a in P.tags))
 ok("the box under the third card: email, the news tick UNTICKED, a trap box, the privacy link, and it is closed until a PDF button is pressed",

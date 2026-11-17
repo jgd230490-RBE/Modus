@@ -44,17 +44,17 @@
       <div class="row"><label for="s-rate">Agreed rate</label><span class="bx"><i>£</i><input id="s-rate" name="rate" inputmode="decimal" autocomplete="off" value="180.00"><i>a load</i></span></div>
       <div class="ans" aria-live="polite"><span class="v">&nbsp;</span><small>&nbsp;</small></div>
       <p class="say" role="status"></p>
-      <button type="button" class="btn btn-ink sm pdf">Download as PDF</button>
+      <button type="button" class="btn btn-line sm pdf">Download as PDF</button>
     </section>
+    <form class="pdfbox" id="pdfbox" data-col="3" action="#" method="post" hidden>
+      <b class="h">Download the PDF</b>
+      <div class="pdfrow"><label class="f">Your email<input type="email" name="email" placeholder="name@example.co.uk" autocomplete="email"></label><button type="submit" class="btn btn-orange sm">Download</button></div>
+      <label class="tick"><input type="checkbox" name="news">Send me Wayscope news now and then</label>
+      <label class="trap" aria-hidden="true">Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+      <p class="fine2">We keep your email with this download. Read the <a href="https://wayscope.co.uk/privacy.html">privacy notice</a>.</p>
+      <p class="say" role="status"></p>
+    </form>
   </div>
-  <form class="pdfbox" id="pdfbox" action="#" method="post" hidden>
-    <b class="h">Download the PDF</b>
-    <div class="pdfrow"><label class="f">Your email<input type="email" name="email" placeholder="name@example.co.uk" autocomplete="email"></label><button type="submit" class="btn btn-orange sm">Download</button></div>
-    <label class="tick"><input type="checkbox" name="news">Send me Wayscope news now and then</label>
-    <label class="trap" aria-hidden="true">Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
-    <p class="fine2">We keep your email with this download. Read the <a href="https://wayscope.co.uk/privacy.html">privacy notice</a>.</p>
-    <p class="say" role="status"></p>
-  </form>
   <div class="next wide"><span><b>Need the roads compared?</b> Ask for a route check.</span><a class="btn btn-line sm" href="/tools/route-check">Route check</a></div>
 </main>
 <script src="/tools/calculators.js"></script>
