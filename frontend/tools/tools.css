@@ -152,4 +152,27 @@ p{margin:0 0 10px}
   .calchead{padding:16px 16px 0}
   .pdfbox{margin:0 16px 16px}
   .next.wide{margin:0 16px 16px}
+  .tick{min-height:44px}   /* the phone's 44 px rule: a tick row is a whole 44 px target (claude/tools-abnormal-adviser) */
 }
+
+/* ---------- calculators: the rows are real boxes (claude/tools-calculators, 17 Nov 2026) ---------- */
+.calc .row label{flex:1;min-width:0;cursor:pointer}
+.calc .row .bx i{font-style:normal}
+.calc .row .bx{display:flex;align-items:center;gap:5px;flex:none;color:var(--ink);font-size:13px}
+.calc .row input,.calc .row select{border:1px solid var(--box-line);border-radius:6px;padding:4px 8px;font:400 13px/1.4 var(--sans);color:var(--ink);
+  background:#fff;min-height:30px;text-align:right}
+.calc .row input{width:86px}
+.calc .row select{max-width:232px;text-align:left;appearance:none;-webkit-appearance:none;padding-right:24px;background-repeat:no-repeat;background-position:right 8px center;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235B6470' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E")}
+.calc .row input:focus,.calc .row select:focus{outline:2px solid var(--orange);outline-offset:1px;border-color:var(--orange)}
+.calc .row [aria-invalid="true"]{border-color:var(--bad)}
+.calc .say{margin:8px 0 0;font-size:12.5px;color:var(--bad)}
+.calc .say:empty{display:none}
+@media (max-width:520px){.calc .row{flex-wrap:wrap}.calc .row select{max-width:100%}.calc .row input,.calc .row select{min-height:44px}}
+
+/* the PDF box sits under the card that was pressed (claude/tools-calculators): inside the grid, in the second row, in that card's column; on one column it follows its card in the page */
+.calcs > .pdfbox{margin:0;max-width:none;grid-row:2;align-self:start}
+.calcs > .pdfbox[data-col="1"]{grid-column:1}
+.calcs > .pdfbox[data-col="2"]{grid-column:2}
+.calcs > .pdfbox[data-col="3"]{grid-column:3}
+@media (max-width:860px){.calcs > .pdfbox[data-col]{grid-row:auto;grid-column:auto}}

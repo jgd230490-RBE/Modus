@@ -594,6 +594,20 @@ ok("an empty page word is not recorded", users.record_page(users.access_for(lead
 csv_ = users.audit_csv()
 ok("the activity CSV: a header and one line per row", csv_.split("\n")[0] == ",".join(users.AUDIT_CSV_COLUMNS)
    and len(csv_.strip().split("\n")) == 1 + len(users.audit_rows(limit=5000)))
+# 17 Nov 2026 (claude/csv-cells-plain): a cell a spreadsheet would run is written as plain text
+ok("csv_cell: text that starts with = + - @, a tab or a return gets a leading apostrophe",
+   [users.csv_cell(v) for v in ("=1+1", "+44 20", "-5", "@SUM(A1)", "\t=1", "\r=1")]
+   == ["'=1+1", "'+44 20", "'-5", "'@SUM(A1)", "'\t=1", "'\r=1"])
+ok("csv_cell: every other value passes through unchanged (plain text, an = inside, a number, None, empty)",
+   [users.csv_cell(v) for v in ("Ada", "a=b", "2026-11-17T10:00:00Z", 5, -5, None, "")]
+   == ["Ada", "a=b", "2026-11-17T10:00:00Z", 5, -5, None, ""])
+import csv as _csv_mod      # noqa: E402
+import io as _io_mod        # noqa: E402
+users.audit_event("signin", user=dict(lead, name="=HYPERLINK(1)"))      # a name typed to run as a formula
+_csv_run = users.audit_csv()
+ok("🔴 the activity CSV writes such a cell as plain text, and no cell starts with = + - or @",
+   ",'=HYPERLINK(1) <lead@example.org>," in _csv_run
+   and not [c for row in _csv_mod.reader(_io_mod.StringIO(_csv_run)) for c in row if c[:1] in ("=", "+", "-", "@")])
 _real_exec = db.execute
 db.execute = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("disk full"))
 try:

@@ -129,6 +129,7 @@ async def lifespan(app: FastAPI):
         db.init_config_db()         # 2.5b. No ALTERs, so its position only needs to precede the seed.
         db.init_costing_db()        # 10 Sep evening. The GLOBAL fuel_index table (untenanted, by design).
         db.init_demo_requests_db()  # H9, 8 Oct. The GLOBAL demo_requests table (untenanted, by design).
+        db.init_tool_leads_db()     # 16 Nov. The GLOBAL tool_leads table (the public tools' details; untenanted, by design).
         db.init_users_db()          # G3, 14 Oct. Logins, sessions, links, audit, attempts: account data, not package data.
         limits.init_db()            # 13 Oct. The GLOBAL road_limits table (untenanted, by design: public road facts).
         # Phase 4.5. Must sit exactly here: init_tenant() migrates a pre-4.5 database by
@@ -7599,6 +7600,98 @@ def tools_page(name: str):
         raise HTTPException(status_code=404, detail="not found")
     path, media = found
     return Response(content=tools_public.page_bytes(path), media_type=media, headers={"Cache-Control": "no-cache"})
+
+
+# 16 Nov 2026 (claude/tools-route-check-request) — the route check REQUEST (an open call, tools_public's rule) and the
+# admin read of the store the tools share (tools_leads). The email to John goes after the answer, as a background task.
+import tools_leads  # noqa: E402
+import tools_route_check  # noqa: E402
+try:
+    from fastapi.responses import JSONResponse as _TRCJson
+    from starlette.background import BackgroundTask as _TRCTask
+except Exception:      # the stubbed fastapi of the sandbox harnesses; the call never runs there
+    _TRCJson = _TRCTask = None
+
+
+@app.post("/api/tools/route-check/request")
+async def tools_route_check_request(request: Request):
+    tools_public.guard(request, tools_route_check.LIMIT)
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    result = tools_route_check.handle(body, tools_public.client_ip(request))
+    rid = result.get("request_id")
+    return _TRCJson({"ok": True}, headers={"Cache-Control": "no-store"},
+                    background=_TRCTask(tools_route_check.deliver, rid) if rid else None)
+
+
+@app.get("/api/admin/tool-leads.csv")
+def tool_leads_csv(token: Optional[str] = None):
+    """The public tools' leads (route check requests, calculator PDF emails), newest first. Admin only."""
+    _check_admin(token)
+    return Response(tools_leads.csv_export(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="tool-leads.csv"',
+                             "Cache-Control": "no-store"})
+
+
+# 17 Nov 2026 (claude/tools-abnormal-adviser) — the abnormal load adviser's free check: the platform's own rules
+# (abnormal_rules.advice) on the typed figures, with the nation the person picked, the SHIPPED bank holidays and no police
+# time bans. Nothing of any organisation is read; nothing is written or kept (tools_abnormal's header).
+import tools_abnormal  # noqa: E402
+
+TOOLS_ABNORMAL_LIMIT = tools_public.Limit("abnormal-load", tools_abnormal.CHECKS_PER_HOUR, 3600)
+
+
+@app.post("/api/tools/abnormal-load")
+async def tools_abnormal_load(request: Request):
+    tools_public.guard(request, TOOLS_ABNORMAL_LIMIT)
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    if not isinstance(body, dict):
+        tools_public.refuse(400, tools_abnormal.SAY["width_m"])
+    if tools_public.trapped(body):
+        return {"ok": True}
+    try:
+        out = tools_abnormal.answer(body)
+    except tools_abnormal.Bad as e:
+        tools_public.refuse(400, e.say)
+    return {"ok": True, "page": out["page"]}
+
+
+# 17 Nov 2026 (claude/tools-calculators) — the three free haul calculators' open calls (tools_calculators.py): each works the
+# platform's own sum on the figures typed and the shipped lorry figures, behind its own limit; the PDF call is the only one
+# that takes an email.
+import tools_calculators  # noqa: E402
+
+
+async def _tools_json(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    return body if isinstance(body, dict) else {}
+
+
+@app.post("/api/tools/calculators/sum")
+async def tools_calc_sum(request: Request):
+    tools_public.guard(request, tools_calculators.SUM_LIMIT)
+    body = await _tools_json(request)
+    which = str(body.get("which") or "")
+    if which not in tools_calculators.WHICH:
+        tools_public.refuse(400, "Pick one of the three calculators.")
+    return tools_calculators.public(which, tools_calculators.work(which, body.get("figures")))
+
+
+@app.post("/api/tools/calculators/pdf")
+async def tools_calc_pdf(request: Request):
+    tools_public.guard(request, tools_calculators.PDF_LIMIT)
+    body = await _tools_json(request)
+    if tools_public.trapped(body):
+        return {"ok": True}
+    return tools_calculators.pdf_answer(body, tools_public.client_ip(request))
 
 
 # 6 Oct 2026 (H5) — the public landing page at /landing/ for PREVIEW on this service. The
