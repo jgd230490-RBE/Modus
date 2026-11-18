@@ -61,9 +61,10 @@ ok("⭐ SRC: the card can show any option: tabs (the app's one tab) where a rout
    && bo.includes('role="tab" className="ws-tab" data-bo-tab={x.alt}') && bo.includes("{boLineName(r, x)}</button>))}"));
 ok("⭐ SRC: Make primary stays on the SUGGESTED option alone (the card can now show another), never while a diversion is in use",
    bo.includes('const canPromote = r.answer === "Suggested" && o && o.chosen && onPromote && !div;'));
-ok("⭐ SRC: the map's click: a limit sign and the open route's own lines first, then a ticked layer's thing, then another route's line, which opens its panel",
-   TRY(() => { const a = html.indexOf("if(cbRef.current.olClick && cbRef.current.olClick(e)) return;"), b = html.indexOf("if(cbRef.current.layerPopup && cbRef.current.layerPopup(e)) return;"),
-                     c = html.indexOf("(cbRef.current.routeClick || cbRef.current.selectRoute || (()=>{}))(hitRoute[0].properties.route_id);"); return a > 0 && a < b && b < c; })
+ok("⭐ SRC: the map's click, in order: a ruled-out option's limit sign; a ticked layer's thing (as before: a collision's dot on a line opens its own box); the open route's own lines; another route's line, which opens its panel",
+   TRY(() => { const a = html.indexOf("if(cbRef.current.olSign && cbRef.current.olSign(e)) return;"), b = html.indexOf("if(cbRef.current.layerPopup && cbRef.current.layerPopup(e)) return;"),
+                     c = html.indexOf("if(cbRef.current.olClick && cbRef.current.olClick(e)) return;"),
+                     d = html.indexOf("(cbRef.current.routeClick || cbRef.current.selectRoute || (()=>{}))(hitRoute[0].properties.route_id);"); return a > 0 && a < b && b < c && c < d; })
    && html.includes('const layers = ["route-line", "route-failed", "ol-use-line"].filter(l => m.getLayer(l));'));
 ok("⭐ SRC: Q6: a route opened from the map leaves the page at the map (no move, no focus taken); ▶ in the list still moves it",
    html.includes("if(!full && openRow !== id){ roQuiet.current = true; setOpenRow(id); }")

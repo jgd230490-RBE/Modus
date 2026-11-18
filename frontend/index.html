@@ -17802,10 +17802,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         const box = [[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]];
         const hitNode = m.queryRenderedFeatures(box, { layers: ["node-dots"] });
         if(hitNode.length) return;    // node taps are handled by mousedown/up
-        // 17 Nov 2026 (route option labels): a ruled-out option's limit sign, then one of the open route's own lines
-        // (the option is picked), before a ticked layer's thing and before any other route's line
-        if(cbRef.current.olClick && cbRef.current.olClick(e)) return;
+        // 17 Nov 2026 (route option labels): a ruled-out option's limit sign first; then a ticked layer's thing as
+        // before (a collision's dot lies ON a line: it still opens its own box); then one of the open route's own
+        // lines (the option is picked); then any other route's line
+        if(cbRef.current.olSign && cbRef.current.olSign(e)) return;
         if(cbRef.current.layerPopup && cbRef.current.layerPopup(e)) return;   // 2.1-5: a ticked layer's thing, not the route under it
+        if(cbRef.current.olClick && cbRef.current.olClick(e)) return;
         const layers = ["route-line", "route-failed", "ol-use-line"].filter(l => m.getLayer(l));
         const hitRoute = m.queryRenderedFeatures(e.point, { layers });
         // Q6: a click on a route's line opens its panel (it only picked the row)
@@ -18606,7 +18608,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(selected !== id) selectRoute(id);
   };
   cbRef.current.olPlace = olPlaceNow; cbRef.current.olMove = olMoveNow; cbRef.current.olOn = olOn;
-  cbRef.current.olClick = (e) => {
+  cbRef.current.olSign = (e) => {
     const m = mapObj.current;
     if(!m || subTab !== "routes" || drawing) return false;
     const box = [[e.point.x - 5, e.point.y - 5], [e.point.x + 5, e.point.y + 5]];
@@ -18621,7 +18623,12 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         return true;
       }
     }
-    if(!olOn) return false;
+    return false;
+  };
+  cbRef.current.olClick = (e) => {
+    const m = mapObj.current;
+    if(!m || subTab !== "routes" || drawing || !olOn) return false;
+    const box = [[e.point.x - 5, e.point.y - 5], [e.point.x + 5, e.point.y + 5]];
     const hit = m.queryRenderedFeatures(box, { layers: ["ol-use-line", "alt-line", "sel-line"].filter(l => m.getLayer(l)) })
       .find(f => f.properties && f.properties.route_id === olRoute && f.properties.vehicle_profile === olBest.lorry);
     if(!hit) return false;
