@@ -17694,11 +17694,6 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       paint: { "circle-radius": 5, "circle-color": nodeExpr(), "circle-stroke-width": 1.5, "circle-stroke-color": "#fff" } });
     if(!m.getLayer("newnode-dot")) m.addLayer({ id: "newnode-dot", type: "circle", source: "newnode",
       paint: { "circle-radius": 8, "circle-color": "#D97706", "circle-stroke-width": 3, "circle-stroke-color": "#2563EB", "circle-opacity": 0.95 } });
-    // the limit sign the Lorry limits layer draws (rlSignImage), one a road, on the marked stretch
-    (olSignsAll.current || []).forEach(f => { const t = f.properties.sign; try { if(!m.hasImage("rl-sign-" + t)) m.addImage("rl-sign-" + t, rlSignImage(t), { pixelRatio: 2 }); } catch(e){} });
-    if(!m.getLayer("ol-sign")) m.addLayer({ id: "ol-sign", type: "symbol", source: "olsigns",
-      layout: { "icon-image": ["concat", "rl-sign-", ["get", "sign"]], "icon-allow-overlap": true,
-                "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.45, 14, 0.8] } });
     // Zone fills go on last so they sit above the routes: the whole point is seeing which
     // lines cross one. A routing zone reads red, an advisory one grey — the colour is the
     // difference between "the router avoids this" and "look at this".
@@ -17727,6 +17722,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     if(!m.getLayer("draw-vertex")) m.addLayer({ id: "draw-vertex", type: "circle", source: "draw",
       filter: ["==", ["geometry-type"], "Point"],
       paint: { "circle-radius": 5, "circle-color": "#fff", "circle-stroke-width": 2.5, "circle-stroke-color": "#DC2626" } });
+    // 17 Nov 2026 (route option labels, F2): the limit sign the Lorry limits layer draws (rlSignImage), one a road, on the
+    // marked stretch. Added LAST so no zone name or dot covers it, and a little larger than that layer's (a route's few
+    // signs, not the scheme's hundreds): about 24 px at any zoom
+    (olSignsAll.current || []).forEach(f => { const t = f.properties.sign; try { if(!m.hasImage("rl-sign-" + t)) m.addImage("rl-sign-" + t, rlSignImage(t), { pixelRatio: 2 }); } catch(e){} });
+    if(!m.getLayer("ol-sign")) m.addLayer({ id: "ol-sign", type: "symbol", source: "olsigns",
+      layout: { "icon-image": ["concat", "rl-sign-", ["get", "sign"]], "icon-allow-overlap": true,
+                "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.72, 14, 0.85] } });
     applyEmphasis(m);   // a basemap switch resets paint, so re-lean towards the active sub-tab
     olRouteFilter(m);
   };
@@ -18010,6 +18012,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
     signs.forEach(f => { const t = f.properties.sign; try { if(!m.hasImage("rl-sign-" + t)) m.addImage("rl-sign-" + t, rlSignImage(t), { pixelRatio: 2 }); } catch(e){} });
     try { const src = m.getSource("olmarks"); if(src) src.setData(olMarkFC.current); } catch(e){}
     olSignsNow();
+    if(cbRef.current.olPlace) cbRef.current.olPlace();   // the labels keep clear of the signs, which arrive after them
   };
   const olSignsNow = () => {
     const m = mapObj.current; if(!m) return;
@@ -18050,6 +18053,8 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       const keep = [...(box.parentElement || box).querySelectorAll("[data-route-map-box], .mapboxgl-ctrl-top-right, .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right, .sl-demo-on-map")]
         .map(el => el.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0)
         .map(r => ({ x0: r.left - at.left - 4, y0: r.top - at.top - 4, x1: r.right - at.left + 4, y1: r.bottom - at.top + 4 }));
+      // nor a limit sign on a ruled-out option's line (the sign is the point of that stretch)
+      ((olSignFC.current && olSignFC.current.features) || []).forEach(f => { const q = m.project(f.geometry.coordinates); keep.push({ x0: q.x - 15, y0: q.y - 15, x1: q.x + 15, y1: q.y + 15 }); });
       const feats = olFeats();
       const items = (olBest.lines || []).map((ln, k) => {
         const c = olLineOf(ln, feats);

@@ -421,6 +421,10 @@ w.ResizeObserver = function(){ this.observe = () => {}; this.disconnect = () => 
        TRY(() => MAP.src.olmarks.data.features.length === 4 && MAP.src.olsigns.data.features.length === 3
          && seen.filter(u => /\/public\/limits$/.test(u)).length === 1 && !q('input[data-route-layer="limits"]').checked),
        TRY(() => [MAP.src.olmarks.data.features.length, MAP.src.olsigns.data.features.length].join()));
+    ok("⭐ DOM F2: no label covers a limit sign: every label's box is clear of every sign shown",
+       TRY(() => { const sg = MAP.src.olsigns.data.features.map(f => ({ x: f.geometry.coordinates[0] * 1000, y: f.geometry.coordinates[1] * 1000 }));
+                   return sg.length === 3 && labs().length === 3 && labs().every(b => { const c = at(b), hw = (b.textContent.replace(/\s+/g, " ").trim().length * 6.6 + 20) / 2;
+                     return sg.every(g => !(Math.abs(g.x - c.x) < hw + 15 && Math.abs(g.y - c.y) < 13 + 15)); }); }), JSON.stringify(labs().map(at)));
     ok("DOM: every option ruled out: the card lists each with its reason as before, and has no tabs", tabs().length === 0 && /Every other option is ruled out\./.test(card()) && qa(".bo-card [data-bo-row^='out-']").length === 2);
     MAP.pops.length = 0;
     MAP.hits = (layers) => layers.length === 1 && layers[0] === "ol-sign" ? [MAP.src.olsigns.data.features.find(f => f.properties.id === "osm:2:weight")] : [];
