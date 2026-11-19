@@ -179,6 +179,13 @@ if (HAVE) {
   const P4 = w.olPlace([item(0, USE_PX)], 700, 430, KEEP);
   ok("⭐ PLACE: no label covers the map's own buttons (a kept-out box): the label moves along its line to clear it",
      TRY(() => P4[0] && P4[0].y - 13 >= 215 && distTo(P4[0], USE_PX) < 2), JSON.stringify(P4));
+  // the longest label the rule can write (test_route_option_labels.py 9b), on full screen's narrowest map (330 px wide)
+  const LONGEST = "Main route · 112.5 min quicker", LW = TRY(() => w.olTextW(LONGEST)) || 0;
+  const narrow = (pts) => pts.map(([x, y]) => [20 + (x - 100) * 0.58, 120 + (y - 100) * 0.58]);
+  const P5 = w.olPlace([item(0, narrow(USE_PX), w.olTextW("In use · 1447.7 min")), item(1, narrow(ALT1_PX), LW), item(2, narrow(ALT2_PX), w.olTextW("Way round 2 · not compared"))], 330, 700, []);
+  ok("⭐ PLACE: the LONGEST labels on a 330 px map (full screen at its narrowest): each is whole inside the map, none overlapping",
+     LW > 150 && LW <= 240 && TRY(() => [[0, w.olTextW("In use · 1447.7 min")], [1, LW], [2, w.olTextW("Way round 2 · not compared")]].every(([k, wd]) => P5[k] && P5[k].x - wd / 2 >= 4 && P5[k].x + wd / 2 <= 326)
+       && [[0, 1], [0, 2], [1, 2]].every(([i, j]) => Math.abs(P5[i].y - P5[j].y) >= 26 || Math.abs(P5[i].x - P5[j].x) >= 200)), JSON.stringify([LW, P5]));
   ok("PLACE: a line of one point, or of no length, gets no label and breaks nothing",
      TRY(() => Object.keys(w.olPlace([item(0, [[10, 10]]), item(1, [[50, 50], [50, 50]])], 700, 430, [])).length === 0));
 }

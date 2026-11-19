@@ -192,6 +192,20 @@ ok("⭐ 9. every label is 4 words or fewer with the option's name as one (5 piec
 ok("9. no label says 'same', 'slower', 'not counted' or a supplier's word (the card's chip words are its own)",
    not any(w in f"{x['name']} {x['words']}".lower() for x in ALL for w in ("same", "slower", "not counted", "here", "osm")))
 
+# 9b. the LONGEST a label can be (the mother session's rule of 17 Nov: a sentence the rule writes is checked at its
+# longest before a screen is called done): three options, one ruled out, two ways round, a diversion in use, a
+# three-figure half-minute difference and a four-figure round trip
+LONG = demo(M(10, 0, 5, 5, 1.0, 2, 200.0, 300.0, 1447.7, 1, 30.0),
+            [(0, M(10, 0, 5, 5, 1.0, 2, 200.0, 300.0, 1335.2, 1, 30.0)), (1, M(10, 0, 5, 5, 1.0, 2, 200.0, 300.0, 1560.4, 1, 30.0)),
+             (3, M(10, 0, 5, 5, 1.0, 2, 200.0, 300.0, 1447.9, 1, 30.0))],
+            use_pair=(2, 2), lines=stored(0, 1, 2, 3, 10, 11), ruled={3: [ZONE]})
+ok("⭐ 9b. the longest labels: 'Main route · 112.5 min quicker' (30 letters), 'Way round 2 · not compared', a four-figure 'In use'",
+   said(LONG) == ["In use · 1447.7 min", "Main route · 112.5 min quicker", "Alt 1 · 112.5 min longer", "Alt 3 · ruled out",
+                  "Way round · not compared", "Way round 2 · not compared"], said(LONG))
+ok("⭐ 9b. at its longest a label is 30 letters, 4 words with the name as one, 5 pieces",
+   max(len(x) for x in said(LONG)) == 30 and all(1 + len(x["words"].split()) <= 4 and len(x["name"].split()) + len(x["words"].split()) <= 5
+                                                  for x in LONG["lines"]), max(len(x) for x in said(LONG)) if HAS else "")
+
 # 10. source: evaluate carries the lines; the words sit in the rule's file
 SRC = open(os.path.join(BACKEND, "route_best.py"), encoding="utf-8").read()
 EV = SRC.split("def evaluate(rid, ctx):")[1].split("\ndef ")[0]
