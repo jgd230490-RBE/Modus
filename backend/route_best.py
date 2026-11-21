@@ -937,7 +937,7 @@ def evaluate(rid, ctx):
            "lorry_basis": basis, "other_lorries": [p for p in profiles if p != lorry],
            "answer": KEEP, "option": None, "alt": None, "why": None, "trade": None, "trade_short": None,
            "trade_also": [], "held_back": None, "in_use_limits": [],
-           "sentences": [], "options": [], "in_use": None, "busy_roads": [],
+           "sentences": [], "options": [], "in_use": None, "busy_roads": [], "lines": [],
            "checks": {"limits_held": bool(ctx.lims), "community_all_options": ctx.community_all}}
     # finding 5: do the lorry types' lines differ on any (leg, option)? Every count here is on the chosen lorry's own
     # lines (16 Nov evening); route_compare's table still pools collisions by option number, so this says where they part
@@ -1017,7 +1017,75 @@ def evaluate(rid, ctx):
         searched = use_searched and was_searched(m)
         out["options"].append(option_entry(a, m, use, ctx, hist, reasons, added, searched))
     _answer(out, use, ctx, hist)
+    out["lines"] = line_labels(out, lines, lorry, use, use_pair)
     return out
+
+
+# --------------------------------------------------------------------------- #
+#  The words on each line of the Routes map                                    #
+# --------------------------------------------------------------------------- #
+#: 17 Nov 2026 (route option labels; John's "Yes, as recommended" to notes route-option-labels-mockup-1117, Q1 to Q8):
+#: while a route is open the Routes map prints one short label on each stored line of the card's lorry, "<name> ·
+#: <words>", 4 words at most with the name as one. The RULE writes both halves here, beside its sentences, so the map
+#: and the card cannot disagree and the page works nothing out: the time difference is half_min's, "similar" is the
+#: time head's "same" (inside the rule's own allowance), "ruled out" is _ruled_out's.
+LINE_IN_USE = "In use"
+LINE_MAIN = "Main route"            # option 0 while a diversion is the line in use (label() says "The main route")
+LINE_SIMILAR = "similar"
+LINE_RULED_OUT = "ruled out"
+LINE_BUSY = "busy hours"            # Q4: a road in use in the weekday busy hours says that, not its time
+LINE_NOT_COMPARED = "not compared"  # a stored line the rule does not judge (a way round that is not in use)
+
+
+def line_name(alt):
+    """An option's name on its line: label()'s, the main route without its article."""
+    return label(alt) if int(alt or 0) else LINE_MAIN
+
+
+def line_words(o, use, busy=False):
+    """(words, state) for one option's line against the line in use. In this order: a busy-hours road in use; ruled
+    out; the time head "same" = "similar" (Q3: also where the why prints a small half-minute difference); else the
+    round-trip difference to the nearest half minute ("3.5 min quicker", "3 min longer"); where that rounds to nothing
+    but a lorry fits a different number of trips a day, the trips ("1 trip fewer")."""
+    if busy:
+        return LINE_BUSY, "busy"
+    if o["ruled_out"]:
+        return LINE_RULED_OUT, "ruled_out"
+    if o["heads"]["time"] == 0:
+        return LINE_SIMILAR, "similar"
+    dt = half_min(use["cycle_min"], o["counts"]["cycle_min"])
+    if dt:
+        return f"{_n(abs(dt))} min " + ("longer" if dt > 0 else "quicker"), ("longer" if dt > 0 else "quicker")
+    d = int(o["counts"]["trips"]) - int(use["trips"])
+    if d:
+        return f"{abs(d)} trip{'' if abs(d) == 1 else 's'} " + ("more" if d > 0 else "fewer"), ("quicker" if d > 0 else "longer")
+    return LINE_SIMILAR, "similar"
+
+
+def line_labels(out, lines, lorry, use, use_pair):
+    """route["lines"]: one entry for every stored line of the card's lorry, the line in use first, then by option
+    number: {"alt" (the loaded leg's option number, None for a line stored on the return leg only), "return_alt",
+    "name", "words", "state"}. state: in_use, quicker, longer, similar, ruled_out, busy, not_compared."""
+    busy_alts = {a for b in (out.get("busy_roads") or []) for a in (b.get("pair") or []) if a is not None}
+    res = [{"alt": use_pair[0], "return_alt": use_pair[1], "name": LINE_IN_USE,
+            "words": f"{_n(use['cycle_min'])} min", "state": "in_use"}]
+    seen_loaded, seen_return = {use_pair[0]}, {use_pair[1]}
+    for o in sorted(out["options"], key=lambda x: x["alt"]):
+        words, state = line_words(o, use, busy=(o["alt"] in busy_alts and o["alt"] != use_pair[0]))
+        res.append({"alt": o["alt"], "return_alt": o.get("return_alt"), "name": line_name(o["alt"]),
+                    "words": words, "state": state})
+        seen_loaded.add(o["alt"])
+        if o.get("return_alt") is not None:
+            seen_return.add(o["return_alt"])
+    loaded = sorted({a for (p, leg, a) in lines if p == lorry and leg == "loaded"} - seen_loaded)
+    for a in loaded:
+        back = a if (lorry, "return", a) in lines else None
+        res.append({"alt": a, "return_alt": back, "name": line_name(a), "words": LINE_NOT_COMPARED, "state": "not_compared"})
+        if back is not None:
+            seen_return.add(back)
+    for a in sorted({a for (p, leg, a) in lines if p == lorry and leg == "return"} - seen_return):
+        res.append({"alt": None, "return_alt": a, "name": line_name(a), "words": LINE_NOT_COMPARED, "state": "not_compared"})
+    return res
 
 
 def option_entry(alt, m, use, ctx, hist, reasons=(), added=(), searched=True):

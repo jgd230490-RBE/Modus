@@ -1136,6 +1136,16 @@ ok("14. source: the card's read never builds the table itself (peek, then its ow
    "_best_table_held(d)" in _ep14 and "_best_one(route_id, d)" in _ep14 and "_best_table(d)" not in _ep14
    and "return _best_table(d)" in _f and "read_cache.peek(" in _m.split("def _best_table_held(")[1].split("\ndef ")[0])
 
+# 15. 17 Nov 2026 (route option labels; test_route_option_labels.py has the words): the card's read carries `lines`
+# for a real route: the line in use first, then one entry for each option the rule judged, by number
+for _c15 in (_c14, _c14w):
+    _r15 = _c15["route"]
+    ok(f"⭐ 15. {_r15['route']}: the card's read carries the labels for the map: the line in use first, then an entry an option",
+       bool(_r15.get("lines")) and _r15["lines"][0]["state"] == "in_use" and _r15["lines"][0]["name"] == "In use"
+       and _r15["lines"][0]["words"].endswith(" min")
+       and [x["alt"] for x in _r15["lines"][1:1 + len(_r15["options"])]] == sorted(o["alt"] for o in _r15["options"])
+       and all(set(x) == {"alt", "return_alt", "name", "words", "state"} for x in _r15["lines"]), _r15.get("lines"))
+
 print()
 for f_ in FAIL:
     print("  FAIL:", f_)
