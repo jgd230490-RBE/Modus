@@ -139,6 +139,11 @@ const SENT = "Busy-hour times are running. Route all can start when they finish.
     ok("⭐ 2. Q6: who started it is the row's hover title only, never words on the row",
        r0.getAttribute("title") === "Started by Ada Admin" && !r0.textContent.includes("Ada Admin"));
     ok("2. a running row has no × and no Carry on", !r0.querySelector("[data-work-close]") && !r0.querySelector("[data-work-carry]"));
+    await act(async () => { w.workSeen({ id: "j1", state: "running", line: "Route all: 93 of 188 legs", done: 93, total: 188 }); w.workSeen({ id: "nobody", line: "x" }); });
+    ok("2. a batch's reply moves the list's row at once (workSeen), in step with the page's own line; a row not in the list is left out",
+       rows().length === 2 && rows()[0].querySelector(".wl-line").textContent === "Route all: 93 of 188 legs"
+       && rows()[0].querySelector('[role="progressbar"] i').style.width === "49%"
+       && (code.match(/workSeen\(j\.working\);/g) || []).length === 4 && code.includes("if(res && res.ok) return res.json();"));
     ok("⭐ 2. the done row: 'R050: Alt 1 made the main route', 'Done 14:02', no bar, a named ×",
        r1.getAttribute("data-work-row") === "done" && r1.querySelector(".wl-line").textContent === "R050: Alt 1 made the main route"
        && r1.querySelector("small").textContent === "Done " + w.workClock(T1) && !r1.querySelector('[role="progressbar"]')
@@ -312,7 +317,7 @@ const SENT = "Busy-hour times are running. Route all can start when they finish.
   ok("7. the chip's colours: the dark grade on the dark bar, the status tokens on Light's white bar; the list a surface card in every look",
      html.includes(".work-chip.wc-ok{border-color:#047857;background:#0F2A22;color:#6EE7B7;}") && html.includes(".work-chip.wc-bad{border-color:#B91C1C;background:#3B1414;color:#FCA5A5;}")
      && html.includes('html[data-theme="light"] .work-chip{border-color:var(--warn-text);background:var(--st-warn-bg);color:var(--warn-text);}')
-     && html.includes(".work-list{position:absolute;right:0;top:40px;z-index:60;width:340px;max-width:calc(100vw - 16px);background:var(--surface);color:var(--ink);"));
+     && html.includes(".work-list{position:absolute;right:0;top:40px;z-index:60;width:372px;max-width:calc(100vw - 16px);background:var(--surface);color:var(--ink);"));
   ok("7. the page makes no sentence about a job itself: no job name is joined to 'is running' or 'can start' in the script",
      !/is running\.|are running\.|can start when/.test(code.replace(/\/\/[^\n]*/g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "")));
 

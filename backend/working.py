@@ -360,8 +360,13 @@ def batch(kinds, job_id=None, wanted=None):
     cur = running(now)
     if cur is None:
         row = _get(job_id)
-        # its own row read "stopped" for want of a batch and nothing else has started since: this batch revives it
-        return row if (row and row["kind"] in kinds and row.get("state") == "running") else None
+        if not row or row["kind"] not in kinds or row.get("state") not in ("running", "stopped") or int(row.get("closed") or 0):
+            return None
+        # its own row read "stopped" (no batch for GAP, or its tab said it was going) and nothing else has started
+        # since: a batch arriving now shows its sender is alive after all, so the row is running again
+        db.execute("UPDATE working_jobs SET state = ?, beat_at = ?, ended_at = NULL WHERE tenant_id = ? AND id = ?",
+                   ("running", _iso(now), db.current_tenant(), row["id"]))
+        return _get(row["id"])
     if cur["kind"] in kinds and cur["row"] is not None:
         return cur["row"]
     raise Busy(sentence(cur["kind"], wanted or kinds[0]))
@@ -379,10 +384,10 @@ def progress(job_id, attempted=0, remaining=None):
         total = done + int(remaining)
     if total is not None:
         done = min(done, int(total))
-    db.execute("UPDATE working_jobs SET done = ?, total = ?, beat_at = ?, state = ?, ended_at = NULL "
-               "WHERE tenant_id = ? AND id = ?",
-               (done, total, _iso(_now()), "running" if row.get("state") == "running" else row["state"],
-                db.current_tenant(), row["id"]))
+    # the state is not touched here: a batch that finishes after its tab has gone still counts what it did, and the
+    # row stays "stopped" (only the START of a batch revives a row, see batch())
+    db.execute("UPDATE working_jobs SET done = ?, total = ?, beat_at = ? WHERE tenant_id = ? AND id = ?",
+               (done, total, _iso(_now()), db.current_tenant(), row["id"]))
     return view(_get(row["id"]))
 
 

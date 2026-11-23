@@ -395,6 +395,13 @@ if working:
     # ======================================================================= #
     #  6. Batches                                                              #
     # ======================================================================= #
+    _net = read("backend/network.py")
+    ok("6. the batches' own logic is as it was: bake_batch keeps its two decorators (one limits check, one index rebuild "
+       "a batch), and the new count above them is plain",
+       '@_limits_once                                  # 17 Oct 2026: one lorry-limits check a route\n'
+       '@road_sections.rebuild_once("bake batch")\ndef bake_batch(' in _net
+       and re.search(r"\n\n\ndef bake_todo\(", _net) is not None
+       and getattr(_real_todo, "__wrapped__", None) is None)
     job = d["id"]
     st, r = http(main.bake_routes, "A", 30, None, None, job)
     ok("⭐ 6. a batch of the job already running is never refused, moves the row on and hands back its line",
@@ -461,6 +468,14 @@ if working:
     ok("7. a late batch of a job that read stopped, with nothing else running, revives its own row",
        st == "ok" and r["working"]["state"] == "running" and r["working"]["done"] == 93, f"{st} {r}")
     working.end(j["id"], "stopped")
+    late = working.progress(j["id"], attempted=0, remaining=95)
+    ok("7. a batch that FINISHES after its tab said it was going leaves the row stopped (its count kept)",
+       late["state"] == "stopped" and late["done"] == 93 and late["ended_at"], str(late))
+    st, r = http(main.bake_routes, "A", 30, None, None, j["id"])
+    ok("7. ...but a batch that STARTS after it shows the sender alive: the row is running again",
+       st == "ok" and r["working"]["state"] == "running" and r["working"]["done"] == 124, f"{st} {r}")
+    working.end(j["id"], "stopped")
+    db.execute("UPDATE working_jobs SET done = 93 WHERE tenant_id = ? AND id = ?", (T, j["id"]))
     network.bake_todo = lambda profile=None, legs=None: 47 if legs == ("loaded",) else 999
     st, c = http(main.working_start, main.WorkStartIn(kind="route_all", profiles=["A", "B"], legs="loaded", carry=j["id"]))
     ok("⭐ 7. Carry on starts a new row that keeps the count ('93 of 187 legs', what is left added to what was done)",

@@ -516,7 +516,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   html[data-theme="light"] .work-chip.wc-bad{border-color:var(--bad-text);background:var(--st-bad-bg);color:var(--bad-text);}
   html[data-theme="light"] .work-chip.wc-bad i{background:var(--red);}
   .work-chip:focus-visible{outline:2px solid var(--hdr-fg);outline-offset:2px;}
-  .work-list{position:absolute;right:0;top:40px;z-index:60;width:340px;max-width:calc(100vw - 16px);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.18);font-size:13px;line-height:1.4;text-align:left;}
+  .work-list{position:absolute;right:0;top:40px;z-index:60;width:372px;max-width:calc(100vw - 16px);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.18);font-size:13px;line-height:1.4;text-align:left;}
   .work-list .wl-head{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);}
   .work-list h6{margin:0;font-size:13px;font-weight:600;color:var(--ink);}
   .work-list ul{list-style:none;margin:0;padding:0;max-height:60vh;overflow:auto;}
@@ -532,9 +532,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .wl-prog i{display:block;height:100%;background:var(--gold);}
   .wl-row .btn-sec{flex:none;} .wl-row .row-x{flex:none;}
   .wl-note{margin:0;padding:8px 12px;border-top:1px solid var(--line);color:var(--ink);}
-  @media (max-width:640px){ .work-list{position:fixed;left:8px;right:8px;top:60px;width:auto;max-width:none;} }
+  @media (max-width:640px){ .work{margin-left:6px;} .work-list{position:fixed;left:8px;right:8px;top:60px;width:auto;max-width:none;} }
   /* the one refusal, where a second job would be pressed (the mockup's card 3) */
-  .work-busy{margin:6px 0 0;max-width:270px;white-space:normal;font-size:13px;line-height:1.4;color:var(--ink);}
+  .work-busy{margin:6px 0 0;max-width:270px;white-space:normal;font-size:13px;font-weight:400;line-height:1.4;color:inherit;}
   .info-pop{position:fixed;z-index:80;max-width:340px;width:max-content;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:10px;padding:12px 14px;box-shadow:0 12px 32px rgba(0,0,0,.35);font-size:14px;line-height:1.45;text-align:left;font-weight:400;text-transform:none;letter-spacing:0;white-space:normal;}
   .info-pop:focus{outline:none;}
   .info-pop h6{margin:0 0 4px;font-size:14px;font-weight:600;color:var(--popover-fg);text-transform:none;letter-spacing:0;padding-right:22px;}
@@ -1721,10 +1721,21 @@ function errSay(what, e){ return `${what} ${errMsg(e)}`; }
 const WORK_BUSY = 423;             // the status the server refuses a second job with: its sentence is shown alone
 const WORK_CARRY = "wayscope-work-carry";
 const WORK_POLL_BUSY = 4000, WORK_POLL_IDLE = 30000;
-var WORK = { jobs: [], busy: {}, running: null, subs: new Set(), sending: {}, carry: null, go: null, canGo: null, seq: 0 };
+var WORK = { jobs: [], busy: {}, running: null, sig: "", subs: new Set(), sending: {}, carry: null, go: null, canGo: null, seq: 0 };
 function workApply(j){
   if(!j || !Array.isArray(j.jobs)) return;
+  // an answer that says what the page already shows draws nothing again (the Routes page reads this list too)
+  const sig = JSON.stringify([j.jobs, j.busy || {}]);
+  if(sig === WORK.sig) return;
+  WORK.sig = sig;
   WORK.jobs = j.jobs; WORK.busy = j.busy || {}; WORK.running = j.running || null;
+  WORK.subs.forEach(f => { try { f(); } catch(e){} });
+}
+// a batch's reply carries its row as it now reads: the list shows it at once, in step with the page's own line
+function workSeen(v){
+  if(!v || !v.id || !WORK.jobs.some(j => j.id === v.id)) return;
+  WORK.jobs = WORK.jobs.map(j => j.id === v.id ? { ...j, ...v, can_carry: j.can_carry, can_close: j.can_close } : j);
+  WORK.sig = "";
   WORK.subs.forEach(f => { try { f(); } catch(e){} });
 }
 function workRead(){
@@ -18414,6 +18425,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         if(!r.ok){ failed.push(`${vehShort(prof)}: ${errMsg(await errFrom(r))}`); continue; }
         const j = await r.json();
         if(j.error) failed.push(`${vehShort(prof)}: ${j.error}`);
+        workSeen(j.working);
         if(say && j.working && j.working.state === "running" && j.working.done < j.working.total) say(j.working.line);
       } catch(e){ failed.push(`${vehShort(prof)}: ${errMsg(e)}`); }
     }
@@ -19153,6 +19165,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
       while(true){
         const j = await postRouteBatch(new URLSearchParams({ limit: "30", job: job.id }), setRouteMsg, "hour-times/bake");
         const left = j.remaining ?? 0;
+        workSeen(j.working);
         setRouteMsg((j.working && j.working.line) || job.line);
         if(left <= 0) break;
         if(left >= last) throw new Error(`${left} left and not falling`);
@@ -19201,6 +19214,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           if(tokenRef.current) q.set("token", tokenRef.current);
           const j = await postRouteBatch(q, setRouteMsg);
           const left = j.remaining ?? 0;
+          workSeen(j.working);                 // the list keeps step with the line here
           setRouteMsg((j.working && j.working.line) || job.line);
           await reloadNetwork();
           if(left <= 0) break;
@@ -19378,6 +19392,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
           const j = await postRouteBatch(q, setZoneMsg);
           done += j.baked || 0;
           const left = j.remaining ?? 0;
+          workSeen(j.working);
           setZoneMsg((j.working && j.working.line) || job.line);
           if(left <= 0) break;
           if(left >= last) throw new Error(`${left} leg(s) left and not falling`);

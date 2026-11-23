@@ -654,11 +654,6 @@ def _mark_leg_quietly(route_id, profile, leg):
         print(f"holding: {route_id} {profile} {leg} not marked: {e}")
 
 
-# 12 Oct 2026 (the review and fix pass): every leg the batch upserts marks the shared-section
-# index dirty and it is rebuilt ONCE when the batch ends — it used to be rebuilt after every
-# primary upsert, about 25 full rebuilds a batch
-@_limits_once                                  # 17 Oct 2026: one lorry-limits check a route
-@road_sections.rebuild_once("bake batch")
 def bake_todo(profile=DEFAULT_PROFILE, legs=LEGS):
     """23 Nov 2026 (the "Working" list): how many (route, leg) pairs a run of bake_batch would work through for this
     lorry type: the same two reads bake_batch makes its list from, and no router call. Route all's line reads
@@ -670,6 +665,11 @@ def bake_todo(profile=DEFAULT_PROFILE, legs=LEGS):
     return sum(1 for r in all_routes for leg in legs if (r["id"], leg) not in attempted)
 
 
+# 12 Oct 2026 (the review and fix pass): every leg the batch upserts marks the shared-section
+# index dirty and it is rebuilt ONCE when the batch ends — it used to be rebuilt after every
+# primary upsert, about 25 full rebuilds a batch
+@_limits_once                                  # 17 Oct 2026: one lorry-limits check a route
+@road_sections.rebuild_once("bake batch")
 def bake_batch(profile=DEFAULT_PROFILE, limit=25, legs=LEGS, alternatives=ALTERNATIVES,
                budget_s=None):
     """
