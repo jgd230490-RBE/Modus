@@ -2138,8 +2138,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     // notice is not a hint
     // NARROWED 13 Oct 2026 (D45, Option A chosen by the user): light grey with red text and a 3 px red rule, was ink
     // with amber text and a 1 px amber rule; the token values are pinned in the 13 Oct block at the end of this file
+    // NARROWED 23 Nov 2026 (the own look, Group A): the bar's text is in the page's text face (var(--f-text), IBM Plex
+    // Sans), was Inter; nothing else in the bar moves
     ok("the bar is CSS classes in <style>: 26 px, light grey with red text from tokens, centred, uppercase, letter-spaced, an ellipsis, the Guide at the right end, 14 px text",
-      /\.demo-bar\{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var\(--demo-bg\);color:var\(--demo-fg\);border-bottom:3px solid var\(--demo-rule\);font:700 14px\/1 Inter,system-ui,sans-serif;letter-spacing:\.06em;/.test(html)
+      /\.demo-bar\{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var\(--demo-bg\);color:var\(--demo-fg\);border-bottom:3px solid var\(--demo-rule\);font:700 14px\/1 var\(--f-text\);letter-spacing:\.06em;/.test(html)
       && !/\.demo-bar[^{]*\{[^}]*font:[^;]*\b1[0-3](?:\.\d+)?px/.test(html)
       && /\.demo-bar-text\{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;\}/.test(html)
       && /\.demo-bar-guide\{position:absolute;right:8px;top:2px;height:21px;[^}]*font:600 14px\/21px /.test(html) && /\.demo-bar\.has-guide\{padding:0 84px;\}/.test(html)

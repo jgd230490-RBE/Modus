@@ -24,9 +24,12 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.css" rel="stylesheet" integrity="sha384-S0a+eT2dLtsB1suB6ZJ/8IX+0d0Fvix9weJQ67L3E+jHOvn6SUKwYXVDyGdMuJtL" crossorigin="anonymous">
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.js" integrity="sha384-jdGuG3GDIph+ONsjITkxWmlUE2RR0At6jtOVirn6L/6dYy3WcAVDaBNI3X96rUT0" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
+    /* 23 Nov 2026 (the own look, Group A): Sora for page headings, box titles and large figures; IBM Plex Sans for
+       everything else (the landing page's pair; it replaces the stock face of 29 Sep). notes/design-language-1123.md */
+    --f-text:'IBM Plex Sans',system-ui,sans-serif; --f-head:Sora,'IBM Plex Sans',system-ui,sans-serif;
     /* Wayscope theme (29 Sep 2026): ink #1F2024 for the header and headings, blue for
        controls and links, ORANGE AS THE BRAND ACCENT ONLY (the logo and the 2 px rule
        under the header). Amber (--gold) keeps meaning WARNING — unbaked routes, a missing
@@ -223,7 +226,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   html[data-theme="dark"] .mapboxgl-ctrl-group{background:var(--surface-3)} html[data-theme="dark"] .mapboxgl-ctrl-group button span{filter:invert(1)}
   /* DARK-REMAP-END */
   html,body,#root{height:100%;}
-  body{margin:0;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;}
+  body{margin:0;font-family:var(--f-text);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;}
   .brand-bar{background:var(--hdr-bg);color:var(--hdr-fg);border-bottom:2px solid var(--brand-orange);}
   .brand-lockup{height:38px;width:auto;display:block;content:var(--hdr-logo);}
   .brand-rule{width:1px;height:28px;background:var(--hdr-rule);}
@@ -247,7 +250,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   /* 11 Oct 2026 — the guide, options 4 + 1 + 2 (the user): Google-style bubbles, slightly transparent; a light
      one-line strip that offers the tour; small pulsing dots on the features. Nothing pops up uninvited. */
   .guide-ring{position:fixed;z-index:9000;pointer-events:none;border:1.5px solid rgba(26,115,232,.55);border-radius:8px;box-shadow:0 0 0 3px rgba(26,115,232,.10);transition:top .15s,left .15s,width .15s,height .15s}
-  .guide-card{position:fixed;z-index:9001;width:min(300px,calc(100vw - 24px));background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border:0;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:11px 13px 8px;font:13px/1.45 Inter,system-ui,sans-serif}
+  .guide-card{position:fixed;z-index:9001;width:min(300px,calc(100vw - 24px));background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border:0;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:11px 13px 8px;font:13px/1.45 var(--f-text)}
   .guide-card[data-place="below"]::before{content:"";position:absolute;top:-6px;left:20px;border:6px solid transparent;border-top:0;border-bottom-color:rgba(32,33,36,.88)}
   .guide-card[data-place="above"]::before{content:"";position:absolute;bottom:-6px;left:20px;border:6px solid transparent;border-bottom:0;border-top-color:rgba(32,33,36,.88)}
   .guide-card h4{margin:0 0 2px;font-size:13.5px;font-weight:600;color:#fff}
@@ -259,7 +262,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .guide-card .guide-foot button.guide-next{color:#8AB4F8}
   .guide-card .guide-off{display:block;margin-top:2px;font:inherit;font-size:12px;color:rgba(255,255,255,.5);background:none;border:none;padding:0;cursor:pointer}
   .guide-card .guide-off:hover{color:rgba(255,255,255,.8);text-decoration:underline}
-  .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#44403C;border:1px solid rgba(31,32,36,.12);border-radius:8px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 Inter,system-ui,sans-serif}
+  .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#44403C;border:1px solid rgba(31,32,36,.12);border-radius:8px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 var(--f-text)}
   .guide-strip b{color:#1F2024;font-weight:600}
   .guide-strip .guide-strip-go{position:relative;font:inherit;font-weight:500;color:#1A73E8;background:none;border:0;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap}
   .guide-strip .guide-strip-go:hover{background:rgba(26,115,232,.08)}
@@ -273,7 +276,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   @media (max-width:767px){.guide-dot{display:none}}   /* 18 Oct 2026 (decision 17): no dots on a phone — the effect draws none; this holds for the second between a resize and its next pass */
   @keyframes guide-pulse{0%{box-shadow:0 0 0 0 rgba(194,65,12,.45)}70%{box-shadow:0 0 0 8px rgba(194,65,12,0)}100%{box-shadow:0 0 0 0 rgba(194,65,12,0)}}
   @media (prefers-reduced-motion:reduce){.guide-dot{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.25)}}
-  .guide-tip{position:fixed;z-index:9003;width:260px;pointer-events:none;background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:8px 11px;font:13px/1.45 Inter,system-ui,sans-serif}
+  .guide-tip{position:fixed;z-index:9003;width:260px;pointer-events:none;background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:8px 11px;font:13px/1.45 var(--f-text)}
   .guide-tip b{color:#fff;font-weight:600}
   /* 11 Oct 2026 — the demo bar (the user: "There is a bar with FICTIONAL DEMO SCHEME · NOTHING HERE IS REAL and a
      guide button on the public map. Lets have that on every page."). One 26 px strip under the header on every
@@ -283,11 +286,11 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
      Review, 11 Oct 2026: the notice is 14 px, the floor (it was 13 px, the hint allowance; a required notice is not
      a hint), and the Guide is 14 px. Below 640 px the notice WRAPS instead of ending in an ellipsis: with the Guide
      beside it a 375 px phone cut it to "FICTIONAL DEMO SCHEME · NOTHING H…" (the map's own phone strip wrapped). */
-  .demo-bar{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var(--demo-bg);color:var(--demo-fg);border-bottom:3px solid var(--demo-rule);font:700 14px/1 Inter,system-ui,sans-serif;letter-spacing:.06em;overflow:hidden;}
+  .demo-bar{position:relative;flex:none;height:26px;display:flex;align-items:center;justify-content:center;padding:0 12px;background:var(--demo-bg);color:var(--demo-fg);border-bottom:3px solid var(--demo-rule);font:700 14px/1 var(--f-text);letter-spacing:.06em;overflow:hidden;}
   .demo-bar.has-guide{padding:0 84px;}
   .demo-bar::before{content:"DEMO";content:"DEMO" / "";flex:none;margin-right:8px;padding:0 6px;border-radius:3px;background:var(--demo-tag-bg);color:var(--demo-tag-fg);line-height:18px;letter-spacing:.08em;}
   .demo-bar-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase;}
-  .demo-bar-guide{position:absolute;right:8px;top:2px;height:21px;padding:0 10px;border:0;border-radius:999px;background:var(--demo-btn-bg);box-shadow:inset 0 0 0 1px var(--demo-btn-ring);color:var(--demo-btn-fg);font:600 14px/21px Inter,system-ui,sans-serif;letter-spacing:0;cursor:pointer;}
+  .demo-bar-guide{position:absolute;right:8px;top:2px;height:21px;padding:0 10px;border:0;border-radius:999px;background:var(--demo-btn-bg);box-shadow:inset 0 0 0 1px var(--demo-btn-ring);color:var(--demo-btn-fg);font:600 14px/21px var(--f-text);letter-spacing:0;cursor:pointer;}
   .demo-bar-guide:hover{background:var(--demo-btn-hover);}
   .demo-bar-guide:focus-visible{outline:2px solid var(--demo-fg);outline-offset:0;}
   /* 18 Oct 2026 (UI audit decision 9): the 21 px pill taps at 44 px through a halo; the bar keeps its height (it clips
@@ -375,7 +378,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   /* 31 Oct 2026 (task 4c PR 3): a pinned picture's Move corners handles (on the map, over the photo: fixed colours) and the
      Pictures list's eye (CSS glyph, named by aria-label) */
   .slp-corner{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid #1E3A8A;box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:grab;}
-  .slp-corner::after{content:attr(data-n);position:absolute;left:20px;top:-4px;font:700 12px Inter,sans-serif;color:#fff;background:#1E3A8A;border-radius:4px;padding:0 4px;}
+  .slp-corner::after{content:attr(data-n);position:absolute;left:20px;top:-4px;font:700 12px var(--f-text);color:#fff;background:#1E3A8A;border-radius:4px;padding:0 4px;}
   .slp-mover{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);border:2px solid #1E3A8A;cursor:move;display:grid;place-items:center;font-size:18px;color:#1E3A8A;box-shadow:0 1px 4px rgba(0,0,0,.35);}
   .slp-turner{width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid #1E3A8A;cursor:grab;display:grid;place-items:center;font-size:15px;color:#1E3A8A;}
   .slp-eye{width:28px;height:28px;border-radius:6px;display:inline-grid;place-items:center;color:var(--muted);flex:none;}
@@ -385,7 +388,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .mapboxgl-ctrl-group button.sl-full-btn{font-size:17px;line-height:1;color:#111827;} .sl-full-btn::before{content:"⤢";} .sl-full-btn[aria-pressed="true"]::before{content:"⤡";}
   .sl-fold{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;}
   .sl-fold:hover{background:var(--surface-2);}
-  .sl-demo-pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;background:var(--demo-bg);color:var(--demo-fg);font:700 12px/1 Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;box-shadow:inset 0 0 0 1px var(--demo-rule);}
+  .sl-demo-pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;background:var(--demo-bg);color:var(--demo-fg);font:700 12px/1 var(--f-text);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;box-shadow:inset 0 0 0 1px var(--demo-rule);}
   .sl-demo-pill b{padding:0 5px;border-radius:3px;background:var(--demo-tag-bg);color:var(--demo-tag-fg);line-height:16px;letter-spacing:.08em;}
   .sl-demo-on-map{position:absolute;top:10px;left:10px;z-index:3;}
   .row-menu-list{position:absolute;right:0;top:32px;z-index:20;min-width:220px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:8px;padding:6px;box-shadow:0 10px 28px rgba(0,0,0,.28);text-align:left;white-space:nowrap;}
@@ -732,6 +735,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ph-lp{border-top:1px solid var(--line);padding:9px 0;font-size:14px}
   .ph-lp small{display:block;color:var(--muted);font-size:13px}
   .ct-h{font-size:16px;font-weight:600;color:var(--ink);margin:0;}
+  /* 23 Nov 2026 (the own look): Sora for page headings, box titles and large figures */
+  h1,h2,h3,h4,.ct-h,.kpi-num,.rc-tile b,.sim-clock{font-family:var(--f-head);}
   .ct-line{font-size:14px;line-height:1.5;color:var(--ink);font-variant-numeric:tabular-nums;}
   .ct-note{font-size:13px;line-height:1.45;color:var(--muted);margin-top:4px;}
   .ct-more{margin-top:6px;font-size:14px;color:var(--ink);}
@@ -1259,7 +1264,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
      accent's control colour (--action). Nothing here applies at 768 px and above. */
   .phone-shell{flex-direction:column;}
   .phone-tabs{flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);}
-  .phone-tab{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;padding:6px 2px;border:0;background:transparent;color:var(--muted);font:500 13px/1.15 Inter,system-ui,sans-serif;cursor:pointer;}
+  .phone-tab{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;padding:6px 2px;border:0;background:transparent;color:var(--muted);font:500 13px/1.15 var(--f-text);cursor:pointer;}
   .phone-tab .nav-ic{width:22px;height:22px;}
   .phone-tab.is-on{color:var(--action);font-weight:600;}
   .phone-tab.is-on::before{content:"";position:absolute;top:0;left:24%;right:24%;height:3px;border-radius:0 0 3px 3px;background:var(--action);}
@@ -1270,7 +1275,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .phone-more{position:absolute;left:0;right:0;bottom:calc(57px + env(safe-area-inset-bottom,0px));z-index:45;max-height:85%;overflow-y:auto;background:var(--surface);border-top:1px solid var(--line);border-radius:14px 14px 0 0;box-shadow:0 -12px 32px rgba(16,24,40,.22);padding:6px 0 10px;}
   .phone-more h3{margin:0;padding:12px 20px 4px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
   .phone-more p{margin:0;padding:0 20px 8px;font-size:14px;color:var(--muted);}
-  .phone-more-item{display:flex;align-items:center;gap:14px;width:100%;min-height:48px;padding:0 20px;border:0;background:transparent;color:var(--ink);font:500 15px Inter,system-ui,sans-serif;text-align:left;text-decoration:none;cursor:pointer;}
+  .phone-more-item{display:flex;align-items:center;gap:14px;width:100%;min-height:48px;padding:0 20px;border:0;background:transparent;color:var(--ink);font:500 15px var(--f-text);text-align:left;text-decoration:none;cursor:pointer;}
   .phone-more-item .nav-ic{width:20px;height:20px;color:var(--muted);}
   .phone-more-item.pm-desk{font-weight:400;color:var(--muted);}   /* 10 Nov 2026 (UI fix phone 2): the pages a phone does not open in the plainer weight, the Simulation in the ink weight */
   .phone-more-item.is-on{color:var(--action);font-weight:600;}
@@ -1285,11 +1290,11 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   /* the phone Look-ahead: a date strip, one card for the chosen day, the day's lines (mockup 10) */
   .ph-la{padding:16px 16px 24px;}
   .ph-seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
-  .ph-seg button{min-height:48px;padding:0 16px;border:0;background:var(--surface);color:var(--muted);font:600 14px Inter,system-ui,sans-serif;cursor:pointer;}
+  .ph-seg button{min-height:48px;padding:0 16px;border:0;background:var(--surface);color:var(--muted);font:600 14px var(--f-text);cursor:pointer;}
   .ph-seg button+button{border-left:1px solid var(--line);}
   .ph-seg button[aria-pressed="true"]{background:var(--action);color:var(--action-fg);}
   .ph-days{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:14px 0 12px;}
-  .ph-day{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--muted);font:500 13px/1.2 Inter,system-ui,sans-serif;cursor:pointer;}
+  .ph-day{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--muted);font:500 13px/1.2 var(--f-text);cursor:pointer;}
   .ph-day b{font-size:18px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
   .ph-day[aria-pressed="true"]{border-color:var(--action);box-shadow:inset 0 0 0 1px var(--action);color:var(--action);}
   .ph-day[aria-pressed="true"] b{color:var(--action);}
@@ -1311,7 +1316,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ph-line .rd-chips{margin-top:4px;}
   .ph-line .row-st{white-space:normal;margin-top:4px;}
   .ph-line .rd-dl{padding:2px 0 12px;grid-template-columns:1fr 1fr;gap:6px 14px;position:static;max-width:none;}
-  .ph-more{width:100%;min-height:48px;border:0;border-top:1px solid var(--line);background:transparent;color:var(--action);font:600 15px Inter,system-ui,sans-serif;cursor:pointer;}
+  .ph-more{width:100%;min-height:48px;border:0;border-top:1px solid var(--line);background:transparent;color:var(--action);font:600 15px var(--f-text);cursor:pointer;}
   .ph-actions{display:flex;gap:10px;margin-top:12px;}
   .ph-actions>*{flex:1;min-height:48px;display:inline-flex;align-items:center;justify-content:center;font-size:15px;}
   /* the shared page header lets its actions wrap under the title instead of pushing the page sideways: on a phone, and
@@ -1341,15 +1346,15 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   [hidden]{display:none !important;}
   .dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px;}
   .dash-wallbar-lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
-  .dash-wallbar-btn{font:600 13px Inter,system-ui,sans-serif;color:var(--navy-deep);background:var(--surface-3);border:1px solid transparent;border-radius:8px;padding:5px 11px;cursor:pointer;}
+  .dash-wallbar-btn{font:600 13px var(--f-text);color:var(--navy-deep);background:var(--surface-3);border:1px solid transparent;border-radius:8px;padding:5px 11px;cursor:pointer;}
   .dash-wallbar-btn:hover{background:var(--grey);}
   .dash-wallbar-btn.is-on{background:var(--navy);color:var(--control-fg);}
-  .dash-wallbar-sel{font:600 13px Inter,system-ui,sans-serif;color:var(--navy-deep);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px 7px;cursor:pointer;}
+  .dash-wallbar-sel{font:600 13px var(--f-text);color:var(--navy-deep);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:4px 7px;cursor:pointer;}
   .dash-wallbar-sep{width:1px;height:20px;background:var(--line);margin:0 3px;}
-  .dash-clock{margin-left:auto;font:700 clamp(15px,2.2vh,40px)/1 Inter,system-ui,sans-serif;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .dash-clock{margin-left:auto;font:700 clamp(15px,2.2vh,40px)/1 var(--f-text);color:var(--ink);font-variant-numeric:tabular-nums;}
   .dash-wallbar-note{font-size:12px;color:var(--muted);}
   .dash-wallbar-note code{background:var(--surface-3);border-radius:4px;padding:1px 5px;font-size:12px;}
-  .dash-divider{font:700 12px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+  .dash-divider{font:700 12px var(--f-text);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
                 border-top:2px solid var(--line);padding-top:9px;margin-bottom:10px;}
   .dash-wall .dash-divider{font-size:14px;}
   input[type=number]::-webkit-outer-spin-button,
@@ -2133,7 +2138,7 @@ const SERIES_LABELS = { id: "seriesLabels", afterDatasetsDraw(chart, _args, opts
   const over = marks.length ? marks[marks.length - 1].y - (A.bottom - 4) : 0;
   if(over > 0) marks.forEach(m => { m.y -= over; });
   const fs = (opts && opts.size) || 11;      // 14 Oct 2026: the big screen passes its larger text size
-  ctx.save(); ctx.font = `600 ${fs}px Inter, system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+  ctx.save(); ctx.font = `600 ${fs}px 'IBM Plex Sans', system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
   const x = A.right + 8;
   marks.forEach(m => {
     ctx.fillStyle = m.col || "#A8A29E"; ctx.fillRect(x, m.y - fs * 0.36, fs * 0.72, fs * 0.72);
@@ -2282,7 +2287,7 @@ function chartWrapText(ctx, text, maxW){
 }
 // title above, the plot, ONE scope line below (wrapped when the chart is narrow), on white, at twice the pixels
 function composeChartPng(plot, title, scope){
-  const S = CHART_PNG_SCALE, pad = 16, font = "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif";
+  const S = CHART_PNG_SCALE, pad = 16, font = "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif";
   const W = Math.max(plot.w, 420) + pad * 2, inner = W - pad * 2;
   const m = document.createElement("canvas").getContext("2d");
   m.font = `600 16px ${font}`; const tl = chartWrapText(m, title, inner);
@@ -2369,6 +2374,7 @@ function ChartCanvas({ config, height, size, title, scope, notools, head }){
     if(!sized || !ref.current || !window.Chart) return;
     if(inst.current) inst.current.destroy();
     window.Chart.defaults.color = tok("--muted", "#64748B");
+    if(window.Chart.defaults.font) window.Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
     window.Chart.defaults.borderColor = tok("--chart-grid", "rgba(100,116,139,.18)");
     inst.current = new window.Chart(ref.current, fitChartConfig(config, vwNow()));
     return () => { if(inst.current){ inst.current.destroy(); inst.current = null; } };
@@ -2590,7 +2596,7 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOp
         ctx.fillStyle = INKg; ctx.beginPath(); ctx.moveTo(px - 5, el.y - half - 7); ctx.lineTo(px + 5, el.y - half - 7); ctx.lineTo(px, el.y - half); ctx.closePath(); ctx.fill();
       }
       const words = r.cap == null ? " · no check-in time typed" : ` · ${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over capacity" : r.near ? " · queue likely" : "");
-      ctx.font = `600 ${gaFs + 1}px Inter, system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+      ctx.font = `600 ${gaFs + 1}px 'IBM Plex Sans', system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
       ctx.fillStyle = r.over ? REDg : INKg;   // the amber step is said in words; gold text fails contrast on white
       ctx.fillText(`${gaN1(r.g.arrivals_per_day)} a day${words}`, right + 10, el.y);
     });
@@ -4144,7 +4150,7 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick, from, to }){
     ctx.fillStyle = "rgba(217,119,6,.10)"; ctx.fillRect(a.left, p100, a.right - a.left, p90 - p100);
     ctx.strokeStyle = tok("--red", "#DC2626"); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(a.left, p100); ctx.lineTo(a.right, p100); ctx.stroke();
-    ctx.fillStyle = tok("--red", "#DC2626"); ctx.font = `600 ${fs}px Inter, system-ui, sans-serif`; ctx.textAlign = "right";
+    ctx.fillStyle = tok("--red", "#DC2626"); ctx.font = `600 ${fs}px 'IBM Plex Sans', system-ui, sans-serif`; ctx.textAlign = "right";
     ctx.fillText("capacity", a.right, p100 - 4);
     if(nowIdx >= 0){
       const x = chart.scales.x.getPixelForValue(nowIdx);
@@ -4252,13 +4258,13 @@ function clpBulletCfg(rows, valKey, nameKey, word){
     meta.data.forEach((el, i) => { const r = rows[i]; if(!r) return;
       const half = (el.height || 16) / 2 + 5, px = x.getPixelForValue(r.cap);
       ctx.strokeStyle = INK; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(px, el.y - half); ctx.lineTo(px, el.y + half); ctx.stroke();
-      ctx.font = `600 ${fs + 1}px Inter, system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+      ctx.font = `600 ${fs + 1}px 'IBM Plex Sans', system-ui, sans-serif`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
       ctx.fillStyle = r.over ? RED : INK;
       // 14 Oct 2026 (seen at 1366 px): the words sit in a column right of the plot, never after the bar, so a bar past its
       // cap cannot push them off the card
       // two short lines, so the column fits at 1366 px
       ctx.fillText(`${clpN1(r[valKey])} ${word}`, A.right + 12, el.y - 7);
-      ctx.font = `500 ${fs}px Inter, system-ui, sans-serif`;
+      ctx.font = `500 ${fs}px 'IBM Plex Sans', system-ui, sans-serif`;
       ctx.fillText(`${r.pct} % of ${grp(r.cap)}` + (r.over ? " · over the cap" : ""), A.right + 12, el.y + 8);
     });
     ctx.restore();
@@ -4299,8 +4305,8 @@ function clpCouncilCfg(c){
     ctx.textBaseline = "middle"; ctx.textAlign = "left"; ctx.fillStyle = INK;
     // 14 Oct 2026 (seen at 1366 px): a column right of the plot, two short lines, so the busiest council's words fit
     meta.data.forEach((el, i) => { const r = rows[i]; if(!r) return;
-      ctx.font = "600 12px Inter, system-ui, sans-serif"; ctx.fillText(`${clpN1(r.movements_per_day)} movements a day`, A.right + 12, el.y - 7);
-      ctx.font = "500 11px Inter, system-ui, sans-serif"; ctx.fillText(`${grp(r.distance)} ${c.distance_word}`, A.right + 12, el.y + 7); });
+      ctx.font = "600 12px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText(`${clpN1(r.movements_per_day)} movements a day`, A.right + 12, el.y - 7);
+      ctx.font = "500 11px 'IBM Plex Sans', system-ui, sans-serif"; ctx.fillText(`${grp(r.distance)} ${c.distance_word}`, A.right + 12, el.y + 7); });
     ctx.restore();
   } };
   return { type: "bar",
@@ -6785,7 +6791,7 @@ function StockpilesPage({ meta, access, who }){
       ctx.beginPath(); ctx.moveTo(a.left, p); ctx.lineTo(a.right, p); ctx.stroke();
       if(nowIdx >= 0){ const x = chart.scales.x.getPixelForValue(nowIdx); ctx.setLineDash([]); ctx.strokeStyle = tok("--ink", "#1E293B"); ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(x, a.top); ctx.lineTo(x, a.bottom); ctx.stroke(); ctx.fillStyle = tok("--ink", "#1E293B");
-        ctx.font = "600 11px Inter, system-ui, sans-serif"; ctx.textAlign = "center"; ctx.fillText("now", x, a.top - 3); }
+        ctx.font = "600 11px 'IBM Plex Sans', system-ui, sans-serif"; ctx.textAlign = "center"; ctx.fillText("now", x, a.top - 3); }
       ctx.restore(); } }] } : null;
   return (
     <div className="max-w-7xl mx-auto p-6 pb-2" data-page="stockpiles">
@@ -8701,7 +8707,7 @@ function rcWhen(r){
 }
 // the fold as a picture for ChartTools: the four totals, then a line a choice (its planned figures)
 function rcPicture(d){
-  const T = d.totals.planned, font = "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif";
+  const T = d.totals.planned, font = "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif";
   const lines = [`Carbon ${rcWord(T.kg, "kg")[0]} · Lorry time ${rcWord(T.min, "min")[0]} · Distance ${rcWord(T.km, "km")[0]} · Fair cost (model) ${T.eur_missing ? "—" : rcWord(T.eur, "eur")[0]}`, ""];
   d.rows.forEach(r => {
     const p = r.planned;
@@ -11977,7 +11983,7 @@ function LaKpi({ value, caption, tone }){
   const len = String(value == null ? "" : value).length;
   return (
     <div className="card px-4 py-3 min-w-0" title={String(value == null ? "" : value)}>
-      <div className={"font-semibold tabular-nums truncate leading-8 " + (len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 6 ? "text-lg" : "text-2xl")}
+      <div className={"kpi-num font-semibold tabular-nums truncate leading-8 " + (len > 12 ? "text-sm" : len > 9 ? "text-base" : len > 6 ? "text-lg" : "text-2xl")}
         style={{ color: tone === "red" ? "var(--red)" : tone === "warn" ? "var(--warn-text)" : "var(--navy-deep)" }}>{value}</div>
       <div className="text-[13px] text-slate-500 mt-0.5 leading-tight">{caption}</div>
     </div>
@@ -15693,7 +15699,7 @@ var OL_H = 26, OL_STEP = 14, OL_NEAR = 10, OL_ENDS = 0.12;
 function olTextW(text){
   try {
     const cv = olTextW.cv || (olTextW.cv = document.createElement("canvas")), x = cv.getContext && cv.getContext("2d");
-    if(x){ x.font = "600 12px Inter, system-ui, sans-serif"; return Math.ceil(x.measureText(text).width) + 20; }
+    if(x){ x.font = "600 12px 'IBM Plex Sans', system-ui, sans-serif"; return Math.ceil(x.measureText(text).width) + 20; }
   } catch(e){}
   return Math.round(String(text).length * 6.6) + 20;
 }
