@@ -659,6 +659,17 @@ def _mark_leg_quietly(route_id, profile, leg):
 # primary upsert, about 25 full rebuilds a batch
 @_limits_once                                  # 17 Oct 2026: one lorry-limits check a route
 @road_sections.rebuild_once("bake batch")
+def bake_todo(profile=DEFAULT_PROFILE, legs=LEGS):
+    """23 Nov 2026 (the "Working" list): how many (route, leg) pairs a run of bake_batch would work through for this
+    lorry type: the same two reads bake_batch makes its list from, and no router call. Route all's line reads
+    "62 of 188 legs" from it."""
+    all_routes = db.query("SELECT id FROM routes WHERE tenant_id = ? ORDER BY id", (db.current_tenant(),))
+    attempted = {(g["route_id"], g["leg"]) for g in db.query(
+        "SELECT route_id, leg FROM route_geometry WHERE tenant_id = ? AND vehicle_profile = ?",
+        (db.current_tenant(), profile))}
+    return sum(1 for r in all_routes for leg in legs if (r["id"], leg) not in attempted)
+
+
 def bake_batch(profile=DEFAULT_PROFILE, limit=25, legs=LEGS, alternatives=ALTERNATIVES,
                budget_s=None):
     """

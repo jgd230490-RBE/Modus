@@ -70,6 +70,7 @@ import route_map_export  # 14 Oct 2026 — the route map export (backlog item 2)
 import forecast_plan  # 12 Nov 2026 — the approved plan by route and month as a CSV (the public map's "All routes", staff Download)
 import community     # 14 Oct 2026 — the community considerations layer (staff map and the CLP plans)
 import collisions    # 16 Oct 2026 — the collision history along the routes (CLOCS v5 C1; staff only)
+import working       # 23 Nov 2026 — the "Working" list: the record of the long job running, one at a time
 import bulletin_doc  # 12 Oct 2026 (C4) — the bulletin as people read it: one view model, the HTML page and the PDF
 import gate_arrivals  # 11 Oct 2026 — the staff Dashboard's "Gate arrivals" panel: lorries a day per gate, every team summed
 import clp  # 14 Oct 2026 (bundle G) — the Dashboard's "CLP monitoring" section and the CLP pack, from one read
@@ -130,6 +131,7 @@ async def lifespan(app: FastAPI):
         db.init_costing_db()        # 10 Sep evening. The GLOBAL fuel_index table (untenanted, by design).
         db.init_demo_requests_db()  # H9, 8 Oct. The GLOBAL demo_requests table (untenanted, by design).
         db.init_tool_leads_db()     # 16 Nov. The GLOBAL tool_leads table (the public tools' details; untenanted, by design).
+        db.init_working_db()        # 23 Nov. The "Working" list's record (working.py): scoped by tenant, not package data.
         db.init_users_db()          # G3, 14 Oct. Logins, sessions, links, audit, attempts: account data, not package data.
         limits.init_db()            # 13 Oct. The GLOBAL road_limits table (untenanted, by design: public road facts).
         # Phase 4.5. Must sit exactly here: init_tenant() migrates a pre-4.5 database by
@@ -512,7 +514,11 @@ AUDIT_SKIP = ("/api/costing/preview", "/api/carbon/scenario", "/api/carbon/summa
 AUDIT_SKIP_PREFIXES = ("/api/auth/", "/api/concerns/",
                        # 16 Nov 2026 (claude/tools-shell): the public tools' open calls work something out from typed
                        # figures; they write no audit row and must not empty the kept reads (tools_public, rule 6)
-                       "/api/tools/")
+                       "/api/tools/",
+                       # 23 Nov 2026 (claude/working-list): the "Working" list's own writes (a job's row started,
+                       # ended, closed) change no figure: no audit row and no kept read emptied. The jobs themselves
+                       # (a batch, a fetch, an import) are audited by their own paths as before.
+                       "/api/working/")
 #: 31 Oct 2026 (task 4c PR 3): adding a pinned picture (a file of up to 10 MB as the body) writes its OWN audit row, so
 #: the middleware does not keep the upload in memory a second time (as /api/site-layouts/read)
 _PICTURE_UPLOAD_PATH = re.compile(r"^/api/locations/[^/]+/site-layout/pictures$")
@@ -2113,6 +2119,10 @@ def forecast_week_restrictions_refresh(sync: int = 0):
     data and writes only the stored check.
     """
     _require_access()
+    # 23 Nov 2026 (the "Working" list): one long job at a time. A press while this check itself is running joins it,
+    # as before (the state comes back and the page polls it)
+    if not restrictions.refresh_state().get("running"):
+        _work_refuse("closures")
     try:                                  # 13 Oct 2026: the lorry-limits check is a DB read; re-run it too
         limits.store_checks()
     except Exception as e:
@@ -4378,7 +4388,18 @@ def promote_alt(route_id: str, profile: str = network.DEFAULT_PROFILE,
     if not want or any(l not in network.LEGS for l in want):
         raise HTTPException(400, f"leg must be one of {list(network.LEGS)}")
     # 17 Nov 2026 (best option step 3): the route choices record keeps who made the choice
-    return network.promote_alternative(route_id, profile, alt_index, leg=want[0], who=_by(), legs=want)
+    # 23 Nov 2026 (the "Working" list): the press is a job for as long as its one request runs (refused while another
+    # job runs; "R050: Alt 1 made the main route" when it has moved; no line when it refused for its own reason)
+    import route_best as _rb
+    try:
+        with working.held("make_primary", by=_by(), subject=route_id,
+                          detail={"label": _rb.label(alt_index)}) as job:
+            res = network.promote_alternative(route_id, profile, alt_index, leg=want[0], who=_by(), legs=want)
+            if isinstance(res, dict) and res.get("promoted") and not res.get("error"):
+                job.done()
+    except working.Busy as b:
+        raise HTTPException(working.BUSY_STATUS, b.sentence)
+    return res
 
 
 @app.get("/api/routes/{route_id}/analysis")
@@ -4412,21 +4433,23 @@ def hour_times_plan(token: Optional[str] = None):
 
 
 @app.post("/api/admin/hour-times/clear")
-def hour_times_clear(token: Optional[str] = None):
+def hour_times_clear(token: Optional[str] = None, job: Optional[str] = None):
     """29 Oct 2026 (task 0f-2): drop the worked-out busy-hour times, so the next run works every one out again."""
     _check_admin(token)
+    _work_batch(("hour_times",), job)       # 23 Nov 2026: refused while another long job runs
     return hour_times.clear()
 
 
 @app.post("/api/admin/hour-times/bake")
-def hour_times_bake(limit: int = Query(30, ge=1, le=60), token: Optional[str] = None):
+def hour_times_bake(limit: int = Query(30, ge=1, le=60), token: Optional[str] = None, job: Optional[str] = None):
     """
     29 Oct 2026 (task 0f-2, the "Busy-hour times" button): work out the next batch of (route, leg, hour) drive times —
     one HERE call each, asked as the bake asks, at hour_times.HOURS on the bake's weekday. Call until `remaining` is 0;
     stops starting calls after network.BAKE_BUDGET_S. Spends HERE calls, so admin only.
     """
     _check_admin(token)
-    return hour_times.bake_batch(limit=limit, budget_s=network.BAKE_BUDGET_S)
+    row = _work_batch(("hour_times",), job)
+    return _work_after(row, hour_times.bake_batch(limit=limit, budget_s=network.BAKE_BUDGET_S))
 
 
 @app.get("/api/public/whoami")
@@ -4832,8 +4855,14 @@ def tenant_import(body: dict, replace: int = 0, token: Optional[str] = None):
     UNBAKED until the network is baked here.
     """
     _check_admin(token)
+    # 23 Nov 2026 (the "Working" list, Q8): the re-import is a job for as long as its request runs. Its row is not
+    # package data, so the import does not wipe its own line; a refused or rolled-back import leaves no line.
     try:
-        res = tenant_package.import_tenant(body, replace=bool(replace))
+        with working.held("import", by=_by()) as job:
+            res = tenant_package.import_tenant(body, replace=bool(replace))
+            job.done()
+    except working.Busy as b:
+        raise HTTPException(working.BUSY_STATUS, b.sentence)
     except ValueError as e:
         raise HTTPException(400, str(e))
     except HTTPException:
@@ -4895,7 +4924,8 @@ def locations_geojson():
 def bake_routes(profile: str = network.DEFAULT_PROFILE,
                 limit: int = Query(25, ge=1, le=60),
                 legs: Optional[str] = None,
-                token: Optional[str] = None):
+                token: Optional[str] = None,
+                job: Optional[str] = None):
     """
     Compute + cache HERE truck geometry for a batch of routes. Call repeatedly
     until 'remaining' is 0. Protected by ADMIN_TOKEN — and refused when that env var is
@@ -4909,8 +4939,11 @@ def bake_routes(profile: str = network.DEFAULT_PROFILE,
     """
     _check_admin(token)
     want = tuple(l.strip() for l in legs.split(",") if l.strip() in network.LEGS) if legs else network.LEGS
-    return network.bake_batch(profile=profile, limit=limit, legs=want or network.LEGS,
-                              budget_s=network.BAKE_BUDGET_S)
+    # 23 Nov 2026 (the "Working" list): `job` is the row the page started (Route all, or a zone's re-route). A batch of
+    # the job already running is never refused; any other long job running refuses it in the one sentence.
+    row = _work_batch(("route_all", "zone_reroute"), job)
+    return _work_after(row, network.bake_batch(profile=profile, limit=limit, legs=want or network.LEGS,
+                                               budget_s=network.BAKE_BUDGET_S))
 
 
 @app.post("/api/admin/clear-geometry")
@@ -6655,13 +6688,18 @@ def diagnostics_compare(route_id: str, probe: bool = False, token: Optional[str]
 
 @app.post("/api/admin/bake-route")
 def bake_route(route_id: str, profile: str = network.DEFAULT_PROFILE,
-               legs: Optional[str] = None, via_holding: bool = False, token: Optional[str] = None):
+               legs: Optional[str] = None, via_holding: bool = False, token: Optional[str] = None,
+               job: Optional[str] = None):
     """Bake one route. Both legs by default; pass legs='loaded' for the outbound only.
     29 Oct 2026 (task 3c): via_holding=true routes each leg that calls off THROUGH its holding area (one more HERE call
     a leg, one option) — the Routes page's "Route again" for a line that does not pass it."""
     _check_admin(token)
     want = tuple(l.strip() for l in legs.split(",") if l.strip() in network.LEGS) if legs else None
-    return network.bake_route(route_id, profile, legs=want, via_holding=via_holding)
+    # 23 Nov 2026 (the "Working" list): Route again sends `job` (its row, one request a lorry type). A new or edited
+    # route and a moved site bake through here with no `job` and are not part of the list.
+    row = _work_batch(("route_again",), job) if job else None
+    res = network.bake_route(route_id, profile, legs=want, via_holding=via_holding)
+    return _work_after(row, res, attempted=1)
 
 
 @app.get("/api/admin/diagnostics/zones")
@@ -6782,6 +6820,11 @@ def create_zone(body: ZoneIn, token: Optional[str] = None):
     Render long before it finished.
     """
     _check_admin(token)
+    # 23 Nov 2026 (the "Working" list): a zone save that would clear route legs starts a job (the page routes them
+    # again), so it is refused while another long job runs. Asked only then; a save that clears nothing goes through.
+    _zone_refuse(lambda: zones.invalidate(new_geometry=body.geometry, dry_run=True)
+                 if (body.kind != zones.HAUL_KIND and body.kind != traffic_limits.KIND and body.affects_routing
+                     and body.active and not (body.starts_on or body.ends_on)) else None)
     z = zones.create_zone(
         body.name, body.geometry, kind=body.kind, affects_routing=body.affects_routing,
         starts_on=body.starts_on, ends_on=body.ends_on, note=body.note, active=body.active,
@@ -6826,6 +6869,15 @@ def update_zone(zone_id: str, body: ZoneIn, token: Optional[str] = None):
               ("name", "geometry", "kind", "affects_routing", "starts_on", "ends_on",
                "note", "active", "speed_kph", "haul_mode", "location_id",
                "limit_value", "limit_counts", "limit_basis", "limit_public") if k in sent}
+
+    def _would_clear():          # 23 Nov 2026 (the "Working" list): what this edit would clear, nothing touched
+        after = dict(before, **fields)
+        if after.get("kind") == zones.HAUL_KIND or before["kind"] == zones.HAUL_KIND:
+            return haul.invalidate_for_zone(zone_id, dry_run=True)
+        return zones.invalidate(zone_id=zone_id,
+                                new_geometry=(after["geometry"] if _permanent_routing(after) else None),
+                                old_geometry=(before["geometry"] if _permanent_routing(before) else None), dry_run=True)
+    _zone_refuse(_would_clear)
     z = zones.update_zone(zone_id, **fields)
     if z.get("error"):
         raise HTTPException(400, z["error"])
@@ -6925,6 +6977,11 @@ def delete_zone(zone_id: str, token: Optional[str] = None):
     before = zones.get_zone(zone_id)
     if not before:
         raise HTTPException(404, "zone not found")
+    # 23 Nov 2026 (the "Working" list): as a save, a delete that would clear route legs is refused while a job runs
+    _zone_refuse(lambda: haul.invalidate_for_zone(zone_id, dry_run=True) if before["kind"] == zones.HAUL_KIND
+                 else zones.invalidate(zone_id=zone_id,
+                                       old_geometry=(before["geometry"] if _permanent_routing(before) else None),
+                                       dry_run=True))
 
     if before["kind"] == zones.HAUL_KIND:
         # Order matters: work out what to clear while the links still exist, then drop
@@ -7041,6 +7098,7 @@ def attach_haul_road(route_id: str, body: HaulLinkIn, token: Optional[str] = Non
     loop the zone writes use.
     """
     _check_admin(token)
+    _work_refuse("zone_reroute")       # 23 Nov 2026: it clears the route's legs for the page to route again
     res = haul.attach(route_id, body.zone_id, seq=body.seq)
     if res.get("error"):
         raise HTTPException(400, res["error"])
@@ -7053,6 +7111,7 @@ def attach_haul_road(route_id: str, body: HaulLinkIn, token: Optional[str] = Non
 def detach_haul_road(route_id: str, zone_id: str, token: Optional[str] = None):
     """Take a haul road off a route and clear the geometry baked through it."""
     _check_admin(token)
+    _work_refuse("zone_reroute")       # 23 Nov 2026: as attach
     res = haul.detach(route_id, zone_id)
     if res.get("error"):
         raise HTTPException(404, res["error"])
@@ -7069,6 +7128,7 @@ def order_haul_roads(route_id: str, body: HaulOrderIn, token: Optional[str] = No
     haul change.
     """
     _check_admin(token)
+    _work_refuse("zone_reroute")       # 23 Nov 2026: as attach
     res = haul.reorder(route_id, body.zone_ids)
     if res.get("error"):
         raise HTTPException(400, res["error"])
@@ -7665,6 +7725,121 @@ def concern_forget(cid: str):
         _concern_refused(e)
     _concern_audit("personal details deleted", cid)
     return out
+
+
+# 23 Nov 2026 (claude/working-list) — the "Working" list (working.py; John's yes to notes/working-list-mockup-1121,
+# Option A). The page's chip reads GET /api/working; a job the PAGE sends in batches (Route all, Busy-hour times, a
+# zone's re-route, Route again) starts its row here, and the batch endpoints above move it on. One long job at a time
+# for the tenant: a second is refused with status 423 and working.sentence, here and at every job's own endpoint.
+def _work_refuse(kind):
+    """423 and the one sentence while any long job is running."""
+    s = working.refusal(kind)
+    if s:
+        raise HTTPException(working.BUSY_STATUS, s)
+
+
+def _work_batch(kinds, job=None):
+    """Before a batch: the row it belongs to (None when no page started one), or 423 while ANOTHER job runs."""
+    try:
+        return working.batch(tuple(kinds), job)
+    except working.Busy as b:
+        raise HTTPException(working.BUSY_STATUS, b.sentence)
+
+
+def _work_after(row, res, attempted=None):
+    """After a batch: move the row on by what the batch reached and hand the page its line (`working`)."""
+    if row and isinstance(res, dict):
+        try:
+            n = attempted if attempted is not None else (res.get("attempted") or 0)
+            res["working"] = working.progress(row["id"], attempted=n, remaining=res.get("remaining"))
+        except Exception as e:
+            print("working: progress not kept:", str(e)[:120])
+    return res
+
+
+def _zone_refuse(would_clear):
+    """A zone write that would clear route legs, while another long job runs: 423 and the sentence. `would_clear` is
+    the write's own dry run (asked only while a job is running); a write that clears nothing is not a job."""
+    s = working.refusal("zone_reroute")
+    if not s:
+        return
+    try:
+        n = int(((would_clear() or {}).get("leg_count")) or 0)
+    except Exception:
+        n = 0
+    if n:
+        raise HTTPException(working.BUSY_STATUS, s)
+
+
+class WorkStartIn(BaseModel):
+    kind: str
+    total: Optional[int] = None
+    subject: Optional[str] = None
+    profiles: Optional[List[str]] = None
+    legs: Optional[str] = None
+    via_holding: Optional[bool] = None
+    carry: Optional[str] = None
+
+
+class WorkEndIn(BaseModel):
+    state: str = "done"
+
+
+@app.get("/api/working")
+def working_list():
+    """What is running, what stopped part-way, what ended in the last 30 minutes and is not closed, and the refusal a
+    second job would get. Any staff sign-in; nothing is fetched or worked out."""
+    acc = _require_access()
+    return working.listing(acc)
+
+
+@app.post("/api/working/start")
+def working_start(body: WorkStartIn, token: Optional[str] = None):
+    """Start the row of a job the page is about to send in batches. An admin, as the batches themselves. 423 and the
+    sentence while any long job is running for this organisation."""
+    _check_admin(token)
+    if body.kind not in working.PAGE_KINDS:
+        raise HTTPException(400, "not a job the page sends")
+    args, total, subject = {}, body.total, (body.subject or None)
+    profs = [p for p in (body.profiles or []) if isinstance(p, str) and p][:40]
+    if body.kind == "route_all":
+        legs = ("loaded",) if body.legs == "loaded" else network.LEGS
+        args = {"profiles": profs, "legs": "loaded" if body.legs == "loaded" else ""}
+        total = sum(network.bake_todo(p, legs) for p in profs)
+    elif body.kind == "zone_reroute":
+        args = {"profiles": profs}
+    elif body.kind == "route_again":
+        if not subject:
+            raise HTTPException(400, "which route?")
+        args = {"profiles": profs, "via_holding": bool(body.via_holding)}
+        total = len(profs) or total
+    if total is not None and not (0 <= int(total) <= 1000000):
+        raise HTTPException(400, "total out of range")
+    try:
+        return working.start(body.kind, by=_by(), total=total, subject=subject, detail={"args": args},
+                             carry=body.carry)
+    except working.Busy as b:
+        raise HTTPException(working.BUSY_STATUS, b.sentence)
+
+
+@app.post("/api/working/{job_id}/end")
+def working_end(job_id: str, body: WorkEndIn, token: Optional[str] = None):
+    """The page says its job ended ("done") or stopped part-way ("stopped": its loop gave up, or the tab is closing)."""
+    _check_admin(token)
+    out = working.end(job_id, body.state)
+    if not out:
+        raise HTTPException(404, "no such job")
+    return out
+
+
+@app.post("/api/working/{job_id}/close")
+def working_close(job_id: str):
+    """Close a finished line for everyone (Q5). A stopped line: only someone who may start that job."""
+    acc = _require_access()
+    if not working.close(job_id, acc):
+        raise HTTPException(404, "nothing to close")
+    return working.listing(acc)
+
 
 # 16 Nov 2026 (claude/tools-shell) — the public tool pages at /tools/<page>: frontend/tools/<page>.html, plus the shared
 # tools.css and tools.js. Open to anyone (gate.scope_for does not police /tools), no demo bar, no cookie. tools_public
