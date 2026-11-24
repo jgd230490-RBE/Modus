@@ -1204,7 +1204,8 @@ ok("UI fix 4 (decision 2): 🔴 var(--green) is never a text colour in the marku
    # NARROWED 10 Nov 2026 (wave 2, card 12): 12 -> 8 — the one status chip: the old StatusWord dots (STATUS_DOT, ×3) and the
    # row-status icon's fill (now the --ok-btn pair on the chip's tint) left
    # NARROWED 24 Nov 2026 (own look, B1 stage 2): 8 -> 9, the ok status DOT (.row-st.rs-ok i) is filled --green (a shape)
-   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 9 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
+   # NARROWED 24 Nov 2026 (own look, B1 stage 7): 9 -> 8, the Dashboard's week bar is ink (a small bar beside a status)
+   not _text_uses("var(--green)") and _fe_wo.count("var(--green)") == 8 and 'color: "var(--green)"' not in _fe_wo and "color:var(--green)" not in _fe_wo
    and "text-[color:var(--green)]" not in fe and "text-emerald-600" not in fe, str(_text_uses("var(--green)"))[:300])
 # NARROWED 29 Oct 2026 (3b, the steel split): 8 — + the dot of Config's "Older: pick one of the three" chip (a status dot, not text)
 # NARROWED 9 Nov 2026 (UI fix phone 2): 9 — + the phone Gate arrivals list's amber bar (a fill, not text)
@@ -1213,7 +1214,8 @@ ok("...nor var(--gold): the 8 uses left are the gate-arrivals key, the warning t
    # dot are the one status chip now (its warning icon keeps var(--gold), a fill)
    # NARROWED 10 Nov 2026 (wave 3, finding 5): 5 -> 6 — the Account's Actual box on a line short past the share takes an amber
    # border (a border, not text)
-   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 6 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
+   # NARROWED 24 Nov 2026 (own look, B1 stage 7): 6 -> 5, the gates' amber peak bar is ink in every state
+   not _text_uses("var(--gold)") and _fe_wo.count("var(--gold)") == 5 and "text-[color:var(--gold)]" not in fe and 'color: "var(--gold)"' not in _fe_wo and "color:var(--gold)" not in _fe_wo, str(_text_uses("var(--gold)"))[:300])
 ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In force on Zones, Delivered % on the Dashboard, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, a variance, the simulation's checks and its no-wait line (ok-text); the stale chip (warn-text on a 10 % tint); the 'gate blocked' and vehicle-error chips and the Account's variance figures and the stockpile table's over-capacity figures on a rose-washed row (bad-text: --red is 4.83:1 on white but 4.4–4.5:1 on the wash); since 22 Oct the abnormal loads' .al-bad chip, route-error line and the limits a load is over (bad-text ×3), its .al-notes list, .al-warn chip, route notes and candidate notes (warn-text ×4)",
    '<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>' in fe
    and '<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>' in fe

@@ -111,7 +111,7 @@ ok("🔴 3 selection: the three 'Place on map' toggles and the drawing palette's
 ok("3 selection: a table column (today, the commit week) is the 6 % tint: eight column washes, none on the 10 % tint",
    (html.match(/var\(--navy-soft-col\)/g) || []).length === 8 && !/\{ background: "var\(--navy-soft\)" \}/.test(html));
 ok("3 figures: the Cost groups and their planned and fair £, today's vehicles, the Submit page's loads and fair £ and the Today heading read the ink, not the sign blue",
-   (html.match(/<Group title="Cost" tone="var\(--navy-deep\)">/g) || []).length === 2 && !/tone="var\(--navy\)"/.test(html.replace('<Bar pct={acctPct != null ? acctPct : 0} tone="var(--navy)" />', ""))
+   (html.match(/<Group title="Cost" tone="var\(--navy-deep\)">/g) || []).length === 2 && !/tone="var\(--navy\)"/.test(html) /* NARROWED 24 Nov 2026 (own look, B1 stage 7): the Last week bar is ink now, no tone */
    && html.includes('fig-group" style={{ color: "var(--navy-deep)" }}>Today'));
 ok("⭐ 3 links: the road closures line's link is the sign blue even when the line is an amber warning",
    html.includes('<button onClick={refreshTarkTee} className="font-semibold underline hover:no-underline" style={{ color: "var(--navy)" }}>'));

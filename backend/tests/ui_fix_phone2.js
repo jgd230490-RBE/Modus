@@ -88,7 +88,9 @@ const mount = (C, props) => { const el = w.document.createElement("div"); w.docu
     ok("PHONE GATES: a name wraps (overflow-wrap) and the bar is 6 px high; type is 13 px or more; the amber / red words are the text-grade colours",
        /overflow-wrap:anywhere/.test(css(".ga-li-name")) && /height:6px/.test(css(".ga-pbar")) && /font-size:13px/.test(css(".ga-li-fig")) && /font-size:13px/.test(css(".ga-li-name small"))
        && /var\(--warn-text\)/.test(css(".ga-li-warn .ga-li-fig")) && /var\(--bad-text\)/.test(css(".ga-li-bad .ga-li-fig"))
-       && /var\(--gold\)/.test(css(".ga-li-warn .ga-pbar i")) && /var\(--red\)/.test(css(".ga-li-bad .ga-pbar i")));
+       // REVERSED 24 Nov 2026 (own look, B1 stage 7): the bar is ink in every state (a small bar beside a status); amber / red
+       // stay on the figure's words above
+       && /var\(--ink\)/.test(css(".ga-pbar i")) && !/\.ga-li-(warn|bad) \.ga-pbar i\{/.test(html));
     ok("PHONE GATES: the Dashboard hands its `phone` to the panel", html.includes("sited={sites.length ? sitesWords(sites, locList) : \"\"} phone={!!phone} onOpen={canApprove ? onOpen : null} queue={gaQueue} sites={sites} />")   /* NARROWED 11 Nov 2026 (CLOCS idea C-I1) */);
 
     // ---- the guide strip on a phone ------------------------------------------------------------------------

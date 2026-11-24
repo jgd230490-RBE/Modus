@@ -4335,11 +4335,12 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && _tdF.indexOf("today-more") > _tdF.indexOf("</table>)}"));
   // NARROWED 24 Nov 2026 (own look, B1 stage 1): the bars take the small 3 px corner (rounded-sm), not rounded-full
   ok("⭐ UI FIX 6 card 5 (the user: keep the progress bars): the four figures and BOTH bars, 'This week to date' and 'Last week', are where they were and as they were",
-     _tdF.includes("<Bar pct={wkPct != null ? wkPct : 0} />") && _tdF.includes('<Bar pct={acctPct != null ? acctPct : 0} tone="var(--navy)" />')
+     // NARROWED 24 Nov 2026 (own look, B1 stage 7): both bars kept, now ink (a small bar beside a status), no tone
+     _tdF.includes("<Bar pct={wkPct != null ? wkPct : 0} />") && _tdF.includes('<Bar pct={acctPct != null ? acctPct : 0} />')
      && _tdF.includes('<span className="font-semibold text-slate-700">This week to date<InfoTip id="dash.week_to_date"')
      && _tdF.includes('<span className="font-semibold text-slate-700">Last week{acct && acct.week ?')
      && (_tdF.match(/<Big value=/g) || []).length === 4 && _tdF.indexOf("This week to date") < _tdF.indexOf("today-lines")
-     && _tdF.includes('<div className="h-2 rounded-sm bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-sm" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: tone || "var(--green)" }} /></div>'));
+     && _tdF.includes('<div className="h-2 rounded-sm bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-sm" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: "var(--ink)" }} /></div>'));
   // REVERSED 22 Oct 2026 (card 4, the user: "yes, build card 4 ... keeping the progress bars"): All sections now fits whole rows
   // like the filled layouts; the working Dashboard is still unchanged (wall false). The fill switch stays the Dashboard's.
   ok("UI FIX 6 card 4: 'All sections' fits whole rows too (tvList = wall, not fill); the working Dashboard keeps its scrolling list; the fill switch is the Dashboard's",

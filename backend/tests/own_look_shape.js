@@ -107,6 +107,11 @@ ok("6 place: sentence case a part, the words unchanged: placeWords capitalises e
      return placeWords("Track · commit week") === "Track · Commit week" && placeWords("May 2026 – May 2027 · approved") === "May 2026 – May 2027 · Approved"
        && placeWords("Plan") === "Plan" && placeWords(undefined) === undefined; })());
 ok("6 place: no capitals, monospace or letter-spacing on the place line", !/\.kicker\{[^}]*(monospace|uppercase|letter-spacing)/.test(css));
+// ---------------------------------------------------------------- stage 7: small bars beside a status are ink
+ok("7 bars: the Dashboard's week bars and the gates' peak bars (and their key) are ink in every state; no amber or red bar fill",
+   code.includes('background: "var(--ink)" }} /></div>') && !code.includes('tone || "var(--green)"') && !/<Bar [^>]*tone=/.test(code)
+   && css.includes(".ga-pbar i{display:block;height:100%;border-radius:3px;background:var(--ink);}") && !/\.ga-li-(warn|bad) \.ga-pbar i\{/.test(css)
+   && css.includes(".ga-key-bar{width:16px;height:10px;border-radius:3px;background:var(--ink);}"));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);

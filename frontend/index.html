@@ -755,10 +755,8 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ga-li-warn .ga-li-fig{color:var(--warn-text);}
   .ga-li-bad .ga-li-fig{color:var(--bad-text);}
   .ga-pbar{height:6px;margin-top:6px;border-radius:3px;background:var(--surface-3);overflow:hidden;}
-  .ga-pbar i{display:block;height:100%;border-radius:3px;background:var(--chart-1);}
-  .ga-li-warn .ga-pbar i{background:var(--gold);}
-  .ga-li-bad .ga-pbar i{background:var(--red);}
-  .ga-key-bar{width:16px;height:10px;border-radius:3px;background:var(--chart-1);}
+  .ga-pbar i{display:block;height:100%;border-radius:3px;background:var(--ink);}   /* 24 Nov 2026 (own look, B1 item 7): ink in every state; the figure's words carry amber / red */
+  .ga-key-bar{width:16px;height:10px;border-radius:3px;background:var(--ink);}
   .ga-key-cap{width:3px;height:14px;background:var(--ink);margin-left:0 !important;}
   .ga-key-track{width:18px;height:12px;border-radius:3px;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--grey);}
   .ga-key-red{width:16px;height:10px;border-radius:3px;background:var(--red);}
@@ -3817,8 +3815,9 @@ function DashboardToday({ meta, week, err, wall, fill }){
       {sub && <div className="text-xs text-slate-500 fig-sub">{sub}</div>}
     </div>
   );
-  const Bar = ({ pct, tone }) => (
-    <div className="h-2 rounded-sm bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-sm" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: tone || "var(--green)" }} /></div>
+  // 24 Nov 2026 (own look, B1 item 7): a small bar beside a status is ink; a chart keeps its palette
+  const Bar = ({ pct }) => (
+    <div className="h-2 rounded-sm bg-slate-100 overflow-hidden mt-1.5"><div className="h-2 rounded-sm" style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: "var(--ink)" }} /></div>
   );
   const acctReportedPlanT = acct ? (acct.rows || []).filter(r => r.actual_qty != null).reduce((s, r) => s + (r.planned_t || 0), 0) : 0;
   const acctPct = acct && acct.reported > 0 && acctReportedPlanT > 0 ? acct.actual_t * 100 / acctReportedPlanT : null;
@@ -3853,7 +3852,7 @@ function DashboardToday({ meta, week, err, wall, fill }){
             </div>
             <div>
               <div className="flex justify-between"><span className="font-semibold text-slate-700">Last week{acct && acct.week ? ` · W${acct.week.week_index}` : ""}<InfoTip id="dash.last_week" value={acct && acct.week ? (acct.reported ? [`${grp(acct.actual_t)} t reported against ${grp(acctReportedPlanT)} t planned on the ${acct.reported} reported lines`, `${acct.delivered} of ${acct.lines} held (≥ ${Math.round((acct.hold_band || 0.98) * 100)} %)`] : "Nothing reported for last week yet: type actuals on Look-ahead → Account.") : "No account week yet."} /></span><span className="tabular-nums">{acctPct != null ? `${acctPct.toFixed(0)} % of plan` : (acct && acct.week ? "not reported" : "—")}</span></div>
-              <Bar pct={acctPct != null ? acctPct : 0} tone="var(--navy)" />
+              <Bar pct={acctPct != null ? acctPct : 0} />
               <div className="text-xs text-slate-500 mt-1">{acct && acct.week ? `${acct.reported} of ${acct.lines} lines reported · ${acct.delivered} held to plan${acct.shortfall ? ` · ${grp(acct.shortfall)} short` : ""}` : "—"}</div>
             </div>
           </div>
