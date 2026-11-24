@@ -99,7 +99,8 @@ ok("3 selection: the phone's chosen tab, its More item and its chosen day read t
    && css.includes(".phone-more-item.is-on{color:var(--navy);") && css.includes('.ph-day[aria-pressed="true"]{border-color:var(--navy);')
    && !/\.(phone-tab\.is-on|phone-more-item\.is-on|ph-day\[aria-pressed="true"\]|ph-seg button\[aria-pressed="true"\])[^{]*\{[^}]*var\(--action\)/.test(css));
 ok("3 selection: the look list's chosen row is a light sign blue tint and tick on the dark popover (was orange)",
-   css.includes(".appearance-item.is-on,.accent-item.is-on{background:rgba(138,180,248,.16);}") && css.includes(".appearance-item .tick,.accent-item .tick{opacity:0;color:#8AB4F8;}"));
+   // NARROWED 24 Nov 2026 (stage 5): the accent items went with the picker's accent half
+   css.includes(".appearance-item.is-on{background:rgba(138,180,248,.16);}") && css.includes(".appearance-item .tick{opacity:0;color:#8AB4F8;}"));
 const placeOn = html.match(/style=\{(gatePlace|areaPlace|picking === c\.name) \? \{ background: "var\(--navy-soft\)", color: "var\(--navy\)" \} : undefined\}/g) || [];
 ok("🔴 3 selection: the three 'Place on map' toggles and the drawing palette's picked tool are the tint and sign blue words; no text-white sits on a --navy or --blue fill but the Submit strip",
    placeOn.length === 3 && html.includes('style={on ? { background: "var(--navy-soft)", color: "var(--navy)" } : undefined} />;')
@@ -140,6 +141,24 @@ ok("4 the guide's dot is the sign blue (was the burnt orange), its pulse from th
 ok("4 button: the supplier orders menu's 'All suppliers' zip is an action, so it reads the button pair (was a --navy fill)",
    css.includes(".row-menu-list button.so-all{margin-top:6px;text-align:center;background:var(--action);color:var(--action-fg);font-weight:600;}")
    && !/so-all\{[^}]*var\(--navy\)/.test(css));
+
+// ---- 5 no accent picker -------------------------------------------------------------------------------------------
+const script = html.slice(html.indexOf('<script type="text/babel"'));
+ok("⭐ 5 no picker: no ACCENTS block, no [data-accent] selector, no accent item in the stylesheet",
+   !css.includes("ACCENTS-START") && !css.includes("ACCENTS-END") && !css.includes("[data-accent") && !css.includes("accent-item") && !css.includes("accent-sw"));
+ok("🔴 5 no picker: no ACCENTS, ACCENT, applyAccent, useAccent or setAccent in the app, and no chart listens to an accent",
+   !/ACCENTS?/.test(script) && !/applyAccent|useAccent|setAccent/.test(script) && !/accent, sized\]/.test(script) && !script.includes("<h6>Accent</h6>"));
+ok("🔴 5 no picker: nothing sets or reads data-accent or the stored modus_accent (the <head> script sets the look only)",
+   !html.includes("data-accent") && !html.includes("modus_accent") && /d\.setAttribute\("data-theme",/.test(html));
+const guide = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8");
+ok("5 no picker: the guide's Appearance passage names the three looks and no accent",
+   guide.includes("picks the look: <strong>Ink</strong> (the default), <strong>Light</strong> or <strong>Dark</strong>. On a chart the first series is the plan")
+   && !/under it the accent|Orange shades|Blue shades|In every accent/.test(guide));
+const audit = fs.readFileSync(path.join(__dirname, "ui_audit.js"), "utf8");
+ok("5 no picker: the UI audit has no Blue pass, no extra accents and no --accents, and sets no stored accent",
+   !/EXTRA_ACCENTS|EXTRA_PASSES|--accents|modus_accent|accent: "blue"|accent: "orange"/.test(audit));
+ok("5 the last stock-ish blue checkboxes (#1D4ED8) take the sign blue",
+   !html.includes('accentColor: "#1D4ED8"') && (html.match(/accentColor: "var\(--navy\)"/g) || []).length >= 6);
 
 console.log(`own_look_tokens.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  FAIL: " + f)); process.exit(1); }

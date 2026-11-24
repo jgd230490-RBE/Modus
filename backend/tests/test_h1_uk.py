@@ -742,7 +742,8 @@ ok("APPEARANCE: the choice is per browser (localStorage modus_theme), applied be
    and 'if(!THEMES.some(([k]) => k === name)) name = "ink";' in fe and fe.index("applyTheme(localStorage.getItem") < fe.index("ReactDOM.createRoot"))
 ok("APPEARANCE: charts rebuild on a change and read token colours — no literal blue left in the Dashboard's series",
    # 13 Oct 2026 (W16): narrowed — the chart also rebuilds on an accent change and once its box first has a size (W5)
-   "}, [JSON.stringify(config), theme, accent, sized]);" in fe and 'window.Chart.defaults.color = tok("--muted"' in fe
+   # NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone: the chart rebuilds on a look change and its first size only
+   "}, [JSON.stringify(config), theme, sized]);" in fe and "useAccent" not in fe and 'window.Chart.defaults.color = tok("--muted"' in fe
    and 'backgroundColor: "#2563EB"' not in fe and 'backgroundColor: "#3B82F6"' not in fe and 'borderColor: "#2563EB"' not in fe and 'tok("--chart-1"' in fe)
 ok("APPEARANCE: cards, the big-screen bar and the Look-ahead's white buttons read surface tokens — no literal white surface left in component CSS",
    ".card{background:var(--surface);" in fe and ".dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);" in fe
@@ -1020,7 +1021,9 @@ def _lum(c):
 def _cr(a, b):
     x, y = sorted([_lum(a), _lum(b)], reverse=True)
     return (x + 0.05) / (y + 0.05)
-_ACC = ["orange", "blue", "blue-shades", "orange-shades"]
+# NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone, so the 12 looks × accents are the three
+# looks; "orange" names the one colour set left (the :root and Dark blocks), so _eff and every loop below read it alone
+_ACC = ["orange"]
 _bad = []
 for _a in _ACC:
     for _l in ["ink", "light", "dark"]:
@@ -1047,9 +1050,9 @@ ok("W16: the status colours are byte-identical in all 12 combinations (the accen
    and len({tuple(_eff(a, "dark")[k] for k in ("green", "gold", "red")) for a in _ACC}) == 1)
 ok("W16: the brief's 'Orange primary' button #FF8C14 would fail on white (2.33:1, under 3:1) — so it is not used on the light looks",
    round(_cr("#FF8C14", "#FFFFFF"), 2) == 2.33 and all(_eff(a, l)["action"].upper() != "#FF8C14" for a in _ACC for l in ("ink", "light")))
-ok("W16: Blue shades' navy header is the Ink look's only (white on it 10.36:1); the Light look keeps its white header",
-   _eff("blue-shades", "ink")["hdr-bg"] == "#1E3A8A" and round(_cr("#FFFFFF", "#1E3A8A"), 2) == 10.36
-   and _eff("blue-shades", "light")["hdr-bg"] == "#FFFFFF" and _eff("blue", "ink")["hdr-bg"] == "#1F2024")
+# NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone: no accent repaints the header — the Ink header is the ink, Light's white, in every case
+ok("W16: Blue shades' navy header is gone with the accents (no [data-accent] block, no --hdr-bg #1E3A8A); the Ink header is the ink and the Light look keeps its white header",
+   "--hdr-bg:#1E3A8A" not in fe and "[data-accent" not in fe and _eff("orange", "ink")["hdr-bg"] == "#1F2024" and _eff("orange", "light")["hdr-bg"] == "#FFFFFF")
 
 # --- 17 Oct 2026: UI fix 2 (claude/ui-fix-dark) — the dark look's contrast failures that needed no decision -------------
 # (notes/ui-audit-findings-1016.md, findings 1, 2 and 6's button). Ratios by the WCAG relative-luminance formula above.
@@ -1267,7 +1270,8 @@ ok("UI fix 4 (decision 1): 🔴 one rule maps text-slate-400 to --muted in the I
    'html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}' in fe
    # NARROWED 23 Nov 2026 (own look, stage 2): Dark's caption grey is the neutral #9C9FA4 (was the blue-tinted #9AA1AB)
    and 'html[data-theme="dark"] .text-slate-400{color:#9C9FA4}' in _dark and _DARK["muted"] == "#9C9FA4"
-   and fe.count("/* CAPTIONS ") == 1 and "/* CAPTIONS-END */" in fe and fe.index("/* CAPTIONS ") > fe.index("/* ACCENTS-END */") and fe.index("/* CAPTIONS-END */") < fe.index("/* DARK-REMAP-START"))
+   and fe.count("/* CAPTIONS ") == 1 and "/* CAPTIONS-END */" in fe and fe.index("/* CAPTIONS ") > fe.index("/* 24 Nov 2026 (the own look, stage 5): the accent picker and its ACCENTS block are gone") and   # NARROWED 24 Nov 2026: where the ACCENTS block was
+    fe.index("/* CAPTIONS-END */") < fe.index("/* DARK-REMAP-START"))
 _mb = []
 for _a in _ACC:
     for _l in ["ink", "light", "dark"]:
@@ -1292,7 +1296,8 @@ ok("...on a washed surface --muted falls short — 4.37 on a selected row (blue-
    and _cr(_DARK["muted"], _over("rgba(217,119,6,.06)", _eff("orange", "dark")["surface"])) >= 4.5
    and _fe_wo.count('background: "var(--navy-soft)"') >= 7 and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 1
    and _fe_wo.count('background: "rgba(217,119,6,.06)"') == 1
-   and ':root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}' in fe)
+   # NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone (Orange shades' #FFF4E6 row with it)
+   and ':root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}' not in fe)
 ok("...the rail's group headings lose their opacity:.85 (3.45 → 4.56), the big screen's two hard-coded greys (#9aa1ac, 2.60) and the Dashboard group title's default (#94a3b8) read --muted, and every slate-300 placeholder (rate not set ×3, not recorded, the dashes) reads slate-500 — the dark remaps for slate-300 and emerald-600 went with their last use",
    # NARROWED 22 Oct 2026 (UI fix 7, card 9, the user's choice): 12 px
    ".rail-group{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}" in fe and "opacity:.85" not in fe
@@ -1339,7 +1344,8 @@ for _line in _dark.splitlines():
 ok("UI fix 2: every selector in the DARK-REMAP block has a use in the markup — the four stale remaps found this way on 17 Oct (bg-[rgba(37,99,235,.06)], bg-slate-200, hover:text-slate-800 / -900: utilities no longer in the file) are gone",
    # NARROWED 17 Nov 2026 (routes-card-room): 48 -> 47. The open route is a panel of its own, no longer a grey table row
    # (bg-slate-50/70), so that row's remap had no use left and went with it, as this check asks of a stale remap
-   not _dead and _dark.count('html[data-theme="dark"]') >= 47 and "bg-slate-50\\/70" not in _dark and "bg-slate-200{" not in _dark and "text-slate-900" not in _dark, str(_dead)[:300])
+   # NARROWED 24 Nov 2026 (own look, stage 5): 47 -> 46, border-blue-200's only use was the Orange shades accent block
+   not _dead and _dark.count('html[data-theme="dark"]') >= 46 and "bg-slate-50\\/70" not in _dark and "bg-slate-200{" not in _dark and "text-slate-900" not in _dark, str(_dead)[:300])
 
 # --- 22 Oct 2026: UI fix 6 (claude/ui-fix-layout) — the approved mockup notes/ui-fix-layout-mockup-1022/ (the user: "i agree to
 # all apart from 4"): the contrast of cards 2, 3, 5 and 6 and of the two extras the user said yes to (the Horizon's commit-week
@@ -1416,9 +1422,10 @@ for _a in _ACC:
             if r < 4.5:
                 _badHz.append(f"{_a}/{_l}: {name} {a} on {shade} = {r:.2f}")
 ok("UI fix 6 card 3: 🔴 on the Horizon's commit-week shade the heading (text-blue-700, the accent's darker shade) and the role word (text-slate-600) read 4.5:1 or better in all 12 looks × accents",
-   not _badHz and len(_hzr) == 24, "; ".join(_badHz[:6]))
+   not _badHz and len(_hzr) == 6, "; ".join(_badHz[:6]))   # NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone: the three looks × two words
 ok("...the figures: the shade #E7EEFB (Ink and Light, Orange and Blue), heading #1D4ED8 5.75:1 (var(--navy) #2563EB was 4.44), Blue shades 5.66, Orange shades #9A3412 on #F4EBE9 6.23 (#C2410C was 4.42); Dark #FFB454 on #3B2D1F 7.53, Dark blue #8FB3F5 on #202632 7.17; the role word #475569 on #E7EEFB 6.50 (--muted would be 4.08), Dark #D5D8DE 9.30 / 10.62",
-   _over("rgba(37,99,235,.08)", "#F8FAFC") == "#E7EEFB" and round(_cr("#1D4ED8", "#E7EEFB"), 2) == 5.75   # NARROWED 24 Nov 2026: the 10 Nov tint written out and round(_cr("#2563EB", "#E7EEFB"), 2) == 4.44
+   # NARROWED 24 Nov 2026: the 10 Nov tint written out
+   _over("rgba(37,99,235,.08)", "#F8FAFC") == "#E7EEFB" and round(_cr("#1D4ED8", "#E7EEFB"), 2) == 5.75 and round(_cr("#2563EB", "#E7EEFB"), 2) == 4.44
    and round(_cr("#1D4ED8", _over("rgba(29,78,216,.08)", "#F8FAFC")), 2) == 5.66
    and _over("rgba(194,65,12,.08)", "#F8FAFC") == "#F4EBE9" and round(_cr("#9A3412", "#F4EBE9"), 2) == 6.23 and round(_cr("#C2410C", "#F4EBE9"), 2) == 4.42
    and _over("rgba(255,140,20,.14)", "#1B1D21") == "#3B2D1F" and round(_cr("#FFB454", "#3B2D1F"), 2) == 7.53
@@ -1427,7 +1434,8 @@ ok("...the figures: the shade #E7EEFB (Ink and Light, Orange and Blue), heading 
    and round(_cr("#D5D8DE", "#3B2D1F"), 2) == 9.30 and round(_cr("#D5D8DE", "#202632"), 2) == 10.62
    # NARROWED 23 Nov 2026 (own look, stage 2): Dark's second text is the neutral #C9CACE (was #D5D8DE)
    # NARROWED 24 Nov 2026 (own look, stage 3): Dark's text-blue-700 is the light sign blue #8AB4F8 (was #FFB454)
-   and _b700 == {"os": "#9A3412", "dark": "#8AB4F8", "dark-blue": "#8FB3F5"} and _s600_dark == "#C9CACE")
+   # NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone: Orange shades' and the dark blue accents' remaps went with it
+   and _b700 == {"os": None, "dark": "#8AB4F8", "dark-blue": None} and _s600_dark == "#C9CACE")
 ok("...var(--navy-deep) passes too (13.97:1 in Ink, 12.07 in Dark) but it is the ink colour, not the darker blue the mockup offered and the user said yes to, so the heading takes the remapped text-blue-700",
    round(_cr(_ROOT["navy-deep"], "#E7EEFB"), 2) == 13.97 and round(_cr(_DARK["navy-deep"], "#3B2D1F"), 2) == 12.07   # the 10 Nov shades, history
    and '<div className={"font-semibold " + (role === "commit" ? "text-blue-700" : "text-slate-600")}>' in fe)

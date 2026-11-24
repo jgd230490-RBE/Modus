@@ -3339,7 +3339,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("W5: a chart is built only once its box has a size; a ResizeObserver resizes it and moves the legend across 768 / 1024 px",
      _cc.includes("const ro = new ResizeObserver(") && _cc.includes("if(!sized || !ref.current || !window.Chart) return;")
      && _cc.includes('if(want && lg.position !== want){ lg.position = want; c.update("none"); } else c.resize();')
-     && _cc.includes("ro.disconnect(); cancelAnimationFrame(raf);") && _cc.includes("}, [JSON.stringify(config), theme, accent, sized]);"));   // (W16 the same evening: + accent)
+     && _cc.includes("ro.disconnect(); cancelAnimationFrame(raf);") && _cc.includes("}, [JSON.stringify(config), theme, sized]);"));   // (W16 the same evening: + accent; NARROWED 24 Nov 2026, own look stage 5: the accent is gone again)
   ok("W5: the rules by width: legend under the plot below 768 px, a doughnut's on the right only from 1024 px; labels 18 characters, no rotation; DPR at most 2",
      /const CHART_LABEL_MAX = 18;/.test(src) && /if\(vw < 768\) return "bottom";/.test(src)
      && /if\(type === "doughnut" \|\| type === "pie"\) return vw >= 1024 \? \(asked \|\| "right"\) : "bottom";/.test(src)
@@ -3392,7 +3392,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   const DARK_BLUE = 'html[data-theme="dark"][data-accent="blue"],html[data-theme="dark"][data-accent="blue-shades"]';
   const accD = (k) => (k === "blue" || k === "blue-shades") ? toks(blockOf(DARK_BLUE)) : toks(blockOf(`html[data-theme="dark"][data-accent="${k}"]`));
   const eff = (k, dark) => dark ? { ...ROOT, ...DARK, ...(k === "orange" ? {} : accD(k)) } : { ...ROOT, ...(k === "orange" ? {} : acc(k)) };
-  const KEYS = ["orange", "blue", "blue-shades", "orange-shades"];
+  // NARROWED 24 Nov 2026 (own look, stage 5): one colour set per look is left (the name "orange" kept for the :root / Dark pair)
+  const KEYS = ["orange"];
   const series = (t) => ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"].map(n => t[n].toUpperCase()).filter(c => c !== t["chart-none"].toUpperCase());
   // colour maths
   const lin = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -3408,19 +3409,19 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // the pairs a reader compares: neighbours in a stack, and 1 against 4 (the cost chart: planned beside the model)
   const worst = (pal) => { let cvd = 1e9, nv = 1e9; const P = []; for (let i = 1; i < pal.length; i++) P.push([i - 1, i]); if (pal.length >= 4) P.push([0, 3]);
     for (const [i, j] of P) { cvd = Math.min(cvd, dE(pal[i], pal[j], "protan"), dE(pal[i], pal[j], "deutan")); nv = Math.min(nv, dE(pal[i], pal[j])); } return { cvd, nv }; };
-  ok("W16: the ACCENTS block exists with a light and a dark block for each of the three alternatives, and touches no status colour",
-     ["blue", "blue-shades", "orange-shades"].every(k => blockOf(`:root:not([data-theme="dark"])[data-accent="${k}"]`)) && !!blockOf(DARK_BLUE)
-     && !blockOf('html[data-theme="dark"][data-accent="orange-shades"]') && !blockOf(':root:not([data-theme="dark"])[data-accent="orange"]')
-     && !/--(green|gold|red):/.test(css.slice(css.indexOf("ACCENTS-START"), css.indexOf("ACCENTS-END"))));
+  // REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone; no accent block is left in the stylesheet, light or dark
+  ok("W16: the ACCENTS block is gone: no [data-accent] block for any of the three alternatives, light or dark, and no ACCENTS-START / -END",
+     ["blue", "blue-shades", "orange-shades", "orange"].every(k => !blockOf(`:root:not([data-theme="dark"])[data-accent="${k}"]`) && !blockOf(`html[data-theme="dark"][data-accent="${k}"]`))
+     && !blockOf(DARK_BLUE) && !css.includes("[data-accent") && !css.includes("ACCENTS-START") && !css.includes("ACCENTS-END"));
   ok("W16: 🔴 Orange (the default, the user's pick) IS the look before 13 Oct: the same buttons, links and series in both looks",
      series(eff("orange", false)).join(" ") === "#E8590C #2563EB #0D9488 #7C3AED #A07D34" && series(eff("orange", true)).join(" ") === "#E8681E #5B8FF0 #13A193 #9572EE #B48E3E"
      && eff("orange", false).action === "#0B4EA2" && eff("orange", false).navy === "#0B4EA2" && eff("orange", true).action === "#8AB4F8");   // NARROWED 24 Nov 2026 (own look, stages 3 and 4): the button is the sign blue too (was #C2410C, Dark #FF8C14)   // NARROWED 24 Nov 2026 (own look, stage 3): the control blue is the sign blue #0B4EA2 (was #2563EB)
-  ok("W16: Blue primary swaps slots 1 and 2 (the plan blue, delivered orange) and 4 and 5 (the model gold: blue beside violet fails 1–4)",
-     series(eff("blue", false)).join(" ") === "#2563EB #E8590C #0D9488 #A07D34 #7C3AED" && series(eff("blue", true)).join(" ") === "#5B8FF0 #E8681E #13A193 #B48E3E #9572EE");
-  ok("W16: the shade accents carry FOUR hues and the fifth series is the 'not yet' grey; in Dark each draws its primary's series",
-     series(eff("blue-shades", false)).join(" ") === "#1D4ED8 #0891B2 #4F46E5 #0D9488" && series(eff("blue-shades", true)).join(" ") === series(eff("blue", true)).join(" ")
-     && series(eff("orange-shades", false)).join(" ") === "#E8590C #9A3412 #A07D34 #BE185D"
-     && series(eff("orange-shades", true)).join(" ") === series(eff("orange", true)).join(" "));
+  // REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone; the other accents' series cannot be drawn any more, so every look draws Orange primary's
+  ok("W16: Blue primary's swapped series (plan blue, delivered orange) is gone: no accent block reorders the series",
+     series(eff("blue", false)).join(" ") === series(eff("orange", false)).join(" ") && series(eff("blue", true)).join(" ") === series(eff("orange", true)).join(" "));
+  ok("W16: the shade accents' four-hue series are gone: every look draws Orange primary's five series",
+     series(eff("blue-shades", false)).length === 5 && series(eff("orange-shades", false)).join(" ") === series(eff("orange", false)).join(" ")
+     && series(eff("blue-shades", true)).join(" ") === series(eff("orange", true)).join(" "));
   for (const k of KEYS) for (const dark of [false, true]) {
     const t = eff(k, dark), pal = series(t), w = worst(pal), surf = dark ? "#1F2024" : "#FFFFFF";
     ok(`W16 palette ${k} · ${dark ? "dark" : "light"}: neighbours and the plan–model pair apart for a colour-blind reader (≥ 8) and for everyone (≥ 15); every series ≥ 3:1 on the surface`,
@@ -3430,18 +3431,20 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      worst(["#1E3A8A", "#2563EB", "#60A5FA", "#93C5FD", "#BFDBFE"]).nv < 15 && cr("#BFDBFE", "#FFFFFF") < 3
      && worst(["#7C2D12", "#C2410C", "#FF8C14", "#FFB55C", "#FFE0B8"]).nv < 15 && cr("#FFE0B8", "#FFFFFF") < 3);
   // the state, the early script, the picker, the charts
-  ok("W16: ACCENTS + applyAccent + useAccent mirror the look; stored as modus_accent (the B6 decision: keys keep the old prefix); unknown → orange",
-     /const ACCENTS = \[\n  \["orange",/.test(src) && /const ACCENT = \{ key: "modus_accent", current: "orange", subs: new Set\(\) \};/.test(src)
-     && /if\(!ACCENTS\.some\(\(\[k\]\) => k === name\)\) name = "orange";/.test(src) && /try \{ applyAccent\(localStorage\.getItem\(ACCENT\.key\) \|\| "orange", false\); \} catch\(e\)\{ applyAccent\("orange", false\); \}/.test(src)
-     && /function useAccent\(\)\{/.test(src));
-  ok("W16: 🔴 the remembered look and accent go on <html> in a plain <head> script, BEFORE the CDN scripts and Babel (no flash of the default)",
-     html.indexOf('d.setAttribute("data-accent",') > 0 && html.indexOf('d.setAttribute("data-accent",') < html.indexOf("react.production.min.js")
-     && /\/\^\(orange\|blue\|blue-shades\|orange-shades\)\$\/\.test\(a\|\|""\)\?a:"orange"/.test(html) && /\/\^\(ink\|light\|dark\)\$\/\.test\(t\|\|""\)\?t:"ink"/.test(html));
-  ok("W16: the picker has a second group, Accent, four menuitemradio items in their own class (the three looks stay three)",
-     /<h6>Accent<\/h6>\n\s*\{ACCENTS\.map\(\(\[k, label, sw\]\) => \(/.test(src) && src.includes('className={"accent-item" + (accent === k ? " is-on" : "")} data-accent-choice={k}')
-     && src.includes("onClick={() => { setAccent(k); setOpen(false); }}"));
-  ok("W16: charts rebuild on an accent change without a reload (ChartCanvas and the Dashboard subscribe)",
-     (src.match(/const \[accent\] = useAccent\(\);/g) || []).length === 2);
+  // REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone; no ACCENTS, ACCENT, applyAccent or useAccent, and nothing reads modus_accent
+  ok("W16: ACCENTS, ACCENT, applyAccent and useAccent are gone, and no script reads the stored modus_accent",
+     !/\bACCENTS\b/.test(src) && !/\bACCENT\b/.test(src) && !/applyAccent|useAccent/.test(src) && !html.includes("modus_accent"));
+  // NARROWED 24 Nov 2026 (own look, stage 5): the <head> script sets the look only; no data-accent anywhere
+  ok("W16: 🔴 the remembered look goes on <html> in a plain <head> script, BEFORE the CDN scripts and Babel (no flash of the default); no accent",
+     html.indexOf('d.setAttribute("data-theme",') > 0 && html.indexOf('d.setAttribute("data-theme",') < html.indexOf("react.production.min.js")
+     && !html.includes("data-accent") && /\/\^\(ink\|light\|dark\)\$\/\.test\(t\|\|""\)\?t:"ink"/.test(html));
+  // REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone; the popover lists the three looks only
+  ok("W16: the picker has no Accent group: no <h6>Accent</h6>, no .accent-item (in the markup or the stylesheet), no setAccent; the three looks stay",
+     !src.includes("<h6>Accent</h6>") && !src.includes("accent-item") && !html.includes(".accent-item") && !html.includes("accent-sw") && !src.includes("setAccent")
+     && src.includes("{THEMES.map(([k, label, sw]) => ("));
+  // REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone; the charts subscribe to the look only
+  ok("W16: charts no longer subscribe to an accent (ChartCanvas and the Dashboard read the look only)",
+     (src.match(/const \[accent\] = useAccent\(\);/g) || []).length === 0 && !/\baccent, sized\]/.test(src));
   ok("W16 (D39): every multi-series Dashboard chart names its series on the chart from 768 px; stacked segments have a 2 px surface gap",
      /const SERIES_LABELS = \{ id: "seriesLabels", afterDatasetsDraw\(chart, _args, opts\)\{/.test(src)
      && /if\(plugins\.seriesLabels && plugins\.seriesLabels\.on && vw >= 768\)\{/.test(src)
@@ -4290,9 +4293,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      // NARROWED 24 Nov 2026 (own look, stage 3): the wash is the column tint; text-blue-700 is the sign blue (the page's
      // Tailwind config) and Dark's the light sign blue #8AB4F8 (was #FFB454)
      && _hz.includes('style={role === "commit" ? { background: "var(--navy-soft-col)" } : {}}>')
-     && html.includes(':root:not([data-theme="dark"])[data-accent="orange-shades"] .text-blue-700{color:#9A3412}')
+     && !html.includes('[data-accent="orange-shades"] .text-blue-700')   // NARROWED 24 Nov 2026 (own look, stage 5): the per-accent remaps went with the accents
      && html.includes('blue:{50:"#F0F4F9",200:"#C2D3E8",300:"#9DB8DA",700:"#0B4EA2",800:"#083A79"}')
-     && html.includes('html[data-theme="dark"] .text-blue-700{color:#8AB4F8}') && html.includes('html[data-theme="dark"][data-accent^="blue"] .text-blue-700{color:#8FB3F5}'));
+     && html.includes('html[data-theme="dark"] .text-blue-700{color:#8AB4F8}') && !html.includes('[data-accent^="blue"] .text-blue-700'));
   // card 5 (decision 6): Rotate and One section only
   const _tdF = src.slice(src.indexOf("function DashboardToday("), src.indexOf("function DashboardStockChart("));
   const _fit = src.slice(src.indexOf("function todayFit("), src.indexOf("function DashboardToday("));

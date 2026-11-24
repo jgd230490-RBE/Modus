@@ -9,11 +9,12 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#1F2024">
-<!-- 13 Oct 2026 (W16): the remembered look and accent go on <html> before anything is drawn, so a reload never
-     flashes the default colours while Babel compiles the app. The app applies them again (applyTheme / applyAccent). -->
-<script>(function(){var d=document.documentElement;try{var t=localStorage.getItem("modus_theme"),a=localStorage.getItem("modus_accent");
-d.setAttribute("data-theme",/^(ink|light|dark)$/.test(t||"")?t:"ink");d.setAttribute("data-accent",/^(orange|blue|blue-shades|orange-shades)$/.test(a||"")?a:"orange");}
-catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange");}})();</script>
+<!-- 13 Oct 2026 (W16): the remembered look goes on <html> before anything is drawn, so a reload never flashes the
+     default colours while Babel compiles the app. The app applies it again (applyTheme). 24 Nov 2026 (the own look,
+     stage 5): the accent picker is gone; a stored accent is no longer read. -->
+<script>(function(){var d=document.documentElement;try{var t=localStorage.getItem("modus_theme");
+d.setAttribute("data-theme",/^(ink|light|dark)$/.test(t||"")?t:"ink");}
+catch(e){d.setAttribute("data-theme","ink");}})();</script>
 <!-- 27 Oct 2026 (pilot readiness phase 2): every outside script and stylesheet is an exact version with an integrity hash, so a changed
      file on a CDN is refused by the browser, not run. Tailwind's CDN sends no CORS header, so it is served from this app (vendor/). -->
 <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
@@ -111,49 +112,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
     --navy-soft:rgba(138,180,248,.16); --navy-soft-col:rgba(138,180,248,.10);
     color-scheme:dark;
   }
-  /* ACCENTS-START — 13 Oct 2026 (W16, bundle E; D39 and the user's picks the same evening: Orange primary the default,
-     the re-stepped shades). The accent is a SECOND axis, html[data-accent], beside html[data-theme]: the look decides
-     the surfaces, the accent decides the control colour and the chart series. "orange" is today's look and has no block
-     (it IS :root and the dark block above). The status colours (--green --gold --red) are never touched here.
-     Every pair is checked in test_h1_uk (text 4.5:1, controls and chart marks 3:1) and the series by the palette check
-     in parse_frontend (notes/bundle-e-plan-1013.md): the shade accents carry FOUR hues, the fifth series is grey;
-     Orange shades in the Dark look keeps Orange primary's series, because no warm set with two oranges passes there.
-     Slot meaning never changes: 1 = plan, 2 = delivered, 4 = the fair-price model. Because the cost chart draws 1
-     beside 4, the pair 1–4 is checked as well as the neighbours: so Blue's model is gold (blue beside violet is 0.4 for a
-     deuteranope) and Blue shades' is teal, and Blue shades in the Dark look draws Blue's series (no dark blue family
-     keeps the plan and the model apart), as Orange shades in Dark draws Orange's. */
-  :root:not([data-theme="dark"])[data-accent="blue"]{
-    --navy:#2563EB; --navy-soft:rgba(37,99,235,.08); --action:#2563EB; --action-fg:#FFFFFF; --control-fg:#FFFFFF;
-    --chart-1:#2563EB; --chart-1-soft:rgba(37,99,235,.18); --chart-2:#E8590C; --chart-3:#0D9488; --chart-4:#A07D34; --chart-5:#7C3AED;
-  }
-  :root:not([data-theme="dark"])[data-accent="blue-shades"]{
-    --navy:#1D4ED8; --navy-soft:rgba(29,78,216,.08); --action:#1D4ED8; --action-fg:#FFFFFF; --control-fg:#FFFFFF;
-    --chart-1:#1D4ED8; --chart-1-soft:rgba(29,78,216,.18); --chart-2:#0891B2; --chart-3:#4F46E5; --chart-4:#0D9488; --chart-5:#A8A29E;
-  }
-  :root:not([data-theme="dark"])[data-accent="orange-shades"]{
-    --navy:#C2410C; --navy-soft:rgba(194,65,12,.08); --action:#C2410C; --action-fg:#FFFFFF; --control-fg:#FFFFFF;
-    --chart-1:#E8590C; --chart-1-soft:rgba(232,89,12,.18); --chart-2:#9A3412; --chart-3:#A07D34; --chart-4:#BE185D; --chart-5:#A8A29E;
-  }
-  /* --navy-soft is the tint behind a chip whose text is --navy: 8 % keeps that text at 4.5:1 or better in every accent
-     (the chips before 13 Oct sat on a 10 % blue tint, 4.49:1). */
-  /* Blue shades in the Ink look: a navy header (white on it 10.4:1). The Light look keeps its white header. */
-  html[data-theme="ink"][data-accent="blue-shades"]{ --hdr-bg:#1E3A8A; }
-  html[data-theme="dark"][data-accent="blue"],html[data-theme="dark"][data-accent="blue-shades"]{
-    --navy:#5B8FF0; --navy-soft:rgba(91,143,240,.08); --blue:#8FB3F5; --action:#5B8FF0; --action-fg:#141518; --control-fg:#141518;
-    --chart-1:#5B8FF0; --chart-1-soft:rgba(91,143,240,.22); --chart-2:#E8681E; --chart-3:#13A193; --chart-4:#B48E3E; --chart-5:#9572EE;
-  }
-  /* the few Tailwind colour utilities that mean "control blue": orange in Orange shades, blue tints in the dark blue accents */
-  :root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}
-  :root:not([data-theme="dark"])[data-accent="orange-shades"] .border-blue-200{border-color:#FED7AA}
-  :root:not([data-theme="dark"])[data-accent="orange-shades"] .border-blue-300{border-color:#FDBA74}
-  :root:not([data-theme="dark"])[data-accent="orange-shades"] .text-blue-700{color:#9A3412}
-  :root:not([data-theme="dark"])[data-accent="orange-shades"] .text-blue-800{color:#7C2D12}
-  html[data-theme="dark"][data-accent^="blue"] .bg-blue-50{background-color:rgba(91,143,240,.14)}
-  html[data-theme="dark"][data-accent^="blue"] .border-blue-200{border-color:rgba(91,143,240,.35)}
-  html[data-theme="dark"][data-accent^="blue"] .border-blue-300{border-color:rgba(91,143,240,.45)}
-  html[data-theme="dark"][data-accent^="blue"] .text-blue-700{color:#8FB3F5}
-  html[data-theme="dark"][data-accent^="blue"] .text-blue-800{color:#A9C4F7}
-  /* ACCENTS-END */
+  /* 24 Nov 2026 (the own look, stage 5): the accent picker and its ACCENTS block are gone; one colour set per look. */
   /* CAPTIONS — 17 Oct 2026 (UI audit, finding 3, the 17 Oct decision 1): every secondary caption in the Ink and Light
      looks reads the muted text colour (#64748B: 4.76:1 on white, 4.56:1 on the rail and on a card's second surface) in
      place of Tailwind's slate-400 (#94A3B8, 2.56:1). One rule, written with :where() so it weighs as little as the utility
@@ -191,7 +150,6 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   html[data-theme="dark"] .bg-white{background-color:var(--surface)}
   html[data-theme="dark"] .border-amber-200{border-color:rgba(251,191,36,.35)}
   html[data-theme="dark"] .border-amber-300{border-color:rgba(251,191,36,.45)}
-  html[data-theme="dark"] .border-blue-200{border-color:rgba(138,180,248,.35)}
   html[data-theme="dark"] .border-blue-300{border-color:rgba(138,180,248,.45)}
   html[data-theme="dark"] .border-red-300{border-color:rgba(248,113,113,.5)}
   html[data-theme="dark"] .border-slate-100{border-color:#2A2B2F}
@@ -248,10 +206,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .appearance-btn:hover,.appearance-btn[aria-expanded="true"]{background:var(--hdr-btn-hover);}
   .appearance-menu{position:absolute;right:0;top:40px;min-width:200px;background:var(--popover-bg);color:var(--popover-fg);border:1px solid var(--popover-line);border-radius:10px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.45);font-size:12.5px;line-height:1.4;z-index:60;}
   .appearance-menu h6{margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--popover-muted);padding:6px 10px 4px;font-weight:600;}
-  .appearance-item,.accent-item{width:100%;display:flex;align-items:center;gap:10px;padding:7px 10px;border:0;background:transparent;color:var(--popover-fg);border-radius:7px;cursor:pointer;text-align:left;font:inherit;}
-  .appearance-item:hover,.accent-item:hover{background:rgba(255,255,255,.06);} .appearance-item.is-on,.accent-item.is-on{background:rgba(138,180,248,.16);}
-  .appearance-item .tick,.accent-item .tick{opacity:0;color:#8AB4F8;} .appearance-item.is-on .tick,.accent-item.is-on .tick{opacity:1;}
-  .swatch.accent-sw i{flex:0 0 34%;} .swatch.accent-sw b{flex:1;} .swatch.accent-sw b::after{display:none;}
+  .appearance-item{width:100%;display:flex;align-items:center;gap:10px;padding:7px 10px;border:0;background:transparent;color:var(--popover-fg);border-radius:7px;cursor:pointer;text-align:left;font:inherit;}
+  .appearance-item:hover{background:rgba(255,255,255,.06);} .appearance-item.is-on{background:rgba(138,180,248,.16);}
+  .appearance-item .tick{opacity:0;color:#8AB4F8;} .appearance-item.is-on .tick{opacity:1;}
   .swatch{display:inline-flex;width:34px;height:20px;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.15);flex:none;}
   .swatch i{display:block;flex:0 0 30%;} .swatch b{display:block;flex:1;position:relative;} .swatch b::after{content:"";position:absolute;right:3px;bottom:3px;width:10px;height:5px;border-radius:2px;background:var(--sw-dot);}
   /* H10 (8 Oct 2026): the in-app guide — a coach-mark card, demo tenant only. In-page, no library. */
@@ -1482,11 +1439,6 @@ function UnitNum({ value, onValue, kind, dp, ...rest }){
   return <input {...rest} value={txt} onChange={e => { const t = e.target.value; setTxt(t);
     const n = t.trim() === "" ? null : (isNaN(+t) ? t : +(+back(+t)).toFixed(6)); last.current = n; onValue(n); }} />;
 }
-function useAccent(){
-  const [a, setA] = useState(ACCENT.current);
-  useEffect(() => { const f = (n) => setA(n); ACCENT.subs.add(f); return () => ACCENT.subs.delete(f); }, []);
-  return [a, (n) => applyAccent(n)];
-}
 function useTheme(){
   const [t, setT] = useState(THEME.current);
   useEffect(() => { const f = (n) => setT(n); THEME.subs.add(f); return () => THEME.subs.delete(f); }, []);
@@ -1718,27 +1670,6 @@ function applyTheme(name, persist = true){
   THEME.subs.forEach(f => { try { f(name); } catch(e){} });
 }
 try { applyTheme(localStorage.getItem(THEME.key) || "ink", false); } catch(e){ applyTheme("ink", false); }
-// 13 Oct 2026 (W16, bundle E; D39): the ACCENT, a second axis beside the look (html[data-accent], the ACCENTS block in
-// the <style>). The look decides the surfaces; the accent decides the controls and the chart series. "orange" is the
-// default and is exactly the look before 13 Oct. Per browser (localStorage, like the look), set on <html> by the
-// small script in <head> before anything draws, and again here; charts subscribe through useAccent().
-// The swatch shows the button colour, then series 1 (the plan) and series 2 (delivered) in the Ink / Light look.
-const ACCENTS = [
-  ["orange",        "Orange",        { btn: "#C2410C", s1: "#E8590C", s2: "#2563EB" }],
-  ["blue",          "Blue",          { btn: "#2563EB", s1: "#2563EB", s2: "#E8590C" }],
-  ["blue-shades",   "Blue shades",   { btn: "#1D4ED8", s1: "#1D4ED8", s2: "#0891B2" }],
-  ["orange-shades", "Orange shades", { btn: "#C2410C", s1: "#E8590C", s2: "#9A3412" }],
-];
-const ACCENT = { key: "modus_accent", current: "orange", subs: new Set() };
-function applyAccent(name, persist = true){
-  if(!ACCENTS.some(([k]) => k === name)) name = "orange";
-  ACCENT.current = name;
-  const root = typeof document !== "undefined" && document.documentElement;
-  if(root && root.setAttribute) root.setAttribute("data-accent", name);
-  if(persist){ try { localStorage.setItem(ACCENT.key, name); } catch(e){} }
-  ACCENT.subs.forEach(f => { try { f(name); } catch(e){} });
-}
-try { applyAccent(localStorage.getItem(ACCENT.key) || "orange", false); } catch(e){ applyAccent("orange", false); }
 // a computed token, for the few colours that are built in JS (Chart.js)
 const tok = (name, fallback) => {
   try { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback; } catch(e){ return fallback; }
@@ -2353,7 +2284,6 @@ function ChartCanvas({ config, height, size, title, scope, notools, head }){
   const ref = useRef(null);
   const inst = useRef(null);
   const [theme] = useTheme();          // 5 Oct 2026: axes, grid and legend follow the look
-  const [accent] = useAccent();        // 13 Oct 2026 (W16): and the accent
   const [sized, setSized] = useState(false);
   const cfgRef = useRef(config); cfgRef.current = config;
   const vwNow = () => (typeof window !== "undefined" && window.innerWidth) || 1280;
@@ -2386,7 +2316,7 @@ function ChartCanvas({ config, height, size, title, scope, notools, head }){
     window.Chart.defaults.borderColor = tok("--chart-grid", "rgba(100,116,139,.18)");
     inst.current = new window.Chart(ref.current, fitChartConfig(config, vwNow()));
     return () => { if(inst.current){ inst.current.destroy(); inst.current = null; } };
-  }, [JSON.stringify(config), theme, accent, sized]);
+  }, [JSON.stringify(config), theme, sized]);
   const tools = !notools && sized && <ChartTools title={title || autoTitle} scope={scope} getPlot={getPlot} inline={!!head} />;
   const chart = <div ref={box} className={"chart-box" + (size === "lg" ? " is-lg" : size === "fill" ? " is-fill" : "")} data-chart-box="" style={height ? { height } : undefined}><canvas ref={ref}></canvas>{!head && tools}</div>;
   return head ? <><div className="gw-head" data-chart-head="1"><div className="min-w-0">{head}</div>{tools}</div>{chart}</> : chart;
@@ -2941,7 +2871,6 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const [tick, setTick] = useState(0);               // bumps every 5 min in big-screen mode
   const [stamp, setStamp] = useState(null);
   const [theme] = useTheme();          // 5 Oct 2026: chart colours are tokens; re-render on a change.
-  const [accent] = useAccent();        // 13 Oct 2026 (W16): the accent changes the series colours too
                                        // ⚠️ Hooks before the early returns below — on 5 Oct this hook
                                        // sat after them and React #310 blanked the whole app.
   // --- 15 Sep: how the big screen is divided ---------------------------------------
@@ -5273,7 +5202,6 @@ function DemoBar({ onGuide }){
 // or Escape. Keyboard: the button is a real button; the items are menuitemradio.
 function AppearancePicker(){
   const [theme, setTheme] = useTheme();
-  const [accent, setAccent] = useAccent();
   const [open, setOpen] = useState(false);
   const box = useRef(null);
   useEffect(() => {
@@ -5299,17 +5227,6 @@ function AppearancePicker(){
               className={"appearance-item" + (theme === k ? " is-on" : "")}
               onClick={() => { setTheme(k); setOpen(false); }}>
               <span className="swatch" style={{ "--sw-dot": sw.dot }} aria-hidden="true"><i style={{ background: sw.bar }}></i><b style={{ background: sw.page }}></b></span>
-              <span className="flex-1">{label}</span>
-              <span className="tick" aria-hidden="true">✓</span>
-            </button>
-          ))}
-          {/* 13 Oct 2026 (W16): the accent, a second group (its own class, so the three looks stay three items) */}
-          <h6>Accent</h6>
-          {ACCENTS.map(([k, label, sw]) => (
-            <button key={k} type="button" role="menuitemradio" aria-checked={accent === k ? "true" : "false"}
-              className={"accent-item" + (accent === k ? " is-on" : "")} data-accent-choice={k}
-              onClick={() => { setAccent(k); setOpen(false); }}>
-              <span className="swatch accent-sw" aria-hidden="true"><i style={{ background: sw.btn }}></i><b style={{ background: sw.s1 }}></b><b style={{ background: sw.s2 }}></b></span>
               <span className="flex-1">{label}</span>
               <span className="tick" aria-hidden="true">✓</span>
             </button>
@@ -15270,7 +15187,7 @@ function RoutePlanning({ route, token, onSaved }){
         <F k="rate_eur_per_t" label={`${CUR()} per tonne`} />
         <F k="rate_eur_per_km" label={`${CUR()} per ${DU()}`} rate />
         <label className="flex items-center gap-2 min-h-6 text-sm text-slate-700 col-span-2" data-route-skip-holding="1">
-          <input type="checkbox" checked={!!v.skip_holding} onChange={e => setV(x => ({ ...x, skip_holding: e.target.checked }))} style={{ accentColor: "#1D4ED8" }} />
+          <input type="checkbox" checked={!!v.skip_holding} onChange={e => setV(x => ({ ...x, skip_holding: e.target.checked }))} style={{ accentColor: "var(--navy)" }} />
           Does not call off at a holding area
         </label>
         {/* 8 Nov 2026 (v2.1, the return journey; the mockup John approved): how much of the empty way back the carbon
@@ -15282,7 +15199,7 @@ function RoutePlanning({ route, token, onSaved }){
               ["part", `May take other work · ${route.return_part_pct ?? 43} %`], ["oneway", "One way only"]].map(([val, words]) => (
               <label key={val || "guess"} className="inline-flex items-center gap-1.5 min-h-6">
                 <input type="radio" name={`ret-${route.id}`} value={val} checked={v.return_mode === val}
-                  onChange={() => setV(x => ({ ...x, return_mode: val }))} style={{ accentColor: "#1D4ED8" }} />
+                  onChange={() => setV(x => ({ ...x, return_mode: val }))} style={{ accentColor: "var(--navy)" }} />
                 {words}
               </label>))}
           </div>
@@ -19601,7 +19518,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <span className="block text-sm font-medium text-slate-700 mt-2 mb-1">Go straight to the gate</span>
                     <div className="mt-1 space-y-1" data-holding-exempt="1">
                       {keys.map(k => <label key={k} className="flex items-center gap-2 min-h-6 text-xs text-slate-700">
-                        <input type="checkbox" checked={cur.includes(k)} onChange={() => toggle(k)} style={{ accentColor: "#1D4ED8" }} />{vehLabel(k)}</label>)}
+                        <input type="checkbox" checked={cur.includes(k)} onChange={() => toggle(k)} style={{ accentColor: "var(--navy)" }} />{vehLabel(k)}</label>)}
                     </div>
                     <p className="text-[13px] text-slate-400 mt-1.5">Abnormal loads never call off here.</p>
                   </div>; })()

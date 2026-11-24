@@ -31,7 +31,8 @@ const code = html.match(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/)[
 const css = html.slice(0, html.indexOf("</style>"));
 const tokens = (block) => { const o = {}; for (const m of block.matchAll(/--([a-z0-9-]+):\s*(#[0-9A-Fa-f]{6})/g)) o[m[1]] = m[2]; return o; };
 const rootBlock = css.slice(css.indexOf(":root{"), css.indexOf("html[data-theme=\"light\"]{"));
-const darkBlock = css.slice(css.indexOf("html[data-theme=\"dark\"]{"), css.indexOf("/* ACCENTS-START"));
+// NARROWED 24 Nov 2026 (the own look, stage 5): the ACCENTS block is gone, so the Dark block ends at its own closing brace
+const darkBlock = (() => { const i = css.indexOf("html[data-theme=\"dark\"]{"); return css.slice(i, css.indexOf("\n  }", i)); })();
 const ROOT_T = tokens(rootBlock), DARK_T = tokens(darkBlock);
 const lum = (hex) => { const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
