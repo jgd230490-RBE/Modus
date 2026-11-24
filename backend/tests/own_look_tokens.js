@@ -116,5 +116,30 @@ ok("3 controls: the supplies checkbox and the look swatches take the sign blue (
    html.includes('style={{ accentColor: "var(--navy)" }}') && !html.includes('accentColor: "#2563EB"')
    && html.includes('page: "#F5F5F6", dot: "#0B4EA2" }]') && html.includes('page: "#141518", dot: "#8AB4F8" }]'));
 
+// ---- 4 the one primary button --------------------------------------------------------------------------------------
+ok("⭐ 4 button: --action is the sign blue with white text; Dark's the light sign blue with dark text",
+   tokenIn(rootBlock, "action") === "#0B4EA2" && tokenIn(rootBlock, "action-fg") === "#FFFFFF"
+   && tokenIn(darkBlock, "action") === "#8AB4F8" && tokenIn(darkBlock, "action-fg") === "#141518");
+ok("4 button: the filled button and an inline accent fill read the pair (.btn-pri, .text-white on var(--action))",
+   /\.btn-pri\{[^}]*background:var\(--action\);color:var\(--action-fg\);/.test(css) && css.includes('.text-white[style*="var(--action)"]{color:var(--action-fg);}'));
+ok("🔴 4 button: Confirm week stays green — its own pair, unchanged, on both buttons",
+   tokenIn(rootBlock, "ok-btn") === "#047857" && tokenIn(rootBlock, "ok-btn-fg") === "#FFFFFF" && tokenIn(darkBlock, "ok-btn") === "#34D399"
+   && (html.match(/style=\{\{ background: "var\(--ok-btn\)", color: "var\(--ok-btn-fg\)" \}\}/g) || []).length === 2);
+// orange is the brand only: the logo (an image) and the 2 px rule under the header. Left as data, not controls: the chart
+// palette's slot 1 (#E8590C / #E8681E), the lorry plan's blocks (.pb-dis, lpPalette) and the accent list (stage 5 removes it)
+const accentsCut = css.indexOf("ACCENTS-START") > 0 ? css.slice(0, css.indexOf("ACCENTS-START")) + css.slice(css.indexOf("ACCENTS-END")) : css;
+const orangeCss = (accentsCut.replace(/\/\*[\s\S]*?\*\//g, "").match(/#(C2410C|FF8C14|FFA10A|EA580C|F97316)\b|rgba\((194, ?65, ?12|255, ?140, ?20)/gi) || []);
+ok("⭐ 4 orange is the brand only: no burnt or brand orange on any control, tint or focus in the stylesheet (the brand tokens and the lorry plan's data block aside)",
+   orangeCss.map(c => c.toUpperCase()).sort().join(" ") === "#C2410C #FF8C14 #FFA10A" && (accentsCut.match(/\.pb-dis\{background:#C2410C;\}/g) || []).length === 1
+   && tokenIn(rootBlock, "brand-orange") === "#FF8C14" && tokenIn(rootBlock, "brand-orange-to") === "#FFA10A", orangeCss.join(" "));
+ok("4 orange is the brand only: --brand-orange paints the header's 2 px rule and nothing else",
+   (html.match(/var\(--brand-orange\)/g) || []).length === 1 && css.includes(".brand-bar{background:var(--hdr-bg);color:var(--hdr-fg);border-bottom:2px solid var(--brand-orange);}"));
+ok("4 the guide's dot is the sign blue (was the burnt orange), its pulse from the same token",
+   /\.guide-dot\{[^}]*background:var\(--navy\);/.test(css) && css.includes("@keyframes guide-pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--navy) 45%,transparent)}"));
+
+ok("4 button: the supplier orders menu's 'All suppliers' zip is an action, so it reads the button pair (was a --navy fill)",
+   css.includes(".row-menu-list button.so-all{margin-top:6px;text-align:center;background:var(--action);color:var(--action-fg);font-weight:600;}")
+   && !/so-all\{[^}]*var\(--navy\)/.test(css));
+
 console.log(`own_look_tokens.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  FAIL: " + f)); process.exit(1); }

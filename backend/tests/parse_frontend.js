@@ -2063,8 +2063,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // NARROWED 5 Nov 2026 (group 6): the same muted count also carries the new concerns, with its own title
   ok("...and the pending count is a muted number, not a gold badge", code.includes('<span className="rail-count" title={it.id === "concerns" ? `${badge} new concern(s)` : `${badge} line(s) waiting for approval`}>{badge}</span>'));
   // 11 Oct 2026 — the fresher shell (fresh-directions.html: A with B's orange button and kicker)
-  ok("the action colour is its own token: deep orange with white text in the light looks (5.2:1), brand orange with ink text in dark (7.0:1)",
-    /--action:#C2410C; --action-fg:#FFFFFF;/.test(html) && /--action:#FF8C14; --action-fg:#1F2024;/.test(html)
+  // NARROWED 24 Nov 2026 (the own look, Group A, stage 4): the ONE primary button is the sign blue, white text (8.00:1), and
+  // Dark's the light sign blue with dark text (8.66:1); orange is the brand only (was #C2410C / #FF8C14)
+  ok("the action colour is its own token: the sign blue with white text in the light looks (8.0:1), the light sign blue with dark text in dark (8.7:1)",
+    /--action:#0B4EA2; --action-fg:#FFFFFF;/.test(html) && /--action:#8AB4F8; --action-fg:#141518;/.test(html)
     && /\.btn-pri\{display:inline-block;padding:7px 14px;border-radius:6px;background:var\(--action\);color:var\(--action-fg\);/.test(html)
     && (html.match(/var\(--brand-orange\)/g) || []).length <= 2);
   ok("the rail has line icons (inline SVG, no library) in place of the glyphs, one per nav entry",
@@ -3412,7 +3414,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && !/--(green|gold|red):/.test(css.slice(css.indexOf("ACCENTS-START"), css.indexOf("ACCENTS-END"))));
   ok("W16: 🔴 Orange (the default, the user's pick) IS the look before 13 Oct: the same buttons, links and series in both looks",
      series(eff("orange", false)).join(" ") === "#E8590C #2563EB #0D9488 #7C3AED #A07D34" && series(eff("orange", true)).join(" ") === "#E8681E #5B8FF0 #13A193 #9572EE #B48E3E"
-     && eff("orange", false).action === "#C2410C" && eff("orange", false).navy === "#0B4EA2" && eff("orange", true).action === "#FF8C14");   // NARROWED 24 Nov 2026 (own look, stage 3): the control blue is the sign blue #0B4EA2 (was #2563EB)
+     && eff("orange", false).action === "#0B4EA2" && eff("orange", false).navy === "#0B4EA2" && eff("orange", true).action === "#8AB4F8");   // NARROWED 24 Nov 2026 (own look, stages 3 and 4): the button is the sign blue too (was #C2410C, Dark #FF8C14)   // NARROWED 24 Nov 2026 (own look, stage 3): the control blue is the sign blue #0B4EA2 (was #2563EB)
   ok("W16: Blue primary swaps slots 1 and 2 (the plan blue, delivered orange) and 4 and 5 (the model gold: blue beside violet fails 1–4)",
      series(eff("blue", false)).join(" ") === "#2563EB #E8590C #0D9488 #A07D34 #7C3AED" && series(eff("blue", true)).join(" ") === "#5B8FF0 #E8681E #13A193 #B48E3E #9572EE");
   ok("W16: the shade accents carry FOUR hues and the fifth series is the 'not yet' grey; in Dark each draws its primary's series",
