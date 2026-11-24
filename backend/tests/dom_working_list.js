@@ -162,8 +162,19 @@ const SENT = "Busy-hour times are running. Route all can start when they finish.
        && rs.querySelector("[data-work-carry]").textContent === "Carry on" && !rs.querySelector("[data-work-close]"), rs.textContent);
     await set([{ ...STOP, can_carry: false }]);
     ok("⭐ 2. ...and no Carry on for someone who may not start that job (the server says who may)", rows().length === 1 && !rows()[0].querySelector("[data-work-carry]"));
+    // 24 Nov 2026 (axe on the open list in Chrome, the mother session): Escape with the list's own "i" box open leaves
+    // the list open (the box's own handler closes the box); Escape then closes the list and the chip has the focus
+    const fakePop = w.document.createElement("div"); fakePop.className = "info-pop"; w.document.body.appendChild(fakePop);
+    await act(async () => { w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+    ok("⭐ 2. Escape while the list's \"i\" box is open does not close the list under it", !!list());
+    fakePop.remove();
+    const carryBtn = rows()[0] && rows()[0].querySelector(".wl-line"); if (carryBtn && carryBtn.focus) carryBtn.focus();
     await act(async () => { w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
     const escClosed = !list();
+    ok("⭐ 2. after Escape the chip has the focus (what had it went with the list)", escClosed && w.document.activeElement === chip(),
+       String(w.document.activeElement && w.document.activeElement.tagName));
+    ok("⭐ 2. the chip names no list it controls (the list is not on the page while closed; axe asked for a review of it)",
+       !/aria-controls="work-list"/.test(html) && chip().getAttribute("aria-haspopup") === "dialog" && chip().getAttribute("aria-expanded") === "false");
     await click(chip());
     await act(async () => { w.document.body.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true })); });
     ok("2. Escape closes the list, and so does a click outside it", escClosed && !list());

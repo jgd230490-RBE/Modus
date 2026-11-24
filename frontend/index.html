@@ -5295,6 +5295,7 @@ function WorkChip(){
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
   const box = useRef(null);
+  const escd = useRef(false);
   useEffect(() => {
     let t = null, gone = false;
     const next = () => { if(!gone) t = setTimeout(tick, (WORK.running || workSending()) ? WORK_POLL_BUSY : WORK_POLL_IDLE); };
@@ -5307,9 +5308,17 @@ function WorkChip(){
   useEffect(() => {
     if(!open) return;
     const away = (e) => { if(box.current && box.current.contains(e.target)) return; if(e.target && e.target.closest && e.target.closest(".info-pop")) return; setOpen(false); };
-    const key = (e) => { if(e.key === "Escape") setOpen(false); };
+    // 24 Nov 2026: Escape with the list's own "i" box open closes that box only (its own handler); the next Escape
+    // closes the list, and the chip takes the focus back (the row or "i" that had it is gone with the list)
+    const key = (e) => { if(e.key !== "Escape") return; if(document.querySelector(".info-pop")) return; escd.current = true; setOpen(false); };
     document.addEventListener("mousedown", away); document.addEventListener("keydown", key);
     return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", key); };
+  }, [open]);
+  useEffect(() => {
+    if(open || !escd.current) return;
+    escd.current = false;
+    const b = box.current && box.current.querySelector("[data-work-chip]");
+    if(b){ try { b.focus(); } catch(e){} }
   }, [open]);
   const jobs = w.jobs || [];
   useEffect(() => { if(!jobs.length && open) setOpen(false); }, [jobs.length]);
@@ -5340,7 +5349,7 @@ function WorkChip(){
   return (
     <span className="work" ref={box}>
       <button type="button" className={"work-chip wc-" + tone} data-work-chip={tone} aria-haspopup="dialog"
-              aria-expanded={open ? "true" : "false"} aria-controls="work-list" onClick={() => setOpen(o => !o)}>
+              aria-expanded={open ? "true" : "false"} onClick={() => setOpen(o => !o)}>
         <i aria-hidden="true"></i><span>{word} · {n}</span>
       </button>
       {open && (
