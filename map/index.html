@@ -6082,7 +6082,7 @@
               + (Number(p.routes_attached) || 0) + ' route(s)</div>';
         if (p.note) body += '<div style="font-size:11px;margin-top:6px;color:var(--ink-2);">' + p.note + '</div>';
         return '<div style="min-width:220px;">'
-            + '<h4 style="margin:0 0 4px;color:' + CONFIG.COLORS.brandDark + ';font-size:13px;">'
+            + '<h4 style="margin:0 0 4px;color:var(--ink);font-size:13px;">'
             + (p.name || p.zone_id) + '</h4>' + body + '</div>';
     }
 
@@ -6093,7 +6093,7 @@
             ? (p.starts_on || 'open') + ' → ' + (p.ends_on || 'open')
             : 'no dates set';
         return '<div style="min-width:210px;">' +
-            '<h4 style="margin:0 0 4px;color:' + CONFIG.COLORS.brandDark + ';font-size:13px;">' + (p.name || p.id) + '</h4>' +
+            '<h4 style="margin:0 0 4px;color:var(--ink);font-size:13px;">' + (p.name || p.id) + '</h4>' +
             '<div style="font-size:11.5px;color:var(--muted);">' + (kindLabels[p.kind] || p.kind) + ' · ' + when + '</div>' +
             '<div style="font-size:11.5px;margin-top:6px;color:' +
                 (p.affects_routing === true || p.affects_routing === 'true' ? '#1F2024' : 'var(--muted)') + ';font-weight:600;">' +   // ink, not red: red is kept for a clash or a cap breach
@@ -8191,7 +8191,7 @@
                 (co2On ? '<div style="color:var(--muted);">' + (sh.co2_t == null ? 'no figure' : fmtTonnes(Number(sh.co2_t))) + '</div>' : '') + '</td></tr>';
         }).join('');
         return '<div style="min-width:240px;max-width:340px;font-size:14px;">' +
-            '<h4 style="margin:0 0 4px;color:' + CONFIG.COLORS.brandDark + ';font-size:14px;">Shared road section · ' + rlEsc(monthLabel(m)) + '</h4>' +
+            '<h4 style="margin:0 0 4px;color:var(--ink);font-size:14px;">Shared road section · ' + rlEsc(monthLabel(m)) + '</h4>' +
             '<div style="margin-bottom:6px;">' + cwN(f ? f.properties.rl_mv_text : '0') +
             (f && PV() === 2 && f.properties.rl_in_text != null ? ' (' + f.properties.rl_in_text + ' in, ' + f.properties.rl_out_text + ' out)' : '') +
             ' · ' + (f ? f.properties.rl_routes_text : '') +
@@ -9740,7 +9740,7 @@
                 const info=ROUTEINFO[(rid||'').toString().trim().toLowerCase()]||{};
                 const safe=(rid||'').toString().replace(/\\/g,'\\\\').replace(/'/g,"\\'");
                 const html='<div style="min-width:210px;">'+
-                    '<h4 style="margin:0 0 4px;color:'+CONFIG.COLORS.brandDark+';font-size:13px;">'+rid+'</h4>'+
+                    '<h4 style="margin:0 0 4px;color:var(--ink);font-size:13px;">'+rid+'</h4>'+
                     '<div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">'+(info.origin||'—')+' → '+(info.dest||'—')+(info.distance_km?(' · '+fmtDist(info.distance_km, 1)+' '+DU()):'')+'</div>'+
                     '<button class="rb-popup-btn" onclick="openRouteAnalysis(\''+safe+'\')">Full route analysis →</button></div>';
                 new mapboxgl.Popup({offset:10}).setLngLat(e.lngLat).setHTML(html).addTo(map);
