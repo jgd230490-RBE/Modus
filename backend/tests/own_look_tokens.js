@@ -58,7 +58,7 @@ ok("1 type: a chart's downloaded picture and the record's picture name IBM Plex 
 // ---- 2 greys -------------------------------------------------------------------------------------------------------
 const twAt = html.indexOf('<script src="/vendor/tailwind-play-3.4.17.js"></script>');
 const cfgAt = html.indexOf("<script>tailwind.config={theme:{extend:{colors:{slate:{");
-const slate = cfgAt > 0 ? Object.fromEntries([...html.slice(cfgAt, html.indexOf("</script>", cfgAt)).matchAll(/(\d+):"(#[0-9A-F]{6})"/g)].map(m => [m[1], m[2]])) : {};
+const slate = cfgAt > 0 ? Object.fromEntries([...html.slice(cfgAt, html.indexOf("}", cfgAt + 50)).matchAll(/(\d+):"(#[0-9A-F]{6})"/g)].map(m => [m[1], m[2]])) : {};
 ok("⭐ 2 greys: Tailwind's slate ramp is re-defined in ONE place, the page's Tailwind config, right after the play script loads",
    twAt > 0 && cfgAt > twAt && cfgAt - twAt < 700, `${twAt} ${cfgAt}`);
 ok("2 greys: ...as the neutral ramp made from the ink (50 soft surface, 200 / 300 lines, 500 captions, 600 second text, 800 ink)",
@@ -75,6 +75,46 @@ ok("🔴 2 greys: Dark's greys are neutral too (captions #9C9FA4, lines #333539 
    && css.includes('html[data-theme="dark"] .border-slate-200{border-color:#333539}') && css.includes('html[data-theme="dark"] .border-slate-300{border-color:#4B4D52}'));
 ok("2 greys: no map popup or label falls back to a system typeface (the Routes map's popups read the text face)",
    !/font:1[24]px system-ui/.test(html) && (html.match(/font:1[24]px var\(--f-text\)/g) || []).length === 3);
+
+// ---- 3 sign blue ---------------------------------------------------------------------------------------------------
+const lightHdr = (() => { const a = css.indexOf('  html[data-theme="light"]{'); return css.slice(a, css.indexOf("\n  }", a)); })();
+ok("⭐ 3 sign blue: --navy and --blue are #0B4EA2, --navy-soft its 10 % tint (a chosen thing), --navy-soft-col its 6 % tint (a table column)",
+   tokenIn(rootBlock, "navy") === "#0B4EA2" && tokenIn(rootBlock, "blue") === "#0B4EA2"
+   && tokenIn(rootBlock, "navy-soft") === "rgba(11,78,162,.10)" && tokenIn(rootBlock, "navy-soft-col") === "rgba(11,78,162,.06)");
+ok("🔴 3 sign blue: Dark's is the light sign blue #8AB4F8 (16 % and 10 % tints) with dark text on a fill, never orange",
+   tokenIn(darkBlock, "navy") === "#8AB4F8" && tokenIn(darkBlock, "blue") === "#8AB4F8" && tokenIn(darkBlock, "navy-soft") === "rgba(138,180,248,.16)"
+   && tokenIn(darkBlock, "navy-soft-col") === "rgba(138,180,248,.10)" && tokenIn(darkBlock, "control-fg") === "#141518");
+ok("3 sign blue: the white bar's chosen segment is a sign blue tint with sign blue words (was an orange tint)",
+   tokenIn(lightHdr, "hdr-on") === "rgba(11,78,162,.10)" && css.includes('html[data-theme="light"] .hdr-seg button.is-on{color:var(--navy);}'));
+ok("3 sign blue: the page's five blue utilities are the sign blue ramp, and Dark remaps them to the light sign blue (no orange)",
+   html.includes('950:"#0C0D0F"},blue:{50:"#F0F4F9",200:"#C2D3E8",300:"#9DB8DA",700:"#0B4EA2",800:"#083A79"}}}}};</script>')
+   && css.includes('html[data-theme="dark"] .bg-blue-50{background-color:rgba(138,180,248,.12)}') && css.includes('html[data-theme="dark"] .text-blue-700{color:#8AB4F8}')
+   && css.includes('html[data-theme="dark"] .text-blue-800{color:#A9C8FA}') && css.includes('html[data-theme="dark"] .border-blue-300{border-color:rgba(138,180,248,.45)}'));
+ok("⭐ 3 selection: the rail's chosen page, the wall bar's chosen button and the phone's chosen segment are the 10 % tint with sign blue words — none filled",
+   css.includes(".rail-item.is-on{background:var(--navy-soft);color:var(--navy);font-weight:600;}")
+   && css.includes(".dash-wallbar-btn.is-on{background:var(--navy-soft);color:var(--navy);}")
+   && css.includes('.ph-seg button[aria-pressed="true"]{background:var(--navy-soft);color:var(--navy);}'));
+ok("3 selection: the phone's chosen tab, its More item and its chosen day read the sign blue, not the action colour",
+   css.includes(".phone-tab.is-on{color:var(--navy);") && /\.phone-tab\.is-on::before\{[^}]*background:var\(--navy\);\}/.test(css)
+   && css.includes(".phone-more-item.is-on{color:var(--navy);") && css.includes('.ph-day[aria-pressed="true"]{border-color:var(--navy);')
+   && !/\.(phone-tab\.is-on|phone-more-item\.is-on|ph-day\[aria-pressed="true"\]|ph-seg button\[aria-pressed="true"\])[^{]*\{[^}]*var\(--action\)/.test(css));
+ok("3 selection: the look list's chosen row is a light sign blue tint and tick on the dark popover (was orange)",
+   css.includes(".appearance-item.is-on,.accent-item.is-on{background:rgba(138,180,248,.16);}") && css.includes(".appearance-item .tick,.accent-item .tick{opacity:0;color:#8AB4F8;}"));
+const placeOn = html.match(/style=\{(gatePlace|areaPlace|picking === c\.name) \? \{ background: "var\(--navy-soft\)", color: "var\(--navy\)" \} : undefined\}/g) || [];
+ok("🔴 3 selection: the three 'Place on map' toggles and the drawing palette's picked tool are the tint and sign blue words; no text-white sits on a --navy or --blue fill but the Submit strip",
+   placeOn.length === 3 && html.includes('style={on ? { background: "var(--navy-soft)", color: "var(--navy)" } : undefined} />;')
+   && !/background: ?"var\(--blue\)"/.test(html)
+   && (html.match(/background: ?"var\(--navy\)"/g) || []).length === 1 && html.includes('text-white kpi-num" style={{ background: "var(--navy)" }}>'));
+ok("3 selection: a table column (today, the commit week) is the 6 % tint: eight column washes, none on the 10 % tint",
+   (html.match(/var\(--navy-soft-col\)/g) || []).length === 8 && !/\{ background: "var\(--navy-soft\)" \}/.test(html));
+ok("3 figures: the Cost groups and their planned and fair £, today's vehicles, the Submit page's loads and fair £ and the Today heading read the ink, not the sign blue",
+   (html.match(/<Group title="Cost" tone="var\(--navy-deep\)">/g) || []).length === 2 && !/tone="var\(--navy\)"/.test(html.replace('<Bar pct={acctPct != null ? acctPct : 0} tone="var(--navy)" />', ""))
+   && html.includes('fig-group" style={{ color: "var(--navy-deep)" }}>Today'));
+ok("⭐ 3 links: the road closures line's link is the sign blue even when the line is an amber warning",
+   html.includes('<button onClick={refreshTarkTee} className="font-semibold underline hover:no-underline" style={{ color: "var(--navy)" }}>'));
+ok("3 controls: the supplies checkbox and the look swatches take the sign blue (no stock blue on a control)",
+   html.includes('style={{ accentColor: "var(--navy)" }}') && !html.includes('accentColor: "#2563EB"')
+   && html.includes('page: "#F5F5F6", dot: "#0B4EA2" }]') && html.includes('page: "#141518", dot: "#8AB4F8" }]'));
 
 console.log(`own_look_tokens.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  FAIL: " + f)); process.exit(1); }

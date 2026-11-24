@@ -81,8 +81,10 @@ ok("...Submit's Save & send, Locations / Zones / Routes' Save and Create, the la
    && /style=\{\{ background: "var\(--action\)" \}\}>\s*\{savingLoc \? "Working…"/.test(code.replace(/disabled:opacity-50" /g, 'disabled:opacity-50"\n '))
    && (code.match(/background: ?"var\(--action\)"/g) || []).length >= 22);
 const navyButtons = [...code.matchAll(/<button[^>]*?background: ?"var\(--navy\)"/g)].map(m => m[0]);
-ok("...no ACTION button is filled blue any more: the one navy-filled button left is a selection (the drawing palette's picked tool, aria-pressed)",
-   navyButtons.length === 1 && navyButtons[0].startsWith("<button {...r} aria-pressed={on}"), navyButtons.length + " navy buttons");
+// NARROWED 24 Nov 2026 (the own look, Group A, stage 3): a selection is a tint, never a fill, so the drawing palette's picked
+// tool is now the --navy-soft tint with --navy words and NO button is filled with --navy (was: exactly that one)
+ok("...no ACTION button is filled blue any more, and no selection either: the drawing palette's picked tool is a --navy-soft tint (aria-pressed)",
+   navyButtons.length === 0 && /<button \{\.\.\.r\} aria-pressed=\{on\}[^\n]*style=\{on \? \{ background: "var\(--navy-soft\)", color: "var\(--navy\)" \}/.test(code), navyButtons.length + " navy buttons");
 ok("⭐ 13: ONE tab — .ws-tab, the selected one a --navy-soft tint with --navy text and edge, never filled like a button",
    css.includes('.ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--navy-soft);color:var(--navy);border-color:var(--navy);}'));
 ok("...Users' tabs, the Look-ahead's Account / Commit / Horizon, Stockpiles' piles and years and the CLP notes' tabs all use it",

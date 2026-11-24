@@ -613,16 +613,22 @@ ok("...colours lines by leg (CM_OUT / CM_BACK), not by team; the team is named i
 // 13 Oct 2026 (W6, narrowed): ", today" (one " · " a cell at most)
 // NARROWED 17 Oct 2026 (UI fix 2, claude/ui-fix-dark, finding 2): the wash is var(--navy-soft) INLINE — the .tbl th rule
 // out-ranks a bg-blue-50 class — so the dark look paints today's column in its own tint (the figures were 1.14:1 on #eff6ff)
+// NARROWED 24 Nov 2026 (the own look, Group A, stage 3): a table column is the 6 % tint --navy-soft-col (a chosen thing is the 10 % --navy-soft)
 ok("today's column carries the wash and the '· today' suffix",
-  _laBody.includes('", today"') && _laBody.includes('style={t ? { background: "var(--navy-soft)" } : {}}'));
+  _laBody.includes('", today"') && _laBody.includes('style={t ? { background: "var(--navy-soft-col)" } : {}}'));
 // NARROWED 27 Oct 2026 (stockpile forecast, card 4): + the Horizon's stockpile strip's heading row keeps the commit wash (eight)
 ok("UI fix 2 (#2): no #eff6ff / #64748b / #B45309 literal is left in the Look-ahead; eight inline var(--navy-soft) washes (today's th and td, the summary row, the Horizon's commit th and two td, the stockpile strip's heading cell); the week pill reads var(--muted) when off",
   !/#eff6ff|#64748b|#B45309/i.test(_laBody)
-  && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 8
+  // NARROWED 24 Nov 2026 (own look, stage 3): of the eight, the seven column washes are the 6 % column tint, --navy-soft-col
+  // (and the Horizon's stockpile cell's `bg` the same), and the eighth, the chosen week pill, keeps the 10 % --navy-soft
+  && (_laBody.match(/\{ background: "var\(--navy-soft-col\)"/g) || []).length === 7 && _laBody.includes('(role === "commit" ? "var(--navy-soft-col)" : undefined)')
+  && (_laBody.match(/\{ background: "var\(--navy-soft\)"/g) || []).length === 1
   && _laBody.includes('style={bucket === b ? { background: "var(--navy-soft)", color: "var(--navy)" } : { color: "var(--muted)" }}'));
 ok("...the road-closures line is 13 px in slate-500 (checked) or amber-700 (not checked) — classes the dark look remaps — with no inline colour (was 11 px #64748b / #B45309, 3.64:1 in Dark)",
   _laBody.includes('<div className={"text-[13px] mb-3 flex flex-wrap items-center gap-2 " + (ttSrc.restrictions === "ok" ? "text-slate-500" : "text-amber-700")}>')
-  && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "re-check" : "check now"}'));
+  && !_laBody.includes("text-[11px] mb-3 flex flex-wrap") && _laBody.includes('{ttSrc.restrictions === "ok" ? "re-check" : "check now"}')
+  // 24 Nov 2026 (own look, stage 3; the independent review of the second mockup): the line's link is the sign blue, never amber
+  && _laBody.includes('<button onClick={refreshTarkTee} className="font-semibold underline hover:no-underline" style={{ color: "var(--navy)" }}>'));
 // 17 Oct 2026 (UI fix 2, findings 1 and 6): the pressed view pill and the two Confirm week buttons read tokens
 ok("UI fix 2 (#1): the pressed view pill (Commit / Account / Horizon) reads var(--control-fg), not an inline white",
   _laBody.includes('<button key={id} type="button" onClick={() => pick(id)} className="ws-tab" aria-current={view === id ? "page" : undefined}>{label}</button>') && !/color: "white"/.test(_laBody)
@@ -2047,8 +2053,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // (the warm stone line #E7E5E4 and the warm rail #FAFAF9 were the 11 Oct shell; the banned list rules out warm paper)
   ok("the shell tokens are the NEUTRAL greys made from the ink and the rail has its own two tokens, light and dark",
     /--line:#E1E2E4; --bg:#FFFFFF;/.test(html) && /--rail-bg:#F5F5F6; --rail-on:#1F2024;/.test(html) && /--rail-bg:#1B1D21; --rail-on:#F3F4F6;/.test(html));
-  ok("⭐ the rail's active item is INK, not the action colour (one accent on a neutral shell)",
-    /\.rail-item\.is-on\{background:var\(--surface\);color:var\(--rail-on\);font-weight:600;box-shadow:0 0 0 1px var\(--line\);\}/.test(html)
+  // NARROWED 24 Nov 2026 (the own look, Group A, stage 3): the chosen page is a 10 % sign blue tint with sign blue words (the own look: a
+  // selection is a tint); still never the action colour, and never a fill (was ink on a white chip with a ring)
+  ok("⭐ the rail's active item is the sign blue tint, not the action colour and not a fill (one accent on a neutral shell)",
+    /\.rail-item\.is-on\{background:var\(--navy-soft\);color:var\(--navy\);font-weight:600;\}/.test(html)
     && code.includes('className={"rail shrink-0 flex flex-col transition-[width] duration-150 "')
     && code.includes('className={"rail-item w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition " + (active ? "is-on" : "")}')
     && !code.includes('border-[color:var(--navy)] bg-slate-50 text-[color:var(--navy)] font-semibold'));
@@ -3404,7 +3412,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && !/--(green|gold|red):/.test(css.slice(css.indexOf("ACCENTS-START"), css.indexOf("ACCENTS-END"))));
   ok("W16: 🔴 Orange (the default, the user's pick) IS the look before 13 Oct: the same buttons, links and series in both looks",
      series(eff("orange", false)).join(" ") === "#E8590C #2563EB #0D9488 #7C3AED #A07D34" && series(eff("orange", true)).join(" ") === "#E8681E #5B8FF0 #13A193 #9572EE #B48E3E"
-     && eff("orange", false).action === "#C2410C" && eff("orange", false).navy === "#2563EB" && eff("orange", true).action === "#FF8C14");
+     && eff("orange", false).action === "#C2410C" && eff("orange", false).navy === "#0B4EA2" && eff("orange", true).action === "#FF8C14");   // NARROWED 24 Nov 2026 (own look, stage 3): the control blue is the sign blue #0B4EA2 (was #2563EB)
   ok("W16: Blue primary swaps slots 1 and 2 (the plan blue, delivered orange) and 4 and 5 (the model gold: blue beside violet fails 1–4)",
      series(eff("blue", false)).join(" ") === "#2563EB #E8590C #0D9488 #A07D34 #7C3AED" && series(eff("blue", true)).join(" ") === "#5B8FF0 #E8681E #13A193 #B48E3E #9572EE");
   ok("W16: the shade accents carry FOUR hues and the fifth series is the 'not yet' grey; in Dark each draws its primary's series",
@@ -3829,9 +3837,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      /\.phone-tab\{[^}]*min-height:56px;/.test(_css) && /\.phone-more-item\{[^}]*min-height:48px;/.test(_css) && /\.ph-seg button\{min-height:48px;/.test(_css)
      && /\.ph-day\{[^}]*min-height:56px;/.test(_css) && /\.ph-line>button\{[^}]*min-height:48px;/.test(_css) && /\.ph-more\{[^}]*min-height:48px;/.test(_css)
      && /\.ph-actions>\*\{flex:1;min-height:48px;/.test(_css) && /\.tap48\{min-height:48px;\}/.test(_css));
-  ok("PHONE CSS: tokens only (every look and accent follows), the active tab in the accent's control colour, the 14 px floor kept (13 px only for the tab words and notes)",
-     _css.length > 3000 && !/#[0-9A-Fa-f]{3,6}\b/.test(_css) && /\.phone-tab\.is-on\{color:var\(--action\);/.test(_css)
-     && /\.phone-tab\.is-on::before\{[^}]*background:var\(--action\);\}/.test(_css) && !/font(-size)?:[^;]*\b(9|10|11|12)px/.test(_css));
+  // NARROWED 24 Nov 2026 (the own look, Group A, stage 3): the chosen tab is a selection, so the sign blue (--navy), not the action colour
+  ok("PHONE CSS: tokens only (every look and accent follows), the active tab in the sign blue, the 14 px floor kept (13 px only for the tab words and notes)",
+     _css.length > 3000 && !/#[0-9A-Fa-f]{3,6}\b/.test(_css) && /\.phone-tab\.is-on\{color:var\(--navy\);/.test(_css)
+     && /\.phone-tab\.is-on::before\{[^}]*background:var\(--navy\);\}/.test(_css) && !/font(-size)?:[^;]*\b(9|10|11|12)px/.test(_css));
   ok("PHONE CSS: the page header's actions wrap under the title (a phone, and 768–1023 px beside the open rail), the Look-ahead's flags wrap in their chips",
      /\n  \.ph-actions-box\{flex-shrink:1;min-width:0;max-width:100%;flex-wrap:wrap;\}/.test(_css)
      && /\[data-guide="lookahead-flags"\] \.chip-st\{white-space:normal;/.test(_css)
@@ -4276,9 +4285,12 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ UI FIX 6 card 3 (finding #37): the commit week's heading is text-blue-700 (the accent's darker shade, remapped per accent and look) instead of var(--navy) at 4.44:1; the commit column keeps its inline wash",
      _hz.includes('<div className={"font-semibold " + (role === "commit" ? "text-blue-700" : "text-slate-600")}>')
      && !_hz.includes('style={role === "commit" ? { color: "var(--navy)" } : {}}')
-     && _hz.includes('style={role === "commit" ? { background: "var(--navy-soft)" } : {}}>')
+     // NARROWED 24 Nov 2026 (own look, stage 3): the wash is the column tint; text-blue-700 is the sign blue (the page's
+     // Tailwind config) and Dark's the light sign blue #8AB4F8 (was #FFB454)
+     && _hz.includes('style={role === "commit" ? { background: "var(--navy-soft-col)" } : {}}>')
      && html.includes(':root:not([data-theme="dark"])[data-accent="orange-shades"] .text-blue-700{color:#9A3412}')
-     && html.includes('html[data-theme="dark"] .text-blue-700{color:#FFB454}') && html.includes('html[data-theme="dark"][data-accent^="blue"] .text-blue-700{color:#8FB3F5}'));
+     && html.includes('blue:{50:"#F0F4F9",200:"#C2D3E8",300:"#9DB8DA",700:"#0B4EA2",800:"#083A79"}')
+     && html.includes('html[data-theme="dark"] .text-blue-700{color:#8AB4F8}') && html.includes('html[data-theme="dark"][data-accent^="blue"] .text-blue-700{color:#8FB3F5}'));
   // card 5 (decision 6): Rotate and One section only
   const _tdF = src.slice(src.indexOf("function DashboardToday("), src.indexOf("function DashboardStockChart("));
   const _fit = src.slice(src.indexOf("function todayFit("), src.indexOf("function DashboardToday("));
@@ -4944,9 +4956,11 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
      && ed.includes("if(!b.isEmpty() && m.getZoom() < 15) m.fitBounds(b, { padding: 40, maxZoom: 18, duration: 0 });")
      // NARROWED 31 Oct 2026 (PR 3): and a pinned picture's "Fit to screen" (asked for, never on its own)
      && (ed.match(/fitBounds\(/g) || []).length === 2 && ed.includes("const fitPic = (p) => {") && ed.includes("onClick={() => fitPic(p)}>Fit to screen</button>"));
-  ok("DRAW: the palette's tool button is ONE module-level component (a click never remounts it, so the focus stays), white on an inline navy when picked (the Dark look's rule)",
+  // NARROWED 24 Nov 2026 (the own look, Group A, stage 3): the picked tool is the --navy-soft tint with --navy words (a selection is a
+  // tint, never a fill; was white on an inline navy)
+  ok("DRAW: the palette's tool button is ONE module-level component (a click never remounts it, so the focus stays), the sign blue tint and words when picked",
      (src.match(/const PalBtn = /g) || []).length === 1 && src.includes('const PalBtn = ({ on, ...r }) => <button {...r} aria-pressed={on} className=')
-     && src.includes('style={on ? { background: "var(--navy)" } : undefined} />;') && src.indexOf("const PalBtn = ") < src.indexOf("function SiteLayoutDraw(")
+     && src.includes('style={on ? { background: "var(--navy-soft)", color: "var(--navy)" } : undefined} />;') && !src.includes('style={on ? { background: "var(--navy)" } : undefined} />;') && src.indexOf("const PalBtn = ") < src.indexOf("function SiteLayoutDraw(")
      && !ed.includes("const PalBtn") && (ed.match(/<PalBtn /g) || []).length === 4 && !ed.includes("bg-[color:var(--navy)]"));
   ok("DRAW: a selected area's m² is less its holes (the Chrome check, 31 Oct)",
      ed.includes("withHoles(sel).geometry.coordinates.reduce((s, r, i) => s + (i ? -1 : 1) * window.WSLayouts.areaM2(r), 0)")
