@@ -55,5 +55,26 @@ ok("1 type: Chart.js draws its own axes and keys in IBM Plex Sans (guarded: a st
 ok("1 type: a chart's downloaded picture and the record's picture name IBM Plex Sans first",
    (html.match(/font = "'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif"/g) || []).length === 2);
 
+// ---- 2 greys -------------------------------------------------------------------------------------------------------
+const twAt = html.indexOf('<script src="/vendor/tailwind-play-3.4.17.js"></script>');
+const cfgAt = html.indexOf("<script>tailwind.config={theme:{extend:{colors:{slate:{");
+const slate = cfgAt > 0 ? Object.fromEntries([...html.slice(cfgAt, html.indexOf("</script>", cfgAt)).matchAll(/(\d+):"(#[0-9A-F]{6})"/g)].map(m => [m[1], m[2]])) : {};
+ok("⭐ 2 greys: Tailwind's slate ramp is re-defined in ONE place, the page's Tailwind config, right after the play script loads",
+   twAt > 0 && cfgAt > twAt && cfgAt - twAt < 700, `${twAt} ${cfgAt}`);
+ok("2 greys: ...as the neutral ramp made from the ink (50 soft surface, 200 / 300 lines, 500 captions, 600 second text, 800 ink)",
+   JSON.stringify(slate) === JSON.stringify({ 50: "#F5F5F6", 100: "#EDEEEF", 200: "#E1E2E4", 300: "#C6C8CC", 400: "#8A8D93", 500: "#62656B",
+     600: "#44464B", 700: "#34363A", 800: "#1F2024", 900: "#141518", 950: "#0C0D0F" }), JSON.stringify(slate));
+ok("🔴 2 greys: the light tokens are neutral (ink, captions, lines, the rail and soft surfaces; no warm paper)",
+   tokenIn(rootBlock, "ink") === "#1F2024" && tokenIn(rootBlock, "muted") === "#62656B" && tokenIn(rootBlock, "line") === "#E1E2E4"
+   && tokenIn(rootBlock, "grey") === "#C6C8CC" && tokenIn(rootBlock, "surface-2") === "#F5F5F6" && tokenIn(rootBlock, "surface-3") === "#EDEEEF"
+   && tokenIn(rootBlock, "rail-bg") === "#F5F5F6");
+ok("🔴 2 greys: Dark's greys are neutral too (captions #9C9FA4, lines #333539 / #4B4D52; the ink surfaces stay)",
+   tokenIn(darkBlock, "muted") === "#9C9FA4" && tokenIn(darkBlock, "line") === "#333539" && tokenIn(darkBlock, "grey") === "#4B4D52"
+   && tokenIn(darkBlock, "surface") === "#1F2024" && tokenIn(darkBlock, "bg") === "#141518"
+   && css.includes('html[data-theme="dark"] .text-slate-400{color:#9C9FA4}') && css.includes('html[data-theme="dark"] .text-slate-600{color:#C9CACE}')
+   && css.includes('html[data-theme="dark"] .border-slate-200{border-color:#333539}') && css.includes('html[data-theme="dark"] .border-slate-300{border-color:#4B4D52}'));
+ok("2 greys: no map popup or label falls back to a system typeface (the Routes map's popups read the text face)",
+   !/font:1[24]px system-ui/.test(html) && (html.match(/font:1[24]px var\(--f-text\)/g) || []).length === 3);
+
 console.log(`own_look_tokens.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  FAIL: " + f)); process.exit(1); }

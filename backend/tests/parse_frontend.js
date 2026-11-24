@@ -2043,8 +2043,10 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && _dbBody.includes("data: D.actualM, backgroundColor: C2") && _dbBody.includes("data: D.fairM, backgroundColor: C4")
     && _dbBody.includes("data: D.co2M, borderColor: C1, backgroundColor: C1S"));
   // 8. the shell: warm neutrals, a dimmed rail whose active item is ink
-  ok("the shell tokens are the warm neutrals and the rail has its own two tokens, light and dark",
-    /--line:#E7E5E4; --bg:#FFFFFF;/.test(html) && /--rail-bg:#FAFAF9; --rail-on:#1F2024;/.test(html) && /--rail-bg:#1B1D21; --rail-on:#F3F4F6;/.test(html));
+  // NARROWED 23 Nov 2026 (the own look, Group A, stage 2): the greys are the neutral ramp made from the ink
+  // (the warm stone line #E7E5E4 and the warm rail #FAFAF9 were the 11 Oct shell; the banned list rules out warm paper)
+  ok("the shell tokens are the NEUTRAL greys made from the ink and the rail has its own two tokens, light and dark",
+    /--line:#E1E2E4; --bg:#FFFFFF;/.test(html) && /--rail-bg:#F5F5F6; --rail-on:#1F2024;/.test(html) && /--rail-bg:#1B1D21; --rail-on:#F3F4F6;/.test(html));
   ok("⭐ the rail's active item is INK, not the action colour (one accent on a neutral shell)",
     /\.rail-item\.is-on\{background:var\(--surface\);color:var\(--rail-on\);font-weight:600;box-shadow:0 0 0 1px var\(--line\);\}/.test(html)
     && code.includes('className={"rail shrink-0 flex flex-col transition-[width] duration-150 "')
@@ -2784,10 +2786,11 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     && _dbS.includes("{fill && wallSection !== simIdx && <span className=\"dash-wallbar-note\" title="));
   // 17 Oct 2026 (the user: "entry gate and empty lorry icons look too similar")
   ok("⭐ SIM: an entry gate never reads as a lorry — a bullseye (radius 7, thick ink rim, ink centre) against the empty lorry's small blue ring (radius 4); the key draws the same",
-    mapSrc.includes('m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 2.5 } });')
-    && mapSrc.includes('m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1E293B" } });')
+    // NARROWED 23 Nov 2026 (own look, stage 2): the rim and centre are the ink #1F2024 (was slate-800), map and key alike
+    mapSrc.includes('m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1F2024", "circle-stroke-width": 2.5 } });')
+    && mapSrc.includes('m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1F2024" } });')
     && mapSrc.includes('"circle-radius": ["match", ["get", "k"], "wait", 4.5, 4]') && mapSrc.includes('"circle-stroke-color": ["match", ["get", "k"], "wait", tok("--red", "#DC2626"), "pour", "#FFFFFF"')   // NARROWED 29 Oct 2026 (task 3c)
-    && /\.sim-dot-gate\{background:radial-gradient\(circle,#1E293B 0 2\.5px,#FFFFFF 3px\);border:2\.5px solid #1E293B;width:15px;height:15px;\}/.test(html)
+    && /\.sim-dot-gate\{background:radial-gradient\(circle,#1F2024 0 2\.5px,#FFFFFF 3px\);border:2\.5px solid #1F2024;width:15px;height:15px;\}/.test(html)
     && /\.sim-dot-empty\{background:#FFFFFF;border:2px solid var\(--sim-lorry\);\}/.test(html));
   // RE-PINNED 29 Oct 2026 (the page, card 5): the key is a row UNDER the map (a named list) on the page; the box over the map stays on the big screen only
   ok("SIM: the map's key is a named group on the big screen, a named list under the map on the page (an aria-label on a plain div is not allowed: the UI audit's aria-prohibited-attr)",
@@ -3433,7 +3436,8 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      /const SERIES_LABELS = \{ id: "seriesLabels", afterDatasetsDraw\(chart, _args, opts\)\{/.test(src)
      && /if\(plugins\.seriesLabels && plugins\.seriesLabels\.on && vw >= 768\)\{/.test(src)
      && (src.match(/\.\.\.named \}/g) || []).length === 3 && /borderWidth: \{ top: 2 \}, borderColor: SURF, borderSkipped: "start"/.test(src)
-     && /ctx\.fillStyle = tok\("--ink", "#1E293B"\);/.test(src));
+     // NARROWED 23 Nov 2026 (own look, stage 2): the fallback ink is #1F2024
+     && /ctx\.fillStyle = tok\("--ink", "#1F2024"\);/.test(src));
   ok("W16 (D39): an amber status is a triangle and a red one a diamond beside its word — every .chip-st dot, by the token it is painted with",
      /\.chip-st i\[style\*="--gold"\]\{width:10px;height:9px;border-radius:0;clip-path:polygon\(50% 0,100% 100%,0 100%\);\}/.test(html)
      && /\.chip-st i\[style\*="--red"\]\{width:10px;height:10px;border-radius:0;clip-path:polygon\(50% 0,100% 50%,50% 100%,0 50%\);\}/.test(html));
@@ -4034,8 +4038,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("🔴 captions #3 (decision 1): ONE rule maps text-slate-400 to --muted outside the dark look, weighed with :where() so hover:text-slate-700 still wins; the dark remap keeps its line; a second rule steps the greys on a selected row (.bg-blue-50) to slate-600",
      html.includes('html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}')
      // NARROWED 10 Nov 2026 (wave 3, finding 5): + the Account's amber short-row wash (rgba(217,119,6,.06))
-     && html.includes('html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-500{color:#475569}')
-     && (html.match(/\.text-slate-400\{/g) || []).length === 2 && html.includes('html[data-theme="dark"] .text-slate-400{color:#9AA1AB}')
+     // NARROWED 23 Nov 2026 (the own look, Group A, stage 2): the wash step is the neutral second text #44464B, was slate-600 #475569
+     && html.includes('html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-500{color:#44464B}')
+     && (html.match(/\.text-slate-400\{/g) || []).length === 2 && html.includes('html[data-theme="dark"] .text-slate-400{color:#9C9FA4}')   // NARROWED 23 Nov 2026 (own look): Dark's neutral caption grey, was #9AA1AB
      // NARROWED 22 Oct 2026 (UI fix 7): fewer captions on the Data pages (the Diagnostics card and long hints went)
      && code.includes("text-slate-400 hover:text-slate-700") && (code.match(/\btext-slate-400\b/g) || []).length >= 100);
   ok("captions #3: the rail's group headings have no opacity, the big screen's labels read --muted (no #9aa1ac), the Dashboard group title defaults to --muted (no #94a3b8), and no text-slate-300 is left in the markup — every placeholder reads slate-500 (the dark remap line went with it)",
@@ -4050,7 +4055,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      code.includes('<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>') && !code.includes("text-emerald-600")
      && code.includes('<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>')
      && _cat.includes('const fg = dir === "in" ? "var(--ok-text)" : "var(--navy)";')
-     && code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') && code.includes('["rgba(191,46,85,.12)", "var(--bad-text)"]') && code.includes('["#f1f5f9", "#475569"]')
+     && code.includes('["rgba(3,158,134,.12)", "var(--ok-text)"]') && code.includes('["rgba(191,46,85,.12)", "var(--bad-text)"]') && code.includes('["#edeeef", "#44464B"]')   /* NARROWED 23 Nov 2026 (own look): the neutral pair, was slate #f1f5f9 / #475569 */
      && code.includes(': has ? ["routed", "var(--ok-text)"] : null;') && code.includes('color: "var(--ok-text)" }}>set</span>') && code.includes('{r.action === "held" && <RowStatus word="Delivered" tone="ok" />}')
      && /\.sim-ok\{color:var\(--ok-text\);/.test(html) && /\.sim-tl-ok\{[^}]*fill:var\(--ok-text\);\}/.test(html) && html.includes(".sim-warn{color:var(--warn-text);}")
      && !/color: "var\(--green\)"/.test(code) && !/color:var\(--green\)/.test(html) && !/fill:var\(--green\)/.test(html)
@@ -5438,7 +5443,7 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("⭐ 2.1-9 (card 1): one row a lorry, trips as blocks across 06:00–19:00 by their start and minutes, the break hatched, a role=img (a group for a planner) with the words",
      code.includes("const LP_DAY_FROM = 6 * 60, LP_DAY_TO = 19 * 60;") && lpc.includes('role={can ? "group" : "img"} aria-label={`Lorry ${r.n}: ${title}; ${r.free_words}`}')
      && lpc.includes("const left = Math.max(0, (st - LP_DAY_FROM) / span * 100), width = Math.max(0.6, b.minutes / span * 100);")
-     && html.includes(".lp-blk.is-break{background:repeating-linear-gradient(135deg,#CBD5E1 0 4px,#E2E8F0 4px 8px);color:#334155}"));
+     && html.includes(".lp-blk.is-break{background:repeating-linear-gradient(135deg,#C6C8CC 0 4px,#E1E2E4 4px 8px);color:#34363A}"));   // NARROWED 23 Nov 2026 (own look): the neutral hatch
   ok("⭐ 2.1-9 (Q8): the free time in the server's words at the row's end; destination colours from the chart tokens (no hard-coded control blue)",
      lpc.includes('<div className="lp-free" data-lp-free={r.free_minutes}>{r.free_words}</div>') && code.includes("const lpPalette = () => [1, 2, 3, 4, 5].map(i => tok(`--chart-${i}`"));
   ok("⭐ 2.1-9 (Q12): Apply only in the compressed view, planners / admins, never on a confirmed week or with nothing to move, and asks first; the grid re-reads after",

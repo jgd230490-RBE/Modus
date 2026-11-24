@@ -717,7 +717,8 @@ ok("map: the overlay response carries the team names the map shows",
 fe_src = read("frontend/index.html")
 # REVERSED 23 Oct 2026 (claude/team-words): the tooltip showed the raw slot id to a person; the pill is the name only
 ok("frontend: the team pill shows the name, and no tooltip with the id",
-   '"#64748B" }}>{teamName(k)}</span>' in fe_src and "title={k}>{teamName(k)}</span>" not in fe_src)
+   # NARROWED 23 Nov 2026 (the own look, Group A): the unnamed team's fallback grey is the neutral caption grey, was slate #64748B
+   '"#62656B" }}>{teamName(k)}</span>' in fe_src and "title={k}>{teamName(k)}</span>" not in fe_src)
 ok("frontend: the submit picker has no hard-coded six-team fallback",
    '["IPT1","IPT2","IPT3","IPT4","IPT5","IPT6"]' not in fe_src and "Object.keys(TEAM_LABELS)" in fe_src)
 # NARROWED 14 Oct 2026 (D9): + the phone's More sheet (the header, the rail's foot, and More)

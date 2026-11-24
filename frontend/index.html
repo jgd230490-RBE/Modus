@@ -20,6 +20,10 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js" integrity="sha384-KCD0A3BqTNZfWlXJcL7fKzDri97vicyNr4NUIr0vX6K9PZ0X5hOTeEbFh99jPEST" crossorigin="anonymous"></script>
 <script src="/vendor/tailwind-play-3.4.17.js"></script>
+<!-- 23 Nov 2026 (the own look, Group A; notes/design-language-1123.md): Tailwind's slate ramp, re-defined in ONE place as
+     neutral greys made from the ink (no blue-tinted grey): 50 the soft surface, 200 / 300 the two lines, 500 captions,
+     600 second text, 800 the ink. Every text- / bg- / border- / divide-slate utility in this page reads it. -->
+<script>tailwind.config={theme:{extend:{colors:{slate:{50:"#F5F5F6",100:"#EDEEEF",200:"#E1E2E4",300:"#C6C8CC",400:"#8A8D93",500:"#62656B",600:"#44464B",700:"#34363A",800:"#1F2024",900:"#141518",950:"#0C0D0F"}}}}};</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt" crossorigin="anonymous"></script>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.css" rel="stylesheet" integrity="sha384-S0a+eT2dLtsB1suB6ZJ/8IX+0d0Fvix9weJQ67L3E+jHOvn6SUKwYXVDyGdMuJtL" crossorigin="anonymous">
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.js" integrity="sha384-jdGuG3GDIph+ONsjITkxWmlUE2RR0At6jtOVirn6L/6dYy3WcAVDaBNI3X96rUT0" crossorigin="anonymous"></script>
@@ -37,8 +41,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
        The variable NAMES are kept so nothing else had to change. The brand tokens mirror
        frontend/brand/theme-tokens.css. */
     --navy:#2563EB; --navy-deep:#1F2024; --blue:#3B82F6; --navy-soft:rgba(37,99,235,.08);
-    --red:#DC2626; --green:#059669; --gold:#D97706; --grey:#E7E5E4;
-    --ink:#1E293B; --muted:#64748B; --line:#E7E5E4; --bg:#FFFFFF;
+    --red:#DC2626; --green:#059669; --gold:#D97706; --grey:#C6C8CC;
+    --ink:#1F2024; --muted:#62656B; --line:#E1E2E4; --bg:#FFFFFF;
     --brand-orange:#FF8C14; --brand-orange-from:#FF8312; --brand-orange-to:#FFA10A;
     --brand-orange-text:#C75F06; --brand-gold:#D2931F; --brand-ink:#1F2024; --brand-paper:#FFFFFF;
     /* 5 Oct 2026 — APPEARANCE (the picker at the right of the header, html[data-theme]).
@@ -48,8 +52,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
        colour utilities the app uses are remapped for dark in the DARK-REMAP block below
        (generated from the utilities actually present in this file and asserted in
        test_h1_uk). Exports (XLSX, PDF) are documents and keep the print palette. */
-    --surface:#FFFFFF; --surface-2:#FAFAF9; --surface-3:#F3F2EF; --control-fg:#FFFFFF;
-    --rail-bg:#FAFAF9; --rail-on:#1F2024; --action:#C2410C; --action-fg:#FFFFFF;
+    --surface:#FFFFFF; --surface-2:#F5F5F6; --surface-3:#EDEEEF; --control-fg:#FFFFFF;
+    --rail-bg:#F5F5F6; --rail-on:#1F2024; --action:#C2410C; --action-fg:#FFFFFF;
     /* 17 Oct 2026 (UI audit, finding 6): the Confirm week button's own pair, a text-grade green and its text
        colour, so the one irreversible action on the Look-ahead reads 5.48:1 here and 8.47:1 in the dark look
        (white on the --green token was 3.77:1 and 1.92:1). The status WORDS keep the green (open question 2). */
@@ -79,7 +83,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
     --chart-1:#E8590C; --chart-1-soft:rgba(232,89,12,.18); --chart-2:#2563EB; --chart-3:#0D9488; --chart-4:#7C3AED; --chart-5:#A07D34; --chart-none:#A8A29E; --chart-grid:rgba(100,116,139,.18);
     --hdr-bg:#1F2024; --hdr-fg:#FFFFFF; --hdr-muted:rgba(255,255,255,.7); --hdr-rule:rgba(255,255,255,.28);
     --hdr-btn:rgba(255,255,255,.10); --hdr-btn-hover:rgba(255,255,255,.20); --hdr-on:rgba(255,255,255,.25); --hdr-border:rgba(255,255,255,.20);
-    --hdr-logo:url("/brand/logo-header-on-dark.svg"); --popover-bg:#1F2024; --popover-fg:#E6E7EA; --popover-muted:#9AA1AB; --popover-line:rgba(255,255,255,.12);
+    --hdr-logo:url("/brand/logo-header-on-dark.svg"); --popover-bg:#1F2024; --popover-fg:#E6E7EA; --popover-muted:#9C9FA4; --popover-line:rgba(255,255,255,.12);
     /* 13 Oct 2026 (D45, Option A, chosen by the user): the demo bar is light grey with red caps, a 3 px red rule
        and a red DEMO tag, the same in every look (the dark look keeps the light bar, so it stands out). Red is
        reserved for statuses; this warning about the data is the one exception, and it is always in words.
@@ -95,8 +99,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   }
   html[data-theme="dark"]{
     --navy:#FF8C14; --navy-deep:#F3F4F6; --blue:#FFA10A;
-    --red:#F87171; --green:#34D399; --gold:#FBBF24; --grey:#33363D;
-    --ink:#E6E7EA; --muted:#9AA1AB; --line:#33363D; --bg:#141518;
+    --red:#F87171; --green:#34D399; --gold:#FBBF24; --grey:#4B4D52;
+    --ink:#E6E7EA; --muted:#9C9FA4; --line:#333539; --bg:#141518;
     --surface:#1F2024; --surface-2:#1B1D21; --surface-3:#26282D; --control-fg:#1F2024;
     --rail-bg:#1B1D21; --rail-on:#F3F4F6; --action:#FF8C14; --action-fg:#1F2024;
     --ok-btn:#34D399; --ok-btn-fg:#1F2024;
@@ -161,7 +165,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
      rule matches them the way the dark remap matches a filled control: [style*=]. A var() is kept verbatim in the style
      attribute, but a colour is re-serialised by the browser (rgba(191, 46, 85, 0.05)), so the rose wash is matched both ways. */
   html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}
-  html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-500{color:#475569}
+  html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-500{color:#44464B}
   /* 27 Oct 2026 (UI fix 10): a chip (blue text on the 8 % blue tint) on a row that already has a wash (a selected row, the Account's
      short row) fell to 4.26-4.31:1, so there the chip's tint is plain surface (5.17:1 or better in every accent). !important: the tint is inline. */
   html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"]) :where([style*="--navy-soft"],[style*="rgba(37, 99, 235, 0.08)"],[style*="rgba(37,99,235,.08)"]){background:var(--surface) !important}
@@ -169,7 +173,10 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
      amber-washed row (a line short past the share) fell to 4.35:1, so its tint is plain surface there too; and a quantity's
      m3 line under its tonnes (.la-sub, muted) fell to 4.27:1 on the today column's blue wash, so on any wash it is slate-600. */
   html:where(:not([data-theme="dark"])) :where([style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) :where([style*="--navy-soft"],[style*="rgba(37, 99, 235, 0.08)"],[style*="rgba(37,99,235,.08)"]){background:var(--surface) !important}
-  html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .la-sub{color:#475569}
+  html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .la-sub{color:#44464B}
+  /* 23 Nov 2026 (the own look, Group A): the greys above are now the neutral ramp made from the ink (--muted #62656B, the
+     wash step #44464B, Tailwind's slate ramp re-defined in the page's Tailwind config); the figures in the notes above are
+     the old slate pairs, measured again for the new greys in test_h1_uk. */
   /* CAPTIONS-END */
   /* DARK-REMAP-START — generated 5 Oct 2026 from the colour utilities in this file; test_h1_uk asserts coverage both ways
      (17 Oct 2026: every utility has a remap, and every remap has a utility — four stale lines went that day) */
@@ -180,24 +187,24 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   html[data-theme="dark"] .bg-slate-100{background-color:var(--surface-3)}
   html[data-theme="dark"] .bg-slate-50{background-color:var(--surface-2)}
   html[data-theme="dark"] .bg-slate-50\/60{background-color:rgba(27,29,33,.6)}
-  html[data-theme="dark"] .bg-slate-800{background-color:#3A3D45}
+  html[data-theme="dark"] .bg-slate-800{background-color:#3A3B3F}
   html[data-theme="dark"] .bg-white{background-color:var(--surface)}
   html[data-theme="dark"] .border-amber-200{border-color:rgba(251,191,36,.35)}
   html[data-theme="dark"] .border-amber-300{border-color:rgba(251,191,36,.45)}
   html[data-theme="dark"] .border-blue-200{border-color:rgba(255,140,20,.35)}
   html[data-theme="dark"] .border-blue-300{border-color:rgba(255,140,20,.45)}
   html[data-theme="dark"] .border-red-300{border-color:rgba(248,113,113,.5)}
-  html[data-theme="dark"] .border-slate-100{border-color:#2A2D33}
-  html[data-theme="dark"] .border-slate-200{border-color:#33363D}
+  html[data-theme="dark"] .border-slate-100{border-color:#2A2B2F}
+  html[data-theme="dark"] .border-slate-200{border-color:#333539}
   html[data-theme="dark"] .border-slate-200\/70{border-color:rgba(51,54,61,.7)}
-  html[data-theme="dark"] .border-slate-300{border-color:#3D414A}
-  html[data-theme="dark"] .border-slate-800{border-color:#3A3D45}
+  html[data-theme="dark"] .border-slate-300{border-color:#4B4D52}
+  html[data-theme="dark"] .border-slate-800{border-color:#3A3B3F}
   html[data-theme="dark"] .disabled\:bg-slate-50:disabled{background-color:var(--surface-2)}
-  html[data-theme="dark"] .disabled\:text-slate-500:disabled{color:#A9AFB8}
-  html[data-theme="dark"] .divide-slate-100{--tw-divide-opacity:1;border-color:#2A2D33}
-  html[data-theme="dark"] .divide-slate-200{--tw-divide-opacity:1;border-color:#33363D}
+  html[data-theme="dark"] .disabled\:text-slate-500:disabled{color:#ABADB2}
+  html[data-theme="dark"] .divide-slate-100{--tw-divide-opacity:1;border-color:#2A2B2F}
+  html[data-theme="dark"] .divide-slate-200{--tw-divide-opacity:1;border-color:#333539}
   html[data-theme="dark"] .hover\:bg-slate-100:hover{background-color:var(--surface-3)}
-  html[data-theme="dark"] .hover\:bg-slate-200:hover{background-color:#2F3238}
+  html[data-theme="dark"] .hover\:bg-slate-200:hover{background-color:#2F3034}
   html[data-theme="dark"] .hover\:bg-slate-50:hover{background-color:var(--surface-2)}
   html[data-theme="dark"] .hover\:bg-white:hover{background-color:var(--surface)}
   html[data-theme="dark"] .hover\:text-slate-700:hover{color:#E6E7EA}
@@ -205,9 +212,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   html[data-theme="dark"] .text-amber-800{color:#FCD34D}
   html[data-theme="dark"] .text-blue-700{color:#FFB454}
   html[data-theme="dark"] .text-blue-800{color:#FFC77A}
-  html[data-theme="dark"] .text-slate-400{color:#9AA1AB}
-  html[data-theme="dark"] .text-slate-500{color:#A9AFB8}
-  html[data-theme="dark"] .text-slate-600{color:#D5D8DE}
+  html[data-theme="dark"] .text-slate-400{color:#9C9FA4}
+  html[data-theme="dark"] .text-slate-500{color:#ABADB2}
+  html[data-theme="dark"] .text-slate-600{color:#C9CACE}
   html[data-theme="dark"] .text-slate-700{color:#E6E7EA}
   html[data-theme="dark"] .text-slate-800{color:#F3F4F6}
   /* 17 Oct 2026 (UI audit, finding 1): a filled control is `text-white` beside an INLINE background var(--navy) or
@@ -222,7 +229,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
      (white on it 2.03:1), so their text reads the control's own text colour: 8.03:1, 9.01:1 in the blue accents. */
   html[data-theme="dark"] .text-white[style*="var(--haul-text)"]{color:var(--control-fg)}
   html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{background-color:var(--surface-3);color:var(--ink);border-color:var(--grey)}
-  html[data-theme="dark"] input::placeholder,html[data-theme="dark"] textarea::placeholder{color:#6B7280}
+  html[data-theme="dark"] input::placeholder,html[data-theme="dark"] textarea::placeholder{color:#7A7D83}
   html[data-theme="dark"] .mapboxgl-ctrl-group{background:var(--surface-3)} html[data-theme="dark"] .mapboxgl-ctrl-group button span{filter:invert(1)}
   /* DARK-REMAP-END */
   html,body,#root{height:100%;}
@@ -262,11 +269,11 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .guide-card .guide-foot button.guide-next{color:#8AB4F8}
   .guide-card .guide-off{display:block;margin-top:2px;font:inherit;font-size:12px;color:rgba(255,255,255,.5);background:none;border:none;padding:0;cursor:pointer}
   .guide-card .guide-off:hover{color:rgba(255,255,255,.8);text-decoration:underline}
-  .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#44403C;border:1px solid rgba(31,32,36,.12);border-radius:8px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 var(--f-text)}
+  .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#44464B;border:1px solid rgba(31,32,36,.12);border-radius:8px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 var(--f-text)}
   .guide-strip b{color:#1F2024;font-weight:600}
   .guide-strip .guide-strip-go{position:relative;font:inherit;font-weight:500;color:#1A73E8;background:none;border:0;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap}
   .guide-strip .guide-strip-go:hover{background:rgba(26,115,232,.08)}
-  .guide-strip .guide-x{position:relative;font:inherit;font-size:16px;line-height:1;color:#78716C;background:none;border:0;padding:2px 6px;border-radius:4px;cursor:pointer}
+  .guide-strip .guide-x{position:relative;font:inherit;font-size:16px;line-height:1;color:#62656B;background:none;border:0;padding:2px 6px;border-radius:4px;cursor:pointer}
   .guide-strip .guide-x:hover{background:rgba(31,32,36,.06)}
   /* 18 Oct 2026 (UI audit decision 18): on a touch screen the strip's two buttons tap at 44 px through halos, the glyphs and the
      strip's height unchanged — "Take the tour" (93 × 24) 44 tall; the × (23 × 20) 44 × 44, reaching 9 px into the strip's 10 px
@@ -458,14 +465,14 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .auth-links button{background:none;border:0;padding:0;font:inherit;color:var(--muted);text-decoration:underline;cursor:pointer;white-space:nowrap;}
   .auth-links button:hover{color:var(--ink);}
   /* 27 Oct 2026 (F3 b): two-step sign-in */
-  .auth-who{font-size:13px;color:var(--muted);background:var(--surface-2, #F8FAFC);border-radius:6px;padding:6px 10px;margin:0 0 6px;overflow-wrap:anywhere;}
+  .auth-who{font-size:13px;color:var(--muted);background:var(--surface-2, #F5F5F6);border-radius:6px;padding:6px 10px;margin:0 0 6px;overflow-wrap:anywhere;}
   .auth-steps{margin:0 0 6px;padding-left:20px;font-size:14px;color:var(--ink);list-style:decimal;}
   .auth-qr{display:inline-block;background:#fff;padding:4px;border:1px solid var(--line);border-radius:6px;margin:4px 0;line-height:0;}
   .auth-qr svg{width:164px;height:164px;display:block;}
   .auth-key{font-family:ui-monospace,Consolas,monospace;font-weight:600;letter-spacing:.06em;color:var(--ink);overflow-wrap:anywhere;}
   .auth-otp{font-family:ui-monospace,Consolas,monospace;font-size:22px;letter-spacing:.3em;text-align:center;}
   .recovery-codes{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin:10px 0 12px;padding:10px 14px;
-    background:var(--surface-2, #F8FAFC);border-radius:6px;font-family:ui-monospace,Consolas,monospace;font-weight:600;font-size:14px;color:var(--ink);}
+    background:var(--surface-2, #F5F5F6);border-radius:6px;font-family:ui-monospace,Consolas,monospace;font-weight:600;font-size:14px;color:var(--ink);}
   /* 18 Oct 2026 (UI audit #10, the 44 px rule): on a touch screen the two text links under Sign in are 44 px rows (they were
      20 px, with Sign in 10 px above); a mouse keeps the tight row */
   @media (pointer:coarse){.auth-links button{padding:12px 0;}}
@@ -540,8 +547,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .chart-tools.is-inline{position:static;}
   /* 17 Nov 2026 (best option step 3): the route choices record on the Dashboard */
   .rc-head{display:flex;align-items:center;gap:8px;margin:0 0 8px;}
-  .rc-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line, #e2e8f0);border-radius:10px;overflow:hidden;background:var(--surface);}
-  .rc-tile{padding:10px 14px;border-left:1px solid var(--line, #e2e8f0);min-width:0;}
+  .rc-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line, #e1e2e4);border-radius:10px;overflow:hidden;background:var(--surface);}
+  .rc-tile{padding:10px 14px;border-left:1px solid var(--line, #e1e2e4);min-width:0;}
   .rc-tile:first-child{border-left:0;}
   .rc-tile .rc-tk{display:block;font-size:13px;color:var(--muted);}
   .rc-tile b{display:block;font-size:22px;font-weight:600;margin-top:2px;white-space:nowrap;}
@@ -559,9 +566,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .rc-ended td{color:var(--muted);}
   .rc-empty{text-align:center;padding:14px 8px;font-size:13px;}
   .rc-empty b{display:block;font-size:14px;margin-bottom:4px;}
-  .rc-pcard{border:1px solid var(--line, #e2e8f0);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:13px;}
+  .rc-pcard{border:1px solid var(--line, #e1e2e4);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:13px;}
   .rc-pcard b{display:block;}
-  @media (max-width:767px){ .rc-tiles{grid-template-columns:repeat(2,minmax(0,1fr));} .rc-tile:nth-child(3){border-left:0;} .rc-tile:nth-child(n+3){border-top:1px solid var(--line, #e2e8f0);} .rc-tile b{font-size:18px;} }
+  @media (max-width:767px){ .rc-tiles{grid-template-columns:repeat(2,minmax(0,1fr));} .rc-tile:nth-child(3){border-left:0;} .rc-tile:nth-child(n+3){border-top:1px solid var(--line, #e1e2e4);} .rc-tile b{font-size:18px;} }
   .chart-tool{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--muted);font-size:16px;line-height:1;cursor:pointer;}
   .chart-tool:hover{color:var(--ink);border-color:var(--muted);}
   .chart-tool-copy::before{content:"\29C9";} .chart-tool-dl::before{content:"\2193";}
@@ -695,9 +702,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   @media (max-width:767px){.lp-row{grid-template-columns:1fr;gap:2px}.lp-row .lp-free{text-align:left}}
   .lp-nm{font-size:13px;font-weight:600}
   .lp-nm small{display:block;color:var(--muted);font-weight:500;font-size:12px}
-  .lp-track{position:relative;height:28px;background:var(--soft,#F1F5F9);border-radius:5px;overflow:hidden}
+  .lp-track{position:relative;height:28px;background:var(--soft,#EDEEEF);border-radius:5px;overflow:hidden}
   .lp-blk{position:absolute;top:2px;bottom:2px;border-radius:3px;font-size:12px;line-height:24px;color:#fff;overflow:hidden;white-space:nowrap;padding:0 4px;box-sizing:border-box;border-right:1px solid rgba(255,255,255,.6);background:var(--navy)}
-  .lp-blk.is-break{background:repeating-linear-gradient(135deg,#CBD5E1 0 4px,#E2E8F0 4px 8px);color:#334155}
+  .lp-blk.is-break{background:repeating-linear-gradient(135deg,#C6C8CC 0 4px,#E1E2E4 4px 8px);color:#34363A}
   /* 9 Nov 2026 (2.1-9b, card 9): a trip a planner can drag or move from its menu — a details whose summary is the block face */
   .lp-trip{position:absolute;top:2px;bottom:2px;min-width:24px;overflow:visible}
   .lp-trip summary.lp-blk{position:static;height:24px;display:block;list-style:none;cursor:grab;border:0;margin:0}
@@ -824,7 +831,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-wall .sim-tl-name,.sim-wall .sim-tl-ok{font-size:clamp(13px,1.4vh,22px);}
   .sim-map-wrap{position:relative;align-self:start;min-width:0;}
   .sim-map{height:62vh;min-height:360px;max-height:720px;border:1px solid var(--line);border-radius:8px;overflow:hidden;}   /* 29 Oct 2026 (the page): the app's map height (MAP_H) */
-  .sim-legend{position:absolute;left:10px;bottom:10px;background:#FFFFFF;border:1px solid #E7E5E4;border-radius:6px;padding:6px 9px;font-size:13px;color:#1E293B;z-index:2;}
+  .sim-legend{position:absolute;left:10px;bottom:10px;background:#FFFFFF;border:1px solid #E1E2E4;border-radius:6px;padding:6px 9px;font-size:13px;color:#1F2024;z-index:2;}
   .sim-legend div{display:flex;align-items:center;gap:7px;margin:2px 0;}
   /* 29 Oct 2026 (the Simulation's own page, mockup notes/sim-page-mockup-1029): the key is a ROW under the map (the box stays on
      the big screen only); the controls in one row; the Scenario a full-width band in three columns; the tables read-only;
@@ -868,12 +875,12 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-seg button.on{background:var(--navy-soft);color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);}   /* 29 Oct 2026: ink on the Dark look's light navy (the audit: white failed) */
   .sim-site-row{margin-bottom:4px;}
   .sim-onsite{border-top:1px solid var(--line);padding-top:6px;margin-top:4px;}
-  .sim-dot-gate{background:radial-gradient(circle,#1E293B 0 2.5px,#FFFFFF 3px);border:2.5px solid #1E293B;width:15px;height:15px;}
+  .sim-dot-gate{background:radial-gradient(circle,#1F2024 0 2.5px,#FFFFFF 3px);border:2.5px solid #1F2024;width:15px;height:15px;}
   .sim-line{display:inline-block;width:18px;height:0;flex:0 0 auto;}
   .sim-line-end{border-top:1.5px dashed #94A3B8;}
   .sim-line-haul{border-top:3px dashed #7C3AED;}
   .sim-line-busy{border-top:3px solid var(--navy);box-shadow:0 0 6px 2px rgba(29,78,216,.25);}   /* 5 Nov 2026 (task 0d-2) */
-  .sim-busy-note{position:absolute;top:10px;left:10px;z-index:3;max-width:calc(100% - 70px);background:#FFFFFF;color:#1E293B;border-left:4px solid var(--navy);border-radius:6px;box-shadow:0 4px 14px rgba(15,23,42,.18);padding:8px 12px;font-size:13px;font-weight:600;opacity:0;transform:translateY(-6px);transition:opacity .35s,transform .35s;pointer-events:none;}
+  .sim-busy-note{position:absolute;top:10px;left:10px;z-index:3;max-width:calc(100% - 70px);background:#FFFFFF;color:#1F2024;border-left:4px solid var(--navy);border-radius:6px;box-shadow:0 4px 14px rgba(15,23,42,.18);padding:8px 12px;font-size:13px;font-weight:600;opacity:0;transform:translateY(-6px);transition:opacity .35s,transform .35s;pointer-events:none;}
   .sim-busy-note.on{opacity:1;transform:none;}
   .sim-wall .sim-busy-note{font-size:clamp(13px,1.6vh,26px);}
   .sim-badge{background:#FFFFFF;border:1px solid #DC2626;color:#B91C1C;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.12);}
@@ -881,7 +888,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .sim-hbadge,.hbadge{display:inline-flex;align-items:center;justify-content:center;background:#1D4ED8;color:#FFFFFF;font-weight:700;border:1.5px solid #FFFFFF;box-shadow:0 0 0 1px #1D4ED8;border-radius:3px;}
   .sim-hbadge{width:22px;height:22px;font-size:14px;}
   .hbadge{width:18px;height:18px;font-size:12px;vertical-align:-3px;margin-right:4px;}
-  .sim-dot-held{background:#475569;}
+  .sim-dot-held{background:#44464B;}
   .sim-cmp td:first-child{max-width:190px;}
   .sim-side{display:flex;flex-direction:column;gap:12px;min-width:0;}
   @media (min-width:1024px){.sim-side{max-height:max(360px,min(62vh,720px));overflow:auto;}}   /* 10 Nov 2026 (finding 9): the Now card and the gates are no taller than the map, so nothing is left empty under it */
@@ -980,9 +987,9 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .pour-bar div{display:flex;align-items:center;justify-content:center;color:#fff;white-space:nowrap;overflow:hidden;min-width:0;}
   .pour-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);margin-top:6px;}
   .pour-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
-  .pb-load{background:#475569;} .pb-there{background:#2563EB;} .pb-chk{background:#64748B;} .pb-dis{background:#C2410C;}
+  .pb-load{background:#44464B;} .pb-there{background:#2563EB;} .pb-chk{background:#62656B;} .pb-dis{background:#C2410C;}
   .pb-wash{background:#0F766E;} .pb-back{background:#1E40AF;}
-  .pour-mark{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.03em;border-radius:4px;padding:0 5px;margin-left:4px;background:#334155;color:#fff;vertical-align:1px;}
+  .pour-mark{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.03em;border-radius:4px;padding:0 5px;margin-left:4px;background:#34363A;color:#fff;vertical-align:1px;}
   @media (max-width:900px){.pour-form,.pour-figs{grid-template-columns:repeat(2,minmax(0,1fr));}.pour-wide{grid-column:span 2;}}
   .ed-head:focus{outline:none;}
   .ed-head:focus-visible{outline:2px solid var(--navy);outline-offset:2px;border-radius:2px;}
@@ -1125,7 +1132,7 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .ol-lab b{font-weight:700;}
   .ol-lab.ol-out{color:var(--muted);}
   .ol-lab[aria-pressed="true"]{border-color:#1D4ED8;box-shadow:0 0 0 2px rgba(29,78,216,.38),0 1px 2px rgba(0,0,0,.2);}
-  html[data-theme="dark"] .ol-lab{border-color:#78716C;box-shadow:0 1px 2px rgba(0,0,0,.5);}
+  html[data-theme="dark"] .ol-lab{border-color:#62656B;box-shadow:0 1px 2px rgba(0,0,0,.5);}
   html[data-theme="dark"] .ol-lab[aria-pressed="true"]{border-color:#7AA2FF;box-shadow:0 0 0 2px rgba(122,162,255,.5);}
   @media (max-width:1024px), (pointer:coarse){.ol-lab::after{content:"";position:absolute;left:-4px;right:-4px;top:-10px;bottom:-10px;}}
   .bo-grp{font-weight:600;font-size:13px;padding:6px 0 2px;}
@@ -1400,8 +1407,8 @@ catch(e){d.setAttribute("data-theme","ink");d.setAttribute("data-accent","orange
   .al-dl dt{color:var(--muted);} .al-dl dd{margin:0;}
   .al-bans td,.al-bans th{height:36px;padding:0 6px;font-size:13px;}
   .al-bans .ctl-sm{padding:3px 6px;font-size:13px;width:100%;}
-  .al-grey{background:#F1F5F9;color:#475569;border-color:#CBD5E1;} .al-okc{background:#ECFDF5;color:var(--ok-text);border-color:#A7F3D0;}
-  html[data-theme="dark"] .al-grey{background:#1E293B;color:#CBD5E1;border-color:#475569;} html[data-theme="dark"] .al-okc{background:#052E16;color:#86EFAC;border-color:#166534;}
+  .al-grey{background:#EDEEEF;color:#44464B;border-color:#C6C8CC;} .al-okc{background:#ECFDF5;color:var(--ok-text);border-color:#A7F3D0;}
+  html[data-theme="dark"] .al-grey{background:#26282D;color:#C6C8CC;border-color:#44464B;} html[data-theme="dark"] .al-okc{background:#052E16;color:#86EFAC;border-color:#166534;}
   .al-route{border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:4px;}
   .al-ptbl{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 8px;} .al-ptbl th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;padding:4px 6px;border-bottom:1px solid var(--line);}
   .al-ptbl td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:top;} .al-ptbl .ctl-sm{padding:2px 6px;font-size:12px;}
@@ -1694,8 +1701,8 @@ function errSay(what, e){ return `${what} ${errMsg(e)}`; }
 const UK_VIEW = { center: [-1.5, 52.6], zoom: 6 };
 
 const THEMES = [
-  ["ink",   "Ink",   { bar: "#1F2024", page: "#F8FAFC", dot: "#2563EB" }],
-  ["light", "Light", { bar: "#FFFFFF", page: "#F8FAFC", dot: "#2563EB" }],
+  ["ink",   "Ink",   { bar: "#1F2024", page: "#F5F5F6", dot: "#2563EB" }],
+  ["light", "Light", { bar: "#FFFFFF", page: "#F5F5F6", dot: "#2563EB" }],
   ["dark",  "Dark",  { bar: "#1F2024", page: "#141518", dot: "#FF8C14" }],
 ];
 const THEME = { key: "modus_theme", current: "ink", subs: new Set() };
@@ -2142,7 +2149,7 @@ const SERIES_LABELS = { id: "seriesLabels", afterDatasetsDraw(chart, _args, opts
   const x = A.right + 8;
   marks.forEach(m => {
     ctx.fillStyle = m.col || "#A8A29E"; ctx.fillRect(x, m.y - fs * 0.36, fs * 0.72, fs * 0.72);
-    ctx.fillStyle = tok("--ink", "#1E293B");
+    ctx.fillStyle = tok("--ink", "#1F2024");
     const t = m.label;
     ctx.fillText(t, x + fs * 1.1, m.y);
   });
@@ -2192,7 +2199,7 @@ function fitChartConfig(config, vw){
 // and ONE scope line below (the scheme, what the page was showing, "Wayscope, <date>", the demo notice) so a pasted chart never
 // loses its scope. Firefox cannot write an image to the clipboard by default: Copy then saves the file and says "Saved instead".
 const CHART_PNG_SCALE = 2;
-const CHART_INK = "#1F2937", CHART_MUTED = "#475569", CHART_GRID = "rgba(100,116,139,.22)";
+const CHART_INK = "#1F2937", CHART_MUTED = "#44464B", CHART_GRID = "rgba(100,116,139,.22)";
 const localIsoDate = (d) => { const x = d || new Date(); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
 // the page's own parts (months, status, sites or team) go first; the scheme leads, the brand and the demo notice close
 function chartScopeLine(parts){
@@ -2373,7 +2380,7 @@ function ChartCanvas({ config, height, size, title, scope, notools, head }){
   useEffect(() => {
     if(!sized || !ref.current || !window.Chart) return;
     if(inst.current) inst.current.destroy();
-    window.Chart.defaults.color = tok("--muted", "#64748B");
+    window.Chart.defaults.color = tok("--muted", "#62656B");
     if(window.Chart.defaults.font) window.Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
     window.Chart.defaults.borderColor = tok("--chart-grid", "rgba(100,116,139,.18)");
     inst.current = new window.Chart(ref.current, fitChartConfig(config, vwNow()));
@@ -2606,8 +2613,8 @@ function GateArrivalsPanel({ ga, err, month, months, onMonth, sited, phone, onOp
     // a bullet chart: a pale track from 0 to the gate's capacity, the planned arrivals as the bar inside it, a marker at
     // capacity; a gate with no check-in has no track
     data: { labels: rowsC.map(r => r.g.location_name), datasets: [
-      { label: "Capacity a day", data: rowsC.map(r => r.cap == null ? null : r.cap), backgroundColor: tok("--surface-3", "#F3F2EF"),
-        borderColor: tok("--grey", "#E7E5E4"), borderWidth: 1, borderRadius: 4, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
+      { label: "Capacity a day", data: rowsC.map(r => r.cap == null ? null : r.cap), backgroundColor: tok("--surface-3", "#EDEEEF"),
+        borderColor: tok("--grey", "#E1E2E4"), borderWidth: 1, borderRadius: 4, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
       { label: "Planned arrivals a day", data: rowsC.map(r => r.g.arrivals_per_day),
         backgroundColor: rowsC.map(r => r.over ? REDg : r.near ? GOLDg : (r.cap == null ? NONEg : C1g)), borderWidth: 0, borderRadius: 4, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
     options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { top: 12, right: 250 } },
@@ -4154,9 +4161,9 @@ function DashboardStockChart({ meta, weekNow, wall, fill, tick, from, to }){
     ctx.fillText("capacity", a.right, p100 - 4);
     if(nowIdx >= 0){
       const x = chart.scales.x.getPixelForValue(nowIdx);
-      ctx.setLineDash([]); ctx.strokeStyle = tok("--ink", "#1E293B"); ctx.lineWidth = 1;
+      ctx.setLineDash([]); ctx.strokeStyle = tok("--ink", "#1F2024"); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x, a.top); ctx.lineTo(x, a.bottom); ctx.stroke();
-      ctx.fillStyle = tok("--ink", "#1E293B"); ctx.textAlign = "left"; ctx.fillText("now", x + 4, a.top + fs + 2);
+      ctx.fillStyle = tok("--ink", "#1F2024"); ctx.textAlign = "left"; ctx.fillText("now", x + 4, a.top + fs + 2);
     }
     ctx.restore();
   } };
@@ -4250,7 +4257,7 @@ function ClpCard({ c, info, children, wide }){
 // a bullet chart, one row a route or a site: a pale track to the cap, the planned figure inside it (red past the cap), an
 // ink marker at the cap, and the figure in words beside it (no hover on a print or a TV). Rows with no cap are a sentence.
 function clpBulletCfg(rows, valKey, nameKey, word){
-  const C1 = tok("--chart-1", "#E8590C"), RED = tok("--red", "#DC2626"), INK = tok("--ink", "#1E293B");
+  const C1 = tok("--chart-1", "#E8590C"), RED = tok("--red", "#DC2626"), INK = tok("--ink", "#1F2024");
   const fs = 11;
   const marks = { id: "clpCapMarks", afterDatasetsDraw: (chart) => {
     const meta = chart.getDatasetMeta(1), x = chart.scales.x, ctx = chart.ctx, A = chart.chartArea; if(!x || !A) return;
@@ -4271,7 +4278,7 @@ function clpBulletCfg(rows, valKey, nameKey, word){
   } };
   return { type: "bar",
     data: { labels: rows.map(r => r[nameKey]), datasets: [
-      { label: "Cap a day", data: rows.map(r => r.cap), backgroundColor: tok("--surface-3", "#F3F2EF"), borderColor: tok("--grey", "#E7E5E4"),
+      { label: "Cap a day", data: rows.map(r => r.cap), backgroundColor: tok("--surface-3", "#EDEEEF"), borderColor: tok("--grey", "#E1E2E4"),
         borderWidth: 1, borderRadius: 4, barPercentage: 0.78, maxBarThickness: 34, grouped: false, order: 2 },
       { label: `Planned ${word}`, data: rows.map(r => r[valKey]), backgroundColor: rows.map(r => r.over ? RED : C1), borderWidth: 0,
         borderRadius: 4, barPercentage: 0.5, maxBarThickness: 22, grouped: false, order: 1 }] },
@@ -4298,7 +4305,7 @@ function clpShareCfg(c){
                 y: { stacked: true, max: 100, ticks: { callback: (v) => v + " %" } } } } };
 }
 function clpCouncilCfg(c){
-  const C1 = tok("--chart-1", "#E8590C"), C3 = tok("--chart-3", "#0D9488"), INK = tok("--ink", "#1E293B");
+  const C1 = tok("--chart-1", "#E8590C"), C3 = tok("--chart-3", "#0D9488"), INK = tok("--ink", "#1F2024");
   const rows = c.rows || [];
   const words = { id: "clpCouncilWords", afterDatasetsDraw: (chart) => {
     const meta = chart.getDatasetMeta(1), ctx = chart.ctx, A = chart.chartArea; if(!A) return; ctx.save();
@@ -4319,7 +4326,7 @@ function clpCouncilCfg(c){
     plugins: [words] };
 }
 function clpCarbonCfg(c, per){
-  const C1 = tok("--chart-1", "#E8590C"), C3 = tok("--chart-3", "#0D9488"), INK = tok("--ink", "#1E293B");
+  const C1 = tok("--chart-1", "#E8590C"), C3 = tok("--chart-3", "#0D9488"), INK = tok("--ink", "#1F2024");
   const m = c.months || [];
   const k = per === "tonne" ? "kg_per_tonne" : "kg_per_load";
   const ds = [{ label: "As planned", data: m.map(r => r[k]), borderColor: C1, backgroundColor: C1, pointRadius: 4, tension: 0 }];
@@ -6789,8 +6796,8 @@ function StockpilesPage({ meta, access, who }){
       const y = chart.scales.y, a = chart.chartArea, ctx = chart.ctx; if(!y) return;
       const p = y.getPixelForValue(100); ctx.save(); ctx.strokeStyle = tok("--red", "#DC2626"); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(a.left, p); ctx.lineTo(a.right, p); ctx.stroke();
-      if(nowIdx >= 0){ const x = chart.scales.x.getPixelForValue(nowIdx); ctx.setLineDash([]); ctx.strokeStyle = tok("--ink", "#1E293B"); ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(x, a.top); ctx.lineTo(x, a.bottom); ctx.stroke(); ctx.fillStyle = tok("--ink", "#1E293B");
+      if(nowIdx >= 0){ const x = chart.scales.x.getPixelForValue(nowIdx); ctx.setLineDash([]); ctx.strokeStyle = tok("--ink", "#1F2024"); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, a.top); ctx.lineTo(x, a.bottom); ctx.stroke(); ctx.fillStyle = tok("--ink", "#1F2024");
         ctx.font = "600 11px 'IBM Plex Sans', system-ui, sans-serif"; ctx.textAlign = "center"; ctx.fillText("now", x, a.top - 3); }
       ctx.restore(); } }] } : null;
   return (
@@ -9114,7 +9121,7 @@ function vehOption(v, suggested, current){
   // (and in the European slot, whose strings were ids) — so only another language's
   // fallback is marked; until then English fallbacks were starred and European ones not.
   return <option key={v} value={v} disabled={!fits && v !== current}
-    style={{ color: fits ? undefined : "#cbd5e1" }}>
+    style={{ color: fits ? undefined : "#c6c8cc" }}>
     {vehLabel(v)}{vehIsFallback(v) && !["en", "eu"].includes(VEH.lang) ? " *" : ""}{fits ? "" : " · not used for this material"}
   </option>;
 }
@@ -11970,7 +11977,7 @@ function IptPill({ ipt }){
   const k = iptKey(ipt);
   if(!k) return <span className="text-xs text-slate-500">no {TEAM().toLowerCase()}</span>;
   return <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full text-white"
-    style={{ background: IPT_PALETTE_C[k] || "#64748B" }}>{teamName(k)}</span>;
+    style={{ background: IPT_PALETTE_C[k] || "#62656B" }}>{teamName(k)}</span>;
 }
 function WsPill({ ws }){
   if(!ws) return null;
@@ -12307,7 +12314,7 @@ function LorryPlan({ bucket, tick, access, onData, weekConfirmed, today }){
               ))}
               {canMove && moving && blocks.length > 0 && <div className="clp-note" data-lp-drag-hint="1">Drag a trip to another lorry of its yard{view === "compressed" ? ", or to a day above" : ""}; a drop that would pass the driver's day is refused. Each trip's menu does the same from the keyboard.</div>}
               <div className="lp-axis" aria-hidden="true"><span></span><div className="lp-ticks">{Array.from({ length: (LP_DAY_TO - LP_DAY_FROM) / 60 + 1 }, (_, i) => <span key={i} style={{ left: `${i * 60 / (LP_DAY_TO - LP_DAY_FROM) * 100}%` }}>{String(LP_DAY_FROM / 60 + i).padStart(2, "0")}:00</span>)}</div><span></span></div>
-              <div className="lp-key" data-lp-key="1">{Object.entries(dests).map(([d, c]) => <span key={d}><i style={{ background: c }}></i>{lpShort(d)}</span>)}<span><i style={{ background: "repeating-linear-gradient(135deg,#CBD5E1 0 4px,#E2E8F0 4px 8px)" }}></i>required break</span><span><i style={{ background: "var(--soft,#F1F5F9)", border: "1px solid #CBD5E1" }}></i>free</span></div>
+              <div className="lp-key" data-lp-key="1">{Object.entries(dests).map(([d, c]) => <span key={d}><i style={{ background: c }}></i>{lpShort(d)}</span>)}<span><i style={{ background: "repeating-linear-gradient(135deg,#C6C8CC 0 4px,#E1E2E4 4px 8px)" }}></i>required break</span><span><i style={{ background: "var(--soft,#EDEEEF)", border: "1px solid #C6C8CC" }}></i>free</span></div>
               {view === "compressed" && (
                 <div className="lp-moves" data-lp-moves={mv.length}>
                   <button type="button" className="font-semibold" aria-expanded={moves ? "true" : "false"} onClick={() => setMoves(m => !m)}>
@@ -14048,8 +14055,8 @@ function SimMap({ meta, D, store, frame, site, wall }){
                    paint: { "text-color": "#0E7490", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
       // 17 Oct 2026 (the user: the gate and an empty lorry looked too alike, both a small white dot with a rim): the gate is a
       // BULLSEYE — a bigger white ring with a thick dark rim and a dark centre — so it never reads as a lorry
-      m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1E293B", "circle-stroke-width": 2.5 } });
-      m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1E293B" } });
+      m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1F2024", "circle-stroke-width": 2.5 } });
+      m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1F2024" } });
       m.addLayer({ id: "sim-gate-labels", type: "symbol", source: "sim-gates", layout: { "text-field": ["get", "name"], "text-size": 12, "text-offset": [0, 1.1], "text-anchor": "top" },
                    paint: { "text-color": "#1E293B", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
       m.addLayer({ id: "sim-lorries", type: "circle", source: "sim-lorries", paint: {
@@ -15102,7 +15109,7 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
       const team = teamText(r.ipt || (ls[0] || {}).ipt) || "";
       const wk = ls.map(l => `${grp((l.week || {}).planned_qty, 0)} ${unitLbl(l.unit)} · ${grp((l.week_derived || {}).trips)} trips`).join("<br>");
       const head = today ? (fg.todayText ? `Today: ${fg.todayText}<br>This week:<br>` : "Not today. This week:<br>") : "";
-      const label = `<div style="font:12px system-ui"><b>${r.route_id}</b> · ${r.origin.name} → ${r.dest.name}<br>${head}${wk}${team ? `<br><span style="color:#475569">${team}</span>` : ""}${r.vehicle_as_planned === false ? `<br><i>drawn for ${vehLabel(r.vehicle_profile)}, not the planned vehicle</i>` : ""}</div>`;
+      const label = `<div style="font:12px var(--f-text)"><b>${r.route_id}</b> · ${r.origin.name} → ${r.dest.name}<br>${head}${wk}${team ? `<br><span style="color:#44464B">${team}</span>` : ""}${r.vehicle_as_planned === false ? `<br><i>drawn for ${vehLabel(r.vehicle_profile)}, not the planned vehicle</i>` : ""}</div>`;
       if(r.geometry && r.geometry.length > 1){
         feats.push({ type: "Feature", properties: { route_id: r.route_id, kind: fg.today ? "out" : "faded", label }, geometry: { type: "LineString", coordinates: r.geometry } });
         // the way back only for today's lines on the Dashboard (Q3); the Look-ahead draws the week out only (Q6)
@@ -15672,17 +15679,17 @@ function rlPopup(m, e, D, popRef){
   const kind = ((D.community && D.community.kinds) || []).find(k => k.key === p.kind) || {};
   const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
   let html = "";
-  if(layer === "rl-limit-sign" || layer === "rl-limit-line") html = `<b>${esc(p.headline || p.label || "Lorry limit")}</b><div style="color:#64748B">Advisory: routes are not changed by it.</div>`;
+  if(layer === "rl-limit-sign" || layer === "rl-limit-line") html = `<b>${esc(p.headline || p.label || "Lorry limit")}</b><div style="color:#62656B">Advisory: routes are not changed by it.</div>`;
   else if(layer === "rl-coll"){
     const month = p.month ? new Date(p.month + "-15T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : String(p.year || "");
     const road = [p.road, p.road2].filter(x => x && x !== "null").join(" / ");
-    html = `<b>${esc(p.severity_word || "")} injury collision</b><div>${esc(month)}</div>${road ? `<div>${esc(road)}</div>` : ""}<div style="color:#64748B">Reported to the police.</div>`;
+    html = `<b>${esc(p.severity_word || "")} injury collision</b><div>${esc(month)}</div>${road ? `<div>${esc(road)}</div>` : ""}<div style="color:#62656B">Reported to the police.</div>`;
   }
-  else if(layer === "rl-closure-pt" || layer === "rl-closure-line") html = `<b>${esc(p._headline || p._label || "Planned road closure")}</b><div style="color:#64748B">For information: routes do not avoid it.</div>`;
+  else if(layer === "rl-closure-pt" || layer === "rl-closure-line") html = `<b>${esc(p._headline || p._label || "Planned road closure")}</b><div style="color:#62656B">For information: routes do not avoid it.</div>`;
   else html = `<b>${esc(p.name || kind.label || "")}</b>${p.name && kind.label ? `<div>${esc(kind.label)}</div>` : ""}${p.detail ? `<div>${esc(p.detail)}</div>` : ""}`;
   try { if(popRef.current) popRef.current.remove(); } catch(err){}
   popRef.current = new window.mapboxgl.Popup({ closeButton: true, maxWidth: "280px" }).setLngLat(e.lngLat)
-    .setHTML(`<div style="font:14px system-ui;max-width:260px">${html}</div>`).addTo(m);
+    .setHTML(`<div style="font:14px var(--f-text);max-width:260px">${html}</div>`).addTo(m);
   return true;
 }
 // 8 Nov 2026 (task 2.1-7, Q7): one leg's distance and time for a vehicle and option, from /api/routes/status (no new read)
@@ -16068,7 +16075,7 @@ function VehChips({ profiles }){
         const [bg, fg] = both    ? ["rgba(3,158,134,.12)", "var(--ok-text)"]
                        : p.baked ? ["rgba(255,193,1,.16)", "#8a6d00"]
                        : p.error ? ["rgba(191,46,85,.12)", "var(--bad-text)"]
-                                 : ["#f1f5f9", "#475569"];
+                                 : ["#edeeef", "#44464B"];
         const alts = p.alt_count > 1 ? ` · ${p.alt_count} options` : "";
         const tip = p.error ? `${vehLabel(k)} — ${p.error}`
                   : !p.baked ? `${vehLabel(k)} · not routed`
@@ -16379,7 +16386,7 @@ function RouteRestrictions({ routeId }){
             {hits.map((h, i) => (
               <tr key={i} className="border-t border-slate-100 align-top">
                 <td className="px-1 py-1">
-                  <span className="font-medium" style={{ color: h.colour || "#334155" }}>
+                  <span className="font-medium" style={{ color: h.colour || "#34363A" }}>
                     {h.severity === "breach" ? "■ " : h.severity === "warn" ? "▲ " : "· "}
                     {h.headline || h.what}
                   </span>
@@ -18625,7 +18632,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
         const pr = sg[0].properties || {};
         try { if(rlPop.current) rlPop.current.remove(); } catch(err){}
         rlPop.current = new window.mapboxgl.Popup({ closeButton: true, maxWidth: "280px" }).setLngLat(sg[0].geometry.coordinates)
-          .setHTML(`<div style="font:14px system-ui;max-width:260px" data-ol-sign-pop="1"><b>${esc(pr.headline)}</b><div style="color:#64748B">${esc(pr.who)}</div></div>`).addTo(m);
+          .setHTML(`<div style="font:14px var(--f-text);max-width:260px" data-ol-sign-pop="1"><b>${esc(pr.headline)}</b><div style="color:#62656B">${esc(pr.who)}</div></div>`).addTo(m);
         return true;
       }
     }
@@ -20353,7 +20360,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <option value="">— pick destination —</option>
                   {destOpts.map(l => {
                     const ok = destValid(l.id);
-                    return <option key={l.id} value={l.id} disabled={!ok} style={{ color: ok ? undefined : "#cbd5e1" }}>
+                    return <option key={l.id} value={l.id} disabled={!ok} style={{ color: ok ? undefined : "#c6c8cc" }}>
                       {l.name}{ok ? "" : " · no shared material"}
                     </option>;
                   })}
