@@ -2014,8 +2014,9 @@ ok("11 Oct: one pulsing dot per visible feature, hover / focus / tap shows its l
   code.includes("function guideHintsOn(){ return !!TENANT.demo_notice && guideRead() !== 'off'; }") && code.includes("const on = guideHintsOn() && guideIndex < 0;")
   && code.includes("dot.onmouseenter = show; dot.onfocus = show; dot.onmouseleave = hide; dot.onblur = hide;")
   && /\.guide-dot\{position:fixed;z-index:9002;[^}]*animation:guide-pulse 2s infinite\}/.test(html) && /prefers-reduced-motion:reduce\)\{\.guide-dot\{animation:none/.test(html));
+// NARROWED 24 Nov 2026 (the own look, B2): the line grey is the app's neutral #E1E2E4 (no warm grey; notes/design-language-1123.md)
 ok("11 Oct: the map takes the app's shell — warm neutrals, sentence-case 13 px headings, 14 px controls, orange primary buttons, routes still blue",
-  /--line:#E7E5E4; --bg:#FFFFFF;/.test(html) && /--action:#C2410C; --action-fg:#FFFFFF;/.test(html) && /--navy:#2563EB;/.test(html)
+  /--line:#E1E2E4; --bg:#FFFFFF;/.test(html) && /--action:#C2410C; --action-fg:#FFFFFF;/.test(html) && /--navy:#2563EB;/.test(html)
   && /\.sidebar h3 \{ margin:0 0 8px; font-size:13px; font-weight:600; letter-spacing:0; color:var\(--navy-deep\); text-transform:none; \}/.test(html)
   && /select \{ width:100%;[^}]*font-size:14px;/.test(html) && /\.btn \{[^}]*background:var\(--action\); color:var\(--action-fg\); \}/.test(html)
   && !/font-size:1(0|0\.5|1)px;\s*color:#8a9099/.test(html) && html.includes('<div class="panel-top" aria-hidden="true"></div>') && /\.sidebar \.panel-top\{ flex:none; position:sticky; top:-20px;/.test(html)   /* NARROWED 28 Oct 2026 (task 0a, card 6): the spacer is the sticky strip */
@@ -2791,7 +2792,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
     ok("⭐ the zone popup's kind names are the legend's (the popup said 'Zone' where the legend says 'Advisory')",
        keys.every(k => popup[k] && popup[k] === legend[k]), JSON.stringify({ popup, legend }));
     ok("...and 'Routing avoids this area' is ink, not the selection red (red is kept for a clash or a cap breach)",
-       code.includes("(p.affects_routing === true || p.affects_routing === 'true' ? '#1F2024' : '#6b7280')")
+       code.includes("(p.affects_routing === true || p.affects_routing === 'true' ? '#1F2024' : 'var(--muted)')")   // NARROWED 24 Nov 2026 (own look, B2): the caption token, not a stock grey
        && !code.includes("p.affects_routing === 'true' ? CONFIG.COLORS.selection"));
   }
   // the matrix fetch in flight is shared
@@ -5412,9 +5413,10 @@ function qrRead(mod) {
   const lum = (h) => { const n = parseInt(h.replace("#", ""), 16); return 0.2126 * lin(n >> 16 & 255) + 0.7152 * lin(n >> 8 & 255) + 0.0722 * lin(n & 255); };
   const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
   const muted = (html.match(/--muted:(#[0-9A-Fa-f]{6});/) || ["", "#000000"])[1];
-  ok("card 9: the name reads at 4.76:1 or better (--muted #64748B on the panel's white; was 3.22:1)",
-     muted.toUpperCase() === "#64748B" && /\.sidebar \{ position:absolute;[^}]*background:var\(--surface\);/.test(html) && /--surface:#FFFFFF;/.test(html)   /* NARROWED 10 Nov 2026 (wave 2, card 14): the white surface and dark text are tokens (--surface #FFFFFF, --navy-deep #1F2024 in :root, the same colours), so the staff app's Dark look can reach the embedded map */
-     && ratio(muted, "#FFFFFF") >= 4.5 && Math.round(ratio(muted, "#FFFFFF") * 100) / 100 === 4.76 && ratio("#8A9099", "#FFFFFF") < 4.5,
+  // NARROWED 24 Nov 2026 (the own look, B2): --muted is the app's neutral caption grey #62656B, 5.84:1 (was #64748B, 4.76:1)
+  ok("card 9: the name reads at 4.76:1 or better (--muted #62656B on the panel's white, 5.84:1; was 3.22:1)",
+     muted.toUpperCase() === "#62656B" && /\.sidebar \{ position:absolute;[^}]*background:var\(--surface\);/.test(html) && /--surface:#FFFFFF;/.test(html)   /* NARROWED 10 Nov 2026 (wave 2, card 14): the white surface and dark text are tokens (--surface #FFFFFF, --navy-deep #1F2024 in :root, the same colours), so the staff app's Dark look can reach the embedded map */
+     && ratio(muted, "#FFFFFF") >= 4.5 && Math.round(ratio(muted, "#FFFFFF") * 100) / 100 === 5.84 && ratio("#8A9099", "#FFFFFF") < 4.5,
      ratio(muted, "#FFFFFF").toFixed(2));
   ok("card 9: the group's heading is 14 px like its sibling groups in the fold (community, collisions, council, limits)",
      html.includes("#restrictions-group h3{ font-size:14px; }")
