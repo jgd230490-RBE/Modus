@@ -72,8 +72,11 @@ function evalExpr(e, props) {
     return ctx.out;
   };
   let e2 = null, e1 = null, em = null, err = "";
-  try { e2 = run("vehicles", 2); e1 = run("vehicles", 1); em = run("m3", 2); } catch (x) { err = String(x); }
-  ok("A-F5 the label runs in a sandbox", !!e2 && !!e1 && !!em, err);
+  // REVERSED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q6, card 4): no words along the lines;
+  // the label's field is GONE, so the sandbox below is not run (its checks stay, for the day a label comes back)
+  if (src) { try { e2 = run("vehicles", 2); e1 = run("vehicles", 1); em = run("m3", 2); } catch (x) { err = String(x); } }
+  ok("A-F5 the route label is gone from the public map (REVERSED 24 Nov 2026: it ran in a sandbox)",
+     !src && !html.includes("forecastLabelField") && !html.includes("'forecast-labels'"), err);
   if (e2) {
     ok("⭐ A-F5 a route of 66 visits a day reads 'R050 · 132 a day' (movements: the road card's figure), not 'R050 · 66'",
        evalExpr(e2, { route_id: "R050", f_avg: 66 }) === "R050 · 132 a day", evalExpr(e2, { route_id: "R050", f_avg: 66 }));

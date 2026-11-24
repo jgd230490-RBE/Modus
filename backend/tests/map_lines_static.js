@@ -187,6 +187,24 @@ if (sb.applyLegLook) {
      && P('route-alt-lines', 'line-opacity') === 0.9);
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+console.log("F. Card 4 (Q6): no words along the lines");
+// comment-stripped source, so the dated note that says what went cannot make a gone-check fail or pass
+const code = html.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+ok("F1 the forecast line's label layer is gone: no 'forecast-labels' layer, rule, list entry or visibility switch",
+   !code.includes("forecast-labels") && !/setForecastLabelsVisible/.test(code));
+ok("F2 its text field and unit are gone (forecastLabelField, FORECAST_LABEL_UNIT) and the map config has no label halo",
+   !/forecastLabelField|FORECAST_LABEL_UNIT/.test(code) && !/forecastLabelHalo/.test(cfg));
+const rules = between("    const LABEL_RULES = {", "    const LABEL_SORT");
+ok("F3 the stretches' and the routes' badges are drawn under Labels \"All\" only (Few: null)",
+   rules.includes("'road-load-labels':   { few: null, all: 0 },") && rules.includes("'carbon-route-labels':{ few: null, all: 0 },"));
+ok("F4 the cap badge (a route over its planning flag) is kept as it was: a flag, not a figure along the line",
+   rules.includes("'forecast-cap-badge': { few: 0, all: 0 },") && code.includes("id:'forecast-cap-badge'"));
+ok("F5 the key's badge rows follow the switch (badgesOn: Labels \"All\"), and a Labels change re-draws the key",
+   code.includes("function badgesOn(){ return typeof LABELS !== 'undefined' && LABELS.mode === 'all'; }")
+   && (code.match(/badgesOn\(\) \? '<div class="ml-row ml-key">/g) || []).length === 2
+   && /LABELS\.mode = mode;\s*applyLabels\(true\); syncLabelsSwitch\(\);\s*try \{ if \(typeof renderModeLegends === 'function'/.test(code));
+
 for (const f of fail) console.log("  FAIL: " + f);
 console.log(`${pass} passed, ${fail.length} failed`);
 process.exit(fail.length ? 1 : 0);

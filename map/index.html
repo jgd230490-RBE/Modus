@@ -2510,30 +2510,9 @@
     // else on this map: the reserved set is inbound #059669, outbound #f59e0b, temp
     // #C2790B, forecast #3B82F6, selection #DC2626, brand #2563EB/#1F2024 and the six
     // IPT band colours. parse_map.js asserts that.
-    // 2026-09-08 (§F1). The forecast route label read "412 vehicles", which is the same
-    // confusion the 04 Sep correction was about: 412 is not 412 lorries, it is 412 loads
-    // carried out and brought back. "Two-way" says what the number counts. Short form on
-    // the line, because the label sits ON a dotted route at 12 px.
-    // ⚠️ It is the LABEL that changed, not the figure. f_unit is still stamped on the
-    // feature and still drives the popup and the KPI cards.
-    // 2026-09-15 (the human): "the route label with two-way movement should be daily
-    // average not total". It was a MONTH's worth — "2221 Two-way" on a route running
-    // about a hundred movements a day — sitting beside a KPI card reading "101
-    // MOVEMENTS / DAY". Two rates on one screen, two orders of magnitude apart.
-    // 🔴 The division is the SERVER's (`per_day` / `working_days` on both public feeds),
-    // not this file's: lesson 25, one config value one reader.
-    // REVERSED 9 Nov 2026 (2.1-11b Q2): "Two-way" is retired; the line reads the organisation's count
-    // (forecastLabelField(): f_avg × PV() in a vehicles unit, the unit's own figure otherwise)
-    const FORECAST_LABEL_UNIT = 'movements / day';
-    // 11 Nov 2026 (card A-F5, John's yes): the label names its ROUTE ("R050 · 132 a day"). It read "132 movements a day"
-    // beside a road card saying 172 for the same road: the line is one route, the card adds every route on the road.
-    // A route under 1 a day that month (a lane with nothing that way: "0 movements a day") has no label.
-    function forecastLabelField() {
-        const u = CONFIG.FORECAST_UNIT || 'vehicles';
-        if (u !== 'vehicles') return ['concat', ['get', 'route_id'], ' · ', ['get', 'f_avg'], ' ', (u === 'm3' ? 'm³' : u) + ' / day'];
-        const n = ['round', ['*', ['to-number', ['get', 'f_avg'], 0], PV()]];
-        return ['case', ['<', n, 1], '', ['concat', ['get', 'route_id'], ' · ', ['to-string', n], ' a day']];
-    }
+    // REMOVED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q6, card 4): no words along the
+    // lines. The forecast line's label ("R050 · 132 a day": its text field and unit) is gone with its
+    // layer; a route's figures are on its card and the road card, the shared stretches' badges under Labels "All".
     // 12 Oct 2026 (the user, evening): "line width by volume leave out and change to heat map like the carbon
     // (toggle between carbon and volume)". The fix pass's width by volume (f_avg on fixed stops) is gone: the
     // forecast line is ONE width again (3.5 px on a 6 px casing), and volume is shown by COLOUR in the Volume heat
@@ -3152,10 +3131,10 @@
         'zone-limit':         { few: 9, all: 9 },
         'restriction-labels': { few: 11, all: 11 },
         'limit-signs':        { few: 13, all: 13, words: true },     // Off keeps the signs and drops their words
-        'forecast-labels':    { few: 0, all: 0 },
         'forecast-cap-badge': { few: 0, all: 0 },
-        'road-load-labels':   { few: 0, all: 0 },
-        'carbon-route-labels':{ few: 0, all: 0 },
+        // 24 Nov 2026 (Q6, card 4): the stretches' and the routes' badges only under Labels "All" (were Few and All)
+        'road-load-labels':   { few: null, all: 0 },
+        'carbon-route-labels':{ few: null, all: 0 },
         'area-label':         { few: 0, all: 0 },
         'area-county-label':  { few: 0, all: 0 },
     };
@@ -3215,6 +3194,7 @@
         if (!LABEL_MODES.includes(mode)) return;
         LABELS.mode = mode;
         applyLabels(true); syncLabelsSwitch();
+        try { if (typeof renderModeLegends === 'function' && typeof mapModeMonth === 'function') renderModeLegends(mapModeMonth()); } catch (e) {}   // 24 Nov 2026: the key's badge row follows
         try { scheduleViewWrite(); } catch (e) {}
     }
 
@@ -6895,7 +6875,7 @@
             let status = document.getElementById('forecast-status');
 
             if (!isChecked) {
-                ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
+                ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l => { if(map.getLayer(l)) map.removeLayer(l); });
                 const sd = map.getSource('routes-source');
                 if (sd) { const d = sd._data; d.features.forEach(f => { if (f.properties) f.properties.is_forecast = false; }); sd.setData(d); }
                 applyFilters();            // §9: and the cards drop back to the network count
@@ -6973,12 +6953,6 @@
                         id: 'forecast-layer', type: 'line', source: 'routes-source',
                         filter: ['==', 'is_forecast', true],
                         paint: { 'line-color': CONFIG.COLORS.forecast, 'line-width': FORECAST_LINE_WIDTH, 'line-opacity': 1 }
-                    });
-                    map.addLayer({
-                        id: 'forecast-labels', type: 'symbol', source: 'routes-source',
-                        filter: ['==', 'is_forecast', true],
-                        layout: { 'symbol-placement': 'line-center', 'text-field': forecastLabelField(), 'text-size': 12, 'text-offset': [0,-1] },
-                        paint: { 'text-color': '#ffffff', 'text-halo-color': CONFIG.COLORS.forecastLabelHalo, 'text-halo-width': 2 }
                     });
                 }
                 ensureFlowLayer();
@@ -7685,7 +7659,7 @@
     // 16 Oct 2026 (D115): forecast-flow left this list. It is drawn from its own source (the lanes, flow-source), whose
     // features carry no is_forecast / type / route_id, so this filter would hide every lane; drawFlow() cuts the lanes
     // by the same three tests instead.
-    const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels','diversion-edge'];   // 29 Oct 2026: + the amber edge
+    const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','diversion-edge'];   // 29 Oct 2026: + the amber edge; 24 Nov 2026: the labels gone
     function forecastLayerFilter(){
         const legs = [];
         const inCb = document.getElementById('layer-inbound'), outCb = document.getElementById('layer-outbound');
@@ -7711,7 +7685,6 @@
         const f = forecastLayerFilter();
         map.addLayer({id:'forecast-casing',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecastCasing,'line-width':FORECAST_CASING_WIDTH,'line-opacity':1}}, labelAnchor());
         map.addLayer({id:'forecast-layer',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecast,'line-width':FORECAST_LINE_WIDTH,'line-opacity':1}}, labelAnchor());
-        map.addLayer({id:'forecast-labels',type:'symbol',source:'routes-source',filter:f,layout:{'symbol-placement':'line-center','text-field':forecastLabelField(),'text-size':12,'text-offset':[0,-1]},paint:{'text-color':'#ffffff','text-halo-color':CONFIG.COLORS.forecastLabelHalo,'text-halo-width':2}});
         if (typeof ensureDiversionEdge === 'function') ensureDiversionEdge();   // 29 Oct 2026: with the overlay it edges
         raiseMarks();
         ensureCapBadgeLayer();
@@ -8114,9 +8087,6 @@
     const COUNCIL_ROUTE_COLOR = '#A8A29E', COUNCIL_ROUTE_WIDTH = 2;
     const COUNCIL_QUIET_LAYERS = ['forecast-casing', 'forecast-flow', 'forecast-flow-light', 'forecast-cap-badge'];
     function councilFocus(){ return typeof areaTierOn === 'function' && (areaTierOn('district') || areaTierOn('county')); }
-    function setForecastLabelsVisible(on){
-        if (map.getLayer('forecast-labels')) map.setLayoutProperty('forecast-labels', 'visibility', on ? 'visible' : 'none');
-    }
     // 12 Oct 2026 (evening): one heat map at a time. Volume (toggle-road-load) wins if both ids were ever checked at
     // once (an old shared link that carried road-load.carbon: radio buttons cannot hold both, this is the guard).
     function heatMode(){ return modeOn('toggle-road-load') ? 'volume' : modeOn('toggle-carbon') ? 'carbon' : null; }
@@ -8172,8 +8142,9 @@
                     rlBox.innerHTML = '<b>Volume · ' + CW().lower + ' in ' + rlEsc(monthLabel(m)) + '</b>' +
                         '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
                         stepRanges(rlStops(), '').map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
-                        // 19 Oct 2026: the badges' key — what the number on the road is
-                        '<div class="ml-row ml-key">' + MV_PILL_HTML + CW().lower + ' on that stretch</div>';
+                        // 19 Oct 2026: the badges' key — what the number on the road is; 24 Nov 2026 (Q6): only while the
+                        // badges are drawn (Labels "All")
+                        (badgesOn() ? '<div class="ml-row ml-key">' + MV_PILL_HTML + CW().lower + ' on that stretch</div>' : '');
                     // 14 Oct 2026 (the user took the recommendation): shortened to match the bulletin's map note — its first
                     // sentence is bulletin_doc.map_note() word for word; the rest keeps only the facts a reader needs
                     // 22 Oct 2026 (words sweep): cut to what a reader needs; the shared-section count, one load = one movement
@@ -8201,7 +8172,7 @@
                         // 10 Nov 2026 (UI critique 18): grey is also a route with nothing in the month, so the key says both
                         '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_NONE + '"></span>Nothing this month, or not routed yet</div>' +
                         // 19 Oct 2026: the badges' key; 10 Nov 2026: the badge carries its unit, the key says what it is
-                        '<div class="ml-row ml-key"><span class="co-pill">24 t CO₂e</span>from that route in the month</div>' +
+                        (badgesOn() ? '<div class="ml-row ml-key"><span class="co-pill">24 t CO₂e</span>from that route in the month</div>' : '') +
                         (miss ? '<div class="ml-foot">Leaves out ' + miss + ' line' + (miss === 1 ? '' : 's') + ' not routed yet.</div>' : '');
                     more = 'Approved plan only: loaded journeys and the scheme’s share of the empty return. A colour means the same tonnes every month.' +
                         (mtx.carbonStamp ? ' ' + rlEsc(mtx.carbonStamp) + '.' : '');
@@ -8211,6 +8182,8 @@
         const moreEl = document.getElementById('heat-info-more');
         if (moreEl && moreEl.innerHTML !== more) moreEl.innerHTML = more;
     }
+    // 24 Nov 2026 (Q6, card 4): the badges on the lines are drawn under Labels "All" only, and the key's badge row with them
+    function badgesOn(){ return typeof LABELS !== 'undefined' && LABELS.mode === 'all'; }
     // the badge in the key: the same arrow and number the map draws
     const MV_PILL_HTML = '<span class="mv-pill"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 4h9M7 1l3 3-3 3M11 8H2M5 5L2 8l3 3" fill="none" stroke="#2563EB" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>19</span>';
     // the one entry point: every month change, every toggle, the style.load re-add and the overlay switching off
@@ -8220,7 +8193,6 @@
         const off = document.getElementById('heat-off');
         if (off && off.checked !== !mode) off.checked = !mode;     // a link or a reset that cleared both shows "Off"
         RL.month = m;
-        setForecastLabelsVisible(!(m && (rl || co2)) && !councilFocus());
         if (!m || !rl) removeRoadLoadLayers();
         if (m && rl) {
             drawRoadLoad(m);    // the cached month at once, or an empty source while it is read
@@ -9158,7 +9130,7 @@
                  d.features.forEach(f=>{ if(f.geometry.type==='LineString'||f.geometry.type==='MultiLineString') f.properties.is_forecast=false; }); src.setData(d); }
         // 12 Oct 2026 (review §2.2d): the road-load and carbon-label layers go with the overlay, or closing the bar
         // left the month's shared sections on the map
-        ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
+        ['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'].forEach(l=>{ if(map.getLayer(l)) map.removeLayer(l); });
         if (typeof updateDiversionEdge === 'function') updateDiversionEdge(src && src._data);   // 29 Oct 2026: no month, no edge
         if (typeof updateHoldingChevrons === 'function') updateHoldingChevrons(src && src._data);   // 29 Oct 2026 (task 3c): every route again
         applyZoneMonth(null);   // no month on screen: show every active zone again

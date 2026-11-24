@@ -1669,10 +1669,10 @@ ok("§E: dismissals are keyed per month, so changing month brings them back",
 // it now also carries the rate, because the figure beside it became a daily one.
 // REVERSED 9 Nov 2026 (v2.1 2.1-11b: the organisation's count, 2 movements a visit by default; a cap stays in visits): the label is the count's own ("movements / day"),
 // built once by forecastLabelField() and used at both label layers
-ok("§F1: the forecast route label says movements, not vehicles",
-  /const FORECAST_LABEL_UNIT = 'movements \/ day';/.test(code)
-  && !/const FORECAST_LABEL_UNIT = '[^']*vehicles/i.test(code)
-  && (code.match(/'text-field': ?forecastLabelField\(\)/g) || []).length === 2
+// REVERSED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q6, card 4): no words along the lines, so
+// the forecast line's label, its text field and its unit are GONE (the figure still rides on the feature, below)
+ok("§F1: the forecast route label is gone (REVERSED 24 Nov 2026: it said movements, not vehicles)",
+  !/FORECAST_LABEL_UNIT/.test(code) && !/forecastLabelField/.test(code) && !/'forecast-labels'/.test(code)
   && !/\['get', 'f_unit'\]\]/.test(code));
 ok("§F1: ...and the FIGURE is untouched — f_unit still rides on the feature",
   /f\.properties\.f_unit = m\.unit/.test(code) && /f\.properties\.f_unit=unit/.test(code));
@@ -2606,7 +2606,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && code.includes("setCapBadges(overCap.filter(rid => live.some(i => i.src === 'cap' && i.id === rid)));"));
 
   // 6. review §3 row 3 — the overlay honours the filters; per-route roll-up; WS names; the stockpile sentence
-  ok("row 3: the four forecast overlay layers are filtered by the leg toggles and the routes passing routePassesFilters",
+  ok("row 3: the forecast overlay layers are filtered by the leg toggles and the routes passing routePassesFilters",
      /function forecastLayerFilter\(\)/.test(code)
      && code.includes("&& f.properties.route_id && routePassesFilters(f.properties)) rids.push(f.properties.route_id);")
      && code.includes("['in', ['get', 'type'], ['literal', legs]],")
@@ -2614,7 +2614,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      // NARROWED 16 Oct 2026 (D115): three layers now — forecast-flow is drawn from its own lanes (flow-source), whose
      // features carry no type / route_id, so drawFlow() applies the same leg toggles and routePassesFilters instead
      // NARROWED 29 Oct 2026 (the diversion edge): + 'diversion-edge', so the amber edge follows the same filter
-     && code.includes("const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','forecast-labels','diversion-edge'];")
+     // NARROWED 24 Nov 2026 (Q6): the labels layer is gone, so three
+     && code.includes("const FORECAST_OVERLAY_LAYERS = ['forecast-casing','forecast-layer','diversion-edge'];")
      && code.includes("if (map.getLayer('forecast-flow')) drawFlow();")
      && /function flowLegFigures\(\)\{[\s\S]{0,500}const legOn = \{ 'Inbound Highway': !inCb \|\| inCb\.checked, 'Outbound Highway': !outCb \|\| outCb\.checked \};[\s\S]{0,200}const passing = modeRoutesPassing\(\);[\s\S]{0,200}\(p\.is_forecast && legOn\[p\.type\] && passing\[p\.route_id\]\)/.test(code)
      && !/filter:\['==','is_forecast',true\]/.test(code));
@@ -3419,7 +3420,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
      && (code.match(/raiseMarks\(\);/g) || []).length >= 11);   // 9 on the base, + the two new adders
   // NARROWED 29 Oct 2026 (the diversion edge): both lists also remove 'diversion-edge', after the labels
   ok("⭐ C1: the road-load and carbon-label ids are in BOTH removal lists (Show forecast off, and closeTimeline)",
-     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
+     // NARROWED 24 Nov 2026 (Q6): the forecast labels' id is gone from both lists
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach\(l\s?=>\s?\{ if\(map\.getLayer\(l\)\) map\.removeLayer\(l\); \}\);/g) || []).length === 2);
   ok("⭐ C1: re-added on style.load (setStyle drops every source and layer): the handler calls refreshMapModes() after the month re-render",
      (() => { const a = code.indexOf("map.on('style.load', async () => {"); const b = code.indexOf("let ALIGNMENT_POPUP_WIRED");
               const sl = a > 0 && b > a ? code.slice(a, b) : "";
@@ -3429,10 +3431,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   ok("C1: every month on the playhead, the overlay switching off and closing the bar refresh the modes",
      /applyFilters\(\);\s*if\(typeof refreshMapModes === 'function'\) refreshMapModes\(\);[^\n]*\n    \}\n    function toggleTimeline/.test(code)
      && src.includes("if (typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon follow\n                return;"));
-  ok("⭐ C1: in either mode the per-route forecast labels HIDE, so two figures never show for one road",
-     blkCode.includes("map.setLayoutProperty('forecast-labels', 'visibility', on ? 'visible' : 'none');")
-     // NARROWED 12 Oct 2026 (night): and while By council is on (the council view quiets the routes)
-     && blkCode.includes("setForecastLabelsVisible(!(m && (rl || co2)) && !councilFocus());"));
+  // REVERSED 24 Nov 2026 (Q6, card 4): there is no per-route figure label to hide any more (two figures still never show
+  // for one road: the badges are the only figures on the lines, under Labels "All")
+  ok("⭐ C1: the per-route forecast label is gone, and so is the switch that hid it (REVERSED 24 Nov 2026)",
+     !blkCode.includes("'forecast-labels'") && !/setForecastLabelsVisible/.test(code));
   // 12 Oct 2026 (night, the user: By council "would be good to see by itself")
   ok("⭐ council view: while a By council box is ticked the routes are thin pale grey with no casing, flow dashes or cap badges, and the route labels hide",
      blkCode.includes("const COUNCIL_ROUTE_COLOR = '#A8A29E', COUNCIL_ROUTE_WIDTH = 2;")
@@ -3737,9 +3739,10 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
       ASYNC_PINS.push((async () => {
         const flush = () => new Promise(r => setTimeout(r, 0));
         B.refreshMapModes(); await flush(); await flush();
-        ok("⭐ C1: Road load on, October: one fetch of road-load?month=10, the source and three layers added, the per-route labels hidden",
+        ok("⭐ C1: Road load on, October: one fetch of road-load?month=10, the source and three layers added (no per-route label to hide: REVERSED 24 Nov 2026)",
            JSON.stringify(fetches) === JSON.stringify(["/api/public/road-load?month=10"]) && !!fmap.layers["road-load-line"] && !!fmap.layers["road-load-casing"]
-           && !!fmap.layers["road-load-labels"] && fmap.layers["forecast-labels"].layout.visibility === "none"
+           // REVERSED 24 Nov 2026 (Q6): the page has no per-route label; the stand-in layer is never touched
+           && !!fmap.layers["road-load-labels"] && fmap.layers["forecast-labels"].layout.visibility === undefined
            && fmap.sources["road-load-source"]._data.features.length === 2, JSON.stringify(fetches));
         {
           const lp = fmap.sources["road-load-label-source"] ? fmap.sources["road-load-label-source"]._data.features : [];
@@ -3762,8 +3765,14 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
            // carries the badge's key instead
            && !el("heat-info-more").innerHTML.includes("the loaded leg is counted once")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): the counting rule is in T10
            && el("heat-info-more").innerHTML.includes("Where routes share a road, its colour shows their total.")
-           && el("road-load-legend").innerHTML.includes("lorry movements a day on that stretch</div>")
-           && el("road-load-legend").innerHTML.includes('<span class="mv-pill">') && !el("road-load-legend").innerHTML.includes("ml-foot"));
+           // NARROWED 24 Nov 2026 (Q6, card 4): the badges' row only under Labels "All" (Few here: no row); checked with All below
+           && !el("road-load-legend").innerHTML.includes("on that stretch</div>")
+           && !el("road-load-legend").innerHTML.includes('<span class="mv-pill">') && !el("road-load-legend").innerHTML.includes("ml-foot"));
+        // 24 Nov 2026 (Q6, card 4): with Labels "All" the badges are drawn and the key's badge row is back
+        globalThis.LABELS = { mode: "all" }; B.renderModeLegends(10);
+        ok("⭐ 24 Nov 2026 (Q6): Labels All — the Volume key has the badge row again",
+           el("road-load-legend").innerHTML.includes("lorry movements a day on that stretch</div>") && el("road-load-legend").innerHTML.includes('<span class="mv-pill">'));
+        delete globalThis.LABELS; B.renderModeLegends(10);
         {
           const fl0 = fmap.layers["forecast-layer"].paint, rl0 = fmap.layers["road-load-line"].paint;
           ok("⭐ heat map (Volume): the routes are painted by f_avg and the sections by rl_mv on the SAME five blues and stops [10, 25, 50, 100], the width by the same band (REVERSED 24 Nov 2026)",
@@ -3820,8 +3829,13 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
            && !el("heat-info-more").innerHTML.includes("both legs")   // NARROWED 22 Oct 2026 (words sweep; the user: no back-end words on screens): shorter, "not routed yet"
            && !el("heat-info-more").innerHTML.includes("(55.5 t)") && el("carbon-legend").innerHTML.includes("Leaves out 3 lines not routed yet.")
            // NARROWED 10 Nov 2026 (UI critique 18): the key's pill carries the unit as the badges do; grey is also a route with nothing in the month
-           && el("carbon-legend").innerHTML.includes('<span class="co-pill">24 t CO₂e</span>from that route in the month')
+           // NARROWED 24 Nov 2026 (Q6, card 4): the pill's row only under Labels "All" (Few here); checked with All below
+           && !el("carbon-legend").innerHTML.includes('<span class="co-pill">')
            && el("carbon-legend").innerHTML.includes('Nothing this month, or not routed yet'), el("carbon-legend").innerHTML.slice(0, 400));
+        globalThis.LABELS = { mode: "all" }; B.renderModeLegends(10);
+        ok("⭐ 24 Nov 2026 (Q6): Labels All — the Carbon key has the pill row again",
+           el("carbon-legend").innerHTML.includes('<span class="co-pill">24 t CO₂e</span>from that route in the month'));
+        delete globalThis.LABELS; B.renderModeLegends(10);
         // REVERSED 12 Oct 2026 (evening): carbon paints the routes only, so a section-month figure from the server never
         // sets the stops; the route-month maximum always does
         TL.matrix.sectionCo2Max = 9.1; B.refreshMapModes(); await flush();
@@ -3848,7 +3862,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
         ok("⭐ C1: ...the route label switches to t CO₂e (its own layer on the loaded leg) and the per-route figure label stays hidden",
            // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): a route with no carbon figure gets no badge
            !!fmap.layers["carbon-route-labels"] && JSON.stringify(fmap.layers["carbon-route-labels"].filter) === JSON.stringify(["all", ["all"], ["==", ["get", "type"], "Inbound Highway"], ["==", ["typeof", ["get", "f_co2"]], "number"]])
-           && fmap.layers["forecast-labels"].layout.visibility === "none");
+           && fmap.layers["forecast-labels"].layout.visibility === undefined);   // REVERSED 24 Nov 2026 (Q6): never touched
         const fco2 = a1_data.features.map(f => f.properties.route_id + "/" + f.properties.type.split(" ")[0] + "=" + f.properties.f_co2).join(",");
         ok("⭐ C1: f_co2 is the route's month figure on BOTH legs (rounded to 0.1 t); a route with no figure is null, never 0",
            fco2 === "R1/Inbound=47.3,R1/Outbound=47.3,R2/Inbound=null,R2/Outbound=null,R3/Inbound=5", fco2);
@@ -3887,7 +3901,8 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
           const fq = fmap.layers["forecast-layer"].paint;
           ok("⭐ council view (sandbox): with Local authority districts ticked the routes are #A8A29E at 2 px, the casing and flow hidden, the labels hidden",
              fq["line-color"] === "#A8A29E" && fq["line-width"] === 2 && fmap.layers["forecast-casing"].layout.visibility === "none"
-             && fmap.layers["forecast-flow"].layout.visibility === "none" && fmap.layers["forecast-labels"].layout.visibility === "none", JSON.stringify(fq));
+             // REVERSED 24 Nov 2026 (Q6): no per-route label, so nothing of it to hide
+             && fmap.layers["forecast-flow"].layout.visibility === "none" && fmap.layers["forecast-labels"].layout.visibility === undefined, JSON.stringify(fq));
           // REVERSED 12 Oct 2026 (night): no network fade in the mode block; the boxes are unticked (pinned above)
           ok("council view (sandbox): the mode block leaves the network's paint alone (no inbound-lines layer touched)", !fmap.layers["inbound-lines"]);
           delete globalThis.areaTierOn;
@@ -3905,16 +3920,17 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
         el("toggle-carbon").checked = false; B.toggleCarbon(); await flush();
         // NARROWED 12 Oct 2026 (evening): one width now, not "volume widths"; and the "Off" button shows picked
         ok("heat map: with neither mode picked, refreshMapModes shows the 'Off' radio picked", el("heat-off").checked === true);
-        ok("⭐ C1: both off: the forecast routes are plan blue at their one width again, the carbon labels gone, the route labels back",
+        ok("⭐ C1: both off: the forecast routes are plan blue at their one width again, the carbon labels gone (no route label: REVERSED 24 Nov 2026)",
            fmap.layers["forecast-layer"].paint["line-color"] === "#3B82F6" && fmap.layers["forecast-layer"].paint["line-width"] === "FLW"
            && fmap.layers["forecast-casing"].paint["line-width"] === "FCW" && !fmap.layers["carbon-route-labels"]
-           && fmap.layers["forecast-labels"].layout.visibility === "visible" && el("carbon-legend").hidden === true && el("road-load-legend").hidden === true);
+           // REVERSED 24 Nov 2026 (Q6): no route label comes back (there is none)
+           && fmap.layers["forecast-labels"].layout.visibility === undefined && el("carbon-legend").hidden === true && el("road-load-legend").hidden === true);
         // closing the bar with Road load ticked: no month, nothing drawn, the legend says why
         el("toggle-road-load").checked = true; B.refreshMapModes(); await flush();
         TL.on = false; B.refreshMapModes(); await flush();
         ok("C1: the bar closed with Road load ticked: no layers, no source, and the legend says it shows one month",
            !fmap.layers["road-load-line"] && !fmap.sources["road-load-source"] && el("road-load-legend").innerHTML.includes("Shows one month")
-           && fmap.layers["forecast-labels"].layout.visibility === "visible");
+           && fmap.layers["forecast-labels"].layout.visibility === undefined);   // REVERSED 24 Nov 2026 (Q6): never touched
         // 12 Oct 2026 (wording review): it said "set From and To to the same month" - controls D14 removed
         ok("⭐ wording: the 'one month' note tells a person to press Play or pick a month, never to set the removed From / To",
            el("road-load-legend").innerHTML.includes("Shows one month: press Play or pick a month.")
@@ -4452,7 +4468,7 @@ function qrRead(mod) {
      (code.match(/map\.on\('mousemove'/g) || []).length === 1 && (code.match(/generateId: true/g) || []).length === 1
      && !/promoteId/.test(code));
   ok("Track C: the two removal lists are the one list, unchanged by the merge (Road load, Carbon and the forecast layers; the council areas are their own group and stay)",
-     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','forecast-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach/g) || []).length === 2   // NARROWED 28 Oct 2026 (8d): + the light's dots layer; NARROWED 29 Oct 2026: + the diversion edge
+     (code.match(/\['road-load-labels','road-load-line','road-load-casing','carbon-route-labels','diversion-edge','forecast-layer','forecast-casing','forecast-flow','forecast-flow-light','forecast-cap-badge'\]\.forEach/g) || []).length === 2   /* NARROWED 24 Nov 2026 (Q6): no forecast labels */   // NARROWED 28 Oct 2026 (8d): + the light's dots layer; NARROWED 29 Oct 2026: + the diversion edge
      && !/'area-fill','forecast/.test(code));
   // the deep link carries Road load and Carbon
   ok("⭐ Track C link: the Road load and Carbon boxes travel in &layers= (the box list names them; a change to either writes the link)",
@@ -7298,7 +7314,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
     L.applyLabels();
     ok("⭐ 0a (sandbox): Few — sites from 11, short zone names from 12, haul names from 13 without the gates' access roads, gates from 14, no work-section marks; the figures and the limit box stay",
        layers['location-names'].min === 11 && layers['zone-label'].min === 12 && layers['temp-haul-label'].min === 13 && layers['site-gates-label'].min === 14
-       && layers['ws-boundary-labels'].min === 24 && layers['road-load-labels'].min === 0 && layers['zone-limit'].min === 9 && layers['area-label'].min === 0
+       // NARROWED 24 Nov 2026 (Q6, card 4): the stretches' badges are drawn under "All" only (Few: never, 24)
+       && layers['ws-boundary-labels'].min === 24 && layers['road-load-labels'].min === 24 && layers['zone-limit'].min === 9 && layers['area-label'].min === 0
        && JSON.stringify(layers['zone-label'].layout['text-field']).includes('index-of')
        && JSON.stringify(layers['temp-haul-label'].layout['text-field']) === JSON.stringify(['case', ['coalesce', ['get', 'access_road'], false], '', ['get', 'name']]));
     ok("⭐ 0a (sandbox): the one name style — 13 px semibold, ink on a soft white halo, sorted site > zone > haul > gate",
