@@ -157,6 +157,8 @@ ok("5 no picker: the guide's Appearance passage names the three looks and no acc
 const audit = fs.readFileSync(path.join(__dirname, "ui_audit.js"), "utf8");
 ok("5 no picker: the UI audit has no Blue pass, no extra accents and no --accents, and sets no stored accent",
    !/EXTRA_ACCENTS|EXTRA_PASSES|--accents|modus_accent|accent: "blue"|accent: "orange"/.test(audit));
+ok("🔴 5 no picker: every newContext call in the audit passes (browser, look, width[, guide]) — no accent left in a call (the team walk's five stopped the first run)",
+   (audit.match(/newContext\(browser, look, w(, true)?\)/g) || []).length >= 7 && !/newContext\(browser, look, "[a-z-]+"/.test(audit));
 ok("5 the last stock-ish blue checkboxes (#1D4ED8) take the sign blue",
    !html.includes('accentColor: "#1D4ED8"') && (html.match(/accentColor: "var\(--navy\)"/g) || []).length >= 6);
 
