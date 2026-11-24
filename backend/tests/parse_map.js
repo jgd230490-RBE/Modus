@@ -4438,9 +4438,10 @@ function qrRead(mod) {
      !/From and To/.test(code) && !/set From/.test(code));
   // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): the Month label is the picker's h3 (13 px, as every panel heading); the
   // month and year buttons 13 px (the floor since decision 4)
+  // NARROWED 24 Nov 2026 (the own look, B2): the buttons' face is the page's text face token, not the old stock face
   ok("⭐ the 14 px floor: the Volume and Carbon labels (.fc-toggle is 13.5 px) are 14 px; the Month heading is the picker's h3 and its buttons 13 px",
      /\.fc-toggle\.fc-mode\{ font-size:14px; \}/.test(html) && html.includes('<h3 id="fc-month-label">Month</h3>')
-     && html.includes("font:500 13px Inter,system-ui,sans-serif; cursor:pointer; }") && !html.includes('<label id="fc-chips-label">Month</label>'));
+     && html.includes("font:500 13px var(--f-text); cursor:pointer; }") && !html.includes('<label id="fc-chips-label">Month</label>'));
   // the phone sheet and the map's foot: Mapbox's logo and attribution carry the ONS / OS lines of a council layer
   const phoneCss = (() => { const i = html.indexOf("@media (max-width:767px){\n            #kpi-hud, #menu-toggle"); return i > 0 ? html.slice(i, html.indexOf("\n        }\n", i)) : ""; })();
   ok("⭐ licences (phone): the bottom controls (Mapbox logo, attribution with the ONS / OS lines) ride above the sheet, never under it",
@@ -5378,7 +5379,7 @@ function qrRead(mod) {
      html.includes("body.wall-mode.has-demo-notice #demo-notice{ font-size:22px; height:auto; padding:8px 22px; }")
      && desk.includes("body.wall-mode.has-demo-notice #demo-notice{ line-height:1.4; white-space:normal; overflow:visible; }")
      && desk.includes("body.wall-mode.has-demo-notice #demo-notice::before{ line-height:inherit; }")
-     && /\n\s*#demo-notice\{[^}]*font:700 10\.5px\/1\.4 system-ui,sans-serif;/.test(html));
+     && /\n\s*#demo-notice\{[^}]*font:700 10\.5px\/1\.4 var\(--f-text\);/.test(html));   // NARROWED 24 Nov 2026 (own look, B2): the text face token, not a system face
   const phoneBlock = (html.match(/@media \(max-width:1023px\)\{([\s\S]*?)\n        \}\n        @media \(min-width:701px\)/) || ["", ""])[1];
   ok("card 7: the phone band is unchanged (14 px, line-height 1.35, wrapping)",
      phoneBlock.includes("body.has-demo-notice #demo-notice{ left:0; right:0; top:0; transform:none; border-radius:0; border-width:0 0 3px; white-space:normal; text-align:center; font-size:14px; line-height:1.35; letter-spacing:.03em; padding:5px 12px; }")
@@ -5390,7 +5391,7 @@ function qrRead(mod) {
   ok("card 8: the Guide stays inside the band: its top + height end at or above the red rule (26 px strip less its 3 px rule)",
      px(guideDesk, "top") + px(guideDesk, "height") <= px(deskRule, "height") - 3, `${px(guideDesk, "top")} + ${px(guideDesk, "height")}`);
   ok("card 8: the base Guide rule is 14 px in the same 21 px box, an inset ring instead of the border (colours unchanged)",
-     /border:0;/.test(guideBase) && /height:21px;padding:0 10px;font:600 14px\/21px system-ui,sans-serif;/.test(guideBase)
+     /border:0;/.test(guideBase) && /height:21px;padding:0 10px;font:600 14px\/21px var\(--f-text\);/.test(guideBase)   // NARROWED 24 Nov 2026 (own look, B2): the text face token
      && /box-shadow:inset 0 0 0 1px var\(--line\),0 2px 8px rgba\(16,24,40,\.12\);/.test(guideBase)
      && /background:var\(--surface\);color:var\(--navy-deep\);/.test(guideBase) && /--surface:#FFFFFF;/.test(html) && /--navy-deep:#1F2024;/.test(html), guideBase);   /* NARROWED 10 Nov 2026 (wave 2, card 14): the white surface and dark text are tokens (--surface #FFFFFF, --navy-deep #1F2024 in :root, the same colours), so the staff app's Dark look can reach the embedded map */
   ok("card 8: no 11 / 11.5 px left on any Guide button rule",
