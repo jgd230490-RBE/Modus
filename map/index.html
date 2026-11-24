@@ -248,7 +248,17 @@
         /* 11 Oct 2026 (live, October data): a card could shrink below its own figure, so "302.9" ran into "18".
            A card now never goes narrower than its figure or its longest label word. */
         @media (min-width:1024px){ #kpi-cards .kpi-card{ min-width:min-content; } }
-        .kpi-card.lead .kpi-label{ color:var(--ink); font-weight:500; }
+        /* 24 Nov 2026 (the own look, B2; the third mockup's card 2, John's yes): the bar is one ruled strip. At a desk each figure
+           sits between hairlines that run the bar's height (the gap becomes padding, 12 px a side: 25 px between figures, it was
+           18 px), the line between the two groups is one of those hairlines, and every label has one weight. No thick line: the
+           bar sits under the demo rule. */
+        @media (min-width:1024px){
+            #kpi-cards, #kpi-cards .kpi-row{ gap:0; align-self:stretch; align-items:stretch; }
+            #kpi-cards .kpi-card{ display:flex; flex-direction:column; justify-content:center; padding:0 12px; border-left:1px solid var(--line); }
+            #kpi-cards .kpi-card[hidden]{ display:none; }   /* display:flex beats the hidden attribute (the Material card in a vehicles unit) */
+            #kpi-cards .kpi-sep{ display:none; }
+        }
+        .kpi-card.lead .kpi-label{ color:var(--muted); font-weight:400; }
         .layers-box{ border-top:1px solid var(--line); padding-top:12px; }
         .layers-box > summary{ cursor:pointer; list-style:none; font-size:14px; font-weight:600; color:var(--ink); padding:2px 0 10px; }
         .layers-box > summary::-webkit-details-marker{ display:none; }
