@@ -75,6 +75,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
        fell to 4.24:1 on a selected row). The dark look: #F0A838 with dark text on the fills (8.03:1) and #3A2E1C behind
        the chips (6.53:1). */
     --haul-text:#9A5F08; --haul-soft:#FBF0DF;
+    --line-2:#C6C8CC;
     /* 10 Oct 2026 — THE DATA PALETTE (notes/colour-system-1010.md). Colour on a chart does
        one job: slot 1 is always the PLAN (11 Oct: the brand orange, orange-led), slot 2 always
        DELIVERED (blue), slot 4 the fair-price MODEL (violet), slots 3 and 5 further
@@ -107,6 +108,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     --ok-btn:#34D399; --ok-btn-fg:#1F2024;
     --ok-text:#34D399; --warn-text:#FBBF24; --bad-text:#F87171;
     --haul-text:#F0A838; --haul-soft:#3A2E1C;
+    --line-2:#4B4D52;
     --st-none:#C9CACE;
     --chart-1:#E8681E; --chart-1-soft:rgba(232,104,30,.22); --chart-2:#8AB4F8; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
     --navy-soft:rgba(138,180,248,.16); --navy-soft-col:rgba(138,180,248,.10);
@@ -262,7 +264,13 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
      the halo to its own box, so a tap outside the bar never reaches the pill) */
   .demo-bar-guide::after{content:"";position:absolute;inset:-12px -8px;}
   @media (max-width:639px){ .demo-bar{letter-spacing:.03em;height:auto;min-height:26px;padding:4px 12px;line-height:1.3;} .demo-bar.has-guide{padding:4px 76px 4px 12px;} .demo-bar-text{white-space:normal;text-overflow:clip;text-align:center;} .demo-bar-guide{top:50%;transform:translateY(-50%);} }
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:6px;}
+  .card{background:none;border:0;border-top:1px solid var(--ink);border-radius:0;padding-left:0 !important;padding-right:0 !important;}
+  /* 24 Nov 2026 (own look, B1 item 5; third mockup Q1): a section is ruled, not boxed. A table that scrolls sideways inside a
+     section keeps an edge to scroll inside: a hairline under it (the ink line is its top). A table's first and last cells
+     sit flush with the rule, as drawn. */
+  .card.overflow-auto,.card.overflow-x-auto{border-bottom:1px solid var(--line);}
+  .card .tbl th:first-child,.card .tbl td:first-child{padding-left:0;} .card .tbl th:last-child,.card .tbl td:last-child{padding-right:0;}
+  .ruled{background:none !important;border:0 !important;border-top:1px solid var(--ink) !important;border-radius:0 !important;box-shadow:none !important;padding-left:0 !important;padding-right:0 !important;}
   /* 10 Oct 2026 — the shell pass (ui-review-1009, mockup 8): a dimmed rail whose active item is
      ink, not the action colour; hairline borders; monochrome glyphs. One accent on a neutral shell. */
   .rail{background:var(--rail-bg);border-right:1px solid var(--line);}
@@ -392,7 +400,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   /* 9 Nov 2026 (UI critique finding 10, card 10): Configuration read-only for a reader. CfgFields is a fieldset (no frame);
      disabled for a reader, its controls are drawn as text: no box, no arrow, no placeholder, a tick a ✓ or –, no buttons */
   .cfg-fs{border:0;margin:0;padding:0;min-width:0;}
-  .cfg-ro-note{border:1px solid var(--line);background:var(--navy-soft);color:var(--ink);border-radius:6px;padding:10px 14px;font-size:14px;margin:0 0 16px;}
+  .cfg-ro-note{border:0;border-left:2px solid var(--line-2);background:none;color:var(--ink);border-radius:0;padding:2px 0 2px 10px;font-size:14px;margin:0 0 16px;}
   .cfg-ro input:not([type=checkbox]):not([type=radio]),.cfg-ro select,.cfg-ro textarea{border-color:transparent;background:transparent;box-shadow:none;color:var(--ink);-webkit-text-fill-color:var(--ink);opacity:1;cursor:default;-webkit-appearance:none;appearance:none;resize:none;}
   .cfg-ro input::placeholder,.cfg-ro textarea::placeholder{color:var(--muted);-webkit-text-fill-color:var(--muted);}
   .cfg-ro input::-webkit-calendar-picker-indicator{display:none;}
@@ -467,7 +475,8 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .fig-strip>*{border:0 !important;border-radius:0 !important;background:none !important;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line) !important;margin:-1px 0 0 -1px;min-width:0;}
   /* 10 Oct 2026 — the one-screen Dashboard (mockups 1 and 8): six cards, collapsed detail sections */
   .dash-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);border-radius:0;background:none;overflow:hidden;}
-  .dash-cards .dash-card{border:0;border-radius:0;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line);margin:-1px 0 0 -1px;}
+  .dash-cards .dash-card{border:0;border-radius:0;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line);margin:-1px 0 0 -1px;padding-left:12px !important;padding-right:12px !important;}
+  .dash-cards .dash-card:first-child{padding-left:2px !important;}   /* 24 Nov 2026 (own look, B1 item 5): a strip cell keeps its own padding inside a ruled section (the third mockup: 10 px, the first 2 px) */
   @media (min-width:900px){.dash-cards{grid-template-columns:repeat(3,minmax(0,1fr));}}
   @media (min-width:1280px){.dash-cards{grid-template-columns:repeat(6,minmax(0,1fr));}}
   .dash-card{padding:14px 16px;}
@@ -500,7 +509,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .dash-card-l{font-size:14px;color:var(--muted);font-weight:500;line-height:1.3;min-height:2.6em;}
   .dash-card-v{font-size:clamp(1.3rem,1.6vw,1.75rem);font-weight:600;color:var(--navy-deep);line-height:1.15;margin:6px 0 4px;white-space:nowrap;}
   .dash-card-s{font-size:13px;color:var(--muted);line-height:1.3;}
-  .dash-more{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:0 16px;}
+  .dash-more{background:none;border:0;border-top:1px solid var(--ink);border-radius:0;padding:0;}
   .dash-more>summary{cursor:pointer;list-style:none;padding:12px 0;font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:8px;}
   .dash-more>summary::-webkit-details-marker{display:none;}
   .dash-more>summary::before{content:"›";display:inline-block;width:14px;color:var(--muted);transition:transform .15s;}
@@ -539,7 +548,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .rc-ended td{color:var(--muted);}
   .rc-empty{text-align:center;padding:14px 8px;font-size:13px;}
   .rc-empty b{display:block;font-size:14px;margin-bottom:4px;}
-  .rc-pcard{border:1px solid var(--line, #e1e2e4);border-radius:6px;padding:8px 10px;margin-top:8px;font-size:13px;}
+  .rc-pcard{border:0;border-top:1px solid var(--line, #e1e2e4);border-radius:0;padding:8px 0;margin-top:8px;font-size:13px;}
   .rc-pcard b{display:block;}
   @media (max-width:767px){ .rc-tiles{grid-template-columns:repeat(2,minmax(0,1fr));} .rc-tile:nth-child(3){border-left:0;} .rc-tile:nth-child(n+3){border-top:1px solid var(--line, #e1e2e4);} .rc-tile b{font-size:18px;} }
   .chart-tool{width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--muted);font-size:16px;line-height:1;cursor:pointer;}
@@ -659,7 +668,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .dash-filters select option{color:#1F2024;}
   .tbl tr.is-picked td{background:var(--chart-1-soft);}
   /* 11 Oct 2026 — the carbon target on the Dashboard, Forecasts and Submit forecast (tokens only, so every look follows) */
-  .ct-strip{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 16px;color:var(--ink);}
+  .ct-strip{background:none;border:0;border-top:1px solid var(--ink);border-radius:0;padding:12px 0;color:var(--ink);}
   .ct-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 16px;}
   /* 8 Nov 2026 (v2.1 task 2.1-9): the Lorry plan panel — one row a lorry, its trips across the day */
   .lp-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:0;margin:8px 0 4px;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);overflow:hidden}
@@ -781,7 +790,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-tl-top{display:flex;align-items:center;justify-content:space-between;gap:8px;} .sim-tl-top .sim-tl-head{flex:1 1 auto;min-width:0;}
   .sim-tl-head{font-size:13px;color:var(--muted);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .sim-tl-head b{color:var(--ink);font-weight:600;}
-  .sim-fold{margin-top:10px;border:1px solid var(--line);border-radius:6px;padding:0 12px;background:var(--surface);}
+  .sim-fold{margin-top:10px;border:0;border-top:1px solid var(--ink);border-radius:0;padding:0;background:none;}
   .sim-fold>summary{cursor:pointer;padding:10px 0;font-size:15px;font-weight:600;color:var(--ink);}
   .sim-fold[open]>summary{border-bottom:1px solid var(--line);margin-bottom:6px;}
   .sim-fold>.sim-scroll{margin-bottom:12px;}
@@ -866,7 +875,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-cmp td:first-child{max-width:190px;}
   .sim-side{display:flex;flex-direction:column;gap:12px;min-width:0;}
   @media (min-width:1024px){.sim-side{max-height:max(360px,min(62vh,720px));overflow:auto;}}   /* 10 Nov 2026 (finding 9): the Now card and the gates are no taller than the map, so nothing is left empty under it */
-  .sim-card{border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--surface);color:var(--ink);}
+  .sim-card{border:0;border-top:1px solid var(--ink);border-radius:0;padding:12px 0;background:none;color:var(--ink);}
   .sim-card-h{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:6px;}
   .sim-clock{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;color:var(--ink);}
   .sim-btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;}
@@ -909,7 +918,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-hold-row{flex-wrap:wrap;row-gap:2px;}   /* 30 Oct 2026 (task 3c): the holding row wraps; its note is a line under it, never a flex item beside it */
   .sim-msg{color:var(--red);font-size:14px;font-weight:600;}
   .sim-h4{font-size:15px;font-weight:600;color:var(--ink);margin:16px 0 2px;}
-  .sim-tl{border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden;cursor:pointer;margin-top:6px;}
+  .sim-tl{border:0;border-top:1px solid var(--ink);border-bottom:1px solid var(--line);border-radius:0;background:none;overflow:hidden;cursor:pointer;margin-top:6px;}
   .sim-tl svg{display:block;}
   .sim-tl-open{fill:rgba(5,150,105,.07);}
   .sim-tl-pour{fill:var(--sim-mixer);}
@@ -925,7 +934,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-tl-marktext{font-size:12px;font-weight:600;fill:var(--red);}
   .sim-tl-note{font-size:12px;fill:var(--muted);}
   .sim-tl-cursor{stroke:var(--ink);stroke-width:1.5;}
-  .sim-scroll{margin-top:6px;border:1px solid var(--line);border-radius:6px;}
+  .sim-scroll{margin-top:6px;border:0;border-top:1px solid var(--ink);border-bottom:1px solid var(--line);border-radius:0;}
   .sim-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
   .kb-scroll:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}   /* 17 Oct 2026 (UI audit #15): a scrolling table a keyboard user can Tab to (tabindex 0, role region) */
   /* 23 Oct 2026 (UI fix 9, decision 16): a Data table row opens from the keyboard through a real button on its name (Locations,
@@ -978,7 +987,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-checks{margin-top:10px;font-size:14px;color:var(--ink);display:flex;flex-direction:column;gap:2px;}
   .sim-ok{color:var(--ok-text);font-weight:700;}
   .sim-plist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;}
-  .sim-pcard{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--surface);color:var(--ink);}
+  .sim-pcard{border:0;border-top:1px solid var(--ink);border-radius:0;padding:10px 0;background:none;color:var(--ink);}
   .sim-pc-h{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:15px;}
   .sim-pc-dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin:8px 0 0;}
   .sim-pc-dl dt{font-size:13px;color:var(--muted);}
@@ -990,7 +999,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .gw-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:8px;}
   @media (min-width:1024px){.gw-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
   @media (min-width:1600px){.gw-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}
-  .gw-gate{border:1px solid var(--line);border-radius:6px;padding:10px 12px;min-width:0;}
+  .gw-gate{border:0;border-top:1px solid var(--ink);border-radius:0;padding:10px 0;min-width:0;}
   /* 10 Nov 2026 (16 Oct item 33, mockup card 3): the gates as one list, a row opening its day chart */
   .gw-table{margin-top:8px;}
   .gw-table td{vertical-align:middle;}
@@ -1090,12 +1099,12 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   /* 16 Nov 2026 (step 1b): the best option card on Data -> Routes. A collision row never takes a status tint (R5, 16 Oct;
      John 16 Nov "Yes, plain words"): .bo-col rows carry .bo-dash or a grey rs-none chip only. Under 600 px of card the
      head's name and chip share a line and the figures go below (the full-window panel, a tablet). */
-  .bo-card{container-type:inline-size;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin:0 0 10px;max-width:820px;}
+  .bo-card{container-type:inline-size;background:none;border:0;border-top:2px solid var(--ink);border-radius:0;padding:10px 0 0;margin:0 0 10px;max-width:820px;}
   .bo-eye{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
   .bo-ans{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:6px 0 2px;} .bo-ans b{font-size:20px;letter-spacing:-.01em;}
   .bo-why{font-size:13px;margin:0 0 8px;}
   .bo-done{font-size:13px;margin:0 0 10px;max-width:820px;}
-  .bo-state{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font-size:13px;margin:6px 0;}
+  .bo-state{background:none;border:0;border-left:2px solid var(--line-2);border-radius:0;padding:2px 0 2px 10px;font-size:13px;margin:6px 0;}
   .bo-heads{border-top:1px solid var(--line);}
   .bo-tabs{margin:8px 0 8px;}
   /* 17 Nov 2026 (route option labels): the labels on the Routes map. A small solid box in the app's look (not the
@@ -1127,6 +1136,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .ro-body.ro-wide{grid-template-columns:minmax(0,820px) minmax(0,1fr);}
   .ro-body.ro-wide>.ro-under{grid-column:1 / -1;}
   .ro-main,.ro-side,.ro-under{min-width:0;}
+  .ro-body.ro-wide>.ro-side{border-left:1px solid var(--line);padding-left:16px;}
   .ro-under:empty{display:none;}
   .ro-under{margin-bottom:10px;}
   .ro-pick{min-width:0;flex:0 1 auto;max-width:100%;text-overflow:ellipsis;}
@@ -1327,7 +1337,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
      display:none on [hidden], but a utility class on the same element would win, so it
      is forced here. */
   [hidden]{display:none !important;}
-  .dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 12px;}
+  .dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:none;border:0;border-top:1px solid var(--ink);border-bottom:1px solid var(--line);border-radius:0;padding:8px 0;}
   .dash-wallbar-lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);}
   .dash-wallbar-btn{font:600 13px var(--f-text);color:var(--navy-deep);background:var(--surface-3);border:1px solid transparent;border-radius:6px;padding:5px 11px;cursor:pointer;}
   .dash-wallbar-btn:hover{background:var(--grey);}
@@ -1362,7 +1372,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .al-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;} .al-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
   .al-tick{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink);margin:6px 0;}
   .al-tick input{margin-top:3px;flex:none;}
-  .al-advice{background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:12px;font-size:13px;}
+  .al-advice{background:none;border:0;border-left:2px solid var(--line-2);border-radius:0;padding:2px 0 2px 10px;font-size:13px;}
   .al-lines{margin:0;padding-left:16px;} .al-lines li{margin:4px 0;}
   .al-notes{margin:8px 0 0;padding-left:16px;color:var(--warn-text);} .al-notes li{margin:3px 0;}
   .al-foot{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:8px;margin:10px 0 0;}
@@ -1395,7 +1405,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .al-typed-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;}
   .al-via{margin-top:8px;max-width:520px;} .al-via .ctl{font-family:ui-monospace,Consolas,monospace;font-size:12px;}
   .al-mark{margin-left:6px;font-weight:600;}
-  .al-strip{display:flex;flex-wrap:wrap;gap:14px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:8px 14px;font-size:13px;background:var(--surface);margin-top:12px;}
+  .al-strip{display:flex;flex-wrap:wrap;gap:14px;align-items:center;border:0;border-top:1px solid var(--ink);border-bottom:1px solid var(--line);border-radius:0;padding:8px 0;font-size:13px;background:none;margin-top:12px;}
   .al-strip b{font-size:16px;font-variant-numeric:tabular-nums;} .al-strip-btn{padding:4px 9px;font-size:13px;} .al-strip-words{flex-basis:100%;color:var(--muted);font-size:12px;}
 </style>
 </head>
@@ -9487,7 +9497,7 @@ function Matrix({ meta, who, editTarget, vehLang, access, initialCost, initialTa
       <PageHeader title="Submit forecast"
         subtitle="One vehicle per line; a split across two vehicles is two lines." />
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
+      <div className="ruled py-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Field label="Origin">
             <select value={origin} onChange={e => setOrigin(e.target.value)} className={selCls}>
@@ -11218,7 +11228,7 @@ function carbonTargetError(status, txt){
 function CarbonStep({ n, children, ...rest }){
   return (
     <li>
-      <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5" id={"carbon-step-" + n} data-step={n} {...rest} aria-labelledby={"carbon-step-" + n + "-h"}>
+      <section className="ruled py-4 sm:py-5" id={"carbon-step-" + n} data-step={n} {...rest} aria-labelledby={"carbon-step-" + n + "-h"}>
         <h2 id={"carbon-step-" + n + "-h"} className="flex items-center gap-3 text-lg font-semibold text-slate-800">
           <span className="inline-flex items-center justify-center shrink-0 text-base font-bold tabular-nums" style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid var(--line)", background: "var(--surface-2)", color: "var(--ink)" }}>{n}</span>
           <span>{CARBON_STEP_TITLES[n - 1]}</span>
@@ -12626,7 +12636,7 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
   }
   if(mode === "compact"){
     return (
-      <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 min-w-0" data-fuel-widget="compact" title={hasIndex ? String(price) : ""}>
+      <div className="px-4 py-3 min-w-0" data-fuel-widget="compact" title={hasIndex ? String(price) : ""}>
         <div className="text-lg leading-8 font-bold tabular-nums truncate" style={{ color: "var(--navy-deep)" }}>
           {hasIndex ? priceTight : <span className="text-base text-amber-700">Index unavailable</span>}{staleChip}
         </div>
@@ -12638,7 +12648,7 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
     );
   }
   return (
-    <div className={"rounded-xl border border-slate-200 bg-white " + (mode === "config" ? "p-4" : "px-4 py-2.5 mb-3")} data-fuel-widget={mode || "strip"}>
+    <div className={"ruled " + (mode === "config" ? "py-4" : "py-2.5 mb-3")} data-fuel-widget={mode || "strip"}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
         <div className="flex items-baseline gap-2 min-w-0">
           <span className="text-xs uppercase tracking-wide text-slate-500">Diesel {country}</span>
@@ -13174,7 +13184,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                 {[["tonnes", "Tonnes"], ["cost", "Cost"]].map(([k, l]) => <button key={k} type="button" aria-pressed={acctShow === k ? "true" : "false"} onClick={() => setAcctShow(k)}>{l}</button>)}
               </span>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="ruled overflow-hidden">
               {/* 22 Oct 2026 (UI fix 6, cards 1 and 2): the table keeps its 1,220 px; the Action column is pinned right (.la-pin),
                   the scroller pads its right edge so Tab brings the Note box out from under the pin (.la-acct-scroll), and the
                   headings take the .tbl th look (.la-acct-head). */}
@@ -13341,7 +13351,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
             return (
             <div className="mt-4">
               {title}
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="ruled overflow-hidden">
                 {fcs.length > 0 && <table className="text-sm w-full" style={{ minWidth: 860 }}>
                   {head(true)}
                   <tbody>{fcs.map(s => row(s, true))}</tbody>
@@ -13381,7 +13391,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
             const roleOf = (m, w) => { const rr = horizon.roles || {}; return Object.keys(rr).find(k => rr[k][0] === m && rr[k][1] === w) || null; };
             const roleLbl = { account: "ACCOUNT", commit: "COMMIT", "make-ready": "MAKE-READY", "early-warning": "EARLY WARNING" };
             return (
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="ruled overflow-hidden">
                 <div className="overflow-auto">
                   <table className="text-sm" style={{ minWidth: 1300 }}>
                     <thead className="bg-slate-50 text-slate-500 text-xs">
@@ -15082,7 +15092,7 @@ function CommitMap({ meta, bucket, tick, lines, title, height, flush, fill, toda
   return (
     <div className={(flush ? "" : "mt-4") + (fill ? " h-full flex flex-col min-h-0" : "")}>
       <div className={"text-sm font-semibold text-slate-700 mb-2" + (flush ? " px-4 pt-3 chart-title" : "")}>{title || "This week's movements"}{sub && <span className="font-normal text-slate-500"> · {sub}</span>}{today ? <InfoTip id="map.commit.today" /> : <InfoTip id="map.commit.week" />}</div>
-      <div className={(flush ? "" : "bg-white rounded-xl border border-slate-200 overflow-hidden") + (fill ? " flex-1 flex flex-col min-h-0" : "")}>
+      <div className={(flush ? "" : "ruled overflow-hidden") + (fill ? " flex-1 flex flex-col min-h-0" : "")}>
         {/* 14 Oct 2026: on a filled big screen the map takes the whole card; its ResizeObserver follows */}
         <div ref={mapDiv} style={fill ? { flex: "1 1 auto", minHeight: 0 } : { height: height || 380 }} />
         <div className="cm-key px-3 py-2 text-[13px] text-slate-600 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1" data-commit-key={today ? "today" : "week"}>
@@ -16549,7 +16559,7 @@ function CarbonRouteChoices(){
     <td className="text-right tabular-nums" style={tone(s.min)}>{sign(s.min, busyMins)}</td></>;
   const T = d.totals && d.totals.planned;
   return (
-    <section className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 mt-4" data-carbon-route-choices="1" aria-labelledby="carbon-route-choices-h">
+    <section className="ruled py-4 sm:py-5 mt-4" data-carbon-route-choices="1" aria-labelledby="carbon-route-choices-h">
       <h2 id="carbon-route-choices-h" className="text-lg font-semibold text-slate-800">Route choices <span className="text-sm font-normal text-slate-500">· against each route's main road</span></h2>
       <div className="overflow-x-auto mt-2 kb-scroll" tabIndex={0} role="region" aria-label="Route choices">
         <table className="tbl">

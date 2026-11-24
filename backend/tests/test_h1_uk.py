@@ -746,7 +746,9 @@ ok("APPEARANCE: charts rebuild on a change and read token colours — no literal
    "}, [JSON.stringify(config), theme, sized]);" in fe and "useAccent" not in fe and 'window.Chart.defaults.color = tok("--muted"' in fe
    and 'backgroundColor: "#2563EB"' not in fe and 'backgroundColor: "#3B82F6"' not in fe and 'borderColor: "#2563EB"' not in fe and 'tok("--chart-1"' in fe)
 ok("APPEARANCE: cards, the big-screen bar and the Look-ahead's white buttons read surface tokens — no literal white surface left in component CSS",
-   ".card{background:var(--surface);" in fe and ".dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);" in fe
+   # NARROWED 24 Nov 2026 (own look, B1 stage 5): a section and the big-screen bar are ruled on the page's own surface: no fill
+   # at all, so no literal white either
+   ".card{background:none;border:0;border-top:1px solid var(--ink);" in fe and ".dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:none;" in fe
    # NARROWED 27 Oct 2026 (pilot readiness F3 b): one exemption, the two-step QR code's frame — a QR code must be dark on
    # WHITE in either look or a phone camera cannot read it
    # NARROWED 31 Oct 2026 (task 4c PR 3): + the pinned pictures' corner and turn handles — they sit ON THE MAP (a drawing or
@@ -1490,7 +1492,8 @@ ok("OWN LOOK 3: a chosen control's tint carries only sign blue words or the ink 
    and round(_cr("#B45309", _over("rgba(11,78,162,.10)", "#FFFFFF")), 2) == 4.27
    # NARROWED 24 Nov 2026 (own look, B1 stage 3): CSS 10 -> 8: the lorry plan's badge and the CLP organisation are plain words now
    and len(_nsInline) >= 9 and all('color: "var(--navy)"' in m for m in _nsInline)
-   and len(_nsCss) >= 8 and all(("color:var(--navy)" in r or "color:var(--ink)" in r) for r in _nsCss),
+   # NARROWED 24 Nov 2026 (own look, B1 stage 5): 8 -> 7, the Config read-only note is a margin line now (no tint)
+   and len(_nsCss) >= 7 and all(("color:var(--navy)" in r or "color:var(--ink)" in r) for r in _nsCss),
    str([m for m in _nsInline if 'color: "var(--navy)"' not in m][:3]) + str([r for r in _nsCss if "color:var(--navy)" not in r and "color:var(--ink)" not in r][:3]))
 # card 2 (finding #11): the Account's headings and button; card 5: the count line; card 1: the pinned short-row cell
 ok("UI fix 6 card 2: the Account headings are --muted on --surface-2 — 4.56:1 (Ink and Light), 6.48:1 (Dark), 4.5 or better in all 12 — and the button is the accent pair (white on #C2410C 5.18:1, on #2563EB 5.17; checked in all 12 by W16 above)",

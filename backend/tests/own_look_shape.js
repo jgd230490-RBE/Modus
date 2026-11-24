@@ -81,6 +81,22 @@ ok("4 figures: no figure cell keeps a box (border + corner) of its own",
 ok("4 figures: the phone's day summary is four cells, the Dashboard's labels keep two lines so the figures line up",
    /\n  \.ph-figs\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\);/.test(css) && /\.ph-figs>span\{display:block;/.test(css)
    && /\n  \.dash-card-l\{[^}]*min-height:2\.6em;/.test(css));
+// ---------------------------------------------------------------- stage 5: sections ruled, not boxed
+ok("5 sections: a .card is a 1 px ink line and its content, no border, corner, fill or side padding",
+   css.includes(".card{background:none;border:0;border-top:1px solid var(--ink);border-radius:0;padding-left:0 !important;padding-right:0 !important;}"));
+ok("5 sections: a sideways-scrolling table in a section keeps an edge (a hairline under it); a table's outer cells sit flush with the rule",
+   css.includes(".card.overflow-auto,.card.overflow-x-auto{border-bottom:1px solid var(--line);}")
+   && css.includes(".card .tbl th:first-child,.card .tbl td:first-child{padding-left:0;}"));
+const boxed = ["dash-more", "rc-pcard", "ct-strip", "sim-fold", "sim-card", "sim-tl", "sim-scroll", "sim-pcard", "gw-gate", "al-strip", "dash-wallbar", "bo-card"]
+  .filter(c => !new RegExp("\\n  \\." + c + "\\{[^}]*border:0;[^}]*border-top:(1|2)px solid var\\(--(ink|line)[^}]*border-radius:0;").test(css));
+ok("5 sections: the app's own boxes are ruled (folds, the strips, the simulation's cards, gates, the big-screen bar, the Best option card)", boxed.length === 0, boxed);
+ok("5 sections: the Best option card opens under a 2 px ink line and its notes are margin lines; the abnormal-load advice and the read-only note too",
+   /\n  \.bo-card\{[^}]*border-top:2px solid var\(--ink\);/.test(css) && /\n  \.bo-state\{background:none;border:0;border-left:2px solid var\(--line-2\);/.test(css)
+   && /\n  \.al-advice\{background:none;border:0;border-left:2px solid var\(--line-2\);/.test(css) && /\n  \.cfg-ro-note\{border:0;border-left:2px solid var\(--line-2\);/.test(css)
+   && /--line-2:#C6C8CC;/.test(css) && /--line-2:#4B4D52;/.test(css));
+ok("5 sections: no rounded bordered section box is left in the markup (bg-white rounded-xl border), the dialog's own box aside; the Tailwind sections are .ruled",
+   !/rounded-xl border/.test(code) && count(code, /className=\{?"ruled /g) >= 5 && css.includes(".ruled{background:none !important;border:0 !important;border-top:1px solid var(--ink) !important;"));
+ok("5 sections: Routes' open route is columns divided by a hairline", css.includes(".ro-body.ro-wide>.ro-side{border-left:1px solid var(--line);padding-left:16px;}"));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
