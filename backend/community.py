@@ -458,15 +458,7 @@ def status():
                       (db.current_tenant(),)):
         if r["kind"] in counts:
             counts[r["kind"]] = int(r["n"])
-    state = (row or {}).get("state") or "never"
-    if state == "running" and row and row.get("started_at"):
-        try:
-            last = max(x for x in (row["started_at"], det.get("beat")) if x)
-            if datetime.now(timezone.utc) - datetime.fromisoformat(last.replace("Z", "+00:00")) > STALE_RUN:
-                state = "failed"
-                det.setdefault("error", "the last refresh stopped without finishing (the server restarted?)")
-        except ValueError:
-            pass
+    state = _run_state(row, det)
     sources = []
     for s in SOURCE_ORDER:
         d = (det.get("sources") or {}).get(s) or {}
@@ -480,6 +472,32 @@ def status():
             "counts": counts, "total": sum(counts.values()), "sources": sources,
             "kinds": [dict(k, count=counts[k["key"]]) for k in KINDS],
             "credit": credit_line([s["key"] for s in sources if s["fetched_at"]])}
+
+
+def _run_state(row, det):
+    """The state of the last refresh as it READS: a 'running' row with no sign of life for STALE_RUN is a dead run
+    ('failed', and `det` gains the reason). One rule, read by status() and run_state()."""
+    state = (row or {}).get("state") or "never"
+    if state == "running" and row and row.get("started_at"):
+        try:
+            last = max(x for x in (row["started_at"], det.get("beat")) if x)
+            if datetime.now(timezone.utc) - datetime.fromisoformat(last.replace("Z", "+00:00")) > STALE_RUN:
+                state = "failed"
+                det.setdefault("error", "the last refresh stopped without finishing (the server restarted?)")
+        except ValueError:
+            pass
+    return state
+
+
+def run_state():
+    """23 Nov 2026 (the "Working" list, working.py): the refresh's own state from its one row, no counts: `state` as
+    status() gives it, when it started, when it last showed life (`last`), when it last finished, who started it."""
+    row = _meta_row()
+    det = _detail(row)
+    state = _run_state(row, det)
+    started = (row or {}).get("started_at")
+    return {"state": state, "started_at": started, "last": max([x for x in (started, det.get("beat")) if x] or [None]),
+            "fetched_at": (row or {}).get("fetched_at"), "by": (row or {}).get("by_whom"), "error": det.get("error")}
 
 
 def covers_all_options(det=None):
@@ -720,13 +738,14 @@ def refresh(by=None, fetchers=None, strip=None, today=None, sources=SOURCE_ORDER
 def start_refresh(by=None, sync=False, **kw):
     """Start a refresh on a thread (or run it now with sync=True). Refuses while one is running."""
     import fetch_guard
+    import working
     tenant = db.current_tenant()
     # 29 Oct 2026: one big fetch at a time — the collision history's and this one together took live over its memory
+    # 23 Nov 2026 (the "Working" list): one long job at a time, of ANY kind, said in the one sentence (working.refusal);
+    # it replaces "a refresh is already running" and fetch_guard's two sentences
     with fetch_guard.LOCK, _LOCK:
         st = status()
-        if st["state"] == "running":
-            return dict(st, started=False, message="a refresh is already running")
-        busy = fetch_guard.other_running("community")
+        busy = working.refusal("community")
         if busy:
             return dict(st, started=False, message=busy)
         _write_meta("running", dict(_detail(_meta_row()), error=None), by=by, started_at=_now())

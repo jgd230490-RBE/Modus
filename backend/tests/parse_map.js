@@ -8501,6 +8501,20 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      html.includes("#kpi-cards .kpi-card{ display:flex; flex-direction:column; justify-content:center; padding:0 10px; border-left:1px solid var(--line); }")
      && html.includes("#kpi-cards .kpi-sep{ display:none; }") && html.includes("#kpi-cards .kpi-card[hidden]{ display:none; }")
      && html.includes(".kpi-card.lead .kpi-label{ color:var(--muted); font-weight:400; }") && !/#kpi-hud\{[^}]*border-(top|bottom):\s?[2-9]px/.test(html));
+  // 24 Nov 2026 (John: "Fix it tonight"): with the conditions chip showing, a card keeps its own width (two label lines at most),
+  // the cards wrap, and a card that does not fit drops to a row the bar's own box cuts off whole; every figure at one top. Without
+  // the chip none of it applies, and the bar keeps its 72 px.
+  {
+    const on = "#kpi-hud:has(#kpi-conditions.on) #kpi-cards";
+    ok("⭐ OWN LOOK (map): with the conditions chip showing, the cards wrap inside the bar's 72 px box and a card that does not fit is cut off whole, never squeezed under the chip",
+       html.includes(on + "{ flex-wrap:wrap; align-content:flex-start; overflow:hidden; }")
+       && html.includes(on + " .kpi-row{ display:contents; }")
+       && html.includes(on + " .kpi-card{ flex-shrink:0; height:100%; box-sizing:border-box; justify-content:flex-start; padding-top:6px; }")
+       && html.includes("#kpi-cards .kpi-label{ white-space:normal; max-width:104px; }")
+       && /#kpi-hud\{ position:absolute; top:0; left:300px; right:0; z-index:15; height:72px;/.test(html));
+    ok("OWN LOOK (map): the chip's rules only ever apply while the chip shows (no bare #kpi-cards wrap or clip)",
+       !rules.some(r => /(^|,)\s*#kpi-cards\s*(,|$)/.test(r.sel) && /flex-wrap:\s*wrap|overflow:\s*hidden/.test(r.body)));
+  }
   // every main pair measured (WCAG 2.x), with the page's own values
   const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
   const rgb = h => { const n = parseInt(h.replace("#", ""), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };

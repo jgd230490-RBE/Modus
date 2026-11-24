@@ -44,7 +44,11 @@ ok("⭐ 12: the status is a shape and a word — no tint, no pill, the word in t
    /\.row-st\{display:inline-flex;align-items:center;gap:7px;[^}]*color:var\(--st-none\);white-space:nowrap;\}/.test(css)
    && !/\.row-st\{[^}]*(background|border-radius|padding)/.test(css)
    && css.includes(".row-st.rs-ok{color:var(--ok-text);}") && css.includes(".row-st.rs-warn{color:var(--warn-text);}")
-   && css.includes(".row-st.rs-bad{color:var(--bad-text);}") && !/--st-(ok|warn|bad|none)-bg/.test(html));
+   // NARROWED 24 Nov 2026 (own look B1, taking main 34e08ac in): the one place still reading the tints is the Working
+   // list's chip on Light, which keeps its own three beside its rules (the Working list, 21 Nov mockup, waiting for John)
+   && css.includes(".row-st.rs-bad{color:var(--bad-text);}") && !/--st-(ok|warn|bad|none)-bg/.test(html
+        .replace(/\n  html\[data-theme="light"\]\{--st-ok-bg:#ECFDF5;--st-warn-bg:#FFFBEB;--st-bad-bg:#FEF2F2;\}/, "")
+        .replace(/\n  html\[data-theme="light"\] \.work-chip[^\n]*/g, "")));
 ok("...each tone keeps its own SHAPE (dot ok, diamond warning, square bad, ring none and draft), so a status is never colour alone (D39)",
    code.includes('const RS_TONES = { ok: 1, warn: 1, bad: 1, none: 1, draft: 1 };') && !code.includes("RS_ICON")
    && css.includes(".row-st.rs-ok i{background:var(--green);border:0;}") && /\.row-st\.rs-warn i\{background:var\(--gold\);border:0;border-radius:0;[^}]*rotate\(45deg\)/.test(css)

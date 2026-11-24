@@ -460,7 +460,8 @@ _dm = _fe.split("const hourBake = async")[1].split("const bulkBake = async")[0]
 ok("⭐ 6. the button: admins only, its call count on it and in the question, clear then batches until none are left",
    "`Busy-hour times again · ${hourPlan.here_calls} calls`" in _fe and "if(!canEdit) return;" in _fe
    and "routing calls. ` +" in _dm and "The plan's figures do not change." in _dm
-   and "admin/hour-times/clear" in _dm and 'postRouteBatch(new URLSearchParams({ limit: "30" }), setRouteMsg, "hour-times/bake")' in _dm
+   # NARROWED 23 Nov 2026 (claude/working-list): each batch carries the run's row in the "Working" list (job)
+   and "admin/hour-times/clear" in _dm and 'postRouteBatch(new URLSearchParams({ limit: "30", job: job.id }), setRouteMsg, "hour-times/bake")' in _dm
    and "if(left >= last) throw" in _dm)
 # NARROWED 11 Nov 2026 (CLOCS B-F6): Busy-hour times moved into the Routing menu, one job a line there
 ok("6. the header's buttons wrap as whole buttons; the new one keeps its words on one line (card 2)",
@@ -469,8 +470,11 @@ ok("6. the header's buttons wrap as whole buttons; the new one keeps its words o
 _shown = (re.findall(r"setRouteMsg\(`([^`]*)`\)", _dm) + re.findall(r"confirm\(`([^`]*)`", _dm)
           + re.findall(r"` It takes [^`]*`", _ra)
           + [_ra.split("data-hour-note>")[1].split("</p>")[0], "Busy-hour times · calls"])
+# NARROWED 23 Nov 2026 (claude/working-list): the run's own line while it runs ("Busy-hour times: 240 of 854 worked out")
+# is made on the server now (working.line; its words are checked in test_working.py §11), so one message fewer is a
+# template here: 5 -> 4
 ok("6. the words the screen shows name no supplier and no back end",
-   len(_shown) >= 5 and not re.search(r"\bHERE\b|\bAPI\b|endpoint|server|token|\bbak(e|ed|ing)\b", " ".join(_shown)),
+   len(_shown) >= 4 and not re.search(r"\bHERE\b|\bAPI\b|endpoint|server|token|\bbak(e|ed|ing)\b", " ".join(_shown)),
    str(_shown))
 ok("6. the table is registered five times (schema, key, tenanted, package order, audit)",
    "route_hour_times" in db.TENANTED_TABLES and "route_hour_times" in db._TENANT_DDL and "route_hour_times" in db._TENANT_PK
@@ -507,8 +511,9 @@ ok("⭐ 9. (16 Nov, the mockup's card 1) the menu line shows the calls still due
    and "{hourDue(hourPlan) ? `Busy-hour times · ${hourDue(hourPlan).here_calls} calls`" in _fe
    and ": `Busy-hour times again · ${hourPlan.here_calls} calls`}" in _fe)
 ok("⭐ 9. (card 2) with routes due the run does NOT clear; the clear runs only for the whole run, and each asks first",
-   "if(!due){" in _dm2 and _dm2.index("if(!due){") < _dm2.index("admin/hour-times/clear")
-   and _dm2.index("confirm(due") < _dm2.index("if(!due){")
+   # NARROWED 23 Nov 2026 (claude/working-list): "Carry on" (c) runs the rest of a stopped run: no question, never a clear
+   "if(!due && !c){" in _dm2 and _dm2.index("if(!due && !c){") < _dm2.index("admin/hour-times/clear")
+   and _dm2.index("confirm(due") < _dm2.index("if(!due && !c){") and "if(!c && !confirm(due" in _dm2
    and "The other routes keep theirs." in _dm2 and "Every route's times are replaced." in _dm2
    and "Work out the busy-hour times again for all ${all} routes?" in _dm2 and " routed again" in _dm2)
 ok("9. (card 3) the end line says how many were worked out and how many kept theirs",

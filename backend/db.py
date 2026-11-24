@@ -385,9 +385,11 @@ def _run(sql, params, fetch):
 # staff map reads them fresh), and moving one must not throw away the kept staff reads.
 # 5 Nov 2026 (group 6): + concerns. A PUBLIC send writes it: it must not throw away the kept staff reads (a flood of
 # reports would otherwise make every heavy read rebuild); the concern figures are read fresh.
+# 23 Nov 2026 (the "Working" list): + working_jobs, the record of what long job is running (working.py). It is written at
+# every batch of a Route all: bumping would empty every kept read at each one. No figure is built from it.
 NO_DATA_TABLES = frozenset({"audit_log", "auth_attempts", "auth_tokens", "user_sessions", "users",
                             "demo_requests", "clp_notes", "clp_review_groups", "clp_reviews",
-                            "site_layout_pictures", "concerns", "tool_leads"})
+                            "site_layout_pictures", "concerns", "tool_leads", "working_jobs"})
 _DATA_VERSION = [0]
 _WRITE_TABLE_RE = None
 
@@ -1308,6 +1310,41 @@ def init_tool_leads_db():
             )
         """)
         cur.execute("CREATE INDEX IF NOT EXISTS ix_tool_leads_created ON tool_leads (created_at)")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def init_working_db():
+    """
+    23 Nov 2026 (claude/working-list) — the record of what long job is running (working.py): what it is, how far, when it
+    started, who started it, its state. Scoped by tenant_id in every statement, but NOT package data (as the login
+    tables): a re-import replaces every TENANTED_TABLES row and is itself a job in this list, so its own record must
+    outlive it. In NO_DATA_TABLES: a batch's progress write never ends a kept read. `held` (0 / 1) marks a job one
+    request of this process holds (Make primary, the re-import); `closed` (0 / 1) a finished line someone closed.
+    """
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS working_jobs (
+                tenant_id   TEXT NOT NULL,
+                id          TEXT NOT NULL,
+                kind        TEXT NOT NULL,
+                subject     TEXT,
+                state       TEXT NOT NULL,
+                done        INTEGER DEFAULT 0,
+                total       INTEGER,
+                detail      TEXT,
+                by_whom     TEXT,
+                held        INTEGER DEFAULT 0,
+                started_at  TEXT NOT NULL,
+                beat_at     TEXT,
+                ended_at    TEXT,
+                closed      INTEGER DEFAULT 0,
+                PRIMARY KEY (tenant_id, id)
+            )
+        """)
         conn.commit()
     finally:
         conn.close()
