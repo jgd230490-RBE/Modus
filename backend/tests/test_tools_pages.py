@@ -389,8 +389,10 @@ ok("main.py serves /tools/{name} through tools_public, answers 404 for /tools an
    and 'headers={"Cache-Control": "no-cache"}' in MAIN[MAIN.find("def tools_page"):MAIN.find("def tools_page") + 600])
 ok("🔴 /tools is not a static mount (a mount would list or redirect; the handler answers only what tools_public allows)",
    'app.mount("/tools"' not in MAIN)
+# NARROWED 23 Nov 2026 (claude/working-list): "/api/tools/" is no longer the LAST prefix ("/api/working/" follows it: the
+# "Working" list's own writes); it is still in the tuple
 ok("⭐ the open calls write no audit row and empty no kept read (/api/tools/ in AUDIT_SKIP_PREFIXES)",
-   '"/api/tools/")' in MAIN[MAIN.find("AUDIT_SKIP_PREFIXES = ("):MAIN.find("\n\n", MAIN.find("AUDIT_SKIP_PREFIXES = ("))])
+   '"/api/tools/",' in MAIN[MAIN.find("AUDIT_SKIP_PREFIXES = ("):MAIN.find("\n\n", MAIN.find("AUDIT_SKIP_PREFIXES = ("))])
 ok("the /tools routes come before the catch-all page", MAIN.find('@app.get("/tools/{name}"') < MAIN.find('@app.get("/")\ndef frontend_index'))
 import security_headers  # noqa: E402
 ok("⭐ no browser or proxy keeps a tool's answer (/api/tools/ in NO_STORE_PREFIXES)", "/api/tools/" in security_headers.NO_STORE_PREFIXES)

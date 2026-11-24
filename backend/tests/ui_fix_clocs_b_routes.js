@@ -123,8 +123,11 @@ const compile = (src, names) => {
      code.includes("onClick={() => routeAgainAsk(r)}>{Object.keys(r.profiles || {}).length ? \"Route again\" : \"Route\"}</button>")
      && ask.includes("if(!confirm(had ? `Route ${r.id} again? Its lines are replaced.` : `Route ${r.id}?`)) return;")
      && ask.indexOf("confirm(") < ask.indexOf("rebakeRoute(r.id"));
-  ok("...no visible Route button left in a row; while it routes the row says 'Routing…'",
-     !code.includes('className="btn-sec btn-sm mr-1">') && code.includes('data-route-busy={r.id}>Routing…</span>'));
+  // REVERSED 23 Nov 2026 (claude/working-list, the mockup's card 2): while it routes the row says its line in the
+  // "Working" list ("R014: routing again, 1 of 4 lorry types"), not 'Routing…'
+  ok("...no visible Route button left in a row; while it routes the row says its line in the Working list, not 'Routing…'",
+     !code.includes('className="btn-sec btn-sm mr-1">') && !code.includes('data-route-busy={r.id}>Routing…</span>')
+     && /data-route-busy=\{r\.id\}[^>]*>\{bakeLine\}<\/span>/.test(code));
   ok("...'Keep the main route' on Zones is left as it is (it is undone in the same place)", code.includes("onKeep={keepMain}"));
 }
 
