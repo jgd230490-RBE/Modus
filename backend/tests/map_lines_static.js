@@ -253,6 +253,55 @@ ok("G10 the hover asks the same box (the hand and the tip within 5 px of a line)
    /map\.on\('mousemove', \(e\) => \{\s*(\/\/[^\n]*\n\s*)?let features = routeHitsAt\(e\.point, interactiveLayers\);/.test(html)
    && html.includes("const LINE_BAND_WIDTHS = [3, 4.5, 6, 8, 10];"));
 
+// ---------------------------------------------------------------------------------------------------------------
+console.log("H. Q5: a month on screen opens on Volume; a link's own layers and a picked Off still win");
+ok("H1 the page ships Volume checked, Off and Carbon unchecked (one checked radio in the group)",
+   /<input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad\(\)" checked>/.test(html)
+   && /<input type="radio" name="heat-mode" id="heat-off" onchange="toggleHeatOff\(\)">/.test(html)
+   && !/id="toggle-carbon"[^>]*checked/.test(html) && (html.match(/name="heat-mode"[^>]*checked/g) || []).length === 1);
+ok("H2 the link's defaults are read from the page as shipped (so Volume is the default and a link with Off writes -road-load)",
+   html.includes("VIEW.defaults = layersOn();") && /function layerBoxes\(\)[\s\S]{0,600}toggle-road-load/.test(html));
+ok("H3 Off picked stays Off: refreshMapModes only mirrors the radios, it never ticks Volume back",
+   /const off = document\.getElementById\('heat-off'\);\s*if \(off && off\.checked !== !mode\) off\.checked = !mode;/.test(html)
+   && !/getElementById\('toggle-road-load'\)\.checked\s*=\s*true/.test(html));
+ok("H4 the council view still turns the heat map Off (kept)",
+   html.includes("if (on) { const off = document.getElementById('heat-off'); if (off && !off.checked) { off.checked = true;"));
+ok("H5 the Labels box says the figures on the roads come with All",
+   html.includes("Off hides the names on the map. Few shows the sites. All shows every name and the figures on the roads."));
+ok("H6 the heat map's radios are built after the link reads its defaults, so Volume is named a default by hand (a link with Off keeps Off)",
+   /VIEW\.defaults = layersOn\(\);[^\n]*\n(\s*\/\/[^\n]*\n)*\s*const LATE_DEFAULTS = \['road-load'\];\s*LATE_DEFAULTS\.forEach\(k => \{ if \(!VIEW\.defaults\.includes\(k\)\) VIEW\.defaults\.push\(k\); \}\);\s*VIEW\.defaults\.sort\(\);/.test(html)
+   && html.indexOf("const LATE_DEFAULTS") < html.indexOf("function encodeView"));
+// ---------------------------------------------------------------------------------------------------------------
+console.log("I. The key and the guides");
+const legend = fnSrc("renderModeLegends");
+ok("I1 Volume and Carbon: each band's row is a line in its blue at its width (bandSample), not a square",
+   (legend.match(/bandSample\(i\)/g) || []).length === 2 && !/ml-sw" style="background:' \+ CARBON_RAMP\[i\]/.test(legend)
+   && html.includes("return '<span class=\"ml-ln\" aria-hidden=\"true\"><i style=\"background:' + CARBON_RAMP[i] + ';height:' + LINE_BAND_WIDTHS[i] + 'px\"></i></span>';"));
+let samples = null;
+try {
+  const kb = {}; vm.createContext(kb);
+  vm.runInContext("const CARBON_RAMP = ['#72A7FF', '#006AFD', '#0051C4', '#00388E', '#00215B']; const LINE_BAND_WIDTHS = [3, 4.5, 6, 8, 10];\n" + fnSrc("bandSample") + "\nthis.out = [0,1,2,3,4].map(bandSample);", kb);
+  samples = kb.out;
+} catch (e) { samples = e.message; }
+ok("I2 sandbox: the five samples run 3 to 10 px in the five blues", Array.isArray(samples) && samples.length === 5
+   && samples[0].includes("background:#72A7FF;height:3px") && samples[4].includes("background:#00215B;height:10px"), samples);
+ok("I3 the sample's box is fixed (22 x 14) so the words line up; a dark look keeps a light outline",
+   html.includes(".mode-legend .ml-ln{ display:inline-flex; align-items:center; width:22px; height:14px; flex:0 0 22px; }")
+   && html.includes('html[data-look="dark"] .mode-legend .ml-ln i{ box-shadow:0 0 0 1px rgba(231,229,228,.7); }'));
+ok("I4 the leg rows in Haul routes name the new paint (ink #3A3C41, grey #8E9197; alternatives #A9ABB0)",
+   html.includes('id="layer-inbound" checked onchange="applyFilters()"> Laden (out)</label><span class="color-dot" style="background:#3A3C41;">')
+   && html.includes('id="layer-outbound" checked onchange="applyFilters()"> Empty (return)</label><span class="color-dot" style="background:#8E9197;">')
+   && html.includes('Alternative routes <span class="lim-n" id="alts-note"></span></label><span class="color-dot" style="background:#A9ABB0;">'));
+const guide = fs.readFileSync(path.join(ROOT, "frontend", "help", "index.html"), "utf8").replace(/\r\n?/g, "\n");
+ok("I5 the user guide: dark and grey legs, no green and amber, the pick drawn dark over a soft blue edge, a click just beside a route counts",
+   guide.includes("<tr><td>Dark and grey lines</td>") && !guide.includes("<tr><td>Green and amber lines</td>")
+   && guide.includes("Click a route, or just beside it, for its name and distance: it is drawn dark over a soft blue edge and the other routes fade."));
+ok("I6 the user guide: darker and wider is more; one blue with Off; the badges under Labels All; a month opens on Volume",
+   guide.includes("the darker and wider the blue, the more lorry movements a day on that stretch") && guide.includes("With Heat map Off they are all one blue.")
+   && guide.includes("With Labels on All, a small white badge") && guide.includes("(a month opens on Volume; a shared link keeps its own choice)")
+   && guide.includes("the work-section marks, the heat map's badges and each gate's own access road") && !guide.includes("<tr><td>Blue lines with a figure</td>")
+   && !guide.includes("turn blue and show their lorry movements a day"));
+
 for (const f of fail) console.log("  FAIL: " + f);
 console.log(`${pass} passed, ${fail.length} failed`);
 process.exit(fail.length ? 1 : 0);

@@ -3328,17 +3328,19 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
   // ---- the controls: two checkboxes, off by default, under Forecast traffic volume ----
   // NARROWED 12 Oct 2026 (the user, evening: "toggle between carbon and volume"): the two checkboxes are ONE radio group,
   // Heat map: Off · Volume · Carbon; "Off" ships checked; the ids are kept so a shared link still opens on the same mode
-  ok("⭐ C1: a 'Heat map' radio group — Off (checked), Volume, Carbon — sits in the forecast box; Volume and Carbon OFF by default",
+  // REVERSED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q5): VOLUME ships checked (was Off), so a
+  // month on screen opens on the amounts in colour; Off is still the first button and a link's own layers still win
+  ok("⭐ C1: a 'Heat map' radio group — Off, Volume (checked), Carbon — sits in the forecast box; Carbon off by default (REVERSED 24 Nov 2026: Off was checked)",
      code.includes('<div class="heat-group" role="radiogroup" aria-labelledby="heat-label">')
-     && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off" onchange="toggleHeatOff()" checked> Off</label>')
+     && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off" onchange="toggleHeatOff()"> Off</label>')
      // NARROWED 19 Oct 2026 (the user: map controls, council view and labels): one segmented control (.heat-seg); the sub-lines moved behind the "i"
-     && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()"> Volume</label>')
+     && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()" checked> Volume</label>')
      && code.includes('<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-carbon" onchange="toggleCarbon()"> Carbon</label>')
      && /<div class="heat-seg">\s*<label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off"/.test(code)
      && code.includes('<p><b>Volume</b>: <span id="heat-count-words">lorry movements a day</span>.</p><p><b>Carbon</b>: t CO₂e in the month.</p>')   // 9 Nov 2026 (2.1-11b)   // NARROWED 28 Oct 2026 (task 0a, John: fewer words on the panel; the detail is in the user guide §8)
      && !code.includes('<span class="mode-sub">')
      && !/type="checkbox" id="toggle-(road-load|carbon)"/.test(code) && !code.includes("> Road load</label>")
-     && !/id="toggle-road-load"[^>]*checked/.test(code) && !/id="toggle-carbon"[^>]*checked/.test(code)
+     && /id="toggle-road-load"[^>]*checked/.test(code) && !/id="toggle-carbon"[^>]*checked/.test(code) && !/id="heat-off"[^>]*checked/.test(code)
      && code.indexOf('id="toggle-road-load"') > code.indexOf('id="toggle-forecast"') && code.indexOf('id="toggle-carbon"') > code.indexOf('id="toggle-road-load"'));
   ok("heat map (12 Oct, evening): 'Off' re-draws without either mode and re-writes the shared link; the width legend's CSS is gone",
      code.includes("function toggleHeatOff(){\n        refreshMapModes();\n        if (typeof scheduleViewWrite === 'function') scheduleViewWrite();")
@@ -3657,7 +3659,7 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
     try {
       blkApi = new Function("document", "map", "TL", "CONFIG", "a1_data", "routePassesFilters", "monthLabel", "teamText", "fmtDist", "DU", "raiseMarks", "labelAnchor",
         "forecastLayerFilter", "FORECAST_LINE_WIDTH", "FORECAST_CASING_WIDTH", "fetch", "ensureTimelineMatrix", "openTimeline", "tlLoopBounds", "ROUTEINFO", "mapboxgl", "forecastWindow",
-        "bandWidthExpr", "LINE_BAND_PAD", "flowWidthExpr",
+        "bandWidthExpr", "LINE_BAND_PAD", "flowWidthExpr", "LINE_BAND_WIDTHS",
         blk + "\nreturn { RL, carbonStops, carbonColor, roadLoadFeatures, mapModeMonth, refreshMapModes, refreshMapModeFilters, toggleRoadLoad, toggleCarbon, stampCarbon, carbonMissingLines, roadLoadPopupHTML, renderModeLegends, CARBON_RAMP, CARBON_NONE, ROAD_LOAD_LABEL, runMidpoint, roadLoadLabelPoints, fmtTonnes, volumeColor, VOLUME_STOPS, heatMode, toggleHeatOff, carbonLabelPoints };")(
         document, fmap, TL, CONFIG, a1_data, p => passFilter(p), monthLabel, teamApi ? teamApi.teamText : (x => x), (k, d) => Number(k).toFixed(d), () => "km", () => {}, () => undefined,
         () => ["all"], "FLW", "FCW", url => fetchImpl(url), () => Promise.resolve(TL.matrix), () => { opened++; }, () => [9, 12],
@@ -3665,7 +3667,9 @@ ok("reduced motion: no motion while playing when it matches — the hauls' lanes
         // merge with C3 (D14): the page's own forecastWindow — the matrix's span with volume; NARROWED 12 Oct 2026 (Track C
         // review): else no window (null), as the page now says
         () => (TL.matrix && TL.matrix.span) ? [TL.matrix.span[0], TL.matrix.span[1]] : null,
-        bandApi.bandWidthExpr, bandApi.LINE_BAND_PAD, h => (h ? "FLOW0" : "FLOW"));
+        bandApi.bandWidthExpr, bandApi.LINE_BAND_PAD, h => (h ? "FLOW0" : "FLOW"),
+        // 24 Nov 2026 (card 2): the key draws each band's line at its width (bandSample reads the page's own widths)
+        bandApi.LINE_BAND_WIDTHS || [3, 4.5, 6, 8, 10]);
     } catch (e) { blkErr = e.message; }
     ok("⭐ C1 sandbox: the road-load / carbon block runs against a fake map and DOM", !!blkApi && !!teamApi, blkErr);
     if (blkApi) {
@@ -5273,7 +5277,11 @@ function qrRead(mod) {
     const pressed = () => [...byId['preset-views'].innerHTML.matchAll(/data-preset="([^"]+)" aria-pressed="true"/g)].map(m => m[1]).join(',');
     const DEF = on();
     P.VIEW.ready = true;
-    ok("presets (sandbox): the defaults are read from the boxes as shipped (no council box, no closures, no forecast)", P.VIEW.defaults.join(',') === DEF && !/areas|restr|forecast/.test(DEF), P.VIEW.defaults.join(','));
+    // NARROWED 24 Nov 2026 (the route lines mockup, Q5): Volume ships checked, but the page builds the heat map's radios at
+    // DOMContentLoaded, after the defaults are read, so they are named by hand (LATE_DEFAULTS); this fake's radios stand for
+    // that (unticked when read), and the defaults are the boxes as shipped PLUS road-load
+    ok("presets (sandbox): the defaults are read from the boxes as shipped (no council box, no closures, no forecast), and Volume (NARROWED 24 Nov 2026)",
+       P.VIEW.defaults.join(',') === DEF.split(',').concat(['road-load']).sort().join(',') && !/areas|restr|forecast/.test(DEF), P.VIEW.defaults.join(','));
     // no council areas loaded: the group is hidden, so the two council views are not offered
     byId['council-group'].hidden = true; P.renderPresets();
     ok("⭐ presets (sandbox): with no council areas the council views are not offered; the four others are",
@@ -5287,13 +5295,15 @@ function qrRead(mod) {
     ok("⭐ presets (sandbox) Busiest roads: Volume picked (Off and Carbon not), the forecast routes on, the page's layers as shipped, the timeline asked for",
        rl.checked && !co.checked && !heatOff.checked && fc.checked && on() === [DEF, 'forecast'].join(',').split(',').sort().join(',') && calls.timeline === 1, on());
     P.writeView();
-    ok("⭐ presets (sandbox) Busiest roads: the link carries it (layers=forecast.road-load), and the button shows pressed",
-       /layers=forecast\.road-load(&|$)/.test(location.search) && pressed() === 'busiest-roads', location.search + ' / ' + pressed());
+    // NARROWED 24 Nov 2026 (Q5): Volume is the default now, so the link carries only the forecast routes (was forecast.road-load)
+    ok("⭐ presets (sandbox) Busiest roads: the link carries it (layers=forecast; Volume is the default since 24 Nov 2026), and the button shows pressed",
+       /layers=forecast(&|$)/.test(location.search) && rl.checked && pressed() === 'busiest-roads', location.search + ' / ' + pressed());
     // 2. Route carbon
     P.applyPreset('route-carbon');
     P.writeView();
-    ok("⭐ presets (sandbox) Route carbon: Carbon picked, Volume let go, link layers=carbon.forecast, only it pressed",
-       co.checked && !rl.checked && !heatOff.checked && /layers=carbon\.forecast(&|$)/.test(location.search) && pressed() === 'route-carbon', location.search + ' / ' + pressed());
+    // NARROWED 24 Nov 2026 (Q5): Volume let go is now a change from the default, so the link says "-road-load" too
+    ok("⭐ presets (sandbox) Route carbon: Carbon picked, Volume let go, link layers=carbon.forecast.-road-load, only it pressed",
+       co.checked && !rl.checked && !heatOff.checked && /layers=carbon\.forecast\.-road-load(&|$)/.test(location.search) && pressed() === 'route-carbon', location.search + ' / ' + pressed());
     // 3. Councils: carbon (from a heat map)
     byId['layer-chainage'].checked = true;         // a box ticked by hand before: the council view remembers it
     P.applyPreset('councils-carbon');
@@ -5327,7 +5337,9 @@ function qrRead(mod) {
     // 6. Everything
     P.applyPreset('everything'); P.writeView();
     ok("⭐ presets (sandbox) Everything: the page's layers as shipped with the forecast routes; closures off, heat map Off, no council",
-       on() === [DEF, 'forecast'].join(',').split(',').sort().join(',') && heatOff.checked && !councilOn() && location.search === '?layers=forecast' && pressed() === 'everything', location.search + ' ' + on());
+       // NARROWED 24 Nov 2026 (the route lines mockup, Q5): Volume is the page's default heat map (LATE_DEFAULTS), so a view
+       // with the heat map Off says so in the link ("-road-load"); before, Off was the default and wrote nothing
+       on() === [DEF, 'forecast'].join(',').split(',').sort().join(',') && heatOff.checked && !councilOn() && location.search === '?layers=forecast.-road-load' && pressed() === 'everything', location.search + ' ' + on());
     ok("⭐ presets (sandbox) Everything: the lorry-limit boxes are left OFF, as the closures are", limBoxes.every(id => !byId[id].checked));
     // the limits not offered (none loaded, or the endpoint failed): Closures leaves the hidden boxes alone and still matches
     byId['limit-boxes'].hidden = true;
@@ -7280,7 +7292,8 @@ ok("D115: the old flow (a 2 px white [0,4,3] on routes-source, on top of both le
   ok("⭐ 0a card 4: a Labels group under Heat map — Off · Few · All radios, Few the default (from the link), an 'i' that says what each does",
      code.includes('<div class="heat-group labels-group" role="radiogroup" aria-labelledby="labels-label">')
      && ["off", "few", "all"].every(m => code.includes(`id="labels-${m}" onchange="setLabels('${m}')"`))
-     && code.includes("Off hides the names on the map. Few shows the sites and the figures. All shows every name.")
+     // NARROWED 24 Nov 2026 (the route lines mockup, Q6): the figures on the roads are drawn under All only
+     && code.includes("Off hides the names on the map. Few shows the sites. All shows every name and the figures on the roads.")
      && /return LABEL_MODES\.includes\(v\) \? v : 'few';/.test(code));
   ok("0a card 4: the share link carries &labels=off|all only (Few writes nothing); the view reads it back and applies it",
      code.includes("if (v.labels === 'off' || v.labels === 'all') q.set('labels', v.labels);")

@@ -449,8 +449,13 @@
         .mode-legend .ml-steps{ display:flex; gap:2px; margin:4px 0 2px; }
         .mode-legend .ml-steps i{ flex:1; height:14px; display:block; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
         .mode-legend .ml-sw{ display:inline-block; width:14px; height:14px; flex:0 0 14px; border-radius:3px; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
+        /* 24 Nov 2026 (the route lines mockup, card 2, Direction 2): a band's row is a short line in its colour AT its width
+           (LINE_BAND_WIDTHS), in a fixed 22 x 14 box so the words line up */
+        .mode-legend .ml-ln{ display:inline-flex; align-items:center; width:22px; height:14px; flex:0 0 22px; }
+        .mode-legend .ml-ln i{ display:block; width:100%; border-radius:0; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
         /* 12 Nov 2026 (card A-F2b, dark grounds): on the Dark look the near-black outline vanished round the darkest blues */
         html[data-look="dark"] .mode-legend .ml-steps i, html[data-look="dark"] .mode-legend .ml-sw{ box-shadow:0 0 0 1px rgba(231,229,228,.7); }
+        html[data-look="dark"] .mode-legend .ml-ln i{ box-shadow:0 0 0 1px rgba(231,229,228,.7); }
         .mode-legend .ml-foot{ margin-top:6px; color:var(--muted); }
         /* 16 Oct 2026 (D115): the flow legend — a sample of each spacing as drawn, then its band */
         #flow-legend{ margin-top:12px; }
@@ -6734,9 +6739,11 @@
                     <div class="heat-group" role="radiogroup" aria-labelledby="heat-label">
                     <div class="ctl-head"><div class="heat-label" id="heat-label">Heat map</div><button type="button" class="info-i" aria-expanded="false" aria-controls="info-heat" onclick="toggleInfo(this)" title="About the heat map" aria-label="About the heat map"><span aria-hidden="true">i</span></button></div>
                     <div class="info-pop" id="info-heat" hidden><p><b>Volume</b>: <span id="heat-count-words">lorry movements a day</span>.</p><p><b>Carbon</b>: t CO₂e in the month.</p><p id="heat-info-more"></p></div>
+                    <!-- 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q5): the page opens on Volume, so a month on
+                         screen shows its amounts in colour; Off is a click away and stays once picked; a link's own layers win -->
                     <div class="heat-seg">
-                    <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off" onchange="toggleHeatOff()" checked> Off</label>
-                    <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()"> Volume</label>
+                    <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="heat-off" onchange="toggleHeatOff()"> Off</label>
+                    <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-road-load" onchange="toggleRoadLoad()" checked> Volume</label>
                     <label class="fc-toggle fc-mode"><input type="radio" name="heat-mode" id="toggle-carbon" onchange="toggleCarbon()"> Carbon</label>
                     </div>
                     <div class="mode-legend" id="road-load-legend" hidden></div>
@@ -6745,7 +6752,7 @@
                     <!-- 28 Oct 2026 (John, task 0a): the labels on the map, Off / Few / All (applyLabels); Few is the default -->
                     <div class="heat-group labels-group" role="radiogroup" aria-labelledby="labels-label">
                     <div class="ctl-head"><div class="heat-label" id="labels-label">Labels</div><button type="button" class="info-i" aria-expanded="false" aria-controls="info-labels" onclick="toggleInfo(this)" title="About the labels" aria-label="About the labels"><span aria-hidden="true">i</span></button></div>
-                    <div class="info-pop" id="info-labels" hidden><p>Off hides the names on the map. Few shows the sites and the figures. All shows every name.</p></div>
+                    <div class="info-pop" id="info-labels" hidden><p>Off hides the names on the map. Few shows the sites. All shows every name and the figures on the roads.</p></div>
                     <div class="heat-seg">
                     <label class="fc-toggle fc-mode"><input type="radio" name="labels-mode" id="labels-off" onchange="setLabels('off')"> Off</label>
                     <label class="fc-toggle fc-mode"><input type="radio" name="labels-mode" id="labels-few" onchange="setLabels('few')"> Few</label>
@@ -8159,7 +8166,8 @@
                     const other = ROUTE_VOLUME_STOPS !== VOLUME_STOPS;
                     rlBox.innerHTML = '<b>Volume · ' + CW().lower + ' in ' + rlEsc(monthLabel(m)) + '</b>' +
                         '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
-                        stepRanges(rlStops(), '').map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
+                        // 24 Nov 2026 (card 2): each band's row is its line, colour and width, as the map draws it
+                        stepRanges(rlStops(), '').map((t, i) => '<div class="ml-row">' + bandSample(i) + t + '</div>').join('') +
                         // 19 Oct 2026: the badges' key — what the number on the road is; 24 Nov 2026 (Q6): only while the
                         // badges are drawn (Labels "All")
                         (badgesOn() ? '<div class="ml-row ml-key">' + MV_PILL_HTML + CW().lower + ' on that stretch</div>' : '');
@@ -8186,7 +8194,7 @@
                     const miss = carbonMissingLines(m);
                     coBox.innerHTML = '<b>Carbon · t CO₂e in ' + rlEsc(monthLabel(m)) + ', ' + per + '</b>' +
                         '<div class="ml-steps">' + CARBON_RAMP.map(c => '<i style="background:' + c + '"></i>').join('') + '</div>' +
-                        ranges.map((t, i) => '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_RAMP[i] + '"></span>' + t + '</div>').join('') +
+                        ranges.map((t, i) => '<div class="ml-row">' + bandSample(i) + t + '</div>').join('') +
                         // 10 Nov 2026 (UI critique 18): grey is also a route with nothing in the month, so the key says both
                         '<div class="ml-row"><span class="ml-sw" style="background:' + CARBON_NONE + '"></span>Nothing this month, or not routed yet</div>' +
                         // 19 Oct 2026: the badges' key; 10 Nov 2026: the badge carries its unit, the key says what it is
@@ -8199,6 +8207,10 @@
         }
         const moreEl = document.getElementById('heat-info-more');
         if (moreEl && moreEl.innerHTML !== more) moreEl.innerHTML = more;
+    }
+    // 24 Nov 2026 (card 2): the key's sample of band i, the line in the band's blue at the band's width
+    function bandSample(i){
+        return '<span class="ml-ln" aria-hidden="true"><i style="background:' + CARBON_RAMP[i] + ';height:' + LINE_BAND_WIDTHS[i] + 'px"></i></span>';
     }
     // 24 Nov 2026 (Q6, card 4): the badges on the lines are drawn under Labels "All" only, and the key's badge row with them
     function badgesOn(){ return typeof LABELS !== 'undefined' && LABELS.mode === 'all'; }
@@ -10070,6 +10082,12 @@
     function layerKey(id) { return id.indexOf('layer-') === 0 ? id.slice(6) : id.indexOf('toggle-') === 0 ? id.slice(7) : id; }
     function layersOn() { return layerBoxes().filter(cb => cb.checked).map(cb => layerKey(cb.id)).sort(); }
     VIEW.defaults = layersOn();          // the static boxes as the page ships them (the closures' boxes start off)
+    // 24 Nov 2026 (the route lines mockup, Q5): Volume ships CHECKED, but the heat map's radios are built at DOMContentLoaded,
+    // after this line, so layersOn() cannot see them: the boxes built later that ship checked are named here. Without it a
+    // link with Off wrote nothing and opened on Volume, and every Volume link carried "road-load" (found in Chrome).
+    const LATE_DEFAULTS = ['road-load'];
+    LATE_DEFAULTS.forEach(k => { if (!VIEW.defaults.includes(k)) VIEW.defaults.push(k); });
+    VIEW.defaults.sort();
     function monthParam(m) {
         const y = CONFIG.START_YEAR + Math.floor((m - 1) / 12), mm = ((m - 1) % 12) + 1;
         return y + '-' + String(mm).padStart(2, '0');

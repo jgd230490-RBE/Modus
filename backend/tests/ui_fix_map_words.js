@@ -86,7 +86,10 @@ function evalExpr(e, props) {
        && evalExpr(e2, { route_id: "R9", f_avg: null }) === "");
     ok("A-F5 a scheme counting another unit keeps its unit and figure: 'R1 · 12 m³ / day'", evalExpr(em, { route_id: "R1", f_avg: 12 }) === "R1 · 12 m³ / day");
   }
-  ok("A-F5 the user guide says what the label's number is", guide.includes("&quot;R050 · 132 a day&quot;") && /a road’s card adds up every route on that road|a road's card adds up every route on that road/.test(guide));
+  // REVERSED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q6): no words along a route's line, so the
+  // guide no longer explains the label's number; it says there are none and where the figures are
+  ok("A-F5 the user guide says no words are drawn along a route's line (REVERSED 24 Nov 2026: it explained 'R050 · 132 a day')",
+     !guide.includes("&quot;R050 · 132 a day&quot;") && guide.includes("No words are drawn along a route's line: click it for its name and figures."));
 }
 
 // ---------------------------------------------------------------------------------------------- the road card sandbox
