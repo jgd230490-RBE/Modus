@@ -822,6 +822,36 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .sim-wall-gates th{font-size:clamp(12px,1.35vh,22px);}
   .sim-wall .sim-tl-hour,.sim-wall .sim-tl-marktext,.sim-wall .sim-tl-note{font-size:clamp(12px,1.25vh,20px);}
   .sim-wall .sim-tl-name,.sim-wall .sim-tl-ok{font-size:clamp(13px,1.4vh,22px);}
+  /* 24 Nov 2026: the Simulation in FULL SCREEN (John's live check, section D; mockup notes/simulation-fullscreen-mockup-1124,
+     Q1 to Q8). The SAME player laid over the whole window by one class, as the Routes page's full screen is (z 70: under the
+     i boxes and messages): a bar, the page's own controls row, the map beside Now and the gates, the queue line under the map.
+     The Scenario band, the folds and the key rows stay on the ordinary page. Text follows the screen's height by the big
+     screen's own steps, so a laptop reads as before and a meeting screen reads from across the room. */
+  .sim-play.sim-full{position:fixed;inset:0;z-index:70;margin:0;padding:10px 14px;background:var(--surface);display:grid;grid-template-columns:minmax(0,1fr) clamp(280px,24vw,640px);grid-template-rows:auto auto minmax(0,1fr) auto auto;grid-template-areas:"bar bar" "ctl ctl" "map side" "tlh side" "tl side";gap:8px 14px;}
+  .sim-full>.sim-full-bar{grid-area:bar;display:flex;align-items:center;gap:14px;min-width:0;border-bottom:1px solid var(--ink);padding-bottom:8px;}
+  .sim-full-bar>*{flex:none;} .sim-full-bar>.sim-full-words{flex:1 1 auto;min-width:0;} .sim-full-bar .sim-tag{margin:0;}
+  .sim-full-head{font-family:var(--f-head);font-weight:600;font-size:clamp(18px,2.9vh,40px);line-height:1.2;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sim-full-sub{font-size:clamp(13px,1.9vh,24px);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sim-full>.sim-ctl-row{grid-area:ctl;margin:0;}
+  .sim-full>.sim-grid{display:contents;}
+  .sim-full .sim-main{grid-area:map;min-height:0;}
+  .sim-full .sim-main>.sim-map-wrap{height:100%;}
+  .sim-full .sim-main .sim-map{height:100%;min-height:0;max-height:none;}
+  .sim-full .sim-side{grid-area:side;max-height:none;min-height:0;overflow:auto;}
+  .sim-full>.sim-tl-top{grid-area:tlh;} .sim-full>[data-sim-tl-wrap]{grid-area:tl;min-width:0;}
+  .sim-full>.sim-band,.sim-full .sim-key,.sim-full .sim-clock-small{display:none;}
+  .sim-full .sim-clock{font-size:clamp(34px,7vh,96px);}
+  .sim-full .sim-now,.sim-full .sim-card-h{font-size:clamp(14px,1.7vh,28px);}
+  .sim-full .sim-now th{font-size:clamp(13px,1.35vh,22px);}
+  .sim-full .sim-side .ct-note,.sim-full .sim-side .sim-lbl{font-size:clamp(13px,1.55vh,26px);}
+  .sim-full .sim-tl-head{font-size:clamp(13px,1.4vh,22px);}
+  .sim-full .sim-busy-note{left:76px;max-width:calc(100% - 146px);}   /* beside the Key button, never under it */
+  /* the key in full screen: a button at the map's top left (clear of the map's own mark and credit at the bottom), its list
+     in a box under it; the page's own key rows are hidden there */
+  .sim-key-btn{position:absolute;left:10px;top:10px;z-index:3;min-height:28px;padding:4px 10px;background:var(--surface);color:var(--ink);border:1px solid var(--grey);border-radius:6px;font:600 13px var(--f-text);cursor:pointer;}
+  .sim-key-btn:focus-visible{outline:2px solid var(--navy);outline-offset:2px;}
+  .sim-key-box{position:absolute;left:10px;top:46px;z-index:3;margin:0;padding:6px 10px;list-style:none;max-height:calc(100% - 56px);overflow:auto;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:6px;font-size:clamp(13px,1.55vh,22px);}
+  .sim-key-box li{display:flex;align-items:center;gap:7px;margin:3px 0;}
   .sim-map-wrap{position:relative;align-self:start;min-width:0;}
   .sim-map{height:62vh;min-height:360px;max-height:720px;border:1px solid var(--line);border-radius:8px;overflow:hidden;}   /* 29 Oct 2026 (the page): the app's map height (MAP_H) */
   .sim-legend{position:absolute;left:10px;bottom:10px;background:#FFFFFF;border:1px solid #E1E2E4;border-radius:6px;padding:6px 9px;font-size:13px;color:#1F2024;z-index:2;}
@@ -14153,10 +14183,15 @@ const lookMapStyle = () => { try { return simMapStyle(); } catch (e) { return "m
 const mapGroundDark = (style) => /dark|night|satellite|maaamet/.test(String(style || ""));
 const zoneLabelPaint = (dark) => ({ "text-color": dark ? "#F5F5F4" : "#1F2024",
   "text-halo-color": dark ? "rgba(18,19,22,0.92)" : "#FFFFFF", "text-halo-width": 1.75, "text-halo-blur": 0.5 });
+// 24 Nov 2026 (F1): the Simulation map's names: ink on white on a light ground, near-white (or a coloured name's light
+// shade) on a near-black halo on a dark one; the halo 1.5 as before
+const simLabelPaint = (dark, light, darkShade) => ({ "text-color": dark ? (darkShade || "#F5F5F4") : (light || "#1F2024"),
+  "text-halo-color": dark ? "rgba(18,19,22,0.92)" : "#FFFFFF", "text-halo-width": 1.5 });
 // the map: its own Mapbox instance (CommitMap's pattern), drawn from the reply and redrawn at each clock minute; `wall` = the
 // big screen (the key stays a box over the map there; on the page it is a row under it)
-function SimMap({ meta, D, store, frame, site, wall }){
+function SimMap({ meta, D, store, frame, site, wall, full }){
   const div = useRef(null), mapObj = useRef(null), badges = useRef({});
+  const [keyOpen, setKeyOpen] = useState(false), keyBtn = useRef(null), preFull = useRef(null);   // 24 Nov 2026 (full screen)
   const busyOn = useRef(null), busyNote = useRef(null), noteTimer = useRef(null);   // 5 Nov 2026 (task 0d-2)
   const [note, setNote] = useState({ text: "", on: false });
   const [ready, setReady] = useState(false);
@@ -14174,6 +14209,9 @@ function SimMap({ meta, D, store, frame, site, wall }){
     THEME.subs.add(onLook);
     m.on("style.load", () => {
       if(m.getSource("sim-routes")) return;
+      // 24 Nov 2026 (F1, the Simulation full screen's brief): the names follow the ground, the zone names' rule
+      // (zoneLabelPaint): on Dark near-white on a near-black halo; a coloured name takes its light shade there
+      const dk = mapGroundDark(styleNow), nm = simLabelPaint(dk);
       const empty = { type: "FeatureCollection", features: [] };
       ["sim-routes", "sim-ends", "sim-haul", "sim-gates", "sim-lorries", "sim-areas", "sim-area-pts", "sim-wash", "sim-called", "sim-busy", "sim-busy-main"].forEach(s => m.addSource(s, { type: "geojson", data: empty }));
       m.addLayer({ id: "sim-routes", type: "line", source: "sim-routes", paint: { "line-color": "#94A3B8", "line-width": 1.6, "line-opacity": 0.75 } });
@@ -14185,24 +14223,24 @@ function SimMap({ meta, D, store, frame, site, wall }){
       m.addLayer({ id: "sim-ends", type: "line", source: "sim-ends", paint: { "line-color": "#94A3B8", "line-width": 1, "line-dasharray": [2, 2] } });
       m.addLayer({ id: "sim-haul", type: "line", source: "sim-haul", paint: { "line-color": tok("--chart-4", "#7C3AED"), "line-width": 4, "line-dasharray": [1.5, 1] } });
       m.addLayer({ id: "sim-haul-label", type: "symbol", source: "sim-haul", layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-size": 12, "text-offset": [0, -1] },
-                   paint: { "text-color": "#5B21B6", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
+                   paint: simLabelPaint(dk, "#5B21B6", "#C4B5FD") });
       // 28 Oct 2026 (v2): a site's areas (a shape or a point, named with its level) and its wheel wash
       m.addLayer({ id: "sim-areas", type: "fill", source: "sim-areas", paint: { "fill-color": ["match", ["get", "act"], "load", "#A16207", "#1D4ED8"], "fill-opacity": 0.12 } });
       m.addLayer({ id: "sim-areas-line", type: "line", source: "sim-areas", paint: { "line-color": ["match", ["get", "act"], "load", "#A16207", "#1D4ED8"], "line-width": 1.5, "line-dasharray": [3, 2] } });
       m.addLayer({ id: "sim-areas-pt", type: "circle", source: "sim-area-pts", paint: { "circle-radius": 9, "circle-color": ["match", ["get", "act"], "load", "#A16207", "#1D4ED8"], "circle-opacity": 0.18, "circle-stroke-color": ["match", ["get", "act"], "load", "#A16207", "#1D4ED8"], "circle-stroke-width": 1.5 } });
       m.addLayer({ id: "sim-areas-label", type: "symbol", source: "sim-areas", layout: { "text-field": ["get", "label"], "text-size": 12, "text-offset": [0, 1.4], "text-anchor": "top" },
-                   paint: { "text-color": "#1E293B", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
+                   paint: nm });
       m.addLayer({ id: "sim-areas-pt-label", type: "symbol", source: "sim-area-pts", layout: { "text-field": ["get", "label"], "text-size": 12, "text-offset": [0, 1.4], "text-anchor": "top" },
-                   paint: { "text-color": "#1E293B", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
+                   paint: nm });
       m.addLayer({ id: "sim-wash", type: "circle", source: "sim-wash", paint: { "circle-radius": 5.5, "circle-color": "#FFFFFF", "circle-stroke-color": "#0E7490", "circle-stroke-width": 2.5 } });
       m.addLayer({ id: "sim-wash-label", type: "symbol", source: "sim-wash", layout: { "text-field": ["get", "label"], "text-size": 12, "text-offset": [0, 1.1], "text-anchor": "top" },
-                   paint: { "text-color": "#0E7490", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
+                   paint: simLabelPaint(dk, "#0E7490", "#67E8F9") });
       // 17 Oct 2026 (the user: the gate and an empty lorry looked too alike, both a small white dot with a rim): the gate is a
       // BULLSEYE — a bigger white ring with a thick dark rim and a dark centre — so it never reads as a lorry
       m.addLayer({ id: "sim-gates", type: "circle", source: "sim-gates", paint: { "circle-radius": 7, "circle-color": "#FFFFFF", "circle-stroke-color": "#1F2024", "circle-stroke-width": 2.5 } });
       m.addLayer({ id: "sim-gates-dot", type: "circle", source: "sim-gates", paint: { "circle-radius": 2.5, "circle-color": "#1F2024" } });
       m.addLayer({ id: "sim-gate-labels", type: "symbol", source: "sim-gates", layout: { "text-field": ["get", "name"], "text-size": 12, "text-offset": [0, 1.1], "text-anchor": "top" },
-                   paint: { "text-color": "#1E293B", "text-halo-color": "#FFFFFF", "text-halo-width": 1.5 } });
+                   paint: nm });
       m.addLayer({ id: "sim-lorries", type: "circle", source: "sim-lorries", paint: {
         "circle-radius": ["match", ["get", "k"], "wait", 4.5, 4],
         "circle-color": ["match", ["get", "k"], "laden", tok("--sim-lorry", "#2563EB"), "pour", tok("--sim-mixer", "#E8590C"), "held", "#475569", "#FFFFFF"],
@@ -14227,6 +14265,29 @@ function SimMap({ meta, D, store, frame, site, wall }){
     }
     return () => { THEME.subs.delete(onLook); if(ro) ro.disconnect(); };
   }, []);
+  // 24 Nov 2026 (the Simulation's full screen, Q4 / Q5): the map keeps its area going in and coming out. Read before the
+  // map takes its new size (a layout effect runs before the box is measured again), fitted after with no animation; coming
+  // out, the area it showed before going in, unless someone moved the map meanwhile. The key box closes on the way out.
+  React.useLayoutEffect(() => {
+    if(!full) setKeyOpen(false);
+    const m = mapObj.current;
+    if(!m || !ready || wall) return;
+    try {
+      const now = m.getBounds(), pre = preFull.current;
+      const moved = pre && (Math.abs(m.getZoom() - pre.zoom) > 1e-6 || m.getCenter().distanceTo(pre.center) > 1);
+      const area = (!full && pre && !moved) ? pre.bounds : now;
+      m.resize();
+      try { m.fitBounds(area, { duration: 0, padding: 0 }); } catch(e){}
+      preFull.current = full ? { bounds: now, zoom: m.getZoom(), center: m.getCenter() } : null;
+    } catch(e){}
+  }, [full]);
+  // Esc closes the key box first (and only that); the page's own Esc then leaves full screen
+  useEffect(() => {
+    if(!keyOpen) return;
+    const onKey = (e) => { if(e.key !== "Escape") return; e.stopPropagation(); e.preventDefault(); setKeyOpen(false); try { keyBtn.current && keyBtn.current.focus(); } catch(_){ } };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [keyOpen]);
   // the still parts: each route's line, its end to its gate, the haul roads, the gates
   useEffect(() => {
     const m = mapObj.current;
@@ -14400,6 +14461,9 @@ function SimMap({ meta, D, store, frame, site, wall }){
   return (
     <div className="sim-map-wrap">
       <div ref={div} className="sim-map" role="region" aria-label="Simulation map" />
+      {full && !wall && <button type="button" ref={keyBtn} className="sim-key-btn" aria-expanded={keyOpen ? "true" : "false"} aria-controls="sim-key-box"
+        data-sim-key-btn="1" onClick={() => setKeyOpen(o => !o)}>Key</button>}
+      {full && !wall && keyOpen && <ul id="sim-key-box" className="sim-key-box" aria-label="Key" data-sim-key-box="1">{key.map(([c, w]) => <li key={w}><i className={c} aria-hidden="true"></i>{w}</li>)}</ul>}
       {simBusyUses(D).length > 0 && <div className={"sim-busy-note" + (note.on ? " on" : "")} role="status" aria-live="polite" data-sim-busy-note="1">{note.text}</div>}
       {wall
         ? <div className="sim-legend" role="group" aria-label="Map key">{key.map(([c, w]) => <div key={w}><i className={c} aria-hidden="true"></i>{w}</div>)}</div>
@@ -14491,7 +14555,7 @@ function SimTimeline({ D, t, onSeek, site }){
 
 // the player: the controls row (the page's scale / period / site, then Play / Restart / Speed and the clock), the map with
 // its key, the Now card and Gates / Stations now beside it, the timeline full width, then the scenario band (card 2)
-function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt }){
+function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt, full, onLeave, bar }){
   // 9 Nov 2026 (finding 9): the clock opens at the day's busiest point, and again when the month, week or day changes
   // (not on a scenario change: the clock stays where you put it)
   const [t, setT] = useState(() => (startAt != null && startAt >= D.window.start && startAt <= D.window.end) ? startAt : D.window.start);
@@ -14530,15 +14594,41 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt }){
   const f = useMemo(() => simFrame(D, store ? store.legs : {}, t), [D, store, t]);
   const order = (D.gates || []).slice().sort((a, b) => (b.arrivals - a.arrivals) || (a.gate_id < b.gate_id ? -1 : 1));
   const playWord = playing ? "Pause" : (t >= s1 ? "Play again" : "Play");
+  // 24 Nov 2026 (the Simulation's full screen, John's "Yes, as recommended" to Q1 to Q8): the SAME player and map over the
+  // whole window by a class (the Routes / site-layout full screen's way), never a second player. While it is up the page
+  // behind is out of reach (the same walk up the tree), focus goes to Play, and Esc leaves (Routes keeps Esc for drawing)
+  const playRoot = useRef(null), playBtn = useRef(null);
+  useEffect(() => {
+    if(!full || !playRoot.current) return;
+    const off = [];
+    for(let n = playRoot.current; n.parentElement && n !== document.body; n = n.parentElement)
+      for(const x of n.parentElement.children) if(x !== n && !x.hasAttribute("inert") && !/^(SCRIPT|STYLE|LINK)$/.test(x.tagName)){ x.setAttribute("inert", ""); off.push(x); }
+    try { playBtn.current && playBtn.current.focus(); } catch(e){}
+    const onKey = (e) => {
+      if(e.key !== "Escape" || e.defaultPrevented) return;
+      const tg = e.target && e.target.tagName;
+      if(tg === "SELECT") return;   // a drop-down has the key (an open "i" box stops its own Esc before it reaches here)
+      e.preventDefault(); onLeave && onLeave();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); off.forEach(x => x.removeAttribute("inert")); };
+  }, [full]);
   // 28 Oct 2026 (v2): the site view — the map framed on one site, its stations now and its queues (the site is the page's pick)
   const stOrder = site ? [...(D.gates || []).filter(g => g.location_id === site.d.location_id).map(g => ({ key: "gate:" + g.gate_id, name: "Gate in", sub: `${g.gate_name}${g.check_in != null ? ` · check-in ${+g.check_in} min` : ""}`, gate: g })),
     ...(site.d.stations || []).filter(st => st.kind !== "gate" || !(D.gates || []).some(g => g.gate_id === st.gate_id)).map(st => ({ key: st.key, name: st.name, sub: st.kind === "gate" ? "out" : `${st.bays} bay${st.bays === 1 ? "" : "s"} · ${+st.service} min`, st }))] : [];
   return (
-    <div className="sim-play" data-sim-player="1">
+    <div ref={playRoot} className={"sim-play" + (full ? " sim-full" : "")} data-sim-player="1" data-sim-full={full ? "1" : "0"}
+      role={full ? "region" : undefined} aria-label={full ? "Simulation, full screen" : undefined}>
+      {full && <div className="sim-full-bar" data-sim-full-bar="1">
+        {TENANT.demo_notice && <span className="sl-demo-pill" role="note" data-sim-full-demo="1"><b>DEMO</b>{TENANT.demo_notice}</span>}
+        <div className="sim-full-words"><div className="sim-full-head" data-sim-full-head="1">{bar && bar.head}</div><div className="sim-full-sub" data-sim-full-sub="1">{bar && bar.sub}</div></div>
+        <span className="sim-tag">Planning view, not a record</span>
+        <button type="button" className="btn-sec" onClick={() => onLeave && onLeave()} data-sim-full-leave="1">Leave full screen</button>
+      </div>}
       <div className="sim-ctl-row" data-sim-controls="1">
         <div className="sim-ctl-left">{controls}</div>
         <div className="sim-ctl-right">
-          <button type="button" className="btn-pri" onClick={() => { if(t >= s1) setT(s0); setPlaying(p => !p); }} data-sim-play="1">{playWord}</button>
+          <button type="button" ref={playBtn} className="btn-pri" onClick={() => { if(t >= s1) setT(s0); setPlaying(p => !p); }} data-sim-play="1">{playWord}</button>
           <button type="button" className="btn-sec" onClick={() => { setPlaying(false); setT(s0); }}>Restart</button>
           <label className="sim-lbl">Speed <select className="ga-sel" value={sp} onChange={e => setSp(e.target.value)} aria-label="Playback speed">
             {SIM_SPEEDS.map(([v, w]) => <option key={v} value={v}>{w}</option>)}</select></label>
@@ -14547,7 +14637,7 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt }){
       </div>
       <div className="sim-grid">
         <div className="sim-main">
-          <SimMap meta={meta} D={D} store={store} frame={f} site={site} />
+          <SimMap meta={meta} D={D} store={store} frame={f} site={site} full={!!full} />
         </div>
         <div className="sim-side kb-scroll" tabIndex={0} role="region" aria-label="Now and gates">
           <div className="sim-card" data-sim-now-card="1">
@@ -14573,8 +14663,8 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt }){
                 <tr><td>Most waiting on site</td><td className="num">{wo.site_most == null ? "—" : wo.site_most}</td><td className="num"><b>{w.site_most == null ? "—" : w.site_most}</b></td></tr>
                 <tr><td>Most waiting at the gate</td><td className="num">{wo.gate_most == null ? "—" : wo.gate_most}</td><td className="num"><b>{w.gate_most == null ? "—" : w.gate_most}</b></td></tr>
                 <tr><td>Time on site, average</td><td className="num">{wo.avg_on_site == null ? "—" : `${Math.round(wo.avg_on_site)} min`}</td><td className="num"><b>{w.avg_on_site == null ? "—" : `${Math.round(w.avg_on_site)} min`}</b></td></tr>
-                <tr><td>Minutes waiting, on site and at the gate</td><td className="num">{Math.round((wo.site_minutes_lost || 0) + (wo.gate_minutes_lost || 0))}</td><td className="num"><b>{Math.round((w.site_minutes_lost || 0) + (w.gate_minutes_lost || 0))}</b></td></tr>
-                <tr><td>Minutes held</td><td className="num">—</td><td className="num"><b>{Math.round(w.minutes_held || 0)}</b></td></tr>
+                <tr><td>Minutes waiting, on site and at the gate</td><td className="num">{grp((wo.site_minutes_lost || 0) + (wo.gate_minutes_lost || 0))}</td><td className="num"><b>{grp((w.site_minutes_lost || 0) + (w.gate_minutes_lost || 0))}</b></td></tr>
+                <tr><td>Minutes held</td><td className="num">—</td><td className="num"><b>{grp(w.minutes_held || 0)}</b></td></tr>
                 <tr><td>Last lorry out</td><td className="num">{simHM(wo.last_out)}</td><td className="num"><b>{simHM(w.last_out)}</b></td></tr>
                 {gbp(wo) != null && <tr><td>All waiting as lorry time<div className="sim-sub">{M.lorry_hour_words}</div></td><td className="num">£{gbp(wo).toLocaleString("en-GB")}</td><td className="num"><b>£{gbp(w).toLocaleString("en-GB")}</b></td></tr>}
                 {kg(wo) != null && <tr><td>Idling, if every waiting engine runs<div className="sim-sub">{M.idle_words}</div></td><td className="num">{kg(wo).toFixed(1)} kg CO₂</td><td className="num"><b>{kg(w).toFixed(1)} kg CO₂</b></td></tr>}
@@ -14586,17 +14676,17 @@ function SimPlayer({ meta, D, store, scenario, controls, site, open, startAt }){
             ? <div className="sim-card" data-sim-stations-now="1">
               <div className="sim-card-h">Stations now · {site.d.name}</div>
               <table className="sim-now"><thead><tr><th scope="col">Station</th><th scope="col" className="num">Waiting</th><th scope="col" className="num">Busy</th><th scope="col" className="num">Min lost</th></tr></thead>
-                <tbody>{(D.holding || []).filter(h => h.on && (h.served || []).some(s => s.id === site.d.location_id)).map(h => <tr key={"h" + h.id} className={((f.heldBy || {})[h.id] || 0) > 0 ? "sim-q" : ""} data-sim-now-holding={h.id}><td><span className="hbadge" aria-hidden="true">H</span>{h.name}<div className="sim-sub">{h.spaces ? `${h.spaces} spaces · ` : ""}{h.call} called forward at a time</div></td><td className="num">{((f.heldBy || {})[h.id] || 0) || ""}{((f.heldBy || {})[h.id] || 0) > 0 ? " held" : ""}</td><td className="num nw">—</td><td className="num">{Math.round((f.heldLost || {})[h.id] || 0)}</td></tr>)}
+                <tbody>{(D.holding || []).filter(h => h.on && (h.served || []).some(s => s.id === site.d.location_id)).map(h => <tr key={"h" + h.id} className={((f.heldBy || {})[h.id] || 0) > 0 ? "sim-q" : ""} data-sim-now-holding={h.id}><td><span className="hbadge" aria-hidden="true">H</span>{h.name}<div className="sim-sub">{h.spaces ? `${h.spaces} spaces · ` : ""}{h.call} called forward at a time</div></td><td className="num">{((f.heldBy || {})[h.id] || 0) || ""}{((f.heldBy || {})[h.id] || 0) > 0 ? " held" : ""}</td><td className="num nw">—</td><td className="num">{grp((f.heldLost || {})[h.id] || 0)}</td></tr>)}
                 {stOrder.map(r => { const n = r.gate ? { w: (f.gates[r.gate.gate_id] || {}).w || 0, lost: (f.gates[r.gate.gate_id] || {}).lost || 0, busy: null } : (f.stations[r.key] || { w: 0, busy: 0, lost: 0 });
-                  return <tr key={r.key} className={n.w > 0 ? "sim-q" : ""} data-sim-now-station={r.key}><td>{r.name}{r.sub ? <div className="sim-sub">{r.sub}</div> : null}</td><td className="num">{n.w || ""}</td><td className="num nw">{r.st && r.st.kind !== "gate" ? `${n.busy} / ${r.st.bays}` : (r.gate ? "one lane" : "—")}</td><td className="num">{Math.round(n.lost)}</td></tr>; })}</tbody></table>
+                  return <tr key={r.key} className={n.w > 0 ? "sim-q" : ""} data-sim-now-station={r.key}><td>{r.name}{r.sub ? <div className="sim-sub">{r.sub}</div> : null}</td><td className="num">{n.w || ""}</td><td className="num nw">{r.st && r.st.kind !== "gate" ? `${n.busy} / ${r.st.bays}` : (r.gate ? "one lane" : "—")}</td><td className="num">{grp(n.lost)}</td></tr>; })}</tbody></table>
               <div className="ct-note">On site now {f.onSite}{site.d.avg_on_site == null ? "" : ` · gate in → gate out ${Math.round(site.d.avg_on_site)} min on average, ${Math.round(site.d.longest_on_site)} the longest`}</div>
             </div>
             : <div className="sim-card">
             <div className="sim-card-h">Gates now</div>
             <table className="sim-now"><thead><tr><th scope="col">Gate</th><th scope="col" className="num">Waiting</th><th scope="col" className="num">Min lost</th></tr></thead>
-              <tbody>{(D.holding || []).filter(h => h.on).map(h => <tr key={"h" + h.id} className={((f.heldBy || {})[h.id] || 0) > 0 ? "sim-q" : ""} data-sim-now-holding={h.id}><td><span className="hbadge" aria-hidden="true">H</span>{h.name}</td><td className="num">{(f.heldBy || {})[h.id] || 0}{((f.heldBy || {})[h.id] || 0) > 0 ? " held" : ""}</td><td className="num">{Math.round((f.heldLost || {})[h.id] || 0)}</td></tr>)}
+              <tbody>{(D.holding || []).filter(h => h.on).map(h => <tr key={"h" + h.id} className={((f.heldBy || {})[h.id] || 0) > 0 ? "sim-q" : ""} data-sim-now-holding={h.id}><td><span className="hbadge" aria-hidden="true">H</span>{h.name}</td><td className="num">{(f.heldBy || {})[h.id] || 0}{((f.heldBy || {})[h.id] || 0) > 0 ? " held" : ""}</td><td className="num">{grp((f.heldLost || {})[h.id] || 0)}</td></tr>)}
                 {order.map(g => { const n = f.gates[g.gate_id] || { w: 0, lost: 0 };
-                return <tr key={g.gate_id} className={n.w > 0 ? "sim-q" : ""} data-sim-now-gate={g.gate_id}><td>{simGateName(g)}</td><td className="num">{n.w}{n.w > 0 ? " waiting" : ""}</td><td className="num">{Math.round(n.lost)}</td></tr>; })}</tbody></table>
+                return <tr key={g.gate_id} className={n.w > 0 ? "sim-q" : ""} data-sim-now-gate={g.gate_id}><td>{simGateName(g)}</td><td className="num">{n.w}{n.w > 0 ? " waiting" : ""}</td><td className="num">{grp(n.lost)}</td></tr>; })}</tbody></table>
           </div>}
         </div>
       </div>
@@ -14968,10 +15058,37 @@ function SimulationPage({ meta, months, phone, initial }){
     (D.sites || []).length > 0 && [D.checks.sites_add_up, "On site, every lorry checked in left by a gate or is named as having no area."]].filter(Boolean) : [];
   const nOk = checks.filter(c => c[0]).length, allOk = nOk === checks.length;
   const peak = D && D.loads > 0 ? simPeak(D, site) : null;
+  // 24 Nov 2026 (the Simulation's full screen, Q1 to Q8): a desk from 1,024 px, never the phone page, only while a day
+  // plays; it ends by itself when that stops. Chrome's own full screen is asked at the same click, a courtesy only
+  // (`fsAsked`, the Data page's way); Chrome leaving its own leaves this too (the Big screen's way). The bar's words are
+  // the page's own: the headline's bold part and the figures line's start, worked out once here.
+  const deskWide = useMQ("(min-width: 1024px)");
+  const [full, setFull] = useState(false);
+  const fsAsked = useRef(false), fullBtn = useRef(null), wasFull = useRef(false);
+  const fullOk = !phone && deskWide && !!D && D.loads > 0;
+  const enterFull = () => {
+    setFull(true);
+    try { if(document.documentElement.requestFullscreen && !document.fullscreenElement){ fsAsked.current = true; document.documentElement.requestFullscreen().catch(() => { fsAsked.current = false; }); } }
+    catch(e){ fsAsked.current = false; }
+  };
+  const leaveFull = () => {
+    setFull(false);
+    try { if(fsAsked.current && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); } catch(e){}
+    fsAsked.current = false;
+  };
+  useEffect(() => { if(full && !fullOk) leaveFull(); }, [full, fullOk]);
+  useEffect(() => { if(wasFull.current && !full){ try { fullBtn.current && fullBtn.current.focus(); } catch(e){} } wasFull.current = full; }, [full]);
+  useEffect(() => {
+    const onFs = () => { if(!document.fullscreenElement && fsAsked.current){ fsAsked.current = false; setFull(false); } };
+    document.addEventListener("fullscreenchange", onFs);
+    return () => { document.removeEventListener("fullscreenchange", onFs); try { if(fsAsked.current && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch(e){} };
+  }, []);
+  const headWords = peak ? `${peak.n} ${peak.n === 1 ? "lorry" : "lorries"} waiting at ${peak.name} at ${simHM(peak.at)}` : (D ? `Nothing queues on this day (${D.label}).` : "");
+  const dayWords = D && D.loads > 0 ? `${D.label} · ${simDayWords(D)} · ${grp(D.loads)} loads · ${grp(D.gate_arrivals)} arrivals` : "";
   return (
     <div className="max-w-7xl mx-auto p-6 pb-2" data-page="simulation" data-sim="1">
       <PageHeader title="Simulation" subtitle="An average working day, lorry by lorry, at every gate and on site. Staff only."
-        actions={<><span className="sim-tag" data-sim-tag="1">Planning view, not a record</span><InfoTip id="dash.sim" /></>} />
+        actions={<>{fullOk && <button type="button" ref={fullBtn} className="btn-sec" onClick={enterFull} data-sim-full-btn="1">Full screen</button>}<span className="sim-tag" data-sim-tag="1">Planning view, not a record</span><InfoTip id="dash.sim" /></>} />
       <div data-sim-state={!D ? (loadErr ? "error" : "loading") : (D.loads > 0 ? "set" : "none")}>
         {loadErr && <div className="ct-line" style={{ color: "var(--red)" }}>The simulation did not load.</div>}
         {!D && !loadErr && <div className="ct-note">Working out the day…</div>}
@@ -14982,16 +15099,17 @@ function SimulationPage({ meta, months, phone, initial }){
           {phone && <div className="sim-ctl-row" data-sim-controls="1"><div className="sim-ctl-left">{controls}</div></div>}
           {/* 9 Nov 2026 (finding 9): the headline first — the busiest point of this day — or one line saying nothing queues */}
           {peak
-            ? <div className="sim-head" data-sim-head="queue"><b>{peak.n} {peak.n === 1 ? "lorry" : "lorries"} waiting at {peak.name} at {simHM(peak.at)}</b> — the busiest point of this day.{peak.avg != null ? ` Gate in → gate out ${Math.round(peak.avg)} min on average.` : ""}</div>
+            ? <div className="sim-head" data-sim-head="queue"><b>{headWords}</b> — the busiest point of this day.{peak.avg != null ? ` Gate in → gate out ${Math.round(peak.avg)} min on average.` : ""}</div>
             : <div className="sim-head sim-head-none" data-sim-head="none">Nothing queues on this day ({D.label}).{busiestM && busiestM.label !== D.label
                 ? <> <button type="button" className="sim-link" data-sim-busiest="1" onClick={() => { setMsg(""); setSc(x => ({ ...x, scale: "month" })); setMonth(busiestM.month_index); }}>Show the busiest day ({busiestM.label})</button></> : null}</div>}
           {/* the figures line (card 3): few words; the rules are in the i box */}
-          <div className="sim-figs" data-sim-lead="1">{D.label} · {simDayWords(D)} · {grp(D.loads)} loads · {grp(D.gate_arrivals)} arrivals{pourN ? `, ${pourN} of them mixers` : ""} · {(D.arrival_pattern && D.arrival_pattern.kind === "rush") ? D.arrival_pattern.words : "spread evenly"}{D.bands.on ? ` · bands ${D.bands.words} off` : ""}{(D.gates || []).some(g => g.shut_words) ? " · shut times off" : ""}{busy ? " · working it out…" : ""}</div>
+          <div className="sim-figs" data-sim-lead="1">{dayWords}{pourN ? `, ${pourN} of them mixers` : ""} · {(D.arrival_pattern && D.arrival_pattern.kind === "rush") ? D.arrival_pattern.words : "spread evenly"}{D.bands.on ? ` · bands ${D.bands.words} off` : ""}{(D.gates || []).some(g => g.shut_words) ? " · shut times off" : ""}{busy ? " · working it out…" : ""}</div>
           {(D.notes || []).map((n, i) => <div key={i} className="ct-note" data-sim-note="1">{n}</div>)}
           {phone
             ? <><div className="ct-note" data-sim-phone="1">The plan's day, read-only here.</div><SimPhoneList D={D} /></>
             : <>
               <SimPlayer meta={meta} D={D} store={store} open={open} site={site} controls={controls} startAt={peak ? peak.at : null}
+                full={full} onLeave={leaveFull} bar={{ head: headWords, sub: dayWords }}
                 scenario={<SimScenario key={resetN} D={D} sc={sc} onChange={onScenario} onGate={onGate} onReset={() => { setMsg(""); setSc(SIM_SC0()); setResetN(n => n + 1); setSiteId(""); }} msg={msg} />} />
               <details className="sim-fold" data-sim-fold="table"><summary>Busiest hour at each gate</summary>
               <SimTable D={D} />
@@ -15142,7 +15260,7 @@ function SimWall({ meta, month, show, pass, loop, fill, tick }){
         <div className="sim-wall-now" data-sim-now="1">On the road: {f.laden} laden · {f.empty} empty · {f.waiting} waiting at gates</div>
         <table className="sim-now sim-wall-gates"><thead><tr><th scope="col">Gate</th><th scope="col" className="num">Waiting now</th><th scope="col" className="num">Minutes lost</th></tr></thead>
           <tbody>{order.map(g => { const n = f.gates[g.gate_id] || { w: 0, lost: 0 };
-            return <tr key={g.gate_id} className={n.w > 0 ? "sim-q" : ""} data-sim-now-gate={g.gate_id}><td>{simGateName(g)}</td><td className="num">{n.w}{n.w > 0 ? " waiting" : ""}</td><td className="num">{Math.round(n.lost)}</td></tr>; })}</tbody></table>
+            return <tr key={g.gate_id} className={n.w > 0 ? "sim-q" : ""} data-sim-now-gate={g.gate_id}><td>{simGateName(g)}</td><td className="num">{n.w}{n.w > 0 ? " waiting" : ""}</td><td className="num">{grp(n.lost)}</td></tr>; })}</tbody></table>
         <div className="sim-chips"><span className="sim-chip sim-chip-staff">Staff only · never on the public map</span><span className="sim-chip">Planning view, not a record of what happened</span></div>
       </div>
       <div className="sim-wall-tl"><SimTimeline D={D} t={t} onSeek={(m) => { tRef.current = m; setT(m); }} /></div>
