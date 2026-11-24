@@ -1453,8 +1453,8 @@
 
     <div class="control-group">
         <h3>Haul routes</h3>
-        <div class="control-item"><label><input type="checkbox" id="layer-inbound" checked onchange="applyFilters()"> Laden (out)</label><span class="color-dot" style="background:#059669;"></span></div>
-        <div class="control-item"><label><input type="checkbox" id="layer-outbound" checked onchange="applyFilters()"> Empty (return)</label><span class="color-dot" style="background:#f59e0b;"></span></div>
+        <div class="control-item"><label><input type="checkbox" id="layer-inbound" checked onchange="applyFilters()"> Laden (out)</label><span class="color-dot" style="background:#3A3C41;"></span></div>
+        <div class="control-item"><label><input type="checkbox" id="layer-outbound" checked onchange="applyFilters()"> Empty (return)</label><span class="color-dot" style="background:#8E9197;"></span></div>
         <!-- 29 Oct 2026 (task 3c): shown once the scheme has a holding area (updateHoldingChevrons) -->
         <div class="control-item" id="holding-legend" hidden><span class="hbadge" aria-hidden="true">H</span><span style="font-size:12.5px;color:var(--ink-2);font-weight:500;">Holding area · <b>›››</b> called forward to the gate</span></div>
         <!-- Temporary haul removed: the network stores only a scalar origin_temp_km per
@@ -1467,7 +1467,7 @@
              OFF by default — 107 routes with up to two alternatives each on both
              legs is a lot of line, and this answers a question nobody asks
              continuously. -->
-        <div class="control-item"><label><input type="checkbox" id="layer-alts" onchange="toggleAlts(this.checked)"> Alternative routes <span class="lim-n" id="alts-note"></span></label><span class="color-dot" style="background:#94a3b8; opacity:.6;"></span></div>
+        <div class="control-item"><label><input type="checkbox" id="layer-alts" onchange="toggleAlts(this.checked)"> Alternative routes <span class="lim-n" id="alts-note"></span></label><span class="color-dot" style="background:#A9ABB0;"></span></div>
         <!-- 31 Oct 2026 (task 4c PR 4): the site layouts a planner chose to show the public ("Show on the public map" on
              Data -> Locations), the phase in force in the month on screen, drawn from zoom 16 only. For everyone; on by
              default; the row is hidden until /api/public/site-layouts says some layout shows in some month. -->
@@ -2498,6 +2498,7 @@
         try { if (typeof restyleHaulEraser === 'function') restyleHaulEraser(); } catch (e) {}
         try { if (typeof applyLabels === 'function') applyLabels(); } catch (e) {}     // 28 Oct 2026: a dark ground turns the names light
         try { if (typeof restyleHeatEdge === 'function') restyleHeatEdge(); } catch (e) {}     // 12 Nov 2026 (A-F2b): and the heat map's edge pale
+        try { if (typeof applyLegLook === 'function') applyLegLook(); } catch (e) {}     // 24 Nov 2026: and the legs pale on a dark casing
         try { scheduleViewWrite(); } catch (e) {}
     }
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -2541,8 +2542,25 @@
     // each at first, 1.6 to 3.8 px by band since 23 Oct 2026, 1.75 px either side of the middle: FLOW_WIDTHS, FLOW_OFFSET)
     // sit inside the blue with a gap between them.
     // Still one width for every route: the width carries no figure.
-    const FORECAST_LINE_WIDTH = 6;
-    const FORECAST_CASING_WIDTH = 8.5;
+    // REVERSED 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q4 = Direction 2, card 2): with a heat
+    // map on, the line's WIDTH carries its band too, the same band as its colour (LINE_BAND_WIDTHS, bandWidthExpr): the
+    // busy roads are found without the key and the picture survives grey print and colour blindness. This reverses
+    // 12 Oct's "line width by volume leave out" and "a line's width never carries a figure". With the heat map Off the
+    // line is ONE sign blue at ONE width (FORECAST_LINE_WIDTH on FORECAST_CASING_WIDTH, a white casing): which routes run,
+    // never how much.
+    const FORECAST_LINE_WIDTH = 5;
+    const FORECAST_CASING_WIDTH = 7.6;
+    //: the five bands' widths (px), the heat map's own five bands (under 10 · 10-25 · 25-50 · 50-100 · 100 and over
+    //: movements a day for Volume; the carbon stops for Carbon); the casing LINE_BAND_PAD wider than the line it lifts
+    const LINE_BAND_WIDTHS = [3, 4.5, 6, 8, 10];
+    const LINE_BAND_PAD = 2.4;
+    //: a step on prop at the given ascending stops: the band's width (+ pad for a casing). A line with no figure (a
+    //: carbon line with none) takes the first band's width
+    function bandWidthExpr(prop, stops, pad){
+        const e = ['step', ['to-number', ['get', prop], 0], LINE_BAND_WIDTHS[0] + (pad || 0)];
+        stops.forEach((st, i) => { e.push(st, LINE_BAND_WIDTHS[i + 1] + (pad || 0)); });
+        return e;
+    }
     //: working days in a planning month, as the public feed reports it. 22 only until
     //: the first feed answers — never a second copy of the figure.
     let FORECAST_WORKING_DAYS = 22;
@@ -3019,6 +3037,67 @@
     function restyleHaulEraser(){ try { if (map.getLayer('haul-eraser')) map.setPaintProperty('haul-eraser', 'line-color', haulEraserColour()); } catch (e) {} }
     // 23 Oct 2026 (the user: a subtler highlight than the breach red): the clicked route keeps its own colours and every
     // other route dims; null puts them all back. Re-applied after a basemap change by the style.load handler.
+    // ===== 24 Nov 2026 (John: "Yes, as recommended" to the route lines mockup, Q1 to Q5; notes\public-map-lines-mockup-1124
+    // cards 1, 2 and 8) — ONE MEANING A COLOUR =====
+    // Ink and grey are the approved network (the loaded leg ink, the empty leg grey, each left of its own travel as since
+    // 17 Oct); blue is lorries forecast in the month on screen. So the legs are no longer green and amber (REVERSES the
+    // 23 Oct line redesign's colours; solid, cased, under the names and left of travel stay). With a month on screen a leg
+    // that IS on the month's forecast is not drawn as a leg at all (the forecast line replaces it, so no green or amber
+    // sits beside the blue), and a route NOT on it falls back to ONE quiet pale-grey line on the road (no offset).
+    // NET.offset / core / casing are the leg ramps the style.load handler defines (OFFSET_IN, WIDTH_CORE, WIDTH_CASING).
+    const NET = {
+        loaded: '#3A3C41', empty: '#8E9197', casing: '#ffffff',
+        // a dark ground (labelsDark: Dark, Navigation night, the aerial styles, Standard at dusk or night): a pale pair on
+        // a dark casing. Set in the build (the mockup drew no dark network): the pair keeps the light look's step
+        loadedDark: '#D4D6DA', emptyDark: '#9A9DA3', casingDark: '#1F2024',
+        quiet: '#A9ABB0', quietDark: '#6B6E74',
+        quietCore: ['interpolate', ['linear'], ['zoom'], 7, 1, 12, 2, 16, 3.4],
+        quietCasing: ['interpolate', ['linear'], ['zoom'], 7, 2.6, 12, 4, 16, 5.6],
+        // the other options a route had: a thinner neutral grey, no casing (the slate grey goes)
+        alt: '#A9ABB0', altDark: '#7D8087', altOpacity: 0.9,
+        altWidth: ['interpolate', ['linear'], ['zoom'], 7, 0.6, 12, 1.2, 16, 2],
+        offset: null, core: null, casing_w: null
+    };
+    // a month on screen = the forecast overlay is drawn (the timeline's month, or Show forecast's window)
+    function netMonthOn(){ try { return !!(map && map.getLayer && map.getLayer('forecast-layer')); } catch (e) { return false; } }
+    function netDark(){ return typeof labelsDark === 'function' && labelsDark(); }
+    // the legs' paint for the look on screen; the creation paint of each leg layer reads the same
+    function netLegPaint(loaded){
+        const month = netMonthOn(), dark = netDark();
+        return { color: month ? (dark ? NET.quietDark : NET.quiet) : loaded ? (dark ? NET.loadedDark : NET.loaded) : (dark ? NET.emptyDark : NET.empty),
+                 casing: dark ? NET.casingDark : NET.casing,
+                 core: month ? NET.quietCore : NET.core, casingW: month ? NET.quietCasing : NET.casing_w,
+                 offset: month ? 0 : NET.offset };
+    }
+    function netHaulColour(){ const dark = netDark(); return ['match', ['get', 'type'], 'Inbound Haul', dark ? NET.loadedDark : NET.loaded, dark ? NET.emptyDark : NET.empty]; }
+    // re-applied by applyFilters, raiseMarks (every layer (re)made, a month on or off) and a change of light; a paint
+    // set to what it already is costs nothing (Mapbox compares first)
+    function applyLegLook(){
+        if (!map || !map.getLayer || NET.offset == null) return;
+        [['inbound-lines', true], ['outbound-lines', false]].forEach(([l, loaded]) => {
+            const p = netLegPaint(loaded);
+            try {
+                if (map.getLayer(l)) { map.setPaintProperty(l, 'line-color', p.color); map.setPaintProperty(l, 'line-width', p.core); map.setPaintProperty(l, 'line-offset', p.offset); }
+                if (map.getLayer(l + '-casing')) { map.setPaintProperty(l + '-casing', 'line-color', p.casing); map.setPaintProperty(l + '-casing', 'line-width', p.casingW); map.setPaintProperty(l + '-casing', 'line-offset', p.offset); }
+            } catch (e) {}
+        });
+        // the haul-road pieces follow their leg: ink and grey dots left of travel, or the quiet grey on the road with a month on
+        const month = netMonthOn(), dark = netDark();
+        try {
+            if (map.getLayer('haul-dots')) { map.setPaintProperty('haul-dots', 'line-color', month ? (dark ? NET.quietDark : NET.quiet) : netHaulColour()); map.setPaintProperty('haul-dots', 'line-offset', month ? 0 : NET.offset); }
+            if (map.getLayer('haul-eraser')) { map.setPaintProperty('haul-eraser', 'line-width', month ? NET.quietCasing : NET.casing_w); map.setPaintProperty('haul-eraser', 'line-offset', month ? 0 : NET.offset); }
+        } catch (e) {}
+        try {
+            if (map.getLayer('route-alt-lines')) {
+                map.setPaintProperty('route-alt-lines', 'line-color', netDark() ? NET.altDark : NET.alt);
+                map.setPaintProperty('route-alt-lines', 'line-opacity', NET.altOpacity);
+                map.setPaintProperty('route-alt-lines', 'line-width', NET.altWidth);
+            }
+        } catch (e) {}
+    }
+    //: a leg (and its haul pieces) on the month's forecast is not drawn as a leg: the forecast line is drawn in its place.
+    //: With no month on screen no feature is on the forecast, so this lets every leg through.
+    const NET_IDLE = ['!=', ['get', 'is_forecast'], true];
     const DIM_LAYERS = ['inbound-lines', 'outbound-lines', 'inbound-lines-casing', 'outbound-lines-casing', 'haul-dots'];
     const DIM_OPACITY = 0.42;
     function setRouteDim(routeId){
@@ -3030,6 +3109,7 @@
         if (!map || !map.getStyle) return;
         if (typeof applyLabels === 'function') applyLabels();     // 28 Oct 2026 (task 0a): a label layer just (re)made
         if (typeof restyleHeatEdge === 'function') restyleHeatEdge();     // 12 Nov 2026 (A-F2b): a casing just (re)made on a dark ground
+        applyLegLook();                                                   // 24 Nov 2026: the legs' look (a month on or off, a dark ground)
         let ids;
         try { ids = map.getStyle().layers.map(l => l.id); } catch (e) { return; }
         // 13 Oct 2026: the lorry limits go over the routes first, so the marks then land on top of them
@@ -3901,10 +3981,11 @@
         if (ROUTE_PICK.open) renderRoutePick();       // the greyed rows follow the other four
 
         const none = ['==', ['get', 'type'], 'NONE'];
+        // 24 Nov 2026 (the route lines rethink, card 2): NET_IDLE — a leg on the month's forecast is drawn by the forecast line
         if (map.getLayer('inbound-lines')) map.setFilter('inbound-lines',
-            inVis ? ['all', ['==', ['get', 'type'], 'Inbound Highway'], ...filterArr.slice(1)] : none);
+            inVis ? ['all', ['==', ['get', 'type'], 'Inbound Highway'], NET_IDLE, ...filterArr.slice(1)] : none);
         if (map.getLayer('outbound-lines')) map.setFilter('outbound-lines',
-            outVis ? ['all', ['==', ['get', 'type'], 'Outbound Highway'], ...filterArr.slice(1)] : none);
+            outVis ? ['all', ['==', ['get', 'type'], 'Outbound Highway'], NET_IDLE, ...filterArr.slice(1)] : none);
         // 🔴 THE CASINGS MUST CARRY THE SAME FILTER AS THE LINE THEY SIT UNDER.
         //
         // Found 2026-09-01 while removing the arrow layers, which is what used to be
@@ -3913,13 +3994,14 @@
         // On a light basemap a solid white line under nothing is easy to miss, which
         // is presumably why it survived since Phase 2.5a. (The legs were dotted from Sep to 23 Oct 2026; solid again now.)
         if (map.getLayer('inbound-lines-casing')) map.setFilter('inbound-lines-casing',
-            inVis ? ['all', ['==', ['get', 'type'], 'Inbound Highway'], ...filterArr.slice(1)] : none);
+            inVis ? ['all', ['==', ['get', 'type'], 'Inbound Highway'], NET_IDLE, ...filterArr.slice(1)] : none);
         if (map.getLayer('outbound-lines-casing')) map.setFilter('outbound-lines-casing',
-            outVis ? ['all', ['==', ['get', 'type'], 'Outbound Highway'], ...filterArr.slice(1)] : none);
+            outVis ? ['all', ['==', ['get', 'type'], 'Outbound Highway'], NET_IDLE, ...filterArr.slice(1)] : none);
         if (map.getLayer('holding-chevrons')) applyHoldingChevronFilter();     // 29 Oct 2026 (task 3c): the same four filters and leg toggles
         // 23 Oct 2026: the haul-road pieces follow the leg toggles and the same filters as the legs they belong to
         const haulBase = haulPieceFilter();
-        ['haul-eraser', 'haul-dots'].forEach(l => { if (map.getLayer(l)) map.setFilter(l, haulBase[0] === 'in' ? ['all', haulBase, ...filterArr.slice(1)] : haulBase); });
+        ['haul-eraser', 'haul-dots'].forEach(l => { if (map.getLayer(l)) map.setFilter(l, haulBase[0] === 'in' ? ['all', haulBase, NET_IDLE, ...filterArr.slice(1)] : haulBase); });
+        applyLegLook();       // 24 Nov 2026: and their look (ink and grey, or the month's quiet grey)
         // 12 Oct 2026 (review §3 row 3): the forecast overlay honours the same filters and the
         // leg toggles. It used to be filtered on is_forecast alone, so an origin filter left
         // every other route's blue overlay and label on the map.
@@ -4019,8 +4101,11 @@
         // the user: "I dont want dotted lines anymore, on any routes". A crisp white casing lifts the solid colour off the
         // basemap, as a road atlas does, and every route layer is added BEFORE the basemap's first label layer
         // (labelAnchor) so road names and place names print over the lines.
-        const WIDTH_CORE   = ['interpolate', ['linear'], ['zoom'], 7, 1.4, 12, 3.6, 16, 6];
-        const WIDTH_CASING = ['interpolate', ['linear'], ['zoom'], 7, 3.8, 12, 6,   16, 8.4];   // the core + 2.4 px
+        // NARROWED 24 Nov 2026 (John, the route lines rethink, card 1): thinner, so the approved network reads as a drawing
+        // under the month's blue (was 1.4 / 3.6 / 6 on 3.8 / 6 / 8.4)
+        const WIDTH_CORE   = ['interpolate', ['linear'], ['zoom'], 7, 1.1, 12, 2.6, 16, 4.6];
+        const WIDTH_CASING = ['interpolate', ['linear'], ['zoom'], 7, 2.9, 12, 4.8, 16, 7];   // the core + 1.8 to 2.4 px
+        NET.offset = OFFSET_IN; NET.core = WIDTH_CORE; NET.casing_w = WIDTH_CASING;      // applyLegLook's ramps
         // The one dotted thing left on a route, on purpose (the user, 23 Oct: "the haul road in the same colours but dotted
         // and thinner"): where a leg runs on a HAUL ROAD it is drawn thinner and dotted in its own colour — withHaulPieces
         // finds the stretch of the leg within HAUL_NEAR_M of a drawn haul road and adds it as an 'Inbound Haul' /
@@ -4058,9 +4143,9 @@
             'layout': { visibility: altsVisible() ? 'visible' : 'none',
                         'line-cap': 'round', 'line-join': 'round' },
             'paint': {
-                'line-color': '#94a3b8',
-                'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.8, 12, 2.2, 16, 3.6],
-                'line-opacity': 0.45,
+                'line-color': NET.alt,        // 24 Nov 2026 (card 9): a thinner neutral grey (was slate #94a3b8 at 0.45)
+                'line-width': NET.altWidth,
+                'line-opacity': NET.altOpacity,
             },
         }, labelAnchor());
 
@@ -4093,7 +4178,7 @@
             'layout': { 'line-cap': 'round', 'line-join': 'round' },
             'filter': ['==', ['get', 'type'], 'Outbound Highway'], 
             'paint': { 
-                'line-color': '#f59e0b', 
+                'line-color': netLegPaint(false).color,      // 24 Nov 2026: grey, the empty leg (was amber #f59e0b)
                 'line-width': WIDTH_CORE, 
                 'line-opacity': 1,
                 'line-offset': OFFSET_OUT
@@ -4123,7 +4208,7 @@
             'layout': { 'line-cap': 'round', 'line-join': 'round' },
             'filter': ['==', ['get', 'type'], 'Inbound Highway'], 
             'paint': { 
-                'line-color': '#059669', 
+                'line-color': netLegPaint(true).color,       // 24 Nov 2026: ink, the loaded leg (was green #059669)
                 'line-width': WIDTH_CORE, 
                 'line-opacity': 1,
                 'line-offset': OFFSET_IN
@@ -4149,7 +4234,7 @@
             'source': 'routes-source',
             'layout': { 'line-cap': 'round', 'line-join': 'round' },
             'filter': haulPieceFilter(),
-            'paint': { 'line-color': ['match', ['get', 'type'], 'Inbound Haul', '#059669', '#f59e0b'], 'line-width': HAUL_DOT_WIDTH,
+            'paint': { 'line-color': netHaulColour(), 'line-width': HAUL_DOT_WIDTH,
                        'line-opacity': 1, 'line-offset': OFFSET_IN, 'line-dasharray': HAUL_DOTS }
         }, labelAnchor());
 
@@ -6721,14 +6806,10 @@
                     // became green/amber the moment the forecast overlay was switched on,
                     // while the sidebar key still showed the old colours. The base layers
                     // are green/amber now, so this only resets opacity after a highlight.
-                    if (map.getLayer('inbound-lines')) {
-                        map.setPaintProperty('inbound-lines', 'line-color', '#059669'); 
-                        map.setPaintProperty('inbound-lines', 'line-opacity', 1.0);
-                    }
-                    if (map.getLayer('outbound-lines')) {
-                        map.setPaintProperty('outbound-lines', 'line-color', '#f59e0b'); 
-                        map.setPaintProperty('outbound-lines', 'line-opacity', 1.0);
-                    }
+                    // 24 Nov 2026: the colours are the look on screen's (applyLegLook: ink and grey, or the month's quiet grey)
+                    if (typeof applyLegLook === 'function') applyLegLook();
+                    if (map.getLayer('inbound-lines')) map.setPaintProperty('inbound-lines', 'line-opacity', 1.0);
+                    if (map.getLayer('outbound-lines')) map.setPaintProperty('outbound-lines', 'line-opacity', 1.0);
 
                     // Setup Universal Hover Glow Layer (Sits behind the routes)
                     if (!map.getLayer('global-route-hover')) {
@@ -6886,12 +6967,12 @@
                     map.addLayer({
                         id: 'forecast-casing', type: 'line', source: 'routes-source',
                         filter: ['==', 'is_forecast', true],
-                        paint: { 'line-color': CONFIG.COLORS.forecastCasing, 'line-width': FORECAST_CASING_WIDTH, 'line-opacity': 0.9 }
+                        paint: { 'line-color': CONFIG.COLORS.forecastCasing, 'line-width': FORECAST_CASING_WIDTH, 'line-opacity': 1 }
                     });
                     map.addLayer({
                         id: 'forecast-layer', type: 'line', source: 'routes-source',
                         filter: ['==', 'is_forecast', true],
-                        paint: { 'line-color': CONFIG.COLORS.forecast, 'line-width': FORECAST_LINE_WIDTH, 'line-opacity': 0.95 }
+                        paint: { 'line-color': CONFIG.COLORS.forecast, 'line-width': FORECAST_LINE_WIDTH, 'line-opacity': 1 }
                     });
                     map.addLayer({
                         id: 'forecast-labels', type: 'symbol', source: 'routes-source',
@@ -7628,8 +7709,8 @@
     function ensureForecastLayers(){
         if(map.getLayer('forecast-layer')) return;
         const f = forecastLayerFilter();
-        map.addLayer({id:'forecast-casing',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecastCasing,'line-width':FORECAST_CASING_WIDTH,'line-opacity':0.9}}, labelAnchor());
-        map.addLayer({id:'forecast-layer',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecast,'line-width':FORECAST_LINE_WIDTH,'line-opacity':0.95}}, labelAnchor());
+        map.addLayer({id:'forecast-casing',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecastCasing,'line-width':FORECAST_CASING_WIDTH,'line-opacity':1}}, labelAnchor());
+        map.addLayer({id:'forecast-layer',type:'line',source:'routes-source',filter:f,paint:{'line-color':CONFIG.COLORS.forecast,'line-width':FORECAST_LINE_WIDTH,'line-opacity':1}}, labelAnchor());
         map.addLayer({id:'forecast-labels',type:'symbol',source:'routes-source',filter:f,layout:{'symbol-placement':'line-center','text-field':forecastLabelField(),'text-size':12,'text-offset':[0,-1]},paint:{'text-color':'#ffffff','text-halo-color':CONFIG.COLORS.forecastLabelHalo,'text-halo-width':2}});
         if (typeof ensureDiversionEdge === 'function') ensureDiversionEdge();   // 29 Oct 2026: with the overlay it edges
         raiseMarks();
@@ -7706,8 +7787,8 @@
     //: 20 t load), in which case they are twenty times larger and the legend names the unit
     const ROUTE_VOLUME_STOPS = (CONFIG.FORECAST_UNIT && CONFIG.FORECAST_UNIT !== 'vehicles') ? VOLUME_STOPS.map(s => s * 20) : VOLUME_STOPS;
     // 16 Oct 2026 (D115): 6 / 8.5 (were 5 / 7.5), the forecast line's width, so the flow's lanes fit every mode
-    const ROAD_LOAD_LINE_WIDTH = 6;        // one width (the heat map's), never by volume
-    const ROAD_LOAD_CASING_WIDTH = 8.5;    // 2.5 px wider than the line it sits under
+    // REVERSED 24 Nov 2026 (Q4, Direction 2): a shared section's width is its band too, as its colour
+    // (bandWidthExpr('rl_mv', rlStops()), the casing LINE_BAND_PAD wider): ROAD_LOAD_LINE_WIDTH / _CASING_WIDTH are gone
     //: 19 Oct 2026 (the user: "labels too wordy and noisy, perhaps a small icon label with a legend explaining what the
     //: number is"): the run's label is its NUMBER on a badge with a two-way arrow ("118"; was "118 two-way / day · 7
     //: routes"), what it counts said once in the heat map's key; the route count is in the section's card on click. A
@@ -7765,7 +7846,9 @@
     //: blues sank into the ground. There the edge turns pale; the one list of blues is kept. A separate Dark list (c)
     //: stays open to John.
     const HEAT_EDGE_DARK = '#E7E5E4';
-    function heatEdgeColour(heat){ return heat && typeof labelsDark === 'function' && labelsDark() ? HEAT_EDGE_DARK : CONFIG.COLORS.forecastCasing; }
+    // NARROWED 24 Nov 2026 (card 2): the edge under every forecast line is WHITE on a light ground (CONFIG.COLORS.forecastCasing;
+    // it was the near-black ink) and the pale HEAT_EDGE_DARK on a dark ground, the heat map on or Off
+    function heatEdgeColour(heat){ return typeof labelsDark === 'function' && labelsDark() ? HEAT_EDGE_DARK : CONFIG.COLORS.forecastCasing; }
     let HEAT_LINES_ON = false;      // set by applyCarbonMode: a heat map colours the route lines now
     function restyleHeatEdge(){
         try {
@@ -7778,7 +7861,7 @@
     const CARBON_NONE = '#A8A29E';
     //: the four stops as fractions of the programme's largest route-month, rounded to two significant figures
     const CARBON_STEP_FRACTIONS = [0.2, 0.4, 0.6, 0.8];
-    const CARBON_LINE_WIDTH = 6, CARBON_CASING_WIDTH = 8.5;     // 16 Oct 2026 (D115): were 5 / 7.5
+    // REVERSED 24 Nov 2026 (Q4): CARBON_LINE_WIDTH / CARBON_CASING_WIDTH are gone; a carbon line's width is its carbon band
     const RL = { cache: {}, pending: {}, error: {}, month: null, wired: false };
 
     function modeOn(id){ const cb = document.getElementById(id); return !!(cb && cb.checked); }
@@ -7928,10 +8011,10 @@
         if (map.getLayer('road-load-line')) return;
         map.addLayer({ id: 'road-load-casing', type: 'line', source: 'road-load-source',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
-            paint: { 'line-color': CONFIG.COLORS.forecastCasing, 'line-width': ROAD_LOAD_CASING_WIDTH, 'line-opacity': 0.9 } }, labelAnchor());
+            paint: { 'line-color': CONFIG.COLORS.forecastCasing, 'line-width': bandWidthExpr('rl_mv', rlStops(), LINE_BAND_PAD), 'line-opacity': 1 } }, labelAnchor());
         map.addLayer({ id: 'road-load-line', type: 'line', source: 'road-load-source',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
-            paint: { 'line-color': CONFIG.COLORS.brand, 'line-width': ROAD_LOAD_LINE_WIDTH, 'line-opacity': 0.95 } }, labelAnchor());
+            paint: { 'line-color': CONFIG.COLORS.brand, 'line-width': bandWidthExpr('rl_mv', rlStops(), 0), 'line-opacity': 1 } }, labelAnchor());
         try { addPillBadges(map); } catch (e) {}
         map.addLayer({ id: 'road-load-labels', type: 'symbol', source: ROAD_LOAD_LABEL_SOURCE,
             filter: ['>=', ['get', 'rl_mv'], ROAD_LOAD_BADGE_MIN],
@@ -8043,12 +8126,20 @@
         const focus = councilFocus();
         const paint = focus ? COUNCIL_ROUTE_COLOR : vol ? volumeColor('f_avg', ROUTE_VOLUME_STOPS) : co2 ? carbonColor('f_co2', stops) : CONFIG.COLORS.forecast;
         const heat = vol || co2;
+        // 24 Nov 2026 (Q4, Direction 2): the width by the same band as the colour; Off: one width
+        const bandW = pad => vol ? bandWidthExpr('f_avg', ROUTE_VOLUME_STOPS, pad) : bandWidthExpr('f_co2', stops, pad);
+        const caseW = heat ? bandW(LINE_BAND_PAD) : FORECAST_CASING_WIDTH;
         if (map.getLayer('forecast-layer')) {
             map.setPaintProperty('forecast-layer', 'line-color', paint);
-            map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : heat ? CARBON_LINE_WIDTH : FORECAST_LINE_WIDTH);
+            map.setPaintProperty('forecast-layer', 'line-width', focus ? COUNCIL_ROUTE_WIDTH : heat ? bandW(0) : FORECAST_LINE_WIDTH);
         }
         COUNCIL_QUIET_LAYERS.forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, 'visibility', focus ? 'none' : 'visible'); });
-        if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', heat ? CARBON_CASING_WIDTH : FORECAST_CASING_WIDTH);
+        if (map.getLayer('forecast-casing')) map.setPaintProperty('forecast-casing', 'line-width', caseW);
+        // the amber diversion edge takes the casing's place, at the casing's width (29 Oct), so it follows the band too
+        if (map.getLayer('diversion-edge')) map.setPaintProperty('diversion-edge', 'line-width', caseW);
+        // the flow's lanes (1.6 px a lane, 1.75 px off the middle) do not fit inside a 3 px line: on the first band they
+        // are not drawn while a heat map is on (the moving dots replace the lanes in their own build)
+        if (map.getLayer('forecast-flow')) map.setPaintProperty('forecast-flow', 'line-width', flowWidthExpr(heat && !focus));
         HEAT_LINES_ON = heat && !focus; restyleHeatEdge();
         if (co2) { ensureCarbonLabelLayer(); syncCarbonLabels(); }
         else {
@@ -8057,8 +8148,8 @@
         }
         if (map.getLayer('road-load-line')) {
             map.setPaintProperty('road-load-line', 'line-color', volumeColor('rl_mv', rlStops()));
-            map.setPaintProperty('road-load-line', 'line-width', ROAD_LOAD_LINE_WIDTH);
-            if (map.getLayer('road-load-casing')) map.setPaintProperty('road-load-casing', 'line-width', ROAD_LOAD_CASING_WIDTH);
+            map.setPaintProperty('road-load-line', 'line-width', bandWidthExpr('rl_mv', rlStops(), 0));
+            if (map.getLayer('road-load-casing')) map.setPaintProperty('road-load-casing', 'line-width', bandWidthExpr('rl_mv', rlStops(), LINE_BAND_PAD));
             if (map.getLayer('road-load-labels')) map.setLayoutProperty('road-load-labels', 'text-field', ROAD_LOAD_LABEL);
         }
         if (typeof renderFlowLegend === 'function') renderFlowLegend();   // 16 Oct (D115): the flow legend follows the council view
@@ -8477,8 +8568,9 @@
         try { if (next) map.moveLayer('forecast-flow', next); else map.moveLayer('forecast-flow'); } catch (e) {}
     }
     // the lane's width by its figure: a step on fl_mv at the five bands' stops
-    function flowWidthExpr(){
-        const e = ['step', ['to-number', ['get', 'fl_mv'], 0], FLOW_WIDTHS[0]];
+    function flowWidthExpr(hideFirst){
+        // 24 Nov 2026: hideFirst (a heat map on, its first band's line 3 px wide): no lane on the first band
+        const e = ['step', ['to-number', ['get', 'fl_mv'], 0], hideFirst ? 0 : FLOW_WIDTHS[0]];
         FLOW_STOPS.forEach((s, i) => { e.push(s, FLOW_WIDTHS[i + 1]); });
         return e;
     }

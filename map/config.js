@@ -19,12 +19,15 @@ window.CONFIG = {
 
   // Theme (Wayscope, 29 Sep 2026): ink #1F2024, blue for routes/controls, orange is the
   // brand accent and is NOT used on the map (it would blur with amber warnings).
+  // 24 Nov 2026 (John, the public map's route lines rethink, Q1 to Q4): the stock blues are gone from the map. The sign
+  // blue is the one blue of a control, a pick and the forecast line with the heat map Off; a forecast line sits on a
+  // WHITE casing on light grounds (index.html turns it pale on dark ones: HEAT_EDGE_DARK).
   COLORS: {
-    brand:             "#2563EB",  // the accent blue
-    brandDark:         "#1F2024",  // ink (headings, casing)
-    forecast:          "#3B82F6",  // forecast route highlight (core)
-    forecastCasing:    "#1F2024",  // darker outline behind forecast routes
-    forecastLabelHalo: "#2563EB",  // halo behind forecast labels
+    brand:             "#0B4EA2",  // the sign blue (a picked route's halo, the shared sections before they take a colour)
+    brandDark:         "#1F2024",  // ink (headings)
+    forecast:          "#0B4EA2",  // the forecast line, heat map Off: one sign blue
+    forecastCasing:    "#FFFFFF",  // the white casing under a forecast line (light grounds)
+    forecastLabelHalo: "#0B4EA2",  // halo behind forecast labels (24 Nov 2026: the sign blue)
     selection:         "#DC2626",  // a clicked/selected route
     peak:              "#DC2626",  // alerts / peak values (theme red)
     green:             "#059669"   // success / confirmations
