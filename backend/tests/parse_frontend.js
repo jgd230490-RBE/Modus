@@ -2037,15 +2037,15 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   // 8b. the data palette: six tokens, light and dark, read in fixed order, never a raw hex on a dataset
   // 11 Oct 2026 NARROWED: the user chose the orange-led palette (plan = brand orange, delivered = blue, model = violet)
   ok("the data palette is six tokens in the light look (plan orange, delivered blue, teal, model violet, gold, not-yet grey)",
-    /--chart-1:#E8590C; --chart-1-soft:rgba\(232,89,12,\.18\); --chart-2:#2563EB; --chart-3:#0D9488; --chart-4:#7C3AED; --chart-5:#A07D34; --chart-none:#A8A29E;/.test(html));
+    /--chart-1:#E8590C; --chart-1-soft:rgba\(232,89,12,\.18\); --chart-2:#0B4EA2; --chart-3:#0D9488; --chart-4:#7C3AED; --chart-5:#A07D34; --chart-none:#A8A29E;/.test(html));   // NARROWED 24 Nov 2026 (own look, stage 6): delivered is the sign blue (was #2563EB / Dark #5B8FF0); the palette check passes
   ok("...and six dark steps on the dark surface (validated 10 Oct, colour-system-1010.md)",
-    /--chart-1:#E8681E; --chart-1-soft:rgba\(232,104,30,\.22\); --chart-2:#5B8FF0; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965;/.test(html));
+    /--chart-1:#E8681E; --chart-1-soft:rgba\(232,104,30,\.22\); --chart-2:#8AB4F8; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965;/.test(html));   // NARROWED 24 Nov 2026 (own look, stage 6): delivered is the sign blue (was #2563EB / Dark #5B8FF0); the palette check passes
   ok("⭐ the charts read the slots in FIXED order and a sixth series is grey, never a new hue (no cycled PALETTE)",
     code.includes('const CHART_SLOTS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5"];')
     && code.includes('const colorOf = (i) => tok(CHART_SLOTS[i] || "--chart-none", "#A8A29E");') && !/const PALETTE = \[/.test(code));
   ok("🔴 no Dashboard dataset carries a raw hex: planned is slot 1, delivered slot 2, the model slot 4 (status colours stay on the stockpile chart only)",
     !/backgroundColor: "#[0-9A-Fa-f]{6}"/.test(_dbBody) && !/borderColor: "#[0-9A-Fa-f]{6}"/.test(_dbBody)
-    && _dbBody.includes('C2 = tok("--chart-2", "#2563EB"), C4 = tok("--chart-4", "#7C3AED")')
+    && _dbBody.includes('C2 = tok("--chart-2", "#0B4EA2"), C4 = tok("--chart-4", "#7C3AED")')   // NARROWED 24 Nov 2026 (own look, stage 6): the fallback follows the token
     && _dbBody.includes("data: D.actualM, backgroundColor: C2") && _dbBody.includes("data: D.fairM, backgroundColor: C4")
     && _dbBody.includes("data: D.co2M, borderColor: C1, backgroundColor: C1S"));
   // 8. the shell: warm neutrals, a dimmed rail whose active item is ink
@@ -3414,7 +3414,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      ["blue", "blue-shades", "orange-shades", "orange"].every(k => !blockOf(`:root:not([data-theme="dark"])[data-accent="${k}"]`) && !blockOf(`html[data-theme="dark"][data-accent="${k}"]`))
      && !blockOf(DARK_BLUE) && !css.includes("[data-accent") && !css.includes("ACCENTS-START") && !css.includes("ACCENTS-END"));
   ok("W16: 🔴 Orange (the default, the user's pick) IS the look before 13 Oct: the same buttons, links and series in both looks",
-     series(eff("orange", false)).join(" ") === "#E8590C #2563EB #0D9488 #7C3AED #A07D34" && series(eff("orange", true)).join(" ") === "#E8681E #5B8FF0 #13A193 #9572EE #B48E3E"
+     series(eff("orange", false)).join(" ") === "#E8590C #0B4EA2 #0D9488 #7C3AED #A07D34" && series(eff("orange", true)).join(" ") === "#E8681E #8AB4F8 #13A193 #9572EE #B48E3E"   /* NARROWED 24 Nov 2026 (own look, stage 6): series 2 is the sign blue */
      && eff("orange", false).action === "#0B4EA2" && eff("orange", false).navy === "#0B4EA2" && eff("orange", true).action === "#8AB4F8");   // NARROWED 24 Nov 2026 (own look, stages 3 and 4): the button is the sign blue too (was #C2410C, Dark #FF8C14)   // NARROWED 24 Nov 2026 (own look, stage 3): the control blue is the sign blue #0B4EA2 (was #2563EB)
   // REVERSED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone; the other accents' series cannot be drawn any more, so every look draws Orange primary's
   ok("W16: Blue primary's swapped series (plan blue, delivered orange) is gone: no accent block reorders the series",

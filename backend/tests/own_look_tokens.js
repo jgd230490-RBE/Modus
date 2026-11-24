@@ -160,5 +160,12 @@ ok("5 no picker: the UI audit has no Blue pass, no extra accents and no --accent
 ok("5 the last stock-ish blue checkboxes (#1D4ED8) take the sign blue",
    !html.includes('accentColor: "#1D4ED8"') && (html.match(/accentColor: "var\(--navy\)"/g) || []).length >= 6);
 
+// ---- 6 the chart-blue trial: delivered (series 2) is the sign blue, kept because the palette check passes ---------
+// 24 Nov 2026, the palette check's own maths (parse_frontend W16): light worst colour-blind 21.0 (was 20.7), everyone
+// 22.5 (22.6), lowest series contrast 3.58, series 2 8.00:1 (5.17); Dark worst 15.2 (14.7), 18.5 (17.2), 4.59, 7.72.
+ok("⭐ 6 chart blue: --chart-2 is the sign blue in light (#0B4EA2) and Dark (#8AB4F8); the 'delivered' fallbacks follow",
+   tokenIn(rootBlock, "chart-2") === "#0B4EA2" && /html\[data-theme="dark"\]\{[^}]*--chart-2:#8AB4F8;/.test(css)
+   && !/tok\("--chart-2", "#2563EB"\)/.test(html) && (html.match(/tok\("--chart-2", "#0B4EA2"\)/g) || []).length === 2);
+
 console.log(`own_look_tokens.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  FAIL: " + f)); process.exit(1); }

@@ -81,7 +81,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
        categories, in fixed order, never cycled; --chart-none is "not yet". Validated for
        colour-blind separation and 3:1 contrast on white and on the dark surface. Status
        (--green/--gold/--red) is a separate, reserved scale and never a series colour. */
-    --chart-1:#E8590C; --chart-1-soft:rgba(232,89,12,.18); --chart-2:#2563EB; --chart-3:#0D9488; --chart-4:#7C3AED; --chart-5:#A07D34; --chart-none:#A8A29E; --chart-grid:rgba(100,116,139,.18);
+    --chart-1:#E8590C; --chart-1-soft:rgba(232,89,12,.18); --chart-2:#0B4EA2; --chart-3:#0D9488; --chart-4:#7C3AED; --chart-5:#A07D34; --chart-none:#A8A29E; --chart-grid:rgba(100,116,139,.18);
     --hdr-bg:#1F2024; --hdr-fg:#FFFFFF; --hdr-muted:rgba(255,255,255,.7); --hdr-rule:rgba(255,255,255,.28);
     --hdr-btn:rgba(255,255,255,.10); --hdr-btn-hover:rgba(255,255,255,.20); --hdr-on:rgba(255,255,255,.25); --hdr-border:rgba(255,255,255,.20);
     --hdr-logo:url("/brand/logo-header-on-dark.svg"); --popover-bg:#1F2024; --popover-fg:#E6E7EA; --popover-muted:#9C9FA4; --popover-line:rgba(255,255,255,.12);
@@ -108,7 +108,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     --ok-text:#34D399; --warn-text:#FBBF24; --bad-text:#F87171;
     --haul-text:#F0A838; --haul-soft:#3A2E1C;
     --st-ok-bg:#052E16; --st-warn-bg:#3A2E1C; --st-bad-bg:#3F1D1D; --st-none-bg:#26282D;
-    --chart-1:#E8681E; --chart-1-soft:rgba(232,104,30,.22); --chart-2:#5B8FF0; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
+    --chart-1:#E8681E; --chart-1-soft:rgba(232,104,30,.22); --chart-2:#8AB4F8; --chart-3:#13A193; --chart-4:#9572EE; --chart-5:#B48E3E; --chart-none:#6B6965; --chart-grid:rgba(154,161,171,.16);
     --navy-soft:rgba(138,180,248,.16); --navy-soft-col:rgba(138,180,248,.10);
     color-scheme:dark;
   }
@@ -3128,7 +3128,7 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   // 1:1), so it reads from across a site office; `fill` = one section at a time, filling the screen
   const fill = wall && wallLayout !== "all";
   const tf = { size: wall ? Math.max(13, Math.min(30, Math.round(winH / 74))) : 11 };
-  const C1 = tok("--chart-1", "#E8590C"), C1S = tok("--chart-1-soft", "rgba(232,89,12,.18)"), C2 = tok("--chart-2", "#2563EB"), C4 = tok("--chart-4", "#7C3AED");
+  const C1 = tok("--chart-1", "#E8590C"), C1S = tok("--chart-1-soft", "rgba(232,89,12,.18)"), C2 = tok("--chart-2", "#0B4EA2"), C4 = tok("--chart-4", "#7C3AED");
   const eurTip = { callbacks: { label: (c) => `${c.dataset.label}: ${CUR()}${grp(c.parsed.y)}` } };
   const commonOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
   const barScales = { scales: { x: { grid: { display: false }, ticks: { font: tf } }, y: { ticks: { font: tf } } } };
@@ -6698,7 +6698,7 @@ function StockpilesPage({ meta, access, who }){
     : sp.peak_pct != null ? { tone: "ok", text: `Never over: ${Math.round(sp.peak_pct)} % at most` } : null;
   const nowIdx = sp && cw ? sp.weeks.findIndex(w => w.month_index === cw.month_index && w.week_index === cw.week_index) : -1;
   const cut = sp ? sp.weeks.reduce((k, w, i) => (w.basis === "recorded" || w.basis === "part") ? i : k, 0) : 0;
-  const C2 = tok("--chart-2", "#2563EB");
+  const C2 = tok("--chart-2", "#0B4EA2");
   const chartCfg = sp && sp.capacity_qty ? { type: "line",
     data: { labels: sp.weeks.map(w => stockWeekWord(w.from) + " " + (w.from || "").slice(2, 4)),
       datasets: [{ label: sp.name, data: sp.weeks.map(w => Math.round(w.balance_end * 1000 / sp.capacity_qty) / 10),
