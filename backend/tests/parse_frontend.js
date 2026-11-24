@@ -442,8 +442,9 @@ ok("peak is the busiest single month per working day",
   code.includes("Math.max(...monthlyT) / wd") && code.includes("Math.max(...monthlyQ) / wd"));
 ok("vehicle loads convert through the payload", code.includes("avgT / p, peakVeh = peakT / p"));
 ok("trips are stated to equal vehicle loads on one line", code.includes("avgTrips: avgVeh, peakTrips: peakVeh"));
-ok("the cards sit in the navy strip with tabular numerals, no new fonts",
-  code.includes('style={{ background: "var(--navy)" }}') && code.includes("tabular-nums")
+// REVERSED 24 Nov 2026 (own look, B1 stage 4): the figures sit in the ruled strip (2 px ink line), not a navy fill
+ok("the cards sit in the ruled strip with tabular numerals, no new fonts",
+  code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-6 kpi-num" data-fig-strip="submit">') && !code.includes('style={{ background: "var(--navy)" }}') && code.includes("tabular-nums")
   && !/fontFamily/.test(code.slice(code.indexOf("Avg vehicles / day") - 2000, code.indexOf("Avg vehicles / day") + 2000)));
 
 // ---- 4d. Tasks C + D — the Look-ahead page ------------------------------------
@@ -2079,8 +2080,9 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
     code.includes("function PageHeader({ title, subtitle, actions, children, kicker })") && code.includes('{kicker && <div className="kicker">{kicker}</div>}')
     && /\.kicker\{font:600 12px ui-monospace,/.test(html)
     && ['<PageHeader title="Dashboard" kicker=', '<PageHeader title="Forecasts" kicker="Plan"', '<PageHeader title="Configuration" kicker="Data"', '<PageHeader title="Look-ahead" kicker='].every(t => code.includes(t)));
-  ok("the Dashboard's six figures sit in one strip card, and Big screen is the orange action button",
-    /\.dash-cards\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:0;border:1px solid var\(--line\);/.test(html) && _dbBody.includes('className={wall ? "btn-sec" : "btn-pri"}'));
+  // NARROWED 24 Nov 2026 (own look, B1 stage 4): the strip is ruled, not boxed: a 2 px ink line on top, a hairline under
+  ok("the Dashboard's six figures sit in one ruled strip, and Big screen is the orange action button",
+    /\.dash-cards\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:0;border:0;border-top:2px solid var\(--ink\);border-bottom:1px solid var\(--line\);/.test(html) && _dbBody.includes('className={wall ? "btn-sec" : "btn-pri"}'));
   ok("orange-led means the largest material over the whole programme takes slot 1; ranked on every row, so a filter never repaints",
     _dbBody.includes("const matRank = {}; rows.forEach(r => { matRank[r.material_type] = (matRank[r.material_type] || 0) + (r.tonnes || 0); });")
     && _dbBody.includes(".sort((a, b) => (matRank[b] || 0) - (matRank[a] || 0)"));
@@ -4072,7 +4074,7 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
      && !/\btext-slate-300\b/.test(code) && !html.includes(".text-slate-300{") && !html.includes(".text-emerald-600{")
      && (code.match(/<span className="text-slate-500">rate not set<\/span>/g) || []).length === 3);
   ok("decision 3: the Submit strip's peak values carry no colour of their own (the label says Peak)",
-     !code.includes("text-[color:var(--gold)]") && code.includes('<div className="text-lg font-bold tabular-nums">{value}</div>') && code.includes(".map(([label, value]) => (") && !code.includes('"peak"]'));
+     !code.includes("text-[color:var(--gold)]") && code.includes('<div className="text-lg font-bold tabular-nums text-[color:var(--navy-deep)]">{value}</div>') /* NARROWED 24 Nov 2026 (own look, B1 stage 4): the strip's figure colour, no longer the fill's white */ && code.includes(".map(([label, value]) => (") && !code.includes('"peak"]'));
   ok("decision 2: the green status WORDS read --ok-text, never --green — In force, Delivered %, the CatChips 'in' chip, the Routes vehicle chips, the set / held / routed tags, the simulation's checks; the red chip words read --bad-text; the stale chip --warn-text",
      code.includes('<span className="font-semibold" style={{ color: "var(--ok-text)" }}>In force</span>') && !code.includes("text-emerald-600")
      && code.includes('<span style={{ color: "var(--ok-text)" }}>{r.deliveredPct.toFixed(0)} %</span>')
@@ -4126,14 +4128,16 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("after the first compare: the two slate-100 chips on Zones (Advisory, Not open) read slate-600 (slate-500 on slate-100 is 4.34:1), and the compact fuel card's two captions no longer truncate at 12 px (the BAF line carries its own hover title) — finding 11's clipped captions, brought forward because the 12 px made the clipping worse",
      !/bg-slate-100 text-slate-500|text-slate-500 bg-slate-100/.test(code)
      && code.includes('<span className="tg text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>') /* NARROWED 24 Nov 2026 (own look): + the tag class */
-     && _fw.includes('<div className="text-xs uppercase tracking-wide text-slate-500 mt-0.5">') && _fw.includes('<div className="text-xs text-slate-500 mt-0.5" title={bafTxt}>{bafTxt}</div>')
+     // NARROWED 24 Nov 2026 (own look, B1 stage 4): the caption in sentence case (no small capitals), the words unchanged
+     && _fw.includes('<div className="text-xs text-slate-500 mt-0.5">') && _fw.includes('<div className="text-xs text-slate-500 mt-0.5" title={bafTxt}>{bafTxt}</div>')
      && !_fw.includes("text-slate-500 mt-0.5 truncate") && !_fw.includes('mt-0.5 truncate" title={bafTxt}'));
   ok("🔴 captions #20: the Config fuel widget has no 9, 10 or 11 px text (text-xs text-slate-500 captions, the DESNZ attribution among them) and its three admin buttons are btn-sec btn-sm; the Dashboard's figure labels and sub-lines, the Today card's captions and the group titles are 12 px; the never-rendered Kpi component is gone",
      !/text-\[(9|10|11)px\]/.test(_fw) && _fw.includes('const attribution = <span className="text-xs text-slate-500"') && (_fw.match(/className="btn-sec btn-sm disabled:opacity-40"/g) || []).length === 3
      && !_fw.includes("hover:bg-slate-50 disabled:opacity-40") && _fw.includes('<span className="text-xs uppercase tracking-wide text-slate-500">Diesel {country}</span>') && _fw.includes('<span className="w-full text-xs text-slate-500">The base is locked')
-     && (code.match(/className="text-xs font-semibold uppercase tracking-wide text-slate-500 mt-0\.5 fig-label"/g) || []).length === 2 && !code.includes("text-[11px] font-semibold uppercase tracking-wide text-slate-400")
+     // NARROWED 24 Nov 2026 (own look, B1 stage 4): the figure labels and group titles in sentence case (no small capitals)
+     && (code.match(/className="text-xs font-semibold text-slate-500 mt-0\.5 fig-label"/g) || []).length === 2 && !code.includes("text-[11px] font-semibold uppercase tracking-wide text-slate-400")
      && (code.match(/className="text-xs text-slate-500 fig-sub"/g) || []).length === 2 && !code.includes("text-slate-400 fig-sub")
-     && (code.match(/className="text-xs font-semibold uppercase tracking-wide(?: mb-2)? fig-group"/g) || []).length === 2 && !/text-\[10px\] font-semibold uppercase tracking-wide(?: mb-2)? fig-group/.test(code)
+     && (code.match(/className="text-xs font-semibold(?: mb-2)? fig-group"/g) || []).length === 2 && !/uppercase tracking-wide(?: mb-2)? fig-(group|label)/.test(code) && !/text-\[10px\] font-semibold uppercase tracking-wide(?: mb-2)? fig-group/.test(code)
      && code.includes('<div className="text-xs text-slate-500">{cw.from ? `week ') && code.includes('<div className="text-xs text-slate-500 mt-1">{bigNum(T.wkPlanT)}') && code.includes('<div className="text-xs text-slate-500 mt-1">{acct && acct.week ? `${acct.reported}')
      && !code.includes("function Kpi(") && !/\bKpi\b/.test(code));
 }

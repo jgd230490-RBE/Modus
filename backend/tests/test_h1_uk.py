@@ -1116,7 +1116,8 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    len(_sites.get("action", [])) == 23 and ".text-white[style*=\"var(--action)\"]{color:var(--action-fg);}" in fe
    # NARROWED 24 Nov 2026 (own look, stage 3): navy 2 -> 1 and blue 3 -> 0: the drawing palette's picked tool and the three
    # "Place on map" toggles are selections, now a --navy-soft tint with --navy words; the Submit strip stays (Group B's strip)
-   and len(_sites.get("navy", [])) == 1 and not _sites.get("blue") and len(_sites.get("slate-800", [])) == 2
+   # NARROWED 24 Nov 2026 (own look, B1 stage 4): navy 1 -> 0, the Submit strip is a ruled strip with ink figures
+   and not _sites.get("navy") and not _sites.get("blue") and len(_sites.get("slate-800", [])) == 2
    # NARROWED 24 Nov 2026 (own look, B1 stage 3): the team pill is a plain word now, so no text-white on the team palette
    and not _sites.get("team palette") and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
@@ -1128,7 +1129,8 @@ ok("...every inline navy / blue fill is written `background: \"var(--navy)\"` / 
    # NARROWED 10 Nov 2026 (wave 2, card 13): 14+ -> 2 navy fills (the Submit strip and the palette's picked tool); the primary
    # actions are written the same way on the accent, `background: "var(--action)"`, 23 of them
    # NARROWED 24 Nov 2026 (own look, stage 3): one navy fill (the Submit strip) and no blue fill; a selection is a tint
-   and _fe_wo.count('background: "var(--navy)"') + _fe_wo.count('background:"var(--navy)"') == 1 and _fe_wo.count('background: "var(--blue)"') == 0
+   # NARROWED 24 Nov 2026 (own look, B1 stage 4): no navy fill left (the Submit strip is ruled); the dark rule stays for any later one
+   and _fe_wo.count('background: "var(--navy)"') + _fe_wo.count('background:"var(--navy)"') == 0 and _fe_wo.count('background: "var(--blue)"') == 0
    and _fe_wo.count('background: "var(--action)"') >= 22   # NARROWED 11 Nov 2026 (CLOCS B-F6): Route all in the menu
    and "backgroundColor: \"var(--navy)\"" not in _fe_wo and "backgroundColor: \"var(--blue)\"" not in _fe_wo)
 _bad1 = []
@@ -1142,7 +1144,10 @@ ok("...in the dark look --control-fg reads 4.5:1 on both fills in every accent (
    not _bad1 and round(_cr("#1F2024", "#FF8C14"), 2) == 6.99 and round(_cr("#FFFFFF", "#FF8C14"), 2) == 2.33, "; ".join(_bad1))
 ok("...the Submit strip's labels sit at full opacity in the strip's own text colour (white/60 was 2.86:1 in Ink, 1.65:1 in Dark); the gold 'peak' values went with UI fix 4 (decision 3, 17 Oct)",
    # NARROWED 22 Oct 2026 (UI fix 7): the labels are 12 px now (text-xs)
-   '<div className="text-xs uppercase tracking-wide">{label}</div>' in fe and "text-white/60" not in fe
+   # NARROWED 24 Nov 2026 (own look, B1 stage 4): the strip is no longer filled: the labels are the caption grey, in sentence
+   # case (no small capitals, design language's banned list), on the page's own surface
+   '<div className="text-xs text-slate-500">{label}</div>' in fe and "text-white/60" not in fe
+   and 'divide-x divide-slate-200 text-white kpi-num' not in fe
    and '(tone === "peak" ? "text-[color:var(--gold)]" : "")' not in fe
    and '.unit-sw-seg button[aria-pressed="true"]{background:var(--navy-soft);color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);}' in fe)   # NARROWED 10 Nov 2026 (card 13): the selected segment is the tint
 
@@ -1309,7 +1314,8 @@ ok("...the rail's group headings lose their opacity:.85 (3.45 → 4.56), the big
    and "text-slate-300" not in _fe_wo and ".text-slate-300{" not in _dark and ".text-emerald-600{" not in _dark
    and _fe_wo.count('<span className="text-slate-500">rate not set</span>') == 3 and 'className="text-slate-500">not recorded</span>' in fe)
 ok("UI fix 4 (decision 3): the Submit strip's six values read in the strip's own text colour — the amber on the strip was 1.62:1 (1.4:1 in Dark) and the label already says Peak",
-   '<div className="text-lg font-bold tabular-nums">{value}</div>' in fe and ".map(([label, value]) => (" in fe and '"peak"]' not in fe
+   # NARROWED 24 Nov 2026 (own look, B1 stage 4): the strip is ruled on the page's surface; the figures read --navy-deep
+   '<div className="text-lg font-bold tabular-nums text-[color:var(--navy-deep)]">{value}</div>' in fe and ".map(([label, value]) => (" in fe and '"peak"]' not in fe
    and '["Peak movements / day", fmt(perDay.peakTrips, "vehicles")],' in fe
    # NARROWED 24 Nov 2026 (own look, stage 3): the 17 Oct strip was #2563EB (Dark #FF8C14), written out
    and round(_cr(_ROOT["gold"], "#2563EB"), 2) == 1.62 and round(_cr(_DARK["gold"], "#FF8C14"), 1) == 1.4)

@@ -103,10 +103,11 @@ ok("3 selection: the look list's chosen row is a light sign blue tint and tick o
    // NARROWED 24 Nov 2026 (stage 5): the accent items went with the picker's accent half
    css.includes(".appearance-item.is-on{background:rgba(138,180,248,.16);}") && css.includes(".appearance-item .tick{opacity:0;color:#8AB4F8;}"));
 const placeOn = html.match(/style=\{(gatePlace|areaPlace|picking === c\.name) \? \{ background: "var\(--navy-soft\)", color: "var\(--navy\)" \} : undefined\}/g) || [];
-ok("🔴 3 selection: the three 'Place on map' toggles and the drawing palette's picked tool are the tint and sign blue words; no text-white sits on a --navy or --blue fill but the Submit strip",
+// NARROWED 24 Nov 2026 (own look, B1 stage 4): the Submit strip is a ruled strip now, so no navy fill is left at all
+ok("🔴 3 selection: the three 'Place on map' toggles and the drawing palette's picked tool are the tint and sign blue words; no text-white sits on a --navy or --blue fill",
    placeOn.length === 3 && html.includes('style={on ? { background: "var(--navy-soft)", color: "var(--navy)" } : undefined} />;')
    && !/background: ?"var\(--blue\)"/.test(html)
-   && (html.match(/background: ?"var\(--navy\)"/g) || []).length === 1 && html.includes('text-white kpi-num" style={{ background: "var(--navy)" }}>'));
+   && (html.match(/background: ?"var\(--navy\)"/g) || []).length === 0 && html.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-6 kpi-num" data-fig-strip="submit">'));
 ok("3 selection: a table column (today, the commit week) is the 6 % tint: eight column washes, none on the 10 % tint",
    (html.match(/var\(--navy-soft-col\)/g) || []).length === 8 && !/\{ background: "var\(--navy-soft\)" \}/.test(html));
 ok("3 figures: the Cost groups and their planned and fair £, today's vehicles, the Submit page's loads and fair £ and the Today heading read the ink, not the sign blue",

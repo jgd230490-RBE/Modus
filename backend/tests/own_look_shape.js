@@ -65,6 +65,22 @@ ok("3 tags: the CSS pills are plain words: abnormal-load categories, the row det
    /\.al-chip\{display:inline-block;font-size:12px;font-weight:600;white-space:nowrap;margin-right:8px;\}/.test(css) && !/\.al-(so|vr1|stgo|cu|warn|bad|grey|okc)\{[^}]*background/.test(css)
    && !/\.(rd-chip|clp-org|lp-badge|sim-chip|rc-end)\{[^}]*(background|border-radius|padding)/.test(css) && css.includes('.rd-chips .rd-chip+.rd-chip::before{content:"\\00B7";')
    && !/html\[data-theme="dark"\] \.al-\w+\{background/.test(css));
+// ---------------------------------------------------------------- stage 4: figures as one ruled strip
+ok("4 figures: .fig-strip is the one ruled strip (2 px ink on top, a hairline under, no gap, no box); its cells lose their box and take hairlines",
+   css.includes(".fig-strip{display:grid;gap:0 !important;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);overflow:hidden;background:none;}")
+   && css.includes(".fig-strip>*{border:0 !important;border-radius:0 !important;background:none !important;box-shadow:inset 1px 0 0 var(--line),inset 0 1px 0 var(--line) !important;margin:-1px 0 0 -1px;min-width:0;}"));
+ok("4 figures: the Look-ahead's tiles and the Submit page's six figures are .fig-strip rows; the tiles carry no .card, the Submit strip no fill",
+   code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-3" data-fig-strip="lookahead">')
+   && code.includes('<div className="px-4 py-3 min-w-0" data-la-kpi="1"') && !code.includes('<div className="card px-4 py-3 min-w-0"')
+   && code.includes('<div className="fig-strip grid grid-cols-2 md:grid-cols-6 kpi-num" data-fig-strip="submit">') && !code.includes("divide-x divide-slate-200 text-white kpi-num"));
+const ruled = sel => new RegExp("\\n  \\." + sel + "\\{[^}]*border-top:2px solid var\\(--ink\\);").test(css);
+ok("4 figures: every other row of figures is ruled under the ink line (Dashboard, Routes tiles, lorry plan, abnormal loads, pours, the phone's day)",
+   ["dash-cards", "rc-tiles", "lp-kpis", "al-stats", "pour-figs", "ph-figs"].every(ruled), ["dash-cards", "rc-tiles", "lp-kpis", "al-stats", "pour-figs", "ph-figs"].filter(x => !ruled(x)));
+ok("4 figures: no figure cell keeps a box (border + corner) of its own",
+   !/\n  \.(lp-kpi|al-stat|pour-figs div|dash-cards \.dash-card)\{[^}]*border:1px solid/.test(css) && !/\n  \.(lp-kpi|al-stat|pour-figs div)\{[^}]*border-radius:6px/.test(css));
+ok("4 figures: the phone's day summary is four cells, the Dashboard's labels keep two lines so the figures line up",
+   /\n  \.ph-figs\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\);/.test(css) && /\.ph-figs>span\{display:block;/.test(css)
+   && /\n  \.dash-card-l\{[^}]*min-height:2\.6em;/.test(css));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
