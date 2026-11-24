@@ -167,5 +167,51 @@ ok("⭐ 6 chart blue: --chart-2 is the sign blue in light (#0B4EA2) and Dark (#8
    tokenIn(rootBlock, "chart-2") === "#0B4EA2" && /html\[data-theme="dark"\]\{[^}]*--chart-2:#8AB4F8;/.test(css)
    && !/tok\("--chart-2", "#2563EB"\)/.test(html) && (html.match(/tok\("--chart-2", "#0B4EA2"\)/g) || []).length === 2);
 
+// ---- 7 guards: CEILINGS that may only come down (as ui_audit_rules' PINNED_MAX) -----------------------------------
+// A ceiling is lowered when the thing it counts goes; it is never raised. Each count was 0 or the figure below on
+// 24 Nov 2026 (the branch's stage 7); the same counters on main 388d2b2 read: Inter 2, stock blue 20, data-accent 22,
+// an orange --action 3, filled selections 3 (the phone segment, the wall bar's chosen button, PalBtn): each fails there.
+const CEIL = {
+  INTER: 0,           // "Inter" as a font name on the app page
+  STOCK_BLUE: 7,      // literal #2563EB / #3B82F6 outside the chart tokens: all data colours on a map or a plan block
+                      //   (--sim-lorry, .pb-there, two sim fallbacks, ROUTE_COLOR, NODE_COLORS' Port, one place stroke)
+  DATA_ACCENT: 0,     // data-accent anywhere on the page
+  ACTION_ORANGE: 0,   // a --action defined as an orange anywhere (a token block or an inline style)
+  FILLED_SELECTION: 0 // a selected / pressed / current thing drawn as a solid blue fill
+};
+const noComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const htmlNC = noComments(html);
+const interN = (htmlNC.match(/font-family:[^;}"]*\bInter\b|family=Inter\b|["']Inter["']/g) || []).length;
+ok("⭐ 7 ceiling: no Inter on the app page (font-family, a Google Fonts family or a quoted name)", interN <= CEIL.INTER, "found " + interN);
+const tokenBlocks = [rootBlock, ...[...css.matchAll(/html\[data-theme="(?:dark|light)"\]\{[^}]*\}/g)].map(m => m[0])];
+let chartTokenBlues = 0; for (const b of tokenBlocks) chartTokenBlues += (b.match(/--chart-[0-9a-z-]+:\s*#(?:2563EB|3B82F6)/gi) || []).length;
+const stockN = (htmlNC.match(/#(?:2563EB|3B82F6)\b/gi) || []).length - chartTokenBlues;
+ok("⭐ 7 ceiling: literal #2563EB / #3B82F6 outside the chart tokens may only fall (" + CEIL.STOCK_BLUE + ", all map / plan data colours)",
+   stockN <= CEIL.STOCK_BLUE, "found " + stockN);
+const accN = (html.match(/data-accent/g) || []).length;
+ok("🔴 7 ceiling: no data-accent anywhere on the page", accN <= CEIL.DATA_ACCENT, "found " + accN);
+const isOrange = (hex) => { const h = hex.replace("#", ""); if (!/^[0-9a-f]{6}$/i.test(h)) return false;
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); return r > 150 && r > g && g > b && r - b > 90 && g > 40; };
+const actionDefs = [...htmlNC.matchAll(/["']?--action["']?\s*:\s*["']?(#[0-9a-fA-F]{6}|var\(--[a-z0-9-]+\))/g)].map(m => m[1]);
+const resolve = (v) => { const t = v.match(/^var\(--([a-z0-9-]+)\)$/); return t ? (tokenIn(rootBlock, t[1]) || v) : v; };
+const orangeActions = actionDefs.map(resolve).filter(isOrange);
+ok("🔴 7 ceiling: no --action resolves to an orange (every definition, token blocks and inline styles)",
+   actionDefs.length >= 2 && orangeActions.length <= CEIL.ACTION_ORANGE && isOrange("#C2410C") && isOrange("#FF8C14") && !isOrange("#0B4EA2") && !isOrange("#8AB4F8"),
+   "defs " + actionDefs.join(" ") + " · orange " + orangeActions.join(" "));
+const FILL = /background(?:-color)?:\s*(var\(--(?:navy|action|blue)\)|#0B4EA2|#8AB4F8|#2563EB|#3B82F6|#5B8FF0|#1D4ED8)\s*[;}]/i;
+const SELECTED = /\.is-on|\[aria-pressed="true"\]|\[aria-selected="true"\]|\[aria-current|\.active\b|:checked|\.on\b|\.sel\b|\.picked/;
+const fills = [];
+css.replace(/([^{}]+)\{([^{}]*)\}/g, (m, sel, body) => {   // a 1–4 px ::before / ::after bar is a marker, not a fill
+  if (SELECTED.test(sel) && FILL.test(body) && !(/::(before|after)/.test(sel) && /height:\s*[1-4]px/.test(body))) fills.push(sel.trim().slice(-60)); return m; });
+const BLUE_V = '(?:var\\(--(?:navy|action|blue)\\)|#0B4EA2|#8AB4F8|#2563EB|#3B82F6|#1D4ED8)';
+for (const re of [new RegExp('\\b(?:on|active|sel|selected|picked|isOn|chosen|cur|current|is[A-Z]\\w*)\\b[^?\\n]{0,40}\\?\\s*\\{?\\s*(?:background|backgroundColor):\\s*"' + BLUE_V + '"', "g"),
+                  new RegExp('(?:background|backgroundColor):\\s*[\\w.!=<>"\' ]{1,60}\\?\\s*"' + BLUE_V + '"', "g"),
+                  /\?\s*"[^"]*\bbg-(?:blue-(?:600|700|800)|\[var\(--navy\)\])[^"]*"/g])
+  for (const m of script.matchAll(re)) fills.push(m[0].slice(0, 60));
+ok("⭐ 7 ceiling: no selection is a solid blue fill (CSS for a chosen / pressed / current thing; a ternary on a chosen flag)",
+   fills.length <= CEIL.FILLED_SELECTION, JSON.stringify(fills));
+ok("7 the ceilings only come down: every one is at or under its figure of 24 Nov 2026",
+   CEIL.INTER <= 0 && CEIL.STOCK_BLUE <= 7 && CEIL.DATA_ACCENT <= 0 && CEIL.ACTION_ORANGE <= 0 && CEIL.FILLED_SELECTION <= 0);
+
 console.log(`own_look_tokens.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  FAIL: " + f)); process.exit(1); }
