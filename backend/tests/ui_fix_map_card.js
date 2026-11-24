@@ -102,7 +102,8 @@ ok("C5 …and in the app's Dark look 4.5:1 or better on the dark panel", okDark 
 const infoRule = (html.match(/\n        \.info-i\{([^}]*)\}/) || [])[1] || "";
 ok("C6 the 'i' button is 24 px (axe target-size), drawing the same 18 px circle inside a 3 px transparent border",
    /width:24px; height:24px;/.test(infoRule) && /border:3px solid transparent;/.test(infoRule) && /background-clip:padding-box;/.test(infoRule)
-   && /box-shadow:inset 0 0 0 1\.5px #94A3B8;/.test(infoRule) && /margin:-3px;/.test(infoRule), infoRule);
+   // NARROWED 24 Nov 2026 (the own look, B2): the ring is the control-edge token (#8A8D93, a neutral grey; was the slate #94A3B8)
+   && /box-shadow:inset 0 0 0 1\.5px var\(--ctl-edge\);/.test(infoRule) && /--ctl-edge:#8A8D93;/.test(html) && /margin:-3px;/.test(infoRule), infoRule);
 ok("C7 its hit area is still 44 px (::after inset -10 px on 24 px)", html.includes('.info-i::after{ content:""; position:absolute; inset:-10px; }'));
 ok("C8 the phone sheet's 'or email <address>' link is a 44 px tap (was 17 px, crowded under the Report a concern button) that does not reach over the button",
    html.includes(".concern-or a{ color:var(--navy); display:inline-block; padding:14px 0; margin:-14px 0; }")
