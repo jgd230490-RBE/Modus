@@ -4455,7 +4455,9 @@ ok("🔴 no compliance claim on a screen: the drivers' hours words never say 'co
   ok("ERROR WORDS: Route all's retry says 'did not answer' with no status, and its last try a sentence",
      src.includes("say(`Wayscope did not answer. Trying again in ${wait} s (${attempt + 1} of ${ROUTE_RETRY_S.length})…`);")
      && src.includes("throw new Error(`No answer after ${attempt + 1} tries.`);")
-     && src.includes("setRouteMsg(`Routing the whole network stopped. ${errMsg(e)} Routes already worked out are kept, so you can run it again.`);"));
+     // NARROWED 23 Nov 2026 (claude/working-list): refused because another long job is running, the server's one sentence
+     // is shown alone (workBusy); any other stop keeps this message
+     && src.includes("setRouteMsg(workBusy(e) || `Routing the whole network stopped. ${errMsg(e)} Routes already worked out are kept, so you can run it again.`);"));
   ok("ERROR WORDS: the code sign-in still tells a wrong code from a failure (e.status, as okJSON throws)",
      src.includes(`.catch(e => setErr(e && e.status === 401 ? "That access code isn't recognised." : errSay("Couldn't sign in.", e)))`));
 
