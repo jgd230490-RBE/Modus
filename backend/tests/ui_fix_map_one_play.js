@@ -73,8 +73,10 @@ console.log("Kept");
 {
   ok("the panel's button: same words, still opens the bar and plays",
      html.includes('<button type="button" class="btn" id="tl-open" onclick="startTimeline()">▶ Play forecast timeline</button>'));
-  ok("the bar's Play keeps its orange fill",
-     html.includes("#timeline-bar #tl-play{ width:48px; background:#C2410C; border-color:#C2410C; color:#fff; font-size:17px; font-weight:700; }"));
+  // REVERSED 24 Nov 2026 (the own look, B2; John 23 Nov): the one filled button is the sign blue (the action colour), no orange on a control
+  ok("the bar's Play keeps its fill, now the action colour (the sign blue)",
+     html.includes("#timeline-bar #tl-play{ width:48px; background:var(--action); border-color:var(--action); color:var(--action-fg); font-size:17px; font-weight:700; }")
+     && /--action:#0B4EA2;/.test(html) && !/#C2410C/i.test(html));
   ok("the grey 'loading' Play still covers the panel's button (A-F7)",
      html.includes("const PLAY_IDS = ['tl-open', 'tl-play', 'm-play', 'm-full-play'];")
      && /\.play-wait, \.play-wait:hover\{ opacity:\.45; cursor:progress; filter:grayscale\(1\); \}/.test(html));

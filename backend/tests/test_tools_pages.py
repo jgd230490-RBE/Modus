@@ -418,6 +418,18 @@ WALL = read("backend/tests/smoke_reviewer_wall.py")
 ok("the reviewer-wall sweep checks that every /api/tools route is named open on purpose",
    "tools_public.OPEN_ROUTES" in WALL and '_tools_routes == sorted(set(tools_public.OPEN_ROUTES))' in WALL)
 
+# 24 Nov 2026 (the own look, claude/own-look-pages; notes\design-language-1123.md): CEILINGS that may only come down while
+# John decides whether the tool pages and the landing page (one set of tokens, pinned equal above) take the sign blue in
+# place of the orange buttons. The tool pages already use Sora and IBM Plex Sans; nothing on them was changed.
+_own_files = {p.name: p.read_text(encoding="utf-8") for p in sorted(TOOLS.iterdir()) if p.suffix in (".html", ".css", ".js")}
+ok("OWN LOOK: every tool page, its scripts and tools.css are read for the ceilings (%d files)" % len(_own_files),
+   len(_own_files) >= 8 and "tools.css" in _own_files)
+ok("🔴 OWN LOOK: no tool page, script or tools.css names Inter (ceiling 0)", not any(re.search(r"\bInter\b", t) for t in _own_files.values()))
+ok("🔴 OWN LOOK: no stock blue #2563EB / #3B82F6 on the tool pages (ceiling 0)",
+   not any(re.search(r"#(2563EB|3B82F6)\b", t, re.I) for t in _own_files.values()))
+ok("🔴 OWN LOOK: the tool pages' 999px corners stay at 2 or fewer (24 Nov: tools.css .cr and .chip; the own look wants 0)",
+   sum(t.count("999px") for t in _own_files.values()) <= 2)
+
 print()
 for f in FAIL:
     print("  FAIL:", f)

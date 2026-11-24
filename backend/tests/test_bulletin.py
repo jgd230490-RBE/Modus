@@ -2187,10 +2187,13 @@ ok("⭐ D41 'Fictional demo scheme' ON both maps of a demo tenant: the route map
    and HTML10B.count('<g class="map-tag">') == 2 and LH10B.count('<g class="map-tag">') == 1
    and bulletin_doc._svg_tag(None) == "" and "map_demo_tag" in read("backend/bulletin_doc.py"))
 # the HTML: the band, the brief, the leaflet links
-ok("⭐ W15 the page: the ink band with the logo inlined as SVG (vector, gradient kept), the orange rule, Inter loaded, the mark "
+# REVERSED for the WEB page only, 24 Nov 2026 (the own look, claude/own-look-pages): the page loads Sora and IBM Plex Sans,
+# not Inter; the PDFs keep Inter embedded (the W15 PDF checks above are unchanged)
+ok("⭐ W15 the page: the ink band with the logo inlined as SVG (vector, gradient kept), the orange rule, Sora and IBM Plex Sans loaded, the mark "
    "at the foot; Key points after the map; links to the leaflet page and its PDF",
    '<header class="band">' in HTML10B and 'class="brand-logo"' in HTML10B and "ws-orange" in HTML10B and "<img" not in HTML10B
-   and '<div class="band-rule"></div>' in HTML10B and "fonts.googleapis.com/css2?family=Inter" in HTML10B
+   and '<div class="band-rule"></div>' in HTML10B and "fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:" in HTML10B
+   and "family=Inter" not in HTML10B
    and '<ul class="brief" data-bulletin="brief">' in HTML10B and HTML10B.index('data-bulletin="map"') < HTML10B.index('data-bulletin="brief"')
    # NARROWED 10 Nov 2026 (UI critique 25b): the links read "One-page version" and "One-page version (PDF)"
    and 'href="/bulletin/leaflet/?month=10">One-page version</a>' in HTML10B
@@ -2217,9 +2220,10 @@ ok("#5 …the works and glance tables, whose columns wrap, stay plain wrappers (
    '<div class="tw"><table data-bulletin="works">' in HTML10B and '<div class="tw"><table data-bulletin="glance">' in HTML10B
    and HTML10B.count('tabindex="0"') == len(_regB) == 7 and all(l.strip() for _, l in _regB)
    and not _BANNED.search(" ".join(l for _, l in _regB)) and not _trucks(" ".join(l for _, l in _regB)))
+# NARROWED 24 Nov 2026 (the own look): the link blue is now the sign blue #0B4EA2
 ok("#5 …a visible ring on a focused region in the page and in the leaflet (the link blue), and the leaflet's map is the same named region",
-   ".mapwrap:focus-visible,.tw:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}" in HTML10B
-   and ".mapwrap:focus-visible{outline:2px solid #1D4ED8;outline-offset:2px}" in LH10B
+   ".mapwrap:focus-visible,.tw:focus-visible{outline:2px solid #0B4EA2;outline-offset:2px}" in HTML10B
+   and ".mapwrap:focus-visible{outline:2px solid #0B4EA2;outline-offset:2px}" in LH10B
    and '<div class="mapwrap" data-bulletin="map" tabindex="0" role="region" aria-label="Planned lorry routes, October 2026"><svg' in LH10B
    and LH10B.count('tabindex="0"') == 1)
 ok("#5 …the sideways scroll itself is unchanged (open question 5): the map's 720 px floor and the wrappers' overflow-x stay",
@@ -2465,6 +2469,35 @@ ok("LEAFLET FOOT: the map's svg{display:block} is still there, and the footer's 
    and _lf_css.index(_lf_mark.group(0)) > _lf_svg.start(), _lf_mark.group(0) if _lf_mark else "no footer .brand-logo rule")
 ok("LEAFLET FOOT: the leaflet's footer still prints the badge, the mark and the words in that order",
    _re_lf.search(r"<footer>\{notice\} \{_mark_html\(\)\} \{e\(S\[\"foot\"\]\)\}", _bd) is not None)
+# ⭐ 24 Nov 2026 (the own look, claude/own-look-pages; notes\design-language-1123.md): the bulletin's two WEB pages (the
+# newsletter page and the one-page leaflet) take the app's look: Sora for headings and figures, IBM Plex Sans for the text,
+# neutral greys from the ink, the sign blue #0B4EA2 for the button, links and focus, one 6 px corner (3 px for a swatch,
+# a bar or the demo tag), no small-capital label. The PDFs keep Inter (checked above, unchanged). Ceilings only come down.
+def _own_css(h):
+    return h[h.index("<style>"):h.index("</style>")]
+def _own_lum(h):
+    h = h.lstrip("#"); c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+def _own_cr(a, b):
+    a, b = _own_lum(a), _own_lum(b); return round((max(a, b) + 0.05) / (min(a, b) + 0.05), 2)
+for _onm, _oh in (("the newsletter page", HTML10B), ("the leaflet page", LH10B)):
+    _oc = _own_css(_oh)
+    ok("OWN LOOK (%s): Sora and IBM Plex Sans loaded, no Inter anywhere on the page (ceiling 0)" % _onm,
+       "family=Sora:wght@500;600;700&family=IBM+Plex+Sans:" in _oh and not re.search(r"\bInter\b", _oh)
+       and "font:16px/1.5 'IBM Plex Sans'," in _oc and "font-family:Sora,'IBM Plex Sans',sans-serif}" in _oc)
+    ok("🔴 OWN LOOK (%s): no stock blue (#2563EB, #3B82F6, #1D4ED8), no red-orange button (#C2410C on .btn), no warm grey (#57534E, #E7E5E4) in the stylesheet" % _onm,
+       not re.search(r"#(2563EB|3B82F6|1D4ED8|57534E|E7E5E4|C9CED6)\b", _oc, re.I) and not re.search(r"\.btn\{[^}]*#C2410C", _oc))
+    ok("OWN LOOK (%s): the one button is the sign blue with white words (8.0:1)" % _onm,
+       re.search(r"\.btn\{\{?[^}]*background:(#0B4EA2|var\(--sign\));color:#fff;", _oc) is not None and _own_cr("#FFFFFF", "#0B4EA2") == 8.0)
+    _orad = set(re.findall(r"border-radius:([0-9.]+px)", _oc))
+    ok("🔴 OWN LOOK (%s): one corner — every border-radius is 6 px or 3 px, no 999px (ceiling 0)" % _onm, _orad <= {"6px", "3px"} and "999px" not in _oc)
+    ok("🔴 OWN LOOK (%s): no small-capital label — the only text-transform left is none (ceiling 0)" % _onm, "text-transform:uppercase" not in _oc)
+ok("OWN LOOK (the newsletter page): the tokens are the app's greys (captions #62656B 5.84:1 on white, the head band #F5F5F6, the line #E1E2E4) and the sign blue",
+   "--muted:#62656B;--line:#E1E2E4;" in _own_css(HTML10B) and "--head:#F5F5F6;--sign:#0B4EA2}" in _own_css(HTML10B)
+   and _own_cr("#62656B", "#FFFFFF") == 5.84 and _own_cr("#62656B", "#F5F5F6") == 5.36 and _own_cr("#44464B", "#FFFFFF") >= 9)
+ok("OWN LOOK: the PDF builders are untouched by the web page's look — the PDFs still embed Inter",
+   b"Inter-Bold" in PDF10B and b"Inter-Bold" in LF10B)
 # =========================================================================== #
 print()
 for f_ in FAIL:

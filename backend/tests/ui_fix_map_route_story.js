@@ -242,11 +242,12 @@ for (let m = 1; m <= 60; m++) {
      css(".rs-figs").includes("display:flex;") && !css(".rs-figs").includes("wrap") && css(".rs-col i").includes("background:#6690E3;"));
   ok("⭐ after the busiest-month button has done its job (it is no longer a button on that month) the keyboard is on the months, not lost",
      html.includes("|| (held === 'go' ? document.getElementById('rs-range') : null);"));
+  // NARROWED 24 Nov 2026 (the own look, B2): the sign blue (Dark: #8AB4F8) and its tints in place of the stock blues
   ok("⭐ the slider is kept out of sight for the keyboard, as the timeline's is, and the bars show the focus",
-     css(".rs-chart input[type=range]").includes("clip:rect(0,0,0,0)") && css(".rs-chart:focus-within .rs-plot").includes("outline:2px solid #1D4ED8;"));
+     css(".rs-chart input[type=range]").includes("clip:rect(0,0,0,0)") && css(".rs-chart:focus-within .rs-plot").includes("outline:2px solid var(--navy);"));
   ok("⭐ nothing in the panel is under 12 px, and every button in it has a visible keyboard focus",
      !(html.slice(html.indexOf("        .rs-ctl{"), html.indexOf("        .route-card .rs-yl{")).match(/font-size:(\d+(\.\d+)?)px/g) || []).some(x => parseFloat(x.split(":")[1]) < 12)
-     && html.includes(".rs-seg button:focus-visible, .rs-bt:focus-visible, .rs-go:focus-visible, .rs-cell:focus-visible{ outline:2px solid #1D4ED8; outline-offset:-2px; }"));
+     && html.includes(".rs-seg button:focus-visible, .rs-bt:focus-visible, .rs-go:focus-visible, .rs-cell:focus-visible{ outline:2px solid var(--navy); outline-offset:-2px; }"));
   ok("⭐ Dark (the map inside the app): the bars, the marked month, the pressed switch, the links and the focus ring each have a Dark rule",
      ['html[data-look="dark"] .rs-col i{', 'html[data-look="dark"] .rs-col.rs-now i{', 'html[data-look="dark"] .rs-col.rs-now::before{', 'html[data-look="dark"] .rs-seg button[aria-pressed="true"]{',
       'html[data-look="dark"] .rs-cell.rs-now{', 'html[data-look="dark"] .rs-chart:focus-within .rs-plot{'].every(x => html.includes(x)));

@@ -87,8 +87,9 @@ const outline = darkKey ? "#" + hex2(darkKey[1]) + hex2(darkKey[2]) + hex2(darkK
 const darkSurface = (html.match(/html\[data-look="dark"\]\{[^}]*--surface:\s*(#[0-9A-Fa-f]{6})/) || [])[1];
 ok("D2 the outline (at full strength) parts from the Dark panel by ≥ 3:1 and from the darkest swatch",
    outline && darkSurface && contrast(outline, darkSurface) >= 3 && contrast(outline, RAMP[4]) >= 3, [outline, darkSurface]);
+// 24 Nov 2026 (the own look, one corner size): the swatch's corner is 3 px now (it was 2 px); D3 is about the outline, kept whole.
 ok("D3 kept: the light look keeps its near-black outline",
-   html.includes(".mode-legend .ml-sw{ display:inline-block; width:14px; height:14px; flex:0 0 14px; border-radius:2px; box-shadow:0 0 0 1px rgba(31,32,36,.35); }"));
+   html.includes(".mode-legend .ml-sw{ display:inline-block; width:14px; height:14px; flex:0 0 14px; border-radius:3px; box-shadow:0 0 0 1px rgba(31,32,36,.35); }"));
 
 for (const f of fail) console.log("  FAIL: " + f);
 console.log(`${pass} passed, ${fail.length} failed`);

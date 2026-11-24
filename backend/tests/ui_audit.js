@@ -1,5 +1,7 @@
 /*
- * ui_audit.js — the whole app in a REAL browser, every screen × width × look × accent, measured.  16 Oct 2026.
+ * ui_audit.js — the whole app in a REAL browser, every screen × width × look, measured.  16 Oct 2026.
+ *   24 Nov 2026 (the own look, stage 5): the accent picker is gone from the app, so the audit has no accent axis, no
+ *   Blue pass and no accent option; a run's shape changed, so the first run after it is a NEW baseline (it pairs with none).
  *
  * ⚠️ NOT PART OF THE DEFAULT SUITE (run_suite.py lists it in BROWSER_ONLY; test_modus.py asserts that). It needs:
  *   - Playwright and axe-core, found through NODE_PATH, and Google Chrome installed — the browser it drives (the user,
@@ -11,8 +13,8 @@
  *   - a demo database (backend/forecasts_local.db, or --db). It is COPIED to a temporary folder and the
  *     server runs against the copy, so the database you point it at is never written. The tenant is read from it.
  *
- *     node backend/tests/ui_audit.js                 # quick: 390 and 1366 px, Ink and Dark, + Dark with the Blue accent at 1366, ~15 min
- *     node backend/tests/ui_audit.js --full          # 320 360 390 768 1024 1366 1920 × Ink Light Dark, + the other accents and Dark / Blue at 1920
+ *     node backend/tests/ui_audit.js                 # quick: 390 and 1366 px, Ink and Dark, ~15 min
+ *     node backend/tests/ui_audit.js --full          # 320 360 390 768 1024 1366 1920 × Ink Light Dark
  *     node backend/tests/ui_audit.js --compare latest    # ...and say what changed since the previous run of the same shape
  *     node backend/tests/ui_audit.js --no-strict-44      # the 44 px rule on a phone back to a warning (decision 14; a failure by default since 18 Oct 2026, see below)
  *     node backend/tests/ui_audit.js --base http://127.0.0.1:8834 --code <planner code> --map-password <pw>
@@ -42,12 +44,9 @@
  *       the help TOC rows padded to 44 px; with them the password eyes, the sign-in links, the help "top" link and the privacy
  *       Back link); since then it is ON by default. The flag is a grading, not part of the run's shape, so a
  *       strict run pairs with a plain one in --compare.
- *     - the look and accent asked for are the ones on <html>, and the page is the one named (its header)           (fail)
- *       the passes: every look at every width with the Orange accent; the other accents at the widest width in the first
- *       look (--full); and, decision 15 (17 Oct 2026), the Dark look with the Blue accent at the widest width (1366 in the
- *       quick shape, 1920 in --full) — the pair no other pass measures, where white figures on --navy #5B8FF0 fail (3.17:1).
- *       The portal pages only, ~3 min; part of the run's recorded shape (REPORT.options.extraPasses), so --compare pairs
- *       like with like and a run from before it does not pair. Off when --looks or --accents chose the passes by hand.
+ *     - the look asked for is the one on <html>, and the page is the one named (its header)                         (fail)
+ *       the passes: every look at every width. (Until 24 Nov 2026 also the other accents and decision 15's Dark / Blue
+ *       pass; the accents are gone from the app.)
  *       A control's hit area is ITS OWN (or its label's, for a checkbox / radio): a tap that lands on an ancestor is not
  *       credited — until 17 Oct 2026 it was, so a small control inside a bigger parent (the demo bar's 21 px Guide pill,
  *       centred in a 45 px bar on a phone) passed 44 × 44 on the parent's area and was never a row (finding #33).
@@ -126,7 +125,7 @@ const BACKEND = path.join(ROOT, "backend");
 function parseArgs(argv) {
   const o = { full: false, headed: false, blockMapbox: false, keepServer: false, guide: false, deep: true, out: path.join(ROOT, "ui-audit"),
               db: path.join(BACKEND, "forecasts_local.db"), python: null, base: null, code: "ui-planner", teamCode: "ui-team-1",
-              email: null, password: null, mapPassword: "ui-map", compare: null, widths: null, looks: null, accents: null, pages: null, maxShot: 4500, strict44: true, browser: "chrome" };
+              email: null, password: null, mapPassword: "ui-map", compare: null, widths: null, looks: null, pages: null, maxShot: 4500, strict44: true, browser: "chrome" };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = () => argv[++i];
     if (a === "--full") o.full = true;
@@ -152,7 +151,6 @@ function parseArgs(argv) {
     else if (a === "--compare") o.compare = v();
     else if (a === "--widths") o.widths = v().split(",").map(Number);
     else if (a === "--looks") o.looks = v().split(",");
-    else if (a === "--accents") o.accents = v().split(",");
     else if (a === "--pages") o.pages = v().split(",");
     else if (a === "--max-shot") o.maxShot = +v();
     else if (a === "--browser") { o.browser = v(); if (!/^(chrome|chromium)$/.test(o.browser)) { console.error("ui_audit.js: --browser chrome | chromium"); process.exit(2); } }
@@ -167,15 +165,8 @@ const OPT = parseArgs(process.argv.slice(2));
 const HEIGHT = { 320: 568, 360: 780, 390: 844, 768: 1024, 1024: 768, 1366: 768, 1920: 1080 };
 const WIDTHS = OPT.widths || (OPT.full ? [320, 360, 390, 768, 1024, 1366, 1920] : [390, 1366]);
 const LOOKS = OPT.looks || (OPT.full ? ["ink", "light", "dark"] : ["ink", "dark"]);
-const EXTRA_ACCENTS = OPT.accents || (OPT.full ? ["blue", "blue-shades", "orange-shades"] : []);
 const PORTAL_PAGES = OPT.pages || ["dashboard", "submit", "forecasts", "carbon", "abnormal", "stockpiles", "pours", "simulation", "clp", "lookahead", "locations", "routes", "zones", "config", "users", "map"];   // 22 Oct 2026: + abnormal (S16 / B5); 28 Oct 2026: + stockpiles (Plan > Stockpiles, PR #144); 29 Oct 2026: + pours (Plan > Pours, task 3a); 29 Oct 2026: + simulation (its own page)   // 31 Oct 2026: + clp (Plan > CLP documents, PR 3a)
 const DESK_W = Math.max(...WIDTHS);           // where the deep stops and the keyboard pass run
-// decision 15 (17 Oct 2026): one more pass, the Dark look with the Blue accent at the desk width (1366 in the quick shape, 1920
-// in --full): the Blue accent's --navy is #5B8FF0 in Dark, where white figures on it fail (3.17:1) — a pair no other pass
-// measures (the extra accents run in the first look, Ink). The portal pages only (first = false: no public / sign-in / deep
-// stops), ~3 min. Part of the run's shape (sameShape), so a run from before it does not pair in --compare. Off when the looks
-// or accents were chosen by hand (--looks / --accents: a custom run says what it wants).
-const EXTRA_PASSES = (OPT.looks || OPT.accents) ? [] : [{ look: "dark", accent: "blue", widths: [DESK_W] }];
 const PHONE_W = Math.min(...WIDTHS);
 const CONFIG_TABS = ["Vehicles", "Materials", "Planning", "Costing · fuel", "Seasonal restrictions", "Map and bulletin", "Everything (JSON)"];
 // what the page header says on each portal page (the NAV labels, except Config); the map page has no header
@@ -271,7 +262,7 @@ const SHOTS = path.join(RUN_DIR, "shots");
 if (!OPT.selfTest) fs.mkdirSync(SHOTS, { recursive: true });
 
 function gitHead() { try { return execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT }).toString().trim(); } catch (e) { return null; } }
-const REPORT = { stamp: STAMP, head: gitHead(), options: { full: OPT.full, widths: WIDTHS, looks: LOOKS, extraAccents: EXTRA_ACCENTS, extraPasses: EXTRA_PASSES, pages: PORTAL_PAGES, blockMapbox: OPT.blockMapbox, deep: OPT.deep, guide: OPT.guide, browser: OPT.browser, strict44: OPT.strict44 },
+const REPORT = { stamp: STAMP, head: gitHead(), options: { full: OPT.full, widths: WIDTHS, looks: LOOKS, pages: PORTAL_PAGES, blockMapbox: OPT.blockMapbox, deep: OPT.deep, guide: OPT.guide, browser: OPT.browser, strict44: OPT.strict44 },
                  stops: [], timings: {}, notes: [], totals: { passed: 0, failed: 0 },
                  // FR1 (10 Nov 2026): the rule measures' version and limits. NOT in options: not part of the run's shape (sameShape),
                  // so a run before them still pairs; compareRuns reads this to tell a first measure from a new finding
@@ -307,7 +298,7 @@ function domChecks(arg) {
   const rootHidden = /hidden|clip/.test(getComputedStyle(doc).overflowY) || /hidden|clip/.test(getComputedStyle(document.body).overflowY);
   const docScrolls = !rootHidden && doc.scrollHeight > doc.clientHeight + 4;
   const header = document.querySelector('[data-guide="page-header"] h2');
-  const out = { vw: innerWidth, vh: innerHeight, theme: doc.getAttribute("data-theme"), accent: doc.getAttribute("data-accent"), title: document.title,
+  const out = { vw: innerWidth, vh: innerHeight, theme: doc.getAttribute("data-theme"), accentAttr: doc.getAttribute("data-accent"), title: document.title,
     pageTitle: header ? header.textContent.trim() : null, signedIn: !!document.querySelector('[data-guide="rail"], .phone-tabs'),
     deskOnly: !!document.querySelector("[data-desk-only]"),
     docHScroll: doc.scrollWidth > doc.clientWidth + 1 ? doc.scrollWidth - doc.clientWidth : 0,
@@ -631,7 +622,7 @@ async function audit(page, store, meta) {
     .catch(e => { note(`rule measures on ${meta.name} @${meta.width}: ${String(e.message || e).split("\n")[0].slice(0, 120)}`); return null; });
   const axe = await runAxe(page);
   const drained = drain(store);
-  const file = `${meta.name}__${meta.width}__${meta.look}__${meta.accent}.png`.replace(/[^A-Za-z0-9_.+-]/g, "-");
+  const file = `${meta.name}__${meta.width}__${meta.look}.png`.replace(/[^A-Za-z0-9_.+-]/g, "-");
   const shot = await shoot(page, path.join(SHOTS, file), meta.width, meta.height, dom.contentH, fixed);
   // FR1, A1a / A1b counted AGAIN after axe and the shot (the viewport is back at the fold): a section that draws after the
   // settle (run 2, 10 Nov 2026: the Dashboard at 1366 read 375 words on one stop and 317 on the next, the same page) is in by
@@ -659,7 +650,7 @@ async function audit(page, store, meta) {
   const third = http.filter(h => !h.url.startsWith(meta.base) && !(OPT.blockMapbox && /mapbox/.test(h.url)));
   const axeFail = axe.violations.filter(WCAG);
   const axeWarn = axe.violations.filter(v => !WCAG(v));
-  const label = `${meta.name} @${meta.width} ${meta.look}/${meta.accent}`;
+  const label = `${meta.name} @${meta.width} ${meta.look}`;
   const checks = [
     { id: "no-js-errors", ok: realErr.length === 0, detail: realErr },
     { id: "no-http-errors", ok: sameOrigin.length === 0, detail: sameOrigin },
@@ -668,7 +659,7 @@ async function audit(page, store, meta) {
     { id: "targets-24px", ok: dom.tinyTargets.length === 0, detail: dom.tinyTargets },
   ];
   if (meta.portal) {
-    checks.push({ id: "look-applied", ok: dom.theme === meta.look && dom.accent === meta.accent, detail: { theme: dom.theme, accent: dom.accent } });
+    checks.push({ id: "look-applied", ok: dom.theme === meta.look && dom.accentAttr == null, detail: { theme: dom.theme, accentAttr: dom.accentAttr } });   // 24 Nov 2026: and no data-accent left on <html>
     // the page named is the one on screen: its header's title — or, on a phone, the desk-only card for a page made for a desk (D9)
     const want = PAGE_TITLE[meta.page];
     const deskCard = meta.width < 768 && !PHONE_PAGES.includes(meta.page) && dom.deskOnly;
@@ -714,7 +705,7 @@ async function audit(page, store, meta) {
   if (meta.readyMs === null) warnings.push({ id: "ready-none", detail: `no figure on the page within ${RULES.LIMITS.readyCapMs} ms of the navigation` });
   for (const c of checks) ok(`${label}: ${c.id}`, c.ok, c.ok ? "" : JSON.stringify(c.detail).slice(0, 300));
   const stop = { ...meta, shot: "shots/" + file, shotGrown: shot.grown || undefined, shotRegrown: shot.regrown || undefined, shotPinned: shot.pinned || undefined, settleMs: t, settleWhy: store.settleWhy || undefined, checks, warnings,
-                 theme: dom.theme, accentApplied: dom.accent, title: dom.title, pageTitle: dom.pageTitle, contentH: dom.contentH, nav: dom.nav, masks: dom.masks,
+                 theme: dom.theme, title: dom.title, pageTitle: dom.pageTitle, contentH: dom.contentH, nav: dom.nav, masks: dom.masks,
                  signedIn: dom.signedIn };
   if (rmUse) { stop.words = rmUse.words; stop.wordsScope = rmUse.scope; stop.wordsSkipped = rmUse.skipped; stop.blocks = rmUse.blocks; stop.primaries = rmUse.primaries;
     if (rmLate && rmLate.words !== rm.words) stop.wordsLate = { atFold: rm.words, afterShot: rmLate.words }; }
@@ -791,25 +782,25 @@ async function keyboardPass(page, meta) {
   ok(`${label} — something takes the focus`, reached > 0);
   const warnings = [];
   if (back.length) warnings.push({ id: "focus-order", detail: back.map(s => `${s.tag} "${s.text}" (document position ${s.order})`) });
-  REPORT.stops.push({ name: meta.name + "+keyboard", width: meta.width, height: meta.height, look: meta.look, accent: meta.accent, kind: "keyboard", stops, checks: [
+  REPORT.stops.push({ name: meta.name + "+keyboard", width: meta.width, height: meta.height, look: meta.look, kind: "keyboard", stops, checks: [
     { id: "focus-visible", ok: noRing.length === 0, detail: noRing }, { id: "focus-on-screen", ok: hidden.length === 0, detail: hidden },
     { id: "focus-not-stuck", ok: trapped.length === 0, detail: trapped }, { id: "focus-reaches", ok: reached > 0, detail: reached }], warnings });
   process.stdout.write(`${noRing.length || hidden.length || trapped.length ? "FAIL" : "ok  "} ${label.padEnd(46)}  ${real.length} stops${noRing.length ? ", " + noRing.length + " without a visible focus" : ""}${hidden.length ? ", " + hidden.length + " off screen" : ""}${trapped.length ? ", stuck" : ""}${back.length ? ", " + back.length + " out of order" : ""}\n`);
 }
 
 // ---------------------------------------------------------------- contexts, sign-in ----------------------------------
-async function newContext(browser, look, accent, width, guide) {
+async function newContext(browser, look, width, guide) {
   // one context per width: a phone (below 768 px) is a touch device with a coarse pointer, which the app's CSS reads
   const ctx = await browser.newContext({ viewport: { width, height: HEIGHT[width] || 800 }, deviceScaleFactor: 1, locale: "en-GB", timezoneId: "Europe/London",
     colorScheme: look === "dark" ? "dark" : "light", isMobile: width < 768, hasTouch: width < 768 });
-  // the remembered look and accent, read by the <head> script before anything draws (W16); the demo guide's strip and
+  // the remembered look, read by the <head> script before anything draws (W16); the demo guide's strip and
   // dots and the map's own tour switched off (what "Hide the tips" writes) — the keyboard pass would otherwise measure
   // the tour's bubble, not the page. --guide (or the map-page+guide stop) keeps them, as a first visitor sees them.
   // And an LCP observer.
-  await ctx.addInitScript(([l, a, g]) => {
-    try { localStorage.setItem("modus_theme", l); localStorage.setItem("modus_accent", a); if (!g) { localStorage.setItem("wayscope_guide_all", "off"); localStorage.setItem("wayscope_guide_map", "off"); } } catch (e) {}
+  await ctx.addInitScript(([l, g]) => {
+    try { localStorage.setItem("modus_theme", l); if (!g) { localStorage.setItem("wayscope_guide_all", "off"); localStorage.setItem("wayscope_guide_map", "off"); } } catch (e) {}
     try { new PerformanceObserver(list => { for (const e of list.getEntries()) window.__uiAuditLCP = e.startTime; }).observe({ type: "largest-contentful-paint", buffered: true }); } catch (e) {}
-  }, [look, accent, guide || OPT.guide]);
+  }, [look, guide || OPT.guide]);
   if (OPT.blockMapbox) await ctx.route(/api\.mapbox\.com|events\.mapbox\.com|tiles\.mapbox\.com/, r => r.abort());
   return ctx;
 }
@@ -921,8 +912,8 @@ async function mapStop(page, store, meta) { meta.mapState = await waitForMap(pag
 // a first visitor's context (the guide storage not switched off — the existing guide flag of newContext) that carries THIS
 // context's cookies: the map access and the staff session the signed-in context has (Playwright hands over the HttpOnly ones
 // too). The two guide stops open in one (17 Oct 2026, findings #32 / #33). Returns the page, its store and a close().
-async function guideContext(browser, ctx, base, look, accent, w) {
-  const g = await newContext(browser, look, accent, w, true);
+async function guideContext(browser, ctx, base, look, w) {
+  const g = await newContext(browser, look, w, true);
   await g.addCookies(await ctx.cookies(base));
   const gp = await g.newPage(); const gs = newStore(); watch(gp, gs);
   return { gp, gs, close: () => g.close() };
@@ -940,17 +931,17 @@ async function timeReady(page, t0, arg) {
 }
 async function evalCall(page, code) { return page.evaluate(code).then(() => true).catch(e => { note(`${code}: ${String(e.message || e).slice(0, 120)}`); return false; }); }
 
-async function walkPortal(browser, base, look, accent, first, widths) {
-  const meta = (name, width, extra) => ({ name, width, height: HEIGHT[width] || 800, look, accent, base, ...(extra || {}) });
+async function walkPortal(browser, base, look, first, widths) {
+  const meta = (name, width, extra) => ({ name, width, height: HEIGHT[width] || 800, look, base, ...(extra || {}) });
   const switches = [];
   for (const w of widths) {
-    const ctx = await newContext(browser, look, accent, w);
+    const ctx = await newContext(browser, look, w);
     const page = await ctx.newPage();
     const store = newStore();
     watch(page, store);
     const t0 = Date.now();
     if (first) {
-      // 1. the public view and the sign-in screens, at every width, in the first look + accent only (they do not change with the data)
+      // 1. the public view and the sign-in screens, at every width, in the first look only (they do not change with the data)
       await page.goto(base + "/", { waitUntil: "domcontentloaded" });
       await page.waitForSelector('button:has-text("Staff sign in")', { timeout: 60000 });
       if (w === DESK_W) REPORT.timings.publicFirstPaintMs = Date.now() - t0;
@@ -998,7 +989,7 @@ async function walkPortal(browser, base, look, accent, first, widths) {
       const readyMs = await readyP;
       await audit(page, store, meta(id, w, { portal: true, page: id, readyMs }));
       if (first && w === DESK_W) switches.push({ page: id, headerMs: switched });
-      // the deep stops: once, at the desk width, in the first look + accent; one that fails is noted, not fatal
+      // the deep stops: once, at the desk width, in the first look; one that fails is noted, not fatal
       if (OPT.deep && w === DESK_W && first) { try { await deepStops(page, store, meta, id, w); } catch (e) { note(`deep stops on ${id}: ${String(e.message || e).split("\n")[0].slice(0, 160)}`); await leaveFullscreen(page); drain(store); } }
       // the phone's More sheet, once, at the narrowest width (a sheet over the page: not grown, the controls under it not counted)
       if (w === PHONE_W && w < 768 && id === "dashboard" && first) {
@@ -1010,7 +1001,7 @@ async function walkPortal(browser, base, look, accent, first, widths) {
         // is not opened. The demo bar's Guide pill is on every portal stop (it needs no guide) — this stop asserts it is on
         // the page (guide-shown) and pictures the hints on a phone, which no other stop does.
         if (OPT.deep) {
-          const { gp, gs, close } = await guideContext(browser, ctx, base, look, accent, w);
+          const { gp, gs, close } = await guideContext(browser, ctx, base, look, w);
           try {
             await signIn(gp, base, OPT.email ? { email: OPT.email, password: OPT.password, totp: OPT.totp } : { code: OPT.code }); drain(gs);
             await gotoPage(gp, "dashboard");
@@ -1036,7 +1027,7 @@ async function walkPortal(browser, base, look, accent, first, widths) {
           // context carries this context's cookies — the map access — and the guide storage is not switched off: until
           // 17 Oct 2026 it had no cookie, so this stop was the map's PASSWORD page in every run (finding #32) and the dots were
           // never measured; it asserts the strip, NO dot on the phone (decision 8, 18 Oct 2026) and that the map loaded.
-          const { gp, gs, close } = await guideContext(browser, ctx, base, look, accent, w);
+          const { gp, gs, close } = await guideContext(browser, ctx, base, look, w);
           await gp.goto(base + "/map/", { waitUntil: "domcontentloaded" });
           const st = await waitForMap(gp); await waitGuide(gp);
           await audit(gp, gs, { ...meta("map-page+guide", w, { fixed: true, guide: "map" }), mapState: st });
@@ -1221,9 +1212,9 @@ async function errorStates(page, ctx, store, meta, w) {
 // the team (submitter) role: fewer pages, no approve, a locked team
 async function walkTeam(browser, base) {
   const look = LOOKS[0], w = DESK_W;
-  const ctx = await newContext(browser, look, "orange", w);
+  const ctx = await newContext(browser, look, w);
   const page = await ctx.newPage(); const store = newStore(); watch(page, store);
-  const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, accent: "orange", base, ...(extra || {}) });
+  const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, base, ...(extra || {}) });
   try { await signIn(page, base, { code: OPT.teamCode, name: "UI audit team" }); }
   catch (e) { note("team walk skipped: " + e.message); await ctx.close(); return; }
   drain(store);
@@ -1254,9 +1245,9 @@ async function walkLogin(browser, base) {
   if (!made) return;
   const link = made.replace(/^https?:\/\/[^/]+/, base);
   for (const w of [DESK_W, PHONE_W].filter((x, i, a) => a.indexOf(x) === i)) {
-    const ctx = await newContext(browser, look, "orange", w);
+    const ctx = await newContext(browser, look, w);
     const page = await ctx.newPage(); const store = newStore(); watch(page, store);
-    const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, accent: "orange", base, ...(extra || {}) });
+    const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, base, ...(extra || {}) });
     if (w !== DESK_W) {
       // the phone, as the login user (the header's account menu, not Sign out): the password was set at the desk width first
       try {
@@ -1357,10 +1348,10 @@ async function walkReviewer(browser, base) {
   if (!made) return;
   const codes = [];
   for (const w of [DESK_W, PHONE_W].filter((x, i, a) => a.indexOf(x) === i)) {
-    const ctx = await newContext(browser, look, "orange", w);
+    const ctx = await newContext(browser, look, w);
     const page = await ctx.newPage(); const store = newStore(); watch(page, store);
     const apiSeen = []; page.on("request", rq => { if (rq.url().startsWith(base + "/api/")) apiSeen.push(rq.url()); });
-    const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, accent: "orange", base, ...(extra || {}) });
+    const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, base, ...(extra || {}) });
     try {
       if (w === DESK_W) {
         await page.goto(made.link, { waitUntil: "domcontentloaded" });
@@ -1411,9 +1402,9 @@ async function walkEmpty(browser) {
   try { server = await startServer({ empty: true }); } catch (e) { note("empty-tenant walk skipped: " + e.message); return; }
   try {
     const look = LOOKS[0], w = DESK_W;
-    const ctx = await newContext(browser, look, "orange", w);
+    const ctx = await newContext(browser, look, w);
     const page = await ctx.newPage(); const store = newStore(); watch(page, store);
-    const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, accent: "orange", base: server.base, ...(extra || {}) });
+    const meta = (name, extra) => ({ name, width: w, height: HEIGHT[w], look, base: server.base, ...(extra || {}) });
     await signIn(page, server.base, { code: OPT.code });
     drain(store);
     for (const id of ["dashboard", "lookahead", "routes", "submit"]) {
@@ -1429,9 +1420,9 @@ async function walkEmpty(browser) {
 async function walkUnsigned(browser, base) {
   // a visitor without any cookie: the map's password page
   const look = LOOKS[0];
-  const meta = (name, w) => ({ name, width: w, height: HEIGHT[w] || 800, look, accent: "orange", base });
+  const meta = (name, w) => ({ name, width: w, height: HEIGHT[w] || 800, look, base });
   for (const w of WIDTHS) {
-    const ctx = await newContext(browser, look, "orange", w);
+    const ctx = await newContext(browser, look, w);
     const page = await ctx.newPage(); const store = newStore(); watch(page, store);
     await page.goto(base + "/map/", { waitUntil: "domcontentloaded" });
     await audit(page, store, meta("map-password", w));
@@ -1458,7 +1449,7 @@ async function walkUnsigned(browser, base) {
 const noOrigin = (s) => String(s).replace(/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?/, "");
 function findingKeys(stop) {
   const keys = [];
-  const one = (id, x) => `${stop.name}|${stop.width}|${stop.look}|${stop.accent}|${id}|${x && typeof x === "object" && (x.id || x.sel || x.url || x.tag) ? (x.id || x.sel || (x.url ? noOrigin(x.url) : null) || x.tag) + (x.text ? " " + x.text : "") : typeof x === "string" ? noOrigin(x).slice(0, 80) : ""}`;
+  const one = (id, x) => `${stop.name}|${stop.width}|${stop.look}|${id}|${x && typeof x === "object" && (x.id || x.sel || x.url || x.tag) ? (x.id || x.sel || (x.url ? noOrigin(x.url) : null) || x.tag) + (x.text ? " " + x.text : "") : typeof x === "string" ? noOrigin(x).slice(0, 80) : ""}`;
   for (const c of (stop.checks || [])) if (!c.ok) {
     if (Array.isArray(c.detail)) for (const x of c.detail) keys.push(one(c.id, x)); else keys.push(one(c.id, null));
   }
@@ -1472,7 +1463,7 @@ function findingKeys(stop) {
 // not pair with one that has it. --strict-44 is a grading, not a shape, of the same stops: a strict run pairs with a plain one.
 // 28 Oct 2026: a run whose pages are the earlier run's plus new ones (Plan > Stockpiles) still pairs: the added page's stops
 // read as new rows; a page dropped, or any other change of shape, does not pair
-function sameShape(a, b) { const k = (o) => [o.widths, o.looks, o.extraAccents, o.extraPasses || [], o.browser || "chromium"];
+function sameShape(a, b) { const k = (o) => [o.widths, o.looks, o.extraAccents || [], o.extraPasses || [], o.browser || "chromium"];   // 24 Nov 2026: a run since stage 5 has neither, so it pairs only with another
   const pa = a.pages || [], pb = b.pages || [];
   return JSON.stringify(k(a)) === JSON.stringify(k(b)) && pa.every(p => pb.includes(p)); }
 async function compareRuns(browser, prevPath) {
@@ -1579,7 +1570,7 @@ function summaryTables() {
 }
 function writeSummaryMd(t) {
   const lines = [`# UI audit ${REPORT.stamp} — ${REPORT.head || "?"}`, "",
-    `${REPORT.stops.length} stops · widths ${WIDTHS.join(", ")} · looks ${LOOKS.join(", ")}${EXTRA_ACCENTS.length ? " · accents " + EXTRA_ACCENTS.join(", ") + " at " + DESK_W : ""}${EXTRA_PASSES.map(p => " · + " + p.look + " / " + p.accent + " at " + p.widths.join(", ")).join("")}${OPT.strict44 ? " · strict 44 px" : ""} · ${REPORT.browser ? REPORT.browser.ran + " " + REPORT.browser.version : ""} · ${REPORT.secs} s`,
+    `${REPORT.stops.length} stops · widths ${WIDTHS.join(", ")} · looks ${LOOKS.join(", ")}${OPT.strict44 ? " · strict 44 px" : ""} · ${REPORT.browser ? REPORT.browser.ran + " " + REPORT.browser.version : ""} · ${REPORT.secs} s`,
     `**${PASS} passed, ${FAIL.length} failed.** First paint of the public view ${REPORT.timings.publicFirstPaintMs} ms; the portal's first data after sign-in ${REPORT.timings.portalFirstDataMs} ms.`, "",
     // FR1 (10 Nov 2026): the three lines a UI PR carries (notes\ux-programme-1109.md §2, L1 step 3)
     "## For the PR", "", ...RULES.prLines(REPORT), "",
@@ -1598,9 +1589,9 @@ function writeSummaryMd(t) {
   if (measured.length) {
     lines.push("", "## Rule measures (FR1: A1a screen words, A1c filled primaries, A3 page ready)", "",
       `Limits: a block over ${RULES.LIMITS.blockWords} words fails on a staff screen; words grew > ${RULES.LIMITS.wordsGrowPct} % or > ${RULES.LIMITS.wordsGrowAbs} words warns; more than ${RULES.LIMITS.primaries} filled primary warns; page ready ${RULES.LIMITS.readySlowerPct} % slower and over ${RULES.LIMITS.readyFloorMs} ms warns. Page ready is the laptop's local copy, not live's speed.`, "",
-      "| Stop | Width | Look / accent | Words | Filled primaries | Ready ms | Long blocks |", "|---|---:|---|---:|---:|---:|---:|");
+      "| Stop | Width | Look | Words | Filled primaries | Ready ms | Long blocks |", "|---|---:|---|---:|---:|---:|---:|");
     for (const s of measured.slice().sort((a, b) => a.name.localeCompare(b.name) || a.width - b.width || a.look.localeCompare(b.look)))
-      lines.push(`| ${s.name} | ${s.width} | ${s.look} / ${s.accent} | ${s.words} | ${(s.primaries || []).length}${(s.primaries || []).length > RULES.LIMITS.primaries ? " ⚠ " + s.primaries.map(p => p.text).join(" · ").replace(/\|/g, "¦") : ""} | ${s.readyMs == null ? "" : s.readyMs} | ${(s.blocks || []).length || ""} |`);
+      lines.push(`| ${s.name} | ${s.width} | ${s.look} | ${s.words} | ${(s.primaries || []).length}${(s.primaries || []).length > RULES.LIMITS.primaries ? " ⚠ " + s.primaries.map(p => p.text).join(" · ").replace(/\|/g, "¦") : ""} | ${s.readyMs == null ? "" : s.readyMs} | ${(s.blocks || []).length || ""} |`);
     const longs = new Map();   // one row per block text, with every stop it was seen on
     for (const s of measured) if (!RULES.PROSE_SKIPPED.test(s.name)) for (const b of s.blocks || []) { const k = RULES.pinKey(b.text); const r = longs.get(k) || { b, stops: new Set(), staff: false, pin: RULES.pinOf(b.text) }; r.stops.add(s.name + "@" + s.width); r.staff = r.staff || RULES.isStaffStop(s); longs.set(k, r); }
     if (longs.size) { lines.push("", `## Long blocks (A1b: more than ${RULES.LIMITS.blockWords} words outside an "i" box)`, "", "| Words | Graded | Seen on | Text |", "|---:|---|---|---|");
@@ -1637,7 +1628,6 @@ table{border-collapse:collapse;margin:0 20px 16px}td,th{border:1px solid var(--l
 <label>Screen <select id="fPage"><option value="">all</option></select></label>
 <label>Width <select id="fW"><option value="">all</option></select></label>
 <label>Look <select id="fLook"><option value="">all</option></select></label>
-<label>Accent <select id="fAcc"><option value="">all</option></select></label>
 <label>Check <select id="fCheck"><option value="">any</option></select></label>
 <label><input type="checkbox" id="fBad"> only stops with failures</label>
 <label><input type="checkbox" id="fWarn"> or warnings</label>
@@ -1649,7 +1639,7 @@ table{border-collapse:collapse;margin:0 20px 16px}td,th{border:1px solid var(--l
 const R = ${json};
 const $ = (s) => document.querySelector(s);
 const uniq = (k) => [...new Set(R.stops.map(s => s[k]))].filter(x => x != null).sort((a, b) => (typeof a === "number" ? a - b : String(a).localeCompare(String(b))));
-for (const [id, k] of [["#fPage", "name"], ["#fW", "width"], ["#fLook", "look"], ["#fAcc", "accent"]]) for (const v of uniq(k)) $(id).insertAdjacentHTML("beforeend", "<option>" + v + "</option>");
+for (const [id, k] of [["#fPage", "name"], ["#fW", "width"], ["#fLook", "look"]]) for (const v of uniq(k)) $(id).insertAdjacentHTML("beforeend", "<option>" + v + "</option>");
 for (const v of [...new Set(R.stops.flatMap(s => [...s.checks.map(c => c.id), ...(s.warnings || []).map(w => w.id)]))].sort()) $("#fCheck").insertAdjacentHTML("beforeend", "<option>" + v + "</option>");
 $("#sum").innerHTML = "<div><b>" + R.totals.passed + "</b> passed · <b class='" + (R.totals.failed ? "fail" : "ok") + "'>" + R.totals.failed + "</b> failed</div>"
   + "<div>" + R.stops.length + " stops · " + R.secs + " s</div><div>first paint: public " + (R.timings.publicFirstPaintMs || "–") + " ms · portal's first data " + (R.timings.portalFirstDataMs || "–") + " ms</div>"
@@ -1659,7 +1649,7 @@ $("#tables").innerHTML = "<table><tr><th>Check</th><th>Pass</th><th>Fail</th></t
   + (R.notes.length ? "<table><tr><th>Notes</th></tr>" + R.notes.map(n => "<tr><td>" + esc(n) + "</td></tr>").join("") + "</table>" : "");
 function esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 function draw() {
-  const f = { name: $("#fPage").value, width: $("#fW").value, look: $("#fLook").value, accent: $("#fAcc").value }, onlyBad = $("#fBad").checked, orWarn = $("#fWarn").checked, chk = $("#fCheck").value;
+  const f = { name: $("#fPage").value, width: $("#fW").value, look: $("#fLook").value }, onlyBad = $("#fBad").checked, orWarn = $("#fWarn").checked, chk = $("#fCheck").value;
   const rows = R.stops.filter(s => Object.entries(f).every(([k, v]) => !v || String(s[k]) === v))
     .filter(s => !chk || s.checks.some(c => c.id === chk && !c.ok) || (s.warnings || []).some(w => w.id === chk))
     .filter(s => !onlyBad || s.checks.some(c => !c.ok) || (orWarn && (s.warnings || []).length));
@@ -1668,7 +1658,7 @@ function draw() {
     const bad = s.checks.filter(c => !c.ok), warn = s.warnings || [];
     const cmp = R.compare && R.compare.shots.find(x => x.shot === s.shot);
     return "<div class='card'>" + (s.shot ? "<a href='" + s.shot + "' target='_blank'><img loading='lazy' src='" + s.shot + "' alt=''></a>" : "")
-      + "<div class='b'><h3>" + esc(s.name) + " <span class='m'>@" + s.width + " · " + s.look + " / " + s.accent + (s.settleMs != null ? " · " + s.settleMs + " ms" : "") + (s.shotGrown ? " · shot " + s.shotGrown + " px tall" : "") + "</span></h3>"
+      + "<div class='b'><h3>" + esc(s.name) + " <span class='m'>@" + s.width + " · " + s.look + (s.settleMs != null ? " · " + s.settleMs + " ms" : "") + (s.shotGrown ? " · shot " + s.shotGrown + " px tall" : "") + "</span></h3>"
       + (cmp && cmp.status === "changed" ? "<span class='tag warn'>changed " + cmp.pct + " %</span>" + (cmp.diff ? " <a class='m' href='" + cmp.diff + "' target='_blank'>diff</a>" : "") : "")
       + bad.map(c => "<span class='tag fail'>" + esc(c.id) + "</span>").join("") + warn.map(w => "<span class='tag warn'>" + esc(w.id) + " " + (Array.isArray(w.detail) ? w.detail.length : "") + "</span>").join("")
       + (!bad.length && !warn.length ? "<span class='tag ok'>clean</span>" : "")
@@ -1727,7 +1717,7 @@ async function selfTestRules(browser) {
   }
   try {
     server = await startServer({});
-    console.log(`ui_audit: server ${server.base}${server.tenant ? " · tenant " + server.tenant : ""} · widths ${WIDTHS.join(",")} · looks ${LOOKS.join(",")} · accents orange${EXTRA_ACCENTS.length ? "," + EXTRA_ACCENTS.join(",") : ""}${EXTRA_PASSES.map(p => " · + " + p.look + "/" + p.accent + " at " + p.widths.join(",")).join("")}${OPT.strict44 ? " · strict 44 px" : ""} · out ${RUN_DIR}`);
+    console.log(`ui_audit: server ${server.base}${server.tenant ? " · tenant " + server.tenant : ""} · widths ${WIDTHS.join(",")} · looks ${LOOKS.join(",")}${OPT.strict44 ? " · strict 44 px" : ""} · out ${RUN_DIR}`);
     // the browser: the installed Google Chrome (the user's); Playwright's bundled Chromium only when asked or when Chrome is missing
     if (OPT.browser === "chrome") {
       try { browser = await chromium.launch({ headless: !OPT.headed, channel: "chrome" }); }
@@ -1743,11 +1733,7 @@ async function selfTestRules(browser) {
     try { const src = fs.readFileSync(path.join(ROOT, "frontend", "index.html"), "utf8"); const n = (src.match(/\bconfirm\(/g) || []).length;
       REPORT.nativeConfirms = n; note(`frontend/index.html confirms with the browser's own confirm() box in ${n} places (unstyled, in no look, not pictured)`); } catch (e) {}
     let first = true;
-    for (const look of LOOKS) { await walkPortal(browser, server.base, look, "orange", first, WIDTHS); first = false; }
-    // the accents change the controls and the chart colours only: the desk width alone, in the first look
-    for (const accent of EXTRA_ACCENTS) await walkPortal(browser, server.base, LOOKS[0], accent, false, [DESK_W]);
-    // decision 15: the Dark look with the Blue accent at the desk width — the portal pages only (first = false)
-    for (const p of EXTRA_PASSES) await walkPortal(browser, server.base, p.look, p.accent, false, p.widths);
+    for (const look of LOOKS) { await walkPortal(browser, server.base, look, first, WIDTHS); first = false; }
     if (OPT.deep) {
       await walkTeam(browser, server.base);
       if (!server.external) { await walkLogin(browser, server.base); await walkReviewer(browser, server.base); await walkEmpty(browser); }

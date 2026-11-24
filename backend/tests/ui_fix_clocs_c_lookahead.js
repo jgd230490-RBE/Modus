@@ -67,7 +67,8 @@ try {
 const contrast = (hex) => 1.05 / (F.lpLum(hex) + 0.05);
 if (F.lpDeep) {
   const tokens = ["#E8590C", "#2563EB", "#0D9488", "#7C3AED", "#A07D34", "#E8681E", "#5B8FF0", "#13A193", "#9572EE", "#B48E3E",
-    "#1D4ED8", "#0891B2", "#4F46E5", "#A8A29E", "#9A3412", "#BE185D", "#9D174D", "#0F766E", "#B45309", "#4338CA", "#C2410C"];
+    "#1D4ED8", "#0891B2", "#4F46E5", "#A8A29E", "#9A3412", "#BE185D", "#9D174D", "#0F766E", "#B45309", "#4338CA", "#C2410C",
+    "#0B4EA2", "#8AB4F8"];   // WIDENED 24 Nov 2026 (own look, stage 6): --chart-2 is the sign blue, light and Dark
   const deep = tokens.map(F.lpDeep);
   ok("⭐ C-F4: every chart token and extra fill, deepened, carries white text at 4.5 : 1 or more (it was 3.4 on #E8590C)",
      deep.every(h => /^#[0-9a-f]{6}$/i.test(h) && contrast(h) >= 4.5) && contrast("#E8590C") < 4.5, JSON.stringify(deep));

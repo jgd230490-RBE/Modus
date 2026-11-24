@@ -727,9 +727,10 @@ _fe_wo = fe.replace(_dark, "")          # the utilities in the app markup, not t
 _uncovered = sorted({u for u in set(_PAL.findall(_fe_wo)) if not _SKIP.match(u) and ("." + _esc(u)) not in _dark})
 ok("🔴 APPEARANCE: every Tailwind colour utility the app uses has a dark remap (generated block, html[data-theme=\"dark\"])",
    not _uncovered and _dark.count('html[data-theme="dark"]') >= 40, str(_uncovered)[:300])
-ok("APPEARANCE: three looks as tokens — ink on :root, light = header tokens only, dark = a full palette with orange controls and color-scheme dark",
+# NARROWED 24 Nov 2026 (own look, stage 3): Dark's selection and link colour is the light sign blue #8AB4F8 (was orange)
+ok("APPEARANCE: three looks as tokens — ink on :root, light = header tokens only, dark = a full palette with the light sign blue for selections and links and color-scheme dark",
    '--hdr-logo:url("/brand/logo-header-on-dark.svg")' in fe and 'html[data-theme="light"]{' in fe and '--hdr-logo:url("/brand/logo-header-on-light.svg")' in fe
-   and 'html[data-theme="dark"]{' in fe and "--navy:#FF8C14; --navy-deep:#F3F4F6; --blue:#FFA10A;" in fe and fe.count("color-scheme:dark;") == 1)
+   and 'html[data-theme="dark"]{' in fe and "--navy:#8AB4F8; --navy-deep:#F3F4F6; --blue:#8AB4F8;" in fe and fe.count("color-scheme:dark;") == 1)
 ok("APPEARANCE: the header reads header tokens, never a white literal — bar, lockup, rule, muted text, buttons, the language segment",
    ".brand-bar{background:var(--hdr-bg);color:var(--hdr-fg);" in fe and "content:var(--hdr-logo);" in fe and ".brand-rule{width:1px;height:28px;background:var(--hdr-rule);}" in fe
    and 'className="brand-bar shrink-0"' in fe and "bg-white/10" not in fe and "text-white/70" not in fe and "border-white/20" not in fe and "bg-white/25" not in fe)
@@ -741,7 +742,8 @@ ok("APPEARANCE: the choice is per browser (localStorage modus_theme), applied be
    and 'if(!THEMES.some(([k]) => k === name)) name = "ink";' in fe and fe.index("applyTheme(localStorage.getItem") < fe.index("ReactDOM.createRoot"))
 ok("APPEARANCE: charts rebuild on a change and read token colours — no literal blue left in the Dashboard's series",
    # 13 Oct 2026 (W16): narrowed — the chart also rebuilds on an accent change and once its box first has a size (W5)
-   "}, [JSON.stringify(config), theme, accent, sized]);" in fe and 'window.Chart.defaults.color = tok("--muted"' in fe
+   # NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone: the chart rebuilds on a look change and its first size only
+   "}, [JSON.stringify(config), theme, sized]);" in fe and "useAccent" not in fe and 'window.Chart.defaults.color = tok("--muted"' in fe
    and 'backgroundColor: "#2563EB"' not in fe and 'backgroundColor: "#3B82F6"' not in fe and 'borderColor: "#2563EB"' not in fe and 'tok("--chart-1"' in fe)
 ok("APPEARANCE: cards, the big-screen bar and the Look-ahead's white buttons read surface tokens — no literal white surface left in component CSS",
    ".card{background:var(--surface);" in fe and ".dash-wallbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;background:var(--surface);" in fe
@@ -983,6 +985,11 @@ def _blk(sel):
 def _tk(b):
     return {k: v.strip() for k, v in _re.findall(r"--([a-z0-9-]+):([^;]+);", b or "")}
 _ROOT, _DARK, _LIGHTHDR = _tk(_blk(":root")), _tk(_blk('html[data-theme="dark"]')), _tk(_blk('html[data-theme="light"]'))
+# 23 Nov 2026 (the own look, Group A, stage 2): the page re-defines Tailwind's slate ramp in its Tailwind config as
+# neutral greys made from the ink; the measures below read the page's own values (the v3 slate pair above is history)
+_SLATE = dict(re.findall(r'(\d+):"(#[0-9A-F]{6})"', fe.split("tailwind.config={theme:{extend:{colors:{slate:{")[1].split("}")[0]))
+# 24 Nov 2026 (the own look, stage 3): the page re-defines the five blue utilities it uses as the sign blue ramp
+_BLUE = dict(re.findall(r'(\d+):"(#[0-9A-F]{6})"', fe.split("},blue:{")[1].split("}")[0]))
 def _eff(acc, look):
     t = dict(_ROOT)
     if look == "light":
@@ -1014,7 +1021,9 @@ def _lum(c):
 def _cr(a, b):
     x, y = sorted([_lum(a), _lum(b)], reverse=True)
     return (x + 0.05) / (y + 0.05)
-_ACC = ["orange", "blue", "blue-shades", "orange-shades"]
+# NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone, so the 12 looks × accents are the three
+# looks; "orange" names the one colour set left (the :root and Dark blocks), so _eff and every loop below read it alone
+_ACC = ["orange"]
 _bad = []
 for _a in _ACC:
     for _l in ["ink", "light", "dark"]:
@@ -1041,9 +1050,9 @@ ok("W16: the status colours are byte-identical in all 12 combinations (the accen
    and len({tuple(_eff(a, "dark")[k] for k in ("green", "gold", "red")) for a in _ACC}) == 1)
 ok("W16: the brief's 'Orange primary' button #FF8C14 would fail on white (2.33:1, under 3:1) — so it is not used on the light looks",
    round(_cr("#FF8C14", "#FFFFFF"), 2) == 2.33 and all(_eff(a, l)["action"].upper() != "#FF8C14" for a in _ACC for l in ("ink", "light")))
-ok("W16: Blue shades' navy header is the Ink look's only (white on it 10.36:1); the Light look keeps its white header",
-   _eff("blue-shades", "ink")["hdr-bg"] == "#1E3A8A" and round(_cr("#FFFFFF", "#1E3A8A"), 2) == 10.36
-   and _eff("blue-shades", "light")["hdr-bg"] == "#FFFFFF" and _eff("blue", "ink")["hdr-bg"] == "#1F2024")
+# NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone: no accent repaints the header — the Ink header is the ink, Light's white, in every case
+ok("W16: Blue shades' navy header is gone with the accents (no [data-accent] block, no --hdr-bg #1E3A8A); the Ink header is the ink and the Light look keeps its white header",
+   "--hdr-bg:#1E3A8A" not in fe and "[data-accent" not in fe and _eff("orange", "ink")["hdr-bg"] == "#1F2024" and _eff("orange", "light")["hdr-bg"] == "#FFFFFF")
 
 # --- 17 Oct 2026: UI fix 2 (claude/ui-fix-dark) — the dark look's contrast failures that needed no decision -------------
 # (notes/ui-audit-findings-1016.md, findings 1, 2 and 6's button). Ratios by the WCAG relative-luminance formula above.
@@ -1105,7 +1114,9 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    # NARROWED 11 Nov 2026 (CLOCS card C-F6): action +1, the site layout's "Show it" (the public tick asks first)
    # 12 Nov 2026 (batch 4 merge, both kept): 23 - 1 (B-F6) + 1 (C-F6) = 23
    len(_sites.get("action", [])) == 23 and ".text-white[style*=\"var(--action)\"]{color:var(--action-fg);}" in fe
-   and len(_sites.get("navy", [])) == 2 and len(_sites.get("blue", [])) == 3 and len(_sites.get("slate-800", [])) == 2
+   # NARROWED 24 Nov 2026 (own look, stage 3): navy 2 -> 1 and blue 3 -> 0: the drawing palette's picked tool and the three
+   # "Place on map" toggles are selections, now a --navy-soft tint with --navy words; the Submit strip stays (Group B's strip)
+   and len(_sites.get("navy", [])) == 1 and not _sites.get("blue") and len(_sites.get("slate-800", [])) == 2
    and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
 ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",
@@ -1115,7 +1126,8 @@ ok("...every inline navy / blue fill is written `background: \"var(--navy)\"` / 
    and ".bg-\\[color\\:var\\(--navy\\)\\]" not in fe
    # NARROWED 10 Nov 2026 (wave 2, card 13): 14+ -> 2 navy fills (the Submit strip and the palette's picked tool); the primary
    # actions are written the same way on the accent, `background: "var(--action)"`, 23 of them
-   and _fe_wo.count('background: "var(--navy)"') + _fe_wo.count('background:"var(--navy)"') == 2 and _fe_wo.count('background: "var(--blue)"') >= 1
+   # NARROWED 24 Nov 2026 (own look, stage 3): one navy fill (the Submit strip) and no blue fill; a selection is a tint
+   and _fe_wo.count('background: "var(--navy)"') + _fe_wo.count('background:"var(--navy)"') == 1 and _fe_wo.count('background: "var(--blue)"') == 0
    and _fe_wo.count('background: "var(--action)"') >= 22   # NARROWED 11 Nov 2026 (CLOCS B-F6): Route all in the menu
    and "backgroundColor: \"var(--navy)\"" not in _fe_wo and "backgroundColor: \"var(--blue)\"" not in _fe_wo)
 _bad1 = []
@@ -1147,7 +1159,7 @@ for _a in _ACC:
     for _l in ["ink", "light", "dark"]:
         t = _eff(_a, _l)
         _surfs = [("a card", t["surface"]), ("the page", t["bg"]), ("the rail", t["rail-bg"]), ("a second surface", t["surface-2"]),
-                  ("a slate-50 table head", t["surface-2"] if _l == "dark" else "#F8FAFC"), ("a selected row", "#FFF4E6" if _a == "orange-shades" and _l != "dark" else "#EFF6FF" if _l != "dark" else _over(t["navy-soft"], t["surface"]))]
+                  ("a slate-50 table head", t["surface-2"] if _l == "dark" else "#F8FAFC"), ("a selected row", "#FFF4E6" if _a == "orange-shades" and _l != "dark" else _BLUE["50"] if _l != "dark" else _over("rgba(91,143,240,.14)" if _a.startswith("blue") else "rgba(138,180,248,.12)", t["surface"]))]   # NARROWED 24 Nov 2026 (own look, stage 3): a selected row IS .bg-blue-50 — light the page's #F0F4F9, Dark its remap (the 16 % --navy-soft is a chosen control's tint, measured below)
         for name in _TXT:
             for where, bgc in _surfs:
                 r = _cr(t[name], bgc)
@@ -1262,13 +1274,15 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--ok-text)\" }}>" in fe and "style={{ color: s.over ? \"var(--bad-text)\" : \"var(--navy-deep)\" }}>" in fe)
 ok("UI fix 4 (decision 1): 🔴 one rule maps text-slate-400 to --muted in the Ink and Light looks, written html:where(:not([data-theme=\"dark\"])) so it weighs as little as the utility and hover:text-slate-700 still wins; the dark look keeps its remap, whose value IS the dark --muted",
    'html:where(:not([data-theme="dark"])) .text-slate-400{color:var(--muted)}' in fe
-   and 'html[data-theme="dark"] .text-slate-400{color:#9AA1AB}' in _dark and _DARK["muted"] == "#9AA1AB"
-   and fe.count("/* CAPTIONS ") == 1 and "/* CAPTIONS-END */" in fe and fe.index("/* CAPTIONS ") > fe.index("/* ACCENTS-END */") and fe.index("/* CAPTIONS-END */") < fe.index("/* DARK-REMAP-START"))
+   # NARROWED 23 Nov 2026 (own look, stage 2): Dark's caption grey is the neutral #9C9FA4 (was the blue-tinted #9AA1AB)
+   and 'html[data-theme="dark"] .text-slate-400{color:#9C9FA4}' in _dark and _DARK["muted"] == "#9C9FA4"
+   and fe.count("/* CAPTIONS ") == 1 and "/* CAPTIONS-END */" in fe and fe.index("/* CAPTIONS ") > fe.index("/* 24 Nov 2026 (the own look, stage 5): the accent picker and its ACCENTS block are gone") and   # NARROWED 24 Nov 2026: where the ACCENTS block was
+    fe.index("/* CAPTIONS-END */") < fe.index("/* DARK-REMAP-START"))
 _mb = []
 for _a in _ACC:
     for _l in ["ink", "light", "dark"]:
         t = _eff(_a, _l)
-        for where, bgc in [("a card", t["surface"]), ("the page", t["bg"]), ("the rail", t["rail-bg"]), ("a second surface", t["surface-2"]), ("a slate-50 head", t["surface-2"] if _l == "dark" else "#F8FAFC")]:
+        for where, bgc in [("a card", t["surface"]), ("the page", t["bg"]), ("the rail", t["rail-bg"]), ("a second surface", t["surface-2"]), ("a slate-50 head", t["surface-2"] if _l == "dark" else _SLATE["50"])]:   # NARROWED 23 Nov 2026: the page's slate-50
             r = _cr(t["muted"], bgc)
             if r < 4.5:
                 _mb.append(f"{_a}/{_l}: --muted on {where} {t['muted']} on {bgc} = {r:.2f}")
@@ -1277,17 +1291,19 @@ ok("...--muted reads 4.5:1 or better on a card, the page, the rail, a second sur
    and round(_cr("#9AA1AB", "#1F2024"), 2) == 6.25 and round(_cr("#94A3B8", "#FFFFFF"), 2) == 2.56 and round(_cr("#CBD5E1", "#FFFFFF"), 2) == 1.48, "; ".join(_mb[:4]))
 ok("...on a washed surface --muted falls short — 4.37 on a selected row (blue-50 #EFF6FF; 4.38 on Orange shades' #FFF4E6), 4.28 on the Horizon's commit-week wash (navy-soft over white, #EEF3FD) and 4.43 on the Account's short-row wash (5 % rose, #FCF5F6) — so the second rule steps the greys there to slate-600 #475569 (6.96, 6.98, 6.81, 7.05), matching the inline washes by [style*=], again with :where() so a hover utility still wins",
    round(_cr("#64748B", "#EFF6FF"), 2) == 4.37 and round(_cr("#64748B", "#FFF4E6"), 2) == 4.38
-   and round(_cr("#64748B", _over(_ROOT["navy-soft"], "#FFFFFF")), 2) == 4.28 and round(_cr("#64748B", _over("rgba(191,46,85,.05)", "#FFFFFF")), 2) == 4.43
+   # NARROWED 24 Nov 2026 (own look, stage 3): the 10 Nov wash was rgba(37,99,235,.08), written out (the token is the sign blue now)
+   and round(_cr("#64748B", _over("rgba(37,99,235,.08)", "#FFFFFF")), 2) == 4.28 and round(_cr("#64748B", _over("rgba(191,46,85,.05)", "#FFFFFF")), 2) == 4.43
    and round(_cr("#475569", "#EFF6FF"), 2) == 6.96 and round(_cr("#475569", "#FFF4E6"), 2) == 6.98
-   and round(_cr("#475569", _over(_ROOT["navy-soft"], "#FFFFFF")), 2) == 6.81 and round(_cr("#475569", _over("rgba(191,46,85,.05)", "#FFFFFF")), 2) == 7.05
+   and round(_cr("#475569", _over("rgba(37,99,235,.08)", "#FFFFFF")), 2) == 6.81 and round(_cr("#475569", _over("rgba(191,46,85,.05)", "#FFFFFF")), 2) == 7.05
    # NARROWED 10 Nov 2026 (wave 3, finding 5): the Account's short-row wash is 6 % amber now (#FDF7F0: --muted 4.47, short of
    # 4.5), so the rule lists it too (slate-600 7.12); the rose wash is left on the stockpile table's over row only (1)
-   and 'html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-500{color:#475569}' in fe
+   and 'html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-400,html:where(:not([data-theme="dark"])) :where(.bg-blue-50,[style*="--navy-soft"],[style*="rgba(191, 46, 85"],[style*="rgba(191,46,85"],[style*="rgba(217, 119, 6, 0.06)"],[style*="rgba(217,119,6,.06)"]) .text-slate-500{color:#44464B}' in fe
    and round(_cr("#64748B", _over("rgba(217,119,6,.06)", "#FFFFFF")), 2) == 4.47 and round(_cr("#475569", _over("rgba(217,119,6,.06)", "#FFFFFF")), 2) == 7.12
    and _cr(_DARK["muted"], _over("rgba(217,119,6,.06)", _eff("orange", "dark")["surface"])) >= 4.5
    and _fe_wo.count('background: "var(--navy-soft)"') >= 7 and _fe_wo.count('background: "rgba(191,46,85,.05)"') == 1
    and _fe_wo.count('background: "rgba(217,119,6,.06)"') == 1
-   and ':root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}' in fe)
+   # NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone (Orange shades' #FFF4E6 row with it)
+   and ':root:not([data-theme="dark"])[data-accent="orange-shades"] .bg-blue-50{background-color:#FFF4E6}' not in fe)
 ok("...the rail's group headings lose their opacity:.85 (3.45 → 4.56), the big screen's two hard-coded greys (#9aa1ac, 2.60) and the Dashboard group title's default (#94a3b8) read --muted, and every slate-300 placeholder (rate not set ×3, not recorded, the dashes) reads slate-500 — the dark remaps for slate-300 and emerald-600 went with their last use",
    # NARROWED 22 Oct 2026 (UI fix 7, card 9, the user's choice): 12 px
    ".rail-group{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}" in fe and "opacity:.85" not in fe
@@ -1299,7 +1315,8 @@ ok("...the rail's group headings lose their opacity:.85 (3.45 → 4.56), the big
 ok("UI fix 4 (decision 3): the Submit strip's six values read in the strip's own text colour — the amber on the strip was 1.62:1 (1.4:1 in Dark) and the label already says Peak",
    '<div className="text-lg font-bold tabular-nums">{value}</div>' in fe and ".map(([label, value]) => (" in fe and '"peak"]' not in fe
    and '["Peak movements / day", fmt(perDay.peakTrips, "vehicles")],' in fe
-   and round(_cr(_ROOT["gold"], _ROOT["navy"]), 2) == 1.62 and round(_cr(_DARK["gold"], _DARK["navy"]), 1) == 1.4)
+   # NARROWED 24 Nov 2026 (own look, stage 3): the 17 Oct strip was #2563EB (Dark #FF8C14), written out
+   and round(_cr(_ROOT["gold"], "#2563EB"), 2) == 1.62 and round(_cr(_DARK["gold"], "#FF8C14"), 1) == 1.4)
 # Every selector in the DARK-REMAP block must match something in the markup — the reverse of the coverage check above.
 # (The selector this fix replaced, .bg-[color:var(--navy)].text-white, had matched nothing since 7 Oct and nobody noticed.)
 _UTIL = set(_PAL.findall(_fe_wo))
@@ -1333,13 +1350,16 @@ for _line in _dark.splitlines():
 ok("UI fix 2: every selector in the DARK-REMAP block has a use in the markup — the four stale remaps found this way on 17 Oct (bg-[rgba(37,99,235,.06)], bg-slate-200, hover:text-slate-800 / -900: utilities no longer in the file) are gone",
    # NARROWED 17 Nov 2026 (routes-card-room): 48 -> 47. The open route is a panel of its own, no longer a grey table row
    # (bg-slate-50/70), so that row's remap had no use left and went with it, as this check asks of a stale remap
-   not _dead and _dark.count('html[data-theme="dark"]') >= 47 and "bg-slate-50\\/70" not in _dark and "bg-slate-200{" not in _dark and "text-slate-900" not in _dark, str(_dead)[:300])
+   # NARROWED 24 Nov 2026 (own look, stage 5): 47 -> 46, border-blue-200's only use was the Orange shades accent block
+   not _dead and _dark.count('html[data-theme="dark"]') >= 46 and "bg-slate-50\\/70" not in _dark and "bg-slate-200{" not in _dark and "text-slate-900" not in _dark, str(_dead)[:300])
 
 # --- 22 Oct 2026: UI fix 6 (claude/ui-fix-layout) — the approved mockup notes/ui-fix-layout-mockup-1022/ (the user: "i agree to
 # all apart from 4"): the contrast of cards 2, 3, 5 and 6 and of the two extras the user said yes to (the Horizon's commit-week
 # heading, finding #37; the Avoided chip). Every ratio by the WCAG 2.x relative-luminance formula above (_cr); a tint laid over
 # its surface by _over; the tokens per look × accent from _eff. Tailwind's own values are v3's palette (the CDN build).
 _TW_BLUE700, _TW_SLATE600 = "#1D4ED8", "#475569"
+_TW_SLATE600 = _SLATE["600"]   # 23 Nov 2026: the page's own slate-600 (see _SLATE)
+_TW_BLUE700 = _BLUE["700"]
 def _rule_colour(sel):
     m = _re.search(_re.escape(sel) + r"\{color:(#[0-9A-Fa-f]{6})\}", _css)
     return m.group(1) if m else None
@@ -1396,7 +1416,7 @@ for _a in _ACC:
     for _l in ["ink", "light", "dark"]:
         t = _eff(_a, _l)
         _dk = _l == "dark"
-        shade = _over(t["navy-soft"], t["surface-2"] if _dk else "#F8FAFC")      # the thead is bg-slate-50 (dark: --surface-2)
+        shade = _over(t.get("navy-soft-col", t["navy-soft"]), t["surface-2"] if _dk else _SLATE["50"])   # the thead is bg-slate-50 (dark: --surface-2); NARROWED 23 Nov 2026: the page's slate-50; NARROWED 24 Nov 2026: the 6 % column tint (10 % in Dark)
         head = (_b700["dark-blue"] if _a.startswith("blue") else _b700["dark"]) if _dk else (_b700["os"] if _a == "orange-shades" else _TW_BLUE700)
         role = _s600_dark if _dk else _TW_SLATE600
         for name, a in [("the commit week's heading (text-blue-700)", head), ("its role word (text-slate-600)", role)]:
@@ -1408,19 +1428,66 @@ for _a in _ACC:
             if r < 4.5:
                 _badHz.append(f"{_a}/{_l}: {name} {a} on {shade} = {r:.2f}")
 ok("UI fix 6 card 3: 🔴 on the Horizon's commit-week shade the heading (text-blue-700, the accent's darker shade) and the role word (text-slate-600) read 4.5:1 or better in all 12 looks × accents",
-   not _badHz and len(_hzr) == 24, "; ".join(_badHz[:6]))
+   not _badHz and len(_hzr) == 6, "; ".join(_badHz[:6]))   # NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone: the three looks × two words
 ok("...the figures: the shade #E7EEFB (Ink and Light, Orange and Blue), heading #1D4ED8 5.75:1 (var(--navy) #2563EB was 4.44), Blue shades 5.66, Orange shades #9A3412 on #F4EBE9 6.23 (#C2410C was 4.42); Dark #FFB454 on #3B2D1F 7.53, Dark blue #8FB3F5 on #202632 7.17; the role word #475569 on #E7EEFB 6.50 (--muted would be 4.08), Dark #D5D8DE 9.30 / 10.62",
-   _over(_ROOT["navy-soft"], "#F8FAFC") == "#E7EEFB" and round(_cr("#1D4ED8", "#E7EEFB"), 2) == 5.75 and round(_cr("#2563EB", "#E7EEFB"), 2) == 4.44
+   # NARROWED 24 Nov 2026: the 10 Nov tint written out
+   _over("rgba(37,99,235,.08)", "#F8FAFC") == "#E7EEFB" and round(_cr("#1D4ED8", "#E7EEFB"), 2) == 5.75 and round(_cr("#2563EB", "#E7EEFB"), 2) == 4.44
    and round(_cr("#1D4ED8", _over("rgba(29,78,216,.08)", "#F8FAFC")), 2) == 5.66
    and _over("rgba(194,65,12,.08)", "#F8FAFC") == "#F4EBE9" and round(_cr("#9A3412", "#F4EBE9"), 2) == 6.23 and round(_cr("#C2410C", "#F4EBE9"), 2) == 4.42
    and _over("rgba(255,140,20,.14)", "#1B1D21") == "#3B2D1F" and round(_cr("#FFB454", "#3B2D1F"), 2) == 7.53
    and _over("rgba(91,143,240,.08)", "#1B1D21") == "#202632" and round(_cr("#8FB3F5", "#202632"), 2) == 7.17
    and round(_cr("#475569", "#E7EEFB"), 2) == 6.50 and round(_cr("#64748B", "#E7EEFB"), 2) == 4.08
    and round(_cr("#D5D8DE", "#3B2D1F"), 2) == 9.30 and round(_cr("#D5D8DE", "#202632"), 2) == 10.62
-   and _b700 == {"os": "#9A3412", "dark": "#FFB454", "dark-blue": "#8FB3F5"} and _s600_dark == "#D5D8DE")
+   # NARROWED 23 Nov 2026 (own look, stage 2): Dark's second text is the neutral #C9CACE (was #D5D8DE)
+   # NARROWED 24 Nov 2026 (own look, stage 3): Dark's text-blue-700 is the light sign blue #8AB4F8 (was #FFB454)
+   # NARROWED 24 Nov 2026 (the own look, Group A, stage 5): the accent picker is gone: Orange shades' and the dark blue accents' remaps went with it
+   and _b700 == {"os": None, "dark": "#8AB4F8", "dark-blue": None} and _s600_dark == "#C9CACE")
 ok("...var(--navy-deep) passes too (13.97:1 in Ink, 12.07 in Dark) but it is the ink colour, not the darker blue the mockup offered and the user said yes to, so the heading takes the remapped text-blue-700",
-   round(_cr(_ROOT["navy-deep"], "#E7EEFB"), 2) == 13.97 and round(_cr(_DARK["navy-deep"], "#3B2D1F"), 2) == 12.07
+   round(_cr(_ROOT["navy-deep"], "#E7EEFB"), 2) == 13.97 and round(_cr(_DARK["navy-deep"], "#3B2D1F"), 2) == 12.07   # the 10 Nov shades, history
    and '<div className={"font-semibold " + (role === "commit" ? "text-blue-700" : "text-slate-600")}>' in fe)
+# 23 Nov 2026 (the own look, Group A, stage 2): the neutral greys, measured
+ok("OWN LOOK 2: the page's slate ramp is the neutral one made from the ink (50 #F5F5F6, 200 #E1E2E4, 300 #C6C8CC, 500 #62656B, 600 #44464B, 800 #1F2024) and the shell tokens follow it, light and Dark",
+   _SLATE.get("50") == "#F5F5F6" and _SLATE.get("200") == "#E1E2E4" and _SLATE.get("300") == "#C6C8CC" and _SLATE.get("500") == "#62656B"
+   and _SLATE.get("600") == "#44464B" and _SLATE.get("800") == "#1F2024" and len(_SLATE) == 11
+   and _ROOT["ink"] == "#1F2024" and _ROOT["muted"] == "#62656B" and _ROOT["line"] == "#E1E2E4" and _ROOT["grey"] == "#C6C8CC"
+   and _ROOT["surface-2"] == "#F5F5F6" and _ROOT["rail-bg"] == "#F5F5F6" and _ROOT["surface-3"] == "#EDEEEF"
+   and _DARK["muted"] == "#9C9FA4" and _DARK["line"] == "#333539" and _DARK["grey"] == "#4B4D52"
+   and _DARK["surface"] == "#1F2024" and _DARK["bg"] == "#141518", str(_SLATE))
+ok("OWN LOOK 2: the measured pairs — captions #62656B on white 5.84, on the rail and slate-50 5.36, on a selected row 5.37, on the commit-week wash 5.25, on the amber wash 5.49; second text #44464B on the washes 8.49 to 8.88 (8.4886 at the least); Dark captions #9C9FA4 on #1F2024 6.13, on the page 6.88, on --surface-3 5.55; Dark second text #C9CACE 9.94",
+   round(_cr("#62656B", "#FFFFFF"), 2) == 5.84 and round(_cr("#62656B", "#F5F5F6"), 2) == 5.36 and round(_cr("#62656B", "#EFF6FF"), 2) == 5.37
+   and round(_cr("#62656B", _over("rgba(37,99,235,.08)", "#FFFFFF")), 2) == 5.25 and round(_cr("#62656B", _over("rgba(217,119,6,.06)", "#FFFFFF")), 2) == 5.49
+   and min(_cr("#44464B", c) for c in ("#EFF6FF", _over("rgba(37,99,235,.08)", "#FFFFFF"), _over("rgba(191,46,85,.05)", "#FFFFFF"), _over("rgba(217,119,6,.06)", "#FFFFFF"))) >= 8.48
+   and round(_cr("#9C9FA4", "#1F2024"), 2) == 6.13 and round(_cr("#9C9FA4", "#141518"), 2) == 6.88 and round(_cr("#9C9FA4", "#26282D"), 2) == 5.55
+   and round(_cr("#C9CACE", "#1F2024"), 2) == 9.94)
+_blueGrey = [h for h in ["#64748B", "#475569", "#94A3B8", "#CBD5E1", "#E2E8F0", "#F1F5F9", "#F8FAFC", "#334155", "#1E293B", "#9AA1AB", "#A9AFB8", "#D5D8DE", "#33363D", "#3D414A", "#E7E5E4", "#FAFAF9", "#F3F2EF"]
+             if h in _blk(":root") + _blk('html[data-theme="dark"]') and h not in ("#F1F5F9", "#E2E8F0", "#94A3B8")]
+ok("OWN LOOK 2: no slate, blue-tinted or warm grey is left in the :root or Dark token blocks (the demo bar's three, #F1F5F9 / #E2E8F0 / #94A3B8, are unchanged by decision and the status chip's none tint is Group B's)",
+   not _blueGrey, str(_blueGrey))
+# 24 Nov 2026 (the own look, Group A, stage 3): the sign blue and the selection tints, measured
+ok("OWN LOOK 3: the sign blue tokens — --navy and --blue #0B4EA2, --navy-soft its 10 % tint (a chosen thing), --navy-soft-col its 6 % tint (a table column); Dark #8AB4F8, 16 % and 10 %, with --control-fg #141518; the page's blue utilities are the sign blue ramp (50 #F0F4F9, 200 #C2D3E8, 300 #9DB8DA, 700 #0B4EA2, 800 #083A79)",
+   _ROOT["navy"] == "#0B4EA2" and _ROOT["blue"] == "#0B4EA2" and _ROOT["navy-soft"] == "rgba(11,78,162,.10)" and _ROOT["navy-soft-col"] == "rgba(11,78,162,.06)"
+   and _DARK["navy"] == "#8AB4F8" and _DARK["blue"] == "#8AB4F8" and _DARK["navy-soft"] == "rgba(138,180,248,.16)" and _DARK["navy-soft-col"] == "rgba(138,180,248,.10)"
+   and _DARK["control-fg"] == "#141518" and _BLUE == {"50": "#F0F4F9", "200": "#C2D3E8", "300": "#9DB8DA", "700": "#0B4EA2", "800": "#083A79"}
+   and 'html[data-theme="dark"] .bg-blue-50{background-color:rgba(138,180,248,.12)}' in _dark and 'html[data-theme="dark"] .text-blue-700{color:#8AB4F8}' in _dark
+   and 'html[data-theme="dark"] .text-blue-800{color:#A9C8FA}' in _dark and "255,140,20" not in _dark.split("/* DARK-REMAP-END */")[0].split("/* DARK-REMAP-START")[1])
+ok("OWN LOOK 3: the measured pairs — the sign blue on white 8.00, on a selected row (#F0F4F9) 7.24, on the rail's 10 % tint 6.26, on a chosen control's 10 % tint 6.80; text-blue-800 on a selected row 10.05; white on the sign blue 8.00; Dark #8AB4F8 on #1F2024 7.72, on the page 8.66, on its 16 % tint 5.60; #141518 on #8AB4F8 8.66; Dark text-blue-800 on its row 7.56",
+   round(_cr("#0B4EA2", "#FFFFFF"), 2) == 8.00 and round(_cr("#0B4EA2", "#F0F4F9"), 2) == 7.24
+   and round(_cr("#0B4EA2", _over("rgba(11,78,162,.10)", "#F5F5F6")), 2) == 6.26 and round(_cr("#0B4EA2", _over("rgba(11,78,162,.10)", "#FFFFFF")), 2) == 6.80
+   and round(_cr("#083A79", "#F0F4F9"), 2) == 10.05 and round(_cr("#8AB4F8", "#1F2024"), 2) == 7.72 and round(_cr("#8AB4F8", "#141518"), 2) == 8.66
+   and round(_cr("#8AB4F8", _over("rgba(138,180,248,.16)", "#1F2024")), 2) == 5.60 and round(_cr("#141518", "#8AB4F8"), 2) == 8.66
+   and round(_cr("#A9C8FA", _over("rgba(138,180,248,.12)", "#1F2024")), 2) == 7.56)
+# a FINDING, not a fault on the page: the 16 % Dark tint (and the 10 % light one) is too strong for a status word or a caption
+# — Dark bad-text 4.27 and --muted 4.44, light warn-text 4.27 — so a chosen control's tint carries ONLY its own sign blue
+# words (or the ink): every inline --navy-soft background names --navy as its colour, and every CSS rule on --navy-soft
+# reads --navy or the ink (the Config read-only note)
+_nsInline = [m for m in re.findall(r'\{[^{}]*background: "var\(--navy-soft\)"[^{}]*\}', _fe_wo)]
+_nsCss = re.findall(r'\n  [^\n{]*\{[^}]*background:var\(--navy-soft\);[^}]*\}', fe.split("</style>")[0])
+ok("OWN LOOK 3: a chosen control's tint carries only sign blue words or the ink — status words and captions fall short on it (Dark bad-text 4.27, --muted 4.44 on the 16 % tint; light warn-text 4.27 on the 10 %), so none sits on it: every inline --navy-soft fill names --navy, every --navy-soft rule reads --navy or --ink",
+   round(_cr("#F87171", _over("rgba(138,180,248,.16)", "#1F2024")), 2) == 4.27 and round(_cr("#9C9FA4", _over("rgba(138,180,248,.16)", "#1F2024")), 2) == 4.44
+   and round(_cr("#B45309", _over("rgba(11,78,162,.10)", "#FFFFFF")), 2) == 4.27
+   and len(_nsInline) >= 9 and all('color: "var(--navy)"' in m for m in _nsInline)
+   and len(_nsCss) >= 10 and all(("color:var(--navy)" in r or "color:var(--ink)" in r) for r in _nsCss),
+   str([m for m in _nsInline if 'color: "var(--navy)"' not in m][:3]) + str([r for r in _nsCss if "color:var(--navy)" not in r and "color:var(--ink)" not in r][:3]))
 # card 2 (finding #11): the Account's headings and button; card 5: the count line; card 1: the pinned short-row cell
 ok("UI fix 6 card 2: the Account headings are --muted on --surface-2 — 4.56:1 (Ink and Light), 6.48:1 (Dark), 4.5 or better in all 12 — and the button is the accent pair (white on #C2410C 5.18:1, on #2563EB 5.17; checked in all 12 by W16 above)",
    all(_cr(_eff(a, l)["muted"], _eff(a, l)["surface-2"]) >= 4.5 for a in _ACC for l in ("ink", "light", "dark"))
