@@ -17,7 +17,7 @@ ok("1 corner: the Tailwind config maps every rounded-* utility to the one 6 px c
    html.includes('borderRadius:{sm:"3px",DEFAULT:"6px",md:"6px",lg:"6px",xl:"6px","2xl":"6px"}'));
 ok("1 corner: no rounded-full is left on the page (the pills took the one corner)", !/\brounded-full\b/.test(html));
 const radii = [...new Set((css.match(/border-radius:[^;}"]*/g) || []).map(r => r.slice(14).trim()))].sort();
-const allowed = ["6px", "3px", "0", "50%", "9px", "6px 6px 0 0", "0 0 6px 6px", "0 0 3px 3px"];
+const allowed = ["6px", "3px", "0", "0 !important", "50%", "9px", "6px 6px 0 0", "0 0 6px 6px", "0 0 3px 3px"];
 ok("1 corner: the stylesheet's corners are 6 px, the small 3 px, none, a round dot (50 %) and the count dot's 9 px only",
    radii.every(r => allowed.includes(r)), radii);
 ok("1 corner: no 999px corner is left in the stylesheet (the count dots are 9 px on an 18 px box)", !/border-radius:999px/.test(css));
@@ -46,6 +46,26 @@ ok("2 status: the second-text token for the ring and the none word, light #44464
 ok("2 status: the Look-ahead flag chips (.chip-st) take the same four shapes, 10 px (warning a diamond, bad a square)",
    /\.chip-st i\{width:10px;height:10px;border-radius:50%;/.test(css) && /\.chip-st i\[style\*="--gold"\]\{[^}]*transform:rotate\(45deg\);\}/.test(css)
    && /\.chip-st i\[style\*="--red"\]\{border-radius:0;\}/.test(css) && !/clip-path:polygon/.test(css.slice(css.indexOf(".chip-st"), css.indexOf(".chip-st") + 1200)));
+
+// ---------------------------------------------------------------- stage 3: tags as plain words joined by "·"
+ok("3 tags: .tg undoes a chip's tint, border, padding and corner (beats the old inline tints); tags side by side are joined by a middle dot",
+   css.includes(".tg{background:none !important;border:0 !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;}")
+   && css.includes('.tg:has(+ .tg)::after{content:"\\00B7";'));
+ok("3 tags: a team, a workstream and a material are plain words in the second-text grey, with no colour of their own",
+   code.includes('<span className="tg tg-plain text-xs font-semibold">{teamName(k)}</span>') && code.includes('<span className="tg tg-plain text-xs font-semibold">{ws}</span>')
+   && code.includes('<span key={c} className="tg tg-plain text-xs whitespace-nowrap">{c}</span>') && css.includes(".tg-plain{color:var(--st-none) !important;}")
+   && !code.includes("IPT_PALETTE_C[k] || \"#62656B\" }}>{teamName(k)}"));
+ok("3 tags: a tag in the warning or bad words carries the status shape (diamond / square), so it is never colour alone; 'Avoided' (a kind) does not",
+   /\.tg:not\(\.tg-ns\)\[style\*="--warn-text"\]::before,\.tg:not\(\.tg-ns\)\[style\*="--bad-text"\]::before\{content:"";display:inline-block;width:9px;height:9px;/.test(css)
+   && css.includes('.tg:not(.tg-ns)[style*="--warn-text"]::before{transform:rotate(45deg);}') && code.includes('className="tg tg-ns text-xs font-semibold px-2 py-0.5 rounded" style={{ color: "var(--bad-text)" }}>Avoided'));
+ok("3 tags: every former pill span carries .tg (24), none is left without it; the two controls with a chip's classes (a season month, a button) do not",
+   count(code, /className=\{?"tg /g) === 24 && !/<span[^>]*className=\{?"(?!tg )[^"]*\bpx-1\.5 (py-0\.5 )?rounded\b/.test(code)
+   && /<label key=\{m\} className=\{"text-xs px-1\.5 py-0\.5 rounded border cursor-pointer/.test(code));
+ok("3 tags: the CSS pills are plain words: abnormal-load categories, the row details' chips (joined by a dot), the CLP organisation, the lorry plan's badge, the Simulation's chips, the record's end word",
+   /\.al-chip\{display:inline-block;font-size:12px;font-weight:600;white-space:nowrap;margin-right:8px;\}/.test(css) && !/\.al-(so|vr1|stgo|cu|warn|bad|grey|okc)\{[^}]*background/.test(css)
+   && !/\.(rd-chip|clp-org|lp-badge|sim-chip|rc-end)\{[^}]*(background|border-radius|padding)/.test(css) && css.includes('.rd-chips .rd-chip+.rd-chip::before{content:"\\00B7";')
+   && !/html\[data-theme="dark"\] \.al-\w+\{background/.test(css));
+ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
 if (fail.length) { fail.forEach(f => console.log("  FAIL: " + f)); process.exit(1); }

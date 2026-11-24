@@ -325,6 +325,15 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
     background:var(--surface);color:var(--muted);font:inherit;font-size:14px;font-weight:600;line-height:1.3;cursor:pointer;white-space:nowrap;}
   .ws-tab:hover{color:var(--ink);}
   .ws-tab[aria-selected="true"],.ws-tab[aria-current="page"],.ws-tab[aria-pressed="true"],.ws-on{background:var(--navy-soft);color:var(--navy);border-color:var(--navy);}
+  /* 24 Nov 2026 (own look, B1 item 3; John's yes to the second mockup): a TAG (team, material, workstream, a vehicle, a
+     source word such as 'target') is a plain word, never a tinted pill: no background, border, padding or corner (!important
+     beats the old inline tints). Tags side by side are joined by a middle dot. A tag in the warning or bad words carries the
+     status shape (diamond / square), so it is never colour alone; .tg-plain is a team or a material, in the second-text grey. */
+  .tg{background:none !important;border:0 !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;}
+  .tg-plain{color:var(--st-none) !important;}
+  .tg:has(+ .tg)::after{content:"\00B7";margin-left:6px;font-weight:400;color:var(--muted);}
+  .tg:not(.tg-ns)[style*="--warn-text"]::before,.tg:not(.tg-ns)[style*="--bad-text"]::before{content:"";display:inline-block;width:9px;height:9px;margin:0 6px 1px 1px;background:currentColor;vertical-align:middle;}
+  .tg:not(.tg-ns)[style*="--warn-text"]::before{transform:rotate(45deg);}
   .chip-st{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);white-space:nowrap;}
   .chip-st i{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block;box-sizing:border-box;}
   /* 13 Oct 2026 (W16, D39): a status is a SHAPE and a word, never colour alone — the plan orange is 6.5 from the
@@ -520,7 +529,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .rc-table .rc-k{font-size:12px;color:var(--muted);}
   .rc-table .rc-col{font-size:13px;}
   .rc-table td.rc-none{text-align:left;color:var(--muted);font-size:13px;}
-  .rc-end{display:inline-block;margin-top:4px;font-size:12px;padding:1px 8px;border-radius:6px;background:var(--surface-3);color:var(--ink-2, var(--ink));}
+  .rc-end{display:inline-block;margin-top:4px;font-size:12px;font-weight:600;color:var(--st-none);}
   .rc-ended td{color:var(--muted);}
   .rc-empty{text-align:center;padding:14px 8px;font-size:13px;}
   .rc-empty b{display:block;font-size:14px;margin-bottom:4px;}
@@ -686,7 +695,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .lp-track.is-over.is-no{box-shadow:inset 0 0 0 2px var(--bad-text)}
   .lp-refused{font-size:12px;color:var(--bad-text);font-weight:600;grid-column:2}
   .lp-day-over{box-shadow:inset 0 0 0 2px var(--ok-text)}
-  .lp-badge{display:inline-block;font-size:12px;font-weight:600;color:var(--navy);background:var(--navy-soft);border-radius:6px;padding:0 7px;margin-left:6px;vertical-align:1px}
+  .lp-badge{display:inline-block;font-size:12px;font-weight:600;color:var(--st-none);margin-left:8px;vertical-align:1px}
   .lp-free{font-size:13px;color:var(--muted);text-align:right}
   .lp-axis{display:grid;grid-template-columns:140px 1fr 150px;gap:10px;color:var(--muted);font-size:12px;padding:2px 0 6px}
   @media (max-width:767px){.lp-axis{display:none}}
@@ -751,8 +760,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   :root{--sim-lorry:#2563EB;--sim-mixer:#E8590C;}
   html[data-theme="dark"]{--sim-lorry:#5B8FF0;--sim-mixer:#E8681E;}
   .sim-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
-  .sim-chip{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:2px 10px;font-size:13px;color:var(--muted);background:var(--surface);}
-  .sim-chip-staff{color:var(--navy);background:var(--navy-soft);border-color:transparent;font-weight:600;}
+  .sim-chip{display:inline-block;font-size:13px;color:var(--muted);}   /* 24 Nov 2026 (own look): plain words joined by a dot */
+  .sim-chip+.sim-chip::before{content:"\00B7";margin:0 8px;}
+  .sim-chip-staff{color:var(--ink);font-weight:600;}
   .sim-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:10px;}
   /* 17 Oct 2026 (one screen): from 1024 px the map and its timeline on the left, the clock / Gates now / scenario beside
      them; the map takes what the screen's height leaves for it, so the map, the clock and the queues fit one screen */
@@ -932,7 +942,7 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .clp-thread > li{border-top:1px solid var(--line);padding:7px 0;}
   .clp-step{font-size:13px;color:var(--muted);}
   /* 31 Oct 2026 (task 4a, PR 3c): a client reviewer's comment carries its group's name */
-  .clp-org{display:inline-block;font-size:12px;font-weight:600;line-height:18px;padding:0 8px;margin-right:6px;border-radius:6px;background:var(--navy-soft);color:var(--navy);}
+  .clp-org{display:inline-block;font-size:12px;font-weight:600;line-height:18px;margin-right:8px;color:var(--st-none);}
   .clp-words{font-size:14px;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere;}
   .clp-line{display:flex;gap:6px;align-items:baseline;font-size:13px;padding:3px 0;color:var(--ink);}
   .clp-line b{white-space:nowrap;}
@@ -1036,8 +1046,9 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .rd-p{display:flex;align-items:flex-start;gap:6px;}
   .rd-main{min-width:0;}
   .rd-sum{font-weight:600;color:var(--ink);white-space:normal;line-height:1.3;}
-  .rd-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;}
-  .rd-chip{display:inline-block;font-size:12px;font-weight:600;line-height:18px;padding:0 8px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink);white-space:nowrap;}
+  .rd-chips{display:flex;flex-wrap:wrap;gap:0 4px;margin-top:3px;}
+  .rd-chip{display:inline-block;font-size:12px;font-weight:600;line-height:18px;color:var(--st-none);white-space:nowrap;}   /* 24 Nov 2026 (own look): a plain word */
+  .rd-chips .rd-chip+.rd-chip::before{content:"\00B7";margin:0 6px 0 2px;font-weight:400;color:var(--muted);}
   .rd-chev{position:relative;flex:none;width:22px;height:22px;margin-top:-1px;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;transition:transform .15s;}
   .rd-chev::after{content:"";position:absolute;inset:-3px;}
   @media (pointer:coarse){.rd-chev::after{inset:-11px;}}
@@ -1349,13 +1360,14 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .al-notes{margin:8px 0 0;padding-left:16px;color:var(--warn-text);} .al-notes li{margin:3px 0;}
   .al-foot{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:8px;margin:10px 0 0;}
   .al-flag{display:inline-block;margin:2px 4px 2px 0;}
-  .al-chip{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:6px;border:1px solid transparent;white-space:nowrap;margin-right:4px;}
-  .al-so{background:#F5F3FF;color:#5B21B6;border-color:#DDD6FE;} .al-vr1{background:#ECFEFF;color:#0E7490;border-color:#A5F3FC;}
-  .al-stgo{background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;} .al-cu{background:var(--surface-3);color:var(--ink);border-color:var(--line);}
-  .al-warn{background:#FFFBEB;color:var(--warn-text);border-color:#FDE68A;} .al-bad{background:#FEF2F2;color:var(--bad-text);border-color:#FECACA;}
-  html[data-theme="dark"] .al-so{background:#2E1065;color:#DDD6FE;border-color:#5B21B6;} html[data-theme="dark"] .al-vr1{background:#083344;color:#A5F3FC;border-color:#0E7490;}
-  html[data-theme="dark"] .al-stgo{background:#172554;color:#BFDBFE;border-color:#1D4ED8;}
-  html[data-theme="dark"] .al-warn{background:#3A2E1C;color:#FCD34D;border-color:#92400E;} html[data-theme="dark"] .al-bad{background:#3F1D1D;color:#FCA5A5;border-color:#991B1B;}
+  .al-chip{display:inline-block;font-size:12px;font-weight:600;white-space:nowrap;margin-right:8px;}
+  .al-so{color:#5B21B6;} .al-vr1{color:#0E7490;}
+  .al-stgo{color:var(--navy);} .al-cu{color:var(--st-none);}
+  .al-warn{color:var(--warn-text);} .al-bad{color:var(--bad-text);}
+  .al-warn::before,.al-bad::before{content:"";display:inline-block;width:9px;height:9px;margin:0 6px 1px 1px;background:currentColor;vertical-align:middle;} .al-warn::before{transform:rotate(45deg);}
+  html[data-theme="dark"] .al-so{color:#DDD6FE;} html[data-theme="dark"] .al-vr1{color:#A5F3FC;}
+  html[data-theme="dark"] .al-stgo{color:var(--navy);}
+  html[data-theme="dark"] .al-warn{color:#FCD34D;} html[data-theme="dark"] .al-bad{color:#FCA5A5;}
   .al-tri{background:none;border:0;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;min-width:24px;min-height:24px;transition:transform .12s;}
   .al-tri.is-open{transform:rotate(90deg);}
   .al-tbl td{white-space:normal;height:auto;padding-top:8px;padding-bottom:8px;vertical-align:top;}
@@ -1365,8 +1377,8 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .al-dl dt{color:var(--muted);} .al-dl dd{margin:0;}
   .al-bans td,.al-bans th{height:36px;padding:0 6px;font-size:13px;}
   .al-bans .ctl-sm{padding:3px 6px;font-size:13px;width:100%;}
-  .al-grey{background:#EDEEEF;color:#44464B;border-color:#C6C8CC;} .al-okc{background:#ECFDF5;color:var(--ok-text);border-color:#A7F3D0;}
-  html[data-theme="dark"] .al-grey{background:#26282D;color:#C6C8CC;border-color:#44464B;} html[data-theme="dark"] .al-okc{background:#052E16;color:#86EFAC;border-color:#166534;}
+  .al-grey{color:var(--st-none);} .al-okc{color:var(--ok-text);}
+  html[data-theme="dark"] .al-okc{color:#86EFAC;}
   .al-route{border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:4px;}
   .al-ptbl{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 8px;} .al-ptbl th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;padding:4px 6px;border-bottom:1px solid var(--line);}
   .al-ptbl td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:top;} .al-ptbl .ctl-sm{padding:2px 6px;font-size:12px;}
@@ -3179,8 +3191,8 @@ function Dashboard({ meta, initialData, initialWeek, initialTarget, initialGates
   const cost = data.costing || {};
   const K = D.kpis;
   const ctW = ctFig(ct, ctErr);        // 11 Oct 2026: the carbon target as one more big-screen figure
-  const srcChip = (s) => s === "target" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">target</span>
-                        : s === "route" ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">quote</span> : null;
+  const srcChip = (s) => s === "target" ? <span className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">target</span>
+                        : s === "route" ? <span className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">quote</span> : null;
   // KPI cards: two figures per row below 1536 px, four on a wide screen — a figure is
   // never truncated (the 11 Sep screenshot: "1 017 …", "€ 3.31…")
   const Group = ({ title, children, tone }) => (
@@ -10005,7 +10017,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
   ].filter(Boolean);
   const clearOne = (k) => setF(x => ({ ...x, [k]: k === "mine" ? false : k === "q" ? "" : "ALL" }));
   const clearAll = () => setF({ status: "ALL", ipt: "ALL", discipline: "ALL", mine: false, q: "" });
-  const chip = (t, title) => <span className="text-[12px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600" title={title}>{t}</span>;
+  const chip = (t, title) => <span className="tg text-[12px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600" title={title}>{t}</span>;
   const sortCaption = `sorted by ${sort.key === "quantity" ? "total" : sort.key === "months" ? "months" : "route"}, ${sort.dir === "desc" ? "largest first" : "smallest first"}`;
   const qtyHead = unitSel === "loads" ? "Loads" : unitSel === "lorries" ? "Lorries" : "Tonnes";
   // the one status: what needs a person first (Rejected, a ROAD LIMIT, Pending, Mixed), else Approved; +1 when both
@@ -10108,7 +10120,7 @@ function Forecasts({ meta, who, access, onEdit, onChanged, initialCost, initialR
                             : grp(q)}</td>
                           <td className="num" data-label={`Planned ${CUR()}`} data-cost-cell="1">{!cost ? <span className="text-slate-500">…</span> : !c ? <span className="text-slate-500">—</span>
                             : c.planned == null ? <span className="text-slate-500">rate not set</span>
-                            : <>{CUR()}{grp(c.planned)}{c.source === "target" && <span className="ml-1 text-[12px] font-medium px-1.5 rounded bg-slate-100 text-slate-600">target</span>}</>}</td>
+                            : <>{CUR()}{grp(c.planned)}{c.source === "target" && <span className="tg ml-1 text-[12px] font-medium px-1.5 rounded bg-slate-100 text-slate-600">target</span>}</>}</td>
                           <td className="num" data-label={`Fair ${CUR()}`} style={{ color: "var(--chart-4)" }}>{!cost ? <span className="text-slate-500">…</span> : (!c || c.fair == null) ? <span className="text-slate-500">—</span> : <>{CUR()}{grp(c.fair)}</>}</td>
                           <td className="rd-status" data-label="Status"><RowStatus word={st.word} tone={st.tone} more={st.more} /></td>
                           <td className="num whitespace-nowrap rd-actions">
@@ -11894,13 +11906,11 @@ const spanLabel = (a, b) => {
 function IptPill({ ipt }){
   const k = iptKey(ipt);
   if(!k) return <span className="text-xs text-slate-500">no {TEAM().toLowerCase()}</span>;
-  return <span className="text-xs font-semibold px-1.5 py-0.5 rounded text-white"
-    style={{ background: IPT_PALETTE_C[k] || "#62656B" }}>{teamName(k)}</span>;
+  return <span className="tg tg-plain text-xs font-semibold">{teamName(k)}</span>;   // 24 Nov 2026 (own look): a team is a plain word
 }
 function WsPill({ ws }){
   if(!ws) return null;
-  return <span className="text-xs font-semibold px-1.5 py-0.5 rounded"
-    style={{ background: "var(--navy-soft)", color: "var(--navy)" }}>{ws}</span>;
+  return <span className="tg tg-plain text-xs font-semibold">{ws}</span>;
 }
 function LaKpi({ value, caption, tone }){
   // a long value steps its size down before it would be cut off ("£1.43…" read as a price); 10 Nov 2026 (finding 20):
@@ -12535,7 +12545,7 @@ function FuelWidget({ who, access, mode, initial, onChanged }){
     : sum.baf_reason === "no share" ? "BAF: type a fuel share"
     : "BAF: no index";
   const baseTxt = fuelS.baf_base_eur_per_l != null ? `base ${CUR()}${(+fuelS.baf_base_eur_per_l).toFixed(3)} · ${fuelDate(fuelS.baf_base_bulletin_date)}` : "no base locked";
-  const staleChip = hasIndex && idx.stale ? <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded" style={{ color: "var(--warn-text)", background: "rgba(217,119,6,.10)" }} title="The last good published price is older than 8 days">stale</span> : null;
+  const staleChip = hasIndex && idx.stale ? <span className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded" style={{ color: "var(--warn-text)", background: "rgba(217,119,6,.10)" }} title="The last good published price is older than 8 days">stale</span> : null;
   const inputCls = "border border-slate-300 rounded px-1.5 py-0.5 text-xs text-right tabular-nums w-20";
   const setting = (k, label, placeholder, title) => (
     <label className="inline-flex items-center gap-1 text-xs text-slate-600" title={title}>
@@ -13206,7 +13216,7 @@ function LookAhead({ meta, who, access, initialPage, initialView, initialAcctSho
                           </td>}
                           {acctCost && <><td className="px-2 py-2 text-right tabular-nums text-slate-600">
                             {r.planned_eur == null ? <span className="text-slate-500">rate not set</span> : <>
-                              <div>{CUR()}{grp(r.planned_eur)}{r.rate_source === "target" && <span className="ml-1 text-xs font-semibold px-1.5 py-0.5 rounded text-slate-600 bg-slate-100" title="No rate on this route — priced at the target rate from Config">target</span>}</div>
+                              <div>{CUR()}{grp(r.planned_eur)}{r.rate_source === "target" && <span className="tg ml-1 text-xs font-semibold px-1.5 py-0.5 rounded text-slate-600 bg-slate-100" title="No rate on this route — priced at the target rate from Config">target</span>}</div>
                               {r.planned_units && r.planned_units.per_t != null && <div className="text-xs text-slate-400 whitespace-nowrap">{unitTriple(r.planned_units)}</div>}
                               {r.planned_eur_adj != null && <div className="text-xs text-slate-500" title="Quote × (1 + BAF). The quote above is unchanged.">+ BAF {CUR()}{grp(r.planned_eur_adj)}</div>}
                             </>}
@@ -15991,9 +16001,9 @@ function VehChips({ profiles }){
         const p = profiles[k] || {};
         const both = p.baked && p.return_baked;
         const [bg, fg] = both    ? ["rgba(3,158,134,.12)", "var(--ok-text)"]
-                       : p.baked ? ["rgba(255,193,1,.16)", "#8a6d00"]
+                       : p.baked ? ["rgba(255,193,1,.16)", "var(--warn-text)"]
                        : p.error ? ["rgba(191,46,85,.12)", "var(--bad-text)"]
-                                 : ["#edeeef", "#44464B"];
+                                 : ["#edeeef", "var(--st-none)"];
         const alts = p.alt_count > 1 ? ` · ${p.alt_count} options` : "";
         const tip = p.error ? `${vehLabel(k)} — ${p.error}`
                   : !p.baked ? `${vehLabel(k)} · not routed`
@@ -16001,7 +16011,7 @@ function VehChips({ profiles }){
                     (p.return_baked ? ", return routed" : ", return NOT routed") + alts;
         return (
           <span key={k} title={tip}
-            className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+            className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
             style={{ background: bg, color: fg }}>
             {vehShort(k)}{p.baked && !p.return_baked ? " ↦" : ""}
           </span>
@@ -17147,7 +17157,7 @@ function RouteAnalysis({ routeId, active, onFocus, onShow, onPromote, promoting,
               return (
                 <div key={"u" + u.from} className="text-[13px] mt-2" data-busy-in-use={u.from} data-busy-status={u.status}>
                   <p className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+                    <span className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                       style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }}>
                       Busy hours: Alt {u.alt}{u.status === "paused" ? " · paused" : ""}</span>
                     <span>{u.status === "in_use" ? "In use" : "Paused"} on weekdays {u.from}–{u.to}{since ? ` since ${since}` : ""}{u.decided_by ? `, by ${u.decided_by}` : ""}.</span>
@@ -17189,8 +17199,7 @@ function CatChips({ list, dir }){
   return (
     <span className="flex flex-wrap gap-1">
       {arr.map(c => (
-        <span key={c} className="text-xs px-1.5 py-0.5 rounded whitespace-nowrap"
-          style={{ background: bg, color: fg }}>{c}</span>
+        <span key={c} className="tg tg-plain text-xs whitespace-nowrap">{c}</span>
       ))}
     </span>
   );
@@ -20465,7 +20474,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                   <td className="px-3 py-2 text-center" data-label="Gate">
                     {(l.gate_lat != null && l.gate_lon != null)
                       ? <span title={`Routes via ${Number(l.gate_lat).toFixed(5)}, ${Number(l.gate_lon).toFixed(5)}`}
-                          className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+                          className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                           style={{ background: "rgba(3,158,134,.12)", color: "var(--ok-text)" }}>set</span>
                       : <span className="text-slate-500" title="Routes to the marker itself">—</span>}
                   </td>
@@ -20576,7 +20585,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       <span className="flex flex-wrap items-center gap-1 mt-1" data-route-notes={r.id}>
                       {!!(r.gate_blockers || []).length && (
                         <span title={(r.gate_blockers || []).join("; ")}
-                          className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+                          className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                           style={{ background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>
                           gate blocked
                         </span>
@@ -20590,13 +20599,13 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         const words = hr.state === "calls" ? `Calls at ${H.name || "the holding area"}` : hr.state === "route_again" ? "Route again: does not pass the holding area"
                           : hr.state === "skip" ? "Does not call off" : hr.state === "exempt" ? "Straight to the gate" : "Not routed yet";
                         return <span data-route-holding={hr.state} title={hr.state === "route_again" ? "Its line does not pass the holding area: Route again through the holding area in the row's menu (one option)" : undefined}
-                          className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+                          className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                           style={hr.state === "route_again" ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" } : { background: "rgba(29,78,216,.10)", color: "var(--navy)" }}>{words}</span>;
                       })()}
                       {(busyUses || []).filter(u => u.route_id === r.id && u.status !== "stopped").map(u => (
                         // 5 Nov 2026 (task 0d-2): "Busy hours: Alt 2", hover for the hours; amber while paused
                         <span key={"bh" + u.from} data-route-busy={r.id} title={`Weekdays ${u.from}–${u.to}${u.status === "paused" ? " · paused: the road changed" : ""}`}
-                          className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+                          className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                           style={u.status === "in_use" ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }}>
                           Busy hours: Alt {u.alt}</span>))}
                       {(() => {
@@ -20607,7 +20616,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         // tint read 4.09:1 in the audit
                         return <span data-route-return={mode} data-route-return-typed={typed ? "1" : "0"}
                           title={typed ? "Chosen in the row's planning figures" : "Guessed from the route's start; choose in the row's planning figures"}
-                          className={"text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}
+                          className={"tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap" + (typed ? "" : " bg-slate-100 text-slate-600")}
                           style={typed ? { background: "rgba(29,78,216,.10)", color: "var(--navy)" } : undefined}>{words}</span>;
                       })()}
                       {(() => {
@@ -20619,7 +20628,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                         const more = (used.length ? used : bad).length - 1;
                         return (
                           <span data-route-diverted={r.id}
-                            className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+                            className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                             style={used.length ? { background: "rgba(180,83,9,.12)", color: "var(--warn-text)" }
                                                : { background: "rgba(197,48,48,.12)", color: "var(--bad-text)" }}>
                             {used.length ? "Diverted" : "Not diverted"} {divMonths(p.starts_on, p.ends_on)}{more > 0 ? ` +${more}` : ""}
@@ -20628,7 +20637,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       {!!(r.haul_roads || []).length && (
                         // 22 Oct 2026 (UI fix 6, card 6): the chip sits on a SOLID var(--haul-soft) (4.64:1 on any row; the tint fell to 4.24:1 on a selected row)
                         <span title={`Routed through ${(r.haul_roads || []).length} temporary haul road(s): ${(r.haul_roads || []).join(", ")}. Expand the row to edit.`}
-                          className="text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+                          className="tg text-xs font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
                           style={{ background: "var(--haul-soft)", color: "var(--haul-text)" }}>
                           haul ×{(r.haul_roads || []).length}
                         </span>
@@ -20767,24 +20776,24 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                       {z.kind === HAUL_KIND
                         ? (z.location_id
                            /* 28 Oct 2026 (simulation v2): a road inside a site is never routed through */
-                           ? <span className="text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap" data-zone-inside={z.id}
+                           ? <span className="tg text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap" data-zone-inside={z.id}
                                style={{ background: "var(--haul-soft)", color: "var(--haul-text)" }}
                                title="A road inside a site: never routed through; the Simulation drives it between the gates, the areas and the wheel wash.">
                                Inside a site{z.speed_kph ? ` @ ${Math.round(speed(z.speed_kph))} ${SPD()}` : ""}
                              </span>
                            : z.affects_routing
-                           ? <span className="text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap"
+                           ? <span className="tg text-xs font-semibold px-2 py-0.5 rounded whitespace-nowrap"
                                style={{ background: "var(--haul-soft)", color: "var(--haul-text)" }}
                                title="Routes attached to this road are sent through it.">
                                Routed through{z.speed_kph ? ` @ ${Math.round(speed(z.speed_kph))} ${SPD()}` : ""}
                              </span>
-                           : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600" title="Drawn but not open to traffic">Not open</span>)
+                           : <span className="tg text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600" title="Drawn but not open to traffic">Not open</span>)
                         : z.kind === LIMIT_KIND
                         /* 9 Nov 2026 (2.1-1): a traffic limit never routes; its cell is the limit */
-                        ? <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 whitespace-nowrap" data-zone-limit-chip={z.id}>{limitChip(z.limit) || "Limit"}</span>
+                        ? <span className="tg text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 whitespace-nowrap" data-zone-limit-chip={z.id}>{limitChip(z.limit) || "Limit"}</span>
                         : z.affects_routing
-                        ? <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>
-                        : <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>}
+                        ? <span className="tg tg-ns text-xs font-semibold px-2 py-0.5 rounded" style={{ color: "var(--bad-text)" }}>Avoided</span>
+                        : <span className="tg text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">Advisory</span>}
                     </td>
                     <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }} data-label="From" data-zone-from={z.id}>{dayWords(z.starts_on) || "—"}</td>
                     <td className="px-3 py-2 text-slate-500" style={{ whiteSpace: "nowrap" }} data-label="To" data-zone-to={z.id}>{dayWords(z.ends_on) || "—"}</td>

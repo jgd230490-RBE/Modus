@@ -1117,7 +1117,8 @@ ok("UI fix 2 (#1): every text-white in the markup sits on a known fill — 13 on
    # NARROWED 24 Nov 2026 (own look, stage 3): navy 2 -> 1 and blue 3 -> 0: the drawing palette's picked tool and the three
    # "Place on map" toggles are selections, now a --navy-soft tint with --navy words; the Submit strip stays (Group B's strip)
    and len(_sites.get("navy", [])) == 1 and not _sites.get("blue") and len(_sites.get("slate-800", [])) == 2
-   and len(_sites.get("team palette", [])) == 1 and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
+   # NARROWED 24 Nov 2026 (own look, B1 stage 3): the team pill is a plain word now, so no text-white on the team palette
+   and not _sites.get("team palette") and len(_sites.get("haul text", [])) == 4 and not _sites.get("zone colour")
    and not _sites.get("green") and not _sites.get("ok-btn") and not _sites.get("unknown"), str({k: len(v) for k, v in _sites.items()}))
 ok("...the one text-white on var(--red) is the Locations form's Delete button (white on #F87171 is 2.77:1 in Dark — found 17 Oct, not in the audit's stops; its own fix)",
    len(_sites.get("red", [])) == 1 and ">Delete</button>" in _sites.get("red", [""])[0])
@@ -1246,7 +1247,7 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-9b): bad-text 51 -> 53 — the Lorry plan's refused-drop line and the red edge of a lorry that cannot take the trip
    # NARROWED 9 Nov 2026 (v2.1 task 2.1-1): bad-text +2, warn-text +2 — the traffic limits' Over / Near word on the
    # Dashboard fold's table and OVER / NEAR on the Simulation's "Traffic limits on this day" line
-   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 62 and  # NARROWED 24 Nov 2026 (own look, B1 stage 2): 63 -> 62, the status square is --red (a shape, not a word), the chip lost its glyph; NARROWED 17 Nov 2026 (best option step 3): 62 -> 63, the route choices record's .rc-more (what a choice adds, red); NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
+   and _fe_wo.count("var(--ok-text)") >= 25 and _fe_wo.count("var(--bad-text)") == 63 and  # NARROWED 24 Nov 2026 (own look, B1 stage 3): 62 -> 63, "Avoided" is the plain word in --bad-text (was #B91C1C on pink); NARROWED 24 Nov 2026 (own look, B1 stage 2): 63 -> 62, the status square is --red (a shape, not a word), the chip lost its glyph; NARROWED 17 Nov 2026 (best option step 3): 62 -> 63, the route choices record's .rc-more (what a choice adds, red); NARROWED 10 Nov 2026 (wave 3, item 33): 60 -> 61, the gates list's "n % of N" on a gate over capacity
      # NARROWED 10 Nov 2026 (wave 3, finding 5): 59 -> 58, the Account's red variance figure is words now (amber when flagged)
     # NARROWED 10 Nov 2026 (wave 3, item 24): 58 -> 60, the Account's Fuel card: "Update failed: showing the last price" and a failed save
       # NARROWED 10 Nov 2026 (wave 2, card 12): 57 -> 59, the status chip's bad word and icon
@@ -1260,7 +1261,7 @@ ok("UI fix 4 (decision 2): the status WORDS read the text-grade colours — In f
    # NARROWED 10 Nov 2026 (wave 3, item 24): 29 -> 30, the Account's Fuel card "No diesel price yet"
    # NARROWED 10 Nov 2026 (wave 3, item 33): 30 -> 31, the gates list's "n % of N" on a gate near capacity
    # NARROWED 10 Nov 2026 (wave 3, routes-first-run, merged): +1 = 32, the Vehicles cell's "n out only"
-   _fe_wo.count("var(--warn-text)") == 33   # NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
+   _fe_wo.count("var(--warn-text)") == 34   # NARROWED 24 Nov 2026 (own look, B1 stage 3): 33 -> 34, the half-routed vehicle tag is --warn-text (was #8a6d00, unreadable in Dark as a plain word); NARROWED 11 Nov 2026 (CLOCS B-F2): 32 -> 33, the Routes bar's "No reason typed" words
      # NARROWED 10 Nov 2026 (wave 2, card 12): 25 -> 26, the status chip's warning word
    and ".sim-pp-flag{color:var(--bad-text);" in fe
    and 'color: short ? (role === "commit" ? "var(--bad-text)" : "var(--red)")' in fe and 'color: role === "commit" ? "var(--bad-text)" : "var(--red)" }}> · month changed' in fe
@@ -1399,7 +1400,8 @@ ok("UI fix 6 card 6: the dark rule maps text-white on an inline var(--haul-text)
    and _fe_wo.count('background: "var(--haul-text)"') == 3 and 'style={zoneDraw ? { background: isHaul(zoneForm) ? "var(--haul-text)" : ZONE_ROUTING } : undefined}>' in fe
    and 'const ZONE_ROUTING = "#DC2626";' in fe and round(_cr("#FFFFFF", "#DC2626"), 2) == 4.83 and "(finding 7, open)" not in fe)
 ok("UI fix 6 (the user's extra): the 'Avoided' chip is #B91C1C on its pink #FDE8EE, 5.53:1 (was #DC2626, 4.13:1), a fixed pair the same in every look — var(--bad-text) is #F87171 in the dark look and would read 2.36:1 on the pink",
-   '<span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: "#FDE8EE", color: "#B91C1C" }}>Avoided</span>' in fe
+   # REVERSED 24 Nov 2026 (own look, B1 stage 3): no pink; the plain word in --bad-text, no shape (.tg-ns)
+   '<span className="tg tg-ns text-xs font-semibold px-2 py-0.5 rounded" style={{ color: "var(--bad-text)" }}>Avoided</span>' in fe and "#FDE8EE" not in fe
    and round(_cr("#B91C1C", "#FDE8EE"), 2) == 5.53 and round(_cr("#DC2626", "#FDE8EE"), 2) == 4.13
    and round(_cr(_DARK["bad-text"], "#FDE8EE"), 2) == 2.36 and "FDE8EE" not in _dark)
 # card 3 (finding #11) + the user's yes to finding #37: the Horizon's commit week, heading and role word, on its shade
@@ -1480,8 +1482,9 @@ _nsCss = re.findall(r'\n  [^\n{]*\{[^}]*background:var\(--navy-soft\);[^}]*\}', 
 ok("OWN LOOK 3: a chosen control's tint carries only sign blue words or the ink — status words and captions fall short on it (Dark bad-text 4.27, --muted 4.44 on the 16 % tint; light warn-text 4.27 on the 10 %), so none sits on it: every inline --navy-soft fill names --navy, every --navy-soft rule reads --navy or --ink",
    round(_cr("#F87171", _over("rgba(138,180,248,.16)", "#1F2024")), 2) == 4.27 and round(_cr("#9C9FA4", _over("rgba(138,180,248,.16)", "#1F2024")), 2) == 4.44
    and round(_cr("#B45309", _over("rgba(11,78,162,.10)", "#FFFFFF")), 2) == 4.27
+   # NARROWED 24 Nov 2026 (own look, B1 stage 3): CSS 10 -> 8: the lorry plan's badge and the CLP organisation are plain words now
    and len(_nsInline) >= 9 and all('color: "var(--navy)"' in m for m in _nsInline)
-   and len(_nsCss) >= 10 and all(("color:var(--navy)" in r or "color:var(--ink)" in r) for r in _nsCss),
+   and len(_nsCss) >= 8 and all(("color:var(--navy)" in r or "color:var(--ink)" in r) for r in _nsCss),
    str([m for m in _nsInline if 'color: "var(--navy)"' not in m][:3]) + str([r for r in _nsCss if "color:var(--navy)" not in r and "color:var(--ink)" not in r][:3]))
 # card 2 (finding #11): the Account's headings and button; card 5: the count line; card 1: the pinned short-row cell
 ok("UI fix 6 card 2: the Account headings are --muted on --surface-2 — 4.56:1 (Ink and Light), 6.48:1 (Dark), 4.5 or better in all 12 — and the button is the accent pair (white on #C2410C 5.18:1, on #2563EB 5.17; checked in all 12 by W16 above)",
