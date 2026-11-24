@@ -20786,7 +20786,7 @@ function DataManagement({ meta, who, subTab: propSubTab, onSubTab }){
                     <td className="px-3 py-2 font-medium rd-primary">
                       <button type="button" className="row-open" data-zone-open={z.id} aria-label={canEdit ? `Edit ${z.name}` : `Show ${z.name} on the map`}
                         aria-current={zoneSel === z.id ? "true" : undefined}
-                        onClick={(e) => { e.stopPropagation(); openZoneFromKeys(z); }}>{roadPlates(z.name)}</button>
+                        onClick={(e) => { e.stopPropagation(); openZoneFromKeys(z); }}><span>{roadPlates(z.name)}</span></button>
                       {zoneFrom[z.id] && <span className="block text-xs font-normal text-slate-500" data-zone-from-layout={z.id}>From the {zoneFrom[z.id].site} site layout</span>}
                     </td>
                     <td className="px-3 py-2 text-slate-500" data-label="Kind">{(ZONE_KINDS.find(k => k[0] === z.kind) || [null, z.kind])[1]}</td>

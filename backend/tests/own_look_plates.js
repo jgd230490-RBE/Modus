@@ -134,7 +134,7 @@ const PLATED = [
   ["Routes zones table", '{roadPlates(z.name) || l.zone_id}'],
   ["Locations gate list", '<span className="font-medium text-slate-700">{roadPlates(g.name)}</span>'],
   ["Locations gate list, access road", 'access road: {roadPlates(((haulRoadList || []).find(z => z.id === g.access_zone_id) || {}).name) || g.access_zone_id}'],
-  ["Data → Zones table", 'openZoneFromKeys(z); }}>{roadPlates(z.name)}</button>'],
+  ["Data → Zones table (one span inside the inline-flex button, so the plate sits in the line)", 'openZoneFromKeys(z); }}><span>{roadPlates(z.name)}</span></button>'],
 ];
 for (const [label, s] of PLATED) ok(`⭐ 4 places: ${label} plates the name`, html.includes(s));
 ok("4 places: roadPlates is called at exactly these places (a new one is added here)",
