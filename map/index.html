@@ -15,7 +15,7 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.css" rel="stylesheet" integrity="sha384-S0a+eT2dLtsB1suB6ZJ/8IX+0d0Fvix9weJQ67L3E+jHOvn6SUKwYXVDyGdMuJtL" crossorigin="anonymous">
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.js" integrity="sha384-jdGuG3GDIph+ONsjITkxWmlUE2RR0At6jtOVirn6L/6dYy3WcAVDaBNI3X96rUT0" crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="config.js"></script>
     <!-- The alignment overlay module: product code only. The alignment, chainage,
          package bands, boundaries and any existing-railway geometry are TENANT DATA
@@ -26,14 +26,23 @@
     <script src="site-layouts.js?v=4"></script>
     <style>
         :root{
-            --navy:#2563EB; --navy-deep:#1F2024; --ink:#1E293B; --muted:#64748B;
-            --line:#E7E5E4; --bg:#FFFFFF; --accent:#DC2626; --green:#059669;
+            /* 24 Nov 2026 (the own look, Group B: the map): Sora for headings and large figures, IBM Plex Sans for everything
+               else, the app's two tokens with the app's values (notes/design-language-1123.md). The old stock face is gone from the page. */
+            --f-text:'IBM Plex Sans',system-ui,sans-serif; --f-head:Sora,'IBM Plex Sans',system-ui,sans-serif;
+            /* 24 Nov 2026 (the own look, B2): the sign blue for selected things, links and the one filled button; a chosen
+               thing is a 10 % tint with blue words (--navy-soft), a picked row or column 6 % (--navy-soft-col), never a fill.
+               The route lines' blues are the script's own paints and do not read this token. */
+            --navy:#0B4EA2; --navy-soft:rgba(11,78,162,.10); --navy-soft-col:rgba(11,78,162,.06); --navy-deep:#1F2024; --ink:#1F2024; --muted:#62656B;
+            --line:#E1E2E4; --bg:#FFFFFF; --accent:#DC2626; --green:#059669;
             /* 11 Oct 2026 — the map takes the staff app's shell: warm neutrals, orange primary buttons. --navy
                stays blue: it is the route colour and the link colour (the user: routes stay blue). */
-            --action:#C2410C; --action-fg:#FFFFFF; --surface-2:#FAFAF9; --note:#78716C;
+            --action:#0B4EA2; --action-fg:#FFFFFF; --surface-2:#F5F5F6; --note:#62656B;
             /* 10 Nov 2026 (wave 2, card 14): the panel's surfaces and fixed text as tokens, so the staff app's Dark look can
                reach the map it embeds (html[data-look="dark"] below). The values here are the ones the page always had. */
-            --surface:#FFFFFF; --ctl-line:#D6D3D1; --ink-2:#57534E;
+            --surface:#FFFFFF; --ctl-line:#C6C8CC; --ink-2:#44464B;
+            /* 24 Nov 2026 (the own look, B2): neutral greys made from the ink, the app's values (Group A); --ctl-edge is the
+               darker control edge a text box, a switch's track and a ruled axis take (3.3:1 on white) */
+            --surface-3:#EDEEEF; --ctl-edge:#8A8D93;
             /* 10 Nov 2026 (wave 3, map card): a status sentence in green reads at 4.5:1 or better (#059669 was 3.76:1) */
             --ok-text:#047857;
         }
@@ -42,12 +51,14 @@
            on Dark (dark-v11), as the Simulation's map already does; a basemap picked by hand is kept. The public map (not
            embedded) has no Dark look and never sets data-look. --navy stays the route blue. */
         html[data-look="dark"]{
-            --ink:#E6E7EA; --muted:#9AA1AB; --line:#33363D; --bg:#141518; --navy-deep:#F3F4F6; --note:#9AA1AB;
-            --surface:#1F2024; --surface-2:#1B1D21; --ctl-line:#45484F; --ink-2:#C9CCD1; --ok-text:#34D399;
-            --action:#FF8C14; --action-fg:#1F2024;
+            --ink:#E6E7EA; --muted:#9C9FA4; --line:#333539; --bg:#141518; --navy-deep:#F3F4F6; --note:#9C9FA4;
+            --surface:#1F2024; --surface-2:#1B1D21; --ctl-line:#4B4D52; --ink-2:#C9CACE; --ok-text:#34D399;
+            --surface-3:#26282D; --ctl-edge:#6E7177;
+            --navy:#8AB4F8; --navy-soft:rgba(138,180,248,.16); --navy-soft-col:rgba(138,180,248,.10);
+            --action:#8AB4F8; --action-fg:#141518;
             color-scheme:dark;
         }
-        html[data-look="dark"] a{ color:#8FB3F5; }
+        html[data-look="dark"] a{ color:#8AB4F8; }
         html[data-look="dark"] select, html[data-look="dark"] input{ background:var(--surface); color:var(--ink); }
         html[data-look="dark"] .mapboxgl-popup-content{ background:var(--surface); color:var(--ink); }
         html[data-look="dark"] .mapboxgl-popup-tip{ border-top-color:var(--surface); border-bottom-color:var(--surface); }
@@ -58,19 +69,19 @@
         /* the few fixed light boxes the token swap does not reach (found in Chrome, 10 Nov): the tour strip, the timeline's
            rail, the phone's full-screen strip, a road table's hover and clicked row */
         html[data-look="dark"] .guide-strip{ background:rgba(31,32,36,.92); border-color:rgba(255,255,255,.14); }
-        html[data-look="dark"] .guide-strip .guide-strip-go{ color:#8FB3F5; }
+        html[data-look="dark"] .guide-strip .guide-strip-go{ color:#8AB4F8; }
         html[data-look="dark"] .guide-strip .guide-x{ color:var(--muted); }
         html[data-look="dark"] .tl-rail{ background:var(--surface-2); }
         html[data-look="dark"] .kpi-switch{ background:var(--surface-2); border-color:var(--ctl-line); }
         html[data-look="dark"] #m-full-strip:not([hidden]){ background:rgba(31,32,36,.96); }
         html[data-look="dark"] .secsel-btn:hover{ background:var(--surface-2); }
         html[data-look="dark"] .secsel-x:hover{ background:var(--surface-2); }
-        html[data-look="dark"] table.secsel-table tr.secsel-clicked td{ background:rgba(37,99,235,.22); }
-        html[data-look="dark"] .drawer-tab.active{ background:rgba(37,99,235,.22); color:#8FB3F5; }
+        html[data-look="dark"] table.secsel-table tr.secsel-clicked td{ background:var(--navy-soft-col); }
+        html[data-look="dark"] .drawer-tab.active{ background:var(--navy-soft); color:var(--navy); }
         html[data-look="dark"] .mapboxgl-ctrl.mapboxgl-ctrl-attrib{ background:rgba(31,32,36,.72); }
-        html[data-look="dark"] .mapboxgl-ctrl-attrib a{ color:#C9CCD1; }
+        html[data-look="dark"] .mapboxgl-ctrl-attrib a{ color:#C9CACE; }
         *{ box-sizing:border-box; }
-        body { margin:0; padding:0; font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--ink); overflow:hidden; -webkit-font-smoothing:antialiased; }
+        body { margin:0; padding:0; font-family:var(--f-text); background:var(--bg); color:var(--ink); overflow:hidden; -webkit-font-smoothing:antialiased; }
         /* 9 Nov 2026 (UI critique finding 2, card 2): the page never scrolls. body's overflow:hidden only stopped the wheel:
            the parked route drawer (translated below the window) made the page 80 px taller, and focus, a scrollIntoView or
            a script lifted the whole map — the DEMO bar off screen, the figures bar cut. Now the window holds html, body is
@@ -81,20 +92,20 @@
         #map { position:absolute; top:0; bottom:0; right:0; left:300px; transition:left .25s ease; }
         body.sidebar-closed #map, .sidebar.closed ~ #map { left:0; }
 
-        #menu-toggle { position:absolute; top:14px; left:14px; z-index:1000; background:var(--surface); color:var(--navy-deep); border:1px solid var(--line); padding:8px 13px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; box-shadow:0 1px 3px rgba(16,24,40,.08); }
-        #menu-toggle:hover{ border-color:#d0d3d8; }
+        #menu-toggle { position:absolute; top:14px; left:14px; z-index:1000; background:var(--surface); color:var(--navy-deep); border:1px solid var(--line); padding:8px 13px; border-radius:6px; cursor:pointer; font-weight:600; font-size:13px; box-shadow:0 1px 3px rgba(16,24,40,.08); }
+        #menu-toggle:hover{ border-color:var(--ctl-line); }
         /* 12 Oct 2026 (review 2.8): a tap on the chrome is a tap, never a double-tap zoom — the panel, the figures bar,
            the conditions panel, the timeline bar and the route drawer */
         .sidebar, #menu-toggle, #kpi-hud, #tl-warnings, #timeline-bar, #route-drawer{ touch-action:manipulation; }
         /* 12 Oct 2026 — the panel's own close control, a 44 px target; shown below 1024 only (the phone block) */
-        .sidebar-close{ display:none; position:absolute; top:10px; left:10px; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--navy-deep); font-size:22px; line-height:1; cursor:pointer; padding:0; }
+        .sidebar-close{ display:none; position:absolute; top:10px; left:10px; width:44px; height:44px; align-items:center; justify-content:center; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--navy-deep); font-size:22px; line-height:1; cursor:pointer; padding:0; }
 
         .sidebar { position:absolute; top:0; bottom:0; left:0; width:300px; background:var(--surface); border-right:1px solid var(--line); padding:20px 18px 24px; z-index:10; display:flex; flex-direction:column; gap:22px; overflow-y:auto; transition:transform .25s ease; }
         .sidebar.closed { transform:translateX(-100%); }
         .sidebar .panel-top{ flex:none; position:sticky; top:-20px; z-index:2; height:64px; margin:-20px -18px 0; background:var(--surface); }   /* top:-20px: sticky counts from the panel's padding edge */
         .sidebar-close{ z-index:3; }
         .sidebar h2 { margin:0; font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--navy-deep); padding-top:42px; display:flex; align-items:center; gap:9px; }
-        .sidebar h2::before{ content:""; width:8px; height:22px; background:var(--navy); border-radius:2px; }
+        .sidebar h2::before{ content:""; width:8px; height:22px; background:var(--navy); border-radius:3px; }
         .sidebar h2 small{ display:block; font-size:9.5px; font-weight:500; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin-top:3px; }
         .sidebar h3 { margin:0 0 8px; font-size:13px; font-weight:600; letter-spacing:0; color:var(--navy-deep); text-transform:none; }
 
@@ -210,6 +221,8 @@
             body.wall-mode.has-demo-notice #demo-notice{ line-height:1.4; white-space:normal; overflow:visible; }
             body.wall-mode.has-demo-notice #demo-notice::before{ line-height:inherit; }
         }
+        /* 24 Nov 2026 (own look): Sora for the bar's month and figures, the panel's title and a card's title */
+        .kpi-title, .kpi-value, .sidebar h2, .area-ch, .lim-title, .m-fig b{ font-family:var(--f-head); }
         .kpi-title{ font-size:16px; font-weight:600; color:var(--navy-deep); line-height:1.2;
                     letter-spacing:-.01em; min-width:120px; white-space:nowrap; }
         .kpi-title:empty{ display:none; }
@@ -235,7 +248,18 @@
         /* 11 Oct 2026 (live, October data): a card could shrink below its own figure, so "302.9" ran into "18".
            A card now never goes narrower than its figure or its longest label word. */
         @media (min-width:1024px){ #kpi-cards .kpi-card{ min-width:min-content; } }
-        .kpi-card.lead .kpi-label{ color:var(--ink); font-weight:500; }
+        /* 24 Nov 2026 (the own look, B2; the third mockup's card 2, John's yes): the bar is one ruled strip. At a desk each figure
+           sits between hairlines that run the bar's height (the gap becomes padding, 10 px a side: 21 px between figures, it was
+           18 px; 8 px a side under 1280 px, so a label wraps no more than it did at 1150 px), the line between the two groups is
+           one of those hairlines, and every label has one weight. No thick line: the bar sits under the demo rule. */
+        @media (min-width:1024px){
+            #kpi-cards, #kpi-cards .kpi-row{ gap:0; align-self:stretch; align-items:stretch; }
+            #kpi-cards .kpi-card{ display:flex; flex-direction:column; justify-content:center; padding:0 10px; border-left:1px solid var(--line); }
+            #kpi-cards .kpi-card[hidden]{ display:none; }   /* display:flex beats the hidden attribute (the Material card in a vehicles unit) */
+            #kpi-cards .kpi-sep{ display:none; }
+        }
+        @media (min-width:1024px) and (max-width:1279px){ #kpi-cards .kpi-card{ padding:0 8px; } }
+        .kpi-card.lead .kpi-label{ color:var(--muted); font-weight:400; }
         .layers-box{ border-top:1px solid var(--line); padding-top:12px; }
         .layers-box > summary{ cursor:pointer; list-style:none; font-size:14px; font-weight:600; color:var(--ink); padding:2px 0 10px; }
         .layers-box > summary::-webkit-details-marker{ display:none; }
@@ -254,18 +278,18 @@
         .kpi-note{ display:none; }
         /* the conditions pill: dots and counts; opens #tl-warnings */
         #kpi-conditions{ margin-left:auto; display:none; align-items:center; gap:8px; border:1px solid var(--line);
-                         background:var(--surface); border-radius:999px; padding:8px 14px 8px 12px; font:inherit; font-size:13px;
+                         background:var(--surface); border-radius:6px; padding:8px 14px 8px 12px; font:inherit; font-size:13px;
                          color:var(--navy-deep); cursor:pointer; white-space:nowrap; }
-        #kpi-conditions:hover{ border-color:#cbd5e1; }
+        #kpi-conditions:hover{ border-color:var(--ctl-line); }
         #kpi-conditions.on{ display:flex; }
         .cond-part{ display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
         /* 12 Oct 2026 (browser check, 1280 px, sidebar open): with a planning-flag item the pill was 453 px wide and
            covered the last figure card by 91 px. On the desktop bar its items wrap into rows inside a 300 px pill;
            each dot stays with its words. */
         @media (min-width:1024px){ #kpi-conditions{ flex-wrap:wrap; max-width:300px; flex-shrink:0; column-gap:12px; row-gap:2px;
-                                                   white-space:normal; border-radius:14px; padding:6px 12px; } }
+                                                   white-space:normal; border-radius:6px; padding:6px 12px; } }
         .cond-dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
-        .cond-dot.clash{ background:#C2321C; } .cond-dot.warn{ background:#D98A17; } .cond-dot.caution{ background:#8A94A3; }
+        .cond-dot.clash{ background:#C2321C; } .cond-dot.warn{ background:#D98A17; } .cond-dot.caution{ background:#8A8D93; }
         /* 2026-10-06 — the breakdown ("what is moving") lives in the SIDEBAR now, as plain
            rows, not chips over the map. The .kpi-chips / .kpi-chip names are kept: the
            browser check reads them and the figures per row are unchanged. */
@@ -278,12 +302,12 @@
         /* 11 Oct 2026 (live): "29 veh/d · 131 two-way/d · 3,795 t/d" was cut off at 300 px; the figures wrap instead */
         .kpi-chip{ flex-wrap:wrap; }
         .kpi-chip .chip-n{ color:var(--muted); white-space:normal; text-align:right; margin-left:auto; }
-        .kpi-switch{ display:flex; gap:2px; margin:0 0 8px; padding:2px; border-radius:7px;
-                     background:#eef2f7; border:1px solid #e2e8f0; }
+        .kpi-switch{ display:flex; gap:2px; margin:0 0 8px; padding:2px; border-radius:6px;
+                     background:var(--surface-3); border:1px solid var(--line); }
         .kpi-switch:empty{ display:none; }
         .kpi-switch button{ flex:1; border:none; background:none; cursor:pointer; padding:5px 3px;
                      font-size:12px; font-weight:600; white-space:nowrap;
-                     color:var(--ink-2); border-radius:5px; font-family:inherit; }   /* 10 Nov 2026: was --muted, 4.23:1 on the grey */
+                     color:var(--ink-2); border-radius:6px; font-family:inherit; }   /* 10 Nov 2026: was --muted, 4.23:1 on the grey */
         .kpi-switch button.on{ background:var(--surface); color:var(--navy-deep); box-shadow:0 1px 2px rgba(16,24,40,.10); }
         /* 2026-09-08 (§C): the 07 Sep name plates are gone. The ends of live routes
            are marked by the location ICON growing 2 px with a 1 px halo — a data-driven
@@ -297,7 +321,7 @@
            labels, no coloured left stripes — the dot and the noun carry the level. */
         #tl-warnings{ display:none; position:absolute; top:84px; right:12px; z-index:24; width:min(360px, calc(100vw - 24px));
                       max-height:min(60vh, 520px); overflow:auto; background:var(--surface); border:1px solid var(--line);
-                      border-radius:12px; padding:14px 18px 6px; flex-direction:column; pointer-events:auto; }
+                      border-radius:6px; padding:14px 18px 6px; flex-direction:column; pointer-events:auto; }
         /* 9 Nov 2026 (card 2): at a desk the open conditions panel covered the zoom buttons (top 98 / 110, right 10 / 12) —
            hidden while the page was lifted 80 px. It sits left of the zoom stack now (10 px margin + 29 px + a gap). */
         @media (min-width:1024px){ body #tl-warnings{ right:52px; } }
@@ -316,7 +340,7 @@
         .tl-warn .show:hover{ text-decoration:underline; }
         .tl-warn .x{ position:relative; border:none; background:none; color:var(--muted); cursor:pointer; font-size:14px; line-height:1; padding:0 2px; }
         /* kept as level classes so the sort and the dots agree: clash red, warn amber, caution slate */
-        .tl-warn.clash .cond-dot{ background:#C2321C; } .tl-warn.warn .cond-dot{ background:#D98A17; } .tl-warn.caution .cond-dot{ background:#8A94A3; }
+        .tl-warn.clash .cond-dot{ background:#C2321C; } .tl-warn.warn .cond-dot{ background:#D98A17; } .tl-warn.caution .cond-dot{ background:#8A8D93; }
         /* on a phone the note is the first thing to go, then the panel shrinks to the
            two numbers — see claude/mobile-analysis.md */
         @media (max-width:1023px){
@@ -388,7 +412,7 @@
             #kpi-hud, body.sidebar-closed #kpi-hud{ padding-bottom:6px; gap:4px; }
             #kpi-hud .kpi-value{ font-size:20px; }
         }
-        .restr-warn{ font-size:12.5px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:7px; padding:7px 9px; margin-top:8px; line-height:1.45; }
+        .restr-warn{ font-size:12.5px; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:7px 9px; margin-top:8px; line-height:1.45; }
 
         .fc-box h3{ border:none; }
         .fc-row{ display:flex; gap:10px; margin-bottom:10px; }
@@ -415,7 +439,7 @@
         .mode-legend .ml-row{ display:flex; align-items:center; gap:10px; padding:2px 0; }
         .mode-legend .ml-steps{ display:flex; gap:2px; margin:4px 0 2px; }
         .mode-legend .ml-steps i{ flex:1; height:14px; display:block; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
-        .mode-legend .ml-sw{ display:inline-block; width:14px; height:14px; flex:0 0 14px; border-radius:2px; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
+        .mode-legend .ml-sw{ display:inline-block; width:14px; height:14px; flex:0 0 14px; border-radius:3px; box-shadow:0 0 0 1px rgba(31,32,36,.35); }
         /* 12 Nov 2026 (card A-F2b, dark grounds): on the Dark look the near-black outline vanished round the darkest blues */
         html[data-look="dark"] .mode-legend .ml-steps i, html[data-look="dark"] .mode-legend .ml-sw{ box-shadow:0 0 0 1px rgba(231,229,228,.7); }
         .mode-legend .ml-foot{ margin-top:6px; color:var(--muted); }
@@ -434,12 +458,12 @@
         /* 10 Nov 2026 (wave 3, map card): the button is 24 px (the target-size rule) and still draws the same 18 px circle:
            a transparent 3 px border, the fill clipped inside it, the ring an inset shadow */
         .info-i{ position:relative; flex:none; display:inline-grid; place-items:center; width:24px; height:24px; padding:0; border-radius:50%;
-                 border:3px solid transparent; background:var(--surface); background-clip:padding-box; box-shadow:inset 0 0 0 1.5px #94A3B8;
-                 color:var(--ink-2); font:700 11px/1 Inter,system-ui,sans-serif; cursor:pointer; margin:-3px; }
+                 border:3px solid transparent; background:var(--surface); background-clip:padding-box; box-shadow:inset 0 0 0 1.5px var(--ctl-edge);
+                 color:var(--ink-2); font:italic 600 12px/1 Georgia,'Times New Roman',serif; cursor:pointer; margin:-3px; }   /* 24 Nov 2026 (own look): the mockup's "i"; IBM Plex Sans's bold i read as a capital I */
         .info-i::after{ content:""; position:absolute; inset:-10px; }   /* 44 px, as before */
-        .info-i[aria-expanded="true"]{ background-color:var(--navy); box-shadow:inset 0 0 0 1.5px var(--navy); color:#fff; }
+        .info-i[aria-expanded="true"]{ background-color:var(--navy-soft); box-shadow:inset 0 0 0 1.5px var(--navy); color:var(--navy); }
         .info-i:focus-visible{ outline:2px solid var(--navy); outline-offset:-1px; }
-        .info-pop{ margin:0 0 10px; padding:10px 12px; background:var(--surface); border:1px solid #CBD5E1; border-radius:8px;
+        .info-pop{ margin:0 0 10px; padding:10px 12px; background:var(--surface); border:1px solid var(--ctl-line); border-radius:6px;
                    box-shadow:0 6px 18px rgba(16,24,40,.10); font-size:13px; line-height:1.5; color:var(--ink); }
         .info-pop[hidden]{ display:none; }
         .info-pop p{ margin:0 0 6px; }
@@ -449,10 +473,10 @@
         .month-picker .mp-years{ display:flex; gap:4px; margin:0 0 6px; }
         .month-picker .mp-months{ display:grid; grid-template-columns:repeat(6, 1fr); gap:4px; }
         .month-picker button{ height:32px; padding:0; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--ink);
-                              font:500 13px Inter,system-ui,sans-serif; cursor:pointer; }
+                              font:500 13px var(--f-text); cursor:pointer; }
         .month-picker .mp-years button{ flex:1; font-weight:600; }
         .month-picker button.none{ color:var(--muted); background:var(--surface-2); }
-        .month-picker button[aria-pressed="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; font-weight:700; }
+        .month-picker button[aria-pressed="true"]{ background:var(--navy-soft); border-color:var(--navy); color:var(--navy); font-weight:700; }
         .month-picker .chips-none{ font-size:14px; color:var(--note); }
         .fc-box #tl-open{ margin-top:8px; }
         /* 12 Nov 2026 (John: "option b now", claude/map-one-play; mockup map-one-play-mockup-1112 B): while the timeline
@@ -463,12 +487,12 @@
         .fc-box .fc-toggle{ margin-top:8px; }
         #forecast-status:empty{ display:none; }
         /* the heat map as one segmented control (the three radio buttons keep their ids, names and handlers) */
-        .heat-seg{ display:flex; border:1px solid var(--ctl-line); border-radius:8px; overflow:hidden; }
+        .heat-seg{ display:flex; border:1px solid var(--ctl-line); border-radius:6px; overflow:hidden; }
         .heat-seg .fc-toggle.fc-mode{ flex:1; justify-content:center; margin:0; padding:8px 4px; border:0; border-right:1px solid var(--ctl-line);
                                       border-radius:0; background:var(--surface); }
         .heat-seg .fc-toggle.fc-mode:last-child{ border-right:0; }
         .heat-seg input{ position:absolute; opacity:0; width:1px; height:1px; margin:0; }
-        .heat-seg .fc-toggle.fc-mode:has(input:checked){ background:var(--navy); color:#fff; font-weight:600; }   /* beats the white above (19 Oct, seen in Chrome: white on white) */
+        .heat-seg .fc-toggle.fc-mode:has(input:checked){ background:var(--navy-soft); color:var(--navy); font-weight:600; }   /* beats the white above (19 Oct, seen in Chrome: white on white) */
         .heat-seg label:focus-within{ outline:2px solid var(--navy); outline-offset:-3px; }
         .filter-grid{ display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); column-gap:6px; }
         .filter-grid select{ min-width:0; font-size:13px; padding:8px 6px; grid-column:span 7; }      /* "All destinations" whole (seen in Chrome, 19 Oct; cut again in a 119 px column, 27 Oct): the wordier select of each row takes seven twelfths (140 px of 244), the other five (98 px) */
@@ -476,15 +500,15 @@
         /* 8 Nov 2026 (v2.1 item 2.1-3, mockup notes/map-export-default-mockup-1108 card 3): the Routes picker, the grid's
            full width under the four selects; its list opens in place (the sidebar is the Layers sheet on a phone) */
         .filter-grid .route-pick-btn{ grid-column:1 / -1; margin-top:6px; min-height:36px; display:flex; justify-content:space-between; align-items:center;
-                        gap:6px; padding:8px 8px; border:1px solid #A8A29E; border-radius:6px; background:var(--surface); color:var(--ink);
-                        font:600 13px Inter,system-ui,sans-serif; text-align:left; cursor:pointer; }
+                        gap:6px; padding:8px 8px; border:1px solid var(--ctl-edge); border-radius:6px; background:var(--surface); color:var(--ink);
+                        font:600 13px var(--f-text); text-align:left; cursor:pointer; }
         .route-pick-btn span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
         .route-pick-btn::after{ content:"\25BE"; color:var(--muted); font-weight:400; flex:none; }
         .route-pick-btn:focus-visible{ outline:2px solid var(--navy); outline-offset:1px; }
-        .route-pick{ margin-top:6px; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(16,24,40,.14); padding:8px; background:var(--surface); }
+        .route-pick{ margin-top:6px; border:1px solid var(--line); border-radius:6px; box-shadow:0 8px 24px rgba(16,24,40,.14); padding:8px; background:var(--surface); }
         .route-pick[hidden]{ display:none; }
-        .route-pick input[type=search]{ width:100%; box-sizing:border-box; min-height:40px; border:1px solid #A8A29E; border-radius:6px; padding:6px 10px;
-                        font:14px Inter,system-ui,sans-serif; color:var(--ink); margin-bottom:4px; }
+        .route-pick input[type=search]{ width:100%; box-sizing:border-box; min-height:40px; border:1px solid var(--ctl-edge); border-radius:6px; padding:6px 10px;
+                        font:14px var(--f-text); color:var(--ink); margin-bottom:4px; }
         .route-pick-list{ max-height:260px; overflow:auto; }
         .route-pick-row{ display:flex; gap:8px; align-items:flex-start; min-height:32px; padding:4px 2px; font-size:13px; line-height:1.35; cursor:pointer; }
         .route-pick-row input{ width:18px; height:18px; margin:1px 0 0; flex:none; }
@@ -494,7 +518,7 @@
         .route-pick-none{ margin:6px 2px; font-size:13px; color:var(--muted); }
         .route-pick-foot{ display:flex; justify-content:space-between; align-items:center; gap:8px; border-top:1px solid var(--line); padding-top:6px;
                         margin-top:4px; font-size:13px; color:var(--muted); }
-        .route-pick-foot button{ background:none; border:0; padding:8px 4px; font:600 13px Inter,system-ui,sans-serif; color:var(--navy); cursor:pointer; }
+        .route-pick-foot button{ background:none; border:0; padding:8px 4px; font:600 13px var(--f-text); color:var(--navy); cursor:pointer; }
         @media (max-width: 767px), (pointer: coarse){      /* a phone's 44 px taps (the UI audit's strict rule) */
             .filter-grid .route-pick-btn, .route-pick input[type=search], .route-pick-row, .route-pick-foot button{ min-height:44px; }
             .route-pick-row{ align-items:center; }
@@ -502,16 +526,16 @@
         .share-group .share-row .btn{ font-size:13px; padding:8px 10px; }      /* two to a row at 300 px (were one each at 14 px) */
         .layers-box > summary small{ margin-left:6px; font-size:13px; font-weight:500; color:var(--muted); }
         /* the number badges' key (the badges on the map are drawn by pillBadgeImage) */
-        .mv-pill, .co-pill{ flex:none; display:inline-flex; align-items:center; gap:3px; height:20px; padding:0 7px; border-radius:10px; background:var(--surface);
-                            font:700 13px/20px Inter,system-ui,sans-serif; white-space:nowrap; }
+        .mv-pill, .co-pill{ flex:none; display:inline-flex; align-items:center; gap:3px; height:20px; padding:0 7px; border-radius:6px; background:var(--surface);
+                            font:700 13px/20px var(--f-text); white-space:nowrap; }
         .mv-pill{ color:#1D4ED8; box-shadow:inset 0 0 0 1.5px #2563EB; }
         .co-pill{ color:#065F46; box-shadow:inset 0 0 0 1.5px #059669; }
         .mode-legend .ml-key{ margin-top:6px; }
         #btn-detail{ margin-top:8px; }
 
-        .mapboxgl-popup-content { border-radius:10px !important; border:1px solid var(--line) !important; padding:13px 14px !important; box-shadow:0 8px 28px rgba(16,24,40,.14) !important; font-family:'Inter',sans-serif !important; }
-        .mapboxgl-popup-content h3, .mapboxgl-popup-content h4{ font-family:'Inter',sans-serif; }
-        .rb-popup-btn{ margin-top:10px; width:100%; background:var(--navy); color:#fff; border:none; padding:8px; border-radius:6px; font-weight:600; font-size:12px; cursor:pointer; }
+        .mapboxgl-popup-content { border-radius:6px !important; border:1px solid var(--line) !important; padding:13px 14px !important; box-shadow:0 8px 28px rgba(16,24,40,.14) !important; font-family:var(--f-text) !important; }
+        .mapboxgl-popup-content h3, .mapboxgl-popup-content h4{ font-family:var(--f-head); }
+        .rb-popup-btn{ margin-top:10px; width:100%; background:var(--action); color:var(--action-fg); border:none; padding:8px; border-radius:6px; font-weight:600; font-size:12px; cursor:pointer; }
 
         /* Bottom drawer: route analysis + forecast detail */
         #route-drawer{ position:absolute; left:300px; right:0; bottom:0; z-index:20; background:var(--surface); border-top:1px solid var(--line); box-shadow:0 -8px 28px rgba(16,24,40,.10); transform:translateY(100%); transition:transform .28s ease, visibility 0s linear .28s; visibility:hidden; height:46vh; max-height:46vh; display:flex; flex-direction:column; }
@@ -527,11 +551,11 @@
         body.timeline-on #route-drawer{ padding-bottom:var(--tl-foot, 0px); }
         .drawer-head{ display:flex; align-items:center; gap:4px; padding:10px 16px; border-bottom:1px solid var(--line); }
         .drawer-tab{ border:none; background:none; font-size:12.5px; font-weight:600; color:var(--muted); padding:6px 10px; cursor:pointer; border-radius:6px; }
-        .drawer-tab.active{ color:var(--navy); background:#eef3fb; }
+        .drawer-tab.active{ color:var(--navy); background:var(--navy-soft); }
         .drawer-close{ position:relative; margin-left:auto; border:none; background:none; font-size:20px; line-height:1; color:var(--muted); cursor:pointer; padding:2px 8px; }
         .drawer-body{ overflow:auto; padding:16px; flex:1 1 auto; min-height:0; }
         .an-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; }
-        .an-card{ border:1px solid var(--line); border-radius:9px; padding:11px 13px; }
+        .an-card{ border:1px solid var(--line); border-radius:6px; padding:11px 13px; }
         .an-val{ font-size:19px; font-weight:700; color:var(--navy-deep); letter-spacing:-.02em; }
         .an-lbl{ font-size:12px; font-weight:500; letter-spacing:0; text-transform:none; color:var(--muted); margin-top:3px; }
         .an-sub{ font-size:12.5px; color:var(--muted); margin-top:1px; }
@@ -544,13 +568,13 @@
         .rs-ctl{ margin-left:auto; display:flex; align-items:center; gap:6px; }
         .rs-ctl[hidden]{ display:none; }
         .rs-ctl + .drawer-close{ margin-left:2px; }
-        .rs-seg{ display:inline-flex; border:1px solid var(--ctl-line); border-radius:7px; overflow:hidden; }
+        .rs-seg{ display:inline-flex; border:1px solid var(--ctl-line); border-radius:6px; overflow:hidden; }
         .rs-seg[hidden]{ display:none; }
         .rs-seg button, .rs-bt{ border:0; background:var(--surface); color:var(--ink); font:inherit; font-size:12px; font-weight:600; padding:5px 9px; min-height:26px; cursor:pointer; white-space:nowrap; }
         .rs-seg button + button{ border-left:1px solid var(--ctl-line); }
-        .rs-seg button[aria-pressed="true"]{ background:#EEF3FB; color:#1E3A8A; }
-        .rs-bt{ border:1px solid var(--ctl-line); border-radius:7px; }
-        .rs-seg button:focus-visible, .rs-bt:focus-visible, .rs-go:focus-visible, .rs-cell:focus-visible{ outline:2px solid #1D4ED8; outline-offset:-2px; }
+        .rs-seg button[aria-pressed="true"]{ background:var(--navy-soft); color:var(--navy); }
+        .rs-bt{ border:1px solid var(--ctl-line); border-radius:6px; }
+        .rs-seg button:focus-visible, .rs-bt:focus-visible, .rs-go:focus-visible, .rs-cell:focus-visible{ outline:2px solid var(--navy); outline-offset:-2px; }
         #drawer-analysis{ padding:10px 16px; position:relative; }
         .rs-two{ display:grid; grid-template-columns:minmax(0, 484px) minmax(0, 1fr); gap:22px; }
         .rs-title{ margin:0; font-size:14px; font-weight:700; color:var(--navy-deep); display:flex; flex-wrap:wrap; align-items:baseline; column-gap:6px; }
@@ -564,25 +588,25 @@
         .rs-fig{ display:block; text-align:left; font:inherit; color:inherit; background:none; border:0; padding:0; }
         .rs-fig b{ display:block; font-size:19px; font-weight:700; letter-spacing:-.02em; line-height:1.15; color:var(--navy-deep); }
         .rs-fig span{ font-size:12px; color:var(--muted); }
-        button.rs-go{ border:1px solid var(--ctl-line); border-radius:7px; padding:1px 7px 3px; margin:-2px -8px 0 -8px; cursor:pointer; min-height:24px; }
-        button.rs-go b{ color:#1D4ED8; }
+        button.rs-go{ border:1px solid var(--ctl-line); border-radius:6px; padding:1px 7px 3px; margin:-2px -8px 0 -8px; cursor:pointer; min-height:24px; }
+        button.rs-go b{ color:var(--navy); }
         .rs-chart{ position:relative; }
-        .rs-plot{ display:flex; align-items:flex-end; gap:4px; height:100px; margin-top:4px; border-bottom:1px solid #94A3B8; cursor:pointer; touch-action:manipulation; user-select:none; }
+        .rs-plot{ display:flex; align-items:flex-end; gap:4px; height:100px; margin-top:4px; border-bottom:1px solid var(--ctl-edge); cursor:pointer; touch-action:manipulation; user-select:none; }
         .rs-plot.rs-many{ gap:2px; }
         .rs-col{ flex:1 1 0; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; position:relative; }
-        .rs-col i{ display:block; width:72%; min-height:3px; background:#6690E3; border-radius:2px 2px 0 0; }
+        .rs-col i{ display:block; width:72%; min-height:3px; background:#6690E3; border-radius:3px 3px 0 0; }
         .rs-col.rs-none i{ min-height:0; height:0; }
         .rs-col em{ font-style:normal; font-size:12px; font-weight:700; color:var(--ink); margin-bottom:2px; white-space:nowrap; }
-        .rs-col.rs-now i{ background:#1D4ED8; }
-        .rs-col.rs-now::before{ content:""; position:absolute; left:-1px; right:-1px; top:-3px; bottom:-19px; border:1.5px solid #1D4ED8; border-radius:4px; background:rgba(29,78,216,.07); pointer-events:none; }
+        .rs-col.rs-now i{ background:var(--navy); }
+        .rs-col.rs-now::before{ content:""; position:absolute; left:-1px; right:-1px; top:-3px; bottom:-19px; border:1.5px solid var(--navy); border-radius:3px; background:var(--navy-soft-col); pointer-events:none; }
         .rs-xl{ display:flex; gap:4px; margin-top:3px; }
         .rs-plot.rs-many + .rs-xl{ gap:2px; }
         .rs-xl span{ flex:1 1 0; min-width:0; text-align:center; font-size:12px; color:var(--muted); overflow:hidden; }
-        .rs-xl span.rs-now{ color:#1D4ED8; font-weight:700; }
+        .rs-xl span.rs-now{ color:var(--navy); font-weight:700; }
         .rs-yl{ display:flex; gap:4px; font-size:12px; color:var(--muted); }
         .rs-yl span{ min-width:0; border-top:1px solid var(--ctl-line); margin-top:2px; padding-top:1px; text-align:center; overflow:hidden; }
         .rs-chart input[type=range]{ position:absolute; width:1px; height:1px; min-width:0; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
-        .rs-chart:focus-within .rs-plot{ outline:2px solid #1D4ED8; outline-offset:2px; }
+        .rs-chart:focus-within .rs-plot{ outline:2px solid var(--navy); outline-offset:2px; }
         .rs-sline{ font-size:12.5px; color:var(--muted); margin:0 0 6px; }
         .rs-sline b{ font-size:14px; color:var(--navy-deep); margin-right:6px; }
         table.rs-year{ border-collapse:collapse; width:100%; font-size:12.5px; }
@@ -592,10 +616,10 @@
         table.rs-year td.rs-sum{ font-weight:700; padding-right:0; }
         table.rs-year td.rs-nil{ padding:4px 8px; color:var(--muted); }
         .rs-cell{ border:1.5px solid transparent; border-radius:3px; background:none; font:inherit; color:inherit; padding:2px 4px; min-width:30px; min-height:24px; text-align:right; cursor:pointer; }
-        .rs-cell.rs-now{ border-color:#1D4ED8; }
+        .rs-cell.rs-now{ border-color:var(--navy); }
         .rs-cell.rs-peak{ font-weight:700; }
         .rs-cards{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; }
-        .rs-card{ border:1px solid var(--line); border-radius:8px; padding:6px 9px; position:relative; }
+        .rs-card{ border:1px solid var(--line); border-radius:6px; padding:6px 9px; position:relative; }
         .rs-card b{ display:block; font-size:15px; color:var(--navy-deep); }
         .rs-card span{ font-size:12px; color:var(--muted); }
         .rs-card .info-i{ vertical-align:middle; margin-left:4px; }
@@ -604,19 +628,19 @@
         .rs-more .route-words h4{ display:inline; font-size:12px; margin:0 6px 0 0; color:var(--ink); }
         .rs-more .route-words p{ display:inline; font-size:12px; margin:0 12px 0 0; }
         .rs-lorry{ display:inline-block; margin:0 12px 4px 0; color:var(--ink); }
-        .rs-more a{ color:#1D4ED8; font-weight:600; text-decoration:none; }
+        .rs-more a{ color:var(--navy); font-weight:600; text-decoration:none; }
         .info-pop.rs-info{ position:absolute; z-index:3; right:16px; top:46px; width:min(320px, calc(100% - 32px)); margin:0; box-shadow:0 8px 24px rgba(16,24,40,.14); }
-        .rs-info a{ color:#1D4ED8; font-weight:600; }
+        .rs-info a{ color:var(--navy); font-weight:600; }
         .rs-info a[hidden]{ display:none; }
-        html[data-look="dark"] .rs-seg button[aria-pressed="true"]{ background:rgba(37,99,235,.22); color:#8FB3F5; }
+        html[data-look="dark"] .rs-seg button[aria-pressed="true"]{ background:var(--navy-soft); color:var(--navy); }
         html[data-look="dark"] .rs-col i{ background:#5B7FC7; }
-        html[data-look="dark"] .rs-col.rs-now i{ background:#8FB3F5; }
-        html[data-look="dark"] .rs-col.rs-now::before{ border-color:#8FB3F5; background:rgba(143,179,245,.10); }
-        html[data-look="dark"] .rs-xl span.rs-now, html[data-look="dark"] button.rs-go b, html[data-look="dark"] .rs-more a, html[data-look="dark"] .rs-info a{ color:#8FB3F5; }
+        html[data-look="dark"] .rs-col.rs-now i{ background:#8AB4F8; }
+        html[data-look="dark"] .rs-col.rs-now::before{ border-color:#8AB4F8; background:rgba(138,180,248,.10); }
+        html[data-look="dark"] .rs-xl span.rs-now, html[data-look="dark"] button.rs-go b, html[data-look="dark"] .rs-more a, html[data-look="dark"] .rs-info a{ color:#8AB4F8; }
         html[data-look="dark"] .rs-plot{ border-bottom-color:#6B7080; }
-        html[data-look="dark"] .rs-cell.rs-now{ border-color:#8FB3F5; }
-        html[data-look="dark"] .rs-seg button:focus-visible, html[data-look="dark"] .rs-bt:focus-visible, html[data-look="dark"] .rs-go:focus-visible, html[data-look="dark"] .rs-cell:focus-visible{ outline-color:#8FB3F5; }
-        html[data-look="dark"] .rs-chart:focus-within .rs-plot{ outline-color:#8FB3F5; }
+        html[data-look="dark"] .rs-cell.rs-now{ border-color:#8AB4F8; }
+        html[data-look="dark"] .rs-seg button:focus-visible, html[data-look="dark"] .rs-bt:focus-visible, html[data-look="dark"] .rs-go:focus-visible, html[data-look="dark"] .rs-cell:focus-visible{ outline-color:#8AB4F8; }
+        html[data-look="dark"] .rs-chart:focus-within .rs-plot{ outline-color:#8AB4F8; }
         /* 12 Nov 2026 (option A2): "All routes". One scroller (the tab's own), so the headings and the totals stay put;
            the cells that stay put are solid, or the rows would show through them. */
         #route-drawer .drawer-head{ flex-wrap:wrap; row-gap:6px; }
@@ -625,7 +649,7 @@
         table.ar-table{ border-collapse:separate; border-spacing:0; width:100%; min-width:780px; font-size:12.5px; }
         table.ar-table th, table.ar-table td{ padding:4px 6px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line); font-weight:400; color:var(--ink); background:var(--surface); }
         table.ar-table thead th{ position:sticky; top:0; z-index:2; padding:2px 2px; }
-        table.ar-table tfoot th, table.ar-table tfoot td{ position:sticky; bottom:0; z-index:2; font-weight:700; border-top:1.5px solid #94A3B8; border-bottom:0; background:var(--surface-2); }
+        table.ar-table tfoot th, table.ar-table tfoot td{ position:sticky; bottom:0; z-index:2; font-weight:700; border-top:1.5px solid var(--ctl-edge); border-bottom:0; background:var(--surface-2); }
         table.ar-table tbody th, table.ar-table tfoot th{ text-align:left; position:sticky; left:0; z-index:1; padding:0 8px 0 0; }
         .ar-name{ display:inline-block; max-width:360px; overflow:hidden; text-overflow:ellipsis; vertical-align:middle; }
         table.ar-table tfoot th{ padding:4px 8px 4px 4px; z-index:3; }
@@ -636,29 +660,29 @@
         table.ar-table.ar-t .ar-name{ max-width:172px; }
         table.ar-table.ar-t .ar-l{ max-width:160px; }
         table.ar-table td.ar-sum{ font-weight:700; }
-        table.ar-table .ar-now, table.ar-table tr.ar-picked th, table.ar-table tr.ar-picked td{ background:#EFF6FF; }
+        table.ar-table .ar-now, table.ar-table tr.ar-picked th, table.ar-table tr.ar-picked td{ background:#F0F4F9; }
         table.ar-table tfoot .ar-now{ background:#E3EDFB; }
         table.ar-table td.ar-none{ text-align:left; color:var(--muted); padding:12px 0; }
-        .ar-h{ border:0; background:none; font:inherit; font-size:12px; font-weight:600; color:var(--muted); padding:4px 3px; min-height:24px; min-width:24px; cursor:pointer; border-radius:4px; white-space:nowrap; }
-        th.ar-now .ar-h{ color:#1E3A8A; }
+        .ar-h{ border:0; background:none; font:inherit; font-size:12px; font-weight:600; color:var(--muted); padding:4px 3px; min-height:24px; min-width:24px; cursor:pointer; border-radius:3px; white-space:nowrap; }
+        th.ar-now .ar-h{ color:var(--navy); }
         th[aria-sort="descending"] .ar-h::after{ content:" \25BE"; }
         th[aria-sort="ascending"] .ar-h::after{ content:" \25B4"; }
-        .ar-rid{ border:0; background:none; font:inherit; font-weight:600; color:#1D4ED8; padding:3px 4px; min-height:24px; min-width:40px; cursor:pointer; border-radius:4px; text-align:left; }
-        .ar-h:focus-visible, .ar-rid:focus-visible, .ar-mat:focus-visible, a.ar-dl:focus-visible{ outline:2px solid #1D4ED8; outline-offset:-2px; }
+        .ar-rid{ border:0; background:none; font:inherit; font-weight:600; color:var(--navy); padding:3px 4px; min-height:24px; min-width:40px; cursor:pointer; border-radius:3px; text-align:left; }
+        .ar-h:focus-visible, .ar-rid:focus-visible, .ar-mat:focus-visible, a.ar-dl:focus-visible{ outline:2px solid var(--navy); outline-offset:-2px; }
         .ar-year button{ min-width:28px; }
         .ar-year button[disabled]{ color:var(--muted); cursor:default; opacity:.55; }
         .ar-prev::before{ content:"\25C0"; } .ar-next::before{ content:"\25B6"; }
-        .ar-yr{ padding:5px 9px; font-size:12px; font-weight:700; border-left:1px solid var(--ctl-line); border-right:1px solid var(--ctl-line); background:#EEF3FB; color:#1E3A8A; }
-        .ar-mat{ border:1px solid var(--ctl-line); border-radius:7px; background:var(--surface); color:var(--ink); font:inherit; font-size:12px; font-weight:600; padding:4px 6px; min-height:28px; max-width:150px; }
+        .ar-yr{ padding:5px 9px; font-size:12px; font-weight:700; border-left:1px solid var(--ctl-line); border-right:1px solid var(--ctl-line); background:var(--navy-soft); color:var(--navy); }
+        .ar-mat{ border:1px solid var(--ctl-line); border-radius:6px; background:var(--surface); color:var(--ink); font:inherit; font-size:12px; font-weight:600; padding:4px 6px; min-height:28px; max-width:150px; }
         a.ar-dl{ text-decoration:none; display:inline-flex; align-items:center; }
-        .rs-bt[aria-pressed="true"]{ background:#EEF3FB; color:#1E3A8A; }
+        .rs-bt[aria-pressed="true"]{ background:var(--navy-soft); color:var(--navy); }
         body.drawer-open.drawer-tall #route-drawer{ height:80vh; max-height:80vh; }
         body.drawer-open.drawer-tall #tl-warnings{ display:none; }     /* the taller table takes the Conditions panel's room; "Taller" again brings it back */
-        html[data-look="dark"] table.ar-table .ar-now, html[data-look="dark"] table.ar-table tr.ar-picked th, html[data-look="dark"] table.ar-table tr.ar-picked td{ background:#202F50; }
+        html[data-look="dark"] table.ar-table .ar-now, html[data-look="dark"] table.ar-table tr.ar-picked th, html[data-look="dark"] table.ar-table tr.ar-picked td{ background:#2C323D; }
         html[data-look="dark"] table.ar-table tfoot .ar-now{ background:#243560; }
-        html[data-look="dark"] th.ar-now .ar-h, html[data-look="dark"] .ar-rid{ color:#8FB3F5; }
-        html[data-look="dark"] .ar-yr, html[data-look="dark"] .rs-bt[aria-pressed="true"]{ background:#202F50; color:#8FB3F5; }
-        html[data-look="dark"] .ar-h:focus-visible, html[data-look="dark"] .ar-rid:focus-visible, html[data-look="dark"] .ar-mat:focus-visible, html[data-look="dark"] a.ar-dl:focus-visible{ outline-color:#8FB3F5; }
+        html[data-look="dark"] th.ar-now .ar-h, html[data-look="dark"] .ar-rid{ color:#8AB4F8; }
+        html[data-look="dark"] .ar-yr, html[data-look="dark"] .rs-bt[aria-pressed="true"]{ background:var(--navy-soft); color:var(--navy); }
+        html[data-look="dark"] .ar-h:focus-visible, html[data-look="dark"] .ar-rid:focus-visible, html[data-look="dark"] .ar-mat:focus-visible, html[data-look="dark"] a.ar-dl:focus-visible{ outline-color:#8AB4F8; }
         /* a laptop-height window (650 px: 125 px of content): the same story a little tighter, still without scrolling */
         @media (max-height:680px){ .rs-plot{ height:80px; } .rs-what{ margin:3px 0 2px; } .rs-desc{ margin-bottom:4px; } .rs-inm{ margin:2px 0 1px; } }
         /* the phone's route card: the same line, the months as a picture, one button to the busiest month */
@@ -667,12 +691,12 @@
         .route-card .rs-xl{ gap:3px; }
         .route-card .rs-col em, .route-card .rs-xl span, .route-card .rs-yl{ font-size:12px; }
         .route-card .rs-yl{ margin-bottom:8px; }
-        .route-card .rs-busy{ color:#1D4ED8; }
+        .route-card .rs-busy{ color:var(--navy); }
         .route-card .rs-busy[disabled]{ color:var(--muted); cursor:default; }
-        html[data-look="dark"] .route-card .rs-busy{ color:#8FB3F5; }
+        html[data-look="dark"] .route-card .rs-busy{ color:#8AB4F8; }
 
         /* Playable forecast timeline bar */
-        #timeline-bar{ display:none; position:absolute; left:calc(50% + 150px); transform:translateX(-50%); bottom:18px; z-index:25; background:var(--surface); border:1px solid var(--line); border-radius:11px; box-shadow:0 8px 28px rgba(16,24,40,.16); padding:8px 12px; align-items:center; gap:11px; }
+        #timeline-bar{ display:none; position:absolute; left:calc(50% + 150px); transform:translateX(-50%); bottom:18px; z-index:25; background:var(--surface); border:1px solid var(--line); border-radius:6px; box-shadow:0 8px 28px rgba(16,24,40,.16); padding:8px 12px; align-items:center; gap:11px; }
         body.sidebar-closed #timeline-bar{ left:50%; }
         /* 12 Oct 2026 (browser check, 1280 px): with a council layer on, Mapbox's attribution wraps to two lines and the
            first, the ONS / OS licence line, sat behind the timeline bar. While the bar is open the map's foot controls
@@ -685,7 +709,7 @@
         #timeline-bar input[type=range]{ width:250px; flex:1 1 250px; min-width:90px; accent-color:var(--navy); cursor:pointer; }
         #timeline-bar{ max-width:calc(100vw - 36px); }
         #timeline-bar .tl-btn, #timeline-bar .tl-close{ flex:0 0 auto; }
-        .tl-btn{ border:none; background:var(--navy); color:#fff; width:30px; height:30px; border-radius:8px; cursor:pointer; font-size:12px; }
+        .tl-btn{ border:none; background:var(--action); color:var(--action-fg); width:30px; height:30px; border-radius:6px; cursor:pointer; font-size:12px; }
         .tl-close{ border:none; background:none; color:var(--muted); cursor:pointer; font-size:15px; }
         /* 15 Sep — the label OVERLAPPED the speed select. It had min-width:190px and
            white-space:nowrap but no flex sizing, so as a flex item it shrank to exactly
@@ -696,7 +720,7 @@
            change length. */
         #tl-label{ font-size:12px; font-weight:600; color:var(--navy-deep); min-width:190px; white-space:nowrap; flex:0 0 auto; }
         /* and the select was far bigger than five two-character options need */
-        #tl-speed{ border:1px solid var(--line); border-radius:7px; background:var(--surface); color:var(--navy-deep); font:600 11px Inter,system-ui,sans-serif; padding:3px 2px 3px 5px; cursor:pointer; flex:0 0 auto; width:50px; text-align:center; text-align-last:center; }
+        #tl-speed{ border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--navy-deep); font:600 11px var(--f-text); padding:3px 2px 3px 5px; cursor:pointer; flex:0 0 auto; width:50px; text-align:center; text-align-last:center; }
         /* 12 Oct 2026 (D22): the announcer is visually hidden but read by a screen reader. (The "full horizon" checkbox
            that sat here is the M3 bar's "Plan months / Full horizon" pair now, styled with the M3 rules below.) */
         #timeline-bar:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
@@ -725,7 +749,7 @@
         /* ===== 12 Oct 2026 (evening) — the M3 bar (review §2.4, mockup 3; the user: "build full m3 bar"). These come after
            the base and the narrow rules above and win by specificity ([role="group"] / #timeline-bar …), so the rules
            above stay as they were. Every font here is 14 px or more (the 14 px floor), against the mockup's 11-13. */
-        #timeline-bar[role="group"]{ flex-direction:column; align-items:stretch; gap:0; padding:12px 16px 10px; border-radius:12px; }
+        #timeline-bar[role="group"]{ flex-direction:column; align-items:stretch; gap:0; padding:12px 16px 10px; border-radius:6px; }
         @media (min-width:1024px){
             #timeline-bar[role="group"]{ left:324px; right:24px; transform:none; max-width:none; }
             body.sidebar-closed #timeline-bar[role="group"]{ left:24px; }
@@ -741,7 +765,7 @@
         }
         .tl-row1{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
         #timeline-bar .tl-btn{ width:40px; height:40px; border:1px solid var(--ctl-line); background:var(--surface); color:var(--ink); font-size:14px; display:inline-flex; align-items:center; justify-content:center; }
-        #timeline-bar #tl-play{ width:48px; background:#C2410C; border-color:#C2410C; color:#fff; font-size:17px; font-weight:700; }
+        #timeline-bar #tl-play{ width:48px; background:var(--action); border-color:var(--action); color:var(--action-fg); font-size:17px; font-weight:700; }
         #timeline-bar .tl-btn:focus-visible, .tl-seg button:focus-visible, .tl-ghost:focus-visible, #tl-toast button:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
         .tl-lbl{ line-height:1.2; min-width:0; flex:0 1 auto; }
         #timeline-bar #tl-label{ display:block; font-size:17px; font-weight:600; color:var(--ink); min-width:0; white-space:nowrap; }
@@ -760,29 +784,29 @@
         .tl-ctl{ margin-left:auto; display:flex; align-items:center; gap:12px 14px; font-size:14px; white-space:nowrap; flex-wrap:wrap; justify-content:flex-end; color:var(--ink); }
         .tl-sw{ display:inline-flex; align-items:center; gap:8px; cursor:pointer; position:relative; }
         .tl-sw input{ position:absolute; opacity:0; width:1px; height:1px; margin:0; }
-        .tl-sw i{ width:34px; height:20px; border-radius:999px; background:#A8A29E; position:relative; display:inline-block; flex:none; }
-        .tl-sw i:after{ content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background:var(--surface); transition:left .15s; }
-        .tl-sw input:checked + i{ background:#1F2024; }
+        .tl-sw i{ width:34px; height:20px; border-radius:6px; background:var(--ctl-edge); position:relative; display:inline-block; flex:none; }
+        .tl-sw i:after{ content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:3px; background:var(--surface); transition:left .15s; }
+        .tl-sw input:checked + i{ background:var(--navy); }
         .tl-sw input:checked + i:after{ left:16px; }
         .tl-sw input:focus-visible + i{ outline:2px solid var(--navy); outline-offset:2px; }
-        .tl-seg{ display:inline-flex; border:1px solid var(--ctl-line); border-radius:7px; overflow:hidden; }
-        .tl-seg button{ border:0; background:var(--surface); color:var(--ink); font:500 14px Inter,system-ui,sans-serif; padding:6px 10px; cursor:pointer; }
+        .tl-seg{ display:inline-flex; border:1px solid var(--ctl-line); border-radius:6px; overflow:hidden; }
+        .tl-seg button{ border:0; background:var(--surface); color:var(--ink); font:500 14px var(--f-text); padding:6px 10px; cursor:pointer; }
         .tl-seg button + button{ border-left:1px solid var(--ctl-line); }
-        .tl-seg button[aria-checked="true"]{ background:#1F2024; color:#fff; }
-        #timeline-bar #tl-speed{ width:auto; font:500 14px Inter,system-ui,sans-serif; padding:6px 6px; color:var(--ink); border-color:#D6D3D1; text-align:left; text-align-last:auto; }
-        .tl-ghost{ border:1px solid var(--ctl-line); border-radius:7px; padding:6px 10px; background:var(--surface); color:var(--ink); font:500 14px Inter,system-ui,sans-serif; cursor:pointer; }
+        .tl-seg button[aria-checked="true"]{ background:var(--navy-soft); color:var(--navy); font-weight:600; }
+        #timeline-bar #tl-speed{ width:auto; font:500 14px var(--f-text); padding:6px 6px; color:var(--ink); border-color:var(--ctl-line); text-align:left; text-align-last:auto; }
+        .tl-ghost{ border:1px solid var(--ctl-line); border-radius:6px; padding:6px 10px; background:var(--surface); color:var(--ink); font:500 14px var(--f-text); cursor:pointer; }
         #timeline-bar .tl-close{ font-size:22px; padding:0 4px; line-height:1; }
         /* the loop label sits over the bracket of the months Play loops over; JS sets its indent and the bracket */
         .tl-looplbl{ margin-top:10px; font-size:14px; color:var(--ink); line-height:1.3; min-height:18px; }
         .tl-looplbl b{ font-weight:600; }
         .tl-railwrap{ position:relative; margin-top:18px; }
         .tl-loop{ position:absolute; top:-14px; height:11px; border:1.5px solid #1F2024; border-bottom:0; border-radius:3px 3px 0 0; pointer-events:none; }
-        .tl-rail{ display:flex; height:30px; border:1px solid var(--ctl-line); border-radius:4px; overflow:hidden; background:#FAFAF9; cursor:pointer; touch-action:none; user-select:none; }
+        .tl-rail{ display:flex; height:30px; border:1px solid var(--ctl-line); border-radius:3px; overflow:hidden; background:var(--surface-2); cursor:pointer; touch-action:none; user-select:none; }
         .tl-rail i{ flex:1; position:relative; border-left:1px solid #EFEDEA; display:block; }
         .tl-rail i:first-child{ border-left:0; }
-        .tl-rail i.yr{ border-left:1px solid #A8A29E; }
-        .tl-rail i.vol{ background:rgba(37,99,235,.28); }
-        .tl-rail i.now{ background:rgba(37,99,235,.62); }
+        .tl-rail i.yr{ border-left:1px solid var(--ctl-edge); }
+        .tl-rail i.vol{ background:rgba(11,78,162,.28); }
+        .tl-rail i.now{ background:rgba(11,78,162,.62); }
         .tl-rail i.now:not(.vol){ background:rgba(31,32,36,.18); }
         .tl-rail i.cl:before{ content:""; position:absolute; left:50%; top:3px; margin-left:-5px; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:8px solid #D97706; }
         .tl-rail i.oc:after{ content:""; position:absolute; left:50%; bottom:3px; margin-left:-4px; width:8px; height:8px; border-radius:50%; background:#DC2626; }
@@ -792,14 +816,14 @@
         /* the range is the keyboard's and the screen reader's control of the month; the rail above is the pointer's */
         #timeline-bar .tl-railwrap input[type=range]{ position:absolute; width:1px; height:1px; min-width:0; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; flex:none; }
         #timeline-bar .tl-railwrap:focus-within .tl-rail{ outline:2px solid var(--navy); outline-offset:2px; }
-        .tl-years{ display:flex; font-size:14px; color:#78716C; margin-top:3px; }
+        .tl-years{ display:flex; font-size:14px; color:var(--muted); margin-top:3px; }
         .tl-years span{ flex:1; padding-left:4px; }
         .tl-hints{ display:flex; align-items:center; gap:6px 12px; margin-top:8px; font-size:14px; color:var(--ink-2); flex-wrap:wrap; }
-        .tl-hints kbd{ font-family:inherit; font-size:14px; border:1px solid var(--ctl-line); border-bottom-width:2px; border-radius:4px; padding:0 6px; background:var(--surface); color:var(--ink); margin-right:2px; }
-        .tl-hints .sep{ color:#D6D3D1; }
+        .tl-hints kbd{ font-family:inherit; font-size:14px; border:1px solid var(--ctl-line); border-bottom-width:2px; border-radius:3px; padding:0 6px; background:var(--surface); color:var(--ink); margin-right:2px; }
+        .tl-hints .sep{ color:var(--ctl-line); }
         .tl-leg{ margin-left:auto; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
         .tl-leg i{ display:inline-block; vertical-align:middle; margin-right:5px; }
-        .tl-leg .sq{ width:12px; height:12px; background:rgba(37,99,235,.28); border:1px solid var(--ctl-line); }
+        .tl-leg .sq{ width:12px; height:12px; background:rgba(11,78,162,.28); border:1px solid var(--ctl-line); }
         .tl-leg .tri{ width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:8px solid #D97706; }
         .tl-leg .dot{ width:8px; height:8px; border-radius:50%; background:#DC2626; }
         /* a short screen keeps the map: the keys go first, then the reduced-motion note; the rail's legend stays */
@@ -815,17 +839,17 @@
         }
         /* paused on a clash: above the bar, at its left (the conditions panel holds the right) */
         #tl-toast{ position:absolute; z-index:26; left:324px; bottom:var(--tl-foot, 200px); width:min(450px, calc(100vw - 48px)); background:var(--surface);
-                   border:1px solid #E7E5E4; border-left:4px solid #DC2626; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.18);
+                   border:1px solid var(--line); border-left:4px solid #DC2626; border-radius:6px; box-shadow:0 6px 20px rgba(0,0,0,.18);
                    padding:12px 14px; font-size:14px; line-height:1.4; color:var(--ink); }
         #tl-toast[hidden]{ display:none; }
         body.sidebar-closed #tl-toast{ left:24px; }
         @media (max-width:1023px){ #tl-toast, body.sidebar-closed #tl-toast{ left:12px; } }
         #tl-toast .h{ font-weight:600; font-size:15px; color:#B91C1C; }
-        #tl-toast .h span{ color:#78716C; font-weight:400; font-size:14px; margin-left:8px; }
+        #tl-toast .h span{ color:var(--muted); font-weight:400; font-size:14px; margin-left:8px; }
         #tl-toast p{ margin:4px 0 10px; }
         #tl-toast .acts{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-        #tl-toast .tl-act{ border:0; background:#C2410C; color:#fff; border-radius:7px; padding:7px 12px; font:600 14px Inter,system-ui,sans-serif; cursor:pointer; }
-        #tl-toast .tl-lnk{ margin-left:auto; border:0; background:none; color:var(--ink-2); text-decoration:underline; font:14px Inter,system-ui,sans-serif; cursor:pointer; padding:4px 0; }
+        #tl-toast .tl-act{ border:0; background:var(--action); color:var(--action-fg); border-radius:6px; padding:7px 12px; font:600 14px var(--f-text); cursor:pointer; }
+        #tl-toast .tl-lnk{ margin-left:auto; border:0; background:none; color:var(--ink-2); text-decoration:underline; font:14px var(--f-text); cursor:pointer; padding:4px 0; }
         /* WALL MODE: chrome off — the fictional strip, the map, the month and its figures, the rail */
         #wall-hud, #wall-hint{ display:none; }
         body.wall-mode #main-sidebar, body.wall-mode #menu-toggle, body.wall-mode #kpi-hud, body.wall-mode #tl-warnings, body.wall-mode #tl-toast,
@@ -846,12 +870,12 @@
         body.wall-mode .tl-rail i.cl:before{ border-left-width:8px; border-right-width:8px; border-bottom-width:13px; margin-left:-8px; }
         body.wall-mode .tl-rail i.oc:after{ width:12px; height:12px; margin-left:-6px; }
         body.wall-mode #wall-hud{ display:block; position:absolute; z-index:26; left:28px; bottom:calc(var(--tl-foot, 160px) + 12px); color:var(--navy-deep);
-                                  background:rgba(255,255,255,.9); padding:10px 14px 12px; border-radius:12px; }
+                                  background:rgba(255,255,255,.9); padding:10px 14px 12px; border-radius:6px; }
         body.wall-mode #wall-hud .m{ font-size:64px; font-weight:700; letter-spacing:-.01em; line-height:1; }
         body.wall-mode #wall-hud .f{ font-size:26px; font-weight:500; margin-top:10px; font-variant-numeric:tabular-nums; }
         body.wall-mode #wall-hint{ display:block; position:absolute; z-index:26; right:28px; top:calc(var(--notice-h, 26px) + 24px); font-size:20px; color:var(--ink-2);
-                                   text-align:right; line-height:1.3; background:rgba(255,255,255,.9); padding:10px 14px; border-radius:12px; }
-        body.wall-mode #wall-hint button{ margin-top:8px; border:1px solid var(--ctl-line); border-radius:7px; background:var(--surface); color:var(--navy-deep); font:500 16px Inter,system-ui,sans-serif; padding:6px 12px; cursor:pointer; }
+                                   text-align:right; line-height:1.3; background:rgba(255,255,255,.9); padding:10px 14px; border-radius:6px; }
+        body.wall-mode #wall-hint button{ margin-top:8px; border:1px solid var(--ctl-line); border-radius:6px; background:var(--surface); color:var(--navy-deep); font:500 16px var(--f-text); padding:6px 12px; cursor:pointer; }
         body.wall-mode.has-demo-notice #demo-notice{ font-size:22px; height:auto; padding:8px 22px; }
         /* ===== 12 Oct 2026 — the interactivity pass (review 2.3, D14, D29) and the phone shell (review 2.8 row 2,
            mockup 7, D30). Every font size in this section is 14 px or more (the staff bar's floor).
@@ -866,25 +890,25 @@
         @media (min-width:768px) and (max-width:1024px){
             body.sidebar-closed:not(.wall-mode) #t-strip{ display:flex; position:absolute; left:50%; transform:translateX(-50%); bottom:18px; z-index:25;
                 max-width:min(620px, calc(100% - 24px)); align-items:center; gap:10px; padding:8px 10px; background:var(--surface);
-                border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 28px rgba(16,24,40,.16); }
+                border:1px solid var(--line); border-radius:6px; box-shadow:0 8px 28px rgba(16,24,40,.16); }
             body.sidebar-closed:not(.wall-mode) #timeline-bar{ display:none !important; }
-            #t-strip .t-play{ flex:0 0 48px; width:48px; height:48px; border-radius:24px; border:0; background:#C2410C; color:#fff; font-size:18px; font-weight:700; cursor:pointer; }
+            #t-strip .t-play{ flex:0 0 48px; width:48px; height:48px; border-radius:6px; border:0; background:var(--action); color:var(--action-fg); font-size:18px; font-weight:700; cursor:pointer; }
             #t-strip .t-play:focus-visible{ outline:2px solid var(--navy); outline-offset:2px; }
             #t-strip .t-chips{ min-width:0; overflow-x:auto; scrollbar-width:thin; }
             #t-strip .month-chips{ flex-wrap:nowrap; }
             #t-strip .month-chip{ flex:0 0 auto; min-height:44px; min-width:52px; }
         }
-        .month-chip{ border:1px solid var(--ctl-line); background:var(--surface); color:var(--ink); border-radius:999px; padding:6px 12px; min-height:36px;
-                     font:500 14px/1.2 Inter,system-ui,sans-serif; cursor:pointer; white-space:nowrap; }
+        .month-chip{ border:1px solid var(--ctl-line); background:var(--surface); color:var(--ink); border-radius:6px; padding:6px 12px; min-height:36px;
+                     font:500 14px/1.2 var(--f-text); cursor:pointer; white-space:nowrap; }
         .month-chip:hover{ border-color:var(--navy); }
-        .month-chip[aria-pressed="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; }
+        .month-chip[aria-pressed="true"]{ background:var(--navy-soft); border-color:var(--navy); color:var(--navy); font-weight:600; }
         .month-chips .chips-none{ font-size:14px; color:var(--note); }
         /* 13 Oct 2026: the preset views, chips like the month chips; pressed = the map matches that view */
         .preset-views{ display:flex; flex-wrap:wrap; gap:6px; }
-        .preset-chip{ border:1px solid var(--ctl-line); background:var(--surface); color:var(--ink); border-radius:999px; padding:6px 12px; min-height:36px;
-                      font:500 14px/1.2 Inter,system-ui,sans-serif; cursor:pointer; }
+        .preset-chip{ border:1px solid var(--ctl-line); background:var(--surface); color:var(--ink); border-radius:6px; padding:6px 12px; min-height:36px;
+                      font:500 14px/1.2 var(--f-text); cursor:pointer; }
         .preset-chip:hover{ border-color:var(--navy); }
-        .preset-chip[aria-pressed="true"]{ background:var(--navy); border-color:var(--navy); color:#fff; }
+        .preset-chip[aria-pressed="true"]{ background:var(--navy-soft); border-color:var(--navy); color:var(--navy); font-weight:600; }
         .preset-note{ margin-top:6px; font-size:14px; color:var(--note); line-height:1.45; }
         .share-row{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
         .share-row .btn{ flex:1 1 auto; width:auto; }
@@ -894,19 +918,19 @@
         .concern-panel-slot .concern-btn{ width:100%; margin-top:6px; font-size:14px; padding:8px 10px; }
         .concern-unset{ display:block; margin-top:8px; font-size:14px; color:var(--note); line-height:1.45; }
         #route-hover-card{ position:fixed; z-index:35; pointer-events:none; max-width:300px; background:var(--surface); border:1px solid var(--line);
-                           border-radius:10px; box-shadow:0 8px 28px rgba(16,24,40,.14); padding:10px 12px; font:14px/1.4 Inter,system-ui,sans-serif; color:var(--ink); }
+                           border-radius:6px; box-shadow:0 8px 28px rgba(16,24,40,.14); padding:10px 12px; font:14px/1.4 var(--f-text); color:var(--ink); }
         #route-hover-card[hidden]{ display:none; }
         #route-hover-card .hc-title{ display:block; font-weight:600; color:var(--navy-deep); }
         #route-hover-card .hc-sub, #route-hover-card .hc-hint{ display:block; color:var(--muted); }
         #route-hover-card .hc-fig{ display:block; font-weight:600; color:var(--navy-deep); margin-top:4px; }
         #route-hover-card .hc-sub:empty, #route-hover-card .hc-fig:empty, #route-hover-card .hc-hint:empty{ display:none; }
         /* 10 Nov 2026 (v2.1 2.1-4): the road card, the area card, the box tool */
-        .secsel-card{ font:14px/1.4 Inter,system-ui,sans-serif; color:var(--ink); min-width:240px; max-width:360px; }
+        .secsel-card{ font:14px/1.4 var(--f-text); color:var(--ink); min-width:240px; max-width:360px; }
         .secsel-title{ margin:0 0 4px; font-size:14px; color:var(--navy-deep); }
         .secsel-sum{ margin:0 0 2px; }
         .secsel-sub, .secsel-team, .secsel-note{ color:var(--muted); }
         .secsel-note{ margin:6px 0 0; font-size:14px; }
-        .secsel-limit{ margin:4px 0; padding:3px 7px; border-left:3px solid #64748B; font-weight:600; }
+        .secsel-limit{ margin:4px 0; padding:3px 7px; border-left:3px solid var(--muted); font-weight:600; }
         .secsel-limit.secsel-over{ border-color:#B91C1C; color:#B91C1C; }
         .secsel-limit.secsel-near{ border-color:#B45309; color:#B45309; }
         .secsel-scroll{ max-height:260px; overflow:auto; margin-top:6px; }
@@ -917,33 +941,33 @@
         table.secsel-table .secsel-rid{ font-weight:600; white-space:nowrap; }
         /* 12 Nov 2026 (map-pick-route, option R1): each route number on the road card is a button, 44 px tall, filling its cell */
         table.secsel-table td.secsel-rid{ padding:0; }
-        .secsel-rid-btn{ display:block; width:100%; min-width:44px; min-height:44px; margin:0; padding:2px 8px 2px 0; border:0; border-radius:4px; background:transparent; font:inherit; font-weight:600; color:var(--navy-deep); text-align:left; cursor:pointer; }
+        .secsel-rid-btn{ display:block; width:100%; min-width:44px; min-height:44px; margin:0; padding:2px 8px 2px 0; border:0; border-radius:3px; background:transparent; font:inherit; font-weight:600; color:var(--navy-deep); text-align:left; cursor:pointer; }
         .secsel-rid-btn:hover{ text-decoration:underline; }
-        .secsel-rid-btn:focus-visible{ outline:2px solid #1D4ED8; outline-offset:-2px; }
-        html[data-look="dark"] .secsel-rid-btn:focus-visible{ outline-color:#8FB3F5; }
-        table.secsel-table tr.secsel-clicked td{ background:#EFF6FF; }
+        .secsel-rid-btn:focus-visible{ outline:2px solid var(--navy); outline-offset:-2px; }
+        html[data-look="dark"] .secsel-rid-btn:focus-visible{ outline-color:#8AB4F8; }
+        table.secsel-table tr.secsel-clicked td{ background:#F0F4F9; }
         table.secsel-table tr.secsel-total td{ border-top:1px solid var(--line); font-weight:600; }
         .secsel-btns{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-        .secsel-btn{ min-height:32px; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--navy-deep); font:600 14px Inter,system-ui,sans-serif; cursor:pointer; }
-        .secsel-btn:hover{ background:#F8FAFC; }
-        .secsel-btn.secsel-copy, .secsel-btn.secsel-sum-btn{ background:var(--navy); border-color:var(--navy); color:#fff; }
-        .secsel-ctrl-btn::before{ content:""; display:block; width:14px; height:12px; margin:auto; border:2px dashed #1F2024; border-radius:1px; }
-        .secsel-ctrl-btn[aria-pressed="true"]{ background:#DBEAFE !important; }
+        .secsel-btn{ min-height:32px; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--navy-deep); font:600 14px var(--f-text); cursor:pointer; }
+        .secsel-btn:hover{ background:var(--surface-2); }
+        .secsel-btn.secsel-copy, .secsel-btn.secsel-sum-btn{ background:var(--action); border-color:var(--action); color:var(--action-fg); }
+        .secsel-ctrl-btn::before{ content:""; display:block; width:14px; height:12px; margin:auto; border:2px dashed #1F2024; border-radius:3px; }
+        .secsel-ctrl-btn[aria-pressed="true"]{ background:var(--navy-soft) !important; }
         .secsel-rect{ position:absolute; border:2px dashed #1D4ED8; background:rgba(29,78,216,.06); pointer-events:none; z-index:5; }
         .secsel-hint{ position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:6; background:var(--surface); border:1px solid var(--line);
-                      border-radius:8px; padding:6px 10px; font:14px Inter,system-ui,sans-serif; box-shadow:0 4px 14px rgba(16,24,40,.12); }
+                      border-radius:6px; padding:6px 10px; font:14px var(--f-text); box-shadow:0 4px 14px rgba(16,24,40,.12); }
         .secsel-hint[hidden], .secsel-panel[hidden], .secsel-frame[hidden]{ display:none; }
-        .secsel-panel{ position:absolute; top:10px; right:56px; z-index:6; background:var(--surface); border:1px solid var(--line); border-radius:10px;
+        .secsel-panel{ position:absolute; top:10px; right:56px; z-index:6; background:var(--surface); border:1px solid var(--line); border-radius:6px;
                        box-shadow:0 8px 28px rgba(16,24,40,.14); padding:12px 14px; max-width:380px;
                        max-height:calc(100% - var(--tl-foot, 0px) - 30px); overflow:auto; }
         .secsel-panel .secsel-scroll{ max-height:none; }
         .secsel-x{ position:absolute; top:6px; right:6px; width:28px; height:28px; border:none; background:transparent; cursor:pointer; border-radius:6px; }
         .secsel-x::before{ content:"\00D7"; font-size:18px; color:var(--muted); }
-        .secsel-x:hover{ background:#F1F5F9; }
+        .secsel-x:hover{ background:var(--surface-2); }
         .secsel-frame{ position:absolute; inset:0; z-index:6; pointer-events:none; }
         .secsel-frame-box{ position:absolute; left:15%; right:15%; top:22%; height:36%; border:2px dashed #1D4ED8; background:rgba(29,78,216,.06); }
         .secsel-frame-bar{ position:absolute; left:8px; right:8px; top:8px; pointer-events:auto; display:flex; flex-wrap:wrap; gap:6px; align-items:center;
-                           background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:8px 10px; font:14px Inter,system-ui,sans-serif; }
+                           background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:8px 10px; font:14px var(--f-text); }
         .secsel-frame-bar span{ flex:1 1 100%; }
         .secsel-frame-bar .secsel-btn{ min-height:44px; flex:1; }
         .play-wait, .play-wait:hover{ opacity:.45; cursor:progress; filter:grayscale(1); }   /* 11 Nov 2026 (A-F7): Play while the months load */
@@ -955,7 +979,7 @@
         #month-text[hidden]{ display:none; }
         .mt-head{ display:flex; align-items:center; gap:8px; padding:12px 12px 10px 18px; border-bottom:1px solid var(--line); }
         .mt-head h2{ margin:0; font-size:16px; font-weight:600; color:var(--navy-deep); flex:1; }
-        .mt-close, .share-close{ width:44px; height:44px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--navy-deep); font-size:22px; line-height:1; cursor:pointer; padding:0; flex:0 0 auto; }
+        .mt-close, .share-close{ width:44px; height:44px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--navy-deep); font-size:22px; line-height:1; cursor:pointer; padding:0; flex:0 0 auto; }
         .mt-body{ overflow:auto; padding:12px 18px 18px; }
         .mt-body p{ margin:0 0 10px; font-size:14px; }
         .mt-figs{ display:grid; grid-template-columns:1fr auto; gap:6px 12px; margin:0 0 14px; }
@@ -976,12 +1000,12 @@
         }
         @media (max-width:1023px){ body.has-demo-notice #month-text{ top:var(--notice-h, 26px); } }
         #share-panel{ position:fixed; z-index:40; left:50%; top:50%; transform:translate(-50%, -50%); width:min(340px, calc(100vw - 24px));
-                      max-height:calc(100vh - 24px); overflow:auto; background:var(--surface); border:1px solid var(--line); border-radius:12px;
+                      max-height:calc(100vh - 24px); overflow:auto; background:var(--surface); border:1px solid var(--line); border-radius:6px;
                       box-shadow:0 12px 40px rgba(16,24,40,.22); padding:14px 16px 16px; font-size:14px; line-height:1.45; color:var(--ink); }
         #share-panel[hidden]{ display:none; }
         /* 14 Oct 2026 (backlog item 2): the route map export card, the share card's twin */
         #rme-panel{ position:fixed; z-index:40; left:50%; top:50%; transform:translate(-50%, -50%); width:min(360px, calc(100vw - 24px));
-                    max-height:calc(100vh - 24px); overflow:auto; background:var(--surface); border:1px solid var(--line); border-radius:12px;
+                    max-height:calc(100vh - 24px); overflow:auto; background:var(--surface); border:1px solid var(--line); border-radius:6px;
                     box-shadow:0 12px 40px rgba(16,24,40,.22); padding:14px 16px 16px; font-size:14px; line-height:1.45; color:var(--ink); }
         #rme-panel[hidden]{ display:none; }
         /* 10 Nov 2026 (live test finding 8): on a window under about 766 px the export card's top edge covered the DEMO
@@ -992,7 +1016,7 @@
         #rme-panel .share-head b{ flex:1; font-size:16px; color:var(--navy-deep); }
         #rme-panel .rme-what{ margin:0 0 10px; color:var(--muted); }
         #rme-panel .rme-field{ display:block; font-weight:600; margin-bottom:4px; }
-        #rme-panel select{ width:100%; min-height:44px; font:14px Inter,system-ui,sans-serif; margin-bottom:10px; }
+        #rme-panel select{ width:100%; min-height:44px; font:14px var(--f-text); margin-bottom:10px; }
         #rme-panel .rme-field[hidden], #rme-panel select[hidden]{ display:none; }
         #rme-panel .rme-plan-what{ margin:-4px 0 10px; color:var(--muted); font-size:14px; }
         #rme-panel .rme-check{ display:flex; gap:8px; align-items:center; min-height:44px; font-size:14px; margin:-2px 0 8px; }
@@ -1003,7 +1027,7 @@
         #share-panel .share-head b{ flex:1; font-size:16px; color:var(--navy-deep); }
         #share-qr{ display:flex; justify-content:center; margin:6px 0 10px; }
         #share-qr svg{ width:220px; height:220px; }
-        #share-url{ width:100%; font:14px Inter,system-ui,sans-serif; padding:8px 10px; border:1px solid var(--ctl-line); border-radius:6px; color:var(--ink); }
+        #share-url{ width:100%; font:14px var(--f-text); padding:8px 10px; border:1px solid var(--ctl-line); border-radius:6px; color:var(--ink); }
         #share-status{ min-height:20px; font-size:14px; color:var(--green); margin-top:6px; }
         /* 5 Nov 2026 (group 6, mockup notes/report-concern-mockup-1105 cards 1-3): Report a concern. A button where the email
            link was; the form a card on the right of the map (the whole screen on a phone); a click on the map drops the pin
@@ -1022,8 +1046,8 @@
         #concern-panel .cn-field{ margin:0 0 12px; }
         #concern-panel .cn-lbl{ display:block; font-weight:600; margin-bottom:4px; color:var(--navy-deep); }
         #concern-panel select, #concern-panel input[type=text], #concern-panel input[type=date], #concern-panel input[type=time],
-        #concern-panel input[type=email], #concern-panel textarea{ width:100%; box-sizing:border-box; min-height:44px; font:14px Inter,system-ui,sans-serif;
-                        padding:8px 10px; border:1px solid #A8A29E; border-radius:6px; color:var(--ink); background:var(--surface); }
+        #concern-panel input[type=email], #concern-panel textarea{ width:100%; box-sizing:border-box; min-height:44px; font:14px var(--f-text);
+                        padding:8px 10px; border:1px solid var(--ctl-edge); border-radius:6px; color:var(--ink); background:var(--surface); }
         #concern-panel textarea{ min-height:110px; resize:vertical; }
         #concern-panel .cn-row{ display:flex; gap:10px; } #concern-panel .cn-row > .cn-field{ flex:1 1 0; min-width:0; }
         #concern-panel .cn-hint{ margin:4px 0 0; font-size:14px; color:var(--note); }
@@ -1039,7 +1063,7 @@
         #concern-panel .cn-trap{ position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden; }
         #concern-panel .cn-ref{ font-size:20px; font-weight:700; color:var(--navy-deep); }
         #cn-pick{ position:fixed; z-index:43; left:50%; bottom:calc(16px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); width:min(360px, calc(100vw - 24px));
-                  background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 28px rgba(16,24,40,.22); padding:10px 12px; font-size:14px; }
+                  background:var(--surface); border:1px solid var(--line); border-radius:6px; box-shadow:0 8px 28px rgba(16,24,40,.22); padding:10px 12px; font-size:14px; }
         #cn-pick[hidden], #cn-cross[hidden]{ display:none; }
         #cn-pick p{ margin:0 0 8px; color:var(--navy-deep); }
         #cn-pick .cn-actions{ display:flex; gap:8px; } #cn-pick .btn{ flex:1 1 auto; width:auto; }
@@ -1071,21 +1095,21 @@
             .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right{ bottom:var(--m-sheet-h, 0px); }
             /* 28 Oct 2026 (card 2): the demo strip is a pill on the Layers row (the map starts at the top of the screen); the
                Guide is in the Layers sheet; ⤢ top right, the zoom under it. measureNotice() sets --notice-h to 0 here. */
-            body.has-demo-notice #demo-notice{ left:122px; right:60px; top:14px; transform:none; max-width:none; border-radius:20px; display:flex; flex-wrap:wrap;
+            body.has-demo-notice #demo-notice{ left:122px; right:60px; top:14px; transform:none; max-width:none; border-radius:6px; display:flex; flex-wrap:wrap;
                       justify-content:center; align-items:center; gap:2px 0; border-width:1px; padding:3px 8px; font-size:14px; line-height:1.2; letter-spacing:.03em;
                       text-align:center; white-space:normal; }
             #guide-btn{ display:none !important; }
             #btn-guide-sheet:not([hidden]){ display:block; }
             #m-full-btn{ display:grid; place-items:center; position:absolute; right:8px; top:10px; z-index:27; width:44px; height:44px; padding:0;
-                      border:1px solid var(--line); border-radius:22px; background:var(--surface); color:var(--navy-deep); font-size:20px; line-height:1;
+                      border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--navy-deep); font-size:20px; line-height:1;
                       box-shadow:0 2px 10px rgba(16,24,40,.12); cursor:pointer; }
             #m-full-strip:not([hidden]){ display:flex; align-items:center; gap:10px; position:absolute; left:8px; right:8px; z-index:27;
-                      bottom:calc(8px + env(safe-area-inset-bottom, 0px)); height:56px; padding:0 6px; border-radius:28px;
-                      background:rgba(255,255,255,.96); box-shadow:0 4px 18px rgba(16,24,40,.22); font-family:Inter,system-ui,sans-serif; }
+                      bottom:calc(8px + env(safe-area-inset-bottom, 0px)); height:56px; padding:0 6px; border-radius:6px;
+                      background:rgba(255,255,255,.96); box-shadow:0 4px 18px rgba(16,24,40,.22); font-family:var(--f-text); }
             #m-full-strip .mf-month{ flex:1 1 auto; min-width:0; color:var(--navy-deep); }
             #m-full-strip .mf-month b{ display:block; font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
             #m-full-strip .mf-month span{ display:block; font-size:14px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-            #m-full-exit{ flex:0 0 44px; width:44px; height:44px; border-radius:22px; border:1px solid var(--line); background:var(--surface);
+            #m-full-exit{ flex:0 0 44px; width:44px; height:44px; border-radius:6px; border:1px solid var(--line); background:var(--surface);
                       color:var(--navy-deep); font-size:20px; line-height:1; padding:0; cursor:pointer; }
             /* full screen: the map alone — the sheet, Layers, ⤢ and the guide's strip go; the demo pill moves to the top
                centre; a route's card still opens in the sheet (map-full-card) until the sheet folds again */
@@ -1095,7 +1119,7 @@
             body.map-full.has-demo-notice #demo-notice{ left:50%; right:auto; top:8px; transform:translateX(-50%); max-width:calc(100vw - 80px); white-space:nowrap; }
             body.map-full .mapboxgl-ctrl-top-right{ top:44px !important; }
             #m-layers-btn{ display:flex; align-items:center; gap:8px; position:absolute; left:12px; top:12px; z-index:27; height:48px; padding:0 18px;
-                           border:1px solid var(--line); border-radius:24px; background:var(--surface); color:var(--navy-deep); font:600 15px Inter,system-ui,sans-serif;
+                           border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--navy-deep); font:600 15px var(--f-text);
                            box-shadow:0 2px 10px rgba(16,24,40,.12); cursor:pointer; }
             body.has-demo-notice #m-layers-btn{ top:calc(var(--notice-h, 26px) + 10px); }
             /* the panel IS the full-screen layers sheet: it rises from the bottom, under the demo strip */
@@ -1112,10 +1136,10 @@
             .month-picker button{ min-height:44px; }
             .layers-box > summary{ min-height:44px; display:flex; align-items:center; flex-wrap:wrap; padding:2px 0; }   /* the folds: 44 px rows (UI audit, 19 Oct) */
             #m-sheet{ display:flex; flex-direction:column; position:absolute; left:0; right:0; bottom:0; z-index:26; background:var(--surface);
-                      border-top:1px solid var(--line); border-radius:16px 16px 0 0; box-shadow:0 -8px 28px rgba(16,24,40,.14);
+                      border-top:1px solid var(--line); border-radius:6px 6px 0 0; box-shadow:0 -8px 28px rgba(16,24,40,.14);
                       max-height:calc(100% - var(--notice-h, 0px) - 72px); font-size:14px; color:var(--ink); padding-bottom:env(safe-area-inset-bottom, 0px); }
             .m-handle{ display:flex; align-items:center; justify-content:center; flex:0 0 48px; height:48px; width:100%; border:0; background:none; cursor:pointer; padding:0; }
-            .m-grip{ width:40px; height:5px; border-radius:3px; background:#A8A29E; }
+            .m-grip{ width:40px; height:5px; border-radius:3px; background:var(--ctl-edge); }
             .m-peek{ display:flex; flex-wrap:wrap; align-items:flex-start; gap:4px 16px; padding:0 16px 8px; }
             .m-month{ flex:1 0 100%; font-size:15px; font-weight:600; color:var(--navy-deep); }
             /* the two lead figures side by side at any phone width; a label wraps between words, never inside one: with min-width:0
@@ -1124,7 +1148,7 @@
             .m-fig{ flex:1 1 0; min-width:min-content; }
             .m-fig b{ display:block; font-size:24px; font-weight:600; color:var(--navy-deep); font-variant-numeric:tabular-nums; line-height:1.1; }
             .m-fig span{ font-size:14px; color:var(--muted); }
-            .m-cond{ margin-left:auto; min-height:44px; border:1px solid var(--line); border-radius:22px; background:var(--surface); padding:0 14px; font:500 14px Inter,system-ui,sans-serif; color:var(--navy-deep); cursor:pointer; display:flex; align-items:center; gap:6px; }
+            .m-cond{ margin-left:auto; min-height:44px; border:1px solid var(--line); border-radius:6px; background:var(--surface); padding:0 14px; font:500 14px var(--f-text); color:var(--navy-deep); cursor:pointer; display:flex; align-items:center; gap:6px; }
             .m-cond[hidden]{ display:none; }
             .m-body{ overflow:auto; padding:0 16px 8px; flex:1 1 auto; min-height:0; }
             #m-sheet[data-state="half"]{ height:min(62vh, calc(100% - var(--notice-h, 0px) - 72px)); }   /* half: about half the screen; the body scrolls */
@@ -1143,7 +1167,7 @@
             .m-chips-row{ display:flex; gap:8px; align-items:center; padding:8px 12px 12px; border-top:1px solid var(--line); overflow-x:auto; }
             .m-chips-row .month-chips{ flex-wrap:nowrap; }
             .m-chips-row .month-chip{ min-width:48px; padding:0 10px; flex:0 0 auto; }   /* 48 px targets; a long tenant scrolls the row */
-            .m-play{ flex:0 0 48px; width:48px; height:48px; border-radius:24px; border:0; background:var(--navy); color:#fff; font-size:18px; cursor:pointer; }
+            .m-play{ flex:0 0 48px; width:48px; height:48px; border-radius:6px; border:0; background:var(--action); color:var(--action-fg); font-size:18px; cursor:pointer; }
             /* 28 Oct 2026: the row now scrolls to the month on screen, so Play stays pinned at its left end, the chips passing under it */
             .m-chips-row .m-play{ position:sticky; left:0; z-index:1; box-shadow:0 0 0 8px #fff; }
             .route-card h3{ margin:4px 0 2px; font-size:16px; }
@@ -1184,31 +1208,31 @@
         }
             /* H10 (8 Oct 2026): the map's guide — demo tenant only, in-page, no library. */
             /* 22 Oct 2026 (UI fix 6, card 8): 14 px in a 21 px box like the app bar's Guide, an inset ring for the border (was 11.5 px, 4 px 12 px padding) */
-            #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:var(--surface);color:var(--navy-deep);border:0;border-radius:999px;height:21px;padding:0 10px;font:600 14px/21px system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 0 0 1px var(--line),0 2px 8px rgba(16,24,40,.12);}
-            #guide-btn:hover{background:#eff6ff;}
+            #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:var(--surface);color:var(--navy-deep);border:0;border-radius:6px;height:21px;padding:0 10px;font:600 14px/21px var(--f-text);cursor:pointer;box-shadow:inset 0 0 0 1px var(--line),0 2px 8px rgba(16,24,40,.12);}
+            #guide-btn:hover{background:var(--navy-soft);}
             /* 22 Oct 2026 (UI fix 6, card 8, review): on a touch screen the 21 px Guide keeps a 44 px tap area through an
                invisible ::after, like the app bar's Guide (decision 9); the visible pill is unchanged */
             @media (pointer:coarse){ #guide-btn::after{content:"";position:absolute;inset:-12px -8px;} }
   /* 11 Oct 2026 — the guide, options 4 + 1 + 2 (the user): Google-style bubbles, slightly transparent; a light
      one-line strip that offers the tour; small pulsing dots on the features. Nothing pops up uninvited. */
-  #guide-ring{position:fixed;z-index:9000;pointer-events:none;border:1.5px solid rgba(26,115,232,.55);border-radius:8px;box-shadow:0 0 0 3px rgba(26,115,232,.10);transition:top .15s,left .15s,width .15s,height .15s}
-  #guide-card{position:fixed;z-index:9001;width:min(300px,calc(100vw - 24px));background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border:0;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:11px 13px 8px;font:13px/1.45 Inter,system-ui,sans-serif}
+  #guide-ring{position:fixed;z-index:9000;pointer-events:none;border:1.5px solid rgba(11,78,162,.55);border-radius:6px;box-shadow:0 0 0 3px rgba(11,78,162,.10);transition:top .15s,left .15s,width .15s,height .15s}
+  #guide-card{position:fixed;z-index:9001;width:min(300px,calc(100vw - 24px));background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border:0;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:11px 13px 8px;font:13px/1.45 var(--f-text)}
   #guide-card[data-place="below"]::before{content:"";position:absolute;top:-6px;left:20px;border:6px solid transparent;border-top:0;border-bottom-color:rgba(32,33,36,.88)}
   #guide-card[data-place="above"]::before{content:"";position:absolute;bottom:-6px;left:20px;border:6px solid transparent;border-bottom:0;border-top-color:rgba(32,33,36,.88)}
   #guide-card h4{margin:0 0 2px;font-size:13.5px;font-weight:600;color:#fff}
   #guide-card p{margin:0;color:rgba(255,255,255,.86)}
   #guide-card .guide-foot{display:flex;align-items:center;gap:2px;margin-top:8px}
   #guide-card .guide-step{font-size:12px;color:rgba(255,255,255,.55);margin-right:auto}
-  #guide-card .guide-foot button{font:inherit;font-size:13px;font-weight:500;border-radius:4px;padding:4px 8px;border:0;background:transparent;color:rgba(255,255,255,.75);cursor:pointer}
+  #guide-card .guide-foot button{font:inherit;font-size:13px;font-weight:500;border-radius:3px;padding:4px 8px;border:0;background:transparent;color:rgba(255,255,255,.75);cursor:pointer}
   #guide-card .guide-foot button:hover{background:rgba(255,255,255,.08)}
   #guide-card .guide-foot button.guide-next{color:#8AB4F8}
   #guide-card .guide-off{display:block;margin-top:2px;font:inherit;font-size:12px;color:rgba(255,255,255,.5);background:none;border:none;padding:0;cursor:pointer}
   #guide-card .guide-off:hover{color:rgba(255,255,255,.8);text-decoration:underline}
-  .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--ink-2);border:1px solid rgba(31,32,36,.12);border-radius:8px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 Inter,system-ui,sans-serif}
+  .guide-strip{position:fixed;z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 72px);background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--ink-2);border:1px solid rgba(31,32,36,.12);border-radius:6px;box-shadow:0 2px 8px rgba(16,24,40,.08);padding:5px 6px 5px 12px;font:13px/1.4 var(--f-text)}
   .guide-strip b{color:var(--navy-deep);font-weight:600}
-  .guide-strip .guide-strip-go{position:relative;font:inherit;font-weight:500;color:#1A73E8;background:none;border:0;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap}
-  .guide-strip .guide-strip-go:hover{background:rgba(26,115,232,.08)}
-  .guide-strip .guide-x{position:relative;font:inherit;font-size:16px;line-height:1;color:#78716C;background:none;border:0;padding:2px 6px;border-radius:4px;cursor:pointer}
+  .guide-strip .guide-strip-go{position:relative;font:inherit;font-weight:500;color:var(--navy);background:none;border:0;padding:3px 6px;border-radius:3px;cursor:pointer;white-space:nowrap}
+  .guide-strip .guide-strip-go:hover{background:var(--navy-soft-col)}
+  .guide-strip .guide-x{position:relative;font:inherit;font-size:16px;line-height:1;color:var(--muted);background:none;border:0;padding:2px 6px;border-radius:3px;cursor:pointer}
   .guide-strip .guide-x:hover{background:rgba(31,32,36,.06)}
   /* 18 Oct 2026 (UI audit decision 18): on a touch screen the strip's two buttons tap at 44 px through halos, the glyphs and the
      strip's height unchanged — "Take the tour" (93 × 24) 44 tall; the × (23 × 20) 44 × 44, reaching 9 px into the strip's 10 px
@@ -1218,12 +1242,12 @@
      hid the start of a road card's title ("...an 2028"). While a popup is open the strip is hidden (at once, no script), and it comes back
      when the popup closes; a phone (under 768 px, where the strip sits under Layers and a card is a sheet) is unchanged. */
   @media (min-width:768px){body:has(.mapboxgl-popup) .guide-strip{display:none}}
-  .guide-dot{position:fixed;z-index:9002;width:10px;height:10px;border-radius:50%;background:#C2410C;border:0;padding:0;cursor:pointer;animation:guide-pulse 2s infinite}
-  @keyframes guide-pulse{0%{box-shadow:0 0 0 0 rgba(194,65,12,.45)}70%{box-shadow:0 0 0 8px rgba(194,65,12,0)}100%{box-shadow:0 0 0 0 rgba(194,65,12,0)}}
-  @media (prefers-reduced-motion:reduce){.guide-dot{animation:none;box-shadow:0 0 0 3px rgba(194,65,12,.25)}}
-  .guide-tip{position:fixed;z-index:9003;width:260px;pointer-events:none;background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:8px 11px;font:13px/1.45 Inter,system-ui,sans-serif}
+  .guide-dot{position:fixed;z-index:9002;width:10px;height:10px;border-radius:50%;background:#0B4EA2;border:0;padding:0;cursor:pointer;animation:guide-pulse 2s infinite}
+  @keyframes guide-pulse{0%{box-shadow:0 0 0 0 rgba(11,78,162,.45)}70%{box-shadow:0 0 0 8px rgba(11,78,162,0)}100%{box-shadow:0 0 0 0 rgba(11,78,162,0)}}
+  @media (prefers-reduced-motion:reduce){.guide-dot{animation:none;box-shadow:0 0 0 3px rgba(11,78,162,.25)}}
+  .guide-tip{position:fixed;z-index:9003;width:260px;pointer-events:none;background:rgba(32,33,36,.88);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:rgba(255,255,255,.86);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:8px 11px;font:13px/1.45 var(--f-text)}
   .guide-tip b{color:#fff;font-weight:600}
-            #demo-notice{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:30;background:#F1F5F9;color:#B91C1C;border:1px solid #DC2626;border-radius:999px;padding:4px 12px;font:700 10.5px/1.4 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;pointer-events:none;}
+            #demo-notice{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:30;background:#F1F5F9;color:#B91C1C;border:1px solid #DC2626;border-radius:6px;padding:4px 12px;font:700 10.5px/1.4 var(--f-text);letter-spacing:.06em;text-transform:uppercase;pointer-events:none;}
             /* 13 Oct 2026 (D45, Option A): light grey, red caps, a red rule and a red DEMO tag, as the app's demo bar */
             #demo-notice::before{content:"DEMO";content:"DEMO" / "";display:inline-block;margin-right:8px;padding:0 6px;border-radius:3px;background:#B91C1C;color:#FFFFFF;letter-spacing:.08em;}
 </style>
@@ -1288,7 +1312,7 @@
         <div id="area-district-rows" hidden></div>
         <div id="area-legend" hidden></div>
         <div class="area-legend-title area-sub">Highway authority</div>
-        <div class="control-item"><label><input type="checkbox" id="layer-areas-county" onchange="toggleAreaTier('county', this.checked)"> County boundary</label><span class="color-dot" style="background:#ffffff; border:2px dashed #1F2024; border-radius:2px;"></span></div>
+        <div class="control-item"><label><input type="checkbox" id="layer-areas-county" onchange="toggleAreaTier('county', this.checked)"> County boundary</label><span class="color-dot" style="background:#ffffff; border:2px dashed #1F2024; border-radius:3px;"></span></div>
         <div class="area-county-fig" id="area-county-fig"></div>
         <div class="area-note" id="area-notes"></div>
         <div class="ctl-head" style="margin-top:8px"><span class="area-legend-title">About these figures</span><button type="button" class="info-i" aria-expanded="false" aria-controls="info-council" onclick="toggleInfo(this)" title="About the council figures" aria-label="About the council figures"><span aria-hidden="true">i</span></button></div>
@@ -3169,7 +3193,7 @@
 
     function locationPopupHTML(props, svId) {
         const kind = canonicalLocType(props.node_type);
-        let h = `<div style='min-width: 180px;'><h3 style='margin:0 0 5px 0; color:#2563EB; border-bottom: 1px solid #eee; padding-bottom:4px;'>${props.name}</h3>` +
+        let h = `<div style='min-width: 180px;'><h3 style='margin:0 0 5px 0; color:var(--navy); border-bottom: 1px solid var(--line); padding-bottom:4px;'>${props.name}</h3>` +
                 `<p style='margin:4px 0;'><b>Type:</b> ${props.node_type}</p>`;
         if (kind === 'Compound' && props.ipt) h += `<p style='margin:4px 0;'><b>${TEAM}:</b> ${teamText(props.ipt)}</p>`;
         else if (kind === 'Quarry') h += `<p style='margin:4px 0;'><b>Material:</b> ${props.material || '—'}</p>`;
@@ -3200,11 +3224,11 @@
         // 31 Oct 2026 (task 4c PR 4): a site whose layout shows this month gets "Show the site layout" (no phase name)
         if (typeof publicLayoutSite === 'function' && publicLayoutSite(props.id)) {
             const sid = String(props.id).replace(/[^A-Za-z0-9_-]/g, '');
-            h += `<button onclick="showSiteLayout('${sid}')" style="margin-top:10px; width:100%; background:#fff; color:#2563EB; border:1px solid #2563EB; padding:7px; border-radius:4px; font-weight:bold; cursor:pointer;">Show the site layout</button>`;
+            h += `<button onclick="showSiteLayout('${sid}')" style="margin-top:10px; width:100%; background:var(--surface); color:var(--navy); border:1px solid var(--navy); padding:7px; border-radius:3px; font-weight:bold; cursor:pointer;">Show the site layout</button>`;
         }
         const safe = String(props.name || '').replace(/'/g, "\\'");
         // 29 Oct 2026 (task 3c): no route starts or ends at a holding area, so nothing to filter to
-        h += kind === 'Holding' ? '</div>' : `<button onclick="filterByNode('${safe}', '${kind}')" style="margin-top:10px; width:100%; background:#2563EB; color:#fff; border:none; padding:8px; border-radius:4px; font-weight:bold; cursor:pointer;">Filter Routes to this Location</button></div>`;
+        h += kind === 'Holding' ? '</div>' : `<button onclick="filterByNode('${safe}', '${kind}')" style="margin-top:10px; width:100%; background:var(--action); color:var(--action-fg); border:none; padding:8px; border-radius:3px; font-weight:bold; cursor:pointer;">Filter Routes to this Location</button></div>`;
         return h;
     }
 
@@ -4600,16 +4624,16 @@
                 new mapboxgl.Popup({ closeButton: true })
                     .setLngLat(e.lngLat)
                     .setHTML(
-                        `<div style="font:13px/1.45 system-ui,sans-serif;min-width:190px;">`
+                        `<div style="font:13px/1.45 var(--f-text);min-width:190px;">`
                         + `<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;">`
                         + `<span style="flex:0 0 14px;height:4px;background:${p.ipt_colour || '#64748B'};"></span>`
                         + `<b>${p.ipt || 'Unknown'}</b></div>`
-                        + `<div style="color:#475569;margin-bottom:5px;">${p.ipt_label || 'Unassigned'}</div>`
+                        + `<div style="color:var(--ink-2);margin-bottom:5px;">${p.ipt_label || 'Unassigned'}</div>`
                         + (wsCode
                             ? `<div><b>Work section:</b> ${wsCode} — ${wsName}</div>`
                             : `<div><b>Work section:</b> none — outside the mainline scope</div>`)
                         + (ws.length > 1
-                            ? `<div style="font-size:11px;color:#64748b;">also on this ground: `
+                            ? `<div style="font-size:11px;color:var(--muted);">also on this ground: `
                               + `${ws.filter(w => w !== wsCode).join(', ')}</div>`
                             : '')
                         + `<div><b>Track:</b> ${p.align_type || '–'}</div>`
@@ -4623,7 +4647,7 @@
                             : '')
                         + `<div><b>Chainage:</b> ${ch(p.chain_from_m)} – ${ch(p.chain_to_m)}</div>`
                         + (undOn
-                            ? `<div style="margin-top:5px;padding:4px 7px;border-left:3px solid ${(window.IPT_UNDERLAY || {}).colour || '#C4B5FD'};font-size:11.5px;color:#475569;">`
+                            ? `<div style="margin-top:5px;padding:4px 7px;border-left:3px solid ${(window.IPT_UNDERLAY || {}).colour || '#C4B5FD'};font-size:11.5px;color:var(--ink-2);">`
                               + `${(window.IPT_UNDERLAY || {}).note || ((window.IPT_UNDERLAY || {}).key + ' applies on this stretch (underlay).')}</div>`
                             : '')
                         + (provisional
@@ -4661,9 +4685,9 @@
                 new mapboxgl.Popup({ closeButton: true })
                     .setLngLat(e.lngLat)
                     .setHTML(
-                        `<div style="font:13px/1.45 system-ui,sans-serif;min-width:210px;">`
+                        `<div style="font:13px/1.45 var(--f-text);min-width:210px;">`
                         + `<b>Work section boundary</b>`
-                        + `<div style="color:#475569;margin:4px 0 6px;">${p.chain_txt || ''}</div>`
+                        + `<div style="color:var(--ink-2);margin:4px 0 6px;">${p.chain_txt || ''}</div>`
                         + `<div><b>From:</b> ${nameOf(p.from_ws)}</div>`
                         + `<div><b>To:</b> ${nameOf(p.to_ws)}</div>`
                         + (gone
@@ -5941,7 +5965,7 @@
         const where = p.road_name || (p.road_nr ? 'Road ' + p.road_nr : '');
         const km = (p.km_from != null && p.km_to != null && (p.km_from || p.km_to))
             ? ' · km ' + p.km_from + '–' + p.km_to : '';
-        let body = '<div style="font-size:11.5px;color:#6b7280;">' + (p._label || '') +
+        let body = '<div style="font-size:11.5px;color:var(--muted);">' + (p._label || '') +
                    (where ? ' · ' + where : '') + km + '</div>';
 
         if(p.bridge_name) body += '<div style="font-size:12px;margin-top:6px;"><b>' + p.bridge_name + '</b></div>';
@@ -5955,16 +5979,16 @@
             const det = [p.effect, p.cause].filter(Boolean).join(' · ');
             if(det) body += '<div style="font-size:11.5px;margin-top:5px;color:' + colour + ';font-weight:600;">' + det + '</div>';
         }
-        if(p.extra_info) body += '<div style="font-size:11px;margin-top:6px;color:#374151;">' + p.extra_info + '</div>';
-        if(p.detour_comment) body += '<div style="font-size:11px;margin-top:4px;color:#374151;"><b>Diversion:</b> ' + p.detour_comment + '</div>';
-        if(p.construction_year) body += '<div style="font-size:11px;color:#6b7280;margin-top:4px;">Built ' + p.construction_year + '</div>';
+        if(p.extra_info) body += '<div style="font-size:11px;margin-top:6px;color:var(--ink-2);">' + p.extra_info + '</div>';
+        if(p.detour_comment) body += '<div style="font-size:11px;margin-top:4px;color:var(--ink-2);"><b>Diversion:</b> ' + p.detour_comment + '</div>';
+        if(p.construction_year) body += '<div style="font-size:11px;color:var(--muted);margin-top:4px;">Built ' + p.construction_year + '</div>';
         if(p._from || p._to){
-            body += '<div style="font-size:11px;color:#6b7280;margin-top:5px;">' +
+            body += '<div style="font-size:11px;color:var(--muted);margin-top:5px;">' +
                     (p._from || 'open') + ' → ' + (p._to || 'open') + '</div>';
         }
         const phone = p.traffic_ctrl_contact_phone || p.contractor_contact_phone;
         const org = p.traffic_ctrl_organization || p.contractor_organization;
-        if(org || phone) body += '<div style="font-size:11px;color:#6b7280;margin-top:4px;">' +
+        if(org || phone) body += '<div style="font-size:11px;color:var(--muted);margin-top:4px;">' +
             (org || '') + (phone ? ' · ' + phone : '') + '</div>';
         // attribution names the provider the API named — never a hard-coded authority
         const pvd = RESTR.provider || {};
@@ -6017,7 +6041,7 @@
         // 'false' is a truthy string — compare against the string, not the value
         const active = !(p.active === false || p.active === 'false');
         let h = `<div style='min-width:170px;'>` +
-                `<h3 style='margin:0 0 5px 0;color:#2563EB;border-bottom:1px solid #eee;padding-bottom:4px;'>` +
+                `<h3 style='margin:0 0 5px 0;color:var(--navy);border-bottom:1px solid var(--line);padding-bottom:4px;'>` +
                 `${p.name}</h3>` +
                 `<p style='margin:4px 0;'><b>Site:</b> ${p.location_name || p.location_id}</p>` +
                 `<p style='margin:4px 0;'><b>Direction:</b> ${dir}</p>`;
@@ -6044,7 +6068,7 @@
         const when = (p.starts_on || p.ends_on)
             ? (p.starts_on || 'open') + ' → ' + (p.ends_on || 'open')
             : 'no dates set';
-        let body = '<div style="font-size:11.5px;color:#6b7280;">Temporary haul road · ' + when + '</div>';
+        let body = '<div style="font-size:11.5px;color:var(--muted);">Temporary haul road · ' + when + '</div>';
         if (km !== null) body += '<div style="font-size:11.5px;margin-top:6px;"><b>' + fmtDist(km, 2) + ' ' + DU() + '</b> as drawn</div>';
         body += speed
             ? '<div style="font-size:11.5px;margin-top:2px;">Assigned speed <b>' + Math.round(distU(speed)) + ' ' + SPD() + '</b>'
@@ -6054,11 +6078,11 @@
               + 'Assigned, not measured: only as good as the drawn line.</div>'
             : '<div style="font-size:11.5px;margin-top:2px;color:#92400e;">No speed assigned — this '
               + 'stretch adds distance but no time to any cycle.</div>';
-        body += '<div style="font-size:11.5px;margin-top:6px;color:#6b7280;">Used by '
+        body += '<div style="font-size:11.5px;margin-top:6px;color:var(--muted);">Used by '
               + (Number(p.routes_attached) || 0) + ' route(s)</div>';
-        if (p.note) body += '<div style="font-size:11px;margin-top:6px;color:#374151;">' + p.note + '</div>';
+        if (p.note) body += '<div style="font-size:11px;margin-top:6px;color:var(--ink-2);">' + p.note + '</div>';
         return '<div style="min-width:220px;">'
-            + '<h4 style="margin:0 0 4px;color:' + CONFIG.COLORS.brandDark + ';font-size:13px;">'
+            + '<h4 style="margin:0 0 4px;color:var(--ink);font-size:13px;">'
             + (p.name || p.zone_id) + '</h4>' + body + '</div>';
     }
 
@@ -6069,13 +6093,13 @@
             ? (p.starts_on || 'open') + ' → ' + (p.ends_on || 'open')
             : 'no dates set';
         return '<div style="min-width:210px;">' +
-            '<h4 style="margin:0 0 4px;color:' + CONFIG.COLORS.brandDark + ';font-size:13px;">' + (p.name || p.id) + '</h4>' +
-            '<div style="font-size:11.5px;color:#6b7280;">' + (kindLabels[p.kind] || p.kind) + ' · ' + when + '</div>' +
+            '<h4 style="margin:0 0 4px;color:var(--ink);font-size:13px;">' + (p.name || p.id) + '</h4>' +
+            '<div style="font-size:11.5px;color:var(--muted);">' + (kindLabels[p.kind] || p.kind) + ' · ' + when + '</div>' +
             '<div style="font-size:11.5px;margin-top:6px;color:' +
-                (p.affects_routing === true || p.affects_routing === 'true' ? '#1F2024' : '#6b7280') + ';font-weight:600;">' +   // ink, not red: red is kept for a clash or a cap breach
+                (p.affects_routing === true || p.affects_routing === 'true' ? '#1F2024' : 'var(--muted)') + ';font-weight:600;">' +   // ink, not red: red is kept for a clash or a cap breach
                 (p.affects_routing === true || p.affects_routing === 'true'
                     ? 'Routes avoid this area' : 'For information only: routes not changed') + '</div>' +
-            (p.note ? '<div style="font-size:11.5px;margin-top:6px;color:#374151;">' + p.note + '</div>' : '') +
+            (p.note ? '<div style="font-size:11.5px;margin-top:6px;color:var(--ink-2);">' + p.note + '</div>' : '') +
             '</div>';
     }
 
@@ -6586,16 +6610,16 @@
     // ===== end of lorry limits =====
 </script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         /* Theme refinements — base minimalist theme lives in the <head> block */
-        body { font-family:'Inter',system-ui,sans-serif !important; }
+        body { font-family:var(--f-text) !important; }
         .sidebar { box-shadow:none !important; border-right:1px solid var(--line) !important; padding:20px 18px 24px !important; background:var(--surface) !important; }
         .rb-title { border:none !important; text-transform:none !important; }
         .control-group, .fc-box { background:transparent !important; border:none !important; box-shadow:none !important; padding:0 !important; margin:0 !important; }
-        .mapboxgl-popup-content { min-width:210px !important; max-width:360px !important; padding:13px 14px !important; border-radius:10px !important; box-shadow:0 8px 28px rgba(16,24,40,.14) !important; }
-        .mapboxgl-popup-close-button { font-size:18px; color:#94a3b8; padding:4px 9px; }
+        .mapboxgl-popup-content { min-width:210px !important; max-width:360px !important; padding:13px 14px !important; border-radius:6px !important; box-shadow:0 8px 28px rgba(16,24,40,.14) !important; }
+        .mapboxgl-popup-close-button { font-size:18px; color:var(--ctl-edge); padding:4px 9px; }
         .mapboxgl-popup-close-button:hover { color:var(--accent); background:transparent !important; }
     </style>
 
@@ -6786,7 +6810,7 @@
                 if (sd) { const d = sd._data; d.features.forEach(f => { if (f.properties) f.properties.is_forecast = false; }); sd.setData(d); }
                 applyFilters();            // §9: and the cards drop back to the network count
                 status.innerHTML = "";
-                status.style.color = "#6b7280";
+                status.style.color = "var(--muted)";
                 if (typeof refreshMapModes === 'function') refreshMapModes();   // 12 Oct: Road load / Carbon follow
                 return;
             }
@@ -8159,24 +8183,24 @@
         const rows = shares.map(sh => {
             const info = (typeof ROUTEINFO !== 'undefined' && ROUTEINFO[(sh.route_id || '').toString().trim().toLowerCase()]) || {};
             const mv = Number(sh.movements_per_day) || 0;
-            const io = PV() === 2 && sh.in_per_day != null ? '<div style="color:#6b7280;">' + rlN(Number(sh.in_per_day)) + ' in, ' + rlN(Number(sh.out_per_day)) + ' out</div>' : '';
+            const io = PV() === 2 && sh.in_per_day != null ? '<div style="color:var(--muted);">' + rlN(Number(sh.in_per_day)) + ' in, ' + rlN(Number(sh.out_per_day)) + ' out</div>' : '';
             return '<tr><td style="padding:2px 8px 2px 0;font-weight:600;">' + rlEsc(sh.route_id) + '</td>' +
                 '<td style="padding:2px 8px 2px 0;">' + rlEsc(info.origin || '—') + ' → ' + rlEsc(info.dest || '—') +
-                '<div style="color:#6b7280;">' + rlEsc(teamText((sh.teams || []).join(', ')) || '—') + '</div></td>' +
+                '<div style="color:var(--muted);">' + rlEsc(teamText((sh.teams || []).join(', ')) || '—') + '</div></td>' +
                 '<td style="padding:2px 0;text-align:right;font-variant-numeric:tabular-nums;">' + (mv > 0 && mv < 1 ? 'under 1' : Math.round(mv)) + io +
-                (co2On ? '<div style="color:#6b7280;">' + (sh.co2_t == null ? 'no figure' : fmtTonnes(Number(sh.co2_t))) + '</div>' : '') + '</td></tr>';
+                (co2On ? '<div style="color:var(--muted);">' + (sh.co2_t == null ? 'no figure' : fmtTonnes(Number(sh.co2_t))) + '</div>' : '') + '</td></tr>';
         }).join('');
         return '<div style="min-width:240px;max-width:340px;font-size:14px;">' +
-            '<h4 style="margin:0 0 4px;color:' + CONFIG.COLORS.brandDark + ';font-size:14px;">Shared road section · ' + rlEsc(monthLabel(m)) + '</h4>' +
+            '<h4 style="margin:0 0 4px;color:var(--ink);font-size:14px;">Shared road section · ' + rlEsc(monthLabel(m)) + '</h4>' +
             '<div style="margin-bottom:6px;">' + cwN(f ? f.properties.rl_mv_text : '0') +
             (f && PV() === 2 && f.properties.rl_in_text != null ? ' (' + f.properties.rl_in_text + ' in, ' + f.properties.rl_out_text + ' out)' : '') +
             ' · ' + (f ? f.properties.rl_routes_text : '') +
             (co2On && f ? ' · ' + rlEsc(f.properties.rl_co2_text) : '') + '</div>' +
-            '<table style="border-collapse:collapse;width:100%;font-size:14px;"><thead><tr style="color:#6b7280;text-align:left;">' +
+            '<table style="border-collapse:collapse;width:100%;font-size:14px;"><thead><tr style="color:var(--muted);text-align:left;">' +
             '<th style="font-weight:500;">Route</th><th style="font-weight:500;">From → to · team</th><th style="font-weight:500;text-align:right;">' + CW().col + '</th></tr></thead>' +
             '<tbody>' + rows + '</tbody></table>' +
-            (left.length ? '<div style="color:#6b7280;margin-top:6px;">Also on this section, outside the filters: ' + left.map(rlEsc).join(', ') + '.</div>' : '') +
-            '<div style="color:#6b7280;margin-top:6px;">' + (PV() === 2 ? 'Loaded lorries in, empty ones out, each where it runs. ' : 'Each lorry counted once. ') +
+            (left.length ? '<div style="color:var(--muted);margin-top:6px;">Also on this section, outside the filters: ' + left.map(rlEsc).join(', ') + '.</div>' : '') +
+            '<div style="color:var(--muted);margin-top:6px;">' + (PV() === 2 ? 'Loaded lorries in, empty ones out, each where it runs. ' : 'Each lorry counted once. ') +
             (Number(run.length_km) > 0 ? 'Section ' + fmtDist(Number(run.length_km), 1) + ' ' + DU() + '. ' : '') + 'Approved plan only.' +
             (co2On && RL.cache[m] && RL.cache[m].carbon && RL.cache[m].carbon.stamp ? ' ' + rlEsc(RL.cache[m].carbon.stamp) + '.' : '') + '</div></div>';
     }
@@ -9716,8 +9740,8 @@
                 const info=ROUTEINFO[(rid||'').toString().trim().toLowerCase()]||{};
                 const safe=(rid||'').toString().replace(/\\/g,'\\\\').replace(/'/g,"\\'");
                 const html='<div style="min-width:210px;">'+
-                    '<h4 style="margin:0 0 4px;color:'+CONFIG.COLORS.brandDark+';font-size:13px;">'+rid+'</h4>'+
-                    '<div style="font-size:11.5px;color:#6b7280;margin-bottom:8px;">'+(info.origin||'—')+' → '+(info.dest||'—')+(info.distance_km?(' · '+fmtDist(info.distance_km, 1)+' '+DU()):'')+'</div>'+
+                    '<h4 style="margin:0 0 4px;color:var(--ink);font-size:13px;">'+rid+'</h4>'+
+                    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">'+(info.origin||'—')+' → '+(info.dest||'—')+(info.distance_km?(' · '+fmtDist(info.distance_km, 1)+' '+DU()):'')+'</div>'+
                     '<button class="rb-popup-btn" onclick="openRouteAnalysis(\''+safe+'\')">Full route analysis →</button></div>';
                 new mapboxgl.Popup({offset:10}).setLngLat(e.lngLat).setHTML(html).addTo(map);
             });
@@ -10243,7 +10267,7 @@
         if (!t) {
             t = document.createElement('div'); t.id = 'copy-toast'; t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite');
             t.style.cssText = 'position:fixed;left:50%;top:calc(var(--notice-h, 0px) + 70px);transform:translateX(-50%);z-index:41;background:#1F2024;color:#fff;'
-                + 'border-radius:8px;padding:8px 14px;font:500 14px Inter,system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.2);pointer-events:none;';
+                + 'border-radius:6px;padding:8px 14px;font:500 14px var(--f-text);box-shadow:0 4px 14px rgba(0,0,0,.2);pointer-events:none;';
             document.body.appendChild(t);
         }
         t.textContent = text; t.hidden = false;
@@ -10550,10 +10574,10 @@
         const d = (p.dist_m === null || p.dist_m === undefined || p.dist_m === 'null') ? '' :
             (Number(p.dist_m) < 1 ? 'On or across a route or a site' : `${Math.round(Number(p.dist_m))} m from the nearest route or site`);
         const sub = p.name ? k.label + (p.detail ? ' · ' + p.detail : '') : (p.detail || '');
-        const html = `<div style="font:14px system-ui;max-width:260px"><b>${escHtml(p.name || k.label)}</b>` +
+        const html = `<div style="font:14px var(--f-text);max-width:260px"><b>${escHtml(p.name || k.label)}</b>` +
             (sub ? `<div>${escHtml(sub)}</div>` : '') +
-            (d ? `<div style="color:#64748B">${escHtml(d)}</div>` : '') +
-            `<div style="color:#64748B">Source: ${escHtml(p.source || '')}</div></div>`;
+            (d ? `<div style="color:var(--muted)">${escHtml(d)}</div>` : '') +
+            `<div style="color:var(--muted)">Source: ${escHtml(p.source || '')}</div></div>`;
         if (COMM.popup) COMM.popup.remove();
         COMM.popup = new mapboxgl.Popup({ closeButton: true, maxWidth: '280px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
     }
@@ -10662,12 +10686,12 @@
         const where = [road, (p.junction && p.junction !== 'null') ? p.junction : null].filter(Boolean).join(', ');
         const users = arr(p.vru_words);
         const d = (p.dist_m === null || p.dist_m === undefined || p.dist_m === 'null') ? '' : `${Math.round(Number(p.dist_m))} m from the nearest route or site`;
-        const html = `<div style="font:14px system-ui;max-width:270px"><b>${escHtml(p.severity_word || '')} injury collision</b>` +
+        const html = `<div style="font:14px var(--f-text);max-width:270px"><b>${escHtml(p.severity_word || '')} injury collision</b>` +
             `<div>${escHtml(month)}</div>` + (where ? `<div>${escHtml(where)}</div>` : '') +
             (users.length ? `<div>Hurt: ${escHtml(users.join(', '))}</div>` : '') +
             (String(p.goods) === 'true' ? '<div>A goods vehicle over 3.5 t was involved</div>' : '') +
-            (d ? `<div style="color:#64748B">${escHtml(d)}</div>` : '') +
-            '<div style="color:#64748B">Police-reported (DfT road safety data). Evidence for a route risk assessment, not the assessment.</div></div>';
+            (d ? `<div style="color:var(--muted)">${escHtml(d)}</div>` : '') +
+            '<div style="color:var(--muted)">Police-reported (DfT road safety data). Evidence for a route risk assessment, not the assessment.</div></div>';
         if (COLL.popup) COLL.popup.remove();
         COLL.popup = new mapboxgl.Popup({ closeButton: true, maxWidth: '290px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
     }
@@ -10789,21 +10813,21 @@
         const f = e.features && e.features[0]; if (!f) return;
         const p = f.properties || {};
         const when = abnWhen(p.date_from, p.date_to, p.time_band);
-        const html = `<div style="font:14px system-ui;max-width:300px"><b>Abnormal load · ${escHtml(p.name || '')}</b><br>` +
+        const html = `<div style="font:14px var(--f-text);max-width:300px"><b>Abnormal load · ${escHtml(p.name || '')}</b><br>` +
             `${escHtml(p.team_name || '')} · ${escHtml(when)} · ${p.movements || ''} movement${p.movements === 1 ? '' : 's'}${p.escorted === true || p.escorted === 'true' ? ' · escorted' : ''}<br>` +
             `${escHtml(p.class_word || '')}${p.leg === 'return' ? ' · the return leg' : ''}<br>` +
-            `<span style="color:#475569">${escHtml(p.size || '')}${p.roads ? ' · roads: ' + escHtml(p.roads) : ''}</span><br>` +
-            `<span style="color:#475569">${escHtml(p.indicative || '')} ${p.candidates ? p.candidates + ' potential pinch point' + (p.candidates === 1 ? '' : 's') + ', Grey — to survey.' : ''}</span></div>`;
+            `<span style="color:var(--ink-2)">${escHtml(p.size || '')}${p.roads ? ' · roads: ' + escHtml(p.roads) : ''}</span><br>` +
+            `<span style="color:var(--ink-2)">${escHtml(p.indicative || '')} ${p.candidates ? p.candidates + ' potential pinch point' + (p.candidates === 1 ? '' : 's') + ', Grey — to survey.' : ''}</span></div>`;
         new mapboxgl.Popup({ maxWidth: '320px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
     }
     function abnormalPointPopup(e) {
         const f = e.features && e.features[0]; if (!f) return;
         const p = f.properties || {};
-        const html = `<div style="font:14px system-ui;max-width:300px"><b>${escHtml(p.pinch_id || '')} · ${escHtml(p.words || '')}</b><br>` +
+        const html = `<div style="font:14px var(--f-text);max-width:300px"><b>${escHtml(p.pinch_id || '')} · ${escHtml(p.words || '')}</b><br>` +
             `${escHtml(p.movement || '')}${p.detail ? ' · ' + escHtml(p.detail) : ''}<br>` +
             // 28 Oct 2026 (the user: no supplier names on a screen; mockup notes\map-abnormal-words-mockup-1028): the source in the
             // page's own words (its From column); the suppliers are named in the technical guide, T1
-            `<span style="color:#475569">${escHtml(p.grade_word || 'Grey — to survey')} · from ${p.source === 'line' ? 'the line' : p.source === 'limits' ? 'a signed limit' : p.source === 'typed' ? 'the planner' : p.source === 'osm' ? 'the map' : 'the route’s directions'}; the route survey decides.</span></div>`;
+            `<span style="color:var(--ink-2)">${escHtml(p.grade_word || 'Grey — to survey')} · from ${p.source === 'line' ? 'the line' : p.source === 'limits' ? 'a signed limit' : p.source === 'typed' ? 'the planner' : p.source === 'osm' ? 'the map' : 'the route’s directions'}; the route survey decides.</span></div>`;
         new mapboxgl.Popup({ maxWidth: '320px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
     }
     function renderAbnormalPanel() {
@@ -11087,10 +11111,10 @@
     function abnormalPublicPopup(e) {
         const f = e.features && e.features[0]; if (!f) return;
         const p = f.properties || {};
-        const html = `<div style="font:14px system-ui;max-width:300px"><b>Abnormal load</b><br>` +
+        const html = `<div style="font:14px var(--f-text);max-width:300px"><b>Abnormal load</b><br>` +
             `${escHtml(abnWhen(p.date_from, p.date_to, p.time_band))} · ${p.movements || ''} movement${p.movements === 1 ? '' : 's'}${p.escorted === true || p.escorted === 'true' ? ' · escorted' : ''}${p.leg === 'return' ? ' · the return leg' : ''}<br>` +
-            `${p.roads ? '<span style="color:#475569">Roads: ' + escHtml(p.roads) + '</span><br>' : ''}` +
-            `<span style="color:#475569">${escHtml(p.public_words || 'Indicative route; the agreed route may differ.')}</span></div>`;
+            `${p.roads ? '<span style="color:var(--ink-2)">Roads: ' + escHtml(p.roads) + '</span><br>' : ''}` +
+            `<span style="color:var(--ink-2)">${escHtml(p.public_words || 'Indicative route; the agreed route may differ.')}</span></div>`;
         new mapboxgl.Popup({ maxWidth: '320px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
     }
     function renderAbnormalPublicPanel() {
@@ -11226,7 +11250,7 @@
         const L = ((TLIM.data && TLIM.data.limits) || []).find(x => String(x.id) === String((f.properties || {}).id)); if (!L) return;
         const m = TLIM.month, r = m ? (L.months || {})[String(m)] : null, u = tlimUnit(L);
         let body;
-        if (!m) body = `Limit ${tlimN(L.limit.value)} lorry ${u} a day.<br><span style="color:#475569">Pick a month to see the plan against it.</span>`;
+        if (!m) body = `Limit ${tlimN(L.limit.value)} lorry ${u} a day.<br><span style="color:var(--ink-2)">Pick a month to see the plan against it.</span>`;
         else if (!r) body = `Not in force in ${monthLabel(m)}.`;
         else {
             const col = TLIM_COL[r.state] || TLIM_COL.none;
@@ -11236,13 +11260,13 @@
                 return `<tr><td style="padding:1px 6px 1px 0">${escHtml(x.route_id)}</td><td style="padding:1px 6px 1px 0">${escHtml((p.origin || '') + ' → ' + (p.dest || ''))}</td><td style="text-align:right">${tlimN(x.a_day)}</td></tr>`;
             }).join('');
             body = `<span style="color:${col};font-weight:700">${tlimV(r.value, L.limit.value)} lorry ${u} a day</span> in ${monthLabel(m)} · limit ${tlimN(L.limit.value)}<br>` +
-                (u === 'movements' ? `<span style="color:#475569">${tlimN(r.in_per_day)} in, ${tlimN(r.out_per_day)} out · in and out counted separately · daily average</span><br>`
-                                   : `<span style="color:#475569">daily average</span><br>`) +
-                (L.limit.basis === 'busiest_day' ? '<span style="color:#475569">The limit is for the busiest day; this is the month\'s daily average.</span><br>' : '') +
+                (u === 'movements' ? `<span style="color:var(--ink-2)">${tlimN(r.in_per_day)} in, ${tlimN(r.out_per_day)} out · in and out counted separately · daily average</span><br>`
+                                   : `<span style="color:var(--ink-2)">daily average</span><br>`) +
+                (L.limit.basis === 'busiest_day' ? '<span style="color:var(--ink-2)">The limit is for the busiest day; this is the month\'s daily average.</span><br>' : '') +
                 (rows ? `<table style="margin-top:4px;font-size:13px;border-collapse:collapse"><thead><tr><th style="text-align:left">Route</th><th style="text-align:left">From → to</th><th style="text-align:right">A day</th></tr></thead><tbody>${rows}</tbody></table>` : '');
         }
-        const html = `<div style="font:14px system-ui;max-width:320px"><b>Traffic limit · ${escHtml(L.name)}</b><br>${body}` +
-            `<div style="color:#475569;margin-top:4px">This scheme's lorries only. Approved plan.</div></div>`;
+        const html = `<div style="font:14px var(--f-text);max-width:320px"><b>Traffic limit · ${escHtml(L.name)}</b><br>${body}` +
+            `<div style="color:var(--ink-2);margin-top:4px">This scheme's lorries only. Approved plan.</div></div>`;
         new mapboxgl.Popup({ maxWidth: '340px' }).setLngLat(e.lngLat).setHTML(html).addTo(map);
     }
     function loadTrafficLimits() {
@@ -12295,7 +12319,7 @@
         if (!lngLat || !isFinite(lngLat.lng) || !isFinite(lngLat.lat)) return;
         CN.pin = { lng: Math.round(lngLat.lng * 1e6) / 1e6, lat: Math.round(lngLat.lat * 1e6) / 1e6, centre: !!centre };
         try {
-            if (!CN.marker && typeof mapboxgl !== 'undefined' && mapboxgl.Marker) CN.marker = new mapboxgl.Marker({ color: '#C2410C' });
+            if (!CN.marker && typeof mapboxgl !== 'undefined' && mapboxgl.Marker) CN.marker = new mapboxgl.Marker({ color: '#0B4EA2' });
             if (CN.marker) CN.marker.setLngLat([CN.pin.lng, CN.pin.lat]).addTo(map);
         } catch (e) {}
         concernPinWords();

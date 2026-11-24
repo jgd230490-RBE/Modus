@@ -67,9 +67,10 @@ const fnSrc = (re) => (re.exec(html) || [""])[0];
      html.includes("const dr = document.getElementById('route-drawer'); if (drawerTab === 'detail' && dr && dr.classList.contains('open') && typeof openForecastDetail === 'function') openForecastDetail();"));
   // REVERSED 12 Nov 2026 (claude/ui-map-forecast-detail-1111, option A2 "All routes"; John's "Yes, option A"): the new table's own tint
   // (solid colours: its first column and its headings stay put, and a see-through tint would show the rows under them)
+  // NARROWED 24 Nov 2026 (the own look, B2): the sign blue (Dark: #8AB4F8) and its tints in place of the stock blues
   ok("A: the tint has a light and a Dark look (the cells that stay put are solid, so the tint is too)",
-     html.includes("table.ar-table .ar-now, table.ar-table tr.ar-picked th, table.ar-table tr.ar-picked td{ background:#EFF6FF; }")
-     && html.includes('html[data-look="dark"] table.ar-table .ar-now, html[data-look="dark"] table.ar-table tr.ar-picked th, html[data-look="dark"] table.ar-table tr.ar-picked td{ background:#202F50; }'));
+     html.includes("table.ar-table .ar-now, table.ar-table tr.ar-picked th, table.ar-table tr.ar-picked td{ background:#F0F4F9; }")
+     && html.includes('html[data-look="dark"] table.ar-table .ar-now, html[data-look="dark"] table.ar-table tr.ar-picked th, html[data-look="dark"] table.ar-table tr.ar-picked td{ background:#2C323D; }'));
 
   // ---------- R1: the road card's row buttons ----------
   const pick = fnSrc(/function secselPickRow\(rid, kind\) \{[\s\S]*?\n    \}/);
@@ -125,10 +126,10 @@ const fnSrc = (re) => (re.exec(html) || [""])[0];
      && html.includes("SECSEL.area = box; SECSEL.areaPick = null;"));
   ok("⭐ R1: the row button is 44 px tall at least, fills its cell, and has a visible keyboard focus",
      /\.secsel-rid-btn\{[^}]*min-width:44px; min-height:44px;/.test(html) && /table\.secsel-table td\.secsel-rid\{ padding:0; \}/.test(html)
-     && /\.secsel-rid-btn:focus-visible\{ outline:2px solid #1D4ED8;/.test(html)
-     && html.includes('html[data-look="dark"] .secsel-rid-btn:focus-visible{ outline-color:#8FB3F5; }'));
+     && /\.secsel-rid-btn:focus-visible\{ outline:2px solid var\(--navy\);/.test(html)   // NARROWED 24 Nov 2026 (own look, B2): the sign blue
+     && html.includes('html[data-look="dark"] .secsel-rid-btn:focus-visible{ outline-color:#8AB4F8; }'));
   ok("R1: the phone's sheet draws the same card (roadCardHTML) and the same button (its onclick is in the HTML, so the sheet needs nothing extra); Dark: the tint is the existing one",
-     html.includes("box.innerHTML = sc === 'road' ? roadCardHTML() +") && html.includes('html[data-look="dark"] table.secsel-table tr.secsel-clicked td{ background:rgba(37,99,235,.22); }'));
+     html.includes("box.innerHTML = sc === 'road' ? roadCardHTML() +") && html.includes('html[data-look="dark"] table.secsel-table tr.secsel-clicked td{ background:var(--navy-soft-col); }'));   // NARROWED 24 Nov 2026 (own look, B2)
   ok("⭐ A + R1: technical T1 says what the tab and the row buttons do, and that the card stays open",
      guide.includes('id="t1-pick-route"') && guide.includes("<code>secselPickRow</code>") && guide.includes("<code>openForecastDetail</code>") && guide.includes("fc-picked") && guide.includes("stays open"));
   for (const f of fail) console.log("  FAIL: " + f);

@@ -210,13 +210,14 @@ const namesOf = (rid) => ({ rid, from: rid === "R050" ? "Tilton Viaduct site" : 
   ok("⭐ in movements a day (the view it opens on) the route's name has the room of the longest pair in the demo (360 px) and the material its own (200 px); in tonnes, whose figures are wider, both give way with their full words in a tip",
      css(".ar-name").includes("max-width:360px;") && css("table.ar-table .ar-l").includes("max-width:200px;") && css("table.ar-table.ar-t .ar-name").includes("max-width:172px;")
      && html.includes("<span class=\"ar-name\" title=\"' + where + '\">") && html.includes("'<td class=\"ar-l\" title=\"' + escHtml(r.materials.join(', ')) + '\">'"));
+  // NARROWED 24 Nov 2026 (the own look, B2): the sign blue (Dark: #8AB4F8) and its tints in place of the stock blues
   ok("⭐ nothing in the table is under 12 px; every button in it shows the keyboard's focus; the arrows are drawn by CSS on named buttons",
      !(html.slice(html.indexOf("        #route-drawer .drawer-head{"), html.indexOf("        /* a laptop-height window")).match(/font-size:(\d+(\.\d+)?)px/g) || []).some(x => parseFloat(x.split(":")[1]) < 12)
-     && html.includes(".ar-h:focus-visible, .ar-rid:focus-visible, .ar-mat:focus-visible, a.ar-dl:focus-visible{ outline:2px solid #1D4ED8; outline-offset:-2px; }")
+     && html.includes(".ar-h:focus-visible, .ar-rid:focus-visible, .ar-mat:focus-visible, a.ar-dl:focus-visible{ outline:2px solid var(--navy); outline-offset:-2px; }")
      && html.includes('.ar-prev::before{ content:"\\25C0"; } .ar-next::before{ content:"\\25B6"; }'));
   ok("⭐ Dark (the map inside the app): the tinted month, the picked row, the totals' month, the route numbers and the year each have a Dark rule, solid like the light ones",
-     ['html[data-look="dark"] table.ar-table .ar-now, html[data-look="dark"] table.ar-table tr.ar-picked th, html[data-look="dark"] table.ar-table tr.ar-picked td{ background:#202F50; }',
-      'html[data-look="dark"] table.ar-table tfoot .ar-now{', 'html[data-look="dark"] th.ar-now .ar-h, html[data-look="dark"] .ar-rid{ color:#8FB3F5; }', 'html[data-look="dark"] .ar-yr,'].every(x => html.includes(x)));
+     ['html[data-look="dark"] table.ar-table .ar-now, html[data-look="dark"] table.ar-table tr.ar-picked th, html[data-look="dark"] table.ar-table tr.ar-picked td{ background:#2C323D; }',
+      'html[data-look="dark"] table.ar-table tfoot .ar-now{', 'html[data-look="dark"] th.ar-now .ar-h, html[data-look="dark"] .ar-rid{ color:#8AB4F8; }', 'html[data-look="dark"] .ar-yr,'].every(x => html.includes(x)));
   const words = t => t.replace(/’/g, "'").trim().split(/\s+/).filter(Boolean).length;
   ok("⭐ the table's 'i' is 30 words or fewer in either unit, uses the organisation's own counting sentence, and its guide link shows to staff only",
      html.includes("words.textContent = 'Approved plan, a year at a time. ' + CW().note + ' A route’s number shows it on the map.';")

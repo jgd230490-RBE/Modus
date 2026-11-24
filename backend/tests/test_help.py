@@ -96,7 +96,7 @@ ok("says 'stockpile'", "stockpile" in text.lower())
 ok("never a bare 'pile' (standing wording rule)", not re.search(r"(?<![a-z])piles?(?![a-z])", text, re.I))
 ok("no internal names leak into the user guide", not re.search(r"forecast_days|route_geometry|TENANTED_TABLES|_check_admin", text))
 urls = re.findall(r"https?://[^\s\"'<>]+", src)
-ok("external assets: only the Inter font (%d URLs)" % len(urls), urls and all(u.startswith("https://fonts.googleapis.com") for u in urls))
+ok("external assets: only the Google fonts, Sora and IBM Plex Sans since 24 Nov 2026 (%d URLs)" % len(urls), urls and all(u.startswith("https://fonts.googleapis.com") for u in urls))
 # 2026-09-14: the guide gained JavaScript — a role switcher and the troubleshooting
 # picker. The old assertion was "no <script> at all"; it is NARROWED, not dropped, because
 # what it was really protecting is that this page pulls in nothing and calls nothing.
@@ -879,11 +879,14 @@ ok("#17 ...the figure CSS keeps height:auto beside max-width:100%, so a narrowed
 # on a phone (nowrap first columns, long paths): each is a named region with tabindex 0 and a ring; the two whose columns wrap are plain.
 _tg2 = open(TECH, encoding="utf-8").read()
 ok("\U0001f534 #15 the technical guide's <pre> blocks wrap (pre-wrap, overflow-wrap anywhere) at every width, so none scrolls sideways",
-   "pre{background:#F5F7FA;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;white-space:pre-wrap;"
+   # NARROWED 24 Nov 2026 (the own look, claude/own-look-pages): the box is the neutral panel grey and the one 6 px corner
+   "pre{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;overflow:auto;white-space:pre-wrap;"
    "overflow-wrap:anywhere;font:12.5px/1.45 Consolas,ui-monospace,monospace}" in _tg2)
 ok("\U0001f534 27 Oct 2026 (audit #44): T2 names no hyphenated code token that broke over two lines on a phone; inline <code> keeps its plain rule "
    "(an overflow-wrap:anywhere on it broke five more tokens inside the tables' cells at 390 px — audit run 214459)",
-   "padding:1px 4px;border-radius:4px}" in _tg2 and "border-radius:4px;overflow-wrap:anywhere}" not in _tg2
+   # NARROWED 24 Nov 2026 (the own look): inline code is a small inner piece, so its corner is 3 px
+   "padding:1px 4px;border-radius:3px}" in _tg2 and "border-radius:4px;overflow-wrap:anywhere}" not in _tg2
+   and "border-radius:3px;overflow-wrap:anywhere}" not in _tg2
    and "details.row-menu" not in _tg2 and "grown from the Forecasts page's menu" in _tg2)
 _tgr = re.findall(r'<div class="tbl"( tabindex="0" role="region" aria-label="([^"]*)")?>', _tg2)
 ok3("\U0001f534 #15 the three tables that scroll on a phone (T3 sources, T6 words, T8 sources) are named regions with tabindex 0, the other two plain; a ring on focus",
@@ -920,10 +923,12 @@ for _nm, _pg, _roles in (("the user guide", src, True), ("the technical guide", 
         and "#nav{position:static;width:auto}" in _pg and "#nav{max-height" not in _pg and "#nav{overflow" not in _pg, str(_m9 and _m9.group(0)[:160]))
     ok3("decision 10 (%s): at a desk the skip link is off the top of the column until it has the focus (transform, then an outline), and the focused text draws no ring of its own" % _nm,
         ".skip{position:absolute;left:8px;top:8px;z-index:9;" in _pg and "transform:translateY(-200%)}" in _pg
-        and ".skip:focus{transform:none;outline:2px solid #FF8C14;outline-offset:2px}" in _pg and "main:focus{outline:0}" in _pg)
+        # NARROWED 24 Nov 2026 (the own look): the ring is the sign blue (orange is the brand only, never a control's)
+        and ".skip:focus{transform:none;outline:2px solid var(--blue);outline-offset:2px}" in _pg and "main:focus{outline:0}" in _pg)
     ok3("decision 10 (%s): '↑ top' is a 44 px box on a phone (inline-flex, min 44 × 44), unchanged at a desk" % _nm,
         "#top{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}" in _pg.split("@media (max-width:900px){.skip")[1].split("\n")[0]
-        and "#top{position:fixed;right:18px;bottom:18px;background:var(--navy);color:#fff;text-decoration:none;padding:8px 12px;border-radius:20px;font-size:12px}" in _pg)
+        # NARROWED 24 Nov 2026 (the own look): the one 6 px corner, no pill
+        and "#top{position:fixed;right:18px;bottom:18px;background:var(--navy);color:#fff;text-decoration:none;padding:8px 12px;border-radius:6px;font-size:12px}" in _pg)
     if _roles:
         ok3("decision 10 (%s): the role buttons and the troubleshooting questions are 44 px on a phone" % _nm,
             "#roles button{min-height:44px}" in _pg.split("@media (max-width:900px){.skip")[1].split("\n")[0]
@@ -1003,13 +1008,16 @@ for _nm, _pg in (("user guide", src), ("technical guide", _tg2)):
             continue
         ok("🔴 UI fix 8 (%s): the %s box's title is a hex colour (not a light token) at 4.5:1 or more on its box" % (_nm, _kind),
            _fg.group(1).startswith("#") and _ratio(_fg.group(1), _bg.group(1)) >= 4.5)
-    ok("⭐ UI fix 8 (%s): the note title #1D4ED8 (6.05:1) and the warn title #B91C1C (5.91:1); the borders keep the tokens" % _nm,
-       ".callout.note{background:#EEF4FB;border-color:var(--blue)}.callout.note .ct{color:#1D4ED8}" in _css
+    # NARROWED 24 Nov 2026 (the own look): the note box is the sign blue's 6 % wash, its title the sign blue (7.24:1)
+    ok("⭐ UI fix 8 (%s): the note title #0B4EA2 (7.24:1) and the warn title #B91C1C (5.91:1); the borders keep the tokens" % _nm,
+       ".callout.note{background:#F0F4F9;border-color:var(--blue)}.callout.note .ct{color:#0B4EA2}" in _css
+       and round(_ratio("#0B4EA2", "#F0F4F9"), 2) == 7.24
        and ".callout.warn{background:#FDF2F5;border-color:var(--red)}.callout.warn .ct{color:#B91C1C}" in _css)
     ok("🔴 UI fix 8 (%s): no callout title or h3 is drawn in var(--blue) / var(--red) / var(--green) any more" % _nm,
        not re.search(r"\.ct\{color:var\(--(blue|red|green)\)\}|h3\{color:var\(--blue\)", _css))
-    ok("⭐ UI fix 8 (%s, card 4): h3 headings #1D4ED8 on white, 6.70:1" % _nm,
-       "h3{color:#1D4ED8;font-size:16px;margin:22px 0 6px}" in _css and round(_ratio("#1D4ED8", "#FFFFFF"), 2) == 6.70)
+    # NARROWED 24 Nov 2026 (the own look): the sign blue marks links and what is chosen only, so h3 is the ink like h1 and h2
+    ok("⭐ UI fix 8 (%s, card 4): h3 headings in the ink #1F2024 on white, 16 or more to 1" % _nm,
+       "h3{color:var(--deep);font-size:16px;margin:22px 0 6px}" in _css and "--deep:#1F2024;" in _css and _ratio("#1F2024", "#FFFFFF") >= 16)
     ok("UI fix 8 (%s): the guide still has no Dark look, so the light pairs are the only pairs" % _nm,
        "prefers-color-scheme" not in _pg and 'data-theme' not in _pg)
 ok("UI fix 8: the user guide's green box title (unused today) is #047857, 4.85:1 on its box",
@@ -1586,5 +1594,35 @@ _h35 = _h35[_h35.index('<h2 id="3-5-clp-monitoring">'):_h35.index('<h1 id="4-sub
 ok("CLP RECORDED TONNES: guide 3.5 lists 'Planned and recorded tonnes' first, as typed on Account, never zero, never a lorry count",
    _h35.index("<strong>Planned and recorded tonnes</strong>") < _h35.index("<strong>Routes against their planning cap</strong>")
    and "tonnes typed on Account" in _h35 and "not recorded, never zero" in _h35 and "never a lorry count" in _h35)
+# ⭐ 24 Nov 2026 (the own look, claude/own-look-pages; notes\design-language-1123.md): both guides carry the look the app
+# took in claude/own-look-tokens — Sora for headings, IBM Plex Sans for the rest, neutral greys made from the ink, the
+# sign blue #0B4EA2 for links, the "↑ top" button and what is chosen, one 6 px corner (3 px for inline code), no pill.
+# The ceilings below may only come down. The guides still have no Dark look. Group A owns the Appearance passage (the look
+# picker) in the user guide: it is left word for word here.
+for _nm, _pg in (("user guide", src), ("technical guide", _tg2)):
+    _cs = _pg[:_pg.index("</style>")]
+    ok("OWN LOOK (%s): the page loads Sora and IBM Plex Sans and no Inter; the text is IBM Plex Sans, the headings Sora" % _nm,
+       "family=Sora:wght@500;600;700&family=IBM+Plex+Sans:" in _pg and not re.search(r"\bInter\b", _cs)
+       and "font:15px/1.6 'IBM Plex Sans'," in _cs and "h1,h2,h3,h4,#nav .brand{font-family:Sora," in _cs)
+    ok("🔴 OWN LOOK (%s): no stock blue (#2563EB, #3B82F6, #1D4ED8) and no slate grey (#64748B, #E2E8F0, #F8FAFC, #1E293B) — ceiling 0" % _nm,
+       not re.search(r"#(2563EB|3B82F6|1D4ED8|64748B|E2E8F0|F8FAFC|1E293B|F7FBFF|EEF1F5|F5F7FA)\b", _cs, re.I))
+    ok("OWN LOOK (%s): the tokens are the app's: the sign blue, the ink, the caption grey, the line and the panel" % _nm,
+       "--navy:#0B4EA2;" in _cs and "--blue:#0B4EA2;" in _cs and "--ink:#1F2024;" in _cs and "--grey:#62656B;" in _cs
+       and "--line:#E1E2E4;" in _cs and "--panel:#F5F5F6}" in _cs and "a{color:var(--navy)}" in _cs
+       and round(_ratio("#62656B", "#FFFFFF"), 2) == 5.84 and round(_ratio("#62656B", "#F5F5F6"), 2) == 5.36 and round(_ratio("#0B4EA2", "#FFFFFF"), 2) == 8.0)
+    _rad = sorted(set(re.findall(r"border-radius:([0-9.]+px)", _cs)))
+    ok("🔴 OWN LOOK (%s): one corner — every border-radius is 6 px or 3 px (no 8, 16, 20 px), no 999px (ceiling 0)" % _nm,
+       set(_rad) <= {"6px", "3px"} and "999px" not in _pg)
+    ok("🔴 OWN LOOK (%s): orange is the brand only — the contents' rule under the mark, nowhere on a control" % _nm,
+       _cs.count("#FF8C14") == 1 and "border-right:2px solid #FF8C14}" in _cs)
+    ok("OWN LOOK (%s): table heads are ruled, not filled (ink words over a 2 px ink line)" % _nm,
+       "th{background:#fff;color:var(--deep);text-align:left;padding:7px 9px;font-weight:600;border-bottom:2px solid var(--deep)}" in _cs
+       and "th{background:var(--navy)" not in _cs)
+ok("OWN LOOK (user guide): a chosen role or question is the sign blue's tint with blue words, never a fill (6.80:1); no small capital label",
+   '#roles button[aria-pressed="true"]{background:rgba(11,78,162,.10);border-color:var(--navy);color:var(--navy);font-weight:600}' in src
+   and '.ts-q button[aria-expanded="true"]{border-color:var(--navy);background:rgba(11,78,162,.10);color:var(--navy);font-weight:600}' in src
+   and "text-transform:uppercase" not in src[:src.index("</style>")] and round(_ratio("#0B4EA2", "#E7EDF6"), 2) == 6.8)
+ok("OWN LOOK (user guide): Group A's Appearance passage (the look picker) is still there, word for word, for its own branch to change",
+   "<li><strong>Appearance</strong> — the round, half-filled button picks the look: <strong>Ink</strong> (the default)" in src)
 print("test_help.py: %d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

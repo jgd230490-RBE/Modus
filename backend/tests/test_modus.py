@@ -895,11 +895,18 @@ ok("overlay.js computes the grid scale from the data's latitude, not a constant"
 # joins the old list because a grep showed it gone from every shipped file.
 OLD = ("#003787", "#0A1446", "#3398DB", "#BF2E55", "#039E86", "#FFC101", "#0F172A")
 NEW = ("#1F2024", "#2563EB")
+# 24 Nov 2026 (the own look): NARROWED, not removed. On the three pages a person reads (the app, the map page, the user
+# guide) the accent is the sign blue #0B4EA2; the stock blue is on the design language's banned list for a control and
+# the guide no longer carries it at all. map/config.js still holds the 29 Sep blue for the map's own colours, so its
+# pair is the old one.
+NEW_LOOK = ("#1F2024", "#0B4EA2")
 for rel in ("frontend/index.html", "map/index.html", "map/config.js", "frontend/help/index.html"):
     src = read(rel)
     ok(f"{rel}: none of the old palette", not any(h.lower() in src.lower() for h in OLD),
        str([h for h in OLD if h.lower() in src.lower()]))
-    ok(f"{rel}: the Wayscope ink and accent", all(h.lower() in src.lower() for h in NEW))
+    want = NEW if rel == "map/config.js" else NEW_LOOK
+    ok(f"{rel}: the Wayscope ink and accent", all(h.lower() in src.lower() for h in want),
+       str([h for h in want if h.lower() not in src.lower()]))
 for rel in ("backend/export.py",):
     src = read(rel)
     ok(f"{rel}: none of the old palette", not any(h.lower() in src.lower() for h in OLD))
