@@ -107,6 +107,8 @@ ok("6 place: sentence case a part, the words unchanged: placeWords capitalises e
      return placeWords("Track · commit week") === "Track · Commit week" && placeWords("May 2026 – May 2027 · approved") === "May 2026 – May 2027 · Approved"
        && placeWords("Plan") === "Plan" && placeWords(undefined) === undefined; })());
 ok("6 place: no capitals, monospace or letter-spacing on the place line", !/\.kicker\{[^}]*(monospace|uppercase|letter-spacing)/.test(css));
+// 24 Nov 2026: the old dot before the place line goes (the brief: "not capitals with a dot"); the mark replaces it
+ok("6 place: no dot before the place line (the mark is its only sign)", !/\.kicker::before/.test(css));
 // ---------------------------------------------------------------- stage 7: small bars beside a status are ink
 ok("7 bars: the Dashboard's week bars and the gates' peak bars (and their key) are ink in every state; no amber or red bar fill",
    code.includes('background: "var(--ink)" }} /></div>') && !code.includes('tone || "var(--green)"') && !/<Bar [^>]*tone=/.test(code)
@@ -133,6 +135,7 @@ const CEIL = {
   roundedXlBox: 0,         // "rounded-xl border" section boxes in the markup
   roundedLgBox: 52,        // "rounded-lg border" boxes: notices, form sub-panels and segmented controls, not sections (listed for John)
   cssBoxes: 16,            // stylesheet rules with a 1 px line border AND the 6 px corner (controls, the sign-in card, the tablet cards)
+  smallCaps: 18,  // capital labels left (the rail's groups and the demo bar, kept; menus' heads, notices' heads: listed for John)
 };
 const radiiNow = [...new Set((css.match(/border-radius:[^;}"]*/g) || []).map(r => r.slice(14).trim()))];
 const now = {
@@ -144,11 +147,14 @@ const now = {
   roundedXlBox: count(code, /rounded-xl border/g),
   roundedLgBox: count(code, /rounded-lg border/g),
   cssBoxes: count(css, /\n  [^\n{]*\{[^}]*border:1px solid var\(--line\)[^}]*border-radius:6px[^}]*\}/g),
+  smallCaps: count(css, /text-transform:uppercase/g) + count(code, /[" ]uppercase[ "]/g),
 };
 for (const k of Object.keys(CEIL)) ok(`9 ceiling: ${k} ${now[k]} ≤ ${CEIL[k]} (may only come down)`, now[k] <= CEIL[k], { now: now[k], ceiling: CEIL[k] });
 ok("9 ceiling: the ceilings themselves are at or under the branch's measured figures (a raised ceiling fails here first)",
    CEIL.cornerSizes <= 9 && CEIL.css999 === 0 && CEIL.inline999 <= 1 && CEIL.tintedStatus === 0 && CEIL.boxedFigureTiles === 0 && CEIL.roundedXlBox === 0
-   && CEIL.roundedLgBox <= 52 && CEIL.cssBoxes <= 16);
+   && CEIL.roundedLgBox <= 52 && CEIL.cssBoxes <= 16 && CEIL.smallCaps <= 18);
+// 24 Nov 2026: the Best option card's eyebrow in sentence case, as the third mockup draws it (".ey": 12 px, muted, no capitals)
+ok("5 best option: the card's eyebrow is not small capitals", /\n  \.bo-eye\{(?![^}]*(uppercase|letter-spacing))[^}]*\}/.test(css));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);
