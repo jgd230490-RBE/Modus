@@ -8481,6 +8481,21 @@ ok("BUSY HOURS (Q16): the flow lanes and the busiest roads stay on the main road
      !/color:#(6b7280|64748b|475569|374151)\b/i.test(code));
   ok("OWN LOOK (map): a popup's title written by script reads the ink token, never config's fixed ink (in Dark it vanished on the dark card)",
      !/COLORS\.brandDark/.test(html) && (html.match(/<h4 style="margin:0 0 4px;color:var\(--ink\);/g) || []).length === 4);
+  // 24 Nov 2026: three filled buttons kept white words on var(--navy), which is #8AB4F8 in Dark (2.11:1): a fill that turns with the
+  // look carries words that turn with it (var(--action-fg)), in the page's CSS and in what script writes.
+  {
+    const tokBg = /background(-color)?:\s*var\(--(navy|blue|action)\)/i, white = /(^|[;{\s"'`])color:\s*(#fff\b|#ffffff\b|white\b|#F8FAFC\b|#FAFAF9\b|rgba\(255,\s?255,\s?255)/i;
+    const badCss = rules.filter(r => tokBg.test(r.body) && white.test(r.body)).map(r => r.sel);
+    const badInline = (html.match(/style=(["'])[^"']*\1/g) || []).filter(x => tokBg.test(x) && white.test(x));
+    ok("⭐ OWN LOOK (map): no fill in the sign blue or the action colour carries white words (in Dark that fill is light): it reads var(--action-fg)",
+       badCss.length === 0 && badInline.length === 0
+       && html.includes(".rb-popup-btn{ margin-top:10px; width:100%; background:var(--action); color:var(--action-fg);")
+       && html.includes(".tl-btn{ border:none; background:var(--action); color:var(--action-fg);")
+       && html.includes(".secsel-btn.secsel-copy, .secsel-btn.secsel-sum-btn{ background:var(--action); border-color:var(--action); color:var(--action-fg); }"),
+       badCss.concat(badInline).join(" | "));
+    ok("OWN LOOK (map): the Guide button's hover is the sign-blue tint, not a fixed pale blue under words that turn light in Dark",
+       html.includes("#guide-btn:hover{background:var(--navy-soft);}") && !/#guide-btn:hover\{background:#/i.test(html));
+  }
   // the figures bar: one ruled strip at a desk
   ok("⭐ OWN LOOK (map): the figures bar is one ruled strip at a desk: a hairline between every figure, the group line folded in, one label weight",
      html.includes("#kpi-cards .kpi-card{ display:flex; flex-direction:column; justify-content:center; padding:0 10px; border-left:1px solid var(--line); }")

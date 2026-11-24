@@ -535,7 +535,7 @@
 
         .mapboxgl-popup-content { border-radius:6px !important; border:1px solid var(--line) !important; padding:13px 14px !important; box-shadow:0 8px 28px rgba(16,24,40,.14) !important; font-family:var(--f-text) !important; }
         .mapboxgl-popup-content h3, .mapboxgl-popup-content h4{ font-family:var(--f-head); }
-        .rb-popup-btn{ margin-top:10px; width:100%; background:var(--navy); color:#fff; border:none; padding:8px; border-radius:6px; font-weight:600; font-size:12px; cursor:pointer; }
+        .rb-popup-btn{ margin-top:10px; width:100%; background:var(--action); color:var(--action-fg); border:none; padding:8px; border-radius:6px; font-weight:600; font-size:12px; cursor:pointer; }
 
         /* Bottom drawer: route analysis + forecast detail */
         #route-drawer{ position:absolute; left:300px; right:0; bottom:0; z-index:20; background:var(--surface); border-top:1px solid var(--line); box-shadow:0 -8px 28px rgba(16,24,40,.10); transform:translateY(100%); transition:transform .28s ease, visibility 0s linear .28s; visibility:hidden; height:46vh; max-height:46vh; display:flex; flex-direction:column; }
@@ -709,7 +709,7 @@
         #timeline-bar input[type=range]{ width:250px; flex:1 1 250px; min-width:90px; accent-color:var(--navy); cursor:pointer; }
         #timeline-bar{ max-width:calc(100vw - 36px); }
         #timeline-bar .tl-btn, #timeline-bar .tl-close{ flex:0 0 auto; }
-        .tl-btn{ border:none; background:var(--navy); color:#fff; width:30px; height:30px; border-radius:6px; cursor:pointer; font-size:12px; }
+        .tl-btn{ border:none; background:var(--action); color:var(--action-fg); width:30px; height:30px; border-radius:6px; cursor:pointer; font-size:12px; }
         .tl-close{ border:none; background:none; color:var(--muted); cursor:pointer; font-size:15px; }
         /* 15 Sep — the label OVERLAPPED the speed select. It had min-width:190px and
            white-space:nowrap but no flex sizing, so as a flex item it shrank to exactly
@@ -950,7 +950,7 @@
         .secsel-btns{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
         .secsel-btn{ min-height:32px; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--navy-deep); font:600 14px var(--f-text); cursor:pointer; }
         .secsel-btn:hover{ background:var(--surface-2); }
-        .secsel-btn.secsel-copy, .secsel-btn.secsel-sum-btn{ background:var(--navy); border-color:var(--navy); color:#fff; }
+        .secsel-btn.secsel-copy, .secsel-btn.secsel-sum-btn{ background:var(--action); border-color:var(--action); color:var(--action-fg); }
         .secsel-ctrl-btn::before{ content:""; display:block; width:14px; height:12px; margin:auto; border:2px dashed #1F2024; border-radius:3px; }
         .secsel-ctrl-btn[aria-pressed="true"]{ background:var(--navy-soft) !important; }
         .secsel-rect{ position:absolute; border:2px dashed #1D4ED8; background:rgba(29,78,216,.06); pointer-events:none; z-index:5; }
@@ -1209,7 +1209,7 @@
             /* H10 (8 Oct 2026): the map's guide — demo tenant only, in-page, no library. */
             /* 22 Oct 2026 (UI fix 6, card 8): 14 px in a 21 px box like the app bar's Guide, an inset ring for the border (was 11.5 px, 4 px 12 px padding) */
             #guide-btn{position:absolute;left:calc(50% + 110px);top:9px;z-index:30;background:var(--surface);color:var(--navy-deep);border:0;border-radius:6px;height:21px;padding:0 10px;font:600 14px/21px var(--f-text);cursor:pointer;box-shadow:inset 0 0 0 1px var(--line),0 2px 8px rgba(16,24,40,.12);}
-            #guide-btn:hover{background:#eff6ff;}
+            #guide-btn:hover{background:var(--navy-soft);}
             /* 22 Oct 2026 (UI fix 6, card 8, review): on a touch screen the 21 px Guide keeps a 44 px tap area through an
                invisible ::after, like the app bar's Guide (decision 9); the visible pill is unchanged */
             @media (pointer:coarse){ #guide-btn::after{content:"";position:absolute;inset:-12px -8px;} }
