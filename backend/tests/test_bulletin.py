@@ -2048,7 +2048,63 @@ ok("⭐ W15 Inter in the PDFs (embedded TrueType subsets): every piece of text t
    b"Inter-Bold" in PDF10B and b"/FontFile2" in PDF10B and _SF and all(b"+" in f for f in _SF), str(_SF))
 ok("⭐ W15 the logo is VECTOR: drawn from the brand SVG master, no image in an offline newsletter (the map is a schematic too)",
    b"/Subtype /Image" not in PDF10B and len(brand_pdf.logo_shapes()[1]) == 9
-   and brand_pdf.logo_shapes()[0] == [15.0, 84.0, 1380.39, 263.0])
+   # REVERSED 24 Nov 2026 (John's yes to the logo's cut top dot, notes\logo-top-dot-mockup-1124): the frame's top was
+   # 84.0, which cut 9 of the first dot's 30 units; it is the same frame moved up so the mark sits in its middle
+   and brand_pdf.logo_shapes()[0] == [15.0, 72.27, 1380.39, 263.0])
+
+
+# 24 Nov 2026 — every logo file keeps its whole drawing inside its own frame. The tight files' frame started at y 84 while
+# the first dot starts at 75 (about a pixel of the dot cut in every header), and the tall files' frame ended 3.8 units
+# above the tails of the "y" and the "p". A browser clips an <img> at the frame; the PDFs do not, which hid it there.
+def _logo_ink(name):
+    """(viewBox, [x0, y0, x1, y1]) of a brand SVG: the box of everything it draws, half the line's width included."""
+    vb, shapes = brand_pdf.logo_shapes(name)
+    xs, ys = [], []
+    for sh in shapes:
+        half = sh["width"] / 2 if sh["stroke"] else 0.0
+        if sh["kind"] == "circle":
+            cx_, cy_, r_ = sh["circle"]
+            xs += [cx_ - r_ - half, cx_ + r_ + half]; ys += [cy_ - r_ - half, cy_ + r_ + half]
+            continue
+        cur = None
+        for sg in sh["segs"]:
+            if sg[0] in ("M", "L"):
+                pts = [(sg[1], sg[2])]; cur = pts[0]
+            elif sg[0] == "C" and cur is not None:
+                (a, b), (c1x, c1y), (c2x, c2y), (ex, ey) = cur, (sg[1], sg[2]), (sg[3], sg[4]), (sg[5], sg[6])
+                pts = []
+                for k in range(1, 25):                       # the curve itself, not its handles
+                    t = k / 24; u = 1 - t
+                    pts.append((u ** 3 * a + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t ** 3 * ex,
+                                u ** 3 * b + 3 * u * u * t * c1y + 3 * u * t * t * c2y + t ** 3 * ey))
+                cur = (ex, ey)
+            else:
+                continue
+            xs += [q[0] - half for q in pts] + [q[0] + half for q in pts]
+            ys += [q[1] - half for q in pts] + [q[1] + half for q in pts]
+    return vb, [min(xs), min(ys), max(xs), max(ys)]
+
+
+_LOGO_FILES = ("mark", "logo-header-on-dark", "logo-header-on-light", "logo-header-mono-white",
+               "logo-stacked-on-dark", "logo-stacked-on-light")
+_LOGO_OUT = {}
+for _n in _LOGO_FILES:
+    _vb, _ink = _logo_ink(_n)
+    _over = [round(v, 2) for v in (_vb[0] - _ink[0], _vb[1] - _ink[1], _ink[2] - (_vb[0] + _vb[2]), _ink[3] - (_vb[1] + _vb[3]))]
+    if max(_over) > 0.05:
+        _LOGO_OUT[_n] = _over                               # how far the drawing runs past the left, top, right, bottom
+ok("🔴 every logo file draws inside its own frame: no dot, line or letter is cut where a page shows the file",
+   not _LOGO_OUT, str(_LOGO_OUT))
+_mvb, _mink = _logo_ink("mark")
+ok("the mark sits in the middle of its frame: the same room above the first dot as under the W (it sat 12 units high)",
+   abs((_mink[1] - _mvb[1]) - (_mvb[1] + _mvb[3] - _mink[3])) < 0.1 and 2.5 < _mink[1] - _mvb[1] < 3.0,
+   f"above {_mink[1] - _mvb[1]:.2f}, below {_mvb[1] + _mvb[3] - _mink[3]:.2f}")
+ok("the frame kept its size, so no page's stated logo width or height changes (1380.39 x 263, the mark 563 x 263)",
+   brand_pdf.logo_shapes()[0][2:] == [1380.39, 263.0] and brand_pdf.logo_shapes("mark")[0][2:] == [563.0, 263.0])
+ok("the landing site's two logo files are the app's, byte for byte",
+   all(open(os.path.join(ROOT, "landing", "assets", f + ".svg"), "rb").read()
+       == open(os.path.join(ROOT, "frontend", "brand", f + ".svg"), "rb").read()
+       for f in ("logo-header-on-dark", "logo-header-on-light")))
 _ofl = read("backend/fonts/Inter-OFL.txt")
 ok("🔴 the OFL ships beside the fonts (the licence's condition), three static TrueType files, no Reserved Font Name claimed",
    "SIL Open Font License, Version 1.1" in _ofl and "Copyright (c) 2016 The Inter Project Authors" in _ofl
