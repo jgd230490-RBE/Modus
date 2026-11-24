@@ -483,7 +483,8 @@ if (loaded) {
     // Approved-only default: the Pending IPT2 line is not in the default view
     ok("...the default view is Approved only (the Pending line is filtered out; the status select says so)",
       // 13 Oct 2026 (W3, narrowed): the scope is said once, in the kicker ("· approved"); the subtitle that repeated it is gone
-      dOut.includes(" · approved<") && !dOut.includes("approved only") && !dOut.includes(">R4<"));
+      // NARROWED 24 Nov 2026 (own look, B1 stage 6): the place line is in sentence case a part ("· Approved")
+      dOut.includes(" · Approved<") && !dOut.includes("approved only") && !dOut.includes(">R4<"));
     const rowsFix = cl.lines.map(l => ({ route_id: l.route_id, discipline: l.discipline, section_id: l.section_id, month_index: l.month_index,
       quantity: l.quantity, unit: l.unit, status: l.status, ipt: l.ipt, material_type: l.material_type, material_description: null,
       vehicle_type: l.vehicle_type, submitted_by: "tester", reject_reason: null }));

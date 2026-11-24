@@ -97,6 +97,16 @@ ok("5 sections: the Best option card opens under a 2 px ink line and its notes a
 ok("5 sections: no rounded bordered section box is left in the markup (bg-white rounded-xl border), the dialog's own box aside; the Tailwind sections are .ruled",
    !/rounded-xl border/.test(code) && count(code, /className=\{?"ruled /g) >= 5 && css.includes(".ruled{background:none !important;border:0 !important;border-top:1px solid var(--ink) !important;"));
 ok("5 sections: Routes' open route is columns divided by a hairline", css.includes(".ro-body.ro-wide>.ro-side{border-left:1px solid var(--line);padding-left:16px;}"));
+// ---------------------------------------------------------------- stage 6: the place line
+ok("6 place: the place line is the mark (/brand/mark.svg, 12 px, hidden from readers) and the place, in the text face and the caption grey",
+   code.includes('<img className="kicker-mark" src="/brand/mark.svg" alt="" aria-hidden="true" />{placeWords(kicker)}')
+   && css.includes(".kicker{display:flex;align-items:center;gap:7px;font:400 12px/1.4 var(--f-text);color:var(--muted);margin-bottom:4px;}")
+   && css.includes(".kicker-mark{height:12px;width:auto;flex:none;}"));
+ok("6 place: sentence case a part, the words unchanged: placeWords capitalises each part's first letter and nothing else",
+   (() => { const m = code.match(/function placeWords\(k\)\{[^\n]*\}/); if (!m) return false; const placeWords = new Function("return " + m[0])();
+     return placeWords("Track · commit week") === "Track · Commit week" && placeWords("May 2026 – May 2027 · approved") === "May 2026 – May 2027 · Approved"
+       && placeWords("Plan") === "Plan" && placeWords(undefined) === undefined; })());
+ok("6 place: no capitals, monospace or letter-spacing on the place line", !/\.kicker\{[^}]*(monospace|uppercase|letter-spacing)/.test(css));
 ok("3 tags: no NUL byte or other control character crept into the page", !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(html));
 
 console.log(`own_look_shape.js: ${pass} passed, ${fail.length} failed`);

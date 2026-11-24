@@ -285,7 +285,10 @@ catch(e){d.setAttribute("data-theme","ink");}})();</script>
   .rail-search kbd{font:12px ui-monospace,Consolas,monospace;white-space:nowrap;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;}
   .rail-search:focus-within{outline:2px solid var(--action);outline-offset:1px;border-color:var(--action);}   /* 17 Oct 2026 (UI audit #16): the input has outline:0, so the ring goes on the label that frames it — the same ring as .auth-input:focus */
   .nav-ic{width:18px;height:18px;flex:none;}
-  .kicker{font:600 12px ui-monospace,'SF Mono',Consolas,'Liberation Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--action);margin-bottom:4px;}
+  /* 24 Nov 2026 (own look, B1 item 6; John's yes to the mockups): the place line is the mark and the place in sentence case
+     ("Track · Commit week"), in the caption grey, the text face: no capitals, no monospace, no letter-spacing, no orange words. */
+  .kicker{display:flex;align-items:center;gap:7px;font:400 12px/1.4 var(--f-text);color:var(--muted);margin-bottom:4px;}
+  .kicker-mark{height:12px;width:auto;flex:none;}
   .kicker::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--action);margin-right:8px;vertical-align:1px;}
   .rail-count{font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;}
   /* TABLET-RAIL — 10 Nov 2026 (UI critique finding 3, John's decision 2; wave 4 card 1): a folded rail keeps its counts as
@@ -8577,11 +8580,13 @@ function SitesMenu({ locList, sites, onChange }){
 }
 
 // One header for every page: title, one line of purpose, actions on the right.
+// the place line's words: each part after a " · " starts with a capital (sentence case per part), the words unchanged
+function placeWords(k){ return typeof k === "string" ? k.split(" · ").map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(" · ") : k; }
 function PageHeader({ title, subtitle, actions, children, kicker }){
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 mb-5" data-guide="page-header">
       <div className="min-w-0">
-        {kicker && <div className="kicker">{kicker}</div>}
+        {kicker && <div className="kicker"><img className="kicker-mark" src="/brand/mark.svg" alt="" aria-hidden="true" />{placeWords(kicker)}</div>}
         <h2 className="text-[26px] font-bold text-[color:var(--navy-deep)] tracking-tight leading-tight">{title}</h2>
         {subtitle && <p className="text-sm text-slate-500 mt-0.5 max-w-3xl">{subtitle}</p>}
         {children}

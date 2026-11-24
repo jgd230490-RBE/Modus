@@ -2076,9 +2076,12 @@ ok("AL2: the row's text actions (Edit, Draw the route, Approve…, Delete) and t
   ok("the rail search filters the pages in place, Enter opens the first match, Ctrl K focuses it",
     code.includes('placeholder="Find a page…"') && code.includes("g.items.filter(navMatch)") && code.includes("if(e.key === \"Enter\" && navFirst){ setPage(navFirst.id); setNavQ(\"\"); }")
     && code.includes('(e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")'));
-  ok("PageHeader takes a monospace kicker; the four rebuilt pages pass one",
-    code.includes("function PageHeader({ title, subtitle, actions, children, kicker })") && code.includes('{kicker && <div className="kicker">{kicker}</div>}')
-    && /\.kicker\{font:600 12px ui-monospace,/.test(html)
+  // REVERSED 24 Nov 2026 (own look, B1 stage 6; John's yes to the mockups): the place line is the mark and the place in
+  // sentence case, the text face in the caption grey: no monospace, no capitals, no letter-spacing
+  ok("PageHeader takes a place line (the mark and the place in sentence case); the four rebuilt pages pass one",
+    code.includes("function PageHeader({ title, subtitle, actions, children, kicker })")
+    && code.includes('{kicker && <div className="kicker"><img className="kicker-mark" src="/brand/mark.svg" alt="" aria-hidden="true" />{placeWords(kicker)}</div>}')
+    && /\.kicker\{display:flex;align-items:center;gap:7px;font:400 12px\/1\.4 var\(--f-text\);color:var\(--muted\);/.test(html) && !/\.kicker\{[^}]*(monospace|uppercase|letter-spacing)/.test(html)
     && ['<PageHeader title="Dashboard" kicker=', '<PageHeader title="Forecasts" kicker="Plan"', '<PageHeader title="Configuration" kicker="Data"', '<PageHeader title="Look-ahead" kicker='].every(t => code.includes(t)));
   // NARROWED 24 Nov 2026 (own look, B1 stage 4): the strip is ruled, not boxed: a 2 px ink line on top, a hairline under
   ok("the Dashboard's six figures sit in one ruled strip, and Big screen is the orange action button",
